@@ -239,7 +239,7 @@ achieve this on client side and concrete implementation is not part of this RFC.
 
 #### Examples
 
-1. Create Audio+Video `sendrecv` p2p `Peer`.
+1\. Create Audio+Video `sendrecv` p2p `Peer`.
 
 ```json
 {
@@ -254,9 +254,7 @@ achieve this on client side and concrete implementation is not part of this RFC.
         },
         "direction": {
           "Send": {
-            "receivers": [
-              2
-            ]
+            "receivers": [ 2 ]
           }
         }
       },
@@ -267,9 +265,7 @@ achieve this on client side and concrete implementation is not part of this RFC.
         },
         "direction": {
           "Send": {
-            "receivers": [
-              2
-            ]
+            "receivers": [ 2 ]
           }
         }
       },
@@ -321,7 +317,7 @@ Client is expected to:
 After negotiation is done and media starts flowing, client will receive notification that his media is being sent to 
 `Peer { peer_id = 2 }`, and he is receiving media from `Peer { peer_id = 2 }`.
 
-2. Create Audio `send` to SFU `Peer`.
+2\. Create Audio `send` to SFU `Peer`.
 
 ```json
 {
@@ -390,9 +386,7 @@ to do any request related stuff that Server needs to do, and distinguish between
 
 ```json
 {
-  "peer_ids": [
-    1, 2, 3
-  ]
+  "peer_ids": [ 1, 2, 3 ]
 }
 ```
 
@@ -453,7 +447,7 @@ Assuming such `Peer` exists on Clients end:
 
 Meaning that media is being published to server but has no actual receivers.
 
-1. Server notifies Client that video is being received by other `Peer {peer_id = 2}`.
+1\. Server notifies Client that video is being received by other `Peer {peer_id = 2}`.
 
 Server => Client
 
@@ -468,9 +462,7 @@ Server => Client
       },
       "direction": {
         "Send": {
-          "receivers": [
-            2
-          ]
+          "receivers": [ 2 ]
         }
       }
     },
@@ -481,9 +473,7 @@ Server => Client
       },
       "direction": {
         "Send": {
-          "receivers": [
-            2
-          ]
+          "receivers": [ 2 ]
         }
       }
     }
@@ -491,7 +481,7 @@ Server => Client
 }
 ```
 
-2. Client wants to unsubscribe `Peer {peer_id = 2}` from specified tracks.
+2\. Client wants to unsubscribe `Peer {peer_id = 2}` from specified tracks.
 
 Client => Server
 
@@ -654,7 +644,15 @@ enum RemotePeerTrackType {
 }
 ```
 
-Server notifies Client of any remote peers that Client can connect to. This is a key method when talking about Dynamic API mentioned in `Signalling Protocol considerations`. 
+Server notifies Client of any remote peers that Client can connect to. This is a key method when talking about Dynamic 
+API mentioned in `Signalling Protocol considerations`. Any Client's request to subscriber/publish will be based on data
+provided by this request.
+
+Params:
+1. ```remote_peer_id```: if `Some`, then represents specific remote `Peer` associated with some `Member`. If `None`, then represents Servers peer connection.
+2. ```remote_member_id```: if `Some`, then represents specific remote `Member` associated with some . If `None`, then represents Servers peer connection.
+3. ```can_rx```: if `Some` then Client can subscribe to specified media.
+4. ```can_tx```: if `Some` then Client can publish specified media to remote `Peer`.
 
 #### Examples:
 
@@ -678,22 +676,169 @@ Server notifies Client of any remote peers that Client can connect to. This is a
 }
 ```
 
+2. Notify Client that it is possible to publish Audio to specified `Peers`.
+
+```json
+{
+  "peers": [
+    {
+      "peer_id": 2,
+      "member_id": "User2",
+      "can_rx": null,
+      "can_tx": {
+        "Audio": {
+          "audio_settings": {}
+        }
+      }
+    },
+    {
+      "peer_id": 3,
+      "member_id": "User3",
+      "can_rx": null,
+      "can_tx": {
+        "Audio": {
+          "audio_settings": {}
+        }
+      }
+    }
+  ]
+}
+```
+
+Params:
+1. ```remote_peer_id```: if `Some`, then represents specific remote `Peer` associated with some `Member`. If `None`, 
+then represents Servers peer connection (only SFU).
+2. ```remote_member_id```: if `Some`, then represents specific remote `Member`. If `None`, then represents Server's peer 
+connection (only SFU).
+3. ```can_rx```: if `Some` then Client can subscribe to specified media.
+4. ```can_tx```: if `Some` then Client can publish specified media to remote `Peer`.
+
 #### 8. RequestTracks
 
 ```rust
 struct RequestTracks {
-    local_peer_id: Option<u64>,
-    remote_peer_id: u64,
+    peer_id: Option<u64>,
+    remote_peer_id: Option<u64>,
     rx: Option<RemotePeerTrackType>,
     tx: Option<RemotePeerTrackType>,
 }
 ```
 
+Related objects:
 
+```rust
+enum RemotePeerTrackType {
+    Audio {
+        audio_settings: Option<AudioSettings>,
+    },
+    Video {
+        video_settings: Option<VideoSettings>,
+    },
+    AudioVideo {
+        audio_settings: Option<AudioSettings>,
+        video_settings: Option<VideoSettings>,
+    },
+}
+```
+
+Client requests to send or receive media to/from remote peer.
+
+Params:
+1. ```peer_id```: if `Some` then Client wants to connect specified local `Peer` to remote. If `None`then it us to server
+to decide which of Client's `Peers` will be connected.
+2. ```remote_peer_id```: if `Some`, then represents specific remote `Member` associated with some . If `None`, then 
+represents Server's peer connection (only SFU).
+3. ```rx```: if `Some` then Client requests to subscribe to specified media.
+4. ```tx```: if `Some` then Client requests to publish specified media to remote `Peer`.
+
+#### Examples
+
+1\. Client requests to subscribe to remote `Peer {peer_id = 2}` audio and video.
+
+```json
+{
+  "peer_id": 1,
+  "remote_peer_id": 2,
+  "rx": null,
+  "tx": {
+    "AudioVideo": {
+      "audio_settings": {},
+      "video_settings": {}
+    }
+  }
+}
+```
+
+2\. Client requests to publish to Server's peer connection.
+
+```json
+{
+  "peer_id": 1,
+  "remote_peer_id": null,
+  "rx": null,
+  "tx": {
+    "AudioVideo": {
+      "audio_settings": {},
+      "video_settings": {}
+    }
+  }
+}
+```
+
+#### 9. GetMembers, Members
+
+```rust
+struct GetMembers {
+    peer_ids: Vec<u64>,
+}
+```
+
+Client requests `Member` ids.
+
+```rust
+struct Members {
+    members: Vec<Member>
+}
+```
+
+Server provides `Member`'s list according to user request.
+
+It is recommended to cache `Peer` id - `Member` id relation in Web Client. Probably, in two maps: `HashMap<peer_id, member_id>`, `HashMap<member_id, peer_id>`.
+
+#### Examples
+
+1\. Client request `Member`'s that own specified `Peer`'s.
+```json
+{
+  "peer_ids": [
+    2, 3, 4
+  ]
+}
+```
+
+2\. Server provides `Member`'s that own specified `Peers`'s.
+```json
+{
+  "members": [
+    {
+      "member_id": "user_2",
+      "peers": [ 1 ]
+    },
+    {
+      "member_id": "user_2",
+      "peers": [ 2 ]
+    },
+    {
+      "member_id": "user_3",
+      "peers": [ 3, 4 ]
+    }
+  ]
+}
+```
 
 ### Extended examples
 
-#### 1. 1 <=> 1 p2p with unpublish and republish
+#### 1. 1 <=> 1 p2p with unpublish and republish.   
 
 ```
 .----user1----.    .->-->-->--. .----user2----.
@@ -701,7 +846,8 @@ struct RequestTracks {
 '-------------'    '-<--<--<--' '-------------'
 ```
 
-1. Server send `AddPeer` to user1.
+1\. Server send `AddPeer` to user1. 
+
 ```json
 {
   "method": "AddPeer",
@@ -772,8 +918,9 @@ struct RequestTracks {
   }
 }
 ```
+ 
+2\. User1 answers with [SDP Offer]. 
 
-2. User1 answers with [SDP Offer].
 ```json
 {
   "method": "Offer",
@@ -783,8 +930,9 @@ struct RequestTracks {
   }
 }
 ```
+ 
+3\. Server send `AddPeer` with user1 [SDP Offer] to user2.
 
-3. Server send `AddPeer` with user1 [SDP Offer] to user2.
 ```json
 {
   "method": "AddPeer",
@@ -822,9 +970,7 @@ struct RequestTracks {
           },
           "direction": {
             "Send": {
-              "receivers": [
-                1
-              ]
+              "receivers": [ 1 ]
             }
           }
         },
@@ -835,9 +981,7 @@ struct RequestTracks {
           },
           "direction": {
             "Send": {
-              "receivers": [
-                1
-              ]
+              "receivers": [ 1 ]
             }
           }
         }
@@ -856,7 +1000,8 @@ struct RequestTracks {
 }
 ```
 
-3. User2 answers with [SDP Answer]
+4\. User2 answers with [SDP Answer]
+
 ```json
 {
   "method": "Answer",
@@ -867,13 +1012,29 @@ struct RequestTracks {
 }
 ```
 
-4. Both peers exchange discovered [ICE Candidate]'s. TODO
+5\. Both peers exchange discovered [ICE Candidate]'s.
 
 ```json
-
+{
+  "method": "Candidate",
+  "payload": {
+    "peer_id": 1,
+    "candidate": "user1_ice_candidate"
+  }
+}
 ```
 
-5. At this point connection is supposed to be established.
+```json
+{
+  "method": "Candidate",
+  "payload": {
+    "peer_id": 2,
+    "candidate": "user1_ice_candidate"
+  }
+}
+```
+
+6\. At this point connection is supposed to be established.
 
 ```
 .----user1----.    .->-->-->--. .----user2----.
@@ -881,67 +1042,577 @@ struct RequestTracks {
 '-------------'    '-<--<--<--' '-------------'
 ```
 
-6. User1 wants to unpublish his tracks, so he sends `RemoveTracks` Server.
+7\. User1 wants to unpublish his tracks, so he sends `RemoveTracks` Server.
 
 ```json
 {
   "method": "RemoveTracks",
   "payload": {
     "peer_id": 1,
-    "tracks": [
-      1,
-      2
+    "tracks": [1, 2]
+  }
+}
+```
+
+8\. Server updates User2 tracks.
+
+```json
+{
+  "method": "RemoveTracks",
+  "payload": {
+    "peer_id": 2,
+    "tracks": [ 1, 2 ]
+  }
+}
+```
+
+9\. Server approves User1 `RemoveTracks` request.
+
+10\. User1 initiates SDP renegotiation
+
+```
+.----user1----.         .----user2----.
+:             o(1)-<--<-o(2)          :
+'-------------'         '-------------'
+```
+
+11\. Server notifies User1 that he can publish to User2
+
+```json
+{
+  "method": "RemotePeer",
+  "payload": {
+    "peers": [
+      {
+        "peer_id": 2,
+        "member_id": "user_2",
+        "can_rx": null,
+        "can_tx": {
+          "AudioVideo": {
+            "audio_settings": {},
+            "video_settings": {}
+          }
+        }
+      }
     ]
   }
 }
 ```
 
-7. Server approves 
+12\. Server notifies User2 that he can subscriber to User1.
 
 ```json
+{
+  "method": "RemotePeers",
+  "payload": {
+    "peers": [
+      {
+        "peer_id": 1,
+        "member_id": "user_1",
+        "can_rx": {
+          "AudioVideo": {
+            "audio_settings": {},
+            "video_settings": {}
+          }
+        },
+        "can_tx": null
+      }
+    ]
+  }
+}
+```
 
+13\. User1 requests to publish to User2.
+
+```json
+{
+  "method": "RequestTracks",
+  "payload": {
+    "peer_id": 1,
+    "remote_peer_id": 2,
+    "rx": null,
+    "tx": {
+      "AudioVideo": {
+        "audio_settings": {},
+        "video_settings": {}
+      }
+    }
+  }
+}
+```
+
+14\. Server updates User2 tracks.
+
+```json
+{
+  "method": "UpdateTracks",
+  "payload": {
+    "peer_id": 2,
+    "tracks": [
+      {
+        "id": 1,
+        "media_type": {
+          "Audio": {}
+        },
+        "direction": {
+          "Recv": {
+            "sender": 1
+          }
+        }
+      },
+      {
+        "id": 2,
+        "media_type": {
+          "Audio": {}
+        },
+        "direction": {
+          "Recv": {
+            "sender": 1
+          }
+        }
+      }
+    ]
+  }
+}
+```
+
+15\. Server updates User1 tracks.
+
+```json
+{
+  "method": "UpdateTracks",
+  "payload": {
+    "peer_id": 1,
+    "tracks": [
+      {
+        "id": 1,
+        "media_type": {
+          "Audio": {}
+        },
+        "direction": {
+          "Send": {
+            "receivers": [ 2 ]
+          }
+        }
+      },
+      {
+        "id": 2,
+        "media_type": {
+          "Video": {}
+        },
+        "direction": {
+          "Send": {
+            "receivers": [ 2 ]
+          }
+        }
+      }
+    ]
+  }
+}
+```
+
+16\. SDP Renegotiation
+
+```
+.----user1----.    .->-->-->--. .----user2----.
+:             o(1)=:          :=o(2)          :
+'-------------'    '-<--<--<--' '-------------'
+```
+
+#### 2. 1 => 2 SFU.
+
+```
+                                                       .-------user2------.
+                          .-------SFU-------.    .-->--o      pc_id = 2   :
+.------user1------.       :       .---->----o-->-'     '------------------'
+:     pc_id = 1   o-->-->-o--->---:         :
+'-----------------'       :       '---->----o-->-.     .-------user3------.
+                          '-----------------'    '-->--o      pc_id = 3   :
+                                                       '------------------'
+```
+
+1\. Server requests User1 to create `sendonly` `Peer` passing Server's [SDP Offer].
+
+```json
+{
+  "method": "AddPeer",
+  "payload": {
+    "peer": {
+      "peer_id": 1,
+      "p2p": false,
+      "tracks": [
+        {
+          "id": 1,
+          "media_type": {
+            "Audio": {}
+          },
+          "direction": {
+            "Send": {
+              "receivers": []
+            }
+          }
+        },
+        {
+          "id": 2,
+          "media_type": {
+            "Video": {}
+          },
+          "direction": {
+            "Send": {
+              "receivers": []
+            }
+          }
+        }
+      ]
+    },
+    "sdp_offer": "server_user1_recvonly_offer",
+    "ice_servers": {
+      "urls": [
+        "turn:turnserver.com:3478",
+        "turn:turnserver.com:3478?transport=tcp"
+      ],
+      "username": "turn_user",
+      "credential": "turn_credential"
+    }
+  }
+}
+```
+
+2\. User1 creates peer and answeres with [SDP Answer].
+
+```json
+{
+  "method": "Answer",
+  "payload": {
+    "peer_id": 1,
+    "sdp_answer": "user_1_sendonly_answer"
+  }
+}
+```
+
+3\. Server and User1 exchange [ICE Candidate]'s.
+
+```json
+{
+  "method": "Candidate",
+  "payload": {
+    "peer_id": 1,
+    "candidate": "user1_ice_candidate"
+  }
+}
 ```
 
 ```json
+{
+  "method": "Candidate",
+  "payload": {
+    "peer_id": 1,
+    "candidate": "servers_ice_candidate"
+  }
+}
+```
 
+4\. Connection is established
+
+```
+                          .-------SFU-------.
+.------user1------.       :                 ;
+:     pc_id = 1   o-->-->-o                 :
+'-----------------'       :                 ;
+                          '-----------------'
+```
+
+5\. Server requests User2 to create `recvonly` `Peer` passing Server's [SDP Offer]. 
+
+```json
+{
+  "method": "AddPeer",
+  "payload": {
+    "peer": {
+      "peer_id": 2,
+      "p2p": false,
+      "tracks": [
+        {
+          "id": 1,
+          "media_type": {
+            "Audio": {}
+          },
+          "direction": {
+            "Recv": {
+              "sender": 1
+            }
+          }
+        },
+        {
+          "id": 2,
+          "media_type": {
+            "Video": {}
+          },
+          "direction": {
+            "Recv": {
+              "sender": 1
+            }
+          }
+        }
+      ]
+    },
+    "sdp_offer": "server_user2_sendonly_offer",
+    "ice_servers": {
+      "urls": [
+        "turn:turnserver.com:3478",
+        "turn:turnserver.com:3478?transport=tcp"
+      ],
+      "username": "turn_user",
+      "credential": "turn_credential"
+    }
+  }
+}
+```
+
+6\. User2 answers with [SDP Answer].
+
+```json
+{
+  "method": "Answer",
+  "payload": {
+    "peer_id": 2,
+    "sdp_answer": "user_2_recvonly_answer"
+  }
+}
+```
+
+7\. Server and User2 exchange [ICE Candidate]'s.
+
+```json
+{
+  "method": "Candidate",
+  "payload": {
+    "peer_id": 2,
+    "candidate": "user1_ice_candidate"
+  }
+}
 ```
 
 ```json
+{
+  "method": "Candidate",
+  "payload": {
+    "peer_id": 2,
+    "candidate": "servers_ice_candidate"
+  }
+}
+```
 
+8\. User2 is connected to Server's peer connection.
+
+```
+                                                       .-------user2------.
+                          .-------SFU-------.    .-->--o      pc_id = 2   :
+.------user1------.       :                 o-->-'     '------------------'
+:     pc_id = 1   o-->-->-o-                :
+'-----------------'       :                 :
+                          '-----------------'
+```
+
+9\. Server notifies User1 that he has new subscriber.
+
+```json
+{
+  "method": "UpdateTracks",
+  "payload": {
+    "peer_id": 1,
+    "tracks": [
+      {
+        "id": 1,
+        "media_type": {
+          "Audio": {}
+        },
+        "direction": {
+          "Send": {
+            "receivers": [ 2 ]
+          }
+        }
+      },
+      {
+        "id": 2,
+        "media_type": {
+          "Video": {}
+        },
+        "direction": {
+          "Send": {
+            "receivers": [2]
+          }
+        }
+      }
+    ]
+  }
+}
+```
+
+10\. Server sends User1 `Peer {peer_id = 1 }` media to User2 `Peer {peer_id = 2 }`.
+
+ ```
+                                                        .-------user2------.
+                           .-------SFU-------.    .-->--o      pc_id = 2   :
+ .------user1------.       :         .->-->--o-->-'     '------------------'
+ :     pc_id = 1   o-->-->-o--->-->--'       :
+ '-----------------'       :                 :
+                           '-----------------'
+ ```
+ 
+11\. Server requests User3 to create `recvonly` `Peer` passing Server's [SDP Offer]. 
+
+```json
+{
+  "method": "AddPeer",
+  "payload": {
+    "peer": {
+      "peer_id": 3,
+      "p2p": false,
+      "tracks": [
+        {
+          "id": 1,
+          "media_type": {
+            "Audio": {}
+          },
+          "direction": {
+            "Recv": {
+              "sender": 1
+            }
+          }
+        },
+        {
+          "id": 2,
+          "media_type": {
+            "Video": {}
+          },
+          "direction": {
+            "Recv": {
+              "sender": 1
+            }
+          }
+        }
+      ]
+    },
+    "sdp_offer": "server_user3_sendonly_offer",
+    "ice_servers": {
+      "urls": [
+        "turn:turnserver.com:3478",
+        "turn:turnserver.com:3478?transport=tcp"
+      ],
+      "username": "turn_user",
+      "credential": "turn_credential"
+    }
+  }
+}
+```
+
+12\. User3 answers with [SDP Answer].
+
+```json
+{
+  "method": "Answer",
+  "payload": {
+    "peer_id": 3,
+    "sdp_answer": "user_3_recvonly_answer"
+  }
+}
+```
+
+13\. Server and User3 exchange [ICE Candidate]'s.
+
+```json
+{
+  "method": "Candidate",
+  "payload": {
+    "peer_id": 3,
+    "candidate": "user1_ice_candidate"
+  }
+}
 ```
 
 ```json
+{
+  "method": "Candidate",
+  "payload": {
+    "peer_id": 3,
+    "candidate": "servers_ice_candidate"
+  }
+}
+```
+
+14\. User3 is connected to Server's peer connection.
 
 ```
+                                                       .-------user2------.
+                          .-------SFU-------.    .-->--o      pc_id = 2   :
+.------user1------.       :       .---->----o-->-'     '------------------'
+:     pc_id = 1   o-->-->-o--->---'         :
+'-----------------'       :                 o-->-.     .-------user3------.
+                          '-----------------'    '-->--o      pc_id = 3   :
+                                                       '------------------'
+```
+
+15\. Server notifies User1 that he has new subscriber.
 
 ```json
-
+{
+  "method": "UpdateTracks",
+  "payload": {
+    "peer_id": 1,
+    "tracks": [
+      {
+        "id": 1,
+        "media_type": {
+          "Audio": {}
+        },
+        "direction": {
+          "Send": {
+            "receivers": [ 2,3 ]
+          }
+        }
+      },
+      {
+        "id": 2,
+        "media_type": {
+          "Video": {}
+        },
+        "direction": {
+          "Send": {
+            "receivers": [ 2,3 ]
+          }
+        }
+      }
+    ]
+  }
+}
 ```
 
-```json
+16\. Server sends User1 `Peer {peer_id = 1 }` media to User2 `Peer {peer_id = 3 }`.
 
 ```
+                                                     .-------user2------.
+                          .-------SFU-------.    .->-o      pc_id = 2   :
+.------user1------.       :       .---->----o-->-'   '------------------'
+:     pc_id = 1   o-->-->-o--->---:         :
+'-----------------'       :       '---->----o-->-.   .-------user3------.
+                          '-----------------'    '->-o      pc_id = 3   :
+                                                     '------------------'
+```
 
+## Drawbacks and alternatives
+[drawbacks-and-alternatives]: #drawbacks-and-alternatives
 
-## Drawbacks
-[drawbacks]: #drawbacks
-
-Why should we *not* do this?
-
-
-
-
-## Rationale and alternatives
-[rationale-and-alternatives]: #rationale-and-alternatives
-
-- Why is this design the best in the space of possible designs?
-- What other designs have been considered and what is the rationale for not choosing them?
-- What is the impact of not doing this?
-
-
+This RFC design tries to be a "silver bullet": cover all possible use-cases and combine them in single protocol. Such 
+versatility increases complexity. Simplifications can be achieved by imposing some general constraints:
+1. Divide current protocl protocol in two separate protocols: one for SFU and one for P2P.
+2. Reject future possibilities of using 1 `Peer` for all inbound/outbound tracks.
+3. Limit number of outbound streams in single `Peer` to 1.
+4. Remove publishers acknowledgement of every receiver on each track.
+5. Remove subscribers acknowledgement of every publisher that is not publishing at the moment.
 
 ## Unresolved questions and future possibilities
-[unresolved-questions]: #unresolved-questions
+[unresolved-questions-and-future-possibilities]: #unresolved-questions-and-future-possibilities
 
 ### Data channels
 
@@ -951,7 +1622,7 @@ exchange. It is an amazing feature with huge potential, but, at this point it is
 As the project develops, requirements will change, and we might consider adding data channels. Although, they are not 
 mentioned in this protocol, only minor tweaks will be required to support them.
 
-### Multiple recv tracks from different senders
+### Receiving tracks form multiple senders in single peer connection
 
 There are two general ways to manage Client's peer connections when using SFU server:
 1. Having only one pair of [RTCPeerConnection]'s (one at Client end and one at Server) and passing all send/recv tracks 
