@@ -64,12 +64,12 @@ So, how it works from `Medea Media Server` point of view:
 
 ### Transport considerations
 
-Although, signalling can be implemented on top of any transport, WebSocket is suited the most since it provides small 
-overhead reliable duplex connection. Widely used and supported.
+Although, signalling can be implemented on top of any transport, WebSocket suits the most since it provides small 
+overhead reliable duplex connection, widely used and supported.
 
 ### Protocol considerations
 
-Existing best practices are recommended:
+Existing best practices are recommended for final implementation:
 1. Message level ping-pongs.
 2. Reconnects.
 3. Transactions.
@@ -91,8 +91,8 @@ struct Payload<T> {
 }
 ```
 
-Each message requires answer, answer can carry payload(e.g. answering with [SDP Answer] to [SDP Offer]), error, or nothing, 
-which just means that message reached destination and was processed. 
+Each message requires answer. Answer can carry some payload(e.g. answering with [SDP Answer] to [SDP Offer]), Error, or 
+just noting nothing, which just means that message reached destination and was processed. 
  
 ### Signalling Protocol considerations
 
@@ -102,7 +102,7 @@ quite verbose `Control Api` design.
 
 Having in mind, that `Medea Media Server` already has user connection graph received from `Control Service` by the 
 moment user connects, it is possible to establish all required connections without bothering `User Application`. 
-Basically connection establishment should not depend on interaction with `User Application`.
+Basically connection establishment may not depend on interaction with `User Application` at all.
 
 On the other hand, some use cases require more manual control over media exchange process. For example:
 1. User wants to receive lower resolution video.
@@ -115,7 +115,7 @@ So API can be divided in two categories:
 `Medea Web Client` required.
 2. Dynamic: when `User Application` needs to express complex use cases.
 
-Current RFC offers combining both ways: everything will be configured automatically, but dynamic API is always there if 
+Current RFC offers combining both ways: everything will be configured automagically, but dynamic API is always there if 
 you need it.
 
 ## Reference-level explanation
@@ -227,7 +227,7 @@ Servers requests [RTCPeerConnection] creation.
 Params:
 1. `peer`: peer connection settings.
 2. `sdp_offer`: if `None`, client should create [SDP Offer] and pass it to the server. If `Some`, client should 
-`setRemoteDescription`, create [SDP Answer] and pass it to the server.
+set it as remote description, create [SDP Answer], set it as local description, and pass it to the server.
 3. `ice_servers`: just list of ice servers that should be passed to [RTCPeerConnection] constructor.
 
 Peer settings should be discussed in more detail.
@@ -314,7 +314,7 @@ Client is expected to:
 6. Answer `AddPeer` request with `Offer` request containing [SDP Offer].
 7. Expect remote [SDP Answer] to set it as remote description.
 
-After negotiation is done and media starts flowing, client will receive notification that his media is being sent to 
+After negotiation is done and media starts flowing, client might receive notification that his media is being sent to 
 `Peer { peer_id = 2 }`, and he is receiving media from `Peer { peer_id = 2 }`.
 
 2\. Create Audio `send` to SFU `Peer`.
@@ -359,7 +359,7 @@ Client is expected to:
 6. Set created [SDP Answer] as local description.
 7. Answer `AddPeer` request with `Answer` request containing [SDP Offer]. 
 
-After negotiation is done and media starts flowing, client will receive notification that his media is being sent to 
+After negotiation is done and media starts flowing, client might receive notification that his media is being sent to 
 server.
 
 
@@ -1605,7 +1605,7 @@ It is recommended to cache `Peer` id - `Member` id relation in Web Client. Proba
 
 This RFC design tries to be a "silver bullet": cover all possible use-cases and combine them in single protocol. Such 
 versatility increases complexity. Simplifications can be achieved by imposing some general constraints:
-1. Divide current protocl protocol in two separate protocols: one for SFU and one for P2P.
+1. Divide current protocol in two separate protocols: one for SFU and one for P2P.
 2. Reject future possibilities of using 1 `Peer` for all inbound/outbound tracks.
 3. Limit number of outbound streams in single `Peer` to 1.
 4. Remove publishers acknowledgement of every receiver on each track.
