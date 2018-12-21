@@ -240,7 +240,7 @@ achieve this on client side and concrete implementation is not part of this RFC.
 #### Examples
 
 <details>
-<summary>Create Audio+Video `sendrecv` p2p `Peer`</summary>
+<summary>Create Audio+Video sendrecv p2p Peer</summary>
 
 ```json
 {
@@ -321,7 +321,7 @@ After negotiation is done and media starts flowing, client might receive notific
 </details>
 
 <details>
-<summary>Create Audio `send` to SFU `Peer`</summary>
+<summary>Create Audio send to SFU Peer</summary>
 
 ```json
 {
@@ -388,7 +388,7 @@ to do any request related stuff that Server needs to do, and distinguish between
 #### Examples
 
 <details>
-<summary>Server tells client to dispose specified `Peers` / Client requests Server's permission to dispose specified `Peers`</summary>
+<summary>Server tells client to dispose specified Peers / Client requests Server's permission to dispose specified Peers</summary>
 
 ```json
 {
@@ -421,7 +421,7 @@ If Client => Server, then it can be used to express Clients intentions to:
 #### Examples 
 
 <details>
-<summary>Assuming such `Peer` exists on Client's end</summary>
+<summary>Assuming such Peer exists on Client's end</summary>
 
 ```json
 {
@@ -459,7 +459,7 @@ Meaning that media is being published to server but has no actual receivers.
 </details>
 
 <details>
-<summary>Server notifies Client that video is being received by other `Peer {peer_id = 2}`</summary>
+<summary>Server notifies Client that video is being received by other Peer {peer_id = 2}</summary>
 
 Server => Client
 
@@ -496,7 +496,7 @@ Server => Client
 </details>
 
 <details>
-<summary>Client wants to unsubscribe `Peer {peer_id = 2}` from specified track</summary>
+<summary>Client wants to unsubscribe Peer {peer_id = 2} from specified track</summary>
 
 Client => Server
 
@@ -549,7 +549,7 @@ If Client => Server, then Client requests Server's permission to dispose specifi
 #### Examples
 
 <details>
-<summary>Server tells client to dispose specified `Tracks` / Client requests Server's permission to dispose specified `Tracks`</summary>
+<summary>Server tells client to dispose specified Tracks / Client requests Server's permission to dispose specified Tracks</summary>
 
 ```json
 {
@@ -582,7 +582,7 @@ Server can send it:
 #### Examples
 
 <details>
-<summary>Client sends `Peers` [SDP Offer]</summary>
+<summary>Client sends Peers SDP Offer</summary>
 
 ```json
 {
@@ -613,7 +613,7 @@ Server can send it only as answer to `Offer`.
 #### Examples
 
 <details>
-<summary>Client sends `Peers` [SDP Answer]</summary>
+<summary>Client sends Peers SDP Answer</summary>
 
 ```json
 {
@@ -683,7 +683,7 @@ Params:
 #### Examples:
 
 <details>
-<summary>Notify Client that it is possible to subscribe to `Member {id = 2}` Video and Audio tracks</summary>
+<summary>Notify Client that it is possible to subscribe to Member {id = 2} Video and Audio tracks</summary>
 
 ```json
 {
@@ -706,7 +706,7 @@ Params:
 </details>
 
 <details>
-<summary>Notify Client that it is possible to publish Audio to specified `Peers`</summary>
+<summary>Notify Client that it is possible to publish Audio to specified Peers</summary>
 
 ```json
 {
@@ -787,7 +787,7 @@ represents Server's peer connection (only SFU).
 #### Examples
 
 <details>
-<summary>Client requests to subscribe to remote `Peer {peer_id = 2}` audio and video</summary>
+<summary>Client requests to subscribe to remote Peer {peer_id = 2} audio and video</summary>
 
 ```json
 {
@@ -847,7 +847,7 @@ It is recommended to cache `Peer` id - `Member` id relation in Web Client. Proba
 #### Examples
 
 <details>
-<summary>Client request `Member`'s that own specified `Peer`'s</summary>
+<summary>Client request Member's that own specified Peer's</summary>
 
 ```json
 {
@@ -860,7 +860,7 @@ It is recommended to cache `Peer` id - `Member` id relation in Web Client. Proba
 </details>
 
 <details>
-<summary>Server provides `Member`'s that own specified `Peers`'s</summary>
+<summary>Server provides Member's that own specified Peers's</summary>
 
 ```json
 {
@@ -886,7 +886,7 @@ It is recommended to cache `Peer` id - `Member` id relation in Web Client. Proba
 ### Extended examples
 
 <details>
-<summary>1 <=> 1 p2p with unpublish and republish. </summary>
+<summary>1 <=> 1 p2p with unpublish and republish</summary>
 
 ```
 .----user1----.    .->-->-->--. .----user2----.
