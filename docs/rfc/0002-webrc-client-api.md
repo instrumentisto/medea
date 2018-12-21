@@ -239,7 +239,8 @@ achieve this on client side and concrete implementation is not part of this RFC.
 
 #### Examples
 
-1\. Create Audio+Video `sendrecv` p2p `Peer`.
+<details>
+<summary>Create Audio+Video `sendrecv` p2p `Peer`</summary>
 
 ```json
 {
@@ -317,7 +318,10 @@ Client is expected to:
 After negotiation is done and media starts flowing, client might receive notification that his media is being sent to 
 `Peer { peer_id = 2 }`, and he is receiving media from `Peer { peer_id = 2 }`.
 
-2\. Create Audio `send` to SFU `Peer`.
+</details>
+
+<details>
+<summary>Create Audio `send` to SFU `Peer`</summary>
 
 ```json
 {
@@ -362,6 +366,7 @@ Client is expected to:
 After negotiation is done and media starts flowing, client might receive notification that his media is being sent to 
 server.
 
+</details>
 
 #### 2. RemovePeers
 
@@ -382,13 +387,16 @@ to do any request related stuff that Server needs to do, and distinguish between
 
 #### Examples
 
-1. Server tells client to dispose specified `Peers` / Client requests Server's permission to dispose specified `Peers`.
+<details>
+<summary>Server tells client to dispose specified `Peers` / Client requests Server's permission to dispose specified `Peers`</summary>
 
 ```json
 {
   "peer_ids": [ 1, 2, 3 ]
 }
 ```
+
+</details>
 
 #### 3. UpdateTracks
 
@@ -412,7 +420,8 @@ If Client => Server, then it can be used to express Clients intentions to:
 
 #### Examples 
 
-Assuming such `Peer` exists on Clients end:
+<details>
+<summary>Assuming such `Peer` exists on Client's end</summary>
 
 ```json
 {
@@ -447,7 +456,10 @@ Assuming such `Peer` exists on Clients end:
 
 Meaning that media is being published to server but has no actual receivers.
 
-1\. Server notifies Client that video is being received by other `Peer {peer_id = 2}`.
+</details>
+
+<details>
+<summary>Server notifies Client that video is being received by other `Peer {peer_id = 2}`</summary>
 
 Server => Client
 
@@ -481,7 +493,10 @@ Server => Client
 }
 ```
 
-2\. Client wants to unsubscribe `Peer {peer_id = 2}` from specified tracks.
+</details>
+
+<details>
+<summary>Client wants to unsubscribe `Peer {peer_id = 2}` from specified track</summary>
 
 Client => Server
 
@@ -515,6 +530,7 @@ Client => Server
 }
 ```
 
+</details>
 
 #### 4. RemoveTracks
 
@@ -532,7 +548,8 @@ If Client => Server, then Client requests Server's permission to dispose specifi
 
 #### Examples
 
-1. Server tells client to dispose specified `Tracks` / Client requests Server's permission to dispose specified `Tracks`.
+<details>
+<summary>Server tells client to dispose specified `Tracks` / Client requests Server's permission to dispose specified `Tracks`</summary>
 
 ```json
 {
@@ -540,6 +557,8 @@ If Client => Server, then Client requests Server's permission to dispose specifi
   "tracks": [1, 2]
 }
 ```
+
+</details>
 
 #### 5. Offer
 
@@ -562,7 +581,8 @@ Server can send it:
 
 #### Examples
 
-1. Client sends `Peers` [SDP Offer]
+<details>
+<summary>Client sends `Peers` [SDP Offer]</summary>
 
 ```json
 {
@@ -570,6 +590,8 @@ Server can send it:
   "sdp_offer": "sdp_offer_body"
 }
 ```
+
+</details>
 
 #### 6. Answer
 
@@ -590,7 +612,8 @@ Server can send it only as answer to `Offer`.
 
 #### Examples
 
-1. Client sends `Peers` [SDP Answer]
+<details>
+<summary>Client sends `Peers` [SDP Answer]</summary>
 
 ```json
 {
@@ -598,6 +621,9 @@ Server can send it only as answer to `Offer`.
   "sdp_offer": "sdp_answer_body"
 }
 ```
+
+</details>
+
 
 #### 7. Candidate
 
@@ -656,7 +682,8 @@ Params:
 
 #### Examples:
 
-1. Notify Client that it is possible subscribe to `Member {id = 2}` Video and Audio tracks.
+<details>
+<summary>Notify Client that it is possible to subscribe to `Member {id = 2}` Video and Audio tracks</summary>
 
 ```json
 {
@@ -676,7 +703,10 @@ Params:
 }
 ```
 
-2. Notify Client that it is possible to publish Audio to specified `Peers`.
+</details>
+
+<details>
+<summary>Notify Client that it is possible to publish Audio to specified `Peers`</summary>
 
 ```json
 {
@@ -712,6 +742,9 @@ then represents Servers peer connection (only SFU).
 connection (only SFU).
 3. ```can_rx```: if `Some` then Client can subscribe to specified media.
 4. ```can_tx```: if `Some` then Client can publish specified media to remote `Peer`.
+
+</details>
+
 
 #### 8. RequestTracks
 
@@ -753,7 +786,8 @@ represents Server's peer connection (only SFU).
 
 #### Examples
 
-1\. Client requests to subscribe to remote `Peer {peer_id = 2}` audio and video.
+<details>
+<summary>Client requests to subscribe to remote `Peer {peer_id = 2}` audio and video</summary>
 
 ```json
 {
@@ -769,7 +803,10 @@ represents Server's peer connection (only SFU).
 }
 ```
 
-2\. Client requests to publish to Server's peer connection.
+</details>
+
+<details>
+<summary>Client requests to publish to Server's peer connection</summary>
 
 ```json
 {
@@ -784,6 +821,8 @@ represents Server's peer connection (only SFU).
   }
 }
 ```
+
+</details>
 
 #### 9. GetMembers, Members
 
@@ -807,7 +846,9 @@ It is recommended to cache `Peer` id - `Member` id relation in Web Client. Proba
 
 #### Examples
 
-1\. Client request `Member`'s that own specified `Peer`'s.
+<details>
+<summary>Client request `Member`'s that own specified `Peer`'s</summary>
+
 ```json
 {
   "peer_ids": [
@@ -816,7 +857,11 @@ It is recommended to cache `Peer` id - `Member` id relation in Web Client. Proba
 }
 ```
 
-2\. Server provides `Member`'s that own specified `Peers`'s.
+</details>
+
+<details>
+<summary>Server provides `Member`'s that own specified `Peers`'s</summary>
+
 ```json
 {
   "members": [
@@ -836,9 +881,12 @@ It is recommended to cache `Peer` id - `Member` id relation in Web Client. Proba
 }
 ```
 
+</details>
+
 ### Extended examples
 
-#### 1. 1 <=> 1 p2p with unpublish and republish.   
+<details>
+<summary>1 <=> 1 p2p with unpublish and republish. </summary>
 
 ```
 .----user1----.    .->-->-->--. .----user2----.
@@ -1219,7 +1267,11 @@ It is recommended to cache `Peer` id - `Member` id relation in Web Client. Proba
 '-------------'    '-<--<--<--' '-------------'
 ```
 
-#### 2. 1 => 2 SFU.
+</details>
+
+
+<details>
+<summary>1 => 2 SFU</summary>
 
 ```
                                                        .-------user2------.
@@ -1599,6 +1651,8 @@ It is recommended to cache `Peer` id - `Member` id relation in Web Client. Proba
                           '-----------------'    '->-o      pc_id = 3   :
                                                      '------------------'
 ```
+
+</details>
 
 ## Drawbacks and alternatives
 [drawbacks-and-alternatives]: #drawbacks-and-alternatives
