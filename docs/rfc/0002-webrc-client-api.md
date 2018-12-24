@@ -1,7 +1,7 @@
-- Feature Name: `client_webrtc_signalling_api`
+- Feature Name: `client_webrtc_api`
 - Start Date: 2018-12-13
-- RFC PR: (leave this empty)
-- Tracking Issue: (leave this empty)
+- RFC PR: [instrumentisto/medea#7](https://github.com/instrumentisto/medea/pull/7)
+- Tracking Issue: [instrumentisto/medea#4](https://github.com/instrumentisto/medea/issues/6)
 
 
 
@@ -9,38 +9,39 @@
 ## Summary
 [summary]: #summary
 
-Formalize communication protocol between client(browser, mobile apps) and media server regarding [WebRTC] connection 
-management.
+Formalize communication protocol between client (browser, mobile apps) and media server regarding [WebRTC] connection management.
+
+
+
 
 ## Motivation
 [motivation]: #motivation
 
-[WebRTC] allows P2P data exchange, but [WebRTC] as a protocol comes without signaling. At a minimum signalling protocol 
-must provide ways to exchange Session Description data([SDP Offer] / [SDP Answer]) and [ICE Candidate]. But if you think about 
-signalling protocol in terms of interaction with media server things are becoming more complicated.
+[WebRTC] allows P2P data exchange, but [WebRTC] as a protocol comes without signaling. At the minimum signalling protocol must provide ways to exchange Session Description data ([SDP Offer] / [SDP Answer]) and [ICE Candidate]. But if you think about signalling protocol in terms of interaction with media server things become more complicated.
 
 You will need to express ways to:
 1. Provide STUN/TURN servers.
-2. Exchange some low-level media metadata(resolution, codecs, media types).
-3. Allow more sophisticated track management(updating video resolution on preview/fullscreen switches, passing multiple 
-video tracks with different settings).
-4. Pass some user metadata to hook business logic on.
+2. Exchange some low-level media metadata (resolution, codecs, media types).
+3. Allow more sophisticated track management (updating video resolution on preview/fullscreen switches, passing multiple video tracks with different settings).
+4. Pass some user metadata to hook business logic onto.
 5. Build more complex connection graphs.
 6. Dynamically cancel/begin media publishing/receiving.
-7. Passing errors, connection stats messages.
+7. Passing errors, connection statistics.
 8. Cover both P2P mesh and SFU scenarios.
 
 The protocol must be versatile enough to cover all possible use cases.
 
+
+
+
 ## Guide-level explanation
 [guide-level-explanation]: #guide-level-explanation
 
-### What is `WebRTC Client API`? 
 
-It is a part of `Client API` responsible for [WebRTC] connection management. You can find `Client API` on approximate 
-architecture design. 
+### What is `Client WebRTC API`? 
 
-```                                                   
+It is a part of `Client API` responsible for [WebRTC] connection management. You can find `Client API` on the following approximate architecture design:
+```
                                                                        .------------Server-----------.
                                                                        :     .-------------------.   :
                           .--------------------------------------------+-----o  Control Service  :   :
@@ -49,23 +50,23 @@ architecture design.
                           :                                            :        Control Api          :
 .--------Client-----------+------------------------.                   :              |              :
 :  .--------------------. :  .--------------------. :  .-Client-API--. :  .-----------o------------. :
-:  :  User Application  o-'  :  Medea Web Client  o-+--'             '-+--o   Medea Media Server   : :
+:  :  User Application  o-'  :     Web Client     o-+--'             '-+--o      Media Server      : :
 :  :                    :----:                    o-+--.             .-+--o                        : :
 :  '--------------------'    '--------------------' :  '----Media----' :  '------------------------' :
 '---------------------------------------------------'                  '-----------------------------'
-                           
 ```
 
-So, how it works from `Medea Media Server` point of view:
+So, how it works from `Media Server` point of view:
 1. `Control Service` configures media room via `Control API`.  
-2. `Medea Media Server` provides all necessary information (urls+credentials) for all room members.
-3. `User Application` passes credentials and other necessary stuff (like `<video>` elements) to `Medea Web Client`.
-4. And voila!
+2. `Media Server` provides all necessary information (URLs + credentials) for all room members.
+3. `User Application` passes credentials and other necessary stuff (like `<video>` elements) to `Web Client`.
+4. And voilà!
+
 
 ### Transport considerations
 
-Although, signalling can be implemented on top of any transport, WebSocket suits the most since it provides small 
-overhead reliable duplex connection, widely used and supported.
+Although, signalling can be implemented on top of any transport, WebSocket suits the most since it provides small overhead reliable duplex connection, is widely adopted and supported.
+
 
 ### Protocol considerations
 
@@ -91,35 +92,34 @@ struct Payload<T> {
 }
 ```
 
-Each message requires answer. Answer can carry some payload(e.g. answering with [SDP Answer] to [SDP Offer]), Error, or 
-just noting nothing, which just means that message reached destination and was processed. 
- 
+Each message requires answer. Answer can carry some payload(e.g. answering with [SDP Answer] to [SDP Offer]), Error, or just noting, which just means that message reached destination and was processed. 
+
+
 ### Signalling Protocol considerations
+[signalling-protocol-considerations]: #signalling-protocol-considerations
 
-One of the main goals, is to make `Medea Web Client` integration as easy as possible. This means less interaction 
-between `User Application` and `Medea Web Client` and more interaction between `Medea Web Client` and `Medea Media Server`, 
-quite verbose `Control Api` design.
+One of the main goals, is to make `Web Client` integration as easy as possible. This means less interaction between `User Application` and `Web Client`, and more interaction between `Web Client` and `Media Server`, quite verbose `Control Api` design.
 
-Having in mind, that `Medea Media Server` already has user connection graph received from `Control Service` by the 
-moment user connects, it is possible to establish all required connections without bothering `User Application`. 
-Basically connection establishment may not depend on interaction with `User Application` at all.
+Having in mind, that `Media Server` already has user connection graph received from `Control Service` by the moment user connects, it is possible to establish all required connections without bothering `User Application`. Basically, connection establishment may not depend on interaction with `User Application` at all.
 
 On the other hand, some use cases require more manual control over media exchange process. For example:
 1. User wants to receive lower resolution video.
 2. User wants to stop sending media to specific user.
 3. And then start sending media again.
-4. Mute/unmute.
+4. Mute or unmute.
 
 So API can be divided in two categories:
-1. Preconfigured: where everything works from the box and almost no interaction between `User Application` and 
-`Medea Web Client` required.
+1. Preconfigured: where everything works out-of-the-box and almost no interaction between `User Application` and `Web Client` required.
 2. Dynamic: when `User Application` needs to express complex use cases.
 
-Current RFC offers combining both ways: everything will be configured automagically, but dynamic API is always there if 
-you need it.
+Current RFC offers combining both ways: everything will be configured automagically, but dynamic API is always there if you need it.
+
+
+
 
 ## Reference-level explanation
 [reference-level-explanation]: #reference-level-explanation
+
 
 ### Data model
 
@@ -150,7 +150,7 @@ you need it.
 
 #### Member
 
-Just a way to group `Peers` and provide `User Application` with some users meta data. `Member` can have 0-N `Peers`.
+Just a way to group `Peers` and provide `User Application` with some user metadata. `Member` can have 0-N `Peers`.
 
 ```rust
 struct Member {
@@ -198,8 +198,9 @@ struct VideoSettings {}
 ```
 
 `P2P` flag implies some logic on `TrackDirection::Send` tracks:
-1. `P2P` send tracks always have only one receiver.
-2. Non `P2P` send tracks can have 0-N receivers. 0 - if media is transmitted to server, but have no actual user receiving it.
+1. `P2P` `Send` tracks always have only one receiver.
+2. Non-`P2P` `Send` tracks can have 0-N receivers. 0 - if media is transmitted to server, but have no actual user receiving it.
+
 
 ### Methods
 
@@ -209,7 +210,7 @@ struct VideoSettings {}
 struct AddPeer {
     peer: Peer,
     sdp_offer: Option<String>,
-    ice_servers: ICEServers
+    ice_servers: ICEServers,
 }
 ```
 
@@ -226,18 +227,12 @@ Servers requests [RTCPeerConnection] creation.
 
 Params:
 1. `peer`: peer connection settings.
-2. `sdp_offer`: if `None`, client should create [SDP Offer] and pass it to the server. If `Some`, client should 
-set it as remote description, create [SDP Answer], set it as local description, and pass it to the server.
+2. `sdp_offer`: if `None`, client should create [SDP Offer] and pass it to the server. If `Some`, client should set it as remote description, then create [SDP Answer], set it as local description, and pass it to the server.
 3. `ice_servers`: just list of ice servers that should be passed to [RTCPeerConnection] constructor.
 
-Peer settings should be discussed in more detail.
+The most important part of `Peer` object is list of tracks. All `TrackDirection::Send` tracks must be created according to their settings and added to the `Peer`. If there is at least one `TrackDirection::Recv` track, then created [RTCPeerConnection] must be ready to receive tracks (`recvonly`/`sendrecv` SDP). Currently, there are multiple ways to achieve this on client side and concrete implementation is not part of this RFC. 
 
-The most important part of `Peer` object is list of tracks. All `TrackDirection::Send` tracks must be created according 
-to their settings and added to peer. If there is at least one `TrackDirection::Recv` track, then created 
-[RTCPeerConnection] must be ready to receive tracks(`recvonly`/`sendrecv` SDP). Currently there are multiple ways to 
-achieve this on client side and concrete implementation is not part of this RFC. 
-
-#### Examples
+##### Examples
 
 <details>
 <summary>Create Audio+Video sendrecv p2p Peer</summary>
@@ -247,53 +242,48 @@ achieve this on client side and concrete implementation is not part of this RFC.
   "peer": {
     "peer_id": 1,
     "p2p": true,
-    "tracks": [
-      {
-        "id": 1,
-        "media_type": {
-          "Audio": {}
-        },
-        "direction": {
-          "Send": {
-            "receivers": [ 2 ]
-          }
-        }
+    "tracks": [{
+      "id": 1,
+      "media_type": {
+        "Audio": {}
       },
-      {
-        "id": 2,
-        "media_type": {
-          "Video": {}
-        },
-        "direction": {
-          "Send": {
-            "receivers": [ 2 ]
-          }
-        }
-      },
-      {
-        "id": 3,
-        "media_type": {
-          "Audio": {}
-        },
-        "direction": {
-          "Recv": {
-            "sender": 2
-          }
-        }
-      },
-      {
-        "id": 4,
-        "media_type": {
-          "Video": {}
-        },
-        "direction": {
-          "Recv": {
-            "sender": 2
-          }
+      "direction": {
+        "Send": {
+          "receivers": [2]
         }
       }
-    ]
-  },
+    }, {
+      "id": 2,
+      "media_type": {
+        "Video": {}
+      },
+      "direction": {
+        "Send": {
+          "receivers": [2]
+        }
+      }
+    }, {
+      "id": 3,
+      "media_type": {
+        "Audio": {}
+      },
+      "direction": {
+        "Recv": {
+          "sender": 2
+        }
+      }
+    }, {
+      "id": 4,
+        "media_type": {
+        "Video": {}
+      },
+      "direction": {
+        "Recv": {
+          "sender": 2
+        }
+      }
+    }
+  ]},
   "sdp_offer": null,
   "ice_servers": {
     "urls": [
@@ -307,7 +297,7 @@ achieve this on client side and concrete implementation is not part of this RFC.
 ```
 
 Client is expected to:
-1. Create [RTCPeerConnection] with provided ice servers and associate it with given `peer_id`.
+1. Create [RTCPeerConnection] with provided ICE servers and associate it with given `peer_id`.
 2. Initialize Audio and Video tracks without any additional settings.
 3. Add newly created tracks to [RTCPeerConnection].
 4. Create `sendrecv` [SDP Offer].
@@ -315,9 +305,7 @@ Client is expected to:
 6. Answer `AddPeer` request with `Offer` request containing [SDP Offer].
 7. Expect remote [SDP Answer] to set it as remote description.
 
-After negotiation is done and media starts flowing, client might receive notification that his media is being sent to 
-`Peer { peer_id = 2 }`, and he is receiving media from `Peer { peer_id = 2 }`.
-
+After negotiation is done and media starts flowing, the client might receive notification that his media is being sent to `Peer { peer_id = 2 }`, and he is receiving media from `Peer { peer_id = 2 }`.
 </details>
 
 <details>
@@ -328,19 +316,17 @@ After negotiation is done and media starts flowing, client might receive notific
   "peer": {
     "peer_id": 1,
     "p2p": false,
-    "tracks": [
-      {
-        "id": 1,
-        "media_type": {
-          "Audio": {}
-        },
-        "direction": {
-          "Send": {
-            "receivers": []
-          }
+    "tracks": [{
+      "id": 1,
+      "media_type": {
+        "Audio": {}
+      },
+      "direction": {
+        "Send": {
+          "receivers": []
         }
       }
-    ]
+    }]
   },
   "sdp_offer": "server_user1_recvonly_offer",
   "ice_servers": {
@@ -355,7 +341,7 @@ After negotiation is done and media starts flowing, client might receive notific
 ```
 
 Client is expected to:
-1. Create [RTCPeerConnection] with provided ice servers and associate it with given `peer_id`.
+1. Create [RTCPeerConnection] with provided ICE servers and associate it with given `peer_id`.
 2. Initialize Audio track without any additional settings.
 3. Add newly created track to [RTCPeerConnection].
 4. Set provided offer as peers remote description.
@@ -363,9 +349,7 @@ Client is expected to:
 6. Set created [SDP Answer] as local description.
 7. Answer `AddPeer` request with `Answer` request containing [SDP Offer]. 
 
-After negotiation is done and media starts flowing, client might receive notification that his media is being sent to 
-server.
-
+After negotiation is done and media starts flowing, client might receive notification that his media is being sent to server.
 </details>
 
 #### 2. RemovePeers
@@ -376,26 +360,24 @@ struct RemovePeers {
 }
 ```
 
-Server's/Client's request to dispose(close) specified `Peers`.
+Server's/Client's request to dispose (close) specified `Peers`.
 
 If Server => Client, then Client must dispose specified `Peers`.
-If Client => Server, then Client requests Server's permission to dispose specified `Peers`. Server may give permission 
-in answer.
 
-Probably, Server will always give his permission on any Client's request. This kind of request flow will allow Server 
-to do any request related stuff that Server needs to do, and distinguish between abnormal and normal events.
+If Client => Server, then Client requests Server's permission to dispose specified `Peers`. Server may give permission in answer.
 
-#### Examples
+Probably, Server will always give his permission on any Client's request. This kind of request flow will allow Server to do any request related stuff that Server needs to do, and distinguish between abnormal and normal events.
+
+##### Examples
 
 <details>
 <summary>Server tells client to dispose specified Peers / Client requests Server's permission to dispose specified Peers</summary>
 
 ```json
 {
-  "peer_ids": [ 1, 2, 3 ]
+  "peer_ids": [1, 2, 3]
 }
 ```
-
 </details>
 
 #### 3. UpdateTracks
@@ -418,7 +400,7 @@ If Client => Server, then it can be used to express Clients intentions to:
 1. Update existing track settings.
 2. Cancel sending media to specific receiver (only remove).
 
-#### Examples 
+##### Examples 
 
 <details>
 <summary>Assuming such Peer exists on Client's end</summary>
@@ -427,35 +409,31 @@ If Client => Server, then it can be used to express Clients intentions to:
 {
   "peer_id": 1,
   "p2p": false,
-  "tracks": [
-    {
-      "id": 1,
-      "media_type": {
-        "Audio": {}
-      },
-      "direction": {
-        "Send": {
-          "receivers": []
-        }
-      }
+  "tracks": [{
+    "id": 1,
+    "media_type": {
+      "Audio": {}
     },
-    {
-      "id": 2,
-      "media_type": {
-        "Video": {}
-      },
-      "direction": {
-        "Send": {
-          "receivers": []
-        }
+    "direction": {
+      "Send": {
+        "receivers": []
       }
     }
-  ]
+  }, {
+    "id": 2,
+    "media_type": {
+      "Video": {}
+    },
+    "direction": {
+      "Send": {
+        "receivers": []
+      }
+    }
+  }]
 }
 ```
 
 Meaning that media is being published to server but has no actual receivers.
-
 </details>
 
 <details>
@@ -466,33 +444,29 @@ Server => Client
 ```json
 {
   "peer_id": 1,
-  "tracks": [
-    {
-      "id": 1,
-      "media_type": {
-        "Audio": {}
-      },
-      "direction": {
-        "Send": {
-          "receivers": [ 2 ]
-        }
-      }
+  "tracks": [{
+    "id": 1,
+    "media_type": {
+      "Audio": {}
     },
-    {
-      "id": 2,
-      "media_type": {
-        "Video": {}
-      },
-      "direction": {
-        "Send": {
-          "receivers": [ 2 ]
-        }
+    "direction": {
+      "Send": {
+        "receivers": [2]
       }
     }
-  ]
+  }, {
+    "id": 2,
+    "media_type": {
+      "Video": {}
+    },
+    "direction": {
+      "Send": {
+        "receivers": [2]
+      }
+    }
+  }]
 }
 ```
-
 </details>
 
 <details>
@@ -503,33 +477,29 @@ Client => Server
 ```json
 {
   "peer_id": 1,
-  "tracks": [
-    {
-      "id": 1,
-      "media_type": {
-        "Audio": {}
-      },
-      "direction": {
-        "Send": {
-          "receivers": []
-        }
-      }
+  "tracks": [{
+    "id": 1,
+    "media_type": {
+      "Audio": {}
     },
-    {
-      "id": 2,
-      "media_type": {
-        "Video": {}
-      },
-      "direction": {
-        "Send": {
-          "receivers": []
-        }
+    "direction": {
+      "Send": {
+        "receivers": []
       }
     }
-  ]
+  }, {
+    "id": 2,
+    "media_type": {
+      "Video": {}
+    },
+    "direction": {
+      "Send": {
+        "receivers": []
+      }
+    }
+  }]
 }
 ```
-
 </details>
 
 #### 4. RemoveTracks
@@ -541,12 +511,13 @@ struct RemoveTracks {
 }
 ```
 
-Server's/Client's request to dispose specified `Tracks`.
+Server's/Client's request to dispose (close) specified `Tracks`.
 
-If Server => Client, then Client must dispose(stop and remove).
+If Server => Client, then Client must dispose (stop and remove).
+
 If Client => Server, then Client requests Server's permission to dispose specified `Peers`.
 
-#### Examples
+##### Examples
 
 <details>
 <summary>Server tells client to dispose specified Tracks / Client requests Server's permission to dispose specified Tracks</summary>
@@ -557,7 +528,6 @@ If Client => Server, then Client requests Server's permission to dispose specifi
   "tracks": [1, 2]
 }
 ```
-
 </details>
 
 #### 5. Offer
@@ -579,7 +549,7 @@ Server can send it:
 1. If server triggers renegotiation.
 2. Retransmission from peer that triggered renegotiation.
 
-#### Examples
+##### Examples
 
 <details>
 <summary>Client sends Peers SDP Offer</summary>
@@ -590,7 +560,6 @@ Server can send it:
   "sdp_offer": "sdp_offer_body"
 }
 ```
-
 </details>
 
 #### 6. Answer
@@ -602,7 +571,7 @@ struct Answer {
 }
 ```
 
-Server's / Client's [SDP Answer]  sent during SDP negotiation between peers.
+Server's / Client's [SDP Answer] sent during SDP negotiation between peers.
 
 Client can send it:
 1. As answer to `AddPeer {sdp_offer: Some}`.
@@ -621,7 +590,6 @@ Server can send it only as answer to `Offer`.
   "sdp_offer": "sdp_answer_body"
 }
 ```
-
 </details>
 
 
@@ -670,9 +638,7 @@ enum RemotePeerTrackType {
 }
 ```
 
-Server notifies Client of any remote peers that Client can connect to. This is a key method when talking about Dynamic 
-API mentioned in `Signalling Protocol considerations`. Any Client's request to subscriber/publish will be based on data
-provided by this request.
+Server notifies Client of any remote peers that Client can connect to. This is a key method when talking about Dynamic API mentioned in [Signalling Protocol considerations][signalling-protocol-considerations]. Any Client's request to subscribe/publish will be based on data provided by this request.
 
 Params:
 1. ```remote_peer_id```: if `Some`, then represents specific remote `Peer` associated with some `Member`. If `None`, then represents Servers peer connection.
@@ -687,22 +653,19 @@ Params:
 
 ```json
 {
-  "peers": [
-    {
-      "peer_id": 2,
-      "member_id": "User2",
-      "can_rx": {
-        "AudioVideo": {
-          "audio_settings": {},
-          "video_settings": {}
-        }
-      },
-      "can_tx": null
-    }
-  ]
+  "peers": [{
+    "peer_id": 2,
+    "member_id": "User2",
+    "can_rx": {
+      "AudioVideo": {
+        "audio_settings": {},
+        "video_settings": {}
+      }
+    },
+    "can_tx": null
+  }]
 }
 ```
-
 </details>
 
 <details>
@@ -710,41 +673,28 @@ Params:
 
 ```json
 {
-  "peers": [
-    {
-      "peer_id": 2,
-      "member_id": "User2",
-      "can_rx": null,
-      "can_tx": {
-        "Audio": {
-          "audio_settings": {}
-        }
-      }
-    },
-    {
-      "peer_id": 3,
-      "member_id": "User3",
-      "can_rx": null,
-      "can_tx": {
-        "Audio": {
-          "audio_settings": {}
-        }
+  "peers": [{
+    "peer_id": 2,
+    "member_id": "User2",
+    "can_rx": null,
+    "can_tx": {
+      "Audio": {
+        "audio_settings": {}
       }
     }
-  ]
+  }, {
+    "peer_id": 3,
+    "member_id": "User3",
+    "can_rx": null,
+    "can_tx": {
+      "Audio": {
+        "audio_settings": {}
+      }
+    }
+  }]
 }
 ```
-
-Params:
-1. ```remote_peer_id```: if `Some`, then represents specific remote `Peer` associated with some `Member`. If `None`, 
-then represents Servers peer connection (only SFU).
-2. ```remote_member_id```: if `Some`, then represents specific remote `Member`. If `None`, then represents Server's peer 
-connection (only SFU).
-3. ```can_rx```: if `Some` then Client can subscribe to specified media.
-4. ```can_tx```: if `Some` then Client can publish specified media to remote `Peer`.
-
 </details>
-
 
 #### 8. RequestTracks
 
@@ -784,7 +734,7 @@ represents Server's peer connection (only SFU).
 3. ```rx```: if `Some` then Client requests to subscribe to specified media.
 4. ```tx```: if `Some` then Client requests to publish specified media to remote `Peer`.
 
-#### Examples
+##### Examples
 
 <details>
 <summary>Client requests to subscribe to remote Peer {peer_id = 2} audio and video</summary>
@@ -802,7 +752,6 @@ represents Server's peer connection (only SFU).
   }
 }
 ```
-
 </details>
 
 <details>
@@ -821,7 +770,6 @@ represents Server's peer connection (only SFU).
   }
 }
 ```
-
 </details>
 
 #### 9. GetMembers, Members
@@ -832,7 +780,7 @@ struct GetMembers {
 }
 ```
 
-Client requests `Member` ids.
+Client requests `Member` IDs.
 
 ```rust
 struct Members {
@@ -844,7 +792,7 @@ Server provides `Member`'s list according to user request.
 
 It is recommended to cache `Peer` id - `Member` id relation in Web Client. Probably, in two maps: `HashMap<peer_id, member_id>`, `HashMap<member_id, peer_id>`.
 
-#### Examples
+##### Examples
 
 <details>
 <summary>Client request Member's that own specified Peer's</summary>
@@ -856,7 +804,6 @@ It is recommended to cache `Peer` id - `Member` id relation in Web Client. Proba
   ]
 }
 ```
-
 </details>
 
 <details>
@@ -864,24 +811,20 @@ It is recommended to cache `Peer` id - `Member` id relation in Web Client. Proba
 
 ```json
 {
-  "members": [
-    {
-      "member_id": "user_2",
-      "peers": [ 1 ]
-    },
-    {
-      "member_id": "user_2",
-      "peers": [ 2 ]
-    },
-    {
-      "member_id": "user_3",
-      "peers": [ 3, 4 ]
-    }
-  ]
+  "members": [{
+    "member_id": "user_2",
+    "peers": [ 1 ]
+  }, {
+    "member_id": "user_2",
+    "peers": [ 2 ]
+  }, {
+    "member_id": "user_3",
+    "peers": [ 3, 4 ]
+  }]
 }
 ```
-
 </details>
+
 
 ### Extended examples
 
@@ -894,7 +837,7 @@ It is recommended to cache `Peer` id - `Member` id relation in Web Client. Proba
 '-------------'    '-<--<--<--' '-------------'
 ```
 
-1\. Server send `AddPeer` to user1. 
+1\. Server send `AddPeer` to `user1`:
 
 ```json
 {
@@ -903,56 +846,47 @@ It is recommended to cache `Peer` id - `Member` id relation in Web Client. Proba
     "peer": {
       "peer_id": 1,
       "p2p": true,
-      "tracks": [
-        {
-          "id": 1,
-          "media_type": {
-            "Audio": {}
-          },
-          "direction": {
-            "Send": {
-              "receivers": [
-                2
-              ]
-            }
-          }
+      "tracks": [{
+        "id": 1,
+        "media_type": {
+          "Audio": {}
         },
-        {
-          "id": 2,
-          "media_type": {
-            "Video": {}
-          },
-          "direction": {
-            "Send": {
-              "receivers": [
-                2
-              ]
-            }
-          }
-        },
-        {
-          "id": 3,
-          "media_type": {
-            "Audio": {}
-          },
-          "direction": {
-            "Recv": {
-              "sender": 2
-            }
-          }
-        },
-        {
-          "id": 4,
-          "media_type": {
-            "Video": {}
-          },
-          "direction": {
-            "Recv": {
-              "sender": 2
-            }
+        "direction": {
+          "Send": {
+            "receivers": [2]
           }
         }
-      ]
+      }, {
+        "id": 2,
+        "media_type": {
+          "Video": {}
+        },
+        "direction": {
+          "Send": {
+            "receivers": [2]
+          }
+        }
+      }, {
+        "id": 3,
+        "media_type": {
+          "Audio": {}
+        },
+        "direction": {
+          "Recv": {
+            "sender": 2
+          }
+        }
+      }, {
+        "id": 4,
+        "media_type": {
+          "Video": {}
+        },
+        "direction": {
+          "Recv": {
+            "sender": 2
+          }
+        }
+      }]
     },
     "sdp_offer": null,
     "ice_servers": {
@@ -967,7 +901,7 @@ It is recommended to cache `Peer` id - `Member` id relation in Web Client. Proba
 }
 ```
  
-2\. User1 answers with [SDP Offer]. 
+2\. `user1` answers with [SDP Offer]:
 
 ```json
 {
@@ -979,7 +913,7 @@ It is recommended to cache `Peer` id - `Member` id relation in Web Client. Proba
 }
 ```
  
-3\. Server send `AddPeer` with user1 [SDP Offer] to user2.
+3\. Server send `AddPeer` with `user1`'s [SDP Offer] to `user2`:
 
 ```json
 {
@@ -988,52 +922,47 @@ It is recommended to cache `Peer` id - `Member` id relation in Web Client. Proba
     "peer": {
       "peer_id": 2,
       "p2p": true,
-      "tracks": [
-        {
-          "id": 1,
-          "media_type": {
-            "Audio": {}
-          },
-          "direction": {
-            "Recv": {
-              "sender": 1
-            }
-          }
+      "tracks": [{
+        "id": 1,
+        "media_type": {
+          "Audio": {}
         },
-        {
-          "id": 2,
-          "media_type": {
-            "Audio": {}
-          },
-          "direction": {
-            "Recv": {
-              "sender": 1
-            }
-          }
-        },
-        {
-          "id": 3,
-          "media_type": {
-            "Audio": {}
-          },
-          "direction": {
-            "Send": {
-              "receivers": [ 1 ]
-            }
-          }
-        },
-        {
-          "id": 4,
-          "media_type": {
-            "Video": {}
-          },
-          "direction": {
-            "Send": {
-              "receivers": [ 1 ]
-            }
+        "direction": {
+          "Recv": {
+            "sender": 1
           }
         }
-      ]
+      }, {
+        "id": 2,
+        "media_type": {
+          "Audio": {}
+        },
+        "direction": {
+          "Recv": {
+            "sender": 1
+          }
+        }
+      }, {
+        "id": 3,
+        "media_type": {
+          "Audio": {}
+        },
+        "direction": {
+          "Send": {
+            "receivers": [1]
+          }
+        }
+      }, {
+        "id": 4,
+        "media_type": {
+          "Video": {}
+        },
+        "direction": {
+          "Send": {
+            "receivers": [1]
+          }
+        }
+      }]
     },
     "sdp_offer": "user1_sendrecv_offer",
     "ice_servers": {
@@ -1048,7 +977,7 @@ It is recommended to cache `Peer` id - `Member` id relation in Web Client. Proba
 }
 ```
 
-4\. User2 answers with [SDP Answer]
+4\. `user2` answers with [SDP Answer]:
 
 ```json
 {
@@ -1060,7 +989,7 @@ It is recommended to cache `Peer` id - `Member` id relation in Web Client. Proba
 }
 ```
 
-5\. Both peers exchange discovered [ICE Candidate]'s.
+5\. Both peers exchange discovered [ICE Candidate]'s:
 
 ```json
 {
@@ -1082,7 +1011,7 @@ It is recommended to cache `Peer` id - `Member` id relation in Web Client. Proba
 }
 ```
 
-6\. At this point connection is supposed to be established.
+6\. At this point connection is supposed to be established:
 
 ```
 .----user1----.    .->-->-->--. .----user2----.
@@ -1090,7 +1019,7 @@ It is recommended to cache `Peer` id - `Member` id relation in Web Client. Proba
 '-------------'    '-<--<--<--' '-------------'
 ```
 
-7\. User1 wants to unpublish his tracks, so he sends `RemoveTracks` Server.
+7\. `user1` wants to unpublish his tracks, so he sends `RemoveTracks` to the server:
 
 ```json
 {
@@ -1102,21 +1031,21 @@ It is recommended to cache `Peer` id - `Member` id relation in Web Client. Proba
 }
 ```
 
-8\. Server updates User2 tracks.
+8\. Server updates `user2` tracks:
 
 ```json
 {
   "method": "RemoveTracks",
   "payload": {
     "peer_id": 2,
-    "tracks": [ 1, 2 ]
+    "tracks": [1, 2]
   }
 }
 ```
 
-9\. Server approves User1 `RemoveTracks` request.
+9\. Server approves `user1` `RemoveTracks` request.
 
-10\. User1 initiates SDP renegotiation
+10\. `user1` initiates SDP renegotiation:
 
 ```
 .----user1----.         .----user2----.
@@ -1124,53 +1053,49 @@ It is recommended to cache `Peer` id - `Member` id relation in Web Client. Proba
 '-------------'         '-------------'
 ```
 
-11\. Server notifies User1 that he can publish to User2
+11\. Server notifies `user1` that he can publish to `user2`:
 
 ```json
 {
   "method": "RemotePeer",
   "payload": {
-    "peers": [
-      {
-        "peer_id": 2,
-        "member_id": "user_2",
-        "can_rx": null,
-        "can_tx": {
-          "AudioVideo": {
-            "audio_settings": {},
-            "video_settings": {}
-          }
+    "peers": [{
+      "peer_id": 2,
+      "member_id": "user_2",
+      "can_rx": null,
+      "can_tx": {
+        "AudioVideo": {
+          "audio_settings": {},
+          "video_settings": {}
         }
       }
-    ]
+    }]
   }
 }
 ```
 
-12\. Server notifies User2 that he can subscriber to User1.
+12\. Server notifies `user2` that he can subscribe to `user1`:
 
 ```json
 {
   "method": "RemotePeers",
   "payload": {
-    "peers": [
-      {
-        "peer_id": 1,
-        "member_id": "user_1",
-        "can_rx": {
-          "AudioVideo": {
-            "audio_settings": {},
-            "video_settings": {}
-          }
-        },
-        "can_tx": null
-      }
-    ]
+    "peers": [{
+      "peer_id": 1,
+      "member_id": "user_1",
+      "can_rx": {
+        "AudioVideo": {
+          "audio_settings": {},
+          "video_settings": {}
+        }
+      },
+      "can_tx": null
+    }]
   }
 }
 ```
 
-13\. User1 requests to publish to User2.
+13\. `user1` requests to publish to `user2`:
 
 ```json
 {
@@ -1189,84 +1114,77 @@ It is recommended to cache `Peer` id - `Member` id relation in Web Client. Proba
 }
 ```
 
-14\. Server updates User2 tracks.
+14\. Server updates `user2` tracks:
 
 ```json
 {
   "method": "UpdateTracks",
   "payload": {
     "peer_id": 2,
-    "tracks": [
-      {
-        "id": 1,
-        "media_type": {
-          "Audio": {}
-        },
-        "direction": {
-          "Recv": {
-            "sender": 1
-          }
-        }
+    "tracks": [{
+      "id": 1,
+      "media_type": {
+        "Audio": {}
       },
-      {
-        "id": 2,
-        "media_type": {
-          "Audio": {}
-        },
-        "direction": {
-          "Recv": {
-            "sender": 1
-          }
+      "direction": {
+        "Recv": {
+          "sender": 1
         }
       }
-    ]
+    }, {
+      "id": 2,
+      "media_type": {
+        "Audio": {}
+      },
+      "direction": {
+        "Recv": {
+          "sender": 1
+        }
+      }
+    }]
   }
 }
 ```
 
-15\. Server updates User1 tracks.
+15\. Server updates `user1` tracks:
 
 ```json
 {
   "method": "UpdateTracks",
   "payload": {
     "peer_id": 1,
-    "tracks": [
-      {
-        "id": 1,
-        "media_type": {
-          "Audio": {}
-        },
-        "direction": {
-          "Send": {
-            "receivers": [ 2 ]
-          }
-        }
+    "tracks": [{
+      "id": 1,
+      "media_type": {
+        "Audio": {}
       },
-      {
-        "id": 2,
-        "media_type": {
-          "Video": {}
-        },
-        "direction": {
-          "Send": {
-            "receivers": [ 2 ]
-          }
+      "direction": {
+        "Send": {
+          "receivers": [2]
         }
       }
-    ]
+    }, {
+      "id": 2,
+      "media_type": {
+        "Video": {}
+      },
+      "direction": {
+        "Send": {
+          "receivers": [2]
+        }
+      }
+    }]
   }
 }
 ```
 
-16\. SDP Renegotiation
+16\. SDP re-negotiation:
 
 ```
 .----user1----.    .->-->-->--. .----user2----.
 :             o(1)=:          :=o(2)          :
 '-------------'    '-<--<--<--' '-------------'
 ```
-
 </details>
 
 
@@ -1283,7 +1201,7 @@ It is recommended to cache `Peer` id - `Member` id relation in Web Client. Proba
                                                        '------------------'
 ```
 
-1\. Server requests User1 to create `sendonly` `Peer` passing Server's [SDP Offer].
+1\. Server requests `user1` to create `sendonly` `Peer` passing Server's [SDP Offer]:
 
 ```json
 {
@@ -1292,30 +1210,27 @@ It is recommended to cache `Peer` id - `Member` id relation in Web Client. Proba
     "peer": {
       "peer_id": 1,
       "p2p": false,
-      "tracks": [
-        {
-          "id": 1,
-          "media_type": {
-            "Audio": {}
-          },
-          "direction": {
-            "Send": {
-              "receivers": []
-            }
-          }
+      "tracks": [{
+        "id": 1,
+        "media_type": {
+          "Audio": {}
         },
-        {
-          "id": 2,
-          "media_type": {
-            "Video": {}
-          },
-          "direction": {
-            "Send": {
-              "receivers": []
-            }
+        "direction": {
+          "Send": {
+            "receivers": []
           }
         }
-      ]
+      }, {
+        "id": 2,
+        "media_type": {
+          "Video": {}
+        },
+        "direction": {
+          "Send": {
+            "receivers": []
+          }
+        }
+      }]
     },
     "sdp_offer": "server_user1_recvonly_offer",
     "ice_servers": {
@@ -1330,7 +1245,7 @@ It is recommended to cache `Peer` id - `Member` id relation in Web Client. Proba
 }
 ```
 
-2\. User1 creates peer and answeres with [SDP Answer].
+2\. `user1` creates peer and answers with [SDP Answer]:
 
 ```json
 {
@@ -1342,7 +1257,7 @@ It is recommended to cache `Peer` id - `Member` id relation in Web Client. Proba
 }
 ```
 
-3\. Server and User1 exchange [ICE Candidate]'s.
+3\. Server and `user1` exchange [ICE Candidate]s:
 
 ```json
 {
@@ -1364,7 +1279,7 @@ It is recommended to cache `Peer` id - `Member` id relation in Web Client. Proba
 }
 ```
 
-4\. Connection is established
+4\. Connection is established:
 
 ```
                           .-------SFU-------.
@@ -1374,7 +1289,7 @@ It is recommended to cache `Peer` id - `Member` id relation in Web Client. Proba
                           '-----------------'
 ```
 
-5\. Server requests User2 to create `recvonly` `Peer` passing Server's [SDP Offer]. 
+5\. Server requests `user2` to create `recvonly` `Peer` passing Server's [SDP Offer]:
 
 ```json
 {
@@ -1383,30 +1298,27 @@ It is recommended to cache `Peer` id - `Member` id relation in Web Client. Proba
     "peer": {
       "peer_id": 2,
       "p2p": false,
-      "tracks": [
-        {
-          "id": 1,
-          "media_type": {
-            "Audio": {}
-          },
-          "direction": {
-            "Recv": {
-              "sender": 1
-            }
-          }
+      "tracks": [{
+        "id": 1,
+        "media_type": {
+          "Audio": {}
         },
-        {
-          "id": 2,
-          "media_type": {
-            "Video": {}
-          },
-          "direction": {
-            "Recv": {
-              "sender": 1
-            }
+        "direction": {
+          "Recv": {
+            "sender": 1
           }
         }
-      ]
+      }, {
+        "id": 2,
+        "media_type": {
+          "Video": {}
+        },
+        "direction": {
+          "Recv": {
+            "sender": 1
+          }
+        }
+      }]
     },
     "sdp_offer": "server_user2_sendonly_offer",
     "ice_servers": {
@@ -1421,7 +1333,7 @@ It is recommended to cache `Peer` id - `Member` id relation in Web Client. Proba
 }
 ```
 
-6\. User2 answers with [SDP Answer].
+6\. `user2` answers with [SDP Answer]:
 
 ```json
 {
@@ -1433,7 +1345,7 @@ It is recommended to cache `Peer` id - `Member` id relation in Web Client. Proba
 }
 ```
 
-7\. Server and User2 exchange [ICE Candidate]'s.
+7\. Server and `user2` exchange [ICE Candidate]s:
 
 ```json
 {
@@ -1455,7 +1367,7 @@ It is recommended to cache `Peer` id - `Member` id relation in Web Client. Proba
 }
 ```
 
-8\. User2 is connected to Server's peer connection.
+8\. `user2` is connected to Server's peer connection:
 
 ```
                                                        .-------user2------.
@@ -1466,53 +1378,50 @@ It is recommended to cache `Peer` id - `Member` id relation in Web Client. Proba
                           '-----------------'
 ```
 
-9\. Server notifies User1 that he has new subscriber.
+9\. Server notifies `user1` that he has new subscriber:
 
 ```json
 {
   "method": "UpdateTracks",
   "payload": {
     "peer_id": 1,
-    "tracks": [
-      {
-        "id": 1,
-        "media_type": {
-          "Audio": {}
-        },
-        "direction": {
-          "Send": {
-            "receivers": [ 2 ]
-          }
-        }
+    "tracks": [{
+      "id": 1,
+      "media_type": {
+        "Audio": {}
       },
-      {
-        "id": 2,
-        "media_type": {
-          "Video": {}
-        },
-        "direction": {
-          "Send": {
-            "receivers": [2]
-          }
+      "direction": {
+        "Send": {
+          "receivers": [ 2 ]
         }
       }
-    ]
+    }, {
+      "id": 2,
+      "media_type": {
+        "Video": {}
+      },
+      "direction": {
+        "Send": {
+          "receivers": [2]
+        }
+      }
+    }]
   }
 }
 ```
 
-10\. Server sends User1 `Peer {peer_id = 1 }` media to User2 `Peer {peer_id = 2 }`.
+10\. Server sends `user1` `Peer {peer_id = 1}` media to `user2` `Peer {peer_id = 2}`:
 
- ```
+```
                                                         .-------user2------.
                            .-------SFU-------.    .-->--o      pc_id = 2   :
  .------user1------.       :         .->-->--o-->-'     '------------------'
  :     pc_id = 1   o-->-->-o--->-->--'       :
  '-----------------'       :                 :
                            '-----------------'
- ```
- 
-11\. Server requests User3 to create `recvonly` `Peer` passing Server's [SDP Offer]. 
+```
+
+11\. Server requests `user3` to create `recvonly` `Peer` passing Server's [SDP Offer]: 
 
 ```json
 {
@@ -1521,30 +1430,27 @@ It is recommended to cache `Peer` id - `Member` id relation in Web Client. Proba
     "peer": {
       "peer_id": 3,
       "p2p": false,
-      "tracks": [
-        {
-          "id": 1,
-          "media_type": {
-            "Audio": {}
-          },
-          "direction": {
-            "Recv": {
-              "sender": 1
-            }
-          }
+      "tracks": [{
+        "id": 1,
+        "media_type": {
+          "Audio": {}
         },
-        {
-          "id": 2,
-          "media_type": {
-            "Video": {}
-          },
-          "direction": {
-            "Recv": {
-              "sender": 1
-            }
+        "direction": {
+          "Recv": {
+            "sender": 1
           }
         }
-      ]
+      }, {
+        "id": 2,
+        "media_type": {
+          "Video": {}
+        },
+        "direction": {
+          "Recv": {
+            "sender": 1
+          }
+        }
+      }]
     },
     "sdp_offer": "server_user3_sendonly_offer",
     "ice_servers": {
@@ -1559,7 +1465,7 @@ It is recommended to cache `Peer` id - `Member` id relation in Web Client. Proba
 }
 ```
 
-12\. User3 answers with [SDP Answer].
+12\. `user2` answers with [SDP Answer]:
 
 ```json
 {
@@ -1571,7 +1477,7 @@ It is recommended to cache `Peer` id - `Member` id relation in Web Client. Proba
 }
 ```
 
-13\. Server and User3 exchange [ICE Candidate]'s.
+13\. Server and `user3` exchange [ICE Candidate]s:
 
 ```json
 {
@@ -1593,7 +1499,7 @@ It is recommended to cache `Peer` id - `Member` id relation in Web Client. Proba
 }
 ```
 
-14\. User3 is connected to Server's peer connection.
+14\. `user3` is connected to Server's peer connection:
 
 ```
                                                        .-------user2------.
@@ -1605,42 +1511,39 @@ It is recommended to cache `Peer` id - `Member` id relation in Web Client. Proba
                                                        '------------------'
 ```
 
-15\. Server notifies User1 that he has new subscriber.
+15\. Server notifies `user1` that he has new subscriber:
 
 ```json
 {
   "method": "UpdateTracks",
   "payload": {
     "peer_id": 1,
-    "tracks": [
-      {
-        "id": 1,
-        "media_type": {
-          "Audio": {}
-        },
-        "direction": {
-          "Send": {
-            "receivers": [ 2,3 ]
-          }
-        }
+    "tracks": [{
+      "id": 1,
+      "media_type": {
+        "Audio": {}
       },
-      {
-        "id": 2,
-        "media_type": {
-          "Video": {}
-        },
-        "direction": {
-          "Send": {
-            "receivers": [ 2,3 ]
-          }
+      "direction": {
+        "Send": {
+          "receivers": [2, 3]
         }
       }
-    ]
+    }, {
+      "id": 2,
+      "media_type": {
+        "Video": {}
+      },
+      "direction": {
+        "Send": {
+          "receivers": [2, 3]
+        }
+      }
+    }]
   }
 }
 ```
 
-16\. Server sends User1 `Peer {peer_id = 1 }` media to User2 `Peer {peer_id = 3 }`.
+16\. Server sends `user1` `Peer {peer_id = 1}` media to `user2` `Peer {peer_id = 3}`:
 
 ```
                                                      .-------user2------.
@@ -1651,54 +1554,56 @@ It is recommended to cache `Peer` id - `Member` id relation in Web Client. Proba
                           '-----------------'    '->-o      pc_id = 3   :
                                                      '------------------'
 ```
-
 </details>
+
+
+
 
 ## Drawbacks and alternatives
 [drawbacks-and-alternatives]: #drawbacks-and-alternatives
 
-This RFC design tries to be a "silver bullet": cover all possible use-cases and combine them in single protocol. Such 
-versatility increases complexity. Simplifications can be achieved by imposing some general constraints:
+This RFC design tries to be a "silver bullet": cover all possible use-cases and combine them into a single protocol. Such versatility increases complexity. Simplifications can be achieved by imposing some general constraints:
 1. Divide current protocol in two separate protocols: one for SFU and one for P2P.
 2. Reject future possibilities of using 1 `Peer` for all inbound/outbound tracks.
-3. Limit number of outbound streams in single `Peer` to 1.
+3. Limit the number of outbound streams in single `Peer` to 1.
 4. Remove publishers acknowledgement of every receiver on each track.
 5. Remove subscribers acknowledgement of every publisher that is not publishing at the moment.
+
+
+
 
 ## Unresolved questions and future possibilities
 [unresolved-questions-and-future-possibilities]: #unresolved-questions-and-future-possibilities
 
+
 ### Data channels
 
-[WebRTC] spec introduces [RTCDataChannel] - a bi-directional data channel between two peers which allows arbitrary data 
-exchange. It is an amazing feature with huge potential, but, at this point it is quite useless for our use cases.
+[WebRTC] spec introduces [RTCDataChannel] - a bi-directional data channel between two peers which allows arbitrary data exchange. It is an amazing feature with huge potential, but, at this point it is quite useless for our use cases.
 
-As the project develops, requirements will change, and we might consider adding data channels. Although, they are not 
+As the project grows, requirements will change, and we might consider adding data channels. Although, they are not 
 mentioned in this protocol, only minor tweaks will be required to support them.
 
-### Receiving tracks form multiple senders in single peer connection
+
+### Receiving tracks from multiple senders in single peer connection
 
 There are two general ways to manage Client's peer connections when using SFU server:
-1. Having only one pair of [RTCPeerConnection]'s (one at Client end and one at Server) and passing all send/recv tracks 
-through this connection.
-2. Having a separate [RTCPeerConnection] pair for each track group.
+1. Having only one pair of [RTCPeerConnection]'s (one at Client's end and one at Server) and pass all send/recv tracks through this connection.
+2. Or having a separate [RTCPeerConnection] pair for each track group.
 
-First way is preferable since it allows to reduce resources usage on both ends. But track management is very unclear in 
-this case and gstreamers [webrtcbin] currently does not support dynamic addition/removal of streams and needs major 
-updates to be able to do so.
+First way is preferable since it allows to reduce resources usage on both ends. But track management is very unclear in this case and [webrtcbin] module of [GStreamer] currently does not support dynamic addition/removal of streams and needs major updates to be able to do so.
 
-Current protocol assumes that there will be separate [RTCPeerConnection] pair for each track group. 
-At the same time, it does not forbid having all the tracks in single [RTCPeerConnection] pair, but it will require some 
-minor changes to make this work.
+Current protocol assumes that there will be separate [RTCPeerConnection] pair for each track group. At the same time, it does not forbid having all the tracks in single [RTCPeerConnection] pair, but it will require some minor changes to make this work.
 
 
 
 
-[RTCPeerConnection]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
-[MediaStreamTrack]: https://www.w3.org/TR/mediacapture-streams/#mediastreamtrack
-[webrtcbin]: https://gstreamer.freedesktop.org/data/doc/gstreamer/head/gst-plugins-bad/html/gst-plugins-bad-plugins-webrtcbin.html
-[RTCDataChannel]:https://www.w3.org/TR/webrtc/#rtcdatachannel
-[WebRTC]:https://www.w3.org/TR/webrtc/
-[SDP Offer]:https://tools.ietf.org/html/rfc3264
-[SDP Answer]:https://tools.ietf.org/html/rfc3264
+
+[GStreamer]: https://gstreamer.freedesktop.org
 [ICE Candidate]:https://tools.ietf.org/html/rfc8445
+[MediaStreamTrack]: https://www.w3.org/TR/mediacapture-streams/#mediastreamtrack
+[RTCDataChannel]:https://www.w3.org/TR/webrtc/#rtcdatachannel
+[RTCPeerConnection]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
+[SDP Answer]:https://tools.ietf.org/html/rfc3264
+[SDP Offer]:https://tools.ietf.org/html/rfc3264
+[WebRTC]:https://www.w3.org/TR/webrtc
+[webrtcbin]: https://gstreamer.freedesktop.org/data/doc/gstreamer/head/gst-plugins-bad/html/gst-plugins-bad-plugins-webrtcbin.html
