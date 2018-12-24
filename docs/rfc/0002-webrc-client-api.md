@@ -26,8 +26,8 @@ You will need to express ways to:
 4. Pass some user metadata to hook business logic onto.
 5. Build more complex connection graphs.
 6. Dynamically cancel/begin media publishing/receiving.
-7. Passing errors, connection statistics.
-8. Cover both P2P mesh and SFU scenarios.
+7. Passing errors, [RTCPeerConnection]'s [RTCStatsReport]'s.
+8. Cover both [P2P full mesh] and [Hub Server(SFU, MCU)] scenarios.
 
 The protocol must be versatile enough to cover all possible use cases.
 
@@ -71,10 +71,12 @@ Although, signalling can be implemented on top of any transport, WebSocket suits
 ### Protocol considerations
 
 Existing best practices are recommended for final implementation:
-1. Message level ping-pongs.
-2. Reconnects.
-3. Transactions.
-4. Using custom Close Frame Status Codes.
+1. Message level ping-pongs, since it is the most reliable way to detect connection loss.
+2. Reconnects, since [RTCPeerConnection] always outlives WebSocket connection in cases of network issues, and both parts
+ should know when to dispose related resources.
+3. Transactions, so each part will receive answers to all request sent, and be able to know if request was processed 
+correctly or caused some kind of error.
+4. Using custom Close Frame Status Codes, to implement reliable send-and-close.
 
 Transactions:
 
@@ -204,10 +206,10 @@ struct VideoSettings {}
 
 ### Methods
 
-#### 1. AddPeer
+#### 1. CreatePeer
 
 ```rust
-struct AddPeer {
+struct CreatePeer {
     peer: Peer,
     sdp_offer: Option<String>,
     ice_servers: ICEServers,
@@ -302,7 +304,7 @@ Client is expected to:
 3. Add newly created tracks to [RTCPeerConnection].
 4. Create `sendrecv` [SDP Offer].
 5. Set offer as peers local description.
-6. Answer `AddPeer` request with `Offer` request containing [SDP Offer].
+6. Answer `CreatePeer` request with `Offer` request containing [SDP Offer].
 7. Expect remote [SDP Answer] to set it as remote description.
 
 After negotiation is done and media starts flowing, the client might receive notification that his media is being sent to `Peer { peer_id = 2 }`, and he is receiving media from `Peer { peer_id = 2 }`.
@@ -347,7 +349,7 @@ Client is expected to:
 4. Set provided offer as peers remote description.
 5. Create `sendonly` [SDP Answer].
 6. Set created [SDP Answer] as local description.
-7. Answer `AddPeer` request with `Answer` request containing [SDP Offer]. 
+7. Answer `CreatePeer` request with `Answer` request containing [SDP Offer]. 
 
 After negotiation is done and media starts flowing, client might receive notification that his media is being sent to server.
 </details>
@@ -542,7 +544,7 @@ struct Offer {
 Server's / Client's [SDP Offer] sent during SDP negotiation between peers.
 
 Client can send it:
-1. As answer to `AddPeer {sdp_offer: None}`
+1. As answer to `CreatePeer {sdp_offer: None}`
 2. As answer to `UpdateTracks` if update requires SDP renegotiation.
 
 Server can send it:
@@ -574,7 +576,7 @@ struct Answer {
 Server's / Client's [SDP Answer] sent during SDP negotiation between peers.
 
 Client can send it:
-1. As answer to `AddPeer {sdp_offer: Some}`.
+1. As answer to `CreatePeer {sdp_offer: Some}`.
 2. As answer to `Offer`.
 
 Server can send it only as answer to `Offer`.
@@ -837,11 +839,11 @@ It is recommended to cache `Peer` id - `Member` id relation in Web Client. Proba
 '-------------'    '-<--<--<--' '-------------'
 ```
 
-1\. Server send `AddPeer` to `user1`:
+1\. Server send `CreatePeer` to `user1`:
 
 ```json
 {
-  "method": "AddPeer",
+  "method": "CreatePeer",
   "payload": {
     "peer": {
       "peer_id": 1,
@@ -913,11 +915,11 @@ It is recommended to cache `Peer` id - `Member` id relation in Web Client. Proba
 }
 ```
  
-3\. Server send `AddPeer` with `user1`'s [SDP Offer] to `user2`:
+3\. Server send `CreatePeer` with `user1`'s [SDP Offer] to `user2`:
 
 ```json
 {
-  "method": "AddPeer",
+  "method": "CreatePeer",
   "payload": {
     "peer": {
       "peer_id": 2,
@@ -1205,7 +1207,7 @@ It is recommended to cache `Peer` id - `Member` id relation in Web Client. Proba
 
 ```json
 {
-  "method": "AddPeer",
+  "method": "CreatePeer",
   "payload": {
     "peer": {
       "peer_id": 1,
@@ -1293,7 +1295,7 @@ It is recommended to cache `Peer` id - `Member` id relation in Web Client. Proba
 
 ```json
 {
-  "method": "AddPeer",
+  "method": "CreatePeer",
   "payload": {
     "peer": {
       "peer_id": 2,
@@ -1425,7 +1427,7 @@ It is recommended to cache `Peer` id - `Member` id relation in Web Client. Proba
 
 ```json
 {
-  "method": "AddPeer",
+  "method": "CreatePeer",
   "payload": {
     "peer": {
       "peer_id": 3,
@@ -1607,3 +1609,6 @@ Current protocol assumes that there will be separate [RTCPeerConnection] pair fo
 [SDP Offer]:https://tools.ietf.org/html/rfc3264
 [WebRTC]:https://www.w3.org/TR/webrtc
 [webrtcbin]: https://gstreamer.freedesktop.org/data/doc/gstreamer/head/gst-plugins-bad/html/gst-plugins-bad-plugins-webrtcbin.html
+[P2P full mesh]: https://webrtcglossary.com/mesh/
+[Hub Server(SFU, MCU)]: https://webrtcglossary.com/sfu/
+[RTCStatsReport]: https://developer.mozilla.org/en-US/docs/Web/API/RTCStatsReport
