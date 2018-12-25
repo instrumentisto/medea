@@ -26,8 +26,8 @@ You will need to express ways to:
 4. Pass some user metadata to hook business logic onto.
 5. Build more complex connection graphs.
 6. Dynamically cancel/begin media publishing/receiving.
-7. Passing errors, [RTCPeerConnection]'s [RTCStatsReport]'s.
-8. Cover both [P2P full mesh] and [Hub Server(SFU, MCU)] scenarios.
+7. Passing errors, [RTCPeerConnection]s, [RTCStatsReport]s.
+8. Cover both [p2p full mesh] and [hub server (SFU, MCU)] scenarios.
 
 The protocol must be versatile enough to cover all possible use cases.
 
@@ -71,11 +71,9 @@ Although, signalling can be implemented on top of any transport, WebSocket suits
 ### Protocol considerations
 
 Existing best practices are recommended for final implementation:
-1. Message level ping-pongs, since it is the most reliable way to detect connection loss.
-2. Reconnects, since [RTCPeerConnection] always outlives WebSocket connection in cases of network issues, and both parts
- should know when to dispose related resources.
-3. Transactions, so each part will receive answers to all request sent, and be able to know if request was processed 
-correctly or caused some kind of error.
+1. Message level `ping`/`pong`, since it is the most reliable way to detect connection loss (protocol level WebSocket `ping`/`pong` may disfunct due to browser implementation and is not exposed to `Web Client`).
+2. Reconnects, since [RTCPeerConnection] always outlives WebSocket connection in cases of network issues, and both parts should know when to dispose related resources.
+3. Transactions, so each part will receive answers to all request sent, and be able to know if request was processed correctly or caused some kind of error.
 4. Using custom Close Frame Status Codes, to implement reliable send-and-close.
 
 Transactions:
@@ -94,7 +92,7 @@ struct Payload<T> {
 }
 ```
 
-Each message requires answer. Answer can carry some payload(e.g. answering with [SDP Answer] to [SDP Offer]), Error, or just noting, which just means that message reached destination and was processed. 
+Each message requires answer. Answer can carry some payload (e.g. answering with [SDP Answer] to [SDP Offer]), error, or just noting, which just means that message reached destination and was processed.
 
 
 ### Signalling Protocol considerations
@@ -1601,14 +1599,14 @@ Current protocol assumes that there will be separate [RTCPeerConnection] pair fo
 
 
 [GStreamer]: https://gstreamer.freedesktop.org
+[hub server (SFU, MCU)]: https://webrtcglossary.com/sfu
 [ICE Candidate]:https://tools.ietf.org/html/rfc8445
 [MediaStreamTrack]: https://www.w3.org/TR/mediacapture-streams/#mediastreamtrack
+[p2p full mesh]: https://webrtcglossary.com/mesh
 [RTCDataChannel]:https://www.w3.org/TR/webrtc/#rtcdatachannel
 [RTCPeerConnection]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
+[RTCStatsReport]: https://developer.mozilla.org/en-US/docs/Web/API/RTCStatsReport
 [SDP Answer]:https://tools.ietf.org/html/rfc3264
 [SDP Offer]:https://tools.ietf.org/html/rfc3264
 [WebRTC]:https://www.w3.org/TR/webrtc
 [webrtcbin]: https://gstreamer.freedesktop.org/data/doc/gstreamer/head/gst-plugins-bad/html/gst-plugins-bad-plugins-webrtcbin.html
-[P2P full mesh]: https://webrtcglossary.com/mesh/
-[Hub Server(SFU, MCU)]: https://webrtcglossary.com/sfu/
-[RTCStatsReport]: https://developer.mozilla.org/en-US/docs/Web/API/RTCStatsReport
