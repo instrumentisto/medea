@@ -73,12 +73,10 @@ Although, signalling can be implemented on top of any transport, WebSocket suits
 Existing best practices are recommended for final implementation:
 1. Message level `ping`/`pong`, since it is the most reliable way to detect connection loss (protocol level WebSocket `ping`/`pong` may disfunct due to browser implementation and is not exposed to `Web Client`).
 2. Reconnects, since [RTCPeerConnection] always outlives WebSocket connection in cases of network issues, and both parts should know when to dispose related resources.
-3. Transactions, so each part will receive answers to all request sent, and be able to know if request was processed correctly or caused some kind of error.
+3. Share common identifier across multiple messages, so each part will receive answers to all request sent, and be able to know if request was processed correctly or caused some kind of error.
 4. Using custom Close Frame Status Codes, to implement reliable send-and-close.
 
-Transactions:
-
-Each message is represented as:
+Each message could be represented as:
 
 ```rust
 struct WsMessage<T> {
@@ -166,7 +164,6 @@ struct Member {
 ```rust
 struct Peer {
     peer_id: u64,
-    p2p: bool,
     tracks: Vec<Track>,
 }
 ```
@@ -197,26 +194,21 @@ struct AudioSettings {}
 struct VideoSettings {}
 ```
 
-`P2P` flag implies some logic on `TrackDirection::Send` tracks:
-1. `P2P` `Send` tracks always have only one receiver.
-2. Non-`P2P` `Send` tracks can have 0-N receivers. 0 - if media is transmitted to server, but have no actual user receiving it.
-
-
 ### Methods
 
-#### 1. CreatePeer
+#### 1. SetPeer
 
 ```rust
-struct CreatePeer {
+struct SetPeer {
     peer: Peer,
     sdp_offer: Option<String>,
-    ice_servers: ICEServers,
+    ice_servers: Vec<ICEServer>,
 }
 ```
 
 Related objects:
 ```rust
-struct ICEServers {
+struct ICEServer {
     urls: Vec<String>,
     username: String,
     credential: String,
@@ -241,7 +233,6 @@ The most important part of `Peer` object is list of tracks. All `TrackDirection:
 {
   "peer": {
     "peer_id": 1,
-    "p2p": true,
     "tracks": [{
       "id": 1,
       "media_type": {
@@ -285,14 +276,16 @@ The most important part of `Peer` object is list of tracks. All `TrackDirection:
     }
   ]},
   "sdp_offer": null,
-  "ice_servers": {
-    "urls": [
-      "turn:turnserver.com:3478",
-      "turn:turnserver.com:3478?transport=tcp"
-    ],
-    "username": "turn_user",
-    "credential": "turn_credential"
-  }
+  "ice_servers":[
+      {
+      "urls":[
+        "turn:turnserver.com:3478",
+        "turn:turnserver.com:3478?transport=tcp"
+      ],
+      "username":"turn_user",
+      "credential":"turn_credential"
+      }
+  ]
 }
 ```
 
@@ -302,7 +295,7 @@ Client is expected to:
 3. Add newly created tracks to [RTCPeerConnection].
 4. Create `sendrecv` [SDP Offer].
 5. Set offer as peers local description.
-6. Answer `CreatePeer` request with `Offer` request containing [SDP Offer].
+6. Answer `SetPeer` request with `Offer` request containing [SDP Offer].
 7. Expect remote [SDP Answer] to set it as remote description.
 
 After negotiation is done and media starts flowing, the client might receive notification that his media is being sent to `Peer { peer_id = 2 }`, and he is receiving media from `Peer { peer_id = 2 }`.
@@ -315,7 +308,6 @@ After negotiation is done and media starts flowing, the client might receive not
 {
   "peer": {
     "peer_id": 1,
-    "p2p": false,
     "tracks": [{
       "id": 1,
       "media_type": {
@@ -329,14 +321,16 @@ After negotiation is done and media starts flowing, the client might receive not
     }]
   },
   "sdp_offer": "server_user1_recvonly_offer",
-  "ice_servers": {
-    "urls": [
-      "turn:turnserver.com:3478",
-      "turn:turnserver.com:3478?transport=tcp"
-    ],
-    "username": "turn_user",
-    "credential": "turn_credential"
-  }
+  "ice_servers":[
+      {
+      "urls":[
+        "turn:turnserver.com:3478",
+        "turn:turnserver.com:3478?transport=tcp"
+      ],
+      "username":"turn_user",
+      "credential":"turn_credential"
+      }
+  ]
 }
 ```
 
@@ -347,7 +341,7 @@ Client is expected to:
 4. Set provided offer as peers remote description.
 5. Create `sendonly` [SDP Answer].
 6. Set created [SDP Answer] as local description.
-7. Answer `CreatePeer` request with `Answer` request containing [SDP Offer]. 
+7. Answer `SetPeer` request with `Answer` request containing [SDP Offer]. 
 
 After negotiation is done and media starts flowing, client might receive notification that his media is being sent to server.
 </details>
@@ -380,10 +374,10 @@ Probably, Server will always give his permission on any Client's request. This k
 ```
 </details>
 
-#### 3. UpdateTracks
+#### 3. SetTracks
 
 ```rust
-struct UpdateTracks {
+struct SetTracks {
     peer_id: u64,
     tracks: Vec<Track>,
 }
@@ -408,7 +402,6 @@ If Client => Server, then it can be used to express Clients intentions to:
 ```json
 {
   "peer_id": 1,
-  "p2p": false,
   "tracks": [{
     "id": 1,
     "media_type": {
@@ -542,8 +535,8 @@ struct Offer {
 Server's / Client's [SDP Offer] sent during SDP negotiation between peers.
 
 Client can send it:
-1. As answer to `CreatePeer {sdp_offer: None}`
-2. As answer to `UpdateTracks` if update requires SDP renegotiation.
+1. As answer to `SetPeer {sdp_offer: None}`
+2. As answer to `SetTracks` if update requires SDP renegotiation.
 
 Server can send it:
 1. If server triggers renegotiation.
@@ -574,7 +567,7 @@ struct Answer {
 Server's / Client's [SDP Answer] sent during SDP negotiation between peers.
 
 Client can send it:
-1. As answer to `CreatePeer {sdp_offer: Some}`.
+1. As answer to `SetPeer {sdp_offer: Some}`.
 2. As answer to `Offer`.
 
 Server can send it only as answer to `Offer`.
@@ -696,10 +689,10 @@ Params:
 ```
 </details>
 
-#### 8. RequestTracks
+#### 8. RequestRemoteTracks
 
 ```rust
-struct RequestTracks {
+struct RequestRemoteTracks {
     peer_id: Option<u64>,
     remote_peer_id: Option<u64>,
     rx: Option<RemotePeerTrackType>,
@@ -837,15 +830,14 @@ It is recommended to cache `Peer` id - `Member` id relation in Web Client. Proba
 '-------------'    '-<--<--<--' '-------------'
 ```
 
-1\. Server send `CreatePeer` to `user1`:
+1\. Server send `SetPeer` to `user1`:
 
 ```json
 {
-  "method": "CreatePeer",
+  "method": "SetPeer",
   "payload": {
     "peer": {
       "peer_id": 1,
-      "p2p": true,
       "tracks": [{
         "id": 1,
         "media_type": {
@@ -889,14 +881,16 @@ It is recommended to cache `Peer` id - `Member` id relation in Web Client. Proba
       }]
     },
     "sdp_offer": null,
-    "ice_servers": {
-      "urls": [
-        "turn:turnserver.com:3478",
-        "turn:turnserver.com:3478?transport=tcp"
-      ],
-      "username": "turn_user",
-      "credential": "turn_credential"
-    }
+    "ice_servers":[
+        {
+        "urls":[
+          "turn:turnserver.com:3478",
+          "turn:turnserver.com:3478?transport=tcp"
+        ],
+        "username":"turn_user",
+        "credential":"turn_credential"
+        }
+    ]
   }
 }
 ```
@@ -913,15 +907,14 @@ It is recommended to cache `Peer` id - `Member` id relation in Web Client. Proba
 }
 ```
  
-3\. Server send `CreatePeer` with `user1`'s [SDP Offer] to `user2`:
+3\. Server send `SetPeer` with `user1`'s [SDP Offer] to `user2`:
 
 ```json
 {
-  "method": "CreatePeer",
+  "method": "SetPeer",
   "payload": {
     "peer": {
       "peer_id": 2,
-      "p2p": true,
       "tracks": [{
         "id": 1,
         "media_type": {
@@ -965,14 +958,16 @@ It is recommended to cache `Peer` id - `Member` id relation in Web Client. Proba
       }]
     },
     "sdp_offer": "user1_sendrecv_offer",
-    "ice_servers": {
-      "urls": [
-        "turn:turnserver.com:3478",
-        "turn:turnserver.com:3478?transport=tcp"
-      ],
-      "username": "turn_user",
-      "credential": "turn_credential"
-    }
+    "ice_servers":[
+        {
+        "urls":[
+          "turn:turnserver.com:3478",
+          "turn:turnserver.com:3478?transport=tcp"
+        ],
+        "username":"turn_user",
+        "credential":"turn_credential"
+        }
+    ]
   }
 }
 ```
@@ -1099,7 +1094,7 @@ It is recommended to cache `Peer` id - `Member` id relation in Web Client. Proba
 
 ```json
 {
-  "method": "RequestTracks",
+  "method": "RequestRemoteTracks",
   "payload": {
     "peer_id": 1,
     "remote_peer_id": 2,
@@ -1118,7 +1113,7 @@ It is recommended to cache `Peer` id - `Member` id relation in Web Client. Proba
 
 ```json
 {
-  "method": "UpdateTracks",
+  "method": "SetTracks",
   "payload": {
     "peer_id": 2,
     "tracks": [{
@@ -1150,7 +1145,7 @@ It is recommended to cache `Peer` id - `Member` id relation in Web Client. Proba
 
 ```json
 {
-  "method": "UpdateTracks",
+  "method": "SetTracks",
   "payload": {
     "peer_id": 1,
     "tracks": [{
@@ -1205,11 +1200,10 @@ It is recommended to cache `Peer` id - `Member` id relation in Web Client. Proba
 
 ```json
 {
-  "method": "CreatePeer",
+  "method": "SetPeer",
   "payload": {
     "peer": {
       "peer_id": 1,
-      "p2p": false,
       "tracks": [{
         "id": 1,
         "media_type": {
@@ -1233,14 +1227,16 @@ It is recommended to cache `Peer` id - `Member` id relation in Web Client. Proba
       }]
     },
     "sdp_offer": "server_user1_recvonly_offer",
-    "ice_servers": {
-      "urls": [
-        "turn:turnserver.com:3478",
-        "turn:turnserver.com:3478?transport=tcp"
-      ],
-      "username": "turn_user",
-      "credential": "turn_credential"
-    }
+    "ice_servers":[
+        {
+        "urls":[
+          "turn:turnserver.com:3478",
+          "turn:turnserver.com:3478?transport=tcp"
+        ],
+        "username":"turn_user",
+        "credential":"turn_credential"
+        }
+    ]
   }
 }
 ```
@@ -1293,11 +1289,10 @@ It is recommended to cache `Peer` id - `Member` id relation in Web Client. Proba
 
 ```json
 {
-  "method": "CreatePeer",
+  "method": "SetPeer",
   "payload": {
     "peer": {
       "peer_id": 2,
-      "p2p": false,
       "tracks": [{
         "id": 1,
         "media_type": {
@@ -1321,14 +1316,16 @@ It is recommended to cache `Peer` id - `Member` id relation in Web Client. Proba
       }]
     },
     "sdp_offer": "server_user2_sendonly_offer",
-    "ice_servers": {
-      "urls": [
-        "turn:turnserver.com:3478",
-        "turn:turnserver.com:3478?transport=tcp"
-      ],
-      "username": "turn_user",
-      "credential": "turn_credential"
-    }
+    "ice_servers":[
+        {
+        "urls":[
+          "turn:turnserver.com:3478",
+          "turn:turnserver.com:3478?transport=tcp"
+        ],
+        "username":"turn_user",
+        "credential":"turn_credential"
+        }
+    ]
   }
 }
 ```
@@ -1382,7 +1379,7 @@ It is recommended to cache `Peer` id - `Member` id relation in Web Client. Proba
 
 ```json
 {
-  "method": "UpdateTracks",
+  "method": "SetTracks",
   "payload": {
     "peer_id": 1,
     "tracks": [{
@@ -1425,11 +1422,10 @@ It is recommended to cache `Peer` id - `Member` id relation in Web Client. Proba
 
 ```json
 {
-  "method": "CreatePeer",
+  "method": "SetPeer",
   "payload": {
     "peer": {
       "peer_id": 3,
-      "p2p": false,
       "tracks": [{
         "id": 1,
         "media_type": {
@@ -1453,14 +1449,16 @@ It is recommended to cache `Peer` id - `Member` id relation in Web Client. Proba
       }]
     },
     "sdp_offer": "server_user3_sendonly_offer",
-    "ice_servers": {
-      "urls": [
-        "turn:turnserver.com:3478",
-        "turn:turnserver.com:3478?transport=tcp"
-      ],
-      "username": "turn_user",
-      "credential": "turn_credential"
-    }
+    "ice_servers":[
+        {
+        "urls":[
+          "turn:turnserver.com:3478",
+          "turn:turnserver.com:3478?transport=tcp"
+        ],
+        "username":"turn_user",
+        "credential":"turn_credential"
+        }
+    ]
   }
 }
 ```
@@ -1515,7 +1513,7 @@ It is recommended to cache `Peer` id - `Member` id relation in Web Client. Proba
 
 ```json
 {
-  "method": "UpdateTracks",
+  "method": "SetTracks",
   "payload": {
     "peer_id": 1,
     "tracks": [{
