@@ -73,25 +73,7 @@ Although, signalling can be implemented on top of any transport, WebSocket suits
 Existing best practices are recommended for final implementation:
 1. Message level `ping`/`pong`, since it is the most reliable way to detect connection loss (protocol level WebSocket `ping`/`pong` may disfunct due to browser implementation and is not exposed to `Web Client`).
 2. Reconnects, since [RTCPeerConnection] always outlives WebSocket connection in cases of network issues, and both parts should know when to dispose related resources.
-3. Share common identifier across multiple messages, so each part will receive answers to all request sent, and be able to know if request was processed correctly or caused some kind of error.
-4. Using custom Close Frame Status Codes, to implement reliable send-and-close.
-
-Each message could be represented as:
-
-```rust
-struct WsMessage<T> {
-    id: i64,
-    payload: Option<Result<Payload<T>, Error>>,
-}
-
-struct Payload<T> {
-    method: String,
-    params: T,
-}
-```
-
-Each message requires answer. Answer can carry some payload (e.g. answering with [SDP Answer] to [SDP Offer]), error, or just noting, which just means that message reached destination and was processed.
-
+3. Using custom Close Frame Status Codes, to implement reliable send-and-close.
 
 ### Signalling Protocol considerations
 [signalling-protocol-considerations]: #signalling-protocol-considerations
@@ -112,7 +94,11 @@ So API can be divided in two categories:
 
 Current RFC offers combining both ways: everything will be configured automagically, but dynamic API is always there if you need it.
 
+All WS messages sent by `Server` are called `Events`. `Event` means a fact that already has happened, so client cannot reject `Event` in any way (you cannot reject the happened past), it can only adopt itself to the received `Events`. So, `Server` just notifies `Client` about happened facts and `Clients` reacts on them to make the proper state. This also emphasizes the indisputable authority of the `Server`.
+The naming for `Events` follows the convention `<entity><passive-verb>`, for example: `PeerCreated`, `TracksApplied`, `PeersRemoved`.
 
+All WS messages sent by `Client` are called `Commands`. `Command` is basically a request/desire/intention of client to change the state on `Server`.
+The naming for `Commands` follows the convention `<infinitive-verb><entity>`, for example: `TracksApplied`, `MakeSdpOffer`, `MakeSdpAnswer`.
 
 
 ## Reference-level explanation
@@ -196,10 +182,14 @@ struct VideoSettings {}
 
 ### Methods
 
-#### 1. SetPeer
+### Events
+
+I.e. `Server` => `Client` requests.
+
+#### 1. PeerCreated
 
 ```rust
-struct SetPeer {
+struct PeerCreated {
     peer: Peer,
     sdp_offer: Option<String>,
     ice_servers: Vec<ICEServer>,
@@ -227,7 +217,7 @@ The most important part of `Peer` object is list of tracks. All `TrackDirection:
 ##### Examples
 
 <details>
-<summary>Create Audio+Video sendrecv p2p Peer</summary>
+<summary>Create Audio+Video sendrecv Peer</summary>
 
 ```json
 {
@@ -295,7 +285,7 @@ Client is expected to:
 3. Add newly created tracks to [RTCPeerConnection].
 4. Create `sendrecv` [SDP Offer].
 5. Set offer as peers local description.
-6. Answer `SetPeer` request with `Offer` request containing [SDP Offer].
+6. Answer `PeerCreated` request with `Offer` request containing [SDP Offer].
 7. Expect remote [SDP Answer] to set it as remote description.
 
 After negotiation is done and media starts flowing, the client might receive notification that his media is being sent to `Peer { peer_id = 2 }`, and he is receiving media from `Peer { peer_id = 2 }`.
@@ -341,31 +331,26 @@ Client is expected to:
 4. Set provided offer as peers remote description.
 5. Create `sendonly` [SDP Answer].
 6. Set created [SDP Answer] as local description.
-7. Answer `SetPeer` request with `Answer` request containing [SDP Offer]. 
+7. Answer `PeerCreated` request with `Answer` request containing [SDP Offer]. 
 
 After negotiation is done and media starts flowing, client might receive notification that his media is being sent to server.
 </details>
 
-#### 2. RemovePeers
+#### 2. PeersRemoved
 
 ```rust
-struct RemovePeers {
+struct PeersRemoved {
     peer_ids: Vec<u64>,
 }
 ```
 
-Server's/Client's request to dispose (close) specified `Peers`.
+`Server` requests to dispose (close) specified `Peers`.
 
-If Server => Client, then Client must dispose specified `Peers`.
-
-If Client => Server, then Client requests Server's permission to dispose specified `Peers`. Server may give permission in answer.
-
-Probably, Server will always give his permission on any Client's request. This kind of request flow will allow Server to do any request related stuff that Server needs to do, and distinguish between abnormal and normal events.
 
 ##### Examples
 
 <details>
-<summary>Server tells client to dispose specified Peers / Client requests Server's permission to dispose specified Peers</summary>
+<summary>Server tells Client to dispose specified Peers</summary>
 
 ```json
 {
@@ -374,25 +359,21 @@ Probably, Server will always give his permission on any Client's request. This k
 ```
 </details>
 
-#### 3. SetTracks
+#### 3. TracksApplied
 
 ```rust
-struct SetTracks {
+struct TracksApplied {
     peer_id: u64,
     tracks: Vec<Track>,
 }
 ```
 
-Server's/Client's request to update tracks in specified `Peer`.
+`Server` requests to update tracks in specified `Peer`.
 
-If Server => Client, then it can be used to:
+It can be used to:
 1. Add new track.
 2. Update existing track settings (e.g. change to lower video resolution, mute audio).
 3. Update send track receivers list (add/remove).
-
-If Client => Server, then it can be used to express Clients intentions to:
-1. Update existing track settings.
-2. Cancel sending media to specific receiver (only remove).
 
 ##### Examples 
 
@@ -432,8 +413,6 @@ Meaning that media is being published to server but has no actual receivers.
 <details>
 <summary>Server notifies Client that video is being received by other Peer {peer_id = 2}</summary>
 
-Server => Client
-
 ```json
 {
   "peer_id": 1,
@@ -462,58 +441,21 @@ Server => Client
 ```
 </details>
 
-<details>
-<summary>Client wants to unsubscribe Peer {peer_id = 2} from specified track</summary>
-
-Client => Server
-
-```json
-{
-  "peer_id": 1,
-  "tracks": [{
-    "id": 1,
-    "media_type": {
-      "Audio": {}
-    },
-    "direction": {
-      "Send": {
-        "receivers": []
-      }
-    }
-  }, {
-    "id": 2,
-    "media_type": {
-      "Video": {}
-    },
-    "direction": {
-      "Send": {
-        "receivers": []
-      }
-    }
-  }]
-}
-```
-</details>
-
-#### 4. RemoveTracks
+#### 4. TracksRemoved
 
 ```rust
-struct RemoveTracks {
+struct TracksRemoved {
     peer_id: u64,
     tracks: Vec<u64>,
 }
 ```
 
-Server's/Client's request to dispose (close) specified `Tracks`.
-
-If Server => Client, then Client must dispose (stop and remove).
-
-If Client => Server, then Client requests Server's permission to dispose specified `Peers`.
+`Server` requests to dispose (close) specified `Tracks`.
 
 ##### Examples
 
 <details>
-<summary>Server tells client to dispose specified Tracks / Client requests Server's permission to dispose specified Tracks</summary>
+<summary>Server tells client to dispose specified Tracks</summary>
 
 ```json
 {
@@ -523,29 +465,21 @@ If Client => Server, then Client requests Server's permission to dispose specifi
 ```
 </details>
 
-#### 5. Offer
+#### 5. SdpOfferMade
 
 ```rust
-struct Offer {
+struct SdpOfferMade {
     peer_id: u64,
     sdp_offer: String,
 }
 ```
 
-Server's / Client's [SDP Offer] sent during SDP negotiation between peers.
-
-Client can send it:
-1. As answer to `SetPeer {sdp_offer: None}`
-2. As answer to `SetTracks` if update requires SDP renegotiation.
-
-Server can send it:
-1. If server triggers renegotiation.
-2. Retransmission from peer that triggered renegotiation.
+`Server` applies [SDP Offer] to `Client`s [RTCPeerConnection]. Being sent during SDP negotiation/renegotiation.
 
 ##### Examples
 
 <details>
-<summary>Client sends Peers SDP Offer</summary>
+<summary>Server sends SDP Offer to Peer {peer_id = 1}</summary>
 
 ```json
 {
@@ -555,27 +489,21 @@ Server can send it:
 ```
 </details>
 
-#### 6. Answer
+#### 6. SdpAnswerMade
 
 ```rust
-struct Answer {
+struct SdpAnswerMade {
     peer_id: u64,
     sdp_answer: String,
 }
 ```
 
-Server's / Client's [SDP Answer] sent during SDP negotiation between peers.
-
-Client can send it:
-1. As answer to `SetPeer {sdp_offer: Some}`.
-2. As answer to `Offer`.
-
-Server can send it only as answer to `Offer`.
+`Server` applies [SDP Offer] to `Client`s [RTCPeerConnection]. Being sent during SDP negotiation/renegotiation.
 
 #### Examples
 
 <details>
-<summary>Client sends Peers SDP Answer</summary>
+<summary>Server sends SDP Offer to Peer {peer_id = 1}</summary>
 
 ```json
 {
@@ -586,23 +514,34 @@ Server can send it only as answer to `Offer`.
 </details>
 
 
-#### 7. Candidate
+#### 7. IceCandidatesDiscovered
 
 ```rust
-struct Candidate {
+struct IceCandidatesDiscovered {
     peer_id: u64,
     candidate: String,
 }
 ```
 
-Server's / Client's [ICE Candidate] sent during ICE negotiation.
+`Server` applies [ICE Candidate] to `Client`s [RTCPeerConnection]. Being sent during ICE negotiation/renegotiation.
 
-Just send each [ICE Candidate] discovered by underlying [RTCPeerConnection] to remote `Peer`. It's as simple as that.
+#### Examples
 
-#### 8. RemotePeers
+<details>
+<summary>Server sends ICE Candidate to Peer {peer_id = 1}</summary>
+
+```json
+{
+  "peer_id": 1,
+  "candidate": "ice_cadidate"
+}
+```
+</details>
+
+#### 8. RemotePeersUpdated
 
 ```rust
-struct RemotePeers {
+struct RemotePeersUpdated {
     peers: Vec<RemotePeer>
 }
 ```
@@ -688,6 +627,39 @@ Params:
 }
 ```
 </details>
+
+#### 9. MembersUpdated 
+
+```rust
+struct Members {
+    members: Vec<Member>
+}
+```
+
+`Server` updates `Client`s acknowledgement of `Peer`-`Member` associations. It is recommended to cache `Peer` id - `Member` id relation in Web Client. Probably, in two maps: `HashMap<peer_id, member_id>`, `HashMap<member_id, peer_id>`.
+
+#### Examples
+
+<details>
+<summary>Server updates Clients acknowledgement of Peer-Member associations</summary>
+
+```json
+{
+  "members": [{
+    "member_id": "user_2",
+    "peers": [ 1 ]
+  }, {
+    "member_id": "user_2",
+    "peers": [ 2 ]
+  }, {
+    "member_id": "user_3",
+    "peers": [ 3, 4 ]
+  }]
+}
+```
+</details>
+
+#### Commands
 
 #### 8. RequestRemoteTracks
 
@@ -783,8 +755,6 @@ struct Members {
 
 Server provides `Member`'s list according to user request.
 
-It is recommended to cache `Peer` id - `Member` id relation in Web Client. Probably, in two maps: `HashMap<peer_id, member_id>`, `HashMap<member_id, peer_id>`.
-
 ##### Examples
 
 <details>
@@ -830,11 +800,11 @@ It is recommended to cache `Peer` id - `Member` id relation in Web Client. Proba
 '-------------'    '-<--<--<--' '-------------'
 ```
 
-1\. Server send `SetPeer` to `user1`:
+1\. Server send `PeerCreated` to `user1`:
 
 ```json
 {
-  "method": "SetPeer",
+  "method": "PeerCreated",
   "payload": {
     "peer": {
       "peer_id": 1,
@@ -907,11 +877,11 @@ It is recommended to cache `Peer` id - `Member` id relation in Web Client. Proba
 }
 ```
  
-3\. Server send `SetPeer` with `user1`'s [SDP Offer] to `user2`:
+3\. Server send `PeerCreated` with `user1`'s [SDP Offer] to `user2`:
 
 ```json
 {
-  "method": "SetPeer",
+  "method": "PeerCreated",
   "payload": {
     "peer": {
       "peer_id": 2,
@@ -1014,11 +984,11 @@ It is recommended to cache `Peer` id - `Member` id relation in Web Client. Proba
 '-------------'    '-<--<--<--' '-------------'
 ```
 
-7\. `user1` wants to unpublish his tracks, so he sends `RemoveTracks` to the server:
+7\. `user1` wants to unpublish his tracks, so he sends `TracksRemoved` to the server:
 
 ```json
 {
-  "method": "RemoveTracks",
+  "method": "TracksRemoved",
   "payload": {
     "peer_id": 1,
     "tracks": [1, 2]
@@ -1030,7 +1000,7 @@ It is recommended to cache `Peer` id - `Member` id relation in Web Client. Proba
 
 ```json
 {
-  "method": "RemoveTracks",
+  "method": "TracksRemoved",
   "payload": {
     "peer_id": 2,
     "tracks": [1, 2]
@@ -1038,7 +1008,7 @@ It is recommended to cache `Peer` id - `Member` id relation in Web Client. Proba
 }
 ```
 
-9\. Server approves `user1` `RemoveTracks` request.
+9\. Server approves `user1` `TracksRemoved` request.
 
 10\. `user1` initiates SDP renegotiation:
 
@@ -1073,7 +1043,7 @@ It is recommended to cache `Peer` id - `Member` id relation in Web Client. Proba
 
 ```json
 {
-  "method": "RemotePeers",
+  "method": "RemotePeersUpdated",
   "payload": {
     "peers": [{
       "peer_id": 1,
@@ -1113,7 +1083,7 @@ It is recommended to cache `Peer` id - `Member` id relation in Web Client. Proba
 
 ```json
 {
-  "method": "SetTracks",
+  "method": "TracksApplied",
   "payload": {
     "peer_id": 2,
     "tracks": [{
@@ -1145,7 +1115,7 @@ It is recommended to cache `Peer` id - `Member` id relation in Web Client. Proba
 
 ```json
 {
-  "method": "SetTracks",
+  "method": "TracksApplied",
   "payload": {
     "peer_id": 1,
     "tracks": [{
@@ -1200,7 +1170,7 @@ It is recommended to cache `Peer` id - `Member` id relation in Web Client. Proba
 
 ```json
 {
-  "method": "SetPeer",
+  "method": "PeerCreated",
   "payload": {
     "peer": {
       "peer_id": 1,
@@ -1289,7 +1259,7 @@ It is recommended to cache `Peer` id - `Member` id relation in Web Client. Proba
 
 ```json
 {
-  "method": "SetPeer",
+  "method": "PeerCreated",
   "payload": {
     "peer": {
       "peer_id": 2,
@@ -1379,7 +1349,7 @@ It is recommended to cache `Peer` id - `Member` id relation in Web Client. Proba
 
 ```json
 {
-  "method": "SetTracks",
+  "method": "TracksApplied",
   "payload": {
     "peer_id": 1,
     "tracks": [{
@@ -1422,7 +1392,7 @@ It is recommended to cache `Peer` id - `Member` id relation in Web Client. Proba
 
 ```json
 {
-  "method": "SetPeer",
+  "method": "PeerCreated",
   "payload": {
     "peer": {
       "peer_id": 3,
@@ -1513,7 +1483,7 @@ It is recommended to cache `Peer` id - `Member` id relation in Web Client. Proba
 
 ```json
 {
-  "method": "SetTracks",
+  "method": "TracksApplied",
   "payload": {
     "peer_id": 1,
     "tracks": [{
