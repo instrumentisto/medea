@@ -26,7 +26,7 @@ You will need to express ways to:
 4. Pass some user metadata to hook business logic onto.
 5. Build more complex connection graphs.
 6. Dynamically cancel/begin media publishing/receiving.
-7. Passing errors, [RTCPeerConnection]s, [RTCStatsReport]s.
+7. Passing errors, [RTCPeerConnection]s [RTCStatsReport]s.
 8. Cover both [p2p full mesh] and [hub server (SFU, MCU)] scenarios.
 
 The protocol must be versatile enough to cover all possible use cases.
@@ -166,8 +166,12 @@ struct Track {
 }
 
 enum TrackDirection {
-    Send(Vec<u64>),     // receiver peers
-    Recv(u64),          // sender peer
+    Send {
+      receivers: Vec<u64>,
+    },
+    Recv {
+      sender: u64,
+    }, 
 }
 
 enum TrackMediaType {
@@ -285,7 +289,7 @@ Client is expected to:
 3. Add newly created tracks to [RTCPeerConnection].
 4. Create `sendrecv` [SDP Offer].
 5. Set offer as peers local description.
-6. Answer `PeerCreated` request with `Offer` request containing [SDP Offer].
+6. Answer `PeerCreated` request with `MakeSdpOffer` request containing [SDP Offer].
 7. Expect remote [SDP Answer] to set it as remote description.
 
 After negotiation is done and media starts flowing, the client might receive notification that his media is being sent to `Peer { peer_id = 2 }`, and he is receiving media from `Peer { peer_id = 2 }`.
@@ -331,7 +335,7 @@ Client is expected to:
 4. Set provided offer as peers remote description.
 5. Create `sendonly` [SDP Answer].
 6. Set created [SDP Answer] as local description.
-7. Answer `PeerCreated` request with `Answer` request containing [SDP Offer]. 
+7. Answer `PeerCreated` request with `MakeSdpAnswer` request containing [SDP Answer]. 
 
 After negotiation is done and media starts flowing, client might receive notification that his media is being sent to server.
 </details>
@@ -455,7 +459,7 @@ struct TracksRemoved {
 ##### Examples
 
 <details>
-<summary>Server tells client to dispose specified Tracks</summary>
+<summary>Server tells Client to dispose specified Tracks</summary>
 
 ```json
 {
@@ -474,7 +478,7 @@ struct SdpOfferMade {
 }
 ```
 
-`Server` applies [SDP Offer] to `Client`s [RTCPeerConnection]. Being sent during SDP negotiation/renegotiation.
+`Server` applies [SDP Offer] to `Client`s [RTCPeerConnection]. Being sent during SDP negotiation/re-negotiation.
 
 ##### Examples
 
@@ -498,7 +502,7 @@ struct SdpAnswerMade {
 }
 ```
 
-`Server` applies [SDP Offer] to `Client`s [RTCPeerConnection]. Being sent during SDP negotiation/renegotiation.
+`Server` applies [SDP Answer] to `Client`s [RTCPeerConnection]. Being sent during SDP negotiation/re-negotiation.
 
 #### Examples
 
@@ -523,7 +527,7 @@ struct IceCandidatesDiscovered {
 }
 ```
 
-`Server` applies [ICE Candidate] to `Client`s [RTCPeerConnection]. Being sent during ICE negotiation/renegotiation.
+`Server` applies [ICE Candidate] to `Client`s [RTCPeerConnection]. Being sent during ICE negotiation/re-negotiation.
 
 #### Examples
 
@@ -581,7 +585,7 @@ Params:
 #### Examples:
 
 <details>
-<summary>Notify Client that it is possible to subscribe to Member {id = 2} Video and Audio tracks</summary>
+<summary>Notify Client that it is possible to subscribe to Member {id = "User2", peer_id = 2} Video and Audio tracks</summary>
 
 ```json
 {
@@ -696,8 +700,8 @@ struct SetTracks {
 }
 ```
 
-`Client` requests to update tracks in specified `Peer`.
-
+`Client` requests to update tracks in specified `Peer`. Server may give permission by sending `TracksApplied`.
+                                                      
 It can be used to express Clients intentions to:
 1. Update existing track settings.
 2. Cancel sending media to specific receiver.
@@ -779,7 +783,7 @@ struct RemoveTracks {
 }
 ```
 
-`Client` requests `Server` permission to dispose specified `Peers`.
+`Client` requests `Server` permission to dispose specified `Peers`. Server may give permission by sending `TracksRemoved`.
 
 ##### Examples
 
@@ -807,7 +811,7 @@ Client sends [SDP Offer] from one if its `Peers`.
 
 Client can send it:
 1. As answer to `PeerCreated {sdp_offer: None}`
-2. As answer to `TracksApplied` if update requires SDP renegotiation.
+2. As answer to `TracksApplied` if update requires SDP re-negotiation.
 
 ##### Examples
 
@@ -902,7 +906,7 @@ enum RemotePeerTrackType {
 }
 ```
 
-Client requests to send or receive media to/from remote `Peer`.
+Client requests to send or receive media to/from remote `Peer`. Server may give permission by sending `TracksApplied`.
 
 Params:
 1. `peer_id`: if `Some` then Client wants to connect specified local `Peer` to remote. If `None`then it us to server
@@ -960,14 +964,6 @@ struct RequestMembers {
 
 Client requests `Member` IDs.
 
-```rust
-struct Members {
-    members: Vec<Member>
-}
-```
-
-Server provides `Member`'s list according to user request.
-
 ##### Examples
 
 <details>
@@ -981,26 +977,6 @@ Server provides `Member`'s list according to user request.
 }
 ```
 </details>
-
-<details>
-<summary>Server provides Member's that own specified Peers's</summary>
-
-```json
-{
-  "members": [{
-    "member_id": "user_2",
-    "peers": [ 1 ]
-  }, {
-    "member_id": "user_2",
-    "peers": [ 2 ]
-  }, {
-    "member_id": "user_3",
-    "peers": [ 3, 4 ]
-  }]
-}
-```
-</details>
-
 
 ### Extended examples
 
