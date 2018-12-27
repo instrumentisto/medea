@@ -550,8 +550,8 @@ Related objects:
 
 ```rust
 struct RemotePeer {
-    remote_peer_id: Option<u64>,
-    remote_member_id: Option<String>,
+    peer_id: Option<u64>,
+    member_id: Option<String>,
     can_rx: Option<RemotePeerTrackType>,
     can_tx: Option<RemotePeerTrackType>,
 }
@@ -573,8 +573,8 @@ enum RemotePeerTrackType {
 Server notifies Client of any remote peers that Client can connect to. This is a key method when talking about Dynamic API mentioned in [Signalling Protocol considerations][signalling-protocol-considerations]. Any Client's request to subscribe/publish will be based on data provided by this request.
 
 Params:
-1. ```remote_peer_id```: if `Some`, then represents specific remote `Peer` associated with some `Member`. If `None`, then represents Servers peer connection.
-2. ```remote_member_id```: if `Some`, then represents specific remote `Member` associated with some . If `None`, then represents Servers peer connection.
+1. ```peer_id```: if `Some`, then represents specific remote `Peer` associated with some `Member`. If `None`, then represents Servers peer connection.
+2. ```member_id```: if `Some`, then represents specific remote `Member` associated with some . If `None`, then represents Servers peer connection.
 3. ```can_rx```: if `Some` then Client can subscribe to specified media.
 4. ```can_tx```: if `Some` then Client can publish specified media to remote `Peer`.
 
@@ -1082,7 +1082,7 @@ Server provides `Member`'s list according to user request.
 
 ```json
 {
-  "method": "Offer",
+  "method": "MakeSdpOffer",
   "payload": {
     "peer_id": 1,
     "sdp_offer": "user1_sendrecv_offer"
@@ -1159,7 +1159,7 @@ Server provides `Member`'s list according to user request.
 
 ```json
 {
-  "method": "Answer",
+  "method": "MakeSDPAnswer",
   "payload": {
     "peer_id": 2,
     "sdp_answer": "user2_sendrecv_answer"
@@ -1169,9 +1169,10 @@ Server provides `Member`'s list according to user request.
 
 5\. Both peers exchange discovered [ICE Candidate]'s:
 
+`user1` => `Server`
 ```json
 {
-  "method": "Candidate",
+  "method": "SetIceCandidate",
   "payload": {
     "peer_id": 1,
     "candidate": "user1_ice_candidate"
@@ -1179,12 +1180,35 @@ Server provides `Member`'s list according to user request.
 }
 ```
 
+`Server` => `user2`
 ```json
 {
-  "method": "Candidate",
+  "method": "IceCandidatesDiscovered",
   "payload": {
     "peer_id": 2,
     "candidate": "user1_ice_candidate"
+  }
+}
+```
+
+`user2` => `Server`
+```json
+{
+  "method": "SetIceCandidate",
+  "payload": {
+    "peer_id": 2,
+    "candidate": "user2_ice_candidate"
+  }
+}
+```
+
+`Server` => `user1`
+```json
+{
+  "method": "IceCandidatesDiscovered",
+  "payload": {
+    "peer_id": 1,
+    "candidate": "user2_ice_candidate"
   }
 }
 ```
@@ -1201,7 +1225,7 @@ Server provides `Member`'s list according to user request.
 
 ```json
 {
-  "method": "TracksRemoved",
+  "method": "RemoveTracks",
   "payload": {
     "peer_id": 1,
     "tracks": [1, 2]
@@ -1221,9 +1245,19 @@ Server provides `Member`'s list according to user request.
 }
 ```
 
-9\. Server approves `user1` `TracksRemoved` request.
+9\. Server updates `user1` tracks:
 
-10\. `user1` initiates SDP renegotiation:
+```json
+{
+  "method": "TracksRemoved",
+  "payload": {
+    "peer_id": 1,
+    "tracks": [1, 2]
+  }
+}
+```
+
+10\. `user1` initiates SDP re-negotiation: `user1` sends `MakeSdpOffer`, `Server` relays `SdpOfferMade` to `user2`, `user2` sends `MakeSDPAnswer`, `Server` relays `SdpAnswerMade` to `user1`.
 
 ```
 .----user1----.         .----user2----.
@@ -1235,7 +1269,7 @@ Server provides `Member`'s list according to user request.
 
 ```json
 {
-  "method": "RemotePeer",
+  "method": "RemotePeersUpdated",
   "payload": {
     "peers": [{
       "peer_id": 2,
@@ -1356,7 +1390,7 @@ Server provides `Member`'s list according to user request.
 }
 ```
 
-16\. SDP re-negotiation:
+16\. SDP re-negotiation: `user1` sends `MakeSdpOffer`, `Server` relays `SdpOfferMade` to `user2`, `user2` sends `MakeSDPAnswer`, `Server` relays `SdpAnswerMade` to `user1`.
 
 ```
 .----user1----.    .->-->-->--. .----user2----.
@@ -1428,7 +1462,7 @@ Server provides `Member`'s list according to user request.
 
 ```json
 {
-  "method": "Answer",
+  "method": "MakeSDPAnswer",
   "payload": {
     "peer_id": 1,
     "sdp_answer": "user_1_sendonly_answer"
@@ -1438,9 +1472,10 @@ Server provides `Member`'s list according to user request.
 
 3\. Server and `user1` exchange [ICE Candidate]s:
 
+`user1` => `Server`
 ```json
 {
-  "method": "Candidate",
+  "method": "SetIceCandidate",
   "payload": {
     "peer_id": 1,
     "candidate": "user1_ice_candidate"
@@ -1448,12 +1483,13 @@ Server provides `Member`'s list according to user request.
 }
 ```
 
+`Server` => `user1`
 ```json
 {
-  "method": "Candidate",
+  "method": "IceCandidatesDiscovered",
   "payload": {
     "peer_id": 1,
-    "candidate": "servers_ice_candidate"
+    "candidate": "server_ice_candidate"
   }
 }
 ```
@@ -1517,7 +1553,7 @@ Server provides `Member`'s list according to user request.
 
 ```json
 {
-  "method": "Answer",
+  "method": "MakeSDPAnswer",
   "payload": {
     "peer_id": 2,
     "sdp_answer": "user_2_recvonly_answer"
@@ -1527,22 +1563,24 @@ Server provides `Member`'s list according to user request.
 
 7\. Server and `user2` exchange [ICE Candidate]s:
 
+`user2` => `Server`
 ```json
 {
-  "method": "Candidate",
+  "method": "SetIceCandidate",
   "payload": {
     "peer_id": 2,
-    "candidate": "user1_ice_candidate"
+    "candidate": "user2_ice_candidate"
   }
 }
 ```
 
+`Server` => `user2`
 ```json
 {
-  "method": "Candidate",
+  "method": "IceCandidatesDiscovered",
   "payload": {
     "peer_id": 2,
-    "candidate": "servers_ice_candidate"
+    "candidate": "server_ice_candidate"
   }
 }
 ```
@@ -1582,7 +1620,7 @@ Server provides `Member`'s list according to user request.
       },
       "direction": {
         "Send": {
-          "receivers": [2]
+          "receivers": [ 2 ]
         }
       }
     }]
@@ -1650,7 +1688,7 @@ Server provides `Member`'s list according to user request.
 
 ```json
 {
-  "method": "Answer",
+  "method": "MakeSDPAnswer",
   "payload": {
     "peer_id": 3,
     "sdp_answer": "user_3_recvonly_answer"
@@ -1660,22 +1698,24 @@ Server provides `Member`'s list according to user request.
 
 13\. Server and `user3` exchange [ICE Candidate]s:
 
+`user3` => `Server`
 ```json
 {
-  "method": "Candidate",
+  "method": "SetIceCandidate",
   "payload": {
     "peer_id": 3,
-    "candidate": "user1_ice_candidate"
+    "candidate": "user3_ice_candidate"
   }
 }
 ```
 
+`Server` => `user3`
 ```json
 {
-  "method": "Candidate",
+  "method": "IceCandidatesDiscovered",
   "payload": {
     "peer_id": 3,
-    "candidate": "servers_ice_candidate"
+    "candidate": "server_ice_candidate"
   }
 }
 ```
