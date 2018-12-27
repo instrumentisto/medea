@@ -659,9 +659,222 @@ struct Members {
 ```
 </details>
 
-#### Commands
+### Commands
 
-#### 8. RequestRemoteTracks
+I.e. `Client` => `Server` requests.
+
+#### 1. RemovePeers
+
+```rust
+struct RemovePeers {
+    peer_ids: Vec<u64>,
+}
+```
+
+`Client` requests `Server` permission to dispose specified `Peers`. Server may give permission by sending `PeersRemoved`.
+
+Probably, Server will always give his permission on any Client's request. This kind of request flow will allow Server to do any request related stuff that Server needs to do, and distinguish between abnormal and normal events.
+
+##### Examples
+
+<details>
+<summary>Client requests Server permission to dispose specified Peers</summary>
+
+```json
+{
+  "peer_ids": [1, 2, 3]
+}
+```
+</details>
+
+#### 2. SetTracks
+
+```rust
+struct SetTracks {
+    peer_id: u64,
+    tracks: Vec<Track>,
+}
+```
+
+`Client` requests to update tracks in specified `Peer`.
+
+It can be used to express Clients intentions to:
+1. Update existing track settings.
+2. Cancel sending media to specific receiver.
+
+##### Examples 
+
+<details>
+<summary>Assuming such Peer exists on Client's end</summary>
+
+```json
+{
+  "peer_id": 1,
+  "tracks": [{
+    "id": 1,
+    "media_type": {
+      "Audio": {}
+    },
+    "direction": {
+      "Send": {
+        "receivers": [2]
+      }
+    }
+  }, {
+    "id": 2,
+    "media_type": {
+      "Video": {}
+    },
+    "direction": {
+      "Send": {
+        "receivers": [2]
+      }
+    }
+  }]
+}
+```
+
+Meaning that media is being published to server and relayed to Peer {peer_id = 2}.
+</details>
+
+<details>
+<summary>Client wants to unsubscribe Peer {peer_id = 2} from specified tracks</summary>
+
+Client => Server
+
+```json
+{
+  "peer_id": 1,
+  "tracks": [{
+    "id": 1,
+    "media_type": {
+      "Audio": {}
+    },
+    "direction": {
+      "Send": {
+        "receivers": []
+      }
+    }
+  }, {
+    "id": 2,
+    "media_type": {
+      "Video": {}
+    },
+    "direction": {
+      "Send": {
+        "receivers": []
+      }
+    }
+  }]
+}
+```
+</details>
+
+#### 3. RemoveTracks
+
+```rust
+struct RemoveTracks {
+    peer_id: u64,
+    tracks: Vec<u64>,
+}
+```
+
+`Client` requests `Server` permission to dispose specified `Peers`.
+
+##### Examples
+
+<details>
+<summary>Client requests Server's permission to dispose specified Tracks</summary>
+
+```json
+{
+  "peer_id": 1,
+  "tracks": [1, 2]
+}
+```
+</details>
+
+#### 4. MakeSdpOffer
+
+```rust
+struct MakeSdpOffer {
+    peer_id: u64,
+    sdp_offer: String,
+}
+```
+
+Client sends [SDP Offer] from one if its `Peers`.
+
+Client can send it:
+1. As answer to `PeerCreated {sdp_offer: None}`
+2. As answer to `TracksApplied` if update requires SDP renegotiation.
+
+##### Examples
+
+<details>
+<summary>Client sends Peers SDP Offer</summary>
+
+```json
+{
+  "peer_id": 1,
+  "sdp_offer": "sdp_offer_body"
+}
+```
+</details>
+
+#### 5. MakeSDPAnswer
+
+```rust
+struct MakeSDPAnswer {
+    peer_id: u64,
+    sdp_answer: String,
+}
+```
+
+Client sends [SDP Answer] from one if its `Peers`.
+
+Client can send it:
+1. As answer to `PeerCreated {sdp_offer: Some}`.
+2. As answer to `SdpOfferMade`.
+
+#### Examples
+
+<details>
+<summary>Client sends Peers SDP Answer</summary>
+
+```json
+{
+  "peer_id": 1,
+  "sdp_offer": "sdp_answer_body"
+}
+```
+</details>
+
+#### 6. SetIceCandidate
+
+```rust
+struct SetIceCandidate {
+    peer_id: u64,
+    candidate: String,
+}
+```
+
+Client sends [ICE Candidate] discovered by underlying [RTCPeerConnection] of one of his `Peers`.
+
+#### Examples
+
+<details>
+<summary>Client sends ICE Candidate from Peer {peer_id = 1}</summary>
+
+```json
+{
+  "peer_id": 1,
+  "candidate": "ice_cadidate"
+}
+```
+</details>
+
+#### 7. RequestRemoteTracks
 
 ```rust
 struct RequestRemoteTracks {
@@ -689,15 +902,15 @@ enum RemotePeerTrackType {
 }
 ```
 
-Client requests to send or receive media to/from remote peer.
+Client requests to send or receive media to/from remote `Peer`.
 
 Params:
-1. ```peer_id```: if `Some` then Client wants to connect specified local `Peer` to remote. If `None`then it us to server
+1. `peer_id`: if `Some` then Client wants to connect specified local `Peer` to remote. If `None`then it us to server
 to decide which of Client's `Peers` will be connected.
-2. ```remote_peer_id```: if `Some`, then represents specific remote `Member` associated with some . If `None`, then 
+2. `remote_peer_id`: if `Some`, then represents specific remote `Member` associated with some . If `None`, then 
 represents Server's peer connection (only SFU).
-3. ```rx```: if `Some` then Client requests to subscribe to specified media.
-4. ```tx```: if `Some` then Client requests to publish specified media to remote `Peer`.
+3. `rx`: if `Some` then Client requests to subscribe to specified media.
+4. `tx`: if `Some` then Client requests to publish specified media to remote `Peer`.
 
 ##### Examples
 
@@ -737,10 +950,10 @@ represents Server's peer connection (only SFU).
 ```
 </details>
 
-#### 9. GetMembers, Members
+#### 9. RequestMembers
 
 ```rust
-struct GetMembers {
+struct RequestMembers {
     peer_ids: Vec<u64>,
 }
 ```
