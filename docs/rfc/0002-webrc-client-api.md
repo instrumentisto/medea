@@ -26,7 +26,7 @@ You will need to express ways to:
 4. Pass some user metadata to hook business logic onto.
 5. Build more complex connection graphs.
 6. Dynamically cancel/begin media publishing/receiving.
-7. Passing errors, [RTCPeerConnection]s [RTCStatsReport]s.
+7. Passing errors, [RTCPeerConnection]s and [RTCStatsReport]s.
 8. Cover both [p2p full mesh] and [hub server (SFU, MCU)] scenarios.
 
 The protocol must be versatile enough to cover all possible use cases.
@@ -75,6 +75,7 @@ Existing best practices are recommended for final implementation:
 2. Reconnects, since [RTCPeerConnection] always outlives WebSocket connection in cases of network issues, and both parts should know when to dispose related resources.
 3. Using custom Close Frame Status Codes, to implement reliable send-and-close.
 
+
 ### Signalling Protocol considerations
 [signalling-protocol-considerations]: #signalling-protocol-considerations
 
@@ -94,11 +95,13 @@ So API can be divided in two categories:
 
 Current RFC offers combining both ways: everything will be configured automagically, but dynamic API is always there if you need it.
 
-All WS messages sent by `Server` are called `Events`. `Event` means a fact that already has happened, so client cannot reject `Event` in any way (you cannot reject the happened past), it can only adopt itself to the received `Events`. So, `Server` just notifies `Client` about happened facts and `Clients` reacts on them to make the proper state. This also emphasizes the indisputable authority of the `Server`.
+All WS messages sent by `Server` are called `Event`s. `Event` means a fact that already has happened, so client cannot reject `Event` in any way (you cannot reject the happened past), it can only adopt itself to the received `Events`. So, `Server` just notifies `Client` about happened facts and `Clients` reacts on them to reach the proper state. This also emphasizes the indisputable authority of the `Server`.  
 The naming for `Events` follows the convention `<entity><passive-verb>`, for example: `PeerCreated`, `TracksApplied`, `PeersRemoved`.
 
-All WS messages sent by `Client` are called `Commands`. `Command` is basically a request/desire/intention of client to change the state on `Server`.
+All WS messages sent by `Client` are called `Commands`. `Command` is basically a request/desire/intention of `Client` to change the state on `Server`.  
 The naming for `Commands` follows the convention `<infinitive-verb><entity>`, for example: `TracksApplied`, `MakeSdpOffer`, `MakeSdpAnswer`.
+
+
 
 
 ## Reference-level explanation
@@ -171,7 +174,7 @@ enum TrackDirection {
     },
     Recv {
       sender: u64,
-    }, 
+    },
 }
 
 enum TrackMediaType {
@@ -184,7 +187,6 @@ struct AudioSettings {}
 struct VideoSettings {}
 ```
 
-### Methods
 
 ### Events
 
@@ -270,16 +272,14 @@ The most important part of `Peer` object is list of tracks. All `TrackDirection:
     }
   ]},
   "sdp_offer": null,
-  "ice_servers":[
-      {
-      "urls":[
-        "turn:turnserver.com:3478",
-        "turn:turnserver.com:3478?transport=tcp"
-      ],
-      "username":"turn_user",
-      "credential":"turn_credential"
-      }
-  ]
+  "ice_servers": [{
+    "urls": [
+      "turn:turnserver.com:3478",
+      "turn:turnserver.com:3478?transport=tcp"
+    ],
+    "username": "turn_user",
+    "credential": "turn_credential"
+  }]
 }
 ```
 
@@ -315,16 +315,14 @@ After negotiation is done and media starts flowing, the client might receive not
     }]
   },
   "sdp_offer": "server_user1_recvonly_offer",
-  "ice_servers":[
-      {
-      "urls":[
-        "turn:turnserver.com:3478",
-        "turn:turnserver.com:3478?transport=tcp"
-      ],
-      "username":"turn_user",
-      "credential":"turn_credential"
-      }
-  ]
+  "ice_servers": [{
+    "urls": [
+      "turn:turnserver.com:3478",
+      "turn:turnserver.com:3478?transport=tcp"
+    ],
+    "username": "turn_user",
+    "credential": "turn_credential"
+  }]
 }
 ```
 
@@ -651,17 +649,18 @@ struct Members {
 {
   "members": [{
     "member_id": "user_2",
-    "peers": [ 1 ]
+    "peers": [1]
   }, {
     "member_id": "user_2",
-    "peers": [ 2 ]
+    "peers": [2]
   }, {
     "member_id": "user_3",
-    "peers": [ 3, 4 ]
+    "peers": [3, 4]
   }]
 }
 ```
 </details>
+
 
 ### Commands
 
@@ -1040,16 +1039,14 @@ Client requests `Member` IDs.
       }]
     },
     "sdp_offer": null,
-    "ice_servers":[
-        {
-        "urls":[
-          "turn:turnserver.com:3478",
-          "turn:turnserver.com:3478?transport=tcp"
-        ],
-        "username":"turn_user",
-        "credential":"turn_credential"
-        }
-    ]
+    "ice_servers": [{
+      "urls": [
+        "turn:turnserver.com:3478",
+        "turn:turnserver.com:3478?transport=tcp"
+      ],
+      "username": "turn_user",
+      "credential": "turn_credential"
+    }]
   }
 }
 ```
@@ -1117,16 +1114,14 @@ Client requests `Member` IDs.
       }]
     },
     "sdp_offer": "user1_sendrecv_offer",
-    "ice_servers":[
-        {
-        "urls":[
-          "turn:turnserver.com:3478",
-          "turn:turnserver.com:3478?transport=tcp"
-        ],
-        "username":"turn_user",
-        "credential":"turn_credential"
-        }
-    ]
+    "ice_servers": [{
+      "urls": [
+        "turn:turnserver.com:3478",
+        "turn:turnserver.com:3478?transport=tcp"
+      ],
+      "username": "turn_user",
+      "credential": "turn_credential"
+    }]
   }
 }
 ```
@@ -1381,11 +1376,11 @@ Client requests `Member` IDs.
 
 ```
                                                        .-------user2------.
-                          .-------SFU-------.    .-->--o      pc_id = 2   :
+                          .-------SFU-------.    .-->--o     pc_id = 2    :
 .------user1------.       :       .---->----o-->-'     '------------------'
-:     pc_id = 1   o-->-->-o--->---:         :
+:    pc_id = 1    o-->-->-o--->---:         :
 '-----------------'       :       '---->----o-->-.     .-------user3------.
-                          '-----------------'    '-->--o      pc_id = 3   :
+                          '-----------------'    '-->--o     pc_id = 3    :
                                                        '------------------'
 ```
 
@@ -1420,16 +1415,14 @@ Client requests `Member` IDs.
       }]
     },
     "sdp_offer": "server_user1_recvonly_offer",
-    "ice_servers":[
-        {
-        "urls":[
-          "turn:turnserver.com:3478",
-          "turn:turnserver.com:3478?transport=tcp"
-        ],
-        "username":"turn_user",
-        "credential":"turn_credential"
-        }
-    ]
+    "ice_servers": [{
+      "urls": [
+        "turn:turnserver.com:3478",
+        "turn:turnserver.com:3478?transport=tcp"
+      ],
+      "username": "turn_user",
+      "credential": "turn_credential"
+    }]
   }
 }
 ```
@@ -1475,7 +1468,7 @@ Client requests `Member` IDs.
 ```
                           .-------SFU-------.
 .------user1------.       :                 ;
-:     pc_id = 1   o-->-->-o                 :
+:    pc_id = 1    o-->-->-o                 :
 '-----------------'       :                 ;
                           '-----------------'
 ```
@@ -1511,16 +1504,14 @@ Client requests `Member` IDs.
       }]
     },
     "sdp_offer": "server_user2_sendonly_offer",
-    "ice_servers":[
-        {
-        "urls":[
-          "turn:turnserver.com:3478",
-          "turn:turnserver.com:3478?transport=tcp"
-        ],
-        "username":"turn_user",
-        "credential":"turn_credential"
-        }
-    ]
+    "ice_servers": [{
+      "urls": [
+        "turn:turnserver.com:3478",
+        "turn:turnserver.com:3478?transport=tcp"
+      ],
+      "username": "turn_user",
+      "credential": "turn_credential"
+    }]
   }
 }
 ```
@@ -1565,9 +1556,9 @@ Client requests `Member` IDs.
 
 ```
                                                        .-------user2------.
-                          .-------SFU-------.    .-->--o      pc_id = 2   :
+                          .-------SFU-------.    .-->--o     pc_id = 2    :
 .------user1------.       :                 o-->-'     '------------------'
-:     pc_id = 1   o-->-->-o-                :
+:    pc_id = 1    o-->-->-o-                :
 '-----------------'       :                 :
                           '-----------------'
 ```
@@ -1586,7 +1577,7 @@ Client requests `Member` IDs.
       },
       "direction": {
         "Send": {
-          "receivers": [ 2 ]
+          "receivers": [2]
         }
       }
     }, {
@@ -1596,7 +1587,7 @@ Client requests `Member` IDs.
       },
       "direction": {
         "Send": {
-          "receivers": [ 2 ]
+          "receivers": [2]
         }
       }
     }]
@@ -1608,9 +1599,9 @@ Client requests `Member` IDs.
 
 ```
                                                         .-------user2------.
-                           .-------SFU-------.    .-->--o      pc_id = 2   :
+                           .-------SFU-------.    .-->--o     pc_id = 2    :
  .------user1------.       :         .->-->--o-->-'     '------------------'
- :     pc_id = 1   o-->-->-o--->-->--'       :
+ :    pc_id = 1    o-->-->-o--->-->--'       :
  '-----------------'       :                 :
                            '-----------------'
 ```
@@ -1646,16 +1637,14 @@ Client requests `Member` IDs.
       }]
     },
     "sdp_offer": "server_user3_sendonly_offer",
-    "ice_servers":[
-        {
-        "urls":[
-          "turn:turnserver.com:3478",
-          "turn:turnserver.com:3478?transport=tcp"
-        ],
-        "username":"turn_user",
-        "credential":"turn_credential"
-        }
-    ]
+    "ice_servers": [{
+      "urls": [
+        "turn:turnserver.com:3478",
+        "turn:turnserver.com:3478?transport=tcp"
+      ],
+      "username": "turn_user",
+      "credential": "turn_credential"
+    }]
   }
 }
 ```
@@ -1700,11 +1689,11 @@ Client requests `Member` IDs.
 
 ```
                                                        .-------user2------.
-                          .-------SFU-------.    .-->--o      pc_id = 2   :
+                          .-------SFU-------.    .-->--o     pc_id = 2    :
 .------user1------.       :       .---->----o-->-'     '------------------'
-:     pc_id = 1   o-->-->-o--->---'         :
+:    pc_id = 1    o-->-->-o--->---'         :
 '-----------------'       :                 o-->-.     .-------user3------.
-                          '-----------------'    '-->--o      pc_id = 3   :
+                          '-----------------'    '-->--o     pc_id = 3    :
                                                        '------------------'
 ```
 
@@ -1744,11 +1733,11 @@ Client requests `Member` IDs.
 
 ```
                                                      .-------user2------.
-                          .-------SFU-------.    .->-o      pc_id = 2   :
+                          .-------SFU-------.    .->-o     pc_id = 2    :
 .------user1------.       :       .---->----o-->-'   '------------------'
-:     pc_id = 1   o-->-->-o--->---:         :
+:    pc_id = 1    o-->-->-o--->---:         :
 '-----------------'       :       '---->----o-->-.   .-------user3------.
-                          '-----------------'    '->-o      pc_id = 3   :
+                          '-----------------'    '->-o     pc_id = 3    :
                                                      '------------------'
 ```
 </details>
