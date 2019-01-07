@@ -97,11 +97,9 @@ Current RFC offers combining both ways: everything will be configured automagica
 
 #### Messaging
 
-All [WebSocket] messages sent by `Media Server` are called `Event`s. `Event` means a fact that already has happened, so `Web Client` cannot reject `Event` in any way (you cannot reject the happened past), it can only adopt itself to the received `Event`s. So, `Media Server` just notifies `Web Client` about happened facts and it reacts on them to reach the proper state. This also emphasizes the indisputable authority of the `Media Server`.  
-The naming for `Event` follows the convention `<entity><passive-verb>`, for example: `PeerCreated`, `TracksApplied`, `PeersRemoved`.
+All [WebSocket] messages sent by `Media Server` are called `Event`s. `Event` means a fact that already has happened, so `Web Client` cannot reject `Event` in any way (you cannot reject the happened past), it can only adopt itself to the received `Event`s. So, `Media Server` just notifies `Web Client` about happened facts and it reacts on them to reach the proper state. This also emphasizes the indisputable authority of the `Media Server`.
 
-All [WebSocket] messages sent by `Web Client` are called `Command`s. `Command` is basically a request/desire/intention of `Web Client` to change the state on `Media Server`.  
-The naming for `Command` follows the convention `<infinitive-verb><entity>`, for example: `ApplyTracks`, `MakeSdpOffer`, `MakeSdpAnswer`.
+All [WebSocket] messages sent by `Web Client` are called `Command`s. `Command` is basically a request/desire/intention of `Web Client` to change the state on `Media Server`.
 
 
 
@@ -110,7 +108,7 @@ The naming for `Command` follows the convention `<infinitive-verb><entity>`, for
 [reference-level-explanation]: #reference-level-explanation
 
 
-### Data model
+### Data model and primitives
 
 ```
    .-------------------------Member---------------------------.
@@ -139,7 +137,7 @@ The naming for `Command` follows the convention `<infinitive-verb><entity>`, for
 
 #### Member
 
-Just a way to group `Peers` and provide `User Application` with some user metadata. `Member` can have 0-N `Peers`.
+Just a way to group `Peers` and provide `User Application` with some user metadata. `Member` can have 0-N `Peer`s.
 
 ```rust
 struct Member {
@@ -150,7 +148,7 @@ struct Member {
 
 #### Peer
 
-[RTCPeerConnection] representation. `Peer` can have 1-N `Tracks`.
+[RTCPeerConnection] representation. `Peer` can have 1-N `Track`s.
 
 ```rust
 struct Peer {
@@ -161,7 +159,7 @@ struct Peer {
 
 #### Track
 
-Somewhat [MediaStreamTrack] representation.
+[MediaStreamTrack] representation.
 
 ```rust
 struct Track {
@@ -192,7 +190,9 @@ struct VideoSettings {}
 
 ### Events
 
-I.e. `Server` => `Client` requests.
+[WebSocket] messages from `Media Server` to `Web Client`.
+
+The naming for `Event` follows the convention `<entity><passive-verb>`, for example: `PeerCreated`, `TracksApplied`, `PeersRemoved`.
 
 #### 1. PeerCreated
 
@@ -213,14 +213,16 @@ struct ICEServer {
 }
 ```
 
-Servers requests [RTCPeerConnection] creation.
+`Media Server` notifies about necessity of [RTCPeerConnection] creation.
 
 Params:
 1. `peer`: peer connection settings.
-2. `sdp_offer`: if `None`, client should create [SDP Offer] and pass it to the server. If `Some`, client should set it as remote description, then create [SDP Answer], set it as local description, and pass it to the server.
-3. `ice_servers`: just list of ice servers that should be passed to [RTCPeerConnection] constructor.
+2. `sdp_offer`: if `None`, client should create [SDP Offer] and pass it to the server; if `Some`, client should set it as remote description, then create [SDP Answer], set it as local description, and pass it to the server.
+3. `ice_servers`: list of [ICE server]s that should be used to construct [RTCPeerConnection].
 
-The most important part of `Peer` object is list of tracks. All `TrackDirection::Send` tracks must be created according to their settings and added to the `Peer`. If there is at least one `TrackDirection::Recv` track, then created [RTCPeerConnection] must be ready to receive tracks (`recvonly`/`sendrecv` SDP). Currently, there are multiple ways to achieve this on client side and concrete implementation is not part of this RFC. 
+The most important part of `Peer` object is a list of `Track`s.
+- All `TrackDirection::Send` `Track`s must be created according to their settings and added to the `Peer`. 
+- If there is at least one `TrackDirection::Recv` `Track`, then created [RTCPeerConnection] must be ready to receive `Track`s (`recvonly`/`sendrecv` SDP). Currently, there are multiple ways to achieve this on client side and concrete implementation is not part of this RFC.
 
 ##### Examples
 
@@ -285,16 +287,16 @@ The most important part of `Peer` object is list of tracks. All `TrackDirection:
 }
 ```
 
-Client is expected to:
-1. Create [RTCPeerConnection] with provided ICE servers and associate it with given `peer_id`.
-2. Initialize Audio and Video tracks without any additional settings.
-3. Add newly created tracks to [RTCPeerConnection].
-4. Create `sendrecv` [SDP Offer].
-5. Set offer as peers local description.
-6. Answer `PeerCreated` request with `MakeSdpOffer` request containing [SDP Offer].
+`Web Client` is expected to:
+1. Create [RTCPeerConnection] with provided [ICE server]s and associate it with given `peer_id`.
+2. Initialize `Audio` and `Video` `Track`s without any additional settings.
+3. Add newly created `Track`s to [RTCPeerConnection].
+4. Generate `sendrecv` [SDP Offer].
+5. Set offer as `Peer`'s local description.
+6. Answer with `MakeSdpOffer` command containing generated [SDP Offer].
 7. Expect remote [SDP Answer] to set it as remote description.
 
-After negotiation is done and media starts flowing, the client might receive notification that his media is being sent to `Peer { peer_id = 2 }`, and he is receiving media from `Peer { peer_id = 2 }`.
+After negotiation is done and media starts flowing, `Web Client` might receive notification that his media is being sent to `Peer { peer_id = 2 }` and he is receiving media from `Peer { peer_id = 2 }`.
 </details>
 
 <details>
@@ -328,16 +330,16 @@ After negotiation is done and media starts flowing, the client might receive not
 }
 ```
 
-Client is expected to:
-1. Create [RTCPeerConnection] with provided ICE servers and associate it with given `peer_id`.
-2. Initialize Audio track without any additional settings.
-3. Add newly created track to [RTCPeerConnection].
-4. Set provided offer as peers remote description.
-5. Create `sendonly` [SDP Answer].
+`Web Client` is expected to:
+1. Create [RTCPeerConnection] with provided [ICE server]s and associate it with given `peer_id`.
+2. Initialize `Audio` `Track` without any additional settings.
+3. Add newly created `Track` to [RTCPeerConnection].
+4. Set provided [SDP Offer] as `Peer`'s remote description.
+5. Generate `sendonly` [SDP Answer].
 6. Set created [SDP Answer] as local description.
-7. Answer `PeerCreated` request with `MakeSdpAnswer` request containing [SDP Answer]. 
+7. Answer with `MakeSdpAnswer` command containing generated [SDP Answer]. 
 
-After negotiation is done and media starts flowing, client might receive notification that his media is being sent to server.
+After negotiation is done and media starts flowing, `Web Client` might receive notification that his media is being sent to `Media Server`.
 </details>
 
 #### 2. PeersRemoved
@@ -348,13 +350,12 @@ struct PeersRemoved {
 }
 ```
 
-`Server` requests to dispose (close) specified `Peers`.
-
+`Media Server` notifies about necessity to dispose (close and remove) specified `Peer`s.
 
 ##### Examples
 
 <details>
-<summary>Server tells Client to dispose specified Peers</summary>
+<summary>Server tells Web Client to dispose specified Peers</summary>
 
 ```json
 {
@@ -372,17 +373,17 @@ struct TracksApplied {
 }
 ```
 
-`Server` requests to update tracks in specified `Peer`.
+`Media Server` notifies about necessity to update `Track`s in specified `Peer`.
 
 It can be used to:
-1. Add new track.
-2. Update existing track settings (e.g. change to lower video resolution, mute audio).
-3. Update send track receivers list (add/remove).
+1. Add new `Track`.
+2. Update existing `Track` settings (e.g. change to lower video resolution, mute audio).
+3. Update `send` `Track` receivers list (add/remove).
 
 ##### Examples 
 
 <details>
-<summary>Assuming such Peer exists on Client's end</summary>
+<summary>If Peer exists on Web Client's end</summary>
 
 ```json
 {
@@ -411,11 +412,11 @@ It can be used to:
 }
 ```
 
-Meaning that media is being published to server but has no actual receivers.
+Means that media is being published to `Media Server` but has no actual receivers.
 </details>
 
 <details>
-<summary>Server notifies Client that video is being received by other Peer {peer_id = 2}</summary>
+<summary>Media Server notifies Web Client that video is being received by other Peer</summary>
 
 ```json
 {
@@ -454,12 +455,12 @@ struct TracksRemoved {
 }
 ```
 
-`Server` requests to dispose (close) specified `Tracks`.
+`Media Server` notifies about necessity to dispose (close and remove) specified `Track`s.
 
 ##### Examples
 
 <details>
-<summary>Server tells Client to dispose specified Tracks</summary>
+<summary>Media Server tells Web Client to dispose specified Tracks</summary>
 
 ```json
 {
@@ -478,12 +479,14 @@ struct SdpOfferMade {
 }
 ```
 
-`Server` applies [SDP Offer] to `Client`s [RTCPeerConnection]. Being sent during SDP negotiation/re-negotiation.
+`Media Server` notifies about necessity to apply specified [SDP Offer] to `Web Client`'s [RTCPeerConnection].
+
+This event is sent during SDP negotiation/re-negotiation. `Web Client` is expected answer with `MakeSdpAnswer` command.
 
 ##### Examples
 
 <details>
-<summary>Server sends SDP Offer to Peer {peer_id = 1}</summary>
+<summary>Media Server sends SDP Offer to Peer</summary>
 
 ```json
 {
@@ -502,12 +505,14 @@ struct SdpAnswerMade {
 }
 ```
 
-`Server` applies [SDP Answer] to `Client`s [RTCPeerConnection]. Being sent during SDP negotiation/re-negotiation.
+`Media Server` notifies about necessity to apply specified [SDP Answer] to `Web Client`'s [RTCPeerConnection].
 
-#### Examples
+This event is sent during SDP negotiation/re-negotiation.
+
+##### Examples
 
 <details>
-<summary>Server sends SDP Offer to Peer {peer_id = 1}</summary>
+<summary>Media Server sends SDP Answer to Peer</summary>
 
 ```json
 {
@@ -517,8 +522,7 @@ struct SdpAnswerMade {
 ```
 </details>
 
-
-#### 7. IceCandidatesDiscovered
+#### 7. IceCandidateDiscovered
 
 ```rust
 struct IceCandidatesDiscovered {
@@ -527,12 +531,14 @@ struct IceCandidatesDiscovered {
 }
 ```
 
-`Server` applies [ICE Candidate] to `Client`s [RTCPeerConnection]. Being sent during ICE negotiation/re-negotiation.
+`Media Server` notifies about necessity to apply [ICE Candidate] to `Web Client`'s [RTCPeerConnection].
 
-#### Examples
+This event is sent during ICE negotiation/re-negotiation.
+
+##### Examples
 
 <details>
-<summary>Server sends ICE Candidate to Peer {peer_id = 1}</summary>
+<summary>Media Server sends ICE Candidate to Peer</summary>
 
 ```json
 {
@@ -551,7 +557,6 @@ struct RemotePeersUpdated {
 ```
 
 Related objects:
-
 ```rust
 struct RemotePeer {
     peer_id: Option<u64>,
@@ -574,18 +579,20 @@ enum RemotePeerTrackType {
 }
 ```
 
-Server notifies Client of any remote peers that Client can connect to. This is a key method when talking about Dynamic API mentioned in [Signalling Protocol considerations][signalling-protocol-considerations]. Any Client's request to subscribe/publish will be based on data provided by this request.
+`Media Server` notifies about any remote `Peer`s that `Web Client` can connect to.
+
+This is a key event when talking about dynamic API mentioned in [Signalling Protocol considerations][signalling-protocol-considerations]. Any `Web Client`'s commands to subscribe/publish will be based on data provided by this event.
 
 Params:
-1. ```peer_id```: if `Some`, then represents specific remote `Peer` associated with some `Member`. If `None`, then represents Servers peer connection.
-2. ```member_id```: if `Some`, then represents specific remote `Member` associated with some . If `None`, then represents Servers peer connection.
-3. ```can_rx```: if `Some` then Client can subscribe to specified media.
-4. ```can_tx```: if `Some` then Client can publish specified media to remote `Peer`.
+1. `peer_id`: if `Some`, then represents specific remote `Peer` associated with some `Member`; if `None`, then represents `Media Server`'s [RTCPeerConnection].
+2. `member_id`: if `Some`, then represents specific remote `Member`; if `None`, then represents `Media Server`'s [RTCPeerConnection].
+3. `can_rx`: if `Some` then `Web Client` can subscribe to specified media.
+4. `can_tx`: if `Some` then `Web Client` can publish specified media to remote `Peer`.
 
-#### Examples:
+##### Examples
 
 <details>
-<summary>Notify Client that it is possible to subscribe to Member {id = "User2", peer_id = 2} Video and Audio tracks</summary>
+<summary>Notify Web Client that it is possible to subscribe to another Member's Video and Audio Tracks</summary>
 
 ```json
 {
@@ -605,7 +612,7 @@ Params:
 </details>
 
 <details>
-<summary>Notify Client that it is possible to publish Audio to specified Peers</summary>
+<summary>Notify Web Client that it is possible to publish Audio to specified Peers</summary>
 
 ```json
 {
@@ -635,17 +642,19 @@ Params:
 #### 9. MembersUpdated 
 
 ```rust
-struct Members {
+struct MembersUpdated {
     members: Vec<Member>
 }
 ```
 
-`Server` updates `Client`s acknowledgement of `Peer`-`Member` associations. It is recommended to cache `Peer` id - `Member` id relation in Web Client. Probably, in two maps: `HashMap<peer_id, member_id>`, `HashMap<member_id, peer_id>`.
+`Media Server` updates `Web Client`'s knowledge about `Peer`<=>`Member` associations.
 
-#### Examples
+It's recommended to cache `Peer` ID and `Member` ID relations in `Web Client`'s local state (for example, in two maps: `HashMap<peer_id, member_id>`, `HashMap<member_id, peer_id>`).
+
+##### Examples
 
 <details>
-<summary>Server updates Clients acknowledgement of Peer-Member associations</summary>
+<summary>Media Server updates Web Client's knowledge about Peer<=>Member associations</summary>
 
 ```json
 {
@@ -666,7 +675,9 @@ struct Members {
 
 ### Commands
 
-I.e. `Client` => `Server` requests.
+[WebSocket] message from `Web Client` to `Media Server`.
+
+The naming for `Command` follows the convention `<infinitive-verb><entity>`, for example: `ApplyTracks`, `MakeSdpOffer`, `MakeSdpAnswer`.
 
 #### 1. RemovePeers
 
@@ -676,14 +687,14 @@ struct RemovePeers {
 }
 ```
 
-`Client` requests `Server` permission to dispose specified `Peers`. Server may give permission by sending `PeersRemoved`.
+`Web Client` asks permission to dispose (close and remove) specified `Peer`s. `Media Server` gives permission by sending `PeersRemoved` event.
 
-Probably, Server will always give his permission on any Client's request. This kind of request flow will allow Server to do any request related stuff that Server needs to do, and distinguish between abnormal and normal events.
+Probably, `Media Server` will always give this permission on any `Web Client`'s command. This kind of messages flow will allow `Media Server` to do any command-related stuff that `Media Server` needs to do, and distinguish between abnormal and normal events.
 
 ##### Examples
 
 <details>
-<summary>Client requests Server permission to dispose specified Peers</summary>
+<summary>Web Client asks permission to dispose specified Peers</summary>
 
 ```json
 {
@@ -692,25 +703,25 @@ Probably, Server will always give his permission on any Client's request. This k
 ```
 </details>
 
-#### 2. SetTracks
+#### 2. ApplyTracks
 
 ```rust
-struct SetTracks {
+struct ApplyTracks {
     peer_id: u64,
     tracks: Vec<Track>,
 }
 ```
 
-`Client` requests to update tracks in specified `Peer`. Server may give permission by sending `TracksApplied`.
-                                                      
-It can be used to express Clients intentions to:
-1. Update existing track settings.
+`Web Client` asks permission to update `Track`s in specified `Peer`. `Media Server` gives permission by sending `TracksApplied` event.
+
+It can be used to express `Web Client`'s intentions to:
+1. Update existing `Track` settings.
 2. Cancel sending media to specific receiver.
 
 ##### Examples 
 
 <details>
-<summary>Assuming such Peer exists on Client's end</summary>
+<summary>If Peer exists on Web Client's end</summary>
 
 ```json
 {
@@ -739,13 +750,11 @@ It can be used to express Clients intentions to:
 }
 ```
 
-Meaning that media is being published to server and relayed to Peer {peer_id = 2}.
+Means that media is being published to `Media Server` and relayed to `Peer {peer_id = 2}`.
 </details>
 
 <details>
-<summary>Client wants to unsubscribe Peer {peer_id = 2} from specified tracks</summary>
-
-Client => Server
+<summary>Web Client wants to unsubscribe Peer from specified Tracks</summary>
 
 ```json
 {
@@ -784,12 +793,12 @@ struct RemoveTracks {
 }
 ```
 
-`Client` requests `Server` permission to dispose specified `Peers`. Server may give permission by sending `TracksRemoved`.
+`Web Client` asks permission to dispose (close and remove) specified `Track`s. `Media Server` gives permission by sending `TracksRemoved` event.
 
 ##### Examples
 
 <details>
-<summary>Client requests Server's permission to dispose specified Tracks</summary>
+<summary>Web Client asks permission to dispose specified Tracks</summary>
 
 ```json
 {
@@ -808,16 +817,16 @@ struct MakeSdpOffer {
 }
 ```
 
-Client sends [SDP Offer] from one if its `Peers`.
+`Web Client` sends [SDP Offer] to one if its `Peer`s.
 
-Client can send it:
-1. As answer to `PeerCreated {sdp_offer: None}`
-2. As answer to `TracksApplied` if update requires SDP re-negotiation.
+`Web Client` can send it:
+1. As reaction to `PeerCreated {sdp_offer: None}` event.
+2. As reaction to `TracksApplied` event if update requires SDP re-negotiation.
 
 ##### Examples
 
 <details>
-<summary>Client sends Peers SDP Offer</summary>
+<summary>Web Client sends SDP Offer to some Peer</summary>
 
 ```json
 {
@@ -836,16 +845,16 @@ struct MakeSDPAnswer {
 }
 ```
 
-Client sends [SDP Answer] from one if its `Peers`.
+`Web Client` sends [SDP Answer] to one if its `Peer`s.
 
-Client can send it:
-1. As answer to `PeerCreated {sdp_offer: Some}`.
-2. As answer to `SdpOfferMade`.
+`Web Client` can send it:
+1. As reaction to `PeerCreated {sdp_offer: Some}` event.
+2. As reaction to `SdpOfferMade` event.
 
-#### Examples
+##### Examples
 
 <details>
-<summary>Client sends Peers SDP Answer</summary>
+<summary>Web Client sends SDP Answer to some Peer</summary>
 
 ```json
 {
@@ -864,12 +873,12 @@ struct SetIceCandidate {
 }
 ```
 
-Client sends [ICE Candidate] discovered by underlying [RTCPeerConnection] of one of his `Peers`.
+`Web Client` sends [ICE Candidate] discovered by underlying [RTCPeerConnection] for one of his `Peer`s.
 
-#### Examples
+##### Examples
 
 <details>
-<summary>Client sends ICE Candidate from Peer {peer_id = 1}</summary>
+<summary>Web Client sends ICE Candidate for some Peer</summary>
 
 ```json
 {
@@ -891,7 +900,6 @@ struct RequestRemoteTracks {
 ```
 
 Related objects:
-
 ```rust
 enum RemotePeerTrackType {
     Audio {
@@ -907,20 +915,19 @@ enum RemotePeerTrackType {
 }
 ```
 
-Client requests to send or receive media to/from remote `Peer`. Server may give permission by sending `TracksApplied`.
+`Web Client` asks permission to send or receive media to/from specified remote `Peer`. `Media Server` may gives permission by sending `TracksApplied` event.
 
 Params:
-1. `peer_id`: if `Some` then Client wants to connect specified local `Peer` to remote. If `None`then it us to server
-to decide which of Client's `Peers` will be connected.
-2. `remote_peer_id`: if `Some`, then represents specific remote `Member` associated with some . If `None`, then 
-represents Server's peer connection (only SFU).
-3. `rx`: if `Some` then Client requests to subscribe to specified media.
-4. `tx`: if `Some` then Client requests to publish specified media to remote `Peer`.
+1. `peer_id`: if `Some`, then `Web Client` wants to connect specified local `Peer` to remote one; if `None`, then `Media Server`
+decides which of `Web Client`'s `Peer`s will be connected.
+2. `remote_peer_id`: if `Some`, then represents specific remote `Peer`; if `None`, then represents `Media Server`'s [RTCPeerConnection] (only [SFU]).
+3. `rx`: if `Some` then `Web Client` requests to subscribe to specified media.
+4. `tx`: if `Some` then `Web Client` requests to publish specified media to remote `Peer`.
 
 ##### Examples
 
 <details>
-<summary>Client requests to subscribe to remote Peer {peer_id = 2} audio and video</summary>
+<summary>Web Client requests to subscribe to remote Peer audio and video</summary>
 
 ```json
 {
@@ -938,7 +945,7 @@ represents Server's peer connection (only SFU).
 </details>
 
 <details>
-<summary>Client requests to publish to Server's peer connection</summary>
+<summary>Web Client requests to publish to Media Server's RTCPeerConnection</summary>
 
 ```json
 {
@@ -955,20 +962,20 @@ represents Server's peer connection (only SFU).
 ```
 </details>
 
-#### 9. RequestMembers
+#### 9. GetMembers
 
 ```rust
-struct RequestMembers {
+struct GetMembers {
     peer_ids: Vec<u64>,
 }
 ```
 
-Client requests `Member` IDs.
+`Web Client` asks IDs of present `Member`s for specified `Peer`s. `Media Server` answers with `MembersUpdated` event.
 
 ##### Examples
 
 <details>
-<summary>Client request Member's that own specified Peer's</summary>
+<summary>Web Client request Members which own specified Peers</summary>
 
 ```json
 {
@@ -978,6 +985,7 @@ Client requests `Member` IDs.
 }
 ```
 </details>
+
 
 ### Extended examples
 
@@ -1788,15 +1796,16 @@ Current protocol assumes that there will be separate [RTCPeerConnection] pair fo
 
 [Control API]: https://github.com/instrumentisto/medea/blob/master/docs/rfc/0001-control-api.md
 [GStreamer]: https://gstreamer.freedesktop.org
-[ICE Candidate]:https://tools.ietf.org/html/rfc8445
+[ICE Candidate]: https://tools.ietf.org/html/rfc8445
+[ICE server]: https://webrtcglossary.com/ice
 [MCU]: https://webrtcglossary.com/mcu
 [MediaStreamTrack]: https://www.w3.org/TR/mediacapture-streams/#mediastreamtrack
 [P2P full mesh]: https://webrtcglossary.com/mesh
-[RTCDataChannel]:https://www.w3.org/TR/webrtc/#rtcdatachannel
+[RTCDataChannel]: https://www.w3.org/TR/webrtc/#rtcdatachannel
 [RTCPeerConnection]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
 [RTCStatsReport]: https://developer.mozilla.org/en-US/docs/Web/API/RTCStatsReport
-[SDP Answer]:https://tools.ietf.org/html/rfc3264
-[SDP Offer]:https://tools.ietf.org/html/rfc3264
+[SDP Answer]: https://tools.ietf.org/html/rfc3264
+[SDP Offer]: https://tools.ietf.org/html/rfc3264
 [SFU]: https://webrtcglossary.com/sfu
 [STUN]: https://tools.ietf.org/html/rfc3489
 [TURN]: https://tools.ietf.org/html/rfc5766
