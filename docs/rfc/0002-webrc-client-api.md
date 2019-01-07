@@ -26,7 +26,7 @@ You will need to express ways to:
 4. Pass some user metadata to hook business logic onto.
 5. Build more complex connection graphs.
 6. Dynamically cancel/begin media publishing/receiving.
-7. Passing errors, [RTCPeerConnection]s and [RTCStatsReport]s.
+7. Passing errors, [RTCStatsReport]s of underlying [RTCPeerConnection]s.
 8. Cover both [P2P full mesh] and hub server ([SFU], [MCU]) scenarios.
 
 The protocol must be versatile enough to cover all possible use cases.
