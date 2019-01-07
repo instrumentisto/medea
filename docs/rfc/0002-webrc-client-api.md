@@ -525,7 +525,7 @@ This event is sent during SDP negotiation/re-negotiation.
 #### 7. IceCandidateDiscovered
 
 ```rust
-struct IceCandidatesDiscovered {
+struct IceCandidateDiscovered {
     peer_id: u64,
     candidate: String,
 }
@@ -836,10 +836,10 @@ struct MakeSdpOffer {
 ```
 </details>
 
-#### 5. MakeSDPAnswer
+#### 5. MakeSdpAnswer
 
 ```rust
-struct MakeSDPAnswer {
+struct MakeSdpAnswer {
     peer_id: u64,
     sdp_answer: String,
 }
@@ -920,7 +920,7 @@ enum RemotePeerTrackType {
 Params:
 1. `peer_id`: if `Some`, then `Web Client` wants to connect specified local `Peer` to remote one; if `None`, then `Media Server`
 decides which of `Web Client`'s `Peer`s will be connected.
-2. `remote_peer_id`: if `Some`, then represents specific remote `Peer`; if `None`, then represents `Media Server`'s [RTCPeerConnection] (only [SFU]).
+2. `remote_peer_id`: if `Some`, then represents specific remote `Peer`; if `None`, then represents `Media Server`'s [RTCPeerConnection], but only for [SFU].
 3. `rx`: if `Some` then `Web Client` requests to subscribe to specified media.
 4. `tx`: if `Some` then `Web Client` requests to publish specified media to remote `Peer`.
 
@@ -990,7 +990,7 @@ struct GetMembers {
 ### Extended examples
 
 <details>
-<summary>1 <=> 1 p2p with unpublish and republish</summary>
+<summary>1 <=> 1 P2P with unpublish and republish</summary>
 
 ```
 .----user1----.    .->-->-->--. .----user2----.
@@ -998,388 +998,407 @@ struct GetMembers {
 '-------------'    '-<--<--<--' '-------------'
 ```
 
-1\. Server send `PeerCreated` to `user1`:
+1. `Media Server` sends `PeerCreated` event to `user1`:
 
-```json
-{
-  "method": "PeerCreated",
-  "payload": {
-    "peer": {
-      "peer_id": 1,
-      "tracks": [{
-        "id": 1,
-        "media_type": {
-          "Audio": {}
+    ```json
+    {
+      "event": "PeerCreated",
+      "data": {
+        "peer": {
+          "peer_id": 1,
+          "tracks": [{
+            "id": 1,
+            "media_type": {
+              "Audio": {}
+            },
+            "direction": {
+              "Send": {
+                "receivers": [2]
+              }
+            }
+          }, {
+            "id": 2,
+            "media_type": {
+              "Video": {}
+            },
+            "direction": {
+              "Send": {
+                "receivers": [2]
+              }
+            }
+          }, {
+            "id": 3,
+            "media_type": {
+              "Audio": {}
+            },
+            "direction": {
+              "Recv": {
+                "sender": 2
+              }
+            }
+          }, {
+            "id": 4,
+            "media_type": {
+              "Video": {}
+            },
+            "direction": {
+              "Recv": {
+                "sender": 2
+              }
+            }
+          }]
         },
-        "direction": {
-          "Send": {
-            "receivers": [2]
-          }
-        }
-      }, {
-        "id": 2,
-        "media_type": {
-          "Video": {}
-        },
-        "direction": {
-          "Send": {
-            "receivers": [2]
-          }
-        }
-      }, {
-        "id": 3,
-        "media_type": {
-          "Audio": {}
-        },
-        "direction": {
-          "Recv": {
-            "sender": 2
-          }
-        }
-      }, {
-        "id": 4,
-        "media_type": {
-          "Video": {}
-        },
-        "direction": {
-          "Recv": {
-            "sender": 2
-          }
-        }
-      }]
-    },
-    "sdp_offer": null,
-    "ice_servers": [{
-      "urls": [
-        "turn:turnserver.com:3478",
-        "turn:turnserver.com:3478?transport=tcp"
-      ],
-      "username": "turn_user",
-      "credential": "turn_credential"
-    }]
-  }
-}
-```
- 
-2\. `user1` answers with [SDP Offer]:
-
-```json
-{
-  "method": "MakeSdpOffer",
-  "payload": {
-    "peer_id": 1,
-    "sdp_offer": "user1_sendrecv_offer"
-  }
-}
-```
- 
-3\. Server send `PeerCreated` with `user1`'s [SDP Offer] to `user2`:
-
-```json
-{
-  "method": "PeerCreated",
-  "payload": {
-    "peer": {
-      "peer_id": 2,
-      "tracks": [{
-        "id": 1,
-        "media_type": {
-          "Audio": {}
-        },
-        "direction": {
-          "Recv": {
-            "sender": 1
-          }
-        }
-      }, {
-        "id": 2,
-        "media_type": {
-          "Audio": {}
-        },
-        "direction": {
-          "Recv": {
-            "sender": 1
-          }
-        }
-      }, {
-        "id": 3,
-        "media_type": {
-          "Audio": {}
-        },
-        "direction": {
-          "Send": {
-            "receivers": [1]
-          }
-        }
-      }, {
-        "id": 4,
-        "media_type": {
-          "Video": {}
-        },
-        "direction": {
-          "Send": {
-            "receivers": [1]
-          }
-        }
-      }]
-    },
-    "sdp_offer": "user1_sendrecv_offer",
-    "ice_servers": [{
-      "urls": [
-        "turn:turnserver.com:3478",
-        "turn:turnserver.com:3478?transport=tcp"
-      ],
-      "username": "turn_user",
-      "credential": "turn_credential"
-    }]
-  }
-}
-```
-
-4\. `user2` answers with [SDP Answer]:
-
-```json
-{
-  "method": "MakeSDPAnswer",
-  "payload": {
-    "peer_id": 2,
-    "sdp_answer": "user2_sendrecv_answer"
-  }
-}
-```
-
-5\. Both peers exchange discovered [ICE Candidate]'s:
-
-`user1` => `Server`
-```json
-{
-  "method": "SetIceCandidate",
-  "payload": {
-    "peer_id": 1,
-    "candidate": "user1_ice_candidate"
-  }
-}
-```
-
-`Server` => `user2`
-```json
-{
-  "method": "IceCandidatesDiscovered",
-  "payload": {
-    "peer_id": 2,
-    "candidate": "user1_ice_candidate"
-  }
-}
-```
-
-`user2` => `Server`
-```json
-{
-  "method": "SetIceCandidate",
-  "payload": {
-    "peer_id": 2,
-    "candidate": "user2_ice_candidate"
-  }
-}
-```
-
-`Server` => `user1`
-```json
-{
-  "method": "IceCandidatesDiscovered",
-  "payload": {
-    "peer_id": 1,
-    "candidate": "user2_ice_candidate"
-  }
-}
-```
-
-6\. At this point connection is supposed to be established:
-
-```
-.----user1----.    .->-->-->--. .----user2----.
-:             o(1)=:          :=o(2)          :
-'-------------'    '-<--<--<--' '-------------'
-```
-
-7\. `user1` wants to unpublish his tracks, so he sends `TracksRemoved` to the server:
-
-```json
-{
-  "method": "RemoveTracks",
-  "payload": {
-    "peer_id": 1,
-    "tracks": [1, 2]
-  }
-}
-```
-
-8\. Server updates `user2` tracks:
-
-```json
-{
-  "method": "TracksRemoved",
-  "payload": {
-    "peer_id": 2,
-    "tracks": [1, 2]
-  }
-}
-```
-
-9\. Server updates `user1` tracks:
-
-```json
-{
-  "method": "TracksRemoved",
-  "payload": {
-    "peer_id": 1,
-    "tracks": [1, 2]
-  }
-}
-```
-
-10\. `user1` initiates SDP re-negotiation: `user1` sends `MakeSdpOffer`, `Server` relays `SdpOfferMade` to `user2`, `user2` sends `MakeSDPAnswer`, `Server` relays `SdpAnswerMade` to `user1`.
-
-```
-.----user1----.         .----user2----.
-:             o(1)-<--<-o(2)          :
-'-------------'         '-------------'
-```
-
-11\. Server notifies `user1` that he can publish to `user2`:
-
-```json
-{
-  "method": "RemotePeersUpdated",
-  "payload": {
-    "peers": [{
-      "peer_id": 2,
-      "member_id": "user_2",
-      "can_rx": null,
-      "can_tx": {
-        "AudioVideo": {
-          "audio_settings": {},
-          "video_settings": {}
-        }
-      }
-    }]
-  }
-}
-```
-
-12\. Server notifies `user2` that he can subscribe to `user1`:
-
-```json
-{
-  "method": "RemotePeersUpdated",
-  "payload": {
-    "peers": [{
-      "peer_id": 1,
-      "member_id": "user_1",
-      "can_rx": {
-        "AudioVideo": {
-          "audio_settings": {},
-          "video_settings": {}
-        }
-      },
-      "can_tx": null
-    }]
-  }
-}
-```
-
-13\. `user1` requests to publish to `user2`:
-
-```json
-{
-  "method": "RequestRemoteTracks",
-  "payload": {
-    "peer_id": 1,
-    "remote_peer_id": 2,
-    "rx": null,
-    "tx": {
-      "AudioVideo": {
-        "audio_settings": {},
-        "video_settings": {}
+        "sdp_offer": null,
+        "ice_servers": [{
+          "urls": [
+            "turn:turnserver.com:3478",
+            "turn:turnserver.com:3478?transport=tcp"
+          ],
+          "username": "turn_user",
+          "credential": "turn_credential"
+        }]
       }
     }
-  }
-}
-```
+    ```
+ 
+2. `user1` answers with [SDP Offer]:
 
-14\. Server updates `user2` tracks:
+    ```json
+    {
+      "command": "MakeSdpOffer",
+      "data": {
+        "peer_id": 1,
+        "sdp_offer": "user1_sendrecv_offer"
+      }
+    }
+    ```
+ 
+3. `Media Server` sends `PeerCreated` event with `user1`'s [SDP Offer] to `user2`:
 
-```json
-{
-  "method": "TracksApplied",
-  "payload": {
-    "peer_id": 2,
-    "tracks": [{
-      "id": 1,
-      "media_type": {
-        "Audio": {}
-      },
-      "direction": {
-        "Recv": {
-          "sender": 1
+    ```json
+    {
+      "event": "PeerCreated",
+      "data": {
+        "peer": {
+          "peer_id": 2,
+          "tracks": [{
+            "id": 1,
+            "media_type": {
+              "Audio": {}
+            },
+            "direction": {
+              "Recv": {
+                "sender": 1
+              }
+            }
+          }, {
+            "id": 2,
+            "media_type": {
+              "Audio": {}
+            },
+            "direction": {
+              "Recv": {
+                "sender": 1
+              }
+            }
+          }, {
+            "id": 3,
+            "media_type": {
+              "Audio": {}
+            },
+            "direction": {
+              "Send": {
+                "receivers": [1]
+              }
+            }
+          }, {
+            "id": 4,
+            "media_type": {
+              "Video": {}
+            },
+            "direction": {
+              "Send": {
+                "receivers": [1]
+              }
+            }
+          }]
+        },
+        "sdp_offer": "user1_sendrecv_offer",
+        "ice_servers": [{
+          "urls": [
+            "turn:turnserver.com:3478",
+            "turn:turnserver.com:3478?transport=tcp"
+          ],
+          "username": "turn_user",
+          "credential": "turn_credential"
+        }]
+      }
+    }
+    ```
+
+4. `user2` answers with [SDP Answer]:
+
+    ```json
+    {
+      "command": "MakeSdpAnswer",
+      "data": {
+        "peer_id": 2,
+        "sdp_answer": "user2_sendrecv_answer"
+      }
+    }
+    ```
+
+5. Both peers exchange discovered [ICE Candidate]s:
+
+    1. `user1` => `Media Server`:
+
+        ```json
+        {
+          "command": "SetIceCandidate",
+          "data": {
+            "peer_id": 1,
+            "candidate": "user1_ice_candidate"
+          }
+        }
+        ```
+
+    2. `Media Server` => `user2`:
+
+        ```json
+        {
+          "event": "IceCandidateDiscovered",
+          "data": {
+            "peer_id": 2,
+            "candidate": "user1_ice_candidate"
+          }
+        }
+        ```
+
+    3. `user2` => `Media Server`:
+
+        ```json
+        {
+          "command": "SetIceCandidate",
+          "data": {
+            "peer_id": 2,
+            "candidate": "user2_ice_candidate"
+          }
+        }
+        ```
+
+    4. `Media Server` => `user1`:
+
+        ```json
+        {
+          "event": "IceCandidateDiscovered",
+          "data": {
+            "peer_id": 1,
+            "candidate": "user2_ice_candidate"
+          }
+        }
+        ```
+
+6. At this point connection is supposed to be established:
+
+    ```
+    .----user1----.    .->-->-->--. .----user2----.
+    :             o(1)=:          :=o(2)          :
+    '-------------'    '-<--<--<--' '-------------'
+    ```
+    
+7. `user1` wants to unpublish his `Track`s, so he sends `RemoveTracks` command to `Media Server`:
+
+    ```json
+    {
+      "command": "RemoveTracks",
+      "data": {
+        "peer_id": 1,
+        "tracks": [1, 2]
+      }
+    }
+    ```
+
+8. `Media Server` updates `user2` `Track`s:
+
+    ```json
+    {
+      "event": "TracksRemoved",
+      "data": {
+        "peer_id": 2,
+        "tracks": [1, 2]
+      }
+    }
+    ```
+
+9. `Media Server` updates `user1` `Track`s:
+
+    ```json
+    {
+      "event": "TracksRemoved",
+      "data": {
+        "peer_id": 1,
+        "tracks": [1, 2]
+      }
+    }
+    ```
+
+10. `user1` initiates SDP re-negotiation: 
+
+    1. `user1` sends `MakeSdpOffer` command.
+
+    2. `Media Server` sends `SdpOfferMade` event to `user2`.
+
+    3. `user2` sends `MakeSdpAnswer` command.
+
+    4. `Media Server` sends `SdpAnswerMade` event to `user1`.
+
+    ```
+    .----user1----.         .----user2----.
+    :             o(1)-<--<-o(2)          :
+    '-------------'         '-------------'
+    ```
+
+11. `Media Server` notifies `user1` that he can publish to `user2`:
+
+    ```json
+    {
+      "event": "RemotePeersUpdated",
+      "data": {
+        "peers": [{
+          "peer_id": 2,
+          "member_id": "user_2",
+          "can_rx": null,
+          "can_tx": {
+            "AudioVideo": {
+              "audio_settings": {},
+              "video_settings": {}
+            }
+          }
+        }]
+      }
+    }
+    ```
+
+12. `Media Server` notifies `user2` that he can subscribe to `user1`:
+
+    ```json
+    {
+      "event": "RemotePeersUpdated",
+      "data": {
+        "peers": [{
+          "peer_id": 1,
+          "member_id": "user_1",
+          "can_rx": {
+            "AudioVideo": {
+              "audio_settings": {},
+              "video_settings": {}
+            }
+          },
+          "can_tx": null
+        }]
+      }
+    }
+    ```
+
+13. `user1` requests to publish to `user2`:
+
+    ```json
+    {
+      "command": "RequestRemoteTracks",
+      "data": {
+        "peer_id": 1,
+        "remote_peer_id": 2,
+        "rx": null,
+        "tx": {
+          "AudioVideo": {
+            "audio_settings": {},
+            "video_settings": {}
+          }
         }
       }
-    }, {
-      "id": 2,
-      "media_type": {
-        "Audio": {}
-      },
-      "direction": {
-        "Recv": {
-          "sender": 1
-        }
+    }
+    ```
+
+14. `Media Server` updates `user2` `Track`s:
+
+    ```json
+    {
+      "event": "TracksApplied",
+      "data": {
+        "peer_id": 2,
+        "tracks": [{
+          "id": 1,
+          "media_type": {
+            "Audio": {}
+          },
+          "direction": {
+            "Recv": {
+              "sender": 1
+            }
+          }
+        }, {
+          "id": 2,
+          "media_type": {
+            "Audio": {}
+          },
+          "direction": {
+            "Recv": {
+              "sender": 1
+            }
+          }
+        }]
       }
-    }]
-  }
-}
-```
+    }
+    ```
 
-15\. Server updates `user1` tracks:
+15. `Media Server` updates `user1` `Track`s:
 
-```json
-{
-  "method": "TracksApplied",
-  "payload": {
-    "peer_id": 1,
-    "tracks": [{
-      "id": 1,
-      "media_type": {
-        "Audio": {}
-      },
-      "direction": {
-        "Send": {
-          "receivers": [2]
-        }
+    ```json
+    {
+      "event": "TracksApplied",
+      "data": {
+        "peer_id": 1,
+        "tracks": [{
+          "id": 1,
+          "media_type": {
+            "Audio": {}
+          },
+          "direction": {
+            "Send": {
+              "receivers": [2]
+            }
+          }
+        }, {
+          "id": 2,
+          "media_type": {
+            "Video": {}
+          },
+          "direction": {
+            "Send": {
+              "receivers": [2]
+            }
+          }
+        }]
       }
-    }, {
-      "id": 2,
-      "media_type": {
-        "Video": {}
-      },
-      "direction": {
-        "Send": {
-          "receivers": [2]
-        }
-      }
-    }]
-  }
-}
-```
+    }
+    ```
 
-16\. SDP re-negotiation: `user1` sends `MakeSdpOffer`, `Server` relays `SdpOfferMade` to `user2`, `user2` sends `MakeSDPAnswer`, `Server` relays `SdpAnswerMade` to `user1`.
+16. SDP re-negotiation: 
 
-```
-.----user1----.    .->-->-->--. .----user2----.
-:             o(1)=:          :=o(2)          :
-'-------------'    '-<--<--<--' '-------------'
-```
+    1. `user1` sends `MakeSdpOffer` command.
+
+    2. `Media Server` sends `SdpOfferMade` event to `user2`. 
+
+    3. `user2` sends `MakeSdpAnswer` command.
+
+    4. `Media Server` sends `SdpAnswerMade` event to `user1`.
+
+    ```
+    .----user1----.    .->-->-->--. .----user2----.
+    :             o(1)=:          :=o(2)          :
+    '-------------'    '-<--<--<--' '-------------'
+    ```
 </details>
-
 
 <details>
 <summary>1 => 2 SFU</summary>
@@ -1394,362 +1413,368 @@ struct GetMembers {
                                                        '------------------'
 ```
 
-1\. Server requests `user1` to create `sendonly` `Peer` passing Server's [SDP Offer]:
+1. `Media Server` notifies `user1` to create `sendonly` `Peer` passing its [SDP Offer]:
 
-```json
-{
-  "method": "PeerCreated",
-  "payload": {
-    "peer": {
-      "peer_id": 1,
-      "tracks": [{
-        "id": 1,
-        "media_type": {
-          "Audio": {}
+    ```json
+    {
+      "event": "PeerCreated",
+      "data": {
+        "peer": {
+          "peer_id": 1,
+          "tracks": [{
+            "id": 1,
+            "media_type": {
+              "Audio": {}
+            },
+            "direction": {
+              "Send": {
+                "receivers": []
+              }
+            }
+          }, {
+            "id": 2,
+            "media_type": {
+              "Video": {}
+            },
+            "direction": {
+              "Send": {
+                "receivers": []
+              }
+            }
+          }]
         },
-        "direction": {
-          "Send": {
-            "receivers": []
-          }
-        }
-      }, {
-        "id": 2,
-        "media_type": {
-          "Video": {}
-        },
-        "direction": {
-          "Send": {
-            "receivers": []
-          }
-        }
-      }]
-    },
-    "sdp_offer": "server_user1_recvonly_offer",
-    "ice_servers": [{
-      "urls": [
-        "turn:turnserver.com:3478",
-        "turn:turnserver.com:3478?transport=tcp"
-      ],
-      "username": "turn_user",
-      "credential": "turn_credential"
-    }]
-  }
-}
-```
-
-2\. `user1` creates peer and answers with [SDP Answer]:
-
-```json
-{
-  "method": "MakeSDPAnswer",
-  "payload": {
-    "peer_id": 1,
-    "sdp_answer": "user_1_sendonly_answer"
-  }
-}
-```
-
-3\. Server and `user1` exchange [ICE Candidate]s:
-
-`user1` => `Server`
-```json
-{
-  "method": "SetIceCandidate",
-  "payload": {
-    "peer_id": 1,
-    "candidate": "user1_ice_candidate"
-  }
-}
-```
-
-`Server` => `user1`
-```json
-{
-  "method": "IceCandidatesDiscovered",
-  "payload": {
-    "peer_id": 1,
-    "candidate": "server_ice_candidate"
-  }
-}
-```
-
-4\. Connection is established:
-
-```
-                          .-------SFU-------.
-.------user1------.       :                 ;
-:    pc_id = 1    o-->-->-o                 :
-'-----------------'       :                 ;
-                          '-----------------'
-```
-
-5\. Server requests `user2` to create `recvonly` `Peer` passing Server's [SDP Offer]:
-
-```json
-{
-  "method": "PeerCreated",
-  "payload": {
-    "peer": {
-      "peer_id": 2,
-      "tracks": [{
-        "id": 1,
-        "media_type": {
-          "Audio": {}
-        },
-        "direction": {
-          "Recv": {
-            "sender": 1
-          }
-        }
-      }, {
-        "id": 2,
-        "media_type": {
-          "Video": {}
-        },
-        "direction": {
-          "Recv": {
-            "sender": 1
-          }
-        }
-      }]
-    },
-    "sdp_offer": "server_user2_sendonly_offer",
-    "ice_servers": [{
-      "urls": [
-        "turn:turnserver.com:3478",
-        "turn:turnserver.com:3478?transport=tcp"
-      ],
-      "username": "turn_user",
-      "credential": "turn_credential"
-    }]
-  }
-}
-```
-
-6\. `user2` answers with [SDP Answer]:
-
-```json
-{
-  "method": "MakeSDPAnswer",
-  "payload": {
-    "peer_id": 2,
-    "sdp_answer": "user_2_recvonly_answer"
-  }
-}
-```
-
-7\. Server and `user2` exchange [ICE Candidate]s:
-
-`user2` => `Server`
-```json
-{
-  "method": "SetIceCandidate",
-  "payload": {
-    "peer_id": 2,
-    "candidate": "user2_ice_candidate"
-  }
-}
-```
-
-`Server` => `user2`
-```json
-{
-  "method": "IceCandidatesDiscovered",
-  "payload": {
-    "peer_id": 2,
-    "candidate": "server_ice_candidate"
-  }
-}
-```
-
-8\. `user2` is connected to Server's peer connection:
-
-```
-                                                       .-------user2------.
-                          .-------SFU-------.    .-->--o     pc_id = 2    :
-.------user1------.       :                 o-->-'     '------------------'
-:    pc_id = 1    o-->-->-o-                :
-'-----------------'       :                 :
-                          '-----------------'
-```
-
-9\. Server notifies `user1` that he has new subscriber:
-
-```json
-{
-  "method": "TracksApplied",
-  "payload": {
-    "peer_id": 1,
-    "tracks": [{
-      "id": 1,
-      "media_type": {
-        "Audio": {}
-      },
-      "direction": {
-        "Send": {
-          "receivers": [2]
-        }
+        "sdp_offer": "server_user1_recvonly_offer",
+        "ice_servers": [{
+          "urls": [
+            "turn:turnserver.com:3478",
+            "turn:turnserver.com:3478?transport=tcp"
+          ],
+          "username": "turn_user",
+          "credential": "turn_credential"
+        }]
       }
-    }, {
-      "id": 2,
-      "media_type": {
-        "Video": {}
-      },
-      "direction": {
-        "Send": {
-          "receivers": [2]
-        }
+    }
+    ```
+
+2. `user1` creates `Peer` and answers with [SDP Answer]:
+
+    ```json
+    {
+      "command": "MakeSdpAnswer",
+      "data": {
+        "peer_id": 1,
+        "sdp_answer": "user_1_sendonly_answer"
       }
-    }]
-  }
-}
-```
+    }
+    ```
 
-10\. Server sends `user1` `Peer {peer_id = 1}` media to `user2` `Peer {peer_id = 2}`:
+3. `Media Server` and `user1` exchange their [ICE Candidate]s:
 
-```
-                                                        .-------user2------.
-                           .-------SFU-------.    .-->--o     pc_id = 2    :
- .------user1------.       :         .->-->--o-->-'     '------------------'
- :    pc_id = 1    o-->-->-o--->-->--'       :
- '-----------------'       :                 :
-                           '-----------------'
-```
+    1. `user1` => `Media Server`:
 
-11\. Server requests `user3` to create `recvonly` `Peer` passing Server's [SDP Offer]: 
-
-```json
-{
-  "method": "PeerCreated",
-  "payload": {
-    "peer": {
-      "peer_id": 3,
-      "tracks": [{
-        "id": 1,
-        "media_type": {
-          "Audio": {}
-        },
-        "direction": {
-          "Recv": {
-            "sender": 1
+        ```json
+        {
+          "command": "SetIceCandidate",
+          "data": {
+            "peer_id": 1,
+            "candidate": "user1_ice_candidate"
           }
         }
-      }, {
-        "id": 2,
-        "media_type": {
-          "Video": {}
-        },
-        "direction": {
-          "Recv": {
-            "sender": 1
+        ```
+
+    2. `Media Server` => `user1`:
+
+        ```json
+        {
+          "event": "IceCandidateDiscovered",
+          "data": {
+            "peer_id": 1,
+            "candidate": "server_ice_candidate"
           }
         }
-      }]
-    },
-    "sdp_offer": "server_user3_sendonly_offer",
-    "ice_servers": [{
-      "urls": [
-        "turn:turnserver.com:3478",
-        "turn:turnserver.com:3478?transport=tcp"
-      ],
-      "username": "turn_user",
-      "credential": "turn_credential"
-    }]
-  }
-}
-```
+        ```
 
-12\. `user2` answers with [SDP Answer]:
+4. Connection is established:
 
-```json
-{
-  "method": "MakeSDPAnswer",
-  "payload": {
-    "peer_id": 3,
-    "sdp_answer": "user_3_recvonly_answer"
-  }
-}
-```
+    ```
+                              .-------SFU-------.
+    .------user1------.       :                 ;
+    :    pc_id = 1    o-->-->-o                 :
+    '-----------------'       :                 ;
+                              '-----------------'
+    ```
 
-13\. Server and `user3` exchange [ICE Candidate]s:
+5. `Media Server` notifies `user2` to create `recvonly` `Peer` passing its [SDP Offer]:
 
-`user3` => `Server`
-```json
-{
-  "method": "SetIceCandidate",
-  "payload": {
-    "peer_id": 3,
-    "candidate": "user3_ice_candidate"
-  }
-}
-```
-
-`Server` => `user3`
-```json
-{
-  "method": "IceCandidatesDiscovered",
-  "payload": {
-    "peer_id": 3,
-    "candidate": "server_ice_candidate"
-  }
-}
-```
-
-14\. `user3` is connected to Server's peer connection:
-
-```
-                                                       .-------user2------.
-                          .-------SFU-------.    .-->--o     pc_id = 2    :
-.------user1------.       :       .---->----o-->-'     '------------------'
-:    pc_id = 1    o-->-->-o--->---'         :
-'-----------------'       :                 o-->-.     .-------user3------.
-                          '-----------------'    '-->--o     pc_id = 3    :
-                                                       '------------------'
-```
-
-15\. Server notifies `user1` that he has new subscriber:
-
-```json
-{
-  "method": "TracksApplied",
-  "payload": {
-    "peer_id": 1,
-    "tracks": [{
-      "id": 1,
-      "media_type": {
-        "Audio": {}
-      },
-      "direction": {
-        "Send": {
-          "receivers": [2, 3]
-        }
+    ```json
+    {
+      "event": "PeerCreated",
+      "data": {
+        "peer": {
+          "peer_id": 2,
+          "tracks": [{
+            "id": 1,
+            "media_type": {
+              "Audio": {}
+            },
+            "direction": {
+              "Recv": {
+                "sender": 1
+              }
+            }
+          }, {
+            "id": 2,
+            "media_type": {
+              "Video": {}
+            },
+            "direction": {
+              "Recv": {
+                "sender": 1
+              }
+            }
+          }]
+        },
+        "sdp_offer": "server_user2_sendonly_offer",
+        "ice_servers": [{
+          "urls": [
+            "turn:turnserver.com:3478",
+            "turn:turnserver.com:3478?transport=tcp"
+          ],
+          "username": "turn_user",
+          "credential": "turn_credential"
+        }]
       }
-    }, {
-      "id": 2,
-      "media_type": {
-        "Video": {}
-      },
-      "direction": {
-        "Send": {
-          "receivers": [2, 3]
-        }
+    }
+    ```
+
+6. `user2` answers with [SDP Answer]:
+
+    ```json
+    {
+      "command": "MakeSdpAnswer",
+      "data": {
+        "peer_id": 2,
+        "sdp_answer": "user_2_recvonly_answer"
       }
-    }]
-  }
-}
-```
+    }
+    ```
 
-16\. Server sends `user1` `Peer {peer_id = 1}` media to `user2` `Peer {peer_id = 3}`:
+7. `Media Server` and `user2` exchange their [ICE Candidate]s:
 
-```
-                                                     .-------user2------.
-                          .-------SFU-------.    .->-o     pc_id = 2    :
-.------user1------.       :       .---->----o-->-'   '------------------'
-:    pc_id = 1    o-->-->-o--->---:         :
-'-----------------'       :       '---->----o-->-.   .-------user3------.
-                          '-----------------'    '->-o     pc_id = 3    :
-                                                     '------------------'
-```
+    1. `user2` => `Media Server`:
+
+        ```json
+        {
+          "command": "SetIceCandidate",
+          "data": {
+            "peer_id": 2,
+            "candidate": "user2_ice_candidate"
+          }
+        }
+        ```
+
+    2. `Media Server` => `user2`:
+
+        ```json
+        {
+          "event": "IceCandidateDiscovered",
+          "data": {
+            "peer_id": 2,
+            "candidate": "server_ice_candidate"
+          }
+        }
+        ```
+
+8. `user2` is connected to `Media Server`'s [RTCPeerConnection]:
+
+    ```
+                                                           .-------user2------.
+                              .-------SFU-------.    .-->--o     pc_id = 2    :
+    .------user1------.       :                 o-->-'     '------------------'
+    :    pc_id = 1    o-->-->-o-                :
+    '-----------------'       :                 :
+                              '-----------------'
+    ```
+
+9. `Media Server` notifies `user1` that he has new subscriber:
+
+    ```json
+    {
+      "event": "TracksApplied",
+      "data": {
+        "peer_id": 1,
+        "tracks": [{
+          "id": 1,
+          "media_type": {
+            "Audio": {}
+          },
+          "direction": {
+            "Send": {
+              "receivers": [2]
+            }
+          }
+        }, {
+          "id": 2,
+          "media_type": {
+            "Video": {}
+          },
+          "direction": {
+            "Send": {
+              "receivers": [2]
+            }
+          }
+        }]
+      }
+    }
+    ```
+
+10. `Media Server` sends `user1` `Peer {peer_id = 1}` media to `user2` `Peer {peer_id = 2}`:
+
+    ```
+                                                            .-------user2------.
+                               .-------SFU-------.    .-->--o     pc_id = 2    :
+     .------user1------.       :         .->-->--o-->-'     '------------------'
+     :    pc_id = 1    o-->-->-o--->-->--'       :
+     '-----------------'       :                 :
+                               '-----------------'
+    ```
+
+11. `Media Server` notifies `user3` to create `recvonly` `Peer` passing its [SDP Offer]: 
+
+    ```json
+    {
+      "event": "PeerCreated",
+      "data": {
+        "peer": {
+          "peer_id": 3,
+          "tracks": [{
+            "id": 1,
+            "media_type": {
+              "Audio": {}
+            },
+            "direction": {
+              "Recv": {
+                "sender": 1
+              }
+            }
+          }, {
+            "id": 2,
+            "media_type": {
+              "Video": {}
+            },
+            "direction": {
+              "Recv": {
+                "sender": 1
+              }
+            }
+          }]
+        },
+        "sdp_offer": "server_user3_sendonly_offer",
+        "ice_servers": [{
+          "urls": [
+            "turn:turnserver.com:3478",
+            "turn:turnserver.com:3478?transport=tcp"
+          ],
+          "username": "turn_user",
+          "credential": "turn_credential"
+        }]
+      }
+    }
+    ```
+
+12. `user2` answers with [SDP Answer]:
+
+    ```json
+    {
+      "command": "MakeSdpAnswer",
+      "data": {
+        "peer_id": 3,
+        "sdp_answer": "user_3_recvonly_answer"
+      }
+    }
+    ```
+
+13. `Media Server` and `user3` exchange their [ICE Candidate]s:
+
+    1. `user3` => `Media Server`:
+
+        ```json
+        {
+          "command": "SetIceCandidate",
+          "data": {
+            "peer_id": 3,
+            "candidate": "user3_ice_candidate"
+          }
+        }
+        ```
+
+    2. `Media Server` => `user3`:
+
+        ```json
+        {
+          "event": "IceCandidateDiscovered",
+          "data": {
+            "peer_id": 3,
+            "candidate": "server_ice_candidate"
+          }
+        }
+        ```
+
+14. `user3` is connected to `Media Server`'s [RTCPeerConnection]:
+
+    ```
+                                                           .-------user2------.
+                              .-------SFU-------.    .-->--o     pc_id = 2    :
+    .------user1------.       :       .---->----o-->-'     '------------------'
+    :    pc_id = 1    o-->-->-o--->---'         :
+    '-----------------'       :                 o-->-.     .-------user3------.
+                              '-----------------'    '-->--o     pc_id = 3    :
+                                                           '------------------'
+    ```
+
+15. `Media Server` notifies `user1` that he has new subscriber:
+
+    ```json
+    {
+      "event": "TracksApplied",
+      "data": {
+        "peer_id": 1,
+        "tracks": [{
+          "id": 1,
+          "media_type": {
+            "Audio": {}
+          },
+          "direction": {
+            "Send": {
+              "receivers": [2, 3]
+            }
+          }
+        }, {
+          "id": 2,
+          "media_type": {
+            "Video": {}
+          },
+          "direction": {
+            "Send": {
+              "receivers": [2, 3]
+            }
+          }
+        }]
+      }
+    }
+    ```
+
+16. `Media Server` sends `user1` `Peer {peer_id = 1}` media to `user3` `Peer {peer_id = 3}`:
+
+    ```
+                                                         .-------user2------.
+                              .-------SFU-------.    .->-o     pc_id = 2    :
+    .------user1------.       :       .---->----o-->-'   '------------------'
+    :    pc_id = 1    o-->-->-o--->---:         :
+    '-----------------'       :       '---->----o-->-.   .-------user3------.
+                              '-----------------'    '->-o     pc_id = 3    :
+                                                         '------------------'
+    ```
 </details>
 
 
