@@ -40,7 +40,7 @@ The protocol must be versatile enough to cover all possible use cases.
 
 ### What is `Client WebRTC API`? 
 
-It is a part of `Client API` responsible for [WebRTC] connection management. You can find `Client API` on the following approximate architecture design:
+`Client WebRTC API` is a part of `Client API` responsible for [WebRTC] connection management. You can find `Client API` on the following approximate architecture design:
 ```
                                                                        .------------Server-----------.
                                                                        :     .-------------------.   :
@@ -57,29 +57,29 @@ It is a part of `Client API` responsible for [WebRTC] connection management. You
 ```
 
 So, how it works from `Media Server` point of view:
-1. `Control Service` configures media room via `Control API`.  
+1. `Control Service` configures media room via [`Control API`][Control API].  
 2. `Media Server` provides all necessary information (URLs + credentials) for all room members.
 3. `User Application` passes credentials and other necessary stuff (like `<video>` elements) to `Web Client`.
-4. And voilà!
+4. ...and voilà!
 
 
 ### Transport considerations
 
-Although, signalling can be implemented on top of any transport, WebSocket suits the most since it provides small overhead reliable duplex connection, is widely adopted and supported.
+Although, signalling can be implemented on top of any transport, [WebSocket] suits the most since it provides small overhead reliable duplex connection, and is widely adopted and supported.
 
 
-### Protocol considerations
+### WebSocket considerations
 
 Existing best practices are recommended for final implementation:
-1. Message level `ping`/`pong`, since it is the most reliable way to detect connection loss (protocol level WebSocket `ping`/`pong` may disfunct due to browser implementation and is not exposed to `Web Client`).
-2. Reconnects, since [RTCPeerConnection] always outlives WebSocket connection in cases of network issues, and both parts should know when to dispose related resources.
+1. Message level `ping`/`pong`, since it is the most reliable way to detect connection loss (protocol level [WebSocket] `ping`/`pong` may disfunct due to browser implementation and is not exposed to `Web Client`).
+2. Reconnects, since [RTCPeerConnection] always outlives [WebSocket] connection in cases of network issues, and both parts should know when to dispose related resources.
 3. Using custom Close Frame Status Codes, to implement reliable send-and-close.
 
 
 ### Signalling Protocol considerations
 [signalling-protocol-considerations]: #signalling-protocol-considerations
 
-One of the main goals, is to make `Web Client` integration as easy as possible. This means less interaction between `User Application` and `Web Client`, and more interaction between `Web Client` and `Media Server`, quite verbose `Control Api` design.
+One of the main goals, is to make `Web Client` integration as easy as possible. This means less interaction between `User Application` and `Web Client`, more interaction between `Web Client` and `Media Server`, and quite verbose [`Control API`][Control API] design.
 
 Having in mind, that `Media Server` already has user connection graph received from `Control Service` by the moment user connects, it is possible to establish all required connections without bothering `User Application`. Basically, connection establishment may not depend on interaction with `User Application` at all.
 
@@ -89,17 +89,19 @@ On the other hand, some use cases require more manual control over media exchang
 3. And then start sending media again.
 4. Mute or unmute.
 
-So API can be divided in two categories:
+So, possible API designs can be divided in two categories:
 1. Preconfigured: where everything works out-of-the-box and almost no interaction between `User Application` and `Web Client` required.
-2. Dynamic: when `User Application` needs to express complex use cases.
+2. Dynamic: when `User Application` needs to express complex use cases and change the topology dynamically.
 
 Current RFC offers combining both ways: everything will be configured automagically, but dynamic API is always there if you need it.
 
-All WS messages sent by `Server` are called `Event`s. `Event` means a fact that already has happened, so client cannot reject `Event` in any way (you cannot reject the happened past), it can only adopt itself to the received `Events`. So, `Server` just notifies `Client` about happened facts and `Clients` reacts on them to reach the proper state. This also emphasizes the indisputable authority of the `Server`.  
-The naming for `Events` follows the convention `<entity><passive-verb>`, for example: `PeerCreated`, `TracksApplied`, `PeersRemoved`.
+#### Messaging
 
-All WS messages sent by `Client` are called `Commands`. `Command` is basically a request/desire/intention of `Client` to change the state on `Server`.  
-The naming for `Commands` follows the convention `<infinitive-verb><entity>`, for example: `TracksApplied`, `MakeSdpOffer`, `MakeSdpAnswer`.
+All [WebSocket] messages sent by `Media Server` are called `Event`s. `Event` means a fact that already has happened, so `Web Client` cannot reject `Event` in any way (you cannot reject the happened past), it can only adopt itself to the received `Event`s. So, `Media Server` just notifies `Web Client` about happened facts and it reacts on them to reach the proper state. This also emphasizes the indisputable authority of the `Media Server`.  
+The naming for `Event` follows the convention `<entity><passive-verb>`, for example: `PeerCreated`, `TracksApplied`, `PeersRemoved`.
+
+All [WebSocket] messages sent by `Web Client` are called `Command`s. `Command` is basically a request/desire/intention of `Web Client` to change the state on `Media Server`.  
+The naming for `Command` follows the convention `<infinitive-verb><entity>`, for example: `ApplyTracks`, `MakeSdpOffer`, `MakeSdpAnswer`.
 
 
 
@@ -1784,6 +1786,7 @@ Current protocol assumes that there will be separate [RTCPeerConnection] pair fo
 
 
 
+[Control API]: https://github.com/instrumentisto/medea/blob/master/docs/rfc/0001-control-api.md
 [GStreamer]: https://gstreamer.freedesktop.org
 [ICE Candidate]:https://tools.ietf.org/html/rfc8445
 [MCU]: https://webrtcglossary.com/mcu
@@ -1799,3 +1802,4 @@ Current protocol assumes that there will be separate [RTCPeerConnection] pair fo
 [TURN]: https://tools.ietf.org/html/rfc5766
 [WebRTC]:https://www.w3.org/TR/webrtc
 [webrtcbin]: https://gstreamer.freedesktop.org/data/doc/gstreamer/head/gst-plugins-bad/html/gst-plugins-bad-plugins-webrtcbin.html
+[WebSocket]: https://en.wikipedia.org/wiki/WebSocket
