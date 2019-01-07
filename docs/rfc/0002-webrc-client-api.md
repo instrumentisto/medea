@@ -17,17 +17,17 @@ Formalize communication protocol between client (browser, mobile apps) and media
 ## Motivation
 [motivation]: #motivation
 
-[WebRTC] allows P2P data exchange, but [WebRTC] as a protocol comes without signaling. At the minimum signalling protocol must provide ways to exchange Session Description data ([SDP Offer] / [SDP Answer]) and [ICE Candidate]. But if you think about signalling protocol in terms of interaction with media server things become more complicated.
+[WebRTC] allows P2P data exchange, but [WebRTC] as a protocol comes without signaling. At the minimum signalling protocol must provide ways to exchange Session Description data ([SDP Offer] / [SDP Answer]) and [ICE Candidate]s. But if you think about signalling protocol in terms of interaction with media server things become more complicated.
 
 You will need to express ways to:
-1. Provide STUN/TURN servers.
+1. Provide [STUN]/[TURN] servers.
 2. Exchange some low-level media metadata (resolution, codecs, media types).
-3. Allow more sophisticated track management (updating video resolution on preview/fullscreen switches, passing multiple video tracks with different settings).
+3. Allow more sophisticated management of media tracks (updating video resolution on preview/fullscreen switches, passing multiple video tracks with different settings).
 4. Pass some user metadata to hook business logic onto.
 5. Build more complex connection graphs.
 6. Dynamically cancel/begin media publishing/receiving.
 7. Passing errors, [RTCPeerConnection]s and [RTCStatsReport]s.
-8. Cover both [p2p full mesh] and [hub server (SFU, MCU)] scenarios.
+8. Cover both [P2P full mesh] and hub server ([SFU], [MCU]) scenarios.
 
 The protocol must be versatile enough to cover all possible use cases.
 
@@ -1785,14 +1785,17 @@ Current protocol assumes that there will be separate [RTCPeerConnection] pair fo
 
 
 [GStreamer]: https://gstreamer.freedesktop.org
-[hub server (SFU, MCU)]: https://webrtcglossary.com/sfu
 [ICE Candidate]:https://tools.ietf.org/html/rfc8445
+[MCU]: https://webrtcglossary.com/mcu
 [MediaStreamTrack]: https://www.w3.org/TR/mediacapture-streams/#mediastreamtrack
-[p2p full mesh]: https://webrtcglossary.com/mesh
+[P2P full mesh]: https://webrtcglossary.com/mesh
 [RTCDataChannel]:https://www.w3.org/TR/webrtc/#rtcdatachannel
 [RTCPeerConnection]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
 [RTCStatsReport]: https://developer.mozilla.org/en-US/docs/Web/API/RTCStatsReport
 [SDP Answer]:https://tools.ietf.org/html/rfc3264
 [SDP Offer]:https://tools.ietf.org/html/rfc3264
+[SFU]: https://webrtcglossary.com/sfu
+[STUN]: https://tools.ietf.org/html/rfc3489
+[TURN]: https://tools.ietf.org/html/rfc5766
 [WebRTC]:https://www.w3.org/TR/webrtc
 [webrtcbin]: https://gstreamer.freedesktop.org/data/doc/gstreamer/head/gst-plugins-bad/html/gst-plugins-bad-plugins-webrtcbin.html
