@@ -1,6 +1,6 @@
 - Feature Name: `control_api`
 - Start Date: 2018-11-21
-- RFC PR: [instrumentisto/medea#6](https://github.com/instrumentisto/medea/issues/6)
+- RFC PR: [instrumentisto/medea#5](https://github.com/instrumentisto/medea/pull/5)
 - Tracking Issue: [instrumentisto/medea#4](https://github.com/instrumentisto/medea/issues/4)
 
 
