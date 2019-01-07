@@ -194,6 +194,19 @@ struct VideoSettings {}
 
 The naming for `Event` follows the convention `<entity><passive-verb>`, for example: `PeerCreated`, `TracksApplied`, `PeersRemoved`.
 
+The format of `Event` [WebSocket] message may be implemented as the following:
+```rust
+struct EventWebSocketMessage {
+    event: String,
+    data: EventData,
+    meta: Option<EventMeta>,
+}
+```
+Where:
+- `event`: name of concrete `Event` (declared below);
+- `data`: data provided by this `Event` (declared below);
+- `meta`: optional metadata of the `Event` for debugging or tracing purposes (may be fully omitted).
+
 #### 1. PeerCreated
 
 ```rust
