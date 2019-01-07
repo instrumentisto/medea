@@ -692,6 +692,19 @@ It's recommended to cache `Peer` ID and `Member` ID relations in `Web Client`'s 
 
 The naming for `Command` follows the convention `<infinitive-verb><entity>`, for example: `ApplyTracks`, `MakeSdpOffer`, `MakeSdpAnswer`.
 
+The format of `Command` [WebSocket] message may be implemented as the following:
+```rust
+struct CommandWebSocketMessage {
+    command: String,
+    data: CommandData,
+    meta: Option<CommandMeta>,
+}
+```
+Where:
+- `command`: name of concrete `Command` (declared below);
+- `data`: data provided by this `Command` (declared below);
+- `meta`: optional metadata of the `Command` for debugging or tracing purposes (may be fully omitted).
+
 #### 1. RemovePeers
 
 ```rust
