@@ -1759,9 +1759,9 @@ struct GetMembers {
 [drawbacks-and-alternatives]: #drawbacks-and-alternatives
 
 This RFC design tries to be a "silver bullet": cover all possible use-cases and combine them into a single protocol. Such versatility increases complexity. Simplifications can be achieved by imposing some general constraints:
-1. Divide current protocol in two separate protocols: one for SFU and one for P2P.
+1. Divide current protocol in two separate protocols: one for [SFU] and one for [P2P full mesh].
 2. Reject future possibilities of using 1 `Peer` for all inbound/outbound tracks.
-3. Limit the number of outbound streams in single `Peer` to 1.
+3. Limit the number of outbound streams in a single `Peer` to 1.
 4. Remove publishers acknowledgement of every receiver on each track.
 5. Remove subscribers acknowledgement of every publisher that is not publishing at the moment.
 
@@ -1776,19 +1776,18 @@ This RFC design tries to be a "silver bullet": cover all possible use-cases and 
 
 [WebRTC] spec introduces [RTCDataChannel] - a bi-directional data channel between two peers which allows arbitrary data exchange. It is an amazing feature with huge potential, but, at this point it is quite useless for our use cases.
 
-As the project grows, requirements will change, and we might consider adding data channels. Although, they are not 
-mentioned in this protocol, only minor tweaks will be required to support them.
+As the project grows, requirements will change, and we might consider adding data channels. Although, they are not mentioned in this protocol, only minor tweaks will be required to support them.
 
 
-### Receiving tracks from multiple senders in single peer connection
+### Receiving tracks from multiple senders in a single peer connection
 
-There are two general ways to manage Client's peer connections when using SFU server:
-1. Having only one pair of [RTCPeerConnection]'s (one at Client's end and one at Server) and pass all send/recv tracks through this connection.
-2. Or having a separate [RTCPeerConnection] pair for each track group.
+There are two general ways to manage `Web Client`'s [RTCPeerConnection]s when using [SFU] server:
+1. Having only one pair of [RTCPeerConnection]s (one at `Web Client`'s end and one at `Media Server`) and pass all `send`/`recv` `Track`s through this connection.
+2. Or having a separate [RTCPeerConnection] pair for each `Track` group.
 
-First way is preferable since it allows to reduce resources usage on both ends. But track management is very unclear in this case and [webrtcbin] module of [GStreamer] currently does not support dynamic addition/removal of streams and needs major updates to be able to do so.
+First way is preferable since it allows to reduce resources usage on both ends. But `Track` management is very unclear in this case and [webrtcbin] module of [GStreamer] currently does not support dynamic addition/removal of streams and needs major updates to be able to do so.
 
-Current protocol assumes that there will be separate [RTCPeerConnection] pair for each track group. At the same time, it does not forbid having all the tracks in single [RTCPeerConnection] pair, but it will require some minor changes to make this work.
+Current protocol assumes that there will be separate [RTCPeerConnection] pair for each `Track` group. At the same time, it does not forbid having all the `Track`s in a single [RTCPeerConnection] pair, but it will require some minor changes to make this work.
 
 
 
