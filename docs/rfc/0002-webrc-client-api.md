@@ -1,7 +1,7 @@
 - Feature Name: `client_webrtc_api`
 - Start Date: 2018-12-13
 - RFC PR: [instrumentisto/medea#7](https://github.com/instrumentisto/medea/pull/7)
-- Tracking Issue: [instrumentisto/medea#4](https://github.com/instrumentisto/medea/issues/6)
+- Tracking Issue: [instrumentisto/medea#6](https://github.com/instrumentisto/medea/issues/6)
 
 
 
