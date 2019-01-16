@@ -13,8 +13,8 @@ where
     W1: io::Write + Send + 'static,
     W2: io::Write + Send + 'static,
 {
-    let drain_out = Json::new(w_out).build().fuse();
-    let drain_err = Json::new(w_err).build().fuse();
+    let drain_out = Json::new(w_out).build();
+    let drain_err = Json::new(w_err).build();
     let drain = Duplicate(
         drain_out.filter(|r| !r.level().is_at_least(Level::Warning)),
         drain_err.filter_level(Level::Warning),
@@ -36,7 +36,7 @@ where
     add_default_keys(Logger::root(drain, o!()))
 }
 
-/// Add default key-values:
+/// Add default key-values for log:
 ///
 /// * `time` - timestamp
 /// * `lvl` - record logging level name
