@@ -11,6 +11,15 @@ pub struct Member {
     pub credentials: String,
 }
 
+const CALLER: Member = Member {
+    id: 1,
+    credentials: "caller_credentials".to_owned(),
+};
+const RESPONDER: Member = Member {
+    id: 1,
+    credentials: "responder_credentials".to_owned(),
+};
+
 pub struct MemberRepository {
     pub members: HashMap<Id, Member>,
 }

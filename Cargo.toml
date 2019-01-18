@@ -9,12 +9,15 @@ edition = "2018"
 
 [dependencies]
 actix = "0.7"
+actix-web = "0.7"
 chrono = "0.4"
+dotenv = "0.13"
 failure = "0.1"
 futures = "0.1"
 im = "12.3"
-log = "0.4"
-slog = { version = "2.4", features = ["max_level_info", "release_max_level_warn"] }
+slog = "2.4"
+slog-envlogger = "2.1"
+slog-stdlog = "3.0"
 slog-async = "2.3"
 slog-json = "2.3"
 slog-scope = "4.1"

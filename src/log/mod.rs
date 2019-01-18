@@ -20,6 +20,7 @@ where
         drain_err.filter_level(Level::Warning),
     )
     .map(Fuse);
+    let drain = slog_envlogger::new(drain).fuse();
     let drain = Async::new(drain).build().fuse();
     add_default_keys(Logger::root(drain, o!()))
 }
