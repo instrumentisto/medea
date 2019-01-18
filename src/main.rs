@@ -1,14 +1,12 @@
 use actix::prelude::*;
 use im::hashmap::HashMap;
 
-use slog::{o, slog_debug, slog_error, slog_info, slog_trace, slog_warn};
-use slog_scope::{debug, error, info, trace, warn};
+use crate::api::control::member::{Member, MemberRepository};
+use crate::log::prelude::*;
 
 mod api;
 mod errors;
 mod log;
-
-use crate::api::control::member::{Member, MemberRepository};
 
 fn main() {
     let logger = log::new_dual_logger(std::io::stdout(), std::io::stderr());
@@ -18,7 +16,8 @@ fn main() {
     run();
     let _ = sys.run();
 
-    info!("Exit");
+    info!("Hooray!");
+    warn!("It works");
 }
 
 fn run() {
