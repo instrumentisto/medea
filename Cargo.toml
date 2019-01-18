@@ -1,11 +1,13 @@
 [package]
 name = "medea"
 version = "0.1.0"
-description = "Medea media server"
-homepage = "https://github.com/instrumentisto/medea"
-documentation = "https://github.com/instrumentisto/medea/tree/master/docs/rfc"
-readme = "README.md"
 edition = "2018"
+description = "Medea media server"
+authors = ["Instrumentisto Team <developer@instrumentisto.com>"]
+homepage = "https://github.com/instrumentisto/medea"
+# documentation = "https://docs.rs/medea"
+readme = "README.md"
+repository = "https://github.com/instrumentisto/medea"
 
 [dependencies]
 actix = "0.7"

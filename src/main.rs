@@ -1,10 +1,10 @@
 pub use actix::prelude::*;
 use dotenv::dotenv;
 
-pub use slog::{o, slog_debug, slog_error, slog_info, slog_trace, slog_warn};
-pub use slog_scope::{debug, error, info, trace, warn};
+use crate::api::control::member::{Member, MemberRepository};
+use crate::log::prelude::*;
 
-pub mod api;
+mod api;
 mod errors;
 mod log;
 mod server;
@@ -16,9 +16,10 @@ fn main() {
     let _guard = slog_stdlog::init().unwrap();
 
     let sys = actix::System::new("medea");
-    init_repo();
     server::run();
+    let addr = Arbiter::start(move |_| MemberRepository::default());
     let _ = sys.run();
 
-    info!("Exit");
+    info!("Hooray!");
+    warn!("It works");
 }

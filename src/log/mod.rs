@@ -1,13 +1,21 @@
-use chrono::Local;
-use slog::{o, Drain, Duplicate, FnValue, Fuse, Level, Logger, PushFnValue, Record};
-use slog_async::Async;
-use slog_json::Json;
+//! Provides logging utilities, used by application.
+
 use std::io;
 
-/// Build app logger which prints all its logs to STDOUT,
-/// but WARN level (and higher) logs to second writer.
-/// All logs are written in JSON format with key-value pairs
-/// such as level and timestamp.
+use chrono::Local;
+use slog::{
+    o, Drain, Duplicate, FnValue, Fuse, Level, Logger, PushFnValue, Record,
+};
+use slog_async::Async;
+use slog_json::Json;
+
+pub mod prelude;
+
+/// Builds JSON [`Logger`] which prints all its log records to `w_out` writer,
+/// but WARN level (and higher) to `w_err` writer.
+///
+/// Created [`Logger`] produces log records with `lvl`, `time` and `msg` fields
+/// by default.
 pub fn new_dual_logger<W1, W2>(w_out: W1, w_err: W2) -> Logger
 where
     W1: io::Write + Send + 'static,
@@ -25,9 +33,10 @@ where
     add_default_keys(Logger::root(drain, o!()))
 }
 
-/// Build logger which writes all its logs to writer.
-/// All logs are written in JSON format with key-value pairs
-/// such as level and timestamp.
+/// Builds JSON [`Logger`] which writes all its logs to the specified writer.
+///
+/// Created [`Logger`] produces log records with `lvl`, `time` and `msg` fields
+/// by default.
 pub fn new_logger<W>(w: W) -> Logger
 where
     W: io::Write + Send + 'static,
@@ -37,11 +46,12 @@ where
     add_default_keys(Logger::root(drain, o!()))
 }
 
-/// Add default key-values for log:
+/// Adds default log record data (key-value pairs) to specified [`Logger`]:
+/// - `time`: creation date and time of log record in [RFC 3339] format.
+/// - `lvl`: logging level of log record.
+/// - `msg`: log record message.
 ///
-/// * `time` - timestamp
-/// * `lvl` - record logging level name
-/// * `msg` - msg - formatted logging message
+/// [RFC 3339]: https://www.ietf.org/rfc/rfc3339.txt
 fn add_default_keys(logger: Logger) -> Logger {
     logger.new(o!(
         "msg" => PushFnValue(move |record : &Record, ser| {

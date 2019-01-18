@@ -2,6 +2,7 @@ use actix::prelude::*;
 use im::hashmap::HashMap;
 
 use crate::errors::AppError;
+use crate::log::prelude::*;
 
 pub type Id = u64;
 
@@ -24,6 +25,29 @@ pub struct MemberRepository {
     pub members: HashMap<Id, Member>,
 }
 
+/// Creates members repository with default Caller and Responder.
+impl Default for MemberRepository {
+    fn default() -> Self {
+        let mut members = HashMap::new();
+        members.insert(
+            1,
+            Member {
+                id: 1,
+                credentials: "caller_credentials".to_owned(),
+            },
+        );
+        members.insert(
+            2,
+            Member {
+                id: 2,
+                credentials: "responder_credentials".to_owned(),
+            },
+        );
+        info! {"Repository created"};
+        MemberRepository { members }
+    }
+}
+
 impl Actor for MemberRepository {
     type Context = Context<Self>;
 }
@@ -38,7 +62,11 @@ impl Message for GetMember {
 impl Handler<GetMember> for MemberRepository {
     type Result = Result<Member, AppError>;
 
-    fn handle(&mut self, msg: GetMember, _: &mut Self::Context) -> Self::Result {
+    fn handle(
+        &mut self,
+        msg: GetMember,
+        _: &mut Self::Context,
+    ) -> Self::Result {
         self.members
             .get(&msg.0)
             .map(|member| member.to_owned())
@@ -56,7 +84,11 @@ impl Message for GetMemberByCredentials {
 impl Handler<GetMemberByCredentials> for MemberRepository {
     type Result = Result<Member, AppError>;
 
-    fn handle(&mut self, msg: GetMemberByCredentials, _: &mut Self::Context) -> Self::Result {
+    fn handle(
+        &mut self,
+        msg: GetMemberByCredentials,
+        _: &mut Self::Context,
+    ) -> Self::Result {
         self.members
             .values()
             .find(|member| member.credentials.eq(&msg.0))
@@ -75,30 +107,22 @@ mod tests {
     #[test]
     fn test_get_member_by_id() {
         System::run(move || {
-            let id = 2;
-            let members = HashMap::unit(
-                id,
-                Member {
-                    id,
-                    credentials: "credentials".to_owned(),
-                },
-            );
-
-            let addr = Arbiter::builder().start(move |_| MemberRepository { members });
+            let addr = Arbiter::start(move |_| MemberRepository::default());
 
             tokio::spawn(
-                addr.send(GetMember(id))
+                addr.send(GetMember(1))
                     .and_then(|res| {
                         assert!(res.is_ok());
                         let member = res.unwrap();
-                        assert_eq!(member.id, 2);
+                        assert_eq!(member.id, 1);
                         Ok(())
                     })
                     .then(move |_| {
-                        Delay::new(Instant::now() + Duration::new(0, 1_000_000)).then(move |_| {
-                            System::current().stop();
-                            future::result(Ok(()))
-                        })
+                        Delay::new(Instant::now() + Duration::new(0, 1_000_000))
+                            .then(move |_| {
+                                System::current().stop();
+                                future::result(Ok(()))
+                            })
                     }),
             );
         });
@@ -107,34 +131,29 @@ mod tests {
     #[test]
     fn test_get_member_by_credentials() {
         System::run(move || {
-            let id = 2;
-            let cred = "credentials";
-            let members = HashMap::unit(
-                id,
-                Member {
-                    id,
-                    credentials: cred.to_owned(),
-                },
-            );
-
-            //let addr = SyncArbiter::start(1, || MemberRepository{members});
-            let addr = Arbiter::builder().start(move |_| MemberRepository { members });
+            let addr = Arbiter::start(move |_| MemberRepository::default());
 
             tokio::spawn(
-                addr.send(GetMemberByCredentials(cred.to_owned()))
-                    .and_then(|res| {
-                        assert!(res.is_ok());
-                        let member = res.unwrap();
-                        assert_eq!(member.id, 2);
-                        assert_eq!(member.credentials, "credentials");
-                        Ok(())
-                    })
-                    .then(move |_| {
-                        Delay::new(Instant::now() + Duration::new(0, 1_000_000)).then(move |_| {
+                addr.send(GetMemberByCredentials(
+                    "responder_credentials".to_owned(),
+                ))
+                .and_then(|res| {
+                    assert!(res.is_ok());
+                    let member = res.unwrap();
+                    assert_eq!(member.id, 2);
+                    assert_eq!(
+                        member.credentials,
+                        "responder_credentials".to_owned()
+                    );
+                    Ok(())
+                })
+                .then(move |_| {
+                    Delay::new(Instant::now() + Duration::new(0, 1_000_000))
+                        .then(move |_| {
                             System::current().stop();
                             future::result(Ok(()))
                         })
-                    }),
+                }),
             );
         });
     }
