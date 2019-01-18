@@ -13,31 +13,9 @@ fn main() {
     let _scope_guard = slog_scope::set_global_logger(logger);
 
     let sys = actix::System::new("medea");
-    run();
+    let addr = Arbiter::start(move |_| MemberRepository::default());
     let _ = sys.run();
 
     info!("Hooray!");
     warn!("It works");
-}
-
-fn run() {
-    let mut members = HashMap::new();
-    members.insert(
-        1,
-        Member {
-            id: 1,
-            credentials: "user1_credentials".to_owned(),
-        },
-    );
-    members.insert(
-        2,
-        Member {
-            id: 2,
-            credentials: "user2_credentials".to_owned(),
-        },
-    );
-
-    let addr = Arbiter::builder().start(move |_| MemberRepository { members });
-
-    info!("Repository created");
 }
