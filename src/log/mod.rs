@@ -1,10 +1,11 @@
+use std::io;
+
 use chrono::Local;
 use slog::{o, Drain, Duplicate, FnValue, Fuse, Level, Logger, PushFnValue, Record};
 use slog_async::Async;
 use slog_json::Json;
-use std::io;
 
-/// Build app logger which prints all its logs to STDOUT,
+/// Builds logger which prints all its logs to `w_out`,
 /// but WARN level (and higher) logs to second writer.
 /// All logs are written in JSON format with key-value pairs
 /// such as level and timestamp.
