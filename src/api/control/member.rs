@@ -1,10 +1,7 @@
 use actix::prelude::*;
-use im::hashmap::HashMap;
+use hashbrown::HashMap;
 
-use crate::{
-    errors::AppError,
-    log::prelude::*,
-};
+use crate::{errors::AppError, log::prelude::*};
 
 pub type Id = u64;
 
@@ -16,29 +13,6 @@ pub struct Member {
 
 pub struct MemberRepository {
     pub members: HashMap<Id, Member>,
-}
-
-/// Creates members repository with default Caller and Responder.
-impl Default for MemberRepository {
-    fn default() -> Self {
-        let mut members = HashMap::new();
-        members.insert(
-            1,
-            Member {
-                id: 1,
-                credentials: "caller_credentials".to_owned(),
-            },
-        );
-        members.insert(
-            2,
-            Member {
-                id: 2,
-                credentials: "responder_credentials".to_owned(),
-            },
-        );
-        info! {"Repository created"};
-        MemberRepository { members }
-    }
 }
 
 impl Actor for MemberRepository {
@@ -97,10 +71,19 @@ mod tests {
     use tokio::prelude::*;
     use tokio::timer::Delay;
 
+    fn members() -> HashMap<Id, Member> {
+        let members = hashmap! {
+            1 => Member{id: 1, credentials: "caller_credentials".to_owned()},
+            2 => Member{id: 2, credentials: "responder_credentials".to_owned()},
+        };
+        members
+    }
+
     #[test]
-    fn test_get_member_by_id() {
+    fn returns_member_by_id() {
         System::run(move || {
-            let addr = Arbiter::start(move |_| MemberRepository::default());
+            let members = members();
+            let addr = Arbiter::start(move |_| MemberRepository { members });
 
             tokio::spawn(
                 addr.send(GetMember(1))
@@ -122,9 +105,10 @@ mod tests {
     }
 
     #[test]
-    fn test_get_member_by_credentials() {
+    fn returns_member_by_credentials() {
         System::run(move || {
-            let addr = Arbiter::start(move |_| MemberRepository::default());
+            let members = members();
+            let addr = Arbiter::start(move |_| MemberRepository { members });
 
             tokio::spawn(
                 addr.send(GetMemberByCredentials(
