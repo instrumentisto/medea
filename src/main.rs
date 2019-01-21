@@ -1,8 +1,10 @@
 use actix::prelude::*;
 use im::hashmap::HashMap;
 
-use crate::api::control::member::{Member, MemberRepository};
-use crate::log::prelude::*;
+use crate::{
+    api::control::{Member, MemberRepository},
+    log::prelude::*,
+};
 
 mod api;
 mod errors;

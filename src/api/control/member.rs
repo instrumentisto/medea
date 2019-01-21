@@ -1,8 +1,10 @@
 use actix::prelude::*;
 use im::hashmap::HashMap;
 
-use crate::errors::AppError;
-use crate::log::prelude::*;
+use crate::{
+    errors::AppError,
+    log::prelude::*,
+};
 
 pub type Id = u64;
 
