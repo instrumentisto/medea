@@ -1,4 +1,4 @@
-pub use actix::prelude::*;
+use actix::prelude::*;
 use dotenv::dotenv;
 
 use crate::api::control::member::{Member, MemberRepository};

@@ -6,21 +6,13 @@ use crate::log::prelude::*;
 
 pub type Id = u64;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Member {
     pub id: Id,
     pub credentials: String,
 }
 
-const CALLER: Member = Member {
-    id: 1,
-    credentials: "caller_credentials".to_owned(),
-};
-const RESPONDER: Member = Member {
-    id: 1,
-    credentials: "responder_credentials".to_owned(),
-};
-
+#[derive(Debug)]
 pub struct MemberRepository {
     pub members: HashMap<Id, Member>,
 }

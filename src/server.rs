@@ -1,8 +1,11 @@
-use crate::*;
-use actix_web::{fs, http, middleware, server, ws, App, Error, HttpRequest, HttpResponse};
-use api::control::member::{Member, MemberRepository};
-use im::hashmap::HashMap;
 use std::time::{Duration, Instant};
+
+use actix::prelude::*;
+use actix_web::{fs, http, middleware, server, ws, App, Error, HttpRequest, HttpResponse, State};
+use im::hashmap::HashMap;
+
+use crate::api::control::member::{GetMember, Member, MemberRepository};
+use crate::log::prelude::*;
 
 /// How often heartbeat pings are sent
 const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);
@@ -10,11 +13,11 @@ const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);
 const CLIENT_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// do websocket handshake and start `WsSessions` actor
-fn ws_index(r: &HttpRequest) -> Result<HttpResponse, Error> {
+fn ws_index(r: &HttpRequest<AppState>) -> Result<HttpResponse, Error> {
     ws::start(r, WsSessions::new())
 }
 
-fn index(r: &HttpRequest) -> Result<HttpResponse, Error> {
+fn index(r: &HttpRequest<AppState>) -> Result<HttpResponse, Error> {
     Ok(HttpResponse::Ok().finish())
 }
 
@@ -27,11 +30,24 @@ struct WsSessions {
 }
 
 impl Actor for WsSessions {
-    type Context = ws::WebsocketContext<Self>;
+    type Context = ws::WebsocketContext<Self, AppState>;
 
     /// Method is called on actor start. We start the heartbeat process here.
     fn started(&mut self, ctx: &mut Self::Context) {
         self.hb(ctx);
+        ctx.state()
+            .members_repo
+            .send(GetMember(1))
+            .into_actor(self)
+            .then(|res, act, ctx| {
+                match res {
+                    Ok(res) => debug!{"{:?}", res},
+                    // something is wrong with chat server
+                    _ => ctx.stop(),
+                }
+                fut::ok(())
+            })
+            .wait(ctx);
     }
 }
 
@@ -85,13 +101,15 @@ impl WsSessions {
 }
 
 /// State with repository address
+#[derive(Debug)]
 struct AppState {
     members_repo: Addr<MemberRepository>,
 }
 
 pub fn run() {
-    server::new(|| {
-        with_state(AppState {
+    let addr = Arbiter::start(move |_| MemberRepository::default());
+    server::new(move || {
+        App::with_state(AppState {
             members_repo: addr.clone(),
         })
         // enable logger
@@ -105,28 +123,5 @@ pub fn run() {
     .unwrap()
     .start();
 
-    println!("Started http server: 127.0.0.1:8080");
-    trace!("Started http server: 127.0.0.1:8080");
-}
-
-fn init_repo<A: Actor>() -> Addr<A> {
-    let mut members = HashMap::new();
-    members.insert(
-        1,
-        Member {
-            id: 1,
-            credentials: "user1_credentials".to_owned(),
-        },
-    );
-    members.insert(
-        2,
-        Member {
-            id: 2,
-            credentials: "user2_credentials".to_owned(),
-        },
-    );
-
-    info!("Repository created");
-
-    Arbiter::builder().start(move |_| MemberRepository { members })
+    info!("Started http server: 127.0.0.1:8080");
 }
