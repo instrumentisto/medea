@@ -1,3 +1,3 @@
 pub mod member;
 
-pub use self::member::{Member, MemberRepository};
+pub use self::member::{ControlError, Member, MemberRepository};

@@ -1,7 +1,8 @@
+use crate::api::control::ControlError;
 use failure::Fail;
 
 #[derive(Fail, Debug)]
 pub enum AppError {
-    #[fail(display = "Not found member")]
-    NotFound,
+    #[fail(display = "Not implemented")]
+    Control(#[fail(cause)] ControlError),
 }

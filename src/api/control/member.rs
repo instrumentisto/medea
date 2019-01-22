@@ -1,7 +1,14 @@
 use actix::prelude::*;
+use failure::Fail;
 use hashbrown::HashMap;
 
-use crate::{errors::AppError, log::prelude::*};
+use crate::log::prelude::*;
+
+#[derive(Fail, Debug, PartialEq)]
+pub enum ControlError {
+    #[fail(display = "Not found member")]
+    NotFound,
+}
 
 pub type Id = u64;
 
@@ -23,21 +30,22 @@ impl Actor for MemberRepository {
 pub struct GetMember(pub Id);
 
 impl Message for GetMember {
-    type Result = Result<Member, AppError>;
+    type Result = Result<Member, ControlError>;
 }
 
 impl Handler<GetMember> for MemberRepository {
-    type Result = Result<Member, AppError>;
+    type Result = Result<Member, ControlError>;
 
     fn handle(
         &mut self,
         msg: GetMember,
         _: &mut Self::Context,
     ) -> Self::Result {
+        debug!("GetMember message received");
         self.members
             .get(&msg.0)
             .map(|member| member.to_owned())
-            .ok_or(AppError::NotFound)
+            .ok_or(ControlError::NotFound)
     }
 }
 
@@ -45,22 +53,23 @@ impl Handler<GetMember> for MemberRepository {
 pub struct GetMemberByCredentials(pub String);
 
 impl Message for GetMemberByCredentials {
-    type Result = Result<Member, AppError>;
+    type Result = Result<Member, ControlError>;
 }
 
 impl Handler<GetMemberByCredentials> for MemberRepository {
-    type Result = Result<Member, AppError>;
+    type Result = Result<Member, ControlError>;
 
     fn handle(
         &mut self,
         msg: GetMemberByCredentials,
         _: &mut Self::Context,
     ) -> Self::Result {
+        debug!("GetMemberByCredentials message received");
         self.members
             .values()
             .find(|member| member.credentials.eq(&msg.0))
             .map(|member| member.to_owned())
-            .ok_or(AppError::NotFound)
+            .ok_or(ControlError::NotFound)
     }
 }
 
@@ -131,6 +140,31 @@ mod tests {
                             future::result(Ok(()))
                         })
                 }),
+            );
+        });
+    }
+
+    #[test]
+    fn returns_error_not_found() {
+        System::run(move || {
+            let members = members();
+            let addr = Arbiter::start(move |_| MemberRepository { members });
+
+            tokio::spawn(
+                addr.send(GetMember(999))
+                    .and_then(|res| {
+                        assert!(res.is_err());
+                        // let member = res.unwrap();
+                        assert_eq!(res.err(), Some(ControlError::NotFound));
+                        Ok(())
+                    })
+                    .then(move |_| {
+                        Delay::new(Instant::now() + Duration::new(0, 1_000_000))
+                            .then(move |_| {
+                                System::current().stop();
+                                future::result(Ok(()))
+                            })
+                    }),
             );
         });
     }
