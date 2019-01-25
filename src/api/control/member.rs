@@ -18,7 +18,7 @@ pub struct Member {
     pub credentials: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct MemberRepository {
     pub members: HashMap<Id, Member>,
 }
@@ -73,6 +73,9 @@ impl Handler<GetMemberByCredentials> for MemberRepository {
             .ok_or(ControlError::NotFound)
     }
 }
+
+impl SystemService for MemberRepository {}
+impl Supervised for MemberRepository {}
 
 #[cfg(test)]
 mod tests {

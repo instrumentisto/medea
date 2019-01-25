@@ -1,18 +1,13 @@
 use actix::prelude::*;
 use dotenv::dotenv;
-use im::hashmap::HashMap;
 
-use crate::{
-    api::control::{Member, MemberRepository},
-    log::prelude::*,
-};
+use crate::{api::client::*, log::prelude::*};
 
 #[macro_use]
 mod utils;
 mod api;
 mod errors;
 mod log;
-mod server;
 
 fn main() {
     dotenv().ok();
@@ -20,14 +15,8 @@ fn main() {
     let _scope_guard = slog_scope::set_global_logger(logger);
     let _guard = slog_stdlog::init().unwrap();
 
-    let members = hashmap! {
-        1 => Member{id: 1, credentials: "caller_credentials".to_owned()},
-        2 => Member{id: 2, credentials: "responder_credentials".to_owned()},
-    };
-
-    let sys = actix::System::new("medea");
+    let sys = System::new("medea");
     server::run();
-    let _addr = Arbiter::start(move |_| MemberRepository { members });
     let _ = sys.run();
 
     info!("Hooray!");
