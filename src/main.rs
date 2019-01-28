@@ -1,15 +1,14 @@
-use actix::prelude::*;
-
 use crate::{
     api::control::{Member, MemberRepository},
     log::prelude::*,
-    utils::hashmap,
 };
+
+#[macro_use]
+mod utils;
 
 mod api;
 mod errors;
 mod log;
-mod utils;
 
 fn main() {
     let logger = log::new_dual_logger(std::io::stdout(), std::io::stderr());
@@ -20,11 +19,10 @@ fn main() {
         2 => Member{id: 2, credentials: "responder_credentials".to_owned()},
     };
 
-    let sys = actix::System::new("medea");
-    let _addr = Arbiter::start(move |_| {
+    let repo = MemberRepository { members };
+    if let Ok(member) = repo.get_member(1) {
+        info!("{:?}", member);
         info!("Hooray!");
         warn!("It works");
-        MemberRepository { members }
-    });
-    let _ = sys.run();
+    }
 }
