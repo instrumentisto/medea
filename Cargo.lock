@@ -28,6 +28,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "actix-broker"
+version = "0.1.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "actix 0.7.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "fnv 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "actix-net"
 version = "0.2.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -672,6 +682,7 @@ name = "medea"
 version = "0.1.0"
 dependencies = [
  "actix 0.7.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "actix-broker 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "actix-web 0.7.18 (registry+https://github.com/rust-lang/crates.io-index)",
  "chrono 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "dotenv 0.13.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1786,6 +1797,7 @@ dependencies = [
 
 [metadata]
 "checksum actix 0.7.9 (registry+https://github.com/rust-lang/crates.io-index)" = "6c616db5fa4b0c40702fb75201c2af7f8aa8f3a2e2c1dda3b0655772aa949666"
+"checksum actix-broker 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)" = "6e35516b71d630755f23fc271db50009ee209f819087c0c1eb5abc10cc4b187b"
 "checksum actix-net 0.2.6 (registry+https://github.com/rust-lang/crates.io-index)" = "8bebfbe6629e0131730746718c9e032b58f02c6ce06ed7c982b9fef6c8545acd"
 "checksum actix-web 0.7.18 (registry+https://github.com/rust-lang/crates.io-index)" = "e9f33c941e5e69a58a6bfef33853228042ed3799fc4b5a4923a36a85776fb690"
 "checksum actix_derive 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)" = "4300e9431455322ae393d43a2ba1ef96b8080573c0fc23b196219efedfb6ba69"

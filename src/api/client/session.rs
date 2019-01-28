@@ -1,6 +1,7 @@
 use std::time::{Duration, Instant};
 
 use actix::prelude::*;
+use actix_broker::{BrokerIssue, BrokerSubscribe};
 use actix_web::ws::CloseCode;
 use actix_web::{
     http, middleware, server, ws, App, AsyncResponder, Error, FutureResponse,
@@ -45,28 +46,13 @@ impl Actor for WsSessions {
     /// Method is called on actor start. We start the heartbeat process here.
     fn started(&mut self, ctx: &mut Self::Context) {
         self.hb(ctx);
-        let join_msg = JoinMember(self.member_id, ctx.address());
-        WsSessionRepository::from_registry()
-            .send(join_msg)
-            .into_actor(self)
-            .then(|res, act, ctx| match res {
-                Ok(res) => {
-                    info!("{:?}", res);
-                    if let Err(_) = res {
-                        ctx.close(Some(
-                            (
-                                CloseCode::Normal,
-                                "Member already connected!".to_owned(),
-                            )
-                                .into(),
-                        ));
-                        ctx.stop();
-                    }
-                    fut::ok(())
-                }
-                _ => fut::ok(()),
-            })
-            .spawn(ctx);
+        let msg = JoinMember(self.member_id, ctx.address());
+        self.issue_async(msg);
+    }
+
+    fn stopped(&mut self, ctx: &mut Self::Context) {
+        let msg = LeaveMember(self.member_id);
+        self.issue_async(msg);
     }
 }
 
@@ -122,12 +108,8 @@ impl WsSessions {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Message)]
 pub struct JoinMember(pub Id, pub Addr<WsSessions>);
-
-impl Message for JoinMember {
-    type Result = Result<(), ClientError>;
-}
 
 #[derive(Clone, Message)]
 pub struct LeaveMember(pub Id);
@@ -160,31 +142,18 @@ impl Actor for WsSessionRepository {
     type Context = Context<Self>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
-        // self.subscribe_async::<LeaveRoom>(ctx);
-        // self.subscribe_async::<SendMessage>(ctx);
+        self.subscribe_async::<JoinMember>(ctx);
+        self.subscribe_async::<LeaveMember>(ctx);
     }
 }
 
 impl Handler<JoinMember> for WsSessionRepository {
-    type Result = Result<(), ClientError>;
+    type Result = ();
 
-    fn handle(
-        &mut self,
-        msg: JoinMember,
-        _ctx: &mut Self::Context,
-    ) -> Self::Result {
+    fn handle(&mut self, msg: JoinMember, _ctx: &mut Self::Context) {
         let JoinMember(id, client) = msg;
-        match self.sessions.get(&id) {
-            Some(_) => {
-                info!("{:?}", self.sessions);
-                Err(ClientError::AlreadyExists)
-            }
-            None => {
-                self.sessions.insert(id, client);
-                info!("{:?}", self.sessions);
-                Ok(())
-            }
-        }
+        self.sessions.insert(id, client);
+        info!("{:?}", self.sessions);
     }
 }
 

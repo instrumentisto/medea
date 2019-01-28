@@ -10,19 +10,20 @@ use futures::future::Future;
 use crate::{
     api::client::*,
     api::control::member::{
-        ControlError, GetMember, Id, Member, MemberRepository,
+        ControlError, GetMemberByCredentials, Id, Member, MemberRepository,
     },
     log::prelude::*,
 };
 
 /// do websocket handshake and start `WsSessions` actor
 fn ws_index(
-    (r, id): (HttpRequest<()>, Path<Id>),
+    (r, creds): (HttpRequest<()>, Path<String>),
 ) -> FutureResponse<HttpResponse> {
+    info!("{:?}", creds);
     MemberRepository::from_registry()
-        .send(GetMember(id.into_inner()))
+        .send(GetMemberByCredentials(creds.into_inner()))
         .from_err()
-        .and_then(move |res| match res {
+        .and_then(|res| match res {
             Ok(res) => {
                 info!("{:?}", res);
                 WsSessionRepository::from_registry()
@@ -63,11 +64,13 @@ pub fn run() {
 
     let addr = Arbiter::start(move |_| MemberRepository { members });
     System::current().registry().set(addr);
+    let addr2 = Arbiter::start(|_| WsSessionRepository::default());
+    System::current().registry().set(addr2);
 
     server::new(move || {
         App::new()
             .middleware(middleware::Logger::default())
-            .resource("/ws/{member_id}", |r| {
+            .resource("/ws/{credentials}", |r| {
                 r.method(http::Method::GET).with(ws_index)
             })
             .resource("/get/", |r| r.method(http::Method::GET).f(index))
