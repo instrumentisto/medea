@@ -1,5 +1,6 @@
-use crate::api::control::ControlError;
 use failure::Fail;
+
+use crate::api::control::ControlError;
 
 #[derive(Fail, Debug)]
 pub enum AppError {
