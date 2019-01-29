@@ -1,32 +1,37 @@
+//! Member definitions and implementations.
+
 use failure::Fail;
 use hashbrown::HashMap;
 
 use crate::log::prelude::*;
 
-/// This error type encompasses any error that can be returned by this crate.
+/// Error that can be returned by Control API.
 #[derive(Fail, Debug, PartialEq)]
 pub enum ControlError {
+    /// [`Member`] is not found in repository.
     #[fail(display = "Not found member")]
     NotFound,
 }
 
-/// Id of Member.
+/// ID of [`Member`].
 pub type Id = u64;
 
-/// Member represent user with its id and credentials.
+/// Media server user with its ID and credentials.
 #[derive(Clone, Debug)]
 pub struct Member {
+    /// ID of [`Member`].
     pub id: Id,
+    /// Credentials to authorize [`Member`] with.
     pub credentials: String,
 }
 
-/// Repository for store members.
+/// Repository that stores store [`Member`]s.
 pub struct MemberRepository {
     pub members: HashMap<Id, Member>,
 }
 
 impl MemberRepository {
-    /// Returns member by its ID.
+    /// Returns [`Member`] by its ID.
     pub fn get_member(&self, id: Id) -> Result<Member, ControlError> {
         debug!("retrieve member by id: {}", id);
         self.members
@@ -35,7 +40,7 @@ impl MemberRepository {
             .ok_or(ControlError::NotFound)
     }
 
-    /// Returns member by its credentials.
+    /// Returns [`Member`] by its credentials.
     pub fn get_member_by_credentials(
         &self,
         credentials: String,

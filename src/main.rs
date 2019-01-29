@@ -1,14 +1,14 @@
+//! Medea media server application.
+
 use crate::{
     api::control::{Member, MemberRepository},
     log::prelude::*,
 };
 
-#[macro_use]
-mod utils;
-
 mod api;
 mod errors;
 mod log;
+#[macro_use] mod utils;
 
 fn main() {
     let logger = log::new_dual_logger(std::io::stdout(), std::io::stderr());
