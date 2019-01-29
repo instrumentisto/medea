@@ -1,10 +1,15 @@
 use actix::prelude::*;
 use dotenv::dotenv;
 
-use crate::{api::client::*, log::prelude::*};
+use crate::{
+    api::client::*,
+    api::control::{Member, MemberRepository},
+    log::prelude::*,
+};
 
 #[macro_use]
 mod utils;
+
 mod api;
 mod errors;
 mod log;
@@ -18,7 +23,4 @@ fn main() {
     let sys = System::new("medea");
     server::run();
     let _ = sys.run();
-
-    info!("Hooray!");
-    warn!("It works");
 }

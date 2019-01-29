@@ -1,9 +1,8 @@
-#[macro_export]
-/// Create a **HashMap** from a list of key-value pairs.
+/// Creates new [`::hashbrown::HashMap`] from a list of key-value pairs.
 ///
 /// ## Example
 ///
-/// ```
+/// ```rust
 /// let map = hashmap! {
 ///     "a" => 1,
 ///     "b" => 2,
@@ -11,8 +10,8 @@
 /// assert_eq!(map["a"], 1);
 /// assert_eq!(map["b"], 2);
 /// assert_eq!(map.get("c"), None);
-/// # }
 /// ```
+#[macro_export]
 macro_rules! hashmap {
     (@single $($x:tt)*) => (());
     (@count $($rest:expr),*) => (<[()]>::len(&[$(hashmap!(@single $rest)),*]));
