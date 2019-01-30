@@ -1,11 +1,7 @@
 use actix::prelude::*;
 use dotenv::dotenv;
 
-use crate::{
-    api::client::*,
-    api::control::{Member, MemberRepository},
-    log::prelude::*,
-};
+use crate::api::client::*;
 
 #[macro_use]
 mod utils;

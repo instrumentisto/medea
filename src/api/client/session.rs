@@ -1,27 +1,19 @@
 use std::time::{Duration, Instant};
 
 use actix::prelude::*;
-use actix_broker::{BrokerIssue, BrokerSubscribe};
-use actix_web::ws::CloseCode;
-use actix_web::{
-    http, middleware, server, ws, App, AsyncResponder, Error, FutureResponse,
-    HttpRequest, HttpResponse, Path,
-};
+use actix_web::ws;
 use failure::Fail;
-use futures::future::Future;
-use hashbrown::{hash_map::Entry, HashMap};
+use hashbrown::HashMap;
 
 use crate::{
     api::client::*,
-    api::control::member::{
-        ControlError, GetMember, Id, Member, MemberRepository,
-    },
+    api::control::member::Id,
     log::prelude::*,
 };
 
 #[derive(Fail, Debug, PartialEq)]
 pub enum ClientError {
-    #[fail(display = "Session already exists")]
+    #[fail(display = "Member already connected")]
     AlreadyExists,
 }
 
@@ -41,18 +33,18 @@ pub struct WsSessions {
 }
 
 impl Actor for WsSessions {
-    type Context = ws::WebsocketContext<Self>;
+    type Context = ws::WebsocketContext<Self, AppState>;
 
     /// Method is called on actor start. We start the heartbeat process here.
     fn started(&mut self, ctx: &mut Self::Context) {
         self.hb(ctx);
-        let msg = JoinMember(self.member_id, ctx.address());
-        self.issue_async(msg);
+        let mut session_repo = ctx.state().session_repo.lock().unwrap();
+        session_repo.add_session(self.member_id, ctx.address());
     }
 
     fn stopped(&mut self, ctx: &mut Self::Context) {
-        let msg = LeaveMember(self.member_id);
-        self.issue_async(msg);
+        let mut session_repo = ctx.state().session_repo.lock().unwrap();
+        session_repo.remove_session(self.member_id);
     }
 }
 
@@ -108,63 +100,25 @@ impl WsSessions {
     }
 }
 
-#[derive(Clone, Message)]
-pub struct JoinMember(pub Id, pub Addr<WsSessions>);
-
-#[derive(Clone, Message)]
-pub struct LeaveMember(pub Id);
-
-#[derive(Clone, Message)]
-#[rtype(result = "bool")]
-pub struct IsConnected(pub Id);
-
-impl Handler<IsConnected> for WsSessionRepository {
-    type Result = MessageResult<IsConnected>;
-
-    fn handle(
-        &mut self,
-        msg: IsConnected,
-        _: &mut Self::Context,
-    ) -> Self::Result {
-        debug!("IsConnected message received");
-        MessageResult(self.sessions.contains_key(&msg.0))
-    }
-}
-
 type Client = Addr<WsSessions>;
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct WsSessionRepository {
     sessions: HashMap<Id, Client>,
 }
 
-impl Actor for WsSessionRepository {
-    type Context = Context<Self>;
-
-    fn started(&mut self, ctx: &mut Self::Context) {
-        self.subscribe_async::<JoinMember>(ctx);
-        self.subscribe_async::<LeaveMember>(ctx);
+impl WsSessionRepository {
+    pub fn is_connected(&self, member_id: Id) -> bool {
+        self.sessions.contains_key(&member_id)
     }
-}
 
-impl Handler<JoinMember> for WsSessionRepository {
-    type Result = ();
-
-    fn handle(&mut self, msg: JoinMember, _ctx: &mut Self::Context) {
-        let JoinMember(id, client) = msg;
+    pub fn add_session(&mut self, id: Id, client: Client) {
         self.sessions.insert(id, client);
         info!("{:?}", self.sessions);
     }
-}
 
-impl Handler<LeaveMember> for WsSessionRepository {
-    type Result = ();
-
-    fn handle(&mut self, msg: LeaveMember, _ctx: &mut Self::Context) {
-        self.sessions.remove(&msg.0);
+    pub fn remove_session(&mut self, id: Id) {
+        self.sessions.remove(&id);
         info!("{:?}", self.sessions);
     }
 }
-
-impl SystemService for WsSessionRepository {}
-impl Supervised for WsSessionRepository {}
