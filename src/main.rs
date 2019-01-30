@@ -6,9 +6,9 @@ use crate::{
 };
 
 mod api;
-mod errors;
 mod log;
-#[macro_use] mod utils;
+#[macro_use]
+mod utils;
 
 fn main() {
     let logger = log::new_dual_logger(std::io::stdout(), std::io::stderr());
@@ -19,8 +19,8 @@ fn main() {
         2 => Member{id: 2, credentials: "responder_credentials".to_owned()},
     };
 
-    let repo = MemberRepository { members };
-    if let Ok(member) = repo.get_member(1) {
+    let repo = MemberRepository::new(members);
+    if let Some(member) = repo.get(1) {
         info!("{:?}", member);
         info!("Hooray!");
         warn!("It works");
