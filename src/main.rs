@@ -1,14 +1,14 @@
+//! Medea media server application.
+
 use actix::prelude::*;
 use dotenv::dotenv;
 
 use crate::api::client::*;
 
+mod api;
+mod log;
 #[macro_use]
 mod utils;
-
-mod api;
-mod errors;
-mod log;
 
 fn main() {
     dotenv().ok();

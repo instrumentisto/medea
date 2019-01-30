@@ -1,51 +1,45 @@
-use failure::Fail;
+//! Member definitions and implementations.
+
 use hashbrown::HashMap;
 
 use crate::log::prelude::*;
 
-/// This error type encompasses any error that can be returned by this crate.
-#[derive(Fail, Debug, PartialEq)]
-pub enum ControlError {
-    #[fail(display = "Not found member")]
-    NotFound,
-}
-
-/// Id of Member.
+/// ID of [`Member`].
 pub type Id = u64;
 
-/// Member represent user with its id and credentials.
+/// Media server user with its ID and credentials.
 #[derive(Clone, Debug)]
 pub struct Member {
+    /// ID of [`Member`].
     pub id: Id,
+    /// Credentials to authorize [`Member`] with.
     pub credentials: String,
 }
 
-/// Repository for store members.
+/// Repository that stores store [`Member`]s.
+#[derive(Default)]
 pub struct MemberRepository {
-    pub members: HashMap<Id, Member>,
+    members: HashMap<Id, Member>,
 }
 
 impl MemberRepository {
-    /// Returns member by its ID.
-    pub fn get_member(&self, id: Id) -> Result<Member, ControlError> {
-        debug!("retrieve member by id: {}", id);
-        self.members
-            .get(&id)
-            .map(|member| member.to_owned())
-            .ok_or(ControlError::NotFound)
+    /// Creates new [`Member`]s repository with passed-in [`Member`]s.
+    pub fn new(members: HashMap<Id, Member>) -> Self {
+        MemberRepository { members }
     }
 
-    /// Returns member by its credentials.
-    pub fn get_member_by_credentials(
-        &self,
-        credentials: String,
-    ) -> Result<Member, ControlError> {
+    /// Returns [`Member`] by its ID.
+    pub fn get(&self, id: Id) -> Option<&Member> {
+        debug!("retrieve member by id: {}", id);
+        self.members.get(&id)
+    }
+
+    /// Returns [`Member`] by its credentials.
+    pub fn get_by_credentials(&self, credentials: String) -> Option<&Member> {
         debug!("retrieve member by credentials: {}", credentials);
         self.members
             .values()
             .find(|member| member.credentials.eq(&credentials))
-            .map(|member| member.to_owned())
-            .ok_or(ControlError::NotFound)
     }
 }
 
@@ -64,10 +58,10 @@ mod tests {
     #[test]
     fn returns_member_by_id() {
         let members = members();
-        let repo = &MemberRepository { members };
+        let repo = MemberRepository::new(members);
 
-        let res = repo.get_member(1);
-        assert!(res.is_ok());
+        let res = repo.get(1);
+        assert!(res.is_some());
         let member = res.unwrap();
         assert_eq!(member.id, 1);
     }
@@ -75,11 +69,10 @@ mod tests {
     #[test]
     fn returns_member_by_credentials() {
         let members = members();
-        let repo = &MemberRepository { members };
+        let repo = MemberRepository::new(members);
 
-        let res =
-            repo.get_member_by_credentials("responder_credentials".to_owned());
-        assert!(res.is_ok());
+        let res = repo.get_by_credentials("responder_credentials".to_owned());
+        assert!(res.is_some());
         let member = res.unwrap();
         assert_eq!(member.id, 2);
         assert_eq!(member.credentials, "responder_credentials".to_owned());
@@ -88,10 +81,9 @@ mod tests {
     #[test]
     fn returns_error_not_found() {
         let members = members();
-        let repo = &MemberRepository { members };
+        let repo = MemberRepository::new(members);
 
-        let res = repo.get_member(999);
-        assert!(res.is_err());
-        assert_eq!(res.err(), Some(ControlError::NotFound));
+        let res = repo.get(999);
+        assert!(res.is_none());
     }
 }
