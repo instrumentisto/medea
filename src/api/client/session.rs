@@ -1,29 +1,20 @@
+//! Member websocket session definitions and implementations.
+
 use std::time::{Duration, Instant};
 
 use actix::prelude::*;
 use actix_web::ws;
-use failure::Fail;
 use hashbrown::HashMap;
 
-use crate::{
-    api::client::*,
-    api::control::member::Id,
-    log::prelude::*,
-};
-
-#[derive(Fail, Debug, PartialEq)]
-pub enum ClientError {
-    #[fail(display = "Member already connected")]
-    AlreadyExists,
-}
+use crate::{api::client::AppState, api::control::member::Id, log::prelude::*};
 
 /// How often heartbeat pings are sent
 const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);
 /// How long before lack of client response causes a timeout
 const CLIENT_TIMEOUT: Duration = Duration::from_secs(10);
 
-/// websocket connection is long running connection, it easier
-/// to handle with an actor
+/// Websocket connection is long running connection, it easier
+/// to handle with an actor.
 #[derive(Debug)]
 pub struct WsSessions {
     /// Client must send ping at least once per 10 seconds (CLIENT_TIMEOUT),
@@ -32,16 +23,41 @@ pub struct WsSessions {
     member_id: Id,
 }
 
+impl WsSessions {
+    /// Creates new [`Member`] session with passed-in [`Member`] ID.
+    pub fn new(member_id: Id) -> Self {
+        Self {
+            hb: Instant::now(),
+            member_id,
+        }
+    }
+
+    /// Helper method that sends ping to client every second.
+    ///
+    /// Also this method checks heartbeats from client
+    fn hb(&self, ctx: &mut <Self as Actor>::Context) {
+        ctx.run_interval(HEARTBEAT_INTERVAL, |act, ctx| {
+            if Instant::now().duration_since(act.hb) > CLIENT_TIMEOUT {
+                ctx.stop();
+                return;
+            }
+            ctx.ping("");
+        });
+    }
+}
+
 impl Actor for WsSessions {
     type Context = ws::WebsocketContext<Self, AppState>;
 
-    /// Method is called on actor start. We start the heartbeat process here.
+    /// Start the heartbeat process and store session in repository
+    /// on start [`Member`] session.
     fn started(&mut self, ctx: &mut Self::Context) {
         self.hb(ctx);
         let mut session_repo = ctx.state().session_repo.lock().unwrap();
         session_repo.add_session(self.member_id, ctx.address());
     }
 
+    /// Remove [`Member`] session repository after stopped session.
     fn stopped(&mut self, ctx: &mut Self::Context) {
         let mut session_repo = ctx.state().session_repo.lock().unwrap();
         session_repo.remove_session(self.member_id);
@@ -51,8 +67,6 @@ impl Actor for WsSessions {
 /// Handler for `ws::Message`
 impl StreamHandler<ws::Message, ws::ProtocolError> for WsSessions {
     fn handle(&mut self, msg: ws::Message, ctx: &mut Self::Context) {
-        // process websocket messages
-        println!("WS: {:?}", msg);
         match msg {
             ws::Message::Ping(msg) => {
                 self.hb = Instant::now();
@@ -70,55 +84,30 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSessions {
     }
 }
 
-impl WsSessions {
-    pub fn new(member_id: Id) -> Self {
-        Self {
-            hb: Instant::now(),
-            member_id,
-        }
-    }
-
-    /// helper method that sends ping to client every second.
-    ///
-    /// also this method checks heartbeats from client
-    fn hb(&self, ctx: &mut <Self as Actor>::Context) {
-        ctx.run_interval(HEARTBEAT_INTERVAL, |act, ctx| {
-            // check client heartbeats
-            if Instant::now().duration_since(act.hb) > CLIENT_TIMEOUT {
-                // heartbeat timed out
-                println!("Websocket Client heartbeat failed, disconnecting!");
-
-                // stop actor
-                ctx.stop();
-
-                // don't try to send a ping
-                return;
-            }
-
-            ctx.ping("");
-        });
-    }
-}
-
+/// Address of [`Member`] session for communicate with it.
 type Client = Addr<WsSessions>;
 
+/// Repository that stores [`Member`] sessions.
 #[derive(Default, Debug)]
 pub struct WsSessionRepository {
     sessions: HashMap<Id, Client>,
 }
 
 impl WsSessionRepository {
+    /// Returns `true` if member with given ID is connected at moment.
     pub fn is_connected(&self, member_id: Id) -> bool {
         self.sessions.contains_key(&member_id)
     }
 
+    /// Stores address of [`Member`] session in repository.
     pub fn add_session(&mut self, id: Id, client: Client) {
+        debug!("add session for member: {}", id);
         self.sessions.insert(id, client);
-        info!("{:?}", self.sessions);
     }
 
+    /// Removes address of [`Member`] session in repository.
     pub fn remove_session(&mut self, id: Id) {
+        debug!("remove session for member: {}", id);
         self.sessions.remove(&id);
-        info!("{:?}", self.sessions);
     }
 }

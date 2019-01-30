@@ -1,3 +1,5 @@
+//! Implementation HTTP server for handle websocket connections.
+
 use std::sync::{Arc, Mutex};
 
 use actix_web::{
@@ -6,19 +8,19 @@ use actix_web::{
 };
 
 use crate::{
-    api::client::*,
-    api::control::member::{ControlError, Member, MemberRepository},
+    api::client::session::{WsSessionRepository, WsSessions},
+    api::control::member::{Member, MemberRepository},
     log::prelude::*,
 };
 
-/// do websocket handshake and start `WsSessions` actor
+/// Do websocket handshake and start `WsSessions` actor
 fn ws_index(
     (r, creds, state): (HttpRequest<AppState>, Path<String>, State<AppState>),
 ) -> Result<HttpResponse, Error> {
-    info!("{:?}", creds);
     let member_repo = state.members_repo.lock().unwrap();
-    match member_repo.get_member_by_credentials(creds.into_inner()) {
-        Ok(member) => {
+    match member_repo.get_by_credentials(creds.into_inner()) {
+        None => Ok(HttpResponse::NotFound().finish()),
+        Some(member) => {
             let session_repo = state.session_repo.lock().unwrap();
             if session_repo.is_connected(member.id) {
                 Ok(HttpResponse::Conflict().finish())
@@ -26,18 +28,10 @@ fn ws_index(
                 ws::start(&r, WsSessions::new(member.id))
             }
         }
-        Err(e) => match e {
-            ControlError::NotFound => Ok(HttpResponse::NotFound().finish()),
-            _ => Ok(HttpResponse::InternalServerError().finish()),
-        },
     }
 }
 
-fn index(_r: &HttpRequest<AppState>) -> Result<HttpResponse, Error> {
-    Ok(HttpResponse::Ok().finish())
-}
-
-/// State with repository address
+/// State with repositories addresses
 pub struct AppState {
     pub members_repo: Arc<Mutex<MemberRepository>>,
     pub session_repo: Arc<Mutex<WsSessionRepository>>,
@@ -49,7 +43,7 @@ pub fn run() {
         2 => Member{id: 2, credentials: "responder_credentials".to_owned()},
     };
 
-    let members_repo = Arc::new(Mutex::new(MemberRepository { members }));
+    let members_repo = Arc::new(Mutex::new(MemberRepository::new(members)));
     let session_repo = Arc::new(Mutex::new(WsSessionRepository::default()));
 
     server::new(move || {
@@ -61,7 +55,6 @@ pub fn run() {
         .resource("/ws/{credentials}", |r| {
             r.method(http::Method::GET).with(ws_index)
         })
-        .resource("/", |r| r.method(http::Method::GET).f(index))
     })
     .bind("127.0.0.1:8080")
     .unwrap()
