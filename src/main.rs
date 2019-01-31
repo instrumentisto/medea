@@ -5,10 +5,11 @@ use crate::{
     log::prelude::*,
 };
 
-mod api;
-mod log;
 #[macro_use]
 mod utils;
+
+mod api;
+mod log;
 
 fn main() {
     let logger = log::new_dual_logger(std::io::stdout(), std::io::stderr());
