@@ -35,11 +35,11 @@ impl MemberRepository {
     }
 
     /// Returns [`Member`] by its credentials.
-    pub fn get_by_credentials(&self, credentials: String) -> Option<Member> {
+    pub fn get_by_credentials(&self, credentials: &str) -> Option<Member> {
         debug!("retrieve member by credentials: {}", credentials);
         self.members
             .values()
-            .find(|member| member.credentials.eq(&credentials))
+            .find(|member| member.credentials.eq(credentials))
             .map(|member| member.clone())
     }
 }
@@ -48,18 +48,16 @@ impl MemberRepository {
 mod tests {
     use super::*;
 
-    fn members() -> HashMap<Id, Member> {
-        let members = hashmap! {
+    fn test_members() -> HashMap<Id, Member> {
+        hashmap! {
             1 => Member{id: 1, credentials: "caller_credentials".to_owned()},
             2 => Member{id: 2, credentials: "responder_credentials".to_owned()},
-        };
-        members
+        }
     }
 
     #[test]
     fn returns_member_by_id() {
-        let members = members();
-        let repo = MemberRepository::new(members);
+        let repo = MemberRepository::new(test_members());
 
         let res = repo.get(1);
         assert!(res.is_some());
@@ -69,20 +67,18 @@ mod tests {
 
     #[test]
     fn returns_member_by_credentials() {
-        let members = members();
-        let repo = MemberRepository::new(members);
+        let repo = MemberRepository::new(test_members());
 
-        let res = repo.get_by_credentials("responder_credentials".to_owned());
+        let res = repo.get_by_credentials("responder_credentials");
         assert!(res.is_some());
         let member = res.unwrap();
         assert_eq!(member.id, 2);
-        assert_eq!(member.credentials, "responder_credentials".to_owned());
+        assert_eq!(member.credentials, "responder_credentials");
     }
 
     #[test]
     fn returns_error_not_found() {
-        let members = members();
-        let repo = MemberRepository::new(members);
+        let repo = MemberRepository::new(test_members());
 
         let res = repo.get(999);
         assert!(res.is_none());
