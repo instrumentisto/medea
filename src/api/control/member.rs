@@ -16,7 +16,7 @@ pub struct Member {
     pub credentials: String,
 }
 
-/// Repository that stores store [`Member`]s.
+/// Repository that stores [`Member`]s.
 #[derive(Default)]
 pub struct MemberRepository {
     members: HashMap<Id, Member>,
@@ -29,17 +29,18 @@ impl MemberRepository {
     }
 
     /// Returns [`Member`] by its ID.
-    pub fn get(&self, id: Id) -> Option<&Member> {
+    pub fn get(&self, id: Id) -> Option<Member> {
         debug!("retrieve member by id: {}", id);
-        self.members.get(&id)
+        self.members.get(&id).map(|member| member.clone())
     }
 
     /// Returns [`Member`] by its credentials.
-    pub fn get_by_credentials(&self, credentials: String) -> Option<&Member> {
+    pub fn get_by_credentials(&self, credentials: String) -> Option<Member> {
         debug!("retrieve member by credentials: {}", credentials);
         self.members
             .values()
             .find(|member| member.credentials.eq(&credentials))
+            .map(|member| member.clone())
     }
 }
 
