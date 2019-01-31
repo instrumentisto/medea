@@ -18,7 +18,7 @@ fn ws_index(
     (r, creds, state): (HttpRequest<AppState>, Path<String>, State<AppState>),
 ) -> Result<HttpResponse, Error> {
     let member_repo = state.members_repo.lock().unwrap();
-    match member_repo.get_by_credentials(creds.into_inner()) {
+    match member_repo.get_by_credentials(creds.as_str()) {
         None => Ok(HttpResponse::NotFound().finish()),
         Some(member) => {
             let session_repo = state.session_repo.lock().unwrap();
