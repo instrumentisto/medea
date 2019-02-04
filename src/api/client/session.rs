@@ -94,11 +94,6 @@ pub struct WsSessionRepository {
 }
 
 impl WsSessionRepository {
-    /// Returns `true` if member with given ID is connected at moment.
-    pub fn is_connected(&self, member_id: Id) -> bool {
-        self.sessions.contains_key(&member_id)
-    }
-
     /// Stores address of [`Member`] session in repository.
     pub fn add_session(&mut self, id: Id, client: Client) {
         debug!("add session for member: {}", id);

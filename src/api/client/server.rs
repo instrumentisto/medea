@@ -19,15 +19,8 @@ fn ws_index(
 ) -> Result<HttpResponse, Error> {
     let member_repo = state.members_repo.lock().unwrap();
     match member_repo.get_by_credentials(creds.as_str()) {
+        Some(member) => ws::start(&r, WsSessions::new(member.id)),
         None => Ok(HttpResponse::NotFound().finish()),
-        Some(member) => {
-            let session_repo = state.session_repo.lock().unwrap();
-            if session_repo.is_connected(member.id) {
-                Ok(HttpResponse::Conflict().finish())
-            } else {
-                ws::start(&r, WsSessions::new(member.id))
-            }
-        }
     }
 }
 
@@ -37,13 +30,7 @@ pub struct AppState {
     pub session_repo: Arc<Mutex<WsSessionRepository>>,
 }
 
-pub fn run() {
-    let members = hashmap! {
-        1 => Member{id: 1, credentials: "caller_credentials".to_owned()},
-        2 => Member{id: 2, credentials: "responder_credentials".to_owned()},
-    };
-
-    let members_repo = Arc::new(Mutex::new(MemberRepository::new(members)));
+pub fn run(members_repo: Arc<Mutex<MemberRepository>>) {
     let session_repo = Arc::new(Mutex::new(WsSessionRepository::default()));
 
     server::new(move || {

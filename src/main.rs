@@ -1,9 +1,11 @@
 //! Medea media server application.
+use std::sync::{Arc, Mutex};
 
 use actix::prelude::*;
 use dotenv::dotenv;
 
 use crate::api::client::*;
+use crate::api::control::*;
 
 #[macro_use]
 mod utils;
@@ -17,7 +19,14 @@ fn main() {
     let _scope_guard = slog_scope::set_global_logger(logger);
     let _guard = slog_stdlog::init().unwrap();
 
+    let members = hashmap! {
+        1 => Member{id: 1, credentials: "caller_credentials".to_owned()},
+        2 => Member{id: 2, credentials: "responder_credentials".to_owned()},
+    };
+
+    let members_repo = Arc::new(Mutex::new(MemberRepository::new(members)));
+
     let sys = System::new("medea");
-    server::run();
+    server::run(members_repo);
     let _ = sys.run();
 }
