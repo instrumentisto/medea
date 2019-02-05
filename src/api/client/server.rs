@@ -49,3 +49,42 @@ pub fn run(members_repo: Arc<Mutex<MemberRepository>>) {
 
     info!("Started http server: 127.0.0.1:8080");
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use actix_web::test;
+    use futures::stream::Stream;
+    use hashbrown::HashMap;
+
+    use crate::api::control::*;
+
+    fn test_members() -> HashMap<Id, Member> {
+        hashmap! {
+            1 => Member{id: 1, credentials: "caller_credentials".to_owned()},
+            2 => Member{id: 2, credentials: "responder_credentials".to_owned()},
+        }
+    }
+
+    #[test]
+    fn connect_by_credentials() {
+        let members_repo =
+            Arc::new(Mutex::new(MemberRepository::new(test_members())));
+        let session_repo = Arc::new(Mutex::new(WsSessionRepository::default()));
+
+        let mut srv = test::TestServer::with_factory(move || {
+            App::with_state(AppState {
+                members_repo: members_repo.clone(),
+                session_repo: session_repo.clone(),
+            })
+            .resource("/ws/{credentials}", |r| {
+                r.method(http::Method::GET).with(ws_index)
+            })
+        });
+        let (reader, mut writer) = srv.ws_at("/ws/caller_credentials").unwrap();
+
+        writer.text("text");
+        let (item, reader) = srv.execute(reader.into_future()).unwrap();
+        assert_eq!(item, Some(ws::Message::Text("text".to_owned())));
+    }
+}
