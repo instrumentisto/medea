@@ -37,6 +37,7 @@ where
 ///
 /// Created [`Logger`] produces log records with `lvl`, `time` and `msg` fields
 /// by default.
+#[allow(dead_code)]
 pub fn new_logger<W>(w: W) -> Logger
 where
     W: io::Write + Send + 'static,

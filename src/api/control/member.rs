@@ -29,6 +29,7 @@ impl MemberRepository {
     }
 
     /// Returns [`Member`] by its ID.
+    #[allow(dead_code)]
     pub fn get(&self, id: Id) -> Option<Member> {
         debug!("retrieve member by id: {}", id);
         self.members.get(&id).map(|member| member.clone())

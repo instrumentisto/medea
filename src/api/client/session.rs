@@ -1,48 +1,59 @@
 //! Member websocket session definitions and implementations.
 
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use actix::prelude::*;
 use actix_web::ws;
 use hashbrown::HashMap;
+use serde_derive::{Deserialize, Serialize};
 
 use crate::{api::client::AppState, api::control::member::Id, log::prelude::*};
 
-/// How often heartbeat pings are sent
-const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);
-/// How long before lack of client response causes a timeout
-const CLIENT_TIMEOUT: Duration = Duration::from_secs(10);
+/// How long before lack of client message causes a timeout.
+const CLIENT_IDLE_TIMEOUT: Duration = Duration::from_secs(10);
+
+#[derive(Debug, Message, Deserialize)]
+enum Event {
+    #[serde(rename = "ping")]
+    Ping(usize),
+}
+
+#[derive(Debug, Serialize)]
+enum Command {
+    #[serde(rename = "pong")]
+    Pong(usize),
+}
 
 /// Websocket connection is long running connection, it easier
 /// to handle with an actor.
 #[derive(Debug)]
 pub struct WsSessions {
-    /// Client must send ping at least once per 10 seconds (CLIENT_TIMEOUT),
-    /// otherwise we drop connection.
-    hb: Instant,
     member_id: Id,
+    /// Client must send any text message at least once per 10 seconds
+    /// (CLIENT_IDLE_TIMEOUT), otherwise we drop connection.
+    idle_timeout_handler: Option<SpawnHandle>,
 }
 
 impl WsSessions {
     /// Creates new [`Member`] session with passed-in [`Member`] ID.
     pub fn new(member_id: Id) -> Self {
         Self {
-            hb: Instant::now(),
             member_id,
+            idle_timeout_handler: None,
         }
     }
 
     /// Helper method that sends ping to client every second.
     ///
     /// Also this method checks heartbeats from client
-    fn hb(&self, ctx: &mut <Self as Actor>::Context) {
-        ctx.run_interval(HEARTBEAT_INTERVAL, |act, ctx| {
-            if Instant::now().duration_since(act.hb) > CLIENT_TIMEOUT {
+    fn hb(&mut self, ctx: &mut <Self as Actor>::Context) {
+        if let Some(handler) = self.idle_timeout_handler {
+            ctx.cancel_future(handler);
+        }
+        self.idle_timeout_handler =
+            Some(ctx.run_later(CLIENT_IDLE_TIMEOUT, |_, ctx| {
                 ctx.stop();
-                return;
-            }
-            ctx.ping("");
-        });
+            }));
     }
 }
 
@@ -64,22 +75,38 @@ impl Actor for WsSessions {
     }
 }
 
+impl Handler<Event> for WsSessions {
+    type Result = ();
+
+    fn handle(&mut self, event: Event, ctx: &mut Self::Context) {
+        match event {
+            Event::Ping(n) => {
+                ctx.text(serde_json::to_string(&Command::Pong(n)).unwrap())
+            }
+        };
+    }
+}
+
 /// Handler for `ws::Message`
 impl StreamHandler<ws::Message, ws::ProtocolError> for WsSessions {
     fn handle(&mut self, msg: ws::Message, ctx: &mut Self::Context) {
         match msg {
-            ws::Message::Ping(msg) => {
-                self.hb = Instant::now();
-                ctx.pong(&msg);
+            ws::Message::Text(text) => {
+                match serde_json::from_str::<Event>(&text) {
+                    Ok(event) => {
+                        println!("Received status:\n{:?}\n", event);
+                        ctx.notify(event);
+                        self.hb(ctx);
+                    }
+                    Err(e) => {
+                        ctx.text(format!("Could not parse event: {}\n", e));
+                    }
+                }
             }
-            ws::Message::Pong(_) => {
-                self.hb = Instant::now();
-            }
-            ws::Message::Text(text) => ctx.text(text),
-            ws::Message::Binary(bin) => ctx.binary(bin),
-            ws::Message::Close(_) => {
+            ws::Message::Binary(_) | ws::Message::Close(_) => {
                 ctx.stop();
             }
+            _ => (),
         }
     }
 }
@@ -104,5 +131,68 @@ impl WsSessionRepository {
     pub fn remove_session(&mut self, id: Id) {
         debug!("remove session for member: {}", id);
         self.sessions.remove(&id);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::{Arc, Mutex};
+    use std::{thread, time};
+
+    use actix_web::{error, http, test, App};
+    use futures::stream::Stream;
+
+    use super::*;
+    use crate::api::control::*;
+
+    #[test]
+    fn connect_by_credentials() {
+        let members_repo = Arc::new(Mutex::new(MemberRepository::default()));
+        let session_repo = Arc::new(Mutex::new(WsSessionRepository::default()));
+
+        let mut srv = test::TestServer::with_factory(move || {
+            App::with_state(AppState {
+                members_repo: members_repo.clone(),
+                session_repo: session_repo.clone(),
+            })
+            .resource("/ws/", |r| {
+                r.method(http::Method::GET)
+                    .with(|r| ws::start(&r, WsSessions::new(1)))
+            })
+        });
+        let (reader, mut writer) = srv.ws_at("/ws/").unwrap();
+
+        writer.text(r#"{"ping":33}"#);
+        let (item, _reader) = srv.execute(reader.into_future()).unwrap();
+        assert_eq!(item, Some(ws::Message::Text(r#"{"pong":33}"#.to_owned())));
+    }
+
+    #[test]
+    fn disconnect_by_timeout() {
+        let members_repo = Arc::new(Mutex::new(MemberRepository::default()));
+        let session_repo = Arc::new(Mutex::new(WsSessionRepository::default()));
+
+        let mut srv = test::TestServer::with_factory(move || {
+            App::with_state(AppState {
+                members_repo: members_repo.clone(),
+                session_repo: session_repo.clone(),
+            })
+            .resource("/ws/{credentials}", |r| {
+                r.method(http::Method::GET)
+                    .with(|r| ws::start(&r, WsSessions::new(1)))
+            })
+        });
+        let (reader, mut writer) = srv.ws_at("/ws/caller_credentials").unwrap();
+
+        thread::sleep(CLIENT_IDLE_TIMEOUT);
+
+        writer.text(r#"{"ping":33}"#);
+        assert!(match srv.execute(reader.into_future()) {
+            Err((
+                ws::ProtocolError::Payload(error::PayloadError::Io(_)),
+                _,
+            )) => true,
+            _ => false,
+        });
     }
 }
