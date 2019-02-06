@@ -5,24 +5,15 @@ use std::time::Duration;
 use actix::prelude::*;
 use actix_web::ws;
 use hashbrown::HashMap;
-use serde_derive::{Deserialize, Serialize};
 
-use crate::{api::client::AppState, api::control::member::Id, log::prelude::*};
+use crate::{
+    api::client::{AppState, Command, Event},
+    api::control::member::Id,
+    log::prelude::*,
+};
 
 /// How long before lack of client message causes a timeout.
 const CLIENT_IDLE_TIMEOUT: Duration = Duration::from_secs(10);
-
-#[derive(Debug, Message, Deserialize)]
-enum Event {
-    #[serde(rename = "ping")]
-    Ping(usize),
-}
-
-#[derive(Debug, Serialize)]
-enum Command {
-    #[serde(rename = "pong")]
-    Pong(usize),
-}
 
 /// Websocket connection is long running connection, it easier
 /// to handle with an actor.
@@ -43,16 +34,15 @@ impl WsSessions {
         }
     }
 
-    /// Helper method that sends ping to client every second.
-    ///
-    /// Also this method checks heartbeats from client
+    /// Helper method that update read timeout handler after every message
+    /// from [`Web Client`].
     fn hb(&mut self, ctx: &mut <Self as Actor>::Context) {
         if let Some(handler) = self.idle_timeout_handler {
             ctx.cancel_future(handler);
         }
         self.idle_timeout_handler =
             Some(ctx.run_later(CLIENT_IDLE_TIMEOUT, |_, ctx| {
-                ctx.stop();
+                ctx.notify(Command::Close(Some(ws::CloseCode::Away.into())));
             }));
     }
 }
@@ -63,9 +53,14 @@ impl Actor for WsSessions {
     /// Start the heartbeat process and store session in repository
     /// on start [`Member`] session.
     fn started(&mut self, ctx: &mut Self::Context) {
+        let mut session_repo: WsSessionRepository =
+            ctx.state().session_repo.lock().unwrap();
+        if let Some(old) =
+            session_repo.add_session(self.member_id, ctx.address())
+        {
+            old.send(Command::Close(None));
+        }
         self.hb(ctx);
-        let mut session_repo = ctx.state().session_repo.lock().unwrap();
-        session_repo.add_session(self.member_id, ctx.address());
     }
 
     /// Remove [`Member`] session repository after stopped session.
@@ -75,13 +70,18 @@ impl Actor for WsSessions {
     }
 }
 
-impl Handler<Event> for WsSessions {
+/// Handler for `Command`.
+impl Handler<Command> for WsSessions {
     type Result = ();
 
-    fn handle(&mut self, event: Event, ctx: &mut Self::Context) {
-        match event {
-            Event::Ping(n) => {
-                ctx.text(serde_json::to_string(&Command::Pong(n)).unwrap())
+    fn handle(&mut self, command: Command, ctx: &mut Self::Context) {
+        match command {
+            Command::Ping(n) => {
+                ctx.text(serde_json::to_string(&Event::Pong(n)).unwrap())
+            }
+            Command::Close(reason) => {
+                ctx.close(reason);
+                ctx.stop();
             }
         };
     }
@@ -92,20 +92,19 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSessions {
     fn handle(&mut self, msg: ws::Message, ctx: &mut Self::Context) {
         match msg {
             ws::Message::Text(text) => {
-                match serde_json::from_str::<Event>(&text) {
-                    Ok(event) => {
-                        println!("Received status:\n{:?}\n", event);
-                        ctx.notify(event);
+                match serde_json::from_str::<Command>(&text) {
+                    Ok(command) => {
+                        println!("Received command:\n{:?}\n", command);
+                        ctx.notify(command);
                         self.hb(ctx);
                     }
                     Err(e) => {
-                        ctx.text(format!("Could not parse event: {}\n", e));
+                        ctx.text(format!("Could not parse command: {}\n", e));
                     }
                 }
             }
-            ws::Message::Binary(_) | ws::Message::Close(_) => {
-                ctx.stop();
-            }
+            ws::Message::Binary(_) => ctx.notify(Command::Close(None)),
+            ws::Message::Close(reason) => ctx.notify(Command::Close(reason)),
             _ => (),
         }
     }
@@ -122,9 +121,9 @@ pub struct WsSessionRepository {
 
 impl WsSessionRepository {
     /// Stores address of [`Member`] session in repository.
-    pub fn add_session(&mut self, id: Id, client: Client) {
+    pub fn add_session(&mut self, id: Id, client: Client) -> Option<Client> {
         debug!("add session for member: {}", id);
-        self.sessions.insert(id, client);
+        self.sessions.insert(id, client)
     }
 
     /// Removes address of [`Member`] session in repository.
@@ -137,7 +136,7 @@ impl WsSessionRepository {
 #[cfg(test)]
 mod tests {
     use std::sync::{Arc, Mutex};
-    use std::{thread, time};
+    use std::thread;
 
     use actix_web::{error, http, test, App};
     use futures::stream::Stream;
