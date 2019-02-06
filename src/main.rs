@@ -1,8 +1,11 @@
 //! Medea media server application.
 
+use dotenv::dotenv;
+
 use crate::{
     api::control::{Member, MemberRepository},
     log::prelude::*,
+    settings::Settings,
 };
 
 #[macro_use]
@@ -10,8 +13,10 @@ mod utils;
 
 mod api;
 mod log;
+mod settings;
 
 fn main() {
+    dotenv().ok();
     let logger = log::new_dual_logger(std::io::stdout(), std::io::stderr());
     let _scope_guard = slog_scope::set_global_logger(logger);
 
@@ -23,5 +28,10 @@ fn main() {
         info!("{:?}", member);
         info!("Hooray!");
         warn!("It works");
+    }
+
+    match Settings::new() {
+        Ok(settings) => info!("{:?}", settings),
+        Err(e) => error!("settings error: {}", e),
     }
 }
