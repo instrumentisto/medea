@@ -1,3 +1,6 @@
+/// Provides application configuration options.
+///
+/// Configuration options can be parsed from config files in TOML format.
 use config::{Config, Environment, File, FileFormat};
 use failure::Error;
 use serde_derive::{Deserialize, Serialize};

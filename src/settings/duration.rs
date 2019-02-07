@@ -1,3 +1,4 @@
+/// Provides deserialize [`time::Duration`] from string.
 use std::fmt;
 use std::time::Duration;
 
