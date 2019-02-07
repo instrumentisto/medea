@@ -4,6 +4,7 @@ use std::time::Duration;
 
 use actix::prelude::*;
 use actix_web::ws;
+use actix_web::ws::CloseReason;
 use hashbrown::HashMap;
 
 use crate::{
@@ -14,6 +15,10 @@ use crate::{
 
 /// How long before lack of client message causes a timeout.
 const CLIENT_IDLE_TIMEOUT: Duration = Duration::from_secs(10);
+
+/// Message for close old member session when reconnect [`Web Client`].
+#[derive(Message)]
+struct Close(Option<CloseReason>);
 
 /// Websocket connection is long running connection, it easier
 /// to handle with an actor.
@@ -42,7 +47,9 @@ impl WsSessions {
         }
         self.idle_timeout_handler =
             Some(ctx.run_later(CLIENT_IDLE_TIMEOUT, |_, ctx| {
-                ctx.notify(Command::Close(Some(ws::CloseCode::Away.into())));
+                debug!("Client timeout");
+                ctx.close(Some(ws::CloseCode::Away.into()));
+                ctx.stop();
             }));
     }
 }
@@ -53,20 +60,29 @@ impl Actor for WsSessions {
     /// Start the heartbeat process and store session in repository
     /// on start [`Member`] session.
     fn started(&mut self, ctx: &mut Self::Context) {
-        let mut session_repo: WsSessionRepository =
-            ctx.state().session_repo.lock().unwrap();
+        self.hb(ctx);
+        let mut session_repo = ctx.state().session_repo.lock().unwrap();
         if let Some(old) =
             session_repo.add_session(self.member_id, ctx.address())
         {
-            old.send(Command::Close(None));
+            old.do_send(Close(None));
         }
-        self.hb(ctx);
     }
 
     /// Remove [`Member`] session repository after stopped session.
     fn stopped(&mut self, ctx: &mut Self::Context) {
         let mut session_repo = ctx.state().session_repo.lock().unwrap();
         session_repo.remove_session(self.member_id);
+    }
+}
+
+/// Handler for `Close`.
+impl Handler<Close> for WsSessions {
+    type Result = ();
+
+    fn handle(&mut self, close: Close, ctx: &mut Self::Context) {
+        ctx.close(close.0);
+        ctx.stop();
     }
 }
 
@@ -79,10 +95,6 @@ impl Handler<Command> for WsSessions {
             Command::Ping(n) => {
                 ctx.text(serde_json::to_string(&Event::Pong(n)).unwrap())
             }
-            Command::Close(reason) => {
-                ctx.close(reason);
-                ctx.stop();
-            }
         };
     }
 }
@@ -94,7 +106,7 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSessions {
             ws::Message::Text(text) => {
                 match serde_json::from_str::<Command>(&text) {
                     Ok(command) => {
-                        println!("Received command:\n{:?}\n", command);
+                        debug!("Received command:\n{:?}\n", command);
                         ctx.notify(command);
                         self.hb(ctx);
                     }
@@ -103,8 +115,10 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSessions {
                     }
                 }
             }
-            ws::Message::Binary(_) => ctx.notify(Command::Close(None)),
-            ws::Message::Close(reason) => ctx.notify(Command::Close(reason)),
+            ws::Message::Close(reason) => {
+                ctx.close(reason);
+                ctx.stop();
+            }
             _ => (),
         }
     }
