@@ -18,7 +18,7 @@ const CLIENT_IDLE_TIMEOUT: Duration = Duration::from_secs(10);
 struct Close(Option<CloseReason>);
 
 /// Messages to keep [`Web Client`] alive.
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Message, Deserialize, Serialize)]
 pub enum Heartbeat {
     #[serde(rename = "ping")]
     Ping(usize),
@@ -91,19 +91,25 @@ impl Handler<Close> for WsSessions {
     }
 }
 
+/// Handler for `Heartbeat`.
+impl Handler<Heartbeat> for WsSessions {
+    type Result = ();
+
+    fn handle(&mut self, msg: Heartbeat, ctx: &mut Self::Context) {
+        if let Heartbeat::Ping(n) = msg {
+            debug!("Received ping: {}", n);
+            ctx.text(serde_json::to_string(&Heartbeat::Pong(n)).unwrap())
+        }
+    }
+}
+
 /// Handler for `ws::Message`
 impl StreamHandler<ws::Message, ws::ProtocolError> for WsSessions {
     fn handle(&mut self, msg: ws::Message, ctx: &mut Self::Context) {
         match msg {
             ws::Message::Text(text) => {
-                match serde_json::from_str::<Heartbeat>(&text) {
-                    Ok(Heartbeat::Ping(n)) => {
-                        debug!("Received ping: {}", n);
-                        ctx.text(
-                            serde_json::to_string(&Heartbeat::Pong(n)).unwrap(),
-                        )
-                    }
-                    _ => {}
+                if let Ok(msg) = serde_json::from_str::<Heartbeat>(&text) {
+                    ctx.notify(msg);
                 };
                 self.hb(ctx);
             }
