@@ -6,12 +6,9 @@ use actix::prelude::*;
 use actix_web::ws;
 use actix_web::ws::CloseReason;
 use hashbrown::HashMap;
+use serde_derive::{Deserialize, Serialize};
 
-use crate::{
-    api::client::{AppState, Command, Event},
-    api::control::member::Id,
-    log::prelude::*,
-};
+use crate::{api::client::AppState, api::control::member::Id, log::prelude::*};
 
 /// How long before lack of client message causes a timeout.
 const CLIENT_IDLE_TIMEOUT: Duration = Duration::from_secs(10);
@@ -19,6 +16,15 @@ const CLIENT_IDLE_TIMEOUT: Duration = Duration::from_secs(10);
 /// Message for close old member session when reconnect [`Web Client`].
 #[derive(Message)]
 struct Close(Option<CloseReason>);
+
+/// Messages to keep [`Web Client`] alive.
+#[derive(Debug, Deserialize, Serialize)]
+pub enum Heartbeat {
+    #[serde(rename = "ping")]
+    Ping(usize),
+    #[serde(rename = "pong")]
+    Pong(usize),
+}
 
 /// Websocket connection is long running connection, it easier
 /// to handle with an actor.
@@ -48,8 +54,7 @@ impl WsSessions {
         self.idle_timeout_handler =
             Some(ctx.run_later(CLIENT_IDLE_TIMEOUT, |_, ctx| {
                 debug!("Client timeout");
-                ctx.close(Some(ws::CloseCode::Away.into()));
-                ctx.stop();
+                ctx.notify(Close(Some(ws::CloseCode::Away.into())));
             }));
     }
 }
@@ -86,39 +91,23 @@ impl Handler<Close> for WsSessions {
     }
 }
 
-/// Handler for `Command`.
-impl Handler<Command> for WsSessions {
-    type Result = ();
-
-    fn handle(&mut self, command: Command, ctx: &mut Self::Context) {
-        match command {
-            Command::Ping(n) => {
-                ctx.text(serde_json::to_string(&Event::Pong(n)).unwrap())
-            }
-        };
-    }
-}
-
 /// Handler for `ws::Message`
 impl StreamHandler<ws::Message, ws::ProtocolError> for WsSessions {
     fn handle(&mut self, msg: ws::Message, ctx: &mut Self::Context) {
         match msg {
             ws::Message::Text(text) => {
-                match serde_json::from_str::<Command>(&text) {
-                    Ok(command) => {
-                        debug!("Received command:\n{:?}\n", command);
-                        ctx.notify(command);
-                        self.hb(ctx);
+                match serde_json::from_str::<Heartbeat>(&text) {
+                    Ok(Heartbeat::Ping(n)) => {
+                        debug!("Received ping: {}", n);
+                        ctx.text(
+                            serde_json::to_string(&Heartbeat::Pong(n)).unwrap(),
+                        )
                     }
-                    Err(e) => {
-                        ctx.text(format!("Could not parse command: {}\n", e));
-                    }
-                }
+                    _ => {}
+                };
+                self.hb(ctx);
             }
-            ws::Message::Close(reason) => {
-                ctx.close(reason);
-                ctx.stop();
-            }
+            ws::Message::Close(reason) => ctx.notify(Close(reason)),
             _ => (),
         }
     }
