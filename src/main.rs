@@ -1,6 +1,4 @@
 //! Medea media server application.
-use std::sync::{Arc, Mutex};
-
 use actix::prelude::*;
 use dotenv::dotenv;
 
@@ -24,7 +22,7 @@ fn main() {
         2 => Member{id: 2, credentials: "responder_credentials".to_owned()},
     };
 
-    let members_repo = Arc::new(Mutex::new(MemberRepository::new(members)));
+    let members_repo = MemberRepository::new(members);
 
     let sys = System::new("medea");
     server::run(members_repo);

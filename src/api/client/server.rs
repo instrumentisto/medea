@@ -1,40 +1,36 @@
 //! Implementation HTTP server for handle websocket connections.
 
-use std::sync::{Arc, Mutex};
-
 use actix_web::{
     http, middleware, server, ws, App, Error, HttpRequest, HttpResponse, Path,
     State,
 };
 
 use crate::{
-    api::client::session::{WsSessionRepository, WsSessions},
+    api::client::session::{WsSessionRepository, WsSessionState, WsSessions},
     api::control::member::MemberRepository,
     log::prelude::*,
 };
 
 /// Do websocket handshake and start `WsSessions` actor
 fn ws_index(
-    (r, creds, state): (HttpRequest<AppState>, Path<String>, State<AppState>),
+    (r, creds, state): (
+        HttpRequest<WsSessionState>,
+        Path<String>,
+        State<WsSessionState>,
+    ),
 ) -> Result<HttpResponse, Error> {
-    let member_repo = state.members_repo.lock().unwrap();
-    match member_repo.get_by_credentials(creds.as_str()) {
+    match state.members_repo.get_by_credentials(creds.as_str()) {
         Some(member) => ws::start(&r, WsSessions::new(member.id)),
         None => Ok(HttpResponse::NotFound().finish()),
     }
 }
 
-/// State with repositories addresses
-pub struct AppState {
-    pub members_repo: Arc<Mutex<MemberRepository>>,
-    pub session_repo: Arc<Mutex<WsSessionRepository>>,
-}
-
-pub fn run(members_repo: Arc<Mutex<MemberRepository>>) {
-    let session_repo = Arc::new(Mutex::new(WsSessionRepository::default()));
+/// Starts HTTP server for handle websocket upgrade request.
+pub fn run(members_repo: MemberRepository) {
+    let session_repo = WsSessionRepository::default();
 
     server::new(move || {
-        App::with_state(AppState {
+        App::with_state(WsSessionState {
             members_repo: members_repo.clone(),
             session_repo: session_repo.clone(),
         })

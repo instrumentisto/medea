@@ -1,4 +1,5 @@
 //! Member definitions and implementations.
+use std::sync::{Arc, Mutex};
 
 use hashbrown::HashMap;
 
@@ -17,28 +18,32 @@ pub struct Member {
 }
 
 /// Repository that stores [`Member`]s.
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct MemberRepository {
-    members: HashMap<Id, Member>,
+    members: Arc<Mutex<HashMap<Id, Member>>>,
 }
 
 impl MemberRepository {
     /// Creates new [`Member`]s repository with passed-in [`Member`]s.
     pub fn new(members: HashMap<Id, Member>) -> Self {
-        MemberRepository { members }
+        MemberRepository {
+            members: Arc::new(Mutex::new(members)),
+        }
     }
 
     /// Returns [`Member`] by its ID.
     #[allow(dead_code)]
     pub fn get(&self, id: Id) -> Option<Member> {
         debug!("retrieve member by id: {}", id);
-        self.members.get(&id).map(|member| member.clone())
+        let members = self.members.lock().unwrap();
+        members.get(&id).map(|member| member.clone())
     }
 
     /// Returns [`Member`] by its credentials.
     pub fn get_by_credentials(&self, credentials: &str) -> Option<Member> {
         debug!("retrieve member by credentials: {}", credentials);
-        self.members
+        let members = self.members.lock().unwrap();
+        members
             .values()
             .find(|member| member.credentials.eq(credentials))
             .map(|member| member.clone())
