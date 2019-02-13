@@ -36,7 +36,7 @@ impl MemberRepository {
     pub fn get(&self, id: Id) -> Option<Member> {
         debug!("retrieve member by id: {}", id);
         let members = self.members.lock().unwrap();
-        members.get(&id).map(|member| member.clone())
+        members.get(&id).map(|m| m.clone())
     }
 
     /// Returns [`Member`] by its credentials.
@@ -45,8 +45,8 @@ impl MemberRepository {
         let members = self.members.lock().unwrap();
         members
             .values()
-            .find(|member| member.credentials.eq(credentials))
-            .map(|member| member.clone())
+            .find(|m| m.credentials.eq(credentials))
+            .map(|m| m.clone())
     }
 }
 

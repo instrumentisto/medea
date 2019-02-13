@@ -1,4 +1,4 @@
-//! Implementation HTTP server for handle websocket connections.
+//! HTTP server for handling WebSocket connections of Client API.
 
 use actix_web::{
     http, middleware, server, ws, App, Error, HttpRequest, HttpResponse, Path,
@@ -6,42 +6,45 @@ use actix_web::{
 };
 
 use crate::{
-    api::client::session::{WsSessionRepository, WsSessionState, WsSessions},
-    api::control::member::MemberRepository,
+    api::{
+        client::session::{WsSession, WsSessionContext, WsSessionRepository},
+        control::member::MemberRepository,
+    },
     log::prelude::*,
 };
 
-/// Do websocket handshake and start `WsSessions` actor
+/// Handles all HTTP requests, performs WebSocket handshake (upgrade) and starts
+/// new [`WsSessions`] actor for WebSocket connection.
 fn ws_index(
     (r, creds, state): (
-        HttpRequest<WsSessionState>,
+        HttpRequest<WsSessionContext>,
         Path<String>,
-        State<WsSessionState>,
+        State<WsSessionContext>,
     ),
 ) -> Result<HttpResponse, Error> {
-    match state.members_repo.get_by_credentials(creds.as_str()) {
-        Some(member) => ws::start(&r, WsSessions::new(member.id)),
+    match state.members.get_by_credentials(creds.as_str()) {
+        Some(member) => ws::start(&r, WsSession::new(member.id)),
         None => Ok(HttpResponse::NotFound().finish()),
     }
 }
 
-/// Starts HTTP server for handle websocket upgrade request.
+/// Starts HTTP server for handling WebSocket connections.
 pub fn run(members_repo: MemberRepository) {
     let session_repo = WsSessionRepository::default();
 
     server::new(move || {
-        App::with_state(WsSessionState {
-            members_repo: members_repo.clone(),
-            session_repo: session_repo.clone(),
+        App::with_state(WsSessionContext {
+            members: members_repo.clone(),
+            sessions: session_repo.clone(),
         })
         .middleware(middleware::Logger::default())
         .resource("/ws/{credentials}", |r| {
             r.method(http::Method::GET).with(ws_index)
         })
     })
-    .bind("127.0.0.1:8080")
+    .bind("0.0.0.0:8080")
     .unwrap()
     .start();
 
-    info!("Started http server: 127.0.0.1:8080");
+    info!("Started HTTP server on 0.0.0.0:8080");
 }
