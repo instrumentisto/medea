@@ -7,7 +7,7 @@ use actix::prelude::*;
 use actix_web::ws;
 use actix_web::ws::CloseReason;
 use hashbrown::HashMap;
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 use crate::{
     api::control::member::{Id, MemberRepository},
