@@ -1,9 +1,10 @@
 //! Medea media server application.
 use actix::prelude::*;
 use dotenv::dotenv;
+use hashbrown::HashMap;
 
-use crate::api::client::*;
-use crate::api::control::*;
+use crate::api::client::{server, Room, RoomsRepository};
+use crate::api::control::Member;
 
 #[macro_use]
 mod utils;
@@ -17,14 +18,20 @@ fn main() {
     let _scope_guard = slog_scope::set_global_logger(logger);
     let _guard = slog_stdlog::init().unwrap();
 
+    let sys = System::new("medea");
+
     let members = hashmap! {
         1 => Member{id: 1, credentials: "caller_credentials".to_owned()},
         2 => Member{id: 2, credentials: "responder_credentials".to_owned()},
     };
+    let room = Arbiter::start(move |_| Room {
+        id: 1,
+        members,
+        sessions: HashMap::new(),
+    });
+    let rooms = hashmap! {1 => room};
+    let rooms_repo = RoomsRepository::new(rooms);
 
-    let members_repo = MemberRepository::new(members);
-
-    let sys = System::new("medea");
-    server::run(members_repo);
+    server::run(rooms_repo);
     let _ = sys.run();
 }

@@ -1,36 +1,29 @@
 //! WebSocket session.
 
-use std::{
-    sync::{Arc, Mutex},
-    time::Duration,
-};
+use std::time::Duration;
 
 use actix::prelude::*;
 use actix_web::ws::{self, CloseReason};
-use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    api::control::member::{self, MemberRepository},
+    api::client::room::{JoinMember, LeaveMember, Room},
+    api::control::member::Id as MemberID,
     log::prelude::*,
 };
 
+// TODO: via conf
 /// Timeout of receiving any WebSocket messages from client.
-const CLIENT_IDLE_TIMEOUT: Duration = Duration::from_secs(10); // TODO: via conf
-
-/// Context for [`WsSession`] which holds all the necessary dependencies.
-pub struct WsSessionContext {
-    /// Repository of all currently existing [`Member`]s in application.
-    pub members: MemberRepository,
-    /// Repository of all currently existing [`WsSession`]s in application.
-    pub sessions: WsSessionRepository,
-}
+pub const CLIENT_IDLE_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// Long-running WebSocket connection of Client API.
 #[derive(Debug)]
 pub struct WsSession {
     /// ID of [`Member`] that WebSocket connection is associated with.
-    member_id: member::Id,
+    member_id: MemberID,
+
+    /// [`Room`] that [`Member`] is associated with.
+    room: Addr<Room>,
 
     /// Handle for watchdog which checks whether WebSocket client became
     /// idle (no `ping` messages received during [`CLIENT_IDLE_TIMEOUT`]).
@@ -42,9 +35,10 @@ pub struct WsSession {
 
 impl WsSession {
     /// Creates new WebSocket session for specified [`Member`].
-    pub fn new(id: member::Id) -> Self {
+    pub fn new(member_id: MemberID, room: Addr<Room>) -> Self {
         Self {
-            member_id: id,
+            member_id,
+            room,
             idle_handler: None,
         }
     }
@@ -55,9 +49,12 @@ impl WsSession {
             ctx.cancel_future(handler);
         }
         self.idle_handler =
-            Some(ctx.run_later(CLIENT_IDLE_TIMEOUT, |_, ctx| {
-                debug!("Client timeouted");
-                ctx.notify(Close(Some(ws::CloseCode::Away.into())));
+            Some(ctx.run_later(CLIENT_IDLE_TIMEOUT, |session, _ctx| {
+                debug!("Client timeout");
+                session.room.do_send(LeaveMember(
+                    session.member_id,
+                    Some(ws::CloseCode::Away.into()),
+                ));
             }));
     }
 }
@@ -65,32 +62,19 @@ impl WsSession {
 /// [`Actor`] implementation that provides an ergonomic way to deal with
 /// WebSocket connection lifecycle for [`WsSession`].
 impl Actor for WsSession {
-    type Context = ws::WebsocketContext<Self, WsSessionContext>;
+    type Context = ws::WebsocketContext<Self>;
 
-    /// Starts [`Heartbeat`] mechanism and stores [`WsSession`]
-    /// in [`WsSessionRepository`] of application.
-    ///
-    /// If some [`WsSession`] already exists in [`WsSessionRepository`] for
-    /// associated [`Member`], then it will be replaced and closed.
+    /// Starts [`Heartbeat`] mechanism and sends message to [`Room`].
     fn started(&mut self, ctx: &mut Self::Context) {
+        debug!("Session of member {} started", self.member_id);
         self.reset_idle_timeout(ctx);
-
-        let mut repo = ctx.state().sessions.clone();
-        if let Some(old) = repo.replace_session(self.member_id, ctx.address()) {
-            old.do_send(Close(None));
-        }
-    }
-
-    /// Removes [`WsSession`] from [`WsSessionRepository`] of application.
-    fn stopped(&mut self, ctx: &mut Self::Context) {
-        let mut repo = ctx.state().sessions.clone();
-        repo.remove_session(self.member_id);
+        self.room.do_send(JoinMember(self.member_id, ctx.address()));
     }
 }
 
-/// Message for closing obsolete [`WsSession`] on client reconnection.
+/// Message sending from [`Room`] for closing [`WsSession`].
 #[derive(Message)]
-struct Close(Option<CloseReason>);
+pub struct Close(pub Option<CloseReason>);
 
 impl Handler<Close> for WsSession {
     type Result = ();
@@ -139,90 +123,10 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
                 }
                 self.reset_idle_timeout(ctx);
             }
-            ws::Message::Close(reason) => ctx.notify(Close(reason)),
-            _ => (),
+            ws::Message::Close(reason) => {
+                self.room.do_send(LeaveMember(self.member_id, reason))
+            }
+            _ => error!("Unsupported message"),
         }
-    }
-}
-
-/// Repository that stores [`WsSession`]s of [`Member`]s.
-#[derive(Clone, Default, Debug)]
-pub struct WsSessionRepository {
-    sessions: Arc<Mutex<HashMap<member::Id, Addr<WsSession>>>>,
-}
-
-impl WsSessionRepository {
-    /// Stores [`WsSession`]'s address in repository for given [`Member`]
-    /// and returns previous one if any.
-    pub fn replace_session(
-        &mut self,
-        id: member::Id,
-        session: Addr<WsSession>,
-    ) -> Option<Addr<WsSession>> {
-        debug!("add session for member: {}", id);
-        let mut sessions = self.sessions.lock().unwrap();
-        sessions.insert(id, session)
-    }
-
-    /// Removes address of [`WsSession`] from repository.
-    pub fn remove_session(&mut self, id: member::Id) {
-        debug!("remove session for member: {}", id);
-        let mut sessions = self.sessions.lock().unwrap();
-        sessions.remove(&id);
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use std::{ops::Add, thread};
-
-    use actix_web::{error, http, test, App};
-    use futures::Stream;
-
-    use super::*;
-
-    #[test]
-    fn responses_with_pong() {
-        let mut srv = test::TestServer::with_factory(move || {
-            App::with_state(WsSessionContext {
-                members: MemberRepository::default(),
-                sessions: WsSessionRepository::default(),
-            })
-            .resource("/ws/", |r| {
-                r.method(http::Method::GET)
-                    .with(|r| ws::start(&r, WsSession::new(1)))
-            })
-        });
-        let (reader, mut writer) = srv.ws_at("/ws/").unwrap();
-
-        writer.text(r#"{"ping":33}"#);
-        let (item, _reader) = srv.execute(reader.into_future()).unwrap();
-        assert_eq!(item, Some(ws::Message::Text(r#"{"pong":33}"#.to_owned())));
-    }
-
-    #[test]
-    fn disconnects_on_idle() {
-        let mut srv = test::TestServer::with_factory(move || {
-            App::with_state(WsSessionContext {
-                members: MemberRepository::default(),
-                sessions: WsSessionRepository::default(),
-            })
-            .resource("/ws/", |r| {
-                r.method(http::Method::GET)
-                    .with(|r| ws::start(&r, WsSession::new(1)))
-            })
-        });
-        let (reader, mut writer) = srv.ws_at("/ws/").unwrap();
-
-        thread::sleep(CLIENT_IDLE_TIMEOUT.add(Duration::from_secs(1)));
-
-        writer.text(r#"{"ping":33}"#);
-        assert!(match srv.execute(reader.into_future()) {
-            Err((
-                ws::ProtocolError::Payload(error::PayloadError::Io(_)),
-                _,
-            )) => true,
-            _ => false,
-        });
     }
 }
