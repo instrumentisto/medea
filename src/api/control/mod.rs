@@ -2,4 +2,4 @@
 
 pub mod member;
 
-pub use self::member::{Id, Member, MemberRepository};
+pub use self::member::*;

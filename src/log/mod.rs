@@ -28,6 +28,7 @@ where
         drain_err.filter_level(Level::Warning),
     )
     .map(Fuse);
+    let drain = slog_envlogger::new(drain).fuse();
     let drain = Async::new(drain).build().fuse();
     add_default_keys(Logger::root(drain, o!()))
 }
@@ -36,6 +37,7 @@ where
 ///
 /// Created [`Logger`] produces log records with `lvl`, `time` and `msg` fields
 /// by default.
+#[allow(dead_code)]
 pub fn new_logger<W>(w: W) -> Logger
 where
     W: io::Write + Send + 'static,
