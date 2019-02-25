@@ -4,13 +4,19 @@ use std::time::Duration;
 
 use actix::prelude::*;
 use actix_web::ws::{self, CloseReason};
+use failure::Fail;
+use futures::future::Future;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    api::client::room::{JoinMember, LeaveMember, Room},
+    api::client::room::{
+        Room, RpcConnection, RpcConnectionClosed, RpcConnectionEstablished,
+        RpcConnectionClosedReason
+    },
     api::control::member::Id as MemberID,
     log::prelude::*,
 };
+use actix_web::ws::CloseCode;
 
 // TODO: via conf
 /// Timeout of receiving any WebSocket messages from client.
@@ -48,13 +54,16 @@ impl WsSession {
         if let Some(handler) = self.idle_handler {
             ctx.cancel_future(handler);
         }
+
+        let member_id = self.member_id;
         self.idle_handler =
-            Some(ctx.run_later(CLIENT_IDLE_TIMEOUT, |session, _ctx| {
-                debug!("Client timeout");
-                session.room.do_send(LeaveMember(
-                    session.member_id,
-                    Some(ws::CloseCode::Away.into()),
-                ));
+            Some(ctx.run_later(CLIENT_IDLE_TIMEOUT, move |session, ctx| {
+                info!("WsConnection with member {} is idle", member_id);
+                session.room.do_send(RpcConnectionClosed {
+                    member_id: session.member_id,
+                    reason: RpcConnectionClosedReason::Idle
+                });
+                ctx.address().close();
             }));
     }
 }
@@ -66,24 +75,37 @@ impl Actor for WsSession {
 
     /// Starts [`Heartbeat`] mechanism and sends message to [`Room`].
     fn started(&mut self, ctx: &mut Self::Context) {
-        debug!("Session of member {} started", self.member_id);
+        debug!("Started WsSession for member {}", self.member_id);
         self.reset_idle_timeout(ctx);
-        self.room.do_send(JoinMember(self.member_id, ctx.address()));
+        self.room.do_send(RpcConnectionEstablished {
+            connection: Box::new(ctx.address()),
+        });
+    }
+}
+
+impl RpcConnection for Addr<WsSession> {
+    fn get_member_id(&self) -> Result<MemberID, Box<dyn std::error::Error>> {
+        self.send(GetMemberId {})
+            .wait()
+            .map_err(|err: MailboxError| err.compat().into())
+    }
+
+    fn close(&self) {
+        self.do_send(Close {
+            close_frame: CloseReason::from(CloseCode::Normal),
+        })
     }
 }
 
 /// Message sending from [`Room`] for closing [`WsSession`].
 #[derive(Message)]
-pub struct Close(pub Option<CloseReason>);
+#[rtype(result = "MemberID")]
+pub struct GetMemberId();
 
-impl Handler<Close> for WsSession {
-    type Result = ();
-
-    /// Closes WebSocket connection and stops [`Actor`] of [`WsSession`].
-    fn handle(&mut self, close: Close, ctx: &mut Self::Context) {
-        ctx.close(close.0);
-        ctx.stop();
-    }
+/// Message sending from [`Room`] for closing [`WsSession`].
+#[derive(Message)]
+pub struct Close {
+    close_frame: CloseReason,
 }
 
 /// Message for keeping client WebSocket connection alive.
@@ -97,6 +119,29 @@ pub enum Heartbeat {
     /// to received `ping` message.
     #[serde(rename = "pong")]
     Pong(usize),
+}
+
+impl Handler<GetMemberId> for WsSession {
+    type Result = MemberID;
+
+    fn handle(
+        &mut self,
+        _msg: GetMemberId,
+        _ctx: &mut Self::Context,
+    ) -> Self::Result {
+        self.member_id
+    }
+}
+
+impl Handler<Close> for WsSession {
+    type Result = ();
+
+    /// Closes WebSocket connection and stops [`Actor`] of [`WsSession`].
+    fn handle(&mut self, close: Close, ctx: &mut Self::Context) {
+        debug!("Closing WsSession for member {}", self.member_id);
+        ctx.close(Some(close.close_frame));
+        ctx.stop();
+    }
 }
 
 impl Handler<Heartbeat> for WsSession {
@@ -115,18 +160,22 @@ impl Handler<Heartbeat> for WsSession {
 impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
     /// Handles arbitrary [`ws::Message`] received from WebSocket client.
     fn handle(&mut self, msg: ws::Message, ctx: &mut Self::Context) {
-        debug!("Received WS message: {:?}", msg);
+        debug!("Received WS message: {:?} from member {}", msg, self.member_id);
         match msg {
             ws::Message::Text(text) => {
+                self.reset_idle_timeout(ctx);
                 if let Ok(msg) = serde_json::from_str::<Heartbeat>(&text) {
                     ctx.notify(msg);
                 }
-                self.reset_idle_timeout(ctx);
             }
-            ws::Message::Close(reason) => {
-                self.room.do_send(LeaveMember(self.member_id, reason))
+            ws::Message::Close(_reason) => {
+                self.room.do_send(RpcConnectionClosed {
+                    member_id: self.member_id,
+                    reason: RpcConnectionClosedReason::Disconnect
+                });
+                ctx.stop();
             }
-            _ => error!("Unsupported message"),
+            _ => error!("Unsupported message from member {}", self.member_id),
         }
     }
 }

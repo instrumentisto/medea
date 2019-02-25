@@ -32,15 +32,15 @@ fn ws_index(
 
     match state.rooms.get(info.room_id) {
         Some(room_addr) => room_addr
-            .send(GetMember(info.credentials.clone()))
+            .send(GetMember {
+                credentials: info.credentials.clone(),
+            })
             .from_err()
             .and_then(move |res| match res {
-                Some(member) => {
-                    ws::start(
-                        &r.drop_state(),
-                        WsSession::new(member.id, room_addr),
-                    )
-                }
+                Some(member) => ws::start(
+                    &r.drop_state(),
+                    WsSession::new(member.id, room_addr),
+                ),
                 None => Ok(HttpResponse::NotFound().into()),
             })
             .responder(),
@@ -78,9 +78,7 @@ mod test {
     use std::{ops::Add, thread, time::Duration};
 
     use actix::prelude::*;
-    use actix_web::{
-        http, test, ws::CloseReason, ws::Message::Close, App,
-    };
+    use actix_web::{http, test, ws::CloseReason, ws::Message::Close, App};
     use futures::Stream;
     use hashbrown::HashMap;
 
@@ -100,7 +98,7 @@ mod test {
         let room = Arbiter::start(move |_| Room {
             id: 1,
             members,
-            sessions: HashMap::new(),
+            connections: HashMap::new(),
         });
         let rooms = hashmap! {1 => room};
         RoomsRepository::new(rooms)
@@ -139,7 +137,13 @@ mod test {
 
         writer.text(r#"{"ping":33}"#);
         assert!(match srv.execute(reader.into_future()) {
-            Ok((Some(Close(Some(CloseReason { code: CloseCode::Away, description: None }))),_)) => true,
+            Ok((
+                Some(Close(Some(CloseReason {
+                    code: CloseCode::Away,
+                    description: None,
+                }))),
+                _,
+            )) => true,
             _ => false,
         });
     }

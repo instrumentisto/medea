@@ -27,7 +27,7 @@ fn main() {
     let room = Arbiter::start(move |_| Room {
         id: 1,
         members,
-        sessions: HashMap::new(),
+        connections: HashMap::new(),
     });
     let rooms = hashmap! {1 => room};
     let rooms_repo = RoomsRepository::new(rooms);
