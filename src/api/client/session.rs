@@ -7,7 +7,7 @@ use actix_web::ws::{self, CloseReason};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    api::client::room::{JoinMember, LeaveMember, Room},
+    api::client::room::{Event, JoinMember, LeaveMember, Room},
     api::control::member::Id as MemberID,
     log::prelude::*,
 };
@@ -109,6 +109,15 @@ impl Handler<Heartbeat> for WsSession {
             trace!("Received ping: {}", n);
             ctx.text(serde_json::to_string(&Heartbeat::Pong(n)).unwrap())
         }
+    }
+}
+
+impl Handler<Event> for WsSession {
+    type Result = ();
+
+    fn handle(&mut self, event: Event, ctx: &mut Self::Context) {
+        trace!("Send event: {:?}", event);
+        ctx.text(serde_json::to_string(&event).unwrap())
     }
 }
 

@@ -1,69 +1,101 @@
-use crate::{api::control::member, log::prelude::*};
+use crate::{api::control::member::Id as MemberID, log::prelude::*};
 
-#[derive(Debug, PartialEq)]
-pub enum PeerMachine {
-    New(Peer),
-    WaitLocalSDP(Peer),
-    WaitLocalHaveRemote(Peer),
-    WaitRemoteSDP(Peer),
-    Stable(Peer),
-    Finished(Peer),
-    Failure,
-}
-
-pub enum Command {
-    MakeSdpOffer,
-    MakeSdpAnswer
-}
+#[derive(Debug, Clone)]
+pub struct New {}
+#[derive(Debug, Clone)]
+pub struct WaitLocalSDP {}
+#[derive(Debug, Clone)]
+pub struct WaitLocalHaveRemote {}
+#[derive(Debug, Clone)]
+pub struct WaitRemoteSDP {}
+#[derive(Debug, Clone)]
+pub struct Stable {}
+#[derive(Debug, Clone)]
+pub struct Finished {}
+#[derive(Debug, Clone)]
+pub struct Failure {}
 
 /// ID of [`Peer`].
 pub type Id = u64;
 
-#[derive(Debug, PartialEq)]
-struct Peer {
+#[derive(Debug, Clone)]
+pub struct PeerContext {
     id: Id,
-    member_id: member::Id,
+    member_id: MemberID,
+    pub opponent_peer_id: Option<Id>,
+    offer: Option<String>,
 }
 
-impl PeerMachine {
-    pub fn new(id: Id, member_id: member::Id) -> Self {
-        PeerMachine::New(Peer{id, member_id})
-    }
+#[derive(Debug, Clone)]
+pub struct Peer<S> {
+    pub context: PeerContext,
+    state: S,
+}
 
-    pub fn approve(self, c: Option<Command>) -> Self {
-        match (self, c) {
-            (PeerMachine::New(peer), None) => {
-                PeerMachine::WaitLocalSDP(peer)
-            },
-            (PeerMachine::New(peer), Some(Command::MakeSdpOffer)) => {
-                PeerMachine::WaitLocalHaveRemote(peer)
-            },
-            (PeerMachine::WaitLocalSDP(peer), Some(Command::MakeSdpOffer)) => {
-                PeerMachine::WaitRemoteSDP(peer)
-            },
-            (PeerMachine::WaitLocalHaveRemote(peer), Some(Command::MakeSdpOffer)) => {
-                PeerMachine::WaitRemoteSDP(peer)
-            },
-            _ => PeerMachine::Failure,
+#[derive(Debug, Clone)]
+pub enum PeerMachine {
+    New(Peer<New>),
+    WaitLocalSDP(Peer<WaitLocalSDP>),
+    WaitLocalHaveRemote(Peer<WaitLocalHaveRemote>),
+    WaitRemoteSDP(Peer<WaitRemoteSDP>),
+    Stable(Peer<Stable>),
+    Finished(Peer<Finished>),
+    Failure(Peer<Failure>),
+}
+
+impl Peer<New> {
+    pub fn new(id: Id, member_id: MemberID) -> Self {
+        let context = PeerContext {
+            id,
+            member_id,
+            opponent_peer_id: None,
+            offer: None,
+        };
+        Peer {
+            context,
+            state: New {},
         }
     }
 
-    pub fn pool(&self) {
-        println!("{:?}", self)
+    pub fn start(self, opponent_peer_id: Id) -> Peer<WaitLocalSDP> {
+        let mut context = self.context;
+        context.opponent_peer_id = Some(opponent_peer_id);
+        Peer {
+            context,
+            state: WaitLocalSDP {},
+        }
+    }
+
+    pub fn set_remote_sdp(self, offer: String) -> Peer<WaitLocalHaveRemote> {
+        let mut context = self.context;
+        context.offer = Some(offer);
+        Peer {
+            context,
+            state: WaitLocalHaveRemote {},
+        }
+    }
+}
+
+impl Peer<WaitLocalSDP> {
+    pub fn set_local_sdp(self, offer: String) -> Peer<WaitRemoteSDP> {
+        let mut context = self.context;
+        context.offer = Some(offer);
+        Peer {
+            context,
+            state: WaitRemoteSDP {},
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use assert_matches::*;
 
     #[test]
     fn create_peer() {
-        let peer = PeerMachine::new(1, 1);
-        let peer = peer.approve(None);
-        peer.pool();
+        let peer = Peer::new(1, 1);
+        let peer = peer.start(2);
 
-        assert_matches!(peer, PeerMachine::WaitLocalSDP(Peer{id: 1, member_id: 1}));
+        assert_eq!(peer.context.opponent_peer_id, Some(2));
     }
 }

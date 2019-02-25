@@ -25,11 +25,7 @@ fn main() {
         1 => Member{id: 1, credentials: "caller_credentials".to_owned()},
         2 => Member{id: 2, credentials: "responder_credentials".to_owned()},
     };
-    let room = Arbiter::start(move |_| Room {
-        id: 1,
-        members,
-        sessions: HashMap::new(),
-    });
+    let room = Arbiter::start(move |_| Room::new(1, members));
     let rooms = hashmap! {1 => room};
     let rooms_repo = RoomsRepository::new(rooms);
 
