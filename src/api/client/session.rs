@@ -4,14 +4,12 @@ use std::time::Duration;
 
 use actix::prelude::*;
 use actix_web::ws::{self, CloseReason};
-use failure::Fail;
-use futures::future::Future;
 use serde::{Deserialize, Serialize};
 
 use crate::{
     api::client::room::{
-        Room, RpcConnection, RpcConnectionClosed, RpcConnectionEstablished,
-        RpcConnectionClosedReason
+        Room, RpcConnection, RpcConnectionClosed, RpcConnectionClosedReason,
+        RpcConnectionEstablished,
     },
     api::control::member::Id as MemberID,
     log::prelude::*,
@@ -61,9 +59,11 @@ impl WsSession {
                 info!("WsConnection with member {} is idle", member_id);
                 session.room.do_send(RpcConnectionClosed {
                     member_id: session.member_id,
-                    reason: RpcConnectionClosedReason::Idle
+                    reason: RpcConnectionClosedReason::Idle,
                 });
-                ctx.address().close();
+                ctx.notify(Close {
+                    reason: Some(CloseCode::Normal.into()),
+                });
             }));
     }
 }
@@ -78,34 +78,26 @@ impl Actor for WsSession {
         debug!("Started WsSession for member {}", self.member_id);
         self.reset_idle_timeout(ctx);
         self.room.do_send(RpcConnectionEstablished {
+            member_id: self.member_id,
             connection: Box::new(ctx.address()),
         });
     }
 }
 
 impl RpcConnection for Addr<WsSession> {
-    fn get_member_id(&self) -> Result<MemberID, Box<dyn std::error::Error>> {
-        self.send(GetMemberId {})
-            .wait()
-            .map_err(|err: MailboxError| err.compat().into())
-    }
-
+    /// Close [`WsSession`] by send himself close message.
     fn close(&self) {
+        debug!("Reconnect WsSession");
         self.do_send(Close {
-            close_frame: CloseReason::from(CloseCode::Normal),
-        })
+            reason: Some(CloseCode::Normal.into()),
+        });
     }
 }
 
-/// Message sending from [`Room`] for closing [`WsSession`].
-#[derive(Message)]
-#[rtype(result = "MemberID")]
-pub struct GetMemberId();
-
-/// Message sending from [`Room`] for closing [`WsSession`].
+/// Message for closing [`WsSession`].
 #[derive(Message)]
 pub struct Close {
-    close_frame: CloseReason,
+    reason: Option<CloseReason>,
 }
 
 /// Message for keeping client WebSocket connection alive.
@@ -121,25 +113,13 @@ pub enum Heartbeat {
     Pong(usize),
 }
 
-impl Handler<GetMemberId> for WsSession {
-    type Result = MemberID;
-
-    fn handle(
-        &mut self,
-        _msg: GetMemberId,
-        _ctx: &mut Self::Context,
-    ) -> Self::Result {
-        self.member_id
-    }
-}
-
 impl Handler<Close> for WsSession {
     type Result = ();
 
     /// Closes WebSocket connection and stops [`Actor`] of [`WsSession`].
     fn handle(&mut self, close: Close, ctx: &mut Self::Context) {
         debug!("Closing WsSession for member {}", self.member_id);
-        ctx.close(Some(close.close_frame));
+        ctx.close(close.reason);
         ctx.stop();
     }
 }
@@ -160,7 +140,10 @@ impl Handler<Heartbeat> for WsSession {
 impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
     /// Handles arbitrary [`ws::Message`] received from WebSocket client.
     fn handle(&mut self, msg: ws::Message, ctx: &mut Self::Context) {
-        debug!("Received WS message: {:?} from member {}", msg, self.member_id);
+        debug!(
+            "Received WS message: {:?} from member {}",
+            msg, self.member_id
+        );
         match msg {
             ws::Message::Text(text) => {
                 self.reset_idle_timeout(ctx);
@@ -168,12 +151,12 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
                     ctx.notify(msg);
                 }
             }
-            ws::Message::Close(_reason) => {
+            ws::Message::Close(reason) => {
                 self.room.do_send(RpcConnectionClosed {
                     member_id: self.member_id,
-                    reason: RpcConnectionClosedReason::Disconnect
+                    reason: RpcConnectionClosedReason::Disconnect,
                 });
-                ctx.stop();
+                ctx.notify(Close { reason });
             }
             _ => error!("Unsupported message from member {}", self.member_id),
         }
