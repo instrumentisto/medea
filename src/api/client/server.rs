@@ -78,7 +78,7 @@ mod test {
     use std::{ops::Add, thread, time::Duration};
 
     use actix::prelude::*;
-    use actix_web::{http, test, ws::CloseReason, ws::Message::Close, App};
+    use actix_web::{http, test, App};
     use futures::Stream;
     use hashbrown::HashMap;
 
@@ -88,7 +88,6 @@ mod test {
     };
 
     use super::*;
-    use actix_web::ws::CloseCode;
 
     fn start_room() -> RoomsRepository {
         let members = hashmap! {

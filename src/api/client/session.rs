@@ -35,6 +35,8 @@ pub struct WsSession {
     /// This one should be renewed on any received WebSocket message
     /// from client.
     idle_handler: Option<SpawnHandle>,
+
+    closed_by_server: bool,
 }
 
 impl WsSession {
@@ -44,6 +46,7 @@ impl WsSession {
             member_id,
             room,
             idle_handler: None,
+            closed_by_server: false,
         }
     }
 
@@ -57,12 +60,12 @@ impl WsSession {
         self.idle_handler =
             Some(ctx.run_later(CLIENT_IDLE_TIMEOUT, move |session, ctx| {
                 info!("WsConnection with member {} is idle", member_id);
+                ctx.notify(Close {
+                    reason: Some(CloseCode::Normal.into()),
+                });
                 session.room.do_send(RpcConnectionClosed {
                     member_id: session.member_id,
                     reason: RpcConnectionClosedReason::Idle,
-                });
-                ctx.notify(Close {
-                    reason: Some(CloseCode::Normal.into()),
                 });
             }));
     }
@@ -82,6 +85,10 @@ impl Actor for WsSession {
             connection: Box::new(ctx.address()),
         });
     }
+
+    fn stopped(&mut self, _ctx: &mut Self::Context) {
+        debug!("Stopped WsSession for member {}", self.member_id);
+    }
 }
 
 impl RpcConnection for Addr<WsSession> {
@@ -100,6 +107,17 @@ pub struct Close {
     reason: Option<CloseReason>,
 }
 
+impl Handler<Close> for WsSession {
+    type Result = ();
+
+    /// Closes WebSocket connection and stops [`Actor`] of [`WsSession`].
+    fn handle(&mut self, close: Close, ctx: &mut Self::Context) {
+        debug!("Closing WsSession for member {}", self.member_id);
+        self.closed_by_server = true;
+        ctx.close(close.reason);
+    }
+}
+
 /// Message for keeping client WebSocket connection alive.
 #[derive(Debug, Message, Deserialize, Serialize)]
 pub enum Heartbeat {
@@ -111,17 +129,6 @@ pub enum Heartbeat {
     /// to received `ping` message.
     #[serde(rename = "pong")]
     Pong(usize),
-}
-
-impl Handler<Close> for WsSession {
-    type Result = ();
-
-    /// Closes WebSocket connection and stops [`Actor`] of [`WsSession`].
-    fn handle(&mut self, close: Close, ctx: &mut Self::Context) {
-        debug!("Closing WsSession for member {}", self.member_id);
-        ctx.close(close.reason);
-        ctx.stop();
-    }
 }
 
 impl Handler<Heartbeat> for WsSession {
@@ -152,11 +159,14 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
                 }
             }
             ws::Message::Close(reason) => {
+                if !self.closed_by_server {
+                    debug!("Send close frame with reason {:?}", reason);
+                    ctx.close(reason);
+                }
                 self.room.do_send(RpcConnectionClosed {
                     member_id: self.member_id,
                     reason: RpcConnectionClosedReason::Disconnect,
                 });
-                ctx.notify(Close { reason });
             }
             _ => error!("Unsupported message from member {}", self.member_id),
         }
