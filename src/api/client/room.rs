@@ -27,32 +27,32 @@ pub struct Room {
 }
 
 /// [`Actor`] implementation that provides an ergonomic way for members
-/// to interact in [` Room`].
+/// to interact in [`Room`].
 impl Actor for Room {
     type Context = Context<Self>;
 }
 
-/// Connection of [`Member`].
+/// [`RpcConnection`] with remote [`Room`] [`Member`].
 pub trait RpcConnection: Debug + Send {
-    /// Close connection.
+    /// Close connection. No [`RpcConnectionClosed`] should be emitted.
     fn close(&self);
 }
 
-/// Message that [`Member`] has connected to [`Room`].
+/// Signals that new  [`RpcConnection`] was established with specified [`Member`].
 #[derive(Message, Debug)]
 pub struct RpcConnectionEstablished {
     pub member_id: MemberID,
     pub connection: Box<dyn RpcConnection>,
 }
 
-/// Message for to get information about [`Member`] by its credentials.
+/// Requests [`Member`] by credentials.
 #[derive(Message, Debug)]
 #[rtype(result = "Option<Member>")]
 pub struct GetMember {
     pub credentials: String,
 }
 
-/// Message that [`Member`] closed or lost connection.
+/// Signals that [`RpcConnection`] with specified member was closed.
 #[derive(Message, Debug)]
 pub struct RpcConnectionClosed {
     pub member_id: MemberID,
@@ -62,16 +62,16 @@ pub struct RpcConnectionClosed {
 /// [`RpcConnection`] close reasons.
 #[derive(Debug)]
 pub enum RpcConnectionClosedReason {
-    /// [`RpcConnection`] gracefully disconnected from server.
+    /// [`RpcConnection`] initiated disconnect from server.
     Disconnect,
-    /// [`RpcConnection`] was considered idle.
+    /// [`RpcConnection`] was considered idle and disconnected.
     Idle,
 }
 
 impl Handler<GetMember> for Room {
     type Result = Option<Member>;
 
-    /// Returns [`Member`] by its credentials if it present in [`Room`].
+    /// Returns [`Member`] by its credentials, if any.
     fn handle(
         &mut self,
         msg: GetMember,
@@ -79,7 +79,7 @@ impl Handler<GetMember> for Room {
     ) -> Self::Result {
         self.members
             .values()
-            .find(|m| m.credentials.eq(msg.credentials.as_str()))
+            .find(|m| m.credentials.eq(&msg.credentials))
             .map(|m| m.clone())
     }
 }
@@ -87,17 +87,17 @@ impl Handler<GetMember> for Room {
 impl Handler<RpcConnectionEstablished> for Room {
     type Result = ();
 
-    /// Store connection of [`Member`] into [`Room`].
+    /// Stores provided [`RPCConnection`] with specified [`Member`] into [`Room`].
     ///
-    /// If the [`Member`] already has connection, it will be closed.
+    /// Current [`RPCConnection`] with specified ['Member'] will be closed, if any.
     fn handle(
         &mut self,
         msg: RpcConnectionEstablished,
         _ctx: &mut Self::Context,
     ) {
-        info!("RpcConnectionEstablished with member {:?}", &msg.member_id);
+        info!("RpcConnectionEstablished with member {}", &msg.member_id);
         if let Some(old_connection) = self.connections.remove(&msg.member_id) {
-            debug!("Reconnect WsSession for member {}", msg.member_id);
+            debug!("New RpcConnection with member {}", msg.member_id);
             old_connection.close();
         }
         self.connections.insert(msg.member_id, msg.connection);

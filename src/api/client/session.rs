@@ -94,7 +94,6 @@ impl Actor for WsSession {
 impl RpcConnection for Addr<WsSession> {
     /// Close [`WsSession`] by send himself close message.
     fn close(&self) {
-        debug!("Reconnect WsSession");
         self.do_send(Close {
             reason: Some(CloseCode::Normal.into()),
         });
