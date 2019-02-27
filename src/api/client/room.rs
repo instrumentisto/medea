@@ -59,12 +59,12 @@ pub struct RpcConnectionClosed {
     pub reason: RpcConnectionClosedReason,
 }
 
-/// Reason closing connection of [`Member`].
+/// [`RpcConnection`] close reasons.
 #[derive(Debug)]
 pub enum RpcConnectionClosedReason {
-    /// [`Member`] closed connection himself.
+    /// [`RpcConnection`] gracefully disconnected from server.
     Disconnect,
-    /// [`Member`] has lost connection.
+    /// [`RpcConnection`] was considered idle.
     Idle,
 }
 

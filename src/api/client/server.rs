@@ -144,37 +144,4 @@ mod test {
             Some(ws::Message::Close(Some(ws::CloseCode::Normal.into())))
         );
     }
-
-    #[test]
-    fn disconnects_on_reconnect() {
-        let mut srv = test::TestServer::with_factory(move || {
-            let repo = start_room();
-            App::with_state(AppContext { rooms: repo })
-                .resource("/ws/{room_id}/{credentials}", |r| {
-                    r.method(http::Method::GET).with(ws_index)
-                })
-        });
-
-        let (reader, mut writer) =
-            srv.ws_at("/ws/1/caller_credentials").unwrap();
-        writer.text(r#"{"ping":33}"#);
-        let (item, reader) = srv.execute(reader.into_future()).unwrap();
-        assert_eq!(item, Some(ws::Message::Text(r#"{"pong":33}"#.to_owned())));
-
-        thread::sleep(Duration::from_secs(1));
-
-        let (reader2, mut writer2) =
-            srv.ws_at("/ws/1/caller_credentials").unwrap();
-        writer2.text(r#"{"ping":33}"#);
-        let (item, _) = srv.execute(reader2.into_future()).unwrap();
-        assert_eq!(item, Some(ws::Message::Text(r#"{"pong":33}"#.to_owned())));
-
-        thread::sleep(Duration::from_secs(1));
-
-        let (item, reader) = srv.execute(reader.into_future()).unwrap();
-        assert_eq!(
-            item,
-            Some(ws::Message::Close(Some(ws::CloseCode::Restart.into())))
-        );
-    }
 }

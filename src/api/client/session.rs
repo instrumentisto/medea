@@ -115,6 +115,7 @@ impl Handler<Close> for WsSession {
         debug!("Closing WsSession for member {}", self.member_id);
         self.closed_by_server = true;
         ctx.close(close.reason);
+        ctx.stop();
     }
 }
 
@@ -160,13 +161,14 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
             }
             ws::Message::Close(reason) => {
                 if !self.closed_by_server {
+                    self.room.do_send(RpcConnectionClosed {
+                        member_id: self.member_id,
+                        reason: RpcConnectionClosedReason::Disconnect,
+                    });
                     debug!("Send close frame with reason {:?}", reason);
                     ctx.close(reason);
+                    ctx.stop();
                 }
-                self.room.do_send(RpcConnectionClosed {
-                    member_id: self.member_id,
-                    reason: RpcConnectionClosedReason::Disconnect,
-                });
             }
             _ => error!("Unsupported message from member {}", self.member_id),
         }
