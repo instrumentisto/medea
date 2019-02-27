@@ -1,10 +1,10 @@
 //! HTTP server for handling WebSocket connections of Client API.
 
 use actix_web::{
-    http, middleware, server, ws, App, Error, HttpRequest, HttpResponse, Path,
-    State,
+    http, middleware, server, ws, App, AsyncResponder, FutureResponse,
+    HttpRequest, HttpResponse, Path, State,
 };
-use futures::future::Future;
+use futures::{future, Future};
 use serde::Deserialize;
 
 use crate::{
@@ -27,21 +27,25 @@ fn ws_index(
         Path<RequestInfo>,
         State<AppContext>,
     ),
-) -> Result<HttpResponse, Error> {
+) -> FutureResponse<HttpResponse> {
     debug!("{:?}", info);
+
     match state.rooms.get(info.room_id) {
         Some(room_addr) => room_addr
-            .send(GetMember(info.credentials.clone()))
+            .send(GetMember {
+                credentials: info.credentials.clone(),
+            })
             .from_err()
-            .and_then(|res| match res {
+            .and_then(move |res| match res {
                 Some(member) => ws::start(
                     &r.drop_state(),
                     WsSession::new(member.id, room_addr),
                 ),
-                None => Ok(HttpResponse::NotFound().finish()),
+                None => Ok(HttpResponse::NotFound().into()),
             })
-            .wait(),
-        None => Ok(HttpResponse::NotFound().finish()),
+            .responder(),
+        None => future::lazy(move || Ok(HttpResponse::NotFound().into()))
+            .responder(),
     }
 }
 
@@ -74,7 +78,7 @@ mod test {
     use std::{ops::Add, thread, time::Duration};
 
     use actix::prelude::*;
-    use actix_web::{error, http, test, App};
+    use actix_web::{http, test, App};
     use futures::Stream;
     use hashbrown::HashMap;
 
@@ -124,15 +128,16 @@ mod test {
         let (reader, mut writer) =
             srv.ws_at("/ws/1/caller_credentials").unwrap();
 
+        writer.text(r#"{"ping":33}"#);
+        let (item, reader) = srv.execute(reader.into_future()).unwrap();
+        assert_eq!(item, Some(ws::Message::Text(r#"{"pong":33}"#.to_owned())));
+
         thread::sleep(session::CLIENT_IDLE_TIMEOUT.add(Duration::from_secs(1)));
 
-        writer.text(r#"{"ping":33}"#);
-        assert!(match srv.execute(reader.into_future()) {
-            Err((
-                ws::ProtocolError::Payload(error::PayloadError::Io(_)),
-                _,
-            )) => true,
-            _ => false,
-        });
+        let (item, _) = srv.execute(reader.into_future()).unwrap();
+        assert_eq!(
+            item,
+            Some(ws::Message::Close(Some(ws::CloseCode::Normal.into())))
+        );
     }
 }

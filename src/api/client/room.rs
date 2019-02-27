@@ -2,17 +2,15 @@
 use std::sync::{Arc, Mutex};
 
 use actix::prelude::*;
-use actix_web::ws::CloseReason;
-use futures::future::Future;
 use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    api::client::{Close, WsSession},
     api::control::{Id as MemberID, Member},
     log::prelude::*,
     media::{Id as PeerID, Peer, PeerMachine},
 };
+use std::fmt::Debug;
 
 use failure::Fail;
 
@@ -43,7 +41,7 @@ pub enum Event {
 pub type Id = u64;
 
 /// Media server room with its members.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct Room {
     /// ID of [`Room`].
     id: Id,
@@ -51,11 +49,30 @@ pub struct Room {
     /// [`Member`]'s this room.
     members: HashMap<MemberID, Member>,
 
-    /// [`WsSession`]s of [`Member`]'s this room.
-    sessions: HashMap<MemberID, Addr<WsSession>>,
+    /// Connections of [`Member`]'s this room.
+    connections: HashMap<MemberID, Box<dyn RpcConnection>>,
 
     /// [`Peer`]s of [`Member`]'s this room.
     peers: HashMap<PeerID, PeerMachine>,
+}
+
+/// [`Actor`] implementation that provides an ergonomic way for members
+/// to interact in [` Room`].
+impl Actor for Room {
+    type Context = Context<Self>;
+}
+
+/// Connection of [`Member`].
+pub trait RpcConnection: Debug + Send {
+    /// Close connection.
+    fn close(&self);
+}
+
+/// Message that [`Member`] has connected to [`Room`].
+#[derive(Message, Debug)]
+pub struct RpcConnectionEstablished {
+    pub member_id: MemberID,
+    pub connection: Box<dyn RpcConnection>,
 }
 
 impl Room {
@@ -63,7 +80,7 @@ impl Room {
         Room {
             id,
             members,
-            sessions: HashMap::new(),
+            connections: HashMap::new(),
             peers: HashMap::new(),
         }
     }
@@ -87,14 +104,28 @@ impl Room {
     }
 }
 
-impl Actor for Room {
-    type Context = Context<Self>;
+/// Message for to get information about [`Member`] by its credentials.
+#[derive(Message, Debug)]
+#[rtype(result = "Option<Member>")]
+pub struct GetMember {
+    pub credentials: String,
 }
 
-/// Message for to get information about [`Member`] by its credentials.
-#[derive(Message)]
-#[rtype(result = "Option<Member>")]
-pub struct GetMember(pub String);
+/// Message that [`Member`] closed or lost connection.
+#[derive(Message, Debug)]
+pub struct RpcConnectionClosed {
+    pub member_id: MemberID,
+    pub reason: RpcConnectionClosedReason,
+}
+
+/// [`RpcConnection`] close reasons.
+#[derive(Debug)]
+pub enum RpcConnectionClosedReason {
+    /// [`RpcConnection`] gracefully disconnected from server.
+    Disconnect,
+    /// [`RpcConnection`] was considered idle.
+    Idle,
+}
 
 impl Handler<GetMember> for Room {
     type Result = Option<Member>;
@@ -102,56 +133,50 @@ impl Handler<GetMember> for Room {
     /// Returns [`Member`] by its credentials if it present in [`Room`].
     fn handle(
         &mut self,
-        credentials: GetMember,
+        msg: GetMember,
         _ctx: &mut Self::Context,
     ) -> Self::Result {
-        debug!("retrieve member by credentials: {}", credentials.0);
         self.members
             .values()
-            .find(|m| m.credentials.eq(credentials.0.as_str()))
+            .find(|m| m.credentials.eq(msg.credentials.as_str()))
             .map(|m| m.clone())
     }
 }
 
-/// Message from [`WsSession`] signaling what [`Member`] connected.
-#[derive(Message)]
-pub struct JoinMember(pub MemberID, pub Addr<WsSession>);
-
-impl Handler<JoinMember> for Room {
+impl Handler<RpcConnectionEstablished> for Room {
     type Result = ();
 
-    /// Stores [`WsSession`] of [`Member`] into [`Room`].
+    /// Store connection of [`Member`] into [`Room`].
     ///
-    /// If [`Member`] is reconnected, close and stop old [`WsSession`]
-    /// before store current [`WsSession`] in [`Room`].
-    fn handle(&mut self, msg: JoinMember, _ctx: &mut Self::Context) {
-        debug!("join member: {}", msg.0);
-        let mut reconnected = false;
-        if let Some(old_session) = self.sessions.remove(&msg.0) {
+    /// If the [`Member`] already has connection, it will be closed.
+    fn handle(
+        &mut self,
+        msg: RpcConnectionEstablished,
+        _ctx: &mut Self::Context,
+    ) {
+        info!("RpcConnectionEstablished with member {:?}", &msg.member_id);
+        if let Some(old_connection) = self.connections.remove(&msg.member_id) {
             reconnected = true;
-            let _ = old_session.send(Close(None)).wait();
+            debug!("Reconnect WsSession for member {}", msg.member_id);
+            old_connection.close();
         }
-        self.sessions.insert(msg.0, msg.1);
-        if !reconnected && self.sessions.len() > 1 {
+        self.connections.insert(msg.member_id, msg.connection);
+        if !reconnected && self.connections.len() > 1 {
             self.start_pipeline((1, 2));
         }
     }
 }
 
-/// Message from [`WsSession`] signaling what [`Member`] closed connection
-/// or become idle.
-#[derive(Message)]
-pub struct LeaveMember(pub MemberID, pub Option<CloseReason>);
-
-impl Handler<LeaveMember> for Room {
+impl Handler<RpcConnectionClosed> for Room {
     type Result = ();
 
-    /// Remove and close [`WsSession`] from [`Room`].
-    fn handle(&mut self, msg: LeaveMember, _ctx: &mut Self::Context) {
-        debug!("leave member: {}", msg.0);
-        if let Some(session) = self.sessions.remove(&msg.0) {
-            session.do_send(Close(msg.1))
-        }
+    /// Remove connection of [`Member`] from [`Room`].
+    fn handle(&mut self, msg: RpcConnectionClosed, _ctx: &mut Self::Context) {
+        info!(
+            "RpcConnectionClosed with member {}, reason {:?}",
+            &msg.member_id, msg.reason
+        );
+        self.connections.remove(&msg.member_id);
     }
 }
 
@@ -216,7 +241,6 @@ impl RoomsRepository {
 
     /// Returns [`Room`] by its ID.
     pub fn get(&self, id: Id) -> Option<Addr<Room>> {
-        debug!("retrieve room by id: {}", id);
         let rooms = self.rooms.lock().unwrap();
         rooms.get(&id).map(|r| r.clone())
     }
