@@ -1,7 +1,6 @@
 //! Medea media server application.
 use actix::prelude::*;
 use dotenv::dotenv;
-use hashbrown::HashMap;
 
 use crate::api::client::{server, Room, RoomsRepository};
 use crate::api::control::Member;

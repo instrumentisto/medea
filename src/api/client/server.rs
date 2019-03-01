@@ -80,7 +80,6 @@ mod test {
     use actix::prelude::*;
     use actix_web::{http, test, App};
     use futures::Stream;
-    use hashbrown::HashMap;
 
     use crate::api::{
         client::{session, Room},

@@ -21,7 +21,7 @@ pub type Id = u64;
 #[derive(Debug, Clone)]
 pub struct PeerContext {
     id: Id,
-    member_id: MemberID,
+    pub member_id: MemberID,
     pub opponent_peer_id: Option<Id>,
     offer: Option<String>,
 }
@@ -66,9 +66,9 @@ impl Peer<New> {
         }
     }
 
-    pub fn set_remote_sdp(self, offer: String) -> Peer<WaitLocalHaveRemote> {
+    pub fn set_remote_sdp(self, offer: &str) -> Peer<WaitLocalHaveRemote> {
         let mut context = self.context;
-        context.offer = Some(offer);
+        context.offer = Some(offer.into());
         Peer {
             context,
             state: WaitLocalHaveRemote {},
@@ -77,9 +77,9 @@ impl Peer<New> {
 }
 
 impl Peer<WaitLocalSDP> {
-    pub fn set_local_sdp(self, offer: String) -> Peer<WaitRemoteSDP> {
+    pub fn set_local_sdp(self, offer: &str) -> Peer<WaitRemoteSDP> {
         let mut context = self.context;
-        context.offer = Some(offer);
+        context.offer = Some(offer.into());
         Peer {
             context,
             state: WaitRemoteSDP {},

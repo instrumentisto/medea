@@ -8,8 +8,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     api::client::room::{
-        Event, Room, RpcConnection, RpcConnectionClosed, RpcConnectionClosedReason,
-        RpcConnectionEstablished,
+        Command, Event, Room, RpcConnection, RpcConnectionClosed,
+        RpcConnectionClosedReason, RpcConnectionEstablished,
     },
     api::control::member::Id as MemberID,
     log::prelude::*,
@@ -80,10 +80,17 @@ impl Actor for WsSession {
     fn started(&mut self, ctx: &mut Self::Context) {
         debug!("Started WsSession for member {}", self.member_id);
         self.reset_idle_timeout(ctx);
-        self.room.do_send(RpcConnectionEstablished {
-            member_id: self.member_id,
-            connection: Box::new(ctx.address()),
-        });
+        self.room
+            .send(RpcConnectionEstablished {
+                member_id: self.member_id,
+                connection: Box::new(ctx.address()),
+            })
+            .into_actor(self)
+            .then(|r, a, c| {
+                debug!("{:?}", r);
+                fut::ok::<(), (), Self>(())
+            })
+            .wait(ctx);
     }
 
     fn stopped(&mut self, _ctx: &mut Self::Context) {
@@ -98,6 +105,10 @@ impl RpcConnection for Addr<WsSession> {
         self.do_send(Close {
             reason: Some(CloseCode::Normal.into()),
         });
+    }
+
+    fn send_event(&self, event: Event) {
+        self.do_send(event);
     }
 }
 
@@ -166,6 +177,16 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
                 self.reset_idle_timeout(ctx);
                 if let Ok(msg) = serde_json::from_str::<Heartbeat>(&text) {
                     ctx.notify(msg);
+                }
+                if let Ok(command) = serde_json::from_str::<Command>(&text) {
+                    self.room
+                        .send(command)
+                        .into_actor(self)
+                        .then(|r, a, c| {
+                            debug!("{:?}", r);
+                            fut::ok::<(), (), Self>(())
+                        })
+                        .wait(ctx);
                 }
             }
             ws::Message::Close(reason) => {
