@@ -86,7 +86,7 @@ impl Actor for WsSession {
                 connection: Box::new(ctx.address()),
             })
             .into_actor(self)
-            .then(|r, a, c| {
+            .then(|r, _a, _c| {
                 debug!("{:?}", r);
                 fut::ok::<(), (), Self>(())
             })
@@ -182,7 +182,7 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
                     self.room
                         .send(command)
                         .into_actor(self)
-                        .then(|r, a, c| {
+                        .then(|r, _a, _c| {
                             debug!("{:?}", r);
                             fut::ok::<(), (), Self>(())
                         })

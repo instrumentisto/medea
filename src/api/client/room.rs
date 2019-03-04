@@ -14,9 +14,6 @@ use std::fmt::Debug;
 
 use failure::Fail;
 
-const PEER_CALLER_ID: PeerID = 1;
-const PEER_RESPONDER_ID: PeerID = 2;
-
 #[derive(Fail, Debug)]
 pub enum RoomError {
     #[fail(display = "Member without peer {}", _0)]
@@ -25,6 +22,8 @@ pub enum RoomError {
     InvalidConnection(MemberID),
     #[fail(display = "Unknown peer {}", _0)]
     UnknownPeer(PeerID),
+    #[fail(display = "Peer dont have opponent {}", _0)]
+    NoOpponentPeer(PeerID),
     #[fail(display = "Unmatched state of peer {}", _0)]
     UnmatchedState(PeerID),
 }
@@ -33,7 +32,7 @@ pub enum RoomError {
 #[rtype(result = "Result<bool, RoomError>")]
 pub enum Command {
     MakeSdpOffer { peer_id: PeerID, sdp_offer: String },
-    MakeSdpAnswer,
+    MakeSdpAnswer { peer_id: PeerID, sdp_answer: String },
 }
 
 #[derive(Debug, Deserialize, Serialize, Message)]
@@ -41,6 +40,10 @@ pub enum Event {
     PeerCreated {
         peer_id: PeerID,
         sdp_offer: Option<String>,
+    },
+    SdpAnswerMade {
+        peer_id: PeerID,
+        sdp_answer: String,
     },
 }
 
@@ -60,6 +63,8 @@ pub struct Room {
     connections: HashMap<MemberID, Box<dyn RpcConnection>>,
 
     member_peers: HashMap<MemberID, PeerID>,
+
+    peer_to_peer: HashMap<PeerID, PeerID>,
 
     /// [`Peer`]s of [`Member`]'s this room.
     peers: HashMap<PeerID, PeerMachine>,
@@ -98,6 +103,7 @@ impl Room {
             connections: HashMap::new(),
             member_peers: HashMap::new(),
             peers: HashMap::new(),
+            peer_to_peer: HashMap::new(),
             peer_index: 0,
         }
     }
@@ -116,31 +122,33 @@ impl Room {
         let peer_caller_id = self
             .member_peers
             .get(&caller)
+            .map(|id| *id)
             .ok_or(RoomError::MemberWithoutPeer(caller))?;
         let peer_responder_id = self
             .member_peers
             .get(&responder)
+            .map(|id| *id)
             .ok_or(RoomError::MemberWithoutPeer(responder))?;
+        self.peer_to_peer.insert(peer_caller_id, peer_responder_id);
+        self.peer_to_peer.insert(peer_responder_id, peer_caller_id);
         let peer_caller = self
             .peers
-            .remove(peer_caller_id)
-            .ok_or(RoomError::UnknownPeer(*peer_caller_id))?;
+            .remove(&peer_caller_id)
+            .ok_or(RoomError::UnknownPeer(peer_caller_id))?;
         let new_peer_caller = match peer_caller {
             PeerMachine::New(peer) => {
-                Ok(PeerMachine::WaitLocalSDP(peer.start(*peer_responder_id)))
+                Ok(PeerMachine::WaitLocalSDP(peer.start(|member_id| {
+                    let connection = self.connections.get(&member_id).unwrap();
+                    let event = Event::PeerCreated {
+                        peer_id: peer_caller_id,
+                        sdp_offer: None,
+                    };
+                    connection.send_event(event);
+                })))
             }
-            _ => Err(RoomError::UnmatchedState(*peer_caller_id)),
+            _ => Err(RoomError::UnmatchedState(peer_caller_id)),
         }?;
-        let event = Event::PeerCreated {
-            peer_id: *peer_caller_id,
-            sdp_offer: None,
-        };
-        let caller_connection = self
-            .connections
-            .get(&caller)
-            .ok_or(RoomError::InvalidConnection(caller))?;
-        caller_connection.send_event(event);
-        self.peers.insert(*peer_caller_id, new_peer_caller);
+        self.peers.insert(peer_caller_id, new_peer_caller);
         Ok(())
     }
 }
@@ -245,15 +253,10 @@ impl Handler<Command> for Room {
                     .peers
                     .remove(&peer_id)
                     .ok_or(RoomError::UnknownPeer(peer_id))?;
-                let (new_peer_caller, responder_peer_id) = match peer_caller {
+                let new_peer_caller = match peer_caller {
                     PeerMachine::WaitLocalSDP(peer) => {
-                        let opponent_peer_id =
-                            peer.context.opponent_peer_id.unwrap();
-                        Ok((
-                            PeerMachine::WaitRemoteSDP(
-                                peer.set_local_sdp(&sdp_offer),
-                            ),
-                            opponent_peer_id,
+                        Ok(PeerMachine::WaitRemoteSDP(
+                            peer.set_local_sdp(sdp_offer.clone()),
                         ))
                     }
                     _ => {
@@ -262,38 +265,90 @@ impl Handler<Command> for Room {
                     }
                 }?;
                 self.peers.insert(peer_id, new_peer_caller);
+
+                let responder_peer_id = self
+                    .peer_to_peer
+                    .get(&peer_id)
+                    .map(|&id| id)
+                    .ok_or(RoomError::NoOpponentPeer(peer_id))?;
                 let peer_responder = self
                     .peers
                     .remove(&responder_peer_id)
                     .ok_or(RoomError::UnknownPeer(responder_peer_id))?;
-                let (new_peer_responder, responder_id) = match peer_responder {
-                    PeerMachine::New(peer) => {
-                        let member_id = peer.context.member_id;
-                        Ok((
-                            PeerMachine::WaitLocalHaveRemote(
-                                peer.set_remote_sdp(&sdp_offer),
-                            ),
-                            member_id,
-                        ))
-                    }
+                let new_peer_responder = match peer_responder {
+                    PeerMachine::New(peer) => Ok(
+                        PeerMachine::WaitLocalHaveRemote(peer.set_remote_sdp(
+                            sdp_offer,
+                            |peer_id, member_id, sdp_offer| {
+                                let connection =
+                                    self.connections.get(&member_id).unwrap();
+                                let event = Event::PeerCreated {
+                                    peer_id,
+                                    sdp_offer: Some(sdp_offer),
+                                };
+                                connection.send_event(event);
+                            },
+                        )),
+                    ),
                     _ => {
                         error!("Unmatched state responder peer");
                         Err(RoomError::UnmatchedState(responder_peer_id))
                     }
                 }?;
                 self.peers.insert(responder_peer_id, new_peer_responder);
-                let event = Event::PeerCreated {
-                    peer_id: responder_peer_id,
-                    sdp_offer: Some(sdp_offer),
-                };
-                let responder_connection = self
-                    .connections
-                    .get(&responder_id)
-                    .ok_or(RoomError::InvalidConnection(responder_id))?;
-                responder_connection.send_event(event);
                 Ok(true)
             }
-            _ => unimplemented!(),
+            Command::MakeSdpAnswer {
+                peer_id,
+                sdp_answer,
+            } => {
+                let peer_responder = self
+                    .peers
+                    .remove(&peer_id)
+                    .ok_or(RoomError::UnknownPeer(peer_id))?;
+                let new_peer_responder = match peer_responder {
+                    PeerMachine::WaitLocalHaveRemote(peer) => {
+                        Ok(PeerMachine::Stable(
+                            peer.set_local_sdp(sdp_answer.clone()),
+                        ))
+                    }
+                    _ => {
+                        error!("Unmatched state caller peer");
+                        Err(RoomError::UnmatchedState(peer_id))
+                    }
+                }?;
+                self.peers.insert(peer_id, new_peer_responder);
+
+                let caller_peer_id = self
+                    .peer_to_peer
+                    .get(&peer_id)
+                    .map(|&id| id)
+                    .ok_or(RoomError::NoOpponentPeer(peer_id))?;
+                let peer_caller = self
+                    .peers
+                    .remove(&caller_peer_id)
+                    .ok_or(RoomError::UnknownPeer(caller_peer_id))?;
+                let new_peer_caller = match peer_caller {
+                    PeerMachine::WaitRemoteSDP(peer) => {
+                        Ok(PeerMachine::Stable(peer.set_remote_sdp(
+                            sdp_answer,
+                            |peer_id, member_id, sdp_answer| {
+                                let connection =
+                                    self.connections.get(&member_id).unwrap();
+                                let event = Event::SdpAnswerMade {
+                                    peer_id,
+                                    sdp_answer,
+                                };
+                                connection.send_event(event);
+                            },
+                        )))
+                    }
+                    _ => Err(RoomError::UnmatchedState(caller_peer_id)),
+                }?;
+                self.peers.insert(caller_peer_id, new_peer_caller);
+
+                Ok(true)
+            }
         }
     }
 }
@@ -316,5 +371,98 @@ impl RoomsRepository {
     pub fn get(&self, id: Id) -> Option<Addr<Room>> {
         let rooms = self.rooms.lock().unwrap();
         rooms.get(&id).map(|r| r.clone())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::time::{Duration, Instant};
+
+    use futures::future::{result, Future};
+    use tokio::timer::Delay;
+
+    use super::*;
+
+    #[derive(Debug, Clone)]
+    struct TestConnection {
+        pub room: Addr<Room>,
+        pub count_events: Arc<AtomicUsize>,
+    }
+
+    impl RpcConnection for TestConnection {
+        fn close(&self) {}
+
+        fn send_event(&self, event: Event) {
+            self.count_events.store(
+                self.count_events.load(Ordering::Relaxed) + 1,
+                Ordering::Relaxed,
+            );
+            match event {
+                Event::PeerCreated { peer_id, sdp_offer } => match sdp_offer {
+                    Some(_) => self.room.do_send(Command::MakeSdpAnswer {
+                        peer_id,
+                        sdp_answer: "responder_answer".into(),
+                    }),
+                    None => self.room.do_send(Command::MakeSdpOffer {
+                        peer_id,
+                        sdp_offer: "caller_offer".into(),
+                    }),
+                },
+                Event::SdpAnswerMade {
+                    peer_id: _,
+                    sdp_answer: _,
+                } => {}
+            }
+        }
+    }
+
+    fn start_room() -> Addr<Room> {
+        let members = hashmap! {
+            1 => Member{id: 1, credentials: "caller_credentials".to_owned()},
+            2 => Member{id: 2, credentials: "responder_credentials".to_owned()},
+        };
+        Arbiter::start(move |_| Room::new(1, members))
+    }
+
+    #[test]
+    fn start_signaling() {
+        let caller_event = Arc::new(AtomicUsize::new(0));
+        let caller_event_clone = Arc::clone(&caller_event);
+        let responder_event = Arc::new(AtomicUsize::new(0));
+        let responder_event_clone = Arc::clone(&responder_event);
+
+        System::run(move || {
+            let room = start_room();
+            let caller = TestConnection {
+                room: room.clone(),
+                count_events: caller_event_clone,
+            };
+            let responder = TestConnection {
+                room: room.clone(),
+                count_events: responder_event_clone,
+            };
+            let caller_message = RpcConnectionEstablished {
+                member_id: 1,
+                connection: Box::new(caller),
+            };
+            let responder_message = RpcConnectionEstablished {
+                member_id: 2,
+                connection: Box::new(responder),
+            };
+            room.do_send(caller_message);
+
+            tokio::spawn(room.send(responder_message).then(move |_| {
+                Delay::new(Instant::now() + Duration::new(0, 1_000_000)).then(
+                    move |_| {
+                        System::current().stop();
+                        result(Ok(()))
+                    },
+                )
+            }));
+        });
+
+        assert_eq!(caller_event.load(Ordering::Relaxed), 2);
+        assert_eq!(responder_event.load(Ordering::Relaxed), 1);
     }
 }

@@ -1,4 +1,4 @@
-use crate::{api::control::member::Id as MemberID, log::prelude::*};
+use crate::api::control::member::Id as MemberID;
 
 #[derive(Debug, Clone)]
 pub struct New {}
@@ -18,17 +18,17 @@ pub struct Failure {}
 /// ID of [`Peer`].
 pub type Id = u64;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct PeerContext {
     id: Id,
-    pub member_id: MemberID,
-    pub opponent_peer_id: Option<Id>,
-    offer: Option<String>,
+    member_id: MemberID,
+    sdp_offer: Option<String>,
+    sdp_answer: Option<String>,
 }
 
 #[derive(Debug, Clone)]
 pub struct Peer<S> {
-    pub context: PeerContext,
+    context: PeerContext,
     state: S,
 }
 
@@ -48,8 +48,8 @@ impl Peer<New> {
         let context = PeerContext {
             id,
             member_id,
-            opponent_peer_id: None,
-            offer: None,
+            sdp_offer: None,
+            sdp_answer: None,
         };
         Peer {
             context,
@@ -57,18 +57,25 @@ impl Peer<New> {
         }
     }
 
-    pub fn start(self, opponent_peer_id: Id) -> Peer<WaitLocalSDP> {
-        let mut context = self.context;
-        context.opponent_peer_id = Some(opponent_peer_id);
+    pub fn start(
+        self,
+        success: impl FnOnce(MemberID) -> (),
+    ) -> Peer<WaitLocalSDP> {
+        success(self.context.member_id);
         Peer {
-            context,
+            context: self.context,
             state: WaitLocalSDP {},
         }
     }
 
-    pub fn set_remote_sdp(self, offer: &str) -> Peer<WaitLocalHaveRemote> {
+    pub fn set_remote_sdp(
+        self,
+        sdp_offer: String,
+        success: impl Fn(Id, MemberID, String) -> (),
+    ) -> Peer<WaitLocalHaveRemote> {
         let mut context = self.context;
-        context.offer = Some(offer.into());
+        context.sdp_offer = Some(sdp_offer.clone());
+        success(context.id, context.member_id, sdp_offer);
         Peer {
             context,
             state: WaitLocalHaveRemote {},
@@ -77,12 +84,39 @@ impl Peer<New> {
 }
 
 impl Peer<WaitLocalSDP> {
-    pub fn set_local_sdp(self, offer: &str) -> Peer<WaitRemoteSDP> {
+    pub fn set_local_sdp(self, sdp_offer: String) -> Peer<WaitRemoteSDP> {
         let mut context = self.context;
-        context.offer = Some(offer.into());
+        context.sdp_offer = Some(sdp_offer);
         Peer {
             context,
             state: WaitRemoteSDP {},
+        }
+    }
+}
+
+impl Peer<WaitRemoteSDP> {
+    pub fn set_remote_sdp(
+        self,
+        sdp_answer: String,
+        success: impl Fn(Id, MemberID, String) -> (),
+    ) -> Peer<Stable> {
+        let mut context = self.context;
+        context.sdp_answer = Some(sdp_answer.clone());
+        success(context.id, context.member_id, sdp_answer);
+        Peer {
+            context,
+            state: Stable {},
+        }
+    }
+}
+
+impl Peer<WaitLocalHaveRemote> {
+    pub fn set_local_sdp(self, sdp_answer: String) -> Peer<Stable> {
+        let mut context = self.context;
+        context.sdp_answer = Some(sdp_answer);
+        Peer {
+            context,
+            state: Stable {},
         }
     }
 }
@@ -94,8 +128,16 @@ mod tests {
     #[test]
     fn create_peer() {
         let peer = Peer::new(1, 1);
-        let peer = peer.start(2);
+        let peer = peer.start(|_| {});
 
-        assert_eq!(peer.context.opponent_peer_id, Some(2));
+        assert_eq!(
+            peer.context,
+            PeerContext {
+                id: 1,
+                member_id: 1,
+                sdp_offer: None,
+                sdp_answer: None
+            }
+        );
     }
 }
