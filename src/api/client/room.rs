@@ -8,7 +8,12 @@ use serde::{Deserialize, Serialize};
 use crate::{
     api::control::{Id as MemberID, Member},
     log::prelude::*,
-    media::{Id as PeerID, Peer, PeerMachine},
+    media::{
+        peer::{Id as PeerID, Peer, PeerMachine},
+        track::{
+            AudioSettings, Id as TrackID, Track, TrackMediaType, VideoSettings,
+        },
+    },
 };
 use std::fmt::Debug;
 
@@ -28,23 +33,28 @@ pub enum RoomError {
     UnmatchedState(PeerID),
 }
 
+/// WebSocket message from Web Client to Media Server.
 #[derive(Debug, Deserialize, Serialize, Message)]
 #[rtype(result = "Result<bool, RoomError>")]
 pub enum Command {
+    /// Web Client sends SDP Offer.
     MakeSdpOffer { peer_id: PeerID, sdp_offer: String },
+    /// Web Client sends SDP Answer.
     MakeSdpAnswer { peer_id: PeerID, sdp_answer: String },
 }
 
+/// WebSocket message from Media Server to Web Client.
 #[derive(Debug, Deserialize, Serialize, Message)]
 pub enum Event {
+    /// Media Server notifies Web Client about necessity of RTCPeerConnection
+    /// creation.
     PeerCreated {
         peer_id: PeerID,
         sdp_offer: Option<String>,
     },
-    SdpAnswerMade {
-        peer_id: PeerID,
-        sdp_answer: String,
-    },
+    /// Media Server notifies Web Client about necessity to apply specified SDP
+    /// Answer to Web Client's RTCPeerConnection.
+    SdpAnswerMade { peer_id: PeerID, sdp_answer: String },
 }
 
 /// ID of [`Room`].
@@ -62,8 +72,10 @@ pub struct Room {
     /// Connections of [`Member`]'s this room.
     connections: HashMap<MemberID, Box<dyn RpcConnection>>,
 
+    /// Peers of [`Member`]'s this room.
     member_peers: HashMap<MemberID, PeerID>,
 
+    /// Relations peer to peer.
     peer_to_peer: HashMap<PeerID, PeerID>,
 
     /// [`Peer`]s of [`Member`]'s this room.
@@ -96,6 +108,7 @@ pub struct RpcConnectionEstablished {
 }
 
 impl Room {
+    /// Create new instance of [`Room`].
     pub fn new(id: Id, members: HashMap<MemberID, Member>) -> Self {
         Room {
             id,
@@ -108,12 +121,17 @@ impl Room {
         }
     }
 
+    /// Generate next ID of [`Peer`].
     fn next_peer_id(&mut self) -> PeerID {
         let id = self.peer_index;
         self.peer_index += 1;
         id
     }
 
+    /// Begins the negotiation process between peers.
+    ///
+    /// Creates audio and video tracks and stores links to them in
+    /// interconnected peers.
     fn start_pipeline(
         &mut self,
         caller: MemberID,
@@ -131,16 +149,25 @@ impl Room {
             .ok_or(RoomError::MemberWithoutPeer(responder))?;
         self.peer_to_peer.insert(peer_caller_id, peer_responder_id);
         self.peer_to_peer.insert(peer_responder_id, peer_caller_id);
+
+        let track_audio =
+            Arc::new(Track::new(1, TrackMediaType::Audio(AudioSettings {})));
+        let track_video =
+            Arc::new(Track::new(2, TrackMediaType::Video(VideoSettings {})));
+
         let peer_caller = self
             .peers
             .remove(&peer_caller_id)
             .ok_or(RoomError::UnknownPeer(peer_caller_id))?;
+
         let new_peer_caller = match peer_caller {
-            PeerMachine::New(peer) => {
-                Ok(PeerMachine::WaitLocalSDP(peer.start(|member_id| {
+            PeerMachine::New(mut peer) => {
+                peer.add_sender(track_audio.clone());
+                peer.add_sender(track_video.clone());
+                Ok(PeerMachine::WaitLocalSDP(peer.start(|id, member_id| {
                     let connection = self.connections.get(&member_id).unwrap();
                     let event = Event::PeerCreated {
-                        peer_id: peer_caller_id,
+                        peer_id: id,
                         sdp_offer: None,
                     };
                     connection.send_event(event);
@@ -149,6 +176,21 @@ impl Room {
             _ => Err(RoomError::UnmatchedState(peer_caller_id)),
         }?;
         self.peers.insert(peer_caller_id, new_peer_caller);
+
+        let peer_responder = self
+            .peers
+            .remove(&peer_responder_id)
+            .ok_or(RoomError::UnknownPeer(peer_responder_id))?;
+
+        let new_peer_responder = match peer_responder {
+            PeerMachine::New(mut peer) => {
+                peer.add_receiver(track_audio);
+                peer.add_receiver(track_video);
+                Ok(PeerMachine::New(peer))
+            }
+            _ => Err(RoomError::UnmatchedState(peer_responder_id)),
+        }?;
+        self.peers.insert(peer_responder_id, new_peer_responder);
         Ok(())
     }
 }
@@ -241,6 +283,8 @@ impl Handler<RpcConnectionClosed> for Room {
 impl Handler<Command> for Room {
     type Result = Result<bool, RoomError>;
 
+    /// Receives [`Command`] from Web client and changes state of interconnected
+    /// [`Peer`]s.
     fn handle(
         &mut self,
         command: Command,
@@ -376,7 +420,6 @@ impl RoomsRepository {
 
 #[cfg(test)]
 mod test {
-    use std::sync::atomic::{AtomicUsize, Ordering};
     use std::time::{Duration, Instant};
 
     use futures::future::{result, Future};
@@ -386,18 +429,29 @@ mod test {
 
     #[derive(Debug, Clone)]
     struct TestConnection {
+        pub member_id: MemberID,
         pub room: Addr<Room>,
-        pub count_events: Arc<AtomicUsize>,
+        pub events: Arc<Mutex<Vec<String>>>,
     }
 
-    impl RpcConnection for TestConnection {
-        fn close(&self) {}
+    impl Actor for TestConnection {
+        type Context = Context<Self>;
 
-        fn send_event(&self, event: Event) {
-            self.count_events.store(
-                self.count_events.load(Ordering::Relaxed) + 1,
-                Ordering::Relaxed,
-            );
+        fn started(&mut self, ctx: &mut Self::Context) {
+            let caller_message = RpcConnectionEstablished {
+                member_id: self.member_id,
+                connection: Box::new(ctx.address()),
+            };
+            self.room.do_send(caller_message);
+        }
+    }
+
+    impl Handler<Event> for TestConnection {
+        type Result = ();
+
+        fn handle(&mut self, event: Event, ctx: &mut Self::Context) {
+            let mut events = self.events.lock().unwrap();
+            events.push(serde_json::to_string(&event).unwrap());
             match event {
                 Event::PeerCreated { peer_id, sdp_offer } => match sdp_offer {
                     Some(_) => self.room.do_send(Command::MakeSdpAnswer {
@@ -412,8 +466,18 @@ mod test {
                 Event::SdpAnswerMade {
                     peer_id: _,
                     sdp_answer: _,
-                } => {}
+                } => {
+                    System::current().stop();
+                }
             }
+        }
+    }
+
+    impl RpcConnection for Addr<TestConnection> {
+        fn close(&self) {}
+
+        fn send_event(&self, event: Event) {
+            self.do_send(event);
         }
     }
 
@@ -427,42 +491,28 @@ mod test {
 
     #[test]
     fn start_signaling() {
-        let caller_event = Arc::new(AtomicUsize::new(0));
-        let caller_event_clone = Arc::clone(&caller_event);
-        let responder_event = Arc::new(AtomicUsize::new(0));
-        let responder_event_clone = Arc::clone(&responder_event);
+        let caller_events = Arc::new(Mutex::new(vec![]));
+        let caller_events_clone = Arc::clone(&caller_events);
+        let responder_events = Arc::new(Mutex::new(vec![]));
+        let responder_events_clone = Arc::clone(&responder_events);
 
         System::run(move || {
             let room = start_room();
-            let caller = TestConnection {
-                room: room.clone(),
-                count_events: caller_event_clone,
-            };
-            let responder = TestConnection {
-                room: room.clone(),
-                count_events: responder_event_clone,
-            };
-            let caller_message = RpcConnectionEstablished {
+            let room_clone = room.clone();
+            Arbiter::start(move |_| TestConnection {
                 member_id: 1,
-                connection: Box::new(caller),
-            };
-            let responder_message = RpcConnectionEstablished {
+                room: room_clone,
+                events: caller_events_clone,
+            });
+            let room_clone = room.clone();
+            Arbiter::start(move |_| TestConnection {
                 member_id: 2,
-                connection: Box::new(responder),
-            };
-            room.do_send(caller_message);
-
-            tokio::spawn(room.send(responder_message).then(move |_| {
-                Delay::new(Instant::now() + Duration::new(0, 1_000_000)).then(
-                    move |_| {
-                        System::current().stop();
-                        result(Ok(()))
-                    },
-                )
-            }));
+                room: room_clone,
+                events: responder_events_clone,
+            });
         });
 
-        assert_eq!(caller_event.load(Ordering::Relaxed), 2);
-        assert_eq!(responder_event.load(Ordering::Relaxed), 1);
+        assert_eq!(caller_events.lock().unwrap().len(), 2);
+        assert_eq!(responder_events.lock().unwrap().len(), 1);
     }
 }

@@ -1,37 +1,31 @@
-use crate::api::control::member::Id as MemberID;
+use std::sync::Arc;
 
-#[derive(Debug, Clone)]
-pub struct New {}
-#[derive(Debug, Clone)]
-pub struct WaitLocalSDP {}
-#[derive(Debug, Clone)]
-pub struct WaitLocalHaveRemote {}
-#[derive(Debug, Clone)]
-pub struct WaitRemoteSDP {}
-#[derive(Debug, Clone)]
-pub struct Stable {}
-#[derive(Debug, Clone)]
-pub struct Finished {}
-#[derive(Debug, Clone)]
-pub struct Failure {}
+use hashbrown::HashMap;
 
-/// ID of [`Peer`].
-pub type Id = u64;
+use crate::{
+    api::control::member::Id as MemberID,
+    media::{
+        errors::MediaError,
+        track::{Id as TrackID, Track},
+    },
+};
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct PeerContext {
-    id: Id,
-    member_id: MemberID,
-    sdp_offer: Option<String>,
-    sdp_answer: Option<String>,
-}
+pub struct New {}
+#[derive(Debug, Clone, PartialEq)]
+pub struct WaitLocalSDP {}
+#[derive(Debug, Clone, PartialEq)]
+pub struct WaitLocalHaveRemote {}
+#[derive(Debug, Clone, PartialEq)]
+pub struct WaitRemoteSDP {}
+#[derive(Debug, Clone, PartialEq)]
+pub struct Stable {}
+#[derive(Debug, Clone, PartialEq)]
+pub struct Finished {}
+#[derive(Debug, Clone, PartialEq)]
+pub struct Failure {}
 
-#[derive(Debug, Clone)]
-pub struct Peer<S> {
-    context: PeerContext,
-    state: S,
-}
-
+/// Implementation state machine for [`Peer`].
 #[derive(Debug, Clone)]
 pub enum PeerMachine {
     New(Peer<New>),
@@ -43,13 +37,36 @@ pub enum PeerMachine {
     Failure(Peer<Failure>),
 }
 
+/// ID of [`Peer`].
+pub type Id = u64;
+
+#[derive(Debug, Clone)]
+pub struct PeerContext {
+    id: Id,
+    member_id: MemberID,
+    sdp_offer: Option<String>,
+    sdp_answer: Option<String>,
+    receivers: HashMap<TrackID, Arc<Track>>,
+    senders: HashMap<TrackID, Arc<Track>>,
+}
+
+/// [`RTCPeerConnection`] representation.
+#[derive(Debug, Clone)]
+pub struct Peer<S> {
+    context: PeerContext,
+    state: S,
+}
+
 impl Peer<New> {
+    /// Creates new [`Peer`] for [`Member`].
     pub fn new(id: Id, member_id: MemberID) -> Self {
         let context = PeerContext {
             id,
             member_id,
             sdp_offer: None,
             sdp_answer: None,
+            receivers: HashMap::new(),
+            senders: HashMap::new(),
         };
         Peer {
             context,
@@ -57,17 +74,21 @@ impl Peer<New> {
         }
     }
 
+    /// Sends PeerCreated event to Web Client and puts [`Peer`] into state
+    /// of waiting for local offer.
     pub fn start(
         self,
-        success: impl FnOnce(MemberID) -> (),
+        success: impl FnOnce(Id, MemberID) -> (),
     ) -> Peer<WaitLocalSDP> {
-        success(self.context.member_id);
+        success(self.context.id, self.context.member_id);
         Peer {
             context: self.context,
             state: WaitLocalSDP {},
         }
     }
 
+    /// Sends PeerCreated event with local offer to Web Client and puts [`Peer`]
+    /// into state of waiting for remote offer.
     pub fn set_remote_sdp(
         self,
         sdp_offer: String,
@@ -81,6 +102,22 @@ impl Peer<New> {
             state: WaitLocalHaveRemote {},
         }
     }
+
+    pub fn add_sender(&mut self, track: Arc<Track>) {
+        self.context.senders.insert(track.id, track);
+    }
+
+    pub fn add_receiver(&mut self, track: Arc<Track>) {
+        self.context.receivers.insert(track.id, track);
+    }
+}
+
+#[test]
+fn create_peer() {
+    let peer = Peer::new(1, 1);
+    let peer = peer.start(|_, _| {});
+
+    assert_eq!(peer.state, WaitLocalSDP {});
 }
 
 impl Peer<WaitLocalSDP> {
@@ -118,26 +155,5 @@ impl Peer<WaitLocalHaveRemote> {
             context,
             state: Stable {},
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn create_peer() {
-        let peer = Peer::new(1, 1);
-        let peer = peer.start(|_| {});
-
-        assert_eq!(
-            peer.context,
-            PeerContext {
-                id: 1,
-                member_id: 1,
-                sdp_offer: None,
-                sdp_answer: None
-            }
-        );
     }
 }
