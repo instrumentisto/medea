@@ -38,8 +38,9 @@ fn ws_index(
         State<Context>,
     ),
 ) -> FutureResponse<HttpResponse> {
-    debug!("Request params: {:?}", info);
     use RpcConnectionAuthorizationError::*;
+
+    debug!("Request params: {:?}", info);
 
     match state.rooms.get(info.room_id) {
         Some(room) => room

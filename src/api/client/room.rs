@@ -167,7 +167,7 @@ pub struct RoomsRepository {
 impl RoomsRepository {
     /// Creates new [`Room`]s repository with passed-in [`Room`]s.
     pub fn new(rooms: HashMap<Id, Addr<Room>>) -> Self {
-        RoomsRepository {
+        Self {
             rooms: Arc::new(Mutex::new(rooms)),
         }
     }
@@ -175,6 +175,6 @@ impl RoomsRepository {
     /// Returns [`Room`] by its ID.
     pub fn get(&self, id: Id) -> Option<Addr<Room>> {
         let rooms = self.rooms.lock().unwrap();
-        rooms.get(&id).map(|r| r.clone())
+        rooms.get(&id).cloned()
     }
 }

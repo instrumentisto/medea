@@ -1,0 +1,12 @@
+# See full lints list at:
+# https://rust-lang.github.io/rust-clippy/master/index.html
+
+doc-valid-idents = [
+    "KiB", "MiB", "GiB", "TiB", "PiB", "EiB",
+    "DirectX", "ECMAScript",
+    "GPLv2", "GPLv3", "GitHub", "GitLab",
+    "IPv4", "IPv6", "JavaScript", "NaN", "NaNs",
+    "OAuth", "OpenGL", "OpenSSH", "OpenSSL", "OpenStreetMap", "TrueType",
+    "iOS", "macOS", "TeX", "LaTeX", "BibTeX", "BibLaTeX", "MinGW",
+    "WebSocket",
+]

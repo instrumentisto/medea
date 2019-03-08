@@ -25,6 +25,7 @@ pub const CLIENT_IDLE_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// Long-running WebSocket connection of Client API.
 #[derive(Debug)]
+#[allow(clippy::module_name_repetitions)]
 pub struct WsSession {
     /// ID of [`Member`] that WebSocket connection is associated with.
     member_id: MemberId,
