@@ -2,8 +2,12 @@
 
 use std::time::Duration;
 
-use actix::prelude::*;
+use actix::{
+    fut::wrap_future, Actor, ActorContext, Addr, AsyncContext, Handler,
+    Message, SpawnHandle, StreamHandler,
+};
 use actix_web::ws::{self, CloseReason};
+use futures::Future;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -11,10 +15,9 @@ use crate::{
         Room, RpcConnection, RpcConnectionClosed, RpcConnectionClosedReason,
         RpcConnectionEstablished,
     },
-    api::control::member::Id as MemberID,
+    api::control::member::Id as MemberId,
     log::prelude::*,
 };
-use actix_web::ws::CloseCode;
 
 // TODO: via conf
 /// Timeout of receiving any WebSocket messages from client.
@@ -24,8 +27,7 @@ pub const CLIENT_IDLE_TIMEOUT: Duration = Duration::from_secs(10);
 #[derive(Debug)]
 pub struct WsSession {
     /// ID of [`Member`] that WebSocket connection is associated with.
-    member_id: MemberID,
-
+    member_id: MemberId,
     /// [`Room`] that [`Member`] is associated with.
     room: Addr<Room>,
 
@@ -36,12 +38,14 @@ pub struct WsSession {
     /// from client.
     idle_handler: Option<SpawnHandle>,
 
+    /// Indicates whether WebSocket connection is closed by server ot by
+    /// client.
     closed_by_server: bool,
 }
 
 impl WsSession {
-    /// Creates new WebSocket session for specified [`Member`].
-    pub fn new(member_id: MemberID, room: Addr<Room>) -> Self {
+    /// Creates new [`WsSession`] for specified [`Member`].
+    pub fn new(member_id: MemberId, room: Addr<Room>) -> Self {
         Self {
             member_id,
             room,
@@ -56,16 +60,28 @@ impl WsSession {
             ctx.cancel_future(handler);
         }
 
-        let member_id = self.member_id;
         self.idle_handler =
-            Some(ctx.run_later(CLIENT_IDLE_TIMEOUT, move |session, ctx| {
-                info!("WsConnection with member {} is idle", member_id);
+            Some(ctx.run_later(CLIENT_IDLE_TIMEOUT, |sess, ctx| {
+                info!("WsConnection with member {} is idle", sess.member_id);
+
+                let member_id = sess.member_id;
+                ctx.wait(wrap_future(
+                    sess.room
+                        .send(RpcConnectionClosed {
+                            member_id,
+                            reason: RpcConnectionClosedReason::Idle,
+                        })
+                        .map_err(move |err| {
+                            error!(
+                                "WsSession of member {} failed to remove from \
+                                 Room, because: {:?}",
+                                member_id, err,
+                            )
+                        }),
+                ));
+
                 ctx.notify(Close {
-                    reason: Some(CloseCode::Normal.into()),
-                });
-                session.room.do_send(RpcConnectionClosed {
-                    member_id: session.member_id,
-                    reason: RpcConnectionClosedReason::Idle,
+                    reason: Some(ws::CloseCode::Normal.into()),
                 });
             }));
     }
@@ -76,14 +92,29 @@ impl WsSession {
 impl Actor for WsSession {
     type Context = ws::WebsocketContext<Self>;
 
-    /// Starts [`Heartbeat`] mechanism and sends message to [`Room`].
+    /// Starts [`Heartbeat`] mechanism and sends [`RpcConnectionEstablished`]
+    /// signal to the [`Room`].
     fn started(&mut self, ctx: &mut Self::Context) {
         debug!("Started WsSession for member {}", self.member_id);
+
         self.reset_idle_timeout(ctx);
-        self.room.do_send(RpcConnectionEstablished {
-            member_id: self.member_id,
-            connection: Box::new(ctx.address()),
-        });
+
+        let member_id = self.member_id;
+        ctx.wait(wrap_future(
+            self.room
+                .send(RpcConnectionEstablished {
+                    member_id: self.member_id,
+                    connection: Box::new(ctx.address()),
+                })
+                .map(|_| ())
+                .map_err(move |err| {
+                    error!(
+                        "WsSession of member {} failed to join Room, \
+                         because: {:?}",
+                        member_id, err,
+                    )
+                }),
+        ));
     }
 
     fn stopped(&mut self, _ctx: &mut Self::Context) {
@@ -92,11 +123,14 @@ impl Actor for WsSession {
 }
 
 impl RpcConnection for Addr<WsSession> {
-    /// Close [`WsSession`] by send himself close message.
-    fn close(&self) {
-        self.do_send(Close {
-            reason: Some(CloseCode::Normal.into()),
-        });
+    /// Closes [`WsSession`] by sending itself "normal closure" close message.
+    fn close(&mut self) -> Box<dyn Future<Item = (), Error = ()>> {
+        let fut = self
+            .send(Close {
+                reason: Some(ws::CloseCode::Normal.into()),
+            })
+            .map_err(|_| ());
+        Box::new(fut)
     }
 }
 
@@ -119,7 +153,7 @@ impl Handler<Close> for WsSession {
 }
 
 /// Message for keeping client WebSocket connection alive.
-#[derive(Debug, Message, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Message, Serialize)]
 pub enum Heartbeat {
     /// `ping` message that WebSocket client is expected to send to the server
     /// periodically.
@@ -160,16 +194,33 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
             }
             ws::Message::Close(reason) => {
                 if !self.closed_by_server {
-                    self.room.do_send(RpcConnectionClosed {
-                        member_id: self.member_id,
-                        reason: RpcConnectionClosedReason::Disconnect,
-                    });
-                    debug!("Send close frame with reason {:?}", reason);
+                    debug!(
+                        "Send close frame with reason {:?} for member {}",
+                        reason, self.member_id
+                    );
+                    let member_id = self.member_id;
+                    ctx.wait(wrap_future(
+                        self.room
+                            .send(RpcConnectionClosed {
+                                member_id: self.member_id,
+                                reason: RpcConnectionClosedReason::Disconnected,
+                            })
+                            .map_err(move |err| {
+                                error!(
+                                    "WsSession of member {} failed to remove \
+                                     from Room, because: {:?}",
+                                    member_id, err,
+                                )
+                            }),
+                    ));
                     ctx.close(reason);
                     ctx.stop();
                 }
             }
-            _ => error!("Unsupported message from member {}", self.member_id),
+            _ => error!(
+                "Unsupported client message from member {}",
+                self.member_id
+            ),
         }
     }
 }

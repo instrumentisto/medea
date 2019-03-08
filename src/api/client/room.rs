@@ -1,117 +1,158 @@
 //! Room definitions and implementations.
-use std::sync::{Arc, Mutex};
 
-use actix::prelude::*;
+use std::{
+    fmt,
+    sync::{Arc, Mutex},
+};
+
+use actix::{
+    fut::wrap_future, Actor, ActorFuture, Addr, Context, Handler, Message,
+};
+use futures::{
+    future::{self, Either},
+    Future,
+};
 use hashbrown::HashMap;
 
 use crate::{
-    api::control::{Id as MemberID, Member},
+    api::control::{Id as MemberId, Member},
     log::prelude::*,
 };
-use std::fmt::Debug;
 
 /// ID of [`Room`].
 pub type Id = u64;
 
-/// Media server room with its members.
+/// Media server room with its [`Member`]s.
 #[derive(Debug)]
 pub struct Room {
-    /// ID of [`Room`].
+    /// ID of this [`Room`].
     pub id: Id,
-
-    /// [`Member`]'s this room.
-    pub members: HashMap<MemberID, Member>,
-
-    /// [`WsSession`]s of [`Member`]'s this room.
-    pub connections: HashMap<MemberID, Box<dyn RpcConnection>>,
+    /// [`Member`]s which currently are present in this [`Room`].
+    pub members: HashMap<MemberId, Member>,
+    /// Established [`WsSession`]s of [`Member`]s in this [`Room`].
+    pub connections: HashMap<MemberId, Box<dyn RpcConnection>>,
+    /* TODO: Replace Box<dyn RpcConnection>> with enum,
+     *       as the set of all possible RpcConnection types is not closed. */
 }
 
-/// [`Actor`] implementation that provides an ergonomic way for members
-/// to interact in [`Room`].
+/// [`Actor`] implementation that provides an ergonomic way
+/// to interact with [`Room`].
 impl Actor for Room {
     type Context = Context<Self>;
 }
 
-/// [`RpcConnection`] with remote [`Room`] [`Member`].
-pub trait RpcConnection: Debug + Send {
-    /// Close connection. No [`RpcConnectionClosed`] should be emitted.
-    fn close(&self);
+/// Established RPC connection with some remote [`Member`].
+pub trait RpcConnection: fmt::Debug + Send {
+    /// Closes [`RpcConnection`].
+    /// No [`RpcConnectionClosed`] signals should be emitted.
+    fn close(&mut self) -> Box<dyn Future<Item = (), Error = ()>>;
 }
 
-/// Signals that new  [`RpcConnection`] was established with specified [`Member`].
-#[derive(Message, Debug)]
+/// Signal for authorizing new [`RpcConnection`] before establishing.
+#[derive(Debug, Message)]
+#[rtype(result = "Result<(), RpcConnectionAuthorizationError>")]
+pub struct AuthorizeRpcConnection {
+    /// ID of [`Member`] to authorize [`RpcConnection`] for.
+    pub member_id: MemberId,
+    /// Credentials to authorize [`RpcConnection`] with.
+    pub credentials: String, // TODO: &str when futures will allow references
+}
+
+/// Error of authorization [`RpcConnection`] in [`Room`].
+#[derive(Debug)]
+pub enum RpcConnectionAuthorizationError {
+    /// Authorizing [`Member`] does not exists in the [`Room`].
+    MemberNotExists,
+    /// Provided credentials are invalid.
+    InvalidCredentials,
+}
+
+impl Handler<AuthorizeRpcConnection> for Room {
+    type Result = Result<(), RpcConnectionAuthorizationError>;
+
+    /// Responses with `Ok` if `RpcConnection` is authorized, otherwise `Err`s.
+    fn handle(
+        &mut self,
+        msg: AuthorizeRpcConnection,
+        _ctx: &mut Self::Context,
+    ) -> Self::Result {
+        use RpcConnectionAuthorizationError::*;
+        if let Some(ref member) = self.members.get(&msg.member_id) {
+            if member.credentials.eq(&msg.credentials) {
+                return Ok(());
+            }
+            return Err(InvalidCredentials);
+        }
+        Err(MemberNotExists)
+    }
+}
+
+/// Signal of new [`RpcConnection`] being established with specified [`Member`].
+#[derive(Debug, Message)]
+#[rtype(result = "Result<(), ()>")]
 pub struct RpcConnectionEstablished {
-    pub member_id: MemberID,
+    /// ID of [`Member`] that establishes [`RpcConnection`].
+    pub member_id: MemberId,
+    /// Established [`RpcConnection`].
     pub connection: Box<dyn RpcConnection>,
 }
 
-/// Requests [`Member`] by credentials.
-#[derive(Message, Debug)]
-#[rtype(result = "Option<Member>")]
-pub struct GetMember {
-    pub credentials: String,
-}
-
-/// Signals that [`RpcConnection`] with specified member was closed.
-#[derive(Message, Debug)]
-pub struct RpcConnectionClosed {
-    pub member_id: MemberID,
-    pub reason: RpcConnectionClosedReason,
-}
-
-/// [`RpcConnection`] close reasons.
-#[derive(Debug)]
-pub enum RpcConnectionClosedReason {
-    /// [`RpcConnection`] initiated disconnect from server.
-    Disconnect,
-    /// [`RpcConnection`] was considered idle and disconnected.
-    Idle,
-}
-
-impl Handler<GetMember> for Room {
-    type Result = Option<Member>;
-
-    /// Returns [`Member`] by its credentials, if any.
-    fn handle(
-        &mut self,
-        msg: GetMember,
-        _ctx: &mut Self::Context,
-    ) -> Self::Result {
-        self.members
-            .values()
-            .find(|m| m.credentials.eq(&msg.credentials))
-            .map(|m| m.clone())
-    }
-}
+/// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
+type ActFuture<I, E> = Box<dyn ActorFuture<Actor = Room, Item = I, Error = E>>;
 
 impl Handler<RpcConnectionEstablished> for Room {
-    type Result = ();
+    type Result = ActFuture<(), ()>;
 
-    /// Stores provided [`RPCConnection`] with specified [`Member`] into [`Room`].
+    /// Stores provided [`RpcConnection`] for given [`Member`] in the [`Room`].
     ///
-    /// Current [`RPCConnection`] with specified ['Member'] will be closed, if any.
+    /// If [`Member`] already has any other [`RpcConnection`],
+    /// then it will be closed.
     fn handle(
         &mut self,
         msg: RpcConnectionEstablished,
-        _ctx: &mut Self::Context,
-    ) {
-        info!("RpcConnectionEstablished with member {}", &msg.member_id);
-        if let Some(old_connection) = self.connections.remove(&msg.member_id) {
-            debug!("New RpcConnection with member {}", msg.member_id);
-            old_connection.close();
+        _: &mut Self::Context,
+    ) -> Self::Result {
+        info!("RpcConnectionEstablished for member {}", msg.member_id);
+
+        let mut fut = Either::A(future::ok(()));
+
+        if let Some(mut old_conn) = self.connections.remove(&msg.member_id) {
+            debug!("Closing old RpcConnection for member {}", msg.member_id);
+            fut = Either::B(old_conn.close());
         }
+
         self.connections.insert(msg.member_id, msg.connection);
+
+        Box::new(wrap_future(fut))
     }
+}
+
+/// Signal of existing [`RpcConnection`] of specified [`Member`] being closed.
+#[derive(Debug, Message)]
+pub struct RpcConnectionClosed {
+    /// ID of [`Member`] which [`RpcConnection`] is closed.
+    pub member_id: MemberId,
+    /// Reason of why [`RpcConnection`] is closed.
+    pub reason: RpcConnectionClosedReason,
+}
+
+/// Reasons of why [`RpcConnection`] may be closed.
+#[derive(Debug)]
+pub enum RpcConnectionClosedReason {
+    /// [`RpcConnection`] is disconnect by server itself.
+    Disconnected,
+    /// [`RpcConnection`] has become idle and is disconnected by idle timeout.
+    Idle,
 }
 
 impl Handler<RpcConnectionClosed> for Room {
     type Result = ();
 
-    /// Remove connection of [`Member`] from [`Room`].
-    fn handle(&mut self, msg: RpcConnectionClosed, _ctx: &mut Self::Context) {
+    /// Removes [`RpcConnection`] of specified [`Member`] from the [`Room`].
+    fn handle(&mut self, msg: RpcConnectionClosed, _: &mut Self::Context) {
         info!(
-            "RpcConnectionClosed with member {}, reason {:?}",
-            &msg.member_id, msg.reason
+            "RpcConnectionClosed for member {}, reason {:?}",
+            msg.member_id, msg.reason
         );
         self.connections.remove(&msg.member_id);
     }
