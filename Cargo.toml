@@ -1,6 +1,6 @@
 [package]
 name = "medea"
-version = "0.1.0"
+version = "0.1.0-dev"
 edition = "2018"
 description = "Medea media server"
 authors = ["Instrumentisto Team <developer@instrumentisto.com>"]
