@@ -9,9 +9,10 @@ use crate::{
     api::control::{Id as MemberID, Member},
     log::prelude::*,
     media::{
-        peer::{Id as PeerID, Peer, PeerMachine},
+        peer::{Event, Id as PeerID, Peer, PeerMachine},
         track::{
-            AudioSettings, Id as TrackID, Track, TrackMediaType, VideoSettings,
+            AudioSettings, DirectionalTrack, Track, TrackMediaType,
+            VideoSettings,
         },
     },
 };
@@ -41,20 +42,6 @@ pub enum Command {
     MakeSdpOffer { peer_id: PeerID, sdp_offer: String },
     /// Web Client sends SDP Answer.
     MakeSdpAnswer { peer_id: PeerID, sdp_answer: String },
-}
-
-/// WebSocket message from Media Server to Web Client.
-#[derive(Debug, Deserialize, Serialize, Message)]
-pub enum Event {
-    /// Media Server notifies Web Client about necessity of RTCPeerConnection
-    /// creation.
-    PeerCreated {
-        peer_id: PeerID,
-        sdp_offer: Option<String>,
-    },
-    /// Media Server notifies Web Client about necessity to apply specified SDP
-    /// Answer to Web Client's RTCPeerConnection.
-    SdpAnswerMade { peer_id: PeerID, sdp_answer: String },
 }
 
 /// ID of [`Room`].
@@ -164,14 +151,14 @@ impl Room {
             PeerMachine::New(mut peer) => {
                 peer.add_sender(track_audio.clone());
                 peer.add_sender(track_video.clone());
-                Ok(PeerMachine::WaitLocalSDP(peer.start(|id, member_id| {
-                    let connection = self.connections.get(&member_id).unwrap();
-                    let event = Event::PeerCreated {
-                        peer_id: id,
-                        sdp_offer: None,
-                    };
-                    connection.send_event(event);
-                })))
+                Ok(PeerMachine::WaitLocalSDP(peer.start(
+                    peer_responder_id,
+                    |member_id, event| {
+                        let connection =
+                            self.connections.get(&member_id).unwrap();
+                        connection.send_event(event);
+                    },
+                )))
             }
             _ => Err(RoomError::UnmatchedState(peer_caller_id)),
         }?;
@@ -322,14 +309,11 @@ impl Handler<Command> for Room {
                 let new_peer_responder = match peer_responder {
                     PeerMachine::New(peer) => Ok(
                         PeerMachine::WaitLocalHaveRemote(peer.set_remote_sdp(
+                            peer_id,
                             sdp_offer,
-                            |peer_id, member_id, sdp_offer| {
+                            |member_id, event| {
                                 let connection =
                                     self.connections.get(&member_id).unwrap();
-                                let event = Event::PeerCreated {
-                                    peer_id,
-                                    sdp_offer: Some(sdp_offer),
-                                };
                                 connection.send_event(event);
                             },
                         )),
@@ -453,7 +437,11 @@ mod test {
             let mut events = self.events.lock().unwrap();
             events.push(serde_json::to_string(&event).unwrap());
             match event {
-                Event::PeerCreated { peer_id, sdp_offer } => match sdp_offer {
+                Event::PeerCreated {
+                    peer_id,
+                    sdp_offer,
+                    tracks,
+                } => match sdp_offer {
                     Some(_) => self.room.do_send(Command::MakeSdpAnswer {
                         peer_id,
                         sdp_answer: "responder_answer".into(),
@@ -512,7 +500,21 @@ mod test {
             });
         });
 
-        assert_eq!(caller_events.lock().unwrap().len(), 2);
-        assert_eq!(responder_events.lock().unwrap().len(), 1);
+        let mut caller_events = caller_events.lock().unwrap();
+        let responder_events = responder_events.lock().unwrap();
+        assert_eq!(caller_events.len(), 2);
+        assert_eq!(
+            caller_events.to_vec(),
+            vec![
+                "{\"PeerCreated\":{\"peer_id\":0,\"sdp_offer\":null,\
+                 \"tracks\":[{\"id\":1,\"media_type\":{\"Audio\":{}},\
+                 \"direction\":{\"Send\":{\"receivers\":[1]}}},{\"id\":2,\
+                 \"media_type\":{\"Video\":{}},\"direction\":{\"Send\":\
+                 {\"receivers\":[1]}}}]}}",
+                "{\"SdpAnswerMade\":{\"peer_id\":0,\"sdp_answer\":\
+                 \"responder_answer\"}}",
+            ]
+        );
+        assert_eq!(responder_events.len(), 1);
     }
 }

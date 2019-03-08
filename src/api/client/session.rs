@@ -7,12 +7,12 @@ use actix_web::ws::{self, CloseReason};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    api::client::room::{
+    api::control::member::Id as MemberID,
+    log::prelude::*,
+    media::{
         Command, Event, Room, RpcConnection, RpcConnectionClosed,
         RpcConnectionClosedReason, RpcConnectionEstablished,
     },
-    api::control::member::Id as MemberID,
-    log::prelude::*,
 };
 use actix_web::ws::CloseCode;
 

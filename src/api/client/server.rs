@@ -8,8 +8,9 @@ use futures::{future, Future};
 use serde::Deserialize;
 
 use crate::{
-    api::client::{GetMember, Id as RoomID, RoomsRepository, WsSession},
+    api::client::WsSession,
     log::prelude::*,
+    media::room::{GetMember, Id as RoomID, RoomsRepository},
 };
 
 /// Contains [`Room`] ID and [`Member`] credentials obtained from request path.
@@ -81,9 +82,9 @@ mod test {
     use actix_web::{http, test, App};
     use futures::Stream;
 
-    use crate::api::{
-        client::{session, Room},
-        control::Member,
+    use crate::{
+        api::{client::session, control::Member},
+        media::Room,
     };
 
     use super::*;
