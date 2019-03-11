@@ -28,21 +28,23 @@ where
         drain_err.filter_level(Level::Warning),
     )
     .map(Fuse);
+    let drain = slog_envlogger::new(drain).fuse();
     let drain = Async::new(drain).build().fuse();
-    add_default_keys(Logger::root(drain, o!()))
+    add_default_keys(&Logger::root(drain, o!()))
 }
 
 /// Builds JSON [`Logger`] which writes all its logs to the specified writer.
 ///
 /// Created [`Logger`] produces log records with `lvl`, `time` and `msg` fields
 /// by default.
+#[allow(dead_code)]
 pub fn new_logger<W>(w: W) -> Logger
 where
     W: io::Write + Send + 'static,
 {
     let drain = Json::new(w).build().fuse();
     let drain = Async::new(drain).build().fuse();
-    add_default_keys(Logger::root(drain, o!()))
+    add_default_keys(&Logger::root(drain, o!()))
 }
 
 /// Adds default log record data (key-value pairs) to specified [`Logger`]:
@@ -51,7 +53,7 @@ where
 /// - `msg`: log record message.
 ///
 /// [RFC 3339]: https://www.ietf.org/rfc/rfc3339.txt
-fn add_default_keys(logger: Logger) -> Logger {
+fn add_default_keys(logger: &Logger) -> Logger {
     logger.new(o!(
         "msg" => PushFnValue(move |record : &Record, ser| {
             ser.emit(record.msg())
