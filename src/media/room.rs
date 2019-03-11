@@ -39,9 +39,20 @@ pub enum RoomError {
 #[rtype(result = "Result<bool, RoomError>")]
 pub enum Command {
     /// Web Client sends SDP Offer.
-    MakeSdpOffer { peer_id: PeerID, sdp_offer: String },
+    MakeSdpOffer {
+        peer_id: PeerID,
+        sdp_offer: String,
+    },
     /// Web Client sends SDP Answer.
-    MakeSdpAnswer { peer_id: PeerID, sdp_answer: String },
+    MakeSdpAnswer {
+        peer_id: PeerID,
+        sdp_answer: String,
+    },
+
+    SetIceCandidate {
+        peer_id: PeerID,
+        candidate: String,
+    },
 }
 
 /// ID of [`Room`].
@@ -115,6 +126,24 @@ impl Room {
         id
     }
 
+    fn remove_peer_by_id(
+        &mut self,
+        peer_id: &PeerID,
+    ) -> Result<PeerMachine, RoomError> {
+        self.peers
+            .remove(peer_id)
+            .ok_or(RoomError::UnknownPeer(*peer_id))
+    }
+
+    fn get_peer_by_id(
+        &self,
+        peer_id: &PeerID,
+    ) -> Result<&PeerMachine, RoomError> {
+        self.peers
+            .get(peer_id)
+            .ok_or(RoomError::UnknownPeer(*peer_id))
+    }
+
     /// Begins the negotiation process between peers.
     ///
     /// Creates audio and video tracks and stores links to them in
@@ -179,6 +208,155 @@ impl Room {
         }?;
         self.peers.insert(peer_responder_id, new_peer_responder);
         Ok(())
+    }
+
+    fn handle_make_sdp_offer(
+        &mut self,
+        from_peer_id: PeerID,
+        from_peer: PeerMachine,
+        sdp_offer: String,
+    ) -> Result<bool, RoomError> {
+        let from_peer = match from_peer {
+            PeerMachine::WaitLocalSDP(peer) => Ok(PeerMachine::WaitRemoteSDP(
+                peer.set_local_sdp(sdp_offer.clone()),
+            )),
+            _ => {
+                error!("Unmatched state caller peer");
+                Err(RoomError::UnmatchedState(from_peer_id))
+            }
+        }?;
+
+        self.peers.insert(from_peer_id, from_peer);
+
+        let responder_peer_id = self
+            .peer_to_peer
+            .get(&from_peer_id)
+            .map(|&id| id)
+            .ok_or(RoomError::NoOpponentPeer(from_peer_id))?;
+        let peer_responder = self
+            .peers
+            .remove(&responder_peer_id)
+            .ok_or(RoomError::UnknownPeer(responder_peer_id))?;
+        let new_peer_responder = match peer_responder {
+            PeerMachine::New(peer) => {
+                Ok(PeerMachine::WaitLocalHaveRemote(peer.set_remote_sdp(
+                    from_peer_id,
+                    sdp_offer,
+                    |member_id, event| {
+                        let connection =
+                            self.connections.get(&member_id).unwrap();
+                        connection.send_event(event);
+                    },
+                )))
+            }
+            _ => {
+                error!("Unmatched state responder peer");
+                Err(RoomError::UnmatchedState(responder_peer_id))
+            }
+        }?;
+        self.peers.insert(responder_peer_id, new_peer_responder);
+        Ok(true)
+    }
+
+    fn handle_make_sdp_answer(
+        &mut self,
+        from_peer_id: PeerID,
+        from_peer: PeerMachine,
+        sdp_answer: String,
+    ) -> Result<bool, RoomError> {
+        let from_peer = match from_peer {
+            PeerMachine::WaitLocalHaveRemote(peer) => {
+                Ok(PeerMachine::Stable(peer.set_local_sdp(sdp_answer.clone())))
+            }
+            _ => {
+                error!("Unmatched state caller peer");
+                Err(RoomError::UnmatchedState(from_peer_id))
+            }
+        }?;
+        self.peers.insert(from_peer_id, from_peer);
+
+        let caller_peer_id = self
+            .peer_to_peer
+            .get(&from_peer_id)
+            .map(|&id| id)
+            .ok_or(RoomError::NoOpponentPeer(from_peer_id))?;
+        let peer_caller = self
+            .peers
+            .remove(&caller_peer_id)
+            .ok_or(RoomError::UnknownPeer(caller_peer_id))?;
+        let new_peer_caller = match peer_caller {
+            PeerMachine::WaitRemoteSDP(peer) => {
+                Ok(PeerMachine::Stable(peer.set_remote_sdp(
+                    sdp_answer,
+                    |peer_id, member_id, sdp_answer| {
+                        let connection =
+                            self.connections.get(&member_id).unwrap();
+                        let event = Event::SdpAnswerMade {
+                            peer_id,
+                            sdp_answer,
+                        };
+                        connection.send_event(event);
+                    },
+                )))
+            }
+            _ => Err(RoomError::UnmatchedState(caller_peer_id)),
+        }?;
+        self.peers.insert(caller_peer_id, new_peer_caller);
+
+        Ok(true)
+    }
+
+    fn handle_set_ice_candidate(
+        &self,
+        from_peer_id: PeerID,
+        from_peer: &PeerMachine,
+        candidate: String,
+    ) -> Result<bool, RoomError> {
+
+        fn send_candidate_to_remote(
+            room: &Room,
+            from_peer_id: PeerID,
+            candidate: String,
+        ) -> Result<bool, RoomError> {
+            let remote_peer_id = room
+                .peer_to_peer
+                .get(&from_peer_id)
+                .ok_or(RoomError::NoOpponentPeer(from_peer_id))?;
+
+            let remote = room
+                .peers
+                .get(remote_peer_id)
+                .ok_or(RoomError::UnknownPeer(*remote_peer_id))?;
+
+            let remote_member_id = remote.get_member_id();
+            let remote = room
+                .connections
+                .get(&remote_member_id)
+                .ok_or(RoomError::InvalidConnection(remote_member_id))?;
+
+            remote.send_event(Event::IceCandidateDiscovered {
+                peer_id: *remote_peer_id,
+                candidate,
+            });
+
+            Ok(true)
+        };
+
+        match from_peer {
+            PeerMachine::WaitLocalSDP(_) => {
+                send_candidate_to_remote(self, from_peer_id, candidate)
+            }
+            PeerMachine::WaitLocalHaveRemote(_) => {
+                send_candidate_to_remote(self, from_peer_id, candidate)
+            }
+            PeerMachine::WaitRemoteSDP(_) => {
+                send_candidate_to_remote(self, from_peer_id, candidate)
+            }
+            PeerMachine::Stable(_) => {
+                send_candidate_to_remote(self, from_peer_id, candidate)
+            }
+            _ => Err(RoomError::UnmatchedState(from_peer_id)),
+        }
     }
 }
 
@@ -280,102 +458,19 @@ impl Handler<Command> for Room {
         debug!("receive command: {:?}", command);
         match command {
             Command::MakeSdpOffer { peer_id, sdp_offer } => {
-                let peer_caller = self
-                    .peers
-                    .remove(&peer_id)
-                    .ok_or(RoomError::UnknownPeer(peer_id))?;
-                let new_peer_caller = match peer_caller {
-                    PeerMachine::WaitLocalSDP(peer) => {
-                        Ok(PeerMachine::WaitRemoteSDP(
-                            peer.set_local_sdp(sdp_offer.clone()),
-                        ))
-                    }
-                    _ => {
-                        error!("Unmatched state caller peer");
-                        Err(RoomError::UnmatchedState(peer_id))
-                    }
-                }?;
-                self.peers.insert(peer_id, new_peer_caller);
-
-                let responder_peer_id = self
-                    .peer_to_peer
-                    .get(&peer_id)
-                    .map(|&id| id)
-                    .ok_or(RoomError::NoOpponentPeer(peer_id))?;
-                let peer_responder = self
-                    .peers
-                    .remove(&responder_peer_id)
-                    .ok_or(RoomError::UnknownPeer(responder_peer_id))?;
-                let new_peer_responder = match peer_responder {
-                    PeerMachine::New(peer) => Ok(
-                        PeerMachine::WaitLocalHaveRemote(peer.set_remote_sdp(
-                            peer_id,
-                            sdp_offer,
-                            |member_id, event| {
-                                let connection =
-                                    self.connections.get(&member_id).unwrap();
-                                connection.send_event(event);
-                            },
-                        )),
-                    ),
-                    _ => {
-                        error!("Unmatched state responder peer");
-                        Err(RoomError::UnmatchedState(responder_peer_id))
-                    }
-                }?;
-                self.peers.insert(responder_peer_id, new_peer_responder);
-                Ok(true)
+                let from_peer = self.remove_peer_by_id(&peer_id)?;
+                self.handle_make_sdp_offer(peer_id, from_peer, sdp_offer)
             }
             Command::MakeSdpAnswer {
                 peer_id,
                 sdp_answer,
             } => {
-                let peer_responder = self
-                    .peers
-                    .remove(&peer_id)
-                    .ok_or(RoomError::UnknownPeer(peer_id))?;
-                let new_peer_responder = match peer_responder {
-                    PeerMachine::WaitLocalHaveRemote(peer) => {
-                        Ok(PeerMachine::Stable(
-                            peer.set_local_sdp(sdp_answer.clone()),
-                        ))
-                    }
-                    _ => {
-                        error!("Unmatched state caller peer");
-                        Err(RoomError::UnmatchedState(peer_id))
-                    }
-                }?;
-                self.peers.insert(peer_id, new_peer_responder);
-
-                let caller_peer_id = self
-                    .peer_to_peer
-                    .get(&peer_id)
-                    .map(|&id| id)
-                    .ok_or(RoomError::NoOpponentPeer(peer_id))?;
-                let peer_caller = self
-                    .peers
-                    .remove(&caller_peer_id)
-                    .ok_or(RoomError::UnknownPeer(caller_peer_id))?;
-                let new_peer_caller = match peer_caller {
-                    PeerMachine::WaitRemoteSDP(peer) => {
-                        Ok(PeerMachine::Stable(peer.set_remote_sdp(
-                            sdp_answer,
-                            |peer_id, member_id, sdp_answer| {
-                                let connection =
-                                    self.connections.get(&member_id).unwrap();
-                                let event = Event::SdpAnswerMade {
-                                    peer_id,
-                                    sdp_answer,
-                                };
-                                connection.send_event(event);
-                            },
-                        )))
-                    }
-                    _ => Err(RoomError::UnmatchedState(caller_peer_id)),
-                }?;
-                self.peers.insert(caller_peer_id, new_peer_caller);
-
-                Ok(true)
+                let from_peer = self.remove_peer_by_id(&peer_id)?;
+                self.handle_make_sdp_answer(peer_id, from_peer, sdp_answer)
+            }
+            Command::SetIceCandidate { peer_id, candidate } => {
+                let from_peer = self.get_peer_by_id(&peer_id)?;
+                self.handle_set_ice_candidate(peer_id, from_peer, candidate)
             }
         }
     }

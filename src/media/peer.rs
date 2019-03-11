@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{sync::Arc, any::Any};
 
 use actix::prelude::*;
 use hashbrown::HashMap;
@@ -25,7 +25,15 @@ pub enum Event {
     },
     /// Media Server notifies Web Client about necessity to apply specified SDP
     /// Answer to Web Client's RTCPeerConnection.
-    SdpAnswerMade { peer_id: Id, sdp_answer: String },
+    SdpAnswerMade {
+        peer_id: Id,
+        sdp_answer: String,
+    },
+
+    IceCandidateDiscovered {
+        peer_id: Id,
+        candidate: String,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -55,6 +63,20 @@ pub enum PeerMachine {
     Failure(Peer<Failure>),
 }
 
+impl PeerMachine {
+    pub fn get_member_id(&self) -> MemberID {
+        match self {
+            PeerMachine::New(peer) => peer.get_member_id(),
+            PeerMachine::WaitLocalSDP(peer) => peer.get_member_id(),
+            PeerMachine::WaitLocalHaveRemote(peer) => peer.get_member_id(),
+            PeerMachine::WaitRemoteSDP(peer) => peer.get_member_id(),
+            PeerMachine::Stable(peer) => peer.get_member_id(),
+            PeerMachine::Finished(peer) => peer.get_member_id(),
+            PeerMachine::Failure(peer) => peer.get_member_id(),
+        }
+    }
+}
+
 /// ID of [`Peer`].
 pub type Id = u64;
 
@@ -73,6 +95,12 @@ pub struct PeerContext {
 pub struct Peer<S> {
     context: PeerContext,
     state: S,
+}
+
+impl<T: Any> Peer<T> {
+    pub fn get_member_id(&self) -> MemberID {
+        self.context.member_id
+    }
 }
 
 impl Peer<New> {
