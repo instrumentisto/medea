@@ -1,6 +1,6 @@
 [package]
 name = "medea"
-version = "0.1.0"
+version = "0.1.0-dev"
 edition = "2018"
 description = "Medea media server"
 authors = ["Instrumentisto Team <developer@instrumentisto.com>"]
@@ -25,6 +25,7 @@ slog-stdlog = "3.0"
 slog-async = "2.3"
 slog-json = "2.3"
 slog-scope = "4.1"
+failure = "0.1"
 
 [dev-dependencies]
 tokio = "0.1"
