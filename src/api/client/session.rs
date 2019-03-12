@@ -7,15 +7,15 @@ use actix::{
     Message, SpawnHandle, StreamHandler,
 };
 use actix_web::ws::{self, CloseReason};
-use futures::Future;
+use futures::{future, Future};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    api::control::member::Id as MemberId,
-    media::{
+    api::client::{
         Command, Event, Room, RpcConnection, RpcConnectionClosed,
         RpcConnectionClosedReason, RpcConnectionEstablished,
     },
+    api::control::member::Id as MemberId,
     log::prelude::*,
 };
 
@@ -110,8 +110,8 @@ impl Actor for WsSession {
                 .map(|_| ())
                 .map_err(move |err| {
                     error!(
-                        "WsSession of member {} failed to join Room, \
-                         because: {:?}",
+                        "WsSession of member {} failed to join Room, because: \
+                         {:?}",
                         member_id, err,
                     )
                 }),
@@ -206,14 +206,23 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
                     ctx.notify(msg);
                 }
                 if let Ok(command) = serde_json::from_str::<Command>(&text) {
-                    self.room
-                        .send(command)
-                        .into_actor(self)
-                        .then(|r, _a, _c| {
-                            debug!("{:?}", r);
-                            fut::ok::<(), (), Self>(())
-                        })
-                        .wait(ctx);
+                    let member_id = self.member_id;
+                    ctx.wait(wrap_future(
+                        self.room
+                            .send(command)
+                            .and_then(move |res| match res {
+                                Ok(_) => future::ok(()),
+                                Err(err) => {
+                                    error!(
+                                        "Command from member {} handle \
+                                         failed, because: {:?}",
+                                        member_id, err,
+                                    );
+                                    future::ok(())
+                                }
+                            })
+                            .map_err(|_| ()),
+                    ));
                 }
             }
             ws::Message::Close(reason) => {
@@ -238,7 +247,6 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
                             }),
                     ));
                     ctx.close(reason);
-                    ctx.stop();
                 }
             }
             _ => error!(

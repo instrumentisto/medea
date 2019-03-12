@@ -1,10 +1,9 @@
-use std::{sync::Arc, any::Any};
+use std::{any::Any, sync::Arc};
 
-use actix::prelude::*;
 use hashbrown::HashMap;
-use serde::{Deserialize, Serialize};
 
 use crate::{
+    api::client::Event,
     api::control::member::Id as MemberID,
     log::prelude::*,
     media::{
@@ -12,29 +11,6 @@ use crate::{
         track::{DirectionalTrack, Id as TrackID, Track, TrackDirection},
     },
 };
-
-/// WebSocket message from Media Server to Web Client.
-#[derive(Debug, Deserialize, Serialize, Message)]
-pub enum Event {
-    /// Media Server notifies Web Client about necessity of RTCPeerConnection
-    /// creation.
-    PeerCreated {
-        peer_id: Id,
-        sdp_offer: Option<String>,
-        tracks: Vec<DirectionalTrack>,
-    },
-    /// Media Server notifies Web Client about necessity to apply specified SDP
-    /// Answer to Web Client's RTCPeerConnection.
-    SdpAnswerMade {
-        peer_id: Id,
-        sdp_answer: String,
-    },
-
-    IceCandidateDiscovered {
-        peer_id: Id,
-        candidate: String,
-    },
-}
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct New {}

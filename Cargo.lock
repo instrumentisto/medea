@@ -688,6 +688,7 @@ dependencies = [
  "slog-json 2.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "slog-scope 4.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "slog-stdlog 3.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tokio 0.1.14 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]

@@ -3,12 +3,9 @@
 use actix::prelude::*;
 use dotenv::dotenv;
 
-use crate::{
-    api::{
-        client::server,
-        control::Member,
-    },
-    media::{Room, RoomsRepository},
+use crate::api::{
+    client::{server, Room, RoomsRepository},
+    control::Member,
 };
 
 #[macro_use]

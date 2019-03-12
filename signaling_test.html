@@ -10,7 +10,7 @@
         var pcs = {};
 
         function connectSocket(caller) {
-            let role = caller ? "caller_credentials" : "responder_credentials";
+            let role = caller ? "1/caller_credentials" : "2/responder_credentials";
             socket = new WebSocket("ws://localhost:8080/ws/1/" + role);
             socket.onmessage = handleSocketMessage;
 
