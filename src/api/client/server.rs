@@ -11,7 +11,7 @@ use crate::{
     api::{
         client::{
             AuthorizeRpcConnection, Id as RoomId, RoomsRepository,
-            RpcConnectionAuthorizationError, WsSession,
+            RpcConnectionAuthorizationError, WsConnection,
         },
         control::Id as MemberId,
     },
@@ -52,7 +52,7 @@ fn ws_index(
             .and_then(move |res| match res {
                 Ok(_) => ws::start(
                     &r.drop_state(),
-                    WsSession::new(info.member_id, room),
+                    WsConnection::new(info.member_id, room),
                 ),
                 Err(MemberNotExists) => Ok(HttpResponse::NotFound().into()),
                 Err(InvalidCredentials) => Ok(HttpResponse::Forbidden().into()),
@@ -96,7 +96,7 @@ mod test {
     use hashbrown::HashMap;
 
     use crate::api::{
-        client::{session, Room},
+        client::{connection, Room},
         control::Member,
     };
 
@@ -108,11 +108,7 @@ mod test {
             1 => Member{id: 1, credentials: "caller_credentials".into()},
             2 => Member{id: 2, credentials: "responder_credentials".into()},
         };
-        let room = Arbiter::start(move |_| Room {
-            id: 1,
-            members,
-            connections: HashMap::new(),
-        });
+        let room = Arbiter::start(move |_| Room::new(1, members));
         let rooms = hashmap! {1 => room};
         RoomsRepository::new(rooms)
     }
@@ -148,7 +144,9 @@ mod test {
         let (item, read) = server.execute(read.into_future()).unwrap();
         assert_eq!(item, Some(ws::Message::Text(r#"{"pong":33}"#.into())));
 
-        thread::sleep(session::CLIENT_IDLE_TIMEOUT.add(Duration::from_secs(1)));
+        thread::sleep(
+            connection::CLIENT_IDLE_TIMEOUT.add(Duration::from_secs(1)),
+        );
 
         let (item, _) = server.execute(read.into_future()).unwrap();
         assert_eq!(

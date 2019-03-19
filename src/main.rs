@@ -1,8 +1,10 @@
 //! Medea media server application.
 
+#[macro_use]
+extern crate lazy_static;
+
 use actix::prelude::*;
 use dotenv::dotenv;
-use hashbrown::HashMap;
 
 use crate::api::{
     client::{server, Room, RoomsRepository},
@@ -14,6 +16,7 @@ mod utils;
 
 mod api;
 mod log;
+mod media;
 
 fn main() {
     dotenv().ok();
@@ -24,14 +27,10 @@ fn main() {
     let sys = System::new("medea");
 
     let members = hashmap! {
-        1 => Member{id: 1, credentials: "caller_credentials".to_owned()},
-        2 => Member{id: 2, credentials: "responder_credentials".to_owned()},
+        1 => Member{id: 1, credentials: "responder_credentials".to_owned()},
+        2 => Member{id: 2, credentials: "caller_credentials".to_owned()},
     };
-    let room = Arbiter::start(move |_| Room {
-        id: 1,
-        members,
-        connections: HashMap::new(),
-    });
+    let room = Arbiter::start(move |_| Room::new(1, members));
     let rooms = hashmap! {1 => room};
     let rooms_repo = RoomsRepository::new(rooms);
 

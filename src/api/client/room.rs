@@ -6,18 +6,37 @@ use std::{
 };
 
 use actix::{
-    fut::wrap_future, Actor, ActorFuture, Addr, Context, Handler, Message,
+    fut::wrap_future, Actor, ActorFuture, Addr, AsyncContext, Context, Handler,
+    Message,
 };
 use futures::{
-    future::{self, Either},
+    future::{self, join_all, Either},
     Future,
 };
 use hashbrown::HashMap;
 
 use crate::{
+    api::client::{Event, Session},
     api::control::{Id as MemberId, Member},
     log::prelude::*,
+    media::{
+        peer::{Id as PeerId, Peer, PeerMachine},
+        track::{
+            AudioSettings, Id as TrackId, Track, TrackMediaType, VideoSettings,
+        },
+    },
 };
+
+lazy_static! {
+    static ref PEER_INDEX: Mutex<u64> = Mutex::new(0);
+}
+
+/// Generate next ID of [`Peer`].
+fn next_peer_id() -> PeerId {
+    let mut index = PEER_INDEX.lock().unwrap();
+    *index += 1;
+    *index
+}
 
 /// ID of [`Room`].
 pub type Id = u64;
@@ -29,10 +48,47 @@ pub struct Room {
     pub id: Id,
     /// [`Member`]s which currently are present in this [`Room`].
     pub members: HashMap<MemberId, Member>,
-    /// Established [`WsSession`]s of [`Member`]s in this [`Room`].
-    pub connections: HashMap<MemberId, Box<dyn RpcConnection>>,
+    /// [`Session`]s of [`Member`]s in this [`Room`].
+    pub sessions: HashMap<MemberId, Session>,
     /* TODO: Replace Box<dyn RpcConnection>> with enum,
      *       as the set of all possible RpcConnection types is not closed. */
+}
+
+impl Room {
+    /// Create new instance of [`Room`].
+    pub fn new(id: Id, members: HashMap<MemberId, Member>) -> Self {
+        Room {
+            id,
+            members,
+            sessions: HashMap::new(),
+        }
+    }
+
+    pub fn session_by_peer(
+        &mut self,
+        peer_id: PeerId,
+    ) -> Option<(&u64, &mut Session)> {
+        self.sessions
+            .iter_mut()
+            .find(|(_, s)| s.peers.contains_key(&peer_id))
+    }
+
+    pub fn remove_session(&mut self, member_id: MemberId) {
+        if let Some(session) = self.sessions.remove(&member_id) {
+            for peer in session.peers.values() {
+                let opponent_peer_id = peer.opponent_id();
+                if let Some((_, opp_session)) =
+                    self.session_by_peer(opponent_peer_id)
+                {
+                    info!(
+                        "Remove peer {:?} of member {:?}",
+                        opponent_peer_id, opp_session.member_id
+                    );
+                    opp_session.remove_peer(opponent_peer_id);
+                }
+            }
+        }
+    }
 }
 
 /// [`Actor`] implementation that provides an ergonomic way
@@ -45,7 +101,12 @@ impl Actor for Room {
 pub trait RpcConnection: fmt::Debug + Send {
     /// Closes [`RpcConnection`].
     /// No [`RpcConnectionClosed`] signals should be emitted.
-    fn close(&mut self) -> Box<dyn Future<Item = (), Error = ()>>;
+    fn close(&self) -> Box<dyn Future<Item = (), Error = ()>>;
+
+    fn send_event(
+        &self,
+        event: Event,
+    ) -> Box<dyn Future<Item = (), Error = ()>>;
 }
 
 /// Signal for authorizing new [`RpcConnection`] before establishing.
@@ -110,21 +171,77 @@ impl Handler<RpcConnectionEstablished> for Room {
     fn handle(
         &mut self,
         msg: RpcConnectionEstablished,
-        _: &mut Self::Context,
+        ctx: &mut Self::Context,
     ) -> Self::Result {
         info!("RpcConnectionEstablished for member {}", msg.member_id);
 
         let mut fut = Either::A(future::ok(()));
+        if let Some(session) = self.sessions.get_mut(&msg.member_id) {
+            debug!(
+                "Replaced RpcConnection for member {} session",
+                msg.member_id
+            );
+            fut = Either::B(session.set_connection(msg.connection));
+        } else {
+            let member_id = msg.member_id;
+            let mut session = Session::new(msg.member_id, msg.connection);
 
-        if let Some(mut old_conn) = self.connections.remove(&msg.member_id) {
-            debug!("Closing old RpcConnection for member {}", msg.member_id);
-            fut = Either::B(old_conn.close());
+            info!("Members in room: {:?}", self.sessions.len());
+            let events = self
+                .sessions
+                .iter_mut()
+                .filter(|&(&m_id, _)| m_id != member_id)
+                .fold(vec![], |mut events, (_, callee)| {
+                    events.push(start_pipeline(&mut session, callee));
+                    events
+                });
+            self.sessions.insert(member_id, session);
+            events.into_iter().for_each(|e| {
+                ctx.notify(MemberEvent {
+                    member_id,
+                    event: e,
+                })
+            })
         }
-
-        self.connections.insert(msg.member_id, msg.connection);
 
         Box::new(wrap_future(fut))
     }
+}
+
+fn start_pipeline(caller: &mut Session, callee: &mut Session) -> Event {
+    info!(
+        "Member {} call member {}",
+        caller.member_id, callee.member_id
+    );
+    let caller_peer_id = next_peer_id();
+    let callee_peer_id = next_peer_id();
+    let mut caller_peer =
+        Peer::new(caller_peer_id, caller.member_id, callee_peer_id);
+    let mut callee_peer =
+        Peer::new(callee_peer_id, callee.member_id, caller_peer_id);
+
+    let track_audio =
+        Arc::new(Track::new(1, TrackMediaType::Audio(AudioSettings {})));
+    let track_video =
+        Arc::new(Track::new(2, TrackMediaType::Video(VideoSettings {})));
+    caller_peer.add_sender(track_audio.clone());
+    caller_peer.add_sender(track_video.clone());
+    callee_peer.add_receiver(track_audio);
+    callee_peer.add_receiver(track_video);
+
+    let event = Event::PeerCreated {
+        peer_id: caller_peer.id(),
+        sdp_offer: None,
+        tracks: caller_peer.tracks(),
+    };
+    let caller_peer = PeerMachine::WaitLocalSDP(caller_peer.start());
+    caller.add_peer(caller_peer);
+
+    let callee_peer = PeerMachine::New(callee_peer);
+    callee.add_peer(callee_peer);
+
+    info!("Send event: {:?}", event);
+    event
 }
 
 /// Signal of existing [`RpcConnection`] of specified [`Member`] being closed.
@@ -148,13 +265,32 @@ pub enum RpcConnectionClosedReason {
 impl Handler<RpcConnectionClosed> for Room {
     type Result = ();
 
-    /// Removes [`RpcConnection`] of specified [`Member`] from the [`Room`].
+    /// Removes [`Session`] of specified [`Member`] from the [`Room`].
     fn handle(&mut self, msg: RpcConnectionClosed, _: &mut Self::Context) {
         info!(
             "RpcConnectionClosed for member {}, reason {:?}",
             msg.member_id, msg.reason
         );
-        self.connections.remove(&msg.member_id);
+        self.remove_session(msg.member_id);
+    }
+}
+
+#[derive(Debug, Message)]
+struct MemberEvent {
+    member_id: MemberId,
+    event: Event,
+}
+
+impl Handler<MemberEvent> for Room {
+    type Result = ();
+
+    /// Send [`Event`] to specified [`Member`] from the [`Room`].
+    fn handle(&mut self, msg: MemberEvent, ctx: &mut Self::Context) {
+        let member_id = msg.member_id;
+        info!("Send event {:?} for member {}", msg.event, msg.member_id);
+        if let Some(session) = self.sessions.get(&member_id) {
+            ctx.wait(wrap_future(session.send_event(msg.event)))
+        }
     }
 }
 
