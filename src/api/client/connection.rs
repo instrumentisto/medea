@@ -7,13 +7,14 @@ use actix::{
     Message, SpawnHandle, StreamHandler,
 };
 use actix_web::ws::{self, CloseReason};
-use futures::Future;
+use futures::future::{self, Future};
 use serde::{Deserialize, Serialize};
 
 use crate::{
     api::client::{
-        Event, Room, RpcConnection, RpcConnectionClosed,
-        RpcConnectionClosedReason, RpcConnectionEstablished,
+        Command, Event, MemberCommand, Room, RpcConnection,
+        RpcConnectionClosed, RpcConnectionClosedReason,
+        RpcConnectionEstablished,
     },
     api::control::member::Id as MemberId,
     log::prelude::*,
@@ -210,6 +211,29 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsConnection {
                 self.reset_idle_timeout(ctx);
                 if let Ok(msg) = serde_json::from_str::<Heartbeat>(&text) {
                     ctx.notify(msg);
+                }
+                if let Ok(command) = serde_json::from_str::<Command>(&text) {
+                    let member_id = self.member_id;
+                    let command = MemberCommand {
+                        member_id: self.member_id,
+                        command,
+                    };
+                    ctx.wait(wrap_future(
+                        self.room
+                            .send(command)
+                            .and_then(move |res| match res {
+                                Ok(_) => future::ok(()),
+                                Err(err) => {
+                                    error!(
+                                        "Command from member {} handle \
+                                         failed, because: {:?}",
+                                        member_id, err,
+                                    );
+                                    future::ok(())
+                                }
+                            })
+                            .map_err(|_| ()),
+                    ));
                 }
             }
             ws::Message::Close(reason) => {
