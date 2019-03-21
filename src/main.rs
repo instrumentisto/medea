@@ -27,8 +27,8 @@ fn main() {
     let sys = System::new("medea");
 
     let members = hashmap! {
-        1 => Member{id: 1, credentials: "responder_credentials".to_owned()},
-        2 => Member{id: 2, credentials: "caller_credentials".to_owned()},
+        1 => Member{id: 1, credentials: "caller_credentials".to_owned()},
+        2 => Member{id: 2, credentials: "responder_credentials".to_owned()},
     };
     let room = Arbiter::start(move |_| Room::new(1, members));
     let rooms = hashmap! {1 => room};

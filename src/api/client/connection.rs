@@ -12,9 +12,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     api::client::{
-        Command, Event, MemberCommand, Room, RpcConnection,
-        RpcConnectionClosed, RpcConnectionClosedReason,
-        RpcConnectionEstablished,
+        Command, Event, Room, RpcConnection, RpcConnectionClosed,
+        RpcConnectionClosedReason, RpcConnectionEstablished,
     },
     api::control::member::Id as MemberId,
     log::prelude::*,
@@ -214,10 +213,6 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsConnection {
                 }
                 if let Ok(command) = serde_json::from_str::<Command>(&text) {
                     let member_id = self.member_id;
-                    let command = MemberCommand {
-                        member_id: self.member_id,
-                        command,
-                    };
                     ctx.wait(wrap_future(
                         self.room
                             .send(command)
@@ -258,7 +253,7 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsConnection {
                             }),
                     ));
                     ctx.close(reason);
-                    ctx.stop();
+                    // ctx.stop();
                 }
             }
             _ => error!(

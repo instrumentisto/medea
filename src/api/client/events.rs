@@ -1,7 +1,10 @@
 use actix::Message;
 use serde::{Deserialize, Serialize};
 
-use crate::media::{peer::Id as PeerId, track::DirectionalTrack};
+use crate::{
+    api::control::member::Id as MemberId,
+    media::{peer::Id as PeerId, track::DirectionalTrack},
+};
 
 /// WebSocket message from Media Server to Web Client.
 #[derive(Debug, Deserialize, Message, Serialize)]

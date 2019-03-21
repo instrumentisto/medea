@@ -8,7 +8,7 @@ use crate::media::peer::{Id as PeerId, PeerMachine};
 #[derive(Debug)]
 pub struct Session {
     pub member_id: MemberId,
-    pub connection: Box<dyn RpcConnection>,
+    connection: Box<dyn RpcConnection>,
     pub peers: HashMap<PeerId, PeerMachine>,
 }
 
@@ -28,8 +28,8 @@ impl Session {
         self.peers.insert(peer.id(), peer);
     }
 
-    pub fn remove_peer(&mut self, peer_id: PeerId) -> Option<PeerMachine> {
-        self.peers.remove(&peer_id)
+    pub fn remove_peer(&mut self, peer_id: &PeerId) -> Option<PeerMachine> {
+        self.peers.remove(peer_id)
     }
 
     pub fn send_event(
