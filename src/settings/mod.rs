@@ -7,11 +7,13 @@ use serde_derive::{Deserialize, Serialize};
 use toml::to_string;
 
 mod duration;
-mod server;
+pub mod server;
 
+/// Settings represents all configuration setting of application.
 #[derive(Debug, Default, Deserialize, Serialize)]
 pub struct Settings {
-    server: server::Server,
+    /// Represents [`Server`] configuration section.
+    pub server: server::Server,
 }
 
 impl Settings {

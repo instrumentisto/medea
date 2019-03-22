@@ -16,6 +16,7 @@ use crate::{
         control::Id as MemberId,
     },
     log::prelude::*,
+    settings::server::Server,
 };
 
 /// Parameters of new WebSocket connection creation HTTP request.
@@ -52,7 +53,11 @@ fn ws_index(
             .and_then(move |res| match res {
                 Ok(_) => ws::start(
                     &r.drop_state(),
-                    WsSession::new(info.member_id, room),
+                    WsSession::new(
+                        info.member_id,
+                        room,
+                        state.config.client_idle_timeout,
+                    ),
                 ),
                 Err(MemberNotExists) => Ok(HttpResponse::NotFound().into()),
                 Err(InvalidCredentials) => Ok(HttpResponse::Forbidden().into()),
@@ -66,13 +71,17 @@ fn ws_index(
 pub struct Context {
     /// Repository of all currently existing [`Room`]s in application.
     pub rooms: RoomsRepository,
+
+    /// Settings of application.
+    pub config: Server,
 }
 
 /// Starts HTTP server for handling WebSocket connections of Client API.
-pub fn run(rooms: RoomsRepository) {
+pub fn run(rooms: RoomsRepository, config: Server) {
     server::new(move || {
         App::with_state(Context {
             rooms: rooms.clone(),
+            config: config.clone(),
         })
         .middleware(middleware::Logger::default())
         .resource("/ws/{room_id}/{member_id}/{credentials}", |r| {
@@ -95,9 +104,12 @@ mod test {
     use futures::Stream;
     use hashbrown::HashMap;
 
-    use crate::api::{
-        client::{session, Room},
-        control::Member,
+    use crate::{
+        api::{
+            client::{session, Room},
+            control::Member,
+        },
+        settings::Settings,
     };
 
     use super::*;
@@ -120,10 +132,13 @@ mod test {
     /// Creates test WebSocket server of Client API which can handle requests.
     fn ws_server() -> test::TestServer {
         test::TestServer::with_factory(move || {
-            App::with_state(Context { rooms: room() })
-                .resource("/ws/{room_id}/{member_id}/{credentials}", |r| {
-                    r.method(http::Method::GET).with(ws_index)
-                })
+            App::with_state(Context {
+                rooms: room(),
+                config: Settings::new().unwrap().server,
+            })
+            .resource("/ws/{room_id}/{member_id}/{credentials}", |r| {
+                r.method(http::Method::GET).with(ws_index)
+            })
         })
     }
 

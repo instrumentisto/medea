@@ -4,9 +4,11 @@ use actix::prelude::*;
 use dotenv::dotenv;
 use hashbrown::HashMap;
 
-use crate::api::{
-    client::{server, Room, RoomsRepository},
-    control::Member,
+use crate::{
+    api::{
+        client::{server, Room, RoomsRepository},
+        control::Member,
+    },
     settings::Settings,
 };
 
@@ -37,11 +39,8 @@ fn main() {
     let rooms = hashmap! {1 => room};
     let rooms_repo = RoomsRepository::new(rooms);
 
-    match Settings::new() {
-        Ok(settings) => info!("{:?}", settings),
-        Err(e) => error!("settings error: {}", e),
-    }
+    let config = Settings::new().unwrap();
 
-    server::run(rooms_repo);
+    server::run(rooms_repo, config.server);
     let _ = sys.run();
 }
