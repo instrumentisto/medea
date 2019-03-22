@@ -44,8 +44,8 @@ fn next_peer_id() -> PeerId {
 pub enum RoomError {
     #[fail(display = "Member without peer {}", _0)]
     MemberWithoutPeer(MemberId),
-    #[fail(display = "Invalid connection of member {}", _0)]
-    InvalidConnection(MemberId),
+    #[fail(display = "Unknown member {}", _0)]
+    UnknownMember(MemberId),
     #[fail(display = "Unknown peer {}", _0)]
     UnknownPeer(PeerId),
     #[fail(display = "Peer dont have opponent {}", _0)]
@@ -109,7 +109,7 @@ impl Room {
         let from_session = self
             .sessions
             .get_mut(&from_member_id)
-            .ok_or(RoomError::UnknownPeer(from_peer_id))?;
+            .ok_or(RoomError::UnknownMember(from_member_id))?;
         let from_peer = from_session
             .remove_peer(&from_peer_id)
             .ok_or(RoomError::UnknownPeer(from_peer_id))?;
@@ -122,7 +122,6 @@ impl Room {
             }
             _ => {
                 let peer_id = from_peer.id();
-                error!("Unmatched state caller peer {}", peer_id);
                 from_session.add_peer(from_peer);
                 Err(RoomError::UnmatchedState(peer_id))
             }
@@ -131,7 +130,7 @@ impl Room {
         let to_session = self
             .sessions
             .get_mut(&transceiver.member_id)
-            .ok_or(RoomError::UnknownPeer(transceiver.peer_id))?;
+            .ok_or(RoomError::UnknownMember(transceiver.member_id))?;
         let to_peer = to_session
             .remove_peer(&transceiver.peer_id)
             .ok_or(RoomError::UnknownPeer(transceiver.peer_id))?;
@@ -149,12 +148,10 @@ impl Room {
             }
             _ => {
                 let peer_id = to_peer.id();
-                error!("Unmatched state responder peer {}", peer_id);
                 to_session.add_peer(to_peer);
                 Err(RoomError::UnmatchedState(peer_id))
             }
         }?;
-
         Ok((to_session.member_id, event))
     }
 
@@ -167,7 +164,7 @@ impl Room {
         let from_session = self
             .sessions
             .get_mut(&from_member_id)
-            .ok_or(RoomError::UnknownPeer(from_peer_id))?;
+            .ok_or(RoomError::UnknownMember(from_member_id))?;
         let from_peer = from_session
             .remove_peer(&from_peer_id)
             .ok_or(RoomError::UnknownPeer(from_peer_id))?;
@@ -180,7 +177,6 @@ impl Room {
             }
             _ => {
                 let peer_id = from_peer.id();
-                error!("Unmatched state caller peer {}", peer_id);
                 from_session.add_peer(from_peer);
                 Err(RoomError::UnmatchedState(peer_id))
             }
@@ -189,7 +185,7 @@ impl Room {
         let to_session = self
             .sessions
             .get_mut(&transceiver.member_id)
-            .ok_or(RoomError::UnknownPeer(transceiver.peer_id))?;
+            .ok_or(RoomError::UnknownMember(transceiver.member_id))?;
         let to_peer = to_session
             .remove_peer(&transceiver.peer_id)
             .ok_or(RoomError::UnknownPeer(transceiver.peer_id))?;
@@ -197,22 +193,19 @@ impl Room {
         let event = match to_peer {
             PeerMachine::WaitRemoteSDP(peer) => {
                 let to_peer = peer.set_remote_sdp(sdp_answer.clone());
-                let event = Event::PeerCreated {
+                let event = Event::SdpAnswerMade {
                     peer_id: to_peer.id(),
-                    sdp_offer: Some(sdp_answer),
-                    tracks: to_peer.tracks(),
+                    sdp_answer,
                 };
                 to_session.add_peer(PeerMachine::Stable(to_peer));
                 Ok(event)
             }
             _ => {
                 let peer_id = to_peer.id();
-                error!("Unmatched state responder peer {}", peer_id);
                 to_session.add_peer(to_peer);
                 Err(RoomError::UnmatchedState(peer_id))
             }
         }?;
-
         Ok((to_session.member_id, event))
     }
 
@@ -225,9 +218,10 @@ impl Room {
         let from_session = self
             .sessions
             .get_mut(&from_member_id)
-            .ok_or(RoomError::UnknownPeer(from_peer_id))?;
+            .ok_or(RoomError::UnknownMember(from_member_id))?;
         let from_peer = from_session
-            .remove_peer(&from_peer_id)
+            .peers
+            .get(&from_peer_id)
             .ok_or(RoomError::UnknownPeer(from_peer_id))?;
         let transceiver = match from_peer {
             PeerMachine::WaitLocalSDP(_)
@@ -239,16 +233,16 @@ impl Room {
         let to_session = self
             .sessions
             .get_mut(&transceiver.member_id)
-            .ok_or(RoomError::UnknownPeer(transceiver.peer_id))?;
+            .ok_or(RoomError::UnknownMember(transceiver.member_id))?;
         let to_peer = to_session
-            .remove_peer(&transceiver.peer_id)
+            .peers
+            .get(&transceiver.peer_id)
             .ok_or(RoomError::UnknownPeer(transceiver.peer_id))?;
 
         let event = Event::IceCandidateDiscovered {
             peer_id: to_peer.id(),
             candidate,
         };
-
         Ok((to_session.member_id, event))
     }
 
@@ -265,7 +259,7 @@ impl Room {
                     .map_err(move |_| RoomError::FailedSendEvent(member_id)),
             ),
             None => {
-                Either::B(future::err(RoomError::FailedSendEvent(member_id)))
+                Either::B(future::err(RoomError::UnknownMember(member_id)))
             }
         };
         Box::new(fut)
@@ -367,7 +361,6 @@ impl Handler<RpcConnectionEstablished> for Room {
             let member_id = msg.member_id;
             let mut session = Session::new(msg.member_id, msg.connection);
 
-            info!("Members in room: {:?}", self.sessions.len());
             let futures = self.sessions.iter_mut().fold(
                 vec![],
                 |mut futures, (_, caller)| {
@@ -441,7 +434,6 @@ impl Handler<Command> for Room {
         command: Command,
         ctx: &mut Self::Context,
     ) -> Self::Result {
-        debug!("receive command: {:?}", command);
         let fut = match command {
             Command::MakeSdpOffer {
                 member_id,

@@ -192,7 +192,7 @@ impl Handler<Heartbeat> for WsConnection {
     /// to the received `Heartbeat::Ping` message.
     fn handle(&mut self, msg: Heartbeat, ctx: &mut Self::Context) {
         if let Heartbeat::Ping(n) = msg {
-            trace!("Received ping: {}", n);
+            debug!("Received ping: {}", n);
             ctx.text(serde_json::to_string(&Heartbeat::Pong(n)).unwrap())
         }
     }
@@ -207,25 +207,25 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsConnection {
         );
         match msg {
             ws::Message::Text(text) => {
-                self.reset_idle_timeout(ctx);
-                if let Ok(msg) = serde_json::from_str::<Heartbeat>(&text) {
-                    ctx.notify(msg);
+                if let Ok(ping) = serde_json::from_str::<Heartbeat>(&text) {
+                    self.reset_idle_timeout(ctx);
+                    debug!("{:?}", ping);
+                    ctx.notify(ping);
                 }
                 if let Ok(command) = serde_json::from_str::<Command>(&text) {
                     let member_id = self.member_id;
                     ctx.wait(wrap_future(
                         self.room
                             .send(command)
-                            .and_then(move |res| match res {
-                                Ok(_) => future::ok(()),
-                                Err(err) => {
-                                    error!(
+                            .map(move |res| {
+                                match res {
+                                    Ok(_) => info!("Command send successful"),
+                                    Err(err) => error!(
                                         "Command from member {} handle \
                                          failed, because: {:?}",
                                         member_id, err,
-                                    );
-                                    future::ok(())
-                                }
+                                    ),
+                                };
                             })
                             .map_err(|_| ()),
                     ));
