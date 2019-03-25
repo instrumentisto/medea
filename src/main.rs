@@ -3,21 +3,22 @@
 use actix::prelude::*;
 use dotenv::dotenv;
 use hashbrown::HashMap;
+use log::prelude::*;
 
 use crate::{
     api::{
         client::{server, Room, RoomsRepository},
         control::Member,
     },
-    settings::Settings,
+    conf::Conf,
 };
 
 #[macro_use]
 mod utils;
 
 mod api;
+mod conf;
 mod log;
-mod settings;
 
 fn main() {
     dotenv().ok();
@@ -39,7 +40,9 @@ fn main() {
     let rooms = hashmap! {1 => room};
     let rooms_repo = RoomsRepository::new(rooms);
 
-    let config = Settings::new().unwrap();
+    let config = Conf::new().unwrap();
+
+    info!("{:?}", config);
 
     server::run(rooms_repo, config.server);
     let _ = sys.run();

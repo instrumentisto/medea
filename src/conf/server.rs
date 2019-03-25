@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use serde_derive::{Deserialize, Serialize};
 
-use crate::settings::duration;
+use crate::conf::duration;
 
 /// Server represents [`Server`] configuration section.
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -15,8 +15,8 @@ pub struct Server {
 
 /// Default returns default configuration parameters of [`Server`] section.
 impl Default for Server {
-    fn default() -> Server {
-        Server {
+    fn default() -> Self {
+        Self {
             client_idle_timeout: Duration::from_secs(10),
         }
     }

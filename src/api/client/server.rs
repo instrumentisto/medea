@@ -15,8 +15,8 @@ use crate::{
         },
         control::Id as MemberId,
     },
+    conf::server::Server,
     log::prelude::*,
-    settings::server::Server,
 };
 
 /// Parameters of new WebSocket connection creation HTTP request.
@@ -105,11 +105,8 @@ mod test {
     use hashbrown::HashMap;
 
     use crate::{
-        api::{
-            client::{session, Room},
-            control::Member,
-        },
-        settings::Settings,
+        api::{client::Room, control::Member},
+        conf::Conf,
     };
 
     use super::*;
@@ -130,11 +127,11 @@ mod test {
     }
 
     /// Creates test WebSocket server of Client API which can handle requests.
-    fn ws_server() -> test::TestServer {
+    fn ws_server(conf: Conf) -> test::TestServer {
         test::TestServer::with_factory(move || {
             App::with_state(Context {
                 rooms: room(),
-                config: Settings::new().unwrap().server,
+                config: conf.server.clone(),
             })
             .resource("/ws/{room_id}/{member_id}/{credentials}", |r| {
                 r.method(http::Method::GET).with(ws_index)
@@ -144,7 +141,7 @@ mod test {
 
     #[test]
     fn responses_with_pong() {
-        let mut server = ws_server();
+        let mut server = ws_server(Conf::new().unwrap());
         let (read, mut write) =
             server.ws_at("/ws/1/1/caller_credentials").unwrap();
 
@@ -155,7 +152,8 @@ mod test {
 
     #[test]
     fn disconnects_on_idle() {
-        let mut server = ws_server();
+        let conf = Conf::new().unwrap();
+        let mut server = ws_server(conf.clone());
         let (read, mut write) =
             server.ws_at("/ws/1/1/caller_credentials").unwrap();
 
@@ -163,7 +161,9 @@ mod test {
         let (item, read) = server.execute(read.into_future()).unwrap();
         assert_eq!(item, Some(ws::Message::Text(r#"{"pong":33}"#.into())));
 
-        thread::sleep(session::CLIENT_IDLE_TIMEOUT.add(Duration::from_secs(1)));
+        thread::sleep(
+            conf.server.client_idle_timeout.add(Duration::from_secs(1)),
+        );
 
         let (item, _) = server.execute(read.into_future()).unwrap();
         assert_eq!(
