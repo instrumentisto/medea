@@ -44,6 +44,6 @@ fn main() {
 
     info!("{:?}", config);
 
-    server::run(rooms_repo, config.server);
+    server::run(rooms_repo, config);
     let _ = sys.run();
 }

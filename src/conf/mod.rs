@@ -9,6 +9,7 @@ use serde_derive::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 mod duration;
+pub mod rpc;
 pub mod server;
 
 static APP_CONF_PATH_CMD_ARG_NAME: &str = "--conf";
@@ -18,6 +19,7 @@ static APP_CONF_PATH_ENV_VAR_NAME: &str = "MEDEA_CONF";
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct Conf {
     /// Represents [`Server`] configuration section.
+    pub rpc: rpc::Rpc,
     pub server: server::Server,
 }
 
@@ -53,7 +55,7 @@ impl Conf {
             cfg.merge(File::with_name(&path))?;
         }
 
-        cfg.merge(Environment::with_prefix("MEDEA").separator("__"))?;
+        cfg.merge(Environment::with_prefix("MEDEA").separator("."))?;
 
         let s: Self = cfg.try_into()?;
         Ok(s)
@@ -86,6 +88,7 @@ mod test {
     use crate::conf::{
         Conf, APP_CONF_PATH_CMD_ARG_NAME, APP_CONF_PATH_ENV_VAR_NAME,
     };
+    use serial_test_derive::serial;
     use std::time::Duration;
 
     #[test]
@@ -127,12 +130,12 @@ mod test {
     }
 
     #[test]
-    fn ensure_file_overrides_defaults() {
-        let defaults = Conf::new().unwrap();
-        let test_config_file_path =
-            "ensure_file_overrides_defaults_test_config.toml";
+    #[serial]
+    fn file_overrides_defaults() {
+        let defaults = Conf::default();
+        let test_config_file_path = "test_config.toml";
 
-        let data = format!("[server]\nclient_idle_timeout = \"55s\"");
+        let data = format!("[rpc]\nidle_timeout = \"45s\"");
         std::fs::write(test_config_file_path, data).unwrap();
         std::env::set_var(APP_CONF_PATH_ENV_VAR_NAME, test_config_file_path);
 
@@ -141,13 +144,43 @@ mod test {
         std::env::remove_var(APP_CONF_PATH_ENV_VAR_NAME);
         std::fs::remove_file(test_config_file_path).unwrap();
 
-        assert_eq!(
-            new_config.server.client_idle_timeout,
-            Duration::from_secs(55)
-        );
-        assert_ne!(
-            new_config.server.client_idle_timeout,
-            defaults.server.client_idle_timeout
-        );
+        assert_eq!(new_config.rpc.idle_timeout, Duration::from_secs(45));
+        assert_ne!(new_config.rpc.idle_timeout, defaults.rpc.idle_timeout);
+    }
+
+    #[test]
+    #[serial]
+    fn env_overrides_defaults() {
+        let defaults = Conf::default();
+
+        std::env::set_var("MEDEA_RPC.IDLE_TIMEOUT", "46s");
+        let new_config = Conf::new().unwrap();
+        std::env::remove_var("MEDEA_RPC.IDLE_TIMEOUT");
+
+        assert_eq!(new_config.rpc.idle_timeout, Duration::from_secs(46));
+        assert_ne!(new_config.rpc.idle_timeout, defaults.rpc.idle_timeout);
+    }
+
+    #[test]
+    #[serial]
+    fn env_overrides_file() {
+        let test_config_file_path = "test_config.toml";
+
+        let data = format!("[rpc]\nidle_timeout = \"47s\"");
+        std::fs::write(test_config_file_path, data).unwrap();
+        std::env::set_var(APP_CONF_PATH_ENV_VAR_NAME, test_config_file_path);
+
+        let file_config = Conf::new().unwrap();
+
+        std::env::set_var("MEDEA_RPC.IDLE_TIMEOUT", "48s");
+        let file_env_config = Conf::new().unwrap();
+
+        std::env::remove_var(APP_CONF_PATH_ENV_VAR_NAME);
+        std::fs::remove_file(test_config_file_path).unwrap();
+        std::env::remove_var("MEDEA_RPC.IDLE_TIMEOUT");
+
+        assert_eq!(file_config.rpc.idle_timeout, Duration::from_secs(47));
+
+        assert_eq!(file_env_config.rpc.idle_timeout, Duration::from_secs(48));
     }
 }

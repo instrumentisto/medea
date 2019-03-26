@@ -15,7 +15,7 @@ use crate::{
         },
         control::Id as MemberId,
     },
-    conf::server::Server,
+    conf::{rpc::Rpc, Conf},
     log::prelude::*,
 };
 
@@ -56,7 +56,7 @@ fn ws_index(
                     WsSession::new(
                         info.member_id,
                         room,
-                        state.config.client_idle_timeout,
+                        state.config.idle_timeout,
                     ),
                 ),
                 Err(MemberNotExists) => Ok(HttpResponse::NotFound().into()),
@@ -73,22 +73,24 @@ pub struct Context {
     pub rooms: RoomsRepository,
 
     /// Settings of application.
-    pub config: Server,
+    pub config: Rpc,
 }
 
 /// Starts HTTP server for handling WebSocket connections of Client API.
-pub fn run(rooms: RoomsRepository, config: Server) {
+pub fn run(rooms: RoomsRepository, config: Conf) {
+    let server_addr = config.server.get_bind_addr();
+
     server::new(move || {
         App::with_state(Context {
             rooms: rooms.clone(),
-            config: config.clone(),
+            config: config.rpc.clone(),
         })
         .middleware(middleware::Logger::default())
         .resource("/ws/{room_id}/{member_id}/{credentials}", |r| {
             r.method(http::Method::GET).with(ws_index)
         })
     })
-    .bind("0.0.0.0:8080")
+    .bind(server_addr)
     .unwrap()
     .start();
 
@@ -110,6 +112,7 @@ mod test {
     };
 
     use super::*;
+    use crate::conf::server::Server;
 
     /// Creates [`RoomsRepository`] for tests filled with a single [`Room`].
     fn room() -> RoomsRepository {
@@ -131,7 +134,7 @@ mod test {
         test::TestServer::with_factory(move || {
             App::with_state(Context {
                 rooms: room(),
-                config: conf.server.clone(),
+                config: conf.rpc.clone(),
             })
             .resource("/ws/{room_id}/{member_id}/{credentials}", |r| {
                 r.method(http::Method::GET).with(ws_index)
@@ -141,7 +144,7 @@ mod test {
 
     #[test]
     fn responses_with_pong() {
-        let mut server = ws_server(Conf::new().unwrap());
+        let mut server = ws_server(Conf::default());
         let (read, mut write) =
             server.ws_at("/ws/1/1/caller_credentials").unwrap();
 
@@ -152,7 +155,13 @@ mod test {
 
     #[test]
     fn disconnects_on_idle() {
-        let conf = Conf::new().unwrap();
+        let conf = Conf {
+            rpc: Rpc {
+                idle_timeout: Duration::new(1, 0),
+            },
+            server: Server::default(),
+        };
+
         let mut server = ws_server(conf.clone());
         let (read, mut write) =
             server.ws_at("/ws/1/1/caller_credentials").unwrap();
@@ -161,9 +170,7 @@ mod test {
         let (item, read) = server.execute(read.into_future()).unwrap();
         assert_eq!(item, Some(ws::Message::Text(r#"{"pong":33}"#.into())));
 
-        thread::sleep(
-            conf.server.client_idle_timeout.add(Duration::from_secs(1)),
-        );
+        thread::sleep(conf.rpc.idle_timeout.add(Duration::from_secs(1)));
 
         let (item, _) = server.execute(read.into_future()).unwrap();
         assert_eq!(
