@@ -33,6 +33,12 @@ impl Source for Conf {
 }
 
 impl Conf {
+    /// Creates new [`Conf`] and applies values from such sources
+    /// and in that order:
+    /// - default values;
+    /// - configuration file, the name of which is given as a command line
+    /// parameter or environment variable;
+    /// - environment variables;
     pub fn new() -> Result<Self, Error> {
         use std::env;
 
@@ -54,6 +60,7 @@ impl Conf {
     }
 }
 
+/// Returns the name of the configuration file, if defined.
 fn get_conf_file_name<T>(
     env_var: Result<String, std::env::VarError>,
     cmd_args: T,
