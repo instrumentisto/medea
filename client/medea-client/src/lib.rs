@@ -13,11 +13,20 @@ cfg_if::cfg_if! {
 }
 
 #[wasm_bindgen]
-extern {
-    fn alert(s: &str);
+pub struct Medea {
+    token: String,
 }
 
 #[wasm_bindgen]
-pub fn greet() {
-    alert("Hello, medea-client!");
+impl Medea {
+    #[wasm_bindgen(constructor)]
+    pub fn new(token: String) -> Self {
+        Self { token }
+    }
+
+    pub fn get_token(&self) -> String {
+        self.token.clone()
+    }
+
+    pub fn drop(self) {}
 }
