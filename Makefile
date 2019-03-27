@@ -1,3 +1,16 @@
+###############################
+# Common defaults/definitions #
+###############################
+
+comma := ,
+
+# Checks two given strings for equality.
+eq = $(if $(or $(1),$(2)),$(and $(findstring $(1),$(2)),\
+                                $(findstring $(2),$(1))),1)
+
+
+
+
 ######################
 # Project parameters #
 ######################
@@ -11,6 +24,13 @@ RUST_VER ?= "1.33"
 ###########
 # Aliases #
 ###########
+
+# Resolve all project dependencies.
+#
+# Usage:
+#	make deps
+
+#deps: cargo yarn
 
 lint: cargo.lint
 
@@ -27,6 +47,39 @@ test: test.unit
 
 
 
+##################
+# Cargo commands #
+##################
+
+# Resolve Cargo project dependencies.
+#
+# Usage:
+#	make cargo [cmd=(fetch|<cargo-cmd>)]
+#	           [background=(no|yes)]
+#	           [dockerized=(no|yes)]
+#
+#cargo-cmd = $(if $(call eq,$(cmd),),fetch,$(cmd))
+#
+#cargo:
+#ifeq ($(dockerized),yes)
+#ifeq ($(background),yes)
+#	-@docker stop cargo-cmd
+#	-@docker rm cargo-cmd
+#endif
+#	docker run --rm --user $(shell id -u) --network=host -v "$(PWD)":/app -w /app \
+#	           --name=cargo-cmd $(if $(call eq,$(background),yes),-d,) \
+#	           -v "$(abspath $(CARGO_HOME))/registry":/usr/local/cargo/registry\
+#		rust:$(RUST_VER) \
+#			make cargo cmd='$(cargo-cmd)' dockerized=no background=no
+#else
+#	cargo $(cargo-cmd) $(if $(call eq,$(background),yes),&,)
+#ifeq ($(cargo-cmd),fetch)
+#	cargo run --bin export_graphql_schema
+#endif
+#endif
+
+
+
 
 # Lint Rust sources with clippy.
 #
@@ -35,7 +88,7 @@ test: test.unit
 
 cargo.lint:
 ifeq ($(dockerized),yes)
-	docker run --rm --network=host -v "$(PWD)":/app -w /app \
+	docker run --rm --user $(shell id -u) --network=host -v "$(PWD)":/app -w /app \
 	           -v "$(abspath $(CARGO_HOME))/registry":/usr/local/cargo/registry\
 		rust:$(RUST_VER) \
 			make cargo.lint dockerized=no pre-install=yes
@@ -52,16 +105,33 @@ endif
 # Run Rust unit tests of project.
 #
 # Usage:
-#	make test.unit [dockerized=(no|yes)]
+#	make test.unit [dockerized=(no|yes)] [app=(server|client)]
 
 test.unit:
 ifeq ($(dockerized),yes)
-	docker run --rm --network=host -v "$(PWD)":/app -w /app \
-	           -v "$(abspath $(CARGO_HOME))/registry":/usr/local/cargo/registry\
-		rust:$(RUST_VER) \
-			make test.unit dockerized=no
+ifeq ($(app),server)
+		docker run --rm --user $(shell id -u) --network=host -v "$(PWD)":/app -w /app \
+    	           -v "$(abspath $(CARGO_HOME))/registry":/usr/local/cargo/registry\
+    		rust:$(RUST_VER) \
+    			make test.unit dockerized=no app=server
+endif
+ifeq ($(app),client)
+		docker run --rm --user $(shell id -u) --network=host -v "$(PWD)":/app -w /app \
+    	           -v "$(abspath $(CARGO_HOME))/registry":/usr/local/cargo/registry\
+    		alexlapa/wasm-pack:stable-$(RUST_VER)-ff-66.0 \
+    			make test.unit dockerized=no app=client
+endif
 else
+ifeq ($(app),)
+	make test.unit dockerized=$(dockerized) app=server
+	make test.unit dockerized=$(dockerized) app=client
+endif
+ifeq ($(app),server)
 	cargo test --all
+endif
+ifeq ($(app),client)
+	wasm-pack test --headless --firefox client/medea-client
+endif
 endif
 
 
@@ -76,7 +146,7 @@ endif
 cargo.fmt:
 ifeq ($(dockerized),yes)
 	docker pull rustlang/rust:nightly
-	docker run --rm --network=host -v "$(PWD)":/app -w /app \
+	docker run --rm --user $(shell id -u) --network=host -v "$(PWD)":/app -w /app \
 	           -v "$(abspath $(CARGO_HOME))/registry":/usr/local/cargo/registry\
 		rustlang/rust:nightly \
 			make cargo.fmt check='$(check)' dockerized=no pre-install=yes
@@ -96,4 +166,4 @@ endif
 ##################
 
 .PHONY: cargo cargo.fmt cargo.lint \
-        test test.e2e test.unit
+        test test.unit
