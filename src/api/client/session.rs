@@ -19,10 +19,6 @@ use crate::{
     log::prelude::*,
 };
 
-// TODO: via conf
-/// Timeout of receiving any WebSocket messages from client.
-pub const CLIENT_IDLE_TIMEOUT: Duration = Duration::from_secs(10);
-
 /// Long-running WebSocket connection of Client API.
 #[derive(Debug)]
 #[allow(clippy::module_name_repetitions)]
@@ -33,11 +29,14 @@ pub struct WsSession {
     room: Addr<Room>,
 
     /// Handle for watchdog which checks whether WebSocket client became
-    /// idle (no `ping` messages received during [`CLIENT_IDLE_TIMEOUT`]).
+    /// idle (no `ping` messages received during [`idle_timeout`]).
     ///
-    /// This one should be renewed on any received WebSocket message
+    /// This one should be renewed on received ping WebSocket message
     /// from client.
     idle_handler: Option<SpawnHandle>,
+
+    /// Timeout of receiving ping messages from client.
+    idle_timeout: Duration,
 
     /// Indicates whether WebSocket connection is closed by server ot by
     /// client.
@@ -46,11 +45,16 @@ pub struct WsSession {
 
 impl WsSession {
     /// Creates new [`WsSession`] for specified [`Member`].
-    pub fn new(member_id: MemberId, room: Addr<Room>) -> Self {
+    pub fn new(
+        member_id: MemberId,
+        room: Addr<Room>,
+        idle_timeout: Duration,
+    ) -> Self {
         Self {
             member_id,
             room,
             idle_handler: None,
+            idle_timeout,
             closed_by_server: false,
         }
     }
@@ -62,7 +66,7 @@ impl WsSession {
         }
 
         self.idle_handler =
-            Some(ctx.run_later(CLIENT_IDLE_TIMEOUT, |sess, ctx| {
+            Some(ctx.run_later(self.idle_timeout, |sess, ctx| {
                 info!("WsConnection with member {} is idle", sess.member_id);
 
                 let member_id = sess.member_id;
@@ -110,8 +114,8 @@ impl Actor for WsSession {
                 .map(|_| ())
                 .map_err(move |err| {
                     error!(
-                        "WsSession of member {} failed to join Room, \
-                         because: {:?}",
+                        "WsSession of member {} failed to join Room, because: \
+                         {:?}",
                         member_id, err,
                     )
                 }),
@@ -188,8 +192,8 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
         );
         match msg {
             ws::Message::Text(text) => {
-                self.reset_idle_timeout(ctx);
                 if let Ok(msg) = serde_json::from_str::<Heartbeat>(&text) {
+                    self.reset_idle_timeout(ctx);
                     ctx.notify(msg);
                 }
             }
@@ -215,7 +219,6 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
                             }),
                     ));
                     ctx.close(reason);
-                    ctx.stop();
                 }
             }
             _ => error!(
