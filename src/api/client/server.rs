@@ -93,7 +93,6 @@ mod test {
     use actix::Arbiter;
     use actix_web::{http, test, App};
     use futures::Stream;
-    use hashbrown::HashMap;
 
     use crate::api::{
         client::{connection, Room},

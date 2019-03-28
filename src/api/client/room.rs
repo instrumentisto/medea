@@ -349,15 +349,15 @@ impl Handler<RpcConnectionEstablished> for Room {
             );
             fut = Either::B(session.set_connection(msg.connection));
         } else {
-            let caller = msg.member_id;
+            let callee = msg.member_id;
             let active_members = self
                 .sessions
                 .keys()
                 .map(|&member_id| member_id)
                 .collect::<Vec<_>>();
             self.sessions
-                .insert(caller, Session::new(caller, msg.connection));
-            active_members.iter().for_each(|&callee| {
+                .insert(callee, Session::new(callee, msg.connection));
+            active_members.iter().for_each(|&caller| {
                 ctx.notify(self.start_pipeline(caller, callee));
             });
         }
@@ -479,11 +479,8 @@ impl RoomsRepository {
 
 #[cfg(test)]
 mod test {
-    use std::time::{Duration, Instant};
-
     use actix::{Arbiter, AsyncContext, System};
-    use futures::future::{result, Future};
-    use tokio::timer::Delay;
+    use futures::future::Future;
 
     use super::*;
 
@@ -537,17 +534,22 @@ mod test {
                     peer_id: _,
                     candidate: _,
                 } => {}
+                Event::PeerFinished { peer_id: _ } => {}
             }
         }
     }
 
     impl RpcConnection for Addr<TestConnection> {
-        fn close(&mut self) -> Box<dyn Future<Item = (), Error = ()>> {
+        fn close(&self) -> Box<dyn Future<Item = (), Error = ()>> {
             Box::new(future::ok(()))
         }
 
-        fn send_event(&self, event: Event) {
-            self.do_send(event);
+        fn send_event(
+            &self,
+            event: Event,
+        ) -> Box<dyn Future<Item = (), Error = ()>> {
+            let fut = self.send(event).map_err(|_| ());
+            Box::new(fut)
         }
     }
 
@@ -588,12 +590,12 @@ mod test {
         assert_eq!(
             caller_events.to_vec(),
             vec![
-                "{\"PeerCreated\":{\"peer_id\":0,\"sdp_offer\":null,\
+                "{\"PeerCreated\":{\"peer_id\":1,\"sdp_offer\":null,\
                  \"tracks\":[{\"id\":1,\"media_type\":{\"Audio\":{}},\
-                 \"direction\":{\"Send\":{\"receivers\":[1]}}},{\"id\":2,\
+                 \"direction\":{\"Send\":{\"receivers\":[2]}}},{\"id\":2,\
                  \"media_type\":{\"Video\":{}},\"direction\":{\"Send\":\
-                 {\"receivers\":[1]}}}]}}",
-                "{\"SdpAnswerMade\":{\"peer_id\":0,\"sdp_answer\":\
+                 {\"receivers\":[2]}}}]}}",
+                "{\"SdpAnswerMade\":{\"peer_id\":1,\"sdp_answer\":\
                  \"responder_answer\"}}",
             ]
         );
