@@ -108,6 +108,10 @@ endif
 #	make test.unit [dockerized=(no|yes)] [app=(server|client)]
 
 test.unit:
+ifeq ($(app),)
+	make test.unit dockerized=$(dockerized) app=server
+	make test.unit dockerized=$(dockerized) app=client
+endif
 ifeq ($(dockerized),yes)
 ifeq ($(app),server)
 		docker run --rm --user $(shell id -u) --network=host -v "$(PWD)":/app -w /app \
@@ -122,10 +126,6 @@ ifeq ($(app),client)
     			make test.unit dockerized=no app=client
 endif
 else
-ifeq ($(app),)
-	make test.unit dockerized=$(dockerized) app=server
-	make test.unit dockerized=$(dockerized) app=client
-endif
 ifeq ($(app),server)
 	cargo test --all
 endif
