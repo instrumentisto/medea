@@ -6,7 +6,7 @@ comma := ,
 
 # Checks two given strings for equality.
 eq = $(if $(or $(1),$(2)),$(and $(findstring $(1),$(2)),\
-                                $(findstring $(2),$(1))),1)
+								$(findstring $(2),$(1))),1)
 
 
 
@@ -33,10 +33,14 @@ NODE_VER ?= "11.10"
 
 deps: cargo yarn
 
+
+fmt: cargo.fmt
+
+
 lint: cargo.lint
 
 
-fmt: cargo.fmt
+up: up.dev
 
 
 # Run all project tests.
@@ -52,8 +56,8 @@ test: test.unit
 #
 # Usage:
 #	make cargo [cmd=(fetch|<cargo-cmd>)]
-#	           [background=(no|yes)]
-#	           [dockerized=(no|yes)]
+#			   [background=(no|yes)]
+#			   [dockerized=(no|yes)]
 
 cargo-cmd = $(if $(call eq,$(cmd),),fetch,$(cmd))
 
@@ -64,8 +68,8 @@ ifeq ($(background),yes)
 	-@docker rm cargo-cmd
 endif
 	docker run --rm --user $(shell id -u) --network=host -v "$(PWD)":/app -w /app \
-	           --name=cargo-cmd $(if $(call eq,$(background),yes),-d,) \
-	           -v "$(abspath $(CARGO_HOME))/registry":/usr/local/cargo/registry\
+				--name=cargo-cmd $(if $(call eq,$(background),yes),-d,) \
+				-v "$(abspath $(CARGO_HOME))/registry":/usr/local/cargo/registry\
 		rust:$(RUST_VER) \
 			make cargo cmd='$(cargo-cmd)' dockerized=no background=no
 else
@@ -88,7 +92,7 @@ endif
 #
 # Usage:
 #	make yarn [cmd=('fetch'|<yarn-cmd>)]
-#	          [dockerized=(yes|no)]
+#			  [dockerized=(yes|no)]
 
 yarn-cmd = $(if $(call eq,$(cmd),),fetch,$(cmd))
 
@@ -116,7 +120,7 @@ endif
 cargo.lint:
 ifeq ($(dockerized),yes)
 	docker run --rm --user $(shell id -u) --network=host -v "$(PWD)":/app -w /app \
-	           -v "$(abspath $(CARGO_HOME))/registry":/usr/local/cargo/registry\
+				-v "$(abspath $(CARGO_HOME))/registry":/usr/local/cargo/registry\
 		rust:$(RUST_VER) \
 			make cargo.lint dockerized=no pre-install=yes
 else
@@ -142,15 +146,15 @@ endif
 ifeq ($(dockerized),yes)
 ifeq ($(app),server)
 		docker run --rm --user $(shell id -u) --network=host -v "$(PWD)":/app -w /app \
-    	           -v "$(abspath $(CARGO_HOME))/registry":/usr/local/cargo/registry\
-    		rust:$(RUST_VER) \
-    			make test.unit dockerized=no app=server
+					-v "$(abspath $(CARGO_HOME))/registry":/usr/local/cargo/registry\
+			rust:$(RUST_VER) \
+				make test.unit dockerized=no app=server
 endif
 ifeq ($(app),client)
 		docker run --rm --user $(shell id -u) --network=host -v "$(PWD)":/app -w /app \
-    	           -v "$(abspath $(CARGO_HOME))/registry":/usr/local/cargo/registry\
-    		alexlapa/wasm-pack:stable-$(RUST_VER)-ff-66.0 \
-    			make test.unit dockerized=no app=client
+					-v "$(abspath $(CARGO_HOME))/registry":/usr/local/cargo/registry\
+			alexlapa/wasm-pack:stable-$(RUST_VER)-ff-66.0 \
+				make test.unit dockerized=no app=client
 endif
 else
 ifeq ($(app),server)
@@ -168,13 +172,13 @@ endif
 #
 # Usage:
 #	make cargo.fmt [check=(no|yes)]
-#	               [dockerized=(no|yes)]
+#				   [dockerized=(no|yes)]
 
 cargo.fmt:
 ifeq ($(dockerized),yes)
 	docker pull rustlang/rust:nightly
 	docker run --rm --user $(shell id -u) --network=host -v "$(PWD)":/app -w /app \
-	           -v "$(abspath $(CARGO_HOME))/registry":/usr/local/cargo/registry\
+				-v "$(abspath $(CARGO_HOME))/registry":/usr/local/cargo/registry\
 		rustlang/rust:nightly \
 			make cargo.fmt check='$(check)' dockerized=no pre-install=yes
 else
@@ -187,10 +191,27 @@ endif
 
 
 
+# Run projects Medea and e2e app locally with dev settings.
+#
+# Usage:
+#	make up.dev
+
+up.dev:
+	$(MAKE) -j2 up.dev.server up.dev.e2e
+
+up.dev.server:
+	cargo run
+
+up.dev.e2e:
+	npm run start --prefix client/e2e
+
+
+
 
 ##################
 # .PHONY section #
 ##################
 
 .PHONY: cargo cargo.fmt cargo.lint \
-        test test.unit
+		deps fmt lint test test.unit \
+		up up.dev up.dev.server up.dev.e2e yarn
