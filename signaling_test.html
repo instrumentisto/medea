@@ -6,14 +6,12 @@
 
     <script type="text/javascript">
 
-        var member_id;
         var socket;
         var pcs = {};
 
         function connectSocket(caller) {
-            let role = caller ? "/caller_credentials" : "/responder_credentials";
-            member_id = caller ? 1 : 2;
-            socket = new WebSocket("ws://localhost:8080/ws/1/" + member_id + role);
+            let role = caller ? "1/caller_credentials" : "2/responder_credentials";
+            socket = new WebSocket("ws://localhost:8080/ws/1/" + role);
             socket.onmessage = handleSocketMessage;
 
             window.setInterval(function () {
@@ -105,7 +103,6 @@
 
                 socket.send(JSON.stringify({
                     MakeSdpAnswer: {
-                        member_id: member_id,
                         peer_id: msg.peer_id,
                         sdp_answer: JSON.stringify(answer)
                     }
@@ -115,7 +112,6 @@
                 pc.setLocalDescription(offer);
                 socket.send(JSON.stringify({
                     MakeSdpOffer: {
-                        member_id: member_id,
                         peer_id: msg.peer_id,
                         sdp_offer: JSON.stringify(offer)
                     }
@@ -128,7 +124,6 @@
                 if (e.candidate) {
                     socket.send(JSON.stringify({
                         SetIceCandidate: {
-                            member_id: member_id,
                             peer_id: msg.peer_id,
                             candidate: JSON.stringify(e.candidate)
                         }

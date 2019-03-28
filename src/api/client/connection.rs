@@ -7,7 +7,7 @@ use actix::{
     Message, SpawnHandle, StreamHandler,
 };
 use actix_web::ws::{self, CloseReason};
-use futures::future::{self, Future};
+use futures::future::Future;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -124,7 +124,8 @@ impl Actor for WsConnection {
 }
 
 impl RpcConnection for Addr<WsConnection> {
-    /// Closes [`WsSession`] by sending itself "normal closure" close message.
+    /// Closes [`WsConnection`] by sending itself "normal closure" close
+    /// message.
     fn close(&self) -> Box<dyn Future<Item = (), Error = ()>> {
         let fut = self
             .send(Close {
@@ -134,6 +135,7 @@ impl RpcConnection for Addr<WsConnection> {
         Box::new(fut)
     }
 
+    /// Sends [`Event`] to Web Client.
     fn send_event(
         &self,
         event: Event,
@@ -166,6 +168,7 @@ impl Handler<Close> for WsConnection {
 impl Handler<Event> for WsConnection {
     type Result = ();
 
+    /// Sends [`Event`] to Web Client.
     fn handle(&mut self, event: Event, ctx: &mut Self::Context) {
         debug!("Event {:?} for member {}", event, self.member_id);
         ctx.text(serde_json::to_string(&event).unwrap())
@@ -192,7 +195,6 @@ impl Handler<Heartbeat> for WsConnection {
     /// to the received `Heartbeat::Ping` message.
     fn handle(&mut self, msg: Heartbeat, ctx: &mut Self::Context) {
         if let Heartbeat::Ping(n) = msg {
-            debug!("Received ping: {}", n);
             ctx.text(serde_json::to_string(&Heartbeat::Pong(n)).unwrap())
         }
     }
@@ -209,7 +211,6 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsConnection {
             ws::Message::Text(text) => {
                 if let Ok(ping) = serde_json::from_str::<Heartbeat>(&text) {
                     self.reset_idle_timeout(ctx);
-                    debug!("{:?}", ping);
                     ctx.notify(ping);
                 }
                 if let Ok(command) = serde_json::from_str::<Command>(&text) {

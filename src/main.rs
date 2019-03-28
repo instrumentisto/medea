@@ -1,8 +1,5 @@
 //! Medea media server application.
 
-#[macro_use]
-extern crate lazy_static;
-
 use actix::prelude::*;
 use dotenv::dotenv;
 

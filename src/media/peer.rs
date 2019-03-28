@@ -4,7 +4,6 @@ use hashbrown::HashMap;
 
 use crate::{
     api::control::member::Id as MemberId,
-    log::prelude::*,
     media::track::{DirectionalTrack, Id as TrackId, Track, TrackDirection},
 };
 
@@ -60,27 +59,15 @@ impl PeerMachine {
         }
     }
 
-    pub fn transceiver(&self) -> Transceiver {
+    pub fn to_peer(&self) -> Id {
         match self {
-            PeerMachine::New(peer) => peer.transceiver(),
-            PeerMachine::WaitLocalSDP(peer) => peer.transceiver(),
-            PeerMachine::WaitLocalHaveRemote(peer) => peer.transceiver(),
-            PeerMachine::WaitRemoteSDP(peer) => peer.transceiver(),
-            PeerMachine::Stable(peer) => peer.transceiver(),
-            PeerMachine::Finished(peer) => peer.transceiver(),
-            PeerMachine::Failure(peer) => peer.transceiver(),
-        }
-    }
-
-    pub fn tracks(&self) -> Vec<DirectionalTrack> {
-        match self {
-            PeerMachine::New(peer) => peer.tracks(),
-            PeerMachine::WaitLocalSDP(peer) => peer.tracks(),
-            PeerMachine::WaitLocalHaveRemote(peer) => peer.tracks(),
-            PeerMachine::WaitRemoteSDP(peer) => peer.tracks(),
-            PeerMachine::Stable(peer) => peer.tracks(),
-            PeerMachine::Finished(peer) => peer.tracks(),
-            PeerMachine::Failure(peer) => peer.tracks(),
+            PeerMachine::New(peer) => peer.to_peer(),
+            PeerMachine::WaitLocalSDP(peer) => peer.to_peer(),
+            PeerMachine::WaitLocalHaveRemote(peer) => peer.to_peer(),
+            PeerMachine::WaitRemoteSDP(peer) => peer.to_peer(),
+            PeerMachine::Stable(peer) => peer.to_peer(),
+            PeerMachine::Finished(peer) => peer.to_peer(),
+            PeerMachine::Failure(peer) => peer.to_peer(),
         }
     }
 }
@@ -97,7 +84,7 @@ pub type Id = u64;
 #[derive(Debug)]
 pub struct PeerContext {
     id: Id,
-    transceiver: Transceiver,
+    to_peer: Id,
     member_id: MemberId,
     sdp_offer: Option<String>,
     sdp_answer: Option<String>,
@@ -121,8 +108,8 @@ impl<T: Any> Peer<T> {
         self.context.id
     }
 
-    pub fn transceiver(&self) -> Transceiver {
-        self.context.transceiver.clone()
+    pub fn to_peer(&self) -> Id {
+        self.context.to_peer
     }
 
     pub fn tracks(&self) -> Vec<DirectionalTrack> {
@@ -133,7 +120,7 @@ impl<T: Any> Peer<T> {
                     id: track.id,
                     media_type: track.media_type.clone(),
                     direction: TrackDirection::Send {
-                        receivers: vec![self.context.transceiver.peer_id],
+                        receivers: vec![self.context.to_peer],
                     },
                 });
                 tracks
@@ -147,7 +134,7 @@ impl<T: Any> Peer<T> {
                     id: track.id,
                     media_type: track.media_type.clone(),
                     direction: TrackDirection::Recv {
-                        sender: self.context.transceiver.peer_id,
+                        sender: self.context.to_peer,
                     },
                 });
                 tracks
@@ -157,11 +144,11 @@ impl<T: Any> Peer<T> {
 
 impl Peer<New> {
     /// Creates new [`Peer`] for [`Member`].
-    pub fn new(id: Id, member_id: MemberId, transceiver: Transceiver) -> Self {
+    pub fn new(id: Id, member_id: MemberId, to_peer: Id) -> Self {
         let context = PeerContext {
             id,
-            transceiver,
             member_id,
+            to_peer,
             sdp_offer: None,
             sdp_answer: None,
             receivers: HashMap::new(),
@@ -207,7 +194,7 @@ impl Peer<New> {
 
 #[test]
 fn create_peer() {
-    let peer = Peer::new(1, 1, Transceiver(2, 2));
+    let peer = Peer::new(1, 1, 2);
     let peer = peer.start();
 
     assert_eq!(peer.state, WaitLocalSDP {});
