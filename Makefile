@@ -17,6 +17,7 @@ eq = $(if $(or $(1),$(2)),$(and $(findstring $(1),$(2)),\
 
 CARGO_HOME ?= $(strip $(shell dirname $$(dirname $$(which cargo))))
 RUST_VER ?= "1.33"
+NODE_VER ?= "11.10"
 
 
 
@@ -30,7 +31,7 @@ RUST_VER ?= "1.33"
 # Usage:
 #	make deps
 
-#deps: cargo yarn
+deps: cargo yarn
 
 lint: cargo.lint
 
@@ -47,36 +48,62 @@ test: test.unit
 
 
 
-##################
-# Cargo commands #
-##################
-
 # Resolve Cargo project dependencies.
 #
 # Usage:
 #	make cargo [cmd=(fetch|<cargo-cmd>)]
 #	           [background=(no|yes)]
 #	           [dockerized=(no|yes)]
+
+cargo-cmd = $(if $(call eq,$(cmd),),fetch,$(cmd))
+
+cargo:
+ifeq ($(dockerized),yes)
+ifeq ($(background),yes)
+	-@docker stop cargo-cmd
+	-@docker rm cargo-cmd
+endif
+	docker run --rm --user $(shell id -u) --network=host -v "$(PWD)":/app -w /app \
+	           --name=cargo-cmd $(if $(call eq,$(background),yes),-d,) \
+	           -v "$(abspath $(CARGO_HOME))/registry":/usr/local/cargo/registry\
+		rust:$(RUST_VER) \
+			make cargo cmd='$(cargo-cmd)' dockerized=no background=no
+else
+	cargo $(cargo-cmd) $(if $(call eq,$(background),yes),&,)
+ifeq ($(cargo-cmd),fetch)
+	cargo fetch --manifest-path client/medea-client/Cargo.toml
+endif
+endif
+
+
+
+#################
+# Yarn commands #
+#################
+
+# Resolve NPM project dependencies with Yarn.
 #
-#cargo-cmd = $(if $(call eq,$(cmd),),fetch,$(cmd))
+# Optional 'cmd' parameter may be used for handy usage of docker-wrapped Yarn,
+# for example: make yarn cmd='upgrade'
 #
-#cargo:
-#ifeq ($(dockerized),yes)
-#ifeq ($(background),yes)
-#	-@docker stop cargo-cmd
-#	-@docker rm cargo-cmd
-#endif
-#	docker run --rm --user $(shell id -u) --network=host -v "$(PWD)":/app -w /app \
-#	           --name=cargo-cmd $(if $(call eq,$(background),yes),-d,) \
-#	           -v "$(abspath $(CARGO_HOME))/registry":/usr/local/cargo/registry\
-#		rust:$(RUST_VER) \
-#			make cargo cmd='$(cargo-cmd)' dockerized=no background=no
-#else
-#	cargo $(cargo-cmd) $(if $(call eq,$(background),yes),&,)
-#ifeq ($(cargo-cmd),fetch)
-#	cargo run --bin export_graphql_schema
-#endif
-#endif
+# Usage:
+#	make yarn [cmd=('fetch'|<yarn-cmd>)]
+#	          [dockerized=(yes|no)]
+
+yarn-cmd = $(if $(call eq,$(cmd),),fetch,$(cmd))
+
+yarn:
+ifneq ($(dockerized),no)
+	docker run --rm --user $(shell id -u) --network=host -v "$(PWD)":/app -w /app \
+		node:$(NODE_VER) \
+			make yarn cmd='$(yarn-cmd)' dockerized=no
+else
+ifeq ($(yarn-cmd),fetch)
+	yarn install --pure-lockfile --cwd client/e2e
+else
+	yarn $(yarn-cmd)
+endif
+endif
 
 
 
