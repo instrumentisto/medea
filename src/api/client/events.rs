@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use crate::media::{peer::Id as PeerId, track::DirectionalTrack};
 
 /// WebSocket message from Media Server to Web Client.
-#[derive(Debug, Deserialize, Message, Serialize)]
+#[derive(Clone, Debug, Deserialize, Message, Serialize)]
 pub enum Event {
     /// Media Server notifies Web Client about necessity of RTCPeerConnection
     /// creation.
@@ -23,5 +23,11 @@ pub enum Event {
     IceCandidateDiscovered {
         peer_id: PeerId,
         candidate: String,
+    },
+
+    /// Media Server notifies Web Client about necessity of RTCPeerConnection
+    /// close.
+    PeerFinished {
+        peer_id: PeerId,
     },
 }

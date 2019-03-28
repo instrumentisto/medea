@@ -8,18 +8,9 @@ use crate::{api::client::RoomError, media::peer::Id as PeerId};
 #[rtype(result = "Result<(), RoomError>")]
 pub enum Command {
     /// Web Client sends SDP Offer.
-    MakeSdpOffer {
-        peer_id: PeerId,
-        sdp_offer: String,
-    },
+    MakeSdpOffer { peer_id: PeerId, sdp_offer: String },
     /// Web Client sends SDP Answer.
-    MakeSdpAnswer {
-        peer_id: PeerId,
-        sdp_answer: String,
-    },
-
-    SetIceCandidate {
-        peer_id: PeerId,
-        candidate: String,
-    },
+    MakeSdpAnswer { peer_id: PeerId, sdp_answer: String },
+    /// Web Client sends Ice Candidate.
+    SetIceCandidate { peer_id: PeerId, candidate: String },
 }

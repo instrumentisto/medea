@@ -3,32 +3,27 @@ use std::{any::Any, sync::Arc};
 use hashbrown::HashMap;
 
 use crate::{
-    api::client::Event,
-    api::control::member::Id as MemberID,
-    log::prelude::*,
-    media::{
-        errors::MediaError,
-        track::{DirectionalTrack, Id as TrackID, Track, TrackDirection},
-    },
+    api::control::member::Id as MemberId,
+    media::track::{DirectionalTrack, Id as TrackId, Track, TrackDirection},
 };
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct New {}
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct WaitLocalSDP {}
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct WaitLocalHaveRemote {}
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct WaitRemoteSDP {}
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct Stable {}
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct Finished {}
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct Failure {}
 
 /// Implementation state machine for [`Peer`].
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum PeerMachine {
     New(Peer<New>),
     WaitLocalSDP(Peer<WaitLocalSDP>),
@@ -40,51 +35,120 @@ pub enum PeerMachine {
 }
 
 impl PeerMachine {
-    pub fn get_member_id(&self) -> MemberID {
+    pub fn member_id(&self) -> MemberId {
         match self {
-            PeerMachine::New(peer) => peer.get_member_id(),
-            PeerMachine::WaitLocalSDP(peer) => peer.get_member_id(),
-            PeerMachine::WaitLocalHaveRemote(peer) => peer.get_member_id(),
-            PeerMachine::WaitRemoteSDP(peer) => peer.get_member_id(),
-            PeerMachine::Stable(peer) => peer.get_member_id(),
-            PeerMachine::Finished(peer) => peer.get_member_id(),
-            PeerMachine::Failure(peer) => peer.get_member_id(),
+            PeerMachine::New(peer) => peer.member_id(),
+            PeerMachine::WaitLocalSDP(peer) => peer.member_id(),
+            PeerMachine::WaitLocalHaveRemote(peer) => peer.member_id(),
+            PeerMachine::WaitRemoteSDP(peer) => peer.member_id(),
+            PeerMachine::Stable(peer) => peer.member_id(),
+            PeerMachine::Finished(peer) => peer.member_id(),
+            PeerMachine::Failure(peer) => peer.member_id(),
         }
     }
+
+    pub fn id(&self) -> Id {
+        match self {
+            PeerMachine::New(peer) => peer.id(),
+            PeerMachine::WaitLocalSDP(peer) => peer.id(),
+            PeerMachine::WaitLocalHaveRemote(peer) => peer.id(),
+            PeerMachine::WaitRemoteSDP(peer) => peer.id(),
+            PeerMachine::Stable(peer) => peer.id(),
+            PeerMachine::Finished(peer) => peer.id(),
+            PeerMachine::Failure(peer) => peer.id(),
+        }
+    }
+
+    pub fn to_peer(&self) -> Id {
+        match self {
+            PeerMachine::New(peer) => peer.to_peer(),
+            PeerMachine::WaitLocalSDP(peer) => peer.to_peer(),
+            PeerMachine::WaitLocalHaveRemote(peer) => peer.to_peer(),
+            PeerMachine::WaitRemoteSDP(peer) => peer.to_peer(),
+            PeerMachine::Stable(peer) => peer.to_peer(),
+            PeerMachine::Finished(peer) => peer.to_peer(),
+            PeerMachine::Failure(peer) => peer.to_peer(),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Transceiver {
+    pub member_id: MemberId,
+    pub peer_id: Id,
 }
 
 /// ID of [`Peer`].
 pub type Id = u64;
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct PeerContext {
     id: Id,
-    member_id: MemberID,
+    to_peer: Id,
+    member_id: MemberId,
     sdp_offer: Option<String>,
     sdp_answer: Option<String>,
-    receivers: HashMap<TrackID, Arc<Track>>,
-    senders: HashMap<TrackID, Arc<Track>>,
+    receivers: HashMap<TrackId, Arc<Track>>,
+    senders: HashMap<TrackId, Arc<Track>>,
 }
 
 /// [`RTCPeerConnection`] representation.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Peer<S> {
     context: PeerContext,
     state: S,
 }
 
 impl<T: Any> Peer<T> {
-    pub fn get_member_id(&self) -> MemberID {
+    pub fn member_id(&self) -> MemberId {
         self.context.member_id
+    }
+
+    pub fn id(&self) -> Id {
+        self.context.id
+    }
+
+    pub fn to_peer(&self) -> Id {
+        self.context.to_peer
+    }
+
+    pub fn tracks(&self) -> Vec<DirectionalTrack> {
+        let tracks = self.context.senders.iter().fold(
+            vec![],
+            |mut tracks, (_, track)| {
+                tracks.push(DirectionalTrack {
+                    id: track.id,
+                    media_type: track.media_type.clone(),
+                    direction: TrackDirection::Send {
+                        receivers: vec![self.context.to_peer],
+                    },
+                });
+                tracks
+            },
+        );
+        self.context
+            .receivers
+            .iter()
+            .fold(tracks, |mut tracks, (_, track)| {
+                tracks.push(DirectionalTrack {
+                    id: track.id,
+                    media_type: track.media_type.clone(),
+                    direction: TrackDirection::Recv {
+                        sender: self.context.to_peer,
+                    },
+                });
+                tracks
+            })
     }
 }
 
 impl Peer<New> {
     /// Creates new [`Peer`] for [`Member`].
-    pub fn new(id: Id, member_id: MemberID) -> Self {
+    pub fn new(id: Id, member_id: MemberId, to_peer: Id) -> Self {
         let context = PeerContext {
             id,
             member_id,
+            to_peer,
             sdp_offer: None,
             sdp_answer: None,
             receivers: HashMap::new(),
@@ -96,49 +160,9 @@ impl Peer<New> {
         }
     }
 
-    pub fn get_tracks(&self, opponent_id: Id) -> Vec<DirectionalTrack> {
-        let tracks = self.context.senders.iter().fold(
-            vec![],
-            |mut tracks, (id, track)| {
-                tracks.push(DirectionalTrack {
-                    id: track.id,
-                    media_type: track.media_type.clone(),
-                    direction: TrackDirection::Send {
-                        receivers: vec![opponent_id],
-                    },
-                });
-                tracks
-            },
-        );
-        self.context
-            .receivers
-            .iter()
-            .fold(tracks, |mut tracks, (id, track)| {
-                tracks.push(DirectionalTrack {
-                    id: track.id,
-                    media_type: track.media_type.clone(),
-                    direction: TrackDirection::Recv {
-                        sender: opponent_id,
-                    },
-                });
-                tracks
-            })
-    }
-
     /// Sends PeerCreated event to Web Client and puts [`Peer`] into state
     /// of waiting for local offer.
-    pub fn start(
-        self,
-        opponent_id: Id,
-        success: impl FnOnce(MemberID, Event) -> (),
-    ) -> Peer<WaitLocalSDP> {
-        let tracks = self.get_tracks(opponent_id);
-        let event = Event::PeerCreated {
-            peer_id: self.context.id,
-            sdp_offer: None,
-            tracks,
-        };
-        success(self.context.member_id, event);
+    pub fn start(self) -> Peer<WaitLocalSDP> {
         Peer {
             context: self.context,
             state: WaitLocalSDP {},
@@ -149,19 +173,10 @@ impl Peer<New> {
     /// into state of waiting for remote offer.
     pub fn set_remote_sdp(
         self,
-        opponent_id: Id,
         sdp_offer: String,
-        success: impl Fn(MemberID, Event) -> (),
     ) -> Peer<WaitLocalHaveRemote> {
-        let tracks = self.get_tracks(opponent_id);
         let mut context = self.context;
         context.sdp_offer = Some(sdp_offer);
-        let event = Event::PeerCreated {
-            peer_id: context.id,
-            sdp_offer: context.sdp_offer.clone(),
-            tracks,
-        };
-        success(context.member_id, event);
         Peer {
             context,
             state: WaitLocalHaveRemote {},
@@ -179,8 +194,8 @@ impl Peer<New> {
 
 #[test]
 fn create_peer() {
-    let peer = Peer::new(1, 1);
-    let peer = peer.start(2, |_, _| {});
+    let peer = Peer::new(1, 1, 2);
+    let peer = peer.start();
 
     assert_eq!(peer.state, WaitLocalSDP {});
 }
@@ -197,14 +212,9 @@ impl Peer<WaitLocalSDP> {
 }
 
 impl Peer<WaitRemoteSDP> {
-    pub fn set_remote_sdp(
-        self,
-        sdp_answer: String,
-        success: impl Fn(Id, MemberID, String) -> (),
-    ) -> Peer<Stable> {
+    pub fn set_remote_sdp(self, sdp_answer: String) -> Peer<Stable> {
         let mut context = self.context;
         context.sdp_answer = Some(sdp_answer.clone());
-        success(context.id, context.member_id, sdp_answer);
         Peer {
             context,
             state: Stable {},

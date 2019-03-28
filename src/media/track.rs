@@ -20,7 +20,7 @@ impl Track {
 }
 
 /// [`Track] with specified direction.
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct DirectionalTrack {
     pub id: Id,
     pub media_type: TrackMediaType,
@@ -28,7 +28,7 @@ pub struct DirectionalTrack {
 }
 
 /// Direction of [`Track`].
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum TrackDirection {
     Send { receivers: Vec<PeerID> },
     Recv { sender: PeerID },
