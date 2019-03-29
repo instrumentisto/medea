@@ -1,5 +1,6 @@
-use serde_derive::{Deserialize, Serialize};
 use std::net::{IpAddr, Ipv4Addr};
+
+use serde_derive::{Deserialize, Serialize};
 
 /// Server represents [`Server`] configuration section.
 #[derive(Clone, Debug, Deserialize, Serialize)]
