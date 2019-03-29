@@ -479,7 +479,7 @@ impl RoomsRepository {
 
 #[cfg(test)]
 mod test {
-    use actix::{Arbiter, AsyncContext, System};
+    use actix::{ActorContext, Arbiter, AsyncContext, System};
     use futures::future::Future;
 
     use super::*;
@@ -525,16 +525,25 @@ mod test {
                     }),
                 },
                 Event::SdpAnswerMade {
-                    peer_id: _,
+                    peer_id,
                     sdp_answer: _,
-                } => {
-                    System::current().stop();
-                }
+                } => self.room.do_send(Command::SetIceCandidate {
+                    peer_id,
+                    candidate: "ice_candidate".into(),
+                }),
                 Event::IceCandidateDiscovered {
                     peer_id: _,
                     candidate: _,
-                } => {}
-                Event::PeerFinished { peer_id: _ } => {}
+                } => {
+                    self.room.do_send(RpcConnectionClosed {
+                        member_id: self.member_id,
+                        reason: RpcConnectionClosedReason::Disconnected,
+                    });
+                    ctx.stop();
+                }
+                Event::PeerFinished { peer_id: _ } => {
+                    System::current().stop();
+                }
             }
         }
     }
@@ -586,7 +595,7 @@ mod test {
 
         let mut caller_events = caller_events.lock().unwrap();
         let responder_events = responder_events.lock().unwrap();
-        assert_eq!(caller_events.len(), 2);
+        assert_eq!(caller_events.len(), 3);
         assert_eq!(
             caller_events.to_vec(),
             vec![
@@ -597,8 +606,21 @@ mod test {
                  {\"receivers\":[2]}}}]}}",
                 "{\"SdpAnswerMade\":{\"peer_id\":1,\"sdp_answer\":\
                  \"responder_answer\"}}",
+                "{\"PeerFinished\":{\"peer_id\":1}}"
             ]
         );
-        assert_eq!(responder_events.len(), 1);
+        assert_eq!(responder_events.len(), 2);
+        assert_eq!(
+            responder_events.to_vec(),
+            vec![
+                "{\"PeerCreated\":{\"peer_id\":2,\"sdp_offer\":\
+                 \"caller_offer\",\"tracks\":[{\"id\":1,\"media_type\":\
+                 {\"Audio\":{}},\"direction\":{\"Recv\":{\"sender\":1}}},\
+                 {\"id\":2,\"media_type\":{\"Video\":{}},\"direction\":\
+                 {\"Recv\":{\"sender\":1}}}]}}",
+                "{\"IceCandidateDiscovered\":{\"peer_id\":2,\"candidate\":\
+                 \"ice_candidate\"}}",
+            ]
+        );
     }
 }
