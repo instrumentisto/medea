@@ -1,9 +1,8 @@
 /// Provides deserialize [`time::Duration`] from string.
-use std::fmt;
-use std::time::Duration;
-
 use serde::de::{self, Unexpected};
 use serde::Serializer;
+
+use std::{fmt, time::Duration};
 
 struct DurationFromStringVisitor;
 

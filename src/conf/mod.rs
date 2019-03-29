@@ -1,22 +1,24 @@
 /// Provides application configuration options.
 ///
 /// Configuration options can be parsed from config files in TOML format.
+mod duration;
+pub mod rpc;
+pub mod server;
+
 use config::{
     Config, ConfigError, Environment, File, FileFormat, Source, Value,
 };
 use failure::Error;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use smart_default::*;
 
-mod duration;
-pub mod rpc;
-pub mod server;
+use std::collections::HashMap;
 
 static APP_CONF_PATH_CMD_ARG_NAME: &str = "--conf";
 static APP_CONF_PATH_ENV_VAR_NAME: &str = "MEDEA_CONF";
 
 /// Settings represents all configuration setting of application.
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, SmartDefault)]
 pub struct Conf {
     /// Represents [`Server`] configuration section.
     pub rpc: rpc::Rpc,

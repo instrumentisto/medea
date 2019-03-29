@@ -1,21 +1,15 @@
+use serde::{Deserialize, Serialize};
+use smart_default::*;
+
 use std::net::{IpAddr, Ipv4Addr};
 
-use serde::{Deserialize, Serialize};
-
 /// Server represents [`Server`] configuration section.
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, SmartDefault)]
 pub struct Server {
+    #[default(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)))]
     pub bind_ip: IpAddr,
+    #[default(8080)]
     pub bind_port: u16,
-}
-
-impl Default for Server {
-    fn default() -> Self {
-        Self {
-            bind_ip: IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)),
-            bind_port: 8080,
-        }
-    }
 }
 
 impl Server {
