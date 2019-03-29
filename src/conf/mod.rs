@@ -1,7 +1,6 @@
 /// Provides application configuration options.
 ///
 /// Configuration options can be parsed from config files in TOML format.
-mod duration;
 pub mod rpc;
 pub mod server;
 
@@ -86,13 +85,15 @@ where
 
 #[cfg(test)]
 mod test {
-    use super::get_conf_file_name;
+    use serial_test_derive::serial;
+
+    use std::time::Duration;
+
     use crate::conf::{
         Conf, APP_CONF_PATH_CMD_ARG_NAME, APP_CONF_PATH_ENV_VAR_NAME,
     };
-    use serial_test_derive::serial;
-    use std::time::Duration;
 
+    use super::get_conf_file_name;
     #[test]
     fn get_conf_file_name_none() {
         let file = get_conf_file_name(

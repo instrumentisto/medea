@@ -13,17 +13,19 @@ pub struct Server {
 }
 
 impl Server {
-    pub fn get_bind_addr(&self) -> impl std::net::ToSocketAddrs {
+    pub fn get_bind_addr(&self) -> (IpAddr, u16) {
         (self.bind_ip, self.bind_port)
     }
 }
 
 #[cfg(test)]
 mod test {
-    use crate::conf::Conf;
 
     use serial_test_derive::serial;
+
     use std::net::{Ipv4Addr, SocketAddr, ToSocketAddrs as _};
+
+    use crate::conf::Conf;
 
     #[test]
     #[serial]

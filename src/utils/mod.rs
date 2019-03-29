@@ -1,5 +1,7 @@
 //! Helper utils used in project.
 
+pub mod duration;
+
 /// Creates new [`::hashbrown::HashMap`] from a list of key-value pairs.
 ///
 /// ## Example

@@ -12,6 +12,7 @@ repository = "https://github.com/instrumentisto/medea"
 [dependencies]
 actix = "0.7"
 actix-web = "0.7"
+
 config = "0.9"
 chrono = "0.4"
 dotenv = "0.13"
@@ -19,18 +20,23 @@ failure = "0.1"
 futures = "0.1"
 hashbrown = "0.1"
 humantime = "1.2"
+
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+serde-humantime = "0.1.1"
+
 slog = "2.4"
 slog-envlogger = "2.1"
 slog-stdlog = "3.0"
 slog-async = "2.3"
 slog-json = "2.3"
 slog-scope = "4.1"
+
 smart-default = "0.5"
 toml = "0.4"
 
 [dev-dependencies]
 serde_test = "1.0"
+
 serial_test = "0.2"
 serial_test_derive = "0.2"
