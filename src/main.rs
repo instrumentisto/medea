@@ -1,5 +1,12 @@
 //! Medea media server application.
 
+#[macro_use]
+mod utils;
+
+mod api;
+mod conf;
+mod log;
+
 use actix::prelude::*;
 use dotenv::dotenv;
 use hashbrown::HashMap;
@@ -12,13 +19,6 @@ use crate::{
     },
     conf::Conf,
 };
-
-#[macro_use]
-mod utils;
-
-mod api;
-mod conf;
-mod log;
 
 fn main() {
     dotenv().ok();
@@ -40,7 +40,7 @@ fn main() {
     let rooms = hashmap! {1 => room};
     let rooms_repo = RoomsRepository::new(rooms);
 
-    let config = Conf::new().unwrap();
+    let config = Conf::parse().unwrap();
 
     info!("{:?}", config);
 

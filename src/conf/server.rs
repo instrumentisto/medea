@@ -35,7 +35,7 @@ mod test {
         std::env::set_var("MEDEA_SERVER.BIND_IP", "5.5.5.5");
         std::env::set_var("MEDEA_SERVER.BIND_PORT", "1234");
 
-        let env_conf = Conf::new().unwrap();
+        let env_conf = Conf::parse().unwrap();
 
         assert_ne!(default_conf.server.bind_ip, env_conf.server.bind_ip);
         assert_ne!(default_conf.server.bind_port, env_conf.server.bind_port);

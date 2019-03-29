@@ -15,7 +15,7 @@ use crate::{
         },
         control::Id as MemberId,
     },
-    conf::{rpc::Rpc, Conf},
+    conf::{Conf, Rpc},
     log::prelude::*,
 };
 
@@ -108,11 +108,10 @@ mod test {
 
     use crate::{
         api::{client::Room, control::Member},
-        conf::Conf,
+        conf::{Conf, Server},
     };
 
     use super::*;
-    use crate::conf::server::Server;
 
     /// Creates [`RoomsRepository`] for tests filled with a single [`Room`].
     fn room() -> RoomsRepository {

@@ -11,6 +11,9 @@ use failure::Error;
 use serde::{Deserialize, Serialize};
 use smart_default::*;
 
+pub use self::server::Server;
+pub use self::rpc::Rpc;
+
 use std::collections::HashMap;
 
 static APP_CONF_PATH_CMD_ARG_NAME: &str = "--conf";
@@ -42,7 +45,7 @@ impl Conf {
     /// - configuration file, the name of which is given as a command line
     /// parameter or environment variable;
     /// - environment variables;
-    pub fn new() -> Result<Self, Error> {
+    pub fn parse() -> Result<Self, Error> {
         use std::env;
 
         let mut cfg = Config::new();
@@ -142,7 +145,7 @@ mod test {
         std::fs::write(test_config_file_path, data).unwrap();
         std::env::set_var(APP_CONF_PATH_ENV_VAR_NAME, test_config_file_path);
 
-        let new_config = Conf::new().unwrap();
+        let new_config = Conf::parse().unwrap();
 
         std::env::remove_var(APP_CONF_PATH_ENV_VAR_NAME);
         std::fs::remove_file(test_config_file_path).unwrap();
@@ -157,7 +160,7 @@ mod test {
         let defaults = Conf::default();
 
         std::env::set_var("MEDEA_RPC.IDLE_TIMEOUT", "46s");
-        let new_config = Conf::new().unwrap();
+        let new_config = Conf::parse().unwrap();
         std::env::remove_var("MEDEA_RPC.IDLE_TIMEOUT");
 
         assert_eq!(new_config.rpc.idle_timeout, Duration::from_secs(46));
@@ -173,10 +176,10 @@ mod test {
         std::fs::write(test_config_file_path, data).unwrap();
         std::env::set_var(APP_CONF_PATH_ENV_VAR_NAME, test_config_file_path);
 
-        let file_config = Conf::new().unwrap();
+        let file_config = Conf::parse().unwrap();
 
         std::env::set_var("MEDEA_RPC.IDLE_TIMEOUT", "48s");
-        let file_env_config = Conf::new().unwrap();
+        let file_env_config = Conf::parse().unwrap();
 
         std::env::remove_var(APP_CONF_PATH_ENV_VAR_NAME);
         std::fs::remove_file(test_config_file_path).unwrap();
