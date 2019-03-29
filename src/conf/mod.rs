@@ -9,10 +9,9 @@ use config::{
 };
 use failure::Error;
 use serde::{Deserialize, Serialize};
-use smart_default::*;
 
-pub use self::server::Server;
 pub use self::rpc::Rpc;
+pub use self::server::Server;
 
 use std::collections::HashMap;
 
@@ -20,7 +19,7 @@ static APP_CONF_PATH_CMD_ARG_NAME: &str = "--conf";
 static APP_CONF_PATH_ENV_VAR_NAME: &str = "MEDEA_CONF";
 
 /// Settings represents all configuration setting of application.
-#[derive(Clone, Debug, Deserialize, Serialize, SmartDefault)]
+#[derive(Clone, Debug, Deserialize, Serialize, Default)]
 pub struct Conf {
     /// Represents [`Server`] configuration section.
     pub rpc: rpc::Rpc,
