@@ -5,15 +5,20 @@ use crate::api::{
     control::member::Id as MemberId,
 };
 
+/// Session authorized [`Member`].
 #[derive(Debug)]
 pub struct Session {
+    /// ID of [`Member`].
     pub member_id: MemberId,
-    // TODO: Replace Box<dyn RpcConnection>> with enum,
-    //       as the set of all possible RpcConnection types is not closed.
+
+    /// Established [`RpcConnection`]s of [`Member`]s.
     connection: Box<dyn RpcConnection>,
+    /* TODO: Replace Box<dyn RpcConnection>> with enum,
+     *       as the set of all possible RpcConnection types is not closed. */
 }
 
 impl Session {
+    /// Returns new [`Session`] of [`Member`].
     pub fn new(
         member_id: MemberId,
         connection: Box<dyn RpcConnection>,
@@ -24,6 +29,7 @@ impl Session {
         }
     }
 
+    /// Sends [`Event`] to remote [`Member`].
     pub fn send_event(
         &self,
         event: Event,
@@ -31,6 +37,9 @@ impl Session {
         self.connection.send_event(event)
     }
 
+    /// Replace [`RpcConnection`] of [`Member`].
+    ///
+    /// Old [`RpcConnection`] will be close.
     pub fn set_connection(
         &mut self,
         connection: Box<dyn RpcConnection>,
