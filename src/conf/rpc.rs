@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 use crate::conf::duration;
 

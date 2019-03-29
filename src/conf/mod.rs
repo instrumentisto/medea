@@ -5,7 +5,7 @@ use config::{
     Config, ConfigError, Environment, File, FileFormat, Source, Value,
 };
 use failure::Error;
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 mod duration;

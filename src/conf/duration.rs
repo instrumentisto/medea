@@ -41,7 +41,7 @@ where
 
 #[cfg(test)]
 mod test {
-    use serde_derive::{Deserialize, Serialize};
+    use serde::{Deserialize, Serialize};
     use serde_test::{assert_de_tokens, assert_ser_tokens, Token};
     use std::time::Duration;
 
