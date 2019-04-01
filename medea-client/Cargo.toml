@@ -15,7 +15,6 @@ crate-type = ["cdylib", "rlib"]
 default = ["console_error_panic_hook"]
 
 [dependencies]
-cfg-if = "0.1.7"
 wasm-bindgen = "0.2.40"
 
 # The `console_error_panic_hook` crate provides better debugging of panics by
