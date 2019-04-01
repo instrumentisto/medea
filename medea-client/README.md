@@ -1,17 +1,6 @@
-### 🛠️ Build with `wasm-pack build`
+Medea-client
+=====
 
-```
-wasm-pack build
-```
+Medea media server client side application. 
 
-### 🔬 Test in Headless Browsers with `wasm-pack test`
-
-```
-wasm-pack test --headless --firefox
-```
-
-### 🎁 Publish to NPM with `wasm-pack publish`
-
-```
-wasm-pack publish
-```
+__DEVELOPMENT IN PROGRESS__

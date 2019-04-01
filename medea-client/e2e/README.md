@@ -1,5 +1,6 @@
-* `npm run start` -- Serve the project locally for development at
-  `http://localhost:8080`.
+e2e application
+=====
 
-* `npm run build` -- Bundle the project (in production mode).
-np
+Supposed to be used as demo and for manual testing.
+
+__DEVELOPMENT IN PROGRESS__
