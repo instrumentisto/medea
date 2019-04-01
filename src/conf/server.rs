@@ -13,7 +13,7 @@ pub struct Server {
 }
 
 impl Server {
-    pub fn get_bind_addr(&self) -> (IpAddr, u16) {
+    pub fn get_bind_addr(&self) -> impl std::net::ToSocketAddrs {
         (self.bind_ip, self.bind_port)
     }
 }
