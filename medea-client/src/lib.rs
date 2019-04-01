@@ -26,6 +26,9 @@ impl Medea {
     #[wasm_bindgen(constructor)]
     pub fn new(token: String) -> Self {
         set_panic_hook();
+
+        get_websocket(&token);
+
         Self { token }
     }
 
