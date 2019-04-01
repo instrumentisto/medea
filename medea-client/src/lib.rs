@@ -1,4 +1,5 @@
 use wasm_bindgen::prelude::*;
+use web_sys::{WebSocket};
 
 // When the `console_error_panic_hook` feature is enabled, we can call the
 // `set_panic_hook` function at least once during initialization, and then
@@ -33,4 +34,8 @@ impl Medea {
     }
 
     pub fn drop(self) {}
+}
+
+fn get_websocket(url: &str) -> WebSocket {
+    WebSocket::new(url).unwrap()
 }

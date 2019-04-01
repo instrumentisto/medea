@@ -1,4 +1,4 @@
 import("../../pkg").then(rust => {
-  let medea = new rust.Medea("some_token");
+  let medea = new rust.Medea("ws://localhost");
   console.log(medea.get_token());
 });
