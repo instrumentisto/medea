@@ -75,7 +75,7 @@ endif
 else
 	cargo $(cargo-cmd) $(if $(call eq,$(background),yes),&,)
 ifeq ($(cargo-cmd),fetch)
-	cargo fetch --manifest-path client/medea-client/Cargo.toml
+	cargo fetch --manifest-path medea-client/Cargo.toml
 endif
 endif
 
@@ -103,7 +103,7 @@ ifneq ($(dockerized),no)
 			make yarn cmd='$(yarn-cmd)' dockerized=no
 else
 ifeq ($(yarn-cmd),fetch)
-	yarn install --pure-lockfile --cwd client/e2e
+	yarn install --pure-lockfile --cwd medea-client/e2e
 else
 	yarn $(yarn-cmd)
 endif
@@ -161,7 +161,7 @@ ifeq ($(app),server)
 	cargo test --all
 endif
 ifeq ($(app),client)
-	wasm-pack test --headless --firefox client/medea-client
+	wasm-pack test --headless --firefox medea-client
 endif
 endif
 
@@ -203,7 +203,7 @@ up.dev.server:
 	cargo run
 
 up.dev.e2e:
-	npm run start --prefix client/e2e
+	npm run start --prefix medea-client/e2e
 
 
 
