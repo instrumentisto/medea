@@ -31,7 +31,7 @@ NODE_VER ?= "11.10"
 # Usage:
 #	make deps
 
-deps: cargo yarn
+deps: cargo.deps yarn
 
 
 fmt: cargo.fmt
@@ -56,28 +56,11 @@ test: test.unit
 #
 # Usage:
 #	make cargo [cmd=(fetch|<cargo-cmd>)]
-#			   [background=(no|yes)]
-#			   [dockerized=(no|yes)]
 
 cargo-cmd = $(if $(call eq,$(cmd),),fetch,$(cmd))
 
-cargo:
-ifeq ($(dockerized),yes)
-ifeq ($(background),yes)
-	-@docker stop cargo-cmd
-	-@docker rm cargo-cmd
-endif
-	docker run --rm --user $(shell id -u) --network=host -v "$(PWD)":/app -w /app \
-				--name=cargo-cmd $(if $(call eq,$(background),yes),-d,) \
-				-v "$(abspath $(CARGO_HOME))/registry":/usr/local/cargo/registry\
-		rust:$(RUST_VER) \
-			make cargo cmd='$(cargo-cmd)' dockerized=no background=no
-else
-	cargo $(cargo-cmd) $(if $(call eq,$(background),yes),&,)
-ifeq ($(cargo-cmd),fetch)
+cargo.deps:
 	cargo fetch --manifest-path medea-client/Cargo.toml
-endif
-endif
 
 
 
@@ -115,20 +98,13 @@ endif
 # Lint Rust sources with clippy.
 #
 # Usage:
-#	make cargo.lint [dockerized=(no|yes)]
+#	make cargo.lint
 
 cargo.lint:
-ifeq ($(dockerized),yes)
-	docker run --rm --user $(shell id -u) --network=host -v "$(PWD)":/app -w /app \
-				-v "$(abspath $(CARGO_HOME))/registry":/usr/local/cargo/registry\
-		rust:$(RUST_VER) \
-			make cargo.lint dockerized=no pre-install=yes
-else
 ifeq ($(pre-install),yes)
 	rustup component add clippy
 endif
 	cargo clippy -- -D clippy::pedantic -D warnings
-endif
 
 
 
@@ -172,21 +148,12 @@ endif
 #
 # Usage:
 #	make cargo.fmt [check=(no|yes)]
-#				   [dockerized=(no|yes)]
 
 cargo.fmt:
-ifeq ($(dockerized),yes)
-	docker pull rustlang/rust:nightly
-	docker run --rm --user $(shell id -u) --network=host -v "$(PWD)":/app -w /app \
-				-v "$(abspath $(CARGO_HOME))/registry":/usr/local/cargo/registry\
-		rustlang/rust:nightly \
-			make cargo.fmt check='$(check)' dockerized=no pre-install=yes
-else
 ifeq ($(pre-install),yes)
 	rustup component add rustfmt
 endif
 	cargo +nightly fmt --all $(if $(call eq,$(check),yes),-- --check,)
-endif
 
 
 
@@ -212,6 +179,6 @@ up.dev.e2e:
 # .PHONY section #
 ##################
 
-.PHONY: cargo cargo.fmt cargo.lint \
-		deps fmt lint test test.unit \
+.PHONY: cargo.deps cargo.fmt cargo.lint \
+		fmt lint test test.unit \
 		up up.dev up.dev.server up.dev.e2e yarn
