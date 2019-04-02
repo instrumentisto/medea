@@ -28,7 +28,6 @@ test: test.unit
 
 
 
-
 # Lint Rust sources with clippy.
 #
 # Usage:
@@ -46,6 +45,7 @@ ifeq ($(pre-install),yes)
 endif
 	cargo clippy -- -D clippy::pedantic -D warnings
 endif
+
 
 
 
