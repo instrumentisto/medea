@@ -3,9 +3,9 @@
 #[macro_use]
 mod utils;
 
-mod api;
-mod conf;
-mod log;
+pub mod api;
+pub mod conf;
+pub mod log;
 
 use actix::prelude::*;
 use dotenv::dotenv;

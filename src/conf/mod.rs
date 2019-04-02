@@ -1,6 +1,5 @@
-/// Provides application configuration options.
-///
-/// Configuration options can be parsed from config files in TOML format.
+//! Provides application configuration options.
+
 pub mod rpc;
 pub mod server;
 
@@ -21,8 +20,9 @@ static APP_CONF_PATH_ENV_VAR_NAME: &str = "MEDEA_CONF";
 /// Holds application config.
 #[derive(Clone, Debug, Deserialize, Serialize, Default)]
 pub struct Conf {
-    /// Represents [`Server`] configuration section.
+    /// HTTP server settings.
     pub rpc: rpc::Rpc,
+    /// RPC connection settings.
     pub server: server::Server,
 }
 

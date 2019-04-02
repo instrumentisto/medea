@@ -1,21 +1,22 @@
+//! HTTP server settings.
 use serde::{Deserialize, Serialize};
 use smart_default::*;
 
 use std::net::{IpAddr, Ipv4Addr};
 
-/// Server represents [`Server`] configuration section.
+/// HTTP server settings.
 #[derive(Clone, Debug, Deserialize, Serialize, SmartDefault)]
 pub struct Server {
-    /// IP to bind to.
+    /// IP to bind HTTP server to. Defaults to **0.0.0.0**.
     #[default(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)))]
     pub bind_ip: IpAddr,
-    /// Port to bind to.
+    /// Port to bind HTTP server to. Defaults to **8080**.
     #[default(8080)]
     pub bind_port: u16,
 }
 
 impl Server {
-    /// Builds ['std::net::ToSocketAddrs'] from ['bind_ip'] and ['bind_port']
+    /// Builds [std::net::ToSocketAddrs] from **bind_ip** and **bind_port**.
     pub fn get_bind_addr(&self) -> impl std::net::ToSocketAddrs {
         (self.bind_ip, self.bind_port)
     }

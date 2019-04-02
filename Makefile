@@ -28,6 +28,7 @@ test: test.unit
 
 
 
+
 # Lint Rust sources with clippy.
 #
 # Usage:
@@ -45,6 +46,19 @@ ifeq ($(pre-install),yes)
 endif
 	cargo clippy -- -D clippy::pedantic -D warnings
 endif
+
+
+
+# Generate project documentation of Rust sources.
+#
+# Usage:
+#	make docs [open=(yes|no)] [clean=(no|yes)]
+
+docs:
+ifeq ($(clean),yes)
+	@rm -rf target/doc/
+endif
+	cargo +nightly doc $(if $(call eq,$(open),no),,--open)
 
 
 
@@ -96,4 +110,4 @@ endif
 ##################
 
 .PHONY: cargo cargo.fmt cargo.lint \
-        test test.e2e test.unit
+        docs test test.e2e test.unit
