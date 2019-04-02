@@ -3,10 +3,11 @@ use smart_default::*;
 
 use std::time::Duration;
 
-/// Server represents [`Server`] configuration section.
+/// RPC connection settings.
 #[derive(Clone, Debug, Serialize, Deserialize, SmartDefault)]
 pub struct Rpc {
-    /// Timeout for [`WsSession`] to wait ping message from [`Web Client`].
+    /// Duration, after which remote RPC client will be considered idle if no
+    /// heartbeat messages received.
     #[serde(with = "serde_humantime")]
     #[default(Duration::from_secs(10))]
     pub idle_timeout: Duration,

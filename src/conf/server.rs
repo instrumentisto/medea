@@ -6,13 +6,16 @@ use std::net::{IpAddr, Ipv4Addr};
 /// Server represents [`Server`] configuration section.
 #[derive(Clone, Debug, Deserialize, Serialize, SmartDefault)]
 pub struct Server {
+    /// IP to bind to.
     #[default(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)))]
     pub bind_ip: IpAddr,
+    /// Port to bind to.
     #[default(8080)]
     pub bind_port: u16,
 }
 
 impl Server {
+    /// Builds ['std::net::ToSocketAddrs'] from ['bind_ip'] and ['bind_port']
     pub fn get_bind_addr(&self) -> impl std::net::ToSocketAddrs {
         (self.bind_ip, self.bind_port)
     }
@@ -20,7 +23,6 @@ impl Server {
 
 #[cfg(test)]
 mod test {
-
     use serial_test_derive::serial;
 
     use std::net::{Ipv4Addr, SocketAddr, ToSocketAddrs as _};

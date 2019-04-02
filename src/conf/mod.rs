@@ -18,7 +18,7 @@ use std::collections::HashMap;
 static APP_CONF_PATH_CMD_ARG_NAME: &str = "--conf";
 static APP_CONF_PATH_ENV_VAR_NAME: &str = "MEDEA_CONF";
 
-/// Settings represents all configuration setting of application.
+/// Holds application config.
 #[derive(Clone, Debug, Deserialize, Serialize, Default)]
 pub struct Conf {
     /// Represents [`Server`] configuration section.
@@ -26,6 +26,7 @@ pub struct Conf {
     pub server: server::Server,
 }
 
+/// Allows merging ['Conf'] into ['config::Config'].
 impl Source for Conf {
     fn clone_into_box(&self) -> Box<Source + Send + Sync> {
         Box::new((*self).clone())
@@ -43,7 +44,7 @@ impl Conf {
     /// - default values;
     /// - configuration file, the name of which is given as a command line
     /// parameter or environment variable;
-    /// - environment variables;
+    /// - environment variables.
     pub fn parse() -> Result<Self, Error> {
         use std::env;
 

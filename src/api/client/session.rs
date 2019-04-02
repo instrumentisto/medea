@@ -192,8 +192,8 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
         );
         match msg {
             ws::Message::Text(text) => {
+                self.reset_idle_timeout(ctx);
                 if let Ok(msg) = serde_json::from_str::<Heartbeat>(&text) {
-                    self.reset_idle_timeout(ctx);
                     ctx.notify(msg);
                 }
             }
@@ -219,6 +219,7 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
                             }),
                     ));
                     ctx.close(reason);
+                    ctx.stop();
                 }
             }
             _ => error!(
