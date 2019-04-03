@@ -59,6 +59,18 @@ impl PeerMachine {
         }
     }
 
+    pub fn sender(&self) -> Option<Id> {
+        match self {
+            PeerMachine::New(peer) => peer.sender(),
+            PeerMachine::WaitLocalSDP(peer) => peer.sender(),
+            PeerMachine::WaitLocalHaveRemote(peer) => peer.sender(),
+            PeerMachine::WaitRemoteSDP(peer) => peer.sender(),
+            PeerMachine::Stable(peer) => peer.sender(),
+            PeerMachine::Finished(peer) => peer.sender(),
+            PeerMachine::Failure(peer) => peer.sender(),
+        }
+    }
+
     pub fn to_peer(&self) -> Id {
         match self {
             PeerMachine::New(peer) => peer.to_peer(),
@@ -110,6 +122,22 @@ impl<T: Any> Peer<T> {
 
     pub fn to_peer(&self) -> Id {
         self.context.to_peer
+    }
+
+    pub fn sender(&self) -> Option<Id> {
+        if self.context.receivers.is_empty() {
+            None
+        } else {
+            Some(self.context.to_peer)
+        }
+    }
+
+    pub fn receivers(&self) -> Option<Id> {
+        if self.context.senders.is_empty() {
+            None
+        } else {
+            Some(self.context.to_peer)
+        }
     }
 
     pub fn tracks(&self) -> Vec<DirectionalTrack> {

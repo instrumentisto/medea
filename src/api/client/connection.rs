@@ -220,14 +220,20 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsConnection {
                             .map(move |res| {
                                 match res {
                                     Ok(_) => (),
-                                    Err(err) => error!(
-                                        "Command from member {} handle \
-                                         failed, because: {:?}",
-                                        member_id, err,
+                                    Err(_) => error!(
+                                        "Command {} from member {} handle \
+                                         failed",
+                                        text, member_id,
                                     ),
                                 };
                             })
-                            .map_err(|_| ()),
+                            .map_err(move |err| {
+                                error!(
+                                    "Cannot send Command from member {}, \
+                                     because {}",
+                                    member_id, err
+                                )
+                            }),
                     ));
                 }
             }
@@ -246,9 +252,9 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsConnection {
                             })
                             .map_err(move |err| {
                                 error!(
-                                    "WsSession of member {} failed to remove \
-                                     from Room, because: {:?}",
-                                    member_id, err,
+                                    "Cannot send Close from member {}, \
+                                     because {}",
+                                    member_id, err
                                 )
                             }),
                     ));

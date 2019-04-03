@@ -27,7 +27,7 @@ pub enum Event {
 
     /// Media Server notifies Web Client about necessity of RTCPeerConnection
     /// close.
-    PeerFinished {
-        peer_id: PeerId,
+    PeersRemoved {
+        peer_ids: Vec<PeerId>,
     },
 }

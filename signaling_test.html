@@ -73,7 +73,7 @@
             var pc = pcs[msg.peer_id];
 
             if (sendVideo || sendAudio) {
-                let stream = await navigator.mediaDevices.getUserMedia({
+                const stream = await navigator.mediaDevices.getUserMedia({
                     audio: sendAudio,
                     video: sendVideo
                 });
@@ -81,7 +81,7 @@
                 yourvid.srcObject = stream;
 
                 stream.getTracks().forEach((track) => {
-                    pc.addTrack(track);
+                    pc.addTrack(track, stream);
                 });
             }
 
@@ -99,9 +99,9 @@
                 pc.setLocalDescription(answer);
 
                 socket.send(JSON.stringify({
-                    MakeSdpAnswer: {
+                    MakeSdpOffer: {
                         peer_id: msg.peer_id,
-                        sdp_answer: JSON.stringify(answer)
+                        sdp_offer: JSON.stringify(answer)
                     }
                 }));
             } else {

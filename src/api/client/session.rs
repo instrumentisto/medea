@@ -29,6 +29,10 @@ impl Session {
         }
     }
 
+    pub fn close(&self) -> impl Future<Item = (), Error = ()> {
+        self.connection.close()
+    }
+
     /// Sends [`Event`] to remote [`Member`].
     pub fn send_event(
         &self,
@@ -46,6 +50,6 @@ impl Session {
     ) -> impl Future<Item = (), Error = ()> {
         let fut = self.connection.close();
         self.connection = connection;
-        fut
+        Box::new(fut)
     }
 }
