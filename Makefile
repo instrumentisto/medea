@@ -60,7 +60,7 @@ test: test.unit
 cargo-cmd = $(if $(call eq,$(cmd),),fetch,$(cmd))
 
 cargo.deps:
-	cargo fetch --manifest-path jason/Cargo.toml
+	cargo fetch
 
 
 
