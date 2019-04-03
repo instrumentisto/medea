@@ -9,6 +9,11 @@ homepage = "https://github.com/instrumentisto/medea"
 readme = "README.md"
 repository = "https://github.com/instrumentisto/medea"
 
+[workspace]
+members = [
+    "jason",
+]
+
 [dependencies]
 actix = "0.7"
 actix-web = "0.7"
