@@ -1,5 +1,5 @@
 use wasm_bindgen::prelude::*;
-use web_sys::{WebSocket};
+use web_sys::WebSocket;
 
 // When the `console_error_panic_hook` feature is enabled, we can call the
 // `set_panic_hook` function at least once during initialization, and then
@@ -17,17 +17,15 @@ pub use console_error_panic_hook::set_once as set_panic_hook;
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
 #[wasm_bindgen]
-pub struct Medea {
+pub struct Jason {
     token: String,
 }
 
 #[wasm_bindgen]
-impl Medea {
+impl Jason {
     #[wasm_bindgen(constructor)]
     pub fn new(token: String) -> Self {
         set_panic_hook();
-
-        get_websocket(&token);
 
         Self { token }
     }
@@ -37,6 +35,10 @@ impl Medea {
     }
 
     pub fn drop(self) {}
+
+    pub fn init_socket(&self) {
+        get_websocket(&self.token);
+    }
 }
 
 fn get_websocket(url: &str) -> WebSocket {

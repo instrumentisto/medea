@@ -1,4 +1,4 @@
-Medea-client
+Jason
 =====
 
 Medea media server client side application. 
