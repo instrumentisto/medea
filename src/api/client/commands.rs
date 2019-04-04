@@ -1,7 +1,7 @@
 use actix::Message;
 use serde::{Deserialize, Serialize};
 
-use crate::{api::client::RoomError, media::peer::Id as PeerId};
+use crate::media::peer::Id as PeerId;
 
 /// WebSocket message from Web Client to Media Server.
 #[derive(Debug, Deserialize, Message, Serialize)]

@@ -3,12 +3,12 @@
 use std::{
     fmt,
     sync::{Arc, Mutex},
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use actix::{
-    fut::wrap_future, Actor, ActorContext, ActorFuture, Addr, AsyncContext,
-    Context, Handler, Message, SpawnHandle,
+    fut::wrap_future, Actor, ActorFuture, Addr, AsyncContext, Context, Handler,
+    Message, SpawnHandle,
 };
 use failure::Fail;
 use futures::{
@@ -21,14 +21,8 @@ use crate::{
     api::client::{Command, Event, Session},
     api::control::{Id as MemberId, Member},
     log::prelude::*,
-    media::{
-        peer::{Id as PeerId, Peer, PeerMachine},
-        track::{AudioSettings, Track, TrackMediaType, VideoSettings},
-    },
+    media::peer::{Id as PeerId, PeerMachine},
 };
-use slog::Drain;
-use std::error::Error;
-use std::time::Instant;
 
 /// Timeout for close [`Session`] after receive `RpcConnectionClosed` message.
 pub const SESSION_IDLE_TIMEOUT: Duration = Duration::from_secs(10);
@@ -139,29 +133,16 @@ impl Room {
         &mut self,
         member_id: MemberId,
         event: Event,
-    ) -> impl Future<Item = (), Error = ()> {
+    ) -> impl Future<Item = (), Error = RoomError> {
         match self.sessions.get(&member_id) {
-            Some(session) => Either::A(session.send_event(event)),
-            None => Either::B(self.close(Instant::now())),
-        }
-    }
-
-    fn handle_member_connected(
-        &mut self,
-        member_id: &MemberId,
-    ) -> impl Future<Item = (), Error = ()> {
-        let peer = self.member_peer(member_id);
-        match peer.sender() {
-            Some(_) => {
-                let fut = match self.handle_peer_created(peer.id()) {
-                    Ok((caller, event)) => {
-                        Either::A(self.send_event(caller, event))
-                    }
-                    Err(e) => Either::B(self.close(Instant::now())),
-                };
-                Either::B(fut)
+            Some(connection) => Either::A(
+                connection
+                    .send_event(event)
+                    .map_err(move |_| RoomError::UnableSendEvent(member_id)),
+            ),
+            None => {
+                Either::B(future::err(RoomError::SessionNotExists(member_id)))
             }
-            None => Either::A(future::ok(())),
         }
     }
 
@@ -404,7 +385,21 @@ impl Handler<RpcConnectionEstablished> for Room {
             let member_id = msg.member_id;
             self.sessions
                 .insert(member_id, Session::new(msg.member_id, msg.connection));
-            fut = Either::B(self.handle_member_connected(&member_id))
+            let peer = self.member_peer(&member_id);
+            fut = match peer.sender() {
+                Some(_) => match self.handle_peer_created(peer.id()) {
+                    Ok((caller, event)) => {
+                        match self.send_event(caller, event).wait() {
+                            Ok(_) => Either::B(Either::A(future::ok(()))),
+                            Err(_) => {
+                                Either::B(Either::B(self.close(Instant::now())))
+                            }
+                        }
+                    }
+                    Err(e) => Either::B(Either::B(self.close(Instant::now()))),
+                },
+                None => Either::B(Either::A(future::ok(()))),
+            };
         }
         Box::new(wrap_future(fut))
     }
@@ -418,7 +413,7 @@ impl Handler<Command> for Room {
     fn handle(
         &mut self,
         command: Command,
-        ctx: &mut Self::Context,
+        _: &mut Self::Context,
     ) -> Self::Result {
         let res = match command {
             Command::MakeSdpOffer { peer_id, sdp_offer } => {
@@ -434,7 +429,10 @@ impl Handler<Command> for Room {
         };
         let fut = match res {
             Ok((member_id, event)) => {
-                Either::A(self.send_event(member_id, event))
+                match self.send_event(member_id, event).wait() {
+                    Ok(_) => Either::A(future::ok(())),
+                    Err(_) => Either::B(self.close(Instant::now())),
+                }
             }
             Err(e) => Either::B(self.close(Instant::now())),
         };
