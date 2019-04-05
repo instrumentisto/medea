@@ -37,6 +37,7 @@ features = [
     'MessageEvent',
     'WebSocket',
     'Window',
+    'CloseEvent'
 ]
 
 wee_alloc = { version = "0.4", optional = true }

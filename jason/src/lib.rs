@@ -1,10 +1,14 @@
 use futures::sync::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
-use js_sys::JSON;
+use js_sys::{Date};
 use serde::{Deserialize, Serialize};
 use std::{cell::RefCell, rc::Rc};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
-use web_sys::{console, MessageEvent, WebSocket, Window};
+use web_sys::{console, MessageEvent, WebSocket, Window, Event, CloseEvent};
+
+mod utils;
+
+use utils::*;
 
 // When the `console_error_panic_hook` feature is enabled, we can call the
 // `set_panic_hook` function at least once during initialization, and then
@@ -14,7 +18,7 @@ use web_sys::{console, MessageEvent, WebSocket, Window};
 // https://github.com/rustwasm/console_error_panic_hook#readme
 #[cfg(feature = "console_error_panic_hook")]
 pub use console_error_panic_hook::set_once as set_panic_hook;
-use core::borrow::Borrow;
+
 
 // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global
 // allocator.
@@ -29,30 +33,25 @@ fn window() -> Window {
 }
 
 struct Transport {
-    sock: Option<Rc<WebSocket>>,
+    sock: Rc<Option<WebSocket>>,
     token: String,
     pinger: Rc<RefCell<Pinger>>,
     subs: Vec<UnboundedSender<Command>>,
-}
-
-struct Pinger {
-    num: usize,
-    socket: Option<Rc<WebSocket>>,
-    hearbeat_handler: Option<HearbeatHandler>
-}
-
-struct HearbeatHandler {
-    closure: Closure<Box<dyn FnMut>>,
-    interva_id: u32,
+    on_open: Option<Closure<dyn FnMut(Event)>>,
+    on_message: Option<Closure<dyn FnMut(MessageEvent)>>,
+    on_close: Option<Closure<dyn FnMut(CloseEvent)>>,
 }
 
 impl Transport {
     fn new(token: String) -> Self {
         Transport {
-            sock: None,
+            sock: Rc::new(None),
             token,
             subs: vec![],
             pinger: Rc::new(RefCell::new(Pinger::new())),
+            on_open: None,
+            on_message: None,
+            on_close: None
         }
     }
 
@@ -62,36 +61,30 @@ impl Transport {
 
         let socket_rc = Rc::clone(&socket);
         let pinger_rc = Rc::clone(&self.pinger);
-        let on_open = move || {
-            console::log(&js_sys::Array::from(&JsValue::from_str(
-                "socket opened",
-            )));
-            pinger_rc.try_borrow_mut().unwrap().start(socket_rc);
-        };
-        let on_open: Closure<FnMut() -> ()> = Closure::once(on_open);
+        let on_open = bind_handler_fn_once("open", &socket, move |_:Event| {
+            pinger_rc.borrow().start(socket_rc);
+        }).unwrap();
 
-        let on_message = Closure::wrap(Box::new(move |event: MessageEvent| {
+        let pinger_rc = Rc::clone(&self.pinger);
+        let on_message = bind_handler_fn_mut("message", &socket, move |event: MessageEvent| {
             let payload = event.data();
+
+            if let Ok(pinger) = pinger_rc.try_borrow_mut() {
+                pinger.set_pong_at(Date::now());
+            }
+
             console::log(&js_sys::Array::from(&payload));
-        }) as Box<dyn FnMut(_)>);
+        }).unwrap();
 
-        socket
-            .add_event_listener_with_callback(
-                "open",
-                on_open.as_ref().unchecked_ref(),
-            )
-            .unwrap();
-        on_open.forget();
+        let on_close = bind_handler_fn_once("close", &socket, move |close:CloseEvent| {
+//            pinger_rc.borrow().start(socket_rc);
+//            self.sock.take();
+        }).unwrap();
 
-        socket
-            .add_event_listener_with_callback(
-                "message",
-                on_message.as_ref().unchecked_ref(),
-            )
-            .unwrap();
-        on_message.forget();
-
-        self.sock = Some(socket)
+        self.on_open = Some(on_open);
+        self.on_message = Some(on_message);
+        self.on_close = Some(on_close);
+        self.sock = Rc::new(Some(socket))
     }
 
     fn add_sub(&mut self, sub: UnboundedSender<Command>) {
@@ -99,46 +92,21 @@ impl Transport {
     }
 }
 
-impl Pinger {
-    fn new() -> Self {
-        Pinger {
-            num: 0,
-            socket: None,
-            hearbeat_handler: None
-        }
-    }
+struct Pinger(Rc<RefCell<InnerPinger>>);
 
-    fn start(&mut self, socket: Rc<WebSocket>) {
-        self.socket = Some(socket);
-        self.send_now();
+struct InnerPinger {
+    num: usize,
+    pong_at: Option<f64>,
+    socket: Option<Rc<WebSocket>>,
+    hearbeat_handler: Option<PingTaskHandler>,
+}
 
-        console::log(&js_sys::Array::from(&JsValue::from_str(
-            "pinger started",
-        )));
-
-        let closure = Closure::wrap(Box::new(|| {
-            console::log(&js_sys::Array::from(&JsValue::from_str("ping")));
-            //            self.send_now();
-        }) as Box<dyn FnMut()>);
-
-        let interva_id = window()
-            .set_interval_with_callback_and_timeout_and_arguments_0(
-                ping.as_ref().unchecked_ref(),
-                3000,
-            )
-            .unwrap();
-        self.hearbeat_handler = Some(HearbeatHandler {
-            closure,
-            interva_id
-        });
-    }
-
+impl InnerPinger {
     fn send_now(&mut self) {
         match self.socket.as_ref() {
             None => {}
             Some(socket) => {
-                let a: &Rc<WebSocket> = socket;
-                self.num += 1;
+                self.num+=1;
 
                 let msg =
                     serde_json::to_string(&Heartbeat::Ping(self.num)).unwrap();
@@ -146,6 +114,49 @@ impl Pinger {
                 socket.send_with_str(&msg).unwrap();
             }
         };
+    }
+}
+
+struct PingTaskHandler {
+    ping_closure: Closure<dyn FnMut()>,
+    interval_id: i32,
+}
+
+impl Pinger {
+    fn new() -> Self {
+        Self(Rc::new(RefCell::new(InnerPinger {
+            num: 0,
+            pong_at: None,
+            socket: None,
+            hearbeat_handler: None,
+        })))
+    }
+
+    fn set_pong_at(&self, at: f64) {
+        self.0.borrow_mut().pong_at = Some(at);
+    }
+
+    fn start(&self, socket: Rc<WebSocket>) {
+        let mut inner = self.0.borrow_mut();
+        inner.socket = Some(socket);
+        inner.send_now();
+
+        let inner_rc = Rc::clone(&self.0);
+        let do_ping = Closure::wrap(Box::new(move || {
+            inner_rc.borrow_mut().send_now();
+        }) as Box<dyn FnMut()>);
+
+        let interval_id = window()
+            .set_interval_with_callback_and_timeout_and_arguments_0(
+                do_ping.as_ref().unchecked_ref(),
+                3000,
+            )
+            .unwrap();
+
+        inner.hearbeat_handler = Some(PingTaskHandler {
+            ping_closure: do_ping,
+            interval_id,
+        });
     }
 }
 
