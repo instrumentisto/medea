@@ -31,11 +31,9 @@ pub struct WsSession {
     /// Handle for watchdog which checks whether WebSocket client became
     /// idle (no `ping` messages received during [`idle_timeout`]).
     ///
-    /// This one should be renewed on received ping WebSocket message
-    /// from client.
+    /// This one should be renewed on received `ping` message from client.
     idle_handler: Option<SpawnHandle>,
-
-    /// Timeout of receiving ping messages from client.
+    /// Timeout of receiving `ping` messages from client.
     idle_timeout: Duration,
 
     /// Indicates whether WebSocket connection is closed by server ot by

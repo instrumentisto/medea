@@ -1,9 +1,22 @@
+###############################
+# Common defaults/definitions #
+###############################
+
+comma := ,
+
+# Checks two given strings for equality.
+eq = $(if $(or $(1),$(2)),$(and $(findstring $(1),$(2)),\
+                                $(findstring $(2),$(1))),1)
+
+
+
+
 ######################
 # Project parameters #
 ######################
 
 CARGO_HOME ?= $(strip $(shell dirname $$(dirname $$(which cargo))))
-RUST_VER ?= "1.33"
+RUST_VER ?= 1.33
 
 
 
@@ -12,49 +25,54 @@ RUST_VER ?= "1.33"
 # Aliases #
 ###########
 
+docs: docs.rust
+
+
 lint: cargo.lint
 
 
 fmt: cargo.fmt
 
 
-# Run all project tests.
-#
-# Usage:
-#	make test
-
 test: test.unit
 
 
 
 
+##################
+# Cargo commands #
+##################
+
+# Format Rust sources with rustfmt.
+#
+# Usage:
+#	make cargo.fmt [check=(no|yes)]
+
+cargo.fmt:
+	cargo +nightly fmt --all $(if $(call eq,$(check),yes),-- --check,)
+
+
 # Lint Rust sources with clippy.
 #
 # Usage:
-#	make cargo.lint [dockerized=(no|yes)]
+#	make cargo.lint
 
 cargo.lint:
-ifeq ($(dockerized),yes)
-	docker run --rm --network=host -v "$(PWD)":/app -w /app \
-	           -v "$(abspath $(CARGO_HOME))/registry":/usr/local/cargo/registry\
-		rust:$(RUST_VER) \
-			make cargo.lint dockerized=no pre-install=yes
-else
-ifeq ($(pre-install),yes)
-	rustup component add clippy
-endif
 	cargo clippy -- -D clippy::pedantic -D warnings
-endif
 
 
 
+
+##########################
+# Documentation commands #
+##########################
 
 # Generate project documentation of Rust sources.
 #
 # Usage:
-#	make docs [open=(yes|no)] [clean=(no|yes)]
+#	make docs.rust [open=(yes|no)] [clean=(no|yes)]
 
-docs:
+docs.rust:
 ifeq ($(clean),yes)
 	@rm -rf target/doc/
 endif
@@ -63,44 +81,17 @@ endif
 
 
 
+####################
+# Testing commands #
+####################
+
 # Run Rust unit tests of project.
 #
 # Usage:
-#	make test.unit [dockerized=(no|yes)]
+#	make test.unit
 
 test.unit:
-ifeq ($(dockerized),yes)
-	docker run --rm --network=host -v "$(PWD)":/app -w /app \
-	           -v "$(abspath $(CARGO_HOME))/registry":/usr/local/cargo/registry\
-		rust:$(RUST_VER) \
-			make test.unit dockerized=no
-else
 	cargo test --all
-endif
-
-
-
-
-# Format Rust sources with rustfmt.
-#
-# Usage:
-#	make cargo.fmt [check=(no|yes)]
-#	               [dockerized=(no|yes)]
-
-cargo.fmt:
-ifeq ($(dockerized),yes)
-	docker pull rustlang/rust:nightly
-	docker run --rm --network=host -v "$(PWD)":/app -w /app \
-	           -v "$(abspath $(CARGO_HOME))/registry":/usr/local/cargo/registry\
-		rustlang/rust:nightly \
-			make cargo.fmt check='$(check)' dockerized=no pre-install=yes
-else
-ifeq ($(pre-install),yes)
-	rustup component add rustfmt
-endif
-	cargo +nightly fmt --all $(if $(call eq,$(check),yes),-- --check,)
-endif
-
 
 
 
@@ -110,4 +101,5 @@ endif
 ##################
 
 .PHONY: cargo cargo.fmt cargo.lint \
-        docs test test.e2e test.unit
+        docs docs.rust \
+        test test.unit
