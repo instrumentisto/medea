@@ -99,9 +99,9 @@
                 pc.setLocalDescription(answer);
 
                 socket.send(JSON.stringify({
-                    MakeSdpOffer: {
+                    MakeSdpAnswer: {
                         peer_id: msg.peer_id,
-                        sdp_offer: JSON.stringify(answer)
+                        sdp_answer: JSON.stringify(answer)
                     }
                 }));
             } else {

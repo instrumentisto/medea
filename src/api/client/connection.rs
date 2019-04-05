@@ -112,7 +112,7 @@ impl Actor for WsConnection {
                         "WsConnection of member {} failed to join Room, \
                          because: {:?}",
                         member_id, err,
-                    )
+                    );
                 }),
         ));
     }
@@ -215,25 +215,15 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsConnection {
                 if let Ok(command) = serde_json::from_str::<Command>(&text) {
                     let member_id = self.member_id;
                     ctx.wait(wrap_future(
-                        self.room
-                            .send(command)
-                            .map(move |res| {
-                                match res {
-                                    Ok(_) => (),
-                                    Err(_) => error!(
-                                        "Command {} from member {} handle \
-                                         failed",
-                                        text, member_id,
-                                    ),
-                                };
-                            })
-                            .map_err(move |err| {
+                        self.room.send(command).map(|_| ()).map_err(
+                            move |err| {
                                 error!(
                                     "Cannot send Command from member {}, \
                                      because {}",
                                     member_id, err
                                 )
-                            }),
+                            },
+                        ),
                     ));
                 }
             }

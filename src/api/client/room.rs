@@ -7,8 +7,9 @@ use std::{
 };
 
 use actix::{
-    fut::wrap_future, Actor, ActorFuture, Addr, AsyncContext, Context, Handler,
-    Message, SpawnHandle,
+    fut::{err, ok, wrap_future},
+    Actor, ActorContext, ActorFuture, Addr, AsyncContext, Context,
+    ContextFutureSpawner, Handler, Message, Running, SpawnHandle, WrapFuture,
 };
 use failure::Fail;
 use futures::{
@@ -18,7 +19,7 @@ use futures::{
 use hashbrown::HashMap;
 
 use crate::{
-    api::client::{Command, Event, Session},
+    api::client::{Command, Event},
     api::control::{Id as MemberId, Member},
     log::prelude::*,
     media::peer::{Id as PeerId, PeerMachine},
@@ -35,7 +36,7 @@ pub enum RoomError {
     #[fail(display = "Unmatched states between peers {} and {}", _0, _1)]
     UnmatchedState(PeerId, PeerId),
     #[fail(display = "Member {} not connected at moment", _0)]
-    SessionNotExists(MemberId),
+    ConnectionNotExists(MemberId),
     #[fail(display = "Unable send event to member {}", _0)]
     UnableSendEvent(MemberId),
 }
@@ -49,6 +50,10 @@ pub struct Room {
     /// ID of this [`Room`].
     id: Id,
 
+    /// Established [`WsConnection`]s of [`Member`]s in this [`Room`].
+    pub connections: HashMap<MemberId, Box<dyn RpcConnection>>,
+    // TODO: Replace Box<dyn RpcConnection>> with enum,
+    //       as the set of all possible RpcConnection types is not closed.
     idle_timeouts: HashMap<MemberId, SpawnHandle>,
 
     /// [`Member`]s which currently are present in this [`Room`].
@@ -56,9 +61,6 @@ pub struct Room {
 
     /// [`Peer`]s of [`Member`]s in this [`Room`].
     peers: HashMap<PeerId, PeerMachine>,
-
-    /// [`Session`]s of [`Member`]s with established [`WsConnection`]s.
-    sessions: HashMap<MemberId, Session>,
 }
 
 impl Room {
@@ -70,30 +72,11 @@ impl Room {
     ) -> Self {
         Room {
             id,
+            connections: HashMap::new(),
             idle_timeouts: HashMap::new(),
             members,
             peers,
-            sessions: HashMap::new(),
         }
-    }
-
-    fn close(
-        &mut self,
-        closed_at: Instant,
-    ) -> impl Future<Item = (), Error = ()> {
-        let fut = self.sessions.drain().fold(
-            vec![],
-            |mut futures, (member_id, session)| {
-                info!(
-                    "Removed session of member {}, because room is close at \
-                     {:?}",
-                    member_id, closed_at
-                );
-                futures.push(session.close());
-                futures
-            },
-        );
-        join_all(fut).map(|_| ())
     }
 
     /// Store [`Peer`] in [`Room`].
@@ -133,17 +116,15 @@ impl Room {
         &mut self,
         member_id: MemberId,
         event: Event,
-    ) -> impl Future<Item = (), Error = RoomError> {
-        match self.sessions.get(&member_id) {
-            Some(connection) => Either::A(
-                connection
-                    .send_event(event)
-                    .map_err(move |_| RoomError::UnableSendEvent(member_id)),
-            ),
-            None => {
-                Either::B(future::err(RoomError::SessionNotExists(member_id)))
-            }
-        }
+    ) -> Result<(), RoomError> {
+        self.connections
+            .get(&member_id)
+            .ok_or(RoomError::ConnectionNotExists(member_id))
+            .and_then(move |conn| {
+                conn.send_event(event)
+                    .wait()
+                    .map_err(|_| RoomError::UnableSendEvent(member_id))
+            })
     }
 
     fn handle_peer_created(
@@ -290,6 +271,38 @@ impl Room {
 /// to interact with [`Room`].
 impl Actor for Room {
     type Context = Context<Self>;
+
+    /// Closes all active [`PrcConnection`].
+    fn stopping(&mut self, ctx: &mut Self::Context) -> Running {
+        use std::mem;
+        let connections = mem::replace(&mut self.connections, hashmap!());
+        let fut = connections.iter().fold(
+            vec![],
+            |mut futures, (member_id, connection)| {
+                info!(
+                    "Close connection of member {}, because room is stopped",
+                    member_id,
+                );
+                futures.push(
+                    connection.send_event(Event::PeersRemoved {
+                        peer_ids: self
+                            .peers
+                            .iter()
+                            .filter(move |(_, peer)| {
+                                peer.member_id() == *member_id
+                            })
+                            .map(|(&id, _)| id)
+                            .collect(),
+                    }),
+                );
+                futures.push(connection.close());
+                futures
+            },
+        );
+        // ToDo ignore error
+        ctx.wait(wrap_future(join_all(fut).map(|_| ())));
+        Running::Continue
+    }
 }
 
 /// Established RPC connection with some remote [`Member`].
@@ -333,7 +346,9 @@ impl Handler<AuthorizeRpcConnection> for Room {
         msg: AuthorizeRpcConnection,
         _ctx: &mut Self::Context,
     ) -> Self::Result {
-        use RpcConnectionAuthorizationError::*;
+        use RpcConnectionAuthorizationError::{
+            InvalidCredentials, MemberNotExists,
+        };
         if let Some(ref member) = self.members.get(&msg.member_id) {
             if member.credentials.eq(&msg.credentials) {
                 return Ok(());
@@ -371,35 +386,35 @@ impl Handler<RpcConnectionEstablished> for Room {
     ) -> Self::Result {
         info!("RpcConnectionEstablished for member {}", msg.member_id);
 
-        let mut fut;
-        if let Some(session) = self.sessions.get_mut(&msg.member_id) {
-            debug!(
-                "Replaced RpcConnection for member {} session",
-                msg.member_id
-            );
+        let mut fut = Either::A(future::ok(()));
+        if let Some(connection) = self.connections.remove(&msg.member_id) {
+            debug!("Closing old RpcConnection for member {}", msg.member_id);
             if let Some(handler) = self.idle_timeouts.remove(&msg.member_id) {
                 ctx.cancel_future(handler);
             }
-            fut = Either::A(session.set_connection(msg.connection));
+            fut = Either::B(connection.close());
         } else {
             let member_id = msg.member_id;
-            self.sessions
-                .insert(member_id, Session::new(msg.member_id, msg.connection));
+            self.connections.insert(msg.member_id, msg.connection);
+
             let peer = self.member_peer(&member_id);
-            fut = match peer.sender() {
-                Some(_) => match self.handle_peer_created(peer.id()) {
-                    Ok((caller, event)) => {
-                        match self.send_event(caller, event).wait() {
-                            Ok(_) => Either::B(Either::A(future::ok(()))),
-                            Err(_) => {
-                                Either::B(Either::B(self.close(Instant::now())))
-                            }
-                        }
-                    }
-                    Err(e) => Either::B(Either::B(self.close(Instant::now()))),
-                },
-                None => Either::B(Either::A(future::ok(()))),
-            };
+            if peer.sender().is_some() {
+                // ToDo try into_future(self) for handle error
+                fut = Either::A(future::done(
+                    self.handle_peer_created(peer.id())
+                        .and_then(|(caller, event)| {
+                            self.send_event(caller, event)
+                        })
+                        .map_err(move |err| {
+                            error!(
+                                "Member {} cannot join room, because {}. Room \
+                                 will be stop.",
+                                member_id, err
+                            );
+                            ctx.stop()
+                        }),
+                ));
+            }
         }
         Box::new(wrap_future(fut))
     }
@@ -413,7 +428,7 @@ impl Handler<Command> for Room {
     fn handle(
         &mut self,
         command: Command,
-        _: &mut Self::Context,
+        ctx: &mut Self::Context,
     ) -> Self::Result {
         let res = match command {
             Command::MakeSdpOffer { peer_id, sdp_offer } => {
@@ -427,15 +442,16 @@ impl Handler<Command> for Room {
                 self.handle_set_ice_candidate(peer_id, candidate)
             }
         };
-        let fut = match res {
-            Ok((member_id, event)) => {
-                match self.send_event(member_id, event).wait() {
-                    Ok(_) => Either::A(future::ok(())),
-                    Err(_) => Either::B(self.close(Instant::now())),
-                }
-            }
-            Err(e) => Either::B(self.close(Instant::now())),
-        };
+        let fut = future::done(
+            res.and_then(|(caller, event)| self.send_event(caller, event))
+                .map_err(move |err| {
+                    error!(
+                        "Failed handle command, because {}. Room will be stop.",
+                        err
+                    );
+                    ctx.stop()
+                }),
+        );
         Box::new(wrap_future(fut))
     }
 }
@@ -463,17 +479,29 @@ impl Handler<RpcConnectionClosed> for Room {
 
     /// Removes [`Session`] of specified [`Member`] from the [`Room`].
     fn handle(&mut self, msg: RpcConnectionClosed, ctx: &mut Self::Context) {
+        use RpcConnectionClosedReason::{Disconnected, Idle};
         info!(
             "RpcConnectionClosed for member {}, reason {:?}",
             msg.member_id, msg.reason
         );
         let closed_at = Instant::now();
-        self.idle_timeouts.insert(
-            msg.member_id,
-            ctx.run_later(SESSION_IDLE_TIMEOUT, move |room, ctx| {
-                ctx.wait(wrap_future(room.close(closed_at)));
-            }),
-        );
+        let member_id = msg.member_id;
+        match msg.reason {
+            Disconnected => ctx.stop(),
+            Idle => {
+                self.idle_timeouts.insert(
+                    msg.member_id,
+                    ctx.run_later(SESSION_IDLE_TIMEOUT, move |_room, ctx| {
+                        info!(
+                            "Member {} connection lost at {:?}. Room will be \
+                             stop.",
+                            member_id, closed_at
+                        );
+                        ctx.stop()
+                    }),
+                );
+            }
+        }
     }
 }
 
@@ -504,6 +532,10 @@ mod test {
     use futures::future::Future;
 
     use super::*;
+    use crate::media::track::{DirectionalTrack, TrackDirection};
+    use crate::media::{
+        AudioSettings, Peer, Track, TrackMediaType, VideoSettings,
+    };
 
     #[derive(Debug, Clone)]
     struct TestConnection {
@@ -516,11 +548,21 @@ mod test {
         type Context = Context<Self>;
 
         fn started(&mut self, ctx: &mut Self::Context) {
-            let caller_message = RpcConnectionEstablished {
-                member_id: self.member_id,
-                connection: Box::new(ctx.address()),
-            };
-            self.room.do_send(caller_message);
+            let member_id = self.member_id;
+            self.room
+                .send(RpcConnectionEstablished {
+                    member_id: self.member_id,
+                    connection: Box::new(ctx.address()),
+                })
+                .into_actor(self)
+                .then(|res, _, ctx| {
+                    match res {
+                        Err(_) => System::current().stop(),
+                        _ => {}
+                    }
+                    ok(())
+                })
+                .wait(ctx);
         }
     }
 
@@ -562,7 +604,7 @@ mod test {
                     });
                     ctx.stop();
                 }
-                Event::PeersRemoved { peer_id: _ } => {
+                Event::PeersRemoved { peer_ids: _ } => {
                     System::current().stop();
                 }
             }
@@ -588,7 +630,31 @@ mod test {
             1 => Member{id: 1, credentials: "caller_credentials".to_owned()},
             2 => Member{id: 2, credentials: "responder_credentials".to_owned()},
         };
-        Arbiter::start(move |_| Room::new(1, members, hashmap!()))
+        Arbiter::start(move |_| Room::new(1, members, create_peers(1, 2)))
+    }
+
+    fn create_peers(
+        caller: MemberId,
+        callee: MemberId,
+    ) -> HashMap<MemberId, PeerMachine> {
+        let caller_peer_id = 1;
+        let callee_peer_id = 2;
+        let mut caller_peer = Peer::new(caller_peer_id, caller, callee_peer_id);
+        let mut callee_peer = Peer::new(callee_peer_id, callee, caller_peer_id);
+
+        let track_audio =
+            Arc::new(Track::new(1, TrackMediaType::Audio(AudioSettings {})));
+        let track_video =
+            Arc::new(Track::new(2, TrackMediaType::Video(VideoSettings {})));
+        caller_peer.add_sender(track_audio.clone());
+        caller_peer.add_sender(track_video.clone());
+        callee_peer.add_receiver(track_audio);
+        callee_peer.add_receiver(track_video);
+
+        hashmap!(
+            caller_peer_id => PeerMachine::New(caller_peer),
+            callee_peer_id => PeerMachine::New(callee_peer),
+        )
     }
 
     #[test]
@@ -620,27 +686,68 @@ mod test {
         assert_eq!(
             caller_events.to_vec(),
             vec![
-                "{\"PeerCreated\":{\"peer_id\":1,\"sdp_offer\":null,\
-                 \"tracks\":[{\"id\":1,\"media_type\":{\"Audio\":{}},\
-                 \"direction\":{\"Send\":{\"receivers\":[2]}}},{\"id\":2,\
-                 \"media_type\":{\"Video\":{}},\"direction\":{\"Send\":\
-                 {\"receivers\":[2]}}}]}}",
-                "{\"SdpAnswerMade\":{\"peer_id\":1,\"sdp_answer\":\
-                 \"responder_answer\"}}",
-                "{\"PeerFinished\":{\"peer_id\":1}}"
+                serde_json::to_string(&Event::PeerCreated {
+                    peer_id: 1,
+                    sdp_offer: None,
+                    tracks: vec![
+                        DirectionalTrack {
+                            id: 1,
+                            direction: TrackDirection::Send {
+                                receivers: vec![2]
+                            },
+                            media_type: TrackMediaType::Audio(AudioSettings {}),
+                        },
+                        DirectionalTrack {
+                            id: 2,
+                            direction: TrackDirection::Send {
+                                receivers: vec![2]
+                            },
+                            media_type: TrackMediaType::Video(VideoSettings {}),
+                        },
+                    ],
+                })
+                .unwrap(),
+                serde_json::to_string(&Event::SdpAnswerMade {
+                    peer_id: 1,
+                    sdp_answer: "responder_answer".into(),
+                })
+                .unwrap(),
+                serde_json::to_string(&Event::PeersRemoved {
+                    peer_ids: vec![1],
+                })
+                .unwrap(),
             ]
         );
         assert_eq!(responder_events.len(), 2);
         assert_eq!(
             responder_events.to_vec(),
             vec![
-                "{\"PeerCreated\":{\"peer_id\":2,\"sdp_offer\":\
-                 \"caller_offer\",\"tracks\":[{\"id\":1,\"media_type\":\
-                 {\"Audio\":{}},\"direction\":{\"Recv\":{\"sender\":1}}},\
-                 {\"id\":2,\"media_type\":{\"Video\":{}},\"direction\":\
-                 {\"Recv\":{\"sender\":1}}}]}}",
-                "{\"IceCandidateDiscovered\":{\"peer_id\":2,\"candidate\":\
-                 \"ice_candidate\"}}",
+                serde_json::to_string(&Event::PeerCreated {
+                    peer_id: 2,
+                    sdp_offer: Some("caller_offer".into()),
+                    tracks: vec![
+                        DirectionalTrack {
+                            id: 1,
+                            direction: TrackDirection::Recv { sender: 1 },
+                            media_type: TrackMediaType::Audio(AudioSettings {}),
+                        },
+                        DirectionalTrack {
+                            id: 2,
+                            direction: TrackDirection::Recv { sender: 1 },
+                            media_type: TrackMediaType::Video(VideoSettings {}),
+                        },
+                    ],
+                })
+                .unwrap(),
+                serde_json::to_string(&Event::IceCandidateDiscovered {
+                    peer_id: 2,
+                    candidate: "ice_candidate".into(),
+                })
+                .unwrap(),
+                serde_json::to_string(&Event::PeersRemoved {
+                    peer_ids: vec![1],
+                })
+                .unwrap(),
             ]
         );
     }

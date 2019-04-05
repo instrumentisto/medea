@@ -107,7 +107,7 @@ mod test {
             1 => Member{id: 1, credentials: "caller_credentials".into()},
             2 => Member{id: 2, credentials: "responder_credentials".into()},
         };
-        let room = Arbiter::start(move |_| Room::new(1, members));
+        let room = Arbiter::start(move |_| Room::new(1, members, hashmap!()));
         let rooms = hashmap! {1 => room};
         RoomsRepository::new(rooms)
     }

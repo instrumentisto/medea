@@ -10,7 +10,7 @@ use crate::{
         client::{server, Room, RoomsRepository},
         control::{Id as MemberId, Member},
     },
-    media::peer::{Id as PeerId, Peer, PeerMachine},
+    media::peer::{Peer, PeerMachine},
 };
 use std::sync::Arc;
 

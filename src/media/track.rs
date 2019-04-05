@@ -23,8 +23,8 @@ impl Track {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct DirectionalTrack {
     pub id: Id,
-    pub media_type: TrackMediaType,
     pub direction: TrackDirection,
+    pub media_type: TrackMediaType,
 }
 
 /// Direction of [`Track`].

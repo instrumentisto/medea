@@ -35,6 +35,7 @@ pub enum PeerMachine {
 }
 
 impl PeerMachine {
+    /// Returns ID of [`Member`] associated with this [`Peer`].
     pub fn member_id(&self) -> MemberId {
         match self {
             PeerMachine::New(peer) => peer.member_id(),
@@ -47,6 +48,7 @@ impl PeerMachine {
         }
     }
 
+    /// Returns ID of [`Peer`].
     pub fn id(&self) -> Id {
         match self {
             PeerMachine::New(peer) => peer.id(),
@@ -59,6 +61,26 @@ impl PeerMachine {
         }
     }
 
+    /// Returns ID of [`Peer`].
+    pub fn failed(self) -> Self {
+        match self {
+            PeerMachine::New(peer) => PeerMachine::Failure(peer.failed()),
+            PeerMachine::WaitLocalSDP(peer) => {
+                PeerMachine::Failure(peer.failed())
+            }
+            PeerMachine::WaitLocalHaveRemote(peer) => {
+                PeerMachine::Failure(peer.failed())
+            }
+            PeerMachine::WaitRemoteSDP(peer) => {
+                PeerMachine::Failure(peer.failed())
+            }
+            PeerMachine::Stable(peer) => PeerMachine::Failure(peer.failed()),
+            PeerMachine::Finished(peer) => PeerMachine::Failure(peer.failed()),
+            PeerMachine::Failure(peer) => PeerMachine::Failure(peer.failed()),
+        }
+    }
+
+    /// Returns sender for this [`Peer`] if exists.
     pub fn sender(&self) -> Option<Id> {
         match self {
             PeerMachine::New(peer) => peer.sender(),
@@ -71,6 +93,7 @@ impl PeerMachine {
         }
     }
 
+    /// Returns ID of interconnected [`Peer`].
     pub fn to_peer(&self) -> Id {
         match self {
             PeerMachine::New(peer) => peer.to_peer(),
@@ -82,12 +105,6 @@ impl PeerMachine {
             PeerMachine::Failure(peer) => peer.to_peer(),
         }
     }
-}
-
-#[derive(Debug, Clone)]
-pub struct Transceiver {
-    pub member_id: MemberId,
-    pub peer_id: Id,
 }
 
 /// ID of [`Peer`].
@@ -112,18 +129,29 @@ pub struct Peer<S> {
 }
 
 impl<T: Any> Peer<T> {
+    /// Returns ID of [`Member`] associated with this [`Peer`].
     pub fn member_id(&self) -> MemberId {
         self.context.member_id
     }
 
+    /// Returns ID of [`Peer`].
     pub fn id(&self) -> Id {
         self.context.id
     }
 
+    pub fn failed(self) -> Peer<Failure> {
+        Peer {
+            context: self.context,
+            state: Failure {},
+        }
+    }
+
+    /// Returns ID of interconnected [`Peer`].
     pub fn to_peer(&self) -> Id {
         self.context.to_peer
     }
 
+    /// Returns sender for this [`Peer`] if exists.
     pub fn sender(&self) -> Option<Id> {
         if self.context.receivers.is_empty() {
             None
@@ -132,7 +160,8 @@ impl<T: Any> Peer<T> {
         }
     }
 
-    pub fn receivers(&self) -> Option<Id> {
+    /// Returns receiver for this [`Peer`] if exists.
+    pub fn receiver(&self) -> Option<Id> {
         if self.context.senders.is_empty() {
             None
         } else {
@@ -140,6 +169,7 @@ impl<T: Any> Peer<T> {
         }
     }
 
+    /// Returns [`Track`]'s of [`Peer`].
     pub fn tracks(&self) -> Vec<DirectionalTrack> {
         let tracks = self.context.senders.iter().fold(
             vec![],
@@ -188,8 +218,7 @@ impl Peer<New> {
         }
     }
 
-    /// Sends PeerCreated event to Web Client and puts [`Peer`] into state
-    /// of waiting for local offer.
+    /// Transition new [`Peer`] into state of waiting for local description.
     pub fn start(self) -> Peer<WaitLocalSDP> {
         Peer {
             context: self.context,
@@ -197,8 +226,7 @@ impl Peer<New> {
         }
     }
 
-    /// Sends PeerCreated event with local offer to Web Client and puts [`Peer`]
-    /// into state of waiting for remote offer.
+    /// Transition new [`Peer`] into state of waiting for remote description.
     pub fn set_remote_sdp(
         self,
         sdp_offer: String,
@@ -211,24 +239,20 @@ impl Peer<New> {
         }
     }
 
+    /// Add [`Track`] to [`Peer`] for send.
     pub fn add_sender(&mut self, track: Arc<Track>) {
         self.context.senders.insert(track.id, track);
     }
 
+    /// Add [`Track`] to [`Peer`] for receive.
     pub fn add_receiver(&mut self, track: Arc<Track>) {
         self.context.receivers.insert(track.id, track);
     }
 }
 
-#[test]
-fn create_peer() {
-    let peer = Peer::new(1, 1, 2);
-    let peer = peer.start();
-
-    assert_eq!(peer.state, WaitLocalSDP {});
-}
-
 impl Peer<WaitLocalSDP> {
+    /// Set local description and transition [`Peer`]
+    /// to [`WaitRemoteSDP`] state.
     pub fn set_local_sdp(self, sdp_offer: String) -> Peer<WaitRemoteSDP> {
         let mut context = self.context;
         context.sdp_offer = Some(sdp_offer);
@@ -240,6 +264,7 @@ impl Peer<WaitLocalSDP> {
 }
 
 impl Peer<WaitRemoteSDP> {
+    /// Set remote description and transition [`Peer`] to [`Stable`] state.
     pub fn set_remote_sdp(self, sdp_answer: String) -> Peer<Stable> {
         let mut context = self.context;
         context.sdp_answer = Some(sdp_answer.clone());
@@ -251,6 +276,7 @@ impl Peer<WaitRemoteSDP> {
 }
 
 impl Peer<WaitLocalHaveRemote> {
+    /// Set local description and transition [`Peer`] to [`Stable`] state.
     pub fn set_local_sdp(self, sdp_answer: String) -> Peer<Stable> {
         let mut context = self.context;
         context.sdp_answer = Some(sdp_answer);
@@ -259,4 +285,12 @@ impl Peer<WaitLocalHaveRemote> {
             state: Stable {},
         }
     }
+}
+
+#[test]
+fn create_peer() {
+    let peer = Peer::new(1, 1, 2);
+    let peer = peer.start();
+
+    assert_eq!(peer.state, WaitLocalSDP {});
 }
