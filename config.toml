@@ -1,0 +1,6 @@
+[server]
+# Duration, after which remote RPC client will be considered idle if no
+# heartbeat messages received.
+#
+# Default:
+#   idle_timeout = "10s"

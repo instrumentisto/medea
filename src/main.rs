@@ -1,19 +1,24 @@
 //! Medea media server application.
 
-use actix::prelude::*;
-use dotenv::dotenv;
-use hashbrown::HashMap;
-
-use crate::api::{
-    client::{server, Room, RoomsRepository},
-    control::Member,
-};
-
 #[macro_use]
 mod utils;
 
-mod api;
-mod log;
+pub mod api;
+pub mod conf;
+pub mod log;
+
+use actix::prelude::*;
+use dotenv::dotenv;
+use hashbrown::HashMap;
+use log::prelude::*;
+
+use crate::{
+    api::{
+        client::{server, Room, RoomsRepository},
+        control::Member,
+    },
+    conf::Conf,
+};
 
 fn main() {
     dotenv().ok();
@@ -35,6 +40,10 @@ fn main() {
     let rooms = hashmap! {1 => room};
     let rooms_repo = RoomsRepository::new(rooms);
 
-    server::run(rooms_repo);
+    let config = Conf::parse().unwrap();
+
+    info!("{:?}", config);
+
+    server::run(rooms_repo, config);
     let _ = sys.run();
 }
