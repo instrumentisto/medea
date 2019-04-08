@@ -31,11 +31,9 @@ pub struct WsSession {
     /// Handle for watchdog which checks whether WebSocket client became
     /// idle (no `ping` messages received during [`idle_timeout`]).
     ///
-    /// This one should be renewed on received ping WebSocket message
-    /// from client.
+    /// This one should be renewed on received `ping` message from client.
     idle_handler: Option<SpawnHandle>,
-
-    /// Timeout of receiving ping messages from client.
+    /// Timeout of receiving `ping` messages from client.
     idle_timeout: Duration,
 
     /// Indicates whether WebSocket connection is closed by server ot by
@@ -192,8 +190,8 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
         );
         match msg {
             ws::Message::Text(text) => {
+                self.reset_idle_timeout(ctx);
                 if let Ok(msg) = serde_json::from_str::<Heartbeat>(&text) {
-                    self.reset_idle_timeout(ctx);
                     ctx.notify(msg);
                 }
             }
@@ -219,6 +217,7 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
                             }),
                     ));
                     ctx.close(reason);
+                    ctx.stop();
                 }
             }
             _ => error!(

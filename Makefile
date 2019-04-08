@@ -6,7 +6,7 @@ comma := ,
 
 # Checks two given strings for equality.
 eq = $(if $(or $(1),$(2)),$(and $(findstring $(1),$(2)),\
-								$(findstring $(2),$(1))),1)
+                                $(findstring $(2),$(1))),1)
 
 
 
@@ -16,8 +16,8 @@ eq = $(if $(or $(1),$(2)),$(and $(findstring $(1),$(2)),\
 ######################
 
 CARGO_HOME ?= $(strip $(shell dirname $$(dirname $$(which cargo))))
-RUST_VER ?= "1.33"
-NODE_VER ?= "11.10"
+RUST_VER ?= 1.33
+NODE_VER ?= 11.10
 
 
 
@@ -34,10 +34,13 @@ NODE_VER ?= "11.10"
 deps: cargo.deps yarn
 
 
-fmt: cargo.fmt
+docs: docs.rust
 
 
 lint: cargo.lint
+
+
+fmt: cargo.fmt
 
 
 up: up.dev
@@ -52,6 +55,31 @@ test: test.unit
 
 
 
+
+##################
+# Cargo commands #
+##################
+
+# Format Rust sources with rustfmt.
+#
+# Usage:
+#	make cargo.fmt [check=(no|yes)]
+
+cargo.fmt:
+	cargo +nightly fmt --all $(if $(call eq,$(check),yes),-- --check,)
+
+
+# Lint Rust sources with clippy.
+#
+# Usage:
+#	make cargo.lint
+
+cargo.lint:
+	cargo clippy -- -D clippy::pedantic -D warnings
+
+
+
+
 # Resolve Cargo project dependencies.
 #
 # Usage:
@@ -61,6 +89,7 @@ cargo-cmd = $(if $(call eq,$(cmd),),fetch,$(cmd))
 
 cargo.deps:
 	cargo fetch
+
 
 
 
@@ -95,19 +124,27 @@ endif
 
 
 
-# Lint Rust sources with clippy.
+##########################
+# Documentation commands #
+##########################
+
+# Generate project documentation of Rust sources.
 #
 # Usage:
-#	make cargo.lint
+#	make docs.rust [open=(yes|no)] [clean=(no|yes)]
 
-cargo.lint:
-ifeq ($(pre-install),yes)
-	rustup component add clippy
+docs.rust:
+ifeq ($(clean),yes)
+	@rm -rf target/doc/
 endif
-	cargo clippy -- -D clippy::pedantic -D warnings
+	cargo +nightly doc $(if $(call eq,$(open),no),,--open)
 
 
 
+
+####################
+# Testing commands #
+####################
 
 # Run Rust unit tests of project.
 #
@@ -144,41 +181,13 @@ endif
 
 
 
-# Format Rust sources with rustfmt.
-#
-# Usage:
-#	make cargo.fmt [check=(no|yes)]
-
-cargo.fmt:
-ifeq ($(pre-install),yes)
-	rustup component add rustfmt
-endif
-	cargo +nightly fmt --all $(if $(call eq,$(check),yes),-- --check,)
-
-
-
-
-# Run projects Medea and e2e app locally with dev settings.
-#
-# Usage:
-#	make up.dev
-
-up.dev:
-	$(MAKE) -j2 up.dev.server up.dev.e2e
-
-up.dev.server:
-	cargo run
-
-up.dev.e2e:
-	npm run start --prefix jason/e2e
-
-
-
-
 ##################
 # .PHONY section #
 ##################
 
-.PHONY: cargo.deps cargo.fmt cargo.lint \
-		fmt lint test test.unit \
-		up up.dev up.dev.server up.dev.e2e yarn
+.PHONY: cargo cargo.deps cargo.fmt cargo.lint \
+        docs docs.rust \
+        test test.unit \
+        up up.dev up.dev.server up.dev.e2e \
+        yarn
+
