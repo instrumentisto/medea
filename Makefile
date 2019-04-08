@@ -181,6 +181,23 @@ endif
 
 
 
+# Run projects Medea and e2e app locally with dev settings.
+#
+# Usage:
+#	make up.dev
+
+up.dev:
+	$(MAKE) -j2 up.dev.server up.dev.e2e
+
+up.dev.server:
+	cargo run
+
+up.dev.e2e:
+	npm run start --prefix jason/e2e
+
+
+
+
 ##################
 # .PHONY section #
 ##################
