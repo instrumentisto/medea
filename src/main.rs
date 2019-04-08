@@ -6,6 +6,7 @@ mod utils;
 pub mod api;
 pub mod conf;
 pub mod log;
+pub mod media;
 
 use std::sync::Arc;
 
@@ -17,7 +18,7 @@ use log::prelude::*;
 use crate::{
     api::{
         client::{server, Room, RoomsRepository},
-        control::Member,
+        control::{Id as MemberId, Member},
     },
     conf::Conf,
     media::{

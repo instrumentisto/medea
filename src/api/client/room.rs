@@ -274,33 +274,33 @@ impl Actor for Room {
 
     /// Closes all active [`PrcConnection`].
     fn stopping(&mut self, ctx: &mut Self::Context) -> Running {
+        use futures::stream::{self, Stream};
         use std::mem;
+
+        debug!("Room stopped");
         let connections = mem::replace(&mut self.connections, hashmap!());
-        let fut = connections.iter().fold(
-            vec![],
-            |mut futures, (member_id, connection)| {
-                info!(
-                    "Close connection of member {}, because room is stopped",
-                    member_id,
-                );
-                futures.push(
-                    connection.send_event(Event::PeersRemoved {
-                        peer_ids: self
-                            .peers
-                            .iter()
-                            .filter(move |(_, peer)| {
-                                peer.member_id() == *member_id
-                            })
-                            .map(|(&id, _)| id)
-                            .collect(),
-                    }),
-                );
-                futures.push(connection.close());
-                futures
+        let conn_with_event = connections
+            .into_iter()
+            .map(|(member_id, conn)| {
+                let event = Event::PeersRemoved {
+                    peer_ids: self
+                        .peers
+                        .iter()
+                        .filter(move |(_, peer)| peer.member_id() == member_id)
+                        .map(|(&id, _)| id)
+                        .collect(),
+                };
+                (conn, event)
+            })
+            .collect::<Vec<_>>();
+
+        ctx.wait(wrap_future(stream::iter_ok(conn_with_event).for_each(
+            |(mut conn, event)| {
+                conn.send_event(event)
+                    .and_then(move |_| conn.close())
+                    .map_err(|_| ())
             },
-        );
-        // ToDo ignore error
-        ctx.wait(wrap_future(join_all(fut).map(|_| ())));
+        )));
         Running::Continue
     }
 }
@@ -309,7 +309,7 @@ impl Actor for Room {
 pub trait RpcConnection: fmt::Debug + Send {
     /// Closes [`RpcConnection`].
     /// No [`RpcConnectionClosed`] signals should be emitted.
-    fn close(&self) -> Box<dyn Future<Item = (), Error = ()>>;
+    fn close(&mut self) -> Box<dyn Future<Item = (), Error = ()>>;
 
     /// Sends [`Event`] to remote [`Member`].
     fn send_event(
@@ -387,7 +387,7 @@ impl Handler<RpcConnectionEstablished> for Room {
         info!("RpcConnectionEstablished for member {}", msg.member_id);
 
         let mut fut = Either::A(future::ok(()));
-        if let Some(connection) = self.connections.remove(&msg.member_id) {
+        if let Some(mut connection) = self.connections.remove(&msg.member_id) {
             debug!("Closing old RpcConnection for member {}", msg.member_id);
             if let Some(handler) = self.idle_timeouts.remove(&msg.member_id) {
                 ctx.cancel_future(handler);
@@ -479,7 +479,6 @@ impl Handler<RpcConnectionClosed> for Room {
 
     /// Removes [`Session`] of specified [`Member`] from the [`Room`].
     fn handle(&mut self, msg: RpcConnectionClosed, ctx: &mut Self::Context) {
-        use RpcConnectionClosedReason::{Disconnected, Idle};
         info!(
             "RpcConnectionClosed for member {}, reason {:?}",
             msg.member_id, msg.reason
@@ -487,8 +486,8 @@ impl Handler<RpcConnectionClosed> for Room {
         let closed_at = Instant::now();
         let member_id = msg.member_id;
         match msg.reason {
-            Disconnected => ctx.stop(),
-            Idle => {
+            RpcConnectionClosedReason::Disconnected => ctx.stop(),
+            RpcConnectionClosedReason::Idle => {
                 self.idle_timeouts.insert(
                     msg.member_id,
                     ctx.run_later(SESSION_IDLE_TIMEOUT, move |_room, ctx| {
