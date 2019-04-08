@@ -1,17 +1,19 @@
 pub mod protocol;
 use self::protocol::*;
-use wasm_bindgen::prelude::*;
-use js_sys::{Date};
-use wasm_bindgen::JsCast;
+use futures::sync::mpsc::UnboundedSender;
+use js_sys::Date;
 use std::{cell::RefCell, rc::Rc};
-use futures::sync::mpsc::{UnboundedSender};
-use web_sys::{console, MessageEvent, WebSocket, Event, CloseEvent};
+use wasm_bindgen::prelude::*;
+use wasm_bindgen::JsCast;
+use web_sys::{console, CloseEvent, Event, MessageEvent, WebSocket};
 
-use crate::utils::{IntervalHandle, window, bind_handler_fn_mut,bind_handler_fn_once};
+use crate::utils::{
+    bind_handler_fn_mut, bind_handler_fn_once, window, IntervalHandle,
+};
 
-//TODO:
-//1. Reconnect.
-//2. Disconnect if no pongs.
+// TODO:
+// 1. Reconnect.
+// 2. Disconnect if no pongs.
 pub struct Transport {
     sock: Rc<RefCell<Option<WebSocket>>>,
     token: String,
@@ -23,15 +25,15 @@ pub struct Transport {
 }
 
 impl Transport {
-    pub fn new(token: String) -> Self {
+    pub fn new(token: String, ping_interval: i32) -> Self {
         Transport {
             sock: Rc::new(RefCell::new(None)),
             token,
             subs: vec![],
-            pinger: Rc::new(Pinger::new()),
+            pinger: Rc::new(Pinger::new(ping_interval)),
             on_open: None,
             on_message: None,
-            on_close: None
+            on_close: None,
         }
     }
 
@@ -43,27 +45,44 @@ impl Transport {
 
         let socket_rc = Rc::clone(&socket);
         let pinger_rc: Rc<Pinger> = Rc::clone(&self.pinger);
-        let on_open = bind_handler_fn_once("open", socket_ref, move |_: Event| {
-            pinger_rc.start(socket_rc);
-        }).unwrap();
+        let on_open =
+            bind_handler_fn_once("open", socket_ref, move |_: Event| {
+                pinger_rc.start(socket_rc);
+            })
+            .unwrap();
 
         let pinger_rc = Rc::clone(&self.pinger);
-        let on_message = bind_handler_fn_mut("message", socket_ref, move |event: MessageEvent| {
-            let payload = event.data();
+        let on_message = bind_handler_fn_mut(
+            "message",
+            socket_ref,
+            move |event: MessageEvent| {
+                let payload = event.data();
 
-            pinger_rc.set_pong_at(Date::now());
+                pinger_rc.set_pong_at(Date::now());
 
-            console::log(&js_sys::Array::from(&payload));
-        }).unwrap();
+                console::log(&js_sys::Array::from(&payload));
+            },
+        )
+        .unwrap();
 
         let socket_rc = Rc::clone(&socket);
         let pinger_rc: Rc<Pinger> = Rc::clone(&self.pinger);
-        let on_close = bind_handler_fn_once("close", socket_ref, move |close: CloseEvent| {
-            console::log(&js_sys::Array::from(&JsValue::from_str(&format!("Close [code: {}, reason: {}]", close.code(), close.reason()))));
-            socket_rc.borrow_mut().take();
-            pinger_rc.stop();
-
-        }).unwrap();
+        let on_close = bind_handler_fn_once(
+            "close",
+            socket_ref,
+            move |close: CloseEvent| {
+                console::log(&js_sys::Array::from(&JsValue::from_str(
+                    &format!(
+                        "Close [code: {}, reason: {}]",
+                        close.code(),
+                        close.reason()
+                    ),
+                )));
+                socket_rc.borrow_mut().take();
+                pinger_rc.stop();
+            },
+        )
+        .unwrap();
 
         self.on_open = Some(on_open);
         self.on_message = Some(on_message);
@@ -80,6 +99,7 @@ impl Transport {
 struct Pinger(Rc<RefCell<InnerPinger>>);
 
 struct InnerPinger {
+    ping_interval: i32,
     num: usize,
     pong_at: Option<f64>,
     socket: Rc<RefCell<Option<WebSocket>>>,
@@ -87,7 +107,6 @@ struct InnerPinger {
 }
 
 impl InnerPinger {
-
     fn send_now(&mut self) {
         if let Ok(socket) = self.socket.try_borrow() {
             if let Some(socket) = socket.as_ref() {
@@ -108,8 +127,9 @@ struct PingTaskHandler {
 }
 
 impl Pinger {
-    fn new() -> Self {
+    fn new(ping_interval: i32) -> Self {
         Self(Rc::new(RefCell::new(InnerPinger {
+            ping_interval,
             num: 0,
             pong_at: None,
             socket: Rc::new(RefCell::new(None)),
@@ -134,7 +154,7 @@ impl Pinger {
         let interval_id = window()
             .set_interval_with_callback_and_timeout_and_arguments_0(
                 do_ping.as_ref().unchecked_ref(),
-                3000,
+                inner.ping_interval,
             )
             .unwrap();
 

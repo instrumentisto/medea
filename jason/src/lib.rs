@@ -1,10 +1,10 @@
 use futures::sync::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
 use wasm_bindgen::prelude::*;
 
-mod utils;
 mod transport;
+mod utils;
 
-use transport::{Transport, protocol::*};
+use transport::{protocol::*, Transport};
 
 // When the `console_error_panic_hook` feature is enabled, we can call the
 // `set_panic_hook` function at least once during initialization, and then
@@ -45,12 +45,11 @@ impl Jason {
     #[wasm_bindgen(constructor)]
     pub fn new() -> Self {
         set_panic_hook();
-        println!("asd");
         Self { transport: None }
     }
 
     pub fn init_session(&mut self, token: String) -> SessionHandler {
-        let mut transport = Transport::new(token);
+        let mut transport = Transport::new(token, 3000);
         transport.init();
 
         let handler = SessionHandler::new();
