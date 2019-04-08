@@ -4,11 +4,11 @@ use serde::{Deserialize, Serialize};
 use std::{cell::RefCell, rc::Rc};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
-use web_sys::{console, MessageEvent, WebSocket, Window, Event, CloseEvent};
+use web_sys::{console, MessageEvent, WebSocket, Event, CloseEvent};
 
 mod utils;
 
-use utils::*;
+use utils::{window, bind_handler_fn_mut, bind_handler_fn_once, IntervalHandle};
 
 // When the `console_error_panic_hook` feature is enabled, we can call the
 // `set_panic_hook` function at least once during initialization, and then
@@ -19,23 +19,19 @@ use utils::*;
 #[cfg(feature = "console_error_panic_hook")]
 pub use console_error_panic_hook::set_once as set_panic_hook;
 
-
 // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global
 // allocator.
 #[cfg(feature = "wee_alloc")]
 #[global_allocator]
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
-fn window() -> Window {
-    // cannot use lazy_static since window is !Sync
-    // safe to unwrap
-    web_sys::window().unwrap()
-}
-
+//TODO:
+//1. Reconnect.
+//2. Disconnect if no pongs.
 struct Transport {
-    sock: Rc<Option<WebSocket>>,
+    sock: Rc<RefCell<Option<WebSocket>>>,
     token: String,
-    pinger: Rc<RefCell<Pinger>>,
+    pinger: Rc<Pinger>,
     subs: Vec<UnboundedSender<Command>>,
     on_open: Option<Closure<dyn FnMut(Event)>>,
     on_message: Option<Closure<dyn FnMut(MessageEvent)>>,
@@ -45,10 +41,10 @@ struct Transport {
 impl Transport {
     fn new(token: String) -> Self {
         Transport {
-            sock: Rc::new(None),
+            sock: Rc::new(RefCell::new(None)),
             token,
             subs: vec![],
-            pinger: Rc::new(RefCell::new(Pinger::new())),
+            pinger: Rc::new(Pinger::new()),
             on_open: None,
             on_message: None,
             on_close: None
@@ -57,34 +53,39 @@ impl Transport {
 
     fn init(&mut self) {
         let socket = WebSocket::new(&self.token).unwrap();
-        let socket = Rc::new(socket);
+        let socket = Rc::new(RefCell::new(Some(socket)));
+        let socket_borrow = socket.borrow();
+        let socket_ref = socket_borrow.as_ref().unwrap();
 
         let socket_rc = Rc::clone(&socket);
-        let pinger_rc = Rc::clone(&self.pinger);
-        let on_open = bind_handler_fn_once("open", &socket, move |_:Event| {
-            pinger_rc.borrow().start(socket_rc);
+        let pinger_rc: Rc<Pinger> = Rc::clone(&self.pinger);
+        let on_open = bind_handler_fn_once("open", socket_ref, move |_: Event| {
+            pinger_rc.start(socket_rc);
         }).unwrap();
 
         let pinger_rc = Rc::clone(&self.pinger);
-        let on_message = bind_handler_fn_mut("message", &socket, move |event: MessageEvent| {
+        let on_message = bind_handler_fn_mut("message", socket_ref, move |event: MessageEvent| {
             let payload = event.data();
 
-            if let Ok(pinger) = pinger_rc.try_borrow_mut() {
-                pinger.set_pong_at(Date::now());
-            }
+            pinger_rc.set_pong_at(Date::now());
 
             console::log(&js_sys::Array::from(&payload));
         }).unwrap();
 
-        let on_close = bind_handler_fn_once("close", &socket, move |close:CloseEvent| {
-//            pinger_rc.borrow().start(socket_rc);
-//            self.sock.take();
+        let socket_rc = Rc::clone(&socket);
+        let pinger_rc: Rc<Pinger> = Rc::clone(&self.pinger);
+        let on_close = bind_handler_fn_once("close", socket_ref, move |close: CloseEvent| {
+            console::log(&js_sys::Array::from(&JsValue::from_str(&format!("Close [code: {}, reason: {}]", close.code(), close.reason()))));
+            socket_rc.borrow_mut().take();
+            pinger_rc.stop();
+
         }).unwrap();
 
         self.on_open = Some(on_open);
         self.on_message = Some(on_message);
         self.on_close = Some(on_close);
-        self.sock = Rc::new(Some(socket))
+        drop(socket_borrow);
+        self.sock = socket
     }
 
     fn add_sub(&mut self, sub: UnboundedSender<Command>) {
@@ -97,29 +98,29 @@ struct Pinger(Rc<RefCell<InnerPinger>>);
 struct InnerPinger {
     num: usize,
     pong_at: Option<f64>,
-    socket: Option<Rc<WebSocket>>,
-    hearbeat_handler: Option<PingTaskHandler>,
+    socket: Rc<RefCell<Option<WebSocket>>>,
+    ping_task: Option<PingTaskHandler>,
 }
 
 impl InnerPinger {
+
     fn send_now(&mut self) {
-        match self.socket.as_ref() {
-            None => {}
-            Some(socket) => {
-                self.num+=1;
+        if let Ok(socket) = self.socket.try_borrow() {
+            if let Some(socket) = socket.as_ref() {
+                self.num += 1;
 
                 let msg =
                     serde_json::to_string(&Heartbeat::Ping(self.num)).unwrap();
 
                 socket.send_with_str(&msg).unwrap();
             }
-        };
+        }
     }
 }
 
 struct PingTaskHandler {
     ping_closure: Closure<dyn FnMut()>,
-    interval_id: i32,
+    interval_handler: IntervalHandle,
 }
 
 impl Pinger {
@@ -127,8 +128,8 @@ impl Pinger {
         Self(Rc::new(RefCell::new(InnerPinger {
             num: 0,
             pong_at: None,
-            socket: None,
-            hearbeat_handler: None,
+            socket: Rc::new(RefCell::new(None)),
+            ping_task: None,
         })))
     }
 
@@ -136,9 +137,9 @@ impl Pinger {
         self.0.borrow_mut().pong_at = Some(at);
     }
 
-    fn start(&self, socket: Rc<WebSocket>) {
+    fn start(&self, socket: Rc<RefCell<Option<WebSocket>>>) {
         let mut inner = self.0.borrow_mut();
-        inner.socket = Some(socket);
+        inner.socket = socket;
         inner.send_now();
 
         let inner_rc = Rc::clone(&self.0);
@@ -153,10 +154,14 @@ impl Pinger {
             )
             .unwrap();
 
-        inner.hearbeat_handler = Some(PingTaskHandler {
+        inner.ping_task = Some(PingTaskHandler {
             ping_closure: do_ping,
-            interval_id,
+            interval_handler: IntervalHandle(interval_id),
         });
+    }
+
+    fn stop(&self) {
+        self.0.borrow_mut().ping_task.take();
     }
 }
 
