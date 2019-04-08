@@ -56,11 +56,19 @@ impl Transport {
             "message",
             socket_ref,
             move |event: MessageEvent| {
-                let payload = event.data();
+                let mut payload = event.data();
 
-                pinger_rc.set_pong_at(Date::now());
+                if payload.is_string() {
+                    let payload = payload.as_string().unwrap();
 
-                console::log(&js_sys::Array::from(&payload));
+                    if let Ok(Heartbeat::Pong(pong)) = serde_json::from_str::<Heartbeat>(&payload) {
+                        pinger_rc.set_pong_at(Date::now());
+                        console::log(&js_sys::Array::from(&JsValue::from_str("pong received")));
+                    } else {
+                        let command = serde_json::from_str::<Command>(&payload).unwrap();
+                        console::log(&js_sys::Array::from(&JsValue::from_str("command received")));
+                    }
+                }
             },
         )
         .unwrap();

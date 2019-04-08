@@ -13,7 +13,7 @@ pub enum Heartbeat {
 }
 
 /// WebSocket message from Web Client to Media Server.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Deserialize)]
 pub enum Command {
     /// Web Client sends SDP Offer.
     MakeSdpOffer { peer_id: u64, sdp_offer: String },
