@@ -19,10 +19,6 @@ use crate::{
     log::prelude::*,
 };
 
-// TODO: via conf
-/// Timeout of receiving any WebSocket messages from client.
-pub const CLIENT_IDLE_TIMEOUT: Duration = Duration::from_secs(10);
-
 /// Long-running WebSocket connection of Client API.
 #[derive(Debug)]
 #[allow(clippy::module_name_repetitions)]
@@ -32,8 +28,11 @@ pub struct WsSession {
     /// [`Room`] that [`Member`] is associated with.
     room: Addr<Room>,
 
+    /// Timeout of receiving any messages from client.
+    idle_timeout: Duration,
+
     /// Timestamp for watchdog which checks whether WebSocket client became
-    /// idle (no messages received during [`CLIENT_IDLE_TIMEOUT`]).
+    /// idle (no messages received during [`idle_timeout`]).
     ///
     /// This one should be renewed on any received WebSocket message
     /// from client.
@@ -46,10 +45,15 @@ pub struct WsSession {
 
 impl WsSession {
     /// Creates new [`WsSession`] for specified [`Member`].
-    pub fn new(member_id: MemberId, room: Addr<Room>) -> Self {
+    pub fn new(
+        member_id: MemberId,
+        room: Addr<Room>,
+        idle_timeout: Duration,
+    ) -> Self {
         Self {
             member_id,
             room,
+            idle_timeout,
             last_activity: Instant::now(),
             closed_by_server: false,
         }
@@ -57,15 +61,15 @@ impl WsSession {
 
     /// Start idle watchdog.
     fn start_watchdog(&mut self, ctx: &mut <Self as Actor>::Context) {
-        ctx.run_interval(Duration::new(1, 0), |conn, ctx| {
-            if Instant::now().duration_since(conn.last_activity)
-                > CLIENT_IDLE_TIMEOUT
+        ctx.run_interval(Duration::new(1, 0), |sess, ctx| {
+            if Instant::now().duration_since(sess.last_activity)
+                > sess.idle_timeout
             {
-                info!("WsConnection with member {} is idle", conn.member_id);
+                info!("WsSession of member {} is idle", sess.member_id);
 
-                let member_id = conn.member_id;
+                let member_id = sess.member_id;
                 ctx.wait(wrap_future(
-                    conn.room
+                    sess.room
                         .send(RpcConnectionClosed {
                             member_id,
                             reason: RpcConnectionClosedReason::Idle,
@@ -109,10 +113,10 @@ impl Actor for WsSession {
                 .map(|_| ())
                 .map_err(move |err| {
                     error!(
-                        "WsConnection of member {} failed to join Room, \
-                         because: {:?}",
+                        "WsSession of member {} failed to join Room, because: \
+                         {:?}",
                         member_id, err,
-                    );
+                    )
                 }),
         ));
     }
@@ -123,9 +127,8 @@ impl Actor for WsSession {
 }
 
 impl RpcConnection for Addr<WsSession> {
-    /// Closes [`WsConnection`] by sending itself "normal closure" close
-    /// message.
-    fn close(&self) -> Box<dyn Future<Item = (), Error = ()>> {
+    /// Closes [`WsSession`] by sending itself "normal closure" close message.
+    fn close(&mut self) -> Box<dyn Future<Item = (), Error = ()>> {
         let fut = self
             .send(Close {
                 reason: Some(ws::CloseCode::Normal.into()),
@@ -194,6 +197,7 @@ impl Handler<Heartbeat> for WsSession {
     /// to the received `Heartbeat::Ping` message.
     fn handle(&mut self, msg: Heartbeat, ctx: &mut Self::Context) {
         if let Heartbeat::Ping(n) = msg {
+            trace!("Received ping: {}", n);
             ctx.text(serde_json::to_string(&Heartbeat::Pong(n)).unwrap())
         }
     }
@@ -242,14 +246,14 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
                             })
                             .map_err(move |err| {
                                 error!(
-                                    "Cannot send Close from member {}, \
-                                     because {}",
-                                    member_id, err
+                                    "WsSession of member {} failed to remove \
+                                     from Room, because: {:?}",
+                                    member_id, err,
                                 )
                             }),
                     ));
                     ctx.close(reason);
-                    // ctx.stop();
+                    ctx.stop();
                 }
             }
             _ => error!(

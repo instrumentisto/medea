@@ -1,25 +1,30 @@
 //! Medea media server application.
 
-use actix::prelude::*;
-use dotenv::dotenv;
-use hashbrown::HashMap;
-
-use crate::media::{AudioSettings, Track, TrackMediaType, VideoSettings};
-use crate::{
-    api::{
-        client::{server, Room, RoomsRepository},
-        control::{Id as MemberId, Member},
-    },
-    media::peer::{Peer, PeerMachine},
-};
-use std::sync::Arc;
-
 #[macro_use]
 mod utils;
 
-mod api;
-mod log;
-mod media;
+pub mod api;
+pub mod conf;
+pub mod log;
+
+use std::sync::Arc;
+
+use actix::prelude::*;
+use dotenv::dotenv;
+use hashbrown::HashMap;
+use log::prelude::*;
+
+use crate::{
+    api::{
+        client::{server, Room, RoomsRepository},
+        control::Member,
+    },
+    conf::Conf,
+    media::{
+        peer::{Peer, PeerMachine},
+        track::{AudioSettings, Track, TrackMediaType, VideoSettings},
+    },
+};
 
 fn main() {
     dotenv().ok();
@@ -38,7 +43,11 @@ fn main() {
     let rooms = hashmap! {1 => room};
     let rooms_repo = RoomsRepository::new(rooms);
 
-    server::run(rooms_repo);
+    let config = Conf::parse().unwrap();
+
+    info!("{:?}", config);
+
+    server::run(rooms_repo, config);
     let _ = sys.run();
 }
 
