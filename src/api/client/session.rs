@@ -1,19 +1,19 @@
 //! WebSocket session.
 
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use actix::{
     fut::wrap_future, Actor, ActorContext, Addr, AsyncContext, Handler,
-    Message, SpawnHandle, StreamHandler,
+    Message, StreamHandler,
 };
 use actix_web::ws::{self, CloseReason};
-use futures::Future;
+use futures::future::Future;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    api::client::room::{
-        Room, RpcConnection, RpcConnectionClosed, RpcConnectionClosedReason,
-        RpcConnectionEstablished,
+    api::client::{
+        Command, Event, Room, RpcConnection, RpcConnectionClosed,
+        RpcConnectionClosedReason, RpcConnectionEstablished,
     },
     api::control::member::Id as MemberId,
     log::prelude::*,
@@ -28,13 +28,15 @@ pub struct WsSession {
     /// [`Room`] that [`Member`] is associated with.
     room: Addr<Room>,
 
-    /// Handle for watchdog which checks whether WebSocket client became
-    /// idle (no `ping` messages received during [`idle_timeout`]).
-    ///
-    /// This one should be renewed on received `ping` message from client.
-    idle_handler: Option<SpawnHandle>,
-    /// Timeout of receiving `ping` messages from client.
+    /// Timeout of receiving any messages from client.
     idle_timeout: Duration,
+
+    /// Timestamp for watchdog which checks whether WebSocket client became
+    /// idle (no messages received during [`idle_timeout`]).
+    ///
+    /// This one should be renewed on any received WebSocket message
+    /// from client.
+    last_activity: Instant,
 
     /// Indicates whether WebSocket connection is closed by server ot by
     /// client.
@@ -51,21 +53,19 @@ impl WsSession {
         Self {
             member_id,
             room,
-            idle_handler: None,
             idle_timeout,
+            last_activity: Instant::now(),
             closed_by_server: false,
         }
     }
 
-    /// Resets idle handler watchdog.
-    fn reset_idle_timeout(&mut self, ctx: &mut <Self as Actor>::Context) {
-        if let Some(handler) = self.idle_handler {
-            ctx.cancel_future(handler);
-        }
-
-        self.idle_handler =
-            Some(ctx.run_later(self.idle_timeout, |sess, ctx| {
-                info!("WsConnection with member {} is idle", sess.member_id);
+    /// Start idle watchdog.
+    fn start_watchdog(&mut self, ctx: &mut <Self as Actor>::Context) {
+        ctx.run_interval(Duration::new(1, 0), |sess, ctx| {
+            if Instant::now().duration_since(sess.last_activity)
+                > sess.idle_timeout
+            {
+                info!("WsSession of member {} is idle", sess.member_id);
 
                 let member_id = sess.member_id;
                 ctx.wait(wrap_future(
@@ -86,7 +86,8 @@ impl WsSession {
                 ctx.notify(Close {
                     reason: Some(ws::CloseCode::Normal.into()),
                 });
-            }));
+            }
+        });
     }
 }
 
@@ -100,7 +101,7 @@ impl Actor for WsSession {
     fn started(&mut self, ctx: &mut Self::Context) {
         debug!("Started WsSession for member {}", self.member_id);
 
-        self.reset_idle_timeout(ctx);
+        self.start_watchdog(ctx);
 
         let member_id = self.member_id;
         ctx.wait(wrap_future(
@@ -135,6 +136,17 @@ impl RpcConnection for Addr<WsSession> {
             .map_err(|_| ());
         Box::new(fut)
     }
+
+    /// Sends [`Event`] to Web Client.
+    fn send_event(
+        &self,
+        event: Event,
+    ) -> Box<dyn Future<Item = (), Error = ()>> {
+        let fut = self
+            .send(event)
+            .map_err(|err| error!("Failed send event {:?} ", err));
+        Box::new(fut)
+    }
 }
 
 /// Message for closing [`WsSession`].
@@ -152,6 +164,16 @@ impl Handler<Close> for WsSession {
         self.closed_by_server = true;
         ctx.close(close.reason);
         ctx.stop();
+    }
+}
+
+impl Handler<Event> for WsSession {
+    type Result = ();
+
+    /// Sends [`Event`] to Web Client.
+    fn handle(&mut self, event: Event, ctx: &mut Self::Context) {
+        debug!("Event {:?} for member {}", event, self.member_id);
+        ctx.text(serde_json::to_string(&event).unwrap())
     }
 }
 
@@ -190,9 +212,23 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
         );
         match msg {
             ws::Message::Text(text) => {
-                self.reset_idle_timeout(ctx);
-                if let Ok(msg) = serde_json::from_str::<Heartbeat>(&text) {
-                    ctx.notify(msg);
+                self.last_activity = Instant::now();
+                if let Ok(ping) = serde_json::from_str::<Heartbeat>(&text) {
+                    ctx.notify(ping);
+                }
+                if let Ok(command) = serde_json::from_str::<Command>(&text) {
+                    let member_id = self.member_id;
+                    ctx.wait(wrap_future(
+                        self.room.send(command).map(|_| ()).map_err(
+                            move |err| {
+                                error!(
+                                    "Cannot send Command from member {}, \
+                                     because {}",
+                                    member_id, err
+                                )
+                            },
+                        ),
+                    ));
                 }
             }
             ws::Message::Close(reason) => {

@@ -6,6 +6,9 @@ mod utils;
 pub mod api;
 pub mod conf;
 pub mod log;
+pub mod media;
+
+use std::sync::Arc;
 
 use actix::prelude::*;
 use dotenv::dotenv;
@@ -15,9 +18,13 @@ use log::prelude::*;
 use crate::{
     api::{
         client::{server, Room, RoomsRepository},
-        control::Member,
+        control::{Id as MemberId, Member},
     },
     conf::Conf,
+    media::{
+        peer::{Peer, PeerMachine},
+        track::{AudioSettings, Track, TrackMediaType, VideoSettings},
+    },
 };
 
 fn main() {
@@ -32,11 +39,8 @@ fn main() {
         1 => Member{id: 1, credentials: "caller_credentials".to_owned()},
         2 => Member{id: 2, credentials: "responder_credentials".to_owned()},
     };
-    let room = Arbiter::start(move |_| Room {
-        id: 1,
-        members,
-        connections: HashMap::new(),
-    });
+    let peers = create_peers(1, 2);
+    let room = Arbiter::start(move |_| Room::new(1, members, peers));
     let rooms = hashmap! {1 => room};
     let rooms_repo = RoomsRepository::new(rooms);
 
@@ -46,4 +50,28 @@ fn main() {
 
     server::run(rooms_repo, config);
     let _ = sys.run();
+}
+
+fn create_peers(
+    caller: MemberId,
+    callee: MemberId,
+) -> HashMap<MemberId, PeerMachine> {
+    let caller_peer_id = 1;
+    let callee_peer_id = 2;
+    let mut caller_peer = Peer::new(caller_peer_id, caller, callee_peer_id);
+    let mut callee_peer = Peer::new(callee_peer_id, callee, caller_peer_id);
+
+    let track_audio =
+        Arc::new(Track::new(1, TrackMediaType::Audio(AudioSettings {})));
+    let track_video =
+        Arc::new(Track::new(2, TrackMediaType::Video(VideoSettings {})));
+    caller_peer.add_sender(track_audio.clone());
+    caller_peer.add_sender(track_video.clone());
+    callee_peer.add_receiver(track_audio);
+    callee_peer.add_receiver(track_video);
+
+    hashmap!(
+        caller_peer_id => PeerMachine::New(caller_peer),
+        callee_peer_id => PeerMachine::New(callee_peer),
+    )
 }

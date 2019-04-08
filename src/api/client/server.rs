@@ -104,7 +104,6 @@ mod test {
     use actix::Arbiter;
     use actix_web::{http, test, App};
     use futures::Stream;
-    use hashbrown::HashMap;
 
     use crate::{
         api::{client::Room, control::Member},
@@ -119,11 +118,7 @@ mod test {
             1 => Member{id: 1, credentials: "caller_credentials".into()},
             2 => Member{id: 2, credentials: "responder_credentials".into()},
         };
-        let room = Arbiter::start(move |_| Room {
-            id: 1,
-            members,
-            connections: HashMap::new(),
-        });
+        let room = Arbiter::start(move |_| Room::new(1, members, hashmap!()));
         let rooms = hashmap! {1 => room};
         RoomsRepository::new(rooms)
     }
