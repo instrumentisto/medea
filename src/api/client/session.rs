@@ -26,7 +26,7 @@ pub const CLIENT_IDLE_TIMEOUT: Duration = Duration::from_secs(10);
 /// Long-running WebSocket connection of Client API.
 #[derive(Debug)]
 #[allow(clippy::module_name_repetitions)]
-pub struct WsConnection {
+pub struct WsSession {
     /// ID of [`Member`] that WebSocket connection is associated with.
     member_id: MemberId,
     /// [`Room`] that [`Member`] is associated with.
@@ -44,7 +44,7 @@ pub struct WsConnection {
     closed_by_server: bool,
 }
 
-impl WsConnection {
+impl WsSession {
     /// Creates new [`WsSession`] for specified [`Member`].
     pub fn new(member_id: MemberId, room: Addr<Room>) -> Self {
         Self {
@@ -89,7 +89,7 @@ impl WsConnection {
 
 /// [`Actor`] implementation that provides an ergonomic way to deal with
 /// WebSocket connection lifecycle for [`WsSession`].
-impl Actor for WsConnection {
+impl Actor for WsSession {
     type Context = ws::WebsocketContext<Self>;
 
     /// Starts [`Heartbeat`] mechanism and sends [`RpcConnectionEstablished`]
@@ -122,7 +122,7 @@ impl Actor for WsConnection {
     }
 }
 
-impl RpcConnection for Addr<WsConnection> {
+impl RpcConnection for Addr<WsSession> {
     /// Closes [`WsConnection`] by sending itself "normal closure" close
     /// message.
     fn close(&self) -> Box<dyn Future<Item = (), Error = ()>> {
@@ -152,7 +152,7 @@ pub struct Close {
     reason: Option<CloseReason>,
 }
 
-impl Handler<Close> for WsConnection {
+impl Handler<Close> for WsSession {
     type Result = ();
 
     /// Closes WebSocket connection and stops [`Actor`] of [`WsSession`].
@@ -164,7 +164,7 @@ impl Handler<Close> for WsConnection {
     }
 }
 
-impl Handler<Event> for WsConnection {
+impl Handler<Event> for WsSession {
     type Result = ();
 
     /// Sends [`Event`] to Web Client.
@@ -187,7 +187,7 @@ pub enum Heartbeat {
     Pong(usize),
 }
 
-impl Handler<Heartbeat> for WsConnection {
+impl Handler<Heartbeat> for WsSession {
     type Result = ();
 
     /// Answers with `Heartbeat::Pong` message to WebSocket client in response
@@ -199,7 +199,7 @@ impl Handler<Heartbeat> for WsConnection {
     }
 }
 
-impl StreamHandler<ws::Message, ws::ProtocolError> for WsConnection {
+impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
     /// Handles arbitrary [`ws::Message`] received from WebSocket client.
     fn handle(&mut self, msg: ws::Message, ctx: &mut Self::Context) {
         debug!(
