@@ -1,23 +1,15 @@
+//! RPC connection settings.
+use serde::{Deserialize, Serialize};
+use smart_default::*;
+
 use std::time::Duration;
 
-use serde_derive::{Deserialize, Serialize};
-
-use crate::conf::duration;
-
-/// Server represents [`Server`] configuration section.
-#[derive(Clone, Debug, Deserialize, Serialize)]
+/// RPC connection settings.
+#[derive(Clone, Debug, Deserialize, Serialize, SmartDefault)]
 pub struct Rpc {
-    /// Timeout for [`WsSession`] to wait ping message from [`Web Client`].
-    #[serde(serialize_with = "duration::serialize")]
-    #[serde(deserialize_with = "duration::deserialize")]
+    /// Duration, after which remote RPC client will be considered idle if no
+    /// heartbeat messages received. Defaults to `10s`.
+    #[default(Duration::from_secs(10))]
+    #[serde(with = "serde_humantime")]
     pub idle_timeout: Duration,
-}
-
-/// Default returns default configuration parameters of [`Server`] section.
-impl Default for Rpc {
-    fn default() -> Self {
-        Self {
-            idle_timeout: Duration::from_secs(10),
-        }
-    }
 }
