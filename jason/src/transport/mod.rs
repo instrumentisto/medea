@@ -1,5 +1,5 @@
 pub mod protocol;
-use self::protocol::{Heartbeat, Event as MedeaEvent};
+use self::protocol::{Command, Heartbeat, Event as MedeaEvent};
 use futures::sync::mpsc::UnboundedSender;
 use js_sys::Date;
 use wasm_bindgen::prelude::*;
@@ -108,6 +108,18 @@ impl Transport {
 
     pub fn add_sub(&mut self, sub: UnboundedSender<MedeaEvent>) {
         self.subs.borrow_mut().push(sub);
+    }
+
+    pub fn send_command(&self, command: &Command) {
+        let socket_borrow = self.sock.borrow();
+
+        //TODO: no socket?
+        if let Some(socket) = socket_borrow.as_ref() {
+            let msg =
+                serde_json::to_string(&command).unwrap();
+
+            socket.send_with_str(&msg).unwrap();
+        }
     }
 }
 
