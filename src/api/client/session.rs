@@ -68,20 +68,17 @@ impl WsSession {
                 info!("WsSession of member {} is idle", sess.member_id);
 
                 let member_id = sess.member_id;
-                ctx.wait(wrap_future(
-                    sess.room
-                        .send(RpcConnectionClosed {
-                            member_id,
-                            reason: RpcConnectionClosedReason::Idle,
-                        })
-                        .map_err(move |err| {
-                            error!(
-                                "WsSession of member {} failed to remove from \
-                                 Room, because: {:?}",
-                                member_id, err,
-                            )
-                        }),
-                ));
+                match sess.room.try_send(RpcConnectionClosed {
+                    member_id,
+                    reason: RpcConnectionClosedReason::Idle,
+                }) {
+                    Err(err) => error!(
+                        "WsSession of member {} failed to remove from Room, \
+                         because: {:?}",
+                        member_id, err,
+                    ),
+                    _ => {}
+                };
 
                 ctx.notify(Close {
                     reason: Some(ws::CloseCode::Normal.into()),
@@ -218,17 +215,13 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
                 }
                 if let Ok(command) = serde_json::from_str::<Command>(&text) {
                     let member_id = self.member_id;
-                    ctx.wait(wrap_future(
-                        self.room.send(command).map(|_| ()).map_err(
-                            move |err| {
-                                error!(
-                                    "Cannot send Command from member {}, \
-                                     because {}",
-                                    member_id, err
-                                )
-                            },
+                    match self.room.try_send(command) {
+                        Err(err) => error!(
+                            "Cannot send Command to Room {}, because {}",
+                            member_id, err
                         ),
-                    ));
+                        _ => {}
+                    }
                 }
             }
             ws::Message::Close(reason) => {
@@ -238,20 +231,17 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
                         reason, self.member_id
                     );
                     let member_id = self.member_id;
-                    ctx.wait(wrap_future(
-                        self.room
-                            .send(RpcConnectionClosed {
-                                member_id: self.member_id,
-                                reason: RpcConnectionClosedReason::Disconnected,
-                            })
-                            .map_err(move |err| {
-                                error!(
-                                    "WsSession of member {} failed to remove \
-                                     from Room, because: {:?}",
-                                    member_id, err,
-                                )
-                            }),
-                    ));
+                    match self.room.try_send(RpcConnectionClosed {
+                        member_id: self.member_id,
+                        reason: RpcConnectionClosedReason::Disconnected,
+                    }) {
+                        Err(err) => error!(
+                            "WsSession of member {} failed to remove from \
+                             Room, because: {:?}",
+                            member_id, err,
+                        ),
+                        _ => {}
+                    };
                     ctx.close(reason);
                     ctx.stop();
                 }

@@ -7,9 +7,8 @@ use std::{
 };
 
 use actix::{
-    fut::{err, ok, wrap_future},
-    Actor, ActorContext, ActorFuture, Addr, AsyncContext, Context,
-    ContextFutureSpawner, Handler, Message, Running, SpawnHandle, WrapFuture,
+    fut::wrap_future, Actor, ActorContext, ActorFuture, Addr, AsyncContext,
+    Context, Handler, Message, Running, SpawnHandle, WrapFuture,
 };
 use failure::Fail;
 use futures::{
@@ -274,33 +273,32 @@ impl Actor for Room {
 
     /// Closes all active [`PrcConnection`].
     fn stopping(&mut self, ctx: &mut Self::Context) -> Running {
-        use futures::stream::{self, Stream};
         use std::mem;
-
-        debug!("Room stopped");
         let connections = mem::replace(&mut self.connections, hashmap!());
-        let conn_with_event = connections
-            .into_iter()
-            .map(|(member_id, conn)| {
-                let event = Event::PeersRemoved {
-                    peer_ids: self
-                        .peers
-                        .iter()
-                        .filter(move |(_, peer)| peer.member_id() == member_id)
-                        .map(|(&id, _)| id)
-                        .collect(),
-                };
-                (conn, event)
-            })
-            .collect::<Vec<_>>();
-
-        ctx.wait(wrap_future(stream::iter_ok(conn_with_event).for_each(
-            |(mut conn, event)| {
-                conn.send_event(event)
-                    .and_then(move |_| conn.close())
-                    .map_err(|_| ())
+        let fut = connections.into_iter().fold(
+            vec![],
+            |mut futures, (member_id, mut connection)| {
+                info!(
+                    "Close connection of member {}, because room is stopped",
+                    member_id,
+                );
+                futures.push(
+                    connection.send_event(Event::PeersRemoved {
+                        peer_ids: self
+                            .peers
+                            .iter()
+                            .filter(move |(_, peer)| {
+                                peer.member_id() == member_id
+                            })
+                            .map(|(&id, _)| id)
+                            .collect(),
+                    }),
+                );
+                futures.push(connection.close());
+                futures
             },
-        )));
+        );
+        ctx.wait(wrap_future(join_all(fut).map(|_| ())));
         Running::Continue
     }
 }
@@ -399,7 +397,6 @@ impl Handler<RpcConnectionEstablished> for Room {
 
             let peer = self.member_peer(&member_id);
             if peer.sender().is_some() {
-                // ToDo try into_future(self) for handle error
                 fut = Either::A(future::done(
                     self.handle_peer_created(peer.id())
                         .and_then(|(caller, event)| {
@@ -421,7 +418,7 @@ impl Handler<RpcConnectionEstablished> for Room {
 }
 
 impl Handler<Command> for Room {
-    type Result = ActFuture<(), ()>;
+    type Result = ();
 
     /// Receives [`Command`] from Web client and changes state of interconnected
     /// [`Peer`]s.
@@ -442,17 +439,16 @@ impl Handler<Command> for Room {
                 self.handle_set_ice_candidate(peer_id, candidate)
             }
         };
-        let fut = future::done(
-            res.and_then(|(caller, event)| self.send_event(caller, event))
-                .map_err(move |err| {
-                    error!(
-                        "Failed handle command, because {}. Room will be stop.",
-                        err
-                    );
-                    ctx.stop()
-                }),
-        );
-        Box::new(wrap_future(fut))
+        match res.and_then(|(caller, event)| self.send_event(caller, event)) {
+            Err(err) => {
+                error!(
+                    "Failed handle command, because {}. Room will be stop.",
+                    err
+                );
+                ctx.stop()
+            }
+            _ => {}
+        }
     }
 }
 
@@ -486,16 +482,20 @@ impl Handler<RpcConnectionClosed> for Room {
         let closed_at = Instant::now();
         let member_id = msg.member_id;
         match msg.reason {
-            RpcConnectionClosedReason::Disconnected => ctx.stop(),
+            RpcConnectionClosedReason::Disconnected => {
+                self.connections.remove(&member_id);
+                ctx.stop()
+            }
             RpcConnectionClosedReason::Idle => {
                 self.idle_timeouts.insert(
                     msg.member_id,
-                    ctx.run_later(SESSION_IDLE_TIMEOUT, move |_room, ctx| {
+                    ctx.run_later(SESSION_IDLE_TIMEOUT, move |room, ctx| {
                         info!(
                             "Member {} connection lost at {:?}. Room will be \
                              stop.",
                             member_id, closed_at
                         );
+                        room.connections.remove(&member_id);
                         ctx.stop()
                     }),
                 );
@@ -527,12 +527,14 @@ impl RoomsRepository {
 
 #[cfg(test)]
 mod test {
+    use std::sync::atomic::{AtomicBool, Ordering};
+
     use actix::{ActorContext, Arbiter, AsyncContext, System};
     use futures::future::Future;
 
     use super::*;
-    use crate::media::track::{DirectionalTrack, TrackDirection};
     use crate::media::{
+        track::{DirectionalTrack, TrackDirection},
         AudioSettings, Peer, Track, TrackMediaType, VideoSettings,
     };
 
@@ -541,41 +543,52 @@ mod test {
         pub member_id: MemberId,
         pub room: Addr<Room>,
         pub events: Arc<Mutex<Vec<String>>>,
+        pub stopped: Arc<AtomicBool>,
     }
 
     impl Actor for TestConnection {
         type Context = Context<Self>;
 
         fn started(&mut self, ctx: &mut Self::Context) {
-            let member_id = self.member_id;
             self.room
-                .send(RpcConnectionEstablished {
+                .try_send(RpcConnectionEstablished {
                     member_id: self.member_id,
                     connection: Box::new(ctx.address()),
                 })
-                .into_actor(self)
-                .then(|res, _, ctx| {
-                    match res {
-                        Err(_) => System::current().stop(),
-                        _ => {}
-                    }
-                    ok(())
-                })
-                .wait(ctx);
+                .unwrap();
+        }
+
+        fn stopped(&mut self, ctx: &mut Self::Context) {
+            if self.stopped.load(Ordering::Relaxed) {
+                System::current().stop()
+            } else {
+                self.stopped.store(true, Ordering::Relaxed);
+            }
+        }
+    }
+
+    #[derive(Message)]
+    struct Close;
+
+    impl Handler<Close> for TestConnection {
+        type Result = ();
+
+        fn handle(&mut self, _: Close, ctx: &mut Self::Context) {
+            ctx.stop()
         }
     }
 
     impl Handler<Event> for TestConnection {
         type Result = ();
 
-        fn handle(&mut self, event: Event, ctx: &mut Self::Context) {
+        fn handle(&mut self, event: Event, _ctx: &mut Self::Context) {
             let mut events = self.events.lock().unwrap();
             events.push(serde_json::to_string(&event).unwrap());
             match event {
                 Event::PeerCreated {
                     peer_id,
                     sdp_offer,
-                    tracks,
+                    tracks: _,
                 } => match sdp_offer {
                     Some(_) => self.room.do_send(Command::MakeSdpAnswer {
                         peer_id,
@@ -601,18 +614,16 @@ mod test {
                         member_id: self.member_id,
                         reason: RpcConnectionClosedReason::Disconnected,
                     });
-                    ctx.stop();
                 }
-                Event::PeersRemoved { peer_ids: _ } => {
-                    System::current().stop();
-                }
+                Event::PeersRemoved { peer_ids: _ } => {}
             }
         }
     }
 
     impl RpcConnection for Addr<TestConnection> {
-        fn close(&self) -> Box<dyn Future<Item = (), Error = ()>> {
-            Box::new(future::ok(()))
+        fn close(&mut self) -> Box<dyn Future<Item = (), Error = ()>> {
+            let fut = self.send(Close {}).map_err(|_| ());
+            Box::new(fut)
         }
 
         fn send_event(
@@ -658,6 +669,7 @@ mod test {
 
     #[test]
     fn start_signaling() {
+        let stopped = Arc::new(AtomicBool::new(false));
         let caller_events = Arc::new(Mutex::new(vec![]));
         let caller_events_clone = Arc::clone(&caller_events);
         let responder_events = Arc::new(Mutex::new(vec![]));
@@ -666,20 +678,22 @@ mod test {
         System::run(move || {
             let room = start_room();
             let room_clone = room.clone();
+            let stopped_clone = stopped.clone();
             Arbiter::start(move |_| TestConnection {
+                events: caller_events_clone,
                 member_id: 1,
                 room: room_clone,
-                events: caller_events_clone,
+                stopped: stopped_clone,
             });
-            let room_clone = room.clone();
             Arbiter::start(move |_| TestConnection {
-                member_id: 2,
-                room: room_clone,
                 events: responder_events_clone,
+                member_id: 2,
+                room,
+                stopped,
             });
         });
 
-        let mut caller_events = caller_events.lock().unwrap();
+        let caller_events = caller_events.lock().unwrap();
         let responder_events = responder_events.lock().unwrap();
         assert_eq!(caller_events.len(), 3);
         assert_eq!(
@@ -741,10 +755,6 @@ mod test {
                 serde_json::to_string(&Event::IceCandidateDiscovered {
                     peer_id: 2,
                     candidate: "ice_candidate".into(),
-                })
-                .unwrap(),
-                serde_json::to_string(&Event::PeersRemoved {
-                    peer_ids: vec![1],
                 })
                 .unwrap(),
             ]
