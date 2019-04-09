@@ -1,11 +1,12 @@
 pub mod protocol;
-use self::protocol::*;
+use self::protocol::{Heartbeat, Event as MedeaEvent};
 use futures::sync::mpsc::UnboundedSender;
 use js_sys::Date;
-use std::{cell::RefCell, rc::Rc};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 use web_sys::{console, CloseEvent, Event, MessageEvent, WebSocket};
+
+use std::{cell::RefCell, rc::Rc, vec};
 
 use crate::utils::{
     bind_handler_fn_mut, bind_handler_fn_once, window, IntervalHandle,
@@ -18,7 +19,7 @@ pub struct Transport {
     sock: Rc<RefCell<Option<WebSocket>>>,
     token: String,
     pinger: Rc<Pinger>,
-    subs: Vec<UnboundedSender<Command>>,
+    subs: Rc<RefCell<Vec<UnboundedSender<MedeaEvent>>>>,
     on_open: Option<Closure<dyn FnMut(Event)>>,
     on_message: Option<Closure<dyn FnMut(MessageEvent)>>,
     on_close: Option<Closure<dyn FnMut(CloseEvent)>>,
@@ -29,7 +30,7 @@ impl Transport {
         Transport {
             sock: Rc::new(RefCell::new(None)),
             token,
-            subs: vec![],
+            subs: Rc::new(RefCell::new(vec![])),
             pinger: Rc::new(Pinger::new(ping_interval)),
             on_open: None,
             on_message: None,
@@ -52,22 +53,28 @@ impl Transport {
             .unwrap();
 
         let pinger_rc = Rc::clone(&self.pinger);
+        let subs_rc = Rc::clone(&self.subs);
         let on_message = bind_handler_fn_mut(
             "message",
             socket_ref,
-            move |event: MessageEvent| {
-                let mut payload = event.data();
+            move |message: MessageEvent| {
+                let payload = message.data();
 
                 if payload.is_string() {
-                    let payload = payload.as_string().unwrap();
+                    let payload: String = payload.as_string().unwrap();
 
-                    if let Ok(Heartbeat::Pong(pong)) = serde_json::from_str::<Heartbeat>(&payload) {
+                    if let Ok(Heartbeat::Pong(_pong)) = serde_json::from_str::<Heartbeat>(&payload) {
                         pinger_rc.set_pong_at(Date::now());
                         console::log(&js_sys::Array::from(&JsValue::from_str("pong received")));
                     } else {
-                        let command = serde_json::from_str::<Command>(&payload).unwrap();
-                        console::log(&js_sys::Array::from(&JsValue::from_str("command received")));
+                        let event = serde_json::from_str::<MedeaEvent>(&payload).unwrap();
+
+                        //TODO: many subs, filter messages by session
+                        if let Some(sub) = subs_rc.borrow().iter().next() {
+                            sub.unbounded_send(event).unwrap();
+                        }
                     }
+
                 }
             },
         )
@@ -99,8 +106,17 @@ impl Transport {
         self.sock = socket
     }
 
-    pub fn add_sub(&mut self, sub: UnboundedSender<Command>) {
-        self.subs.push(sub);
+    pub fn add_sub(&mut self, sub: UnboundedSender<MedeaEvent>) {
+        self.subs.borrow_mut().push(sub);
+    }
+}
+
+impl Drop for Transport {
+    fn drop(&mut self) {
+        let socket_borrow = self.sock.borrow();
+        if let Some(socket) = socket_borrow.as_ref() {
+            socket.close_with_code_and_reason(1001, "Dropped suddenly").is_ok();
+        }
     }
 }
 

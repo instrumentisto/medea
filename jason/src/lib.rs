@@ -4,7 +4,7 @@ use wasm_bindgen::prelude::*;
 mod transport;
 mod utils;
 
-use transport::{protocol::*, Transport};
+use transport::{protocol::Event as MedeaEvent, Transport};
 
 // When the `console_error_panic_hook` feature is enabled, we can call the
 // `set_panic_hook` function at least once during initialization, and then
@@ -28,8 +28,8 @@ pub struct Jason {
 
 #[wasm_bindgen]
 pub struct SessionHandler {
-    tx: UnboundedSender<Command>,
-    _rx: UnboundedReceiver<Command>,
+    tx: UnboundedSender<MedeaEvent>,
+    _rx: UnboundedReceiver<MedeaEvent>,
 }
 
 impl SessionHandler {

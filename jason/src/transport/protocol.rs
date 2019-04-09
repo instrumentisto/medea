@@ -13,7 +13,7 @@ pub enum Heartbeat {
 }
 
 /// WebSocket message from Web Client to Media Server.
-#[derive(Debug, Deserialize)]
+#[derive(Serialize)]
 pub enum Command {
     /// Web Client sends SDP Offer.
     MakeSdpOffer { peer_id: u64, sdp_offer: String },
@@ -23,8 +23,8 @@ pub enum Command {
     SetIceCandidate { peer_id: u64, candidate: String },
 }
 
-/// WebSocket message from Media Server to Web Client.
-#[derive(Debug, Deserialize)]
+/// WebSocket message from Medea to Jason.
+#[derive(Deserialize)]
 pub enum Event {
     /// Media Server notifies Web Client about necessity of RTCPeerConnection
     /// creation.
@@ -53,7 +53,7 @@ pub enum Event {
 }
 
 /// [`Track] with specified direction.
-#[derive(Debug, Deserialize)]
+#[derive(Deserialize)]
 pub struct DirectionalTrack {
     pub id: u64,
     pub direction: TrackDirection,
@@ -61,21 +61,21 @@ pub struct DirectionalTrack {
 }
 
 /// Direction of [`Track`].
-#[derive(Debug, Deserialize)]
+#[derive(Deserialize)]
 pub enum TrackDirection {
     Send { receivers: Vec<u64> },
     Recv { sender: u64 },
 }
 
 /// Type of [`Track`].
-#[derive(Debug, Deserialize)]
+#[derive(Deserialize)]
 pub enum TrackMediaType {
     Audio(AudioSettings),
     Video(VideoSettings),
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Deserialize)]
 pub struct AudioSettings {}
 
-#[derive(Debug, Deserialize)]
+#[derive(Deserialize)]
 pub struct VideoSettings {}
