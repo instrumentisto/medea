@@ -3,11 +3,11 @@ async function f() {
 
     let caller = new rust.Jason();
 
-    let caller_session = caller.init_session("ws://localhost:8080/ws/1/1/caller_credentials");
+    caller.init_session("ws://localhost:8080/ws/1/1/caller_credentials");
 
     let responder = new rust.Jason();
 
-    let responder_session = responder.init_session("ws://localhost:8080/ws/1/2/responder_credentials");
+    responder.init_session("ws://localhost:8080/ws/1/2/responder_credentials");
 
 }
 

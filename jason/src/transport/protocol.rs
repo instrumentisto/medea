@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+
+// TODO: move protocol to crate?
 #[derive(Deserialize, Serialize)]
 pub enum Heartbeat {
     /// `ping` message that WebSocket client is expected to send to the server
@@ -24,7 +26,7 @@ pub enum Command {
 }
 
 /// WebSocket message from Medea to Jason.
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 pub enum Event {
     /// Media Server notifies Web Client about necessity of RTCPeerConnection
     /// creation.
@@ -53,7 +55,7 @@ pub enum Event {
 }
 
 /// [`Track] with specified direction.
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 pub struct DirectionalTrack {
     pub id: u64,
     pub direction: TrackDirection,
@@ -61,21 +63,21 @@ pub struct DirectionalTrack {
 }
 
 /// Direction of [`Track`].
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 pub enum TrackDirection {
     Send { receivers: Vec<u64> },
     Recv { sender: u64 },
 }
 
 /// Type of [`Track`].
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 pub enum TrackMediaType {
     Audio(AudioSettings),
     Video(VideoSettings),
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 pub struct AudioSettings {}
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 pub struct VideoSettings {}
