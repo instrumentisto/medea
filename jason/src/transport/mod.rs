@@ -106,7 +106,7 @@ impl Transport {
         self.sock = socket
     }
 
-    pub fn add_sub(&mut self, sub: UnboundedSender<MedeaEvent>) {
+    pub fn add_sub(&self, sub: UnboundedSender<MedeaEvent>) {
         self.subs.borrow_mut().push(sub);
     }
 

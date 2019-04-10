@@ -8,7 +8,6 @@ async function f() {
     let responder = new rust.Jason();
 
     responder.init_session("ws://localhost:8080/ws/1/2/responder_credentials");
-
 }
 
 f();
