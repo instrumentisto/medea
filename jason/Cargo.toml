@@ -11,40 +11,23 @@ repository = "https://github.com/instrumentisto/medea"
 [lib]
 crate-type = ["cdylib", "rlib"]
 
+[profile.release]
+opt-level = "s"  # Tell `rustc` to optimize for small code size.
+
 [features]
-default = ["console_error_panic_hook"]
+default = ["console_error_panic_hook", "wee_alloc"]
 
 [dependencies]
-
 console_error_panic_hook = { version = "0.1", optional = true }
-discard = "1.0"
+js-sys = "0.3"
 futures = "0.1"
 js-sys = "0.3"
-lazy_static = "1.3"
-
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-
 wasm-bindgen = { version = "0.2", features = ['serde-serialize'] }
 wasm-bindgen-futures = "0.3"
-
-[dependencies.web-sys]
-version = "0.3.4"
-features = [
-    'console',
-    'Event',
-    'EventTarget',
-    'MessageEvent',
-    'WebSocket',
-    'Window',
-    'CloseEvent'
-]
-
+web-sys = { version = "0.3.4", features = ['console','Event','EventTarget','MessageEvent','WebSocket','Window','CloseEvent'] }
 wee_alloc = { version = "0.4", optional = true }
 
 [dev-dependencies]
 wasm-bindgen-test = "0.2"
-
-[profile.release]
-# Tell `rustc` to optimize for small code size.
-opt-level = "s"
