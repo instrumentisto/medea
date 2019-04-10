@@ -11,26 +11,18 @@ repository = "https://github.com/instrumentisto/medea"
 [lib]
 crate-type = ["cdylib", "rlib"]
 
+[profile.release]
+opt-level = "s"  # Tell `rustc` to optimize for small code size.
+
 [features]
-default = ["console_error_panic_hook"]
+default = ["console_error_panic_hook", "wee_alloc"]
 
 [dependencies]
-
 console_error_panic_hook = { version = "0.1", optional = true }
 js-sys = "0.3"
 wasm-bindgen = "0.2"
-
-[dependencies.web-sys]
-version = "0.3.4"
-features = [
-    'WebSocket'
-]
-
-wee_alloc = { version = "0.4", optional = true }
+web-sys = { version = "0.3.4", features = ["WebSocket"] }
+wee_alloc = { version = "0s.4", optional = true }
 
 [dev-dependencies]
 wasm-bindgen-test = "0.2"
-
-[profile.release]
-# Tell `rustc` to optimize for small code size.
-opt-level = "s"
