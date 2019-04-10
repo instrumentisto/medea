@@ -12,4 +12,10 @@ pub struct Rpc {
     #[default(Duration::from_secs(10))]
     #[serde(with = "serde_humantime")]
     pub idle_timeout: Duration,
+
+    /// Duration, after which the server deletes the client session if
+    /// the remote RPC client does not reconnect after it is idle.
+    #[default(Duration::from_secs(10))]
+    #[serde(with = "serde_humantime")]
+    pub reconnect_timeout: Duration,
 }

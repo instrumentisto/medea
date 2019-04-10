@@ -113,12 +113,14 @@ mod test {
     use super::*;
 
     /// Creates [`RoomsRepository`] for tests filled with a single [`Room`].
-    fn room() -> RoomsRepository {
+    fn room(conf: Rpc) -> RoomsRepository {
         let members = hashmap! {
             1 => Member{id: 1, credentials: "caller_credentials".into()},
             2 => Member{id: 2, credentials: "responder_credentials".into()},
         };
-        let room = Arbiter::start(move |_| Room::new(1, members, hashmap!()));
+        let room = Arbiter::start(move |_| {
+            Room::new(1, members, hashmap!(), conf.reconnect_timeout)
+        });
         let rooms = hashmap! {1 => room};
         RoomsRepository::new(rooms)
     }
@@ -127,7 +129,7 @@ mod test {
     fn ws_server(conf: Conf) -> test::TestServer {
         test::TestServer::with_factory(move || {
             App::with_state(Context {
-                rooms: room(),
+                rooms: room(conf.rpc.clone()),
                 config: conf.rpc.clone(),
             })
             .resource("/ws/{room_id}/{member_id}/{credentials}", |r| {
@@ -152,6 +154,7 @@ mod test {
         let conf = Conf {
             rpc: Rpc {
                 idle_timeout: Duration::new(1, 0),
+                reconnect_timeout: Default::default(),
             },
             server: Server::default(),
         };

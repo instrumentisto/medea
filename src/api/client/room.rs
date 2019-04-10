@@ -8,7 +8,7 @@ use std::{
 
 use actix::{
     fut::wrap_future, Actor, ActorContext, ActorFuture, Addr, AsyncContext,
-    Context, Handler, Message, Running, SpawnHandle, WrapFuture,
+    Context, Handler, Message, Running, SpawnHandle,
 };
 use failure::Fail;
 use futures::{
@@ -23,10 +23,6 @@ use crate::{
     log::prelude::*,
     media::peer::{Id as PeerId, PeerMachine},
 };
-
-/// Timeout for close [`Session`] after receive `RpcConnectionClosed` message.
-pub const SESSION_IDLE_TIMEOUT: Duration = Duration::from_secs(10);
-// TODO: via conf
 
 #[derive(Fail, Debug)]
 pub enum RoomError {
@@ -49,11 +45,15 @@ pub struct Room {
     /// ID of this [`Room`].
     id: Id,
 
-    /// Established [`WsConnection`]s of [`Member`]s in this [`Room`].
+    /// Established [`RpcConnection`]s of [`Member`]s in this [`Room`].
     pub connections: HashMap<MemberId, Box<dyn RpcConnection>>,
     // TODO: Replace Box<dyn RpcConnection>> with enum,
     //       as the set of all possible RpcConnection types is not closed.
     idle_timeouts: HashMap<MemberId, SpawnHandle>,
+
+    /// Timeout for close [`RpcConnection`] after receive `RpcConnectionClosed`
+    /// message.
+    connection_timeout: Duration,
 
     /// [`Member`]s which currently are present in this [`Room`].
     members: HashMap<MemberId, Member>,
@@ -68,6 +68,7 @@ impl Room {
         id: Id,
         members: HashMap<MemberId, Member>,
         peers: HashMap<PeerId, PeerMachine>,
+        connection_timeout: Duration,
     ) -> Self {
         Room {
             id,
@@ -75,6 +76,7 @@ impl Room {
             idle_timeouts: HashMap::new(),
             members,
             peers,
+            connection_timeout,
         }
     }
 
@@ -111,6 +113,7 @@ impl Room {
             .ok_or(RoomError::UnknownPeer(*peer_id))
     }
 
+    /// Send [`Event`] to specified remote [`Member`].
     fn send_event(
         &mut self,
         member_id: MemberId,
@@ -126,6 +129,8 @@ impl Room {
             })
     }
 
+    /// Check state of the specified and associated [`Peer`].
+    /// Returns [`Event`] to caller that [`Peer`] is created.
     fn handle_peer_created(
         &mut self,
         from_peer_id: PeerId,
@@ -282,18 +287,20 @@ impl Actor for Room {
                     "Close connection of member {}, because room is stopped",
                     member_id,
                 );
-                futures.push(
-                    connection.send_event(Event::PeersRemoved {
-                        peer_ids: self
-                            .peers
-                            .iter()
-                            .filter(move |(_, peer)| {
-                                peer.member_id() == member_id
-                            })
-                            .map(|(&id, _)| id)
-                            .collect(),
-                    }),
-                );
+                let peer_ids: Vec<_> = self
+                    .peers
+                    .iter()
+                    .filter(move |(_, peer)| match peer {
+                        PeerMachine::New(_) => false,
+                        _ => peer.member_id() == member_id,
+                    })
+                    .map(|(&id, _)| id)
+                    .collect();
+                if !peer_ids.is_empty() {
+                    futures.push(
+                        connection.send_event(Event::PeersRemoved { peer_ids }),
+                    );
+                }
                 futures.push(connection.close());
                 futures
             },
@@ -473,7 +480,7 @@ pub enum RpcConnectionClosedReason {
 impl Handler<RpcConnectionClosed> for Room {
     type Result = ();
 
-    /// Removes [`Session`] of specified [`Member`] from the [`Room`].
+    /// Removes [`RpcConnection`] of specified [`Member`] from the [`Room`].
     fn handle(&mut self, msg: RpcConnectionClosed, ctx: &mut Self::Context) {
         info!(
             "RpcConnectionClosed for member {}, reason {:?}",
@@ -489,7 +496,7 @@ impl Handler<RpcConnectionClosed> for Room {
             RpcConnectionClosedReason::Idle => {
                 self.idle_timeouts.insert(
                     msg.member_id,
-                    ctx.run_later(SESSION_IDLE_TIMEOUT, move |room, ctx| {
+                    ctx.run_later(self.connection_timeout, move |room, ctx| {
                         info!(
                             "Member {} connection lost at {:?}. Room will be \
                              stop.",
@@ -527,7 +534,7 @@ impl RoomsRepository {
 
 #[cfg(test)]
 mod test {
-    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::atomic::{AtomicUsize, Ordering};
 
     use actix::{ActorContext, Arbiter, AsyncContext, System};
     use futures::future::Future;
@@ -543,7 +550,7 @@ mod test {
         pub member_id: MemberId,
         pub room: Addr<Room>,
         pub events: Arc<Mutex<Vec<String>>>,
-        pub stopped: Arc<AtomicBool>,
+        pub stopped: Arc<AtomicUsize>,
     }
 
     impl Actor for TestConnection {
@@ -558,11 +565,10 @@ mod test {
                 .unwrap();
         }
 
-        fn stopped(&mut self, ctx: &mut Self::Context) {
-            if self.stopped.load(Ordering::Relaxed) {
+        fn stopped(&mut self, _ctx: &mut Self::Context) {
+            self.stopped.fetch_add(1, Ordering::Relaxed);
+            if self.stopped.load(Ordering::Relaxed) > 1 {
                 System::current().stop()
-            } else {
-                self.stopped.store(true, Ordering::Relaxed);
             }
         }
     }
@@ -640,7 +646,9 @@ mod test {
             1 => Member{id: 1, credentials: "caller_credentials".to_owned()},
             2 => Member{id: 2, credentials: "responder_credentials".to_owned()},
         };
-        Arbiter::start(move |_| Room::new(1, members, create_peers(1, 2)))
+        Arbiter::start(move |_| {
+            Room::new(1, members, create_peers(1, 2), Duration::from_secs(10))
+        })
     }
 
     fn create_peers(
@@ -669,7 +677,7 @@ mod test {
 
     #[test]
     fn start_signaling() {
-        let stopped = Arc::new(AtomicBool::new(false));
+        let stopped = Arc::new(AtomicUsize::new(0));
         let caller_events = Arc::new(Mutex::new(vec![]));
         let caller_events_clone = Arc::clone(&caller_events);
         let responder_events = Arc::new(Mutex::new(vec![]));
@@ -759,5 +767,27 @@ mod test {
                 .unwrap(),
             ]
         );
+    }
+
+    #[test]
+    fn close_responder_connection_without_caller() {
+        let stopped = Arc::new(AtomicUsize::new(1));
+        let stopped_clone = Arc::clone(&stopped);
+        let events = Arc::new(Mutex::new(vec![]));
+        let events_clone = Arc::clone(&events);
+
+        System::run(move || {
+            let room = start_room();
+            Arbiter::start(move |_| TestConnection {
+                events,
+                member_id: 2,
+                room,
+                stopped,
+            });
+        });
+
+        assert_eq!(stopped_clone.load(Ordering::Relaxed), 2);
+        let events = events_clone.lock().unwrap();
+        assert!(events.is_empty());
     }
 }
