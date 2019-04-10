@@ -14,6 +14,9 @@ members = [
     "jason",
 ]
 
+[profile.release]
+lto = "thin"
+
 [dependencies]
 actix = "0.7"
 actix-web = "0.7"
