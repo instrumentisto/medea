@@ -11,19 +11,17 @@ eq = $(if $(or $(1),$(2)),$(and $(findstring $(1),$(2)),\
 
 
 
-######################
-# Project parameters #
-######################
-
-CARGO_HOME ?= $(strip $(shell dirname $$(dirname $$(which cargo))))
-RUST_VER ?= 1.33
-
-
-
-
 ###########
 # Aliases #
 ###########
+
+# Resolve all project dependencies.
+#
+# Usage:
+#	make deps
+
+deps: cargo yarn
+
 
 docs: docs.rust
 
@@ -34,6 +32,15 @@ lint: cargo.lint
 fmt: cargo.fmt
 
 
+# Run all project application locally in development mode.
+#
+# Usage:
+#	make up
+
+up:
+	$(MAKE) -j2 up.jason up.medea
+
+
 test: test.unit
 
 
@@ -42,6 +49,15 @@ test: test.unit
 ##################
 # Cargo commands #
 ##################
+
+# Resolve Cargo project dependencies.
+#
+# Usage:
+#	make cargo [cmd=(fetch|<cargo-cmd>)]
+
+cargo:
+	cargo $(if $(call eq,$(cmd),),fetch,$(cmd))
+
 
 # Format Rust sources with rustfmt.
 #
@@ -59,6 +75,26 @@ cargo.fmt:
 
 cargo.lint:
 	cargo clippy -- -D clippy::pedantic -D warnings
+
+
+
+
+#################
+# Yarn commands #
+#################
+
+# Resolve NPM project dependencies with Yarn.
+#
+# Optional 'cmd' parameter may be used for handy usage of docker-wrapped Yarn,
+# for example: make yarn cmd='upgrade'
+#
+# Usage:
+#	make yarn [cmd=(install|<yarn-cmd>)]
+
+yarn-cmd =
+
+yarn:
+	yarn --cwd=jason/e2e-demo/ $(if $(call eq,$(cmd),),install,$(cmd))
 
 
 
@@ -88,10 +124,45 @@ endif
 # Run Rust unit tests of project.
 #
 # Usage:
-#	make test.unit
+#	make test.unit [app=(all|medea|jason)]
+
+test-unit-app = $(if $(call eq,$(app),),all,$(app))
 
 test.unit:
-	cargo test --all
+ifeq ($(test-unit-app),all)
+	@make test.unit app=medea
+	@make test.unit app=jason
+endif
+ifeq ($(test-unit-app),medea)
+	cargo test --bin medea
+endif
+ifeq ($(test-unit-app),jason)
+	wasm-pack test --headless --firefox jason
+endif
+
+
+
+
+####################
+# Running commands #
+####################
+
+# Run Jason E2E demo in development mode.
+#
+# Usage:
+#	make up.jason
+
+up.jason:
+	npm run start --prefix=jason/e2e-demo
+
+
+# Run Medea media server in development mode.
+#
+# Usage:
+#	make up.medea
+
+up.medea:
+	cargo run --bin medea
 
 
 
@@ -102,4 +173,7 @@ test.unit:
 
 .PHONY: cargo cargo.fmt cargo.lint \
         docs docs.rust \
-        test test.unit
+        test test.unit \
+        up up.jason up.medea \
+        yarn
+

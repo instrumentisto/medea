@@ -1,0 +1,28 @@
+[package]
+name = "jason"
+version = "0.1.0-dev"
+edition = "2018"
+description = "Medea media server client application"
+authors = ["Instrumentisto Team <developer@instrumentisto.com>"]
+homepage = "https://github.com/instrumentisto/medea"
+readme = "README.md"
+repository = "https://github.com/instrumentisto/medea"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[profile.release]
+opt-level = "s"  # Tell `rustc` to optimize for small code size.
+
+[features]
+default = ["console_error_panic_hook", "wee_alloc"]
+
+[dependencies]
+console_error_panic_hook = { version = "0.1", optional = true }
+js-sys = "0.3"
+wasm-bindgen = "0.2"
+web-sys = { version = "0.3.4", features = ["WebSocket"] }
+wee_alloc = { version = "0.4", optional = true }
+
+[dev-dependencies]
+wasm-bindgen-test = "0.2"
