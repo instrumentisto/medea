@@ -404,8 +404,9 @@ impl Handler<RpcConnectionEstablished> for Room {
 
             let peer = self.member_peer(&member_id);
             if peer.sender().is_some() {
+                let peer_id = peer.id();
                 fut = Either::A(future::done(
-                    self.handle_peer_created(peer.id())
+                    self.handle_peer_created(peer_id)
                         .and_then(|(caller, event)| {
                             self.send_event(caller, event)
                         })
