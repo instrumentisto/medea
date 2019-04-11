@@ -25,6 +25,7 @@ use crate::{
 pub struct WsSession {
     /// ID of [`Member`] that WebSocket connection is associated with.
     member_id: MemberId,
+
     /// [`Room`] that [`Member`] is associated with.
     room: Addr<Room>,
 
@@ -66,19 +67,16 @@ impl WsSession {
                 > sess.idle_timeout
             {
                 info!("WsSession of member {} is idle", sess.member_id);
-
-                let member_id = sess.member_id;
-                match sess.room.try_send(RpcConnectionClosed {
-                    member_id,
+                if let Err(err) = sess.room.try_send(RpcConnectionClosed {
+                    member_id: sess.member_id,
                     reason: RpcConnectionClosedReason::Idle,
                 }) {
-                    Err(err) => error!(
+                    error!(
                         "WsSession of member {} failed to remove from Room, \
                          because: {:?}",
-                        member_id, err,
-                    ),
-                    _ => {}
-                };
+                        sess.member_id, err,
+                    )
+                }
 
                 ctx.notify(Close {
                     reason: Some(ws::CloseCode::Normal.into()),
@@ -214,13 +212,11 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
                     ctx.notify(ping);
                 }
                 if let Ok(command) = serde_json::from_str::<Command>(&text) {
-                    let member_id = self.member_id;
-                    match self.room.try_send(command) {
-                        Err(err) => error!(
+                    if let Err(err) = self.room.try_send(command) {
+                        error!(
                             "Cannot send Command to Room {}, because {}",
-                            member_id, err
-                        ),
-                        _ => {}
+                            self.member_id, err
+                        )
                     }
                 }
             }
@@ -230,17 +226,15 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
                         "Send close frame with reason {:?} for member {}",
                         reason, self.member_id
                     );
-                    let member_id = self.member_id;
-                    match self.room.try_send(RpcConnectionClosed {
+                    if let Err(err) = self.room.try_send(RpcConnectionClosed {
                         member_id: self.member_id,
                         reason: RpcConnectionClosedReason::Disconnected,
                     }) {
-                        Err(err) => error!(
+                        error!(
                             "WsSession of member {} failed to remove from \
                              Room, because: {:?}",
-                            member_id, err,
-                        ),
-                        _ => {}
+                            self.member_id, err,
+                        )
                     };
                     ctx.close(reason);
                     ctx.stop();
