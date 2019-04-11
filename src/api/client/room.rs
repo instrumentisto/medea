@@ -408,15 +408,12 @@ impl Handler<Command> for Room {
                 self.handle_set_ice_candidate(peer_id, candidate)
             }
         };
-        match res.and_then(|(caller, event)| self.send_event(caller, event)) {
-            Err(err) => {
-                error!(
-                    "Failed handle command, because {}. Room will be stop.",
-                    err
-                );
-                ctx.stop()
-            }
-            _ => {}
+        if let Err(err) = res.and_then(|(caller, event)| self.send_event(caller, event)) {
+            error!(
+                "Failed handle command, because {}. Room will be stop.",
+                err
+            );
+            ctx.stop()
         }
     }
 }
