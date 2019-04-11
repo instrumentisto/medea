@@ -8,11 +8,11 @@ use futures::{future, Future as _};
 use serde::Deserialize;
 
 use crate::{
+    api::client::rpc_connection::{
+        AuthorizeRpcConnection, RpcConnectionAuthorizationError,
+    },
     api::{
-        client::{
-            AuthorizeRpcConnection, Id as RoomId, RoomsRepository,
-            RpcConnectionAuthorizationError, WsSession,
-        },
+        client::{Id as RoomId, RoomsRepository, WsSession},
         control::Id as MemberId,
     },
     conf::{Conf, Rpc},
@@ -39,8 +39,6 @@ fn ws_index(
         State<Context>,
     ),
 ) -> FutureResponse<HttpResponse> {
-    use RpcConnectionAuthorizationError::*;
-
     debug!("Request params: {:?}", info);
 
     match state.rooms.get(info.room_id) {
@@ -59,8 +57,12 @@ fn ws_index(
                         state.config.idle_timeout,
                     ),
                 ),
-                Err(MemberNotExists) => Ok(HttpResponse::NotFound().into()),
-                Err(InvalidCredentials) => Ok(HttpResponse::Forbidden().into()),
+                Err(RpcConnectionAuthorizationError::MemberNotExists) => {
+                    Ok(HttpResponse::NotFound().into())
+                }
+                Err(RpcConnectionAuthorizationError::InvalidCredentials) => {
+                    Ok(HttpResponse::Forbidden().into())
+                }
             })
             .responder(),
         None => future::ok(HttpResponse::NotFound().into()).responder(),

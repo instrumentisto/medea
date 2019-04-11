@@ -11,10 +11,11 @@ use futures::future::Future;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    api::client::{
-        Command, Event, Room, RpcConnection, RpcConnectionClosed,
-        RpcConnectionClosedReason, RpcConnectionEstablished,
+    api::client::rpc_connection::{
+        RpcConnection, RpcConnectionClosed, RpcConnectionClosedReason,
+        RpcConnectionEstablished,
     },
+    api::client::{Command, Event, Room},
     api::control::member::Id as MemberId,
     log::prelude::*,
 };
