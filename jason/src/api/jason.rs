@@ -2,9 +2,11 @@ use wasm_bindgen::prelude::*;
 
 use std::rc::Rc;
 
-use crate::transport::Transport;
-use crate::set_panic_hook;
-use crate::api::{SessionHandle, session::Session};
+use crate::{
+    api::{session::Session, SessionHandle},
+    set_panic_hook,
+    transport::Transport,
+};
 
 #[wasm_bindgen]
 pub struct Jason {

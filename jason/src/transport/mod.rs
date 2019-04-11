@@ -1,9 +1,8 @@
 pub mod protocol;
-use self::protocol::{Command, Heartbeat, Event as MedeaEvent};
+
 use futures::sync::mpsc::UnboundedSender;
 use js_sys::Date;
-use wasm_bindgen::prelude::*;
-use wasm_bindgen::JsCast;
+use wasm_bindgen::{prelude::*, JsCast};
 use web_sys::{console, CloseEvent, Event, MessageEvent, WebSocket};
 
 use std::{cell::RefCell, rc::Rc, vec};
@@ -11,6 +10,8 @@ use std::{cell::RefCell, rc::Rc, vec};
 use crate::utils::{
     bind_handler_fn_mut, bind_handler_fn_once, window, IntervalHandle,
 };
+
+use self::protocol::{Command, Event as MedeaEvent, Heartbeat};
 
 // TODO:
 // 1. Reconnect.
@@ -63,18 +64,23 @@ impl Transport {
                 if payload.is_string() {
                     let payload: String = payload.as_string().unwrap();
 
-                    if let Ok(Heartbeat::Pong(_pong)) = serde_json::from_str::<Heartbeat>(&payload) {
+                    if let Ok(Heartbeat::Pong(_pong)) =
+                        serde_json::from_str::<Heartbeat>(&payload)
+                    {
                         pinger_rc.set_pong_at(Date::now());
-                        console::log(&js_sys::Array::from(&JsValue::from_str("pong received")));
+                        console::log(&js_sys::Array::from(&JsValue::from_str(
+                            "pong received",
+                        )));
                     } else {
-                        let event = serde_json::from_str::<MedeaEvent>(&payload).unwrap();
+                        let event =
+                            serde_json::from_str::<MedeaEvent>(&payload)
+                                .unwrap();
 
-                        //TODO: many subs, filter messages by session
+                        // TODO: many subs, filter messages by session
                         if let Some(sub) = subs_rc.borrow().iter().next() {
                             sub.unbounded_send(event).unwrap();
                         }
                     }
-
                 }
             },
         )
@@ -113,10 +119,9 @@ impl Transport {
     pub fn send_command(&self, command: &Command) {
         let socket_borrow = self.sock.borrow();
 
-        //TODO: no socket?
+        // TODO: no socket?
         if let Some(socket) = socket_borrow.as_ref() {
-            let msg =
-                serde_json::to_string(&command).unwrap();
+            let msg = serde_json::to_string(&command).unwrap();
 
             socket.send_with_str(&msg).unwrap();
         }
@@ -127,7 +132,9 @@ impl Drop for Transport {
     fn drop(&mut self) {
         let socket_borrow = self.sock.borrow();
         if let Some(socket) = socket_borrow.as_ref() {
-            socket.close_with_code_and_reason(1001, "Dropped suddenly").is_ok();
+            socket
+                .close_with_code_and_reason(1001, "Dropped suddenly")
+                .is_ok();
         }
     }
 }

@@ -1,9 +1,10 @@
-use wasm_bindgen::closure::Closure;
-use wasm_bindgen::convert::{FromWasmAbi, ReturnWasmAbi};
-use wasm_bindgen::prelude::*;
-use wasm_bindgen::JsCast;
-use web_sys::EventTarget;
-use web_sys::Window;
+use wasm_bindgen::{
+    closure::Closure,
+    convert::{FromWasmAbi, ReturnWasmAbi},
+    prelude::*,
+    JsCast,
+};
+use web_sys::{EventTarget, Window};
 
 pub fn bind_handler_fn_mut<F, A, R>(
     event: &str,

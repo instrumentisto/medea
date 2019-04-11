@@ -1,9 +1,7 @@
-pub use self::api::Jason;
-pub use self::api::SessionHandle;
-
+mod api;
 mod transport;
 mod utils;
-mod api;
+
 // When the `console_error_panic_hook` feature is enabled, we can call the
 // `set_panic_hook` function at least once during initialization, and then
 // we will get better error messages if our code ever panics.
@@ -13,11 +11,11 @@ mod api;
 #[cfg(feature = "console_error_panic_hook")]
 pub use console_error_panic_hook::set_once as set_panic_hook;
 
+pub use self::api::Jason;
+pub use self::api::SessionHandle;
 
 // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global
 // allocator.
 #[cfg(feature = "wee_alloc")]
 #[global_allocator]
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
-
-
