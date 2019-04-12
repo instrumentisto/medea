@@ -1,4 +1,4 @@
-use std::{any::Any, sync::Arc};
+use std::{sync::Arc};
 
 use hashbrown::HashMap;
 
@@ -128,7 +128,7 @@ pub struct Peer<S> {
     state: S,
 }
 
-impl<T: Any> Peer<T> {
+impl<T> Peer<T> {
     /// Returns ID of [`Member`] associated with this [`Peer`].
     pub fn member_id(&self) -> MemberId {
         self.context.member_id

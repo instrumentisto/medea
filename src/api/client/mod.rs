@@ -1,9 +1,11 @@
 //! Implementation of Client API.
 
-pub mod commands;
-pub mod events;
-pub mod room;
+mod commands;
+mod events;
+mod room;
+mod rpc_connection;
+mod session;
+
 pub mod server;
-pub mod session;
 
 pub use self::{commands::*, events::*, room::*, server::*, session::*};
