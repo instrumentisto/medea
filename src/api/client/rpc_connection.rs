@@ -10,6 +10,7 @@ use std::fmt;
 pub trait RpcConnection: fmt::Debug + Send {
     /// Closes [`RpcConnection`].
     /// No [`RpcConnectionClosed`] signals should be emitted.
+    /// TODO: should never err
     fn close(&mut self) -> Box<dyn Future<Item = (), Error = ()>>;
 
     /// Sends [`Event`] to remote [`Member`].

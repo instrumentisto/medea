@@ -108,6 +108,7 @@ impl Actor for WsSession {
                 })
                 .map(|_| ())
                 .map_err(move |err| {
+                    //TODO kill socket on err
                     error!(
                         "WsSession of member {} failed to join Room, because: \
                          {:?}",

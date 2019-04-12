@@ -118,7 +118,8 @@ impl Room {
     }
 
     /// Send [`Event`] to specified remote [`Member`].
-    fn send_event(
+    /// TODO: -> impl Future<(), RoomError>
+    fn send_event_to_member(
         &mut self,
         member_id: MemberId,
         event: Event,
@@ -300,12 +301,17 @@ impl Actor for Room {
                     })
                     .map(|(&id, _)| id)
                     .collect();
+                //TODO: test correctness
                 if !peer_ids.is_empty() {
-                    futures.push(
-                        connection.send_event(Event::PeersRemoved { peer_ids }),
-                    );
+                    futures.push(Either::A(
+                        connection
+                            .send_event(Event::PeersRemoved { peer_ids })
+                            .then(move |_| connection.close()),
+                    ));
+                } else {
+                    futures.push(Either::B(connection.close()));
                 }
-                futures.push(connection.close());
+
                 futures
             },
         );
@@ -369,7 +375,7 @@ impl Handler<RpcConnectionEstablished> for Room {
                 fut = Either::A(future::done(
                     self.handle_peer_created(peer.id())
                         .and_then(|(caller, event)| {
-                            self.send_event(caller, event)
+                            self.send_event_to_member(caller, event)
                         })
                         .map_err(move |err| {
                             error!(
@@ -408,7 +414,7 @@ impl Handler<Command> for Room {
                 self.handle_set_ice_candidate(peer_id, candidate)
             }
         };
-        if let Err(err) = res.and_then(|(caller, event)| self.send_event(caller, event)) {
+        if let Err(err) = res.and_then(|(caller, event)| self.send_event_to_member(caller, event)) {
             error!(
                 "Failed handle command, because {}. Room will be stop.",
                 err
