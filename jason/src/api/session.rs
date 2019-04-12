@@ -24,25 +24,19 @@ pub struct Session(Rc<RefCell<InnerSession>>);
 
 impl Session {
     pub fn new(transport: Rc<Transport>) -> Self {
-        Self {
-            0: InnerSession::new(transport),
-        }
+        Self(InnerSession::new(transport))
     }
 
     pub fn new_handle(&self) -> SessionHandle {
         SessionHandle {
-            inner: Session {
-                0: Rc::clone(&self.0),
-            },
+            inner: Session(Rc::clone(&self.0)),
         }
     }
 
     pub fn subscribe(&self, transport: &Transport) {
-        let mut inner = self.0.borrow_mut();
 
-        transport.add_sub(inner.tx.clone());
-
-        let rx = inner.rx.take().unwrap();
+        let (tx, rx) = unbounded();
+        transport.add_sub(tx);
 
         let inner = Rc::clone(&self.0);
         let poll = rx.for_each(move |event| {
@@ -81,18 +75,12 @@ impl Session {
 
 struct InnerSession {
     transport: Rc<Transport>,
-    tx: UnboundedSender<MedeaEvent>,
-    rx: Option<UnboundedReceiver<MedeaEvent>>,
 }
 
 impl InnerSession {
     fn new(transport: Rc<Transport>) -> Rc<RefCell<Self>> {
-        let (tx, rx) = unbounded();
-
         Rc::new(RefCell::new(Self {
-            transport,
-            tx,
-            rx: Some(rx),
+            transport
         }))
     }
 
