@@ -7,7 +7,9 @@ use web_sys::{console, CloseEvent, Event, MessageEvent, WebSocket};
 
 use std::{cell::RefCell, rc::Rc, vec};
 
-use crate::utils::{bind_handler_fn_mut, bind_handler_fn_once, window, IntervalHandle, WasmErr};
+use crate::utils::{
+    bind_handler_fn_mut, bind_handler_fn_once, window, IntervalHandle, WasmErr,
+};
 
 use self::protocol::{Command, Event as MedeaEvent, Heartbeat};
 use std::error::Error;
@@ -38,11 +40,13 @@ impl Transport {
         }
     }
 
-    pub fn init(&mut self) -> Result<(), WasmErr>{
+    pub fn init(&mut self) -> Result<(), WasmErr> {
         let socket = WebSocket::new(&self.token)?;
         let socket = Rc::new(RefCell::new(Some(socket)));
         let socket_borrow = socket.borrow();
-        let socket_ref = socket_borrow.as_ref().ok_or(WasmErr::NoneError("socket is none"))?;
+        let socket_ref = socket_borrow
+            .as_ref()
+            .ok_or(WasmErr::NoneError("socket is none"))?;
 
         let socket_rc = Rc::clone(&socket);
         let pinger_rc: Rc<Pinger> = Rc::clone(&self.pinger);
@@ -63,27 +67,31 @@ impl Transport {
 
                 if payload.is_string() {
                     let payload = match payload.as_string() {
-                        Some(payload) => { payload },
+                        Some(payload) => payload,
                         None => {
-                            console::error_1(&JsValue::from_str("Message received from WS is not str"));
+                            console::error_1(&JsValue::from_str(
+                                "Message received from WS is not str",
+                            ));
                             return;
-                        },
+                        }
                     };
 
                     if let Ok(Heartbeat::Pong(_pong)) =
                         serde_json::from_str::<Heartbeat>(&payload)
                     {
                         pinger_rc.set_pong_at(Date::now());
-                        console::log_1(&JsValue::from_str(
-                            "pong received",
-                        ));
+                        console::log_1(&JsValue::from_str("pong received"));
                     } else {
-                        let event = match serde_json::from_str::<MedeaEvent>(&payload) {
-                            Ok(event) => {event},
+                        let event = match serde_json::from_str::<MedeaEvent>(
+                            &payload,
+                        ) {
+                            Ok(event) => event,
                             Err(err) => {
-                                console::error_1(&JsValue::from_str(err.description()));
+                                console::error_1(&JsValue::from_str(
+                                    err.description(),
+                                ));
                                 return;
-                            },
+                            }
                         };
 
                         // TODO: many subs, filter messages by session
@@ -91,7 +99,9 @@ impl Transport {
                         let sub = subs_borrow.iter().next().unwrap();
 
                         if let Err(err) = sub.unbounded_send(event) {
-                            console::error_1(&JsValue::from_str(err.description()));
+                            console::error_1(&JsValue::from_str(
+                                err.description(),
+                            ));
                         }
                     }
                 }
@@ -104,13 +114,11 @@ impl Transport {
             "close",
             socket_ref,
             move |close: CloseEvent| {
-                console::log_1(&JsValue::from_str(
-                    &format!(
-                        "Close [code: {}, reason: {}]",
-                        close.code(),
-                        close.reason()
-                    ),
-                ));
+                console::log_1(&JsValue::from_str(&format!(
+                    "Close [code: {}, reason: {}]",
+                    close.code(),
+                    close.reason()
+                )));
                 socket_rc.borrow_mut().take();
                 pinger_rc.stop();
             },
@@ -132,7 +140,7 @@ impl Transport {
     pub fn send_command(&self, command: &Command) {
         let socket_borrow = self.sock.borrow();
 
-        // TODO: no socket?
+        // TODO: no socket? we dont really want this method to return err
         if let Some(socket) = socket_borrow.as_ref() {
             let msg = serde_json::to_string(&command).unwrap();
 
@@ -163,19 +171,14 @@ struct InnerPinger {
 }
 
 impl InnerPinger {
-    fn send_now(&mut self) {
-        if let Ok(socket) = self.socket.try_borrow() {
-            if let Some(socket) = socket.as_ref() {
-                self.num += 1;
-
-                let msg =
-                    serde_json::to_string(&Heartbeat::Ping(self.num)).unwrap();
-
-                if let Err(err) = socket.send_with_str(&msg) {
-                    console::error_1(&err);
-                }
-            }
-        }
+    fn send_now(&mut self) -> Result<(), WasmErr> {
+        let borrow = self.socket.try_borrow()?;
+        let socket = borrow
+            .as_ref()
+            .ok_or(WasmErr::NoneError("Unable to ping: no socket"))?;
+        self.num += 1;
+        let msg = serde_json::to_string(&Heartbeat::Ping(self.num)).unwrap();
+        socket.send_with_str(&msg).map_err(|e| WasmErr::from(e))
     }
 }
 
@@ -199,15 +202,21 @@ impl Pinger {
         self.0.borrow_mut().pong_at = Some(at);
     }
 
-    fn start(&self, socket: Rc<RefCell<Option<WebSocket>>>) -> Result<(),WasmErr> {
+    fn start(
+        &self,
+        socket: Rc<RefCell<Option<WebSocket>>>,
+    ) -> Result<(), WasmErr> {
         let mut inner = self.0.borrow_mut();
         inner.socket = socket;
-        inner.send_now();
+        inner.send_now()?;
 
         let inner_rc = Rc::clone(&self.0);
-        let do_ping = Closure::wrap(Box::new(move || {
-            inner_rc.borrow_mut().send_now();
-        }) as Box<dyn FnMut()>);
+        let do_ping = Closure::wrap(Box::new(
+            move || {
+                // its_ok if ping fails few times
+                inner_rc.borrow_mut().send_now().is_ok();
+            },
+        ) as Box<dyn FnMut()>);
 
         let interval_id = window()
             .set_interval_with_callback_and_timeout_and_arguments_0(
