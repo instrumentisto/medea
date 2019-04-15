@@ -108,7 +108,7 @@ mod test {
 
     use crate::{
         api::{client::Room, control::Member},
-        conf::{Conf, Server},
+        conf::{Conf, Coturn, Server},
     };
 
     use super::*;
@@ -158,6 +158,7 @@ mod test {
             rpc: Rpc {
                 idle_timeout: Duration::new(1, 0),
             },
+            coturn: Coturn::default(),
             server: Server::default(),
         };
 

@@ -4,3 +4,21 @@
 #
 # Default:
 #   idle_timeout = "10s"
+
+[coturn]
+# IP address to bind COTURN server to.
+#
+# Default:
+#   bind_ip = "0.0.0.0"
+bind_ip = "127.0.0.1"
+
+# Port to bind COTURN server to.
+#
+# Default:
+#   bind_port = "3478"
+
+# Username for authorize on COTURN server.
+user = "USER"
+
+# Password for authorize on COTURN server.
+pass = "PASS"

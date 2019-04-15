@@ -1,5 +1,6 @@
 //! Provides application configuration options.
 
+pub mod coturn;
 pub mod rpc;
 pub mod server;
 
@@ -11,6 +12,7 @@ use config::{
 use failure::Error;
 use serde::{Deserialize, Serialize};
 
+pub use self::coturn::Coturn;
 pub use self::rpc::Rpc;
 pub use self::server::Server;
 
@@ -26,6 +28,8 @@ static APP_CONF_PATH_ENV_VAR_NAME: &str = "MEDEA_CONF";
 /// Holds application config.
 #[derive(Clone, Debug, Deserialize, Serialize, Default)]
 pub struct Conf {
+    /// COTURN server settings.
+    pub coturn: coturn::Coturn,
     /// HTTP server settings.
     pub rpc: rpc::Rpc,
     /// RPC connection settings.
