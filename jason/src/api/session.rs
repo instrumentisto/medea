@@ -1,6 +1,6 @@
 use futures::{
     stream::Stream,
-    sync::mpsc::{unbounded, UnboundedReceiver, UnboundedSender},
+    sync::mpsc::unbounded,
 };
 use wasm_bindgen::{prelude::*, JsValue};
 use wasm_bindgen_futures::spawn_local;
@@ -13,9 +13,7 @@ use crate::transport::{
 };
 
 #[wasm_bindgen]
-pub struct SessionHandle {
-    inner: Session,
-}
+pub struct SessionHandle (Session);
 
 #[wasm_bindgen]
 impl SessionHandle {}
@@ -28,9 +26,7 @@ impl Session {
     }
 
     pub fn new_handle(&self) -> SessionHandle {
-        SessionHandle {
-            inner: Session(Rc::clone(&self.0)),
-        }
+        SessionHandle (Session(Rc::clone(&self.0)))
     }
 
     pub fn subscribe(&self, transport: &Transport) {
@@ -90,26 +86,26 @@ impl InnerSession {
         sdp_offer: Option<String>,
         tracks: Vec<DirectionalTrack>,
     ) {
-        console::log(&js_sys::Array::from(&JsValue::from_str(
+        console::log_1(&JsValue::from_str(
             "on_peer_created invoked",
-        )));
+        ));
     }
 
     fn on_sdp_answer(&mut self, peer_id: u64, sdp_answer: String) {
-        console::log(&js_sys::Array::from(&JsValue::from_str(
+        console::log_1(&JsValue::from_str(
             "on_sdp_answer invoked",
-        )));
+        ));
     }
 
     fn on_ice_candidate_discovered(&mut self, peer_id: u64, candidate: String) {
-        console::log(&js_sys::Array::from(&JsValue::from_str(
+        console::log_1(&&JsValue::from_str(
             "on_ice_candidate_discovered invoked",
-        )));
+        ));
     }
 
     fn on_peers_removed(&mut self, peer_ids: Vec<u64>) {
-        console::log(&js_sys::Array::from(&JsValue::from_str(
+        console::log_1(&JsValue::from_str(
             "on_peers_removed invoked",
-        )));
+        ));
     }
 }

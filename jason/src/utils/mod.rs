@@ -1,3 +1,8 @@
+
+mod errors;
+
+pub use self::errors::WasmErr;
+
 use wasm_bindgen::{
     closure::Closure,
     convert::{FromWasmAbi, ReturnWasmAbi},

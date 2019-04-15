@@ -7,11 +7,10 @@ use web_sys::{console, CloseEvent, Event, MessageEvent, WebSocket};
 
 use std::{cell::RefCell, rc::Rc, vec};
 
-use crate::utils::{
-    bind_handler_fn_mut, bind_handler_fn_once, window, IntervalHandle,
-};
+use crate::utils::{bind_handler_fn_mut, bind_handler_fn_once, window, IntervalHandle, WasmErr};
 
 use self::protocol::{Command, Event as MedeaEvent, Heartbeat};
+use std::error::Error;
 
 // TODO:
 // 1. Reconnect.
@@ -39,19 +38,18 @@ impl Transport {
         }
     }
 
-    pub fn init(&mut self) {
-        let socket = WebSocket::new(&self.token).unwrap();
+    pub fn init(&mut self) -> Result<(), WasmErr>{
+        let socket = WebSocket::new(&self.token)?;
         let socket = Rc::new(RefCell::new(Some(socket)));
         let socket_borrow = socket.borrow();
-        let socket_ref = socket_borrow.as_ref().unwrap();
+        let socket_ref = socket_borrow.as_ref().ok_or(WasmErr::NoneError("socket is none"))?;
 
         let socket_rc = Rc::clone(&socket);
         let pinger_rc: Rc<Pinger> = Rc::clone(&self.pinger);
         let on_open =
             bind_handler_fn_once("open", socket_ref, move |_: Event| {
                 pinger_rc.start(socket_rc);
-            })
-            .unwrap();
+            })?;
 
         let pinger_rc = Rc::clone(&self.pinger);
         let subs_rc = Rc::clone(&self.subs);
@@ -62,15 +60,18 @@ impl Transport {
                 let payload = message.data();
 
                 if payload.is_string() {
-                    let payload: String = payload.as_string().unwrap();
+                    let payload = match payload.as_string() {
+                        Some(payload) => { payload },
+                        None => { return; },
+                    };
 
                     if let Ok(Heartbeat::Pong(_pong)) =
                         serde_json::from_str::<Heartbeat>(&payload)
                     {
                         pinger_rc.set_pong_at(Date::now());
-                        console::log(&js_sys::Array::from(&JsValue::from_str(
+                        console::log_1(&JsValue::from_str(
                             "pong received",
-                        )));
+                        ));
                     } else {
                         let event =
                             serde_json::from_str::<MedeaEvent>(&payload)
@@ -92,13 +93,13 @@ impl Transport {
             "close",
             socket_ref,
             move |close: CloseEvent| {
-                console::log(&js_sys::Array::from(&JsValue::from_str(
+                console::log_1(&JsValue::from_str(
                     &format!(
                         "Close [code: {}, reason: {}]",
                         close.code(),
                         close.reason()
                     ),
-                )));
+                ));
                 socket_rc.borrow_mut().take();
                 pinger_rc.stop();
             },
@@ -109,7 +110,9 @@ impl Transport {
         self.on_message = Some(on_message);
         self.on_close = Some(on_close);
         drop(socket_borrow);
-        self.sock = socket
+        self.sock = socket;
+
+        Ok(())
     }
 
     pub fn add_sub(&self, sub: UnboundedSender<MedeaEvent>) {
