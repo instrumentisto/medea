@@ -48,7 +48,9 @@ impl Transport {
         let pinger_rc: Rc<Pinger> = Rc::clone(&self.pinger);
         let on_open =
             bind_handler_fn_once("open", socket_ref, move |_: Event| {
-                pinger_rc.start(socket_rc);
+                if let Err(err) = pinger_rc.start(socket_rc) {
+                    err.log_err();
+                };
             })?;
 
         let pinger_rc = Rc::clone(&self.pinger);
@@ -62,7 +64,10 @@ impl Transport {
                 if payload.is_string() {
                     let payload = match payload.as_string() {
                         Some(payload) => { payload },
-                        None => { return; },
+                        None => {
+                            console::error_1(&JsValue::from_str("Message received from WS is not str"));
+                            return;
+                        },
                     };
 
                     if let Ok(Heartbeat::Pong(_pong)) =
@@ -73,19 +78,25 @@ impl Transport {
                             "pong received",
                         ));
                     } else {
-                        let event =
-                            serde_json::from_str::<MedeaEvent>(&payload)
-                                .unwrap();
+                        let event = match serde_json::from_str::<MedeaEvent>(&payload) {
+                            Ok(event) => {event},
+                            Err(err) => {
+                                console::error_1(&JsValue::from_str(err.description()));
+                                return;
+                            },
+                        };
 
                         // TODO: many subs, filter messages by session
-                        if let Some(sub) = subs_rc.borrow().iter().next() {
-                            sub.unbounded_send(event).unwrap();
+                        let subs_borrow = subs_rc.borrow();
+                        let sub = subs_borrow.iter().next().unwrap();
+
+                        if let Err(err) = sub.unbounded_send(event) {
+                            console::error_1(&JsValue::from_str(err.description()));
                         }
                     }
                 }
             },
-        )
-        .unwrap();
+        )?;
 
         let socket_rc = Rc::clone(&socket);
         let pinger_rc: Rc<Pinger> = Rc::clone(&self.pinger);
@@ -103,8 +114,7 @@ impl Transport {
                 socket_rc.borrow_mut().take();
                 pinger_rc.stop();
             },
-        )
-        .unwrap();
+        )?;
 
         self.on_open = Some(on_open);
         self.on_message = Some(on_message);
@@ -161,7 +171,9 @@ impl InnerPinger {
                 let msg =
                     serde_json::to_string(&Heartbeat::Ping(self.num)).unwrap();
 
-                socket.send_with_str(&msg).unwrap();
+                if let Err(err) = socket.send_with_str(&msg) {
+                    console::error_1(&err);
+                }
             }
         }
     }
@@ -187,7 +199,7 @@ impl Pinger {
         self.0.borrow_mut().pong_at = Some(at);
     }
 
-    fn start(&self, socket: Rc<RefCell<Option<WebSocket>>>) {
+    fn start(&self, socket: Rc<RefCell<Option<WebSocket>>>) -> Result<(),WasmErr> {
         let mut inner = self.0.borrow_mut();
         inner.socket = socket;
         inner.send_now();
@@ -201,13 +213,14 @@ impl Pinger {
             .set_interval_with_callback_and_timeout_and_arguments_0(
                 do_ping.as_ref().unchecked_ref(),
                 inner.ping_interval,
-            )
-            .unwrap();
+            )?;
 
         inner.ping_task = Some(PingTaskHandler {
             _ping_closure: do_ping,
             _interval_handler: IntervalHandle(interval_id),
         });
+
+        Ok(())
     }
 
     fn stop(&self) {
