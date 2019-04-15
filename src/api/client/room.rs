@@ -27,6 +27,7 @@ use crate::{
     log::prelude::*,
     media::peer::{Id as PeerId, PeerMachine},
 };
+use slog::Drain;
 
 #[derive(Fail, Debug)]
 pub enum RoomError {
@@ -123,15 +124,16 @@ impl Room {
         &mut self,
         member_id: MemberId,
         event: Event,
-    ) -> Result<(), RoomError> {
-        self.connections
-            .get(&member_id)
-            .ok_or(RoomError::ConnectionNotExists(member_id))
-            .and_then(move |conn| {
+    ) -> impl Future<Item = (), Error = RoomError> {
+        match self.connections.get(&member_id) {
+            Some(conn) => Either::A(
                 conn.send_event(event)
-                    .wait()
-                    .map_err(|_| RoomError::UnableSendEvent(member_id))
-            })
+                    .map_err(move |_| RoomError::UnableSendEvent(member_id)),
+            ),
+            None => Either::B(future::err(RoomError::ConnectionNotExists(
+                member_id,
+            ))),
+        }
     }
 
     /// Check state of the specified and associated [`Peer`].
@@ -139,9 +141,9 @@ impl Room {
     fn handle_peer_created(
         &mut self,
         from_peer_id: PeerId,
+        to_peer_id: PeerId,
     ) -> Result<(MemberId, Event), RoomError> {
         let from_peer = self.take_peer(&from_peer_id)?;
-        let to_peer_id = from_peer.to_peer();
         let to_peer = self.take_peer(&to_peer_id)?;
 
         let (from_peer, to_peer) = match (from_peer, to_peer) {
@@ -301,7 +303,7 @@ impl Actor for Room {
                     })
                     .map(|(&id, _)| id)
                     .collect();
-                //TODO: test correctness
+                // TODO: test correctness
                 if !peer_ids.is_empty() {
                     futures.push(Either::A(
                         connection
@@ -371,29 +373,72 @@ impl Handler<RpcConnectionEstablished> for Room {
             self.connections.insert(msg.member_id, msg.connection);
 
             let peer = self.member_peer(&member_id);
-            if peer.sender().is_some() {
-                fut = Either::A(future::done(
-                    self.handle_peer_created(peer.id())
-                        .and_then(|(caller, event)| {
-                            self.send_event_to_member(caller, event)
-                        })
-                        .map_err(move |err| {
-                            error!(
-                                "Member {} cannot join room, because {}. Room \
-                                 will be stop.",
-                                member_id, err
-                            );
-                            ctx.stop()
-                        }),
-                ));
+            if let Some(sender) = peer.sender() {
+                ctx.notify(StartSignaling {
+                    from_peer_id: peer.id(),
+                    to_peer_id: sender,
+                });
             }
         }
         Box::new(wrap_future(fut))
     }
 }
 
+#[derive(Debug, Message)]
+#[rtype(result = "Result<(), ()>")]
+pub struct CloseRoom {}
+
+impl Handler<CloseRoom> for Room {
+    type Result = ActFuture<(), ()>;
+
+    fn handle(
+        &mut self,
+        _msg: CloseRoom,
+        _ctx: &mut Self::Context,
+    ) -> Self::Result {
+        Box::new(wrap_future(future::ok(())))
+    }
+}
+
+#[derive(Debug, Message)]
+#[rtype(result = "Result<(), ()>")]
+pub struct StartSignaling {
+    pub from_peer_id: PeerId,
+    pub to_peer_id: PeerId,
+}
+
+impl Handler<StartSignaling> for Room {
+    type Result = ActFuture<(), ()>;
+
+    /// Receives [`Command`] from Web client and changes state of interconnected
+    /// [`Peer`]s.
+    fn handle(
+        &mut self,
+        msg: StartSignaling,
+        ctx: &mut Self::Context,
+    ) -> Self::Result {
+        let addr = ctx.address();
+        let fut =
+            match self.handle_peer_created(msg.from_peer_id, msg.to_peer_id) {
+                Ok((caller, event)) => {
+                    Either::A(self.send_event_to_member(caller, event))
+                }
+                Err(err) => Either::B(future::err(err)),
+            }
+            .map_err(move |err| {
+                error!(
+                    "Cannot start signaling between peers {} {}, because {}. \
+                     Room will be stop.",
+                    msg.from_peer_id, msg.to_peer_id, err
+                );
+                addr.do_send(CloseRoom {})
+            });
+        Box::new(wrap_future(fut))
+    }
+}
+
 impl Handler<Command> for Room {
-    type Result = ();
+    type Result = ActFuture<(), ()>;
 
     /// Receives [`Command`] from Web client and changes state of interconnected
     /// [`Peer`]s.
@@ -414,13 +459,21 @@ impl Handler<Command> for Room {
                 self.handle_set_ice_candidate(peer_id, candidate)
             }
         };
-        if let Err(err) = res.and_then(|(caller, event)| self.send_event_to_member(caller, event)) {
+        let addr = ctx.address();
+        let fut = match res {
+            Ok((caller, event)) => {
+                Either::A(self.send_event_to_member(caller, event))
+            }
+            Err(err) => Either::B(future::err(err)),
+        }
+        .map_err(move |err| {
             error!(
                 "Failed handle command, because {}. Room will be stop.",
                 err
             );
-            ctx.stop()
-        }
+            addr.do_send(CloseRoom {})
+        });
+        Box::new(wrap_future(fut))
     }
 }
 

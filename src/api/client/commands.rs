@@ -5,6 +5,7 @@ use crate::media::peer::Id as PeerId;
 
 /// WebSocket message from Web Client to Media Server.
 #[derive(Debug, Deserialize, Message, Serialize)]
+#[rtype(result = "Result<(), ()>")]
 pub enum Command {
     /// Web Client sends SDP Offer.
     MakeSdpOffer { peer_id: PeerId, sdp_offer: String },
