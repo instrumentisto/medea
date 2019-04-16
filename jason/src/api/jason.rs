@@ -25,7 +25,10 @@ impl Jason {
         }
     }
 
-    pub fn init_session(&mut self, token: String) -> Result<SessionHandle, JsValue> {
+    pub fn init_session(
+        &mut self,
+        token: String,
+    ) -> Result<SessionHandle, JsValue> {
         let mut transport = Transport::new(token, 3000);
         transport.init()?;
         let transport = Rc::new(transport);

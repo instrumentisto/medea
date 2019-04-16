@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 // TODO: just copied from Medea crate, needs refactoring to properly share
-// protocol messages between crates
+// protocol DTOS between crates protocol messages between crates
 #[derive(Deserialize, Serialize)]
 pub enum Heartbeat {
     /// `ping` message that WebSocket client is expected to send to the server

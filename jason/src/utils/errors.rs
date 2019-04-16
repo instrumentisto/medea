@@ -1,8 +1,10 @@
-use std::error::Error;
-use std::fmt::{Display, Formatter};
 use wasm_bindgen::JsValue;
-use web_sys::{console, CloseEvent, Event, MessageEvent, WebSocket};
-use std::borrow::Cow;
+use web_sys::console;
+
+use std::{
+    borrow::Cow,
+    fmt::{Display, Formatter},
+};
 
 pub enum WasmErr {
     JsError(JsValue),
@@ -14,7 +16,10 @@ impl WasmErr {
         console::error_1(&JsValue::from_str(&format!("{}", self)));
     }
 
-    pub fn from_str(msg: &'static str) -> WasmErr {
+    pub fn from_str<S>(msg: S) -> WasmErr
+    where
+        S: Into<Cow<'static, str>>,
+    {
         WasmErr::Other(msg.into())
     }
 }
@@ -58,3 +63,7 @@ macro_rules! impl_from_error {
 
 impl_from_error!(std::cell::BorrowError);
 impl_from_error!(serde_json::error::Error);
+// TODO: improve macro to use generics
+impl_from_error!(
+    futures::sync::mpsc::SendError<crate::transport::protocol::Event>
+);
