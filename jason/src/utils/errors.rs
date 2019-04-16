@@ -37,14 +37,14 @@ impl From<JsValue> for WasmErr {
     }
 }
 
-//impl Into<JsValue> for WasmErr {
-//    fn into(self) -> JsValue {
-//        match self {
-//            WasmErr::JsError(value) => value,
-//            WasmErr::Other(reason) => JsValue::from_str(&reason),
-//        }
-//    }
-//}
+impl From<WasmErr> for JsValue {
+    fn from(err: WasmErr) -> Self {
+        match err {
+            WasmErr::JsError(value) => value,
+            WasmErr::Other(reason) => JsValue::from_str(&reason),
+        }
+    }
+}
 
 macro_rules! impl_from_error {
     ($error:ty) => {

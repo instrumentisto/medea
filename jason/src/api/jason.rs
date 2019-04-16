@@ -25,9 +25,9 @@ impl Jason {
         }
     }
 
-    pub fn init_session(&mut self, token: String) -> SessionHandle {
+    pub fn init_session(&mut self, token: String) -> Result<SessionHandle, JsValue> {
         let mut transport = Transport::new(token, 3000);
-        transport.init();
+        transport.init()?;
         let transport = Rc::new(transport);
 
         let session = Session::new(Rc::clone(&transport));
@@ -38,6 +38,6 @@ impl Jason {
         self.sessions.push(Rc::new(session));
         self.transport = Some(transport);
 
-        handle
+        Ok(handle)
     }
 }
