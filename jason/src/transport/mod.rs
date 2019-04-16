@@ -65,16 +65,23 @@ impl Transport {
                 if let Ok(Heartbeat::Pong(num)) = Heartbeat::try_from(&message)
                 {
                     pinger_rc.set_pong_at(Date::now());
-                } else if let Ok(event) = MedeaEvent::try_from(&message) {
-                    // TODO: many subs, filter messages by session
-                    let subs_borrow = subs_rc.borrow();
-                    let sub = subs_borrow.iter().next().unwrap();
-
-                    if let Err(err) = sub.unbounded_send(event) {
-                        WasmErr::from(err).log_err();
-                    }
                 } else {
-                    // TODO: protocol versions mismatch? should drop connection if so
+                    match MedeaEvent::try_from(&message) {
+                        Ok(event) => {
+                            // TODO: many subs, filter messages by session
+                            let subs_borrow = subs_rc.borrow();
+                            let sub = subs_borrow.iter().next().unwrap();
+
+                            if let Err(err) = sub.unbounded_send(event) {
+                                WasmErr::from(err).log_err();
+                            }
+                        }
+                        Err(err) => {
+                            // TODO: protocol versions mismatch? should drop
+                            // connection if so
+                            err.log_err();
+                        }
+                    }
                 }
             },
         )?;
@@ -206,17 +213,18 @@ impl Pinger {
     }
 }
 
+fn js_val_to_string(msg: &MessageEvent) -> Result<String, WasmErr> {
+    let payload = msg.data();
+    payload
+        .as_string()
+        .ok_or(WasmErr::from_str("Payload is not string"))
+}
+
 impl TryFrom<&MessageEvent> for MedeaEvent {
     type Error = WasmErr;
 
     fn try_from(msg: &MessageEvent) -> Result<Self, Self::Error> {
-        let payload = msg.data();
-
-        let payload = payload
-            .as_string()
-            .ok_or(WasmErr::from_str("Payload is not string"))?;
-
-        serde_json::from_str::<MedeaEvent>(&payload)
+        serde_json::from_str::<MedeaEvent>(&js_val_to_string(msg)?)
             .map_err(|e: serde_json::error::Error| WasmErr::from(e))
     }
 }
@@ -225,13 +233,7 @@ impl TryFrom<&MessageEvent> for Heartbeat {
     type Error = WasmErr;
 
     fn try_from(msg: &MessageEvent) -> Result<Self, Self::Error> {
-        let payload = msg.data();
-
-        let payload = payload
-            .as_string()
-            .ok_or(WasmErr::from_str("Payload is not string"))?;
-
-        serde_json::from_str::<Heartbeat>(&payload)
+        serde_json::from_str::<Heartbeat>(&js_val_to_string(msg)?)
             .map_err(|e: serde_json::error::Error| WasmErr::from(e))
     }
 }
