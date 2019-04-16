@@ -46,7 +46,7 @@ impl Transport {
         let socket_borrow = socket.borrow();
         let socket_ref = socket_borrow
             .as_ref()
-            .ok_or(WasmErr::NoneError("socket is none"))?;
+            .ok_or(WasmErr::from_str("socket is none"))?;
 
         let socket_rc = Rc::clone(&socket);
         let pinger_rc: Rc<Pinger> = Rc::clone(&self.pinger);
@@ -175,9 +175,9 @@ impl InnerPinger {
         let borrow = self.socket.try_borrow()?;
         let socket = borrow
             .as_ref()
-            .ok_or(WasmErr::NoneError("Unable to ping: no socket"))?;
+            .ok_or(WasmErr::from_str("Unable to ping: no socket"))?;
         self.num += 1;
-        let msg = serde_json::to_string(&Heartbeat::Ping(self.num)).unwrap();
+        let msg = serde_json::to_string(&Heartbeat::Ping(self.num))?;
         socket.send_with_str(&msg).map_err(|e| WasmErr::from(e))
     }
 }

@@ -2,17 +2,20 @@ use std::error::Error;
 use std::fmt::{Display, Formatter};
 use wasm_bindgen::JsValue;
 use web_sys::{console, CloseEvent, Event, MessageEvent, WebSocket};
+use std::borrow::Cow;
 
 pub enum WasmErr {
     JsError(JsValue),
-    RustError(Box<dyn Error>),
-    NoneError(&'static str),
-    Other(String),
+    Other(Cow<'static, str>),
 }
 
 impl WasmErr {
     pub fn log_err(&self) {
         console::error_1(&JsValue::from_str(&format!("{}", self)));
+    }
+
+    pub fn from_str(msg: &'static str) -> WasmErr {
+        WasmErr::Other(msg.into())
     }
 }
 
@@ -23,8 +26,6 @@ impl Display for WasmErr {
                 Some(reason) => write!(f, "{}", reason),
                 None => write!(f, "{}", "no str representation for JsError"),
             },
-            WasmErr::RustError(rust_err) => rust_err.fmt(f),
-            WasmErr::NoneError(reason) => write!(f, "{}", reason),
             WasmErr::Other(reason) => write!(f, "{}", reason),
         }
     }
@@ -36,31 +37,24 @@ impl From<JsValue> for WasmErr {
     }
 }
 
-impl Into<JsValue> for WasmErr {
-    fn into(self) -> JsValue {
-        match self {
-            WasmErr::JsError(value) => value,
-            WasmErr::RustError(err) => JsValue::from_str(&format!("{}", err)),
-            WasmErr::NoneError(reason) => JsValue::from_str(reason),
-            WasmErr::Other(reason) => JsValue::from_str(&reason),
-        }
-    }
-}
+//impl Into<JsValue> for WasmErr {
+//    fn into(self) -> JsValue {
+//        match self {
+//            WasmErr::JsError(value) => value,
+//            WasmErr::Other(reason) => JsValue::from_str(&reason),
+//        }
+//    }
+//}
 
 macro_rules! impl_from_error {
     ($error:ty) => {
         impl From<$error> for WasmErr {
             fn from(error: $error) -> Self {
-                WasmErr::Other(format!("{}", error))
+                WasmErr::Other(format!("{}", error).into())
             }
         }
     };
 }
 
 impl_from_error!(std::cell::BorrowError);
-
-// impl From<std::cell::BorrowError> for WasmErr {
-//    fn from(val: JsValue) -> Self {
-//        WasmErr::JsError(val)
-//    }
-//}
+impl_from_error!(serde_json::error::Error);
