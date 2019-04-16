@@ -6,6 +6,7 @@ use std::{
     fmt::{Display, Formatter},
 };
 
+#[derive(Debug)]
 pub enum WasmErr {
     JsError(JsValue),
     Other(Cow<'static, str>),

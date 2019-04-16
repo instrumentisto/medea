@@ -10,42 +10,6 @@ use wasm_bindgen::{
 };
 use web_sys::{EventTarget, Window};
 
-pub fn bind_handler_fn_mut<F, A, R>(
-    event: &str,
-    target: &EventTarget,
-    f: F,
-) -> Result<Closure<dyn FnMut(A) -> R>, JsValue>
-where
-    F: (FnMut(A) -> R) + 'static,
-    A: FromWasmAbi + 'static,
-    R: ReturnWasmAbi + 'static,
-{
-    let closure = Closure::wrap(Box::new(f) as Box<dyn FnMut(A) -> R>);
-    target.add_event_listener_with_callback(
-        event,
-        closure.as_ref().unchecked_ref(),
-    )?;
-    Ok(closure)
-}
-
-pub fn bind_handler_fn_once<F, A, R>(
-    event: &str,
-    target: &EventTarget,
-    f: F,
-) -> Result<Closure<dyn FnMut(A) -> R>, JsValue>
-where
-    F: (FnOnce(A) -> R) + 'static,
-    A: FromWasmAbi + 'static,
-    R: ReturnWasmAbi + 'static,
-{
-    let closure: Closure<FnMut(A) -> (R)> = Closure::once(f);
-    target.add_event_listener_with_callback(
-        event,
-        closure.as_ref().unchecked_ref(),
-    )?;
-    Ok(closure)
-}
-
 pub struct IntervalHandle(pub i32);
 
 pub fn window() -> Window {
