@@ -12,8 +12,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     api::client::rpc_connection::{
-        RpcConnection, RpcConnectionClosed, RpcConnectionClosedReason,
-        RpcConnectionEstablished,
+        Closed, ClosedReason, Established, RpcConnection,
     },
     api::client::{Command, Event, Room},
     api::control::member::Id as MemberId,
@@ -68,9 +67,9 @@ impl WsSession {
                 > sess.idle_timeout
             {
                 info!("WsSession of member {} is idle", sess.member_id);
-                if let Err(err) = sess.room.try_send(RpcConnectionClosed {
+                if let Err(err) = sess.room.try_send(Closed {
                     member_id: sess.member_id,
-                    reason: RpcConnectionClosedReason::Idle,
+                    reason: ClosedReason::Idle,
                 }) {
                     error!(
                         "WsSession of member {} failed to remove from Room, \
@@ -100,20 +99,23 @@ impl Actor for WsSession {
         self.start_watchdog(ctx);
 
         let member_id = self.member_id;
+        let slf_addr = ctx.address();
         ctx.wait(wrap_future(
             self.room
-                .send(RpcConnectionEstablished {
+                .send(Established {
                     member_id: self.member_id,
                     connection: Box::new(ctx.address()),
                 })
                 .map(|_| ())
                 .map_err(move |err| {
-                    // TODO kill socket on err
                     error!(
                         "WsSession of member {} failed to join Room, because: \
                          {:?}",
                         member_id, err,
-                    )
+                    );
+                    slf_addr.do_send(Close {
+                        reason: Some(ws::CloseCode::Normal.into()),
+                    });
                 }),
         ));
     }
@@ -125,12 +127,14 @@ impl Actor for WsSession {
 
 impl RpcConnection for Addr<WsSession> {
     /// Closes [`WsSession`] by sending itself "normal closure" close message.
+    ///
+    /// Never returns error.
     fn close(&mut self) -> Box<dyn Future<Item = (), Error = ()>> {
         let fut = self
             .send(Close {
                 reason: Some(ws::CloseCode::Normal.into()),
             })
-            .map_err(|_| ());
+            .or_else(|_| Ok(()));
         Box::new(fut)
     }
 
@@ -228,9 +232,9 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
                         "Send close frame with reason {:?} for member {}",
                         reason, self.member_id
                     );
-                    if let Err(err) = self.room.try_send(RpcConnectionClosed {
+                    if let Err(err) = self.room.try_send(Closed {
                         member_id: self.member_id,
-                        reason: RpcConnectionClosedReason::Disconnected,
+                        reason: ClosedReason::Disconnected,
                     }) {
                         error!(
                             "WsSession of member {} failed to remove from \

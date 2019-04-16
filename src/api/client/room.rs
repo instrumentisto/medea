@@ -6,8 +6,8 @@ use std::{
 };
 
 use actix::{
-    fut::wrap_future, Actor, ActorContext, ActorFuture, Addr, AsyncContext,
-    Context, Handler, Message, Running, SpawnHandle,
+    fut::wrap_future, Actor, ActorFuture, Addr, AsyncContext, Context, Handler,
+    Message, SpawnHandle,
 };
 use failure::Fail;
 use futures::{
@@ -18,19 +18,17 @@ use hashbrown::HashMap;
 
 use crate::{
     api::client::rpc_connection::{
-        AuthorizeRpcConnection, RpcConnection, RpcConnectionAuthorizationError,
-        RpcConnectionClosed, RpcConnectionClosedReason,
-        RpcConnectionEstablished,
+        AuthorizationError, Authorize, Closed, ClosedReason, Established,
+        RpcConnection,
     },
     api::client::{Command, Event},
     api::control::{Id as MemberId, Member},
     log::prelude::*,
-    media::peer::{Id as PeerId, PeerMachine},
+    media::peer::{Id as PeerId, SignalingStateMachine},
 };
-use slog::Drain;
 
 #[derive(Fail, Debug)]
-pub enum RoomError {
+pub enum Error {
     #[fail(display = "Unknown peer {}", _0)]
     UnknownPeer(PeerId),
     #[fail(display = "Unmatched states between peers {} and {}", _0, _1)]
@@ -64,7 +62,7 @@ pub struct Room {
     members: HashMap<MemberId, Member>,
 
     /// [`Peer`]s of [`Member`]s in this [`Room`].
-    peers: HashMap<PeerId, PeerMachine>,
+    peers: HashMap<PeerId, SignalingStateMachine>,
 }
 
 impl Room {
@@ -72,10 +70,10 @@ impl Room {
     pub fn new(
         id: Id,
         members: HashMap<MemberId, Member>,
-        peers: HashMap<PeerId, PeerMachine>,
+        peers: HashMap<PeerId, SignalingStateMachine>,
         connection_timeout: Duration,
     ) -> Self {
-        Room {
+        Self {
             id,
             connections: HashMap::new(),
             idle_timeouts: HashMap::new(),
@@ -86,21 +84,24 @@ impl Room {
     }
 
     /// Store [`Peer`] in [`Room`].
-    fn add_peer(&mut self, id: PeerId, peer: PeerMachine) {
+    fn add_peer(&mut self, id: PeerId, peer: SignalingStateMachine) {
         self.peers.insert(id, peer);
     }
 
     /// Returns borrowed [`Peer`] by its ID.
-    fn get_peer(&self, peer_id: &PeerId) -> Result<&PeerMachine, RoomError> {
+    fn get_peer(
+        &self,
+        peer_id: PeerId,
+    ) -> Result<&SignalingStateMachine, Error> {
         self.peers
-            .get(peer_id)
-            .ok_or(RoomError::UnknownPeer(*peer_id))
+            .get(&peer_id)
+            .ok_or_else(|| Error::UnknownPeer(peer_id))
     }
 
     /// Returns [`Peer`] of specified [`Member`].
     ///
     /// Panic if [`Peer`] not exists.
-    fn member_peer(&self, member_id: &MemberId) -> &PeerMachine {
+    fn member_peer(&self, member_id: &MemberId) -> &SignalingStateMachine {
         self.peers
             .iter()
             .find(|(_, peer)| peer.member_id() == *member_id)
@@ -111,28 +112,27 @@ impl Room {
     /// Returns owned [`Peer`] by its ID.
     fn take_peer(
         &mut self,
-        peer_id: &PeerId,
-    ) -> Result<PeerMachine, RoomError> {
+        peer_id: PeerId,
+    ) -> Result<SignalingStateMachine, Error> {
         self.peers
-            .remove(peer_id)
-            .ok_or(RoomError::UnknownPeer(*peer_id))
+            .remove(&peer_id)
+            .ok_or_else(|| Error::UnknownPeer(peer_id))
     }
 
     /// Send [`Event`] to specified remote [`Member`].
-    /// TODO: -> impl Future<(), RoomError>
     fn send_event_to_member(
         &mut self,
         member_id: MemberId,
         event: Event,
-    ) -> impl Future<Item = (), Error = RoomError> {
+    ) -> impl Future<Item = (), Error = Error> {
         match self.connections.get(&member_id) {
             Some(conn) => Either::A(
                 conn.send_event(event)
-                    .map_err(move |_| RoomError::UnableSendEvent(member_id)),
+                    .map_err(move |_| Error::UnableSendEvent(member_id)),
             ),
-            None => Either::B(future::err(RoomError::ConnectionNotExists(
-                member_id,
-            ))),
+            None => {
+                Either::B(future::err(Error::ConnectionNotExists(member_id)))
+            }
         }
     }
 
@@ -142,18 +142,19 @@ impl Room {
         &mut self,
         from_peer_id: PeerId,
         to_peer_id: PeerId,
-    ) -> Result<(MemberId, Event), RoomError> {
-        let from_peer = self.take_peer(&from_peer_id)?;
-        let to_peer = self.take_peer(&to_peer_id)?;
+    ) -> Result<(MemberId, Event), Error> {
+        let from_peer = self.take_peer(from_peer_id)?;
+        let to_peer = self.take_peer(to_peer_id)?;
 
         let (from_peer, to_peer) = match (from_peer, to_peer) {
-            (PeerMachine::New(peer_from), PeerMachine::New(peer_to)) => {
-                Ok((peer_from, peer_to))
-            }
+            (
+                SignalingStateMachine::New(peer_from),
+                SignalingStateMachine::New(peer_to),
+            ) => Ok((peer_from, peer_to)),
             (from_peer, to_peer) => {
                 self.add_peer(from_peer_id, from_peer);
                 self.add_peer(to_peer_id, to_peer);
-                Err(RoomError::UnmatchedState(from_peer_id, to_peer_id))
+                Err(Error::UnmatchedState(from_peer_id, to_peer_id))
             }
         }?;
 
@@ -166,8 +167,8 @@ impl Room {
             tracks: to_peer.tracks(),
         };
 
-        self.add_peer(from_peer_id, PeerMachine::New(from_peer));
-        self.add_peer(to_peer_id, PeerMachine::WaitLocalSDP(to_peer));
+        self.add_peer(from_peer_id, SignalingStateMachine::New(from_peer));
+        self.add_peer(to_peer_id, SignalingStateMachine::WaitLocalSDP(to_peer));
         Ok((to_member_id, event))
     }
 
@@ -177,20 +178,20 @@ impl Room {
         &mut self,
         from_peer_id: PeerId,
         sdp_offer: String,
-    ) -> Result<(MemberId, Event), RoomError> {
-        let from_peer = self.take_peer(&from_peer_id)?;
+    ) -> Result<(MemberId, Event), Error> {
+        let from_peer = self.take_peer(from_peer_id)?;
         let to_peer_id = from_peer.to_peer();
-        let to_peer = self.take_peer(&to_peer_id)?;
+        let to_peer = self.take_peer(to_peer_id)?;
 
         let (from_peer, to_peer) = match (from_peer, to_peer) {
             (
-                PeerMachine::WaitLocalSDP(peer_from),
-                PeerMachine::New(peer_to),
+                SignalingStateMachine::WaitLocalSDP(peer_from),
+                SignalingStateMachine::New(peer_to),
             ) => Ok((peer_from, peer_to)),
             (from_peer, to_peer) => {
                 self.add_peer(from_peer_id, from_peer);
                 self.add_peer(to_peer_id, to_peer);
-                Err(RoomError::UnmatchedState(from_peer_id, to_peer_id))
+                Err(Error::UnmatchedState(from_peer_id, to_peer_id))
             }
         }?;
 
@@ -204,8 +205,14 @@ impl Room {
             tracks: to_peer.tracks(),
         };
 
-        self.add_peer(from_peer_id, PeerMachine::WaitRemoteSDP(from_peer));
-        self.add_peer(to_peer_id, PeerMachine::WaitLocalHaveRemote(to_peer));
+        self.add_peer(
+            from_peer_id,
+            SignalingStateMachine::WaitRemoteSDP(from_peer),
+        );
+        self.add_peer(
+            to_peer_id,
+            SignalingStateMachine::WaitLocalHaveRemote(to_peer),
+        );
         Ok((to_member_id, event))
     }
 
@@ -215,25 +222,25 @@ impl Room {
         &mut self,
         from_peer_id: PeerId,
         sdp_answer: String,
-    ) -> Result<(MemberId, Event), RoomError> {
-        let from_peer = self.take_peer(&from_peer_id)?;
+    ) -> Result<(MemberId, Event), Error> {
+        let from_peer = self.take_peer(from_peer_id)?;
         let to_peer_id = from_peer.to_peer();
-        let to_peer = self.take_peer(&to_peer_id)?;
+        let to_peer = self.take_peer(to_peer_id)?;
 
         let (from_peer, to_peer) = match (from_peer, to_peer) {
             (
-                PeerMachine::WaitLocalHaveRemote(peer_from),
-                PeerMachine::WaitRemoteSDP(peer_to),
+                SignalingStateMachine::WaitLocalHaveRemote(peer_from),
+                SignalingStateMachine::WaitRemoteSDP(peer_to),
             ) => Ok((peer_from, peer_to)),
             (from_peer, to_peer) => {
                 self.add_peer(from_peer_id, from_peer);
                 self.add_peer(to_peer_id, to_peer);
-                Err(RoomError::UnmatchedState(from_peer_id, to_peer_id))
+                Err(Error::UnmatchedState(from_peer_id, to_peer_id))
             }
         }?;
 
         let from_peer = from_peer.set_local_sdp(sdp_answer.clone());
-        let to_peer = to_peer.set_remote_sdp(sdp_answer.clone());
+        let to_peer = to_peer.set_remote_sdp(&sdp_answer);
 
         let to_member_id = to_peer.member_id();
         let event = Event::SdpAnswerMade {
@@ -241,8 +248,8 @@ impl Room {
             sdp_answer,
         };
 
-        self.add_peer(from_peer_id, PeerMachine::Stable(from_peer));
-        self.add_peer(to_peer_id, PeerMachine::Stable(to_peer));
+        self.add_peer(from_peer_id, SignalingStateMachine::Stable(from_peer));
+        self.add_peer(to_peer_id, SignalingStateMachine::Stable(to_peer));
         Ok((to_member_id, event))
     }
 
@@ -251,22 +258,25 @@ impl Room {
         &mut self,
         from_peer_id: PeerId,
         candidate: String,
-    ) -> Result<(MemberId, Event), RoomError> {
-        let from_peer = self.get_peer(&from_peer_id)?;
+    ) -> Result<(MemberId, Event), Error> {
+        let from_peer = self.get_peer(from_peer_id)?;
         let to_peer_id = from_peer.to_peer();
-        let to_peer = self.get_peer(&to_peer_id)?;
+        let to_peer = self.get_peer(to_peer_id)?;
 
         match (from_peer, to_peer) {
             (
-                PeerMachine::WaitRemoteSDP(_),
-                PeerMachine::WaitLocalHaveRemote(_),
+                SignalingStateMachine::WaitRemoteSDP(_),
+                SignalingStateMachine::WaitLocalHaveRemote(_),
             )
             | (
-                PeerMachine::WaitLocalHaveRemote(_),
-                PeerMachine::WaitRemoteSDP(_),
+                SignalingStateMachine::WaitLocalHaveRemote(_),
+                SignalingStateMachine::WaitRemoteSDP(_),
             )
-            | (PeerMachine::Stable(_), PeerMachine::Stable(_)) => Ok(()),
-            _ => Err(RoomError::UnmatchedState(from_peer_id, to_peer_id)),
+            | (
+                SignalingStateMachine::Stable(_),
+                SignalingStateMachine::Stable(_),
+            ) => Ok(()),
+            _ => Err(Error::UnmatchedState(from_peer_id, to_peer_id)),
         }?;
 
         let to_member_id = to_peer.member_id();
@@ -282,58 +292,18 @@ impl Room {
 /// to interact with [`Room`].
 impl Actor for Room {
     type Context = Context<Self>;
-
-    /// Closes all active [`PrcConnection`].
-    fn stopping(&mut self, ctx: &mut Self::Context) -> Running {
-        use std::mem;
-        let connections = mem::replace(&mut self.connections, hashmap!());
-        let fut = connections.into_iter().fold(
-            vec![],
-            |mut futures, (member_id, mut connection)| {
-                info!(
-                    "Close connection of member {}, because room is stopped",
-                    member_id,
-                );
-                let peer_ids: Vec<_> = self
-                    .peers
-                    .iter()
-                    .filter(move |(_, peer)| match peer {
-                        PeerMachine::New(_) => false,
-                        _ => peer.member_id() == member_id,
-                    })
-                    .map(|(&id, _)| id)
-                    .collect();
-                // TODO: test correctness
-                if !peer_ids.is_empty() {
-                    futures.push(Either::A(
-                        connection
-                            .send_event(Event::PeersRemoved { peer_ids })
-                            .then(move |_| connection.close()),
-                    ));
-                } else {
-                    futures.push(Either::B(connection.close()));
-                }
-
-                futures
-            },
-        );
-        ctx.wait(wrap_future(join_all(fut).map(|_| ())));
-        Running::Continue
-    }
 }
 
-impl Handler<AuthorizeRpcConnection> for Room {
-    type Result = Result<(), RpcConnectionAuthorizationError>;
+impl Handler<Authorize> for Room {
+    type Result = Result<(), AuthorizationError>;
 
     /// Responses with `Ok` if `RpcConnection` is authorized, otherwise `Err`s.
     fn handle(
         &mut self,
-        msg: AuthorizeRpcConnection,
+        msg: Authorize,
         _ctx: &mut Self::Context,
     ) -> Self::Result {
-        use RpcConnectionAuthorizationError::{
-            InvalidCredentials, MemberNotExists,
-        };
+        use AuthorizationError::{InvalidCredentials, MemberNotExists};
         if let Some(ref member) = self.members.get(&msg.member_id) {
             if member.credentials.eq(&msg.credentials) {
                 return Ok(());
@@ -347,16 +317,19 @@ impl Handler<AuthorizeRpcConnection> for Room {
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
 type ActFuture<I, E> = Box<dyn ActorFuture<Actor = Room, Item = I, Error = E>>;
 
-impl Handler<RpcConnectionEstablished> for Room {
+impl Handler<Established> for Room {
     type Result = ActFuture<(), ()>;
 
     /// Stores provided [`RpcConnection`] for given [`Member`] in the [`Room`].
     ///
     /// If [`Member`] already has any other [`RpcConnection`],
     /// then it will be closed.
+    ///
+    /// If [`Peer`] of this [`Member`] have sender, sends notify about
+    /// start process of signaling.
     fn handle(
         &mut self,
-        msg: RpcConnectionEstablished,
+        msg: Established,
         ctx: &mut Self::Context,
     ) -> Self::Result {
         info!("RpcConnectionEstablished for member {}", msg.member_id);
@@ -384,22 +357,57 @@ impl Handler<RpcConnectionEstablished> for Room {
     }
 }
 
+/// Signal of close [`Room`].
 #[derive(Debug, Message)]
 #[rtype(result = "Result<(), ()>")]
-pub struct CloseRoom {}
+pub struct Close {}
 
-impl Handler<CloseRoom> for Room {
+impl Handler<Close> for Room {
     type Result = ActFuture<(), ()>;
 
+    /// Sends to remote [`Member`] the [`Event`] about [`Peer`] removed.
+    /// Closes all active [`PrcConnection`].
     fn handle(
         &mut self,
-        _msg: CloseRoom,
+        _msg: Close,
         _ctx: &mut Self::Context,
     ) -> Self::Result {
-        Box::new(wrap_future(future::ok(())))
+        use std::mem;
+        let connections = mem::replace(&mut self.connections, HashMap::new());
+        let fut = connections.into_iter().fold(
+            vec![],
+            |mut futures, (member_id, mut connection)| {
+                info!(
+                    "Close connection of member {}, because room is closed",
+                    member_id,
+                );
+                let peer_ids: Vec<_> = self
+                    .peers
+                    .iter()
+                    .filter_map(move |(&id, peer)| match peer {
+                        SignalingStateMachine::New(_) => None,
+                        _ if peer.member_id() == member_id => Some(id),
+                        _ => None,
+                    })
+                    .collect();
+                if peer_ids.is_empty() {
+                    futures.push(Either::A(connection.close()));
+                } else {
+                    futures.push(Either::B(
+                        connection
+                            .send_event(Event::PeersRemoved { peer_ids })
+                            .then(move |_| connection.close()),
+                    ));
+                }
+
+                futures
+            },
+        );
+        Box::new(wrap_future(join_all(fut).map(|_| ())))
     }
 }
 
+/// Signal of start signaling between specified [`Peer`]'s.
 #[derive(Debug, Message)]
 #[rtype(result = "Result<(), ()>")]
 pub struct StartSignaling {
@@ -410,8 +418,8 @@ pub struct StartSignaling {
 impl Handler<StartSignaling> for Room {
     type Result = ActFuture<(), ()>;
 
-    /// Receives [`Command`] from Web client and changes state of interconnected
-    /// [`Peer`]s.
+    /// Check state of interconnected [`Peer`]s and sends [`Event`] about
+    /// [`Peer`] created to remote [`Member`].
     fn handle(
         &mut self,
         msg: StartSignaling,
@@ -427,11 +435,11 @@ impl Handler<StartSignaling> for Room {
             }
             .map_err(move |err| {
                 error!(
-                    "Cannot start signaling between peers {} {}, because {}. \
-                     Room will be stop.",
+                    "Cannot start signaling between peers {} and {}, because \
+                     {}. Room will be stop.",
                     msg.from_peer_id, msg.to_peer_id, err
                 );
-                addr.do_send(CloseRoom {})
+                addr.do_send(Close {})
             });
         Box::new(wrap_future(fut))
     }
@@ -471,17 +479,17 @@ impl Handler<Command> for Room {
                 "Failed handle command, because {}. Room will be stop.",
                 err
             );
-            addr.do_send(CloseRoom {})
+            addr.do_send(Close {})
         });
         Box::new(wrap_future(fut))
     }
 }
 
-impl Handler<RpcConnectionClosed> for Room {
+impl Handler<Closed> for Room {
     type Result = ();
 
     /// Removes [`RpcConnection`] of specified [`Member`] from the [`Room`].
-    fn handle(&mut self, msg: RpcConnectionClosed, ctx: &mut Self::Context) {
+    fn handle(&mut self, msg: Closed, ctx: &mut Self::Context) {
         info!(
             "RpcConnectionClosed for member {}, reason {:?}",
             msg.member_id, msg.reason
@@ -489,11 +497,11 @@ impl Handler<RpcConnectionClosed> for Room {
         let closed_at = Instant::now();
         let member_id = msg.member_id;
         match msg.reason {
-            RpcConnectionClosedReason::Disconnected => {
+            ClosedReason::Disconnected => {
                 self.connections.remove(&member_id);
-                ctx.stop()
+                ctx.notify(Close {})
             }
-            RpcConnectionClosedReason::Idle => {
+            ClosedReason::Idle => {
                 self.idle_timeouts.insert(
                     msg.member_id,
                     ctx.run_later(self.connection_timeout, move |room, ctx| {
@@ -503,7 +511,7 @@ impl Handler<RpcConnectionClosed> for Room {
                             member_id, closed_at
                         );
                         room.connections.remove(&member_id);
-                        ctx.stop()
+                        ctx.notify(Close {})
                     }),
                 );
             }
@@ -541,8 +549,9 @@ mod test {
 
     use super::*;
     use crate::media::{
-        track::{DirectionalTrack, TrackDirection},
-        AudioSettings, Peer, Track, TrackMediaType, VideoSettings,
+        peer::create_peers,
+        track::{Direction, Directional},
+        AudioSettings, MediaType, VideoSettings,
     };
 
     #[derive(Debug, Clone)]
@@ -558,7 +567,7 @@ mod test {
 
         fn started(&mut self, ctx: &mut Self::Context) {
             self.room
-                .try_send(RpcConnectionEstablished {
+                .try_send(Established {
                     member_id: self.member_id,
                     connection: Box::new(ctx.address()),
                 })
@@ -616,9 +625,9 @@ mod test {
                     peer_id: _,
                     candidate: _,
                 } => {
-                    self.room.do_send(RpcConnectionClosed {
+                    self.room.do_send(Closed {
                         member_id: self.member_id,
-                        reason: RpcConnectionClosedReason::Disconnected,
+                        reason: ClosedReason::Disconnected,
                     });
                 }
                 Event::PeersRemoved { peer_ids: _ } => {}
@@ -649,30 +658,6 @@ mod test {
         Arbiter::start(move |_| {
             Room::new(1, members, create_peers(1, 2), Duration::from_secs(10))
         })
-    }
-
-    fn create_peers(
-        caller: MemberId,
-        callee: MemberId,
-    ) -> HashMap<MemberId, PeerMachine> {
-        let caller_peer_id = 1;
-        let callee_peer_id = 2;
-        let mut caller_peer = Peer::new(caller_peer_id, caller, callee_peer_id);
-        let mut callee_peer = Peer::new(callee_peer_id, callee, caller_peer_id);
-
-        let track_audio =
-            Arc::new(Track::new(1, TrackMediaType::Audio(AudioSettings {})));
-        let track_video =
-            Arc::new(Track::new(2, TrackMediaType::Video(VideoSettings {})));
-        caller_peer.add_sender(track_audio.clone());
-        caller_peer.add_sender(track_video.clone());
-        callee_peer.add_receiver(track_audio);
-        callee_peer.add_receiver(track_video);
-
-        hashmap!(
-            caller_peer_id => PeerMachine::New(caller_peer),
-            callee_peer_id => PeerMachine::New(callee_peer),
-        )
     }
 
     #[test]
@@ -711,19 +696,15 @@ mod test {
                     peer_id: 1,
                     sdp_offer: None,
                     tracks: vec![
-                        DirectionalTrack {
+                        Directional {
                             id: 1,
-                            direction: TrackDirection::Send {
-                                receivers: vec![2]
-                            },
-                            media_type: TrackMediaType::Audio(AudioSettings {}),
+                            direction: Direction::Send { receivers: vec![2] },
+                            media_type: MediaType::Audio(AudioSettings {}),
                         },
-                        DirectionalTrack {
+                        Directional {
                             id: 2,
-                            direction: TrackDirection::Send {
-                                receivers: vec![2]
-                            },
-                            media_type: TrackMediaType::Video(VideoSettings {}),
+                            direction: Direction::Send { receivers: vec![2] },
+                            media_type: MediaType::Video(VideoSettings {}),
                         },
                     ],
                 })
@@ -747,15 +728,15 @@ mod test {
                     peer_id: 2,
                     sdp_offer: Some("caller_offer".into()),
                     tracks: vec![
-                        DirectionalTrack {
+                        Directional {
                             id: 1,
-                            direction: TrackDirection::Recv { sender: 1 },
-                            media_type: TrackMediaType::Audio(AudioSettings {}),
+                            direction: Direction::Recv { sender: 1 },
+                            media_type: MediaType::Audio(AudioSettings {}),
                         },
-                        DirectionalTrack {
+                        Directional {
                             id: 2,
-                            direction: TrackDirection::Recv { sender: 1 },
-                            media_type: TrackMediaType::Video(VideoSettings {}),
+                            direction: Direction::Recv { sender: 1 },
+                            media_type: MediaType::Video(VideoSettings {}),
                         },
                     ],
                 })

@@ -9,34 +9,34 @@ pub type Id = u64;
 #[derive(Debug)]
 pub struct Track {
     pub id: Id,
-    pub media_type: TrackMediaType,
+    pub media_type: MediaType,
 }
 
 impl Track {
     /// Creates new [`Track`] of the specified type.
-    pub fn new(id: Id, media_type: TrackMediaType) -> Track {
-        Track { id, media_type }
+    pub fn new(id: Id, media_type: MediaType) -> Self {
+        Self { id, media_type }
     }
 }
 
 /// [`Track] with specified direction.
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct DirectionalTrack {
+pub struct Directional {
     pub id: Id,
-    pub direction: TrackDirection,
-    pub media_type: TrackMediaType,
+    pub direction: Direction,
+    pub media_type: MediaType,
 }
 
 /// Direction of [`Track`].
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub enum TrackDirection {
+pub enum Direction {
     Send { receivers: Vec<PeerID> },
     Recv { sender: PeerID },
 }
 
 /// Type of [`Track`].
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub enum TrackMediaType {
+pub enum MediaType {
     Audio(AudioSettings),
     Video(VideoSettings),
 }

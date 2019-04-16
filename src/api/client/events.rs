@@ -1,7 +1,7 @@
 use actix::Message;
 use serde::{Deserialize, Serialize};
 
-use crate::media::{peer::Id as PeerId, track::DirectionalTrack};
+use crate::media::{peer::Id as PeerId, track::Directional};
 
 /// WebSocket message from Media Server to Web Client.
 #[derive(Clone, Debug, Deserialize, Message, Serialize)]
@@ -11,7 +11,7 @@ pub enum Event {
     PeerCreated {
         peer_id: PeerId,
         sdp_offer: Option<String>,
-        tracks: Vec<DirectionalTrack>,
+        tracks: Vec<Directional>,
     },
     /// Media Server notifies Web Client about necessity to apply specified SDP
     /// Answer to Web Client's RTCPeerConnection.
