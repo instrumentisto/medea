@@ -1,20 +1,11 @@
-use crate::transport::protocol::{
-    Command, Event as MedeaEvent, Heartbeat, InMsg,
-};
-use crate::utils::WasmErr;
-use core::borrow::BorrowMut;
-use std::cell::RefCell;
-use std::convert::TryFrom;
-use wasm_bindgen::{
-    convert::{FromWasmAbi, ReturnWasmAbi},
-    JsValue,
-};
 use wasm_bindgen::{prelude::*, JsCast};
-use web_sys::{
-    console, CloseEvent, Event, MessageEvent,
-    WebSocket as BackingSocket,
-};
-use crate::transport::CloseMsg;
+use web_sys::{CloseEvent, MessageEvent, WebSocket as BackingSocket};
+
+use std::{cell::RefCell, convert::TryFrom};
+
+use crate::{transport::{CloseMsg, protocol::{InMsg, OutMsg}}, utils::WasmErr};
+
+
 
 struct InnerSocket {
     socket: BackingSocket,
@@ -77,7 +68,7 @@ impl WebSocket {
         Ok(())
     }
 
-    pub fn on_close<F>(&self, mut f: F) -> Result<(), WasmErr>
+    pub fn on_close<F>(&self, f: F) -> Result<(), WasmErr>
     where
         F: (FnOnce(CloseMsg)) + 'static,
     {
@@ -98,11 +89,11 @@ impl WebSocket {
         Ok(())
     }
 
-    pub fn send(&self, msg: &str) -> Result<(), WasmErr> {
+    pub fn send(&self, msg: &OutMsg) -> Result<(), WasmErr> {
         self.0
             .borrow()
             .socket
-            .send_with_str(msg)
+            .send_with_str(&serde_json::to_string(msg)?)
             .map_err(|err| WasmErr::from(err))
     }
 

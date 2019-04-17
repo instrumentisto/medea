@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 
+// TODO: should be properly shared between medea and jason
 #[derive(Deserialize)]
 pub enum InMsg {
     /// `pong` message that server answers with to WebSocket client in response
@@ -9,14 +10,13 @@ pub enum InMsg {
     Event(Event),
 }
 
-// TODO: just copied from Medea crate, needs refactoring to properly share
-// protocol DTOS between crates protocol messages between crates
-#[derive(Deserialize, Serialize)]
-pub enum Heartbeat {
+#[derive(Serialize)]
+pub enum OutMsg {
     /// `ping` message that WebSocket client is expected to send to the server
     /// periodically.
     #[serde(rename = "ping")]
     Ping(usize),
+    Command(Command),
 }
 
 /// WebSocket message from Web Client to Media Server.

@@ -76,24 +76,28 @@ impl InnerSession {
 
     fn on_peer_created(
         &mut self,
-        peer_id: u64,
-        sdp_offer: Option<String>,
-        tracks: Vec<DirectionalTrack>,
+        _peer_id: u64,
+        _sdp_offer: Option<String>,
+        _tracks: Vec<DirectionalTrack>,
     ) {
         console::log_1(&JsValue::from_str("on_peer_created invoked"));
     }
 
-    fn on_sdp_answer(&mut self, peer_id: u64, sdp_answer: String) {
+    fn on_sdp_answer(&mut self, _peer_id: u64, _sdp_answer: String) {
         console::log_1(&JsValue::from_str("on_sdp_answer invoked"));
     }
 
-    fn on_ice_candidate_discovered(&mut self, peer_id: u64, candidate: String) {
+    fn on_ice_candidate_discovered(
+        &mut self,
+        _peer_id: u64,
+        _candidate: String,
+    ) {
         console::log_1(&&JsValue::from_str(
             "on_ice_candidate_discovered invoked",
         ));
     }
 
-    fn on_peers_removed(&mut self, peer_ids: Vec<u64>) {
+    fn on_peers_removed(&mut self, _peer_ids: Vec<u64>) {
         console::log_1(&JsValue::from_str("on_peers_removed invoked"));
     }
 }

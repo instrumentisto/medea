@@ -1,14 +1,8 @@
 mod errors;
 
-pub use self::errors::WasmErr;
+use web_sys::Window;
 
-use wasm_bindgen::{
-    closure::Closure,
-    convert::{FromWasmAbi, ReturnWasmAbi},
-    prelude::*,
-    JsCast,
-};
-use web_sys::{EventTarget, Window};
+pub use self::errors::WasmErr;
 
 pub struct IntervalHandle(pub i32);
 
