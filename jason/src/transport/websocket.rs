@@ -101,7 +101,7 @@ impl WebSocket {
             .map_err(WasmErr::from)
     }
 
-    pub fn _close(&self, reason: &str) {
+    pub fn _close(self, reason: &str) {
         if let Err(err) = self
             .0
             .borrow()
