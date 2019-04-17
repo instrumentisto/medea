@@ -3,9 +3,13 @@ use web_sys::{CloseEvent, MessageEvent, WebSocket as BackingSocket};
 
 use std::{cell::RefCell, convert::TryFrom};
 
-use crate::{transport::{CloseMsg, protocol::{InMsg, OutMsg}}, utils::WasmErr};
-
-
+use crate::{
+    transport::{
+        protocol::{InMsg, OutMsg},
+        CloseMsg,
+    },
+    utils::WasmErr,
+};
 
 struct InnerSocket {
     socket: BackingSocket,

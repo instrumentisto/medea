@@ -8,14 +8,16 @@ use js_sys::Date;
 
 use std::{cell::RefCell, rc::Rc, vec};
 
-use crate::{transport::protocol::{InMsg, OutMsg}, utils::WasmErr};
+use crate::{
+    transport::protocol::{InMsg, OutMsg},
+    utils::WasmErr,
+};
 
 use self::{
     pinger::Pinger,
     protocol::{Command, Event as MedeaEvent},
     websocket::WebSocket,
 };
-
 
 // TODO:
 // 1. Reconnect.
