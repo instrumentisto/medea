@@ -31,7 +31,7 @@ pub struct Transport {
 
 impl Transport {
     pub fn new(token: String, ping_interval: i32) -> Self {
-        Transport {
+        Self {
             sock: Rc::new(RefCell::new(None)),
             token,
             subs: Rc::new(RefCell::new(vec![])),
@@ -45,7 +45,7 @@ impl Transport {
         let socket_borrow = socket.borrow();
         let socket_ref = socket_borrow
             .as_ref()
-            .ok_or(WasmErr::from_str("socket is None"))?;
+            .ok_or_else(|| WasmErr::from_str("socket is None"))?;
 
         let socket_rc = Rc::clone(&socket);
         let pinger_rc: Rc<Pinger> = Rc::clone(&self.pinger);
@@ -89,8 +89,7 @@ impl Transport {
 
             // TODO: reconnect on disconnect
             match msg {
-                CloseMsg::Normal(_msg) => {}
-                CloseMsg::Disconnect(_msg) => {}
+                CloseMsg::Normal(_msg) | CloseMsg::Disconnect(_msg) => {}
             }
         })?;
 
@@ -104,7 +103,7 @@ impl Transport {
         self.subs.borrow_mut().push(sub);
     }
 
-    pub fn send_command(&self, command: Command) {
+    pub fn _send_command(&self, command: Command) {
         let socket_borrow = self.sock.borrow();
 
         // TODO: no socket? we dont really want this method to return err

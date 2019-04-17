@@ -22,7 +22,7 @@ impl InnerPinger {
         let borrow = self.socket.try_borrow()?;
         let socket = borrow
             .as_ref()
-            .ok_or(WasmErr::from_str("Unable to ping: no socket"))?;
+            .ok_or_else(|| WasmErr::from_str("Unable to ping: no socket"))?;
         self.num += 1;
         socket.send(&OutMsg::Ping(self.num))
     }

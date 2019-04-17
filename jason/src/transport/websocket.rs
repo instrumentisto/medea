@@ -33,7 +33,7 @@ impl InnerSocket {
 
 impl WebSocket {
     pub fn new(url: &str) -> Result<Self, WasmErr> {
-        Ok(WebSocket(RefCell::new(InnerSocket::new(url)?)))
+        Ok(Self(RefCell::new(InnerSocket::new(url)?)))
     }
 
     pub fn on_open<F>(&self, f: F) -> Result<(), WasmErr>
@@ -98,10 +98,10 @@ impl WebSocket {
             .borrow()
             .socket
             .send_with_str(&serde_json::to_string(msg)?)
-            .map_err(|err| WasmErr::from(err))
+            .map_err(WasmErr::from)
     }
 
-    pub fn close(&self, reason: &str) {
+    pub fn _close(&self, reason: &str) {
         if let Err(err) = self
             .0
             .borrow()
@@ -130,10 +130,9 @@ impl TryFrom<&MessageEvent> for InMsg {
         let payload = msg
             .data()
             .as_string()
-            .ok_or(WasmErr::from_str("Payload is not string"))?;
+            .ok_or_else(|| WasmErr::from_str("Payload is not string"))?;
 
-        serde_json::from_str::<InMsg>(&payload)
-            .map_err(|e: serde_json::error::Error| WasmErr::from(e))
+        serde_json::from_str::<Self>(&payload).map_err(WasmErr::from)
     }
 }
 

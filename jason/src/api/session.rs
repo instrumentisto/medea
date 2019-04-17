@@ -10,10 +10,10 @@ use crate::transport::{
 };
 
 #[wasm_bindgen]
-pub struct SessionHandle(Session);
+pub struct Handle(Session);
 
 #[wasm_bindgen]
-impl SessionHandle {}
+impl Handle {}
 
 pub struct Session(Rc<RefCell<InnerSession>>);
 
@@ -22,8 +22,8 @@ impl Session {
         Self(InnerSession::new(transport))
     }
 
-    pub fn new_handle(&self) -> SessionHandle {
-        SessionHandle(Session(Rc::clone(&self.0)))
+    pub fn new_handle(&self) -> Handle {
+        Handle(Self(Rc::clone(&self.0)))
     }
 
     pub fn subscribe(&self, transport: &Transport) {
@@ -40,21 +40,21 @@ impl Session {
                 } => {
                     inner
                         .borrow_mut()
-                        .on_peer_created(peer_id, sdp_offer, tracks);
+                        .on_peer_created(peer_id, &sdp_offer, &tracks);
                 }
                 MedeaEvent::SdpAnswerMade {
                     peer_id,
                     sdp_answer,
                 } => {
-                    inner.borrow_mut().on_sdp_answer(peer_id, sdp_answer);
+                    inner.borrow_mut().on_sdp_answer(peer_id, &sdp_answer);
                 }
                 MedeaEvent::IceCandidateDiscovered { peer_id, candidate } => {
                     inner
                         .borrow_mut()
-                        .on_ice_candidate_discovered(peer_id, candidate);
+                        .on_ice_candidate_discovered(peer_id, &candidate);
                 }
                 MedeaEvent::PeersRemoved { peer_ids } => {
-                    inner.borrow_mut().on_peers_removed(peer_ids);
+                    inner.borrow_mut().on_peers_removed(&peer_ids);
                 }
             };
 
@@ -66,38 +66,36 @@ impl Session {
 }
 
 struct InnerSession {
-    transport: Rc<Transport>,
+    _transport: Rc<Transport>,
 }
 
 impl InnerSession {
     fn new(transport: Rc<Transport>) -> Rc<RefCell<Self>> {
-        Rc::new(RefCell::new(Self { transport }))
+        Rc::new(RefCell::new(Self {
+            _transport: transport,
+        }))
     }
 
     fn on_peer_created(
         &mut self,
         _peer_id: u64,
-        _sdp_offer: Option<String>,
-        _tracks: Vec<DirectionalTrack>,
+        _sdp_offer: &Option<String>,
+        _tracks: &[DirectionalTrack],
     ) {
         console::log_1(&JsValue::from_str("on_peer_created invoked"));
     }
 
-    fn on_sdp_answer(&mut self, _peer_id: u64, _sdp_answer: String) {
+    fn on_sdp_answer(&mut self, _peer_id: u64, _sdp_answer: &str) {
         console::log_1(&JsValue::from_str("on_sdp_answer invoked"));
     }
 
-    fn on_ice_candidate_discovered(
-        &mut self,
-        _peer_id: u64,
-        _candidate: String,
-    ) {
+    fn on_ice_candidate_discovered(&mut self, _peer_id: u64, _candidate: &str) {
         console::log_1(&&JsValue::from_str(
             "on_ice_candidate_discovered invoked",
         ));
     }
 
-    fn on_peers_removed(&mut self, _peer_ids: Vec<u64>) {
+    fn on_peers_removed(&mut self, _peer_ids: &[u64]) {
         console::log_1(&JsValue::from_str("on_peers_removed invoked"));
     }
 }

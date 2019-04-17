@@ -17,7 +17,7 @@ impl WasmErr {
         console::error_1(&JsValue::from_str(&format!("{}", self)));
     }
 
-    pub fn from_str<S>(msg: S) -> WasmErr
+    pub fn from_str<S>(msg: S) -> Self
     where
         S: Into<Cow<'static, str>>,
     {
@@ -30,7 +30,7 @@ impl Display for WasmErr {
         match self {
             WasmErr::JsError(val) => match val.as_string() {
                 Some(reason) => write!(f, "{}", reason),
-                None => write!(f, "{}", "no str representation for JsError"),
+                None => write!(f, "no str representation for JsError"),
             },
             WasmErr::Other(reason) => write!(f, "{}", reason),
         }
@@ -47,7 +47,7 @@ impl From<WasmErr> for JsValue {
     fn from(err: WasmErr) -> Self {
         match err {
             WasmErr::JsError(value) => value,
-            WasmErr::Other(reason) => JsValue::from_str(&reason),
+            WasmErr::Other(reason) => Self::from_str(&reason),
         }
     }
 }

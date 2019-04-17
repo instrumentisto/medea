@@ -3,12 +3,13 @@ use wasm_bindgen::prelude::*;
 use std::rc::Rc;
 
 use crate::{
-    api::{session::Session, SessionHandle},
+    api::{session::Session, Handle},
     set_panic_hook,
     transport::Transport,
 };
 
 #[wasm_bindgen]
+#[derive(Default)]
 pub struct Jason {
     transport: Option<Rc<Transport>>,
     sessions: Vec<Rc<Session>>,
@@ -19,16 +20,10 @@ impl Jason {
     #[wasm_bindgen(constructor)]
     pub fn new() -> Self {
         set_panic_hook();
-        Self {
-            transport: None,
-            sessions: vec![],
-        }
+        Self::default()
     }
 
-    pub fn init_session(
-        &mut self,
-        token: String,
-    ) -> Result<SessionHandle, JsValue> {
+    pub fn init_session(&mut self, token: String) -> Result<Handle, JsValue> {
         let mut transport = Transport::new(token, 3000);
         transport.init()?;
         let transport = Rc::new(transport);

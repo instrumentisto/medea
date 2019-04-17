@@ -11,6 +11,7 @@ pub enum InMsg {
 }
 
 #[derive(Serialize)]
+#[allow(dead_code)]
 pub enum OutMsg {
     /// `ping` message that WebSocket client is expected to send to the server
     /// periodically.
@@ -21,6 +22,7 @@ pub enum OutMsg {
 
 /// WebSocket message from Web Client to Media Server.
 #[derive(Serialize)]
+#[allow(dead_code)]
 pub enum Command {
     /// Web Client sends SDP Offer.
     MakeSdpOffer { peer_id: u64, sdp_offer: String },
@@ -32,6 +34,7 @@ pub enum Command {
 
 /// WebSocket message from Medea to Jason.
 #[derive(Deserialize)]
+#[allow(dead_code)]
 pub enum Event {
     /// Media Server notifies Web Client about necessity of RTCPeerConnection
     /// creation.
