@@ -15,7 +15,7 @@ use crate::{
 pub struct Jason {
     // TODO: multiple transports if rooms managed by different servers
     transport: Option<Rc<Transport>>,
-    sessions: Vec<Rc<Room>>,
+    rooms: Vec<Room>,
 }
 
 #[wasm_bindgen]
@@ -33,12 +33,15 @@ impl Jason {
         transport.init()?;
         let transport = Rc::new(transport);
 
-        let session = Rc::new(Room::new(Rc::clone(&transport)));
-        session.subscribe(&transport);
+        let room = Room::new(Rc::clone(&transport));
+        room.subscribe(&transport);
+        let handle = room.new_handle();
 
-        self.sessions.push(Rc::clone(&session));
+        self.rooms.push(room);
         self.transport = Some(transport);
 
-        Ok(session.new_handle())
+        Ok(handle)
     }
+
+    pub fn dispose(self) {}
 }
