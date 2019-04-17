@@ -1,5 +1,6 @@
+//! External Jason API.
 mod jason;
-mod session;
+mod room;
 
 pub use self::jason::Jason;
-pub use self::session::Handle;
+pub use self::room::RoomHandle;

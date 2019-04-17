@@ -1,3 +1,5 @@
+//! Represents Medea room.
+
 use futures::{stream::Stream, sync::mpsc::unbounded};
 use wasm_bindgen::{prelude::*, JsValue};
 use wasm_bindgen_futures::spawn_local;
@@ -9,29 +11,33 @@ use crate::transport::{
     protocol::DirectionalTrack, protocol::Event as MedeaEvent, Transport,
 };
 
+#[allow(clippy::module_name_repetitions)]
 #[wasm_bindgen]
-pub struct Handle(Session);
+/// Room handle accessible from JS.
+pub struct RoomHandle(Room);
 
 #[wasm_bindgen]
-impl Handle {}
+impl RoomHandle {}
 
-pub struct Session(Rc<RefCell<InnerSession>>);
+pub struct Room(Rc<RefCell<InnerSession>>);
 
-impl Session {
+impl Room {
     pub fn new(transport: Rc<Transport>) -> Self {
         Self(InnerSession::new(transport))
     }
 
-    pub fn new_handle(&self) -> Handle {
-        Handle(Self(Rc::clone(&self.0)))
+    pub fn new_handle(&self) -> RoomHandle {
+        RoomHandle(Self(Rc::clone(&self.0)))
     }
 
+    /// Subscribes to provided transport messages.
     pub fn subscribe(&self, transport: &Transport) {
         let (tx, rx) = unbounded();
         transport.add_sub(tx);
 
         let inner = Rc::clone(&self.0);
-        let poll = rx.for_each(move |event| {
+
+        let process_msg_task = rx.for_each(move |event| {
             match event {
                 MedeaEvent::PeerCreated {
                     peer_id,
@@ -61,7 +67,7 @@ impl Session {
             Ok(())
         });
 
-        spawn_local(poll);
+        spawn_local(process_msg_task);
     }
 }
 
@@ -76,6 +82,7 @@ impl InnerSession {
         }))
     }
 
+    /// Creates RTCPeerConnection with provided ID.
     fn on_peer_created(
         &mut self,
         _peer_id: u64,
@@ -85,16 +92,19 @@ impl InnerSession {
         console::log_1(&JsValue::from_str("on_peer_created invoked"));
     }
 
+    /// Applies specified SDP Answer to specified RTCPeerConnection.
     fn on_sdp_answer(&mut self, _peer_id: u64, _sdp_answer: &str) {
         console::log_1(&JsValue::from_str("on_sdp_answer invoked"));
     }
 
+    /// Applies specified ICE Candidate to specified RTCPeerConnection.
     fn on_ice_candidate_discovered(&mut self, _peer_id: u64, _candidate: &str) {
         console::log_1(&&JsValue::from_str(
             "on_ice_candidate_discovered invoked",
         ));
     }
 
+    /// Disposes specified RTCPeerConnection's.
     fn on_peers_removed(&mut self, _peer_ids: &[u64]) {
         console::log_1(&JsValue::from_str("on_peers_removed invoked"));
     }

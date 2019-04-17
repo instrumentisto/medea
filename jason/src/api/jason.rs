@@ -1,9 +1,11 @@
+//! Main application handler. Responsible for managing shared transports and
+//! local media, room initialization.
 use wasm_bindgen::prelude::*;
 
 use std::rc::Rc;
 
 use crate::{
-    api::{session::Session, Handle},
+    api::{room::Room, RoomHandle},
     set_panic_hook,
     transport::Transport,
 };
@@ -11,8 +13,9 @@ use crate::{
 #[wasm_bindgen]
 #[derive(Default)]
 pub struct Jason {
+    // TODO: multiple transports if rooms managed by different servers
     transport: Option<Rc<Transport>>,
-    sessions: Vec<Rc<Session>>,
+    sessions: Vec<Rc<Room>>,
 }
 
 #[wasm_bindgen]
@@ -23,19 +26,19 @@ impl Jason {
         Self::default()
     }
 
-    pub fn init_session(&mut self, token: String) -> Result<Handle, JsValue> {
+    /// Enter room with provided token, return initialized connection handler.
+    /// Errors if unable to establish RPC connection with remote.
+    pub fn join_room(&mut self, token: String) -> Result<RoomHandle, JsValue> {
         let mut transport = Transport::new(token, 3000);
         transport.init()?;
         let transport = Rc::new(transport);
 
-        let session = Session::new(Rc::clone(&transport));
+        let session = Rc::new(Room::new(Rc::clone(&transport)));
         session.subscribe(&transport);
 
-        let handle = session.new_handle();
-
-        self.sessions.push(Rc::new(session));
+        self.sessions.push(Rc::clone(&session));
         self.transport = Some(transport);
 
-        Ok(handle)
+        Ok(session.new_handle())
     }
 }

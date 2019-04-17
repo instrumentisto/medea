@@ -19,6 +19,11 @@ use self::{
     websocket::WebSocket,
 };
 
+pub enum CloseMsg {
+    Normal(String),
+    Disconnect(String),
+}
+
 // TODO:
 // 1. Reconnect.
 // 2. Disconnect if no pongs.
@@ -111,9 +116,4 @@ impl Transport {
             socket.send(&OutMsg::Command(command)).unwrap();
         }
     }
-}
-
-pub enum CloseMsg {
-    Normal(String),
-    Disconnect(String),
 }

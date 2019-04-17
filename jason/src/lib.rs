@@ -11,8 +11,8 @@ mod utils;
 #[cfg(feature = "console_error_panic_hook")]
 pub use console_error_panic_hook::set_once as set_panic_hook;
 
-pub use self::api::Handle;
 pub use self::api::Jason;
+pub use self::api::RoomHandle;
 
 // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global
 // allocator.
