@@ -14,12 +14,12 @@ use crate::transport::{
 #[allow(clippy::module_name_repetitions)]
 #[wasm_bindgen]
 /// Room handle accessible from JS.
-pub struct RoomHandle(Rc<RefCell<InnerRoom>>);
+pub struct RoomHandle(Rc<RefCell<Option<InnerRoom>>>);
 
 #[wasm_bindgen]
 impl RoomHandle {}
 
-pub struct Room(Rc<RefCell<InnerRoom>>);
+pub struct Room(Rc<RefCell<Option<InnerRoom>>>);
 
 impl Room {
     pub fn new(transport: Rc<Transport>) -> Self {
@@ -44,23 +44,21 @@ impl Room {
                     sdp_offer,
                     tracks,
                 } => {
-                    inner
-                        .borrow_mut()
+                    inner.borrow_mut().as_mut().unwrap()
                         .on_peer_created(peer_id, &sdp_offer, &tracks);
                 }
                 MedeaEvent::SdpAnswerMade {
                     peer_id,
                     sdp_answer,
                 } => {
-                    inner.borrow_mut().on_sdp_answer(peer_id, &sdp_answer);
+                    inner.borrow_mut().as_mut().unwrap().on_sdp_answer(peer_id, &sdp_answer);
                 }
                 MedeaEvent::IceCandidateDiscovered { peer_id, candidate } => {
-                    inner
-                        .borrow_mut()
+                    inner.borrow_mut().as_mut().unwrap()
                         .on_ice_candidate_discovered(peer_id, &candidate);
                 }
                 MedeaEvent::PeersRemoved { peer_ids } => {
-                    inner.borrow_mut().on_peers_removed(&peer_ids);
+                    inner.borrow_mut().as_mut().unwrap().on_peers_removed(&peer_ids);
                 }
             };
 
@@ -76,10 +74,10 @@ struct InnerRoom {
 }
 
 impl InnerRoom {
-    fn new(transport: Rc<Transport>) -> Rc<RefCell<Self>> {
-        Rc::new(RefCell::new(Self {
+    fn new(transport: Rc<Transport>) -> Rc<RefCell<Option<Self>>> {
+        Rc::new(RefCell::new(Some(Self {
             _transport: transport,
-        }))
+        })))
     }
 
     /// Creates RTCPeerConnection with provided ID.
@@ -107,5 +105,12 @@ impl InnerRoom {
     /// Disposes specified RTCPeerConnection's.
     fn on_peers_removed(&mut self, _peer_ids: &[u64]) {
         console::log_1(&JsValue::from_str("on_peers_removed invoked"));
+    }
+}
+
+impl Drop for Room {
+    fn drop(&mut self) {
+        // drop InnerRoom, invalidates all spawned RoomHandler's
+        self.0.borrow_mut().take();
     }
 }

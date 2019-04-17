@@ -19,14 +19,18 @@ use self::{
     websocket::WebSocket,
 };
 
+/// Connection with remote was closed. Is not emitted if transport was closed by client.
 pub enum CloseMsg {
+    /// Transport was gracefully closed by remote.
     Normal(String),
+    /// Connection was unexpectedly closed. Consider reconnecting.
     Disconnect(String),
 }
 
 // TODO:
-// 1. Reconnect.
-// 2. Disconnect if no pongs.
+// 1. Unsub.
+// 2. Reconnect.
+// 3. Disconnect if no pongs.
 pub struct Transport {
     sock: Rc<RefCell<Option<WebSocket>>>,
     token: String,
