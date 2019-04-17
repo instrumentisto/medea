@@ -14,20 +14,20 @@ use crate::transport::{
 #[allow(clippy::module_name_repetitions)]
 #[wasm_bindgen]
 /// Room handle accessible from JS.
-pub struct RoomHandle(Room);
+pub struct RoomHandle(Rc<RefCell<InnerRoom>>);
 
 #[wasm_bindgen]
 impl RoomHandle {}
 
-pub struct Room(Rc<RefCell<InnerSession>>);
+pub struct Room(Rc<RefCell<InnerRoom>>);
 
 impl Room {
     pub fn new(transport: Rc<Transport>) -> Self {
-        Self(InnerSession::new(transport))
+        Self(InnerRoom::new(transport))
     }
 
     pub fn new_handle(&self) -> RoomHandle {
-        RoomHandle(Self(Rc::clone(&self.0)))
+        RoomHandle(Rc::clone(&self.0))
     }
 
     /// Subscribes to provided transport messages.
@@ -71,11 +71,11 @@ impl Room {
     }
 }
 
-struct InnerSession {
+struct InnerRoom {
     _transport: Rc<Transport>,
 }
 
-impl InnerSession {
+impl InnerRoom {
     fn new(transport: Rc<Transport>) -> Rc<RefCell<Self>> {
         Rc::new(RefCell::new(Self {
             _transport: transport,
@@ -99,7 +99,7 @@ impl InnerSession {
 
     /// Applies specified ICE Candidate to specified RTCPeerConnection.
     fn on_ice_candidate_discovered(&mut self, _peer_id: u64, _candidate: &str) {
-        console::log_1(&&JsValue::from_str(
+        console::log_1(&JsValue::from_str(
             "on_ice_candidate_discovered invoked",
         ));
     }
