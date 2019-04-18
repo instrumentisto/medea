@@ -13,6 +13,11 @@ pub enum WasmErr {
 }
 
 impl WasmErr {
+    // TODO:
+    // 1. Send err to remote
+    // probably should be possible only in debug build:
+    // 2. Stacktrace?
+    // 3. Medea state snapshot?
     pub fn log_err(&self) {
         console::error_1(&JsValue::from_str(&format!("{}", self)));
     }

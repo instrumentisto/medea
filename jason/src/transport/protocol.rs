@@ -8,6 +8,7 @@ pub enum InMsg {
     /// to received `ping` message.
     #[serde(rename = "pong")]
     Pong(usize),
+    #[serde(rename = "event")]
     Event(Event),
 }
 
@@ -19,6 +20,7 @@ pub enum OutMsg {
     /// periodically.
     #[serde(rename = "ping")]
     Ping(usize),
+    #[serde(rename = "command")]
     Command(Command),
 }
 

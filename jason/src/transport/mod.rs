@@ -19,7 +19,8 @@ use self::{
     websocket::WebSocket,
 };
 
-/// Connection with remote was closed. Is not emitted if transport was closed by client.
+/// Connection with remote was closed. Is not emitted if transport was closed by
+/// client.
 pub enum CloseMsg {
     /// Transport was gracefully closed by remote.
     Normal(String),
@@ -28,9 +29,10 @@ pub enum CloseMsg {
 }
 
 // TODO:
-// 1. Unsub.
+// 1. Proper sub registry.
 // 2. Reconnect.
 // 3. Disconnect if no pongs.
+// 4. Buffering if no socket?
 pub struct Transport {
     sock: Rc<RefCell<Option<WebSocket>>>,
     token: String,
@@ -76,10 +78,18 @@ impl Transport {
                 Ok(InMsg::Event(event)) => {
                     // TODO: many subs, filter messages by session
                     let subs_borrow = subs_rc.borrow();
-                    let sub = subs_borrow.iter().next().unwrap();
 
-                    if let Err(err) = sub.unbounded_send(event) {
-                        WasmErr::from(err).log_err();
+                    match subs_borrow.iter().next() {
+                        Some(sub) => {
+                            if let Err(err) = sub.unbounded_send(event) {
+                                // TODO: receiver is gone, should delete this
+                                // subs tx
+                                WasmErr::from(err).log_err();
+                            }
+                        }
+                        None => {
+                            WasmErr::from_str("Transport: no subs").log_err();
+                        }
                     }
                 }
                 Err(err) => {
@@ -108,8 +118,14 @@ impl Transport {
         Ok(())
     }
 
+    // TODO: proper sub registry
     pub fn add_sub(&self, sub: UnboundedSender<MedeaEvent>) {
         self.subs.borrow_mut().push(sub);
+    }
+
+    // TODO: proper sub registry
+    pub fn unsub(&self) {
+        self.subs.borrow_mut().clear();
     }
 
     pub fn _send_command(&self, command: Command) {

@@ -1,6 +1,10 @@
 //! Represents Medea room.
 
-use futures::{stream::Stream, sync::mpsc::unbounded};
+use futures::{
+    future::{Future, IntoFuture},
+    stream::Stream,
+    sync::mpsc::unbounded,
+};
 use wasm_bindgen::{prelude::*, JsValue};
 use wasm_bindgen_futures::spawn_local;
 use web_sys::console;
@@ -37,33 +41,59 @@ impl Room {
 
         let inner = Rc::clone(&self.0);
 
-        let process_msg_task = rx.for_each(move |event| {
-            match event {
-                MedeaEvent::PeerCreated {
-                    peer_id,
-                    sdp_offer,
-                    tracks,
-                } => {
-                    inner.borrow_mut().as_mut().unwrap()
-                        .on_peer_created(peer_id, &sdp_offer, &tracks);
+        let process_msg_task = rx
+            .for_each(move |event| {
+                console::log_1(&JsValue::from_str("got msg"));
+                match inner.borrow_mut().as_mut() {
+                    Some(inner) => {
+                        match event {
+                            MedeaEvent::PeerCreated {
+                                peer_id,
+                                sdp_offer,
+                                tracks,
+                            } => {
+                                inner.on_peer_created(
+                                    peer_id, &sdp_offer, &tracks,
+                                );
+                            }
+                            MedeaEvent::SdpAnswerMade {
+                                peer_id,
+                                sdp_answer,
+                            } => {
+                                inner.on_sdp_answer(peer_id, &sdp_answer);
+                            }
+                            MedeaEvent::IceCandidateDiscovered {
+                                peer_id,
+                                candidate,
+                            } => {
+                                inner.on_ice_candidate_discovered(
+                                    peer_id, &candidate,
+                                );
+                            }
+                            MedeaEvent::PeersRemoved { peer_ids } => {
+                                inner.on_peers_removed(&peer_ids);
+                            }
+                        };
+                        Ok(())
+                    }
+                    None => {
+                        // InnerSession is gone, which means that Room was
+                        // dropped. Not supposed to happen, since InnerSession
+                        // should drop its tx by unsubbing from transport.
+                        Err(())
+                    }
                 }
-                MedeaEvent::SdpAnswerMade {
-                    peer_id,
-                    sdp_answer,
-                } => {
-                    inner.borrow_mut().as_mut().unwrap().on_sdp_answer(peer_id, &sdp_answer);
+            })
+            .into_future()
+            .then(|e| {
+                match e {
+                    Ok(_) => {
+                        console::log_1(&JsValue::from_str("future ok"));
+                    }
+                    Err(_) => console::log_1(&JsValue::from_str("future err")),
                 }
-                MedeaEvent::IceCandidateDiscovered { peer_id, candidate } => {
-                    inner.borrow_mut().as_mut().unwrap()
-                        .on_ice_candidate_discovered(peer_id, &candidate);
-                }
-                MedeaEvent::PeersRemoved { peer_ids } => {
-                    inner.borrow_mut().as_mut().unwrap().on_peers_removed(&peer_ids);
-                }
-            };
-
-            Ok(())
-        });
+                Ok(())
+            });
 
         spawn_local(process_msg_task);
     }
@@ -110,7 +140,21 @@ impl InnerRoom {
 
 impl Drop for Room {
     fn drop(&mut self) {
+        console::log_1(&JsValue::from_str("Drop for Room"));
         // drop InnerRoom, invalidates all spawned RoomHandler's
         self.0.borrow_mut().take();
+    }
+}
+
+impl Drop for InnerRoom {
+    fn drop(&mut self) {
+        self._transport.unsub();
+        console::log_1(&JsValue::from_str("Drop for InnerRoom"));
+    }
+}
+
+impl Drop for RoomHandle {
+    fn drop(&mut self) {
+        console::log_1(&JsValue::from_str("Drop for RoomHandle"));
     }
 }
