@@ -80,3 +80,9 @@ impl Pinger {
         self.0.borrow_mut().ping_task.take();
     }
 }
+
+impl Drop for Pinger {
+    fn drop(&mut self) {
+        WasmErr::from_str("Drop for Pinger").log_err();
+    }
+}

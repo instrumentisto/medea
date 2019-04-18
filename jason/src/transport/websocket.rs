@@ -115,6 +115,7 @@ impl WebSocket {
 
 impl Drop for WebSocket {
     fn drop(&mut self) {
+        WasmErr::from_str("Drop for WebSocket").log_err();
         self.0
             .borrow()
             .socket
