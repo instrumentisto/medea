@@ -12,11 +12,11 @@ use crate::{
 };
 
 enum State {
-    CONNECTING = 0,
-    OPEN = 1,
-    CLOSING = 2,
-    CLOSED = 3,
-    NONE = 4,
+    CONNECTING,
+    OPEN,
+    CLOSING,
+    CLOSED,
+    NONE,
 }
 
 impl TryFrom<u16> for State {
@@ -188,18 +188,18 @@ impl WebSocket {
 
 impl Drop for WebSocket {
     fn drop(&mut self) {
-        WasmErr::from_str("Drop for WebSocket").log_err();
+        let inner = self.0.borrow();
 
-        if let Err(e) = self
-            .0
-            .borrow()
-            .socket
-            .close_with_code_and_reason(1000, "Dropped suddenly")
-        {
-            WasmErr::from(e).log_err();
+        match inner.socket_state {
+            State::CONNECTING | State::OPEN => {
+                if let Err(err) =
+                inner.socket.close_with_code_and_reason(1000, "Dropped unexpectedly")
+                {
+                    WasmErr::from(err).log_err();
+                }
+            }
+            _ => {}
         }
-
-        WasmErr::from_str("Drop for WebSocket").log_err();
     }
 }
 
