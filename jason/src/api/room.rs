@@ -43,7 +43,6 @@ impl Room {
 
         let process_msg_task = rx
             .for_each(move |event| {
-                console::log_1(&JsValue::from_str("got msg"));
                 match inner.borrow_mut().as_mut() {
                     Some(inner) => {
                         match event {
@@ -85,15 +84,7 @@ impl Room {
                 }
             })
             .into_future()
-            .then(|e| {
-                match e {
-                    Ok(_) => {
-                        console::log_1(&JsValue::from_str("future ok"));
-                    }
-                    Err(_) => console::log_1(&JsValue::from_str("future err")),
-                }
-                Ok(())
-            });
+            .then(|_| Ok(()));
 
         spawn_local(process_msg_task);
     }
@@ -105,9 +96,7 @@ struct InnerRoom {
 
 impl InnerRoom {
     fn new(transport: Rc<Transport>) -> Rc<RefCell<Option<Self>>> {
-        Rc::new(RefCell::new(Some(Self {
-            transport: transport,
-        })))
+        Rc::new(RefCell::new(Some(Self { transport })))
     }
 
     /// Creates RTCPeerConnection with provided ID.
@@ -140,7 +129,6 @@ impl InnerRoom {
 
 impl Drop for Room {
     fn drop(&mut self) {
-        console::log_1(&JsValue::from_str("Drop for Room"));
         // drop InnerRoom, invalidates all spawned RoomHandler's
         self.0.borrow_mut().take();
     }
@@ -149,12 +137,5 @@ impl Drop for Room {
 impl Drop for InnerRoom {
     fn drop(&mut self) {
         self.transport.unsub();
-        console::log_1(&JsValue::from_str("Drop for InnerRoom"));
-    }
-}
-
-impl Drop for RoomHandle {
-    fn drop(&mut self) {
-        console::log_1(&JsValue::from_str("Drop for RoomHandle"));
     }
 }
