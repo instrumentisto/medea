@@ -79,16 +79,11 @@ impl Transport {
                     // TODO: many subs, filter messages by session
                     let subs_borrow = subs_rc.borrow();
 
-                    match subs_borrow.iter().next() {
-                        Some(sub) => {
-                            if let Err(err) = sub.unbounded_send(event) {
-                                // TODO: receiver is gone, should delete this
-                                // subs tx
-                                WasmErr::from(err).log_err();
-                            }
-                        }
-                        None => {
-                            WasmErr::from_str("Transport: no subs").log_err();
+                    if let Some(sub) = subs_borrow.iter().next() {
+                        if let Err(err) = sub.unbounded_send(event) {
+                            // TODO: receiver is gone, should delete this
+                            // subs tx
+                            WasmErr::from(err).log_err();
                         }
                     }
                 }

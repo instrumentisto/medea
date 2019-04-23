@@ -100,13 +100,13 @@ impl Room {
 }
 
 struct InnerRoom {
-    _transport: Rc<Transport>,
+    transport: Rc<Transport>,
 }
 
 impl InnerRoom {
     fn new(transport: Rc<Transport>) -> Rc<RefCell<Option<Self>>> {
         Rc::new(RefCell::new(Some(Self {
-            _transport: transport,
+            transport: transport,
         })))
     }
 
@@ -148,7 +148,7 @@ impl Drop for Room {
 
 impl Drop for InnerRoom {
     fn drop(&mut self) {
-        self._transport.unsub();
+        self.transport.unsub();
         console::log_1(&JsValue::from_str("Drop for InnerRoom"));
     }
 }
