@@ -1,3 +1,5 @@
+//!  Abstraction over concrete transport.
+//!
 mod pinger;
 mod websocket;
 
@@ -19,8 +21,7 @@ use self::{
     websocket::WebSocket,
 };
 
-/// Connection with remote was closed. Is not emitted if transport was closed by
-/// client.
+/// Connection with remote was closed.
 pub enum CloseMsg {
     /// Transport was gracefully closed by remote.
     Normal(String),
@@ -101,7 +102,8 @@ impl Transport {
             socket_rc.borrow_mut().take();
             pinger_rc.stop();
 
-            // TODO: reconnect on disconnect
+            // TODO: reconnect on disconnect, propagate error if unable
+            // to reconnect
             match msg {
                 CloseMsg::Normal(_msg) | CloseMsg::Disconnect(_msg) => {}
             }
@@ -123,6 +125,7 @@ impl Transport {
         self.subs.borrow_mut().clear();
     }
 
+    // TODO: proper sub registry
     pub fn _send_command(&self, command: Command) {
         let socket_borrow = self.sock.borrow();
 

@@ -27,7 +27,7 @@ impl Jason {
     }
 
     /// Enter room with provided token, return initialized connection handler.
-    /// Errors if unable to establish RPC connection with remote.
+    /// TODO: Errors if unable to establish RPC connection with remote.
     pub fn join_room(&mut self, token: String) -> Result<RoomHandle, JsValue> {
         let mut transport = Transport::new(token, 3000);
         transport.init()?;

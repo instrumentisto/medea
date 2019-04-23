@@ -1,3 +1,5 @@
+//! ['WebSocket'](https://developer.mozilla.org/ru/docs/WebSockets)
+//! transport wrapper.
 use web_sys::{CloseEvent, Event, MessageEvent, WebSocket as BackingSocket};
 
 use std::{cell::RefCell, convert::TryFrom, rc::Rc};

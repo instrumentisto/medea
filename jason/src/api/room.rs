@@ -23,6 +23,7 @@ pub struct RoomHandle(Rc<RefCell<Option<InnerRoom>>>);
 #[wasm_bindgen]
 impl RoomHandle {}
 
+/// Room handle being used by Rust external modules.
 pub struct Room(Rc<RefCell<Option<InnerRoom>>>);
 
 impl Room {
@@ -86,10 +87,14 @@ impl Room {
             .into_future()
             .then(|_| Ok(()));
 
+        // Spawns Promise in JS, does not provide any handles, so current way to
+        // stop this stream is to drop all connected Senders.
         spawn_local(process_msg_task);
     }
 }
 
+// Actual room. Shared between JS-side handle (['RoomHandle']) and Rust-side
+// handle (['Room']). Manages concrete RTCPeerConnections, handles Medea events.
 struct InnerRoom {
     transport: Rc<Transport>,
 }
@@ -129,13 +134,14 @@ impl InnerRoom {
 
 impl Drop for Room {
     fn drop(&mut self) {
-        // drop InnerRoom, invalidates all spawned RoomHandler's
+        // Drop InnerRoom, invalidates all spawned RoomHandler's.
         self.0.borrow_mut().take();
     }
 }
 
 impl Drop for InnerRoom {
     fn drop(&mut self) {
+        // Drops event handling task.
         self.transport.unsub();
     }
 }
