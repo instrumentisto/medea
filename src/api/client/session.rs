@@ -191,19 +191,6 @@ pub enum Heartbeat {
     Pong(usize),
 }
 
-impl Handler<Heartbeat> for WsSession {
-    type Result = ();
-
-    /// Answers with `Heartbeat::Pong` message to WebSocket client in response
-    /// to the received `Heartbeat::Ping` message.
-    fn handle(&mut self, msg: Heartbeat, ctx: &mut Self::Context) {
-        if let Heartbeat::Ping(n) = msg {
-            trace!("Received ping: {}", n);
-            ctx.text(serde_json::to_string(&Heartbeat::Pong(n)).unwrap())
-        }
-    }
-}
-
 impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
     /// Handles arbitrary [`ws::Message`] received from WebSocket client.
     fn handle(&mut self, msg: ws::Message, ctx: &mut Self::Context) {
@@ -214,8 +201,10 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
         match msg {
             ws::Message::Text(text) => {
                 self.last_activity = Instant::now();
-                if let Ok(ping) = serde_json::from_str::<Heartbeat>(&text) {
-                    ctx.notify(ping);
+                if let Ok(Heartbeat::Ping(n)) = serde_json::from_str::<Heartbeat>(&text) {
+                    trace!("Received ping: {}", n);
+                    // Answer with ['Heartbeat::Pong'].
+                    ctx.text(serde_json::to_string(&Heartbeat::Pong(n)).unwrap())
                 }
                 if let Ok(command) = serde_json::from_str::<Command>(&text) {
                     if let Err(err) = self.room.try_send(command) {
