@@ -74,9 +74,6 @@ impl InnerSocket {
                 err.log_err()
             }
         };
-
-        WasmErr::from_str(format!("new state {:?}", self.socket.ready_state()))
-            .log_err();
     }
 }
 
@@ -186,14 +183,6 @@ impl Drop for WebSocket {
                 WasmErr::from(err).log_err();
             }
         }
-
-        WasmErr::from_str("Drop for WebSocket").log_err();
-    }
-}
-
-impl Drop for InnerSocket {
-    fn drop(&mut self) {
-        WasmErr::from_str("Drop for InnerSocket").log_err();
     }
 }
 

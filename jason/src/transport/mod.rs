@@ -135,7 +135,6 @@ impl Transport {
 
 impl Drop for Transport {
     fn drop(&mut self) {
-        WasmErr::from_str("Drop for Transport").log_err();
         // Drop socket, pinger will be dropped too
         self.sock.borrow_mut().take();
     }

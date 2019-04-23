@@ -1,4 +1,4 @@
-//! Main application handler. Responsible for managing shared transports and
+//! Main application handler. Responsible for managing shared transports,
 //! local media, room initialization.
 use wasm_bindgen::prelude::*;
 
