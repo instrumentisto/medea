@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 // TODO: should be properly shared between medea and jason
 #[derive(Deserialize)]
 #[serde(untagged)]
-pub enum InMsg {
+pub enum ClientMsg {
     /// `pong` message that server answers with to WebSocket client in response
     /// to received `ping` message.
     #[serde(rename = "pong")]
@@ -15,7 +15,7 @@ pub enum InMsg {
 #[derive(Serialize)]
 #[allow(dead_code)]
 #[serde(untagged)]
-pub enum OutMsg {
+pub enum ServerMsg {
     /// `ping` message that WebSocket client is expected to send to the server
     /// periodically.
     #[serde(rename = "ping")]

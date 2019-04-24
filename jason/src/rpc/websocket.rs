@@ -6,7 +6,7 @@ use std::{cell::RefCell, convert::TryFrom, rc::Rc};
 
 use crate::{
     rpc::{
-        protocol::{InMsg, OutMsg},
+        protocol::{ClientMsg, ServerMsg},
         CloseMsg,
     },
     utils::{EventListener, WasmErr},
@@ -119,7 +119,7 @@ impl WebSocket {
 
     pub fn on_message<F>(&self, mut f: F) -> Result<(), WasmErr>
     where
-        F: (FnMut(Result<InMsg, WasmErr>)) + 'static,
+        F: (FnMut(Result<ClientMsg, WasmErr>)) + 'static,
     {
         let mut inner_ref = self.0.borrow_mut();
 
@@ -127,7 +127,7 @@ impl WebSocket {
             Rc::clone(&inner_ref.socket),
             "message",
             move |msg| {
-                let parsed = InMsg::try_from(&msg);
+                let parsed = ClientMsg::try_from(&msg);
 
                 f(parsed);
             },
@@ -156,7 +156,7 @@ impl WebSocket {
         Ok(())
     }
 
-    pub fn send(&self, msg: &OutMsg) -> Result<(), WasmErr> {
+    pub fn send(&self, msg: &ServerMsg) -> Result<(), WasmErr> {
         let inner = self.0.borrow();
 
         match inner.socket_state {
@@ -188,7 +188,7 @@ impl Drop for WebSocket {
     }
 }
 
-impl TryFrom<&MessageEvent> for InMsg {
+impl TryFrom<&MessageEvent> for ClientMsg {
     type Error = WasmErr;
 
     fn try_from(msg: &MessageEvent) -> Result<Self, Self::Error> {

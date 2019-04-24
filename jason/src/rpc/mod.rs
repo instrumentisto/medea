@@ -11,7 +11,7 @@ use js_sys::Date;
 use std::{cell::RefCell, rc::Rc, vec};
 
 use crate::{
-    rpc::protocol::{InMsg, OutMsg},
+    rpc::protocol::{ClientMsg, ServerMsg},
     utils::WasmErr,
 };
 
@@ -69,13 +69,13 @@ impl RPCClient {
 
         let pinger = Rc::clone(&self.pinger);
         let subs = Rc::clone(&self.subs);
-        socket_ref.on_message(move |msg: Result<InMsg, WasmErr>| {
+        socket_ref.on_message(move |msg: Result<ClientMsg, WasmErr>| {
             match msg {
-                Ok(InMsg::Pong(_num)) => {
+                Ok(ClientMsg::Pong(_num)) => {
                     // TODO: detect no pings
                     pinger.set_pong_at(Date::now());
                 }
-                Ok(InMsg::Event(event)) => {
+                Ok(ClientMsg::Event(event)) => {
                     // TODO: many subs, filter messages by session
                     let subs_borrow = subs.borrow();
 
@@ -127,7 +127,7 @@ impl RPCClient {
 
         // TODO: no socket? we dont really want this method to return err
         if let Some(socket) = socket_borrow.as_ref() {
-            socket.send(&OutMsg::Command(command)).unwrap();
+            socket.send(&ServerMsg::Command(command)).unwrap();
         }
     }
 }
