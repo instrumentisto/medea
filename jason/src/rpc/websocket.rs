@@ -81,39 +81,35 @@ impl InnerSocket {
 
 impl WebSocket {
     pub fn new(url: &str) -> Result<Self, WasmErr> {
-        let inner = InnerSocket::new(url)?;
-
-        let inner_rc = Rc::clone(&inner);
-        let mut inner_ref = inner.borrow_mut();
-
-        inner_ref.on_error = Some(EventListener::new_mut(
-            Rc::clone(&inner_ref.socket),
+        let inner_socket = InnerSocket::new(url)?;
+        let mut inner_mut = inner_socket.borrow_mut();
+        let inner = Rc::clone(&inner_socket);
+        inner_mut.on_error = Some(EventListener::new_mut(
+            Rc::clone(&inner_mut.socket),
             "error",
             move |_| {
-                inner_rc.borrow_mut().update_state();
+                inner.borrow_mut().update_state();
             },
         )?);
 
-        drop(inner_ref);
-        Ok(Self(inner))
+        drop(inner_mut);
+        Ok(Self(inner_socket))
     }
 
     pub fn on_open<F>(&self, f: F) -> Result<(), WasmErr>
     where
         F: (FnOnce()) + 'static,
     {
-        let mut inner_ref = self.0.borrow_mut();
-
-        let inner_rc = Rc::clone(&self.0);
-        inner_ref.on_open = Some(EventListener::new_once(
-            Rc::clone(&inner_ref.socket),
+        let mut inner_mut = self.0.borrow_mut();
+        let inner = Rc::clone(&self.0);
+        inner_mut.on_open = Some(EventListener::new_once(
+            Rc::clone(&inner_mut.socket),
             "open",
             move |_| {
-                inner_rc.borrow_mut().update_state();
+                inner.borrow_mut().update_state();
                 f();
             },
         )?);
-
         Ok(())
     }
 
@@ -121,10 +117,9 @@ impl WebSocket {
     where
         F: (FnMut(Result<ClientMsg, WasmErr>)) + 'static,
     {
-        let mut inner_ref = self.0.borrow_mut();
-
-        inner_ref.on_message = Some(EventListener::new_mut(
-            Rc::clone(&inner_ref.socket),
+        let mut inner_mut = self.0.borrow_mut();
+        inner_mut.on_message = Some(EventListener::new_mut(
+            Rc::clone(&inner_mut.socket),
             "message",
             move |msg| {
                 let parsed = ClientMsg::try_from(&msg);
@@ -139,20 +134,18 @@ impl WebSocket {
     where
         F: (FnOnce(CloseMsg)) + 'static,
     {
-        let mut inner_ref = self.0.borrow_mut();
-
-        let inner_rc = Rc::clone(&self.0);
-        inner_ref.on_close = Some(EventListener::new_once(
-            Rc::clone(&inner_ref.socket),
+        let mut inner_mut = self.0.borrow_mut();
+        let inner = Rc::clone(&self.0);
+        inner_mut.on_close = Some(EventListener::new_once(
+            Rc::clone(&inner_mut.socket),
             "close",
             move |msg: CloseEvent| {
-                inner_rc.borrow_mut().update_state();
+                inner.borrow_mut().update_state();
                 let parsed = CloseMsg::from(&msg);
 
                 f(parsed);
             },
         )?);
-
         Ok(())
     }
 

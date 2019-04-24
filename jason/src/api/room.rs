@@ -44,6 +44,7 @@ impl Room {
 
         let process_msg_task = rx
             .for_each(move |event| {
+                //TODO: macro for convenient dispatch
                 match inner.borrow_mut().as_mut() {
                     Some(inner) => {
                         match event {
