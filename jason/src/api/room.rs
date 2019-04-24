@@ -12,7 +12,7 @@ use web_sys::console;
 use std::{cell::RefCell, rc::Rc};
 
 use crate::rpc::{
-    protocol::DirectionalTrack, protocol::Event as MedeaEvent, RPCClient,
+    protocol::DirectionalTrack, protocol::Event, RPCClient,
 };
 
 #[allow(clippy::module_name_repetitions)]
@@ -47,7 +47,7 @@ impl Room {
                 match inner.borrow_mut().as_mut() {
                     Some(inner) => {
                         match event {
-                            MedeaEvent::PeerCreated {
+                            Event::PeerCreated {
                                 peer_id,
                                 sdp_offer,
                                 tracks,
@@ -56,13 +56,13 @@ impl Room {
                                     peer_id, &sdp_offer, &tracks,
                                 );
                             }
-                            MedeaEvent::SdpAnswerMade {
+                            Event::SdpAnswerMade {
                                 peer_id,
                                 sdp_answer,
                             } => {
                                 inner.on_sdp_answer(peer_id, &sdp_answer);
                             }
-                            MedeaEvent::IceCandidateDiscovered {
+                            Event::IceCandidateDiscovered {
                                 peer_id,
                                 candidate,
                             } => {
@@ -70,7 +70,7 @@ impl Room {
                                     peer_id, &candidate,
                                 );
                             }
-                            MedeaEvent::PeersRemoved { peer_ids } => {
+                            Event::PeersRemoved { peer_ids } => {
                                 inner.on_peers_removed(&peer_ids);
                             }
                         };

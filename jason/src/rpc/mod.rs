@@ -17,7 +17,7 @@ use crate::{
 
 use self::{
     pinger::Pinger,
-    protocol::{Command, Event as MedeaEvent},
+    protocol::{Command, Event},
     websocket::WebSocket,
 };
 
@@ -38,7 +38,7 @@ pub struct RPCClient {
     sock: Rc<RefCell<Option<WebSocket>>>,
     token: String,
     pinger: Rc<Pinger>,
-    subs: Rc<RefCell<Vec<UnboundedSender<MedeaEvent>>>>,
+    subs: Rc<RefCell<Vec<UnboundedSender<Event>>>>,
 }
 
 impl RPCClient {
@@ -112,7 +112,7 @@ impl RPCClient {
     }
 
     // TODO: proper sub registry
-    pub fn add_sub(&self, sub: UnboundedSender<MedeaEvent>) {
+    pub fn add_sub(&self, sub: UnboundedSender<Event>) {
         self.subs.borrow_mut().push(sub);
     }
 
