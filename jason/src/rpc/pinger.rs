@@ -3,7 +3,7 @@ use wasm_bindgen::{prelude::*, JsCast};
 use std::{cell::RefCell, rc::Rc};
 
 use crate::{
-    rpc::{protocol::ServerMsg, websocket::WebSocket},
+    rpc::{protocol::ClientMsg, websocket::WebSocket},
     utils::{window, IntervalHandle, WasmErr},
 };
 
@@ -24,7 +24,7 @@ impl InnerPinger {
             .as_ref()
             .ok_or_else(|| WasmErr::from_str("Unable to ping: no socket"))?;
         self.num += 1;
-        socket.send(&ServerMsg::Ping(self.num))
+        socket.send(&ClientMsg::Ping(self.num))
     }
 }
 

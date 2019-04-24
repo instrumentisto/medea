@@ -6,8 +6,8 @@ use std::rc::Rc;
 
 use crate::{
     api::{room::Room, RoomHandle},
-    set_panic_hook,
     rpc::RPCClient,
+    set_panic_hook,
 };
 
 #[wasm_bindgen]

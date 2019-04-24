@@ -11,9 +11,7 @@ use web_sys::console;
 
 use std::{cell::RefCell, rc::Rc};
 
-use crate::rpc::{
-    protocol::DirectionalTrack, protocol::Event, RPCClient,
-};
+use crate::rpc::{protocol::DirectionalTrack, protocol::Event, RPCClient};
 
 #[allow(clippy::module_name_repetitions)]
 #[wasm_bindgen]
@@ -44,7 +42,7 @@ impl Room {
 
         let process_msg_task = rx
             .for_each(move |event| {
-                //TODO: macro for convenient dispatch
+                // TODO: macro for convenient dispatch
                 match inner.borrow_mut().as_mut() {
                     Some(inner) => {
                         match event {

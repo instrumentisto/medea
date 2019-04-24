@@ -115,14 +115,14 @@ impl WebSocket {
 
     pub fn on_message<F>(&self, mut f: F) -> Result<(), WasmErr>
     where
-        F: (FnMut(Result<ClientMsg, WasmErr>)) + 'static,
+        F: (FnMut(Result<ServerMsg, WasmErr>)) + 'static,
     {
         let mut inner_mut = self.0.borrow_mut();
         inner_mut.on_message = Some(EventListener::new_mut(
             Rc::clone(&inner_mut.socket),
             "message",
             move |msg| {
-                let parsed = ClientMsg::try_from(&msg);
+                let parsed = ServerMsg::try_from(&msg);
 
                 f(parsed);
             },
@@ -149,7 +149,7 @@ impl WebSocket {
         Ok(())
     }
 
-    pub fn send(&self, msg: &ServerMsg) -> Result<(), WasmErr> {
+    pub fn send(&self, msg: &ClientMsg) -> Result<(), WasmErr> {
         let inner = self.0.borrow();
 
         match inner.socket_state {
@@ -181,7 +181,7 @@ impl Drop for WebSocket {
     }
 }
 
-impl TryFrom<&MessageEvent> for ClientMsg {
+impl TryFrom<&MessageEvent> for ServerMsg {
     type Error = WasmErr;
 
     fn try_from(msg: &MessageEvent) -> Result<Self, Self::Error> {
