@@ -5,7 +5,7 @@ use web_sys::{CloseEvent, Event, MessageEvent, WebSocket as BackingSocket};
 use std::{cell::RefCell, convert::TryFrom, rc::Rc};
 
 use crate::{
-    transport::{
+    rpc::{
         protocol::{InMsg, OutMsg},
         CloseMsg,
     },

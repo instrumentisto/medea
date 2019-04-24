@@ -7,14 +7,14 @@ use std::rc::Rc;
 use crate::{
     api::{room::Room, RoomHandle},
     set_panic_hook,
-    transport::Transport,
+    rpc::RPCClient,
 };
 
 #[wasm_bindgen]
 #[derive(Default)]
 pub struct Jason {
-    // TODO: multiple transports if rooms managed by different servers
-    transport: Option<Rc<Transport>>,
+    // TODO: multiple RPCClient's if rooms managed by different servers
+    rpc: Option<Rc<RPCClient>>,
     rooms: Vec<Room>,
 }
 
@@ -29,16 +29,16 @@ impl Jason {
     /// Enter room with provided token, return initialized connection handler.
     /// TODO: Errors if unable to establish RPC connection with remote.
     pub fn join_room(&mut self, token: String) -> Result<RoomHandle, JsValue> {
-        let mut transport = Transport::new(token, 3000);
-        transport.init()?;
-        let transport = Rc::new(transport);
+        let mut rpc = RPCClient::new(token, 3000);
+        rpc.init()?;
+        let rpc = Rc::new(rpc);
 
-        let room = Room::new(Rc::clone(&transport));
-        room.subscribe(&transport);
+        let room = Room::new(Rc::clone(&rpc));
+        room.subscribe(&rpc);
         let handle = room.new_handle();
 
         self.rooms.push(room);
-        self.transport = Some(transport);
+        self.rpc = Some(rpc);
 
         Ok(handle)
     }

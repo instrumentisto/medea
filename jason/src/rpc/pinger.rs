@@ -3,7 +3,7 @@ use wasm_bindgen::{prelude::*, JsCast};
 use std::{cell::RefCell, rc::Rc};
 
 use crate::{
-    transport::{protocol::OutMsg, websocket::WebSocket},
+    rpc::{protocol::OutMsg, websocket::WebSocket},
     utils::{window, IntervalHandle, WasmErr},
 };
 

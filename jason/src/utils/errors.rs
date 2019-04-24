@@ -71,5 +71,5 @@ impl_from_error!(std::cell::BorrowError);
 impl_from_error!(serde_json::error::Error);
 // TODO: improve macro to use generics
 impl_from_error!(
-    futures::sync::mpsc::SendError<crate::transport::protocol::Event>
+    futures::sync::mpsc::SendError<crate::rpc::protocol::Event>
 );

@@ -11,7 +11,7 @@ use js_sys::Date;
 use std::{cell::RefCell, rc::Rc, vec};
 
 use crate::{
-    transport::protocol::{InMsg, OutMsg},
+    rpc::protocol::{InMsg, OutMsg},
     utils::WasmErr,
 };
 
@@ -34,14 +34,14 @@ pub enum CloseMsg {
 // 2. Reconnect.
 // 3. Disconnect if no pongs.
 // 4. Buffering if no socket?
-pub struct Transport {
+pub struct RPCClient {
     sock: Rc<RefCell<Option<WebSocket>>>,
     token: String,
     pinger: Rc<Pinger>,
     subs: Rc<RefCell<Vec<UnboundedSender<MedeaEvent>>>>,
 }
 
-impl Transport {
+impl RPCClient {
     pub fn new(token: String, ping_interval: i32) -> Self {
         Self {
             sock: Rc::new(RefCell::new(None)),
@@ -136,7 +136,7 @@ impl Transport {
     }
 }
 
-impl Drop for Transport {
+impl Drop for RPCClient {
     fn drop(&mut self) {
         // Drop socket, pinger will be dropped too
         self.sock.borrow_mut().take();

@@ -11,8 +11,8 @@ use web_sys::console;
 
 use std::{cell::RefCell, rc::Rc};
 
-use crate::transport::{
-    protocol::DirectionalTrack, protocol::Event as MedeaEvent, Transport,
+use crate::rpc::{
+    protocol::DirectionalTrack, protocol::Event as MedeaEvent, RPCClient,
 };
 
 #[allow(clippy::module_name_repetitions)]
@@ -27,18 +27,18 @@ impl RoomHandle {}
 pub struct Room(Rc<RefCell<Option<InnerRoom>>>);
 
 impl Room {
-    pub fn new(transport: Rc<Transport>) -> Self {
-        Self(InnerRoom::new(transport))
+    pub fn new(rpc: Rc<RPCClient>) -> Self {
+        Self(InnerRoom::new(rpc))
     }
 
     pub fn new_handle(&self) -> RoomHandle {
         RoomHandle(Rc::clone(&self.0))
     }
 
-    /// Subscribes to provided transport messages.
-    pub fn subscribe(&self, transport: &Transport) {
+    /// Subscribes to provided RpcTransport messages.
+    pub fn subscribe(&self, rpc: &RPCClient) {
         let (tx, rx) = unbounded();
-        transport.add_sub(tx);
+        rpc.add_sub(tx);
 
         let inner = Rc::clone(&self.0);
 
@@ -79,7 +79,7 @@ impl Room {
                     None => {
                         // InnerSession is gone, which means that Room was
                         // dropped. Not supposed to happen, since InnerSession
-                        // should drop its tx by unsubbing from transport.
+                        // should drop its tx by unsubbing from RpcClient.
                         Err(())
                     }
                 }
@@ -96,12 +96,12 @@ impl Room {
 // Actual room. Shared between JS-side handle (['RoomHandle']) and Rust-side
 // handle (['Room']). Manages concrete RTCPeerConnections, handles Medea events.
 struct InnerRoom {
-    transport: Rc<Transport>,
+    rpc: Rc<RPCClient>,
 }
 
 impl InnerRoom {
-    fn new(transport: Rc<Transport>) -> Rc<RefCell<Option<Self>>> {
-        Rc::new(RefCell::new(Some(Self { transport })))
+    fn new(rpc: Rc<RPCClient>) -> Rc<RefCell<Option<Self>>> {
+        Rc::new(RefCell::new(Some(Self { rpc })))
     }
 
     /// Creates RTCPeerConnection with provided ID.
@@ -142,6 +142,6 @@ impl Drop for Room {
 impl Drop for InnerRoom {
     fn drop(&mut self) {
         // Drops event handling task.
-        self.transport.unsub();
+        self.rpc.unsub();
     }
 }

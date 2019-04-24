@@ -1,5 +1,5 @@
 mod api;
-mod transport;
+mod rpc;
 mod utils;
 
 // When the `console_error_panic_hook` feature is enabled, we can call the
