@@ -11,7 +11,7 @@ pub struct Pinger(Rc<RefCell<InnerPinger>>);
 
 struct InnerPinger {
     ping_interval: i32,
-    num: usize,
+    num: u64,
     pong_at: Option<f64>,
     socket: Rc<RefCell<Option<WebSocket>>>,
     ping_task: Option<PingTaskHandler>,

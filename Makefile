@@ -138,6 +138,7 @@ ifeq ($(test-unit-app),medea)
 endif
 ifeq ($(test-unit-app),jason)
 	wasm-pack test --headless --firefox jason
+	cargo test -p jason
 endif
 
 
