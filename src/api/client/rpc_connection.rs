@@ -1,8 +1,8 @@
-//! ['RpcConnection'] with related messages.
+//! [`RpcConnection`] with related messages.
 use actix::Message;
 use futures::Future;
 
-use crate::{api::client::Event, api::control::Id as MemberId};
+use crate::api::{control::Id as MemberId, protocol::Event};
 
 use std::fmt;
 
@@ -10,7 +10,7 @@ use std::fmt;
 pub trait RpcConnection: fmt::Debug + Send {
     /// Closes [`RpcConnection`].
     /// No [`RpcConnectionClosed`] signals should be emitted.
-    /// TODO: should never err
+    /// Always returns success.
     fn close(&mut self) -> Box<dyn Future<Item = (), Error = ()>>;
 
     /// Sends [`Event`] to remote [`Member`].
@@ -22,8 +22,8 @@ pub trait RpcConnection: fmt::Debug + Send {
 
 /// Signal for authorizing new [`RpcConnection`] before establishing.
 #[derive(Debug, Message)]
-#[rtype(result = "Result<(), RpcConnectionAuthorizationError>")]
-pub struct AuthorizeRpcConnection {
+#[rtype(result = "Result<(), AuthorizationError>")]
+pub struct Authorize {
     /// ID of [`Member`] to authorize [`RpcConnection`] for.
     pub member_id: MemberId,
     /// Credentials to authorize [`RpcConnection`] with.
@@ -32,7 +32,7 @@ pub struct AuthorizeRpcConnection {
 
 /// Error of authorization [`RpcConnection`] in [`Room`].
 #[derive(Debug)]
-pub enum RpcConnectionAuthorizationError {
+pub enum AuthorizationError {
     /// Authorizing [`Member`] does not exists in the [`Room`].
     MemberNotExists,
     /// Provided credentials are invalid.
@@ -42,7 +42,7 @@ pub enum RpcConnectionAuthorizationError {
 /// Signal of new [`RpcConnection`] being established with specified [`Member`].
 #[derive(Debug, Message)]
 #[rtype(result = "Result<(), ()>")]
-pub struct RpcConnectionEstablished {
+pub struct Established {
     /// ID of [`Member`] that establishes [`RpcConnection`].
     pub member_id: MemberId,
     /// Established [`RpcConnection`].
@@ -50,16 +50,16 @@ pub struct RpcConnectionEstablished {
 }
 /// Signal of existing [`RpcConnection`] of specified [`Member`] being closed.
 #[derive(Debug, Message)]
-pub struct RpcConnectionClosed {
+pub struct Closed {
     /// ID of [`Member`] which [`RpcConnection`] is closed.
     pub member_id: MemberId,
     /// Reason of why [`RpcConnection`] is closed.
-    pub reason: RpcConnectionClosedReason,
+    pub reason: ClosedReason,
 }
 
 /// Reasons of why [`RpcConnection`] may be closed.
 #[derive(Debug)]
-pub enum RpcConnectionClosedReason {
+pub enum ClosedReason {
     /// [`RpcConnection`] is disconnect by server itself.
     Disconnected,
     /// [`RpcConnection`] has become idle and is disconnected by idle timeout.

@@ -71,6 +71,10 @@
             pcs[msg.peer_id] = new RTCPeerConnection();
 
             var pc = pcs[msg.peer_id];
+            pc.ontrack = function (e) {
+                console.log("ontrack");
+                partnervid.srcObject = e.streams[0];
+            };
 
             if (sendVideo || sendAudio) {
                 const stream = await navigator.mediaDevices.getUserMedia({
@@ -128,12 +132,6 @@
                 }
 
             };
-
-            pc.ontrack = function (e) {
-                partnervid.srcObject = e.streams[0];
-            };
-
-
         }
 
         async function handleSdpAnswerMade(msg) {
