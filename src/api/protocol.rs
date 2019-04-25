@@ -1,19 +1,6 @@
 use actix::Message;
 use serde::{de::Deserializer, ser::Serializer, Deserialize, Serialize};
 
-/// Message for keeping client WebSocket connection alive.
-#[derive(Debug, Deserialize, Serialize)]
-pub enum Heartbeat {
-    /// `ping` message that WebSocket client is expected to send to the server
-    /// periodically.
-    #[serde(rename = "ping")]
-    Ping(usize),
-    /// `pong` message that server answers with to WebSocket client in response
-    /// to received `ping` message.
-    #[serde(rename = "pong")]
-    Pong(usize),
-}
-
 // TODO: should be properly shared between medea and jason
 #[cfg_attr(test, derive(PartialEq, Debug))]
 #[derive(Message)]
@@ -213,35 +200,35 @@ impl Serialize for ClientMsg {
 }
 
 impl<'de> Deserialize<'de> for ClientMsg {
-    fn deserialize<D>(deserializer: D) -> Result<ClientMsg, D::Error>
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
         use serde::de::Error;
 
         let ev = serde_json::Value::deserialize(deserializer)?;
-        let map = ev.as_object().ok_or(Error::custom(format!(
-            "unable to deser ClientMsg [{:?}]",
-            &ev
-        )))?;
-        match map.get("ping") {
-            Some(a) => {
-                let n = a.as_u64().ok_or(Error::custom(format!(
+        let map = ev.as_object().ok_or_else(|| {
+            Error::custom(format!("unable to deser ClientMsg [{:?}]", &ev))
+        })?;
+
+        if let Some(v) = map.get("ping") {
+            let n = v.as_u64().ok_or_else(|| {
+                Error::custom(format!(
                     "unable to deser ClientMsg::Ping [{:?}]",
                     &ev
-                )))?;
-                Ok(ClientMsg::Ping(n))
-            }
-            None => {
-                let command =
-                    serde_json::from_value::<Command>(ev).map_err(|e| {
-                        Error::custom(format!(
-                            "unable to deser ClientMsg::Command [{:?}]",
-                            e
-                        ))
-                    })?;
-                Ok(ClientMsg::Command(command))
-            }
+                ))
+            })?;
+
+            Ok(ClientMsg::Ping(n))
+        } else {
+            let command =
+                serde_json::from_value::<Command>(ev).map_err(|e| {
+                    Error::custom(format!(
+                        "unable to deser ClientMsg::Command [{:?}]",
+                        e
+                    ))
+                })?;
+            Ok(ClientMsg::Command(command))
         }
     }
 }
@@ -265,35 +252,34 @@ impl Serialize for ServerMsg {
 }
 
 impl<'de> Deserialize<'de> for ServerMsg {
-    fn deserialize<D>(deserializer: D) -> Result<ServerMsg, D::Error>
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
         use serde::de::Error;
 
         let ev = serde_json::Value::deserialize(deserializer)?;
-        let map = ev.as_object().ok_or(Error::custom(format!(
-            "unable to deser ServerMsg [{:?}]",
-            &ev
-        )))?;
-        match map.get("pong") {
-            Some(a) => {
-                let n = a.as_u64().ok_or(Error::custom(format!(
+        let map = ev.as_object().ok_or_else(|| {
+            Error::custom(format!("unable to deser ServerMsg [{:?}]", &ev))
+        })?;
+
+        if let Some(v) = map.get("pong") {
+            let n = v.as_u64().ok_or_else(|| {
+                Error::custom(format!(
                     "unable to deser ServerMsg::Pong [{:?}]",
                     &ev
-                )))?;
-                Ok(ServerMsg::Pong(n))
-            }
-            None => {
-                let event =
-                    serde_json::from_value::<Event>(ev).map_err(|e| {
-                        Error::custom(format!(
-                            "unable to deser ServerMsg::Event [{:?}]",
-                            e
-                        ))
-                    })?;
-                Ok(ServerMsg::Event(event))
-            }
+                ))
+            })?;
+
+            Ok(ServerMsg::Pong(n))
+        } else {
+            let event = serde_json::from_value::<Event>(ev).map_err(|e| {
+                Error::custom(format!(
+                    "unable to deser ServerMsg::Event [{:?}]",
+                    e
+                ))
+            })?;
+            Ok(ServerMsg::Event(event))
         }
     }
 }
