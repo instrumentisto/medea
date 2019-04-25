@@ -550,10 +550,11 @@ mod test {
     use futures::future::Future;
 
     use super::*;
-    use crate::media::{
-        peer::create_peers,
-        track::{Direction, Directional},
-        AudioSettings, MediaType, VideoSettings,
+    use crate::{
+        api::protocol::{
+            AudioSettings, Direction, Directional, MediaType, VideoSettings,
+        },
+        media::peer::create_peers,
     };
 
     #[derive(Debug, Clone)]

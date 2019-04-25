@@ -100,87 +100,6 @@ pub struct AudioSettings {}
 #[cfg_attr(test, derive(PartialEq))]
 pub struct VideoSettings {}
 
-#[cfg(test)]
-mod test {
-    use crate::rpc::protocol::{
-        ClientMsg, Command::MakeSdpOffer, Event::SdpAnswerMade, ServerMsg,
-    };
-
-    #[test]
-    fn command() {
-        let command = ClientMsg::Command(MakeSdpOffer {
-            peer_id: 77,
-            sdp_offer: "offer".to_owned(),
-        });
-        #[cfg_attr(nightly, rustfmt::skip)]
-        let command_str =
-            "{\
-                \"command\":\"MakeSdpOffer\",\
-                \"data\":{\
-                    \"peer_id\":77,\
-                    \"sdp_offer\":\"offer\"\
-                }\
-            }";
-
-        assert_eq!(command_str, serde_json::to_string(&command).unwrap());
-        assert_eq!(
-            command,
-            serde_json::from_str(&serde_json::to_string(&command).unwrap())
-                .unwrap()
-        );
-    }
-
-    #[test]
-    fn ping() {
-        let ping = ClientMsg::Ping(15);
-        let ping_str = "{\"ping\":15}";
-
-        assert_eq!(ping_str, serde_json::to_string(&ping).unwrap());
-        assert_eq!(
-            ping,
-            serde_json::from_str(&serde_json::to_string(&ping).unwrap())
-                .unwrap()
-        )
-    }
-
-    #[test]
-    fn event() {
-        let event = ServerMsg::Event(SdpAnswerMade {
-            peer_id: 45,
-            sdp_answer: "answer".to_owned(),
-        });
-        #[cfg_attr(nightly, rustfmt::skip)]
-        let event_str =
-            "{\
-                \"event\":\"SdpAnswerMade\",\
-                \"data\":{\
-                    \"peer_id\":45,\
-                    \"sdp_answer\":\"answer\"\
-                }\
-            }";
-
-        assert_eq!(event_str, serde_json::to_string(&event).unwrap());
-        assert_eq!(
-            event,
-            serde_json::from_str(&serde_json::to_string(&event).unwrap())
-                .unwrap()
-        );
-    }
-
-    #[test]
-    fn pong() {
-        let pong = ServerMsg::Pong(5);
-        let pong_str = "{\"pong\":5}";
-
-        assert_eq!(pong_str, serde_json::to_string(&pong).unwrap());
-        assert_eq!(
-            pong,
-            serde_json::from_str(&serde_json::to_string(&pong).unwrap())
-                .unwrap()
-        )
-    }
-}
-
 impl Serialize for ClientMsg {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -281,5 +200,84 @@ impl<'de> Deserialize<'de> for ServerMsg {
             })?;
             Ok(ServerMsg::Event(event))
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::api::protocol::{ClientMsg, Command, Event, ServerMsg};
+
+    #[test]
+    fn command() {
+        let command = ClientMsg::Command(Command::MakeSdpOffer {
+            peer_id: 77,
+            sdp_offer: "offer".to_owned(),
+        });
+        #[cfg_attr(nightly, rustfmt::skip)]
+            let command_str =
+            "{\
+                \"command\":\"MakeSdpOffer\",\
+                \"data\":{\
+                    \"peer_id\":77,\
+                    \"sdp_offer\":\"offer\"\
+                }\
+            }";
+
+        assert_eq!(command_str, serde_json::to_string(&command).unwrap());
+        assert_eq!(
+            command,
+            serde_json::from_str(&serde_json::to_string(&command).unwrap())
+                .unwrap()
+        );
+    }
+
+    #[test]
+    fn ping() {
+        let ping = ClientMsg::Ping(15);
+        let ping_str = "{\"ping\":15}";
+
+        assert_eq!(ping_str, serde_json::to_string(&ping).unwrap());
+        assert_eq!(
+            ping,
+            serde_json::from_str(&serde_json::to_string(&ping).unwrap())
+                .unwrap()
+        )
+    }
+
+    #[test]
+    fn event() {
+        let event = ServerMsg::Event(Event::SdpAnswerMade {
+            peer_id: 45,
+            sdp_answer: "answer".to_owned(),
+        });
+        #[cfg_attr(nightly, rustfmt::skip)]
+            let event_str =
+            "{\
+                \"event\":\"SdpAnswerMade\",\
+                \"data\":{\
+                    \"peer_id\":45,\
+                    \"sdp_answer\":\"answer\"\
+                }\
+            }";
+
+        assert_eq!(event_str, serde_json::to_string(&event).unwrap());
+        assert_eq!(
+            event,
+            serde_json::from_str(&serde_json::to_string(&event).unwrap())
+                .unwrap()
+        );
+    }
+
+    #[test]
+    fn pong() {
+        let pong = ServerMsg::Pong(5);
+        let pong_str = "{\"pong\":5}";
+
+        assert_eq!(pong_str, serde_json::to_string(&pong).unwrap());
+        assert_eq!(
+            pong,
+            serde_json::from_str(&serde_json::to_string(&pong).unwrap())
+                .unwrap()
+        )
     }
 }
