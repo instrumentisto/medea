@@ -23,19 +23,16 @@
 
             var msg = JSON.parse(message.data);
 
-            if (msg.pong == undefined) {
-                console.log(JSON.stringify(message.data));
-                if (msg.PeerCreated != undefined) {
-                    handlePeerCreated(msg.PeerCreated);
-                }
-
-                if (msg.SdpAnswerMade != undefined) {
-                    handleSdpAnswerMade(msg.SdpAnswerMade);
-                }
-
-                if (msg.IceCandidateDiscovered != undefined) {
-                    handleIceCandidateDiscovered(msg.IceCandidateDiscovered);
-                }
+            switch (msg.event) {
+                case 'PeerCreated':
+                    handlePeerCreated(msg.data);
+                    break;
+                case 'SdpAnswerMade':
+                    handleSdpAnswerMade(msg.data);
+                    break;
+                case 'IceCandidateDiscovered':
+                    handleIceCandidateDiscovered(msg.data);
+                    break;
             }
         }
 
@@ -103,7 +100,8 @@
                 pc.setLocalDescription(answer);
 
                 socket.send(JSON.stringify({
-                    MakeSdpAnswer: {
+                    command: "MakeSdpAnswer",
+                    data: {
                         peer_id: msg.peer_id,
                         sdp_answer: JSON.stringify(answer)
                     }
@@ -112,7 +110,8 @@
                 var offer = await pc.createOffer(mediaConstraints);
                 pc.setLocalDescription(offer);
                 socket.send(JSON.stringify({
-                    MakeSdpOffer: {
+                    command: "MakeSdpOffer",
+                    data: {
                         peer_id: msg.peer_id,
                         sdp_offer: JSON.stringify(offer)
                     }
@@ -124,7 +123,8 @@
 
                 if (e.candidate) {
                     socket.send(JSON.stringify({
-                        SetIceCandidate: {
+                        command: "SetIceCandidate",
+                        data: {
                             peer_id: msg.peer_id,
                             candidate: JSON.stringify(e.candidate)
                         }
