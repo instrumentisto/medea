@@ -175,7 +175,7 @@ impl Handler<Event> for WsSession {
     /// Sends [`Event`] to Web Client.
     fn handle(&mut self, event: Event, ctx: &mut Self::Context) {
         debug!("Event {:?} for member {}", event, self.member_id);
-        ctx.text(serde_json::to_string(&event).unwrap())
+        ctx.text(serde_json::to_string(ServerMsg::Event(event)).unwrap())
     }
 }
 
