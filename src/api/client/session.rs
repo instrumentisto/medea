@@ -9,15 +9,16 @@ use actix::{
 use actix_web::ws::{self, CloseReason};
 use futures::future::Future;
 
-use crate::api::protocol::{ClientMsg, ServerMsg};
 use crate::{
-    api::client::{
-        room::Room,
-        rpc_connection::{Closed, ClosedReason, Established, RpcConnection},
+    api::{
+        client::rpc_connection::{
+            Closed, ClosedReason, Established, RpcConnection,
+        },
+        control::member::Id as MemberId,
+        protocol::{ClientMsg, Event, ServerMsg},
     },
-    api::control::member::Id as MemberId,
-    api::protocol::Event,
     log::prelude::*,
+    signalling::Room,
 };
 
 /// Long-running WebSocket connection of Client API.

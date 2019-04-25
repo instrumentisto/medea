@@ -3,22 +3,21 @@
 #[macro_use]
 mod utils;
 
-pub mod api;
-pub mod conf;
-pub mod log;
-pub mod media;
+mod api;
+mod conf;
+mod log;
+mod media;
+mod signalling;
 
 use actix::prelude::*;
 use dotenv::dotenv;
 use log::prelude::*;
 
 use crate::{
-    api::{
-        client::{server, Room, RoomsRepository},
-        control::Member,
-    },
+    api::{client::server, control::Member},
     conf::Conf,
     media::peer::create_peers,
+    signalling::{Room, RoomsRepository},
 };
 
 fn main() {

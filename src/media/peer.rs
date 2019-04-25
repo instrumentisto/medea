@@ -37,10 +37,9 @@ pub enum SignalingStateMachine {
     WaitLocalHaveRemote(Peer<WaitLocalHaveRemote>),
     WaitRemoteSDP(Peer<WaitRemoteSDP>),
     Stable(Peer<Stable>),
-    Finished(Peer<Finished>),
-    Failure(Peer<Failure>),
 }
 
+//TODO: macro to remove boilerplate
 impl SignalingStateMachine {
     /// Returns ID of [`Member`] associated with this [`Peer`].
     pub fn member_id(&self) -> MemberId {
@@ -52,8 +51,6 @@ impl SignalingStateMachine {
             }
             SignalingStateMachine::WaitRemoteSDP(peer) => peer.member_id(),
             SignalingStateMachine::Stable(peer) => peer.member_id(),
-            SignalingStateMachine::Finished(peer) => peer.member_id(),
-            SignalingStateMachine::Failure(peer) => peer.member_id(),
         }
     }
 
@@ -65,35 +62,6 @@ impl SignalingStateMachine {
             SignalingStateMachine::WaitLocalHaveRemote(peer) => peer.id(),
             SignalingStateMachine::WaitRemoteSDP(peer) => peer.id(),
             SignalingStateMachine::Stable(peer) => peer.id(),
-            SignalingStateMachine::Finished(peer) => peer.id(),
-            SignalingStateMachine::Failure(peer) => peer.id(),
-        }
-    }
-
-    /// Returns ID of [`Peer`].
-    pub fn failed(self) -> Self {
-        match self {
-            SignalingStateMachine::New(peer) => {
-                SignalingStateMachine::Failure(peer.failed())
-            }
-            SignalingStateMachine::WaitLocalSDP(peer) => {
-                SignalingStateMachine::Failure(peer.failed())
-            }
-            SignalingStateMachine::WaitLocalHaveRemote(peer) => {
-                SignalingStateMachine::Failure(peer.failed())
-            }
-            SignalingStateMachine::WaitRemoteSDP(peer) => {
-                SignalingStateMachine::Failure(peer.failed())
-            }
-            SignalingStateMachine::Stable(peer) => {
-                SignalingStateMachine::Failure(peer.failed())
-            }
-            SignalingStateMachine::Finished(peer) => {
-                SignalingStateMachine::Failure(peer.failed())
-            }
-            SignalingStateMachine::Failure(peer) => {
-                SignalingStateMachine::Failure(peer.failed())
-            }
         }
     }
 
@@ -105,8 +73,6 @@ impl SignalingStateMachine {
             SignalingStateMachine::WaitLocalHaveRemote(peer) => peer.sender(),
             SignalingStateMachine::WaitRemoteSDP(peer) => peer.sender(),
             SignalingStateMachine::Stable(peer) => peer.sender(),
-            SignalingStateMachine::Finished(peer) => peer.sender(),
-            SignalingStateMachine::Failure(peer) => peer.sender(),
         }
     }
 
@@ -118,8 +84,6 @@ impl SignalingStateMachine {
             SignalingStateMachine::WaitLocalHaveRemote(peer) => peer.to_peer(),
             SignalingStateMachine::WaitRemoteSDP(peer) => peer.to_peer(),
             SignalingStateMachine::Stable(peer) => peer.to_peer(),
-            SignalingStateMachine::Finished(peer) => peer.to_peer(),
-            SignalingStateMachine::Failure(peer) => peer.to_peer(),
         }
     }
 }
@@ -156,13 +120,6 @@ impl<T> Peer<T> {
         self.context.id
     }
 
-    pub fn failed(self) -> Peer<Failure> {
-        Peer {
-            context: self.context,
-            state: Failure {},
-        }
-    }
-
     /// Returns ID of interconnected [`Peer`].
     pub fn to_peer(&self) -> Id {
         self.context.to_peer
@@ -171,15 +128,6 @@ impl<T> Peer<T> {
     /// Returns sender for this [`Peer`] if exists.
     pub fn sender(&self) -> Option<Id> {
         if self.context.receivers.is_empty() {
-            None
-        } else {
-            Some(self.context.to_peer)
-        }
-    }
-
-    /// Returns receiver for this [`Peer`] if exists.
-    pub fn receiver(&self) -> Option<Id> {
-        if self.context.senders.is_empty() {
             None
         } else {
             Some(self.context.to_peer)
