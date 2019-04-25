@@ -5,11 +5,9 @@ async function f() {
 
     caller.join_room("ws://localhost:8080/ws/1/1/caller_credentials");
 
-    // caller.dispose();
+    let responder = new rust.Jason();
 
-    // let responder = new rust.Jason();
-    //
-    // responder.init_session("ws://localhost:8080/ws/1/2/responder_credentials");
+    responder.join_room("ws://localhost:8080/ws/1/2/responder_credentials");
 }
 
 f();
