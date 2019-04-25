@@ -2,7 +2,7 @@
 use actix::Message;
 use futures::Future;
 
-use crate::{api::client::Event, api::control::Id as MemberId};
+use crate::api::{control::Id as MemberId, protocol::Event};
 
 use std::fmt;
 

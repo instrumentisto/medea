@@ -7,10 +7,11 @@ use actix_web::{
 use futures::{future, Future as _};
 use serde::Deserialize;
 
+use crate::api::client::WsSession;
 use crate::{
     api::client::rpc_connection::{AuthorizationError, Authorize},
     api::{
-        client::{Id as RoomId, RoomsRepository, WsSession},
+        client::room::{Id as RoomId, RoomsRepository},
         control::Id as MemberId,
     },
     conf::{Conf, Rpc},

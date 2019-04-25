@@ -5,11 +5,13 @@ use std::sync::Arc;
 use hashbrown::HashMap;
 
 use crate::{
-    api::control::member::Id as MemberId,
-    media::track::{
-        AudioSettings, Direction, Directional, Id as TrackId, MediaType, Track,
-        VideoSettings,
+    api::{
+        control::member::Id as MemberId,
+        protocol::{
+            AudioSettings, Direction, Directional, MediaType, VideoSettings,
+        },
     },
+    media::track::{Id as TrackId, Track},
 };
 
 #[derive(Debug, PartialEq)]

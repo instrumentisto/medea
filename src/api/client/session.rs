@@ -8,14 +8,15 @@ use actix::{
 };
 use actix_web::ws::{self, CloseReason};
 use futures::future::Future;
-use serde::{Deserialize, Serialize};
 
+use crate::api::protocol::{ClientMsg, ServerMsg};
 use crate::{
-    api::client::rpc_connection::{
-        Closed, ClosedReason, Established, RpcConnection,
+    api::client::{
+        room::Room,
+        rpc_connection::{Closed, ClosedReason, Established, RpcConnection},
     },
-    api::client::{Command, Event, Room},
     api::control::member::Id as MemberId,
+    api::protocol::Event,
     log::prelude::*,
 };
 
@@ -178,19 +179,6 @@ impl Handler<Event> for WsSession {
     }
 }
 
-/// Message for keeping client WebSocket connection alive.
-#[derive(Debug, Deserialize, Message, Serialize)]
-pub enum Heartbeat {
-    /// `ping` message that WebSocket client is expected to send to the server
-    /// periodically.
-    #[serde(rename = "ping")]
-    Ping(usize),
-    /// `pong` message that server answers with to WebSocket client in response
-    /// to received `ping` message.
-    #[serde(rename = "pong")]
-    Pong(usize),
-}
-
 impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
     /// Handles arbitrary [`ws::Message`] received from WebSocket client.
     fn handle(&mut self, msg: ws::Message, ctx: &mut Self::Context) {
@@ -201,18 +189,26 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
         match msg {
             ws::Message::Text(text) => {
                 self.last_activity = Instant::now();
-                if let Ok(Heartbeat::Ping(n)) = serde_json::from_str::<Heartbeat>(&text) {
-                    trace!("Received ping: {}", n);
-                    // Answer with ['Heartbeat::Pong'].
-                    ctx.text(serde_json::to_string(&Heartbeat::Pong(n)).unwrap())
-                }
-                if let Ok(command) = serde_json::from_str::<Command>(&text) {
-                    if let Err(err) = self.room.try_send(command) {
-                        error!(
-                            "Cannot send Command to Room {}, because {}",
-                            self.member_id, err
+                match serde_json::from_str::<ClientMsg>(&text) {
+                    Ok(ClientMsg::Ping(n)) => {
+                        trace!("Received ping: {}", n);
+                        // Answer with ['Heartbeat::Pong'].
+                        ctx.text(
+                            serde_json::to_string(&ServerMsg::Pong(n)).unwrap(),
                         )
                     }
+                    Ok(ClientMsg::Command(command)) => {
+                        if let Err(err) = self.room.try_send(command) {
+                            error!(
+                                "Cannot send Command to Room {}, because {}",
+                                self.member_id, err
+                            )
+                        }
+                    }
+                    Err(err) => error!(
+                        "Error [{:?}] parsing client message [{}]",
+                        err, &text
+                    ),
                 }
             }
             ws::Message::Close(reason) => {

@@ -1,6 +1,4 @@
-use serde::{Deserialize, Serialize};
-
-use crate::media::peer::Id as PeerID;
+use crate::api::protocol::MediaType;
 
 /// ID of [`Track`].
 pub type Id = u64;
@@ -18,31 +16,3 @@ impl Track {
         Self { id, media_type }
     }
 }
-
-/// [`Track] with specified direction.
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct Directional {
-    pub id: Id,
-    pub direction: Direction,
-    pub media_type: MediaType,
-}
-
-/// Direction of [`Track`].
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub enum Direction {
-    Send { receivers: Vec<PeerID> },
-    Recv { sender: PeerID },
-}
-
-/// Type of [`Track`].
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub enum MediaType {
-    Audio(AudioSettings),
-    Video(VideoSettings),
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct AudioSettings {}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct VideoSettings {}

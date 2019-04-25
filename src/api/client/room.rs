@@ -17,12 +17,14 @@ use futures::{
 use hashbrown::HashMap;
 
 use crate::{
-    api::client::rpc_connection::{
-        AuthorizationError, Authorize, Closed, ClosedReason, Established,
-        RpcConnection,
+    api::{
+        client::rpc_connection::{
+            AuthorizationError, Authorize, Closed, ClosedReason, Established,
+            RpcConnection,
+        },
+        control::{Id as MemberId, Member},
+        protocol::{Command, Event},
     },
-    api::client::{Command, Event},
-    api::control::{Id as MemberId, Member},
     log::prelude::*,
     media::peer::{Id as PeerId, SignalingStateMachine},
 };
