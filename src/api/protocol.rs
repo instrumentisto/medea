@@ -2,8 +2,8 @@ use actix::Message;
 use serde::{de::Deserializer, ser::Serializer, Deserialize, Serialize};
 
 // TODO: should be properly shared between medea and jason
-#[cfg_attr(test, derive(PartialEq, Debug))]
-#[derive(Message)]
+#[cfg_attr(test, derive(PartialEq))]
+#[derive(Message, Debug)]
 #[allow(dead_code)]
 /// Message sent by `Media Server` to `Client`.
 pub enum ServerMsg {
