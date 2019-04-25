@@ -145,7 +145,7 @@ impl RpcConnection for Addr<WsSession> {
         event: Event,
     ) -> Box<dyn Future<Item = (), Error = ()>> {
         let fut = self
-            .send(event)
+            .send(ServerMsg::Event(event))
             .map_err(|err| error!("Failed send event {:?} ", err));
         Box::new(fut)
     }
@@ -169,13 +169,13 @@ impl Handler<Close> for WsSession {
     }
 }
 
-impl Handler<Event> for WsSession {
+impl Handler<ServerMsg> for WsSession {
     type Result = ();
 
     /// Sends [`Event`] to Web Client.
-    fn handle(&mut self, event: Event, ctx: &mut Self::Context) {
-        debug!("Event {:?} for member {}", event, self.member_id);
-        ctx.text(serde_json::to_string(ServerMsg::Event(event)).unwrap())
+    fn handle(&mut self, msg: ServerMsg, ctx: &mut Self::Context) {
+        debug!("Event {:?} for member {}", msg, self.member_id);
+        ctx.text(serde_json::to_string(&msg).unwrap())
     }
 }
 
@@ -193,9 +193,7 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
                     Ok(ClientMsg::Ping(n)) => {
                         trace!("Received ping: {}", n);
                         // Answer with ['Heartbeat::Pong'].
-                        ctx.text(
-                            serde_json::to_string(&ServerMsg::Pong(n)).unwrap(),
-                        )
+                        ctx.notify(ServerMsg::Pong(n));
                     }
                     Ok(ClientMsg::Command(command)) => {
                         if let Err(err) = self.room.try_send(command) {
