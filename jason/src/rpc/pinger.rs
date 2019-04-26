@@ -13,18 +13,19 @@ struct InnerPinger {
     ping_interval: i32,
     num: u64,
     pong_at: Option<f64>,
-    socket: Rc<RefCell<Option<WebSocket>>>,
+    socket: Option<Rc<WebSocket>>,
     ping_task: Option<PingTaskHandler>,
 }
 
 impl InnerPinger {
     fn send_now(&mut self) -> Result<(), WasmErr> {
-        let borrow = self.socket.try_borrow()?;
-        let socket = borrow
-            .as_ref()
-            .ok_or_else(|| WasmErr::from_str("Unable to ping: no socket"))?;
-        self.num += 1;
-        socket.send(&ClientMsg::Ping(self.num))
+        match self.socket.as_ref() {
+            None => Err(WasmErr::from_str("Unable to ping: no socket")),
+            Some(socket) => {
+                self.num += 1;
+                socket.send(&ClientMsg::Ping(self.num))
+            }
+        }
     }
 }
 
@@ -39,22 +40,18 @@ impl Pinger {
             ping_interval,
             num: 0,
             pong_at: None,
-            socket: Rc::new(RefCell::new(None)),
+            socket: None,
             ping_task: None,
         })))
     }
 
-    pub fn set_pong_at(&self, at: f64) {
-        self.0.borrow_mut().pong_at = Some(at);
-    }
-
-    pub fn start(
-        &self,
-        socket: Rc<RefCell<Option<WebSocket>>>,
-    ) -> Result<(), WasmErr> {
+    pub fn start(&self, socket: Rc<WebSocket>) -> Result<(), WasmErr> {
         let mut inner = self.0.borrow_mut();
-        inner.socket = socket;
-        inner.send_now()?;
+        inner.socket = Some(socket);
+        // TODO: commented out since socket might no be opened atm, should be
+        //      uncommented when WebSocket.init resolves only after on_open
+        //      fired from underlying WebSocket
+        //        inner.send_now()?;
 
         let inner_rc = Rc::clone(&self.0);
         let do_ping = Closure::wrap(Box::new(move || {
@@ -74,6 +71,10 @@ impl Pinger {
         });
 
         Ok(())
+    }
+
+    pub fn set_pong_at(&self, at: f64) {
+        self.0.borrow_mut().pong_at = Some(at);
     }
 
     pub fn stop(&self) {

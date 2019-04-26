@@ -3,11 +3,14 @@ async function f() {
 
     let caller = new rust.Jason();
 
-    caller.join_room("ws://localhost:8080/ws/1/1/caller_credentials");
+    let caller_room_handle = await caller.join_room("ws://localhost:8080/ws/1/1/caller_credentials");
 
     let responder = new rust.Jason();
 
-    responder.join_room("ws://localhost:8080/ws/1/2/responder_credentials");
+    let responder_room_handler = await responder.join_room("ws://localhost:8080/ws/1/2/responder_credentials");
+
+    // caller.dispose();
+    // responder.dispose();
 }
 
 f();

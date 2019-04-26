@@ -1,5 +1,6 @@
 //! ['WebSocket'](https://developer.mozilla.org/ru/docs/WebSockets)
 //! transport wrapper.
+use futures::future::{Future, IntoFuture};
 use web_sys::{CloseEvent, Event, MessageEvent, WebSocket as BackingSocket};
 
 use std::{cell::RefCell, convert::TryFrom, rc::Rc};
@@ -57,15 +58,15 @@ struct InnerSocket {
 pub struct WebSocket(Rc<RefCell<InnerSocket>>);
 
 impl InnerSocket {
-    fn new(url: &str) -> Result<Rc<RefCell<Self>>, WasmErr> {
-        Ok(Rc::new(RefCell::new(Self {
+    fn new(url: &str) -> Result<Self, WasmErr> {
+        Ok(Self {
             socket_state: State::CONNECTING,
             socket: Rc::new(BackingSocket::new(url)?),
             on_open: None,
             on_message: None,
             on_close: None,
             on_error: None,
-        })))
+        })
     }
 
     fn update_state(&mut self) {
@@ -80,37 +81,33 @@ impl InnerSocket {
 }
 
 impl WebSocket {
-    pub fn new(url: &str) -> Result<Self, WasmErr> {
-        let inner_socket = InnerSocket::new(url)?;
-        let mut inner_mut = inner_socket.borrow_mut();
-        let inner = Rc::clone(&inner_socket);
-        inner_mut.on_error = Some(EventListener::new_mut(
-            Rc::clone(&inner_mut.socket),
-            "error",
-            move |_| {
-                inner.borrow_mut().update_state();
-            },
-        )?);
+    // Resolves only if connection succeeded.
+    pub fn new(url: &str) -> impl Future<Item = Self, Error = WasmErr> {
+        InnerSocket::new(url).into_future().and_then(|socket| {
+            let socket = Rc::new(RefCell::new(socket));
+            let mut socket_mut = socket.borrow_mut();
 
-        drop(inner_mut);
-        Ok(Self(inner_socket))
-    }
+            let inner = Rc::clone(&socket);
+            socket_mut.on_error = Some(EventListener::new_mut(
+                Rc::clone(&socket_mut.socket),
+                "error",
+                move |_| {
+                    inner.borrow_mut().update_state();
+                },
+            )?);
 
-    pub fn on_open<F>(&self, f: F) -> Result<(), WasmErr>
-    where
-        F: (FnOnce()) + 'static,
-    {
-        let mut inner_mut = self.0.borrow_mut();
-        let inner = Rc::clone(&self.0);
-        inner_mut.on_open = Some(EventListener::new_once(
-            Rc::clone(&inner_mut.socket),
-            "open",
-            move |_| {
-                inner.borrow_mut().update_state();
-                f();
-            },
-        )?);
-        Ok(())
+            let inner = Rc::clone(&socket);
+            socket_mut.on_open = Some(EventListener::new_once(
+                Rc::clone(&socket_mut.socket),
+                "open",
+                move |_| {
+                    inner.borrow_mut().update_state();
+                },
+            )?);
+
+            drop(socket_mut);
+            Ok(Self(socket))
+        })
     }
 
     pub fn on_message<F>(&self, mut f: F) -> Result<(), WasmErr>

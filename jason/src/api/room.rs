@@ -34,10 +34,10 @@ impl Room {
 
     /// Subscribes to provided RpcTransport messages.
     pub fn subscribe(&self, rpc: &RPCClient) {
-
         let inner = Rc::clone(&self.0);
 
-        let process_msg_task = rpc.subscribe()
+        let process_msg_task = rpc
+            .subscribe()
             .for_each(move |event| {
                 // TODO: macro for convenient dispatch
                 match inner.borrow_mut().as_mut() {
