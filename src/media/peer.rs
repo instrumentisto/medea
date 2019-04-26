@@ -31,7 +31,8 @@ pub struct Failure {}
 
 /// Implementation state machine for [`Peer`].
 #[derive(Debug)]
-pub enum SignalingStateMachine {
+#[allow(clippy::module_name_repetitions)]
+pub enum PeerStateMachine {
     New(Peer<New>),
     WaitLocalSDP(Peer<WaitLocalSDP>),
     WaitLocalHaveRemote(Peer<WaitLocalHaveRemote>),
@@ -40,50 +41,48 @@ pub enum SignalingStateMachine {
 }
 
 // TODO: macro to remove boilerplate
-impl SignalingStateMachine {
+impl PeerStateMachine {
     /// Returns ID of [`Member`] associated with this [`Peer`].
     pub fn member_id(&self) -> MemberId {
         match self {
-            SignalingStateMachine::New(peer) => peer.member_id(),
-            SignalingStateMachine::WaitLocalSDP(peer) => peer.member_id(),
-            SignalingStateMachine::WaitLocalHaveRemote(peer) => {
-                peer.member_id()
-            }
-            SignalingStateMachine::WaitRemoteSDP(peer) => peer.member_id(),
-            SignalingStateMachine::Stable(peer) => peer.member_id(),
+            PeerStateMachine::New(peer) => peer.member_id(),
+            PeerStateMachine::WaitLocalSDP(peer) => peer.member_id(),
+            PeerStateMachine::WaitLocalHaveRemote(peer) => peer.member_id(),
+            PeerStateMachine::WaitRemoteSDP(peer) => peer.member_id(),
+            PeerStateMachine::Stable(peer) => peer.member_id(),
         }
     }
 
     /// Returns ID of [`Peer`].
     pub fn id(&self) -> Id {
         match self {
-            SignalingStateMachine::New(peer) => peer.id(),
-            SignalingStateMachine::WaitLocalSDP(peer) => peer.id(),
-            SignalingStateMachine::WaitLocalHaveRemote(peer) => peer.id(),
-            SignalingStateMachine::WaitRemoteSDP(peer) => peer.id(),
-            SignalingStateMachine::Stable(peer) => peer.id(),
+            PeerStateMachine::New(peer) => peer.id(),
+            PeerStateMachine::WaitLocalSDP(peer) => peer.id(),
+            PeerStateMachine::WaitLocalHaveRemote(peer) => peer.id(),
+            PeerStateMachine::WaitRemoteSDP(peer) => peer.id(),
+            PeerStateMachine::Stable(peer) => peer.id(),
         }
     }
 
     /// Returns sender for this [`Peer`] if exists.
     pub fn sender(&self) -> Option<Id> {
         match self {
-            SignalingStateMachine::New(peer) => peer.sender(),
-            SignalingStateMachine::WaitLocalSDP(peer) => peer.sender(),
-            SignalingStateMachine::WaitLocalHaveRemote(peer) => peer.sender(),
-            SignalingStateMachine::WaitRemoteSDP(peer) => peer.sender(),
-            SignalingStateMachine::Stable(peer) => peer.sender(),
+            PeerStateMachine::New(peer) => peer.sender(),
+            PeerStateMachine::WaitLocalSDP(peer) => peer.sender(),
+            PeerStateMachine::WaitLocalHaveRemote(peer) => peer.sender(),
+            PeerStateMachine::WaitRemoteSDP(peer) => peer.sender(),
+            PeerStateMachine::Stable(peer) => peer.sender(),
         }
     }
 
     /// Returns ID of interconnected [`Peer`].
     pub fn to_peer(&self) -> Id {
         match self {
-            SignalingStateMachine::New(peer) => peer.to_peer(),
-            SignalingStateMachine::WaitLocalSDP(peer) => peer.to_peer(),
-            SignalingStateMachine::WaitLocalHaveRemote(peer) => peer.to_peer(),
-            SignalingStateMachine::WaitRemoteSDP(peer) => peer.to_peer(),
-            SignalingStateMachine::Stable(peer) => peer.to_peer(),
+            PeerStateMachine::New(peer) => peer.to_peer(),
+            PeerStateMachine::WaitLocalSDP(peer) => peer.to_peer(),
+            PeerStateMachine::WaitLocalHaveRemote(peer) => peer.to_peer(),
+            PeerStateMachine::WaitRemoteSDP(peer) => peer.to_peer(),
+            PeerStateMachine::Stable(peer) => peer.to_peer(),
         }
     }
 }
@@ -255,7 +254,7 @@ impl Peer<WaitLocalHaveRemote> {
 pub fn create_peers(
     caller: MemberId,
     responder: MemberId,
-) -> HashMap<MemberId, SignalingStateMachine> {
+) -> HashMap<MemberId, PeerStateMachine> {
     let caller_peer_id = 1;
     let responder_peer_id = 2;
     let mut caller_peer = Peer::new(caller_peer_id, caller, responder_peer_id);
@@ -272,8 +271,8 @@ pub fn create_peers(
     responder_peer.add_receiver(track_video);
 
     hashmap!(
-        caller_peer_id => SignalingStateMachine::New(caller_peer),
-        responder_peer_id => SignalingStateMachine::New(responder_peer),
+        caller_peer_id => PeerStateMachine::New(caller_peer),
+        responder_peer_id => PeerStateMachine::New(responder_peer),
     )
 }
 

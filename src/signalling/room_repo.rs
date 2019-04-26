@@ -1,3 +1,5 @@
+//! Repository that stores [`Room`]s addresses.
+//!
 use actix::Addr;
 use hashbrown::HashMap;
 
@@ -5,7 +7,7 @@ use std::sync::{Arc, Mutex};
 
 use crate::signalling::{room::Id as RoomId, Room};
 
-/// Repository that stores [`Room`]s.
+/// Repository that stores [`Room`]s addresses.
 #[derive(Clone, Default)]
 pub struct RoomsRepository {
     // TODO: Use crossbeam's concurrent hashmap when its done.

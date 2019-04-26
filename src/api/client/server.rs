@@ -109,9 +109,10 @@ mod test {
     use futures::Stream;
 
     use crate::{
-        api::{client::Room, control::Member},
+        api::control::Member,
         conf::{Conf, Server},
         media::peer::create_peers,
+        signalling::Room,
     };
 
     use super::*;
