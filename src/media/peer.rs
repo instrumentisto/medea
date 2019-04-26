@@ -39,7 +39,7 @@ pub enum SignalingStateMachine {
     Stable(Peer<Stable>),
 }
 
-//TODO: macro to remove boilerplate
+// TODO: macro to remove boilerplate
 impl SignalingStateMachine {
     /// Returns ID of [`Member`] associated with this [`Peer`].
     pub fn member_id(&self) -> MemberId {

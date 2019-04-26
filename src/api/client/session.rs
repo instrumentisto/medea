@@ -62,7 +62,8 @@ impl WsSession {
         }
     }
 
-    /// Start idle watchdog.
+    /// Start watchdog which will drop connection if now-last_activity >
+    /// idle_timeout.
     fn start_watchdog(&mut self, ctx: &mut <Self as Actor>::Context) {
         ctx.run_interval(Duration::new(1, 0), |sess, ctx| {
             if Instant::now().duration_since(sess.last_activity)
@@ -102,20 +103,32 @@ impl Actor for WsSession {
 
         let member_id = self.member_id;
         let slf_addr = ctx.address();
+        let slf_addr2 = ctx.address();
         ctx.wait(wrap_future(
             self.room
                 .send(Established {
                     member_id: self.member_id,
                     connection: Box::new(ctx.address()),
                 })
-                .map(|_| ())
-                .map_err(move |err| {
+                .map(move |auth_result| {
+                    if let Err(e) = auth_result {
+                        error!(
+                            "Room rejected Established for member {}, cause \
+                             {:?}",
+                            member_id, e
+                        );
+                        slf_addr.do_send(Close {
+                            reason: Some(ws::CloseCode::Normal.into()),
+                        });
+                    }
+                })
+                .map_err(move |send_err| {
                     error!(
                         "WsSession of member {} failed to join Room, because: \
                          {:?}",
-                        member_id, err,
+                        member_id, send_err,
                     );
-                    slf_addr.do_send(Close {
+                    slf_addr2.do_send(Close {
                         reason: Some(ws::CloseCode::Normal.into()),
                     });
                 }),

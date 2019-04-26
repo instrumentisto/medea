@@ -40,6 +40,7 @@ pub enum AuthorizationError {
 }
 
 /// Signal of new [`RpcConnection`] being established with specified [`Member`].
+/// Transport should consider dropping connection if message result is err.
 #[derive(Debug, Message)]
 #[rtype(result = "Result<(), ()>")]
 pub struct Established {
