@@ -3,7 +3,6 @@
 use futures::{
     future::{Future, IntoFuture},
     stream::Stream,
-    sync::mpsc::unbounded,
 };
 use wasm_bindgen::{prelude::*, JsValue};
 use wasm_bindgen_futures::spawn_local;
@@ -35,12 +34,10 @@ impl Room {
 
     /// Subscribes to provided RpcTransport messages.
     pub fn subscribe(&self, rpc: &RPCClient) {
-        let (tx, rx) = unbounded();
-        rpc.add_sub(tx);
 
         let inner = Rc::clone(&self.0);
 
-        let process_msg_task = rx
+        let process_msg_task = rpc.subscribe()
             .for_each(move |event| {
                 // TODO: macro for convenient dispatch
                 match inner.borrow_mut().as_mut() {

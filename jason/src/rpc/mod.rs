@@ -5,7 +5,7 @@ mod websocket;
 
 pub mod protocol;
 
-use futures::sync::mpsc::UnboundedSender;
+use futures::sync::mpsc::{UnboundedSender, unbounded};
 use js_sys::Date;
 
 use std::{cell::RefCell, rc::Rc, vec};
@@ -20,6 +20,7 @@ use self::{
     protocol::{Command, Event},
     websocket::WebSocket,
 };
+use futures::Stream;
 
 /// Connection with remote was closed.
 pub enum CloseMsg {
@@ -112,8 +113,11 @@ impl RPCClient {
     }
 
     // TODO: proper sub registry
-    pub fn add_sub(&self, sub: UnboundedSender<Event>) {
-        self.subs.borrow_mut().push(sub);
+    pub fn subscribe(&self) -> impl Stream<Item = Event, Error = ()> {
+        let (tx, rx) = unbounded();
+        self.subs.borrow_mut().push(tx);
+
+        rx
     }
 
     // TODO: proper sub registry
