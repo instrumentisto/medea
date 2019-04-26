@@ -1,12 +1,9 @@
 //! Room definitions and implementations.
 
-use std::{
-    sync::{Arc, Mutex},
-    time::{Duration, Instant},
-};
+use std::time::{Duration, Instant};
 
 use actix::{
-    fut::wrap_future, Actor, ActorFuture, Addr, AsyncContext, Context, Handler,
+    fut::wrap_future, Actor, ActorFuture, AsyncContext, Context, Handler,
     Message, SpawnHandle,
 };
 use failure::Fail;
@@ -19,8 +16,8 @@ use hashbrown::HashMap;
 use crate::{
     api::{
         client::rpc_connection::{
-            AuthorizationError, Authorize, Closed, ClosedReason, Established,
-            RpcConnection,
+            AuthorizationError, Authorize, ClosedReason, RpcConnection,
+            RpcConnectionClosed, RpcConnectionEstablished,
         },
         control::{Id as MemberId, Member},
         protocol::{Command, Event},
@@ -51,9 +48,10 @@ pub struct Room {
     id: Id,
 
     /// Established [`RpcConnection`]s of [`Member`]s in this [`Room`].
-    pub connections: HashMap<MemberId, Box<dyn RpcConnection>>,
     // TODO: Replace Box<dyn RpcConnection>> with enum,
     //       as the set of all possible RpcConnection types is not closed.
+    pub connections: HashMap<MemberId, Box<dyn RpcConnection>>,
+
     idle_timeouts: HashMap<MemberId, SpawnHandle>,
 
     /// Timeout for close [`RpcConnection`] after receive `RpcConnectionClosed`
@@ -319,7 +317,7 @@ impl Handler<Authorize> for Room {
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
 type ActFuture<I, E> = Box<dyn ActorFuture<Actor = Room, Item = I, Error = E>>;
 
-impl Handler<Established> for Room {
+impl Handler<RpcConnectionEstablished> for Room {
     type Result = ActFuture<(), ()>;
 
     /// Stores provided [`RpcConnection`] for given [`Member`] in the [`Room`].
@@ -331,7 +329,7 @@ impl Handler<Established> for Room {
     /// start process of signaling.
     fn handle(
         &mut self,
-        msg: Established,
+        msg: RpcConnectionEstablished,
         ctx: &mut Self::Context,
     ) -> Self::Result {
         info!("RpcConnectionEstablished for member {}", msg.member_id);
@@ -362,16 +360,17 @@ impl Handler<Established> for Room {
 /// Signal of close [`Room`].
 #[derive(Debug, Message)]
 #[rtype(result = "Result<(), ()>")]
-pub struct Close {}
+#[allow(clippy::module_name_repetitions)]
+pub struct CloseRoom {}
 
-impl Handler<Close> for Room {
+impl Handler<CloseRoom> for Room {
     type Result = ActFuture<(), ()>;
 
     /// Sends to remote [`Member`] the [`Event`] about [`Peer`] removed.
     /// Closes all active [`PrcConnection`].
     fn handle(
         &mut self,
-        _msg: Close,
+        _msg: CloseRoom,
         _ctx: &mut Self::Context,
     ) -> Self::Result {
         use std::mem;
@@ -441,7 +440,7 @@ impl Handler<StartSignaling> for Room {
                      {}. Room will be stop.",
                     msg.from_peer_id, msg.to_peer_id, err
                 );
-                addr.do_send(Close {})
+                addr.do_send(CloseRoom {})
             });
         Box::new(wrap_future(fut))
     }
@@ -481,17 +480,17 @@ impl Handler<Command> for Room {
                 "Failed handle command, because {}. Room will be stop.",
                 err
             );
-            addr.do_send(Close {})
+            addr.do_send(CloseRoom {})
         });
         Box::new(wrap_future(fut))
     }
 }
 
-impl Handler<Closed> for Room {
+impl Handler<RpcConnectionClosed> for Room {
     type Result = ();
 
     /// Removes [`RpcConnection`] of specified [`Member`] from the [`Room`].
-    fn handle(&mut self, msg: Closed, ctx: &mut Self::Context) {
+    fn handle(&mut self, msg: RpcConnectionClosed, ctx: &mut Self::Context) {
         info!(
             "RpcConnectionClosed for member {}, reason {:?}",
             msg.member_id, msg.reason
@@ -501,7 +500,7 @@ impl Handler<Closed> for Room {
         match msg.reason {
             ClosedReason::Disconnected => {
                 self.connections.remove(&member_id);
-                ctx.notify(Close {})
+                ctx.notify(CloseRoom {})
             }
             ClosedReason::Idle => {
                 self.idle_timeouts.insert(
@@ -513,32 +512,11 @@ impl Handler<Closed> for Room {
                             member_id, closed_at
                         );
                         room.connections.remove(&member_id);
-                        ctx.notify(Close {})
+                        ctx.notify(CloseRoom {})
                     }),
                 );
             }
         }
-    }
-}
-
-/// Repository that stores [`Room`]s.
-#[derive(Clone, Default)]
-pub struct RoomsRepository {
-    rooms: Arc<Mutex<HashMap<Id, Addr<Room>>>>,
-}
-
-impl RoomsRepository {
-    /// Creates new [`Room`]s repository with passed-in [`Room`]s.
-    pub fn new(rooms: HashMap<Id, Addr<Room>>) -> Self {
-        Self {
-            rooms: Arc::new(Mutex::new(rooms)),
-        }
-    }
-
-    /// Returns [`Room`] by its ID.
-    pub fn get(&self, id: Id) -> Option<Addr<Room>> {
-        let rooms = self.rooms.lock().unwrap();
-        rooms.get(&id).cloned()
     }
 }
 
@@ -570,7 +548,7 @@ mod test {
 
         fn started(&mut self, ctx: &mut Self::Context) {
             self.room
-                .try_send(Established {
+                .try_send(RpcConnectionEstablished {
                     member_id: self.member_id,
                     connection: Box::new(ctx.address()),
                 })
@@ -628,7 +606,7 @@ mod test {
                     peer_id: _,
                     candidate: _,
                 } => {
-                    self.room.do_send(Closed {
+                    self.room.do_send(RpcConnectionClosed {
                         member_id: self.member_id,
                         reason: ClosedReason::Disconnected,
                     });

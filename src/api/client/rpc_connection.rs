@@ -43,7 +43,8 @@ pub enum AuthorizationError {
 /// Transport should consider dropping connection if message result is err.
 #[derive(Debug, Message)]
 #[rtype(result = "Result<(), ()>")]
-pub struct Established {
+#[allow(clippy::module_name_repetitions)]
+pub struct RpcConnectionEstablished {
     /// ID of [`Member`] that establishes [`RpcConnection`].
     pub member_id: MemberId,
     /// Established [`RpcConnection`].
@@ -51,7 +52,8 @@ pub struct Established {
 }
 /// Signal of existing [`RpcConnection`] of specified [`Member`] being closed.
 #[derive(Debug, Message)]
-pub struct Closed {
+#[allow(clippy::module_name_repetitions)]
+pub struct RpcConnectionClosed {
     /// ID of [`Member`] which [`RpcConnection`] is closed.
     pub member_id: MemberId,
     /// Reason of why [`RpcConnection`] is closed.

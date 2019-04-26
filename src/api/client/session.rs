@@ -12,7 +12,8 @@ use futures::future::Future;
 use crate::{
     api::{
         client::rpc_connection::{
-            Closed, ClosedReason, Established, RpcConnection,
+            ClosedReason, RpcConnection, RpcConnectionClosed,
+            RpcConnectionEstablished,
         },
         control::member::Id as MemberId,
         protocol::{ClientMsg, Event, ServerMsg},
@@ -70,7 +71,7 @@ impl WsSession {
                 > sess.idle_timeout
             {
                 info!("WsSession of member {} is idle", sess.member_id);
-                if let Err(err) = sess.room.try_send(Closed {
+                if let Err(err) = sess.room.try_send(RpcConnectionClosed {
                     member_id: sess.member_id,
                     reason: ClosedReason::Idle,
                 }) {
@@ -106,7 +107,7 @@ impl Actor for WsSession {
         let slf_addr2 = ctx.address();
         ctx.wait(wrap_future(
             self.room
-                .send(Established {
+                .send(RpcConnectionEstablished {
                     member_id: self.member_id,
                     connection: Box::new(ctx.address()),
                 })
@@ -229,7 +230,7 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
                         "Send close frame with reason {:?} for member {}",
                         reason, self.member_id
                     );
-                    if let Err(err) = self.room.try_send(Closed {
+                    if let Err(err) = self.room.try_send(RpcConnectionClosed {
                         member_id: self.member_id,
                         reason: ClosedReason::Disconnected,
                     }) {

@@ -1,3 +1,7 @@
 mod room;
+mod room_repo;
 
-pub use self::room::{Id as RoomId, Room, RoomsRepository};
+pub use self::{
+    room::{Id as RoomId, Room},
+    room_repo::RoomsRepository,
+};
