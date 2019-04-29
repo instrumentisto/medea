@@ -73,7 +73,7 @@ impl WsSession {
                 info!("WsSession of member {} is idle", sess.member_id);
                 if let Err(err) = sess.room.try_send(RpcConnectionClosed {
                     member_id: sess.member_id,
-                    reason: ClosedReason::Idle,
+                    reason: ClosedReason::Lost,
                 }) {
                     error!(
                         "WsSession of member {} failed to remove from Room, \
@@ -232,7 +232,7 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
                     );
                     if let Err(err) = self.room.try_send(RpcConnectionClosed {
                         member_id: self.member_id,
-                        reason: ClosedReason::Disconnected,
+                        reason: ClosedReason::Closed,
                     }) {
                         error!(
                             "WsSession of member {} failed to remove from \

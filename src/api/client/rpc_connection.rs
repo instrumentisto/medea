@@ -63,8 +63,8 @@ pub struct RpcConnectionClosed {
 /// Reasons of why [`RpcConnection`] may be closed.
 #[derive(Debug)]
 pub enum ClosedReason {
-    /// [`RpcConnection`] is disconnect by server itself.
-    Disconnected,
-    /// [`RpcConnection`] has become idle and is disconnected by idle timeout.
-    Idle,
+    /// [`RpcConnection`] was gracefully closed.
+    Closed,
+    /// [`RpcConnection`] was lost and may be reestablished.
+    Lost,
 }

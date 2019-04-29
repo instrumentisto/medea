@@ -324,8 +324,7 @@ impl Handler<RpcConnectionEstablished> for Room {
     /// If [`Member`] already has any other [`RpcConnection`],
     /// then it will be closed.
     ///
-    /// If [`Peer`] of this [`Member`] have sender, sends notify about
-    /// start process of signaling.
+    /// Initiates media establishment between members.
     fn handle(
         &mut self,
         msg: RpcConnectionEstablished,
@@ -334,8 +333,11 @@ impl Handler<RpcConnectionEstablished> for Room {
         info!("RpcConnectionEstablished for member {}", msg.member_id);
 
         let mut fut = Either::A(future::ok(()));
+        // lookup previous member connection
         if let Some(mut connection) = self.connections.remove(&msg.member_id) {
             debug!("Closing old RpcConnection for member {}", msg.member_id);
+
+            // cancel RpcConnection close task, since
             if let Some(handler) =
                 self.reconnect_timeout_handlers.remove(&msg.member_id)
             {
@@ -499,11 +501,11 @@ impl Handler<RpcConnectionClosed> for Room {
         let closed_at = Instant::now();
         let member_id = msg.member_id;
         match msg.reason {
-            ClosedReason::Disconnected => {
+            ClosedReason::Closed => {
                 self.connections.remove(&member_id);
                 ctx.notify(CloseRoom {})
             }
-            ClosedReason::Idle => {
+            ClosedReason::Lost => {
                 self.reconnect_timeout_handlers.insert(
                     msg.member_id,
                     ctx.run_later(self.connection_timeout, move |room, ctx| {
@@ -612,7 +614,7 @@ mod test {
                 } => {
                     self.room.do_send(RpcConnectionClosed {
                         member_id: self.member_id,
-                        reason: ClosedReason::Disconnected,
+                        reason: ClosedReason::Closed,
                     });
                 }
                 Event::PeersRemoved { peer_ids: _ } => {}
