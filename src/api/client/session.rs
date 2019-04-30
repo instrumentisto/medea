@@ -15,7 +15,7 @@ use crate::{
             ClosedReason, RpcConnection, RpcConnectionClosed,
             RpcConnectionEstablished,
         },
-        control::member::Id as MemberId,
+        control::MemberId,
         protocol::{ClientMsg, Event, ServerMsg},
     },
     log::prelude::*,
@@ -226,10 +226,6 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
             }
             ws::Message::Close(reason) => {
                 if !self.closed_by_server {
-                    debug!(
-                        "Send close frame with reason {:?} for member {}",
-                        reason, self.member_id
-                    );
                     if let Err(err) = self.room.try_send(RpcConnectionClosed {
                         member_id: self.member_id,
                         reason: ClosedReason::Closed,

@@ -2,10 +2,8 @@
 use hashbrown::HashMap;
 
 use crate::{
-    api::{
-        control::Id as MemberId,
-    },
-    media::peer::{Id as PeerId, PeerStateMachine},
+    api::control::MemberId,
+    media::{PeerId, PeerStateMachine},
     signalling::room::RoomError,
 };
 
@@ -34,7 +32,10 @@ impl PeerRepository {
     /// Returns [`Peer`] of specified [`Member`].
     ///
     /// Panic if [`Peer`] not exists.
-    pub fn get_peer_by_member_id(&self, member_id: &MemberId) -> &PeerStateMachine {
+    pub fn get_peer_by_member_id(
+        &self,
+        member_id: &MemberId,
+    ) -> &PeerStateMachine {
         self.peers
             .iter()
             .find(|(_, peer)| peer.member_id() == *member_id)
@@ -51,17 +52,10 @@ impl PeerRepository {
             .remove(&peer_id)
             .ok_or_else(|| RoomError::UnknownPeer(peer_id))
     }
-
-    /// Returns all ['Peer']s from repository.
-    pub fn get_all(&self) -> Vec<&PeerStateMachine> {
-        self.peers.values().collect()
-    }
 }
 
 impl From<HashMap<PeerId, PeerStateMachine>> for PeerRepository {
     fn from(map: HashMap<PeerId, PeerStateMachine>) -> Self {
-        PeerRepository {
-            peers: map
-        }
+        Self { peers: map }
     }
 }

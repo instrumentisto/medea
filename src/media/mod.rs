@@ -1,4 +1,7 @@
-pub mod peer;
-pub mod track;
+mod peer;
+mod track;
 
-pub use self::peer::{Id as PeerId, Peer, PeerStateMachine};
+pub use self::{
+    peer::{create_peers, Id as PeerId, Peer, PeerStateMachine},
+    track::{Id as TrackId, Track},
+};

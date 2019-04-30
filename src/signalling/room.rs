@@ -1,14 +1,14 @@
 //! Room definitions and implementations.
 
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use actix::{
     fut::wrap_future, Actor, ActorFuture, AsyncContext, Context, Handler,
-    Message, SpawnHandle,
+    Message,
 };
 use failure::Fail;
 use futures::{
-    future::{self, join_all, Either},
+    future::{self, Either},
     Future,
 };
 use hashbrown::HashMap;
@@ -16,16 +16,22 @@ use hashbrown::HashMap;
 use crate::{
     api::{
         client::rpc_connection::{
-            AuthorizationError, Authorize, ClosedReason, RpcConnection,
-            RpcConnectionClosed, RpcConnectionEstablished,
+            AuthorizationError, Authorize, RpcConnectionClosed,
+            RpcConnectionEstablished,
         },
-        control::{Id as MemberId, Member},
+        control::{Member, MemberId},
         protocol::{Command, Event},
     },
     log::prelude::*,
-    media::peer::{Id as PeerId, PeerStateMachine},
-    signalling::peer_repo::PeerRepository
+    media::{PeerId, PeerStateMachine},
+    signalling::{participants::ParticipantService, peers::PeerRepository},
 };
+
+/// ID of [`Room`].
+pub type Id = u64;
+
+/// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
+type ActFuture<I, E> = Box<dyn ActorFuture<Actor = Room, Item = I, Error = E>>;
 
 #[derive(Fail, Debug)]
 #[allow(clippy::module_name_repetitions)]
@@ -40,33 +46,16 @@ pub enum RoomError {
     UnableSendEvent(MemberId),
 }
 
-/// ID of [`Room`].
-pub type Id = u64;
-
 /// Media server room with its [`Member`]s.
 #[derive(Debug)]
 pub struct Room {
     id: Id,
 
-    /// [`Member`]s which currently are present in this [`Room`].
-    members: HashMap<MemberId, Member>,
-
-    /// Established [`RpcConnection`]s of [`Member`]s in this [`Room`].
-    // TODO: Replace Box<dyn RpcConnection>> with enum,
-    //       as the set of all possible RpcConnection types is not closed.
-    pub connections: HashMap<MemberId, Box<dyn RpcConnection>>,
+    /// ['RpcConnection']s of [`Member`]s in this [`Room`].
+    participants: ParticipantService,
 
     /// [`Peer`]s of [`Member`]s in this [`Room`].
     peers: PeerRepository,
-
-    /// Timeout for close [`RpcConnection`] after receiving
-    /// [`RpcConnectionClosed`] message.
-    reconnect_timeout: Duration,
-
-    /// Stores [`RpcConnection`] drop tasks.
-    /// If [`RpcConnection`] is lost, ['Room'] waits for connection_timeout
-    /// before dropping it irrevocably in case it gets reestablished.
-    no_reconnect_tasks: HashMap<MemberId, SpawnHandle>,
 }
 
 impl Room {
@@ -75,32 +64,12 @@ impl Room {
         id: Id,
         members: HashMap<MemberId, Member>,
         peers: HashMap<PeerId, PeerStateMachine>,
-        connection_timeout: Duration,
+        reconnect_timeout: Duration,
     ) -> Self {
         Self {
             id,
-            connections: HashMap::new(),
-            no_reconnect_tasks: HashMap::new(),
-            members,
-            peers:PeerRepository::from(peers),
-            reconnect_timeout: connection_timeout,
-        }
-    }
-
-    /// Send [`Event`] to specified remote [`Member`].
-    fn send_event_to_member(
-        &mut self,
-        member_id: MemberId,
-        event: Event,
-    ) -> impl Future<Item = (), Error = RoomError> {
-        match self.connections.get(&member_id) {
-            Some(conn) => Either::A(
-                conn.send_event(event)
-                    .map_err(move |_| RoomError::UnableSendEvent(member_id)),
-            ),
-            None => Either::B(future::err(RoomError::ConnectionNotExists(
-                member_id,
-            ))),
+            peers: PeerRepository::from(peers),
+            participants: ParticipantService::new(members, reconnect_timeout),
         }
     }
 
@@ -135,8 +104,10 @@ impl Room {
             tracks: to_peer.tracks(),
         };
 
-        self.peers.add_peer(from_peer_id, PeerStateMachine::New(from_peer));
-        self.peers.add_peer(to_peer_id, PeerStateMachine::WaitLocalSDP(to_peer));
+        self.peers
+            .add_peer(from_peer_id, PeerStateMachine::New(from_peer));
+        self.peers
+            .add_peer(to_peer_id, PeerStateMachine::WaitLocalSDP(to_peer));
         Ok((to_member_id, event))
     }
 
@@ -173,7 +144,8 @@ impl Room {
             tracks: to_peer.tracks(),
         };
 
-        self.peers.add_peer(from_peer_id, PeerStateMachine::WaitRemoteSDP(from_peer));
+        self.peers
+            .add_peer(from_peer_id, PeerStateMachine::WaitRemoteSDP(from_peer));
         self.peers.add_peer(
             to_peer_id,
             PeerStateMachine::WaitLocalHaveRemote(to_peer),
@@ -213,8 +185,10 @@ impl Room {
             sdp_answer,
         };
 
-        self.peers.add_peer(from_peer_id, PeerStateMachine::Stable(from_peer));
-        self.peers.add_peer(to_peer_id, PeerStateMachine::Stable(to_peer));
+        self.peers
+            .add_peer(from_peer_id, PeerStateMachine::Stable(from_peer));
+        self.peers
+            .add_peer(to_peer_id, PeerStateMachine::Stable(to_peer));
         Ok((to_member_id, event))
     }
 
@@ -267,113 +241,9 @@ impl Handler<Authorize> for Room {
         msg: Authorize,
         _ctx: &mut Self::Context,
     ) -> Self::Result {
-        use AuthorizationError::{InvalidCredentials, MemberNotExists};
-        if let Some(ref member) = self.members.get(&msg.member_id) {
-            if member.credentials.eq(&msg.credentials) {
-                return Ok(());
-            }
-            return Err(InvalidCredentials);
-        }
-        Err(MemberNotExists)
-    }
-}
-
-/// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
-type ActFuture<I, E> = Box<dyn ActorFuture<Actor = Room, Item = I, Error = E>>;
-
-impl Handler<RpcConnectionEstablished> for Room {
-    type Result = ActFuture<(), ()>;
-
-    /// Stores provided [`RpcConnection`] for given [`Member`] in the [`Room`].
-    ///
-    /// If [`Member`] already has any other [`RpcConnection`],
-    /// then it will be closed.
-    ///
-    /// Initiates media establishment between members.
-    fn handle(
-        &mut self,
-        msg: RpcConnectionEstablished,
-        ctx: &mut Self::Context,
-    ) -> Self::Result {
-        info!("RpcConnectionEstablished for member {}", msg.member_id);
-
-        let mut fut = Either::A(future::ok(()));
-        // lookup previous member connection
-        if let Some(mut connection) = self.connections.remove(&msg.member_id) {
-            debug!("Closing old RpcConnection for member {}", msg.member_id);
-
-            // cancel RpcConnection close task, since connection is reestablished
-            if let Some(handler) =
-                self.no_reconnect_tasks.remove(&msg.member_id)
-            {
-                ctx.cancel_future(handler);
-            }
-            fut = Either::B(connection.close());
-        } else {
-            self.connections.insert(msg.member_id, msg.connection);
-        }
-
-        let peer = self.peers.get_peer_by_member_id(&msg.member_id);
-        if let Some(sender) = peer.sender() {
-            ctx.notify(ConnectPeers {
-                from_peer_id: peer.id(),
-                to_peer_id: sender,
-            });
-        }
-
-        Box::new(wrap_future(fut))
-    }
-}
-
-/// Signal of close [`Room`].
-#[derive(Debug, Message)]
-#[rtype(result = "Result<(), ()>")]
-#[allow(clippy::module_name_repetitions)]
-pub struct CloseRoom {}
-
-impl Handler<CloseRoom> for Room {
-    type Result = ActFuture<(), ()>;
-
-    /// Sends to remote [`Member`] the [`Event`] about [`Peer`] removed.
-    /// Closes all active [`PrcConnection`].
-    fn handle(
-        &mut self,
-        _msg: CloseRoom,
-        _ctx: &mut Self::Context,
-    ) -> Self::Result {
-        use std::mem;
-        let connections = mem::replace(&mut self.connections, HashMap::new());
-        let fut = connections.into_iter().fold(
-            vec![],
-            |mut futures, (member_id, mut connection)| {
-                info!(
-                    "Close connection of member {}, because room is closed",
-                    member_id,
-                );
-                let peer_ids: Vec<_> = self
-                    .peers
-                    .get_all()
-                    .iter()
-                    .filter_map(move |peer| match peer {
-                        PeerStateMachine::New(_) => None,
-                        _ if peer.member_id() == member_id => Some(peer.id()),
-                        _ => None,
-                    })
-                    .collect();
-                if peer_ids.is_empty() {
-                    futures.push(Either::A(connection.close()));
-                } else {
-                    futures.push(Either::B(
-                        connection
-                            .send_event(Event::PeersRemoved { peer_ids })
-                            .then(move |_| connection.close()),
-                    ));
-                }
-
-                futures
-            },
-        );
-        Box::new(wrap_future(join_all(fut).map(|_| ())))
+        self.participants
+            .get_member_by_id_and_credentials(msg.member_id, &msg.credentials)
+            .map(|_| ())
     }
 }
 
@@ -398,9 +268,9 @@ impl Handler<ConnectPeers> for Room {
         let addr = ctx.address();
         let fut =
             match self.handle_peer_created(msg.from_peer_id, msg.to_peer_id) {
-                Ok((caller, event)) => {
-                    Either::A(self.send_event_to_member(caller, event))
-                }
+                Ok((caller, event)) => Either::A(
+                    self.participants.send_event_to_member(caller, event),
+                ),
                 Err(err) => Either::B(future::err(err)),
             }
             .map_err(move |err| {
@@ -440,7 +310,7 @@ impl Handler<Command> for Room {
         let addr = ctx.address();
         let fut = match res {
             Ok((caller, event)) => {
-                Either::A(self.send_event_to_member(caller, event))
+                Either::A(self.participants.send_event_to_member(caller, event))
             }
             Err(err) => Either::B(future::err(err)),
         }
@@ -455,37 +325,70 @@ impl Handler<Command> for Room {
     }
 }
 
+impl Handler<RpcConnectionEstablished> for Room {
+    type Result = ActFuture<(), ()>;
+
+    /// Saves new ['RpcConnection'] in ['ParticipantService'], initiates media
+    /// establishment between members.
+    fn handle(
+        &mut self,
+        msg: RpcConnectionEstablished,
+        ctx: &mut Self::Context,
+    ) -> Self::Result {
+        info!("RpcConnectionEstablished for member {}", msg.member_id);
+
+        let res = self.participants.connection_established(
+            ctx,
+            msg.member_id,
+            msg.connection,
+        );
+
+        let peer = self.peers.get_peer_by_member_id(&msg.member_id);
+        if let Some(sender) = peer.sender() {
+            ctx.notify(ConnectPeers {
+                from_peer_id: peer.id(),
+                to_peer_id: sender,
+            });
+        }
+
+        Box::new(wrap_future(res))
+    }
+}
+
+/// Signal of close [`Room`].
+#[derive(Debug, Message)]
+#[rtype(result = "()")]
+#[allow(clippy::module_name_repetitions)]
+pub struct CloseRoom {}
+
+impl Handler<CloseRoom> for Room {
+    type Result = ();
+
+    /// Sends to remote [`Member`] the [`Event`] about [`Peer`] removed.
+    /// Closes all active [`RpcConnection`]s.
+    fn handle(
+        &mut self,
+        _msg: CloseRoom,
+        ctx: &mut Self::Context,
+    ) -> Self::Result {
+        info!("Closing Room [id = {:?}]", self.id);
+        let drop_fut = self.participants.drop_connections(ctx);
+        ctx.wait(wrap_future(drop_fut));
+    }
+}
+
 impl Handler<RpcConnectionClosed> for Room {
     type Result = ();
 
-    /// Removes [`RpcConnection`] of specified [`Member`] from the [`Room`].
+    /// Passes message to ['ParticipantService'] to cleanup stored connections.
     fn handle(&mut self, msg: RpcConnectionClosed, ctx: &mut Self::Context) {
         info!(
             "RpcConnectionClosed for member {}, reason {:?}",
             msg.member_id, msg.reason
         );
-        let closed_at = Instant::now();
-        let member_id = msg.member_id;
-        match msg.reason {
-            ClosedReason::Closed => {
-                self.connections.remove(&member_id);
-                ctx.notify(CloseRoom {})
-            }
-            ClosedReason::Lost => {
-                self.no_reconnect_tasks.insert(
-                    msg.member_id,
-                    ctx.run_later(self.reconnect_timeout, move |room, ctx| {
-                        info!(
-                            "Member {} connection lost at {:?}. Room will be \
-                             stop.",
-                            member_id, closed_at
-                        );
-                        room.connections.remove(&member_id);
-                        ctx.notify(CloseRoom {})
-                    }),
-                );
-            }
-        }
+
+        self.participants
+            .connection_closed(ctx, msg.member_id, &msg.reason);
     }
 }
 
@@ -501,10 +404,13 @@ mod test {
 
     use super::*;
     use crate::{
-        api::protocol::{
-            AudioSettings, Direction, Directional, MediaType, VideoSettings,
+        api::{
+            client::rpc_connection::{ClosedReason, RpcConnection},
+            protocol::{
+                AudioSettings, Direction, Directional, MediaType, VideoSettings,
+            },
         },
-        media::peer::create_peers,
+        media::create_peers,
     };
 
     #[derive(Debug, Clone)]

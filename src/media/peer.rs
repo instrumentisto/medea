@@ -6,12 +6,12 @@ use hashbrown::HashMap;
 
 use crate::{
     api::{
-        control::member::Id as MemberId,
+        control::MemberId,
         protocol::{
             AudioSettings, Direction, Directional, MediaType, VideoSettings,
         },
     },
-    media::track::{Id as TrackId, Track},
+    media::{Track, TrackId},
 };
 
 #[derive(Debug, PartialEq)]

@@ -1,5 +1,5 @@
 //! Implementation of Control API.
 
-pub mod member;
+mod member;
 
-pub use self::member::*;
+pub use self::member::{Id as MemberId, Member};

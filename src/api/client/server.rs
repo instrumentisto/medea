@@ -13,7 +13,7 @@ use crate::{
             rpc_connection::{AuthorizationError, Authorize},
             session::WsSession,
         },
-        control::Id as MemberId,
+        control::MemberId,
     },
     conf::{Conf, Rpc},
     log::prelude::*,
@@ -111,7 +111,7 @@ mod test {
     use crate::{
         api::control::Member,
         conf::{Conf, Server},
-        media::peer::create_peers,
+        media::create_peers,
         signalling::Room,
     };
 

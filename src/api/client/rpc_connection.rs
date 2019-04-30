@@ -2,7 +2,7 @@
 use actix::Message;
 use futures::Future;
 
-use crate::api::{control::Id as MemberId, protocol::Event};
+use crate::api::{control::MemberId, protocol::Event};
 
 use std::fmt;
 
@@ -63,8 +63,8 @@ pub struct RpcConnectionClosed {
 /// Reasons of why [`RpcConnection`] may be closed.
 #[derive(Debug)]
 pub enum ClosedReason {
-    /// [`RpcConnection`] was gracefully closed.
+    /// [`RpcConnection`] was irrevocably closed.
     Closed,
-    /// [`RpcConnection`] was lost and may be reestablished.
+    /// [`RpcConnection`] was lost, but may be reestablished.
     Lost,
 }

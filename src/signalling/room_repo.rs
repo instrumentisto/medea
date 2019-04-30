@@ -5,7 +5,7 @@ use hashbrown::HashMap;
 
 use std::sync::{Arc, Mutex};
 
-use crate::signalling::{room::Id as RoomId, Room};
+use crate::signalling::{Room, RoomId};
 
 /// Repository that stores [`Room`]s addresses.
 #[derive(Clone, Default)]

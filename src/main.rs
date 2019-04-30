@@ -16,7 +16,7 @@ use log::prelude::*;
 use crate::{
     api::{client::server, control::Member},
     conf::Conf,
-    media::peer::create_peers,
+    media::create_peers,
     signalling::{Room, RoomsRepository},
 };
 
