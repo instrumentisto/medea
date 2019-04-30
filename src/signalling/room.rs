@@ -24,6 +24,7 @@ use crate::{
     },
     log::prelude::*,
     media::peer::{Id as PeerId, PeerStateMachine},
+    signalling::peer_repo::PeerRepository
 };
 
 #[derive(Fail, Debug)]
@@ -47,25 +48,25 @@ pub type Id = u64;
 pub struct Room {
     id: Id,
 
+    /// [`Member`]s which currently are present in this [`Room`].
+    members: HashMap<MemberId, Member>,
+
     /// Established [`RpcConnection`]s of [`Member`]s in this [`Room`].
     // TODO: Replace Box<dyn RpcConnection>> with enum,
     //       as the set of all possible RpcConnection types is not closed.
     pub connections: HashMap<MemberId, Box<dyn RpcConnection>>,
 
-    /// Stores [`RpcConnection`] drop tasks.
-    /// If [`RpcConnection`] is lost, ['Room'] waits for connection_timeout
-    /// before dropping it irrevocably in case it gets reestablished.
-    reconnect_timeout_handlers: HashMap<MemberId, SpawnHandle>,
+    /// [`Peer`]s of [`Member`]s in this [`Room`].
+    peers: PeerRepository,
 
     /// Timeout for close [`RpcConnection`] after receiving
     /// [`RpcConnectionClosed`] message.
-    connection_timeout: Duration,
+    reconnect_timeout: Duration,
 
-    /// [`Member`]s which currently are present in this [`Room`].
-    members: HashMap<MemberId, Member>,
-
-    /// [`Peer`]s of [`Member`]s in this [`Room`].
-    peers: HashMap<PeerId, PeerStateMachine>,
+    /// Stores [`RpcConnection`] drop tasks.
+    /// If [`RpcConnection`] is lost, ['Room'] waits for connection_timeout
+    /// before dropping it irrevocably in case it gets reestablished.
+    no_reconnect_tasks: HashMap<MemberId, SpawnHandle>,
 }
 
 impl Room {
@@ -79,47 +80,11 @@ impl Room {
         Self {
             id,
             connections: HashMap::new(),
-            reconnect_timeout_handlers: HashMap::new(),
+            no_reconnect_tasks: HashMap::new(),
             members,
-            peers,
-            connection_timeout,
+            peers:PeerRepository::from(peers),
+            reconnect_timeout: connection_timeout,
         }
-    }
-
-    /// Store [`Peer`] in [`Room`].
-    fn add_peer(&mut self, id: PeerId, peer: PeerStateMachine) {
-        self.peers.insert(id, peer);
-    }
-
-    /// Returns borrowed [`Peer`] by its ID.
-    fn get_peer(
-        &self,
-        peer_id: PeerId,
-    ) -> Result<&PeerStateMachine, RoomError> {
-        self.peers
-            .get(&peer_id)
-            .ok_or_else(|| RoomError::UnknownPeer(peer_id))
-    }
-
-    /// Returns [`Peer`] of specified [`Member`].
-    ///
-    /// Panic if [`Peer`] not exists.
-    fn member_peer(&self, member_id: &MemberId) -> &PeerStateMachine {
-        self.peers
-            .iter()
-            .find(|(_, peer)| peer.member_id() == *member_id)
-            .map(|(_, peer)| peer)
-            .unwrap()
-    }
-
-    /// Returns owned [`Peer`] by its ID.
-    fn take_peer(
-        &mut self,
-        peer_id: PeerId,
-    ) -> Result<PeerStateMachine, RoomError> {
-        self.peers
-            .remove(&peer_id)
-            .ok_or_else(|| RoomError::UnknownPeer(peer_id))
     }
 
     /// Send [`Event`] to specified remote [`Member`].
@@ -146,8 +111,8 @@ impl Room {
         from_peer_id: PeerId,
         to_peer_id: PeerId,
     ) -> Result<(MemberId, Event), RoomError> {
-        let from_peer = self.take_peer(from_peer_id)?;
-        let to_peer = self.take_peer(to_peer_id)?;
+        let from_peer = self.peers.take_peer(from_peer_id)?;
+        let to_peer = self.peers.take_peer(to_peer_id)?;
 
         let (from_peer, to_peer) = match (from_peer, to_peer) {
             (
@@ -155,8 +120,8 @@ impl Room {
                 PeerStateMachine::New(peer_to),
             ) => Ok((peer_from, peer_to)),
             (from_peer, to_peer) => {
-                self.add_peer(from_peer_id, from_peer);
-                self.add_peer(to_peer_id, to_peer);
+                self.peers.add_peer(from_peer_id, from_peer);
+                self.peers.add_peer(to_peer_id, to_peer);
                 Err(RoomError::UnmatchedState(from_peer_id, to_peer_id))
             }
         }?;
@@ -170,8 +135,8 @@ impl Room {
             tracks: to_peer.tracks(),
         };
 
-        self.add_peer(from_peer_id, PeerStateMachine::New(from_peer));
-        self.add_peer(to_peer_id, PeerStateMachine::WaitLocalSDP(to_peer));
+        self.peers.add_peer(from_peer_id, PeerStateMachine::New(from_peer));
+        self.peers.add_peer(to_peer_id, PeerStateMachine::WaitLocalSDP(to_peer));
         Ok((to_member_id, event))
     }
 
@@ -182,9 +147,9 @@ impl Room {
         from_peer_id: PeerId,
         sdp_offer: String,
     ) -> Result<(MemberId, Event), RoomError> {
-        let from_peer = self.take_peer(from_peer_id)?;
+        let from_peer = self.peers.take_peer(from_peer_id)?;
         let to_peer_id = from_peer.to_peer();
-        let to_peer = self.take_peer(to_peer_id)?;
+        let to_peer = self.peers.take_peer(to_peer_id)?;
 
         let (from_peer, to_peer) = match (from_peer, to_peer) {
             (
@@ -192,8 +157,8 @@ impl Room {
                 PeerStateMachine::New(peer_to),
             ) => Ok((peer_from, peer_to)),
             (from_peer, to_peer) => {
-                self.add_peer(from_peer_id, from_peer);
-                self.add_peer(to_peer_id, to_peer);
+                self.peers.add_peer(from_peer_id, from_peer);
+                self.peers.add_peer(to_peer_id, to_peer);
                 Err(RoomError::UnmatchedState(from_peer_id, to_peer_id))
             }
         }?;
@@ -208,8 +173,8 @@ impl Room {
             tracks: to_peer.tracks(),
         };
 
-        self.add_peer(from_peer_id, PeerStateMachine::WaitRemoteSDP(from_peer));
-        self.add_peer(
+        self.peers.add_peer(from_peer_id, PeerStateMachine::WaitRemoteSDP(from_peer));
+        self.peers.add_peer(
             to_peer_id,
             PeerStateMachine::WaitLocalHaveRemote(to_peer),
         );
@@ -223,9 +188,9 @@ impl Room {
         from_peer_id: PeerId,
         sdp_answer: String,
     ) -> Result<(MemberId, Event), RoomError> {
-        let from_peer = self.take_peer(from_peer_id)?;
+        let from_peer = self.peers.take_peer(from_peer_id)?;
         let to_peer_id = from_peer.to_peer();
-        let to_peer = self.take_peer(to_peer_id)?;
+        let to_peer = self.peers.take_peer(to_peer_id)?;
 
         let (from_peer, to_peer) = match (from_peer, to_peer) {
             (
@@ -233,8 +198,8 @@ impl Room {
                 PeerStateMachine::WaitRemoteSDP(peer_to),
             ) => Ok((peer_from, peer_to)),
             (from_peer, to_peer) => {
-                self.add_peer(from_peer_id, from_peer);
-                self.add_peer(to_peer_id, to_peer);
+                self.peers.add_peer(from_peer_id, from_peer);
+                self.peers.add_peer(to_peer_id, to_peer);
                 Err(RoomError::UnmatchedState(from_peer_id, to_peer_id))
             }
         }?;
@@ -248,8 +213,8 @@ impl Room {
             sdp_answer,
         };
 
-        self.add_peer(from_peer_id, PeerStateMachine::Stable(from_peer));
-        self.add_peer(to_peer_id, PeerStateMachine::Stable(to_peer));
+        self.peers.add_peer(from_peer_id, PeerStateMachine::Stable(from_peer));
+        self.peers.add_peer(to_peer_id, PeerStateMachine::Stable(to_peer));
         Ok((to_member_id, event))
     }
 
@@ -259,9 +224,9 @@ impl Room {
         from_peer_id: PeerId,
         candidate: String,
     ) -> Result<(MemberId, Event), RoomError> {
-        let from_peer = self.get_peer(from_peer_id)?;
+        let from_peer = self.peers.get_peer(from_peer_id)?;
         let to_peer_id = from_peer.to_peer();
-        let to_peer = self.get_peer(to_peer_id)?;
+        let to_peer = self.peers.get_peer(to_peer_id)?;
 
         match (from_peer, to_peer) {
             (
@@ -337,25 +302,25 @@ impl Handler<RpcConnectionEstablished> for Room {
         if let Some(mut connection) = self.connections.remove(&msg.member_id) {
             debug!("Closing old RpcConnection for member {}", msg.member_id);
 
-            // cancel RpcConnection close task, since
+            // cancel RpcConnection close task, since connection is reestablished
             if let Some(handler) =
-                self.reconnect_timeout_handlers.remove(&msg.member_id)
+                self.no_reconnect_tasks.remove(&msg.member_id)
             {
                 ctx.cancel_future(handler);
             }
             fut = Either::B(connection.close());
         } else {
-            let member_id = msg.member_id;
             self.connections.insert(msg.member_id, msg.connection);
-
-            let peer = self.member_peer(&member_id);
-            if let Some(sender) = peer.sender() {
-                ctx.notify(StartSignaling {
-                    from_peer_id: peer.id(),
-                    to_peer_id: sender,
-                });
-            }
         }
+
+        let peer = self.peers.get_peer_by_member_id(&msg.member_id);
+        if let Some(sender) = peer.sender() {
+            ctx.notify(ConnectPeers {
+                from_peer_id: peer.id(),
+                to_peer_id: sender,
+            });
+        }
+
         Box::new(wrap_future(fut))
     }
 }
@@ -387,10 +352,11 @@ impl Handler<CloseRoom> for Room {
                 );
                 let peer_ids: Vec<_> = self
                     .peers
+                    .get_all()
                     .iter()
-                    .filter_map(move |(&id, peer)| match peer {
+                    .filter_map(move |peer| match peer {
                         PeerStateMachine::New(_) => None,
-                        _ if peer.member_id() == member_id => Some(id),
+                        _ if peer.member_id() == member_id => Some(peer.id()),
                         _ => None,
                     })
                     .collect();
@@ -414,19 +380,19 @@ impl Handler<CloseRoom> for Room {
 /// Signal of start signaling between specified [`Peer`]'s.
 #[derive(Debug, Message)]
 #[rtype(result = "Result<(), ()>")]
-pub struct StartSignaling {
+pub struct ConnectPeers {
     pub from_peer_id: PeerId,
     pub to_peer_id: PeerId,
 }
 
-impl Handler<StartSignaling> for Room {
+impl Handler<ConnectPeers> for Room {
     type Result = ActFuture<(), ()>;
 
     /// Check state of interconnected [`Peer`]s and sends [`Event`] about
     /// [`Peer`] created to remote [`Member`].
     fn handle(
         &mut self,
-        msg: StartSignaling,
+        msg: ConnectPeers,
         ctx: &mut Self::Context,
     ) -> Self::Result {
         let addr = ctx.address();
@@ -506,9 +472,9 @@ impl Handler<RpcConnectionClosed> for Room {
                 ctx.notify(CloseRoom {})
             }
             ClosedReason::Lost => {
-                self.reconnect_timeout_handlers.insert(
+                self.no_reconnect_tasks.insert(
                     msg.member_id,
-                    ctx.run_later(self.connection_timeout, move |room, ctx| {
+                    ctx.run_later(self.reconnect_timeout, move |room, ctx| {
                         info!(
                             "Member {} connection lost at {:?}. Room will be \
                              stop.",
