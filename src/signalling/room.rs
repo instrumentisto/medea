@@ -13,6 +13,10 @@ use futures::{
 };
 use hashbrown::HashMap;
 
+use crate::media::peer::{
+    New, PeerStateError, WaitLocalHaveRemote, WaitLocalSdp, WaitRemoteSdp,
+};
+use crate::media::Peer;
 use crate::{
     api::{
         client::rpc_connection::{
@@ -46,6 +50,14 @@ pub enum RoomError {
     UnableSendEvent(MemberId),
     #[fail(display = "Generic room error {}", _0)]
     Generic(String),
+    #[fail(display = "PeerError: {}", _0)]
+    PeerStateError(PeerStateError),
+}
+
+impl From<PeerStateError> for RoomError {
+    fn from(err: PeerStateError) -> Self {
+        RoomError::PeerStateError(err)
+    }
 }
 
 /// Media server room with its [`Member`]s.
@@ -82,21 +94,10 @@ impl Room {
         from_peer_id: PeerId,
         sdp_offer: String,
     ) -> Result<(MemberId, Event), RoomError> {
-        let from_peer = self.peers.take_peer(from_peer_id)?;
+        let from_peer: Peer<WaitLocalSdp> =
+            self.peers.take_inner_peer(from_peer_id)?;
         let to_peer_id = from_peer.partner_peer_id();
-        let to_peer = self.peers.take_peer(to_peer_id)?;
-
-        let (from_peer, to_peer) = match (from_peer, to_peer) {
-            (
-                PeerStateMachine::WaitLocalSdp(peer_from),
-                PeerStateMachine::New(peer_to),
-            ) => Ok((peer_from, peer_to)),
-            (from_peer, to_peer) => {
-                self.peers.add_peer(from_peer_id, from_peer);
-                self.peers.add_peer(to_peer_id, to_peer);
-                Err(RoomError::UnmatchedState(from_peer_id, to_peer_id))
-            }
-        }?;
+        let to_peer: Peer<New> = self.peers.take_inner_peer(to_peer_id)?;
 
         let from_peer = from_peer.set_local_sdp(sdp_offer.clone());
         let to_peer = to_peer.set_remote_sdp(sdp_offer.clone());
@@ -120,21 +121,11 @@ impl Room {
         from_peer_id: PeerId,
         sdp_answer: String,
     ) -> Result<(MemberId, Event), RoomError> {
-        let from_peer = self.peers.take_peer(from_peer_id)?;
+        let from_peer: Peer<WaitLocalHaveRemote> =
+            self.peers.take_inner_peer(from_peer_id)?;
         let to_peer_id = from_peer.partner_peer_id();
-        let to_peer = self.peers.take_peer(to_peer_id)?;
-
-        let (from_peer, to_peer) = match (from_peer, to_peer) {
-            (
-                PeerStateMachine::WaitLocalHaveRemote(peer_from),
-                PeerStateMachine::WaitRemoteSdp(peer_to),
-            ) => Ok((peer_from, peer_to)),
-            (from_peer, to_peer) => {
-                self.peers.add_peer(from_peer_id, from_peer);
-                self.peers.add_peer(to_peer_id, to_peer);
-                Err(RoomError::UnmatchedState(from_peer_id, to_peer_id))
-            }
-        }?;
+        let to_peer: Peer<WaitRemoteSdp> =
+            self.peers.take_inner_peer(to_peer_id)?;
 
         let from_peer = from_peer.set_local_sdp(sdp_answer.clone());
         let to_peer = to_peer.set_remote_sdp(&sdp_answer);
@@ -191,20 +182,8 @@ impl Room {
         peer1_id: PeerId,
         peer2_id: PeerId,
     ) -> Result<(MemberId, Event), RoomError> {
-        let peer1 = self.peers.take_peer(peer1_id)?;
-        let peer2 = self.peers.take_peer(peer2_id)?;
-
-        // assert that both Peers are New
-        let (peer1, peer2) = match (peer1, peer2) {
-            (PeerStateMachine::New(peer1), PeerStateMachine::New(peer2)) => {
-                Ok((peer1, peer2))
-            }
-            (peer1, peer2) => {
-                self.peers.add_peer(peer1.id(), peer1);
-                self.peers.add_peer(peer2.id(), peer2);
-                Err(RoomError::UnmatchedState(peer1_id, peer2_id))
-            }
-        }?;
+        let peer1: Peer<New> = self.peers.take_inner_peer(peer1_id)?;
+        let peer2: Peer<New> = self.peers.take_inner_peer(peer2_id)?;
 
         // decide which peer is sender
         let (sender, receiver) = if peer1.is_sender() {

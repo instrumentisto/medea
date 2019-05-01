@@ -1,8 +1,10 @@
 #![allow(clippy::use_self)]
 
+use failure::Fail;
 use hashbrown::HashMap;
 
 use std::sync::Arc;
+use std::convert::TryFrom;
 
 use crate::{
     api::{
@@ -15,8 +17,6 @@ use crate::{
     media::{Track, TrackId},
 };
 
-// pub trait PeerState{}
-
 #[derive(Debug, PartialEq)]
 pub struct New {}
 #[derive(Debug, PartialEq)]
@@ -28,6 +28,17 @@ pub struct WaitRemoteSdp {}
 #[derive(Debug, PartialEq)]
 pub struct Stable {}
 
+#[derive(Fail, Debug)]
+#[allow(clippy::module_name_repetitions)]
+pub enum PeerStateError {
+    #[fail(
+        display = "Cannot unwrap Peer from PeerStateMachine [id = {}]. \
+                   Expected state {} was {}",
+        _0, _1, _2
+    )]
+    CantCast(Id, &'static str, &'static str),
+}
+
 /// Implementation state machine for [`Peer`].
 #[derive(Debug)]
 #[allow(clippy::module_name_repetitions)]
@@ -38,22 +49,6 @@ pub enum PeerStateMachine {
     WaitRemoteSdp(Peer<WaitRemoteSdp>),
     Stable(Peer<Stable>),
 }
-
-macro_rules! impl_from_peer {
-    ($peer_type:tt) => {
-        impl From<Peer<$peer_type>> for PeerStateMachine {
-            fn from(peer: Peer<$peer_type>) -> Self {
-                PeerStateMachine::$peer_type(peer)
-            }
-        }
-    };
-}
-
-impl_from_peer!(New);
-impl_from_peer!(WaitLocalSdp);
-impl_from_peer!(WaitLocalHaveRemote);
-impl_from_peer!(WaitRemoteSdp);
-impl_from_peer!(Stable);
 
 // TODO: macro to remove boilerplate
 impl PeerStateMachine {
@@ -105,6 +100,33 @@ impl PeerStateMachine {
         }
     }
 }
+
+macro_rules! impl_peer_converts {
+    ($peer_type:tt) => {
+        impl TryFrom<PeerStateMachine> for Peer<$peer_type> {
+            type Error = PeerStateError;
+
+            fn try_from(peer: PeerStateMachine) -> Result<Self, Self::Error> {
+                match peer {
+                    PeerStateMachine::$peer_type(peer) => Ok(peer),
+                    _ => Err(PeerStateError::CantCast(1, "2", "3")),
+                }
+            }
+        }
+
+        impl From<Peer<$peer_type>> for PeerStateMachine {
+            fn from(peer: Peer<$peer_type>) -> Self {
+                PeerStateMachine::$peer_type(peer)
+            }
+        }
+    };
+}
+
+impl_peer_converts!(New);
+impl_peer_converts!(WaitLocalSdp);
+impl_peer_converts!(WaitLocalHaveRemote);
+impl_peer_converts!(WaitRemoteSdp);
+impl_peer_converts!(Stable);
 
 /// ID of [`Peer`].
 pub type Id = u64;

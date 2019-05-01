@@ -1,9 +1,11 @@
 //! Repository that stores [`Room`]s [`Peer`]s.
 use hashbrown::HashMap;
 
+use std::convert::{TryFrom, TryInto};
+
 use crate::{
     api::control::MemberId,
-    media::{PeerId, PeerStateMachine},
+    media::{Peer, PeerId, PeerStateMachine},
     signalling::room::RoomError,
 };
 
@@ -49,13 +51,21 @@ impl PeerRepository {
     }
 
     /// Returns owned [`Peer`] by its ID.
-    pub fn take_peer(
+    pub fn take_inner_peer<S>(
         &mut self,
         peer_id: PeerId,
-    ) -> Result<PeerStateMachine, RoomError> {
-        self.peers
-            .remove(&peer_id)
-            .ok_or_else(|| RoomError::UnknownPeer(peer_id))
+    ) -> Result<Peer<S>, RoomError>
+    where
+        Peer<S>: TryFrom<PeerStateMachine>,
+        <Peer<S> as TryFrom<PeerStateMachine>>::Error: Into<RoomError>,
+    {
+        match self.peers.remove(&peer_id) {
+            Some(peer) => match peer.try_into() {
+                Ok(peer) => Ok(peer),
+                Err(err) => Err(err.into()),
+            },
+            None => Err(RoomError::UnknownPeer(peer_id)),
+        }
     }
 }
 
