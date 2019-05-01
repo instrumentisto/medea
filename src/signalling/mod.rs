@@ -1,7 +1,7 @@
-mod participants;
-mod peers;
-mod room;
-mod room_repo;
+pub mod participants;
+pub mod peers;
+pub mod room;
+pub mod room_repo;
 
 pub use self::{
     room::{Id as RoomId, Room},

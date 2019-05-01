@@ -207,7 +207,7 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
                 match serde_json::from_str::<ClientMsg>(&text) {
                     Ok(ClientMsg::Ping(n)) => {
                         trace!("Received ping: {}", n);
-                        // Answer with ['Heartbeat::Pong'].
+                        // Answer with Heartbeat::Pong.
                         ctx.notify(ServerMsg::Pong(n));
                     }
                     Ok(ClientMsg::Command(command)) => {

@@ -1,4 +1,4 @@
-//! Repository that stores ['Room']s ['Peer']s.
+//! Repository that stores [`Room`]s [`Peer`]s.
 use hashbrown::HashMap;
 
 use crate::{
@@ -32,15 +32,20 @@ impl PeerRepository {
     /// Returns [`Peer`] of specified [`Member`].
     ///
     /// Panic if [`Peer`] not exists.
-    pub fn get_peer_by_member_id(
+    pub fn get_peers_by_member_id(
         &self,
-        member_id: &MemberId,
-    ) -> &PeerStateMachine {
+        member_id: MemberId,
+    ) -> Vec<&PeerStateMachine> {
         self.peers
             .iter()
-            .find(|(_, peer)| peer.member_id() == *member_id)
-            .map(|(_, peer)| peer)
-            .unwrap()
+            .filter_map(|(_, peer)| {
+                if peer.member_id() == member_id {
+                    Some(peer)
+                } else {
+                    None
+                }
+            })
+            .collect()
     }
 
     /// Returns owned [`Peer`] by its ID.

@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use hashbrown::HashMap;
 
+use crate::api::protocol::Event;
 use crate::{
     api::{
         control::MemberId,
@@ -64,25 +65,29 @@ impl PeerStateMachine {
         }
     }
 
-    /// Returns sender for this [`Peer`] if exists.
-    pub fn sender(&self) -> Option<Id> {
+    /// Returns ID of interconnected [`Peer`].
+    pub fn partner_peer_id(&self) -> Id {
         match self {
-            PeerStateMachine::New(peer) => peer.sender(),
-            PeerStateMachine::WaitLocalSDP(peer) => peer.sender(),
-            PeerStateMachine::WaitLocalHaveRemote(peer) => peer.sender(),
-            PeerStateMachine::WaitRemoteSDP(peer) => peer.sender(),
-            PeerStateMachine::Stable(peer) => peer.sender(),
+            PeerStateMachine::New(peer) => peer.partner_peer_id(),
+            PeerStateMachine::WaitLocalSDP(peer) => peer.partner_peer_id(),
+            PeerStateMachine::WaitLocalHaveRemote(peer) => {
+                peer.partner_peer_id()
+            }
+            PeerStateMachine::WaitRemoteSDP(peer) => peer.partner_peer_id(),
+            PeerStateMachine::Stable(peer) => peer.partner_peer_id(),
         }
     }
 
-    /// Returns ID of interconnected [`Peer`].
-    pub fn to_peer(&self) -> Id {
+    /// Returns ID of interconnected [`Member`].
+    pub fn partner_member_id(&self) -> Id {
         match self {
-            PeerStateMachine::New(peer) => peer.to_peer(),
-            PeerStateMachine::WaitLocalSDP(peer) => peer.to_peer(),
-            PeerStateMachine::WaitLocalHaveRemote(peer) => peer.to_peer(),
-            PeerStateMachine::WaitRemoteSDP(peer) => peer.to_peer(),
-            PeerStateMachine::Stable(peer) => peer.to_peer(),
+            PeerStateMachine::New(peer) => peer.partner_peer_id(),
+            PeerStateMachine::WaitLocalSDP(peer) => peer.partner_peer_id(),
+            PeerStateMachine::WaitLocalHaveRemote(peer) => {
+                peer.partner_peer_id()
+            }
+            PeerStateMachine::WaitRemoteSDP(peer) => peer.partner_peer_id(),
+            PeerStateMachine::Stable(peer) => peer.partner_peer_id(),
         }
     }
 }
@@ -93,8 +98,9 @@ pub type Id = u64;
 #[derive(Debug)]
 pub struct Context {
     id: Id,
-    to_peer: Id,
     member_id: MemberId,
+    partner_peer: Id,
+    partner_member: MemberId,
     sdp_offer: Option<String>,
     sdp_answer: Option<String>,
     receivers: HashMap<TrackId, Arc<Track>>,
@@ -120,17 +126,13 @@ impl<T> Peer<T> {
     }
 
     /// Returns ID of interconnected [`Peer`].
-    pub fn to_peer(&self) -> Id {
-        self.context.to_peer
+    pub fn partner_peer_id(&self) -> Id {
+        self.context.partner_peer
     }
 
-    /// Returns sender for this [`Peer`] if exists.
-    pub fn sender(&self) -> Option<Id> {
-        if self.context.receivers.is_empty() {
-            None
-        } else {
-            Some(self.context.to_peer)
-        }
+    /// Returns ID of interconnected [`Member`].
+    pub fn partner_member_id(&self) -> Id {
+        self.context.partner_member
     }
 
     /// Returns [`Track`]'s of [`Peer`].
@@ -142,7 +144,7 @@ impl<T> Peer<T> {
                     id: track.id,
                     media_type: track.media_type.clone(),
                     direction: Direction::Send {
-                        receivers: vec![self.context.to_peer],
+                        receivers: vec![self.context.partner_peer],
                     },
                 });
                 tracks
@@ -156,21 +158,31 @@ impl<T> Peer<T> {
                     id: track.id,
                     media_type: track.media_type.clone(),
                     direction: Direction::Recv {
-                        sender: self.context.to_peer,
+                        sender: self.context.partner_peer,
                     },
                 });
                 tracks
             })
     }
+
+    pub fn is_sender(&self) -> bool {
+        !self.context.senders.is_empty()
+    }
 }
 
 impl Peer<New> {
     /// Creates new [`Peer`] for [`Member`].
-    pub fn new(id: Id, member_id: MemberId, to_peer: Id) -> Self {
+    pub fn new(
+        id: Id,
+        member_id: MemberId,
+        partner_peer: Id,
+        partner_member: MemberId,
+    ) -> Self {
         let context = Context {
             id,
             member_id,
-            to_peer,
+            partner_peer,
+            partner_member,
             sdp_offer: None,
             sdp_answer: None,
             receivers: HashMap::new(),
@@ -215,6 +227,14 @@ impl Peer<New> {
 }
 
 impl Peer<WaitLocalSDP> {
+    pub fn get_peer_created(&self) -> Event {
+        Event::PeerCreated {
+            peer_id: self.context.id,
+            sdp_offer: self.context.sdp_offer.clone(),
+            tracks: self.tracks(),
+        }
+    }
+
     /// Set local description and transition [`Peer`]
     /// to [`WaitRemoteSDP`] state.
     pub fn set_local_sdp(self, sdp_offer: String) -> Peer<WaitRemoteSDP> {
@@ -257,9 +277,10 @@ pub fn create_peers(
 ) -> HashMap<MemberId, PeerStateMachine> {
     let caller_peer_id = 1;
     let responder_peer_id = 2;
-    let mut caller_peer = Peer::new(caller_peer_id, caller, responder_peer_id);
+    let mut caller_peer =
+        Peer::new(caller_peer_id, caller, responder_peer_id, responder_peer_id);
     let mut responder_peer =
-        Peer::new(responder_peer_id, responder, caller_peer_id);
+        Peer::new(responder_peer_id, responder, caller_peer_id, caller_peer_id);
 
     let track_audio =
         Arc::new(Track::new(1, MediaType::Audio(AudioSettings {})));
@@ -278,7 +299,7 @@ pub fn create_peers(
 
 #[test]
 fn create_peer() {
-    let peer = Peer::new(1, 1, 2);
+    let peer = Peer::new(1, 1, 2, 2);
     let peer = peer.start();
 
     assert_eq!(peer.state, WaitLocalSDP {});

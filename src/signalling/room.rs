@@ -44,6 +44,8 @@ pub enum RoomError {
     ConnectionNotExists(MemberId),
     #[fail(display = "Unable send event to member {}", _0)]
     UnableSendEvent(MemberId),
+    #[fail(display = "Generic room error {}", _0)]
+    Generic(String),
 }
 
 /// Media server room with its [`Member`]s.
@@ -51,7 +53,7 @@ pub enum RoomError {
 pub struct Room {
     id: Id,
 
-    /// ['RpcConnection']s of [`Member`]s in this [`Room`].
+    /// [`RpcConnection`]s of [`Member`]s in this [`Room`].
     participants: ParticipantService,
 
     /// [`Peer`]s of [`Member`]s in this [`Room`].
@@ -73,44 +75,6 @@ impl Room {
         }
     }
 
-    /// Check state of the specified and associated [`Peer`].
-    /// Returns [`Event`] to caller that [`Peer`] is created.
-    fn handle_peer_created(
-        &mut self,
-        from_peer_id: PeerId,
-        to_peer_id: PeerId,
-    ) -> Result<(MemberId, Event), RoomError> {
-        let from_peer = self.peers.take_peer(from_peer_id)?;
-        let to_peer = self.peers.take_peer(to_peer_id)?;
-
-        let (from_peer, to_peer) = match (from_peer, to_peer) {
-            (
-                PeerStateMachine::New(peer_from),
-                PeerStateMachine::New(peer_to),
-            ) => Ok((peer_from, peer_to)),
-            (from_peer, to_peer) => {
-                self.peers.add_peer(from_peer_id, from_peer);
-                self.peers.add_peer(to_peer_id, to_peer);
-                Err(RoomError::UnmatchedState(from_peer_id, to_peer_id))
-            }
-        }?;
-
-        let to_peer = to_peer.start();
-        let to_member_id = to_peer.member_id();
-
-        let event = Event::PeerCreated {
-            peer_id: to_peer_id,
-            sdp_offer: None,
-            tracks: to_peer.tracks(),
-        };
-
-        self.peers
-            .add_peer(from_peer_id, PeerStateMachine::New(from_peer));
-        self.peers
-            .add_peer(to_peer_id, PeerStateMachine::WaitLocalSDP(to_peer));
-        Ok((to_member_id, event))
-    }
-
     /// Applies an offer to the specified and associated [`Peer`].
     /// Returns [`Event`] to callee that [`Peer`] is created.
     fn handle_make_sdp_offer(
@@ -119,7 +83,7 @@ impl Room {
         sdp_offer: String,
     ) -> Result<(MemberId, Event), RoomError> {
         let from_peer = self.peers.take_peer(from_peer_id)?;
-        let to_peer_id = from_peer.to_peer();
+        let to_peer_id = from_peer.partner_peer_id();
         let to_peer = self.peers.take_peer(to_peer_id)?;
 
         let (from_peer, to_peer) = match (from_peer, to_peer) {
@@ -161,7 +125,7 @@ impl Room {
         sdp_answer: String,
     ) -> Result<(MemberId, Event), RoomError> {
         let from_peer = self.peers.take_peer(from_peer_id)?;
-        let to_peer_id = from_peer.to_peer();
+        let to_peer_id = from_peer.partner_peer_id();
         let to_peer = self.peers.take_peer(to_peer_id)?;
 
         let (from_peer, to_peer) = match (from_peer, to_peer) {
@@ -199,7 +163,7 @@ impl Room {
         candidate: String,
     ) -> Result<(MemberId, Event), RoomError> {
         let from_peer = self.peers.get_peer(from_peer_id)?;
-        let to_peer_id = from_peer.to_peer();
+        let to_peer_id = from_peer.partner_peer_id();
         let to_peer = self.peers.get_peer(to_peer_id)?;
 
         match (from_peer, to_peer) {
@@ -223,6 +187,56 @@ impl Room {
             candidate,
         };
         Ok((to_member_id, event))
+    }
+
+    /// Builds [`Event::PeerCreated`].
+    /// Both provided peers must be in New state. At least one of provided peers
+    /// must have outbound tracks.
+    fn build_peer_created(
+        &mut self,
+        peer1_id: PeerId,
+        peer2_id: PeerId,
+    ) -> Result<(MemberId, Event), RoomError> {
+        let peer1 = self.peers.take_peer(peer1_id)?;
+        let peer2 = self.peers.take_peer(peer2_id)?;
+
+        // assert that both Peers are New
+        let (peer1, peer2) = match (peer1, peer2) {
+            (PeerStateMachine::New(peer1), PeerStateMachine::New(peer2)) => {
+                Ok((peer1, peer2))
+            }
+            (peer1, peer2) => {
+                self.peers.add_peer(peer1.id(), peer1);
+                self.peers.add_peer(peer2.id(), peer2);
+                Err(RoomError::UnmatchedState(peer1_id, peer2_id))
+            }
+        }?;
+
+        // decide which peer is sender
+        let (sender, receiver) = if peer1.is_sender() {
+            (peer1, peer2)
+        } else if peer2.is_sender() {
+            (peer2, peer1)
+        } else {
+            self.peers
+                .add_peer(peer1.id(), PeerStateMachine::New(peer1));
+            self.peers
+                .add_peer(peer2.id(), PeerStateMachine::New(peer2));
+            return Err(RoomError::Generic(format!(
+                "Error while trying to connect Peer [id = {}] and Peer [id = \
+                 {}] cause neither of peers are senders",
+                peer1_id, peer2_id
+            )));
+        };
+        self.peers
+            .add_peer(receiver.id(), PeerStateMachine::New(receiver));
+
+        let sender = sender.start();
+        let member_id = sender.member_id();
+        let peer_created = sender.get_peer_created();
+        self.peers
+            .add_peer(sender.id(), PeerStateMachine::WaitLocalSDP(sender));
+        Ok((member_id, peer_created))
     }
 }
 
@@ -250,10 +264,7 @@ impl Handler<Authorize> for Room {
 /// Signal of start signaling between specified [`Peer`]'s.
 #[derive(Debug, Message)]
 #[rtype(result = "Result<(), ()>")]
-pub struct ConnectPeers {
-    pub from_peer_id: PeerId,
-    pub to_peer_id: PeerId,
-}
+pub struct ConnectPeers(PeerId, PeerId);
 
 impl Handler<ConnectPeers> for Room {
     type Result = ActFuture<(), ()>;
@@ -265,22 +276,36 @@ impl Handler<ConnectPeers> for Room {
         msg: ConnectPeers,
         ctx: &mut Self::Context,
     ) -> Self::Result {
+        //        let addr = ctx.address();
+        //        let fut = self
+        //            .participants
+        //            .send_event_to_member(member_id, peer_created)
+        //            .map_err(|err| {
+        //                error!(
+        //                    "Cannot start Peer [id = {}], because {}. Stopping
+        // room.",                    sender.id(),
+        //                    err,
+        //                );
+        //                addr.do_send(CloseRoom {})
+        //            });
+        //
+        //        Box::new(wrap_future(fut))
+
         let addr = ctx.address();
-        let fut =
-            match self.handle_peer_created(msg.from_peer_id, msg.to_peer_id) {
-                Ok((caller, event)) => Either::A(
-                    self.participants.send_event_to_member(caller, event),
-                ),
-                Err(err) => Either::B(future::err(err)),
+        let fut = match self.build_peer_created(msg.0, msg.1) {
+            Ok((caller, event)) => {
+                Either::A(self.participants.send_event_to_member(caller, event))
             }
-            .map_err(move |err| {
-                error!(
-                    "Cannot start signaling between peers {} and {}, because \
-                     {}. Room will be stop.",
-                    msg.from_peer_id, msg.to_peer_id, err
-                );
-                addr.do_send(CloseRoom {})
-            });
+            Err(err) => Either::B(future::err(err)),
+        }
+        .map_err(move |err| {
+            error!(
+                "Cannot start signaling between peers {} and {}, because {}. \
+                 Room will be stop.",
+                msg.0, msg.1, err
+            );
+            addr.do_send(CloseRoom {})
+        });
         Box::new(wrap_future(fut))
     }
 }
@@ -328,7 +353,7 @@ impl Handler<Command> for Room {
 impl Handler<RpcConnectionEstablished> for Room {
     type Result = ActFuture<(), ()>;
 
-    /// Saves new ['RpcConnection'] in ['ParticipantService'], initiates media
+    /// Saves new [`RpcConnection`] in [`ParticipantService`], initiates media
     /// establishment between members.
     fn handle(
         &mut self,
@@ -337,21 +362,33 @@ impl Handler<RpcConnectionEstablished> for Room {
     ) -> Self::Result {
         info!("RpcConnectionEstablished for member {}", msg.member_id);
 
-        let res = self.participants.connection_established(
+        // save new connection
+        self.participants.connection_established(
             ctx,
             msg.member_id,
             msg.connection,
         );
 
-        let peer = self.peers.get_peer_by_member_id(&msg.member_id);
-        if let Some(sender) = peer.sender() {
-            ctx.notify(ConnectPeers {
-                from_peer_id: peer.id(),
-                to_peer_id: sender,
+        // get connected member Peers
+        self.peers
+            .get_peers_by_member_id(msg.member_id)
+            .into_iter()
+            .for_each(|peer| {
+                // only New peers should be connected
+                if let PeerStateMachine::New(peer) = peer {
+                    if self
+                        .participants
+                        .member_has_connection(peer.partner_member_id())
+                    {
+                        ctx.notify(ConnectPeers(
+                            peer.id(),
+                            peer.partner_peer_id(),
+                        ));
+                    }
+                }
             });
-        }
 
-        Box::new(wrap_future(res))
+        Box::new(wrap_future(future::ok(())))
     }
 }
 
@@ -380,7 +417,7 @@ impl Handler<CloseRoom> for Room {
 impl Handler<RpcConnectionClosed> for Room {
     type Result = ();
 
-    /// Passes message to ['ParticipantService'] to cleanup stored connections.
+    /// Passes message to [`ParticipantService`] to cleanup stored connections.
     fn handle(&mut self, msg: RpcConnectionClosed, ctx: &mut Self::Context) {
         info!(
             "RpcConnectionClosed for member {}, reason {:?}",

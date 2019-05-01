@@ -1,8 +1,8 @@
-//! Participant is ['Member'] with ['RpcConnection']. ['ParticipantService']
-//! stores ['Members'] and associated ['RpcConnection']s, handles
-//! ['RpcConnection'] authorization, establishment, message sending.
+//! Participant is [`Member`] with [`RpcConnection`]. [`ParticipantService`]
+//! stores [`Members`] and associated [`RpcConnection`]s, handles
+//! [`RpcConnection`] authorization, establishment, message sending.
 
-use actix::{AsyncContext, Context, SpawnHandle};
+use actix::{AsyncContext, Context, SpawnHandle, fut::wrap_future};
 use hashbrown::HashMap;
 
 use futures::{
@@ -28,9 +28,9 @@ use crate::{
     },
 };
 
-/// Participant is ['Member'] with ['RpcConnection']. ['ParticipantService']
-/// stores ['Members'] and associated ['RpcConnection']s, handles
-/// ['RpcConnection'] authorization, establishment, message sending.
+/// Participant is [`Member`] with [`RpcConnection`]. [`ParticipantService`]
+/// stores [`Members`] and associated [`RpcConnection`]s, handles
+/// [`RpcConnection`] authorization, establishment, message sending.
 #[derive(Debug)]
 pub struct ParticipantService {
     /// [`Member`]s which currently are present in this [`Room`].
@@ -46,7 +46,7 @@ pub struct ParticipantService {
     reconnect_timeout: Duration,
 
     /// Stores [`RpcConnection`] drop tasks.
-    /// If [`RpcConnection`] is lost, ['Room'] waits for connection_timeout
+    /// If [`RpcConnection`] is lost, [`Room`] waits for connection_timeout
     /// before dropping it irrevocably in case it gets reestablished.
     drop_connection_tasks: HashMap<MemberId, SpawnHandle>,
 }
@@ -64,6 +64,10 @@ impl ParticipantService {
         }
     }
 
+    /// Lookup [`Member`] by provided id and credentials. Returns
+    /// `Err(AuthorizationError::MemberNotExists)` if lookup by `MemberId`
+    /// failed. Returns `Err(AuthorizationError::InvalidCredentials)` if
+    /// [`Member`] was found, but incorrect credentials was provided.
     pub fn get_member_by_id_and_credentials(
         &self,
         member_id: MemberId,
@@ -79,6 +83,12 @@ impl ParticipantService {
             }
             None => Err(AuthorizationError::MemberNotExists),
         }
+    }
+
+    /// Checks if [`Member`] has **active** [`RcpConnection`].
+    pub fn member_has_connection(&self, member_id: MemberId) -> bool {
+        self.connections.contains_key(&member_id)
+            && !self.drop_connection_tasks.contains_key(&member_id)
     }
 
     /// Send [`Event`] to specified remote [`Member`].
@@ -98,10 +108,10 @@ impl ParticipantService {
         }
     }
 
-    /// If ['ClosedReason::Closed'], then removes [`RpcConnection`] associated
+    /// If [`ClosedReason::Closed`], then removes [`RpcConnection`] associated
     /// with specified user [`Member`] from the storage and closes the room.
-    /// If ['ClosedReason::Lost'], then creates delayed task that emits
-    /// ['ClosedReason::Closed'].
+    /// If [`ClosedReason::Lost`], then creates delayed task that emits
+    /// [`ClosedReason::Closed`].
     // TODO: Dont close the room. It is being closed atm, because we have
     //      no way to handle absence of RtcPeerConnection when.
     pub fn connection_closed(
@@ -143,8 +153,7 @@ impl ParticipantService {
         ctx: &mut Context<Room>,
         member_id: MemberId,
         con: Box<dyn RpcConnection>,
-    ) -> impl Future<Item = (), Error = ()> {
-        let mut fut = Either::A(future::ok(()));
+    ) {
         // lookup previous member connection
         if let Some(mut connection) = self.connections.remove(&member_id) {
             debug!("Closing old RpcConnection for member {}", member_id);
@@ -155,15 +164,13 @@ impl ParticipantService {
             {
                 ctx.cancel_future(handler);
             }
-            fut = Either::B(connection.close());
+            ctx.spawn(wrap_future(connection.close()));
         } else {
             self.connections.insert(member_id, con);
         }
-
-        fut
     }
 
-    /// Cancels all connection close tasks, closes all ['RpcConnection']s.
+    /// Cancels all connection close tasks, closes all [`RpcConnection`]s.
     pub fn drop_connections(
         &mut self,
         ctx: &mut Context<Room>,

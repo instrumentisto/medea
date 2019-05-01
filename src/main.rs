@@ -1,13 +1,12 @@
 //! Medea media server application.
 
 #[macro_use]
-mod utils;
-
-mod api;
-mod conf;
-mod log;
-mod media;
-mod signalling;
+pub mod utils;
+pub mod api;
+pub mod conf;
+pub mod log;
+pub mod media;
+pub mod signalling;
 
 use actix::prelude::*;
 use dotenv::dotenv;
