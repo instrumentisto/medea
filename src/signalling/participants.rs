@@ -2,7 +2,7 @@
 //! stores [`Members`] and associated [`RpcConnection`]s, handles
 //! [`RpcConnection`] authorization, establishment, message sending.
 
-use actix::{AsyncContext, Context, SpawnHandle, fut::wrap_future};
+use actix::{fut::wrap_future, AsyncContext, Context, SpawnHandle};
 use hashbrown::HashMap;
 
 use futures::{

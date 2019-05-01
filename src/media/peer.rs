@@ -1,45 +1,59 @@
 #![allow(clippy::use_self)]
 
-use std::sync::Arc;
-
 use hashbrown::HashMap;
 
-use crate::api::protocol::Event;
+use std::sync::Arc;
+
 use crate::{
     api::{
         control::MemberId,
         protocol::{
-            AudioSettings, Direction, Directional, MediaType, VideoSettings,
+            AudioSettings, Direction, Directional, Event, MediaType,
+            VideoSettings,
         },
     },
     media::{Track, TrackId},
 };
 
+// pub trait PeerState{}
+
 #[derive(Debug, PartialEq)]
 pub struct New {}
 #[derive(Debug, PartialEq)]
-pub struct WaitLocalSDP {}
+pub struct WaitLocalSdp {}
 #[derive(Debug, PartialEq)]
 pub struct WaitLocalHaveRemote {}
 #[derive(Debug, PartialEq)]
-pub struct WaitRemoteSDP {}
+pub struct WaitRemoteSdp {}
 #[derive(Debug, PartialEq)]
 pub struct Stable {}
-#[derive(Debug, PartialEq)]
-pub struct Finished {}
-#[derive(Debug, PartialEq)]
-pub struct Failure {}
 
 /// Implementation state machine for [`Peer`].
 #[derive(Debug)]
 #[allow(clippy::module_name_repetitions)]
 pub enum PeerStateMachine {
     New(Peer<New>),
-    WaitLocalSDP(Peer<WaitLocalSDP>),
+    WaitLocalSdp(Peer<WaitLocalSdp>),
     WaitLocalHaveRemote(Peer<WaitLocalHaveRemote>),
-    WaitRemoteSDP(Peer<WaitRemoteSDP>),
+    WaitRemoteSdp(Peer<WaitRemoteSdp>),
     Stable(Peer<Stable>),
 }
+
+macro_rules! impl_from_peer {
+    ($peer_type:tt) => {
+        impl From<Peer<$peer_type>> for PeerStateMachine {
+            fn from(peer: Peer<$peer_type>) -> Self {
+                PeerStateMachine::$peer_type(peer)
+            }
+        }
+    };
+}
+
+impl_from_peer!(New);
+impl_from_peer!(WaitLocalSdp);
+impl_from_peer!(WaitLocalHaveRemote);
+impl_from_peer!(WaitRemoteSdp);
+impl_from_peer!(Stable);
 
 // TODO: macro to remove boilerplate
 impl PeerStateMachine {
@@ -47,9 +61,9 @@ impl PeerStateMachine {
     pub fn member_id(&self) -> MemberId {
         match self {
             PeerStateMachine::New(peer) => peer.member_id(),
-            PeerStateMachine::WaitLocalSDP(peer) => peer.member_id(),
+            PeerStateMachine::WaitLocalSdp(peer) => peer.member_id(),
             PeerStateMachine::WaitLocalHaveRemote(peer) => peer.member_id(),
-            PeerStateMachine::WaitRemoteSDP(peer) => peer.member_id(),
+            PeerStateMachine::WaitRemoteSdp(peer) => peer.member_id(),
             PeerStateMachine::Stable(peer) => peer.member_id(),
         }
     }
@@ -58,9 +72,9 @@ impl PeerStateMachine {
     pub fn id(&self) -> Id {
         match self {
             PeerStateMachine::New(peer) => peer.id(),
-            PeerStateMachine::WaitLocalSDP(peer) => peer.id(),
+            PeerStateMachine::WaitLocalSdp(peer) => peer.id(),
             PeerStateMachine::WaitLocalHaveRemote(peer) => peer.id(),
-            PeerStateMachine::WaitRemoteSDP(peer) => peer.id(),
+            PeerStateMachine::WaitRemoteSdp(peer) => peer.id(),
             PeerStateMachine::Stable(peer) => peer.id(),
         }
     }
@@ -69,11 +83,11 @@ impl PeerStateMachine {
     pub fn partner_peer_id(&self) -> Id {
         match self {
             PeerStateMachine::New(peer) => peer.partner_peer_id(),
-            PeerStateMachine::WaitLocalSDP(peer) => peer.partner_peer_id(),
+            PeerStateMachine::WaitLocalSdp(peer) => peer.partner_peer_id(),
             PeerStateMachine::WaitLocalHaveRemote(peer) => {
                 peer.partner_peer_id()
             }
-            PeerStateMachine::WaitRemoteSDP(peer) => peer.partner_peer_id(),
+            PeerStateMachine::WaitRemoteSdp(peer) => peer.partner_peer_id(),
             PeerStateMachine::Stable(peer) => peer.partner_peer_id(),
         }
     }
@@ -82,11 +96,11 @@ impl PeerStateMachine {
     pub fn partner_member_id(&self) -> Id {
         match self {
             PeerStateMachine::New(peer) => peer.partner_peer_id(),
-            PeerStateMachine::WaitLocalSDP(peer) => peer.partner_peer_id(),
+            PeerStateMachine::WaitLocalSdp(peer) => peer.partner_peer_id(),
             PeerStateMachine::WaitLocalHaveRemote(peer) => {
                 peer.partner_peer_id()
             }
-            PeerStateMachine::WaitRemoteSDP(peer) => peer.partner_peer_id(),
+            PeerStateMachine::WaitRemoteSdp(peer) => peer.partner_peer_id(),
             PeerStateMachine::Stable(peer) => peer.partner_peer_id(),
         }
     }
@@ -195,10 +209,10 @@ impl Peer<New> {
     }
 
     /// Transition new [`Peer`] into state of waiting for local description.
-    pub fn start(self) -> Peer<WaitLocalSDP> {
+    pub fn start(self) -> Peer<WaitLocalSdp> {
         Peer {
             context: self.context,
-            state: WaitLocalSDP {},
+            state: WaitLocalSdp {},
         }
     }
 
@@ -226,7 +240,7 @@ impl Peer<New> {
     }
 }
 
-impl Peer<WaitLocalSDP> {
+impl Peer<WaitLocalSdp> {
     pub fn get_peer_created(&self) -> Event {
         Event::PeerCreated {
             peer_id: self.context.id,
@@ -237,17 +251,17 @@ impl Peer<WaitLocalSDP> {
 
     /// Set local description and transition [`Peer`]
     /// to [`WaitRemoteSDP`] state.
-    pub fn set_local_sdp(self, sdp_offer: String) -> Peer<WaitRemoteSDP> {
+    pub fn set_local_sdp(self, sdp_offer: String) -> Peer<WaitRemoteSdp> {
         let mut context = self.context;
         context.sdp_offer = Some(sdp_offer);
         Peer {
             context,
-            state: WaitRemoteSDP {},
+            state: WaitRemoteSdp {},
         }
     }
 }
 
-impl Peer<WaitRemoteSDP> {
+impl Peer<WaitRemoteSdp> {
     /// Set remote description and transition [`Peer`] to [`Stable`] state.
     pub fn set_remote_sdp(self, sdp_answer: &str) -> Peer<Stable> {
         let mut context = self.context;
@@ -302,5 +316,5 @@ fn create_peer() {
     let peer = Peer::new(1, 1, 2, 2);
     let peer = peer.start();
 
-    assert_eq!(peer.state, WaitLocalSDP {});
+    assert_eq!(peer.state, WaitLocalSdp {});
 }

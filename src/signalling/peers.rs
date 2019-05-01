@@ -15,8 +15,8 @@ pub struct PeerRepository {
 
 impl PeerRepository {
     /// Store [`Peer`] in [`Room`].
-    pub fn add_peer(&mut self, id: PeerId, peer: PeerStateMachine) {
-        self.peers.insert(id, peer);
+    pub fn add_peer<S: Into<PeerStateMachine>>(&mut self, id: PeerId, peer: S) {
+        self.peers.insert(id, peer.into());
     }
 
     /// Returns borrowed [`Peer`] by its ID.

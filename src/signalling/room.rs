@@ -88,7 +88,7 @@ impl Room {
 
         let (from_peer, to_peer) = match (from_peer, to_peer) {
             (
-                PeerStateMachine::WaitLocalSDP(peer_from),
+                PeerStateMachine::WaitLocalSdp(peer_from),
                 PeerStateMachine::New(peer_to),
             ) => Ok((peer_from, peer_to)),
             (from_peer, to_peer) => {
@@ -108,12 +108,8 @@ impl Room {
             tracks: to_peer.tracks(),
         };
 
-        self.peers
-            .add_peer(from_peer_id, PeerStateMachine::WaitRemoteSDP(from_peer));
-        self.peers.add_peer(
-            to_peer_id,
-            PeerStateMachine::WaitLocalHaveRemote(to_peer),
-        );
+        self.peers.add_peer(from_peer_id, from_peer);
+        self.peers.add_peer(to_peer_id, to_peer);
         Ok((to_member_id, event))
     }
 
@@ -131,7 +127,7 @@ impl Room {
         let (from_peer, to_peer) = match (from_peer, to_peer) {
             (
                 PeerStateMachine::WaitLocalHaveRemote(peer_from),
-                PeerStateMachine::WaitRemoteSDP(peer_to),
+                PeerStateMachine::WaitRemoteSdp(peer_to),
             ) => Ok((peer_from, peer_to)),
             (from_peer, to_peer) => {
                 self.peers.add_peer(from_peer_id, from_peer);
@@ -149,10 +145,8 @@ impl Room {
             sdp_answer,
         };
 
-        self.peers
-            .add_peer(from_peer_id, PeerStateMachine::Stable(from_peer));
-        self.peers
-            .add_peer(to_peer_id, PeerStateMachine::Stable(to_peer));
+        self.peers.add_peer(from_peer_id, from_peer);
+        self.peers.add_peer(to_peer_id, to_peer);
         Ok((to_member_id, event))
     }
 
@@ -168,12 +162,12 @@ impl Room {
 
         match (from_peer, to_peer) {
             (
-                PeerStateMachine::WaitRemoteSDP(_),
+                PeerStateMachine::WaitRemoteSdp(_),
                 PeerStateMachine::WaitLocalHaveRemote(_),
             )
             | (
                 PeerStateMachine::WaitLocalHaveRemote(_),
-                PeerStateMachine::WaitRemoteSDP(_),
+                PeerStateMachine::WaitRemoteSdp(_),
             )
             | (PeerStateMachine::Stable(_), PeerStateMachine::Stable(_)) => {
                 Ok(())
@@ -218,24 +212,20 @@ impl Room {
         } else if peer2.is_sender() {
             (peer2, peer1)
         } else {
-            self.peers
-                .add_peer(peer1.id(), PeerStateMachine::New(peer1));
-            self.peers
-                .add_peer(peer2.id(), PeerStateMachine::New(peer2));
+            self.peers.add_peer(peer1.id(), peer1);
+            self.peers.add_peer(peer2.id(), peer2);
             return Err(RoomError::Generic(format!(
                 "Error while trying to connect Peer [id = {}] and Peer [id = \
                  {}] cause neither of peers are senders",
                 peer1_id, peer2_id
             )));
         };
-        self.peers
-            .add_peer(receiver.id(), PeerStateMachine::New(receiver));
+        self.peers.add_peer(receiver.id(), receiver);
 
         let sender = sender.start();
         let member_id = sender.member_id();
         let peer_created = sender.get_peer_created();
-        self.peers
-            .add_peer(sender.id(), PeerStateMachine::WaitLocalSDP(sender));
+        self.peers.add_peer(sender.id(), sender);
         Ok((member_id, peer_created))
     }
 }
