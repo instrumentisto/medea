@@ -91,7 +91,7 @@ impl RPCClient {
                         }
                         Err(err) => {
                             // TODO: protocol versions mismatch? should drop
-                            // connection if so
+                            //       connection if so
                             err.log_err();
                         }
                     }
@@ -108,7 +108,7 @@ impl RPCClient {
                     inner.pinger.stop();
 
                     // TODO: reconnect on disconnect, propagate error if unable
-                    // to reconnect
+                    //       to reconnect
                     match msg {
                         CloseMsg::Normal(_msg) | CloseMsg::Disconnect(_msg) => {
                         }
