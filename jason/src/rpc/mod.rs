@@ -71,6 +71,8 @@ impl RPCClient {
 
                 let inner_rc = Rc::clone(&inner);
                 socket.on_message(move |msg: Result<ServerMsg, WasmErr>| {
+
+
                     let inner = inner_rc.borrow();
                     match msg {
                         Ok(ServerMsg::Pong(_num)) => {
@@ -82,8 +84,7 @@ impl RPCClient {
                             if let Some(sub) = inner.subs.iter().next() {
                                 if let Err(err) = sub.unbounded_send(event) {
                                     // TODO: receiver is gone, should delete
-                                    // this
-                                    // subs tx
+                                    //       this subs tx
                                     WasmErr::from(err).log_err();
                                 }
                             }
@@ -94,10 +95,14 @@ impl RPCClient {
                             err.log_err();
                         }
                     }
+
+
                 })?;
 
                 let inner_rc = Rc::clone(&inner);
                 socket.on_close(move |msg: CloseMsg| {
+
+
                     let mut inner = inner_rc.borrow_mut();
                     inner.sock.take();
                     inner.pinger.stop();
@@ -108,6 +113,8 @@ impl RPCClient {
                         CloseMsg::Normal(_msg) | CloseMsg::Disconnect(_msg) => {
                         }
                     }
+
+
                 })?;
 
                 inner.borrow_mut().sock.replace(socket);
