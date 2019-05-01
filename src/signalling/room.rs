@@ -147,24 +147,11 @@ impl Room {
         from_peer_id: PeerId,
         candidate: String,
     ) -> Result<(MemberId, Event), RoomError> {
-        let from_peer = self.peers.get_peer(from_peer_id)?;
+        let from_peer: &Peer<WaitRemoteSdp> =
+            self.peers.get_inner_peer(from_peer_id)?;
         let to_peer_id = from_peer.partner_peer_id();
-        let to_peer = self.peers.get_peer(to_peer_id)?;
-
-        match (from_peer, to_peer) {
-            (
-                PeerStateMachine::WaitRemoteSdp(_),
-                PeerStateMachine::WaitLocalHaveRemote(_),
-            )
-            | (
-                PeerStateMachine::WaitLocalHaveRemote(_),
-                PeerStateMachine::WaitRemoteSdp(_),
-            )
-            | (PeerStateMachine::Stable(_), PeerStateMachine::Stable(_)) => {
-                Ok(())
-            }
-            _ => Err(RoomError::UnmatchedState(from_peer_id, to_peer_id)),
-        }?;
+        let to_peer: &Peer<WaitLocalHaveRemote> =
+            self.peers.get_inner_peer(to_peer_id)?;
 
         let to_member_id = to_peer.member_id();
         let event = Event::IceCandidateDiscovered {

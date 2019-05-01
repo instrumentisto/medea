@@ -3,8 +3,7 @@
 use failure::Fail;
 use hashbrown::HashMap;
 
-use std::sync::Arc;
-use std::convert::TryFrom;
+use std::{convert::TryFrom, fmt::Display, sync::Arc};
 
 use crate::{
     api::{
@@ -36,7 +35,7 @@ pub enum PeerStateError {
                    Expected state {} was {}",
         _0, _1, _2
     )]
-    CantCast(Id, &'static str, &'static str),
+    CantCast(Id, &'static str, String),
 }
 
 /// Implementation state machine for [`Peer`].
@@ -101,15 +100,50 @@ impl PeerStateMachine {
     }
 }
 
+impl Display for PeerStateMachine {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            PeerStateMachine::WaitRemoteSdp(_) => write!(f, "WaitRemoteSdp"),
+            PeerStateMachine::New(_) => write!(f, "New"),
+            PeerStateMachine::WaitLocalSdp(_) => write!(f, "WaitLocalSdp"),
+            PeerStateMachine::WaitLocalHaveRemote(_) => {
+                write!(f, "WaitLocalHaveRemote")
+            }
+            PeerStateMachine::Stable(_) => write!(f, "Stable"),
+        }
+    }
+}
+
 macro_rules! impl_peer_converts {
     ($peer_type:tt) => {
+        impl<'a> TryFrom<&'a PeerStateMachine> for &'a Peer<$peer_type> {
+            type Error = PeerStateError;
+
+            fn try_from(
+                peer: &'a PeerStateMachine,
+            ) -> Result<Self, Self::Error> {
+                match peer {
+                    PeerStateMachine::$peer_type(peer) => Ok(peer),
+                    _ => Err(PeerStateError::CantCast(
+                        1,
+                        stringify!($peer_type),
+                        format!("{}", peer),
+                    )),
+                }
+            }
+        }
+
         impl TryFrom<PeerStateMachine> for Peer<$peer_type> {
             type Error = PeerStateError;
 
             fn try_from(peer: PeerStateMachine) -> Result<Self, Self::Error> {
                 match peer {
                     PeerStateMachine::$peer_type(peer) => Ok(peer),
-                    _ => Err(PeerStateError::CantCast(1, "2", "3")),
+                    _ => Err(PeerStateError::CantCast(
+                        1,
+                        stringify!($peer_type),
+                        format!("{}", peer),
+                    )),
                 }
             }
         }

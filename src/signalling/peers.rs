@@ -22,13 +22,18 @@ impl PeerRepository {
     }
 
     /// Returns borrowed [`Peer`] by its ID.
-    pub fn get_peer(
-        &self,
+    pub fn get_inner_peer<'a, S>(
+        &'a self,
         peer_id: PeerId,
-    ) -> Result<&PeerStateMachine, RoomError> {
-        self.peers
-            .get(&peer_id)
-            .ok_or_else(|| RoomError::UnknownPeer(peer_id))
+    ) -> Result<&'a Peer<S>, RoomError>
+    where
+        &'a Peer<S>: std::convert::TryFrom<&'a PeerStateMachine>,
+        <&'a Peer<S> as TryFrom<&'a PeerStateMachine>>::Error: Into<RoomError>,
+    {
+        match self.peers.get(&peer_id) {
+            Some(peer) => peer.try_into().map_err(Into::into),
+            None => Err(RoomError::UnknownPeer(peer_id)),
+        }
     }
 
     /// Returns [`Peer`] of specified [`Member`].
@@ -60,10 +65,7 @@ impl PeerRepository {
         <Peer<S> as TryFrom<PeerStateMachine>>::Error: Into<RoomError>,
     {
         match self.peers.remove(&peer_id) {
-            Some(peer) => match peer.try_into() {
-                Ok(peer) => Ok(peer),
-                Err(err) => Err(err.into()),
-            },
+            Some(peer) => peer.try_into().map_err(Into::into),
             None => Err(RoomError::UnknownPeer(peer_id)),
         }
     }
