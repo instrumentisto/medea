@@ -65,8 +65,8 @@ impl ParticipantService {
     }
 
     /// Lookup [`Member`] by provided id and credentials. Returns
-    /// `Err(AuthorizationError::MemberNotExists)` if lookup by `MemberId`
-    /// failed. Returns `Err(AuthorizationError::InvalidCredentials)` if
+    /// [`Err(AuthorizationError::MemberNotExists)`] if lookup by [`MemberId`]
+    /// failed. Returns [`Err(AuthorizationError::InvalidCredentials)`] if
     /// [`Member`] was found, but incorrect credentials was provided.
     pub fn get_member_by_id_and_credentials(
         &self,
