@@ -1,5 +1,5 @@
 //! Repository that stores [`Room`]s addresses.
-//!
+
 use actix::Addr;
 use hashbrown::HashMap;
 

@@ -1,3 +1,7 @@
+//!  Remote [MediaStreamTrack] representation.
+//!
+//! [MediaStreamTrack]: https://www.w3.org/TR/mediacapture-streams/#mediastreamtrack
+
 use crate::api::protocol::MediaType;
 
 /// ID of [`Track`].

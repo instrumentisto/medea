@@ -1,5 +1,8 @@
-#![allow(clippy::use_self)]
+//! Remote [RTCPeerConnection] representation.
+//!
+//! [RTCPeerConnection]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
 
+#![allow(clippy::use_self)]
 use failure::Fail;
 use hashbrown::HashMap;
 
@@ -15,17 +18,27 @@ use crate::{
     media::{Track, TrackId},
 };
 
+/// Newly initialized [`Peer`] ready to signalling.
 #[derive(Debug, PartialEq)]
 pub struct New {}
+
+/// [`Peer`] doesnt have remote SDP and is waiting for local SDP.
 #[derive(Debug, PartialEq)]
 pub struct WaitLocalSdp {}
+
+/// [`Peer`] has remote SDP and is waiting for local SDP.
 #[derive(Debug, PartialEq)]
 pub struct WaitLocalHaveRemote {}
+
+/// [`Peer`] has local SDP and is waiting for remote SDP.
 #[derive(Debug, PartialEq)]
 pub struct WaitRemoteSdp {}
+
+/// SDP exchange ended.
 #[derive(Debug, PartialEq)]
 pub struct Stable {}
 
+/// Produced when unwrapping [`PeerStateMachine`] to [`Peer`] with wrong state.
 #[derive(Fail, Debug)]
 #[allow(clippy::module_name_repetitions)]
 pub enum PeerStateError {
@@ -46,7 +59,7 @@ impl PeerStateError {
     }
 }
 
-/// Implementation state machine for [`Peer`].
+/// Implementation of ['Peer'] state machine.
 #[derive(Debug)]
 #[allow(clippy::module_name_repetitions)]
 pub enum PeerStateMachine {
@@ -59,16 +72,6 @@ pub enum PeerStateMachine {
 
 // TODO: macro to remove boilerplate
 impl PeerStateMachine {
-    /// Returns ID of [`Member`] associated with this [`Peer`].
-    pub fn member_id(&self) -> MemberId {
-        match self {
-            PeerStateMachine::New(peer) => peer.member_id(),
-            PeerStateMachine::WaitLocalSdp(peer) => peer.member_id(),
-            PeerStateMachine::WaitLocalHaveRemote(peer) => peer.member_id(),
-            PeerStateMachine::WaitRemoteSdp(peer) => peer.member_id(),
-            PeerStateMachine::Stable(peer) => peer.member_id(),
-        }
-    }
 
     /// Returns ID of [`Peer`].
     pub fn id(&self) -> Id {
@@ -78,6 +81,17 @@ impl PeerStateMachine {
             PeerStateMachine::WaitLocalHaveRemote(peer) => peer.id(),
             PeerStateMachine::WaitRemoteSdp(peer) => peer.id(),
             PeerStateMachine::Stable(peer) => peer.id(),
+        }
+    }
+
+    /// Returns ID of [`Member`] associated with this [`Peer`].
+    pub fn member_id(&self) -> MemberId {
+        match self {
+            PeerStateMachine::New(peer) => peer.member_id(),
+            PeerStateMachine::WaitLocalSdp(peer) => peer.member_id(),
+            PeerStateMachine::WaitLocalHaveRemote(peer) => peer.member_id(),
+            PeerStateMachine::WaitRemoteSdp(peer) => peer.member_id(),
+            PeerStateMachine::Stable(peer) => peer.member_id(),
         }
     }
 

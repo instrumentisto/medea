@@ -1,3 +1,4 @@
+//! Representations of media and media connection establishment objects.
 pub mod peer;
 pub mod track;
 
