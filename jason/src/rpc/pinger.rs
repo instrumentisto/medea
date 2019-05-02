@@ -48,9 +48,6 @@ impl Pinger {
     pub fn start(&self, socket: Rc<WebSocket>) -> Result<(), WasmErr> {
         let mut inner = self.0.borrow_mut();
         inner.socket = Some(socket);
-        // TODO: commented out since socket might no be opened atm, should be
-        //      uncommented when WebSocket.init resolves only after on_open
-        //      fired from underlying WebSocket
         inner.send_now()?;
 
         let inner_rc = Rc::clone(&self.0);
