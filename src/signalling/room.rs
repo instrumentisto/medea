@@ -481,23 +481,22 @@ mod test {
                     peer_id,
                     sdp_offer,
                     tracks: _,
-                } => match sdp_offer {
-                    Some(_) => self.room.do_send(Command::MakeSdpAnswer {
+                } => {
+                    match sdp_offer {
+                        Some(_) => self.room.do_send(Command::MakeSdpAnswer {
+                            peer_id,
+                            sdp_answer: "responder_answer".into(),
+                        }),
+                        None => self.room.do_send(Command::MakeSdpOffer {
+                            peer_id,
+                            sdp_offer: "caller_offer".into(),
+                        }),
+                    }
+                    self.room.do_send(Command::SetIceCandidate {
                         peer_id,
-                        sdp_answer: "responder_answer".into(),
-                    }),
-                    None => self.room.do_send(Command::MakeSdpOffer {
-                        peer_id,
-                        sdp_offer: "caller_offer".into(),
-                    }),
+                        candidate: "ice_candidate".into(),
+                    })
                 },
-                Event::SdpAnswerMade {
-                    peer_id,
-                    sdp_answer: _,
-                } => self.room.do_send(Command::SetIceCandidate {
-                    peer_id,
-                    candidate: "ice_candidate".into(),
-                }),
                 Event::IceCandidateDiscovered {
                     peer_id: _,
                     candidate: _,
@@ -507,7 +506,11 @@ mod test {
                         reason: ClosedReason::Closed,
                     });
                 }
-                Event::PeersRemoved { peer_ids: _ } => {}
+                Event::PeersRemoved { peer_ids: _ } => {},
+                Event::SdpAnswerMade {
+                    peer_id:_,
+                    sdp_answer: _,
+                } => {},
             }
         }
     }
@@ -565,7 +568,6 @@ mod test {
 
         let caller_events = caller_events.lock().unwrap();
         let responder_events = responder_events.lock().unwrap();
-        assert_eq!(caller_events.len(), 3);
         assert_eq!(
             caller_events.to_vec(),
             vec![
@@ -584,20 +586,18 @@ mod test {
                             media_type: MediaType::Video(VideoSettings {}),
                         },
                     ],
-                })
-                .unwrap(),
+                }).unwrap(),
                 serde_json::to_string(&Event::SdpAnswerMade {
                     peer_id: 1,
                     sdp_answer: "responder_answer".into(),
-                })
-                .unwrap(),
-                serde_json::to_string(&Event::PeersRemoved {
-                    peer_ids: vec![1],
-                })
-                .unwrap(),
+                }).unwrap(),
+                serde_json::to_string(&Event::IceCandidateDiscovered {
+                    peer_id: 1,
+                    candidate: "ice_candidate".into(),
+                }).unwrap(),
             ]
         );
-        assert_eq!(responder_events.len(), 2);
+
         assert_eq!(
             responder_events.to_vec(),
             vec![
@@ -616,13 +616,11 @@ mod test {
                             media_type: MediaType::Video(VideoSettings {}),
                         },
                     ],
-                })
-                .unwrap(),
+                }).unwrap(),
                 serde_json::to_string(&Event::IceCandidateDiscovered {
                     peer_id: 2,
                     candidate: "ice_candidate".into(),
-                })
-                .unwrap(),
+                }).unwrap(),
             ]
         );
     }
