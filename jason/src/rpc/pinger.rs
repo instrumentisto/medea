@@ -51,7 +51,7 @@ impl Pinger {
         // TODO: commented out since socket might no be opened atm, should be
         //      uncommented when WebSocket.init resolves only after on_open
         //      fired from underlying WebSocket
-        //        inner.send_now()?;
+        inner.send_now()?;
 
         let inner_rc = Rc::clone(&self.0);
         let do_ping = Closure::wrap(Box::new(move || {

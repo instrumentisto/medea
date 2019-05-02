@@ -1,6 +1,7 @@
 //! ['WebSocket'](https://developer.mozilla.org/ru/docs/WebSockets)
 //! transport wrapper.
 use futures::future::{Future, IntoFuture};
+use futures::stream::Stream;
 use web_sys::{CloseEvent, Event, MessageEvent, WebSocket as BackingSocket};
 
 use std::{cell::RefCell, convert::TryFrom, rc::Rc};
@@ -83,7 +84,10 @@ impl InnerSocket {
 impl WebSocket {
     // Resolves only if connection succeeded.
     pub fn new(url: &str) -> impl Future<Item = Self, Error = WasmErr> {
-        InnerSocket::new(url).into_future().and_then(|socket| {
+        let (tx_error, rx_error) = futures::sync::mpsc::unbounded();
+        let (tx_open, rx_open) = futures::oneshot();
+
+        InnerSocket::new(url).into_future().and_then(move |socket| {
             let socket = Rc::new(RefCell::new(socket));
             let mut socket_mut = socket.borrow_mut();
 
@@ -92,7 +96,7 @@ impl WebSocket {
                 Rc::clone(&socket_mut.socket),
                 "error",
                 move |_| {
-                    inner.borrow_mut().update_state();
+                    tx_error.unbounded_send(inner.borrow_mut().update_state()).map_err(|_|());
                 },
             )?);
 
@@ -101,12 +105,20 @@ impl WebSocket {
                 Rc::clone(&socket_mut.socket),
                 "open",
                 move |_| {
-                    inner.borrow_mut().update_state();
+                    tx_open.send(inner.borrow_mut().update_state()).unwrap();
                 },
             )?);
 
             drop(socket_mut);
             Ok(Self(socket))
+        }).and_then(move |socket| {
+            rx_open.then(move |_| Ok(socket))
+                .select(rx_error.into_future().then(|_| Err(WasmErr::from_str("init socket error"))))
+                // TODO try and_then
+                .then(|res| match res {
+                    Ok((s, _)) => Ok(s),
+                    Err((e, _)) => Err(e),
+                })
         })
     }
 
