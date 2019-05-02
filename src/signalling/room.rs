@@ -1,18 +1,15 @@
 //! Room definitions and implementations. Room is responsible for media
 //! connection establishment between concrete [`Member`]s.
 
-use std::time::Duration;
-
 use actix::{
     fut::wrap_future, Actor, ActorFuture, AsyncContext, Context, Handler,
     Message,
 };
 use failure::Fail;
-use futures::{
-    future::{self, Either},
-    Future,
-};
+use futures::future;
 use hashbrown::HashMap;
+
+use std::time::Duration;
 
 use crate::{
     api::{
@@ -85,14 +82,16 @@ impl Room {
         }
     }
 
-    /// Builds [`Event::PeerCreated`].
-    /// Both provided peers must be in New state. At least one of provided peers
-    /// must have outbound tracks.
-    fn build_peer_created(
+    /// Sends [`Event::PeerCreated`] to one of specified [`Peer`]s based on
+    /// which of them has any outbound tracks. That [`Peer`] state will be
+    /// changed to [`WaitLocalSdp`] state. Both provided peers must be in
+    /// [`New`] state. At least one of provided peers must have outbound
+    /// tracks.
+    fn send_peer_created(
         &mut self,
         peer1_id: PeerId,
         peer2_id: PeerId,
-    ) -> Result<(MemberId, Event), RoomError> {
+    ) -> Result<ActFuture<(), RoomError>, RoomError> {
         let peer1: Peer<New> = self.peers.take_inner_peer(peer1_id)?;
         let peer2: Peer<New> = self.peers.take_inner_peer(peer2_id)?;
 
@@ -120,11 +119,16 @@ impl Room {
             tracks: sender.tracks(),
         };
         self.peers.add_peer(sender.id(), sender);
-        Ok((member_id, peer_created))
+        Ok(Box::new(wrap_future(
+            self.participants
+                .send_event_to_member(member_id, peer_created),
+        )))
     }
 
-    /// Applies an offer to the specified and associated [`Peer`].
-    /// Returns [`Event`] to callee that [`Peer`] is created.
+    /// Sends [`Event::PeerCreated`] to provided [`Peer`] partner. Provided
+    /// [`Peer`] state must be [`WaitLocalSdp`] and will be changed to
+    /// [`WaitRemoteSdp`], partners [`Peer`] state must be [`New`] and will be
+    /// changed to [`WaitLocalHaveRemote`].
     fn handle_make_sdp_offer(
         &mut self,
         from_peer_id: PeerId,
@@ -152,8 +156,10 @@ impl Room {
         )))
     }
 
-    /// Applies an answer to the specified and associated [`Peer`].
-    /// Returns [`Event`] to caller that callee has confirmed offer.
+    /// Sends [`Event::SdpAnswerMade`] to provided [`Peer`] partner. Provided
+    /// [`Peer`] state must be [`WaitLocalHaveRemote`] and will be changed to
+    /// [`Stable`], partners [`Peer`] state must be [`WaitRemoteSdp`] and will
+    /// be changed to [`Stable`].
     fn handle_make_sdp_answer(
         &mut self,
         from_peer_id: PeerId,
@@ -182,7 +188,8 @@ impl Room {
         )))
     }
 
-    /// Sends Ice Candidate from the specified to the associated [`Peer`].
+    /// Sends [`Event::IceCandidateDiscovered`] to provided [`Peer`] partner.
+    /// Both [`Peer`]s may have any state except [`New`].
     fn handle_set_ice_candidate(
         &mut self,
         from_peer_id: PeerId,
@@ -255,30 +262,34 @@ impl Handler<ConnectPeers> for Room {
         msg: ConnectPeers,
         ctx: &mut Self::Context,
     ) -> Self::Result {
-        let addr = ctx.address();
-        let fut = match self.build_peer_created(msg.0, msg.1) {
-            Ok((caller, event)) => {
-                Either::A(self.participants.send_event_to_member(caller, event))
+        match self.send_peer_created(msg.0, msg.1) {
+            Ok(res) => {
+                Box::new(res.map_err(|err, _, ctx: &mut Context<Self>| {
+                    error!(
+                        "Failed handle command, because {}. Room will be \
+                         stopped.",
+                        err
+                    );
+                    ctx.notify(CloseRoom {})
+                }))
             }
-            Err(err) => Either::B(future::err(err)),
+            Err(err) => {
+                error!(
+                    "Failed handle command, because {}. Room will be stopped.",
+                    err
+                );
+                ctx.notify(CloseRoom {});
+                Box::new(wrap_future(future::ok(())))
+            }
         }
-        .map_err(move |err| {
-            error!(
-                "Cannot start signaling between peers {} and {}, because {}. \
-                 Room will be stop.",
-                msg.0, msg.1, err
-            );
-            addr.do_send(CloseRoom {})
-        });
-        Box::new(wrap_future(fut))
     }
 }
 
 impl Handler<Command> for Room {
     type Result = ActFuture<(), ()>;
 
-    /// Receives [`Command`] from Web client and changes state of interconnected
-    /// [`Peer`]s.
+    /// Receives [`Command`] from Web client and passes it to corresponding
+    /// handlers. Will emit [`CloseRoom`] on any error.
     fn handle(
         &mut self,
         command: Command,

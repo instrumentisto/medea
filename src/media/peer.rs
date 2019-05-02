@@ -1,6 +1,6 @@
-//! Remote [RTCPeerConnection] representation.
+//! Remote [`RTCPeerConnection`][1] representation.
 //!
-//! [RTCPeerConnection]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
+//! [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
 
 #![allow(clippy::use_self)]
 use failure::Fail;
@@ -72,7 +72,6 @@ pub enum PeerStateMachine {
 
 // TODO: macro to remove boilerplate
 impl PeerStateMachine {
-
     /// Returns ID of [`Peer`].
     pub fn id(&self) -> Id {
         match self {
