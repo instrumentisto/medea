@@ -42,8 +42,6 @@ type ActFuture<I, E> = Box<dyn ActorFuture<Actor = Room, Item = I, Error = E>>;
 pub enum RoomError {
     #[fail(display = "Unknown peer {}", _0)]
     UnknownPeer(PeerId),
-    #[fail(display = "Unmatched states between peers {} and {}", _0, _1)]
-    UnmatchedState(PeerId, PeerId),
     #[fail(display = "Member {} not connected at moment", _0)]
     ConnectionNotExists(MemberId),
     #[fail(display = "Unable send event to member {}", _0)]
@@ -87,80 +85,6 @@ impl Room {
         }
     }
 
-    /// Applies an offer to the specified and associated [`Peer`].
-    /// Returns [`Event`] to callee that [`Peer`] is created.
-    fn handle_make_sdp_offer(
-        &mut self,
-        from_peer_id: PeerId,
-        sdp_offer: String,
-    ) -> Result<(MemberId, Event), RoomError> {
-        let from_peer: Peer<WaitLocalSdp> =
-            self.peers.take_inner_peer(from_peer_id)?;
-        let to_peer_id = from_peer.partner_peer_id();
-        let to_peer: Peer<New> = self.peers.take_inner_peer(to_peer_id)?;
-
-        let from_peer = from_peer.set_local_sdp(sdp_offer.clone());
-        let to_peer = to_peer.set_remote_sdp(sdp_offer.clone());
-
-        let to_member_id = to_peer.member_id();
-        let event = Event::PeerCreated {
-            peer_id: to_peer_id,
-            sdp_offer: Some(sdp_offer),
-            tracks: to_peer.tracks(),
-        };
-
-        self.peers.add_peer(from_peer_id, from_peer);
-        self.peers.add_peer(to_peer_id, to_peer);
-        Ok((to_member_id, event))
-    }
-
-    /// Applies an answer to the specified and associated [`Peer`].
-    /// Returns [`Event`] to caller that callee has confirmed offer.
-    fn handle_make_sdp_answer(
-        &mut self,
-        from_peer_id: PeerId,
-        sdp_answer: String,
-    ) -> Result<(MemberId, Event), RoomError> {
-        let from_peer: Peer<WaitLocalHaveRemote> =
-            self.peers.take_inner_peer(from_peer_id)?;
-        let to_peer_id = from_peer.partner_peer_id();
-        let to_peer: Peer<WaitRemoteSdp> =
-            self.peers.take_inner_peer(to_peer_id)?;
-
-        let from_peer = from_peer.set_local_sdp(sdp_answer.clone());
-        let to_peer = to_peer.set_remote_sdp(&sdp_answer);
-
-        let to_member_id = to_peer.member_id();
-        let event = Event::SdpAnswerMade {
-            peer_id: to_peer_id,
-            sdp_answer,
-        };
-
-        self.peers.add_peer(from_peer_id, from_peer);
-        self.peers.add_peer(to_peer_id, to_peer);
-        Ok((to_member_id, event))
-    }
-
-    /// Sends Ice Candidate from the specified to the associated [`Peer`].
-    fn handle_set_ice_candidate(
-        &mut self,
-        from_peer_id: PeerId,
-        candidate: String,
-    ) -> Result<(MemberId, Event), RoomError> {
-        let from_peer: &Peer<WaitRemoteSdp> =
-            self.peers.get_inner_peer(from_peer_id)?;
-        let to_peer_id = from_peer.partner_peer_id();
-        let to_peer: &Peer<WaitLocalHaveRemote> =
-            self.peers.get_inner_peer(to_peer_id)?;
-
-        let to_member_id = to_peer.member_id();
-        let event = Event::IceCandidateDiscovered {
-            peer_id: to_peer_id,
-            candidate,
-        };
-        Ok((to_member_id, event))
-    }
-
     /// Builds [`Event::PeerCreated`].
     /// Both provided peers must be in New state. At least one of provided peers
     /// must have outbound tracks.
@@ -190,9 +114,108 @@ impl Room {
 
         let sender = sender.start();
         let member_id = sender.member_id();
-        let peer_created = sender.get_peer_created();
+        let peer_created = Event::PeerCreated {
+            peer_id: sender.id(),
+            sdp_offer: None,
+            tracks: sender.tracks(),
+        };
         self.peers.add_peer(sender.id(), sender);
         Ok((member_id, peer_created))
+    }
+
+    /// Applies an offer to the specified and associated [`Peer`].
+    /// Returns [`Event`] to callee that [`Peer`] is created.
+    fn handle_make_sdp_offer(
+        &mut self,
+        from_peer_id: PeerId,
+        sdp_offer: String,
+    ) -> Result<ActFuture<(), RoomError>, RoomError> {
+        let from_peer: Peer<WaitLocalSdp> =
+            self.peers.take_inner_peer(from_peer_id)?;
+        let to_peer_id = from_peer.partner_peer_id();
+        let to_peer: Peer<New> = self.peers.take_inner_peer(to_peer_id)?;
+
+        let from_peer = from_peer.set_local_sdp(sdp_offer.clone());
+        let to_peer = to_peer.set_remote_sdp(sdp_offer.clone());
+
+        let to_member_id = to_peer.member_id();
+        let event = Event::PeerCreated {
+            peer_id: to_peer_id,
+            sdp_offer: Some(sdp_offer),
+            tracks: to_peer.tracks(),
+        };
+
+        self.peers.add_peer(from_peer_id, from_peer);
+        self.peers.add_peer(to_peer_id, to_peer);
+        Ok(Box::new(wrap_future(
+            self.participants.send_event_to_member(to_member_id, event),
+        )))
+    }
+
+    /// Applies an answer to the specified and associated [`Peer`].
+    /// Returns [`Event`] to caller that callee has confirmed offer.
+    fn handle_make_sdp_answer(
+        &mut self,
+        from_peer_id: PeerId,
+        sdp_answer: String,
+    ) -> Result<ActFuture<(), RoomError>, RoomError> {
+        let from_peer: Peer<WaitLocalHaveRemote> =
+            self.peers.take_inner_peer(from_peer_id)?;
+        let to_peer_id = from_peer.partner_peer_id();
+        let to_peer: Peer<WaitRemoteSdp> =
+            self.peers.take_inner_peer(to_peer_id)?;
+
+        let from_peer = from_peer.set_local_sdp(sdp_answer.clone());
+        let to_peer = to_peer.set_remote_sdp(&sdp_answer);
+
+        let to_member_id = to_peer.member_id();
+        let event = Event::SdpAnswerMade {
+            peer_id: to_peer_id,
+            sdp_answer,
+        };
+
+        self.peers.add_peer(from_peer_id, from_peer);
+        self.peers.add_peer(to_peer_id, to_peer);
+
+        Ok(Box::new(wrap_future(
+            self.participants.send_event_to_member(to_member_id, event),
+        )))
+    }
+
+    /// Sends Ice Candidate from the specified to the associated [`Peer`].
+    fn handle_set_ice_candidate(
+        &mut self,
+        from_peer_id: PeerId,
+        candidate: String,
+    ) -> Result<ActFuture<(), RoomError>, RoomError> {
+        let from_peer = self.peers.get_peer(from_peer_id)?;
+        if let PeerStateMachine::New(_) = from_peer {
+            return Err(RoomError::PeerStateError(PeerStateError::WrongState(
+                from_peer_id,
+                "Not New",
+                format!("{}", from_peer),
+            )));
+        }
+
+        let to_peer_id = from_peer.partner_peer_id();
+        let to_peer = self.peers.get_peer(to_peer_id)?;
+        if let PeerStateMachine::New(_) = to_peer {
+            return Err(RoomError::PeerStateError(PeerStateError::WrongState(
+                to_peer_id,
+                "Not New",
+                format!("{}", to_peer),
+            )));
+        }
+
+        let to_member_id = to_peer.member_id();
+        let event = Event::IceCandidateDiscovered {
+            peer_id: to_peer_id,
+            candidate,
+        };
+
+        Ok(Box::new(wrap_future(
+            self.participants.send_event_to_member(to_member_id, event),
+        )))
     }
 }
 
@@ -232,21 +255,6 @@ impl Handler<ConnectPeers> for Room {
         msg: ConnectPeers,
         ctx: &mut Self::Context,
     ) -> Self::Result {
-        //        let addr = ctx.address();
-        //        let fut = self
-        //            .participants
-        //            .send_event_to_member(member_id, peer_created)
-        //            .map_err(|err| {
-        //                error!(
-        //                    "Cannot start Peer [id = {}], because {}. Stopping
-        // room.",                    sender.id(),
-        //                    err,
-        //                );
-        //                addr.do_send(CloseRoom {})
-        //            });
-        //
-        //        Box::new(wrap_future(fut))
-
         let addr = ctx.address();
         let fut = match self.build_peer_created(msg.0, msg.1) {
             Ok((caller, event)) => {
@@ -276,7 +284,7 @@ impl Handler<Command> for Room {
         command: Command,
         ctx: &mut Self::Context,
     ) -> Self::Result {
-        let res = match command {
+        let result = match command {
             Command::MakeSdpOffer { peer_id, sdp_offer } => {
                 self.handle_make_sdp_offer(peer_id, sdp_offer)
             }
@@ -288,21 +296,27 @@ impl Handler<Command> for Room {
                 self.handle_set_ice_candidate(peer_id, candidate)
             }
         };
-        let addr = ctx.address();
-        let fut = match res {
-            Ok((caller, event)) => {
-                Either::A(self.participants.send_event_to_member(caller, event))
+
+        match result {
+            Ok(res) => {
+                Box::new(res.map_err(|err, _, ctx: &mut Context<Self>| {
+                    error!(
+                        "Failed handle command, because {}. Room will be \
+                         stopped.",
+                        err
+                    );
+                    ctx.notify(CloseRoom {})
+                }))
             }
-            Err(err) => Either::B(future::err(err)),
+            Err(err) => {
+                error!(
+                    "Failed handle command, because {}. Room will be stopped.",
+                    err
+                );
+                ctx.notify(CloseRoom {});
+                Box::new(wrap_future(future::ok(())))
+            }
         }
-        .map_err(move |err| {
-            error!(
-                "Failed handle command, because {}. Room will be stop.",
-                err
-            );
-            addr.do_send(CloseRoom {})
-        });
-        Box::new(wrap_future(fut))
     }
 }
 

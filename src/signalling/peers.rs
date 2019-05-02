@@ -21,6 +21,16 @@ impl PeerRepository {
         self.peers.insert(id, peer.into());
     }
 
+    /// Returns borrowed [`PeerStateMachine`] by its ID.
+    pub fn get_peer(
+        &self,
+        peer_id: PeerId,
+    ) -> Result<&PeerStateMachine, RoomError> {
+        self.peers
+            .get(&peer_id)
+            .ok_or_else(|| RoomError::UnknownPeer(peer_id))
+    }
+
     /// Returns borrowed [`Peer`] by its ID.
     pub fn get_inner_peer<'a, S>(
         &'a self,

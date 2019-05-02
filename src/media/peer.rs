@@ -9,8 +9,7 @@ use crate::{
     api::{
         control::MemberId,
         protocol::{
-            AudioSettings, Direction, Directional, Event, MediaType,
-            VideoSettings,
+            AudioSettings, Direction, Directional, MediaType, VideoSettings,
         },
     },
     media::{Track, TrackId},
@@ -35,7 +34,16 @@ pub enum PeerStateError {
                    Expected state {} was {}",
         _0, _1, _2
     )]
-    CantCast(Id, &'static str, String),
+    WrongState(Id, &'static str, String),
+}
+
+impl PeerStateError {
+    pub fn new_wrong_state(
+        peer: &PeerStateMachine,
+        expected: &'static str,
+    ) -> Self {
+        PeerStateError::WrongState(peer.id(), expected, format!("{}", peer))
+    }
 }
 
 /// Implementation state machine for [`Peer`].
@@ -124,7 +132,7 @@ macro_rules! impl_peer_converts {
             ) -> Result<Self, Self::Error> {
                 match peer {
                     PeerStateMachine::$peer_type(peer) => Ok(peer),
-                    _ => Err(PeerStateError::CantCast(
+                    _ => Err(PeerStateError::WrongState(
                         1,
                         stringify!($peer_type),
                         format!("{}", peer),
@@ -139,7 +147,7 @@ macro_rules! impl_peer_converts {
             fn try_from(peer: PeerStateMachine) -> Result<Self, Self::Error> {
                 match peer {
                     PeerStateMachine::$peer_type(peer) => Ok(peer),
-                    _ => Err(PeerStateError::CantCast(
+                    _ => Err(PeerStateError::WrongState(
                         1,
                         stringify!($peer_type),
                         format!("{}", peer),
@@ -297,14 +305,6 @@ impl Peer<New> {
 }
 
 impl Peer<WaitLocalSdp> {
-    pub fn get_peer_created(&self) -> Event {
-        Event::PeerCreated {
-            peer_id: self.context.id,
-            sdp_offer: self.context.sdp_offer.clone(),
-            tracks: self.tracks(),
-        }
-    }
-
     /// Set local description and transition [`Peer`]
     /// to [`WaitRemoteSDP`] state.
     pub fn set_local_sdp(self, sdp_offer: String) -> Peer<WaitRemoteSdp> {
