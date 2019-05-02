@@ -100,7 +100,7 @@ impl ParticipantService {
         match self.connections.get(&member_id) {
             Some(conn) => Either::A(
                 conn.send_event(event)
-                    .map_err(move |_| RoomError::UnableSendEvent(member_id)),
+                    .map_err(move |_| RoomError::UnableToSendEvent(member_id)),
             ),
             None => Either::B(future::err(RoomError::ConnectionNotExists(
                 member_id,

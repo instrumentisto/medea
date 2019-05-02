@@ -28,7 +28,7 @@ impl PeerRepository {
     ) -> Result<&PeerStateMachine, RoomError> {
         self.peers
             .get(&peer_id)
-            .ok_or_else(|| RoomError::UnknownPeer(peer_id))
+            .ok_or_else(|| RoomError::PeerNotFound(peer_id))
     }
 
     /// Returns borrowed [`Peer`] by its ID.
@@ -42,7 +42,7 @@ impl PeerRepository {
     {
         match self.peers.get(&peer_id) {
             Some(peer) => peer.try_into().map_err(Into::into),
-            None => Err(RoomError::UnknownPeer(peer_id)),
+            None => Err(RoomError::PeerNotFound(peer_id)),
         }
     }
 
@@ -76,7 +76,7 @@ impl PeerRepository {
     {
         match self.peers.remove(&peer_id) {
             Some(peer) => peer.try_into().map_err(Into::into),
-            None => Err(RoomError::UnknownPeer(peer_id)),
+            None => Err(RoomError::PeerNotFound(peer_id)),
         }
     }
 }

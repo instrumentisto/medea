@@ -1,4 +1,5 @@
-//! Room definitions and implementations.
+//! Room definitions and implementations. Room is responsible for media
+//! connection establishment between concrete [`Member`]s.
 
 use std::time::Duration;
 
@@ -13,10 +14,6 @@ use futures::{
 };
 use hashbrown::HashMap;
 
-use crate::media::peer::{
-    New, PeerStateError, WaitLocalHaveRemote, WaitLocalSdp, WaitRemoteSdp,
-};
-use crate::media::Peer;
 use crate::{
     api::{
         client::rpc_connection::{
@@ -27,7 +24,10 @@ use crate::{
         protocol::{Command, Event},
     },
     log::prelude::*,
-    media::{PeerId, PeerStateMachine},
+    media::{
+        New, Peer, PeerId, PeerStateError, PeerStateMachine,
+        WaitLocalHaveRemote, WaitLocalSdp, WaitRemoteSdp,
+    },
     signalling::{participants::ParticipantService, peers::PeerRepository},
 };
 
@@ -40,16 +40,16 @@ type ActFuture<I, E> = Box<dyn ActorFuture<Actor = Room, Item = I, Error = E>>;
 #[derive(Fail, Debug)]
 #[allow(clippy::module_name_repetitions)]
 pub enum RoomError {
-    #[fail(display = "Unknown peer {}", _0)]
-    UnknownPeer(PeerId),
-    #[fail(display = "Member {} not connected at moment", _0)]
+    #[fail(display = "Couldn't find Peer with [id = {}]", _0)]
+    PeerNotFound(PeerId),
+    #[fail(display = "Couldn't find RpcConnection with Member [id = {}]", _0)]
     ConnectionNotExists(MemberId),
-    #[fail(display = "Unable send event to member {}", _0)]
-    UnableSendEvent(MemberId),
-    #[fail(display = "Generic room error {}", _0)]
-    Generic(String),
+    #[fail(display = "Unable to send event to Member [id = {}]", _0)]
+    UnableToSendEvent(MemberId),
     #[fail(display = "PeerError: {}", _0)]
     PeerStateError(PeerStateError),
+    #[fail(display = "Generic room error {}", _0)]
+    BadRoomSpec(String),
 }
 
 impl From<PeerStateError> for RoomError {
@@ -104,7 +104,7 @@ impl Room {
         } else {
             self.peers.add_peer(peer1.id(), peer1);
             self.peers.add_peer(peer2.id(), peer2);
-            return Err(RoomError::Generic(format!(
+            return Err(RoomError::BadRoomSpec(format!(
                 "Error while trying to connect Peer [id = {}] and Peer [id = \
                  {}] cause neither of peers are senders",
                 peer1_id, peer2_id
