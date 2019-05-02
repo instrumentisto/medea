@@ -417,118 +417,17 @@ mod test {
         Arc, Mutex,
     };
 
-    use actix::{ActorContext, Addr, Arbiter, AsyncContext, System};
-    use futures::future::Future;
+    use actix::{Addr, Arbiter, System};
 
     use super::*;
     use crate::{
-        api::{
-            client::rpc_connection::{ClosedReason, RpcConnection},
-            protocol::{
-                AudioSettings, Direction, Directional, MediaType, VideoSettings,
-            },
+        api::protocol::{
+            AudioSettings, Direction, Directional, MediaType, VideoSettings,
         },
         media::create_peers,
     };
 
-    #[derive(Debug, Clone)]
-    struct TestConnection {
-        pub member_id: MemberId,
-        pub room: Addr<Room>,
-        pub events: Arc<Mutex<Vec<String>>>,
-        pub stopped: Arc<AtomicUsize>,
-    }
-
-    impl Actor for TestConnection {
-        type Context = Context<Self>;
-
-        fn started(&mut self, ctx: &mut Self::Context) {
-            self.room
-                .try_send(RpcConnectionEstablished {
-                    member_id: self.member_id,
-                    connection: Box::new(ctx.address()),
-                })
-                .unwrap();
-        }
-
-        fn stopped(&mut self, _ctx: &mut Self::Context) {
-            self.stopped.fetch_add(1, Ordering::Relaxed);
-            if self.stopped.load(Ordering::Relaxed) > 1 {
-                System::current().stop()
-            }
-        }
-    }
-
-    #[derive(Message)]
-    struct Close;
-
-    impl Handler<Close> for TestConnection {
-        type Result = ();
-
-        fn handle(&mut self, _: Close, ctx: &mut Self::Context) {
-            ctx.stop()
-        }
-    }
-
-    impl Handler<Event> for TestConnection {
-        type Result = ();
-
-        fn handle(&mut self, event: Event, _ctx: &mut Self::Context) {
-            let mut events = self.events.lock().unwrap();
-            events.push(serde_json::to_string(&event).unwrap());
-            match event {
-                Event::PeerCreated {
-                    peer_id,
-                    sdp_offer,
-                    tracks: _,
-                } => {
-                    match sdp_offer {
-                        Some(_) => self.room.do_send(Command::MakeSdpAnswer {
-                            peer_id,
-                            sdp_answer: "responder_answer".into(),
-                        }),
-                        None => self.room.do_send(Command::MakeSdpOffer {
-                            peer_id,
-                            sdp_offer: "caller_offer".into(),
-                        }),
-                    }
-                    self.room.do_send(Command::SetIceCandidate {
-                        peer_id,
-                        candidate: "ice_candidate".into(),
-                    })
-                },
-                Event::IceCandidateDiscovered {
-                    peer_id: _,
-                    candidate: _,
-                } => {
-                    self.room.do_send(RpcConnectionClosed {
-                        member_id: self.member_id,
-                        reason: ClosedReason::Closed,
-                    });
-                }
-                Event::PeersRemoved { peer_ids: _ } => {},
-                Event::SdpAnswerMade {
-                    peer_id:_,
-                    sdp_answer: _,
-                } => {},
-            }
-        }
-    }
-
-    impl RpcConnection for Addr<TestConnection> {
-        fn close(&mut self) -> Box<dyn Future<Item = (), Error = ()>> {
-            let fut = self.send(Close {}).map_err(|_| ());
-            Box::new(fut)
-        }
-
-        fn send_event(
-            &self,
-            event: Event,
-        ) -> Box<dyn Future<Item = (), Error = ()>> {
-            let fut = self.send(event).map_err(|_| ());
-            Box::new(fut)
-        }
-    }
+    use crate::api::client::rpc_connection::test::TestConnection;
 
     fn start_room() -> Addr<Room> {
         let members = hashmap! {
@@ -586,15 +485,18 @@ mod test {
                             media_type: MediaType::Video(VideoSettings {}),
                         },
                     ],
-                }).unwrap(),
+                })
+                .unwrap(),
                 serde_json::to_string(&Event::SdpAnswerMade {
                     peer_id: 1,
                     sdp_answer: "responder_answer".into(),
-                }).unwrap(),
+                })
+                .unwrap(),
                 serde_json::to_string(&Event::IceCandidateDiscovered {
                     peer_id: 1,
                     candidate: "ice_candidate".into(),
-                }).unwrap(),
+                })
+                .unwrap(),
             ]
         );
 
@@ -616,11 +518,13 @@ mod test {
                             media_type: MediaType::Video(VideoSettings {}),
                         },
                     ],
-                }).unwrap(),
+                })
+                .unwrap(),
                 serde_json::to_string(&Event::IceCandidateDiscovered {
                     peer_id: 2,
                     candidate: "ice_candidate".into(),
-                }).unwrap(),
+                })
+                .unwrap(),
             ]
         );
     }
