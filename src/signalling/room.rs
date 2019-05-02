@@ -528,26 +528,4 @@ mod test {
             ]
         );
     }
-
-    #[test]
-    fn close_responder_connection_without_caller() {
-        let stopped = Arc::new(AtomicUsize::new(1));
-        let stopped_clone = Arc::clone(&stopped);
-        let events = Arc::new(Mutex::new(vec![]));
-        let events_clone = Arc::clone(&events);
-
-        System::run(move || {
-            let room = start_room();
-            Arbiter::start(move |_| TestConnection {
-                events,
-                member_id: 2,
-                room,
-                stopped,
-            });
-        });
-
-        assert_eq!(stopped_clone.load(Ordering::Relaxed), 2);
-        let events = events_clone.lock().unwrap();
-        assert!(events.is_empty());
-    }
 }
