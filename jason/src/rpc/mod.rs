@@ -57,6 +57,20 @@ impl Inner {
     }
 }
 
+fn on_close(inner_rc: Rc<RefCell<Inner>>) -> Box<FnOnce(CloseMsg)> {
+    Box::new(move |msg: CloseMsg| {
+        let mut inner = inner_rc.borrow_mut();
+        inner.sock.take();
+        inner.pinger.stop();
+
+        // TODO: reconnect on disconnect, propagate error if unable
+        //       to reconnect
+        match msg {
+            CloseMsg::Normal(_msg) | CloseMsg::Disconnect(_msg) => {}
+        }
+    })
+}
+
 impl RPCClient {
     pub fn new(token: String, ping_interval: i32) -> Self {
         Self(Inner::new(token, ping_interval))
@@ -95,27 +109,10 @@ impl RPCClient {
                             err.log_err();
                         }
                     }
-
-
                 })?;
 
                 let inner_rc = Rc::clone(&inner);
-                socket.on_close(move |msg: CloseMsg| {
-
-
-                    let mut inner = inner_rc.borrow_mut();
-                    inner.sock.take();
-                    inner.pinger.stop();
-
-                    // TODO: reconnect on disconnect, propagate error if unable
-                    //       to reconnect
-                    match msg {
-                        CloseMsg::Normal(_msg) | CloseMsg::Disconnect(_msg) => {
-                        }
-                    }
-
-
-                })?;
+                socket.on_close(on_close(inner_rc))?;
 
                 inner.borrow_mut().sock.replace(socket);
                 Ok(())
