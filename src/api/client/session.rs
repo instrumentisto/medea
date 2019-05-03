@@ -3,10 +3,10 @@
 use std::time::{Duration, Instant};
 
 use actix::{
-    fut::wrap_future, Actor, ActorContext, Addr, AsyncContext, Handler,
-    Message, StreamHandler,
+    fut::wrap_future, Actor, ActorContext, ActorFuture, Addr, AsyncContext,
+    Handler, Message, StreamHandler,
 };
-use actix_web::ws::{self, CloseReason};
+use actix_web::ws::{self, CloseReason, WebsocketContext};
 use futures::future::Future;
 
 use crate::{
@@ -63,28 +63,31 @@ impl WsSession {
         }
     }
 
+    fn close_normal(&self, ctx: &mut WebsocketContext<Self>) {
+        ctx.notify(Close {
+            reason: Some(ws::CloseCode::Normal.into()),
+        });
+    }
+
     /// Start watchdog which will drop connection if now-last_activity >
     /// idle_timeout.
     fn start_watchdog(&mut self, ctx: &mut <Self as Actor>::Context) {
-        ctx.run_interval(Duration::new(1, 0), |sess, ctx| {
-            if Instant::now().duration_since(sess.last_activity)
-                > sess.idle_timeout
+        ctx.run_interval(Duration::new(1, 0), |session, ctx| {
+            if Instant::now().duration_since(session.last_activity)
+                > session.idle_timeout
             {
-                info!("WsSession of member {} is idle", sess.member_id);
-                if let Err(err) = sess.room.try_send(RpcConnectionClosed {
-                    member_id: sess.member_id,
+                info!("WsSession of member {} is idle", session.member_id);
+                if let Err(err) = session.room.try_send(RpcConnectionClosed {
+                    member_id: session.member_id,
                     reason: ClosedReason::Lost,
                 }) {
                     error!(
                         "WsSession of member {} failed to remove from Room, \
                          because: {:?}",
-                        sess.member_id, err,
+                        session.member_id, err,
                     )
                 }
-
-                ctx.notify(Close {
-                    reason: Some(ws::CloseCode::Normal.into()),
-                });
+                session.close_normal(ctx);
             }
         });
     }
@@ -103,37 +106,38 @@ impl Actor for WsSession {
         self.start_watchdog(ctx);
 
         let member_id = self.member_id;
-        let slf_addr = ctx.address();
-        let slf_addr2 = ctx.address();
-        ctx.wait(wrap_future(
-            self.room
-                .send(RpcConnectionEstablished {
-                    member_id: self.member_id,
-                    connection: Box::new(ctx.address()),
-                })
-                .map(move |auth_result| {
+        ctx.wait(
+            wrap_future(self.room.send(RpcConnectionEstablished {
+                member_id: self.member_id,
+                connection: Box::new(ctx.address()),
+            }))
+            .map(
+                move |auth_result,
+                      session: &mut Self,
+                      ctx: &mut ws::WebsocketContext<Self>| {
                     if let Err(e) = auth_result {
                         error!(
                             "Room rejected Established for member {}, cause \
                              {:?}",
                             member_id, e
                         );
-                        slf_addr.do_send(Close {
-                            reason: Some(ws::CloseCode::Normal.into()),
-                        });
+                        session.close_normal(ctx);
                     }
-                })
-                .map_err(move |send_err| {
+                },
+            )
+            .map_err(
+                move |send_err,
+                      session: &mut Self,
+                      ctx: &mut ws::WebsocketContext<Self>| {
                     error!(
                         "WsSession of member {} failed to join Room, because: \
                          {:?}",
                         member_id, send_err,
                     );
-                    slf_addr2.do_send(Close {
-                        reason: Some(ws::CloseCode::Normal.into()),
-                    });
-                }),
-        ));
+                    session.close_normal(ctx);
+                },
+            ),
+        );
     }
 
     fn stopped(&mut self, _ctx: &mut Self::Context) {
