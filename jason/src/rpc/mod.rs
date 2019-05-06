@@ -3,26 +3,18 @@
 mod pinger;
 mod websocket;
 
-pub mod protocol;
-
 use futures::{
     sync::mpsc::{unbounded, UnboundedSender},
     Future, Stream,
 };
 use js_sys::Date;
+use protocol::{ClientMsg, Command, Event, ServerMsg};
 
 use std::{cell::RefCell, rc::Rc, vec};
 
-use crate::{
-    rpc::protocol::{ClientMsg, ServerMsg},
-    utils::WasmErr,
-};
+use crate::utils::WasmErr;
 
-use self::{
-    pinger::Pinger,
-    protocol::{Command, Event},
-    websocket::WebSocket,
-};
+use self::{pinger::Pinger, websocket::WebSocket};
 
 /// Connection with remote was closed.
 pub enum CloseMsg {

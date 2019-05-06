@@ -2,15 +2,13 @@
 //! transport wrapper.
 use futures::future::{Future, IntoFuture};
 use futures::stream::Stream;
+use protocol::{ClientMsg, ServerMsg};
 use web_sys::{CloseEvent, Event, MessageEvent, WebSocket as BackingSocket};
 
 use std::{cell::RefCell, convert::TryFrom, rc::Rc};
 
 use crate::{
-    rpc::{
-        protocol::{ClientMsg, ServerMsg},
-        CloseMsg,
-    },
+    rpc::CloseMsg,
     utils::{EventListener, WasmErr},
 };
 
@@ -142,7 +140,7 @@ impl WebSocket {
             Rc::clone(&inner_mut.socket),
             "message",
             move |msg| {
-                let parsed = ServerMsg::try_from(&msg);
+                let parsed = ServerMsg::try_from(&msg).map_err(WasmErr::from);
 
                 f(parsed);
             },
@@ -198,19 +196,6 @@ impl Drop for WebSocket {
                 WasmErr::from(err).log_err();
             }
         }
-    }
-}
-
-impl TryFrom<&MessageEvent> for ServerMsg {
-    type Error = WasmErr;
-
-    fn try_from(msg: &MessageEvent) -> Result<Self, Self::Error> {
-        let payload = msg
-            .data()
-            .as_string()
-            .ok_or_else(|| WasmErr::from_str("Payload is not string"))?;
-
-        serde_json::from_str::<Self>(&payload).map_err(WasmErr::from)
     }
 }
 

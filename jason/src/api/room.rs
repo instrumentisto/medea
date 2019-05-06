@@ -4,13 +4,14 @@ use futures::{
     future::{Future, IntoFuture},
     stream::Stream,
 };
+use protocol::{Directional, Event};
 use wasm_bindgen::{prelude::*, JsValue};
 use wasm_bindgen_futures::spawn_local;
 use web_sys::console;
 
 use std::{cell::RefCell, rc::Rc};
 
-use crate::rpc::{protocol::DirectionalTrack, protocol::Event, RPCClient};
+use crate::rpc::RPCClient;
 
 #[allow(clippy::module_name_repetitions)]
 #[wasm_bindgen]
@@ -105,7 +106,7 @@ impl InnerRoom {
         &mut self,
         _peer_id: u64,
         _sdp_offer: &Option<String>,
-        _tracks: &[DirectionalTrack],
+        _tracks: &[Directional],
     ) {
         console::log_1(&JsValue::from_str("on_peer_created invoked"));
     }

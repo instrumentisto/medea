@@ -1,7 +1,17 @@
+#[cfg(feature = "jason")]
+use std::{borrow::Cow, convert::TryFrom};
+
+#[cfg(feature = "medea")]
+use actix::Message;
+#[cfg(feature = "jason")]
+use failure::Fail;
 use serde::{de::Deserializer, ser::Serializer, Deserialize, Serialize};
+#[cfg(feature = "jason")]
+use web_sys::MessageEvent;
 
 // TODO: should be properly shared between medea and jason
-#[cfg_attr(test, derive(PartialEq, Debug))]
+#[cfg_attr(test, derive(PartialEq))]
+#[cfg_attr(feature = "medea", derive(Message, Debug))]
 #[allow(dead_code)]
 /// Message sent by `Media Server` to `Client`.
 pub enum ServerMsg {
@@ -26,8 +36,10 @@ pub enum ClientMsg {
 
 /// WebSocket message from Web Client to Media Server.
 #[derive(Deserialize, Serialize)]
-#[cfg_attr(test, derive(PartialEq, Debug))]
 #[serde(tag = "command", content = "data")]
+#[cfg_attr(test, derive(PartialEq, Debug))]
+#[cfg_attr(feature = "medea", derive(Message))]
+#[cfg_attr(feature = "medea", rtype(result = "Result<(), ()>"))]
 #[allow(dead_code)]
 pub enum Command {
     /// Web Client sends SDP Offer.
@@ -40,67 +52,62 @@ pub enum Command {
 
 /// WebSocket message from Medea to Jason.
 #[derive(Deserialize, Serialize)]
-#[cfg_attr(test, derive(PartialEq, Debug))]
-#[allow(dead_code)]
 #[serde(tag = "event", content = "data")]
+#[cfg_attr(test, derive(PartialEq, Debug))]
+#[cfg_attr(feature = "medea", derive(Message))]
+#[allow(dead_code)]
 pub enum Event {
     /// Media Server notifies Web Client about necessity of RTCPeerConnection
     /// creation.
     PeerCreated {
         peer_id: u64,
         sdp_offer: Option<String>,
-        tracks: Vec<DirectionalTrack>,
+        tracks: Vec<Directional>,
     },
     /// Media Server notifies Web Client about necessity to apply specified SDP
     /// Answer to Web Client's RTCPeerConnection.
-    SdpAnswerMade {
-        peer_id: u64,
-        sdp_answer: String,
-    },
+    SdpAnswerMade { peer_id: u64, sdp_answer: String },
 
-    IceCandidateDiscovered {
-        peer_id: u64,
-        candidate: String,
-    },
+    /// Media Server notifies Web Client about necessity to apply specified
+    /// ICE Candidate.
+    IceCandidateDiscovered { peer_id: u64, candidate: String },
 
     /// Media Server notifies Web Client about necessity of RTCPeerConnection
     /// close.
-    PeersRemoved {
-        peer_ids: Vec<u64>,
-    },
+    PeersRemoved { peer_ids: Vec<u64> },
 }
 
 /// [`Track] with specified direction.
 #[derive(Deserialize, Serialize)]
-#[cfg_attr(test, derive(PartialEq, Debug))]
-pub struct DirectionalTrack {
+#[cfg_attr(test, derive(PartialEq))]
+pub struct Directional {
     pub id: u64,
-    pub direction: TrackDirection,
-    pub media_type: TrackMediaType,
+    pub direction: Direction,
+    pub media_type: MediaType,
 }
 
 /// Direction of [`Track`].
 #[derive(Deserialize, Serialize)]
-#[cfg_attr(test, derive(PartialEq, Debug))]
-pub enum TrackDirection {
+#[cfg_attr(test, derive(PartialEq))]
+pub enum Direction {
     Send { receivers: Vec<u64> },
     Recv { sender: u64 },
 }
 
 /// Type of [`Track`].
 #[derive(Deserialize, Serialize)]
-#[cfg_attr(test, derive(PartialEq, Debug))]
-pub enum TrackMediaType {
+#[cfg_attr(test, derive(PartialEq))]
+pub enum MediaType {
     Audio(AudioSettings),
     Video(VideoSettings),
 }
 
 #[derive(Deserialize, Serialize)]
-#[cfg_attr(test, derive(PartialEq, Debug))]
+#[cfg_attr(test, derive(PartialEq))]
 pub struct AudioSettings {}
 
 #[derive(Deserialize, Serialize)]
-#[cfg_attr(test, derive(PartialEq, Debug))]
+#[cfg_attr(test, derive(PartialEq))]
 pub struct VideoSettings {}
 
 impl Serialize for ClientMsg {
@@ -155,6 +162,7 @@ impl<'de> Deserialize<'de> for ClientMsg {
     }
 }
 
+#[cfg(feature = "medea")]
 impl Serialize for ServerMsg {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -206,9 +214,25 @@ impl<'de> Deserialize<'de> for ServerMsg {
     }
 }
 
+#[cfg(feature = "jason")]
+impl TryFrom<&MessageEvent> for ServerMsg {
+    type Error = serde_json::Error;
+
+    fn try_from(msg: &MessageEvent) -> Result<Self, Self::Error> {
+        use serde::de::Error;
+
+        let payload = msg
+            .data()
+            .as_string()
+            .ok_or_else(|| Error::custom("Payload is not string"))?;
+
+        serde_json::from_str::<Self>(&payload)
+    }
+}
+
 #[cfg(test)]
 mod test {
-    use crate::rpc::protocol::{ClientMsg, Command, Event, ServerMsg};
+    use super::*;
 
     #[test]
     fn command() {
@@ -217,7 +241,7 @@ mod test {
             sdp_offer: "offer".to_owned(),
         });
         #[cfg_attr(nightly, rustfmt::skip)]
-        let command_str =
+            let command_str =
             "{\
                 \"command\":\"MakeSdpOffer\",\
                 \"data\":{\
@@ -254,7 +278,7 @@ mod test {
             sdp_answer: "answer".to_owned(),
         });
         #[cfg_attr(nightly, rustfmt::skip)]
-        let event_str =
+            let event_str =
             "{\
                 \"event\":\"SdpAnswerMade\",\
                 \"data\":{\

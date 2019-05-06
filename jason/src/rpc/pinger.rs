@@ -1,9 +1,10 @@
+use protocol::ClientMsg;
 use wasm_bindgen::{prelude::*, JsCast};
 
 use std::{cell::RefCell, rc::Rc};
 
 use crate::{
-    rpc::{protocol::ClientMsg, websocket::WebSocket},
+    rpc::websocket::WebSocket,
     utils::{window, IntervalHandle, WasmErr},
 };
 
