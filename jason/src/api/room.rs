@@ -11,6 +11,7 @@ use web_sys::console;
 use std::{cell::RefCell, rc::Rc};
 
 use crate::rpc::{protocol::DirectionalTrack, protocol::Event, RPCClient};
+use crate::utils::WasmErr;
 
 #[allow(clippy::module_name_repetitions)]
 #[wasm_bindgen]
@@ -18,7 +19,23 @@ use crate::rpc::{protocol::DirectionalTrack, protocol::Event, RPCClient};
 pub struct RoomHandle(Rc<RefCell<Option<InnerRoom>>>);
 
 #[wasm_bindgen]
-impl RoomHandle {}
+impl RoomHandle {
+    /// on_local_media = function(error, stream)
+    pub fn on_local_stream(&mut self, on_local_media: js_sys::Function) {
+        match self.0.borrow_mut().as_mut() {
+            Some(inner) => {
+                inner.on_local_media.replace(on_local_media);
+            }
+            None => {
+                on_local_media.call2(
+                    &JsValue::NULL,
+                    &JsValue::NULL,
+                    &WasmErr::from_str("Detached state").into(),
+                );
+            }
+        }
+    }
+}
 
 /// Room handle being used by Rust external modules.
 pub struct Room(Rc<RefCell<Option<InnerRoom>>>);
@@ -93,11 +110,15 @@ impl Room {
 // handle (['Room']). Manages concrete RTCPeerConnections, handles Medea events.
 struct InnerRoom {
     rpc: Rc<RPCClient>,
+    on_local_media: Option<js_sys::Function>,
 }
 
 impl InnerRoom {
     fn new(rpc: Rc<RPCClient>) -> Rc<RefCell<Option<Self>>> {
-        Rc::new(RefCell::new(Some(Self { rpc })))
+        Rc::new(RefCell::new(Some(Self {
+            rpc,
+            on_local_media: None,
+        })))
     }
 
     /// Creates RTCPeerConnection with provided ID.
