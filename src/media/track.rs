@@ -1,4 +1,4 @@
-use crate::api::protocol::MediaType;
+use protocol::MediaType;
 
 /// ID of [`Track`].
 pub type Id = u64;

@@ -1,17 +1,12 @@
 #[cfg(feature = "jason")]
-use std::{borrow::Cow, convert::TryFrom};
+use std::convert::TryFrom;
 
-#[cfg(feature = "medea")]
-use actix::Message;
-#[cfg(feature = "jason")]
-use failure::Fail;
 use serde::{de::Deserializer, ser::Serializer, Deserialize, Serialize};
 #[cfg(feature = "jason")]
 use web_sys::MessageEvent;
 
 // TODO: should be properly shared between medea and jason
 #[cfg_attr(test, derive(PartialEq))]
-#[cfg_attr(feature = "medea", derive(Message, Debug))]
 #[allow(dead_code)]
 /// Message sent by `Media Server` to `Client`.
 pub enum ServerMsg {
@@ -38,8 +33,6 @@ pub enum ClientMsg {
 #[derive(Deserialize, Serialize)]
 #[serde(tag = "command", content = "data")]
 #[cfg_attr(test, derive(PartialEq, Debug))]
-#[cfg_attr(feature = "medea", derive(Message))]
-#[cfg_attr(feature = "medea", rtype(result = "Result<(), ()>"))]
 #[allow(dead_code)]
 pub enum Command {
     /// Web Client sends SDP Offer.
@@ -54,7 +47,6 @@ pub enum Command {
 #[derive(Deserialize, Serialize)]
 #[serde(tag = "event", content = "data")]
 #[cfg_attr(test, derive(PartialEq, Debug))]
-#[cfg_attr(feature = "medea", derive(Message))]
 #[allow(dead_code)]
 pub enum Event {
     /// Media Server notifies Web Client about necessity of RTCPeerConnection
@@ -95,18 +87,18 @@ pub enum Direction {
 }
 
 /// Type of [`Track`].
-#[derive(Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[cfg_attr(test, derive(PartialEq))]
 pub enum MediaType {
     Audio(AudioSettings),
     Video(VideoSettings),
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[cfg_attr(test, derive(PartialEq))]
 pub struct AudioSettings {}
 
-#[derive(Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[cfg_attr(test, derive(PartialEq))]
 pub struct VideoSettings {}
 
@@ -162,7 +154,6 @@ impl<'de> Deserialize<'de> for ClientMsg {
     }
 }
 
-#[cfg(feature = "medea")]
 impl Serialize for ServerMsg {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where

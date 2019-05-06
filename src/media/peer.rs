@@ -3,14 +3,12 @@
 use std::sync::Arc;
 
 use hashbrown::HashMap;
+use protocol::{
+    AudioSettings, Direction, Directional, MediaType, VideoSettings,
+};
 
 use crate::{
-    api::{
-        control::member::Id as MemberId,
-        protocol::{
-            AudioSettings, Direction, Directional, MediaType, VideoSettings,
-        },
-    },
+    api::control::member::Id as MemberId,
     media::track::{Id as TrackId, Track},
 };
 

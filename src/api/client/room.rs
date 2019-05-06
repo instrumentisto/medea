@@ -15,15 +15,15 @@ use futures::{
     Future,
 };
 use hashbrown::HashMap;
+use protocol::{Command, Event};
 
 use crate::{
     api::{
         client::rpc_connection::{
             AuthorizationError, Authorize, Closed, ClosedReason, Established,
-            RpcConnection,
+            MemberMessage, RoomMessage, RpcConnection,
         },
         control::{Id as MemberId, Member},
-        protocol::{Command, Event},
     },
     log::prelude::*,
     media::peer::{Id as PeerId, SignalingStateMachine},
@@ -129,7 +129,7 @@ impl Room {
     ) -> impl Future<Item = (), Error = Error> {
         match self.connections.get(&member_id) {
             Some(conn) => Either::A(
-                conn.send_event(event)
+                conn.send_event(RoomMessage::from(event))
                     .map_err(move |_| Error::UnableSendEvent(member_id)),
             ),
             None => {
@@ -397,7 +397,9 @@ impl Handler<Close> for Room {
                 } else {
                     futures.push(Either::B(
                         connection
-                            .send_event(Event::PeersRemoved { peer_ids })
+                            .send_event(RoomMessage::from(
+                                Event::PeersRemoved { peer_ids },
+                            ))
                             .then(move |_| connection.close()),
                     ));
                 }
@@ -447,17 +449,17 @@ impl Handler<StartSignaling> for Room {
     }
 }
 
-impl Handler<Command> for Room {
+impl Handler<MemberMessage> for Room {
     type Result = ActFuture<(), ()>;
 
     /// Receives [`Command`] from Web client and changes state of interconnected
     /// [`Peer`]s.
     fn handle(
         &mut self,
-        command: Command,
+        command: MemberMessage,
         ctx: &mut Self::Context,
     ) -> Self::Result {
-        let res = match command {
+        let res = match command.into() {
             Command::MakeSdpOffer { peer_id, sdp_offer } => {
                 self.handle_make_sdp_offer(peer_id, sdp_offer)
             }
@@ -548,14 +550,12 @@ mod test {
 
     use actix::{ActorContext, Arbiter, AsyncContext, System};
     use futures::future::Future;
+    use protocol::{
+        AudioSettings, Direction, Directional, MediaType, VideoSettings,
+    };
 
     use super::*;
-    use crate::{
-        api::protocol::{
-            AudioSettings, Direction, Directional, MediaType, VideoSettings,
-        },
-        media::peer::create_peers,
-    };
+    use crate::media::peer::create_peers;
 
     #[derive(Debug, Clone)]
     struct TestConnection {

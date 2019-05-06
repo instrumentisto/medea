@@ -1,10 +1,21 @@
 //! [`RpcConnection`] with related messages.
 use actix::Message;
 use futures::Future;
+use protocol::{Command, Event};
 
-use crate::api::{control::Id as MemberId, protocol::Event};
+use crate::api::control::Id as MemberId;
 
 use std::fmt;
+
+macro_attr! {
+    #[derive(Message, NewtypeFrom!)]
+    #[rtype(result = "Result<(), ()>")]
+    pub struct MemberMessage(Command);
+}
+macro_attr! {
+    #[derive(Message, NewtypeFrom!)]
+    pub struct RoomMessage(Event);
+}
 
 /// Abstraction over RPC connection with some remote [`Member`].
 pub trait RpcConnection: fmt::Debug + Send {
@@ -16,7 +27,7 @@ pub trait RpcConnection: fmt::Debug + Send {
     /// Sends [`Event`] to remote [`Member`].
     fn send_event(
         &self,
-        event: Event,
+        event: RoomMessage,
     ) -> Box<dyn Future<Item = (), Error = ()>>;
 }
 

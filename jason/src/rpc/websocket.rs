@@ -1,7 +1,6 @@
 //! ['WebSocket'](https://developer.mozilla.org/ru/docs/WebSockets)
 //! transport wrapper.
 use futures::future::{Future, IntoFuture};
-use futures::stream::Stream;
 use protocol::{ClientMsg, ServerMsg};
 use web_sys::{CloseEvent, Event, MessageEvent, WebSocket as BackingSocket};
 
