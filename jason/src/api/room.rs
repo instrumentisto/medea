@@ -10,9 +10,10 @@ use web_sys::console;
 
 use std::{cell::RefCell, rc::Rc};
 
+use crate::api::stream::{MediaCaps, MediaManager, MediaStream};
+use crate::api::MediaStreamHandle;
 use crate::rpc::{protocol::DirectionalTrack, protocol::Event, RPCClient};
-use crate::utils::WasmErr;
-use crate::api::stream::MediaManager;
+use crate::utils::{Callback, WasmErr};
 
 #[allow(clippy::module_name_repetitions)]
 #[wasm_bindgen]
@@ -21,18 +22,14 @@ pub struct RoomHandle(Rc<RefCell<Option<InnerRoom>>>);
 
 #[wasm_bindgen]
 impl RoomHandle {
-    /// on_local_media = function(error, stream)
-    pub fn on_local_stream(&mut self, on_local_media: js_sys::Function) {
+    pub fn on_local_stream(&mut self, f: js_sys::Function) {
         match self.0.borrow_mut().as_mut() {
             Some(inner) => {
-                inner.on_local_media.replace(on_local_media);
+                inner.on_local_media.set_func(f);
             }
             None => {
-                on_local_media.call2(
-                    &JsValue::NULL,
-                    &JsValue::NULL,
-                    &WasmErr::from_str("Detached state").into(),
-                );
+                let f: Callback<i32, WasmErr> = f.into();
+                f.call_err(WasmErr::from_str("Detached state"));
             }
         }
     }
@@ -42,7 +39,7 @@ impl RoomHandle {
 pub struct Room(Rc<RefCell<Option<InnerRoom>>>);
 
 impl Room {
-    pub fn new(rpc: Rc<RPCClient>, media_manager:Rc<MediaManager>) -> Self {
+    pub fn new(rpc: Rc<RPCClient>, media_manager: Rc<MediaManager>) -> Self {
         Self(InnerRoom::new(rpc, media_manager))
     }
 
@@ -93,7 +90,9 @@ impl Room {
                     None => {
                         // InnerSession is gone, which means that Room was
                         // dropped. Not supposed to happen, since InnerSession
-                        // should drop its tx by unsubbing from RpcClient.
+                        // should drop its tx by unsubbing from RpcClient,
+                        // meaning that current stream is supposed to resolve
+                        // before InnerSession drop.
                         Err(())
                     }
                 }
@@ -107,21 +106,29 @@ impl Room {
     }
 }
 
-// Actual room. Shared between JS-side handle (['RoomHandle']) and Rust-side
-// handle (['Room']). Manages concrete RTCPeerConnections, handles Medea events.
+/// Actual room. Shared between JS-side handle (['RoomHandle']) and Rust-side
+/// handle (['Room']). Manages concrete RTCPeerConnections, handles Medea
+/// events.
 struct InnerRoom {
     rpc: Rc<RPCClient>,
-    media_manager:Rc<MediaManager>,
-    on_local_media: Option<js_sys::Function>,
+    media_manager: Rc<MediaManager>,
+    on_local_media: Rc<Callback<MediaStreamHandle, WasmErr>>,
 }
 
 impl InnerRoom {
-    fn new(rpc: Rc<RPCClient>, media_manager:Rc<MediaManager>) -> Rc<RefCell<Option<Self>>> {
+    fn new(
+        rpc: Rc<RPCClient>,
+        media_manager: Rc<MediaManager>,
+    ) -> Rc<RefCell<Option<Self>>> {
         Rc::new(RefCell::new(Some(Self {
             rpc,
             media_manager,
-            on_local_media: None,
+            on_local_media: Rc::new(Callback::new()),
         })))
+    }
+
+    fn on_local_media(&self, f: js_sys::Function) {
+        self.on_local_media.set_func(f);
     }
 
     /// Creates RTCPeerConnection with provided ID.
@@ -131,6 +138,22 @@ impl InnerRoom {
         _sdp_offer: &Option<String>,
         _tracks: &[DirectionalTrack],
     ) {
+        let on_local_media = Rc::clone(&self.on_local_media);
+        match MediaCaps::new(true, true) {
+            Err(err) => {
+                on_local_media.call_err(err);
+            }
+            Ok(caps) => {
+                let fut =
+                    self.media_manager.get_stream(caps).then(move |result| {
+                        on_local_media
+                            .call(result.map(|stream| stream.new_handle()));
+                        Ok(())
+                    });
+                spawn_local(fut);
+            }
+        }
+
         console::log_1(&JsValue::from_str("on_peer_created invoked"));
     }
 

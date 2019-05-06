@@ -5,4 +5,4 @@ mod stream;
 
 pub use self::jason::Jason;
 pub use self::room::RoomHandle;
-pub use self::stream::StreamHandle;
+pub use self::stream::MediaStreamHandle;

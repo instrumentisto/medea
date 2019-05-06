@@ -6,22 +6,21 @@ use std::convert::TryFrom;
 use std::rc::Rc;
 use wasm_bindgen::{prelude::*, JsValue};
 use wasm_bindgen_futures::JsFuture;
-use web_sys::{MediaStream, MediaStreamTrack};
+use web_sys::{MediaStream as BackingMediaStream, MediaStreamTrack};
 
 #[derive(Default)]
 pub struct MediaManager(Rc<RefCell<InnerMediaManager>>);
 
 #[derive(Default)]
 struct InnerMediaManager {
-    streams: Vec<Rc<Stream>>,
+    streams: Vec<Rc<MediaStream>>,
 }
 
 impl MediaManager {
-
     pub fn get_stream(
-        &mut self,
+        &self,
         caps: MediaCaps,
-    ) -> impl Future<Item = Rc<Stream>, Error = WasmErr> {
+    ) -> impl Future<Item = Rc<MediaStream>, Error = WasmErr> {
         // TODO: lookup stream by its caps, return its copy
 
         let stream = match self.inner_get_stream(&caps) {
@@ -32,8 +31,8 @@ impl MediaManager {
         let inner = Rc::clone(&self.0);
         let fut = stream
             .and_then(move |stream| {
-                let stream = Stream::new(MediaStream::from(stream))?;
-
+                let stream =
+                    MediaStream::new(BackingMediaStream::from(stream))?;
                 inner.borrow_mut().streams.push(Rc::clone(&stream));
                 Ok(stream)
             })
@@ -60,7 +59,7 @@ pub struct MediaCaps {
 }
 
 impl MediaCaps {
-    fn new(audio: bool, video: bool) -> Result<MediaCaps, WasmErr> {
+    pub fn new(audio: bool, video: bool) -> Result<MediaCaps, WasmErr> {
         if !audio && !video {
             return Err(WasmErr::from_str(
                 "MediaCaps should have video, audio, or both",
@@ -88,25 +87,25 @@ struct InnerStream {
     video: Option<MediaStreamTrack>,
 }
 
-struct Stream(Rc<RefCell<Option<InnerStream>>>);
+pub struct MediaStream(Rc<RefCell<Option<InnerStream>>>);
 
-impl Stream {
-    pub fn new(stream: MediaStream) -> Result<Rc<Self>, WasmErr> {
+impl MediaStream {
+    pub fn new(stream: BackingMediaStream) -> Result<Rc<Self>, WasmErr> {
         Ok(Rc::new(Self(Rc::new(RefCell::new(Some(
             InnerStream::try_from(stream)?,
         ))))))
     }
 
-    pub fn new_handle(&self) -> StreamHandle {
-        StreamHandle(Rc::clone(&self.0))
+    pub fn new_handle(&self) -> MediaStreamHandle {
+        MediaStreamHandle(Rc::clone(&self.0))
     }
 }
 
 #[wasm_bindgen]
-pub struct StreamHandle(Rc<RefCell<Option<InnerStream>>>);
+pub struct MediaStreamHandle(Rc<RefCell<Option<InnerStream>>>);
 
 #[wasm_bindgen]
-impl StreamHandle {
+impl MediaStreamHandle {
     pub fn get_audio_track(&self) -> Result<Option<MediaStreamTrack>, JsValue> {
         match self.0.borrow().as_ref() {
             Some(inner) => Ok(inner.audio.as_ref().cloned()),
@@ -122,10 +121,10 @@ impl StreamHandle {
     }
 }
 
-impl TryFrom<MediaStream> for InnerStream {
+impl TryFrom<BackingMediaStream> for InnerStream {
     type Error = WasmErr;
 
-    fn try_from(media_stream: MediaStream) -> Result<Self, Self::Error> {
+    fn try_from(media_stream: BackingMediaStream) -> Result<Self, Self::Error> {
         let mut stream = InnerStream {
             audio: None,
             video: None,
