@@ -12,6 +12,7 @@ use std::{cell::RefCell, rc::Rc};
 
 use crate::rpc::{protocol::DirectionalTrack, protocol::Event, RPCClient};
 use crate::utils::WasmErr;
+use crate::api::stream::MediaManager;
 
 #[allow(clippy::module_name_repetitions)]
 #[wasm_bindgen]
@@ -41,8 +42,8 @@ impl RoomHandle {
 pub struct Room(Rc<RefCell<Option<InnerRoom>>>);
 
 impl Room {
-    pub fn new(rpc: Rc<RPCClient>) -> Self {
-        Self(InnerRoom::new(rpc))
+    pub fn new(rpc: Rc<RPCClient>, media_manager:Rc<MediaManager>) -> Self {
+        Self(InnerRoom::new(rpc, media_manager))
     }
 
     pub fn new_handle(&self) -> RoomHandle {
@@ -110,13 +111,15 @@ impl Room {
 // handle (['Room']). Manages concrete RTCPeerConnections, handles Medea events.
 struct InnerRoom {
     rpc: Rc<RPCClient>,
+    media_manager:Rc<MediaManager>,
     on_local_media: Option<js_sys::Function>,
 }
 
 impl InnerRoom {
-    fn new(rpc: Rc<RPCClient>) -> Rc<RefCell<Option<Self>>> {
+    fn new(rpc: Rc<RPCClient>, media_manager:Rc<MediaManager>) -> Rc<RefCell<Option<Self>>> {
         Rc::new(RefCell::new(Some(Self {
             rpc,
+            media_manager,
             on_local_media: None,
         })))
     }

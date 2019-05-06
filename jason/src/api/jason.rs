@@ -37,13 +37,14 @@ impl Jason {
     /// Effectively returns Result<RoomHandle, JsValue>
     pub fn join_room(&self, token: String) -> Promise {
         let mut rpc = RPCClient::new(token, 3000);
+        let media_manager = Rc::clone(&self.0.borrow().media_manager);
 
         let inner = Rc::clone(&self.0);
         let fut = rpc
             .init()
             .and_then(move |()| {
                 let rpc = Rc::new(rpc);
-                let room = Room::new(Rc::clone(&rpc));
+                let room = Room::new(Rc::clone(&rpc), media_manager);
                 room.subscribe(&rpc);
 
                 let handle = room.new_handle();
