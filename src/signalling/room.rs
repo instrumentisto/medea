@@ -8,17 +8,17 @@ use actix::{
 use failure::Fail;
 use futures::future;
 use hashbrown::HashMap;
+use protocol::{Command, Event};
 
 use std::time::Duration;
 
 use crate::{
     api::{
         client::rpc_connection::{
-            AuthorizationError, Authorize, RpcConnectionClosed,
+            AuthorizationError, Authorize, CommandMessage, RpcConnectionClosed,
             RpcConnectionEstablished,
         },
         control::{Member, MemberId},
-        protocol::{Command, Event},
     },
     log::prelude::*,
     media::{
@@ -285,17 +285,17 @@ impl Handler<ConnectPeers> for Room {
     }
 }
 
-impl Handler<Command> for Room {
+impl Handler<CommandMessage> for Room {
     type Result = ActFuture<(), ()>;
 
     /// Receives [`Command`] from Web client and passes it to corresponding
     /// handlers. Will emit [`CloseRoom`] on any error.
     fn handle(
         &mut self,
-        command: Command,
+        msg: CommandMessage,
         ctx: &mut Self::Context,
     ) -> Self::Result {
-        let result = match command {
+        let result = match msg.into() {
             Command::MakeSdpOffer { peer_id, sdp_offer } => {
                 self.handle_make_sdp_offer(peer_id, sdp_offer)
             }
@@ -418,14 +418,12 @@ mod test {
     };
 
     use actix::{Addr, Arbiter, System};
+    use protocol::{
+        AudioSettings, Direction, Directional, MediaType, VideoSettings,
+    };
 
     use super::*;
-    use crate::{
-        api::protocol::{
-            AudioSettings, Direction, Directional, MediaType, VideoSettings,
-        },
-        media::create_peers,
-    };
+    use crate::media::create_peers;
 
     use crate::api::client::rpc_connection::test::TestConnection;
 

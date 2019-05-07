@@ -7,14 +7,16 @@ use crate::api::control::MemberId;
 
 use std::fmt;
 
+/// Wrapper [`Command`] for implements actix [`Message`].
 macro_attr! {
     #[derive(Message, NewtypeFrom!)]
     #[rtype(result = "Result<(), ()>")]
-    pub struct MemberMessage(Command);
+    pub struct CommandMessage(Command);
 }
+/// Wrapper [`Event`] for implements actix [`Message`].
 macro_attr! {
     #[derive(Message, NewtypeFrom!)]
-    pub struct RoomMessage(Event);
+    pub struct EventMessage(Event);
 }
 
 /// Abstraction over RPC connection with some remote [`Member`].
@@ -27,7 +29,7 @@ pub trait RpcConnection: fmt::Debug + Send {
     /// Sends [`Event`] to remote [`Member`].
     fn send_event(
         &self,
-        event: RoomMessage,
+        msg: EventMessage,
     ) -> Box<dyn Future<Item = (), Error = ()>>;
 }
 
@@ -92,15 +94,15 @@ pub mod test {
         System,
     };
     use futures::future::Future;
+    use protocol::{Command, Event};
 
     use crate::{
         api::{
             client::rpc_connection::{
-                ClosedReason, RpcConnection, RpcConnectionClosed,
-                RpcConnectionEstablished,
+                ClosedReason, CommandMessage, EventMessage, RpcConnection,
+                RpcConnectionClosed, RpcConnectionEstablished,
             },
             control::MemberId,
-            protocol::{Command, Event},
         },
         signalling::Room,
     };
@@ -145,11 +147,12 @@ pub mod test {
         }
     }
 
-    impl Handler<Event> for TestConnection {
+    impl Handler<EventMessage> for TestConnection {
         type Result = ();
 
-        fn handle(&mut self, event: Event, _ctx: &mut Self::Context) {
+        fn handle(&mut self, msg: EventMessage, _ctx: &mut Self::Context) {
             let mut events = self.events.lock().unwrap();
+            let event = msg.into();
             events.push(serde_json::to_string(&event).unwrap());
             match event {
                 Event::PeerCreated {
@@ -158,19 +161,25 @@ pub mod test {
                     tracks: _,
                 } => {
                     match sdp_offer {
-                        Some(_) => self.room.do_send(Command::MakeSdpAnswer {
-                            peer_id,
-                            sdp_answer: "responder_answer".into(),
-                        }),
-                        None => self.room.do_send(Command::MakeSdpOffer {
-                            peer_id,
-                            sdp_offer: "caller_offer".into(),
-                        }),
+                        Some(_) => self.room.do_send(CommandMessage::from(
+                            Command::MakeSdpAnswer {
+                                peer_id,
+                                sdp_answer: "responder_answer".into(),
+                            },
+                        )),
+                        None => self.room.do_send(CommandMessage::from(
+                            Command::MakeSdpOffer {
+                                peer_id,
+                                sdp_offer: "caller_offer".into(),
+                            },
+                        )),
                     }
-                    self.room.do_send(Command::SetIceCandidate {
-                        peer_id,
-                        candidate: "ice_candidate".into(),
-                    })
+                    self.room.do_send(CommandMessage::from(
+                        Command::SetIceCandidate {
+                            peer_id,
+                            candidate: "ice_candidate".into(),
+                        },
+                    ))
                 }
                 Event::IceCandidateDiscovered {
                     peer_id: _,
@@ -198,9 +207,9 @@ pub mod test {
 
         fn send_event(
             &self,
-            event: Event,
+            msg: EventMessage,
         ) -> Box<dyn Future<Item = (), Error = ()>> {
-            let fut = self.send(event).map_err(|_| ());
+            let fut = self.send(msg).map_err(|_| ());
             Box::new(fut)
         }
     }

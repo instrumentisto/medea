@@ -3,23 +3,22 @@
 //! [`RpcConnection`] authorization, establishment, message sending.
 
 use actix::{fut::wrap_future, AsyncContext, Context, SpawnHandle};
-use hashbrown::HashMap;
-
 use futures::{
     future::{self, join_all, Either},
     Future,
 };
+use hashbrown::HashMap;
+use protocol::Event;
 
 use std::time::{Duration, Instant};
 
 use crate::{
     api::{
         client::rpc_connection::{
-            AuthorizationError, ClosedReason, RpcConnection,
+            AuthorizationError, ClosedReason, EventMessage, RpcConnection,
             RpcConnectionClosed,
         },
         control::{Member, MemberId},
-        protocol::Event,
     },
     log::prelude::*,
     signalling::{
@@ -99,7 +98,7 @@ impl ParticipantService {
     ) -> impl Future<Item = (), Error = RoomError> {
         match self.connections.get(&member_id) {
             Some(conn) => Either::A(
-                conn.send_event(event)
+                conn.send_event(EventMessage::from(event))
                     .map_err(move |_| RoomError::UnableToSendEvent(member_id)),
             ),
             None => Either::B(future::err(RoomError::ConnectionNotExists(
