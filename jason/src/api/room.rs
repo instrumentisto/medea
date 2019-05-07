@@ -11,11 +11,11 @@ use web_sys::console;
 
 use std::{cell::RefCell, rc::Rc};
 
+
 use crate::{
     api::{
-        MediaStreamHandle,
-        stream::{MediaCaps, MediaManager}
     },
+    media::{MediaManager, MediaCaps, MediaStreamHandle},
     rpc::RPCClient,
     utils::{Callback, WasmErr},
 };

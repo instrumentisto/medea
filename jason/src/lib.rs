@@ -4,6 +4,7 @@ extern crate macro_attr;
 extern crate newtype_derive;
 
 mod api;
+mod media;
 mod rpc;
 mod utils;
 

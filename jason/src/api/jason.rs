@@ -8,7 +8,8 @@ use wasm_bindgen_futures::future_to_promise;
 use std::{cell::RefCell, rc::Rc};
 
 use crate::{
-    api::{room::Room, stream::MediaManager},
+    api::{room::Room},
+    media::MediaManager,
     rpc::RPCClient,
     set_panic_hook,
 };
