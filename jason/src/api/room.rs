@@ -10,10 +10,14 @@ use web_sys::console;
 
 use std::{cell::RefCell, rc::Rc};
 
-use crate::api::stream::{MediaCaps, MediaManager, MediaStream};
-use crate::api::MediaStreamHandle;
-use crate::rpc::{protocol::DirectionalTrack, protocol::Event, RPCClient};
-use crate::utils::{Callback, WasmErr};
+use crate::{
+    api::{
+        MediaStreamHandle,
+        stream::{MediaCaps, MediaManager}
+    },
+    rpc::{protocol::DirectionalTrack, protocol::Event, RPCClient},
+    utils::{Callback, WasmErr},
+};
 
 #[allow(clippy::module_name_repetitions)]
 #[wasm_bindgen]

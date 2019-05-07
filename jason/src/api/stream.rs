@@ -2,11 +2,10 @@ use crate::utils::{window, WasmErr};
 use futures::future::{self, Either};
 use futures::Future;
 use std::cell::RefCell;
-use std::convert::TryFrom;
 use std::rc::Rc;
 use wasm_bindgen::{prelude::*, JsValue};
 use wasm_bindgen_futures::JsFuture;
-use web_sys::{MediaStream as BackingMediaStream, MediaStreamTrack};
+use web_sys::MediaStream as BackingMediaStream;
 
 #[derive(Default)]
 pub struct MediaManager(Rc<RefCell<InnerMediaManager>>);
@@ -31,8 +30,7 @@ impl MediaManager {
         let inner = Rc::clone(&self.0);
         let fut = stream
             .and_then(move |stream| {
-                let stream =
-                    MediaStream::new(BackingMediaStream::from(stream))?;
+                let stream = MediaStream::new(BackingMediaStream::from(stream));
                 inner.borrow_mut().streams.push(Rc::clone(&stream));
                 Ok(stream)
             })
@@ -83,17 +81,15 @@ impl From<&MediaCaps> for web_sys::MediaStreamConstraints {
 }
 
 struct InnerStream {
-    audio: Option<MediaStreamTrack>,
-    video: Option<MediaStreamTrack>,
+    stream: BackingMediaStream,
 }
 
+#[allow(clippy::module_name_repetitions)]
 pub struct MediaStream(Rc<RefCell<Option<InnerStream>>>);
 
 impl MediaStream {
-    pub fn new(stream: BackingMediaStream) -> Result<Rc<Self>, WasmErr> {
-        Ok(Rc::new(Self(Rc::new(RefCell::new(Some(
-            InnerStream::try_from(stream)?,
-        ))))))
+    pub fn new(stream: BackingMediaStream) -> Rc<Self> {
+        Rc::new(Self(Rc::new(RefCell::new(Some(InnerStream::from(stream))))))
     }
 
     pub fn new_handle(&self) -> MediaStreamHandle {
@@ -106,60 +102,18 @@ pub struct MediaStreamHandle(Rc<RefCell<Option<InnerStream>>>);
 
 #[wasm_bindgen]
 impl MediaStreamHandle {
-    pub fn get_audio_track(&self) -> Result<Option<MediaStreamTrack>, JsValue> {
+    pub fn get_media_stream(&self) -> Result<BackingMediaStream, JsValue> {
         match self.0.borrow().as_ref() {
-            Some(inner) => Ok(inner.audio.as_ref().cloned()),
-            None => Err(WasmErr::from_str("Detached state").into()),
-        }
-    }
-
-    pub fn get_video_track(&self) -> Result<Option<MediaStreamTrack>, JsValue> {
-        match self.0.borrow().as_ref() {
-            Some(inner) => Ok(inner.video.as_ref().cloned()),
+            Some(inner) => Ok(inner.stream.clone()),
             None => Err(WasmErr::from_str("Detached state").into()),
         }
     }
 }
 
-impl TryFrom<BackingMediaStream> for InnerStream {
-    type Error = WasmErr;
-
-    fn try_from(media_stream: BackingMediaStream) -> Result<Self, Self::Error> {
-        let mut stream = InnerStream {
-            audio: None,
-            video: None,
-        };
-
-        let audio_tracks = js_sys::try_iter(&media_stream.get_audio_tracks())?
-            .ok_or_else(|| {
-                WasmErr::from_str("MediaStream.get_audio_tracks() != Array")
-            })?;
-
-        for track in audio_tracks {
-            let track = MediaStreamTrack::from(track?);
-
-            if stream.audio.replace(track).is_some() {
-                Err(WasmErr::from_str(
-                    "Can handle only one audio track per stream",
-                ))?;
-            }
+impl From<BackingMediaStream> for InnerStream {
+    fn from(media_stream: BackingMediaStream) -> Self {
+        InnerStream {
+            stream: media_stream,
         }
-
-        let video_tracks = js_sys::try_iter(&media_stream.get_video_tracks())?
-            .ok_or_else(|| {
-                WasmErr::from_str("MediaStream.get_video_tracks() != Array")
-            })?;
-
-        for track in video_tracks {
-            let track = MediaStreamTrack::from(track?);
-
-            if stream.video.replace(track).is_some() {
-                Err(WasmErr::from_str(
-                    "Can handle only one video track per stream",
-                ))?;
-            }
-        }
-
-        Ok(stream)
     }
 }

@@ -8,20 +8,13 @@ async function f() {
 
     caller_room_handle.on_local_stream(function (stream, error) {
         if (stream) {
-            console.log(stream);
             var video = document.createElement("video");
 
-
-            console.log(stream.get_audio_track());
-            console.log(stream.get_video_track());
-
-            video.srcObject = stream.get_audio_track();
-            video.srcObject = stream.get_video_track();
-
-            console.log(video);
+            console.log(stream.get_media_stream());
+            video.srcObject = stream.get_media_stream();
 
             document.body.appendChild(video);
-            console.log(document);
+            video.play();
         } else {
             console.log(error);
         }
@@ -41,4 +34,8 @@ async function f() {
     // responder.dispose();
 }
 
-f();
+window.onload = function () {
+  f();
+};
+
+
