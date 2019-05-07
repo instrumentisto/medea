@@ -98,7 +98,7 @@ impl WebSocket {
                     "close",
                     move |_| {
                         inner.borrow_mut().update_state();
-                        tx_close.send(());
+                        let _ = tx_close.send(());
                     },
                 )?);
 
@@ -108,7 +108,7 @@ impl WebSocket {
                     "open",
                     move |_| {
                         inner.borrow_mut().update_state();
-                        tx_open.send(());
+                        let _ = tx_open.send(());
                     },
                 )?);
 
@@ -143,7 +143,7 @@ impl WebSocket {
             "message",
             move |msg| {
                 let parsed =
-                    ServerMessage::try_from(&msg).map(|msg| msg.into());
+                    ServerMessage::try_from(&msg).map(std::convert::Into::into);
 
                 f(parsed);
             },
