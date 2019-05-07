@@ -6,24 +6,22 @@ extern crate macro_attr;
 extern crate newtype_derive;
 
 #[macro_use]
-mod utils;
-
+pub mod utils;
 pub mod api;
 pub mod conf;
 pub mod log;
 pub mod media;
+pub mod signalling;
 
 use actix::prelude::*;
 use dotenv::dotenv;
 use log::prelude::*;
 
 use crate::{
-    api::{
-        client::{server, Room, RoomsRepository},
-        control::Member,
-    },
+    api::{client::server, control::Member},
     conf::Conf,
-    media::peer::create_peers,
+    media::create_peers,
+    signalling::{Room, RoomsRepository},
 };
 
 fn main() {

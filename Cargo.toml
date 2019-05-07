@@ -48,3 +48,4 @@ toml = "0.4"
 [dev-dependencies]
 serial_test = "0.2"
 serial_test_derive = "0.2"
+tokio = "0.1"

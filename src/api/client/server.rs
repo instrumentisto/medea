@@ -7,15 +7,17 @@ use actix_web::{
 use futures::{future, Future as _};
 use serde::Deserialize;
 
-use crate::api::client::WsSession;
 use crate::{
-    api::client::rpc_connection::{AuthorizationError, Authorize},
     api::{
-        client::room::{Id as RoomId, RoomsRepository},
-        control::Id as MemberId,
+        client::{
+            rpc_connection::{AuthorizationError, Authorize},
+            session::WsSession,
+        },
+        control::MemberId,
     },
     conf::{Conf, Rpc},
     log::prelude::*,
+    signalling::{RoomId, RoomsRepository},
 };
 
 /// Parameters of new WebSocket connection creation HTTP request.
@@ -107,9 +109,10 @@ mod test {
     use futures::Stream;
 
     use crate::{
-        api::{client::Room, control::Member},
+        api::control::Member,
         conf::{Conf, Server},
-        media::peer::create_peers,
+        media::create_peers,
+        signalling::Room,
     };
 
     use super::*;

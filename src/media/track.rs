@@ -1,3 +1,7 @@
+//!  Remote [`MediaStreamTrack`][1] representation.
+//!
+//! [1]: https://www.w3.org/TR/mediacapture-streams/#mediastreamtrack
+
 use protocol::MediaType;
 
 /// ID of [`Track`].
