@@ -596,23 +596,24 @@ mod test {
         }
     }
 
-    impl Handler<Event> for TestConnection {
+    impl Handler<RoomMessage> for TestConnection {
         type Result = ();
 
-        fn handle(&mut self, event: Event, _ctx: &mut Self::Context) {
+        fn handle(&mut self, msg: RoomMessage, _ctx: &mut Self::Context) {
             let mut events = self.events.lock().unwrap();
+            let event = msg.into();
             events.push(serde_json::to_string(&event).unwrap());
-            match event {
+            if let Some(msg) = match event {
                 Event::PeerCreated {
                     peer_id,
                     sdp_offer,
                     tracks: _,
                 } => match sdp_offer {
-                    Some(_) => self.room.do_send(Command::MakeSdpAnswer {
+                    Some(_) => Some(Command::MakeSdpAnswer {
                         peer_id,
                         sdp_answer: "responder_answer".into(),
                     }),
-                    None => self.room.do_send(Command::MakeSdpOffer {
+                    None => Some(Command::MakeSdpOffer {
                         peer_id,
                         sdp_offer: "caller_offer".into(),
                     }),
@@ -620,7 +621,7 @@ mod test {
                 Event::SdpAnswerMade {
                     peer_id,
                     sdp_answer: _,
-                } => self.room.do_send(Command::SetIceCandidate {
+                } => Some(Command::SetIceCandidate {
                     peer_id,
                     candidate: "ice_candidate".into(),
                 }),
@@ -632,8 +633,11 @@ mod test {
                         member_id: self.member_id,
                         reason: ClosedReason::Disconnected,
                     });
+                    None
                 }
-                Event::PeersRemoved { peer_ids: _ } => {}
+                Event::PeersRemoved { peer_ids: _ } => None,
+            } {
+                self.room.do_send(MemberMessage::from(msg))
             }
         }
     }
@@ -646,9 +650,9 @@ mod test {
 
         fn send_event(
             &self,
-            event: Event,
+            msg: RoomMessage,
         ) -> Box<dyn Future<Item = (), Error = ()>> {
-            let fut = self.send(event).map_err(|_| ());
+            let fut = self.send(msg).map_err(|_| ());
             Box::new(fut)
         }
     }

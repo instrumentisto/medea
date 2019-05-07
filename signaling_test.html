@@ -5,105 +5,82 @@
     <meta http-equiv='Content-Type' content='text/html; charset=UTF-8'/>
 
     <script type="text/javascript">
-
         var socket;
         var pcs = {};
-
         function connectSocket(caller) {
             let role = caller ? "1/caller_credentials" : "2/responder_credentials";
             socket = new WebSocket("ws://localhost:8080/ws/1/" + role);
             socket.onmessage = handleSocketMessage;
-
             window.setInterval(function () {
                 socket.send("{\"ping\":1}");
             }, 8000);
         };
-
         function handleSocketMessage(message) {
-
             var msg = JSON.parse(message.data);
-
-            if (msg.pong == undefined) {
-                console.log(JSON.stringify(message.data));
-                if (msg.PeerCreated != undefined) {
-                    handlePeerCreated(msg.PeerCreated);
-                }
-
-                if (msg.SdpAnswerMade != undefined) {
-                    handleSdpAnswerMade(msg.SdpAnswerMade);
-                }
-
-                if (msg.IceCandidateDiscovered != undefined) {
-                    handleIceCandidateDiscovered(msg.IceCandidateDiscovered);
-                }
+            switch (msg.event) {
+                case 'PeerCreated':
+                    handlePeerCreated(msg.data);
+                    break;
+                case 'SdpAnswerMade':
+                    handleSdpAnswerMade(msg.data);
+                    break;
+                case 'IceCandidateDiscovered':
+                    handleIceCandidateDiscovered(msg.data);
+                    break;
             }
         }
-
         async function handlePeerCreated(msg) {
             var sendAudio = false;
             var sendVideo = false;
             var recvAudio = false;
             var recvVideo = false;
-
             msg.tracks.forEach((track) => {
-
                 if (track.media_type.Audio != undefined) {
-                    if (track.direction.Send != undefined) {
-                        sendAudio = true;
-                    }
-
-                    if (track.direction.Recv != undefined) {
-                        recvAudio = true;
-                    }
-
+                if (track.direction.Send != undefined) {
+                    sendAudio = true;
                 }
-                if (track.media_type.Video != undefined) {
-                    if (track.direction.Send != undefined) {
-                        sendVideo = true;
-                    }
-
-                    if (track.direction.Recv != undefined) {
-                        recvVideo = true;
-                    }
+                if (track.direction.Recv != undefined) {
+                    recvAudio = true;
                 }
-            });
-
+            }
+            if (track.media_type.Video != undefined) {
+                if (track.direction.Send != undefined) {
+                    sendVideo = true;
+                }
+                if (track.direction.Recv != undefined) {
+                    recvVideo = true;
+                }
+            }
+        });
             pcs[msg.peer_id] = new RTCPeerConnection();
-
             var pc = pcs[msg.peer_id];
             pc.ontrack = function (e) {
                 console.log("ontrack");
                 partnervid.srcObject = e.streams[0];
             };
-
             if (sendVideo || sendAudio) {
                 const stream = await navigator.mediaDevices.getUserMedia({
                     audio: sendAudio,
                     video: sendVideo
                 });
-
                 yourvid.srcObject = stream;
-
                 stream.getTracks().forEach((track) => {
                     pc.addTrack(track, stream);
-                });
+            });
             }
-
-
             var mediaConstraints = {
                 'mandatory': {
                     'OfferToReceiveAudio': recvAudio,
                     'OfferToReceiveVideo': recvVideo
                 }
             };
-
             if (msg.sdp_offer != undefined && msg.sdp_offer != null) {
                 pc.setRemoteDescription(new RTCSessionDescription(JSON.parse(msg.sdp_offer)));
                 var answer = await pc.createAnswer(mediaConstraints);
                 pc.setLocalDescription(answer);
-
                 socket.send(JSON.stringify({
-                    MakeSdpAnswer: {
+                    command: "MakeSdpAnswer",
+                    data: {
                         peer_id: msg.peer_id,
                         sdp_answer: JSON.stringify(answer)
                     }
@@ -112,38 +89,33 @@
                 var offer = await pc.createOffer(mediaConstraints);
                 pc.setLocalDescription(offer);
                 socket.send(JSON.stringify({
-                    MakeSdpOffer: {
+                    command: "MakeSdpOffer",
+                    data: {
                         peer_id: msg.peer_id,
                         sdp_offer: JSON.stringify(offer)
                     }
                 }));
             }
-
-
             pc.onicecandidate = function (e) {
-
                 if (e.candidate) {
                     socket.send(JSON.stringify({
-                        SetIceCandidate: {
+                        command: "SetIceCandidate",
+                        data: {
                             peer_id: msg.peer_id,
                             candidate: JSON.stringify(e.candidate)
                         }
                     }))
                 }
-
             };
         }
-
         async function handleSdpAnswerMade(msg) {
             var pc = pcs[msg.peer_id];
             pc.setRemoteDescription(new RTCSessionDescription(JSON.parse(msg.sdp_answer)))
         }
-
         async function handleIceCandidateDiscovered(msg) {
             var pc = pcs[msg.peer_id];
             pc.addIceCandidate(JSON.parse(msg.candidate));
         }
-
     </script>
 </head>
 <body>

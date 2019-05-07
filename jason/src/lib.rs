@@ -1,3 +1,8 @@
+#[macro_use]
+extern crate macro_attr;
+#[macro_use]
+extern crate newtype_derive;
+
 mod api;
 mod rpc;
 mod utils;

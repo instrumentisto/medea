@@ -12,6 +12,7 @@ repository = "https://github.com/instrumentisto/medea"
 [workspace]
 members = [
     "jason",
+    "protocol",
 ]
 
 [profile.release]

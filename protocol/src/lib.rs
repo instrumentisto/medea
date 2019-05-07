@@ -1,12 +1,7 @@
-#[cfg(feature = "jason")]
-use std::convert::TryFrom;
-
 use serde::{de::Deserializer, ser::Serializer, Deserialize, Serialize};
-#[cfg(feature = "jason")]
-use web_sys::MessageEvent;
 
 // TODO: should be properly shared between medea and jason
-#[cfg_attr(test, derive(PartialEq))]
+#[cfg_attr(test, derive(PartialEq, Debug))]
 #[allow(dead_code)]
 /// Message sent by `Media Server` to `Client`.
 pub enum ServerMsg {
@@ -71,7 +66,7 @@ pub enum Event {
 
 /// [`Track] with specified direction.
 #[derive(Deserialize, Serialize)]
-#[cfg_attr(test, derive(PartialEq))]
+#[cfg_attr(test, derive(PartialEq, Debug))]
 pub struct Directional {
     pub id: u64,
     pub direction: Direction,
@@ -80,7 +75,7 @@ pub struct Directional {
 
 /// Direction of [`Track`].
 #[derive(Deserialize, Serialize)]
-#[cfg_attr(test, derive(PartialEq))]
+#[cfg_attr(test, derive(PartialEq, Debug))]
 pub enum Direction {
     Send { receivers: Vec<u64> },
     Recv { sender: u64 },
@@ -202,22 +197,6 @@ impl<'de> Deserialize<'de> for ServerMsg {
             })?;
             Ok(ServerMsg::Event(event))
         }
-    }
-}
-
-#[cfg(feature = "jason")]
-impl TryFrom<&MessageEvent> for ServerMsg {
-    type Error = serde_json::Error;
-
-    fn try_from(msg: &MessageEvent) -> Result<Self, Self::Error> {
-        use serde::de::Error;
-
-        let payload = msg
-            .data()
-            .as_string()
-            .ok_or_else(|| Error::custom("Payload is not string"))?;
-
-        serde_json::from_str::<Self>(&payload)
     }
 }
 

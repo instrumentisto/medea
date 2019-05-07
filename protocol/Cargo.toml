@@ -7,10 +7,6 @@ homepage = "https://github.com/instrumentisto/medea"
 readme = "README.md"
 repository = "https://github.com/instrumentisto/medea"
 
-[features]
-jason = []
-
 [dependencies]
 serde = { version = "1.0", features = ['derive'] }
 serde_json = "1.0"
-web-sys = { version = "0.3", features = ['MessageEvent'] }
