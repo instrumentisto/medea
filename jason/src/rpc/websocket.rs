@@ -1,18 +1,17 @@
 //! ['WebSocket'](https://developer.mozilla.org/ru/docs/WebSockets)
 //! transport wrapper.
 use futures::future::{Future, IntoFuture};
+use protocol::{ClientMsg, ServerMsg};
 use web_sys::{CloseEvent, Event, MessageEvent, WebSocket as BackingSocket};
 
 use std::{cell::RefCell, convert::TryFrom, rc::Rc};
 
 use crate::{
-    rpc::{
-        protocol::{ClientMsg, ServerMsg},
-        CloseMsg,
-    },
+    rpc::CloseMsg,
     utils::{EventListener, WasmErr},
 };
 
+/// State of websocket.
 #[derive(Debug)]
 enum State {
     CONNECTING,
@@ -22,6 +21,7 @@ enum State {
 }
 
 impl State {
+    /// Returns true if socket can be closed.
     pub fn can_close(&self) -> bool {
         match self {
             State::CONNECTING | State::OPEN => true,
@@ -132,6 +132,7 @@ impl WebSocket {
             })
     }
 
+    /// Set handler on receive message from server.
     pub fn on_message<F>(&self, mut f: F) -> Result<(), WasmErr>
     where
         F: (FnMut(Result<ServerMsg, WasmErr>)) + 'static,
@@ -141,7 +142,8 @@ impl WebSocket {
             Rc::clone(&inner_mut.socket),
             "message",
             move |msg| {
-                let parsed = ServerMsg::try_from(&msg);
+                let parsed =
+                    ServerMessage::try_from(&msg).map(|msg| msg.into());
 
                 f(parsed);
             },
@@ -149,6 +151,7 @@ impl WebSocket {
         Ok(())
     }
 
+    /// Set handler on close socket.
     pub fn on_close<F>(&self, f: F) -> Result<(), WasmErr>
     where
         F: (FnOnce(CloseMsg)) + 'static,
@@ -168,6 +171,7 @@ impl WebSocket {
         Ok(())
     }
 
+    /// Send message to server.
     pub fn send(&self, msg: &ClientMsg) -> Result<(), WasmErr> {
         let inner = self.0.borrow();
 
@@ -200,19 +204,6 @@ impl Drop for WebSocket {
     }
 }
 
-impl TryFrom<&MessageEvent> for ServerMsg {
-    type Error = WasmErr;
-
-    fn try_from(msg: &MessageEvent) -> Result<Self, Self::Error> {
-        let payload = msg
-            .data()
-            .as_string()
-            .ok_or_else(|| WasmErr::from_str("Payload is not string"))?;
-
-        serde_json::from_str::<Self>(&payload).map_err(WasmErr::from)
-    }
-}
-
 impl From<&CloseEvent> for CloseMsg {
     fn from(event: &CloseEvent) -> Self {
         let code: u16 = event.code();
@@ -221,5 +212,25 @@ impl From<&CloseEvent> for CloseMsg {
             1000 => CloseMsg::Normal(body),
             _ => CloseMsg::Disconnect(body),
         }
+    }
+}
+
+macro_attr! {
+    #[derive(NewtypeFrom!)]
+    pub struct ServerMessage(ServerMsg);
+}
+
+impl TryFrom<&MessageEvent> for ServerMessage {
+    type Error = WasmErr;
+
+    fn try_from(msg: &MessageEvent) -> Result<Self, Self::Error> {
+        let payload = msg
+            .data()
+            .as_string()
+            .ok_or_else(|| WasmErr::from_str("Payload is not string"))?;
+
+        serde_json::from_str::<ServerMsg>(&payload)
+            .map_err(WasmErr::from)
+            .map(Self::from)
     }
 }

@@ -1,9 +1,7 @@
-use actix::Message;
 use serde::{de::Deserializer, ser::Serializer, Deserialize, Serialize};
 
 // TODO: should be properly shared between medea and jason
-#[cfg_attr(test, derive(PartialEq))]
-#[derive(Message, Debug)]
+#[cfg_attr(test, derive(PartialEq, Debug))]
 #[allow(dead_code)]
 /// Message sent by `Media Server` to `Client`.
 pub enum ServerMsg {
@@ -27,11 +25,10 @@ pub enum ClientMsg {
 }
 
 /// WebSocket message from Web Client to Media Server.
-#[derive(Deserialize, Serialize, Message)]
-#[cfg_attr(test, derive(PartialEq, Debug))]
+#[derive(Deserialize, Serialize)]
 #[serde(tag = "command", content = "data")]
+#[cfg_attr(test, derive(PartialEq, Debug))]
 #[allow(dead_code)]
-#[rtype(result = "Result<(), ()>")]
 pub enum Command {
     /// Web Client sends SDP Offer.
     MakeSdpOffer { peer_id: u64, sdp_offer: String },
@@ -42,10 +39,10 @@ pub enum Command {
 }
 
 /// WebSocket message from Medea to Jason.
-#[derive(Deserialize, Serialize, Message, Debug)]
-#[cfg_attr(test, derive(PartialEq))]
-#[allow(dead_code)]
+#[derive(Deserialize, Serialize)]
 #[serde(tag = "event", content = "data")]
+#[cfg_attr(test, derive(PartialEq, Debug))]
+#[allow(dead_code)]
 pub enum Event {
     /// Media Server notifies Web Client about necessity of RTCPeerConnection
     /// creation.
@@ -68,8 +65,8 @@ pub enum Event {
 }
 
 /// [`Track] with specified direction.
-#[derive(Deserialize, Serialize, Debug)]
-#[cfg_attr(test, derive(PartialEq))]
+#[derive(Deserialize, Serialize)]
+#[cfg_attr(test, derive(PartialEq, Debug))]
 pub struct Directional {
     pub id: u64,
     pub direction: Direction,
@@ -77,26 +74,26 @@ pub struct Directional {
 }
 
 /// Direction of [`Track`].
-#[derive(Deserialize, Serialize, Debug)]
-#[cfg_attr(test, derive(PartialEq))]
+#[derive(Deserialize, Serialize)]
+#[cfg_attr(test, derive(PartialEq, Debug))]
 pub enum Direction {
     Send { receivers: Vec<u64> },
     Recv { sender: u64 },
 }
 
 /// Type of [`Track`].
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[cfg_attr(test, derive(PartialEq))]
 pub enum MediaType {
     Audio(AudioSettings),
     Video(VideoSettings),
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[cfg_attr(test, derive(PartialEq))]
 pub struct AudioSettings {}
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[cfg_attr(test, derive(PartialEq))]
 pub struct VideoSettings {}
 
@@ -205,7 +202,7 @@ impl<'de> Deserialize<'de> for ServerMsg {
 
 #[cfg(test)]
 mod test {
-    use crate::api::protocol::{ClientMsg, Command, Event, ServerMsg};
+    use super::*;
 
     #[test]
     fn command() {

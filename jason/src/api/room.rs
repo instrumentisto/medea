@@ -4,18 +4,20 @@ use futures::{
     future::{Future, IntoFuture},
     stream::Stream,
 };
+use protocol::{Directional, Event};
 use wasm_bindgen::{prelude::*, JsValue};
 use wasm_bindgen_futures::spawn_local;
 use web_sys::console;
 
 use std::{cell::RefCell, rc::Rc};
 
+use crate::rpc::RPCClient;
 use crate::{
     api::{
         MediaStreamHandle,
         stream::{MediaCaps, MediaManager}
     },
-    rpc::{protocol::DirectionalTrack, protocol::Event, RPCClient},
+    rpc::RPCClient,
     utils::{Callback, WasmErr},
 };
 
@@ -140,7 +142,7 @@ impl InnerRoom {
         &mut self,
         _peer_id: u64,
         _sdp_offer: &Option<String>,
-        _tracks: &[DirectionalTrack],
+        _tracks: &[Directional],
     ) {
         let on_local_media = Rc::clone(&self.on_local_media);
         match MediaCaps::new(true, true) {

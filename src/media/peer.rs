@@ -1,128 +1,185 @@
+//! Remote [`RTCPeerConnection`][1] representation.
+//!
+//! [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
+
 #![allow(clippy::use_self)]
-
-use std::sync::Arc;
-
+use failure::Fail;
 use hashbrown::HashMap;
-
-use crate::{
-    api::{
-        control::member::Id as MemberId,
-        protocol::{
-            AudioSettings, Direction, Directional, MediaType, VideoSettings,
-        },
-    },
-    media::track::{Id as TrackId, Track},
+use protocol::{
+    AudioSettings, Direction, Directional, MediaType, VideoSettings,
 };
 
+use std::{convert::TryFrom, fmt::Display, sync::Arc};
+
+use crate::{
+    api::control::MemberId,
+    media::{Track, TrackId},
+};
+
+/// Newly initialized [`Peer`] ready to signalling.
 #[derive(Debug, PartialEq)]
 pub struct New {}
+
+/// [`Peer`] doesnt have remote SDP and is waiting for local SDP.
 #[derive(Debug, PartialEq)]
-pub struct WaitLocalSDP {}
+pub struct WaitLocalSdp {}
+
+/// [`Peer`] has remote SDP and is waiting for local SDP.
 #[derive(Debug, PartialEq)]
 pub struct WaitLocalHaveRemote {}
+
+/// [`Peer`] has local SDP and is waiting for remote SDP.
 #[derive(Debug, PartialEq)]
-pub struct WaitRemoteSDP {}
+pub struct WaitRemoteSdp {}
+
+/// SDP exchange ended.
 #[derive(Debug, PartialEq)]
 pub struct Stable {}
-#[derive(Debug, PartialEq)]
-pub struct Finished {}
-#[derive(Debug, PartialEq)]
-pub struct Failure {}
 
-/// Implementation state machine for [`Peer`].
-#[derive(Debug)]
-pub enum SignalingStateMachine {
-    New(Peer<New>),
-    WaitLocalSDP(Peer<WaitLocalSDP>),
-    WaitLocalHaveRemote(Peer<WaitLocalHaveRemote>),
-    WaitRemoteSDP(Peer<WaitRemoteSDP>),
-    Stable(Peer<Stable>),
-    Finished(Peer<Finished>),
-    Failure(Peer<Failure>),
+/// Produced when unwrapping [`PeerStateMachine`] to [`Peer`] with wrong state.
+#[derive(Fail, Debug)]
+#[allow(clippy::module_name_repetitions)]
+pub enum PeerStateError {
+    #[fail(
+        display = "Cannot unwrap Peer from PeerStateMachine [id = {}]. \
+                   Expected state {} was {}",
+        _0, _1, _2
+    )]
+    WrongState(Id, &'static str, String),
 }
 
-impl SignalingStateMachine {
-    /// Returns ID of [`Member`] associated with this [`Peer`].
-    pub fn member_id(&self) -> MemberId {
-        match self {
-            SignalingStateMachine::New(peer) => peer.member_id(),
-            SignalingStateMachine::WaitLocalSDP(peer) => peer.member_id(),
-            SignalingStateMachine::WaitLocalHaveRemote(peer) => {
-                peer.member_id()
-            }
-            SignalingStateMachine::WaitRemoteSDP(peer) => peer.member_id(),
-            SignalingStateMachine::Stable(peer) => peer.member_id(),
-            SignalingStateMachine::Finished(peer) => peer.member_id(),
-            SignalingStateMachine::Failure(peer) => peer.member_id(),
-        }
+impl PeerStateError {
+    pub fn new_wrong_state(
+        peer: &PeerStateMachine,
+        expected: &'static str,
+    ) -> Self {
+        PeerStateError::WrongState(peer.id(), expected, format!("{}", peer))
     }
+}
 
+/// Implementation of ['Peer'] state machine.
+#[derive(Debug)]
+#[allow(clippy::module_name_repetitions)]
+pub enum PeerStateMachine {
+    New(Peer<New>),
+    WaitLocalSdp(Peer<WaitLocalSdp>),
+    WaitLocalHaveRemote(Peer<WaitLocalHaveRemote>),
+    WaitRemoteSdp(Peer<WaitRemoteSdp>),
+    Stable(Peer<Stable>),
+}
+
+// TODO: macro to remove boilerplate
+impl PeerStateMachine {
     /// Returns ID of [`Peer`].
     pub fn id(&self) -> Id {
         match self {
-            SignalingStateMachine::New(peer) => peer.id(),
-            SignalingStateMachine::WaitLocalSDP(peer) => peer.id(),
-            SignalingStateMachine::WaitLocalHaveRemote(peer) => peer.id(),
-            SignalingStateMachine::WaitRemoteSDP(peer) => peer.id(),
-            SignalingStateMachine::Stable(peer) => peer.id(),
-            SignalingStateMachine::Finished(peer) => peer.id(),
-            SignalingStateMachine::Failure(peer) => peer.id(),
+            PeerStateMachine::New(peer) => peer.id(),
+            PeerStateMachine::WaitLocalSdp(peer) => peer.id(),
+            PeerStateMachine::WaitLocalHaveRemote(peer) => peer.id(),
+            PeerStateMachine::WaitRemoteSdp(peer) => peer.id(),
+            PeerStateMachine::Stable(peer) => peer.id(),
         }
     }
 
-    /// Returns ID of [`Peer`].
-    pub fn failed(self) -> Self {
+    /// Returns ID of [`Member`] associated with this [`Peer`].
+    pub fn member_id(&self) -> MemberId {
         match self {
-            SignalingStateMachine::New(peer) => {
-                SignalingStateMachine::Failure(peer.failed())
-            }
-            SignalingStateMachine::WaitLocalSDP(peer) => {
-                SignalingStateMachine::Failure(peer.failed())
-            }
-            SignalingStateMachine::WaitLocalHaveRemote(peer) => {
-                SignalingStateMachine::Failure(peer.failed())
-            }
-            SignalingStateMachine::WaitRemoteSDP(peer) => {
-                SignalingStateMachine::Failure(peer.failed())
-            }
-            SignalingStateMachine::Stable(peer) => {
-                SignalingStateMachine::Failure(peer.failed())
-            }
-            SignalingStateMachine::Finished(peer) => {
-                SignalingStateMachine::Failure(peer.failed())
-            }
-            SignalingStateMachine::Failure(peer) => {
-                SignalingStateMachine::Failure(peer.failed())
-            }
-        }
-    }
-
-    /// Returns sender for this [`Peer`] if exists.
-    pub fn sender(&self) -> Option<Id> {
-        match self {
-            SignalingStateMachine::New(peer) => peer.sender(),
-            SignalingStateMachine::WaitLocalSDP(peer) => peer.sender(),
-            SignalingStateMachine::WaitLocalHaveRemote(peer) => peer.sender(),
-            SignalingStateMachine::WaitRemoteSDP(peer) => peer.sender(),
-            SignalingStateMachine::Stable(peer) => peer.sender(),
-            SignalingStateMachine::Finished(peer) => peer.sender(),
-            SignalingStateMachine::Failure(peer) => peer.sender(),
+            PeerStateMachine::New(peer) => peer.member_id(),
+            PeerStateMachine::WaitLocalSdp(peer) => peer.member_id(),
+            PeerStateMachine::WaitLocalHaveRemote(peer) => peer.member_id(),
+            PeerStateMachine::WaitRemoteSdp(peer) => peer.member_id(),
+            PeerStateMachine::Stable(peer) => peer.member_id(),
         }
     }
 
     /// Returns ID of interconnected [`Peer`].
-    pub fn to_peer(&self) -> Id {
+    pub fn partner_peer_id(&self) -> Id {
         match self {
-            SignalingStateMachine::New(peer) => peer.to_peer(),
-            SignalingStateMachine::WaitLocalSDP(peer) => peer.to_peer(),
-            SignalingStateMachine::WaitLocalHaveRemote(peer) => peer.to_peer(),
-            SignalingStateMachine::WaitRemoteSDP(peer) => peer.to_peer(),
-            SignalingStateMachine::Stable(peer) => peer.to_peer(),
-            SignalingStateMachine::Finished(peer) => peer.to_peer(),
-            SignalingStateMachine::Failure(peer) => peer.to_peer(),
+            PeerStateMachine::New(peer) => peer.partner_peer_id(),
+            PeerStateMachine::WaitLocalSdp(peer) => peer.partner_peer_id(),
+            PeerStateMachine::WaitLocalHaveRemote(peer) => {
+                peer.partner_peer_id()
+            }
+            PeerStateMachine::WaitRemoteSdp(peer) => peer.partner_peer_id(),
+            PeerStateMachine::Stable(peer) => peer.partner_peer_id(),
+        }
+    }
+
+    /// Returns ID of interconnected [`Member`].
+    pub fn partner_member_id(&self) -> Id {
+        match self {
+            PeerStateMachine::New(peer) => peer.partner_peer_id(),
+            PeerStateMachine::WaitLocalSdp(peer) => peer.partner_peer_id(),
+            PeerStateMachine::WaitLocalHaveRemote(peer) => {
+                peer.partner_peer_id()
+            }
+            PeerStateMachine::WaitRemoteSdp(peer) => peer.partner_peer_id(),
+            PeerStateMachine::Stable(peer) => peer.partner_peer_id(),
         }
     }
 }
+
+impl Display for PeerStateMachine {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            PeerStateMachine::WaitRemoteSdp(_) => write!(f, "WaitRemoteSdp"),
+            PeerStateMachine::New(_) => write!(f, "New"),
+            PeerStateMachine::WaitLocalSdp(_) => write!(f, "WaitLocalSdp"),
+            PeerStateMachine::WaitLocalHaveRemote(_) => {
+                write!(f, "WaitLocalHaveRemote")
+            }
+            PeerStateMachine::Stable(_) => write!(f, "Stable"),
+        }
+    }
+}
+
+macro_rules! impl_peer_converts {
+    ($peer_type:tt) => {
+        impl<'a> TryFrom<&'a PeerStateMachine> for &'a Peer<$peer_type> {
+            type Error = PeerStateError;
+
+            fn try_from(
+                peer: &'a PeerStateMachine,
+            ) -> Result<Self, Self::Error> {
+                match peer {
+                    PeerStateMachine::$peer_type(peer) => Ok(peer),
+                    _ => Err(PeerStateError::WrongState(
+                        1,
+                        stringify!($peer_type),
+                        format!("{}", peer),
+                    )),
+                }
+            }
+        }
+
+        impl TryFrom<PeerStateMachine> for Peer<$peer_type> {
+            type Error = PeerStateError;
+
+            fn try_from(peer: PeerStateMachine) -> Result<Self, Self::Error> {
+                match peer {
+                    PeerStateMachine::$peer_type(peer) => Ok(peer),
+                    _ => Err(PeerStateError::WrongState(
+                        1,
+                        stringify!($peer_type),
+                        format!("{}", peer),
+                    )),
+                }
+            }
+        }
+
+        impl From<Peer<$peer_type>> for PeerStateMachine {
+            fn from(peer: Peer<$peer_type>) -> Self {
+                PeerStateMachine::$peer_type(peer)
+            }
+        }
+    };
+}
+
+impl_peer_converts!(New);
+impl_peer_converts!(WaitLocalSdp);
+impl_peer_converts!(WaitLocalHaveRemote);
+impl_peer_converts!(WaitRemoteSdp);
+impl_peer_converts!(Stable);
 
 /// ID of [`Peer`].
 pub type Id = u64;
@@ -130,8 +187,9 @@ pub type Id = u64;
 #[derive(Debug)]
 pub struct Context {
     id: Id,
-    to_peer: Id,
     member_id: MemberId,
+    partner_peer: Id,
+    partner_member: MemberId,
     sdp_offer: Option<String>,
     sdp_answer: Option<String>,
     receivers: HashMap<TrackId, Arc<Track>>,
@@ -156,34 +214,14 @@ impl<T> Peer<T> {
         self.context.id
     }
 
-    pub fn failed(self) -> Peer<Failure> {
-        Peer {
-            context: self.context,
-            state: Failure {},
-        }
-    }
-
     /// Returns ID of interconnected [`Peer`].
-    pub fn to_peer(&self) -> Id {
-        self.context.to_peer
+    pub fn partner_peer_id(&self) -> Id {
+        self.context.partner_peer
     }
 
-    /// Returns sender for this [`Peer`] if exists.
-    pub fn sender(&self) -> Option<Id> {
-        if self.context.receivers.is_empty() {
-            None
-        } else {
-            Some(self.context.to_peer)
-        }
-    }
-
-    /// Returns receiver for this [`Peer`] if exists.
-    pub fn receiver(&self) -> Option<Id> {
-        if self.context.senders.is_empty() {
-            None
-        } else {
-            Some(self.context.to_peer)
-        }
+    /// Returns ID of interconnected [`Member`].
+    pub fn partner_member_id(&self) -> Id {
+        self.context.partner_member
     }
 
     /// Returns [`Track`]'s of [`Peer`].
@@ -195,7 +233,7 @@ impl<T> Peer<T> {
                     id: track.id,
                     media_type: track.media_type.clone(),
                     direction: Direction::Send {
-                        receivers: vec![self.context.to_peer],
+                        receivers: vec![self.context.partner_peer],
                     },
                 });
                 tracks
@@ -209,21 +247,31 @@ impl<T> Peer<T> {
                     id: track.id,
                     media_type: track.media_type.clone(),
                     direction: Direction::Recv {
-                        sender: self.context.to_peer,
+                        sender: self.context.partner_peer,
                     },
                 });
                 tracks
             })
     }
+
+    pub fn is_sender(&self) -> bool {
+        !self.context.senders.is_empty()
+    }
 }
 
 impl Peer<New> {
     /// Creates new [`Peer`] for [`Member`].
-    pub fn new(id: Id, member_id: MemberId, to_peer: Id) -> Self {
+    pub fn new(
+        id: Id,
+        member_id: MemberId,
+        partner_peer: Id,
+        partner_member: MemberId,
+    ) -> Self {
         let context = Context {
             id,
             member_id,
-            to_peer,
+            partner_peer,
+            partner_member,
             sdp_offer: None,
             sdp_answer: None,
             receivers: HashMap::new(),
@@ -236,10 +284,10 @@ impl Peer<New> {
     }
 
     /// Transition new [`Peer`] into state of waiting for local description.
-    pub fn start(self) -> Peer<WaitLocalSDP> {
+    pub fn start(self) -> Peer<WaitLocalSdp> {
         Peer {
             context: self.context,
-            state: WaitLocalSDP {},
+            state: WaitLocalSdp {},
         }
     }
 
@@ -267,20 +315,20 @@ impl Peer<New> {
     }
 }
 
-impl Peer<WaitLocalSDP> {
+impl Peer<WaitLocalSdp> {
     /// Set local description and transition [`Peer`]
     /// to [`WaitRemoteSDP`] state.
-    pub fn set_local_sdp(self, sdp_offer: String) -> Peer<WaitRemoteSDP> {
+    pub fn set_local_sdp(self, sdp_offer: String) -> Peer<WaitRemoteSdp> {
         let mut context = self.context;
         context.sdp_offer = Some(sdp_offer);
         Peer {
             context,
-            state: WaitRemoteSDP {},
+            state: WaitRemoteSdp {},
         }
     }
 }
 
-impl Peer<WaitRemoteSDP> {
+impl Peer<WaitRemoteSdp> {
     /// Set remote description and transition [`Peer`] to [`Stable`] state.
     pub fn set_remote_sdp(self, sdp_answer: &str) -> Peer<Stable> {
         let mut context = self.context;
@@ -307,12 +355,13 @@ impl Peer<WaitLocalHaveRemote> {
 pub fn create_peers(
     caller: MemberId,
     responder: MemberId,
-) -> HashMap<MemberId, SignalingStateMachine> {
+) -> HashMap<MemberId, PeerStateMachine> {
     let caller_peer_id = 1;
     let responder_peer_id = 2;
-    let mut caller_peer = Peer::new(caller_peer_id, caller, responder_peer_id);
+    let mut caller_peer =
+        Peer::new(caller_peer_id, caller, responder_peer_id, responder_peer_id);
     let mut responder_peer =
-        Peer::new(responder_peer_id, responder, caller_peer_id);
+        Peer::new(responder_peer_id, responder, caller_peer_id, caller_peer_id);
 
     let track_audio =
         Arc::new(Track::new(1, MediaType::Audio(AudioSettings {})));
@@ -324,15 +373,15 @@ pub fn create_peers(
     responder_peer.add_receiver(track_video);
 
     hashmap!(
-        caller_peer_id => SignalingStateMachine::New(caller_peer),
-        responder_peer_id => SignalingStateMachine::New(responder_peer),
+        caller_peer_id => PeerStateMachine::New(caller_peer),
+        responder_peer_id => PeerStateMachine::New(responder_peer),
     )
 }
 
 #[test]
 fn create_peer() {
-    let peer = Peer::new(1, 1, 2);
+    let peer = Peer::new(1, 1, 2, 2);
     let peer = peer.start();
 
-    assert_eq!(peer.state, WaitLocalSDP {});
+    assert_eq!(peer.state, WaitLocalSdp {});
 }
