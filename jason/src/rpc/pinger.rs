@@ -70,7 +70,7 @@ impl Pinger {
         let inner_rc = Rc::clone(&self.0);
         let do_ping = Closure::wrap(Box::new(move || {
             // its_ok if ping fails few times
-            inner_rc.borrow_mut().send_now().is_ok();
+            let _ = inner_rc.borrow_mut().send_now();
         }) as Box<dyn FnMut()>);
 
         let interval_id = window()
