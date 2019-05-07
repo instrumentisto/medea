@@ -1,23 +1,22 @@
 //! Medea media server application.
 
 #[macro_use]
-mod utils;
-
+pub mod utils;
 pub mod api;
 pub mod conf;
 pub mod log;
+pub mod media;
+pub mod signalling;
 
 use actix::prelude::*;
 use dotenv::dotenv;
-use hashbrown::HashMap;
 use log::prelude::*;
 
 use crate::{
-    api::{
-        client::{server, Room, RoomsRepository},
-        control::Member,
-    },
+    api::{client::server, control::Member},
     conf::Conf,
+    media::create_peers,
+    signalling::{Room, RoomsRepository},
 };
 
 fn main() {
@@ -28,21 +27,19 @@ fn main() {
 
     let sys = System::new("medea");
 
+    let config = Conf::parse().unwrap();
+
+    info!("{:?}", config);
+
     let members = hashmap! {
         1 => Member{id: 1, credentials: "caller_credentials".to_owned()},
         2 => Member{id: 2, credentials: "responder_credentials".to_owned()},
     };
-    let room = Arbiter::start(move |_| Room {
-        id: 1,
-        members,
-        connections: HashMap::new(),
-    });
+    let peers = create_peers(1, 2);
+    let room = Room::new(1, members, peers, config.rpc.reconnect_timeout);
+    let room = Arbiter::start(move |_| room);
     let rooms = hashmap! {1 => room};
     let rooms_repo = RoomsRepository::new(rooms);
-
-    let config = Conf::parse().unwrap();
-
-    info!("{:?}", config);
 
     server::run(rooms_repo, config);
     let _ = sys.run();
