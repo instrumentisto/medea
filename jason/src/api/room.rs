@@ -11,7 +11,6 @@ use web_sys::console;
 
 use std::{cell::RefCell, rc::Rc};
 
-use crate::rpc::RPCClient;
 use crate::{
     api::{
         MediaStreamHandle,
