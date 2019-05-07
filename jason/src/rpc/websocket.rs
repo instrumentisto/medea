@@ -11,6 +11,7 @@ use crate::{
     utils::{EventListener, WasmErr},
 };
 
+/// State of websocket.
 #[derive(Debug)]
 enum State {
     CONNECTING,
@@ -20,6 +21,7 @@ enum State {
 }
 
 impl State {
+    /// Returns true if socket can be closed.
     pub fn can_close(&self) -> bool {
         match self {
             State::CONNECTING | State::OPEN => true,
@@ -130,6 +132,7 @@ impl WebSocket {
             })
     }
 
+    /// Set handler on receive message from server.
     pub fn on_message<F>(&self, mut f: F) -> Result<(), WasmErr>
     where
         F: (FnMut(Result<ServerMsg, WasmErr>)) + 'static,
@@ -148,6 +151,7 @@ impl WebSocket {
         Ok(())
     }
 
+    /// Set handler on close socket.
     pub fn on_close<F>(&self, f: F) -> Result<(), WasmErr>
     where
         F: (FnOnce(CloseMsg)) + 'static,
@@ -167,6 +171,7 @@ impl WebSocket {
         Ok(())
     }
 
+    /// Send message to server.
     pub fn send(&self, msg: &ClientMsg) -> Result<(), WasmErr> {
         let inner = self.0.borrow();
 
