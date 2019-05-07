@@ -7,14 +7,14 @@ use crate::api::control::MemberId;
 
 use std::fmt;
 
-/// Wrapper [`Command`] for implements actix [`Message`].
 macro_attr! {
+    /// Wrapper [`Command`] for implements actix [`Message`].
     #[derive(Message, NewtypeFrom!)]
     #[rtype(result = "Result<(), ()>")]
     pub struct CommandMessage(Command);
 }
-/// Wrapper [`Event`] for implements actix [`Message`].
 macro_attr! {
+    /// Wrapper [`Event`] for implements actix [`Message`].
     #[derive(Message, NewtypeFrom!)]
     pub struct EventMessage(Event);
 }
