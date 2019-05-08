@@ -1,7 +1,6 @@
 //! Implementation of Client API.
 
-pub mod room;
-pub mod server;
-pub mod session;
+mod session;
 
-pub use self::{room::*, server::*, session::*};
+pub mod rpc_connection;
+pub mod server;

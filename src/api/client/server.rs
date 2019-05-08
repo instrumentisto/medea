@@ -10,13 +10,14 @@ use serde::Deserialize;
 use crate::{
     api::{
         client::{
-            AuthorizeRpcConnection, Id as RoomId, RoomsRepository,
-            RpcConnectionAuthorizationError, WsSession,
+            rpc_connection::{AuthorizationError, Authorize},
+            session::WsSession,
         },
-        control::Id as MemberId,
+        control::MemberId,
     },
     conf::{Conf, Rpc},
     log::prelude::*,
+    signalling::{RoomId, RoomsRepository},
 };
 
 /// Parameters of new WebSocket connection creation HTTP request.
@@ -39,13 +40,11 @@ fn ws_index(
         State<Context>,
     ),
 ) -> FutureResponse<HttpResponse> {
-    use RpcConnectionAuthorizationError::*;
-
     debug!("Request params: {:?}", info);
 
     match state.rooms.get(info.room_id) {
         Some(room) => room
-            .send(AuthorizeRpcConnection {
+            .send(Authorize {
                 member_id: info.member_id,
                 credentials: info.credentials.clone(),
             })
@@ -59,8 +58,12 @@ fn ws_index(
                         state.config.idle_timeout,
                     ),
                 ),
-                Err(MemberNotExists) => Ok(HttpResponse::NotFound().into()),
-                Err(InvalidCredentials) => Ok(HttpResponse::Forbidden().into()),
+                Err(AuthorizationError::MemberNotExists) => {
+                    Ok(HttpResponse::NotFound().into())
+                }
+                Err(AuthorizationError::InvalidCredentials) => {
+                    Ok(HttpResponse::Forbidden().into())
+                }
             })
             .responder(),
         None => future::ok(HttpResponse::NotFound().into()).responder(),
@@ -104,25 +107,24 @@ mod test {
     use actix::Arbiter;
     use actix_web::{http, test, App};
     use futures::Stream;
-    use hashbrown::HashMap;
 
     use crate::{
-        api::{client::Room, control::Member},
+        api::control::Member,
         conf::{Conf, Coturn, Server},
+        media::create_peers,
+        signalling::Room,
     };
 
     use super::*;
 
     /// Creates [`RoomsRepository`] for tests filled with a single [`Room`].
-    fn room() -> RoomsRepository {
+    fn room(conf: Rpc) -> RoomsRepository {
         let members = hashmap! {
             1 => Member{id: 1, credentials: "caller_credentials".into()},
             2 => Member{id: 2, credentials: "responder_credentials".into()},
         };
-        let room = Arbiter::start(move |_| Room {
-            id: 1,
-            members,
-            connections: HashMap::new(),
+        let room = Arbiter::start(move |_| {
+            Room::new(1, members, create_peers(1, 2), conf.reconnect_timeout)
         });
         let rooms = hashmap! {1 => room};
         RoomsRepository::new(rooms)
@@ -132,7 +134,7 @@ mod test {
     fn ws_server(conf: Conf) -> test::TestServer {
         test::TestServer::with_factory(move || {
             App::with_state(Context {
-                rooms: room(),
+                rooms: room(conf.rpc.clone()),
                 config: conf.rpc.clone(),
             })
             .resource("/ws/{room_id}/{member_id}/{credentials}", |r| {
@@ -149,14 +151,15 @@ mod test {
 
         write.text(r#"{"ping":33}"#);
         let (item, _) = server.execute(read.into_future()).unwrap();
-        assert_eq!(item, Some(ws::Message::Text(r#"{"pong":33}"#.into())));
+        assert_eq!(Some(ws::Message::Text(r#"{"pong":33}"#.into())), item);
     }
 
     #[test]
     fn disconnects_on_idle() {
         let conf = Conf {
             rpc: Rpc {
-                idle_timeout: Duration::new(1, 0),
+                idle_timeout: Duration::new(2, 0),
+                reconnect_timeout: Default::default(),
             },
             coturn: Coturn::default(),
             server: Server::default(),
@@ -168,14 +171,14 @@ mod test {
 
         write.text(r#"{"ping":33}"#);
         let (item, read) = server.execute(read.into_future()).unwrap();
-        assert_eq!(item, Some(ws::Message::Text(r#"{"pong":33}"#.into())));
+        assert_eq!(Some(ws::Message::Text(r#"{"pong":33}"#.into())), item);
 
         thread::sleep(conf.rpc.idle_timeout.add(Duration::from_secs(1)));
 
         let (item, _) = server.execute(read.into_future()).unwrap();
         assert_eq!(
-            item,
-            Some(ws::Message::Close(Some(ws::CloseCode::Normal.into())))
+            Some(ws::Message::Close(Some(ws::CloseCode::Normal.into()))),
+            item
         );
     }
 }
