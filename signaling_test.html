@@ -69,7 +69,6 @@
 
             var pc = pcs[msg.peer_id];
             pc.ontrack = function (e) {
-                console.log("ontrack");
                 partnervid.srcObject = e.streams[0];
             };
 
@@ -126,7 +125,11 @@
                         command: "SetIceCandidate",
                         data: {
                             peer_id: msg.peer_id,
-                            candidate: JSON.stringify(e.candidate)
+                            candidate: {
+                                candidate: e.candidate.candidate,
+                                sdp_mid: e.candidate.sdpMid,
+                                sdp_m_line_index: e.candidate.sdpMLineIndex
+                            }
                         }
                     }))
                 }
@@ -141,7 +144,11 @@
 
         async function handleIceCandidateDiscovered(msg) {
             var pc = pcs[msg.peer_id];
-            pc.addIceCandidate(JSON.parse(msg.candidate));
+            pc.addIceCandidate(            {
+                candidate:msg.candidate.candidate,
+                sdpMid:msg.candidate.sdp_mid,
+                sdpMLineIndex: msg.candidate.sdp_m_line_index,
+            });
         }
 
     </script>

@@ -4,7 +4,7 @@ use futures::{
     future::{Future, IntoFuture},
     stream::Stream,
 };
-use protocol::{Directional, Event};
+use protocol::{Directional, Event, IceCandidate};
 use wasm_bindgen::{prelude::*, JsValue};
 use wasm_bindgen_futures::spawn_local;
 use web_sys::console;
@@ -167,7 +167,11 @@ impl InnerRoom {
     }
 
     /// Applies specified ICE Candidate to specified RTCPeerConnection.
-    fn on_ice_candidate_discovered(&mut self, _peer_id: u64, _candidate: &str) {
+    fn on_ice_candidate_discovered(
+        &mut self,
+        _peer_id: u64,
+        _candidate: &IceCandidate,
+    ) {
         console::log_1(&JsValue::from_str(
             "on_ice_candidate_discovered invoked",
         ));

@@ -8,7 +8,7 @@ use actix::{
 use failure::Fail;
 use futures::future;
 use hashbrown::HashMap;
-use protocol::{Command, Event};
+use protocol::{Command, Event, IceCandidate};
 
 use std::time::Duration;
 
@@ -193,7 +193,7 @@ impl Room {
     fn handle_set_ice_candidate(
         &mut self,
         from_peer_id: PeerId,
-        candidate: String,
+        candidate: IceCandidate,
     ) -> Result<ActFuture<(), RoomError>, RoomError> {
         let from_peer = self.peers.get_peer(from_peer_id)?;
         if let PeerStateMachine::New(_) = from_peer {
@@ -412,10 +412,7 @@ impl Handler<RpcConnectionClosed> for Room {
 
 #[cfg(test)]
 mod test {
-    use std::sync::{
-        atomic::{AtomicUsize, Ordering},
-        Arc, Mutex,
-    };
+    use std::sync::{atomic::AtomicUsize, Arc, Mutex};
 
     use actix::{Addr, Arbiter, System};
     use protocol::{
@@ -492,7 +489,11 @@ mod test {
                 .unwrap(),
                 serde_json::to_string(&Event::IceCandidateDiscovered {
                     peer_id: 1,
-                    candidate: "ice_candidate".into(),
+                    candidate: IceCandidate {
+                        candidate: "ice_candidate".to_owned(),
+                        sdp_m_line_index: None,
+                        sdp_mid: None
+                    },
                 })
                 .unwrap(),
             ]
@@ -520,7 +521,11 @@ mod test {
                 .unwrap(),
                 serde_json::to_string(&Event::IceCandidateDiscovered {
                     peer_id: 2,
-                    candidate: "ice_candidate".into(),
+                    candidate: IceCandidate {
+                        candidate: "ice_candidate".to_owned(),
+                        sdp_m_line_index: None,
+                        sdp_mid: None
+                    },
                 })
                 .unwrap(),
             ]

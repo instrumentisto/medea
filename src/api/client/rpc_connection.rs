@@ -94,7 +94,7 @@ pub mod test {
         System,
     };
     use futures::future::Future;
-    use protocol::{Command, Event};
+    use protocol::{Command, Event, IceCandidate};
 
     use crate::{
         api::{
@@ -177,7 +177,11 @@ pub mod test {
                     self.room.do_send(CommandMessage::from(
                         Command::SetIceCandidate {
                             peer_id,
-                            candidate: "ice_candidate".into(),
+                            candidate: IceCandidate {
+                                candidate: "ice_candidate".to_owned(),
+                                sdp_m_line_index: None,
+                                sdp_mid: None,
+                            },
                         },
                     ))
                 }
