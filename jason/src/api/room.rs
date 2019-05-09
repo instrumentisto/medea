@@ -174,14 +174,16 @@ impl InnerRoom {
         if let Some(peer) = self.peers.get_peer(peer_id) {
             peer.add_ice_candidate(candidate);
         } else {
-            // TODO: no peer, whats next?
+            // TODO: No peer, whats next?
             WasmErr::from_str(format!("Peer with id {} doesnt exist", peer_id));
         }
     }
 
     /// Disposes specified RTCPeerConnection's.
-    fn on_peers_removed(&mut self, _peer_ids: &[u64]) {
-        console::log_1(&JsValue::from_str("on_peers_removed invoked"));
+    fn on_peers_removed(&mut self, peer_ids: &[u64]) {
+        peer_ids.iter().for_each(|id|{
+            self.peers.remove(*id);
+        })
     }
 }
 

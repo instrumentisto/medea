@@ -134,4 +134,8 @@ impl PeerRepository {
     pub fn get_peer(&self, id: Id) -> Option<&PeerConnection> {
         self.peers.get(&id)
     }
+
+    pub fn remove(&mut self, id: Id) {
+        self.peers.remove(&id);
+    }
 }
