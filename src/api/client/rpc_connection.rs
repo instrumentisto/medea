@@ -82,6 +82,7 @@ pub mod test {
     };
     use futures::future::Future;
 
+    use crate::api::protocol::IceCandidate;
     use crate::{
         api::{
             client::rpc_connection::{
@@ -158,7 +159,11 @@ pub mod test {
                     }
                     self.room.do_send(Command::SetIceCandidate {
                         peer_id,
-                        candidate: "ice_candidate".into(),
+                        candidate: IceCandidate {
+                            candidate: "ice_candidate".to_owned(),
+                            sdp_m_line_index: None,
+                            sdp_mid: None,
+                        },
                     })
                 }
                 Event::IceCandidateDiscovered {
