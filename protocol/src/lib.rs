@@ -35,7 +35,10 @@ pub enum Command {
     /// Web Client sends SDP Answer.
     MakeSdpAnswer { peer_id: u64, sdp_answer: String },
     /// Web Client sends Ice Candidate.
-    SetIceCandidate { peer_id: u64, candidate: String },
+    SetIceCandidate {
+        peer_id: u64,
+        candidate: IceCandidate,
+    },
 }
 
 /// WebSocket message from Medea to Jason.
@@ -57,11 +60,22 @@ pub enum Event {
 
     /// Media Server notifies Web Client about necessity to apply specified
     /// ICE Candidate.
-    IceCandidateDiscovered { peer_id: u64, candidate: String },
+    IceCandidateDiscovered {
+        peer_id: u64,
+        candidate: IceCandidate,
+    },
 
     /// Media Server notifies Web Client about necessity of RTCPeerConnection
     /// close.
     PeersRemoved { peer_ids: Vec<u64> },
+}
+
+/// Represents [`RtcIceCandidateInit`] object.
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
+pub struct IceCandidate {
+    pub candidate: String,
+    pub sdp_m_line_index: Option<u16>,
+    pub sdp_mid: Option<String>,
 }
 
 /// [`Track] with specified direction.
