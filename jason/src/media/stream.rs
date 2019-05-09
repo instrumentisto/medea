@@ -2,7 +2,7 @@ use crate::utils::{window, WasmErr};
 use futures::future::{self, Either};
 use futures::Future;
 use std::cell::RefCell;
-use std::rc::Rc;
+use std::rc::{Rc, Weak};
 use wasm_bindgen::{prelude::*, JsValue};
 use wasm_bindgen_futures::JsFuture;
 use web_sys::MediaStream as BackingMediaStream;
@@ -84,36 +84,36 @@ struct InnerStream {
     stream: BackingMediaStream,
 }
 
-#[allow(clippy::module_name_repetitions)]
-pub struct MediaStream(Rc<RefCell<Option<InnerStream>>>);
-
-impl MediaStream {
-    pub fn new(stream: BackingMediaStream) -> Rc<Self> {
-        Rc::new(Self(Rc::new(RefCell::new(Some(InnerStream::from(stream))))))
-    }
-
-    pub fn new_handle(&self) -> MediaStreamHandle {
-        MediaStreamHandle(Rc::clone(&self.0))
-    }
-}
-
-#[wasm_bindgen]
-pub struct MediaStreamHandle(Rc<RefCell<Option<InnerStream>>>);
-
-#[wasm_bindgen]
-impl MediaStreamHandle {
-    pub fn get_media_stream(&self) -> Result<BackingMediaStream, JsValue> {
-        match self.0.borrow().as_ref() {
-            Some(inner) => Ok(inner.stream.clone()),
-            None => Err(WasmErr::from_str("Detached state").into()),
-        }
-    }
-}
-
 impl From<BackingMediaStream> for InnerStream {
     fn from(media_stream: BackingMediaStream) -> Self {
         InnerStream {
             stream: media_stream,
+        }
+    }
+}
+
+#[allow(clippy::module_name_repetitions)]
+pub struct MediaStream(Rc<InnerStream>);
+
+impl MediaStream {
+    pub fn new(stream: BackingMediaStream) -> Rc<Self> {
+        Rc::new(Self(Rc::new(InnerStream::from(stream))))
+    }
+
+    pub fn new_handle(&self) -> MediaStreamHandle {
+        MediaStreamHandle(Rc::downgrade(&self.0))
+    }
+}
+
+#[wasm_bindgen]
+pub struct MediaStreamHandle(Weak<InnerStream>);
+
+#[wasm_bindgen]
+impl MediaStreamHandle {
+    pub fn get_media_stream(&self) -> Result<BackingMediaStream, JsValue> {
+        match self.0.upgrade() {
+            Some(inner) => Ok(inner.stream.clone()),
+            None => Err(WasmErr::from_str("Detached state").into()),
         }
     }
 }

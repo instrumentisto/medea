@@ -11,11 +11,8 @@ use web_sys::console;
 
 use std::{cell::RefCell, rc::Rc};
 
-
 use crate::{
-    api::{
-    },
-    media::{MediaManager, MediaCaps, MediaStreamHandle},
+    media::{MediaCaps, MediaManager, MediaStreamHandle, PeerRepository},
     rpc::RPCClient,
     utils::{Callback, WasmErr},
 };
@@ -117,6 +114,7 @@ impl Room {
 struct InnerRoom {
     rpc: Rc<RPCClient>,
     media_manager: Rc<MediaManager>,
+    peers: PeerRepository,
     on_local_media: Rc<Callback<MediaStreamHandle, WasmErr>>,
 }
 
@@ -128,6 +126,7 @@ impl InnerRoom {
         Rc::new(RefCell::new(Some(Self {
             rpc,
             media_manager,
+            peers: PeerRepository::default(),
             on_local_media: Rc::new(Callback::new()),
         })))
     }

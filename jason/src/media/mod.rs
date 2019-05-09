@@ -1,6 +1,6 @@
 //! External Jason API.
-mod stream;
 mod peer;
+mod stream;
 
-pub use self::stream::{MediaManager, MediaCaps, MediaStreamHandle};
-pub use self::peer::PeerConnection;
+pub use self::peer::{PeerConnection, PeerRepository};
+pub use self::stream::{MediaCaps, MediaManager, MediaStreamHandle};

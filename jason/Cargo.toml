@@ -28,7 +28,7 @@ serde = { version = "1.0", features = ['derive'] }
 serde_json = "1.0"
 wasm-bindgen = { version = "0.2", features = ['serde-serialize'] }
 wasm-bindgen-futures = "0.3"
-web-sys = { version = "0.3.4", features = ['console','Event','EventTarget','MediaStream','MediaStreamTrack','MediaDevices','MediaStreamConstraints','MessageEvent','Navigator','WebSocket','Window','CloseEvent'] }
+web-sys = { version = "0.3", features = ['console','Event','EventTarget','MediaStream','MediaStreamTrack','MediaDevices','MediaStreamConstraints','MessageEvent','Navigator', 'RtcPeerConnection','RtcSdpType','RtcOfferOptions','RtcSessionDescription','RtcSessionDescriptionInit', 'RtcIceCandidate', 'RtcIceCandidateInit', 'WebSocket','Window','CloseEvent'] }
 wee_alloc = { version = "0.4", optional = true }
 
 [dev-dependencies]
