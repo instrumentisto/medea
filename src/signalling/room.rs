@@ -8,7 +8,7 @@ use actix::{
 use failure::Fail;
 use futures::future;
 use hashbrown::HashMap;
-use protocol::{Command, Event};
+use protocol::{Command, Event, IceCandidate};
 
 use std::time::Duration;
 
@@ -19,7 +19,6 @@ use crate::{
             RpcConnectionEstablished,
         },
         control::{Member, MemberId},
-        protocol::{Command, Event, IceCandidate},
     },
     log::prelude::*,
     media::{

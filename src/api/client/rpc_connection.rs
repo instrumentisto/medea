@@ -94,7 +94,7 @@ pub mod test {
         System,
     };
     use futures::future::Future;
-    use protocol::{Command, Event};
+    use protocol::{Command, Event, IceCandidate};
 
     use crate::{
         api::{
