@@ -81,7 +81,7 @@ pub struct IceCandidate {
     pub sdp_mid: Option<String>,
 }
 
-/// [`Track] with specified direction.
+/// [`Track`] with specified direction.
 #[derive(Deserialize, Serialize, Debug)]
 #[cfg_attr(test, derive(PartialEq))]
 pub struct Directional {
