@@ -70,8 +70,12 @@ impl PeerConnection {
             .map_err(|e| e.into())
     }
 
-    pub fn add_stream(&self, stream: MediaStream) {
-//        self.inner.add_stream(stream.);
+    pub fn add_ice_candidate(&self) {
+
+    }
+
+    pub fn add_stream(&self, stream: Rc<MediaStream>) {
+        self.inner.add_stream(&stream.get_media_stream());
     }
 
     pub fn on_remote_stream(&self) {

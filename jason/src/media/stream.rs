@@ -103,6 +103,10 @@ impl MediaStream {
     pub fn new_handle(&self) -> MediaStreamHandle {
         MediaStreamHandle(Rc::downgrade(&self.0))
     }
+
+    pub fn get_media_stream(&self) -> BackingMediaStream {
+        self.0.stream.clone()
+    }
 }
 
 #[wasm_bindgen]
