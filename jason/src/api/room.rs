@@ -12,7 +12,9 @@ use web_sys::console;
 use std::{cell::RefCell, rc::Rc};
 
 use crate::{
-    media::{MediaCaps, MediaManager, MediaStreamHandle, PeerRepository},
+    media::{
+        MediaCaps, MediaManager, MediaStreamHandle, PeerId, PeerRepository,
+    },
     rpc::RPCClient,
     utils::{Callback, WasmErr},
 };
@@ -80,7 +82,7 @@ impl Room {
                                 candidate,
                             } => {
                                 inner.on_ice_candidate_discovered(
-                                    peer_id, &candidate,
+                                    peer_id, candidate,
                                 );
                             }
                             Event::PeersRemoved { peer_ids } => {
@@ -169,12 +171,21 @@ impl InnerRoom {
     /// Applies specified ICE Candidate to specified RTCPeerConnection.
     fn on_ice_candidate_discovered(
         &mut self,
-        _peer_id: u64,
-        _candidate: &IceCandidate,
+        peer_id: PeerId,
+        candidate: IceCandidate,
     ) {
-        console::log_1(&JsValue::from_str(
-            "on_ice_candidate_discovered invoked",
-        ));
+        match self.peers.get_peer(&peer_id) {
+            Some(peer) => {
+                peer.add_ice_candidate(candidate);
+            }
+            None => {
+                // TODO: no peer, whats next?
+                WasmErr::from_str(format!(
+                    "Peer with id {} doesnt exist",
+                    peer_id
+                ));
+            }
+        }
     }
 
     /// Disposes specified RTCPeerConnection's.
