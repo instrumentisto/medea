@@ -27,14 +27,11 @@ pub struct RoomHandle(Rc<RefCell<Option<InnerRoom>>>);
 #[wasm_bindgen]
 impl RoomHandle {
     pub fn on_local_stream(&mut self, f: js_sys::Function) {
-        match self.0.borrow_mut().as_mut() {
-            Some(inner) => {
-                inner.on_local_media.set_func(f);
-            }
-            None => {
-                let f: Callback<i32, WasmErr> = f.into();
-                f.call_err(WasmErr::from_str("Detached state"));
-            }
+        if let Some(inner) = self.0.borrow_mut().as_mut() {
+            inner.on_local_media.set_func(f);
+        } else {
+            let f: Callback<i32, WasmErr> = f.into();
+            f.call_err(WasmErr::from_str("Detached state"));
         }
     }
 }
@@ -82,7 +79,7 @@ impl Room {
                                 candidate,
                             } => {
                                 inner.on_ice_candidate_discovered(
-                                    peer_id, candidate,
+                                    peer_id, &candidate,
                                 );
                             }
                             Event::PeersRemoved { peer_ids } => {
@@ -110,8 +107,8 @@ impl Room {
     }
 }
 
-/// Actual room. Shared between JS-side handle (['RoomHandle']) and Rust-side
-/// handle (['Room']). Manages concrete RTCPeerConnections, handles Medea
+/// Actual room. Shared between JS-side handle ([`RoomHandle`]) and Rust-side
+/// handle (['Room']). Manages concrete `RTCPeerConnections`, handles Medea
 /// events.
 struct InnerRoom {
     rpc: Rc<RPCClient>,
@@ -151,7 +148,7 @@ impl InnerRoom {
             }
             Ok(caps) => {
                 let fut =
-                    self.media_manager.get_stream(caps).then(move |result| {
+                    self.media_manager.get_stream(&caps).then(move |result| {
                         on_local_media
                             .call(result.map(|stream| stream.new_handle()));
                         Ok(())
@@ -172,19 +169,13 @@ impl InnerRoom {
     fn on_ice_candidate_discovered(
         &mut self,
         peer_id: PeerId,
-        candidate: IceCandidate,
+        candidate: &IceCandidate,
     ) {
-        match self.peers.get_peer(&peer_id) {
-            Some(peer) => {
-                peer.add_ice_candidate(candidate);
-            }
-            None => {
-                // TODO: no peer, whats next?
-                WasmErr::from_str(format!(
-                    "Peer with id {} doesnt exist",
-                    peer_id
-                ));
-            }
+        if let Some(peer) = self.peers.get_peer(peer_id) {
+            peer.add_ice_candidate(candidate);
+        } else {
+            // TODO: no peer, whats next?
+            WasmErr::from_str(format!("Peer with id {} doesnt exist", peer_id));
         }
     }
 

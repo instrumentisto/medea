@@ -18,11 +18,11 @@ struct InnerMediaManager {
 impl MediaManager {
     pub fn get_stream(
         &self,
-        caps: MediaCaps,
+        caps: &MediaCaps,
     ) -> impl Future<Item = Rc<MediaStream>, Error = WasmErr> {
         // TODO: lookup stream by its caps, return its copy
 
-        let stream = match self.inner_get_stream(&caps) {
+        let stream = match self.inner_get_stream(caps) {
             Ok(promise) => JsFuture::from(promise),
             Err(err) => return Either::A(future::err(err)),
         };
@@ -57,19 +57,19 @@ pub struct MediaCaps {
 }
 
 impl MediaCaps {
-    pub fn new(audio: bool, video: bool) -> Result<MediaCaps, WasmErr> {
+    pub fn new(audio: bool, video: bool) -> Result<Self, WasmErr> {
         if !audio && !video {
             return Err(WasmErr::from_str(
                 "MediaCaps should have video, audio, or both",
             ));
         }
-        Ok(MediaCaps { audio, video })
+        Ok(Self { audio, video })
     }
 }
 
 impl From<&MediaCaps> for web_sys::MediaStreamConstraints {
     fn from(caps: &MediaCaps) -> Self {
-        let mut constraints = web_sys::MediaStreamConstraints::new();
+        let mut constraints = Self::new();
         if caps.audio {
             constraints.audio(&JsValue::from_bool(true));
         }
@@ -86,7 +86,7 @@ struct InnerStream {
 
 impl From<BackingMediaStream> for InnerStream {
     fn from(media_stream: BackingMediaStream) -> Self {
-        InnerStream {
+        Self {
             stream: media_stream,
         }
     }

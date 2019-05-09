@@ -1,4 +1,3 @@
-use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 use web_sys::{
@@ -8,7 +7,6 @@ use web_sys::{
 
 use crate::media::stream::MediaStream;
 use crate::utils::WasmErr;
-use futures::future::ok;
 use futures::Future;
 use protocol::IceCandidate;
 use wasm_bindgen_futures::JsFuture;
@@ -30,7 +28,7 @@ impl PeerConnection {
 
         JsFuture::from(self.inner.set_remote_description(&desc))
             .map(|_| ())
-            .map_err(|e| e.into())
+            .map_err(Into::into)
     }
 
     pub fn create_and_set_offer(
@@ -55,7 +53,7 @@ impl PeerConnection {
                 JsFuture::from(inner.set_local_description(&desc))
                     .map(move |_| offer)
             })
-            .map_err(|e| e.into())
+            .map_err(Into::into)
     }
 
     pub fn create_and_set_answer(
@@ -72,12 +70,12 @@ impl PeerConnection {
                 JsFuture::from(inner.set_local_description(&desc))
                     .map(move |_| answer)
             })
-            .map_err(|e| e.into())
+            .map_err(Into::into)
     }
 
     pub fn add_ice_candidate(
         &self,
-        candidate: IceCandidate,
+        candidate: &IceCandidate,
     ) -> impl Future<Item = (), Error = WasmErr> {
         // TODO: According to Web IDL, return value is void.
         //       It may be worth to propose PR to wasm-bindgen, that would
@@ -93,14 +91,15 @@ impl PeerConnection {
                 ),
         )
         .map(|_| ())
-        .map_err(|e| e.into())
+        .map_err(Into::into)
     }
 
-    pub fn add_stream(&self, stream: Rc<MediaStream>) {
+    pub fn add_stream(&self, stream: &Rc<MediaStream>) {
         self.inner.add_stream(&stream.get_media_stream());
     }
 
     pub fn on_remote_stream(&self) {}
+
     //    pub fn set_onaddstream(&self, onaddstream: Option<&Function>)
 }
 
@@ -112,7 +111,7 @@ impl Drop for PeerConnection {
 
 impl From<RtcPeerConnection> for PeerConnection {
     fn from(peer: RtcPeerConnection) -> Self {
-        PeerConnection {
+        Self {
             inner: Rc::new(peer),
         }
     }
@@ -132,7 +131,7 @@ impl PeerRepository {
         Ok(self.peers.get(&id).unwrap())
     }
 
-    pub fn get_peer(&self, id: &Id) -> Option<&PeerConnection> {
-        self.peers.get(id)
+    pub fn get_peer(&self, id: Id) -> Option<&PeerConnection> {
+        self.peers.get(&id)
     }
 }
