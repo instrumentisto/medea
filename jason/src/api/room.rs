@@ -161,8 +161,16 @@ impl InnerRoom {
     }
 
     /// Applies specified SDP Answer to specified RTCPeerConnection.
-    fn on_sdp_answer(&mut self, _peer_id: u64, _sdp_answer: &str) {
-        console::log_1(&JsValue::from_str("on_sdp_answer invoked"));
+    fn on_sdp_answer(&mut self, peer_id: PeerId, sdp_answer: &str) {
+        if let Some(peer) = self.peers.get_peer(peer_id) {
+            spawn_local(peer.set_remote_answer(sdp_answer).or_else(|err|{
+                err.log_err();
+                Err(())
+            }));
+        } else {
+            // TODO: No peer, whats next?
+            WasmErr::from_str(format!("Peer with id {} doesnt exist", peer_id));
+        }
     }
 
     /// Applies specified ICE Candidate to specified RTCPeerConnection.
@@ -180,8 +188,8 @@ impl InnerRoom {
     }
 
     /// Disposes specified RTCPeerConnection's.
-    fn on_peers_removed(&mut self, peer_ids: &[u64]) {
-        peer_ids.iter().for_each(|id|{
+    fn on_peers_removed(&mut self, peer_ids: &[PeerId]) {
+        peer_ids.iter().for_each(|id| {
             self.peers.remove(*id);
         })
     }

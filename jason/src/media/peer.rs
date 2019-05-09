@@ -19,17 +19,6 @@ pub struct PeerConnection {
 }
 
 impl PeerConnection {
-    pub fn set_remote_answer(
-        &self,
-        answer: &str,
-    ) -> impl Future<Item = (), Error = WasmErr> {
-        let mut desc = RtcSessionDescriptionInit::new(RtcSdpType::Answer);
-        desc.sdp(&answer);
-
-        JsFuture::from(self.inner.set_remote_description(&desc))
-            .map(|_| ())
-            .map_err(Into::into)
-    }
 
     pub fn create_and_set_offer(
         &self,
@@ -70,6 +59,18 @@ impl PeerConnection {
                 JsFuture::from(inner.set_local_description(&desc))
                     .map(move |_| answer)
             })
+            .map_err(Into::into)
+    }
+
+    pub fn set_remote_answer(
+        &self,
+        answer: &str,
+    ) -> impl Future<Item = (), Error = WasmErr> {
+        let mut desc = RtcSessionDescriptionInit::new(RtcSdpType::Answer);
+        desc.sdp(&answer);
+
+        JsFuture::from(self.inner.set_remote_description(&desc))
+            .map(|_| ())
             .map_err(Into::into)
     }
 
