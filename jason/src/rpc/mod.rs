@@ -141,7 +141,7 @@ impl RPCClient {
     }
 
     // TODO: proper sub registry
-    pub fn _send_command(&self, command: Command) {
+    pub fn send_command(&self, command: Command) {
         let socket_borrow = &self.0.borrow().sock;
 
         // TODO: no socket? we dont really want this method to return err

@@ -2,20 +2,22 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use web_sys::{
     RtcIceCandidateInit, RtcOfferOptions, RtcPeerConnection, RtcSdpType,
-    RtcSessionDescription, RtcSessionDescriptionInit,
+    RtcSessionDescription, RtcSessionDescriptionInit, RtcPeerConnectionIceEvent, RtcIceCandidate,
 };
 
 use crate::media::stream::MediaStream;
-use crate::utils::WasmErr;
+use crate::utils::{WasmErr, EventListener};
 use futures::Future;
 use protocol::IceCandidate;
 use wasm_bindgen_futures::JsFuture;
+use std::cell::RefCell;
 
 pub type Id = u64;
 
 #[allow(clippy::module_name_repetitions)]
 pub struct PeerConnection {
     inner: Rc<RtcPeerConnection>,
+    on_ice_candidate: RefCell<Option<EventListener<RtcPeerConnection, RtcPeerConnectionIceEvent>>>,
 }
 
 impl PeerConnection {
@@ -101,6 +103,29 @@ impl PeerConnection {
 
     pub fn on_remote_stream(&self) {}
 
+    pub fn on_ice_candidate<F>(&self, mut f: F) -> Result<(), WasmErr>
+        where
+            F: (FnMut(IceCandidate)) + 'static,
+    {
+        self.on_ice_candidate.borrow_mut().replace(EventListener::new_mut(
+            Rc::clone(&self.inner),
+            "icecandidate",
+            move |msg:RtcPeerConnectionIceEvent| {
+                let candidate = msg.candidate().unwrap();
+
+                let candidate = IceCandidate {
+                    candidate: candidate.candidate(),
+                    sdp_m_line_index: candidate.sdp_m_line_index(),
+                    sdp_mid: candidate.sdp_mid()
+                };
+
+                f(candidate);
+            },
+        )?);
+
+        Ok(())
+    }
+
     //    pub fn set_onaddstream(&self, onaddstream: Option<&Function>)
 }
 
@@ -114,6 +139,7 @@ impl From<RtcPeerConnection> for PeerConnection {
     fn from(peer: RtcPeerConnection) -> Self {
         Self {
             inner: Rc::new(peer),
+            on_ice_candidate: RefCell::new(None)
         }
     }
 }

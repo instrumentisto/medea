@@ -8,12 +8,13 @@ use protocol::{Directional, Event, IceCandidate};
 use wasm_bindgen::{prelude::*, JsValue};
 use wasm_bindgen_futures::spawn_local;
 use web_sys::console;
+use protocol::{Command};
 
 use std::{cell::RefCell, rc::Rc};
 
 use crate::{
     media::{
-        MediaCaps, MediaManager, MediaStreamHandle, PeerId, PeerRepository,
+        MediaCaps, MediaManager, MediaStreamHandle, MediaStream, PeerId, PeerRepository,
     },
     rpc::RPCClient,
     utils::{Callback, WasmErr},
@@ -137,26 +138,10 @@ impl InnerRoom {
     /// Creates RTCPeerConnection with provided ID.
     fn on_peer_created(
         &mut self,
-        _peer_id: u64,
-        _sdp_offer: &Option<String>,
-        _tracks: &[Directional],
+        peer_id: PeerId,
+        sdp_offer: &Option<String>,
+        tracks: &[Directional],
     ) {
-        let on_local_media = Rc::clone(&self.on_local_media);
-        match MediaCaps::new(true, true) {
-            Err(err) => {
-                on_local_media.call_err(err);
-            }
-            Ok(caps) => {
-                let fut =
-                    self.media_manager.get_stream(&caps).then(move |result| {
-                        on_local_media
-                            .call(result.map(|stream| stream.new_handle()));
-                        Ok(())
-                    });
-                spawn_local(fut);
-            }
-        }
-
         console::log_1(&JsValue::from_str("on_peer_created invoked"));
     }
 
