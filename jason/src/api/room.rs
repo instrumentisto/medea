@@ -4,17 +4,21 @@ use futures::{
     future::{Future, IntoFuture},
     stream::Stream,
 };
+use protocol::Command;
 use protocol::{Directional, Event, IceCandidate};
 use wasm_bindgen::{prelude::*, JsValue};
 use wasm_bindgen_futures::spawn_local;
 use web_sys::console;
-use protocol::{Command};
 
-use std::rc::{Rc, Weak};
+use std::{
+    cell::RefCell,
+    rc::{Rc, Weak},
+};
 
 use crate::{
     media::{
-        MediaCaps, MediaManager, MediaStreamHandle, MediaStream, PeerId, PeerRepository,
+        MediaCaps, MediaManager, MediaStream, MediaStreamHandle, PeerId,
+        PeerRepository,
     },
     rpc::RPCClient,
     utils::{Callback, WasmErr},
@@ -28,8 +32,8 @@ pub struct RoomHandle(Weak<RefCell<InnerRoom>>);
 #[wasm_bindgen]
 impl RoomHandle {
     pub fn on_local_stream(&mut self, f: js_sys::Function) {
-        if let Some(inner) = self.0.borrow_mut().as_mut() {
-            inner.on_local_media.set_func(f);
+        if let Some(inner) = self.0.upgrade() {
+            inner.borrow_mut().on_local_media.set_func(f);
         } else {
             let f: Callback<i32, WasmErr> = f.into();
             f.call_err(WasmErr::from_str("Detached state"));
@@ -42,7 +46,7 @@ pub struct Room(Rc<RefCell<InnerRoom>>);
 
 impl Room {
     pub fn new(rpc: Rc<RPCClient>, media_manager: Rc<MediaManager>) -> Self {
-        Self(InnerRoom::new(rpc, media_manager))
+        Self(Rc::new(RefCell::new(InnerRoom::new(rpc, media_manager))))
     }
 
     pub fn new_handle(&self) -> RoomHandle {
@@ -101,16 +105,13 @@ struct InnerRoom {
 }
 
 impl InnerRoom {
-    fn new(
-        rpc: Rc<RPCClient>,
-        media_manager: Rc<MediaManager>,
-    ) -> Rc<RefCell<Option<Self>>> {
-        Rc::new(RefCell::new(Some(Self {
+    fn new(rpc: Rc<RPCClient>, media_manager: Rc<MediaManager>) -> Self {
+        Self {
             rpc,
             media_manager,
             peers: PeerRepository::default(),
             on_local_media: Rc::new(Callback::new()),
-        })))
+        }
     }
 
     fn on_local_media(&self, f: js_sys::Function) {
@@ -130,7 +131,7 @@ impl InnerRoom {
     /// Applies specified SDP Answer to specified RTCPeerConnection.
     fn on_sdp_answer(&mut self, peer_id: PeerId, sdp_answer: &str) {
         if let Some(peer) = self.peers.get_peer(peer_id) {
-            spawn_local(peer.set_remote_answer(sdp_answer).or_else(|err|{
+            spawn_local(peer.set_remote_answer(sdp_answer).or_else(|err| {
                 err.log_err();
                 Err(())
             }));
