@@ -125,7 +125,21 @@ impl InnerRoom {
         sdp_offer: &Option<String>,
         tracks: &[Directional],
     ) {
-        console::log_1(&JsValue::from_str("on_peer_created invoked"));
+        let peer = match self.peers.create(peer_id) {
+            Ok(peer) => peer,
+            Err(err) => {
+                err.log_err();
+                return;
+            },
+        };
+
+        let rpc = Rc::clone(&self.rpc);
+        peer.on_ice_candidate(move |candidate|{
+            rpc.send_command(Command::SetIceCandidate { peer_id, candidate });
+        });
+
+        // 1. parse tracks
+        // 2. offer/answer
     }
 
     /// Applies specified SDP Answer to specified RTCPeerConnection.
