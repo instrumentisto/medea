@@ -9,28 +9,29 @@ use wasm_bindgen::{prelude::*, JsValue};
 use wasm_bindgen_futures::spawn_local;
 use web_sys::console;
 
-use std::{cell::RefCell, rc::Rc};
+use std::rc::{Rc, Weak};
 
 use crate::rpc::RPCClient;
+use std::cell::RefCell;
 
 #[allow(clippy::module_name_repetitions)]
 #[wasm_bindgen]
 /// Room handle accessible from JS.
-pub struct RoomHandle(Rc<RefCell<Option<InnerRoom>>>);
+pub struct RoomHandle(Weak<RefCell<InnerRoom>>);
 
 #[wasm_bindgen]
 impl RoomHandle {}
 
 /// Room handle being used by Rust external modules.
-pub struct Room(Rc<RefCell<Option<InnerRoom>>>);
+pub struct Room(Rc<RefCell<InnerRoom>>);
 
 impl Room {
     pub fn new(rpc: Rc<RPCClient>) -> Self {
-        Self(InnerRoom::new(rpc))
+        Self(Rc::new(RefCell::new(InnerRoom::new(rpc))))
     }
 
     pub fn new_handle(&self) -> RoomHandle {
-        RoomHandle(Rc::clone(&self.0))
+        RoomHandle(Rc::downgrade(&self.0))
     }
 
     /// Subscribes to provided RpcTransport messages.
@@ -41,45 +42,29 @@ impl Room {
             .subscribe()
             .for_each(move |event| {
                 // TODO: macro for convenient dispatch
-                match inner.borrow_mut().as_mut() {
-                    Some(inner) => {
-                        match event {
-                            Event::PeerCreated {
-                                peer_id,
-                                sdp_offer,
-                                tracks,
-                            } => {
-                                inner.on_peer_created(
-                                    peer_id, &sdp_offer, &tracks,
-                                );
-                            }
-                            Event::SdpAnswerMade {
-                                peer_id,
-                                sdp_answer,
-                            } => {
-                                inner.on_sdp_answer(peer_id, &sdp_answer);
-                            }
-                            Event::IceCandidateDiscovered {
-                                peer_id,
-                                candidate,
-                            } => {
-                                inner.on_ice_candidate_discovered(
-                                    peer_id, &candidate,
-                                );
-                            }
-                            Event::PeersRemoved { peer_ids } => {
-                                inner.on_peers_removed(&peer_ids);
-                            }
-                        };
-                        Ok(())
+                let mut inner = inner.borrow_mut();
+                match event {
+                    Event::PeerCreated {
+                        peer_id,
+                        sdp_offer,
+                        tracks,
+                    } => {
+                        inner.on_peer_created(peer_id, &sdp_offer, &tracks);
                     }
-                    None => {
-                        // InnerSession is gone, which means that Room was
-                        // dropped. Not supposed to happen, since InnerSession
-                        // should drop its tx by unsubbing from RpcClient.
-                        Err(())
+                    Event::SdpAnswerMade {
+                        peer_id,
+                        sdp_answer,
+                    } => {
+                        inner.on_sdp_answer(peer_id, &sdp_answer);
                     }
-                }
+                    Event::IceCandidateDiscovered { peer_id, candidate } => {
+                        inner.on_ice_candidate_discovered(peer_id, &candidate);
+                    }
+                    Event::PeersRemoved { peer_ids } => {
+                        inner.on_peers_removed(&peer_ids);
+                    }
+                };
+                Ok(())
             })
             .into_future()
             .then(|_| Ok(()));
@@ -97,8 +82,8 @@ struct InnerRoom {
 }
 
 impl InnerRoom {
-    fn new(rpc: Rc<RPCClient>) -> Rc<RefCell<Option<Self>>> {
-        Rc::new(RefCell::new(Some(Self { rpc })))
+    fn new(rpc: Rc<RPCClient>) -> Self {
+        Self { rpc }
     }
 
     /// Creates RTCPeerConnection with provided ID.
@@ -130,13 +115,6 @@ impl InnerRoom {
     /// Disposes specified RTCPeerConnection's.
     fn on_peers_removed(&mut self, _peer_ids: &[u64]) {
         console::log_1(&JsValue::from_str("on_peers_removed invoked"));
-    }
-}
-
-impl Drop for Room {
-    fn drop(&mut self) {
-        // Drop InnerRoom, invalidates all spawned RoomHandler's.
-        self.0.borrow_mut().take();
     }
 }
 
