@@ -52,7 +52,7 @@ pub enum Event {
     PeerCreated {
         peer_id: u64,
         sdp_offer: Option<String>,
-        tracks: Vec<Directional>,
+        tracks: Vec<Track>,
     },
     /// Media Server notifies Web Client about necessity to apply specified SDP
     /// Answer to Web Client's RTCPeerConnection.
@@ -81,7 +81,7 @@ pub struct IceCandidate {
 /// [`Track] with specified direction.
 #[derive(Deserialize, Serialize)]
 #[cfg_attr(test, derive(PartialEq, Debug))]
-pub struct Directional {
+pub struct Track {
     pub id: u64,
     pub direction: Direction,
     pub media_type: MediaType,

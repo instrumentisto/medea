@@ -416,7 +416,7 @@ mod test {
 
     use actix::{Addr, Arbiter, System};
     use protocol::{
-        AudioSettings, Direction, Directional, MediaType, VideoSettings,
+        AudioSettings, Direction, Track, MediaType, VideoSettings,
     };
 
     use super::*;
@@ -469,12 +469,12 @@ mod test {
                     peer_id: 1,
                     sdp_offer: None,
                     tracks: vec![
-                        Directional {
+                        Track {
                             id: 1,
                             direction: Direction::Send { receivers: vec![2] },
                             media_type: MediaType::Audio(AudioSettings {}),
                         },
-                        Directional {
+                        Track {
                             id: 2,
                             direction: Direction::Send { receivers: vec![2] },
                             media_type: MediaType::Video(VideoSettings {}),
@@ -506,12 +506,12 @@ mod test {
                     peer_id: 2,
                     sdp_offer: Some("caller_offer".into()),
                     tracks: vec![
-                        Directional {
+                        Track {
                             id: 1,
                             direction: Direction::Recv { sender: 1 },
                             media_type: MediaType::Audio(AudioSettings {}),
                         },
-                        Directional {
+                        Track {
                             id: 2,
                             direction: Direction::Recv { sender: 1 },
                             media_type: MediaType::Video(VideoSettings {}),

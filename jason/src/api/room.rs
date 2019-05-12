@@ -4,7 +4,7 @@ use futures::{
     future::{Future, IntoFuture},
     stream::Stream,
 };
-use protocol::{Directional, Event, IceCandidate};
+use protocol::{Track, Event, IceCandidate};
 use wasm_bindgen::{prelude::*, JsValue};
 use wasm_bindgen_futures::spawn_local;
 use web_sys::console;
@@ -93,7 +93,7 @@ impl InnerRoom {
         &mut self,
         _peer_id: u64,
         _sdp_offer: &Option<String>,
-        _tracks: &[Directional],
+        _tracks: &[Track],
     ) {
         console::log_1(&JsValue::from_str("on_peer_created invoked"));
     }
