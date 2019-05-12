@@ -36,11 +36,12 @@ struct Inner {
     /// WebSocket connection to remote media server.
     sock: Option<Rc<WebSocket>>,
 
-    /// Credentials for authorize on remote media server.
+    /// Credentials used to authorize connection.
     token: String,
 
-    /// Sends ping message to remote media server with specified interval.
     pinger: Pinger,
+
+    /// Event's subscribers list.
     subs: Vec<UnboundedSender<Event>>,
 }
 
@@ -127,6 +128,7 @@ impl RPCClient {
         )
     }
 
+    /// Returns Stream of all Events received by this [`RpcClient`].
     // TODO: proper sub registry
     pub fn subscribe(&self) -> impl Stream<Item = Event, Error = ()> {
         let (tx, rx) = unbounded();
@@ -135,11 +137,13 @@ impl RPCClient {
         rx
     }
 
+    /// Unsubscribe from this [`RpcClient`]. Drops all subscriptions atm.
     // TODO: proper sub registry
     pub fn unsub(&self) {
         self.0.borrow_mut().subs.clear();
     }
 
+    /// Sends Command to Medea.
     // TODO: proper sub registry
     pub fn send_command(&self, command: Command) {
         let socket_borrow = &self.0.borrow().sock;
