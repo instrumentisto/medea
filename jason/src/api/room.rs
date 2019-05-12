@@ -5,7 +5,7 @@ use futures::{
     stream::Stream,
 };
 use protocol::Command;
-use protocol::{Track, Event, IceCandidate};
+use protocol::{Event, IceCandidate, Track};
 use wasm_bindgen::{prelude::*, JsValue};
 use wasm_bindgen_futures::spawn_local;
 use web_sys::console;
@@ -47,7 +47,10 @@ pub struct Room(Rc<RefCell<InnerRoom>>);
 impl Room {
     /// Creates new [`Room`] associating it with provided [`RpcClient`].
     pub fn new(rpc: &Rc<RPCClient>, media_manager: Rc<MediaManager>) -> Self {
-        let room = Rc::new(RefCell::new(InnerRoom::new(Rc::clone(&rpc, media_manager))));
+        let room = Rc::new(RefCell::new(InnerRoom::new(
+            Rc::clone(&rpc),
+            Rc::clone(&media_manager),
+        )));
 
         let inner = Rc::clone(&room);
 
@@ -132,11 +135,11 @@ impl InnerRoom {
             Err(err) => {
                 err.log_err();
                 return;
-            },
+            }
         };
 
         let rpc = Rc::clone(&self.rpc);
-        peer.on_ice_candidate(move |candidate|{
+        peer.on_ice_candidate(move |candidate| {
             rpc.send_command(Command::SetIceCandidate { peer_id, candidate });
         });
 
