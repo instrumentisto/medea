@@ -6,6 +6,10 @@ use web_sys::EventTarget;
 
 use crate::utils::WasmErr;
 
+/// Wrapper for closure that handles some
+/// [`EventTarget`](https://developer.mozilla.org/ru/docs/Web/API/EventTarget)
+/// event. Implement drop that drops provided closure and unregisters
+/// event handler.
 pub struct EventListener<
     T: Deref<Target = EventTarget>,
     A: FromWasmAbi + 'static,

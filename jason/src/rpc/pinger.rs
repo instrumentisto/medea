@@ -8,7 +8,8 @@ use crate::{
     utils::{window, IntervalHandle, WasmErr},
 };
 
-/// Pinger for periodical tests connection to server by sends ping message.
+/// Responsible for sending/handling keep-alive requests, detecting connection
+/// loss.
 pub struct Pinger(Rc<RefCell<InnerPinger>>);
 
 struct InnerPinger {
@@ -61,7 +62,8 @@ impl Pinger {
         })))
     }
 
-    /// Start [`Pinger`] for give socket.
+    /// Start [`Pinger`] for given [`WebSocket`]. Sends first ping immediately,
+    /// so will fail if provided [`WebSocket`] is not active.
     pub fn start(&self, socket: Rc<WebSocket>) -> Result<(), WasmErr> {
         let mut inner = self.0.borrow_mut();
         inner.socket = Some(socket);
@@ -87,7 +89,7 @@ impl Pinger {
         Ok(())
     }
 
-    /// Store number of pong message.
+    /// Timestamp of last pong received.
     pub fn set_pong_at(&self, at: f64) {
         self.0.borrow_mut().pong_at = Some(at);
     }

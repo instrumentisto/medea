@@ -26,17 +26,11 @@ impl RoomHandle {}
 pub struct Room(Rc<RefCell<InnerRoom>>);
 
 impl Room {
-    pub fn new(rpc: Rc<RPCClient>) -> Self {
-        Self(Rc::new(RefCell::new(InnerRoom::new(rpc))))
-    }
+    /// Creates new [`Room`] associating it with provided [`RpcClient`].
+    pub fn new(rpc: &Rc<RPCClient>) -> Self {
+        let room = Rc::new(RefCell::new(InnerRoom::new(Rc::clone(&rpc))));
 
-    pub fn new_handle(&self) -> RoomHandle {
-        RoomHandle(Rc::downgrade(&self.0))
-    }
-
-    /// Subscribes to provided RpcTransport messages.
-    pub fn subscribe(&self, rpc: &RPCClient) {
-        let inner = Rc::clone(&self.0);
+        let inner = Rc::clone(&room);
 
         let process_msg_task = rpc
             .subscribe()
@@ -72,6 +66,14 @@ impl Room {
         // Spawns Promise in JS, does not provide any handles, so current way to
         // stop this stream is to drop all connected Senders.
         spawn_local(process_msg_task);
+
+        Self(room)
+    }
+
+    /// Creates new [`RoomHandle`] used by JS side. You can create them as many
+    /// as you need.
+    pub fn new_handle(&self) -> RoomHandle {
+        RoomHandle(Rc::downgrade(&self.0))
     }
 }
 

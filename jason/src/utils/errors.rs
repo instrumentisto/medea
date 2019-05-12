@@ -7,6 +7,7 @@ use std::{
     fmt::{Display, Formatter},
 };
 
+/// Generic application error.
 #[derive(Debug)]
 pub enum WasmErr {
     JsError(JsValue),

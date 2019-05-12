@@ -20,6 +20,8 @@ pub struct Inner {
     rooms: Vec<Room>,
 }
 
+/// Main application handler. Responsible for managing shared transports,
+/// local media, room initialization.
 #[wasm_bindgen]
 impl Jason {
     #[wasm_bindgen(constructor)]
@@ -28,8 +30,9 @@ impl Jason {
         Self::default()
     }
 
-    /// Enter room with provided token, return initialized connection handler.
-    /// Effectively returns Result<RoomHandle, JsValue>
+    /// Enter room with provided token. Will establish connection with Medea
+    /// server (if it doesn't already exist). Fails if unable to connect to
+    /// Medea. Effectively returns Result<RoomHandle, WasmErr>
     pub fn join_room(&self, token: String) -> Promise {
         let mut rpc = RPCClient::new(token, 3000);
 
@@ -38,8 +41,7 @@ impl Jason {
             .init()
             .and_then(move |()| {
                 let rpc = Rc::new(rpc);
-                let room = Room::new(Rc::clone(&rpc));
-                room.subscribe(&rpc);
+                let room = Room::new(&rpc);
 
                 let handle = room.new_handle();
 
@@ -53,5 +55,8 @@ impl Jason {
         future_to_promise(fut)
     }
 
+    /// Drops Jason and all related objects (Rooms, Connections, Streams etc. ).
+    /// All objects related to this Jason instance will be detached (you will
+    /// still hold them, but unable to use).
     pub fn dispose(self) {}
 }

@@ -69,6 +69,7 @@ impl InnerSocket {
         })
     }
 
+    /// Checks underlying WebSocket state and updates socket_state.
     fn update_state(&mut self) {
         match State::try_from(self.socket.ready_state()) {
             Ok(new_state) => self.socket_state = new_state,
@@ -81,7 +82,8 @@ impl InnerSocket {
 }
 
 impl WebSocket {
-    /// Resolves only if connection succeeded.
+    /// Initiates new WebSocket connection. Resolves only when underlying
+    /// connection becomes active.
     pub fn new(url: &str) -> impl Future<Item = Self, Error = WasmErr> {
         let (tx_close, rx_close) = futures::oneshot();
         let (tx_open, rx_open) = futures::oneshot();
