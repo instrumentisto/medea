@@ -56,49 +56,43 @@ impl Inner {
     }
 }
 
-/// Returns handler for bind on close WebSocket connection.
-fn on_close(inner_rc: Rc<RefCell<Inner>>) -> Box<FnOnce(CloseMsg)> {
-    Box::new(move |msg: CloseMsg| {
-        let mut inner = inner_rc.borrow_mut();
-        inner.sock.take();
-        inner.pinger.stop();
+/// Handles close messsage from remote server.
+fn on_close(inner_rc: &Rc<RefCell<Inner>>, close_msg: CloseMsg) {
+    let mut inner = inner_rc.borrow_mut();
+    inner.sock.take();
+    inner.pinger.stop();
 
-        // TODO: reconnect on disconnect, propagate error if unable
-        //       to reconnect
-        match msg {
-            CloseMsg::Normal(_msg) | CloseMsg::Disconnect(_msg) => {}
-        }
-    })
+    // TODO: reconnect on disconnect, propagate error if unable
+    //       to reconnect
+    match close_msg {
+        CloseMsg::Normal(_msg) | CloseMsg::Disconnect(_msg) => {}
+    }
 }
 
-/// Returns handler for bind on receive server message.
-fn on_message(
-    inner_rc: Rc<RefCell<Inner>>,
-) -> Box<FnMut(Result<ServerMsg, WasmErr>)> {
-    Box::new(move |msg: Result<ServerMsg, WasmErr>| {
-        let inner = inner_rc.borrow();
-        match msg {
-            Ok(ServerMsg::Pong(_num)) => {
-                // TODO: detect no pings
-                inner.pinger.set_pong_at(Date::now());
-            }
-            Ok(ServerMsg::Event(event)) => {
-                // TODO: many subs, filter messages by session
-                if let Some(sub) = inner.subs.iter().next() {
-                    if let Err(err) = sub.unbounded_send(event) {
-                        // TODO: receiver is gone, should delete
-                        //       this subs tx
-                        WasmErr::from(err).log_err();
-                    }
+/// Handles messages from remote server.
+fn on_message(inner_rc: &Rc<RefCell<Inner>>, msg: Result<ServerMsg, WasmErr>) {
+    let inner = inner_rc.borrow();
+    match msg {
+        Ok(ServerMsg::Pong(_num)) => {
+            // TODO: detect no pings
+            inner.pinger.set_pong_at(Date::now());
+        }
+        Ok(ServerMsg::Event(event)) => {
+            // TODO: many subs, filter messages by session
+            if let Some(sub) = inner.subs.iter().next() {
+                if let Err(err) = sub.unbounded_send(event) {
+                    // TODO: receiver is gone, should delete
+                    //       this subs tx
+                    WasmErr::from(err).log_err();
                 }
             }
-            Err(err) => {
-                // TODO: protocol versions mismatch? should drop
-                //       connection if so
-                err.log_err();
-            }
         }
-    })
+        Err(err) => {
+            // TODO: protocol versions mismatch? should drop
+            //       connection if so
+            err.log_err();
+        }
+    }
 }
 
 impl RPCClient {
@@ -117,10 +111,13 @@ impl RPCClient {
                 inner.borrow_mut().pinger.start(Rc::clone(&socket))?;
 
                 let inner_rc = Rc::clone(&inner);
-                socket.on_message(on_message(inner_rc))?;
+                socket.on_message(move |msg: Result<ServerMsg, WasmErr>| {
+                    on_message(&inner_rc, msg)
+                })?;
 
                 let inner_rc = Rc::clone(&inner);
-                socket.on_close(on_close(inner_rc))?;
+                socket
+                    .on_close(move |msg: CloseMsg| on_close(&inner_rc, msg))?;
 
                 inner.borrow_mut().sock.replace(socket);
                 Ok(())

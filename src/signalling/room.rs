@@ -415,9 +415,7 @@ mod test {
     use std::sync::{atomic::AtomicUsize, Arc, Mutex};
 
     use actix::{Addr, Arbiter, System};
-    use protocol::{
-        AudioSettings, Direction, Track, MediaType, VideoSettings,
-    };
+    use protocol::{AudioSettings, Direction, MediaType, Track, VideoSettings};
 
     use super::*;
     use crate::media::create_peers;

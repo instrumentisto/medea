@@ -4,7 +4,7 @@ use futures::{
     future::{Future, IntoFuture},
     stream::Stream,
 };
-use protocol::{Track, Event, IceCandidate};
+use protocol::{Event, IceCandidate, Track};
 use wasm_bindgen::{prelude::*, JsValue};
 use wasm_bindgen_futures::spawn_local;
 use web_sys::console;
