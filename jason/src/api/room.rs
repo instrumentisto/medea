@@ -143,7 +143,7 @@ impl InnerRoom {
         peer.on_ice_candidate(move |candidate| {
             rpc.send_command(Command::SetIceCandidate { peer_id, candidate });
         })
-        .unwrap();
+            .unwrap();
 
         //        peer.apply_tracks(tracks);
 

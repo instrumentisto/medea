@@ -9,6 +9,7 @@ pub type Id = u64;
 
 /// [`MediaStreamTrack`] representation.
 #[derive(Debug)]
+#[allow(clippy::module_name_repetitions)]
 pub struct MediaTrack {
     pub id: Id,
     pub media_type: MediaType,
