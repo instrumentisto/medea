@@ -110,9 +110,9 @@ mod test {
 
     use crate::{
         api::control::Member,
-        conf::{Conf, Coturn, Server},
+        conf::{Conf, Redis, Server, Turn},
         media::create_peers,
-        signalling::Room,
+        signalling::{coturn::test::create_service, Room},
     };
 
     use super::*;
@@ -124,7 +124,13 @@ mod test {
             2 => Member{id: 2, credentials: "responder_credentials".into()},
         };
         let room = Arbiter::start(move |_| {
-            Room::new(1, members, create_peers(1, 2), conf.reconnect_timeout)
+            Room::new(
+                1,
+                members,
+                create_peers(1, 2),
+                conf.reconnect_timeout,
+                create_service(),
+            )
         });
         let rooms = hashmap! {1 => room};
         RoomsRepository::new(rooms)
@@ -161,8 +167,9 @@ mod test {
                 idle_timeout: Duration::new(2, 0),
                 reconnect_timeout: Default::default(),
             },
-            coturn: Coturn::default(),
+            turn: Turn::default(),
             server: Server::default(),
+            redis: Redis::default(),
         };
 
         let mut server = ws_server(conf.clone());

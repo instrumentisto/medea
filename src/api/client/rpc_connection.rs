@@ -4,10 +4,8 @@ use futures::Future;
 
 use crate::api::{control::MemberId, protocol::Event};
 
-use std::fmt;
-
 /// Abstraction over RPC connection with some remote [`Member`].
-pub trait RpcConnection: fmt::Debug + Send {
+pub trait RpcConnection: Send {
     /// Closes [`RpcConnection`].
     /// No [`RpcConnectionClosed`] signals should be emitted.
     /// Always returns success.
@@ -41,7 +39,7 @@ pub enum AuthorizationError {
 
 /// Signal of new [`RpcConnection`] being established with specified [`Member`].
 /// Transport should consider dropping connection if message result is err.
-#[derive(Debug, Message)]
+#[derive(Message)]
 #[rtype(result = "Result<(), ()>")]
 #[allow(clippy::module_name_repetitions)]
 pub struct RpcConnectionEstablished {
@@ -82,6 +80,7 @@ pub mod test {
     };
     use futures::future::Future;
 
+    use crate::api::protocol::ServerMsg;
     use crate::{
         api::{
             client::rpc_connection::{
@@ -95,7 +94,7 @@ pub mod test {
     };
 
     /// [`RpcConnection`] impl convenient for testing.
-    #[derive(Debug, Clone)]
+    #[derive(Clone)]
     pub struct TestConnection {
         pub member_id: MemberId,
         pub room: Addr<Room>,
@@ -134,47 +133,53 @@ pub mod test {
         }
     }
 
-    impl Handler<Event> for TestConnection {
+    impl Handler<ServerMsg> for TestConnection {
         type Result = ();
 
-        fn handle(&mut self, event: Event, _ctx: &mut Self::Context) {
-            let mut events = self.events.lock().unwrap();
-            events.push(serde_json::to_string(&event).unwrap());
-            match event {
-                Event::PeerCreated {
-                    peer_id,
-                    sdp_offer,
-                    tracks: _,
-                } => {
-                    match sdp_offer {
-                        Some(_) => self.room.do_send(Command::MakeSdpAnswer {
-                            peer_id,
-                            sdp_answer: "responder_answer".into(),
-                        }),
+        fn handle(&mut self, msg: ServerMsg, _ctx: &mut Self::Context) {
+            if let ServerMsg::Event(event) = msg {
+                let mut events = self.events.lock().unwrap();
+                events.push(serde_json::to_string(&event).unwrap());
+                match event {
+                    Event::PeerCreated {
+                        peer_id,
+                        sdp_offer,
+                        tracks: _,
+                        ice_servers: _,
+                    } => match sdp_offer {
+                        Some(_) => {
+                            self.room.do_send(Command::MakeSdpAnswer {
+                                peer_id,
+                                sdp_answer: "responder_answer".into(),
+                            });
+                            self.room.do_send(Command::SetIceCandidate {
+                                peer_id,
+                                candidate: "ice_candidate".into(),
+                            })
+                        }
                         None => self.room.do_send(Command::MakeSdpOffer {
                             peer_id,
                             sdp_offer: "caller_offer".into(),
                         }),
+                    },
+                    Event::IceCandidateDiscovered {
+                        peer_id: _,
+                        candidate: _,
+                    } => {
+                        self.room.do_send(RpcConnectionClosed {
+                            member_id: self.member_id,
+                            reason: ClosedReason::Closed,
+                        });
                     }
-                    self.room.do_send(Command::SetIceCandidate {
+                    Event::PeersRemoved { peer_ids: _ } => {}
+                    Event::SdpAnswerMade {
+                        peer_id,
+                        sdp_answer: _,
+                    } => self.room.do_send(Command::SetIceCandidate {
                         peer_id,
                         candidate: "ice_candidate".into(),
-                    })
+                    }),
                 }
-                Event::IceCandidateDiscovered {
-                    peer_id: _,
-                    candidate: _,
-                } => {
-                    self.room.do_send(RpcConnectionClosed {
-                        member_id: self.member_id,
-                        reason: ClosedReason::Closed,
-                    });
-                }
-                Event::PeersRemoved { peer_ids: _ } => {}
-                Event::SdpAnswerMade {
-                    peer_id: _,
-                    sdp_answer: _,
-                } => {}
             }
         }
     }
@@ -189,7 +194,7 @@ pub mod test {
             &self,
             event: Event,
         ) -> Box<dyn Future<Item = (), Error = ()>> {
-            let fut = self.send(event).map_err(|_| ());
+            let fut = self.send(ServerMsg::Event(event)).map_err(|_| ());
             Box::new(fut)
         }
     }

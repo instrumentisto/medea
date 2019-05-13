@@ -1,15 +1,15 @@
 //! Room definitions and implementations. Room is responsible for media
 //! connection establishment between concrete [`Member`]s.
 
+use std::time::Duration;
+
 use actix::{
-    fut::wrap_future, Actor, ActorFuture, AsyncContext, Context, Handler,
-    Message,
+    fut::wrap_future, Actor, ActorFuture, Addr, AsyncContext, Context, Handler,
+    Message, WrapFuture,
 };
 use failure::Fail;
-use futures::future;
+use futures::future::{self, Either, Future};
 use hashbrown::HashMap;
-
-use std::time::Duration;
 
 use crate::{
     api::{
@@ -25,7 +25,10 @@ use crate::{
         New, Peer, PeerId, PeerStateError, PeerStateMachine,
         WaitLocalHaveRemote, WaitLocalSdp, WaitRemoteSdp,
     },
-    signalling::{participants::ParticipantService, peers::PeerRepository},
+    signalling::{
+        coturn::AuthCoturn, participants::ParticipantService,
+        peers::PeerRepository,
+    },
 };
 
 /// ID of [`Room`].
@@ -45,8 +48,10 @@ pub enum RoomError {
     UnableToSendEvent(MemberId),
     #[fail(display = "PeerError: {}", _0)]
     PeerStateError(PeerStateError),
-    #[fail(display = "Generic room error {}", _0)]
+    #[fail(display = "Generic room error: {}", _0)]
     BadRoomSpec(String),
+    #[fail(display = "Coturn error: {}", _0)]
+    Coturn(String),
 }
 
 impl From<PeerStateError> for RoomError {
@@ -56,7 +61,6 @@ impl From<PeerStateError> for RoomError {
 }
 
 /// Media server room with its [`Member`]s.
-#[derive(Debug)]
 pub struct Room {
     id: Id,
 
@@ -74,11 +78,16 @@ impl Room {
         members: HashMap<MemberId, Member>,
         peers: HashMap<PeerId, PeerStateMachine>,
         reconnect_timeout: Duration,
+        coturn_auth: Addr<AuthCoturn>,
     ) -> Self {
         Self {
             id,
             peers: PeerRepository::from(peers),
-            participants: ParticipantService::new(members, reconnect_timeout),
+            participants: ParticipantService::new(
+                members,
+                coturn_auth,
+                reconnect_timeout,
+            ),
         }
     }
 
@@ -113,16 +122,37 @@ impl Room {
 
         let sender = sender.start();
         let member_id = sender.member_id();
-        let peer_created = Event::PeerCreated {
-            peer_id: sender.id(),
-            sdp_offer: None,
-            tracks: sender.tracks(),
-        };
-        self.peers.add_peer(sender.id(), sender);
-        Ok(Box::new(wrap_future(
-            self.participants
-                .send_event_to_member(member_id, peer_created),
-        )))
+
+        let fut = self
+            .participants
+            .get_ice_user_by_member_id(member_id)
+            .map_err(move |_| {
+                RoomError::Coturn(format!(
+                    "Cannot get ice user for member {}",
+                    member_id
+                ))
+            })
+            .into_actor(self)
+            .then(move |res, room, _| {
+                let fut = match res {
+                    Err(err) => Either::A(future::err(err)),
+                    Ok(ice_user) => {
+                        let event = Event::PeerCreated {
+                            peer_id: sender.id(),
+                            sdp_offer: None,
+                            tracks: sender.tracks(),
+                            ice_servers: ice_user.into(),
+                        };
+                        Either::B(
+                            room.participants
+                                .send_event_to_member(member_id, event),
+                        )
+                    }
+                };
+                room.peers.add_peer(sender.id(), sender);
+                wrap_future(fut)
+            });
+        Ok(Box::new(fut))
     }
 
     /// Sends [`Event::PeerCreated`] to provided [`Peer`] partner. Provided
@@ -143,17 +173,37 @@ impl Room {
         let to_peer = to_peer.set_remote_sdp(sdp_offer.clone());
 
         let to_member_id = to_peer.member_id();
-        let event = Event::PeerCreated {
-            peer_id: to_peer_id,
-            sdp_offer: Some(sdp_offer),
-            tracks: to_peer.tracks(),
-        };
-
-        self.peers.add_peer(from_peer_id, from_peer);
-        self.peers.add_peer(to_peer_id, to_peer);
-        Ok(Box::new(wrap_future(
-            self.participants.send_event_to_member(to_member_id, event),
-        )))
+        let fut =
+            self.participants
+                .get_ice_user_by_member_id(to_member_id)
+                .map_err(move |_| {
+                    RoomError::Coturn(format!(
+                        "Cannot get ice user for member {}",
+                        to_member_id
+                    ))
+                })
+                .into_actor(self)
+                .then(move |res, room, _| {
+                    let fut = match res {
+                        Err(err) => Either::A(future::err(err)),
+                        Ok(ice_user) => {
+                            let event = Event::PeerCreated {
+                                peer_id: to_peer_id,
+                                sdp_offer: Some(sdp_offer),
+                                tracks: to_peer.tracks(),
+                                ice_servers: ice_user.into(),
+                            };
+                            Either::B(room.participants.send_event_to_member(
+                                to_peer.member_id(),
+                                event,
+                            ))
+                        }
+                    };
+                    room.peers.add_peer(from_peer_id, from_peer);
+                    room.peers.add_peer(to_peer_id, to_peer);
+                    wrap_future(fut)
+                });
+        Ok(Box::new(fut))
     }
 
     /// Sends [`Event::SdpAnswerMade`] to provided [`Peer`] partner. Provided
@@ -341,35 +391,32 @@ impl Handler<RpcConnectionEstablished> for Room {
         msg: RpcConnectionEstablished,
         ctx: &mut Self::Context,
     ) -> Self::Result {
+        let member_id = msg.member_id;
         info!("RpcConnectionEstablished for member {}", msg.member_id);
 
-        // save new connection
-        self.participants.connection_established(
-            ctx,
-            msg.member_id,
-            msg.connection,
-        );
-
-        // get connected member Peers
-        self.peers
-            .get_peers_by_member_id(msg.member_id)
-            .into_iter()
-            .for_each(|peer| {
-                // only New peers should be connected
-                if let PeerStateMachine::New(peer) = peer {
-                    if self
-                        .participants
-                        .member_has_connection(peer.partner_member_id())
-                    {
-                        ctx.notify(ConnectPeers(
-                            peer.id(),
-                            peer.partner_peer_id(),
-                        ));
-                    }
-                }
-            });
-
-        Box::new(wrap_future(future::ok(())))
+        let fut =
+            self.participants
+                .connection_established(ctx, msg.member_id, msg.connection)
+                .map_err(|_| ())
+                .into_actor(self)
+                .map(move |_, room, ctx| {
+                    room.peers
+                        .get_peers_by_member_id(member_id)
+                        .into_iter()
+                        .for_each(|peer| {
+                            if let PeerStateMachine::New(peer) = peer {
+                                if room.participants.member_has_connection(
+                                    peer.partner_member_id(),
+                                ) {
+                                    ctx.notify(ConnectPeers(
+                                        peer.id(),
+                                        peer.partner_peer_id(),
+                                    ));
+                                }
+                            }
+                        });
+                });
+        Box::new(fut)
     }
 }
 
@@ -412,22 +459,20 @@ impl Handler<RpcConnectionClosed> for Room {
 
 #[cfg(test)]
 mod test {
-    use std::sync::{
-        atomic::{AtomicUsize, Ordering},
-        Arc, Mutex,
-    };
+    use std::sync::{atomic::AtomicUsize, Arc, Mutex};
 
     use actix::{Addr, Arbiter, System};
 
     use super::*;
+    use crate::api::protocol::ICEServer;
     use crate::{
+        api::client::rpc_connection::test::TestConnection,
         api::protocol::{
             AudioSettings, Direction, Directional, MediaType, VideoSettings,
         },
         media::create_peers,
+        signalling::coturn::test::create_service,
     };
-
-    use crate::api::client::rpc_connection::test::TestConnection;
 
     fn start_room() -> Addr<Room> {
         let members = hashmap! {
@@ -435,7 +480,13 @@ mod test {
             2 => Member{id: 2, credentials: "responder_credentials".to_owned()},
         };
         Arbiter::start(move |_| {
-            Room::new(1, members, create_peers(1, 2), Duration::from_secs(10))
+            Room::new(
+                1,
+                members,
+                create_peers(1, 2),
+                Duration::from_secs(10),
+                create_service(),
+            )
         })
     }
 
@@ -485,6 +536,21 @@ mod test {
                             media_type: MediaType::Video(VideoSettings {}),
                         },
                     ],
+                    ice_servers: vec![
+                        ICEServer {
+                            urls: vec!["stun:5.5.5.5:1234".to_string()],
+                            username: None,
+                            credential: None,
+                        },
+                        ICEServer {
+                            urls: vec![
+                                "turn:5.5.5.5:1234".to_string(),
+                                "turn:5.5.5.5:1234?transport=tcp".to_string()
+                            ],
+                            username: Some("username".to_string()),
+                            credential: Some("password".to_string()),
+                        },
+                    ],
                 })
                 .unwrap(),
                 serde_json::to_string(&Event::SdpAnswerMade {
@@ -516,6 +582,21 @@ mod test {
                             id: 2,
                             direction: Direction::Recv { sender: 1 },
                             media_type: MediaType::Video(VideoSettings {}),
+                        },
+                    ],
+                    ice_servers: vec![
+                        ICEServer {
+                            urls: vec!["stun:5.5.5.5:1234".to_string()],
+                            username: None,
+                            credential: None,
+                        },
+                        ICEServer {
+                            urls: vec![
+                                "turn:5.5.5.5:1234".to_string(),
+                                "turn:5.5.5.5:1234?transport=tcp".to_string()
+                            ],
+                            username: Some("username".to_string()),
+                            credential: Some("password".to_string()),
                         },
                     ],
                 })

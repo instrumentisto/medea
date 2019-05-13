@@ -1,8 +1,9 @@
 //! Provides application configuration options.
 
-pub mod coturn;
+pub mod redis;
 pub mod rpc;
 pub mod server;
+pub mod turn;
 
 use std::env;
 
@@ -12,9 +13,10 @@ use config::{
 use failure::Error;
 use serde::{Deserialize, Serialize};
 
-pub use self::coturn::Coturn;
+pub use self::redis::Redis;
 pub use self::rpc::Rpc;
 pub use self::server::Server;
+pub use self::turn::Turn;
 
 use std::collections::HashMap;
 
@@ -28,12 +30,14 @@ static APP_CONF_PATH_ENV_VAR_NAME: &str = "MEDEA_CONF";
 /// Holds application config.
 #[derive(Clone, Debug, Deserialize, Serialize, Default)]
 pub struct Conf {
-    /// COTURN server settings.
-    pub coturn: coturn::Coturn,
+    /// Redis server settings.
+    pub redis: Redis,
     /// HTTP server settings.
-    pub rpc: rpc::Rpc,
+    pub rpc: Rpc,
     /// RPC connection settings.
-    pub server: server::Server,
+    pub server: Server,
+    /// TURN server settings.
+    pub turn: Turn,
 }
 
 /// Allows merging [`Conf`] into [`config::Config`].

@@ -12,3 +12,10 @@ pub struct Member {
     /// Credentials to authorize [`Member`] with.
     pub credentials: String,
 }
+
+impl Member {
+    /// Returns new instance of [`Memebr`] with given credentials.
+    pub fn new(id: Id, credentials: String) -> Self {
+        Self { id, credentials }
+    }
+}

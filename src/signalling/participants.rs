@@ -2,7 +2,7 @@
 //! stores [`Members`] and associated [`RpcConnection`]s, handles
 //! [`RpcConnection`] authorization, establishment, message sending.
 
-use actix::{fut::wrap_future, AsyncContext, Context, SpawnHandle};
+use actix::{Addr, AsyncContext, Context, SpawnHandle};
 use hashbrown::HashMap;
 
 use futures::{
@@ -22,7 +22,11 @@ use crate::{
         protocol::Event,
     },
     log::prelude::*,
+    media::ICEUser,
     signalling::{
+        coturn::{
+            AuthCoturn, CreateIceUser, GetIceUser, RedisUnreachablePolicy,
+        },
         room::{CloseRoom, RoomError},
         Room,
     },
@@ -31,10 +35,12 @@ use crate::{
 /// Participant is [`Member`] with [`RpcConnection`]. [`ParticipantService`]
 /// stores [`Members`] and associated [`RpcConnection`]s, handles
 /// [`RpcConnection`] authorization, establishment, message sending.
-#[derive(Debug)]
 pub struct ParticipantService {
     /// [`Member`]s which currently are present in this [`Room`].
     members: HashMap<MemberId, Member>,
+
+    /// Service for managing authorization on COTURN server.
+    coturn_auth: Addr<AuthCoturn>,
 
     /// Established [`RpcConnection`]s of [`Member`]s in this [`Room`].
     // TODO: Replace Box<dyn RpcConnection>> with enum,
@@ -54,10 +60,12 @@ pub struct ParticipantService {
 impl ParticipantService {
     pub fn new(
         members: HashMap<MemberId, Member>,
+        coturn_auth: Addr<AuthCoturn>,
         reconnect_timeout: Duration,
     ) -> Self {
         Self {
             members,
+            coturn_auth,
             connections: HashMap::new(),
             reconnect_timeout,
             drop_connection_tasks: HashMap::new(),
@@ -83,6 +91,22 @@ impl ParticipantService {
             }
             None => Err(AuthorizationError::MemberNotExists),
         }
+    }
+
+    /// Returns [`ICEUser`] to authorize remote Web Client on COTURN server.
+    pub fn get_ice_user_by_member_id(
+        &self,
+        member_id: MemberId,
+    ) -> impl Future<Item = ICEUser, Error = ()> {
+        self.coturn_auth
+            .send(GetIceUser(member_id))
+            .map_err(|err| {
+                error!("Auth service unreachable, because {}", err);
+            })
+            .and_then(|res| match res {
+                Ok(user) => future::ok(user),
+                Err(()) => future::err(()),
+            })
     }
 
     /// Checks if [`Member`] has **active** [`RcpConnection`].
@@ -145,7 +169,8 @@ impl ParticipantService {
         }
     }
 
-    /// Stores provided [`RpcConnection`] for given [`Member`] in the [`Room`].
+    /// Stores provided [`RpcConnection`] for given [`Member`] in the [`Room`]
+    /// and send request to COTURN auth service for create [`ICEUser`].
     /// If [`Member`] already has any other [`RpcConnection`],
     /// then it will be closed.
     pub fn connection_established(
@@ -153,7 +178,7 @@ impl ParticipantService {
         ctx: &mut Context<Room>,
         member_id: MemberId,
         con: Box<dyn RpcConnection>,
-    ) {
+    ) -> impl Future<Item = (), Error = ()> {
         // lookup previous member connection
         if let Some(mut connection) = self.connections.remove(&member_id) {
             debug!("Closing old RpcConnection for member {}", member_id);
@@ -164,9 +189,23 @@ impl ParticipantService {
             {
                 ctx.cancel_future(handler);
             }
-            ctx.spawn(wrap_future(connection.close()));
+            Either::A(connection.close())
         } else {
             self.connections.insert(member_id, con);
+            Either::B(
+                self.coturn_auth
+                    .send(CreateIceUser {
+                        member_id,
+                        policy: RedisUnreachablePolicy::default(),
+                    })
+                    .map_err(|err| {
+                        error!("Auth service unreachable, because {}", err);
+                    })
+                    .and_then(|res| match res {
+                        Ok(()) => future::ok(()),
+                        Err(()) => future::err(()),
+                    }),
+            )
         }
     }
 

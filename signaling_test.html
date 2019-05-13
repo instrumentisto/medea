@@ -65,7 +65,8 @@
                 }
             });
 
-            pcs[msg.peer_id] = new RTCPeerConnection();
+            var configuration = { iceServers: msg.ice_servers };
+            pcs[msg.peer_id] = new RTCPeerConnection(configuration);
 
             var pc = pcs[msg.peer_id];
             pc.ontrack = function (e) {
