@@ -7,9 +7,8 @@ use futures::{
 };
 use protocol::Command;
 use protocol::{Event, IceCandidate, Track};
-use wasm_bindgen::{prelude::*, JsValue};
+use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
-use web_sys::console;
 
 use std::{
     cell::RefCell,
@@ -18,7 +17,7 @@ use std::{
 
 use crate::{
     media::{
-        MediaCaps, MediaManager, MediaStream, MediaStreamHandle, PeerId,
+        MediaManager, MediaStreamHandle, PeerId,
         PeerRepository, Sdp,
     },
     rpc::RPCClient,
@@ -47,7 +46,7 @@ pub struct Room(Rc<RefCell<InnerRoom>>);
 
 impl Room {
     /// Creates new [`Room`] associating it with provided [`RpcClient`].
-    pub fn new(rpc: &Rc<RPCClient>, media_manager: Rc<MediaManager>) -> Self {
+    pub fn new(rpc: &Rc<RPCClient>, media_manager: &Rc<MediaManager>) -> Self {
         let room = Rc::new(RefCell::new(InnerRoom::new(
             Rc::clone(&rpc),
             Rc::clone(&media_manager),
@@ -129,7 +128,7 @@ impl InnerRoom {
         &mut self,
         peer_id: PeerId,
         sdp_offer: Option<String>,
-        tracks: Vec<Track>,
+        _tracks: Vec<Track>,
     ) {
         let peer = match self.peers.create(peer_id) {
             Ok(peer) => peer,
@@ -140,15 +139,18 @@ impl InnerRoom {
         };
 
         let rpc = Rc::clone(&self.rpc);
-        peer.on_ice_candidate(move |candidate| {
-            rpc.send_command(Command::SetIceCandidate { peer_id, candidate });
-        })
-            .unwrap();
 
-        //        peer.apply_tracks(tracks);
+        if let Err(err) = peer.on_ice_candidate(move |candidate| {
+            rpc.send_command(Command::SetIceCandidate { peer_id, candidate });
+        }) {
+            err.log_err();
+            return;
+        }
+
+        //                peer.apply_tracks(tracks);
 
         let rpc = Rc::clone(&self.rpc);
-
+        let peer_rc = Rc::clone(peer);
         let fut = match sdp_offer {
             None => Either::A(
                 peer.create_and_set_offer(true, true, false).and_then(
@@ -161,9 +163,17 @@ impl InnerRoom {
                     },
                 ),
             ),
-            Some(offer) => {
-                Either::B(peer.set_remote_description(Sdp::Offer(offer)))
-            }
+            Some(offer) => Either::B(
+                peer.set_remote_description(Sdp::Offer(offer))
+                    .and_then(move |_| peer_rc.create_and_set_answer())
+                    .and_then(move |sdp_answer| {
+                        rpc.send_command(Command::MakeSdpAnswer {
+                            peer_id,
+                            sdp_answer,
+                        });
+                        Ok(())
+                    }),
+            ),
         };
 
         spawn_local(fut.map_err(|err: WasmErr| {
@@ -194,7 +204,10 @@ impl InnerRoom {
         candidate: &IceCandidate,
     ) {
         if let Some(peer) = self.peers.get_peer(peer_id) {
-            peer.add_ice_candidate(candidate);
+            spawn_local(
+                peer.add_ice_candidate(candidate)
+                    .map_err(|err| err.log_err()),
+            );
         } else {
             // TODO: No peer, whats next?
             WasmErr::from_str(format!("Peer with id {} doesnt exist", peer_id));

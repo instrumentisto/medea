@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::rc::Rc;
 use web_sys::{
-    RtcIceCandidate, RtcIceCandidateInit, RtcOfferOptions, RtcPeerConnection,
+    RtcIceCandidateInit, RtcOfferOptions, RtcPeerConnection,
     RtcPeerConnectionIceEvent, RtcSdpType, RtcSessionDescription,
     RtcSessionDescriptionInit,
 };
@@ -10,7 +10,7 @@ use crate::media::stream::MediaStream;
 use crate::utils::{EventListener, WasmErr};
 use futures::Future;
 use protocol::{
-    Direction, IceCandidate as IceDTO, MediaType, Track as TrackDTO,
+    IceCandidate as IceDTO
 };
 use std::cell::RefCell;
 use wasm_bindgen_futures::JsFuture;
@@ -19,6 +19,7 @@ pub type Id = u64;
 
 #[allow(clippy::module_name_repetitions)]
 pub struct PeerConnection {
+    id: Id,
     inner: Rc<RtcPeerConnection>,
     on_ice_candidate: RefCell<
         Option<EventListener<RtcPeerConnection, RtcPeerConnectionIceEvent>>,
@@ -33,6 +34,16 @@ pub enum Sdp {
 }
 
 impl PeerConnection {
+    pub fn new(id: Id) -> Result<Self, WasmErr> {
+        Ok(Self {
+            id,
+            inner: Rc::new(RtcPeerConnection::new()?),
+            on_ice_candidate: RefCell::new(None),
+            recv_audio: RefCell::new(false),
+            recv_video: RefCell::new(false),
+        })
+    }
+
     pub fn create_and_set_offer(
         &self,
         receive_audio: bool,
@@ -136,15 +147,16 @@ impl PeerConnection {
                 Rc::clone(&self.inner),
                 "icecandidate",
                 move |msg: RtcPeerConnectionIceEvent| {
-                    let candidate = msg.candidate().unwrap();
+                    // TODO: examine None candidates, maybe we should send them
+                    if let Some(candidate) = msg.candidate() {
+                        let candidate = IceDTO {
+                            candidate: candidate.candidate(),
+                            sdp_m_line_index: candidate.sdp_m_line_index(),
+                            sdp_mid: candidate.sdp_mid(),
+                        };
 
-                    let candidate = IceDTO {
-                        candidate: candidate.candidate(),
-                        sdp_m_line_index: candidate.sdp_m_line_index(),
-                        sdp_mid: candidate.sdp_mid(),
-                    };
-
-                    f(candidate);
+                        f(candidate);
+                    }
                 },
             )?);
 
@@ -191,32 +203,21 @@ impl Drop for PeerConnection {
     }
 }
 
-impl From<RtcPeerConnection> for PeerConnection {
-    fn from(peer: RtcPeerConnection) -> Self {
-        Self {
-            inner: Rc::new(peer),
-            on_ice_candidate: RefCell::new(None),
-            recv_audio: RefCell::new(false),
-            recv_video: RefCell::new(false),
-        }
-    }
-}
-
 #[derive(Default)]
 #[allow(clippy::module_name_repetitions)]
 pub struct PeerRepository {
-    peers: HashMap<Id, PeerConnection>,
+    peers: HashMap<Id, Rc<PeerConnection>>,
 }
 
 impl PeerRepository {
     // TODO: set ice_servers
-    pub fn create(&mut self, id: Id) -> Result<&PeerConnection, WasmErr> {
-        let peer = PeerConnection::from(RtcPeerConnection::new()?);
+    pub fn create(&mut self, id: Id) -> Result<&Rc<PeerConnection>, WasmErr> {
+        let peer = Rc::new(PeerConnection::new(id)?);
         self.peers.insert(id, peer);
         Ok(self.peers.get(&id).unwrap())
     }
 
-    pub fn get_peer(&self, id: Id) -> Option<&PeerConnection> {
+    pub fn get_peer(&self, id: Id) -> Option<&Rc<PeerConnection>> {
         self.peers.get(&id)
     }
 

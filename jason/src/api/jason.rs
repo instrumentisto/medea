@@ -45,7 +45,7 @@ impl Jason {
             .init()
             .and_then(move |()| {
                 let rpc = Rc::new(rpc);
-                let room = Room::new(&rpc, media_manager);
+                let room = Room::new(&rpc, &media_manager);
 
                 let handle = room.new_handle();
 
