@@ -151,38 +151,38 @@ impl PeerConnection {
         Ok(())
     }
 
-//    // TODO: properly cast and store all tracks/streams in PeerConnection with
-//    // states (pending, active)
-//    pub fn apply_tracks(&self, tracks: Vec<TrackDTO>) -> Result<(), WasmErr> {
-//        let mut send_audio = false;
-//        let mut send_video = false;
-//        let mut recv_audio = false;
-//        let mut recv_video = false;
-//
-//        for track in tracks.into_iter() {
-//            let track = (track.direction, track.media_type);
-//            match track {
-//                (Direction::Recv { .. }, MediaType::Audio { .. }) => {
-//                    recv_audio = true;
-//                }
-//                (Direction::Recv { .. }, MediaType::Video { .. }) => {
-//                    recv_video = true;
-//                }
-//                (Direction::Send { .. }, MediaType::Audio { .. }) => {
-//                    send_audio = true;
-//                }
-//                (Direction::Send { .. }, MediaType::Video { .. }) => {
-//                    send_video = true;
-//                }
-//                _ => Err(WasmErr::from_str(""))?,
-//            };
-//        }
-//
-//        *self.recv_audio.borrow_mut() = recv_audio;
-//        *self.recv_video.borrow_mut() = send_video;
-//
-//        Ok(())
-//    }
+    //    // TODO: properly cast and store all tracks/streams in PeerConnection
+    // with    // states (pending, active)
+    //    pub fn apply_tracks(&self, tracks: Vec<TrackDTO>) -> Result<(),
+    // WasmErr> {        let mut send_audio = false;
+    //        let mut send_video = false;
+    //        let mut recv_audio = false;
+    //        let mut recv_video = false;
+    //
+    //        for track in tracks.into_iter() {
+    //            let track = (track.direction, track.media_type);
+    //            match track {
+    //                (Direction::Recv { .. }, MediaType::Audio { .. }) => {
+    //                    recv_audio = true;
+    //                }
+    //                (Direction::Recv { .. }, MediaType::Video { .. }) => {
+    //                    recv_video = true;
+    //                }
+    //                (Direction::Send { .. }, MediaType::Audio { .. }) => {
+    //                    send_audio = true;
+    //                }
+    //                (Direction::Send { .. }, MediaType::Video { .. }) => {
+    //                    send_video = true;
+    //                }
+    //                _ => Err(WasmErr::from_str(""))?,
+    //            };
+    //        }
+    //
+    //        *self.recv_audio.borrow_mut() = recv_audio;
+    //        *self.recv_video.borrow_mut() = send_video;
+    //
+    //        Ok(())
+    //    }
 }
 
 impl Drop for PeerConnection {

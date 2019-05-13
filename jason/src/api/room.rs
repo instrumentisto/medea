@@ -1,5 +1,6 @@
 //! Represents Medea room.
 
+use futures::future::Either;
 use futures::{
     future::{Future, IntoFuture},
     stream::Stream,
@@ -9,7 +10,6 @@ use protocol::{Event, IceCandidate, Track};
 use wasm_bindgen::{prelude::*, JsValue};
 use wasm_bindgen_futures::spawn_local;
 use web_sys::console;
-use futures::future::Either;
 
 use std::{
     cell::RefCell,
@@ -145,7 +145,7 @@ impl InnerRoom {
         })
         .unwrap();
 
-//        peer.apply_tracks(tracks);
+        //        peer.apply_tracks(tracks);
 
         let rpc = Rc::clone(&self.rpc);
 

@@ -5,9 +5,7 @@
 #![allow(clippy::use_self)]
 use failure::Fail;
 use hashbrown::HashMap;
-use protocol::{
-    AudioSettings, Direction, Track, MediaType, VideoSettings,
-};
+use protocol::{AudioSettings, Direction, MediaType, Track, VideoSettings};
 
 use std::{convert::TryFrom, fmt::Display, sync::Arc};
 
