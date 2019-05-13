@@ -9,7 +9,9 @@ use web_sys::{
 use crate::media::stream::MediaStream;
 use crate::utils::{EventListener, WasmErr};
 use futures::Future;
-use protocol::IceCandidate;
+use protocol::{
+    Direction, IceCandidate as IceDTO, MediaType, Track as TrackDTO,
+};
 use std::cell::RefCell;
 use wasm_bindgen_futures::JsFuture;
 
@@ -21,6 +23,13 @@ pub struct PeerConnection {
     on_ice_candidate: RefCell<
         Option<EventListener<RtcPeerConnection, RtcPeerConnectionIceEvent>>,
     >,
+    recv_audio: RefCell<bool>,
+    recv_video: RefCell<bool>,
+}
+
+pub enum Sdp {
+    Offer(String),
+    Answer(String),
 }
 
 impl PeerConnection {
@@ -66,12 +75,24 @@ impl PeerConnection {
             .map_err(Into::into)
     }
 
-    pub fn set_remote_answer(
+    pub fn set_remote_description(
         &self,
-        answer: &str,
+        sdp: Sdp,
     ) -> impl Future<Item = (), Error = WasmErr> {
-        let mut desc = RtcSessionDescriptionInit::new(RtcSdpType::Answer);
-        desc.sdp(&answer);
+        let desc = match sdp {
+            Sdp::Offer(offer) => {
+                let mut desc =
+                    RtcSessionDescriptionInit::new(RtcSdpType::Offer);
+                desc.sdp(&offer);
+                desc
+            }
+            Sdp::Answer(answer) => {
+                let mut desc =
+                    RtcSessionDescriptionInit::new(RtcSdpType::Answer);
+                desc.sdp(&answer);
+                desc
+            }
+        };
 
         JsFuture::from(self.inner.set_remote_description(&desc))
             .map(|_| ())
@@ -80,7 +101,7 @@ impl PeerConnection {
 
     pub fn add_ice_candidate(
         &self,
-        candidate: &IceCandidate,
+        candidate: &IceDTO,
     ) -> impl Future<Item = (), Error = WasmErr> {
         // TODO: According to Web IDL, return value is void.
         //       It may be worth to propose PR to wasm-bindgen, that would
@@ -107,7 +128,7 @@ impl PeerConnection {
 
     pub fn on_ice_candidate<F>(&self, mut f: F) -> Result<(), WasmErr>
     where
-        F: (FnMut(IceCandidate)) + 'static,
+        F: (FnMut(IceDTO)) + 'static,
     {
         self.on_ice_candidate
             .borrow_mut()
@@ -117,7 +138,7 @@ impl PeerConnection {
                 move |msg: RtcPeerConnectionIceEvent| {
                     let candidate = msg.candidate().unwrap();
 
-                    let candidate = IceCandidate {
+                    let candidate = IceDTO {
                         candidate: candidate.candidate(),
                         sdp_m_line_index: candidate.sdp_m_line_index(),
                         sdp_mid: candidate.sdp_mid(),
@@ -130,7 +151,38 @@ impl PeerConnection {
         Ok(())
     }
 
-    //    pub fn set_onaddstream(&self, onaddstream: Option<&Function>)
+//    // TODO: properly cast and store all tracks/streams in PeerConnection with
+//    // states (pending, active)
+//    pub fn apply_tracks(&self, tracks: Vec<TrackDTO>) -> Result<(), WasmErr> {
+//        let mut send_audio = false;
+//        let mut send_video = false;
+//        let mut recv_audio = false;
+//        let mut recv_video = false;
+//
+//        for track in tracks.into_iter() {
+//            let track = (track.direction, track.media_type);
+//            match track {
+//                (Direction::Recv { .. }, MediaType::Audio { .. }) => {
+//                    recv_audio = true;
+//                }
+//                (Direction::Recv { .. }, MediaType::Video { .. }) => {
+//                    recv_video = true;
+//                }
+//                (Direction::Send { .. }, MediaType::Audio { .. }) => {
+//                    send_audio = true;
+//                }
+//                (Direction::Send { .. }, MediaType::Video { .. }) => {
+//                    send_video = true;
+//                }
+//                _ => Err(WasmErr::from_str(""))?,
+//            };
+//        }
+//
+//        *self.recv_audio.borrow_mut() = recv_audio;
+//        *self.recv_video.borrow_mut() = send_video;
+//
+//        Ok(())
+//    }
 }
 
 impl Drop for PeerConnection {
@@ -144,6 +196,8 @@ impl From<RtcPeerConnection> for PeerConnection {
         Self {
             inner: Rc::new(peer),
             on_ice_candidate: RefCell::new(None),
+            recv_audio: RefCell::new(false),
+            recv_video: RefCell::new(false),
         }
     }
 }

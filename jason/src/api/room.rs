@@ -9,6 +9,7 @@ use protocol::{Event, IceCandidate, Track};
 use wasm_bindgen::{prelude::*, JsValue};
 use wasm_bindgen_futures::spawn_local;
 use web_sys::console;
+use futures::future::Either;
 
 use std::{
     cell::RefCell,
@@ -18,7 +19,7 @@ use std::{
 use crate::{
     media::{
         MediaCaps, MediaManager, MediaStream, MediaStreamHandle, PeerId,
-        PeerRepository,
+        PeerRepository, Sdp,
     },
     rpc::RPCClient,
     utils::{Callback, WasmErr},
@@ -65,13 +66,13 @@ impl Room {
                         sdp_offer,
                         tracks,
                     } => {
-                        inner.on_peer_created(peer_id, &sdp_offer, &tracks);
+                        inner.on_peer_created(peer_id, sdp_offer, tracks);
                     }
                     Event::SdpAnswerMade {
                         peer_id,
                         sdp_answer,
                     } => {
-                        inner.on_sdp_answer(peer_id, &sdp_answer);
+                        inner.on_sdp_answer(peer_id, sdp_answer);
                     }
                     Event::IceCandidateDiscovered { peer_id, candidate } => {
                         inner.on_ice_candidate_discovered(peer_id, &candidate);
@@ -127,8 +128,8 @@ impl InnerRoom {
     fn on_peer_created(
         &mut self,
         peer_id: PeerId,
-        sdp_offer: &Option<String>,
-        tracks: &[Track],
+        sdp_offer: Option<String>,
+        tracks: Vec<Track>,
     ) {
         let peer = match self.peers.create(peer_id) {
             Ok(peer) => peer,
@@ -141,19 +142,45 @@ impl InnerRoom {
         let rpc = Rc::clone(&self.rpc);
         peer.on_ice_candidate(move |candidate| {
             rpc.send_command(Command::SetIceCandidate { peer_id, candidate });
-        });
+        })
+        .unwrap();
 
-        // 1. parse tracks
-        // 2. offer/answer
+//        peer.apply_tracks(tracks);
+
+        let rpc = Rc::clone(&self.rpc);
+
+        let fut = match sdp_offer {
+            None => Either::A(
+                peer.create_and_set_offer(true, true, false).and_then(
+                    move |sdp_offer: String| {
+                        rpc.send_command(Command::MakeSdpOffer {
+                            peer_id,
+                            sdp_offer,
+                        });
+                        Ok(())
+                    },
+                ),
+            ),
+            Some(offer) => {
+                Either::B(peer.set_remote_description(Sdp::Offer(offer)))
+            }
+        };
+
+        spawn_local(fut.map_err(|err: WasmErr| {
+            err.log_err();
+        }));
     }
 
     /// Applies specified SDP Answer to specified RTCPeerConnection.
-    fn on_sdp_answer(&mut self, peer_id: PeerId, sdp_answer: &str) {
+    fn on_sdp_answer(&mut self, peer_id: PeerId, sdp_answer: String) {
         if let Some(peer) = self.peers.get_peer(peer_id) {
-            spawn_local(peer.set_remote_answer(sdp_answer).or_else(|err| {
-                err.log_err();
-                Err(())
-            }));
+            spawn_local(
+                peer.set_remote_description(Sdp::Answer(sdp_answer))
+                    .or_else(|err| {
+                        err.log_err();
+                        Err(())
+                    }),
+            );
         } else {
             // TODO: No peer, whats next?
             WasmErr::from_str(format!("Peer with id {} doesnt exist", peer_id));
