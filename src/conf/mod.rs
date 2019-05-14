@@ -178,6 +178,8 @@ mod conf_parse_spec {
         assert_ne!(new_config.rpc.idle_timeout, defaults.rpc.idle_timeout);
     }
 
+    // TODO: This test seems to pollute environment and might
+    //       fail from time to time.
     #[test]
     #[serial]
     fn env_overrides_defaults() {

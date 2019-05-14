@@ -540,7 +540,16 @@ This event is sent during SDP negotiation/re-negotiation.
 ```rust
 struct IceCandidateDiscovered {
     peer_id: u64,
+    candidate: IceCandidate,
+}
+```
+
+Related objects:
+```rust
+struct IceCandidate {
     candidate: String,
+    sdp_m_line_index: Option<u16>,
+    sdp_mid: Option<String>,
 }
 ```
 
@@ -895,7 +904,16 @@ struct MakeSdpAnswer {
 ```rust
 struct SetIceCandidate {
     peer_id: u64,
+    candidate: IceCandidate,
+}
+```
+
+Related objects:
+```rust
+struct IceCandidate {
     candidate: String,
+    sdp_m_line_index: Option<u16>,
+    sdp_mid: Option<String>,
 }
 ```
 
@@ -1183,7 +1201,11 @@ struct GetMembers {
           "command": "SetIceCandidate",
           "data": {
             "peer_id": 1,
-            "candidate": "user1_ice_candidate"
+            "candidate": {
+               "candidate": "user1_ice_candidate",
+               "sdp_m_line_index": 0,
+               "sdp_mid": "0"
+             }
           }
         }
         ```
@@ -1195,7 +1217,11 @@ struct GetMembers {
           "event": "IceCandidateDiscovered",
           "data": {
             "peer_id": 2,
-            "candidate": "user1_ice_candidate"
+            "candidate": {
+               "candidate": "user1_ice_candidate",
+               "sdp_m_line_index": 0,
+               "sdp_mid": "0"
+             }
           }
         }
         ```
@@ -1207,7 +1233,11 @@ struct GetMembers {
           "command": "SetIceCandidate",
           "data": {
             "peer_id": 2,
-            "candidate": "user2_ice_candidate"
+            "candidate": {
+               "candidate": "user2_ice_candidate",
+               "sdp_m_line_index": 0,
+               "sdp_mid": "0"
+             }
           }
         }
         ```
@@ -1219,7 +1249,11 @@ struct GetMembers {
           "event": "IceCandidateDiscovered",
           "data": {
             "peer_id": 1,
-            "candidate": "user2_ice_candidate"
+            "candidate": {
+               "candidate": "user2_ice_candidate",
+               "sdp_m_line_index": 0,
+               "sdp_mid": "0"
+             }
           }
         }
         ```
@@ -1503,7 +1537,11 @@ struct GetMembers {
           "command": "SetIceCandidate",
           "data": {
             "peer_id": 1,
-            "candidate": "user1_ice_candidate"
+            "candidate": {
+               "candidate": "user1_ice_candidate",
+               "sdp_m_line_index": 0,
+               "sdp_mid": "0"
+             }
           }
         }
         ```
@@ -1515,7 +1553,11 @@ struct GetMembers {
           "event": "IceCandidateDiscovered",
           "data": {
             "peer_id": 1,
-            "candidate": "server_ice_candidate"
+            "candidate": {
+               "candidate": "server_ice_candidate",
+               "sdp_m_line_index": 0,
+               "sdp_mid": "0"
+             }
           }
         }
         ```
@@ -1594,7 +1636,11 @@ struct GetMembers {
           "command": "SetIceCandidate",
           "data": {
             "peer_id": 2,
-            "candidate": "user2_ice_candidate"
+            "candidate": {
+               "candidate": "user2_ice_candidate",
+               "sdp_m_line_index": 0,
+               "sdp_mid": "0"
+             }
           }
         }
         ```
@@ -1606,7 +1652,11 @@ struct GetMembers {
           "event": "IceCandidateDiscovered",
           "data": {
             "peer_id": 2,
-            "candidate": "server_ice_candidate"
+            "candidate": {
+               "candidate": "server_ice_candidate",
+               "sdp_m_line_index": 0,
+               "sdp_mid": "0"
+             }
           }
         }
         ```
@@ -1729,7 +1779,11 @@ struct GetMembers {
           "command": "SetIceCandidate",
           "data": {
             "peer_id": 3,
-            "candidate": "user3_ice_candidate"
+            "candidate": {
+               "candidate": "user3_ice_candidate",
+               "sdp_m_line_index": 0,
+               "sdp_mid": "0"
+             }
           }
         }
         ```
@@ -1741,7 +1795,11 @@ struct GetMembers {
           "event": "IceCandidateDiscovered",
           "data": {
             "peer_id": 3,
-            "candidate": "server_ice_candidate"
+            "candidate": {
+               "candidate": "server_ice_candidate",
+               "sdp_m_line_index": 0,
+               "sdp_mid": "0"
+             }
           }
         }
         ```
