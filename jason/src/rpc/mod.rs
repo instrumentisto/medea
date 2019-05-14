@@ -108,6 +108,7 @@ impl RPCClient {
         WebSocket::new(&self.0.borrow().token).and_then(
             move |socket: WebSocket| {
                 let socket = Rc::new(socket);
+
                 inner.borrow_mut().pinger.start(Rc::clone(&socket))?;
 
                 let inner_rc = Rc::clone(&inner);
@@ -156,5 +157,6 @@ impl Drop for RPCClient {
     fn drop(&mut self) {
         // Drop socket, pinger will be dropped too
         self.0.borrow_mut().sock.take();
+        self.0.borrow_mut().pinger.stop();
     }
 }

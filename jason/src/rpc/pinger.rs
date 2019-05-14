@@ -8,24 +8,20 @@ use crate::{
     utils::{window, IntervalHandle, WasmErr},
 };
 
+// TODO: Implement connection loss deteection.
 /// Responsible for sending/handling keep-alive requests, detecting connection
 /// loss.
 pub struct Pinger(Rc<RefCell<InnerPinger>>);
 
 struct InnerPinger {
-    /// Interval for send ping message.
     ping_interval: i32,
-
-    /// Count of ping message sending to server.
+    /// Sent pings counter.
     num: u64,
-
-    /// Count of pong message received from server.
+    /// Timestamp of last pong received.
     pong_at: Option<f64>,
-
-    /// Socket to server.
+    /// WebSocket connection with remote server.
     socket: Option<Rc<WebSocket>>,
-
-    /// Handler for bind closure what run when ping send.
+    /// Ping send task  handler. Task will be droped if you drop handler.
     ping_task: Option<PingTaskHandler>,
 }
 
@@ -63,9 +59,11 @@ impl Pinger {
     }
 
     /// Start [`Pinger`] for given [`WebSocket`]. Sends first ping immediately,
-    /// so will fail if provided [`WebSocket`] is not active.
+    /// so provided [`WebSocket`] must be active.
     pub fn start(&self, socket: Rc<WebSocket>) -> Result<(), WasmErr> {
         let mut inner = self.0.borrow_mut();
+        inner.num = 0;
+        inner.pong_at = None;
         inner.socket = Some(socket);
         inner.send_now()?;
 
@@ -89,13 +87,14 @@ impl Pinger {
         Ok(())
     }
 
+    /// Stops [`Pinger`].
+    pub fn stop(&self) {
+        self.0.borrow_mut().ping_task.take();
+        self.0.borrow_mut().socket.take();
+    }
+
     /// Timestamp of last pong received.
     pub fn set_pong_at(&self, at: f64) {
         self.0.borrow_mut().pong_at = Some(at);
-    }
-
-    /// Stop [`Pinger`].
-    pub fn stop(&self) {
-        self.0.borrow_mut().ping_task.take();
     }
 }
