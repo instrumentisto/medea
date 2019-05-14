@@ -25,9 +25,10 @@ pub enum ClientMsg {
 }
 
 /// WebSocket message from Web Client to Media Server.
-#[derive(Deserialize, Serialize)]
-#[serde(tag = "command", content = "data")]
 #[cfg_attr(test, derive(PartialEq, Debug))]
+#[cfg_attr(feature = "medea", derive(Deserialize))]
+#[cfg_attr(feature = "jason", derive(Serialize))]
+#[serde(tag = "command", content = "data")]
 #[allow(dead_code)]
 pub enum Command {
     /// Web Client sends SDP Offer.
@@ -42,9 +43,10 @@ pub enum Command {
 }
 
 /// WebSocket message from Medea to Jason.
-#[derive(Deserialize, Serialize)]
-#[serde(tag = "event", content = "data")]
+#[cfg_attr(feature = "medea", derive(Serialize))]
+#[cfg_attr(feature = "jason", derive(Deserialize))]
 #[cfg_attr(test, derive(PartialEq, Debug))]
+#[serde(tag = "event", content = "data")]
 #[allow(dead_code)]
 pub enum Event {
     /// Media Server notifies Web Client about necessity of RTCPeerConnection
@@ -71,7 +73,7 @@ pub enum Event {
 }
 
 /// Represents [`RtcIceCandidateInit`] object.
-#[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct IceCandidate {
     pub candidate: String,
     pub sdp_m_line_index: Option<u16>,
@@ -79,7 +81,8 @@ pub struct IceCandidate {
 }
 
 /// [`Track] with specified direction.
-#[derive(Deserialize, Serialize)]
+#[cfg_attr(feature = "medea", derive(Serialize))]
+#[cfg_attr(feature = "jason", derive(Deserialize))]
 #[cfg_attr(test, derive(PartialEq, Debug))]
 pub struct Track {
     pub id: u64,
@@ -88,7 +91,8 @@ pub struct Track {
 }
 
 /// Direction of [`Track`].
-#[derive(Deserialize, Serialize)]
+#[cfg_attr(feature = "medea", derive(Serialize))]
+#[cfg_attr(feature = "jason", derive(Deserialize))]
 #[cfg_attr(test, derive(PartialEq, Debug))]
 pub enum Direction {
     Send { receivers: Vec<u64> },
@@ -96,21 +100,28 @@ pub enum Direction {
 }
 
 /// Type of [`Track`].
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "medea", derive(Serialize))]
+#[cfg_attr(feature = "jason", derive(Deserialize))]
 #[cfg_attr(test, derive(PartialEq))]
 pub enum MediaType {
     Audio(AudioSettings),
     Video(VideoSettings),
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "medea", derive(Serialize))]
+#[cfg_attr(feature = "jason", derive(Deserialize))]
 #[cfg_attr(test, derive(PartialEq))]
 pub struct AudioSettings {}
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "medea", derive(Serialize))]
+#[cfg_attr(feature = "jason", derive(Deserialize))]
 #[cfg_attr(test, derive(PartialEq))]
 pub struct VideoSettings {}
 
+#[cfg(feature = "jason")]
 impl Serialize for ClientMsg {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -129,6 +140,7 @@ impl Serialize for ClientMsg {
     }
 }
 
+#[cfg(feature = "medea")]
 impl<'de> Deserialize<'de> for ClientMsg {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -163,6 +175,7 @@ impl<'de> Deserialize<'de> for ClientMsg {
     }
 }
 
+#[cfg(feature = "medea")]
 impl Serialize for ServerMsg {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -181,6 +194,7 @@ impl Serialize for ServerMsg {
     }
 }
 
+#[cfg(feature = "jason")]
 impl<'de> Deserialize<'de> for ServerMsg {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
