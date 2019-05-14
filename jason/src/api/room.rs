@@ -9,10 +9,9 @@ use wasm_bindgen::{prelude::*, JsValue};
 use wasm_bindgen_futures::spawn_local;
 use web_sys::console;
 
-use std::rc::{Rc, Weak};
+use std::{rc::{Rc, Weak}, cell::RefCell};
 
 use crate::rpc::RPCClient;
-use std::cell::RefCell;
 
 #[allow(clippy::module_name_repetitions)]
 #[wasm_bindgen]
@@ -30,35 +29,52 @@ impl Room {
     pub fn new(rpc: &Rc<RPCClient>) -> Self {
         let room = Rc::new(RefCell::new(InnerRoom::new(Rc::clone(&rpc))));
 
-        let inner = Rc::clone(&room);
+        let inner = Rc::downgrade(&room);
 
         let process_msg_task = rpc
             .subscribe()
             .for_each(move |event| {
                 // TODO: macro for convenient dispatch
-                let mut inner = inner.borrow_mut();
-                match event {
-                    Event::PeerCreated {
-                        peer_id,
-                        sdp_offer,
-                        tracks,
-                    } => {
-                        inner.on_peer_created(peer_id, &sdp_offer, &tracks);
+                match inner.upgrade() {
+                    Some(inner) => {
+                        let mut inner = inner.borrow_mut();
+                        match event {
+                            Event::PeerCreated {
+                                peer_id,
+                                sdp_offer,
+                                tracks,
+                            } => {
+                                inner.on_peer_created(
+                                    peer_id, &sdp_offer, &tracks,
+                                );
+                            }
+                            Event::SdpAnswerMade {
+                                peer_id,
+                                sdp_answer,
+                            } => {
+                                inner.on_sdp_answer(peer_id, &sdp_answer);
+                            }
+                            Event::IceCandidateDiscovered {
+                                peer_id,
+                                candidate,
+                            } => {
+                                inner.on_ice_candidate_discovered(
+                                    peer_id, &candidate,
+                                );
+                            }
+                            Event::PeersRemoved { peer_ids } => {
+                                inner.on_peers_removed(&peer_ids);
+                            }
+                        };
+                        Ok(())
                     }
-                    Event::SdpAnswerMade {
-                        peer_id,
-                        sdp_answer,
-                    } => {
-                        inner.on_sdp_answer(peer_id, &sdp_answer);
+                    None => {
+                        // InnerSession is gone, which means that Room was
+                        // dropped. Not supposed to happen, since InnerSession
+                        // should drop its tx by unsubbing from RpcClient.
+                        Err(())
                     }
-                    Event::IceCandidateDiscovered { peer_id, candidate } => {
-                        inner.on_ice_candidate_discovered(peer_id, &candidate);
-                    }
-                    Event::PeersRemoved { peer_ids } => {
-                        inner.on_peers_removed(&peer_ids);
-                    }
-                };
-                Ok(())
+                }
             })
             .into_future()
             .then(|_| Ok(()));
