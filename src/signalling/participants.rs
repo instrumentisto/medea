@@ -25,7 +25,8 @@ use crate::{
     media::ICEUser,
     signalling::{
         coturn::{
-            AuthCoturn, CreateIceUser, GetIceUser, RedisUnreachablePolicy,
+            AuthCoturn, CreateIceUser, DeleteIceUser, GetIceUser,
+            RedisUnreachablePolicy,
         },
         room::{CloseRoom, RoomError},
         Room,
@@ -148,6 +149,7 @@ impl ParticipantService {
         match reason {
             ClosedReason::Closed => {
                 self.connections.remove(&member_id);
+                self.coturn_auth.do_send(DeleteIceUser(member_id));
                 ctx.notify(CloseRoom {})
             }
             ClosedReason::Lost => {

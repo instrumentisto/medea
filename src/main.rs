@@ -15,6 +15,7 @@ use actix_redis::RedisActor;
 use dotenv::dotenv;
 use log::prelude::*;
 
+use crate::signalling::IceUsersRepository;
 use crate::{
     api::{client::server, control::Member},
     conf::Conf,
@@ -35,8 +36,10 @@ fn main() {
 
     info!("{:?}", config);
 
-    let redis = RedisActor::start(config.redis.get_addr().to_string());
-    let coturn_auth = AuthService::new(&config, redis).start();
+    let coturn_db = IceUsersRepository::new(RedisActor::start(
+        config.redis.get_addr().to_string(),
+    ));
+    let coturn_auth = AuthService::new(&config, coturn_db).start();
     let members = hashmap! {
         1 => Member::new(1, "caller_credentials".to_owned()),
         2 => Member::new(2, "responder_credentials".to_owned()),

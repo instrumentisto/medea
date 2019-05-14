@@ -3,19 +3,16 @@ use std::net::SocketAddr;
 #[cfg(test)]
 use actix::actors::mocker::Mocker;
 use actix::{
-    Actor, ActorFuture, Addr, AsyncContext, Context, Handler, Message,
-    WrapFuture,
+    Actor, ActorFuture, AsyncContext, Context, Handler, Message, WrapFuture,
 };
-use actix_redis::{Command, RedisActor};
-use crypto::{digest::Digest, md5::Md5};
-use futures::future::{self, Future};
+use futures::future::{self, Either, Future};
 use hashbrown::HashMap;
 use rand::{distributions::Alphanumeric, rngs::OsRng, Rng};
-use redis_async::resp::RespValue;
 use smart_default::*;
 
 use crate::{
-    api::control::MemberId, conf::Conf, log::prelude::*, media::ICEUser,
+    api::control::MemberId, conf::Conf, media::ICEUser,
+    signalling::ice_user_repo::IceUsersRepository,
 };
 
 #[derive(Debug, SmartDefault)]
@@ -38,6 +35,11 @@ pub struct CreateIceUser {
 #[rtype(result = "Result<ICEUser, ()>")]
 pub struct GetIceUser(pub MemberId);
 
+/// Request for delete [`ICEUser`] for [`Member`] from COTURN database.
+#[derive(Debug, Message)]
+#[rtype(result = "Result<(), ()>")]
+pub struct DeleteIceUser(pub MemberId);
+
 #[cfg(not(test))]
 #[allow(clippy::module_name_repetitions)]
 pub type AuthCoturn = AuthService;
@@ -47,7 +49,7 @@ pub type AuthCoturn = Mocker<AuthService>;
 /// Service for managing users of COTURN server.
 pub struct AuthService {
     /// Address of actor for handle Redis commands.
-    coturn_db: Addr<RedisActor>,
+    coturn_db: IceUsersRepository,
 
     /// Credentials to authorize remote Web Client on TURN server.
     ice_users: HashMap<MemberId, ICEUser>,
@@ -67,7 +69,7 @@ pub struct AuthService {
 
 impl AuthService {
     /// Create new instance [`AuthService`].
-    pub fn new(config: &Conf, coturn_db: Addr<RedisActor>) -> Self {
+    pub fn new(config: &Conf, coturn_db: IceUsersRepository) -> Self {
         Self {
             coturn_db,
             db_pass: config.redis.pass.clone(),
@@ -83,66 +85,24 @@ impl AuthService {
         OsRng.sample_iter(&Alphanumeric).take(16).collect()
     }
 
-    /// Create [`ICEUser`] with dynamic created credentials.
-    /// If COTURN database unreachable and given policy is [`ReturnStatic`]
-    /// returns static ICE user.
-    fn create_user(
-        &self,
-        member_id: MemberId,
-        policy: &RedisUnreachablePolicy,
-    ) -> impl Future<Item = ICEUser, Error = ()> {
-        let ice_user = ICEUser {
+    /// Returns [`ICEUser`] for given [`Member`] with dynamic created
+    /// credentials.
+    fn create_user(&self, member_id: MemberId) -> ICEUser {
+        ICEUser {
             address: self.turn_address,
             name: member_id.to_string(),
             pass: self.new_password(),
-        };
-        let policy_result = match policy {
-            RedisUnreachablePolicy::ReturnErr => Err(()),
-            RedisUnreachablePolicy::ReturnStatic => Ok(ICEUser {
-                address: self.turn_address,
-                name: self.turn_username.clone(),
-                pass: self.turn_password.clone(),
-            }),
-        };
-
-        self.store_user(ice_user).then(move |res| match res {
-            Ok(user) => Ok(user),
-            Err(_) => policy_result,
-        })
+        }
     }
 
-    /// Store [`ICEUser`] credential in COTURN database.
-    fn store_user(
-        &self,
-        ice_user: ICEUser,
-    ) -> impl Future<Item = ICEUser, Error = ()> {
-        let key = format!("turn/realm/medea/user/{}/key", ice_user.name);
-        let value = format!("{}:medea:{}", ice_user.name, ice_user.pass);
-        let mut hasher = Md5::new();
-        hasher.input_str(&value);
-        let result = hasher.result_str();
-        Box::new(
-            self.coturn_db
-                .send(Command(resp_array!["SET", key, result]))
-                .map_err(|err| error!("Redis service unreachable: {}", err))
-                .and_then(|res| {
-                    match res {
-                        Ok(RespValue::SimpleString(ref x)) if x == "OK" => {
-                            return future::ok(ice_user)
-                        }
-                        Ok(RespValue::Error(err)) => {
-                            error!("Redis error: {}", err)
-                        }
-                        Err(err) => error!("Redis service error: {}", err),
-                        _ => (),
-                    };
-                    future::err(())
-                }),
-        )
+    /// Returns [`ICEUser`] with static credentials.
+    fn static_user(&self) -> ICEUser {
+        ICEUser {
+            address: self.turn_address,
+            name: self.turn_username.clone(),
+            pass: self.turn_password.clone(),
+        }
     }
-
-    /// Delete [`ICEUser`] from COTURN database.
-    pub fn delete(&self, _member_id: MemberId) {}
 }
 
 /// [`Actor`] implementation that provides an ergonomic way
@@ -152,24 +112,7 @@ impl Actor for AuthService {
 
     // TODO: authorize after reconnect to Redis
     fn started(&mut self, ctx: &mut Self::Context) {
-        ctx.wait(
-            self.coturn_db
-                .send(Command(resp_array!["AUTH", &self.db_pass]))
-                .map_err(|err| error!("Redis service unreachable: {}", err))
-                .map(|res| {
-                    match res {
-                        Ok(RespValue::SimpleString(ref x)) if x == "OK" => {
-                            info!("Redis authenticate success.")
-                        }
-                        Ok(RespValue::Error(err)) => {
-                            error!("Redis authenticate filed: {}", err)
-                        }
-                        Err(err) => error!("Redis service error: {}", err),
-                        _ => (),
-                    };
-                })
-                .into_actor(self),
-        )
+        ctx.wait(self.coturn_db.init(&self.db_pass).into_actor(self))
     }
 }
 
@@ -187,12 +130,22 @@ impl Handler<CreateIceUser> for AuthService {
         msg: CreateIceUser,
         _ctx: &mut Self::Context,
     ) -> Self::Result {
-        let member_id = msg.member_id;
+        let ice_user = self.create_user(msg.member_id);
+        let policy_result = match msg.policy {
+            RedisUnreachablePolicy::ReturnErr => Err(()),
+            RedisUnreachablePolicy::ReturnStatic => Ok(self.static_user()),
+        };
+
         Box::new(
-            self.create_user(msg.member_id, &msg.policy)
+            self.coturn_db
+                .insert(&ice_user)
+                .then(move |res| match res {
+                    Ok(_) => Ok(ice_user),
+                    Err(_) => policy_result,
+                })
                 .into_actor(self)
-                .map(move |ice_user, serv, _| {
-                    serv.ice_users.insert(member_id, ice_user);
+                .map(move |user, serv, _| {
+                    serv.ice_users.insert(msg.member_id, user);
                 }),
         )
     }
@@ -214,6 +167,23 @@ impl Handler<GetIceUser> for AuthService {
     }
 }
 
+impl Handler<DeleteIceUser> for AuthService {
+    type Result = ActFuture<(), ()>;
+
+    /// Delete [`ICEUser`] for given [`Member`] from COTURN database.
+    fn handle(
+        &mut self,
+        msg: DeleteIceUser,
+        _ctx: &mut Self::Context,
+    ) -> Self::Result {
+        let fut = match self.ice_users.remove(&msg.0) {
+            Some(ice_user) => Either::A(self.coturn_db.remove(&ice_user)),
+            None => Either::B(future::ok(())),
+        };
+        Box::new(fut.into_actor(self))
+    }
+}
+
 #[cfg(test)]
 pub mod test {
     use std::any::Any;
@@ -221,6 +191,7 @@ pub mod test {
     use crate::media::ICEUser;
 
     use super::*;
+    use actix::Addr;
 
     pub fn create_service() -> Addr<AuthCoturn> {
         AuthCoturn::create(|_ctx| {
