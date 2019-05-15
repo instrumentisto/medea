@@ -6,21 +6,21 @@
 #   idle_timeout = "10s"
 
 [turn]
-# IP address to bind COTURN server to.
+# Turn server IP address.
 #
 # Default:
 #   ip = "0.0.0.0"
 ip = "127.0.0.1"
 
-# Port to bind COTURN server to.
+# Turn server port.
 #
 # Default:
 #   port = "3478"
 
-# Username for authorize on COTURN server.
+# Static user on Turn server.
 user = "USER"
 
-# Password for authorize on COTURN server.
+# Static user password on Turn server.
 pass = "PASS"
 
 [redis]

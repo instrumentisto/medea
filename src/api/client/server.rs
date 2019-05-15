@@ -112,7 +112,7 @@ mod test {
         api::control::Member,
         conf::{Conf, Redis, Server, Turn},
         media::create_peers,
-        signalling::{coturn::test::create_service, Room},
+        signalling::Room,
     };
 
     use super::*;
@@ -129,7 +129,7 @@ mod test {
                 members,
                 create_peers(1, 2),
                 conf.reconnect_timeout,
-                create_service(),
+                crate::turn::dummy(),
             )
         });
         let rooms = hashmap! {1 => room};

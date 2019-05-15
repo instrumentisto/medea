@@ -25,10 +25,8 @@ use crate::{
         New, Peer, PeerId, PeerStateError, PeerStateMachine,
         WaitLocalHaveRemote, WaitLocalSdp, WaitRemoteSdp,
     },
-    signalling::{
-        coturn::AuthCoturn, participants::ParticipantService,
-        peers::PeerRepository,
-    },
+    signalling::{participants::ParticipantService, peers::PeerRepository},
+    turn::TurnAuthService,
 };
 
 /// ID of [`Room`].
@@ -50,8 +48,8 @@ pub enum RoomError {
     PeerStateError(PeerStateError),
     #[fail(display = "Generic room error: {}", _0)]
     BadRoomSpec(String),
-    #[fail(display = "Coturn error: {}", _0)]
-    Coturn(String),
+    #[fail(display = "Turn service error: {}", _0)]
+    TurnServiceError(String),
 }
 
 impl From<PeerStateError> for RoomError {
@@ -78,14 +76,14 @@ impl Room {
         members: HashMap<MemberId, Member>,
         peers: HashMap<PeerId, PeerStateMachine>,
         reconnect_timeout: Duration,
-        coturn_auth: Addr<AuthCoturn>,
+        turn: Addr<TurnAuthService>,
     ) -> Self {
         Self {
             id,
             peers: PeerRepository::from(peers),
             participants: ParticipantService::new(
                 members,
-                coturn_auth,
+                turn,
                 reconnect_timeout,
             ),
         }
@@ -127,7 +125,7 @@ impl Room {
             .participants
             .get_ice_user_by_member_id(member_id)
             .map_err(move |_| {
-                RoomError::Coturn(format!(
+                RoomError::TurnServiceError(format!(
                     "Cannot get ice user for member {}",
                     member_id
                 ))
@@ -177,7 +175,7 @@ impl Room {
             self.participants
                 .get_ice_user_by_member_id(to_member_id)
                 .map_err(move |_| {
-                    RoomError::Coturn(format!(
+                    RoomError::TurnServiceError(format!(
                         "Cannot get ice user for member {}",
                         to_member_id
                     ))
@@ -471,7 +469,6 @@ mod test {
             AudioSettings, Direction, Directional, MediaType, VideoSettings,
         },
         media::create_peers,
-        signalling::coturn::test::create_service,
     };
 
     fn start_room() -> Addr<Room> {
@@ -485,7 +482,7 @@ mod test {
                 members,
                 create_peers(1, 2),
                 Duration::from_secs(10),
-                create_service(),
+                crate::turn::dummy(),
             )
         })
     }

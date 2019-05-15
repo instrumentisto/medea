@@ -24,12 +24,12 @@ use crate::{
     log::prelude::*,
     media::ICEUser,
     signalling::{
-        coturn::{
-            AuthCoturn, CreateIceUser, DeleteIceUser, GetIceUser,
-            RedisUnreachablePolicy,
-        },
         room::{CloseRoom, RoomError},
         Room,
+    },
+    turn::{
+        CreateIceUser, DeleteIceUser, GetIceUser, TurnAuthService,
+        UnreachablePolicy,
     },
 };
 
@@ -40,8 +40,8 @@ pub struct ParticipantService {
     /// [`Member`]s which currently are present in this [`Room`].
     members: HashMap<MemberId, Member>,
 
-    /// Service for managing authorization on COTURN server.
-    coturn_auth: Addr<AuthCoturn>,
+    /// Service for managing authorization on Turn server.
+    turn: Addr<TurnAuthService>,
 
     /// Established [`RpcConnection`]s of [`Member`]s in this [`Room`].
     // TODO: Replace Box<dyn RpcConnection>> with enum,
@@ -61,12 +61,12 @@ pub struct ParticipantService {
 impl ParticipantService {
     pub fn new(
         members: HashMap<MemberId, Member>,
-        coturn_auth: Addr<AuthCoturn>,
+        turn: Addr<TurnAuthService>,
         reconnect_timeout: Duration,
     ) -> Self {
         Self {
             members,
-            coturn_auth,
+            turn,
             connections: HashMap::new(),
             reconnect_timeout,
             drop_connection_tasks: HashMap::new(),
@@ -94,12 +94,12 @@ impl ParticipantService {
         }
     }
 
-    /// Returns [`ICEUser`] to authorize remote Web Client on COTURN server.
+    /// Returns [`ICEUser`] to authorize remote Web Client on Turn server.
     pub fn get_ice_user_by_member_id(
         &self,
         member_id: MemberId,
     ) -> impl Future<Item = ICEUser, Error = ()> {
-        self.coturn_auth
+        self.turn
             .send(GetIceUser(member_id))
             .map_err(|err| {
                 error!("Auth service unreachable, because {}", err);
@@ -149,7 +149,7 @@ impl ParticipantService {
         match reason {
             ClosedReason::Closed => {
                 self.connections.remove(&member_id);
-                self.coturn_auth.do_send(DeleteIceUser(member_id));
+                self.turn.do_send(DeleteIceUser(member_id));
                 ctx.notify(CloseRoom {})
             }
             ClosedReason::Lost => {
@@ -171,8 +171,7 @@ impl ParticipantService {
         }
     }
 
-    /// Stores provided [`RpcConnection`] for given [`Member`] in the [`Room`]
-    /// and send request to COTURN auth service for create [`ICEUser`].
+    /// Saves provided [`RpcConnection`], registers [`ICEUser`].
     /// If [`Member`] already has any other [`RpcConnection`],
     /// then it will be closed.
     pub fn connection_established(
@@ -195,10 +194,10 @@ impl ParticipantService {
         } else {
             self.connections.insert(member_id, con);
             Either::B(
-                self.coturn_auth
+                self.turn
                     .send(CreateIceUser {
                         member_id,
-                        policy: RedisUnreachablePolicy::default(),
+                        policy: UnreachablePolicy::default(),
                     })
                     .map_err(|err| {
                         error!("Auth service unreachable, because {}", err);

@@ -2,10 +2,10 @@ use std::net::SocketAddr;
 
 use crate::api::protocol::ICEServer;
 
-/// User for authorize on COTURN server.
+/// Credentials on Turn server.
 #[derive(Clone, Debug)]
 pub struct ICEUser {
-    /// Address of COTURN server.
+    /// Address of Turn server.
     pub address: SocketAddr,
     /// Username for authorization.
     pub name: String,
