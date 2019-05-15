@@ -79,12 +79,12 @@ macro_rules! add_peer_state_machine_getter {
                 PeerStateMachine::WaitLocalHaveRemote(peer) => peer.$function(),
                 PeerStateMachine::WaitRemoteSdp(peer) => peer.$function(),
                 PeerStateMachine::Stable(peer) => peer.$function(),
+
             }
         }
     }
 }
 
-// TODO: macro to remove boilerplate
 impl PeerStateMachine {
     /// Returns ID of [`Peer`].
     add_peer_state_machine_getter!(id, Id);
@@ -358,10 +358,15 @@ pub fn create_peers(
     )
 }
 
-#[test]
-fn create_peer() {
-    let peer = Peer::new(1, 1, 2, 2);
-    let peer = peer.start();
+#[cfg(test)]
+mod test {
+    use super::*;
 
-    assert_eq!(peer.state, WaitLocalSdp {});
+    #[test]
+    fn create_peer() {
+        let peer = Peer::new(1, 1, 2, 2);
+        let peer = peer.start();
+
+        assert_eq!(peer.state, WaitLocalSdp {});
+    }
 }
