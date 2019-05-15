@@ -60,6 +60,10 @@ impl PeerStateError {
 }
 
 /// Implementation of ['Peer'] state machine.
+#[state_machine_shared_fn_accessor(id -> Id)]
+#[state_machine_shared_fn_accessor(member_id -> MemberId)]
+#[state_machine_shared_fn_accessor(partner_peer_id -> Id)]
+#[state_machine_shared_fn_accessor(partner_member_id -> Id)]
 #[derive(Debug)]
 #[allow(clippy::module_name_repetitions)]
 pub enum PeerStateMachine {
@@ -67,35 +71,7 @@ pub enum PeerStateMachine {
     WaitLocalSdp(Peer<WaitLocalSdp>),
     WaitLocalHaveRemote(Peer<WaitLocalHaveRemote>),
     WaitRemoteSdp(Peer<WaitRemoteSdp>),
-    Stable(Peer<Stable>),
-}
-
-macro_rules! peer_state_machine_getter {
-    ($function:tt, $result:ty) => {
-        pub fn $function(&self) -> $result {
-            match self {
-                PeerStateMachine::New(peer) => peer.$function(),
-                PeerStateMachine::WaitLocalSdp(peer) => peer.$function(),
-                PeerStateMachine::WaitLocalHaveRemote(peer) => peer.$function(),
-                PeerStateMachine::WaitRemoteSdp(peer) => peer.$function(),
-                PeerStateMachine::Stable(peer) => peer.$function(),
-            }
-        }
-    }
-}
-
-impl PeerStateMachine {
-    /// Returns ID of [`Peer`].
-    peer_state_machine_getter!(id, Id);
-
-    /// Returns ID of [`Member`] associated with this [`Peer`].
-    peer_state_machine_getter!(member_id, MemberId);
-
-    /// Returns ID of interconnected [`Peer`].
-    peer_state_machine_getter!(partner_peer_id, Id);
-
-    /// Returns ID of interconnected [`Member`].
-    peer_state_machine_getter!(partner_member_id, Id);
+    Stable(Peer<Stable>)
 }
 
 impl Display for PeerStateMachine {

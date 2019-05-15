@@ -12,6 +12,7 @@ repository = "https://github.com/instrumentisto/medea"
 [workspace]
 members = [
     "jason",
+    "crates/state-machine-shared-fn-accessor"
 ]
 
 [profile.release]
@@ -37,6 +38,7 @@ slog-json = "2.3"
 slog-scope = "4.1"
 smart-default = "0.5"
 toml = "0.4"
+state-machine-shared-fn-accessor = { path = "crates/state-machine-shared-fn-accessor" }
 [dependencies.serde-humantime]
     git = "https://github.com/tailhook/serde-humantime"
     branch = "serde_wrapper"

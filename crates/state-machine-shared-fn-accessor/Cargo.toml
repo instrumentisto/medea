@@ -1,0 +1,12 @@
+[package]
+name = "state-machine-shared-fn-accessor"
+version = "0.1.0"
+authors = ["Instrumentisto Team <developer@instrumentisto.com>"]
+edition = "2018"
+
+[dependencies]
+syn = "0.15.34"
+quote = "0.6.12"
+
+[lib]
+proc-macro = true
