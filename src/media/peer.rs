@@ -368,18 +368,4 @@ mod test {
 
         assert_eq!(peer.state, WaitLocalSdp {});
     }
-
-    #[test]
-    fn should_get_values_from_getters() {
-        let id = 1;
-        let member_id = 1;
-        let partner_peer = 2;
-        let partner_member = 2;
-        let peer = Peer::new(id, member_id, partner_peer, partner_member);
-
-        assert_eq!(peer.id(), id);
-        assert_eq!(peer.member_id(), member_id);
-        assert_eq!(peer.partner_member_id(), partner_member);
-        assert_eq!(peer.partner_peer_id(), partner_peer);
-    }
 }
