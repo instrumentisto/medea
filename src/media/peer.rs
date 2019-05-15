@@ -70,7 +70,7 @@ pub enum PeerStateMachine {
     Stable(Peer<Stable>),
 }
 
-macro_rules! add_peer_state_machine_getter {
+macro_rules! peer_state_machine_getter {
     ($function:tt, $result:ty) => {
         pub fn $function(&self) -> $result {
             match self {
@@ -79,7 +79,6 @@ macro_rules! add_peer_state_machine_getter {
                 PeerStateMachine::WaitLocalHaveRemote(peer) => peer.$function(),
                 PeerStateMachine::WaitRemoteSdp(peer) => peer.$function(),
                 PeerStateMachine::Stable(peer) => peer.$function(),
-
             }
         }
     }
@@ -87,16 +86,16 @@ macro_rules! add_peer_state_machine_getter {
 
 impl PeerStateMachine {
     /// Returns ID of [`Peer`].
-    add_peer_state_machine_getter!(id, Id);
+    peer_state_machine_getter!(id, Id);
 
     /// Returns ID of [`Member`] associated with this [`Peer`].
-    add_peer_state_machine_getter!(member_id, MemberId);
+    peer_state_machine_getter!(member_id, MemberId);
 
     /// Returns ID of interconnected [`Peer`].
-    add_peer_state_machine_getter!(partner_peer_id, Id);
+    peer_state_machine_getter!(partner_peer_id, Id);
 
     /// Returns ID of interconnected [`Member`].
-    add_peer_state_machine_getter!(partner_member_id, Id);
+    peer_state_machine_getter!(partner_member_id, Id);
 }
 
 impl Display for PeerStateMachine {
