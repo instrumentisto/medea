@@ -70,55 +70,33 @@ pub enum PeerStateMachine {
     Stable(Peer<Stable>),
 }
 
+macro_rules! add_peer_state_machine_getter {
+    ($function:tt, $result:ty) => {
+        pub fn $function(&self) -> $result {
+            match self {
+                PeerStateMachine::New(peer) => peer.$function(),
+                PeerStateMachine::WaitLocalSdp(peer) => peer.$function(),
+                PeerStateMachine::WaitLocalHaveRemote(peer) => peer.$function(),
+                PeerStateMachine::WaitRemoteSdp(peer) => peer.$function(),
+                PeerStateMachine::Stable(peer) => peer.$function(),
+            }
+        }
+    }
+}
+
 // TODO: macro to remove boilerplate
 impl PeerStateMachine {
     /// Returns ID of [`Peer`].
-    pub fn id(&self) -> Id {
-        match self {
-            PeerStateMachine::New(peer) => peer.id(),
-            PeerStateMachine::WaitLocalSdp(peer) => peer.id(),
-            PeerStateMachine::WaitLocalHaveRemote(peer) => peer.id(),
-            PeerStateMachine::WaitRemoteSdp(peer) => peer.id(),
-            PeerStateMachine::Stable(peer) => peer.id(),
-        }
-    }
+    add_peer_state_machine_getter!(id, Id);
 
     /// Returns ID of [`Member`] associated with this [`Peer`].
-    pub fn member_id(&self) -> MemberId {
-        match self {
-            PeerStateMachine::New(peer) => peer.member_id(),
-            PeerStateMachine::WaitLocalSdp(peer) => peer.member_id(),
-            PeerStateMachine::WaitLocalHaveRemote(peer) => peer.member_id(),
-            PeerStateMachine::WaitRemoteSdp(peer) => peer.member_id(),
-            PeerStateMachine::Stable(peer) => peer.member_id(),
-        }
-    }
+    add_peer_state_machine_getter!(member_id, MemberId);
 
     /// Returns ID of interconnected [`Peer`].
-    pub fn partner_peer_id(&self) -> Id {
-        match self {
-            PeerStateMachine::New(peer) => peer.partner_peer_id(),
-            PeerStateMachine::WaitLocalSdp(peer) => peer.partner_peer_id(),
-            PeerStateMachine::WaitLocalHaveRemote(peer) => {
-                peer.partner_peer_id()
-            }
-            PeerStateMachine::WaitRemoteSdp(peer) => peer.partner_peer_id(),
-            PeerStateMachine::Stable(peer) => peer.partner_peer_id(),
-        }
-    }
+    add_peer_state_machine_getter!(partner_peer_id, Id);
 
     /// Returns ID of interconnected [`Member`].
-    pub fn partner_member_id(&self) -> Id {
-        match self {
-            PeerStateMachine::New(peer) => peer.partner_peer_id(),
-            PeerStateMachine::WaitLocalSdp(peer) => peer.partner_peer_id(),
-            PeerStateMachine::WaitLocalHaveRemote(peer) => {
-                peer.partner_peer_id()
-            }
-            PeerStateMachine::WaitRemoteSdp(peer) => peer.partner_peer_id(),
-            PeerStateMachine::Stable(peer) => peer.partner_peer_id(),
-        }
-    }
+    add_peer_state_machine_getter!(partner_member_id, Id);
 }
 
 impl Display for PeerStateMachine {
