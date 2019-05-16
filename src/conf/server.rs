@@ -49,6 +49,9 @@ mod server_spec {
 
         let env_conf = Conf::parse().unwrap();
 
+        env::remove_var("MEDEA_SERVER.BIND_IP");
+        env::remove_var("MEDEA_SERVER.BIND_PORT");
+
         assert_ne!(default_conf.server.bind_ip, env_conf.server.bind_ip);
         assert_ne!(default_conf.server.bind_port, env_conf.server.bind_port);
 

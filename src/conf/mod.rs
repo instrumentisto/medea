@@ -72,17 +72,22 @@ where
 }
 
 #[cfg(test)]
-mod get_conf_file_name_spec {
+mod tests {
+    use serial_test_derive::serial;
+    use std::{fs, time::Duration};
+
     use super::*;
 
     #[test]
-    fn none_if_nothing_is_set() {
+    #[serial]
+    fn get_conf_file_name_spec_none_if_nothing_is_set() {
         env::remove_var(APP_CONF_PATH_ENV_VAR_NAME);
         assert_eq!(get_conf_file_name(vec![]), None);
     }
 
     #[test]
-    fn none_if_empty() {
+    #[serial]
+    fn get_conf_file_name_spec_none_if_empty() {
         env::set_var(APP_CONF_PATH_ENV_VAR_NAME, "env_path");
         assert_eq!(
             get_conf_file_name(vec![
@@ -91,16 +96,20 @@ mod get_conf_file_name_spec {
             ]),
             None,
         );
+        env::remove_var(APP_CONF_PATH_ENV_VAR_NAME);
     }
 
     #[test]
-    fn env_if_set() {
+    #[serial]
+    fn get_conf_file_name_spec_env_if_set() {
         env::set_var(APP_CONF_PATH_ENV_VAR_NAME, "env_path");
         assert_eq!(get_conf_file_name(vec![]), Some("env_path".to_owned()));
+        env::remove_var(APP_CONF_PATH_ENV_VAR_NAME);
     }
 
     #[test]
-    fn arg_if_set() {
+    #[serial]
+    fn get_conf_file_name_spec_arg_if_set() {
         env::remove_var(APP_CONF_PATH_ENV_VAR_NAME);
         assert_eq!(
             get_conf_file_name(vec![
@@ -112,7 +121,8 @@ mod get_conf_file_name_spec {
     }
 
     #[test]
-    fn arg_is_prioritized() {
+    #[serial]
+    fn get_conf_file_name_spec_arg_is_prioritized() {
         env::set_var(APP_CONF_PATH_ENV_VAR_NAME, "env_path");
         assert_eq!(
             get_conf_file_name(vec![
@@ -121,20 +131,12 @@ mod get_conf_file_name_spec {
             ]),
             Some("arg_path".to_owned()),
         );
+        env::remove_var(APP_CONF_PATH_ENV_VAR_NAME);
     }
-}
-
-#[cfg(test)]
-mod conf_parse_spec {
-    use std::{fs, time::Duration};
-
-    use serial_test_derive::serial;
-
-    use super::*;
 
     #[test]
     #[serial]
-    fn file_overrides_defaults() {
+    fn conf_parse_spec_file_overrides_defaults() {
         let defaults = Conf::default();
         let test_config_file_path = "test_config.toml";
 
@@ -151,11 +153,9 @@ mod conf_parse_spec {
         assert_ne!(new_config.rpc.idle_timeout, defaults.rpc.idle_timeout);
     }
 
-    // TODO: This test seems to pollute environment and might
-    //       fail from time to time.
     #[test]
     #[serial]
-    fn env_overrides_defaults() {
+    fn conf_parse_spec_env_overrides_defaults() {
         let defaults = Conf::default();
 
         env::set_var("MEDEA_RPC.IDLE_TIMEOUT", "46s");
@@ -168,7 +168,7 @@ mod conf_parse_spec {
 
     #[test]
     #[serial]
-    fn env_overrides_file() {
+    fn conf_parse_spec_env_overrides_file() {
         let test_config_file_path = "test_config.toml";
 
         let data = format!("[rpc]\nidle_timeout = \"47s\"");
