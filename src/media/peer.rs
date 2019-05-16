@@ -71,7 +71,7 @@ pub enum PeerStateMachine {
     WaitLocalSdp(Peer<WaitLocalSdp>),
     WaitLocalHaveRemote(Peer<WaitLocalHaveRemote>),
     WaitRemoteSdp(Peer<WaitRemoteSdp>),
-    Stable(Peer<Stable>)
+    Stable(Peer<Stable>),
 }
 
 impl Display for PeerStateMachine {

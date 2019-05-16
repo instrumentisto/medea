@@ -5,18 +5,22 @@ use syn::export::Span;
 
 pub fn derive(args: TokenStream, input: TokenStream) -> TokenStream {
     let mut output = input.clone();
-    let inp: syn::DeriveInput = syn::parse(input).expect("failed to parse input");
+    let inp: syn::DeriveInput =
+        syn::parse(input).expect("failed to parse input");
 
     let mut enum_name_iter = std::iter::repeat(inp.ident);
     let enum_name = enum_name_iter.next().unwrap();
 
     let variants: Vec<syn::Ident> = match inp.data {
-        syn::Data::Enum(data) => data.variants.into_iter().map(|c| c.ident).collect(),
+        syn::Data::Enum(data) => {
+            data.variants.into_iter().map(|c| c.ident).collect()
+        }
         _ => panic!("This macro should be used only with enums!"),
     };
 
     let attribute_arguments = args.to_string();
-    let mut attribute_arguments = attribute_arguments.split("->").map(|i| i.trim());
+    let mut attribute_arguments =
+        attribute_arguments.split("->").map(|i| i.trim());
 
     let function = attribute_arguments.next().expect("Not provided function!");
     let function = syn::Ident::new(&function, Span::call_site());

@@ -10,8 +10,12 @@ use proc_macro::TokenStream;
 /// ## How to use:
 ///
 /// ```
-/// #[state_machine_shared_fn_accessor(/*SHARED_STATE_METHOD*/ -> /*RETURN_TYPE_OF_THIS_METHOD*/)]
-/// enum SomeStateMachine {/*...*/}
+/// #[state_machine_shared_fn_accessor(
+///     /*SHARED_STATE_METHOD*/ -> /*RETURN_TYPE_OF_THIS_METHOD*/
+/// )]
+/// enum SomeStateMachine {
+///     // ...
+/// }
 /// ```
 ///
 /// ## Example:
@@ -42,9 +46,7 @@ use proc_macro::TokenStream;
 ///
 /// fn main() {
 ///     let peer = PeerStateMachine::SomeState(Peer {
-///         context: Context {
-///             some_value: 10,
-///         },
+///         context: Context { some_value: 10 },
 ///         state: SomeState,
 ///     });
 ///
@@ -52,6 +54,9 @@ use proc_macro::TokenStream;
 /// }
 /// ```
 #[proc_macro_attribute]
-pub fn state_machine_shared_fn_accessor(args: TokenStream, input: TokenStream) -> TokenStream {
+pub fn state_machine_shared_fn_accessor(
+    args: TokenStream,
+    input: TokenStream,
+) -> TokenStream {
     state_machine_shared_fn_accessor::derive(args, input)
 }
