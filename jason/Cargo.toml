@@ -12,6 +12,7 @@ repository = "https://github.com/instrumentisto/medea"
 crate-type = ["cdylib", "rlib"]
 
 [profile.release]
+lto = true
 opt-level = "s"  # Tell `rustc` to optimize for small code size.
 
 [features]
