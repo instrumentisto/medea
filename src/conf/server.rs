@@ -7,6 +7,7 @@ use smart_default::*;
 
 /// HTTP server settings.
 #[derive(Clone, Debug, Deserialize, Serialize, SmartDefault)]
+#[serde(default)]
 pub struct Server {
     /// IP address to bind HTTP server to. Defaults to `0.0.0.0`.
     #[default(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)))]

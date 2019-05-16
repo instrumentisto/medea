@@ -5,16 +5,12 @@ pub mod server;
 
 use std::env;
 
-use config::{
-    Config, ConfigError, Environment, File, FileFormat, Source, Value,
-};
+use config::{Config, Environment, File};
 use failure::Error;
 use serde::{Deserialize, Serialize};
 
 pub use self::rpc::Rpc;
 pub use self::server::Server;
-
-use std::collections::HashMap;
 
 /// CLI argument that is responsible for holding application configuration
 /// file path.
@@ -25,25 +21,12 @@ static APP_CONF_PATH_ENV_VAR_NAME: &str = "MEDEA_CONF";
 
 /// Holds application config.
 #[derive(Clone, Debug, Deserialize, Serialize, Default)]
+#[serde(default)]
 pub struct Conf {
-    /// HTTP server settings.
-    pub rpc: rpc::Rpc,
     /// RPC connection settings.
+    pub rpc: rpc::Rpc,
+    /// HTTP server settings.
     pub server: server::Server,
-}
-
-/// Allows merging [`Conf`] into [`config::Config`].
-// TODO: Remove after the following issue is resolved:
-//       https://github.com/mehcode/config-rs/issues/60#issuecomment-443241600
-impl Source for Conf {
-    fn clone_into_box(&self) -> Box<Source + Send + Sync> {
-        Box::new((*self).clone())
-    }
-
-    fn collect(&self) -> Result<HashMap<String, Value>, ConfigError> {
-        let serialized = toml::to_string(self).unwrap();
-        File::from_str(serialized.as_str(), FileFormat::Toml).collect()
-    }
 }
 
 impl Conf {
@@ -54,10 +37,7 @@ impl Conf {
     ///   parameter or environment variable;
     /// - environment variables.
     pub fn parse() -> Result<Self, Error> {
-        // TODO: use Config::try_from(&Self::default()) when the issue is fixed:
-        //       https://github.com/mehcode/config-rs/issues/60
         let mut cfg = Config::new();
-        cfg.merge(Self::default())?;
 
         if let Some(path) = get_conf_file_name(env::args()) {
             cfg.merge(File::with_name(&path))?;
@@ -66,6 +46,7 @@ impl Conf {
         cfg.merge(Environment::with_prefix("MEDEA").separator("."))?;
 
         let s: Self = cfg.try_into()?;
+
         Ok(s)
     }
 }
