@@ -1,9 +1,6 @@
 //! Medea media server application.
 
 #[macro_use]
-extern crate medea_derives;
-
-#[macro_use]
 pub mod utils;
 pub mod api;
 pub mod conf;
