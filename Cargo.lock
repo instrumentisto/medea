@@ -783,6 +783,7 @@ dependencies = [
  "futures 0.1.25 (registry+https://github.com/rust-lang/crates.io-index)",
  "hashbrown 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "humantime 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "medea-derives 0.1.0-dev",
  "serde 1.0.84 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde-humantime 0.1.1 (git+https://github.com/tailhook/serde-humantime?branch=serde_wrapper)",
  "serde_json 1.0.36 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -795,9 +796,16 @@ dependencies = [
  "slog-scope 4.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "slog-stdlog 3.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "smart-default 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "state-machine-shared-fn-accessor 0.1.0",
  "tokio 0.1.14 (registry+https://github.com/rust-lang/crates.io-index)",
  "toml 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "medea-derives"
+version = "0.1.0-dev"
+dependencies = [
+ "quote 0.6.12 (registry+https://github.com/rust-lang/crates.io-index)",
+ "syn 0.15.34 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -1506,14 +1514,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 name = "stable_deref_trait"
 version = "1.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-
-[[package]]
-name = "state-machine-shared-fn-accessor"
-version = "0.1.0"
-dependencies = [
- "quote 0.6.12 (registry+https://github.com/rust-lang/crates.io-index)",
- "syn 0.15.34 (registry+https://github.com/rust-lang/crates.io-index)",
-]
 
 [[package]]
 name = "string"

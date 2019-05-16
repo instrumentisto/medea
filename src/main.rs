@@ -1,7 +1,7 @@
 //! Medea media server application.
 
 #[macro_use]
-extern crate state_machine_shared_fn_accessor;
+extern crate medea_derives;
 
 #[macro_use]
 pub mod utils;
