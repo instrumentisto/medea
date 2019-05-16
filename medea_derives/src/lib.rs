@@ -1,11 +1,10 @@
 #[macro_use]
 extern crate quote;
 extern crate proc_macro;
-extern crate syn;
-
-use proc_macro::TokenStream;
 
 mod state_machine_shared_fn_accessor;
+
+use proc_macro::TokenStream;
 
 /// This macro should be used for creating shared state function's accessor.
 /// ## How to use:
