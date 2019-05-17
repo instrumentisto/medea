@@ -22,14 +22,25 @@ console_error_panic_hook = { version = "0.1", optional = true }
 futures = "0.1"
 js-sys = "0.3"
 macro-attr = "0.2"
+medea-client-api-proto = { path = "../proto/client-api", features = ["jason"] }
 newtype_derive = "0.1"
-protocol = { path = "../protocol" }
-serde = { version = "1.0", features = ['derive'] }
+serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-wasm-bindgen = { version = "0.2", features = ['serde-serialize'] }
+wasm-bindgen = { version = "0.2", features = ["serde-serialize"] }
 wasm-bindgen-futures = "0.3"
-web-sys = { version = "0.3", features = ['console','Event','EventTarget','MediaStream','MediaStreamTrack','MediaDevices','MediaStreamConstraints','MessageEvent','Navigator', 'RtcPeerConnection','RtcSdpType','RtcRtpSender','RtcRtpReceiver','RtcRtpTransceiverDirection','RtcRtpTransceiver','RtcRtpTransceiverInit','RtcSessionDescription','RtcSessionDescriptionInit', 'RtcIceCandidate', 'RtcPeerConnectionIceEvent','RtcTrackEvent','RtcIceCandidateInit', 'WebSocket','Window','CloseEvent'] }
 wee_alloc = { version = "0.4", optional = true }
+[dependencies.web-sys]
+    version = "0.3"
+    features = [
+        'CloseEvent', 'console', 'Event', 'EventTarget', 'MediaDevices',
+        'MediaStream', 'MediaStreamConstraints', 'MediaStreamTrack',
+        'MessageEvent', 'Navigator', 'RtcIceCandidate', 'RtcIceCandidateInit',
+        'RtcPeerConnection', 'RtcPeerConnectionIceEvent', 'RtcRtpReceiver',
+        'RtcRtpSender', 'RtcRtpTransceiver', 'RtcRtpTransceiverDirection',
+        'RtcRtpTransceiverInit', 'RtcSdpType', 'RtcSessionDescription',
+        'RtcSessionDescriptionInit', 'RtcTrackEvent', 'WebSocket',
+        'Window',
+    ]
 
 [dev-dependencies]
 wasm-bindgen-test = "0.2"

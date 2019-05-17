@@ -1,20 +1,20 @@
 //! Represents Medea room.
 
-use futures::future::Either;
+use std::{
+    cell::RefCell,
+    collections::HashMap,
+    rc::{Rc, Weak},
+};
+
 use futures::{
+    future::Either,
     future::{Future, IntoFuture},
     stream::Stream,
     sync::mpsc::{unbounded, UnboundedSender},
 };
-use protocol::{Command, Direction};
-use protocol::{Event, IceCandidate, Track};
+use medea_client_api_proto::{Command, Direction, Event, IceCandidate, Track};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
-
-use std::{
-    cell::RefCell,
-    rc::{Rc, Weak},
-};
 
 use crate::{
     api::{ConnectionHandle, connection::Connection},
@@ -24,7 +24,6 @@ use crate::{
     rpc::RpcClient,
     utils::{Callback, WasmErr},
 };
-use std::collections::HashMap;
 
 #[allow(clippy::module_name_repetitions)]
 #[wasm_bindgen]
@@ -48,7 +47,7 @@ pub struct Room(Rc<RefCell<InnerRoom>>);
 
 impl Room {
     /// Creates new [`Room`] associating it with provided [`RpcClient`].
-    pub fn new(rpc: &Rc<RPCClient>, media_manager: &Rc<MediaManager>) -> Self {
+    pub fn new(rpc: &Rc<RpcClient>, media_manager: &Rc<MediaManager>) -> Self {
         let (tx, rx) = unbounded();
         let room = Rc::new(RefCell::new(InnerRoom::new(
             Rc::clone(&rpc),
@@ -56,35 +55,57 @@ impl Room {
             Rc::clone(&media_manager),
         )));
 
-        let inner = Rc::clone(&room);
+        let inner = Rc::downgrade(&room);
+
         let handle_medea_event = rpc
             .subscribe()
             .for_each(move |event| {
                 // TODO: macro for convenient dispatch
-                let mut inner = inner.borrow_mut();
-                match event {
-                    Event::PeerCreated {
-                        peer_id,
-                        sdp_offer,
-                        tracks,
-                    } => {
-                        inner.on_peer_created(peer_id, sdp_offer, tracks);
+                match inner.upgrade() {
+                    Some(inner) => {
+                        let mut inner = inner.borrow_mut();
+                        match event {
+                            Event::PeerCreated {
+                                peer_id,
+                                sdp_offer,
+                                tracks,
+                            } => {
+                                inner.on_peer_created(
+                                    peer_id, sdp_offer, tracks,
+                                );
+                            }
+                            Event::SdpAnswerMade {
+                                peer_id,
+                                sdp_answer,
+                                mids,
+                            } => {
+                                inner.on_sdp_answer(
+                                    peer_id,
+                                    sdp_answer,
+                                    &mids,
+                                );
+                            }
+                            Event::IceCandidateDiscovered {
+                                peer_id,
+                                candidate,
+                            } => {
+                                inner.on_ice_candidate_discovered(
+                                    peer_id, &candidate,
+                                );
+                            }
+                            Event::PeersRemoved { peer_ids } => {
+                                inner.on_peers_removed(&peer_ids);
+                            }
+                        };
+                        Ok(())
                     }
-                    Event::SdpAnswerMade {
-                        peer_id,
-                        sdp_answer,
-                        mids,
-                    } => {
-                        inner.on_sdp_answer(peer_id, sdp_answer, &mids);
+                    None => {
+                        // InnerSession is gone, which means that Room was
+                        // dropped. Not supposed to happen, since InnerSession
+                        // should drop its tx by unsubbing from RpcClient.
+                        Err(())
                     }
-                    Event::IceCandidateDiscovered { peer_id, candidate } => {
-                        inner.on_ice_candidate_discovered(peer_id, &candidate);
-                    }
-                    Event::PeersRemoved { peer_ids } => {
-                        inner.on_peers_removed(&peer_ids);
-                    }
-                };
-                Ok(())
+                }
             })
             .into_future()
             .then(|_| Ok(()));
@@ -130,11 +151,12 @@ impl Room {
     }
 }
 
-/// Actual room. Shared between JS-side handle ([`RoomHandle`]) and Rust-side
-/// handle (['Room']). Manages concrete `RTCPeerConnections`, handles Medea
-/// events.
+/// Actual room. Manages concrete `RTCPeerConnection`s, handles Medea events.
+///
+/// Shared between JS-side handle ([`RoomHandle`])
+/// and Rust-side handle ([`Room`]).
 struct InnerRoom {
-    rpc: Rc<RPCClient>,
+    rpc: Rc<RpcClient>,
     media_manager: Rc<MediaManager>,
     peers: PeerRepository,
     connections: HashMap<u64, Connection>,
@@ -308,8 +330,8 @@ impl InnerRoom {
 }
 
 impl Drop for InnerRoom {
+    /// Drops event handling task.
     fn drop(&mut self) {
-        // Drops event handling task.
         self.rpc.unsub();
     }
 }

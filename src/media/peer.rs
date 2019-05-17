@@ -11,7 +11,9 @@ use std::{
 
 use failure::Fail;
 use hashbrown::HashMap;
-use protocol::{AudioSettings, Direction, MediaType, Track, VideoSettings};
+use medea_client_api_proto::{
+    AudioSettings, Direction, MediaType, Track, VideoSettings,
+};
 
 use crate::{
     api::control::MemberId,

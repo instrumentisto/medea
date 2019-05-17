@@ -4,7 +4,7 @@
 
 use std::{cell::RefCell, sync::Mutex};
 
-use protocol::MediaType;
+use medea_client_api_proto::MediaType;
 
 /// ID of [`Track`].
 pub type Id = u64;

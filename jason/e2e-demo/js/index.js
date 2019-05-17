@@ -1,5 +1,3 @@
-
-
 async function f() {
     console.log(document);
     const rust = await import("../../pkg");

@@ -1,11 +1,11 @@
-use protocol;
-use wasm_bindgen::JsValue;
-use web_sys::console;
-
 use std::{
     borrow::Cow,
     fmt::{Display, Formatter},
 };
+
+use medea_client_api_proto as proto;
+use wasm_bindgen::JsValue;
+use web_sys::console;
 
 /// Generic application error.
 #[derive(Debug)]
@@ -72,4 +72,4 @@ macro_rules! impl_from_error {
 impl_from_error!(std::cell::BorrowError);
 impl_from_error!(serde_json::error::Error);
 // TODO: improve macro to use generics
-impl_from_error!(futures::sync::mpsc::SendError<protocol::Event>);
+impl_from_error!(futures::sync::mpsc::SendError<proto::Event>);

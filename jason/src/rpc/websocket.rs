@@ -1,10 +1,14 @@
-//! ['WebSocket'](https://developer.mozilla.org/ru/docs/WebSockets)
-//! transport wrapper.
-use futures::future::{Future, IntoFuture};
-use protocol::{ClientMsg, ServerMsg};
-use web_sys::{CloseEvent, Event, MessageEvent, WebSocket as BackingSocket};
+//! [WebSocket] transport wrapper.
+//!
+//! [WebSocket]: https://developer.mozilla.org/ru/docs/WebSockets
 
-use std::{cell::RefCell, convert::TryFrom, rc::Rc, thread};
+use std::{cell::RefCell, convert::TryFrom, rc::Rc};
+
+use futures::future::{Future, IntoFuture};
+use macro_attr::*;
+use medea_client_api_proto::{ClientMsg, ServerMsg};
+use newtype_derive::NewtypeFrom;
+use web_sys::{CloseEvent, Event, MessageEvent, WebSocket as BackingSocket};
 
 use crate::{
     rpc::CloseMsg,
@@ -21,7 +25,7 @@ enum State {
 }
 
 impl State {
-    /// Returns true if socket can be closed.
+    /// Returns `true` if socket can be closed.
     pub fn can_close(&self) -> bool {
         match self {
             State::CONNECTING | State::OPEN => true,
@@ -71,8 +75,6 @@ impl InnerSocket {
 
     /// Checks underlying WebSocket state and updates socket_state.
     fn update_state(&mut self) {
-        println!("{:?}", thread::current());
-
         match State::try_from(self.socket.ready_state()) {
             Ok(new_state) => self.socket_state = new_state,
             Err(err) => {
@@ -148,7 +150,6 @@ impl WebSocket {
             move |msg| {
                 let parsed =
                     ServerMessage::try_from(&msg).map(std::convert::Into::into);
-
                 f(parsed);
             },
         )?);
@@ -167,9 +168,7 @@ impl WebSocket {
             "close",
             move |msg: CloseEvent| {
                 inner.borrow_mut().update_state();
-                let parsed = CloseMsg::from(&msg);
-
-                f(parsed);
+                f(CloseMsg::from(&msg));
             },
         )?);
         Ok(())
