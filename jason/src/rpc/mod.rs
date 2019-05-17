@@ -1,6 +1,6 @@
 //! Abstraction over RPC transport.
 
-mod pinger;
+mod heartbeat;
 mod websocket;
 
 use std::{cell::RefCell, rc::Rc, vec};
@@ -14,7 +14,7 @@ use medea_client_api_proto::{ClientMsg, Command, Event, ServerMsg};
 
 use crate::utils::WasmErr;
 
-use self::{pinger::Pinger, websocket::WebSocket};
+use self::{heartbeat::Heartbeat, websocket::WebSocket};
 
 /// Connection with remote was closed.
 pub enum CloseMsg {
@@ -40,19 +40,19 @@ struct Inner {
     /// Credentials used to authorize connection.
     token: String,
 
-    pinger: Pinger,
+    heartbeat: Heartbeat,
 
     /// Event's subscribers list.
     subs: Vec<UnboundedSender<Event>>,
 }
 
 impl Inner {
-    fn new(token: String, ping_interval: i32) -> Rc<RefCell<Self>> {
+    fn new(token: String, heartbeat_interval: i32) -> Rc<RefCell<Self>> {
         Rc::new(RefCell::new(Self {
             sock: None,
             token,
             subs: vec![],
-            pinger: Pinger::new(ping_interval),
+            heartbeat: Heartbeat::new(heartbeat_interval),
         }))
     }
 }
@@ -61,7 +61,7 @@ impl Inner {
 fn on_close(inner_rc: &Rc<RefCell<Inner>>, close_msg: CloseMsg) {
     let mut inner = inner_rc.borrow_mut();
     inner.sock.take();
-    inner.pinger.stop();
+    inner.heartbeat.stop();
 
     // TODO: reconnect on disconnect, propagate error if unable
     //       to reconnect
@@ -76,7 +76,7 @@ fn on_message(inner_rc: &Rc<RefCell<Inner>>, msg: Result<ServerMsg, WasmErr>) {
     match msg {
         Ok(ServerMsg::Pong(_num)) => {
             // TODO: detect no pings
-            inner.pinger.set_pong_at(Date::now());
+            inner.heartbeat.set_pong_at(Date::now());
         }
         Ok(ServerMsg::Event(event)) => {
             // TODO: many subs, filter messages by session
@@ -102,7 +102,7 @@ impl RpcClient {
     }
 
     /// Creates new WebSocket connection to remote media server.
-    /// Starts [`Pinger`] if connection success and binds handlers
+    /// Starts [`Heatbeat`] if connection succeeds and binds handlers
     /// on receiving messages from server and closing socket.
     pub fn init(&mut self) -> impl Future<Item = (), Error = WasmErr> {
         let inner = Rc::clone(&self.0);
@@ -110,7 +110,7 @@ impl RpcClient {
             move |socket: WebSocket| {
                 let socket = Rc::new(socket);
 
-                inner.borrow_mut().pinger.start(Rc::clone(&socket))?;
+                inner.borrow_mut().heartbeat.start(Rc::clone(&socket))?;
 
                 let inner_rc = Rc::clone(&inner);
                 socket.on_message(move |msg: Result<ServerMsg, WasmErr>| {
@@ -155,9 +155,9 @@ impl RpcClient {
 }
 
 impl Drop for RpcClient {
-    /// Drops related connection and its `Pinger`.
+    /// Drops related connection and its [`Heartbeat`].
     fn drop(&mut self) {
         self.0.borrow_mut().sock.take();
-        self.0.borrow_mut().pinger.stop();
+        self.0.borrow_mut().heartbeat.stop();
     }
 }
