@@ -1,4 +1,9 @@
-//! Represents Medea room.
+//! Medea room.
+
+use std::{
+    cell::RefCell,
+    rc::{Rc, Weak},
+};
 
 use futures::{
     future::{Future, IntoFuture},
@@ -8,11 +13,6 @@ use medea_client_api_proto::{Event, IceCandidate, Track};
 use wasm_bindgen::{prelude::*, JsValue};
 use wasm_bindgen_futures::spawn_local;
 use web_sys::console;
-
-use std::{
-    cell::RefCell,
-    rc::{Rc, Weak},
-};
 
 use crate::rpc::RpcClient;
 
@@ -96,8 +96,10 @@ impl Room {
     }
 }
 
-// Actual room. Shared between JS-side handle (['RoomHandle']) and Rust-side
-// handle (['Room']). Manages concrete RTCPeerConnections, handles Medea events.
+/// Actual room. Manages concrete `RTCPeerConnection`s, handles Medea events.
+///
+/// Shared between JS-side handle ([`RoomHandle`])
+/// and Rust-side handle ([`Room`]).
 struct InnerRoom {
     rpc: Rc<RpcClient>,
 }
@@ -140,8 +142,8 @@ impl InnerRoom {
 }
 
 impl Drop for InnerRoom {
+    /// Drops event handling task.
     fn drop(&mut self) {
-        // Drops event handling task.
         self.rpc.unsub();
     }
 }

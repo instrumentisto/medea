@@ -419,10 +419,10 @@ mod test {
         AudioSettings, Direction, MediaType, Track, VideoSettings,
     };
 
-    use super::*;
+    use crate::api::client::rpc_connection::test::TestConnection;
     use crate::media::create_peers;
 
-    use crate::api::client::rpc_connection::test::TestConnection;
+    use super::*;
 
     fn start_room() -> Addr<Room> {
         let members = hashmap! {

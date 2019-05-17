@@ -1,11 +1,11 @@
-use medea_client_api_proto as proto;
-use wasm_bindgen::JsValue;
-use web_sys::console;
-
 use std::{
     borrow::Cow,
     fmt::{Display, Formatter},
 };
+
+use medea_client_api_proto as proto;
+use wasm_bindgen::JsValue;
+use web_sys::console;
 
 /// Generic application error.
 #[derive(Debug)]

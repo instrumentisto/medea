@@ -1,7 +1,9 @@
-//!  Abstraction over concrete transport.
+//! Abstraction over RPC transport.
 
 mod pinger;
 mod websocket;
+
+use std::{cell::RefCell, rc::Rc, vec};
 
 use futures::{
     sync::mpsc::{unbounded, UnboundedSender},
@@ -9,8 +11,6 @@ use futures::{
 };
 use js_sys::Date;
 use medea_client_api_proto::{ClientMsg, Command, Event, ServerMsg};
-
-use std::{cell::RefCell, rc::Rc, vec};
 
 use crate::utils::WasmErr;
 
@@ -29,6 +29,7 @@ pub enum CloseMsg {
 // 2. Reconnect.
 // 3. Disconnect if no pongs.
 // 4. Buffering if no socket?
+#[allow(clippy::module_name_repetitions)]
 pub struct RpcClient(Rc<RefCell<Inner>>);
 
 /// Inner state of [`RpcClient`].
@@ -101,8 +102,8 @@ impl RpcClient {
     }
 
     /// Creates new WebSocket connection to remote media server.
-    /// Start ['Pinger`] if connection success and bind handlers
-    /// on receive messages from server and close socket.
+    /// Starts [`Pinger`] if connection success and binds handlers
+    /// on receiving messages from server and closing socket.
     pub fn init(&mut self) -> impl Future<Item = (), Error = WasmErr> {
         let inner = Rc::clone(&self.0);
         WebSocket::new(&self.0.borrow().token).and_then(
@@ -154,8 +155,8 @@ impl RpcClient {
 }
 
 impl Drop for RpcClient {
+    /// Drops related connection and its `Pinger`.
     fn drop(&mut self) {
-        // Drop socket, pinger will be dropped too
         self.0.borrow_mut().sock.take();
         self.0.borrow_mut().pinger.stop();
     }

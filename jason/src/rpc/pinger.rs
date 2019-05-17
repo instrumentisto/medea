@@ -1,16 +1,16 @@
+use std::{cell::RefCell, rc::Rc};
+
 use medea_client_api_proto::ClientMsg;
 use wasm_bindgen::{prelude::*, JsCast};
-
-use std::{cell::RefCell, rc::Rc};
 
 use crate::{
     rpc::websocket::WebSocket,
     utils::{window, IntervalHandle, WasmErr},
 };
 
-// TODO: Implement connection loss deteection.
 /// Responsible for sending/handling keep-alive requests, detecting connection
 /// loss.
+// TODO: Implement connection loss deteection.
 pub struct Pinger(Rc<RefCell<InnerPinger>>);
 
 struct InnerPinger {

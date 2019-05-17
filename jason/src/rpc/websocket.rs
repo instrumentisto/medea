@@ -1,5 +1,6 @@
-//! ['WebSocket'](https://developer.mozilla.org/ru/docs/WebSockets)
-//! transport wrapper.
+//! [WebSocket] transport wrapper.
+//!
+//! [WebSocket]: https://developer.mozilla.org/ru/docs/WebSockets
 
 use std::{cell::RefCell, convert::TryFrom, rc::Rc};
 
@@ -24,7 +25,7 @@ enum State {
 }
 
 impl State {
-    /// Returns true if socket can be closed.
+    /// Returns `true` if socket can be closed.
     pub fn can_close(&self) -> bool {
         match self {
             State::CONNECTING | State::OPEN => true,
@@ -149,7 +150,6 @@ impl WebSocket {
             move |msg| {
                 let parsed =
                     ServerMessage::try_from(&msg).map(std::convert::Into::into);
-
                 f(parsed);
             },
         )?);
@@ -168,9 +168,7 @@ impl WebSocket {
             "close",
             move |msg: CloseEvent| {
                 inner.borrow_mut().update_state();
-                let parsed = CloseMsg::from(&msg);
-
-                f(parsed);
+                f(CloseMsg::from(&msg));
             },
         )?);
         Ok(())
