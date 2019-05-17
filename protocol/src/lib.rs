@@ -1,4 +1,5 @@
 use serde::{de::Deserializer, ser::Serializer, Deserialize, Serialize};
+use medea_derives::RoomEventDispatch;
 
 // TODO: should be properly shared between medea and jason
 #[cfg_attr(test, derive(PartialEq, Debug))]
@@ -42,7 +43,7 @@ pub enum Command {
 }
 
 /// WebSocket message from Medea to Jason.
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Clone, RoomEventDispatch)]
 #[serde(tag = "event", content = "data")]
 #[cfg_attr(test, derive(PartialEq, Debug))]
 #[allow(dead_code)]
@@ -56,7 +57,9 @@ pub enum Event {
     },
     /// Media Server notifies Web Client about necessity to apply specified SDP
     /// Answer to Web Client's RTCPeerConnection.
-    SdpAnswerMade { peer_id: u64, sdp_answer: String },
+    SdpAnswerMade {
+        peer_id: u64, sdp_answer: String
+    },
 
     /// Media Server notifies Web Client about necessity to apply specified
     /// ICE Candidate.
@@ -67,7 +70,9 @@ pub enum Event {
 
     /// Media Server notifies Web Client about necessity of RTCPeerConnection
     /// close.
-    PeersRemoved { peer_ids: Vec<u64> },
+    PeersRemoved {
+        peer_ids: Vec<u64>
+    },
 }
 
 /// Represents [`RtcIceCandidateInit`] object.
@@ -79,7 +84,7 @@ pub struct IceCandidate {
 }
 
 /// [`Track] with specified direction.
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Clone)]
 #[cfg_attr(test, derive(PartialEq, Debug))]
 pub struct Track {
     pub id: u64,
@@ -88,7 +93,7 @@ pub struct Track {
 }
 
 /// Direction of [`Track`].
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Clone)]
 #[cfg_attr(test, derive(PartialEq, Debug))]
 pub enum Direction {
     Send { receivers: Vec<u64> },

@@ -3,6 +3,7 @@ extern crate quote;
 extern crate proc_macro;
 
 mod state_machine_shared_fn_accessor;
+mod room_event_dispatcher;
 
 use proc_macro::TokenStream;
 
@@ -59,4 +60,11 @@ pub fn state_machine_shared_fn_accessor(
     input: TokenStream,
 ) -> TokenStream {
     state_machine_shared_fn_accessor::derive(args, input)
+}
+
+#[proc_macro_derive(RoomEventDispatch)]
+pub fn room_event_dispatcher(
+    input: TokenStream,
+) -> TokenStream {
+    room_event_dispatcher::derive(input)
 }
