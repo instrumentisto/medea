@@ -1,10 +1,13 @@
 //! ['WebSocket'](https://developer.mozilla.org/ru/docs/WebSockets)
 //! transport wrapper.
-use futures::future::{Future, IntoFuture};
-use medea_client_api_proto::{ClientMsg, ServerMsg};
-use web_sys::{CloseEvent, Event, MessageEvent, WebSocket as BackingSocket};
 
 use std::{cell::RefCell, convert::TryFrom, rc::Rc};
+
+use futures::future::{Future, IntoFuture};
+use macro_attr::*;
+use medea_client_api_proto::{ClientMsg, ServerMsg};
+use newtype_derive::NewtypeFrom;
+use web_sys::{CloseEvent, Event, MessageEvent, WebSocket as BackingSocket};
 
 use crate::{
     rpc::CloseMsg,

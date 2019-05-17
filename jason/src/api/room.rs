@@ -9,7 +9,10 @@ use wasm_bindgen::{prelude::*, JsValue};
 use wasm_bindgen_futures::spawn_local;
 use web_sys::console;
 
-use std::{rc::{Rc, Weak}, cell::RefCell};
+use std::{
+    cell::RefCell,
+    rc::{Rc, Weak},
+};
 
 use crate::rpc::RPCClient;
 

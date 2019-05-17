@@ -1,11 +1,14 @@
 //! [`RpcConnection`] with related messages.
-use actix::Message;
-use futures::Future;
-use medea_client_api_proto::{Command, Event};
-
-use crate::api::control::MemberId;
 
 use std::fmt;
+
+use actix::Message;
+use futures::Future;
+use macro_attr::*;
+use medea_client_api_proto::{Command, Event};
+use newtype_derive::NewtypeFrom;
+
+use crate::api::control::MemberId;
 
 macro_attr! {
     /// Wrapper [`Command`] for implements actix [`Message`].
