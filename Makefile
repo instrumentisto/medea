@@ -74,7 +74,7 @@ cargo.fmt:
 #	make cargo.lint
 
 cargo.lint:
-	cargo clippy -- -D clippy::pedantic -D warnings
+	cargo clippy --all -- -D clippy::pedantic -D warnings
 
 
 
@@ -124,20 +124,24 @@ endif
 # Run Rust unit tests of project.
 #
 # Usage:
-#	make test.unit [app=(all|medea|jason)]
+#	make test.unit [crate=(@all|medea|jason|<crate-name>)]
 
-test-unit-app = $(if $(call eq,$(app),),all,$(app))
+test-unit-crate = $(if $(call eq,$(crate),),@all,$(crate))
 
 test.unit:
-ifeq ($(test-unit-app),all)
-	@make test.unit app=medea
-	@make test.unit app=jason
-endif
-ifeq ($(test-unit-app),medea)
+ifeq ($(test-unit-crate),@all)
+	@make test.unit crate=medea-client-api-proto
+	@make test.unit crate=medea
+	@make test.unit crate=jason
+else
+ifeq ($(test-unit-crate),medea)
 	cargo test --bin medea
-endif
-ifeq ($(test-unit-app),jason)
+else
+ifeq ($(test-unit-crate),jason)
 	wasm-pack test --headless --firefox jason
+endif
+	cargo test -p $(test-unit-crate)
+endif
 endif
 
 

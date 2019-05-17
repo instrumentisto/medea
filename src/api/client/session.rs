@@ -8,15 +8,15 @@ use actix::{
 };
 use actix_web::ws::{self, CloseReason, WebsocketContext};
 use futures::future::Future;
+use medea_client_api_proto::{ClientMsg, ServerMsg};
 
 use crate::{
     api::{
         client::rpc_connection::{
-            ClosedReason, RpcConnection, RpcConnectionClosed,
-            RpcConnectionEstablished,
+            ClosedReason, CommandMessage, EventMessage, RpcConnection,
+            RpcConnectionClosed, RpcConnectionEstablished,
         },
         control::MemberId,
-        protocol::{ClientMsg, Event, ServerMsg},
     },
     log::prelude::*,
     signalling::Room,
@@ -161,10 +161,10 @@ impl RpcConnection for Addr<WsSession> {
     /// Sends [`Event`] to Web Client.
     fn send_event(
         &self,
-        event: Event,
+        msg: EventMessage,
     ) -> Box<dyn Future<Item = (), Error = ()>> {
         let fut = self
-            .send(ServerMsg::Event(event))
+            .send(msg)
             .map_err(|err| error!("Failed send event {:?} ", err));
         Box::new(fut)
     }
@@ -188,13 +188,15 @@ impl Handler<Close> for WsSession {
     }
 }
 
-impl Handler<ServerMsg> for WsSession {
+impl Handler<EventMessage> for WsSession {
     type Result = ();
 
     /// Sends [`Event`] to Web Client.
-    fn handle(&mut self, msg: ServerMsg, ctx: &mut Self::Context) {
-        debug!("Event {:?} for member {}", msg, self.member_id);
-        ctx.text(serde_json::to_string(&msg).unwrap())
+    fn handle(&mut self, msg: EventMessage, ctx: &mut Self::Context) {
+        let event =
+            serde_json::to_string(&ServerMsg::Event(msg.into())).unwrap();
+        debug!("Event {} for member {}", event, self.member_id);
+        ctx.text(event);
     }
 }
 
@@ -212,10 +214,14 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
                     Ok(ClientMsg::Ping(n)) => {
                         trace!("Received ping: {}", n);
                         // Answer with Heartbeat::Pong.
-                        ctx.notify(ServerMsg::Pong(n));
+                        ctx.text(
+                            serde_json::to_string(&ServerMsg::Pong(n)).unwrap(),
+                        );
                     }
                     Ok(ClientMsg::Command(command)) => {
-                        if let Err(err) = self.room.try_send(command) {
+                        if let Err(err) =
+                            self.room.try_send(CommandMessage::from(command))
+                        {
                             error!(
                                 "Cannot send Command to Room {}, because {}",
                                 self.member_id, err
