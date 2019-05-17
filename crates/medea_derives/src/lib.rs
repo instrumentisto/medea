@@ -1,5 +1,3 @@
-#[macro_use]
-extern crate quote;
 extern crate proc_macro;
 
 mod state_machine_shared_fn_accessor;

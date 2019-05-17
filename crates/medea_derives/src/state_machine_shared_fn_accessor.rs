@@ -1,6 +1,7 @@
 //! state_machine_shared_fn_accessor macro implementation.
 
 use proc_macro::TokenStream;
+use quote::quote;
 use syn::export::Span;
 
 pub fn derive(args: TokenStream, input: TokenStream) -> TokenStream {
