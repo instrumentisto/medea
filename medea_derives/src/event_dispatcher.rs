@@ -44,7 +44,7 @@ fn parse_match_variants(enum_input: syn::ItemEnum) -> Vec<MatchVariant> {
                         }
                     }).collect::<Vec<MatchVariantField>>()
                 },
-                _ => unimplemented!()
+                _ => panic!("This macro currently support only named enums!")
             };
 
             MatchVariant {
@@ -67,15 +67,17 @@ pub fn derive(input: TokenStream) -> TokenStream {
         let enum_ident = enum_ident.clone();
         let fields = v.fields;
         let variant_ident = v.ident;
-        let fields = fields.into_iter()
+
+        let fields_names = fields.into_iter()
             .map(|f| {
                 f.ident
             });
+
         let handler_fn_name = to_handler_fn_name(&variant_ident.to_string());
         let handler_fn_ident: syn::Ident = syn::parse_str(&handler_fn_name).unwrap();
 
         let fields_output = quote! {
-            #(#fields,)*
+            #(#fields_names,)*
         };
 
         let match_body = quote! {
@@ -87,7 +89,7 @@ pub fn derive(input: TokenStream) -> TokenStream {
 
     let trait_functions = trait_variants.into_iter().map(|v| {
         let fn_name: syn::Ident = syn::parse_str(&to_handler_fn_name(&v.ident.to_string())).unwrap();
-        let field_types = v.fields.into_iter()
+        let fn_args = v.fields.into_iter()
             .map(|f| {
                 let ident = f.ident;
                 let tt = f.ty;
@@ -96,7 +98,7 @@ pub fn derive(input: TokenStream) -> TokenStream {
                 }
             });
         let fn_out = quote! {
-            fn #fn_name(&self, #(#field_types,)*);
+            fn #fn_name(&self, #(#fn_args,)*);
         };
 
         fn_out

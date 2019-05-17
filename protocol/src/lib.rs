@@ -1,5 +1,5 @@
-use serde::{de::Deserializer, ser::Serializer, Deserialize, Serialize};
 use medea_derives::EventDispatcher;
+use serde::{de::Deserializer, ser::Serializer, Deserialize, Serialize};
 
 // TODO: should be properly shared between medea and jason
 #[cfg_attr(test, derive(PartialEq, Debug))]
@@ -57,9 +57,7 @@ pub enum Event {
     },
     /// Media Server notifies Web Client about necessity to apply specified SDP
     /// Answer to Web Client's RTCPeerConnection.
-    SdpAnswerMade {
-        peer_id: u64, sdp_answer: String
-    },
+    SdpAnswerMade { peer_id: u64, sdp_answer: String },
 
     /// Media Server notifies Web Client about necessity to apply specified
     /// ICE Candidate.
@@ -70,9 +68,7 @@ pub enum Event {
 
     /// Media Server notifies Web Client about necessity of RTCPeerConnection
     /// close.
-    PeersRemoved {
-        peer_ids: Vec<u64>
-    },
+    PeersRemoved { peer_ids: Vec<u64> },
 }
 
 /// Represents [`RtcIceCandidateInit`] object.
