@@ -6,17 +6,15 @@
 use failure::Fail;
 use hashbrown::HashMap;
 use medea_derives::state_machine_shared_fn_accessor;
+use medea_client_api_proto::{
+    AudioSettings, Direction, MediaType, Track, VideoSettings,
+};
 
 use std::{convert::TryFrom, fmt::Display, sync::Arc};
 
 use crate::{
-    api::{
-        control::MemberId,
-        protocol::{
-            AudioSettings, Direction, Directional, MediaType, VideoSettings,
-        },
-    },
-    media::{Track, TrackId},
+    api::control::MemberId,
+    media::{MediaTrack, TrackId},
 };
 
 /// Newly initialized [`Peer`] ready to signalling.
@@ -148,8 +146,8 @@ pub struct Context {
     partner_member: MemberId,
     sdp_offer: Option<String>,
     sdp_answer: Option<String>,
-    receivers: HashMap<TrackId, Arc<Track>>,
-    senders: HashMap<TrackId, Arc<Track>>,
+    receivers: HashMap<TrackId, Arc<MediaTrack>>,
+    senders: HashMap<TrackId, Arc<MediaTrack>>,
 }
 
 /// [`RTCPeerConnection`] representation.
@@ -181,11 +179,11 @@ impl<T> Peer<T> {
     }
 
     /// Returns [`Track`]'s of [`Peer`].
-    pub fn tracks(&self) -> Vec<Directional> {
+    pub fn tracks(&self) -> Vec<Track> {
         let tracks = self.context.senders.iter().fold(
             vec![],
             |mut tracks, (_, track)| {
-                tracks.push(Directional {
+                tracks.push(Track {
                     id: track.id,
                     media_type: track.media_type.clone(),
                     direction: Direction::Send {
@@ -199,7 +197,7 @@ impl<T> Peer<T> {
             .receivers
             .iter()
             .fold(tracks, |mut tracks, (_, track)| {
-                tracks.push(Directional {
+                tracks.push(Track {
                     id: track.id,
                     media_type: track.media_type.clone(),
                     direction: Direction::Recv {
@@ -261,12 +259,12 @@ impl Peer<New> {
     }
 
     /// Add [`Track`] to [`Peer`] for send.
-    pub fn add_sender(&mut self, track: Arc<Track>) {
+    pub fn add_sender(&mut self, track: Arc<MediaTrack>) {
         self.context.senders.insert(track.id, track);
     }
 
     /// Add [`Track`] to [`Peer`] for receive.
-    pub fn add_receiver(&mut self, track: Arc<Track>) {
+    pub fn add_receiver(&mut self, track: Arc<MediaTrack>) {
         self.context.receivers.insert(track.id, track);
     }
 }
@@ -320,9 +318,9 @@ pub fn create_peers(
         Peer::new(responder_peer_id, responder, caller_peer_id, caller_peer_id);
 
     let track_audio =
-        Arc::new(Track::new(1, MediaType::Audio(AudioSettings {})));
+        Arc::new(MediaTrack::new(1, MediaType::Audio(AudioSettings {})));
     let track_video =
-        Arc::new(Track::new(2, MediaType::Video(VideoSettings {})));
+        Arc::new(MediaTrack::new(2, MediaType::Video(VideoSettings {})));
     caller_peer.add_sender(track_audio.clone());
     caller_peer.add_sender(track_video.clone());
     responder_peer.add_receiver(track_audio);

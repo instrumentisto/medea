@@ -7,5 +7,5 @@ pub use self::{
         create_peers, Id as PeerId, New, Peer, PeerStateError,
         PeerStateMachine, WaitLocalHaveRemote, WaitLocalSdp, WaitRemoteSdp,
     },
-    track::{Id as TrackId, Track},
+    track::{Id as TrackId, MediaTrack},
 };
