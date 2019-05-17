@@ -47,7 +47,7 @@ fn parse_match_variants(enum_input: syn::ItemEnum) -> Vec<MatchVariant> {
 
             MatchVariant {
                 ident: variant_ident,
-                fields: fields,
+                fields,
             }
         }).collect::<Vec<MatchVariant>>();
 
@@ -55,11 +55,10 @@ fn parse_match_variants(enum_input: syn::ItemEnum) -> Vec<MatchVariant> {
 }
 
 pub fn derive(input: TokenStream) -> TokenStream {
-    let mut output = TokenStream::new();
+    let item_enum: syn::ItemEnum = syn::parse(input.clone()).unwrap();
+    let enum_ident = item_enum.ident.clone();
 
-    let test: syn::ItemEnum = syn::parse(input.clone()).unwrap();
-    let enum_ident = test.ident.clone();
-    let variants = parse_match_variants(test);
+    let variants = parse_match_variants(item_enum);
     let trait_variants = variants.clone();
 
     let variants = variants.into_iter().map(|v| {
@@ -101,13 +100,15 @@ pub fn derive(input: TokenStream) -> TokenStream {
         fn_out
     });
 
+    let handler_trait_ident: syn::Ident = syn::parse_str(&format!("{}Handler", enum_ident.to_string())).unwrap();
+
     let event_dispatch_impl = quote! {
-        pub trait EventHandler {
+        pub trait #handler_trait_ident {
             #(#trait_functions)*
         }
 
-        impl Event {
-            pub fn dispatch<T: EventHandler>(self, handler: &T) {
+        impl #enum_ident {
+            pub fn dispatch<T: #handler_trait_ident>(self, handler: &T) {
                 match self {
                     #(#variants)*
                 }

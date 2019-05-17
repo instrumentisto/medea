@@ -6,7 +6,7 @@ use futures::{
     stream::Stream,
 };
 use protocol::Command;
-use protocol::{Event, IceCandidate, Track};
+use protocol::{IceCandidate, Track};
 use protocol::EventHandler;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;

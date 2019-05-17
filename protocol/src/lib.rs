@@ -1,5 +1,5 @@
 use serde::{de::Deserializer, ser::Serializer, Deserialize, Serialize};
-use medea_derives::RoomEventDispatch;
+use medea_derives::EventDispatcher;
 
 // TODO: should be properly shared between medea and jason
 #[cfg_attr(test, derive(PartialEq, Debug))]
@@ -43,7 +43,7 @@ pub enum Command {
 }
 
 /// WebSocket message from Medea to Jason.
-#[derive(Deserialize, Serialize, Clone, RoomEventDispatch)]
+#[derive(Deserialize, Serialize, Clone, EventDispatcher)]
 #[serde(tag = "event", content = "data")]
 #[cfg_attr(test, derive(PartialEq, Debug))]
 #[allow(dead_code)]
