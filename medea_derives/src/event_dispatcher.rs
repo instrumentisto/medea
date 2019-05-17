@@ -1,3 +1,5 @@
+//! EventDispatcher macro implementation.
+
 use proc_macro::TokenStream;
 
 #[derive(Clone)]
@@ -55,7 +57,7 @@ fn parse_match_variants(enum_input: syn::ItemEnum) -> Vec<MatchVariant> {
 }
 
 pub fn derive(input: TokenStream) -> TokenStream {
-    let item_enum: syn::ItemEnum = syn::parse(input.clone()).unwrap();
+    let item_enum: syn::ItemEnum = syn::parse(input).unwrap();
     let enum_ident = item_enum.ident.clone();
 
     let variants = parse_match_variants(item_enum);
