@@ -14,7 +14,7 @@ use std::{
     rc::{Rc, Weak},
 };
 
-use crate::rpc::RPCClient;
+use crate::rpc::RpcClient;
 
 #[allow(clippy::module_name_repetitions)]
 #[wasm_bindgen]
@@ -29,7 +29,7 @@ pub struct Room(Rc<RefCell<InnerRoom>>);
 
 impl Room {
     /// Creates new [`Room`] associating it with provided [`RpcClient`].
-    pub fn new(rpc: &Rc<RPCClient>) -> Self {
+    pub fn new(rpc: &Rc<RpcClient>) -> Self {
         let room = Rc::new(RefCell::new(InnerRoom::new(Rc::clone(&rpc))));
 
         let inner = Rc::downgrade(&room);
@@ -99,11 +99,11 @@ impl Room {
 // Actual room. Shared between JS-side handle (['RoomHandle']) and Rust-side
 // handle (['Room']). Manages concrete RTCPeerConnections, handles Medea events.
 struct InnerRoom {
-    rpc: Rc<RPCClient>,
+    rpc: Rc<RpcClient>,
 }
 
 impl InnerRoom {
-    fn new(rpc: Rc<RPCClient>) -> Self {
+    fn new(rpc: Rc<RpcClient>) -> Self {
         Self { rpc }
     }
 

@@ -29,9 +29,9 @@ pub enum CloseMsg {
 // 2. Reconnect.
 // 3. Disconnect if no pongs.
 // 4. Buffering if no socket?
-pub struct RPCClient(Rc<RefCell<Inner>>);
+pub struct RpcClient(Rc<RefCell<Inner>>);
 
-/// Inner state of [`RPCClient`].
+/// Inner state of [`RpcClient`].
 struct Inner {
     /// WebSocket connection to remote media server.
     sock: Option<Rc<WebSocket>>,
@@ -95,7 +95,7 @@ fn on_message(inner_rc: &Rc<RefCell<Inner>>, msg: Result<ServerMsg, WasmErr>) {
     }
 }
 
-impl RPCClient {
+impl RpcClient {
     pub fn new(token: String, ping_interval: i32) -> Self {
         Self(Inner::new(token, ping_interval))
     }
@@ -153,7 +153,7 @@ impl RPCClient {
     }
 }
 
-impl Drop for RPCClient {
+impl Drop for RpcClient {
     fn drop(&mut self) {
         // Drop socket, pinger will be dropped too
         self.0.borrow_mut().sock.take();

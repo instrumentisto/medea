@@ -1,13 +1,14 @@
 //! Main application handler. Responsible for managing shared transports,
 //! local media, room initialization.
+
+use std::{cell::RefCell, rc::Rc};
+
 use futures::future::Future;
 use js_sys::Promise;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::future_to_promise;
 
-use std::{cell::RefCell, rc::Rc};
-
-use crate::{api::room::Room, rpc::RPCClient, set_panic_hook};
+use crate::{api::room::Room, rpc::RpcClient, set_panic_hook};
 
 #[wasm_bindgen]
 #[derive(Default)]
@@ -15,8 +16,8 @@ pub struct Jason(Rc<RefCell<Inner>>);
 
 #[derive(Default)]
 pub struct Inner {
-    // TODO: multiple RPCClient's if rooms managed by different servers
-    rpc: Option<Rc<RPCClient>>,
+    // TODO: multiple RpcClient's if rooms managed by different servers
+    rpc: Option<Rc<RpcClient>>,
     rooms: Vec<Room>,
 }
 
@@ -34,7 +35,7 @@ impl Jason {
     /// server (if it doesn't already exist). Fails if unable to connect to
     /// Medea. Effectively returns Result<RoomHandle, WasmErr>
     pub fn join_room(&self, token: String) -> Promise {
-        let mut rpc = RPCClient::new(token, 3000);
+        let mut rpc = RpcClient::new(token, 3000);
 
         let inner = Rc::clone(&self.0);
         let fut = rpc
