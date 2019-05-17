@@ -8,7 +8,7 @@ use actix::{
 };
 use actix_web::ws::{self, CloseReason, WebsocketContext};
 use futures::future::Future;
-use protocol::{ClientMsg, ServerMsg};
+use medea_client_api_proto::{ClientMsg, ServerMsg};
 
 use crate::{
     api::{

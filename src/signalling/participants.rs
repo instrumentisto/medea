@@ -8,7 +8,7 @@ use futures::{
     Future,
 };
 use hashbrown::HashMap;
-use protocol::Event;
+use medea_client_api_proto::Event;
 
 use std::time::{Duration, Instant};
 

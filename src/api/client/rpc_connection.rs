@@ -1,7 +1,7 @@
 //! [`RpcConnection`] with related messages.
 use actix::Message;
 use futures::Future;
-use protocol::{Command, Event};
+use medea_client_api_proto::{Command, Event};
 
 use crate::api::control::MemberId;
 
@@ -94,7 +94,7 @@ pub mod test {
         System,
     };
     use futures::future::Future;
-    use protocol::{Command, Event, IceCandidate};
+    use medea_client_api_proto::{Command, Event, IceCandidate};
 
     use crate::{
         api::{

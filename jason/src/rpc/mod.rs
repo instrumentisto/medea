@@ -8,7 +8,7 @@ use futures::{
     Future, Stream,
 };
 use js_sys::Date;
-use protocol::{ClientMsg, Command, Event, ServerMsg};
+use medea_client_api_proto::{ClientMsg, Command, Event, ServerMsg};
 
 use std::{cell::RefCell, rc::Rc, vec};
 

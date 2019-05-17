@@ -1,4 +1,4 @@
-use protocol::ClientMsg;
+use medea_client_api_proto::ClientMsg;
 use wasm_bindgen::{prelude::*, JsCast};
 
 use std::{cell::RefCell, rc::Rc};
