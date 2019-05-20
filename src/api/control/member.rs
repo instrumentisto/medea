@@ -34,7 +34,7 @@ pub struct MemberSpec {
 /// Pipeline of [`Member`]
 pub struct MemberPipeline {
     /// Publish pipeline of [`Member`]
-    pub publish: PublishElement,
+    pub publish: Option<PublishElement>,
     /// Play pipeline of [`Member`]
-    pub play: PlayElement,
+    pub play: Option<PlayElement>,
 }
