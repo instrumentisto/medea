@@ -5,7 +5,7 @@
 #![allow(clippy::use_self)]
 use failure::Fail;
 use hashbrown::HashMap;
-use medea_derives::state_machine_shared_fn_accessor;
+use medea_macro::state_machine_shared_fn_accessor;
 use medea_client_api_proto::{
     AudioSettings, Direction, MediaType, Track, VideoSettings,
 };
