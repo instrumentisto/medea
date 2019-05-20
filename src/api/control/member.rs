@@ -19,8 +19,8 @@ pub struct Member {
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "kind")]
-/// `caller` or `responder` kind in [`Room`] pipeline.
-pub enum MemberKind {
+/// Entity for member requests.
+pub enum MemberRequest {
     Member {
         spec: MemberSpec,
     },

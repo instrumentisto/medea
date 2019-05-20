@@ -4,7 +4,6 @@ use serde::{Serialize, Deserialize};
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "kind")]
-
 /// Media element for send media data.
 pub enum PublishElement {
     /// Media element which is able to send media data to another client via WebRTC.

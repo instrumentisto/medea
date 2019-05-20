@@ -2,7 +2,7 @@
 
 use serde::{Serialize, Deserialize};
 
-use super::member::MemberKind;
+use super::member::MemberRequest;
 
 #[derive(Serialize, Deserialize, Debug)]
 /// Spec of [`Room`]
@@ -14,7 +14,7 @@ pub struct RoomSpec {
 /// [`Room`] pipeline.
 pub struct RoomPipeline {
     /// Caller [`Member`] spec
-    caller: MemberKind,
+    caller: MemberRequest,
     /// Responder [`Member`] spec
-    responder: MemberKind,
+    responder: MemberRequest,
 }
