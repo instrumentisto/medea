@@ -17,9 +17,10 @@ use crate::{
         client::server,
         control::Member,
         control::{
-            control_room_repo::ControlRoomRepository, load_from_file,
+            load_from_file,
             ControlRoom, RoomRequest,
         },
+        room_repo::RoomRepository,
     },
     conf::Conf,
     media::create_peers,
@@ -37,14 +38,15 @@ fn main() {
     let config = Conf::parse().unwrap();
     info!("{:?}", config);
 
+    let (id, room_spec) = match load_from_file("room_spec.yml").unwrap() {
+        RoomRequest::Room { id, spec } => (id, spec),
+    };
+
     let members = hashmap! {
         1 => Member{id: 1, credentials: "caller_credentials".to_owned()},
         2 => Member{id: 2, credentials: "responder_credentials".to_owned()},
     };
     let peers = create_peers(1, 2);
-    let (id, room_spec) = match load_from_file("room_spec.yml").unwrap() {
-        RoomRequest::Room { id, spec } => (id, spec),
-    };
     let client_room =
         Room::new(id, members, peers, config.rpc.reconnect_timeout);
     let client_room = Arbiter::start(move |_| client_room);
@@ -55,7 +57,7 @@ fn main() {
     };
     let rooms = hashmap! {id => control_room};
 
-    let room_repo = ControlRoomRepository::new(rooms);
+    let room_repo = RoomRepository::new(rooms);
 
     server::run(room_repo.clone(), config);
     let _ = sys.run();

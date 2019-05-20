@@ -13,7 +13,8 @@ use crate::{
             rpc_connection::{AuthorizationError, Authorize},
             session::WsSession,
         },
-        control::{control_room_repo::ControlRoomRepository, MemberId},
+        control::{MemberId},
+        room_repo::RoomRepository,
     },
     conf::{Conf, Rpc},
     log::prelude::*,
@@ -74,14 +75,14 @@ fn ws_index(
 /// Context for [`App`] which holds all the necessary dependencies.
 pub struct Context {
     /// Repository of all currently existing [`Room`]s in application.
-    pub rooms: ControlRoomRepository,
+    pub rooms: RoomRepository,
 
     /// Settings of application.
     pub config: Rpc,
 }
 
 /// Starts HTTP server for handling WebSocket connections of Client API.
-pub fn run(rooms: ControlRoomRepository, config: Conf) {
+pub fn run(rooms: RoomRepository, config: Conf) {
     let server_addr = config.server.get_bind_addr();
 
     server::new(move || {
@@ -120,7 +121,7 @@ mod test {
     use crate::api::control::{ControlRoom, RoomRequest};
 
     /// Creates [`RoomsRepository`] for tests filled with a single [`Room`].
-    fn room(conf: Rpc) -> ControlRoomRepository {
+    fn room(conf: Rpc) -> RoomRepository {
         let members = hashmap! {
             1 => Member{id: 1, credentials: "caller_credentials".into()},
             2 => Member{id: 2, credentials: "responder_credentials".into()},
@@ -140,7 +141,7 @@ mod test {
         let rooms = hashmap! {
             1 => room
         };
-        ControlRoomRepository::new(rooms)
+        RoomRepository::new(rooms)
     }
 
     /// Creates test WebSocket server of Client API which can handle requests.

@@ -1,4 +1,4 @@
-use super::ControlRoom;
+use super::control::ControlRoom;
 
 use crate::signalling::RoomId;
 
@@ -6,13 +6,13 @@ use hashbrown::HashMap;
 use std::sync::{Arc, Mutex};
 
 #[derive(Clone)]
-pub struct ControlRoomRepository {
+pub struct RoomRepository {
     // TODO: Use crossbeam's concurrent hashmap when its done.
     //       [Tracking](https://github.com/crossbeam-rs/rfcs/issues/32).
     rooms: Arc<Mutex<HashMap<RoomId, ControlRoom>>>,
 }
 
-impl ControlRoomRepository {
+impl RoomRepository {
     pub fn new(rooms: HashMap<RoomId, ControlRoom>) -> Self {
         Self {
             rooms: Arc::new(Mutex::new(rooms)),

@@ -1,7 +1,5 @@
 //! Implementation of Control API.
 
-pub mod control_room_repo;
-
 mod element;
 mod member;
 mod room;
