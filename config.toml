@@ -41,7 +41,7 @@
 # Static user password on Turn server.
 #
 # Default:
-#   user = "PASS"
+#   pass = "PASS"
 
 [redis]
 # IP address to bind Redis server to.
