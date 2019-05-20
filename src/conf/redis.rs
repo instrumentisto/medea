@@ -15,7 +15,7 @@ pub struct Redis {
     #[default(6379)]
     pub port: u16,
     /// Password for authorize on Redis server.
-    #[default(String::from("pass"))]
+    #[default(String::from("turn"))]
     pub pass: String,
 }
 

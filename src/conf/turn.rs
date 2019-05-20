@@ -15,10 +15,10 @@ pub struct Turn {
     #[default(3478)]
     pub port: u16,
     /// Username for authorize on TURN server.
-    #[default(String::from("user"))]
+    #[default(String::from("USER"))]
     pub user: String,
     /// Password for authorize on TURN server.
-    #[default(String::from("pass"))]
+    #[default(String::from("PASS"))]
     pub pass: String,
 }
 
