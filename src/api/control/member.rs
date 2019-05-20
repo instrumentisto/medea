@@ -1,5 +1,7 @@
 //! Member definitions and implementations.
 
+use crate::media::IceUser;
+
 /// ID of [`Member`].
 pub type Id = u64;
 
@@ -11,11 +13,18 @@ pub struct Member {
 
     /// Credentials to authorize [`Member`] with.
     pub credentials: String,
+
+    /// Turn server credentials.
+    pub ice_user: Option<IceUser>,
 }
 
 impl Member {
     /// Returns new instance of [`Memebr`] with given credentials.
     pub fn new(id: Id, credentials: String) -> Self {
-        Self { id, credentials }
+        Self {
+            id,
+            credentials,
+            ice_user: None,
+        }
     }
 }

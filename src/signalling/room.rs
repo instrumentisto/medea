@@ -1,15 +1,15 @@
 //! Room definitions and implementations. Room is responsible for media
 //! connection establishment between concrete [`Member`]s.
 
-use std::time::Duration;
-
 use actix::{
     fut::wrap_future, Actor, ActorFuture, Addr, AsyncContext, Context, Handler,
-    Message, WrapFuture,
+    Message,
 };
 use failure::Fail;
-use futures::future::{self, Either, Future};
+use futures::future;
 use hashbrown::HashMap;
+
+use std::time::Duration;
 
 use crate::{
     api::{
@@ -33,7 +33,8 @@ use crate::{
 pub type Id = u64;
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
-type ActFuture<I, E> = Box<dyn ActorFuture<Actor = Room, Item = I, Error = E>>;
+pub type ActFuture<I, E> =
+    Box<dyn ActorFuture<Actor = Room, Item = I, Error = E>>;
 
 #[derive(Fail, Debug)]
 #[allow(clippy::module_name_repetitions)]
@@ -63,7 +64,7 @@ pub struct Room {
     id: Id,
 
     /// [`RpcConnection`]s of [`Member`]s in this [`Room`].
-    participants: ParticipantService,
+    pub participants: ParticipantService,
 
     /// [`Peer`]s of [`Member`]s in this [`Room`].
     peers: PeerRepository,
@@ -108,49 +109,37 @@ impl Room {
         } else if peer2.is_sender() {
             (peer2, peer1)
         } else {
-            self.peers.add_peer(peer1.id(), peer1);
-            self.peers.add_peer(peer2.id(), peer2);
+            self.peers.add_peer(peer1);
+            self.peers.add_peer(peer2);
             return Err(RoomError::BadRoomSpec(format!(
                 "Error while trying to connect Peer [id = {}] and Peer [id = \
                  {}] cause neither of peers are senders",
                 peer1_id, peer2_id
             )));
         };
-        self.peers.add_peer(receiver.id(), receiver);
+        self.peers.add_peer(receiver);
 
         let sender = sender.start();
         let member_id = sender.member_id();
-
-        let fut = self
+        let ice_servers = self
             .participants
-            .get_ice_user_by_member_id(member_id)
-            .map_err(move |_| {
-                RoomError::TurnServiceError(format!(
-                    "Cannot get ice user for member {}",
-                    member_id
-                ))
-            })
-            .into_actor(self)
-            .then(move |res, room, _| {
-                let fut = match res {
-                    Err(err) => Either::A(future::err(err)),
-                    Ok(ice_user) => {
-                        let event = Event::PeerCreated {
-                            peer_id: sender.id(),
-                            sdp_offer: None,
-                            tracks: sender.tracks(),
-                            ice_servers: ice_user.into(),
-                        };
-                        Either::B(
-                            room.participants
-                                .send_event_to_member(member_id, event),
-                        )
-                    }
-                };
-                room.peers.add_peer(sender.id(), sender);
-                wrap_future(fut)
-            });
-        Ok(Box::new(fut))
+            .get_member(member_id)
+            .unwrap()
+            .ice_user
+            .as_ref()
+            .unwrap()
+            .to_servers_list();
+        let peer_created = Event::PeerCreated {
+            peer_id: sender.id(),
+            sdp_offer: None,
+            tracks: sender.tracks(),
+            ice_servers,
+        };
+        self.peers.add_peer(sender);
+        Ok(Box::new(wrap_future(
+            self.participants
+                .send_event_to_member(member_id, peer_created),
+        )))
     }
 
     /// Sends [`Event::PeerCreated`] to provided [`Peer`] partner. Provided
@@ -171,37 +160,28 @@ impl Room {
         let to_peer = to_peer.set_remote_sdp(sdp_offer.clone());
 
         let to_member_id = to_peer.member_id();
-        let fut =
-            self.participants
-                .get_ice_user_by_member_id(to_member_id)
-                .map_err(move |_| {
-                    RoomError::TurnServiceError(format!(
-                        "Cannot get ice user for member {}",
-                        to_member_id
-                    ))
-                })
-                .into_actor(self)
-                .then(move |res, room, _| {
-                    let fut = match res {
-                        Err(err) => Either::A(future::err(err)),
-                        Ok(ice_user) => {
-                            let event = Event::PeerCreated {
-                                peer_id: to_peer_id,
-                                sdp_offer: Some(sdp_offer),
-                                tracks: to_peer.tracks(),
-                                ice_servers: ice_user.into(),
-                            };
-                            Either::B(room.participants.send_event_to_member(
-                                to_peer.member_id(),
-                                event,
-                            ))
-                        }
-                    };
-                    room.peers.add_peer(from_peer_id, from_peer);
-                    room.peers.add_peer(to_peer_id, to_peer);
-                    wrap_future(fut)
-                });
-        Ok(Box::new(fut))
+        let ice_servers = self
+            .participants
+            .get_member(to_member_id)
+            .unwrap()
+            .ice_user
+            .as_ref()
+            .unwrap()
+            .to_servers_list();
+
+        let event = Event::PeerCreated {
+            peer_id: to_peer_id,
+            sdp_offer: Some(sdp_offer),
+            tracks: to_peer.tracks(),
+            ice_servers,
+        };
+
+        self.peers.add_peer(from_peer);
+        self.peers.add_peer(to_peer);
+
+        Ok(Box::new(wrap_future(
+            self.participants.send_event_to_member(to_member_id, event),
+        )))
     }
 
     /// Sends [`Event::SdpAnswerMade`] to provided [`Peer`] partner. Provided
@@ -228,8 +208,8 @@ impl Room {
             sdp_answer,
         };
 
-        self.peers.add_peer(from_peer_id, from_peer);
-        self.peers.add_peer(to_peer_id, to_peer);
+        self.peers.add_peer(from_peer);
+        self.peers.add_peer(to_peer);
 
         Ok(Box::new(wrap_future(
             self.participants.send_event_to_member(to_member_id, event),
@@ -395,8 +375,9 @@ impl Handler<RpcConnectionEstablished> for Room {
         let fut =
             self.participants
                 .connection_established(ctx, msg.member_id, msg.connection)
-                .map_err(|_| ())
-                .into_actor(self)
+                .map_err(|err, _, _| {
+                    error!("RpcConnectionEstablished error {:?}", err)
+                })
                 .map(move |_, room, ctx| {
                     room.peers
                         .get_peers_by_member_id(member_id)

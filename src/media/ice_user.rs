@@ -4,7 +4,7 @@ use crate::api::protocol::ICEServer;
 
 /// Credentials on Turn server.
 #[derive(Clone, Debug)]
-pub struct ICEUser {
+pub struct IceUser {
     /// Address of Turn server.
     pub address: SocketAddr,
     /// Username for authorization.
@@ -13,8 +13,8 @@ pub struct ICEUser {
     pub pass: String,
 }
 
-impl Into<Vec<ICEServer>> for ICEUser {
-    fn into(self) -> Vec<ICEServer> {
+impl IceUser {
+    pub fn to_servers_list(&self) -> Vec<ICEServer> {
         let stun_url = vec![format!("stun:{}", self.address)];
         let stun = ICEServer {
             urls: stun_url,

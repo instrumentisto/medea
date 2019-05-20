@@ -4,7 +4,7 @@ pub mod peer;
 pub mod track;
 
 pub use self::{
-    ice_user::ICEUser,
+    ice_user::IceUser,
     peer::{
         create_peers, Id as PeerId, New, Peer, PeerStateError,
         PeerStateMachine, WaitLocalHaveRemote, WaitLocalSdp, WaitRemoteSdp,

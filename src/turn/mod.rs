@@ -1,12 +1,9 @@
 pub mod repo;
 pub mod service;
 
-pub use self::{
-    repo::IceUsersRepository,
-    service::{
-        CreateIceUser, DeleteIceUser, GetIceUser, TurnAuthService,
-        UnreachablePolicy,
-    },
+pub use self::service::{
+    CreateIceUser, DeleteIceUser, TurnAuthService, TurnServiceErr,
+    UnreachablePolicy,
 };
 
 #[cfg(test)]

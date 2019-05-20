@@ -3,17 +3,32 @@ use std::net::SocketAddr;
 #[cfg(test)]
 use actix::actors::mocker::Mocker;
 use actix::{
-    Actor, ActorFuture, AsyncContext, Context, Handler, Message, WrapFuture,
+    fut::wrap_future, Actor, ActorFuture, AsyncContext, Context, Handler,
+    Message, WrapFuture,
 };
-use futures::future::{self, Either, Future};
-use hashbrown::HashMap;
+use futures::future::{err, ok, Future};
 use rand::{distributions::Alphanumeric, rngs::OsRng, Rng};
 use smart_default::*;
 
 use crate::{
-    api::control::MemberId, conf::Conf, media::ICEUser,
-    turn::IceUsersRepository,
+    api::control::MemberId,
+    conf::Conf,
+    media::IceUser,
+    turn::repo::{TurnAuthRepo, TurnRepoErr},
 };
+
+static TURN_PASS_LEN: usize = 16;
+
+#[derive(Debug)]
+pub enum TurnServiceErr {
+    TurnRepoErr(TurnRepoErr),
+}
+
+impl From<TurnRepoErr> for TurnServiceErr {
+    fn from(err: TurnRepoErr) -> Self {
+        TurnServiceErr::TurnRepoErr(err)
+    }
+}
 
 /// Defines [`TurnAuthService`] behaviour if remote database is unreachable
 #[derive(Debug, SmartDefault)]
@@ -27,25 +42,18 @@ pub enum UnreachablePolicy {
     ReturnStatic,
 }
 
-static TURN_PASS_LEN: usize = 16;
-
 /// Creates credentials on Turn server for specified member.
 #[derive(Debug, Message)]
-#[rtype(result = "Result<(), ()>")]
+#[rtype(result = "Result<IceUser, TurnServiceErr>")]
 pub struct CreateIceUser {
     pub member_id: MemberId,
     pub policy: UnreachablePolicy,
 }
 
-/// Request to obtain [`ICEUser`] for [`Member`].
+/// Request for delete [`ICEUser`] for [`Member`] from COTURN database.
 #[derive(Debug, Message)]
-#[rtype(result = "Result<ICEUser, ()>")]
-pub struct GetIceUser(pub MemberId);
-
-/// Deletes specified [`Member`] Turn credentials.
-#[derive(Debug, Message)]
-#[rtype(result = "Result<(), ()>")]
-pub struct DeleteIceUser(pub MemberId);
+#[rtype(result = "Result<(), TurnServiceErr>")]
+pub struct DeleteIceUser(pub IceUser);
 
 #[cfg(not(test))]
 #[allow(clippy::module_name_repetitions)]
@@ -56,9 +64,7 @@ pub type TurnAuthService = Mocker<Service>;
 /// Manages Turn server credentials.
 pub struct Service {
     /// Address of actor for handle Redis commands.
-    turn_db: IceUsersRepository,
-    /// Credentials to authorize remote Web Client on TURN server.
-    ice_users: HashMap<MemberId, ICEUser>,
+    turn_db: TurnAuthRepo,
     /// Password for authorize on Redis server.
     db_pass: String,
     /// Turn server address.
@@ -67,20 +73,20 @@ pub struct Service {
     turn_username: String,
     /// Turn server static user password.
     turn_password: String,
+    /// Lazy static [`ICEUser`].
+    static_user: Option<IceUser>,
 }
 
 impl Service {
     /// Create new instance [`AuthService`].
     pub fn new(config: &Conf) -> Self {
         Self {
-            turn_db: IceUsersRepository::new(
-                config.redis.get_addr().to_string(),
-            ),
+            turn_db: TurnAuthRepo::new(config.redis.get_addr().to_string()),
             db_pass: config.redis.pass.clone(),
-            ice_users: HashMap::new(),
             turn_address: config.turn.get_addr(),
             turn_username: config.turn.user.clone(),
             turn_password: config.turn.pass.clone(),
+            static_user: None,
         }
     }
 
@@ -89,23 +95,17 @@ impl Service {
         OsRng.sample_iter(&Alphanumeric).take(n).collect()
     }
 
-    /// Returns [`ICEUser`] for given [`Member`] with dynamic created
-    /// credentials.
-    fn create_user(&self, member_id: MemberId) -> ICEUser {
-        ICEUser {
-            address: self.turn_address,
-            name: member_id.to_string(),
-            pass: self.new_password(TURN_PASS_LEN),
-        }
-    }
-
     /// Returns [`ICEUser`] with static credentials.
-    fn static_user(&self) -> ICEUser {
-        ICEUser {
-            address: self.turn_address,
-            name: self.turn_username.clone(),
-            pass: self.turn_password.clone(),
-        }
+    fn static_user(&mut self) -> IceUser {
+        if self.static_user.is_none() {
+            self.static_user.replace(IceUser {
+                address: self.turn_address,
+                name: self.turn_username.clone(),
+                pass: self.turn_password.clone(),
+            });
+        };
+
+        self.static_user.clone().unwrap()
     }
 }
 
@@ -125,7 +125,7 @@ type ActFuture<I, E> =
     Box<dyn ActorFuture<Actor = Service, Item = I, Error = E>>;
 
 impl Handler<CreateIceUser> for Service {
-    type Result = ActFuture<(), ()>;
+    type Result = ActFuture<IceUser, TurnServiceErr>;
 
     /// Create and registers [`ICEUser`] for given [`Member`].
     fn handle(
@@ -133,45 +133,30 @@ impl Handler<CreateIceUser> for Service {
         msg: CreateIceUser,
         _ctx: &mut Self::Context,
     ) -> Self::Result {
-        let ice_user = self.create_user(msg.member_id);
-        let policy_result = match msg.policy {
-            UnreachablePolicy::ReturnErr => Err(()),
-            UnreachablePolicy::ReturnStatic => Ok(self.static_user()),
+        let ice_user = IceUser {
+            address: self.turn_address,
+            name: msg.member_id.to_string(),
+            pass: self.new_password(TURN_PASS_LEN),
         };
 
-        Box::new(
-            self.turn_db
-                .insert(&ice_user)
-                .then(move |res| match res {
-                    Ok(_) => Ok(ice_user),
-                    Err(_) => policy_result,
+        Box::new(self.turn_db.insert(&ice_user).into_actor(self).then(
+            move |result, act, _| {
+                wrap_future(match result {
+                    Ok(_) => ok(ice_user),
+                    Err(e) => match msg.policy {
+                        UnreachablePolicy::ReturnErr => err(e.into()),
+                        UnreachablePolicy::ReturnStatic => {
+                            ok(act.static_user())
+                        }
+                    },
                 })
-                .into_actor(self)
-                .map(move |user, serv, _| {
-                    serv.ice_users.insert(msg.member_id, user);
-                }),
-        )
-    }
-}
-
-impl Handler<GetIceUser> for Service {
-    type Result = ActFuture<ICEUser, ()>;
-
-    /// Returns [`ICEUser`] for [`Member`].
-    fn handle(
-        &mut self,
-        msg: GetIceUser,
-        _ctx: &mut Self::Context,
-    ) -> Self::Result {
-        Box::new(
-            future::done(self.ice_users.get(&msg.0).cloned().ok_or(()))
-                .into_actor(self),
-        )
+            },
+        ))
     }
 }
 
 impl Handler<DeleteIceUser> for Service {
-    type Result = ActFuture<(), ()>;
+    type Result = ActFuture<(), TurnServiceErr>;
 
     /// Deletes [`ICEUser`] for given [`Member`].
     fn handle(
@@ -179,11 +164,7 @@ impl Handler<DeleteIceUser> for Service {
         msg: DeleteIceUser,
         _ctx: &mut Self::Context,
     ) -> Self::Result {
-        let fut = match self.ice_users.remove(&msg.0) {
-            Some(ice_user) => Either::A(self.turn_db.remove(&ice_user)),
-            None => Either::B(future::ok(())),
-        };
-        Box::new(fut.into_actor(self))
+        Box::new(wrap_future(self.turn_db.remove(&msg.0).map_err(Into::into)))
     }
 }
 
@@ -191,7 +172,7 @@ impl Handler<DeleteIceUser> for Service {
 pub mod test {
     use std::any::Any;
 
-    use crate::media::ICEUser;
+    use crate::media::IceUser;
 
     use super::*;
     use actix::Addr;
@@ -202,15 +183,17 @@ pub mod test {
                 let handler = |a: Box<Any>,
                                _b: &mut Context<TurnAuthService>|
                  -> Box<Any> {
-                    if let Ok(_out) = a.downcast::<GetIceUser>() {
-                        Box::new(Some(Result::<_, ()>::Ok(ICEUser {
-                            address: "5.5.5.5:1234".parse().unwrap(),
-                            name: "username".to_string(),
-                            pass: "password".to_string(),
-                        })))
-                    } else {
-                        Box::new(Some(Result::<_, ()>::Ok(())))
-                    }
+                    //                    if let Ok(_out) =
+                    // a.downcast::<GetIceUser>() {
+                    //                        Box::new(Some(Result::<_,
+                    // ()>::Ok(ICEUser {
+                    // address: "5.5.5.5:1234".parse().unwrap(),
+                    //                            name: "username".to_string(),
+                    //                            pass: "password".to_string(),
+                    //                        })))
+                    //                    } else {
+                    //                        Box::new(Some(Result::<_,
+                    // ()>::Ok(())))                    }
                 };
                 Box::new(handler)
             })
