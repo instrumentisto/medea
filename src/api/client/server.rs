@@ -6,7 +6,6 @@ use actix_web::{
 };
 use futures::{future, Future as _};
 use serde::Deserialize;
-use std::sync::Arc;
 
 use crate::{
     api::{
@@ -75,14 +74,14 @@ fn ws_index(
 /// Context for [`App`] which holds all the necessary dependencies.
 pub struct Context {
     /// Repository of all currently existing [`Room`]s in application.
-    pub rooms: Arc<ControlRoomRepository>,
+    pub rooms: ControlRoomRepository,
 
     /// Settings of application.
     pub config: Rpc,
 }
 
 /// Starts HTTP server for handling WebSocket connections of Client API.
-pub fn run(rooms: Arc<ControlRoomRepository>, config: Conf) {
+pub fn run(rooms: ControlRoomRepository, config: Conf) {
     let server_addr = config.server.get_bind_addr();
 
     server::new(move || {
@@ -148,7 +147,7 @@ mod test {
     fn ws_server(conf: Conf) -> test::TestServer {
         test::TestServer::with_factory(move || {
             App::with_state(Context {
-                rooms: Arc::new(room(conf.rpc.clone())),
+                rooms: room(conf.rpc.clone()),
                 config: conf.rpc.clone(),
             })
             .resource("/ws/{room_id}/{member_id}/{credentials}", |r| {

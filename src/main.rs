@@ -11,7 +11,6 @@ pub mod signalling;
 use actix::prelude::*;
 use dotenv::dotenv;
 use log::prelude::*;
-use std::sync::Arc;
 
 use crate::{
     api::{
@@ -56,8 +55,8 @@ fn main() {
     };
     let rooms = hashmap! {id => control_room};
 
-    let room_repo = Arc::new(ControlRoomRepository::new(rooms));
+    let room_repo = ControlRoomRepository::new(rooms);
 
-    server::run(Arc::clone(&room_repo), config);
+    server::run(room_repo.clone(), config);
     let _ = sys.run();
 }
