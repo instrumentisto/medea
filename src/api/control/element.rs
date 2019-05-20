@@ -30,5 +30,5 @@ pub enum P2pMode {
 /// Media element which is able to play media data for client via WebRTC.
 pub struct WebRtcPublishEndpoint {
     /// Peer-to-peer mode.
-    p2p: P2pMode,
+    pub p2p: P2pMode,
 }

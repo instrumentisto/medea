@@ -7,14 +7,14 @@ use super::member::MemberRequest;
 #[derive(Serialize, Deserialize, Debug, Clone)]
 /// Spec of [`Room`]
 pub struct RoomSpec {
-    pipeline: RoomPipeline,
+    pub pipeline: RoomPipeline,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 /// [`Room`] pipeline.
 pub struct RoomPipeline {
     /// Caller [`Member`] spec
-    caller: MemberRequest,
+    pub caller: MemberRequest,
     /// Responder [`Member`] spec
-    responder: MemberRequest,
+    pub responder: MemberRequest,
 }
