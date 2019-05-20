@@ -1,9 +1,16 @@
-use super::control::ControlRoom;
-
-use crate::signalling::RoomId;
-
 use hashbrown::HashMap;
 use std::sync::{Arc, Mutex};
+use actix::Addr;
+
+use crate::signalling::{Room, RoomId};
+
+use super::control::room::RoomSpec;
+
+#[derive(Clone)]
+pub struct ControlRoom {
+    pub client_room: Addr<Room>,
+    pub spec: RoomSpec,
+}
 
 #[derive(Clone)]
 pub struct RoomRepository {

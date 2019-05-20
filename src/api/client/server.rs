@@ -13,7 +13,7 @@ use crate::{
             rpc_connection::{AuthorizationError, Authorize},
             session::WsSession,
         },
-        control::{MemberId},
+        control::MemberId,
         room_repo::RoomRepository,
     },
     conf::{Conf, Rpc},
@@ -118,7 +118,7 @@ mod test {
     };
 
     use super::*;
-    use crate::api::control::{ControlRoom, RoomRequest};
+    use crate::api::{control::RoomRequest, room_repo::ControlRoom};
 
     /// Creates [`RoomsRepository`] for tests filled with a single [`Room`].
     fn room(conf: Rpc) -> RoomRepository {

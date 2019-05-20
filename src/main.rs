@@ -16,11 +16,8 @@ use crate::{
     api::{
         client::server,
         control::Member,
-        control::{
-            load_from_file,
-            ControlRoom, RoomRequest,
-        },
-        room_repo::RoomRepository,
+        control::{load_from_file, RoomRequest},
+        room_repo::{ControlRoom, RoomRepository},
     },
     conf::Conf,
     media::create_peers,
