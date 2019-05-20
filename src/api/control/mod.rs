@@ -1,34 +1,39 @@
 //! Implementation of Control API.
 
+pub mod control_room_repo;
+
+mod element;
 mod member;
 mod room;
-mod element;
 
-use std::{
-    fs::File,
-    io::Read as _,
-};
+use actix::Addr;
 use failure::Error;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
+use std::{fs::File, io::Read as _};
+
+use crate::signalling::{Room, RoomId};
 
 use self::room::RoomSpec;
 
 pub use self::member::{Id as MemberId, Member};
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(tag = "kind")]
-pub enum ControlRoot {
-    Room {
-        id: String,
-        spec: RoomSpec,
-    },
+pub enum RoomRequest {
+    Room { id: RoomId, spec: RoomSpec },
 }
 
-pub fn load_from_file(path: &str) -> Result<ControlRoot, Error> {
+pub fn load_from_file(path: &str) -> Result<RoomRequest, Error> {
     let mut file = File::open(path)?;
     let mut buf = String::new();
     file.read_to_string(&mut buf)?;
-    let parsed: ControlRoot = serde_yaml::from_str(&buf)?;
+    let parsed: RoomRequest = serde_yaml::from_str(&buf)?;
 
     Ok(parsed)
+}
+
+#[derive(Clone)]
+pub struct ControlRoom {
+    pub client_room: Addr<Room>,
+    pub spec: RoomSpec,
 }

@@ -6,6 +6,7 @@ use actix_web::{
 };
 use futures::{future, Future as _};
 use serde::Deserialize;
+use std::sync::Arc;
 
 use crate::{
     api::{
@@ -13,11 +14,11 @@ use crate::{
             rpc_connection::{AuthorizationError, Authorize},
             session::WsSession,
         },
-        control::MemberId,
+        control::{control_room_repo::ControlRoomRepository, MemberId},
     },
     conf::{Conf, Rpc},
     log::prelude::*,
-    signalling::{RoomId, RoomsRepository},
+    signalling::RoomId,
 };
 
 /// Parameters of new WebSocket connection creation HTTP request.
@@ -44,6 +45,7 @@ fn ws_index(
 
     match state.rooms.get(info.room_id) {
         Some(room) => room
+            .client_room
             .send(Authorize {
                 member_id: info.member_id,
                 credentials: info.credentials.clone(),
@@ -54,7 +56,7 @@ fn ws_index(
                     &r.drop_state(),
                     WsSession::new(
                         info.member_id,
-                        room,
+                        room.client_room,
                         state.config.idle_timeout,
                     ),
                 ),
@@ -73,14 +75,14 @@ fn ws_index(
 /// Context for [`App`] which holds all the necessary dependencies.
 pub struct Context {
     /// Repository of all currently existing [`Room`]s in application.
-    pub rooms: RoomsRepository,
+    pub rooms: Arc<ControlRoomRepository>,
 
     /// Settings of application.
     pub config: Rpc,
 }
 
 /// Starts HTTP server for handling WebSocket connections of Client API.
-pub fn run(rooms: RoomsRepository, config: Conf) {
+pub fn run(rooms: Arc<ControlRoomRepository>, config: Conf) {
     let server_addr = config.server.get_bind_addr();
 
     server::new(move || {
@@ -116,25 +118,37 @@ mod test {
     };
 
     use super::*;
+    use crate::api::control::{ControlRoom, RoomRequest};
 
     /// Creates [`RoomsRepository`] for tests filled with a single [`Room`].
-    fn room(conf: Rpc) -> RoomsRepository {
+    fn room(conf: Rpc) -> ControlRoomRepository {
         let members = hashmap! {
             1 => Member{id: 1, credentials: "caller_credentials".into()},
             2 => Member{id: 2, credentials: "responder_credentials".into()},
         };
-        let room = Arbiter::start(move |_| {
-            Room::new(1, members, create_peers(1, 2), conf.reconnect_timeout)
+        let (id, room_spec) =
+            match crate::api::control::load_from_file("room_spec.yml").unwrap()
+            {
+                RoomRequest::Room { id, spec } => (id, spec),
+            };
+        let client_room = Arbiter::start(move |_| {
+            Room::new(id, members, create_peers(1, 2), conf.reconnect_timeout)
         });
-        let rooms = hashmap! {1 => room};
-        RoomsRepository::new(rooms)
+        let room = ControlRoom {
+            client_room,
+            spec: room_spec,
+        };
+        let rooms = hashmap! {
+            1 => room
+        };
+        ControlRoomRepository::new(rooms)
     }
 
     /// Creates test WebSocket server of Client API which can handle requests.
     fn ws_server(conf: Conf) -> test::TestServer {
         test::TestServer::with_factory(move || {
             App::with_state(Context {
-                rooms: room(conf.rpc.clone()),
+                rooms: Arc::new(room(conf.rpc.clone())),
                 config: conf.rpc.clone(),
             })
             .resource("/ws/{room_id}/{member_id}/{credentials}", |r| {

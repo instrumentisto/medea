@@ -1,5 +1,5 @@
 kind: Room
-id: video-call-2
+id: 1
 spec:
   pipeline:
     # Here we're defining a member who initiates video call.
