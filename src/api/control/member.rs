@@ -33,8 +33,8 @@ pub struct MemberSpec {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 /// Pipeline of [`Member`]
 pub struct MemberPipeline {
-    /// Publish pipeline of [`Member`]
+    /// Publish element of [`Member`].
     pub publish: Option<PublishElement>,
-    /// Play pipeline of [`Member`]
+    /// Play element of [`Member`].
     pub play: Option<PlayElement>,
 }
