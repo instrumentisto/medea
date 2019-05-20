@@ -13,7 +13,7 @@ use dotenv::dotenv;
 use log::prelude::*;
 
 use crate::{
-    api::{client::server, control::Member},
+    api::{client::server, control::Member, control::load_from_file},
     conf::Conf,
     media::create_peers,
     signalling::{Room, RoomsRepository},
@@ -28,6 +28,9 @@ fn main() {
     let sys = System::new("medea");
 
     let config = Conf::parse().unwrap();
+
+    let control_room = load_from_file("room_spec.yml").unwrap();
+    info!("{:?}", control_room);
 
     info!("{:?}", config);
 
