@@ -2,7 +2,6 @@
 
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::export::Span;
 
 pub fn derive(args: TokenStream, input: TokenStream) -> TokenStream {
     let mut output = input.clone();
@@ -19,27 +18,35 @@ pub fn derive(args: TokenStream, input: TokenStream) -> TokenStream {
         _ => panic!("This macro should be used only with enums!"),
     };
 
-    let attribute_arguments = args.to_string();
-    let mut attribute_arguments =
-        attribute_arguments.split("->").map(|i| i.trim());
-
-    let function = attribute_arguments.next().expect("Not provided function!");
-    let function = syn::Ident::new(&function, Span::call_site());
-    let function_iter = std::iter::repeat(function.clone());
-
-    let result = attribute_arguments.next().expect("Not provided result!");
-    let result: syn::Path = syn::parse_str(&result).unwrap();
+    // This is for easy parsing function declaration by default syn parser.
+    let arg_function = format!("{} {{ }}", args.to_string());
+    let mut function: syn::ItemFn = syn::parse_str(&arg_function).unwrap();
+    let function_ident = std::iter::repeat(function.ident.clone());
+    let function_args = std::iter::repeat(function.decl.clone().inputs.into_iter().skip(1));
 
     let enum_output = quote! {
-        #(#enum_name_iter::#variants(inner) => inner.#function_iter(),)*
+        #(#enum_name_iter::#variants(inner) => inner.#function_ident(#(#function_args)*),)*
     };
-    let impl_output = quote! {
-        impl #enum_name {
-            pub fn #function(&self) -> #result {
-                match self {
-                    #enum_output
-                }
+
+    println!("{}", enum_output.to_string());
+
+    // This used for easy body generation by quote.
+    let generated_fn: syn::ItemFn = syn::parse(quote! {
+        pub fn a(&self) {
+            match self {
+                #enum_output
             }
+        }
+    }.into()).unwrap();
+
+    function.block = generated_fn.block;
+
+
+    let impl_output = quote! {
+        #[automatically_derived]
+        impl #enum_name {
+            #[inline]
+            #function
         }
     };
 

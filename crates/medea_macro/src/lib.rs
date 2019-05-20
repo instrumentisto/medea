@@ -1,6 +1,6 @@
 extern crate proc_macro;
 
-mod state_machine_shared_fn_accessor;
+mod state_machine_delegate;
 
 use proc_macro::TokenStream;
 
@@ -52,9 +52,9 @@ use proc_macro::TokenStream;
 /// }
 /// ```
 #[proc_macro_attribute]
-pub fn state_machine_shared_fn_accessor(
+pub fn state_machine_delegate(
     args: TokenStream,
     input: TokenStream,
 ) -> TokenStream {
-    state_machine_shared_fn_accessor::derive(args, input)
+    state_machine_delegate::derive(args, input)
 }
