@@ -9,7 +9,9 @@ use proc_macro::TokenStream;
 ///
 /// ```
 /// #[enum_delegate(pub fn some_value(&self) -> i32)]
-/// #[enum_delegate(pub fn function_with_additional_args(&self, some_arg: i32) -> i32)]
+/// #[enum_delegate(
+///     pub fn function_with_additional_args(&self, some_arg: i32) -> i32
+/// )]
 /// #[enum_delegate(pub fn mutable_function(&mut self) -> i32)]
 /// enum SomeStateMachine {
 ///     // ...
@@ -47,7 +49,9 @@ use proc_macro::TokenStream;
 /// }
 ///
 /// #[enum_delegate(pub fn some_value(&self) -> i32)]
-/// #[enum_delegate(pub fn function_with_additional_args(&self, some_arg: i32) -> i32)]
+/// #[enum_delegate(
+///     pub fn function_with_additional_args(&self, some_arg: i32) -> i32
+/// )]
 /// #[enum_delegate(pub fn mutable_function(&mut self) -> i32)]
 /// enum PeerStateMachine {
 ///     SomeState(Peer<SomeState>),

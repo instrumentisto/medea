@@ -38,7 +38,9 @@ pub fn derive(args: TokenStream, input: TokenStream) -> TokenStream {
     );
 
     let enum_output = quote! {
-        #(#enum_name_iter::#variants(inner) => inner.#function_ident(#(#function_args)*),)*
+        #(#enum_name_iter::#variants(inner) => {
+            inner.#function_ident(#(#function_args)*)
+        },)*
     };
 
     // This used for easy **body** generation by quote.
