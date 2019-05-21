@@ -1,6 +1,6 @@
+use actix::Addr;
 use hashbrown::HashMap;
 use std::sync::{Arc, Mutex};
-use actix::Addr;
 
 use crate::signalling::{Room, RoomId};
 

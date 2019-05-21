@@ -6,7 +6,7 @@ mod member;
 pub mod room;
 
 use failure::Error;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use std::{fs::File, io::Read as _};
 
 use crate::signalling::RoomId;
@@ -15,7 +15,7 @@ use self::room::RoomSpec;
 
 pub use self::member::{Id as MemberId, Member};
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Deserialize, Debug, Clone)]
 #[serde(tag = "kind")]
 /// Entity for creating new Room.
 pub enum RoomRequest {

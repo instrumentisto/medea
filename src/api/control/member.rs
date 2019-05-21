@@ -1,8 +1,9 @@
 //! Member definitions and implementations.
 
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
 use super::element::Element;
+
 use std::collections::HashMap;
 
 /// ID of [`Member`].
@@ -18,14 +19,14 @@ pub struct Member {
     pub credentials: String,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Deserialize, Debug, Clone)]
 #[serde(tag = "kind")]
 /// Entity for member requests.
 pub enum MemberRequest {
     Member { spec: MemberSpec },
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Deserialize, Debug, Clone)]
 /// Spec of member in [`Room`] pipeline.
 pub struct MemberSpec {
     pub pipeline: HashMap<String, Element>,
