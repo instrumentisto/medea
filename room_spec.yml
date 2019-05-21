@@ -16,8 +16,8 @@ spec:
           # Media element which is able to play media data for client via WebRTC.
           play:
             kind: WebRtcPlayEndpoint
-            # spec:
-              # src: "local://video-call-2/responder/publish"
+            spec:
+              src: "local://video-call-2/responder/publish"
     responder:
       kind: Member
       spec:
@@ -28,5 +28,5 @@ spec:
               p2p: Always
           play:
             kind: WebRtcPlayEndpoint
-            # spec:
-              # src: "local://video-call-2/caller/publish"
+            spec:
+              src: "local://video-call-2/caller/publish"

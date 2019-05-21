@@ -2,7 +2,8 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::element::{PlayElement, PublishElement};
+use super::element::Element;
+use std::collections::HashMap;
 
 /// ID of [`Member`].
 pub type Id = u64;
@@ -27,14 +28,5 @@ pub enum MemberRequest {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 /// Spec of member in [`Room`] pipeline.
 pub struct MemberSpec {
-    pub pipeline: MemberPipeline,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-/// Pipeline of [`Member`]
-pub struct MemberPipeline {
-    /// Publish element of [`Member`].
-    pub publish: Option<PublishElement>,
-    /// Play element of [`Member`].
-    pub play: Option<PlayElement>,
+    pub pipeline: HashMap<String, Element>,
 }

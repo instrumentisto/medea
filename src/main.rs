@@ -39,6 +39,8 @@ fn main() {
         RoomRequest::Room { id, spec } => (id, spec),
     };
 
+    println!("{:#?}", room_spec);
+
     let members = hashmap! {
         1 => Member{id: 1, credentials: "caller_credentials".to_owned()},
         2 => Member{id: 2, credentials: "responder_credentials".to_owned()},
