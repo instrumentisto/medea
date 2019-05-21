@@ -12,7 +12,7 @@ repository = "https://github.com/instrumentisto/medea"
 crate-type = ["cdylib", "rlib"]
 
 [features]
-default = ["console_error_panic_hook", "wee_alloc"]
+default = ["console_error_panic_hook"]
 
 [dependencies]
 cfg-if = "0.1"
