@@ -8,9 +8,9 @@ use proc_macro::TokenStream;
 /// ## How to use:
 ///
 /// ```
-/// #[state_machine_shared_fn_accessor(
-///     /*SHARED_STATE_METHOD*/ -> /*RETURN_TYPE_OF_THIS_METHOD*/
-/// )]
+/// #[enum_delegate(pub fn some_value(&self) -> i32)]
+/// #[enum_delegate(pub fn function_with_additional_args(&self, some_arg: i32) -> i32)]
+/// #[enum_delegate(pub fn mutable_function(&mut self) -> i32)]
 /// enum SomeStateMachine {
 ///     // ...
 /// }
@@ -34,21 +34,38 @@ use proc_macro::TokenStream;
 ///     pub fn some_value(&self) -> i32 {
 ///         self.context.some_value
 ///     }
+///
+///     pub fn function_with_additional_args(&self, some_arg: i32) -> i32 {
+///         some_arg
+///     }
+///
+///     pub fn mutable_function(&mut self) -> i32 {
+///         let old_value = self.context.some_value;
+///         self.context.some_value = 1000;
+///         old_value
+///     }
 /// }
 ///
-/// #[state_machine_shared_fn_accessor(some_value -> i32)]
+/// #[enum_delegate(pub fn some_value(&self) -> i32)]
+/// #[enum_delegate(pub fn function_with_additional_args(&self, some_arg: i32) -> i32)]
+/// #[enum_delegate(pub fn mutable_function(&mut self) -> i32)]
 /// enum PeerStateMachine {
 ///     SomeState(Peer<SomeState>),
 ///     AnotherState(Peer<AnotherState>),
 /// }
 ///
 /// fn main() {
-///     let peer = PeerStateMachine::SomeState(Peer {
+///     let mut peer = PeerStateMachine::SomeState(Peer {
 ///         context: Context { some_value: 10 },
 ///         state: SomeState,
 ///     });
 ///
-///     peer.some_value() // -> 10
+///     peer.some_value(); // -> 10
+///
+///     peer.function_with_additional_args(100); // -> 100
+///
+///     peer.mutable_function(); // -> 10
+///     peer.some_value(); // -> 1000
 /// }
 /// ```
 #[proc_macro_attribute]

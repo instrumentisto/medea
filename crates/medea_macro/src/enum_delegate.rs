@@ -1,4 +1,4 @@
-//! state_machine_shared_fn_accessor macro implementation.
+//! `#[enum_delegate()]` macro implementation.
 
 use proc_macro::TokenStream;
 use quote::quote;
@@ -41,7 +41,7 @@ pub fn derive(args: TokenStream, input: TokenStream) -> TokenStream {
         #(#enum_name_iter::#variants(inner) => inner.#function_ident(#(#function_args)*),)*
     };
 
-    // This used for easy body generation by quote.
+    // This used for easy **body** generation by quote.
     let generated_fn: syn::ItemFn = syn::parse(
         quote! {
             pub fn a(&self) {
@@ -53,7 +53,6 @@ pub fn derive(args: TokenStream, input: TokenStream) -> TokenStream {
         .into(),
     )
     .unwrap();
-
     function.block = generated_fn.block;
 
     let impl_output = quote! {
