@@ -58,6 +58,7 @@ test: test.unit
 #	make build.jason
 
 build.jason:
+	@rm -rf jason/e2e-demo/dist/
 	npm run build --prefix=jason/e2e-demo
 	@make opt.jason
 
@@ -65,12 +66,12 @@ build.jason:
 # Optimize wasm binary.
 #
 # Usage:
-#	make opt.wasm [filename=(|<wasm-file>)]
+#	make opt.wasm [file=(|<wasm-file>)]
 
-wasm-file = $(if $(call eq,$(filename),),$(shell find jason/e2e-demo/dist -name '*.module.wasm'),$(filename))
+wasm-file = $(if $(call eq,$(file),),$(shell find jason/e2e-demo/dist -name '*.module.wasm'),$(file))
 
 opt.jason:
-	wasm-opt $(wasm-file) -o $(wasm-file)
+	wasm-opt $(wasm-file) -Os -d -o $(wasm-file)
 
 
 
@@ -207,5 +208,5 @@ up.medea:
         opt.jason \
         test test.unit \
         up up.jason up.medea \
-        yarn
+        yarn wasm2wat
 

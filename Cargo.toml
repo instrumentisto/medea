@@ -15,8 +15,9 @@ members = [
     "protocol",
 ]
 
-[profile.release]
-lto = "thin"
+#[profile.release]
+#lto = true
+#opt-level = "z"  # Tell `rustc` to optimize for small code size.
 
 [dependencies]
 actix = "0.7"

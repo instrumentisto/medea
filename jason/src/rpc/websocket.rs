@@ -143,10 +143,9 @@ impl WebSocket {
         inner_mut.on_message = Some(EventListener::new_mut(
             Rc::clone(&inner_mut.socket),
             "message",
-            move |msg| {
+            move |msg: MessageEvent| {
                 let parsed =
-                    ServerMessage::try_from(&msg).map(std::convert::Into::into);
-
+                    msg.data().into_serde::<ServerMsg>().map_err(WasmErr::from);
                 f(parsed);
             },
         )?);
@@ -214,25 +213,5 @@ impl From<&CloseEvent> for CloseMsg {
             1000 => CloseMsg::Normal(body),
             _ => CloseMsg::Disconnect(body),
         }
-    }
-}
-
-macro_attr! {
-    #[derive(NewtypeFrom!)]
-    pub struct ServerMessage(ServerMsg);
-}
-
-impl TryFrom<&MessageEvent> for ServerMessage {
-    type Error = WasmErr;
-
-    fn try_from(msg: &MessageEvent) -> Result<Self, Self::Error> {
-        let payload = msg
-            .data()
-            .as_string()
-            .ok_or_else(|| WasmErr::from_str("Payload is not string"))?;
-
-        serde_json::from_str::<ServerMsg>(&payload)
-            .map_err(WasmErr::from)
-            .map(Self::from)
     }
 }
