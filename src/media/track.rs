@@ -2,7 +2,7 @@
 //!
 //! [1]: https://www.w3.org/TR/mediacapture-streams/#mediastreamtrack
 
-use protocol::MediaType;
+use medea_client_api_proto::MediaType;
 
 /// ID of [`Track`].
 pub type Id = u64;

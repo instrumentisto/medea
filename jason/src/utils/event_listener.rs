@@ -1,5 +1,4 @@
-use std::ops::Deref;
-use std::rc::Rc;
+use std::{ops::Deref, rc::Rc};
 
 use wasm_bindgen::{closure::Closure, convert::FromWasmAbi, JsCast};
 use web_sys::EventTarget;

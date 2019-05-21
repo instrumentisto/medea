@@ -12,12 +12,12 @@ repository = "https://github.com/instrumentisto/medea"
 [workspace]
 members = [
     "jason",
-    "protocol",
+    "proto/client-api",
 ]
 
-#[profile.release]
-#lto = true
-#opt-level = "z"  # Tell `rustc` to optimize for small code size.
+[profile.release]
+lto = true
+opt-level = "s"  # Tell `rustc` to optimize for small code size.
 
 [dependencies]
 actix = "0.7"
@@ -30,8 +30,8 @@ futures = "0.1"
 hashbrown = "0.1"
 humantime = "1.2"
 macro-attr = "0.2"
+medea-client-api-proto = { path = "proto/client-api", features = ['medea'] }
 newtype_derive = "0.1"
-protocol = { path = "protocol", features = ['medea'] }
 serde = { version = "1.0", features = ['derive'] }
 serde_json = "1.0"
 slog = "2.4"

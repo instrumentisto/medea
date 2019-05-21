@@ -1,18 +1,20 @@
-//! Represents Medea room.
+//! Medea room.
+
+use std::{
+    cell::RefCell,
+    rc::{Rc, Weak},
+};
 
 use futures::{
     future::{Future, IntoFuture},
     stream::Stream,
 };
-use protocol::{Event, IceCandidate, Track};
+use medea_client_api_proto::{Event, IceCandidate, Track};
 use wasm_bindgen::{prelude::*, JsValue};
 use wasm_bindgen_futures::spawn_local;
 use web_sys::console;
 
-use std::rc::{Rc, Weak};
-
-use crate::rpc::RPCClient;
-use std::cell::RefCell;
+use crate::rpc::RpcClient;
 
 #[allow(clippy::module_name_repetitions)]
 #[wasm_bindgen]
@@ -27,38 +29,55 @@ pub struct Room(Rc<RefCell<InnerRoom>>);
 
 impl Room {
     /// Creates new [`Room`] associating it with provided [`RpcClient`].
-    pub fn new(rpc: &Rc<RPCClient>) -> Self {
+    pub fn new(rpc: &Rc<RpcClient>) -> Self {
         let room = Rc::new(RefCell::new(InnerRoom::new(Rc::clone(&rpc))));
 
-        let inner = Rc::clone(&room);
+        let inner = Rc::downgrade(&room);
 
         let process_msg_task = rpc
             .subscribe()
             .for_each(move |event| {
                 // TODO: macro for convenient dispatch
-                let mut inner = inner.borrow_mut();
-                match event {
-                    Event::PeerCreated {
-                        peer_id,
-                        sdp_offer,
-                        tracks,
-                    } => {
-                        inner.on_peer_created(peer_id, &sdp_offer, &tracks);
+                match inner.upgrade() {
+                    Some(inner) => {
+                        let mut inner = inner.borrow_mut();
+                        match event {
+                            Event::PeerCreated {
+                                peer_id,
+                                sdp_offer,
+                                tracks,
+                            } => {
+                                inner.on_peer_created(
+                                    peer_id, &sdp_offer, &tracks,
+                                );
+                            }
+                            Event::SdpAnswerMade {
+                                peer_id,
+                                sdp_answer,
+                            } => {
+                                inner.on_sdp_answer(peer_id, &sdp_answer);
+                            }
+                            Event::IceCandidateDiscovered {
+                                peer_id,
+                                candidate,
+                            } => {
+                                inner.on_ice_candidate_discovered(
+                                    peer_id, &candidate,
+                                );
+                            }
+                            Event::PeersRemoved { peer_ids } => {
+                                inner.on_peers_removed(&peer_ids);
+                            }
+                        };
+                        Ok(())
                     }
-                    Event::SdpAnswerMade {
-                        peer_id,
-                        sdp_answer,
-                    } => {
-                        inner.on_sdp_answer(peer_id, &sdp_answer);
+                    None => {
+                        // InnerSession is gone, which means that Room was
+                        // dropped. Not supposed to happen, since InnerSession
+                        // should drop its tx by unsubbing from RpcClient.
+                        Err(())
                     }
-                    Event::IceCandidateDiscovered { peer_id, candidate } => {
-                        inner.on_ice_candidate_discovered(peer_id, &candidate);
-                    }
-                    Event::PeersRemoved { peer_ids } => {
-                        inner.on_peers_removed(&peer_ids);
-                    }
-                };
-                Ok(())
+                }
             })
             .into_future()
             .then(|_| Ok(()));
@@ -77,14 +96,16 @@ impl Room {
     }
 }
 
-// Actual room. Shared between JS-side handle (['RoomHandle']) and Rust-side
-// handle (['Room']). Manages concrete RTCPeerConnections, handles Medea events.
+/// Actual room. Manages concrete `RTCPeerConnection`s, handles Medea events.
+///
+/// Shared between JS-side handle ([`RoomHandle`])
+/// and Rust-side handle ([`Room`]).
 struct InnerRoom {
-    rpc: Rc<RPCClient>,
+    rpc: Rc<RpcClient>,
 }
 
 impl InnerRoom {
-    fn new(rpc: Rc<RPCClient>) -> Self {
+    fn new(rpc: Rc<RpcClient>) -> Self {
         Self { rpc }
     }
 
@@ -121,8 +142,8 @@ impl InnerRoom {
 }
 
 impl Drop for InnerRoom {
+    /// Drops event handling task.
     fn drop(&mut self) {
-        // Drops event handling task.
         self.rpc.unsub();
     }
 }

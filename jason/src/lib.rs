@@ -4,8 +4,8 @@ mod api;
 mod rpc;
 mod utils;
 
-pub use self::api::Jason;
-pub use self::api::RoomHandle;
+#[doc(inline)]
+pub use self::api::{Jason, RoomHandle};
 
 cfg_if! {
     // When the `console_error_panic_hook` feature is enabled, we can call the

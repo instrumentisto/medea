@@ -8,7 +8,7 @@ use actix::{
 use failure::Fail;
 use futures::future;
 use hashbrown::HashMap;
-use protocol::{Command, Event, IceCandidate};
+use medea_client_api_proto::{Command, Event, IceCandidate};
 
 use std::time::Duration;
 
@@ -415,12 +415,14 @@ mod test {
     use std::sync::{atomic::AtomicUsize, Arc, Mutex};
 
     use actix::{Addr, Arbiter, System};
-    use protocol::{AudioSettings, Direction, MediaType, Track, VideoSettings};
-
-    use super::*;
-    use crate::media::create_peers;
+    use medea_client_api_proto::{
+        AudioSettings, Direction, MediaType, Track, VideoSettings,
+    };
 
     use crate::api::client::rpc_connection::test::TestConnection;
+    use crate::media::create_peers;
+
+    use super::*;
 
     fn start_room() -> Addr<Room> {
         let members = hashmap! {

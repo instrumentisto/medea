@@ -19,13 +19,19 @@ cfg-if = "0.1"
 console_error_panic_hook = { version = "0.1", optional = true }
 futures = "0.1"
 js-sys = "0.3"
-protocol = { path = "../protocol", features = ['jason'] }
-serde = { version = "1.0", features = ['derive'] }
+medea-client-api-proto = { path = "../proto/client-api", features = ["jason"] }
+serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-wasm-bindgen = { version = "0.2", features = ['serde-serialize'] }
+wasm-bindgen = { version = "0.2", features = ["serde-serialize"] }
 wasm-bindgen-futures = "0.3"
-web-sys = { version = "0.3.4", features = ['console','Event','EventTarget','MessageEvent','WebSocket','Window','CloseEvent'] }
 wee_alloc = { version = "0.4", optional = true }
+[dependencies.web-sys]
+    version = "0.3.4"
+    features = [
+        "console",
+        "CloseEvent", "Event", "EventTarget", "MessageEvent",
+        "WebSocket", "Window",
+    ]
 
 [dev-dependencies]
 wasm-bindgen-test = "0.2"
