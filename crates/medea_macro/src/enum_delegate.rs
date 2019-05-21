@@ -24,17 +24,13 @@ pub fn derive(args: &TokenStream, input: TokenStream) -> TokenStream {
     let mut function: syn::ItemFn = syn::parse_str(&arg_function).unwrap();
     let function_ident = std::iter::repeat(function.ident.clone());
     // Iterator over captured function args
-    let function_args = std::iter::repeat(
-        function
-            .decl
-            .clone()
-            .inputs
-            .into_iter()
-            .filter_map(|i| match i {
+    let function_args =
+        std::iter::repeat(function.decl.clone().inputs.into_iter().filter_map(
+            |i| match i {
                 FnArg::Captured(c) => Some(c.pat),
                 _ => None,
-            })
-    );
+            },
+        ));
 
     let enum_output = quote! {
         #(#enum_name_iter::#variants(inner) => {
