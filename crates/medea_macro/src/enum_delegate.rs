@@ -2,6 +2,7 @@
 
 use proc_macro::TokenStream;
 use quote::quote;
+use syn::FnArg;
 
 pub fn derive(args: TokenStream, input: TokenStream) -> TokenStream {
     let mut output = input.clone();
@@ -22,25 +23,38 @@ pub fn derive(args: TokenStream, input: TokenStream) -> TokenStream {
     let arg_function = format!("{} {{ }}", args.to_string());
     let mut function: syn::ItemFn = syn::parse_str(&arg_function).unwrap();
     let function_ident = std::iter::repeat(function.ident.clone());
-    let function_args = std::iter::repeat(function.decl.clone().inputs.into_iter().skip(1));
+    // Iterator over captured function args
+    let function_args = std::iter::repeat(
+        function
+            .decl
+            .clone()
+            .inputs
+            .into_iter()
+            .filter_map(|i| match i {
+                FnArg::Captured(c) => Some(c),
+                _ => None,
+            })
+            .map(|c| c.pat),
+    );
 
     let enum_output = quote! {
         #(#enum_name_iter::#variants(inner) => inner.#function_ident(#(#function_args)*),)*
     };
 
-    println!("{}", enum_output.to_string());
-
     // This used for easy body generation by quote.
-    let generated_fn: syn::ItemFn = syn::parse(quote! {
-        pub fn a(&self) {
-            match self {
-                #enum_output
+    let generated_fn: syn::ItemFn = syn::parse(
+        quote! {
+            pub fn a(&self) {
+                match self {
+                    #enum_output
+                }
             }
         }
-    }.into()).unwrap();
+        .into(),
+    )
+    .unwrap();
 
     function.block = generated_fn.block;
-
 
     let impl_output = quote! {
         #[automatically_derived]

@@ -5,10 +5,10 @@
 #![allow(clippy::use_self)]
 use failure::Fail;
 use hashbrown::HashMap;
-use medea_macro::state_machine_delegate;
 use medea_client_api_proto::{
     AudioSettings, Direction, MediaType, Track, VideoSettings,
 };
+use medea_macro::enum_delegate;
 
 use std::{convert::TryFrom, fmt::Display, sync::Arc};
 
@@ -59,10 +59,10 @@ impl PeerStateError {
 }
 
 /// Implementation of ['Peer'] state machine.
-#[state_machine_delegate(pub fn id(&self) -> Id)]
-#[state_machine_delegate(pub fn member_id(&self) -> MemberId)]
-#[state_machine_delegate(pub fn partner_peer_id(&self) -> Id)]
-#[state_machine_delegate(pub fn partner_member_id(&self) -> Id)]
+#[enum_delegate(pub fn id(&self) -> Id)]
+#[enum_delegate(pub fn member_id(&self) -> MemberId)]
+#[enum_delegate(pub fn partner_peer_id(&self) -> Id)]
+#[enum_delegate(pub fn partner_member_id(&self) -> Id)]
 #[derive(Debug)]
 #[allow(clippy::module_name_repetitions)]
 pub enum PeerStateMachine {

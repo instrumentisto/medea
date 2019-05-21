@@ -1,6 +1,6 @@
 extern crate proc_macro;
 
-mod state_machine_delegate;
+mod enum_delegate;
 
 use proc_macro::TokenStream;
 
@@ -52,9 +52,6 @@ use proc_macro::TokenStream;
 /// }
 /// ```
 #[proc_macro_attribute]
-pub fn state_machine_delegate(
-    args: TokenStream,
-    input: TokenStream,
-) -> TokenStream {
-    state_machine_delegate::derive(args, input)
+pub fn enum_delegate(args: TokenStream, input: TokenStream) -> TokenStream {
+    enum_delegate::derive(args, input)
 }
