@@ -4,7 +4,7 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::FnArg;
 
-pub fn derive(args: TokenStream, input: TokenStream) -> TokenStream {
+pub fn derive(args: &TokenStream, input: TokenStream) -> TokenStream {
     let mut output = input.clone();
     let inp: syn::DeriveInput =
         syn::parse(input).expect("failed to parse input");
@@ -31,10 +31,9 @@ pub fn derive(args: TokenStream, input: TokenStream) -> TokenStream {
             .inputs
             .into_iter()
             .filter_map(|i| match i {
-                FnArg::Captured(c) => Some(c),
+                FnArg::Captured(c) => Some(c.pat),
                 _ => None,
             })
-            .map(|c| c.pat),
     );
 
     let enum_output = quote! {

@@ -73,6 +73,7 @@ use proc_macro::TokenStream;
 /// }
 /// ```
 #[proc_macro_attribute]
+#[allow(clippy::needless_pass_by_value)]
 pub fn enum_delegate(args: TokenStream, input: TokenStream) -> TokenStream {
-    enum_delegate::derive(args, input)
+    enum_delegate::derive(&args, input)
 }
