@@ -454,8 +454,8 @@ mod test {
 
     fn start_room() -> Addr<Room> {
         let members = hashmap! {
-            1 => Member{id: 1, credentials: "caller_credentials".to_owned()},
-            2 => Member{id: 2, credentials: "responder_credentials".to_owned()},
+            1 => Member{id: 1, credentials: "caller_credentials".to_owned(), ice_user: None},
+            2 => Member{id: 2, credentials: "responder_credentials".to_owned(), ice_user: None},
         };
         Arbiter::start(move |_| {
             Room::new(

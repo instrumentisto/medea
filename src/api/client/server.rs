@@ -120,8 +120,8 @@ mod test {
     /// Creates [`RoomsRepository`] for tests filled with a single [`Room`].
     fn room(conf: Rpc) -> RoomsRepository {
         let members = hashmap! {
-            1 => Member{id: 1, credentials: "caller_credentials".into()},
-            2 => Member{id: 2, credentials: "responder_credentials".into()},
+            1 => Member{id: 1, credentials: "caller_credentials".into(), ice_user: None},
+            2 => Member{id: 2, credentials: "responder_credentials".into(), ice_user: None},
         };
         let room = Arbiter::start(move |_| {
             Room::new(

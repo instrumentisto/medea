@@ -183,17 +183,15 @@ pub mod test {
                 let handler = |a: Box<Any>,
                                _b: &mut Context<TurnAuthService>|
                  -> Box<Any> {
-                    //                    if let Ok(_out) =
-                    // a.downcast::<GetIceUser>() {
-                    //                        Box::new(Some(Result::<_,
-                    // ()>::Ok(ICEUser {
-                    // address: "5.5.5.5:1234".parse().unwrap(),
-                    //                            name: "username".to_string(),
-                    //                            pass: "password".to_string(),
-                    //                        })))
-                    //                    } else {
-                    //                        Box::new(Some(Result::<_,
-                    // ()>::Ok(())))                    }
+                    if let Ok(_out) = a.downcast::<CreateIceUser>() {
+                        Box::new(Some(Result::<IceUser, TurnServiceErr>::Ok(IceUser {
+                            address: "5.5.5.5:1234".parse().unwrap(),
+                            name: "username".to_string(),
+                            pass: "password".to_string(),
+                        })))
+                    } else {
+                        Box::new(Some(Result::<_, ()>::Ok(())))
+                    }
                 };
                 Box::new(handler)
             })
