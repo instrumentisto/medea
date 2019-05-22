@@ -15,10 +15,12 @@ use futures::{
 };
 use hashbrown::HashMap;
 
+use medea_client_api_proto::Event;
+
 use crate::{
     api::{
         client::rpc_connection::{
-            AuthorizationError, ClosedReason, RpcConnection,
+            AuthorizationError, ClosedReason, EventMessage, RpcConnection,
             RpcConnectionClosed,
         },
         control::{Member, MemberId},
@@ -141,7 +143,7 @@ impl ParticipantService {
     ) -> impl Future<Item = (), Error = RoomError> {
         match self.connections.get(&member_id) {
             Some(conn) => Either::A(
-                conn.send_event(event)
+                conn.send_event(EventMessage::from(event))
                     .map_err(move |_| RoomError::UnableToSendEvent(member_id)),
             ),
             None => Either::B(future::err(RoomError::ConnectionNotExists(
@@ -178,25 +180,25 @@ impl ParticipantService {
                     member_id,
                     policy: UnreachablePolicy::default(),
                 }))
-                .map_err(|err, _: &mut Room, _| {
-                    ParticipantServiceErr::from(err)
-                })
-                .and_then(move |res, room, _| {
-                    wrap_future(match res {
-                        Ok(ice) => {
-                            if let Some(mut member) =
-                                room.participants.take_member(member_id)
-                            {
-                                member.ice_user.replace(ice);
-                                room.participants.insert_member(member);
-                            };
-                            future::ok(())
-                        }
-                        Err(err) => {
-                            future::err(ParticipantServiceErr::from(err))
-                        }
+                    .map_err(|err, _: &mut Room, _| {
+                        ParticipantServiceErr::from(err)
                     })
-                }),
+                    .and_then(move |res, room, _| {
+                        wrap_future(match res {
+                            Ok(ice) => {
+                                if let Some(mut member) =
+                                room.participants.take_member(member_id)
+                                {
+                                    member.ice_user.replace(ice);
+                                    room.participants.insert_member(member);
+                                };
+                                future::ok(())
+                            }
+                            Err(err) => {
+                                future::err(ParticipantServiceErr::from(err))
+                            }
+                        })
+                    }),
             )
         }
     }

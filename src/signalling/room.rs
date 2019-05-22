@@ -8,17 +8,17 @@ use actix::{
 use failure::Fail;
 use futures::future;
 use hashbrown::HashMap;
+use medea_client_api_proto::{Command, Event, IceCandidate};
 
 use std::time::Duration;
 
 use crate::{
     api::{
         client::rpc_connection::{
-            AuthorizationError, Authorize, RpcConnectionClosed,
+            AuthorizationError, Authorize, CommandMessage, RpcConnectionClosed,
             RpcConnectionEstablished,
         },
         control::{Member, MemberId},
-        protocol::{Command, Event, IceCandidate},
     },
     log::prelude::*,
     media::{
@@ -60,6 +60,7 @@ impl From<PeerStateError> for RoomError {
 }
 
 /// Media server room with its [`Member`]s.
+#[derive(Debug)]
 pub struct Room {
     id: Id,
 
@@ -313,17 +314,17 @@ impl Handler<ConnectPeers> for Room {
     }
 }
 
-impl Handler<Command> for Room {
+impl Handler<CommandMessage> for Room {
     type Result = ActFuture<(), ()>;
 
     /// Receives [`Command`] from Web client and passes it to corresponding
     /// handlers. Will emit [`CloseRoom`] on any error.
     fn handle(
         &mut self,
-        command: Command,
+        msg: CommandMessage,
         ctx: &mut Self::Context,
     ) -> Self::Result {
-        let result = match command {
+        let result = match msg.into() {
             Command::MakeSdpOffer { peer_id, sdp_offer } => {
                 self.handle_make_sdp_offer(peer_id, sdp_offer)
             }
@@ -441,16 +442,14 @@ mod test {
     use std::sync::{atomic::AtomicUsize, Arc, Mutex};
 
     use actix::{Addr, Arbiter, System};
+    use medea_client_api_proto::{
+        AudioSettings, Direction, MediaType, Track, VideoSettings,
+    };
+
+    use crate::api::client::rpc_connection::test::TestConnection;
+    use crate::media::create_peers;
 
     use super::*;
-    use crate::api::protocol::ICEServer;
-    use crate::{
-        api::client::rpc_connection::test::TestConnection,
-        api::protocol::{
-            AudioSettings, Direction, Directional, MediaType, VideoSettings,
-        },
-        media::create_peers,
-    };
 
     fn start_room() -> Addr<Room> {
         let members = hashmap! {
@@ -503,12 +502,12 @@ mod test {
                     peer_id: 1,
                     sdp_offer: None,
                     tracks: vec![
-                        Directional {
+                        Track {
                             id: 1,
                             direction: Direction::Send { receivers: vec![2] },
                             media_type: MediaType::Audio(AudioSettings {}),
                         },
-                        Directional {
+                        Track {
                             id: 2,
                             direction: Direction::Send { receivers: vec![2] },
                             media_type: MediaType::Video(VideoSettings {}),
@@ -555,12 +554,12 @@ mod test {
                     peer_id: 2,
                     sdp_offer: Some("caller_offer".into()),
                     tracks: vec![
-                        Directional {
+                        Track {
                             id: 1,
                             direction: Direction::Recv { sender: 1 },
                             media_type: MediaType::Audio(AudioSettings {}),
                         },
-                        Directional {
+                        Track {
                             id: 2,
                             direction: Direction::Recv { sender: 1 },
                             media_type: MediaType::Video(VideoSettings {}),

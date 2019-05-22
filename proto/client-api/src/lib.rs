@@ -1,9 +1,7 @@
-use actix::Message;
 use serde::{de::Deserializer, ser::Serializer, Deserialize, Serialize};
 
 // TODO: should be properly shared between medea and jason
-#[cfg_attr(test, derive(PartialEq))]
-#[derive(Message, Debug)]
+#[cfg_attr(test, derive(PartialEq, Debug))]
 #[allow(dead_code)]
 /// Message sent by `Media Server` to `Client`.
 pub enum ServerMsg {
@@ -27,11 +25,11 @@ pub enum ClientMsg {
 }
 
 /// WebSocket message from Web Client to Media Server.
-#[derive(Deserialize, Serialize, Message)]
 #[cfg_attr(test, derive(PartialEq, Debug))]
+#[cfg_attr(feature = "medea", derive(Deserialize))]
+#[cfg_attr(feature = "jason", derive(Serialize))]
 #[serde(tag = "command", content = "data")]
 #[allow(dead_code)]
-#[rtype(result = "Result<(), ()>")]
 pub enum Command {
     /// Web Client sends SDP Offer.
     MakeSdpOffer { peer_id: u64, sdp_offer: String },
@@ -45,17 +43,18 @@ pub enum Command {
 }
 
 /// WebSocket message from Medea to Jason.
-#[derive(Deserialize, Serialize, Message, Debug)]
-#[cfg_attr(test, derive(PartialEq))]
-#[allow(dead_code)]
+#[cfg_attr(feature = "medea", derive(Serialize))]
+#[cfg_attr(feature = "jason", derive(Deserialize))]
+#[cfg_attr(test, derive(PartialEq, Debug))]
 #[serde(tag = "event", content = "data")]
+#[allow(dead_code)]
 pub enum Event {
     /// Media Server notifies Web Client about necessity of RTCPeerConnection
     /// creation.
     PeerCreated {
         peer_id: u64,
         sdp_offer: Option<String>,
-        tracks: Vec<Directional>,
+        tracks: Vec<Track>,
         ice_servers: Vec<ICEServer>,
     },
     /// Media Server notifies Web Client about necessity to apply specified SDP
@@ -75,11 +74,21 @@ pub enum Event {
 }
 
 /// Represents [`RtcIceCandidateInit`] object.
-#[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct IceCandidate {
     pub candidate: String,
     pub sdp_m_line_index: Option<u16>,
     pub sdp_mid: Option<String>,
+}
+
+/// [`Track] with specified direction.
+#[cfg_attr(feature = "medea", derive(Serialize))]
+#[cfg_attr(feature = "jason", derive(Deserialize))]
+#[cfg_attr(test, derive(PartialEq, Debug))]
+pub struct Track {
+    pub id: u64,
+    pub direction: Direction,
+    pub media_type: MediaType,
 }
 
 /// [`Track`] with specified direction.
@@ -94,39 +103,38 @@ pub struct ICEServer {
     pub credential: Option<String>,
 }
 
-/// [`Track] with specified direction.
-#[derive(Deserialize, Serialize, Debug)]
-#[cfg_attr(test, derive(PartialEq))]
-pub struct Directional {
-    pub id: u64,
-    pub direction: Direction,
-    pub media_type: MediaType,
-}
-
 /// Direction of [`Track`].
-#[derive(Deserialize, Serialize, Debug)]
-#[cfg_attr(test, derive(PartialEq))]
+#[cfg_attr(feature = "medea", derive(Serialize))]
+#[cfg_attr(feature = "jason", derive(Deserialize))]
+#[cfg_attr(test, derive(PartialEq, Debug))]
 pub enum Direction {
     Send { receivers: Vec<u64> },
     Recv { sender: u64 },
 }
 
 /// Type of [`Track`].
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "medea", derive(Serialize))]
+#[cfg_attr(feature = "jason", derive(Deserialize))]
 #[cfg_attr(test, derive(PartialEq))]
 pub enum MediaType {
     Audio(AudioSettings),
     Video(VideoSettings),
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "medea", derive(Serialize))]
+#[cfg_attr(feature = "jason", derive(Deserialize))]
 #[cfg_attr(test, derive(PartialEq))]
 pub struct AudioSettings {}
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "medea", derive(Serialize))]
+#[cfg_attr(feature = "jason", derive(Deserialize))]
 #[cfg_attr(test, derive(PartialEq))]
 pub struct VideoSettings {}
 
+#[cfg(feature = "jason")]
 impl Serialize for ClientMsg {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -145,6 +153,7 @@ impl Serialize for ClientMsg {
     }
 }
 
+#[cfg(feature = "medea")]
 impl<'de> Deserialize<'de> for ClientMsg {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -179,6 +188,7 @@ impl<'de> Deserialize<'de> for ClientMsg {
     }
 }
 
+#[cfg(feature = "medea")]
 impl Serialize for ServerMsg {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -197,6 +207,7 @@ impl Serialize for ServerMsg {
     }
 }
 
+#[cfg(feature = "jason")]
 impl<'de> Deserialize<'de> for ServerMsg {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -232,7 +243,7 @@ impl<'de> Deserialize<'de> for ServerMsg {
 
 #[cfg(test)]
 mod test {
-    use crate::api::protocol::{ClientMsg, Command, Event, ServerMsg};
+    use super::*;
 
     #[test]
     fn command() {
