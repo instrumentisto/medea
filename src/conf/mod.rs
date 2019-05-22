@@ -9,8 +9,7 @@ use config::{Config, Environment, File};
 use failure::Error;
 use serde::{Deserialize, Serialize};
 
-pub use self::rpc::Rpc;
-pub use self::server::Server;
+pub use self::{rpc::Rpc, server::Server};
 
 /// CLI argument that is responsible for holding application configuration
 /// file path.
@@ -45,9 +44,7 @@ impl Conf {
 
         cfg.merge(Environment::with_prefix("MEDEA").separator("."))?;
 
-        let s: Self = cfg.try_into()?;
-
-        Ok(s)
+        Ok(cfg.try_into()?)
     }
 }
 
