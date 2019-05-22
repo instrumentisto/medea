@@ -1,13 +1,22 @@
+//! Macros for [Medea] media server project.
+//!
+//! This crate is indented for inner use only by [Medea] media server.
+//!
+//! [Medea]: https://github.com/instrumentisto/medea
+
 extern crate proc_macro;
 
 mod enum_delegate;
 
 use proc_macro::TokenStream;
 
-/// This macro should be used for creating shared state function's accessor.
-/// ## How to use:
+/// Macro for generating boilerplate code of methods delegation to `enum`
+/// variants.
+///
+/// # How to use
 ///
 /// ```
+/// # use medea_macro::enum_delegate;
 /// #[enum_delegate(pub fn some_value(&self) -> i32)]
 /// #[enum_delegate(
 ///     pub fn function_with_additional_args(&self, some_arg: i32) -> i32
@@ -18,8 +27,10 @@ use proc_macro::TokenStream;
 /// }
 /// ```
 ///
-/// ## Example:
+/// # Example
+///
 /// ```
+/// # use medea_macro::enum_delegate;
 /// struct SomeState;
 /// struct AnotherState;
 ///

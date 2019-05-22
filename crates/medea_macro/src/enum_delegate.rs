@@ -1,15 +1,17 @@
-//! `#[enum_delegate()]` macro implementation.
+//! `#[enum_delegate]` macro implementation.
+
+use std::iter;
 
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::FnArg;
 
+/// Generates the actual code for `#[enum_delegate]` macro.
 pub fn derive(args: &TokenStream, input: TokenStream) -> TokenStream {
     let mut output = input.clone();
     let inp: syn::DeriveInput =
         syn::parse(input).expect("failed to parse input");
 
-    let mut enum_name_iter = std::iter::repeat(inp.ident);
+    let mut enum_name_iter = iter::repeat(inp.ident);
     let enum_name = enum_name_iter.next().unwrap();
 
     let variants: Vec<syn::Ident> = match inp.data {
@@ -22,12 +24,12 @@ pub fn derive(args: &TokenStream, input: TokenStream) -> TokenStream {
     // This is for easy parsing function declaration by default syn parser.
     let arg_function = format!("{} {{ }}", args.to_string());
     let mut function: syn::ItemFn = syn::parse_str(&arg_function).unwrap();
-    let function_ident = std::iter::repeat(function.ident.clone());
+    let function_ident = iter::repeat(function.ident.clone());
     // Iterator over captured function args
     let function_args =
-        std::iter::repeat(function.decl.clone().inputs.into_iter().filter_map(
+        iter::repeat(function.decl.clone().inputs.into_iter().filter_map(
             |i| match i {
-                FnArg::Captured(c) => Some(c.pat),
+                syn::FnArg::Captured(c) => Some(c.pat),
                 _ => None,
             },
         ));
