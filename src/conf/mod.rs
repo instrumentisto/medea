@@ -24,6 +24,7 @@ static APP_CONF_PATH_ENV_VAR_NAME: &str = "MEDEA_CONF";
 pub struct Conf {
     /// RPC connection settings.
     pub rpc: rpc::Rpc,
+
     /// HTTP server settings.
     pub server: server::Server,
 }
