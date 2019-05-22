@@ -7,18 +7,11 @@ pub mod turn;
 
 use std::env;
 
-use config::{
-    Config, ConfigError, Environment, File, FileFormat, Source, Value,
-};
+use config::{Config, Environment, File};
 use failure::Error;
 use serde::{Deserialize, Serialize};
 
-pub use self::redis::Redis;
-pub use self::rpc::Rpc;
-pub use self::server::Server;
-pub use self::turn::Turn;
-
-use std::collections::HashMap;
+pub use self::{rpc::Rpc, turn::Turn, server::Server, turn::Turn};
 
 /// CLI argument that is responsible for holding application configuration
 /// file path.
@@ -29,6 +22,7 @@ static APP_CONF_PATH_ENV_VAR_NAME: &str = "MEDEA_CONF";
 
 /// Holds application config.
 #[derive(Clone, Debug, Deserialize, Serialize, Default)]
+#[serde(default)]
 pub struct Conf {
     /// Redis server settings.
     pub redis: Redis,
@@ -40,20 +34,6 @@ pub struct Conf {
     pub turn: Turn,
 }
 
-/// Allows merging [`Conf`] into [`config::Config`].
-// TODO: Remove after the following issue is resolved:
-//       https://github.com/mehcode/config-rs/issues/60#issuecomment-443241600
-impl Source for Conf {
-    fn clone_into_box(&self) -> Box<Source + Send + Sync> {
-        Box::new((*self).clone())
-    }
-
-    fn collect(&self) -> Result<HashMap<String, Value>, ConfigError> {
-        let serialized = toml::to_string(self).unwrap();
-        File::from_str(serialized.as_str(), FileFormat::Toml).collect()
-    }
-}
-
 impl Conf {
     /// Creates new [`Conf`] and applies values from the following sources
     /// (in the following order):
@@ -62,10 +42,7 @@ impl Conf {
     ///   parameter or environment variable;
     /// - environment variables.
     pub fn parse() -> Result<Self, Error> {
-        // TODO: use Config::try_from(&Self::default()) when the issue is fixed:
-        //       https://github.com/mehcode/config-rs/issues/60
         let mut cfg = Config::new();
-        cfg.merge(Self::default())?;
 
         if let Some(path) = get_conf_file_name(env::args()) {
             cfg.merge(File::with_name(&path))?;
@@ -73,8 +50,7 @@ impl Conf {
 
         cfg.merge(Environment::with_prefix("MEDEA").separator("."))?;
 
-        let s: Self = cfg.try_into()?;
-        Ok(s)
+        Ok(cfg.try_into()?)
     }
 }
 
@@ -99,17 +75,22 @@ where
 }
 
 #[cfg(test)]
-mod get_conf_file_name_spec {
+mod tests {
+    use serial_test_derive::serial;
+    use std::{fs, time::Duration};
+
     use super::*;
 
     #[test]
-    fn none_if_nothing_is_set() {
+    #[serial]
+    fn get_conf_file_name_spec_none_if_nothing_is_set() {
         env::remove_var(APP_CONF_PATH_ENV_VAR_NAME);
         assert_eq!(get_conf_file_name(vec![]), None);
     }
 
     #[test]
-    fn none_if_empty() {
+    #[serial]
+    fn get_conf_file_name_spec_none_if_empty() {
         env::set_var(APP_CONF_PATH_ENV_VAR_NAME, "env_path");
         assert_eq!(
             get_conf_file_name(vec![
@@ -118,16 +99,20 @@ mod get_conf_file_name_spec {
             ]),
             None,
         );
+        env::remove_var(APP_CONF_PATH_ENV_VAR_NAME);
     }
 
     #[test]
-    fn env_if_set() {
+    #[serial]
+    fn get_conf_file_name_spec_env_if_set() {
         env::set_var(APP_CONF_PATH_ENV_VAR_NAME, "env_path");
         assert_eq!(get_conf_file_name(vec![]), Some("env_path".to_owned()));
+        env::remove_var(APP_CONF_PATH_ENV_VAR_NAME);
     }
 
     #[test]
-    fn arg_if_set() {
+    #[serial]
+    fn get_conf_file_name_spec_arg_if_set() {
         env::remove_var(APP_CONF_PATH_ENV_VAR_NAME);
         assert_eq!(
             get_conf_file_name(vec![
@@ -139,7 +124,8 @@ mod get_conf_file_name_spec {
     }
 
     #[test]
-    fn arg_is_prioritized() {
+    #[serial]
+    fn get_conf_file_name_spec_arg_is_prioritized() {
         env::set_var(APP_CONF_PATH_ENV_VAR_NAME, "env_path");
         assert_eq!(
             get_conf_file_name(vec![
@@ -148,20 +134,12 @@ mod get_conf_file_name_spec {
             ]),
             Some("arg_path".to_owned()),
         );
+        env::remove_var(APP_CONF_PATH_ENV_VAR_NAME);
     }
-}
-
-#[cfg(test)]
-mod conf_parse_spec {
-    use std::{fs, time::Duration};
-
-    use serial_test_derive::serial;
-
-    use super::*;
 
     #[test]
     #[serial]
-    fn file_overrides_defaults() {
+    fn conf_parse_spec_file_overrides_defaults() {
         let defaults = Conf::default();
         let test_config_file_path = "test_config.toml";
 
@@ -178,11 +156,9 @@ mod conf_parse_spec {
         assert_ne!(new_config.rpc.idle_timeout, defaults.rpc.idle_timeout);
     }
 
-    // TODO: This test seems to pollute environment and might
-    //       fail from time to time.
     #[test]
     #[serial]
-    fn env_overrides_defaults() {
+    fn conf_parse_spec_env_overrides_defaults() {
         let defaults = Conf::default();
 
         env::set_var("MEDEA_RPC.IDLE_TIMEOUT", "46s");
@@ -195,7 +171,7 @@ mod conf_parse_spec {
 
     #[test]
     #[serial]
-    fn env_overrides_file() {
+    fn conf_parse_spec_env_overrides_file() {
         let test_config_file_path = "test_config.toml";
 
         let data = format!("[rpc]\nidle_timeout = \"47s\"");

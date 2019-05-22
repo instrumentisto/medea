@@ -1,5 +1,0 @@
-[server]
-# Timeout for websocket session to wait message from [`Web Client`].
-#
-# Default:
-#   idle_timeout = "10s"
