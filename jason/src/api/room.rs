@@ -9,7 +9,7 @@ use futures::{
     future::{Future, IntoFuture},
     stream::Stream,
 };
-use medea_client_api_proto::{Event, IceCandidate, Track};
+use medea_client_api_proto::{Event, IceCandidate, IceServer, Track};
 use wasm_bindgen::{prelude::*, JsValue};
 use wasm_bindgen_futures::spawn_local;
 use web_sys::console;
@@ -46,9 +46,13 @@ impl Room {
                                 peer_id,
                                 sdp_offer,
                                 tracks,
+                                ice_servers,
                             } => {
                                 inner.on_peer_created(
-                                    peer_id, &sdp_offer, &tracks,
+                                    peer_id,
+                                    &sdp_offer,
+                                    &tracks,
+                                    &ice_servers,
                                 );
                             }
                             Event::SdpAnswerMade {
@@ -115,6 +119,7 @@ impl InnerRoom {
         _peer_id: u64,
         _sdp_offer: &Option<String>,
         _tracks: &[Track],
+        _ice_servers: &[IceServer],
     ) {
         console::log_1(&JsValue::from_str("on_peer_created invoked"));
     }

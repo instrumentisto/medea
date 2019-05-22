@@ -60,7 +60,6 @@ impl From<PeerStateError> for RoomError {
 }
 
 /// Media server room with its [`Member`]s.
-#[derive(Debug)]
 pub struct Room {
     id: Id,
 
@@ -443,7 +442,7 @@ mod test {
 
     use actix::{Addr, Arbiter, System};
     use medea_client_api_proto::{
-        AudioSettings, Direction, MediaType, Track, VideoSettings,
+        AudioSettings, Direction, IceServer, MediaType, Track, VideoSettings,
     };
 
     use crate::api::client::rpc_connection::test::TestConnection;
@@ -453,8 +452,16 @@ mod test {
 
     fn start_room() -> Addr<Room> {
         let members = hashmap! {
-            1 => Member{id: 1, credentials: "caller_credentials".to_owned(), ice_user: None},
-            2 => Member{id: 2, credentials: "responder_credentials".to_owned(), ice_user: None},
+            1 => Member{
+                id: 1,
+                credentials: "caller_credentials".to_owned(),
+                ice_user: None
+            },
+            2 => Member{
+                id: 2,
+                credentials: "responder_credentials".to_owned(),
+                ice_user: None
+            },
         };
         Arbiter::start(move |_| {
             Room::new(
@@ -514,12 +521,12 @@ mod test {
                         },
                     ],
                     ice_servers: vec![
-                        ICEServer {
+                        IceServer {
                             urls: vec!["stun:5.5.5.5:1234".to_string()],
                             username: None,
                             credential: None,
                         },
-                        ICEServer {
+                        IceServer {
                             urls: vec![
                                 "turn:5.5.5.5:1234".to_string(),
                                 "turn:5.5.5.5:1234?transport=tcp".to_string()
@@ -566,12 +573,12 @@ mod test {
                         },
                     ],
                     ice_servers: vec![
-                        ICEServer {
+                        IceServer {
                             urls: vec!["stun:5.5.5.5:1234".to_string()],
                             username: None,
                             credential: None,
                         },
-                        ICEServer {
+                        IceServer {
                             urls: vec![
                                 "turn:5.5.5.5:1234".to_string(),
                                 "turn:5.5.5.5:1234?transport=tcp".to_string()

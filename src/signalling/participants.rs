@@ -24,7 +24,6 @@ use crate::{
             RpcConnectionClosed,
         },
         control::{Member, MemberId},
-        protocol::Event,
     },
     log::prelude::*,
     signalling::{
@@ -180,25 +179,25 @@ impl ParticipantService {
                     member_id,
                     policy: UnreachablePolicy::default(),
                 }))
-                    .map_err(|err, _: &mut Room, _| {
-                        ParticipantServiceErr::from(err)
-                    })
-                    .and_then(move |res, room, _| {
-                        wrap_future(match res {
-                            Ok(ice) => {
-                                if let Some(mut member) =
+                .map_err(|err, _: &mut Room, _| {
+                    ParticipantServiceErr::from(err)
+                })
+                .and_then(move |res, room, _| {
+                    wrap_future(match res {
+                        Ok(ice) => {
+                            if let Some(mut member) =
                                 room.participants.take_member(member_id)
-                                {
-                                    member.ice_user.replace(ice);
-                                    room.participants.insert_member(member);
-                                };
-                                future::ok(())
-                            }
-                            Err(err) => {
-                                future::err(ParticipantServiceErr::from(err))
-                            }
-                        })
-                    }),
+                            {
+                                member.ice_user.replace(ice);
+                                room.participants.insert_member(member);
+                            };
+                            future::ok(())
+                        }
+                        Err(err) => {
+                            future::err(ParticipantServiceErr::from(err))
+                        }
+                    })
+                }),
             )
         }
     }
