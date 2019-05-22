@@ -60,6 +60,7 @@ impl From<PeerStateError> for RoomError {
 }
 
 /// Media server room with its [`Member`]s.
+#[derive(Debug)]
 pub struct Room {
     id: Id,
 

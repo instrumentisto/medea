@@ -23,6 +23,7 @@ use crate::{
 };
 
 /// Long-running WebSocket connection of Client API.
+#[derive(Debug)]
 #[allow(clippy::module_name_repetitions)]
 pub struct WsSession {
     /// ID of [`Member`] that WebSocket connection is associated with.

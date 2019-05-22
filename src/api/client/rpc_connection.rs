@@ -1,5 +1,7 @@
 //! [`RpcConnection`] with related messages.
 
+use core::fmt;
+
 use actix::Message;
 use futures::Future;
 use macro_attr::*;
@@ -21,7 +23,7 @@ macro_attr! {
 }
 
 /// Abstraction over RPC connection with some remote [`Member`].
-pub trait RpcConnection: Send {
+pub trait RpcConnection: fmt::Debug + Send {
     /// Closes [`RpcConnection`].
     /// No [`RpcConnectionClosed`] signals should be emitted.
     /// Always returns success.
@@ -55,7 +57,7 @@ pub enum AuthorizationError {
 
 /// Signal of new [`RpcConnection`] being established with specified [`Member`].
 /// Transport should consider dropping connection if message result is err.
-#[derive(Message)]
+#[derive(Debug, Message)]
 #[rtype(result = "Result<(), ()>")]
 #[allow(clippy::module_name_repetitions)]
 pub struct RpcConnectionEstablished {
@@ -95,7 +97,7 @@ pub mod test {
         System,
     };
     use futures::future::Future;
-    use medea_client_api_proto::{Command, Event, IceCandidate, ServerMsg};
+    use medea_client_api_proto::{Command, Event, IceCandidate};
 
     use crate::{
         api::{
@@ -109,7 +111,7 @@ pub mod test {
     };
 
     /// [`RpcConnection`] impl convenient for testing.
-    #[derive(Clone)]
+    #[derive(Debug, Clone)]
     pub struct TestConnection {
         pub member_id: MemberId,
         pub room: Addr<Room>,

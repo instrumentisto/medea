@@ -11,6 +11,16 @@ use crate::{log::prelude::*, media::IceUser};
 #[allow(clippy::module_name_repetitions)]
 pub struct TurnAuthRepo(Addr<RedisActor>);
 
+impl std::fmt::Debug for TurnAuthRepo {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "TurnAuthRepo {{RedisActor {{connected:{}}}}}",
+            self.0.connected()
+        )
+    }
+}
+
 #[derive(Debug)]
 pub enum TurnRepoErr {
     MailboxError(MailboxError),

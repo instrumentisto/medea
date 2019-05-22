@@ -58,6 +58,7 @@ impl From<MailboxError> for ParticipantServiceErr {
 /// Participant is [`Member`] with [`RpcConnection`]. [`ParticipantService`]
 /// stores [`Members`] and associated [`RpcConnection`]s, handles
 /// [`RpcConnection`] authorization, establishment, message sending.
+#[derive(Debug)]
 pub struct ParticipantService {
     /// [`Member`]s which currently are present in this [`Room`].
     members: HashMap<MemberId, Member>,

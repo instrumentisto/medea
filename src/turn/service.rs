@@ -62,6 +62,7 @@ pub type TurnAuthService = Service;
 pub type TurnAuthService = Mocker<Service>;
 
 /// Manages Turn server credentials.
+#[derive(Debug)]
 pub struct Service {
     /// Address of actor for handle Redis commands.
     turn_db: TurnAuthRepo,

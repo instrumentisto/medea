@@ -91,8 +91,7 @@ pub struct Track {
     pub media_type: MediaType,
 }
 
-/// [`Track`] with specified direction.
-/// Part of configuration for [`RTCPeerConnection`].
+/// Representation of [`iceServers`] field of [`RTCConfiguration`] dictionary.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[cfg_attr(test, derive(PartialEq))]
 pub struct IceServer {
