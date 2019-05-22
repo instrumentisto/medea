@@ -20,7 +20,7 @@ use crate::{
     },
     conf::Conf,
     media::create_peers,
-    signalling::{Room, room_repo::RoomsRepository},
+    signalling::{room_repo::RoomsRepository, Room},
 };
 use hashbrown::HashMap;
 

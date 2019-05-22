@@ -352,6 +352,7 @@ impl Peer<WaitLocalHaveRemote> {
     }
 }
 
+// TODO: remove it
 pub fn create_peers(
     caller: MemberId,
     responder: MemberId,

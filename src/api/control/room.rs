@@ -4,10 +4,10 @@ use serde::Deserialize;
 
 use super::member::MemberRequest;
 
-use std::collections::HashMap;
-use crate::api::control::MemberId;
-use crate::api::control::member::MemberSpec;
 use crate::api::control::element::Element;
+use crate::api::control::member::MemberSpec;
+use crate::api::control::MemberId;
+use std::collections::HashMap;
 
 #[derive(Deserialize, Debug, Clone)]
 /// Spec of [`Room`]

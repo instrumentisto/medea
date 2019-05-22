@@ -8,17 +8,25 @@ use actix::{
 use failure::Fail;
 use futures::future;
 use hashbrown::HashMap;
-use medea_client_api_proto::{Command, Event, IceCandidate, MediaType, AudioSettings, VideoSettings};
+use medea_client_api_proto::{
+    AudioSettings, Command, Event, IceCandidate, MediaType, VideoSettings,
+};
 
 use std::time::Duration;
 
+use crate::api::control::element::Element;
+use crate::api::control::member::MemberSpec;
+use crate::api::control::room::RoomSpec;
+use crate::api::control::RoomRequest;
+use crate::media::MediaTrack;
+use crate::signalling::RoomId;
 use crate::{
     api::{
         client::rpc_connection::{
             AuthorizationError, Authorize, CommandMessage, RpcConnectionClosed,
             RpcConnectionEstablished,
         },
-        control::{Member, MemberId, member::MemberRequest},
+        control::{member::MemberRequest, Member, MemberId},
     },
     log::prelude::*,
     media::{
@@ -27,12 +35,6 @@ use crate::{
     },
     signalling::{participants::ParticipantService, peers::PeerRepository},
 };
-use crate::api::control::member::MemberSpec;
-use crate::api::control::room::RoomSpec;
-use crate::api::control::RoomRequest;
-use crate::signalling::RoomId;
-use crate::api::control::element::Element;
-use crate::media::MediaTrack;
 use std::sync::Arc;
 
 /// ID of [`Room`].
@@ -73,19 +75,18 @@ pub struct Room {
     /// [`Peer`]s of [`Member`]s in this [`Room`].
     peers: PeerRepository,
 
+    // TODO: Add docs
     spec: RoomSpec,
 
-    // TODO: rename
-//    control_signalling_members: HashMap<String, MemberId>,
-//    sdf: HashMap<String, HashMap<String, Element>>,
+    peers_count: u64,
 }
 
 impl Room {
     /// Create new instance of [`Room`].
     pub fn new(
-//        id: Id,
-//        members: HashMap<MemberId, Member>,
-//        peers: HashMap<PeerId, PeerStateMachine>,
+        //        id: Id,
+        //        members: HashMap<MemberId, Member>,
+        //        peers: HashMap<PeerId, PeerStateMachine>,
         spec: RoomRequest,
         reconnect_timeout: Duration,
     ) -> Self {
@@ -95,41 +96,34 @@ impl Room {
         // TODO: Rewrite it only with iterator
         let mut members = HashMap::new();
         let mut control_signalling_members = HashMap::new(); // TODO: rename
-        spec.pipeline.iter()
-            .enumerate()
-            .for_each(|(i, (control_id, value))| {
+        spec.pipeline.iter().enumerate().for_each(
+            |(i, (control_id, value))| {
                 let id = i as u64;
                 if let MemberRequest::Member { spec } = value {
                     let member = Member {
                         id,
                         spec: spec.clone(),
                         credentials: format!("{}-credentials", i),
+                        control_id: control_id.clone(),
                     };
                     control_signalling_members.insert(control_id.clone(), id);
                     members.insert(id, member);
                 }
-            });
+            },
+        );
         debug!("Created room with {:?} users.", members);
-
-//        let mut room_spec = HashMap::new();
-//        spec.pipeline.iter()
-//            .for_each(|(member_id, spec)| {
-//                let spec = match spec {
-//                    MemberRequest::Member { spec } => spec.pipeline
-//                };
-////                let
-////                spec.pipeline
-//                room_spec.insert(member_id.clone(), spec);
-//            });
-
-
 
         Self {
             id,
             peers: PeerRepository::from(HashMap::new()),
-            participants: ParticipantService::new(members, control_signalling_members, reconnect_timeout),
+            participants: ParticipantService::new(
+                members,
+                control_signalling_members,
+                reconnect_timeout,
+            ),
             spec,
-//            control_signalling_members
+            //            control_signalling_members
+            peers_count: 0,
         }
     }
 
@@ -340,9 +334,6 @@ impl Handler<ConnectPeers> for Room {
     }
 }
 
-
-//pub struct CreatePeer(MemberId, MemberSpec);
-
 use std::collections::HashMap as StdHashMap;
 
 #[derive(Debug, Message)]
@@ -351,7 +342,7 @@ pub struct CreatePeer {
     pub first_member_pipeline: StdHashMap<String, Element>,
     pub second_member_pipeline: StdHashMap<String, Element>,
     pub first_signalling_id: MemberId,
-    pub second_signallind_id: MemberId,
+    pub second_signalling_id: MemberId,
 }
 
 impl Handler<CreatePeer> for Room {
@@ -362,15 +353,30 @@ impl Handler<CreatePeer> for Room {
         msg: CreatePeer,
         ctx: &mut Self::Context,
     ) -> Self::Result {
-        debug!("Created peer member {} with member {}", msg.first_signalling_id, msg.second_signallind_id);
+        // TODO: Think about usefulness
+        debug!(
+            "Created peer member {} with member {}",
+            msg.first_signalling_id, msg.second_signalling_id
+        );
 
+        // TODO: Maybe need another implementation of dynamic peer ids?
+        let first_peer_id = self.peers_count;
+        self.peers_count += 1;
+        let second_peer_id = self.peers_count;
+        self.peers_count += 1;
 
-        // TODO: Make dynamic
-        let first_peer_id = 1;
-        let second_peer_id = 2;
-
-        let mut first_peer = Peer::new(first_peer_id, msg.first_signalling_id, second_peer_id, msg.second_signallind_id);
-        let mut second_peer = Peer::new(second_peer_id, msg.second_signallind_id, first_peer_id, msg.first_signalling_id);
+        let mut first_peer = Peer::new(
+            first_peer_id,
+            msg.first_signalling_id,
+            second_peer_id,
+            msg.second_signalling_id,
+        );
+        let mut second_peer = Peer::new(
+            second_peer_id,
+            msg.second_signalling_id,
+            first_peer_id,
+            msg.first_signalling_id,
+        );
 
         let track_audio =
             Arc::new(MediaTrack::new(1, MediaType::Audio(AudioSettings {})));
@@ -527,6 +533,7 @@ mod test {
 
     use super::*;
 
+    // TODO: Fix this
     fn start_room() -> Addr<Room> {
         let members = hashmap! {
             1 => Member{id: 1, credentials: "caller_credentials".to_owned()},

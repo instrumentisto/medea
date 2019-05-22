@@ -1,0 +1,57 @@
+kind: Room
+id: 1
+spec:
+  pipeline:
+    # Here we're defining a member who initiates video call.
+    caller:
+      kind: Member
+      spec:
+        pipeline:
+          # Media element which is able to receive media data from client via WebRTC.
+          publish:
+            kind: WebRtcPublishEndpoint
+            spec:
+              # Actually, it receives not media data, but ICE candidates only.
+              p2p: Always
+          # Media element which is able to play media data for client via WebRTC.
+          play:
+            kind: WebRtcPlayEndpoint
+            spec:
+              src: "local://video-call-2/responder/publish"
+          play2:
+            kind: WebRtcPlayEndpoint
+            spec:
+              src: "local://video-call-2/responder2/publish"
+    responder:
+      kind: Member
+      spec:
+        pipeline:
+          publish:
+            kind: WebRtcPublishEndpoint
+            spec:
+              p2p: Always
+          play1:
+            kind: WebRtcPlayEndpoint
+            spec:
+              src: "local://video-call-2/caller/publish"
+          play2:
+            kind: WebRtcPlayEndpoint
+            spec:
+              src: "local://video-call-2/responder2/publish"
+
+    responder2:
+      kind: Member
+      spec:
+        pipeline:
+          publish:
+            kind: WebRtcPublishEndpoint
+            spec:
+              p2p: Always
+          play1:
+            kind: WebRtcPlayEndpoint
+            spec:
+              src: "local://video-call-2/caller/publish"
+          play2:
+            kind: WebRtcPlayEndpoint
+            spec:
+              src: "local://video-call-2/responder/publish"

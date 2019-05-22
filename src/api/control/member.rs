@@ -19,6 +19,8 @@ pub struct Member {
     pub credentials: String,
 
     pub spec: MemberSpec,
+
+    pub control_id: String,
 }
 
 #[derive(Deserialize, Debug, Clone)]

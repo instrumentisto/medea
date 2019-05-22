@@ -6,6 +6,11 @@ async function f() {
     // let caller_room_handle = await caller.join_room("ws://localhost:8080/ws/1/1/caller_credentials");
     caller.join_room("ws://localhost:8080/ws/1/0/0-credentials");
     caller.join_room("ws://localhost:8080/ws/1/1/1-credentials");
+
+    // Use this for testing with 3 members.
+    // caller.join_room("ws://localhost:8080/ws/1/2/2-credentials");
+
+
     // caller.join_room("ws://localhost:8080/ws/1/2/responder_credentials");
     // let responder = new rust.Jason();
 

@@ -12,6 +12,8 @@ use futures::{
 use hashbrown::HashMap;
 use medea_client_api_proto::Event;
 
+use crate::api::control::element::Element;
+use crate::signalling::room::{ConnectPeers, CreatePeer};
 use crate::{
     api::{
         client::rpc_connection::{
@@ -26,8 +28,6 @@ use crate::{
         Room,
     },
 };
-use crate::api::control::element::Element;
-use crate::signalling::room::{ConnectPeers, CreatePeer};
 
 /// Participant is [`Member`] with [`RpcConnection`]. [`ParticipantService`]
 /// stores [`Members`] and associated [`RpcConnection`]s, handles
@@ -52,6 +52,8 @@ pub struct ParticipantService {
     drop_connection_tasks: HashMap<MemberId, SpawnHandle>,
 
     control_signalling_members: HashMap<String, MemberId>,
+
+    responder_awaiting_connection: HashMap<String, Vec<MemberId>>,
 }
 
 impl ParticipantService {
@@ -66,6 +68,7 @@ impl ParticipantService {
             reconnect_timeout,
             drop_connection_tasks: HashMap::new(),
             control_signalling_members,
+            responder_awaiting_connection: HashMap::new(),
         }
     }
 
@@ -172,33 +175,108 @@ impl ParticipantService {
             }
             ctx.spawn(wrap_future(connection.close()));
         } else {
-            let connected_member_pipeline = self.members.get(&member_id).unwrap();
-            connected_member_pipeline.spec.pipeline.iter()
-                .filter_map(|(connected_element_id, connected_element)| match connected_element {
-                    Element::WebRtcPlayEndpoint { spec } => Some(spec),
-                    _ => None
+            // TODO: Think about deletion
+            debug!("Connected member: {}", member_id);
+            debug!(
+                "Current awaiters: {:?}",
+                self.responder_awaiting_connection
+            );
+
+            // TODO: Very need serious refactor
+            let connected_member_pipeline =
+                self.members.get(&member_id).unwrap().clone();
+            connected_member_pipeline
+                .spec
+                .pipeline
+                .iter()
+                .filter_map(|(connected_element_id, connected_element)| {
+                    match connected_element {
+                        Element::WebRtcPlayEndpoint { spec } => Some(spec),
+                        _ => None,
+                    }
                 })
+                .cloned()
                 .for_each(|connected_play_endpoint| {
-                    match self.control_signalling_members.get(&connected_play_endpoint.src.member_id) {
-                        // connected_play_endpoint, connected_signalling_id, responder_signalling_id, connected_member_pipeline
+                    let responder_signalling_id = self
+                        .control_signalling_members
+                        .get(&connected_play_endpoint.src.member_id)
+                        .unwrap();
+                    let is_responder_connected =
+                        self.connections.get(responder_signalling_id).is_some();
 
-                        // AVAILABLE: connected_member_pipeline, connected_signalling_id, connected_signalling_id
-                        // NEED: responder_pipeline
-                        // responder_pipeline = self.members.get(&responder_signalling_id).unwrap()
+                    let this_name = self
+                        .members
+                        .get(&member_id)
+                        .unwrap()
+                        .control_id
+                        .clone();
 
-
-
-                        Some(responder_signalling_id) => {
+                    if let Some(awaiters) =
+                        self.responder_awaiting_connection.get(&this_name)
+                    {
+                        awaiters.iter().for_each(|a| {
                             ctx.notify(CreatePeer {
-                                first_member_pipeline: self.members.get(&member_id).unwrap().spec.pipeline.clone(),
-                                second_member_pipeline: self.members.get(&responder_signalling_id).unwrap().spec.pipeline.clone(),
-                                first_signalling_id: member_id,
-                                second_signallind_id: *responder_signalling_id,
+                                first_member_pipeline: self
+                                    .members
+                                    .get(a)
+                                    .unwrap()
+                                    .spec
+                                    .pipeline
+                                    .clone(),
+                                second_member_pipeline: self
+                                    .members
+                                    .get(&member_id)
+                                    .unwrap()
+                                    .spec
+                                    .pipeline
+                                    .clone(),
+                                second_signalling_id: member_id,
+                                first_signalling_id: *a,
                             });
-                        },
-                        None => ()
+                        });
+                        self.responder_awaiting_connection.remove(&this_name);
                     };
+
+                    if is_responder_connected {
+                        ctx.notify(CreatePeer {
+                            first_member_pipeline: self
+                                .members
+                                .get(&member_id)
+                                .unwrap()
+                                .spec
+                                .pipeline
+                                .clone(),
+                            second_member_pipeline: self
+                                .members
+                                .get(&responder_signalling_id)
+                                .unwrap()
+                                .spec
+                                .pipeline
+                                .clone(),
+                            first_signalling_id: member_id,
+                            second_signalling_id: *responder_signalling_id,
+                        });
+                    } else {
+                        match self
+                            .responder_awaiting_connection
+                            .get_mut(&connected_play_endpoint.src.member_id)
+                        {
+                            Some(awaiter) => {
+                                awaiter.push(member_id);
+                            }
+                            None => {
+                                self.responder_awaiting_connection.insert(
+                                    connected_play_endpoint
+                                        .src
+                                        .member_id
+                                        .clone(),
+                                    vec![member_id],
+                                );
+                            }
+                        }
+                    }
                 });
+
             self.connections.insert(member_id, con);
         }
     }

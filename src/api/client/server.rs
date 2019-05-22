@@ -17,7 +17,7 @@ use crate::{
     },
     conf::{Conf, Rpc},
     log::prelude::*,
-    signalling::{RoomId, room_repo::RoomsRepository},
+    signalling::{room_repo::RoomsRepository, RoomId},
 };
 
 /// Parameters of new WebSocket connection creation HTTP request.
@@ -120,7 +120,8 @@ mod test {
 
     /// Creates [`RoomsRepository`] for tests filled with a single [`Room`].
     fn room(conf: Rpc) -> RoomsRepository {
-        let room_spec = crate::api::control::load_from_file("room_spec.yml").unwrap();
+        let room_spec =
+            crate::api::control::load_from_file("room_spec.yml").unwrap();
 
         println!("{:#?}", room_spec);
 
