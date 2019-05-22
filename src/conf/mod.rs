@@ -11,7 +11,7 @@ use config::{Config, Environment, File};
 use failure::Error;
 use serde::{Deserialize, Serialize};
 
-pub use self::{rpc::Rpc, turn::Turn, server::Server, turn::Turn};
+pub use self::{redis::Redis, rpc::Rpc, server::Server, turn::Turn};
 
 /// CLI argument that is responsible for holding application configuration
 /// file path.
@@ -80,6 +80,7 @@ mod tests {
     use std::{fs, time::Duration};
 
     use super::*;
+    use std::net::Ipv4Addr;
 
     #[test]
     #[serial]
@@ -190,5 +191,41 @@ mod tests {
         assert_eq!(file_config.rpc.idle_timeout, Duration::from_secs(47));
 
         assert_eq!(file_env_config.rpc.idle_timeout, Duration::from_secs(48));
+    }
+
+    #[test]
+    #[serial]
+    fn redis_conf_test() {
+        let default_conf = Conf::default();
+
+        env::set_var("MEDEA_REDIS.IP", "5.5.5.5");
+        env::set_var("MEDEA_REDIS.PORT", "1234");
+
+        let env_conf = Conf::parse().unwrap();
+
+        assert_ne!(default_conf.redis.ip, env_conf.redis.ip);
+        assert_ne!(default_conf.redis.port, env_conf.redis.port);
+
+        assert_eq!(env_conf.redis.ip, Ipv4Addr::new(5, 5, 5, 5));
+        assert_eq!(env_conf.redis.port, 1234);
+        assert_eq!(env_conf.redis.get_addr(), "5.5.5.5:1234".parse().unwrap(),);
+    }
+
+    #[test]
+    #[serial]
+    fn turn_conf_test() {
+        let default_conf = Conf::default();
+
+        env::set_var("MEDEA_TURN.IP", "5.5.5.5");
+        env::set_var("MEDEA_TURN.PORT", "1234");
+
+        let env_conf = Conf::parse().unwrap();
+
+        assert_ne!(default_conf.turn.ip, env_conf.turn.ip);
+        assert_ne!(default_conf.turn.port, env_conf.turn.port);
+
+        assert_eq!(env_conf.turn.ip, Ipv4Addr::new(5, 5, 5, 5));
+        assert_eq!(env_conf.turn.port, 1234);
+        assert_eq!(env_conf.turn.get_addr(), "5.5.5.5:1234".parse().unwrap());
     }
 }
