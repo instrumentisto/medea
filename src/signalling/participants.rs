@@ -26,6 +26,8 @@ use crate::{
         Room,
     },
 };
+use crate::api::control::element::Element;
+use crate::signalling::room::{ConnectPeers, CreatePeer};
 
 /// Participant is [`Member`] with [`RpcConnection`]. [`ParticipantService`]
 /// stores [`Members`] and associated [`RpcConnection`]s, handles
@@ -48,11 +50,14 @@ pub struct ParticipantService {
     /// If [`RpcConnection`] is lost, [`Room`] waits for connection_timeout
     /// before dropping it irrevocably in case it gets reestablished.
     drop_connection_tasks: HashMap<MemberId, SpawnHandle>,
+
+    control_signalling_members: HashMap<String, MemberId>,
 }
 
 impl ParticipantService {
     pub fn new(
         members: HashMap<MemberId, Member>,
+        control_signalling_members: HashMap<String, MemberId>,
         reconnect_timeout: Duration,
     ) -> Self {
         Self {
@@ -60,6 +65,7 @@ impl ParticipantService {
             connections: HashMap::new(),
             reconnect_timeout,
             drop_connection_tasks: HashMap::new(),
+            control_signalling_members,
         }
     }
 
@@ -153,6 +159,7 @@ impl ParticipantService {
         member_id: MemberId,
         con: Box<dyn RpcConnection>,
     ) {
+        use std::convert::TryFrom;
         // lookup previous member connection
         if let Some(mut connection) = self.connections.remove(&member_id) {
             debug!("Closing old RpcConnection for member {}", member_id);
@@ -165,6 +172,33 @@ impl ParticipantService {
             }
             ctx.spawn(wrap_future(connection.close()));
         } else {
+            let connected_member_pipeline = self.members.get(&member_id).unwrap();
+            connected_member_pipeline.spec.pipeline.iter()
+                .filter_map(|(connected_element_id, connected_element)| match connected_element {
+                    Element::WebRtcPlayEndpoint { spec } => Some(spec),
+                    _ => None
+                })
+                .for_each(|connected_play_endpoint| {
+                    match self.control_signalling_members.get(&connected_play_endpoint.src.member_id) {
+                        // connected_play_endpoint, connected_signalling_id, responder_signalling_id, connected_member_pipeline
+
+                        // AVAILABLE: connected_member_pipeline, connected_signalling_id, connected_signalling_id
+                        // NEED: responder_pipeline
+                        // responder_pipeline = self.members.get(&responder_signalling_id).unwrap()
+
+
+
+                        Some(responder_signalling_id) => {
+                            ctx.notify(CreatePeer {
+                                first_member_pipeline: self.members.get(&member_id).unwrap().spec.pipeline.clone(),
+                                second_member_pipeline: self.members.get(&responder_signalling_id).unwrap().spec.pipeline.clone(),
+                                first_signalling_id: member_id,
+                                second_signallind_id: *responder_signalling_id,
+                            });
+                        },
+                        None => ()
+                    };
+                });
             self.connections.insert(member_id, con);
         }
     }

@@ -1,7 +1,7 @@
 //! Implementation of Control API.
 
-mod element;
-mod member;
+pub mod element;
+pub mod member;
 
 pub mod room;
 

@@ -8,7 +8,7 @@ use actix::{
 use failure::Fail;
 use futures::future;
 use hashbrown::HashMap;
-use medea_client_api_proto::{Command, Event, IceCandidate};
+use medea_client_api_proto::{Command, Event, IceCandidate, MediaType, AudioSettings, VideoSettings};
 
 use std::time::Duration;
 
@@ -18,7 +18,7 @@ use crate::{
             AuthorizationError, Authorize, CommandMessage, RpcConnectionClosed,
             RpcConnectionEstablished,
         },
-        control::{Member, MemberId},
+        control::{Member, MemberId, member::MemberRequest},
     },
     log::prelude::*,
     media::{
@@ -27,6 +27,13 @@ use crate::{
     },
     signalling::{participants::ParticipantService, peers::PeerRepository},
 };
+use crate::api::control::member::MemberSpec;
+use crate::api::control::room::RoomSpec;
+use crate::api::control::RoomRequest;
+use crate::signalling::RoomId;
+use crate::api::control::element::Element;
+use crate::media::MediaTrack;
+use std::sync::Arc;
 
 /// ID of [`Room`].
 pub type Id = u64;
@@ -65,21 +72,69 @@ pub struct Room {
 
     /// [`Peer`]s of [`Member`]s in this [`Room`].
     peers: PeerRepository,
+
+    spec: RoomSpec,
+
+    // TODO: rename
+//    control_signalling_members: HashMap<String, MemberId>,
+//    sdf: HashMap<String, HashMap<String, Element>>,
 }
 
 impl Room {
     /// Create new instance of [`Room`].
     pub fn new(
-        id: Id,
-        members: HashMap<MemberId, Member>,
-        peers: HashMap<PeerId, PeerStateMachine>,
+//        id: Id,
+//        members: HashMap<MemberId, Member>,
+//        peers: HashMap<PeerId, PeerStateMachine>,
+        spec: RoomRequest,
         reconnect_timeout: Duration,
     ) -> Self {
+        let (id, spec) = match spec {
+            RoomRequest::Room { id, spec } => (id, spec),
+        };
+        // TODO: Rewrite it only with iterator
+        let mut members = HashMap::new();
+        let mut control_signalling_members = HashMap::new(); // TODO: rename
+        spec.pipeline.iter()
+            .enumerate()
+            .for_each(|(i, (control_id, value))| {
+                let id = i as u64;
+                if let MemberRequest::Member { spec } = value {
+                    let member = Member {
+                        id,
+                        spec: spec.clone(),
+                        credentials: format!("{}-credentials", i),
+                    };
+                    control_signalling_members.insert(control_id.clone(), id);
+                    members.insert(id, member);
+                }
+            });
+        debug!("Created room with {:?} users.", members);
+
+//        let mut room_spec = HashMap::new();
+//        spec.pipeline.iter()
+//            .for_each(|(member_id, spec)| {
+//                let spec = match spec {
+//                    MemberRequest::Member { spec } => spec.pipeline
+//                };
+////                let
+////                spec.pipeline
+//                room_spec.insert(member_id.clone(), spec);
+//            });
+
+
+
         Self {
             id,
-            peers: PeerRepository::from(peers),
-            participants: ParticipantService::new(members, reconnect_timeout),
+            peers: PeerRepository::from(HashMap::new()),
+            participants: ParticipantService::new(members, control_signalling_members, reconnect_timeout),
+            spec,
+//            control_signalling_members
         }
+    }
+
+    pub fn get_id(&self) -> RoomId {
+        self.id
     }
 
     /// Sends [`Event::PeerCreated`] to one of specified [`Peer`]s based on
@@ -282,6 +337,54 @@ impl Handler<ConnectPeers> for Room {
                 Box::new(wrap_future(future::ok(())))
             }
         }
+    }
+}
+
+
+//pub struct CreatePeer(MemberId, MemberSpec);
+
+use std::collections::HashMap as StdHashMap;
+
+#[derive(Debug, Message)]
+#[rtype(result = "Result<(), ()>")]
+pub struct CreatePeer {
+    pub first_member_pipeline: StdHashMap<String, Element>,
+    pub second_member_pipeline: StdHashMap<String, Element>,
+    pub first_signalling_id: MemberId,
+    pub second_signallind_id: MemberId,
+}
+
+impl Handler<CreatePeer> for Room {
+    type Result = Result<(), ()>;
+
+    fn handle(
+        &mut self,
+        msg: CreatePeer,
+        ctx: &mut Self::Context,
+    ) -> Self::Result {
+        debug!("Created peer member {} with member {}", msg.first_signalling_id, msg.second_signallind_id);
+
+
+        // TODO: Make dynamic
+        let first_peer_id = 1;
+        let second_peer_id = 2;
+
+        let mut first_peer = Peer::new(first_peer_id, msg.first_signalling_id, second_peer_id, msg.second_signallind_id);
+        let mut second_peer = Peer::new(second_peer_id, msg.second_signallind_id, first_peer_id, msg.first_signalling_id);
+
+        let track_audio =
+            Arc::new(MediaTrack::new(1, MediaType::Audio(AudioSettings {})));
+        let track_video =
+            Arc::new(MediaTrack::new(2, MediaType::Video(VideoSettings {})));
+        first_peer.add_sender(track_audio.clone());
+        first_peer.add_sender(track_video.clone());
+        second_peer.add_receiver(track_audio);
+        second_peer.add_receiver(track_video);
+
+        self.peers.add_peer(first_peer_id, first_peer);
+        self.peers.add_peer(second_peer_id, second_peer);
+
+        Ok(())
     }
 }
 

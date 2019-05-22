@@ -14,11 +14,10 @@ use crate::{
             session::WsSession,
         },
         control::MemberId,
-        room_repo::RoomRepository,
     },
     conf::{Conf, Rpc},
     log::prelude::*,
-    signalling::RoomId,
+    signalling::{RoomId, room_repo::RoomsRepository},
 };
 
 /// Parameters of new WebSocket connection creation HTTP request.
@@ -45,7 +44,6 @@ fn ws_index(
 
     match state.rooms.get(info.room_id) {
         Some(room) => room
-            .client_room
             .send(Authorize {
                 member_id: info.member_id,
                 credentials: info.credentials.clone(),
@@ -56,7 +54,7 @@ fn ws_index(
                     &r.drop_state(),
                     WsSession::new(
                         info.member_id,
-                        room.client_room,
+                        room,
                         state.config.idle_timeout,
                     ),
                 ),
@@ -75,14 +73,14 @@ fn ws_index(
 /// Context for [`App`] which holds all the necessary dependencies.
 pub struct Context {
     /// Repository of all currently existing [`Room`]s in application.
-    pub rooms: RoomRepository,
+    pub rooms: RoomsRepository,
 
     /// Settings of application.
     pub config: Rpc,
 }
 
 /// Starts HTTP server for handling WebSocket connections of Client API.
-pub fn run(rooms: RoomRepository, config: Conf) {
+pub fn run(rooms: RoomsRepository, config: Conf) {
     let server_addr = config.server.get_bind_addr();
 
     server::new(move || {
@@ -121,27 +119,19 @@ mod test {
     use crate::api::{control::RoomRequest, room_repo::ControlRoom};
 
     /// Creates [`RoomsRepository`] for tests filled with a single [`Room`].
-    fn room(conf: Rpc) -> RoomRepository {
-        let members = hashmap! {
-            1 => Member{id: 1, credentials: "caller_credentials".into()},
-            2 => Member{id: 2, credentials: "responder_credentials".into()},
+    fn room(conf: Rpc) -> RoomsRepository {
+        let room_spec = crate::api::control::load_from_file("room_spec.yml").unwrap();
+
+        println!("{:#?}", room_spec);
+
+        let client_room = Room::new(room_spec, config.rpc.reconnect_timeout);
+        let room_id = client_room.get_id();
+        let client_room = Arbiter::start(move |_| client_room);
+        let room_hash_map = hashmap! {
+            room_id => client_room,
         };
-        let (id, room_spec) =
-            match crate::api::control::load_from_file("room_spec.yml").unwrap()
-            {
-                RoomRequest::Room { id, spec } => (id, spec),
-            };
-        let client_room = Arbiter::start(move |_| {
-            Room::new(id, members, create_peers(1, 2), conf.reconnect_timeout)
-        });
-        let room = ControlRoom {
-            client_room,
-            spec: room_spec,
-        };
-        let rooms = hashmap! {
-            1 => room
-        };
-        RoomRepository::new(rooms)
+
+        RoomsRepository::new(room_hash_map)
     }
 
     /// Creates test WebSocket server of Client API which can handle requests.

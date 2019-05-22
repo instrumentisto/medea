@@ -17,12 +17,12 @@ use crate::{
         client::server,
         control::Member,
         control::{load_from_file, RoomRequest},
-        room_repo::{ControlRoom, RoomRepository},
     },
     conf::Conf,
     media::create_peers,
-    signalling::Room,
+    signalling::{Room, room_repo::RoomsRepository},
 };
+use hashbrown::HashMap;
 
 fn main() {
     dotenv().ok();
@@ -35,29 +35,19 @@ fn main() {
     let config = Conf::parse().unwrap();
     info!("{:?}", config);
 
-    let (id, room_spec) = match load_from_file("room_spec.yml").unwrap() {
-        RoomRequest::Room { id, spec } => (id, spec),
-    };
+    let room_spec = load_from_file("room_spec.yml").unwrap();
 
     println!("{:#?}", room_spec);
 
-    let members = hashmap! {
-        1 => Member{id: 1, credentials: "caller_credentials".to_owned()},
-        2 => Member{id: 2, credentials: "responder_credentials".to_owned()},
-    };
-    let peers = create_peers(1, 2);
-    let client_room =
-        Room::new(id, members, peers, config.rpc.reconnect_timeout);
+    let client_room = Room::new(room_spec, config.rpc.reconnect_timeout);
+    let room_id = client_room.get_id();
     let client_room = Arbiter::start(move |_| client_room);
-
-    let control_room = ControlRoom {
-        client_room,
-        spec: room_spec,
+    let room_hash_map = hashmap! {
+        room_id => client_room,
     };
-    let rooms = hashmap! {id => control_room};
 
-    let room_repo = RoomRepository::new(rooms);
+    let room_repo = RoomsRepository::new(room_hash_map);
 
-    server::run(room_repo.clone(), config);
+    server::run(room_repo, config);
     let _ = sys.run();
 }

@@ -17,6 +17,8 @@ pub struct Member {
 
     /// Credentials to authorize [`Member`] with.
     pub credentials: String,
+
+    pub spec: MemberSpec,
 }
 
 #[derive(Deserialize, Debug, Clone)]
