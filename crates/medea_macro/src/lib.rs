@@ -15,15 +15,11 @@ use proc_macro::TokenStream;
 ///
 /// # How to use
 ///
-/// ```
-/// # use medea_macro::enum_delegate;
-/// #[enum_delegate(pub fn some_value(&self) -> i32)]
-/// #[enum_delegate(
-///     pub fn function_with_additional_args(&self, some_arg: i32) -> i32
-/// )]
-/// #[enum_delegate(pub fn mutable_function(&mut self) -> i32)]
+/// ```ignore
+/// #[enum_delegate(/* The header of the function to be delegated. */)]
 /// enum SomeStateMachine {
-///     // ...
+///     FirstState(/* An internal object whose functions will be delegated. */),
+///     SecondState(/* An internal object whose functions will be delegated. */)
 /// }
 /// ```
 ///
