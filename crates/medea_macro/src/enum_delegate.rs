@@ -21,9 +21,27 @@ pub fn derive(args: &TokenStream, input: TokenStream) -> TokenStream {
         _ => panic!("This macro should be used only with enums!"),
     };
 
+    if variants.is_empty() {
+        panic!("You provided empty enum!")
+    }
+
     // This is for easy parsing function declaration by default syn parser.
     let arg_function = format!("{} {{ }}", args.to_string());
     let mut function: syn::ItemFn = syn::parse_str(&arg_function).unwrap();
+
+    let selfs_count = function
+        .decl
+        .inputs
+        .iter()
+        .filter(|i| match i {
+            syn::FnArg::SelfValue(_) | syn::FnArg::SelfRef(_) => true,
+            _ => false,
+        })
+        .count();
+    if selfs_count == 0 {
+        panic!("Static functions not supported!");
+    }
+
     let function_ident = iter::repeat(function.ident.clone());
     // Iterator over captured function args
     let function_args =
