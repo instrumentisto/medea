@@ -7,13 +7,9 @@ pub mod room;
 mod pipeline;
 
 use failure::Error;
-use serde::Deserialize;
-use std::{
-    fs::File,
-    io::Read as _,
-    convert::TryFrom as _,
-};
 use failure::Fail;
+use serde::Deserialize;
+use std::{convert::TryFrom as _, fs::File, io::Read as _};
 
 use self::{
     element::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},

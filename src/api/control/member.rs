@@ -1,17 +1,10 @@
 //! Member definitions and implementations.
 
 use serde::Deserialize;
-use std::{
-    collections::HashMap,
-    convert::TryFrom,
-};
+use std::{collections::HashMap, convert::TryFrom};
 
-use super::{
-    element::Element,
-    pipeline::Pipeline,
-    Entity,
-    TryFromEntityError,
-};
+use super::{element::Element, pipeline::Pipeline, Entity, TryFromEntityError};
+use crate::api::control::element::WebRtcPlayEndpoint;
 
 pub type Id = u64;
 
@@ -37,6 +30,18 @@ impl MemberSpec {
         id: &str,
     ) -> Option<Result<Element, TryFromEntityError>> {
         Some(Element::try_from(self.0.pipeline.get(id).cloned()?))
+    }
+
+    pub fn get_play_endpoints(&self) -> Vec<WebRtcPlayEndpoint> {
+        self.0
+            .pipeline
+            .iter()
+            .filter_map(|(name, e)| match e {
+                Entity::WebRtcPlayEndpoint { spec } => Some(spec),
+                _ => None,
+            })
+            .cloned()
+            .collect()
     }
 }
 

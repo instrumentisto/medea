@@ -335,11 +335,14 @@ use std::collections::HashMap as StdHashMap;
 
 #[derive(Debug, Message)]
 #[rtype(result = "Result<(), ()>")]
+// TODO: maybe fewer fields???
 pub struct CreatePeer {
-    pub first_member_pipeline: StdHashMap<String, Element>,
-    pub second_member_pipeline: StdHashMap<String, Element>,
-    pub first_signalling_id: MemberId,
-    pub second_signalling_id: MemberId,
+    pub caller_signalling_id: MemberId,
+    pub responder_signalling_id: MemberId,
+    pub caller_spec: MemberSpec,
+    pub responder_spec: MemberSpec,
+    pub caller_control_id: String,
+    pub responder_control_id: String,
 }
 
 impl Handler<CreatePeer> for Room {
@@ -353,41 +356,75 @@ impl Handler<CreatePeer> for Room {
         // TODO: Think about usefulness
         debug!(
             "Created peer member {} with member {}",
-            msg.first_signalling_id, msg.second_signalling_id
+            msg.caller_signalling_id, msg.responder_signalling_id
         );
 
         // TODO: Maybe need another implementation of dynamic peer ids?
-        let first_peer_id = self.peers_count;
+        let caller_peer_id = self.peers_count;
         self.peers_count += 1;
-        let second_peer_id = self.peers_count;
+        let responder_peer_id = self.peers_count;
         self.peers_count += 1;
 
-        let mut first_peer = Peer::new(
-            first_peer_id,
-            msg.first_signalling_id,
-            second_peer_id,
-            msg.second_signalling_id,
+        let mut caller_peer = Peer::new(
+            caller_peer_id,
+            msg.caller_signalling_id,
+            responder_peer_id,
+            msg.responder_signalling_id,
+        );
+        let mut responder_peer = Peer::new(
+            responder_peer_id,
+            msg.responder_signalling_id,
+            caller_peer_id,
+            msg.caller_signalling_id,
         );
 
-        let mut second_peer = Peer::new(
-            second_peer_id,
-            msg.second_signalling_id,
-            first_peer_id,
-            msg.first_signalling_id,
-        );
+        let mut last_track_id = 0;
 
-        let track_audio =
-            Arc::new(MediaTrack::new(1, MediaType::Audio(AudioSettings {})));
-        let track_video =
-            Arc::new(MediaTrack::new(2, MediaType::Video(VideoSettings {})));
-        first_peer.add_sender(track_audio.clone());
-        first_peer.add_sender(track_video.clone());
-        second_peer.add_receiver(track_audio);
-        second_peer.add_receiver(track_video);
+        // TODO: remove boilerplate
+        for endpoint in msg.caller_spec.get_play_endpoints().into_iter() {
+            if endpoint.src.member_id == msg.responder_control_id {
+                last_track_id += 1;
+                let track_audio = Arc::new(MediaTrack::new(
+                    last_track_id,
+                    MediaType::Audio(AudioSettings {}),
+                ));
+                last_track_id += 1;
+                let track_video = Arc::new(MediaTrack::new(
+                    last_track_id,
+                    MediaType::Video(VideoSettings {}),
+                ));
 
-        self.peers.add_peer(first_peer_id, first_peer);
-        self.peers.add_peer(second_peer_id, second_peer);
+                responder_peer.add_sender(track_audio.clone());
+                responder_peer.add_sender(track_video.clone());
+                caller_peer.add_receiver(track_audio);
+                caller_peer.add_receiver(track_video);
+            }
+        }
 
+        for endpoint in msg.responder_spec.get_play_endpoints().into_iter() {
+            if endpoint.src.member_id == msg.caller_control_id {
+                last_track_id += 1;
+                let track_audio = Arc::new(MediaTrack::new(
+                    last_track_id,
+                    MediaType::Audio(AudioSettings {}),
+                ));
+                last_track_id += 1;
+                let track_video = Arc::new(MediaTrack::new(
+                    last_track_id,
+                    MediaType::Video(VideoSettings {}),
+                ));
+
+                caller_peer.add_sender(track_audio.clone());
+                caller_peer.add_sender(track_video.clone());
+                responder_peer.add_receiver(track_audio);
+                responder_peer.add_receiver(track_video);
+            }
+        }
+
+        self.peers.add_peer(caller_peer_id, caller_peer);
+        self.peers.add_peer(responder_peer_id, responder_peer);
+
+        // TODO: remove this
         println!("Peers: {:#?}", self.peers);
 
         Ok(())

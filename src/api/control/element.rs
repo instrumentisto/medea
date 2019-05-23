@@ -4,10 +4,7 @@ use serde::{
     de::{self, Deserializer, Error, Visitor},
     Deserialize,
 };
-use std::{
-    convert::TryFrom,
-    fmt,
-};
+use std::{convert::TryFrom, fmt};
 
 #[derive(Debug)]
 pub enum Element {

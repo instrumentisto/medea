@@ -53,9 +53,6 @@ pub struct ParticipantService {
 
     // TODO: Need rename
     control_signalling_members: HashMap<String, MemberId>,
-
-    // TODO: Need rename
-    responder_awaiting_connection: HashMap<String, Vec<MemberId>>,
 }
 
 impl ParticipantService {
@@ -70,7 +67,6 @@ impl ParticipantService {
             reconnect_timeout,
             drop_connection_tasks: HashMap::new(),
             control_signalling_members,
-            responder_awaiting_connection: HashMap::new(),
         }
     }
 
@@ -177,14 +173,51 @@ impl ParticipantService {
             }
             ctx.spawn(wrap_future(connection.close()));
         } else {
-            // TODO: Think about deletion
             debug!("Connected member: {}", member_id);
-            debug!(
-                "Current awaiters: {:?}",
-                self.responder_awaiting_connection
-            );
 
-            // TODO: Rewrite Peer connection
+            let connected_member = self.members.get(&member_id).unwrap();
+            let connected_member_play_endpoints =
+                connected_member.spec.get_play_endpoints();
+            for connected_member_endpoint in connected_member_play_endpoints {
+                let responder_member_control_id =
+                    connected_member_endpoint.src.member_id;
+                let responder_member_signalling_id = match self
+                    .control_signalling_members
+                    .get(&responder_member_control_id)
+                {
+                    Some(r) => r,
+                    None => {
+                        warn!(
+                            "Member with control id '{}' not found! Probably \
+                             this is error in spec.",
+                            responder_member_control_id
+                        );
+                        continue;
+                    }
+                };
+
+                let is_responder_connected = self
+                    .connections
+                    .get(&responder_member_signalling_id)
+                    .is_some();
+                if is_responder_connected {
+                    ctx.notify(CreatePeer {
+                        caller_signalling_id: *responder_member_signalling_id,
+                        caller_spec: self
+                            .members
+                            .get(&responder_member_signalling_id)
+                            .unwrap()
+                            .spec
+                            .clone(),
+                        responder_signalling_id: connected_member.id,
+                        responder_spec: connected_member.spec.clone(),
+                        caller_control_id: responder_member_control_id,
+                        responder_control_id: connected_member
+                            .control_id
+                            .clone(),
+                    });
+                }
+            }
 
             self.connections.insert(member_id, con);
         }

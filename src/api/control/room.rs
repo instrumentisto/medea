@@ -3,10 +3,7 @@
 use std::convert::TryFrom;
 
 use super::{
-    Entity,
-    TryFromEntityError,
-    member::MemberSpec,
-    pipeline::Pipeline,
+    member::MemberSpec, pipeline::Pipeline, Entity, TryFromEntityError,
 };
 
 use crate::signalling::RoomId;
