@@ -26,6 +26,7 @@ use crate::{
         Room,
     },
 };
+use crate::api::control::member::MemberSpec;
 
 /// Participant is [`Member`] with [`RpcConnection`]. [`ParticipantService`]
 /// stores [`Members`] and associated [`RpcConnection`]s, handles
@@ -51,6 +52,15 @@ pub struct ParticipantService {
 
     // TODO: Need rename
     control_signalling_members: HashMap<String, MemberId>,
+
+    members_awaiting_connection: HashMap<u64, NewPeer>,
+}
+
+#[derive(Debug)]
+struct NewPeer {
+    signalling_id: u64,
+    spec: MemberSpec,
+    control_id: String,
 }
 
 impl ParticipantService {
@@ -65,6 +75,7 @@ impl ParticipantService {
             reconnect_timeout,
             drop_connection_tasks: HashMap::new(),
             control_signalling_members,
+            members_awaiting_connection: HashMap::new(),
         }
     }
 
@@ -172,10 +183,35 @@ impl ParticipantService {
         } else {
             debug!("Connected member: {}", member_id);
 
+            // TODO:
+            //     1) Create function for that
+            //     2) Simplify
+            //     3) Reduce `clone()`s
+
             let connected_member = self.members.get(&member_id).unwrap();
             let connected_member_play_endpoints =
                 connected_member.spec.get_play_endpoints();
+
+            let mut added_member = None;
+            if let Some(awaiter) = self.members_awaiting_connection.get_mut(&member_id) {
+                added_member = Some(awaiter.control_id.clone());
+                ctx.notify(CreatePeer {
+                    caller_control_id: connected_member.control_id.clone(),
+                    caller_signalling_id: connected_member.id,
+                    caller_spec: connected_member.spec.clone(),
+                    responder_spec: awaiter.spec.clone(),
+                    responder_control_id: awaiter.control_id.clone(),
+                    responder_signalling_id: awaiter.signalling_id,
+                });
+                self.members_awaiting_connection.remove(&member_id);
+            }
+
             for connected_member_endpoint in connected_member_play_endpoints {
+                if let Some(ref c) = added_member {
+                    if connected_member_endpoint.src.member_id.as_str() == c.as_str() {
+                        continue;
+                    }
+                }
                 let responder_member_control_id =
                     connected_member_endpoint.src.member_id;
                 let responder_member_signalling_id = match self
@@ -197,6 +233,11 @@ impl ParticipantService {
                     .connections
                     .get(&responder_member_signalling_id)
                     .is_some();
+                let responder_new_peer = NewPeer {
+                    signalling_id: connected_member.id,
+                    spec: connected_member.spec.clone(),
+                    control_id: connected_member.control_id.clone(),
+                };
                 if is_responder_connected {
                     ctx.notify(CreatePeer {
                         caller_signalling_id: *responder_member_signalling_id,
@@ -213,6 +254,8 @@ impl ParticipantService {
                             .control_id
                             .clone(),
                     });
+                } else {
+                    self.members_awaiting_connection.insert(*responder_member_signalling_id, responder_new_peer);
                 }
             }
 

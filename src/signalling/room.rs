@@ -349,7 +349,7 @@ impl Handler<CreatePeer> for Room {
         ctx: &mut Self::Context,
     ) -> Self::Result {
         // TODO: Think about usefulness
-        debug!(
+        println!(
             "Created peer member {} with member {}",
             msg.caller_signalling_id, msg.responder_signalling_id
         );
@@ -578,6 +578,10 @@ mod test {
         Arbiter::start(move |_| client_room)
     }
 
+    // TODO: Fix this test.
+    //       This test sometimes fails due to racing connections.
+    //       When the second user connects first, and the first user
+    //       follows him, their events are swapped.
     #[test]
     fn start_signaling() {
         let stopped = Arc::new(AtomicUsize::new(0));
@@ -592,13 +596,13 @@ mod test {
             let stopped_clone = stopped.clone();
             Arbiter::start(move |_| TestConnection {
                 events: caller_events_clone,
-                member_id: 2,
+                member_id: 1,
                 room: room_clone,
                 stopped: stopped_clone,
             });
             Arbiter::start(move |_| TestConnection {
                 events: responder_events_clone,
-                member_id: 1,
+                member_id: 2,
                 room,
                 stopped,
             });
