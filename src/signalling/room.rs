@@ -83,9 +83,6 @@ pub struct Room {
 impl Room {
     /// Create new instance of [`Room`].
     pub fn new(
-        //        id: Id,
-        //        members: HashMap<MemberId, Member>,
-        //        peers: HashMap<PeerId, PeerStateMachine>,
         room: RoomSpec,
         reconnect_timeout: Duration,
     ) -> Self {
@@ -94,14 +91,14 @@ impl Room {
         let mut control_signalling_members = HashMap::new(); // TODO: rename
         room.spec.pipeline.iter().enumerate().for_each(
             |(i, (control_id, value))| {
-                let id = i as u64;
+                let id = (i as u64) + 1;
                 let member_spec = MemberSpec::try_from(value.clone()).unwrap();
 
                 control_signalling_members.insert(control_id.clone(), id);
                 let member = Member {
                     id,
                     spec: member_spec,
-                    credentials: format!("{}-credentials", i),
+                    credentials: format!("{}-credentials", id),
                     control_id: control_id.clone(),
                 };
                 members.insert(id, member);
@@ -307,6 +304,7 @@ impl Handler<ConnectPeers> for Room {
         msg: ConnectPeers,
         ctx: &mut Self::Context,
     ) -> Self::Result {
+//        println!("sdfsdaf");
         match self.send_peer_created(msg.0, msg.1) {
             Ok(res) => {
                 Box::new(res.map_err(|err, _, ctx: &mut Context<Self>| {
@@ -348,7 +346,7 @@ impl Handler<CreatePeer> for Room {
     fn handle(
         &mut self,
         msg: CreatePeer,
-        _ctx: &mut Self::Context,
+        ctx: &mut Self::Context,
     ) -> Self::Result {
         // TODO: Think about usefulness
         debug!(
@@ -357,10 +355,10 @@ impl Handler<CreatePeer> for Room {
         );
 
         // TODO: Maybe need another implementation of dynamic peer ids?
+        self.peers_count += 1;
         let caller_peer_id = self.peers_count;
         self.peers_count += 1;
         let responder_peer_id = self.peers_count;
-        self.peers_count += 1;
 
         let mut caller_peer = Peer::new(
             caller_peer_id,
@@ -421,8 +419,13 @@ impl Handler<CreatePeer> for Room {
         self.peers.add_peer(caller_peer_id, caller_peer);
         self.peers.add_peer(responder_peer_id, responder_peer);
 
+        ctx.notify(ConnectPeers(
+            caller_peer_id,
+            responder_peer_id,
+        ));
+
         // TODO: remove this
-        println!("Peers: {:#?}", self.peers);
+//        println!("Peers: {:#?}", self.peers);
 
         Ok(())
     }
@@ -493,24 +496,25 @@ impl Handler<RpcConnectionEstablished> for Room {
             msg.connection,
         );
 
+        // TODO: Remove this
         // get connected member Peers
-        self.peers
-            .get_peers_by_member_id(msg.member_id)
-            .into_iter()
-            .for_each(|peer| {
-                // only New peers should be connected
-                if let PeerStateMachine::New(peer) = peer {
-                    if self
-                        .participants
-                        .member_has_connection(peer.partner_member_id())
-                    {
-                        ctx.notify(ConnectPeers(
-                            peer.id(),
-                            peer.partner_peer_id(),
-                        ));
-                    }
-                }
-            });
+//        self.peers
+//            .get_peers_by_member_id(msg.member_id)
+//            .into_iter()
+//            .for_each(|peer| {
+//                // only New peers should be connected
+//                if let PeerStateMachine::New(peer) = peer {
+//                    if self
+//                        .participants
+//                        .member_has_connection(peer.partner_member_id())
+//                    {
+//                        ctx.notify(ConnectPeers(
+//                            peer.id(),
+//                            peer.partner_peer_id(),
+//                        ));
+//                    }
+//                }
+//            });
 
         Box::new(wrap_future(future::ok(())))
     }
@@ -564,18 +568,14 @@ mod test {
 
     use crate::api::client::rpc_connection::test::TestConnection;
     use crate::media::create_peers;
+    use crate::api::control;
 
     use super::*;
 
-    // TODO: Fix this
     fn start_room() -> Addr<Room> {
-        let members = hashmap! {
-            1 => Member{id: 1, credentials: "caller_credentials".to_owned()},
-            2 => Member{id: 2, credentials: "responder_credentials".to_owned()},
-        };
-        Arbiter::start(move |_| {
-            Room::new(1, members, create_peers(1, 2), Duration::from_secs(10))
-        })
+        let room_spec = control::load_from_file("room_spec_test.yml").unwrap();
+        let client_room = Room::new(room_spec, Duration::from_secs(10));
+        Arbiter::start(move |_| client_room)
     }
 
     #[test]
@@ -592,13 +592,13 @@ mod test {
             let stopped_clone = stopped.clone();
             Arbiter::start(move |_| TestConnection {
                 events: caller_events_clone,
-                member_id: 1,
+                member_id: 2,
                 room: room_clone,
                 stopped: stopped_clone,
             });
             Arbiter::start(move |_| TestConnection {
                 events: responder_events_clone,
-                member_id: 2,
+                member_id: 1,
                 room,
                 stopped,
             });

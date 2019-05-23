@@ -116,17 +116,14 @@ mod test {
     };
 
     use super::*;
-    use crate::api::control::RoomRequest;
+    use crate::api::control::room::RoomSpec;
+    use crate::api::control::load_from_file;
 
     /// Creates [`RoomsRepository`] for tests filled with a single [`Room`].
     fn room(conf: Rpc) -> RoomsRepository {
-        let room_spec =
-            crate::api::control::load_from_file("room_spec.yml").unwrap();
+        let room_spec = load_from_file("room_spec_test.yml").unwrap();
 
-        // TODO: remove this
-        println!("{:#?}", room_spec);
-
-        let client_room = Room::new(room_spec, config.rpc.reconnect_timeout);
+        let client_room = Room::new(room_spec, conf.reconnect_timeout);
         let room_id = client_room.get_id();
         let client_room = Arbiter::start(move |_| client_room);
         let room_hash_map = hashmap! {
@@ -153,7 +150,7 @@ mod test {
     fn responses_with_pong() {
         let mut server = ws_server(Conf::default());
         let (read, mut write) =
-            server.ws_at("/ws/1/1/caller_credentials").unwrap();
+            server.ws_at("/ws/1/1/1-credentials").unwrap();
 
         write.text(r#"{"ping":33}"#);
         let (item, _) = server.execute(read.into_future()).unwrap();
@@ -172,7 +169,7 @@ mod test {
 
         let mut server = ws_server(conf.clone());
         let (read, mut write) =
-            server.ws_at("/ws/1/1/caller_credentials").unwrap();
+            server.ws_at("/ws/1/1/1-credentials").unwrap();
 
         write.text(r#"{"ping":33}"#);
         let (item, read) = server.execute(read.into_future()).unwrap();
