@@ -304,7 +304,6 @@ impl Handler<ConnectPeers> for Room {
         msg: ConnectPeers,
         ctx: &mut Self::Context,
     ) -> Self::Result {
-//        println!("sdfsdaf");
         match self.send_peer_created(msg.0, msg.1) {
             Ok(res) => {
                 Box::new(res.map_err(|err, _, ctx: &mut Context<Self>| {
@@ -349,7 +348,7 @@ impl Handler<CreatePeer> for Room {
         ctx: &mut Self::Context,
     ) -> Self::Result {
         // TODO: Think about usefulness
-        println!(
+        info!(
             "Created peer member {} with member {}",
             msg.caller_signalling_id, msg.responder_signalling_id
         );
@@ -567,7 +566,6 @@ mod test {
     };
 
     use crate::api::client::rpc_connection::test::TestConnection;
-    use crate::media::create_peers;
     use crate::api::control;
 
     use super::*;
