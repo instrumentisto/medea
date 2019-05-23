@@ -327,16 +327,19 @@ impl Handler<ConnectPeers> for Room {
     }
 }
 
+#[derive(Debug)]
+pub struct NewPeer {
+    pub signalling_id: u64,
+    pub spec: MemberSpec,
+    pub control_id: String,
+}
+
 #[derive(Debug, Message)]
 #[rtype(result = "Result<(), ()>")]
 // TODO: maybe fewer fields???
 pub struct CreatePeer {
-    pub caller_signalling_id: MemberId,
-    pub responder_signalling_id: MemberId,
-    pub caller_spec: MemberSpec,
-    pub responder_spec: MemberSpec,
-    pub caller_control_id: String,
-    pub responder_control_id: String,
+    pub caller: NewPeer,
+    pub responder: NewPeer,
 }
 
 impl Handler<CreatePeer> for Room {
@@ -350,7 +353,7 @@ impl Handler<CreatePeer> for Room {
         // TODO: Think about usefulness
         info!(
             "Created peer member {} with member {}",
-            msg.caller_signalling_id, msg.responder_signalling_id
+            msg.caller.signalling_id, msg.responder.signalling_id
         );
 
         // TODO: Maybe need another implementation of dynamic peer ids?
@@ -361,22 +364,22 @@ impl Handler<CreatePeer> for Room {
 
         let mut caller_peer = Peer::new(
             caller_peer_id,
-            msg.caller_signalling_id,
+            msg.caller.signalling_id,
             responder_peer_id,
-            msg.responder_signalling_id,
+            msg.responder.signalling_id,
         );
         let mut responder_peer = Peer::new(
             responder_peer_id,
-            msg.responder_signalling_id,
+            msg.responder.signalling_id,
             caller_peer_id,
-            msg.caller_signalling_id,
+            msg.caller.signalling_id,
         );
 
         let mut last_track_id = 0;
 
         // TODO: remove boilerplate
-        for endpoint in msg.caller_spec.get_play_endpoints().into_iter() {
-            if endpoint.src.member_id == msg.responder_control_id {
+        for endpoint in msg.caller.spec.get_play_endpoints().into_iter() {
+            if endpoint.src.member_id == msg.responder.control_id {
                 last_track_id += 1;
                 let track_audio = Arc::new(MediaTrack::new(
                     last_track_id,
@@ -395,8 +398,8 @@ impl Handler<CreatePeer> for Room {
             }
         }
 
-        for endpoint in msg.responder_spec.get_play_endpoints().into_iter() {
-            if endpoint.src.member_id == msg.caller_control_id {
+        for endpoint in msg.responder.spec.get_play_endpoints().into_iter() {
+            if endpoint.src.member_id == msg.caller.control_id {
                 last_track_id += 1;
                 let track_audio = Arc::new(MediaTrack::new(
                     last_track_id,

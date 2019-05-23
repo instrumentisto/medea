@@ -22,11 +22,10 @@ use crate::{
     },
     log::prelude::*,
     signalling::{
-        room::{CloseRoom, RoomError, CreatePeer},
+        room::{CloseRoom, RoomError, CreatePeer, NewPeer},
         Room,
     },
 };
-use crate::api::control::member::MemberSpec;
 
 /// Participant is [`Member`] with [`RpcConnection`]. [`ParticipantService`]
 /// stores [`Members`] and associated [`RpcConnection`]s, handles
@@ -56,12 +55,6 @@ pub struct ParticipantService {
     members_awaiting_connection: HashMap<u64, NewPeer>,
 }
 
-#[derive(Debug)]
-struct NewPeer {
-    signalling_id: u64,
-    spec: MemberSpec,
-    control_id: String,
-}
 
 impl ParticipantService {
     pub fn new(
@@ -192,20 +185,29 @@ impl ParticipantService {
             let connected_member_play_endpoints =
                 connected_member.spec.get_play_endpoints();
 
+            // connect_awaiters
             let mut added_member = None;
             if let Some(awaiter) = self.members_awaiting_connection.get_mut(&member_id) {
                 added_member = Some(awaiter.control_id.clone());
+                let connected_new_peer = NewPeer {
+                    control_id: connected_member.control_id.clone(),
+                    signalling_id: connected_member.id,
+                    spec: connected_member.spec.clone(),
+                };
+                let awaiter_new_peer = NewPeer {
+                    spec: awaiter.spec.clone(),
+                    control_id: awaiter.control_id.clone(),
+                    signalling_id: awaiter.signalling_id,
+                };
+
                 ctx.notify(CreatePeer {
-                    caller_control_id: connected_member.control_id.clone(),
-                    caller_signalling_id: connected_member.id,
-                    caller_spec: connected_member.spec.clone(),
-                    responder_spec: awaiter.spec.clone(),
-                    responder_control_id: awaiter.control_id.clone(),
-                    responder_signalling_id: awaiter.signalling_id,
+                    caller: connected_new_peer,
+                    responder: awaiter_new_peer,
                 });
                 self.members_awaiting_connection.remove(&member_id);
             }
 
+            // connect_existing_play_endpoints
             for connected_member_endpoint in connected_member_play_endpoints {
                 if let Some(ref c) = added_member {
                     if connected_member_endpoint.src.member_id.as_str() == c.as_str() {
@@ -233,29 +235,28 @@ impl ParticipantService {
                     .connections
                     .get(&responder_member_signalling_id)
                     .is_some();
-                let responder_new_peer = NewPeer {
+                let connected_new_peer = NewPeer {
                     signalling_id: connected_member.id,
                     spec: connected_member.spec.clone(),
                     control_id: connected_member.control_id.clone(),
                 };
+                let responder_new_peer = NewPeer {
+                    signalling_id: *responder_member_signalling_id,
+                    spec: self
+                        .members
+                        .get(&responder_member_signalling_id)
+                        .unwrap()
+                        .spec
+                        .clone(),
+                    control_id: responder_member_control_id,
+                };
                 if is_responder_connected {
                     ctx.notify(CreatePeer {
-                        caller_signalling_id: *responder_member_signalling_id,
-                        caller_spec: self
-                            .members
-                            .get(&responder_member_signalling_id)
-                            .unwrap()
-                            .spec
-                            .clone(),
-                        responder_signalling_id: connected_member.id,
-                        responder_spec: connected_member.spec.clone(),
-                        caller_control_id: responder_member_control_id,
-                        responder_control_id: connected_member
-                            .control_id
-                            .clone(),
+                        caller: responder_new_peer,
+                        responder: connected_new_peer,
                     });
                 } else {
-                    self.members_awaiting_connection.insert(*responder_member_signalling_id, responder_new_peer);
+                    self.members_awaiting_connection.insert(*responder_member_signalling_id, connected_new_peer);
                 }
             }
 
