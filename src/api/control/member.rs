@@ -1,12 +1,18 @@
 //! Member definitions and implementations.
 
 use serde::Deserialize;
+use std::{
+    collections::HashMap,
+    convert::TryFrom,
+};
 
-use super::element::Element;
+use super::{
+    element::Element,
+    pipeline::Pipeline,
+    Entity,
+    TryFromEntityError,
+};
 
-use std::collections::HashMap;
-
-/// ID of [`Member`].
 pub type Id = u64;
 
 /// Media server user with its ID and credentials.
@@ -23,15 +29,24 @@ pub struct Member {
     pub control_id: String,
 }
 
-#[derive(Deserialize, Debug, Clone)]
-#[serde(tag = "kind")]
-/// Entity for member requests.
-pub enum MemberRequest {
-    Member { spec: MemberSpec },
+#[derive(Clone, Debug)]
+pub struct MemberSpec(pub Pipeline);
+impl MemberSpec {
+    pub fn get_element(
+        &self,
+        id: &str,
+    ) -> Option<Result<Element, TryFromEntityError>> {
+        Some(Element::try_from(self.0.pipeline.get(id).cloned()?))
+    }
 }
 
-#[derive(Deserialize, Debug, Clone)]
-/// Spec of member in [`Room`] pipeline.
-pub struct MemberSpec {
-    pub pipeline: HashMap<String, Element>,
+impl TryFrom<Entity> for MemberSpec {
+    type Error = TryFromEntityError;
+
+    fn try_from(from: Entity) -> Result<Self, Self::Error> {
+        match from {
+            Entity::Member { spec } => Ok(MemberSpec(spec)),
+            _ => Err(TryFromEntityError::NotMember),
+        }
+    }
 }

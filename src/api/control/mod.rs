@@ -2,32 +2,53 @@
 
 pub mod element;
 pub mod member;
-
 pub mod room;
+
+mod pipeline;
 
 use failure::Error;
 use serde::Deserialize;
-use std::{fs::File, io::Read as _};
+use std::{
+    fs::File,
+    io::Read as _,
+    convert::TryFrom as _,
+};
+use failure::Fail;
 
-use crate::signalling::RoomId;
-
-use self::room::RoomSpec;
+use self::{
+    element::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
+    pipeline::Pipeline,
+    room::RoomSpec,
+};
 
 pub use self::member::{Id as MemberId, Member};
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Debug, Fail)]
+pub enum TryFromEntityError {
+    #[fail(display = "This entity is not Element")]
+    NotElement,
+    #[fail(display = "This entity is not Room")]
+    NotRoom,
+    #[fail(display = "This entity is not Member")]
+    NotMember,
+}
+
+#[derive(Clone, Deserialize, Debug)]
 #[serde(tag = "kind")]
-/// Entity for creating new Room.
-pub enum RoomRequest {
-    Room { id: RoomId, spec: RoomSpec },
+pub enum Entity {
+    Room { id: u64, spec: Pipeline },
+    Member { spec: Pipeline },
+    WebRtcPublishEndpoint { spec: WebRtcPublishEndpoint },
+    WebRtcPlayEndpoint { spec: WebRtcPlayEndpoint },
 }
 
 /// Load [`RoomRequest`] from file with YAML format.
-pub fn load_from_file(path: &str) -> Result<RoomRequest, Error> {
+pub fn load_from_file(path: &str) -> Result<RoomSpec, Error> {
     let mut file = File::open(path)?;
     let mut buf = String::new();
     file.read_to_string(&mut buf)?;
-    let parsed: RoomRequest = serde_yaml::from_str(&buf)?;
+    let parsed: Entity = serde_yaml::from_str(&buf)?;
+    let room = RoomSpec::try_from(parsed)?;
 
-    Ok(parsed)
+    Ok(room)
 }

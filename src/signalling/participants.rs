@@ -51,8 +51,10 @@ pub struct ParticipantService {
     /// before dropping it irrevocably in case it gets reestablished.
     drop_connection_tasks: HashMap<MemberId, SpawnHandle>,
 
+    // TODO: Need rename
     control_signalling_members: HashMap<String, MemberId>,
 
+    // TODO: Need rename
     responder_awaiting_connection: HashMap<String, Vec<MemberId>>,
 }
 
@@ -182,100 +184,7 @@ impl ParticipantService {
                 self.responder_awaiting_connection
             );
 
-            // TODO: Very need serious refactor
-            let connected_member_pipeline =
-                self.members.get(&member_id).unwrap().clone();
-            connected_member_pipeline
-                .spec
-                .pipeline
-                .iter()
-                .filter_map(|(connected_element_id, connected_element)| {
-                    match connected_element {
-                        Element::WebRtcPlayEndpoint { spec } => Some(spec),
-                        _ => None,
-                    }
-                })
-                .cloned()
-                .for_each(|connected_play_endpoint| {
-                    let responder_signalling_id = self
-                        .control_signalling_members
-                        .get(&connected_play_endpoint.src.member_id)
-                        .unwrap();
-                    let is_responder_connected =
-                        self.connections.get(responder_signalling_id).is_some();
-
-                    let this_name = self
-                        .members
-                        .get(&member_id)
-                        .unwrap()
-                        .control_id
-                        .clone();
-
-                    if let Some(awaiters) =
-                        self.responder_awaiting_connection.get(&this_name)
-                    {
-                        awaiters.iter().for_each(|a| {
-                            ctx.notify(CreatePeer {
-                                first_member_pipeline: self
-                                    .members
-                                    .get(a)
-                                    .unwrap()
-                                    .spec
-                                    .pipeline
-                                    .clone(),
-                                second_member_pipeline: self
-                                    .members
-                                    .get(&member_id)
-                                    .unwrap()
-                                    .spec
-                                    .pipeline
-                                    .clone(),
-                                second_signalling_id: member_id,
-                                first_signalling_id: *a,
-                            });
-                        });
-                        self.responder_awaiting_connection.remove(&this_name);
-                    };
-
-                    if is_responder_connected {
-                        ctx.notify(CreatePeer {
-                            first_member_pipeline: self
-                                .members
-                                .get(&member_id)
-                                .unwrap()
-                                .spec
-                                .pipeline
-                                .clone(),
-                            second_member_pipeline: self
-                                .members
-                                .get(&responder_signalling_id)
-                                .unwrap()
-                                .spec
-                                .pipeline
-                                .clone(),
-                            first_signalling_id: member_id,
-                            second_signalling_id: *responder_signalling_id,
-                        });
-                    } else {
-                        match self
-                            .responder_awaiting_connection
-                            .get_mut(&connected_play_endpoint.src.member_id)
-                        {
-                            Some(awaiter) => {
-                                awaiter.push(member_id);
-                            }
-                            None => {
-                                self.responder_awaiting_connection.insert(
-                                    connected_play_endpoint
-                                        .src
-                                        .member_id
-                                        .clone(),
-                                    vec![member_id],
-                                );
-                            }
-                        }
-                    }
-                });
+            // TODO: Rewrite Peer connection
 
             self.connections.insert(member_id, con);
         }

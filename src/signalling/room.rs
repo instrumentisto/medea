@@ -17,7 +17,6 @@ use std::time::Duration;
 use crate::api::control::element::Element;
 use crate::api::control::member::MemberSpec;
 use crate::api::control::room::RoomSpec;
-use crate::api::control::RoomRequest;
 use crate::media::MediaTrack;
 use crate::signalling::RoomId;
 use crate::{
@@ -26,7 +25,7 @@ use crate::{
             AuthorizationError, Authorize, CommandMessage, RpcConnectionClosed,
             RpcConnectionEstablished,
         },
-        control::{member::MemberRequest, Member, MemberId},
+        control::{Member, MemberId},
     },
     log::prelude::*,
     media::{
@@ -35,6 +34,7 @@ use crate::{
     },
     signalling::{participants::ParticipantService, peers::PeerRepository},
 };
+use std::convert::TryFrom;
 use std::sync::Arc;
 
 /// ID of [`Room`].
@@ -87,41 +87,38 @@ impl Room {
         //        id: Id,
         //        members: HashMap<MemberId, Member>,
         //        peers: HashMap<PeerId, PeerStateMachine>,
-        spec: RoomRequest,
+        room: RoomSpec,
         reconnect_timeout: Duration,
     ) -> Self {
-        let (id, spec) = match spec {
-            RoomRequest::Room { id, spec } => (id, spec),
-        };
         // TODO: Rewrite it only with iterator
         let mut members = HashMap::new();
         let mut control_signalling_members = HashMap::new(); // TODO: rename
-        spec.pipeline.iter().enumerate().for_each(
+        room.spec.pipeline.iter().enumerate().for_each(
             |(i, (control_id, value))| {
                 let id = i as u64;
-                if let MemberRequest::Member { spec } = value {
-                    let member = Member {
-                        id,
-                        spec: spec.clone(),
-                        credentials: format!("{}-credentials", i),
-                        control_id: control_id.clone(),
-                    };
-                    control_signalling_members.insert(control_id.clone(), id);
-                    members.insert(id, member);
-                }
+                let member_spec = MemberSpec::try_from(value.clone()).unwrap();
+
+                control_signalling_members.insert(control_id.clone(), id);
+                let member = Member {
+                    id,
+                    spec: member_spec,
+                    credentials: format!("{}-credentials", i),
+                    control_id: control_id.clone(),
+                };
+                members.insert(id, member);
             },
         );
         debug!("Created room with {:?} users.", members);
 
         Self {
-            id,
+            id: room.id,
             peers: PeerRepository::from(HashMap::new()),
             participants: ParticipantService::new(
                 members,
                 control_signalling_members,
                 reconnect_timeout,
             ),
-            spec,
+            spec: room,
             //            control_signalling_members
             peers_count: 0,
         }
@@ -371,6 +368,7 @@ impl Handler<CreatePeer> for Room {
             second_peer_id,
             msg.second_signalling_id,
         );
+
         let mut second_peer = Peer::new(
             second_peer_id,
             msg.second_signalling_id,
@@ -389,6 +387,8 @@ impl Handler<CreatePeer> for Room {
 
         self.peers.add_peer(first_peer_id, first_peer);
         self.peers.add_peer(second_peer_id, second_peer);
+
+        println!("Peers: {:#?}", self.peers);
 
         Ok(())
     }

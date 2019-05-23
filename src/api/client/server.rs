@@ -116,13 +116,14 @@ mod test {
     };
 
     use super::*;
-    use crate::api::{control::RoomRequest, room_repo::ControlRoom};
+    use crate::api::control::RoomRequest;
 
     /// Creates [`RoomsRepository`] for tests filled with a single [`Room`].
     fn room(conf: Rpc) -> RoomsRepository {
         let room_spec =
             crate::api::control::load_from_file("room_spec.yml").unwrap();
 
+        // TODO: remove this
         println!("{:#?}", room_spec);
 
         let client_room = Room::new(room_spec, config.rpc.reconnect_timeout);

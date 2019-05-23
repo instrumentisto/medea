@@ -13,11 +13,7 @@ use dotenv::dotenv;
 use log::prelude::*;
 
 use crate::{
-    api::{
-        client::server,
-        control::Member,
-        control::{load_from_file, RoomRequest},
-    },
+    api::{client::server, control::load_from_file, control::Member},
     conf::Conf,
     media::create_peers,
     signalling::{room_repo::RoomsRepository, Room},

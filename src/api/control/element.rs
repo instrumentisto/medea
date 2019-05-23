@@ -1,16 +1,33 @@
-//! Element definitions and implementations.
+use super::{Entity, TryFromEntityError};
 
 use serde::{
     de::{self, Deserializer, Error, Visitor},
     Deserialize,
 };
-use std::fmt;
+use std::{
+    convert::TryFrom,
+    fmt,
+};
 
-#[derive(Deserialize, Debug, Clone)]
-#[serde(tag = "kind")]
+#[derive(Debug)]
 pub enum Element {
-    WebRtcPublishEndpoint { spec: WebRtcPublishEndpoint },
-    WebRtcPlayEndpoint { spec: WebRtcPlayEndpoint },
+    WebRtcPublishEndpoint(WebRtcPublishEndpoint),
+    WebRtcPlayEndpoint(WebRtcPlayEndpoint),
+}
+impl TryFrom<Entity> for Element {
+    type Error = TryFromEntityError;
+
+    fn try_from(from: Entity) -> Result<Self, Self::Error> {
+        match from {
+            Entity::WebRtcPlayEndpoint { spec } => {
+                Ok(Element::WebRtcPlayEndpoint(spec))
+            }
+            Entity::WebRtcPublishEndpoint { spec } => {
+                Ok(Element::WebRtcPublishEndpoint(spec))
+            }
+            _ => Err(TryFromEntityError::NotElement),
+        }
+    }
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -33,12 +50,18 @@ pub struct WebRtcPlayEndpoint {
 }
 
 #[derive(Debug, Clone)]
+/// Special uri with pattern "local://{room_id}/{member_id}/{pipeline_id}
 pub struct LocalUri {
+    /// ID of [`Room`]
+    // TODO: Why this field never used???
     pub room_id: String,
+    /// ID of [`Member`]
     pub member_id: String,
+    /// Control ID of [`Element`]
     pub pipeline_id: String,
 }
 
+// TODO: Write unit tests?
 impl<'de> Deserialize<'de> for LocalUri {
     fn deserialize<D>(deserializer: D) -> Result<LocalUri, D::Error>
     where

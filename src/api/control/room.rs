@@ -1,16 +1,37 @@
 //! Room definitions and implementations.
 
-use serde::Deserialize;
+use std::convert::TryFrom;
 
-use super::member::MemberRequest;
+use super::{
+    Entity,
+    TryFromEntityError,
+    member::MemberSpec,
+    pipeline::Pipeline,
+};
 
-use crate::api::control::element::Element;
-use crate::api::control::member::MemberSpec;
-use crate::api::control::MemberId;
-use std::collections::HashMap;
+use crate::signalling::RoomId;
 
-#[derive(Deserialize, Debug, Clone)]
-/// Spec of [`Room`]
+#[derive(Clone, Debug)]
 pub struct RoomSpec {
-    pub pipeline: HashMap<String, MemberRequest>,
+    pub id: RoomId,
+    pub spec: Pipeline,
+}
+impl RoomSpec {
+    pub fn get_member(
+        &self,
+        id: &str,
+    ) -> Option<Result<MemberSpec, TryFromEntityError>> {
+        Some(MemberSpec::try_from(self.spec.pipeline.get(id).cloned()?))
+    }
+}
+
+impl TryFrom<Entity> for RoomSpec {
+    type Error = TryFromEntityError;
+
+    fn try_from(from: Entity) -> Result<Self, Self::Error> {
+        match from {
+            Entity::Room { id, spec } => Ok(RoomSpec { id, spec }),
+            _ => Err(TryFromEntityError::NotRoom),
+        }
+    }
 }
