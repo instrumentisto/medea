@@ -3,30 +3,44 @@
 use actix::{Addr, MailboxError};
 use actix_redis::{Command, RedisActor};
 use crypto::{digest::Digest, md5::Md5};
+use failure::Fail;
 use futures::future::Future;
 use redis_async::resp::RespValue;
 
 use crate::{log::prelude::*, media::IceUser};
 
-#[allow(clippy::module_name_repetitions)]
-pub struct TurnAuthRepo(Addr<RedisActor>);
+#[derive(Fail, Debug)]
+pub enum TurnAuthRepoErr {
+    #[fail(display = "RedisActor is unreachable: {}", _0)]
+    MailboxError(MailboxError),
+    #[fail(display = "Redis returned error: {}", _0)]
+    RedisError(actix_redis::Error),
+    #[fail(display = "Redis returned unknown answer {:?}", _0)]
+    UnknownAnswer(RespValue),
+}
 
-impl std::fmt::Debug for TurnAuthRepo {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "TurnAuthRepo {{RedisActor {{connected:{}}}}}",
-            self.0.connected()
-        )
+impl From<MailboxError> for TurnAuthRepoErr {
+    fn from(err: MailboxError) -> Self {
+        TurnAuthRepoErr::MailboxError(err)
     }
 }
 
-#[derive(Debug)]
-pub enum TurnRepoErr {
-    MailboxError(MailboxError),
-    RedisError(actix_redis::Error),
-    UnexpectedAnswer(RespValue),
+impl From<actix_redis::Error> for TurnAuthRepoErr {
+    fn from(err: actix_redis::Error) -> Self {
+        TurnAuthRepoErr::RedisError(err)
+    }
 }
+
+impl From<RespValue> for TurnAuthRepoErr {
+    fn from(err: RespValue) -> Self {
+        TurnAuthRepoErr::UnknownAnswer(err)
+    }
+}
+
+// Abstraction over remote Redis database used to store Turn server
+// credentials.
+#[allow(clippy::module_name_repetitions)]
+pub struct TurnAuthRepo(Addr<RedisActor>);
 
 impl TurnAuthRepo {
     pub fn new<S: Into<String>>(addr: S) -> Self {
@@ -56,7 +70,7 @@ impl TurnAuthRepo {
     pub fn insert(
         &mut self,
         ice_user: &IceUser,
-    ) -> impl Future<Item = (), Error = TurnRepoErr> {
+    ) -> impl Future<Item = (), Error = TurnAuthRepoErr> {
         debug!("Store ICE user: {:?}", ice_user);
         let key = format!("turn/realm/medea/user/{}/key", ice_user.name);
         let value = format!("{}:medea:{}", ice_user.name, ice_user.pass);
@@ -66,7 +80,7 @@ impl TurnAuthRepo {
         Box::new(
             self.0
                 .send(Command(resp_array!["SET", key, result]))
-                .map_err(TurnRepoErr::MailboxError)
+                .map_err(TurnAuthRepoErr::MailboxError)
                 .and_then(Self::parse_redis_answer),
         )
     }
@@ -75,13 +89,13 @@ impl TurnAuthRepo {
     pub fn remove(
         &mut self,
         ice_user: &IceUser,
-    ) -> impl Future<Item = (), Error = TurnRepoErr> {
+    ) -> impl Future<Item = (), Error = TurnAuthRepoErr> {
         debug!("Delete ICE user: {:?}", ice_user);
         let key = format!("turn/realm/medea/user/{}/key", ice_user.name);
         Box::new(
             self.0
                 .send(Command(resp_array!["DEL", key]))
-                .map_err(TurnRepoErr::MailboxError)
+                .map_err(Into::into)
                 .and_then(Self::parse_redis_answer),
         )
     }
@@ -89,7 +103,7 @@ impl TurnAuthRepo {
     /// Parse result from raw Redis answer.
     fn parse_redis_answer(
         result: Result<RespValue, actix_redis::Error>,
-    ) -> Result<(), TurnRepoErr> {
+    ) -> Result<(), TurnAuthRepoErr> {
         match result {
             Ok(resp) => {
                 if let RespValue::SimpleString(ref answer) = resp {
@@ -97,9 +111,19 @@ impl TurnAuthRepo {
                         return Ok(());
                     }
                 }
-                Err(TurnRepoErr::UnexpectedAnswer(resp))
+                Err(TurnAuthRepoErr::from(resp))
             }
-            Err(err) => Err(TurnRepoErr::RedisError(err)),
+            Err(err) => Err(TurnAuthRepoErr::from(err)),
         }
+    }
+}
+
+impl std::fmt::Debug for TurnAuthRepo {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "TurnAuthRepo {{RedisActor {{connected:{}}}}}",
+            self.0.connected()
+        )
     }
 }

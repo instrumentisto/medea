@@ -6,6 +6,7 @@ use actix::{
     fut::wrap_future, Actor, ActorFuture, AsyncContext, Context, Handler,
     Message, WrapFuture,
 };
+use failure::Fail;
 use futures::future::{err, ok, Future};
 use rand::{distributions::Alphanumeric, rngs::OsRng, Rng};
 use smart_default::*;
@@ -14,19 +15,30 @@ use crate::{
     api::control::MemberId,
     conf::Conf,
     media::IceUser,
-    turn::repo::{TurnAuthRepo, TurnRepoErr},
+    turn::repo::{TurnAuthRepo, TurnAuthRepoErr},
 };
 
 static TURN_PASS_LEN: usize = 16;
 
-#[derive(Debug)]
+/// Ergonomic type alias for using [`ActorFuture`] for [`AuthService`].
+type ActFuture<I, E> =
+    Box<dyn ActorFuture<Actor = Service, Item = I, Error = E>>;
+
+#[cfg(not(test))]
+#[allow(clippy::module_name_repetitions)]
+pub type TurnAuthService = Service;
+#[cfg(test)]
+pub type TurnAuthService = Mocker<Service>;
+
+#[derive(Debug, Fail)]
 pub enum TurnServiceErr {
-    TurnRepoErr(TurnRepoErr),
+    #[fail(display = "Error accessing TurnAuthRepo: {}", _0)]
+    TurnAuthRepoErr(TurnAuthRepoErr),
 }
 
-impl From<TurnRepoErr> for TurnServiceErr {
-    fn from(err: TurnRepoErr) -> Self {
-        TurnServiceErr::TurnRepoErr(err)
+impl From<TurnAuthRepoErr> for TurnServiceErr {
+    fn from(err: TurnAuthRepoErr) -> Self {
+        TurnServiceErr::TurnAuthRepoErr(err)
     }
 }
 
@@ -42,31 +54,12 @@ pub enum UnreachablePolicy {
     ReturnStatic,
 }
 
-/// Creates credentials on Turn server for specified member.
-#[derive(Debug, Message)]
-#[rtype(result = "Result<IceUser, TurnServiceErr>")]
-pub struct CreateIceUser {
-    pub member_id: MemberId,
-    pub policy: UnreachablePolicy,
-}
-
-/// Request for delete [`ICEUser`] for [`Member`] from COTURN database.
-#[derive(Debug, Message)]
-#[rtype(result = "Result<(), TurnServiceErr>")]
-pub struct DeleteIceUser(pub IceUser);
-
-#[cfg(not(test))]
-#[allow(clippy::module_name_repetitions)]
-pub type TurnAuthService = Service;
-#[cfg(test)]
-pub type TurnAuthService = Mocker<Service>;
-
 /// Manages Turn server credentials.
 #[derive(Debug)]
 pub struct Service {
-    /// Address of actor for handle Redis commands.
+    /// Turn credentials repository.
     turn_db: TurnAuthRepo,
-    /// Password for authorize on Redis server.
+    /// TurnAuthRepo password.
     db_pass: String,
     /// Turn server address.
     turn_address: SocketAddr,
@@ -110,20 +103,40 @@ impl Service {
     }
 }
 
-/// [`Actor`] implementation that provides an ergonomic way
-/// to interact with [`AuthService`].
 impl Actor for Service {
     type Context = Context<Self>;
 
-    // TODO: authorize after reconnect to Redis
+    // Init TurnAuthRepo establishing and authenticating connection.
     fn started(&mut self, ctx: &mut Self::Context) {
         ctx.wait(self.turn_db.init(&self.db_pass).into_actor(self))
     }
 }
 
-/// Ergonomic type alias for using [`ActorFuture`] for [`AuthService`].
-type ActFuture<I, E> =
-    Box<dyn ActorFuture<Actor = Service, Item = I, Error = E>>;
+/// Request for delete [`ICEUser`] for [`Member`] from COTURN database.
+#[derive(Debug, Message)]
+#[rtype(result = "Result<(), TurnServiceErr>")]
+pub struct DeleteIceUser(pub IceUser);
+
+impl Handler<DeleteIceUser> for Service {
+    type Result = ActFuture<(), TurnServiceErr>;
+
+    /// Deletes [`ICEUser`] for given [`Member`].
+    fn handle(
+        &mut self,
+        msg: DeleteIceUser,
+        _ctx: &mut Self::Context,
+    ) -> Self::Result {
+        Box::new(wrap_future(self.turn_db.remove(&msg.0).map_err(Into::into)))
+    }
+}
+
+/// Creates credentials on Turn server for specified member.
+#[derive(Debug, Message)]
+#[rtype(result = "Result<IceUser, TurnServiceErr>")]
+pub struct CreateIceUser {
+    pub member_id: MemberId,
+    pub policy: UnreachablePolicy,
+}
 
 impl Handler<CreateIceUser> for Service {
     type Result = ActFuture<IceUser, TurnServiceErr>;
@@ -153,19 +166,6 @@ impl Handler<CreateIceUser> for Service {
                 })
             },
         ))
-    }
-}
-
-impl Handler<DeleteIceUser> for Service {
-    type Result = ActFuture<(), TurnServiceErr>;
-
-    /// Deletes [`ICEUser`] for given [`Member`].
-    fn handle(
-        &mut self,
-        msg: DeleteIceUser,
-        _ctx: &mut Self::Context,
-    ) -> Self::Result {
-        Box::new(wrap_future(self.turn_db.remove(&msg.0).map_err(Into::into)))
     }
 }
 
