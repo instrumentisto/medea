@@ -9,20 +9,20 @@ pub mod media;
 pub mod signalling;
 pub mod turn;
 
-use actix::prelude::*;
-use dotenv::dotenv;
-use log::prelude::*;
-
-use crate::{
-    api::{client::server, control::Member},
-    conf::Conf,
-    media::create_peers,
-    signalling::{Room, RoomsRepository},
-    turn::TurnAuthService,
-};
-
 #[cfg(not(test))]
 fn main() {
+    use actix::prelude::*;
+    use dotenv::dotenv;
+    use log::prelude::*;
+
+    use crate::{
+        api::{client::server, control::Member},
+        conf::Conf,
+        media::create_peers,
+        signalling::{Room, RoomsRepository},
+        turn::TurnAuthService,
+    };
+
     dotenv().ok();
     let logger = log::new_dual_logger(std::io::stdout(), std::io::stderr());
     let _scope_guard = slog_scope::set_global_logger(logger);

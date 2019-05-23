@@ -284,7 +284,15 @@ pub mod test {
 
     impl Debug for ParticipantService {
         fn fmt(&self, f: &mut Formatter) -> Result {
-            unimplemented!()
+            write!(
+                f,
+                "ParticipantService {{ members: {:?}, connections: {:?}, \
+                 reconnect_timeout: {:?}, drop_connection_tasks: {:?} }}",
+                self.members,
+                self.connections,
+                self.reconnect_timeout,
+                self.drop_connection_tasks
+            )
         }
     }
 
