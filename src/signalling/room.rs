@@ -14,7 +14,6 @@ use medea_client_api_proto::{
 
 use std::time::Duration;
 
-use crate::api::control::element::Element;
 use crate::api::control::member::MemberSpec;
 use crate::api::control::room::RoomSpec;
 use crate::media::MediaTrack;
@@ -331,8 +330,6 @@ impl Handler<ConnectPeers> for Room {
     }
 }
 
-use std::collections::HashMap as StdHashMap;
-
 #[derive(Debug, Message)]
 #[rtype(result = "Result<(), ()>")]
 // TODO: maybe fewer fields???
@@ -351,7 +348,7 @@ impl Handler<CreatePeer> for Room {
     fn handle(
         &mut self,
         msg: CreatePeer,
-        ctx: &mut Self::Context,
+        _ctx: &mut Self::Context,
     ) -> Self::Result {
         // TODO: Think about usefulness
         debug!(

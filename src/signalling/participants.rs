@@ -12,8 +12,6 @@ use futures::{
 use hashbrown::HashMap;
 use medea_client_api_proto::Event;
 
-use crate::api::control::element::Element;
-use crate::signalling::room::{ConnectPeers, CreatePeer};
 use crate::{
     api::{
         client::rpc_connection::{
@@ -24,7 +22,7 @@ use crate::{
     },
     log::prelude::*,
     signalling::{
-        room::{CloseRoom, RoomError},
+        room::{CloseRoom, RoomError, CreatePeer},
         Room,
     },
 };
@@ -160,7 +158,6 @@ impl ParticipantService {
         member_id: MemberId,
         con: Box<dyn RpcConnection>,
     ) {
-        use std::convert::TryFrom;
         // lookup previous member connection
         if let Some(mut connection) = self.connections.remove(&member_id) {
             debug!("Closing old RpcConnection for member {}", member_id);

@@ -13,12 +13,10 @@ use dotenv::dotenv;
 use log::prelude::*;
 
 use crate::{
-    api::{client::server, control::load_from_file, control::Member},
+    api::{client::server, control::load_from_file},
     conf::Conf,
-    media::create_peers,
     signalling::{room_repo::RoomsRepository, Room},
 };
-use hashbrown::HashMap;
 
 fn main() {
     dotenv().ok();

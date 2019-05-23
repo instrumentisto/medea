@@ -1,7 +1,7 @@
 use crate::api::control::Entity;
 
 use serde::Deserialize;
-use std::{collections::HashMap, convert::TryFrom as _};
+use std::collections::HashMap;
 
 #[derive(Clone, Deserialize, Debug)]
 pub struct Pipeline {

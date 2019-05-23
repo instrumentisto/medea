@@ -1,7 +1,6 @@
 //! Member definitions and implementations.
 
-use serde::Deserialize;
-use std::{collections::HashMap, convert::TryFrom};
+use std::convert::TryFrom;
 
 use super::{element::Element, pipeline::Pipeline, Entity, TryFromEntityError};
 use crate::api::control::element::WebRtcPlayEndpoint;
@@ -36,7 +35,7 @@ impl MemberSpec {
         self.0
             .pipeline
             .iter()
-            .filter_map(|(name, e)| match e {
+            .filter_map(|(_name, e)| match e {
                 Entity::WebRtcPlayEndpoint { spec } => Some(spec),
                 _ => None,
             })
