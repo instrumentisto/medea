@@ -41,6 +41,10 @@ pub type ActFuture<I, E> =
 pub enum RoomError {
     #[fail(display = "Couldn't find Peer with [id = {}]", _0)]
     PeerNotFound(PeerId),
+    #[fail(display = "Couldn't find Member with [id = {}]", _0)]
+    MemberNotFound(MemberId),
+    #[fail(display = "Member [id = {}] does not have Turn credentials", _0)]
+    NoTurnCredentials(MemberId),
     #[fail(display = "Couldn't find RpcConnection with Member [id = {}]", _0)]
     ConnectionNotExists(MemberId),
     #[fail(display = "Unable to send event to Member [id = {}]", _0)]
@@ -125,10 +129,10 @@ impl Room {
         let ice_servers = self
             .participants
             .get_member(member_id)
-            .unwrap()
+            .ok_or_else(|| RoomError::MemberNotFound(member_id))?
             .ice_user
             .as_ref()
-            .unwrap()
+            .ok_or_else(|| RoomError::NoTurnCredentials(member_id))?
             .to_servers_list();
         let peer_created = Event::PeerCreated {
             peer_id: sender.id(),
@@ -164,10 +168,10 @@ impl Room {
         let ice_servers = self
             .participants
             .get_member(to_member_id)
-            .unwrap()
+            .ok_or_else(|| RoomError::MemberNotFound(to_member_id))?
             .ice_user
             .as_ref()
-            .unwrap()
+            .ok_or_else(|| RoomError::NoTurnCredentials(to_member_id))?
             .to_servers_list();
 
         let event = Event::PeerCreated {

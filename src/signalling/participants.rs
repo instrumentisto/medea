@@ -58,7 +58,7 @@ impl From<MailboxError> for ParticipantServiceErr {
 /// Participant is [`Member`] with [`RpcConnection`]. [`ParticipantService`]
 /// stores [`Members`] and associated [`RpcConnection`]s, handles
 /// [`RpcConnection`] authorization, establishment, message sending.
-#[derive(Debug)]
+#[cfg_attr(not(test), derive(Debug))]
 pub struct ParticipantService {
     /// [`Member`]s which currently are present in this [`Room`].
     members: HashMap<MemberId, Member>,
@@ -273,4 +273,19 @@ impl ParticipantService {
 
         join_all(close_fut).map(|_| ())
     }
+}
+
+#[cfg(test)]
+
+pub mod test {
+    use std::fmt::{Debug, Formatter, Result};
+
+    use super::*;
+
+    impl Debug for ParticipantService {
+        fn fmt(&self, f: &mut Formatter) -> Result {
+            unimplemented!()
+        }
+    }
+
 }

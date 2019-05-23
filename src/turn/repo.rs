@@ -5,7 +5,7 @@ use actix_redis::{Command, RedisActor};
 use crypto::{digest::Digest, md5::Md5};
 use failure::Fail;
 use futures::future::Future;
-use redis_async::resp::RespValue;
+use redis_async::{resp::RespValue, resp_array};
 
 use crate::{log::prelude::*, media::IceUser};
 

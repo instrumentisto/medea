@@ -1,8 +1,6 @@
 //! Medea media server application.
 
 #[macro_use]
-extern crate redis_async;
-#[macro_use]
 pub mod utils;
 pub mod api;
 pub mod conf;
