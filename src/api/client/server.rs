@@ -110,7 +110,7 @@ mod test {
 
     use crate::{
         api::control::Member,
-        conf::{Conf, Redis, Server, Turn},
+        conf::{Conf, Server, Turn},
         media::create_peers,
         signalling::Room,
     };
@@ -177,7 +177,6 @@ mod test {
             },
             turn: Turn::default(),
             server: Server::default(),
-            redis: Redis::default(),
         };
 
         let mut server = ws_server(conf.clone());

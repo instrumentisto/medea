@@ -43,7 +43,7 @@
 # Default:
 #   pass = "PASS"
 
-[redis]
+[turn.redis]
 # IP address to bind Redis server to.
 #
 # Default:
@@ -52,7 +52,7 @@
 # Redis database port.
 #
 # Default:
-#   ip = 6379
+#   port = 6379
 
 # Redis database password.
 #
