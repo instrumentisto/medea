@@ -29,7 +29,7 @@ fn main() {
     let config = Conf::parse().unwrap();
     info!("{:?}", config);
 
-    let room_spec = load_from_file("room_spec_test.yml").unwrap();
+    let room_spec = load_from_file("room_spec.yml").unwrap();
 
     //    println!("{:#?}", room_spec);
 

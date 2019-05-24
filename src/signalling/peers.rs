@@ -79,6 +79,10 @@ impl PeerRepository {
             caller.spec.get_publish_endpoints(),
             &mut self.last_track_id,
         );
+        responder_peer.add_publish_endpoints(
+            responder.spec.get_publish_endpoints(),
+            &mut self.last_track_id,
+        );
         for endpoint in caller.spec.get_play_endpoints().into_iter() {
             if responder.control_id == endpoint.src.member_id {
                 responder_peer
@@ -88,10 +92,6 @@ impl PeerRepository {
             }
         }
 
-        responder_peer.add_publish_endpoints(
-            responder.spec.get_publish_endpoints(),
-            &mut self.last_track_id,
-        );
         for endpoint in responder.spec.get_play_endpoints().into_iter() {
             if caller.control_id == endpoint.src.member_id {
                 caller_peer

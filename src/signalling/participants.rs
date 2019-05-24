@@ -152,6 +152,31 @@ impl ParticipantService {
         }
     }
 
+    fn connect_waiting_if_exist(&self, member: Member, ctx: &mut Context<Room>) -> Option<String> {
+        let mut added_member = None;
+        if let Some(awaiter) =
+        self.members_awaiting_connection.get(&member.id)
+        {
+            added_member = Some(awaiter.control_id.clone());
+            let connected_new_peer = NewPeer {
+                control_id: member.control_id,
+                signalling_id: member.id,
+                spec: member.spec,
+            };
+            let awaiter_new_peer = NewPeer {
+                spec: awaiter.spec.clone(),
+                control_id: awaiter.control_id.clone(),
+                signalling_id: awaiter.signalling_id,
+            };
+
+            ctx.notify(CreatePeer {
+                caller: connected_new_peer,
+                responder: awaiter_new_peer,
+            });
+        }
+        added_member
+    }
+
     /// Stores provided [`RpcConnection`] for given [`Member`] in the [`Room`].
     /// If [`Member`] already has any other [`RpcConnection`],
     /// then it will be closed.
@@ -184,39 +209,19 @@ impl ParticipantService {
             let connected_member_play_endpoints =
                 connected_member.spec.get_play_endpoints();
 
-            // connect_awaiters
-            let mut added_member = None;
-            if let Some(awaiter) =
-                self.members_awaiting_connection.get_mut(&member_id)
-            {
-                added_member = Some(awaiter.control_id.clone());
-                let connected_new_peer = NewPeer {
-                    control_id: connected_member.control_id.clone(),
-                    signalling_id: connected_member.id,
-                    spec: connected_member.spec.clone(),
-                };
-                let awaiter_new_peer = NewPeer {
-                    spec: awaiter.spec.clone(),
-                    control_id: awaiter.control_id.clone(),
-                    signalling_id: awaiter.signalling_id,
-                };
-
-                ctx.notify(CreatePeer {
-                    caller: connected_new_peer,
-                    responder: awaiter_new_peer,
-                });
-                self.members_awaiting_connection.remove(&member_id);
-            }
+            let mut added_member = self.connect_waiting_if_exist(connected_member.clone(), ctx);
+            self.members_awaiting_connection.remove(&member_id);
 
             // connect_existing_play_endpoints
             for connected_member_endpoint in connected_member_play_endpoints {
                 if let Some(ref c) = added_member {
-                    if connected_member_endpoint.src.member_id.as_str()
-                        == c.as_str()
+                    if &connected_member_endpoint.src.member_id
+                        == c
                     {
                         continue;
                     }
                 }
+
                 let responder_member_control_id =
                     connected_member_endpoint.src.member_id;
                 let responder_member_signalling_id = match self
@@ -234,10 +239,7 @@ impl ParticipantService {
                     }
                 };
 
-                let is_responder_connected = self
-                    .connections
-                    .get(&responder_member_signalling_id)
-                    .is_some();
+                let is_responder_connected = self.member_has_connection(*responder_member_signalling_id);
                 let connected_new_peer = NewPeer {
                     signalling_id: connected_member.id,
                     spec: connected_member.spec.clone(),
@@ -258,6 +260,7 @@ impl ParticipantService {
                         caller: responder_new_peer,
                         responder: connected_new_peer,
                     });
+//                    self.members_awaiting_connection.remove(&member_id);
                 } else {
                     self.members_awaiting_connection.insert(
                         *responder_member_signalling_id,
