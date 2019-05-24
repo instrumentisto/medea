@@ -55,8 +55,8 @@ pub struct ParticipantService {
     /// [`Member`].
     control_signalling_members: HashMap<String, MemberId>,
 
-    /// Stores [`NewPeer`] which wait connection of another [`Member`].
-    members_awaiting_connection: HashMap<MemberId, NewPeer>,
+    /// Stores [`NewPeer`]s which wait connection of another [`Member`].
+    members_waiting_connection: HashMap<MemberId, Vec<NewPeer>>,
 }
 
 impl ParticipantService {
@@ -71,7 +71,7 @@ impl ParticipantService {
             reconnect_timeout,
             drop_connection_tasks: HashMap::new(),
             control_signalling_members,
-            members_awaiting_connection: HashMap::new(),
+            members_waiting_connection: HashMap::new(),
         }
     }
 
@@ -158,31 +158,33 @@ impl ParticipantService {
 
     /// Create [`Peer`]s between waiting [`Member`] and connected.
     ///
-    /// Returns control ID of waiting [`MemberSpec`] if there was one.
-    fn connect_waiting_if_exist(
+    /// Returns all control ID of members which we connected.
+    fn connect_waiting_members(
         &self,
         member: Member,
         ctx: &mut Context<Room>,
-    ) -> Option<String> {
-        let mut added_member = None;
-        if let Some(awaiter) = self.members_awaiting_connection.get(&member.id)
+    ) -> Vec<String> {
+        let mut added_member = Vec::new();
+        if let Some(waiters) = self.members_waiting_connection.get(&member.id)
         {
-            added_member = Some(awaiter.control_id.clone());
-            let connected_new_peer = NewPeer {
-                control_id: member.control_id.clone(),
-                signalling_id: member.id,
-                spec: Arc::clone(&member.spec),
-            };
-            let awaiter_new_peer = NewPeer {
-                spec: Arc::clone(&awaiter.spec),
-                control_id: awaiter.control_id.clone(),
-                signalling_id: awaiter.signalling_id,
-            };
+            for waiter in waiters {
+                added_member.push(waiter.control_id.clone());
+                let connected_new_peer = NewPeer {
+                    control_id: member.control_id.clone(),
+                    signalling_id: member.id,
+                    spec: Arc::clone(&member.spec),
+                };
+                let waiter_new_peer = NewPeer {
+                    spec: Arc::clone(&waiter.spec),
+                    control_id: waiter.control_id.clone(),
+                    signalling_id: waiter.signalling_id,
+                };
 
-            ctx.notify(CreatePeer {
-                caller: connected_new_peer,
-                responder: awaiter_new_peer,
-            });
+                ctx.notify(CreatePeer {
+                    caller: connected_new_peer,
+                    responder: waiter_new_peer,
+                });
+            }
         }
         added_member
     }
@@ -203,15 +205,14 @@ impl ParticipantService {
         let connected_member_play_endpoints =
             connected_member.spec.get_play_endpoints();
 
-        let added_member =
-            self.connect_waiting_if_exist(connected_member.clone(), ctx);
-        self.members_awaiting_connection.remove(&member_id);
+        let added_waiting_members =
+            self.connect_waiting_members(connected_member.clone(), ctx);
+        self.members_waiting_connection.remove(&member_id);
 
         for connected_member_endpoint in connected_member_play_endpoints {
-            if let Some(ref c) = added_member {
-                if &connected_member_endpoint.src.member_id == c {
-                    continue;
-                }
+            // Skip members which waiting for us because we added them before.
+            if added_waiting_members.contains(&connected_member_endpoint.src.member_id) {
+                continue;
             }
 
             let responder_member_control_id =
@@ -263,10 +264,14 @@ impl ParticipantService {
                     responder: connected_new_peer,
                 });
             } else {
-                self.members_awaiting_connection.insert(
-                    *responder_member_signalling_id,
-                    connected_new_peer,
-                );
+                match self.members_waiting_connection.get_mut(responder_member_signalling_id) {
+                    Some(m) => {
+                        m.push(connected_new_peer);
+                    },
+                    None => {
+                        self.members_waiting_connection.insert(*responder_member_signalling_id, vec![connected_new_peer]);
+                    },
+                }
             }
         }
     }
