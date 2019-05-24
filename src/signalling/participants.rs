@@ -49,7 +49,8 @@ pub struct ParticipantService {
     /// before dropping it irrevocably in case it gets reestablished.
     drop_connection_tasks: HashMap<MemberId, SpawnHandle>,
 
-    /// Stores relation between ID of [`MemberSpec`] and ID of signalling [`Member`].
+    /// Stores relation between ID of [`MemberSpec`] and ID of signalling
+    /// [`Member`].
     control_signalling_members: HashMap<String, MemberId>,
 
     /// Stores [`NewPeer`] which wait connection of another [`Member`].

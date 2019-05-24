@@ -6,9 +6,11 @@ use serde::{
     de::{self, Deserializer, Error, Visitor},
     Deserialize,
 };
+
 use std::{convert::TryFrom, fmt};
 
-/// [`Element`] represents a media element that one or more media data streams flow through.
+/// [`Element`] represents a media element that one or more media data streams
+/// flow through.
 #[derive(Debug)]
 pub enum Element {
     WebRtcPublishEndpoint(WebRtcPublishEndpoint),
@@ -38,7 +40,8 @@ pub enum P2pMode {
 }
 
 #[derive(Deserialize, Debug, Clone)]
-/// Media element which is able to publish media data for another client via WebRTC.
+/// Media element which is able to publish media data for another client via
+/// WebRTC.
 pub struct WebRtcPublishEndpoint {
     /// Peer-to-peer mode.
     pub p2p: P2pMode,

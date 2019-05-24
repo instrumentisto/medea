@@ -3,6 +3,7 @@
 use crate::api::control::Entity;
 
 use serde::Deserialize;
+
 use std::collections::HashMap;
 
 /// Entity that represents some pipeline of spec.

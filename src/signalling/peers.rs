@@ -4,11 +4,10 @@ use hashbrown::HashMap;
 
 use std::convert::{TryFrom, TryInto};
 
-use crate::signalling::room::NewPeer;
 use crate::{
     api::control::MemberId,
     media::{Peer, PeerId, PeerStateMachine},
-    signalling::room::RoomError,
+    signalling::room::{NewPeer, RoomError},
 };
 
 #[derive(Debug)]

@@ -6,9 +6,9 @@ pub mod room;
 
 mod pipeline;
 
-use failure::Error;
-use failure::Fail;
+use failure::{Error, Fail};
 use serde::Deserialize;
+
 use std::{convert::TryFrom as _, fs::File, io::Read as _};
 
 use self::{

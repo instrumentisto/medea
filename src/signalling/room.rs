@@ -8,31 +8,27 @@ use actix::{
 use failure::Fail;
 use futures::future;
 use hashbrown::HashMap;
-use medea_client_api_proto::{
-    Command, Event, IceCandidate,
-};
+use medea_client_api_proto::{Command, Event, IceCandidate};
 
-use std::time::Duration;
+use std::{convert::TryFrom, time::Duration};
 
-use crate::api::control::member::MemberSpec;
-use crate::api::control::room::RoomSpec;
-use crate::signalling::RoomId;
 use crate::{
     api::{
         client::rpc_connection::{
             AuthorizationError, Authorize, CommandMessage, RpcConnectionClosed,
             RpcConnectionEstablished,
         },
-        control::{Member, MemberId},
+        control::{member::MemberSpec, room::RoomSpec, Member, MemberId},
     },
     log::prelude::*,
     media::{
         New, Peer, PeerId, PeerStateError, PeerStateMachine,
         WaitLocalHaveRemote, WaitLocalSdp, WaitRemoteSdp,
     },
-    signalling::{participants::ParticipantService, peers::PeerRepository},
+    signalling::{
+        participants::ParticipantService, peers::PeerRepository, RoomId,
+    },
 };
-use std::convert::TryFrom;
 
 /// ID of [`Room`].
 pub type Id = u64;
@@ -481,7 +477,8 @@ mod test {
     use super::*;
 
     fn start_room() -> Addr<Room> {
-        let room_spec = control::load_from_yaml_file("room_spec_test.yml").unwrap();
+        let room_spec =
+            control::load_from_yaml_file("room_spec_test.yml").unwrap();
         let client_room = Room::new(room_spec, Duration::from_secs(10));
         Arbiter::start(move |_| client_room)
     }
@@ -516,10 +513,10 @@ mod test {
             });
         });
 
-//        println!(
-//            "\n\n===RESPONDER===\n{:?}\n\n===CALLER===\n{:?}\n\n\n",
-//            responder_events, caller_events
-//        );
+        //        println!(
+        //            "\n\n===RESPONDER===\n{:?}\n\n===CALLER===\n{:?}\n\n\n",
+        //            responder_events, caller_events
+        //        );
 
         let caller_events = caller_events.lock().unwrap();
         let responder_events = responder_events.lock().unwrap();
