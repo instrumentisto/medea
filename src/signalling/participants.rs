@@ -152,10 +152,13 @@ impl ParticipantService {
         }
     }
 
-    fn connect_waiting_if_exist(&self, member: Member, ctx: &mut Context<Room>) -> Option<String> {
+    fn connect_waiting_if_exist(
+        &self,
+        member: Member,
+        ctx: &mut Context<Room>,
+    ) -> Option<String> {
         let mut added_member = None;
-        if let Some(awaiter) =
-        self.members_awaiting_connection.get(&member.id)
+        if let Some(awaiter) = self.members_awaiting_connection.get(&member.id)
         {
             added_member = Some(awaiter.control_id.clone());
             let connected_new_peer = NewPeer {
@@ -175,6 +178,81 @@ impl ParticipantService {
             });
         }
         added_member
+    }
+
+    fn connect_peers_of_member(
+        &mut self,
+        ctx: &mut Context<Room>,
+        member_id: MemberId,
+    ) {
+        let connected_member = match self.members.get(&member_id) {
+            Some(m) => m,
+            None => {
+                warn!("Connected a non-existent member with id {}!", member_id);
+                return;
+            }
+        };
+        let connected_member_play_endpoints =
+            connected_member.spec.get_play_endpoints();
+
+        let mut added_member =
+            self.connect_waiting_if_exist(connected_member.clone(), ctx);
+        self.members_awaiting_connection.remove(&member_id);
+
+        for connected_member_endpoint in connected_member_play_endpoints {
+            if let Some(ref c) = added_member {
+                if &connected_member_endpoint.src.member_id == c {
+                    continue;
+                }
+            }
+
+            let responder_member_control_id =
+                connected_member_endpoint.src.member_id;
+            let responder_member_signalling_id = match self
+                .control_signalling_members
+                .get(&responder_member_control_id)
+            {
+                Some(r) => r,
+                None => {
+                    warn!(
+                        "Member with control id '{}' not found! Probably this \
+                         is error in spec.",
+                        responder_member_control_id
+                    );
+                    continue;
+                }
+            };
+
+            let connected_new_peer = NewPeer {
+                signalling_id: connected_member.id,
+                spec: connected_member.spec.clone(),
+                control_id: connected_member.control_id.clone(),
+            };
+
+            let is_responder_connected =
+                self.member_has_connection(*responder_member_signalling_id);
+            if is_responder_connected {
+                let responder_new_peer = NewPeer {
+                    signalling_id: *responder_member_signalling_id,
+                    spec: self
+                        .members
+                        .get(&responder_member_signalling_id)
+                        .unwrap()
+                        .spec
+                        .clone(),
+                    control_id: responder_member_control_id,
+                };
+                ctx.notify(CreatePeer {
+                    caller: responder_new_peer,
+                    responder: connected_new_peer,
+                });
+            } else {
+                self.members_awaiting_connection.insert(
+                    *responder_member_signalling_id,
+                    connected_new_peer,
+                );
+            }
+        }
     }
 
     /// Stores provided [`RpcConnection`] for given [`Member`] in the [`Room`].
@@ -199,75 +277,8 @@ impl ParticipantService {
             ctx.spawn(wrap_future(connection.close()));
         } else {
             debug!("Connected member: {}", member_id);
-
-            // TODO:
-            //     1) Create function for that
-            //     2) Simplify
-            //     3) Reduce `clone()`s
-
-            let connected_member = self.members.get(&member_id).unwrap();
-            let connected_member_play_endpoints =
-                connected_member.spec.get_play_endpoints();
-
-            let mut added_member = self.connect_waiting_if_exist(connected_member.clone(), ctx);
-            self.members_awaiting_connection.remove(&member_id);
-
-            // connect_existing_play_endpoints
-            for connected_member_endpoint in connected_member_play_endpoints {
-                if let Some(ref c) = added_member {
-                    if &connected_member_endpoint.src.member_id
-                        == c
-                    {
-                        continue;
-                    }
-                }
-
-                let responder_member_control_id =
-                    connected_member_endpoint.src.member_id;
-                let responder_member_signalling_id = match self
-                    .control_signalling_members
-                    .get(&responder_member_control_id)
-                {
-                    Some(r) => r,
-                    None => {
-                        warn!(
-                            "Member with control id '{}' not found! Probably \
-                             this is error in spec.",
-                            responder_member_control_id
-                        );
-                        continue;
-                    }
-                };
-
-                let is_responder_connected = self.member_has_connection(*responder_member_signalling_id);
-                let connected_new_peer = NewPeer {
-                    signalling_id: connected_member.id,
-                    spec: connected_member.spec.clone(),
-                    control_id: connected_member.control_id.clone(),
-                };
-                let responder_new_peer = NewPeer {
-                    signalling_id: *responder_member_signalling_id,
-                    spec: self
-                        .members
-                        .get(&responder_member_signalling_id)
-                        .unwrap()
-                        .spec
-                        .clone(),
-                    control_id: responder_member_control_id,
-                };
-                if is_responder_connected {
-                    ctx.notify(CreatePeer {
-                        caller: responder_new_peer,
-                        responder: connected_new_peer,
-                    });
-//                    self.members_awaiting_connection.remove(&member_id);
-                } else {
-                    self.members_awaiting_connection.insert(
-                        *responder_member_signalling_id,
-                        connected_new_peer,
-                    );
-                }
-            }
+            
+            self.connect_peers_of_member(ctx, member_id);
 
             self.connections.insert(member_id, con);
         }
