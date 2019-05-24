@@ -91,7 +91,6 @@ impl PeerRepository {
         self.add_peer(caller_peer_id, caller_peer);
         self.add_peer(responder_peer_id, responder_peer);
 
-        // TODO: remove this
         //        println!("Peers: {:#?}", self.peers);
 
         (caller_peer_id, responder_peer_id)

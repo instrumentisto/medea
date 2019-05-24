@@ -76,7 +76,7 @@ impl Room {
     /// Create new instance of [`Room`].
     pub fn new(room: RoomSpec, reconnect_timeout: Duration) -> Self {
         let mut members = HashMap::new();
-        let mut control_signalling_members = HashMap::new(); // TODO: rename
+        let mut control_signalling_members = HashMap::new();
         room.spec.pipeline.iter().enumerate().for_each(
             |(i, (control_id, value))| {
                 let id = (i as u64) + 1;
@@ -337,8 +337,7 @@ impl Handler<CreatePeer> for Room {
         msg: CreatePeer,
         ctx: &mut Self::Context,
     ) -> Self::Result {
-        // TODO: Think about usefulness
-        info!(
+        debug!(
             "Created peer member {} with member {}",
             msg.caller.signalling_id, msg.responder.signalling_id
         );
@@ -348,8 +347,7 @@ impl Handler<CreatePeer> for Room {
 
         ctx.notify(ConnectPeers(caller_peer_id, responder_peer_id));
 
-        // TODO: remove this
-        println!("Peers: {:#?}", self.peers);
+//        println!("Peers: {:#?}", self.peers);
 
         Ok(())
     }
