@@ -303,6 +303,9 @@ impl Peer<New> {
         }
     }
 
+    /// Add all [`WebRtcPublishEndpoint`] to this [`Peer`].
+    ///
+    /// This use `last_track_id` counter for generating new [`MediaTrack`] ID.
     pub fn add_publish_endpoints(
         &mut self,
         endpoints: Vec<&WebRtcPublishEndpoint>,
