@@ -8,7 +8,7 @@ use super::{
 
 use crate::signalling::RoomId;
 
-/// Control API [`Room`] specification.
+/// [`crate::signalling::room::Room`] specification.
 /// Newtype for [`Entity::Room`]
 #[derive(Clone, Debug)]
 pub struct RoomSpec {

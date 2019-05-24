@@ -391,33 +391,6 @@ impl Peer<WaitLocalHaveRemote> {
     }
 }
 
-// TODO: remove it
-pub fn create_peers(
-    caller: MemberId,
-    responder: MemberId,
-) -> HashMap<MemberId, PeerStateMachine> {
-    let caller_peer_id = 1;
-    let responder_peer_id = 2;
-    let mut caller_peer =
-        Peer::new(caller_peer_id, caller, responder_peer_id, responder_peer_id);
-    let mut responder_peer =
-        Peer::new(responder_peer_id, responder, caller_peer_id, caller_peer_id);
-
-    let track_audio =
-        Arc::new(MediaTrack::new(1, MediaType::Audio(AudioSettings {})));
-    let track_video =
-        Arc::new(MediaTrack::new(2, MediaType::Video(VideoSettings {})));
-    caller_peer.add_sender(track_audio.clone());
-    caller_peer.add_sender(track_video.clone());
-    responder_peer.add_receiver(track_audio);
-    responder_peer.add_receiver(track_video);
-
-    hashmap!(
-        caller_peer_id => PeerStateMachine::New(caller_peer),
-        responder_peer_id => PeerStateMachine::New(responder_peer),
-    )
-}
-
 #[test]
 fn create_peer() {
     let peer = Peer::new(1, 1, 2, 2);
