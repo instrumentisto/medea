@@ -200,7 +200,7 @@ impl ParticipantService {
         let connected_member_play_endpoints =
             connected_member.spec.get_play_endpoints();
 
-        let mut added_member =
+        let added_member =
             self.connect_waiting_if_exist(connected_member.clone(), ctx);
         self.members_awaiting_connection.remove(&member_id);
 

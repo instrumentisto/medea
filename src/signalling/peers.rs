@@ -4,16 +4,12 @@ use hashbrown::HashMap;
 
 use std::convert::{TryFrom, TryInto};
 
-use crate::api::control::Member;
-use crate::media::MediaTrack;
 use crate::signalling::room::NewPeer;
 use crate::{
     api::control::MemberId,
     media::{Peer, PeerId, PeerStateMachine},
     signalling::room::RoomError,
 };
-use medea_client_api_proto::{AudioSettings, MediaType, VideoSettings};
-use std::sync::Arc;
 
 #[derive(Debug)]
 pub struct PeerRepository {

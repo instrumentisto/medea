@@ -9,14 +9,13 @@ use failure::Fail;
 use futures::future;
 use hashbrown::HashMap;
 use medea_client_api_proto::{
-    AudioSettings, Command, Event, IceCandidate, MediaType, VideoSettings,
+    Command, Event, IceCandidate,
 };
 
 use std::time::Duration;
 
 use crate::api::control::member::MemberSpec;
 use crate::api::control::room::RoomSpec;
-use crate::media::MediaTrack;
 use crate::signalling::RoomId;
 use crate::{
     api::{
@@ -34,7 +33,6 @@ use crate::{
     signalling::{participants::ParticipantService, peers::PeerRepository},
 };
 use std::convert::TryFrom;
-use std::sync::Arc;
 
 /// ID of [`Room`].
 pub type Id = u64;

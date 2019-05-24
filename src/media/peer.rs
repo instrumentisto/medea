@@ -260,7 +260,7 @@ impl<T> Peer<T> {
         self.context
             .senders
             .iter()
-            .map(|(key, value)| value)
+            .map(|(_key, value)| value)
             .cloned()
             .collect()
     }
@@ -299,7 +299,7 @@ impl Peer<New> {
         endpoints: Vec<WebRtcPublishEndpoint>,
         last_track_id: &mut u64,
     ) {
-        for endpoint in endpoints.into_iter() {
+        for _endpoint in endpoints.into_iter() {
             *last_track_id += 1;
             let track_audio = Arc::new(MediaTrack::new(
                 *last_track_id,
