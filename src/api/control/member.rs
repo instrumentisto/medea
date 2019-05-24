@@ -16,14 +16,19 @@ pub struct Member {
     /// Credentials to authorize [`Member`] with.
     pub credentials: String,
 
+    /// Control API specification of this [`Member`].
     pub spec: MemberSpec,
 
+    /// ID from Control API specification of this [`Member`].
     pub control_id: String,
 }
 
+/// Newtype for [`Entity::Member`] variant.
 #[derive(Clone, Debug)]
 pub struct MemberSpec(pub Pipeline);
+
 impl MemberSpec {
+    /// Get [`Element`] of this [`MemberSpec`] by ID.
     pub fn get_element(
         &self,
         id: &str,
@@ -31,6 +36,7 @@ impl MemberSpec {
         Some(Element::try_from(self.0.pipeline.get(id).cloned()?))
     }
 
+    /// Get all [`WebRtcPlayEndpoint`]s of this [`MemberSpec`].
     pub fn get_play_endpoints(&self) -> Vec<WebRtcPlayEndpoint> {
         self.0
             .pipeline
@@ -43,7 +49,8 @@ impl MemberSpec {
             .collect()
     }
 
-    pub fn get_play_endpoint_by_src(
+    /// Get all [`WebRtcPlayEndpoint`]s by ID of [`MemberSpec`].
+    pub fn get_play_endpoint_by_member_id(
         &self,
         src: &str,
     ) -> Vec<WebRtcPlayEndpoint> {
@@ -54,6 +61,7 @@ impl MemberSpec {
             .collect()
     }
 
+    /// Get all [`WebRtcPublishEndpoint`]s of this [`MemberSpec`].
     pub fn get_publish_endpoints(&self) -> Vec<WebRtcPublishEndpoint> {
         self.0
             .pipeline

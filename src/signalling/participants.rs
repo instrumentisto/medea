@@ -49,10 +49,11 @@ pub struct ParticipantService {
     /// before dropping it irrevocably in case it gets reestablished.
     drop_connection_tasks: HashMap<MemberId, SpawnHandle>,
 
-    // TODO: Need rename
+    /// Stores relation between ID of [`MemberSpec`] and ID of signalling [`Member`].
     control_signalling_members: HashMap<String, MemberId>,
 
-    members_awaiting_connection: HashMap<u64, NewPeer>,
+    /// Stores [`NewPeer`] which wait connection of another [`Member`].
+    members_awaiting_connection: HashMap<MemberId, NewPeer>,
 }
 
 impl ParticipantService {
@@ -152,6 +153,9 @@ impl ParticipantService {
         }
     }
 
+    /// Create [`Peer`]s between waiting [`Member`] and connected.
+    ///
+    /// Return control ID of waiting [`MemberSpec`].
     fn connect_waiting_if_exist(
         &self,
         member: Member,
@@ -180,7 +184,8 @@ impl ParticipantService {
         added_member
     }
 
-    fn connect_peers_of_member(
+    /// Interconnect [`Peer`]s of members based on [`MemberSpec`].
+    fn create_and_interconnect_members_peers(
         &mut self,
         ctx: &mut Context<Room>,
         member_id: MemberId,
@@ -258,6 +263,7 @@ impl ParticipantService {
     /// Stores provided [`RpcConnection`] for given [`Member`] in the [`Room`].
     /// If [`Member`] already has any other [`RpcConnection`],
     /// then it will be closed.
+    /// Create and interconnect all necessary [`Member`]'s [`Peer`].
     pub fn connection_established(
         &mut self,
         ctx: &mut Context<Room>,
@@ -277,8 +283,8 @@ impl ParticipantService {
             ctx.spawn(wrap_future(connection.close()));
         } else {
             debug!("Connected member: {}", member_id);
-            
-            self.connect_peers_of_member(ctx, member_id);
+
+            self.create_and_interconnect_members_peers(ctx, member_id);
 
             self.connections.insert(member_id, con);
         }

@@ -19,9 +19,12 @@ use std::sync::Arc;
 pub struct PeerRepository {
     /// [`Peer`]s of [`Member`]s in this [`Room`].
     peers: HashMap<PeerId, PeerStateMachine>,
-    waiting_members: HashMap<MemberId, NewPeer>,
+
+    /// Count of [`Peer`]s in this [`Room`].
     peers_count: u64,
-    last_track_id: u64,
+
+    /// Count of [`MediaTrack`]s in this [`Room`].
+    tracks_count: u64,
 }
 
 impl PeerRepository {
@@ -40,18 +43,7 @@ impl PeerRepository {
             .ok_or_else(|| RoomError::PeerNotFound(peer_id))
     }
 
-    pub fn add_waiter_member(&mut self, id: MemberId, peer: NewPeer) {
-        self.waiting_members.insert(id, peer);
-    }
-
-    pub fn get_waiting_member_peer(&self, id: MemberId) -> Option<NewPeer> {
-        self.waiting_members.get(&id).cloned()
-    }
-
-    pub fn connect_waiting_member(&self, member: &Member) {
-        // TODO
-    }
-
+    /// Create and interconnect [`Peer`]s based on [`MemberSpec`].
     pub fn create_peers(
         &mut self,
         caller: NewPeer,
@@ -77,11 +69,11 @@ impl PeerRepository {
 
         caller_peer.add_publish_endpoints(
             caller.spec.get_publish_endpoints(),
-            &mut self.last_track_id,
+            &mut self.tracks_count,
         );
         responder_peer.add_publish_endpoints(
             responder.spec.get_publish_endpoints(),
-            &mut self.last_track_id,
+            &mut self.tracks_count,
         );
         for endpoint in caller.spec.get_play_endpoints().into_iter() {
             if responder.control_id == endpoint.src.member_id {
@@ -164,9 +156,8 @@ impl From<HashMap<PeerId, PeerStateMachine>> for PeerRepository {
     fn from(map: HashMap<PeerId, PeerStateMachine>) -> Self {
         Self {
             peers: map,
-            waiting_members: HashMap::new(),
             peers_count: 0,
-            last_track_id: 0,
+            tracks_count: 0,
         }
     }
 }

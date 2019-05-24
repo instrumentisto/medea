@@ -118,7 +118,7 @@ mod test {
 
     /// Creates [`RoomsRepository`] for tests filled with a single [`Room`].
     fn room(conf: Rpc) -> RoomsRepository {
-        let room_spec = control::load_from_file("room_spec_test.yml").unwrap();
+        let room_spec = control::load_from_yaml_file("room_spec_test.yml").unwrap();
 
         let client_room = Room::new(room_spec, conf.reconnect_timeout);
         let room_id = client_room.get_id();

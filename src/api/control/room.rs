@@ -8,12 +8,20 @@ use super::{
 
 use crate::signalling::RoomId;
 
+/// Control API [`Room`] specification.
+/// Newtype for [`Entity::Room`]
 #[derive(Clone, Debug)]
 pub struct RoomSpec {
     pub id: RoomId,
     pub spec: Pipeline,
 }
+
 impl RoomSpec {
+    /// Try to find [`MemberSpec`] by ID.
+    ///
+    /// Return `None` if [`MemberSpec`] not presented in [`RoomSpec`].
+    /// Return `Some(TryFromEntityError::NotMember)` if entity with this ID
+    ///         finded but its not [`MemberSpec`].
     pub fn get_member(
         &self,
         id: &str,

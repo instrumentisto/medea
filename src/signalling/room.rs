@@ -74,16 +74,13 @@ pub struct Room {
     /// [`Peer`]s of [`Member`]s in this [`Room`].
     peers: PeerRepository,
 
-    // TODO: Add docs
+    /// This [`Room`]'s control API specification.
     spec: RoomSpec,
-
-    peers_count: u64,
 }
 
 impl Room {
     /// Create new instance of [`Room`].
     pub fn new(room: RoomSpec, reconnect_timeout: Duration) -> Self {
-        // TODO: Rewrite it only with iterator
         let mut members = HashMap::new();
         let mut control_signalling_members = HashMap::new(); // TODO: rename
         room.spec.pipeline.iter().enumerate().for_each(
@@ -112,8 +109,6 @@ impl Room {
                 reconnect_timeout,
             ),
             spec: room,
-            //            control_signalling_members
-            peers_count: 0,
         }
     }
 
@@ -342,6 +337,7 @@ pub struct CreatePeer {
 impl Handler<CreatePeer> for Room {
     type Result = Result<(), ()>;
 
+    /// Create [`Peer`] between members and interconnect it by control API spec.
     fn handle(
         &mut self,
         msg: CreatePeer,
@@ -416,6 +412,7 @@ impl Handler<RpcConnectionEstablished> for Room {
 
     /// Saves new [`RpcConnection`] in [`ParticipantService`], initiates media
     /// establishment between members.
+    /// Create and interconnect all necessary [`Member`]'s [`Peer`].
     fn handle(
         &mut self,
         msg: RpcConnectionEstablished,
@@ -486,7 +483,7 @@ mod test {
     use super::*;
 
     fn start_room() -> Addr<Room> {
-        let room_spec = control::load_from_file("room_spec_test.yml").unwrap();
+        let room_spec = control::load_from_yaml_file("room_spec_test.yml").unwrap();
         let client_room = Room::new(room_spec, Duration::from_secs(10));
         Arbiter::start(move |_| client_room)
     }
@@ -521,10 +518,10 @@ mod test {
             });
         });
 
-        println!(
-            "\n\n===RESPONDER===\n{:?}\n\n===CALLER===\n{:?}\n\n\n",
-            responder_events, caller_events
-        );
+//        println!(
+//            "\n\n===RESPONDER===\n{:?}\n\n===CALLER===\n{:?}\n\n\n",
+//            responder_events, caller_events
+//        );
 
         let caller_events = caller_events.lock().unwrap();
         let responder_events = responder_events.lock().unwrap();

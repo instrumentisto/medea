@@ -13,7 +13,7 @@ use dotenv::dotenv;
 use log::prelude::*;
 
 use crate::{
-    api::{client::server, control::load_from_file},
+    api::{client::server, control::load_from_yaml_file},
     conf::Conf,
     signalling::{room_repo::RoomsRepository, Room},
 };
@@ -29,7 +29,7 @@ fn main() {
     let config = Conf::parse().unwrap();
     info!("{:?}", config);
 
-    let room_spec = load_from_file("room_spec.yml").unwrap();
+    let room_spec = load_from_yaml_file("room_spec.yml").unwrap();
 
     //    println!("{:#?}", room_spec);
 

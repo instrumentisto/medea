@@ -255,6 +255,7 @@ impl<T> Peer<T> {
             })
     }
 
+    /// Returns all senders [`MediaTrack`].
     pub fn get_senders(&self) -> Vec<Arc<MediaTrack>> {
         self.context
             .senders

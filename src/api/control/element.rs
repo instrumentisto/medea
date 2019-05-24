@@ -1,3 +1,5 @@
+//! Control API specification Element definitions.
+
 use super::{Entity, TryFromEntityError};
 
 use serde::{
@@ -6,6 +8,7 @@ use serde::{
 };
 use std::{convert::TryFrom, fmt};
 
+/// [`Element`] represents a media element that one or more media data streams flow through.
 #[derive(Debug)]
 pub enum Element {
     WebRtcPublishEndpoint(WebRtcPublishEndpoint),
@@ -35,19 +38,21 @@ pub enum P2pMode {
 }
 
 #[derive(Deserialize, Debug, Clone)]
-/// Media element which is able to play media data for client via WebRTC.
+/// Media element which is able to publish media data for another client via WebRTC.
 pub struct WebRtcPublishEndpoint {
     /// Peer-to-peer mode.
     pub p2p: P2pMode,
 }
 
+/// Media element which is able to play media data for client via WebRTC.
 #[derive(Deserialize, Debug, Clone)]
 pub struct WebRtcPlayEndpoint {
+    /// Source URI in format `local://{room_id}/{member_id}/{pipeline_id}`.
     pub src: LocalUri,
 }
 
 #[derive(Debug, Clone)]
-/// Special uri with pattern "local://{room_id}/{member_id}/{pipeline_id}
+/// Special uri with pattern `local://{room_id}/{member_id}/{pipeline_id}`.
 pub struct LocalUri {
     /// ID of [`Room`]
     // TODO: Why this field never used???
@@ -59,6 +64,8 @@ pub struct LocalUri {
 }
 
 // TODO: Write unit tests?
+/// Serde deserializer for [`LocalUri`].
+/// Deserialize URIs with pattern `local://{room_id}/{member_id}/{pipeline_id}.
 impl<'de> Deserialize<'de> for LocalUri {
     fn deserialize<D>(deserializer: D) -> Result<LocalUri, D::Error>
     where
