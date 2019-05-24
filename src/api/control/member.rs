@@ -5,6 +5,7 @@ use std::convert::TryFrom;
 use super::{element::Element, pipeline::Pipeline, Entity, TryFromEntityError};
 
 use crate::api::control::element::{WebRtcPlayEndpoint, WebRtcPublishEndpoint};
+use std::sync::Arc;
 
 pub type Id = u64;
 
@@ -18,7 +19,7 @@ pub struct Member {
     pub credentials: String,
 
     /// Control API specification of this [`Member`].
-    pub spec: MemberSpec,
+    pub spec: Arc<MemberSpec>,
 
     /// ID from Control API specification of this [`Member`].
     pub control_id: String,
@@ -38,7 +39,7 @@ impl MemberSpec {
     }
 
     /// Get all [`WebRtcPlayEndpoint`]s of this [`MemberSpec`].
-    pub fn get_play_endpoints(&self) -> Vec<WebRtcPlayEndpoint> {
+    pub fn get_play_endpoints(&self) -> Vec<&WebRtcPlayEndpoint> {
         self.0
             .pipeline
             .iter()
@@ -46,7 +47,6 @@ impl MemberSpec {
                 Entity::WebRtcPlayEndpoint { spec } => Some(spec),
                 _ => None,
             })
-            .cloned()
             .collect()
     }
 
@@ -54,16 +54,15 @@ impl MemberSpec {
     pub fn get_play_endpoint_by_member_id(
         &self,
         src: &str,
-    ) -> Vec<WebRtcPlayEndpoint> {
+    ) -> Vec<&WebRtcPlayEndpoint> {
         self.get_play_endpoints()
-            .iter()
+            .into_iter()
             .filter(|endpoint| endpoint.src.member_id == src)
-            .cloned()
             .collect()
     }
 
     /// Get all [`WebRtcPublishEndpoint`]s of this [`MemberSpec`].
-    pub fn get_publish_endpoints(&self) -> Vec<WebRtcPublishEndpoint> {
+    pub fn get_publish_endpoints(&self) -> Vec<&WebRtcPublishEndpoint> {
         self.0
             .pipeline
             .iter()
@@ -71,7 +70,6 @@ impl MemberSpec {
                 Entity::WebRtcPublishEndpoint { spec } => Some(spec),
                 _ => None,
             })
-            .cloned()
             .collect()
     }
 }

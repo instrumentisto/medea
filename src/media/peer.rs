@@ -274,7 +274,7 @@ impl<T> Peer<T> {
 #[derive(Debug, Clone)]
 pub struct NewPeer {
     pub signalling_id: u64,
-    pub spec: MemberSpec,
+    pub spec: Arc<MemberSpec>,
     pub control_id: String,
 }
 
@@ -304,7 +304,7 @@ impl Peer<New> {
 
     pub fn add_publish_endpoints(
         &mut self,
-        endpoints: Vec<WebRtcPublishEndpoint>,
+        endpoints: Vec<&WebRtcPublishEndpoint>,
         last_track_id: &mut u64,
     ) {
         for _endpoint in endpoints.into_iter() {

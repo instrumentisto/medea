@@ -39,6 +39,8 @@ impl PeerRepository {
     }
 
     /// Create and interconnect [`Peer`]s based on [`MemberSpec`].
+    ///
+    /// Returns IDs of created [`Peer`]s. `(caller_peer_id, responder_peer_id)`.
     pub fn create_peers(
         &mut self,
         caller: NewPeer,

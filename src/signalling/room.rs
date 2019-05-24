@@ -29,6 +29,7 @@ use crate::{
         participants::ParticipantService, peers::PeerRepository, RoomId,
     },
 };
+use std::sync::Arc;
 
 /// ID of [`Room`].
 pub type Id = u64;
@@ -85,7 +86,7 @@ impl Room {
                 control_signalling_members.insert(control_id.clone(), id);
                 let member = Member {
                     id,
-                    spec: member_spec,
+                    spec: Arc::new(member_spec),
                     credentials: format!("{}-credentials", id),
                     control_id: control_id.clone(),
                 };

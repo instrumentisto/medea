@@ -3,6 +3,7 @@
 //! [`RpcConnection`] authorization, establishment, message sending.
 
 use std::time::{Duration, Instant};
+use std::sync::Arc;
 
 use actix::{fut::wrap_future, AsyncContext, Context, SpawnHandle};
 use futures::{
@@ -168,12 +169,12 @@ impl ParticipantService {
         {
             added_member = Some(awaiter.control_id.clone());
             let connected_new_peer = NewPeer {
-                control_id: member.control_id,
+                control_id: member.control_id.clone(),
                 signalling_id: member.id,
-                spec: member.spec,
+                spec: Arc::clone(&member.spec),
             };
             let awaiter_new_peer = NewPeer {
-                spec: awaiter.spec.clone(),
+                spec: Arc::clone(&awaiter.spec),
                 control_id: awaiter.control_id.clone(),
                 signalling_id: awaiter.signalling_id,
             };
@@ -214,10 +215,10 @@ impl ParticipantService {
             }
 
             let responder_member_control_id =
-                connected_member_endpoint.src.member_id;
+                &connected_member_endpoint.src.member_id;
             let responder_member_signalling_id = match self
                 .control_signalling_members
-                .get(&responder_member_control_id)
+                .get(responder_member_control_id)
             {
                 Some(r) => r,
                 None => {
@@ -232,7 +233,7 @@ impl ParticipantService {
 
             let connected_new_peer = NewPeer {
                 signalling_id: connected_member.id,
-                spec: connected_member.spec.clone(),
+                spec: Arc::clone(&connected_member.spec),
                 control_id: connected_member.control_id.clone(),
             };
 
@@ -241,7 +242,7 @@ impl ParticipantService {
             if is_responder_connected {
                 let responder_spec =
                     match self.members.get(&responder_member_signalling_id) {
-                        Some(m) => m,
+                        Some(m) => m.spec.clone(),
                         None => {
                             warn!(
                                 "Try to get nonexistent member by signalling \
@@ -254,13 +255,8 @@ impl ParticipantService {
 
                 let responder_new_peer = NewPeer {
                     signalling_id: *responder_member_signalling_id,
-                    spec: self
-                        .members
-                        .get(&responder_member_signalling_id)
-                        .unwrap()
-                        .spec
-                        .clone(),
-                    control_id: responder_member_control_id,
+                    spec: Arc::clone(&responder_spec),
+                    control_id: responder_member_control_id.clone(),
                 };
                 ctx.notify(CreatePeer {
                     caller: responder_new_peer,
