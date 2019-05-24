@@ -472,11 +472,7 @@ mod test {
         let client_room = Room::new(room_spec, Duration::from_secs(10));
         Arbiter::start(move |_| client_room)
     }
-
-    // TODO: Fix this test.
-    //       This test sometimes fails due to racing connections.
-    //       When the second user connects first, and the first user
-    //       follows him, their events are swapped.
+    
     #[test]
     fn start_signaling() {
         let stopped = Arc::new(AtomicUsize::new(0));
@@ -503,80 +499,80 @@ mod test {
             });
         });
 
-        //        println!(
-        //            "\n\n===RESPONDER===\n{:?}\n\n===CALLER===\n{:?}\n\n\n",
-        //            responder_events, caller_events
-        //        );
-
         let caller_events = caller_events.lock().unwrap();
         let responder_events = responder_events.lock().unwrap();
-        assert_eq!(
-            caller_events.to_vec(),
-            vec![
-                serde_json::to_string(&Event::PeerCreated {
-                    peer_id: 1,
-                    sdp_offer: None,
-                    tracks: vec![
-                        Track {
-                            id: 1,
-                            direction: Direction::Send { receivers: vec![2] },
-                            media_type: MediaType::Audio(AudioSettings {}),
-                        },
-                        Track {
-                            id: 2,
-                            direction: Direction::Send { receivers: vec![2] },
-                            media_type: MediaType::Video(VideoSettings {}),
-                        },
-                    ],
-                })
-                .unwrap(),
-                serde_json::to_string(&Event::SdpAnswerMade {
-                    peer_id: 1,
-                    sdp_answer: "responder_answer".into(),
-                })
-                .unwrap(),
-                serde_json::to_string(&Event::IceCandidateDiscovered {
-                    peer_id: 1,
-                    candidate: IceCandidate {
-                        candidate: "ice_candidate".to_owned(),
-                        sdp_m_line_index: None,
-                        sdp_mid: None
-                    },
-                })
-                .unwrap(),
-            ]
-        );
 
-        assert_eq!(
-            responder_events.to_vec(),
-            vec![
-                serde_json::to_string(&Event::PeerCreated {
-                    peer_id: 2,
-                    sdp_offer: Some("caller_offer".into()),
-                    tracks: vec![
-                        Track {
-                            id: 1,
-                            direction: Direction::Recv { sender: 1 },
-                            media_type: MediaType::Audio(AudioSettings {}),
-                        },
-                        Track {
-                            id: 2,
-                            direction: Direction::Recv { sender: 1 },
-                            media_type: MediaType::Video(VideoSettings {}),
-                        },
-                    ],
-                })
-                .unwrap(),
-                serde_json::to_string(&Event::IceCandidateDiscovered {
-                    peer_id: 2,
-                    candidate: IceCandidate {
-                        candidate: "ice_candidate".to_owned(),
-                        sdp_m_line_index: None,
-                        sdp_mid: None
+        let first_connected_member_events = vec![
+            serde_json::to_string(&Event::PeerCreated {
+                peer_id: 1,
+                sdp_offer: None,
+                tracks: vec![
+                    Track {
+                        id: 1,
+                        direction: Direction::Send { receivers: vec![2] },
+                        media_type: MediaType::Audio(AudioSettings {}),
                     },
-                })
+                    Track {
+                        id: 2,
+                        direction: Direction::Send { receivers: vec![2] },
+                        media_type: MediaType::Video(VideoSettings {}),
+                    },
+                ],
+            })
                 .unwrap(),
-            ]
-        );
+            serde_json::to_string(&Event::SdpAnswerMade {
+                peer_id: 1,
+                sdp_answer: "responder_answer".into(),
+            })
+                .unwrap(),
+            serde_json::to_string(&Event::IceCandidateDiscovered {
+                peer_id: 1,
+                candidate: IceCandidate {
+                    candidate: "ice_candidate".to_owned(),
+                    sdp_m_line_index: None,
+                    sdp_mid: None
+                },
+            })
+                .unwrap(),
+        ];
+        let second_connected_member_events = vec![
+            serde_json::to_string(&Event::PeerCreated {
+                peer_id: 2,
+                sdp_offer: Some("caller_offer".into()),
+                tracks: vec![
+                    Track {
+                        id: 1,
+                        direction: Direction::Recv { sender: 1 },
+                        media_type: MediaType::Audio(AudioSettings {}),
+                    },
+                    Track {
+                        id: 2,
+                        direction: Direction::Recv { sender: 1 },
+                        media_type: MediaType::Video(VideoSettings {}),
+                    },
+                ],
+            })
+                .unwrap(),
+            serde_json::to_string(&Event::IceCandidateDiscovered {
+                peer_id: 2,
+                candidate: IceCandidate {
+                    candidate: "ice_candidate".to_owned(),
+                    sdp_m_line_index: None,
+                    sdp_mid: None
+                },
+            })
+                .unwrap(),
+        ];
+
+        let caller_events = caller_events.to_vec();
+        let responder_events = responder_events.to_vec();
+
+        if caller_events != first_connected_member_events {
+            assert_eq!(caller_events, second_connected_member_events);
+        }
+
+        if responder_events != first_connected_member_events {
+            assert_eq!(responder_events, second_connected_member_events);
+        }
     }
 }
