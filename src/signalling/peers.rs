@@ -6,8 +6,8 @@ use std::convert::{TryFrom, TryInto};
 
 use crate::{
     api::control::MemberId,
-    media::{Peer, PeerId, PeerStateMachine},
-    signalling::room::{NewPeer, RoomError},
+    media::{Peer, PeerId, PeerStateMachine, NewPeer},
+    signalling::room::RoomError,
 };
 
 #[derive(Debug)]

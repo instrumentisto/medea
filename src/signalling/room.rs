@@ -23,7 +23,7 @@ use crate::{
     log::prelude::*,
     media::{
         New, Peer, PeerId, PeerStateError, PeerStateMachine,
-        WaitLocalHaveRemote, WaitLocalSdp, WaitRemoteSdp,
+        WaitLocalHaveRemote, WaitLocalSdp, WaitRemoteSdp, NewPeer,
     },
     signalling::{
         participants::ParticipantService, peers::PeerRepository, RoomId,
@@ -311,14 +311,6 @@ impl Handler<ConnectPeers> for Room {
             }
         }
     }
-}
-
-// TODO: Move into peers.rs
-#[derive(Debug, Clone)]
-pub struct NewPeer {
-    pub signalling_id: u64,
-    pub spec: MemberSpec,
-    pub control_id: String,
 }
 
 #[derive(Debug, Message)]

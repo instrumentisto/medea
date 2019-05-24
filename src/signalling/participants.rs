@@ -20,9 +20,10 @@ use crate::{
         },
         control::{Member, MemberId},
     },
+    media::NewPeer,
     log::prelude::*,
     signalling::{
-        room::{CloseRoom, CreatePeer, NewPeer, RoomError},
+        room::{CloseRoom, CreatePeer, RoomError},
         Room,
     },
 };

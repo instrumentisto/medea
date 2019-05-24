@@ -12,7 +12,7 @@ use medea_client_api_proto::{
 use std::{convert::TryFrom, fmt::Display, sync::Arc};
 
 use crate::{
-    api::control::{element::WebRtcPublishEndpoint, MemberId},
+    api::control::{element::WebRtcPublishEndpoint, MemberId, member::MemberSpec},
     media::{MediaTrack, TrackId},
 };
 
@@ -267,6 +267,13 @@ impl<T> Peer<T> {
     pub fn is_sender(&self) -> bool {
         !self.context.senders.is_empty()
     }
+}
+
+#[derive(Debug, Clone)]
+pub struct NewPeer {
+    pub signalling_id: u64,
+    pub spec: MemberSpec,
+    pub control_id: String,
 }
 
 impl Peer<New> {
