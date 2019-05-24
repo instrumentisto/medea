@@ -38,7 +38,7 @@ fmt: cargo.fmt
 #	make up
 
 up:
-	$(MAKE) -j2 up.jason up.medea
+	$(MAKE) -j3 up.coturn up.jason up.medea
 
 
 test: test.unit
@@ -167,6 +167,15 @@ up.jason:
 
 up.medea:
 	cargo run --bin medea
+
+
+# Run Coturn and Redis.
+#
+# Usage:
+#	make up.coturn
+
+up.coturn:
+	docker-compose up
 
 
 

@@ -2,8 +2,6 @@ version: '3.4'
 
 services:
   coturn-db:
-    networks:
-      - turn-net
     container_name: ${COMPOSE_PROJECT_NAME}-coturn-db
     image: redis:alpine
     command: ["redis-server", "/etc/redis.conf"]
@@ -12,21 +10,12 @@ services:
     volumes:
       - ./_dev/coturn/redis.conf:/etc/redis.conf:ro
   coturn:
-    networks:
-      - turn-net
     container_name: ${COMPOSE_PROJECT_NAME}-coturn
     image: instrumentisto/coturn:4.5
     depends_on: ["coturn-db"]
-    ports:
-      - "3478:3478"        # coturn stun/turn
-      - "3478:3478/udp"    # coturn stun/turn
     command:
       - --log-file=stdout
-      - --Verbose
     volumes:
       - ./_dev/coturn/turnserver.conf:/etc/coturn/turnserver.conf:ro
       - ./.cache/coturn/data:/var/lib/coturn
-
-networks:
-  turn-net:
-    driver: bridge
+    network_mode: host
