@@ -3,7 +3,7 @@
 use std::convert::TryFrom;
 
 use super::{element::Element, pipeline::Pipeline, Entity, TryFromEntityError};
-use crate::api::control::element::WebRtcPlayEndpoint;
+use crate::api::control::element::{WebRtcPlayEndpoint, WebRtcPublishEndpoint};
 
 pub type Id = u64;
 
@@ -37,6 +37,29 @@ impl MemberSpec {
             .iter()
             .filter_map(|(_name, e)| match e {
                 Entity::WebRtcPlayEndpoint { spec } => Some(spec),
+                _ => None,
+            })
+            .cloned()
+            .collect()
+    }
+
+    pub fn get_play_endpoint_by_src(
+        &self,
+        src: &str,
+    ) -> Vec<WebRtcPlayEndpoint> {
+        self.get_play_endpoints()
+            .iter()
+            .filter(|endpoint| endpoint.src.member_id == src)
+            .cloned()
+            .collect()
+    }
+
+    pub fn get_publish_endpoints(&self) -> Vec<WebRtcPublishEndpoint> {
+        self.0
+            .pipeline
+            .iter()
+            .filter_map(|(_name, e)| match e {
+                Entity::WebRtcPublishEndpoint { spec } => Some(spec),
                 _ => None,
             })
             .cloned()

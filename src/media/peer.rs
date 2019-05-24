@@ -11,6 +11,7 @@ use medea_client_api_proto::{
 
 use std::{convert::TryFrom, fmt::Display, sync::Arc};
 
+use crate::api::control::element::WebRtcPublishEndpoint;
 use crate::{
     api::control::MemberId,
     media::{MediaTrack, TrackId},
@@ -254,6 +255,15 @@ impl<T> Peer<T> {
             })
     }
 
+    pub fn get_senders(&self) -> Vec<Arc<MediaTrack>> {
+        self.context
+            .senders
+            .iter()
+            .map(|(key, value)| value)
+            .cloned()
+            .collect()
+    }
+
     pub fn is_sender(&self) -> bool {
         !self.context.senders.is_empty()
     }
@@ -280,6 +290,28 @@ impl Peer<New> {
         Self {
             context,
             state: New {},
+        }
+    }
+
+    pub fn add_publish_endpoints(
+        &mut self,
+        endpoints: Vec<WebRtcPublishEndpoint>,
+        last_track_id: &mut u64,
+    ) {
+        for endpoint in endpoints.into_iter() {
+            *last_track_id += 1;
+            let track_audio = Arc::new(MediaTrack::new(
+                *last_track_id,
+                MediaType::Audio(AudioSettings {}),
+            ));
+            *last_track_id += 1;
+            let track_video = Arc::new(MediaTrack::new(
+                *last_track_id,
+                MediaType::Video(VideoSettings {}),
+            ));
+
+            self.add_sender(track_audio);
+            self.add_sender(track_video);
         }
     }
 

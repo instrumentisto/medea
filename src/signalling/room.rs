@@ -82,10 +82,7 @@ pub struct Room {
 
 impl Room {
     /// Create new instance of [`Room`].
-    pub fn new(
-        room: RoomSpec,
-        reconnect_timeout: Duration,
-    ) -> Self {
+    pub fn new(room: RoomSpec, reconnect_timeout: Duration) -> Self {
         // TODO: Rewrite it only with iterator
         let mut members = HashMap::new();
         let mut control_signalling_members = HashMap::new(); // TODO: rename
@@ -327,7 +324,8 @@ impl Handler<ConnectPeers> for Room {
     }
 }
 
-#[derive(Debug)]
+// TODO: Move into peers.rs
+#[derive(Debug, Clone)]
 pub struct NewPeer {
     pub signalling_id: u64,
     pub spec: MemberSpec,
@@ -336,7 +334,6 @@ pub struct NewPeer {
 
 #[derive(Debug, Message)]
 #[rtype(result = "Result<(), ()>")]
-// TODO: maybe fewer fields???
 pub struct CreatePeer {
     pub caller: NewPeer,
     pub responder: NewPeer,
@@ -356,78 +353,13 @@ impl Handler<CreatePeer> for Room {
             msg.caller.signalling_id, msg.responder.signalling_id
         );
 
-        // TODO: Maybe need another implementation of dynamic peer ids?
-        self.peers_count += 1;
-        let caller_peer_id = self.peers_count;
-        self.peers_count += 1;
-        let responder_peer_id = self.peers_count;
+        let (caller_peer_id, responder_peer_id) =
+            self.peers.create_peers(msg.caller, msg.responder);
 
-        let mut caller_peer = Peer::new(
-            caller_peer_id,
-            msg.caller.signalling_id,
-            responder_peer_id,
-            msg.responder.signalling_id,
-        );
-        let mut responder_peer = Peer::new(
-            responder_peer_id,
-            msg.responder.signalling_id,
-            caller_peer_id,
-            msg.caller.signalling_id,
-        );
-
-        let mut last_track_id = 0;
-
-        // TODO: remove boilerplate
-        for endpoint in msg.caller.spec.get_play_endpoints().into_iter() {
-            if endpoint.src.member_id == msg.responder.control_id {
-                last_track_id += 1;
-                let track_audio = Arc::new(MediaTrack::new(
-                    last_track_id,
-                    MediaType::Audio(AudioSettings {}),
-                ));
-                last_track_id += 1;
-                let track_video = Arc::new(MediaTrack::new(
-                    last_track_id,
-                    MediaType::Video(VideoSettings {}),
-                ));
-
-                responder_peer.add_sender(track_audio.clone());
-                responder_peer.add_sender(track_video.clone());
-                caller_peer.add_receiver(track_audio);
-                caller_peer.add_receiver(track_video);
-            }
-        }
-
-        for endpoint in msg.responder.spec.get_play_endpoints().into_iter() {
-            if endpoint.src.member_id == msg.caller.control_id {
-                last_track_id += 1;
-                let track_audio = Arc::new(MediaTrack::new(
-                    last_track_id,
-                    MediaType::Audio(AudioSettings {}),
-                ));
-                last_track_id += 1;
-                let track_video = Arc::new(MediaTrack::new(
-                    last_track_id,
-                    MediaType::Video(VideoSettings {}),
-                ));
-
-                caller_peer.add_sender(track_audio.clone());
-                caller_peer.add_sender(track_video.clone());
-                responder_peer.add_receiver(track_audio);
-                responder_peer.add_receiver(track_video);
-            }
-        }
-
-        self.peers.add_peer(caller_peer_id, caller_peer);
-        self.peers.add_peer(responder_peer_id, responder_peer);
-
-        ctx.notify(ConnectPeers(
-            caller_peer_id,
-            responder_peer_id,
-        ));
+        ctx.notify(ConnectPeers(caller_peer_id, responder_peer_id));
 
         // TODO: remove this
-//        println!("Peers: {:#?}", self.peers);
+        println!("Peers: {:#?}", self.peers);
 
         Ok(())
     }
@@ -497,26 +429,6 @@ impl Handler<RpcConnectionEstablished> for Room {
             msg.member_id,
             msg.connection,
         );
-
-        // TODO: Remove this
-        // get connected member Peers
-//        self.peers
-//            .get_peers_by_member_id(msg.member_id)
-//            .into_iter()
-//            .for_each(|peer| {
-//                // only New peers should be connected
-//                if let PeerStateMachine::New(peer) = peer {
-//                    if self
-//                        .participants
-//                        .member_has_connection(peer.partner_member_id())
-//                    {
-//                        ctx.notify(ConnectPeers(
-//                            peer.id(),
-//                            peer.partner_peer_id(),
-//                        ));
-//                    }
-//                }
-//            });
 
         Box::new(wrap_future(future::ok(())))
     }
@@ -608,6 +520,11 @@ mod test {
                 stopped,
             });
         });
+
+        println!(
+            "\n\n===RESPONDER===\n{:?}\n\n===CALLER===\n{:?}\n\n\n",
+            responder_events, caller_events
+        );
 
         let caller_events = caller_events.lock().unwrap();
         let responder_events = responder_events.lock().unwrap();

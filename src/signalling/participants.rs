@@ -22,7 +22,7 @@ use crate::{
     },
     log::prelude::*,
     signalling::{
-        room::{CloseRoom, RoomError, CreatePeer, NewPeer},
+        room::{CloseRoom, CreatePeer, NewPeer, RoomError},
         Room,
     },
 };
@@ -54,7 +54,6 @@ pub struct ParticipantService {
 
     members_awaiting_connection: HashMap<u64, NewPeer>,
 }
-
 
 impl ParticipantService {
     pub fn new(
@@ -187,7 +186,9 @@ impl ParticipantService {
 
             // connect_awaiters
             let mut added_member = None;
-            if let Some(awaiter) = self.members_awaiting_connection.get_mut(&member_id) {
+            if let Some(awaiter) =
+                self.members_awaiting_connection.get_mut(&member_id)
+            {
                 added_member = Some(awaiter.control_id.clone());
                 let connected_new_peer = NewPeer {
                     control_id: connected_member.control_id.clone(),
@@ -210,7 +211,9 @@ impl ParticipantService {
             // connect_existing_play_endpoints
             for connected_member_endpoint in connected_member_play_endpoints {
                 if let Some(ref c) = added_member {
-                    if connected_member_endpoint.src.member_id.as_str() == c.as_str() {
+                    if connected_member_endpoint.src.member_id.as_str()
+                        == c.as_str()
+                    {
                         continue;
                     }
                 }
@@ -256,7 +259,10 @@ impl ParticipantService {
                         responder: connected_new_peer,
                     });
                 } else {
-                    self.members_awaiting_connection.insert(*responder_member_signalling_id, connected_new_peer);
+                    self.members_awaiting_connection.insert(
+                        *responder_member_signalling_id,
+                        connected_new_peer,
+                    );
                 }
             }
 
