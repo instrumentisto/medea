@@ -75,11 +75,9 @@ impl Service {
     /// Create new instance [`AuthService`].
     pub fn new(config: &Conf) -> Self {
         Self {
-            turn_db: TurnAuthRepo::new(
-                config.turn.redis.get_addr().to_string(),
-            ),
+            turn_db: TurnAuthRepo::new(config.turn.redis.addr().to_string()),
             db_pass: config.turn.redis.pass.clone(),
-            turn_address: config.turn.get_addr(),
+            turn_address: config.turn.addr(),
             turn_username: config.turn.user.clone(),
             turn_password: config.turn.pass.clone(),
             static_user: None,

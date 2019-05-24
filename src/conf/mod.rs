@@ -209,10 +209,7 @@ mod tests {
 
         assert_eq!(env_conf.turn.redis.ip, Ipv4Addr::new(5, 5, 5, 5));
         assert_eq!(env_conf.turn.redis.port, 1234);
-        assert_eq!(
-            env_conf.turn.redis.get_addr(),
-            "5.5.5.5:1234".parse().unwrap(),
-        );
+        assert_eq!(env_conf.turn.redis.addr(), "5.5.5.5:1234".parse().unwrap());
     }
 
     #[test]
@@ -230,6 +227,6 @@ mod tests {
 
         assert_eq!(env_conf.turn.ip, Ipv4Addr::new(5, 5, 5, 5));
         assert_eq!(env_conf.turn.port, 1234);
-        assert_eq!(env_conf.turn.get_addr(), "5.5.5.5:1234".parse().unwrap());
+        assert_eq!(env_conf.turn.addr(), "5.5.5.5:1234".parse().unwrap());
     }
 }

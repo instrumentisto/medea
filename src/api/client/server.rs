@@ -81,7 +81,7 @@ pub struct Context {
 
 /// Starts HTTP server for handling WebSocket connections of Client API.
 pub fn run(rooms: RoomsRepository, config: Conf) {
-    let server_addr = config.server.get_bind_addr();
+    let server_addr = config.server.bind_addr();
 
     server::new(move || {
         App::with_state(Context {

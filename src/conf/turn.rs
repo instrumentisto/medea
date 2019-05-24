@@ -28,7 +28,7 @@ pub struct Turn {
 impl Turn {
     /// Builds [`SocketAddr`] from `ip` and `port`.
     #[inline]
-    pub fn get_addr(&self) -> SocketAddr {
+    pub fn addr(&self) -> SocketAddr {
         (self.ip, self.port)
             .to_socket_addrs()
             .unwrap()
@@ -54,7 +54,7 @@ pub struct Redis {
 impl Redis {
     /// Builds [`SocketAddr`] from `ip` and `port`.
     #[inline]
-    pub fn get_addr(&self) -> SocketAddr {
+    pub fn addr(&self) -> SocketAddr {
         (self.ip, self.port)
             .to_socket_addrs()
             .unwrap()
