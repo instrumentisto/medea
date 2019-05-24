@@ -1,6 +1,26 @@
 [server]
+# IP address to bind HTTP server to.
+#
+# Default:
+#   bind_ip = "0.0.0.0"
+
+# Port to bind HTTP server to.
+#
+# Default:
+#   bind_port = 8080
+
+
+
+
+[rpc]
 # Duration, after which remote RPC client will be considered idle if no
 # heartbeat messages received.
 #
 # Default:
 #   idle_timeout = "10s"
+
+# Duration, after which the server deletes the client session if
+# the remote RPC client does not reconnect after it is idle.
+#
+# Default:
+#   reconnect_timeout = "10s"

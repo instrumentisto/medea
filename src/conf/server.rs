@@ -7,6 +7,7 @@ use smart_default::*;
 
 /// HTTP server settings.
 #[derive(Clone, Debug, Deserialize, Serialize, SmartDefault)]
+#[serde(default)]
 pub struct Server {
     /// IP address to bind HTTP server to. Defaults to `0.0.0.0`.
     #[default(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)))]
@@ -47,6 +48,9 @@ mod server_spec {
         env::set_var("MEDEA_SERVER.BIND_PORT", "1234");
 
         let env_conf = Conf::parse().unwrap();
+
+        env::remove_var("MEDEA_SERVER.BIND_IP");
+        env::remove_var("MEDEA_SERVER.BIND_PORT");
 
         assert_ne!(default_conf.server.bind_ip, env_conf.server.bind_ip);
         assert_ne!(default_conf.server.bind_port, env_conf.server.bind_port);
