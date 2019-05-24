@@ -2,11 +2,11 @@
 
 use std::convert::TryFrom;
 
+use crate::signalling::RoomId;
+
 use super::{
     member::MemberSpec, pipeline::Pipeline, Entity, TryFromEntityError,
 };
-
-use crate::signalling::RoomId;
 
 /// [`crate::signalling::room::Room`] specification.
 /// Newtype for [`Entity::Room`]

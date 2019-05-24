@@ -10,7 +10,7 @@ use futures::future;
 use hashbrown::HashMap;
 use medea_client_api_proto::{Command, Event, IceCandidate};
 
-use std::{convert::TryFrom, time::Duration};
+use std::{convert::TryFrom, time::Duration, sync::Arc};
 
 use crate::{
     api::{
@@ -29,7 +29,6 @@ use crate::{
         participants::ParticipantService, peers::PeerRepository, RoomId,
     },
 };
-use std::sync::Arc;
 
 /// ID of [`Room`].
 pub type Id = u64;

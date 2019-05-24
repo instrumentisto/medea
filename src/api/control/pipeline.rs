@@ -1,10 +1,10 @@
 //! Control API specification Pipeline definition.
 
-use crate::api::control::Entity;
-
 use serde::Deserialize;
 
 use std::collections::HashMap;
+
+use crate::api::control::Entity;
 
 /// Entity that represents some pipeline of spec.
 #[derive(Clone, Deserialize, Debug)]

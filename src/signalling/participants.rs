@@ -2,8 +2,10 @@
 //! stores [`Members`] and associated [`RpcConnection`]s, handles
 //! [`RpcConnection`] authorization, establishment, message sending.
 
-use std::time::{Duration, Instant};
-use std::sync::Arc;
+use std::{
+    time::{Duration, Instant},
+    sync::Arc
+};
 
 use actix::{fut::wrap_future, AsyncContext, Context, SpawnHandle};
 use futures::{

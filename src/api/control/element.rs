@@ -1,13 +1,13 @@
 //! Control API specification Element definitions.
 
-use super::{Entity, TryFromEntityError};
-
 use serde::{
     de::{self, Deserializer, Error, Visitor},
     Deserialize,
 };
 
 use std::{convert::TryFrom, fmt};
+
+use super::{Entity, TryFromEntityError};
 
 /// [`Element`] represents a media element that one or more media data streams
 /// flow through.

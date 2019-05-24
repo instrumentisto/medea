@@ -1,11 +1,13 @@
 //! Member definitions and implementations.
 
-use std::convert::TryFrom;
+use std::{
+    convert::TryFrom,
+    sync::Arc,
+};
 
 use super::{element::Element, pipeline::Pipeline, Entity, TryFromEntityError};
 
 use crate::api::control::element::{WebRtcPlayEndpoint, WebRtcPublishEndpoint};
-use std::sync::Arc;
 
 pub type Id = u64;
 
