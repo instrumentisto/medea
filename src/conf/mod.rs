@@ -77,11 +77,11 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::{fs, net::Ipv4Addr, time::Duration};
+
     use serial_test_derive::serial;
-    use std::{fs, time::Duration};
 
     use super::*;
-    use std::net::Ipv4Addr;
 
     #[test]
     #[serial]

@@ -15,7 +15,7 @@ use crate::{
     api::control::MemberId,
     conf::Conf,
     media::IceUser,
-    turn::repo::{TurnAuthRepo, TurnAuthRepoErr},
+    turn::repo::{TurnDatabase, TurnDatabaseErr},
 };
 
 static TURN_PASS_LEN: usize = 16;
@@ -33,11 +33,11 @@ pub type TurnAuthService = Mocker<Service>;
 #[derive(Debug, Fail)]
 pub enum TurnServiceErr {
     #[fail(display = "Error accessing TurnAuthRepo: {}", _0)]
-    TurnAuthRepoErr(TurnAuthRepoErr),
+    TurnAuthRepoErr(TurnDatabaseErr),
 }
 
-impl From<TurnAuthRepoErr> for TurnServiceErr {
-    fn from(err: TurnAuthRepoErr) -> Self {
+impl From<TurnDatabaseErr> for TurnServiceErr {
+    fn from(err: TurnDatabaseErr) -> Self {
         TurnServiceErr::TurnAuthRepoErr(err)
     }
 }
@@ -58,7 +58,7 @@ pub enum UnreachablePolicy {
 #[derive(Debug)]
 pub struct Service {
     /// Turn credentials repository.
-    turn_db: TurnAuthRepo,
+    turn_db: TurnDatabase,
     /// TurnAuthRepo password.
     db_pass: String,
     /// Turn server address.
@@ -75,7 +75,7 @@ impl Service {
     /// Create new instance [`AuthService`].
     pub fn new(config: &Conf) -> Self {
         Self {
-            turn_db: TurnAuthRepo::new(config.turn.redis.addr().to_string()),
+            turn_db: TurnDatabase::new(config.turn.redis.addr().to_string()),
             db_pass: config.turn.redis.pass.clone(),
             turn_address: config.turn.addr(),
             turn_username: config.turn.user.clone(),
