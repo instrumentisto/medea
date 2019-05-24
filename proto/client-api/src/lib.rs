@@ -91,7 +91,7 @@ pub struct Track {
     pub media_type: MediaType,
 }
 
-/// Representation of [`iceServers`] field of [`RTCConfiguration`] dictionary.
+/// Representation of `iceServers` field of `RTCConfiguration` dictionary.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[cfg_attr(test, derive(PartialEq))]
 pub struct IceServer {

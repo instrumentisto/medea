@@ -1,4 +1,4 @@
-version: '3.4'
+version: 2
 
 services:
   coturn-db:
@@ -8,7 +8,7 @@ services:
     ports:
       - "6379:6379"    # coturn redis
     volumes:
-      - ./_dev/coturn/redis.conf:/etc/redis.conf:ro
+      - ./dev/coturn/redis.conf:/etc/redis.conf:ro
   coturn:
     container_name: ${COMPOSE_PROJECT_NAME}-coturn
     image: instrumentisto/coturn:4.5
@@ -16,6 +16,6 @@ services:
     command:
       - --log-file=stdout
     volumes:
-      - ./_dev/coturn/turnserver.conf:/etc/coturn/turnserver.conf:ro
+      - ./dev/coturn/turnserver.conf:/etc/coturn/turnserver.conf:ro
       - ./.cache/coturn/data:/var/lib/coturn
     network_mode: host
