@@ -62,4 +62,3 @@ impl Redis {
             .unwrap()
     }
 }
-

@@ -8,7 +8,7 @@ use actix::{
 };
 use failure::Fail;
 use futures::future::{err, ok, Future};
-use rand::{distributions::Alphanumeric, rngs::OsRng, Rng};
+use rand::{distributions::Alphanumeric, Rng};
 use smart_default::*;
 
 use crate::{
@@ -75,7 +75,9 @@ impl Service {
     /// Create new instance [`AuthService`].
     pub fn new(config: &Conf) -> Self {
         Self {
-            turn_db: TurnAuthRepo::new(config.turn.redis.get_addr().to_string()),
+            turn_db: TurnAuthRepo::new(
+                config.turn.redis.get_addr().to_string(),
+            ),
             db_pass: config.turn.redis.pass.clone(),
             turn_address: config.turn.get_addr(),
             turn_username: config.turn.user.clone(),
@@ -86,7 +88,10 @@ impl Service {
 
     /// Generates random alphanumeric string of specified length.
     fn new_password(&self, n: usize) -> String {
-        OsRng.sample_iter(&Alphanumeric).take(n).collect()
+        rand::thread_rng()
+            .sample_iter(&Alphanumeric)
+            .take(n)
+            .collect()
     }
 
     /// Returns [`ICEUser`] with static credentials.

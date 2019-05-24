@@ -10,7 +10,11 @@ use config::{Config, Environment, File};
 use failure::Error;
 use serde::{Deserialize, Serialize};
 
-pub use self::{rpc::Rpc, server::Server, turn::{Turn, Redis}};
+pub use self::{
+    rpc::Rpc,
+    server::Server,
+    turn::{Redis, Turn},
+};
 
 /// CLI argument that is responsible for holding application configuration
 /// file path.
@@ -205,7 +209,10 @@ mod tests {
 
         assert_eq!(env_conf.turn.redis.ip, Ipv4Addr::new(5, 5, 5, 5));
         assert_eq!(env_conf.turn.redis.port, 1234);
-        assert_eq!(env_conf.turn.redis.get_addr(), "5.5.5.5:1234".parse().unwrap(),);
+        assert_eq!(
+            env_conf.turn.redis.get_addr(),
+            "5.5.5.5:1234".parse().unwrap(),
+        );
     }
 
     #[test]
