@@ -6,7 +6,7 @@ use std::convert::{TryFrom, TryInto};
 
 use crate::{
     api::control::MemberId,
-    media::{Peer, PeerId, PeerStateMachine, NewPeer},
+    media::{NewPeer, Peer, PeerId, PeerStateMachine},
     signalling::room::RoomError,
 };
 

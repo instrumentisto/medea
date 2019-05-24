@@ -22,8 +22,8 @@ use crate::{
     },
     log::prelude::*,
     media::{
-        New, Peer, PeerId, PeerStateError, PeerStateMachine,
-        WaitLocalHaveRemote, WaitLocalSdp, WaitRemoteSdp, NewPeer,
+        New, NewPeer, Peer, PeerId, PeerStateError, PeerStateMachine,
+        WaitLocalHaveRemote, WaitLocalSdp, WaitRemoteSdp,
     },
     signalling::{
         participants::ParticipantService, peers::PeerRepository, RoomId,
@@ -339,7 +339,7 @@ impl Handler<CreatePeer> for Room {
 
         ctx.notify(ConnectPeers(caller_peer_id, responder_peer_id));
 
-//        println!("Peers: {:#?}", self.peers);
+        //        println!("Peers: {:#?}", self.peers);
 
         Ok(())
     }
@@ -472,7 +472,7 @@ mod test {
         let client_room = Room::new(room_spec, Duration::from_secs(10));
         Arbiter::start(move |_| client_room)
     }
-    
+
     #[test]
     fn start_signaling() {
         let stopped = Arc::new(AtomicUsize::new(0));
@@ -519,21 +519,21 @@ mod test {
                     },
                 ],
             })
-                .unwrap(),
+            .unwrap(),
             serde_json::to_string(&Event::SdpAnswerMade {
                 peer_id: 1,
                 sdp_answer: "responder_answer".into(),
             })
-                .unwrap(),
+            .unwrap(),
             serde_json::to_string(&Event::IceCandidateDiscovered {
                 peer_id: 1,
                 candidate: IceCandidate {
                     candidate: "ice_candidate".to_owned(),
                     sdp_m_line_index: None,
-                    sdp_mid: None
+                    sdp_mid: None,
                 },
             })
-                .unwrap(),
+            .unwrap(),
         ];
         let second_connected_member_events = vec![
             serde_json::to_string(&Event::PeerCreated {
@@ -552,16 +552,16 @@ mod test {
                     },
                 ],
             })
-                .unwrap(),
+            .unwrap(),
             serde_json::to_string(&Event::IceCandidateDiscovered {
                 peer_id: 2,
                 candidate: IceCandidate {
                     candidate: "ice_candidate".to_owned(),
                     sdp_m_line_index: None,
-                    sdp_mid: None
+                    sdp_mid: None,
                 },
             })
-                .unwrap(),
+            .unwrap(),
         ];
 
         let caller_events = caller_events.to_vec();

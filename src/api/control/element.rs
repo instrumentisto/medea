@@ -67,7 +67,7 @@ pub struct LocalUri {
 }
 
 /// Serde deserializer for [`LocalUri`].
-/// Deserialize URIs with pattern `local://{room_id}/{member_id}/{pipeline_id}.
+/// Deserialize URIs with pattern `local://{room_id}/{member_id}/{pipeline_id}`.
 impl<'de> Deserialize<'de> for LocalUri {
     fn deserialize<D>(deserializer: D) -> Result<LocalUri, D::Error>
     where
@@ -150,8 +150,10 @@ mod test {
 
     #[test]
     fn should_parse_local_uri() {
-        let valid_json_uri = "{ \"src\": \"local://room_id/member_id/pipeline_id\" }";
-        let local_uri: LocalUriTest = serde_json::from_str(valid_json_uri).unwrap();
+        let valid_json_uri =
+            r#"{ "src": "local://room_id/member_id/pipeline_id" }"#;
+        let local_uri: LocalUriTest =
+            serde_json::from_str(valid_json_uri).unwrap();
 
         assert_eq!(local_uri.src.member_id, "member_id".to_string());
         assert_eq!(local_uri.src.room_id, "room_id".to_string());
@@ -160,7 +162,8 @@ mod test {
 
     #[test]
     fn should_return_error_when_uri_not_local() {
-        let invalid_json_uri = "{ \"src\": \"not_local://room_id/member_id/pipeline_id\" }";
+        let invalid_json_uri =
+            r#"{ "src": "not_local://room_id/member_id/pipeline_id" }"#;
         match serde_json::from_str::<LocalUriTest>(invalid_json_uri) {
             Ok(_) => assert!(false),
             Err(_) => assert!(true),
@@ -169,7 +172,7 @@ mod test {
 
     #[test]
     fn should_return_error_when_uri_is_not_full() {
-        let invalid_json_uri = "{ \"src\": \"local://room_id/member_id\" } ";
+        let invalid_json_uri = r#"{ "src": "local://room_id/member_id" }"#;
         match serde_json::from_str::<LocalUriTest>(invalid_json_uri) {
             Ok(_) => assert!(false),
             Err(_) => assert!(true),
@@ -178,7 +181,7 @@ mod test {
 
     #[test]
     fn should_return_error_when_uri_have_empty_part() {
-        let invalid_json_uri = "{ \"src\": \"local://room_id//pipeline_id\" }";
+        let invalid_json_uri = r#"{ "src": "local://room_id//pipeline_id" }"#;
         match serde_json::from_str::<LocalUriTest>(invalid_json_uri) {
             Ok(_) => assert!(false),
             Err(_) => assert!(true),

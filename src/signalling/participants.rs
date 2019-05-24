@@ -20,8 +20,8 @@ use crate::{
         },
         control::{Member, MemberId},
     },
-    media::NewPeer,
     log::prelude::*,
+    media::NewPeer,
     signalling::{
         room::{CloseRoom, CreatePeer, RoomError},
         Room,
@@ -157,7 +157,7 @@ impl ParticipantService {
 
     /// Create [`Peer`]s between waiting [`Member`] and connected.
     ///
-    /// Return control ID of waiting [`MemberSpec`].
+    /// Returns control ID of waiting [`MemberSpec`] if there was one.
     fn connect_waiting_if_exist(
         &self,
         member: Member,

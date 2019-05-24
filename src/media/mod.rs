@@ -4,9 +4,8 @@ pub mod track;
 
 pub use self::{
     peer::{
-        Id as PeerId, New, Peer, PeerStateError,
-        PeerStateMachine, WaitLocalHaveRemote, WaitLocalSdp, WaitRemoteSdp,
-        NewPeer,
+        Id as PeerId, New, NewPeer, Peer, PeerStateError, PeerStateMachine,
+        WaitLocalHaveRemote, WaitLocalSdp, WaitRemoteSdp,
     },
     track::{Id as TrackId, MediaTrack},
 };

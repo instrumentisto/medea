@@ -52,7 +52,7 @@ pub enum Entity {
     WebRtcPlayEndpoint { spec: WebRtcPlayEndpoint },
 }
 
-/// Load [`RoomRequest`] from file with YAML format.
+/// Load [`Entity`] from file with YAML format.
 pub fn load_from_yaml_file(path: &str) -> Result<RoomSpec, Error> {
     let mut file = File::open(path)?;
     let mut buf = String::new();
