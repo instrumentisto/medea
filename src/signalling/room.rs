@@ -10,7 +10,7 @@ use futures::future;
 use hashbrown::HashMap;
 use medea_client_api_proto::{Command, Event, IceCandidate};
 
-use std::{convert::TryFrom, time::Duration, sync::Arc};
+use std::{convert::TryFrom, sync::Arc, time::Duration};
 
 use crate::{
     api::{
@@ -335,7 +335,7 @@ impl Handler<CreatePeer> for Room {
         );
 
         let (caller_peer_id, responder_peer_id) =
-            self.peers.create_peers(msg.caller, msg.responder);
+            self.peers.create_peers(&msg.caller, &msg.responder);
 
         ctx.notify(ConnectPeers(caller_peer_id, responder_peer_id));
 

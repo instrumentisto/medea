@@ -69,7 +69,7 @@ pub struct LocalUri {
 /// Serde deserializer for [`LocalUri`].
 /// Deserialize URIs with pattern `local://{room_id}/{member_id}/{pipeline_id}`.
 impl<'de> Deserialize<'de> for LocalUri {
-    fn deserialize<D>(deserializer: D) -> Result<LocalUri, D::Error>
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {

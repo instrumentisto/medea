@@ -3,8 +3,8 @@
 //! [`RpcConnection`] authorization, establishment, message sending.
 
 use std::{
+    sync::Arc,
     time::{Duration, Instant},
-    sync::Arc
 };
 
 use actix::{fut::wrap_future, AsyncContext, Context, SpawnHandle};
@@ -163,12 +163,11 @@ impl ParticipantService {
     /// Returns all control ID of members which we connected.
     fn connect_waiting_members(
         &self,
-        member: Member,
+        member: &Member,
         ctx: &mut Context<Room>,
     ) -> Vec<String> {
         let mut added_member = Vec::new();
-        if let Some(waiters) = self.members_waiting_connection.get(&member.id)
-        {
+        if let Some(waiters) = self.members_waiting_connection.get(&member.id) {
             for waiter in waiters {
                 added_member.push(waiter.control_id.clone());
                 let connected_new_peer = NewPeer {
@@ -197,41 +196,44 @@ impl ParticipantService {
         ctx: &mut Context<Room>,
         member_id: MemberId,
     ) {
-        let connected_member = match self.members.get(&member_id) {
-            Some(m) => m,
-            None => {
-                warn!("Connected a non-existent member with id {}!", member_id);
-                return;
-            }
+        let connected_member = if let Some(m) = self.members.get(&member_id) {
+            m
+        } else {
+            warn!("Connected a non-existent member with id {}!", member_id);
+            // Maybe better return error here?
+            return;
         };
         let connected_member_play_endpoints =
             connected_member.spec.get_play_endpoints();
 
         let added_waiting_members =
-            self.connect_waiting_members(connected_member.clone(), ctx);
+            self.connect_waiting_members(&connected_member, ctx);
         self.members_waiting_connection.remove(&member_id);
 
         for connected_member_endpoint in connected_member_play_endpoints {
             // Skip members which waiting for us because we added them before.
-            if added_waiting_members.contains(&connected_member_endpoint.src.member_id) {
+            if added_waiting_members
+                .contains(&connected_member_endpoint.src.member_id)
+            {
                 continue;
             }
 
             let responder_member_control_id =
                 &connected_member_endpoint.src.member_id;
-            let responder_member_signalling_id = match self
+
+            let responder_member_signalling_id = if let Some(r) = self
                 .control_signalling_members
                 .get(responder_member_control_id)
             {
-                Some(r) => r,
-                None => {
-                    warn!(
-                        "Member with control id '{}' not found! Probably this \
-                         is error in spec.",
-                        responder_member_control_id
-                    );
-                    continue;
-                }
+                r
+            } else {
+                warn!(
+                    "Member with control id '{}' not found! Probably this is \
+                     error in spec.",
+                    responder_member_control_id
+                );
+                // Maybe better return error here?
+                continue;
             };
 
             let connected_new_peer = NewPeer {
@@ -243,18 +245,13 @@ impl ParticipantService {
             let is_responder_connected =
                 self.member_has_connection(*responder_member_signalling_id);
             if is_responder_connected {
-                let responder_spec =
-                    match self.members.get(&responder_member_signalling_id) {
-                        Some(m) => m.spec.clone(),
-                        None => {
-                            warn!(
-                                "Try to get nonexistent member by signalling \
-                                 id '{}'!",
-                                responder_member_signalling_id
-                            );
-                            continue;
-                        }
-                    };
+                let responder_spec = if let Some(m) =
+                    self.members.get(&responder_member_signalling_id)
+                {
+                    m.spec.clone()
+                } else {
+                    continue;
+                };
 
                 let responder_new_peer = NewPeer {
                     signalling_id: *responder_member_signalling_id,
@@ -265,15 +262,16 @@ impl ParticipantService {
                     caller: responder_new_peer,
                     responder: connected_new_peer,
                 });
+            } else if let Some(m) = self
+                .members_waiting_connection
+                .get_mut(responder_member_signalling_id)
+            {
+                m.push(connected_new_peer);
             } else {
-                match self.members_waiting_connection.get_mut(responder_member_signalling_id) {
-                    Some(m) => {
-                        m.push(connected_new_peer);
-                    },
-                    None => {
-                        self.members_waiting_connection.insert(*responder_member_signalling_id, vec![connected_new_peer]);
-                    },
-                }
+                self.members_waiting_connection.insert(
+                    *responder_member_signalling_id,
+                    vec![connected_new_peer],
+                );
             }
         }
     }

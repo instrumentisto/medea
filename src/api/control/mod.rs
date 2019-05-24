@@ -21,6 +21,7 @@ pub use self::member::{Id as MemberId, Member};
 /// Errors that can occur when we try transform some spec from [`Entity`].
 /// This error used in all [`TryFrom`] of Control API.
 #[derive(Debug, Fail)]
+#[allow(clippy::pub_enum_variant_names)]
 pub enum TryFromEntityError {
     #[fail(display = "This entity is not Element")]
     NotElement,

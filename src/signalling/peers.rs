@@ -43,8 +43,8 @@ impl PeerRepository {
     /// Returns IDs of created [`Peer`]s. `(caller_peer_id, responder_peer_id)`.
     pub fn create_peers(
         &mut self,
-        caller: NewPeer,
-        responder: NewPeer,
+        caller: &NewPeer,
+        responder: &NewPeer,
     ) -> (u64, u64) {
         self.peers_count += 1;
         let caller_peer_id = self.peers_count;
@@ -72,7 +72,7 @@ impl PeerRepository {
             responder.spec.get_publish_endpoints(),
             &mut self.tracks_count,
         );
-        for endpoint in caller.spec.get_play_endpoints().into_iter() {
+        for endpoint in caller.spec.get_play_endpoints() {
             if responder.control_id == endpoint.src.member_id {
                 responder_peer
                     .get_senders()
@@ -81,7 +81,7 @@ impl PeerRepository {
             }
         }
 
-        for endpoint in responder.spec.get_play_endpoints().into_iter() {
+        for endpoint in responder.spec.get_play_endpoints() {
             if caller.control_id == endpoint.src.member_id {
                 caller_peer
                     .get_senders()

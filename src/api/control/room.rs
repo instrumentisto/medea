@@ -11,6 +11,7 @@ use super::{
 /// [`crate::signalling::room::Room`] specification.
 /// Newtype for [`Entity::Room`]
 #[derive(Clone, Debug)]
+#[allow(clippy::module_name_repetitions)]
 pub struct RoomSpec {
     pub id: RoomId,
     pub spec: Pipeline,
@@ -35,7 +36,7 @@ impl TryFrom<Entity> for RoomSpec {
 
     fn try_from(from: Entity) -> Result<Self, Self::Error> {
         match from {
-            Entity::Room { id, spec } => Ok(RoomSpec { id, spec }),
+            Entity::Room { id, spec } => Ok(Self { id, spec }),
             _ => Err(TryFromEntityError::NotRoom),
         }
     }

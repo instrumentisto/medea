@@ -272,6 +272,7 @@ impl<T> Peer<T> {
 }
 
 #[derive(Debug, Clone)]
+#[allow(clippy::module_name_repetitions)]
 pub struct NewPeer {
     pub signalling_id: u64,
     pub spec: Arc<MemberSpec>,
@@ -307,7 +308,7 @@ impl Peer<New> {
         endpoints: Vec<&WebRtcPublishEndpoint>,
         last_track_id: &mut u64,
     ) {
-        for _endpoint in endpoints.into_iter() {
+        for _endpoint in endpoints {
             *last_track_id += 1;
             let track_audio = Arc::new(MediaTrack::new(
                 *last_track_id,

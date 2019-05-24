@@ -1,9 +1,6 @@
 //! Member definitions and implementations.
 
-use std::{
-    convert::TryFrom,
-    sync::Arc,
-};
+use std::{convert::TryFrom, sync::Arc};
 
 use super::{element::Element, pipeline::Pipeline, Entity, TryFromEntityError};
 
@@ -29,6 +26,7 @@ pub struct Member {
 
 /// Newtype for [`Entity::Member`] variant.
 #[derive(Clone, Debug)]
+#[allow(clippy::module_name_repetitions)]
 pub struct MemberSpec(pub Pipeline);
 
 impl MemberSpec {
@@ -81,7 +79,7 @@ impl TryFrom<Entity> for MemberSpec {
 
     fn try_from(from: Entity) -> Result<Self, Self::Error> {
         match from {
-            Entity::Member { spec } => Ok(MemberSpec(spec)),
+            Entity::Member { spec } => Ok(Self(spec)),
             _ => Err(TryFromEntityError::NotMember),
         }
     }
