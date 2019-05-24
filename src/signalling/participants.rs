@@ -239,6 +239,19 @@ impl ParticipantService {
             let is_responder_connected =
                 self.member_has_connection(*responder_member_signalling_id);
             if is_responder_connected {
+                let responder_spec =
+                    match self.members.get(&responder_member_signalling_id) {
+                        Some(m) => m,
+                        None => {
+                            warn!(
+                                "Try to get nonexistent member by signalling \
+                                 id '{}'!",
+                                responder_member_signalling_id
+                            );
+                            continue;
+                        }
+                    };
+
                 let responder_new_peer = NewPeer {
                     signalling_id: *responder_member_signalling_id,
                     spec: self

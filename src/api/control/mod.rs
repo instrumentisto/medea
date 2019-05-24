@@ -2,9 +2,8 @@
 
 pub mod element;
 pub mod member;
+pub mod pipeline;
 pub mod room;
-
-mod pipeline;
 
 use failure::{Error, Fail};
 use serde::Deserialize;
