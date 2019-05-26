@@ -22,12 +22,14 @@ static TURN_PASS_LEN: usize = 16;
 #[allow(clippy::module_name_repetitions)]
 /// Manages Turn server credentials.
 pub trait TurnAuthService: fmt::Debug + Send {
+    /// Generates and registers Turn credentials.
     fn create_user(
         &self,
         member_id: MemberId,
         policy: UnreachablePolicy,
     ) -> Box<dyn Future<Item = IceUser, Error = TurnServiceErr>>;
 
+    /// Deletes provided Turn credentials.
     fn delete_user(
         &self,
         user: IceUser,
@@ -35,6 +37,7 @@ pub trait TurnAuthService: fmt::Debug + Send {
 }
 
 impl TurnAuthService for Addr<Service> {
+    /// Sends [`CreateIceUser`] to [`Service`].
     fn create_user(
         &self,
         member_id: u64,
@@ -49,6 +52,7 @@ impl TurnAuthService for Addr<Service> {
         ))
     }
 
+    /// Sends [`DeleteIceUser`] to [`Service`].
     fn delete_user(
         &self,
         user: IceUser,
@@ -163,21 +167,21 @@ impl Actor for Service {
     }
 }
 
-/// Request for delete [`ICEUser`] for [`Member`] from COTURN database.
+/// Request for delete [`ICEUser`] for [`Member`] from Turn database.
 #[derive(Debug, Message)]
 #[rtype(result = "Result<(), TurnServiceErr>")]
 struct DeleteIceUser(pub IceUser);
 
 impl Handler<DeleteIceUser> for Service {
-    type Result = ActFuture<(), TurnServiceErr>;
+    type Result = Box<dyn Future<Item = (), Error = TurnServiceErr>>;
 
-    /// Deletes [`ICEUser`] for given [`Member`].
+    /// Deletes provided [`ICEUser`] from [`TurnDatabase`].
     fn handle(
         &mut self,
         msg: DeleteIceUser,
         _ctx: &mut Self::Context,
     ) -> Self::Result {
-        Box::new(wrap_future(self.turn_db.remove(&msg.0).map_err(Into::into)))
+        Box::new(self.turn_db.remove(&msg.0).map_err(Into::into))
     }
 }
 
@@ -192,7 +196,8 @@ struct CreateIceUser {
 impl Handler<CreateIceUser> for Service {
     type Result = ActFuture<IceUser, TurnServiceErr>;
 
-    /// Create and registers [`ICEUser`] for given [`Member`].
+    /// Generates [`IceUser`] with saved Turn address, provided [`MemberId`] and
+    /// random password. Inserts created [`IceUser`] into [`TurnDatabase`].
     fn handle(
         &mut self,
         msg: CreateIceUser,
@@ -234,8 +239,8 @@ pub mod test {
     impl TurnAuthService for TurnAuthServiceMock {
         fn create_user(
             &self,
-            _member_id: u64,
-            _policy: UnreachablePolicy,
+            _: u64,
+            _: UnreachablePolicy,
         ) -> Box<Future<Item = IceUser, Error = TurnServiceErr>> {
             Box::new(future::ok(IceUser {
                 address: "5.5.5.5:1234".parse().unwrap(),
@@ -246,7 +251,7 @@ pub mod test {
 
         fn delete_user(
             &self,
-            _user: IceUser,
+            _: IceUser,
         ) -> Box<Future<Item = (), Error = TurnServiceErr>> {
             Box::new(future::ok(()))
         }

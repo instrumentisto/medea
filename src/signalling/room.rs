@@ -451,8 +451,7 @@ mod test {
     };
 
     use crate::{
-        api::client::rpc_connection::test::TestConnection,
-        media::create_peers,
+        api::client::rpc_connection::test::TestConnection, media::create_peers,
         turn::new_turn_auth_service_mock,
     };
 
