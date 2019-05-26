@@ -42,6 +42,7 @@ impl From<RespValue> for TurnDatabaseErr {
 #[allow(clippy::module_name_repetitions)]
 pub struct TurnDatabase(Addr<RedisActor>);
 
+//TODO: Auth after reconnect.
 impl TurnDatabase {
     pub fn new<S: Into<String>>(addr: S) -> Self {
         Self(RedisActor::start(addr))
