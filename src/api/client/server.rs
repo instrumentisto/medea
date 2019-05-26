@@ -113,6 +113,7 @@ mod test {
         conf::{Conf, Server, Turn},
         media::create_peers,
         signalling::Room,
+        turn::new_turn_auth_service_mock,
     };
 
     use super::*;
@@ -137,7 +138,7 @@ mod test {
                 members,
                 create_peers(1, 2),
                 conf.reconnect_timeout,
-                crate::turn::dummy(),
+                new_turn_auth_service_mock(),
             )
         });
         let rooms = hashmap! {1 => room};

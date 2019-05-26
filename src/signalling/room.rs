@@ -2,7 +2,7 @@
 //! connection establishment between concrete [`Member`]s.
 
 use actix::{
-    fut::wrap_future, Actor, ActorFuture, Addr, AsyncContext, Context, Handler,
+    fut::wrap_future, Actor, ActorFuture, AsyncContext, Context, Handler,
     Message,
 };
 use failure::Fail;
@@ -82,7 +82,7 @@ impl Room {
         members: HashMap<MemberId, Member>,
         peers: HashMap<PeerId, PeerStateMachine>,
         reconnect_timeout: Duration,
-        turn: Addr<TurnAuthService>,
+        turn: Box<dyn TurnAuthService>,
     ) -> Self {
         Self {
             id,
@@ -450,8 +450,11 @@ mod test {
         AudioSettings, Direction, IceServer, MediaType, Track, VideoSettings,
     };
 
-    use crate::api::client::rpc_connection::test::TestConnection;
-    use crate::media::create_peers;
+    use crate::{
+        api::client::rpc_connection::test::TestConnection,
+        media::create_peers,
+        turn::new_turn_auth_service_mock,
+    };
 
     use super::*;
 
@@ -474,7 +477,7 @@ mod test {
                 members,
                 create_peers(1, 2),
                 Duration::from_secs(10),
-                crate::turn::dummy(),
+                new_turn_auth_service_mock(),
             )
         })
     }
