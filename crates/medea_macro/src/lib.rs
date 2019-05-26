@@ -10,23 +10,32 @@ mod enum_delegate;
 
 use proc_macro::TokenStream;
 
-/// Macro for generating boilerplate code of methods delegation to `enum`
-/// variants.
+/// Delegates functions to enum variants field. Variants are expected to have
+/// only one field.
 ///
 /// # How to use
 ///
-/// ```ignore
-/// #[enum_delegate(/* The header of the function to be delegated. */)]
-/// enum SomeStateMachine {
-///     FirstState(/* An internal object whose functions will be delegated. */),
-///     SecondState(/* An internal object whose functions will be delegated. */)
+/// ```
+/// use medea_macro::enum_delegate;
+///
+/// #[enum_delegate(pub fn as_str(&self) -> &str)]
+/// #[enum_delegate(pub fn push_str(&mut self, arg:&str))]
+/// enum MyEnum {
+///     Foo(String),
+///     Bar(String),
+/// }
+///
+/// fn main() {
+///     let mut foo = MyEnum::Foo(String::from("foo"));
+///     foo.push_str("_bar");
+///     assert_eq!(foo.as_str(), "foo_bar")
 /// }
 /// ```
 ///
-/// # Example
+/// # Extended example
 ///
 /// ```
-/// # use medea_macro::enum_delegate;
+/// use medea_macro::enum_delegate;
 /// struct SomeState;
 /// struct AnotherState;
 ///
@@ -71,12 +80,12 @@ use proc_macro::TokenStream;
 ///         state: SomeState,
 ///     });
 ///
-///     peer.some_value(); // -> 10
+///     assert_eq!(peer.some_value(), 10);
 ///
-///     peer.function_with_additional_args(100); // -> 100
+///     assert_eq!(peer.function_with_additional_args(100), 100);
 ///
-///     peer.mutable_function(); // -> 10
-///     peer.some_value(); // -> 1000
+///     assert_eq!(peer.mutable_function(), 10);
+///     assert_eq!(peer.some_value(), 1000);
 /// }
 /// ```
 #[proc_macro_attribute]
