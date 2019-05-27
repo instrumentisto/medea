@@ -83,7 +83,6 @@ impl Room {
                 let member = Member {
                     id,
                     spec: Arc::new(member_spec),
-                    credentials: format!("{}-credentials", id),
                     control_id: control_id.clone(),
                 };
                 members.insert(id, member);

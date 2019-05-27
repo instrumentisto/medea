@@ -148,7 +148,7 @@ mod test {
     fn responses_with_pong() {
         let mut server = ws_server(Conf::default());
         let (read, mut write) =
-            server.ws_at("/ws/video-call-1/1/1-credentials").unwrap();
+            server.ws_at("/ws/video-call-1/1/test").unwrap();
 
         write.text(r#"{"ping":33}"#);
         let (item, _) = server.execute(read.into_future()).unwrap();
@@ -167,7 +167,7 @@ mod test {
 
         let mut server = ws_server(conf.clone());
         let (read, mut write) =
-            server.ws_at("/ws/video-call-1/1/1-credentials").unwrap();
+            server.ws_at("/ws/video-call-1/1/test").unwrap();
 
         write.text(r#"{"ping":33}"#);
         let (item, read) = server.execute(read.into_future()).unwrap();

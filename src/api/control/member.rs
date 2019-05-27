@@ -14,9 +14,6 @@ pub struct Member {
     /// ID of [`Member`].
     pub id: Id,
 
-    /// Credentials to authorize [`Member`] with.
-    pub credentials: String,
-
     /// Control API specification of this [`Member`].
     pub spec: Arc<MemberSpec>,
 
@@ -27,7 +24,10 @@ pub struct Member {
 /// Newtype for [`Entity::Member`] variant.
 #[derive(Clone, Debug)]
 #[allow(clippy::module_name_repetitions)]
-pub struct MemberSpec(pub Pipeline);
+pub struct MemberSpec {
+    pub pipeline: Pipeline,
+    pub credentials: String,
+}
 
 impl MemberSpec {
     /// Get [`Element`] of this [`MemberSpec`] by ID.
@@ -35,12 +35,12 @@ impl MemberSpec {
         &self,
         id: &str,
     ) -> Option<Result<Element, TryFromEntityError>> {
-        Some(Element::try_from(self.0.pipeline.get(id).cloned()?))
+        Some(Element::try_from(self.pipeline.pipeline.get(id).cloned()?))
     }
 
     /// Get all [`WebRtcPlayEndpoint`]s of this [`MemberSpec`].
     pub fn get_play_endpoints(&self) -> Vec<&WebRtcPlayEndpoint> {
-        self.0
+        self.pipeline
             .pipeline
             .iter()
             .filter_map(|(_name, e)| match e {
@@ -63,7 +63,7 @@ impl MemberSpec {
 
     /// Get all [`WebRtcPublishEndpoint`]s of this [`MemberSpec`].
     pub fn get_publish_endpoints(&self) -> Vec<&WebRtcPublishEndpoint> {
-        self.0
+        self.pipeline
             .pipeline
             .iter()
             .filter_map(|(_name, e)| match e {
@@ -79,7 +79,10 @@ impl TryFrom<Entity> for MemberSpec {
 
     fn try_from(from: Entity) -> Result<Self, Self::Error> {
         match from {
-            Entity::Member { spec } => Ok(Self(spec)),
+            Entity::Member { spec, credentials } => Ok(Self {
+                pipeline: spec,
+                credentials,
+            }),
             _ => Err(TryFromEntityError::NotMember),
         }
     }

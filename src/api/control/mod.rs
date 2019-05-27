@@ -42,7 +42,7 @@ pub enum Entity {
 
     /// Represent [`MemberSpec`].
     /// Can transform into [`MemberSpec`] by `MemberSpec::try_from`.
-    Member { spec: Pipeline },
+    Member { spec: Pipeline, credentials: String },
 
     /// Represent [`WebRtcPublishEndpoint`].
     /// Can transform into [`Element`] enum by `Element::try_from`.

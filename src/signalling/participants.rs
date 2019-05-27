@@ -88,7 +88,7 @@ impl ParticipantService {
     ) -> Result<&Member, AuthorizationError> {
         match self.members.get(&member_id) {
             Some(ref member) => {
-                if member.credentials.eq(credentials) {
+                if member.spec.credentials.eq(credentials) {
                     Ok(member)
                 } else {
                     Err(AuthorizationError::InvalidCredentials)
