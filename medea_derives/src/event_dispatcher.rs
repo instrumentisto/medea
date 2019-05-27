@@ -45,29 +45,31 @@ fn to_handler_fn_name(event: &str) -> String {
 ///
 /// Panic if enum is unnamed.
 fn parse_match_variants(enum_input: syn::ItemEnum) -> Vec<MatchVariant> {
-    enum_input.variants.into_iter()
+    enum_input
+        .variants
+        .into_iter()
         .map(|v| {
             let variant_ident = v.ident;
 
             let fields = match v.fields {
-                syn::Fields::Named(f) => {
-                    f.named.into_iter().map(|f| {
-                        MatchVariantField {
-                            ident: f.ident.unwrap(), // This is only named field macro
-                            ty: f.ty
-                        }
-                    }).collect::<Vec<MatchVariantField>>()
-                },
-                _ => panic!("This macro currently support only named enums!")
+                syn::Fields::Named(f) => f
+                    .named
+                    .into_iter()
+                    .map(|f| MatchVariantField {
+                        ident: f.ident.unwrap(),
+                        ty: f.ty,
+                    })
+                    .collect::<Vec<MatchVariantField>>(),
+                _ => panic!("This macro currently support only named enums!"),
             };
 
             MatchVariant {
                 ident: variant_ident,
                 fields,
             }
-        }).collect::<Vec<MatchVariant>>()
+        })
+        .collect::<Vec<MatchVariant>>()
 }
-
 
 /// Generates the actual code for `#[derive(EventDispatcher)]` macro.
 ///
@@ -96,35 +98,35 @@ pub fn derive(input: TokenStream) -> TokenStream {
         let fields = v.fields;
         let variant_ident = v.ident;
 
-        let fields_names = fields.into_iter()
-            .map(|f| {
-                f.ident
-            });
+        let fields_names = fields.into_iter().map(|f| f.ident);
 
         let handler_fn_name = to_handler_fn_name(&variant_ident.to_string());
-        let handler_fn_ident: syn::Ident = syn::parse_str(&handler_fn_name).unwrap();
+        let handler_fn_ident: syn::Ident =
+            syn::parse_str(&handler_fn_name).unwrap();
 
         let fields_output = quote! {
             #(#fields_names,)*
         };
 
         let match_body = quote! {
-            #enum_ident::#variant_ident {#fields_output} => {handler.#handler_fn_ident(#fields_output)},
+            #enum_ident::#variant_ident {#fields_output} => {
+                handler.#handler_fn_ident(#fields_output)
+            },
         };
 
         match_body
     });
 
     let trait_functions = trait_variants.into_iter().map(|v| {
-        let fn_name: syn::Ident = syn::parse_str(&to_handler_fn_name(&v.ident.to_string())).unwrap();
-        let fn_args = v.fields.into_iter()
-            .map(|f| {
-                let ident = f.ident;
-                let tt = f.ty;
-                quote! {
-                    #ident: #tt
-                }
-            });
+        let fn_name: syn::Ident =
+            syn::parse_str(&to_handler_fn_name(&v.ident.to_string())).unwrap();
+        let fn_args = v.fields.into_iter().map(|f| {
+            let ident = f.ident;
+            let tt = f.ty;
+            quote! {
+                #ident: #tt
+            }
+        });
         let fn_out = quote! {
             fn #fn_name(&mut self, #(#fn_args,)*);
         };
@@ -132,7 +134,8 @@ pub fn derive(input: TokenStream) -> TokenStream {
         fn_out
     });
 
-    let handler_trait_ident: syn::Ident = syn::parse_str(&format!("{}Handler", enum_ident.to_string())).unwrap();
+    let handler_trait_ident: syn::Ident =
+        syn::parse_str(&format!("{}Handler", enum_ident.to_string())).unwrap();
 
     let event_dispatch_impl = quote! {
         pub trait #handler_trait_ident {
@@ -147,7 +150,6 @@ pub fn derive(input: TokenStream) -> TokenStream {
             }
         }
     };
-
 
     event_dispatch_impl.into()
 }

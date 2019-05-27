@@ -2,8 +2,8 @@
 extern crate quote;
 extern crate proc_macro;
 
-mod state_machine_shared_fn_accessor;
 mod event_dispatcher;
+mod state_machine_shared_fn_accessor;
 
 use proc_macro::TokenStream;
 
@@ -70,9 +70,7 @@ pub fn state_machine_shared_fn_accessor(
 ///
 /// #[derive(EventDispatcher)]
 /// enum Event {
-///     SdpAnswerMade {
-///         peer_id: u64, sdp_answer: String
-///     },
+///     SdpAnswerMade { peer_id: u64, sdp_answer: String },
 /// }
 ///
 /// struct Room {
@@ -107,8 +105,6 @@ pub fn state_machine_shared_fn_accessor(
 /// }
 /// ```
 #[proc_macro_derive(EventDispatcher)]
-pub fn derive_event_dispatcher(
-    input: TokenStream,
-) -> TokenStream {
+pub fn derive_event_dispatcher(input: TokenStream) -> TokenStream {
     event_dispatcher::derive(input)
 }
