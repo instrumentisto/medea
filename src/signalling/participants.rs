@@ -198,14 +198,12 @@ impl ParticipantService {
                 continue;
             }
 
-            let responder_id =
-                &connected_member_endpoint.src.member_id;
+            let responder_id = &connected_member_endpoint.src.member_id;
 
             let is_responder_connected =
                 self.member_has_connection(responder_id);
             if is_responder_connected {
-                let responder = if let Some(m) =
-                    self.members.get(responder_id)
+                let responder = if let Some(m) = self.members.get(responder_id)
                 {
                     m
                 } else {
@@ -221,9 +219,8 @@ impl ParticipantService {
                     caller: responder.clone(),
                     responder: connected_member.clone(),
                 });
-            } else if let Some(m) = self
-                .members_waiting_connection
-                .get_mut(responder_id)
+            } else if let Some(m) =
+                self.members_waiting_connection.get_mut(responder_id)
             {
                 m.push(connected_member.clone());
             } else {
