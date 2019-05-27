@@ -139,7 +139,6 @@ ifeq ($(test-unit-crate),medea)
 else
 ifeq ($(test-unit-crate),jason)
 	wasm-pack test --headless --firefox jason
-	cargo test -p jason
 endif
 	cargo test -p $(test-unit-crate)
 endif
