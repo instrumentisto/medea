@@ -6,6 +6,7 @@ use super::{element::Element, pipeline::Pipeline, Entity, TryFromEntityError};
 
 use crate::api::control::element::{WebRtcPlayEndpoint, WebRtcPublishEndpoint};
 
+/// ID of [`Member`].
 pub type Id = u64;
 
 /// Media server user with its ID and credentials.
@@ -25,7 +26,10 @@ pub struct Member {
 #[derive(Clone, Debug)]
 #[allow(clippy::module_name_repetitions)]
 pub struct MemberSpec {
-    pub pipeline: Pipeline,
+    /// Spec of this [`Member`].
+    pub spec: Pipeline,
+
+    /// Credentials to authorize [`Member`] with.
     pub credentials: String,
 }
 
@@ -35,12 +39,12 @@ impl MemberSpec {
         &self,
         id: &str,
     ) -> Option<Result<Element, TryFromEntityError>> {
-        Some(Element::try_from(self.pipeline.pipeline.get(id).cloned()?))
+        Some(Element::try_from(self.spec.pipeline.get(id).cloned()?))
     }
 
     /// Get all [`WebRtcPlayEndpoint`]s of this [`MemberSpec`].
     pub fn get_play_endpoints(&self) -> Vec<&WebRtcPlayEndpoint> {
-        self.pipeline
+        self.spec
             .pipeline
             .iter()
             .filter_map(|(_name, e)| match e {
@@ -63,7 +67,7 @@ impl MemberSpec {
 
     /// Get all [`WebRtcPublishEndpoint`]s of this [`MemberSpec`].
     pub fn get_publish_endpoints(&self) -> Vec<&WebRtcPublishEndpoint> {
-        self.pipeline
+        self.spec
             .pipeline
             .iter()
             .filter_map(|(_name, e)| match e {
@@ -80,7 +84,7 @@ impl TryFrom<Entity> for MemberSpec {
     fn try_from(from: Entity) -> Result<Self, Self::Error> {
         match from {
             Entity::Member { spec, credentials } => Ok(Self {
-                pipeline: spec,
+                spec: spec,
                 credentials,
             }),
             _ => Err(TryFromEntityError::NotMember),

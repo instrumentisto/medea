@@ -47,7 +47,6 @@ fn main() {
     } else {
         HashMap::new()
     };
-
     info!("Loaded static specs: {:?}", rooms);
 
     let room_repo = RoomsRepository::new(rooms);
