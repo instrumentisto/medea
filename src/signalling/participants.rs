@@ -198,35 +198,21 @@ impl ParticipantService {
                 continue;
             }
 
-            let responder_member_control_id =
+            let responder_id =
                 &connected_member_endpoint.src.member_id;
 
-            let responder_member_signalling_id = if let Some(r) =
-                self.members.get(responder_member_control_id)
-            {
-                &r.id
-            } else {
-                warn!(
-                    "Member with id '{}' not found! Probably this is error in \
-                     spec.",
-                    responder_member_control_id
-                );
-                // Maybe better return error here?
-                continue;
-            };
-
             let is_responder_connected =
-                self.member_has_connection(responder_member_signalling_id);
+                self.member_has_connection(responder_id);
             if is_responder_connected {
                 let responder = if let Some(m) =
-                    self.members.get(responder_member_signalling_id)
+                    self.members.get(responder_id)
                 {
                     m
                 } else {
                     warn!(
                         "Member with id {} not found, but this member has \
                          connection!",
-                        responder_member_signalling_id
+                        responder_id
                     );
                     continue;
                 };
@@ -237,12 +223,12 @@ impl ParticipantService {
                 });
             } else if let Some(m) = self
                 .members_waiting_connection
-                .get_mut(responder_member_signalling_id)
+                .get_mut(responder_id)
             {
                 m.push(connected_member.clone());
             } else {
                 self.members_waiting_connection.insert(
-                    responder_member_signalling_id.clone(),
+                    responder_id.clone(),
                     vec![connected_member.clone()],
                 );
             }
