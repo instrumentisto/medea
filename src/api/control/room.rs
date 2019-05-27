@@ -2,18 +2,19 @@
 
 use std::convert::TryFrom;
 
-use crate::signalling::RoomId;
-
 use super::{
     member::MemberSpec, pipeline::Pipeline, Entity, TryFromEntityError,
 };
+
+/// ID of [`Room`].
+pub type Id = String;
 
 /// [`crate::signalling::room::Room`] specification.
 /// Newtype for [`Entity::Room`]
 #[derive(Clone, Debug)]
 #[allow(clippy::module_name_repetitions)]
 pub struct RoomSpec {
-    pub id: RoomId,
+    pub id: Id,
     pub spec: Pipeline,
 }
 

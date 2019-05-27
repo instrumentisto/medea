@@ -18,20 +18,17 @@ use crate::{
             AuthorizationError, Authorize, CommandMessage, RpcConnectionClosed,
             RpcConnectionEstablished,
         },
-        control::{member::MemberSpec, room::RoomSpec, Member, MemberId},
+        control::{
+            member::MemberSpec, room::RoomSpec, Member, MemberId, RoomId,
+        },
     },
     log::prelude::*,
     media::{
         New, NewPeer, Peer, PeerId, PeerStateError, PeerStateMachine,
         WaitLocalHaveRemote, WaitLocalSdp, WaitRemoteSdp,
     },
-    signalling::{
-        participants::ParticipantService, peers::PeerRepository, RoomId,
-    },
+    signalling::{participants::ParticipantService, peers::PeerRepository},
 };
-
-/// ID of [`Room`].
-pub type Id = u64;
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
 type ActFuture<I, E> = Box<dyn ActorFuture<Actor = Room, Item = I, Error = E>>;
@@ -60,7 +57,7 @@ impl From<PeerStateError> for RoomError {
 /// Media server room with its [`Member`]s.
 #[derive(Debug)]
 pub struct Room {
-    id: Id,
+    id: RoomId,
 
     /// [`RpcConnection`]s of [`Member`]s in this [`Room`].
     participants: ParticipantService,
@@ -95,7 +92,7 @@ impl Room {
         debug!("Created room with {:?} users.", members);
 
         Self {
-            id: room.id,
+            id: room.id.clone(),
             peers: PeerRepository::from(HashMap::new()),
             participants: ParticipantService::new(
                 members,
@@ -107,7 +104,7 @@ impl Room {
     }
 
     pub fn get_id(&self) -> RoomId {
-        self.id
+        self.id.clone()
     }
 
     /// Sends [`Event::PeerCreated`] to one of specified [`Peer`]s based on

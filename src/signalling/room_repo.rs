@@ -5,7 +5,7 @@ use hashbrown::HashMap;
 
 use std::sync::{Arc, Mutex};
 
-use crate::signalling::{Room, RoomId};
+use crate::{api::control::RoomId, signalling::Room};
 
 /// Repository that stores [`Room`]s addresses.
 #[derive(Clone, Default)]
@@ -24,8 +24,8 @@ impl RoomsRepository {
     }
 
     /// Returns [`Room`] by its ID.
-    pub fn get(&self, id: RoomId) -> Option<Addr<Room>> {
+    pub fn get(&self, id: &str) -> Option<Addr<Room>> {
         let rooms = self.rooms.lock().unwrap();
-        rooms.get(&id).cloned()
+        rooms.get(id).cloned()
     }
 }

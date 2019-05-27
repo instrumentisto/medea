@@ -13,11 +13,11 @@ use crate::{
             rpc_connection::{AuthorizationError, Authorize},
             session::WsSession,
         },
-        control::MemberId,
+        control::{MemberId, RoomId},
     },
     conf::{Conf, Rpc},
     log::prelude::*,
-    signalling::{room_repo::RoomsRepository, RoomId},
+    signalling::room_repo::RoomsRepository,
 };
 
 /// Parameters of new WebSocket connection creation HTTP request.
@@ -42,7 +42,7 @@ fn ws_index(
 ) -> FutureResponse<HttpResponse> {
     debug!("Request params: {:?}", info);
 
-    match state.rooms.get(info.room_id) {
+    match state.rooms.get(&info.room_id) {
         Some(room) => room
             .send(Authorize {
                 member_id: info.member_id,
@@ -147,7 +147,8 @@ mod test {
     #[test]
     fn responses_with_pong() {
         let mut server = ws_server(Conf::default());
-        let (read, mut write) = server.ws_at("/ws/1/1/1-credentials").unwrap();
+        let (read, mut write) =
+            server.ws_at("/ws/video-call-1/1/1-credentials").unwrap();
 
         write.text(r#"{"ping":33}"#);
         let (item, _) = server.execute(read.into_future()).unwrap();
@@ -165,7 +166,8 @@ mod test {
         };
 
         let mut server = ws_server(conf.clone());
-        let (read, mut write) = server.ws_at("/ws/1/1/1-credentials").unwrap();
+        let (read, mut write) =
+            server.ws_at("/ws/video-call-1/1/1-credentials").unwrap();
 
         write.text(r#"{"ping":33}"#);
         let (item, read) = server.execute(read.into_future()).unwrap();

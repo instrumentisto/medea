@@ -17,6 +17,7 @@ use self::{
 };
 
 pub use self::member::{Id as MemberId, Member};
+pub use self::room::Id as RoomId;
 
 /// Errors that can occur when we try transform some spec from [`Entity`].
 /// This error used in all [`TryFrom`] of Control API.
@@ -37,7 +38,7 @@ pub enum TryFromEntityError {
 pub enum Entity {
     /// Represent [`RoomSpec`].
     /// Can transform into [`RoomSpec`] by `RoomSpec::try_from`.
-    Room { id: u64, spec: Pipeline },
+    Room { id: RoomId, spec: Pipeline },
 
     /// Represent [`MemberSpec`].
     /// Can transform into [`MemberSpec`] by `MemberSpec::try_from`.
