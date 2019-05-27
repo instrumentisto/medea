@@ -2,21 +2,31 @@
 
 use proc_macro::TokenStream;
 
+/// Variant of enum.
 #[derive(Clone)]
 struct MatchVariant {
+    /// Identifier of enum variant.
     ident: syn::Ident,
+
+    /// Fields of enum variant.
     fields: Vec<MatchVariantField>,
 }
 
+/// Field of match variant.
 #[derive(Clone)]
 struct MatchVariantField {
+    /// Identifier of enum field.
     ident: syn::Ident,
+
+    /// Type of enum field.
     ty: syn::Type,
 }
 
-// Do not use it with names like SendRDP, ReceiveRDP, HTTP!
-// For this names this function generate names like
-// on_send_r_d_p, on_receive_r_d_p, on_h_t_t_p!
+/// Transform function name from snake_case to camelCase and add "on_" prefix.
+///
+/// Do not use it with names like `SendRDP`, `ReceiveRDP`, `HTTP`!
+/// For this names this function generate names like
+/// `on_send_r_d_p`, `on_receive_r_d_p`, `on_h_t_t_p`!
 fn to_handler_fn_name(event: &str) -> String {
     let mut snake_case = String::new();
     snake_case.push_str("on");
@@ -30,6 +40,10 @@ fn to_handler_fn_name(event: &str) -> String {
     snake_case
 }
 
+/// Parse all [`MatchVariant`]s of provided enum.
+/// Support only named enums.
+///
+/// Panic if enum is unnamed.
 fn parse_match_variants(enum_input: syn::ItemEnum) -> Vec<MatchVariant> {
     enum_input.variants.into_iter()
         .map(|v| {
@@ -54,6 +68,22 @@ fn parse_match_variants(enum_input: syn::ItemEnum) -> Vec<MatchVariant> {
         }).collect::<Vec<MatchVariant>>()
 }
 
+
+/// Generates the actual code for `#[derive(EventDispatcher)]` macro.
+///
+/// # Generation algorithm
+/// 1. parse variants of enum
+/// 2. for every variant it does the following:
+/// 2.1. get all variant fields
+/// 2.2. generate function name
+/// 2.3. generate `match` for this variant that call function with all
+///      enum variant fields as argument
+/// 3. generate trait functions declaration by transformation function name
+///    from snake_case to camelCase and add "on_" prefix.
+/// 4. generate trait {enum_name}Handler with generated functions declarations
+///    from step 3.
+/// 5. generate function `dispatch<T: {enum_name}Handler>(self, handler: &T)`
+///    with `match` that generated in step 2.3.
 pub fn derive(input: TokenStream) -> TokenStream {
     let item_enum: syn::ItemEnum = syn::parse(input).unwrap();
     let enum_ident = item_enum.ident.clone();
