@@ -3,7 +3,6 @@
 //! [`RpcConnection`] authorization, establishment, message sending.
 
 use std::{
-    sync::Arc,
     time::{Duration, Instant},
 };
 
@@ -207,10 +206,10 @@ impl ParticipantService {
             let responder_member_signalling_id = if let Some(r) =
                 self.members.get(responder_member_control_id)
             {
-                r.id.clone()
+                &r.id
             } else {
                 warn!(
-                    "Member with control id '{}' not found! Probably this is \
+                    "Member with id '{}' not found! Probably this is \
                      error in spec.",
                     responder_member_control_id
                 );
@@ -219,10 +218,10 @@ impl ParticipantService {
             };
 
             let is_responder_connected = self
-                .member_has_connection(&responder_member_signalling_id);
+                .member_has_connection(responder_member_signalling_id);
             if is_responder_connected {
                 let responder_spec = if let Some(m) =
-                    self.members.get(&responder_member_signalling_id)
+                    self.members.get(responder_member_signalling_id)
                 {
                     m.spec.clone()
                 } else {
@@ -231,7 +230,7 @@ impl ParticipantService {
 
                 let responder = Member {
                     id: responder_member_control_id.clone(),
-                    spec: Arc::clone(&responder_spec),
+                    spec: responder_spec,
                 };
                 ctx.notify(CreatePeer {
                     caller: responder,
@@ -239,7 +238,7 @@ impl ParticipantService {
                 });
             } else if let Some(m) = self
                 .members_waiting_connection
-                .get_mut(&responder_member_signalling_id)
+                .get_mut(responder_member_signalling_id)
             {
                 m.push(connected_member.clone());
             } else {
