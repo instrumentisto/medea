@@ -72,18 +72,15 @@ pub struct Room {
 impl Room {
     /// Create new instance of [`Room`].
     pub fn new(room: RoomSpec, reconnect_timeout: Duration) -> Self {
+        // TODO: rewrite this
         let mut members = HashMap::new();
-        let mut control_signalling_members = HashMap::new();
         room.spec.pipeline.iter().for_each(
             |(control_id, value)| {
-//                let id = (i as u64) + 1;
                 let member_spec = MemberSpec::try_from(value.clone()).unwrap();
 
-                control_signalling_members.insert(control_id.clone(), control_id.clone());
                 let member = Member {
                     id: control_id.clone(),
                     spec: Arc::new(member_spec),
-                    control_id: control_id.clone(),
                 };
                 members.insert(control_id.clone(), member);
             },
@@ -95,7 +92,6 @@ impl Room {
             peers: PeerRepository::from(HashMap::new()),
             participants: ParticipantService::new(
                 members,
-                control_signalling_members,
                 reconnect_timeout,
             ),
             spec: room,

@@ -17,9 +17,6 @@ pub struct Member {
 
     /// Control API specification of this [`Member`].
     pub spec: Arc<MemberSpec>,
-
-    /// ID from Control API specification of this [`Member`].
-    pub control_id: String,
 }
 
 /// Newtype for [`Entity::Member`] variant.
