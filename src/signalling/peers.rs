@@ -53,15 +53,15 @@ impl PeerRepository {
 
         let mut caller_peer = Peer::new(
             caller_peer_id,
-            caller.signalling_id,
+            caller.signalling_id.clone(),
             responder_peer_id,
-            responder.signalling_id,
+            responder.signalling_id.clone(),
         );
         let mut responder_peer = Peer::new(
             responder_peer_id,
-            responder.signalling_id,
+            responder.signalling_id.clone(),
             caller_peer_id,
-            caller.signalling_id,
+            caller.signalling_id.clone(),
         );
 
         caller_peer.add_publish_endpoints(

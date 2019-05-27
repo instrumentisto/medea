@@ -141,15 +141,15 @@ impl ParticipantService {
             }
             ClosedReason::Lost => {
                 self.drop_connection_tasks.insert(
-                    member_id,
+                    member_id.clone(),
                     ctx.run_later(self.reconnect_timeout, move |_, ctx| {
                         info!(
                             "Member {} connection lost at {:?}. Room will be \
                              stopped.",
-                            member_id, closed_at
+                            &member_id, closed_at
                         );
                         ctx.notify(RpcConnectionClosed {
-                            member_id,
+                            member_id: member_id,
                             reason: ClosedReason::Closed,
                         })
                     }),
@@ -172,13 +172,13 @@ impl ParticipantService {
                 added_member.push(waiter.control_id.clone());
                 let connected_new_peer = NewPeer {
                     control_id: member.control_id.clone(),
-                    signalling_id: member.id,
+                    signalling_id: member.id.clone(),
                     spec: Arc::clone(&member.spec),
                 };
                 let waiter_new_peer = NewPeer {
                     spec: Arc::clone(&waiter.spec),
                     control_id: waiter.control_id.clone(),
-                    signalling_id: waiter.signalling_id,
+                    signalling_id: waiter.signalling_id.clone(),
                 };
 
                 ctx.notify(CreatePeer {
@@ -237,16 +237,16 @@ impl ParticipantService {
             };
 
             let connected_new_peer = NewPeer {
-                signalling_id: connected_member.id,
+                signalling_id: connected_member.id.clone(),
                 spec: Arc::clone(&connected_member.spec),
                 control_id: connected_member.control_id.clone(),
             };
 
             let is_responder_connected =
-                self.member_has_connection(*responder_member_signalling_id);
+                self.member_has_connection(responder_member_signalling_id.clone());
             if is_responder_connected {
                 let responder_spec = if let Some(m) =
-                    self.members.get(&responder_member_signalling_id)
+                    self.members.get(responder_member_signalling_id)
                 {
                     m.spec.clone()
                 } else {
@@ -254,7 +254,7 @@ impl ParticipantService {
                 };
 
                 let responder_new_peer = NewPeer {
-                    signalling_id: *responder_member_signalling_id,
+                    signalling_id: responder_member_signalling_id.clone(),
                     spec: Arc::clone(&responder_spec),
                     control_id: responder_member_control_id.clone(),
                 };
@@ -269,7 +269,7 @@ impl ParticipantService {
                 m.push(connected_new_peer);
             } else {
                 self.members_waiting_connection.insert(
-                    *responder_member_signalling_id,
+                    responder_member_signalling_id.clone(),
                     vec![connected_new_peer],
                 );
             }
@@ -300,9 +300,9 @@ impl ParticipantService {
         } else {
             debug!("Connected member: {}", member_id);
 
-            self.create_and_interconnect_members_peers(ctx, member_id);
+            self.create_and_interconnect_members_peers(ctx, member_id.clone());
 
-            self.connections.insert(member_id, con);
+            self.connections.insert(member_id.clone(), con);
         }
     }
 

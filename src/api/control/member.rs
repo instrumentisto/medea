@@ -7,7 +7,7 @@ use super::{element::Element, pipeline::Pipeline, Entity, TryFromEntityError};
 use crate::api::control::element::{WebRtcPlayEndpoint, WebRtcPublishEndpoint};
 
 /// ID of [`Member`].
-pub type Id = u64;
+pub type Id = String;
 
 /// Media server user with its ID and credentials.
 #[derive(Debug, Clone)]

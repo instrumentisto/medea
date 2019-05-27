@@ -125,7 +125,7 @@ pub mod test {
         fn started(&mut self, ctx: &mut Self::Context) {
             self.room
                 .try_send(RpcConnectionEstablished {
-                    member_id: self.member_id,
+                    member_id: self.member_id.clone(),
                     connection: Box::new(ctx.address()),
                 })
                 .unwrap();
@@ -193,7 +193,7 @@ pub mod test {
                     candidate: _,
                 } => {
                     self.room.do_send(RpcConnectionClosed {
-                        member_id: self.member_id,
+                        member_id: self.member_id.clone(),
                         reason: ClosedReason::Closed,
                     });
                 }

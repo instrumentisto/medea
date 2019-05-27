@@ -74,18 +74,18 @@ impl Room {
     pub fn new(room: RoomSpec, reconnect_timeout: Duration) -> Self {
         let mut members = HashMap::new();
         let mut control_signalling_members = HashMap::new();
-        room.spec.pipeline.iter().enumerate().for_each(
-            |(i, (control_id, value))| {
-                let id = (i as u64) + 1;
+        room.spec.pipeline.iter().for_each(
+            |(control_id, value)| {
+//                let id = (i as u64) + 1;
                 let member_spec = MemberSpec::try_from(value.clone()).unwrap();
 
-                control_signalling_members.insert(control_id.clone(), id);
+                control_signalling_members.insert(control_id.clone(), control_id.clone());
                 let member = Member {
-                    id,
+                    id: control_id.clone(),
                     spec: Arc::new(member_spec),
                     control_id: control_id.clone(),
                 };
-                members.insert(id, member);
+                members.insert(control_id.clone(), member);
             },
         );
         debug!("Created room with {:?} users.", members);
@@ -483,13 +483,13 @@ mod test {
             let stopped_clone = stopped.clone();
             Arbiter::start(move |_| TestConnection {
                 events: caller_events_clone,
-                member_id: 1,
+                member_id: "caller".to_string(),
                 room: room_clone,
                 stopped: stopped_clone,
             });
             Arbiter::start(move |_| TestConnection {
                 events: responder_events_clone,
-                member_id: 2,
+                member_id: "responder".to_string(),
                 room,
                 stopped,
             });

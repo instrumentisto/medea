@@ -208,7 +208,7 @@ pub struct Peer<S> {
 impl<T> Peer<T> {
     /// Returns ID of [`Member`] associated with this [`Peer`].
     pub fn member_id(&self) -> MemberId {
-        self.context.member_id
+        self.context.member_id.clone()
     }
 
     /// Returns ID of [`Peer`].
@@ -222,8 +222,8 @@ impl<T> Peer<T> {
     }
 
     /// Returns ID of interconnected [`Member`].
-    pub fn partner_member_id(&self) -> Id {
-        self.context.partner_member
+    pub fn partner_member_id(&self) -> MemberId {
+        self.context.partner_member.clone()
     }
 
     /// Returns [`Track`]'s of [`Peer`].
@@ -274,7 +274,7 @@ impl<T> Peer<T> {
 #[derive(Debug, Clone)]
 #[allow(clippy::module_name_repetitions)]
 pub struct NewPeer {
-    pub signalling_id: u64,
+    pub signalling_id: MemberId,
     pub spec: Arc<MemberSpec>,
     pub control_id: String,
 }
@@ -399,7 +399,7 @@ impl Peer<WaitLocalHaveRemote> {
 
 #[test]
 fn create_peer() {
-    let peer = Peer::new(1, 1, 2, 2);
+    let peer = Peer::new(1, "1".to_string(), 2, "2".to_string());
     let peer = peer.start();
 
     assert_eq!(peer.state, WaitLocalSdp {});

@@ -45,7 +45,7 @@ fn ws_index(
     match state.rooms.get(&info.room_id) {
         Some(room) => room
             .send(Authorize {
-                member_id: info.member_id,
+                member_id: info.member_id.clone(),
                 credentials: info.credentials.clone(),
             })
             .from_err()
@@ -53,7 +53,7 @@ fn ws_index(
                 Ok(_) => ws::start(
                     &r.drop_state(),
                     WsSession::new(
-                        info.member_id,
+                        info.member_id.clone(),
                         room,
                         state.config.idle_timeout,
                     ),
@@ -148,7 +148,7 @@ mod test {
     fn responses_with_pong() {
         let mut server = ws_server(Conf::default());
         let (read, mut write) =
-            server.ws_at("/ws/video-call-1/1/test").unwrap();
+            server.ws_at("/ws/video-call-1/caller/test").unwrap();
 
         write.text(r#"{"ping":33}"#);
         let (item, _) = server.execute(read.into_future()).unwrap();
@@ -167,7 +167,7 @@ mod test {
 
         let mut server = ws_server(conf.clone());
         let (read, mut write) =
-            server.ws_at("/ws/video-call-1/1/test").unwrap();
+            server.ws_at("/ws/video-call-1/caller/test").unwrap();
 
         write.text(r#"{"ping":33}"#);
         let (item, read) = server.execute(read.into_future()).unwrap();
