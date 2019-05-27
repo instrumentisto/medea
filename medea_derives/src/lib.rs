@@ -66,6 +66,8 @@ pub fn state_machine_shared_fn_accessor(
 /// some enum with named fields.
 /// ## Derive macro use
 /// ```
+/// use medea_derives::EventDispatcher;
+///
 /// #[derive(EventDispatcher)]
 /// enum Event {
 ///     SdpAnswerMade {
@@ -91,18 +93,19 @@ pub fn state_machine_shared_fn_accessor(
 ///     // Example:
 ///     // Original enum variant name is SomeEnumVariant then handler name
 ///     // for this variant will be on_some_enum_variant.
-///     fn on_sdp_answer_made(peer_id: u64, sdp_answer: String) {
+///     fn on_sdp_answer_made(&mut self, peer_id: u64, sdp_answer: String) {
 ///         // Some handler code
 ///     }
 /// }
 ///
 /// // A function that accepts an [`Event`]
 /// // and must pass it to the desired function.
-/// fn some_function(event: Event, room: &Room) {
+/// fn some_function(event: Event, room: &mut Room) {
 ///     // This function will call the necessary function
 ///     // based on the variant of enum [`Event`]
 ///     event.dispatch(room);
 /// }
+/// ```
 #[proc_macro_derive(EventDispatcher)]
 pub fn derive_event_dispatcher(
     input: TokenStream,
