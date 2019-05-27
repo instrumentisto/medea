@@ -4,8 +4,8 @@ use hashbrown::HashMap;
 
 use std::convert::{TryFrom, TryInto};
 
-use crate::api::control::Member;
 use crate::{
+    api::control::Member,
     media::{Peer, PeerId, PeerStateMachine},
     signalling::room::RoomError,
 };

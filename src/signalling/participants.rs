@@ -49,7 +49,7 @@ pub struct ParticipantService {
     /// before dropping it irrevocably in case it gets reestablished.
     drop_connection_tasks: HashMap<MemberId, SpawnHandle>,
 
-    /// Stores [`NewPeer`]s which wait connection of another [`Member`].
+    /// Stores [`Member`]s which wait connection of another [`Member`].
     members_waiting_connection: HashMap<MemberId, Vec<Member>>,
 }
 
@@ -218,20 +218,21 @@ impl ParticipantService {
             let is_responder_connected =
                 self.member_has_connection(responder_member_signalling_id);
             if is_responder_connected {
-                let responder_spec = if let Some(m) =
+                let responder = if let Some(m) =
                     self.members.get(responder_member_signalling_id)
                 {
-                    m.spec.clone()
+                    m
                 } else {
+                    warn!(
+                        "Member with id {} not found, but this member has \
+                         connection!",
+                        responder_member_signalling_id
+                    );
                     continue;
                 };
 
-                let responder = Member {
-                    id: responder_member_control_id.clone(),
-                    spec: responder_spec,
-                };
                 ctx.notify(CreatePeer {
-                    caller: responder,
+                    caller: responder.clone(),
                     responder: connected_member.clone(),
                 });
             } else if let Some(m) = self
