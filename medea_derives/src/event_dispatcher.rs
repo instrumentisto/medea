@@ -22,7 +22,7 @@ struct MatchVariantField {
     ty: syn::Type,
 }
 
-/// Transform function name from snake_case to camelCase and add "on_" prefix.
+/// Transform function name from `snake_case` to `camelCase` and add "on_" prefix.
 ///
 /// Do not use it with names like `SendRDP`, `ReceiveRDP`, `HTTP`!
 /// For this names this function generate names like
@@ -81,8 +81,8 @@ fn parse_match_variants(enum_input: syn::ItemEnum) -> Vec<MatchVariant> {
 /// 2.3. generate `match` for this variant that call function with all
 ///      enum variant fields as argument
 /// 3. generate trait functions declaration by transformation function name
-///    from snake_case to camelCase and add "on_" prefix.
-/// 4. generate trait {enum_name}Handler with generated functions declarations
+///    from `snake_case` to `camelCase` and add "on_" prefix.
+/// 4. generate trait `{enum_name}Handler` with generated functions declarations
 ///    from step 3.
 /// 5. generate function `dispatch<T: {enum_name}Handler>(self, handler: &T)`
 ///    with `match` that generated in step 2.3.
