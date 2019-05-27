@@ -105,9 +105,6 @@ impl Actor for WsSession {
 
         self.start_watchdog(ctx);
 
-        // TODO: Fix this
-        let member_id1 = self.member_id.clone();
-        let member_id2 = self.member_id.clone();
         ctx.wait(
             wrap_future(self.room.send(RpcConnectionEstablished {
                 member_id: self.member_id.clone(),
@@ -121,7 +118,7 @@ impl Actor for WsSession {
                         error!(
                             "Room rejected Established for member {}, cause \
                              {:?}",
-                            member_id1, e
+                            session.member_id, e
                         );
                         session.close_normal(ctx);
                     }
@@ -134,7 +131,7 @@ impl Actor for WsSession {
                     error!(
                         "WsSession of member {} failed to join Room, because: \
                          {:?}",
-                        member_id2, send_err,
+                        session.member_id, send_err,
                     );
                     session.close_normal(ctx);
                 },

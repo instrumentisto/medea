@@ -2,9 +2,7 @@
 //! stores [`Members`] and associated [`RpcConnection`]s, handles
 //! [`RpcConnection`] authorization, establishment, message sending.
 
-use std::{
-    time::{Duration, Instant},
-};
+use std::time::{Duration, Instant};
 
 use actix::{fut::wrap_future, AsyncContext, Context, SpawnHandle};
 use futures::{
@@ -209,16 +207,16 @@ impl ParticipantService {
                 &r.id
             } else {
                 warn!(
-                    "Member with id '{}' not found! Probably this is \
-                     error in spec.",
+                    "Member with id '{}' not found! Probably this is error in \
+                     spec.",
                     responder_member_control_id
                 );
                 // Maybe better return error here?
                 continue;
             };
 
-            let is_responder_connected = self
-                .member_has_connection(responder_member_signalling_id);
+            let is_responder_connected =
+                self.member_has_connection(responder_member_signalling_id);
             if is_responder_connected {
                 let responder_spec = if let Some(m) =
                     self.members.get(responder_member_signalling_id)

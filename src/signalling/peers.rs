@@ -4,11 +4,11 @@ use hashbrown::HashMap;
 
 use std::convert::{TryFrom, TryInto};
 
+use crate::api::control::Member;
 use crate::{
     media::{Peer, PeerId, PeerStateMachine},
     signalling::room::RoomError,
 };
-use crate::api::control::Member;
 
 #[derive(Debug)]
 pub struct PeerRepository {

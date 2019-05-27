@@ -12,9 +12,7 @@ use medea_client_api_proto::{
 use std::{convert::TryFrom, fmt::Display, sync::Arc};
 
 use crate::{
-    api::control::{
-        element::WebRtcPublishEndpoint, MemberId,
-    },
+    api::control::{element::WebRtcPublishEndpoint, MemberId},
     media::{MediaTrack, TrackId},
 };
 
