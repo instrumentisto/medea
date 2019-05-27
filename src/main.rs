@@ -13,10 +13,11 @@ use dotenv::dotenv;
 use log::prelude::*;
 
 use crate::{
-    api::{client::server, control::load_from_yaml_file},
+    api::{client::server, control::load_static_specs_from_dir},
     conf::Conf,
     signalling::{room_repo::RoomsRepository, Room},
 };
+use hashbrown::HashMap;
 
 fn main() {
     dotenv().ok();
@@ -29,18 +30,27 @@ fn main() {
     let config = Conf::parse().unwrap();
     info!("{:?}", config);
 
-    let room_spec = load_from_yaml_file("room_spec.yml").unwrap();
+    let rooms: HashMap<String, Addr<Room>> = if let Some(static_specs_path) =
+        config.server.static_specs_path.clone()
+    {
+        let room_specs = load_static_specs_from_dir(static_specs_path).unwrap();
+        room_specs
+            .into_iter()
+            .map(|s| {
+                let room = Room::new(s, config.rpc.reconnect_timeout);
+                let room_id = room.get_id();
+                let room = Arbiter::start(move |_| room);
 
-    //    println!("{:#?}", room_spec);
-
-    let client_room = Room::new(room_spec, config.rpc.reconnect_timeout);
-    let room_id = client_room.get_id();
-    let client_room = Arbiter::start(move |_| client_room);
-    let room_hash_map = hashmap! {
-        room_id => client_room,
+                (room_id, room)
+            })
+            .collect()
+    } else {
+        HashMap::new()
     };
 
-    let room_repo = RoomsRepository::new(room_hash_map);
+    info!("Loaded static specs: {:?}", rooms);
+
+    let room_repo = RoomsRepository::new(rooms);
 
     server::run(room_repo, config);
     let _ = sys.run();

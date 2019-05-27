@@ -12,9 +12,13 @@ pub struct Server {
     /// IP address to bind HTTP server to. Defaults to `0.0.0.0`.
     #[default(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)))]
     pub bind_ip: IpAddr,
+
     /// Port to bind HTTP server to. Defaults to `8080`.
     #[default(8080)]
     pub bind_port: u16,
+
+    /// Path to directory with static control API specs.
+    pub static_specs_path: Option<String>,
 }
 
 impl Server {

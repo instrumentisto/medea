@@ -8,7 +8,7 @@ pub mod room;
 use failure::{Error, Fail};
 use serde::Deserialize;
 
-use std::{convert::TryFrom as _, fs::File, io::Read as _};
+use std::{convert::TryFrom as _, fs::File, io::Read as _, path::Path};
 
 use self::{
     element::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
@@ -16,8 +16,10 @@ use self::{
     room::RoomSpec,
 };
 
-pub use self::member::{Id as MemberId, Member};
-pub use self::room::Id as RoomId;
+pub use self::{
+    member::{Id as MemberId, Member},
+    room::Id as RoomId,
+};
 
 /// Errors that can occur when we try transform some spec from [`Entity`].
 /// This error used in all [`TryFrom`] of Control API.
@@ -53,8 +55,8 @@ pub enum Entity {
     WebRtcPlayEndpoint { spec: WebRtcPlayEndpoint },
 }
 
-/// Load [`Entity`] from file with YAML format.
-pub fn load_from_yaml_file(path: &str) -> Result<RoomSpec, Error> {
+/// Load [`RoomSpec`] from file with YAML format.
+pub fn load_from_yaml_file<P: AsRef<Path>>(path: P) -> Result<RoomSpec, Error> {
     let mut file = File::open(path)?;
     let mut buf = String::new();
     file.read_to_string(&mut buf)?;
@@ -62,4 +64,18 @@ pub fn load_from_yaml_file(path: &str) -> Result<RoomSpec, Error> {
     let room = RoomSpec::try_from(parsed)?;
 
     Ok(room)
+}
+
+/// Load all [`RoomSpec`] from YAML files from provided path.
+pub fn load_static_specs_from_dir<P: AsRef<Path>>(
+    path: P,
+) -> Result<Vec<RoomSpec>, Error> {
+    let mut specs = Vec::new();
+    for entry in std::fs::read_dir(path)? {
+        let entry = entry?;
+        let spec = load_from_yaml_file(entry.path())?;
+        specs.push(spec)
+    }
+
+    Ok(specs)
 }
