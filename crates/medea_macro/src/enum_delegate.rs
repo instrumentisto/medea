@@ -6,6 +6,19 @@ use proc_macro::TokenStream;
 use quote::quote;
 
 /// Generates the actual code for `#[enum_delegate]` macro.
+///
+/// # Generation algorithm
+/// 1) parse input enum
+/// 2) check that enum is not empty
+/// 3) add "{}" to the macro argument to get the full function declaration.
+/// 4) parse this full function declaration
+/// 5) check that function to delegate is not static by counting `[&][&mut] self`
+///    arguments
+/// 6) get all argument idents (except `[&][&mut] self`) from a function to be
+///    delegated
+/// 7) generate function with `match` of all variants that returns
+///    result of delegated function call
+/// 8) add this function to implementation of enum
 pub fn derive(args: &TokenStream, input: TokenStream) -> TokenStream {
     let mut output = input.clone();
     let inp: syn::DeriveInput =
