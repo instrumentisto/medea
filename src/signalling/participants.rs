@@ -76,10 +76,10 @@ impl ParticipantService {
     /// [`Member`] was found, but incorrect credentials was provided.
     pub fn get_member_by_id_and_credentials(
         &self,
-        member_id: MemberId,
+        member_id: &str,
         credentials: &str,
     ) -> Result<&Member, AuthorizationError> {
-        match self.members.get(&member_id) {
+        match self.members.get(member_id) {
             Some(ref member) => {
                 if member.spec.credentials.eq(credentials) {
                     Ok(member)
@@ -92,9 +92,9 @@ impl ParticipantService {
     }
 
     /// Checks if [`Member`] has **active** [`RcpConnection`].
-    pub fn member_has_connection(&self, member_id: MemberId) -> bool {
-        self.connections.contains_key(&member_id)
-            && !self.drop_connection_tasks.contains_key(&member_id)
+    pub fn member_has_connection(&self, member_id: &str) -> bool {
+        self.connections.contains_key(member_id)
+            && !self.drop_connection_tasks.contains_key(member_id)
     }
 
     /// Send [`Event`] to specified remote [`Member`].
@@ -177,9 +177,9 @@ impl ParticipantService {
     fn create_and_interconnect_members_peers(
         &mut self,
         ctx: &mut Context<Room>,
-        member_id: MemberId,
+        member_id: &str,
     ) {
-        let connected_member = if let Some(m) = self.members.get(&member_id) {
+        let connected_member = if let Some(m) = self.members.get(member_id) {
             m
         } else {
             warn!("Connected a non-existent member with id {}!", member_id);
@@ -191,7 +191,7 @@ impl ParticipantService {
 
         let added_waiting_members =
             self.connect_waiting_members(&connected_member, ctx);
-        self.members_waiting_connection.remove(&member_id);
+        self.members_waiting_connection.remove(member_id);
 
         for connected_member_endpoint in connected_member_play_endpoints {
             // Skip members which waiting for us because we added them before.
@@ -219,7 +219,7 @@ impl ParticipantService {
             };
 
             let is_responder_connected = self
-                .member_has_connection(responder_member_signalling_id.clone());
+                .member_has_connection(&responder_member_signalling_id);
             if is_responder_connected {
                 let responder_spec = if let Some(m) =
                     self.members.get(&responder_member_signalling_id)
@@ -258,16 +258,16 @@ impl ParticipantService {
     pub fn connection_established(
         &mut self,
         ctx: &mut Context<Room>,
-        member_id: MemberId,
+        member_id: &str,
         con: Box<dyn RpcConnection>,
     ) {
         // lookup previous member connection
-        if let Some(mut connection) = self.connections.remove(&member_id) {
+        if let Some(mut connection) = self.connections.remove(member_id) {
             debug!("Closing old RpcConnection for member {}", member_id);
 
             // cancel RpcConnection close task, since connection is
             // reestablished
-            if let Some(handler) = self.drop_connection_tasks.remove(&member_id)
+            if let Some(handler) = self.drop_connection_tasks.remove(member_id)
             {
                 ctx.cancel_future(handler);
             }
@@ -275,9 +275,9 @@ impl ParticipantService {
         } else {
             debug!("Connected member: {}", member_id);
 
-            self.create_and_interconnect_members_peers(ctx, member_id.clone());
+            self.create_and_interconnect_members_peers(ctx, member_id);
 
-            self.connections.insert(member_id.clone(), con);
+            self.connections.insert(member_id.to_string(), con);
         }
     }
 

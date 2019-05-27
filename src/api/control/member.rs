@@ -81,7 +81,7 @@ impl TryFrom<Entity> for MemberSpec {
     fn try_from(from: Entity) -> Result<Self, Self::Error> {
         match from {
             Entity::Member { spec, credentials } => Ok(Self {
-                spec: spec,
+                spec,
                 credentials,
             }),
             _ => Err(TryFromEntityError::NotMember),

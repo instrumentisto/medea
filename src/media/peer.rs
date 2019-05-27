@@ -13,7 +13,7 @@ use std::{convert::TryFrom, fmt::Display, sync::Arc};
 
 use crate::{
     api::control::{
-        element::WebRtcPublishEndpoint, member::MemberSpec, MemberId,
+        element::WebRtcPublishEndpoint, MemberId,
     },
     media::{MediaTrack, TrackId},
 };

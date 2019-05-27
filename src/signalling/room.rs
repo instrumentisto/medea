@@ -262,7 +262,7 @@ impl Handler<Authorize> for Room {
         _ctx: &mut Self::Context,
     ) -> Self::Result {
         self.participants
-            .get_member_by_id_and_credentials(msg.member_id, &msg.credentials)
+            .get_member_by_id_and_credentials(&msg.member_id, &msg.credentials)
             .map(|_| ())
     }
 }
@@ -399,7 +399,7 @@ impl Handler<RpcConnectionEstablished> for Room {
         // save new connection
         self.participants.connection_established(
             ctx,
-            msg.member_id,
+            &msg.member_id,
             msg.connection,
         );
 

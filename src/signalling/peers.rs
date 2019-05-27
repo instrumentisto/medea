@@ -5,7 +5,6 @@ use hashbrown::HashMap;
 use std::convert::{TryFrom, TryInto};
 
 use crate::{
-    api::control::MemberId,
     media::{Peer, PeerId, PeerStateMachine},
     signalling::room::RoomError,
 };
@@ -119,7 +118,7 @@ impl PeerRepository {
     /// Panic if [`Peer`] not exists.
     pub fn get_peers_by_member_id(
         &self,
-        member_id: MemberId,
+        member_id: &str,
     ) -> Vec<&PeerStateMachine> {
         self.peers
             .iter()
