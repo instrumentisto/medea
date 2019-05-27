@@ -24,7 +24,7 @@ use crate::{
     },
     log::prelude::*,
     media::{
-        New, NewPeer, Peer, PeerId, PeerStateError, PeerStateMachine,
+        New, Peer, PeerId, PeerStateError, PeerStateMachine,
         WaitLocalHaveRemote, WaitLocalSdp, WaitRemoteSdp,
     },
     signalling::{participants::ParticipantService, peers::PeerRepository},
@@ -72,28 +72,28 @@ pub struct Room {
 impl Room {
     /// Create new instance of [`Room`].
     pub fn new(room: RoomSpec, reconnect_timeout: Duration) -> Self {
-        // TODO: rewrite this
-        let mut members = HashMap::new();
-        room.spec.pipeline.iter().for_each(
-            |(control_id, value)| {
-                let member_spec = MemberSpec::try_from(value.clone()).unwrap();
+        let members = room
+            .spec
+            .pipeline
+            .iter()
+            .map(|(control_id, entity)| {
+                let member_spec = MemberSpec::try_from(entity.clone()).unwrap();
 
-                let member = Member {
-                    id: control_id.clone(),
-                    spec: Arc::new(member_spec),
-                };
-                members.insert(control_id.clone(), member);
-            },
-        );
+                (
+                    control_id.clone(),
+                    Member {
+                        id: control_id.clone(),
+                        spec: Arc::new(member_spec),
+                    },
+                )
+            })
+            .collect();
         debug!("Created room with {:?} users.", members);
 
         Self {
             id: room.id.clone(),
             peers: PeerRepository::from(HashMap::new()),
-            participants: ParticipantService::new(
-                members,
-                reconnect_timeout,
-            ),
+            participants: ParticipantService::new(members, reconnect_timeout),
             spec: room,
         }
     }
@@ -308,8 +308,8 @@ impl Handler<ConnectPeers> for Room {
 #[derive(Debug, Message)]
 #[rtype(result = "Result<(), ()>")]
 pub struct CreatePeer {
-    pub caller: NewPeer,
-    pub responder: NewPeer,
+    pub caller: Member,
+    pub responder: Member,
 }
 
 impl Handler<CreatePeer> for Room {
@@ -323,7 +323,7 @@ impl Handler<CreatePeer> for Room {
     ) -> Self::Result {
         debug!(
             "Created peer member {} with member {}",
-            msg.caller.signalling_id, msg.responder.signalling_id
+            msg.caller.id, msg.responder.id
         );
 
         let (caller_peer_id, responder_peer_id) =

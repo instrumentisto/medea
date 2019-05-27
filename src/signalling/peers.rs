@@ -6,9 +6,10 @@ use std::convert::{TryFrom, TryInto};
 
 use crate::{
     api::control::MemberId,
-    media::{NewPeer, Peer, PeerId, PeerStateMachine},
+    media::{Peer, PeerId, PeerStateMachine},
     signalling::room::RoomError,
 };
+use crate::api::control::Member;
 
 #[derive(Debug)]
 pub struct PeerRepository {
@@ -43,8 +44,8 @@ impl PeerRepository {
     /// Returns IDs of created [`Peer`]s. `(caller_peer_id, responder_peer_id)`.
     pub fn create_peers(
         &mut self,
-        caller: &NewPeer,
-        responder: &NewPeer,
+        caller: &Member,
+        responder: &Member,
     ) -> (u64, u64) {
         self.peers_count += 1;
         let caller_peer_id = self.peers_count;
@@ -53,15 +54,15 @@ impl PeerRepository {
 
         let mut caller_peer = Peer::new(
             caller_peer_id,
-            caller.signalling_id.clone(),
+            caller.id.clone(),
             responder_peer_id,
-            responder.signalling_id.clone(),
+            responder.id.clone(),
         );
         let mut responder_peer = Peer::new(
             responder_peer_id,
-            responder.signalling_id.clone(),
+            responder.id.clone(),
             caller_peer_id,
-            caller.signalling_id.clone(),
+            caller.id.clone(),
         );
 
         caller_peer.add_publish_endpoints(
@@ -73,7 +74,7 @@ impl PeerRepository {
             &mut self.tracks_count,
         );
         for endpoint in caller.spec.get_play_endpoints() {
-            if responder.control_id == endpoint.src.member_id {
+            if responder.id == endpoint.src.member_id {
                 responder_peer
                     .get_senders()
                     .into_iter()
@@ -82,7 +83,7 @@ impl PeerRepository {
         }
 
         for endpoint in responder.spec.get_play_endpoints() {
-            if caller.control_id == endpoint.src.member_id {
+            if caller.id == endpoint.src.member_id {
                 caller_peer
                     .get_senders()
                     .into_iter()

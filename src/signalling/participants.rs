@@ -24,7 +24,6 @@ use crate::{
         control::{Member, MemberId},
     },
     log::prelude::*,
-    media::NewPeer,
     signalling::{
         room::{CloseRoom, CreatePeer, RoomError},
         Room,
@@ -54,7 +53,7 @@ pub struct ParticipantService {
     drop_connection_tasks: HashMap<MemberId, SpawnHandle>,
 
     /// Stores [`NewPeer`]s which wait connection of another [`Member`].
-    members_waiting_connection: HashMap<MemberId, Vec<NewPeer>>,
+    members_waiting_connection: HashMap<MemberId, Vec<Member>>,
 }
 
 impl ParticipantService {
@@ -163,21 +162,11 @@ impl ParticipantService {
         let mut added_member = Vec::new();
         if let Some(waiters) = self.members_waiting_connection.get(&member.id) {
             for waiter in waiters {
-                added_member.push(waiter.control_id.clone());
-                let connected_new_peer = NewPeer {
-                    control_id: member.id.clone(),
-                    signalling_id: member.id.clone(),
-                    spec: Arc::clone(&member.spec),
-                };
-                let waiter_new_peer = NewPeer {
-                    spec: Arc::clone(&waiter.spec),
-                    control_id: waiter.control_id.clone(),
-                    signalling_id: waiter.signalling_id.clone(),
-                };
+                added_member.push(waiter.id.clone());
 
                 ctx.notify(CreatePeer {
-                    caller: connected_new_peer,
-                    responder: waiter_new_peer,
+                    caller: member.clone(),
+                    responder: waiter.clone(),
                 });
             }
         }
@@ -215,7 +204,8 @@ impl ParticipantService {
             let responder_member_control_id =
                 &connected_member_endpoint.src.member_id;
 
-            let responder_member_signalling_id = if let Some(r) = self.members.get(responder_member_control_id)
+            let responder_member_signalling_id = if let Some(r) =
+                self.members.get(responder_member_control_id)
             {
                 r.id.clone()
             } else {
@@ -228,15 +218,8 @@ impl ParticipantService {
                 continue;
             };
 
-
-            let connected_new_peer = NewPeer {
-                signalling_id: connected_member.id.clone(),
-                spec: Arc::clone(&connected_member.spec),
-                control_id: connected_member.id.clone(),
-            };
-
-            let is_responder_connected =
-                self.member_has_connection(responder_member_signalling_id.clone());
+            let is_responder_connected = self
+                .member_has_connection(responder_member_signalling_id.clone());
             if is_responder_connected {
                 let responder_spec = if let Some(m) =
                     self.members.get(&responder_member_signalling_id)
@@ -246,24 +229,23 @@ impl ParticipantService {
                     continue;
                 };
 
-                let responder_new_peer = NewPeer {
-                    signalling_id: responder_member_signalling_id.clone(),
+                let responder = Member {
+                    id: responder_member_control_id.clone(),
                     spec: Arc::clone(&responder_spec),
-                    control_id: responder_member_control_id.clone(),
                 };
                 ctx.notify(CreatePeer {
-                    caller: responder_new_peer,
-                    responder: connected_new_peer,
+                    caller: responder,
+                    responder: connected_member.clone(),
                 });
             } else if let Some(m) = self
                 .members_waiting_connection
                 .get_mut(&responder_member_signalling_id)
             {
-                m.push(connected_new_peer);
+                m.push(connected_member.clone());
             } else {
                 self.members_waiting_connection.insert(
                     responder_member_signalling_id.clone(),
-                    vec![connected_new_peer],
+                    vec![connected_member.clone()],
                 );
             }
         }

@@ -271,14 +271,6 @@ impl<T> Peer<T> {
     }
 }
 
-#[derive(Debug, Clone)]
-#[allow(clippy::module_name_repetitions)]
-pub struct NewPeer {
-    pub signalling_id: MemberId,
-    pub spec: Arc<MemberSpec>,
-    pub control_id: String,
-}
-
 impl Peer<New> {
     /// Creates new [`Peer`] for [`Member`].
     pub fn new(
