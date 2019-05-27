@@ -5,7 +5,9 @@
 #![allow(clippy::use_self)]
 use failure::Fail;
 use hashbrown::HashMap;
-use protocol::{AudioSettings, Direction, MediaType, Track, VideoSettings};
+use medea_client_api_proto::{
+    AudioSettings, Direction, MediaType, Track, VideoSettings,
+};
 
 use std::{convert::TryFrom, fmt::Display, sync::Arc};
 
@@ -56,10 +58,6 @@ impl PeerStateError {
 }
 
 /// Implementation of ['Peer'] state machine.
-#[state_machine_shared_fn_accessor(id -> Id)]
-#[state_machine_shared_fn_accessor(member_id -> MemberId)]
-#[state_machine_shared_fn_accessor(partner_peer_id -> Id)]
-#[state_machine_shared_fn_accessor(partner_member_id -> Id)]
 #[derive(Debug)]
 #[allow(clippy::module_name_repetitions)]
 pub enum PeerStateMachine {
@@ -68,6 +66,57 @@ pub enum PeerStateMachine {
     WaitLocalHaveRemote(Peer<WaitLocalHaveRemote>),
     WaitRemoteSdp(Peer<WaitRemoteSdp>),
     Stable(Peer<Stable>),
+}
+
+// TODO: macro to remove boilerplate
+impl PeerStateMachine {
+    /// Returns ID of [`Peer`].
+    pub fn id(&self) -> Id {
+        match self {
+            PeerStateMachine::New(peer) => peer.id(),
+            PeerStateMachine::WaitLocalSdp(peer) => peer.id(),
+            PeerStateMachine::WaitLocalHaveRemote(peer) => peer.id(),
+            PeerStateMachine::WaitRemoteSdp(peer) => peer.id(),
+            PeerStateMachine::Stable(peer) => peer.id(),
+        }
+    }
+
+    /// Returns ID of [`Member`] associated with this [`Peer`].
+    pub fn member_id(&self) -> MemberId {
+        match self {
+            PeerStateMachine::New(peer) => peer.member_id(),
+            PeerStateMachine::WaitLocalSdp(peer) => peer.member_id(),
+            PeerStateMachine::WaitLocalHaveRemote(peer) => peer.member_id(),
+            PeerStateMachine::WaitRemoteSdp(peer) => peer.member_id(),
+            PeerStateMachine::Stable(peer) => peer.member_id(),
+        }
+    }
+
+    /// Returns ID of interconnected [`Peer`].
+    pub fn partner_peer_id(&self) -> Id {
+        match self {
+            PeerStateMachine::New(peer) => peer.partner_peer_id(),
+            PeerStateMachine::WaitLocalSdp(peer) => peer.partner_peer_id(),
+            PeerStateMachine::WaitLocalHaveRemote(peer) => {
+                peer.partner_peer_id()
+            }
+            PeerStateMachine::WaitRemoteSdp(peer) => peer.partner_peer_id(),
+            PeerStateMachine::Stable(peer) => peer.partner_peer_id(),
+        }
+    }
+
+    /// Returns ID of interconnected [`Member`].
+    pub fn partner_member_id(&self) -> Id {
+        match self {
+            PeerStateMachine::New(peer) => peer.partner_peer_id(),
+            PeerStateMachine::WaitLocalSdp(peer) => peer.partner_peer_id(),
+            PeerStateMachine::WaitLocalHaveRemote(peer) => {
+                peer.partner_peer_id()
+            }
+            PeerStateMachine::WaitRemoteSdp(peer) => peer.partner_peer_id(),
+            PeerStateMachine::Stable(peer) => peer.partner_peer_id(),
+        }
+    }
 }
 
 impl Display for PeerStateMachine {
@@ -329,15 +378,10 @@ pub fn create_peers(
     )
 }
 
-#[cfg(test)]
-mod test {
-    use super::*;
+#[test]
+fn create_peer() {
+    let peer = Peer::new(1, 1, 2, 2);
+    let peer = peer.start();
 
-    #[test]
-    fn create_peer() {
-        let peer = Peer::new(1, 1, 2, 2);
-        let peer = peer.start();
-
-        assert_eq!(peer.state, WaitLocalSdp {});
-    }
+    assert_eq!(peer.state, WaitLocalSdp {});
 }

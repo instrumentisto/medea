@@ -1,4 +1,4 @@
-//! state_machine_shared_fn_accessor macro implementation.
+//! `state_machine_shared_fn_accessor` macro implementation.
 
 use proc_macro::TokenStream;
 use syn::export::Span;

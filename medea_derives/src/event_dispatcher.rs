@@ -1,4 +1,4 @@
-//! EventDispatcher macro implementation.
+//! `EventDispatcher` macro implementation.
 
 use proc_macro::TokenStream;
 
@@ -31,7 +31,7 @@ fn to_handler_fn_name(event: &str) -> String {
 }
 
 fn parse_match_variants(enum_input: syn::ItemEnum) -> Vec<MatchVariant> {
-    let variants = enum_input.variants.into_iter()
+    enum_input.variants.into_iter()
         .map(|v| {
             let variant_ident = v.ident;
 
@@ -51,9 +51,7 @@ fn parse_match_variants(enum_input: syn::ItemEnum) -> Vec<MatchVariant> {
                 ident: variant_ident,
                 fields,
             }
-        }).collect::<Vec<MatchVariant>>();
-
-    variants
+        }).collect::<Vec<MatchVariant>>()
 }
 
 pub fn derive(input: TokenStream) -> TokenStream {
@@ -98,7 +96,7 @@ pub fn derive(input: TokenStream) -> TokenStream {
                 }
             });
         let fn_out = quote! {
-            fn #fn_name(&self, #(#fn_args,)*);
+            fn #fn_name(&mut self, #(#fn_args,)*);
         };
 
         fn_out
@@ -112,7 +110,7 @@ pub fn derive(input: TokenStream) -> TokenStream {
         }
 
         impl #enum_ident {
-            pub fn dispatch<T: #handler_trait_ident>(self, handler: &T) {
+            pub fn dispatch<T: #handler_trait_ident>(self, handler: &mut T) {
                 match self {
                     #(#variants)*
                 }

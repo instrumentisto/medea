@@ -2,5 +2,5 @@
 mod jason;
 mod room;
 
-pub use self::jason::Jason;
-pub use self::room::RoomHandle;
+#[doc(inline)]
+pub use self::{jason::Jason, room::RoomHandle};
