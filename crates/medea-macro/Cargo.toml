@@ -1,15 +1,16 @@
 [package]
-name = "medea-derives"
+name = "medea-macro"
 version = "0.1.0-dev"
 edition = "2018"
-description = "Derive macros for medea."
+description = "Macros for Medea media server project"
 authors = ["Instrumentisto Team <developer@instrumentisto.com>"]
 homepage = "https://github.com/instrumentisto/medea"
+# documentation = "https://docs.rs/medea-macro"
 repository = "https://github.com/instrumentisto/medea"
-
-[dependencies]
-syn = { version = "0.15.34", features = ["full"] }
-quote = "0.6.12"
 
 [lib]
 proc-macro = true
+
+[dependencies]
+quote = "0.6"
+syn = { version = "0.15", features = ["full"] }

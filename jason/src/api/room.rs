@@ -9,7 +9,7 @@ use futures::{
     future::{Future, IntoFuture},
     stream::Stream,
 };
-use medea_client_api_proto::{IceCandidate, Track, EventHandler};
+use medea_client_api_proto::{EventHandler, IceCandidate, Track};
 use wasm_bindgen::{prelude::*, JsValue};
 use wasm_bindgen_futures::spawn_local;
 use web_sys::console;
@@ -61,7 +61,7 @@ impl Room {
     /// Creates new [`Room`] associating it with provided [`RpcClient`].
     pub fn new(rpc: &Rc<RpcClient>) -> Self {
         let inner = Rc::new(RefCell::new(InnerRoom::new(Rc::clone(&rpc))));
-        let mut room = Room(Rc::clone(&inner));
+        let mut room = Self(Rc::clone(&inner));
 
         let process_msg_task = rpc
             .subscribe()

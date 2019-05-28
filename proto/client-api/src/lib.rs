@@ -1,5 +1,5 @@
+use medea_macro::EventDispatcher;
 use serde::{de::Deserializer, ser::Serializer, Deserialize, Serialize};
-use medea_derives::EventDispatcher;
 
 // TODO: should be properly shared between medea and jason
 #[cfg_attr(test, derive(PartialEq, Debug))]

@@ -1,26 +1,43 @@
-#[macro_use]
-extern crate quote;
+//! Macros for [Medea] media server project.
+//!
+//! This crate is indented for inner use only by [Medea] media server.
+//!
+//! [Medea]: https://github.com/instrumentisto/medea
+
 extern crate proc_macro;
 
+mod enum_delegate;
 mod event_dispatcher;
-mod state_machine_shared_fn_accessor;
 
 use proc_macro::TokenStream;
 
-/// This macro should be used for creating shared state function's accessor.
-/// ## How to use:
+/// Delegates function calls to enum variants field.
+/// Variants are expected to have only one field.
+///
+/// # How to use
 ///
 /// ```
-/// #[state_machine_shared_fn_accessor(
-///     /*SHARED_STATE_METHOD*/ -> /*RETURN_TYPE_OF_THIS_METHOD*/
-/// )]
-/// enum SomeStateMachine {
-///     // ...
+/// use medea_macro::enum_delegate;
+///
+/// #[enum_delegate(pub fn as_str(&self) -> &str)]
+/// #[enum_delegate(pub fn push_str(&mut self, arg: &str))]
+/// enum MyEnum {
+///     Foo(String),
+///     Bar(String),
+/// }
+///
+/// fn main() {
+///     let mut foo = MyEnum::Foo(String::from("foo"));
+///     foo.push_str("_bar");
+///     assert_eq!(foo.as_str(), "foo_bar")
 /// }
 /// ```
 ///
-/// ## Example:
+/// # Extended example
+///
 /// ```
+/// use medea_macro::enum_delegate;
+///
 /// struct SomeState;
 /// struct AnotherState;
 ///
@@ -37,36 +54,54 @@ use proc_macro::TokenStream;
 ///     pub fn some_value(&self) -> i32 {
 ///         self.context.some_value
 ///     }
+///
+///     pub fn function_with_additional_args(&self, some_arg: i32) -> i32 {
+///         some_arg
+///     }
+///
+///     pub fn mutable_function(&mut self) -> i32 {
+///         let old_value = self.context.some_value;
+///         self.context.some_value = 1000;
+///         old_value
+///     }
 /// }
 ///
-/// #[state_machine_shared_fn_accessor(some_value -> i32)]
+/// #[enum_delegate(pub fn some_value(&self) -> i32)]
+/// #[enum_delegate(
+///     pub fn function_with_additional_args(&self, some_arg: i32) -> i32
+/// )]
+/// #[enum_delegate(pub fn mutable_function(&mut self) -> i32)]
 /// enum PeerStateMachine {
 ///     SomeState(Peer<SomeState>),
 ///     AnotherState(Peer<AnotherState>),
 /// }
 ///
 /// fn main() {
-///     let peer = PeerStateMachine::SomeState(Peer {
+///     let mut peer = PeerStateMachine::SomeState(Peer {
 ///         context: Context { some_value: 10 },
 ///         state: SomeState,
 ///     });
 ///
-///     peer.some_value() // -> 10
+///     assert_eq!(peer.some_value(), 10);
+///
+///     assert_eq!(peer.function_with_additional_args(100), 100);
+///
+///     assert_eq!(peer.mutable_function(), 10);
+///     assert_eq!(peer.some_value(), 1000);
 /// }
 /// ```
+#[allow(clippy::needless_pass_by_value)]
 #[proc_macro_attribute]
-pub fn state_machine_shared_fn_accessor(
-    args: TokenStream,
-    input: TokenStream,
-) -> TokenStream {
-    state_machine_shared_fn_accessor::derive(args, input)
+pub fn enum_delegate(args: TokenStream, input: TokenStream) -> TokenStream {
+    enum_delegate::derive(&args, input)
+        .unwrap_or_else(|e| e.to_compile_error().into())
 }
 
 /// This is macro for generating Handler trait based on
 /// some enum with named fields.
 /// ## Derive macro use
 /// ```
-/// use medea_derives::EventDispatcher;
+/// use medea_macro::EventDispatcher;
 ///
 /// #[derive(EventDispatcher)]
 /// enum Event {

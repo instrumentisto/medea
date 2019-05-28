@@ -1,6 +1,7 @@
 //! `EventDispatcher` macro implementation.
 
 use proc_macro::TokenStream;
+use quote::quote;
 
 /// Variant of enum.
 #[derive(Clone)]
@@ -22,7 +23,8 @@ struct MatchVariantField {
     ty: syn::Type,
 }
 
-/// Transform function name from `snake_case` to `camelCase` and add "on_" prefix.
+/// Transform function name from `snake_case` to `camelCase` and add "on_"
+/// prefix.
 ///
 /// Do not use it with names like `SendRDP`, `ReceiveRDP`, `HTTP`!
 /// For this names this function generate names like

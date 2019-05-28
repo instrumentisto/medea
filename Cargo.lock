@@ -850,7 +850,7 @@ dependencies = [
  "humantime 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "macro-attr 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "medea-client-api-proto 0.1.0-dev",
- "medea-derives 0.1.0-dev",
+ "medea-macro 0.1.0-dev",
  "newtype_derive 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.91 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde-humantime 0.1.1 (git+https://github.com/tailhook/serde-humantime?branch=serde_wrapper)",
@@ -872,13 +872,13 @@ dependencies = [
 name = "medea-client-api-proto"
 version = "0.1.0-dev"
 dependencies = [
- "medea-derives 0.1.0-dev",
+ "medea-macro 0.1.0-dev",
  "serde 1.0.91 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_json 1.0.39 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
-name = "medea-derives"
+name = "medea-macro"
 version = "0.1.0-dev"
 dependencies = [
  "quote 0.6.12 (registry+https://github.com/rust-lang/crates.io-index)",
