@@ -105,11 +105,12 @@ pub fn enum_delegate(args: TokenStream, input: TokenStream) -> TokenStream {
 ///
 /// #[derive(EventDispatcher)]
 /// enum Event {
-///     SdpAnswerMade { peer_id: u64, sdp_answer: String },
+///     SomeEvent { new_bar: i32 },
+///     AnotherEvent,
 /// }
 ///
-/// struct Room {
-///     // ...
+/// struct Foo {
+///     bar: i32,
 /// }
 ///
 /// // The principle of generation Handler trait name
@@ -117,7 +118,7 @@ pub fn enum_delegate(args: TokenStream, input: TokenStream) -> TokenStream {
 /// // Example:
 /// // Original enum name is Event then handler name
 /// // for this enum will be "EventHandler".
-/// impl EventHandler for Room {
+/// impl EventHandler for Foo {
 ///     // The name of the function is generated based
 ///     // on the name of the enumeration [`Event`].
 ///     // The principle of its generation
@@ -126,17 +127,23 @@ pub fn enum_delegate(args: TokenStream, input: TokenStream) -> TokenStream {
 ///     // Example:
 ///     // Original enum variant name is SomeEnumVariant then handler name
 ///     // for this variant will be on_some_enum_variant.
-///     fn on_sdp_answer_made(&mut self, peer_id: u64, sdp_answer: String) {
-///         // Some handler code
+///     fn on_some_event(&mut self, new_bar: i32) {
+///         self.bar = new_bar;
+///     }
+///
+///     fn on_another_event(&mut self) {
+///         self.bar = 2;
 ///     }
 /// }
 ///
-/// // A function that accepts an [`Event`]
-/// // and must pass it to the desired function.
-/// fn some_function(event: Event, room: &mut Room) {
-///     // This function will call the necessary function
-///     // based on the variant of enum [`Event`]
-///     event.dispatch(room);
+/// fn main() {
+///     let mut foo = Foo { bar: 0 };
+///
+///     Event::SomeEvent { new_bar: 1 }.dispatch(&mut foo);
+///     assert_eq!(foo.bar, 1);
+///
+///     Event::AnotherEvent.dispatch(&mut foo);
+///     assert_eq!(foo.bar, 2);
 /// }
 /// ```
 #[proc_macro_derive(EventDispatcher)]
