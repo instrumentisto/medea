@@ -153,11 +153,14 @@ pub fn derive(input: TokenStream) -> Result<TokenStream> {
         syn::parse_str(&format!("{}Handler", enum_ident.to_string()))?;
 
     let event_dispatch_impl = quote! {
+        #[automatically_derived]
         pub trait #handler_trait_ident {
             #(#trait_functions)*
         }
 
+        #[automatically_derived]
         impl #enum_ident {
+            #[inline]
             pub fn dispatch<T: #handler_trait_ident>(self, handler: &mut T) {
                 match self {
                     #(#variants)*
