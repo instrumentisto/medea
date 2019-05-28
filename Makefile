@@ -131,6 +131,7 @@ test-unit-crate = $(if $(call eq,$(crate),),@all,$(crate))
 test.unit:
 ifeq ($(test-unit-crate),@all)
 	@make test.unit crate=medea-client-api-proto
+	@make test.unit crate=medea-macro
 	@make test.unit crate=medea
 	@make test.unit crate=jason
 else
