@@ -8,9 +8,9 @@ homepage = "https://github.com/instrumentisto/medea"
 # documentation = "https://docs.rs/medea-macro"
 repository = "https://github.com/instrumentisto/medea"
 
+[lib]
+proc-macro = true
+
 [dependencies]
 quote = "0.6"
 syn = { version = "0.15", features = ["full"] }
-
-[lib]
-proc-macro = true

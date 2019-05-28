@@ -10,8 +10,8 @@ mod enum_delegate;
 
 use proc_macro::TokenStream;
 
-/// Delegates functions to enum variants field. Variants are expected to have
-/// only one field.
+/// Delegates function calls to enum variants field.
+/// Variants are expected to have only one field.
 ///
 /// # How to use
 ///
@@ -19,7 +19,7 @@ use proc_macro::TokenStream;
 /// use medea_macro::enum_delegate;
 ///
 /// #[enum_delegate(pub fn as_str(&self) -> &str)]
-/// #[enum_delegate(pub fn push_str(&mut self, arg:&str))]
+/// #[enum_delegate(pub fn push_str(&mut self, arg: &str))]
 /// enum MyEnum {
 ///     Foo(String),
 ///     Bar(String),
@@ -36,6 +36,7 @@ use proc_macro::TokenStream;
 ///
 /// ```
 /// use medea_macro::enum_delegate;
+///
 /// struct SomeState;
 /// struct AnotherState;
 ///
@@ -88,8 +89,9 @@ use proc_macro::TokenStream;
 ///     assert_eq!(peer.some_value(), 1000);
 /// }
 /// ```
-#[proc_macro_attribute]
 #[allow(clippy::needless_pass_by_value)]
+#[proc_macro_attribute]
 pub fn enum_delegate(args: TokenStream, input: TokenStream) -> TokenStream {
     enum_delegate::derive(&args, input)
+        .unwrap_or_else(|e| e.to_compile_error().into())
 }

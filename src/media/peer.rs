@@ -59,12 +59,12 @@ impl PeerStateError {
 }
 
 /// Implementation of ['Peer'] state machine.
+#[allow(clippy::module_name_repetitions)]
 #[enum_delegate(pub fn id(&self) -> Id)]
 #[enum_delegate(pub fn member_id(&self) -> MemberId)]
 #[enum_delegate(pub fn partner_peer_id(&self) -> Id)]
 #[enum_delegate(pub fn partner_member_id(&self) -> Id)]
 #[derive(Debug)]
-#[allow(clippy::module_name_repetitions)]
 pub enum PeerStateMachine {
     New(Peer<New>),
     WaitLocalSdp(Peer<WaitLocalSdp>),

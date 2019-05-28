@@ -4,43 +4,53 @@ use std::iter;
 
 use proc_macro::TokenStream;
 use quote::quote;
+use syn::{
+    parse::{Error, Result},
+    spanned::Spanned as _,
+};
 
 /// Generates the actual code for `#[enum_delegate]` macro.
 ///
-/// # Generation algorithm
-/// 1. parse input enum;
-/// 2. check that enum is not empty;
-/// 3. add "{}" to the macro argument to get the full function declaration;
-/// 4. parse this full function declaration;
-/// 5. check that function to delegate is not static by counting;
-///    `[&][&mut] self` arguments;
-/// 6. get all argument idents (except `[&][&mut] self`) from a function to be
-///    delegated;
-/// 7. generate function with `match` of all variants that returns
-///    result of delegated function call;
-/// 8. add this function to implementation of enum.
-pub fn derive(args: &TokenStream, input: TokenStream) -> TokenStream {
+/// # Algorithm
+///
+/// 1. Check that input `enum` is not empty.
+/// 2. Add `{}` to the macro argument (given function declaration).
+/// 3. Check that delegation function is not static (presence of
+///    `[&][&mut] self` arguments).
+/// 4. Collect all the delegation function arguments.
+/// 5. Generate wrapper-function with dispatching delegation function call to
+///    all the `enum` variants.
+///
+/// # Limitations
+///
+/// - Cannot delegate static methods.
+pub fn derive(args: &TokenStream, input: TokenStream) -> Result<TokenStream> {
     let mut output = input.clone();
-    let inp: syn::DeriveInput =
-        syn::parse(input).expect("failed to parse input");
+    let inp: syn::DeriveInput = syn::parse(input)?;
 
-    let mut enum_name_iter = iter::repeat(inp.ident);
+    let mut enum_name_iter = iter::repeat(inp.ident.clone());
     let enum_name = enum_name_iter.next().unwrap();
 
-    let variants: Vec<syn::Ident> = match inp.data {
-        syn::Data::Enum(data) => {
-            data.variants.into_iter().map(|c| c.ident).collect()
+    let variants: Vec<syn::Ident> = match &inp.data {
+        syn::Data::Enum(ref data) => {
+            data.variants.iter().map(|c| c.ident.clone()).collect()
         }
-        _ => panic!("This macro should be used only with enums!"),
+        _ => {
+            return Err(Error::new(
+                inp.span(),
+                "This macro can be used on enums only",
+            ))
+        }
     };
-
     if variants.is_empty() {
-        panic!("You provided empty enum!")
+        return Err(Error::new(
+            inp.span(),
+            "This macro can be used on non-empty enums only",
+        ));
     }
 
-    // This is for easy parsing function declaration by default syn parser.
     let arg_function = format!("{} {{ }}", args.to_string());
-    let mut function: syn::ItemFn = syn::parse_str(&arg_function).unwrap();
+    let mut function: syn::ItemFn = syn::parse_str(&arg_function)?;
 
     let selfs_count = function
         .decl
@@ -52,11 +62,13 @@ pub fn derive(args: &TokenStream, input: TokenStream) -> TokenStream {
         })
         .count();
     if selfs_count == 0 {
-        panic!("Static functions not supported!");
+        return Err(Error::new(
+            function.span(),
+            "This macro can be used for non-static methods only",
+        ));
     }
 
     let function_ident = iter::repeat(function.ident.clone());
-    // Iterator over captured function args
     let function_args =
         iter::repeat(function.decl.clone().inputs.into_iter().filter_map(
             |i| match i {
@@ -96,5 +108,5 @@ pub fn derive(args: &TokenStream, input: TokenStream) -> TokenStream {
     let impl_output: TokenStream = impl_output.into();
     output.extend(impl_output);
 
-    output
+    Ok(output)
 }
