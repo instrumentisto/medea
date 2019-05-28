@@ -10,8 +10,8 @@
         var pcs = {};
 
         function connectSocket(caller) {
-            let role = caller ? "1/caller_credentials" : "2/responder_credentials";
-            socket = new WebSocket("ws://localhost:8080/ws/1/" + role);
+            let role = caller ? "caller/test" : "responder/test";
+            socket = new WebSocket("ws://localhost:8080/ws/pub-sub-video-call/" + role);
             socket.onmessage = handleSocketMessage;
 
             window.setInterval(function () {

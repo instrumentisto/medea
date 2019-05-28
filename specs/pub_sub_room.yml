@@ -1,5 +1,5 @@
 kind: Room
-id: video-call-2
+id: pub-sub-video-call
 spec:
   pipeline:
     # Here we're defining a member who initiates video call.
@@ -23,4 +23,4 @@ spec:
           play:
             kind: WebRtcPlayEndpoint
             spec:
-              src: "local://video-call-1/caller/publish"
+              src: "local://pub-sub-video-call/caller/publish"

@@ -443,7 +443,7 @@ mod test {
 
     fn start_room() -> Addr<Room> {
         let room_spec =
-            control::load_from_yaml_file("./specs/room_spec_test.yml").unwrap();
+            control::load_from_yaml_file("./specs/pub_sub_room.yml").unwrap();
         let client_room = Room::new(&room_spec, Duration::from_secs(10));
         Arbiter::start(move |_| client_room)
     }
