@@ -16,10 +16,7 @@ use std::{
 };
 
 use crate::{
-    media::{
-        MediaManager, MediaStreamHandle, PeerId,
-        PeerRepository, Sdp,
-    },
+    media::{MediaManager, MediaStreamHandle, PeerId, PeerRepository, Sdp},
     rpc::RPCClient,
     utils::{Callback, WasmErr},
 };
@@ -128,7 +125,7 @@ impl InnerRoom {
         &mut self,
         peer_id: PeerId,
         sdp_offer: Option<String>,
-        _tracks: Vec<Track>,
+        tracks: Vec<Track>,
     ) {
         let peer = match self.peers.create(peer_id) {
             Ok(peer) => peer,
@@ -147,7 +144,7 @@ impl InnerRoom {
             return;
         }
 
-        //                peer.apply_tracks(tracks);
+        peer.sync_tracks(tracks, Rc::clone(&self.media_manager));
 
         let rpc = Rc::clone(&self.rpc);
         let peer_rc = Rc::clone(peer);
