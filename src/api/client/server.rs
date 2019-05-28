@@ -81,7 +81,7 @@ pub struct Context {
 
 /// Starts HTTP server for handling WebSocket connections of Client API.
 pub fn run(rooms: RoomsRepository, config: Conf) {
-    let server_addr = config.server.get_bind_addr();
+    let server_addr = config.server.bind_addr();
 
     server::new(move || {
         App::with_state(Context {
@@ -110,9 +110,10 @@ mod test {
 
     use crate::{
         api::control::Member,
-        conf::{Conf, Redis, Server, Turn},
+        conf::{Conf, Server, Turn},
         media::create_peers,
         signalling::Room,
+        turn::new_turn_auth_service_mock,
     };
 
     use super::*;
@@ -137,7 +138,7 @@ mod test {
                 members,
                 create_peers(1, 2),
                 conf.reconnect_timeout,
-                crate::turn::dummy(),
+                new_turn_auth_service_mock(),
             )
         });
         let rooms = hashmap! {1 => room};
@@ -177,7 +178,6 @@ mod test {
             },
             turn: Turn::default(),
             server: Server::default(),
-            redis: Redis::default(),
         };
 
         let mut server = ws_server(conf.clone());

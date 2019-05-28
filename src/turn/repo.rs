@@ -10,7 +10,7 @@ use redis_async::{resp::RespValue, resp_array};
 use crate::{log::prelude::*, media::IceUser};
 
 #[derive(Fail, Debug)]
-pub enum TurnAuthRepoErr {
+pub enum TurnDatabaseErr {
     #[fail(display = "RedisActor is unreachable: {}", _0)]
     MailboxError(MailboxError),
     #[fail(display = "Redis returned error: {}", _0)]
@@ -19,30 +19,31 @@ pub enum TurnAuthRepoErr {
     UnknownAnswer(RespValue),
 }
 
-impl From<MailboxError> for TurnAuthRepoErr {
+impl From<MailboxError> for TurnDatabaseErr {
     fn from(err: MailboxError) -> Self {
-        TurnAuthRepoErr::MailboxError(err)
+        TurnDatabaseErr::MailboxError(err)
     }
 }
 
-impl From<actix_redis::Error> for TurnAuthRepoErr {
+impl From<actix_redis::Error> for TurnDatabaseErr {
     fn from(err: actix_redis::Error) -> Self {
-        TurnAuthRepoErr::RedisError(err)
+        TurnDatabaseErr::RedisError(err)
     }
 }
 
-impl From<RespValue> for TurnAuthRepoErr {
+impl From<RespValue> for TurnDatabaseErr {
     fn from(err: RespValue) -> Self {
-        TurnAuthRepoErr::UnknownAnswer(err)
+        TurnDatabaseErr::UnknownAnswer(err)
     }
 }
 
 // Abstraction over remote Redis database used to store Turn server
 // credentials.
 #[allow(clippy::module_name_repetitions)]
-pub struct TurnAuthRepo(Addr<RedisActor>);
+pub struct TurnDatabase(Addr<RedisActor>);
 
-impl TurnAuthRepo {
+//TODO: Auth after reconnect.
+impl TurnDatabase {
     pub fn new<S: Into<String>>(addr: S) -> Self {
         Self(RedisActor::start(addr))
     }
@@ -70,7 +71,7 @@ impl TurnAuthRepo {
     pub fn insert(
         &mut self,
         ice_user: &IceUser,
-    ) -> impl Future<Item = (), Error = TurnAuthRepoErr> {
+    ) -> impl Future<Item = (), Error = TurnDatabaseErr> {
         debug!("Store ICE user: {:?}", ice_user);
         let key = format!("turn/realm/medea/user/{}/key", ice_user.name);
         let value = format!("{}:medea:{}", ice_user.name, ice_user.pass);
@@ -80,7 +81,7 @@ impl TurnAuthRepo {
         Box::new(
             self.0
                 .send(Command(resp_array!["SET", key, result]))
-                .map_err(TurnAuthRepoErr::MailboxError)
+                .map_err(TurnDatabaseErr::MailboxError)
                 .and_then(Self::parse_redis_answer),
         )
     }
@@ -89,7 +90,7 @@ impl TurnAuthRepo {
     pub fn remove(
         &mut self,
         ice_user: &IceUser,
-    ) -> impl Future<Item = (), Error = TurnAuthRepoErr> {
+    ) -> impl Future<Item = (), Error = TurnDatabaseErr> {
         debug!("Delete ICE user: {:?}", ice_user);
         let key = format!("turn/realm/medea/user/{}/key", ice_user.name);
         Box::new(
@@ -103,7 +104,7 @@ impl TurnAuthRepo {
     /// Parse result from raw Redis answer.
     fn parse_redis_answer(
         result: Result<RespValue, actix_redis::Error>,
-    ) -> Result<(), TurnAuthRepoErr> {
+    ) -> Result<(), TurnDatabaseErr> {
         match result {
             Ok(resp) => {
                 if let RespValue::SimpleString(ref answer) = resp {
@@ -111,14 +112,14 @@ impl TurnAuthRepo {
                         return Ok(());
                     }
                 }
-                Err(TurnAuthRepoErr::from(resp))
+                Err(TurnDatabaseErr::from(resp))
             }
-            Err(err) => Err(TurnAuthRepoErr::from(err)),
+            Err(err) => Err(TurnDatabaseErr::from(err)),
         }
     }
 }
 
-impl std::fmt::Debug for TurnAuthRepo {
+impl std::fmt::Debug for TurnDatabase {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,

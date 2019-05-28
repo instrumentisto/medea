@@ -6,7 +6,7 @@
 use std::time::{Duration, Instant};
 
 use actix::{
-    fut::wrap_future, ActorFuture, Addr, AsyncContext, Context, MailboxError,
+    fut::wrap_future, ActorFuture, AsyncContext, Context, MailboxError,
     SpawnHandle,
 };
 use futures::{
@@ -26,14 +26,12 @@ use crate::{
         control::{Member, MemberId},
     },
     log::prelude::*,
+    media::IceUser,
     signalling::{
         room::{ActFuture, CloseRoom, RoomError},
         Room,
     },
-    turn::{
-        CreateIceUser, DeleteIceUser, TurnAuthService, TurnServiceErr,
-        UnreachablePolicy,
-    },
+    turn::{TurnAuthService, TurnServiceErr, UnreachablePolicy},
 };
 
 #[derive(Debug)]
@@ -64,7 +62,7 @@ pub struct ParticipantService {
     members: HashMap<MemberId, Member>,
 
     /// Service for managing authorization on Turn server.
-    turn: Addr<TurnAuthService>,
+    turn: Box<dyn TurnAuthService>,
 
     /// Established [`RpcConnection`]s of [`Member`]s in this [`Room`].
     // TODO: Replace Box<dyn RpcConnection>> with enum,
@@ -84,7 +82,7 @@ pub struct ParticipantService {
 impl ParticipantService {
     pub fn new(
         members: HashMap<MemberId, Member>,
-        turn: Addr<TurnAuthService>,
+        turn: Box<dyn TurnAuthService>,
         reconnect_timeout: Duration,
     ) -> Self {
         Self {
@@ -176,29 +174,24 @@ impl ParticipantService {
             self.connections.insert(member_id, con);
 
             Box::new(
-                wrap_future(self.turn.send(CreateIceUser {
-                    member_id,
-                    policy: UnreachablePolicy::default(),
-                }))
+                wrap_future(
+                    self.turn
+                        .create_user(member_id, UnreachablePolicy::default()),
+                )
                 .map_err(|err, _: &mut Room, _| {
                     ParticipantServiceErr::from(err)
                 })
-                .and_then(move |res, room, _| {
-                    wrap_future(match res {
-                        Ok(ice) => {
-                            if let Some(mut member) =
-                                room.participants.take_member(member_id)
-                            {
-                                member.ice_user.replace(ice);
-                                room.participants.insert_member(member);
-                            };
-                            future::ok(())
-                        }
-                        Err(err) => {
-                            future::err(ParticipantServiceErr::from(err))
-                        }
-                    })
-                }),
+                .and_then(
+                    move |ice: IceUser, room: &mut Room, _| {
+                        if let Some(mut member) =
+                            room.participants.take_member(member_id)
+                        {
+                            member.ice_user.replace(ice);
+                            room.participants.insert_member(member);
+                        };
+                        wrap_future(future::ok(()))
+                    },
+                ),
             )
         }
     }
@@ -245,7 +238,7 @@ impl ParticipantService {
     fn delete_ice_user(&mut self, member_id: MemberId) {
         if let Some(mut member) = self.members.remove(&member_id) {
             if let Some(ice_user) = member.ice_user.take() {
-                self.turn.do_send(DeleteIceUser(ice_user));
+                self.turn.delete_user(ice_user);
             }
             self.members.insert(member_id, member);
         }

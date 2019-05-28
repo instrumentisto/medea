@@ -1,6 +1,5 @@
 //! Provides application configuration options.
 
-pub mod redis;
 pub mod rpc;
 pub mod server;
 pub mod turn;
@@ -11,7 +10,11 @@ use config::{Config, Environment, File};
 use failure::Error;
 use serde::{Deserialize, Serialize};
 
-pub use self::{redis::Redis, rpc::Rpc, server::Server, turn::Turn};
+pub use self::{
+    rpc::Rpc,
+    server::Server,
+    turn::{Redis, Turn},
+};
 
 /// CLI argument that is responsible for holding application configuration
 /// file path.
@@ -24,8 +27,6 @@ static APP_CONF_PATH_ENV_VAR_NAME: &str = "MEDEA_CONF";
 #[derive(Clone, Debug, Deserialize, Serialize, Default)]
 #[serde(default)]
 pub struct Conf {
-    /// Redis server settings.
-    pub redis: Redis,
     /// HTTP server settings.
     pub rpc: Rpc,
     /// RPC connection settings.
@@ -76,11 +77,11 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::{fs, net::Ipv4Addr, time::Duration};
+
     use serial_test_derive::serial;
-    use std::{fs, time::Duration};
 
     use super::*;
-    use std::net::Ipv4Addr;
 
     #[test]
     #[serial]
@@ -198,17 +199,17 @@ mod tests {
     fn redis_conf_test() {
         let default_conf = Conf::default();
 
-        env::set_var("MEDEA_REDIS.IP", "5.5.5.5");
-        env::set_var("MEDEA_REDIS.PORT", "1234");
+        env::set_var("MEDEA_TURN.REDIS.IP", "5.5.5.5");
+        env::set_var("MEDEA_TURN.REDIS.PORT", "1234");
 
         let env_conf = Conf::parse().unwrap();
 
-        assert_ne!(default_conf.redis.ip, env_conf.redis.ip);
-        assert_ne!(default_conf.redis.port, env_conf.redis.port);
+        assert_ne!(default_conf.turn.redis.ip, env_conf.turn.redis.ip);
+        assert_ne!(default_conf.turn.redis.port, env_conf.turn.redis.port);
 
-        assert_eq!(env_conf.redis.ip, Ipv4Addr::new(5, 5, 5, 5));
-        assert_eq!(env_conf.redis.port, 1234);
-        assert_eq!(env_conf.redis.get_addr(), "5.5.5.5:1234".parse().unwrap(),);
+        assert_eq!(env_conf.turn.redis.ip, Ipv4Addr::new(5, 5, 5, 5));
+        assert_eq!(env_conf.turn.redis.port, 1234);
+        assert_eq!(env_conf.turn.redis.addr(), "5.5.5.5:1234".parse().unwrap());
     }
 
     #[test]
@@ -226,6 +227,6 @@ mod tests {
 
         assert_eq!(env_conf.turn.ip, Ipv4Addr::new(5, 5, 5, 5));
         assert_eq!(env_conf.turn.port, 1234);
-        assert_eq!(env_conf.turn.get_addr(), "5.5.5.5:1234".parse().unwrap());
+        assert_eq!(env_conf.turn.addr(), "5.5.5.5:1234".parse().unwrap());
     }
 }
