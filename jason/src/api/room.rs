@@ -21,6 +21,9 @@ use crate::rpc::RpcClient;
 /// Room handle accessible from JS.
 pub struct RoomHandle(Weak<RefCell<InnerRoom>>);
 
+#[wasm_bindgen]
+impl RoomHandle {}
+
 impl EventHandler for Room {
     /// Creates RTCPeerConnection with provided ID.
     fn on_peer_created(
