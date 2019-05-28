@@ -1,7 +1,11 @@
-//! `EventDispatcher` macro implementation.
+//! `#[derive(EventDispatcher)]` macro implementation.
 
 use proc_macro::TokenStream;
 use quote::quote;
+use syn::{
+    parse::{Error, Result},
+    spanned::Spanned as _,
+};
 
 /// Variant of enum.
 #[derive(Clone)]
@@ -46,34 +50,41 @@ fn to_handler_fn_name(event: &str) -> String {
 /// Support only named enums.
 ///
 /// Panic if enum is unnamed.
-fn parse_match_variants(enum_input: syn::ItemEnum) -> Vec<MatchVariant> {
-    enum_input
-        .variants
-        .into_iter()
-        .map(|v| {
-            let variant_ident = v.ident;
+fn parse_match_variants(
+    enum_input: syn::ItemEnum,
+) -> Result<Vec<MatchVariant>> {
+    let mut match_variants = Vec::new();
 
-            let fields: Vec<MatchVariantField> = match v.fields {
-                syn::Fields::Named(f) => f
-                    .named
-                    .into_iter()
-                    .map(|f| MatchVariantField {
-                        ident: f.ident.unwrap(),
-                        ty: f.ty,
-                    })
-                    .collect(),
-                syn::Fields::Unit => {
-                    Vec::new()
-                },
-                syn::Fields::Unnamed(_f) => panic!("This macro not supported unnamed enum variants!"),
-            };
+    for v in enum_input.variants {
+        let variant_ident = v.ident;
 
-            MatchVariant {
-                ident: variant_ident,
-                fields,
+        let fields: Vec<MatchVariantField> = match v.fields {
+            syn::Fields::Named(f) => f
+                .named
+                .into_iter()
+                .map(|f| MatchVariantField {
+                    ident: f.ident.unwrap(),
+                    ty: f.ty,
+                })
+                .collect(),
+            syn::Fields::Unit => Vec::new(),
+            syn::Fields::Unnamed(f) => {
+                return Err(Error::new(
+                    f.span(),
+                    "This macro not support unnamed enum variants!",
+                ));
             }
-        })
-        .collect::<Vec<MatchVariant>>()
+        };
+
+        let variant = MatchVariant {
+            ident: variant_ident,
+            fields,
+        };
+
+        match_variants.push(variant);
+    }
+
+    Ok(match_variants)
 }
 
 /// Generates the actual code for `#[derive(EventDispatcher)]` macro.
@@ -91,11 +102,11 @@ fn parse_match_variants(enum_input: syn::ItemEnum) -> Vec<MatchVariant> {
 ///    from step 3.
 /// 5. generate function `dispatch<T: {enum_name}Handler>(self, handler: &T)`
 ///    with `match` that generated in step 2.3.
-pub fn derive(input: TokenStream) -> TokenStream {
-    let item_enum: syn::ItemEnum = syn::parse(input).unwrap();
+pub fn derive(input: TokenStream) -> Result<TokenStream> {
+    let item_enum: syn::ItemEnum = syn::parse(input)?;
     let enum_ident = item_enum.ident.clone();
 
-    let variants = parse_match_variants(item_enum);
+    let variants = parse_match_variants(item_enum)?;
     let trait_variants = variants.clone();
 
     let variants = variants.into_iter().map(|v| {
@@ -140,7 +151,7 @@ pub fn derive(input: TokenStream) -> TokenStream {
     });
 
     let handler_trait_ident: syn::Ident =
-        syn::parse_str(&format!("{}Handler", enum_ident.to_string())).unwrap();
+        syn::parse_str(&format!("{}Handler", enum_ident.to_string()))?;
 
     let event_dispatch_impl = quote! {
         pub trait #handler_trait_ident {
@@ -156,5 +167,5 @@ pub fn derive(input: TokenStream) -> TokenStream {
         }
     };
 
-    event_dispatch_impl.into()
+    Ok(event_dispatch_impl.into())
 }
