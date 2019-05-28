@@ -53,7 +53,7 @@ fn parse_match_variants(enum_input: syn::ItemEnum) -> Vec<MatchVariant> {
         .map(|v| {
             let variant_ident = v.ident;
 
-            let fields = match v.fields {
+            let fields: Vec<MatchVariantField> = match v.fields {
                 syn::Fields::Named(f) => f
                     .named
                     .into_iter()
@@ -61,8 +61,11 @@ fn parse_match_variants(enum_input: syn::ItemEnum) -> Vec<MatchVariant> {
                         ident: f.ident.unwrap(),
                         ty: f.ty,
                     })
-                    .collect::<Vec<MatchVariantField>>(),
-                _ => panic!("This macro currently support only named enums!"),
+                    .collect(),
+                syn::Fields::Unit => {
+                    Vec::new()
+                },
+                syn::Fields::Unnamed(_f) => panic!("This macro not supported unnamed enum variants!"),
             };
 
             MatchVariant {
