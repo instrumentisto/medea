@@ -49,7 +49,7 @@ fn to_handler_fn_name(event: &str) -> String {
 /// Parse all [`MatchVariant`]s of provided enum.
 /// Support only named enums.
 ///
-/// Panic if enum is unnamed.
+/// Returns error if enum have unnamed variant.
 fn parse_match_variants(
     enum_input: syn::ItemEnum,
 ) -> Result<Vec<MatchVariant>> {

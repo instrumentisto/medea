@@ -100,6 +100,7 @@ pub fn enum_delegate(args: TokenStream, input: TokenStream) -> TokenStream {
 /// This is macro for generating Handler trait based on
 /// some enum with named fields.
 /// ## Derive macro use
+/// ### 1. Declare enum for events and struct for data
 /// ```
 /// use medea_macro::EventDispatcher;
 ///
@@ -112,21 +113,42 @@ pub fn enum_delegate(args: TokenStream, input: TokenStream) -> TokenStream {
 /// struct Foo {
 ///     bar: i32,
 /// }
+/// ```
 ///
-/// // The principle of generation Handler trait name
-/// // is to simply add postfix "Handler".
-/// // Example:
-/// // Original enum name is Event then handler name
-/// // for this enum will be "EventHandler".
+/// ### 2. Implement handler for your data
+/// #### Principle of generation name for handler trait
+/// The __principle of generation name for handler trait__ is
+/// to simply add postfix "Handler" to event enum name.
+///
+/// For example:
+///
+/// Original enum name is Event then handler name for this
+/// enum will be `EventHandler`.
+///
+/// #### Principle of generation name for handler functions
+/// The __principle of generation name for handler functions__ is
+/// to translate the name of the event enum variant from `camelCase`
+/// to `snake_case` and add the prefix `on_`.
+///
+/// For example:
+///
+/// Event enum variant name is `SomeEnumVariant` then handler function name
+/// will be `on_some_enum_variant`.
+///
+/// ```
+/// # use medea_macro::EventDispatcher;
+/// #
+/// # #[derive(EventDispatcher)]
+/// # enum Event {
+/// #     SomeEvent { new_bar: i32 },
+/// #     AnotherEvent,
+/// # }
+/// #
+/// # struct Foo {
+/// #     bar: i32,
+/// # }
+/// #
 /// impl EventHandler for Foo {
-///     // The name of the function is generated based
-///     // on the name of the enumeration [`Event`].
-///     // The principle of its generation
-///     // is to translate the name from camelCase
-///     // to snake_case and add the prefix "on".
-///     // Example:
-///     // Original enum variant name is SomeEnumVariant then handler name
-///     // for this variant will be on_some_enum_variant.
 ///     fn on_some_event(&mut self, new_bar: i32) {
 ///         self.bar = new_bar;
 ///     }
@@ -135,6 +157,43 @@ pub fn enum_delegate(args: TokenStream, input: TokenStream) -> TokenStream {
 ///         self.bar = 2;
 ///     }
 /// }
+///
+/// fn main() {
+///     let mut foo = Foo { bar: 0 };
+///
+///     Event::SomeEvent { new_bar: 1 }.dispatch(&mut foo);
+///     assert_eq!(foo.bar, 1);
+///
+///     Event::AnotherEvent.dispatch(&mut foo);
+///     assert_eq!(foo.bar, 2);
+/// }
+/// ```
+///
+/// ### 3. And finaly
+/// You can use `dispatch()` on your event when you need it.
+///
+/// ```
+/// # use medea_macro::EventDispatcher;
+/// #
+/// # #[derive(EventDispatcher)]
+/// # enum Event {
+/// #     SomeEvent { new_bar: i32 },
+/// #     AnotherEvent,
+/// # }
+/// #
+/// # struct Foo {
+/// #     bar: i32,
+/// # }
+/// #
+/// # impl EventHandler for Foo {
+/// #    fn on_some_event(&mut self, new_bar: i32) {
+/// #        self.bar = new_bar;
+/// #    }
+/// #
+/// #    fn on_another_event(&mut self) {
+/// #        self.bar = 2;
+/// #    }
+/// # }
 ///
 /// fn main() {
 ///     let mut foo = Foo { bar: 0 };
