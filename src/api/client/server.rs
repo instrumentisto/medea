@@ -121,7 +121,7 @@ mod test {
         let room_spec =
             control::load_from_yaml_file("./specs/room_spec.yml").unwrap();
 
-        let client_room = Room::new(room_spec, conf.reconnect_timeout);
+        let client_room = Room::new(&room_spec, conf.reconnect_timeout);
         let room_id = client_room.get_id();
         let client_room = Arbiter::start(move |_| client_room);
         let room_hash_map = hashmap! {

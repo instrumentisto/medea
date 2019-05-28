@@ -2,7 +2,11 @@
 //! stores [`Members`] and associated [`RpcConnection`]s, handles
 //! [`RpcConnection`] authorization, establishment, message sending.
 
-use std::time::{Duration, Instant};
+use std::{
+    convert::TryFrom,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 use actix::{fut::wrap_future, AsyncContext, Context, SpawnHandle};
 use futures::{
@@ -18,7 +22,7 @@ use crate::{
             AuthorizationError, ClosedReason, EventMessage, RpcConnection,
             RpcConnectionClosed,
         },
-        control::{Member, MemberId},
+        control::{Member, MemberId, MemberSpec, RoomSpec},
     },
     log::prelude::*,
     signalling::{
@@ -54,10 +58,25 @@ pub struct ParticipantService {
 }
 
 impl ParticipantService {
-    pub fn new(
-        members: HashMap<MemberId, Member>,
-        reconnect_timeout: Duration,
-    ) -> Self {
+    pub fn new(room_spec: &RoomSpec, reconnect_timeout: Duration) -> Self {
+        let members = room_spec
+            .spec
+            .pipeline
+            .iter()
+            .map(|(control_id, entity)| {
+                let member_spec = MemberSpec::try_from(entity.clone()).unwrap();
+
+                (
+                    control_id.clone(),
+                    Member {
+                        id: control_id.clone(),
+                        spec: Arc::new(member_spec),
+                    },
+                )
+            })
+            .collect();
+        debug!("Created room with {:?} users.", members);
+
         Self {
             members,
             connections: HashMap::new(),

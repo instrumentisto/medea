@@ -13,12 +13,11 @@ use std::{convert::TryFrom as _, fs::File, io::Read as _, path::Path};
 use self::{
     element::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
     pipeline::Pipeline,
-    room::RoomSpec,
 };
 
 pub use self::{
-    member::{Id as MemberId, Member},
-    room::Id as RoomId,
+    member::{Id as MemberId, Member, MemberSpec},
+    room::{Id as RoomId, RoomSpec},
 };
 
 /// Errors that can occur when we try transform some spec from [`Entity`].

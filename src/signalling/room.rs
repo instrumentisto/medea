@@ -1,6 +1,8 @@
 //! Room definitions and implementations. Room is responsible for media
 //! connection establishment between concrete [`Member`]s.
 
+use std::time::Duration;
+
 use actix::{
     fut::wrap_future, Actor, ActorFuture, AsyncContext, Context, Handler,
     Message,
@@ -10,17 +12,13 @@ use futures::future;
 use hashbrown::HashMap;
 use medea_client_api_proto::{Command, Event, IceCandidate};
 
-use std::{convert::TryFrom, sync::Arc, time::Duration};
-
 use crate::{
     api::{
         client::rpc_connection::{
             AuthorizationError, Authorize, CommandMessage, RpcConnectionClosed,
             RpcConnectionEstablished,
         },
-        control::{
-            member::MemberSpec, room::RoomSpec, Member, MemberId, RoomId,
-        },
+        control::{Member, MemberId, RoomId, RoomSpec},
     },
     log::prelude::*,
     media::{
@@ -64,38 +62,23 @@ pub struct Room {
 
     /// [`Peer`]s of [`Member`]s in this [`Room`].
     peers: PeerRepository,
-
-    /// This [`Room`]'s control API specification.
-    spec: RoomSpec,
 }
 
 impl Room {
     /// Create new instance of [`Room`].
-    pub fn new(room: RoomSpec, reconnect_timeout: Duration) -> Self {
-        let members = room
-            .spec
-            .pipeline
-            .iter()
-            .map(|(control_id, entity)| {
-                let member_spec = MemberSpec::try_from(entity.clone()).unwrap();
-
-                (
-                    control_id.clone(),
-                    Member {
-                        id: control_id.clone(),
-                        spec: Arc::new(member_spec),
-                    },
-                )
-            })
-            .collect();
-        debug!("Created room with {:?} users.", members);
-
-        Self {
-            id: room.id.clone(),
+    pub fn new(room_spec: &RoomSpec, reconnect_timeout: Duration) -> Self {
+        let room = Self {
+            id: room_spec.id.clone(),
             peers: PeerRepository::from(HashMap::new()),
-            participants: ParticipantService::new(members, reconnect_timeout),
-            spec: room,
-        }
+            participants: ParticipantService::new(
+                &room_spec,
+                reconnect_timeout,
+            ),
+        };
+
+        info!("Starting new Room {:?}", room);
+
+        room
     }
 
     pub fn get_id(&self) -> RoomId {
@@ -461,7 +444,7 @@ mod test {
     fn start_room() -> Addr<Room> {
         let room_spec =
             control::load_from_yaml_file("./specs/room_spec_test.yml").unwrap();
-        let client_room = Room::new(room_spec, Duration::from_secs(10));
+        let client_room = Room::new(&room_spec, Duration::from_secs(10));
         Arbiter::start(move |_| client_room)
     }
 

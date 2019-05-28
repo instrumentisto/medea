@@ -30,14 +30,20 @@ fn main() {
     let config = Conf::parse().unwrap();
     info!("{:?}", config);
 
-    let rooms: HashMap<String, Addr<Room>> = if let Some(static_specs_path) =
-        config.server.static_specs_path.clone()
-    {
+    let room_repo = RoomsRepository::new(start_static_rooms(&config));
+
+    server::run(room_repo, config);
+    let _ = sys.run();
+}
+
+/// Parses static [`Room`]s from config and starts them in separate arbiters.
+fn start_static_rooms(config: &Conf) -> HashMap<String, Addr<Room>> {
+    if let Some(static_specs_path) = config.server.static_specs_path.clone() {
         let room_specs = load_static_specs_from_dir(static_specs_path).unwrap();
         room_specs
             .into_iter()
-            .map(|s| {
-                let room = Room::new(s, config.rpc.reconnect_timeout);
+            .map(|room_spec| {
+                let room = Room::new(&room_spec, config.rpc.reconnect_timeout);
                 let room_id = room.get_id();
                 let room = Arbiter::start(move |_| room);
 
@@ -46,11 +52,5 @@ fn main() {
             .collect()
     } else {
         HashMap::new()
-    };
-    info!("Loaded static specs: {:?}", rooms);
-
-    let room_repo = RoomsRepository::new(rooms);
-
-    server::run(room_repo, config);
-    let _ = sys.run();
+    }
 }
