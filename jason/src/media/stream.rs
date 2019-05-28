@@ -5,7 +5,7 @@ use std::cell::RefCell;
 use std::rc::{Rc, Weak};
 use wasm_bindgen::{prelude::*, JsValue};
 use wasm_bindgen_futures::JsFuture;
-use web_sys::MediaStream as BackingMediaStream;
+use web_sys::{MediaStream as BackingMediaStream, MediaStreamTrack};
 
 #[derive(Default)]
 pub struct MediaManager(Rc<RefCell<InnerMediaManager>>);
@@ -18,11 +18,11 @@ struct InnerMediaManager {
 impl MediaManager {
     pub fn get_stream(
         &self,
-        caps: &MediaCaps,
+        request: &GetMediaRequest,
     ) -> impl Future<Item = Rc<MediaStream>, Error = WasmErr> {
         // TODO: lookup stream by its caps, return its copy
 
-        let stream = match self.inner_get_stream(caps) {
+        let stream = match self.inner_get_stream(request) {
             Ok(promise) => JsFuture::from(promise),
             Err(err) => return Either::A(future::err(err)),
         };
@@ -41,7 +41,7 @@ impl MediaManager {
 
     fn inner_get_stream(
         &self,
-        caps: &MediaCaps,
+        caps: &GetMediaRequest,
     ) -> Result<js_sys::Promise, WasmErr> {
         window()
             .navigator()
@@ -51,12 +51,12 @@ impl MediaManager {
     }
 }
 
-pub struct MediaCaps {
+pub struct GetMediaRequest {
     audio: bool,
     video: bool,
 }
 
-impl MediaCaps {
+impl GetMediaRequest {
     pub fn new(audio: bool, video: bool) -> Result<Self, WasmErr> {
         if !audio && !video {
             return Err(WasmErr::from_str(
@@ -67,8 +67,8 @@ impl MediaCaps {
     }
 }
 
-impl From<&MediaCaps> for web_sys::MediaStreamConstraints {
-    fn from(caps: &MediaCaps) -> Self {
+impl From<&GetMediaRequest> for web_sys::MediaStreamConstraints {
+    fn from(caps: &GetMediaRequest) -> Self {
         let mut constraints = Self::new();
         if caps.audio {
             constraints.audio(&JsValue::from_bool(true));
@@ -82,12 +82,37 @@ impl From<&MediaCaps> for web_sys::MediaStreamConstraints {
 
 struct InnerStream {
     stream: BackingMediaStream,
+    audio_tracks: Vec<MediaStreamTrack>,
+    video_tracks: Vec<MediaStreamTrack>,
 }
 
 impl From<BackingMediaStream> for InnerStream {
     fn from(media_stream: BackingMediaStream) -> Self {
+        let mut audio_tracks = Vec::new();
+        let mut video_tracks = Vec::new();
+
+        let stream_audio_tracks =
+            js_sys::try_iter(&media_stream.get_audio_tracks())
+                .unwrap()
+                .unwrap();
+
+        for track in stream_audio_tracks {
+            audio_tracks.push(MediaStreamTrack::from(track.unwrap()));
+        }
+
+        let stream_video_tracks =
+            js_sys::try_iter(&media_stream.get_video_tracks())
+                .unwrap()
+                .unwrap();
+
+        for track in stream_video_tracks {
+            video_tracks.push(MediaStreamTrack::from(track.unwrap()));
+        }
+
         Self {
             stream: media_stream,
+            audio_tracks,
+            video_tracks,
         }
     }
 }
@@ -104,8 +129,12 @@ impl MediaStream {
         MediaStreamHandle(Rc::downgrade(&self.0))
     }
 
-    pub fn get_media_stream(&self) -> BackingMediaStream {
-        self.0.stream.clone()
+    pub fn get_audio_track(&self) -> Option<&MediaStreamTrack> {
+        self.0.audio_tracks.get(0)
+    }
+
+    pub fn get_video_track(&self) -> Option<&MediaStreamTrack> {
+        self.0.video_tracks.get(0)
     }
 }
 

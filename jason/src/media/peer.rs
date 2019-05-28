@@ -1,19 +1,21 @@
 use std::collections::HashMap;
 use std::rc::Rc;
 use web_sys::{
-    RtcIceCandidateInit, RtcOfferOptions, RtcPeerConnection,
-    RtcPeerConnectionIceEvent, RtcRtpReceiver, RtcRtpSender,
+    MediaStreamTrack, RtcIceCandidateInit, RtcOfferOptions, RtcPeerConnection,
+    RtcPeerConnectionIceEvent, RtcRtpSender, RtcRtpTransceiver,
     RtcRtpTransceiverDirection, RtcRtpTransceiverInit, RtcSdpType,
     RtcSessionDescription, RtcSessionDescriptionInit,
 };
 
 use crate::media::stream::MediaStream;
+use crate::media::{GetMediaRequest, MediaManager};
 use crate::utils::{EventListener, WasmErr};
-use futures::Future;
+use futures::future::join_all;
+use futures::future::IntoFuture;
+use futures::{future, Future};
 use protocol::{Direction, IceCandidate as IceDTO, MediaType, Track};
 use std::cell::RefCell;
 use wasm_bindgen_futures::JsFuture;
-use crate::media::MediaManager;
 
 pub type Id = u64;
 
@@ -22,28 +24,36 @@ pub enum Sdp {
     Answer(String),
 }
 
-#[allow(clippy::module_name_repetitions)]
-pub struct PeerConnection(RefCell<InnerPeer>);
+pub struct MediaConnections {
+    senders: HashMap<u64, Sender>,
+    receivers: HashMap<u64, Receiver>,
+}
 
-struct InnerPeer {
+#[allow(clippy::module_name_repetitions)]
+pub struct PeerConnection {
     id: Id,
     peer: Rc<RtcPeerConnection>,
     on_ice_candidate: RefCell<
         Option<EventListener<RtcPeerConnection, RtcPeerConnectionIceEvent>>,
     >,
-    senders: HashMap<u64, RtcRtpSender>,
-    receivers: HashMap<u64, RtcRtpReceiver>,
+    connections: Rc<RefCell<MediaConnections>>,
 }
 
 impl PeerConnection {
+    pub fn id(&self) -> Id {
+        self.id
+    }
+
     pub fn new(id: Id) -> Result<Self, WasmErr> {
-        Ok(Self(RefCell::new(InnerPeer {
+        Ok(Self {
             id,
             peer: Rc::new(RtcPeerConnection::new()?),
             on_ice_candidate: RefCell::new(None),
-            senders: HashMap::default(),
-            receivers: HashMap::default(),
-        })))
+            connections: Rc::new(RefCell::new(MediaConnections {
+                senders: HashMap::new(),
+                receivers: HashMap::new(),
+            })),
+        })
     }
 
     pub fn create_and_set_offer(
@@ -132,10 +142,6 @@ impl PeerConnection {
         .map_err(Into::into)
     }
 
-    pub fn add_stream(&self, stream: &Rc<MediaStream>) {
-        self.peer.add_stream(&stream.get_media_stream());
-    }
-
     pub fn on_remote_stream(&self) {}
 
     pub fn on_ice_candidate<F>(&self, mut f: F) -> Result<(), WasmErr>
@@ -164,55 +170,161 @@ impl PeerConnection {
         Ok(())
     }
 
-    // TODO: properly cast and store all tracks/streams in PeerConnection
-    //       with states (pending, active)
-    pub fn sync_tracks(&self, tracks: Vec<Track>, media_manager: Rc<MediaManager>) {
-        for track in tracks.into_iter() {
-            let track_id = track.id;
-            let track = (track.direction, track.media_type);
+    pub fn update_tracks(
+        &self,
+        tracks: Vec<Track>,
+        media_manager: &Rc<MediaManager>,
+    ) -> impl Future<Item = (), Error = WasmErr> {
+        // insert peer transceivers
+        for track in tracks {
+            match track.direction {
+                Direction::Send { receivers } => {
+                    self.connections.borrow_mut().senders.insert(
+                        track.id,
+                        Sender::new(&self.peer, receivers, track.media_type),
+                    );
+                }
+                Direction::Recv { sender } => {
+                    self.connections.borrow_mut().receivers.insert(
+                        track.id,
+                        Receiver::new(&self.peer, sender, track.media_type),
+                    );
+                }
+            }
+        }
 
-            let transceiver = match track {
-                (Direction::Recv { sender }, MediaType::Audio(settings)) => {
-                    let mut init = RtcRtpTransceiverInit::new();
-                    init.direction(RtcRtpTransceiverDirection::Recvonly);
-                    self.receivers.insert(
-                        track_id,
-                        self.peer
-                            .add_transceiver_with_str_and_init("audio", &init)
-                            .receiver(),
-                    );
-                }
-                (Direction::Recv { sender }, MediaType::Video(settings)) => {
-                    let mut init = RtcRtpTransceiverInit::new();
-                    init.direction(RtcRtpTransceiverDirection::Recvonly);
-                    self.receivers.insert(
-                        track_id,
-                        self.peer
-                            .add_transceiver_with_str_and_init("video", &init)
-                            .receiver(),
-                    );
-                }
-                (Direction::Send { receivers }, MediaType::Audio(settings)) => {
-                    let mut init = RtcRtpTransceiverInit::new();
-                    init.direction(RtcRtpTransceiverDirection::Sendonly);
-                    self.senders.insert(
-                        track_id,
-                        self.peer
-                            .add_transceiver_with_str_and_init("audio", &init)
-                            .sender(),
-                    );
-                }
-                (Direction::Send { receivers }, MediaType::Video(settings)) => {
-                    let mut init = RtcRtpTransceiverInit::new();
-                    init.direction(RtcRtpTransceiverDirection::Sendonly);
-                    self.senders.insert(
-                        track_id,
-                        self.peer
-                            .add_transceiver_with_str_and_init("video", &init)
-                            .sender(),
-                    );
-                }
-            };
+        // if senders not empty, then get media from media manager and insert
+        // tracks into transceivers
+        if self.connections.borrow().senders.is_empty() {
+            future::Either::B(future::ok(()))
+        } else {
+            let media_request = build_get_media_request(
+                self.connections.borrow().senders.values(),
+            );
+
+            let media_manager = Rc::clone(media_manager);
+            let connections = Rc::clone(&self.connections);
+            let get_media = media_request
+                .into_future()
+                .and_then(move |media_request| {
+                    media_manager.get_stream(&media_request)
+                })
+                .and_then(move |stream: Rc<MediaStream>| {
+                    let mut promises = Vec::new();
+                    for sender in connections.borrow().senders.values() {
+                        let rtc_sender: RtcRtpSender =
+                            sender.transceiver.sender();
+                        let replace = match sender.media_type {
+                            MediaType::Audio(_) => rtc_sender
+                                .replace_track(stream.get_audio_track()),
+                            MediaType::Video(_) => rtc_sender
+                                .replace_track(stream.get_video_track()),
+                        };
+
+                        promises.push(
+                            JsFuture::from(replace)
+                                .map_err(|err| WasmErr::from(err)),
+                        );
+                    }
+
+                    join_all(promises)
+                })
+                .map(|_| ());
+
+            future::Either::A(get_media)
+        }
+    }
+
+    //    pub fn process_sdp(&self, )
+}
+
+/// Builds [`GetMediaRequest`] from peer senders. Currently allows only one
+/// audio and one video track to be requested.
+fn build_get_media_request<'a>(
+    senders: impl IntoIterator<Item = &'a Sender>,
+) -> Result<GetMediaRequest, WasmErr> {
+    let mut senders = senders.into_iter();
+    let audio = senders.any(|s| match s.media_type {
+        MediaType::Audio(_) => true,
+        MediaType::Video(_) => false,
+    });
+
+    let video = senders.any(|s| match s.media_type {
+        MediaType::Audio(_) => false,
+        MediaType::Video(_) => true,
+    });
+
+    GetMediaRequest::new(audio, video)
+}
+
+pub struct Sender {
+    transceiver: RtcRtpTransceiver,
+    receivers: Vec<u64>,
+    media_type: MediaType,
+    track: Option<MediaStreamTrack>,
+    stream: Option<Rc<MediaStream>>,
+}
+
+impl Sender {
+    fn new(
+        peer: &Rc<RtcPeerConnection>,
+        receivers: Vec<u64>,
+        media_type: MediaType,
+    ) -> Self {
+        let transceiver = match media_type {
+            MediaType::Audio(_) => {
+                let mut init = RtcRtpTransceiverInit::new();
+                init.direction(RtcRtpTransceiverDirection::Sendonly);
+                peer.add_transceiver_with_str_and_init("audio", &init)
+            }
+            MediaType::Video(_) => {
+                let mut init = RtcRtpTransceiverInit::new();
+                init.direction(RtcRtpTransceiverDirection::Sendonly);
+                peer.add_transceiver_with_str_and_init("video", &init)
+            }
+        };
+
+        Self {
+            transceiver,
+            receivers,
+            media_type,
+            track: None,
+            stream: None,
+        }
+    }
+}
+
+pub struct Receiver {
+    transceiver: RtcRtpTransceiver,
+    sender: u64,
+    media_type: MediaType,
+    track: Option<MediaStreamTrack>,
+}
+
+impl Receiver {
+    fn new(
+        peer: &Rc<RtcPeerConnection>,
+        sender: u64,
+        media_type: MediaType,
+    ) -> Self {
+        let transceiver = match media_type {
+            MediaType::Audio(_) => {
+                let mut init = RtcRtpTransceiverInit::new();
+                init.direction(RtcRtpTransceiverDirection::Recvonly);
+                peer.add_transceiver_with_str_and_init("audio", &init)
+            }
+            MediaType::Video(_) => {
+                let mut init = RtcRtpTransceiverInit::new();
+                init.direction(RtcRtpTransceiverDirection::Recvonly);
+                peer.add_transceiver_with_str_and_init("video", &init)
+            }
+        };
+
+        Self {
+            transceiver,
+            sender,
+            media_type,
+            track: None,
         }
     }
 }
