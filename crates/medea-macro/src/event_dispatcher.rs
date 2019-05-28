@@ -29,25 +29,24 @@ struct MatchVariantField {
 
 /// Transform function name from `snake_case` to `camelCase` and add "on_"
 /// prefix.
-///
-/// Do not use it with names like `SendRDP`, `ReceiveRDP`, `HTTP`!
-/// For this names this function generate names like
-/// `on_send_r_d_p`, `on_receive_r_d_p`, `on_h_t_t_p`!
 fn to_handler_fn_name(event: &str) -> String {
     let mut snake_case = String::new();
-    snake_case.push_str("on");
+    snake_case.push_str("on_");
+    let mut prev_ch = '\0';
+
     for ch in event.chars() {
-        if ch.is_uppercase() {
+        if ch.is_uppercase() && !prev_ch.is_uppercase() && (prev_ch != '\0') {
             snake_case.push('_');
         }
         snake_case.push_str(&ch.to_lowercase().to_string());
+        prev_ch = ch;
     }
 
     snake_case
 }
 
 /// Parse all [`MatchVariant`]s of provided enum.
-/// Support only named enums.
+/// Support only named enum variants.
 ///
 /// Returns error if enum have unnamed variant.
 fn parse_match_variants(
