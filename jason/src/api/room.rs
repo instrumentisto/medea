@@ -24,7 +24,7 @@ pub struct RoomHandle(Weak<RefCell<InnerRoom>>);
 #[wasm_bindgen]
 impl RoomHandle {}
 
-impl EventHandler for Room {
+impl EventHandler for RoomHandle {
     /// Creates RTCPeerConnection with provided ID.
     fn on_peer_created(
         &mut self,
@@ -63,13 +63,13 @@ pub struct Room(Rc<RefCell<InnerRoom>>);
 impl Room {
     /// Creates new [`Room`] associating it with provided [`RpcClient`].
     pub fn new(rpc: &Rc<RpcClient>) -> Self {
-        let inner = Rc::new(RefCell::new(InnerRoom::new(Rc::clone(&rpc))));
-        let mut room = Self(Rc::clone(&inner));
+        let room = Rc::new(RefCell::new(InnerRoom::new(Rc::clone(&rpc))));
+        let mut inner = RoomHandle(Rc::downgrade(&room));
 
         let process_msg_task = rpc
             .subscribe()
             .for_each(move |event| {
-                event.dispatch(&mut room);
+                event.dispatch(&mut inner);
                 Ok(())
             })
             .into_future()
@@ -79,7 +79,7 @@ impl Room {
         // stop this stream is to drop all connected Senders.
         spawn_local(process_msg_task);
 
-        Self(inner)
+        Self(room)
     }
 
     /// Creates new [`RoomHandle`] used by JS side. You can create them as many
