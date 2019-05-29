@@ -26,7 +26,7 @@ use crate::{
     },
     log::prelude::*,
     signalling::{
-        room::{CloseRoom, CreatePeer, RoomError},
+        room::{CloseRoom, RoomError},
         Room,
     },
 };
@@ -52,9 +52,6 @@ pub struct ParticipantService {
     /// If [`RpcConnection`] is lost, [`Room`] waits for connection_timeout
     /// before dropping it irrevocably in case it gets reestablished.
     drop_connection_tasks: HashMap<MemberId, SpawnHandle>,
-
-    /// Stores [`Member`]s which wait connection of another [`Member`].
-    members_waiting_connection: HashMap<MemberId, Vec<Member>>,
 }
 
 impl ParticipantService {
@@ -82,8 +79,13 @@ impl ParticipantService {
             connections: HashMap::new(),
             reconnect_timeout,
             drop_connection_tasks: HashMap::new(),
-            members_waiting_connection: HashMap::new(),
         }
+    }
+
+    // TODO: add doc
+    #[allow(clippy::ptr_arg)]
+    pub fn get_member_by_id(&self, id: &MemberId) -> Option<&Member> {
+        self.members.get(id)
     }
 
     /// Lookup [`Member`] by provided id and credentials. Returns
@@ -169,95 +171,9 @@ impl ParticipantService {
         }
     }
 
-    /// Create [`Peer`]s between waiting [`Member`] and connected.
-    ///
-    /// Returns all control ID of members which we connected.
-    fn connect_waiting_members(
-        &self,
-        member: &Member,
-        ctx: &mut Context<Room>,
-    ) -> Vec<String> {
-        let mut added_member = Vec::new();
-        if let Some(waiters) = self.members_waiting_connection.get(&member.id) {
-            for waiter in waiters {
-                added_member.push(waiter.id.clone());
-
-                ctx.notify(CreatePeer {
-                    caller: member.clone(),
-                    responder: waiter.clone(),
-                });
-            }
-        }
-        added_member
-    }
-
-    /// Interconnect [`Peer`]s of members based on [`MemberSpec`].
-    #[allow(clippy::ptr_arg)]
-    fn create_and_interconnect_members_peers(
-        &mut self,
-        ctx: &mut Context<Room>,
-        member_id: &MemberId,
-    ) {
-        let connected_member = if let Some(m) = self.members.get(member_id) {
-            m
-        } else {
-            warn!("Connected a non-existent member with id {}!", member_id);
-            // Maybe better return error here?
-            return;
-        };
-        let connected_member_play_endpoints =
-            connected_member.spec.get_play_endpoints();
-
-        let added_waiting_members =
-            self.connect_waiting_members(&connected_member, ctx);
-        self.members_waiting_connection.remove(member_id);
-
-        for connected_member_endpoint in connected_member_play_endpoints {
-            // Skip members which waiting for us because we added them before.
-            if added_waiting_members
-                .contains(&connected_member_endpoint.src.member_id)
-            {
-                continue;
-            }
-
-            let responder_id = &connected_member_endpoint.src.member_id;
-
-            let is_responder_connected =
-                self.member_has_connection(responder_id);
-            if is_responder_connected {
-                let responder = if let Some(m) = self.members.get(responder_id)
-                {
-                    m
-                } else {
-                    warn!(
-                        "Member with id {} not found, but this member has \
-                         connection!",
-                        responder_id
-                    );
-                    continue;
-                };
-
-                ctx.notify(CreatePeer {
-                    caller: responder.clone(),
-                    responder: connected_member.clone(),
-                });
-            } else if let Some(m) =
-                self.members_waiting_connection.get_mut(responder_id)
-            {
-                m.push(connected_member.clone());
-            } else {
-                self.members_waiting_connection.insert(
-                    responder_id.clone(),
-                    vec![connected_member.clone()],
-                );
-            }
-        }
-    }
-
     /// Stores provided [`RpcConnection`] for given [`Member`] in the [`Room`].
     /// If [`Member`] already has any other [`RpcConnection`],
     /// then it will be closed.
-    /// Create and interconnect all necessary [`Member`]'s [`Peer`].
     #[allow(clippy::ptr_arg)]
     pub fn connection_established(
         &mut self,
@@ -278,8 +194,6 @@ impl ParticipantService {
             ctx.spawn(wrap_future(connection.close()));
         } else {
             debug!("Connected member: {}", member_id);
-
-            self.create_and_interconnect_members_peers(ctx, member_id);
 
             self.connections.insert(member_id.to_string(), con);
         }

@@ -3,7 +3,8 @@
 use std::convert::TryFrom;
 
 use super::{
-    member::MemberSpec, pipeline::Pipeline, Entity, TryFromEntityError, MemberId,
+    member::MemberSpec, pipeline::Pipeline, Entity, MemberId,
+    TryFromEntityError,
 };
 
 /// ID of [`Room`].
