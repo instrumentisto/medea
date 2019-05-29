@@ -2,6 +2,7 @@
 
 use std::{
     cell::RefCell,
+    ops::DerefMut,
     rc::{Rc, Weak},
 };
 
@@ -24,42 +25,6 @@ pub struct RoomHandle(Weak<RefCell<InnerRoom>>);
 #[wasm_bindgen]
 impl RoomHandle {}
 
-/// Newtype for [`InnerRoom`] event handling.
-struct InnerRoomHandle(Rc<RefCell<InnerRoom>>);
-
-impl EventHandler for InnerRoomHandle {
-    /// Creates RTCPeerConnection with provided ID.
-    fn on_peer_created(
-        &mut self,
-        _peer_id: u64,
-        _sdp_offer: Option<String>,
-        _tracks: Vec<Track>,
-    ) {
-        console::log_1(&JsValue::from_str("on_peer_created invoked"));
-    }
-
-    /// Applies specified SDP Answer to specified RTCPeerConnection.
-    fn on_sdp_answer_made(&mut self, _peer_id: u64, _sdp_answer: String) {
-        console::log_1(&JsValue::from_str("on_sdp_answer invoked"));
-    }
-
-    /// Applies specified ICE Candidate to specified RTCPeerConnection.
-    fn on_ice_candidate_discovered(
-        &mut self,
-        _peer_id: u64,
-        _candidate: IceCandidate,
-    ) {
-        console::log_1(&JsValue::from_str(
-            "on_ice_candidate_discovered invoked",
-        ));
-    }
-
-    /// Disposes specified RTCPeerConnection's.
-    fn on_peers_removed(&mut self, _peer_ids: Vec<u64>) {
-        console::log_1(&JsValue::from_str("on_peers_removed invoked"));
-    }
-}
-
 /// Room handle being used by Rust external modules.
 pub struct Room(Rc<RefCell<InnerRoom>>);
 
@@ -73,7 +38,7 @@ impl Room {
             .subscribe()
             .for_each(move |event| match inner.upgrade() {
                 Some(inner) => {
-                    event.dispatch(&mut InnerRoomHandle(inner));
+                    event.dispatch(inner.borrow_mut().deref_mut());
                     Ok(())
                 }
                 None => Err(()),
@@ -106,6 +71,39 @@ struct InnerRoom {
 impl InnerRoom {
     fn new(rpc: Rc<RpcClient>) -> Self {
         Self { rpc }
+    }
+}
+
+impl EventHandler for InnerRoom {
+    /// Creates RTCPeerConnection with provided ID.
+    fn on_peer_created(
+        &mut self,
+        _peer_id: u64,
+        _sdp_offer: Option<String>,
+        _tracks: Vec<Track>,
+    ) {
+        console::log_1(&JsValue::from_str("on_peer_created invoked"));
+    }
+
+    /// Applies specified SDP Answer to specified RTCPeerConnection.
+    fn on_sdp_answer_made(&mut self, _peer_id: u64, _sdp_answer: String) {
+        console::log_1(&JsValue::from_str("on_sdp_answer invoked"));
+    }
+
+    /// Applies specified ICE Candidate to specified RTCPeerConnection.
+    fn on_ice_candidate_discovered(
+        &mut self,
+        _peer_id: u64,
+        _candidate: IceCandidate,
+    ) {
+        console::log_1(&JsValue::from_str(
+            "on_ice_candidate_discovered invoked",
+        ));
+    }
+
+    /// Disposes specified RTCPeerConnection's.
+    fn on_peers_removed(&mut self, _peer_ids: Vec<u64>) {
+        console::log_1(&JsValue::from_str("on_peers_removed invoked"));
     }
 }
 

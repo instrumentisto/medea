@@ -206,7 +206,7 @@ pub fn enum_delegate(args: TokenStream, input: TokenStream) -> TokenStream {
 /// }
 /// ```
 #[proc_macro_derive(EventDispatcher)]
-pub fn derive_event_dispatcher(input: TokenStream) -> TokenStream {
+pub fn event_dispatcher(input: TokenStream) -> TokenStream {
     event_dispatcher::derive(input)
         .unwrap_or_else(|e| e.to_compile_error().into())
 }
