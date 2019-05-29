@@ -20,8 +20,8 @@ pub struct Member {
 }
 
 /// Newtype for [`Entity::Member`] variant.
-#[derive(Clone, Debug)]
 #[allow(clippy::module_name_repetitions)]
+#[derive(Clone, Debug)]
 pub struct MemberSpec {
     /// Spec of this [`Member`].
     pub spec: Pipeline,
@@ -52,7 +52,7 @@ impl MemberSpec {
     }
 
     /// Get all [`WebRtcPlayEndpoint`]s by ID of [`MemberSpec`].
-    pub fn get_play_endpoint_by_member_id(
+    pub fn get_play_endpoints_by_member_id(
         &self,
         src: &str,
     ) -> Vec<&WebRtcPlayEndpoint> {

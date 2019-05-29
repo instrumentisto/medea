@@ -23,8 +23,8 @@ pub use self::{
 
 /// Errors that can occur when we try transform some spec from [`Entity`].
 /// This error used in all [`TryFrom`] of Control API.
-#[derive(Debug, Fail)]
 #[allow(clippy::pub_enum_variant_names)]
+#[derive(Debug, Fail)]
 pub enum TryFromEntityError {
     #[fail(display = "Entity is not Element")]
     NotElement,

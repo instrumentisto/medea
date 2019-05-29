@@ -8,8 +8,8 @@ use medea_client_api_proto::MediaType;
 pub type Id = u64;
 
 /// [`MediaStreamTrack`] representation.
-#[derive(Debug)]
 #[allow(clippy::module_name_repetitions)]
+#[derive(Debug)]
 pub struct MediaTrack {
     pub id: Id,
     pub media_type: MediaType,

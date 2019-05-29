@@ -16,6 +16,7 @@ pub enum Element {
     WebRtcPublishEndpoint(WebRtcPublishEndpoint),
     WebRtcPlayEndpoint(WebRtcPlayEndpoint),
 }
+
 impl TryFrom<Entity> for Element {
     type Error = TryFromEntityError;
 
@@ -32,16 +33,16 @@ impl TryFrom<Entity> for Element {
     }
 }
 
-#[derive(Deserialize, Debug, Clone)]
 /// Peer-to-peer mode of [`WebRtcPublishEndpoint`].
+#[derive(Deserialize, Debug, Clone)]
 pub enum P2pMode {
     /// Always connect peer-to-peer.
     Always,
 }
 
-#[derive(Deserialize, Debug, Clone)]
 /// Media element which is able to publish media data for another client via
 /// WebRTC.
+#[derive(Deserialize, Debug, Clone)]
 pub struct WebRtcPublishEndpoint {
     /// Peer-to-peer mode.
     pub p2p: P2pMode,
@@ -54,8 +55,8 @@ pub struct WebRtcPlayEndpoint {
     pub src: LocalUri,
 }
 
-#[derive(Debug, Clone)]
 /// Special uri with pattern `local://{room_id}/{member_id}/{pipeline_id}`.
+#[derive(Debug, Clone)]
 pub struct LocalUri {
     /// ID of [`Room`]
     // TODO: Why this field never used???

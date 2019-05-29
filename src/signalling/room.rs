@@ -34,8 +34,8 @@ use crate::{
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
 type ActFuture<I, E> = Box<dyn ActorFuture<Actor = Room, Item = I, Error = E>>;
 
-#[derive(Fail, Debug)]
 #[allow(clippy::module_name_repetitions)]
+#[derive(Fail, Debug)]
 pub enum RoomError {
     #[fail(display = "Couldn't find Peer with [id = {}]", _0)]
     PeerNotFound(PeerId),
@@ -85,7 +85,7 @@ pub struct Room {
 impl Room {
     /// Create new instance of [`Room`].
     ///
-    /// Returns [`RoomError::BadRoomSpec`] when error in [`Entity`]
+    /// Returns [`RoomError::BadRoomSpec`] when error while [`Entity`]
     /// transformation happens.
     pub fn new(
         room_spec: &RoomSpec,
@@ -121,6 +121,7 @@ impl Room {
         })
     }
 
+    /// Returns [`RoomId`] of this [`Room`].
     pub fn get_id(&self) -> RoomId {
         self.id.clone()
     }
@@ -330,18 +331,18 @@ impl Handler<ConnectPeers> for Room {
 
 #[derive(Debug, Message)]
 #[rtype(result = "Result<(), ()>")]
-pub struct CreatePeer {
+pub struct CreatePeers {
     pub caller: Member,
     pub responder: Member,
 }
 
-impl Handler<CreatePeer> for Room {
+impl Handler<CreatePeers> for Room {
     type Result = Result<(), ()>;
 
     /// Create [`Peer`] between members and interconnect it by control API spec.
     fn handle(
         &mut self,
-        msg: CreatePeer,
+        msg: CreatePeers,
         ctx: &mut Self::Context,
     ) -> Self::Result {
         debug!(
@@ -413,7 +414,7 @@ struct CreateNecessaryMemberPeers(MemberId);
 impl Handler<CreateNecessaryMemberPeers> for Room {
     type Result = ();
 
-    /// Create and interconnect all necessary [`Member`]'s [`Peer`].
+    /// Create and interconnect all necessary [`Member`]'s [`Peer`]s.
     fn handle(
         &mut self,
         msg: CreateNecessaryMemberPeers,
@@ -442,7 +443,7 @@ impl Handler<CreateNecessaryMemberPeers> for Room {
                         self.participants.get_member_by_id(recv_member_id)
                     {
                         already_connected_members.push(recv_member_id.clone());
-                        ctx.notify(CreatePeer {
+                        ctx.notify(CreatePeers {
                             caller: recv_member.clone(),
                             responder: member.clone(),
                         });
@@ -470,7 +471,7 @@ impl Handler<CreateNecessaryMemberPeers> for Room {
                     .participants
                     .get_member_by_id(sender_member_id)
                     .unwrap();
-                ctx.notify(CreatePeer {
+                ctx.notify(CreatePeers {
                     caller: sender_member.clone(),
                     responder: member.clone(),
                 });
@@ -484,7 +485,7 @@ impl Handler<RpcConnectionEstablished> for Room {
 
     /// Saves new [`RpcConnection`] in [`ParticipantService`], initiates media
     /// establishment between members.
-    /// Create and interconnect all necessary [`Member`]'s [`Peer`].
+    /// Create and interconnect all necessary [`Member`]'s [`Peer`]s.
     fn handle(
         &mut self,
         msg: RpcConnectionEstablished,
@@ -506,9 +507,9 @@ impl Handler<RpcConnectionEstablished> for Room {
 }
 
 /// Signal of close [`Room`].
+#[allow(clippy::module_name_repetitions)]
 #[derive(Debug, Message)]
 #[rtype(result = "()")]
-#[allow(clippy::module_name_repetitions)]
 pub struct CloseRoom {}
 
 impl Handler<CloseRoom> for Room {

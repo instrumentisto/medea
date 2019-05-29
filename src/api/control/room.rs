@@ -12,8 +12,8 @@ pub type Id = String;
 
 /// [`crate::signalling::room::Room`] specification.
 /// Newtype for [`Entity::Room`]
-#[derive(Clone, Debug)]
 #[allow(clippy::module_name_repetitions)]
+#[derive(Clone, Debug)]
 pub struct RoomSpec {
     pub id: Id,
     pub spec: Pipeline,
