@@ -24,7 +24,10 @@ pub struct RoomHandle(Weak<RefCell<InnerRoom>>);
 #[wasm_bindgen]
 impl RoomHandle {}
 
-impl EventHandler for RoomHandle {
+/// Newtype for [`InnerRoom`] event handling.
+struct InnerRoomHandle(Rc<RefCell<InnerRoom>>);
+
+impl EventHandler for InnerRoomHandle {
     /// Creates RTCPeerConnection with provided ID.
     fn on_peer_created(
         &mut self,
@@ -64,13 +67,16 @@ impl Room {
     /// Creates new [`Room`] associating it with provided [`RpcClient`].
     pub fn new(rpc: &Rc<RpcClient>) -> Self {
         let room = Rc::new(RefCell::new(InnerRoom::new(Rc::clone(&rpc))));
-        let mut inner = RoomHandle(Rc::downgrade(&room));
+        let inner = Rc::downgrade(&room);
 
         let process_msg_task = rpc
             .subscribe()
-            .for_each(move |event| {
-                event.dispatch(&mut inner);
-                Ok(())
+            .for_each(move |event| match inner.upgrade() {
+                Some(inner) => {
+                    event.dispatch(&mut InnerRoomHandle(inner));
+                    Ok(())
+                }
+                None => Err(()),
             })
             .into_future()
             .then(|_| Ok(()));
