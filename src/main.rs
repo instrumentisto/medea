@@ -13,10 +13,13 @@ use dotenv::dotenv;
 use log::prelude::*;
 
 use crate::{
+    api::control::RoomId,
     api::{client::server, control::load_static_specs_from_dir},
     conf::Conf,
     signalling::{room_repo::RoomsRepository, Room},
 };
+
+use failure::Fail;
 use hashbrown::HashMap;
 
 fn main() {
@@ -30,27 +33,53 @@ fn main() {
     let config = Conf::parse().unwrap();
     info!("{:?}", config);
 
-    let room_repo = RoomsRepository::new(start_static_rooms(&config));
+    match start_static_rooms(&config) {
+        Ok(r) => {
+            let room_repo = RoomsRepository::new(r);
+            server::run(room_repo, config);
+        }
+        Err(e) => {
+            error!("Server not started because of error: '{}'", e);
+            System::current().stop_with_code(100);
+        }
+    };
 
-    server::run(room_repo, config);
     let _ = sys.run();
 }
 
-/// Parses static [`Room`]s from config and starts them in separate arbiters.
-fn start_static_rooms(config: &Conf) -> HashMap<String, Addr<Room>> {
-    if let Some(static_specs_path) = config.server.static_specs_path.clone() {
-        let room_specs = load_static_specs_from_dir(static_specs_path).unwrap();
-        room_specs
-            .into_iter()
-            .map(|room_spec| {
-                let room = Room::new(&room_spec, config.rpc.reconnect_timeout);
-                let room_id = room.get_id();
-                let room = Arbiter::start(move |_| room);
+// TODO: add doc
+#[derive(Debug, Fail)]
+enum ServerStartError {
+    #[fail(display = "Duplicate of room ID '{}'", _0)]
+    DuplicateRoomId(RoomId),
+    #[fail(display = "Failed to load specs. {}", _0)]
+    LoadSpec(failure::Error),
+}
 
-                (room_id, room)
-            })
-            .collect()
+// TODO: update doc
+/// Parses static [`Room`]s from config and starts them in separate arbiters.
+fn start_static_rooms(
+    config: &Conf,
+) -> Result<HashMap<String, Addr<Room>>, ServerStartError> {
+    if let Some(static_specs_path) = config.server.static_specs_path.clone() {
+        let room_specs = match load_static_specs_from_dir(static_specs_path) {
+            Ok(r) => r,
+            Err(e) => return Err(ServerStartError::LoadSpec(e)),
+        };
+        let mut rooms = HashMap::new();
+
+        for spec in room_specs {
+            if rooms.contains_key(&spec.id) {
+                return Err(ServerStartError::DuplicateRoomId(spec.id));
+            }
+
+            let room = Room::new(&spec, config.rpc.reconnect_timeout);
+            let room = Arbiter::start(move |_| room);
+            rooms.insert(spec.id, room);
+        }
+
+        Ok(rooms)
     } else {
-        HashMap::new()
+        Ok(HashMap::new())
     }
 }
