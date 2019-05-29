@@ -41,7 +41,12 @@ impl Room {
                     event.dispatch(inner.borrow_mut().deref_mut());
                     Ok(())
                 }
-                None => Err(()),
+                None => {
+                    // InnerSession is gone, which means that Room was
+                    // dropped. Not supposed to happen, since InnerSession
+                    // should drop its tx by unsubbing from RpcClient.
+                    Err(())
+                }
             })
             .into_future()
             .then(|_| Ok(()));
