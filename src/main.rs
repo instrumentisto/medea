@@ -17,6 +17,7 @@ use crate::{
     api::{client::server, control::load_static_specs_from_dir},
     conf::Conf,
     signalling::{room_repo::RoomsRepository, Room},
+    signalling::room::RoomError
 };
 
 use failure::Fail;
@@ -47,17 +48,44 @@ fn main() {
     let _ = sys.run();
 }
 
-// TODO: add doc
+/// Errors which can happen while server starting.
 #[derive(Debug, Fail)]
 enum ServerStartError {
+    /// Duplicate room ID finded.
     #[fail(display = "Duplicate of room ID '{}'", _0)]
     DuplicateRoomId(RoomId),
+
+    /// Some error happened while loading spec.
     #[fail(display = "Failed to load specs. {}", _0)]
     LoadSpec(failure::Error),
+
+    /// Some error happened while creating new room from spec.
+    #[fail(display = "Bad room spec. {}", _0)]
+    BadRoomSpec(String),
+
+    /// Unexpected error returned from room.
+    #[fail(display = "Unknown room error.")]
+    UnknownRoomError,
 }
 
-// TODO: update doc
+impl From<RoomError> for ServerStartError {
+    fn from(err: RoomError) -> Self {
+        match err {
+            RoomError::BadRoomSpec(m) => ServerStartError::BadRoomSpec(m),
+            _ => ServerStartError::UnknownRoomError,
+        }
+    }
+}
+
 /// Parses static [`Room`]s from config and starts them in separate arbiters.
+///
+/// Returns [`ServerStartError::DuplicateRoomId`] if find duplicated room ID.
+///
+/// Returns [`ServerStartError::LoadSpec`] if some error happened
+/// while loading spec.
+///
+/// Returns [`ServerStartError::BadRoomSpec`]
+/// if some error happened while creating room from spec.
 fn start_static_rooms(
     config: &Conf,
 ) -> Result<HashMap<String, Addr<Room>>, ServerStartError> {
@@ -73,7 +101,7 @@ fn start_static_rooms(
                 return Err(ServerStartError::DuplicateRoomId(spec.id));
             }
 
-            let room = Room::new(&spec, config.rpc.reconnect_timeout);
+            let room = Room::new(&spec, config.rpc.reconnect_timeout)?;
             let room = Arbiter::start(move |_| room);
             rooms.insert(spec.id, room);
         }

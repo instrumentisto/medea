@@ -26,11 +26,11 @@ pub use self::{
 #[derive(Debug, Fail)]
 #[allow(clippy::pub_enum_variant_names)]
 pub enum TryFromEntityError {
-    #[fail(display = "This entity is not Element")]
+    #[fail(display = "Entity is not Element")]
     NotElement,
-    #[fail(display = "This entity is not Room")]
+    #[fail(display = "Entity is not Room")]
     NotRoom,
-    #[fail(display = "This entity is not Member")]
+    #[fail(display = "Entity is not Member")]
     NotMember,
 }
 

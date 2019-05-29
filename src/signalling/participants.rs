@@ -82,7 +82,7 @@ impl ParticipantService {
         }
     }
 
-    // TODO: add doc
+    /// Lookup [`Member`] by provided id.
     #[allow(clippy::ptr_arg)]
     pub fn get_member_by_id(&self, id: &MemberId) -> Option<&Member> {
         self.members.get(id)

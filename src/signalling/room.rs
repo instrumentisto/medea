@@ -18,7 +18,10 @@ use crate::{
             AuthorizationError, Authorize, CommandMessage, RpcConnectionClosed,
             RpcConnectionEstablished,
         },
-        control::{Element, Member, MemberId, MemberSpec, RoomId, RoomSpec},
+        control::{
+            Element, Member, MemberId, MemberSpec, RoomId, RoomSpec,
+            TryFromEntityError,
+        },
     },
     log::prelude::*,
     media::{
@@ -52,6 +55,15 @@ impl From<PeerStateError> for RoomError {
     }
 }
 
+impl From<TryFromEntityError> for RoomError {
+    fn from(err: TryFromEntityError) -> Self {
+        RoomError::BadRoomSpec(format!(
+            "Entity occured in wrong place. {}",
+            err
+        ))
+    }
+}
+
 /// Media server room with its [`Member`]s.
 #[derive(Debug)]
 pub struct Room {
@@ -63,29 +75,33 @@ pub struct Room {
     /// [`Peer`]s of [`Member`]s in this [`Room`].
     peers: PeerRepository,
 
-    // TODO: add doc
-    member_receivers: HashMap<MemberId, Vec<MemberId>>,
+    /// Stores [`MemberId`]s of all sender's receivers.
+    ///
+    /// __Key__ is sender's [`MemberId`].
+    /// __Value__ is all sender's receivers.
+    sender_receivers: HashMap<MemberId, Vec<MemberId>>,
 }
 
 impl Room {
     /// Create new instance of [`Room`].
-    pub fn new(room_spec: &RoomSpec, reconnect_timeout: Duration) -> Self {
-        // TODO: Need refactor
-        let mut member_receivers: HashMap<MemberId, Vec<MemberId>> =
+    pub fn new(
+        room_spec: &RoomSpec,
+        reconnect_timeout: Duration,
+    ) -> Result<Self, RoomError> {
+        let mut sender_receivers: HashMap<MemberId, Vec<MemberId>> =
             HashMap::new();
         for (member_id, member_entity) in &room_spec.spec.pipeline {
-            let member = MemberSpec::try_from(member_entity.clone()).unwrap();
+            let member = MemberSpec::try_from(member_entity.clone())?;
             for element_entity in member.spec.pipeline.values() {
-                let element =
-                    Element::try_from(element_entity.clone()).unwrap();
+                let element = Element::try_from(element_entity.clone())?;
 
                 if let Element::WebRtcPlayEndpoint(play) = element {
                     if let Some(m) =
-                        member_receivers.get_mut(&play.src.member_id)
+                        sender_receivers.get_mut(&play.src.member_id)
                     {
                         m.push(member_id.clone());
                     } else {
-                        member_receivers.insert(
+                        sender_receivers.insert(
                             play.src.member_id.clone(),
                             vec![member_id.clone()],
                         );
@@ -94,15 +110,15 @@ impl Room {
             }
         }
 
-        Self {
+        Ok(Self {
             id: room_spec.id.clone(),
             peers: PeerRepository::from(HashMap::new()),
             participants: ParticipantService::new(
                 &room_spec,
                 reconnect_timeout,
             ),
-            member_receivers,
-        }
+            sender_receivers,
+        })
     }
 
     pub fn get_id(&self) -> RoomId {
@@ -393,7 +409,6 @@ impl Handler<CommandMessage> for Room {
 impl Handler<RpcConnectionEstablished> for Room {
     type Result = ActFuture<(), ()>;
 
-    // TODO: update doc
     /// Saves new [`RpcConnection`] in [`ParticipantService`], initiates media
     /// establishment between members.
     /// Create and interconnect all necessary [`Member`]'s [`Peer`].
@@ -411,12 +426,13 @@ impl Handler<RpcConnectionEstablished> for Room {
             msg.connection,
         );
 
+        // TODO: move it into separate fn
         let member_id = &msg.member_id;
         let member = self.participants.get_member_by_id(member_id).unwrap();
 
         // connect receivers
         let mut already_connected_members = Vec::new();
-        if let Some(m) = self.member_receivers.get(member_id) {
+        if let Some(m) = self.sender_receivers.get(member_id) {
             for recv_member_id in m {
                 if self.participants.member_has_connection(recv_member_id) {
                     let recv_member = self
