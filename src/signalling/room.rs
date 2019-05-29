@@ -84,6 +84,9 @@ pub struct Room {
 
 impl Room {
     /// Create new instance of [`Room`].
+    ///
+    /// Returns [`RoomError::BadRoomSpec`] when error in [`Entity`]
+    /// transformation happens.
     pub fn new(
         room_spec: &RoomSpec,
         reconnect_timeout: Duration,
@@ -102,7 +105,7 @@ impl Room {
                         m.push(member_id.clone());
                     } else {
                         sender_receivers.insert(
-                            play.src.member_id.clone(),
+                            play.src.member_id,
                             vec![member_id.clone()],
                         );
                     }
@@ -113,10 +116,7 @@ impl Room {
         Ok(Self {
             id: room_spec.id.clone(),
             peers: PeerRepository::from(HashMap::new()),
-            participants: ParticipantService::new(
-                &room_spec,
-                reconnect_timeout,
-            ),
+            participants: ParticipantService::new(room_spec, reconnect_timeout),
             sender_receivers,
         })
     }
@@ -406,34 +406,26 @@ impl Handler<CommandMessage> for Room {
     }
 }
 
-impl Handler<RpcConnectionEstablished> for Room {
-    type Result = ActFuture<(), ()>;
+#[derive(Debug, Message)]
+#[rtype(result = "()")]
+struct CreateNecessaryMemberPeers(MemberId);
 
-    /// Saves new [`RpcConnection`] in [`ParticipantService`], initiates media
-    /// establishment between members.
+impl Handler<CreateNecessaryMemberPeers> for Room {
+    type Result = ();
+
     /// Create and interconnect all necessary [`Member`]'s [`Peer`].
     fn handle(
         &mut self,
-        msg: RpcConnectionEstablished,
+        msg: CreateNecessaryMemberPeers,
         ctx: &mut Self::Context,
-    ) -> Self::Result {
-        info!("RpcConnectionEstablished for member {}", msg.member_id);
-
-        // save new connection
-        self.participants.connection_established(
-            ctx,
-            &msg.member_id,
-            msg.connection,
-        );
-
-        // TODO: move it into separate fn
-        let member_id = &msg.member_id;
+    ) {
+        let member_id = &msg.0;
         let member = self.participants.get_member_by_id(member_id).unwrap();
 
         // connect receivers
         let mut already_connected_members = Vec::new();
-        if let Some(m) = self.sender_receivers.get(member_id) {
-            for recv_member_id in m {
+        if let Some(receivers) = self.sender_receivers.get(member_id) {
+            for recv_member_id in receivers {
                 if self.participants.member_has_connection(recv_member_id) {
                     let recv_member = self
                         .participants
@@ -466,6 +458,30 @@ impl Handler<RpcConnectionEstablished> for Room {
                 });
             }
         }
+    }
+}
+
+impl Handler<RpcConnectionEstablished> for Room {
+    type Result = ActFuture<(), ()>;
+
+    /// Saves new [`RpcConnection`] in [`ParticipantService`], initiates media
+    /// establishment between members.
+    /// Create and interconnect all necessary [`Member`]'s [`Peer`].
+    fn handle(
+        &mut self,
+        msg: RpcConnectionEstablished,
+        ctx: &mut Self::Context,
+    ) -> Self::Result {
+        info!("RpcConnectionEstablished for member {}", msg.member_id);
+
+        // save new connection
+        self.participants.connection_established(
+            ctx,
+            &msg.member_id,
+            msg.connection,
+        );
+
+        ctx.notify(CreateNecessaryMemberPeers(msg.member_id));
 
         Box::new(wrap_future(future::ok(())))
     }
@@ -525,7 +541,8 @@ mod test {
     fn start_room() -> Addr<Room> {
         let room_spec =
             control::load_from_yaml_file("./specs/pub_sub_room.yml").unwrap();
-        let client_room = Room::new(&room_spec, Duration::from_secs(10));
+        let client_room =
+            Room::new(&room_spec, Duration::from_secs(10)).unwrap();
         Arbiter::start(move |_| client_room)
     }
 

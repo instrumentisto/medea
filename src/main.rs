@@ -16,8 +16,8 @@ use crate::{
     api::control::RoomId,
     api::{client::server, control::load_static_specs_from_dir},
     conf::Conf,
+    signalling::room::RoomError,
     signalling::{room_repo::RoomsRepository, Room},
-    signalling::room::RoomError
 };
 
 use failure::Fail;
