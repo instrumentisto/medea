@@ -420,22 +420,40 @@ impl Handler<CreateNecessaryMemberPeers> for Room {
         ctx: &mut Self::Context,
     ) {
         let member_id = &msg.0;
-        let member = self.participants.get_member_by_id(member_id).unwrap();
+        let member =
+            if let Some(m) = self.participants.get_member_by_id(member_id) {
+                m
+            } else {
+                error!(
+                    "Try to create necessary peers for nonexistent member \
+                     with ID {}. Room will be stopped.",
+                    member_id
+                );
+                ctx.notify(CloseRoom {});
+                return;
+            };
 
         // connect receivers
         let mut already_connected_members = Vec::new();
         if let Some(receivers) = self.sender_receivers.get(member_id) {
             for recv_member_id in receivers {
                 if self.participants.member_has_connection(recv_member_id) {
-                    let recv_member = self
-                        .participants
-                        .get_member_by_id(recv_member_id)
-                        .unwrap();
-                    already_connected_members.push(recv_member_id.clone());
-                    ctx.notify(CreatePeer {
-                        caller: recv_member.clone(),
-                        responder: member.clone(),
-                    });
+                    if let Some(recv_member) =
+                        self.participants.get_member_by_id(recv_member_id)
+                    {
+                        already_connected_members.push(recv_member_id.clone());
+                        ctx.notify(CreatePeer {
+                            caller: recv_member.clone(),
+                            responder: member.clone(),
+                        });
+                    } else {
+                        error!(
+                            "Try to create peer for nonexistent member with \
+                             ID {}. Room wil be stopped.",
+                            recv_member_id
+                        );
+                        ctx.notify(CloseRoom {});
+                    }
                 }
             }
         }
