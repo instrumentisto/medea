@@ -90,9 +90,10 @@ impl ParticipantService {
     /// [`Err(AuthorizationError::MemberNotExists)`] if lookup by [`MemberId`]
     /// failed. Returns [`Err(AuthorizationError::InvalidCredentials)`] if
     /// [`Member`] was found, but incorrect credentials was provided.
+    #[allow(clippy::ptr_arg)]
     pub fn get_member_by_id_and_credentials(
         &self,
-        member_id: &str,
+        member_id: &MemberId,
         credentials: &str,
     ) -> Result<&Member, AuthorizationError> {
         match self.members.get(member_id) {
@@ -108,7 +109,8 @@ impl ParticipantService {
     }
 
     /// Checks if [`Member`] has **active** [`RcpConnection`].
-    pub fn member_has_connection(&self, member_id: &str) -> bool {
+    #[allow(clippy::ptr_arg)]
+    pub fn member_has_connection(&self, member_id: &MemberId) -> bool {
         self.connections.contains_key(member_id)
             && !self.drop_connection_tasks.contains_key(member_id)
     }
@@ -190,10 +192,11 @@ impl ParticipantService {
     }
 
     /// Interconnect [`Peer`]s of members based on [`MemberSpec`].
+    #[allow(clippy::ptr_arg)]
     fn create_and_interconnect_members_peers(
         &mut self,
         ctx: &mut Context<Room>,
-        member_id: &str,
+        member_id: &MemberId,
     ) {
         let connected_member = if let Some(m) = self.members.get(member_id) {
             m
@@ -255,10 +258,11 @@ impl ParticipantService {
     /// If [`Member`] already has any other [`RpcConnection`],
     /// then it will be closed.
     /// Create and interconnect all necessary [`Member`]'s [`Peer`].
+    #[allow(clippy::ptr_arg)]
     pub fn connection_established(
         &mut self,
         ctx: &mut Context<Room>,
-        member_id: &str,
+        member_id: &MemberId,
         con: Box<dyn RpcConnection>,
     ) {
         // lookup previous member connection

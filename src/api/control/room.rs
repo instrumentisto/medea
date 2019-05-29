@@ -3,7 +3,7 @@
 use std::convert::TryFrom;
 
 use super::{
-    member::MemberSpec, pipeline::Pipeline, Entity, TryFromEntityError,
+    member::MemberSpec, pipeline::Pipeline, Entity, TryFromEntityError, MemberId,
 };
 
 /// ID of [`Room`].
@@ -24,9 +24,10 @@ impl RoomSpec {
     /// Return `None` if [`MemberSpec`] not presented in [`RoomSpec`].
     /// Return `Some(TryFromEntityError::NotMember)` if entity with this ID
     ///         finded but its not [`MemberSpec`].
+    #[allow(clippy::ptr_arg)]
     pub fn get_member(
         &self,
-        id: &str,
+        id: &MemberId,
     ) -> Option<Result<MemberSpec, TryFromEntityError>> {
         Some(MemberSpec::try_from(self.spec.pipeline.get(id).cloned()?))
     }

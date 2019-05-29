@@ -5,7 +5,7 @@ use hashbrown::HashMap;
 use std::convert::{TryFrom, TryInto};
 
 use crate::{
-    api::control::Member,
+    api::control::{Member, MemberId},
     media::{Peer, PeerId, PeerStateMachine},
     signalling::room::RoomError,
 };
@@ -116,14 +116,15 @@ impl PeerRepository {
     /// Returns [`Peer`] of specified [`Member`].
     ///
     /// Panic if [`Peer`] not exists.
+    #[allow(clippy::ptr_arg)]
     pub fn get_peers_by_member_id(
         &self,
-        member_id: &str,
+        member_id: &MemberId,
     ) -> Vec<&PeerStateMachine> {
         self.peers
             .iter()
             .filter_map(|(_, peer)| {
-                if peer.member_id() == member_id {
+                if peer.member_id().as_str() == member_id.as_str() {
                     Some(peer)
                 } else {
                     None

@@ -44,7 +44,7 @@ impl MemberSpec {
         self.spec
             .pipeline
             .iter()
-            .filter_map(|(_name, e)| match e {
+            .filter_map(|(_, e)| match e {
                 Entity::WebRtcPlayEndpoint { spec } => Some(spec),
                 _ => None,
             })
@@ -67,7 +67,7 @@ impl MemberSpec {
         self.spec
             .pipeline
             .iter()
-            .filter_map(|(_name, e)| match e {
+            .filter_map(|(_, e)| match e {
                 Entity::WebRtcPublishEndpoint { spec } => Some(spec),
                 _ => None,
             })
