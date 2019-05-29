@@ -36,10 +36,6 @@ impl RoomHandle {
             f.call_err(WasmErr::from_str("Detached state"));
         }
     }
-
-    pub fn get_transceiver(&self) {
-
-    }
 }
 
 /// Room handle being used by Rust external modules.
@@ -124,7 +120,6 @@ impl InnerRoom {
         self.on_local_media.set_func(f);
     }
 
-    /// Creates RTCPeerConnection with provided ID.
     fn on_peer_created(
         &mut self,
         peer_id: PeerId,
@@ -151,10 +146,11 @@ impl InnerRoom {
 
         let rpc = Rc::clone(&self.rpc);
         let peer_rc = Rc::clone(peer);
-        let process_sdp = {
-            match sdp_offer {
-                None => Either::A(
-                    peer.create_and_set_offer(true, true, false).and_then(
+        // sync provided tracks and process sdp
+        spawn_local(
+            peer.update_tracks(tracks, &self.media_manager)
+                .and_then(move |_| match sdp_offer {
+                    None => Either::A(peer_rc.create_and_set_offer().and_then(
                         move |sdp_offer: String| {
                             rpc.send_command(Command::MakeSdpOffer {
                                 peer_id,
@@ -162,25 +158,20 @@ impl InnerRoom {
                             });
                             Ok(())
                         },
+                    )),
+                    Some(offer) => Either::B(
+                        peer_rc
+                            .set_remote_description(Sdp::Offer(offer))
+                            .and_then(move |_| peer_rc.create_and_set_answer())
+                            .and_then(move |sdp_answer| {
+                                rpc.send_command(Command::MakeSdpAnswer {
+                                    peer_id,
+                                    sdp_answer,
+                                });
+                                Ok(())
+                            }),
                     ),
-                ),
-                Some(offer) => Either::B(
-                    peer.set_remote_description(Sdp::Offer(offer))
-                        .and_then(move |_| peer_rc.create_and_set_answer())
-                        .and_then(move |sdp_answer| {
-                            rpc.send_command(Command::MakeSdpAnswer {
-                                peer_id,
-                                sdp_answer,
-                            });
-                            Ok(())
-                        }),
-                ),
-            }
-        };
-
-        spawn_local(
-            peer.update_tracks(tracks, &self.media_manager)
-                .and_then(move |_| process_sdp)
+                })
                 .map_err(|err: WasmErr| {
                     err.log_err();
                 }),

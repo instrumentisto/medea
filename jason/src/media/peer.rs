@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::rc::Rc;
 use web_sys::{
-    MediaStreamTrack, RtcIceCandidateInit, RtcOfferOptions, RtcPeerConnection,
+    MediaStreamTrack, RtcIceCandidateInit, RtcPeerConnection,
     RtcPeerConnectionIceEvent, RtcRtpSender, RtcRtpTransceiver,
     RtcRtpTransceiverDirection, RtcRtpTransceiverInit, RtcSdpType,
     RtcSessionDescription, RtcSessionDescriptionInit,
@@ -58,17 +58,9 @@ impl PeerConnection {
 
     pub fn create_and_set_offer(
         &self,
-        receive_audio: bool,
-        receive_video: bool,
-        ice_restart: bool,
     ) -> impl Future<Item = String, Error = WasmErr> {
-        let mut opts = RtcOfferOptions::new();
-        opts.offer_to_receive_audio(receive_audio)
-            .offer_to_receive_video(receive_video)
-            .ice_restart(ice_restart);
-
         let inner = Rc::clone(&self.peer);
-        JsFuture::from(self.peer.create_offer_with_rtc_offer_options(&opts))
+        JsFuture::from(self.peer.create_offer())
             .map(RtcSessionDescription::from)
             .and_then(move |offer: RtcSessionDescription| {
                 let offer = offer.sdp();
@@ -192,7 +184,6 @@ impl PeerConnection {
                 }
             }
         }
-
         // if senders not empty, then get media from media manager and insert
         // tracks into transceivers
         if self.connections.borrow().senders.is_empty() {
@@ -234,8 +225,6 @@ impl PeerConnection {
             future::Either::A(get_media)
         }
     }
-
-    //    pub fn process_sdp(&self, )
 }
 
 /// Builds [`GetMediaRequest`] from peer senders. Currently allows only one

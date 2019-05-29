@@ -1,3 +1,5 @@
+
+
 async function f() {
     console.log(document);
     const rust = await import("../../pkg");
@@ -34,8 +36,8 @@ async function f() {
     // responder.dispose();
 }
 
-window.onload = function () {
-  f();
+window.onload = async function () {
+    await f();
 };
 
 
