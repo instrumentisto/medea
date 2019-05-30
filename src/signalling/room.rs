@@ -94,6 +94,7 @@ impl Room {
         let mut sender_receivers: HashMap<MemberId, Vec<MemberId>> =
             HashMap::new();
         for (member_id, member_entity) in &room_spec.spec.pipeline {
+            let member_id = MemberId(member_id.clone());
             let member = MemberSpec::try_from(member_entity.clone())?;
             for element_entity in member.spec.pipeline.values() {
                 let element = Element::try_from(element_entity.clone())?;
@@ -579,13 +580,13 @@ mod test {
             let stopped_clone = stopped.clone();
             Arbiter::start(move |_| TestConnection {
                 events: caller_events_clone,
-                member_id: "caller".to_string(),
+                member_id: MemberId(String::from("caller")),
                 room: room_clone,
                 stopped: stopped_clone,
             });
             Arbiter::start(move |_| TestConnection {
                 events: responder_events_clone,
-                member_id: "responder".to_string(),
+                member_id: MemberId(String::from("responder")),
                 room,
                 stopped,
             });

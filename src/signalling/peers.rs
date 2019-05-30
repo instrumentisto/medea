@@ -124,7 +124,7 @@ impl PeerRepository {
         self.peers
             .iter()
             .filter_map(|(_, peer)| {
-                if peer.member_id().as_str() == member_id.as_str() {
+                if &peer.member_id() == member_id {
                     Some(peer)
                 } else {
                     None

@@ -30,7 +30,9 @@ impl RoomSpec {
         &self,
         id: &MemberId,
     ) -> Option<Result<MemberSpec, TryFromEntityError>> {
-        Some(MemberSpec::try_from(self.spec.pipeline.get(id).cloned()?))
+        Some(MemberSpec::try_from(
+            self.spec.pipeline.get(&id.0).cloned()?,
+        ))
     }
 }
 

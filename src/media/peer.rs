@@ -347,7 +347,12 @@ mod test {
 
     #[test]
     fn create_peer() {
-        let peer = Peer::new(1, "1".to_string(), 2, "2".to_string());
+        let peer = Peer::new(
+            1,
+            MemberId(String::from("1")),
+            2,
+            MemberId(String::from("2")),
+        );
         let peer = peer.start();
 
         assert_eq!(peer.state, WaitLocalSdp {});

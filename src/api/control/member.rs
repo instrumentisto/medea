@@ -1,13 +1,22 @@
 //! Member definitions and implementations.
 
-use std::{convert::TryFrom, sync::Arc};
+use std::{convert::TryFrom, fmt::Display, sync::Arc};
+
+use serde::Deserialize;
 
 use super::{element::Element, pipeline::Pipeline, Entity, TryFromEntityError};
 
 use crate::api::control::element::{WebRtcPlayEndpoint, WebRtcPublishEndpoint};
 
 /// ID of [`Member`].
-pub type Id = String;
+#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq)]
+pub struct Id(pub String);
+
+impl Display for Id {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(fmt, "{}", self.0)
+    }
+}
 
 /// Media server user with its ID and credentials.
 #[derive(Debug, Clone)]
@@ -48,17 +57,6 @@ impl MemberSpec {
                 Entity::WebRtcPlayEndpoint { spec } => Some(spec),
                 _ => None,
             })
-            .collect()
-    }
-
-    /// Get all [`WebRtcPlayEndpoint`]s by ID of [`MemberSpec`].
-    pub fn get_play_endpoints_by_member_id(
-        &self,
-        src: &str,
-    ) -> Vec<&WebRtcPlayEndpoint> {
-        self.get_play_endpoints()
-            .into_iter()
-            .filter(|endpoint| endpoint.src.member_id == src)
             .collect()
     }
 

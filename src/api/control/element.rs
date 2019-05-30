@@ -1,11 +1,13 @@
 //! Control API specification Element definitions.
 
+use std::{convert::TryFrom, fmt};
+
 use serde::{
     de::{self, Deserializer, Error, Visitor},
     Deserialize,
 };
 
-use std::{convert::TryFrom, fmt};
+use crate::api::control::MemberId;
 
 use super::{Entity, TryFromEntityError};
 
@@ -62,7 +64,7 @@ pub struct LocalUri {
     // TODO: Why this field never used???
     pub room_id: String,
     /// ID of [`Member`]
-    pub member_id: String,
+    pub member_id: MemberId,
     /// Control ID of [`Element`]
     pub pipeline_id: String,
 }
@@ -128,7 +130,7 @@ impl<'de> Deserialize<'de> for LocalUri {
 
                 Ok(LocalUri {
                     room_id,
-                    member_id,
+                    member_id: MemberId(member_id),
                     pipeline_id,
                 })
             }
@@ -156,9 +158,12 @@ mod test {
         let local_uri: LocalUriTest =
             serde_json::from_str(valid_json_uri).unwrap();
 
-        assert_eq!(local_uri.src.member_id, "member_id".to_string());
-        assert_eq!(local_uri.src.room_id, "room_id".to_string());
-        assert_eq!(local_uri.src.pipeline_id, "pipeline_id".to_string());
+        assert_eq!(
+            local_uri.src.member_id,
+            MemberId(String::from("member_id"))
+        );
+        assert_eq!(local_uri.src.room_id, String::from("room_id"));
+        assert_eq!(local_uri.src.pipeline_id, String::from("pipeline_id"));
     }
 
     #[test]

@@ -64,9 +64,9 @@ impl ParticipantService {
                 let member_spec = MemberSpec::try_from(entity.clone()).unwrap();
 
                 (
-                    control_id.clone(),
+                    MemberId(control_id.clone()),
                     Member {
-                        id: control_id.clone(),
+                        id: MemberId(control_id.clone()),
                         spec: Arc::new(member_spec),
                     },
                 )
@@ -174,7 +174,6 @@ impl ParticipantService {
     /// Stores provided [`RpcConnection`] for given [`Member`] in the [`Room`].
     /// If [`Member`] already has any other [`RpcConnection`],
     /// then it will be closed.
-    #[allow(clippy::ptr_arg)]
     pub fn connection_established(
         &mut self,
         ctx: &mut Context<Room>,
@@ -195,7 +194,7 @@ impl ParticipantService {
         } else {
             debug!("Connected member: {}", member_id);
 
-            self.connections.insert(member_id.to_string(), con);
+            self.connections.insert(member_id.clone(), con);
         }
     }
 
