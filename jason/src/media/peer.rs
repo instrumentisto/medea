@@ -12,8 +12,9 @@ use crate::media::{GetMediaRequest, MediaManager};
 use crate::utils::{EventListener, WasmErr};
 use futures::future::join_all;
 use futures::future::IntoFuture;
+use futures::sync::mpsc::UnboundedSender;
 use futures::{future, Future};
-use protocol::{Direction, IceCandidate as IceDTO, MediaType, Track};
+use protocol::{Direction, IceCandidate as IceDto, MediaType, Track};
 use std::cell::RefCell;
 use wasm_bindgen_futures::JsFuture;
 
@@ -22,6 +23,48 @@ pub type Id = u64;
 pub enum Sdp {
     Offer(String),
     Answer(String),
+}
+
+pub enum PeerEvent {
+    IceCandidateDiscovered {
+        peer_id: Id,
+        ice: IceDto,
+    },
+    NewRemoteStream {
+        peer_id: Id,
+        remote_stream: Rc<MediaStream>,
+    },
+}
+
+#[allow(clippy::module_name_repetitions)]
+pub struct PeerRepository {
+    peers: HashMap<Id, Rc<PeerConnection>>,
+    peer_events_sender: UnboundedSender<PeerEvent>,
+}
+
+impl PeerRepository {
+    pub fn new(peer_events_sender: UnboundedSender<PeerEvent>) -> Self {
+        Self {
+            peers: HashMap::new(),
+            peer_events_sender,
+        }
+    }
+
+    // TODO: set ice_servers
+    pub fn create(&mut self, id: Id) -> Result<&Rc<PeerConnection>, WasmErr> {
+        let peer =
+            Rc::new(PeerConnection::new(id, self.peer_events_sender.clone())?);
+        self.peers.insert(id, peer);
+        Ok(self.peers.get(&id).unwrap())
+    }
+
+    pub fn get_peer(&self, id: Id) -> Option<&Rc<PeerConnection>> {
+        self.peers.get(&id)
+    }
+
+    pub fn remove(&mut self, id: Id) {
+        self.peers.remove(&id);
+    }
 }
 
 pub struct MediaConnections {
@@ -37,6 +80,7 @@ pub struct PeerConnection {
         Option<EventListener<RtcPeerConnection, RtcPeerConnectionIceEvent>>,
     >,
     connections: Rc<RefCell<MediaConnections>>,
+    peer_events_sender: UnboundedSender<PeerEvent>,
 }
 
 impl PeerConnection {
@@ -44,8 +88,11 @@ impl PeerConnection {
         self.id
     }
 
-    pub fn new(id: Id) -> Result<Self, WasmErr> {
-        Ok(Self {
+    pub fn new(
+        id: Id,
+        peer_events_sender: UnboundedSender<PeerEvent>,
+    ) -> Result<Self, WasmErr> {
+        let peer = Self {
             id,
             peer: Rc::new(RtcPeerConnection::new()?),
             on_ice_candidate: RefCell::new(None),
@@ -53,7 +100,33 @@ impl PeerConnection {
                 senders: HashMap::new(),
                 receivers: HashMap::new(),
             })),
-        })
+            peer_events_sender: peer_events_sender.clone(),
+        };
+
+        peer.on_ice_candidate
+            .borrow_mut()
+            .replace(EventListener::new_mut(
+                Rc::clone(&peer.peer),
+                "icecandidate",
+                move |msg: RtcPeerConnectionIceEvent| {
+                    // TODO: examine None candidates, maybe we should send them
+                    if let Some(candidate) = msg.candidate() {
+                        peer_events_sender.unbounded_send(
+                            PeerEvent::IceCandidateDiscovered {
+                                peer_id: id,
+                                ice: IceDto {
+                                    candidate: candidate.candidate(),
+                                    sdp_m_line_index: candidate
+                                        .sdp_m_line_index(),
+                                    sdp_mid: candidate.sdp_mid(),
+                                },
+                            },
+                        );
+                    }
+                },
+            )?);
+
+        Ok(peer)
     }
 
     pub fn create_and_set_offer(
@@ -116,7 +189,7 @@ impl PeerConnection {
 
     pub fn add_ice_candidate(
         &self,
-        candidate: &IceDTO,
+        candidate: &IceDto,
     ) -> impl Future<Item = (), Error = WasmErr> {
         // TODO: According to Web IDL, return value is void.
         //       It may be worth to propose PR to wasm-bindgen, that would
@@ -136,37 +209,11 @@ impl PeerConnection {
 
     pub fn on_remote_stream(&self) {}
 
-    pub fn on_ice_candidate<F>(&self, mut f: F) -> Result<(), WasmErr>
-    where
-        F: (FnMut(IceDTO)) + 'static,
-    {
-        self.on_ice_candidate
-            .borrow_mut()
-            .replace(EventListener::new_mut(
-                Rc::clone(&self.peer),
-                "icecandidate",
-                move |msg: RtcPeerConnectionIceEvent| {
-                    // TODO: examine None candidates, maybe we should send them
-                    if let Some(candidate) = msg.candidate() {
-                        let candidate = IceDTO {
-                            candidate: candidate.candidate(),
-                            sdp_m_line_index: candidate.sdp_m_line_index(),
-                            sdp_mid: candidate.sdp_mid(),
-                        };
-
-                        f(candidate);
-                    }
-                },
-            )?);
-
-        Ok(())
-    }
-
     pub fn update_tracks(
         &self,
         tracks: Vec<Track>,
         media_manager: &Rc<MediaManager>,
-    ) -> impl Future<Item = (), Error = WasmErr> {
+    ) -> impl Future<Item = (), Error = ()> {
         // insert peer transceivers
         for track in tracks {
             match track.direction {
@@ -184,6 +231,7 @@ impl PeerConnection {
                 }
             }
         }
+
         // if senders not empty, then get media from media manager and insert
         // tracks into transceivers
         if self.connections.borrow().senders.is_empty() {
@@ -197,6 +245,7 @@ impl PeerConnection {
             let connections = Rc::clone(&self.connections);
             let get_media = media_request
                 .into_future()
+                .map_err(|err| err.log_err())
                 .and_then(move |media_request| {
                     media_manager.get_stream(&media_request)
                 })
@@ -217,11 +266,10 @@ impl PeerConnection {
                                 .map_err(|err| WasmErr::from(err)),
                         );
                     }
-
                     join_all(promises)
+                        .map_err(|err| WasmErr::from(err).log_err())
                 })
                 .map(|_| ());
-
             future::Either::A(get_media)
         }
     }
@@ -233,14 +281,16 @@ fn build_get_media_request<'a>(
     senders: impl IntoIterator<Item = &'a Sender>,
 ) -> Result<GetMediaRequest, WasmErr> {
     let mut senders = senders.into_iter();
-    let audio = senders.any(|s| match s.media_type {
-        MediaType::Audio(_) => true,
-        MediaType::Video(_) => false,
-    });
+    let mut audio = false;
+    let mut video = false;
 
-    let video = senders.any(|s| match s.media_type {
-        MediaType::Audio(_) => false,
-        MediaType::Video(_) => true,
+    senders.for_each(|s| match s.media_type {
+        MediaType::Audio(_) => {
+            audio = true;
+        }
+        MediaType::Video(_) => {
+            video = true;
+        }
     });
 
     GetMediaRequest::new(audio, video)
@@ -321,28 +371,5 @@ impl Receiver {
 impl Drop for PeerConnection {
     fn drop(&mut self) {
         self.peer.close()
-    }
-}
-
-#[derive(Default)]
-#[allow(clippy::module_name_repetitions)]
-pub struct PeerRepository {
-    peers: HashMap<Id, Rc<PeerConnection>>,
-}
-
-impl PeerRepository {
-    // TODO: set ice_servers
-    pub fn create(&mut self, id: Id) -> Result<&Rc<PeerConnection>, WasmErr> {
-        let peer = Rc::new(PeerConnection::new(id)?);
-        self.peers.insert(id, peer);
-        Ok(self.peers.get(&id).unwrap())
-    }
-
-    pub fn get_peer(&self, id: Id) -> Option<&Rc<PeerConnection>> {
-        self.peers.get(&id)
-    }
-
-    pub fn remove(&mut self, id: Id) {
-        self.peers.remove(&id);
     }
 }

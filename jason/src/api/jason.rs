@@ -8,7 +8,11 @@ use wasm_bindgen_futures::future_to_promise;
 use std::{cell::RefCell, rc::Rc};
 
 use crate::{
-    api::room::Room, media::MediaManager, rpc::RPCClient, set_panic_hook,
+    api::room::Room,
+    media::{MediaManager, MediaStreamHandle},
+    rpc::RPCClient,
+    set_panic_hook,
+    utils::{Callback, WasmErr},
 };
 
 #[wasm_bindgen]
@@ -57,6 +61,10 @@ impl Jason {
             .map_err(JsValue::from);
 
         future_to_promise(fut)
+    }
+
+    pub fn on_local_stream(&self, f: js_sys::Function) {
+        self.0.borrow_mut().media_manager.on_local_stream(f);
     }
 
     /// Drops Jason and all related objects (Rooms, Connections, Streams etc. ).

@@ -4,8 +4,9 @@ use futures::future::Either;
 use futures::{
     future::{Future, IntoFuture},
     stream::Stream,
+    sync::mpsc::{unbounded, UnboundedReceiver, UnboundedSender},
 };
-use protocol::Command;
+use protocol::{Command, Direction};
 use protocol::{Event, IceCandidate, Track};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
@@ -15,11 +16,15 @@ use std::{
     rc::{Rc, Weak},
 };
 
+use crate::api::connection::Connection;
+use crate::media::PeerEvent;
 use crate::{
+    api::ConnectionHandle,
     media::{MediaManager, MediaStreamHandle, PeerId, PeerRepository, Sdp},
     rpc::RPCClient,
     utils::{Callback, WasmErr},
 };
+use std::collections::HashMap;
 
 #[allow(clippy::module_name_repetitions)]
 #[wasm_bindgen]
@@ -28,9 +33,9 @@ pub struct RoomHandle(Weak<RefCell<InnerRoom>>);
 
 #[wasm_bindgen]
 impl RoomHandle {
-    pub fn on_local_stream(&mut self, f: js_sys::Function) {
+    pub fn on_new_connection(&mut self, f: js_sys::Function) {
         if let Some(inner) = self.0.upgrade() {
-            inner.borrow_mut().on_local_media.set_func(f);
+            inner.borrow_mut().on_new_connection.set_func(f);
         } else {
             let f: Callback<i32, WasmErr> = f.into();
             f.call_err(WasmErr::from_str("Detached state"));
@@ -44,13 +49,14 @@ pub struct Room(Rc<RefCell<InnerRoom>>);
 impl Room {
     /// Creates new [`Room`] associating it with provided [`RpcClient`].
     pub fn new(rpc: &Rc<RPCClient>, media_manager: &Rc<MediaManager>) -> Self {
+        let (tx, rx) = unbounded();
         let room = Rc::new(RefCell::new(InnerRoom::new(
             Rc::clone(&rpc),
+            tx,
             Rc::clone(&media_manager),
         )));
 
         let inner = Rc::clone(&room);
-
         let process_msg_task = rpc
             .subscribe()
             .for_each(move |event| {
@@ -86,6 +92,24 @@ impl Room {
         // stop this stream is to drop all connected Senders.
         spawn_local(process_msg_task);
 
+        let inner = Rc::clone(&room);
+        let handle_peer_event = rx
+            .for_each(move |event| {
+                let mut inner = inner.borrow_mut();
+
+                match event {
+                    PeerEvent::IceCandidateDiscovered { peer_id, ice } => {
+                        inner.on_peer_ice_candidate_discovered(peer_id, ice);
+                    }
+                    PeerEvent::NewRemoteStream { .. } => {}
+                }
+                Ok(())
+            })
+            .into_future()
+            .then(|_| Ok(()));
+
+        spawn_local(handle_peer_event);
+
         Self(room)
     }
 
@@ -103,21 +127,36 @@ struct InnerRoom {
     rpc: Rc<RPCClient>,
     media_manager: Rc<MediaManager>,
     peers: PeerRepository,
-    on_local_media: Rc<Callback<MediaStreamHandle, WasmErr>>,
+    connections: HashMap<u64, Connection>,
+    on_new_connection: Rc<Callback<ConnectionHandle, WasmErr>>,
 }
 
 impl InnerRoom {
-    fn new(rpc: Rc<RPCClient>, media_manager: Rc<MediaManager>) -> Self {
+    fn new(
+        rpc: Rc<RPCClient>,
+        peer_events_sender: UnboundedSender<PeerEvent>,
+        media_manager: Rc<MediaManager>,
+    ) -> Self {
         Self {
             rpc,
             media_manager,
-            peers: PeerRepository::default(),
-            on_local_media: Rc::new(Callback::new()),
+            peers: PeerRepository::new(peer_events_sender),
+            connections: HashMap::new(),
+            on_new_connection: Rc::new(Callback::new()),
         }
     }
 
-    fn on_local_media(&self, f: js_sys::Function) {
-        self.on_local_media.set_func(f);
+    fn on_peer_ice_candidate_discovered(
+        &mut self,
+        peer_id: PeerId,
+        candidate: IceCandidate,
+    ) {
+        self.rpc
+            .send_command(Command::SetIceCandidate { peer_id, candidate });
+    }
+
+    fn on_new_connection(&self, f: js_sys::Function) {
+        self.on_new_connection.set_func(f);
     }
 
     fn on_peer_created(
@@ -126,6 +165,28 @@ impl InnerRoom {
         sdp_offer: Option<String>,
         tracks: Vec<Track>,
     ) {
+        let create_connection = |room: &mut InnerRoom, member_id: &u64| {
+            if !room.connections.contains_key(member_id) {
+                let con = Connection::new(*member_id);
+                room.on_new_connection.call_ok(con.new_handle());
+                room.connections.insert(*member_id, con);
+            }
+        };
+
+        // iterate through tracks and create all connections
+        for track in tracks.as_slice() {
+            match track.direction {
+                Direction::Send { ref receivers } => {
+                    for receiver in receivers {
+                        create_connection(self, receiver);
+                    }
+                }
+                Direction::Recv { ref sender } => {
+                    create_connection(self, sender);
+                }
+            }
+        }
+
         // Create peer
         let peer = match self.peers.create(peer_id) {
             Ok(peer) => peer,
@@ -135,21 +196,12 @@ impl InnerRoom {
             }
         };
 
-        // Bind onicecandidate
-        let rpc = Rc::clone(&self.rpc);
-        if let Err(err) = peer.on_ice_candidate(move |candidate| {
-            rpc.send_command(Command::SetIceCandidate { peer_id, candidate });
-        }) {
-            err.log_err();
-            return;
-        }
-
         let rpc = Rc::clone(&self.rpc);
         let peer_rc = Rc::clone(peer);
         // sync provided tracks and process sdp
-        spawn_local(
-            peer.update_tracks(tracks, &self.media_manager)
-                .and_then(move |_| match sdp_offer {
+        spawn_local(peer.update_tracks(tracks, &self.media_manager).and_then(
+            move |_| {
+                let fut = match sdp_offer {
                     None => Either::A(peer_rc.create_and_set_offer().and_then(
                         move |sdp_offer: String| {
                             rpc.send_command(Command::MakeSdpOffer {
@@ -171,11 +223,14 @@ impl InnerRoom {
                                 Ok(())
                             }),
                     ),
-                })
-                .map_err(|err: WasmErr| {
-                    err.log_err();
-                }),
-        );
+                };
+                fut.map_err(|err| err.log_err())
+            },
+        ));
+    }
+
+    fn asd(&mut self, id: u64) {
+        WasmErr::from_str("aha!").log_err();
     }
 
     /// Applies specified SDP Answer to specified RTCPeerConnection.

@@ -1,4 +1,4 @@
-use crate::utils::{window, WasmErr};
+use crate::utils::{window, Callback, WasmErr};
 use futures::future::{self, Either};
 use futures::Future;
 use std::cell::RefCell;
@@ -7,53 +7,9 @@ use wasm_bindgen::{prelude::*, JsValue};
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{MediaStream as BackingMediaStream, MediaStreamTrack};
 
-#[derive(Default)]
-pub struct MediaManager(Rc<RefCell<InnerMediaManager>>);
-
-#[derive(Default)]
-struct InnerMediaManager {
-    streams: Vec<Rc<MediaStream>>,
-}
-
-impl MediaManager {
-    pub fn get_stream(
-        &self,
-        request: &GetMediaRequest,
-    ) -> impl Future<Item = Rc<MediaStream>, Error = WasmErr> {
-        // TODO: lookup stream by its caps, return its copy
-
-        let stream = match self.inner_get_stream(request) {
-            Ok(promise) => JsFuture::from(promise),
-            Err(err) => return Either::A(future::err(err)),
-        };
-
-        let inner = Rc::clone(&self.0);
-        let fut = stream
-            .and_then(move |stream| {
-                let stream = MediaStream::new(BackingMediaStream::from(stream));
-                inner.borrow_mut().streams.push(Rc::clone(&stream));
-                Ok(stream)
-            })
-            .map_err(WasmErr::from);
-
-        Either::B(fut)
-    }
-
-    fn inner_get_stream(
-        &self,
-        caps: &GetMediaRequest,
-    ) -> Result<js_sys::Promise, WasmErr> {
-        window()
-            .navigator()
-            .media_devices()?
-            .get_user_media_with_constraints(&caps.into())
-            .map_err(WasmErr::from)
-    }
-}
-
 pub struct GetMediaRequest {
-    audio: bool,
-    video: bool,
+    pub audio: bool,
+    pub video: bool,
 }
 
 impl GetMediaRequest {

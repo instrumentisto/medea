@@ -8,6 +8,16 @@ pub struct Callback<T, E> {
     _phantom2: PhantomData<E>,
 }
 
+impl<T, E> Default for Callback<T, E> {
+    fn default() -> Self {
+        Self {
+            f: RefCell::new(None),
+            _phantom: PhantomData,
+            _phantom2: PhantomData,
+        }
+    }
+}
+
 impl<T: Into<JsValue>, E: Into<JsValue>> Callback<T, E> {
     pub fn new() -> Self {
         Self {
