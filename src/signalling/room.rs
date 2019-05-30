@@ -331,14 +331,14 @@ impl Handler<ConnectPeers> for Room {
 }
 
 #[derive(Debug, Message)]
-#[rtype(result = "Result<(), ()>")]
+#[rtype(result = "()")]
 pub struct CreatePeers {
     pub caller: Member,
     pub responder: Member,
 }
 
 impl Handler<CreatePeers> for Room {
-    type Result = Result<(), ()>;
+    type Result = ();
 
     /// Create [`Peer`] between members and interconnect it by control API spec.
     fn handle(
@@ -357,8 +357,6 @@ impl Handler<CreatePeers> for Room {
         ctx.notify(ConnectPeers(caller_peer_id, responder_peer_id));
 
         // println!("Peers: {:#?}", self.peers);
-
-        Ok(())
     }
 }
 
