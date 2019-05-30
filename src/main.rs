@@ -52,7 +52,7 @@ fn main() {
 #[derive(Debug, Fail)]
 enum ServerStartError {
     /// Duplicate room ID finded.
-    #[fail(display = "Duplicate of room ID '{}'", _0)]
+    #[fail(display = "Duplicate of room ID '{:?}'", _0)]
     DuplicateRoomId(RoomId),
 
     /// Some error happened while loading spec.
@@ -88,7 +88,7 @@ impl From<RoomError> for ServerStartError {
 /// if some error happened while creating room from spec.
 fn start_static_rooms(
     config: &Conf,
-) -> Result<HashMap<String, Addr<Room>>, ServerStartError> {
+) -> Result<HashMap<RoomId, Addr<Room>>, ServerStartError> {
     if let Some(static_specs_path) = config.server.static_specs_path.clone() {
         let room_specs = match load_static_specs_from_dir(static_specs_path) {
             Ok(r) => r,

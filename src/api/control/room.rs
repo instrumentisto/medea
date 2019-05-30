@@ -1,5 +1,6 @@
 //! Room definitions and implementations.
 
+use serde::Deserialize;
 use std::convert::TryFrom;
 
 use super::{
@@ -8,7 +9,8 @@ use super::{
 };
 
 /// ID of [`Room`].
-pub type Id = String;
+#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq)]
+pub struct Id(pub String);
 
 /// [`crate::signalling::room::Room`] specification.
 /// Newtype for [`Entity::Room`]
