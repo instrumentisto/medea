@@ -10,6 +10,9 @@ pub mod signalling;
 
 use actix::prelude::*;
 use dotenv::dotenv;
+use failure::Fail;
+use hashbrown::HashMap;
+
 use log::prelude::*;
 
 use crate::{
@@ -19,9 +22,6 @@ use crate::{
     signalling::room::RoomError,
     signalling::{room_repo::RoomsRepository, Room},
 };
-
-use failure::Fail;
-use hashbrown::HashMap;
 
 fn main() {
     dotenv().ok();
