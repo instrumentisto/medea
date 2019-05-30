@@ -108,10 +108,12 @@ pub fn enum_delegate(args: TokenStream, input: TokenStream) -> TokenStream {
 /// enum Event {
 ///     SomeEvent { new_bar: i32 },
 ///     AnotherEvent,
+///     UnnamedVariant(i32, i32),
 /// }
 ///
 /// struct Foo {
 ///     bar: i32,
+///     baz: i32,
 /// }
 /// ```
 ///
@@ -142,10 +144,12 @@ pub fn enum_delegate(args: TokenStream, input: TokenStream) -> TokenStream {
 /// # enum Event {
 /// #     SomeEvent { new_bar: i32 },
 /// #     AnotherEvent,
+/// #     UnnamedVariant(i32, i32),
 /// # }
 /// #
 /// # struct Foo {
 /// #     bar: i32,
+/// #     baz: i32,
 /// # }
 /// #
 /// impl EventHandler for Foo {
@@ -156,16 +160,11 @@ pub fn enum_delegate(args: TokenStream, input: TokenStream) -> TokenStream {
 ///     fn on_another_event(&mut self) {
 ///         self.bar = 2;
 ///     }
-/// }
 ///
-/// fn main() {
-///     let mut foo = Foo { bar: 0 };
-///
-///     Event::SomeEvent { new_bar: 1 }.dispatch(&mut foo);
-///     assert_eq!(foo.bar, 1);
-///
-///     Event::AnotherEvent.dispatch(&mut foo);
-///     assert_eq!(foo.bar, 2);
+///     fn on_unnamed_variant(&mut self, data: (i32, i32)) {
+///         self.bar = data.0;
+///         self.baz = data.1;
+///     }
 /// }
 /// ```
 ///
@@ -179,10 +178,12 @@ pub fn enum_delegate(args: TokenStream, input: TokenStream) -> TokenStream {
 /// # enum Event {
 /// #     SomeEvent { new_bar: i32 },
 /// #     AnotherEvent,
+/// #     UnnamedVariant(i32, i32),
 /// # }
 /// #
 /// # struct Foo {
 /// #     bar: i32,
+/// #     baz: i32,
 /// # }
 /// #
 /// # impl EventHandler for Foo {
@@ -193,16 +194,25 @@ pub fn enum_delegate(args: TokenStream, input: TokenStream) -> TokenStream {
 /// #    fn on_another_event(&mut self) {
 /// #        self.bar = 2;
 /// #    }
+/// #
+/// #    fn on_unnamed_variant(&mut self, data: (i32, i32)) {
+/// #        self.bar = data.0;
+/// #        self.baz = data.1;
+/// #    }
 /// # }
 ///
 /// fn main() {
-///     let mut foo = Foo { bar: 0 };
+///     let mut foo = Foo { bar: 0, baz: 0 };
 ///
 ///     Event::SomeEvent { new_bar: 1 }.dispatch(&mut foo);
 ///     assert_eq!(foo.bar, 1);
 ///
 ///     Event::AnotherEvent.dispatch(&mut foo);
 ///     assert_eq!(foo.bar, 2);
+///
+///     Event::UnnamedVariant(3, 3).dispatch(&mut foo);
+///     assert_eq!(foo.bar, 3);
+///     assert_eq!(foo.baz, 3);
 /// }
 /// ```
 #[proc_macro_attribute]

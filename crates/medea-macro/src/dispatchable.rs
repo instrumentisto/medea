@@ -1,30 +1,58 @@
-//! `#[derive(EventDispatcher)]` macro implementation.
+//! `#[dispatchable]` macro implementation.
 
 use proc_macro::TokenStream;
+use proc_macro2::Span;
 use quote::quote;
-use syn::{
-    parse::{Error, Result},
-    spanned::Spanned as _,
-};
+use syn::parse::Result;
 
-/// Variant of enum.
+/// Named variant of enum.
 #[derive(Clone)]
-struct MatchVariant {
+struct NamedVariant {
     /// Identifier of enum variant.
     ident: syn::Ident,
 
     /// Fields of enum variant.
-    fields: Vec<MatchVariantField>,
+    fields: Vec<NamedVariantField>,
 }
 
-/// Field of match variant.
+/// Field of [`NamedVariant`].
 #[derive(Clone)]
-struct MatchVariantField {
+struct NamedVariantField {
     /// Identifier of enum field.
     ident: syn::Ident,
 
     /// Type of enum field.
     ty: syn::Type,
+}
+
+/// Field of [`UnnamedVariant`].
+#[derive(Clone)]
+struct UnnamedVariantField {
+    /// Type of enum field.
+    ty: syn::Type,
+}
+
+/// Unnamed variant of enum.
+#[derive(Clone)]
+struct UnnamedVariant {
+    /// Identifier of enum variant.
+    ident: syn::Ident,
+
+    /// Fields of enum variant.
+    fields: Vec<UnnamedVariantField>,
+}
+
+/// Type of enum variant.
+///
+/// [`VariantType::Named`] - `SomeEnum::NamedVariant { field: i32 }`
+///
+/// [`VariantType::Named`] - `SomeEnum::EmptyVariant`
+///
+/// [`VariantType::Unnamed`] - `SomeEnum::UnnamedVariant(u32)`
+#[derive(Clone)]
+enum VariantType {
+    Named(NamedVariant),
+    Unnamed(UnnamedVariant),
 }
 
 /// Transform function name from `snake_case` to `camelCase` and add "on_"
@@ -45,48 +73,53 @@ fn to_handler_fn_name(event: &str) -> String {
     snake_case
 }
 
-/// Parse all [`MatchVariant`]s of provided enum.
-/// Support only named enum variants.
-///
-/// Returns error if enum have unnamed variant.
-fn parse_match_variants(
-    enum_input: syn::ItemEnum,
-) -> Result<Vec<MatchVariant>> {
+/// Parse all [`VariantType`]s of provided enum.
+fn parse_match_variants(enum_input: syn::ItemEnum) -> Vec<VariantType> {
     let mut match_variants = Vec::new();
 
     for v in enum_input.variants {
         let variant_ident = v.ident;
 
-        let fields: Vec<MatchVariantField> = match v.fields {
-            syn::Fields::Named(f) => f
-                .named
-                .into_iter()
-                .map(|f| MatchVariantField {
-                    ident: f.ident.unwrap(),
-                    ty: f.ty,
-                })
-                .collect(),
-            syn::Fields::Unit => Vec::new(),
+        match v.fields {
+            syn::Fields::Named(f) => {
+                let fields = f
+                    .named
+                    .into_iter()
+                    .map(|f| NamedVariantField {
+                        ident: f.ident.unwrap(),
+                        ty: f.ty,
+                    })
+                    .collect();
+                match_variants.push(VariantType::Named(NamedVariant {
+                    ident: variant_ident,
+                    fields,
+                }));
+            }
+            syn::Fields::Unit => {
+                match_variants.push(VariantType::Named(NamedVariant {
+                    ident: variant_ident,
+                    fields: Vec::new(),
+                }));
+            }
             syn::Fields::Unnamed(f) => {
-                return Err(Error::new(
-                    f.span(),
-                    "This macro not support unnamed enum variants!",
-                ));
+                let fields = f
+                    .unnamed
+                    .into_iter()
+                    .map(|f| UnnamedVariantField { ty: f.ty })
+                    .collect();
+
+                match_variants.push(VariantType::Unnamed(UnnamedVariant {
+                    ident: variant_ident,
+                    fields,
+                }));
             }
         };
-
-        let variant = MatchVariant {
-            ident: variant_ident,
-            fields,
-        };
-
-        match_variants.push(variant);
     }
 
-    Ok(match_variants)
+    match_variants
 }
 
-/// Generates the actual code for `#[derive(EventDispatcher)]` macro.
+/// Generates the actual code for `#[dispatchable]` macro.
 ///
 /// # Generation algorithm
 /// 1. parse variants of enum
@@ -107,49 +140,105 @@ pub fn derive(input: TokenStream) -> Result<TokenStream> {
     let item_enum: syn::ItemEnum = syn::parse(input)?;
     let enum_ident = item_enum.ident.clone();
 
-    let variants = parse_match_variants(item_enum)?;
+    let variants = parse_match_variants(item_enum);
     let trait_variants = variants.clone();
 
-    let variants = variants.into_iter().map(|v| {
+    let variants = variants.into_iter().map(|variant_type| {
         let enum_ident = enum_ident.clone();
-        let fields = v.fields;
-        let variant_ident = v.ident;
 
-        let fields_names = fields.into_iter().map(|f| f.ident);
+        match variant_type {
+            VariantType::Named(v) => {
+                let fields = v.fields;
+                let variant_ident = v.ident;
 
-        let handler_fn_name = to_handler_fn_name(&variant_ident.to_string());
-        let handler_fn_ident: syn::Ident =
-            syn::parse_str(&handler_fn_name).unwrap();
+                let fields_names = fields.into_iter().map(|f| f.ident);
 
-        let fields_output = quote! {
-            #(#fields_names,)*
-        };
+                let handler_fn_name =
+                    to_handler_fn_name(&variant_ident.to_string());
+                let handler_fn_ident: syn::Ident =
+                    syn::parse_str(&handler_fn_name).unwrap();
 
-        let match_body = quote! {
-            #enum_ident::#variant_ident {#fields_output} => {
-                handler.#handler_fn_ident(#fields_output)
-            },
-        };
+                let fields_output = quote! {
+                    #(#fields_names,)*
+                };
 
-        match_body
-    });
+                let match_body = quote! {
+                    #enum_ident::#variant_ident {#fields_output} => {
+                        handler.#handler_fn_ident(#fields_output)
+                    },
+                };
 
-    let trait_functions = trait_variants.into_iter().map(|v| {
-        let fn_name: syn::Ident =
-            syn::parse_str(&to_handler_fn_name(&v.ident.to_string())).unwrap();
-        let fn_args = v.fields.into_iter().map(|f| {
-            let ident = f.ident;
-            let tt = f.ty;
-            quote! {
-                #ident: #tt
+                match_body
             }
-        });
-        let fn_out = quote! {
-            fn #fn_name(&mut self, #(#fn_args,)*);
-        };
 
-        fn_out
+            VariantType::Unnamed(v) => {
+                let fields = v.fields;
+                let variant_ident = v.ident;
+
+                let tuple_fields_names =
+                    fields.iter().enumerate().map(|(i, _)| {
+                        syn::Ident::new(
+                            &format!("field_{}", i),
+                            Span::call_site(),
+                        )
+                    });
+
+                let handler_fn_name =
+                    to_handler_fn_name(&variant_ident.to_string());
+                let handler_fn_ident: syn::Ident =
+                    syn::parse_str(&handler_fn_name).unwrap();
+
+                let fields_output = quote! {
+                    #(#tuple_fields_names,)*
+                };
+
+                let match_body = quote! {
+                    #enum_ident::#variant_ident (#fields_output) => {
+                        handler.#handler_fn_ident((#fields_output))
+                    },
+                };
+
+                match_body
+            }
+        }
     });
+
+    let trait_functions =
+        trait_variants
+            .into_iter()
+            .map(|variant_type| match variant_type {
+                VariantType::Named(v) => {
+                    let fn_name: syn::Ident = syn::parse_str(
+                        &to_handler_fn_name(&v.ident.to_string()),
+                    )
+                    .unwrap();
+                    let fn_args = v.fields.into_iter().map(|f| {
+                        let ident = f.ident;
+                        let tt = f.ty;
+                        quote! {
+                            #ident: #tt
+                        }
+                    });
+                    let fn_out = quote! {
+                        fn #fn_name(&mut self, #(#fn_args,)*);
+                    };
+
+                    fn_out
+                }
+
+                VariantType::Unnamed(v) => {
+                    let fn_name: syn::Ident = syn::parse_str(
+                        &to_handler_fn_name(&v.ident.to_string()),
+                    )
+                    .unwrap();
+                    let fn_tuple_inner = v.fields.into_iter().map(|f| f.ty);
+                    let fn_out = quote! {
+                        fn #fn_name(&mut self, data: (#(#fn_tuple_inner,)*));
+                    };
+
+                    fn_out
+                }
+            });
 
     let handler_trait_ident: syn::Ident =
         syn::parse_str(&format!("{}Handler", enum_ident.to_string()))?;
