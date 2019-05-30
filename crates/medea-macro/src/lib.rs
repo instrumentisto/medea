@@ -98,8 +98,8 @@ pub fn enum_delegate(args: TokenStream, input: TokenStream) -> TokenStream {
 }
 
 /// This is macro for generating Handler trait based on
-/// some enum with named fields.
-/// ## Derive macro use
+/// some enum.
+/// ## Macro use
 /// ### 1. Declare enum for events and struct for data
 /// ```
 /// use medea_macro::dispatchable;
