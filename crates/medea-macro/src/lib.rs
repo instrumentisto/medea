@@ -6,8 +6,8 @@
 
 extern crate proc_macro;
 
+mod dispatchable;
 mod enum_delegate;
-mod event_dispatcher;
 
 use proc_macro::TokenStream;
 
@@ -102,9 +102,9 @@ pub fn enum_delegate(args: TokenStream, input: TokenStream) -> TokenStream {
 /// ## Derive macro use
 /// ### 1. Declare enum for events and struct for data
 /// ```
-/// use medea_macro::EventDispatcher;
+/// use medea_macro::dispatchable;
 ///
-/// #[derive(EventDispatcher)]
+/// #[dispatchable]
 /// enum Event {
 ///     SomeEvent { new_bar: i32 },
 ///     AnotherEvent,
@@ -136,9 +136,9 @@ pub fn enum_delegate(args: TokenStream, input: TokenStream) -> TokenStream {
 /// will be `on_some_enum_variant`.
 ///
 /// ```
-/// # use medea_macro::EventDispatcher;
+/// # use medea_macro::dispatchable;
 /// #
-/// # #[derive(EventDispatcher)]
+/// # #[dispatchable]
 /// # enum Event {
 /// #     SomeEvent { new_bar: i32 },
 /// #     AnotherEvent,
@@ -173,9 +173,9 @@ pub fn enum_delegate(args: TokenStream, input: TokenStream) -> TokenStream {
 /// You can use `dispatch()` on your event when you need it.
 ///
 /// ```
-/// # use medea_macro::EventDispatcher;
+/// # use medea_macro::dispatchable;
 /// #
-/// # #[derive(EventDispatcher)]
+/// # #[dispatchable]
 /// # enum Event {
 /// #     SomeEvent { new_bar: i32 },
 /// #     AnotherEvent,
@@ -205,8 +205,7 @@ pub fn enum_delegate(args: TokenStream, input: TokenStream) -> TokenStream {
 ///     assert_eq!(foo.bar, 2);
 /// }
 /// ```
-#[proc_macro_derive(EventDispatcher)]
-pub fn derive_event_dispatcher(input: TokenStream) -> TokenStream {
-    event_dispatcher::derive(input)
-        .unwrap_or_else(|e| e.to_compile_error().into())
+#[proc_macro_attribute]
+pub fn dispatchable(_: TokenStream, input: TokenStream) -> TokenStream {
+    dispatchable::derive(input).unwrap_or_else(|e| e.to_compile_error().into())
 }

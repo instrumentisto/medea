@@ -1,4 +1,4 @@
-use medea_macro::EventDispatcher;
+use medea_macro::dispatchable;
 use serde::{de::Deserializer, ser::Serializer, Deserialize, Serialize};
 
 // TODO: should be properly shared between medea and jason
@@ -44,8 +44,9 @@ pub enum Command {
 }
 
 /// WebSocket message from Medea to Jason.
+#[dispatchable]
 #[cfg_attr(feature = "medea", derive(Serialize))]
-#[cfg_attr(feature = "jason", derive(Deserialize, EventDispatcher))]
+#[cfg_attr(feature = "jason", derive(Deserialize))]
 #[cfg_attr(test, derive(PartialEq, Debug))]
 #[serde(tag = "event", content = "data")]
 #[allow(dead_code)]

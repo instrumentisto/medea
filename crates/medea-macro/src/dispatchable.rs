@@ -102,6 +102,8 @@ fn parse_match_variants(
 /// 5. generate function `dispatch<T: {enum_name}Handler>(self, handler: &T)`
 ///    with `match` that generated in step 2.3.
 pub fn derive(input: TokenStream) -> Result<TokenStream> {
+    let mut output = input.clone();
+
     let item_enum: syn::ItemEnum = syn::parse(input)?;
     let enum_ident = item_enum.ident.clone();
 
@@ -169,5 +171,7 @@ pub fn derive(input: TokenStream) -> Result<TokenStream> {
         }
     };
 
-    Ok(event_dispatch_impl.into())
+    output.extend(TokenStream::from(event_dispatch_impl));
+
+    Ok(output)
 }
