@@ -5,6 +5,7 @@
 /// ## Example
 ///
 /// ```rust
+/// # use medea::hashmap;
 /// let map = hashmap! {
 ///     "a" => 1,
 ///     "b" => 2,

@@ -1,5 +1,7 @@
 use serde::{de::Deserializer, ser::Serializer, Deserialize, Serialize};
 
+// TODO: Deal with #[cfg_attr(test, ...)] when running e2e tests.
+
 // TODO: should be properly shared between medea and jason
 #[cfg_attr(test, derive(PartialEq, Debug))]
 #[allow(dead_code)]
@@ -48,6 +50,7 @@ pub enum Command {
 #[cfg_attr(test, derive(PartialEq, Debug))]
 #[serde(tag = "event", content = "data")]
 #[allow(dead_code)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Event {
     /// Media Server notifies Web Client about necessity of RTCPeerConnection
     /// creation.
@@ -84,6 +87,7 @@ pub struct IceCandidate {
 #[cfg_attr(feature = "medea", derive(Serialize))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
 #[cfg_attr(test, derive(PartialEq, Debug))]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Track {
     pub id: u64,
     pub direction: Direction,
@@ -94,13 +98,14 @@ pub struct Track {
 #[cfg_attr(feature = "medea", derive(Serialize))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
 #[cfg_attr(test, derive(PartialEq, Debug))]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Direction {
     Send { receivers: Vec<u64> },
     Recv { sender: u64 },
 }
 
 /// Type of [`Track`].
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "medea", derive(Serialize))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
 #[cfg_attr(test, derive(PartialEq))]
@@ -109,13 +114,13 @@ pub enum MediaType {
     Video(VideoSettings),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "medea", derive(Serialize))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
 #[cfg_attr(test, derive(PartialEq))]
 pub struct AudioSettings {}
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "medea", derive(Serialize))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
 #[cfg_attr(test, derive(PartialEq))]

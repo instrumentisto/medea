@@ -269,6 +269,28 @@ impl Room {
             self.participants.send_event_to_member(to_member_id, event),
         )))
     }
+
+    fn create_peers(
+        &mut self,
+        to_create: Vec<(&Member, Member)>,
+        ctx: &mut <Self as Actor>::Context,
+    ) {
+        for p in to_create {
+            let caller = p.0;
+            let responder = p.1;
+            debug!(
+                "Created peer member {} with member {}",
+                caller.id, responder.id
+            );
+
+            let (caller_peer_id, responder_peer_id) =
+                self.peers.create_peers(caller, &responder);
+
+            ctx.notify(ConnectPeers(caller_peer_id, responder_peer_id));
+
+            // println!("Peers: {:#?}", self.peers);
+        }
+    }
 }
 
 /// [`Actor`] implementation that provides an ergonomic way
@@ -327,36 +349,6 @@ impl Handler<ConnectPeers> for Room {
                 Box::new(wrap_future(future::ok(())))
             }
         }
-    }
-}
-
-#[derive(Debug, Message)]
-#[rtype(result = "()")]
-pub struct CreatePeers {
-    pub caller: Member,
-    pub responder: Member,
-}
-
-impl Handler<CreatePeers> for Room {
-    type Result = ();
-
-    /// Create [`Peer`] between members and interconnect it by control API spec.
-    fn handle(
-        &mut self,
-        msg: CreatePeers,
-        ctx: &mut Self::Context,
-    ) -> Self::Result {
-        debug!(
-            "Created peer member {} with member {}",
-            msg.caller.id, msg.responder.id
-        );
-
-        let (caller_peer_id, responder_peer_id) =
-            self.peers.create_peers(&msg.caller, &msg.responder);
-
-        ctx.notify(ConnectPeers(caller_peer_id, responder_peer_id));
-
-        // println!("Peers: {:#?}", self.peers);
     }
 }
 
@@ -422,7 +414,7 @@ impl Handler<CreateNecessaryMemberPeers> for Room {
         let member_id = &msg.0;
         let member =
             if let Some(m) = self.participants.get_member_by_id(member_id) {
-                m
+                m.clone()
             } else {
                 error!(
                     "Try to create necessary peers for nonexistent member \
@@ -433,6 +425,8 @@ impl Handler<CreateNecessaryMemberPeers> for Room {
                 return;
             };
 
+        let mut need_create = Vec::new();
+
         // connect receivers
         let mut already_connected_members = Vec::new();
         if let Some(receivers) = self.sender_receivers.get(member_id) {
@@ -442,10 +436,7 @@ impl Handler<CreateNecessaryMemberPeers> for Room {
                         self.participants.get_member_by_id(recv_member_id)
                     {
                         already_connected_members.push(recv_member_id.clone());
-                        ctx.notify(CreatePeers {
-                            caller: recv_member.clone(),
-                            responder: member.clone(),
-                        });
+                        need_create.push((&member, recv_member.clone()));
                     } else {
                         error!(
                             "Try to create peer for nonexistent member with \
@@ -470,12 +461,11 @@ impl Handler<CreateNecessaryMemberPeers> for Room {
                     .participants
                     .get_member_by_id(sender_member_id)
                     .unwrap();
-                ctx.notify(CreatePeers {
-                    caller: sender_member.clone(),
-                    responder: member.clone(),
-                });
+                need_create.push((&member, sender_member.clone()));
             }
         }
+
+        self.create_peers(need_create, ctx);
     }
 }
 
@@ -539,131 +529,5 @@ impl Handler<RpcConnectionClosed> for Room {
 
         self.participants
             .connection_closed(ctx, msg.member_id, &msg.reason);
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use std::sync::{atomic::AtomicUsize, Arc, Mutex};
-
-    use actix::{Addr, Arbiter, System};
-    use medea_client_api_proto::{
-        AudioSettings, Direction, MediaType, Track, VideoSettings,
-    };
-
-    use crate::api::client::rpc_connection::test::TestConnection;
-    use crate::api::control;
-
-    use super::*;
-
-    fn start_room() -> Addr<Room> {
-        let room_spec =
-            control::load_from_yaml_file("./specs/pub_sub_room.yml").unwrap();
-        let client_room =
-            Room::new(&room_spec, Duration::from_secs(10)).unwrap();
-        Arbiter::start(move |_| client_room)
-    }
-
-    #[test]
-    fn start_signaling() {
-        let stopped = Arc::new(AtomicUsize::new(0));
-        let caller_events = Arc::new(Mutex::new(vec![]));
-        let caller_events_clone = Arc::clone(&caller_events);
-        let responder_events = Arc::new(Mutex::new(vec![]));
-        let responder_events_clone = Arc::clone(&responder_events);
-
-        System::run(move || {
-            let room = start_room();
-            let room_clone = room.clone();
-            let stopped_clone = stopped.clone();
-            Arbiter::start(move |_| TestConnection {
-                events: caller_events_clone,
-                member_id: MemberId(String::from("caller")),
-                room: room_clone,
-                stopped: stopped_clone,
-            });
-            Arbiter::start(move |_| TestConnection {
-                events: responder_events_clone,
-                member_id: MemberId(String::from("responder")),
-                room,
-                stopped,
-            });
-        });
-
-        let caller_events = caller_events.lock().unwrap();
-        let responder_events = responder_events.lock().unwrap();
-
-        let first_connected_member_events = vec![
-            serde_json::to_string(&Event::PeerCreated {
-                peer_id: 1,
-                sdp_offer: None,
-                tracks: vec![
-                    Track {
-                        id: 1,
-                        direction: Direction::Send { receivers: vec![2] },
-                        media_type: MediaType::Audio(AudioSettings {}),
-                    },
-                    Track {
-                        id: 2,
-                        direction: Direction::Send { receivers: vec![2] },
-                        media_type: MediaType::Video(VideoSettings {}),
-                    },
-                ],
-            })
-            .unwrap(),
-            serde_json::to_string(&Event::SdpAnswerMade {
-                peer_id: 1,
-                sdp_answer: "responder_answer".into(),
-            })
-            .unwrap(),
-            serde_json::to_string(&Event::IceCandidateDiscovered {
-                peer_id: 1,
-                candidate: IceCandidate {
-                    candidate: "ice_candidate".to_owned(),
-                    sdp_m_line_index: None,
-                    sdp_mid: None,
-                },
-            })
-            .unwrap(),
-        ];
-        let second_connected_member_events = vec![
-            serde_json::to_string(&Event::PeerCreated {
-                peer_id: 2,
-                sdp_offer: Some("caller_offer".into()),
-                tracks: vec![
-                    Track {
-                        id: 1,
-                        direction: Direction::Recv { sender: 1 },
-                        media_type: MediaType::Audio(AudioSettings {}),
-                    },
-                    Track {
-                        id: 2,
-                        direction: Direction::Recv { sender: 1 },
-                        media_type: MediaType::Video(VideoSettings {}),
-                    },
-                ],
-            })
-            .unwrap(),
-            serde_json::to_string(&Event::IceCandidateDiscovered {
-                peer_id: 2,
-                candidate: IceCandidate {
-                    candidate: "ice_candidate".to_owned(),
-                    sdp_m_line_index: None,
-                    sdp_mid: None,
-                },
-            })
-            .unwrap(),
-        ];
-
-        let caller_events = caller_events.to_vec();
-        let responder_events = responder_events.to_vec();
-
-        if caller_events != first_connected_member_events {
-            assert_eq!(caller_events, second_connected_member_events);
-        }
-
-        if responder_events != first_connected_member_events {
-            assert_eq!(responder_events, second_connected_member_events);
-        }
     }
 }
