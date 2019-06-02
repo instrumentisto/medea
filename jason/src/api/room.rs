@@ -57,7 +57,7 @@ impl Room {
         )));
 
         let inner = Rc::clone(&room);
-        let process_msg_task = rpc
+        let handle_medea_event = rpc
             .subscribe()
             .for_each(move |event| {
                 // TODO: macro for convenient dispatch
@@ -88,10 +88,6 @@ impl Room {
             .into_future()
             .then(|_| Ok(()));
 
-        // Spawns Promise in JS, does not provide any handles, so current way to
-        // stop this stream is to drop all connected Senders.
-        spawn_local(process_msg_task);
-
         let inner = Rc::clone(&room);
         let handle_peer_event = rx
             .for_each(move |event| {
@@ -108,6 +104,9 @@ impl Room {
             .into_future()
             .then(|_| Ok(()));
 
+        // Spawns Promise in JS, does not provide any handles, so current way to
+        // stop this stream is to drop all connected Senders.
+        spawn_local(handle_medea_event);
         spawn_local(handle_peer_event);
 
         Self(room)

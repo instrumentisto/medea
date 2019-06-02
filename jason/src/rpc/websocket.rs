@@ -4,7 +4,7 @@ use futures::future::{Future, IntoFuture};
 use protocol::{ClientMsg, ServerMsg};
 use web_sys::{CloseEvent, Event, MessageEvent, WebSocket as BackingSocket};
 
-use std::{cell::RefCell, convert::TryFrom, rc::Rc};
+use std::{cell::RefCell, convert::TryFrom, rc::Rc, thread};
 
 use crate::{
     rpc::CloseMsg,
@@ -71,6 +71,9 @@ impl InnerSocket {
 
     /// Checks underlying WebSocket state and updates socket_state.
     fn update_state(&mut self) {
+
+        println!("{:?}", thread::current());
+
         match State::try_from(self.socket.ready_state()) {
             Ok(new_state) => self.socket_state = new_state,
             Err(err) => {

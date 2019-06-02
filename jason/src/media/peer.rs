@@ -1,10 +1,11 @@
 use std::collections::HashMap;
 use std::rc::Rc;
+use web_sys::console;
 use web_sys::{
     MediaStreamTrack, RtcIceCandidateInit, RtcPeerConnection,
     RtcPeerConnectionIceEvent, RtcRtpSender, RtcRtpTransceiver,
     RtcRtpTransceiverDirection, RtcRtpTransceiverInit, RtcSdpType,
-    RtcSessionDescription, RtcSessionDescriptionInit,
+    RtcSessionDescription, RtcSessionDescriptionInit, RtcTrackEvent,
 };
 
 use crate::media::stream::MediaStream;
@@ -16,6 +17,7 @@ use futures::sync::mpsc::UnboundedSender;
 use futures::{future, Future};
 use protocol::{Direction, IceCandidate as IceDto, MediaType, Track};
 use std::cell::RefCell;
+use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::JsFuture;
 
 pub type Id = u64;
@@ -76,9 +78,9 @@ pub struct MediaConnections {
 pub struct PeerConnection {
     id: Id,
     peer: Rc<RtcPeerConnection>,
-    on_ice_candidate: RefCell<
-        Option<EventListener<RtcPeerConnection, RtcPeerConnectionIceEvent>>,
-    >,
+    on_ice_candidate:
+        EventListener<RtcPeerConnection, RtcPeerConnectionIceEvent>,
+    on_track: EventListener<RtcPeerConnection, RtcTrackEvent>,
     connections: Rc<RefCell<MediaConnections>>,
     peer_events_sender: UnboundedSender<PeerEvent>,
 }
@@ -92,41 +94,67 @@ impl PeerConnection {
         id: Id,
         peer_events_sender: UnboundedSender<PeerEvent>,
     ) -> Result<Self, WasmErr> {
-        let peer = Self {
+        let peer = Rc::new(RtcPeerConnection::new()?);
+
+        let sender = peer_events_sender.clone();
+        let on_ice_candidate = EventListener::new_mut(
+            Rc::clone(&peer),
+            "icecandidate",
+            move |msg: RtcPeerConnectionIceEvent| {
+                // TODO: examine None candidates, maybe we should send them
+                if let Some(candidate) = msg.candidate() {
+                    sender.unbounded_send(PeerEvent::IceCandidateDiscovered {
+                        peer_id: id,
+                        ice: IceDto {
+                            candidate: candidate.candidate(),
+                            sdp_m_line_index: candidate.sdp_m_line_index(),
+                            sdp_mid: candidate.sdp_mid(),
+                        },
+                    });
+                }
+            },
+        )?;
+
+        let connections = Rc::new(RefCell::new(MediaConnections {
+            senders: HashMap::new(),
+            receivers: HashMap::new(),
+        }));
+
+        let sender = peer_events_sender.clone();
+        let connections_rc = Rc::clone(&connections);
+        let peer_rc = Rc::clone(&peer);
+        let on_track = EventListener::new_mut(
+            Rc::clone(&peer_rc),
+            "track",
+            move |new_track: RtcTrackEvent| {
+                WasmErr::from_str("12345").log_err();
+//                console::error_1(&new_track);
+                console::error_1(&peer_rc.get_transceivers());
+
+
+
+//                let receivers: &HashMap<u64, Receiver> =
+//                    ;
+
+//                for receiver in &connections_rc.borrow().receivers {
+//                    WasmErr::from_str("asd").log_err();
+//                    let track: MediaStreamTrack =
+//                        receiver.1.transceiver.receiver().track();
+//                    console::error_1(&receiver.1.transceiver);
+
+
+//                }
+            },
+        )?;
+
+        Ok(Self {
             id,
-            peer: Rc::new(RtcPeerConnection::new()?),
-            on_ice_candidate: RefCell::new(None),
-            connections: Rc::new(RefCell::new(MediaConnections {
-                senders: HashMap::new(),
-                receivers: HashMap::new(),
-            })),
-            peer_events_sender: peer_events_sender.clone(),
-        };
-
-        peer.on_ice_candidate
-            .borrow_mut()
-            .replace(EventListener::new_mut(
-                Rc::clone(&peer.peer),
-                "icecandidate",
-                move |msg: RtcPeerConnectionIceEvent| {
-                    // TODO: examine None candidates, maybe we should send them
-                    if let Some(candidate) = msg.candidate() {
-                        peer_events_sender.unbounded_send(
-                            PeerEvent::IceCandidateDiscovered {
-                                peer_id: id,
-                                ice: IceDto {
-                                    candidate: candidate.candidate(),
-                                    sdp_m_line_index: candidate
-                                        .sdp_m_line_index(),
-                                    sdp_mid: candidate.sdp_mid(),
-                                },
-                            },
-                        );
-                    }
-                },
-            )?);
-
-        Ok(peer)
+            peer,
+            on_ice_candidate,
+            on_track,
+            connections,
+            peer_events_sender,
+        })
     }
 
     pub fn create_and_set_offer(
