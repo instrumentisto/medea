@@ -1,6 +1,8 @@
 //! Room definitions and implementations. Room is responsible for media
 //! connection establishment between concrete [`Member`]s.
 
+use std::{collections::HashMap as StdHashMap, time::Duration};
+
 use actix::{
     fut::wrap_future, Actor, ActorFuture, AsyncContext, Context, Handler,
     Message,
@@ -9,8 +11,6 @@ use failure::Fail;
 use futures::future;
 use hashbrown::HashMap;
 use protocol::{Command, Event, IceCandidate};
-
-use std::time::Duration;
 
 use crate::{
     api::{
@@ -22,8 +22,8 @@ use crate::{
     },
     log::prelude::*,
     media::{
-        New, Peer, PeerId, PeerStateError, PeerStateMachine,
-        WaitLocalHaveRemote, WaitLocalSdp, WaitRemoteSdp,
+        New, Peer, PeerError, PeerId, PeerStateMachine, WaitLocalHaveRemote,
+        WaitLocalSdp, WaitRemoteSdp,
     },
     signalling::{participants::ParticipantService, peers::PeerRepository},
 };
@@ -44,14 +44,16 @@ pub enum RoomError {
     #[fail(display = "Unable to send event to Member [id = {}]", _0)]
     UnableToSendEvent(MemberId),
     #[fail(display = "PeerError: {}", _0)]
-    PeerStateError(PeerStateError),
+    PeerError(PeerError),
     #[fail(display = "Generic room error {}", _0)]
     BadRoomSpec(String),
+    #[fail(display = "Client error:{}", _0)]
+    ClientError(String),
 }
 
-impl From<PeerStateError> for RoomError {
-    fn from(err: PeerStateError) -> Self {
-        RoomError::PeerStateError(err)
+impl From<PeerError> for RoomError {
+    fn from(err: PeerError) -> Self {
+        RoomError::PeerError(err)
     }
 }
 
@@ -133,9 +135,17 @@ impl Room {
         &mut self,
         from_peer_id: PeerId,
         sdp_offer: String,
+        mids: Option<StdHashMap<u64, String>>,
     ) -> Result<ActFuture<(), RoomError>, RoomError> {
-        let from_peer: Peer<WaitLocalSdp> =
+        let mut from_peer: Peer<WaitLocalSdp> =
             self.peers.take_inner_peer(from_peer_id)?;
+
+        if from_peer.is_sender() {
+            from_peer.set_mids(mids.ok_or(RoomError::ClientError(
+                format!("Peer is sender but did not provide any mids"),
+            ))?)?;
+        }
+
         let to_peer_id = from_peer.partner_peer_id();
         let to_peer: Peer<New> = self.peers.take_inner_peer(to_peer_id)?;
 
@@ -164,9 +174,17 @@ impl Room {
         &mut self,
         from_peer_id: PeerId,
         sdp_answer: String,
+        mids: Option<StdHashMap<u64, String>>,
     ) -> Result<ActFuture<(), RoomError>, RoomError> {
-        let from_peer: Peer<WaitLocalHaveRemote> =
+        let mut from_peer: Peer<WaitLocalHaveRemote> =
             self.peers.take_inner_peer(from_peer_id)?;
+
+        if from_peer.is_sender() {
+            from_peer.set_mids(mids.ok_or(RoomError::ClientError(
+                format!("Peer is sender but did not provide any mids"),
+            ))?)?;
+        }
+
         let to_peer_id = from_peer.partner_peer_id();
         let to_peer: Peer<WaitRemoteSdp> =
             self.peers.take_inner_peer(to_peer_id)?;
@@ -178,6 +196,7 @@ impl Room {
         let event = Event::SdpAnswerMade {
             peer_id: to_peer_id,
             sdp_answer,
+            mids: from_peer.get_mids()?,
         };
 
         self.peers.add_peer(from_peer_id, from_peer);
@@ -197,7 +216,7 @@ impl Room {
     ) -> Result<ActFuture<(), RoomError>, RoomError> {
         let from_peer = self.peers.get_peer(from_peer_id)?;
         if let PeerStateMachine::New(_) = from_peer {
-            return Err(RoomError::PeerStateError(PeerStateError::WrongState(
+            return Err(RoomError::PeerError(PeerError::WrongState(
                 from_peer_id,
                 "Not New",
                 format!("{}", from_peer),
@@ -207,7 +226,7 @@ impl Room {
         let to_peer_id = from_peer.partner_peer_id();
         let to_peer = self.peers.get_peer(to_peer_id)?;
         if let PeerStateMachine::New(_) = to_peer {
-            return Err(RoomError::PeerStateError(PeerStateError::WrongState(
+            return Err(RoomError::PeerError(PeerError::WrongState(
                 to_peer_id,
                 "Not New",
                 format!("{}", to_peer),
@@ -296,13 +315,16 @@ impl Handler<CommandMessage> for Room {
         ctx: &mut Self::Context,
     ) -> Self::Result {
         let result = match msg.into() {
-            Command::MakeSdpOffer { peer_id, sdp_offer } => {
-                self.handle_make_sdp_offer(peer_id, sdp_offer)
-            }
+            Command::MakeSdpOffer {
+                peer_id,
+                sdp_offer,
+                mids,
+            } => self.handle_make_sdp_offer(peer_id, sdp_offer, mids),
             Command::MakeSdpAnswer {
                 peer_id,
                 sdp_answer,
-            } => self.handle_make_sdp_answer(peer_id, sdp_answer),
+                mids,
+            } => self.handle_make_sdp_answer(peer_id, sdp_answer, mids),
             Command::SetIceCandidate { peer_id, candidate } => {
                 self.handle_set_ice_candidate(peer_id, candidate)
             }

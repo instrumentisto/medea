@@ -2,6 +2,11 @@
 //!
 //! [1]: https://www.w3.org/TR/mediacapture-streams/#mediastreamtrack
 
+use std::{
+    cell::RefCell,
+    sync::Mutex
+};
+
 use protocol::MediaType;
 
 /// ID of [`Track`].
@@ -12,12 +17,25 @@ pub type Id = u64;
 #[allow(clippy::module_name_repetitions)]
 pub struct MediaTrack {
     pub id: Id,
+    mid: Mutex<RefCell<Option<String>>>,
     pub media_type: MediaType,
 }
 
 impl MediaTrack {
     /// Creates new [`Track`] of the specified type.
     pub fn new(id: Id, media_type: MediaType) -> Self {
-        Self { id, media_type }
+        Self {
+            id,
+            mid: Mutex::new(RefCell::new(None)),
+            media_type,
+        }
+    }
+
+    pub fn set_mid(&self, mid: String) {
+        self.mid.lock().unwrap().borrow_mut().replace(mid);
+    }
+
+    pub fn mid(&self) -> Option<String> {
+        self.mid.lock().unwrap().borrow().as_ref().cloned()
     }
 }

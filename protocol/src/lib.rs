@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use serde::{de::Deserializer, ser::Serializer, Deserialize, Serialize};
 
 // TODO: should be properly shared between medea and jason
@@ -31,9 +33,17 @@ pub enum ClientMsg {
 #[allow(dead_code)]
 pub enum Command {
     /// Web Client sends SDP Offer.
-    MakeSdpOffer { peer_id: u64, sdp_offer: String },
+    MakeSdpOffer {
+        peer_id: u64,
+        sdp_offer: String,
+        mids: Option<HashMap<u64, String>>,
+    },
     /// Web Client sends SDP Answer.
-    MakeSdpAnswer { peer_id: u64, sdp_answer: String },
+    MakeSdpAnswer {
+        peer_id: u64,
+        sdp_answer: String,
+        mids: Option<HashMap<u64, String>>,
+    },
     /// Web Client sends Ice Candidate.
     SetIceCandidate {
         peer_id: u64,
@@ -56,7 +66,11 @@ pub enum Event {
     },
     /// Media Server notifies Web Client about necessity to apply specified SDP
     /// Answer to Web Client's RTCPeerConnection.
-    SdpAnswerMade { peer_id: u64, sdp_answer: String },
+    SdpAnswerMade {
+        peer_id: u64,
+        sdp_answer: String,
+        mids: Option<HashMap<u64, String>>,
+    },
 
     /// Media Server notifies Web Client about necessity to apply specified
     /// ICE Candidate.
@@ -92,7 +106,7 @@ pub struct Track {
 #[cfg_attr(test, derive(PartialEq, Debug))]
 pub enum Direction {
     Send { receivers: Vec<u64> },
-    Recv { sender: u64 },
+    Recv { sender: u64, mid: Option<String> },
 }
 
 /// Type of [`Track`].

@@ -8,6 +8,7 @@
 
         var socket;
         var pcs = {};
+        var transceivers = [];
 
         function connectSocket(caller) {
             let role = caller ? "1/caller_credentials" : "2/responder_credentials";
@@ -36,6 +37,19 @@
             }
         }
 
+        function get_mids() {
+
+            var mids = {};
+            console.log(transceivers);
+            transceivers.forEach(function (v, i) {
+                if (v != undefined) {
+                    mids[i] = v.mid;
+                }
+            });
+
+            return mids;
+        }
+
         async function handlePeerCreated(msg) {
 
             pcs[msg.peer_id] = new RTCPeerConnection();
@@ -44,45 +58,27 @@
 
             var sendAudio = false;
             var sendVideo = false;
-            var transceivers = [];
 
             msg.tracks.forEach((track) => {
 
                 var transceiver;
-                if (track.media_type.Audio != undefined) {
-                    if (track.direction.Send != undefined) {
+                if (track.direction.Send != undefined) {
+
+                    if (track.media_type.Audio != undefined) {
                         sendAudio = true;
                         transceiver = pc.addTransceiver("audio", {
-                            direction:"sendonly"
+                            direction: "sendonly"
                         })
-                    }
-                    if (track.direction.Recv != undefined) {
-                        transceiver = pc.addTransceiver("audio", {
-                            direction:"recvonly"
-                        })
-                    }
-                }
-                if (track.media_type.Video != undefined) {
-                    if (track.direction.Send != undefined) {
+                    } else {
                         sendVideo = true;
                         transceiver = pc.addTransceiver("video", {
-                            direction:"sendonly"
-                        })
-                    }
-                    if (track.direction.Recv != undefined) {
-                        transceiver = pc.addTransceiver("video", {
-                            direction:"recvonly"
+                            direction: "sendonly"
                         })
                     }
                 }
 
                 transceivers[track.id] = transceiver;
             });
-
-            console.log("1");
-            console.log(pc.getTransceivers());
-
-
 
             pc.ontrack = function (e) {
                 console.log(e);
@@ -111,28 +107,27 @@
             if (msg.sdp_offer != undefined && msg.sdp_offer != null) {
                 pc.setRemoteDescription(new RTCSessionDescription(JSON.parse(msg.sdp_offer)));
                 var answer = await pc.createAnswer();
-                pc.setLocalDescription(answer);
+                await pc.setLocalDescription(answer);
 
-
-                console.log("2");
-                console.log(pc.getTransceivers());
-                // socket.send(JSON.stringify({
-                //     command: "MakeSdpAnswer",
-                //     data: {
-                //         peer_id: msg.peer_id,
-                //         sdp_answer: JSON.stringify(answer)
-                //     }
-                // }));
+                socket.send(JSON.stringify({
+                    command: "MakeSdpAnswer",
+                    data: {
+                        peer_id: msg.peer_id,
+                        sdp_answer: JSON.stringify(answer),
+                        mids: get_mids()
+                    }
+                }));
             } else {
                 var offer = await pc.createOffer();
-                pc.setLocalDescription(offer);
-                // socket.send(JSON.stringify({
-                //     command: "MakeSdpOffer",
-                //     data: {
-                //         peer_id: msg.peer_id,
-                //         sdp_offer: JSON.stringify(offer)
-                //     }
-                // }));
+                await pc.setLocalDescription(offer);
+                socket.send(JSON.stringify({
+                    command: "MakeSdpOffer",
+                    data: {
+                        peer_id: msg.peer_id,
+                        sdp_offer: JSON.stringify(offer),
+                        mids: get_mids()
+                    }
+                }));
             }
 
             pc.onicecandidate = function (e) {
