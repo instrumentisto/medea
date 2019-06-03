@@ -4,9 +4,9 @@ mod event_listener;
 
 use web_sys::Window;
 
-pub use self::callback::Callback;
-pub use self::errors::WasmErr;
-pub use self::event_listener::EventListener;
+pub use self::{
+    callback::Callback, errors::WasmErr, event_listener::EventListener,
+};
 
 /// Returns [`window`] object. Panics if unable to access it.
 pub fn window() -> Window {

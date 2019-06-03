@@ -2,17 +2,22 @@
 mod peer;
 mod stream;
 
-pub use self::peer::{
-    Id as PeerId, PeerConnection, PeerEvent, PeerRepository, Sdp,
+use std::{cell::RefCell, rc::Rc};
+
+use futures::{
+    future::{self, Either},
+    Future,
 };
-pub use self::stream::{GetMediaRequest, MediaStream, MediaStreamHandle};
-use crate::utils::{window, Callback, WasmErr};
-use futures::future::Either;
-use futures::{future, Future};
-use std::cell::RefCell;
-use std::rc::Rc;
+
 use wasm_bindgen_futures::JsFuture;
 use web_sys::MediaStream as BackingMediaStream;
+
+use crate::utils::{window, Callback, WasmErr};
+
+pub use self::{
+    peer::{Id as PeerId, PeerConnection, PeerEvent, PeerRepository, Sdp},
+    stream::{GetMediaRequest, MediaStream, MediaStreamHandle},
+};
 
 #[derive(Default)]
 #[allow(clippy::module_name_repetitions)]

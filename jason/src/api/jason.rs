@@ -1,11 +1,12 @@
 //! Main application handler. Responsible for managing shared transports,
 //! local media, room initialization.
+
+use std::{cell::RefCell, rc::Rc};
+
 use futures::future::Future;
 use js_sys::Promise;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::future_to_promise;
-
-use std::{cell::RefCell, rc::Rc};
 
 use crate::{
     api::room::Room, media::MediaManager, rpc::RPCClient, set_panic_hook,
