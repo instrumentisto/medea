@@ -2,10 +2,7 @@
 //!
 //! [1]: https://www.w3.org/TR/mediacapture-streams/#mediastreamtrack
 
-use std::{
-    cell::RefCell,
-    sync::Mutex
-};
+use std::{cell::RefCell, sync::Mutex};
 
 use protocol::MediaType;
 
