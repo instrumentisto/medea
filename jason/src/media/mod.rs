@@ -12,9 +12,10 @@ use futures::{future, Future};
 use std::cell::RefCell;
 use std::rc::Rc;
 use wasm_bindgen_futures::JsFuture;
-use web_sys::{MediaStream as BackingMediaStream, MediaStreamTrack};
+use web_sys::MediaStream as BackingMediaStream;
 
 #[derive(Default)]
+#[allow(clippy::module_name_repetitions)]
 pub struct MediaManager(Rc<RefCell<InnerMediaManager>>);
 
 #[derive(Default)]
@@ -41,7 +42,8 @@ impl MediaManager {
         let inner: Rc<RefCell<InnerMediaManager>> = Rc::clone(&self.0);
         let fut = stream.then(move |res| match res {
             Ok(stream) => {
-                let stream = MediaStream::new(BackingMediaStream::from(stream));
+                let stream =
+                    MediaStream::from_stream(BackingMediaStream::from(stream));
                 inner.borrow_mut().streams.push(Rc::clone(&stream));
                 inner.borrow().on_local_stream.call_ok(stream.new_handle());
                 Ok(stream)

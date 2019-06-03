@@ -71,7 +71,6 @@ impl InnerSocket {
 
     /// Checks underlying WebSocket state and updates socket_state.
     fn update_state(&mut self) {
-
         println!("{:?}", thread::current());
 
         match State::try_from(self.socket.ready_state()) {

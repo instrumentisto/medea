@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use std::rc::Rc;
-use web_sys::console;
 use web_sys::{
     MediaStreamTrack, RtcIceCandidateInit, RtcPeerConnection,
     RtcPeerConnectionIceEvent, RtcRtpSender, RtcRtpTransceiver,
@@ -11,13 +10,13 @@ use web_sys::{
 use crate::media::stream::MediaStream;
 use crate::media::{GetMediaRequest, MediaManager};
 use crate::utils::{EventListener, WasmErr};
+
 use futures::future::join_all;
 use futures::future::IntoFuture;
 use futures::sync::mpsc::UnboundedSender;
 use futures::{future, Future};
 use protocol::{Direction, IceCandidate as IceDto, MediaType, Track};
 use std::cell::RefCell;
-use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::JsFuture;
 
 pub type Id = u64;
@@ -27,6 +26,7 @@ pub enum Sdp {
     Answer(String),
 }
 
+#[allow(clippy::module_name_repetitions)]
 pub enum PeerEvent {
     IceCandidateDiscovered {
         peer_id: Id,
@@ -34,6 +34,7 @@ pub enum PeerEvent {
     },
     NewRemoteStream {
         peer_id: Id,
+        sender_id: u64,
         remote_stream: Rc<MediaStream>,
     },
 }
@@ -54,8 +55,7 @@ impl PeerRepository {
 
     // TODO: set ice_servers
     pub fn create(&mut self, id: Id) -> Result<&Rc<PeerConnection>, WasmErr> {
-        let peer =
-            Rc::new(PeerConnection::new(id, self.peer_events_sender.clone())?);
+        let peer = Rc::new(PeerConnection::new(id, &self.peer_events_sender)?);
         self.peers.insert(id, peer);
         Ok(self.peers.get(&id).unwrap())
     }
@@ -69,32 +69,68 @@ impl PeerRepository {
     }
 }
 
-pub struct MediaConnections {
+struct MediaConnections {
     senders: HashMap<u64, Sender>,
     receivers: HashMap<u64, Receiver>,
 }
 
+// update Receiver associated with provided track by transceiver's mid, find
+// track sender
+impl MediaConnections {
+    pub fn add_track(&mut self, track_event: &RtcTrackEvent) -> Option<u64> {
+        let transceiver = track_event.transceiver();
+        // should be safe to unwrap
+        let mid = transceiver.mid().unwrap();
+
+        let mut sender: Option<u64> = None;
+        for receiver in &mut self.receivers.values_mut() {
+            if let Some(recv_mid) = &receiver.mid {
+                if recv_mid == &mid {
+                    let track = track_event.track();
+                    receiver.transceiver.replace(transceiver);
+                    receiver.track.replace(track);
+                    sender = Some(receiver.sender_id);
+                    break;
+                }
+            }
+        }
+
+        sender
+    }
+
+    pub fn get_by_sender(
+        &mut self,
+        sender_id: u64,
+    ) -> impl Iterator<Item = &mut Receiver> {
+        self.receivers.iter_mut().filter_map(move |(_, receiver)| {
+            if receiver.sender_id == sender_id {
+                Some(receiver)
+            } else {
+                None
+            }
+        })
+    }
+}
+
 #[allow(clippy::module_name_repetitions)]
 pub struct PeerConnection {
-    id: Id,
     peer: Rc<RtcPeerConnection>,
-    on_ice_candidate:
+    _on_ice_candidate:
         EventListener<RtcPeerConnection, RtcPeerConnectionIceEvent>,
-    on_track: EventListener<RtcPeerConnection, RtcTrackEvent>,
+    _on_track: EventListener<RtcPeerConnection, RtcTrackEvent>,
     connections: Rc<RefCell<MediaConnections>>,
-    peer_events_sender: UnboundedSender<PeerEvent>,
 }
 
 impl PeerConnection {
-    pub fn id(&self) -> Id {
-        self.id
-    }
-
     pub fn new(
-        id: Id,
-        peer_events_sender: UnboundedSender<PeerEvent>,
+        peer_id: Id,
+        peer_events_sender: &UnboundedSender<PeerEvent>,
     ) -> Result<Self, WasmErr> {
         let peer = Rc::new(RtcPeerConnection::new()?);
+        let connections = Rc::new(RefCell::new(MediaConnections {
+            senders: HashMap::new(),
+            receivers: HashMap::new(),
+        }));
 
         let sender = peer_events_sender.clone();
         let on_ice_candidate = EventListener::new_mut(
@@ -103,58 +139,77 @@ impl PeerConnection {
             move |msg: RtcPeerConnectionIceEvent| {
                 // TODO: examine None candidates, maybe we should send them
                 if let Some(candidate) = msg.candidate() {
-                    sender.unbounded_send(PeerEvent::IceCandidateDiscovered {
-                        peer_id: id,
-                        ice: IceDto {
-                            candidate: candidate.candidate(),
-                            sdp_m_line_index: candidate.sdp_m_line_index(),
-                            sdp_mid: candidate.sdp_mid(),
+                    let _ = sender.unbounded_send(
+                        PeerEvent::IceCandidateDiscovered {
+                            peer_id,
+                            ice: IceDto {
+                                candidate: candidate.candidate(),
+                                sdp_m_line_index: candidate.sdp_m_line_index(),
+                                sdp_mid: candidate.sdp_mid(),
+                            },
                         },
+                    );
+                }
+            },
+        )?;
+
+        let sender = peer_events_sender.clone();
+        let connections_rc = Rc::clone(&connections);
+        let on_track = EventListener::new_mut(
+            Rc::clone(&peer),
+            "track",
+            move |track_event: RtcTrackEvent| {
+                let mut connections = connections_rc.borrow_mut();
+
+                if let Some(sender_id) = connections.add_track(&track_event) {
+                    let mut tracks: Vec<&MediaStreamTrack> = Vec::new();
+                    for receiver in connections.get_by_sender(sender_id) {
+                        match receiver.track {
+                            None => return,
+                            Some(ref track) => tracks.push(track),
+                        }
+                    }
+
+                    // build and set MediaStream in receivers
+                    let stream = MediaStream::from_tracks(&tracks);
+                    for receiver in connections.get_by_sender(sender_id) {
+                        let stream = Rc::clone(&stream);
+                        receiver.stream.replace(stream);
+                    }
+
+                    let _ = sender.unbounded_send(PeerEvent::NewRemoteStream {
+                        peer_id,
+                        sender_id,
+                        remote_stream: Rc::clone(&stream),
                     });
                 }
             },
         )?;
 
-        let connections = Rc::new(RefCell::new(MediaConnections {
-            senders: HashMap::new(),
-            receivers: HashMap::new(),
-        }));
-
-        let sender = peer_events_sender.clone();
-        let connections_rc = Rc::clone(&connections);
-        let peer_rc = Rc::clone(&peer);
-        let on_track = EventListener::new_mut(
-            Rc::clone(&peer_rc),
-            "track",
-            move |new_track: RtcTrackEvent| {
-                WasmErr::from_str("12345").log_err();
-//                console::error_1(&new_track);
-                console::error_1(&peer_rc.get_transceivers());
-
-
-
-//                let receivers: &HashMap<u64, Receiver> =
-//                    ;
-
-//                for receiver in &connections_rc.borrow().receivers {
-//                    WasmErr::from_str("asd").log_err();
-//                    let track: MediaStreamTrack =
-//                        receiver.1.transceiver.receiver().track();
-//                    console::error_1(&receiver.1.transceiver);
-
-
-//                }
-            },
-        )?;
-
         Ok(Self {
-            id,
             peer,
-            on_ice_candidate,
-            on_track,
+            _on_ice_candidate: on_ice_candidate,
+            _on_track: on_track,
             connections,
-            peer_events_sender,
         })
+    }
+
+    pub fn get_mids(&self) -> Result<Option<HashMap<u64, String>>, WasmErr> {
+        if self.connections.borrow().senders.is_empty() {
+            return Ok(None);
+        }
+
+        let mut mids = HashMap::new();
+        for (track, sender) in &self.connections.borrow().senders {
+            mids.insert(
+                *track,
+                sender.transceiver.mid().ok_or_else(|| {
+                    WasmErr::from_str("Peer has senders without mid")
+                })?,
+            );
+        }
+
+        Ok(Some(mids))
     }
 
     pub fn create_and_set_offer(
@@ -235,8 +290,6 @@ impl PeerConnection {
         .map_err(Into::into)
     }
 
-    pub fn on_remote_stream(&self) {}
-
     pub fn update_tracks(
         &self,
         tracks: Vec<Track>,
@@ -245,17 +298,17 @@ impl PeerConnection {
         // insert peer transceivers
         for track in tracks {
             match track.direction {
-                Direction::Send { receivers } => {
+                Direction::Send { .. } => {
                     self.connections.borrow_mut().senders.insert(
                         track.id,
-                        Sender::new(&self.peer, receivers, track.media_type),
+                        Sender::new(&self.peer, track.media_type),
                     );
                 }
-                Direction::Recv { sender } => {
-                    self.connections.borrow_mut().receivers.insert(
-                        track.id,
-                        Receiver::new(&self.peer, sender, track.media_type),
-                    );
+                Direction::Recv { sender, mid } => {
+                    self.connections
+                        .borrow_mut()
+                        .receivers
+                        .insert(track.id, Receiver::new(sender, mid));
                 }
             }
         }
@@ -290,12 +343,10 @@ impl PeerConnection {
                         };
 
                         promises.push(
-                            JsFuture::from(replace)
-                                .map_err(|err| WasmErr::from(err)),
+                            JsFuture::from(replace).map_err(WasmErr::from),
                         );
                     }
-                    join_all(promises)
-                        .map_err(|err| WasmErr::from(err).log_err())
+                    join_all(promises).map_err(|err| err.log_err())
                 })
                 .map(|_| ());
             future::Either::A(get_media)
@@ -308,7 +359,7 @@ impl PeerConnection {
 fn build_get_media_request<'a>(
     senders: impl IntoIterator<Item = &'a Sender>,
 ) -> Result<GetMediaRequest, WasmErr> {
-    let mut senders = senders.into_iter();
+    let senders = senders.into_iter();
     let mut audio = false;
     let mut video = false;
 
@@ -326,18 +377,11 @@ fn build_get_media_request<'a>(
 
 pub struct Sender {
     transceiver: RtcRtpTransceiver,
-    receivers: Vec<u64>,
     media_type: MediaType,
-    track: Option<MediaStreamTrack>,
-    stream: Option<Rc<MediaStream>>,
 }
 
 impl Sender {
-    fn new(
-        peer: &Rc<RtcPeerConnection>,
-        receivers: Vec<u64>,
-        media_type: MediaType,
-    ) -> Self {
+    fn new(peer: &Rc<RtcPeerConnection>, media_type: MediaType) -> Self {
         let transceiver = match media_type {
             MediaType::Audio(_) => {
                 let mut init = RtcRtpTransceiverInit::new();
@@ -353,45 +397,27 @@ impl Sender {
 
         Self {
             transceiver,
-            receivers,
             media_type,
-            track: None,
-            stream: None,
         }
     }
 }
 
 pub struct Receiver {
-    transceiver: RtcRtpTransceiver,
-    sender: u64,
-    media_type: MediaType,
+    transceiver: Option<RtcRtpTransceiver>,
+    sender_id: u64,
+    mid: Option<String>,
     track: Option<MediaStreamTrack>,
+    stream: Option<Rc<MediaStream>>,
 }
 
 impl Receiver {
-    fn new(
-        peer: &Rc<RtcPeerConnection>,
-        sender: u64,
-        media_type: MediaType,
-    ) -> Self {
-        let transceiver = match media_type {
-            MediaType::Audio(_) => {
-                let mut init = RtcRtpTransceiverInit::new();
-                init.direction(RtcRtpTransceiverDirection::Recvonly);
-                peer.add_transceiver_with_str_and_init("audio", &init)
-            }
-            MediaType::Video(_) => {
-                let mut init = RtcRtpTransceiverInit::new();
-                init.direction(RtcRtpTransceiverDirection::Recvonly);
-                peer.add_transceiver_with_str_and_init("video", &init)
-            }
-        };
-
+    fn new(sender_id: u64, mid: Option<String>) -> Self {
         Self {
-            transceiver,
-            sender,
-            media_type,
+            transceiver: None,
+            sender_id,
+            mid,
             track: None,
+            stream: None,
         }
     }
 }

@@ -4,7 +4,7 @@ use futures::future::Either;
 use futures::{
     future::{Future, IntoFuture},
     stream::Stream,
-    sync::mpsc::{unbounded, UnboundedReceiver, UnboundedSender},
+    sync::mpsc::{unbounded, UnboundedSender},
 };
 use protocol::{Command, Direction};
 use protocol::{Event, IceCandidate, Track};
@@ -17,10 +17,11 @@ use std::{
 };
 
 use crate::api::connection::Connection;
-use crate::media::PeerEvent;
 use crate::{
     api::ConnectionHandle,
-    media::{MediaManager, MediaStreamHandle, PeerId, PeerRepository, Sdp},
+    media::{
+        MediaManager, MediaStream, PeerEvent, PeerId, PeerRepository, Sdp,
+    },
     rpc::RPCClient,
     utils::{Callback, WasmErr},
 };
@@ -73,8 +74,9 @@ impl Room {
                     Event::SdpAnswerMade {
                         peer_id,
                         sdp_answer,
+                        mids,
                     } => {
-                        inner.on_sdp_answer(peer_id, sdp_answer);
+                        inner.on_sdp_answer(peer_id, sdp_answer, &mids);
                     }
                     Event::IceCandidateDiscovered { peer_id, candidate } => {
                         inner.on_ice_candidate_discovered(peer_id, &candidate);
@@ -97,7 +99,17 @@ impl Room {
                     PeerEvent::IceCandidateDiscovered { peer_id, ice } => {
                         inner.on_peer_ice_candidate_discovered(peer_id, ice);
                     }
-                    PeerEvent::NewRemoteStream { .. } => {}
+                    PeerEvent::NewRemoteStream {
+                        peer_id,
+                        sender_id,
+                        remote_stream,
+                    } => {
+                        inner.on_peer_new_remote_stream(
+                            peer_id,
+                            sender_id,
+                            &remote_stream,
+                        );
+                    }
                 }
                 Ok(())
             })
@@ -154,8 +166,23 @@ impl InnerRoom {
             .send_command(Command::SetIceCandidate { peer_id, candidate });
     }
 
-    fn on_new_connection(&self, f: js_sys::Function) {
-        self.on_new_connection.set_func(f);
+    fn on_peer_new_remote_stream(
+        &mut self,
+        _peer_id: PeerId,
+        sender_id: u64,
+        remote_stream: &Rc<MediaStream>,
+    ) {
+        match self.connections.get(&sender_id) {
+            None => WasmErr::from_str(
+                "NewRemoteStream from sender without connection",
+            )
+            .log_err(),
+            Some(connection) => {
+                connection
+                    .on_remote_stream()
+                    .call_ok(remote_stream.new_handle());
+            }
+        }
     }
 
     fn on_peer_created(
@@ -164,7 +191,7 @@ impl InnerRoom {
         sdp_offer: Option<String>,
         tracks: Vec<Track>,
     ) {
-        let create_connection = |room: &mut InnerRoom, member_id: &u64| {
+        let create_connection = |room: &mut Self, member_id: &u64| {
             if !room.connections.contains_key(member_id) {
                 let con = Connection::new(*member_id);
                 room.on_new_connection.call_ok(con.new_handle());
@@ -174,13 +201,13 @@ impl InnerRoom {
 
         // iterate through tracks and create all connections
         for track in tracks.as_slice() {
-            match track.direction {
+            match &track.direction {
                 Direction::Send { ref receivers } => {
                     for receiver in receivers {
                         create_connection(self, receiver);
                     }
                 }
-                Direction::Recv { ref sender } => {
+                Direction::Recv { ref sender, .. } => {
                     create_connection(self, sender);
                 }
             }
@@ -206,34 +233,42 @@ impl InnerRoom {
                             rpc.send_command(Command::MakeSdpOffer {
                                 peer_id,
                                 sdp_offer,
+                                mids: peer_rc.get_mids().unwrap(),
                             });
                             Ok(())
                         },
                     )),
-                    Some(offer) => Either::B(
-                        peer_rc
-                            .set_remote_description(Sdp::Offer(offer))
-                            .and_then(move |_| peer_rc.create_and_set_answer())
-                            .and_then(move |sdp_answer| {
-                                rpc.send_command(Command::MakeSdpAnswer {
-                                    peer_id,
-                                    sdp_answer,
-                                });
-                                Ok(())
-                            }),
-                    ),
+                    Some(offer) => {
+                        let peer_rc1 = Rc::clone(&peer_rc);
+                        Either::B(
+                            peer_rc
+                                .set_remote_description(Sdp::Offer(offer))
+                                .and_then(move |_| {
+                                    peer_rc.create_and_set_answer()
+                                })
+                                .and_then(move |sdp_answer| {
+                                    rpc.send_command(Command::MakeSdpAnswer {
+                                        peer_id,
+                                        sdp_answer,
+                                        mids: peer_rc1.get_mids().unwrap(),
+                                    });
+                                    Ok(())
+                                }),
+                        )
+                    }
                 };
                 fut.map_err(|err| err.log_err())
             },
         ));
     }
 
-    fn asd(&mut self, id: u64) {
-        WasmErr::from_str("aha!").log_err();
-    }
-
     /// Applies specified SDP Answer to specified RTCPeerConnection.
-    fn on_sdp_answer(&mut self, peer_id: PeerId, sdp_answer: String) {
+    fn on_sdp_answer(
+        &mut self,
+        peer_id: PeerId,
+        sdp_answer: String,
+        _mids: &Option<HashMap<u64, String>>,
+    ) {
         if let Some(peer) = self.peers.get_peer(peer_id) {
             spawn_local(
                 peer.set_remote_description(Sdp::Answer(sdp_answer))

@@ -1,11 +1,8 @@
-use crate::utils::{window, Callback, WasmErr};
-use futures::future::{self, Either};
-use futures::Future;
-use std::cell::RefCell;
 use std::rc::{Rc, Weak};
 use wasm_bindgen::{prelude::*, JsValue};
-use wasm_bindgen_futures::JsFuture;
 use web_sys::{MediaStream as BackingMediaStream, MediaStreamTrack};
+
+use crate::utils::WasmErr;
 
 pub struct GetMediaRequest {
     pub audio: bool,
@@ -77,8 +74,19 @@ impl From<BackingMediaStream> for InnerStream {
 pub struct MediaStream(Rc<InnerStream>);
 
 impl MediaStream {
-    pub fn new(stream: BackingMediaStream) -> Rc<Self> {
+    pub fn from_stream(stream: BackingMediaStream) -> Rc<Self> {
         Rc::new(Self(Rc::new(InnerStream::from(stream))))
+    }
+
+    pub fn from_tracks(tracks: &[&MediaStreamTrack]) -> Rc<Self> {
+        // should be safe to unwrap
+        let stream = BackingMediaStream::new().unwrap();
+
+        for track in tracks {
+            stream.add_track(&track);
+        }
+
+        Self::from_stream(stream)
     }
 
     pub fn new_handle(&self) -> MediaStreamHandle {

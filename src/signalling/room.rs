@@ -142,7 +142,7 @@ impl Room {
 
         if from_peer.is_sender() {
             from_peer.set_mids(mids.ok_or(RoomError::ClientError(
-                format!("Peer is sender but did not provide any mids"),
+                String::from("Peer is sender but did not provide any mids"),
             ))?)?;
         }
 
@@ -181,7 +181,7 @@ impl Room {
 
         if from_peer.is_sender() {
             from_peer.set_mids(mids.ok_or(RoomError::ClientError(
-                format!("Peer is sender but did not provide any mids"),
+                String::from("Peer is sender but did not provide any mids"),
             ))?)?;
         }
 

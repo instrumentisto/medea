@@ -29,13 +29,18 @@ async function f() {
     let responder_room_handler = await responder.join_room("ws://localhost:8080/ws/1/2/responder_credentials");
 
     responder_room_handler.on_new_connection(function (connection) {
-        console.log("responder got new connection")
-        //    connection.on_remote_stream(function (stream) {
-        //
-        //    });
+
+        connection.on_remote_stream(function (stream) {
+            console.log("got remote video");
+
+            var video = document.createElement("video");
+
+            video.srcObject = stream.get_media_stream();
+            document.body.appendChild(video);
+            video.play();
+        });
     });
 
-    //
     // caller.dispose();
     // responder.dispose();
 }

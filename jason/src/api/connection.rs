@@ -1,13 +1,5 @@
 /// Represents connection with specific [`Member`].
-use futures::future::Either;
-use futures::{
-    future::{Future, IntoFuture},
-    stream::Stream,
-};
-use protocol::Command;
-use protocol::{Event, IceCandidate, Track};
 use wasm_bindgen::prelude::*;
-use wasm_bindgen_futures::spawn_local;
 
 use std::{
     cell::RefCell,
@@ -15,8 +7,7 @@ use std::{
 };
 
 use crate::{
-    media::{MediaManager, MediaStreamHandle, PeerId, PeerRepository, Sdp},
-    rpc::RPCClient,
+    media::MediaStreamHandle,
     utils::{Callback, WasmErr},
 };
 
@@ -34,6 +25,14 @@ impl ConnectionHandle {
             f.call_err(WasmErr::from_str("Detached state"));
         }
     }
+
+    pub fn member_id(&self) -> Result<u64, JsValue> {
+        if let Some(inner) = self.0.upgrade() {
+            Ok(inner.borrow().remote_member)
+        } else {
+            Err(WasmErr::from_str("Detached state").into())
+        }
+    }
 }
 
 pub struct Connection(Rc<RefCell<InnerConnection>>);
@@ -48,6 +47,11 @@ impl Connection {
 
     pub fn new_handle(&self) -> ConnectionHandle {
         ConnectionHandle(Rc::downgrade(&self.0))
+    }
+
+    pub fn on_remote_stream(&self) -> Rc<Callback<MediaStreamHandle, WasmErr>> {
+        let a = &self.0.borrow().on_remote_stream;
+        Rc::clone(&a)
     }
 }
 

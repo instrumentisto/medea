@@ -237,7 +237,7 @@ mod test {
         let command = ClientMsg::Command(Command::MakeSdpOffer {
             peer_id: 77,
             sdp_offer: "offer".to_owned(),
-            mids: None
+            mids: None,
         });
         #[cfg_attr(nightly, rustfmt::skip)]
             let command_str =
@@ -276,7 +276,7 @@ mod test {
         let event = ServerMsg::Event(Event::SdpAnswerMade {
             peer_id: 45,
             sdp_answer: "answer".to_owned(),
-            mids: None
+            mids: None,
         });
         #[cfg_attr(nightly, rustfmt::skip)]
             let event_str =
