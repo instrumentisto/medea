@@ -121,36 +121,39 @@ impl StreamHandler<WebMessage, ProtocolError> for TestMember {
     }
 }
 
-// TODO: give thread name
-fn run_test_server(bind_port: u16) {
+fn run_test_server(bind_port: u16, thread_name: &str) {
     let is_server_starting = Arc::new(Mutex::new(Cell::new(true)));
     let is_server_starting_ref = Arc::clone(&is_server_starting);
+    let builder = std::thread::Builder::new().name(thread_name.to_string());
 
-    let server_thread = std::thread::spawn(move || {
-        dotenv::dotenv().ok();
-        let _sys = System::new("medea");
+    let server_thread = builder
+        .spawn(move || {
+            dotenv::dotenv().ok();
+            let _sys = System::new("medea");
 
-        let config = Conf {
-            server: Server {
-                static_specs_path: Some("tests/specs".to_string()),
-                bind_port,
+            let config = Conf {
+                server: Server {
+                    static_specs_path: Some("tests/specs".to_string()),
+                    bind_port,
+                    ..Default::default()
+                },
                 ..Default::default()
-            },
-            ..Default::default()
-        };
+            };
 
-        match start_static_rooms(&config) {
-            Ok(r) => {
-                let room_repo = RoomsRepository::new(r);
-                server::run(room_repo, config);
-            }
-            Err(e) => {
-                panic!("Server not started because of error: '{}'", e);
-            }
-        };
-        let is_server_starting_guard = is_server_starting_ref.lock().unwrap();
-        is_server_starting_guard.set(false);
-    });
+            match start_static_rooms(&config) {
+                Ok(r) => {
+                    let room_repo = RoomsRepository::new(r);
+                    server::run(room_repo, config);
+                }
+                Err(e) => {
+                    panic!("Server not started because of error: '{}'", e);
+                }
+            };
+            let is_server_starting_guard =
+                is_server_starting_ref.lock().unwrap();
+            is_server_starting_guard.set(false);
+        })
+        .unwrap();
 
     // Wait until server is up
     while is_server_starting.lock().unwrap().get() {}
@@ -161,7 +164,7 @@ fn run_test_server(bind_port: u16) {
 #[test]
 fn should_work_pub_sub_video_call() {
     let bind_port = test_ports::SIGNALLING_TEST_PUB_SUB_TEST;
-    run_test_server(bind_port);
+    run_test_server(bind_port, "should_work_pub_sub_video_call");
     let base_url = format!("ws://localhost:{}/ws", bind_port);
 
     let sys = System::new("medea-signaling-pub-sub-test");
@@ -269,7 +272,7 @@ fn should_work_pub_sub_video_call() {
 #[test]
 fn should_work_three_members_p2p_video_call() {
     let bind_port = test_ports::SIGNALLING_TEST_THREE_MEMBERS;
-    run_test_server(bind_port);
+    run_test_server(bind_port, "should_work_three_members_p2p_video_call");
     let base_url = format!("ws://localhost:{}/ws", bind_port);
 
     let sys = System::new("medea-signaling-3-members-test");
