@@ -270,6 +270,7 @@ impl Room {
         )))
     }
 
+    /// Create [`Peer`] between members and interconnect it by control API spec.
     fn create_peers(
         &mut self,
         to_create: Vec<(&Member, Member)>,
@@ -292,7 +293,8 @@ impl Room {
         }
     }
 
-    fn create_neccessary_peers(
+    /// Create and interconnect all necessary [`Member`]'s [`Peer`]s.
+    fn create_necessary_peers(
         &mut self,
         member_id: &MemberId,
         ctx: &mut <Self as Actor>::Context,
@@ -325,7 +327,7 @@ impl Room {
                     } else {
                         error!(
                             "Try to create peer for nonexistent member with \
-                             ID {}. Room wil be stopped.",
+                             ID {}. Room will be stopped.",
                             recv_member_id
                         );
                         ctx.notify(CloseRoom {});
@@ -342,11 +344,19 @@ impl Room {
             }
 
             if self.participants.member_has_connection(sender_member_id) {
-                let sender_member = self
-                    .participants
-                    .get_member_by_id(sender_member_id)
-                    .unwrap();
-                need_create.push((&member, sender_member.clone()));
+                if let Some(sender_member) =
+                    self.participants.get_member_by_id(sender_member_id)
+                {
+                    need_create.push((&member, sender_member.clone()));
+                } else {
+                    error!(
+                        "Try to get member with ID {} which has active \
+                         RpcConnection but not presented in participants! \
+                         Room will be stopped.",
+                        sender_member_id
+                    );
+                    ctx.notify(CloseRoom {});
+                }
             }
         }
 
@@ -479,7 +489,7 @@ impl Handler<RpcConnectionEstablished> for Room {
             msg.connection,
         );
 
-        self.create_neccessary_peers(&msg.member_id, ctx);
+        self.create_necessary_peers(&msg.member_id, ctx);
 
         Box::new(wrap_future(future::ok(())))
     }

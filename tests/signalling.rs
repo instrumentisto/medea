@@ -1,3 +1,5 @@
+//! Signalling API e2e tests.
+
 mod test_ports;
 
 use actix::{Actor, Arbiter, AsyncContext, Context, StreamHandler, System};
@@ -5,32 +7,44 @@ use actix_web::ws::{
     Client, ClientWriter, Message as WebMessage, ProtocolError,
 };
 use futures::future::Future;
-use medea::conf::Server;
 use medea::{
-    api::client::server, conf::Conf, signalling::room_repo::RoomsRepository,
-    start_static_rooms,
+    api::client::server, conf::Conf, conf::Server,
+    signalling::room_repo::RoomsRepository, start_static_rooms,
 };
 use medea_client_api_proto::{Command, Direction, Event, IceCandidate};
 use serde_json::error::Error as SerdeError;
-use std::rc::Rc;
 use std::{
     cell::Cell,
+    rc::Rc,
     sync::{Arc, Mutex},
     time::Duration,
 };
 
+/// Medea client for testing purposes.
 struct TestMember {
+    /// Writer to websocket.
     writer: ClientWriter,
+
+    /// All [`Event`]s which this [`TestMember`] received.
+    /// This field used for give some debug info when test just stuck forever
+    /// (most often, such a test will end on a timer of five seconds
+    /// and display all events of this [`TestMember`]).
     events: Vec<Event>,
+
+    /// Function which will be called at every received by this [`TestMember`]
+    /// [`Event`].
     test_fn: Box<FnMut(&Event)>,
 }
 
 impl Actor for TestMember {
     type Context = Context<Self>;
 
+    /// Start heartbeat and set a timer that will panic when 5 seconds expire.
+    /// The timer is needed because some tests may just stuck
+    /// and listen socket forever.
     fn started(&mut self, ctx: &mut Self::Context) {
-        self.hb(ctx);
-        ctx.run_later(Duration::new(5, 0), |act, _ctx| {
+        self.heartbeat(ctx);
+        ctx.run_later(Duration::from_secs(5), |act, _ctx| {
             panic!(
                 "This test lasts more than 5 seconds. Most likely, this is \
                  not normal. Here is all events of member: {:?}",
@@ -41,17 +55,25 @@ impl Actor for TestMember {
 }
 
 impl TestMember {
-    fn hb(&self, ctx: &mut Context<Self>) {
-        ctx.run_later(Duration::new(1, 0), |act, ctx| {
+    /// Signaling heartbeat for server.
+    /// Most likely, this ping will never be sent,
+    /// because it has been established that it is sent once per 3 seconds,
+    /// and there are simply no tests that last so much.
+    fn heartbeat(&self, ctx: &mut Context<Self>) {
+        ctx.run_later(Duration::from_secs(3), |act, ctx| {
             act.writer.text(r#"{"ping": 1}"#);
-            act.hb(ctx);
+            act.heartbeat(ctx);
         });
     }
 
+    /// Send command to the server.
     fn send_command(&mut self, msg: Command) {
         self.writer.text(&serde_json::to_string(&msg).unwrap());
     }
 
+    /// Start test member in new [`Arbiter`] by given uri.
+    /// `test_fn` - is function which will be called at every [`Event`]
+    /// received from server.
     pub fn start(uri: &str, test_fn: Box<FnMut(&Event)>) {
         Arbiter::spawn(
             Client::new(uri)
@@ -74,6 +96,9 @@ impl TestMember {
 }
 
 impl StreamHandler<WebMessage, ProtocolError> for TestMember {
+    /// Basic signalling implementation.
+    /// A `TestMember::test_fn` function will be called for each [`Event`]
+    /// received from test server.
     fn handle(&mut self, msg: WebMessage, _ctx: &mut Context<Self>) {
         match msg {
             WebMessage::Text(txt) => {
@@ -81,6 +106,7 @@ impl StreamHandler<WebMessage, ProtocolError> for TestMember {
                     serde_json::from_str(&txt);
                 if let Ok(event) = event {
                     self.events.push(event.clone());
+                    // Test function call
                     (self.test_fn)(&event);
                     match event {
                         Event::PeerCreated {
@@ -121,6 +147,15 @@ impl StreamHandler<WebMessage, ProtocolError> for TestMember {
     }
 }
 
+/// Run medea server. This function lock main thread until server is up.
+/// Server starts in different thread and `join`'ed with main thread.
+/// When test is done, server will be destroyed.
+/// Server load all specs from `tests/specs`.
+/// Provide name for thread same as your test function's name. This will
+/// help you when server is panic in some test case.
+/// __Please, generate port__ by adding your test name to
+/// `/tests/test_port.rs::generate_ports_for_tests!` for dealing with
+///  asynchronously of tests.
 fn run_test_server(bind_port: u16, thread_name: &str) {
     let is_server_starting = Arc::new(Mutex::new(Cell::new(true)));
     let is_server_starting_ref = Arc::clone(&is_server_starting);
@@ -163,9 +198,11 @@ fn run_test_server(bind_port: u16, thread_name: &str) {
 
 #[test]
 fn should_work_pub_sub_video_call() {
-    let bind_port = test_ports::SIGNALLING_TEST_PUB_SUB_TEST;
+    let test_name = "should_work_pub_sub_video_call";
+    let bind_port = test_ports::get_port_for_test(test_name);
     run_test_server(bind_port, "should_work_pub_sub_video_call");
-    let base_url = format!("ws://localhost:{}/ws", bind_port);
+    let base_url =
+        format!("ws://localhost:{}/ws/pub-sub-video-call", bind_port);
 
     let sys = System::new("medea-signaling-pub-sub-test");
 
@@ -258,11 +295,11 @@ fn should_work_pub_sub_video_call() {
     };
 
     TestMember::start(
-        &format!("{}/pub-sub-video-call/caller/test", base_url),
+        &format!("{}/caller/test", base_url),
         Box::new(test_fn.clone()),
     );
     TestMember::start(
-        &format!("{}/pub-sub-video-call/responder/test", base_url),
+        &format!("{}/responder/test", base_url),
         Box::new(test_fn),
     );
 
@@ -271,9 +308,11 @@ fn should_work_pub_sub_video_call() {
 
 #[test]
 fn should_work_three_members_p2p_video_call() {
-    let bind_port = test_ports::SIGNALLING_TEST_THREE_MEMBERS;
-    run_test_server(bind_port, "should_work_three_members_p2p_video_call");
-    let base_url = format!("ws://localhost:{}/ws", bind_port);
+    let test_name = "should_work_three_members_p2p_video_call";
+    let bind_port = test_ports::get_port_for_test(test_name);
+    run_test_server(bind_port, test_name);
+    let base_url =
+        format!("ws://localhost:{}/ws/three-members-conference", bind_port);
 
     let sys = System::new("medea-signaling-3-members-test");
 
@@ -348,15 +387,15 @@ fn should_work_three_members_p2p_video_call() {
     };
 
     TestMember::start(
-        &format!("{}/three-members-conference/caller/test", base_url),
+        &format!("{}/caller/test", base_url),
         Box::new(test_fn.clone()),
     );
     TestMember::start(
-        &format!("{}/three-members-conference/responder/test", base_url),
+        &format!("{}/responder/test", base_url),
         Box::new(test_fn.clone()),
     );
     TestMember::start(
-        &format!("{}/three-members-conference/responder2/test", base_url),
+        &format!("{}/responder2/test", base_url),
         Box::new(test_fn),
     );
 
