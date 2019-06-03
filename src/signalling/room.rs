@@ -288,8 +288,69 @@ impl Room {
 
             ctx.notify(ConnectPeers(caller_peer_id, responder_peer_id));
 
-            // println!("Peers: {:#?}", self.peers);
+            //             println!("Peers: {:#?}", self.peers);
         }
+    }
+
+    fn create_neccessary_peers(
+        &mut self,
+        member_id: &MemberId,
+        ctx: &mut <Self as Actor>::Context,
+    ) {
+        let member =
+            if let Some(m) = self.participants.get_member_by_id(member_id) {
+                m.clone()
+            } else {
+                error!(
+                    "Try to create necessary peers for nonexistent member \
+                     with ID {}. Room will be stopped.",
+                    member_id
+                );
+                ctx.notify(CloseRoom {});
+                return;
+            };
+
+        let mut need_create = Vec::new();
+
+        // connect receivers
+        let mut already_connected_members = Vec::new();
+        if let Some(receivers) = self.sender_receivers.get(member_id) {
+            for recv_member_id in receivers {
+                if self.participants.member_has_connection(recv_member_id) {
+                    if let Some(recv_member) =
+                        self.participants.get_member_by_id(recv_member_id)
+                    {
+                        already_connected_members.push(recv_member_id.clone());
+                        need_create.push((&member, recv_member.clone()));
+                    } else {
+                        error!(
+                            "Try to create peer for nonexistent member with \
+                             ID {}. Room wil be stopped.",
+                            recv_member_id
+                        );
+                        ctx.notify(CloseRoom {});
+                    }
+                }
+            }
+        }
+
+        // connect senders
+        for play in member.spec.get_play_endpoints() {
+            let sender_member_id = &play.src.member_id;
+            if already_connected_members.contains(sender_member_id) {
+                continue;
+            }
+
+            if self.participants.member_has_connection(sender_member_id) {
+                let sender_member = self
+                    .participants
+                    .get_member_by_id(sender_member_id)
+                    .unwrap();
+                need_create.push((&member, sender_member.clone()));
+            }
+        }
+
+        self.create_peers(need_create, ctx);
     }
 }
 
@@ -398,77 +459,6 @@ impl Handler<CommandMessage> for Room {
     }
 }
 
-#[derive(Debug, Message)]
-#[rtype(result = "()")]
-struct CreateNecessaryMemberPeers(MemberId);
-
-impl Handler<CreateNecessaryMemberPeers> for Room {
-    type Result = ();
-
-    /// Create and interconnect all necessary [`Member`]'s [`Peer`]s.
-    fn handle(
-        &mut self,
-        msg: CreateNecessaryMemberPeers,
-        ctx: &mut Self::Context,
-    ) {
-        let member_id = &msg.0;
-        let member =
-            if let Some(m) = self.participants.get_member_by_id(member_id) {
-                m.clone()
-            } else {
-                error!(
-                    "Try to create necessary peers for nonexistent member \
-                     with ID {}. Room will be stopped.",
-                    member_id
-                );
-                ctx.notify(CloseRoom {});
-                return;
-            };
-
-        let mut need_create = Vec::new();
-
-        // connect receivers
-        let mut already_connected_members = Vec::new();
-        if let Some(receivers) = self.sender_receivers.get(member_id) {
-            for recv_member_id in receivers {
-                if self.participants.member_has_connection(recv_member_id) {
-                    if let Some(recv_member) =
-                        self.participants.get_member_by_id(recv_member_id)
-                    {
-                        already_connected_members.push(recv_member_id.clone());
-                        need_create.push((&member, recv_member.clone()));
-                    } else {
-                        error!(
-                            "Try to create peer for nonexistent member with \
-                             ID {}. Room wil be stopped.",
-                            recv_member_id
-                        );
-                        ctx.notify(CloseRoom {});
-                    }
-                }
-            }
-        }
-
-        // connect senders
-        for play in member.spec.get_play_endpoints() {
-            let sender_member_id = &play.src.member_id;
-            if already_connected_members.contains(sender_member_id) {
-                continue;
-            }
-
-            if self.participants.member_has_connection(sender_member_id) {
-                let sender_member = self
-                    .participants
-                    .get_member_by_id(sender_member_id)
-                    .unwrap();
-                need_create.push((&member, sender_member.clone()));
-            }
-        }
-
-        self.create_peers(need_create, ctx);
-    }
-}
-
 impl Handler<RpcConnectionEstablished> for Room {
     type Result = ActFuture<(), ()>;
 
@@ -489,7 +479,7 @@ impl Handler<RpcConnectionEstablished> for Room {
             msg.connection,
         );
 
-        ctx.notify(CreateNecessaryMemberPeers(msg.member_id));
+        self.create_neccessary_peers(&msg.member_id, ctx);
 
         Box::new(wrap_future(future::ok(())))
     }

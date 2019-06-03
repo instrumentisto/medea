@@ -1,7 +1,4 @@
-use actix::{
-    Actor, Arbiter, AsyncContext, Context, Handler, Message, StreamHandler,
-    System,
-};
+use actix::{Actor, Arbiter, AsyncContext, Context, StreamHandler, System};
 use actix_web::ws::{
     Client, ClientWriter, Message as WebMessage, ProtocolError,
 };
@@ -24,10 +21,6 @@ struct TestMember {
     events: Vec<Event>,
 }
 
-#[derive(Message)]
-#[rtype(result = ())]
-struct ClientCommand(Command);
-
 impl Actor for TestMember {
     type Context = Context<Self>;
 
@@ -49,6 +42,10 @@ impl TestMember {
             act.writer.text(r#"{"ping": 1}"#);
             act.hb(ctx);
         });
+    }
+
+    fn send_command(&mut self, msg: Command) {
+        self.writer.text(&serde_json::to_string(&msg).unwrap());
     }
 
     fn test_events(&self) {
@@ -135,19 +132,12 @@ impl TestMember {
     }
 }
 
-impl Handler<ClientCommand> for TestMember {
-    type Result = ();
-
-    fn handle(&mut self, msg: ClientCommand, _ctx: &mut Context<Self>) {
-        self.writer.text(&serde_json::to_string(&msg.0).unwrap());
-    }
-}
-
 impl StreamHandler<WebMessage, ProtocolError> for TestMember {
     // TODO: provide here FnOnce
-    fn handle(&mut self, msg: WebMessage, ctx: &mut Context<Self>) {
+    fn handle(&mut self, msg: WebMessage, _ctx: &mut Context<Self>) {
         match msg {
             WebMessage::Text(txt) => {
+                //                println!("[{}]\t{}", self.is_caller, txt);
                 let event: Result<Event, SerdeError> =
                     serde_json::from_str(&txt);
                 if let Ok(event) = event {
@@ -161,35 +151,28 @@ impl StreamHandler<WebMessage, ProtocolError> for TestMember {
                             match sdp_offer {
                                 Some(_) => {
                                     self.is_caller = false;
-                                    ctx.notify(ClientCommand(
-                                        Command::MakeSdpAnswer {
-                                            peer_id,
-                                            sdp_answer: "responder_answer"
-                                                .to_string(),
-                                        },
-                                    ));
+                                    self.send_command(Command::MakeSdpAnswer {
+                                        peer_id,
+                                        sdp_answer: "responder_answer"
+                                            .to_string(),
+                                    });
                                 }
                                 None => {
                                     self.is_caller = true;
-                                    ctx.notify(ClientCommand(
-                                        Command::MakeSdpOffer {
-                                            peer_id,
-                                            sdp_offer: "caller_offer"
-                                                .to_string(),
-                                        },
-                                    ));
+                                    self.send_command(Command::MakeSdpOffer {
+                                        peer_id,
+                                        sdp_offer: "caller_offer".to_string(),
+                                    });
                                 }
                             }
-                            ctx.notify(ClientCommand(
-                                Command::SetIceCandidate {
-                                    peer_id,
-                                    candidate: IceCandidate {
-                                        candidate: "ice_candidate".to_string(),
-                                        sdp_m_line_index: None,
-                                        sdp_mid: None,
-                                    },
+                            self.send_command(Command::SetIceCandidate {
+                                peer_id,
+                                candidate: IceCandidate {
+                                    candidate: "ice_candidate".to_string(),
+                                    sdp_m_line_index: None,
+                                    sdp_mid: None,
                                 },
-                            ));
+                            });
                         }
                         Event::IceCandidateDiscovered {
                             peer_id: _,
