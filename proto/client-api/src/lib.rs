@@ -45,12 +45,10 @@ pub enum Command {
 }
 
 /// WebSocket message from Medea to Jason.
-#[cfg_attr(feature = "medea", derive(Serialize))]
+#[cfg_attr(feature = "medea", derive(Serialize, Debug, Clone, PartialEq))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
-#[cfg_attr(test, derive(PartialEq, Debug))]
 #[serde(tag = "event", content = "data")]
 #[allow(dead_code)]
-#[derive(Debug, Clone, PartialEq)]
 pub enum Event {
     /// Media Server notifies Web Client about necessity of RTCPeerConnection
     /// creation.
@@ -84,10 +82,8 @@ pub struct IceCandidate {
 }
 
 /// [`Track] with specified direction.
-#[cfg_attr(feature = "medea", derive(Serialize))]
+#[cfg_attr(feature = "medea", derive(Serialize, Debug, Clone, PartialEq))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
-#[cfg_attr(test, derive(PartialEq, Debug))]
-#[derive(Debug, Clone, PartialEq)]
 pub struct Track {
     pub id: u64,
     pub direction: Direction,
@@ -95,35 +91,27 @@ pub struct Track {
 }
 
 /// Direction of [`Track`].
-#[cfg_attr(feature = "medea", derive(Serialize))]
+#[cfg_attr(feature = "medea", derive(Serialize, Debug, Clone, PartialEq))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
-#[cfg_attr(test, derive(PartialEq, Debug))]
-#[derive(Debug, Clone, PartialEq)]
 pub enum Direction {
     Send { receivers: Vec<u64> },
     Recv { sender: u64 },
 }
 
 /// Type of [`Track`].
-#[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "medea", derive(Serialize))]
+#[cfg_attr(feature = "medea", derive(Serialize, Debug, PartialEq, Clone))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
-#[cfg_attr(test, derive(PartialEq))]
 pub enum MediaType {
     Audio(AudioSettings),
     Video(VideoSettings),
 }
 
-#[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "medea", derive(Serialize))]
+#[cfg_attr(feature = "medea", derive(Serialize, Clone, Debug, PartialEq))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
-#[cfg_attr(test, derive(PartialEq))]
 pub struct AudioSettings {}
 
-#[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "medea", derive(Serialize))]
+#[cfg_attr(feature = "medea", derive(Serialize, Clone, Debug, PartialEq))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
-#[cfg_attr(test, derive(PartialEq))]
 pub struct VideoSettings {}
 
 #[cfg(feature = "jason")]

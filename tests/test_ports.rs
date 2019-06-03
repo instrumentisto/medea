@@ -38,6 +38,3 @@ generate_ports_for_tests!(
 pub fn get_port_for_test(name: &str) -> u16 {
     *PORTS.get(name).expect("Port for this name is not defined!")
 }
-
-
-
