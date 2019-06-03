@@ -19,6 +19,7 @@ struct TestMember {
     writer: ClientWriter,
     is_caller: bool,
     events: Vec<Event>,
+    test_fn: Box<Fn(&Vec<Event>)>,
 }
 
 impl Actor for TestMember {
@@ -48,70 +49,7 @@ impl TestMember {
         self.writer.text(&serde_json::to_string(&msg).unwrap());
     }
 
-    fn test_events(&self) {
-        let mut is_caller = false;
-        if let Event::PeerCreated {
-            peer_id,
-            sdp_offer,
-            tracks,
-        } = &self.events[0]
-        {
-            if let Some(_) = sdp_offer {
-                is_caller = false;
-            } else {
-                is_caller = true;
-            }
-            assert_eq!(tracks.len(), 2);
-            for track in tracks {
-                match &track.direction {
-                    Direction::Send { receivers } => {
-                        assert!(is_caller);
-                        assert!(!receivers.contains(&peer_id));
-                    }
-                    Direction::Recv { sender } => {
-                        assert!(!is_caller);
-                        assert_ne!(sender, peer_id);
-                    }
-                }
-            }
-        } else {
-            assert!(false)
-        }
-
-        if is_caller {
-            if let Event::SdpAnswerMade {
-                peer_id: _,
-                sdp_answer: _,
-            } = &self.events[1]
-            {
-                assert!(true);
-            } else {
-                assert!(false);
-            }
-
-            if let Event::IceCandidateDiscovered {
-                peer_id: _,
-                candidate: _,
-            } = &self.events[2]
-            {
-                assert!(true);
-            } else {
-                assert!(false);
-            }
-        } else {
-            if let Event::IceCandidateDiscovered {
-                peer_id: _,
-                candidate: _,
-            } = &self.events[1]
-            {
-                assert!(true);
-            } else {
-                assert!(false);
-            }
-        }
-    }
-
-    pub fn start(uri: &str) {
+    pub fn start(uri: &str, test_fn: Box<Fn(&Vec<Event>)>) {
         Arbiter::spawn(
             Client::new(uri)
                 .connect()
@@ -125,6 +63,7 @@ impl TestMember {
                             writer,
                             events: Vec::new(),
                             is_caller: false,
+                            test_fn,
                         }
                     });
                 }),
@@ -133,11 +72,10 @@ impl TestMember {
 }
 
 impl StreamHandler<WebMessage, ProtocolError> for TestMember {
-    // TODO: provide here FnOnce
     fn handle(&mut self, msg: WebMessage, _ctx: &mut Context<Self>) {
         match msg {
             WebMessage::Text(txt) => {
-                //                println!("[{}]\t{}", self.is_caller, txt);
+                // println!("[{}]\t{}", self.is_caller, txt);
                 let event: Result<Event, SerdeError> =
                     serde_json::from_str(&txt);
                 if let Ok(event) = event {
@@ -178,11 +116,7 @@ impl StreamHandler<WebMessage, ProtocolError> for TestMember {
                             peer_id: _,
                             candidate: _,
                         } => {
-                            // TODO: provide and use FnOnce instead of this.
-                            self.test_events();
-                            if self.is_caller {
-                                System::current().stop();
-                            }
+                            (self.test_fn)(&self.events);
                         }
                         _ => (),
                     }
@@ -194,8 +128,7 @@ impl StreamHandler<WebMessage, ProtocolError> for TestMember {
 }
 
 // TODO: deal with async testing. Maybe use different ports?
-#[test]
-fn sig_test() {
+fn run_test_server() {
     let is_server_starting = Arc::new(Mutex::new(Cell::new(true)));
     let is_server_starting_ref = Arc::clone(&is_server_starting);
 
@@ -222,15 +155,92 @@ fn sig_test() {
     // Wait until server is up
     while is_server_starting.lock().unwrap().get() {}
 
+    server_thread.join().unwrap();
+}
+
+#[test]
+fn sig_test() {
+    run_test_server();
+
     let sys = System::new("medea-signalling-test");
 
-    TestMember::start("ws://localhost:8080/ws/pub-sub-video-call/caller/test");
+    let pub_sub_test = |events: &Vec<Event>| {
+        let mut is_caller = false;
+        if let Event::PeerCreated {
+            peer_id,
+            sdp_offer,
+            tracks,
+        } = &events[0]
+        {
+            if let Some(_) = sdp_offer {
+                is_caller = false;
+            } else {
+                is_caller = true;
+            }
+            assert_eq!(tracks.len(), 2);
+            for track in tracks {
+                match &track.direction {
+                    Direction::Send { receivers } => {
+                        assert!(is_caller);
+                        assert!(!receivers.contains(&peer_id));
+                    }
+                    Direction::Recv { sender } => {
+                        assert!(!is_caller);
+                        assert_ne!(sender, peer_id);
+                    }
+                }
+            }
+        } else {
+            assert!(false)
+        }
+
+        if is_caller {
+            if let Event::SdpAnswerMade {
+                peer_id: _,
+                sdp_answer: _,
+            } = &events[1]
+            {
+                assert!(true);
+            } else {
+                assert!(false);
+            }
+
+            if let Event::IceCandidateDiscovered {
+                peer_id: _,
+                candidate: _,
+            } = &events[2]
+            {
+                assert!(true);
+            } else {
+                assert!(false);
+            }
+        } else {
+            if let Event::IceCandidateDiscovered {
+                peer_id: _,
+                candidate: _,
+            } = &events[1]
+            {
+                assert!(true);
+            } else {
+                assert!(false);
+            }
+        }
+
+        if is_caller {
+            System::current().stop();
+        }
+    };
+
+    TestMember::start(
+        "ws://localhost:8080/ws/pub-sub-video-call/caller/test",
+        Box::new(pub_sub_test.clone()),
+    );
     TestMember::start(
         "ws://localhost:8080/ws/pub-sub-video-call/responder/test",
+        Box::new(pub_sub_test.clone()),
     );
 
     let _ = sys.run();
-    server_thread.join().unwrap();
 }
 
 // TODO: add ping-pong e2e test
