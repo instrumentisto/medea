@@ -1,3 +1,5 @@
+mod test_ports;
+
 use actix::{Actor, Arbiter, AsyncContext, Context, StreamHandler, System};
 use actix_web::ws::{
     Client, ClientWriter, Message as WebMessage, ProtocolError,
@@ -14,6 +16,7 @@ use std::{
     sync::{Arc, Mutex},
     time::Duration,
 };
+use medea::conf::Server;
 
 struct TestMember {
     writer: ClientWriter,
@@ -128,7 +131,7 @@ impl StreamHandler<WebMessage, ProtocolError> for TestMember {
 }
 
 // TODO: deal with async testing. Maybe use different ports?
-fn run_test_server() {
+fn run_test_server(bind_port: u16) {
     let is_server_starting = Arc::new(Mutex::new(Cell::new(true)));
     let is_server_starting_ref = Arc::clone(&is_server_starting);
 
@@ -136,8 +139,14 @@ fn run_test_server() {
         dotenv::dotenv().ok();
         let _sys = System::new("medea");
 
-        // TODO: Don't load config from file. Use static.
-        let config = Conf::parse().unwrap();
+        let config = Conf {
+            server: Server {
+                static_specs_path: Some("tests/specs".to_string()),
+                bind_port,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
 
         match start_static_rooms(&config) {
             Ok(r) => {
@@ -159,8 +168,10 @@ fn run_test_server() {
 }
 
 #[test]
-fn sig_test() {
-    run_test_server();
+fn pub_sub_test() {
+    let bind_port = test_ports::SIGNALLING_TEST_PUB_SUB_TEST;
+    run_test_server(bind_port);
+    let base_url = format!("ws://localhost:{}/ws", bind_port);
 
     let sys = System::new("medea-signalling-test");
 
@@ -232,11 +243,11 @@ fn sig_test() {
     };
 
     TestMember::start(
-        "ws://localhost:8080/ws/pub-sub-video-call/caller/test",
+        &format!("{}/pub-sub-video-call/caller/test", base_url),
         Box::new(pub_sub_test.clone()),
     );
     TestMember::start(
-        "ws://localhost:8080/ws/pub-sub-video-call/responder/test",
+        &format!("{}/pub-sub-video-call/responder/test", base_url),
         Box::new(pub_sub_test.clone()),
     );
 
