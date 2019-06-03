@@ -1,5 +1,12 @@
-use std::collections::HashMap;
-use std::rc::Rc;
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
+
+use futures::{
+    future::{self, join_all, IntoFuture},
+    sync::mpsc::UnboundedSender,
+    Future,
+};
+use protocol::{Direction, IceCandidate as IceDto, MediaType, Track};
+use wasm_bindgen_futures::JsFuture;
 use web_sys::{
     MediaStreamTrack, RtcIceCandidateInit, RtcPeerConnection,
     RtcPeerConnectionIceEvent, RtcRtpSender, RtcRtpTransceiver,
@@ -7,17 +14,10 @@ use web_sys::{
     RtcSessionDescription, RtcSessionDescriptionInit, RtcTrackEvent,
 };
 
-use crate::media::stream::MediaStream;
-use crate::media::{GetMediaRequest, MediaManager};
-use crate::utils::{EventListener, WasmErr};
-
-use futures::future::join_all;
-use futures::future::IntoFuture;
-use futures::sync::mpsc::UnboundedSender;
-use futures::{future, Future};
-use protocol::{Direction, IceCandidate as IceDto, MediaType, Track};
-use std::cell::RefCell;
-use wasm_bindgen_futures::JsFuture;
+use crate::{
+    media::{stream::MediaStream, GetMediaRequest, MediaManager},
+    utils::{EventListener, WasmErr},
+};
 
 pub type Id = u64;
 
