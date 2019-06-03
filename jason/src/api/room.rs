@@ -7,8 +7,8 @@ use std::{
 };
 
 use futures::{
-    future::{Future, IntoFuture},
-    stream::Stream,
+    future::{Future as _, IntoFuture},
+    stream::Stream as _,
 };
 use medea_client_api_proto::{EventHandler, IceCandidate, Track};
 use wasm_bindgen::{prelude::*, JsValue};
@@ -38,7 +38,7 @@ impl Room {
             .subscribe()
             .for_each(move |event| match inner.upgrade() {
                 Some(inner) => {
-                    event.dispatch(inner.borrow_mut().deref_mut());
+                    event.dispatch_with(inner.borrow_mut().deref_mut());
                     Ok(())
                 }
                 None => {

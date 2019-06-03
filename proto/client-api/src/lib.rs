@@ -45,10 +45,10 @@ pub enum Command {
 
 /// WebSocket message from Medea to Jason.
 #[allow(dead_code)]
+#[dispatchable]
 #[cfg_attr(feature = "medea", derive(Serialize))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
 #[cfg_attr(test, derive(Debug, PartialEq))]
-#[dispatchable]
 #[serde(tag = "event", content = "data")]
 pub enum Event {
     /// Media Server notifies Web Client about necessity of RTCPeerConnection
@@ -82,7 +82,7 @@ pub struct IceCandidate {
     pub sdp_mid: Option<String>,
 }
 
-/// [`Track] with specified direction.
+/// [`Track`] with specified direction.
 #[cfg_attr(feature = "medea", derive(Serialize))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
 #[cfg_attr(test, derive(Debug, PartialEq))]

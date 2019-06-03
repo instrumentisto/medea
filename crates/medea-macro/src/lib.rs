@@ -97,17 +97,19 @@ pub fn enum_delegate(args: TokenStream, input: TokenStream) -> TokenStream {
         .unwrap_or_else(|e| e.to_compile_error().into())
 }
 
-/// This is macro for generating Handler trait based on
-/// some enum.
-/// ## Macro use
-/// ### 1. Declare enum for events and struct for data
+/// Generates `*Handler` trait and displatching function for some event,
+/// represented as `enum`.
+///
+/// # How to use
+///
+/// ### 1. Declare `enum` for event variants and a `struct` to handle them.
 /// ```
 /// use medea_macro::dispatchable;
 ///
 /// #[dispatchable]
 /// enum Event {
-///     SomeEvent { new_bar: i32 },
-///     AnotherEvent,
+///     Some { new_bar: i32 },
+///     Another,
 ///     UnnamedVariant(i32, i32),
 /// }
 ///
@@ -117,33 +119,19 @@ pub fn enum_delegate(args: TokenStream, input: TokenStream) -> TokenStream {
 /// }
 /// ```
 ///
-/// ### 2. Implement handler for your data
-/// #### Principle of generation name for handler trait
-/// The __principle of generation name for handler trait__ is
-/// to simply add postfix "Handler" to event enum name.
+/// ### 2. Implement handler for your `struct`.
 ///
-/// For example:
-///
-/// Original enum name is Event then handler name for this
-/// enum will be `EventHandler`.
-///
-/// #### Principle of generation name for handler functions
-/// The __principle of generation name for handler functions__ is
-/// to translate the name of the event enum variant from `camelCase`
-/// to `snake_case` and add the prefix `on_`.
-///
-/// For example:
-///
-/// Event enum variant name is `SomeEnumVariant` then handler function name
-/// will be `on_some_enum_variant`.
+/// For the given `enum` macro generates a unique trait by adding `Handler`
+/// to the end of its name. Each method of trait is created by `snake_case`'ing
+/// `enum` variants and adding `on_` prefix.
 ///
 /// ```
 /// # use medea_macro::dispatchable;
 /// #
 /// # #[dispatchable]
 /// # enum Event {
-/// #     SomeEvent { new_bar: i32 },
-/// #     AnotherEvent,
+/// #     Some { new_bar: i32 },
+/// #     Another,
 /// #     UnnamedVariant(i32, i32),
 /// # }
 /// #
@@ -153,11 +141,11 @@ pub fn enum_delegate(args: TokenStream, input: TokenStream) -> TokenStream {
 /// # }
 /// #
 /// impl EventHandler for Foo {
-///     fn on_some_event(&mut self, new_bar: i32) {
+///     fn on_some(&mut self, new_bar: i32) {
 ///         self.bar = new_bar;
 ///     }
 ///
-///     fn on_another_event(&mut self) {
+///     fn on_another(&mut self) {
 ///         self.bar = 2;
 ///     }
 ///
@@ -168,16 +156,18 @@ pub fn enum_delegate(args: TokenStream, input: TokenStream) -> TokenStream {
 /// }
 /// ```
 ///
-/// ### 3. And finaly
-/// You can use `dispatch()` on your event when you need it.
+/// ### 3. Dispatch event with handler
+///
+/// For the given `enum` macro generates `dispatch_with()` method to dispatch
+/// `enum` with a given handler.
 ///
 /// ```
 /// # use medea_macro::dispatchable;
 /// #
 /// # #[dispatchable]
 /// # enum Event {
-/// #     SomeEvent { new_bar: i32 },
-/// #     AnotherEvent,
+/// #     Some { new_bar: i32 },
+/// #     Another,
 /// #     UnnamedVariant(i32, i32),
 /// # }
 /// #
@@ -187,11 +177,11 @@ pub fn enum_delegate(args: TokenStream, input: TokenStream) -> TokenStream {
 /// # }
 /// #
 /// # impl EventHandler for Foo {
-/// #    fn on_some_event(&mut self, new_bar: i32) {
+/// #    fn on_some(&mut self, new_bar: i32) {
 /// #        self.bar = new_bar;
 /// #    }
 /// #
-/// #    fn on_another_event(&mut self) {
+/// #    fn on_another(&mut self) {
 /// #        self.bar = 2;
 /// #    }
 /// #
@@ -200,17 +190,17 @@ pub fn enum_delegate(args: TokenStream, input: TokenStream) -> TokenStream {
 /// #        self.baz = data.1;
 /// #    }
 /// # }
-///
+/// #
 /// fn main() {
 ///     let mut foo = Foo { bar: 0, baz: 0 };
 ///
-///     Event::SomeEvent { new_bar: 1 }.dispatch(&mut foo);
+///     Event::Some { new_bar: 1 }.dispatch_with(&mut foo);
 ///     assert_eq!(foo.bar, 1);
 ///
-///     Event::AnotherEvent.dispatch(&mut foo);
+///     Event::Another.dispatch_with(&mut foo);
 ///     assert_eq!(foo.bar, 2);
 ///
-///     Event::UnnamedVariant(3, 3).dispatch(&mut foo);
+///     Event::UnnamedVariant(3, 3).dispatch_with(&mut foo);
 ///     assert_eq!(foo.bar, 3);
 ///     assert_eq!(foo.baz, 3);
 /// }
