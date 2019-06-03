@@ -204,8 +204,10 @@ fn should_work_pub_sub_video_call() {
     let base_url =
         format!("ws://localhost:{}/ws/pub-sub-video-call", bind_port);
 
-    let sys = System::new("medea-signaling-pub-sub-test");
+    let sys = System::new(test_name);
 
+    // Note that events is separated by members.
+    // Every member will have different instance of this.
     let mut events = Vec::new();
     let test_fn = move |event: &Event| {
         events.push(event.clone());
@@ -314,8 +316,11 @@ fn should_work_three_members_p2p_video_call() {
     let base_url =
         format!("ws://localhost:{}/ws/three-members-conference", bind_port);
 
-    let sys = System::new("medea-signaling-3-members-test");
+    let sys = System::new(test_name);
 
+    // Note that events, peer_created_count, ice_candidates and members_tested
+    // is separated by members.
+    // Every member will have different instance of this.
     let mut events = Vec::new();
     let mut peer_created_count = 0;
     let mut ice_candidates = 0;
