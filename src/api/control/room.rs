@@ -1,11 +1,10 @@
 //! Room definitions and implementations.
 
-use hashbrown::HashMap;
 use serde::Deserialize;
 use std::convert::TryFrom;
 
 use super::{
-    endpoint::Endpoint, member::MemberSpec, pipeline::Pipeline, Element,
+    member::MemberSpec, pipeline::Pipeline, Element,
     MemberId, TryFromElementError,
 };
 
@@ -37,39 +36,19 @@ impl RoomSpec {
         ))
     }
 
-    /// Get all relations between [`Member`]s [`Endpoint`]s.
-    ///
-    /// Returns [`HashMap`] with [`MemberId`] of sender and all of his receivers
-    /// [`MemberId`].
-    ///
-    /// Returns [`TryFromElementError`] if some unexpected [`Element`] finded.
-    pub fn get_sender_receivers(
-        &self,
-    ) -> Result<HashMap<MemberId, Vec<MemberId>>, TryFromElementError> {
-        let mut sender_receivers: HashMap<MemberId, Vec<MemberId>> =
-            HashMap::new();
+    /// Get all receivers of all [`Member`]'s [`WebRtcPublishEndpoint`]s.
+    pub fn get_receivers_for_member(&self, id: &MemberId) -> Result<Vec<MemberId>, TryFromElementError> {
+        let mut receivers = Vec::new();
         for (member_id, member_element) in &self.spec.pipeline {
-            let member_id = MemberId(member_id.clone());
             let member = MemberSpec::try_from(member_element.clone())?;
-            for endpoint_element in member.spec.pipeline.values() {
-                let endpoint = Endpoint::try_from(endpoint_element.clone())?;
-
-                if let Endpoint::WebRtcPlay(play) = endpoint {
-                    if let Some(m) =
-                        sender_receivers.get_mut(&play.src.member_id)
-                    {
-                        m.push(member_id.clone());
-                    } else {
-                        sender_receivers.insert(
-                            play.src.member_id,
-                            vec![member_id.clone()],
-                        );
-                    }
+            for endpoint in member.play_endpoints() {
+                if &endpoint.src.member_id == id {
+                    receivers.push(MemberId(member_id.clone()));
                 }
             }
         }
 
-        Ok(sender_receivers)
+        Ok(receivers)
     }
 }
 

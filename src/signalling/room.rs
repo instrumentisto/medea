@@ -71,12 +71,6 @@ pub struct Room {
 
     /// [`Peer`]s of [`Member`]s in this [`Room`].
     peers: PeerRepository,
-
-    /// Stores [`MemberId`]s of all sender's receivers.
-    ///
-    /// __Key__ is sender's [`MemberId`].
-    /// __Value__ is all sender's receivers.
-    sender_receivers: HashMap<MemberId, Vec<MemberId>>,
 }
 
 impl Room {
@@ -91,8 +85,7 @@ impl Room {
         Ok(Self {
             id: room_spec.id.clone(),
             peers: PeerRepository::from(HashMap::new()),
-            participants: ParticipantService::new(room_spec, reconnect_timeout),
-            sender_receivers: room_spec.get_sender_receivers()?,
+            participants: ParticipantService::new(room_spec, reconnect_timeout)?,
         })
     }
 
@@ -290,22 +283,20 @@ impl Room {
 
         // connect receivers
         let mut already_connected_members = Vec::new();
-        if let Some(receivers) = self.sender_receivers.get(member_id) {
-            for recv_member_id in receivers {
-                if self.participants.member_has_connection(recv_member_id) {
-                    if let Some(recv_member) =
-                        self.participants.get_member_by_id(recv_member_id)
-                    {
-                        already_connected_members.push(recv_member_id.clone());
-                        need_create.push((&member, recv_member.clone()));
-                    } else {
-                        error!(
-                            "Try to create peer for nonexistent member with \
-                             ID {}. Room will be stopped.",
-                            recv_member_id
-                        );
-                        ctx.notify(CloseRoom {});
-                    }
+        for recv_member_id in &member.receivers {
+            if self.participants.member_has_connection(recv_member_id) {
+                if let Some(recv_member) =
+                    self.participants.get_member_by_id(recv_member_id)
+                {
+                    already_connected_members.push(recv_member_id.clone());
+                    need_create.push((&member, recv_member.clone()));
+                } else {
+                    error!(
+                        "Try to create peer for nonexistent member with \
+                         ID {}. Room will be stopped.",
+                        recv_member_id
+                    );
+                    ctx.notify(CloseRoom {});
                 }
             }
         }

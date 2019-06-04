@@ -30,6 +30,9 @@ pub struct Member {
 
     /// Control API specification of this [`Member`].
     pub spec: Arc<MemberSpec>,
+
+    /// Receivers of this [`Member`]'s publish endpoints.
+    pub receivers: Vec<Id>,
 }
 
 /// Newtype for [`Element::Member`] variant.

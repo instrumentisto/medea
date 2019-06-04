@@ -22,7 +22,7 @@ use crate::{
             AuthorizationError, ClosedReason, EventMessage, RpcConnection,
             RpcConnectionClosed,
         },
-        control::{Member, MemberId, MemberSpec, RoomSpec},
+        control::{Member, MemberId, MemberSpec, RoomSpec, TryFromElementError},
     },
     log::prelude::*,
     signalling::{
@@ -55,32 +55,32 @@ pub struct ParticipantService {
 }
 
 impl ParticipantService {
-    pub fn new(room_spec: &RoomSpec, reconnect_timeout: Duration) -> Self {
-        let members = room_spec
-            .spec
-            .pipeline
-            .iter()
-            .map(|(control_id, element)| {
-                let member_spec =
-                    MemberSpec::try_from(element.clone()).unwrap();
+    /// Create new [`ParticipantService`] from [`RoomSpec`].
+    pub fn new(room_spec: &RoomSpec, reconnect_timeout: Duration) -> Result<Self, TryFromElementError> {
+        let mut members = HashMap::new();
+        for (control_id, element) in &room_spec.spec.pipeline {
+            let member_spec =
+                MemberSpec::try_from(element.clone())?;
+            let member_id = MemberId(control_id.clone());
 
-                (
-                    MemberId(control_id.clone()),
-                    Member {
-                        id: MemberId(control_id.clone()),
-                        spec: Arc::new(member_spec),
-                    },
-                )
-            })
-            .collect();
-        debug!("Created room with {:?} users.", members);
+            members.insert(
+                member_id.clone(),
+                Member {
+                    receivers: room_spec.get_receivers_for_member(&member_id)?,
+                    id: member_id,
+                    spec: Arc::new(member_spec),
+                },
+            );
+        }
 
-        Self {
+        debug!("Created room with {:?} members.", members);
+
+        Ok(Self {
             members,
             connections: HashMap::new(),
             reconnect_timeout,
             drop_connection_tasks: HashMap::new(),
-        }
+        })
     }
 
     /// Lookup [`Member`] by provided id.
