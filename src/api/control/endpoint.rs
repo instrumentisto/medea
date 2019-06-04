@@ -9,7 +9,7 @@ use serde::{
 
 use crate::api::control::MemberId;
 
-use super::{Entity, TryFromEntityError};
+use super::{Element, TryFromElementError};
 use serde::de::Unexpected;
 
 /// [`Endpoint`] represents a media element that one or more media data streams
@@ -20,18 +20,18 @@ pub enum Endpoint {
     WebRtcPlay(WebRtcPlayEndpoint),
 }
 
-impl TryFrom<Entity> for Endpoint {
-    type Error = TryFromEntityError;
+impl TryFrom<Element> for Endpoint {
+    type Error = TryFromElementError;
 
-    fn try_from(from: Entity) -> Result<Self, Self::Error> {
+    fn try_from(from: Element) -> Result<Self, Self::Error> {
         match from {
-            Entity::WebRtcPlayEndpoint { spec } => {
+            Element::WebRtcPlayEndpoint { spec } => {
                 Ok(Endpoint::WebRtcPlay(spec))
             }
-            Entity::WebRtcPublishEndpoint { spec } => {
+            Element::WebRtcPublishEndpoint { spec } => {
                 Ok(Endpoint::WebRtcPublish(spec))
             }
-            _ => Err(TryFromEntityError::NotEndpoint),
+            _ => Err(TryFromElementError::NotEndpoint),
         }
     }
 }

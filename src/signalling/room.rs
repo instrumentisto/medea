@@ -18,7 +18,7 @@ use crate::{
             AuthorizationError, Authorize, CommandMessage, RpcConnectionClosed,
             RpcConnectionEstablished,
         },
-        control::{Member, MemberId, RoomId, RoomSpec, TryFromEntityError},
+        control::{Member, MemberId, RoomId, RoomSpec, TryFromElementError},
     },
     log::prelude::*,
     media::{
@@ -52,10 +52,10 @@ impl From<PeerStateError> for RoomError {
     }
 }
 
-impl From<TryFromEntityError> for RoomError {
-    fn from(err: TryFromEntityError) -> Self {
+impl From<TryFromElementError> for RoomError {
+    fn from(err: TryFromElementError) -> Self {
         RoomError::BadRoomSpec(format!(
-            "Entity located in wrong place. {}",
+            "Element located in wrong place. {}",
             err
         ))
     }
@@ -82,7 +82,7 @@ pub struct Room {
 impl Room {
     /// Create new instance of [`Room`].
     ///
-    /// Returns [`RoomError::BadRoomSpec`] when error while [`Entity`]
+    /// Returns [`RoomError::BadRoomSpec`] when error while [`Element`]
     /// transformation happens.
     pub fn new(
         room_spec: &RoomSpec,

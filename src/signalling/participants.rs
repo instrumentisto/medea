@@ -60,8 +60,9 @@ impl ParticipantService {
             .spec
             .pipeline
             .iter()
-            .map(|(control_id, entity)| {
-                let member_spec = MemberSpec::try_from(entity.clone()).unwrap();
+            .map(|(control_id, element)| {
+                let member_spec =
+                    MemberSpec::try_from(element.clone()).unwrap();
 
                 (
                     MemberId(control_id.clone()),

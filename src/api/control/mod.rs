@@ -21,23 +21,23 @@ pub use self::{
     room::{Id as RoomId, RoomSpec},
 };
 
-/// Errors that can occur when we try transform some spec from [`Entity`].
+/// Errors that can occur when we try transform some spec from [`Element`].
 /// This error used in all [`TryFrom`] of Control API.
 #[allow(clippy::pub_enum_variant_names)]
 #[derive(Debug, Fail)]
-pub enum TryFromEntityError {
-    #[fail(display = "Entity is not Endpoint")]
+pub enum TryFromElementError {
+    #[fail(display = "Element is not Endpoint")]
     NotEndpoint,
-    #[fail(display = "Entity is not Room")]
+    #[fail(display = "Element is not Room")]
     NotRoom,
-    #[fail(display = "Entity is not Member")]
+    #[fail(display = "Element is not Member")]
     NotMember,
 }
 
 /// Entity for parsing Control API request.
 #[derive(Clone, Deserialize, Debug)]
 #[serde(tag = "kind")]
-pub enum Entity {
+pub enum Element {
     /// Represent [`RoomSpec`].
     /// Can transform into [`RoomSpec`] by `RoomSpec::try_from`.
     Room { id: RoomId, spec: Pipeline },
@@ -60,7 +60,7 @@ pub fn load_from_yaml_file<P: AsRef<Path>>(path: P) -> Result<RoomSpec, Error> {
     let mut file = File::open(path)?;
     let mut buf = String::new();
     file.read_to_string(&mut buf)?;
-    let parsed: Entity = serde_yaml::from_str(&buf)?;
+    let parsed: Element = serde_yaml::from_str(&buf)?;
     let room = RoomSpec::try_from(parsed)?;
 
     Ok(room)

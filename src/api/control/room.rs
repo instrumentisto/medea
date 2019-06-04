@@ -5,8 +5,8 @@ use serde::Deserialize;
 use std::convert::TryFrom;
 
 use super::{
-    endpoint::Endpoint, member::MemberSpec, pipeline::Pipeline, Entity,
-    MemberId, TryFromEntityError,
+    endpoint::Endpoint, member::MemberSpec, pipeline::Pipeline, Element,
+    MemberId, TryFromElementError,
 };
 
 /// ID of [`Room`].
@@ -14,7 +14,7 @@ use super::{
 pub struct Id(pub String);
 
 /// [`crate::signalling::room::Room`] specification.
-/// Newtype for [`Entity::Room`]
+/// Newtype for [`Element::Room`]
 #[allow(clippy::module_name_repetitions)]
 #[derive(Clone, Debug)]
 pub struct RoomSpec {
@@ -26,12 +26,12 @@ impl RoomSpec {
     /// Try to find [`MemberSpec`] by ID.
     ///
     /// Return `None` if [`MemberSpec`] not presented in [`RoomSpec`].
-    /// Return `Some(TryFromEntityError::NotMember)` if entity with this ID
+    /// Return `Some(TryFromElementError::NotMember)` if element with this ID
     ///         finded but its not [`MemberSpec`].
     pub fn get_member(
         &self,
         id: &MemberId,
-    ) -> Option<Result<MemberSpec, TryFromEntityError>> {
+    ) -> Option<Result<MemberSpec, TryFromElementError>> {
         Some(MemberSpec::try_from(
             self.spec.pipeline.get(&id.0).cloned()?,
         ))
@@ -42,19 +42,19 @@ impl RoomSpec {
     /// Returns [`HashMap`] with [`MemberId`] of sender and all of his receivers
     /// [`MemberId`].
     ///
-    /// Returns [`TryFromEntityError`] if some unexpected [`Entity`] finded.
+    /// Returns [`TryFromElementError`] if some unexpected [`Element`] finded.
     pub fn get_sender_receivers(
         &self,
-    ) -> Result<HashMap<MemberId, Vec<MemberId>>, TryFromEntityError> {
+    ) -> Result<HashMap<MemberId, Vec<MemberId>>, TryFromElementError> {
         let mut sender_receivers: HashMap<MemberId, Vec<MemberId>> =
             HashMap::new();
-        for (member_id, member_entity) in &self.spec.pipeline {
+        for (member_id, member_element) in &self.spec.pipeline {
             let member_id = MemberId(member_id.clone());
-            let member = MemberSpec::try_from(member_entity.clone())?;
-            for element_entity in member.spec.pipeline.values() {
-                let element = Endpoint::try_from(element_entity.clone())?;
+            let member = MemberSpec::try_from(member_element.clone())?;
+            for endpoint_element in member.spec.pipeline.values() {
+                let endpoint = Endpoint::try_from(endpoint_element.clone())?;
 
-                if let Endpoint::WebRtcPlay(play) = element {
+                if let Endpoint::WebRtcPlay(play) = endpoint {
                     if let Some(m) =
                         sender_receivers.get_mut(&play.src.member_id)
                     {
@@ -73,13 +73,13 @@ impl RoomSpec {
     }
 }
 
-impl TryFrom<Entity> for RoomSpec {
-    type Error = TryFromEntityError;
+impl TryFrom<Element> for RoomSpec {
+    type Error = TryFromElementError;
 
-    fn try_from(from: Entity) -> Result<Self, Self::Error> {
+    fn try_from(from: Element) -> Result<Self, Self::Error> {
         match from {
-            Entity::Room { id, spec } => Ok(Self { id, spec }),
-            _ => Err(TryFromEntityError::NotRoom),
+            Element::Room { id, spec } => Ok(Self { id, spec }),
+            _ => Err(TryFromElementError::NotRoom),
         }
     }
 }

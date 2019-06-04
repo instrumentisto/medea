@@ -5,7 +5,7 @@ use std::{convert::TryFrom, fmt::Display, sync::Arc};
 use serde::Deserialize;
 
 use super::{
-    endpoint::Endpoint, pipeline::Pipeline, Entity, TryFromEntityError,
+    endpoint::Endpoint, pipeline::Pipeline, Element, TryFromElementError,
 };
 
 use crate::api::control::endpoint::{
@@ -32,7 +32,7 @@ pub struct Member {
     pub spec: Arc<MemberSpec>,
 }
 
-/// Newtype for [`Entity::Member`] variant.
+/// Newtype for [`Element::Member`] variant.
 #[allow(clippy::module_name_repetitions)]
 #[derive(Clone, Debug)]
 pub struct MemberSpec {
@@ -48,7 +48,7 @@ impl MemberSpec {
     pub fn get_endpoint_by_id(
         &self,
         id: &str,
-    ) -> Option<Result<Endpoint, TryFromEntityError>> {
+    ) -> Option<Result<Endpoint, TryFromElementError>> {
         Some(Endpoint::try_from(self.spec.pipeline.get(id).cloned()?))
     }
 
@@ -58,7 +58,7 @@ impl MemberSpec {
             .pipeline
             .iter()
             .filter_map(|(_, e)| match e {
-                Entity::WebRtcPlayEndpoint { spec } => Some(spec),
+                Element::WebRtcPlayEndpoint { spec } => Some(spec),
                 _ => None,
             })
             .collect()
@@ -70,22 +70,22 @@ impl MemberSpec {
             .pipeline
             .iter()
             .filter_map(|(_, e)| match e {
-                Entity::WebRtcPublishEndpoint { spec } => Some(spec),
+                Element::WebRtcPublishEndpoint { spec } => Some(spec),
                 _ => None,
             })
             .collect()
     }
 }
 
-impl TryFrom<Entity> for MemberSpec {
-    type Error = TryFromEntityError;
+impl TryFrom<Element> for MemberSpec {
+    type Error = TryFromElementError;
 
-    fn try_from(from: Entity) -> Result<Self, Self::Error> {
+    fn try_from(from: Element) -> Result<Self, Self::Error> {
         match from {
-            Entity::Member { spec, credentials } => {
+            Element::Member { spec, credentials } => {
                 Ok(Self { spec, credentials })
             }
-            _ => Err(TryFromEntityError::NotMember),
+            _ => Err(TryFromElementError::NotMember),
         }
     }
 }
