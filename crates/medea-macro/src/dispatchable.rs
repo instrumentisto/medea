@@ -1,37 +1,16 @@
 //! `#[dispatchable]` macro implementation.
 
-use proc_macro::TokenStream;
+use inflector::Inflector;
 use proc_macro2::Span;
+use proc_macro::TokenStream;
 use quote::quote;
 use syn::parse::Result;
 
 /// Transforms given name from `camelCase` to `snake_case` and adds `on_`
 /// prefix.
 fn to_handler_fn_name(name: &str) -> String {
-    let mut snake_case = String::new();
-    snake_case.push_str("on_");
-    let mut prev_ch = '\0';
-    let mut uppercase_duration = 0;
-
-    for ch in name.chars() {
-        if ch.is_uppercase() && !prev_ch.is_uppercase() && (prev_ch != '\0') {
-            snake_case.push('_');
-        }
-
-        if ch.is_lowercase() && uppercase_duration > 1 {
-            let prev_ch = snake_case.pop().unwrap();
-            snake_case.push('_');
-            snake_case.push(prev_ch);
-        }
-
-        snake_case.push_str(&ch.to_lowercase().to_string());
-        prev_ch = ch;
-        if ch.is_uppercase() {
-            uppercase_duration += 1;
-        } else {
-            uppercase_duration = 0;
-        }
-    }
+    let mut snake_case = name.to_snake_case();
+    snake_case.insert_str(0, "on_");
 
     snake_case
 }
@@ -178,12 +157,7 @@ mod tests {
             to_handler_fn_name("RTCPeerConnection"),
             "on_rtc_peer_connection"
         );
-        assert_eq!(to_handler_fn_name("Nam3"), "on_nam3");
-        assert_eq!(to_handler_fn_name("1Name"), "on_1_name");
-        assert_eq!(to_handler_fn_name("123NAme"), "on_123_n_ame");
         assert_eq!(to_handler_fn_name("testString"), "on_test_string");
-        assert_eq!(to_handler_fn_name("123test"), "on_123test");
-        assert_eq!(to_handler_fn_name("123Test"), "on_123_test");
         assert_eq!(to_handler_fn_name("testtest"), "on_testtest");
         assert_eq!(to_handler_fn_name("Some"), "on_some");
         assert_eq!(to_handler_fn_name("S"), "on_s");
