@@ -1,6 +1,6 @@
 //! Implementation of Control API.
 
-pub mod element;
+pub mod endpoint;
 pub mod member;
 pub mod pipeline;
 pub mod room;
@@ -11,12 +11,12 @@ use serde::Deserialize;
 use std::{convert::TryFrom as _, fs::File, io::Read as _, path::Path};
 
 use self::{
-    element::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
+    endpoint::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
     pipeline::Pipeline,
 };
 
 pub use self::{
-    element::Endpoint,
+    endpoint::Endpoint,
     member::{Id as MemberId, Member, MemberSpec},
     room::{Id as RoomId, RoomSpec},
 };
@@ -27,7 +27,7 @@ pub use self::{
 #[derive(Debug, Fail)]
 pub enum TryFromEntityError {
     #[fail(display = "Entity is not Element")]
-    NotElement,
+    NotEndpoint,
     #[fail(display = "Entity is not Room")]
     NotRoom,
     #[fail(display = "Entity is not Member")]

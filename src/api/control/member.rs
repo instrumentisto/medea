@@ -5,10 +5,12 @@ use std::{convert::TryFrom, fmt::Display, sync::Arc};
 use serde::Deserialize;
 
 use super::{
-    element::Endpoint, pipeline::Pipeline, Entity, TryFromEntityError,
+    endpoint::Endpoint, pipeline::Pipeline, Entity, TryFromEntityError,
 };
 
-use crate::api::control::element::{WebRtcPlayEndpoint, WebRtcPublishEndpoint};
+use crate::api::control::endpoint::{
+    WebRtcPlayEndpoint, WebRtcPublishEndpoint,
+};
 
 /// ID of [`Member`].
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq)]
@@ -21,7 +23,7 @@ impl Display for Id {
 }
 
 /// Media server user with its ID and credentials.
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub struct Member {
     /// ID of [`Member`].
     pub id: Id,

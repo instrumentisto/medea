@@ -20,7 +20,6 @@ fn main() {
 
     match start_static_rooms(&config) {
         Ok(r) => {
-            //            let loaded_rooms_id =
             info!(
                 "Loaded rooms: {:?}",
                 r.iter().map(|(id, _)| &id.0).collect::<Vec<&String>>()

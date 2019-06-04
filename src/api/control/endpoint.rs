@@ -1,4 +1,4 @@
-//! Control API specification Element definitions.
+//! Control API specification Endpoint definitions.
 
 use std::{convert::TryFrom, fmt};
 
@@ -12,7 +12,7 @@ use crate::api::control::MemberId;
 use super::{Entity, TryFromEntityError};
 use serde::de::Unexpected;
 
-/// [`Element`] represents a media element that one or more media data streams
+/// [`Endpoint`] represents a media element that one or more media data streams
 /// flow through.
 #[derive(Debug)]
 pub enum Endpoint {
@@ -31,13 +31,13 @@ impl TryFrom<Entity> for Endpoint {
             Entity::WebRtcPublishEndpoint { spec } => {
                 Ok(Endpoint::WebRtcPublish(spec))
             }
-            _ => Err(TryFromEntityError::NotElement),
+            _ => Err(TryFromEntityError::NotEndpoint),
         }
     }
 }
 
 /// Peer-to-peer mode of [`WebRtcPublishEndpoint`].
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Clone, Deserialize, Debug)]
 pub enum P2pMode {
     /// Always connect peer-to-peer.
     Always,
@@ -45,28 +45,30 @@ pub enum P2pMode {
 
 /// Media element which is able to publish media data for another client via
 /// WebRTC.
-#[derive(Deserialize, Debug, Clone)]
+#[allow(clippy::module_name_repetitions)]
+#[derive(Clone, Deserialize, Debug)]
 pub struct WebRtcPublishEndpoint {
     /// Peer-to-peer mode.
     pub p2p: P2pMode,
 }
 
 /// Media element which is able to play media data for client via WebRTC.
-#[derive(Deserialize, Debug, Clone)]
+#[allow(clippy::module_name_repetitions)]
+#[derive(Clone, Deserialize, Debug)]
 pub struct WebRtcPlayEndpoint {
     /// Source URI in format `local://{room_id}/{member_id}/{pipeline_id}`.
     pub src: LocalUri,
 }
 
 /// Special uri with pattern `local://{room_id}/{member_id}/{pipeline_id}`.
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub struct LocalUri {
     /// ID of [`Room`]
     // TODO: Why this field never used???
     pub room_id: String,
     /// ID of [`Member`]
     pub member_id: MemberId,
-    /// Control ID of [`Element`]
+    /// Control ID of [`Endpoint`]
     pub pipeline_id: String,
 }
 

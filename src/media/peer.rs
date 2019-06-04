@@ -14,7 +14,7 @@ use std::{convert::TryFrom, fmt::Display, sync::Arc};
 
 use crate::{
     api::control::{
-        element::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
+        endpoint::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
         MemberId,
     },
     media::{MediaTrack, TrackId},

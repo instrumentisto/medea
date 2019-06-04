@@ -5,7 +5,7 @@ use serde::Deserialize;
 use std::convert::TryFrom;
 
 use super::{
-    element::Endpoint, member::MemberSpec, pipeline::Pipeline, Entity,
+    endpoint::Endpoint, member::MemberSpec, pipeline::Pipeline, Entity,
     MemberId, TryFromEntityError,
 };
 
