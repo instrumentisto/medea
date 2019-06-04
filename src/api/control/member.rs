@@ -44,8 +44,8 @@ pub struct MemberSpec {
 }
 
 impl MemberSpec {
-    /// Get [`Element`] of this [`MemberSpec`] by ID.
-    pub fn get_element_by_id(
+    /// Get [`Endpoint`] of this [`MemberSpec`] by ID.
+    pub fn get_endpoint_by_id(
         &self,
         id: &str,
     ) -> Option<Result<Endpoint, TryFromEntityError>> {

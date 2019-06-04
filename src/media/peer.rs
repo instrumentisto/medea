@@ -258,7 +258,7 @@ impl Peer<New> {
         endpoints: Vec<&WebRtcPublishEndpoint>,
         last_track_id: &mut u64,
     ) {
-        for _endpoint in endpoints {
+        for _ in endpoints {
             *last_track_id += 1;
             let track_audio = Arc::new(MediaTrack::new(
                 *last_track_id,

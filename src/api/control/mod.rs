@@ -26,7 +26,7 @@ pub use self::{
 #[allow(clippy::pub_enum_variant_names)]
 #[derive(Debug, Fail)]
 pub enum TryFromEntityError {
-    #[fail(display = "Entity is not Element")]
+    #[fail(display = "Entity is not Endpoint")]
     NotEndpoint,
     #[fail(display = "Entity is not Room")]
     NotRoom,
@@ -47,11 +47,11 @@ pub enum Entity {
     Member { spec: Pipeline, credentials: String },
 
     /// Represent [`WebRtcPublishEndpoint`].
-    /// Can transform into [`Element`] enum by `Element::try_from`.
+    /// Can transform into [`Endpoint`] enum by `Endpoint::try_from`.
     WebRtcPublishEndpoint { spec: WebRtcPublishEndpoint },
 
     /// Represent [`WebRtcPlayEndpoint`].
-    /// Can transform into [`Element`] enum by `Element::try_from`.
+    /// Can transform into [`Endpoint`] enum by `Endpoint::try_from`.
     WebRtcPlayEndpoint { spec: WebRtcPlayEndpoint },
 }
 
