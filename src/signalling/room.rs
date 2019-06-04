@@ -85,7 +85,10 @@ impl Room {
         Ok(Self {
             id: room_spec.id.clone(),
             peers: PeerRepository::from(HashMap::new()),
-            participants: ParticipantService::new(room_spec, reconnect_timeout)?,
+            participants: ParticipantService::new(
+                room_spec,
+                reconnect_timeout,
+            )?,
         })
     }
 
@@ -244,15 +247,15 @@ impl Room {
         ctx: &mut <Self as Actor>::Context,
     ) {
         for p in to_create {
-            let caller = p.0;
-            let responder = p.1;
+            let first_member = p.0;
+            let second_member = p.1;
             debug!(
                 "Created peer member {} with member {}",
-                caller.id, responder.id
+                first_member.id, second_member.id
             );
 
             let (caller_peer_id, responder_peer_id) =
-                self.peers.create_peers(caller, &responder);
+                self.peers.create_peers(first_member, &second_member);
 
             ctx.notify(ConnectPeers(caller_peer_id, responder_peer_id));
 
@@ -292,8 +295,8 @@ impl Room {
                     need_create.push((&member, recv_member.clone()));
                 } else {
                     error!(
-                        "Try to create peer for nonexistent member with \
-                         ID {}. Room will be stopped.",
+                        "Try to create peer for nonexistent member with ID \
+                         {}. Room will be stopped.",
                         recv_member_id
                     );
                     ctx.notify(CloseRoom {});

@@ -160,7 +160,7 @@ impl<'de> Deserialize<'de> for LocalUri {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use serde::Deserialize;
 
     use super::*;

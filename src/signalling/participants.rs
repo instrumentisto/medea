@@ -22,7 +22,9 @@ use crate::{
             AuthorizationError, ClosedReason, EventMessage, RpcConnection,
             RpcConnectionClosed,
         },
-        control::{Member, MemberId, MemberSpec, RoomSpec, TryFromElementError},
+        control::{
+            Member, MemberId, MemberSpec, RoomSpec, TryFromElementError,
+        },
     },
     log::prelude::*,
     signalling::{
@@ -56,17 +58,20 @@ pub struct ParticipantService {
 
 impl ParticipantService {
     /// Create new [`ParticipantService`] from [`RoomSpec`].
-    pub fn new(room_spec: &RoomSpec, reconnect_timeout: Duration) -> Result<Self, TryFromElementError> {
+    pub fn new(
+        room_spec: &RoomSpec,
+        reconnect_timeout: Duration,
+    ) -> Result<Self, TryFromElementError> {
         let mut members = HashMap::new();
         for (control_id, element) in &room_spec.spec.pipeline {
-            let member_spec =
-                MemberSpec::try_from(element.clone())?;
+            let member_spec = MemberSpec::try_from(element.clone())?;
             let member_id = MemberId(control_id.clone());
 
             members.insert(
                 member_id.clone(),
                 Member {
-                    receivers: room_spec.get_receivers_for_member(&member_id)?,
+                    receivers: room_spec
+                        .get_receivers_for_member(&member_id)?,
                     id: member_id,
                     spec: Arc::new(member_spec),
                 },
