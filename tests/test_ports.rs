@@ -3,8 +3,11 @@
 /// Macro for generating ports numbers.
 /// This should used when you want to start test server.
 /// It's necessary because tests run asynchronously and ports
-/// should not overlap. Enumerating start from 40000 because
-/// the chance to cross the already used port is very small.
+/// should not overlap. Enumerating start from 49151 because
+/// based on [Registered by IANA ports][1] this is the last reserved port.
+/// 16384 ought to be enough for anybody.
+///
+/// [1]: https://en.wikipedia.org/wiki/List_of_TCP_and_UDP_port_numbers
 macro_rules! generate_ports_for_tests {
     ( $( $x:tt ),* $(,)* ) => {
         use lazy_static::lazy_static;
@@ -18,7 +21,7 @@ macro_rules! generate_ports_for_tests {
                     .into_iter()
                     .enumerate()
                     .map(|(i, t)| {
-                        let port = 40000 + i as u16;
+                        let port = 49151 + i as u16;
                         (t, port)
                     })
                     .collect()
@@ -27,6 +30,7 @@ macro_rules! generate_ports_for_tests {
     };
 }
 
+// Register your test by adding test name into this macro call.
 generate_ports_for_tests!(
     should_work_three_members_p2p_video_call,
     should_work_pub_sub_video_call,

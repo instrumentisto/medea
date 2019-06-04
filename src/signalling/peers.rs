@@ -40,62 +40,54 @@ impl PeerRepository {
 
     /// Create and interconnect [`Peer`]s based on [`MemberSpec`].
     ///
-    /// Returns IDs of created [`Peer`]s. `(caller_peer_id, responder_peer_id)`.
+    /// Returns IDs of created [`Peer`]s. `(first_peer_id, second_peer_id)`.
     pub fn create_peers(
         &mut self,
-        caller: &Member,
-        responder: &Member,
+        first_member: &Member,
+        second_member: &Member,
     ) -> (u64, u64) {
         self.peers_count += 1;
-        let caller_peer_id = self.peers_count;
+        let first_peer_id = self.peers_count;
         self.peers_count += 1;
-        let responder_peer_id = self.peers_count;
+        let second_peer_id = self.peers_count;
 
-        let mut caller_peer = Peer::new(
-            caller_peer_id,
-            caller.id.clone(),
-            responder_peer_id,
-            responder.id.clone(),
+        let mut first_peer = Peer::new(
+            first_peer_id,
+            first_member.id.clone(),
+            second_peer_id,
+            second_member.id.clone(),
         );
-        let mut responder_peer = Peer::new(
-            responder_peer_id,
-            responder.id.clone(),
-            caller_peer_id,
-            caller.id.clone(),
+        let mut second_peer = Peer::new(
+            second_peer_id,
+            second_member.id.clone(),
+            first_peer_id,
+            first_member.id.clone(),
         );
 
-        caller_peer.add_publish_endpoints(
-            caller.spec.get_publish_endpoints(),
+        first_peer.add_publish_endpoints(
+            first_member.spec.publish_endpoints(),
             &mut self.tracks_count,
         );
-        responder_peer.add_publish_endpoints(
-            responder.spec.get_publish_endpoints(),
+        second_peer.add_publish_endpoints(
+            second_member.spec.publish_endpoints(),
             &mut self.tracks_count,
         );
-        for endpoint in caller.spec.get_play_endpoints() {
-            if responder.id == endpoint.src.member_id {
-                responder_peer
-                    .get_senders()
-                    .into_iter()
-                    .for_each(|s| caller_peer.add_receiver(s));
-            }
-        }
 
-        for endpoint in responder.spec.get_play_endpoints() {
-            if caller.id == endpoint.src.member_id {
-                caller_peer
-                    .get_senders()
-                    .into_iter()
-                    .for_each(|s| responder_peer.add_receiver(s));
-            }
-        }
+        first_peer.add_play_endpoints(
+            first_member.spec.play_endpoints(),
+            &mut second_peer,
+        );
+        second_peer.add_play_endpoints(
+            second_member.spec.play_endpoints(),
+            &mut first_peer,
+        );
 
-        self.add_peer(caller_peer_id, caller_peer);
-        self.add_peer(responder_peer_id, responder_peer);
+        self.add_peer(first_peer_id, first_peer);
+        self.add_peer(second_peer_id, second_peer);
 
         //        println!("Peers: {:#?}", self.peers);
 
-        (caller_peer_id, responder_peer_id)
+        (first_peer_id, second_peer_id)
     }
 
     /// Returns borrowed [`Peer`] by its ID.
@@ -116,7 +108,6 @@ impl PeerRepository {
     /// Returns [`Peer`] of specified [`Member`].
     ///
     /// Panic if [`Peer`] not exists.
-    #[allow(clippy::ptr_arg)]
     pub fn get_peers_by_member_id(
         &self,
         member_id: &MemberId,

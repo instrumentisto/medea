@@ -13,7 +13,10 @@ use medea_macro::enum_delegate;
 use std::{convert::TryFrom, fmt::Display, sync::Arc};
 
 use crate::{
-    api::control::{element::WebRtcPublishEndpoint, MemberId},
+    api::control::{
+        element::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
+        MemberId,
+    },
     media::{MediaTrack, TrackId},
 };
 
@@ -247,7 +250,7 @@ impl Peer<New> {
         }
     }
 
-    /// Add all [`WebRtcPublishEndpoint`] to this [`Peer`].
+    /// Add all [`WebRtcPublishEndpoint`]s to this [`Peer`].
     ///
     /// This use `last_track_id` counter for generating new [`MediaTrack`] ID.
     pub fn add_publish_endpoints(
@@ -269,6 +272,22 @@ impl Peer<New> {
 
             self.add_sender(track_audio);
             self.add_sender(track_video);
+        }
+    }
+
+    /// Add all `partner_peer` related [`WebRtcPlayEndpoint`]s to this [`Peer`].
+    pub fn add_play_endpoints(
+        &mut self,
+        endpoints: Vec<&WebRtcPlayEndpoint>,
+        partner_peer: &mut Peer<New>,
+    ) {
+        for endpoint in endpoints {
+            if self.context.partner_member == endpoint.src.member_id {
+                partner_peer
+                    .get_senders()
+                    .into_iter()
+                    .for_each(|s| self.add_receiver(s));
+            }
         }
     }
 

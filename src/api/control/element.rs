@@ -10,25 +10,26 @@ use serde::{
 use crate::api::control::MemberId;
 
 use super::{Entity, TryFromEntityError};
+use serde::de::Unexpected;
 
 /// [`Element`] represents a media element that one or more media data streams
 /// flow through.
 #[derive(Debug)]
-pub enum Element {
-    WebRtcPublishEndpoint(WebRtcPublishEndpoint),
-    WebRtcPlayEndpoint(WebRtcPlayEndpoint),
+pub enum Endpoint {
+    WebRtcPublish(WebRtcPublishEndpoint),
+    WebRtcPlay(WebRtcPlayEndpoint),
 }
 
-impl TryFrom<Entity> for Element {
+impl TryFrom<Entity> for Endpoint {
     type Error = TryFromEntityError;
 
     fn try_from(from: Entity) -> Result<Self, Self::Error> {
         match from {
             Entity::WebRtcPlayEndpoint { spec } => {
-                Ok(Element::WebRtcPlayEndpoint(spec))
+                Ok(Endpoint::WebRtcPlay(spec))
             }
             Entity::WebRtcPublishEndpoint { spec } => {
-                Ok(Element::WebRtcPublishEndpoint(spec))
+                Ok(Endpoint::WebRtcPublish(spec))
             }
             _ => Err(TryFromEntityError::NotElement),
         }
@@ -93,9 +94,12 @@ impl<'de> Deserialize<'de> for LocalUri {
             {
                 let protocol_name: String = value.chars().take(8).collect();
                 if protocol_name != "local://" {
-                    return Err(Error::custom(
-                        "Expected local uri in format \
-                         local://room_id/member_id/pipeline_id!",
+                    return Err(Error::invalid_value(
+                        Unexpected::Str(&format!(
+                            "{} in {}",
+                            protocol_name, value
+                        )),
+                        &self,
                     ));
                 }
 
@@ -105,27 +109,40 @@ impl<'de> Deserialize<'de> for LocalUri {
                 let uri_body_splitted_len = uri_body_splitted.len();
                 if uri_body_splitted_len != 3 {
                     let error_msg = if uri_body_splitted_len == 0 {
-                        "Missing room_id, member_id, pipeline_id"
+                        "room_id, member_id, pipeline_id"
                     } else if uri_body_splitted_len == 1 {
-                        "Missing member_id, pipeline_id"
+                        "member_id, pipeline_id"
                     } else if uri_body_splitted_len == 2 {
-                        "Missing pipeline_id"
+                        "pipeline_id"
                     } else {
-                        "Too many params"
+                        return Err(Error::custom(format!(
+                            "Too many fields: {}. Expecting 3 fields, found \
+                             {}.",
+                            uri_body, uri_body_splitted_len
+                        )));
                     };
-                    return Err(Error::custom(error_msg));
+                    return Err(Error::missing_field(error_msg));
                 }
                 let room_id = uri_body_splitted.pop().unwrap().to_string();
                 if room_id.is_empty() {
-                    return Err(Error::custom("room_id is empty!"));
+                    return Err(Error::custom(format!(
+                        "room_id in {} is empty!",
+                        value
+                    )));
                 }
                 let member_id = uri_body_splitted.pop().unwrap().to_string();
                 if member_id.is_empty() {
-                    return Err(Error::custom("member_id is empty!"));
+                    return Err(Error::custom(format!(
+                        "member_id in {} is empty!",
+                        value
+                    )));
                 }
                 let pipeline_id = uri_body_splitted.pop().unwrap().to_string();
                 if pipeline_id.is_empty() {
-                    return Err(Error::custom("pipeline_id is empty!"));
+                    return Err(Error::custom(format!(
+                        "pipeline_id in {} is empty!",
+                        value
+                    )));
                 }
 
                 Ok(LocalUri {

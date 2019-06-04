@@ -4,7 +4,9 @@ use std::{convert::TryFrom, fmt::Display, sync::Arc};
 
 use serde::Deserialize;
 
-use super::{element::Element, pipeline::Pipeline, Entity, TryFromEntityError};
+use super::{
+    element::Endpoint, pipeline::Pipeline, Entity, TryFromEntityError,
+};
 
 use crate::api::control::element::{WebRtcPlayEndpoint, WebRtcPublishEndpoint};
 
@@ -41,15 +43,15 @@ pub struct MemberSpec {
 
 impl MemberSpec {
     /// Get [`Element`] of this [`MemberSpec`] by ID.
-    pub fn get_element(
+    pub fn get_element_by_id(
         &self,
         id: &str,
-    ) -> Option<Result<Element, TryFromEntityError>> {
-        Some(Element::try_from(self.spec.pipeline.get(id).cloned()?))
+    ) -> Option<Result<Endpoint, TryFromEntityError>> {
+        Some(Endpoint::try_from(self.spec.pipeline.get(id).cloned()?))
     }
 
     /// Get all [`WebRtcPlayEndpoint`]s of this [`MemberSpec`].
-    pub fn get_play_endpoints(&self) -> Vec<&WebRtcPlayEndpoint> {
+    pub fn play_endpoints(&self) -> Vec<&WebRtcPlayEndpoint> {
         self.spec
             .pipeline
             .iter()
@@ -61,7 +63,7 @@ impl MemberSpec {
     }
 
     /// Get all [`WebRtcPublishEndpoint`]s of this [`MemberSpec`].
-    pub fn get_publish_endpoints(&self) -> Vec<&WebRtcPublishEndpoint> {
+    pub fn publish_endpoints(&self) -> Vec<&WebRtcPublishEndpoint> {
         self.spec
             .pipeline
             .iter()

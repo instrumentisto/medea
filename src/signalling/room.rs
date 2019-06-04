@@ -1,7 +1,7 @@
 //! Room definitions and implementations. Room is responsible for media
 //! connection establishment between concrete [`Member`]s.
 
-use std::{convert::TryFrom, time::Duration};
+use std::time::Duration;
 
 use actix::{
     fut::wrap_future, Actor, ActorFuture, AsyncContext, Context, Handler,
@@ -18,10 +18,7 @@ use crate::{
             AuthorizationError, Authorize, CommandMessage, RpcConnectionClosed,
             RpcConnectionEstablished,
         },
-        control::{
-            Element, Member, MemberId, MemberSpec, RoomId, RoomSpec,
-            TryFromEntityError,
-        },
+        control::{Member, MemberId, RoomId, RoomSpec, TryFromEntityError},
     },
     log::prelude::*,
     media::{
@@ -58,7 +55,7 @@ impl From<PeerStateError> for RoomError {
 impl From<TryFromEntityError> for RoomError {
     fn from(err: TryFromEntityError) -> Self {
         RoomError::BadRoomSpec(format!(
-            "Entity occured in wrong place. {}",
+            "Entity located in wrong place. {}",
             err
         ))
     }
@@ -91,34 +88,11 @@ impl Room {
         room_spec: &RoomSpec,
         reconnect_timeout: Duration,
     ) -> Result<Self, RoomError> {
-        let mut sender_receivers: HashMap<MemberId, Vec<MemberId>> =
-            HashMap::new();
-        for (member_id, member_entity) in &room_spec.spec.pipeline {
-            let member_id = MemberId(member_id.clone());
-            let member = MemberSpec::try_from(member_entity.clone())?;
-            for element_entity in member.spec.pipeline.values() {
-                let element = Element::try_from(element_entity.clone())?;
-
-                if let Element::WebRtcPlayEndpoint(play) = element {
-                    if let Some(m) =
-                        sender_receivers.get_mut(&play.src.member_id)
-                    {
-                        m.push(member_id.clone());
-                    } else {
-                        sender_receivers.insert(
-                            play.src.member_id,
-                            vec![member_id.clone()],
-                        );
-                    }
-                }
-            }
-        }
-
         Ok(Self {
             id: room_spec.id.clone(),
             peers: PeerRepository::from(HashMap::new()),
             participants: ParticipantService::new(room_spec, reconnect_timeout),
-            sender_receivers,
+            sender_receivers: room_spec.get_sender_receivers()?,
         })
     }
 
@@ -289,7 +263,7 @@ impl Room {
 
             ctx.notify(ConnectPeers(caller_peer_id, responder_peer_id));
 
-            //             println!("Peers: {:#?}", self.peers);
+            // println!("Peers: {:#?}", self.peers);
         }
     }
 
@@ -337,7 +311,7 @@ impl Room {
         }
 
         // connect senders
-        for play in member.spec.get_play_endpoints() {
+        for play in member.spec.play_endpoints() {
             let sender_member_id = &play.src.member_id;
             if already_connected_members.contains(sender_member_id) {
                 continue;

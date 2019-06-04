@@ -22,7 +22,7 @@ use std::{
 
 /// Medea client for testing purposes.
 struct TestMember {
-    /// Writer to websocket.
+    /// Writer to WebSocket.
     writer: ClientWriter,
 
     /// All [`Event`]s which this [`TestMember`] received.
@@ -71,7 +71,7 @@ impl TestMember {
         self.writer.text(&serde_json::to_string(&msg).unwrap());
     }
 
-    /// Start test member in new [`Arbiter`] by given uri.
+    /// Start test member in new [`Arbiter`] by given URI.
     /// `test_fn` - is function which will be called at every [`Event`]
     /// received from server.
     pub fn start(uri: &str, test_fn: Box<FnMut(&Event)>) {
@@ -97,8 +97,8 @@ impl TestMember {
 
 impl StreamHandler<WebMessage, ProtocolError> for TestMember {
     /// Basic signalling implementation.
-    /// A `TestMember::test_fn` function will be called for each [`Event`]
-    /// received from test server.
+    /// A `TestMember::test_fn` [`FnMut`] function will be called for each
+    /// [`Event`] received from test server.
     fn handle(&mut self, msg: WebMessage, _ctx: &mut Context<Self>) {
         match msg {
             WebMessage::Text(txt) => {
@@ -110,9 +110,7 @@ impl StreamHandler<WebMessage, ProtocolError> for TestMember {
                     (self.test_fn)(&event);
                     match event {
                         Event::PeerCreated {
-                            peer_id,
-                            sdp_offer,
-                            tracks: _,
+                            peer_id, sdp_offer, ..
                         } => {
                             match sdp_offer {
                                 Some(_) => {
@@ -150,20 +148,24 @@ impl StreamHandler<WebMessage, ProtocolError> for TestMember {
 /// Run medea server. This function lock main thread until server is up.
 /// Server starts in different thread and `join`'ed with main thread.
 /// When test is done, server will be destroyed.
+///
 /// Server load all specs from `tests/specs`.
+///
 /// Provide name for thread same as your test function's name. This will
-/// help you when server is panic in some test case.
-/// __Please, generate port__ by adding your test name to
-/// `/tests/test_port.rs::generate_ports_for_tests!` for dealing with
-///  asynchronously of tests.
-fn run_test_server(bind_port: u16, thread_name: &str) {
+/// help you when server is panic in some test case. And this `test_name`
+/// will be used as name for getting port from [`test_ports`] module.
+///
+/// Don't forget register your test in [`test_ports`], otherwise the server
+/// will just panic.
+fn run_test_server(test_name: &str) -> u16 {
+    let bind_port = test_ports::get_port_for_test(test_name);
+
     let is_server_starting = Arc::new(Mutex::new(Cell::new(true)));
     let is_server_starting_ref = Arc::clone(&is_server_starting);
-    let builder = std::thread::Builder::new().name(thread_name.to_string());
+    let builder = std::thread::Builder::new().name(test_name.to_string());
 
     let server_thread = builder
         .spawn(move || {
-            dotenv::dotenv().ok();
             let _sys = System::new("medea");
 
             let config = Conf {
@@ -194,13 +196,14 @@ fn run_test_server(bind_port: u16, thread_name: &str) {
     while is_server_starting.lock().unwrap().get() {}
 
     server_thread.join().unwrap();
+
+    bind_port
 }
 
 #[test]
 fn should_work_pub_sub_video_call() {
     let test_name = "should_work_pub_sub_video_call";
-    let bind_port = test_ports::get_port_for_test(test_name);
-    run_test_server(bind_port, "should_work_pub_sub_video_call");
+    let bind_port = run_test_server(test_name);
     let base_url =
         format!("ws://localhost:{}/ws/pub-sub-video-call", bind_port);
 
@@ -211,19 +214,13 @@ fn should_work_pub_sub_video_call() {
     let mut events = Vec::new();
     let test_fn = move |event: &Event| {
         events.push(event.clone());
-        if let Event::IceCandidateDiscovered {
-            peer_id: _,
-            candidate: _,
-        } = event
-        {
+
+        // Start of checking result of test.
+        if let Event::IceCandidateDiscovered { .. } = event {
             let peers_count = events
                 .iter()
                 .filter(|e| match e {
-                    Event::PeerCreated {
-                        peer_id: _,
-                        sdp_offer: _,
-                        tracks: _,
-                    } => true,
+                    Event::PeerCreated { .. } => true,
                     _ => false,
                 })
                 .count();
@@ -259,32 +256,17 @@ fn should_work_pub_sub_video_call() {
             }
 
             if is_caller {
-                if let Event::SdpAnswerMade {
-                    peer_id: _,
-                    sdp_answer: _,
-                } = &events[1]
-                {
-                    assert!(true);
+                if let Event::SdpAnswerMade { .. } = &events[1] {
                 } else {
                     assert!(false);
                 }
 
-                if let Event::IceCandidateDiscovered {
-                    peer_id: _,
-                    candidate: _,
-                } = &events[2]
-                {
-                    assert!(true);
+                if let Event::IceCandidateDiscovered { .. } = &events[2] {
                 } else {
                     assert!(false);
                 }
             } else {
-                if let Event::IceCandidateDiscovered {
-                    peer_id: _,
-                    candidate: _,
-                } = &events[1]
-                {
-                    assert!(true);
+                if let Event::IceCandidateDiscovered { .. } = &events[1] {
                 } else {
                     assert!(false);
                 }
@@ -311,44 +293,37 @@ fn should_work_pub_sub_video_call() {
 #[test]
 fn should_work_three_members_p2p_video_call() {
     let test_name = "should_work_three_members_p2p_video_call";
-    let bind_port = test_ports::get_port_for_test(test_name);
-    run_test_server(bind_port, test_name);
+    let bind_port = run_test_server(test_name);
     let base_url =
         format!("ws://localhost:{}/ws/three-members-conference", bind_port);
 
     let sys = System::new(test_name);
 
-    // Note that events, peer_created_count, ice_candidates and members_tested
+    // Note that events, peer_created_count, ice_candidates
     // is separated by members.
     // Every member will have different instance of this.
     let mut events = Vec::new();
     let mut peer_created_count = 0;
     let mut ice_candidates = 0;
+    // This is shared state of members.
     let members_tested = Rc::new(Cell::new(0));
 
     let test_fn = move |event: &Event| {
         events.push(event.clone());
         match event {
-            Event::PeerCreated {
-                peer_id: _,
-                sdp_offer: _,
-                tracks: _,
-            } => {
+            Event::PeerCreated { .. } => {
                 peer_created_count += 1;
             }
-            Event::IceCandidateDiscovered {
-                peer_id: _,
-                candidate: _,
-            } => {
+            Event::IceCandidateDiscovered { .. } => {
                 ice_candidates += 1;
                 if ice_candidates == 2 {
+                    // Start of checking result of test.
+
                     assert_eq!(peer_created_count, 2);
 
                     events.iter().for_each(|e| match e {
                         Event::PeerCreated {
-                            peer_id,
-                            sdp_offer: _,
-                            tracks,
+                            peer_id, tracks, ..
                         } => {
                             assert_eq!(tracks.len(), 4);
                             let recv_count = tracks

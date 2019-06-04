@@ -59,7 +59,7 @@ impl From<RoomError> for ServerStartError {
 pub fn start_static_rooms(
     config: &Conf,
 ) -> Result<HashMap<RoomId, Addr<Room>>, ServerStartError> {
-    if let Some(static_specs_path) = config.server.static_specs_path.clone() {
+    if let Some(static_specs_path) = &config.server.static_specs_path {
         let room_specs = match load_static_specs_from_dir(static_specs_path) {
             Ok(r) => r,
             Err(e) => return Err(ServerStartError::LoadSpec(e)),

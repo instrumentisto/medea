@@ -20,6 +20,11 @@ fn main() {
 
     match start_static_rooms(&config) {
         Ok(r) => {
+            //            let loaded_rooms_id =
+            info!(
+                "Loaded rooms: {:?}",
+                r.iter().map(|(id, _)| &id.0).collect::<Vec<&String>>()
+            );
             let room_repo = RoomsRepository::new(r);
             server::run(room_repo, config);
         }

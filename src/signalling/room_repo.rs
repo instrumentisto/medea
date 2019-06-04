@@ -24,7 +24,6 @@ impl RoomsRepository {
     }
 
     /// Returns [`Room`] by its ID.
-    #[allow(clippy::ptr_arg)]
     pub fn get(&self, id: &RoomId) -> Option<Addr<Room>> {
         let rooms = self.rooms.lock().unwrap();
         rooms.get(id).cloned()
