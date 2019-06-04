@@ -1,5 +1,5 @@
 kind: Room
-id: video-call-3
+id: three-members-conference
 spec:
   pipeline:
     # Here we're defining a member who initiates video call.
@@ -18,11 +18,11 @@ spec:
           play:
             kind: WebRtcPlayEndpoint
             spec:
-              src: "local://video-call-3/responder/publish"
+              src: "local://three-members-conference/responder/publish"
           play2:
             kind: WebRtcPlayEndpoint
             spec:
-              src: "local://video-call-3/responder2/publish"
+              src: "local://three-members-conference/responder2/publish"
     responder:
       kind: Member
       credentials: test
@@ -35,11 +35,11 @@ spec:
           play1:
             kind: WebRtcPlayEndpoint
             spec:
-              src: "local://video-call-3/caller/publish"
+              src: "local://three-members-conference/caller/publish"
           play2:
             kind: WebRtcPlayEndpoint
             spec:
-              src: "local://video-call-3/responder2/publish"
+              src: "local://three-members-conference/responder2/publish"
 
     responder2:
       kind: Member
@@ -53,8 +53,8 @@ spec:
           play1:
             kind: WebRtcPlayEndpoint
             spec:
-              src: "local://video-call-3/caller/publish"
+              src: "local://three-members-conference/caller/publish"
           play2:
             kind: WebRtcPlayEndpoint
             spec:
-              src: "local://video-call-3/responder/publish"
+              src: "local://three-members-conference/responder/publish"

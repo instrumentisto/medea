@@ -119,7 +119,7 @@ mod test {
     /// Creates [`RoomsRepository`] for tests filled with a single [`Room`].
     fn room(conf: Rpc) -> RoomsRepository {
         let room_spec =
-            control::load_from_yaml_file("./specs/room_spec.yml").unwrap();
+            control::load_from_yaml_file("./specs/video_call_1.yml").unwrap();
 
         let client_room =
             Room::new(&room_spec, conf.reconnect_timeout).unwrap();
