@@ -4,9 +4,7 @@ use std::{convert::TryFrom, fmt::Display, sync::Arc};
 
 use serde::Deserialize;
 
-use super::{
-    endpoint::Endpoint, pipeline::Pipeline, Element, TryFromElementError,
-};
+use super::{pipeline::Pipeline, Element, TryFromElementError};
 
 use crate::api::control::endpoint::{
     WebRtcPlayEndpoint, WebRtcPublishEndpoint,
@@ -22,7 +20,7 @@ impl Display for Id {
     }
 }
 
-/// Media server user with its ID and credentials.
+/// Media server user with its ID, credentials and spec.
 #[derive(Clone, Debug)]
 pub struct Member {
     /// ID of [`Member`].
@@ -47,14 +45,6 @@ pub struct MemberSpec {
 }
 
 impl MemberSpec {
-    /// Get [`Endpoint`] of this [`MemberSpec`] by ID.
-    pub fn get_endpoint_by_id(
-        &self,
-        id: &str,
-    ) -> Option<Result<Endpoint, TryFromElementError>> {
-        Some(Endpoint::try_from(self.spec.pipeline.get(id).cloned()?))
-    }
-
     /// Get all [`WebRtcPlayEndpoint`]s of this [`MemberSpec`].
     pub fn play_endpoints(&self) -> Vec<&WebRtcPlayEndpoint> {
         self.spec

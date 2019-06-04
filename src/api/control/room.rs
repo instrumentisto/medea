@@ -22,20 +22,6 @@ pub struct RoomSpec {
 }
 
 impl RoomSpec {
-    /// Try to find [`MemberSpec`] by ID.
-    ///
-    /// Return `None` if [`MemberSpec`] not presented in [`RoomSpec`].
-    /// Return `Some(TryFromElementError::NotMember)` if element with this ID
-    ///         finded but its not [`MemberSpec`].
-    pub fn get_member(
-        &self,
-        id: &MemberId,
-    ) -> Option<Result<MemberSpec, TryFromElementError>> {
-        Some(MemberSpec::try_from(
-            self.spec.pipeline.get(&id.0).cloned()?,
-        ))
-    }
-
     /// Get all receivers of all [`Member`]'s [`WebRtcPublishEndpoint`]s.
     pub fn get_receivers_for_member(
         &self,

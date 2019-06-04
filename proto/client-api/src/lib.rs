@@ -1,7 +1,5 @@
 use serde::{de::Deserializer, ser::Serializer, Deserialize, Serialize};
 
-// TODO: Deal with #[cfg_attr(test, ...)] when running e2e tests.
-
 // TODO: should be properly shared between medea and jason
 #[cfg_attr(test, derive(PartialEq, Debug))]
 #[allow(dead_code)]

@@ -105,9 +105,7 @@ impl PeerRepository {
         }
     }
 
-    /// Returns [`Peer`] of specified [`Member`].
-    ///
-    /// Panic if [`Peer`] not exists.
+    /// Returns all [`Peer`]s of specified [`Member`].
     pub fn get_peers_by_member_id(
         &self,
         member_id: &MemberId,

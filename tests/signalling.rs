@@ -157,7 +157,7 @@ impl StreamHandler<WebMessage, ProtocolError> for TestMember {
 ///
 /// Don't forget register your test in [`test_ports`], otherwise the server
 /// will just panic.
-fn run_test_server(test_name: &str) -> u16 {
+fn run_test_server(test_name: &'static str) -> u16 {
     let bind_port = test_ports::get_port_for_test(test_name);
 
     let is_server_starting = Arc::new(Mutex::new(Cell::new(true)));
@@ -166,7 +166,7 @@ fn run_test_server(test_name: &str) -> u16 {
 
     let server_thread = builder
         .spawn(move || {
-            let _sys = System::new("medea");
+            let _ = System::new(format!("test-medea-server-{}", test_name));
 
             let config = Conf {
                 server: Server {
@@ -367,15 +367,15 @@ fn should_work_three_members_p2p_video_call() {
     };
 
     TestMember::start(
-        &format!("{}/caller/test", base_url),
+        &format!("{}/member-1/test", base_url),
         Box::new(test_fn.clone()),
     );
     TestMember::start(
-        &format!("{}/responder/test", base_url),
+        &format!("{}/member-2/test", base_url),
         Box::new(test_fn.clone()),
     );
     TestMember::start(
-        &format!("{}/responder2/test", base_url),
+        &format!("{}/member-3/test", base_url),
         Box::new(test_fn),
     );
 

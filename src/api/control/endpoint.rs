@@ -3,14 +3,13 @@
 use std::{convert::TryFrom, fmt};
 
 use serde::{
-    de::{self, Deserializer, Error, Visitor},
+    de::{self, Deserializer, Error, Unexpected, Visitor},
     Deserialize,
 };
 
 use crate::api::control::MemberId;
 
 use super::{Element, TryFromElementError};
-use serde::de::Unexpected;
 
 /// [`Endpoint`] represents a media element that one or more media data streams
 /// flow through.
@@ -56,24 +55,23 @@ pub struct WebRtcPublishEndpoint {
 #[allow(clippy::module_name_repetitions)]
 #[derive(Clone, Deserialize, Debug)]
 pub struct WebRtcPlayEndpoint {
-    /// Source URI in format `local://{room_id}/{member_id}/{pipeline_id}`.
+    /// Source URI in format `local://{room_id}/{member_id}/{endpoint_id}`.
     pub src: LocalUri,
 }
 
-/// Special uri with pattern `local://{room_id}/{member_id}/{pipeline_id}`.
+/// Special uri with pattern `local://{room_id}/{member_id}/{endpoint_id}`.
 #[derive(Clone, Debug)]
 pub struct LocalUri {
     /// ID of [`Room`]
-    // TODO: Why this field never used???
     pub room_id: String,
     /// ID of [`Member`]
     pub member_id: MemberId,
     /// Control ID of [`Endpoint`]
-    pub pipeline_id: String,
+    pub endpoint_id: String,
 }
 
 /// Serde deserializer for [`LocalUri`].
-/// Deserialize URIs with pattern `local://{room_id}/{member_id}/{pipeline_id}`.
+/// Deserialize URIs with pattern `local://{room_id}/{member_id}/{endpoint_id}`.
 impl<'de> Deserialize<'de> for LocalUri {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -86,7 +84,7 @@ impl<'de> Deserialize<'de> for LocalUri {
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
                 formatter.write_str(
-                    "Uri in format local://room_id/member_id/pipeline_id",
+                    "Uri in format local://room_id/member_id/endpoint_id",
                 )
             }
 
@@ -111,11 +109,11 @@ impl<'de> Deserialize<'de> for LocalUri {
                 let uri_body_splitted_len = uri_body_splitted.len();
                 if uri_body_splitted_len != 3 {
                     let error_msg = if uri_body_splitted_len == 0 {
-                        "room_id, member_id, pipeline_id"
+                        "room_id, member_id, endpoint_id"
                     } else if uri_body_splitted_len == 1 {
-                        "member_id, pipeline_id"
+                        "member_id, endpoint_id"
                     } else if uri_body_splitted_len == 2 {
-                        "pipeline_id"
+                        "endpoint_id"
                     } else {
                         return Err(Error::custom(format!(
                             "Too many fields: {}. Expecting 3 fields, found \
@@ -139,10 +137,10 @@ impl<'de> Deserialize<'de> for LocalUri {
                         value
                     )));
                 }
-                let pipeline_id = uri_body_splitted.pop().unwrap().to_string();
-                if pipeline_id.is_empty() {
+                let endpoint_id = uri_body_splitted.pop().unwrap().to_string();
+                if endpoint_id.is_empty() {
                     return Err(Error::custom(format!(
-                        "pipeline_id in {} is empty!",
+                        "endpoint_id in {} is empty!",
                         value
                     )));
                 }
@@ -150,7 +148,7 @@ impl<'de> Deserialize<'de> for LocalUri {
                 Ok(LocalUri {
                     room_id,
                     member_id: MemberId(member_id),
-                    pipeline_id,
+                    endpoint_id,
                 })
             }
         }
@@ -173,7 +171,7 @@ mod tests {
     #[test]
     fn should_parse_local_uri() {
         let valid_json_uri =
-            r#"{ "src": "local://room_id/member_id/pipeline_id" }"#;
+            r#"{ "src": "local://room_id/member_id/endpoint_id" }"#;
         let local_uri: LocalUriTest =
             serde_json::from_str(valid_json_uri).unwrap();
 
@@ -182,13 +180,13 @@ mod tests {
             MemberId(String::from("member_id"))
         );
         assert_eq!(local_uri.src.room_id, String::from("room_id"));
-        assert_eq!(local_uri.src.pipeline_id, String::from("pipeline_id"));
+        assert_eq!(local_uri.src.endpoint_id, String::from("endpoint_id"));
     }
 
     #[test]
     fn should_return_error_when_uri_not_local() {
         let invalid_json_uri =
-            r#"{ "src": "not_local://room_id/member_id/pipeline_id" }"#;
+            r#"{ "src": "not_local://room_id/member_id/endpoint_id" }"#;
         match serde_json::from_str::<LocalUriTest>(invalid_json_uri) {
             Ok(_) => assert!(false),
             Err(_) => assert!(true),
@@ -206,7 +204,7 @@ mod tests {
 
     #[test]
     fn should_return_error_when_uri_have_empty_part() {
-        let invalid_json_uri = r#"{ "src": "local://room_id//pipeline_id" }"#;
+        let invalid_json_uri = r#"{ "src": "local://room_id//endpoint_id" }"#;
         match serde_json::from_str::<LocalUriTest>(invalid_json_uri) {
             Ok(_) => assert!(false),
             Err(_) => assert!(true),
