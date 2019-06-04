@@ -15,8 +15,8 @@ use medea_client_api_proto::{Command, Event, IceCandidate};
 use crate::{
     api::{
         client::rpc_connection::{
-            AuthorizationError, Authorize, CommandMessage, RpcConnectionClosed,
-            RpcConnectionEstablished,
+            AuthorizationError, Authorize, ClosedReason, CommandMessage,
+            RpcConnectionClosed, RpcConnectionEstablished,
         },
         control::{Member, MemberId, RoomId, RoomSpec, TryFromElementError},
     },
@@ -463,7 +463,10 @@ impl Handler<RpcConnectionEstablished> for Room {
             msg.connection,
         );
 
-        self.create_necessary_peers(&msg.member_id, ctx);
+        // Check that user is not reconnecting
+        if self.peers.get_peers_by_member_id(&msg.member_id).is_empty() {
+            self.create_necessary_peers(&msg.member_id, ctx);
+        }
 
         Box::new(wrap_future(future::ok(())))
     }
@@ -495,11 +498,16 @@ impl Handler<RpcConnectionClosed> for Room {
     type Result = ();
 
     /// Passes message to [`ParticipantService`] to cleanup stored connections.
+    /// Remove all related for disconnected [`Member`] [`Peer`]s.
     fn handle(&mut self, msg: RpcConnectionClosed, ctx: &mut Self::Context) {
         info!(
             "RpcConnectionClosed for member {}, reason {:?}",
             msg.member_id, msg.reason
         );
+
+        if let ClosedReason::Closed = msg.reason {
+            self.peers.connection_closed(&msg.member_id);
+        }
 
         self.participants
             .connection_closed(ctx, msg.member_id, &msg.reason);

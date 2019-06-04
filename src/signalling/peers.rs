@@ -138,6 +138,26 @@ impl PeerRepository {
             None => Err(RoomError::PeerNotFound(peer_id)),
         }
     }
+
+    /// Close all related to disconnected [`Member`] [`Peer`]s and partner
+    /// [`Peer`]s.
+    pub fn connection_closed(&mut self, member_id: &MemberId) {
+        let mut peers_to_remove: Vec<PeerId> = Vec::new();
+        for peer in self.get_peers_by_member_id(member_id) {
+            for partner_peer in
+                self.get_peers_by_member_id(&peer.partner_member_id())
+            {
+                if &partner_peer.partner_member_id() == member_id {
+                    peers_to_remove.push(partner_peer.id());
+                }
+            }
+            peers_to_remove.push(peer.id());
+        }
+
+        for peer_id in peers_to_remove {
+            self.peers.remove(&peer_id);
+        }
+    }
 }
 
 impl From<HashMap<PeerId, PeerStateMachine>> for PeerRepository {
