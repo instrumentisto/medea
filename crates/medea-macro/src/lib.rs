@@ -6,6 +6,7 @@
 
 extern crate proc_macro;
 
+mod dispatchable;
 mod enum_delegate;
 
 use proc_macro::TokenStream;
@@ -94,4 +95,117 @@ use proc_macro::TokenStream;
 pub fn enum_delegate(args: TokenStream, input: TokenStream) -> TokenStream {
     enum_delegate::derive(&args, input)
         .unwrap_or_else(|e| e.to_compile_error().into())
+}
+
+/// Generates `*Handler` trait and displatching function for some event,
+/// represented as `enum`.
+///
+/// # How to use
+///
+/// ### 1. Declare `enum` for event variants and a `struct` to handle them.
+/// ```
+/// use medea_macro::dispatchable;
+///
+/// #[dispatchable]
+/// enum Event {
+///     Some { new_bar: i32 },
+///     Another,
+///     UnnamedVariant(i32, i32),
+/// }
+///
+/// struct Foo {
+///     bar: i32,
+///     baz: i32,
+/// }
+/// ```
+///
+/// ### 2. Implement handler for your `struct`.
+///
+/// For the given `enum` macro generates a unique trait by adding `Handler`
+/// to the end of its name. Each method of trait is created by `snake_case`'ing
+/// `enum` variants and adding `on_` prefix.
+///
+/// ```
+/// # use medea_macro::dispatchable;
+/// #
+/// # #[dispatchable]
+/// # enum Event {
+/// #     Some { new_bar: i32 },
+/// #     Another,
+/// #     UnnamedVariant(i32, i32),
+/// # }
+/// #
+/// # struct Foo {
+/// #     bar: i32,
+/// #     baz: i32,
+/// # }
+/// #
+/// impl EventHandler for Foo {
+///     fn on_some(&mut self, new_bar: i32) {
+///         self.bar = new_bar;
+///     }
+///
+///     fn on_another(&mut self) {
+///         self.bar = 2;
+///     }
+///
+///     fn on_unnamed_variant(&mut self, data: (i32, i32)) {
+///         self.bar = data.0;
+///         self.baz = data.1;
+///     }
+/// }
+/// ```
+///
+/// ### 3. Dispatch event with handler
+///
+/// For the given `enum` macro generates `dispatch_with()` method to dispatch
+/// `enum` with a given handler.
+///
+/// ```
+/// # use medea_macro::dispatchable;
+/// #
+/// # #[dispatchable]
+/// # enum Event {
+/// #     Some { new_bar: i32 },
+/// #     Another,
+/// #     UnnamedVariant(i32, i32),
+/// # }
+/// #
+/// # struct Foo {
+/// #     bar: i32,
+/// #     baz: i32,
+/// # }
+/// #
+/// # impl EventHandler for Foo {
+/// #    fn on_some(&mut self, new_bar: i32) {
+/// #        self.bar = new_bar;
+/// #    }
+/// #
+/// #    fn on_another(&mut self) {
+/// #        self.bar = 2;
+/// #    }
+/// #
+/// #    fn on_unnamed_variant(&mut self, data: (i32, i32)) {
+/// #        self.bar = data.0;
+/// #        self.baz = data.1;
+/// #    }
+/// # }
+/// #
+/// fn main() {
+///     let mut foo = Foo { bar: 0, baz: 0 };
+///
+///     Event::Some { new_bar: 1 }.dispatch_with(&mut foo);
+///     assert_eq!(foo.bar, 1);
+///
+///     Event::Another.dispatch_with(&mut foo);
+///     assert_eq!(foo.bar, 2);
+///
+///     Event::UnnamedVariant(3, 3).dispatch_with(&mut foo);
+///     assert_eq!(foo.bar, 3);
+///     assert_eq!(foo.baz, 3);
+/// }
+/// ```
+#[proc_macro_attribute]
+pub fn dispatchable(_: TokenStream, input: TokenStream) -> TokenStream {
+    dispatchable::derive(input).unwrap_or_else(|e| e.to_compile_error().into())
 }
