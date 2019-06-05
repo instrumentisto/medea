@@ -1,0 +1,135 @@
+//! Abstraction over remote Redis database used to store Turn server
+//! credentials.
+extern crate tokio;
+
+use bb8::{Pool, RunError};
+use bb8_redis::{RedisConnectionManager, RedisPool};
+use crypto::{digest::Digest, md5::Md5};
+use failure::Fail;
+use futures::future::Future;
+use redis::{ConnectionInfo, RedisError};
+use tokio::prelude::*;
+
+use crate::{
+    api::control::MemberId, log::prelude::*, media::IceUser, signalling::RoomId,
+};
+
+#[derive(Fail, Debug)]
+pub enum TurnDatabaseErr {
+    #[fail(display = "Redis returned error: {}", _0)]
+    RedisError(RedisError),
+}
+
+impl From<RedisError> for TurnDatabaseErr {
+    fn from(err: RedisError) -> Self {
+        TurnDatabaseErr::RedisError(err)
+    }
+}
+
+#[derive(Debug)]
+pub struct TurnDatabaseInsertableUser {
+    pub ice_user: IceUser,
+    pub room_id: RoomId,
+}
+
+// Abstraction over remote Redis database used to store Turn server
+// credentials.
+#[allow(clippy::module_name_repetitions)]
+#[derive(Debug)]
+pub struct TurnDatabase {
+    pool: RedisPool,
+    info: ConnectionInfo,
+}
+
+// TODO: Auth after reconnect.
+impl TurnDatabase {
+    /// New TurnDatabase
+    pub fn new<S: Into<ConnectionInfo> + Clone>(
+        connection_info: S,
+    ) -> Result<Self, TurnDatabaseErr> {
+        let client = redis::Client::open(connection_info.clone().into())?;
+        let connection_manager = RedisConnectionManager::new(client)?;
+        let mut runtime =
+            tokio::runtime::Runtime::new().expect("Unable to create a runtime");
+        let pool = runtime.block_on(future::lazy(|| {
+            Pool::builder().build(connection_manager)
+        }))?;
+        let redis_pool = RedisPool::new(pool);
+
+        Ok(Self {
+            pool: redis_pool,
+            info: connection_info.into(),
+        })
+    }
+
+    /// Inserts provided [`IceUser`] into remote Redis database.
+    pub fn insert(
+        &mut self,
+        user: &TurnDatabaseInsertableUser,
+    ) -> impl Future<Item = (), Error = RunError<TurnDatabaseErr>> {
+        debug!("Store ICE user: {:?}", user);
+        let key = format!(
+            "turn/realm/medea/user/{}/key",
+            format!("{}:{}", user.room_id, user.ice_user.name)
+        );
+        let value =
+            format!("{}:medea:{}", user.ice_user.name, user.ice_user.pass);
+        let mut hasher = Md5::new();
+        hasher.input_str(&value);
+        let result = hasher.result_str();
+
+        self.pool.run(|connection| {
+            redis::cmd("SET")
+                .arg(key)
+                .arg(result)
+                .query_async(connection)
+                .map_err(TurnDatabaseErr::RedisError)
+        })
+    }
+
+    /// Deletes provided [`IceUser`] from remote Redis database.
+    pub fn remove(
+        &mut self,
+        user: &TurnDatabaseInsertableUser,
+    ) -> impl Future<Item = (), Error = bb8::RunError<TurnDatabaseErr>> {
+        debug!("Delete ICE user: {:?}", user);
+        let key = format!(
+            "turn/realm/medea/user/{}/key",
+            format!("{}:{}", user.room_id, user.ice_user.name)
+        );
+
+        self.pool.run(|connection| {
+            redis::cmd("DEL")
+                .arg(key)
+                .query_async(connection)
+                .map_err(TurnDatabaseErr::RedisError)
+        })
+    }
+
+    pub fn remove_users(
+        &mut self,
+        room_id: RoomId,
+        users_ids: &[MemberId],
+    ) -> impl Future<Item = (), Error = bb8::RunError<TurnDatabaseErr>> {
+        debug!(
+            "Delete ICE users_ids {{ {:?} }} from room {:?}",
+            users_ids, room_id
+        );
+        let mut delete_keys = Vec::with_capacity(users_ids.len());
+
+        for user_id in users_ids {
+            delete_keys.push(format!(
+                "turn/realm/medea/user/{}/key",
+                format!("{}:{}", room_id, user_id)
+            ));
+        }
+
+        self.pool.run(|connection| {
+            redis::cmd("DEL")
+                .arg(delete_keys)
+                .to_owned()
+                .query_async(connection)
+                .map_err(TurnDatabaseErr::RedisError)
+        })
+    }
+}

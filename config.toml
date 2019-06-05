@@ -9,9 +9,6 @@
 # Default:
 #   bind_port = 8080
 
-
-
-
 [rpc]
 # Duration, after which remote RPC client will be considered idle if no
 # heartbeat messages received.
@@ -24,3 +21,45 @@
 #
 # Default:
 #   reconnect_timeout = "10s"
+
+[turn]
+# Turn server IP address.
+#
+# Default:
+#   ip = "0.0.0.0"
+
+# Turn server port.
+#
+# Default:
+#   port = 3478
+
+# Static user on Turn server.
+#
+# Default:
+#   user = "USER"
+
+# Static user password on Turn server.
+#
+# Default:
+#   pass = "PASS"
+
+[turn.db.redis]
+# IP address to bind Redis server to.
+#
+# Default:
+#   ip = "0.0.0.0"
+
+# Redis database port.
+#
+# Default:
+#   port = 6379
+
+# Redis database password.
+#
+# Default:
+#   pass = "turn"
+
+# Redis database number.
+#
+# Default:
+#   db_number = 0

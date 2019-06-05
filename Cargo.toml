@@ -22,6 +22,8 @@ lto = "thin"
 [dependencies]
 actix = "0.7"
 actix-web = "0.7"
+bb8 = "0.3.0"
+bb8-redis = "0.3.0"
 config = "0.9"
 chrono = "0.4"
 dotenv = "0.13"
@@ -33,7 +35,10 @@ macro-attr = "0.2"
 medea-client-api-proto = { path = "proto/client-api", features = ["medea"] }
 medea-macro = { path = "crates/medea-macro" }
 newtype_derive = "0.1"
-serde = { version = "1.0", features = ['derive'] }
+rand = "0.6"
+rust-crypto = "0.2"
+redis = "0.10.0"
+serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 slog = "2.4"
 slog-envlogger = "2.1"
@@ -43,6 +48,7 @@ slog-json = "2.3"
 slog-scope = "4.1"
 smart-default = "0.5"
 toml = "0.4"
+tokio = "0.1"
 [dependencies.serde-humantime]
     git = "https://github.com/tailhook/serde-humantime"
     branch = "serde_wrapper"
@@ -50,4 +56,3 @@ toml = "0.4"
 [dev-dependencies]
 serial_test = "0.2"
 serial_test_derive = "0.2"
-tokio = "0.1"

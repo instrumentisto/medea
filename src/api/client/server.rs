@@ -81,7 +81,7 @@ pub struct Context {
 
 /// Starts HTTP server for handling WebSocket connections of Client API.
 pub fn run(rooms: RoomsRepository, config: Conf) {
-    let server_addr = config.server.get_bind_addr();
+    let server_addr = config.server.bind_addr();
 
     server::new(move || {
         App::with_state(Context {
@@ -110,9 +110,10 @@ mod test {
 
     use crate::{
         api::control::Member,
-        conf::{Conf, Server},
+        conf::{Conf, Server, Turn},
         media::create_peers,
         signalling::Room,
+        turn::new_turn_auth_service_mock,
     };
 
     use super::*;
@@ -120,11 +121,25 @@ mod test {
     /// Creates [`RoomsRepository`] for tests filled with a single [`Room`].
     fn room(conf: Rpc) -> RoomsRepository {
         let members = hashmap! {
-            1 => Member{id: 1, credentials: "caller_credentials".into()},
-            2 => Member{id: 2, credentials: "responder_credentials".into()},
+            1 => Member{
+                id: 1,
+                credentials: "caller_credentials".into(),
+                ice_user: None
+            },
+            2 => Member{
+                id: 2,
+                credentials: "responder_credentials".into(),
+                ice_user: None
+            },
         };
         let room = Arbiter::start(move |_| {
-            Room::new(1, members, create_peers(1, 2), conf.reconnect_timeout)
+            Room::new(
+                1,
+                members,
+                create_peers(1, 2),
+                conf.reconnect_timeout,
+                new_turn_auth_service_mock(),
+            )
         });
         let rooms = hashmap! {1 => room};
         RoomsRepository::new(rooms)
@@ -161,6 +176,7 @@ mod test {
                 idle_timeout: Duration::new(2, 0),
                 reconnect_timeout: Default::default(),
             },
+            turn: Turn::default(),
             server: Server::default(),
         };
 

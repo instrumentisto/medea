@@ -57,6 +57,7 @@ pub enum Event {
         peer_id: u64,
         sdp_offer: Option<String>,
         tracks: Vec<Track>,
+        ice_servers: Vec<IceServer>,
     },
     /// Media Server notifies Web Client about necessity to apply specified SDP
     /// Answer to Web Client's RTCPeerConnection.
@@ -90,6 +91,17 @@ pub struct Track {
     pub id: u64,
     pub direction: Direction,
     pub media_type: MediaType,
+}
+
+/// Representation of [`iceServers`] field of [`RTCConfiguration`] dictionary.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[cfg_attr(test, derive(PartialEq))]
+pub struct IceServer {
+    pub urls: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub username: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub credential: Option<String>,
 }
 
 /// Direction of [`Track`].
