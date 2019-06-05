@@ -1,8 +1,8 @@
 //! `#[dispatchable]` macro implementation.
 
 use inflector::Inflector;
-use proc_macro2::Span;
 use proc_macro::TokenStream;
+use proc_macro2::Span;
 use quote::quote;
 use syn::parse::Result;
 
@@ -11,7 +11,6 @@ use syn::parse::Result;
 fn to_handler_fn_name(name: &str) -> String {
     let mut snake_case = name.to_snake_case();
     snake_case.insert_str(0, "on_");
-
     snake_case
 }
 
@@ -145,23 +144,24 @@ pub fn derive(input: TokenStream) -> Result<TokenStream> {
 }
 
 #[cfg(test)]
-mod tests {
+mod to_handler_fn_name_spec {
     use super::to_handler_fn_name;
 
     #[test]
-    fn should_convert_trait_name_from_camel_case_to_snake_case() {
-        assert_eq!(to_handler_fn_name("SomeTestTrait"), "on_some_test_trait");
-        assert_eq!(to_handler_fn_name("RPCConnection"), "on_rpc_connection");
-        assert_eq!(to_handler_fn_name("RConnection"), "on_r_connection");
-        assert_eq!(
-            to_handler_fn_name("RTCPeerConnection"),
-            "on_rtc_peer_connection"
-        );
-        assert_eq!(to_handler_fn_name("testString"), "on_test_string");
-        assert_eq!(to_handler_fn_name("testtest"), "on_testtest");
-        assert_eq!(to_handler_fn_name("Some"), "on_some");
-        assert_eq!(to_handler_fn_name("S"), "on_s");
-        assert_eq!(to_handler_fn_name("s"), "on_s");
-        assert_eq!(to_handler_fn_name("ASDF"), "on_asdf");
+    fn converts_name_from_camel_case_to_snake_case() {
+        for (name, expected) in vec![
+            ("SomeTestTrait", "on_some_test_trait"),
+            ("RPCConnection", "on_rpc_connection"),
+            ("RConnection", "on_r_connection"),
+            ("RTCPeerConnection", "on_rtc_peer_connection"),
+            ("testString", "on_test_string"),
+            ("testtest", "on_testtest"),
+            ("Some", "on_some"),
+            ("S", "on_s"),
+            ("s", "on_s"),
+            ("ASDF", "on_asdf"),
+        ] {
+            assert_eq!(to_handler_fn_name(name), expected);
+        }
     }
 }
