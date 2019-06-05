@@ -1,8 +1,9 @@
+use medea_macro::dispatchable;
 use serde::{de::Deserializer, ser::Serializer, Deserialize, Serialize};
 
 // TODO: should be properly shared between medea and jason
-#[cfg_attr(test, derive(PartialEq, Debug))]
 #[allow(dead_code)]
+#[cfg_attr(test, derive(Debug, PartialEq))]
 /// Message sent by `Media Server` to `Client`.
 pub enum ServerMsg {
     /// `pong` message that server answers with to WebSocket client in response
@@ -13,8 +14,8 @@ pub enum ServerMsg {
     Event(Event),
 }
 
-#[cfg_attr(test, derive(PartialEq, Debug))]
 #[allow(dead_code)]
+#[cfg_attr(test, derive(Debug, PartialEq))]
 /// Message from 'Client' to 'Media Server'.
 pub enum ClientMsg {
     /// `ping` message that WebSocket client is expected to send to the server
@@ -25,11 +26,11 @@ pub enum ClientMsg {
 }
 
 /// WebSocket message from Web Client to Media Server.
-#[cfg_attr(test, derive(PartialEq, Debug))]
+#[allow(dead_code)]
 #[cfg_attr(feature = "medea", derive(Deserialize))]
 #[cfg_attr(feature = "jason", derive(Serialize))]
+#[cfg_attr(test, derive(Debug, PartialEq))]
 #[serde(tag = "command", content = "data")]
-#[allow(dead_code)]
 pub enum Command {
     /// Web Client sends SDP Offer.
     MakeSdpOffer { peer_id: u64, sdp_offer: String },
@@ -43,10 +44,11 @@ pub enum Command {
 }
 
 /// WebSocket message from Medea to Jason.
+#[allow(dead_code)]
+#[dispatchable]
 #[cfg_attr(feature = "medea", derive(Serialize, Debug, Clone, PartialEq))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
 #[serde(tag = "event", content = "data")]
-#[allow(dead_code)]
 pub enum Event {
     /// Media Server notifies Web Client about necessity of RTCPeerConnection
     /// creation.
@@ -72,7 +74,7 @@ pub enum Event {
 }
 
 /// Represents [`RtcIceCandidateInit`] object.
-#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct IceCandidate {
     pub candidate: String,
     pub sdp_m_line_index: Option<u16>,
