@@ -31,10 +31,7 @@ macro_rules! generate_ports_for_tests {
 }
 
 // Register your test by adding test name into this macro call.
-generate_ports_for_tests!(
-    should_work_three_members_p2p_video_call,
-    should_work_pub_sub_video_call,
-);
+generate_ports_for_tests!(three_members_p2p_video_call, pub_sub_video_call,);
 
 /// Use it for easy get port by declared before name.
 ///

@@ -201,8 +201,8 @@ fn run_test_server(test_name: &'static str) -> u16 {
 }
 
 #[test]
-fn should_work_pub_sub_video_call() {
-    let test_name = "should_work_pub_sub_video_call";
+fn pub_sub_video_call() {
+    let test_name = "pub_sub_video_call";
     let bind_port = run_test_server(test_name);
     let base_url =
         format!("ws://localhost:{}/ws/pub-sub-video-call", bind_port);
@@ -291,8 +291,8 @@ fn should_work_pub_sub_video_call() {
 }
 
 #[test]
-fn should_work_three_members_p2p_video_call() {
-    let test_name = "should_work_three_members_p2p_video_call";
+fn three_members_p2p_video_call() {
+    let test_name = "three_members_p2p_video_call";
     let bind_port = run_test_server(test_name);
     let base_url =
         format!("ws://localhost:{}/ws/three-members-conference", bind_port);

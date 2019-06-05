@@ -158,7 +158,7 @@ impl<'de> Deserialize<'de> for LocalUri {
 }
 
 #[cfg(test)]
-mod tests {
+mod local_uri_deserialization_tests {
     use serde::Deserialize;
 
     use super::*;
@@ -169,7 +169,7 @@ mod tests {
     }
 
     #[test]
-    fn should_parse_local_uri() {
+    fn deserialize() {
         let valid_json_uri =
             r#"{ "src": "local://room_id/member_id/endpoint_id" }"#;
         let local_uri: LocalUriTest =
@@ -184,7 +184,7 @@ mod tests {
     }
 
     #[test]
-    fn should_return_error_when_uri_not_local() {
+    fn return_error_when_uri_not_local() {
         let invalid_json_uri =
             r#"{ "src": "not_local://room_id/member_id/endpoint_id" }"#;
         match serde_json::from_str::<LocalUriTest>(invalid_json_uri) {
@@ -194,7 +194,7 @@ mod tests {
     }
 
     #[test]
-    fn should_return_error_when_uri_is_not_full() {
+    fn return_error_when_uri_is_not_full() {
         let invalid_json_uri = r#"{ "src": "local://room_id/member_id" }"#;
         match serde_json::from_str::<LocalUriTest>(invalid_json_uri) {
             Ok(_) => assert!(false),
@@ -203,7 +203,7 @@ mod tests {
     }
 
     #[test]
-    fn should_return_error_when_uri_have_empty_part() {
+    fn return_error_when_uri_have_empty_part() {
         let invalid_json_uri = r#"{ "src": "local://room_id//endpoint_id" }"#;
         match serde_json::from_str::<LocalUriTest>(invalid_json_uri) {
             Ok(_) => assert!(false),
