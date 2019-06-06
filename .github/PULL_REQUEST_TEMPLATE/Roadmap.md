@@ -40,7 +40,7 @@ Related to <paste issues/PRs references>
     - [ ] In [draft mode][l:1]
     - [ ] Name contains `WIP: ` prefix
     - [ ] Name contains issue reference
-    - [ ] Has `k: ` labels applied
+    - [ ] Has `k::` labels applied
     - [ ] Has assignee
 - [ ] [Review][l:2] is completed and changes are approved
 - Before merge:
