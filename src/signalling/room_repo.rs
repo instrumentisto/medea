@@ -1,9 +1,9 @@
 //! Repository that stores [`Room`]s addresses.
 
+use std::sync::{Arc, Mutex};
+
 use actix::Addr;
 use hashbrown::HashMap;
-
-use std::sync::{Arc, Mutex};
 
 use crate::{api::control::RoomId, signalling::Room};
 

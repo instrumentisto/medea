@@ -5,10 +5,10 @@ pub mod member;
 pub mod pipeline;
 pub mod room;
 
+use std::{convert::TryFrom as _, fs::File, io::Read as _, path::Path};
+
 use failure::{Error, Fail};
 use serde::Deserialize;
-
-use std::{convert::TryFrom as _, fs::File, io::Read as _, path::Path};
 
 use self::{
     endpoint::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},

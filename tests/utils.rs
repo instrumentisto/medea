@@ -2,8 +2,10 @@
 
 use std::{
     cell::Cell,
-    sync::atomic::{AtomicUsize, Ordering},
-    sync::{Arc, Mutex},
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc, Mutex,
+    },
 };
 
 use actix::System;

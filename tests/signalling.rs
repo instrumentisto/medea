@@ -2,15 +2,15 @@
 
 mod utils;
 
+use std::{cell::Cell, rc::Rc, time::Duration};
+
 use actix::{Actor, Arbiter, AsyncContext, Context, StreamHandler, System};
 use actix_web::ws::{
     Client, ClientWriter, Message as WebMessage, ProtocolError,
 };
 use futures::future::Future;
-
 use medea_client_api_proto::{Command, Direction, Event, IceCandidate};
 use serde_json::error::Error as SerdeError;
-use std::{cell::Cell, rc::Rc, time::Duration};
 
 /// Medea client for testing purposes.
 struct TestMember {

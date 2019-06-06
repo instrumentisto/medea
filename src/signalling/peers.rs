@@ -1,11 +1,11 @@
 //! Repository that stores [`Room`]s [`Peer`]s.
 
-use hashbrown::HashMap;
-
 use std::{
     convert::{TryFrom, TryInto},
     fmt,
 };
+
+use hashbrown::HashMap;
 
 use crate::{
     api::control::{Member, MemberId},
