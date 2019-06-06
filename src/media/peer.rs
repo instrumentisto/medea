@@ -260,7 +260,6 @@ impl Peer<New> {
         endpoints: Vec<&WebRtcPublishEndpoint>,
         track_id_counter: &mut Counter,
     ) {
-        // TODO: &mut track_id_counter looks bad
         for _ in endpoints {
             let track_audio = Arc::new(MediaTrack::new(
                 track_id_counter.next_id(),

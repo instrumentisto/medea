@@ -25,12 +25,14 @@ pub struct PeerRepository {
     tracks_count: Counter,
 }
 
+/// Simple ID counter.
 #[derive(Default, Debug)]
 pub struct Counter {
     count: u64,
 }
 
 impl Counter {
+    /// Returns id and increase counter.
     pub fn next_id(&mut self) -> u64 {
         let id = self.count;
         self.count += 1;
