@@ -240,28 +240,26 @@ impl Room {
         )))
     }
 
-    /// Create [`Peer`] between members and interconnect it by control API spec.
-    fn create_peers(
+    /// Create [`Peer`] between [`Member`]s and interconnect it by control API
+    /// spec.
+    fn create_and_interconnect_peers(
         &mut self,
-        to_create: Vec<(&Member, Member)>,
+        first_member: &Member,
+        second_member: &Member,
         ctx: &mut <Self as Actor>::Context,
     ) {
-        for p in to_create {
-            let first_member = p.0;
-            let second_member = p.1;
-            debug!(
-                "Created peer member {} with member {}",
-                first_member.id(),
-                second_member.id()
-            );
+        debug!(
+            "Created peer member {} with member {}",
+            first_member.id(),
+            second_member.id()
+        );
 
-            let (caller_peer_id, responder_peer_id) =
-                self.peers.create_peers(first_member, &second_member);
+        let (first_peer_id, second_peer_id) =
+            self.peers.create_peers(first_member, second_member);
 
-            ctx.notify(ConnectPeers(caller_peer_id, responder_peer_id));
+        ctx.notify(ConnectPeers(first_peer_id, second_peer_id));
 
-            // println!("Peers: {:#?}", self.peers);
-        }
+        // println!("Peers: {:#?}", self.peers);
     }
 
     /// Create and interconnect all [`Peer`]s between connected [`Member`]
@@ -334,7 +332,15 @@ impl Room {
             }
         }
 
-        self.create_peers(need_create, ctx);
+        need_create
+            .into_iter()
+            .for_each(|(first_member, second_member)| {
+                self.create_and_interconnect_peers(
+                    first_member,
+                    &second_member,
+                    ctx,
+                );
+            });
     }
 }
 
