@@ -144,6 +144,9 @@ endif
 	cargo test -p $(test-unit-crate)
 endif
 endif
+	cargo test -p $(test-unit-crate)
+endif
+endif
 
 
 
