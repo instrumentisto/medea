@@ -2,7 +2,10 @@
 
 use hashbrown::HashMap;
 
-use std::convert::{TryFrom, TryInto};
+use std::{
+    convert::{TryFrom, TryInto},
+    fmt,
+};
 
 use crate::{
     api::control::{Member, MemberId},
@@ -16,10 +19,30 @@ pub struct PeerRepository {
     peers: HashMap<PeerId, PeerStateMachine>,
 
     /// Count of [`Peer`]s in this [`Room`].
-    peers_count: u64,
+    peers_count: Counter,
 
     /// Count of [`MediaTrack`]s in this [`Room`].
-    tracks_count: u64,
+    tracks_count: Counter,
+}
+
+#[derive(Default)]
+pub struct Counter {
+    count: u64,
+}
+
+impl Counter {
+    pub fn next_id(&mut self) -> u64 {
+        let id = self.count;
+        self.count += 1;
+
+        id
+    }
+}
+
+impl fmt::Debug for Counter {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.count)
+    }
 }
 
 impl PeerRepository {
@@ -46,10 +69,8 @@ impl PeerRepository {
         first_member: &Member,
         second_member: &Member,
     ) -> (u64, u64) {
-        self.peers_count += 1;
-        let first_peer_id = self.peers_count;
-        self.peers_count += 1;
-        let second_peer_id = self.peers_count;
+        let first_peer_id = self.peers_count.next_id();
+        let second_peer_id = self.peers_count.next_id();
 
         let mut first_peer = Peer::new(
             first_peer_id,
@@ -162,8 +183,8 @@ impl From<HashMap<PeerId, PeerStateMachine>> for PeerRepository {
     fn from(map: HashMap<PeerId, PeerStateMachine>) -> Self {
         Self {
             peers: map,
-            peers_count: 0,
-            tracks_count: 0,
+            peers_count: Counter::default(),
+            tracks_count: Counter::default(),
         }
     }
 }

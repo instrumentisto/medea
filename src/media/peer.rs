@@ -18,6 +18,7 @@ use crate::{
         MemberId,
     },
     media::{MediaTrack, TrackId},
+    signalling::peers::Counter,
 };
 
 /// Newly initialized [`Peer`] ready to signalling.
@@ -252,21 +253,21 @@ impl Peer<New> {
 
     /// Add all [`WebRtcPublishEndpoint`]s to this [`Peer`].
     ///
-    /// This use `last_track_id` counter for generating new [`MediaTrack`] ID.
+    /// This use `track_id_counter` counter for generating new [`MediaTrack`]
+    /// ID.
     pub fn add_publish_endpoints(
         &mut self,
         endpoints: Vec<&WebRtcPublishEndpoint>,
-        last_track_id: &mut u64,
+        track_id_counter: &mut Counter,
     ) {
+        // TODO: &mut track_id_counter looks bad
         for _ in endpoints {
-            *last_track_id += 1;
             let track_audio = Arc::new(MediaTrack::new(
-                *last_track_id,
+                track_id_counter.next_id(),
                 MediaType::Audio(AudioSettings {}),
             ));
-            *last_track_id += 1;
             let track_video = Arc::new(MediaTrack::new(
-                *last_track_id,
+                track_id_counter.next_id(),
                 MediaType::Video(VideoSettings {}),
             ));
 
