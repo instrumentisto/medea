@@ -25,7 +25,7 @@ pub struct PeerRepository {
     tracks_count: Counter,
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct Counter {
     count: u64,
 }
@@ -39,7 +39,7 @@ impl Counter {
     }
 }
 
-impl fmt::Debug for Counter {
+impl fmt::Display for Counter {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.count)
     }
