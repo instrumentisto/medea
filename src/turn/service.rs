@@ -27,7 +27,7 @@ static TURN_PASS_LEN: usize = 16;
 /// Manages Turn server credentials.
 pub trait TurnAuthService: fmt::Debug + Send {
     /// Generates and registers Turn credentials.
-    fn create_user(
+    fn create(
         &self,
         member_id: MemberId,
         room_id: RoomId,
@@ -35,14 +35,14 @@ pub trait TurnAuthService: fmt::Debug + Send {
     ) -> Box<dyn Future<Item = IceUser, Error = TurnServiceErr>>;
 
     /// Deletes provided Turn credentials.
-    fn delete_user(
+    fn delete(
         &self,
         user: IceUser,
         room_id: RoomId,
     ) -> Box<dyn Future<Item = (), Error = TurnServiceErr>>;
 
     /// Deletes [`users`] from redis with provided [`RoomId`].
-    fn delete_multiple_users(
+    fn delete_batch(
         &self,
         room_id: RoomId,
         users: Vec<u64>,
@@ -51,7 +51,7 @@ pub trait TurnAuthService: fmt::Debug + Send {
 
 impl TurnAuthService for Addr<Service> {
     /// Sends [`CreateIceUser`] to [`Service`].
-    fn create_user(
+    fn create(
         &self,
         member_id: u64,
         room_id: RoomId,
@@ -76,7 +76,7 @@ impl TurnAuthService for Addr<Service> {
     }
 
     /// Sends [`DeleteIceUser`] to [`Service`].
-    fn delete_user(
+    fn delete(
         &self,
         user: IceUser,
         room_id: RoomId,
@@ -95,7 +95,7 @@ impl TurnAuthService for Addr<Service> {
     }
 
     /// Sends [`DeleteRoom`] to [`Service`].
-    fn delete_multiple_users(
+    fn delete_batch(
         &self,
         room_id: RoomId,
         users: Vec<MemberId>,
@@ -333,7 +333,7 @@ pub mod test {
     struct TurnAuthServiceMock {}
 
     impl TurnAuthService for TurnAuthServiceMock {
-        fn create_user(
+        fn create(
             &self,
             _: u64,
             _: RoomId,
@@ -346,7 +346,7 @@ pub mod test {
             }))
         }
 
-        fn delete_user(
+        fn delete(
             &self,
             _: IceUser,
             _: RoomId,
@@ -354,7 +354,7 @@ pub mod test {
             Box::new(future::ok(()))
         }
 
-        fn delete_multiple_users(
+        fn delete_batch(
             &self,
             _: RoomId,
             _: Vec<u64>,

@@ -9,6 +9,7 @@ use actix::{
     fut::wrap_future, ActorFuture, AsyncContext, Context, MailboxError,
     SpawnHandle,
 };
+use failure::Fail;
 use futures::{
     future::{self, join_all, Either},
     Future,
@@ -35,10 +36,15 @@ use crate::{
     turn::{TurnAuthService, TurnServiceErr, UnreachablePolicy},
 };
 
-#[derive(Debug)]
+#[derive(Fail, Debug)]
 #[allow(clippy::module_name_repetitions)]
 pub enum ParticipantServiceErr {
+    #[fail(display = "TurnService Error in ParticipantService: {}", _0)]
     TurnServiceErr(TurnServiceErr),
+    #[fail(
+        display = "Mailbox error when accessing ParticipantService: {}",
+        _0
+    )]
     MailBoxErr(MailboxError),
 }
 
@@ -179,7 +185,7 @@ impl ParticipantService {
         } else {
             self.connections.insert(member_id, con);
             Box::new(
-                wrap_future(self.turn.create_user(
+                wrap_future(self.turn.create(
                     member_id,
                     self.room_id,
                     UnreachablePolicy::default(),
@@ -244,7 +250,7 @@ impl ParticipantService {
     fn delete_ice_user(&mut self, member_id: MemberId) {
         if let Some(mut member) = self.members.remove(&member_id) {
             if let Some(ice_user) = member.ice_user.take() {
-                self.turn.delete_user(ice_user, self.room_id);
+                self.turn.delete(ice_user, self.room_id);
             }
             self.members.insert(member_id, member);
         }
@@ -270,22 +276,18 @@ impl ParticipantService {
         );
 
         // removing all users from room
-        let remove_all_users_fut = Box::new(
+        let remove_all_users_fut = Box::new({
+            let mut users_ids = Vec::with_capacity(self.members.len());
+            self.members.iter_mut().for_each(|data| {
+                users_ids.push(*data.0);
+                data.1.ice_user = None;
+            });
             self.turn
-                .delete_multiple_users(
-                    self.room_id,
-                    self.members.iter().map(|(id, _)| *id).collect(),
-                )
-                .map_err(|_| ()),
-        );
+                .delete_batch(self.room_id, users_ids)
+                .map_err(|_| ())
+        });
         close_fut.push(remove_all_users_fut);
 
         join_all(close_fut).map(|_| ())
     }
-}
-
-#[cfg(test)]
-
-pub mod test {
-    use super::*;
 }

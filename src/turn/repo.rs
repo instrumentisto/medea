@@ -49,8 +49,8 @@ impl TurnDatabase {
     ) -> Result<Self, TurnDatabaseErr> {
         let client = redis::Client::open(connection_info.clone().into())?;
         let connection_manager = RedisConnectionManager::new(client)?;
-        let mut runtime =
-            tokio::runtime::Runtime::new().expect("Unable to create a runtime");
+        let mut runtime = tokio::runtime::Runtime::new()
+            .expect("Unable to create a runtime in TurnDatabase");
         let pool = runtime.block_on(future::lazy(|| {
             Pool::builder().build(connection_manager)
         }))?;

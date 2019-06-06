@@ -94,7 +94,10 @@ pub struct Track {
 }
 
 /// Representation of [`iceServers`] field of [`RTCConfiguration`] dictionary.
-#[derive(Clone, Debug, Deserialize, Serialize)]
+
+#[cfg_attr(feature = "medea", derive(Serialize))]
+#[cfg_attr(feature = "jason", derive(Deserialize))]
+#[derive(Clone, Debug)]
 #[cfg_attr(test, derive(PartialEq))]
 pub struct IceServer {
     pub urls: Vec<String>,

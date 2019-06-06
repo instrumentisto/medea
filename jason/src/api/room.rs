@@ -10,7 +10,7 @@ use futures::{
     future::{Future as _, IntoFuture},
     stream::Stream as _,
 };
-use medea_client_api_proto::{EventHandler, IceCandidate, Track};
+use medea_client_api_proto::{EventHandler, IceCandidate, IceServer, Track};
 use wasm_bindgen::{prelude::*, JsValue};
 use wasm_bindgen_futures::spawn_local;
 use web_sys::console;
@@ -86,6 +86,7 @@ impl EventHandler for InnerRoom {
         _peer_id: u64,
         _sdp_offer: Option<String>,
         _tracks: Vec<Track>,
+        _ice_servers: Vec<IceServer>,
     ) {
         console::log_1(&JsValue::from_str("on_peer_created invoked"));
     }
