@@ -431,3 +431,126 @@ impl Handler<RpcConnectionClosed> for Room {
             .connection_closed(ctx, msg.member_id, &msg.reason);
     }
 }
+
+#[cfg(test)]
+mod test {
+    use std::sync::{atomic::AtomicUsize, Arc, Mutex};
+
+    use actix::{Addr, Arbiter, System};
+    use medea_client_api_proto::{
+        AudioSettings, Direction, MediaType, Track, VideoSettings,
+    };
+
+    use crate::api::client::rpc_connection::test::TestConnection;
+    use crate::media::create_peers;
+
+    use super::*;
+
+    fn start_room() -> Addr<Room> {
+        let members = hashmap! {
+            1 => Member{id: 1, credentials: "caller_credentials".to_owned()},
+            2 => Member{id: 2, credentials: "responder_credentials".to_owned()},
+        };
+        Arbiter::start(move |_| {
+            Room::new(1, members, create_peers(1, 2), Duration::from_secs(10))
+        })
+    }
+
+    #[test]
+    fn start_signaling() {
+        let stopped = Arc::new(AtomicUsize::new(0));
+        let caller_events = Arc::new(Mutex::new(vec![]));
+        let caller_events_clone = Arc::clone(&caller_events);
+        let responder_events = Arc::new(Mutex::new(vec![]));
+        let responder_events_clone = Arc::clone(&responder_events);
+
+        System::run(move || {
+            let room = start_room();
+            let room_clone = room.clone();
+            let stopped_clone = stopped.clone();
+            Arbiter::start(move |_| TestConnection {
+                events: caller_events_clone,
+                member_id: 1,
+                room: room_clone,
+                stopped: stopped_clone,
+            });
+            Arbiter::start(move |_| TestConnection {
+                events: responder_events_clone,
+                member_id: 2,
+                room,
+                stopped,
+            });
+        });
+
+        let caller_events = caller_events.lock().unwrap();
+        let responder_events = responder_events.lock().unwrap();
+        assert_eq!(
+            caller_events.to_vec(),
+            vec![
+                serde_json::to_string(&Event::PeerCreated {
+                    peer_id: 1,
+                    sdp_offer: None,
+                    tracks: vec![
+                        Track {
+                            id: 1,
+                            direction: Direction::Send { receivers: vec![2] },
+                            media_type: MediaType::Audio(AudioSettings {}),
+                        },
+                        Track {
+                            id: 2,
+                            direction: Direction::Send { receivers: vec![2] },
+                            media_type: MediaType::Video(VideoSettings {}),
+                        },
+                    ],
+                })
+                .unwrap(),
+                serde_json::to_string(&Event::SdpAnswerMade {
+                    peer_id: 1,
+                    sdp_answer: "responder_answer".into(),
+                })
+                .unwrap(),
+                serde_json::to_string(&Event::IceCandidateDiscovered {
+                    peer_id: 1,
+                    candidate: IceCandidate {
+                        candidate: "ice_candidate".to_owned(),
+                        sdp_m_line_index: None,
+                        sdp_mid: None
+                    },
+                })
+                .unwrap(),
+            ]
+        );
+
+        assert_eq!(
+            responder_events.to_vec(),
+            vec![
+                serde_json::to_string(&Event::PeerCreated {
+                    peer_id: 2,
+                    sdp_offer: Some("caller_offer".into()),
+                    tracks: vec![
+                        Track {
+                            id: 1,
+                            direction: Direction::Recv { sender: 1 },
+                            media_type: MediaType::Audio(AudioSettings {}),
+                        },
+                        Track {
+                            id: 2,
+                            direction: Direction::Recv { sender: 1 },
+                            media_type: MediaType::Video(VideoSettings {}),
+                        },
+                    ],
+                })
+                .unwrap(),
+                serde_json::to_string(&Event::IceCandidateDiscovered {
+                    peer_id: 2,
+                    candidate: IceCandidate {
+                        candidate: "ice_candidate".to_owned(),
+                        sdp_m_line_index: None,
+                        sdp_mid: None
+                    },
+                })
+                .unwrap(),
+            ]
+        );
+    }
+}

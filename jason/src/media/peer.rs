@@ -5,7 +5,7 @@ use futures::{
     sync::mpsc::UnboundedSender,
     Future,
 };
-use protocol::{Direction, IceCandidate as IceDto, MediaType, Track};
+use medea_client_api_proto::{Direction, IceCandidate as IceDto, MediaType, Track};
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
     MediaStreamTrack, RtcIceCandidateInit, RtcPeerConnection,

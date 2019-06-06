@@ -9,7 +9,7 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::future_to_promise;
 
 use crate::{
-    api::room::Room, media::MediaManager, rpc::RPCClient, set_panic_hook,
+    api::room::Room, media::MediaManager, rpc::RpcClient, set_panic_hook,
 };
 
 #[wasm_bindgen]

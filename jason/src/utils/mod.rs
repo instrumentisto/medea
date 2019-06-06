@@ -4,6 +4,7 @@ mod event_listener;
 
 use web_sys::Window;
 
+#[doc(inline)]
 pub use self::{
     callback::Callback, errors::WasmErr, event_listener::EventListener,
 };

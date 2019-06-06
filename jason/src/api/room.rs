@@ -16,13 +16,12 @@ use std::{
     rc::{Rc, Weak},
 };
 
-use crate::api::connection::Connection;
 use crate::{
-    api::ConnectionHandle,
+    api::{ConnectionHandle, connection::Connection},
     media::{
         MediaManager, MediaStream, PeerEvent, PeerId, PeerRepository, Sdp,
     },
-    rpc::RPCClient,
+    rpc::RpcClient,
     utils::{Callback, WasmErr},
 };
 use std::collections::HashMap;
@@ -144,7 +143,7 @@ struct InnerRoom {
 
 impl InnerRoom {
     fn new(
-        rpc: Rc<RPCClient>,
+        rpc: Rc<RpcClient>,
         peer_events_sender: UnboundedSender<PeerEvent>,
         media_manager: Rc<MediaManager>,
     ) -> Self {
