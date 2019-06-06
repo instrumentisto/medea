@@ -1,11 +1,12 @@
 //! Room definitions and implementations.
 
-use serde::Deserialize;
 use std::convert::TryFrom;
 
+use hashbrown::HashMap;
+use serde::Deserialize;
+
 use super::{
-    member::MemberSpec, pipeline::Pipeline, Element, MemberId,
-    TryFromElementError,
+    pipeline::Pipeline, Element, Member, MemberId, TryFromElementError,
 };
 
 /// ID of [`Room`].
@@ -17,8 +18,8 @@ pub struct Id(pub String);
 #[allow(clippy::module_name_repetitions)]
 #[derive(Clone, Debug)]
 pub struct RoomSpec {
-    pub id: Id,
-    pub spec: Pipeline,
+    id: Id,
+    pipeline: Pipeline,
 }
 
 impl RoomSpec {
@@ -27,17 +28,17 @@ impl RoomSpec {
         &self,
         id: &MemberId,
     ) -> Result<Vec<MemberId>, TryFromElementError> {
-        let mut receivers = Vec::new();
-        for (member_id, member_element) in &self.spec.pipeline {
-            let member = MemberSpec::try_from(member_element.clone())?;
-            for endpoint in member.play_endpoints() {
-                if &endpoint.src.member_id == id {
-                    receivers.push(MemberId(member_id.clone()));
-                }
-            }
-        }
+        self.pipeline.get_receivers_for_member(id)
+    }
 
-        Ok(receivers)
+    pub fn members(
+        &self,
+    ) -> Result<HashMap<MemberId, Member>, TryFromElementError> {
+        self.pipeline.members(self)
+    }
+
+    pub fn id(&self) -> &Id {
+        &self.id
     }
 }
 
@@ -46,7 +47,7 @@ impl TryFrom<Element> for RoomSpec {
 
     fn try_from(from: Element) -> Result<Self, Self::Error> {
         match from {
-            Element::Room { id, spec } => Ok(Self { id, spec }),
+            Element::Room { id, spec } => Ok(Self { id, pipeline: spec }),
             _ => Err(TryFromElementError::NotRoom),
         }
     }

@@ -2,10 +2,7 @@
 //! stores [`Members`] and associated [`RpcConnection`]s, handles
 //! [`RpcConnection`] authorization, establishment, message sending.
 
-use std::{
-    convert::TryFrom,
-    time::{Duration, Instant},
-};
+use std::time::{Duration, Instant};
 
 use actix::{fut::wrap_future, AsyncContext, Context, SpawnHandle};
 use futures::{
@@ -21,9 +18,7 @@ use crate::{
             AuthorizationError, ClosedReason, EventMessage, RpcConnection,
             RpcConnectionClosed,
         },
-        control::{
-            Member, MemberId, MemberSpec, RoomSpec, TryFromElementError,
-        },
+        control::{Member, MemberId, RoomSpec, TryFromElementError},
     },
     log::prelude::*,
     signalling::{
@@ -61,16 +56,7 @@ impl ParticipantService {
         room_spec: &RoomSpec,
         reconnect_timeout: Duration,
     ) -> Result<Self, TryFromElementError> {
-        let mut members = HashMap::new();
-        for (control_id, element) in &room_spec.spec.pipeline {
-            let member_spec = MemberSpec::try_from(element.clone())?;
-            let member_id = MemberId(control_id.clone());
-
-            members.insert(
-                member_id.clone(),
-                Member::new(member_id, member_spec, room_spec)?,
-            );
-        }
+        let members = room_spec.members()?;
 
         debug!("Created room with {:?} members.", members);
 

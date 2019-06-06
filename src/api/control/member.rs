@@ -5,14 +5,10 @@ use std::{convert::TryFrom, fmt::Display, sync::Arc};
 use serde::Deserialize;
 
 use super::{
+    endpoint::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
     pipeline::Pipeline,
     room::RoomSpec,
-    Element,
-    TryFromElementError,
-    endpoint::{
-        WebRtcPublishEndpoint,
-        WebRtcPlayEndpoint,
-    }
+    Element, TryFromElementError,
 };
 
 /// ID of [`Member`].
@@ -57,8 +53,8 @@ impl Member {
     }
 
     /// Returns credentials to authorize [`Member`] with.
-    pub fn credentials(&self) -> &String {
-        &self.spec.credentials
+    pub fn credentials(&self) -> &str {
+        self.spec.credentials()
     }
 
     /// Returns all [`WebRtcPlayEndpoint`]s of this [`Member`].
@@ -82,35 +78,25 @@ impl Member {
 #[derive(Clone, Debug)]
 pub struct MemberSpec {
     /// Spec of this [`Member`].
-    pub spec: Pipeline,
+    pipeline: Pipeline,
 
     /// Credentials to authorize [`Member`] with.
-    pub credentials: String,
+    credentials: String,
 }
 
 impl MemberSpec {
-    /// Get all [`WebRtcPlayEndpoint`]s of this [`MemberSpec`].
+    /// Returns all [`WebRtcPlayEndpoint`]s of this [`MemberSpec`].
     pub fn play_endpoints(&self) -> Vec<&WebRtcPlayEndpoint> {
-        self.spec
-            .pipeline
-            .iter()
-            .filter_map(|(_, e)| match e {
-                Element::WebRtcPlayEndpoint { spec } => Some(spec),
-                _ => None,
-            })
-            .collect()
+        self.pipeline.play_endpoints()
     }
 
-    /// Get all [`WebRtcPublishEndpoint`]s of this [`MemberSpec`].
+    /// Returns all [`WebRtcPublishEndpoint`]s of this [`MemberSpec`].
     pub fn publish_endpoints(&self) -> Vec<&WebRtcPublishEndpoint> {
-        self.spec
-            .pipeline
-            .iter()
-            .filter_map(|(_, e)| match e {
-                Element::WebRtcPublishEndpoint { spec } => Some(spec),
-                _ => None,
-            })
-            .collect()
+        self.pipeline.publish_endpoints()
+    }
+
+    pub fn credentials(&self) -> &str {
+        &self.credentials
     }
 }
 
@@ -119,9 +105,10 @@ impl TryFrom<Element> for MemberSpec {
 
     fn try_from(from: Element) -> Result<Self, Self::Error> {
         match from {
-            Element::Member { spec, credentials } => {
-                Ok(Self { spec, credentials })
-            }
+            Element::Member { spec, credentials } => Ok(Self {
+                pipeline: spec,
+                credentials,
+            }),
             _ => Err(TryFromElementError::NotMember),
         }
     }

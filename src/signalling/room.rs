@@ -83,7 +83,7 @@ impl Room {
         reconnect_timeout: Duration,
     ) -> Result<Self, RoomError> {
         Ok(Self {
-            id: room_spec.id.clone(),
+            id: room_spec.id().clone(),
             peers: PeerRepository::from(HashMap::new()),
             participants: ParticipantService::new(
                 room_spec,

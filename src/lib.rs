@@ -67,13 +67,15 @@ pub fn start_static_rooms(
         let mut rooms = HashMap::new();
 
         for spec in room_specs {
-            if rooms.contains_key(&spec.id) {
-                return Err(ServerStartError::DuplicateRoomId(spec.id));
+            if rooms.contains_key(spec.id()) {
+                return Err(ServerStartError::DuplicateRoomId(
+                    spec.id().clone(),
+                ));
             }
 
             let room = Room::new(&spec, config.rpc.reconnect_timeout)?;
             let room = Arbiter::start(move |_| room);
-            rooms.insert(spec.id, room);
+            rooms.insert(spec.id().clone(), room);
         }
 
         Ok(rooms)
