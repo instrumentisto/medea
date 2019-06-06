@@ -97,7 +97,7 @@ pub mod test {
         System,
     };
     use futures::future::Future;
-    use medea_client_api_proto::{Command, Event, IceCandidate};
+    use medea_client_api_proto::{Command, Direction, Event, IceCandidate};
 
     use crate::{
         api::{
@@ -161,21 +161,34 @@ pub mod test {
                 Event::PeerCreated {
                     peer_id,
                     sdp_offer,
-                    tracks: _,
+                    tracks,
                 } => {
+                    let mut mid = 0;
+                    let mids = tracks
+                        .into_iter()
+                        .filter_map(|t| match t.direction {
+                            Direction::Send { .. } => {
+                                let result = Some((t.id, mid.to_string()));
+                                mid += 1;
+                                result
+                            }
+                            Direction::Recv { .. } => None,
+                        })
+                        .collect();
+
                     match sdp_offer {
                         Some(_) => self.room.do_send(CommandMessage::from(
                             Command::MakeSdpAnswer {
                                 peer_id,
                                 sdp_answer: "responder_answer".into(),
-                                mids: None,
+                                mids: Some(mids),
                             },
                         )),
                         None => self.room.do_send(CommandMessage::from(
                             Command::MakeSdpOffer {
                                 peer_id,
                                 sdp_offer: "caller_offer".into(),
-                                mids: None,
+                                mids: Some(mids),
                             },
                         )),
                     }

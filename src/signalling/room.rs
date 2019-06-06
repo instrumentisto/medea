@@ -441,8 +441,9 @@ mod test {
         AudioSettings, Direction, MediaType, Track, VideoSettings,
     };
 
-    use crate::api::client::rpc_connection::test::TestConnection;
-    use crate::media::create_peers;
+    use crate::{
+        api::client::rpc_connection::test::TestConnection, media::create_peers,
+    };
 
     use super::*;
 
@@ -507,6 +508,7 @@ mod test {
                 serde_json::to_string(&Event::SdpAnswerMade {
                     peer_id: 1,
                     sdp_answer: "responder_answer".into(),
+                    mids: None
                 })
                 .unwrap(),
                 serde_json::to_string(&Event::IceCandidateDiscovered {
@@ -530,12 +532,18 @@ mod test {
                     tracks: vec![
                         Track {
                             id: 1,
-                            direction: Direction::Recv { sender: 1 },
+                            direction: Direction::Recv {
+                                sender: 1,
+                                mid: Some(String::from("0"))
+                            },
                             media_type: MediaType::Audio(AudioSettings {}),
                         },
                         Track {
                             id: 2,
-                            direction: Direction::Recv { sender: 1 },
+                            direction: Direction::Recv {
+                                sender: 1,
+                                mid: Some(String::from("1"))
+                            },
                             media_type: MediaType::Video(VideoSettings {}),
                         },
                     ],
