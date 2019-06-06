@@ -1,7 +1,7 @@
 ---
 name: Release
 about: Prepare a new release of the project.
-labels: enhancement, k: documentation
+labels: enhancement, k::documentation
 ---
 
 <Remove everything above before submitting this PR>
@@ -18,7 +18,7 @@ Prepares [<paste release version>](<paste milestone link>) release.
     - [ ] In [draft mode][l:1]
     - [ ] Name contains `WIP: ` prefix
     - [ ] Name contains issue reference
-    - [ ] Has `k: ` labels applied
+    - [ ] Has `k::` labels applied
     - [ ] Has assignee
 - [ ] Documentation is updated (if required)
 - [ ] Tests are updated (if required)

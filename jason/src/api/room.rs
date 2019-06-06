@@ -1,15 +1,16 @@
-//! Represents Medea room.
+//! Medea room.
 
 use std::{
     cell::RefCell,
     collections::HashMap,
+    ops::DerefMut,
     rc::{Rc, Weak},
 };
 
 use futures::{
     future::Either,
-    future::{Future, IntoFuture},
-    stream::Stream,
+    future::{Future as _, IntoFuture},
+    stream::Stream as _,
     sync::mpsc::{unbounded, UnboundedSender},
 };
 use medea_client_api_proto::{Command, Direction, Event, IceCandidate, Track};
@@ -59,52 +60,16 @@ impl Room {
 
         let handle_medea_event = rpc
             .subscribe()
-            .for_each(move |event| {
-                // TODO: macro for convenient dispatch
-                match inner.upgrade() {
-                    Some(inner) => {
-                        let mut inner = inner.borrow_mut();
-                        match event {
-                            Event::PeerCreated {
-                                peer_id,
-                                sdp_offer,
-                                tracks,
-                            } => {
-                                inner.on_peer_created(
-                                    peer_id, sdp_offer, tracks,
-                                );
-                            }
-                            Event::SdpAnswerMade {
-                                peer_id,
-                                sdp_answer,
-                                mids,
-                            } => {
-                                inner.on_sdp_answer(
-                                    peer_id,
-                                    sdp_answer,
-                                    &mids,
-                                );
-                            }
-                            Event::IceCandidateDiscovered {
-                                peer_id,
-                                candidate,
-                            } => {
-                                inner.on_ice_candidate_discovered(
-                                    peer_id, &candidate,
-                                );
-                            }
-                            Event::PeersRemoved { peer_ids } => {
-                                inner.on_peers_removed(&peer_ids);
-                            }
-                        };
-                        Ok(())
-                    }
-                    None => {
-                        // InnerSession is gone, which means that Room was
-                        // dropped. Not supposed to happen, since InnerSession
-                        // should drop its tx by unsubbing from RpcClient.
-                        Err(())
-                    }
+            .for_each(move |event| match inner.upgrade() {
+                Some(inner) => {
+                    event.dispatch_with(inner.borrow_mut().deref_mut());
+                    Ok(())
+                }
+                None => {
+                    // InnerSession is gone, which means that Room was
+                    // dropped. Not supposed to happen, since InnerSession
+                    // should drop its tx by unsubbing from RpcClient.
+                    Err(())
                 }
             })
             .into_future()
@@ -177,35 +142,10 @@ impl InnerRoom {
             on_new_connection: Rc::new(Callback::new()),
         }
     }
+}
 
-    fn on_peer_ice_candidate_discovered(
-        &mut self,
-        peer_id: PeerId,
-        candidate: IceCandidate,
-    ) {
-        self.rpc
-            .send_command(Command::SetIceCandidate { peer_id, candidate });
-    }
-
-    fn on_peer_new_remote_stream(
-        &mut self,
-        _peer_id: PeerId,
-        sender_id: u64,
-        remote_stream: &Rc<MediaStream>,
-    ) {
-        match self.connections.get(&sender_id) {
-            None => WasmErr::from_str(
-                "NewRemoteStream from sender without connection",
-            )
-            .log_err(),
-            Some(connection) => {
-                connection
-                    .on_remote_stream()
-                    .call_ok(remote_stream.new_handle());
-            }
-        }
-    }
-
+impl EventHandler for InnerRoom {
+    /// Creates RTCPeerConnection with provided ID.
     fn on_peer_created(
         &mut self,
         peer_id: PeerId,

@@ -32,7 +32,7 @@ Resolves <paste issue reference>
     - [ ] In [draft mode][l:1]
     - [ ] Name contains `WIP: ` prefix
     - [ ] Name contains issue reference
-    - [ ] Has `k: ` labels applied
+    - [ ] Has `k::` labels applied
     - [ ] Has assignee
 - [ ] Documentation is updated (if required)
 - [ ] Tests are updated (if required)

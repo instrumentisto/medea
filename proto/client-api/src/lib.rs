@@ -1,10 +1,11 @@
 use std::collections::HashMap;
 
+use medea_macro::dispatchable;
 use serde::{de::Deserializer, ser::Serializer, Deserialize, Serialize};
 
 // TODO: should be properly shared between medea and jason
-#[cfg_attr(test, derive(PartialEq, Debug))]
 #[allow(dead_code)]
+#[cfg_attr(test, derive(Debug, PartialEq))]
 /// Message sent by `Media Server` to `Client`.
 pub enum ServerMsg {
     /// `pong` message that server answers with to WebSocket client in response
@@ -15,8 +16,8 @@ pub enum ServerMsg {
     Event(Event),
 }
 
-#[cfg_attr(test, derive(PartialEq, Debug))]
 #[allow(dead_code)]
+#[cfg_attr(test, derive(Debug, PartialEq))]
 /// Message from 'Client' to 'Media Server'.
 pub enum ClientMsg {
     /// `ping` message that WebSocket client is expected to send to the server
@@ -27,11 +28,11 @@ pub enum ClientMsg {
 }
 
 /// WebSocket message from Web Client to Media Server.
-#[cfg_attr(test, derive(PartialEq, Debug))]
+#[allow(dead_code)]
 #[cfg_attr(feature = "medea", derive(Deserialize))]
 #[cfg_attr(feature = "jason", derive(Serialize))]
+#[cfg_attr(test, derive(Debug, PartialEq))]
 #[serde(tag = "command", content = "data")]
-#[allow(dead_code)]
 pub enum Command {
     /// Web Client sends SDP Offer.
     MakeSdpOffer {
@@ -53,11 +54,12 @@ pub enum Command {
 }
 
 /// WebSocket message from Medea to Jason.
+#[allow(dead_code)]
+#[dispatchable]
 #[cfg_attr(feature = "medea", derive(Serialize))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
-#[cfg_attr(test, derive(PartialEq, Debug))]
+#[cfg_attr(test, derive(Debug, PartialEq))]
 #[serde(tag = "event", content = "data")]
-#[allow(dead_code)]
 pub enum Event {
     /// Media Server notifies Web Client about necessity of RTCPeerConnection
     /// creation.
@@ -87,17 +89,17 @@ pub enum Event {
 }
 
 /// Represents [`RtcIceCandidateInit`] object.
-#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct IceCandidate {
     pub candidate: String,
     pub sdp_m_line_index: Option<u16>,
     pub sdp_mid: Option<String>,
 }
 
-/// [`Track] with specified direction.
+/// [`Track`] with specified direction.
 #[cfg_attr(feature = "medea", derive(Serialize))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
-#[cfg_attr(test, derive(PartialEq, Debug))]
+#[cfg_attr(test, derive(Debug, PartialEq))]
 pub struct Track {
     pub id: u64,
     pub direction: Direction,
@@ -107,7 +109,7 @@ pub struct Track {
 /// Direction of [`Track`].
 #[cfg_attr(feature = "medea", derive(Serialize))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
-#[cfg_attr(test, derive(PartialEq, Debug))]
+#[cfg_attr(test, derive(Debug, PartialEq))]
 pub enum Direction {
     Send { receivers: Vec<u64> },
     Recv { sender: u64, mid: Option<String> },
@@ -138,8 +140,8 @@ pub struct VideoSettings {}
 #[cfg(feature = "jason")]
 impl Serialize for ClientMsg {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
+        where
+            S: Serializer,
     {
         use serde::ser::SerializeStruct;
 
@@ -157,8 +159,8 @@ impl Serialize for ClientMsg {
 #[cfg(feature = "medea")]
 impl<'de> Deserialize<'de> for ClientMsg {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
+        where
+            D: Deserializer<'de>,
     {
         use serde::de::Error;
 
@@ -192,8 +194,8 @@ impl<'de> Deserialize<'de> for ClientMsg {
 #[cfg(feature = "medea")]
 impl Serialize for ServerMsg {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
+        where
+            S: Serializer,
     {
         use serde::ser::SerializeStruct;
 
@@ -211,8 +213,8 @@ impl Serialize for ServerMsg {
 #[cfg(feature = "jason")]
 impl<'de> Deserialize<'de> for ServerMsg {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
+        where
+            D: Deserializer<'de>,
     {
         use serde::de::Error;
 
