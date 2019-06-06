@@ -4,7 +4,6 @@
 
 use std::{
     convert::TryFrom,
-    sync::Arc,
     time::{Duration, Instant},
 };
 
@@ -69,12 +68,7 @@ impl ParticipantService {
 
             members.insert(
                 member_id.clone(),
-                Member {
-                    receivers: room_spec
-                        .get_receivers_for_member(&member_id)?,
-                    id: member_id,
-                    spec: Arc::new(member_spec),
-                },
+                Member::new(member_id, member_spec, room_spec)?,
             );
         }
 
@@ -104,7 +98,7 @@ impl ParticipantService {
     ) -> Result<&Member, AuthorizationError> {
         match self.members.get(member_id) {
             Some(ref member) => {
-                if member.spec.credentials.eq(credentials) {
+                if member.credentials().eq(credentials) {
                     Ok(member)
                 } else {
                     Err(AuthorizationError::InvalidCredentials)

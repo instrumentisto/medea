@@ -4,10 +4,15 @@ use std::{convert::TryFrom, fmt::Display, sync::Arc};
 
 use serde::Deserialize;
 
-use super::{pipeline::Pipeline, Element, TryFromElementError};
-
-use crate::api::control::endpoint::{
-    WebRtcPlayEndpoint, WebRtcPublishEndpoint,
+use super::{
+    pipeline::Pipeline,
+    room::RoomSpec,
+    Element,
+    TryFromElementError,
+    endpoint::{
+        WebRtcPublishEndpoint,
+        WebRtcPlayEndpoint,
+    }
 };
 
 /// ID of [`Member`].
@@ -24,13 +29,52 @@ impl Display for Id {
 #[derive(Clone, Debug)]
 pub struct Member {
     /// ID of [`Member`].
-    pub id: Id,
+    id: Id,
 
     /// Control API specification of this [`Member`].
-    pub spec: Arc<MemberSpec>,
+    spec: Arc<MemberSpec>,
 
     /// Receivers of this [`Member`]'s publish endpoints.
-    pub receivers: Vec<Id>,
+    receivers: Vec<Id>,
+}
+
+impl Member {
+    pub fn new(
+        id: Id,
+        spec: MemberSpec,
+        room_spec: &RoomSpec,
+    ) -> Result<Self, TryFromElementError> {
+        Ok(Self {
+            receivers: room_spec.get_receivers_for_member(&id)?,
+            spec: Arc::new(spec),
+            id,
+        })
+    }
+
+    /// Returns [`Id`] of [`Member`].
+    pub fn id(&self) -> &Id {
+        &self.id
+    }
+
+    /// Returns credentials to authorize [`Member`] with.
+    pub fn credentials(&self) -> &String {
+        &self.spec.credentials
+    }
+
+    /// Returns all [`WebRtcPlayEndpoint`]s of this [`Member`].
+    pub fn play_endpoints(&self) -> Vec<&WebRtcPlayEndpoint> {
+        self.spec.play_endpoints()
+    }
+
+    /// Returns all [`WebRtcPublishEndpoint`]s of this [`Member`].
+    pub fn publish_endpoints(&self) -> Vec<&WebRtcPublishEndpoint> {
+        self.spec.publish_endpoints()
+    }
+
+    /// Returns all receivers [`Id`] of this [`Member`].
+    pub fn receivers(&self) -> &Vec<Id> {
+        &self.receivers
+    }
 }
 
 /// Newtype for [`Element::Member`] variant.

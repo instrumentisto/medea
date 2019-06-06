@@ -74,32 +74,32 @@ impl PeerRepository {
 
         let mut first_peer = Peer::new(
             first_peer_id,
-            first_member.id.clone(),
+            first_member.id().clone(),
             second_peer_id,
-            second_member.id.clone(),
+            second_member.id().clone(),
         );
         let mut second_peer = Peer::new(
             second_peer_id,
-            second_member.id.clone(),
+            second_member.id().clone(),
             first_peer_id,
-            first_member.id.clone(),
+            first_member.id().clone(),
         );
 
         first_peer.add_publish_endpoints(
-            first_member.spec.publish_endpoints(),
+            first_member.publish_endpoints(),
             &mut self.tracks_count,
         );
         second_peer.add_publish_endpoints(
-            second_member.spec.publish_endpoints(),
+            second_member.publish_endpoints(),
             &mut self.tracks_count,
         );
 
         first_peer.add_play_endpoints(
-            first_member.spec.play_endpoints(),
+            first_member.play_endpoints(),
             &mut second_peer,
         );
         second_peer.add_play_endpoints(
-            second_member.spec.play_endpoints(),
+            second_member.play_endpoints(),
             &mut first_peer,
         );
 

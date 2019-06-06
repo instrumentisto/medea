@@ -251,7 +251,8 @@ impl Room {
             let second_member = p.1;
             debug!(
                 "Created peer member {} with member {}",
-                first_member.id, second_member.id
+                first_member.id(),
+                second_member.id()
             );
 
             let (caller_peer_id, responder_peer_id) =
@@ -286,7 +287,7 @@ impl Room {
 
         // connect receivers
         let mut already_connected_members = Vec::new();
-        for recv_member_id in &member.receivers {
+        for recv_member_id in member.receivers() {
             if self.participants.member_has_connection(recv_member_id) {
                 if let Some(recv_member) =
                     self.participants.get_member_by_id(recv_member_id)
@@ -305,7 +306,7 @@ impl Room {
         }
 
         // connect senders
-        for play in member.spec.play_endpoints() {
+        for play in member.play_endpoints() {
             let sender_member_id = &play.src.member_id;
             if already_connected_members.contains(sender_member_id) {
                 continue;
