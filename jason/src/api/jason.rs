@@ -60,6 +60,9 @@ impl Jason {
         future_to_promise(fut)
     }
 
+    /// Set `on_local_stream` callback, which will be invoked once media
+    /// acquisition request will resolve returning [`MediaStreamHandle`] or
+    /// [`WasmErr`].
     pub fn on_local_stream(&self, f: js_sys::Function) {
         self.0.borrow_mut().media_manager.on_local_stream(f);
     }
