@@ -53,11 +53,11 @@ impl TryFrom<Element> for RoomSpec {
 }
 
 #[cfg(test)]
-mod tests {
+mod room_spec_tests {
     use super::*;
 
     #[test]
-    fn should_properly_get_receivers_for_member() {
+    fn properly_get_receivers_for_member() {
         let spec = r#"
             kind: Room
             id: test-call
