@@ -1,24 +1,16 @@
 //! Signalling API e2e tests.
 
-mod test_ports;
+mod utils;
 
 use actix::{Actor, Arbiter, AsyncContext, Context, StreamHandler, System};
 use actix_web::ws::{
     Client, ClientWriter, Message as WebMessage, ProtocolError,
 };
 use futures::future::Future;
-use medea::{
-    api::client::server, conf::Conf, conf::Server,
-    signalling::room_repo::RoomsRepository, start_static_rooms,
-};
+
 use medea_client_api_proto::{Command, Direction, Event, IceCandidate};
 use serde_json::error::Error as SerdeError;
-use std::{
-    cell::Cell,
-    rc::Rc,
-    sync::{Arc, Mutex},
-    time::Duration,
-};
+use std::{cell::Cell, rc::Rc, time::Duration};
 
 /// Medea client for testing purposes.
 struct TestMember {
@@ -145,65 +137,10 @@ impl StreamHandler<WebMessage, ProtocolError> for TestMember {
     }
 }
 
-/// Run medea server. This function lock main thread until server is up.
-/// Server starts in different thread and `join`'ed with main thread.
-/// When test is done, server will be destroyed.
-///
-/// Server load all specs from `tests/specs`.
-///
-/// Provide name for thread same as your test function's name. This will
-/// help you when server is panic in some test case. And this `test_name`
-/// will be used as name for getting port from [`test_ports`] module.
-///
-/// Don't forget register your test in [`test_ports`], otherwise the server
-/// will just panic.
-fn run_test_server(test_name: &'static str) -> u16 {
-    let bind_port = test_ports::get_port_for_test(test_name);
-
-    let is_server_starting = Arc::new(Mutex::new(Cell::new(true)));
-    let is_server_starting_ref = Arc::clone(&is_server_starting);
-    let builder = std::thread::Builder::new().name(test_name.to_string());
-
-    let server_thread = builder
-        .spawn(move || {
-            let _ = System::new(format!("test-medea-server-{}", test_name));
-
-            let config = Conf {
-                server: Server {
-                    static_specs_path: Some("tests/specs".to_string()),
-                    bind_port,
-                    ..Default::default()
-                },
-                ..Default::default()
-            };
-
-            match start_static_rooms(&config) {
-                Ok(r) => {
-                    let room_repo = RoomsRepository::new(r);
-                    server::run(room_repo, config);
-                }
-                Err(e) => {
-                    panic!("Server not started because of error: '{}'", e);
-                }
-            };
-            let is_server_starting_guard =
-                is_server_starting_ref.lock().unwrap();
-            is_server_starting_guard.set(false);
-        })
-        .unwrap();
-
-    // Wait until server is up
-    while is_server_starting.lock().unwrap().get() {}
-
-    server_thread.join().unwrap();
-
-    bind_port
-}
-
 #[test]
 fn pub_sub_video_call() {
     let test_name = "pub_sub_video_call";
-    let bind_port = run_test_server(test_name);
+    let bind_port = utils::run_test_server(test_name);
     let base_url =
         format!("ws://localhost:{}/ws/pub-sub-video-call", bind_port);
 
@@ -293,7 +230,7 @@ fn pub_sub_video_call() {
 #[test]
 fn three_members_p2p_video_call() {
     let test_name = "three_members_p2p_video_call";
-    let bind_port = run_test_server(test_name);
+    let bind_port = utils::run_test_server(test_name);
     let base_url =
         format!("ws://localhost:{}/ws/three-members-conference", bind_port);
 
