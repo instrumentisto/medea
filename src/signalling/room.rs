@@ -264,8 +264,13 @@ impl Room {
         }
     }
 
-    /// Create and interconnect all necessary [`Member`]'s [`Peer`]s.
-    fn create_necessary_peers(
+    /// Create and interconnect all [`Peer`]s between connected [`Member`]
+    /// and all available at this moment [`Member`]s from [`MemberSpec`].
+    ///
+    /// Availability is determines by checking [`RpcConnection`] of all
+    /// [`Member`]s from [`WebRtcPlayEndpoint`]s and from receivers of
+    /// connected [`Member`].
+    fn create_peers_with_available_members(
         &mut self,
         member_id: &MemberId,
         ctx: &mut <Self as Actor>::Context,
@@ -460,7 +465,7 @@ impl Handler<RpcConnectionEstablished> for Room {
 
         // Check that user is not reconnecting
         if self.peers.get_peers_by_member_id(&msg.member_id).is_empty() {
-            self.create_necessary_peers(&msg.member_id, ctx);
+            self.create_peers_with_available_members(&msg.member_id, ctx);
         }
 
         Box::new(wrap_future(future::ok(())))
