@@ -5,7 +5,10 @@ use futures::{
     sync::mpsc::UnboundedSender,
     Future,
 };
-use medea_client_api_proto::{Direction, IceCandidate as IceDto, MediaType, Track};
+use medea_client_api_proto::{
+    Direction, IceCandidate as IceDto, MediaType, Track,
+};
+use medea_macro::dispatchable;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
     MediaStreamTrack, RtcIceCandidateInit, RtcPeerConnection,
@@ -26,6 +29,7 @@ pub enum Sdp {
     Answer(String),
 }
 
+#[dispatchable]
 #[allow(clippy::module_name_repetitions)]
 pub enum PeerEvent {
     IceCandidateDiscovered {

@@ -13,14 +13,17 @@ use futures::{
     stream::Stream as _,
     sync::mpsc::{unbounded, UnboundedSender},
 };
-use medea_client_api_proto::{Command, Direction, Event, IceCandidate, Track};
+use medea_client_api_proto::{
+    Command, Direction, EventHandler, IceCandidate, Track,
+};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 
 use crate::{
-    api::{ConnectionHandle, connection::Connection},
+    api::{connection::Connection, ConnectionHandle},
     media::{
-        MediaManager, MediaStream, PeerEvent, PeerId, PeerRepository, Sdp,
+        MediaManager, MediaStream, PeerEvent, PeerEventHandler, PeerId,
+        PeerRepository, Sdp,
     },
     rpc::RpcClient,
     utils::{Callback, WasmErr},
@@ -57,7 +60,6 @@ impl Room {
         )));
 
         let inner = Rc::downgrade(&room);
-
         let handle_medea_event = rpc
             .subscribe()
             .for_each(move |event| match inner.upgrade() {
@@ -75,28 +77,14 @@ impl Room {
             .into_future()
             .then(|_| Ok(()));
 
-        let inner = Rc::clone(&room);
+        let inner = Rc::downgrade(&room);
         let handle_peer_event = rx
-            .for_each(move |event| {
-                let mut inner = inner.borrow_mut();
-
-                match event {
-                    PeerEvent::IceCandidateDiscovered { peer_id, ice } => {
-                        inner.on_peer_ice_candidate_discovered(peer_id, ice);
-                    }
-                    PeerEvent::NewRemoteStream {
-                        peer_id,
-                        sender_id,
-                        remote_stream,
-                    } => {
-                        inner.on_peer_new_remote_stream(
-                            peer_id,
-                            sender_id,
-                            &remote_stream,
-                        );
-                    }
+            .for_each(move |event| match inner.upgrade() {
+                Some(inner) => {
+                    event.dispatch_with(inner.borrow_mut().deref_mut());
+                    Ok(())
                 }
-                Ok(())
+                None => Err(()),
             })
             .into_future()
             .then(|_| Ok(()));
@@ -224,11 +212,11 @@ impl EventHandler for InnerRoom {
     }
 
     /// Applies specified SDP Answer to specified RTCPeerConnection.
-    fn on_sdp_answer(
+    fn on_sdp_answer_made(
         &mut self,
         peer_id: PeerId,
         sdp_answer: String,
-        _mids: &Option<HashMap<u64, String>>,
+        _mids: Option<HashMap<u64, String>>,
     ) {
         if let Some(peer) = self.peers.get_peer(peer_id) {
             spawn_local(
@@ -248,11 +236,11 @@ impl EventHandler for InnerRoom {
     fn on_ice_candidate_discovered(
         &mut self,
         peer_id: PeerId,
-        candidate: &IceCandidate,
+        candidate: IceCandidate,
     ) {
         if let Some(peer) = self.peers.get_peer(peer_id) {
             spawn_local(
-                peer.add_ice_candidate(candidate)
+                peer.add_ice_candidate(&candidate)
                     .map_err(|err| err.log_err()),
             );
         } else {
@@ -262,10 +250,40 @@ impl EventHandler for InnerRoom {
     }
 
     /// Disposes specified RTCPeerConnection's.
-    fn on_peers_removed(&mut self, peer_ids: &[PeerId]) {
+    fn on_peers_removed(&mut self, peer_ids: Vec<PeerId>) {
         peer_ids.iter().for_each(|id| {
             self.peers.remove(*id);
         })
+    }
+}
+
+impl PeerEventHandler for InnerRoom {
+    fn on_ice_candidate_discovered(
+        &mut self,
+        peer_id: PeerId,
+        candidate: IceCandidate,
+    ) {
+        self.rpc
+            .send_command(Command::SetIceCandidate { peer_id, candidate });
+    }
+
+    fn on_new_remote_stream(
+        &mut self,
+        _peer_id: PeerId,
+        sender_id: u64,
+        remote_stream: Rc<MediaStream>,
+    ) {
+        match self.connections.get(&sender_id) {
+            None => WasmErr::from_str(
+                "NewRemoteStream from sender without connection",
+            )
+            .log_err(),
+            Some(connection) => {
+                connection
+                    .on_remote_stream()
+                    .call_ok(remote_stream.new_handle());
+            }
+        }
     }
 }
 

@@ -140,8 +140,8 @@ pub struct VideoSettings {}
 #[cfg(feature = "jason")]
 impl Serialize for ClientMsg {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where
-            S: Serializer,
+    where
+        S: Serializer,
     {
         use serde::ser::SerializeStruct;
 
@@ -159,8 +159,8 @@ impl Serialize for ClientMsg {
 #[cfg(feature = "medea")]
 impl<'de> Deserialize<'de> for ClientMsg {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where
-            D: Deserializer<'de>,
+    where
+        D: Deserializer<'de>,
     {
         use serde::de::Error;
 
@@ -194,8 +194,8 @@ impl<'de> Deserialize<'de> for ClientMsg {
 #[cfg(feature = "medea")]
 impl Serialize for ServerMsg {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where
-            S: Serializer,
+    where
+        S: Serializer,
     {
         use serde::ser::SerializeStruct;
 
@@ -213,8 +213,8 @@ impl Serialize for ServerMsg {
 #[cfg(feature = "jason")]
 impl<'de> Deserialize<'de> for ServerMsg {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where
-            D: Deserializer<'de>,
+    where
+        D: Deserializer<'de>,
     {
         use serde::de::Error;
 

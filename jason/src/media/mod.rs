@@ -15,7 +15,10 @@ use web_sys::MediaStream as BackingMediaStream;
 use crate::utils::{window, Callback, WasmErr};
 
 pub use self::{
-    peer::{Id as PeerId, PeerConnection, PeerEvent, PeerRepository, Sdp},
+    peer::{
+        Id as PeerId, PeerConnection, PeerEvent, PeerEventHandler,
+        PeerRepository, Sdp,
+    },
     stream::{GetMediaRequest, MediaStream, MediaStreamHandle},
 };
 
