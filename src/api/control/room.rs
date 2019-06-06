@@ -31,12 +31,14 @@ impl RoomSpec {
         self.pipeline.get_receivers_for_member(id)
     }
 
+    /// Returns all [`Member`]s of this [`RoomSpec`].
     pub fn members(
         &self,
     ) -> Result<HashMap<MemberId, Member>, TryFromElementError> {
         self.pipeline.members(self)
     }
 
+    /// Returns ID of this [`RoomSpec`]
     pub fn id(&self) -> &Id {
         &self.id
     }

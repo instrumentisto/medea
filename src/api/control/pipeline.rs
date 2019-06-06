@@ -41,7 +41,7 @@ impl Pipeline {
             .collect()
     }
 
-    /// Get all receivers of all [`Member`]'s [`WebRtcPublishEndpoint`]s.
+    /// Get all receivers of all [`Member`]'s [`WebRtcPublishEndpoint`].
     pub fn get_receivers_for_member(
         &self,
         id: &MemberId,
@@ -59,7 +59,7 @@ impl Pipeline {
         Ok(receivers)
     }
 
-    /// Get all members from pipeline of [`RoomSpec`].
+    /// Get all [`Member`]s from pipeline of [`RoomSpec`].
     pub fn members(
         &self,
         room_spec: &RoomSpec,
