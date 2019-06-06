@@ -56,12 +56,12 @@ pub struct WebRtcPublishEndpoint {
 #[derive(Clone, Deserialize, Debug)]
 pub struct WebRtcPlayEndpoint {
     /// Source URI in format `local://{room_id}/{member_id}/{endpoint_id}`.
-    pub src: LocalUri,
+    pub src: SrcUri,
 }
 
 /// Special uri with pattern `local://{room_id}/{member_id}/{endpoint_id}`.
 #[derive(Clone, Debug)]
-pub struct LocalUri {
+pub struct SrcUri {
     /// ID of [`Room`]
     pub room_id: String,
     /// ID of [`Member`]
@@ -70,17 +70,17 @@ pub struct LocalUri {
     pub endpoint_id: String,
 }
 
-/// Serde deserializer for [`LocalUri`].
+/// Serde deserializer for [`SrcUri`].
 /// Deserialize URIs with pattern `local://{room_id}/{member_id}/{endpoint_id}`.
-impl<'de> Deserialize<'de> for LocalUri {
+impl<'de> Deserialize<'de> for SrcUri {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
-        struct LocalUriVisitor;
+        struct SrcUriVisitor;
 
-        impl<'de> Visitor<'de> for LocalUriVisitor {
-            type Value = LocalUri;
+        impl<'de> Visitor<'de> for SrcUriVisitor {
+            type Value = SrcUri;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
                 formatter.write_str(
@@ -88,7 +88,7 @@ impl<'de> Deserialize<'de> for LocalUri {
                 )
             }
 
-            fn visit_str<E>(self, value: &str) -> Result<LocalUri, E>
+            fn visit_str<E>(self, value: &str) -> Result<SrcUri, E>
             where
                 E: de::Error,
             {
@@ -145,7 +145,7 @@ impl<'de> Deserialize<'de> for LocalUri {
                     )));
                 }
 
-                Ok(LocalUri {
+                Ok(SrcUri {
                     room_id,
                     member_id: MemberId(member_id),
                     endpoint_id,
@@ -153,26 +153,26 @@ impl<'de> Deserialize<'de> for LocalUri {
             }
         }
 
-        deserializer.deserialize_identifier(LocalUriVisitor)
+        deserializer.deserialize_identifier(SrcUriVisitor)
     }
 }
 
 #[cfg(test)]
-mod local_uri_deserialization_tests {
+mod src_uri_deserialization_tests {
     use serde::Deserialize;
 
     use super::*;
 
     #[derive(Deserialize)]
-    struct LocalUriTest {
-        src: LocalUri,
+    struct SrcUriTest {
+        src: SrcUri,
     }
 
     #[test]
     fn deserialize() {
         let valid_json_uri =
             r#"{ "src": "local://room_id/member_id/endpoint_id" }"#;
-        let local_uri: LocalUriTest =
+        let local_uri: SrcUriTest =
             serde_json::from_str(valid_json_uri).unwrap();
 
         assert_eq!(
@@ -187,7 +187,7 @@ mod local_uri_deserialization_tests {
     fn return_error_when_uri_not_local() {
         let invalid_json_uri =
             r#"{ "src": "not_local://room_id/member_id/endpoint_id" }"#;
-        match serde_json::from_str::<LocalUriTest>(invalid_json_uri) {
+        match serde_json::from_str::<SrcUriTest>(invalid_json_uri) {
             Ok(_) => assert!(false),
             Err(_) => assert!(true),
         }
@@ -196,7 +196,7 @@ mod local_uri_deserialization_tests {
     #[test]
     fn return_error_when_uri_is_not_full() {
         let invalid_json_uri = r#"{ "src": "local://room_id/member_id" }"#;
-        match serde_json::from_str::<LocalUriTest>(invalid_json_uri) {
+        match serde_json::from_str::<SrcUriTest>(invalid_json_uri) {
             Ok(_) => assert!(false),
             Err(_) => assert!(true),
         }
@@ -205,7 +205,7 @@ mod local_uri_deserialization_tests {
     #[test]
     fn return_error_when_uri_have_empty_part() {
         let invalid_json_uri = r#"{ "src": "local://room_id//endpoint_id" }"#;
-        match serde_json::from_str::<LocalUriTest>(invalid_json_uri) {
+        match serde_json::from_str::<SrcUriTest>(invalid_json_uri) {
             Ok(_) => assert!(false),
             Err(_) => assert!(true),
         }
