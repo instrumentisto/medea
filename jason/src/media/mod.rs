@@ -12,7 +12,7 @@ use futures::{
 use wasm_bindgen_futures::JsFuture;
 use web_sys::MediaStream as BackingMediaStream;
 
-use crate::utils::{window, Callback, WasmErr};
+use crate::utils::{window, Callback2, WasmErr};
 
 pub use self::{
     peer::{
@@ -29,7 +29,7 @@ pub struct MediaManager(Rc<RefCell<InnerMediaManager>>);
 #[derive(Default)]
 struct InnerMediaManager {
     streams: Vec<Rc<MediaStream>>,
-    on_local_stream: Rc<Callback<MediaStreamHandle, WasmErr>>,
+    on_local_stream: Rc<Callback2<MediaStreamHandle, WasmErr>>,
 }
 
 impl MediaManager {
@@ -42,7 +42,7 @@ impl MediaManager {
         let stream = match self.inner_get_stream(request) {
             Ok(promise) => JsFuture::from(promise).map_err(WasmErr::from),
             Err(err) => {
-                self.0.borrow().on_local_stream.call_err(err);
+                self.0.borrow().on_local_stream.call2(err);
                 return Either::A(future::err(()));
             }
         };
@@ -53,11 +53,11 @@ impl MediaManager {
                 let stream =
                     MediaStream::from_stream(BackingMediaStream::from(stream));
                 inner.borrow_mut().streams.push(Rc::clone(&stream));
-                inner.borrow().on_local_stream.call_ok(stream.new_handle());
+                inner.borrow().on_local_stream.call1(stream.new_handle());
                 Ok(stream)
             }
             Err(err) => {
-                inner.borrow().on_local_stream.call_err(err);
+                inner.borrow().on_local_stream.call2(err);
                 Err(())
             }
         });

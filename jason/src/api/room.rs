@@ -26,7 +26,7 @@ use crate::{
         PeerRepository, Sdp,
     },
     rpc::RpcClient,
-    utils::{Callback, WasmErr},
+    utils::{Callback2, WasmErr},
 };
 
 #[allow(clippy::module_name_repetitions)]
@@ -36,12 +36,15 @@ pub struct RoomHandle(Weak<RefCell<InnerRoom>>);
 
 #[wasm_bindgen]
 impl RoomHandle {
-    pub fn on_new_connection(&mut self, f: js_sys::Function) {
+    pub fn on_new_connection(
+        &mut self,
+        f: js_sys::Function,
+    ) -> Result<(), JsValue> {
         if let Some(inner) = self.0.upgrade() {
             inner.borrow_mut().on_new_connection.set_func(f);
+            Ok(())
         } else {
-            let f: Callback<i32, WasmErr> = f.into();
-            f.call_err(WasmErr::from_str("Detached state"));
+            Err(WasmErr::from_str("Detached state").into())
         }
     }
 }
@@ -113,7 +116,7 @@ struct InnerRoom {
     media_manager: Rc<MediaManager>,
     peers: PeerRepository,
     connections: HashMap<u64, Connection>,
-    on_new_connection: Rc<Callback<ConnectionHandle, WasmErr>>,
+    on_new_connection: Rc<Callback2<ConnectionHandle, WasmErr>>,
 }
 
 impl InnerRoom {
@@ -127,7 +130,7 @@ impl InnerRoom {
             media_manager,
             peers: PeerRepository::new(peer_events_sender),
             connections: HashMap::new(),
-            on_new_connection: Rc::new(Callback::new()),
+            on_new_connection: Rc::new(Callback2::default()),
         }
     }
 }
@@ -143,7 +146,7 @@ impl EventHandler for InnerRoom {
         let create_connection = |room: &mut Self, member_id: &u64| {
             if !room.connections.contains_key(member_id) {
                 let con = Connection::new(*member_id);
-                room.on_new_connection.call_ok(con.new_handle());
+                room.on_new_connection.call1(con.new_handle());
                 room.connections.insert(*member_id, con);
             }
         };
@@ -281,7 +284,7 @@ impl PeerEventHandler for InnerRoom {
             Some(connection) => {
                 connection
                     .on_remote_stream()
-                    .call_ok(remote_stream.new_handle());
+                    .call(remote_stream.new_handle());
             }
         }
     }

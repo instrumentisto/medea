@@ -1,4 +1,3 @@
-/// Represents connection with specific [`Member`].
 use wasm_bindgen::prelude::*;
 
 use std::{
@@ -11,18 +10,24 @@ use crate::{
     utils::{Callback, WasmErr},
 };
 
+/// [`Connection`] handle accessible from js.
 #[allow(clippy::module_name_repetitions)]
 #[wasm_bindgen]
 pub struct ConnectionHandle(Weak<RefCell<InnerConnection>>);
 
 #[wasm_bindgen]
 impl ConnectionHandle {
-    pub fn on_remote_stream(&mut self, f: js_sys::Function) {
+    /// Sets callback, that will be invoked on remote [`Member`] media stream
+    /// arrival.
+    pub fn on_remote_stream(
+        &mut self,
+        f: js_sys::Function,
+    ) -> Result<(), JsValue> {
         if let Some(inner) = self.0.upgrade() {
             inner.borrow_mut().on_remote_stream.set_func(f);
+            Ok(())
         } else {
-            let f: Callback<i32, WasmErr> = f.into();
-            f.call_err(WasmErr::from_str("Detached state"));
+            Err(WasmErr::from_str("Detached state").into())
         }
     }
 
@@ -35,29 +40,35 @@ impl ConnectionHandle {
     }
 }
 
+/// [`Connection`] handle being used by Rust external modules.
 pub struct Connection(Rc<RefCell<InnerConnection>>);
 
 impl Connection {
     pub fn new(member_id: u64) -> Self {
         Self(Rc::new(RefCell::new(InnerConnection {
             remote_member: member_id,
-            on_remote_stream: Rc::new(Callback::new()),
+            on_remote_stream: Rc::new(Callback::default()),
         })))
     }
 
+    /// Creates new [`ConnectionHandle`] used by JS side.
     pub fn new_handle(&self) -> ConnectionHandle {
         ConnectionHandle(Rc::downgrade(&self.0))
     }
 
-    pub fn on_remote_stream(&self) -> Rc<Callback<MediaStreamHandle, WasmErr>> {
+    pub fn on_remote_stream(&self) -> Rc<Callback<MediaStreamHandle>> {
         let a = &self.0.borrow().on_remote_stream;
         Rc::clone(&a)
     }
 }
 
+/// Represents connection with specific remote [`Member`].
+///
+/// Shared between JS-side handle ([`ConnectionHandle`])
+/// and Rust-side handle ([`Connection`]).
 struct InnerConnection {
     remote_member: u64,
-    on_remote_stream: Rc<Callback<MediaStreamHandle, WasmErr>>,
+    on_remote_stream: Rc<Callback<MediaStreamHandle>>,
 }
 
 impl InnerConnection {}

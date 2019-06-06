@@ -46,6 +46,9 @@ pub enum PeerEvent {
 #[allow(clippy::module_name_repetitions)]
 pub struct PeerRepository {
     peers: HashMap<Id, Rc<PeerConnection>>,
+
+    /// Sender that will be injected to all [`Peers`] created by this
+    /// repository.
     peer_events_sender: UnboundedSender<PeerEvent>,
 }
 

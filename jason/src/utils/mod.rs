@@ -6,7 +6,9 @@ use web_sys::Window;
 
 #[doc(inline)]
 pub use self::{
-    callback::Callback, errors::WasmErr, event_listener::EventListener,
+    callback::{Callback, Callback2},
+    errors::WasmErr,
+    event_listener::EventListener,
 };
 
 /// Returns [`Window`] object. Panics if unable to access it.
