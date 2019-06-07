@@ -135,8 +135,12 @@ impl InnerRoom {
     }
 }
 
+/// RPC event handlers.
 impl EventHandler for InnerRoom {
-    /// Creates RTCPeerConnection with provided ID.
+    /// Creates [`PeerConnection`] with provided ID, all new [`Connections`]
+    /// based on provided tracks. If provided sdp offer is Some, then offer is
+    /// applied to created peer, and [`Command::MakeSdpAnswer`] is emitted back
+    /// to RPC server.
     fn on_peer_created(
         &mut self,
         peer_id: PeerId,
@@ -214,7 +218,8 @@ impl EventHandler for InnerRoom {
         ));
     }
 
-    /// Applies specified SDP Answer to specified RTCPeerConnection.
+    /// Applies specified SDP Answer to specified [`PeerConnection`].
+    // TODO: pass mids to peer.
     fn on_sdp_answer_made(
         &mut self,
         peer_id: PeerId,
@@ -235,7 +240,7 @@ impl EventHandler for InnerRoom {
         }
     }
 
-    /// Applies specified ICE Candidate to specified RTCPeerConnection.
+    /// Applies specified ICE Candidate to specified [`PeerConnection`].
     fn on_ice_candidate_discovered(
         &mut self,
         peer_id: PeerId,
@@ -260,7 +265,10 @@ impl EventHandler for InnerRoom {
     }
 }
 
+/// Peers event handlers.
 impl PeerEventHandler for InnerRoom {
+    /// Handles [`PeerEvent::IceCandidateDiscovered`] event. Sends received
+    /// candidate to RPC server.
     fn on_ice_candidate_discovered(
         &mut self,
         peer_id: PeerId,
@@ -278,6 +286,8 @@ impl PeerEventHandler for InnerRoom {
         });
     }
 
+    /// Handles [`PeerEvent::NewRemoteStream`] event. Passes received
+    /// [`MediaStream`] to related [`Connection`].
     fn on_new_remote_stream(
         &mut self,
         _peer_id: PeerId,
@@ -289,11 +299,7 @@ impl PeerEventHandler for InnerRoom {
                 "NewRemoteStream from sender without connection",
             )
             .log_err(),
-            Some(connection) => {
-                connection
-                    .on_remote_stream()
-                    .call(remote_stream.new_handle());
-            }
+            Some(connection) => connection.new_remote_stream(remote_stream),
         }
     }
 }

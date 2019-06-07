@@ -19,7 +19,7 @@ async function f() {
     });
 
     caller_room_handle.on_new_connection(function (connection) {
-        console.log("caller got new connection")
+        console.log("caller got new connection with member " + connection.member_id());
     });
 
     let responder = new rust.Jason();
@@ -28,8 +28,10 @@ async function f() {
 
     responder_room_handler.on_new_connection(function (connection) {
 
+        console.log("caller got new connection with member " + connection.member_id());
+
         connection.on_remote_stream(function (stream) {
-            console.log("got remote video");
+            console.log("got video from remote member " + connection.member_id());
 
             var video = document.createElement("video");
 
