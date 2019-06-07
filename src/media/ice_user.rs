@@ -6,14 +6,17 @@ use medea_client_api_proto::IceServer;
 #[derive(Clone, Debug)]
 pub struct IceUser {
     /// Address of Turn server.
-    pub address: SocketAddr,
+    address: SocketAddr,
     /// Username for authorization.
-    pub name: String,
+    name: String,
     /// Password for authorization.
-    pub pass: String,
+    pass: String,
 }
 
 impl IceUser {
+
+    //TODO: new(), getters (e.g. name(), pass())
+
     pub fn to_servers_list(&self) -> Vec<IceServer> {
         let stun_url = vec![format!("stun:{}", self.address)];
         let stun = IceServer {

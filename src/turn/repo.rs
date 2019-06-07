@@ -68,12 +68,15 @@ impl TurnDatabase {
         user: &TurnDatabaseInsertableUser,
     ) -> impl Future<Item = (), Error = RunError<TurnDatabaseErr>> {
         debug!("Store ICE user: {:?}", user);
+
+        // TODO: bad value
         let key = format!(
             "turn/realm/medea/user/{}/key",
             format!("{}:{}", user.room_id, user.ice_user.name)
         );
         let value =
             format!("{}:medea:{}", user.ice_user.name, user.ice_user.pass);
+
         let mut hasher = Md5::new();
         hasher.input_str(&value);
         let result = hasher.result_str();

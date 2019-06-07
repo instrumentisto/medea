@@ -278,9 +278,14 @@ impl ParticipantService {
         // removing all users from room
         let remove_all_users_fut = Box::new({
             let mut users_ids = Vec::with_capacity(self.members.len());
-            self.members.iter_mut().for_each(|data| {
-                users_ids.push(*data.0);
-                data.1.ice_user = None;
+
+            //TODO: (id, data)
+            self.members.iter_mut().for_each(|(_, data)| {
+                if let Some(ice_user) = data.ice_user.take() {
+                    users_ids.push(ice_user);
+                }
+//                users_ids.push(*data.0);
+//                data.1.ice_user = None;
             });
             self.turn
                 .delete_batch(self.room_id, users_ids)

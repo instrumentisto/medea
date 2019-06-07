@@ -38,14 +38,14 @@ pub trait TurnAuthService: fmt::Debug + Send {
     fn delete(
         &self,
         user: IceUser,
-        room_id: RoomId,
+//        room_id: RoomId,
     ) -> Box<dyn Future<Item = (), Error = TurnServiceErr>>;
 
     /// Deletes [`users`] from redis with provided [`RoomId`].
     fn delete_batch(
         &self,
-        room_id: RoomId,
-        users: Vec<u64>,
+//        room_id: RoomId,
+        users: Vec<IceUser>,
     ) -> Box<dyn Future<Item = (), Error = TurnServiceErr>>;
 }
 
