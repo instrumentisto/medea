@@ -1,12 +1,16 @@
-//! 
+//! Wrappers and adapters for MediaStream and relate objects.
 
 use std::rc::{Rc, Weak};
 
 use wasm_bindgen::{prelude::*, JsValue};
-use web_sys::{MediaStream as BackingMediaStream, MediaStreamTrack};
+use web_sys::{MediaStream as SysMediaStream, MediaStreamTrack};
 
 use crate::utils::WasmErr;
 
+/// [`MediaStreamConstraints`] object representation. Used when calling
+/// getUserMedia() to specify what kinds of tracks should be included in the
+/// returned MediaStream, and, optionally, to establish constraints for those
+/// tracks' settings.
 pub struct GetMediaRequest {
     audio: bool,
     video: bool,
@@ -36,14 +40,23 @@ impl From<&GetMediaRequest> for web_sys::MediaStreamConstraints {
     }
 }
 
+/// [`MediaStream`] object wrapper.
+///
+/// Shared between JS-side handle ([`MediaStreamHandle`])
+/// and Rust-side handle ([`MediaStream`]).
 struct InnerStream {
-    stream: BackingMediaStream,
+    /// Actual [`MediaStream`] object.
+    stream: SysMediaStream,
+
+    /// List of [`MediaStream`]s audio tracks.
     audio_tracks: Vec<MediaStreamTrack>,
+
+    /// List of [`MediaStream`]s video tracks.
     video_tracks: Vec<MediaStreamTrack>,
 }
 
-impl From<BackingMediaStream> for InnerStream {
-    fn from(media_stream: BackingMediaStream) -> Self {
+impl From<SysMediaStream> for InnerStream {
+    fn from(media_stream: SysMediaStream) -> Self {
         let mut audio_tracks = Vec::new();
         let mut video_tracks = Vec::new();
 
@@ -73,17 +86,18 @@ impl From<BackingMediaStream> for InnerStream {
     }
 }
 
+/// Rust-side [`InnerStream`] adapter.
 #[allow(clippy::module_name_repetitions)]
 pub struct MediaStream(Rc<InnerStream>);
 
 impl MediaStream {
-    pub fn from_stream(stream: BackingMediaStream) -> Rc<Self> {
+    pub fn from_stream(stream: SysMediaStream) -> Rc<Self> {
         Rc::new(Self(Rc::new(InnerStream::from(stream))))
     }
 
     pub fn from_tracks(tracks: &[&MediaStreamTrack]) -> Rc<Self> {
         // should be safe to unwrap
-        let stream = BackingMediaStream::new().unwrap();
+        let stream = SysMediaStream::new().unwrap();
 
         for track in tracks {
             stream.add_track(&track);
@@ -105,12 +119,13 @@ impl MediaStream {
     }
 }
 
+/// JS-side [`InnerStream`] adapter.
 #[wasm_bindgen]
 pub struct MediaStreamHandle(Weak<InnerStream>);
 
 #[wasm_bindgen]
 impl MediaStreamHandle {
-    pub fn get_media_stream(&self) -> Result<BackingMediaStream, JsValue> {
+    pub fn get_media_stream(&self) -> Result<SysMediaStream, JsValue> {
         match self.0.upgrade() {
             Some(inner) => Ok(inner.stream.clone()),
             None => Err(WasmErr::from_str("Detached state").into()),

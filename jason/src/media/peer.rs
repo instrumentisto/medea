@@ -31,10 +31,14 @@ pub enum Sdp {
 
 #[dispatchable]
 #[allow(clippy::module_name_repetitions)]
+/// Events emitted from [`PeerConnection`].
 pub enum PeerEvent {
+    /// [`PeerConnection`] discovered new ice candidate.
     IceCandidateDiscovered {
         peer_id: Id,
-        ice: IceDto,
+        candidate: String,
+        sdp_m_line_index: Option<u16>,
+        sdp_mid: Option<String>,
     },
     NewRemoteStream {
         peer_id: Id,
@@ -149,11 +153,9 @@ impl PeerConnection {
                     let _ = sender.unbounded_send(
                         PeerEvent::IceCandidateDiscovered {
                             peer_id,
-                            ice: IceDto {
-                                candidate: candidate.candidate(),
-                                sdp_m_line_index: candidate.sdp_m_line_index(),
-                                sdp_mid: candidate.sdp_mid(),
-                            },
+                            candidate: candidate.candidate(),
+                            sdp_m_line_index: candidate.sdp_m_line_index(),
+                            sdp_mid: candidate.sdp_mid(),
                         },
                     );
                 }

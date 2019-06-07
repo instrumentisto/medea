@@ -264,10 +264,18 @@ impl PeerEventHandler for InnerRoom {
     fn on_ice_candidate_discovered(
         &mut self,
         peer_id: PeerId,
-        candidate: IceCandidate,
+        candidate: String,
+        sdp_m_line_index: Option<u16>,
+        sdp_mid: Option<String>,
     ) {
-        self.rpc
-            .send_command(Command::SetIceCandidate { peer_id, candidate });
+        self.rpc.send_command(Command::SetIceCandidate {
+            peer_id,
+            candidate: IceCandidate {
+                candidate,
+                sdp_m_line_index,
+                sdp_mid,
+            },
+        });
     }
 
     fn on_new_remote_stream(
