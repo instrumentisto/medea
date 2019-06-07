@@ -4,11 +4,16 @@ mod utils;
 
 use std::{cell::Cell, rc::Rc, time::Duration};
 
-use actix::{Actor, Arbiter, AsyncContext, Context, StreamHandler, System};
+use actix::{
+    Actor, Arbiter, AsyncContext, Context, Handler, Message, StreamHandler,
+    System,
+};
 use actix_web::ws::{
-    Client, ClientWriter, Message as WebMessage, ProtocolError,
+    Client, ClientWriter, CloseCode, CloseReason, Message as WebMessage,
+    ProtocolError,
 };
 use futures::future::Future;
+use medea::media::PeerId;
 use medea_client_api_proto::{Command, Direction, Event, IceCandidate};
 use serde_json::error::Error as SerdeError;
 
@@ -25,25 +30,7 @@ struct TestMember {
 
     /// Function which will be called at every received by this [`TestMember`]
     /// [`Event`].
-    test_fn: Box<FnMut(&Event)>,
-}
-
-impl Actor for TestMember {
-    type Context = Context<Self>;
-
-    /// Start heartbeat and set a timer that will panic when 5 seconds expire.
-    /// The timer is needed because some tests may just stuck
-    /// and listen socket forever.
-    fn started(&mut self, ctx: &mut Self::Context) {
-        self.heartbeat(ctx);
-        ctx.run_later(Duration::from_secs(5), |act, _ctx| {
-            panic!(
-                "This test lasts more than 5 seconds. Most likely, this is \
-                 not normal. Here is all events of member: {:?}",
-                act.events
-            );
-        });
-    }
+    test_fn: Box<FnMut(&Event, &mut Context<TestMember>)>,
 }
 
 impl TestMember {
@@ -66,7 +53,10 @@ impl TestMember {
     /// Start test member in new [`Arbiter`] by given URI.
     /// `test_fn` - is function which will be called at every [`Event`]
     /// received from server.
-    pub fn start(uri: &str, test_fn: Box<FnMut(&Event)>) {
+    pub fn start(
+        uri: &str,
+        test_fn: Box<FnMut(&Event, &mut Context<TestMember>)>,
+    ) {
         Arbiter::spawn(
             Client::new(uri)
                 .connect()
@@ -87,11 +77,44 @@ impl TestMember {
     }
 }
 
+impl Actor for TestMember {
+    type Context = Context<Self>;
+
+    /// Start heartbeat and set a timer that will panic when 5 seconds expire.
+    /// The timer is needed because some tests may just stuck
+    /// and listen socket forever.
+    fn started(&mut self, ctx: &mut Self::Context) {
+        self.heartbeat(ctx);
+        ctx.run_later(Duration::from_secs(5), |act, _ctx| {
+            panic!(
+                "This test lasts more than 5 seconds. Most likely, this is \
+                 not normal. Here is all events of member: {:?}",
+                act.events
+            );
+        });
+    }
+}
+
+#[derive(Debug, Message)]
+#[rtype(result = "()")]
+struct CloseSocket;
+
+impl Handler<CloseSocket> for TestMember {
+    type Result = ();
+
+    fn handle(&mut self, _msg: CloseSocket, _ctx: &mut Self::Context) {
+        self.writer.close(Some(CloseReason {
+            code: CloseCode::Normal,
+            description: None,
+        }));
+    }
+}
+
 impl StreamHandler<WebMessage, ProtocolError> for TestMember {
     /// Basic signalling implementation.
     /// A `TestMember::test_fn` [`FnMut`] function will be called for each
     /// [`Event`] received from test server.
-    fn handle(&mut self, msg: WebMessage, _ctx: &mut Context<Self>) {
+    fn handle(&mut self, msg: WebMessage, ctx: &mut Context<Self>) {
         match msg {
             WebMessage::Text(txt) => {
                 let event: Result<Event, SerdeError> =
@@ -99,7 +122,7 @@ impl StreamHandler<WebMessage, ProtocolError> for TestMember {
                 if let Ok(event) = event {
                     self.events.push(event.clone());
                     // Test function call
-                    (self.test_fn)(&event);
+                    (self.test_fn)(&event, ctx);
                     match event {
                         Event::PeerCreated {
                             peer_id, sdp_offer, ..
@@ -149,7 +172,7 @@ fn pub_sub_video_call() {
     // Note that events is separated by members.
     // Every member will have different instance of this.
     let mut events = Vec::new();
-    let test_fn = move |event: &Event| {
+    let test_fn = move |event: &Event, _ctx: &mut Context<TestMember>| {
         events.push(event.clone());
 
         // Start of checking result of test.
@@ -242,10 +265,12 @@ fn three_members_p2p_video_call() {
     let mut events = Vec::new();
     let mut peer_created_count = 0;
     let mut ice_candidates = 0;
+
     // This is shared state of members.
     let members_tested = Rc::new(Cell::new(0));
+    let members_peers_removed = Rc::new(Cell::new(0));
 
-    let test_fn = move |event: &Event| {
+    let test_fn = move |event: &Event, ctx: &mut Context<TestMember>| {
         events.push(event.clone());
         match event {
             Event::PeerCreated { .. } => {
@@ -293,10 +318,36 @@ fn three_members_p2p_video_call() {
                         _ => (),
                     });
 
-                    members_tested.set(members_tested.get() + 1);
-                    if members_tested.get() == 3 {
-                        System::current().stop();
+                    // Check peers removing.
+                    // After closing socket, server should send
+                    // Event::PeersRemoved to all remaining
+                    // members.
+                    // Close should happen when last TestMember pass
+                    // tests.
+                    if members_tested.get() == 2 {
+                        ctx.notify(CloseSocket);
                     }
+                    members_tested.set(members_tested.get() + 1);
+                }
+            }
+            Event::PeersRemoved { .. } => {
+                // This event should get two remaining members after closing
+                // last tested member.
+                let peers_removed: Vec<&Vec<PeerId>> = events
+                    .iter()
+                    .filter_map(|e| match e {
+                        Event::PeersRemoved { peer_ids } => Some(peer_ids),
+                        _ => None,
+                    })
+                    .collect();
+                assert_eq!(peers_removed.len(), 1);
+                assert_eq!(peers_removed[0].len(), 2);
+                assert_ne!(peers_removed[0][0], peers_removed[0][1]);
+
+                members_peers_removed.set(members_peers_removed.get() + 1);
+                // Stop when all members receive Event::PeerRemoved
+                if members_peers_removed.get() == 2 {
+                    System::current().stop();
                 }
             }
             _ => (),

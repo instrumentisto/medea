@@ -140,6 +140,18 @@ impl Room {
         )))
     }
 
+    /// Sends [`Event::PeersRemoved`] to [`Member`].
+    fn send_peers_removed(
+        &mut self,
+        member_id: MemberId,
+        peers: Vec<PeerId>,
+    ) -> ActFuture<(), RoomError> {
+        Box::new(wrap_future(self.participants.send_event_to_member(
+            member_id,
+            Event::PeersRemoved { peer_ids: peers },
+        )))
+    }
+
     /// Sends [`Event::PeerCreated`] to provided [`Peer`] partner. Provided
     /// [`Peer`] state must be [`WaitLocalSdp`] and will be changed to
     /// [`WaitRemoteSdp`], partners [`Peer`] state must be [`New`] and will be
@@ -403,6 +415,36 @@ impl Handler<ConnectPeers> for Room {
     }
 }
 
+#[derive(Debug, Message)]
+#[rtype(result = "Result<(), ()>")]
+pub struct PeersRemoved {
+    pub peers_id: Vec<PeerId>,
+    pub member_id: MemberId,
+}
+
+impl Handler<PeersRemoved> for Room {
+    type Result = ActFuture<(), ()>;
+
+    /// Send [`Event::PeersRemoved`] to [`Member`].
+    fn handle(
+        &mut self,
+        msg: PeersRemoved,
+        _ctx: &mut Self::Context,
+    ) -> Self::Result {
+        Box::new(
+            self.send_peers_removed(msg.member_id, msg.peers_id)
+                .map_err(|err, _, ctx: &mut Context<Self>| {
+                    error!(
+                        "Failed PeersEvent command, because {}. Room will be \
+                         stopped.",
+                        err
+                    );
+                    ctx.notify(CloseRoom {})
+                }),
+        )
+    }
+}
+
 impl Handler<CommandMessage> for Room {
     type Result = ActFuture<(), ()>;
 
@@ -512,7 +554,7 @@ impl Handler<RpcConnectionClosed> for Room {
         );
 
         if let ClosedReason::Closed = msg.reason {
-            self.peers.connection_closed(&msg.member_id);
+            self.peers.connection_closed(&msg.member_id, ctx);
         }
 
         self.participants

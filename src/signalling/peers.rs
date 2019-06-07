@@ -5,12 +5,13 @@ use std::{
     fmt,
 };
 
+use actix::{AsyncContext as _, Context};
 use hashbrown::HashMap;
 
 use crate::{
     api::control::{Member, MemberId},
     media::{Peer, PeerId, PeerStateMachine},
-    signalling::room::RoomError,
+    signalling::room::{PeersRemoved, Room, RoomError},
 };
 
 #[derive(Debug)]
@@ -162,21 +163,52 @@ impl PeerRepository {
 
     /// Close all related to disconnected [`Member`] [`Peer`]s and partner
     /// [`Peer`]s.
-    pub fn connection_closed(&mut self, member_id: &MemberId) {
-        let mut peers_to_remove: Vec<PeerId> = Vec::new();
-        for peer in self.get_peers_by_member_id(member_id) {
-            for partner_peer in
-                self.get_peers_by_member_id(&peer.partner_member_id())
-            {
-                if &partner_peer.partner_member_id() == member_id {
-                    peers_to_remove.push(partner_peer.id());
-                }
-            }
-            peers_to_remove.push(peer.id());
-        }
+    ///
+    /// Send [`Event::PeersRemoved`] to all affected [`Member`]s.
+    pub fn connection_closed(
+        &mut self,
+        member_id: &MemberId,
+        ctx: &mut Context<Room>,
+    ) {
+        let mut peers_to_remove: HashMap<MemberId, Vec<PeerId>> =
+            HashMap::new();
 
-        for peer_id in peers_to_remove {
-            self.peers.remove(&peer_id);
+        self.get_peers_by_member_id(member_id)
+            .into_iter()
+            .map(|peer| {
+                self.get_peers_by_member_id(&peer.partner_member_id())
+                    .into_iter()
+                    .filter(|partner_peer| {
+                        &partner_peer.partner_member_id() == member_id
+                    })
+                    .for_each(|partner_peer| {
+                        peers_to_remove
+                            .entry(partner_peer.member_id())
+                            .or_insert(Vec::new())
+                            .push(partner_peer.id());
+                    });
+
+                peers_to_remove
+                    .entry(peer.partner_member_id())
+                    .or_insert(Vec::new())
+                    .push(peer.id());
+
+                peer.id()
+            })
+            .collect::<Vec<PeerId>>()
+            .into_iter()
+            .for_each(|id| {
+                self.peers.remove(&id);
+            });
+
+        for (peer_member_id, peers_id) in peers_to_remove {
+            for peer_id in &peers_id {
+                self.peers.remove(peer_id);
+            }
+            ctx.notify(PeersRemoved {
+                member_id: peer_member_id,
+                peers_id,
+            })
         }
     }
 }

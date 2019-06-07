@@ -21,10 +21,7 @@ use crate::{
         control::{Member, MemberId, RoomSpec, TryFromElementError},
     },
     log::prelude::*,
-    signalling::{
-        room::{CloseRoom, RoomError},
-        Room,
-    },
+    signalling::{room::RoomError, Room},
 };
 
 /// Participant is [`Member`] with [`RpcConnection`]. [`ParticipantService`]
@@ -133,7 +130,7 @@ impl ParticipantService {
         match reason {
             ClosedReason::Closed => {
                 self.connections.remove(&member_id);
-                ctx.notify(CloseRoom {})
+                // ctx.notify(CloseRoom {})
             }
             ClosedReason::Lost => {
                 self.drop_connection_tasks.insert(
