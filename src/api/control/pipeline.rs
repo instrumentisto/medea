@@ -48,7 +48,7 @@ impl Pipeline {
     ) -> Result<Vec<MemberId>, TryFromElementError> {
         let mut receivers = Vec::new();
         for (member_id, member_element) in &self.pipeline {
-            let member = MemberSpec::try_from(member_element.clone())?;
+            let member = MemberSpec::try_from(member_element)?;
             for endpoint in member.play_endpoints() {
                 if &endpoint.src.member_id == id {
                     receivers.push(MemberId(member_id.clone()));
@@ -66,7 +66,7 @@ impl Pipeline {
     ) -> Result<HashBrownMap<MemberId, Member>, TryFromElementError> {
         let mut members = HashBrownMap::new();
         for (control_id, element) in &self.pipeline {
-            let member_spec = MemberSpec::try_from(element.clone())?;
+            let member_spec = MemberSpec::try_from(element)?;
             let member_id = MemberId(control_id.clone());
 
             members.insert(

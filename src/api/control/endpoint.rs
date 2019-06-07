@@ -19,16 +19,16 @@ pub enum Endpoint {
     WebRtcPlay(WebRtcPlayEndpoint),
 }
 
-impl TryFrom<Element> for Endpoint {
+impl TryFrom<&Element> for Endpoint {
     type Error = TryFromElementError;
 
-    fn try_from(from: Element) -> Result<Self, Self::Error> {
+    fn try_from(from: &Element) -> Result<Self, Self::Error> {
         match from {
             Element::WebRtcPlayEndpoint { spec } => {
-                Ok(Endpoint::WebRtcPlay(spec))
+                Ok(Endpoint::WebRtcPlay(spec.clone()))
             }
             Element::WebRtcPublishEndpoint { spec } => {
-                Ok(Endpoint::WebRtcPublish(spec))
+                Ok(Endpoint::WebRtcPublish(spec.clone()))
             }
             _ => Err(TryFromElementError::NotEndpoint),
         }

@@ -100,14 +100,14 @@ impl MemberSpec {
     }
 }
 
-impl TryFrom<Element> for MemberSpec {
+impl TryFrom<&Element> for MemberSpec {
     type Error = TryFromElementError;
 
-    fn try_from(from: Element) -> Result<Self, Self::Error> {
+    fn try_from(from: &Element) -> Result<Self, Self::Error> {
         match from {
             Element::Member { spec, credentials } => Ok(Self {
-                pipeline: spec,
-                credentials,
+                pipeline: spec.clone(),
+                credentials: credentials.clone(),
             }),
             _ => Err(TryFromElementError::NotMember),
         }

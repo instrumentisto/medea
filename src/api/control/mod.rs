@@ -61,7 +61,7 @@ pub fn load_from_yaml_file<P: AsRef<Path>>(path: P) -> Result<RoomSpec, Error> {
     let mut buf = String::new();
     file.read_to_string(&mut buf)?;
     let parsed: Element = serde_yaml::from_str(&buf)?;
-    let room = RoomSpec::try_from(parsed)?;
+    let room = RoomSpec::try_from(&parsed)?;
 
     Ok(room)
 }

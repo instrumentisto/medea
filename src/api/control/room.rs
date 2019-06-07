@@ -44,12 +44,15 @@ impl RoomSpec {
     }
 }
 
-impl TryFrom<Element> for RoomSpec {
+impl TryFrom<&Element> for RoomSpec {
     type Error = TryFromElementError;
 
-    fn try_from(from: Element) -> Result<Self, Self::Error> {
+    fn try_from(from: &Element) -> Result<Self, Self::Error> {
         match from {
-            Element::Room { id, spec } => Ok(Self { id, pipeline: spec }),
+            Element::Room { id, spec } => Ok(Self {
+                id: id.clone(),
+                pipeline: spec.clone(),
+            }),
             _ => Err(TryFromElementError::NotRoom),
         }
     }
@@ -99,7 +102,7 @@ mod room_spec_tests {
                           src: "local://test-call/some-member/publish"
         "#;
         let spec: Element = serde_yaml::from_str(spec).unwrap();
-        let room = RoomSpec::try_from(spec).unwrap();
+        let room = RoomSpec::try_from(&spec).unwrap();
 
         let caller_member_id = MemberId("caller".to_string());
         let responder_member_id = MemberId("responder".to_string());
