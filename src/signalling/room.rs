@@ -302,7 +302,7 @@ impl Room {
 
         // connect receivers
         let mut already_connected_members = Vec::new();
-        for recv_member_id in member.receivers() {
+        for recv_member_id in &member.receivers() {
             if self.participants.member_has_connection(recv_member_id) {
                 if let Some(recv_member) =
                     self.participants.get_member_by_id(recv_member_id)

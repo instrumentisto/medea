@@ -1,6 +1,6 @@
 //! Room definitions and implementations.
 
-use std::convert::TryFrom;
+use std::{convert::TryFrom, sync::Arc};
 
 use hashbrown::HashMap;
 use serde::Deserialize;
@@ -20,40 +20,22 @@ pub struct Id(pub String);
 #[derive(Clone, Debug)]
 pub struct RoomSpec {
     id: Id,
-    pipeline: Pipeline,
+    pipeline: Arc<Pipeline>,
 }
 
 impl RoomSpec {
-    /// Get all receivers of all [`Member`]'s [`WebRtcPublishEndpoint`]s.
-    pub fn get_receivers_for_member(
-        &self,
-        id: &MemberId,
-    ) -> Result<Vec<MemberId>, TryFromElementError> {
-        let mut receivers = Vec::new();
-        for (member_id, member_element) in &self.pipeline {
-            let member = MemberSpec::try_from(member_element)?;
-            for endpoint in member.play_endpoints() {
-                if &endpoint.src.member_id == id {
-                    receivers.push(MemberId(member_id.clone()));
-                }
-            }
-        }
-
-        Ok(receivers)
-    }
-
     /// Returns all [`Member`]s of this [`RoomSpec`].
     pub fn members(
         &self,
     ) -> Result<HashMap<MemberId, Member>, TryFromElementError> {
         let mut members = HashMap::new();
-        for (control_id, element) in &self.pipeline {
+        for (control_id, element) in self.pipeline.iter() {
             let member_spec = MemberSpec::try_from(element)?;
             let member_id = MemberId(control_id.clone());
 
             members.insert(
                 member_id.clone(),
-                Member::new(member_id, member_spec, self)?,
+                Member::new(member_id, member_spec, Arc::clone(&self.pipeline)),
             );
         }
 
@@ -73,7 +55,7 @@ impl TryFrom<&Element> for RoomSpec {
         match from {
             Element::Room { id, spec } => Ok(Self {
                 id: id.clone(),
-                pipeline: spec.clone(),
+                pipeline: Arc::new(spec.clone()),
             }),
             _ => Err(TryFromElementError::NotRoom),
         }
@@ -128,18 +110,14 @@ mod room_spec_tests {
 
         let caller_member_id = MemberId("caller".to_string());
         let responder_member_id = MemberId("responder".to_string());
-        let some_member_id = MemberId("some-member".to_string());
 
+        let room_members = room.members().unwrap();
         let caller_receivers =
-            room.get_receivers_for_member(&caller_member_id).unwrap();
+            room_members.get(&caller_member_id).unwrap().receivers();
         assert_eq!(caller_receivers, vec![responder_member_id.clone()]);
 
         let responder_receivers =
-            room.get_receivers_for_member(&responder_member_id).unwrap();
+            room_members.get(&responder_member_id).unwrap().receivers();
         assert_eq!(responder_receivers, vec![]);
-
-        let some_member_receivers =
-            room.get_receivers_for_member(&some_member_id).unwrap();
-        assert_eq!(some_member_receivers, vec![responder_member_id.clone()]);
     }
 }

@@ -7,7 +7,6 @@ use serde::Deserialize;
 use super::{
     endpoint::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
     pipeline::Pipeline,
-    room::RoomSpec,
     Element, TryFromElementError,
 };
 
@@ -30,21 +29,17 @@ pub struct Member {
     /// Control API specification of this [`Member`].
     spec: Arc<MemberSpec>,
 
-    /// Receivers of this [`Member`]'s publish endpoints.
-    receivers: Vec<Id>,
+    /// Pipeline of [`Room`] in which this [`Member`] is located.
+    room_pipeline: Arc<Pipeline>,
 }
 
 impl Member {
-    pub fn new(
-        id: Id,
-        spec: MemberSpec,
-        room_spec: &RoomSpec,
-    ) -> Result<Self, TryFromElementError> {
-        Ok(Self {
-            receivers: room_spec.get_receivers_for_member(&id)?,
+    pub fn new(id: Id, spec: MemberSpec, room_pipeline: Arc<Pipeline>) -> Self {
+        Self {
             spec: Arc::new(spec),
             id,
-        })
+            room_pipeline,
+        }
     }
 
     /// Returns [`Id`] of [`Member`].
@@ -67,9 +62,27 @@ impl Member {
         self.spec.publish_endpoints()
     }
 
-    /// Returns all receivers [`Id`] of this [`Member`].
-    pub fn receivers(&self) -> &Vec<Id> {
-        &self.receivers
+    /// Get all receivers [`Id`] of all [`Member`]'s [`WebRtcPublishEndpoint`]s.
+    pub fn receivers(&self) -> Vec<Id> {
+        self.room_pipeline
+            .iter()
+            .filter_map(|(id, element)| {
+                MemberSpec::try_from(element).map(|s| (id, s)).ok()
+            })
+            .filter_map(|(id, member)| {
+                if member
+                    .play_endpoints()
+                    .iter()
+                    .filter(|e| e.src.member_id == self.id)
+                    .count()
+                    > 0
+                {
+                    Some(Id(id.clone()))
+                } else {
+                    None
+                }
+            })
+            .collect()
     }
 }
 
