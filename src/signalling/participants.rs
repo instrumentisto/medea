@@ -250,7 +250,7 @@ impl ParticipantService {
     fn delete_ice_user(&mut self, member_id: MemberId) {
         if let Some(mut member) = self.members.remove(&member_id) {
             if let Some(ice_user) = member.ice_user.take() {
-                self.turn.delete(ice_user, self.room_id);
+                self.turn.delete(ice_user);
             }
             self.members.insert(member_id, member);
         }
@@ -277,19 +277,14 @@ impl ParticipantService {
 
         // removing all users from room
         let remove_all_users_fut = Box::new({
-            let mut users_ids = Vec::with_capacity(self.members.len());
+            let mut room_users = Vec::with_capacity(self.members.len());
 
-            //TODO: (id, data)
             self.members.iter_mut().for_each(|(_, data)| {
                 if let Some(ice_user) = data.ice_user.take() {
-                    users_ids.push(ice_user);
+                    room_users.push(ice_user);
                 }
-//                users_ids.push(*data.0);
-//                data.1.ice_user = None;
             });
-            self.turn
-                .delete_batch(self.room_id, users_ids)
-                .map_err(|_| ())
+            self.turn.delete_batch(room_users).map_err(|_| ())
         });
         close_fut.push(remove_all_users_fut);
 

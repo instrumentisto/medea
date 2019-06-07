@@ -12,7 +12,6 @@ use rand::{distributions::Alphanumeric, Rng};
 use redis::ConnectionInfo;
 use smart_default::*;
 
-use crate::turn::repo::TurnDatabaseInsertableUser;
 use crate::{
     api::control::MemberId,
     conf::Conf,
@@ -38,13 +37,11 @@ pub trait TurnAuthService: fmt::Debug + Send {
     fn delete(
         &self,
         user: IceUser,
-//        room_id: RoomId,
     ) -> Box<dyn Future<Item = (), Error = TurnServiceErr>>;
 
     /// Deletes [`users`] from redis with provided [`RoomId`].
     fn delete_batch(
         &self,
-//        room_id: RoomId,
         users: Vec<IceUser>,
     ) -> Box<dyn Future<Item = (), Error = TurnServiceErr>>;
 }
@@ -79,13 +76,8 @@ impl TurnAuthService for Addr<Service> {
     fn delete(
         &self,
         user: IceUser,
-        room_id: RoomId,
     ) -> Box<Future<Item = (), Error = TurnServiceErr>> {
-        let delete_user = TurnDatabaseInsertableUser {
-            ice_user: user,
-            room_id,
-        };
-        Box::new(self.send(DeleteIceUser(delete_user)).then(
+        Box::new(self.send(DeleteIceUser(user)).then(
             |r: Result<Result<(), TurnServiceErr>, MailboxError>| match r {
                 Ok(Err(err)) => Err(err),
                 Err(err) => Err(TurnServiceErr::from(err)),
@@ -97,10 +89,9 @@ impl TurnAuthService for Addr<Service> {
     /// Sends [`DeleteRoom`] to [`Service`].
     fn delete_batch(
         &self,
-        room_id: RoomId,
-        users: Vec<MemberId>,
+        users: Vec<IceUser>,
     ) -> Box<Future<Item = (), Error = TurnServiceErr>> {
-        Box::new(self.send(DeleteMultipleUsers { room_id, users }).then(
+        Box::new(self.send(DeleteMultipleUsers(users)).then(
             |r: Result<Result<(), TurnServiceErr>, MailboxError>| match r {
                 Ok(Err(err)) => Err(err),
                 Err(err) => Err(TurnServiceErr::from(err)),
@@ -216,11 +207,13 @@ impl Service {
     /// Returns [`ICEUser`] with static credentials.
     fn static_user(&mut self) -> IceUser {
         if self.static_user.is_none() {
-            self.static_user.replace(IceUser {
-                address: self.turn_address,
-                name: self.turn_username.clone(),
-                pass: self.turn_password.clone(),
-            });
+            // todo: ask static user room_id
+            self.static_user.replace(IceUser::new(
+                self.turn_address,
+                0,
+                self.turn_username.clone(),
+                self.turn_password.clone(),
+            ));
         };
 
         self.static_user.clone().unwrap()
@@ -234,7 +227,7 @@ impl Actor for Service {
 /// Request for delete [`ICEUser`] for [`Member`] from Turn database.
 #[derive(Debug, Message)]
 #[rtype(result = "Result<(), TurnServiceErr>")]
-struct DeleteIceUser(pub TurnDatabaseInsertableUser);
+struct DeleteIceUser(pub IceUser);
 
 impl Handler<DeleteIceUser> for Service {
     type Result = Box<dyn Future<Item = (), Error = TurnServiceErr>>;
@@ -268,21 +261,17 @@ impl Handler<CreateIceUser> for Service {
         msg: CreateIceUser,
         _ctx: &mut Self::Context,
     ) -> Self::Result {
-        let ice_user = IceUser {
-            address: self.turn_address,
-            name: msg.member_id.to_string(),
-            pass: self.new_password(TURN_PASS_LEN),
-        };
+        let ice_user = IceUser::new(
+            self.turn_address,
+            msg.room_id,
+            msg.member_id.to_string(),
+            self.new_password(TURN_PASS_LEN),
+        );
 
-        let turn_db_user = TurnDatabaseInsertableUser {
-            ice_user,
-            room_id: msg.room_id,
-        };
-
-        Box::new(self.turn_db.insert(&turn_db_user).into_actor(self).then(
+        Box::new(self.turn_db.insert(&ice_user).into_actor(self).then(
             move |result, act, _| {
                 wrap_future(match result {
-                    Ok(_) => ok(turn_db_user.ice_user),
+                    Ok(_) => ok(ice_user),
                     Err(e) => match msg.policy {
                         UnreachablePolicy::ReturnErr => err(e.into()),
                         UnreachablePolicy::ReturnStatic => {
@@ -298,10 +287,7 @@ impl Handler<CreateIceUser> for Service {
 /// Deletes all users from given room in redis.
 #[derive(Debug, Message)]
 #[rtype(result = "Result<(), TurnServiceErr>")]
-struct DeleteMultipleUsers {
-    room_id: RoomId,
-    users: Vec<u64>,
-}
+struct DeleteMultipleUsers(Vec<IceUser>);
 
 impl Handler<DeleteMultipleUsers> for Service {
     type Result = ActFuture<(), TurnServiceErr>;
@@ -314,7 +300,7 @@ impl Handler<DeleteMultipleUsers> for Service {
     ) -> Self::Result {
         Box::new(
             self.turn_db
-                .remove_users(msg.room_id, &msg.users)
+                .remove_users(&msg.0)
                 .map_err(TurnServiceErr::from)
                 .into_actor(self),
         )
@@ -349,14 +335,12 @@ pub mod test {
         fn delete(
             &self,
             _: IceUser,
-            _: RoomId,
         ) -> Box<Future<Item = (), Error = TurnServiceErr>> {
             Box::new(future::ok(()))
         }
 
         fn delete_batch(
             &self,
-            _: RoomId,
             _: Vec<u64>,
         ) -> Box<dyn Future<Item = (), Error = TurnServiceErr>> {
             Box::new(future::ok(()))

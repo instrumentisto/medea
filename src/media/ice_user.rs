@@ -1,5 +1,6 @@
 use std::net::SocketAddr;
 
+use crate::signalling::RoomId;
 use medea_client_api_proto::IceServer;
 
 /// Credentials on Turn server.
@@ -7,6 +8,7 @@ use medea_client_api_proto::IceServer;
 pub struct IceUser {
     /// Address of Turn server.
     address: SocketAddr,
+    //todo: this argument is passed by value, but not consumed in the function body. consider &str
     /// Username for authorization.
     name: String,
     /// Password for authorization.
@@ -14,8 +16,18 @@ pub struct IceUser {
 }
 
 impl IceUser {
-
-    //TODO: new(), getters (e.g. name(), pass())
+    pub fn new(
+        address: SocketAddr,
+        room_id: RoomId,
+        name: String,
+        pass: String,
+    ) -> Self {
+        Self {
+            address,
+            name: format!("{}:{}", name, room_id),
+            pass,
+        }
+    }
 
     pub fn to_servers_list(&self) -> Vec<IceServer> {
         let stun_url = vec![format!("stun:{}", self.address)];
@@ -34,5 +46,17 @@ impl IceUser {
             credential: Some(self.pass.clone()),
         };
         vec![stun, turn]
+    }
+
+    pub fn address(&self) -> &SocketAddr {
+        &self.address
+    }
+
+    pub fn name(&self) -> &String {
+        &self.name
+    }
+
+    pub fn pass(&self) -> &String {
+        &self.pass
     }
 }
