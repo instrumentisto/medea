@@ -87,12 +87,24 @@ pub struct MemberSpec {
 impl MemberSpec {
     /// Returns all [`WebRtcPlayEndpoint`]s of this [`MemberSpec`].
     pub fn play_endpoints(&self) -> Vec<&WebRtcPlayEndpoint> {
-        self.pipeline.play_endpoints()
+        self.pipeline
+            .iter()
+            .filter_map(|(_, e)| match e {
+                Element::WebRtcPlayEndpoint { spec } => Some(spec),
+                _ => None,
+            })
+            .collect()
     }
 
     /// Returns all [`WebRtcPublishEndpoint`]s of this [`MemberSpec`].
     pub fn publish_endpoints(&self) -> Vec<&WebRtcPublishEndpoint> {
-        self.pipeline.publish_endpoints()
+        self.pipeline
+            .iter()
+            .filter_map(|(_, e)| match e {
+                Element::WebRtcPublishEndpoint { spec } => Some(spec),
+                _ => None,
+            })
+            .collect()
     }
 
     pub fn credentials(&self) -> &str {

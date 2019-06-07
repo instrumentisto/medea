@@ -6,7 +6,8 @@ use hashbrown::HashMap;
 use serde::Deserialize;
 
 use super::{
-    pipeline::Pipeline, Element, Member, MemberId, TryFromElementError,
+    pipeline::Pipeline, Element, Member, MemberId, MemberSpec,
+    TryFromElementError,
 };
 
 /// ID of [`Room`].
@@ -28,14 +29,35 @@ impl RoomSpec {
         &self,
         id: &MemberId,
     ) -> Result<Vec<MemberId>, TryFromElementError> {
-        self.pipeline.get_receivers_for_member(id)
+        let mut receivers = Vec::new();
+        for (member_id, member_element) in &self.pipeline {
+            let member = MemberSpec::try_from(member_element)?;
+            for endpoint in member.play_endpoints() {
+                if &endpoint.src.member_id == id {
+                    receivers.push(MemberId(member_id.clone()));
+                }
+            }
+        }
+
+        Ok(receivers)
     }
 
     /// Returns all [`Member`]s of this [`RoomSpec`].
     pub fn members(
         &self,
     ) -> Result<HashMap<MemberId, Member>, TryFromElementError> {
-        self.pipeline.members(self)
+        let mut members = HashMap::new();
+        for (control_id, element) in &self.pipeline {
+            let member_spec = MemberSpec::try_from(element)?;
+            let member_id = MemberId(control_id.clone());
+
+            members.insert(
+                member_id.clone(),
+                Member::new(member_id, member_spec, self)?,
+            );
+        }
+
+        Ok(members)
     }
 
     /// Returns ID of this [`RoomSpec`]
