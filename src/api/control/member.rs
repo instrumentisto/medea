@@ -10,6 +10,8 @@ use super::{
     Element, TryFromElementError,
 };
 
+use crate::log::prelude::*;
+
 /// ID of [`Member`].
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq)]
 pub struct Id(pub String);
@@ -67,7 +69,16 @@ impl Member {
         self.room_pipeline
             .iter()
             .filter_map(|(id, element)| {
-                MemberSpec::try_from(element).map(|s| (id, s)).ok()
+                MemberSpec::try_from(element)
+                    .map(|s| (id, s))
+                    .map_err(|e| {
+                        error!(
+                            "Given not room pipeline into member. Here is \
+                             error: {:?}",
+                            e
+                        )
+                    })
+                    .ok()
             })
             .filter_map(|(id, member)| {
                 if member
