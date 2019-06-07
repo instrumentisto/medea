@@ -2,6 +2,7 @@
 
 use std::{convert::TryFrom, fmt::Display, sync::Arc};
 
+use hashbrown::HashMap;
 use serde::Deserialize;
 
 use super::{
@@ -9,8 +10,6 @@ use super::{
     pipeline::Pipeline,
     Element, TryFromElementError,
 };
-
-use crate::log::prelude::*;
 
 /// ID of [`Member`].
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq)]
@@ -65,21 +64,17 @@ impl Member {
     }
 
     /// Get all receivers [`Id`] of all [`Member`]'s [`WebRtcPublishEndpoint`]s.
-    pub fn receivers(&self) -> Vec<Id> {
-        self.room_pipeline
-            .iter()
-            .filter_map(|(id, element)| {
-                MemberSpec::try_from(element)
-                    .map(|s| (id, s))
-                    .map_err(|e| {
-                        error!(
-                            "Given not room pipeline into member. Here is \
-                             error: {:?}",
-                            e
-                        )
-                    })
-                    .ok()
-            })
+    ///
+    /// Returns [`TryFromElementError::NotMember`] when not member finded in
+    /// [`RoomSpec`]'s [`Pipeline`].
+    pub fn receivers(&self) -> Result<Vec<Id>, TryFromElementError> {
+        let mut members = HashMap::new();
+        for (id, element) in self.room_pipeline.iter() {
+            members.insert(id, MemberSpec::try_from(element)?);
+        }
+
+        Ok(members
+            .into_iter()
             .filter_map(|(id, member)| {
                 if member
                     .play_endpoints()
@@ -93,7 +88,7 @@ impl Member {
                     None
                 }
             })
-            .collect()
+            .collect())
     }
 }
 

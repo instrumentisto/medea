@@ -301,8 +301,21 @@ impl Room {
         let mut need_create = Vec::new();
 
         // connect receivers
+        let receivers = match member.receivers() {
+            Ok(r) => r,
+            Err(e) => {
+                error!(
+                    "Member {} has wrong room pipeline. Room will be stopped. \
+                     Here is error: {:?}",
+                    member.id(),
+                    e
+                );
+                ctx.notify(CloseRoom {});
+                return;
+            }
+        };
         let mut already_connected_members = Vec::new();
-        for recv_member_id in &member.receivers() {
+        for recv_member_id in &receivers {
             if self.participants.member_has_connection(recv_member_id) {
                 if let Some(recv_member) =
                     self.participants.get_member_by_id(recv_member_id)

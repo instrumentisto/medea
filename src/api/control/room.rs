@@ -112,12 +112,18 @@ mod room_spec_tests {
         let responder_member_id = MemberId("responder".to_string());
 
         let room_members = room.members().unwrap();
-        let caller_receivers =
-            room_members.get(&caller_member_id).unwrap().receivers();
+        let caller_receivers = room_members
+            .get(&caller_member_id)
+            .unwrap()
+            .receivers()
+            .unwrap();
         assert_eq!(caller_receivers, vec![responder_member_id.clone()]);
 
-        let responder_receivers =
-            room_members.get(&responder_member_id).unwrap().receivers();
+        let responder_receivers = room_members
+            .get(&responder_member_id)
+            .unwrap()
+            .receivers()
+            .unwrap();
         assert_eq!(responder_receivers, vec![]);
     }
 }
