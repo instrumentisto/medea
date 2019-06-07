@@ -1,3 +1,5 @@
+//! 
+
 use std::rc::{Rc, Weak};
 
 use wasm_bindgen::{prelude::*, JsValue};
@@ -6,8 +8,8 @@ use web_sys::{MediaStream as BackingMediaStream, MediaStreamTrack};
 use crate::utils::WasmErr;
 
 pub struct GetMediaRequest {
-    pub audio: bool,
-    pub video: bool,
+    audio: bool,
+    video: bool,
 }
 
 impl GetMediaRequest {
