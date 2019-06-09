@@ -77,27 +77,40 @@ impl TurnAuthService for Addr<Service> {
         &self,
         user: IceUser,
     ) -> Box<Future<Item = (), Error = TurnServiceErr>> {
-        Box::new(self.send(DeleteIceUser(user)).then(
-            |r: Result<Result<(), TurnServiceErr>, MailboxError>| match r {
-                Ok(Err(err)) => Err(err),
-                Err(err) => Err(TurnServiceErr::from(err)),
-                _ => Ok(()),
-            },
-        ))
+        if user.is_static() {
+            Box::new(futures::future::ok(()))
+        } else {
+            Box::new(self.send(DeleteIceUser(user)).then(
+                |r: Result<Result<(), TurnServiceErr>, MailboxError>| match r {
+                    Ok(Err(err)) => Err(err),
+                    Err(err) => Err(TurnServiceErr::from(err)),
+                    _ => Ok(()),
+                },
+            ))
+        }
     }
 
     /// Sends [`DeleteRoom`] to [`Service`].
     fn delete_batch(
         &self,
         users: Vec<IceUser>,
-    ) -> Box<Future<Item = (), Error = TurnServiceErr>> {
-        Box::new(self.send(DeleteMultipleUsers(users)).then(
-            |r: Result<Result<(), TurnServiceErr>, MailboxError>| match r {
-                Ok(Err(err)) => Err(err),
-                Err(err) => Err(TurnServiceErr::from(err)),
-                _ => Ok(()),
-            },
-        ))
+    ) -> Box<Future<Item=(), Error=TurnServiceErr>> {
+
+        // leave only non static users
+        let users: Vec<IceUser> =
+            users.into_iter().filter(|u| !u.is_static()).collect();
+
+        if users.is_empty() {
+            Box::new(futures::future::ok(()))
+        } else {
+            Box::new(self.send(DeleteMultipleUsers(users)).then(
+                |r: Result<Result<(), TurnServiceErr>, MailboxError>| match r {
+                    Ok(Err(err)) => Err(err),
+                    Err(err) => Err(TurnServiceErr::from(err)),
+                    _ => Ok(()),
+                },
+            ))
+        }
     }
 }
 
@@ -339,7 +352,7 @@ pub mod test {
 
         fn delete_batch(
             &self,
-            _: Vec<u64>,
+            _: Vec<IceUser>,
         ) -> Box<dyn Future<Item = (), Error = TurnServiceErr>> {
             Box::new(future::ok(()))
         }

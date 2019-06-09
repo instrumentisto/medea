@@ -63,7 +63,7 @@ impl From<MailboxError> for ParticipantServiceErr {
 /// Participant is [`Member`] with [`RpcConnection`]. [`ParticipantService`]
 /// stores [`Members`] and associated [`RpcConnection`]s, handles
 /// [`RpcConnection`] authorization, establishment, message sending.
-#[cfg_attr(not(test), derive(Debug))]
+#[derive(Debug)]
 pub struct ParticipantService {
     /// [`Room`]s id from which this [`ParticipantService`] was created.
     room_id: RoomId,

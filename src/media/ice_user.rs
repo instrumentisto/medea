@@ -13,10 +13,14 @@ pub struct IceUser {
     user: String,
     /// Password for authorization.
     pass: String,
+    /// Non static users are meant to be saved and delete from some remote
+    /// storage, while static users are hardcoded on Turn server and do not
+    /// require any additional management.
+    is_static: bool,
 }
 
 impl IceUser {
-    /// Build new [`IceUser`].
+    /// Build new non static [`IceUser`].
     pub fn build(
         address: SocketAddr,
         room_id: RoomId,
@@ -27,14 +31,17 @@ impl IceUser {
             address,
             user: format!("{}_{}", room_id, name),
             pass,
+            is_static: false,
         }
     }
 
+    /// Build new static [`IceUser`].
     pub fn new(address: SocketAddr, user: String, pass: String) -> Self {
         Self {
             address,
             user,
             pass,
+            is_static: true,
         }
     }
 
@@ -68,5 +75,9 @@ impl IceUser {
 
     pub fn pass(&self) -> &str {
         &self.pass
+    }
+
+    pub fn is_static(&self) -> bool {
+        self.is_static
     }
 }
