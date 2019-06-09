@@ -263,6 +263,7 @@ impl Room {
 
 /// [`Actor`] implementation that provides an ergonomic way
 /// to interact with [`Room`].
+// TODO: close connections on signal (gracefull shutdown)
 impl Actor for Room {
     type Context = Context<Self>;
 }
