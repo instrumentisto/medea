@@ -188,7 +188,7 @@ impl ParticipantService {
                 wrap_future(self.turn.create(
                     member_id,
                     self.room_id,
-                    UnreachablePolicy::default(),
+                    UnreachablePolicy::ReturnErr,
                 ))
                 .map_err(|err, _: &mut Room, _| {
                     ParticipantServiceErr::from(err)

@@ -63,3 +63,8 @@
 #
 # Default:
 #   db_number = 0
+
+# The duration to wait to start a connection before returning err.
+#
+# Default:
+#   connection_timeout = 5s

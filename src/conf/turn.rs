@@ -1,6 +1,9 @@
 //! STUN/TURN server settings.
 
-use std::net::{IpAddr, Ipv4Addr, SocketAddr, ToSocketAddrs as _};
+use std::{
+    net::{IpAddr, Ipv4Addr, SocketAddr, ToSocketAddrs as _},
+    time::Duration,
+};
 
 use serde::{Deserialize, Serialize};
 use smart_default::*;
@@ -59,16 +62,8 @@ pub struct Redis {
     /// The database number to use. This is usually 0.
     #[default(0)]
     pub db_number: i64,
-}
-
-impl Redis {
-    /// Builds [`SocketAddr`] from `ip` and `port`.
-    #[inline]
-    pub fn addr(&self) -> SocketAddr {
-        (self.ip, self.port)
-            .to_socket_addrs()
-            .unwrap()
-            .next()
-            .unwrap()
-    }
+    /// The duration to wait to start a connection before returning err.
+    #[default(Duration::from_secs(5))]
+    #[serde(with = "serde_humantime")]
+    pub connection_timeout: Duration,
 }

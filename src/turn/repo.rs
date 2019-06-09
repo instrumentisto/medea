@@ -11,6 +11,7 @@ use redis::{ConnectionInfo, RedisError};
 use tokio::prelude::*;
 
 use crate::{log::prelude::*, media::IceUser};
+use std::time::Duration;
 
 #[derive(Fail, Debug)]
 pub enum TurnDatabaseErr {
@@ -36,6 +37,7 @@ pub struct TurnDatabase {
 impl TurnDatabase {
     /// New TurnDatabase
     pub fn new<S: Into<ConnectionInfo> + Clone>(
+        connection_timeout: Duration,
         connection_info: S,
     ) -> Result<Self, TurnDatabaseErr> {
         let client = redis::Client::open(connection_info.clone().into())?;
@@ -46,8 +48,10 @@ impl TurnDatabase {
         // happen.
         let mut runtime = tokio::runtime::Runtime::new()
             .expect("Unable to create a runtime in TurnDatabase");
-        let pool = runtime.block_on(future::lazy(|| {
-            Pool::builder().build(connection_manager)
+        let pool = runtime.block_on(future::lazy(move || {
+            Pool::builder()
+                .connection_timeout(connection_timeout)
+                .build(connection_manager)
         }))?;
         let redis_pool = RedisPool::new(pool);
 

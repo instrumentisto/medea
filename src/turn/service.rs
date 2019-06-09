@@ -10,7 +10,6 @@ use failure::Fail;
 use futures::future::{err, ok, Future};
 use rand::{distributions::Alphanumeric, Rng};
 use redis::ConnectionInfo;
-use smart_default::*;
 
 use crate::{
     api::control::MemberId,
@@ -70,8 +69,7 @@ impl TurnAuthService for Addr<Service> {
     fn delete(
         &self,
         users: Vec<IceUser>,
-    ) -> Box<Future<Item=(), Error=TurnServiceErr>> {
-
+    ) -> Box<Future<Item = (), Error = TurnServiceErr>> {
         // leave only non static users
         let users: Vec<IceUser> =
             users.into_iter().filter(|u| !u.is_static()).collect();
@@ -126,11 +124,10 @@ impl From<MailboxError> for TurnServiceErr {
 }
 
 /// Defines [`TurnAuthService`] behaviour if remote database is unreachable
-#[derive(Debug, SmartDefault)]
+#[derive(Debug)]
 pub enum UnreachablePolicy {
     /// Error will be propagated if request to db fails cause it is
     /// unreachable.
-    #[default]
     ReturnErr,
     /// Static member credentials will be returned if request to db fails cause
     /// it is unreachable.
@@ -159,25 +156,28 @@ struct Service {
 pub fn new_turn_auth_service(
     config: &Conf,
 ) -> Result<Box<dyn TurnAuthService>, TurnServiceErr> {
-    let turn_db = TurnDatabase::new(ConnectionInfo {
-        addr: Box::new(redis::ConnectionAddr::Tcp(
-            config.turn.db.redis.ip.to_string(),
-            config.turn.db.redis.port,
-        )),
-        db: config.turn.db.redis.db_number,
-        passwd: if config.turn.db.redis.pass.is_empty() {
-            None
-        } else {
-            Some(config.turn.db.redis.pass.clone())
+    let turn_db = TurnDatabase::new(
+        config.turn.db.redis.connection_timeout,
+        ConnectionInfo {
+            addr: Box::new(redis::ConnectionAddr::Tcp(
+                config.turn.db.redis.ip.to_string(),
+                config.turn.db.redis.port,
+            )),
+            db: config.turn.db.redis.db_number,
+            passwd: if config.turn.db.redis.pass.is_empty() {
+                None
+            } else {
+                Some(config.turn.db.redis.pass.clone())
+            },
         },
-    })?;
+    )?;
 
     let service = Service {
         turn_db,
         db_pass: config.turn.db.redis.pass.clone(),
         turn_address: config.turn.addr(),
         turn_username: config.turn.user.clone(),
-        turn_password: config.turn.db.redis.pass.clone(),
+        turn_password: config.turn.pass.clone(),
         static_user: None,
     };
 
