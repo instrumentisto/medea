@@ -80,24 +80,8 @@ impl TurnDatabase {
         })
     }
 
-    /// Deletes provided [`IceUser`] from remote Redis database.
+    /// Deletes batch of provided [`IceUser`]s.
     pub fn remove(
-        &mut self,
-        user: &IceUser,
-    ) -> impl Future<Item = (), Error = bb8::RunError<TurnDatabaseErr>> {
-        debug!("Delete ICE user: {:?}", user);
-        let key = format!("turn/realm/medea/user/{}/key", user.user());
-
-        self.pool.run(|connection| {
-            redis::cmd("DEL")
-                .arg(key)
-                .query_async(connection)
-                .map_err(TurnDatabaseErr::RedisError)
-        })
-    }
-
-    /// Deletes batch of provided [`IceUser`]'s.
-    pub fn remove_users(
         &mut self,
         users: &[IceUser],
     ) -> impl Future<Item = (), Error = bb8::RunError<TurnDatabaseErr>> {

@@ -224,7 +224,11 @@ impl ParticipantService {
         match reason {
             ClosedReason::Closed => {
                 self.connections.remove(&member_id);
-                self.delete_ice_user(member_id);
+                ctx.spawn(wrap_future(
+                    self.delete_ice_user(member_id).map_err(|err| {
+                        error!("Error deleting IceUser {:?}", err)
+                    }),
+                ));
                 ctx.notify(CloseRoom {})
             }
             ClosedReason::Lost => {
@@ -247,12 +251,21 @@ impl ParticipantService {
     }
 
     /// Deletes [`IceUser`] associated with provided [`Member`].
-    fn delete_ice_user(&mut self, member_id: MemberId) {
-        if let Some(mut member) = self.members.remove(&member_id) {
-            if let Some(ice_user) = member.ice_user.take() {
-                self.turn.delete(ice_user);
+    fn delete_ice_user(
+        &mut self,
+        member_id: MemberId,
+    ) -> Box<dyn Future<Item = (), Error = TurnServiceErr>> {
+        match self.members.remove(&member_id) {
+            Some(mut member) => {
+                let delete_fut = match member.ice_user.take() {
+                    Some(ice_user) => self.turn.delete(vec![ice_user]),
+                    None => Box::new(future::ok(())),
+                };
+                self.members.insert(member_id, member);
+
+                delete_fut
             }
-            self.members.insert(member_id, member);
+            None => Box::new(future::ok(())),
         }
     }
 
@@ -284,7 +297,7 @@ impl ParticipantService {
                     room_users.push(ice_user);
                 }
             });
-            self.turn.delete_batch(room_users).map_err(|_| ())
+            self.turn.delete(room_users).map_err(|_| ())
         });
         close_fut.push(remove_all_users_fut);
 

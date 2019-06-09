@@ -33,14 +33,8 @@ pub trait TurnAuthService: fmt::Debug + Send {
         policy: UnreachablePolicy,
     ) -> Box<dyn Future<Item = IceUser, Error = TurnServiceErr>>;
 
-    /// Deletes provided Turn credentials.
+    /// Deletes batch of [`IceUser`]s.
     fn delete(
-        &self,
-        user: IceUser,
-    ) -> Box<dyn Future<Item = (), Error = TurnServiceErr>>;
-
-    /// Deletes [`users`] from redis with provided [`RoomId`].
-    fn delete_batch(
         &self,
         users: Vec<IceUser>,
     ) -> Box<dyn Future<Item = (), Error = TurnServiceErr>>;
@@ -72,26 +66,8 @@ impl TurnAuthService for Addr<Service> {
         )
     }
 
-    /// Sends [`DeleteIceUser`] to [`Service`].
-    fn delete(
-        &self,
-        user: IceUser,
-    ) -> Box<Future<Item = (), Error = TurnServiceErr>> {
-        if user.is_static() {
-            Box::new(futures::future::ok(()))
-        } else {
-            Box::new(self.send(DeleteIceUser(user)).then(
-                |r: Result<Result<(), TurnServiceErr>, MailboxError>| match r {
-                    Ok(Err(err)) => Err(err),
-                    Err(err) => Err(TurnServiceErr::from(err)),
-                    _ => Ok(()),
-                },
-            ))
-        }
-    }
-
     /// Sends [`DeleteRoom`] to [`Service`].
-    fn delete_batch(
+    fn delete(
         &self,
         users: Vec<IceUser>,
     ) -> Box<Future<Item=(), Error=TurnServiceErr>> {
@@ -103,7 +79,7 @@ impl TurnAuthService for Addr<Service> {
         if users.is_empty() {
             Box::new(futures::future::ok(()))
         } else {
-            Box::new(self.send(DeleteMultipleUsers(users)).then(
+            Box::new(self.send(DeleteIceUsers(users)).then(
                 |r: Result<Result<(), TurnServiceErr>, MailboxError>| match r {
                     Ok(Err(err)) => Err(err),
                     Err(err) => Err(TurnServiceErr::from(err)),
@@ -235,24 +211,6 @@ impl Actor for Service {
     type Context = Context<Self>;
 }
 
-/// Request for delete [`ICEUser`] for [`Member`] from Turn database.
-#[derive(Debug, Message)]
-#[rtype(result = "Result<(), TurnServiceErr>")]
-struct DeleteIceUser(pub IceUser);
-
-impl Handler<DeleteIceUser> for Service {
-    type Result = Box<dyn Future<Item = (), Error = TurnServiceErr>>;
-
-    /// Deletes provided [`TurnDatabaseInsertableUser`] from [`TurnDatabase`].
-    fn handle(
-        &mut self,
-        msg: DeleteIceUser,
-        _ctx: &mut Self::Context,
-    ) -> Self::Result {
-        Box::new(self.turn_db.remove(&msg.0).map_err(TurnServiceErr::from))
-    }
-}
-
 /// Creates credentials on Turn server for specified member.
 #[derive(Debug, Message)]
 #[rtype(result = "Result<IceUser, TurnServiceErr>")]
@@ -298,20 +256,20 @@ impl Handler<CreateIceUser> for Service {
 /// Deletes all users from given room in redis.
 #[derive(Debug, Message)]
 #[rtype(result = "Result<(), TurnServiceErr>")]
-struct DeleteMultipleUsers(Vec<IceUser>);
+struct DeleteIceUsers(Vec<IceUser>);
 
-impl Handler<DeleteMultipleUsers> for Service {
+impl Handler<DeleteIceUsers> for Service {
     type Result = ActFuture<(), TurnServiceErr>;
 
     /// Deletes all users with provided [`RoomId`]
     fn handle(
         &mut self,
-        msg: DeleteMultipleUsers,
+        msg: DeleteIceUsers,
         _ctx: &mut Self::Context,
     ) -> Self::Result {
         Box::new(
             self.turn_db
-                .remove_users(&msg.0)
+                .remove(&msg.0)
                 .map_err(TurnServiceErr::from)
                 .into_actor(self),
         )
@@ -347,13 +305,6 @@ pub mod test {
             &self,
             _: IceUser,
         ) -> Box<Future<Item = (), Error = TurnServiceErr>> {
-            Box::new(future::ok(()))
-        }
-
-        fn delete_batch(
-            &self,
-            _: Vec<IceUser>,
-        ) -> Box<dyn Future<Item = (), Error = TurnServiceErr>> {
             Box::new(future::ok(()))
         }
     }
