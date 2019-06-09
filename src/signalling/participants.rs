@@ -297,7 +297,9 @@ impl ParticipantService {
                     room_users.push(ice_user);
                 }
             });
-            self.turn.delete(room_users).map_err(|_| ())
+            self.turn
+                .delete(room_users)
+                .map_err(|err| error!("Error removing IceUsers {:?}", err))
         });
         close_fut.push(remove_all_users_fut);
 
