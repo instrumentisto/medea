@@ -303,7 +303,7 @@ pub mod test {
 
         fn delete(
             &self,
-            _: IceUser,
+            _: Vec<IceUser>,
         ) -> Box<Future<Item = (), Error = TurnServiceErr>> {
             Box::new(future::ok(()))
         }
