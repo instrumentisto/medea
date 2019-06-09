@@ -1,6 +1,6 @@
 //! Abstraction over remote Redis database used to store Turn server
 //! credentials.
-extern crate tokio;
+use std::time::Duration;
 
 use bb8::{Pool, RunError};
 use bb8_redis::{RedisConnectionManager, RedisPool};
@@ -11,7 +11,6 @@ use redis::{ConnectionInfo, RedisError};
 use tokio::prelude::*;
 
 use crate::{log::prelude::*, media::IceUser};
-use std::time::Duration;
 
 #[derive(Fail, Debug)]
 pub enum TurnDatabaseErr {
