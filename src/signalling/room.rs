@@ -135,7 +135,7 @@ impl Room {
             .ice_user
             .as_ref()
             .ok_or_else(|| RoomError::NoTurnCredentials(member_id))?
-            .to_servers_list();
+            .servers_list();
         let peer_created = Event::PeerCreated {
             peer_id: sender.id(),
             sdp_offer: None,
@@ -174,7 +174,7 @@ impl Room {
             .ice_user
             .as_ref()
             .ok_or_else(|| RoomError::NoTurnCredentials(to_member_id))?
-            .to_servers_list();
+            .servers_list();
 
         let event = Event::PeerCreated {
             peer_id: to_peer_id,

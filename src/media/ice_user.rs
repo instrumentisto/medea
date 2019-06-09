@@ -1,35 +1,45 @@
 use std::net::SocketAddr;
 
-use crate::signalling::RoomId;
 use medea_client_api_proto::IceServer;
+
+use crate::signalling::RoomId;
 
 /// Credentials on Turn server.
 #[derive(Clone, Debug)]
 pub struct IceUser {
     /// Address of Turn server.
     address: SocketAddr,
-    //todo: this argument is passed by value, but not consumed in the function body. consider &str
     /// Username for authorization.
-    name: String,
+    user: String,
     /// Password for authorization.
     pass: String,
 }
 
 impl IceUser {
-    pub fn new(
+    /// Build new [`IceUser`].
+    pub fn build(
         address: SocketAddr,
         room_id: RoomId,
-        name: String,
+        name: &str,
         pass: String,
     ) -> Self {
         Self {
             address,
-            name: format!("{}:{}", name, room_id),
+            user: format!("{}_{}", room_id, name),
             pass,
         }
     }
 
-    pub fn to_servers_list(&self) -> Vec<IceServer> {
+    pub fn new(address: SocketAddr, user: String, pass: String) -> Self {
+        Self {
+            address,
+            user,
+            pass,
+        }
+    }
+
+    /// Build vector of [`IceServer`].
+    pub fn servers_list(&self) -> Vec<IceServer> {
         let stun_url = vec![format!("stun:{}", self.address)];
         let stun = IceServer {
             urls: stun_url,
@@ -42,7 +52,7 @@ impl IceUser {
         ];
         let turn = IceServer {
             urls: turn_urls,
-            username: Some(self.name.clone()),
+            username: Some(self.user.clone()),
             credential: Some(self.pass.clone()),
         };
         vec![stun, turn]
@@ -52,11 +62,11 @@ impl IceUser {
         &self.address
     }
 
-    pub fn name(&self) -> &String {
-        &self.name
+    pub fn user(&self) -> &str {
+        &self.user
     }
 
-    pub fn pass(&self) -> &String {
+    pub fn pass(&self) -> &str {
         &self.pass
     }
 }

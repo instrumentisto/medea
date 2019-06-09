@@ -10,9 +10,7 @@ use futures::future::Future;
 use redis::{ConnectionInfo, RedisError};
 use tokio::prelude::*;
 
-use crate::{
-    log::prelude::*, media::IceUser
-};
+use crate::{log::prelude::*, media::IceUser};
 
 #[derive(Fail, Debug)]
 pub enum TurnDatabaseErr {
@@ -35,7 +33,6 @@ pub struct TurnDatabase {
     info: ConnectionInfo,
 }
 
-// TODO: Auth after reconnect.
 impl TurnDatabase {
     /// New TurnDatabase
     pub fn new<S: Into<ConnectionInfo> + Clone>(
@@ -43,6 +40,10 @@ impl TurnDatabase {
     ) -> Result<Self, TurnDatabaseErr> {
         let client = redis::Client::open(connection_info.clone().into())?;
         let connection_manager = RedisConnectionManager::new(client)?;
+
+        // Its safe to unwrap here, since this err comes directly from mio and
+        // means that mio doesnt have bindings for this target, which wont
+        // happen.
         let mut runtime = tokio::runtime::Runtime::new()
             .expect("Unable to create a runtime in TurnDatabase");
         let pool = runtime.block_on(future::lazy(|| {
@@ -63,10 +64,8 @@ impl TurnDatabase {
     ) -> impl Future<Item = (), Error = RunError<TurnDatabaseErr>> {
         debug!("Store ICE user: {:?}", user);
 
-        let key = format!("turn/realm/medea/user/{}/key", user.name());
-        // todo: ask if it will be okay to use 1:1:medea:pass (maybe
-        // 1#1:medea:pass?)
-        let value = format!("{}:medea:{}", user.name(), user.pass());
+        let key = format!("turn/realm/medea/user/{}/key", user.user());
+        let value = format!("{}:medea:{}", user.user(), user.pass());
 
         let mut hasher = Md5::new();
         hasher.input_str(&value);
@@ -87,7 +86,7 @@ impl TurnDatabase {
         user: &IceUser,
     ) -> impl Future<Item = (), Error = bb8::RunError<TurnDatabaseErr>> {
         debug!("Delete ICE user: {:?}", user);
-        let key = format!("turn/realm/medea/user/{}/key", user.name());
+        let key = format!("turn/realm/medea/user/{}/key", user.user());
 
         self.pool.run(|connection| {
             redis::cmd("DEL")
@@ -97,6 +96,7 @@ impl TurnDatabase {
         })
     }
 
+    /// Deletes batch of provided [`IceUser`]'s.
     pub fn remove_users(
         &mut self,
         users: &[IceUser],
@@ -106,7 +106,7 @@ impl TurnDatabase {
 
         for user in users {
             delete_keys
-                .push(format!("turn/realm/medea/user/{}/key", user.name()));
+                .push(format!("turn/realm/medea/user/{}/key", user.user()));
         }
 
         self.pool.run(|connection| {

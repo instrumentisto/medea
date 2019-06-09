@@ -207,10 +207,8 @@ impl Service {
     /// Returns [`ICEUser`] with static credentials.
     fn static_user(&mut self) -> IceUser {
         if self.static_user.is_none() {
-            // todo: ask static user room_id
             self.static_user.replace(IceUser::new(
                 self.turn_address,
-                0,
                 self.turn_username.clone(),
                 self.turn_password.clone(),
             ));
@@ -261,10 +259,10 @@ impl Handler<CreateIceUser> for Service {
         msg: CreateIceUser,
         _ctx: &mut Self::Context,
     ) -> Self::Result {
-        let ice_user = IceUser::new(
+        let ice_user = IceUser::build(
             self.turn_address,
             msg.room_id,
-            msg.member_id.to_string(),
+            &msg.member_id.to_string(),
             self.new_password(TURN_PASS_LEN),
         );
 
@@ -325,11 +323,11 @@ pub mod test {
             _: RoomId,
             _: UnreachablePolicy,
         ) -> Box<Future<Item = IceUser, Error = TurnServiceErr>> {
-            Box::new(future::ok(IceUser {
-                address: "5.5.5.5:1234".parse().unwrap(),
-                name: "username".to_string(),
-                pass: "password".to_string(),
-            }))
+            Box::new(future::ok(IceUser::new(
+                "5.5.5.5:1234".parse().unwrap(),
+                String::from("username"),
+                String::from("password"),
+            )))
         }
 
         fn delete(
