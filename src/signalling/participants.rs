@@ -288,8 +288,8 @@ impl ParticipantService {
             },
         );
 
-        // removing all users from room
-        let remove_all_users_fut = Box::new({
+        // deleting all IceUsers
+        let remove_ice_users = Box::new({
             let mut room_users = Vec::with_capacity(self.members.len());
 
             self.members.iter_mut().for_each(|(_, data)| {
@@ -301,7 +301,7 @@ impl ParticipantService {
                 .delete(room_users)
                 .map_err(|err| error!("Error removing IceUsers {:?}", err))
         });
-        close_fut.push(remove_all_users_fut);
+        close_fut.push(remove_ice_users);
 
         join_all(close_fut).map(|_| ())
     }
