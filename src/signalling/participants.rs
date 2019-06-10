@@ -18,10 +18,10 @@ use crate::{
             AuthorizationError, ClosedReason, EventMessage, RpcConnection,
             RpcConnectionClosed,
         },
-        control::{Member, MemberId, RoomSpec, TryFromElementError},
+        control::{MemberId, RoomSpec, TryFromElementError},
     },
     log::prelude::*,
-    signalling::{room::RoomError, Room},
+    signalling::{room::RoomError, state::member::Participant, Room},
 };
 
 /// Participant is [`Member`] with [`RpcConnection`]. [`ParticipantService`]
@@ -30,7 +30,7 @@ use crate::{
 #[derive(Debug)]
 pub struct ParticipantService {
     /// [`Member`]s which currently are present in this [`Room`].
-    members: HashMap<MemberId, Member>,
+    members: HashMap<MemberId, Participant>,
 
     /// Established [`RpcConnection`]s of [`Member`]s in this [`Room`].
     // TODO: Replace Box<dyn RpcConnection>> with enum,
@@ -53,9 +53,9 @@ impl ParticipantService {
         room_spec: &RoomSpec,
         reconnect_timeout: Duration,
     ) -> Result<Self, TryFromElementError> {
-        let members = room_spec.members()?;
-
-        debug!("Created room with {:?} members.", members);
+        let members = Participant::get_store(room_spec);
+        // TODO: more informative msg
+        debug!("Created room with {:?} members.", members.iter().map(|(id, _)| id).collect::<Vec<&MemberId>>());
 
         Ok(Self {
             members,
@@ -66,8 +66,11 @@ impl ParticipantService {
     }
 
     /// Lookup [`Member`] by provided id.
-    pub fn get_member_by_id(&self, id: &MemberId) -> Option<&Member> {
-        self.members.get(id)
+    pub fn get_member_by_id(
+        &self,
+        id: &MemberId,
+    ) -> Option<Participant> {
+        self.members.get(id).cloned()
     }
 
     /// Lookup [`Member`] by provided id and credentials. Returns
@@ -78,11 +81,11 @@ impl ParticipantService {
         &self,
         member_id: &MemberId,
         credentials: &str,
-    ) -> Result<&Member, AuthorizationError> {
+    ) -> Result<Participant, AuthorizationError> {
         match self.members.get(member_id) {
-            Some(ref member) => {
+            Some(member) => {
                 if member.credentials().eq(credentials) {
-                    Ok(member)
+                    Ok(member.clone())
                 } else {
                     Err(AuthorizationError::InvalidCredentials)
                 }

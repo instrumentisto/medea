@@ -1,3 +1,5 @@
+pub mod state;
+
 pub mod participants;
 pub mod peers;
 pub mod room;

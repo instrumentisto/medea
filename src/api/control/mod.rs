@@ -17,7 +17,7 @@ use self::{
 
 pub use self::{
     endpoint::Endpoint,
-    member::{Id as MemberId, Member, MemberSpec},
+    member::{Id as MemberId, MemberSpec},
     room::{Id as RoomId, RoomSpec},
 };
 

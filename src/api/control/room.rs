@@ -6,7 +6,7 @@ use hashbrown::HashMap;
 use serde::Deserialize;
 
 use super::{
-    pipeline::Pipeline, Element, Member, MemberId, MemberSpec,
+    member::MemberSpec, pipeline::Pipeline, Element, MemberId,
     TryFromElementError,
 };
 
@@ -19,24 +19,21 @@ pub struct Id(pub String);
 #[allow(clippy::module_name_repetitions)]
 #[derive(Clone, Debug)]
 pub struct RoomSpec {
-    id: Id,
-    pipeline: Arc<Pipeline>,
+    pub id: Id,
+    pub pipeline: Arc<Pipeline>,
 }
 
 impl RoomSpec {
     /// Returns all [`Member`]s of this [`RoomSpec`].
     pub fn members(
         &self,
-    ) -> Result<HashMap<MemberId, Member>, TryFromElementError> {
-        let mut members = HashMap::new();
+    ) -> Result<HashMap<MemberId, MemberSpec>, TryFromElementError> {
+        let mut members: HashMap<MemberId, MemberSpec> = HashMap::new();
         for (control_id, element) in self.pipeline.iter() {
             let member_spec = MemberSpec::try_from(element)?;
             let member_id = MemberId(control_id.clone());
 
-            members.insert(
-                member_id.clone(),
-                Member::new(member_id, member_spec, Arc::clone(&self.pipeline)),
-            );
+            members.insert(member_id.clone(), member_spec);
         }
 
         Ok(members)

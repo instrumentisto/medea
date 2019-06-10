@@ -9,9 +9,12 @@ use actix::{AsyncContext as _, Context};
 use hashbrown::HashMap;
 
 use crate::{
-    api::control::{Member, MemberId},
+    api::control::MemberId,
     media::{Peer, PeerId, PeerStateMachine},
-    signalling::room::{PeersRemoved, Room, RoomError},
+    signalling::{
+        state::member::Participant,
+        room::{ PeersRemoved, Room, RoomError},
+    },
 };
 
 #[derive(Debug)]
@@ -69,8 +72,8 @@ impl PeerRepository {
     /// Returns IDs of created [`Peer`]s. `(first_peer_id, second_peer_id)`.
     pub fn create_peers(
         &mut self,
-        first_member: &Member,
-        second_member: &Member,
+        first_member: &Participant,
+        second_member: &Participant,
     ) -> (u64, u64) {
         let first_peer_id = self.peers_count.next_id();
         let second_peer_id = self.peers_count.next_id();
@@ -89,20 +92,20 @@ impl PeerRepository {
         );
 
         first_peer.add_publish_endpoints(
-            first_member.publish_endpoints(),
+            first_member.publish(),
             &mut self.tracks_count,
         );
         second_peer.add_publish_endpoints(
-            second_member.publish_endpoints(),
+            second_member.publish(),
             &mut self.tracks_count,
         );
 
         first_peer.add_play_endpoints(
-            first_member.play_endpoints(),
+            first_member.play(),
             &mut second_peer,
         );
         second_peer.add_play_endpoints(
-            second_member.play_endpoints(),
+            second_member.play(),
             &mut first_peer,
         );
 

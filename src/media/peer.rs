@@ -14,11 +14,11 @@ use std::{convert::TryFrom, fmt::Display, sync::Arc};
 
 use crate::{
     api::control::{
-        endpoint::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
         MemberId,
     },
     media::{MediaTrack, TrackId},
     signalling::peers::Counter,
+    signalling::state::member::Participant,
 };
 
 /// Newly initialized [`Peer`] ready to signalling.
@@ -257,7 +257,7 @@ impl Peer<New> {
     /// ID.
     pub fn add_publish_endpoints(
         &mut self,
-        endpoints: HashMap<&String, &WebRtcPublishEndpoint>,
+        endpoints: HashMap<MemberId, Participant>,
         track_id_counter: &mut Counter,
     ) {
         for _ in endpoints {
@@ -278,11 +278,11 @@ impl Peer<New> {
     /// Add all `partner_peer` related [`WebRtcPlayEndpoint`]s to this [`Peer`].
     pub fn add_play_endpoints(
         &mut self,
-        endpoints: HashMap<&String, &WebRtcPlayEndpoint>,
+        endpoints: HashMap<MemberId, Participant>,
         partner_peer: &mut Peer<New>,
     ) {
         for (_, endpoint) in endpoints {
-            if self.context.partner_member == endpoint.src.member_id {
+            if self.context.partner_member == endpoint.id() {
                 partner_peer
                     .get_senders()
                     .into_iter()

@@ -18,14 +18,14 @@ use crate::{
             AuthorizationError, Authorize, ClosedReason, CommandMessage,
             RpcConnectionClosed, RpcConnectionEstablished,
         },
-        control::{Member, MemberId, RoomId, RoomSpec, TryFromElementError},
+        control::{MemberId, RoomId, RoomSpec, TryFromElementError},
     },
     log::prelude::*,
     media::{
         New, Peer, PeerId, PeerStateError, PeerStateMachine,
         WaitLocalHaveRemote, WaitLocalSdp, WaitRemoteSdp,
     },
-    signalling::{participants::ParticipantService, peers::PeerRepository},
+    signalling::{participants::ParticipantService, peers::PeerRepository, state::member::Participant},
 };
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
@@ -256,8 +256,8 @@ impl Room {
     /// spec.
     fn create_and_interconnect_peers(
         &mut self,
-        first_member: &Member,
-        second_member: &Member,
+        first_member: &Participant,
+        second_member: &Participant,
         ctx: &mut <Self as Actor>::Context,
     ) {
         debug!(
@@ -301,24 +301,25 @@ impl Room {
         let mut need_create = Vec::new();
 
         // connect receivers
-        let receivers = match member.receivers() {
-            Ok(r) => r,
-            Err(e) => {
-                error!(
-                    "Member {} has wrong room pipeline. Room will be stopped. \
-                     Here is error: {:?}",
-                    member.id(),
-                    e
-                );
-                ctx.notify(CloseRoom {});
-                return;
-            }
-        };
+//        let (_, receivers) = match member.publish() {
+//            Ok(r) => r,
+//            Err(e) => {
+//                error!(
+//                    "Member {} has wrong room pipeline. Room will be stopped. \
+//                     Here is error: {:?}",
+//                    member.lock().unwrap().borrow().id(),
+//                    e
+//                );
+//                ctx.notify(CloseRoom {});
+//                return;
+//            }
+//        };
+        let receivers = member.publish();
         let mut already_connected_members = Vec::new();
-        for recv_member_id in &receivers {
-            if self.participants.member_has_connection(recv_member_id) {
+        for (recv_member_id, _) in receivers {
+            if self.participants.member_has_connection(&recv_member_id) {
                 if let Some(recv_member) =
-                    self.participants.get_member_by_id(recv_member_id)
+                    self.participants.get_member_by_id(&recv_member_id)
                 {
                     already_connected_members.push(recv_member_id.clone());
                     need_create.push((&member, recv_member.clone()));
@@ -334,22 +335,17 @@ impl Room {
         }
 
         // connect senders
-        for (_, play) in member.play_endpoints() {
-            let sender_member_id = &play.src.member_id;
-            if already_connected_members.contains(sender_member_id) {
+        for (_, play) in member.play() {
+            let sender_member_id = play.id();
+            if already_connected_members.contains(&sender_member_id) {
                 continue;
             }
 
-            if self.participants.member_has_connection(sender_member_id) {
+            if self.participants.member_has_connection(&sender_member_id) {
                 if let Some(sender_member) =
-                    self.participants.get_member_by_id(sender_member_id)
+                    self.participants.get_member_by_id(&sender_member_id)
                 {
-                    if sender_member
-                        .publish_endpoints()
-                        .contains_key(&play.src.endpoint_id)
-                    {
-                        need_create.push((&member, sender_member.clone()));
-                    }
+                    need_create.push((&member, sender_member.clone()));
                 } else {
                     error!(
                         "Try to get member with ID {} which has active \

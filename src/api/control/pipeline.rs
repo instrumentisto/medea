@@ -15,7 +15,7 @@ use crate::api::control::Element;
 /// Entity that represents some pipeline of spec.
 #[derive(Clone, Deserialize, Debug)]
 pub struct Pipeline {
-    pipeline: HashMap<String, Element>,
+    pub pipeline: HashMap<String, Element>,
 }
 
 impl Pipeline {
