@@ -287,7 +287,7 @@ fn three_members_p2p_video_call() {
                         Event::PeerCreated {
                             peer_id, tracks, ..
                         } => {
-                            assert_eq!(tracks.len(), 4);
+                            assert_eq!(tracks.len(), 8);
                             let recv_count = tracks
                                 .iter()
                                 .filter_map(|t| match &t.direction {
@@ -298,7 +298,7 @@ fn three_members_p2p_video_call() {
                                     assert_ne!(sender, peer_id);
                                 })
                                 .count();
-                            assert_eq!(recv_count, 2);
+                            assert_eq!(recv_count, 4);
 
                             let send_count = tracks
                                 .iter()
@@ -313,7 +313,7 @@ fn three_members_p2p_video_call() {
                                     assert_eq!(receivers.len(), 1);
                                 })
                                 .count();
-                            assert_eq!(send_count, 2);
+                            assert_eq!(send_count, 4);
                         }
                         _ => (),
                     });

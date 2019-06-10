@@ -253,6 +253,7 @@ impl Peer<New> {
     ///
     /// This use `track_id_counter` counter for generating new [`MediaTrack`]
     /// ID.
+    // TODO (evdokimovs): Upd doc
     pub fn add_publish_endpoints(
         &mut self,
         endpoints: HashMap<MemberId, Participant>,
@@ -274,6 +275,7 @@ impl Peer<New> {
     }
 
     /// Add all `partner_peer` related [`WebRtcPlayEndpoint`]s to this [`Peer`].
+    // TODO (evdokimovs): Upd doc
     pub fn add_play_endpoints(
         &mut self,
         endpoints: HashMap<MemberId, Participant>,

@@ -13,9 +13,9 @@ pub struct Participant(Arc<Mutex<RefCell<ParticipantInner>>>);
 #[derive(Debug)]
 pub struct ParticipantInner {
     id: MemberId,
-    // TODO(evdokimovs): there is memory leak because Arc.
+    // TODO (evdokimovs): there is memory leak because Arc.
     senders: HashMap<MemberId, Participant>,
-    // TODO(evdokimovs): there is memory leak because Arc.
+    // TODO (evdokimovs): there is memory leak because Arc.
     receivers: HashMap<MemberId, Participant>,
     credentials: String,
 }
@@ -109,8 +109,10 @@ impl ParticipantInner {
             participant.load(room_spec, &participants);
         }
 
-        println!("\n\n\n\n{:#?}\n\n\n\n", participants);
+//        println!("\n\n\n\n{:#?}\n\n\n\n", participants);
 
         participants
     }
 }
+
+// TODO (evdokimovs): add Participant unit tests
