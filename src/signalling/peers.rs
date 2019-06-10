@@ -100,8 +100,10 @@ impl PeerRepository {
             &mut self.tracks_count,
         );
 
-        first_peer.add_play_endpoints(first_member.play(), &mut second_peer);
-        second_peer.add_play_endpoints(second_member.play(), &mut first_peer);
+        first_peer
+            .add_play_endpoints(first_member.receivers(), &mut second_peer);
+        second_peer
+            .add_play_endpoints(second_member.receivers(), &mut first_peer);
 
         self.add_peer(first_peer_id, first_peer);
         self.add_peer(second_peer_id, second_peer);

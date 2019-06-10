@@ -338,7 +338,7 @@ impl Room {
         }
 
         // connect senders
-        for (_, play) in member.play() {
+        for (_, play) in member.receivers() {
             let sender_member_id = play.id();
             if already_connected_members.contains(&sender_member_id) {
                 continue;

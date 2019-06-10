@@ -5,7 +5,9 @@ use crate::api::control::{MemberId, MemberSpec, RoomSpec};
 use hashbrown::HashMap;
 use std::cell::RefCell;
 
-pub struct Id(String);
+use super::endpoint::{
+    Id as EndpointId, P2pMode, WebRtcPlayEndpoint, WebRtcPublishEndpoint,
+};
 
 #[derive(Debug, Clone)]
 pub struct Participant(Arc<Mutex<RefCell<ParticipantInner>>>);
@@ -14,9 +16,9 @@ pub struct Participant(Arc<Mutex<RefCell<ParticipantInner>>>);
 pub struct ParticipantInner {
     id: MemberId,
     // TODO (evdokimovs): there is memory leak because Arc.
-    senders: HashMap<MemberId, Participant>,
+    send: HashMap<EndpointId, Arc<WebRtcPublishEndpoint>>,
     // TODO (evdokimovs): there is memory leak because Arc.
-    receivers: HashMap<MemberId, Participant>,
+    recv: HashMap<EndpointId, Arc<WebRtcPlayEndpoint>>,
     credentials: String,
 }
 
@@ -37,12 +39,47 @@ impl Participant {
         self.0.lock().unwrap().borrow().credentials.clone()
     }
 
-    pub fn publish(&self) -> HashMap<MemberId, Self> {
-        self.0.lock().unwrap().borrow().senders.clone()
+    pub fn publish(&self) -> HashMap<String, Arc<WebRtcPublishEndpoint>> {
+        self.0.lock().unwrap().borrow().send.clone()
     }
 
-    pub fn play(&self) -> HashMap<MemberId, Self> {
-        self.0.lock().unwrap().borrow().receivers.clone()
+    pub fn receivers(&self) -> HashMap<String, Arc<WebRtcPlayEndpoint>> {
+        self.0.lock().unwrap().borrow().recv.clone()
+    }
+
+    pub fn add_receiver(
+        &self,
+        id: EndpointId,
+        endpoint: Arc<WebRtcPlayEndpoint>,
+    ) {
+        self.0
+            .lock()
+            .unwrap()
+            .borrow_mut()
+            .recv
+            .insert(id, endpoint);
+    }
+
+    pub fn add_recv_to_send(
+        &self,
+        id: EndpointId,
+        endpoint: Arc<WebRtcPublishEndpoint>,
+    ) {
+        self.0
+            .lock()
+            .unwrap()
+            .borrow_mut()
+            .send
+            .entry(id)
+            .or_insert(Vec::new())
+            .push(endpoint)
+    }
+
+    pub fn get_publisher(
+        &self,
+        id: &EndpointId,
+    ) -> Option<Arc<WebRtcPublishEndpoint>> {
+        self.0.lock().unwrap().borrow().send.get(id)
     }
 }
 
@@ -50,8 +87,8 @@ impl ParticipantInner {
     pub fn new(id: MemberId, credentials: String) -> Self {
         Self {
             id,
-            senders: HashMap::new(),
-            receivers: HashMap::new(),
+            send: HashMap::new(),
+            recv: HashMap::new(),
             credentials,
         }
     }
@@ -65,16 +102,42 @@ impl ParticipantInner {
             room_spec.pipeline.pipeline.get(&self.id.0).unwrap(),
         )
         .unwrap();
+        let me = store.get(&self.id).unwrap();
         spec.play_endpoints().iter().for_each(|(_, p)| {
             let sender_participant =
                 store.get(&MemberId(p.src.member_id.to_string())).unwrap();
-            self.senders.insert(
-                sender_participant.id().clone(),
-                sender_participant.clone(),
-            );
-        });
 
-        let self_id = self.id.clone();
+            let publisher = WebRtcPublishEndpoint {
+                participant: sender_participant.clone(),
+                receivers: Vec::new(),
+                p2p: P2pMode::Always,
+            };
+
+            match sender_participant
+                .get_publisher(&EndpointId(p.src.endpoint_id.to_string()))
+            {
+                Some(publisher) => {
+                    WebRtcPlayEndpoint {
+                        participant: me,
+                        publisher,
+                        src: p.src,
+                    }
+
+                    // TODO: Mutate publisher here
+                }
+                None => {
+                    // Create Publisher
+                    // create play
+                    // add play to publisher
+                    // insert publisher into participant
+                }
+            }
+
+            self.recv.push(WebRtcPlayEndpoint {
+                src: p.src,
+                publisher: sender_participant.clone(),
+            });
+        });
 
         for (id, element) in room_spec.pipeline.iter() {
             let member = MemberSpec::try_from(element).unwrap();
@@ -86,7 +149,6 @@ impl ParticipantInner {
                 .for_each(|_| {
                     let member_id = MemberId(id.clone());
                     let participant = store.get(&member_id).unwrap().clone();
-                    self.receivers.insert(member_id, participant);
                 });
         }
     }
@@ -109,7 +171,7 @@ impl ParticipantInner {
             participant.load(room_spec, &participants);
         }
 
-//        println!("\n\n\n\n{:#?}\n\n\n\n", participants);
+        //        println!("\n\n\n\n{:#?}\n\n\n\n", participants);
 
         participants
     }
