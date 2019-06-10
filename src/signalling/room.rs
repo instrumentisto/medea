@@ -529,12 +529,7 @@ impl Handler<RpcConnectionEstablished> for Room {
             msg.connection,
         );
 
-        // TODO: remove this check, create_peers_with_available_members should
-        //       be idempotent
-        
-        if self.peers.get_peers_by_member_id(&msg.member_id).is_empty() {
-            self.create_peers_with_available_members(&msg.member_id, ctx);
-        }
+        self.create_peers_with_available_members(&msg.member_id, ctx);
 
         Box::new(wrap_future(future::ok(())))
     }
