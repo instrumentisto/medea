@@ -25,7 +25,10 @@ use crate::{
         New, Peer, PeerId, PeerStateError, PeerStateMachine,
         WaitLocalHaveRemote, WaitLocalSdp, WaitRemoteSdp,
     },
-    signalling::{participants::ParticipantService, peers::PeerRepository, state::member::Participant},
+    signalling::{
+        participants::ParticipantService, peers::PeerRepository,
+        state::member::Participant,
+    },
 };
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
@@ -301,19 +304,19 @@ impl Room {
         let mut need_create = Vec::new();
 
         // connect receivers
-//        let (_, receivers) = match member.publish() {
-//            Ok(r) => r,
-//            Err(e) => {
-//                error!(
-//                    "Member {} has wrong room pipeline. Room will be stopped. \
-//                     Here is error: {:?}",
-//                    member.lock().unwrap().borrow().id(),
-//                    e
-//                );
-//                ctx.notify(CloseRoom {});
-//                return;
-//            }
-//        };
+        //        let (_, receivers) = match member.publish() {
+        //            Ok(r) => r,
+        //            Err(e) => {
+        //                error!(
+        //                    "Member {} has wrong room pipeline. Room will be
+        // stopped. \                     Here is error: {:?}",
+        //                    member.lock().unwrap().borrow().id(),
+        //                    e
+        //                );
+        //                ctx.notify(CloseRoom {});
+        //                return;
+        //            }
+        //        };
         let receivers = member.publish();
         let mut already_connected_members = Vec::new();
         for (recv_member_id, _) in receivers {

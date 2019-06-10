@@ -13,9 +13,7 @@ use medea_macro::enum_delegate;
 use std::{convert::TryFrom, fmt::Display, sync::Arc};
 
 use crate::{
-    api::control::{
-        MemberId,
-    },
+    api::control::MemberId,
     media::{MediaTrack, TrackId},
     signalling::peers::Counter,
     signalling::state::member::Participant,

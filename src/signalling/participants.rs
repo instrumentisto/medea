@@ -55,7 +55,10 @@ impl ParticipantService {
     ) -> Result<Self, TryFromElementError> {
         let members = Participant::get_store(room_spec);
         // TODO: more informative msg
-        debug!("Created room with {:?} members.", members.iter().map(|(id, _)| id).collect::<Vec<&MemberId>>());
+        debug!(
+            "Created room with {:?} members.",
+            members.iter().map(|(id, _)| id).collect::<Vec<&MemberId>>()
+        );
 
         Ok(Self {
             members,
@@ -66,10 +69,7 @@ impl ParticipantService {
     }
 
     /// Lookup [`Member`] by provided id.
-    pub fn get_member_by_id(
-        &self,
-        id: &MemberId,
-    ) -> Option<Participant> {
+    pub fn get_member_by_id(&self, id: &MemberId) -> Option<Participant> {
         self.members.get(id).cloned()
     }
 

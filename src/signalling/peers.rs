@@ -12,8 +12,8 @@ use crate::{
     api::control::MemberId,
     media::{Peer, PeerId, PeerStateMachine},
     signalling::{
+        room::{PeersRemoved, Room, RoomError},
         state::member::Participant,
-        room::{ PeersRemoved, Room, RoomError},
     },
 };
 
@@ -100,14 +100,8 @@ impl PeerRepository {
             &mut self.tracks_count,
         );
 
-        first_peer.add_play_endpoints(
-            first_member.play(),
-            &mut second_peer,
-        );
-        second_peer.add_play_endpoints(
-            second_member.play(),
-            &mut first_peer,
-        );
+        first_peer.add_play_endpoints(first_member.play(), &mut second_peer);
+        second_peer.add_play_endpoints(second_member.play(), &mut first_peer);
 
         self.add_peer(first_peer_id, first_peer);
         self.add_peer(second_peer_id, second_peer);
