@@ -257,7 +257,7 @@ impl Peer<New> {
     /// ID.
     pub fn add_publish_endpoints(
         &mut self,
-        endpoints: Vec<&WebRtcPublishEndpoint>,
+        endpoints: HashMap<&String, &WebRtcPublishEndpoint>,
         track_id_counter: &mut Counter,
     ) {
         for _ in endpoints {
@@ -278,10 +278,10 @@ impl Peer<New> {
     /// Add all `partner_peer` related [`WebRtcPlayEndpoint`]s to this [`Peer`].
     pub fn add_play_endpoints(
         &mut self,
-        endpoints: Vec<&WebRtcPlayEndpoint>,
+        endpoints: HashMap<&String, &WebRtcPlayEndpoint>,
         partner_peer: &mut Peer<New>,
     ) {
-        for endpoint in endpoints {
+        for (_, endpoint) in endpoints {
             if self.context.partner_member == endpoint.src.member_id {
                 partner_peer
                     .get_senders()

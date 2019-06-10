@@ -334,7 +334,7 @@ impl Room {
         }
 
         // connect senders
-        for play in member.play_endpoints() {
+        for (_, play) in member.play_endpoints() {
             let sender_member_id = &play.src.member_id;
             if already_connected_members.contains(sender_member_id) {
                 continue;
@@ -344,7 +344,12 @@ impl Room {
                 if let Some(sender_member) =
                     self.participants.get_member_by_id(sender_member_id)
                 {
-                    need_create.push((&member, sender_member.clone()));
+                    if sender_member
+                        .publish_endpoints()
+                        .contains_key(&play.src.endpoint_id)
+                    {
+                        need_create.push((&member, sender_member.clone()));
+                    }
                 } else {
                     error!(
                         "Try to get member with ID {} which has active \

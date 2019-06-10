@@ -54,12 +54,14 @@ impl Member {
     }
 
     /// Returns all [`WebRtcPlayEndpoint`]s of this [`Member`].
-    pub fn play_endpoints(&self) -> Vec<&WebRtcPlayEndpoint> {
+    pub fn play_endpoints(&self) -> HashMap<&String, &WebRtcPlayEndpoint> {
         self.spec.play_endpoints()
     }
 
     /// Returns all [`WebRtcPublishEndpoint`]s of this [`Member`].
-    pub fn publish_endpoints(&self) -> Vec<&WebRtcPublishEndpoint> {
+    pub fn publish_endpoints(
+        &self,
+    ) -> HashMap<&String, &WebRtcPublishEndpoint> {
         self.spec.publish_endpoints()
     }
 
@@ -67,6 +69,7 @@ impl Member {
     ///
     /// Returns [`TryFromElementError::NotMember`] when not member finded in
     /// [`RoomSpec`]'s [`Pipeline`].
+    #[allow(clippy::block_in_if_condition_stmt)]
     pub fn receivers(&self) -> Result<Vec<Id>, TryFromElementError> {
         let mut members = HashMap::new();
         for (id, element) in self.room_pipeline.iter() {
@@ -79,7 +82,12 @@ impl Member {
                 if member
                     .play_endpoints()
                     .iter()
-                    .filter(|e| e.src.member_id == self.id)
+                    .filter(|(_, e)| e.src.member_id == self.id)
+                    .filter(|(_, e)| {
+                        self.spec
+                            .publish_endpoints()
+                            .contains_key(&e.src.endpoint_id)
+                    })
                     .count()
                     > 0
                 {
@@ -105,22 +113,24 @@ pub struct MemberSpec {
 
 impl MemberSpec {
     /// Returns all [`WebRtcPlayEndpoint`]s of this [`MemberSpec`].
-    pub fn play_endpoints(&self) -> Vec<&WebRtcPlayEndpoint> {
+    pub fn play_endpoints(&self) -> HashMap<&String, &WebRtcPlayEndpoint> {
         self.pipeline
             .iter()
-            .filter_map(|(_, e)| match e {
-                Element::WebRtcPlayEndpoint { spec } => Some(spec),
+            .filter_map(|(id, e)| match e {
+                Element::WebRtcPlayEndpoint { spec } => Some((id, spec)),
                 _ => None,
             })
             .collect()
     }
 
     /// Returns all [`WebRtcPublishEndpoint`]s of this [`MemberSpec`].
-    pub fn publish_endpoints(&self) -> Vec<&WebRtcPublishEndpoint> {
+    pub fn publish_endpoints(
+        &self,
+    ) -> HashMap<&String, &WebRtcPublishEndpoint> {
         self.pipeline
             .iter()
-            .filter_map(|(_, e)| match e {
-                Element::WebRtcPublishEndpoint { spec } => Some(spec),
+            .filter_map(|(id, e)| match e {
+                Element::WebRtcPublishEndpoint { spec } => Some((id, spec)),
                 _ => None,
             })
             .collect()
