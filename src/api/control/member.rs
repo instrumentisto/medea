@@ -65,6 +65,10 @@ impl Member {
         self.spec.publish_endpoints()
     }
 
+    // TODO: remove this func in favor of extending WebRtcPublishEndpoint with
+    //       list of play endpoints, and play endpoint should have member_id (or maybe
+    //       ref to parent element?)
+
     /// Get all receivers [`Id`] of all [`Member`]'s [`WebRtcPublishEndpoint`]s.
     ///
     /// Returns [`TryFromElementError::NotMember`] when not member finded in

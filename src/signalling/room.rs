@@ -529,7 +529,9 @@ impl Handler<RpcConnectionEstablished> for Room {
             msg.connection,
         );
 
-        // Check that user is not reconnecting
+        // TODO: remove this check, create_peers_with_available_members should
+        //       be idempotent
+        
         if self.peers.get_peers_by_member_id(&msg.member_id).is_empty() {
             self.create_peers_with_available_members(&msg.member_id, ctx);
         }
