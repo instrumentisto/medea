@@ -301,7 +301,9 @@ impl Room {
                 return;
             };
 
-        let mut need_create = Vec::new();
+        println!("Create peers for member {:#?}", member);
+
+//        let mut need_create = Vec::new();
 
         // connect receivers
         //        let (_, receivers) = match member.publish() {
@@ -317,6 +319,24 @@ impl Room {
         //                return;
         //            }
         //        };
+
+        for (id, publish) in member.publish() {
+            for receiver in publish.receivers() {
+                if self.participants.member_has_connection(&receiver.owner_id()) {
+                    let publish_participant = self.participants.get_member_by_id(&receiver.owner_id()).unwrap();
+                    self.create_and_interconnect_peers(&member, &publish_participant, ctx);
+                }
+            }
+        }
+
+        for (id, play) in member.receivers() {
+            if self.participants.member_has_connection(&play.publisher().owner_id()) {
+                let play_participant = self.participants.get_member_by_id(&play.publisher().owner_id()).unwrap();
+                self.create_and_interconnect_peers(&member, &play_participant, ctx);
+            }
+        }
+       /*
+
         let receivers = member.publish();
         let mut already_connected_members = Vec::new();
         for (_, endpoint) in receivers {
@@ -373,6 +393,7 @@ impl Room {
                     ctx,
                 );
             });
+            */
     }
 }
 
