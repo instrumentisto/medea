@@ -322,18 +322,18 @@ impl Room {
         for (_, endpoint) in receivers {
             if self
                 .participants
-                .member_has_connection(&endpoint.owner().id())
+                .member_has_connection(&endpoint.owner_id())
             {
                 if let Some(recv_member) =
-                    self.participants.get_member_by_id(&endpoint.owner().id())
+                    self.participants.get_member_by_id(&endpoint.owner_id())
                 {
-                    already_connected_members.push(endpoint.owner().id());
+                    already_connected_members.push(endpoint.owner_id());
                     need_create.push((&member, recv_member.clone()));
                 } else {
                     error!(
                         "Try to create peer for nonexistent member with ID \
                          {}. Room will be stopped.",
-                        endpoint.owner().id()
+                        endpoint.owner_id()
                     );
                     ctx.notify(CloseRoom {});
                 }
@@ -342,7 +342,7 @@ impl Room {
 
         // connect senders
         for (_, play) in member.receivers() {
-            let sender_member_id = play.owner().id();
+            let sender_member_id = play.owner_id();
             if already_connected_members.contains(&sender_member_id) {
                 continue;
             }

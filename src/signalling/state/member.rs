@@ -36,10 +36,6 @@ impl Participant {
         self.0.lock().unwrap().borrow().id.clone()
     }
 
-    pub fn load(&self, room_spec: &RoomSpec, store: &HashMap<MemberId, Self>) {
-        self.0.lock().unwrap().borrow_mut().load(room_spec, store);
-    }
-
     pub fn get_store(room_spec: &RoomSpec) -> HashMap<MemberId, Self> {
         ParticipantInner::get_store(room_spec)
     }
@@ -54,6 +50,72 @@ impl Participant {
 
     pub fn receivers(&self) -> HashMap<EndpointId, WebRtcPlayEndpoint> {
         self.0.lock().unwrap().borrow().recv.clone()
+    }
+
+    pub fn load(
+        &self,
+        room_spec: &RoomSpec,
+        store: &HashMap<MemberId, Participant>,
+    ) {
+        let spec = MemberSpec::try_from(
+            room_spec.pipeline.pipeline.get(&self.id().0).unwrap(),
+        )
+        .unwrap();
+
+        spec.play_endpoints().iter().for_each(|(name_p, p)| {
+            let sender_participant =
+                store.get(&MemberId(p.src.member_id.to_string())).unwrap();
+
+            let publisher = WebRtcPublishEndpoint::new(
+                P2pMode::Always,
+                Vec::new(),
+                sender_participant.id(),
+            );
+
+            match sender_participant
+                .get_publisher(&EndpointId(p.src.endpoint_id.to_string()))
+            {
+                Some(publisher) => {
+                    let play_endpoint = WebRtcPlayEndpoint::new(
+                        p.src.clone(),
+                        publisher.clone(),
+                        self.id(),
+                    );
+
+                    self.add_receiver(
+                        EndpointId(name_p.to_string()),
+                        play_endpoint.clone(),
+                    );
+
+                    publisher.add_receiver(play_endpoint);
+                }
+                None => {
+                    let send_endpoint = WebRtcPublishEndpoint::new(
+                        P2pMode::Always,
+                        Vec::new(),
+                        sender_participant.id(),
+                    );
+
+                    let play_endpoint = WebRtcPlayEndpoint::new(
+                        p.src.clone(),
+                        send_endpoint.clone(),
+                        self.id(),
+                    );
+
+                    send_endpoint.add_receiver(play_endpoint.clone());
+
+                    sender_participant.add_sender(
+                        EndpointId(p.src.endpoint_id.to_string()),
+                        send_endpoint,
+                    );
+
+                    self.add_receiver(
+                        EndpointId(name_p.to_string()),
+                        play_endpoint,
+                    );
+                }
+            }
+        });
     }
 
     pub fn add_receiver(&self, id: EndpointId, endpoint: WebRtcPlayEndpoint) {
@@ -111,7 +173,7 @@ impl ParticipantInner {
             let publisher = WebRtcPublishEndpoint::new(
                 P2pMode::Always,
                 Vec::new(),
-                sender_participant.clone(),
+                sender_participant.id(),
             );
 
             match sender_participant
@@ -121,7 +183,7 @@ impl ParticipantInner {
                     let play_endpoint = WebRtcPlayEndpoint::new(
                         p.src.clone(),
                         publisher.clone(),
-                        me.clone(),
+                        me.id(),
                     );
 
                     me.add_receiver(
@@ -135,13 +197,13 @@ impl ParticipantInner {
                     let send_endpoint = WebRtcPublishEndpoint::new(
                         P2pMode::Always,
                         Vec::new(),
-                        sender_participant.clone(),
+                        sender_participant.id(),
                     );
 
                     let play_endpoint = WebRtcPlayEndpoint::new(
                         p.src.clone(),
                         send_endpoint.clone(),
-                        me.clone(),
+                        me.id(),
                     );
 
                     send_endpoint.add_receiver(play_endpoint.clone());
@@ -167,7 +229,7 @@ impl ParticipantInner {
         for (id, member) in &members {
             participants.insert(
                 id.clone(),
-                Participant::new(id.clone(), member.credentials().to_string())
+                Participant::new(id.clone(), member.credentials().to_string()),
             );
         }
 
