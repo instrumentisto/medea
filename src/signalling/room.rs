@@ -301,25 +301,6 @@ impl Room {
                 return;
             };
 
-        //         println!("Create peers for member {:#?}", member);
-
-        //        let mut need_create = Vec::new();
-
-        // connect receivers
-        //        let (_, receivers) = match member.publish() {
-        //            Ok(r) => r,
-        //            Err(e) => {
-        //                error!(
-        //                    "Member {} has wrong room pipeline. Room will be
-        // stopped. \                     Here is error: {:?}",
-        //                    member.lock().unwrap().borrow().id(),
-        //                    e
-        //                );
-        //                ctx.notify(CloseRoom {});
-        //                return;
-        //            }
-        //        };
-
         for (id, publish) in member.publish() {
             for receiver in publish.receivers() {
                 if self
@@ -336,7 +317,6 @@ impl Room {
                         &publish_participant,
                         ctx,
                     );
-                    receiver.connected();
                 }
             }
         }
@@ -356,65 +336,8 @@ impl Room {
                     &play_participant,
                     ctx,
                 );
-                play.connected();
             }
         }
-        // let receivers = member.publish();
-        // let mut already_connected_members = Vec::new();
-        // for (_, endpoint) in receivers {
-        // if self
-        // .participants
-        // .member_has_connection(&endpoint.owner_id())
-        // {
-        // if let Some(recv_member) =
-        // self.participants.get_member_by_id(&endpoint.owner_id())
-        // {
-        // already_connected_members.push(endpoint.owner_id());
-        // need_create.push((&member, recv_member.clone()));
-        // } else {
-        // error!(
-        // "Try to create peer for nonexistent member with ID \
-        // {}. Room will be stopped.",
-        // endpoint.owner_id()
-        // );
-        // ctx.notify(CloseRoom {});
-        // }
-        // }
-        // }
-        //
-        // connect senders
-        // for (_, play) in member.receivers() {
-        // let sender_member_id = play.owner_id();
-        // if already_connected_members.contains(&sender_member_id) {
-        // continue;
-        // }
-        //
-        // if self.participants.member_has_connection(&sender_member_id) {
-        // if let Some(sender_member) =
-        // self.participants.get_member_by_id(&sender_member_id)
-        // {
-        // need_create.push((&member, sender_member.clone()));
-        // } else {
-        // error!(
-        // "Try to get member with ID {} which has active \
-        // RpcConnection but not presented in participants! \
-        // Room will be stopped.",
-        // sender_member_id
-        // );
-        // ctx.notify(CloseRoom {});
-        // }
-        // }
-        // }
-        //
-        // need_create
-        // .into_iter()
-        // .for_each(|(first_member, second_member)| {
-        // self.create_and_interconnect_peers(
-        // first_member,
-        // &second_member,
-        // ctx,
-        // );
-        // });
     }
 }
 
