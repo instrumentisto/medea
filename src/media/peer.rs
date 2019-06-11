@@ -258,15 +258,17 @@ impl Peer<New> {
         &mut self,
         partner_peer: &mut Peer<New>,
         tracks_count: &mut Counter,
-        publish_endpoints: HashMap<EndpointId, WebRtcPublishEndpoint>,
+        publish_endpoints: HashMap<EndpointId, Arc<WebRtcPublishEndpoint>>,
     ) {
         let partner_id = self.partner_member_id();
 
+        // TODO: unwrap weak
         publish_endpoints
             .into_iter()
             .flat_map(|(_m, e)| {
                 e.receivers()
                     .into_iter()
+                    .map(|e| e.upgrade().unwrap())
                     .filter(|e| e.owner_id() == partner_id && !e.is_connected())
             })
             .for_each(|e| {

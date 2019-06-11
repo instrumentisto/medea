@@ -1,5 +1,5 @@
 use std::convert::TryFrom;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, Weak};
 
 use crate::api::control::{MemberId, MemberSpec, RoomSpec};
 use hashbrown::HashMap;
@@ -15,10 +15,8 @@ pub struct Participant(Arc<Mutex<RefCell<ParticipantInner>>>);
 #[derive(Debug)]
 pub struct ParticipantInner {
     id: MemberId,
-    // TODO (evdokimovs): there is memory leak because Arc.
-    send: HashMap<EndpointId, WebRtcPublishEndpoint>,
-    // TODO (evdokimovs): there is memory leak because Arc.
-    recv: HashMap<EndpointId, WebRtcPlayEndpoint>,
+    send: HashMap<EndpointId, Arc<WebRtcPublishEndpoint>>,
+    recv: HashMap<EndpointId, Arc<WebRtcPlayEndpoint>>,
     credentials: String,
 }
 
@@ -44,11 +42,11 @@ impl Participant {
         self.0.lock().unwrap().borrow().credentials.clone()
     }
 
-    pub fn publish(&self) -> HashMap<EndpointId, WebRtcPublishEndpoint> {
+    pub fn publish(&self) -> HashMap<EndpointId, Arc<WebRtcPublishEndpoint>> {
         self.0.lock().unwrap().borrow().send.clone()
     }
 
-    pub fn receivers(&self) -> HashMap<EndpointId, WebRtcPlayEndpoint> {
+    pub fn receivers(&self) -> HashMap<EndpointId, Arc<WebRtcPlayEndpoint>> {
         self.0.lock().unwrap().borrow().recv.clone()
     }
 
@@ -76,33 +74,33 @@ impl Participant {
                 .get_publisher(&EndpointId(p.src.endpoint_id.to_string()))
             {
                 Some(publisher) => {
-                    let play_endpoint = WebRtcPlayEndpoint::new(
+                    let play_endpoint = Arc::new(WebRtcPlayEndpoint::new(
                         p.src.clone(),
-                        publisher.clone(),
+                        Arc::downgrade(&publisher),
                         self.id(),
-                    );
+                    ));
 
                     self.add_receiver(
                         EndpointId(name_p.to_string()),
-                        play_endpoint.clone(),
+                        Arc::clone(&play_endpoint),
                     );
 
-                    publisher.add_receiver(play_endpoint);
+                    publisher.add_receiver(Arc::downgrade(&play_endpoint));
                 }
                 None => {
-                    let send_endpoint = WebRtcPublishEndpoint::new(
+                    let send_endpoint = Arc::new(WebRtcPublishEndpoint::new(
                         P2pMode::Always,
                         Vec::new(),
                         sender_participant.id(),
-                    );
+                    ));
 
-                    let play_endpoint = WebRtcPlayEndpoint::new(
+                    let play_endpoint = Arc::new(WebRtcPlayEndpoint::new(
                         p.src.clone(),
-                        send_endpoint.clone(),
+                        Arc::downgrade(&send_endpoint),
                         self.id(),
-                    );
+                    ));
 
-                    send_endpoint.add_receiver(play_endpoint.clone());
+                    send_endpoint.add_receiver(Arc::downgrade(&play_endpoint));
 
                     sender_participant.add_sender(
                         EndpointId(p.src.endpoint_id.to_string()),
@@ -118,7 +116,11 @@ impl Participant {
         });
     }
 
-    pub fn add_receiver(&self, id: EndpointId, endpoint: WebRtcPlayEndpoint) {
+    pub fn add_receiver(
+        &self,
+        id: EndpointId,
+        endpoint: Arc<WebRtcPlayEndpoint>,
+    ) {
         self.0
             .lock()
             .unwrap()
@@ -127,7 +129,11 @@ impl Participant {
             .insert(id, endpoint);
     }
 
-    pub fn add_sender(&self, id: EndpointId, endpoint: WebRtcPublishEndpoint) {
+    pub fn add_sender(
+        &self,
+        id: EndpointId,
+        endpoint: Arc<WebRtcPublishEndpoint>,
+    ) {
         self.0
             .lock()
             .unwrap()
@@ -139,7 +145,7 @@ impl Participant {
     pub fn get_publisher(
         &self,
         id: &EndpointId,
-    ) -> Option<WebRtcPublishEndpoint> {
+    ) -> Option<Arc<WebRtcPublishEndpoint>> {
         self.0.lock().unwrap().borrow().send.get(id).cloned()
     }
 }
@@ -180,33 +186,33 @@ impl ParticipantInner {
                 .get_publisher(&EndpointId(p.src.endpoint_id.to_string()))
             {
                 Some(publisher) => {
-                    let play_endpoint = WebRtcPlayEndpoint::new(
+                    let play_endpoint = Arc::new(WebRtcPlayEndpoint::new(
                         p.src.clone(),
-                        publisher.clone(),
+                        Arc::downgrade(&publisher),
                         me.id(),
-                    );
+                    ));
 
                     me.add_receiver(
                         EndpointId(name_p.to_string()),
-                        play_endpoint.clone(),
+                        Arc::clone(&play_endpoint),
                     );
 
-                    publisher.add_receiver(play_endpoint);
+                    publisher.add_receiver(Arc::downgrade(&play_endpoint));
                 }
                 None => {
-                    let send_endpoint = WebRtcPublishEndpoint::new(
+                    let send_endpoint = Arc::new(WebRtcPublishEndpoint::new(
                         P2pMode::Always,
                         Vec::new(),
                         sender_participant.id(),
-                    );
+                    ));
 
-                    let play_endpoint = WebRtcPlayEndpoint::new(
+                    let play_endpoint = Arc::new(WebRtcPlayEndpoint::new(
                         p.src.clone(),
-                        send_endpoint.clone(),
+                        Arc::downgrade(&send_endpoint),
                         me.id(),
-                    );
+                    ));
 
-                    send_endpoint.add_receiver(play_endpoint.clone());
+                    send_endpoint.add_receiver(Arc::downgrade(&play_endpoint));
 
                     sender_participant.add_sender(
                         EndpointId(p.src.endpoint_id.to_string()),

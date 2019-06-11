@@ -304,6 +304,7 @@ impl Room {
         // Create all connected publish endpoints.
         for (id, publish) in member.publish() {
             for receiver in publish.receivers() {
+                let receiver = receiver.upgrade().unwrap(); // TODO: unwrap
                 if self
                     .participants
                     .member_has_connection(&receiver.owner_id())
@@ -323,15 +324,17 @@ impl Room {
         }
 
         // Create all connected play endpoint.
+        // TODO: properly unwrap Weak
         for (id, play) in member.receivers() {
-            if self
-                .participants
-                .member_has_connection(&play.publisher().owner_id())
-                && !play.is_connected()
+            if self.participants.member_has_connection(
+                &play.publisher().upgrade().unwrap().owner_id(),
+            ) && !play.is_connected()
             {
                 let play_participant = self
                     .participants
-                    .get_member_by_id(&play.publisher().owner_id())
+                    .get_member_by_id(
+                        &play.publisher().upgrade().unwrap().owner_id(),
+                    )
                     .unwrap();
                 self.create_and_interconnect_peers(
                     &member,

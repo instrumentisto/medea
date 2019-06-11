@@ -1,7 +1,7 @@
 use super::member::Participant;
 use crate::api::control::{endpoint::SrcUri, MemberId};
 use std::cell::RefCell;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, Weak};
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Id(pub String);
@@ -9,7 +9,7 @@ pub struct Id(pub String);
 #[derive(Debug, Clone)]
 pub struct WebRtcPlayEndpointInner {
     pub src: SrcUri,
-    pub publisher: WebRtcPublishEndpoint,
+    pub publisher: Weak<WebRtcPublishEndpoint>,
     pub owner_id: MemberId,
     pub is_connected: bool,
 }
@@ -23,7 +23,7 @@ impl WebRtcPlayEndpointInner {
         self.owner_id.clone()
     }
 
-    pub fn publisher(&self) -> WebRtcPublishEndpoint {
+    pub fn publisher(&self) -> Weak<WebRtcPublishEndpoint> {
         self.publisher.clone()
     }
 
@@ -36,23 +36,21 @@ impl WebRtcPlayEndpointInner {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct WebRtcPlayEndpoint(Arc<Mutex<RefCell<WebRtcPlayEndpointInner>>>);
+#[derive(Debug)]
+pub struct WebRtcPlayEndpoint(Mutex<RefCell<WebRtcPlayEndpointInner>>);
 
 impl WebRtcPlayEndpoint {
     pub fn new(
         src: SrcUri,
-        publisher: WebRtcPublishEndpoint,
+        publisher: Weak<WebRtcPublishEndpoint>,
         owner_id: MemberId,
     ) -> Self {
-        Self(Arc::new(Mutex::new(RefCell::new(
-            WebRtcPlayEndpointInner {
-                src,
-                publisher,
-                owner_id,
-                is_connected: false,
-            },
-        ))))
+        Self(Mutex::new(RefCell::new(WebRtcPlayEndpointInner {
+            src,
+            publisher,
+            owner_id,
+            is_connected: false,
+        })))
     }
 
     pub fn src(&self) -> SrcUri {
@@ -63,7 +61,7 @@ impl WebRtcPlayEndpoint {
         self.0.lock().unwrap().borrow().owner_id()
     }
 
-    pub fn publisher(&self) -> WebRtcPublishEndpoint {
+    pub fn publisher(&self) -> Weak<WebRtcPublishEndpoint> {
         self.0.lock().unwrap().borrow().publisher()
     }
 
@@ -84,16 +82,16 @@ pub enum P2pMode {
 #[derive(Debug, Clone)]
 pub struct WebRtcPublishEndpointInner {
     pub p2p: P2pMode,
-    pub receivers: Vec<WebRtcPlayEndpoint>,
+    pub receivers: Vec<Weak<WebRtcPlayEndpoint>>,
     pub owner_id: MemberId,
 }
 
 impl WebRtcPublishEndpointInner {
-    pub fn add_receiver(&mut self, receiver: WebRtcPlayEndpoint) {
+    pub fn add_receiver(&mut self, receiver: Weak<WebRtcPlayEndpoint>) {
         self.receivers.push(receiver);
     }
 
-    pub fn receivers(&self) -> Vec<WebRtcPlayEndpoint> {
+    pub fn receivers(&self) -> Vec<Weak<WebRtcPlayEndpoint>> {
         self.receivers.clone()
     }
 
@@ -102,31 +100,27 @@ impl WebRtcPublishEndpointInner {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct WebRtcPublishEndpoint(
-    Arc<Mutex<RefCell<WebRtcPublishEndpointInner>>>,
-);
+#[derive(Debug)]
+pub struct WebRtcPublishEndpoint(Mutex<RefCell<WebRtcPublishEndpointInner>>);
 
 impl WebRtcPublishEndpoint {
     pub fn new(
         p2p: P2pMode,
-        receivers: Vec<WebRtcPlayEndpoint>,
+        receivers: Vec<Weak<WebRtcPlayEndpoint>>,
         owner_id: MemberId,
     ) -> Self {
-        Self(Arc::new(Mutex::new(RefCell::new(
-            WebRtcPublishEndpointInner {
-                p2p,
-                receivers,
-                owner_id,
-            },
-        ))))
+        Self(Mutex::new(RefCell::new(WebRtcPublishEndpointInner {
+            p2p,
+            receivers,
+            owner_id,
+        })))
     }
 
-    pub fn add_receiver(&self, receiver: WebRtcPlayEndpoint) {
+    pub fn add_receiver(&self, receiver: Weak<WebRtcPlayEndpoint>) {
         self.0.lock().unwrap().borrow_mut().add_receiver(receiver)
     }
 
-    pub fn receivers(&self) -> Vec<WebRtcPlayEndpoint> {
+    pub fn receivers(&self) -> Vec<Weak<WebRtcPlayEndpoint>> {
         self.0.lock().unwrap().borrow().receivers()
     }
 
