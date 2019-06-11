@@ -23,7 +23,7 @@ pub enum ParticipantsLoadError {
 }
 
 impl From<TryFromElementError> for ParticipantsLoadError {
-    fn from(err: TryFromElementError) -> ParticipantsLoadError {
+    fn from(err: TryFromElementError) -> Self {
         ParticipantsLoadError::TryFromError(err)
     }
 }
@@ -74,97 +74,94 @@ impl Participant {
     pub fn load(
         &self,
         room_spec: &RoomSpec,
-        store: &HashMap<MemberId, Arc<Participant>>,
+        store: &HashMap<MemberId, Arc<Self>>,
     ) -> Result<(), ParticipantsLoadError> {
         let spec = MemberSpec::try_from(
-            room_spec
-                .pipeline
-                .pipeline
-                .get(&self.id().0)
-                .map(|e| Ok(e))
-                .unwrap_or(Err(ParticipantsLoadError::MemberNotFound(
-                    self.id(),
-                )))?,
+            room_spec.pipeline.pipeline.get(&self.id().0).map_or(
+                Err(ParticipantsLoadError::MemberNotFound(self.id())),
+                Ok,
+            )?,
         )?;
 
-        let me = store
-            .get(&self.id())
-            .map(|p| Ok(p))
-            .unwrap_or(Err(ParticipantsLoadError::MemberNotFound(self.id())))?;
+        let me = store.get(&self.id()).map_or(
+            Err(ParticipantsLoadError::MemberNotFound(self.id())),
+            Ok,
+        )?;
 
         for (name_p, p) in spec.play_endpoints() {
             let sender_id = MemberId(p.src.member_id.to_string());
-            let sender_participant =
-                store.get(&sender_id).map(|p| Ok(p)).unwrap_or(Err(
-                    ParticipantsLoadError::MemberNotFound(sender_id),
-                ))?;
+            let sender_participant = store.get(&sender_id).map_or(
+                Err(ParticipantsLoadError::MemberNotFound(sender_id)),
+                Ok,
+            )?;
             let publisher_spec = MemberSpec::try_from(
                 room_spec
                     .pipeline
                     .pipeline
                     .get(&p.src.member_id.to_string())
-                    .map(|e| Ok(e))
-                    .unwrap_or(Err(ParticipantsLoadError::MemberNotFound(
-                        p.src.member_id.clone(),
-                    )))?,
+                    .map_or(
+                        Err(ParticipantsLoadError::MemberNotFound(
+                            p.src.member_id.clone(),
+                        )),
+                        Ok,
+                    )?,
             )?;
 
             let publisher_endpoint = *publisher_spec
                 .publish_endpoints()
                 .get(&p.src.endpoint_id)
-                .map(|e| Ok(e))
-                .unwrap_or(Err(ParticipantsLoadError::EndpointNotFound(
-                    p.src.endpoint_id.clone(),
-                )))?;
+                .map_or(
+                    Err(ParticipantsLoadError::EndpointNotFound(
+                        p.src.endpoint_id.clone(),
+                    )),
+                    Ok,
+                )?;
 
-            match sender_participant
+            if let Some(publisher) = sender_participant
                 .get_publisher(&EndpointId(p.src.endpoint_id.to_string()))
             {
-                Some(publisher) => {
-                    let play_endpoint = Arc::new(WebRtcPlayEndpoint::new(
-                        p.src.clone(),
-                        Arc::downgrade(&publisher),
-                        Arc::downgrade(&me),
-                    ));
+                let play_endpoint = Arc::new(WebRtcPlayEndpoint::new(
+                    p.src.clone(),
+                    Arc::downgrade(&publisher),
+                    Arc::downgrade(&me),
+                ));
 
-                    self.add_receiver(
-                        EndpointId(name_p.to_string()),
-                        Arc::clone(&play_endpoint),
-                    );
+                self.add_receiver(
+                    EndpointId(name_p.to_string()),
+                    Arc::clone(&play_endpoint),
+                );
 
-                    publisher.add_receiver(Arc::downgrade(&play_endpoint));
-                }
-                None => {
-                    let send_endpoint = Arc::new(WebRtcPublishEndpoint::new(
-                        publisher_endpoint.p2p.clone(),
-                        Vec::new(),
-                        Arc::downgrade(&sender_participant),
-                    ));
+                publisher.add_receiver(Arc::downgrade(&play_endpoint));
+            } else {
+                let send_endpoint = Arc::new(WebRtcPublishEndpoint::new(
+                    publisher_endpoint.p2p.clone(),
+                    Vec::new(),
+                    Arc::downgrade(&sender_participant),
+                ));
 
-                    let play_endpoint = Arc::new(WebRtcPlayEndpoint::new(
-                        p.src.clone(),
-                        Arc::downgrade(&send_endpoint),
-                        Arc::downgrade(&me),
-                    ));
+                let play_endpoint = Arc::new(WebRtcPlayEndpoint::new(
+                    p.src.clone(),
+                    Arc::downgrade(&send_endpoint),
+                    Arc::downgrade(&me),
+                ));
 
-                    send_endpoint.add_receiver(Arc::downgrade(&play_endpoint));
+                send_endpoint.add_receiver(Arc::downgrade(&play_endpoint));
 
-                    sender_participant.add_sender(
-                        EndpointId(p.src.endpoint_id.to_string()),
-                        send_endpoint,
-                    );
+                sender_participant.add_sender(
+                    EndpointId(p.src.endpoint_id.to_string()),
+                    send_endpoint,
+                );
 
-                    self.add_receiver(
-                        EndpointId(name_p.to_string()),
-                        play_endpoint,
-                    );
-                }
+                self.add_receiver(
+                    EndpointId(name_p.to_string()),
+                    play_endpoint,
+                );
             }
         }
 
         spec.publish_endpoints().into_iter().for_each(|(name, e)| {
             let endpoint_id = EndpointId(name.clone());
-            if let None = self.publish().get(&endpoint_id) {
+            if self.publish().get(&endpoint_id).is_none() {
                 self.add_sender(
                     endpoint_id,
                     Arc::new(WebRtcPublishEndpoint::new(

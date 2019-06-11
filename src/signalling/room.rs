@@ -26,7 +26,8 @@ use crate::{
         WaitLocalHaveRemote, WaitLocalSdp, WaitRemoteSdp,
     },
     signalling::{
-        participants::ParticipantService, peers::PeerRepository,
+        participants::ParticipantService,
+        peers::PeerRepository,
         state::member::{Participant, ParticipantsLoadError},
     },
 };
