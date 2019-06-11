@@ -311,13 +311,9 @@ impl Room {
                     .member_has_connection(&receiver_owner.id())
                     && !receiver.is_connected()
                 {
-                    let publish_participant = self
-                        .participants
-                        .get_member_by_id(&receiver_owner.id())
-                        .unwrap();
                     self.create_and_interconnect_peers(
                         &member,
-                        &publish_participant,
+                        &receiver_owner,
                         ctx,
                     );
                 }
@@ -327,16 +323,18 @@ impl Room {
         // Create all connected play endpoint.
         // TODO: properly unwrap Weak
         for (id, play) in member.receivers() {
-            if self.participants.member_has_connection(
-                &play.publisher().upgrade().unwrap().owner_id(),
-            ) && !play.is_connected()
+            let play_participant = play
+                .publisher()
+                .upgrade()
+                .unwrap()
+                .owner()
+                .upgrade()
+                .unwrap();
+            if self
+                .participants
+                .member_has_connection(&play_participant.id())
+                && !play.is_connected()
             {
-                let play_participant = self
-                    .participants
-                    .get_member_by_id(
-                        &play.publisher().upgrade().unwrap().owner_id(),
-                    )
-                    .unwrap();
                 self.create_and_interconnect_peers(
                     &member,
                     &play_participant,

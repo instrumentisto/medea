@@ -83,7 +83,7 @@ pub enum P2pMode {
 pub struct WebRtcPublishEndpointInner {
     pub p2p: P2pMode,
     pub receivers: Vec<Weak<WebRtcPlayEndpoint>>,
-    pub owner_id: MemberId,
+    pub owner: Weak<Participant>,
 }
 
 impl WebRtcPublishEndpointInner {
@@ -95,8 +95,8 @@ impl WebRtcPublishEndpointInner {
         self.receivers.clone()
     }
 
-    pub fn owner_id(&self) -> MemberId {
-        self.owner_id.clone()
+    pub fn owner(&self) -> Weak<Participant> {
+        Weak::clone(&self.owner)
     }
 }
 
@@ -107,12 +107,12 @@ impl WebRtcPublishEndpoint {
     pub fn new(
         p2p: P2pMode,
         receivers: Vec<Weak<WebRtcPlayEndpoint>>,
-        owner_id: MemberId,
+        owner: Weak<Participant>,
     ) -> Self {
         Self(Mutex::new(RefCell::new(WebRtcPublishEndpointInner {
             p2p,
             receivers,
-            owner_id,
+            owner,
         })))
     }
 
@@ -124,7 +124,7 @@ impl WebRtcPublishEndpoint {
         self.0.lock().unwrap().borrow().receivers()
     }
 
-    pub fn owner_id(&self) -> MemberId {
-        self.0.lock().unwrap().borrow().owner_id()
+    pub fn owner(&self) -> Weak<Participant> {
+        self.0.lock().unwrap().borrow().owner()
     }
 }

@@ -69,7 +69,7 @@ impl Participant {
             let publisher = WebRtcPublishEndpoint::new(
                 P2pMode::Always,
                 Vec::new(),
-                sender_participant.id(),
+                Arc::downgrade(&sender_participant),
             );
 
             match sender_participant
@@ -93,7 +93,7 @@ impl Participant {
                     let send_endpoint = Arc::new(WebRtcPublishEndpoint::new(
                         P2pMode::Always,
                         Vec::new(),
-                        sender_participant.id(),
+                        Arc::downgrade(&sender_participant),
                     ));
 
                     let play_endpoint = Arc::new(WebRtcPlayEndpoint::new(
@@ -181,7 +181,7 @@ impl ParticipantInner {
             let publisher = WebRtcPublishEndpoint::new(
                 P2pMode::Always,
                 Vec::new(),
-                sender_participant.id(),
+                Arc::downgrade(&sender_participant),
             );
 
             match sender_participant
@@ -205,7 +205,7 @@ impl ParticipantInner {
                     let send_endpoint = Arc::new(WebRtcPublishEndpoint::new(
                         P2pMode::Always,
                         Vec::new(),
-                        sender_participant.id(),
+                        Arc::downgrade(&sender_participant),
                     ));
 
                     let play_endpoint = Arc::new(WebRtcPlayEndpoint::new(
