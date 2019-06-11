@@ -27,7 +27,7 @@ use crate::{
     },
     signalling::{
         participants::ParticipantService, peers::PeerRepository,
-        state::member::Participant,
+        state::member::{Participant, ParticipantsLoadError},
     },
 };
 
@@ -59,6 +59,15 @@ impl From<TryFromElementError> for RoomError {
     fn from(err: TryFromElementError) -> Self {
         RoomError::BadRoomSpec(format!(
             "Element located in wrong place. {}",
+            err
+        ))
+    }
+}
+
+impl From<ParticipantsLoadError> for RoomError {
+    fn from(err: ParticipantsLoadError) -> Self {
+        RoomError::BadRoomSpec(format!(
+            "Error while loading room spec. {}",
             err
         ))
     }

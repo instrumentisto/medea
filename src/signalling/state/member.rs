@@ -1,13 +1,32 @@
 use std::convert::TryFrom;
 use std::sync::{Arc, Mutex};
 
-use crate::api::control::{MemberId, MemberSpec, RoomSpec};
+use crate::api::control::{
+    MemberId, MemberSpec, RoomSpec, TryFromElementError,
+};
+use failure::Fail;
 use hashbrown::HashMap;
 use std::cell::RefCell;
 
 use super::endpoint::{
     Id as EndpointId, WebRtcPlayEndpoint, WebRtcPublishEndpoint,
 };
+
+#[derive(Debug, Fail)]
+pub enum ParticipantsLoadError {
+    #[fail(display = "TryFromElementError: {}", _0)]
+    TryFromError(TryFromElementError),
+    #[fail(display = "Member with id '{}' not found.", _0)]
+    MemberNotFound(MemberId),
+    #[fail(display = "Endpoint with id '{}' not found.", _0)]
+    EndpointNotFound(String),
+}
+
+impl From<TryFromElementError> for ParticipantsLoadError {
+    fn from(err: TryFromElementError) -> ParticipantsLoadError {
+        ParticipantsLoadError::TryFromError(err)
+    }
+}
 
 #[derive(Debug)]
 pub struct Participant(Mutex<RefCell<ParticipantInner>>);
@@ -34,7 +53,9 @@ impl Participant {
         self.0.lock().unwrap().borrow().id.clone()
     }
 
-    pub fn get_store(room_spec: &RoomSpec) -> HashMap<MemberId, Arc<Self>> {
+    pub fn get_store(
+        room_spec: &RoomSpec,
+    ) -> Result<HashMap<MemberId, Arc<Self>>, ParticipantsLoadError> {
         ParticipantInner::get_store(room_spec)
     }
 
@@ -54,30 +75,47 @@ impl Participant {
         &self,
         room_spec: &RoomSpec,
         store: &HashMap<MemberId, Arc<Participant>>,
-    ) {
+    ) -> Result<(), ParticipantsLoadError> {
         let spec = MemberSpec::try_from(
-            room_spec.pipeline.pipeline.get(&self.id().0).unwrap(),
-        )
-        .unwrap();
+            room_spec
+                .pipeline
+                .pipeline
+                .get(&self.id().0)
+                .map(|e| Ok(e))
+                .unwrap_or(Err(ParticipantsLoadError::MemberNotFound(
+                    self.id(),
+                )))?,
+        )?;
 
-        let me = store.get(&self.id()).unwrap().clone();
+        let me = store
+            .get(&self.id())
+            .map(|p| Ok(p))
+            .unwrap_or(Err(ParticipantsLoadError::MemberNotFound(self.id())))?;
 
-        spec.play_endpoints().iter().for_each(|(name_p, p)| {
+        for (name_p, p) in spec.play_endpoints() {
+            let sender_id = MemberId(p.src.member_id.to_string());
             let sender_participant =
-                store.get(&MemberId(p.src.member_id.to_string())).unwrap();
+                store.get(&sender_id).map(|p| Ok(p)).unwrap_or(Err(
+                    ParticipantsLoadError::MemberNotFound(sender_id),
+                ))?;
             let publisher_spec = MemberSpec::try_from(
                 room_spec
                     .pipeline
                     .pipeline
                     .get(&p.src.member_id.to_string())
-                    .unwrap(),
-            )
-                .unwrap();
+                    .map(|e| Ok(e))
+                    .unwrap_or(Err(ParticipantsLoadError::MemberNotFound(
+                        p.src.member_id.clone(),
+                    )))?,
+            )?;
 
             let publisher_endpoint = *publisher_spec
                 .publish_endpoints()
                 .get(&p.src.endpoint_id)
-                .unwrap();
+                .map(|e| Ok(e))
+                .unwrap_or(Err(ParticipantsLoadError::EndpointNotFound(
+                    p.src.endpoint_id.clone(),
+                )))?;
 
             match sender_participant
                 .get_publisher(&EndpointId(p.src.endpoint_id.to_string()))
@@ -122,7 +160,7 @@ impl Participant {
                     );
                 }
             }
-        });
+        }
 
         spec.publish_endpoints().into_iter().for_each(|(name, e)| {
             let endpoint_id = EndpointId(name.clone());
@@ -136,7 +174,9 @@ impl Participant {
                     )),
                 );
             }
-        })
+        });
+
+        Ok(())
     }
 
     pub fn add_receiver(
@@ -185,8 +225,9 @@ impl ParticipantInner {
 
     pub fn get_store(
         room_spec: &RoomSpec,
-    ) -> HashMap<MemberId, Arc<Participant>> {
-        let members = room_spec.members().unwrap();
+    ) -> Result<HashMap<MemberId, Arc<Participant>>, ParticipantsLoadError>
+    {
+        let members = room_spec.members()?;
         let mut participants = HashMap::new();
 
         for (id, member) in &members {
@@ -200,12 +241,12 @@ impl ParticipantInner {
         }
 
         for (_, participant) in &participants {
-            participant.load(room_spec, &participants);
+            participant.load(room_spec, &participants)?;
         }
 
         //        println!("\n\n\n\n{:#?}\n\n\n\n", participants);
 
-        participants
+        Ok(participants)
     }
 }
 

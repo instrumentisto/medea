@@ -19,10 +19,14 @@ use crate::{
             AuthorizationError, ClosedReason, EventMessage, RpcConnection,
             RpcConnectionClosed,
         },
-        control::{MemberId, RoomSpec, TryFromElementError},
+        control::{MemberId, RoomSpec},
     },
     log::prelude::*,
-    signalling::{room::RoomError, state::member::Participant, Room},
+    signalling::{
+        room::RoomError,
+        state::member::{Participant, ParticipantsLoadError},
+        Room,
+    },
 };
 
 /// Participant is [`Member`] with [`RpcConnection`]. [`ParticipantService`]
@@ -53,8 +57,9 @@ impl ParticipantService {
     pub fn new(
         room_spec: &RoomSpec,
         reconnect_timeout: Duration,
-    ) -> Result<Self, TryFromElementError> {
-        let members = Participant::get_store(room_spec);
+    ) -> Result<Self, ParticipantsLoadError> {
+        let members = Participant::get_store(room_spec)?;
+
         // TODO: more informative msg
         debug!(
             "Created room with {:?} members.",
