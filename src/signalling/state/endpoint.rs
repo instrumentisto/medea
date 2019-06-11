@@ -1,5 +1,8 @@
 use super::member::Participant;
-use crate::api::control::{endpoint::SrcUri, MemberId};
+use crate::api::control::{
+    endpoint::{P2pMode, SrcUri},
+    MemberId,
+};
 use std::cell::RefCell;
 use std::sync::{Arc, Mutex, Weak};
 
@@ -72,11 +75,6 @@ impl WebRtcPlayEndpoint {
     pub fn connected(&self) {
         self.0.lock().unwrap().borrow_mut().set_is_connected(true);
     }
-}
-
-#[derive(Debug, Clone)]
-pub enum P2pMode {
-    Always,
 }
 
 #[derive(Debug, Clone)]

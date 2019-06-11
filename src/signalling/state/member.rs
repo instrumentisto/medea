@@ -1,12 +1,12 @@
 use std::convert::TryFrom;
 use std::sync::{Arc, Mutex, Weak};
 
-use crate::api::control::{MemberId, MemberSpec, RoomSpec};
+use crate::api::control::{endpoint::P2pMode, MemberId, MemberSpec, RoomSpec};
 use hashbrown::HashMap;
 use std::cell::RefCell;
 
 use super::endpoint::{
-    Id as EndpointId, P2pMode, WebRtcPlayEndpoint, WebRtcPublishEndpoint,
+    Id as EndpointId, WebRtcPlayEndpoint, WebRtcPublishEndpoint,
 };
 
 #[derive(Debug)]
@@ -175,11 +175,23 @@ impl ParticipantInner {
         let me = store.get(&self.id).unwrap();
 
         spec.play_endpoints().iter().for_each(|(name_p, p)| {
-            let sender_participant =
-                store.get(&MemberId(p.src.member_id.to_string())).unwrap();
+            let sender_participant = store.get(&p.src.member_id).unwrap();
+            let publisher_spec = MemberSpec::try_from(
+                room_spec
+                    .pipeline
+                    .pipeline
+                    .get(&p.src.member_id.to_string())
+                    .unwrap(),
+            )
+            .unwrap();
+
+            let publisher_endpoint = *publisher_spec
+                .publish_endpoints()
+                .get(&p.src.endpoint_id)
+                .unwrap();
 
             let publisher = WebRtcPublishEndpoint::new(
-                P2pMode::Always,
+                publisher_endpoint.p2p.clone(),
                 Vec::new(),
                 Arc::downgrade(&sender_participant),
             );
