@@ -10,12 +10,14 @@ use hashbrown::HashMap;
 
 use crate::{
     api::control::MemberId,
-    media::{Peer, PeerId, PeerStateMachine},
+    media::{MediaTrack, Peer, PeerId, PeerStateMachine},
     signalling::{
         room::{PeersRemoved, Room, RoomError},
         state::member::Participant,
     },
 };
+use medea_client_api_proto::{AudioSettings, MediaType, VideoSettings};
+use std::sync::Arc;
 
 #[derive(Debug)]
 pub struct PeerRepository {
@@ -51,6 +53,8 @@ impl fmt::Display for Counter {
     }
 }
 
+use crate::log::prelude::*;
+
 impl PeerRepository {
     /// Store [`Peer`] in [`Room`].
     pub fn add_peer<S: Into<PeerStateMachine>>(&mut self, id: PeerId, peer: S) {
@@ -75,6 +79,11 @@ impl PeerRepository {
         first_member: &Participant,
         second_member: &Participant,
     ) -> (u64, u64) {
+        debug!(
+            "Created peer between {} and {}.",
+            first_member.id(),
+            second_member.id()
+        );
         let first_peer_id = self.peers_count.next_id();
         let second_peer_id = self.peers_count.next_id();
 
@@ -91,19 +100,59 @@ impl PeerRepository {
             first_member.id().clone(),
         );
 
-        first_peer.add_publish_endpoints(
-            first_member.publish(),
-            &mut self.tracks_count,
-        );
-        second_peer.add_publish_endpoints(
-            second_member.publish(),
-            &mut self.tracks_count,
-        );
+        first_member
+            .publish()
+            .into_iter()
+            .flat_map(|(_m, e)| {
+                e.receivers().into_iter().filter(|e| {
+                    e.owner_id() == second_member.id() && !e.is_connected()
+                })
+            })
+            .for_each(|e| {
+                let track_audio = Arc::new(MediaTrack::new(
+                    self.tracks_count.next_id(),
+                    MediaType::Audio(AudioSettings {}),
+                ));
+                let track_video = Arc::new(MediaTrack::new(
+                    self.tracks_count.next_id(),
+                    MediaType::Video(VideoSettings {}),
+                ));
 
-        first_peer
-            .add_play_endpoints(first_member.receivers(), &mut second_peer);
-        second_peer
-            .add_play_endpoints(second_member.receivers(), &mut first_peer);
+                first_peer.add_sender(track_video.clone());
+                first_peer.add_sender(track_audio.clone());
+
+                second_peer.add_receiver(track_video);
+                second_peer.add_receiver(track_audio);
+
+                e.connected();
+            });
+
+        second_member
+            .publish()
+            .into_iter()
+            .flat_map(|(_m, e)| {
+                e.receivers().into_iter().filter(|e| {
+                    e.owner_id() == first_member.id() && !e.is_connected()
+                })
+            })
+            .for_each(|e| {
+                let track_audio = Arc::new(MediaTrack::new(
+                    self.tracks_count.next_id(),
+                    MediaType::Audio(AudioSettings {}),
+                ));
+                let track_video = Arc::new(MediaTrack::new(
+                    self.tracks_count.next_id(),
+                    MediaType::Video(VideoSettings {}),
+                ));
+
+                second_peer.add_sender(track_video.clone());
+                second_peer.add_sender(track_audio.clone());
+
+                first_peer.add_receiver(track_video);
+                first_peer.add_receiver(track_audio);
+
+                e.connected();
+            });
 
         self.add_peer(first_peer_id, first_peer);
         self.add_peer(second_peer_id, second_peer);

@@ -11,6 +11,7 @@ pub struct WebRtcPlayEndpointInner {
     pub src: SrcUri,
     pub publisher: WebRtcPublishEndpoint,
     pub owner_id: MemberId,
+    pub is_connected: bool,
 }
 
 impl WebRtcPlayEndpointInner {
@@ -24,6 +25,14 @@ impl WebRtcPlayEndpointInner {
 
     pub fn publisher(&self) -> WebRtcPublishEndpoint {
         self.publisher.clone()
+    }
+
+    pub fn is_connected(&self) -> bool {
+        self.is_connected
+    }
+
+    pub fn set_is_connected(&mut self, value: bool) {
+        self.is_connected = value;
     }
 }
 
@@ -41,6 +50,7 @@ impl WebRtcPlayEndpoint {
                 src,
                 publisher,
                 owner_id,
+                is_connected: false,
             },
         ))))
     }
@@ -55,6 +65,14 @@ impl WebRtcPlayEndpoint {
 
     pub fn publisher(&self) -> WebRtcPublishEndpoint {
         self.0.lock().unwrap().borrow().publisher()
+    }
+
+    pub fn is_connected(&self) -> bool {
+        self.0.lock().unwrap().borrow().is_connected()
+    }
+
+    pub fn connected(&self) {
+        self.0.lock().unwrap().borrow_mut().set_is_connected(true);
     }
 }
 
