@@ -1,7 +1,11 @@
-use super::member::Participant;
+use std::{
+    cell::RefCell,
+    sync::{Mutex, Weak},
+};
+
 use crate::api::control::endpoint::{P2pMode, SrcUri};
-use std::cell::RefCell;
-use std::sync::{Mutex, Weak};
+
+use super::participant::Participant;
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Id(pub String);
@@ -15,23 +19,23 @@ struct WebRtcPlayEndpointInner {
 }
 
 impl WebRtcPlayEndpointInner {
-    pub fn src(&self) -> SrcUri {
+    fn src(&self) -> SrcUri {
         self.src.clone()
     }
 
-    pub fn owner(&self) -> Weak<Participant> {
+    fn owner(&self) -> Weak<Participant> {
         Weak::clone(&self.owner)
     }
 
-    pub fn publisher(&self) -> Weak<WebRtcPublishEndpoint> {
+    fn publisher(&self) -> Weak<WebRtcPublishEndpoint> {
         self.publisher.clone()
     }
 
-    pub fn is_connected(&self) -> bool {
+    fn is_connected(&self) -> bool {
         self.is_connected
     }
 
-    pub fn set_is_connected(&mut self, value: bool) {
+    fn set_is_connected(&mut self, value: bool) {
         self.is_connected = value;
     }
 }
@@ -83,15 +87,15 @@ struct WebRtcPublishEndpointInner {
 }
 
 impl WebRtcPublishEndpointInner {
-    pub fn add_receiver(&mut self, receiver: Weak<WebRtcPlayEndpoint>) {
+    fn add_receiver(&mut self, receiver: Weak<WebRtcPlayEndpoint>) {
         self.receivers.push(receiver);
     }
 
-    pub fn receivers(&self) -> Vec<Weak<WebRtcPlayEndpoint>> {
+    fn receivers(&self) -> Vec<Weak<WebRtcPlayEndpoint>> {
         self.receivers.clone()
     }
 
-    pub fn owner(&self) -> Weak<Participant> {
+    fn owner(&self) -> Weak<Participant> {
         Weak::clone(&self.owner)
     }
 }

@@ -15,12 +15,16 @@ use crate::api::control::Element;
 /// Entity that represents some pipeline of spec.
 #[derive(Clone, Deserialize, Debug)]
 pub struct Pipeline {
-    pub pipeline: HashMap<String, Element>,
+    pipeline: HashMap<String, Element>,
 }
 
 impl Pipeline {
     pub fn iter(&self) -> impl Iterator<Item = (&String, &Element)> {
         self.into_iter()
+    }
+
+    pub fn get(&self, id: &str) -> Option<&Element> {
+        self.pipeline.get(id)
     }
 }
 

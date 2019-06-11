@@ -2,8 +2,10 @@
 //! stores [`Members`] and associated [`RpcConnection`]s, handles
 //! [`RpcConnection`] authorization, establishment, message sending.
 
-use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::{
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 use actix::{fut::wrap_future, AsyncContext, Context, SpawnHandle};
 use futures::{
@@ -24,7 +26,7 @@ use crate::{
     log::prelude::*,
     signalling::{
         room::RoomError,
-        state::member::{Participant, ParticipantsLoadError},
+        state::participant::{Participant, ParticipantsLoadError},
         Room,
     },
 };
@@ -58,7 +60,7 @@ impl ParticipantService {
         room_spec: &RoomSpec,
         reconnect_timeout: Duration,
     ) -> Result<Self, ParticipantsLoadError> {
-        let members = Participant::get_store(room_spec)?;
+        let members = Participant::load_store(room_spec)?;
 
         // TODO: more informative msg
         debug!(

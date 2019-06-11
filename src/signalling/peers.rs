@@ -13,7 +13,7 @@ use crate::{
     media::{Peer, PeerId, PeerStateMachine},
     signalling::{
         room::{PeersRemoved, Room, RoomError},
-        state::member::Participant,
+        state::participant::Participant,
     },
 };
 
@@ -69,7 +69,7 @@ impl PeerRepository {
             .ok_or_else(|| RoomError::PeerNotFound(peer_id))
     }
 
-    /// Create and interconnect [`Peer`]s based on [`MemberSpec`].
+    /// Create and interconnect [`Peer`]s based on [`Participant`].
     ///
     /// Returns IDs of created [`Peer`]s. `(first_peer_id, second_peer_id)`.
     pub fn create_peers(
@@ -101,12 +101,12 @@ impl PeerRepository {
         first_peer.add_publish_endpoints(
             &mut second_peer,
             &mut self.tracks_count,
-            first_member.publish(),
+            first_member.publishers(),
         );
         second_peer.add_publish_endpoints(
             &mut first_peer,
             &mut self.tracks_count,
-            second_member.publish(),
+            second_member.publishers(),
         );
 
         self.add_peer(first_peer_id, first_peer);

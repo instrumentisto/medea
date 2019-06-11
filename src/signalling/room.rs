@@ -28,7 +28,7 @@ use crate::{
     signalling::{
         participants::ParticipantService,
         peers::PeerRepository,
-        state::member::{Participant, ParticipantsLoadError},
+        state::participant::{Participant, ParticipantsLoadError},
     },
 };
 
@@ -265,8 +265,8 @@ impl Room {
         )))
     }
 
-    /// Create [`Peer`] between [`Member`]s and interconnect it by control API
-    /// spec.
+    /// Create [`Peer`] between [`Participant`]s and interconnect it by control
+    /// API spec.
     fn create_and_interconnect_peers(
         &mut self,
         first_member: &Participant,
@@ -288,7 +288,7 @@ impl Room {
     }
 
     /// Create and interconnect all [`Peer`]s between connected [`Member`]
-    /// and all available at this moment [`Member`]s from [`MemberSpec`].
+    /// and all available at this moment [`Member`]s from [`Participant`].
     ///
     /// Availability is determines by checking [`RpcConnection`] of all
     /// [`Member`]s from [`WebRtcPlayEndpoint`]s and from receivers of
@@ -312,7 +312,7 @@ impl Room {
             };
 
         // Create all connected publish endpoints.
-        for (_id, publish) in member.publish() {
+        for (_id, publish) in member.publishers() {
             for receiver in publish.receivers() {
                 let receiver = receiver.upgrade().unwrap(); // TODO: unwrap
                 let receiver_owner = receiver.owner().upgrade().unwrap();
