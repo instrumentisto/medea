@@ -100,59 +100,16 @@ impl PeerRepository {
             first_member.id().clone(),
         );
 
-        first_member
-            .publish()
-            .into_iter()
-            .flat_map(|(_m, e)| {
-                e.receivers().into_iter().filter(|e| {
-                    e.owner_id() == second_member.id() && !e.is_connected()
-                })
-            })
-            .for_each(|e| {
-                let track_audio = Arc::new(MediaTrack::new(
-                    self.tracks_count.next_id(),
-                    MediaType::Audio(AudioSettings {}),
-                ));
-                let track_video = Arc::new(MediaTrack::new(
-                    self.tracks_count.next_id(),
-                    MediaType::Video(VideoSettings {}),
-                ));
-
-                first_peer.add_sender(track_video.clone());
-                first_peer.add_sender(track_audio.clone());
-
-                second_peer.add_receiver(track_video);
-                second_peer.add_receiver(track_audio);
-
-                e.connected();
-            });
-
-        second_member
-            .publish()
-            .into_iter()
-            .flat_map(|(_m, e)| {
-                e.receivers().into_iter().filter(|e| {
-                    e.owner_id() == first_member.id() && !e.is_connected()
-                })
-            })
-            .for_each(|e| {
-                let track_audio = Arc::new(MediaTrack::new(
-                    self.tracks_count.next_id(),
-                    MediaType::Audio(AudioSettings {}),
-                ));
-                let track_video = Arc::new(MediaTrack::new(
-                    self.tracks_count.next_id(),
-                    MediaType::Video(VideoSettings {}),
-                ));
-
-                second_peer.add_sender(track_video.clone());
-                second_peer.add_sender(track_audio.clone());
-
-                first_peer.add_receiver(track_video);
-                first_peer.add_receiver(track_audio);
-
-                e.connected();
-            });
+        first_peer.add_publish_endpoints(
+            &mut second_peer,
+            &mut self.tracks_count,
+            first_member.publish(),
+        );
+        second_peer.add_publish_endpoints(
+            &mut first_peer,
+            &mut self.tracks_count,
+            second_member.publish(),
+        );
 
         self.add_peer(first_peer_id, first_peer);
         self.add_peer(second_peer_id, second_peer);

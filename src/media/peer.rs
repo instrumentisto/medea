@@ -254,46 +254,39 @@ impl Peer<New> {
         }
     }
 
-    /// Add all [`WebRtcPublishEndpoint`]s to this [`Peer`].
-    ///
-    /// This use `track_id_counter` counter for generating new [`MediaTrack`]
-    /// ID.
-    // TODO (evdokimovs): Upd doc
     pub fn add_publish_endpoints(
         &mut self,
-        endpoints: HashMap<EndpointId, WebRtcPublishEndpoint>,
-        track_id_counter: &mut Counter,
-    ) {
-        for _ in endpoints {
-            let track_audio = Arc::new(MediaTrack::new(
-                track_id_counter.next_id(),
-                MediaType::Audio(AudioSettings {}),
-            ));
-            let track_video = Arc::new(MediaTrack::new(
-                track_id_counter.next_id(),
-                MediaType::Video(VideoSettings {}),
-            ));
-
-            self.add_sender(track_audio);
-            self.add_sender(track_video);
-        }
-    }
-
-    /// Add all `partner_peer` related [`WebRtcPlayEndpoint`]s to this [`Peer`].
-    // TODO (evdokimovs): Upd doc
-    pub fn add_play_endpoints(
-        &mut self,
-        endpoints: HashMap<EndpointId, WebRtcPlayEndpoint>,
         partner_peer: &mut Peer<New>,
+        tracks_count: &mut Counter,
+        publish_endpoints: HashMap<EndpointId, WebRtcPublishEndpoint>,
     ) {
-        for (_, endpoint) in endpoints {
-            if self.context.partner_member == endpoint.src().member_id {
-                partner_peer
-                    .get_senders()
+        let partner_id = self.partner_member_id();
+
+        publish_endpoints
+            .into_iter()
+            .flat_map(|(_m, e)| {
+                e.receivers()
                     .into_iter()
-                    .for_each(|s| self.add_receiver(s));
-            }
-        }
+                    .filter(|e| e.owner_id() == partner_id && !e.is_connected())
+            })
+            .for_each(|e| {
+                let track_audio = Arc::new(MediaTrack::new(
+                    tracks_count.next_id(),
+                    MediaType::Audio(AudioSettings {}),
+                ));
+                let track_video = Arc::new(MediaTrack::new(
+                    tracks_count.next_id(),
+                    MediaType::Video(VideoSettings {}),
+                ));
+
+                self.add_sender(track_video.clone());
+                self.add_sender(track_audio.clone());
+
+                partner_peer.add_receiver(track_video);
+                partner_peer.add_receiver(track_audio);
+
+                e.connected();
+            });
     }
 
     /// Transition new [`Peer`] into state of waiting for local description.

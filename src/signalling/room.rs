@@ -301,6 +301,7 @@ impl Room {
                 return;
             };
 
+        // Create all connected publish endpoints.
         for (id, publish) in member.publish() {
             for receiver in publish.receivers() {
                 if self
@@ -321,6 +322,7 @@ impl Room {
             }
         }
 
+        // Create all connected play endpoint.
         for (id, play) in member.receivers() {
             if self
                 .participants
