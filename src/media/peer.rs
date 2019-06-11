@@ -16,12 +16,7 @@ use crate::{
     api::control::MemberId,
     media::{MediaTrack, TrackId},
     signalling::peers::Counter,
-    signalling::state::{
-        endpoint::{
-            Id as EndpointId, WebRtcPlayEndpoint, WebRtcPublishEndpoint,
-        },
-        member::Participant,
-    },
+    signalling::state::endpoint::{Id as EndpointId, WebRtcPublishEndpoint},
 };
 
 /// Newly initialized [`Peer`] ready to signalling.

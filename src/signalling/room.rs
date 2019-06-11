@@ -302,7 +302,7 @@ impl Room {
             };
 
         // Create all connected publish endpoints.
-        for (id, publish) in member.publish() {
+        for (_id, publish) in member.publish() {
             for receiver in publish.receivers() {
                 let receiver = receiver.upgrade().unwrap(); // TODO: unwrap
                 let receiver_owner = receiver.owner().upgrade().unwrap();
@@ -322,7 +322,7 @@ impl Room {
 
         // Create all connected play endpoint.
         // TODO: properly unwrap Weak
-        for (id, play) in member.receivers() {
+        for (_id, play) in member.receivers() {
             let play_participant = play
                 .publisher()
                 .upgrade()

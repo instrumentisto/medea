@@ -1,10 +1,7 @@
 use super::member::Participant;
-use crate::api::control::{
-    endpoint::{P2pMode, SrcUri},
-    MemberId,
-};
+use crate::api::control::endpoint::{P2pMode, SrcUri};
 use std::cell::RefCell;
-use std::sync::{Arc, Mutex, Weak};
+use std::sync::{Mutex, Weak};
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Id(pub String);

@@ -1,5 +1,5 @@
 use std::convert::TryFrom;
-use std::sync::{Arc, Mutex, Weak};
+use std::sync::{Arc, Mutex};
 
 use crate::api::control::{endpoint::P2pMode, MemberId, MemberSpec, RoomSpec};
 use hashbrown::HashMap;
@@ -65,12 +65,6 @@ impl Participant {
         spec.play_endpoints().iter().for_each(|(name_p, p)| {
             let sender_participant =
                 store.get(&MemberId(p.src.member_id.to_string())).unwrap();
-
-            let publisher = WebRtcPublishEndpoint::new(
-                P2pMode::Always,
-                Vec::new(),
-                Arc::downgrade(&sender_participant),
-            );
 
             match sender_participant
                 .get_publisher(&EndpointId(p.src.endpoint_id.to_string()))
@@ -190,12 +184,6 @@ impl ParticipantInner {
                 .get(&p.src.endpoint_id)
                 .unwrap();
 
-            let publisher = WebRtcPublishEndpoint::new(
-                publisher_endpoint.p2p.clone(),
-                Vec::new(),
-                Arc::downgrade(&sender_participant),
-            );
-
             match sender_participant
                 .get_publisher(&EndpointId(p.src.endpoint_id.to_string()))
             {
@@ -215,7 +203,7 @@ impl ParticipantInner {
                 }
                 None => {
                     let send_endpoint = Arc::new(WebRtcPublishEndpoint::new(
-                        P2pMode::Always,
+                        publisher_endpoint.p2p.clone(),
                         Vec::new(),
                         Arc::downgrade(&sender_participant),
                     ));
@@ -240,6 +228,20 @@ impl ParticipantInner {
                 }
             }
         });
+
+        spec.publish_endpoints().into_iter().for_each(|(name, e)| {
+            let endpoint_id = EndpointId(name.clone());
+            if let None = self.send.get(&endpoint_id) {
+                self.send.insert(
+                    endpoint_id,
+                    Arc::new(WebRtcPublishEndpoint::new(
+                        e.p2p.clone(),
+                        Vec::new(),
+                        Arc::downgrade(me),
+                    )),
+                );
+            }
+        })
     }
 
     pub fn get_store(
