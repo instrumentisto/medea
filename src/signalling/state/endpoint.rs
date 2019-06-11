@@ -10,11 +10,11 @@ use std::sync::{Arc, Mutex, Weak};
 pub struct Id(pub String);
 
 #[derive(Debug, Clone)]
-pub struct WebRtcPlayEndpointInner {
-    pub src: SrcUri,
-    pub publisher: Weak<WebRtcPublishEndpoint>,
-    pub owner: Weak<Participant>,
-    pub is_connected: bool,
+struct WebRtcPlayEndpointInner {
+    src: SrcUri,
+    publisher: Weak<WebRtcPublishEndpoint>,
+    owner: Weak<Participant>,
+    is_connected: bool,
 }
 
 impl WebRtcPlayEndpointInner {
@@ -78,10 +78,10 @@ impl WebRtcPlayEndpoint {
 }
 
 #[derive(Debug, Clone)]
-pub struct WebRtcPublishEndpointInner {
-    pub p2p: P2pMode,
-    pub receivers: Vec<Weak<WebRtcPlayEndpoint>>,
-    pub owner: Weak<Participant>,
+struct WebRtcPublishEndpointInner {
+    p2p: P2pMode,
+    receivers: Vec<Weak<WebRtcPlayEndpoint>>,
+    owner: Weak<Participant>,
 }
 
 impl WebRtcPublishEndpointInner {
