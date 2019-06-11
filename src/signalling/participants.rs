@@ -2,6 +2,7 @@
 //! stores [`Members`] and associated [`RpcConnection`]s, handles
 //! [`RpcConnection`] authorization, establishment, message sending.
 
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use actix::{fut::wrap_future, AsyncContext, Context, SpawnHandle};
@@ -30,7 +31,7 @@ use crate::{
 #[derive(Debug)]
 pub struct ParticipantService {
     /// [`Member`]s which currently are present in this [`Room`].
-    members: HashMap<MemberId, Participant>,
+    members: HashMap<MemberId, Arc<Participant>>,
 
     /// Established [`RpcConnection`]s of [`Member`]s in this [`Room`].
     // TODO: Replace Box<dyn RpcConnection>> with enum,
@@ -69,7 +70,7 @@ impl ParticipantService {
     }
 
     /// Lookup [`Member`] by provided id.
-    pub fn get_member_by_id(&self, id: &MemberId) -> Option<Participant> {
+    pub fn get_member_by_id(&self, id: &MemberId) -> Option<Arc<Participant>> {
         self.members.get(id).cloned()
     }
 
@@ -81,7 +82,7 @@ impl ParticipantService {
         &self,
         member_id: &MemberId,
         credentials: &str,
-    ) -> Result<Participant, AuthorizationError> {
+    ) -> Result<Arc<Participant>, AuthorizationError> {
         match self.members.get(member_id) {
             Some(member) => {
                 if member.credentials().eq(credentials) {

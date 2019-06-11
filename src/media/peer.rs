@@ -269,7 +269,10 @@ impl Peer<New> {
                 e.receivers()
                     .into_iter()
                     .map(|e| e.upgrade().unwrap())
-                    .filter(|e| e.owner_id() == partner_id && !e.is_connected())
+                    .filter(|e| {
+                        e.owner().upgrade().unwrap().id() == partner_id
+                            && !e.is_connected()
+                    })
             })
             .for_each(|e| {
                 let track_audio = Arc::new(MediaTrack::new(

@@ -305,14 +305,15 @@ impl Room {
         for (id, publish) in member.publish() {
             for receiver in publish.receivers() {
                 let receiver = receiver.upgrade().unwrap(); // TODO: unwrap
+                let receiver_owner = receiver.owner().upgrade().unwrap();
                 if self
                     .participants
-                    .member_has_connection(&receiver.owner_id())
+                    .member_has_connection(&receiver_owner.id())
                     && !receiver.is_connected()
                 {
                     let publish_participant = self
                         .participants
-                        .get_member_by_id(&receiver.owner_id())
+                        .get_member_by_id(&receiver_owner.id())
                         .unwrap();
                     self.create_and_interconnect_peers(
                         &member,

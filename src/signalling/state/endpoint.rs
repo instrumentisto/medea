@@ -10,7 +10,7 @@ pub struct Id(pub String);
 pub struct WebRtcPlayEndpointInner {
     pub src: SrcUri,
     pub publisher: Weak<WebRtcPublishEndpoint>,
-    pub owner_id: MemberId,
+    pub owner: Weak<Participant>,
     pub is_connected: bool,
 }
 
@@ -19,8 +19,8 @@ impl WebRtcPlayEndpointInner {
         self.src.clone()
     }
 
-    pub fn owner_id(&self) -> MemberId {
-        self.owner_id.clone()
+    pub fn owner(&self) -> Weak<Participant> {
+        Weak::clone(&self.owner)
     }
 
     pub fn publisher(&self) -> Weak<WebRtcPublishEndpoint> {
@@ -43,12 +43,12 @@ impl WebRtcPlayEndpoint {
     pub fn new(
         src: SrcUri,
         publisher: Weak<WebRtcPublishEndpoint>,
-        owner_id: MemberId,
+        owner: Weak<Participant>,
     ) -> Self {
         Self(Mutex::new(RefCell::new(WebRtcPlayEndpointInner {
             src,
             publisher,
-            owner_id,
+            owner,
             is_connected: false,
         })))
     }
@@ -57,8 +57,8 @@ impl WebRtcPlayEndpoint {
         self.0.lock().unwrap().borrow().src()
     }
 
-    pub fn owner_id(&self) -> MemberId {
-        self.0.lock().unwrap().borrow().owner_id()
+    pub fn owner(&self) -> Weak<Participant> {
+        self.0.lock().unwrap().borrow().owner()
     }
 
     pub fn publisher(&self) -> Weak<WebRtcPublishEndpoint> {
