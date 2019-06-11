@@ -1,7 +1,7 @@
 use std::convert::TryFrom;
 use std::sync::{Arc, Mutex};
 
-use crate::api::control::{endpoint::P2pMode, MemberId, MemberSpec, RoomSpec};
+use crate::api::control::{MemberId, MemberSpec, RoomSpec};
 use hashbrown::HashMap;
 use std::cell::RefCell;
 
@@ -65,6 +65,19 @@ impl Participant {
         spec.play_endpoints().iter().for_each(|(name_p, p)| {
             let sender_participant =
                 store.get(&MemberId(p.src.member_id.to_string())).unwrap();
+            let publisher_spec = MemberSpec::try_from(
+                room_spec
+                    .pipeline
+                    .pipeline
+                    .get(&p.src.member_id.to_string())
+                    .unwrap(),
+            )
+                .unwrap();
+
+            let publisher_endpoint = *publisher_spec
+                .publish_endpoints()
+                .get(&p.src.endpoint_id)
+                .unwrap();
 
             match sender_participant
                 .get_publisher(&EndpointId(p.src.endpoint_id.to_string()))
@@ -85,7 +98,7 @@ impl Participant {
                 }
                 None => {
                     let send_endpoint = Arc::new(WebRtcPublishEndpoint::new(
-                        P2pMode::Always,
+                        publisher_endpoint.p2p.clone(),
                         Vec::new(),
                         Arc::downgrade(&sender_participant),
                     ));
@@ -110,6 +123,20 @@ impl Participant {
                 }
             }
         });
+
+        spec.publish_endpoints().into_iter().for_each(|(name, e)| {
+            let endpoint_id = EndpointId(name.clone());
+            if let None = self.publish().get(&endpoint_id) {
+                self.add_sender(
+                    endpoint_id,
+                    Arc::new(WebRtcPublishEndpoint::new(
+                        e.p2p.clone(),
+                        Vec::new(),
+                        Arc::downgrade(&me),
+                    )),
+                );
+            }
+        })
     }
 
     pub fn add_receiver(
@@ -154,94 +181,6 @@ impl ParticipantInner {
             recv: HashMap::new(),
             credentials,
         }
-    }
-
-    pub fn load(
-        &mut self,
-        room_spec: &RoomSpec,
-        store: &HashMap<MemberId, Arc<Participant>>,
-    ) {
-        let spec = MemberSpec::try_from(
-            room_spec.pipeline.pipeline.get(&self.id.0).unwrap(),
-        )
-        .unwrap();
-
-        let me = store.get(&self.id).unwrap();
-
-        spec.play_endpoints().iter().for_each(|(name_p, p)| {
-            let sender_participant = store.get(&p.src.member_id).unwrap();
-            let publisher_spec = MemberSpec::try_from(
-                room_spec
-                    .pipeline
-                    .pipeline
-                    .get(&p.src.member_id.to_string())
-                    .unwrap(),
-            )
-            .unwrap();
-
-            let publisher_endpoint = *publisher_spec
-                .publish_endpoints()
-                .get(&p.src.endpoint_id)
-                .unwrap();
-
-            match sender_participant
-                .get_publisher(&EndpointId(p.src.endpoint_id.to_string()))
-            {
-                Some(publisher) => {
-                    let play_endpoint = Arc::new(WebRtcPlayEndpoint::new(
-                        p.src.clone(),
-                        Arc::downgrade(&publisher),
-                        Arc::downgrade(&me),
-                    ));
-
-                    me.add_receiver(
-                        EndpointId(name_p.to_string()),
-                        Arc::clone(&play_endpoint),
-                    );
-
-                    publisher.add_receiver(Arc::downgrade(&play_endpoint));
-                }
-                None => {
-                    let send_endpoint = Arc::new(WebRtcPublishEndpoint::new(
-                        publisher_endpoint.p2p.clone(),
-                        Vec::new(),
-                        Arc::downgrade(&sender_participant),
-                    ));
-
-                    let play_endpoint = Arc::new(WebRtcPlayEndpoint::new(
-                        p.src.clone(),
-                        Arc::downgrade(&send_endpoint),
-                        Arc::downgrade(&me),
-                    ));
-
-                    send_endpoint.add_receiver(Arc::downgrade(&play_endpoint));
-
-                    sender_participant.add_sender(
-                        EndpointId(p.src.endpoint_id.to_string()),
-                        send_endpoint,
-                    );
-
-                    me.add_receiver(
-                        EndpointId(name_p.to_string()),
-                        play_endpoint,
-                    );
-                }
-            }
-        });
-
-        spec.publish_endpoints().into_iter().for_each(|(name, e)| {
-            let endpoint_id = EndpointId(name.clone());
-            if let None = self.send.get(&endpoint_id) {
-                self.send.insert(
-                    endpoint_id,
-                    Arc::new(WebRtcPublishEndpoint::new(
-                        e.p2p.clone(),
-                        Vec::new(),
-                        Arc::downgrade(me),
-                    )),
-                );
-            }
-        })
     }
 
     pub fn get_store(
