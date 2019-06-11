@@ -16,13 +16,22 @@ pub struct Participant(Arc<Mutex<RefCell<ParticipantInner>>>);
 pub struct ParticipantInner {
     id: MemberId,
     // TODO (evdokimovs): there is memory leak because Arc.
-    send: HashMap<EndpointId, Arc<WebRtcPublishEndpoint>>,
+    send: HashMap<EndpointId, WebRtcPublishEndpoint>,
     // TODO (evdokimovs): there is memory leak because Arc.
-    recv: HashMap<EndpointId, Arc<WebRtcPlayEndpoint>>,
+    recv: HashMap<EndpointId, WebRtcPlayEndpoint>,
     credentials: String,
 }
 
 impl Participant {
+    pub fn new(id: MemberId, credentials: String) -> Self {
+        Self(Arc::new(Mutex::new(RefCell::new(ParticipantInner {
+            id,
+            send: HashMap::new(),
+            recv: HashMap::new(),
+            credentials,
+        }))))
+    }
+
     pub fn id(&self) -> MemberId {
         self.0.lock().unwrap().borrow().id.clone()
     }
@@ -39,19 +48,15 @@ impl Participant {
         self.0.lock().unwrap().borrow().credentials.clone()
     }
 
-    pub fn publish(&self) -> HashMap<String, Arc<WebRtcPublishEndpoint>> {
+    pub fn publish(&self) -> HashMap<EndpointId, WebRtcPublishEndpoint> {
         self.0.lock().unwrap().borrow().send.clone()
     }
 
-    pub fn receivers(&self) -> HashMap<String, Arc<WebRtcPlayEndpoint>> {
+    pub fn receivers(&self) -> HashMap<EndpointId, WebRtcPlayEndpoint> {
         self.0.lock().unwrap().borrow().recv.clone()
     }
 
-    pub fn add_receiver(
-        &self,
-        id: EndpointId,
-        endpoint: Arc<WebRtcPlayEndpoint>,
-    ) {
+    pub fn add_receiver(&self, id: EndpointId, endpoint: WebRtcPlayEndpoint) {
         self.0
             .lock()
             .unwrap()
@@ -60,26 +65,20 @@ impl Participant {
             .insert(id, endpoint);
     }
 
-    pub fn add_recv_to_send(
-        &self,
-        id: EndpointId,
-        endpoint: Arc<WebRtcPublishEndpoint>,
-    ) {
+    pub fn add_sender(&self, id: EndpointId, endpoint: WebRtcPublishEndpoint) {
         self.0
             .lock()
             .unwrap()
             .borrow_mut()
             .send
-            .entry(id)
-            .or_insert(Vec::new())
-            .push(endpoint)
+            .insert(id, endpoint);
     }
 
     pub fn get_publisher(
         &self,
         id: &EndpointId,
-    ) -> Option<Arc<WebRtcPublishEndpoint>> {
-        self.0.lock().unwrap().borrow().send.get(id)
+    ) -> Option<WebRtcPublishEndpoint> {
+        self.0.lock().unwrap().borrow().send.get(id).cloned()
     }
 }
 
@@ -102,55 +101,63 @@ impl ParticipantInner {
             room_spec.pipeline.pipeline.get(&self.id.0).unwrap(),
         )
         .unwrap();
+
         let me = store.get(&self.id).unwrap();
-        spec.play_endpoints().iter().for_each(|(_, p)| {
+
+        spec.play_endpoints().iter().for_each(|(name_p, p)| {
             let sender_participant =
                 store.get(&MemberId(p.src.member_id.to_string())).unwrap();
 
-            let publisher = WebRtcPublishEndpoint {
-                participant: sender_participant.clone(),
-                receivers: Vec::new(),
-                p2p: P2pMode::Always,
-            };
+            let publisher = WebRtcPublishEndpoint::new(
+                P2pMode::Always,
+                Vec::new(),
+                sender_participant.clone(),
+            );
 
             match sender_participant
                 .get_publisher(&EndpointId(p.src.endpoint_id.to_string()))
             {
                 Some(publisher) => {
-                    WebRtcPlayEndpoint {
-                        participant: me,
-                        publisher,
-                        src: p.src,
-                    }
+                    let play_endpoint = WebRtcPlayEndpoint::new(
+                        p.src.clone(),
+                        publisher.clone(),
+                        me.clone(),
+                    );
 
-                    // TODO: Mutate publisher here
+                    me.add_receiver(
+                        EndpointId(name_p.to_string()),
+                        play_endpoint.clone(),
+                    );
+
+                    publisher.add_receiver(play_endpoint);
                 }
                 None => {
-                    // Create Publisher
-                    // create play
-                    // add play to publisher
-                    // insert publisher into participant
+                    let send_endpoint = WebRtcPublishEndpoint::new(
+                        P2pMode::Always,
+                        Vec::new(),
+                        sender_participant.clone(),
+                    );
+
+                    let play_endpoint = WebRtcPlayEndpoint::new(
+                        p.src.clone(),
+                        send_endpoint.clone(),
+                        me.clone(),
+                    );
+
+                    send_endpoint.add_receiver(play_endpoint.clone());
+
+                    sender_participant.add_sender(
+                        EndpointId(p.src.endpoint_id.to_string()),
+                        send_endpoint,
+                    );
+
+                    me.add_receiver(
+                        EndpointId(name_p.to_string()),
+                        play_endpoint,
+                    );
                 }
             }
-
-            self.recv.push(WebRtcPlayEndpoint {
-                src: p.src,
-                publisher: sender_participant.clone(),
-            });
         });
-
-        for (id, element) in room_spec.pipeline.iter() {
-            let member = MemberSpec::try_from(element).unwrap();
-
-            member
-                .play_endpoints()
-                .into_iter()
-                .filter(|(_, endpoint)| endpoint.src.member_id == self_id)
-                .for_each(|_| {
-                    let member_id = MemberId(id.clone());
-                    let participant = store.get(&member_id).unwrap().clone();
-                });
-        }
     }
 
     pub fn get_store(room_spec: &RoomSpec) -> HashMap<MemberId, Participant> {
@@ -160,10 +167,7 @@ impl ParticipantInner {
         for (id, member) in &members {
             participants.insert(
                 id.clone(),
-                Participant(Arc::new(Mutex::new(RefCell::new(Self::new(
-                    id.clone(),
-                    member.credentials().to_string(),
-                ))))),
+                Participant::new(id.clone(), member.credentials().to_string())
             );
         }
 

@@ -319,18 +319,21 @@ impl Room {
         //        };
         let receivers = member.publish();
         let mut already_connected_members = Vec::new();
-        for (recv_member_id, _) in receivers {
-            if self.participants.member_has_connection(&recv_member_id) {
+        for (_, endpoint) in receivers {
+            if self
+                .participants
+                .member_has_connection(&endpoint.owner().id())
+            {
                 if let Some(recv_member) =
-                    self.participants.get_member_by_id(&recv_member_id)
+                    self.participants.get_member_by_id(&endpoint.owner().id())
                 {
-                    already_connected_members.push(recv_member_id.clone());
+                    already_connected_members.push(endpoint.owner().id());
                     need_create.push((&member, recv_member.clone()));
                 } else {
                     error!(
                         "Try to create peer for nonexistent member with ID \
                          {}. Room will be stopped.",
-                        recv_member_id
+                        endpoint.owner().id()
                     );
                     ctx.notify(CloseRoom {});
                 }
@@ -339,7 +342,7 @@ impl Room {
 
         // connect senders
         for (_, play) in member.receivers() {
-            let sender_member_id = play.id();
+            let sender_member_id = play.owner().id();
             if already_connected_members.contains(&sender_member_id) {
                 continue;
             }
