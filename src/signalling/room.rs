@@ -1,5 +1,5 @@
 //! Room definitions and implementations. Room is responsible for media
-//! connection establishment between concrete [`Member`]s.
+//! connection establishment between concrete [`Participant`]s.
 
 use std::time::Duration;
 
@@ -26,9 +26,9 @@ use crate::{
         WaitLocalHaveRemote, WaitLocalSdp, WaitRemoteSdp,
     },
     signalling::{
+        control::participant::{Participant, ParticipantsLoadError},
         participants::ParticipantService,
         peers::PeerRepository,
-        state::participant::{Participant, ParticipantsLoadError},
     },
 };
 
@@ -74,15 +74,15 @@ impl From<ParticipantsLoadError> for RoomError {
     }
 }
 
-/// Media server room with its [`Member`]s.
+/// Media server room with its [`Participant`]s.
 #[derive(Debug)]
 pub struct Room {
     id: RoomId,
 
-    /// [`RpcConnection`]s of [`Member`]s in this [`Room`].
+    /// [`RpcConnection`]s of [`Participant`]s in this [`Room`].
     participants: ParticipantService,
 
-    /// [`Peer`]s of [`Member`]s in this [`Room`].
+    /// [`Peer`]s of [`Participant`]s in this [`Room`].
     peers: PeerRepository,
 }
 
@@ -153,7 +153,7 @@ impl Room {
         )))
     }
 
-    /// Sends [`Event::PeersRemoved`] to [`Member`].
+    /// Sends [`Event::PeersRemoved`] to [`Participant`].
     fn send_peers_removed(
         &mut self,
         member_id: MemberId,
@@ -285,12 +285,12 @@ impl Room {
         ctx.notify(ConnectPeers(first_peer_id, second_peer_id));
     }
 
-    /// Create and interconnect all [`Peer`]s between connected [`Member`]
-    /// and all available at this moment [`Member`]s from [`Participant`].
+    /// Create and interconnect all [`Peer`]s between connected [`Participant`]
+    /// and all available at this moment [`Participant`].
     ///
     /// Availability is determines by checking [`RpcConnection`] of all
-    /// [`Member`]s from [`WebRtcPlayEndpoint`]s and from receivers of
-    /// connected [`Member`].
+    /// [`Participant`]s from [`WebRtcPlayEndpoint`]s and from receivers of
+    /// connected [`Participant`].
     fn create_peers_with_available_members(
         &mut self,
         member_id: &MemberId,
@@ -315,17 +315,26 @@ impl Room {
                 let receiver = if let Some(receiver) = receiver.upgrade() {
                     receiver
                 } else {
-                    error!("Empty weak pointer for publisher receiver. {:?}. Closing room.", publish);
+                    error!(
+                        "Empty weak pointer for publisher receiver. {:?}. \
+                         Closing room.",
+                        publish
+                    );
                     ctx.notify(CloseRoom {});
                     return;
                 };
-                let receiver_owner = if let Some(receiver_owner) = receiver.owner().upgrade() {
-                    receiver_owner
-                } else {
-                    error!("Empty weak pointer for publisher's receiver's owner. {:?}. Closing room.", receiver);
-                    ctx.notify(CloseRoom {});
-                    return;
-                };
+                let receiver_owner =
+                    if let Some(receiver_owner) = receiver.owner().upgrade() {
+                        receiver_owner
+                    } else {
+                        error!(
+                            "Empty weak pointer for publisher's receiver's \
+                             owner. {:?}. Closing room.",
+                            receiver
+                        );
+                        ctx.notify(CloseRoom {});
+                        return;
+                    };
 
                 if self
                     .participants
@@ -343,19 +352,28 @@ impl Room {
 
         // Create all connected play receivers peers.
         for (_id, play) in member.receivers() {
-            let plays_publisher_participant = if let Some(plays_publisher) = play.publisher().upgrade() {
-                if let Some(owner) = plays_publisher.owner().upgrade() {
-                    owner
+            let plays_publisher_participant =
+                if let Some(plays_publisher) = play.publisher().upgrade() {
+                    if let Some(owner) = plays_publisher.owner().upgrade() {
+                        owner
+                    } else {
+                        error!(
+                            "Empty weak pointer for play's publisher owner. \
+                             {:?}. Closing room.",
+                            plays_publisher
+                        );
+                        ctx.notify(CloseRoom {});
+                        return;
+                    }
                 } else {
-                    error!("Empty weak pointer for play's publisher owner. {:?}. Closing room.", plays_publisher);
+                    error!(
+                        "Empty weak pointer for play's publisher. {:?}. \
+                         Closing room.",
+                        play
+                    );
                     ctx.notify(CloseRoom {});
                     return;
-                }
-            } else {
-                error!("Empty weak pointer for play's publisher. {:?}. Closing room.", play);
-                ctx.notify(CloseRoom {});
-                return;
-            };
+                };
 
             if self
                 .participants
@@ -402,7 +420,7 @@ impl Handler<ConnectPeers> for Room {
     type Result = ActFuture<(), ()>;
 
     /// Check state of interconnected [`Peer`]s and sends [`Event`] about
-    /// [`Peer`] created to remote [`Member`].
+    /// [`Peer`] created to remote [`Participant`].
     fn handle(
         &mut self,
         msg: ConnectPeers,
@@ -441,7 +459,7 @@ pub struct PeersRemoved {
 impl Handler<PeersRemoved> for Room {
     type Result = ActFuture<(), ()>;
 
-    /// Send [`Event::PeersRemoved`] to [`Member`].
+    /// Send [`Event::PeersRemoved`] to [`Participant`].
     fn handle(
         &mut self,
         msg: PeersRemoved,
@@ -529,7 +547,7 @@ impl Handler<RpcConnectionEstablished> for Room {
 
     /// Saves new [`RpcConnection`] in [`ParticipantService`], initiates media
     /// establishment between members.
-    /// Create and interconnect all necessary [`Member`]'s [`Peer`]s.
+    /// Create and interconnect all necessary [`Participant`]'s [`Peer`]s.
     fn handle(
         &mut self,
         msg: RpcConnectionEstablished,
@@ -559,7 +577,7 @@ pub struct CloseRoom {}
 impl Handler<CloseRoom> for Room {
     type Result = ();
 
-    /// Sends to remote [`Member`] the [`Event`] about [`Peer`] removed.
+    /// Sends to remote [`Participant`] the [`Event`] about [`Peer`] removed.
     /// Closes all active [`RpcConnection`]s.
     fn handle(
         &mut self,
@@ -576,7 +594,7 @@ impl Handler<RpcConnectionClosed> for Room {
     type Result = ();
 
     /// Passes message to [`ParticipantService`] to cleanup stored connections.
-    /// Remove all related for disconnected [`Member`] [`Peer`]s.
+    /// Remove all related for disconnected [`Participant`] [`Peer`]s.
     fn handle(&mut self, msg: RpcConnectionClosed, ctx: &mut Self::Context) {
         info!(
             "RpcConnectionClosed for member {}, reason {:?}",

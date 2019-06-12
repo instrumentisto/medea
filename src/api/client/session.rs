@@ -26,10 +26,10 @@ use crate::{
 #[derive(Debug)]
 #[allow(clippy::module_name_repetitions)]
 pub struct WsSession {
-    /// ID of [`Member`] that WebSocket connection is associated with.
+    /// ID of [`Participant`] that WebSocket connection is associated with.
     member_id: MemberId,
 
-    /// [`Room`] that [`Member`] is associated with.
+    /// [`Room`] that [`Participant`] is associated with.
     room: Addr<Room>,
 
     /// Timeout of receiving any messages from client.
@@ -48,7 +48,7 @@ pub struct WsSession {
 }
 
 impl WsSession {
-    /// Creates new [`WsSession`] for specified [`Member`].
+    /// Creates new [`WsSession`] for specified [`Participant`].
     pub fn new(
         member_id: MemberId,
         room: Addr<Room>,

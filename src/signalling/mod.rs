@@ -1,4 +1,4 @@
-pub mod state;
+pub mod control;
 
 pub mod participants;
 pub mod peers;

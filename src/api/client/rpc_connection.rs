@@ -22,14 +22,14 @@ macro_attr! {
     pub struct EventMessage(Event);
 }
 
-/// Abstraction over RPC connection with some remote [`Member`].
+/// Abstraction over RPC connection with some remote [`Participant`].
 pub trait RpcConnection: fmt::Debug + Send {
     /// Closes [`RpcConnection`].
     /// No [`RpcConnectionClosed`] signals should be emitted.
     /// Always returns success.
     fn close(&mut self) -> Box<dyn Future<Item = (), Error = ()>>;
 
-    /// Sends [`Event`] to remote [`Member`].
+    /// Sends [`Event`] to remote [`Participant`].
     fn send_event(
         &self,
         msg: EventMessage,
@@ -40,7 +40,7 @@ pub trait RpcConnection: fmt::Debug + Send {
 #[derive(Debug, Message)]
 #[rtype(result = "Result<(), AuthorizationError>")]
 pub struct Authorize {
-    /// ID of [`Member`] to authorize [`RpcConnection`] for.
+    /// ID of [`Participant`] to authorize [`RpcConnection`] for.
     pub member_id: MemberId,
     /// Credentials to authorize [`RpcConnection`] with.
     pub credentials: String, // TODO: &str when futures will allow references
@@ -49,28 +49,30 @@ pub struct Authorize {
 /// Error of authorization [`RpcConnection`] in [`Room`].
 #[derive(Debug)]
 pub enum AuthorizationError {
-    /// Authorizing [`Member`] does not exists in the [`Room`].
-    MemberNotExists,
+    /// Authorizing [`Participant`] does not exists in the [`Room`].
+    ParticipantNotExists,
     /// Provided credentials are invalid.
     InvalidCredentials,
 }
 
-/// Signal of new [`RpcConnection`] being established with specified [`Member`].
-/// Transport should consider dropping connection if message result is err.
+/// Signal of new [`RpcConnection`] being established with specified
+/// [`Participant`]. Transport should consider dropping connection if message
+/// result is err.
 #[derive(Debug, Message)]
 #[rtype(result = "Result<(), ()>")]
 #[allow(clippy::module_name_repetitions)]
 pub struct RpcConnectionEstablished {
-    /// ID of [`Member`] that establishes [`RpcConnection`].
+    /// ID of [`Participant`] that establishes [`RpcConnection`].
     pub member_id: MemberId,
     /// Established [`RpcConnection`].
     pub connection: Box<dyn RpcConnection>,
 }
-/// Signal of existing [`RpcConnection`] of specified [`Member`] being closed.
+/// Signal of existing [`RpcConnection`] of specified [`Participant`] being
+/// closed.
 #[derive(Debug, Message)]
 #[allow(clippy::module_name_repetitions)]
 pub struct RpcConnectionClosed {
-    /// ID of [`Member`] which [`RpcConnection`] is closed.
+    /// ID of [`Participant`] which [`RpcConnection`] is closed.
     pub member_id: MemberId,
     /// Reason of why [`RpcConnection`] is closed.
     pub reason: ClosedReason,

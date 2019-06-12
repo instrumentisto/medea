@@ -1,6 +1,7 @@
-//! Participant is [`Member`] with [`RpcConnection`]. [`ParticipantService`]
-//! stores [`Members`] and associated [`RpcConnection`]s, handles
-//! [`RpcConnection`] authorization, establishment, message sending.
+//! [`Participant`] is member of [`Room`] with [`RpcConnection`].
+//! [`ParticipantService`] stores [`Participant`]s and associated
+//! [`RpcConnection`]s, handles [`RpcConnection`] authorization, establishment,
+//! message sending.
 
 use std::{
     sync::Arc,
@@ -25,21 +26,22 @@ use crate::{
     },
     log::prelude::*,
     signalling::{
+        control::participant::{Participant, ParticipantsLoadError},
         room::RoomError,
-        state::participant::{Participant, ParticipantsLoadError},
         Room,
     },
 };
 
-/// Participant is [`Member`] with [`RpcConnection`]. [`ParticipantService`]
-/// stores [`Members`] and associated [`RpcConnection`]s, handles
-/// [`RpcConnection`] authorization, establishment, message sending.
+/// [`Participant`] is member of [`Room`] with [`RpcConnection`].
+/// [`ParticipantService`] stores [`Participant`]s and associated
+/// [`RpcConnection`]s, handles [`RpcConnection`] authorization, establishment,
+/// message sending.
 #[derive(Debug)]
 pub struct ParticipantService {
-    /// [`Member`]s which currently are present in this [`Room`].
+    /// [`Participant`]s which currently are present in this [`Room`].
     members: HashMap<MemberId, Arc<Participant>>,
 
-    /// Established [`RpcConnection`]s of [`Member`]s in this [`Room`].
+    /// Established [`RpcConnection`]s of [`Participant`]s in this [`Room`].
     // TODO: Replace Box<dyn RpcConnection>> with enum,
     //       as the set of all possible RpcConnection types is not closed.
     connections: HashMap<MemberId, Box<dyn RpcConnection>>,
@@ -76,15 +78,16 @@ impl ParticipantService {
         })
     }
 
-    /// Lookup [`Member`] by provided id.
+    /// Lookup [`Participant`] by provided id.
     pub fn get_member_by_id(&self, id: &MemberId) -> Option<Arc<Participant>> {
         self.members.get(id).cloned()
     }
 
-    /// Lookup [`Member`] by provided id and credentials. Returns
-    /// [`Err(AuthorizationError::MemberNotExists)`] if lookup by [`MemberId`]
-    /// failed. Returns [`Err(AuthorizationError::InvalidCredentials)`] if
-    /// [`Member`] was found, but incorrect credentials was provided.
+    /// Lookup [`Participant`] by provided id and credentials. Returns
+    /// [`Err(AuthorizationError::ParticipantNotExists)`] if lookup by
+    /// [`MemberId`] failed. Returns
+    /// [`Err(AuthorizationError::InvalidCredentials)`] if [`Participant`]
+    /// was found, but incorrect credentials was provided.
     pub fn get_member_by_id_and_credentials(
         &self,
         member_id: &MemberId,
@@ -98,17 +101,17 @@ impl ParticipantService {
                     Err(AuthorizationError::InvalidCredentials)
                 }
             }
-            None => Err(AuthorizationError::MemberNotExists),
+            None => Err(AuthorizationError::ParticipantNotExists),
         }
     }
 
-    /// Checks if [`Member`] has **active** [`RcpConnection`].
+    /// Checks if [`Participant`] has **active** [`RcpConnection`].
     pub fn member_has_connection(&self, member_id: &MemberId) -> bool {
         self.connections.contains_key(member_id)
             && !self.drop_connection_tasks.contains_key(member_id)
     }
 
-    /// Send [`Event`] to specified remote [`Member`].
+    /// Send [`Event`] to specified remote [`Participant`].
     pub fn send_event_to_member(
         &mut self,
         member_id: MemberId,
@@ -126,9 +129,9 @@ impl ParticipantService {
     }
 
     /// If [`ClosedReason::Closed`], then removes [`RpcConnection`] associated
-    /// with specified user [`Member`] from the storage and closes the room.
-    /// If [`ClosedReason::Lost`], then creates delayed task that emits
-    /// [`ClosedReason::Closed`].
+    /// with specified user [`Participant`] from the storage and closes the
+    /// room. If [`ClosedReason::Lost`], then creates delayed task that
+    /// emits [`ClosedReason::Closed`].
     // TODO: Dont close the room. It is being closed atm, because we have
     //      no way to handle absence of RtcPeerConnection when.
     pub fn connection_closed(
@@ -162,9 +165,9 @@ impl ParticipantService {
         }
     }
 
-    /// Stores provided [`RpcConnection`] for given [`Member`] in the [`Room`].
-    /// If [`Member`] already has any other [`RpcConnection`],
-    /// then it will be closed.
+    /// Stores provided [`RpcConnection`] for given [`Participant`] in the
+    /// [`Room`]. If [`Participant`] already has any other
+    /// [`RpcConnection`], then it will be closed.
     pub fn connection_established(
         &mut self,
         ctx: &mut Context<Room>,

@@ -1,3 +1,5 @@
+//! [`Participant`] is member of [`Room`] with [`RpcConnection`].
+
 use std::{
     cell::RefCell,
     convert::TryFrom as _,
@@ -7,21 +9,29 @@ use std::{
 use failure::Fail;
 use hashbrown::HashMap;
 
-use crate::api::control::{
-    MemberId, MemberSpec, RoomSpec, TryFromElementError,
+use crate::{
+    api::control::{
+        MemberId, MemberSpec, RoomSpec, TryFromElementError,
+    },
+    media::PeerId
 };
-use crate::media::PeerId;
 
 use super::endpoint::{
     Id as EndpointId, WebRtcPlayEndpoint, WebRtcPublishEndpoint,
 };
 
+/// Errors which may occur while loading [`Participant`]s from [`RoomSpec`].
 #[derive(Debug, Fail)]
 pub enum ParticipantsLoadError {
+    /// Errors that can occur when we try transform some spec from [`Element`].
     #[fail(display = "TryFromElementError: {}", _0)]
     TryFromError(TryFromElementError),
+
+    /// [`Participant`] not found.
     #[fail(display = "Member with id '{}' not found.", _0)]
     MemberNotFound(MemberId),
+
+    /// [`Endpoint`] not found.
     #[fail(display = "Endpoint with id '{}' not found.", _0)]
     EndpointNotFound(String),
 }
@@ -32,12 +42,13 @@ impl From<TryFromElementError> for ParticipantsLoadError {
     }
 }
 
+/// [`Participant`] is member of [`Room`] with [`RpcConnection`].
 #[derive(Debug)]
 pub struct Participant(Mutex<RefCell<ParticipantInner>>);
 
 #[allow(clippy::module_name_repetitions)]
 #[derive(Debug)]
-pub struct ParticipantInner {
+struct ParticipantInner {
     id: MemberId,
     publishers: HashMap<EndpointId, Arc<WebRtcPublishEndpoint>>,
     receivers: HashMap<EndpointId, Arc<WebRtcPlayEndpoint>>,
@@ -45,6 +56,7 @@ pub struct ParticipantInner {
 }
 
 impl Participant {
+    /// Create new empty [`Participant`].
     fn new(id: MemberId, credentials: String) -> Self {
         Self(Mutex::new(RefCell::new(ParticipantInner {
             id,
@@ -54,6 +66,9 @@ impl Participant {
         })))
     }
 
+    /// Notify [`Participant`] that some [`Peer`]s removed.
+    ///
+    /// All [`PeerId`]s related to this [`Participant`] will be removed.
     pub fn peers_removed(&self, peer_ids: &Vec<PeerId>) {
         self.publishers()
             .into_iter()
@@ -66,30 +81,56 @@ impl Participant {
             .for_each(|(_, p)| p.reset());
     }
 
+    /// Returns [`MemberId`] of this [`Participant`].
     pub fn id(&self) -> MemberId {
         self.0.lock().unwrap().borrow().id.clone()
     }
 
+    /// Creates all empty [`Participant`] from [`RoomSpec`] and then
+    /// load all related to this [`Participant`]s receivers and publishers.
+    ///
+    /// Returns store of all [`Participant`]s loaded from [`RoomSpec`].
     pub fn load_store(
         room_spec: &RoomSpec,
     ) -> Result<HashMap<MemberId, Arc<Self>>, ParticipantsLoadError> {
-        ParticipantInner::load_store(room_spec)
+        let members = room_spec.members()?;
+        let mut participants = HashMap::new();
+
+        for (id, member) in &members {
+            participants.insert(
+                id.clone(),
+                Arc::new(Participant::new(
+                    id.clone(),
+                    member.credentials().to_string(),
+                )),
+            );
+        }
+
+        for (_, participant) in &participants {
+            participant.load(room_spec, &participants)?;
+        }
+
+        Ok(participants)
     }
 
+    /// Returns credentials of this [`Participant`].
     pub fn credentials(&self) -> String {
         self.0.lock().unwrap().borrow().credentials.clone()
     }
 
+    /// Returns all publishers of this [`Participant`].
     pub fn publishers(
         &self,
     ) -> HashMap<EndpointId, Arc<WebRtcPublishEndpoint>> {
         self.0.lock().unwrap().borrow().publishers.clone()
     }
 
+    /// Returns all receivers of this [`Participant`].
     pub fn receivers(&self) -> HashMap<EndpointId, Arc<WebRtcPlayEndpoint>> {
         self.0.lock().unwrap().borrow().receivers.clone()
     }
 
+    /// Load all publishers and receivers of this [`Participant`].
     fn load(
         &self,
         room_spec: &RoomSpec,
@@ -201,6 +242,7 @@ impl Participant {
         Ok(())
     }
 
+    /// Insert new receiver into this [`Participant`].
     pub fn insert_receiver(
         &self,
         id: EndpointId,
@@ -214,6 +256,7 @@ impl Participant {
             .insert(id, endpoint);
     }
 
+    /// Insert new publisher into this [`Participant`].
     pub fn insert_publisher(
         &self,
         id: EndpointId,
@@ -227,46 +270,12 @@ impl Participant {
             .insert(id, endpoint);
     }
 
+    /// Lookup [`WebRtcPublishEndpoint`] publisher by id.
     pub fn get_publisher_by_id(
         &self,
         id: &EndpointId,
     ) -> Option<Arc<WebRtcPublishEndpoint>> {
         self.0.lock().unwrap().borrow().publishers.get(id).cloned()
-    }
-}
-
-impl ParticipantInner {
-    pub fn new(id: MemberId, credentials: String) -> Self {
-        Self {
-            id,
-            publishers: HashMap::new(),
-            receivers: HashMap::new(),
-            credentials,
-        }
-    }
-
-    pub fn load_store(
-        room_spec: &RoomSpec,
-    ) -> Result<HashMap<MemberId, Arc<Participant>>, ParticipantsLoadError>
-    {
-        let members = room_spec.members()?;
-        let mut participants = HashMap::new();
-
-        for (id, member) in &members {
-            participants.insert(
-                id.clone(),
-                Arc::new(Participant::new(
-                    id.clone(),
-                    member.credentials().to_string(),
-                )),
-            );
-        }
-
-        for (_, participant) in &participants {
-            participant.load(room_spec, &participants)?;
-        }
-
-        Ok(participants)
     }
 }
 

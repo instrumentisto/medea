@@ -14,10 +14,12 @@ use std::{convert::TryFrom, fmt::Display, sync::Arc};
 
 use crate::{
     api::control::MemberId,
-    media::{MediaTrack, TrackId},
-    signalling::peers::Counter,
-    signalling::state::endpoint::{Id as EndpointId, WebRtcPublishEndpoint},
     log::prelude::*,
+    media::{MediaTrack, TrackId},
+    signalling::{
+        control::endpoint::{Id as EndpointId, WebRtcPublishEndpoint},
+        peers::Counter
+    }
 };
 
 /// Newly initialized [`Peer`] ready to signalling.
@@ -161,7 +163,7 @@ pub struct Peer<S> {
 }
 
 impl<T> Peer<T> {
-    /// Returns ID of [`Member`] associated with this [`Peer`].
+    /// Returns ID of [`Participant`] associated with this [`Peer`].
     pub fn member_id(&self) -> MemberId {
         self.context.member_id.clone()
     }
@@ -176,7 +178,7 @@ impl<T> Peer<T> {
         self.context.partner_peer
     }
 
-    /// Returns ID of interconnected [`Member`].
+    /// Returns ID of interconnected [`Participant`].
     pub fn partner_member_id(&self) -> MemberId {
         self.context.partner_member.clone()
     }
@@ -227,7 +229,7 @@ impl<T> Peer<T> {
 }
 
 impl Peer<New> {
-    /// Creates new [`Peer`] for [`Member`].
+    /// Creates new [`Peer`] for [`Participant`].
     pub fn new(
         id: Id,
         member_id: MemberId,
@@ -250,6 +252,10 @@ impl Peer<New> {
         }
     }
 
+    /// Add all publish endpoints to this [`Peer`].
+    ///
+    /// This also create [`Peer`]s for [`WebRtcPlayEndpoint`]s that
+    /// receive something from us.
     pub fn add_publish_endpoints(
         &mut self,
         partner_peer: &mut Peer<New>,
@@ -268,20 +274,27 @@ impl Peer<New> {
                     .filter_map(|e| {
                         let upgraded_play = e.upgrade();
                         if upgraded_play.is_none() {
-                            warn!("Empty weak pointer of publisher's play endpoint. {:?}.", e);
+                            warn!(
+                                "Empty weak pointer of publisher's play \
+                                 endpoint. {:?}.",
+                                e
+                            );
                         }
                         upgraded_play
                     })
                     .filter_map(|p| {
                         let owner = p.owner().upgrade();
                         if owner.is_none() {
-                            warn!("Empty weak pointer for publisher's play's owner participant. {:?}.", p);
+                            warn!(
+                                "Empty weak pointer for publisher's play's \
+                                 owner participant. {:?}.",
+                                p
+                            );
                         }
                         owner.map(|owner| (p, owner))
                     })
                     .filter(|(e, owner)| {
-                        owner.id() == partner_id
-                            && !e.is_connected()
+                        owner.id() == partner_id && !e.is_connected()
                     })
             })
             .for_each(|(e, _)| {

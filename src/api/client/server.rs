@@ -25,9 +25,9 @@ use crate::{
 struct RequestParams {
     /// ID of [`Room`] that WebSocket connection connects to.
     room_id: RoomId,
-    /// ID of [`Member`] that establishes WebSocket connection.
+    /// ID of [`Participant`] that establishes WebSocket connection.
     member_id: MemberId,
-    /// Credential of [`Member`] to authorize WebSocket connection with.
+    /// Credential of [`Participant`] to authorize WebSocket connection with.
     credentials: String,
 }
 
@@ -58,7 +58,7 @@ fn ws_index(
                         state.config.idle_timeout,
                     ),
                 ),
-                Err(AuthorizationError::MemberNotExists) => {
+                Err(AuthorizationError::ParticipantNotExists) => {
                     Ok(HttpResponse::NotFound().into())
                 }
                 Err(AuthorizationError::InvalidCredentials) => {

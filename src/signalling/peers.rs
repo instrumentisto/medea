@@ -12,14 +12,14 @@ use crate::{
     api::control::MemberId,
     media::{Peer, PeerId, PeerStateMachine},
     signalling::{
+        control::participant::Participant,
         room::{PeersRemoved, Room, RoomError},
-        state::participant::Participant,
     },
 };
 
 #[derive(Debug)]
 pub struct PeerRepository {
-    /// [`Peer`]s of [`Member`]s in this [`Room`].
+    /// [`Peer`]s of [`Participant`]s in this [`Room`].
     peers: HashMap<PeerId, PeerStateMachine>,
 
     /// Count of [`Peer`]s in this [`Room`].
@@ -132,7 +132,7 @@ impl PeerRepository {
         }
     }
 
-    /// Returns all [`Peer`]s of specified [`Member`].
+    /// Returns all [`Peer`]s of specified [`Participant`].
     pub fn get_peers_by_member_id(
         &self,
         member_id: &MemberId,
@@ -164,10 +164,10 @@ impl PeerRepository {
         }
     }
 
-    /// Close all related to disconnected [`Member`] [`Peer`]s and partner
+    /// Close all related to disconnected [`Participant`] [`Peer`]s and partner
     /// [`Peer`]s.
     ///
-    /// Send [`Event::PeersRemoved`] to all affected [`Member`]s.
+    /// Send [`Event::PeersRemoved`] to all affected [`Participant`]s.
     pub fn connection_closed(
         &mut self,
         member_id: &MemberId,
