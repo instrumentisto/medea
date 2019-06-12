@@ -18,8 +18,8 @@ use crate::{
     media::{MediaTrack, TrackId},
     signalling::{
         control::endpoint::{Id as EndpointId, WebRtcPublishEndpoint},
-        peers::Counter
-    }
+        peers::Counter,
+    },
 };
 
 /// Newly initialized [`Peer`] ready to signalling.

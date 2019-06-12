@@ -460,6 +460,7 @@ impl Handler<PeersRemoved> for Room {
     type Result = ActFuture<(), ()>;
 
     /// Send [`Event::PeersRemoved`] to [`Participant`].
+    #[allow(clippy::single_match_else)]
     fn handle(
         &mut self,
         msg: PeersRemoved,

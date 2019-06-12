@@ -10,10 +10,8 @@ use failure::Fail;
 use hashbrown::HashMap;
 
 use crate::{
-    api::control::{
-        MemberId, MemberSpec, RoomSpec, TryFromElementError,
-    },
-    media::PeerId
+    api::control::{MemberId, MemberSpec, RoomSpec, TryFromElementError},
+    media::PeerId,
 };
 
 use super::endpoint::{
@@ -69,7 +67,7 @@ impl Participant {
     /// Notify [`Participant`] that some [`Peer`]s removed.
     ///
     /// All [`PeerId`]s related to this [`Participant`] will be removed.
-    pub fn peers_removed(&self, peer_ids: &Vec<PeerId>) {
+    pub fn peers_removed(&self, peer_ids: &[PeerId]) {
         self.publishers()
             .into_iter()
             .for_each(|(_, p)| p.remove_peer_ids(peer_ids));
@@ -99,7 +97,7 @@ impl Participant {
         for (id, member) in &members {
             participants.insert(
                 id.clone(),
-                Arc::new(Participant::new(
+                Arc::new(Self::new(
                     id.clone(),
                     member.credentials().to_string(),
                 )),

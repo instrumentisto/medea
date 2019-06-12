@@ -57,7 +57,7 @@ impl WebRtcPlayEndpointInner {
     }
 
     fn peer_id(&self) -> Option<PeerId> {
-        self.peer_id.clone()
+        self.peer_id
     }
 
     fn reset(&mut self) {
@@ -65,7 +65,7 @@ impl WebRtcPlayEndpointInner {
     }
 }
 
-/// Signalling representation of WebRtcPlayEndpoint.
+/// Signalling representation of `WebRtcPlayEndpoint`.
 #[allow(clippy::module_name_repetitions)]
 #[derive(Debug)]
 pub struct WebRtcPlayEndpoint(Mutex<RefCell<WebRtcPlayEndpointInner>>);
@@ -163,18 +163,19 @@ impl WebRtcPublishEndpointInner {
         self.peer_ids = HashSet::new()
     }
 
+    #[allow(clippy::trivially_copy_pass_by_ref)]
     fn remove_peer_id(&mut self, peer_id: &PeerId) {
         self.peer_ids.remove(peer_id);
     }
 
-    fn remove_peer_ids(&mut self, peer_ids: &Vec<PeerId>) {
+    fn remove_peer_ids(&mut self, peer_ids: &[PeerId]) {
         for peer_id in peer_ids {
             self.remove_peer_id(peer_id)
         }
     }
 }
 
-/// Signalling representation of WebRtcPublishEndpoint.
+/// Signalling representation of `WebRtcPublishEndpoint`.
 #[allow(clippy::module_name_repetitions)]
 #[derive(Debug)]
 pub struct WebRtcPublishEndpoint(Mutex<RefCell<WebRtcPublishEndpointInner>>);
@@ -227,12 +228,13 @@ impl WebRtcPublishEndpoint {
     }
 
     /// Remove [`PeerId`] from peer_ids.
+    #[allow(clippy::trivially_copy_pass_by_ref)]
     pub fn remove_peer_id(&self, peer_id: &PeerId) {
         self.0.lock().unwrap().borrow_mut().remove_peer_id(peer_id)
     }
 
     /// Remove all [`PeerId`]s related to this [`WebRtcPublishEndpoint`].
-    pub fn remove_peer_ids(&self, peer_ids: &Vec<PeerId>) {
+    pub fn remove_peer_ids(&self, peer_ids: &[PeerId]) {
         self.0
             .lock()
             .unwrap()
