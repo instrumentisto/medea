@@ -93,11 +93,14 @@ pub struct Track {
     pub media_type: MediaType,
 }
 
-/// Representation of [`iceServers`] field of [`RTCConfiguration`] dictionary.
-
+/// Representation of [RTCIceServer][1] (item of `iceServers` field
+/// from [RTCConfiguration][2]).
+///
+/// [1]: https://developer.mozilla.org/en-US/docs/Web/API/RTCIceServer
+/// [2]: https://developer.mozilla.org/en-US/docs/Web/API/RTCConfiguration
+#[derive(Clone, Debug)]
 #[cfg_attr(feature = "medea", derive(Serialize))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
-#[derive(Clone, Debug)]
 #[cfg_attr(test, derive(PartialEq))]
 pub struct IceServer {
     pub urls: Vec<String>,

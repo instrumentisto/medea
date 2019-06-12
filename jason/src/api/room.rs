@@ -83,32 +83,28 @@ impl EventHandler for InnerRoom {
     /// Creates RTCPeerConnection with provided ID.
     fn on_peer_created(
         &mut self,
-        _peer_id: u64,
-        _sdp_offer: Option<String>,
-        _tracks: Vec<Track>,
-        _ice_servers: Vec<IceServer>,
+        _: u64,
+        _: Option<String>,
+        _: Vec<Track>,
+        _: Vec<IceServer>,
     ) {
         console::log_1(&JsValue::from_str("on_peer_created invoked"));
     }
 
     /// Applies specified SDP Answer to specified RTCPeerConnection.
-    fn on_sdp_answer_made(&mut self, _peer_id: u64, _sdp_answer: String) {
+    fn on_sdp_answer_made(&mut self, _: u64, _: String) {
         console::log_1(&JsValue::from_str("on_sdp_answer invoked"));
     }
 
     /// Applies specified ICE Candidate to specified RTCPeerConnection.
-    fn on_ice_candidate_discovered(
-        &mut self,
-        _peer_id: u64,
-        _candidate: IceCandidate,
-    ) {
+    fn on_ice_candidate_discovered(&mut self, _: u64, _: IceCandidate) {
         console::log_1(&JsValue::from_str(
             "on_ice_candidate_discovered invoked",
         ));
     }
 
     /// Disposes specified RTCPeerConnection's.
-    fn on_peers_removed(&mut self, _peer_ids: Vec<u64>) {
+    fn on_peers_removed(&mut self, _: Vec<u64>) {
         console::log_1(&JsValue::from_str("on_peers_removed invoked"));
     }
 }
