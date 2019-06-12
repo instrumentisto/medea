@@ -282,14 +282,7 @@ impl Room {
         let (first_peer_id, second_peer_id) =
             self.peers.create_peers(first_member, second_member);
 
-        // println!(
-        // "\n\nParticipants: {:#?}\n\nPeers: {:#?}\n\n",
-        // self.participants, self.peers
-        // );
-
         ctx.notify(ConnectPeers(first_peer_id, second_peer_id));
-
-        // println!("Peers: {:#?}", self.peers);
     }
 
     /// Create and interconnect all [`Peer`]s between connected [`Member`]
@@ -319,8 +312,21 @@ impl Room {
         // Create all connected publish endpoints.
         for (_id, publish) in member.publishers() {
             for receiver in publish.receivers() {
-                let receiver = receiver.upgrade().unwrap(); // TODO: unwrap
-                let receiver_owner = receiver.owner().upgrade().unwrap();
+                let receiver = if let Some(receiver) = receiver.upgrade() {
+                    receiver
+                } else {
+                    error!("Empty weak pointer for publisher receiver. {:?}. Closing room.", publish);
+                    ctx.notify(CloseRoom {});
+                    return;
+                };
+                let receiver_owner = if let Some(receiver_owner) = receiver.owner().upgrade() {
+                    receiver_owner
+                } else {
+                    error!("Empty weak pointer for publisher's receiver's owner. {:?}. Closing room.", receiver);
+                    ctx.notify(CloseRoom {});
+                    return;
+                };
+
                 if self
                     .participants
                     .member_has_connection(&receiver_owner.id())
@@ -335,24 +341,30 @@ impl Room {
             }
         }
 
-        // Create all connected play endpoint.
-        // TODO: properly unwrap Weak
+        // Create all connected play receivers peers.
         for (_id, play) in member.receivers() {
-            let play_participant = play
-                .publisher()
-                .upgrade()
-                .unwrap()
-                .owner()
-                .upgrade()
-                .unwrap();
+            let plays_publisher_participant = if let Some(plays_publisher) = play.publisher().upgrade() {
+                if let Some(owner) = plays_publisher.owner().upgrade() {
+                    owner
+                } else {
+                    error!("Empty weak pointer for play's publisher owner. {:?}. Closing room.", plays_publisher);
+                    ctx.notify(CloseRoom {});
+                    return;
+                }
+            } else {
+                error!("Empty weak pointer for play's publisher. {:?}. Closing room.", play);
+                ctx.notify(CloseRoom {});
+                return;
+            };
+
             if self
                 .participants
-                .member_has_connection(&play_participant.id())
+                .member_has_connection(&plays_publisher_participant.id())
                 && !play.is_connected()
             {
                 self.create_and_interconnect_peers(
                     &member,
-                    &play_participant,
+                    &plays_publisher_participant,
                     ctx,
                 );
             }
@@ -433,12 +445,21 @@ impl Handler<PeersRemoved> for Room {
     fn handle(
         &mut self,
         msg: PeersRemoved,
-        _ctx: &mut Self::Context,
+        ctx: &mut Self::Context,
     ) -> Self::Result {
-        self.participants
-            .get_member_by_id(&msg.member_id)
-            .unwrap()
-            .peers_removed(&msg.peers_id);
+        if let Some(participant) =
+            self.participants.get_member_by_id(&msg.member_id)
+        {
+            participant.peers_removed(&msg.peers_id);
+        } else {
+            error!(
+                "Participant with id {} for which received \
+                 Event::PeersRemoved not found. Closing room.",
+                msg.member_id
+            );
+            ctx.notify(CloseRoom {});
+            return Box::new(wrap_future(future::err(())));
+        }
 
         Box::new(
             self.send_peers_removed(msg.member_id, msg.peers_id)

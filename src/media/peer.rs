@@ -17,6 +17,7 @@ use crate::{
     media::{MediaTrack, TrackId},
     signalling::peers::Counter,
     signalling::state::endpoint::{Id as EndpointId, WebRtcPublishEndpoint},
+    log::prelude::*,
 };
 
 /// Newly initialized [`Peer`] ready to signalling.
@@ -258,20 +259,32 @@ impl Peer<New> {
         let partner_id = self.partner_member_id();
         let self_id = self.id();
 
-        // TODO: unwrap weak
         publish_endpoints
             .into_iter()
             .flat_map(|(_m, e)| {
                 e.add_peer_id(self_id);
                 e.receivers()
                     .into_iter()
-                    .map(|e| e.upgrade().unwrap())
-                    .filter(|e| {
-                        e.owner().upgrade().unwrap().id() == partner_id
+                    .filter_map(|e| {
+                        let upgraded_play = e.upgrade();
+                        if upgraded_play.is_none() {
+                            warn!("Empty weak pointer of publisher's play endpoint. {:?}.", e);
+                        }
+                        upgraded_play
+                    })
+                    .filter_map(|p| {
+                        let owner = p.owner().upgrade();
+                        if owner.is_none() {
+                            warn!("Empty weak pointer for publisher's play's owner participant. {:?}.", p);
+                        }
+                        owner.map(|owner| (p, owner))
+                    })
+                    .filter(|(e, owner)| {
+                        owner.id() == partner_id
                             && !e.is_connected()
                     })
             })
-            .for_each(|e| {
+            .for_each(|(e, _)| {
                 let track_audio = Arc::new(MediaTrack::new(
                     tracks_count.next_id(),
                     MediaType::Audio(AudioSettings {}),
