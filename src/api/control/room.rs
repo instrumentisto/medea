@@ -24,7 +24,7 @@ pub struct RoomSpec {
 }
 
 impl RoomSpec {
-    /// Returns all [`Member`]s of this [`RoomSpec`].
+    /// Returns all [`MemberSpec`]s of this [`RoomSpec`].
     pub fn members(
         &self,
     ) -> Result<HashMap<MemberId, MemberSpec>, TryFromElementError> {

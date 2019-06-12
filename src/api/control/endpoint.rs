@@ -64,7 +64,7 @@ pub struct WebRtcPlayEndpoint {
 pub struct SrcUri {
     /// ID of [`Room`]
     pub room_id: String,
-    /// ID of [`Member`]
+    /// ID of `Member`
     pub member_id: MemberId,
     /// Control ID of [`Endpoint`]
     pub endpoint_id: String,

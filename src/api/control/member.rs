@@ -11,7 +11,7 @@ use super::{
     Element, TryFromElementError,
 };
 
-/// ID of [`Member`].
+/// ID of `Member`.
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq)]
 pub struct Id(pub String);
 
@@ -25,10 +25,10 @@ impl Display for Id {
 #[allow(clippy::module_name_repetitions)]
 #[derive(Clone, Debug)]
 pub struct MemberSpec {
-    /// Spec of this [`Member`].
+    /// Spec of this `Member`.
     pipeline: Pipeline,
 
-    /// Credentials to authorize [`Member`] with.
+    /// Credentials to authorize `Member` with.
     credentials: String,
 }
 

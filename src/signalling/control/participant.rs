@@ -287,11 +287,11 @@ impl Participant {
 
 #[cfg(test)]
 mod participant_loading_tests {
-    use super::*;
-
     use std::sync::Arc;
 
     use crate::api::control::Element;
+
+    use super::*;
 
     #[test]
     pub fn load_store() {
