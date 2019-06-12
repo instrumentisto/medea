@@ -8,9 +8,9 @@ async function f() {
     caller.join_room("ws://localhost:8080/ws/video-call-1/responder/test");
 
     // Use this for testing with 3 members.
-    // caller.join_room("ws://localhost:8080/ws/video-call-3/caller/test");
-    // caller.join_room("ws://localhost:8080/ws/video-call-3/responder/test");
-    // caller.join_room("ws://localhost:8080/ws/video-call-3/responder2/test");
+    // caller.join_room("ws://localhost:8080/ws/three-members-conference/caller/test");
+    // caller.join_room("ws://localhost:8080/ws/three-members-conference/responder/test");
+    // caller.join_room("ws://localhost:8080/ws/three-members-conference/responder2/test");
 
 
     // caller.join_room("ws://localhost:8080/ws/1/2/responder_credentials");
@@ -19,7 +19,6 @@ async function f() {
     // let responder_room_handler = await responder.join_room("ws://localhost:8080/ws/1/2/responder_credentials");
 
     // caller.dispose();
-    // responder.dispose();
 }
 
 f();
