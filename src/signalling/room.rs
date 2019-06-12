@@ -470,7 +470,10 @@ impl Handler<PeersRemoved> for Room {
         msg: PeersRemoved,
         ctx: &mut Self::Context,
     ) -> Self::Result {
-        info!("Peers {:?} removed for member '{}'.", msg.peers_id, msg.member_id);
+        info!(
+            "Peers {:?} removed for member '{}'.",
+            msg.peers_id, msg.member_id
+        );
         if let Some(participant) =
             self.participants.get_member_by_id(&msg.member_id)
         {
