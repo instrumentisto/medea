@@ -29,9 +29,9 @@ use crate::{
     utils::{Callback2, WasmErr},
 };
 
+/// Room handle accessible from JS.
 #[allow(clippy::module_name_repetitions)]
 #[wasm_bindgen]
-/// Room handle accessible from JS.
 pub struct RoomHandle(Weak<RefCell<InnerRoom>>);
 
 #[wasm_bindgen]
@@ -248,8 +248,12 @@ impl EventHandler for InnerRoom {
     ) {
         if let Some(peer) = self.peers.get_peer(peer_id) {
             spawn_local(
-                peer.add_ice_candidate(&candidate)
-                    .map_err(|err| err.log_err()),
+                peer.add_ice_candidate(
+                    &candidate.candidate,
+                    candidate.sdp_m_line_index,
+                    &candidate.sdp_mid,
+                )
+                .map_err(|err| err.log_err()),
             );
         } else {
             // TODO: No peer, whats next?
@@ -299,7 +303,7 @@ impl PeerEventHandler for InnerRoom {
                 "NewRemoteStream from sender without connection",
             )
             .log_err(),
-            Some(connection) => connection.new_remote_stream(remote_stream),
+            Some(connection) => connection.new_remote_stream(&remote_stream),
         }
     }
 }

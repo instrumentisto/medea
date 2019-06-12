@@ -1,8 +1,9 @@
-//! External Jason API.
 mod peer;
 mod stream;
+mod stream_request;
+mod track;
 
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, convert::TryFrom, rc::Rc};
 
 use futures::{
     future::{self, Either},
@@ -12,6 +13,7 @@ use futures::{
 use wasm_bindgen_futures::JsFuture;
 use web_sys::MediaStream as BackingMediaStream;
 
+use crate::media::stream_request::{SimpleStreamRequest, StreamRequest};
 use crate::utils::{window, Callback2, WasmErr};
 
 pub use self::{
@@ -19,8 +21,10 @@ pub use self::{
         Id as PeerId, PeerConnection, PeerEvent, PeerEventHandler,
         PeerRepository, Sdp,
     },
-    stream::{GetMediaRequest, MediaStream, MediaStreamHandle},
+    stream::{MediaStream, MediaStreamHandle},
 };
+use futures::future::IntoFuture;
+use wasm_bindgen::JsValue;
 
 #[derive(Default)]
 #[allow(clippy::module_name_repetitions)]
@@ -35,34 +39,24 @@ struct InnerMediaManager {
 impl MediaManager {
     pub fn get_stream(
         &self,
-        request: &GetMediaRequest,
+        request: StreamRequest,
     ) -> impl Future<Item = Rc<MediaStream>, Error = ()> {
-        // TODO: lookup stream by caps, return its copy if found
-
-        let stream = match self.inner_get_stream(request) {
-            Ok(promise) => JsFuture::from(promise).map_err(WasmErr::from),
-            Err(err) => {
-                self.0.borrow().on_local_stream.call2(err);
-                return Either::A(future::err(()));
-            }
-        };
+        // TODO: lookup stream by caps, and return its copy if found
 
         let inner: Rc<RefCell<InnerMediaManager>> = Rc::clone(&self.0);
-        let fut = stream.then(move |res| match res {
-            Ok(stream) => {
-                let stream =
-                    MediaStream::from_stream(BackingMediaStream::from(stream));
-                inner.borrow_mut().streams.push(Rc::clone(&stream));
-                inner.borrow().on_local_stream.call1(stream.new_handle());
-                Ok(stream)
-            }
-            Err(err) => {
-                inner.borrow().on_local_stream.call2(err);
-                Err(())
-            }
-        });
-
-        Either::B(fut)
+        self.inner_get_stream(request)
+            .then(move |result| match result {
+                Ok(stream) => {
+                    let stream = Rc::new(stream);
+                    inner.borrow_mut().streams.push(Rc::clone(&stream));
+                    inner.borrow().on_local_stream.call1(stream.new_handle());
+                    Ok(stream)
+                }
+                Err(err) => {
+                    inner.borrow().on_local_stream.call2(err);
+                    Err(())
+                }
+            })
     }
 
     pub fn on_local_stream(&self, f: js_sys::Function) {
@@ -71,12 +65,31 @@ impl MediaManager {
 
     fn inner_get_stream(
         &self,
-        caps: &GetMediaRequest,
-    ) -> Result<js_sys::Promise, WasmErr> {
-        window()
-            .navigator()
-            .media_devices()?
-            .get_user_media_with_constraints(&caps.into())
-            .map_err(WasmErr::from)
+        caps: StreamRequest,
+    ) -> impl Future<Item = MediaStream, Error = WasmErr> {
+        let request = match SimpleStreamRequest::try_from(caps) {
+            Ok(request) => request,
+            Err(err) => return Either::A(future::err(err)),
+        };
+
+        let constraints = web_sys::MediaStreamConstraints::from(&request);
+        Either::B(
+            window()
+                .navigator()
+                .media_devices()
+                .map_err(WasmErr::from)
+                .into_future()
+                .and_then(move |devices| {
+                    devices
+                        .get_user_media_with_constraints(&constraints)
+                        .map_err(WasmErr::from)
+                })
+                .and_then(|promise: js_sys::Promise| {
+                    JsFuture::from(promise).map_err(WasmErr::from)
+                })
+                .and_then(move |stream| {
+                    request.parse_stream(BackingMediaStream::from(stream))
+                }),
+        )
     }
 }

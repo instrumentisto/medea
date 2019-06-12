@@ -8,7 +8,7 @@ use futures::future::{Future, IntoFuture};
 use macro_attr::*;
 use medea_client_api_proto::{ClientMsg, ServerMsg};
 use newtype_derive::NewtypeFrom;
-use web_sys::{CloseEvent, Event, MessageEvent, WebSocket as BackingSocket};
+use web_sys::{CloseEvent, Event, MessageEvent, WebSocket as SysWebSocket};
 
 use crate::{
     rpc::CloseMsg,
@@ -51,12 +51,12 @@ impl TryFrom<u16> for State {
 }
 
 struct InnerSocket {
-    socket: Rc<BackingSocket>,
+    socket: Rc<SysWebSocket>,
     socket_state: State,
-    on_open: Option<EventListener<BackingSocket, Event>>,
-    on_message: Option<EventListener<BackingSocket, MessageEvent>>,
-    on_close: Option<EventListener<BackingSocket, CloseEvent>>,
-    on_error: Option<EventListener<BackingSocket, Event>>,
+    on_open: Option<EventListener<SysWebSocket, Event>>,
+    on_message: Option<EventListener<SysWebSocket, MessageEvent>>,
+    on_close: Option<EventListener<SysWebSocket, CloseEvent>>,
+    on_error: Option<EventListener<SysWebSocket, Event>>,
 }
 
 pub struct WebSocket(Rc<RefCell<InnerSocket>>);
@@ -65,7 +65,7 @@ impl InnerSocket {
     fn new(url: &str) -> Result<Self, WasmErr> {
         Ok(Self {
             socket_state: State::CONNECTING,
-            socket: Rc::new(BackingSocket::new(url)?),
+            socket: Rc::new(SysWebSocket::new(url)?),
             on_open: None,
             on_message: None,
             on_close: None,
