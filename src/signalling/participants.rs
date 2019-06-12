@@ -64,10 +64,25 @@ impl ParticipantService {
     ) -> Result<Self, ParticipantsLoadError> {
         let members = Participant::load_store(room_spec)?;
 
-        // TODO: more informative msg
         debug!(
-            "Created room with {:?} members.",
-            members.iter().map(|(id, _)| id).collect::<Vec<&MemberId>>()
+            "Created ParticipantService with participants: {:?}.",
+            members
+                .iter()
+                .map(|(id, p)| {
+                    format!(
+                        "{{ id: {}, receivers: {:?}, publishers: {:?} }};",
+                        id,
+                        p.receivers()
+                            .into_iter()
+                            .map(|(id, _)| id.to_string())
+                            .collect::<Vec<String>>(),
+                        p.publishers()
+                            .into_iter()
+                            .map(|(id, _)| id.to_string())
+                            .collect::<Vec<String>>()
+                    )
+                })
+                .collect::<Vec<String>>()
         );
 
         Ok(Self {

@@ -2,6 +2,7 @@
 
 use std::{
     cell::RefCell,
+    fmt::Display,
     sync::{Mutex, Weak},
 };
 
@@ -17,6 +18,12 @@ use super::participant::Participant;
 /// ID of endpoint.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Id(pub String);
+
+impl Display for Id {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(fmt, "{}", self.0)
+    }
+}
 
 #[derive(Debug, Clone)]
 struct WebRtcPlayEndpointInner {
