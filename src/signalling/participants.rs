@@ -9,6 +9,7 @@ use actix::{
     fut::wrap_future, ActorFuture, AsyncContext, Context, MailboxError,
     SpawnHandle,
 };
+use failure::Fail;
 use futures::{
     future::{self, join_all, Either},
     Future,
@@ -17,6 +18,7 @@ use hashbrown::HashMap;
 
 use medea_client_api_proto::Event;
 
+use crate::signalling::RoomId;
 use crate::{
     api::{
         client::rpc_connection::{
@@ -34,10 +36,15 @@ use crate::{
     turn::{TurnAuthService, TurnServiceErr, UnreachablePolicy},
 };
 
-#[derive(Debug)]
+#[derive(Fail, Debug)]
 #[allow(clippy::module_name_repetitions)]
 pub enum ParticipantServiceErr {
+    #[fail(display = "TurnService Error in ParticipantService: {}", _0)]
     TurnServiceErr(TurnServiceErr),
+    #[fail(
+        display = "Mailbox error when accessing ParticipantService: {}",
+        _0
+    )]
     MailBoxErr(MailboxError),
 }
 
@@ -56,8 +63,11 @@ impl From<MailboxError> for ParticipantServiceErr {
 /// Participant is [`Member`] with [`RpcConnection`]. [`ParticipantService`]
 /// stores [`Members`] and associated [`RpcConnection`]s, handles
 /// [`RpcConnection`] authorization, establishment, message sending.
-#[cfg_attr(not(test), derive(Debug))]
+#[derive(Debug)]
 pub struct ParticipantService {
+    /// [`Room`]s id from which this [`ParticipantService`] was created.
+    room_id: RoomId,
+
     /// [`Member`]s which currently are present in this [`Room`].
     members: HashMap<MemberId, Member>,
 
@@ -81,11 +91,13 @@ pub struct ParticipantService {
 
 impl ParticipantService {
     pub fn new(
+        room_id: RoomId,
         members: HashMap<MemberId, Member>,
         turn: Box<dyn TurnAuthService>,
         reconnect_timeout: Duration,
     ) -> Self {
         Self {
+            room_id,
             members,
             turn,
             connections: HashMap::new(),
@@ -172,12 +184,12 @@ impl ParticipantService {
             Box::new(wrap_future(connection.close().then(|_| Ok(()))))
         } else {
             self.connections.insert(member_id, con);
-
             Box::new(
-                wrap_future(
-                    self.turn
-                        .create_user(member_id, UnreachablePolicy::default()),
-                )
+                wrap_future(self.turn.create(
+                    member_id,
+                    self.room_id,
+                    UnreachablePolicy::ReturnErr,
+                ))
                 .map_err(|err, _: &mut Room, _| {
                     ParticipantServiceErr::from(err)
                 })
@@ -212,7 +224,11 @@ impl ParticipantService {
         match reason {
             ClosedReason::Closed => {
                 self.connections.remove(&member_id);
-                self.delete_ice_user(member_id);
+                ctx.spawn(wrap_future(
+                    self.delete_ice_user(member_id).map_err(|err| {
+                        error!("Error deleting IceUser {:?}", err)
+                    }),
+                ));
                 ctx.notify(CloseRoom {})
             }
             ClosedReason::Lost => {
@@ -235,17 +251,25 @@ impl ParticipantService {
     }
 
     /// Deletes [`IceUser`] associated with provided [`Member`].
-    fn delete_ice_user(&mut self, member_id: MemberId) {
-        if let Some(mut member) = self.members.remove(&member_id) {
-            if let Some(ice_user) = member.ice_user.take() {
-                self.turn.delete_user(ice_user);
+    fn delete_ice_user(
+        &mut self,
+        member_id: MemberId,
+    ) -> Box<dyn Future<Item = (), Error = TurnServiceErr>> {
+        match self.members.remove(&member_id) {
+            Some(mut member) => {
+                let delete_fut = match member.ice_user.take() {
+                    Some(ice_user) => self.turn.delete(vec![ice_user]),
+                    None => Box::new(future::ok(())),
+                };
+                self.members.insert(member_id, member);
+
+                delete_fut
             }
-            self.members.insert(member_id, member);
+            None => Box::new(future::ok(())),
         }
     }
 
     /// Cancels all connection close tasks, closes all [`RpcConnection`]s,
-    /// **does not** clears Turn credentials.
     pub fn drop_connections(
         &mut self,
         ctx: &mut Context<Room>,
@@ -256,7 +280,7 @@ impl ParticipantService {
         });
 
         // closing all RpcConnection's
-        let close_fut = self.connections.drain().fold(
+        let mut close_fut = self.connections.drain().fold(
             vec![],
             |mut futures, (_, mut connection)| {
                 futures.push(connection.close());
@@ -264,29 +288,21 @@ impl ParticipantService {
             },
         );
 
+        // deleting all IceUsers
+        let remove_ice_users = Box::new({
+            let mut room_users = Vec::with_capacity(self.members.len());
+
+            self.members.iter_mut().for_each(|(_, data)| {
+                if let Some(ice_user) = data.ice_user.take() {
+                    room_users.push(ice_user);
+                }
+            });
+            self.turn
+                .delete(room_users)
+                .map_err(|err| error!("Error removing IceUsers {:?}", err))
+        });
+        close_fut.push(remove_ice_users);
+
         join_all(close_fut).map(|_| ())
     }
-}
-
-#[cfg(test)]
-
-pub mod test {
-    use std::fmt::{Debug, Formatter, Result};
-
-    use super::*;
-
-    impl Debug for ParticipantService {
-        fn fmt(&self, f: &mut Formatter) -> Result {
-            write!(
-                f,
-                "ParticipantService {{ members: {:?}, connections: {:?}, \
-                 reconnect_timeout: {:?}, drop_connection_tasks: {:?} }}",
-                self.members,
-                self.connections,
-                self.reconnect_timeout,
-                self.drop_connection_tasks
-            )
-        }
-    }
-
 }

@@ -1,130 +1,107 @@
 //! Abstraction over remote Redis database used to store Turn server
 //! credentials.
-use actix::{Addr, MailboxError};
-use actix_redis::{Command, RedisActor};
+use std::time::Duration;
+
+use bb8::{Pool, RunError};
+use bb8_redis::{RedisConnectionManager, RedisPool};
 use crypto::{digest::Digest, md5::Md5};
 use failure::Fail;
 use futures::future::Future;
-use redis_async::{resp::RespValue, resp_array};
+use redis::{ConnectionInfo, RedisError};
+use tokio::prelude::*;
 
 use crate::{log::prelude::*, media::IceUser};
 
 #[derive(Fail, Debug)]
 pub enum TurnDatabaseErr {
-    #[fail(display = "RedisActor is unreachable: {}", _0)]
-    MailboxError(MailboxError),
     #[fail(display = "Redis returned error: {}", _0)]
-    RedisError(actix_redis::Error),
-    #[fail(display = "Redis returned unknown answer {:?}", _0)]
-    UnknownAnswer(RespValue),
+    RedisError(RedisError),
 }
 
-impl From<MailboxError> for TurnDatabaseErr {
-    fn from(err: MailboxError) -> Self {
-        TurnDatabaseErr::MailboxError(err)
-    }
-}
-
-impl From<actix_redis::Error> for TurnDatabaseErr {
-    fn from(err: actix_redis::Error) -> Self {
+impl From<RedisError> for TurnDatabaseErr {
+    fn from(err: RedisError) -> Self {
         TurnDatabaseErr::RedisError(err)
-    }
-}
-
-impl From<RespValue> for TurnDatabaseErr {
-    fn from(err: RespValue) -> Self {
-        TurnDatabaseErr::UnknownAnswer(err)
     }
 }
 
 // Abstraction over remote Redis database used to store Turn server
 // credentials.
 #[allow(clippy::module_name_repetitions)]
-pub struct TurnDatabase(Addr<RedisActor>);
+#[derive(Debug)]
+pub struct TurnDatabase {
+    pool: RedisPool,
+    info: ConnectionInfo,
+}
 
-//TODO: Auth after reconnect.
 impl TurnDatabase {
-    pub fn new<S: Into<String>>(addr: S) -> Self {
-        Self(RedisActor::start(addr))
-    }
+    /// New TurnDatabase
+    pub fn new<S: Into<ConnectionInfo> + Clone>(
+        connection_timeout: Duration,
+        connection_info: S,
+    ) -> Result<Self, TurnDatabaseErr> {
+        let client = redis::Client::open(connection_info.clone().into())?;
+        let connection_manager = RedisConnectionManager::new(client)?;
 
-    /// Connects and authenticates connection with remote Redis database.
-    pub fn init(&self, db_pass: &str) -> impl Future<Item = (), Error = ()> {
-        self.0
-            .send(Command(resp_array!["AUTH", db_pass]))
-            .map_err(|err| error!("Redis service unreachable: {}", err))
-            .map(|res| {
-                match res {
-                    Ok(RespValue::SimpleString(ref x)) if x == "OK" => {
-                        info!("Redis authenticate success.")
-                    }
-                    Ok(RespValue::Error(err)) => {
-                        error!("Redis authenticate filed: {}", err)
-                    }
-                    Err(err) => error!("Redis service error: {}", err),
-                    _ => (),
-                };
-            })
+        // Its safe to unwrap here, since this err comes directly from mio and
+        // means that mio doesnt have bindings for this target, which wont
+        // happen.
+        let mut runtime = tokio::runtime::Runtime::new()
+            .expect("Unable to create a runtime in TurnDatabase");
+        let pool = runtime.block_on(future::lazy(move || {
+            Pool::builder()
+                .connection_timeout(connection_timeout)
+                .build(connection_manager)
+        }))?;
+        let redis_pool = RedisPool::new(pool);
+
+        Ok(Self {
+            pool: redis_pool,
+            info: connection_info.into(),
+        })
     }
 
     /// Inserts provided [`IceUser`] into remote Redis database.
     pub fn insert(
         &mut self,
-        ice_user: &IceUser,
-    ) -> impl Future<Item = (), Error = TurnDatabaseErr> {
-        debug!("Store ICE user: {:?}", ice_user);
-        let key = format!("turn/realm/medea/user/{}/key", ice_user.name);
-        let value = format!("{}:medea:{}", ice_user.name, ice_user.pass);
+        user: &IceUser,
+    ) -> impl Future<Item = (), Error = RunError<TurnDatabaseErr>> {
+        debug!("Store ICE user: {:?}", user);
+
+        let key = format!("turn/realm/medea/user/{}/key", user.user());
+        let value = format!("{}:medea:{}", user.user(), user.pass());
+
         let mut hasher = Md5::new();
         hasher.input_str(&value);
         let result = hasher.result_str();
-        Box::new(
-            self.0
-                .send(Command(resp_array!["SET", key, result]))
-                .map_err(TurnDatabaseErr::MailboxError)
-                .and_then(Self::parse_redis_answer),
-        )
+
+        self.pool.run(|connection| {
+            redis::cmd("SET")
+                .arg(key)
+                .arg(result)
+                .query_async(connection)
+                .map_err(TurnDatabaseErr::RedisError)
+        })
     }
 
-    /// Deletes provided [`IceUser`] from remote Redis database.
+    /// Deletes batch of provided [`IceUser`]s.
     pub fn remove(
         &mut self,
-        ice_user: &IceUser,
-    ) -> impl Future<Item = (), Error = TurnDatabaseErr> {
-        debug!("Delete ICE user: {:?}", ice_user);
-        let key = format!("turn/realm/medea/user/{}/key", ice_user.name);
-        Box::new(
-            self.0
-                .send(Command(resp_array!["DEL", key]))
-                .map_err(Into::into)
-                .and_then(Self::parse_redis_answer),
-        )
-    }
+        users: &[IceUser],
+    ) -> impl Future<Item = (), Error = bb8::RunError<TurnDatabaseErr>> {
+        debug!("Remove ICE users: {:?}", users);
+        let mut delete_keys = Vec::with_capacity(users.len());
 
-    /// Parse result from raw Redis answer.
-    fn parse_redis_answer(
-        result: Result<RespValue, actix_redis::Error>,
-    ) -> Result<(), TurnDatabaseErr> {
-        match result {
-            Ok(resp) => {
-                if let RespValue::SimpleString(ref answer) = resp {
-                    if answer == "OK" {
-                        return Ok(());
-                    }
-                }
-                Err(TurnDatabaseErr::from(resp))
-            }
-            Err(err) => Err(TurnDatabaseErr::from(err)),
+        for user in users {
+            delete_keys
+                .push(format!("turn/realm/medea/user/{}/key", user.user()));
         }
-    }
-}
 
-impl std::fmt::Debug for TurnDatabase {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "TurnAuthRepo {{RedisActor {{connected:{}}}}}",
-            self.0.connected()
-        )
+        self.pool.run(|connection| {
+            redis::cmd("DEL")
+                .arg(delete_keys)
+                .to_owned()
+                .query_async(connection)
+                .map_err(TurnDatabaseErr::RedisError)
+        })
     }
 }

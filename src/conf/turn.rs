@@ -1,6 +1,9 @@
 //! STUN/TURN server settings.
 
-use std::net::{IpAddr, Ipv4Addr, SocketAddr, ToSocketAddrs as _};
+use std::{
+    net::{IpAddr, Ipv4Addr, SocketAddr, ToSocketAddrs as _},
+    time::Duration,
+};
 
 use serde::{Deserialize, Serialize};
 use smart_default::*;
@@ -9,8 +12,8 @@ use smart_default::*;
 #[derive(Clone, Debug, Deserialize, Serialize, SmartDefault)]
 #[serde(default)]
 pub struct Turn {
-    /// Redis server settings.
-    pub redis: Redis,
+    /// Database settings
+    pub db: Db,
     /// IP address STUN/TURN server. Defaults to `0.0.0.0`.
     #[default(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)))]
     pub ip: IpAddr,
@@ -39,6 +42,13 @@ impl Turn {
 
 #[derive(Clone, Debug, Deserialize, Serialize, SmartDefault)]
 #[serde(default)]
+pub struct Db {
+    /// Redis server settings.
+    pub redis: Redis,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, SmartDefault)]
+#[serde(default)]
 pub struct Redis {
     /// IP address Redis server. Defaults to `0.0.0.0`.
     #[default(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)))]
@@ -49,16 +59,11 @@ pub struct Redis {
     /// Password for authorize on Redis server.
     #[default(String::from("turn"))]
     pub pass: String,
-}
-
-impl Redis {
-    /// Builds [`SocketAddr`] from `ip` and `port`.
-    #[inline]
-    pub fn addr(&self) -> SocketAddr {
-        (self.ip, self.port)
-            .to_socket_addrs()
-            .unwrap()
-            .next()
-            .unwrap()
-    }
+    /// The database number to use. This is usually 0.
+    #[default(0)]
+    pub db_number: i64,
+    /// The duration to wait to start a connection before returning err.
+    #[default(Duration::from_secs(5))]
+    #[serde(with = "serde_humantime")]
+    pub connection_timeout: Duration,
 }

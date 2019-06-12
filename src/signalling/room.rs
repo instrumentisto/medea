@@ -1,6 +1,8 @@
 //! Room definitions and implementations. Room is responsible for media
 //! connection establishment between concrete [`Member`]s.
 
+use std::time::Duration;
+
 use actix::{
     fut::wrap_future, Actor, ActorFuture, AsyncContext, Context, Handler,
     Message,
@@ -8,9 +10,8 @@ use actix::{
 use failure::Fail;
 use futures::future;
 use hashbrown::HashMap;
-use medea_client_api_proto::{Command, Event, IceCandidate};
 
-use std::time::Duration;
+use medea_client_api_proto::{Command, Event, IceCandidate};
 
 use crate::{
     api::{
@@ -88,6 +89,7 @@ impl Room {
             id,
             peers: PeerRepository::from(peers),
             participants: ParticipantService::new(
+                id,
                 members,
                 turn,
                 reconnect_timeout,
@@ -133,7 +135,7 @@ impl Room {
             .ice_user
             .as_ref()
             .ok_or_else(|| RoomError::NoTurnCredentials(member_id))?
-            .to_servers_list();
+            .servers_list();
         let peer_created = Event::PeerCreated {
             peer_id: sender.id(),
             sdp_offer: None,
@@ -172,7 +174,7 @@ impl Room {
             .ice_user
             .as_ref()
             .ok_or_else(|| RoomError::NoTurnCredentials(to_member_id))?
-            .to_servers_list();
+            .servers_list();
 
         let event = Event::PeerCreated {
             peer_id: to_peer_id,
@@ -261,6 +263,7 @@ impl Room {
 
 /// [`Actor`] implementation that provides an ergonomic way
 /// to interact with [`Room`].
+// TODO: close connections on signal (gracefull shutdown)
 impl Actor for Room {
     type Context = Context<Self>;
 }
@@ -446,6 +449,7 @@ mod test {
     use std::sync::{atomic::AtomicUsize, Arc, Mutex};
 
     use actix::{Addr, Arbiter, System};
+
     use medea_client_api_proto::{
         AudioSettings, Direction, IceServer, MediaType, Track, VideoSettings,
     };

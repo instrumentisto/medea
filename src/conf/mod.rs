@@ -199,17 +199,28 @@ mod tests {
     fn redis_conf_test() {
         let default_conf = Conf::default();
 
-        env::set_var("MEDEA_TURN.REDIS.IP", "5.5.5.5");
-        env::set_var("MEDEA_TURN.REDIS.PORT", "1234");
+        env::set_var("MEDEA_TURN.DB.REDIS.IP", "5.5.5.5");
+        env::set_var("MEDEA_TURN.DB.REDIS.PORT", "1234");
+        env::set_var("MEDEA_TURN.DB.REDIS.CONNECTION_TIMEOUT", "10s");
 
         let env_conf = Conf::parse().unwrap();
 
-        assert_ne!(default_conf.turn.redis.ip, env_conf.turn.redis.ip);
-        assert_ne!(default_conf.turn.redis.port, env_conf.turn.redis.port);
+        assert_ne!(default_conf.turn.db.redis.ip, env_conf.turn.db.redis.ip);
+        assert_ne!(
+            default_conf.turn.db.redis.connection_timeout,
+            env_conf.turn.db.redis.connection_timeout
+        );
+        assert_ne!(
+            default_conf.turn.db.redis.connection_timeout,
+            env_conf.turn.db.redis.connection_timeout
+        );
 
-        assert_eq!(env_conf.turn.redis.ip, Ipv4Addr::new(5, 5, 5, 5));
-        assert_eq!(env_conf.turn.redis.port, 1234);
-        assert_eq!(env_conf.turn.redis.addr(), "5.5.5.5:1234".parse().unwrap());
+        assert_eq!(env_conf.turn.db.redis.ip, Ipv4Addr::new(5, 5, 5, 5));
+        assert_eq!(env_conf.turn.db.redis.port, 1234);
+        assert_eq!(
+            env_conf.turn.db.redis.connection_timeout,
+            Duration::from_secs(10)
+        )
     }
 
     #[test]

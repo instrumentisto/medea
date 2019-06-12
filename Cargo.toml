@@ -11,6 +11,7 @@ repository = "https://github.com/instrumentisto/medea"
 
 [workspace]
 members = [
+    "crates/medea-macro",
     "jason",
     "proto/client-api",
 ]
@@ -20,8 +21,9 @@ lto = "thin"
 
 [dependencies]
 actix = "0.7"
-actix-redis = "0.5"
 actix-web = "0.7"
+bb8 = "0.3"
+bb8-redis = "0.3"
 config = "0.9"
 chrono = "0.4"
 dotenv = "0.13"
@@ -31,9 +33,10 @@ hashbrown = "0.1"
 humantime = "1.2"
 macro-attr = "0.2"
 medea-client-api-proto = { path = "proto/client-api", features = ["medea"] }
+medea-macro = { path = "crates/medea-macro" }
 newtype_derive = "0.1"
 rand = "0.6"
-redis-async = "0.4"
+redis = "0.10"
 rust-crypto = "0.2"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
@@ -44,6 +47,7 @@ slog-async = "2.3"
 slog-json = "2.3"
 slog-scope = "4.1"
 smart-default = "0.5"
+tokio = "0.1"
 toml = "0.4"
 [dependencies.serde-humantime]
     git = "https://github.com/tailhook/serde-humantime"
@@ -52,4 +56,3 @@ toml = "0.4"
 [dev-dependencies]
 serial_test = "0.2"
 serial_test_derive = "0.2"
-tokio = "0.1"
