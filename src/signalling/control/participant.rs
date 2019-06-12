@@ -84,6 +84,11 @@ impl Participant {
         self.0.lock().unwrap().borrow().id.clone()
     }
 
+    /// Returns credentials of this [`Participant`].
+    pub fn credentials(&self) -> String {
+        self.0.lock().unwrap().borrow().credentials.clone()
+    }
+
     /// Creates all empty [`Participant`] from [`RoomSpec`] and then
     /// load all related to this [`Participant`]s receivers and publishers.
     ///
@@ -109,11 +114,6 @@ impl Participant {
         }
 
         Ok(participants)
-    }
-
-    /// Returns credentials of this [`Participant`].
-    pub fn credentials(&self) -> String {
-        self.0.lock().unwrap().borrow().credentials.clone()
     }
 
     /// Returns all publishers of this [`Participant`].
@@ -240,7 +240,7 @@ impl Participant {
         Ok(())
     }
 
-    /// Insert new receiver into this [`Participant`].
+    /// Insert receiver into this [`Participant`].
     pub fn insert_receiver(
         &self,
         id: EndpointId,
@@ -254,7 +254,7 @@ impl Participant {
             .insert(id, endpoint);
     }
 
-    /// Insert new publisher into this [`Participant`].
+    /// Insert publisher into this [`Participant`].
     pub fn insert_publisher(
         &self,
         id: EndpointId,
@@ -275,6 +275,111 @@ impl Participant {
     ) -> Option<Arc<WebRtcPublishEndpoint>> {
         self.0.lock().unwrap().borrow().publishers.get(id).cloned()
     }
+
+    /// Lookup [`WebRtcPlayEndpoint`] receiver by id.
+    pub fn get_receiver_by_id(
+        &self,
+        id: &EndpointId,
+    ) -> Option<Arc<WebRtcPlayEndpoint>> {
+        self.0.lock().unwrap().borrow().receivers.get(id).cloned()
+    }
 }
 
-// TODO (evdokimovs): add Participant unit tests
+#[cfg(test)]
+mod participant_loading_tests {
+    use super::*;
+
+    use std::sync::Arc;
+
+    use crate::api::control::Element;
+
+    #[test]
+    pub fn load_store() {
+        let spec = r#"
+            kind: Room
+            id: test-call
+            spec:
+              pipeline:
+                caller:
+                  kind: Member
+                  credentials: test
+                  spec:
+                    pipeline:
+                      publish:
+                        kind: WebRtcPublishEndpoint
+                        spec:
+                          p2p: Always
+                some-member:
+                  kind: Member
+                  credentials: test
+                  spec:
+                    pipeline:
+                      publish:
+                        kind: WebRtcPublishEndpoint
+                        spec:
+                          p2p: Always
+                responder:
+                  kind: Member
+                  credentials: test
+                  spec:
+                    pipeline:
+                      play:
+                        kind: WebRtcPlayEndpoint
+                        spec:
+                          src: "local://test-call/caller/publish"
+                      play2:
+                        kind: WebRtcPlayEndpoint
+                        spec:
+                          src: "local://test-call/some-member/publish"
+        "#;
+        let room_element: Element = serde_yaml::from_str(&spec).unwrap();
+        let room_spec = RoomSpec::try_from(&room_element).unwrap();
+        let store = Participant::load_store(&room_spec).unwrap();
+
+        let caller = store.get(&MemberId("caller".to_string())).unwrap();
+        let responder = store.get(&MemberId("responder".to_string())).unwrap();
+
+        let caller_publish_endpoint = caller
+            .get_publisher_by_id(&EndpointId("publish".to_string()))
+            .unwrap();
+        let responder_play_endpoint = responder
+            .get_receiver_by_id(&EndpointId("play".to_string()))
+            .unwrap();
+
+        let is_caller_has_responder_in_receivers = caller_publish_endpoint
+            .receivers()
+            .into_iter()
+            .map(|p| p.upgrade().unwrap())
+            .filter(|p| Arc::ptr_eq(p, &responder_play_endpoint))
+            .count()
+            == 1;
+        assert!(is_caller_has_responder_in_receivers);
+
+        assert!(Arc::ptr_eq(
+            &responder_play_endpoint.publisher().upgrade().unwrap(),
+            &caller_publish_endpoint
+        ));
+
+        let some_participant =
+            store.get(&MemberId("some-member".to_string())).unwrap();
+        assert!(some_participant.receivers().is_empty());
+        assert_eq!(some_participant.publishers().len(), 1);
+
+        let responder_play2_endpoint = responder
+            .get_receiver_by_id(&EndpointId("play2".to_string()))
+            .unwrap();
+        let some_participant_publisher = some_participant
+            .get_publisher_by_id(&EndpointId("publish".to_string()))
+            .unwrap();
+        assert_eq!(some_participant_publisher.receivers().len(), 1);
+        let is_some_participant_has_responder_in_receivers =
+            some_participant_publisher
+                .receivers()
+                .into_iter()
+                .map(|p| p.upgrade().unwrap())
+                .filter(|p| Arc::ptr_eq(p, &responder_play2_endpoint))
+                .count()
+                == 1;
+        assert!(is_some_participant_has_responder_in_receivers);
+    }
+}
