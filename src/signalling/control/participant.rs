@@ -219,8 +219,8 @@ impl Participant {
             }
         }
 
-        // First of all, it is necessary to create [`WebRtcPublishEndpoint`]s
-        // to which no [`WebRtcPlayEndpoint`] refers.
+        // This is necessary to create [`WebRtcPublishEndpoint`],
+        // to which none [`WebRtcPlayEndpoint`] refers.
         this_member_spec.publish_endpoints().into_iter().for_each(
             |(name, e)| {
                 let endpoint_id = EndpointId(name.clone());
@@ -268,7 +268,7 @@ impl Participant {
             .insert(id, endpoint);
     }
 
-    /// Lookup [`WebRtcPublishEndpoint`] publisher by id.
+    /// Lookup [`WebRtcPublishEndpoint`] publisher by [`EndpointId`].
     pub fn get_publisher_by_id(
         &self,
         id: &EndpointId,
@@ -276,7 +276,7 @@ impl Participant {
         self.0.lock().unwrap().borrow().publishers.get(id).cloned()
     }
 
-    /// Lookup [`WebRtcPlayEndpoint`] receiver by id.
+    /// Lookup [`WebRtcPlayEndpoint`] receiver by [`EndpointId`].
     pub fn get_receiver_by_id(
         &self,
         id: &EndpointId,

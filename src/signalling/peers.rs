@@ -10,6 +10,7 @@ use hashbrown::HashMap;
 
 use crate::{
     api::control::MemberId,
+    log::prelude::*,
     media::{Peer, PeerId, PeerStateMachine},
     signalling::{
         control::participant::Participant,
@@ -50,8 +51,6 @@ impl fmt::Display for Counter {
         write!(f, "{}", self.count)
     }
 }
-
-use crate::log::prelude::*;
 
 impl PeerRepository {
     /// Store [`Peer`] in [`Room`].
@@ -111,8 +110,6 @@ impl PeerRepository {
 
         self.add_peer(first_peer_id, first_peer);
         self.add_peer(second_peer_id, second_peer);
-
-        //        println!("Peers: {:#?}", self.peers);
 
         (first_peer_id, second_peer_id)
     }

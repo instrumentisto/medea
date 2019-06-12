@@ -265,7 +265,7 @@ impl Room {
         )))
     }
 
-    /// Create [`Peer`] between [`Participant`]s and interconnect it by control
+    /// Create [`Peer`]s between [`Participant`]s and interconnect it by control
     /// API spec.
     fn create_and_interconnect_peers(
         &mut self,
@@ -350,7 +350,7 @@ impl Room {
             }
         }
 
-        // Create all connected play receivers peers.
+        // Create all connected play's receivers peers.
         for (_id, play) in member.receivers() {
             let plays_publisher_participant =
                 if let Some(plays_publisher) = play.publisher().upgrade() {
@@ -449,6 +449,7 @@ impl Handler<ConnectPeers> for Room {
     }
 }
 
+/// Signal of removing [`Participant`]'s [`Peer`]s.
 #[derive(Debug, Message)]
 #[rtype(result = "Result<(), ()>")]
 pub struct PeersRemoved {
@@ -459,13 +460,17 @@ pub struct PeersRemoved {
 impl Handler<PeersRemoved> for Room {
     type Result = ActFuture<(), ()>;
 
-    /// Send [`Event::PeersRemoved`] to [`Participant`].
+    /// Send [`Event::PeersRemoved`] to remote [`Participant`].
+    ///
+    /// Delete all removed [`PeerId`]s from all [`Participant`]'s
+    /// endpoints.
     #[allow(clippy::single_match_else)]
     fn handle(
         &mut self,
         msg: PeersRemoved,
         ctx: &mut Self::Context,
     ) -> Self::Result {
+        info!("Peers {:?} removed for member '{}'.", msg.peers_id, msg.member_id);
         if let Some(participant) =
             self.participants.get_member_by_id(&msg.member_id)
         {
@@ -548,7 +553,7 @@ impl Handler<RpcConnectionEstablished> for Room {
 
     /// Saves new [`RpcConnection`] in [`ParticipantService`], initiates media
     /// establishment between members.
-    /// Create and interconnect all necessary [`Participant`]'s [`Peer`]s.
+    /// Create and interconnect all available [`Participant`]'s [`Peer`]s.
     fn handle(
         &mut self,
         msg: RpcConnectionEstablished,
