@@ -256,11 +256,13 @@ impl Peer<New> {
         publish_endpoints: HashMap<EndpointId, Arc<WebRtcPublishEndpoint>>,
     ) {
         let partner_id = self.partner_member_id();
+        let self_id = self.id();
 
         // TODO: unwrap weak
         publish_endpoints
             .into_iter()
             .flat_map(|(_m, e)| {
+                e.add_peer_id(self_id);
                 e.receivers()
                     .into_iter()
                     .map(|e| e.upgrade().unwrap())
@@ -285,7 +287,7 @@ impl Peer<New> {
                 partner_peer.add_receiver(track_video);
                 partner_peer.add_receiver(track_audio);
 
-                e.connected();
+                e.connect(partner_peer.id());
             });
     }
 

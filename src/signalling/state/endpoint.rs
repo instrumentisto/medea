@@ -4,8 +4,10 @@ use std::{
 };
 
 use crate::api::control::endpoint::{P2pMode, SrcUri};
+use crate::media::PeerId;
 
 use super::participant::Participant;
+use hashbrown::HashSet;
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Id(pub String);
@@ -15,7 +17,7 @@ struct WebRtcPlayEndpointInner {
     src: SrcUri,
     publisher: Weak<WebRtcPublishEndpoint>,
     owner: Weak<Participant>,
-    is_connected: bool,
+    peer_id: Option<PeerId>,
 }
 
 impl WebRtcPlayEndpointInner {
@@ -32,11 +34,19 @@ impl WebRtcPlayEndpointInner {
     }
 
     fn is_connected(&self) -> bool {
-        self.is_connected
+        self.peer_id.is_some()
     }
 
-    fn set_is_connected(&mut self, value: bool) {
-        self.is_connected = value;
+    fn set_peer_id(&mut self, peer_id: PeerId) {
+        self.peer_id = Some(peer_id)
+    }
+
+    fn peer_id(&self) -> Option<PeerId> {
+        self.peer_id.clone()
+    }
+
+    fn reset(&mut self) {
+        self.peer_id = None
     }
 }
 
@@ -54,7 +64,7 @@ impl WebRtcPlayEndpoint {
             src,
             publisher,
             owner,
-            is_connected: false,
+            peer_id: None,
         })))
     }
 
@@ -74,8 +84,16 @@ impl WebRtcPlayEndpoint {
         self.0.lock().unwrap().borrow().is_connected()
     }
 
-    pub fn connected(&self) {
-        self.0.lock().unwrap().borrow_mut().set_is_connected(true);
+    pub fn connect(&self, peer_id: PeerId) {
+        self.0.lock().unwrap().borrow_mut().set_peer_id(peer_id);
+    }
+
+    pub fn peer_id(&self) -> Option<PeerId> {
+        self.0.lock().unwrap().borrow().peer_id()
+    }
+
+    pub fn reset(&self) {
+        self.0.lock().unwrap().borrow_mut().reset()
     }
 }
 
@@ -84,6 +102,7 @@ struct WebRtcPublishEndpointInner {
     p2p: P2pMode,
     receivers: Vec<Weak<WebRtcPlayEndpoint>>,
     owner: Weak<Participant>,
+    peer_ids: HashSet<PeerId>,
 }
 
 impl WebRtcPublishEndpointInner {
@@ -97,6 +116,28 @@ impl WebRtcPublishEndpointInner {
 
     fn owner(&self) -> Weak<Participant> {
         Weak::clone(&self.owner)
+    }
+
+    fn add_peer_id(&mut self, peer_id: PeerId) {
+        self.peer_ids.insert(peer_id);
+    }
+
+    fn peer_ids(&self) -> HashSet<PeerId> {
+        self.peer_ids.clone()
+    }
+
+    pub fn reset(&mut self) {
+        self.peer_ids = HashSet::new()
+    }
+
+    pub fn remove_peer_id(&mut self, peer_id: &PeerId) {
+        self.peer_ids.remove(peer_id);
+    }
+
+    pub fn remove_peer_ids(&mut self, peer_ids: &Vec<PeerId>) {
+        for peer_id in peer_ids {
+            self.remove_peer_id(peer_id)
+        }
     }
 }
 
@@ -114,6 +155,7 @@ impl WebRtcPublishEndpoint {
             p2p,
             receivers,
             owner,
+            peer_ids: HashSet::new(),
         })))
     }
 
@@ -127,5 +169,29 @@ impl WebRtcPublishEndpoint {
 
     pub fn owner(&self) -> Weak<Participant> {
         self.0.lock().unwrap().borrow().owner()
+    }
+
+    pub fn add_peer_id(&self, peer_id: PeerId) {
+        self.0.lock().unwrap().borrow_mut().add_peer_id(peer_id)
+    }
+
+    pub fn peer_ids(&self) -> HashSet<PeerId> {
+        self.0.lock().unwrap().borrow().peer_ids()
+    }
+
+    pub fn reset(&self) {
+        self.0.lock().unwrap().borrow_mut().reset()
+    }
+
+    pub fn remove_peer_id(&self, peer_id: &PeerId) {
+        self.0.lock().unwrap().borrow_mut().remove_peer_id(peer_id)
+    }
+
+    pub fn remove_peer_ids(&self, peer_ids: &Vec<PeerId>) {
+        self.0
+            .lock()
+            .unwrap()
+            .borrow_mut()
+            .remove_peer_ids(peer_ids)
     }
 }

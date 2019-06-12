@@ -282,6 +282,11 @@ impl Room {
         let (first_peer_id, second_peer_id) =
             self.peers.create_peers(first_member, second_member);
 
+        // println!(
+        // "\n\nParticipants: {:#?}\n\nPeers: {:#?}\n\n",
+        // self.participants, self.peers
+        // );
+
         ctx.notify(ConnectPeers(first_peer_id, second_peer_id));
 
         // println!("Peers: {:#?}", self.peers);
@@ -430,15 +435,23 @@ impl Handler<PeersRemoved> for Room {
         msg: PeersRemoved,
         _ctx: &mut Self::Context,
     ) -> Self::Result {
+        self.participants
+            .get_member_by_id(&msg.member_id)
+            .unwrap()
+            .peers_removed(&msg.peers_id);
+
         Box::new(
             self.send_peers_removed(msg.member_id, msg.peers_id)
-                .map_err(|err, _, ctx: &mut Context<Self>| {
-                    error!(
-                        "Failed PeersEvent command, because {}. Room will be \
-                         stopped.",
-                        err
-                    );
-                    ctx.notify(CloseRoom {})
+                .map_err(|err, _, ctx: &mut Context<Self>| match err {
+                    RoomError::ConnectionNotExists(_) => (),
+                    _ => {
+                        error!(
+                            "Failed PeersEvent command, because {}. Room will \
+                             be stopped.",
+                            err
+                        );
+                        ctx.notify(CloseRoom {})
+                    }
                 }),
         )
     }

@@ -178,7 +178,7 @@ impl PeerRepository {
 
         self.get_peers_by_member_id(member_id)
             .into_iter()
-            .map(|peer| {
+            .for_each(|peer| {
                 self.get_peers_by_member_id(&peer.partner_member_id())
                     .into_iter()
                     .filter(|partner_peer| {
@@ -196,12 +196,10 @@ impl PeerRepository {
                     .or_insert(Vec::new())
                     .push(peer.id());
 
-                peer.id()
-            })
-            .collect::<Vec<PeerId>>()
-            .into_iter()
-            .for_each(|id| {
-                self.peers.remove(&id);
+                peers_to_remove
+                    .entry(peer.member_id())
+                    .or_insert(Vec::new())
+                    .push(peer.id());
             });
 
         for (peer_member_id, peers_id) in peers_to_remove {

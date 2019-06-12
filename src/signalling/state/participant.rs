@@ -10,6 +10,7 @@ use hashbrown::HashMap;
 use crate::api::control::{
     MemberId, MemberSpec, RoomSpec, TryFromElementError,
 };
+use crate::media::PeerId;
 
 use super::endpoint::{
     Id as EndpointId, WebRtcPlayEndpoint, WebRtcPublishEndpoint,
@@ -51,6 +52,18 @@ impl Participant {
             receivers: HashMap::new(),
             credentials,
         })))
+    }
+
+    pub fn peers_removed(&self, peer_ids: &Vec<PeerId>) {
+        self.publishers()
+            .into_iter()
+            .for_each(|(_, p)| p.remove_peer_ids(peer_ids));
+
+        self.receivers()
+            .into_iter()
+            .filter_map(|(_, p)| p.peer_id().map(|id| (id, p)))
+            .filter(|(id, _)| peer_ids.contains(&id))
+            .for_each(|(_, p)| p.reset());
     }
 
     pub fn id(&self) -> MemberId {
