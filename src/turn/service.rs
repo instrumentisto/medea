@@ -276,7 +276,8 @@ impl Handler<DeleteIceUsers> for Service {
     }
 }
 
-#[cfg(test)]
+
+#[cfg(any(feature = "e2e_test", test))]
 pub mod test {
     use futures::future;
 
@@ -290,7 +291,7 @@ pub mod test {
     impl TurnAuthService for TurnAuthServiceMock {
         fn create(
             &self,
-            _: u64,
+            _: MemberId,
             _: RoomId,
             _: UnreachablePolicy,
         ) -> Box<Future<Item = IceUser, Error = TurnServiceErr>> {

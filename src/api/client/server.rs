@@ -110,10 +110,7 @@ mod test {
 
     use crate::{
         api::control,
-        api::control::Member,
-        conf::{Conf, Server},
         conf::{Conf, Server, Turn},
-        media::create_peers,
         signalling::Room,
         turn::new_turn_auth_service_mock,
     };

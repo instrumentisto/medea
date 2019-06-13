@@ -175,7 +175,7 @@ fn pub_sub_video_call() {
     let test_fn = move |event: &Event, _ctx: &mut Context<TestMember>| {
         events.push(event.clone());
 
-        // Start of checking result of test.
+        // Start checking result of test.
         if let Event::IceCandidateDiscovered { .. } = event {
             let peers_count = events
                 .iter()
@@ -191,8 +191,11 @@ fn pub_sub_video_call() {
                 peer_id,
                 sdp_offer,
                 tracks,
+                ice_servers,
             } = &events[0]
             {
+                assert_eq!(ice_servers.len(), 2);
+
                 if let Some(_) = sdp_offer {
                     is_caller = false;
                 } else {
@@ -273,13 +276,14 @@ fn three_members_p2p_video_call() {
     let test_fn = move |event: &Event, ctx: &mut Context<TestMember>| {
         events.push(event.clone());
         match event {
-            Event::PeerCreated { .. } => {
+            Event::PeerCreated { ice_servers, .. } => {
+                assert_eq!(ice_servers.len(), 2);
                 peer_created_count += 1;
             }
             Event::IceCandidateDiscovered { .. } => {
                 ice_candidates += 1;
                 if ice_candidates == 2 {
-                    // Start of checking result of test.
+                    // Start checking result of test.
 
                     assert_eq!(peer_created_count, 2);
 

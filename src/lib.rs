@@ -17,13 +17,13 @@ use crate::{
     api::{control::load_static_specs_from_dir, control::RoomId},
     conf::Conf,
     signalling::{room::RoomError, Room},
-    turn::new_turn_auth_service,
+    turn::service,
 };
 
 /// Errors which can happen while server starting.
 #[derive(Debug, Fail)]
 pub enum ServerStartError {
-    /// Duplicate room ID finded.
+    /// Duplicate [`RoomId`] founded.
     #[fail(display = "Duplicate of room ID '{:?}'", _0)]
     DuplicateRoomId(RoomId),
 
@@ -75,7 +75,10 @@ pub fn start_static_rooms(
                 ));
             }
 
-            let turn_auth_service = new_turn_auth_service(&config)
+            #[cfg(feature = "e2e_test")]
+            let turn_auth_service = service::test::new_turn_auth_service_mock();
+            #[cfg(not(feature = "e2e_test"))]
+            let turn_auth_service = service::new_turn_auth_service(config)
                 .expect("Unable to start turn service");
 
             let room = Room::new(

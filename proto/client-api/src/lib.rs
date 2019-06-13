@@ -99,7 +99,6 @@ pub struct Track {
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "medea", derive(Serialize, PartialEq))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
-#[cfg_attr(test, derive(PartialEq))]
 pub struct IceServer {
     pub urls: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]

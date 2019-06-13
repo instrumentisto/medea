@@ -136,7 +136,7 @@ ifeq ($(test-unit-crate),@all)
 	@make test.unit crate=jason
 else
 ifeq ($(test-unit-crate),medea)
-	cargo test -p medea
+	cargo test -p medea --features "e2e_test"
 else
 ifeq ($(test-unit-crate),jason)
 	wasm-pack test --headless --firefox jason
