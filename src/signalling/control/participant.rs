@@ -4,6 +4,7 @@ use std::{
     cell::RefCell,
     convert::TryFrom as _,
     sync::{Arc, Mutex},
+    ops::Deref as _,
 };
 
 use failure::Fail;
@@ -13,10 +14,12 @@ use crate::{
     api::control::{MemberId, MemberSpec, RoomSpec, TryFromElementError},
     media::PeerId,
 };
+use crate::media::IceUser;
 
 use super::endpoint::{
     Id as EndpointId, WebRtcPlayEndpoint, WebRtcPublishEndpoint,
 };
+use medea_client_api_proto::IceServer;
 
 /// Errors which may occur while loading [`Participant`]s from [`RoomSpec`].
 #[derive(Debug, Fail)]
@@ -51,6 +54,7 @@ struct ParticipantInner {
     publishers: HashMap<EndpointId, Arc<WebRtcPublishEndpoint>>,
     receivers: HashMap<EndpointId, Arc<WebRtcPlayEndpoint>>,
     credentials: String,
+    ice_user: Option<IceUser>
 }
 
 impl Participant {
@@ -61,6 +65,7 @@ impl Participant {
             publishers: HashMap::new(),
             receivers: HashMap::new(),
             credentials,
+            ice_user: None,
         })))
     }
 
@@ -77,6 +82,18 @@ impl Participant {
             .filter_map(|(_, p)| p.peer_id().map(|id| (id, p)))
             .filter(|(id, _)| peer_ids.contains(&id))
             .for_each(|(_, p)| p.reset());
+    }
+
+    pub fn servers_list(&self) -> Option<Vec<IceServer>> {
+        self.0.lock().unwrap().borrow().ice_user.as_ref().map(|u| u.servers_list())
+    }
+
+    pub fn take_ice_user(&self) -> Option<IceUser> {
+        self.0.lock().unwrap().borrow_mut().ice_user.take()
+    }
+
+    pub fn replace_ice_user(&self, new_ice_user: IceUser) -> Option<IceUser> {
+        self.0.lock().unwrap().borrow_mut().ice_user.replace(new_ice_user)
     }
 
     /// Returns [`MemberId`] of this [`Participant`].

@@ -7,6 +7,7 @@ pub mod conf;
 pub mod log;
 pub mod media;
 pub mod signalling;
+pub mod turn;
 
 use actix::prelude::*;
 use failure::Fail;
@@ -16,6 +17,7 @@ use crate::{
     api::{control::load_static_specs_from_dir, control::RoomId},
     conf::Conf,
     signalling::{room::RoomError, Room},
+    turn::new_turn_auth_service,
 };
 
 /// Errors which can happen while server starting.
@@ -73,7 +75,10 @@ pub fn start_static_rooms(
                 ));
             }
 
-            let room = Room::new(&spec, config.rpc.reconnect_timeout)?;
+                let turn_auth_service = new_turn_auth_service(&config).expect("Unable to start turn service");
+
+            let room = Room::new(&spec, config.rpc.reconnect_timeout,
+                                 turn_auth_service)?;
             let room = Arbiter::start(move |_| room);
             rooms.insert(spec.id().clone(), room);
         }

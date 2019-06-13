@@ -38,7 +38,7 @@ fmt: cargo.fmt
 #	make up
 
 up:
-	$(MAKE) -j2 up.jason up.medea
+	$(MAKE) -j3 up.coturn up.jason up.medea
 
 
 test: test.unit
@@ -152,6 +152,15 @@ endif
 # Running commands #
 ####################
 
+# Run Coturn STUN/TURN server.
+#
+# Usage:
+#	make up.coturn
+
+up.coturn:
+	docker-compose up
+
+
 # Run Jason E2E demo in development mode.
 #
 # Usage:
@@ -179,6 +188,6 @@ up.medea:
 .PHONY: cargo cargo.fmt cargo.lint \
         docs docs.rust \
         test test.unit \
-        up up.jason up.medea \
+        up up.coturn up.jason up.medea \
         yarn
 

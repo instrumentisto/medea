@@ -10,6 +10,7 @@ use actix::{
 use failure::Fail;
 use futures::future;
 use hashbrown::HashMap;
+
 use medea_client_api_proto::{Command, Event, IceCandidate};
 
 use crate::{
@@ -30,24 +31,32 @@ use crate::{
         participants::ParticipantService,
         peers::PeerRepository,
     },
+    turn::TurnAuthService,
 };
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
-type ActFuture<I, E> = Box<dyn ActorFuture<Actor = Room, Item = I, Error = E>>;
+pub type ActFuture<I, E> =
+    Box<dyn ActorFuture<Actor = Room, Item = I, Error = E>>;
 
 #[allow(clippy::module_name_repetitions)]
 #[derive(Fail, Debug)]
 pub enum RoomError {
     #[fail(display = "Couldn't find Peer with [id = {}]", _0)]
     PeerNotFound(PeerId),
+    #[fail(display = "Couldn't find Member with [id = {}]", _0)]
+    MemberNotFound(MemberId),
+    #[fail(display = "Member [id = {}] does not have Turn credentials", _0)]
+    NoTurnCredentials(MemberId),
     #[fail(display = "Couldn't find RpcConnection with Member [id = {}]", _0)]
     ConnectionNotExists(MemberId),
     #[fail(display = "Unable to send event to Member [id = {}]", _0)]
     UnableToSendEvent(MemberId),
     #[fail(display = "PeerError: {}", _0)]
     PeerStateError(PeerStateError),
-    #[fail(display = "Generic room error {}", _0)]
+    #[fail(display = "Generic room error: {}", _0)]
     BadRoomSpec(String),
+    #[fail(display = "Turn service error: {}", _0)]
+    TurnServiceError(String),
 }
 
 impl From<PeerStateError> for RoomError {
@@ -80,7 +89,7 @@ pub struct Room {
     id: RoomId,
 
     /// [`RpcConnection`]s of [`Participant`]s in this [`Room`].
-    participants: ParticipantService,
+    pub participants: ParticipantService,
 
     /// [`Peer`]s of [`Participant`]s in this [`Room`].
     peers: PeerRepository,
@@ -94,6 +103,7 @@ impl Room {
     pub fn new(
         room_spec: &RoomSpec,
         reconnect_timeout: Duration,
+        turn: Box<dyn TurnAuthService>,
     ) -> Result<Self, RoomError> {
         Ok(Self {
             id: room_spec.id().clone(),
@@ -101,6 +111,7 @@ impl Room {
             participants: ParticipantService::new(
                 room_spec,
                 reconnect_timeout,
+                turn,
             )?,
         })
     }
@@ -141,10 +152,17 @@ impl Room {
 
         let sender = sender.start();
         let member_id = sender.member_id();
+        let ice_servers = self
+            .participants
+            .get_member(member_id.clone())
+            .ok_or_else(|| RoomError::MemberNotFound(member_id.clone()))?
+            .servers_list()
+            .ok_or_else(|| RoomError::NoTurnCredentials(member_id.clone()))?;
         let peer_created = Event::PeerCreated {
             peer_id: sender.id(),
             sdp_offer: None,
             tracks: sender.tracks(),
+            ice_servers,
         };
         self.peers.add_peer(sender.id(), sender);
         Ok(Box::new(wrap_future(
@@ -183,14 +201,23 @@ impl Room {
         let to_peer = to_peer.set_remote_sdp(sdp_offer.clone());
 
         let to_member_id = to_peer.member_id();
+        let ice_servers = self
+            .participants
+            .get_member(to_member_id.clone())
+            .ok_or_else(|| RoomError::MemberNotFound(to_member_id.clone()))?
+            .servers_list()
+            .ok_or_else(|| RoomError::NoTurnCredentials(to_member_id.clone()))?;
+
         let event = Event::PeerCreated {
             peer_id: to_peer_id,
             sdp_offer: Some(sdp_offer),
             tracks: to_peer.tracks(),
+            ice_servers,
         };
 
         self.peers.add_peer(from_peer_id, from_peer);
         self.peers.add_peer(to_peer_id, to_peer);
+
         Ok(Box::new(wrap_future(
             self.participants.send_event_to_member(to_member_id, event),
         )))
@@ -392,6 +419,7 @@ impl Room {
 
 /// [`Actor`] implementation that provides an ergonomic way
 /// to interact with [`Room`].
+// TODO: close connections on signal (gracefull shutdown)
 impl Actor for Room {
     type Context = Context<Self>;
 }
@@ -567,7 +595,7 @@ impl Handler<RpcConnectionEstablished> for Room {
         // save new connection
         self.participants.connection_established(
             ctx,
-            &msg.member_id,
+            msg.member_id.clone(),
             msg.connection,
         );
 

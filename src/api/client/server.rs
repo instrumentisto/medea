@@ -81,7 +81,7 @@ pub struct Context {
 
 /// Starts HTTP server for handling WebSocket connections of Client API.
 pub fn run(rooms: RoomsRepository, config: Conf) {
-    let server_addr = config.server.get_bind_addr();
+    let server_addr = config.server.bind_addr();
 
     server::new(move || {
         App::with_state(Context {
@@ -111,7 +111,11 @@ mod test {
     use crate::{
         api::control,
         conf::{Conf, Server},
+        api::control::Member,
+        conf::{Conf, Server, Turn},
+        media::create_peers,
         signalling::Room,
+        turn::new_turn_auth_service_mock,
     };
 
     use super::*;
@@ -123,7 +127,8 @@ mod test {
                 .unwrap();
 
         let client_room =
-            Room::new(&room_spec, conf.reconnect_timeout).unwrap();
+            Room::new(&room_spec, conf.reconnect_timeout,
+                     new_turn_auth_service_mock() ).unwrap();
         let room_id = client_room.get_id();
         let client_room = Arbiter::start(move |_| client_room);
         let room_hash_map = hashmap! {
@@ -164,6 +169,7 @@ mod test {
                 idle_timeout: Duration::new(2, 0),
                 reconnect_timeout: Default::default(),
             },
+            turn: Turn::default(),
             server: Server::default(),
         };
 

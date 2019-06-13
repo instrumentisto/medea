@@ -1,6 +1,7 @@
 //! Room definitions and implementations.
 
 use std::{convert::TryFrom, sync::Arc};
+use std::fmt::Display;
 
 use hashbrown::HashMap;
 use serde::Deserialize;
@@ -13,6 +14,13 @@ use super::{
 /// ID of [`Room`].
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq)]
 pub struct Id(pub String);
+
+impl Display for Id {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(fmt, "{}", self.0)
+    }
+}
+
 
 /// [`crate::signalling::room::Room`] specification.
 /// Newtype for [`Element::Room`]
