@@ -32,7 +32,7 @@
 # Turn server IP address.
 #
 # Default:
-#   ip = "0.0.0.0"
+#   ip = "127.0.0.1"
 
 # Turn server port.
 #
