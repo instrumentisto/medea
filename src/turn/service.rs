@@ -13,9 +13,9 @@ use redis::ConnectionInfo;
 
 use crate::{
     api::control::MemberId,
+    api::control::RoomId,
     conf::Conf,
     media::IceUser,
-    api::control::RoomId,
     turn::repo::{TurnDatabase, TurnDatabaseErr},
 };
 

@@ -206,7 +206,9 @@ impl Room {
             .get_member(to_member_id.clone())
             .ok_or_else(|| RoomError::MemberNotFound(to_member_id.clone()))?
             .servers_list()
-            .ok_or_else(|| RoomError::NoTurnCredentials(to_member_id.clone()))?;
+            .ok_or_else(|| {
+                RoomError::NoTurnCredentials(to_member_id.clone())
+            })?;
 
         let event = Event::PeerCreated {
             peer_id: to_peer_id,
@@ -592,16 +594,18 @@ impl Handler<RpcConnectionEstablished> for Room {
     ) -> Self::Result {
         info!("RpcConnectionEstablished for member {}", msg.member_id);
 
-        // save new connection
-        self.participants.connection_established(
-            ctx,
-            msg.member_id.clone(),
-            msg.connection,
-        );
+        let member_id = msg.member_id;
 
-        self.create_peers_with_available_members(&msg.member_id, ctx);
-
-        Box::new(wrap_future(future::ok(())))
+        let fut = self
+            .participants
+            .connection_established(ctx, member_id.clone(), msg.connection)
+            .map_err(|err, _, _| {
+                error!("RpcConnectionEstablished error {:?}", err)
+            })
+            .map(move |_, room, ctx| {
+                room.create_peers_with_available_members(&member_id, ctx);
+            });
+        Box::new(fut)
     }
 }
 

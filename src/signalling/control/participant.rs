@@ -3,18 +3,18 @@
 use std::{
     cell::RefCell,
     convert::TryFrom as _,
-    sync::{Arc, Mutex},
     ops::Deref as _,
+    sync::{Arc, Mutex},
 };
 
 use failure::Fail;
 use hashbrown::HashMap;
 
+use crate::media::IceUser;
 use crate::{
     api::control::{MemberId, MemberSpec, RoomSpec, TryFromElementError},
     media::PeerId,
 };
-use crate::media::IceUser;
 
 use super::endpoint::{
     Id as EndpointId, WebRtcPlayEndpoint, WebRtcPublishEndpoint,
@@ -54,7 +54,7 @@ struct ParticipantInner {
     publishers: HashMap<EndpointId, Arc<WebRtcPublishEndpoint>>,
     receivers: HashMap<EndpointId, Arc<WebRtcPlayEndpoint>>,
     credentials: String,
-    ice_user: Option<IceUser>
+    ice_user: Option<IceUser>,
 }
 
 impl Participant {
@@ -85,7 +85,13 @@ impl Participant {
     }
 
     pub fn servers_list(&self) -> Option<Vec<IceServer>> {
-        self.0.lock().unwrap().borrow().ice_user.as_ref().map(|u| u.servers_list())
+        self.0
+            .lock()
+            .unwrap()
+            .borrow()
+            .ice_user
+            .as_ref()
+            .map(|u| u.servers_list())
     }
 
     pub fn take_ice_user(&self) -> Option<IceUser> {
@@ -93,7 +99,12 @@ impl Participant {
     }
 
     pub fn replace_ice_user(&self, new_ice_user: IceUser) -> Option<IceUser> {
-        self.0.lock().unwrap().borrow_mut().ice_user.replace(new_ice_user)
+        self.0
+            .lock()
+            .unwrap()
+            .borrow_mut()
+            .ice_user
+            .replace(new_ice_user)
     }
 
     /// Returns [`MemberId`] of this [`Participant`].

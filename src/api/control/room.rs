@@ -1,7 +1,7 @@
 //! Room definitions and implementations.
 
-use std::{convert::TryFrom, sync::Arc};
 use std::fmt::Display;
+use std::{convert::TryFrom, sync::Arc};
 
 use hashbrown::HashMap;
 use serde::Deserialize;
@@ -20,7 +20,6 @@ impl Display for Id {
         write!(fmt, "{}", self.0)
     }
 }
-
 
 /// [`crate::signalling::room::Room`] specification.
 /// Newtype for [`Element::Room`]

@@ -170,7 +170,10 @@ impl ParticipantService {
         self.members.get(&member_id).cloned()
     }
 
-    pub fn take_member(&mut self, member_id: MemberId) -> Option<Arc<Participant>> {
+    pub fn take_member(
+        &mut self,
+        member_id: MemberId,
+    ) -> Option<Arc<Participant>> {
         self.members.remove(&member_id)
     }
 
@@ -229,10 +232,9 @@ impl ParticipantService {
                 .and_then(
                     move |ice: IceUser, room: &mut Room, _| {
                         if let Some(mut member) =
-                            room.participants.take_member(member_id.clone())
+                            room.participants.get_member_by_id(&member_id)
                         {
                             member.replace_ice_user(ice);
-                            room.participants.insert_member(member);
                         };
                         wrap_future(future::ok(()))
                     },

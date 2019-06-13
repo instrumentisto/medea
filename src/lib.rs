@@ -75,10 +75,14 @@ pub fn start_static_rooms(
                 ));
             }
 
-                let turn_auth_service = new_turn_auth_service(&config).expect("Unable to start turn service");
+            let turn_auth_service = new_turn_auth_service(&config)
+                .expect("Unable to start turn service");
 
-            let room = Room::new(&spec, config.rpc.reconnect_timeout,
-                                 turn_auth_service)?;
+            let room = Room::new(
+                &spec,
+                config.rpc.reconnect_timeout,
+                turn_auth_service,
+            )?;
             let room = Arbiter::start(move |_| room);
             rooms.insert(spec.id().clone(), room);
         }

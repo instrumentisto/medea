@@ -110,8 +110,8 @@ mod test {
 
     use crate::{
         api::control,
-        conf::{Conf, Server},
         api::control::Member,
+        conf::{Conf, Server},
         conf::{Conf, Server, Turn},
         media::create_peers,
         signalling::Room,
@@ -126,9 +126,12 @@ mod test {
             control::load_from_yaml_file("tests/specs/pub_sub_video_call.yml")
                 .unwrap();
 
-        let client_room =
-            Room::new(&room_spec, conf.reconnect_timeout,
-                     new_turn_auth_service_mock() ).unwrap();
+        let client_room = Room::new(
+            &room_spec,
+            conf.reconnect_timeout,
+            new_turn_auth_service_mock(),
+        )
+        .unwrap();
         let room_id = client_room.get_id();
         let client_room = Arbiter::start(move |_| client_room);
         let room_hash_map = hashmap! {
