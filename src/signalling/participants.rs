@@ -166,14 +166,6 @@ impl ParticipantService {
             && !self.drop_connection_tasks.contains_key(member_id)
     }
 
-    pub fn get_member(&self, member_id: &MemberId) -> Option<Arc<Participant>> {
-        self.members.get(&member_id).cloned()
-    }
-
-    pub fn insert_member(&mut self, member: Arc<Participant>) {
-        self.members.insert(member.id(), member);
-    }
-
     /// Send [`Event`] to specified remote [`Participant`].
     pub fn send_event_to_member(
         &mut self,

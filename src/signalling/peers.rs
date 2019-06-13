@@ -54,8 +54,9 @@ impl fmt::Display for Counter {
 
 impl PeerRepository {
     /// Store [`Peer`] in [`Room`].
-    pub fn add_peer<S: Into<PeerStateMachine>>(&mut self, id: PeerId, peer: S) {
-        self.peers.insert(id, peer.into());
+    pub fn add_peer<S: Into<PeerStateMachine>>(&mut self, peer: S) {
+        let peer = peer.into();
+        self.peers.insert(peer.id(), peer);
     }
 
     /// Returns borrowed [`PeerStateMachine`] by its ID.
@@ -108,8 +109,8 @@ impl PeerRepository {
             second_member.publishers(),
         );
 
-        self.add_peer(first_peer_id, first_peer);
-        self.add_peer(second_peer_id, second_peer);
+        self.add_peer(first_peer);
+        self.add_peer(second_peer);
 
         (first_peer_id, second_peer_id)
     }

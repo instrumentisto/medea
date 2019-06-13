@@ -139,21 +139,21 @@ impl Room {
         } else if peer2.is_sender() {
             (peer2, peer1)
         } else {
-            self.peers.add_peer(peer1.id(), peer1);
-            self.peers.add_peer(peer2.id(), peer2);
+            self.peers.add_peer(peer1);
+            self.peers.add_peer(peer2);
             return Err(RoomError::BadRoomSpec(format!(
                 "Error while trying to connect Peer [id = {}] and Peer [id = \
                  {}] cause neither of peers are senders",
                 peer1_id, peer2_id
             )));
         };
-        self.peers.add_peer(receiver.id(), receiver);
+        self.peers.add_peer(receiver);
 
         let sender = sender.start();
         let member_id = sender.member_id();
         let ice_servers = self
             .participants
-            .get_member(&member_id)
+            .get_member_by_id(&member_id)
             .ok_or_else(|| RoomError::MemberNotFound(member_id.clone()))?
             .servers_list()
             .ok_or_else(|| RoomError::NoTurnCredentials(member_id.clone()))?;
@@ -163,7 +163,7 @@ impl Room {
             tracks: sender.tracks(),
             ice_servers,
         };
-        self.peers.add_peer(sender.id(), sender);
+        self.peers.add_peer(sender);
         Ok(Box::new(wrap_future(
             self.participants
                 .send_event_to_member(member_id, peer_created),
@@ -202,7 +202,7 @@ impl Room {
         let to_member_id = to_peer.member_id();
         let ice_servers = self
             .participants
-            .get_member(&to_member_id)
+            .get_member_by_id(&to_member_id)
             .ok_or_else(|| RoomError::MemberNotFound(to_member_id.clone()))?
             .servers_list()
             .ok_or_else(|| {
@@ -210,14 +210,14 @@ impl Room {
             })?;
 
         let event = Event::PeerCreated {
-            peer_id: to_peer_id,
+            peer_id: to_peer.id(),
             sdp_offer: Some(sdp_offer),
             tracks: to_peer.tracks(),
             ice_servers,
         };
 
-        self.peers.add_peer(from_peer_id, from_peer);
-        self.peers.add_peer(to_peer_id, to_peer);
+        self.peers.add_peer(from_peer);
+        self.peers.add_peer(to_peer);
 
         Ok(Box::new(wrap_future(
             self.participants.send_event_to_member(to_member_id, event),
@@ -248,8 +248,8 @@ impl Room {
             sdp_answer,
         };
 
-        self.peers.add_peer(from_peer_id, from_peer);
-        self.peers.add_peer(to_peer_id, to_peer);
+        self.peers.add_peer(from_peer);
+        self.peers.add_peer(to_peer);
 
         Ok(Box::new(wrap_future(
             self.participants.send_event_to_member(to_member_id, event),
