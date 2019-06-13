@@ -102,7 +102,7 @@ struct CloseSocket;
 impl Handler<CloseSocket> for TestMember {
     type Result = ();
 
-    fn handle(&mut self, _msg: CloseSocket, _ctx: &mut Self::Context) {
+    fn handle(&mut self, _: CloseSocket, _: &mut Self::Context) {
         self.writer.close(Some(CloseReason {
             code: CloseCode::Normal,
             description: None,
@@ -172,7 +172,7 @@ fn pub_sub_video_call() {
     // Note that events is separated by members.
     // Every member will have different instance of this.
     let mut events = Vec::new();
-    let test_fn = move |event: &Event, _ctx: &mut Context<TestMember>| {
+    let test_fn = move |event: &Event, _: &mut Context<TestMember>| {
         events.push(event.clone());
 
         // Start checking result of test.

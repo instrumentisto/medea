@@ -10,7 +10,6 @@ use actix::{
 use failure::Fail;
 use futures::future;
 use hashbrown::HashMap;
-
 use medea_client_api_proto::{Command, Event, IceCandidate};
 
 use crate::{

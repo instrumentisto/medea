@@ -18,27 +18,27 @@ use futures::{
     Future,
 };
 use hashbrown::HashMap;
-
 use medea_client_api_proto::Event;
 
-use crate::api::control::RoomId;
 use crate::{
     api::{
         client::rpc_connection::{
             AuthorizationError, ClosedReason, EventMessage, RpcConnection,
             RpcConnectionClosed,
         },
+        control::RoomId,
         control::{MemberId, RoomSpec},
     },
     log::prelude::*,
     media::IceUser,
     signalling::{
         control::participant::{Participant, ParticipantsLoadError},
-        room::{ActFuture, CloseRoom, RoomError},
+        room::{ActFuture, RoomError},
         Room,
     },
     turn::{TurnAuthService, TurnServiceErr, UnreachablePolicy},
 };
+
 #[derive(Fail, Debug)]
 #[allow(clippy::module_name_repetitions)]
 pub enum ParticipantServiceErr {
@@ -148,7 +148,7 @@ impl ParticipantService {
         member_id: &MemberId,
         credentials: &str,
     ) -> Result<Arc<Participant>, AuthorizationError> {
-        match self.members.get(member_id) {
+        match self.get_member_by_id(member_id) {
             Some(member) => {
                 if member.credentials().eq(credentials) {
                     Ok(member.clone())
@@ -168,13 +168,6 @@ impl ParticipantService {
 
     pub fn get_member(&self, member_id: MemberId) -> Option<Arc<Participant>> {
         self.members.get(&member_id).cloned()
-    }
-
-    pub fn take_member(
-        &mut self,
-        member_id: MemberId,
-    ) -> Option<Arc<Participant>> {
-        self.members.remove(&member_id)
     }
 
     pub fn insert_member(&mut self, member: Arc<Participant>) {
@@ -231,7 +224,7 @@ impl ParticipantService {
                 })
                 .and_then(
                     move |ice: IceUser, room: &mut Room, _| {
-                        if let Some(mut member) =
+                        if let Some(member) =
                             room.participants.get_member_by_id(&member_id)
                         {
                             member.replace_ice_user(ice);
@@ -291,13 +284,12 @@ impl ParticipantService {
         &mut self,
         member_id: MemberId,
     ) -> Box<dyn Future<Item = (), Error = TurnServiceErr>> {
-        match self.members.remove(&member_id) {
-            Some(mut member) => {
+        match self.get_member_by_id(&member_id) {
+            Some(member) => {
                 let delete_fut = match member.take_ice_user() {
                     Some(ice_user) => self.turn.delete(vec![ice_user]),
                     None => Box::new(future::ok(())),
                 };
-                self.members.insert(member_id, member);
 
                 delete_fut
             }
@@ -328,7 +320,7 @@ impl ParticipantService {
         let remove_ice_users = Box::new({
             let mut room_users = Vec::with_capacity(self.members.len());
 
-            self.members.iter_mut().for_each(|(_, data)| {
+            self.members.iter().for_each(|(_, data)| {
                 if let Some(ice_user) = data.take_ice_user() {
                     room_users.push(ice_user);
                 }

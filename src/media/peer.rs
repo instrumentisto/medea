@@ -3,14 +3,15 @@
 //! [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
 
 #![allow(clippy::use_self)]
+
+use std::{convert::TryFrom, fmt::Display, sync::Arc};
+
 use failure::Fail;
 use hashbrown::HashMap;
 use medea_client_api_proto::{
     AudioSettings, Direction, MediaType, Track, VideoSettings,
 };
 use medea_macro::enum_delegate;
-
-use std::{convert::TryFrom, fmt::Display, sync::Arc};
 
 use crate::{
     api::control::MemberId,

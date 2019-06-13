@@ -3,23 +3,22 @@
 use std::{
     cell::RefCell,
     convert::TryFrom as _,
-    ops::Deref as _,
     sync::{Arc, Mutex},
 };
 
 use failure::Fail;
 use hashbrown::HashMap;
+use medea_client_api_proto::IceServer;
 
-use crate::media::IceUser;
 use crate::{
     api::control::{MemberId, MemberSpec, RoomSpec, TryFromElementError},
+    media::IceUser,
     media::PeerId,
 };
 
 use super::endpoint::{
     Id as EndpointId, WebRtcPlayEndpoint, WebRtcPublishEndpoint,
 };
-use medea_client_api_proto::IceServer;
 
 /// Errors which may occur while loading [`Participant`]s from [`RoomSpec`].
 #[derive(Debug, Fail)]
