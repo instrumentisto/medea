@@ -14,7 +14,7 @@ use futures::{
     sync::mpsc::{unbounded, UnboundedSender},
 };
 use medea_client_api_proto::{
-    Command, Direction, EventHandler, IceCandidate, Track,
+    Command, Direction, EventHandler, IceCandidate, IceServer, Track,
 };
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
@@ -146,6 +146,7 @@ impl EventHandler for InnerRoom {
         peer_id: PeerId,
         sdp_offer: Option<String>,
         tracks: Vec<Track>,
+        ice_servers: Vec<IceServer>,
     ) {
         let create_connection = |room: &mut Self, member_id: &u64| {
             if !room.connections.contains_key(member_id) {
@@ -253,7 +254,7 @@ impl EventHandler for InnerRoom {
                     candidate.sdp_m_line_index,
                     &candidate.sdp_mid,
                 )
-                .map_err(|err| err.log_err()),
+                    .map_err(|err| err.log_err()),
             );
         } else {
             // TODO: No peer, whats next?
@@ -302,7 +303,7 @@ impl PeerEventHandler for InnerRoom {
             None => WasmErr::from_str(
                 "NewRemoteStream from sender without connection",
             )
-            .log_err(),
+                .log_err(),
             Some(connection) => connection.new_remote_stream(&remote_stream),
         }
     }

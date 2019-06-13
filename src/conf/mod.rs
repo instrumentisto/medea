@@ -2,6 +2,7 @@
 
 pub mod rpc;
 pub mod server;
+pub mod turn;
 
 use std::env;
 
@@ -9,7 +10,11 @@ use config::{Config, Environment, File};
 use failure::Error;
 use serde::{Deserialize, Serialize};
 
-pub use self::{rpc::Rpc, server::Server};
+pub use self::{
+    rpc::Rpc,
+    server::Server,
+    turn::{Redis, Turn},
+};
 
 /// CLI argument that is responsible for holding application configuration
 /// file path.
@@ -22,11 +27,12 @@ static APP_CONF_PATH_ENV_VAR_NAME: &str = "MEDEA_CONF";
 #[derive(Clone, Debug, Deserialize, Serialize, Default)]
 #[serde(default)]
 pub struct Conf {
-    /// RPC connection settings.
-    pub rpc: rpc::Rpc,
-
     /// HTTP server settings.
-    pub server: server::Server,
+    pub rpc: Rpc,
+    /// RPC connection settings.
+    pub server: Server,
+    /// TURN server settings.
+    pub turn: Turn,
 }
 
 impl Conf {
@@ -71,8 +77,9 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::{fs, net::Ipv4Addr, time::Duration};
+
     use serial_test_derive::serial;
-    use std::{fs, time::Duration};
 
     use super::*;
 
@@ -185,5 +192,52 @@ mod tests {
         assert_eq!(file_config.rpc.idle_timeout, Duration::from_secs(47));
 
         assert_eq!(file_env_config.rpc.idle_timeout, Duration::from_secs(48));
+    }
+
+    #[test]
+    #[serial]
+    fn redis_conf_test() {
+        let default_conf = Conf::default();
+
+        env::set_var("MEDEA_TURN.DB.REDIS.IP", "5.5.5.5");
+        env::set_var("MEDEA_TURN.DB.REDIS.PORT", "1234");
+        env::set_var("MEDEA_TURN.DB.REDIS.CONNECTION_TIMEOUT", "10s");
+
+        let env_conf = Conf::parse().unwrap();
+
+        assert_ne!(default_conf.turn.db.redis.ip, env_conf.turn.db.redis.ip);
+        assert_ne!(
+            default_conf.turn.db.redis.connection_timeout,
+            env_conf.turn.db.redis.connection_timeout
+        );
+        assert_ne!(
+            default_conf.turn.db.redis.connection_timeout,
+            env_conf.turn.db.redis.connection_timeout
+        );
+
+        assert_eq!(env_conf.turn.db.redis.ip, Ipv4Addr::new(5, 5, 5, 5));
+        assert_eq!(env_conf.turn.db.redis.port, 1234);
+        assert_eq!(
+            env_conf.turn.db.redis.connection_timeout,
+            Duration::from_secs(10)
+        )
+    }
+
+    #[test]
+    #[serial]
+    fn turn_conf_test() {
+        let default_conf = Conf::default();
+
+        env::set_var("MEDEA_TURN.IP", "5.5.5.5");
+        env::set_var("MEDEA_TURN.PORT", "1234");
+
+        let env_conf = Conf::parse().unwrap();
+
+        assert_ne!(default_conf.turn.ip, env_conf.turn.ip);
+        assert_ne!(default_conf.turn.port, env_conf.turn.port);
+
+        assert_eq!(env_conf.turn.ip, Ipv4Addr::new(5, 5, 5, 5));
+        assert_eq!(env_conf.turn.port, 1234);
+        assert_eq!(env_conf.turn.addr(), "5.5.5.5:1234".parse().unwrap());
     }
 }

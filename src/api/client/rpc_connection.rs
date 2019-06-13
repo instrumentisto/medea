@@ -162,6 +162,7 @@ pub mod test {
                     peer_id,
                     sdp_offer,
                     tracks,
+                    ice_servers: _,
                 } => {
                     let mut mid = 0;
                     let mids = tracks

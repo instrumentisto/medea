@@ -24,3 +24,53 @@
 #
 # Default:
 #   reconnect_timeout = "10s"
+
+
+
+
+[turn]
+# Turn server IP address.
+#
+# Default:
+#   ip = "127.0.0.1"
+
+# Turn server port.
+#
+# Default:
+#   port = 3478
+
+# Static user on Turn server.
+#
+# Default:
+#   user = "USER"
+
+# Static user password on Turn server.
+#
+# Default:
+#   pass = "PASS"
+
+[turn.db.redis]
+# Host of Coturn's Redis database.
+#
+# Default:
+#   host = "127.0.0.1"
+
+# Port of Coturn's Redis database for client connections.
+#
+# Default:
+#   port = 6379
+
+# Password to connect to Coturn's Redis database with.
+#
+# Default:
+#   pass = "turn"
+
+# Number of Coturn's database in Redis.
+#
+# Default:
+#   db_number = 0
+
+# Timeout for establishing connection with Coturn's Redis database.
+#
+# Default:
+#   connection_timeout = "5s"

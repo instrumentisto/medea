@@ -26,19 +26,25 @@ use crate::{
         WaitLocalSdp, WaitRemoteSdp,
     },
     signalling::{participants::ParticipantService, peers::PeerRepository},
+    turn::TurnAuthService,
 };
 
 /// ID of [`Room`].
 pub type Id = u64;
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
-type ActFuture<I, E> = Box<dyn ActorFuture<Actor = Room, Item = I, Error = E>>;
+pub type ActFuture<I, E> =
+Box<dyn ActorFuture<Actor = Room, Item = I, Error = E>>;
 
 #[derive(Fail, Debug)]
 #[allow(clippy::module_name_repetitions)]
 pub enum RoomError {
     #[fail(display = "Couldn't find Peer with [id = {}]", _0)]
     PeerNotFound(PeerId),
+    #[fail(display = "Couldn't find Member with [id = {}]", _0)]
+    MemberNotFound(MemberId),
+    #[fail(display = "Member [id = {}] does not have Turn credentials", _0)]
+    NoTurnCredentials(MemberId),
     #[fail(display = "Couldn't find RpcConnection with Member [id = {}]", _0)]
     ConnectionNotExists(MemberId),
     #[fail(display = "Unable to send event to Member [id = {}]", _0)]
@@ -47,6 +53,8 @@ pub enum RoomError {
     PeerError(PeerError),
     #[fail(display = "Generic room error {}", _0)]
     BadRoomSpec(String),
+    #[fail(display = "Turn service error: {}", _0)]
+    TurnServiceError(String),
     #[fail(display = "Client error:{}", _0)]
     ClientError(String),
 }
@@ -63,7 +71,7 @@ pub struct Room {
     id: Id,
 
     /// [`RpcConnection`]s of [`Member`]s in this [`Room`].
-    participants: ParticipantService,
+    pub participants: ParticipantService,
 
     /// [`Peer`]s of [`Member`]s in this [`Room`].
     peers: PeerRepository,
@@ -76,11 +84,17 @@ impl Room {
         members: HashMap<MemberId, Member>,
         peers: HashMap<PeerId, PeerStateMachine>,
         reconnect_timeout: Duration,
+        turn: Box<dyn TurnAuthService>,
     ) -> Self {
         Self {
             id,
             peers: PeerRepository::from(peers),
-            participants: ParticipantService::new(members, reconnect_timeout),
+            participants: ParticipantService::new(
+                id,
+                members,
+                turn,
+                reconnect_timeout,
+            ),
         }
     }
 
@@ -103,24 +117,33 @@ impl Room {
         } else if peer2.is_sender() {
             (peer2, peer1)
         } else {
-            self.peers.add_peer(peer1.id(), peer1);
-            self.peers.add_peer(peer2.id(), peer2);
+            self.peers.add_peer(peer1);
+            self.peers.add_peer(peer2);
             return Err(RoomError::BadRoomSpec(format!(
                 "Error while trying to connect Peer [id = {}] and Peer [id = \
                  {}] cause neither of peers are senders",
                 peer1_id, peer2_id
             )));
         };
-        self.peers.add_peer(receiver.id(), receiver);
+        self.peers.add_peer(receiver);
 
         let sender = sender.start();
         let member_id = sender.member_id();
+        let ice_servers = self
+            .participants
+            .get_member(member_id)
+            .ok_or_else(|| RoomError::MemberNotFound(member_id))?
+            .ice_user
+            .as_ref()
+            .ok_or_else(|| RoomError::NoTurnCredentials(member_id))?
+            .servers_list();
         let peer_created = Event::PeerCreated {
             peer_id: sender.id(),
             sdp_offer: None,
             tracks: sender.tracks(),
+            ice_servers,
         };
-        self.peers.add_peer(sender.id(), sender);
+        self.peers.add_peer(sender);
         Ok(Box::new(wrap_future(
             self.participants
                 .send_event_to_member(member_id, peer_created),
@@ -137,7 +160,7 @@ impl Room {
         sdp_offer: String,
         mids: Option<StdHashMap<u64, String>>,
     ) -> Result<ActFuture<(), RoomError>, RoomError> {
-        let mut from_peer: Peer<WaitLocalSdp> =
+        let from_peer: Peer<WaitLocalSdp> =
             self.peers.take_inner_peer(from_peer_id)?;
 
         if from_peer.is_sender() {
@@ -153,14 +176,25 @@ impl Room {
         let to_peer = to_peer.set_remote_sdp(sdp_offer.clone());
 
         let to_member_id = to_peer.member_id();
+        let ice_servers = self
+            .participants
+            .get_member(to_member_id)
+            .ok_or_else(|| RoomError::MemberNotFound(to_member_id))?
+            .ice_user
+            .as_ref()
+            .ok_or_else(|| RoomError::NoTurnCredentials(to_member_id))?
+            .servers_list();
+
         let event = Event::PeerCreated {
             peer_id: to_peer_id,
             sdp_offer: Some(sdp_offer),
             tracks: to_peer.tracks(),
+            ice_servers,
         };
 
-        self.peers.add_peer(from_peer_id, from_peer);
-        self.peers.add_peer(to_peer_id, to_peer);
+        self.peers.add_peer(from_peer);
+        self.peers.add_peer(to_peer);
+
         Ok(Box::new(wrap_future(
             self.participants.send_event_to_member(to_member_id, event),
         )))
@@ -199,8 +233,8 @@ impl Room {
             mids: from_peer.get_mids()?,
         };
 
-        self.peers.add_peer(from_peer_id, from_peer);
-        self.peers.add_peer(to_peer_id, to_peer);
+        self.peers.add_peer(from_peer);
+        self.peers.add_peer(to_peer);
 
         Ok(Box::new(wrap_future(
             self.participants.send_event_to_member(to_member_id, event),
@@ -247,6 +281,7 @@ impl Room {
 
 /// [`Actor`] implementation that provides an ergonomic way
 /// to interact with [`Room`].
+// TODO: close connections on signal (gracefull shutdown)
 impl Actor for Room {
     type Context = Context<Self>;
 }
@@ -363,35 +398,34 @@ impl Handler<RpcConnectionEstablished> for Room {
         msg: RpcConnectionEstablished,
         ctx: &mut Self::Context,
     ) -> Self::Result {
+        let member_id = msg.member_id;
         info!("RpcConnectionEstablished for member {}", msg.member_id);
 
-        // save new connection
-        self.participants.connection_established(
-            ctx,
-            msg.member_id,
-            msg.connection,
-        );
-
-        // get connected member Peers
-        self.peers
-            .get_peers_by_member_id(msg.member_id)
-            .into_iter()
-            .for_each(|peer| {
-                // only New peers should be connected
-                if let PeerStateMachine::New(peer) = peer {
-                    if self
-                        .participants
-                        .member_has_connection(peer.partner_member_id())
-                    {
-                        ctx.notify(ConnectPeers(
-                            peer.id(),
-                            peer.partner_peer_id(),
-                        ));
-                    }
-                }
-            });
-
-        Box::new(wrap_future(future::ok(())))
+        let fut =
+            self.participants
+                .connection_established(ctx, msg.member_id, msg.connection)
+                .map_err(|err, _, _| {
+                    error!("RpcConnectionEstablished error {:?}", err)
+                })
+                .map(move |_, room, ctx| {
+                    room.peers
+                        .get_peers_by_member_id(member_id)
+                        .into_iter()
+                        .for_each(|peer| {
+                            // only New peers should be connected
+                            if let PeerStateMachine::New(peer) = peer {
+                                if room.participants.member_has_connection(
+                                    peer.partner_member_id(),
+                                ) {
+                                    ctx.notify(ConnectPeers(
+                                        peer.id(),
+                                        peer.partner_peer_id(),
+                                    ));
+                                }
+                            }
+                        });
+                });
+        Box::new(fut)
     }
 }
 
@@ -437,23 +471,39 @@ mod test {
     use std::sync::{atomic::AtomicUsize, Arc, Mutex};
 
     use actix::{Addr, Arbiter, System};
+
     use medea_client_api_proto::{
-        AudioSettings, Direction, MediaType, Track, VideoSettings,
+        AudioSettings, Direction, IceServer, MediaType, Track, VideoSettings,
     };
 
     use crate::{
         api::client::rpc_connection::test::TestConnection, media::create_peers,
+        turn::new_turn_auth_service_mock,
     };
 
     use super::*;
 
     fn start_room() -> Addr<Room> {
         let members = hashmap! {
-            1 => Member{id: 1, credentials: "caller_credentials".to_owned()},
-            2 => Member{id: 2, credentials: "responder_credentials".to_owned()},
+            1 => Member{
+                id: 1,
+                credentials: "caller_credentials".to_owned(),
+                ice_user: None
+            },
+            2 => Member{
+                id: 2,
+                credentials: "responder_credentials".to_owned(),
+                ice_user: None
+            },
         };
         Arbiter::start(move |_| {
-            Room::new(1, members, create_peers(1, 2), Duration::from_secs(10))
+            Room::new(
+                1,
+                members,
+                create_peers(1, 2),
+                Duration::from_secs(10),
+                new_turn_auth_service_mock(),
+            )
         })
     }
 
@@ -503,6 +553,21 @@ mod test {
                             media_type: MediaType::Video(VideoSettings {}),
                         },
                     ],
+                    ice_servers: vec![
+                        IceServer {
+                            urls: vec!["stun:5.5.5.5:1234".to_string()],
+                            username: None,
+                            credential: None,
+                        },
+                        IceServer {
+                            urls: vec![
+                                "turn:5.5.5.5:1234".to_string(),
+                                "turn:5.5.5.5:1234?transport=tcp".to_string()
+                            ],
+                            username: Some("username".to_string()),
+                            credential: Some("password".to_string()),
+                        },
+                    ],
                 })
                 .unwrap(),
                 serde_json::to_string(&Event::SdpAnswerMade {
@@ -545,6 +610,21 @@ mod test {
                                 mid: Some(String::from("1"))
                             },
                             media_type: MediaType::Video(VideoSettings {}),
+                        },
+                    ],
+                    ice_servers: vec![
+                        IceServer {
+                            urls: vec!["stun:5.5.5.5:1234".to_string()],
+                            username: None,
+                            credential: None,
+                        },
+                        IceServer {
+                            urls: vec![
+                                "turn:5.5.5.5:1234".to_string(),
+                                "turn:5.5.5.5:1234?transport=tcp".to_string()
+                            ],
+                            username: Some("username".to_string()),
+                            credential: Some("password".to_string()),
                         },
                     ],
                 })

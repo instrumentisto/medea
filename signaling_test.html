@@ -52,6 +52,8 @@
 
         async function handlePeerCreated(msg) {
 
+            var configuration = { iceServers: msg.ice_servers };
+            pcs[msg.peer_id] = new RTCPeerConnection(configuration);
             pcs[msg.peer_id] = new RTCPeerConnection();
 
             var pc = pcs[msg.peer_id];
