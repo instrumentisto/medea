@@ -50,14 +50,25 @@ pub struct Participant(Mutex<RefCell<ParticipantInner>>);
 #[derive(Debug)]
 struct ParticipantInner {
     id: MemberId,
+
+    /// All [`WebRtcPublishEndpoint`]s of this [`Participant`].
     publishers: HashMap<EndpointId, Arc<WebRtcPublishEndpoint>>,
+
+    /// All [`WebRtcPlayEndpoint`]s of this [`Participant`].
     receivers: HashMap<EndpointId, Arc<WebRtcPlayEndpoint>>,
+
+    /// Credentials for this [`Participant`].
     credentials: String,
+
+    /// [`IceUser`] of this [`Participant`].
     ice_user: Option<IceUser>,
 }
 
 impl Participant {
     /// Create new empty [`Participant`].
+    ///
+    /// To fill this [`Participant`], you need to call the [`Participant::load`]
+    /// function.
     fn new(id: MemberId, credentials: String) -> Self {
         Self(Mutex::new(RefCell::new(ParticipantInner {
             id,
@@ -83,6 +94,7 @@ impl Participant {
             .for_each(|(_, p)| p.reset());
     }
 
+    /// Returns list of [`IceServer`] for this [`Participant`].
     pub fn servers_list(&self) -> Option<Vec<IceServer>> {
         self.0
             .lock()
@@ -93,10 +105,12 @@ impl Participant {
             .map(IceUser::servers_list)
     }
 
+    /// Returns and set to `None` [`IceUser`] of this [`Participant`].
     pub fn take_ice_user(&self) -> Option<IceUser> {
         self.0.lock().unwrap().borrow_mut().ice_user.take()
     }
 
+    /// Replace and return [`IceUser`] of this [`Participant`].
     pub fn replace_ice_user(&self, new_ice_user: IceUser) -> Option<IceUser> {
         self.0
             .lock()
