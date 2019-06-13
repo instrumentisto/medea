@@ -232,7 +232,7 @@ impl Handler<CreateIceUser> for Service {
     ) -> Self::Result {
         let ice_user = IceUser::build(
             self.turn_address,
-            msg.room_id.clone(),
+            &msg.room_id,
             &msg.member_id.to_string(),
             self.new_password(TURN_PASS_LEN),
         );

@@ -23,7 +23,7 @@ impl IceUser {
     /// Build new non static [`IceUser`].
     pub fn build(
         address: SocketAddr,
-        room_id: RoomId,
+        room_id: &RoomId,
         name: &str,
         pass: String,
     ) -> Self {

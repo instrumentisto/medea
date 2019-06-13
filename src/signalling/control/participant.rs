@@ -90,7 +90,7 @@ impl Participant {
             .borrow()
             .ice_user
             .as_ref()
-            .map(|u| u.servers_list())
+            .map(IceUser::servers_list)
     }
 
     pub fn take_ice_user(&self) -> Option<IceUser> {

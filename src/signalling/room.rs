@@ -153,7 +153,7 @@ impl Room {
         let member_id = sender.member_id();
         let ice_servers = self
             .participants
-            .get_member(member_id.clone())
+            .get_member(&member_id)
             .ok_or_else(|| RoomError::MemberNotFound(member_id.clone()))?
             .servers_list()
             .ok_or_else(|| RoomError::NoTurnCredentials(member_id.clone()))?;
@@ -202,7 +202,7 @@ impl Room {
         let to_member_id = to_peer.member_id();
         let ice_servers = self
             .participants
-            .get_member(to_member_id.clone())
+            .get_member(&to_member_id)
             .ok_or_else(|| RoomError::MemberNotFound(to_member_id.clone()))?
             .servers_list()
             .ok_or_else(|| {

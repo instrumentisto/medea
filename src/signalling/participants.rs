@@ -166,7 +166,7 @@ impl ParticipantService {
             && !self.drop_connection_tasks.contains_key(member_id)
     }
 
-    pub fn get_member(&self, member_id: MemberId) -> Option<Arc<Participant>> {
+    pub fn get_member(&self, member_id: &MemberId) -> Option<Arc<Participant>> {
         self.members.get(&member_id).cloned()
     }
 
@@ -254,7 +254,7 @@ impl ParticipantService {
                 self.connections.remove(&member_id);
 
                 ctx.spawn(wrap_future(
-                    self.delete_ice_user(member_id).map_err(|err| {
+                    self.delete_ice_user(&member_id).map_err(|err| {
                         error!("Error deleting IceUser {:?}", err)
                     }),
                 ));
@@ -282,17 +282,13 @@ impl ParticipantService {
     /// Deletes [`IceUser`] associated with provided [`Member`].
     fn delete_ice_user(
         &mut self,
-        member_id: MemberId,
+        member_id: &MemberId,
     ) -> Box<dyn Future<Item = (), Error = TurnServiceErr>> {
         match self.get_member_by_id(&member_id) {
-            Some(member) => {
-                let delete_fut = match member.take_ice_user() {
-                    Some(ice_user) => self.turn.delete(vec![ice_user]),
-                    None => Box::new(future::ok(())),
-                };
-
-                delete_fut
-            }
+            Some(member) => match member.take_ice_user() {
+                Some(ice_user) => self.turn.delete(vec![ice_user]),
+                None => Box::new(future::ok(())),
+            },
             None => Box::new(future::ok(())),
         }
     }
