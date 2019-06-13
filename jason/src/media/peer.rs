@@ -30,6 +30,10 @@ pub enum Sdp {
     Answer(String),
 }
 
+pub enum PeerError {
+
+}
+
 #[dispatchable]
 #[allow(clippy::module_name_repetitions)]
 /// Events emitted from [`PeerConnection`].
@@ -99,6 +103,7 @@ pub struct PeerConnection {
     /// [`RtcPeerConnection`] receives new [`StreamTrack`] from remote
     /// peer.
     _on_track: EventListener<RtcPeerConnection, RtcTrackEvent>,
+
     media_connections: Rc<RefCell<MediaConnections>>,
 }
 
@@ -331,35 +336,21 @@ impl PeerConnection {
             let get_media = media_manager
                 .get_stream(media_request)
                 .and_then(move |stream: Rc<MediaStream>| {
-
                     let mut promises = Vec::new();
 
                     for sender in connections.borrow().senders.values() {
                         let sender: &Sender = sender;
 
                         if let Some(track) = stream.get_track_by_id(sender.track_id) {
-                            promises.push(sender.transceiver.sender().replace_track(Some(track.track())));
-                        } else {
+                            let replace_promise = sender.transceiver.sender().replace_track(Some(track.track()));
 
+                            promises.push(JsFuture::from(replace_promise).map_err(WasmErr::from));
+                        } else {
+                            //TODO: should not happen, but we should report
                         }
                     }
 
-//                        let rtc_sender: RtcRtpSender = sender.transceiver.sender();
-//                        let replace = match sender.media_type {
-//                            MediaType::Audio(_) => rtc_sender
-//                                .replace_track(stream.get_audio_track()),
-//
-//                            MediaType::Video(_) =>
-//                                rtc_sender
-//                                    .replace_track(stream.get_video_track()),
-//                        };
-//
-//                        promises.push(
-//                            JsFuture::from(replace).map_err(WasmErr::from),
-//                        );
-//                    join_all(promises).map_err(|err:
-//                                                WasmErr| err.log_err());
-                    Ok(())
+                    join_all(promises).map_err(|err| err.log_err())
                 })
                 .map(|_| ());
             future::Either::B(get_media)
