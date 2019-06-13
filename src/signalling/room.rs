@@ -160,7 +160,7 @@ impl Room {
         sdp_offer: String,
         mids: Option<StdHashMap<u64, String>>,
     ) -> Result<ActFuture<(), RoomError>, RoomError> {
-        let from_peer: Peer<WaitLocalSdp> =
+        let mut from_peer: Peer<WaitLocalSdp> =
             self.peers.take_inner_peer(from_peer_id)?;
 
         if from_peer.is_sender() {
