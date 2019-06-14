@@ -1,6 +1,7 @@
 //! Signalling API e2e tests.
 
-// TODO: dockerize app, run tests on single instance, remove e2e_tests feature, run tests with redis up, extend tests with ice servers check
+// TODO: dockerize app, run tests on single instance, remove e2e_tests feature,
+// run tests with redis up, extend tests with ice servers check
 
 use std::{cell::Cell, rc::Rc, time::Duration};
 
@@ -193,6 +194,18 @@ fn pub_sub_video_call() {
             } = &events[0]
             {
                 assert_eq!(ice_servers.len(), 2);
+                assert_eq!(
+                    ice_servers[0].urls[0],
+                    "stun:127.0.0.1:3478".to_string()
+                );
+                assert_eq!(
+                    ice_servers[1].urls[0],
+                    "turn:127.0.0.1:3478".to_string()
+                );
+                assert_eq!(
+                    ice_servers[1].urls[1],
+                    "turn:127.0.0.1:3478?transport=tcp".to_string()
+                );
 
                 if let Some(_) = sdp_offer {
                     is_caller = false;
@@ -275,6 +288,19 @@ fn three_members_p2p_video_call() {
         match event {
             Event::PeerCreated { ice_servers, .. } => {
                 assert_eq!(ice_servers.len(), 2);
+                assert_eq!(
+                    ice_servers[0].urls[0],
+                    "stun:127.0.0.1:3478".to_string()
+                );
+                assert_eq!(
+                    ice_servers[1].urls[0],
+                    "turn:127.0.0.1:3478".to_string()
+                );
+                assert_eq!(
+                    ice_servers[1].urls[1],
+                    "turn:127.0.0.1:3478?transport=tcp".to_string()
+                );
+
                 peer_created_count += 1;
             }
             Event::IceCandidateDiscovered { .. } => {
