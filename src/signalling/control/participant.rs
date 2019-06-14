@@ -1,7 +1,6 @@
 //! [`Participant`] is member of [`Room`] with [`RpcConnection`].
 
 use std::{
-    cell::RefCell,
     convert::TryFrom as _,
     sync::{Arc, Mutex},
 };
@@ -44,7 +43,7 @@ impl From<TryFromElementError> for ParticipantsLoadError {
 
 /// [`Participant`] is member of [`Room`] with [`RpcConnection`].
 #[derive(Debug)]
-pub struct Participant(Mutex<RefCell<ParticipantInner>>);
+pub struct Participant(Mutex<ParticipantInner>);
 
 #[allow(clippy::module_name_repetitions)]
 #[derive(Debug)]
@@ -70,13 +69,13 @@ impl Participant {
     /// To fill this [`Participant`], you need to call the [`Participant::load`]
     /// function.
     fn new(id: MemberId, credentials: String) -> Self {
-        Self(Mutex::new(RefCell::new(ParticipantInner {
+        Self(Mutex::new(ParticipantInner {
             id,
             publishers: HashMap::new(),
             receivers: HashMap::new(),
             credentials,
             ice_user: None,
-        })))
+        }))
     }
 
     /// Notify [`Participant`] that some [`Peer`]s removed.
@@ -99,7 +98,6 @@ impl Participant {
         self.0
             .lock()
             .unwrap()
-            .borrow()
             .ice_user
             .as_ref()
             .map(IceUser::servers_list)
@@ -107,27 +105,22 @@ impl Participant {
 
     /// Returns and set to `None` [`IceUser`] of this [`Participant`].
     pub fn take_ice_user(&self) -> Option<IceUser> {
-        self.0.lock().unwrap().borrow_mut().ice_user.take()
+        self.0.lock().unwrap().ice_user.take()
     }
 
     /// Replace and return [`IceUser`] of this [`Participant`].
     pub fn replace_ice_user(&self, new_ice_user: IceUser) -> Option<IceUser> {
-        self.0
-            .lock()
-            .unwrap()
-            .borrow_mut()
-            .ice_user
-            .replace(new_ice_user)
+        self.0.lock().unwrap().ice_user.replace(new_ice_user)
     }
 
     /// Returns [`MemberId`] of this [`Participant`].
     pub fn id(&self) -> MemberId {
-        self.0.lock().unwrap().borrow().id.clone()
+        self.0.lock().unwrap().id.clone()
     }
 
     /// Returns credentials of this [`Participant`].
     pub fn credentials(&self) -> String {
-        self.0.lock().unwrap().borrow().credentials.clone()
+        self.0.lock().unwrap().credentials.clone()
     }
 
     /// Creates all empty [`Participant`] from [`RoomSpec`] and then
@@ -161,12 +154,12 @@ impl Participant {
     pub fn publishers(
         &self,
     ) -> HashMap<EndpointId, Arc<WebRtcPublishEndpoint>> {
-        self.0.lock().unwrap().borrow().publishers.clone()
+        self.0.lock().unwrap().publishers.clone()
     }
 
     /// Returns all receivers of this [`Participant`].
     pub fn receivers(&self) -> HashMap<EndpointId, Arc<WebRtcPlayEndpoint>> {
-        self.0.lock().unwrap().borrow().receivers.clone()
+        self.0.lock().unwrap().receivers.clone()
     }
 
     /// Load all publishers and receivers of this [`Participant`].
@@ -287,12 +280,7 @@ impl Participant {
         id: EndpointId,
         endpoint: Arc<WebRtcPlayEndpoint>,
     ) {
-        self.0
-            .lock()
-            .unwrap()
-            .borrow_mut()
-            .receivers
-            .insert(id, endpoint);
+        self.0.lock().unwrap().receivers.insert(id, endpoint);
     }
 
     /// Insert publisher into this [`Participant`].
@@ -301,12 +289,7 @@ impl Participant {
         id: EndpointId,
         endpoint: Arc<WebRtcPublishEndpoint>,
     ) {
-        self.0
-            .lock()
-            .unwrap()
-            .borrow_mut()
-            .publishers
-            .insert(id, endpoint);
+        self.0.lock().unwrap().publishers.insert(id, endpoint);
     }
 
     /// Lookup [`WebRtcPublishEndpoint`] publisher by [`EndpointId`].
@@ -314,7 +297,7 @@ impl Participant {
         &self,
         id: &EndpointId,
     ) -> Option<Arc<WebRtcPublishEndpoint>> {
-        self.0.lock().unwrap().borrow().publishers.get(id).cloned()
+        self.0.lock().unwrap().publishers.get(id).cloned()
     }
 
     /// Lookup [`WebRtcPlayEndpoint`] receiver by [`EndpointId`].
@@ -322,7 +305,7 @@ impl Participant {
         &self,
         id: &EndpointId,
     ) -> Option<Arc<WebRtcPlayEndpoint>> {
-        self.0.lock().unwrap().borrow().receivers.get(id).cloned()
+        self.0.lock().unwrap().receivers.get(id).cloned()
     }
 }
 

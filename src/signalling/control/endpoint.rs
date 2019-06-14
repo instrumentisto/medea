@@ -1,7 +1,6 @@
 //! Signalling representation of endpoints.
 
 use std::{
-    cell::RefCell,
     fmt::Display,
     sync::{Mutex, Weak},
 };
@@ -75,7 +74,7 @@ impl WebRtcPlayEndpointInner {
 /// Signalling representation of `WebRtcPlayEndpoint`.
 #[allow(clippy::module_name_repetitions)]
 #[derive(Debug)]
-pub struct WebRtcPlayEndpoint(Mutex<RefCell<WebRtcPlayEndpointInner>>);
+pub struct WebRtcPlayEndpoint(Mutex<WebRtcPlayEndpointInner>);
 
 impl WebRtcPlayEndpoint {
     /// Create new [`WebRtcPlayEndpoint`].
@@ -84,49 +83,49 @@ impl WebRtcPlayEndpoint {
         publisher: Weak<WebRtcPublishEndpoint>,
         owner: Weak<Participant>,
     ) -> Self {
-        Self(Mutex::new(RefCell::new(WebRtcPlayEndpointInner {
+        Self(Mutex::new(WebRtcPlayEndpointInner {
             src,
             publisher,
             owner,
             peer_id: None,
-        })))
+        }))
     }
 
     /// Returns [`SrcUri`] of this [`WebRtcPlayEndpoint`].
     pub fn src(&self) -> SrcUri {
-        self.0.lock().unwrap().borrow().src()
+        self.0.lock().unwrap().src()
     }
 
     /// Returns owner [`Participant`] of this [`WebRtcPlayEndpoint`].
     pub fn owner(&self) -> Weak<Participant> {
-        self.0.lock().unwrap().borrow().owner()
+        self.0.lock().unwrap().owner()
     }
 
     /// Returns publisher's [`WebRtcPublishEndpoint`].
     pub fn publisher(&self) -> Weak<WebRtcPublishEndpoint> {
-        self.0.lock().unwrap().borrow().publisher()
+        self.0.lock().unwrap().publisher()
     }
 
     /// Check that peer connection established for this [`WebRtcPlayEndpoint`].
     pub fn is_connected(&self) -> bool {
-        self.0.lock().unwrap().borrow().is_connected()
+        self.0.lock().unwrap().is_connected()
     }
 
     /// Save [`PeerId`] of this [`WebRtcPlayEndpoint`].
     pub fn connect(&self, peer_id: PeerId) {
-        self.0.lock().unwrap().borrow_mut().set_peer_id(peer_id);
+        self.0.lock().unwrap().set_peer_id(peer_id);
     }
 
     /// Return [`PeerId`] of [`Peer`] of this [`WebRtcPlayEndpoint`].
     pub fn peer_id(&self) -> Option<PeerId> {
-        self.0.lock().unwrap().borrow().peer_id()
+        self.0.lock().unwrap().peer_id()
     }
 
     /// Reset state of this [`WebRtcPlayEndpoint`].
     ///
     /// Atm this only reset peer_id.
     pub fn reset(&self) {
-        self.0.lock().unwrap().borrow_mut().reset()
+        self.0.lock().unwrap().reset()
     }
 }
 
@@ -185,7 +184,7 @@ impl WebRtcPublishEndpointInner {
 /// Signalling representation of `WebRtcPublishEndpoint`.
 #[allow(clippy::module_name_repetitions)]
 #[derive(Debug)]
-pub struct WebRtcPublishEndpoint(Mutex<RefCell<WebRtcPublishEndpointInner>>);
+pub struct WebRtcPublishEndpoint(Mutex<WebRtcPublishEndpointInner>);
 
 impl WebRtcPublishEndpoint {
     /// Create new [`WebRtcPublishEndpoint`].
@@ -194,58 +193,54 @@ impl WebRtcPublishEndpoint {
         receivers: Vec<Weak<WebRtcPlayEndpoint>>,
         owner: Weak<Participant>,
     ) -> Self {
-        Self(Mutex::new(RefCell::new(WebRtcPublishEndpointInner {
+        Self(Mutex::new(WebRtcPublishEndpointInner {
             p2p,
             receivers,
             owner,
             peer_ids: HashSet::new(),
-        })))
+        }))
     }
 
     /// Add receiver for this [`WebRtcPublishEndpoint`].
     pub fn add_receiver(&self, receiver: Weak<WebRtcPlayEndpoint>) {
-        self.0.lock().unwrap().borrow_mut().add_receiver(receiver)
+        self.0.lock().unwrap().add_receiver(receiver)
     }
 
     /// Returns all receivers of this [`WebRtcPublishEndpoint`].
     pub fn receivers(&self) -> Vec<Weak<WebRtcPlayEndpoint>> {
-        self.0.lock().unwrap().borrow().receivers()
+        self.0.lock().unwrap().receivers()
     }
 
     /// Returns owner [`Participant`] of this [`WebRtcPublishEndpoint`].
     pub fn owner(&self) -> Weak<Participant> {
-        self.0.lock().unwrap().borrow().owner()
+        self.0.lock().unwrap().owner()
     }
 
     /// Add [`PeerId`] of this [`WebRtcPublishEndpoint`].
     pub fn add_peer_id(&self, peer_id: PeerId) {
-        self.0.lock().unwrap().borrow_mut().add_peer_id(peer_id)
+        self.0.lock().unwrap().add_peer_id(peer_id)
     }
 
     /// Returns all [`PeerId`] of this [`WebRtcPublishEndpoint`].
     pub fn peer_ids(&self) -> HashSet<PeerId> {
-        self.0.lock().unwrap().borrow().peer_ids()
+        self.0.lock().unwrap().peer_ids()
     }
 
     /// Reset state of this [`WebRtcPublishEndpoint`].
     ///
     /// Atm this only reset peer_ids.
     pub fn reset(&self) {
-        self.0.lock().unwrap().borrow_mut().reset()
+        self.0.lock().unwrap().reset()
     }
 
     /// Remove [`PeerId`] from peer_ids.
     #[allow(clippy::trivially_copy_pass_by_ref)]
     pub fn remove_peer_id(&self, peer_id: &PeerId) {
-        self.0.lock().unwrap().borrow_mut().remove_peer_id(peer_id)
+        self.0.lock().unwrap().remove_peer_id(peer_id)
     }
 
     /// Remove all [`PeerId`]s related to this [`WebRtcPublishEndpoint`].
     pub fn remove_peer_ids(&self, peer_ids: &[PeerId]) {
-        self.0
-            .lock()
-            .unwrap()
-            .borrow_mut()
-            .remove_peer_ids(peer_ids)
+        self.0.lock().unwrap().remove_peer_ids(peer_ids)
     }
 }
