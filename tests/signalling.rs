@@ -1,5 +1,7 @@
 //! Signalling API e2e tests.
 
+// TODO: dockerize app, run tests on single instance, remove e2e_tests feature, run tests with redis up, extend tests with ice servers check
+
 mod utils;
 
 use std::{cell::Cell, rc::Rc, time::Duration};

@@ -140,6 +140,8 @@ struct WebRtcPublishEndpointInner {
     /// Owner [`Participant`] of this [`WebRtcPublishEndpoint`].
     owner: Weak<Participant>,
 
+    // TODO: some doc that explains why we will need this field
+
     /// All [`PeerId`]s created for this [`WebRtcPublishEndpoint`].
     peer_ids: HashSet<PeerId>,
 }
