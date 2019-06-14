@@ -2,8 +2,6 @@
 
 // TODO: dockerize app, run tests on single instance, remove e2e_tests feature, run tests with redis up, extend tests with ice servers check
 
-mod utils;
-
 use std::{cell::Cell, rc::Rc, time::Duration};
 
 use actix::{
@@ -165,9 +163,7 @@ impl StreamHandler<WebMessage, ProtocolError> for TestMember {
 #[test]
 fn pub_sub_video_call() {
     let test_name = "pub_sub_video_call";
-    let bind_port = utils::run_test_server(test_name);
-    let base_url =
-        format!("ws://localhost:{}/ws/pub-sub-video-call", bind_port);
+    let base_url = "ws://localhost:8081/ws/pub-sub-video-call";
 
     let sys = System::new(test_name);
 
@@ -258,9 +254,8 @@ fn pub_sub_video_call() {
 #[test]
 fn three_members_p2p_video_call() {
     let test_name = "three_members_p2p_video_call";
-    let bind_port = utils::run_test_server(test_name);
-    let base_url =
-        format!("ws://localhost:{}/ws/three-members-conference", bind_port);
+
+    let base_url = "ws://localhost:8081/ws/three-members-conference";
 
     let sys = System::new(test_name);
 

@@ -19,9 +19,6 @@ members = [
 [profile.release]
 lto = "thin"
 
-[features]
-e2e_test = []
-
 [dependencies]
 actix = "0.7"
 actix-web = "0.7"

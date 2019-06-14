@@ -75,9 +75,6 @@ pub fn start_static_rooms(
                 ));
             }
 
-            #[cfg(feature = "e2e_test")]
-            let turn_auth_service = service::test::new_turn_auth_service_mock();
-            #[cfg(not(feature = "e2e_test"))]
             let turn_auth_service = service::new_turn_auth_service(config)
                 .expect("Unable to start turn service");
 

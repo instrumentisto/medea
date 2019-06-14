@@ -136,13 +136,38 @@ ifeq ($(test-unit-crate),@all)
 	@make test.unit crate=jason
 else
 ifeq ($(test-unit-crate),medea)
-	cargo test -p medea --features "e2e_test"
+	cargo test --lib --bin medea
 else
 ifeq ($(test-unit-crate),jason)
 	wasm-pack test --headless --firefox jason
 endif
 	cargo test -p $(test-unit-crate)
 endif
+endif
+
+
+# Run Rust e2e tests of project.
+# If logs set to "yes" then medea print all logs to stdout.
+#
+# Usage:
+# 	make test.e2e [dockerized=(yes|no)] [logs=(yes|no)]
+
+medea-env-dockerized = MEDEA_SERVER_BIND_PORT=8081 \
+	MEDEA_SERVER_STATIC_SPECS_PATH=./tests/specs
+
+medea-env-debug = MEDEA_SERVER.BIND_PORT=8081 \
+	MEDEA_SERVER.STATIC_SPECS_PATH=./tests/specs
+
+test.e2e: up.coturn
+ifeq ($(dockerized),yes)
+	make down.medea
+	env $(medea-env-dockerized) docker-compose -f docker-compose.medea.yml up -d
+	cargo test --test e2e && make down.medea
+else
+	- killall medea
+	echo $(medea-env)
+	env $(medea-env-debug) $(if $(call eq,$(logs),yes),,RUST_LOG=warn) cargo run &
+	sleep 2 && cargo test --test e2e && killall medea
 endif
 
 
@@ -157,8 +182,8 @@ endif
 # Usage:
 #	make up.coturn
 
-up.coturn:
-	docker-compose up
+up.coturn: down.coturn
+	docker-compose -f docker-compose.coturn.yml up -d
 
 
 # Run Jason E2E demo in development mode.
@@ -175,8 +200,38 @@ up.jason:
 # Usage:
 #	make up.medea
 
-up.medea:
+up.medea: up.coturn
+ifeq ($(dockerized),yes)
+	@make down.medea
+	docker-compose -f docker-compose.medea.yml up
+	@make down.coturn
+else
 	cargo run --bin medea
+endif
+
+
+
+
+#####################
+# Stopping commands #
+#####################
+
+# Stop dockerized medea.
+#
+# Usage:
+# 	make down.medea
+
+down.medea:
+	docker-compose -f docker-compose.medea.yml down
+
+
+# Stop dockerized coturn.
+#
+# Usage:
+# 	make down.coturn
+
+down.coturn:
+	docker-compose -f docker-compose.coturn.yml down -t 1
 
 
 
@@ -189,5 +244,6 @@ up.medea:
         docs docs.rust \
         test test.unit \
         up up.coturn up.jason up.medea \
-        yarn
+        yarn down.coturn down.medea \
+        test.e2e
 
