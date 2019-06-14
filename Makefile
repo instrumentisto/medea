@@ -162,12 +162,12 @@ test.e2e: up.coturn
 ifeq ($(dockerized),yes)
 	make down.medea
 	env $(medea-env-dockerized) docker-compose -f docker-compose.medea.yml up -d
-	cargo test --test e2e && make down.medea
+	- cargo test --test e2e && make down.medea
 else
 	- killall medea
 	echo $(medea-env)
 	env $(medea-env-debug) $(if $(call eq,$(logs),yes),,RUST_LOG=warn) cargo run &
-	sleep 2 && cargo test --test e2e && killall medea
+	- sleep 2 && cargo test --test e2e && killall medea
 endif
 
 
