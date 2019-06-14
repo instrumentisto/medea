@@ -31,7 +31,7 @@ struct TestMember {
 
     /// Function which will be called at every received by this [`TestMember`]
     /// [`Event`].
-    test_fn: Box<FnMut(&Event, &mut Context<TestMember>)>,
+    test_fn: Box<dyn FnMut(&Event, &mut Context<TestMember>)>,
 }
 
 impl TestMember {
@@ -56,7 +56,7 @@ impl TestMember {
     /// received from server.
     pub fn start(
         uri: &str,
-        test_fn: Box<FnMut(&Event, &mut Context<TestMember>)>,
+        test_fn: Box<dyn FnMut(&Event, &mut Context<TestMember>)>,
     ) {
         Arbiter::spawn(
             Client::new(uri)
