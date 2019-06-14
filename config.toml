@@ -13,7 +13,7 @@
 #
 # Default:
 #   static_specs_path = None
-static_specs_path = "specs"
+static_specs_path = "dev/specs"
 
 
 

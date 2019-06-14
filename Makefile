@@ -165,7 +165,6 @@ ifeq ($(dockerized),yes)
 	- cargo test --test e2e && make down.medea
 else
 	- killall medea
-	echo $(medea-env)
 	env $(medea-env-debug) $(if $(call eq,$(logs),yes),,RUST_LOG=warn) cargo run &
 	- sleep 2 && cargo test --test e2e && killall medea
 endif
