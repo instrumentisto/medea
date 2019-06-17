@@ -33,7 +33,7 @@ impl WasmErr {
         console::error_1(&JsValue::from_str(&format!("{}", self)));
     }
 
-    pub fn from_str<S>(msg: S) -> Self
+    pub fn build_from_str<S>(msg: S) -> Self
     where
         S: Into<Cow<'static, str>>,
     {

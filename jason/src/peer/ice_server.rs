@@ -1,10 +1,15 @@
+//! Wrapper for array of [`RtcIceServer`][1].
+//!
+//! [1]: https://www.w3.org/TR/webrtc/#rtciceserver-dictionary
 use std::ops::Deref;
 
 use medea_client_api_proto::IceServer;
 use wasm_bindgen::JsValue;
 use web_sys::RtcIceServer;
 
-/// Wrapper for Array of [`RtcIceServer`].
+/// Wrapper for array of [`RtcIceServer`][1].
+///
+/// [1]: https://www.w3.org/TR/webrtc/#rtciceserver-dictionary
 pub struct RtcIceServers(js_sys::Array);
 
 impl From<Vec<IceServer>> for RtcIceServers {

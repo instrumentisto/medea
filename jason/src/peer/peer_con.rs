@@ -23,6 +23,9 @@ use crate::{
 
 pub type Id = u64;
 
+/// [`RTCSdpType`][1] adapter. `pranswer` and `rollback` SDPs aren't used.
+///
+/// [1]: https://www.w3.org/TR/webrtc/#rtcsdptype
 pub enum Sdp {
     Offer(String),
     Answer(String),
@@ -53,22 +56,30 @@ pub struct PeerConnection {
     /// Underlying [`RtcPeerConnection`].
     peer: Rc<RtcPeerConnection>,
 
-    /// [`RtcPeerConnection`]'s [`on_ice_candidate`] callback. Which fires when
-    /// [`RtcPeerConnection`] discovers new ice candidate.
+    /// [`RtcPeerConnection`][1]'s [`on_ice_candidate`][2] callback. Which
+    /// fires when [`RtcPeerConnection`][1] discovers new ice candidate.
+    ///
+    /// [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
+    /// [2]: https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-onicecandidate
     _on_ice_candidate:
         EventListener<RtcPeerConnection, RtcPeerConnectionIceEvent>,
 
-    /// [`RtcPeerConnection`]'s [`on_track`] callback. Which fires when
-    /// [`RtcPeerConnection`] receives new [`StreamTrack`] from remote
+    /// [`RtcPeerConnection`][1]'s [`on_track`][2] callback. Which fires when
+    /// [`RtcPeerConnection`][1] receives new [`StreamTrack`] from remote
     /// peer.
+    ///
+    /// [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
+    /// [2]: https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-ontrack
     _on_track: EventListener<RtcPeerConnection, RtcTrackEvent>,
 
+    /// [`Sender`]s and [`Receivers`] of this [`PeerConnection`].
     media_connections: Rc<RefCell<MediaConnections>>,
 }
 
 impl PeerConnection {
-    /// Create new [`PeerConnection`]. Provided  [`peer_events_sender`] will be
-    /// used to emit any events from [`PeerEvent`].
+    /// Create new [`PeerConnection`]. Provided  `peer_events_sender` will be
+    /// used to emit any events from [`PeerEvent`], provided `ice_servers` will
+    /// be used by created [`PeerConenction`].
     pub fn new(
         peer_id: Id,
         peer_events_sender: &UnboundedSender<PeerEvent>,
@@ -128,6 +139,8 @@ impl PeerConnection {
                         }
                     }
 
+                    // got all tracks from this sender, so emit
+                    // PeerEvent::NewRemoteStream
                     let _ = sender.unbounded_send(PeerEvent::NewRemoteStream {
                         peer_id,
                         sender_id,
@@ -149,17 +162,27 @@ impl PeerConnection {
         })
     }
 
-    pub fn get_mids(&self) -> Result<Option<HashMap<u64, String>>, WasmErr> {
+    /// Track id to mid relations of all send tracks of this
+    /// [`PeerConnection`]. mid is id of [`m= section`][1]. mids are received
+    /// directly from registered [`RTCRtpTransceiver`][2]s, and are being
+    /// allocated on local sdp update (i.e. after `create_and_set_offer` call).
+    /// Errors if finds sending transceiver without mid.
+    ///
+    /// [1]: https://tools.ietf.org/html/rfc4566#section-5.14
+    /// [2]: https://www.w3.org/TR/webrtc/#rtcrtptransceiver-interface
+    pub fn get_send_mids(
+        &self,
+    ) -> Result<Option<HashMap<u64, String>>, WasmErr> {
         if self.media_connections.borrow().senders.is_empty() {
             return Ok(None);
         }
 
         let mut mids = HashMap::new();
-        for (track, sender) in &self.media_connections.borrow().senders {
+        for (track_id, sender) in &self.media_connections.borrow().senders {
             mids.insert(
-                *track,
+                *track_id,
                 sender.transceiver.mid().ok_or_else(|| {
-                    WasmErr::from_str("Peer has senders without mid")
+                    WasmErr::build_from_str("Peer has senders without mid")
                 })?,
             );
         }
@@ -167,6 +190,11 @@ impl PeerConnection {
         Ok(Some(mids))
     }
 
+    /// Obtain SDP Offer from underlying [`RTCPeerConnection`][1] and set it as
+    /// local description. Should be called after changing local tracks, but
+    /// not all changes require renegotiation.
+    ///
+    /// [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
     pub fn create_and_set_offer(
         &self,
     ) -> impl Future<Item = String, Error = WasmErr> {
@@ -184,6 +212,11 @@ impl PeerConnection {
             .map_err(Into::into)
     }
 
+    /// Obtain SDP Answer from underlying [`RTCPeerConnection`][1] and set it as
+    /// local description. Should be called whenever remote description is
+    /// changed.
+    ///
+    /// [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
     pub fn create_and_set_answer(
         &self,
     ) -> impl Future<Item = String, Error = WasmErr> {
@@ -201,6 +234,9 @@ impl PeerConnection {
             .map_err(Into::into)
     }
 
+    /// Updates underlying [`RTCPeerConnection`][1] remote SDP.
+    ///
+    /// [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
     pub fn set_remote_description(
         &self,
         sdp: Sdp,
@@ -225,7 +261,10 @@ impl PeerConnection {
             .map_err(Into::into)
     }
 
-    /// Add ice candidate from remote peer to this peer.
+    /// Adds remote [`RTCPeerConnection`][1]s [ICE Candidate][2] to this peer.
+    ///
+    /// [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
+    /// [2]: https://tools.ietf.org/html/rfc5245#section-2
     pub fn add_ice_candidate(
         &self,
         candidate: &str,
@@ -247,9 +286,10 @@ impl PeerConnection {
 
     /// Update peers tracks.
     ///
-    /// Synchronize provided tracks with this peer [`media_connections`]. Each
-    /// [`Direction::Send`] track have corresponding [`Sender`], and each
-    /// [`Direction::Recv`] track has [`Receiver`].
+    /// Synchronize provided tracks with this [`PeerConnection`] [`Sender`]s and
+    /// [`Receiver`]s. Will proc local media request if required.
+    // TODO: Doesnt really updates anything, but generates new senders and
+    // receivers.
     pub fn update_tracks(
         &self,
         tracks: Vec<Track>,
@@ -318,9 +358,11 @@ impl MediaConnections {
         // validate that provided stream have all tracks that we need
         for sender in self.senders.values() {
             if !stream.has_track(sender.track_id) {
-                return future::Either::A(future::err(WasmErr::from_str(
-                    "Stream does not have all necessary tracks",
-                )));
+                return future::Either::A(future::err(
+                    WasmErr::build_from_str(
+                        "Stream does not have all necessary tracks",
+                    ),
+                ));
             }
         }
 

@@ -1,3 +1,7 @@
+//! Adapters to [`RTCPeerConnection`][1] and related objects.
+//!
+//! [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
+
 mod ice_server;
 mod peer_con;
 mod repo;

@@ -16,20 +16,28 @@ use crate::{
     utils::{window, Callback2, WasmErr},
 };
 
+/// Responsible for [`MediaStream`] acquisition and storing.
 #[derive(Default)]
 #[allow(clippy::module_name_repetitions)]
 pub struct MediaManager(Rc<RefCell<InnerMediaManager>>);
 
 #[derive(Default)]
 struct InnerMediaManager {
-    // Obtained streams.
+    /// Obtained streams.
     streams: Vec<Rc<MediaStream>>,
 
-    // Callback to be invoked when new [`MediaStream`] was acquired.
+    /// Callback to be invoked when new [`MediaStream`] was acquired providing
+    /// its handle.
+    // TODO: will be extended with some metadata that would allow client to
+    //       understand purpose of obtaining this stream.
     on_local_stream: Rc<Callback2<MediaStreamHandle, WasmErr>>,
 }
 
 impl MediaManager {
+    /// Obtain [`MediaStream`] based on provided [`StreamRequest`]. Acquired
+    /// streams are cached and cloning existing stream is preferable to
+    /// obtaining new. on_local_stream callback will be invoked each time this
+    /// function succeeds.
     // TODO: lookup stream by caps, and return its copy if found
     pub fn get_stream(
         &self,
@@ -79,6 +87,8 @@ impl MediaManager {
         )
     }
 
+    /// Set on_local_stream callback that will be invoked when [`MediaManager`]
+    /// obtains [`MediaStream`].
     pub fn set_on_local_stream(&self, f: js_sys::Function) {
         self.0.borrow_mut().on_local_stream.set_func(f);
     }

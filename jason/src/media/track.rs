@@ -8,6 +8,9 @@ use web_sys::MediaStreamTrack;
 
 pub type Id = u64;
 
+/// [`MediaStreamTrack`][1] wrapper.
+///
+/// [1]: https://www.w3.org/TR/mediacapture-streams/#mediastreamtrack
 #[allow(clippy::module_name_repetitions)]
 pub struct MediaTrack {
     id: Id,

@@ -42,7 +42,7 @@ impl RoomHandle {
             inner.borrow_mut().on_new_connection.set_func(f);
             Ok(())
         } else {
-            Err(WasmErr::from_str("Detached state").into())
+            Err(WasmErr::build_from_str("Detached state").into())
         }
     }
 }
@@ -188,7 +188,7 @@ impl EventHandler for InnerRoom {
                             rpc.send_command(Command::MakeSdpOffer {
                                 peer_id,
                                 sdp_offer,
-                                mids: peer_rc.get_mids().unwrap(),
+                                mids: peer_rc.get_send_mids().unwrap(),
                             });
                             Ok(())
                         },
@@ -205,7 +205,7 @@ impl EventHandler for InnerRoom {
                                     rpc.send_command(Command::MakeSdpAnswer {
                                         peer_id,
                                         sdp_answer,
-                                        mids: peer_rc1.get_mids().unwrap(),
+                                        mids: peer_rc1.get_send_mids().unwrap(),
                                     });
                                     Ok(())
                                 }),
@@ -234,7 +234,10 @@ impl EventHandler for InnerRoom {
             );
         } else {
             // TODO: No peer, whats next?
-            WasmErr::from_str(format!("Peer with id {} doesnt exist", peer_id));
+            WasmErr::build_from_str(format!(
+                "Peer with id {} doesnt exist",
+                peer_id
+            ));
         }
     }
 
@@ -255,7 +258,10 @@ impl EventHandler for InnerRoom {
             );
         } else {
             // TODO: No peer, whats next?
-            WasmErr::from_str(format!("Peer with id {} doesnt exist", peer_id));
+            WasmErr::build_from_str(format!(
+                "Peer with id {} doesnt exist",
+                peer_id
+            ));
         }
     }
 
@@ -297,7 +303,7 @@ impl PeerEventHandler for InnerRoom {
         remote_stream: MediaStream,
     ) {
         match self.connections.get(&sender_id) {
-            None => WasmErr::from_str(
+            None => WasmErr::build_from_str(
                 "NewRemoteStream from sender without connection",
             )
             .log_err(),

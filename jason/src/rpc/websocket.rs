@@ -131,7 +131,7 @@ impl WebSocket {
                         Ok(socket)
                     })
                     .select(rx_close.then(|_| {
-                        Err(WasmErr::from_str("Failed to init WebSocket"))
+                        Err(WasmErr::build_from_str("Failed to init WebSocket"))
                     }))
                     .map(|(socket, _)| socket)
                     .map_err(|(err, _)| err)
@@ -183,7 +183,7 @@ impl WebSocket {
                 .socket
                 .send_with_str(&serde_json::to_string(msg)?)
                 .map_err(WasmErr::from),
-            _ => Err(WasmErr::from_str("Underlying socket is closed")),
+            _ => Err(WasmErr::build_from_str("Underlying socket is closed")),
         }
     }
 }
@@ -230,7 +230,7 @@ impl TryFrom<&MessageEvent> for ServerMessage {
         let payload = msg
             .data()
             .as_string()
-            .ok_or_else(|| WasmErr::from_str("Payload is not string"))?;
+            .ok_or_else(|| WasmErr::build_from_str("Payload is not string"))?;
 
         serde_json::from_str::<ServerMsg>(&payload)
             .map_err(WasmErr::from)

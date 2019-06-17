@@ -30,7 +30,7 @@ impl InnerHeartbeat {
     /// Returns error no open socket.
     fn send_now(&mut self) -> Result<(), WasmErr> {
         match self.socket.as_ref() {
-            None => Err(WasmErr::from_str("Unable to ping: no socket")),
+            None => Err(WasmErr::build_from_str("Unable to ping: no socket")),
             Some(socket) => {
                 self.num += 1;
                 socket.send(&ClientMsg::Ping(self.num))

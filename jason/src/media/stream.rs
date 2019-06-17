@@ -55,7 +55,7 @@ impl InnerStream {
     }
 }
 
-/// Rust-side [`InnerStream`] handle.
+/// Rust-side [`MediaStream`] handle.
 #[allow(clippy::module_name_repetitions)]
 pub struct MediaStream(Rc<InnerStream>);
 
@@ -90,7 +90,7 @@ impl MediaStream {
     }
 }
 
-/// JS-side [`InnerStream`] handle.
+/// JS-side [`MediaStream`] handle.
 #[wasm_bindgen]
 pub struct MediaStreamHandle(Weak<InnerStream>);
 
@@ -99,7 +99,7 @@ impl MediaStreamHandle {
     pub fn get_media_stream(&self) -> Result<SysMediaStream, JsValue> {
         match self.0.upgrade() {
             Some(inner) => Ok(inner.stream.clone()),
-            None => Err(WasmErr::from_str("Detached state").into()),
+            None => Err(WasmErr::build_from_str("Detached state").into()),
         }
     }
 }
