@@ -104,7 +104,7 @@ pub fn run(rooms: RoomsRepository, config: Conf) {
     .unwrap()
     .start();
 
-    info!("Started HTTP server on 0.0.0.0:8080");
+    info!("Started HTTP server on {:?}", server_addr);
 }
 
 #[cfg(test)]
