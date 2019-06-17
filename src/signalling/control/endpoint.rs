@@ -26,6 +26,9 @@ impl Display for Id {
 
 #[derive(Debug, Clone)]
 struct WebRtcPlayEndpointInner {
+    /// ID of this [`WebRtcPlayEndpoint`].
+    id: Id,
+
     /// Source URI of [`WebRtcPublishEndpoint`] from which this
     /// [`WebRtcPlayEndpoint`] receive data.
     src: SrcUri,
@@ -77,6 +80,14 @@ impl WebRtcPlayEndpointInner {
     }
 }
 
+impl Drop for WebRtcPlayEndpointInner {
+    fn drop(&mut self) {
+        if let Some(receiver_publisher) = self.publisher().upgrade() {
+            receiver_publisher.remove_empty_weaks_from_receivers();
+        }
+    }
+}
+
 /// Signalling representation of `WebRtcPlayEndpoint`.
 #[allow(clippy::module_name_repetitions)]
 #[derive(Debug)]
@@ -85,11 +96,13 @@ pub struct WebRtcPlayEndpoint(Mutex<WebRtcPlayEndpointInner>);
 impl WebRtcPlayEndpoint {
     /// Create new [`WebRtcPlayEndpoint`].
     pub fn new(
+        id: Id,
         src: SrcUri,
         publisher: Weak<WebRtcPublishEndpoint>,
         owner: Weak<Participant>,
     ) -> Self {
         Self(Mutex::new(WebRtcPlayEndpointInner {
+            id,
             src,
             publisher,
             owner,
@@ -133,10 +146,18 @@ impl WebRtcPlayEndpoint {
     pub fn reset(&self) {
         self.0.lock().unwrap().reset()
     }
+
+    /// Returns ID of this [`WebRtcPlayEndpoint`].
+    pub fn id(&self) -> Id {
+        self.0.lock().unwrap().id.clone()
+    }
 }
 
 #[derive(Debug, Clone)]
 struct WebRtcPublishEndpointInner {
+    /// ID of this [`WebRtcPublishEndpoint`].
+    id: Id,
+
     /// P2P connection mode for this [`WebRtcPublishEndpoint`].
     p2p: P2pMode,
 
@@ -152,6 +173,17 @@ struct WebRtcPublishEndpointInner {
     /// while removing [`WebRtcPublishEndpoint`] for removing all [`Peer`]s of
     /// this [`WebRtcPublishEndpoint`].
     peer_ids: HashSet<PeerId>,
+}
+
+impl Drop for WebRtcPublishEndpointInner {
+    fn drop(&mut self) {
+        for receiver in self.receivers().iter().filter_map(|r| Weak::upgrade(r))
+        {
+            if let Some(receiver_owner) = receiver.owner().upgrade() {
+                receiver_owner.remove_receiver(&receiver.id())
+            }
+        }
+    }
 }
 
 impl WebRtcPublishEndpointInner {
@@ -199,11 +231,13 @@ pub struct WebRtcPublishEndpoint(Mutex<WebRtcPublishEndpointInner>);
 impl WebRtcPublishEndpoint {
     /// Create new [`WebRtcPublishEndpoint`].
     pub fn new(
+        id: Id,
         p2p: P2pMode,
         receivers: Vec<Weak<WebRtcPlayEndpoint>>,
         owner: Weak<Participant>,
     ) -> Self {
         Self(Mutex::new(WebRtcPublishEndpointInner {
+            id,
             p2p,
             receivers,
             owner,
@@ -252,5 +286,20 @@ impl WebRtcPublishEndpoint {
     /// Remove all [`PeerId`]s related to this [`WebRtcPublishEndpoint`].
     pub fn remove_peer_ids(&self, peer_ids: &[PeerId]) {
         self.0.lock().unwrap().remove_peer_ids(peer_ids)
+    }
+
+    /// Returns ID of this [`WebRtcPublishEndpoint`].
+    pub fn id(&self) -> Id {
+        self.0.lock().unwrap().id.clone()
+    }
+
+    /// Remove all empty Weak pointers from receivers of this
+    /// [`WebRtcPublishEndpoint`].
+    pub fn remove_empty_weaks_from_receivers(&self) {
+        self.0
+            .lock()
+            .unwrap()
+            .receivers
+            .retain(|e| e.upgrade().is_some());
     }
 }
