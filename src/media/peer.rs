@@ -261,7 +261,7 @@ impl Peer<New> {
         &mut self,
         partner_peer: &mut Peer<New>,
         tracks_count: &mut Counter,
-        publish_endpoints: HashMap<EndpointId, Arc<WebRtcPublishEndpoint>>,
+        publish_endpoints: HashMap<EndpointId, WebRtcPublishEndpoint>,
     ) {
         let partner_id = self.partner_member_id();
         let self_id = self.id();
@@ -272,17 +272,6 @@ impl Peer<New> {
                 e.add_peer_id(self_id);
                 e.receivers()
                     .into_iter()
-                    .filter_map(|e| {
-                        let upgraded_play = e.upgrade();
-                        if upgraded_play.is_none() {
-                            warn!(
-                                "Empty weak pointer of publisher's play \
-                                 endpoint. {:?}.",
-                                e
-                            );
-                        }
-                        upgraded_play
-                    })
                     .filter_map(|p| {
                         let owner = p.owner().upgrade();
                         if owner.is_none() {

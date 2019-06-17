@@ -51,10 +51,10 @@ struct ParticipantInner {
     id: MemberId,
 
     /// All [`WebRtcPublishEndpoint`]s of this [`Participant`].
-    publishers: HashMap<EndpointId, Arc<WebRtcPublishEndpoint>>,
+    publishers: HashMap<EndpointId, WebRtcPublishEndpoint>,
 
     /// All [`WebRtcPlayEndpoint`]s of this [`Participant`].
-    receivers: HashMap<EndpointId, Arc<WebRtcPlayEndpoint>>,
+    receivers: HashMap<EndpointId, WebRtcPlayEndpoint>,
 
     /// Credentials for this [`Participant`].
     credentials: String,
@@ -101,6 +101,16 @@ impl Participant {
             .ice_user
             .as_ref()
             .map(IceUser::servers_list)
+    }
+
+    /// Remove publisher [`WebRtcPublishEndpoint`] from this [`Participant`].
+    pub fn remove_publisher(&self, id: &EndpointId) {
+        self.0.lock().unwrap().publishers.remove(id);
+    }
+
+    /// Remove receiver [`WebRtcPlayEndpoint`] from this [`Participant`].
+    pub fn remove_receiver(&self, id: &EndpointId) {
+        self.0.lock().unwrap().receivers.remove(id);
     }
 
     /// Returns and set to `None` [`IceUser`] of this [`Participant`].
@@ -151,14 +161,12 @@ impl Participant {
     }
 
     /// Returns all publishers of this [`Participant`].
-    pub fn publishers(
-        &self,
-    ) -> HashMap<EndpointId, Arc<WebRtcPublishEndpoint>> {
+    pub fn publishers(&self) -> HashMap<EndpointId, WebRtcPublishEndpoint> {
         self.0.lock().unwrap().publishers.clone()
     }
 
     /// Returns all receivers of this [`Participant`].
-    pub fn receivers(&self) -> HashMap<EndpointId, Arc<WebRtcPlayEndpoint>> {
+    pub fn receivers(&self) -> HashMap<EndpointId, WebRtcPlayEndpoint> {
         self.0.lock().unwrap().receivers.clone()
     }
 
@@ -214,42 +222,46 @@ impl Participant {
             if let Some(publisher) = publisher_participant.get_publisher_by_id(
                 &EndpointId(spec_play_endpoint.src.endpoint_id.to_string()),
             ) {
-                let new_play_endpoint = Arc::new(WebRtcPlayEndpoint::new(
+                let new_play_endpoint_id =
+                    EndpointId(spec_play_name.to_string());
+                let new_play_endpoint = WebRtcPlayEndpoint::new(
                     spec_play_endpoint.src.clone(),
-                    Arc::downgrade(&publisher),
+                    publisher.clone(),
                     Arc::downgrade(&this_member),
-                ));
+                    new_play_endpoint_id.clone(),
+                );
 
                 self.insert_receiver(
                     EndpointId(spec_play_name.to_string()),
-                    Arc::clone(&new_play_endpoint),
+                    new_play_endpoint.clone(),
                 );
 
-                publisher.add_receiver(Arc::downgrade(&new_play_endpoint));
+                publisher.add_receiver(new_play_endpoint.clone());
             } else {
-                let new_publish = Arc::new(WebRtcPublishEndpoint::new(
+                let new_publish_endpoint_id =
+                    EndpointId(spec_play_endpoint.src.endpoint_id.to_string());
+                let new_publish = WebRtcPublishEndpoint::new(
                     publisher_endpoint.p2p.clone(),
                     Vec::new(),
                     Arc::downgrade(&publisher_participant),
-                ));
+                    new_publish_endpoint_id.clone(),
+                );
 
-                let new_self_play = Arc::new(WebRtcPlayEndpoint::new(
+                let new_self_play_endpoint_id =
+                    EndpointId(spec_play_name.to_string());
+                let new_self_play = WebRtcPlayEndpoint::new(
                     spec_play_endpoint.src.clone(),
-                    Arc::downgrade(&new_publish),
+                    new_publish.clone(),
                     Arc::downgrade(&this_member),
-                ));
-
-                new_publish.add_receiver(Arc::downgrade(&new_self_play));
-
-                publisher_participant.insert_publisher(
-                    EndpointId(spec_play_endpoint.src.endpoint_id.to_string()),
-                    new_publish,
+                    new_self_play_endpoint_id.clone(),
                 );
 
-                self.insert_receiver(
-                    EndpointId(spec_play_name.to_string()),
-                    new_self_play,
-                );
+                new_publish.add_receiver(new_self_play.clone());
+
+                publisher_participant
+                    .insert_publisher(new_publish_endpoint_id, new_publish);
+
+                self.insert_receiver(new_self_play_endpoint_id, new_self_play);
             }
         }
 
@@ -260,12 +272,13 @@ impl Participant {
                 let endpoint_id = EndpointId(name.clone());
                 if self.publishers().get(&endpoint_id).is_none() {
                     self.insert_publisher(
-                        endpoint_id,
-                        Arc::new(WebRtcPublishEndpoint::new(
+                        endpoint_id.clone(),
+                        WebRtcPublishEndpoint::new(
                             e.p2p.clone(),
                             Vec::new(),
                             Arc::downgrade(&this_member),
-                        )),
+                            endpoint_id,
+                        ),
                     );
                 }
             },
@@ -278,7 +291,7 @@ impl Participant {
     pub fn insert_receiver(
         &self,
         id: EndpointId,
-        endpoint: Arc<WebRtcPlayEndpoint>,
+        endpoint: WebRtcPlayEndpoint,
     ) {
         self.0.lock().unwrap().receivers.insert(id, endpoint);
     }
@@ -287,7 +300,7 @@ impl Participant {
     pub fn insert_publisher(
         &self,
         id: EndpointId,
-        endpoint: Arc<WebRtcPublishEndpoint>,
+        endpoint: WebRtcPublishEndpoint,
     ) {
         self.0.lock().unwrap().publishers.insert(id, endpoint);
     }
@@ -296,7 +309,7 @@ impl Participant {
     pub fn get_publisher_by_id(
         &self,
         id: &EndpointId,
-    ) -> Option<Arc<WebRtcPublishEndpoint>> {
+    ) -> Option<WebRtcPublishEndpoint> {
         self.0.lock().unwrap().publishers.get(id).cloned()
     }
 
@@ -304,15 +317,13 @@ impl Participant {
     pub fn get_receiver_by_id(
         &self,
         id: &EndpointId,
-    ) -> Option<Arc<WebRtcPlayEndpoint>> {
+    ) -> Option<WebRtcPlayEndpoint> {
         self.0.lock().unwrap().receivers.get(id).cloned()
     }
 }
 
 #[cfg(test)]
 mod participant_loading_tests {
-    use std::sync::Arc;
-
     use crate::api::control::Element;
 
     use super::*;
@@ -373,16 +384,15 @@ mod participant_loading_tests {
         let is_caller_has_responder_in_receivers = caller_publish_endpoint
             .receivers()
             .into_iter()
-            .map(|p| p.upgrade().unwrap())
-            .filter(|p| Arc::ptr_eq(p, &responder_play_endpoint))
+            .filter(|p| p.id() == responder_play_endpoint.id())
             .count()
             == 1;
         assert!(is_caller_has_responder_in_receivers);
 
-        assert!(Arc::ptr_eq(
-            &responder_play_endpoint.publisher().upgrade().unwrap(),
-            &caller_publish_endpoint
-        ));
+        assert_eq!(
+            responder_play_endpoint.publisher().id(),
+            caller_publish_endpoint.id()
+        );
 
         let some_participant =
             store.get(&MemberId("some-member".to_string())).unwrap();
@@ -400,8 +410,7 @@ mod participant_loading_tests {
             some_participant_publisher
                 .receivers()
                 .into_iter()
-                .map(|p| p.upgrade().unwrap())
-                .filter(|p| Arc::ptr_eq(p, &responder_play2_endpoint))
+                .filter(|p| p.id() == responder_play2_endpoint.id())
                 .count()
                 == 1;
         assert!(is_some_participant_has_responder_in_receivers);
