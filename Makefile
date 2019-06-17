@@ -194,11 +194,17 @@ endif
 
 # Run Coturn STUN/TURN server.
 #
+# Defaults:
+# 	logs=no
+#
 # Usage:
-#	make up.coturn
+#	make up.coturn [logs=(yes|no)]
 
-up.coturn: down.coturn
+up.coturn:
 	docker-compose -f docker-compose.coturn.yml up -d
+ifeq ($(logs),yes)
+	docker-compose -f docker-compose.coturn.yml logs &
+endif
 
 
 # Run Jason E2E demo in development mode.
