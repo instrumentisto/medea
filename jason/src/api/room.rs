@@ -21,10 +21,8 @@ use wasm_bindgen_futures::spawn_local;
 
 use crate::{
     api::{connection::Connection, ConnectionHandle},
-    media::{
-        MediaManager, MediaStream, PeerEvent, PeerEventHandler, PeerId,
-        PeerRepository, Sdp,
-    },
+    media::{MediaManager, MediaStream},
+    peer::{PeerEvent, PeerEventHandler, PeerId, PeerRepository, Sdp},
     rpc::RpcClient,
     utils::{Callback2, WasmErr},
 };

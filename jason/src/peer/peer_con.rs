@@ -5,23 +5,21 @@ use futures::{
     sync::mpsc::UnboundedSender,
     Future,
 };
-use medea_client_api_proto::{Direction, MediaType, Track, IceServer};
+use medea_client_api_proto::{Direction, IceServer, MediaType, Track};
 use medea_macro::dispatchable;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
-    RtcIceCandidateInit, RtcPeerConnection, RtcPeerConnectionIceEvent,
-    RtcRtpSender, RtcRtpTransceiver, RtcRtpTransceiverDirection,
+    RtcConfiguration, RtcIceCandidateInit, RtcPeerConnection,
+    RtcPeerConnectionIceEvent, RtcRtpTransceiver, RtcRtpTransceiverDirection,
     RtcRtpTransceiverInit, RtcSdpType, RtcSessionDescription,
     RtcSessionDescriptionInit, RtcTrackEvent,
 };
 
 use crate::{
-    media::{
-        stream::MediaStream, track::MediaTrack, MediaManager, StreamRequest,
-    },
+    media::{MediaManager, MediaStream, MediaTrack, StreamRequest},
+    peer::ice_server::RtcIceServers,
     utils::{EventListener, WasmErr},
 };
-use futures::future::{err, Either};
 
 pub type Id = u64;
 
@@ -29,8 +27,6 @@ pub enum Sdp {
     Offer(String),
     Answer(String),
 }
-
-pub enum PeerError {}
 
 #[dispatchable]
 #[allow(clippy::module_name_repetitions)]
@@ -50,41 +46,6 @@ pub enum PeerEvent {
         sender_id: u64,
         remote_stream: MediaStream,
     },
-}
-
-///
-#[allow(clippy::module_name_repetitions)]
-pub struct PeerRepository {
-    /// Peer id to [`PeerConnection`],
-    peers: HashMap<Id, Rc<PeerConnection>>,
-
-    /// Sender that will be injected to all [`Peers`] created by this
-    /// repository.
-    peer_events_sender: UnboundedSender<PeerEvent>,
-}
-
-impl PeerRepository {
-    pub fn new(peer_events_sender: UnboundedSender<PeerEvent>) -> Self {
-        Self {
-            peers: HashMap::new(),
-            peer_events_sender,
-        }
-    }
-
-    // TODO: set ice_servers
-    pub fn create(&mut self, id: Id, ice_servers:Vec<IceServer>) -> Result<&Rc<PeerConnection>, WasmErr> {
-        let peer = Rc::new(PeerConnection::new(id, &self.peer_events_sender, ice_servers)?);
-        self.peers.insert(id, peer);
-        Ok(self.peers.get(&id).unwrap())
-    }
-
-    pub fn get_peer(&self, id: Id) -> Option<&Rc<PeerConnection>> {
-        self.peers.get(&id)
-    }
-
-    pub fn remove(&mut self, id: Id) {
-        self.peers.remove(&id);
-    }
 }
 
 #[allow(clippy::module_name_repetitions)]
@@ -111,12 +72,14 @@ impl PeerConnection {
     pub fn new(
         peer_id: Id,
         peer_events_sender: &UnboundedSender<PeerEvent>,
-        ice_servers: Vec<IceServer>
+        ice_servers: Vec<IceServer>,
     ) -> Result<Self, WasmErr> {
-        let peer_conf = RtcConfiguration::new();
-//        peer_conf.ice_ser
+        let mut peer_conf = RtcConfiguration::new();
 
-        let peer = Rc::new(RtcPeerConnection::new_with_configuration(&peer_conf)?);
+        peer_conf.ice_servers(&RtcIceServers::from(ice_servers));
+
+        let peer =
+            Rc::new(RtcPeerConnection::new_with_configuration(&peer_conf)?);
         let connections = Rc::new(RefCell::new(MediaConnections::new()));
 
         // Bind to `icecandidate` event.
@@ -292,6 +255,7 @@ impl PeerConnection {
         tracks: Vec<Track>,
         media_manager: &Rc<MediaManager>,
     ) -> impl Future<Item = (), Error = WasmErr> {
+        // TODO: insert tracks
         // insert peer transceivers
         for track in tracks {
             match track.direction {
@@ -315,7 +279,7 @@ impl PeerConnection {
         if self.media_connections.borrow().senders.is_empty() {
             future::Either::A(future::ok(()))
         } else {
-            let mut media_request = StreamRequest::new();
+            let mut media_request = StreamRequest::default();
             for (track_id, sender) in &self.media_connections.borrow().senders {
                 media_request
                     .add_track_request(*track_id, sender.media_type.clone());
@@ -325,7 +289,7 @@ impl PeerConnection {
             let connections = Rc::clone(&self.media_connections);
             let get_media = media_manager.get_stream(media_request).and_then(
                 move |stream| {
-                    connections.borrow_mut().insert_local_stream(stream)
+                    connections.borrow_mut().insert_local_stream(&stream)
                 },
             );
             future::Either::B(get_media)
@@ -350,7 +314,7 @@ impl MediaConnections {
     /// based on track ids. Stream must have all required tracks.
     pub fn insert_local_stream(
         &mut self,
-        stream: Rc<MediaStream>,
+        stream: &Rc<MediaStream>,
     ) -> impl Future<Item = (), Error = WasmErr> {
         // validate that provided stream have all tracks that we need
         for sender in self.senders.values() {
@@ -431,7 +395,6 @@ pub struct Sender {
     track_id: u64,
     transceiver: RtcRtpTransceiver,
     media_type: MediaType,
-    track: Option<Rc<MediaTrack>>,
 }
 
 impl Sender {
@@ -457,7 +420,6 @@ impl Sender {
             track_id,
             transceiver,
             media_type,
-            track: None,
         }
     }
 }

@@ -1,4 +1,3 @@
-mod peer;
 mod stream;
 mod stream_request;
 mod track;
@@ -13,18 +12,14 @@ use futures::{
 use wasm_bindgen_futures::JsFuture;
 use web_sys::MediaStream as BackingMediaStream;
 
-use crate::media::stream_request::{SimpleStreamRequest, StreamRequest};
 use crate::utils::{window, Callback2, WasmErr};
 
 pub use self::{
-    peer::{
-        Id as PeerId, PeerConnection, PeerEvent, PeerEventHandler,
-        PeerRepository, Sdp,
-    },
     stream::{MediaStream, MediaStreamHandle},
+    stream_request::{SimpleStreamRequest, StreamRequest},
+    track::MediaTrack,
 };
 use futures::future::IntoFuture;
-use wasm_bindgen::JsValue;
 
 #[derive(Default)]
 #[allow(clippy::module_name_repetitions)]
@@ -88,7 +83,7 @@ impl MediaManager {
                     JsFuture::from(promise).map_err(WasmErr::from)
                 })
                 .and_then(move |stream| {
-                    request.parse_stream(BackingMediaStream::from(stream))
+                    request.parse_stream(&BackingMediaStream::from(stream))
                 }),
         )
     }

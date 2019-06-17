@@ -298,7 +298,7 @@ impl Peer<WaitLocalSdp> {
         for (id, track) in self.context.senders.iter_mut() {
             let mid = mids
                 .remove(&id)
-                .ok_or(PeerError::MidsMismatch(Arc::clone(track)))?;
+                .ok_or_else(||PeerError::MidsMismatch(Arc::clone(track)))?;
             track.set_mid(mid)
         }
 
@@ -336,7 +336,7 @@ impl Peer<WaitLocalHaveRemote> {
         for (id, track) in self.context.senders.iter_mut() {
             let mid = mids
                 .remove(&id)
-                .ok_or(PeerError::MidsMismatch(Arc::clone(track)))?;
+                .ok_or_else(||PeerError::MidsMismatch(Arc::clone(track)))?;
             track.set_mid(mid)
         }
 
@@ -357,7 +357,7 @@ impl Peer<Stable> {
                     *track_id,
                     track
                         .mid()
-                        .ok_or(PeerError::MidsMismatch(Arc::clone(track)))?,
+                        .ok_or_else(||PeerError::MidsMismatch(Arc::clone(track)))?,
                 );
             }
             Ok(Some(mids))

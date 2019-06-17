@@ -4,6 +4,7 @@ use medea_client_api_proto::MediaType;
 use web_sys::MediaStreamTrack;
 
 /// [`MediaStreamTrack`] wrapper.
+#[allow(clippy::module_name_repetitions)]
 pub struct MediaTrack {
     id: u64,
     track: MediaStreamTrack,

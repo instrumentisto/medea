@@ -164,7 +164,7 @@ impl Room {
             self.peers.take_inner_peer(from_peer_id)?;
 
         if from_peer.is_sender() {
-            from_peer.set_mids(mids.ok_or(RoomError::ClientError(
+            from_peer.set_mids(mids.ok_or_else(|| RoomError::ClientError(
                 String::from("Peer is sender but did not provide any mids"),
             ))?)?;
         }
@@ -214,7 +214,7 @@ impl Room {
             self.peers.take_inner_peer(from_peer_id)?;
 
         if from_peer.is_sender() {
-            from_peer.set_mids(mids.ok_or(RoomError::ClientError(
+            from_peer.set_mids(mids.ok_or_else(|| RoomError::ClientError(
                 String::from("Peer is sender but did not provide any mids"),
             ))?)?;
         }

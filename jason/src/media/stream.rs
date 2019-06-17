@@ -1,10 +1,9 @@
 //! Wrappers and adapters for [`MediaStream`] and relate objects.
 
 use std::collections::HashMap;
-use std::convert::TryFrom;
 use std::rc::{Rc, Weak};
 
-use medea_client_api_proto::{AudioSettings, MediaType, VideoSettings};
+use medea_client_api_proto::MediaType;
 use wasm_bindgen::{prelude::*, JsValue};
 use web_sys::MediaStream as SysMediaStream;
 

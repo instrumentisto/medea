@@ -10,19 +10,13 @@ use crate::utils::WasmErr;
 /// [`getUserMedia()`] to specify what kinds of tracks should be included in the
 /// returned [`MediaStream`], and, optionally, to establish constraints for
 /// those track's settings.
+#[derive(Default)]
 pub struct StreamRequest {
     audio: HashMap<u64, AudioSettings>,
     video: HashMap<u64, VideoSettings>,
 }
 
 impl StreamRequest {
-    pub fn new() -> Self {
-        Self {
-            audio: HashMap::new(),
-            video: HashMap::new(),
-        }
-    }
-
     /// Add track request to this [`StreamRequest`].
     pub fn add_track_request(&mut self, track_id: u64, media_type: MediaType) {
         match media_type {
@@ -38,6 +32,7 @@ impl StreamRequest {
 
 /// Subtype of [`StreamRequest`], which can have max one track of each kind and
 /// must have at least one track of any kind.
+#[allow(clippy::module_name_repetitions)]
 pub struct SimpleStreamRequest {
     audio: Option<(u64, AudioSettings)>,
     video: Option<(u64, VideoSettings)>,
@@ -47,7 +42,7 @@ impl SimpleStreamRequest {
     /// Parse raw [`web_sys::MediaStream`] and return [`MediaStream`].
     pub fn parse_stream(
         &self,
-        stream: web_sys::MediaStream,
+        stream: &web_sys::MediaStream,
     ) -> Result<MediaStream, WasmErr> {
         let mut tracks = Vec::new();
 

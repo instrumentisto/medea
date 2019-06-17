@@ -1,5 +1,6 @@
 mod api;
 mod media;
+mod peer;
 mod rpc;
 mod utils;
 
