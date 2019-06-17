@@ -219,9 +219,8 @@ impl ParticipantService {
                             room.participants.get_member_by_id(&member_id)
                         {
                             member.replace_ice_user(ice);
-                            // TODO: Maybe create function for this?
                             room.participants
-                                .insert_connections(member_id.clone(), con);
+                                .insert_connection(member_id.clone(), con);
                         };
                         wrap_future(future::ok(()))
                     },
@@ -230,7 +229,8 @@ impl ParticipantService {
         }
     }
 
-    fn insert_connections(
+    /// Insert new [`RpcConnection`] into this [`ParticipantService`].
+    fn insert_connection(
         &mut self,
         member_id: MemberId,
         conn: Box<dyn RpcConnection>,

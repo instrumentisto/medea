@@ -38,6 +38,12 @@ struct WebRtcPlayEndpointInner {
     owner: Weak<Participant>,
 
     /// [`PeerId`] of [`Peer`] created for this [`WebRtcPlayEndpoint`].
+    ///
+    /// Currently this field used for detecting status of this
+    /// [`WebRtcPlayEndpoint`] connection.
+    ///
+    /// In future this may be used for removing [`WebRtcPlayEndpoint`]
+    /// and related peer.
     peer_id: Option<PeerId>,
 }
 
@@ -140,8 +146,11 @@ struct WebRtcPublishEndpointInner {
     /// Owner [`Participant`] of this [`WebRtcPublishEndpoint`].
     owner: Weak<Participant>,
 
-    // TODO: some doc that explains why we will need this field
-    /// All [`PeerId`]s created for this [`WebRtcPublishEndpoint`].
+    /// [`PeerId`] of all [`Peer`]s created for this [`WebRtcPublishEndpoint`].
+    ///
+    /// Currently this field used for nothing but in future this may be used
+    /// while removing [`WebRtcPublishEndpoint`] for removing all [`Peer`]s of
+    /// this [`WebRtcPublishEndpoint`].
     peer_ids: HashSet<PeerId>,
 }
 
