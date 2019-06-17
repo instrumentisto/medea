@@ -220,13 +220,22 @@ impl ParticipantService {
                         {
                             member.replace_ice_user(ice);
                             // TODO: Maybe create function for this?
-                            room.participants.connections.insert(member_id.clone(), con);
+                            room.participants
+                                .insert_connections(member_id.clone(), con);
                         };
                         wrap_future(future::ok(()))
                     },
                 ),
             )
         }
+    }
+
+    fn insert_connections(
+        &mut self,
+        member_id: MemberId,
+        conn: Box<dyn RpcConnection>,
+    ) {
+        self.connections.insert(member_id, conn);
     }
 
     /// If [`ClosedReason::Closed`], then removes [`RpcConnection`] associated

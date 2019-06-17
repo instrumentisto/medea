@@ -41,7 +41,7 @@ up:
 	$(MAKE) -j3 up.coturn up.jason up.medea
 
 
-test: test.unit
+test: test.unit test.e2e
 
 
 
@@ -149,24 +149,40 @@ endif
 # Run Rust e2e tests of project.
 # If logs set to "yes" then medea print all logs to stdout.
 #
+# Defaults:
+# 	dockerized=yes logs=no
+#
 # Usage:
 # 	make test.e2e [dockerized=(yes|no)] [logs=(yes|no)]
 
 medea-env-dockerized = MEDEA_SERVER_BIND_PORT=8081 \
-	MEDEA_SERVER_STATIC_SPECS_PATH=./tests/specs
+	$(if $(call eq,$(logs),yes),,RUST_LOG=warn) \
+	MEDEA_SERVER_STATIC_SPECS_PATH=tests/specs
 
-medea-env-debug = MEDEA_SERVER.BIND_PORT=8081 \
-	MEDEA_SERVER.STATIC_SPECS_PATH=./tests/specs
+medea-env-debug = RUST_BACKTRACE=1 \
+	MEDEA_SERVER.BIND_PORT=8081 \
+	MEDEA_SERVER.STATIC_SPECS_PATH=./tests/specs \
+	$(if $(call eq,$(logs),yes),,RUST_LOG=warn)
 
 test.e2e: up.coturn
-ifeq ($(dockerized),yes)
-	make down.medea
-	env $(medea-env-dockerized) docker-compose -f docker-compose.medea.yml up -d
-	- cargo test --test e2e && make down.medea
-else
-	- killall medea
+ifeq ($(dockerized),no)
+	@make down.medea dockerized=yes
+	@make down.medea dockerized=no
+
+	cargo build
 	env $(medea-env-debug) $(if $(call eq,$(logs),yes),,RUST_LOG=warn) cargo run &
-	- sleep 2 && cargo test --test e2e && killall medea
+	sleep 1
+	- cargo test --test e2e
+
+	@make down.medea
+else
+	@make down.medea dockerized=yes
+	@make down.medea dockerized=no
+
+	env $(medea-env-dockerized) docker-compose -f docker-compose.medea.yml up -d --build
+	docker-compose -f docker-compose.medea.yml logs &
+	- cargo test --test e2e
+	- @make down.medea dockerized=yes
 endif
 
 
@@ -196,8 +212,11 @@ up.jason:
 
 # Run Medea media server in development mode.
 #
+# Defaults:
+# 	dockerized=no
+#
 # Usage:
-#	make up.medea
+#	make up.medea  [dockerized=(yes|no)]
 
 up.medea: up.coturn
 ifeq ($(dockerized),yes)
@@ -215,13 +234,28 @@ endif
 # Stopping commands #
 #####################
 
-# Stop dockerized medea.
+# Stop all related to Medea services.
+
+down:
+	@make down.medea dockerized=yes
+	@make down.medea dockerized=no
+	@make down.coturn
+
+
+# Stop Medea media server.
+#
+# Defaults:
+# 	dockerized=no
 #
 # Usage:
-# 	make down.medea
+# 	make down.medea [dockerized=(yes|no)]
 
 down.medea:
+ifeq ($(dockerized),yes)
 	docker-compose -f docker-compose.medea.yml down
+else
+	- killall medea
+endif
 
 
 # Stop dockerized coturn.
@@ -241,8 +275,7 @@ down.coturn:
 
 .PHONY: cargo cargo.fmt cargo.lint \
         docs docs.rust \
-        test test.unit \
+        test.e2e test test.unit \
         up up.coturn up.jason up.medea \
-        yarn down.coturn down.medea \
-        test.e2e
+        yarn down down.coturn down.medea
 
