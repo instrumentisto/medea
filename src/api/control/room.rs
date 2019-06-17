@@ -1,7 +1,10 @@
 //! Room definitions and implementations.
 
-use std::fmt::Display;
-use std::{convert::TryFrom, sync::Arc};
+use std::{
+    fmt::Display,
+    convert::TryFrom,
+    sync::Arc
+};
 
 use hashbrown::HashMap;
 use serde::Deserialize;

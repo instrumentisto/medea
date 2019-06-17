@@ -204,7 +204,6 @@ impl ParticipantService {
             }
             Box::new(wrap_future(connection.close().then(|_| Ok(()))))
         } else {
-            self.connections.insert(member_id.clone(), con);
             Box::new(
                 wrap_future(self.turn.create(
                     member_id.clone(),
@@ -220,6 +219,8 @@ impl ParticipantService {
                             room.participants.get_member_by_id(&member_id)
                         {
                             member.replace_ice_user(ice);
+                            // TODO: Maybe create function for this?
+                            room.participants.connections.insert(member_id.clone(), con);
                         };
                         wrap_future(future::ok(()))
                     },
