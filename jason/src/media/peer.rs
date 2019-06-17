@@ -48,7 +48,7 @@ pub enum PeerEvent {
     NewRemoteStream {
         peer_id: Id,
         sender_id: u64,
-        remote_stream: Rc<MediaStream>,
+        remote_stream: MediaStream,
     },
 }
 
@@ -153,25 +153,19 @@ impl PeerConnection {
 
                     // gather all tracks from new track sender, break if still
                     // waiting for some tracks
-                    let mut tracks: Vec<&MediaTrack> = Vec::new();
+                    let mut tracks: Vec<Rc<MediaTrack>> = Vec::new();
                     for receiver in connections.get_by_sender(sender_id) {
                         match receiver.track {
                             None => return,
-                            Some(ref track) => tracks.push(track),
+                            Some(ref track) => tracks.push(Rc::clone(track)),
                         }
                     }
 
-                    // build and set MediaStream in receivers
-//                    let stream = MediaStream::from_tracks(tracks);
-//                    for receiver in connections.get_by_sender(sender_id) {
-//                        let stream = Rc::clone(&stream);
-//                    }
-//
-//                    let _ = sender.unbounded_send(PeerEvent::NewRemoteStream {
-//                        peer_id,
-//                        sender_id,
-//                        remote_stream: Rc::clone(&stream),
-//                    });
+                    let _ = sender.unbounded_send(PeerEvent::NewRemoteStream {
+                        peer_id,
+                        sender_id,
+                        remote_stream: MediaStream::from_tracks(tracks),
+                    });
                 } else {
                     // TODO: means that this peer is out of sync, should be
                     //       handled somehow (propagated to medea to init peer
@@ -304,10 +298,10 @@ impl PeerConnection {
                     );
                 }
                 Direction::Recv { sender, mid } => {
-                    self.media_connections
-                        .borrow_mut()
-                        .receivers
-                        .insert(track.id, Receiver::new(track.id, track.media_type, sender, mid));
+                    self.media_connections.borrow_mut().receivers.insert(
+                        track.id,
+                        Receiver::new(track.id, track.media_type, sender, mid),
+                    );
                 }
             }
         }
@@ -397,7 +391,11 @@ impl MediaConnections {
         for receiver in &mut self.receivers.values_mut() {
             if let Some(recv_mid) = &receiver.mid {
                 if recv_mid == &mid {
-                    let track = MediaTrack::new(receiver.track_id, track, receiver.media_type.clone());
+                    let track = MediaTrack::new(
+                        receiver.track_id,
+                        track,
+                        receiver.media_type.clone(),
+                    );
 
                     receiver.transceiver.replace(transceiver);
                     receiver.track.replace(track);
@@ -455,7 +453,7 @@ impl Sender {
             track_id,
             transceiver,
             media_type,
-            track: None
+            track: None,
         }
     }
 }
@@ -467,11 +465,16 @@ pub struct Receiver {
     sender_id: u64,
     transceiver: Option<RtcRtpTransceiver>,
     mid: Option<String>,
-    track: Option<MediaTrack>,
+    track: Option<Rc<MediaTrack>>,
 }
 
 impl Receiver {
-    fn new(track_id: u64, media_type:MediaType, sender_id: u64, mid: Option<String>) -> Self {
+    fn new(
+        track_id: u64,
+        media_type: MediaType,
+        sender_id: u64,
+        mid: Option<String>,
+    ) -> Self {
         Self {
             track_id,
             media_type,

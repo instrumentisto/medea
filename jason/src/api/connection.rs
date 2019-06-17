@@ -58,7 +58,7 @@ impl Connection {
     }
 
     /// Pass new [`MediaStream`] received from related remote [`Member`].
-    pub fn new_remote_stream(&self, stream: &Rc<MediaStream>) {
+    pub fn new_remote_stream(&self, stream: &MediaStream) {
         self.0.borrow().on_remote_stream.call(stream.new_handle());
     }
 }

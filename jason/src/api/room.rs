@@ -296,7 +296,7 @@ impl PeerEventHandler for InnerRoom {
         &mut self,
         _peer_id: PeerId,
         sender_id: u64,
-        remote_stream: Rc<MediaStream>,
+        remote_stream: MediaStream,
     ) {
         match self.connections.get(&sender_id) {
             None => WasmErr::from_str(

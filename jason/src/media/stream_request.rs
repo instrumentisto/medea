@@ -44,11 +44,12 @@ pub struct SimpleStreamRequest {
 }
 
 impl SimpleStreamRequest {
+    /// Parse raw [`web_sys::MediaStream`] and return [`MediaStream`].
     pub fn parse_stream(
         &self,
         stream: web_sys::MediaStream,
     ) -> Result<MediaStream, WasmErr> {
-        let mut tracks: Vec<MediaTrack> = Vec::new();
+        let mut tracks = Vec::new();
 
         if let Some((id, audio)) = &self.audio {
             let audio_tracks: Vec<web_sys::MediaStreamTrack> =

@@ -39,8 +39,7 @@ impl InnerStream {
     }
 
     /// Adds provided track.
-    fn add_track(&mut self, track: MediaTrack) {
-        let track = Rc::new(track);
+    fn add_track(&mut self, track: Rc<MediaTrack>) {
         self.stream.add_track(track.track());
         let caps = track.caps();
         match caps {
@@ -55,7 +54,7 @@ impl InnerStream {
 }
 
 impl MediaStream {
-    pub fn from_tracks(tracks: Vec<MediaTrack>) -> Self {
+    pub fn from_tracks(tracks: Vec<Rc<MediaTrack>>) -> Self {
         let mut stream = InnerStream::new();
 
         for track in tracks {

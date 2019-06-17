@@ -11,12 +11,8 @@ pub struct MediaTrack {
 }
 
 impl MediaTrack {
-    pub fn new(
-        id: u64,
-        track: MediaStreamTrack,
-        caps: MediaType,
-    ) -> MediaTrack {
-        Self { id, track, caps }
+    pub fn new(id: u64, track: MediaStreamTrack, caps: MediaType) -> Rc<Self> {
+        Rc::new(Self { id, track, caps })
     }
 
     pub fn id(&self) -> u64 {
