@@ -1,4 +1,6 @@
-//! Wrappers and adapters for [`MediaStream`] and relate objects.
+//! Wrappers and adapters for [`MediaStream`][1] and relate objects.
+//!
+//! [1]: https://www.w3.org/TR/mediacapture-streams/#mediastream
 
 use std::collections::HashMap;
 use std::rc::{Rc, Weak};
@@ -12,16 +14,14 @@ use crate::{
     utils::WasmErr,
 };
 
-/// Rust-side [`InnerStream`] adapter.
-#[allow(clippy::module_name_repetitions)]
-pub struct MediaStream(Rc<InnerStream>);
-
 /// [`MediaStream`] object wrapper.
 ///
 /// Shared between JS-side handle ([`MediaStreamHandle`])
 /// and Rust-side handle ([`MediaStream`]).
 struct InnerStream {
-    /// Actual [`MediaStream`] object.
+    /// Actual [`MediaStream`][1] object.
+    ///
+    /// [1]: https://www.w3.org/TR/mediacapture-streams/#mediastream
     stream: SysMediaStream,
 
     /// List of [`MediaStream`]s audio tracks.
@@ -55,6 +55,10 @@ impl InnerStream {
     }
 }
 
+/// Rust-side [`InnerStream`] handle.
+#[allow(clippy::module_name_repetitions)]
+pub struct MediaStream(Rc<InnerStream>);
+
 impl MediaStream {
     pub fn from_tracks(tracks: Vec<Rc<MediaTrack>>) -> Self {
         let mut stream = InnerStream::new();
@@ -86,7 +90,7 @@ impl MediaStream {
     }
 }
 
-/// JS-side [`InnerStream`] adapter.
+/// JS-side [`InnerStream`] handle.
 #[wasm_bindgen]
 pub struct MediaStreamHandle(Weak<InnerStream>);
 

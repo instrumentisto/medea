@@ -70,7 +70,7 @@ impl Jason {
     /// acquisition request will resolve returning [`MediaStreamHandle`] or
     /// [`WasmErr`].
     pub fn on_local_stream(&self, f: js_sys::Function) {
-        self.0.borrow_mut().media_manager.on_local_stream(f);
+        self.0.borrow_mut().media_manager.set_on_local_stream(f);
     }
 
     /// Drops Jason and all related objects (Rooms, Connections, Streams etc. ).

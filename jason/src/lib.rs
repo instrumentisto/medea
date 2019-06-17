@@ -1,8 +1,8 @@
-mod api;
-mod media;
-mod peer;
-mod rpc;
-mod utils;
+pub mod api;
+pub mod media;
+pub mod peer;
+pub mod rpc;
+pub mod utils;
 
 // When the `console_error_panic_hook` feature is enabled, we can call the
 // `set_panic_hook` function at least once during initialization, and then

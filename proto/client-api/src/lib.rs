@@ -89,7 +89,9 @@ pub enum Event {
     PeersRemoved { peer_ids: Vec<u64> },
 }
 
-/// Represents [`RtcIceCandidateInit`] object.
+/// Represents [`RtcIceCandidateInit`][1] object.
+///
+/// [1]: https://www.w3.org/TR/webrtc/#dom-rtcicecandidateinit
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct IceCandidate {
     pub candidate: String,

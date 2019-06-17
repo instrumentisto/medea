@@ -1,15 +1,26 @@
+//! [`MediaStreamConstraints`][1] adapters.
+//!
+//! [1]: https://www.w3.org/TR/mediacapture-streams/#dom-mediastreamconstraints
+
+use std::{collections::HashMap, convert::TryFrom};
+
 use medea_client_api_proto::{AudioSettings, MediaType, VideoSettings};
-use std::collections::HashMap;
-use std::convert::TryFrom;
 use wasm_bindgen::JsValue;
 
-use crate::media::{MediaStream, MediaTrack, TrackId};
-use crate::utils::WasmErr;
+use crate::{
+    media::{MediaStream, MediaTrack, TrackId},
+    utils::WasmErr,
+};
 
-/// [`MediaStreamConstraints`] object representation. Used when calling
-/// [`getUserMedia()`] to specify what kinds of tracks should be included in the
-/// returned [`MediaStream`], and, optionally, to establish constraints for
-/// those track's settings.
+/// [`MediaStreamConstraints`][1] object representation. Used when calling
+/// [`getUserMedia()`][2] to specify what kinds of tracks should be included in
+/// the returned [`MediaStream`][3], and, optionally, to establish constraints
+/// for those track's settings.
+///
+/// [1]: https://www.w3.org/TR/mediacapture-streams/#dom-mediastreamconstraints
+/// [2]:
+/// https://www.w3.org/TR/mediacapture-streams/#dom-mediadevices-getusermedia()
+/// [3]: https://www.w3.org/TR/mediacapture-streams/#mediastream
 #[derive(Default)]
 pub struct StreamRequest {
     audio: HashMap<u64, AudioSettings>,
