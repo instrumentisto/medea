@@ -34,7 +34,7 @@ impl InnerStream {
         Self {
             stream: SysMediaStream::new().unwrap(),
             audio_tracks: HashMap::new(),
-            video_tracks: HashMap::new()
+            video_tracks: HashMap::new(),
         }
     }
 
@@ -45,10 +45,10 @@ impl InnerStream {
         let caps = track.caps();
         match caps {
             MediaType::Audio(_) => {
-                self.audio_tracks.insert(track.id(),track);
+                self.audio_tracks.insert(track.id(), track);
             }
             MediaType::Video(_) => {
-                self.video_tracks.insert(track.id(),track);
+                self.video_tracks.insert(track.id(), track);
             }
         }
     }
@@ -65,9 +65,19 @@ impl MediaStream {
         Self(Rc::new(stream))
     }
 
-    pub fn get_track_by_id(&self, track_id: u64) -> Option<Rc<MediaTrack>> {
+    pub fn has_track(&self, track_id: u64) -> bool {
+        self.0.video_tracks.contains_key(&track_id)
+            || self.0.audio_tracks.contains_key(&track_id)
+    }
 
-        unimplemented!()
+    pub fn get_track_by_id(&self, track_id: u64) -> Option<Rc<MediaTrack>> {
+        match self.0.video_tracks.get(&track_id) {
+            Some(track) => Some(Rc::clone(track)),
+            None => match self.0.audio_tracks.get(&track_id) {
+                Some(track) => Some(Rc::clone(track)),
+                None => None,
+            },
+        }
     }
 
     pub fn new_handle(&self) -> MediaStreamHandle {

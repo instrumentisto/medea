@@ -14,6 +14,15 @@ pub enum WasmErr {
     Other(Cow<'static, str>),
 }
 
+impl Clone for WasmErr {
+    fn clone(&self) -> Self {
+        match self {
+            WasmErr::JsError(err) => WasmErr::JsError(err.clone()),
+            WasmErr::Other(err) => WasmErr::Other(err.clone()),
+        }
+    }
+}
+
 impl WasmErr {
     // TODO:
     // 1. Send err to remote

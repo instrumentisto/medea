@@ -21,7 +21,7 @@ use crate::{
     },
     utils::{EventListener, WasmErr},
 };
-use futures::future::Either;
+use futures::future::{err, Either};
 
 pub type Id = u64;
 
@@ -30,9 +30,7 @@ pub enum Sdp {
     Answer(String),
 }
 
-pub enum PeerError {
-
-}
+pub enum PeerError {}
 
 #[dispatchable]
 #[allow(clippy::module_name_repetitions)]
@@ -144,33 +142,29 @@ impl PeerConnection {
             Rc::clone(&peer),
             "track",
             move |track_event: RtcTrackEvent| {
+                let mut connections = connections_rc.borrow_mut();
+                let transceiver = track_event.transceiver();
+                let track = track_event.track();
 
+                if let Some(receiver) =
+                    connections.add_remote_track(transceiver, track)
+                {
+                    let sender_id = receiver.sender_id;
 
-//                let mut connections = connections_rc.borrow_mut();
-//
-//                let transceiver = track_event.transceiver();
-//                let track = track_event.track();
-//
-//                if let Some(receiver) =
-//                    connections.add_remote_track(transceiver, track)
-//                {
-//                    let sender_id = receiver.sender_id;
-//
-//                    // gather all tracks from new track sender, break if still
-//                    // waiting for some tracks
-//                    let mut tracks: Vec<&StreamTrack> = Vec::new();
-//                    for receiver in connections.get_by_sender(sender_id) {
-//                        match receiver.track {
-//                            None => return,
-//                            Some(ref track) => tracks.push(track),
-//                        }
-//                    }
-//
-//                    // build and set MediaStream in receivers
+                    // gather all tracks from new track sender, break if still
+                    // waiting for some tracks
+                    let mut tracks: Vec<&MediaTrack> = Vec::new();
+                    for receiver in connections.get_by_sender(sender_id) {
+                        match receiver.track {
+                            None => return,
+                            Some(ref track) => tracks.push(track),
+                        }
+                    }
+
+                    // build and set MediaStream in receivers
 //                    let stream = MediaStream::from_tracks(tracks);
 //                    for receiver in connections.get_by_sender(sender_id) {
 //                        let stream = Rc::clone(&stream);
-//                        receiver.stream.replace(stream);
 //                    }
 //
 //                    let _ = sender.unbounded_send(PeerEvent::NewRemoteStream {
@@ -178,13 +172,11 @@ impl PeerConnection {
 //                        sender_id,
 //                        remote_stream: Rc::clone(&stream),
 //                    });
-//                } else {
-//                    // TODO: means that this peer is out of sync, should be
-//                    //       handled somehow (propagated to medea to init peer
-//                    //       recreation?)
-//                }
-
-
+                } else {
+                    // TODO: means that this peer is out of sync, should be
+                    //       handled somehow (propagated to medea to init peer
+                    //       recreation?)
+                }
             },
         )?;
 
@@ -301,27 +293,27 @@ impl PeerConnection {
         &self,
         tracks: Vec<Track>,
         media_manager: &Rc<MediaManager>,
-    ) -> impl Future<Item = (), Error = ()> {
+    ) -> impl Future<Item = (), Error = WasmErr> {
         // insert peer transceivers
         for track in tracks {
             match track.direction {
                 Direction::Send { .. } => {
                     self.media_connections.borrow_mut().senders.insert(
                         track.id,
-                        Sender::new(&self.peer, track.id, track.media_type),
+                        Sender::new(track.id, track.media_type, &self.peer),
                     );
                 }
                 Direction::Recv { sender, mid } => {
                     self.media_connections
                         .borrow_mut()
                         .receivers
-                        .insert(track.id, Receiver::new(sender, mid));
+                        .insert(track.id, Receiver::new(track.id, track.media_type, sender, mid));
                 }
             }
         }
 
         // if senders not empty, then get media from media manager and insert
-        // tracks into transceivers
+        //         tracks into transceivers
         if self.media_connections.borrow().senders.is_empty() {
             future::Either::A(future::ok(()))
         } else {
@@ -333,26 +325,11 @@ impl PeerConnection {
 
             let media_manager = Rc::clone(media_manager);
             let connections = Rc::clone(&self.media_connections);
-            let get_media = media_manager
-                .get_stream(media_request)
-                .and_then(move |stream: Rc<MediaStream>| {
-                    let mut promises = Vec::new();
-
-                    for sender in connections.borrow().senders.values() {
-                        let sender: &Sender = sender;
-
-                        if let Some(track) = stream.get_track_by_id(sender.track_id) {
-                            let replace_promise = sender.transceiver.sender().replace_track(Some(track.track()));
-
-                            promises.push(JsFuture::from(replace_promise).map_err(WasmErr::from));
-                        } else {
-                            //TODO: should not happen, but we should report
-                        }
-                    }
-
-                    join_all(promises).map_err(|err| err.log_err())
-                })
-                .map(|_| ());
+            let get_media = media_manager.get_stream(media_request).and_then(
+                move |stream| {
+                    connections.borrow_mut().insert_local_stream(stream)
+                },
+            );
             future::Either::B(get_media)
         }
     }
@@ -371,13 +348,48 @@ impl MediaConnections {
         }
     }
 
+    /// Inserts tracks from provided [`MediaStream`] into stored [`Sender`]s
+    /// based on track ids. Stream must have all required tracks.
+    pub fn insert_local_stream(
+        &mut self,
+        stream: Rc<MediaStream>,
+    ) -> impl Future<Item = (), Error = WasmErr> {
+        // validate that provided stream have all tracks that we need
+        for sender in self.senders.values() {
+            if !stream.has_track(sender.track_id) {
+                return future::Either::A(future::err(WasmErr::from_str(
+                    "Stream does not have all necessary tracks",
+                )));
+            }
+        }
+
+        let mut promises = Vec::new();
+        for sender in self.senders.values() {
+            let sender: &Sender = sender;
+
+            if let Some(track) = stream.get_track_by_id(sender.track_id) {
+                promises.push(
+                    JsFuture::from(
+                        sender
+                            .transceiver
+                            .sender()
+                            .replace_track(Some(track.track())),
+                    )
+                    .map_err(WasmErr::from),
+                );
+            }
+        }
+
+        future::Either::B(join_all(promises).map(|_| ()))
+    }
+
     /// Find associated [`Receiver`] by transceiver's mid and update it with
     /// [`StreamTrack`] and [`RtcRtpTransceiver`] and return found
     /// [`Receiver`].
     pub fn add_remote_track(
         &mut self,
         transceiver: RtcRtpTransceiver,
-        track: MediaTrack,
+        track: web_sys::MediaStreamTrack,
     ) -> Option<&Receiver> {
         // should be safe to unwrap
         let mid = transceiver.mid().unwrap();
@@ -385,6 +397,8 @@ impl MediaConnections {
         for receiver in &mut self.receivers.values_mut() {
             if let Some(recv_mid) = &receiver.mid {
                 if recv_mid == &mid {
+                    let track = MediaTrack::new(receiver.track_id, track, receiver.media_type.clone());
+
                     receiver.transceiver.replace(transceiver);
                     receiver.track.replace(track);
                     return Some(receiver);
@@ -415,10 +429,15 @@ pub struct Sender {
     track_id: u64,
     transceiver: RtcRtpTransceiver,
     media_type: MediaType,
+    track: Option<Rc<MediaTrack>>,
 }
 
 impl Sender {
-    fn new(peer: &Rc<RtcPeerConnection>, track_id:u64, media_type: MediaType) -> Self {
+    fn new(
+        track_id: u64,
+        media_type: MediaType,
+        peer: &Rc<RtcPeerConnection>,
+    ) -> Self {
         let transceiver = match media_type {
             MediaType::Audio(_) => {
                 let mut init = RtcRtpTransceiverInit::new();
@@ -436,23 +455,28 @@ impl Sender {
             track_id,
             transceiver,
             media_type,
+            track: None
         }
     }
 }
 
 /// Remote track representation that is being received from some remote peer.
 pub struct Receiver {
-    transceiver: Option<RtcRtpTransceiver>,
+    track_id: u64,
+    media_type: MediaType,
     sender_id: u64,
+    transceiver: Option<RtcRtpTransceiver>,
     mid: Option<String>,
     track: Option<MediaTrack>,
 }
 
 impl Receiver {
-    fn new(sender_id: u64, mid: Option<String>) -> Self {
+    fn new(track_id: u64, media_type:MediaType, sender_id: u64, mid: Option<String>) -> Self {
         Self {
-            transceiver: None,
+            track_id,
+            media_type,
             sender_id,
+            transceiver: None,
             mid,
             track: None,
         }

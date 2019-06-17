@@ -34,7 +34,7 @@ pub type Id = u64;
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
 pub type ActFuture<I, E> =
-Box<dyn ActorFuture<Actor = Room, Item = I, Error = E>>;
+    Box<dyn ActorFuture<Actor = Room, Item = I, Error = E>>;
 
 #[derive(Fail, Debug)]
 #[allow(clippy::module_name_repetitions)]

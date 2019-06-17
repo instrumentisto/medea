@@ -182,9 +182,9 @@ impl EventHandler for InnerRoom {
         let rpc = Rc::clone(&self.rpc);
         let peer_rc = Rc::clone(peer);
         // sync provided tracks and process sdp
-        spawn_local(peer.update_tracks(tracks, &self.media_manager).and_then(
-            move |_| {
-                let fut = match sdp_offer {
+        spawn_local(
+            peer.update_tracks(tracks, &self.media_manager)
+                .and_then(move |_| match sdp_offer {
                     None => Either::A(peer_rc.create_and_set_offer().and_then(
                         move |sdp_offer: String| {
                             rpc.send_command(Command::MakeSdpOffer {
@@ -213,10 +213,9 @@ impl EventHandler for InnerRoom {
                                 }),
                         )
                     }
-                };
-                fut.map_err(|err| err.log_err())
-            },
-        ));
+                })
+                .map_err(|err: WasmErr| err.log_err()),
+        );
     }
 
     /// Applies specified SDP Answer to specified [`PeerConnection`].
@@ -254,7 +253,7 @@ impl EventHandler for InnerRoom {
                     candidate.sdp_m_line_index,
                     &candidate.sdp_mid,
                 )
-                    .map_err(|err| err.log_err()),
+                .map_err(|err| err.log_err()),
             );
         } else {
             // TODO: No peer, whats next?
@@ -303,7 +302,7 @@ impl PeerEventHandler for InnerRoom {
             None => WasmErr::from_str(
                 "NewRemoteStream from sender without connection",
             )
-                .log_err(),
+            .log_err(),
             Some(connection) => connection.new_remote_stream(&remote_stream),
         }
     }

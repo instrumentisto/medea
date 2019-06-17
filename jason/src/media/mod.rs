@@ -40,7 +40,7 @@ impl MediaManager {
     pub fn get_stream(
         &self,
         request: StreamRequest,
-    ) -> impl Future<Item = Rc<MediaStream>, Error = ()> {
+    ) -> impl Future<Item = Rc<MediaStream>, Error = WasmErr> {
         // TODO: lookup stream by caps, and return its copy if found
 
         let inner: Rc<RefCell<InnerMediaManager>> = Rc::clone(&self.0);
@@ -53,8 +53,8 @@ impl MediaManager {
                     Ok(stream)
                 }
                 Err(err) => {
-                    inner.borrow().on_local_stream.call2(err);
-                    Err(())
+                    inner.borrow().on_local_stream.call2(err.clone());
+                    Err(err)
                 }
             })
     }
