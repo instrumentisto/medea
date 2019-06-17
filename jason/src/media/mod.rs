@@ -17,7 +17,7 @@ use crate::utils::{window, Callback2, WasmErr};
 pub use self::{
     stream::{MediaStream, MediaStreamHandle},
     stream_request::{SimpleStreamRequest, StreamRequest},
-    track::MediaTrack,
+    track::{Id as TrackId, MediaTrack},
 };
 use futures::future::IntoFuture;
 

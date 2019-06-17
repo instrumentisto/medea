@@ -4,14 +4,14 @@ use std::rc::Rc;
 
 use medea_client_api_proto::IceServer;
 
-use crate::peer::peer_con::{Id, PeerConnection, PeerEvent};
+use crate::peer::{PeerConnection, PeerEvent, PeerId};
 use crate::utils::WasmErr;
 
 /// [`PeerConnection`] factory and repository.
 #[allow(clippy::module_name_repetitions)]
 pub struct PeerRepository {
     /// Peer id to [`PeerConnection`],
-    peers: HashMap<Id, Rc<PeerConnection>>,
+    peers: HashMap<PeerId, Rc<PeerConnection>>,
 
     /// Sender that will be injected to all [`Peers`] created by this
     /// repository.
@@ -32,7 +32,7 @@ impl PeerRepository {
     /// servers and stored [`PeerEvent`] sender.
     pub fn create(
         &mut self,
-        id: Id,
+        id: PeerId,
         ice_servers: Vec<IceServer>,
     ) -> Result<&Rc<PeerConnection>, WasmErr> {
         let peer = Rc::new(PeerConnection::new(
@@ -44,11 +44,11 @@ impl PeerRepository {
         Ok(self.peers.get(&id).unwrap())
     }
 
-    pub fn get_peer(&self, id: Id) -> Option<&Rc<PeerConnection>> {
+    pub fn get_peer(&self, id: PeerId) -> Option<&Rc<PeerConnection>> {
         self.peers.get(&id)
     }
 
-    pub fn remove(&mut self, id: Id) {
+    pub fn remove(&mut self, id: PeerId) {
         self.peers.remove(&id);
     }
 }

@@ -3,6 +3,8 @@ mod peer_con;
 mod repo;
 
 pub use self::{
-    peer_con::{Id as PeerId, PeerConnection, PeerEvent, PeerEventHandler, Sdp},
+    peer_con::{
+        Id as PeerId, PeerConnection, PeerEvent, PeerEventHandler, Sdp,
+    },
     repo::PeerRepository,
 };

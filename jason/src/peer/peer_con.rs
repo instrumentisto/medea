@@ -16,7 +16,7 @@ use web_sys::{
 };
 
 use crate::{
-    media::{MediaManager, MediaStream, MediaTrack, StreamRequest},
+    media::{MediaManager, MediaStream, MediaTrack, StreamRequest, TrackId},
     peer::ice_server::RtcIceServers,
     utils::{EventListener, WasmErr},
 };
@@ -392,7 +392,7 @@ impl MediaConnections {
 
 /// Local track representation, that is being sent to some remote peer.
 pub struct Sender {
-    track_id: u64,
+    track_id: TrackId,
     transceiver: RtcRtpTransceiver,
     media_type: MediaType,
 }
@@ -436,7 +436,7 @@ pub struct Receiver {
 
 impl Receiver {
     fn new(
-        track_id: u64,
+        track_id: TrackId,
         media_type: MediaType,
         sender_id: u64,
         mid: Option<String>,

@@ -7,7 +7,10 @@ use medea_client_api_proto::MediaType;
 use wasm_bindgen::{prelude::*, JsValue};
 use web_sys::MediaStream as SysMediaStream;
 
-use crate::{media::track::MediaTrack, utils::WasmErr};
+use crate::{
+    media::{MediaTrack, TrackId},
+    utils::WasmErr,
+};
 
 /// Rust-side [`InnerStream`] adapter.
 #[allow(clippy::module_name_repetitions)]
@@ -63,12 +66,12 @@ impl MediaStream {
         Self(Rc::new(stream))
     }
 
-    pub fn has_track(&self, track_id: u64) -> bool {
+    pub fn has_track(&self, track_id: TrackId) -> bool {
         self.0.video_tracks.contains_key(&track_id)
             || self.0.audio_tracks.contains_key(&track_id)
     }
 
-    pub fn get_track_by_id(&self, track_id: u64) -> Option<Rc<MediaTrack>> {
+    pub fn get_track_by_id(&self, track_id: TrackId) -> Option<Rc<MediaTrack>> {
         match self.0.video_tracks.get(&track_id) {
             Some(track) => Some(Rc::clone(track)),
             None => match self.0.audio_tracks.get(&track_id) {

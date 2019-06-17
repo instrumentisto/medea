@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::convert::TryFrom;
 use wasm_bindgen::JsValue;
 
-use crate::media::{stream::MediaStream, track::MediaTrack};
+use crate::media::{MediaStream, MediaTrack, TrackId};
 use crate::utils::WasmErr;
 
 /// [`MediaStreamConstraints`] object representation. Used when calling
@@ -18,7 +18,11 @@ pub struct StreamRequest {
 
 impl StreamRequest {
     /// Add track request to this [`StreamRequest`].
-    pub fn add_track_request(&mut self, track_id: u64, media_type: MediaType) {
+    pub fn add_track_request(
+        &mut self,
+        track_id: TrackId,
+        media_type: MediaType,
+    ) {
         match media_type {
             MediaType::Audio(audio) => {
                 self.audio.insert(track_id, audio);
