@@ -1,16 +1,26 @@
-use wasm_bindgen::prelude::*;
-
+/// Represents connection with specific remote [`Member`].
 use std::{
     cell::RefCell,
     rc::{Rc, Weak},
 };
+
+use wasm_bindgen::prelude::*;
 
 use crate::{
     media::{MediaStream, MediaStreamHandle},
     utils::{Callback, WasmErr},
 };
 
-/// [`Connection`] handle accessible from js.
+/// Represents connection with specific remote [`Member`].
+///
+/// Shared between JS-side handle ([`ConnectionHandle`])
+/// and Rust-side handle ([`Connection`]).
+struct InnerConnection {
+    remote_member: u64,
+    on_remote_stream: Callback<MediaStreamHandle>,
+}
+
+/// [`InnerConnection`] handle accessible from js.
 #[allow(clippy::module_name_repetitions)]
 #[wasm_bindgen]
 pub struct ConnectionHandle(Weak<RefCell<InnerConnection>>);
@@ -41,7 +51,7 @@ impl ConnectionHandle {
     }
 }
 
-/// [`Connection`] handle being used by Rust external modules.
+/// [`InnerConnection`] handle being used by Rust external modules.
 pub struct Connection(Rc<RefCell<InnerConnection>>);
 
 impl Connection {
@@ -61,13 +71,4 @@ impl Connection {
     pub fn new_remote_stream(&self, stream: &MediaStream) {
         self.0.borrow().on_remote_stream.call(stream.new_handle());
     }
-}
-
-/// Represents connection with specific remote [`Member`].
-///
-/// Shared between JS-side handle ([`ConnectionHandle`])
-/// and Rust-side handle ([`Connection`]).
-struct InnerConnection {
-    remote_member: u64,
-    on_remote_stream: Callback<MediaStreamHandle>,
 }

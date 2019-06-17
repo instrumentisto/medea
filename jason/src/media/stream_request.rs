@@ -18,12 +18,8 @@ pub struct StreamRequest {
 
 impl StreamRequest {
     /// Add track request to this [`StreamRequest`].
-    pub fn add_track_request(
-        &mut self,
-        track_id: TrackId,
-        media_type: MediaType,
-    ) {
-        match media_type {
+    pub fn add_track_request(&mut self, track_id: TrackId, caps: MediaType) {
+        match caps {
             MediaType::Audio(audio) => {
                 self.audio.insert(track_id, audio);
             }

@@ -58,7 +58,7 @@ pub struct PeerConnection {
     _on_ice_candidate:
         EventListener<RtcPeerConnection, RtcPeerConnectionIceEvent>,
 
-    /// [`RtcPeerConnection`]'s [`_on_track`] callback. Which fires when
+    /// [`RtcPeerConnection`]'s [`on_track`] callback. Which fires when
     /// [`RtcPeerConnection`] receives new [`StreamTrack`] from remote
     /// peer.
     _on_track: EventListener<RtcPeerConnection, RtcTrackEvent>,
@@ -275,14 +275,13 @@ impl PeerConnection {
         }
 
         // if senders not empty, then get media from media manager and insert
-        //         tracks into transceivers
+        // tracks into transceivers
         if self.media_connections.borrow().senders.is_empty() {
             future::Either::A(future::ok(()))
         } else {
             let mut media_request = StreamRequest::default();
             for (track_id, sender) in &self.media_connections.borrow().senders {
-                media_request
-                    .add_track_request(*track_id, sender.media_type.clone());
+                media_request.add_track_request(*track_id, sender.caps.clone());
             }
 
             let media_manager = Rc::clone(media_manager);
@@ -298,8 +297,8 @@ impl PeerConnection {
 }
 
 struct MediaConnections {
-    senders: HashMap<u64, Sender>,
-    receivers: HashMap<u64, Receiver>,
+    senders: HashMap<TrackId, Sender>,
+    receivers: HashMap<TrackId, Receiver>,
 }
 
 impl MediaConnections {
@@ -362,7 +361,7 @@ impl MediaConnections {
                     let track = MediaTrack::new(
                         receiver.track_id,
                         track,
-                        receiver.media_type.clone(),
+                        receiver.caps.clone(),
                     );
 
                     receiver.transceiver.replace(transceiver);
@@ -394,16 +393,16 @@ impl MediaConnections {
 pub struct Sender {
     track_id: TrackId,
     transceiver: RtcRtpTransceiver,
-    media_type: MediaType,
+    caps: MediaType,
 }
 
 impl Sender {
     fn new(
-        track_id: u64,
-        media_type: MediaType,
+        track_id: TrackId,
+        caps: MediaType,
         peer: &Rc<RtcPeerConnection>,
     ) -> Self {
-        let transceiver = match media_type {
+        let transceiver = match caps {
             MediaType::Audio(_) => {
                 let mut init = RtcRtpTransceiverInit::new();
                 init.direction(RtcRtpTransceiverDirection::Sendonly);
@@ -419,15 +418,15 @@ impl Sender {
         Self {
             track_id,
             transceiver,
-            media_type,
+            caps,
         }
     }
 }
 
 /// Remote track representation that is being received from some remote peer.
 pub struct Receiver {
-    track_id: u64,
-    media_type: MediaType,
+    track_id: TrackId,
+    caps: MediaType,
     sender_id: u64,
     transceiver: Option<RtcRtpTransceiver>,
     mid: Option<String>,
@@ -437,13 +436,13 @@ pub struct Receiver {
 impl Receiver {
     fn new(
         track_id: TrackId,
-        media_type: MediaType,
+        caps: MediaType,
         sender_id: u64,
         mid: Option<String>,
     ) -> Self {
         Self {
             track_id,
-            media_type,
+            caps,
             sender_id,
             transceiver: None,
             mid,
