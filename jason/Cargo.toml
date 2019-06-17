@@ -35,9 +35,9 @@ wee_alloc = { version = "0.4", optional = true }
     features = [
         'CloseEvent', 'console', 'Event', 'EventTarget', 'MediaDevices',
         'MediaStream', 'MediaStreamConstraints', 'MediaStreamTrack',
-        'MessageEvent', 'Navigator', 'RtcIceCandidate', 'RtcIceCandidateInit',
-        'RtcPeerConnection', 'RtcPeerConnectionIceEvent', 'RtcRtpReceiver',
-        'RtcRtpSender', 'RtcRtpTransceiver', 'RtcRtpTransceiverDirection',
+        'MessageEvent', 'Navigator', 'RtcConfiguration', 'RtcIceCandidate',
+        'RtcIceCandidateInit', 'RtcPeerConnection', 'RtcPeerConnectionIceEvent',
+        'RtcRtpReceiver', 'RtcRtpSender', 'RtcRtpTransceiver', 'RtcRtpTransceiverDirection',
         'RtcRtpTransceiverInit', 'RtcSdpType', 'RtcSessionDescription',
         'RtcSessionDescriptionInit', 'RtcTrackEvent', 'WebSocket',
         'Window',

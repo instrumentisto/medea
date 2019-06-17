@@ -171,7 +171,7 @@ impl EventHandler for InnerRoom {
         }
 
         // Create peer
-        let peer = match self.peers.create(peer_id) {
+        let peer = match self.peers.create(peer_id, ice_servers) {
             Ok(peer) => peer,
             Err(err) => {
                 err.log_err();

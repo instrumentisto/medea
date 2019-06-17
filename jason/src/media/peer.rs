@@ -5,7 +5,7 @@ use futures::{
     sync::mpsc::UnboundedSender,
     Future,
 };
-use medea_client_api_proto::{Direction, MediaType, Track};
+use medea_client_api_proto::{Direction, MediaType, Track, IceServer};
 use medea_macro::dispatchable;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
@@ -72,8 +72,8 @@ impl PeerRepository {
     }
 
     // TODO: set ice_servers
-    pub fn create(&mut self, id: Id) -> Result<&Rc<PeerConnection>, WasmErr> {
-        let peer = Rc::new(PeerConnection::new(id, &self.peer_events_sender)?);
+    pub fn create(&mut self, id: Id, ice_servers:Vec<IceServer>) -> Result<&Rc<PeerConnection>, WasmErr> {
+        let peer = Rc::new(PeerConnection::new(id, &self.peer_events_sender, ice_servers)?);
         self.peers.insert(id, peer);
         Ok(self.peers.get(&id).unwrap())
     }
@@ -111,8 +111,12 @@ impl PeerConnection {
     pub fn new(
         peer_id: Id,
         peer_events_sender: &UnboundedSender<PeerEvent>,
+        ice_servers: Vec<IceServer>
     ) -> Result<Self, WasmErr> {
-        let peer = Rc::new(RtcPeerConnection::new()?);
+        let peer_conf = RtcConfiguration::new();
+//        peer_conf.ice_ser
+
+        let peer = Rc::new(RtcPeerConnection::new_with_configuration(&peer_conf)?);
         let connections = Rc::new(RefCell::new(MediaConnections::new()));
 
         // Bind to `icecandidate` event.
