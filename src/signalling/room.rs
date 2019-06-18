@@ -39,7 +39,7 @@ pub type ActFuture<I, E> =
 
 /// Macro for unwrapping Option.
 ///
-/// If Option::None then `error!` with provided message will be
+/// If [`Option::None`] then `error!` with provided message will be
 /// called, [`CloseRoom`] emitted to [`Room`] context and function
 /// will be returned with provided return expression.
 ///
@@ -48,36 +48,34 @@ pub type ActFuture<I, E> =
 /// ## Usage
 /// ```ignore
 /// option_unwrap!(
-///     bar.some_weak_pointer().upgrade(), // Some Option type
+///     foo.some_weak_pointer().upgrade(), // Some Option type
 ///     ctx, // Context of Room
 ///     (), // This will be returned from function in None case
 ///     "Empty Weak pointer for bar with ID {}", // Error message
-///     bar.id(), // format! syntax
+///     foo.id(), // format! syntax
 /// );
 /// ```
 macro_rules! option_unwrap {
     ($e:expr, $ctx:expr, $ret:expr, $msg:expr, $( $x:expr ),* $(,)?) => {
-        match $e {
-            Some(e) => e,
-            None => {
-                error!(
-                    "[ROOM]: {} Room will be closed.",
-                    format!($msg, $( $x, )*)
-                );
-                $ctx.notify(CloseRoom {});
-                return $ret;
-            }
+        if let Some(e) = $e {
+            e
+        } else {
+            error!(
+                "[ROOM]: {} Room will be closed.",
+                format!($msg, $( $x, )*)
+            );
+            $ctx.notify(CloseRoom {});
+            return $ret;
         }
     };
 
     ($e:expr, $ctx:expr, $ret:expr, $msg:expr $(,)?) => {
-        match $e {
-            Some(e) => e,
-            None => {
-                error!("[ROOM]: {} Room will be closed.", $msg);
-                $ctx.notify(CloseRoom {});
-                return $ret;
-            }
+        if let Some(e) = $e {
+            e
+        } else {
+            error!("[ROOM]: {} Room will be closed.", $msg);
+            $ctx.notify(CloseRoom {});
+            return $ret;
         }
     };
 }
@@ -90,11 +88,11 @@ macro_rules! option_unwrap {
 ///
 /// ## Usage
 /// ```ignore
-/// option_unwrap!(
-///     bar.some_weak_pointer().upgrade(), // Some Option type
+/// unit_option_unwrap!(
+///     foo.some_weak_pointer().upgrade(), // Some Option type
 ///     ctx, // Context of Room
 ///     "Empty Weak pointer for bar with ID {}", // Error message
-///     bar.id(), // format! syntax
+///     foo.id(), // format! syntax
 /// );
 /// ```
 macro_rules! unit_option_unwrap {
@@ -104,7 +102,7 @@ macro_rules! unit_option_unwrap {
 
     ($e:expr, $ctx:expr, $msg:expr $(,)?) => {
         option_unwrap!($e, $ctx, (), $msg);
-    }
+    };
 }
 
 #[allow(clippy::module_name_repetitions)]
