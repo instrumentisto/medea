@@ -10,6 +10,7 @@ pub mod signalling;
 pub mod turn;
 
 use actix::prelude::*;
+use actix::actors::signal;
 use dotenv::dotenv;
 use log::prelude::*;
 
@@ -20,13 +21,20 @@ use crate::{
     signalling::{Room, RoomsRepository},
     turn::new_turn_auth_service,
 };
+use actix_web::server::StopServer;
+use actix::actors::signal::{Subscribe, ProcessSignals};
+
+//struct Signals;
+//
+//impl Actor for Signals {
+//    type Context = Context<Self>;
+//}
 
 fn main() {
     dotenv().ok();
     let logger = log::new_dual_logger(std::io::stdout(), std::io::stderr());
     let _scope_guard = slog_scope::set_global_logger(logger);
     slog_stdlog::init().unwrap();
-
     let sys = System::new("medea");
 
     let config = Conf::parse().unwrap();
@@ -50,6 +58,11 @@ fn main() {
 
     let rooms = hashmap! {1 => room};
     let rooms_repo = RoomsRepository::new(rooms);
+
+    //me register graceful shutdown signals
+//    let my_signal = Signals.start();
+//    let process_signals = System::current().registry().get::<signal::ProcessSignals>();
+//    process_signals.do_send(Subscribe(my_signal.recipient()));
 
     server::run(rooms_repo, config);
     let _ = sys.run();
