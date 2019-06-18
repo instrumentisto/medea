@@ -214,26 +214,31 @@ impl Participant {
             if let Some(publisher) = publisher_participant.get_publisher_by_id(
                 &EndpointId(spec_play_endpoint.src.endpoint_id.to_string()),
             ) {
+                let new_play_endpoint_id =
+                    EndpointId(spec_play_name.to_string());
                 let new_play_endpoint = Arc::new(WebRtcPlayEndpoint::new(
+                    new_play_endpoint_id.clone(),
                     spec_play_endpoint.src.clone(),
                     Arc::downgrade(&publisher),
                     Arc::downgrade(&this_member),
                 ));
 
-                self.insert_receiver(
-                    EndpointId(spec_play_name.to_string()),
-                    Arc::clone(&new_play_endpoint),
-                );
+                self.insert_receiver(Arc::clone(&new_play_endpoint));
 
                 publisher.add_receiver(Arc::downgrade(&new_play_endpoint));
             } else {
+                let new_publish_id =
+                    EndpointId(spec_play_endpoint.src.endpoint_id.to_string());
                 let new_publish = Arc::new(WebRtcPublishEndpoint::new(
+                    new_publish_id.clone(),
                     publisher_endpoint.p2p.clone(),
                     Vec::new(),
                     Arc::downgrade(&publisher_participant),
                 ));
 
+                let new_self_play_id = EndpointId(spec_play_name.to_string());
                 let new_self_play = Arc::new(WebRtcPlayEndpoint::new(
+                    new_self_play_id.clone(),
                     spec_play_endpoint.src.clone(),
                     Arc::downgrade(&new_publish),
                     Arc::downgrade(&this_member),
@@ -241,15 +246,9 @@ impl Participant {
 
                 new_publish.add_receiver(Arc::downgrade(&new_self_play));
 
-                publisher_participant.insert_publisher(
-                    EndpointId(spec_play_endpoint.src.endpoint_id.to_string()),
-                    new_publish,
-                );
+                publisher_participant.insert_publisher(new_publish);
 
-                self.insert_receiver(
-                    EndpointId(spec_play_name.to_string()),
-                    new_self_play,
-                );
+                self.insert_receiver(new_self_play);
             }
         }
 
@@ -259,14 +258,14 @@ impl Participant {
             |(name, e)| {
                 let endpoint_id = EndpointId(name.clone());
                 if self.publishers().get(&endpoint_id).is_none() {
-                    self.insert_publisher(
-                        endpoint_id,
-                        Arc::new(WebRtcPublishEndpoint::new(
+                    self.insert_publisher(Arc::new(
+                        WebRtcPublishEndpoint::new(
+                            endpoint_id,
                             e.p2p.clone(),
                             Vec::new(),
                             Arc::downgrade(&this_member),
-                        )),
-                    );
+                        ),
+                    ));
                 }
             },
         );
@@ -275,21 +274,21 @@ impl Participant {
     }
 
     /// Insert receiver into this [`Participant`].
-    pub fn insert_receiver(
-        &self,
-        id: EndpointId,
-        endpoint: Arc<WebRtcPlayEndpoint>,
-    ) {
-        self.0.lock().unwrap().receivers.insert(id, endpoint);
+    pub fn insert_receiver(&self, endpoint: Arc<WebRtcPlayEndpoint>) {
+        self.0
+            .lock()
+            .unwrap()
+            .receivers
+            .insert(endpoint.id(), endpoint);
     }
 
     /// Insert publisher into this [`Participant`].
-    pub fn insert_publisher(
-        &self,
-        id: EndpointId,
-        endpoint: Arc<WebRtcPublishEndpoint>,
-    ) {
-        self.0.lock().unwrap().publishers.insert(id, endpoint);
+    pub fn insert_publisher(&self, endpoint: Arc<WebRtcPublishEndpoint>) {
+        self.0
+            .lock()
+            .unwrap()
+            .publishers
+            .insert(endpoint.id(), endpoint);
     }
 
     /// Lookup [`WebRtcPublishEndpoint`] publisher by [`EndpointId`].
@@ -306,6 +305,16 @@ impl Participant {
         id: &EndpointId,
     ) -> Option<Arc<WebRtcPlayEndpoint>> {
         self.0.lock().unwrap().receivers.get(id).cloned()
+    }
+
+    /// Remove receiver [`WebRtcPlayEndpoint`] from this [`Participant`].
+    pub fn remove_receiver(&self, id: &EndpointId) {
+        self.0.lock().unwrap().receivers.remove(id);
+    }
+
+    /// Remove receiver [`WebRtcPublishEndpoint`] from this [`Participant`].
+    pub fn remove_publisher(&self, id: &EndpointId) {
+        self.0.lock().unwrap().publishers.remove(id);
     }
 }
 
