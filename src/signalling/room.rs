@@ -340,6 +340,17 @@ impl Room {
         // Create all connected publish endpoints.
         for (_id, publish) in member.publishers() {
             for receiver in publish.receivers() {
+                let receiver = if let Some(receiver) = receiver.upgrade() {
+                    receiver
+                } else {
+                    error!(
+                        "Empty weak pointer for publisher receiver. {:?}. \
+                         Closing room.",
+                        publish
+                    );
+                    ctx.notify(CloseRoom {});
+                    return;
+                };
                 let receiver_owner =
                     if let Some(receiver_owner) = receiver.owner().upgrade() {
                         receiver_owner
@@ -369,21 +380,28 @@ impl Room {
 
         // Create all connected play's receivers peers.
         for (_id, play) in member.receivers() {
-            // TODO: remove block
-            let plays_publisher_participant = {
-                let plays_publisher = play.publisher();
-                if let Some(owner) = plays_publisher.owner().upgrade() {
-                    owner
+            let plays_publisher_participant =
+                if let Some(plays_publisher) = play.publisher().upgrade() {
+                    if let Some(owner) = plays_publisher.owner().upgrade() {
+                        owner
+                    } else {
+                        error!(
+                            "Empty weak pointer for play's publisher owner. \
+                             {:?}. Closing room.",
+                            plays_publisher
+                        );
+                        ctx.notify(CloseRoom {});
+                        return;
+                    }
                 } else {
                     error!(
-                        "Empty weak pointer for play's publisher owner. {:?}. \
+                        "Empty weak pointer for play's publisher. {:?}. \
                          Closing room.",
-                        plays_publisher
+                        play
                     );
                     ctx.notify(CloseRoom {});
                     return;
-                }
-            };
+                };
 
             if self
                 .participants
