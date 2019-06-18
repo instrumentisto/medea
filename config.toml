@@ -17,7 +17,7 @@
 # heartbeat messages received.
 #
 # Default:
-#   idle_timeout = "10s"
+   idle_timeout = "100s"
 
 # Duration, after which the server deletes the client session if
 # the remote RPC client does not reconnect after it is idle.

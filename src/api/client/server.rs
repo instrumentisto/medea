@@ -88,14 +88,14 @@ pub fn run(rooms: RoomsRepository, config: Conf) {
             rooms: rooms.clone(),
             config: config.rpc.clone(),
         })
-        .middleware(middleware::Logger::default())
-        .resource("/ws/{room_id}/{member_id}/{credentials}", |r| {
-            r.method(http::Method::GET).with(ws_index)
-        })
+            .middleware(middleware::Logger::default())
+            .resource("/ws/{room_id}/{member_id}/{credentials}", |r| {
+                r.method(http::Method::GET).with(ws_index)
+            })
     })
-    .bind(server_addr)
-    .unwrap()
-    .start();
+        .bind(server_addr)
+        .unwrap()
+        .start();
 
     info!("Started HTTP server on {:?}", server_addr);
 }

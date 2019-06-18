@@ -2,10 +2,7 @@
 
 use std::time::{Duration, Instant};
 
-use actix::{
-    fut::wrap_future, Actor, ActorContext, ActorFuture, Addr, AsyncContext,
-    Handler, Message, StreamHandler,
-};
+use actix::{fut::wrap_future, Actor, ActorContext, ActorFuture, Addr, AsyncContext, Handler, Message, StreamHandler};
 use actix_web::ws::{self, CloseReason, WebsocketContext};
 use futures::future::Future;
 use medea_client_api_proto::{ClientMsg, ServerMsg};
@@ -21,6 +18,10 @@ use crate::{
     log::prelude::*,
     signalling::Room,
 };
+
+use actix::System;
+use actix::actors::signal;
+use actix::actors::signal::Subscribe;
 
 /// Long-running WebSocket connection of Client API.
 #[derive(Debug)]
@@ -104,6 +105,10 @@ impl Actor for WsSession {
         debug!("Started WsSession for member {}", self.member_id);
 
         self.start_watchdog(ctx);
+
+        let process_signals = System::current().registry().get::<signal::ProcessSignals>();
+        process_signals.do_send(Subscribe(ctx.address().recipient()));
+
 
         let member_id = self.member_id;
         ctx.wait(
@@ -255,5 +260,29 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
                 self.member_id
             ),
         }
+    }
+}
+
+// Shutdown system on and of `SIGINT`, `SIGTERM`, `SIGQUIT` signals
+impl Handler<signal::Signal> for WsSession {
+    type Result = ();
+
+    fn handle(&mut self, msg: signal::Signal, ctx: &mut Self::Context) {
+        match msg.0 {
+            signal::SignalType::Int => {
+                debug!("SIGINT received by WsSession, exiting");
+            },
+            signal::SignalType::Hup => {
+                debug!("SIGHUP received by WsSession, reloading");
+            },
+            signal::SignalType::Term => {
+                debug!("SIGTERM received by WsSession, stopping");
+            },
+            signal::SignalType::Quit => {
+                debug!("SIGQUIT received by WsSession, exiting");
+            }
+            _ => (),
+        }
+        self.close_normal(ctx);
     }
 }
