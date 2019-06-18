@@ -37,8 +37,78 @@ use crate::{
 pub type ActFuture<I, E> =
     Box<dyn ActorFuture<Actor = Room, Item = I, Error = E>>;
 
+/// Macro for unwrapping Option.
+///
+/// If Option::None then `error!` with provided message will be
+/// called, [`CloseRoom`] emitted to [`Room`] context and function
+/// will be returned with provided return expression.
+///
+/// You can use `format!` syntax in this macro to provide some debug info.
+///
+/// ## Usage
+/// ```ignore
+/// option_unwrap!(
+///     bar.some_weak_pointer().upgrade(), // Some Option type
+///     ctx, // Context of Room
+///     (), // This will be returned from function in None case
+///     "Empty Weak pointer for bar with ID {}", // Error message
+///     bar.id(), // format! syntax
+/// );
+/// ```
+macro_rules! option_unwrap {
+    ($e:expr, $ctx:expr, $ret:expr, $msg:expr, $( $x:expr ),* $(,)?) => {
+        match $e {
+            Some(e) => e,
+            None => {
+                error!(
+                    "[ROOM]: {} Room will be closed.",
+                    format!($msg, $( $x, )*)
+                );
+                $ctx.notify(CloseRoom {});
+                return $ret;
+            }
+        }
+    };
+
+    ($e:expr, $ctx:expr, $ret:expr, $msg:expr $(,)?) => {
+        match $e {
+            Some(e) => e,
+            None => {
+                error!("[ROOM]: {} Room will be closed.", $msg);
+                $ctx.notify(CloseRoom {});
+                return $ret;
+            }
+        }
+    };
+}
+
+/// Macro for unwrapping Option that work similar as [`option_unwrap!`], but
+/// always return `()` when None case happened. This will close Room when
+/// `Option::None`.
+///
+/// Read more info in [`option_unwrap!`] docs.
+///
+/// ## Usage
+/// ```ignore
+/// option_unwrap!(
+///     bar.some_weak_pointer().upgrade(), // Some Option type
+///     ctx, // Context of Room
+///     "Empty Weak pointer for bar with ID {}", // Error message
+///     bar.id(), // format! syntax
+/// );
+/// ```
+macro_rules! unit_option_unwrap {
+    ($e:expr, $ctx:expr, $msg:tt, $( $x:expr ),* $(,)?) => {
+        option_unwrap!($e, $ctx, (), $msg, $( $x, )*);
+    };
+
+    ($e:expr, $ctx:expr, $msg:expr $(,)?) => {
+        option_unwrap!($e, $ctx, (), $msg);
+    }
+}
+
 #[allow(clippy::module_name_repetitions)]
-#[derive(Fail, Debug)]
+#[derive(Debug, Fail)]
 pub enum RoomError {
     #[fail(display = "Couldn't find Peer with [id = {}]", _0)]
     PeerNotFound(PeerId),
@@ -324,45 +394,30 @@ impl Room {
         member_id: &MemberId,
         ctx: &mut <Self as Actor>::Context,
     ) {
-        let member =
-            if let Some(m) = self.participants.get_member_by_id(member_id) {
-                m.clone()
-            } else {
-                error!(
-                    "Try to create necessary peers for nonexistent member \
-                     with ID {}. Room will be stopped.",
-                    member_id
-                );
-                ctx.notify(CloseRoom {});
-                return;
-            };
+        let member = unit_option_unwrap!(
+            self.participants.get_member_by_id(member_id),
+            ctx,
+            "Try to create peers for nonexistent participant with ID {}.",
+            member_id,
+        );
 
         // Create all connected publish endpoints.
         for (_id, publish) in member.publishers() {
             for receiver in publish.receivers() {
-                let receiver = if let Some(receiver) = receiver.upgrade() {
-                    receiver
-                } else {
-                    error!(
-                        "Empty weak pointer for publisher receiver. {:?}. \
-                         Closing room.",
-                        publish
-                    );
-                    ctx.notify(CloseRoom {});
-                    return;
-                };
-                let receiver_owner =
-                    if let Some(receiver_owner) = receiver.owner().upgrade() {
-                        receiver_owner
-                    } else {
-                        error!(
-                            "Empty weak pointer for publisher's receiver's \
-                             owner. {:?}. Closing room.",
-                            receiver
-                        );
-                        ctx.notify(CloseRoom {});
-                        return;
-                    };
+                let receiver = unit_option_unwrap!(
+                    receiver.upgrade(),
+                    ctx,
+                    "Empty weak pointer for publisher receiver. {:?}.",
+                    receiver,
+                );
+
+                let receiver_owner = unit_option_unwrap!(
+                    receiver.owner().upgrade(),
+                    ctx,
+                    "Empty weak pointer for publisher's receiver's owner. \
+                     {:?}.",
+                    receiver,
+                );
 
                 if self
                     .participants
@@ -379,29 +434,21 @@ impl Room {
         }
 
         // Create all connected play's receivers peers.
-        for (_id, play) in member.receivers() {
-            let plays_publisher_participant =
-                if let Some(plays_publisher) = play.publisher().upgrade() {
-                    if let Some(owner) = plays_publisher.owner().upgrade() {
-                        owner
-                    } else {
-                        error!(
-                            "Empty weak pointer for play's publisher owner. \
-                             {:?}. Closing room.",
-                            plays_publisher
-                        );
-                        ctx.notify(CloseRoom {});
-                        return;
-                    }
-                } else {
-                    error!(
-                        "Empty weak pointer for play's publisher. {:?}. \
-                         Closing room.",
-                        play
-                    );
-                    ctx.notify(CloseRoom {});
-                    return;
-                };
+        for (_, play) in member.receivers() {
+            let plays_publisher_participant = {
+                let play_publisher = unit_option_unwrap!(
+                    play.publisher().upgrade(),
+                    ctx,
+                    "Empty weak pointer for play's publisher. {:?}.",
+                    play,
+                );
+                unit_option_unwrap!(
+                    play_publisher.owner().upgrade(),
+                    ctx,
+                    "Empty weak pointer for play's publisher owner. {:?}.",
+                    play_publisher,
+                )
+            };
 
             if self
                 .participants
