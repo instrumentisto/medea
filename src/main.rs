@@ -9,8 +9,8 @@ pub mod media;
 pub mod signalling;
 pub mod turn;
 
-use actix::prelude::*;
 use actix::actors::signal;
+use actix::prelude::*;
 use dotenv::dotenv;
 use log::prelude::*;
 
@@ -21,14 +21,6 @@ use crate::{
     media::create_peers,
     signalling::{Room, RoomsRepository},
 };
-use actix_web::server::StopServer;
-use actix::actors::signal::{Subscribe, ProcessSignals};
-
-//struct Signals;
-//
-//impl Actor for Signals {
-//    type Context = Context<Self>;
-//}
 
 fn main() {
     dotenv().ok();
@@ -47,7 +39,8 @@ fn main() {
     };
     let peers = create_peers(1, 2);
 
-    let process_signals = System::current().registry().get::<signal::ProcessSignals>();
+    let process_signals =
+        System::current().registry().get::<signal::ProcessSignals>();
 
     let turn_auth_service =
         new_turn_auth_service(&config).expect("Unable to start turn service");
@@ -57,7 +50,7 @@ fn main() {
         peers,
         config.rpc.reconnect_timeout,
         turn_auth_service,
-        process_signals
+        process_signals,
     );
     let room = Arbiter::start(move |_| room);
     let rooms = hashmap! {1 => room};

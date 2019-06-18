@@ -1,9 +1,15 @@
 //! Room definitions and implementations. Room is responsible for media
 //! connection establishment between concrete [`Member`]s.
 
+use core::fmt;
 use std::time::Duration;
 
-use actix::{fut::wrap_future, Actor, ActorFuture, AsyncContext, Context, Handler, Message, Addr};
+use actix::actors::signal;
+use actix::actors::signal::{ProcessSignals, Subscribe};
+use actix::{
+    fut::wrap_future, Actor, ActorFuture, Addr, AsyncContext, Context, Handler,
+    Message,
+};
 use failure::Fail;
 use futures::future;
 use hashbrown::HashMap;
@@ -27,11 +33,6 @@ use crate::{
     turn::TurnAuthService,
 };
 
-use actix::System;
-use actix::actors::signal;
-use actix::actors::signal::{Subscribe, ProcessSignals};
-use core::fmt;
-
 /// ID of [`Room`].
 pub type Id = u64;
 
@@ -45,22 +46,22 @@ macro_rules! important_quit_signals {
             signal::SignalType::Int => {
                 error!("SIGINT received by Room, exiting");
                 $action();
-            },
+            }
             signal::SignalType::Hup => {
                 error!("SIGHUP received by Room, reloading");
                 $action();
-            },
+            }
             signal::SignalType::Term => {
                 error!("SIGTERM received by Room, stopping");
                 $action();
-            },
+            }
             signal::SignalType::Quit => {
                 error!("SIGQUIT received by Room, exiting");
                 $action();
             }
             _ => (),
         }
-    }
+    };
 }
 
 #[derive(Debug, Fail)]
@@ -100,9 +101,9 @@ pub struct Room {
     /// [`Peer`]s of [`Member`]s in this [`Room`].
     peers: PeerRepository,
 
-    //me attention
+    // me attention
     /// Actix addr of [`ProcessSignals`]
-    process_signals: Addr<ProcessSignals>
+    process_signals: Addr<ProcessSignals>,
 }
 
 impl Room {
@@ -293,9 +294,13 @@ impl Room {
 }
 
 impl fmt::Debug for Room {
-    //me attention
+    // me attention
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Room {{ id: {:?}, participants: {:?}, peers: {:?} }}", self.id, self.participants, self.peers)
+        write!(
+            f,
+            "Room {{ id: {:?}, participants: {:?}, peers: {:?} }}",
+            self.id, self.participants, self.peers
+        )
     }
 }
 
@@ -306,8 +311,9 @@ impl Actor for Room {
     type Context = Context<Self>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
-        //me attention
-        self.process_signals.do_send(Subscribe(ctx.address().recipient()));
+        // me attention
+        self.process_signals
+            .do_send(Subscribe(ctx.address().recipient()));
     }
 }
 
@@ -476,11 +482,9 @@ impl Handler<CloseRoom> for Room {
 impl Handler<signal::Signal> for Room {
     type Result = ();
 
-    //me attention
+    // me attention
     fn handle(&mut self, msg: signal::Signal, ctx: &mut Self::Context) {
-        important_quit_signals!(msg.0, || {
-            ctx.notify(CloseRoom {})
-        });
+        important_quit_signals!(msg.0, || { ctx.notify(CloseRoom {}) });
     }
 }
 
@@ -530,7 +534,8 @@ mod test {
             },
         };
 
-        let process_signals = System::current().registry().get::<signal::ProcessSignals>();
+        let process_signals =
+            System::current().registry().get::<signal::ProcessSignals>();
 
         Arbiter::start(move |_| {
             Room::new(
@@ -539,7 +544,7 @@ mod test {
                 create_peers(1, 2),
                 Duration::from_secs(10),
                 new_turn_auth_service_mock(),
-                process_signals
+                process_signals,
             )
         })
     }

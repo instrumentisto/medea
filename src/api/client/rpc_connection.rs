@@ -5,8 +5,9 @@ use core::fmt;
 use actix::Message;
 use futures::Future;
 use macro_attr::*;
-use medea_client_api_proto::{Command, Event};
 use newtype_derive::NewtypeFrom;
+
+use medea_client_api_proto::{Command, Event};
 
 use crate::api::control::MemberId;
 
@@ -97,6 +98,7 @@ pub mod test {
         System,
     };
     use futures::future::Future;
+
     use medea_client_api_proto::{Command, Event, IceCandidate};
 
     use crate::{

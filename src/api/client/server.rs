@@ -88,14 +88,14 @@ pub fn run(rooms: RoomsRepository, config: Conf) {
             rooms: rooms.clone(),
             config: config.rpc.clone(),
         })
-            .middleware(middleware::Logger::default())
-            .resource("/ws/{room_id}/{member_id}/{credentials}", |r| {
-                r.method(http::Method::GET).with(ws_index)
-            })
+        .middleware(middleware::Logger::default())
+        .resource("/ws/{room_id}/{member_id}/{credentials}", |r| {
+            r.method(http::Method::GET).with(ws_index)
+        })
     })
-        .bind(server_addr)
-        .unwrap()
-        .start();
+    .bind(server_addr)
+    .unwrap()
+    .start();
 
     info!("Started HTTP server on {:?}", server_addr);
 }
@@ -104,7 +104,7 @@ pub fn run(rooms: RoomsRepository, config: Conf) {
 mod test {
     use std::{ops::Add, thread, time::Duration};
 
-    use actix::Arbiter;
+    use actix::{Arbiter, System};
     use actix_web::{http, test, App};
     use futures::Stream;
 
@@ -132,6 +132,10 @@ mod test {
                 ice_user: None
             },
         };
+
+        let process_signals =
+            System::current().registry().get::<signal::ProcessSignals>();
+
         let room = Arbiter::start(move |_| {
             Room::new(
                 1,
@@ -139,6 +143,7 @@ mod test {
                 create_peers(1, 2),
                 conf.reconnect_timeout,
                 new_turn_auth_service_mock(),
+                process_signals
             )
         });
         let rooms = hashmap! {1 => room};
