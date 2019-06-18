@@ -1,14 +1,11 @@
 //! Repository that stores [`Room`]s addresses.
 
+use std::sync::{Arc, Mutex};
+
 use actix::Addr;
 use hashbrown::HashMap;
 
-use std::sync::{Arc, Mutex};
-
 use crate::signalling::{Room, RoomId};
-
-use actix::prelude::*;
-use actix::actors::signal;
 
 /// Repository that stores [`Room`]s addresses.
 #[derive(Clone, Default)]
