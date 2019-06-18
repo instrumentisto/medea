@@ -32,6 +32,3 @@ impl RoomsRepository {
         rooms.get(&id).cloned()
     }
 }
-
-
-

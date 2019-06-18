@@ -47,6 +47,8 @@ fn main() {
     };
     let peers = create_peers(1, 2);
 
+    let process_signals = System::current().registry().get::<signal::ProcessSignals>();
+
     let turn_auth_service =
         new_turn_auth_service(&config).expect("Unable to start turn service");
     let room = Room::new(
@@ -55,15 +57,11 @@ fn main() {
         peers,
         config.rpc.reconnect_timeout,
         turn_auth_service,
+        process_signals
     );
     let room = Arbiter::start(move |_| room);
     let rooms = hashmap! {1 => room};
     let rooms_repo = RoomsRepository::new(rooms);
-
-    //me register graceful shutdown signals
-//    let my_signal = Signals.start();
-//    let process_signals = System::current().registry().get::<signal::ProcessSignals>();
-//    process_signals.do_send(Subscribe(my_signal.recipient()));
 
     server::run(rooms_repo, config);
     let _ = sys.run();
