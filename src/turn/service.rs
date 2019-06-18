@@ -293,7 +293,7 @@ pub mod test {
             _: u64,
             _: RoomId,
             _: UnreachablePolicy,
-        ) -> Box<Future<Item = IceUser, Error = TurnServiceErr>> {
+        ) -> Box<dyn Future<Item = IceUser, Error = TurnServiceErr>> {
             Box::new(future::ok(IceUser::new(
                 "5.5.5.5:1234".parse().unwrap(),
                 String::from("username"),
@@ -304,7 +304,7 @@ pub mod test {
         fn delete(
             &self,
             _: Vec<IceUser>,
-        ) -> Box<Future<Item = (), Error = TurnServiceErr>> {
+        ) -> Box<dyn Future<Item = (), Error = TurnServiceErr>> {
             Box::new(future::ok(()))
         }
     }

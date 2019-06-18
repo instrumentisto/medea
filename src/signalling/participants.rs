@@ -190,7 +190,8 @@ impl ParticipantService {
                     self.room_id,
                     UnreachablePolicy::ReturnErr,
                 ))
-                .map_err(|err, _: &mut Room, _| {
+                .map_err(move |err, room: &mut Room, _| {
+                    room.participants.connections.remove(&member_id);
                     ParticipantServiceErr::from(err)
                 })
                 .and_then(
@@ -213,7 +214,7 @@ impl ParticipantService {
     /// If [`ClosedReason::Lost`], then creates delayed task that emits
     /// [`ClosedReason::Closed`].
     // TODO: Dont close the room. It is being closed atm, because we have
-    //      no way to handle absence of RtcPeerConnection.
+    //       no way to handle absence of RpcConnection.
     pub fn connection_closed(
         &mut self,
         ctx: &mut Context<Room>,
