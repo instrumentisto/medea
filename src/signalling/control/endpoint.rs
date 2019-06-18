@@ -162,7 +162,7 @@ impl WebRtcPlayEndpoint {
 
 impl Drop for WebRtcPlayEndpoint {
     fn drop(&mut self) {
-        if (Arc::strong_count(&self.0) - 1) == 1 {
+        if Arc::strong_count(&self.0) == 1 {
             self.publisher().remove_receiver(&self.id());
         }
     }
@@ -319,7 +319,7 @@ impl WebRtcPublishEndpoint {
 /// This is memory leak fix for [`WebRtcPublishEndpoint`].
 impl Drop for WebRtcPublishEndpoint {
     fn drop(&mut self) {
-        if (Arc::strong_count(&self.0) - 1) == self.receivers().len() {
+        if Arc::strong_count(&self.0) == self.receivers().len() {
             let inner = self.0.lock().unwrap();
             for receiver in &inner.receivers {
                 if let Some(receiver_owner) = receiver.owner().upgrade() {
