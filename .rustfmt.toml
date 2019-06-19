@@ -13,3 +13,5 @@ error_on_line_overflow = true
 error_on_unformatted = true
 
 unstable_features = true
+
+merge_imports = true
