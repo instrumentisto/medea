@@ -9,9 +9,9 @@ pub mod media;
 pub mod signalling;
 pub mod turn;
 
-use actix_web::actix::actors::signal;
-use actix_web::actix::System;
+use actix::actors::signal;
 use actix::prelude::Arbiter;
+use actix::System;
 use dotenv::dotenv;
 use log::prelude::*;
 
