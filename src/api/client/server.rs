@@ -1,12 +1,12 @@
 //! HTTP server for handling WebSocket connections of Client API.
 
 use actix_web::{
-    http, middleware,
-    web::{Data, Path},
-    App, HttpRequest, HttpResponse, HttpServer,
+    middleware,
+    web::{Data, Path, Payload},
+    App, Error, HttpRequest, HttpResponse, HttpServer,
 };
 use actix_web_actors::ws;
-use futures::{future, Future as _, Future, IntoFuture};
+use futures::{future, Future};
 use serde::Deserialize;
 
 use crate::{
@@ -21,9 +21,6 @@ use crate::{
     log::prelude::*,
     signalling::{RoomId, RoomsRepository},
 };
-use actix_web::{client::WsClientError, web::Payload, Error};
-use futures::future::Either;
-use std::convert::TryInto;
 
 /// Parameters of new WebSocket connection creation HTTP request.
 #[derive(Debug, Deserialize)]

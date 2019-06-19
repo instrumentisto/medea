@@ -49,7 +49,6 @@ fn main() {
         Room::new(1, members, peers, rpc_reconnect_timeout, turn_auth_service)
     });
 
-    //    let room = Arbiter::start(move |_| room);
     let rooms = hashmap! {1 => room};
     let rooms_repo = RoomsRepository::new(rooms);
 
