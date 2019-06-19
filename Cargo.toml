@@ -20,8 +20,9 @@ members = [
 lto = "thin"
 
 [dependencies]
-actix = "0.7"
-actix-web = "0.7"
+actix = "0.8"
+actix-web = "1.0"
+actix-web-actors = "1.0"
 bb8 = "0.3"
 bb8-redis = "0.3"
 config = "0.9"

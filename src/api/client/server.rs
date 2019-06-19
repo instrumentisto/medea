@@ -1,10 +1,12 @@
 //! HTTP server for handling WebSocket connections of Client API.
 
 use actix_web::{
-    http, middleware, server, ws, App, AsyncResponder, FutureResponse,
-    HttpRequest, HttpResponse, Path, State,
+    http, middleware,
+    web::{Data, Path},
+    App, HttpRequest, HttpResponse, HttpServer,
 };
-use futures::{future, Future as _};
+use actix_web_actors::ws;
+use futures::{future, Future as _, Future, IntoFuture};
 use serde::Deserialize;
 
 use crate::{
@@ -19,6 +21,9 @@ use crate::{
     log::prelude::*,
     signalling::{RoomId, RoomsRepository},
 };
+use actix_web::{client::WsClientError, web::Payload, Error};
+use futures::future::Either;
+use std::convert::TryInto;
 
 /// Parameters of new WebSocket connection creation HTTP request.
 #[derive(Debug, Deserialize)]
@@ -33,30 +38,31 @@ struct RequestParams {
 
 /// Handles all HTTP requests, performs WebSocket handshake (upgrade) and starts
 /// new [`WsSession`] for WebSocket connection.
+// TODO: maybe not use Box<dyn Future...>?
 fn ws_index(
-    (r, info, state): (
-        HttpRequest<Context>,
-        Path<RequestParams>,
-        State<Context>,
-    ),
-) -> FutureResponse<HttpResponse> {
+    r: HttpRequest,
+    info: Path<RequestParams>,
+    state: Data<Context>,
+    payload: Payload,
+) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     debug!("Request params: {:?}", info);
 
     match state.rooms.get(info.room_id) {
-        Some(room) => room
-            .send(Authorize {
+        Some(room) => Box::new(
+            room.send(Authorize {
                 member_id: info.member_id,
                 credentials: info.credentials.clone(),
             })
             .from_err()
             .and_then(move |res| match res {
                 Ok(_) => ws::start(
-                    &r.drop_state(),
                     WsSession::new(
                         info.member_id,
                         room,
                         state.config.idle_timeout,
                     ),
+                    &r, // TODO: drop_state()
+                    payload,
                 ),
                 Err(AuthorizationError::MemberNotExists) => {
                     Ok(HttpResponse::NotFound().into())
@@ -64,9 +70,9 @@ fn ws_index(
                 Err(AuthorizationError::InvalidCredentials) => {
                     Ok(HttpResponse::Forbidden().into())
                 }
-            })
-            .responder(),
-        None => future::ok(HttpResponse::NotFound().into()).responder(),
+            }),
+        ),
+        None => Box::new(future::ok(HttpResponse::NotFound().into())),
     }
 }
 
@@ -82,16 +88,20 @@ pub struct Context {
 /// Starts HTTP server for handling WebSocket connections of Client API.
 pub fn run(rooms: RoomsRepository, config: Conf) {
     let server_addr = config.server.bind_addr();
-
-    server::new(move || {
-        App::with_state(Context {
-            rooms: rooms.clone(),
-            config: config.rpc.clone(),
-        })
-        .middleware(middleware::Logger::default())
-        .resource("/ws/{room_id}/{member_id}/{credentials}", |r| {
-            r.method(http::Method::GET).with(ws_index)
-        })
+    //.service(web::resource("/path1").to(|| HttpResponse::Ok()))
+    HttpServer::new(move || {
+        App::new()
+            .data(Context {
+                rooms: rooms.clone(),
+                config: config.rpc.clone(),
+            })
+            .service(
+                actix_web::web::resource(
+                    "/ws/{room_id}/{member_id}/{credentials}",
+                )
+                .to_async(ws_index),
+            )
+            .wrap(middleware::Logger::default())
     })
     .bind(server_addr)
     .unwrap()

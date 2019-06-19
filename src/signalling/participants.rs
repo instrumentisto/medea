@@ -18,7 +18,6 @@ use hashbrown::HashMap;
 
 use medea_client_api_proto::Event;
 
-use crate::signalling::RoomId;
 use crate::{
     api::{
         client::rpc_connection::{
@@ -31,7 +30,7 @@ use crate::{
     media::IceUser,
     signalling::{
         room::{ActFuture, CloseRoom, RoomError},
-        Room,
+        Room, RoomId,
     },
     turn::{TurnAuthService, TurnServiceErr, UnreachablePolicy},
 };
