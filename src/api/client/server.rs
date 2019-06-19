@@ -1,8 +1,8 @@
 //! HTTP server for handling WebSocket connections of Client API.
 
 use actix_web::{
-    http, middleware, server, ws, App, AsyncResponder, FutureResponse,
-    HttpRequest, HttpResponse, Path, State,
+    App, AsyncResponder, FutureResponse, http, HttpRequest, HttpResponse, middleware,
+    Path, server, State, ws,
 };
 use futures::{future, Future as _};
 use serde::Deserialize;
@@ -104,8 +104,10 @@ pub fn run(rooms: RoomsRepository, config: Conf) {
 mod test {
     use std::{ops::Add, thread, time::Duration};
 
-    use actix::{Arbiter, System};
-    use actix_web::{http, test, App};
+    use actix::Arbiter;
+    use actix_web::{App, http, test};
+    use actix_web::actix::actors::signal;
+    use actix_web::actix::System;
     use futures::Stream;
 
     use crate::{
