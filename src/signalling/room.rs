@@ -60,6 +60,7 @@ pub enum RoomError {
 
 impl From<PeerStateError> for RoomError {
     fn from(err: PeerStateError) -> Self {
+        // panic!("{:?}", err);
         RoomError::PeerStateError(err)
     }
 }
@@ -499,8 +500,7 @@ mod test {
             let room_clone = room.clone();
             let stopped_clone = stopped.clone();
 
-            let arbiter1 = Arbiter::new();
-            TestConnection::start_in_arbiter(&arbiter1, move |_| {
+            TestConnection::start_in_arbiter(&Arbiter::new(), move |_| {
                 TestConnection {
                     events: caller_events_clone,
                     member_id: 1,
@@ -509,8 +509,7 @@ mod test {
                 }
             });
 
-            let arbiter2 = Arbiter::new();
-            TestConnection::start_in_arbiter(&arbiter2, move |_| {
+            TestConnection::start_in_arbiter(&Arbiter::new(), move |_| {
                 TestConnection {
                     events: responder_events_clone,
                     member_id: 2,

@@ -96,7 +96,7 @@ pub fn run(rooms: RoomsRepository, config: Conf) {
                 actix_web::web::resource(
                     "/ws/{room_id}/{member_id}/{credentials}",
                 )
-                .to_async(ws_index),
+                .route(actix_web::web::get().to_async(ws_index)),
             )
             .wrap(middleware::Logger::default())
     })
@@ -199,32 +199,38 @@ mod test {
             .force_send(Message::Text(r#"{"ping": 33}"#.into()))
             .unwrap();
 
-        server.block_on(socket
-            .flush()
-            .into_future()
-            .map_err(|_| ())
-            .and_then(|socket| {
-                socket.into_future().map_err(|_| ()).and_then(move |(item, read)| {
-                    assert_eq!(
-                        Some(ws::Frame::Text(Some(r#"{"pong":33}"#.into()))),
-                        item
-                    );
-
-                    thread::sleep(
-                        conf.rpc.idle_timeout.add(Duration::from_secs(1)),
-                    );
-
-                    read.into_future().map_err(|(e, _)| panic!("{:?}", e)).map(
-                        |(item, _)| {
+        server
+            .block_on(socket.flush().into_future().map_err(|_| ()).and_then(
+                |socket| {
+                    socket.into_future().map_err(|_| ()).and_then(
+                        move |(item, read)| {
                             assert_eq!(
-                                Some(ws::Frame::Close(Some(
-                                    ws::CloseCode::Normal.into()
+                                Some(ws::Frame::Text(Some(
+                                    r#"{"pong":33}"#.into()
                                 ))),
                                 item
                             );
+
+                            thread::sleep(
+                                conf.rpc
+                                    .idle_timeout
+                                    .add(Duration::from_secs(1)),
+                            );
+
+                            read.into_future()
+                                .map_err(|(e, _)| panic!("{:?}", e))
+                                .map(|(item, _)| {
+                                    assert_eq!(
+                                        Some(ws::Frame::Close(Some(
+                                            ws::CloseCode::Normal.into()
+                                        ))),
+                                        item
+                                    );
+                                })
                         },
                     )
-                })
-            })).unwrap();
+                },
+            ))
+            .unwrap();
     }
 }
