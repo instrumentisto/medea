@@ -111,9 +111,12 @@ pub fn run(rooms: RoomsRepository, config: Conf) {
 mod test {
     use std::{ops::Add, thread, time::Duration};
 
-    use actix::Arbiter;
+    use actix::{Actor as _, Arbiter, System};
+    use actix_codec::{AsyncRead, Framed};
+    use actix_http::HttpService;
+    use actix_http_test::{TestServer, TestServerRuntime};
     use actix_web::{http, test, App};
-    use futures::Stream;
+    use futures::{sink::Sink, Stream};
 
     use crate::{
         api::control::Member,
@@ -124,6 +127,12 @@ mod test {
     };
 
     use super::*;
+    use actix_http::{
+        h1::Message::Item,
+        ws::{Frame, Message},
+    };
+    use futures::future::IntoFuture;
+    use tokio::prelude::AsyncWrite;
 
     /// Creates [`RoomsRepository`] for tests filled with a single [`Room`].
     fn room(conf: Rpc) -> RoomsRepository {
@@ -139,7 +148,8 @@ mod test {
                 ice_user: None
             },
         };
-        let room = Arbiter::start(move |_| {
+        let arbiter = Arbiter::new();
+        let room = Room::start_in_arbiter(&arbiter, move |_| {
             Room::new(
                 1,
                 members,
@@ -153,31 +163,26 @@ mod test {
     }
 
     /// Creates test WebSocket server of Client API which can handle requests.
-    fn ws_server(conf: Conf) -> test::TestServer {
-        test::TestServer::with_factory(move || {
-            App::with_state(Context {
-                rooms: room(conf.rpc.clone()),
-                config: conf.rpc.clone(),
-            })
-            .resource("/ws/{room_id}/{member_id}/{credentials}", |r| {
-                r.method(http::Method::GET).with(ws_index)
-            })
+    fn ws_server(conf: Conf) -> TestServerRuntime {
+        TestServer::new(move || {
+            HttpService::new(
+                App::new()
+                    .data(Context {
+                        rooms: room(conf.rpc.clone()),
+                        config: conf.rpc.clone(),
+                    })
+                    .service(
+                        actix_web::web::resource(
+                            "/ws/{room_id}/{member_id}/{credentials}",
+                        )
+                        .to_async(ws_index),
+                    ),
+            )
         })
     }
 
     #[test]
-    fn responses_with_pong() {
-        let mut server = ws_server(Conf::default());
-        let (read, mut write) =
-            server.ws_at("/ws/1/1/caller_credentials").unwrap();
-
-        write.text(r#"{"ping":33}"#);
-        let (item, _) = server.execute(read.into_future()).unwrap();
-        assert_eq!(Some(ws::Message::Text(r#"{"pong":33}"#.into())), item);
-    }
-
-    #[test]
-    fn disconnects_on_idle() {
+    fn ping_pong_and_disconnects_on_idle() {
         let conf = Conf {
             rpc: Rpc {
                 idle_timeout: Duration::new(2, 0),
@@ -188,19 +193,38 @@ mod test {
         };
 
         let mut server = ws_server(conf.clone());
-        let (read, mut write) =
-            server.ws_at("/ws/1/1/caller_credentials").unwrap();
+        let mut socket = server.ws_at("/ws/1/1/caller_credentials").unwrap();
 
-        write.text(r#"{"ping":33}"#);
-        let (item, read) = server.execute(read.into_future()).unwrap();
-        assert_eq!(Some(ws::Message::Text(r#"{"pong":33}"#.into())), item);
+        socket
+            .force_send(Message::Text(r#"{"ping": 33}"#.into()))
+            .unwrap();
 
-        thread::sleep(conf.rpc.idle_timeout.add(Duration::from_secs(1)));
+        server.block_on(socket
+            .flush()
+            .into_future()
+            .map_err(|_| ())
+            .and_then(|socket| {
+                socket.into_future().map_err(|_| ()).and_then(move |(item, read)| {
+                    assert_eq!(
+                        Some(ws::Frame::Text(Some(r#"{"pong":33}"#.into()))),
+                        item
+                    );
 
-        let (item, _) = server.execute(read.into_future()).unwrap();
-        assert_eq!(
-            Some(ws::Message::Close(Some(ws::CloseCode::Normal.into()))),
-            item
-        );
+                    thread::sleep(
+                        conf.rpc.idle_timeout.add(Duration::from_secs(1)),
+                    );
+
+                    read.into_future().map_err(|(e, _)| panic!("{:?}", e)).map(
+                        |(item, _)| {
+                            assert_eq!(
+                                Some(ws::Frame::Close(Some(
+                                    ws::CloseCode::Normal.into()
+                                ))),
+                                item
+                            );
+                        },
+                    )
+                })
+            })).unwrap();
     }
 }

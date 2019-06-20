@@ -474,7 +474,8 @@ mod test {
                 ice_user: None
             },
         };
-        Arbiter::start(move |_| {
+        let arbiter = Arbiter::new();
+        Room::start_in_arbiter(&arbiter, move |_| {
             Room::new(
                 1,
                 members,
@@ -497,19 +498,28 @@ mod test {
             let room = start_room();
             let room_clone = room.clone();
             let stopped_clone = stopped.clone();
-            Arbiter::start(move |_| TestConnection {
-                events: caller_events_clone,
-                member_id: 1,
-                room: room_clone,
-                stopped: stopped_clone,
+
+            let arbiter1 = Arbiter::new();
+            TestConnection::start_in_arbiter(&arbiter1, move |_| {
+                TestConnection {
+                    events: caller_events_clone,
+                    member_id: 1,
+                    room: room_clone,
+                    stopped: stopped_clone,
+                }
             });
-            Arbiter::start(move |_| TestConnection {
-                events: responder_events_clone,
-                member_id: 2,
-                room,
-                stopped,
+
+            let arbiter2 = Arbiter::new();
+            TestConnection::start_in_arbiter(&arbiter2, move |_| {
+                TestConnection {
+                    events: responder_events_clone,
+                    member_id: 2,
+                    room,
+                    stopped,
+                }
             });
-        });
+        })
+        .unwrap();
 
         let caller_events = caller_events.lock().unwrap();
         let responder_events = responder_events.lock().unwrap();
