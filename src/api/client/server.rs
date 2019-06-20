@@ -105,9 +105,10 @@ mod test {
     use std::{ops::Add, thread, time::Duration};
 
     use actix::Arbiter;
-    use actix_web::actix::actors::signal;
-    use actix_web::actix::System;
-    use actix_web::{http, test, App};
+    use actix_web::{
+        actix::{actors::signal, System},
+        http, test, App,
+    };
     use futures::Stream;
 
     use crate::{

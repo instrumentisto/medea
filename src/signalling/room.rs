@@ -1,14 +1,12 @@
 //! Room definitions and implementations. Room is responsible for media
 //! connection establishment between concrete [`Member`]s.
 
-use core::fmt;
-use std::time::Duration;
+use std::{fmt, time::Duration};
 
-use actix::actors::signal;
-use actix::actors::signal::{ProcessSignals, Subscribe};
 use actix::{
-    fut::wrap_future, Actor, ActorFuture, Addr, AsyncContext, Context, Handler,
-    Message,
+    actors::signal::{self, ProcessSignals, Subscribe},
+    fut::wrap_future,
+    Actor, ActorFuture, Addr, AsyncContext, Context, Handler, Message,
 };
 use failure::Fail;
 use futures::future;
@@ -101,7 +99,6 @@ pub struct Room {
     /// [`Peer`]s of [`Member`]s in this [`Room`].
     peers: PeerRepository,
 
-    // me attention
     /// Actix addr of [`ProcessSignals`]
     process_signals: Addr<ProcessSignals>,
 }
@@ -294,7 +291,6 @@ impl Room {
 }
 
 impl fmt::Debug for Room {
-    // me attention
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
@@ -311,7 +307,6 @@ impl Actor for Room {
     type Context = Context<Self>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
-        // me attention
         self.process_signals
             .do_send(Subscribe(ctx.address().recipient()));
     }
@@ -478,11 +473,10 @@ impl Handler<CloseRoom> for Room {
     }
 }
 
-// Shutdown system on and of `SIGINT`, `SIGTERM`, `SIGQUIT` signals
+// Close room on `SIGINT`, `SIGTERM`, `SIGQUIT` signals.
 impl Handler<signal::Signal> for Room {
     type Result = ();
 
-    // me attention
     fn handle(&mut self, msg: signal::Signal, ctx: &mut Self::Context) {
         important_quit_signals!(msg.0, || { ctx.notify(CloseRoom {}) });
     }

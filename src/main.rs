@@ -9,9 +9,7 @@ pub mod media;
 pub mod signalling;
 pub mod turn;
 
-use actix::actors::signal;
-use actix::prelude::Arbiter;
-use actix::System;
+use actix::{actors::signal, prelude::Arbiter, System};
 use dotenv::dotenv;
 use log::prelude::*;
 
@@ -29,7 +27,6 @@ fn main() {
     let _scope_guard = slog_scope::set_global_logger(logger);
     slog_stdlog::init().unwrap();
     let sys = System::new("medea");
-
     let config = Conf::parse().unwrap();
 
     info!("{:?}", config);
