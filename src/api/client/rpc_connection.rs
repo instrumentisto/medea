@@ -1,13 +1,12 @@
 //! [`RpcConnection`] with related messages.
 
-use core::fmt;
+use std::fmt;
 
 use actix::Message;
 use futures::Future;
 use macro_attr::*;
-use newtype_derive::NewtypeFrom;
-
 use medea_client_api_proto::{Command, Event};
+use newtype_derive::NewtypeFrom;
 
 use crate::api::control::MemberId;
 
@@ -98,7 +97,6 @@ pub mod test {
         System,
     };
     use futures::future::Future;
-
     use medea_client_api_proto::{Command, Event, IceCandidate};
 
     use crate::{
