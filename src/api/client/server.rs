@@ -194,8 +194,8 @@ mod test {
                     .and_then(|socket| {
                         socket
                             .into_future()
-                            .map_err(|e| panic!("{:?}", e.0))
-                            .and_then(move |(item, read)| {
+                            .map_err(|(e, _)| panic!("{:?}", e))
+                            .and_then(|(item, read)| {
                                 assert_eq!(
                                     Some(ws::Frame::Text(Some(
                                         r#"{"pong":33}"#.into()
