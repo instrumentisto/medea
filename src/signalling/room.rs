@@ -60,7 +60,6 @@ pub enum RoomError {
 
 impl From<PeerStateError> for RoomError {
     fn from(err: PeerStateError) -> Self {
-        // panic!("{:?}", err);
         RoomError::PeerStateError(err)
     }
 }
