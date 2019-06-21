@@ -475,8 +475,7 @@ mod test {
                 ice_user: None
             },
         };
-        let arbiter = Arbiter::new();
-        Room::start_in_arbiter(&arbiter, move |_| {
+        Room::start_in_arbiter(&Arbiter::new(), move |_| {
             Room::new(
                 1,
                 members,

@@ -35,7 +35,6 @@ struct RequestParams {
 
 /// Handles all HTTP requests, performs WebSocket handshake (upgrade) and starts
 /// new [`WsSession`] for WebSocket connection.
-// TODO: maybe not use Box<dyn Future...>?
 fn ws_index(
     r: HttpRequest,
     info: Path<RequestParams>,
@@ -58,7 +57,7 @@ fn ws_index(
                         room,
                         state.config.idle_timeout,
                     ),
-                    &r, // TODO: drop_state()
+                    &r,
                     payload,
                 ),
                 Err(AuthorizationError::MemberNotExists) => {
@@ -85,7 +84,6 @@ pub struct Context {
 /// Starts HTTP server for handling WebSocket connections of Client API.
 pub fn run(rooms: RoomsRepository, config: Conf) {
     let server_addr = config.server.bind_addr();
-    //.service(web::resource("/path1").to(|| HttpResponse::Ok()))
     HttpServer::new(move || {
         App::new()
             .data(Context {
@@ -141,8 +139,7 @@ mod test {
                 ice_user: None
             },
         };
-        let arbiter = Arbiter::new();
-        let room = Room::start_in_arbiter(&arbiter, move |_| {
+        let room = Room::start_in_arbiter(&Arbiter::new(), move |_| {
             Room::new(
                 1,
                 members,

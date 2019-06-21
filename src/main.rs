@@ -44,8 +44,7 @@ fn main() {
 
     let rpc_reconnect_timeout = config.rpc.reconnect_timeout;
 
-    let arbiter = Arbiter::new();
-    let room = Room::start_in_arbiter(&arbiter, move |_| {
+    let room = Room::start_in_arbiter(&Arbiter::new(), move |_| {
         Room::new(1, members, peers, rpc_reconnect_timeout, turn_auth_service)
     });
 

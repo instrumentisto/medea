@@ -181,8 +181,7 @@ pub fn new_turn_auth_service(
         static_user: None,
     };
 
-    let arbiter = Arbiter::new();
-    let service = Service::start_in_arbiter(&arbiter, move |_| service);
+    let service = Service::start_in_arbiter(&Arbiter::new(), move |_| service);
 
     Ok(Box::new(service))
 }
