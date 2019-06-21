@@ -111,12 +111,11 @@ pub fn run(rooms: RoomsRepository, config: Conf) {
 mod test {
     use std::{ops::Add, thread, time::Duration};
 
-    use actix::{Actor as _, Arbiter, System};
-    use actix_codec::{AsyncRead, Framed};
-    use actix_http::HttpService;
+    use actix::{Actor as _, Arbiter};
+    use actix_http::{ws::Message, HttpService};
     use actix_http_test::{TestServer, TestServerRuntime};
-    use actix_web::{http, test, App};
-    use futures::{sink::Sink, Stream};
+    use actix_web::App;
+    use futures::{future::IntoFuture, sink::Sink, Stream};
 
     use crate::{
         api::control::Member,
@@ -127,12 +126,6 @@ mod test {
     };
 
     use super::*;
-    use actix_http::{
-        h1::Message::Item,
-        ws::{Frame, Message},
-    };
-    use futures::future::IntoFuture;
-    use tokio::prelude::AsyncWrite;
 
     /// Creates [`RoomsRepository`] for tests filled with a single [`Room`].
     fn room(conf: Rpc) -> RoomsRepository {

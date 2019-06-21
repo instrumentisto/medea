@@ -198,7 +198,9 @@ impl ParticipantService {
                         {
                             member.ice_user.replace(ice);
                             room.participants.insert_member(member);
-                            room.participants.connections.insert(member_id, con);
+                            room.participants
+                                .connections
+                                .insert(member_id, con);
                         };
                         wrap_future(future::ok(()))
                     },

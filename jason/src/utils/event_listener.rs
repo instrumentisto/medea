@@ -51,7 +51,7 @@ impl<T: Deref<Target = EventTarget>, A: FromWasmAbi + 'static>
     where
         F: FnOnce(A) + 'static,
     {
-        let closure: Closure<FnMut(A)> = Closure::once(closure);
+        let closure: Closure<dyn FnMut(A)> = Closure::once(closure);
 
         target.add_event_listener_with_callback(
             event_name,
