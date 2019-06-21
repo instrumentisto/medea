@@ -165,7 +165,7 @@ mod test {
                         actix_web::web::resource(
                             "/ws/{room_id}/{member_id}/{credentials}",
                         )
-                        .to_async(ws_index),
+                        .route(actix_web::web::get().to_async(ws_index)),
                     ),
             )
         })
@@ -183,44 +183,45 @@ mod test {
         };
 
         let mut server = ws_server(conf.clone());
-        let mut socket = server.ws_at("/ws/1/1/caller_credentials").unwrap();
-
-        socket
-            .force_send(Message::Text(r#"{"ping": 33}"#.into()))
-            .unwrap();
+        let socket = server.ws_at("/ws/1/1/caller_credentials").unwrap();
 
         server
-            .block_on(socket.flush().into_future().map_err(|_| ()).and_then(
-                |socket| {
-                    socket.into_future().map_err(|_| ()).and_then(
-                        move |(item, read)| {
-                            assert_eq!(
-                                Some(ws::Frame::Text(Some(
-                                    r#"{"pong":33}"#.into()
-                                ))),
-                                item
-                            );
+            .block_on(
+                socket
+                    .send(Message::Text(r#"{"ping": 33}"#.into()))
+                    .into_future()
+                    .map_err(|e| panic!("{:?}", e))
+                    .and_then(|socket| {
+                        socket
+                            .into_future()
+                            .map_err(|e| panic!("{:?}", e.0))
+                            .and_then(move |(item, read)| {
+                                assert_eq!(
+                                    Some(ws::Frame::Text(Some(
+                                        r#"{"pong":33}"#.into()
+                                    ))),
+                                    item
+                                );
 
-                            thread::sleep(
-                                conf.rpc
-                                    .idle_timeout
-                                    .add(Duration::from_secs(1)),
-                            );
+                                thread::sleep(
+                                    conf.rpc
+                                        .idle_timeout
+                                        .add(Duration::from_secs(1)),
+                                );
 
-                            read.into_future()
-                                .map_err(|(e, _)| panic!("{:?}", e))
-                                .map(|(item, _)| {
-                                    assert_eq!(
-                                        Some(ws::Frame::Close(Some(
-                                            ws::CloseCode::Normal.into()
-                                        ))),
-                                        item
-                                    );
-                                })
-                        },
-                    )
-                },
-            ))
+                                read.into_future()
+                                    .map_err(|(e, _)| panic!("{:?}", e))
+                                    .map(|(item, _)| {
+                                        assert_eq!(
+                                            Some(ws::Frame::Close(Some(
+                                                ws::CloseCode::Normal.into()
+                                            ))),
+                                            item
+                                        );
+                                    })
+                            })
+                    }),
+            )
             .unwrap();
     }
 }
