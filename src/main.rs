@@ -9,7 +9,7 @@ pub mod media;
 pub mod signalling;
 pub mod turn;
 
-use actix::{actors::signal, prelude::Arbiter, System};
+use actix::{actors::signal, prelude::Arbiter, System, Actor};
 use dotenv::dotenv;
 use log::prelude::*;
 
@@ -19,7 +19,9 @@ use crate::{
     conf::Conf,
     media::create_peers,
     signalling::{Room, RoomsRepository},
+    utils::graceful_shutdown,
 };
+use crate::utils::graceful_shutdown::GracefulShutdown;
 
 fn main() {
     dotenv().ok();
@@ -40,6 +42,10 @@ fn main() {
     let process_signals =
         System::current().registry().get::<signal::ProcessSignals>();
 
+
+    let mut shutdown_handler = GracefulShutdown::new(8000,
+                                                     process_signals.clone());
+
     let turn_auth_service =
         new_turn_auth_service(&config).expect("Unable to start turn service");
     let room = Room::new(
@@ -48,12 +54,18 @@ fn main() {
         peers,
         config.rpc.reconnect_timeout,
         turn_auth_service,
-        process_signals,
+//        shutdown_handler.clone(),
     );
     let room = Arbiter::start(move |_| room);
+    shutdown_handler.subscribe(room.clone().recipient());
+
     let rooms = hashmap! {1 => room};
     let rooms_repo = RoomsRepository::new(rooms);
 
-    server::run(rooms_repo, config);
+    //todo send StopServer to server when these signals
+    let http_server = server::run(rooms_repo, config);
+    shutdown_handler.subscribe(http_server.recipient());
+
+    shutdown_handler.start();
     let _ = sys.run();
 }

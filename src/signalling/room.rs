@@ -30,6 +30,7 @@ use crate::{
     signalling::{participants::ParticipantService, peers::PeerRepository},
     turn::TurnAuthService,
 };
+use crate::utils::graceful_shutdown::GracefulShutdown;
 
 /// ID of [`Room`].
 pub type Id = u64;
@@ -99,8 +100,8 @@ pub struct Room {
     /// [`Peer`]s of [`Member`]s in this [`Room`].
     peers: PeerRepository,
 
-    /// Actix addr of [`ProcessSignals`]
-    process_signals: Addr<ProcessSignals>,
+    // Actix addr of [`ProcessSignals`]
+    // shutdown_handler: GracefullShutdown,
 }
 
 impl Room {
@@ -111,7 +112,7 @@ impl Room {
         peers: HashMap<PeerId, PeerStateMachine>,
         reconnect_timeout: Duration,
         turn: Box<dyn TurnAuthService>,
-        process_signals: Addr<ProcessSignals>,
+        // shutdown_handler: GracefullShutdown,
     ) -> Self {
         Self {
             id,
@@ -122,7 +123,7 @@ impl Room {
                 turn,
                 reconnect_timeout,
             ),
-            process_signals,
+            // shutdown_handler,
         }
     }
 
@@ -307,8 +308,9 @@ impl Actor for Room {
     type Context = Context<Self>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
-        self.process_signals
-            .do_send(Subscribe(ctx.address().recipient()));
+      //  self.shutdown_handler.subscribe(ctx.address().recipient());
+//        self.process_signals
+//            .do_send(Subscribe(ctx.address().recipient()));
     }
 }
 
@@ -530,6 +532,8 @@ mod test {
 
         let process_signals =
             System::current().registry().get::<signal::ProcessSignals>();
+//        let shutdown_handler = GracefullShutdown::new(8000,
+//                                                      process_signals.clone());
 
         Arbiter::start(move |_| {
             Room::new(
@@ -538,7 +542,7 @@ mod test {
                 create_peers(1, 2),
                 Duration::from_secs(10),
                 new_turn_auth_service_mock(),
-                process_signals,
+                //shutdown_handler,
             )
         })
     }

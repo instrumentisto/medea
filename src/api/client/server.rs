@@ -19,6 +19,9 @@ use crate::{
     log::prelude::*,
     signalling::{RoomId, RoomsRepository},
 };
+use actix::{Addr, Handler, Actor, Recipient};
+use actix::actors::signal;
+use actix_web::server::{StopServer};
 
 /// Parameters of new WebSocket connection creation HTTP request.
 #[derive(Debug, Deserialize)]
@@ -80,10 +83,10 @@ pub struct Context {
 }
 
 /// Starts HTTP server for handling WebSocket connections of Client API.
-pub fn run(rooms: RoomsRepository, config: Conf) {
+pub fn run(rooms: RoomsRepository, config: Conf) -> Addr<ServerWrapper> {
     let server_addr = config.server.bind_addr();
 
-    server::new(move || {
+    let actix_server_addr = server::new(move || {
         App::with_state(Context {
             rooms: rooms.clone(),
             config: config.rpc.clone(),
@@ -93,11 +96,31 @@ pub fn run(rooms: RoomsRepository, config: Conf) {
             r.method(http::Method::GET).with(ws_index)
         })
     })
+    .disable_signals()
     .bind(server_addr)
     .unwrap()
     .start();
 
+    let server_wrapper = ServerWrapper(actix_server_addr.recipient());
+
     info!("Started HTTP server on {:?}", server_addr);
+
+    server_wrapper.start()
+}
+
+pub struct ServerWrapper(pub Recipient<StopServer>);
+
+impl actix::Actor for ServerWrapper {
+    type Context = actix::Context<Self>;
+}
+
+impl Handler<signal::Signal> for ServerWrapper {
+    type Result = ();
+
+    fn handle(&mut self, _: signal::Signal, _: &mut actix::Context<Self>) {
+        debug!("server closer got signal");
+        self.0.do_send(StopServer{ graceful: true } );
+    }
 }
 
 #[cfg(test)]
@@ -136,17 +159,13 @@ mod test {
             },
         };
 
-        let process_signals =
-            System::current().registry().get::<signal::ProcessSignals>();
-
         let room = Arbiter::start(move |_| {
             Room::new(
                 1,
                 members,
                 create_peers(1, 2),
                 conf.reconnect_timeout,
-                new_turn_auth_service_mock(),
-                process_signals,
+                new_turn_auth_service_mock()
             )
         });
         let rooms = hashmap! {1 => room};
