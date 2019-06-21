@@ -30,7 +30,7 @@ use crate::{
     signalling::{participants::ParticipantService, peers::PeerRepository},
     turn::TurnAuthService,
 };
-use crate::utils::graceful_shutdown::GracefulShutdown;
+use crate::utils::graceful_shutdown::{GracefulShutdown, GracefulShutdownResult};
 
 /// ID of [`Room`].
 pub type Id = u64;
@@ -38,30 +38,6 @@ pub type Id = u64;
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
 pub type ActFuture<I, E> =
     Box<dyn ActorFuture<Actor = Room, Item = I, Error = E>>;
-
-macro_rules! important_quit_signals {
-    ($msg: expr, $action: expr) => {
-        match $msg {
-            signal::SignalType::Int => {
-                error!("SIGINT received by Room, exiting");
-                $action();
-            }
-            signal::SignalType::Hup => {
-                error!("SIGHUP received by Room, reloading");
-                $action();
-            }
-            signal::SignalType::Term => {
-                error!("SIGTERM received by Room, stopping");
-                $action();
-            }
-            signal::SignalType::Quit => {
-                error!("SIGQUIT received by Room, exiting");
-                $action();
-            }
-            _ => (),
-        }
-    };
-}
 
 #[derive(Debug, Fail)]
 #[allow(clippy::module_name_repetitions)]
@@ -99,9 +75,6 @@ pub struct Room {
 
     /// [`Peer`]s of [`Member`]s in this [`Room`].
     peers: PeerRepository,
-
-    // Actix addr of [`ProcessSignals`]
-    // shutdown_handler: GracefullShutdown,
 }
 
 impl Room {
@@ -112,7 +85,6 @@ impl Room {
         peers: HashMap<PeerId, PeerStateMachine>,
         reconnect_timeout: Duration,
         turn: Box<dyn TurnAuthService>,
-        // shutdown_handler: GracefullShutdown,
     ) -> Self {
         Self {
             id,
@@ -123,7 +95,6 @@ impl Room {
                 turn,
                 reconnect_timeout,
             ),
-            // shutdown_handler,
         }
     }
 
@@ -306,12 +277,6 @@ impl fmt::Debug for Room {
 // TODO: close connections on signal (gracefull shutdown)
 impl Actor for Room {
     type Context = Context<Self>;
-
-    fn started(&mut self, ctx: &mut Self::Context) {
-      //  self.shutdown_handler.subscribe(ctx.address().recipient());
-//        self.process_signals
-//            .do_send(Subscribe(ctx.address().recipient()));
-    }
 }
 
 impl Handler<Authorize> for Room {
@@ -476,11 +441,14 @@ impl Handler<CloseRoom> for Room {
 }
 
 // Close room on `SIGINT`, `SIGTERM`, `SIGQUIT` signals.
-impl Handler<signal::Signal> for Room {
-    type Result = ();
+impl Handler<GracefulShutdownResult> for Room {
+    type Result = Result<(), Box<dyn std::error::Error + Send>>;
 
-    fn handle(&mut self, msg: signal::Signal, ctx: &mut Self::Context) {
-        important_quit_signals!(msg.0, || { ctx.notify(CloseRoom {}) });
+    fn handle(&mut self, msg: GracefulShutdownResult, ctx: &mut Self::Context)
+        -> Result<(), Box<dyn std::error::Error + Send>> {
+        info!("Shutting down Room: {:?}", self.id);
+        ctx.notify(CloseRoom {});
+        Ok(())
     }
 }
 

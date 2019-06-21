@@ -22,6 +22,7 @@ use crate::{
 use actix::{Addr, Handler, Actor, Recipient};
 use actix::actors::signal;
 use actix_web::server::{StopServer};
+use crate::utils::graceful_shutdown::{GracefulShutdown, GracefulShutdownResult};
 
 /// Parameters of new WebSocket connection creation HTTP request.
 #[derive(Debug, Deserialize)]
@@ -114,12 +115,14 @@ impl actix::Actor for ServerWrapper {
     type Context = actix::Context<Self>;
 }
 
-impl Handler<signal::Signal> for ServerWrapper {
-    type Result = ();
+impl Handler<GracefulShutdownResult> for ServerWrapper {
+    type Result = Result<(), Box<dyn std::error::Error + Send>>;
 
-    fn handle(&mut self, _: signal::Signal, _: &mut actix::Context<Self>) {
-        debug!("server closer got signal");
+    fn handle(&mut self, _: GracefulShutdownResult, _: &mut actix::Context<Self>)
+        -> Result<(), Box<dyn std::error::Error + Send>> {
+        info!("Shutting down Actix Web Server");
         self.0.do_send(StopServer{ graceful: true } );
+        Ok(())
     }
 }
 
