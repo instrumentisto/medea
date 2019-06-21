@@ -11,8 +11,7 @@ use medea_client_api_proto::IceServer;
 
 use crate::{
     api::control::{MemberId, MemberSpec, RoomSpec, TryFromElementError},
-    media::IceUser,
-    media::PeerId,
+    media::{IceUser, PeerId},
 };
 
 use super::endpoint::{

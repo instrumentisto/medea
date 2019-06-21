@@ -12,8 +12,7 @@ use rand::{distributions::Alphanumeric, Rng};
 use redis::ConnectionInfo;
 
 use crate::{
-    api::control::MemberId,
-    api::control::RoomId,
+    api::control::{MemberId, RoomId},
     conf::Conf,
     media::IceUser,
     turn::repo::{TurnDatabase, TurnDatabaseErr},
@@ -181,7 +180,9 @@ pub fn new_turn_auth_service(
         static_user: None,
     };
 
-    Ok(Box::new(Arbiter::start(|_| service)))
+    let service = Service::start_in_arbiter(&Arbiter::new(), move |_| service);
+
+    Ok(Box::new(service))
 }
 
 impl Service {

@@ -14,7 +14,7 @@ use failure::Fail;
 use hashbrown::HashMap;
 
 use crate::{
-    api::{control::load_static_specs_from_dir, control::RoomId},
+    api::control::{load_static_specs_from_dir, RoomId},
     conf::Conf,
     signalling::{room::RoomError, Room},
     turn::service,
@@ -83,7 +83,7 @@ pub fn start_static_rooms(
                 config.rpc.reconnect_timeout,
                 turn_auth_service,
             )?;
-            let room = Arbiter::start(move |_| room);
+            let room = Room::start_in_arbiter(&Arbiter::new(), move |_| room);
             rooms.insert(spec.id().clone(), room);
         }
 

@@ -1,10 +1,12 @@
 //! HTTP server for handling WebSocket connections of Client API.
 
 use actix_web::{
-    http, middleware, server, ws, App, AsyncResponder, FutureResponse,
-    HttpRequest, HttpResponse, Path, State,
+    middleware,
+    web::{Data, Path, Payload},
+    App, Error, HttpRequest, HttpResponse, HttpServer,
 };
-use futures::{future, Future as _};
+use actix_web_actors::ws;
+use futures::{future, Future};
 use serde::Deserialize;
 
 use crate::{
@@ -25,38 +27,38 @@ use crate::{
 struct RequestParams {
     /// ID of [`Room`] that WebSocket connection connects to.
     room_id: RoomId,
-    /// ID of [`Participant`] that establishes WebSocket connection.
+    /// ID of [`Member`] that establishes WebSocket connection.
     member_id: MemberId,
-    /// Credential of [`Participant`] to authorize WebSocket connection with.
+    /// Credential of [`Member`] to authorize WebSocket connection with.
     credentials: String,
 }
 
 /// Handles all HTTP requests, performs WebSocket handshake (upgrade) and starts
 /// new [`WsSession`] for WebSocket connection.
 fn ws_index(
-    (r, info, state): (
-        HttpRequest<Context>,
-        Path<RequestParams>,
-        State<Context>,
-    ),
-) -> FutureResponse<HttpResponse> {
+    r: HttpRequest,
+    info: Path<RequestParams>,
+    state: Data<Context>,
+    payload: Payload,
+) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     debug!("Request params: {:?}", info);
 
     match state.rooms.get(&info.room_id) {
-        Some(room) => room
-            .send(Authorize {
+        Some(room) => Box::new(
+            room.send(Authorize {
                 member_id: info.member_id.clone(),
                 credentials: info.credentials.clone(),
             })
             .from_err()
             .and_then(move |res| match res {
                 Ok(_) => ws::start(
-                    &r.drop_state(),
                     WsSession::new(
                         info.member_id.clone(),
                         room,
                         state.config.idle_timeout,
                     ),
+                    &r,
+                    payload,
                 ),
                 Err(AuthorizationError::ParticipantNotExists) => {
                     Ok(HttpResponse::NotFound().into())
@@ -64,9 +66,9 @@ fn ws_index(
                 Err(AuthorizationError::InvalidCredentials) => {
                     Ok(HttpResponse::Forbidden().into())
                 }
-            })
-            .responder(),
-        None => future::ok(HttpResponse::NotFound().into()).responder(),
+            }),
+        ),
+        None => Box::new(future::ok(HttpResponse::NotFound().into())),
     }
 }
 
@@ -82,16 +84,19 @@ pub struct Context {
 /// Starts HTTP server for handling WebSocket connections of Client API.
 pub fn run(rooms: RoomsRepository, config: Conf) {
     let server_addr = config.server.bind_addr();
-
-    server::new(move || {
-        App::with_state(Context {
-            rooms: rooms.clone(),
-            config: config.rpc.clone(),
-        })
-        .middleware(middleware::Logger::default())
-        .resource("/ws/{room_id}/{member_id}/{credentials}", |r| {
-            r.method(http::Method::GET).with(ws_index)
-        })
+    HttpServer::new(move || {
+        App::new()
+            .data(Context {
+                rooms: rooms.clone(),
+                config: config.rpc.clone(),
+            })
+            .service(
+                actix_web::web::resource(
+                    "/ws/{room_id}/{member_id}/{credentials}",
+                )
+                .route(actix_web::web::get().to_async(ws_index)),
+            )
+            .wrap(middleware::Logger::default())
     })
     .bind(server_addr)
     .unwrap()
@@ -104,9 +109,11 @@ pub fn run(rooms: RoomsRepository, config: Conf) {
 mod test {
     use std::{ops::Add, thread, time::Duration};
 
-    use actix::Arbiter;
-    use actix_web::{http, test, App};
-    use futures::Stream;
+    use actix::{Actor as _, Arbiter};
+    use actix_http::{ws::Message, HttpService};
+    use actix_http_test::{TestServer, TestServerRuntime};
+    use actix_web::App;
+    use futures::{future::IntoFuture, sink::Sink, Stream};
 
     use crate::{
         api::control,
@@ -130,7 +137,8 @@ mod test {
         )
         .unwrap();
         let room_id = client_room.get_id();
-        let client_room = Arbiter::start(move |_| client_room);
+        let client_room =
+            Room::start_in_arbiter(&Arbiter::new(), move |_| client_room);
         let room_hash_map = hashmap! {
             room_id => client_room,
         };
@@ -139,31 +147,26 @@ mod test {
     }
 
     /// Creates test WebSocket server of Client API which can handle requests.
-    fn ws_server(conf: Conf) -> test::TestServer {
-        test::TestServer::with_factory(move || {
-            App::with_state(Context {
-                rooms: room(conf.rpc.clone()),
-                config: conf.rpc.clone(),
-            })
-            .resource("/ws/{room_id}/{member_id}/{credentials}", |r| {
-                r.method(http::Method::GET).with(ws_index)
-            })
+    fn ws_server(conf: Conf) -> TestServerRuntime {
+        TestServer::new(move || {
+            HttpService::new(
+                App::new()
+                    .data(Context {
+                        rooms: room(conf.rpc.clone()),
+                        config: conf.rpc.clone(),
+                    })
+                    .service(
+                        actix_web::web::resource(
+                            "/ws/{room_id}/{member_id}/{credentials}",
+                        )
+                        .route(actix_web::web::get().to_async(ws_index)),
+                    ),
+            )
         })
     }
 
     #[test]
-    fn responses_with_pong() {
-        let mut server = ws_server(Conf::default());
-        let (read, mut write) =
-            server.ws_at("/ws/pub-sub-video-call/caller/test").unwrap();
-
-        write.text(r#"{"ping":33}"#);
-        let (item, _) = server.execute(read.into_future()).unwrap();
-        assert_eq!(Some(ws::Message::Text(r#"{"pong":33}"#.into())), item);
-    }
-
-    #[test]
-    fn disconnects_on_idle() {
+    fn ping_pong_and_disconnects_on_idle() {
         let conf = Conf {
             rpc: Rpc {
                 idle_timeout: Duration::new(2, 0),
@@ -174,19 +177,46 @@ mod test {
         };
 
         let mut server = ws_server(conf.clone());
-        let (read, mut write) =
+        let socket =
             server.ws_at("/ws/pub-sub-video-call/caller/test").unwrap();
 
-        write.text(r#"{"ping":33}"#);
-        let (item, read) = server.execute(read.into_future()).unwrap();
-        assert_eq!(Some(ws::Message::Text(r#"{"pong":33}"#.into())), item);
+        server
+            .block_on(
+                socket
+                    .send(Message::Text(r#"{"ping": 33}"#.into()))
+                    .into_future()
+                    .map_err(|e| panic!("{:?}", e))
+                    .and_then(|socket| {
+                        socket
+                            .into_future()
+                            .map_err(|(e, _)| panic!("{:?}", e))
+                            .and_then(|(item, read)| {
+                                assert_eq!(
+                                    Some(ws::Frame::Text(Some(
+                                        r#"{"pong":33}"#.into()
+                                    ))),
+                                    item
+                                );
 
-        thread::sleep(conf.rpc.idle_timeout.add(Duration::from_secs(1)));
+                                thread::sleep(
+                                    conf.rpc
+                                        .idle_timeout
+                                        .add(Duration::from_secs(1)),
+                                );
 
-        let (item, _) = server.execute(read.into_future()).unwrap();
-        assert_eq!(
-            Some(ws::Message::Close(Some(ws::CloseCode::Normal.into()))),
-            item
-        );
+                                read.into_future()
+                                    .map_err(|(e, _)| panic!("{:?}", e))
+                                    .map(|(item, _)| {
+                                        assert_eq!(
+                                            Some(ws::Frame::Close(Some(
+                                                ws::CloseCode::Normal.into()
+                                            ))),
+                                            item
+                                        );
+                                    })
+                            })
+                    }),
+            )
+            .unwrap();
     }
 }

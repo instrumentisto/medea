@@ -6,7 +6,7 @@ use actix::{
     fut::wrap_future, Actor, ActorContext, ActorFuture, Addr, AsyncContext,
     Handler, Message, StreamHandler,
 };
-use actix_web::ws::{self, CloseReason, WebsocketContext};
+use actix_web_actors::ws::{self, CloseReason, WebsocketContext};
 use futures::future::Future;
 use medea_client_api_proto::{ClientMsg, ServerMsg};
 

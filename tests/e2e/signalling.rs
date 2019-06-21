@@ -2,17 +2,17 @@
 
 use std::{cell::Cell, rc::Rc, time::Duration};
 
-use actix::{
-    Actor, Arbiter, AsyncContext, Context, Handler, Message, StreamHandler,
-    System,
-};
-use actix_web::ws::{
-    Client, ClientWriter, CloseCode, CloseReason, Message as WebMessage,
-    ProtocolError,
-};
 use futures::future::Future;
 use medea::media::PeerId;
 use medea_client_api_proto::{Command, Direction, Event, IceCandidate};
+use old_actix::{
+    Actor, Arbiter, AsyncContext, Context, Handler, Message, StreamHandler,
+    System,
+};
+use old_actix_web::ws::{
+    Client, ClientWriter, CloseCode, CloseReason, Message as WebMessage,
+    ProtocolError,
+};
 use serde_json::error::Error as SerdeError;
 
 /// Medea client for testing purposes.
@@ -93,9 +93,11 @@ impl Actor for TestMember {
     }
 }
 
-#[derive(Debug, Message)]
-#[rtype(result = "()")]
 struct CloseSocket;
+
+impl Message for CloseSocket {
+    type Result = ();
+}
 
 impl Handler<CloseSocket> for TestMember {
     type Result = ();

@@ -26,8 +26,7 @@ use crate::{
             AuthorizationError, ClosedReason, EventMessage, RpcConnection,
             RpcConnectionClosed,
         },
-        control::RoomId,
-        control::{MemberId as ParticipantId, RoomSpec},
+        control::{MemberId as ParticipantId, RoomId, RoomSpec},
     },
     log::prelude::*,
     media::IceUser,
@@ -136,7 +135,10 @@ impl ParticipantService {
     }
 
     /// Lookup [`Participant`] by provided id.
-    pub fn get_participant_by_id(&self, id: &ParticipantId) -> Option<Arc<Participant>> {
+    pub fn get_participant_by_id(
+        &self,
+        id: &ParticipantId,
+    ) -> Option<Arc<Participant>> {
         self.participants.get(id).cloned()
     }
 
@@ -163,7 +165,10 @@ impl ParticipantService {
     }
 
     /// Checks if [`Participant`] has **active** [`RcpConnection`].
-    pub fn participant_has_connection(&self, participant_id: &ParticipantId) -> bool {
+    pub fn participant_has_connection(
+        &self,
+        participant_id: &ParticipantId,
+    ) -> bool {
         self.connections.contains_key(participant_id)
             && !self.drop_connection_tasks.contains_key(participant_id)
     }
@@ -175,10 +180,11 @@ impl ParticipantService {
         event: Event,
     ) -> impl Future<Item = (), Error = RoomError> {
         match self.connections.get(&participant_id) {
-            Some(conn) => Either::A(
-                conn.send_event(EventMessage::from(event))
-                    .map_err(move |_| RoomError::UnableToSendEvent(participant_id)),
-            ),
+            Some(conn) => {
+                Either::A(conn.send_event(EventMessage::from(event)).map_err(
+                    move |_| RoomError::UnableToSendEvent(participant_id),
+                ))
+            }
             None => Either::B(future::err(RoomError::ConnectionNotExists(
                 participant_id,
             ))),
@@ -194,25 +200,32 @@ impl ParticipantService {
         participant_id: ParticipantId,
         con: Box<dyn RpcConnection>,
     ) -> ActFuture<Arc<Participant>, ParticipantServiceErr> {
-
         let participant = match self.get_participant_by_id(&participant_id) {
             None => {
-                return Box::new(wrap_future(future::err(ParticipantServiceErr::ParticipantNotFound(participant_id))));
-            },
-            Some(participant) => { participant },
+                return Box::new(wrap_future(future::err(
+                    ParticipantServiceErr::ParticipantNotFound(participant_id),
+                )));
+            }
+            Some(participant) => participant,
         };
 
         // lookup previous participant connection
         if let Some(mut connection) = self.connections.remove(&participant_id) {
-            debug!("Closing old RpcConnection for participant {}", participant_id);
+            debug!(
+                "Closing old RpcConnection for participant {}",
+                participant_id
+            );
 
             // cancel RpcConnection close task, since connection is
             // reestablished
-            if let Some(handler) = self.drop_connection_tasks.remove(&participant_id)
+            if let Some(handler) =
+                self.drop_connection_tasks.remove(&participant_id)
             {
                 ctx.cancel_future(handler);
             }
-            Box::new(wrap_future(connection.close().then(move |_| Ok(participant))))
+            Box::new(wrap_future(
+                connection.close().then(move |_| Ok(participant)),
+            ))
         } else {
             Box::new(
                 wrap_future(self.turn.create(

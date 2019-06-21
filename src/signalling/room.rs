@@ -288,7 +288,8 @@ impl Room {
         self.peers.add_peer(to_peer);
 
         Ok(Box::new(wrap_future(
-            self.participants.send_event_to_participant(to_member_id, event),
+            self.participants
+                .send_event_to_participant(to_member_id, event),
         )))
     }
 
@@ -320,7 +321,8 @@ impl Room {
         self.peers.add_peer(to_peer);
 
         Ok(Box::new(wrap_future(
-            self.participants.send_event_to_participant(to_member_id, event),
+            self.participants
+                .send_event_to_participant(to_member_id, event),
         )))
     }
 
@@ -357,7 +359,8 @@ impl Room {
         };
 
         Ok(Box::new(wrap_future(
-            self.participants.send_event_to_participant(to_member_id, event),
+            self.participants
+                .send_event_to_participant(to_member_id, event),
         )))
     }
 
@@ -473,7 +476,10 @@ impl Handler<Authorize> for Room {
         _ctx: &mut Self::Context,
     ) -> Self::Result {
         self.participants
-            .get_participant_by_id_and_credentials(&msg.member_id, &msg.credentials)
+            .get_participant_by_id_and_credentials(
+                &msg.member_id,
+                &msg.credentials,
+            )
             .map(|_| ())
     }
 }
