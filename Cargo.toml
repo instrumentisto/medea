@@ -26,6 +26,9 @@ actix-http = "0.2"
 actix-http-test = "0.2"
 actix-web = "1.0"
 actix-web-actors = "1.0"
+# TODO: use version from crates.io when commit
+# https://github.com/actix/actix-web/commit/ff724e239db50210a9913de6e214be214f41befa#diff-c39fd968c2b6beb9a6960dd533618bcbR41
+# will be released in crates.io.
 awc = { git = "https://github.com/actix/actix-web" }
 bb8 = "0.3"
 bb8-redis = "0.3"
@@ -60,7 +63,5 @@ toml = "0.4"
     branch = "serde_wrapper"
 
 [dev-dependencies]
-old-actix = { version = "0.7", package = "actix" }
-old-actix-web = { version = "0.7", package = "actix-web" }
 serial_test = "0.2"
 serial_test_derive = "0.2"

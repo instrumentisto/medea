@@ -2,22 +2,21 @@
 
 use std::{cell::Cell, rc::Rc, time::Duration};
 
-use futures::future::Future;
-use futures::Stream;
+use actix::{
+    Actor, Arbiter, AsyncContext, Context, Handler, Message, StreamHandler,
+    System,
+};
+use actix_codec::Framed;
+use actix_http::ws::{Codec, Message as WsMessage};
+use awc::{
+    error::WsProtocolError,
+    ws::{CloseCode, CloseReason, Frame},
+    BoxedSocket,
+};
+use futures::{future::Future, sink::Sink, stream::SplitSink, Stream};
 use medea::media::PeerId;
 use medea_client_api_proto::{Command, Direction, Event, IceCandidate};
-use actix::{Actor, Arbiter, AsyncContext, Context, Handler, Message, StreamHandler, System};
-
 use serde_json::error::Error as SerdeError;
-use awc::error::WsProtocolError;
-use awc::ws::Frame;
-use futures::stream::SplitSink;
-use actix_codec::Framed;
-use awc::BoxedSocket;
-use actix_http::ws::Codec;
-use futures::sink::Sink;
-use actix_http::ws::Message as WsMessage;
-use awc::ws::{CloseCode, CloseReason};
 
 /// Medea client for testing purposes.
 struct TestMember {
@@ -42,7 +41,9 @@ impl TestMember {
     /// and there are simply no tests that last so much.
     fn heartbeat(&self, ctx: &mut Context<Self>) {
         ctx.run_later(Duration::from_secs(3), |act, ctx| {
-            act.writer.start_send(WsMessage::Text(r#"{"ping": 1}"#.to_string())).unwrap();
+            act.writer
+                .start_send(WsMessage::Text(r#"{"ping": 1}"#.to_string()))
+                .unwrap();
             act.writer.poll_complete().unwrap();
             act.heartbeat(ctx);
         });
@@ -50,28 +51,30 @@ impl TestMember {
 
     /// Send command to the server.
     fn send_command(&mut self, msg: Command) {
-        //self.writer.text(&serde_json::to_string(&msg).unwrap());
+        // self.writer.text(&serde_json::to_string(&msg).unwrap());
         let json = serde_json::to_string(&msg).unwrap();
-        self.writer.start_send(WsMessage::Text(json));
+        self.writer.start_send(WsMessage::Text(json)).unwrap();
         self.writer.poll_complete().unwrap();
     }
 
+    /// Start test member in new [`Arbiter`] by given URI.
+    /// `test_fn` - is function which will be called at every [`Event`]
+    /// received from server.
     pub fn start(
         uri: &str,
         test_fn: Box<dyn FnMut(&Event, &mut Context<TestMember>)>,
     ) {
         Arbiter::spawn(
-            awc::Client::new().ws(uri).connect()
+            awc::Client::new()
+                .ws(uri)
+                .connect()
                 .map_err(|e| panic!("Error: {}", e))
-                .map(|(response, framed)| {
-                    println!("1");
-                    let (stream, sink) = framed.split();
+                .map(|(_, framed)| {
+                    let (sink, stream) = framed.split();
                     TestMember::create(|ctx| {
-                        println!("2");
-                        TestMember::add_stream(sink, ctx);
-                        println!("3");
+                        TestMember::add_stream(stream, ctx);
                         TestMember {
-                            writer: stream,
+                            writer: sink,
                             events: Vec::new(),
                             test_fn,
                         }
@@ -79,33 +82,6 @@ impl TestMember {
                 }),
         )
     }
-
-//    /// Start test member in new [`Arbiter`] by given URI.
-//    /// `test_fn` - is function which will be called at every [`Event`]
-//    /// received from server.
-//    pub fn start(
-//        uri: &str,
-//        test_fn: Box<dyn FnMut(&Event, &mut Context<TestMember>)>,
-//    ) {
-//        Self::test_start(uri);
-//        Arbiter::spawn(
-//            Client::new(uri)
-//                .connect()
-//                .map_err(|e| {
-//                    panic!("Error: {}", e);
-//                })
-//                .map(|(reader, writer)| {
-//                    TestMember::create(|ctx| {
-//                        TestMember::add_stream(reader, ctx);
-//                        TestMember {
-//                            writer,
-//                            events: Vec::new(),
-//                            test_fn,
-//                        }
-//                    });
-//                }),
-//        )
-//    }
 }
 
 impl Actor for TestMember {
@@ -136,15 +112,13 @@ impl Handler<CloseSocket> for TestMember {
     type Result = ();
 
     fn handle(&mut self, _: CloseSocket, _: &mut Self::Context) {
-        self.writer.start_send(WsMessage::Close(Some(CloseReason {
-            code: CloseCode::Normal,
-            description: None
-        })));
+        self.writer
+            .start_send(WsMessage::Close(Some(CloseReason {
+                code: CloseCode::Normal,
+                description: None,
+            })))
+            .unwrap();
         self.writer.poll_complete().unwrap();
-//        self.writer.close(Some(CloseReason {
-//            code: CloseCode::Normal,
-//            description: None,
-//        }));
     }
 }
 
@@ -202,7 +176,6 @@ impl StreamHandler<Frame, WsProtocolError> for TestMember {
 #[test]
 fn pub_sub_video_call() {
     System::run(|| {
-        let test_name = "pub_sub_video_call";
         let base_url = "ws://localhost:8081/ws/pub-sub-video-call";
 
         // Note that events is separated by members.
@@ -297,14 +270,13 @@ fn pub_sub_video_call() {
             &format!("{}/responder/test", base_url),
             Box::new(test_fn),
         );
-    });
+    })
+    .unwrap();
 }
 
 #[test]
 fn three_members_p2p_video_call() {
     System::run(|| {
-        let test_name = "three_members_p2p_video_call";
-
         let base_url = "ws://localhost:8081/ws/three-members-conference";
 
         // Note that events, peer_created_count, ice_candidates
@@ -353,7 +325,9 @@ fn three_members_p2p_video_call() {
                                 let recv_count = tracks
                                     .iter()
                                     .filter_map(|t| match &t.direction {
-                                        Direction::Recv { sender } => Some(sender),
+                                        Direction::Recv { sender } => {
+                                            Some(sender)
+                                        }
                                         _ => None,
                                     })
                                     .map(|sender| {
@@ -428,5 +402,6 @@ fn three_members_p2p_video_call() {
             &format!("{}/member-3/test", base_url),
             Box::new(test_fn),
         );
-    }).unwrap();
+    })
+    .unwrap();
 }
