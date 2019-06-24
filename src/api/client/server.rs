@@ -90,13 +90,13 @@ pub fn run(rooms: RoomsRepository, config: Conf) {
                 rooms: rooms.clone(),
                 config: config.rpc.clone(),
             })
+            .wrap(middleware::Logger::default())
             .service(
                 actix_web::web::resource(
                     "/ws/{room_id}/{member_id}/{credentials}",
                 )
                 .route(actix_web::web::get().to_async(ws_index)),
             )
-            .wrap(middleware::Logger::default())
     })
     .bind(server_addr)
     .unwrap()
