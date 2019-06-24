@@ -152,3 +152,59 @@ impl Handler<Signal> for GracefulShutdown {
     }
 }
 
+pub struct TimeoutShutdown {
+    pub shutdown_timeout: u64,
+    pub process_signals: Addr<ProcessSignals>,
+}
+
+impl Actor for TimeoutShutdown {
+    type Context = Context<Self>;
+
+    fn started(&mut self, ctx: &mut Self::Context) {
+        self.process_signals
+            .do_send(Subscribe(ctx.address().recipient()));
+    }
+}
+
+impl Handler<Signal> for TimeoutShutdown {
+    type Result = ();
+
+    fn handle(&mut self, msg: Signal, ctx: &mut Context<Self>) {
+        match msg.0 {
+            SignalType::Int => {
+                error!("SIGINT received timeoutshutdown, exiting");
+            }
+            SignalType::Hup => {
+                error!("SIGHUP received, reloading");
+            }
+            SignalType::Term => {
+                error!("SIGTERM received, stopping");
+            }
+            SignalType::Quit => {
+                error!("SIGQUIT received, exiting");
+            }
+            _ => { return; },
+        };
+
+        let timeout_to_display = self.shutdown_timeout;
+        ctx.run_later(Duration::from_millis(self.shutdown_timeout), move |_, _| {
+            info!("Shutting down system after: {:?} ms", timeout_to_display);
+            println!("Shutting down system after: {:?} ms", timeout_to_display);
+            System::current().stop();
+        });
+    }
+}
+
+pub fn new(shutdown_timeout: u64, process_signals: Addr<signal::ProcessSignals>) -> GracefulShutdown {
+    let graceful_shutdown = GracefulShutdown::new(3000,
+                                                     process_signals.clone());
+
+    let timeout_shutdown = TimeoutShutdown {
+        shutdown_timeout,
+        process_signals
+    };
+    timeout_shutdown.start();
+
+    //todo impl messages for graceful shutdown and start it here
+    graceful_shutdown
+}
