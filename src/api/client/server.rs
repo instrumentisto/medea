@@ -3,7 +3,7 @@
 use actix_web::{
     middleware,
     web::{Data, Path, Payload},
-    App, Error, HttpRequest, HttpResponse, HttpServer,
+    App, HttpRequest, HttpResponse, HttpServer,
 };
 use actix_web_actors::ws;
 use futures::{future, Future};
@@ -36,15 +36,15 @@ struct RequestParams {
 /// Handles all HTTP requests, performs WebSocket handshake (upgrade) and starts
 /// new [`WsSession`] for WebSocket connection.
 fn ws_index(
-    r: HttpRequest,
+    request: HttpRequest,
     info: Path<RequestParams>,
     state: Data<Context>,
     payload: Payload,
-) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
+) -> impl Future<Item = HttpResponse, Error = actix_web::Error> {
     debug!("Request params: {:?}", info);
 
     match state.rooms.get(info.room_id) {
-        Some(room) => Box::new(
+        Some(room) => future::Either::A(
             room.send(Authorize {
                 member_id: info.member_id,
                 credentials: info.credentials.clone(),
@@ -57,7 +57,7 @@ fn ws_index(
                         room,
                         state.config.idle_timeout,
                     ),
-                    &r,
+                    &request,
                     payload,
                 ),
                 Err(AuthorizationError::MemberNotExists) => {
@@ -68,7 +68,7 @@ fn ws_index(
                 }
             }),
         ),
-        None => Box::new(future::ok(HttpResponse::NotFound().into())),
+        None => future::Either::B(future::ok(HttpResponse::NotFound().into())),
     }
 }
 
@@ -113,7 +113,7 @@ mod test {
     use actix_http::{ws::Message, HttpService};
     use actix_http_test::{TestServer, TestServerRuntime};
     use actix_web::App;
-    use futures::{future::IntoFuture, sink::Sink, Stream};
+    use futures::{future::IntoFuture as _, sink::Sink as _, Stream as _};
 
     use crate::{
         api::control::Member,
