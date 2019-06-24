@@ -26,6 +26,7 @@ actix-http = "0.2"
 actix-http-test = "0.2"
 actix-web = "1.0"
 actix-web-actors = "1.0"
+awc = { git = "https://github.com/actix/actix-web" }
 bb8 = "0.3"
 bb8-redis = "0.3"
 config = "0.9"
