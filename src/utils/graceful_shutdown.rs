@@ -1,49 +1,30 @@
 //! A class to handle shutdown signals and to shut down system
 
-use actix::{actors::signal::{self, ProcessSignals, Subscribe},
-            fut::wrap_future, Actor, ActorFuture, Addr,
-            AsyncContext, Context, Handler, Message, System, Recipient,
-            Arbiter};
+use std::collections::BTreeMap;
 use std::thread::{
-  self, sleep
+    self, sleep
 };
 use std::sync::mpsc;
 use std::{time};
 
+
+use actix::{actors::signal::{self, ProcessSignals, Subscribe}, Actor, ActorFuture, Addr, AsyncContext, Context, Handler, Message, System, Recipient, Arbiter, MailboxError};
+
 use crate::log::prelude::*;
-use tokio::prelude::future::Future;
+
+use tokio::prelude::*;
+use tokio::prelude::future::join_all;
 use actix::actors::signal::{
     Signal, SignalType
 };
+
 use std::time::{Duration, Instant};
 use tokio::timer::Delay;
 use std::sync::mpsc::{Sender, Receiver};
+use actix::prelude::fut::WrapFuture;
+use core::borrow::BorrowMut;
 
-
-macro_rules! important_quit_signals {
-    ($msg: expr, $action: expr) => {
-        match $msg {
-            SignalType::Int => {
-                error!("SIGINT received, exiting");
-                $action();
-            }
-            SignalType::Hup => {
-                error!("SIGHUP received, reloading");
-                $action();
-            }
-            SignalType::Term => {
-                error!("SIGTERM received, stopping");
-                $action();
-            }
-            SignalType::Quit => {
-                error!("SIGQUIT received, exiting");
-                $action();
-            }
-            _ => (),
-        }
-    };
-}
-
+#[derive(Debug)]
 pub struct GracefulShutdownResult;
 
 impl Message for GracefulShutdownResult {
@@ -52,26 +33,39 @@ impl Message for GracefulShutdownResult {
 
 pub struct GracefulShutdown {
     /// [`Actor`]s to send message when graceful shutdown
-    recipients: Vec<Recipient<GracefulShutdownResult>>,
+    recipients: BTreeMap<u8, Vec<Recipient<GracefulShutdownResult>>>,
 
     /// Timeout after which all [`Actors`] will be forced shutdown
     shutdown_timeout: u64,
 
-    /// Actix addr of [`ProcessSignals`]
+    /// Actix address of [`ProcessSignals`]
     process_signals: Addr<ProcessSignals>,
 }
 
 impl GracefulShutdown {
     pub fn new(shutdown_timeout: u64, process_signals: Addr<ProcessSignals>) -> Self {
         Self {
-            recipients: Vec::new(),
+            recipients: BTreeMap::new(),
             shutdown_timeout,
             process_signals,
         }
     }
 
-    pub fn subscribe(&mut self, who: Recipient<GracefulShutdownResult>) {
-        self.recipients.push(who);
+    /// Subscribe to exit events, with priority
+    // todo: may be a bug: no checking who subscribed, may subcsribe same adress multiple times with the same/different priorities
+    pub fn subscribe(&mut self, priority: u8, who: Recipient<GracefulShutdownResult>) {
+        let vec_with_current_priority =
+            self.recipients.get_mut(&priority);
+        if let Some(vector) =
+            vec_with_current_priority {
+            vector.push(who);
+        }
+        else {
+            self.recipients.insert(priority, Vec::new());
+            // unwrap should not panic because we have inserted new empty vector in the line above /\
+            let vector = self.recipients.get_mut(&priority).unwrap();
+            vector.push(who);
+        }
     }
 }
 
@@ -88,78 +82,68 @@ impl Handler<Signal> for GracefulShutdown {
     type Result = ();
 
     fn handle(&mut self, msg: Signal, ctx: &mut Context<Self>) {
-
-        let (sender, receiver) = mpsc::channel();
-
-        sender.send(());
-
-        important_quit_signals!(msg.0, {
-            let mut send_futures = Vec::with_capacity(self.recipients.len());
-            for recipient in &self.recipients {
-                send_futures.push(recipient.send(GracefulShutdownResult{}));
+        match msg.0 {
+            SignalType::Int => {
+                error!("SIGINT received, exiting");
             }
-
-            for send_future in send_futures {
-                let future_sender1 = sender.clone();
-                let future_sender2 = sender.clone();
-                Arbiter::spawn(
-                    send_future
-                            .map(move |res| {
-                                future_sender1.send(());
-                            })
-                            .map_err(move |err| {
-                                error!("Error shutting down: {:?}", err);
-                                future_sender2.send(());
-                            })
-                );
+            SignalType::Hup => {
+                error!("SIGHUP received, reloading");
             }
-        });
+            SignalType::Term => {
+                error!("SIGTERM received, stopping");
+            }
+            SignalType::Quit => {
+                error!("SIGQUIT received, exiting");
+            }
+            _ => { return; },
+        };
 
 
-        let receiver_length = self.recipients.len() as u64;
+//        let mut shutdown_future: Box<future::Future<Item = (), Error = ()>> =
+//            Box::new(
+//                tokio::prelude::future::ok::<(), ()> (())
+//            );
 
-        let wait_for_send_futures_to_execute =
-            futures::future::poll_fn(move ||
-                tokio_threadpool::blocking(|| {
-                    for _ in 0..receiver_length {
-                        match receiver.recv() {
-                            Ok(_) => {()},
-                            Err(_) => { return (); },
-                        };
-                    }
-                })
-            );
+        let mut shutdown_futures_vec = Vec::new();
 
-        let timeout_future =
-            Delay::new(Instant::now() + Duration::from_millis(self.shutdown_timeout));
+        for (priority, recipients) in &self.recipients {
+            info!("PRINT FROM HANDLER: {:?}: \"{:?}\"", priority, recipients.len());
 
-        let finish_or_timeout =
-            timeout_future.select2(
-                wait_for_send_futures_to_execute
-            );
+            let mut this_priority_futures_vec = Vec::with_capacity(recipients.len());
 
-        // !!!! this code PANICS 7 times on thread and 1 time on arbiter
+            for recipient in recipients {
+                let send_fut = recipient.send(GracefulShutdownResult{});
+                this_priority_futures_vec.push(send_fut);
+//                shutdown_futures_vec.push(send_fut);
+            }
+            let this_priority_futures = join_all(this_priority_futures_vec);
+            shutdown_futures_vec.push(this_priority_futures);
+//            shutdown_future = Box::new(
+//                shutdown_future
+//                .then(|_| {
+//                    this_priority_futures
+//                        .map(|_| ())
+//                        .map_err(|_| ())
+//            }));
+        }
 
-        Arbiter::spawn(
-            finish_or_timeout.map(|_| {
-                System::current().stop();
-            })
+        //todo use then/and_then instead of join
+        let shutdown_future = join_all(shutdown_futures_vec);
+
+//        let result = timeout_future.select2(shutdown_future);
+
+        info!("PRINT FROM HANDLER: result ready");
+
+        ctx.wait(
+            shutdown_future
+                .timeout(Duration::from_millis(self.shutdown_timeout))
+                .map(|_| {
+                    System::current().stop(); })
                 .map_err(|_| {
+                    error!("Error trying to shut down system gracefully.");
                     System::current().stop();
                 })
+                .into_actor(self)
         );
-
-//        ctx.run_later(time::Duration::from_millis(300), |_, _| {
-//            System::current().stop();
-//        });
-//
-//        tokio::spawn({
-//            futures::future::empty()
-//                .map(|_: ()| {
-//                    thread::sleep(time::Duration::from_millis(self.shutdown_timeout));
-//                    System::current().stop();
-//                })
-//                .map_err(|_: ()| ())
-//        });
     }
 }
