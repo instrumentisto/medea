@@ -6,6 +6,7 @@ use actix_web::{
 };
 use futures::{future, Future as _};
 use serde::Deserialize;
+use actix::Actor;
 
 use crate::{
     api::{
@@ -19,10 +20,10 @@ use crate::{
     log::prelude::*,
     signalling::{RoomId, RoomsRepository},
 };
-use actix::{Addr, Handler, Actor, Recipient};
-use actix::actors::signal;
 use actix_web::server::{StopServer};
-use crate::utils::graceful_shutdown::{GracefulShutdown, GracefulShutdownResult};
+use crate::utils::graceful_shutdown::{GracefulShutdownResult};
+use actix::Addr;
+
 
 /// Parameters of new WebSocket connection creation HTTP request.
 #[derive(Debug, Deserialize)]
@@ -84,7 +85,7 @@ pub struct Context {
 }
 
 /// Starts HTTP server for handling WebSocket connections of Client API.
-pub fn run(rooms: RoomsRepository, config: Conf) -> Addr<ServerWrapper> {
+pub fn run(rooms: RoomsRepository, config: Conf) -> Addr<server_wrapper_mod::ServerWrapper> {
     let server_addr = config.server.bind_addr();
 
     let actix_server_addr = server::new(move || {
@@ -102,29 +103,49 @@ pub fn run(rooms: RoomsRepository, config: Conf) -> Addr<ServerWrapper> {
     .unwrap()
     .start();
 
-    let server_wrapper = ServerWrapper(actix_server_addr.recipient());
+    let server_wrapper = server_wrapper_mod::ServerWrapper(actix_server_addr.recipient());
 
     info!("Started HTTP server on {:?}", server_addr);
 
     server_wrapper.start()
 }
 
-pub struct ServerWrapper(pub Recipient<StopServer>);
+pub mod server_wrapper_mod {
 
-impl actix::Actor for ServerWrapper {
-    type Context = actix::Context<Self>;
-}
+    use actix::{Addr, Handler, Actor, Recipient, Context};
+    use actix::actors::signal;
+    use actix_web::server::StopServer;
+    use actix::{AsyncContext, WrapFuture};
+    use crate::utils::graceful_shutdown::GracefulShutdownResult;
 
-impl Handler<GracefulShutdownResult> for ServerWrapper {
-    type Result = Result<(), Box<dyn std::error::Error + Send>>;
+    pub struct ServerWrapper(pub Recipient<StopServer>);
+    use crate::log::prelude::*;
+    use tokio::prelude::future::Future;
 
-    fn handle(&mut self, _: GracefulShutdownResult, _: &mut actix::Context<Self>)
-        -> Result<(), Box<dyn std::error::Error + Send>> {
-        info!("Shutting down Actix Web Server");
-        self.0.do_send(StopServer{ graceful: true } );
-        Ok(())
+    impl actix::Actor for ServerWrapper {
+        type Context = Context<Self>;
+    }
+
+
+    impl Handler<GracefulShutdownResult> for ServerWrapper {
+        type Result = Result<(), Box<dyn std::error::Error + Send>>;
+
+        fn handle(&mut self, _: GracefulShutdownResult, ctx: &mut Self::Context)
+                  -> Result<(), Box<dyn std::error::Error + Send>> {
+            info!("Shutting down Actix Web Server");
+            ctx.wait(
+                self.0.send(StopServer { graceful: true })
+                    .map(|_| ())
+                    .map_err(|_| {
+                        error!("Error trying to send StopServer to actix_web");
+                    })
+                    .into_actor(self)
+            );
+            Ok(())
+        }
     }
 }
+
 
 #[cfg(test)]
 mod test {
