@@ -2,23 +2,26 @@
 
 use std::{cell::Cell, rc::Rc, time::Duration};
 
-use futures::future::Future;
-use medea::media::PeerId;
-use medea_client_api_proto::{Command, Direction, Event, IceCandidate};
-use old_actix::{
+use actix::{
     Actor, Arbiter, AsyncContext, Context, Handler, Message, StreamHandler,
     System,
 };
-use old_actix_web::ws::{
-    Client, ClientWriter, CloseCode, CloseReason, Message as WebMessage,
-    ProtocolError,
+use actix_codec::Framed;
+use actix_http::ws::{Codec, Message as WsMessage};
+use awc::{
+    error::WsProtocolError,
+    ws::{CloseCode, CloseReason, Frame},
+    BoxedSocket,
 };
+use futures::{future::Future, sink::Sink, stream::SplitSink, Stream};
+use medea::media::PeerId;
+use medea_client_api_proto::{Command, Direction, Event, IceCandidate};
 use serde_json::error::Error as SerdeError;
 
 /// Medea client for testing purposes.
 struct TestMember {
     /// Writer to WebSocket.
-    writer: ClientWriter,
+    writer: SplitSink<Framed<BoxedSocket, Codec>>,
 
     /// All [`Event`]s which this [`TestMember`] received.
     /// This field used for give some debug info when test just stuck forever
@@ -38,14 +41,20 @@ impl TestMember {
     /// and there are simply no tests that last so much.
     fn heartbeat(&self, ctx: &mut Context<Self>) {
         ctx.run_later(Duration::from_secs(3), |act, ctx| {
-            act.writer.text(r#"{"ping": 1}"#);
+            act.writer
+                .start_send(WsMessage::Text(r#"{"ping": 1}"#.to_string()))
+                .unwrap();
+            act.writer.poll_complete().unwrap();
             act.heartbeat(ctx);
         });
     }
 
     /// Send command to the server.
     fn send_command(&mut self, msg: Command) {
-        self.writer.text(&serde_json::to_string(&msg).unwrap());
+        // self.writer.text(&serde_json::to_string(&msg).unwrap());
+        let json = serde_json::to_string(&msg).unwrap();
+        self.writer.start_send(WsMessage::Text(json)).unwrap();
+        self.writer.poll_complete().unwrap();
     }
 
     /// Start test member in new [`Arbiter`] by given URI.
@@ -56,16 +65,16 @@ impl TestMember {
         test_fn: Box<dyn FnMut(&Event, &mut Context<TestMember>)>,
     ) {
         Arbiter::spawn(
-            Client::new(uri)
+            awc::Client::new()
+                .ws(uri)
                 .connect()
-                .map_err(|e| {
-                    panic!("Error: {}", e);
-                })
-                .map(|(reader, writer)| {
+                .map_err(|e| panic!("Error: {}", e))
+                .map(|(_, framed)| {
+                    let (sink, stream) = framed.split();
                     TestMember::create(|ctx| {
-                        TestMember::add_stream(reader, ctx);
+                        TestMember::add_stream(stream, ctx);
                         TestMember {
-                            writer,
+                            writer: sink,
                             events: Vec::new(),
                             test_fn,
                         }
@@ -103,20 +112,24 @@ impl Handler<CloseSocket> for TestMember {
     type Result = ();
 
     fn handle(&mut self, _: CloseSocket, _: &mut Self::Context) {
-        self.writer.close(Some(CloseReason {
-            code: CloseCode::Normal,
-            description: None,
-        }));
+        self.writer
+            .start_send(WsMessage::Close(Some(CloseReason {
+                code: CloseCode::Normal,
+                description: None,
+            })))
+            .unwrap();
+        self.writer.poll_complete().unwrap();
     }
 }
 
-impl StreamHandler<WebMessage, ProtocolError> for TestMember {
+impl StreamHandler<Frame, WsProtocolError> for TestMember {
     /// Basic signalling implementation.
     /// A `TestMember::test_fn` [`FnMut`] function will be called for each
     /// [`Event`] received from test server.
-    fn handle(&mut self, msg: WebMessage, ctx: &mut Context<Self>) {
+    fn handle(&mut self, msg: Frame, ctx: &mut Context<Self>) {
         match msg {
-            WebMessage::Text(txt) => {
+            Frame::Text(txt) => {
+                let txt = String::from_utf8(txt.unwrap().to_vec()).unwrap();
                 let event: Result<Event, SerdeError> =
                     serde_json::from_str(&txt);
                 if let Ok(event) = event {
@@ -162,236 +175,233 @@ impl StreamHandler<WebMessage, ProtocolError> for TestMember {
 
 #[test]
 fn pub_sub_video_call() {
-    let test_name = "pub_sub_video_call";
-    let base_url = "ws://localhost:8081/ws/pub-sub-video-call";
+    System::run(|| {
+        let base_url = "ws://localhost:8081/ws/pub-sub-video-call";
 
-    let sys = System::new(test_name);
+        // Note that events is separated by members.
+        // Every member will have different instance of this.
+        let mut events = Vec::new();
+        let test_fn = move |event: &Event, _: &mut Context<TestMember>| {
+            events.push(event.clone());
 
-    // Note that events is separated by members.
-    // Every member will have different instance of this.
-    let mut events = Vec::new();
-    let test_fn = move |event: &Event, _: &mut Context<TestMember>| {
-        events.push(event.clone());
+            // Start checking result of test.
+            if let Event::IceCandidateDiscovered { .. } = event {
+                let peers_count = events
+                    .iter()
+                    .filter(|e| match e {
+                        Event::PeerCreated { .. } => true,
+                        _ => false,
+                    })
+                    .count();
+                assert_eq!(peers_count, 1);
 
-        // Start checking result of test.
-        if let Event::IceCandidateDiscovered { .. } = event {
-            let peers_count = events
-                .iter()
-                .filter(|e| match e {
-                    Event::PeerCreated { .. } => true,
-                    _ => false,
-                })
-                .count();
-            assert_eq!(peers_count, 1);
+                let mut is_caller = false;
+                if let Event::PeerCreated {
+                    peer_id,
+                    sdp_offer,
+                    tracks,
+                    ice_servers,
+                } = &events[0]
+                {
+                    assert_eq!(ice_servers.len(), 2);
+                    assert_eq!(
+                        ice_servers[0].urls[0],
+                        "stun:127.0.0.1:3478".to_string()
+                    );
+                    assert_eq!(
+                        ice_servers[1].urls[0],
+                        "turn:127.0.0.1:3478".to_string()
+                    );
+                    assert_eq!(
+                        ice_servers[1].urls[1],
+                        "turn:127.0.0.1:3478?transport=tcp".to_string()
+                    );
 
-            let mut is_caller = false;
-            if let Event::PeerCreated {
-                peer_id,
-                sdp_offer,
-                tracks,
-                ice_servers,
-            } = &events[0]
-            {
-                assert_eq!(ice_servers.len(), 2);
-                assert_eq!(
-                    ice_servers[0].urls[0],
-                    "stun:127.0.0.1:3478".to_string()
-                );
-                assert_eq!(
-                    ice_servers[1].urls[0],
-                    "turn:127.0.0.1:3478".to_string()
-                );
-                assert_eq!(
-                    ice_servers[1].urls[1],
-                    "turn:127.0.0.1:3478?transport=tcp".to_string()
-                );
-
-                if let Some(_) = sdp_offer {
-                    is_caller = false;
-                } else {
-                    is_caller = true;
-                }
-                assert_eq!(tracks.len(), 2);
-                for track in tracks {
-                    match &track.direction {
-                        Direction::Send { receivers } => {
-                            assert!(is_caller);
-                            assert!(!receivers.contains(&peer_id));
-                        }
-                        Direction::Recv { sender } => {
-                            assert!(!is_caller);
-                            assert_ne!(sender, peer_id);
+                    if let Some(_) = sdp_offer {
+                        is_caller = false;
+                    } else {
+                        is_caller = true;
+                    }
+                    assert_eq!(tracks.len(), 2);
+                    for track in tracks {
+                        match &track.direction {
+                            Direction::Send { receivers } => {
+                                assert!(is_caller);
+                                assert!(!receivers.contains(&peer_id));
+                            }
+                            Direction::Recv { sender } => {
+                                assert!(!is_caller);
+                                assert_ne!(sender, peer_id);
+                            }
                         }
                     }
-                }
-            } else {
-                assert!(false)
-            }
-
-            if is_caller {
-                if let Event::SdpAnswerMade { .. } = &events[1] {
                 } else {
-                    assert!(false);
+                    assert!(false)
                 }
 
-                if let Event::IceCandidateDiscovered { .. } = &events[2] {
+                if is_caller {
+                    if let Event::SdpAnswerMade { .. } = &events[1] {
+                    } else {
+                        assert!(false);
+                    }
+
+                    if let Event::IceCandidateDiscovered { .. } = &events[2] {
+                    } else {
+                        assert!(false);
+                    }
                 } else {
-                    assert!(false);
+                    if let Event::IceCandidateDiscovered { .. } = &events[1] {
+                    } else {
+                        assert!(false);
+                    }
                 }
-            } else {
-                if let Event::IceCandidateDiscovered { .. } = &events[1] {
-                } else {
-                    assert!(false);
+
+                if is_caller {
+                    System::current().stop();
                 }
             }
+        };
 
-            if is_caller {
-                System::current().stop();
-            }
-        }
-    };
-
-    TestMember::start(
-        &format!("{}/caller/test", base_url),
-        Box::new(test_fn.clone()),
-    );
-    TestMember::start(
-        &format!("{}/responder/test", base_url),
-        Box::new(test_fn),
-    );
-
-    let _ = sys.run();
+        TestMember::start(
+            &format!("{}/caller/test", base_url),
+            Box::new(test_fn.clone()),
+        );
+        TestMember::start(
+            &format!("{}/responder/test", base_url),
+            Box::new(test_fn),
+        );
+    })
+    .unwrap();
 }
 
 #[test]
 fn three_members_p2p_video_call() {
-    let test_name = "three_members_p2p_video_call";
+    System::run(|| {
+        let base_url = "ws://localhost:8081/ws/three-members-conference";
 
-    let base_url = "ws://localhost:8081/ws/three-members-conference";
+        // Note that events, peer_created_count, ice_candidates
+        // is separated by members.
+        // Every member will have different instance of this.
+        let mut events = Vec::new();
+        let mut peer_created_count = 0;
+        let mut ice_candidates = 0;
 
-    let sys = System::new(test_name);
+        // This is shared state of members.
+        let members_tested = Rc::new(Cell::new(0));
+        let members_peers_removed = Rc::new(Cell::new(0));
 
-    // Note that events, peer_created_count, ice_candidates
-    // is separated by members.
-    // Every member will have different instance of this.
-    let mut events = Vec::new();
-    let mut peer_created_count = 0;
-    let mut ice_candidates = 0;
+        let test_fn = move |event: &Event, ctx: &mut Context<TestMember>| {
+            events.push(event.clone());
+            match event {
+                Event::PeerCreated { ice_servers, .. } => {
+                    assert_eq!(ice_servers.len(), 2);
+                    assert_eq!(
+                        ice_servers[0].urls[0],
+                        "stun:127.0.0.1:3478".to_string()
+                    );
+                    assert_eq!(
+                        ice_servers[1].urls[0],
+                        "turn:127.0.0.1:3478".to_string()
+                    );
+                    assert_eq!(
+                        ice_servers[1].urls[1],
+                        "turn:127.0.0.1:3478?transport=tcp".to_string()
+                    );
 
-    // This is shared state of members.
-    let members_tested = Rc::new(Cell::new(0));
-    let members_peers_removed = Rc::new(Cell::new(0));
+                    peer_created_count += 1;
+                }
+                Event::IceCandidateDiscovered { .. } => {
+                    ice_candidates += 1;
+                    if ice_candidates == 2 {
+                        // Start checking result of test.
 
-    let test_fn = move |event: &Event, ctx: &mut Context<TestMember>| {
-        events.push(event.clone());
-        match event {
-            Event::PeerCreated { ice_servers, .. } => {
-                assert_eq!(ice_servers.len(), 2);
-                assert_eq!(
-                    ice_servers[0].urls[0],
-                    "stun:127.0.0.1:3478".to_string()
-                );
-                assert_eq!(
-                    ice_servers[1].urls[0],
-                    "turn:127.0.0.1:3478".to_string()
-                );
-                assert_eq!(
-                    ice_servers[1].urls[1],
-                    "turn:127.0.0.1:3478?transport=tcp".to_string()
-                );
+                        assert_eq!(peer_created_count, 2);
 
-                peer_created_count += 1;
-            }
-            Event::IceCandidateDiscovered { .. } => {
-                ice_candidates += 1;
-                if ice_candidates == 2 {
-                    // Start checking result of test.
+                        events.iter().for_each(|e| match e {
+                            Event::PeerCreated {
+                                peer_id, tracks, ..
+                            } => {
+                                assert_eq!(tracks.len(), 4);
+                                let recv_count = tracks
+                                    .iter()
+                                    .filter_map(|t| match &t.direction {
+                                        Direction::Recv { sender } => {
+                                            Some(sender)
+                                        }
+                                        _ => None,
+                                    })
+                                    .map(|sender| {
+                                        assert_ne!(sender, peer_id);
+                                    })
+                                    .count();
+                                assert_eq!(recv_count, 2);
 
-                    assert_eq!(peer_created_count, 2);
+                                let send_count = tracks
+                                    .iter()
+                                    .filter_map(|t| match &t.direction {
+                                        Direction::Send { receivers } => {
+                                            Some(receivers)
+                                        }
+                                        _ => None,
+                                    })
+                                    .map(|receivers| {
+                                        assert!(!receivers.contains(peer_id));
+                                        assert_eq!(receivers.len(), 1);
+                                    })
+                                    .count();
+                                assert_eq!(send_count, 2);
+                            }
+                            _ => (),
+                        });
 
-                    events.iter().for_each(|e| match e {
-                        Event::PeerCreated {
-                            peer_id, tracks, ..
-                        } => {
-                            assert_eq!(tracks.len(), 4);
-                            let recv_count = tracks
-                                .iter()
-                                .filter_map(|t| match &t.direction {
-                                    Direction::Recv { sender } => Some(sender),
-                                    _ => None,
-                                })
-                                .map(|sender| {
-                                    assert_ne!(sender, peer_id);
-                                })
-                                .count();
-                            assert_eq!(recv_count, 2);
-
-                            let send_count = tracks
-                                .iter()
-                                .filter_map(|t| match &t.direction {
-                                    Direction::Send { receivers } => {
-                                        Some(receivers)
-                                    }
-                                    _ => None,
-                                })
-                                .map(|receivers| {
-                                    assert!(!receivers.contains(peer_id));
-                                    assert_eq!(receivers.len(), 1);
-                                })
-                                .count();
-                            assert_eq!(send_count, 2);
+                        // Check peers removing.
+                        // After closing socket, server should send
+                        // Event::PeersRemoved to all remaining
+                        // members.
+                        // Close should happen when last TestMember pass
+                        // tests.
+                        if members_tested.get() == 2 {
+                            ctx.notify(CloseSocket);
                         }
-                        _ => (),
-                    });
-
-                    // Check peers removing.
-                    // After closing socket, server should send
-                    // Event::PeersRemoved to all remaining
-                    // members.
-                    // Close should happen when last TestMember pass
-                    // tests.
-                    if members_tested.get() == 2 {
-                        ctx.notify(CloseSocket);
+                        members_tested.set(members_tested.get() + 1);
                     }
-                    members_tested.set(members_tested.get() + 1);
                 }
-            }
-            Event::PeersRemoved { .. } => {
-                // This event should get two remaining members after closing
-                // last tested member.
-                let peers_removed: Vec<&Vec<PeerId>> = events
-                    .iter()
-                    .filter_map(|e| match e {
-                        Event::PeersRemoved { peer_ids } => Some(peer_ids),
-                        _ => None,
-                    })
-                    .collect();
-                assert_eq!(peers_removed.len(), 1);
-                assert_eq!(peers_removed[0].len(), 2);
-                assert_ne!(peers_removed[0][0], peers_removed[0][1]);
+                Event::PeersRemoved { .. } => {
+                    // This event should get two remaining members after closing
+                    // last tested member.
+                    let peers_removed: Vec<&Vec<PeerId>> = events
+                        .iter()
+                        .filter_map(|e| match e {
+                            Event::PeersRemoved { peer_ids } => Some(peer_ids),
+                            _ => None,
+                        })
+                        .collect();
+                    assert_eq!(peers_removed.len(), 1);
+                    assert_eq!(peers_removed[0].len(), 2);
+                    assert_ne!(peers_removed[0][0], peers_removed[0][1]);
 
-                members_peers_removed.set(members_peers_removed.get() + 1);
-                // Stop when all members receive Event::PeerRemoved
-                if members_peers_removed.get() == 2 {
-                    System::current().stop();
+                    members_peers_removed.set(members_peers_removed.get() + 1);
+                    // Stop when all members receive Event::PeerRemoved
+                    if members_peers_removed.get() == 2 {
+                        System::current().stop();
+                    }
                 }
+                _ => (),
             }
-            _ => (),
-        }
-    };
+        };
 
-    TestMember::start(
-        &format!("{}/member-1/test", base_url),
-        Box::new(test_fn.clone()),
-    );
-    TestMember::start(
-        &format!("{}/member-2/test", base_url),
-        Box::new(test_fn.clone()),
-    );
-    TestMember::start(
-        &format!("{}/member-3/test", base_url),
-        Box::new(test_fn),
-    );
-
-    let _ = sys.run();
+        TestMember::start(
+            &format!("{}/member-1/test", base_url),
+            Box::new(test_fn.clone()),
+        );
+        TestMember::start(
+            &format!("{}/member-2/test", base_url),
+            Box::new(test_fn.clone()),
+        );
+        TestMember::start(
+            &format!("{}/member-3/test", base_url),
+            Box::new(test_fn),
+        );
+    })
+    .unwrap();
 }
