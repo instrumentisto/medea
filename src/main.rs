@@ -43,7 +43,7 @@ fn main() {
         System::current().registry().get::<signal::ProcessSignals>();
 
 
-    let mut shutdown_handler = GracefulShutdown::new(8000,
+    let mut shutdown_handler = GracefulShutdown::new(3000,
                                                      process_signals.clone());
 
     let turn_auth_service =
@@ -57,14 +57,13 @@ fn main() {
 //        shutdown_handler.clone(),
     );
     let room = Arbiter::start(move |_| room);
-    shutdown_handler.subscribe(room.clone().recipient());
+    shutdown_handler.subscribe(1, room.clone().recipient());
 
     let rooms = hashmap! {1 => room};
     let rooms_repo = RoomsRepository::new(rooms);
 
-    //todo send StopServer to server when these signals
     let http_server = server::run(rooms_repo, config);
-    shutdown_handler.subscribe(http_server.recipient());
+    shutdown_handler.subscribe(2, http_server.recipient().clone());
 
     shutdown_handler.start();
     let _ = sys.run();
