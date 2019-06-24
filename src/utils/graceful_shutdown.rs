@@ -137,6 +137,7 @@ impl Handler<Signal> for GracefulShutdown {
 
         info!("PRINT FROM HANDLER: result ready");
 
+        //todo handle panics and not freeze when that happends
         ctx.wait(
             shutdown_future
                 .timeout(Duration::from_millis(self.shutdown_timeout))
