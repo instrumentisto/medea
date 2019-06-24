@@ -54,7 +54,6 @@ fn main() {
         peers,
         config.rpc.reconnect_timeout,
         turn_auth_service,
-//        shutdown_handler.clone(),
     );
     let room = Arbiter::start(move |_| room);
     shutdown_handler.subscribe(1, room.clone().recipient());
