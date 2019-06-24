@@ -40,11 +40,11 @@ fn ws_index(
     info: Path<RequestParams>,
     state: Data<Context>,
     payload: Payload,
-) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
+) -> impl Future<Item = HttpResponse, Error = Error> {
     debug!("Request params: {:?}", info);
 
     match state.rooms.get(&info.room_id) {
-        Some(room) => Box::new(
+        Some(room) => future::Either::A(
             room.send(Authorize {
                 member_id: info.member_id.clone(),
                 credentials: info.credentials.clone(),
@@ -68,7 +68,7 @@ fn ws_index(
                 }
             }),
         ),
-        None => Box::new(future::ok(HttpResponse::NotFound().into())),
+        None => future::Either::B(future::ok(HttpResponse::NotFound().into())),
     }
 }
 
@@ -90,13 +90,13 @@ pub fn run(rooms: RoomsRepository, config: Conf) {
                 rooms: rooms.clone(),
                 config: config.rpc.clone(),
             })
+            .wrap(middleware::Logger::default())
             .service(
                 actix_web::web::resource(
                     "/ws/{room_id}/{member_id}/{credentials}",
                 )
                 .route(actix_web::web::get().to_async(ws_index)),
             )
-            .wrap(middleware::Logger::default())
     })
     .bind(server_addr)
     .unwrap()
@@ -113,7 +113,7 @@ mod test {
     use actix_http::{ws::Message, HttpService};
     use actix_http_test::{TestServer, TestServerRuntime};
     use actix_web::App;
-    use futures::{future::IntoFuture, sink::Sink, Stream};
+    use futures::{future::IntoFuture as _, sink::Sink as _, Stream as _};
 
     use crate::{
         api::control,
