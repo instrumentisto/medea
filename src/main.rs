@@ -43,7 +43,7 @@ fn main() {
         System::current().registry().get::<signal::ProcessSignals>();
 
 
-    let mut shutdown_handler = GracefulShutdown::new(3000,
+    let mut graceful_shutdown = graceful_shutdown::new(3000,
                                                      process_signals.clone());
 
     let turn_auth_service =
@@ -56,14 +56,14 @@ fn main() {
         turn_auth_service,
     );
     let room = Arbiter::start(move |_| room);
-    shutdown_handler.subscribe(1, room.clone().recipient());
+    graceful_shutdown.subscribe(1, room.clone().recipient());
 
     let rooms = hashmap! {1 => room};
     let rooms_repo = RoomsRepository::new(rooms);
 
     let http_server = server::run(rooms_repo, config);
-    shutdown_handler.subscribe(2, http_server.recipient().clone());
+    //graceful_shutdown.subscribe(2, http_server.recipient().clone());
 
-    shutdown_handler.start();
+    graceful_shutdown.start();
     let _ = sys.run();
 }

@@ -134,7 +134,7 @@ pub mod server_wrapper_mod {
                   -> Result<(), Box<dyn std::error::Error + Send>> {
             info!("Shutting down Actix Web Server");
             ctx.wait(
-                self.0.send(StopServer { graceful: true })
+                self.0.send(StopServer { graceful: false })
                     .map(|_| ())
                     .map_err(|_| {
                         error!("Error trying to send StopServer to actix_web");
