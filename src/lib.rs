@@ -67,6 +67,7 @@ pub fn start_static_rooms(
             Err(e) => return Err(ServerStartError::LoadSpec(e)),
         };
         let mut rooms = HashMap::new();
+        let arbiter = Arbiter::new();
 
         for spec in room_specs {
             if rooms.contains_key(spec.id()) {
@@ -75,16 +76,16 @@ pub fn start_static_rooms(
                 ));
             }
 
-            let turn_auth_service = service::new_turn_auth_service(config)
+            let turn_auth_service = service::new_turn_auth_service(&config)
                 .expect("Unable to start turn service");
 
-            let room = Room::new(
-                &spec,
-                config.rpc.reconnect_timeout,
-                turn_auth_service,
-            )?;
-            let room = Room::start_in_arbiter(&Arbiter::new(), move |_| room);
-            rooms.insert(spec.id().clone(), room);
+            let room_id = spec.id().clone();
+            let rpc_reconnect_timeout = config.rpc.reconnect_timeout;
+            let room = Room::start_in_arbiter(&arbiter, move |_| {
+                Room::new(&spec, rpc_reconnect_timeout, turn_auth_service)
+                    .unwrap()
+            });
+            rooms.insert(room_id, room);
         }
 
         Ok(rooms)

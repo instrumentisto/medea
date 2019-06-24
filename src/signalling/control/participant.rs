@@ -1,9 +1,6 @@
 //! [`Participant`] is member of [`Room`] with [`RpcConnection`].
 
-use std::{
-    convert::TryFrom as _,
-    sync::{Arc, Mutex},
-};
+use std::convert::TryFrom as _;
 
 use failure::Fail;
 use hashbrown::HashMap;
@@ -17,6 +14,7 @@ use crate::{
 use super::endpoint::{
     Id as EndpointId, WebRtcPlayEndpoint, WebRtcPublishEndpoint,
 };
+use std::{cell::RefCell, rc::Rc};
 
 /// Errors which may occur while loading [`Participant`]s from [`RoomSpec`].
 #[derive(Debug, Fail)]
@@ -42,7 +40,7 @@ impl From<TryFromElementError> for ParticipantsLoadError {
 
 /// [`Participant`] is member of [`Room`] with [`RpcConnection`].
 #[derive(Debug)]
-pub struct Participant(Mutex<ParticipantInner>);
+pub struct Participant(RefCell<ParticipantInner>);
 
 #[allow(clippy::module_name_repetitions)]
 #[derive(Debug)]
@@ -50,10 +48,10 @@ struct ParticipantInner {
     id: MemberId,
 
     /// All [`WebRtcPublishEndpoint`]s of this [`Participant`].
-    publishers: HashMap<EndpointId, Arc<WebRtcPublishEndpoint>>,
+    publishers: HashMap<EndpointId, Rc<WebRtcPublishEndpoint>>,
 
     /// All [`WebRtcPlayEndpoint`]s of this [`Participant`].
-    receivers: HashMap<EndpointId, Arc<WebRtcPlayEndpoint>>,
+    receivers: HashMap<EndpointId, Rc<WebRtcPlayEndpoint>>,
 
     /// Credentials for this [`Participant`].
     credentials: String,
@@ -68,7 +66,7 @@ impl Participant {
     /// To fill this [`Participant`], you need to call the [`Participant::load`]
     /// function.
     fn new(id: MemberId, credentials: String) -> Self {
-        Self(Mutex::new(ParticipantInner {
+        Self(RefCell::new(ParticipantInner {
             id,
             publishers: HashMap::new(),
             receivers: HashMap::new(),
@@ -94,32 +92,27 @@ impl Participant {
 
     /// Returns list of [`IceServer`] for this [`Participant`].
     pub fn servers_list(&self) -> Option<Vec<IceServer>> {
-        self.0
-            .lock()
-            .unwrap()
-            .ice_user
-            .as_ref()
-            .map(IceUser::servers_list)
+        self.0.borrow().ice_user.as_ref().map(IceUser::servers_list)
     }
 
     /// Returns and set to `None` [`IceUser`] of this [`Participant`].
     pub fn take_ice_user(&self) -> Option<IceUser> {
-        self.0.lock().unwrap().ice_user.take()
+        self.0.borrow_mut().ice_user.take()
     }
 
     /// Replace and return [`IceUser`] of this [`Participant`].
     pub fn replace_ice_user(&self, new_ice_user: IceUser) -> Option<IceUser> {
-        self.0.lock().unwrap().ice_user.replace(new_ice_user)
+        self.0.borrow_mut().ice_user.replace(new_ice_user)
     }
 
     /// Returns [`MemberId`] of this [`Participant`].
     pub fn id(&self) -> MemberId {
-        self.0.lock().unwrap().id.clone()
+        self.0.borrow().id.clone()
     }
 
     /// Returns credentials of this [`Participant`].
     pub fn credentials(&self) -> String {
-        self.0.lock().unwrap().credentials.clone()
+        self.0.borrow().credentials.clone()
     }
 
     /// Creates all empty [`Participant`] from [`RoomSpec`] and then
@@ -128,14 +121,14 @@ impl Participant {
     /// Returns store of all [`Participant`]s loaded from [`RoomSpec`].
     pub fn load_store(
         room_spec: &RoomSpec,
-    ) -> Result<HashMap<MemberId, Arc<Self>>, ParticipantsLoadError> {
+    ) -> Result<HashMap<MemberId, Rc<Self>>, ParticipantsLoadError> {
         let members = room_spec.members()?;
         let mut participants = HashMap::new();
 
         for (id, member) in &members {
             participants.insert(
                 id.clone(),
-                Arc::new(Self::new(
+                Rc::new(Self::new(
                     id.clone(),
                     member.credentials().to_string(),
                 )),
@@ -150,22 +143,20 @@ impl Participant {
     }
 
     /// Returns all publishers of this [`Participant`].
-    pub fn publishers(
-        &self,
-    ) -> HashMap<EndpointId, Arc<WebRtcPublishEndpoint>> {
-        self.0.lock().unwrap().publishers.clone()
+    pub fn publishers(&self) -> HashMap<EndpointId, Rc<WebRtcPublishEndpoint>> {
+        self.0.borrow().publishers.clone()
     }
 
     /// Returns all receivers of this [`Participant`].
-    pub fn receivers(&self) -> HashMap<EndpointId, Arc<WebRtcPlayEndpoint>> {
-        self.0.lock().unwrap().receivers.clone()
+    pub fn receivers(&self) -> HashMap<EndpointId, Rc<WebRtcPlayEndpoint>> {
+        self.0.borrow().receivers.clone()
     }
 
     /// Load all publishers and receivers of this [`Participant`].
     fn load(
         &self,
         room_spec: &RoomSpec,
-        store: &HashMap<MemberId, Arc<Self>>,
+        store: &HashMap<MemberId, Rc<Self>>,
     ) -> Result<(), ParticipantsLoadError> {
         let this_member_spec = MemberSpec::try_from(
             room_spec.pipeline.get(&self.id().0).map_or(
@@ -215,35 +206,35 @@ impl Participant {
             ) {
                 let new_play_endpoint_id =
                     EndpointId(spec_play_name.to_string());
-                let new_play_endpoint = Arc::new(WebRtcPlayEndpoint::new(
+                let new_play_endpoint = Rc::new(WebRtcPlayEndpoint::new(
                     new_play_endpoint_id.clone(),
                     spec_play_endpoint.src.clone(),
-                    Arc::downgrade(&publisher),
-                    Arc::downgrade(&this_member),
+                    Rc::downgrade(&publisher),
+                    Rc::downgrade(&this_member),
                 ));
 
-                self.insert_receiver(Arc::clone(&new_play_endpoint));
+                self.insert_receiver(Rc::clone(&new_play_endpoint));
 
-                publisher.add_receiver(Arc::downgrade(&new_play_endpoint));
+                publisher.add_receiver(Rc::downgrade(&new_play_endpoint));
             } else {
                 let new_publish_id =
                     EndpointId(spec_play_endpoint.src.endpoint_id.to_string());
-                let new_publish = Arc::new(WebRtcPublishEndpoint::new(
+                let new_publish = Rc::new(WebRtcPublishEndpoint::new(
                     new_publish_id.clone(),
                     publisher_endpoint.p2p.clone(),
                     Vec::new(),
-                    Arc::downgrade(&publisher_participant),
+                    Rc::downgrade(&publisher_participant),
                 ));
 
                 let new_self_play_id = EndpointId(spec_play_name.to_string());
-                let new_self_play = Arc::new(WebRtcPlayEndpoint::new(
+                let new_self_play = Rc::new(WebRtcPlayEndpoint::new(
                     new_self_play_id.clone(),
                     spec_play_endpoint.src.clone(),
-                    Arc::downgrade(&new_publish),
-                    Arc::downgrade(&this_member),
+                    Rc::downgrade(&new_publish),
+                    Rc::downgrade(&this_member),
                 ));
 
-                new_publish.add_receiver(Arc::downgrade(&new_self_play));
+                new_publish.add_receiver(Rc::downgrade(&new_self_play));
 
                 publisher_participant.insert_publisher(new_publish);
 
@@ -257,14 +248,12 @@ impl Participant {
             |(name, e)| {
                 let endpoint_id = EndpointId(name.clone());
                 if self.publishers().get(&endpoint_id).is_none() {
-                    self.insert_publisher(Arc::new(
-                        WebRtcPublishEndpoint::new(
-                            endpoint_id,
-                            e.p2p.clone(),
-                            Vec::new(),
-                            Arc::downgrade(&this_member),
-                        ),
-                    ));
+                    self.insert_publisher(Rc::new(WebRtcPublishEndpoint::new(
+                        endpoint_id,
+                        e.p2p.clone(),
+                        Vec::new(),
+                        Rc::downgrade(&this_member),
+                    )));
                 }
             },
         );
@@ -273,19 +262,17 @@ impl Participant {
     }
 
     /// Insert receiver into this [`Participant`].
-    pub fn insert_receiver(&self, endpoint: Arc<WebRtcPlayEndpoint>) {
+    pub fn insert_receiver(&self, endpoint: Rc<WebRtcPlayEndpoint>) {
         self.0
-            .lock()
-            .unwrap()
+            .borrow_mut()
             .receivers
             .insert(endpoint.id(), endpoint);
     }
 
     /// Insert publisher into this [`Participant`].
-    pub fn insert_publisher(&self, endpoint: Arc<WebRtcPublishEndpoint>) {
+    pub fn insert_publisher(&self, endpoint: Rc<WebRtcPublishEndpoint>) {
         self.0
-            .lock()
-            .unwrap()
+            .borrow_mut()
             .publishers
             .insert(endpoint.id(), endpoint);
     }
@@ -294,32 +281,32 @@ impl Participant {
     pub fn get_publisher_by_id(
         &self,
         id: &EndpointId,
-    ) -> Option<Arc<WebRtcPublishEndpoint>> {
-        self.0.lock().unwrap().publishers.get(id).cloned()
+    ) -> Option<Rc<WebRtcPublishEndpoint>> {
+        self.0.borrow().publishers.get(id).cloned()
     }
 
     /// Lookup [`WebRtcPlayEndpoint`] receiver by [`EndpointId`].
     pub fn get_receiver_by_id(
         &self,
         id: &EndpointId,
-    ) -> Option<Arc<WebRtcPlayEndpoint>> {
-        self.0.lock().unwrap().receivers.get(id).cloned()
+    ) -> Option<Rc<WebRtcPlayEndpoint>> {
+        self.0.borrow().receivers.get(id).cloned()
     }
 
     /// Remove receiver [`WebRtcPlayEndpoint`] from this [`Participant`].
     pub fn remove_receiver(&self, id: &EndpointId) {
-        self.0.lock().unwrap().receivers.remove(id);
+        self.0.borrow_mut().receivers.remove(id);
     }
 
     /// Remove receiver [`WebRtcPublishEndpoint`] from this [`Participant`].
     pub fn remove_publisher(&self, id: &EndpointId) {
-        self.0.lock().unwrap().publishers.remove(id);
+        self.0.borrow_mut().publishers.remove(id);
     }
 }
 
 #[cfg(test)]
 mod participant_loading_tests {
-    use std::sync::Arc;
+    use std::rc::Rc;
 
     use crate::api::control::Element;
 
@@ -382,12 +369,12 @@ mod participant_loading_tests {
             .receivers()
             .into_iter()
             .map(|p| p.upgrade().unwrap())
-            .filter(|p| Arc::ptr_eq(p, &responder_play_endpoint))
+            .filter(|p| Rc::ptr_eq(p, &responder_play_endpoint))
             .count()
             == 1;
         assert!(is_caller_has_responder_in_receivers);
 
-        assert!(Arc::ptr_eq(
+        assert!(Rc::ptr_eq(
             &responder_play_endpoint.publisher().upgrade().unwrap(),
             &caller_publish_endpoint
         ));
@@ -409,7 +396,7 @@ mod participant_loading_tests {
                 .receivers()
                 .into_iter()
                 .map(|p| p.upgrade().unwrap())
-                .filter(|p| Arc::ptr_eq(p, &responder_play2_endpoint))
+                .filter(|p| Rc::ptr_eq(p, &responder_play2_endpoint))
                 .count()
                 == 1;
         assert!(is_some_participant_has_responder_in_receivers);

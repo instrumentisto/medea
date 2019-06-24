@@ -1,6 +1,6 @@
 //! Signalling representation of endpoints.
 
-use std::{cell::RefCell, fmt::Display, sync::Weak};
+use std::{cell::RefCell, fmt::Display, rc::Weak};
 
 use hashbrown::HashSet;
 
@@ -89,7 +89,6 @@ impl Drop for WebRtcPlayEndpointInner {
 #[allow(clippy::module_name_repetitions)]
 #[derive(Debug)]
 pub struct WebRtcPlayEndpoint(RefCell<WebRtcPlayEndpointInner>);
-unsafe impl std::marker::Sync for WebRtcPlayEndpoint {}
 
 impl WebRtcPlayEndpoint {
     /// Create new [`WebRtcPlayEndpoint`].
@@ -225,7 +224,6 @@ impl WebRtcPublishEndpointInner {
 #[allow(clippy::module_name_repetitions)]
 #[derive(Debug)]
 pub struct WebRtcPublishEndpoint(RefCell<WebRtcPublishEndpointInner>);
-unsafe impl std::marker::Sync for WebRtcPublishEndpoint {}
 
 impl WebRtcPublishEndpoint {
     /// Create new [`WebRtcPublishEndpoint`].

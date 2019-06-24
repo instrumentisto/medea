@@ -1,6 +1,6 @@
 //! Room definitions and implementations.
 
-use std::{convert::TryFrom, fmt::Display, sync::Arc};
+use std::{convert::TryFrom, fmt::Display};
 
 use hashbrown::HashMap;
 use serde::Deserialize;
@@ -26,7 +26,7 @@ impl Display for Id {
 #[derive(Clone, Debug)]
 pub struct RoomSpec {
     pub id: Id,
-    pub pipeline: Arc<Pipeline>,
+    pub pipeline: Pipeline,
 }
 
 impl RoomSpec {
@@ -58,7 +58,7 @@ impl TryFrom<&Element> for RoomSpec {
         match from {
             Element::Room { id, spec } => Ok(Self {
                 id: id.clone(),
-                pipeline: Arc::new(spec.clone()),
+                pipeline: spec.clone(),
             }),
             _ => Err(TryFromElementError::NotRoom),
         }

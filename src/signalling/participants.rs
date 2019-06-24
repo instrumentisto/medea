@@ -4,7 +4,7 @@
 //! credentials management.
 
 use std::{
-    sync::Arc,
+    rc::Rc,
     time::{Duration, Instant},
 };
 
@@ -74,7 +74,7 @@ pub struct ParticipantService {
     room_id: RoomId,
 
     /// [`Participant`]s which currently are present in this [`Room`].
-    participants: HashMap<ParticipantId, Arc<Participant>>,
+    participants: HashMap<ParticipantId, Rc<Participant>>,
 
     /// Service for managing authorization on Turn server.
     turn: Box<dyn TurnAuthService>,
@@ -138,7 +138,7 @@ impl ParticipantService {
     pub fn get_participant_by_id(
         &self,
         id: &ParticipantId,
-    ) -> Option<Arc<Participant>> {
+    ) -> Option<Rc<Participant>> {
         self.participants.get(id).cloned()
     }
 
@@ -151,7 +151,7 @@ impl ParticipantService {
         &self,
         participant_id: &ParticipantId,
         credentials: &str,
-    ) -> Result<Arc<Participant>, AuthorizationError> {
+    ) -> Result<Rc<Participant>, AuthorizationError> {
         match self.get_participant_by_id(participant_id) {
             Some(participant) => {
                 if participant.credentials().eq(credentials) {
@@ -199,7 +199,7 @@ impl ParticipantService {
         ctx: &mut Context<Room>,
         participant_id: ParticipantId,
         con: Box<dyn RpcConnection>,
-    ) -> ActFuture<Arc<Participant>, ParticipantServiceErr> {
+    ) -> ActFuture<Rc<Participant>, ParticipantServiceErr> {
         let participant = match self.get_participant_by_id(&participant_id) {
             None => {
                 return Box::new(wrap_future(future::err(

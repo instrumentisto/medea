@@ -4,7 +4,7 @@
 
 #![allow(clippy::use_self)]
 
-use std::{convert::TryFrom, fmt::Display, sync::Arc};
+use std::{convert::TryFrom, fmt::Display, rc::Rc};
 
 use failure::Fail;
 use hashbrown::HashMap;
@@ -152,8 +152,8 @@ pub struct Context {
     partner_member: MemberId,
     sdp_offer: Option<String>,
     sdp_answer: Option<String>,
-    receivers: HashMap<TrackId, Arc<MediaTrack>>,
-    senders: HashMap<TrackId, Arc<MediaTrack>>,
+    receivers: HashMap<TrackId, Rc<MediaTrack>>,
+    senders: HashMap<TrackId, Rc<MediaTrack>>,
 }
 
 /// [`RTCPeerConnection`] representation.
@@ -215,7 +215,7 @@ impl<T> Peer<T> {
     }
 
     /// Returns all senders [`MediaTrack`].
-    pub fn get_senders(&self) -> Vec<Arc<MediaTrack>> {
+    pub fn get_senders(&self) -> Vec<Rc<MediaTrack>> {
         self.context
             .senders
             .iter()
@@ -261,7 +261,7 @@ impl Peer<New> {
         &mut self,
         partner_peer: &mut Peer<New>,
         tracks_count: &mut Counter,
-        publish_endpoints: HashMap<EndpointId, Arc<WebRtcPublishEndpoint>>,
+        publish_endpoints: HashMap<EndpointId, Rc<WebRtcPublishEndpoint>>,
     ) {
         let partner_id = self.partner_member_id();
         let self_id = self.id();
@@ -299,11 +299,11 @@ impl Peer<New> {
                     })
             })
             .for_each(|(e, _)| {
-                let track_audio = Arc::new(MediaTrack::new(
+                let track_audio = Rc::new(MediaTrack::new(
                     tracks_count.next_id(),
                     MediaType::Audio(AudioSettings {}),
                 ));
-                let track_video = Arc::new(MediaTrack::new(
+                let track_video = Rc::new(MediaTrack::new(
                     tracks_count.next_id(),
                     MediaType::Video(VideoSettings {}),
                 ));
@@ -340,12 +340,12 @@ impl Peer<New> {
     }
 
     /// Add [`Track`] to [`Peer`] for send.
-    pub fn add_sender(&mut self, track: Arc<MediaTrack>) {
+    pub fn add_sender(&mut self, track: Rc<MediaTrack>) {
         self.context.senders.insert(track.id, track);
     }
 
     /// Add [`Track`] to [`Peer`] for receive.
-    pub fn add_receiver(&mut self, track: Arc<MediaTrack>) {
+    pub fn add_receiver(&mut self, track: Rc<MediaTrack>) {
         self.context.receivers.insert(track.id, track);
     }
 }

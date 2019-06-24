@@ -130,15 +130,16 @@ mod test {
             control::load_from_yaml_file("tests/specs/pub_sub_video_call.yml")
                 .unwrap();
 
-        let client_room = Room::new(
-            &room_spec,
-            conf.reconnect_timeout,
-            new_turn_auth_service_mock(),
-        )
-        .unwrap();
-        let room_id = client_room.get_id();
-        let client_room =
-            Room::start_in_arbiter(&Arbiter::new(), move |_| client_room);
+        let room_id = room_spec.id.clone();
+        let client_room = Room::start_in_arbiter(&Arbiter::new(), move |_| {
+            let client_room = Room::new(
+                &room_spec,
+                conf.reconnect_timeout,
+                new_turn_auth_service_mock(),
+            )
+            .unwrap();
+            client_room
+        });
         let room_hash_map = hashmap! {
             room_id => client_room,
         };
