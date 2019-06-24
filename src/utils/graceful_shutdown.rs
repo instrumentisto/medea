@@ -23,6 +23,7 @@ use tokio::timer::Delay;
 use std::sync::mpsc::{Sender, Receiver};
 use actix::prelude::fut::WrapFuture;
 use core::borrow::BorrowMut;
+use crate::utils::then_all::then_all;
 
 #[derive(Debug)]
 pub struct GracefulShutdownResult;
@@ -127,8 +128,10 @@ impl Handler<Signal> for GracefulShutdown {
 //            }));
         }
 
-        //todo use then/and_then instead of join
-        let shutdown_future = join_all(shutdown_futures_vec);
+
+        let shutdown_future = then_all(shutdown_futures_vec);
+
+//        let timeout_future = Delay::new(Instant::now() + Duration::from_millis(self.shutdown_timeout));
 
 //        let result = timeout_future.select2(shutdown_future);
 
@@ -147,3 +150,4 @@ impl Handler<Signal> for GracefulShutdown {
         );
     }
 }
+
