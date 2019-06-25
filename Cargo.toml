@@ -21,9 +21,6 @@ lto = "thin"
 
 [dependencies]
 actix = "0.8"
-actix-codec = "0.1"
-actix-http = "0.2"
-actix-http-test = "0.2"
 actix-web = "1.0"
 actix-web-actors = "1.0"
 # TODO: use version from crates.io when commit
@@ -63,5 +60,8 @@ toml = "0.4"
     branch = "serde_wrapper"
 
 [dev-dependencies]
+actix-http = "0.2"
+actix-http-test = "0.2"
 serial_test = "0.2"
 serial_test_derive = "0.2"
+actix-codec = "0.1.2"
