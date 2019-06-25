@@ -284,46 +284,55 @@ impl PeerConnection {
         .map_err(Into::into)
     }
 
+    // TODO: Doesnt really updates anything, but only generates new senders and
+    //       receivers atm.
+    fn update_track(&self, track: Track) {
+        match track.direction {
+            Direction::Send { .. } => {
+                self.media_connections.borrow_mut().senders.insert(
+                    track.id,
+                    Sender::new(track.id, track.media_type, &self.peer),
+                );
+            }
+            Direction::Recv { sender, mid } => {
+                self.media_connections.borrow_mut().receivers.insert(
+                    track.id,
+                    Receiver::new(track.id, track.media_type, sender, mid),
+                );
+            }
+        }
+    }
+
+    /// Update this peer [`Receiver`]s mids.
+    pub fn set_recv_mids(&self, mids: HashMap<u64, String>) {
+        for (track_id, mid) in mids {
+            if let Some(receiver) = self
+                .media_connections
+                .borrow_mut()
+                .receivers
+                .get_mut(&track_id)
+            {
+                receiver.mid.replace(mid);
+            }
+        }
+    }
+
     /// Update peers tracks.
     ///
     /// Synchronize provided tracks with this [`PeerConnection`] [`Sender`]s and
     /// [`Receiver`]s. Will proc local media request if required.
-    // TODO: Doesnt really updates anything, but generates new senders and
-    // receivers.
     pub fn update_tracks(
         &self,
         tracks: Vec<Track>,
         media_manager: &Rc<MediaManager>,
     ) -> impl Future<Item = (), Error = WasmErr> {
-        // TODO: insert tracks
-        // insert peer transceivers
         for track in tracks {
-            match track.direction {
-                Direction::Send { .. } => {
-                    self.media_connections.borrow_mut().senders.insert(
-                        track.id,
-                        Sender::new(track.id, track.media_type, &self.peer),
-                    );
-                }
-                Direction::Recv { sender, mid } => {
-                    self.media_connections.borrow_mut().receivers.insert(
-                        track.id,
-                        Receiver::new(track.id, track.media_type, sender, mid),
-                    );
-                }
-            }
+            self.update_track(track);
         }
 
-        // if senders not empty, then get media from media manager and insert
-        // tracks into transceivers
-        if self.media_connections.borrow().senders.is_empty() {
-            future::Either::A(future::ok(()))
-        } else {
-            let mut media_request = StreamRequest::default();
-            for (track_id, sender) in &self.media_connections.borrow().senders {
-                media_request.add_track_request(*track_id, sender.caps.clone());
-            }
-
+        if let Some(media_request) =
+            self.media_connections.borrow().get_request()
+        {
             let media_manager = Rc::clone(media_manager);
             let connections = Rc::clone(&self.media_connections);
             let get_media = media_manager.get_stream(media_request).and_then(
@@ -332,11 +341,15 @@ impl PeerConnection {
                 },
             );
             future::Either::B(get_media)
+        } else {
+            future::Either::A(future::ok(()))
         }
     }
 }
 
+/// Stores [`Peer`]s [`Sender`]s and [`Receiver`]s.
 struct MediaConnections {
+    need_local_stream: bool,
     senders: HashMap<TrackId, Sender>,
     receivers: HashMap<TrackId, Receiver>,
 }
@@ -344,8 +357,22 @@ struct MediaConnections {
 impl MediaConnections {
     pub fn new() -> Self {
         Self {
+            need_local_stream: false,
             senders: HashMap::new(),
             receivers: HashMap::new(),
+        }
+    }
+
+    /// Check if [`Sender`]s require new [`MediaStream`].
+    fn get_request(&self) -> Option<StreamRequest> {
+        if self.need_local_stream {
+            let mut media_request = StreamRequest::default();
+            for (track_id, sender) in &self.senders {
+                media_request.add_track_request(*track_id, sender.caps.clone());
+            }
+            Some(media_request)
+        } else {
+            None
         }
     }
 
@@ -387,8 +414,10 @@ impl MediaConnections {
     }
 
     /// Find associated [`Receiver`] by transceiver's mid and update it with
-    /// [`StreamTrack`] and [`RtcRtpTransceiver`] and return found
+    /// [`StreamTrack`] and [`RtcRtpTransceiver`][1] and return found
     /// [`Receiver`].
+    ///
+    /// [1]: https://www.w3.org/TR/webrtc/#rtcrtptransceiver-interface
     pub fn add_remote_track(
         &mut self,
         transceiver: RtcRtpTransceiver,
@@ -466,6 +495,10 @@ impl Sender {
 }
 
 /// Remote track representation that is being received from some remote peer.
+/// Basically, it can have two states: waiting and receiving. When track arrives
+/// we can save related [`RtcRtpTransceiver`][1] and actual [`MediaTrack`].
+///
+/// [1]: https://www.w3.org/TR/webrtc/#rtcrtptransceiver-interface
 pub struct Receiver {
     track_id: TrackId,
     caps: MediaType,

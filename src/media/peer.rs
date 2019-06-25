@@ -55,7 +55,7 @@ pub enum PeerError {
         display = "Peer is sending Track [{:?}], but did not provide its mid",
         _0
     )]
-    MidsMismatch(Arc<MediaTrack>),
+    MidsMismatch(TrackId),
 }
 
 impl PeerError {
@@ -298,7 +298,7 @@ impl Peer<WaitLocalSdp> {
         for (id, track) in self.context.senders.iter_mut() {
             let mid = mids
                 .remove(&id)
-                .ok_or_else(|| PeerError::MidsMismatch(Arc::clone(track)))?;
+                .ok_or_else(|| PeerError::MidsMismatch(track.id))?;
             track.set_mid(mid)
         }
 
@@ -336,7 +336,7 @@ impl Peer<WaitLocalHaveRemote> {
         for (id, track) in self.context.senders.iter_mut() {
             let mid = mids
                 .remove(&id)
-                .ok_or_else(|| PeerError::MidsMismatch(Arc::clone(track)))?;
+                .ok_or_else(|| PeerError::MidsMismatch(track.id))?;
             track.set_mid(mid)
         }
 
@@ -355,9 +355,9 @@ impl Peer<Stable> {
             for (track_id, track) in self.context.senders.iter() {
                 mids.insert(
                     *track_id,
-                    track.mid().ok_or_else(|| {
-                        PeerError::MidsMismatch(Arc::clone(track))
-                    })?,
+                    track
+                        .mid()
+                        .ok_or_else(|| PeerError::MidsMismatch(track.id))?,
                 );
             }
             Ok(Some(mids))

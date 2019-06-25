@@ -37,18 +37,21 @@ fn main() {
         1 => Member::new(1, "caller_credentials".to_owned()),
         2 => Member::new(2, "responder_credentials".to_owned()),
     };
-    let peers = create_peers(1, 2);
 
     let turn_auth_service =
         new_turn_auth_service(&config).expect("Unable to start turn service");
-    let room = Room::new(
-        1,
-        members,
-        peers,
-        config.rpc.reconnect_timeout,
-        turn_auth_service,
-    );
-    let room = Arbiter::start(move |_| room);
+
+    let reconnect_timeout = config.rpc.reconnect_timeout;
+    let room = Arbiter::start(move |_| {
+        Room::new(
+            1,
+            members,
+            create_peers(1, 2),
+            reconnect_timeout,
+            turn_auth_service,
+        )
+    });
+
     let rooms = hashmap! {1 => room};
     let rooms_repo = RoomsRepository::new(rooms);
 

@@ -222,9 +222,13 @@ impl EventHandler for InnerRoom {
         &mut self,
         peer_id: PeerId,
         sdp_answer: String,
-        _mids: Option<HashMap<u64, String>>,
+        mids: Option<HashMap<u64, String>>,
     ) {
         if let Some(peer) = self.peers.get_peer(peer_id) {
+            if let Some(mids) = mids {
+                peer.set_recv_mids(mids);
+            }
+
             spawn_local(
                 peer.set_remote_description(Sdp::Answer(sdp_answer))
                     .or_else(|err| {

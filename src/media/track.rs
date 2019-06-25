@@ -2,7 +2,7 @@
 //!
 //! [1]: https://www.w3.org/TR/mediacapture-streams/#mediastreamtrack
 
-use std::{cell::RefCell, sync::Mutex};
+use std::cell::RefCell;
 
 use medea_client_api_proto::MediaType;
 
@@ -14,7 +14,7 @@ pub type Id = u64;
 #[allow(clippy::module_name_repetitions)]
 pub struct MediaTrack {
     pub id: Id,
-    mid: Mutex<RefCell<Option<String>>>,
+    mid: RefCell<Option<String>>,
     pub media_type: MediaType,
 }
 
@@ -23,16 +23,16 @@ impl MediaTrack {
     pub fn new(id: Id, media_type: MediaType) -> Self {
         Self {
             id,
-            mid: Mutex::new(RefCell::new(None)),
+            mid: RefCell::new(None),
             media_type,
         }
     }
 
     pub fn set_mid(&self, mid: String) {
-        self.mid.lock().unwrap().borrow_mut().replace(mid);
+        self.mid.borrow_mut().replace(mid);
     }
 
     pub fn mid(&self) -> Option<String> {
-        self.mid.lock().unwrap().borrow().as_ref().cloned()
+        self.mid.borrow_mut().as_ref().cloned()
     }
 }
