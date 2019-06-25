@@ -3,17 +3,16 @@
 
 use std::prelude::v1::*;
 
-use std::fmt;
+use std::{fmt, thread, time};
 use std::mem;
 use tokio::prelude::future::{IntoFuture, Future};
-use tokio::prelude::{Async, Poll};
+use tokio::prelude::*;
 
 #[derive(Debug)]
 enum ElemState<T> where T: Future {
     Pending(T),
     Done(),
 }
-
 
 #[must_use = "futures do nothing unless polled"]
 pub struct ThenAll<I>
@@ -56,32 +55,31 @@ impl<I> Future for ThenAll<I>
 
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        let mut result = Async::NotReady;
+        let last_val = match self.elems[self.last_elem] {
+            ElemState::Pending(ref mut t) => {
+                match t.poll() {
+                    Ok(Async::Ready(_)) => Ok(()),
+                    Ok(Async::NotReady) => {
+                        task::current().notify();
+                        return Ok(Async::NotReady);
+                    },
+                    Err(e) => Err(()),
+                }
+            },
+            ElemState::Done() => {
+                Ok(())
+            },
+        };
 
-        while (result != Async::Ready(())) {
-            let last_val = match self.elems[self.last_elem] {
-                ElemState::Pending(ref mut t) => {
-                    match t.poll() {
-                        Ok(Async::Ready(_)) => Ok(()),
-                        Ok(Async::NotReady) => {
-                            continue;
-                        },
-                        Err(e) => Err(()),
-                    }
-                },
-                ElemState::Done() => {
-                    Ok(())
-                },
-            };
+        self.elems[self.last_elem] = ElemState::Done();
+        self.last_elem += 1;
 
-            self.elems[self.last_elem] = ElemState::Done();
-            self.last_elem += 1;
-
-            if self.last_elem == self.elems.len() {
-                result = Async::Ready(());
-            }
+        if self.last_elem == self.elems.len() {
+            Ok(Async::Ready(()))
         }
-
-        Ok(result)
+        else {
+            task::current().notify();
+            Ok(Async::NotReady)
+        }
     }
 }
