@@ -93,7 +93,6 @@ pub struct Track {
     pub media_type: MediaType,
 }
 
-#[allow(clippy::doc_markdown)]
 /// Representation of [RTCIceServer][1] (item of `iceServers` field
 /// from [RTCConfiguration][2]).
 ///

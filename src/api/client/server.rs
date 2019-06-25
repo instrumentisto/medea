@@ -2,11 +2,14 @@
 
 use actix_web::{
     middleware,
-    web::{Data, Path, Payload},
+    web::{resource, Data, Path, Payload},
     App, HttpRequest, HttpResponse, HttpServer,
 };
 use actix_web_actors::ws;
-use futures::{future, Future};
+use futures::{
+    future::{self, Either},
+    Future,
+};
 use serde::Deserialize;
 
 use crate::{
@@ -44,7 +47,7 @@ fn ws_index(
     debug!("Request params: {:?}", info);
 
     match state.rooms.get(info.room_id) {
-        Some(room) => future::Either::A(
+        Some(room) => Either::A(
             room.send(Authorize {
                 member_id: info.member_id,
                 credentials: info.credentials.clone(),
@@ -68,7 +71,7 @@ fn ws_index(
                 }
             }),
         ),
-        None => future::Either::B(future::ok(HttpResponse::NotFound().into())),
+        None => Either::B(future::ok(HttpResponse::NotFound().into())),
     }
 }
 
@@ -84,6 +87,7 @@ pub struct Context {
 /// Starts HTTP server for handling WebSocket connections of Client API.
 pub fn run(rooms: RoomsRepository, config: Conf) {
     let server_addr = config.server.bind_addr();
+
     HttpServer::new(move || {
         App::new()
             .data(Context {
@@ -92,10 +96,8 @@ pub fn run(rooms: RoomsRepository, config: Conf) {
             })
             .wrap(middleware::Logger::default())
             .service(
-                actix_web::web::resource(
-                    "/ws/{room_id}/{member_id}/{credentials}",
-                )
-                .route(actix_web::web::get().to_async(ws_index)),
+                resource("/ws/{room_id}/{member_id}/{credentials}")
+                    .route(actix_web::web::get().to_async(ws_index)),
             )
     })
     .bind(server_addr)
@@ -109,10 +111,9 @@ pub fn run(rooms: RoomsRepository, config: Conf) {
 mod test {
     use std::{ops::Add, thread, time::Duration};
 
-    use actix::{Actor as _, Arbiter};
+    use actix::Actor as _;
     use actix_http::{ws::Message, HttpService};
     use actix_http_test::{TestServer, TestServerRuntime};
-    use actix_web::App;
     use futures::{future::IntoFuture as _, sink::Sink as _, Stream as _};
 
     use crate::{
@@ -139,15 +140,14 @@ mod test {
                 ice_user: None
             },
         };
-        let room = Room::start_in_arbiter(&Arbiter::new(), move |_| {
-            Room::new(
-                1,
-                members,
-                create_peers(1, 2),
-                conf.reconnect_timeout,
-                new_turn_auth_service_mock(),
-            )
-        });
+        let room = Room::new(
+            1,
+            members,
+            create_peers(1, 2),
+            conf.reconnect_timeout,
+            new_turn_auth_service_mock(),
+        )
+        .start();
         let rooms = hashmap! {1 => room};
         RoomsRepository::new(rooms)
     }
@@ -162,10 +162,8 @@ mod test {
                         config: conf.rpc.clone(),
                     })
                     .service(
-                        actix_web::web::resource(
-                            "/ws/{room_id}/{member_id}/{credentials}",
-                        )
-                        .route(actix_web::web::get().to_async(ws_index)),
+                        resource("/ws/{room_id}/{member_id}/{credentials}")
+                            .route(actix_web::web::get().to_async(ws_index)),
                     ),
             )
         })

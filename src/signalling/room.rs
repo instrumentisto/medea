@@ -448,7 +448,7 @@ impl Handler<RpcConnectionClosed> for Room {
 mod test {
     use std::sync::{atomic::AtomicUsize, Arc, Mutex};
 
-    use actix::{Addr, Arbiter, System};
+    use actix::{Addr, System};
 
     use medea_client_api_proto::{
         AudioSettings, Direction, IceServer, MediaType, Track, VideoSettings,
@@ -474,15 +474,14 @@ mod test {
                 ice_user: None
             },
         };
-        Room::start_in_arbiter(&Arbiter::new(), move |_| {
-            Room::new(
-                1,
-                members,
-                create_peers(1, 2),
-                Duration::from_secs(10),
-                new_turn_auth_service_mock(),
-            )
-        })
+        Room::new(
+            1,
+            members,
+            create_peers(1, 2),
+            Duration::from_secs(10),
+            new_turn_auth_service_mock(),
+        )
+        .start()
     }
 
     #[test]
@@ -498,23 +497,21 @@ mod test {
             let room_clone = room.clone();
             let stopped_clone = stopped.clone();
 
-            TestConnection::start_in_arbiter(&Arbiter::new(), move |_| {
-                TestConnection {
-                    events: caller_events_clone,
-                    member_id: 1,
-                    room: room_clone,
-                    stopped: stopped_clone,
-                }
-            });
+            TestConnection {
+                events: caller_events_clone,
+                member_id: 1,
+                room: room_clone,
+                stopped: stopped_clone,
+            }
+            .start();
 
-            TestConnection::start_in_arbiter(&Arbiter::new(), move |_| {
-                TestConnection {
-                    events: responder_events_clone,
-                    member_id: 2,
-                    room,
-                    stopped,
-                }
-            });
+            TestConnection {
+                events: responder_events_clone,
+                member_id: 2,
+                room,
+                stopped,
+            }
+            .start();
         })
         .unwrap();
 
