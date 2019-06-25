@@ -22,7 +22,10 @@ use crate::{
     conf::Conf,
     media::create_peers,
     signalling::{Room, RoomsRepository},
-    utils::graceful_shutdown,
+    utils::graceful_shutdown::{
+        self,
+        ShutdownSubscribe
+    },
 };
 
 fn main() {
@@ -44,7 +47,7 @@ fn main() {
     let process_signals =
         System::current().registry().get::<signal::ProcessSignals>();
 
-    let mut graceful_shutdown =
+    let graceful_shutdown =
         graceful_shutdown::new(5000, process_signals.clone());
 
     let turn_auth_service =
@@ -57,14 +60,16 @@ fn main() {
         turn_auth_service,
     );
     let room = Arbiter::start(move |_| room);
-    graceful_shutdown.subscribe(1, room.clone().recipient());
+    graceful_shutdown.do_send(ShutdownSubscribe {
+        priority: 1,
+        who: room.clone().recipient(),
+    });
 
     let rooms = hashmap! {1 => room};
     let rooms_repo = RoomsRepository::new(rooms);
 
-    let http_server = server::run(rooms_repo, config);
+    let _ = server::run(rooms_repo, config);
     // graceful_shutdown.subscribe(2, http_server.recipient().clone());
 
-    graceful_shutdown.start();
     let _ = sys.run();
 }
