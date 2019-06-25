@@ -4,7 +4,7 @@
 use std::time::Duration;
 
 use actix::{
-    fut::wrap_future, Actor, ActorFuture, AsyncContext, Context, Handler,
+    Actor, ActorFuture, AsyncContext, Context, fut::wrap_future, Handler,
     Message,
 };
 use failure::Fail;
@@ -28,6 +28,7 @@ use crate::{
     },
     signalling::{participants::ParticipantService, peers::PeerRepository},
     turn::TurnAuthService,
+    utils::graceful_shutdown::ShutdownResult,
 };
 
 /// ID of [`Room`].
@@ -448,7 +449,7 @@ impl Handler<RpcConnectionClosed> for Room {
 
 #[cfg(test)]
 mod test {
-    use std::sync::{atomic::AtomicUsize, Arc, Mutex};
+    use std::sync::{Arc, atomic::AtomicUsize, Mutex};
 
     use actix::{Addr, System};
 
