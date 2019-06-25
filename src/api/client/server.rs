@@ -154,8 +154,7 @@ mod test {
 
     use actix::Arbiter;
     use actix_web::{
-        actix::{actors::signal, System},
-        App, http, test,
+        App, http, test
     };
     use futures::Stream;
 
