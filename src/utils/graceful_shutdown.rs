@@ -1,21 +1,22 @@
 //! A class to handle shutdown signals and to shut down system
 
-use std::collections::BTreeMap;
+use std::{
+    collections::BTreeMap,
+    time::Duration
+};
 
 use actix::{
-    actors::signal::{self, ProcessSignals, Subscribe},
-    Actor, Addr, AsyncContext, Context, Handler, Message, Recipient, System,
+    Actor,
+    actors::signal::{self, ProcessSignals, Subscribe}, actors::signal::{Signal, SignalType}, Addr, AsyncContext, Context, Handler, Message, prelude::fut::WrapFuture,
+    Recipient,
+    System,
+};
+use tokio::prelude::{
+    future::{Future, join_all},
 };
 
 use crate::log::prelude::*;
-
-use actix::actors::signal::{Signal, SignalType};
-use tokio::prelude::future::join_all;
-use tokio::prelude::*;
-
 use crate::utils::then_all::then_all;
-use actix::prelude::fut::WrapFuture;
-use std::time::Duration;
 
 #[derive(Debug)]
 pub struct ShutdownResult;

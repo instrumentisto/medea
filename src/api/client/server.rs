@@ -1,9 +1,9 @@
 //! HTTP server for handling WebSocket connections of Client API.
 
-use actix::Actor;
+use actix::{Actor, Addr};
 use actix_web::{
-    http, middleware, server, ws, App, AsyncResponder, FutureResponse,
-    HttpRequest, HttpResponse, Path, State,
+    App, AsyncResponder, FutureResponse, http, HttpRequest, HttpResponse, middleware,
+    Path, server, State, ws,
 };
 use futures::{future, Future as _};
 use serde::Deserialize;
@@ -20,7 +20,6 @@ use crate::{
     log::prelude::*,
     signalling::{RoomId, RoomsRepository},
 };
-use actix::Addr;
 
 /// Parameters of new WebSocket connection creation HTTP request.
 #[derive(Debug, Deserialize)]
@@ -112,15 +111,15 @@ pub fn run(
 }
 
 pub mod actors {
-
-    use crate::utils::graceful_shutdown::ShutdownResult;
     use actix::{AsyncContext, WrapFuture};
     use actix::{Context, Handler, Recipient};
     use actix_web::server::StopServer;
+    use tokio::prelude::future::Future;
+
+    use crate::log::prelude::*;
+    use crate::utils::graceful_shutdown::ShutdownResult;
 
     pub struct ServerWrapper(pub Recipient<StopServer>);
-    use crate::log::prelude::*;
-    use tokio::prelude::future::Future;
 
     impl actix::Actor for ServerWrapper {
         type Context = Context<Self>;
@@ -156,7 +155,7 @@ mod test {
     use actix::Arbiter;
     use actix_web::{
         actix::{actors::signal, System},
-        http, test, App,
+        App, http, test,
     };
     use futures::Stream;
 
