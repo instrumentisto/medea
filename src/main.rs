@@ -9,7 +9,7 @@ pub mod media;
 pub mod signalling;
 pub mod turn;
 
-use actix::{actors::signal, prelude::Arbiter, System, Actor};
+use actix::{actors::signal, prelude::Arbiter, Actor, System};
 use dotenv::dotenv;
 use log::prelude::*;
 
@@ -21,9 +21,6 @@ use crate::{
     signalling::{Room, RoomsRepository},
     utils::graceful_shutdown,
 };
-use crate::utils::graceful_shutdown::GracefulShutdown;
-use futures::future::Future;
-use crate::utils::then_all::then_all;
 
 fn main() {
     dotenv().ok();
@@ -44,9 +41,8 @@ fn main() {
     let process_signals =
         System::current().registry().get::<signal::ProcessSignals>();
 
-
-    let mut graceful_shutdown = graceful_shutdown::new(3000,
-                                                     process_signals.clone());
+    let mut graceful_shutdown =
+        graceful_shutdown::new(5000, process_signals.clone());
 
     let turn_auth_service =
         new_turn_auth_service(&config).expect("Unable to start turn service");
@@ -64,35 +60,8 @@ fn main() {
     let rooms_repo = RoomsRepository::new(rooms);
 
     let http_server = server::run(rooms_repo, config);
-    //graceful_shutdown.subscribe(2, http_server.recipient().clone());
+    // graceful_shutdown.subscribe(2, http_server.recipient().clone());
 
     graceful_shutdown.start();
     let _ = sys.run();
-
-
-    //this is then_all futures test
-    //delete if not needed
-//    let disp = |e| {
-//        println!("disp: {:?}", e);
-//    };
-//    let mut_err = |_| {()};
-//    let mut fut_vec = Vec::new();
-//    fut_vec.push(futures::future::ok::<u8, u8>(1)
-//        .map(disp)
-//        .map_err(mut_err));
-//    fut_vec.push(futures::future::ok::<u8, u8>(2)
-//        .map(disp)
-//        .map_err(mut_err));
-//    fut_vec.push(futures::future::ok::<u8, u8>(3)
-//        .map(disp)
-//        .map_err(mut_err));
-//    fut_vec.push(futures::future::ok::<u8, u8>(4)
-//        .map(disp)
-//        .map_err(mut_err));
-//
-//    let wait_fut = then_all(fut_vec);
-//    tokio::run(wait_fut);
-//
-//    println!("done");
-
 }

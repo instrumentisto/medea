@@ -4,9 +4,8 @@
 use std::{fmt, time::Duration};
 
 use actix::{
-    actors::signal::{self, ProcessSignals, Subscribe},
-    fut::wrap_future,
-    Actor, ActorFuture, Addr, AsyncContext, Context, Handler, Message,
+    fut::wrap_future, Actor, ActorFuture, AsyncContext, Context, Handler,
+    Message,
 };
 use failure::Fail;
 use futures::future;
@@ -14,6 +13,7 @@ use hashbrown::HashMap;
 
 use medea_client_api_proto::{Command, Event, IceCandidate};
 
+use crate::utils::graceful_shutdown::ShutdownResult;
 use crate::{
     api::{
         client::rpc_connection::{
@@ -30,7 +30,6 @@ use crate::{
     signalling::{participants::ParticipantService, peers::PeerRepository},
     turn::TurnAuthService,
 };
-use crate::utils::graceful_shutdown::{GracefulShutdown, GracefulShutdownResult};
 
 /// ID of [`Room`].
 pub type Id = u64;
@@ -441,11 +440,14 @@ impl Handler<CloseRoom> for Room {
 }
 
 // Close room on `SIGINT`, `SIGTERM`, `SIGQUIT` signals.
-impl Handler<GracefulShutdownResult> for Room {
+impl Handler<ShutdownResult> for Room {
     type Result = Result<(), Box<dyn std::error::Error + Send>>;
 
-    fn handle(&mut self, msg: GracefulShutdownResult, ctx: &mut Self::Context)
-        -> Result<(), Box<dyn std::error::Error + Send>> {
+    fn handle(
+        &mut self,
+        _: ShutdownResult,
+        ctx: &mut Self::Context,
+    ) -> Result<(), Box<dyn std::error::Error + Send>> {
         info!("Shutting down Room: {:?}", self.id);
         ctx.notify(CloseRoom {});
         Ok(())
@@ -498,11 +500,6 @@ mod test {
             },
         };
 
-        let process_signals =
-            System::current().registry().get::<signal::ProcessSignals>();
-//        let shutdown_handler = GracefullShutdown::new(8000,
-//                                                      process_signals.clone());
-
         Arbiter::start(move |_| {
             Room::new(
                 1,
@@ -510,7 +507,6 @@ mod test {
                 create_peers(1, 2),
                 Duration::from_secs(10),
                 new_turn_auth_service_mock(),
-                //shutdown_handler,
             )
         })
     }

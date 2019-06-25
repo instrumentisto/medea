@@ -1,12 +1,12 @@
 //! HTTP server for handling WebSocket connections of Client API.
 
+use actix::Actor;
 use actix_web::{
     http, middleware, server, ws, App, AsyncResponder, FutureResponse,
     HttpRequest, HttpResponse, Path, State,
 };
 use futures::{future, Future as _};
 use serde::Deserialize;
-use actix::Actor;
 
 use crate::{
     api::{
@@ -20,10 +20,7 @@ use crate::{
     log::prelude::*,
     signalling::{RoomId, RoomsRepository},
 };
-use actix_web::server::{StopServer};
-use crate::utils::graceful_shutdown::{GracefulShutdownResult};
 use actix::Addr;
-
 
 /// Parameters of new WebSocket connection creation HTTP request.
 #[derive(Debug, Deserialize)]
@@ -85,7 +82,10 @@ pub struct Context {
 }
 
 /// Starts HTTP server for handling WebSocket connections of Client API.
-pub fn run(rooms: RoomsRepository, config: Conf) -> Addr<server_wrapper_mod::ServerWrapper> {
+pub fn run(
+    rooms: RoomsRepository,
+    config: Conf,
+) -> Addr<actors::ServerWrapper> {
     let server_addr = config.server.bind_addr();
 
     let actix_server_addr = server::new(move || {
@@ -103,20 +103,20 @@ pub fn run(rooms: RoomsRepository, config: Conf) -> Addr<server_wrapper_mod::Ser
     .unwrap()
     .start();
 
-    let server_wrapper = server_wrapper_mod::ServerWrapper(actix_server_addr.recipient());
+    let server_wrapper =
+        actors::ServerWrapper(actix_server_addr.recipient());
 
     info!("Started HTTP server on {:?}", server_addr);
 
     server_wrapper.start()
 }
 
-pub mod server_wrapper_mod {
+pub mod actors {
 
-    use actix::{Addr, Handler, Actor, Recipient, Context};
-    use actix::actors::signal;
-    use actix_web::server::StopServer;
+    use crate::utils::graceful_shutdown::ShutdownResult;
     use actix::{AsyncContext, WrapFuture};
-    use crate::utils::graceful_shutdown::GracefulShutdownResult;
+    use actix::{Context, Handler, Recipient};
+    use actix_web::server::StopServer;
 
     pub struct ServerWrapper(pub Recipient<StopServer>);
     use crate::log::prelude::*;
@@ -126,26 +126,28 @@ pub mod server_wrapper_mod {
         type Context = Context<Self>;
     }
 
-
-    impl Handler<GracefulShutdownResult> for ServerWrapper {
+    impl Handler<ShutdownResult> for ServerWrapper {
         type Result = Result<(), Box<dyn std::error::Error + Send>>;
 
-        fn handle(&mut self, _: GracefulShutdownResult, ctx: &mut Self::Context)
-                  -> Result<(), Box<dyn std::error::Error + Send>> {
+        fn handle(
+            &mut self,
+            _: ShutdownResult,
+            ctx: &mut Self::Context,
+        ) -> Result<(), Box<dyn std::error::Error + Send>> {
             info!("Shutting down Actix Web Server");
             ctx.wait(
-                self.0.send(StopServer { graceful: false })
+                self.0
+                    .send(StopServer { graceful: false })
                     .map(|_| ())
                     .map_err(|_| {
                         error!("Error trying to send StopServer to actix_web");
                     })
-                    .into_actor(self)
+                    .into_actor(self),
             );
             Ok(())
         }
     }
 }
-
 
 #[cfg(test)]
 mod test {
@@ -189,7 +191,7 @@ mod test {
                 members,
                 create_peers(1, 2),
                 conf.reconnect_timeout,
-                new_turn_auth_service_mock()
+                new_turn_auth_service_mock(),
             )
         });
         let rooms = hashmap! {1 => room};
