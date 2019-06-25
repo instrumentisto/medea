@@ -1,6 +1,6 @@
 //! [`Participant`] is member of [`Room`] with [`RpcConnection`].
 
-use std::convert::TryFrom as _;
+use std::{cell::RefCell, convert::TryFrom as _, rc::Rc};
 
 use failure::Fail;
 use hashbrown::HashMap;
@@ -14,7 +14,6 @@ use crate::{
 use super::endpoint::{
     Id as EndpointId, WebRtcPlayEndpoint, WebRtcPublishEndpoint,
 };
-use std::{cell::RefCell, rc::Rc};
 
 /// Errors which may occur while loading [`Participant`]s from [`RoomSpec`].
 #[derive(Debug, Fail)]

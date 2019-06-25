@@ -402,7 +402,7 @@ impl Room {
                     receiver.upgrade(),
                     ctx,
                     "Empty weak pointer for publisher receiver. {:?}.",
-                    receiver,
+                    publish,
                 );
 
                 let receiver_owner = unit_option_unwrap!(
