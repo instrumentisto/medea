@@ -22,6 +22,8 @@ use crate::{
     utils::graceful_shutdown,
 };
 use crate::utils::graceful_shutdown::GracefulShutdown;
+use futures::future::Future;
+use crate::utils::then_all::then_all;
 
 fn main() {
     dotenv().ok();
@@ -66,4 +68,31 @@ fn main() {
 
     graceful_shutdown.start();
     let _ = sys.run();
+
+
+    //this is then_all futures test
+    //delete if not needed
+//    let disp = |e| {
+//        println!("disp: {:?}", e);
+//    };
+//    let mut_err = |_| {()};
+//    let mut fut_vec = Vec::new();
+//    fut_vec.push(futures::future::ok::<u8, u8>(1)
+//        .map(disp)
+//        .map_err(mut_err));
+//    fut_vec.push(futures::future::ok::<u8, u8>(2)
+//        .map(disp)
+//        .map_err(mut_err));
+//    fut_vec.push(futures::future::ok::<u8, u8>(3)
+//        .map(disp)
+//        .map_err(mut_err));
+//    fut_vec.push(futures::future::ok::<u8, u8>(4)
+//        .map(disp)
+//        .map_err(mut_err));
+//
+//    let wait_fut = then_all(fut_vec);
+//    tokio::run(wait_fut);
+//
+//    println!("done");
+
 }
