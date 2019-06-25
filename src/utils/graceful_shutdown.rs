@@ -25,12 +25,19 @@ impl Message for ShutdownResult {
     type Result = Result<(), Box<dyn std::error::Error + Send>>;
 }
 
+/// Subscribe to exit events, with priority
+pub struct ShutdownSubscribe{
+    pub priority: u8,
+    pub who: Recipient<ShutdownResult>,
+}
+
+impl Message for ShutdownSubscribe {
+    type Result = ();
+}
+
 pub struct GracefulShutdown {
     /// [`Actor`]s to send message when graceful shutdown
     recipients: BTreeMap<u8, Vec<Recipient<ShutdownResult>>>,
-
-    /// Timeout after which all [`Actors`] will be forced shutdown
-    // shutdown_timeout: u64,
 
     /// Actix address of [`ProcessSignals`]
     process_signals: Addr<ProcessSignals>,
@@ -40,28 +47,7 @@ impl GracefulShutdown {
     pub fn new(process_signals: Addr<ProcessSignals>) -> Self {
         Self {
             recipients: BTreeMap::new(),
-            // shutdown_timeout,
             process_signals,
-        }
-    }
-
-    /// Subscribe to exit events, with priority
-    // todo: may be a bug: no checking who subscribed, may subcsribe same adress
-    // multiple times with the same/different priorities
-    pub fn subscribe(
-        &mut self,
-        priority: u8,
-        who: Recipient<ShutdownResult>,
-    ) {
-        let vec_with_current_priority = self.recipients.get_mut(&priority);
-        if let Some(vector) = vec_with_current_priority {
-            vector.push(who);
-        } else {
-            self.recipients.insert(priority, Vec::new());
-            // unwrap should not panic because we have inserted new empty vector
-            // in the line above /\
-            let vector = self.recipients.get_mut(&priority).unwrap();
-            vector.push(who);
         }
     }
 }
@@ -131,6 +117,25 @@ impl Handler<Signal> for GracefulShutdown {
     }
 }
 
+impl Handler<ShutdownSubscribe> for GracefulShutdown {
+    type Result = ();
+
+    fn handle(&mut self, msg: ShutdownSubscribe, _: &mut Context<Self>) {
+        // todo: may be a bug: may subscribe same address multiple times with the same/different priorities
+
+        let vec_with_current_priority = self.recipients.get_mut(&msg.priority);
+        if let Some(vector) = vec_with_current_priority {
+            vector.push(msg.who);
+        } else {
+            self.recipients.insert(msg.priority, Vec::new());
+            // unwrap should not panic because we have inserted new empty vector
+            // with the key we are trying to get in the line above /\
+            let vector = self.recipients.get_mut(&msg.priority).unwrap();
+            vector.push(msg.who);
+        }
+    }
+}
+
 pub struct TimeoutShutdown {
     pub shutdown_timeout: u64,
     pub process_signals: Addr<ProcessSignals>,
@@ -175,7 +180,7 @@ impl Handler<Signal> for TimeoutShutdown {
 pub fn new(
     shutdown_timeout: u64,
     process_signals: Addr<signal::ProcessSignals>,
-) -> GracefulShutdown {
+) -> Addr<GracefulShutdown> {
     let graceful_shutdown = GracefulShutdown::new(process_signals.clone());
 
     let timeout_shutdown = TimeoutShutdown {
@@ -184,6 +189,5 @@ pub fn new(
     };
     timeout_shutdown.start();
 
-    // todo impl messages for graceful shutdown and start it here
-    graceful_shutdown
+    graceful_shutdown.start()
 }
