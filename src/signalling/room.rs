@@ -474,7 +474,7 @@ impl Handler<RpcConnectionClosed> for Room {
 mod test {
     use std::sync::{atomic::AtomicUsize, Arc, Mutex};
 
-    use actix::{Addr, Arbiter, System};
+    use actix::{Addr, System};
 
     use medea_client_api_proto::{
         AudioSettings, Direction, IceServer, MediaType, Track, VideoSettings,
@@ -500,15 +500,14 @@ mod test {
                 ice_user: None
             },
         };
-        Arbiter::start(move |_| {
-            Room::new(
-                1,
-                members,
-                create_peers(1, 2),
-                Duration::from_secs(10),
-                new_turn_auth_service_mock(),
-            )
-        })
+        Room::new(
+            1,
+            members,
+            create_peers(1, 2),
+            Duration::from_secs(10),
+            new_turn_auth_service_mock(),
+        )
+        .start()
     }
 
     #[test]
@@ -523,19 +522,24 @@ mod test {
             let room = start_room();
             let room_clone = room.clone();
             let stopped_clone = stopped.clone();
-            Arbiter::start(move |_| TestConnection {
+
+            TestConnection {
                 events: caller_events_clone,
                 member_id: 1,
                 room: room_clone,
                 stopped: stopped_clone,
-            });
-            Arbiter::start(move |_| TestConnection {
+            }
+            .start();
+
+            TestConnection {
                 events: responder_events_clone,
                 member_id: 2,
                 room,
                 stopped,
-            });
-        });
+            }
+            .start();
+        })
+        .unwrap();
 
         let caller_events = caller_events.lock().unwrap();
         let responder_events = responder_events.lock().unwrap();

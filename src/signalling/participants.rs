@@ -18,7 +18,6 @@ use hashbrown::HashMap;
 
 use medea_client_api_proto::Event;
 
-use crate::signalling::RoomId;
 use crate::{
     api::{
         client::rpc_connection::{
@@ -31,7 +30,7 @@ use crate::{
     media::IceUser,
     signalling::{
         room::{ActFuture, CloseRoom, RoomError},
-        Room,
+        Room, RoomId,
     },
     turn::{TurnAuthService, TurnServiceErr, UnreachablePolicy},
 };
@@ -202,6 +201,9 @@ impl ParticipantService {
                                 .connections
                                 .insert(member_id, con);
                             room.participants.insert_member(member);
+                            room.participants
+                                .connections
+                                .insert(member_id, con);
                         };
                         wrap_future(future::ok(()))
                     },

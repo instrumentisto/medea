@@ -3,6 +3,7 @@
 
 max_width = 80
 format_strings = true
+merge_imports = true
 normalize_comments = true
 wrap_comments = true
 
