@@ -2,8 +2,8 @@
 
 use actix::{Actor, Addr};
 use actix_web::{
-    App, AsyncResponder, FutureResponse, http, HttpRequest, HttpResponse, middleware,
-    Path, server, State, ws,
+    http, middleware, server, ws, App, AsyncResponder, FutureResponse,
+    HttpRequest, HttpResponse, Path, State,
 };
 use futures::{future, Future as _};
 use serde::Deserialize;
@@ -102,8 +102,7 @@ pub fn run(
     .unwrap()
     .start();
 
-    let server_wrapper =
-        actors::ServerWrapper(actix_server_addr.recipient());
+    let server_wrapper = actors::ServerWrapper(actix_server_addr.recipient());
 
     info!("Started HTTP server on {:?}", server_addr);
 
@@ -111,8 +110,7 @@ pub fn run(
 }
 
 pub mod actors {
-    use actix::{AsyncContext, WrapFuture};
-    use actix::{Context, Handler, Recipient};
+    use actix::{Actor, AsyncContext, Context, Handler, Recipient, WrapFuture};
     use actix_web::server::StopServer;
     use tokio::prelude::future::Future;
 
@@ -121,7 +119,7 @@ pub mod actors {
 
     pub struct ServerWrapper(pub Recipient<StopServer>);
 
-    impl actix::Actor for ServerWrapper {
+    impl Actor for ServerWrapper {
         type Context = Context<Self>;
     }
 
@@ -153,9 +151,7 @@ mod test {
     use std::{ops::Add, thread, time::Duration};
 
     use actix::Arbiter;
-    use actix_web::{
-        App, http, test
-    };
+    use actix_web::{http, test, App};
     use futures::Stream;
 
     use crate::{

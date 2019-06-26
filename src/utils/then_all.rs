@@ -1,11 +1,13 @@
 //! Definition of the [`ThenAll`] tokio-based combinator,
 //! executing each future in a list of futures one by one. Ignores errors.
 
+use std::fmt;
 use std::prelude::v1::*;
 
-use std::fmt;
-use tokio::prelude::future::{Future, IntoFuture};
-use tokio::prelude::*;
+use tokio::prelude::{
+    future::{Future, IntoFuture},
+    task, Async, Poll,
+};
 
 #[derive(Debug)]
 enum ElemState<T>

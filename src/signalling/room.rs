@@ -1,10 +1,10 @@
 //! Room definitions and implementations. Room is responsible for media
 //! connection establishment between concrete [`Member`]s.
 
-use std::{fmt, time::Duration};
+use std::time::Duration;
 
 use actix::{
-    Actor, ActorFuture, AsyncContext, Context, fut::wrap_future, Handler,
+    fut::wrap_future, Actor, ActorFuture, AsyncContext, Context, Handler,
     Message,
 };
 use failure::Fail;
@@ -462,7 +462,7 @@ impl Handler<RpcConnectionClosed> for Room {
 
 #[cfg(test)]
 mod test {
-    use std::sync::{Arc, atomic::AtomicUsize, Mutex};
+    use std::sync::{atomic::AtomicUsize, Arc, Mutex};
 
     use actix::{Addr, Arbiter, System};
 

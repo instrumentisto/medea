@@ -9,10 +9,7 @@ pub mod media;
 pub mod signalling;
 pub mod turn;
 
-use actix::{
-    actors::signal,
-    prelude::*
-};
+use actix::{actors::signal, prelude::*};
 use dotenv::dotenv;
 use log::prelude::*;
 
@@ -22,10 +19,7 @@ use crate::{
     conf::Conf,
     media::create_peers,
     signalling::{Room, RoomsRepository},
-    utils::graceful_shutdown::{
-        self,
-        ShutdownSubscribe
-    },
+    utils::graceful_shutdown::{self, ShutdownSubscribe},
 };
 
 fn main() {
@@ -47,8 +41,7 @@ fn main() {
     let process_signals =
         System::current().registry().get::<signal::ProcessSignals>();
 
-    let graceful_shutdown =
-        graceful_shutdown::create(5000, process_signals.clone());
+    let graceful_shutdown = graceful_shutdown::create(5000, &process_signals);
 
     let turn_auth_service =
         new_turn_auth_service(&config).expect("Unable to start turn service");

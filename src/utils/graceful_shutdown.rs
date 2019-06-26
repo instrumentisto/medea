@@ -1,18 +1,15 @@
 //! A class to handle shutdown signals and to shut down system
 
-use std::{collections::BTreeMap, time::Duration, mem};
+use std::{collections::BTreeMap, time::Duration};
 
 use actix::{
     self,
-    Actor, actors::signal::{self, ProcessSignals, Subscribe},
-    actors::signal::{Signal, SignalType}, Addr, Arbiter, AsyncContext,
-    Context, Handler, MailboxError, Message, prelude::fut::WrapFuture,
-    Recipient, System
+    actors::signal::{self, ProcessSignals, Signal, SignalType, Subscribe},
+    prelude::fut::WrapFuture,
+    Actor, Addr, Arbiter, AsyncContext, Context, Handler, Message, Recipient,
+    System,
 };
-use tokio::prelude::{
-    future::{Future, join_all},
-};
-use tokio::prelude::future;
+use tokio::prelude::future::{join_all, Future};
 
 use crate::{log::prelude::*, utils::then_all::then_all};
 
@@ -24,7 +21,7 @@ impl Message for ShutdownResult {
 }
 
 /// Subscribe to exit events, with priority
-pub struct ShutdownSubscribe{
+pub struct ShutdownSubscribe {
     pub priority: u8,
     pub who: Recipient<ShutdownResult>,
 }
@@ -45,7 +42,10 @@ pub struct GracefulShutdown {
 }
 
 impl GracefulShutdown {
-    fn new(shutdown_timeout: u64, process_signals: Addr<ProcessSignals>) -> Self {
+    fn new(
+        shutdown_timeout: u64,
+        process_signals: Addr<ProcessSignals>,
+    ) -> Self {
         Self {
             recipients: BTreeMap::new(),
             shutdown_timeout,
@@ -97,7 +97,6 @@ impl Handler<Signal> for GracefulShutdown {
             }
             let this_priority_futures = join_all(this_priority_futures_vec);
             shutdown_futures_vec.push(this_priority_futures);
-
         }
 
         let shutdown_future = then_all(shutdown_futures_vec);
@@ -114,7 +113,7 @@ impl Handler<Signal> for GracefulShutdown {
         }
 
         ctx.spawn(
-                shutdown_future
+            shutdown_future
                 .map(|_| {
                     System::current().stop();
                 })
@@ -122,7 +121,7 @@ impl Handler<Signal> for GracefulShutdown {
                     error!("Error trying to shut down system gracefully.");
                     System::current().stop();
                 })
-                .into_actor(self)
+                .into_actor(self),
         );
     }
 }
@@ -131,7 +130,8 @@ impl Handler<ShutdownSubscribe> for GracefulShutdown {
     type Result = ();
 
     fn handle(&mut self, msg: ShutdownSubscribe, _: &mut Context<Self>) {
-        // todo: may be a bug: may subscribe same address multiple times with the same/different priorities
+        // todo: may be a bug: may subscribe same address multiple times with
+        // the same/different priorities
 
         let vec_with_current_priority = self.recipients.get_mut(&msg.priority);
         if let Some(vector) = vec_with_current_priority {
@@ -146,55 +146,11 @@ impl Handler<ShutdownSubscribe> for GracefulShutdown {
     }
 }
 
-//pub struct TimeoutShutdown {
-//    pub shutdown_timeout: u64,
-//    pub process_signals: Addr<ProcessSignals>,
-//}
-//
-//impl Actor for TimeoutShutdown {
-//    type Context = Context<Self>;
-//
-//    fn started(&mut self, ctx: &mut Self::Context) {
-//        self.process_signals
-//            .do_send(Subscribe(ctx.address().recipient()));
-//    }
-//}
-//
-//impl Handler<Signal> for TimeoutShutdown {
-//    type Result = ();
-//
-//    fn handle(&mut self, msg: Signal, ctx: &mut Context<Self>) {
-//        match msg.0 {
-//            SignalType::Int
-//            | SignalType::Hup
-//            | SignalType::Term
-//            | SignalType::Quit => {}
-//            _ => return,
-//        };
-//        info!(
-//            "System will be shut down in {:?} ms.",
-//            self.shutdown_timeout
-//        );
-//
-//        ctx.run_later(
-//            Duration::from_millis(self.shutdown_timeout),
-//            move |_, _| {
-//                System::current().stop();
-//            },
-//        );
-//    }
-//}
-
 pub fn create(
     shutdown_timeout: u64,
-    process_signals: Addr<signal::ProcessSignals>,
+    process_signals: &Addr<signal::ProcessSignals>,
 ) -> Addr<GracefulShutdown> {
-    let graceful_shutdown = GracefulShutdown::new(shutdown_timeout,
-                                                  process_signals.clone());
-//    let timeout_shutdown = TimeoutShutdown {
-//        shutdown_timeout,
-//        process_signals,
-//    };
-//    let shutdown = Arbiter::start(|ctx| {timeout_shutdown});
-    Arbiter::start(|ctx| {graceful_shutdown})
+    let graceful_shutdown =
+        GracefulShutdown::new(shutdown_timeout, process_signals.clone());
+    Arbiter::start(|_| graceful_shutdown)
 }
