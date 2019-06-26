@@ -10,4 +10,5 @@ doc-valid-idents = [
     "iOS", "macOS", "TeX", "LaTeX", "BibTeX", "BibLaTeX", "MinGW",
     "WebSocket",
     "RTCIceServer", "RTCConfiguration",
+    "WebRTC",
 ]
