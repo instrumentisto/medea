@@ -276,7 +276,7 @@ impl Handler<DeleteIceUsers> for Service {
     }
 }
 
-#[cfg(any(feature = "e2e_test", test))]
+#[cfg(test)]
 pub mod test {
     use futures::future;
 
