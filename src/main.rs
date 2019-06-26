@@ -48,7 +48,7 @@ fn main() {
         System::current().registry().get::<signal::ProcessSignals>();
 
     let graceful_shutdown =
-        graceful_shutdown::new(5000, process_signals.clone());
+        graceful_shutdown::create(5000, process_signals.clone());
 
     let turn_auth_service =
         new_turn_auth_service(&config).expect("Unable to start turn service");
