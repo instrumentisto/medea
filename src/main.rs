@@ -13,12 +13,12 @@ use actix::prelude::*;
 use dotenv::dotenv;
 use log::prelude::*;
 
-use crate::turn::new_turn_auth_service;
 use crate::{
     api::{client::server, control::Member},
     conf::Conf,
     media::create_peers,
     signalling::{Room, RoomsRepository},
+    turn::new_turn_auth_service,
 };
 
 fn main() {
@@ -41,14 +41,13 @@ fn main() {
 
     let turn_auth_service =
         new_turn_auth_service(&config).expect("Unable to start turn service");
-    let room = Room::new(
-        1,
-        members,
-        peers,
-        config.rpc.reconnect_timeout,
-        turn_auth_service,
-    );
-    let room = Arbiter::start(move |_| room);
+
+    let rpc_reconnect_timeout = config.rpc.reconnect_timeout;
+
+    let room = Room::start_in_arbiter(&Arbiter::new(), move |_| {
+        Room::new(1, members, peers, rpc_reconnect_timeout, turn_auth_service)
+    });
+
     let rooms = hashmap! {1 => room};
     let rooms_repo = RoomsRepository::new(rooms);
 

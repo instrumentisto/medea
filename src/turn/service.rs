@@ -46,7 +46,7 @@ impl TurnAuthService for Addr<Service> {
         member_id: u64,
         room_id: RoomId,
         policy: UnreachablePolicy,
-    ) -> Box<Future<Item = IceUser, Error = TurnServiceErr>> {
+    ) -> Box<dyn Future<Item = IceUser, Error = TurnServiceErr>> {
         Box::new(
             self.send(CreateIceUser {
                 member_id,
@@ -69,7 +69,7 @@ impl TurnAuthService for Addr<Service> {
     fn delete(
         &self,
         users: Vec<IceUser>,
-    ) -> Box<Future<Item = (), Error = TurnServiceErr>> {
+    ) -> Box<dyn Future<Item = (), Error = TurnServiceErr>> {
         // leave only non static users
         let users: Vec<IceUser> =
             users.into_iter().filter(|u| !u.is_static()).collect();
@@ -181,7 +181,8 @@ pub fn new_turn_auth_service(
         static_user: None,
     };
 
-    Ok(Box::new(Arbiter::start(|_| service)))
+    let service = Service::start_in_arbiter(&Arbiter::new(), move |_| service);
+    Ok(Box::new(service))
 }
 
 impl Service {
@@ -293,7 +294,7 @@ pub mod test {
             _: u64,
             _: RoomId,
             _: UnreachablePolicy,
-        ) -> Box<Future<Item = IceUser, Error = TurnServiceErr>> {
+        ) -> Box<dyn Future<Item = IceUser, Error = TurnServiceErr>> {
             Box::new(future::ok(IceUser::new(
                 "5.5.5.5:1234".parse().unwrap(),
                 String::from("username"),
@@ -304,7 +305,7 @@ pub mod test {
         fn delete(
             &self,
             _: Vec<IceUser>,
-        ) -> Box<Future<Item = (), Error = TurnServiceErr>> {
+        ) -> Box<dyn Future<Item = (), Error = TurnServiceErr>> {
             Box::new(future::ok(()))
         }
     }
