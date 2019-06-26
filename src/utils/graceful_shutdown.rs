@@ -1,17 +1,16 @@
 //! A class to handle shutdown signals and to shut down system
 
-use std::{collections::BTreeMap, time::Duration};
+use std::{collections::BTreeMap, time::Duration, mem};
 
-use actix::{
-    self,
-    actors::signal::{self, ProcessSignals, Signal, SignalType, Subscribe},
-    prelude::fut::WrapFuture,
-    Actor, Addr, Arbiter, AsyncContext, Context, Handler, Message, Recipient,
-    System,
-};
+use actix::{self, actors::signal::{self, ProcessSignals, Signal, SignalType, Subscribe}, prelude::fut::WrapFuture, Actor, Addr, Arbiter, AsyncContext, Context, Handler, Message, Recipient, System, MailboxError};
 use tokio::prelude::future::{join_all, Future};
 
-use crate::{log::prelude::*, utils::then_all::then_all};
+type ShutdownFutureType = Box<dyn Future<
+    Item = std::vec::Vec<
+        std::result::Result<(),
+            std::boxed::Box<(dyn std::error::Error + std::marker::Send + 'static)>>>,
+    Error = MailboxError>>;
+
 
 #[derive(Debug)]
 pub struct ShutdownResult;
@@ -85,7 +84,10 @@ impl Handler<Signal> for GracefulShutdown {
             }
         };
 
-        let mut shutdown_futures_vec = Vec::new();
+        let mut shutdown_future: ShutdownFutureType =
+            Box::new(futures::future::ok::<
+                Vec<Result<(), Box<(dyn std::error::Error + Send + 'static)>>>,
+                MailboxError> (vec![Ok(())] ));
 
         for recipients in self.recipients.values() {
             let mut this_priority_futures_vec =
@@ -95,11 +97,17 @@ impl Handler<Signal> for GracefulShutdown {
                 let send_fut = recipient.send(ShutdownResult {});
                 this_priority_futures_vec.push(send_fut);
             }
-            let this_priority_futures = join_all(this_priority_futures_vec);
-            shutdown_futures_vec.push(this_priority_futures);
-        }
 
-        let shutdown_future = then_all(shutdown_futures_vec);
+            let this_priority_futures = join_all(this_priority_futures_vec);
+            let new_shutdown_future =
+                Box::new(shutdown_future
+                    .then(|_| {this_priority_futures}));
+            // we need to rewrite shutdown_future, otherwise compiler thinks we moved value
+            shutdown_future = Box::new(futures::future::ok::<
+                Vec<Result<(), Box<(dyn std::error::Error + Send + 'static)>>>,
+                MailboxError> (vec![Ok(())] ));
+            mem::replace(&mut shutdown_future, new_shutdown_future);
+        }
 
         ctx.run_later(
             Duration::from_millis(self.shutdown_timeout),
