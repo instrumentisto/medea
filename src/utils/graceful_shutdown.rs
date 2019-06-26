@@ -1,22 +1,21 @@
 //! A class to handle shutdown signals and to shut down system
 
-use std::{
-    collections::BTreeMap,
-    time::Duration
-};
+use std::{collections::BTreeMap, time::Duration, mem};
 
 use actix::{
-    Actor,
-    actors::signal::{self, ProcessSignals, Subscribe}, actors::signal::{Signal, SignalType}, Addr, AsyncContext, Context, Handler, Message, prelude::fut::WrapFuture,
-    Recipient,
-    System,
+    self,
+    Actor, actors::signal::{self, ProcessSignals, Subscribe},
+    actors::signal::{Signal, SignalType}, Addr, Arbiter, AsyncContext,
+    Context, Handler, MailboxError, Message, prelude::fut::WrapFuture,
+    Recipient, System
 };
 use tokio::prelude::{
     future::{Future, join_all},
 };
+use tokio::prelude::future;
 
-use crate::log::prelude::*;
-use crate::utils::then_all::then_all;
+use crate::{log::prelude::*, utils::then_all::then_all};
+use actix_web::ws::ProtocolError::BadOpCode;
 
 #[derive(Debug)]
 pub struct ShutdownResult;
@@ -44,7 +43,7 @@ pub struct GracefulShutdown {
 }
 
 impl GracefulShutdown {
-    pub fn new(process_signals: Addr<ProcessSignals>) -> Self {
+    fn new(process_signals: Addr<ProcessSignals>) -> Self {
         Self {
             recipients: BTreeMap::new(),
             process_signals,
@@ -89,6 +88,13 @@ impl Handler<Signal> for GracefulShutdown {
 
         let mut shutdown_futures_vec = Vec::new();
 
+//        let mut shutdown_future = Box::new(
+//            future::ok::<(), MailboxError>( () )
+//                .and_then(|_| {
+//                    future::ok::<(), MailboxError>( () )
+//                })
+//        );
+
         for recipients in self.recipients.values() {
             let mut this_priority_futures_vec =
                 Vec::with_capacity(recipients.len());
@@ -99,6 +105,9 @@ impl Handler<Signal> for GracefulShutdown {
             }
             let this_priority_futures = join_all(this_priority_futures_vec);
             shutdown_futures_vec.push(this_priority_futures);
+//            let new_shutdown_future = Box::new(shutdown_future.and_then(|_| {this_priority_futures}));
+//            mem::replace(&mut shutdown_future, new_shutdown_future);
+
         }
 
         let shutdown_future = then_all(shutdown_futures_vec);
@@ -155,13 +164,11 @@ impl Handler<Signal> for TimeoutShutdown {
 
     fn handle(&mut self, msg: Signal, ctx: &mut Context<Self>) {
         match msg.0 {
-            SignalType::Int |
-            SignalType::Hup |
-            SignalType::Term |
-            SignalType::Quit => {},
-            _ => {
-                return;
-            }
+            SignalType::Int
+            | SignalType::Hup
+            | SignalType::Term
+            | SignalType::Quit => {}
+            _ => return,
         };
         info!(
             "System will be shut down in {:?} ms.",
@@ -182,12 +189,10 @@ pub fn new(
     process_signals: Addr<signal::ProcessSignals>,
 ) -> Addr<GracefulShutdown> {
     let graceful_shutdown = GracefulShutdown::new(process_signals.clone());
-
     let timeout_shutdown = TimeoutShutdown {
         shutdown_timeout,
         process_signals,
     };
-    timeout_shutdown.start();
-
-    graceful_shutdown.start()
+    let shutdown = Arbiter::start(|ctx| {timeout_shutdown});
+    Arbiter::start(|ctx| {graceful_shutdown})
 }
