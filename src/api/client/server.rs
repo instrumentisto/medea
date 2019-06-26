@@ -6,7 +6,10 @@ use actix_web::{
     App, Error, HttpRequest, HttpResponse, HttpServer,
 };
 use actix_web_actors::ws;
-use futures::{future, Future};
+use futures::{
+    future::{self, Either},
+    Future,
+};
 use serde::Deserialize;
 
 use crate::{
@@ -44,7 +47,7 @@ fn ws_index(
     debug!("Request params: {:?}", info);
 
     match state.rooms.get(&info.room_id) {
-        Some(room) => future::Either::A(
+        Some(room) => Either::A(
             room.send(Authorize {
                 member_id: info.member_id.clone(),
                 credentials: info.credentials.clone(),
@@ -68,7 +71,7 @@ fn ws_index(
                 }
             }),
         ),
-        None => future::Either::B(future::ok(HttpResponse::NotFound().into())),
+        None => Either::B(future::ok(HttpResponse::NotFound().into())),
     }
 }
 
