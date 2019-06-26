@@ -30,7 +30,7 @@ struct InnerMediaManager {
     /// its handle.
     // TODO: will be extended with some metadata that would allow client to
     //       understand purpose of obtaining this stream.
-    on_local_stream: Rc<Callback2<MediaStreamHandle, WasmErr>>,
+    on_local_stream: Callback2<MediaStreamHandle, WasmErr>,
 }
 
 impl MediaManager {
@@ -91,5 +91,11 @@ impl MediaManager {
     /// obtains [`MediaStream`].
     pub fn set_on_local_stream(&self, f: js_sys::Function) {
         self.0.borrow_mut().on_local_stream.set_func(f);
+    }
+}
+
+impl Drop for InnerMediaManager {
+    fn drop(&mut self) {
+        WasmErr::build_from_str("Drop for InnerMediaManager").log_err();
     }
 }

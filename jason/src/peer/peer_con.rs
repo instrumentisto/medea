@@ -1,35 +1,22 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use futures::{
-    future::{self, join_all},
-    sync::mpsc::UnboundedSender,
-    Future,
-};
-use medea_client_api_proto::{Direction, IceServer, MediaType, Track};
+use futures::{future, sync::mpsc::UnboundedSender, Future};
+use medea_client_api_proto::{IceServer, Track};
 use medea_macro::dispatchable;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
     RtcConfiguration, RtcIceCandidateInit, RtcPeerConnection,
-    RtcPeerConnectionIceEvent, RtcRtpTransceiver, RtcRtpTransceiverDirection,
-    RtcRtpTransceiverInit, RtcSdpType, RtcSessionDescription,
+    RtcPeerConnectionIceEvent, RtcSdpType, RtcSessionDescription,
     RtcSessionDescriptionInit, RtcTrackEvent,
 };
 
 use crate::{
-    media::{MediaManager, MediaStream, MediaTrack, StreamRequest, TrackId},
-    peer::ice_server::RtcIceServers,
+    media::{MediaManager, MediaStream, MediaTrack},
+    peer::{ice_server::RtcIceServers, media_connections::MediaConnections},
     utils::{EventListener, WasmErr},
 };
 
 pub type Id = u64;
-
-/// [`RTCSdpType`][1] adapter. `pranswer` and `rollback` SDPs aren't used.
-///
-/// [1]: https://www.w3.org/TR/webrtc/#rtcsdptype
-pub enum Sdp {
-    Offer(String),
-    Answer(String),
-}
 
 #[dispatchable]
 #[allow(clippy::module_name_repetitions)]
@@ -91,7 +78,8 @@ impl PeerConnection {
 
         let peer =
             Rc::new(RtcPeerConnection::new_with_configuration(&peer_conf)?);
-        let connections = Rc::new(RefCell::new(MediaConnections::new()));
+        let connections =
+            Rc::new(RefCell::new(MediaConnections::new(Rc::clone(&peer))));
 
         // Bind to `icecandidate` event.
         let sender = peer_events_sender.clone();
@@ -100,6 +88,7 @@ impl PeerConnection {
             "icecandidate",
             move |msg: RtcPeerConnectionIceEvent| {
                 // TODO: examine None candidates, maybe we should send them
+                //       (although no one does)
                 if let Some(candidate) = msg.candidate() {
                     let _ = sender.unbounded_send(
                         PeerEvent::IceCandidateDiscovered {
@@ -127,13 +116,13 @@ impl PeerConnection {
                 if let Some(receiver) =
                     connections.add_remote_track(transceiver, track)
                 {
-                    let sender_id = receiver.sender_id;
+                    let sender_id = receiver.sender_id();
 
                     // gather all tracks from new track sender, break if still
                     // waiting for some tracks
                     let mut tracks: Vec<Rc<MediaTrack>> = Vec::new();
                     for receiver in connections.get_by_sender(sender_id) {
-                        match receiver.track {
+                        match receiver.track() {
                             None => return,
                             Some(ref track) => tracks.push(Rc::clone(track)),
                         }
@@ -173,21 +162,7 @@ impl PeerConnection {
     pub fn get_send_mids(
         &self,
     ) -> Result<Option<HashMap<u64, String>>, WasmErr> {
-        if self.media_connections.borrow().senders.is_empty() {
-            return Ok(None);
-        }
-
-        let mut mids = HashMap::new();
-        for (track_id, sender) in &self.media_connections.borrow().senders {
-            mids.insert(
-                *track_id,
-                sender.transceiver.mid().ok_or_else(|| {
-                    WasmErr::build_from_str("Peer has senders without mid")
-                })?,
-            );
-        }
-
-        Ok(Some(mids))
+        self.media_connections.borrow().get_send_mids()
     }
 
     /// Obtain SDP Offer from underlying [`RTCPeerConnection`][1] and set it as
@@ -237,24 +212,32 @@ impl PeerConnection {
     /// Updates underlying [`RTCPeerConnection`][1] remote SDP.
     ///
     /// [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
-    pub fn set_remote_description(
+    pub fn set_remote_answer(
         &self,
-        sdp: Sdp,
+        answer: &str,
+        mids: Option<HashMap<u64, String>>,
     ) -> impl Future<Item = (), Error = WasmErr> {
-        let desc = match sdp {
-            Sdp::Offer(offer) => {
-                let mut desc =
-                    RtcSessionDescriptionInit::new(RtcSdpType::Offer);
-                desc.sdp(&offer);
-                desc
-            }
-            Sdp::Answer(answer) => {
-                let mut desc =
-                    RtcSessionDescriptionInit::new(RtcSdpType::Answer);
-                desc.sdp(&answer);
-                desc
-            }
-        };
+        if let Some(mids) = mids {
+            self.media_connections.borrow_mut().set_recv_mids(mids);
+        }
+
+        let mut desc = RtcSessionDescriptionInit::new(RtcSdpType::Answer);
+        desc.sdp(answer);
+
+        JsFuture::from(self.peer.set_remote_description(&desc))
+            .map(|_| ())
+            .map_err(Into::into)
+    }
+
+    /// Updates underlying [`RTCPeerConnection`][1] remote SDP.
+    ///
+    /// [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
+    pub fn set_remote_offer(
+        &self,
+        offer: &str,
+    ) -> impl Future<Item = (), Error = WasmErr> {
+        let mut desc = RtcSessionDescriptionInit::new(RtcSdpType::Offer);
+        desc.sdp(offer);
 
         JsFuture::from(self.peer.set_remote_description(&desc))
             .map(|_| ())
@@ -284,39 +267,6 @@ impl PeerConnection {
         .map_err(Into::into)
     }
 
-    // TODO: Doesnt really updates anything, but only generates new senders and
-    //       receivers atm.
-    fn update_track(&self, track: Track) {
-        match track.direction {
-            Direction::Send { .. } => {
-                self.media_connections.borrow_mut().senders.insert(
-                    track.id,
-                    Sender::new(track.id, track.media_type, &self.peer),
-                );
-            }
-            Direction::Recv { sender, mid } => {
-                self.media_connections.borrow_mut().receivers.insert(
-                    track.id,
-                    Receiver::new(track.id, track.media_type, sender, mid),
-                );
-            }
-        }
-    }
-
-    /// Update this peer [`Receiver`]s mids.
-    pub fn set_recv_mids(&self, mids: HashMap<u64, String>) {
-        for (track_id, mid) in mids {
-            if let Some(receiver) = self
-                .media_connections
-                .borrow_mut()
-                .receivers
-                .get_mut(&track_id)
-            {
-                receiver.mid.replace(mid);
-            }
-        }
-    }
-
     /// Update peers tracks.
     ///
     /// Synchronize provided tracks with this [`PeerConnection`] [`Sender`]s and
@@ -327,7 +277,7 @@ impl PeerConnection {
         media_manager: &Rc<MediaManager>,
     ) -> impl Future<Item = (), Error = WasmErr> {
         for track in tracks {
-            self.update_track(track);
+            self.media_connections.borrow_mut().update_track(track);
         }
 
         if let Some(media_request) =
@@ -343,185 +293,6 @@ impl PeerConnection {
             future::Either::B(get_media)
         } else {
             future::Either::A(future::ok(()))
-        }
-    }
-}
-
-/// Stores [`Peer`]s [`Sender`]s and [`Receiver`]s.
-struct MediaConnections {
-    need_local_stream: bool,
-    senders: HashMap<TrackId, Sender>,
-    receivers: HashMap<TrackId, Receiver>,
-}
-
-impl MediaConnections {
-    pub fn new() -> Self {
-        Self {
-            need_local_stream: false,
-            senders: HashMap::new(),
-            receivers: HashMap::new(),
-        }
-    }
-
-    /// Check if [`Sender`]s require new [`MediaStream`].
-    fn get_request(&self) -> Option<StreamRequest> {
-        if self.need_local_stream {
-            let mut media_request = StreamRequest::default();
-            for (track_id, sender) in &self.senders {
-                media_request.add_track_request(*track_id, sender.caps.clone());
-            }
-            Some(media_request)
-        } else {
-            None
-        }
-    }
-
-    /// Inserts tracks from provided [`MediaStream`] into stored [`Sender`]s
-    /// based on track ids. Stream must have all required tracks.
-    pub fn insert_local_stream(
-        &mut self,
-        stream: &Rc<MediaStream>,
-    ) -> impl Future<Item = (), Error = WasmErr> {
-        // validate that provided stream have all tracks that we need
-        for sender in self.senders.values() {
-            if !stream.has_track(sender.track_id) {
-                return future::Either::A(future::err(
-                    WasmErr::build_from_str(
-                        "Stream does not have all necessary tracks",
-                    ),
-                ));
-            }
-        }
-
-        let mut promises = Vec::new();
-        for sender in self.senders.values() {
-            let sender: &Sender = sender;
-
-            if let Some(track) = stream.get_track_by_id(sender.track_id) {
-                promises.push(
-                    JsFuture::from(
-                        sender
-                            .transceiver
-                            .sender()
-                            .replace_track(Some(track.track())),
-                    )
-                    .map_err(WasmErr::from),
-                );
-            }
-        }
-
-        future::Either::B(join_all(promises).map(|_| ()))
-    }
-
-    /// Find associated [`Receiver`] by transceiver's mid and update it with
-    /// [`StreamTrack`] and [`RtcRtpTransceiver`][1] and return found
-    /// [`Receiver`].
-    ///
-    /// [1]: https://www.w3.org/TR/webrtc/#rtcrtptransceiver-interface
-    pub fn add_remote_track(
-        &mut self,
-        transceiver: RtcRtpTransceiver,
-        track: web_sys::MediaStreamTrack,
-    ) -> Option<&Receiver> {
-        // should be safe to unwrap
-        let mid = transceiver.mid().unwrap();
-
-        for receiver in &mut self.receivers.values_mut() {
-            if let Some(recv_mid) = &receiver.mid {
-                if recv_mid == &mid {
-                    let track = MediaTrack::new(
-                        receiver.track_id,
-                        track,
-                        receiver.caps.clone(),
-                    );
-
-                    receiver.transceiver.replace(transceiver);
-                    receiver.track.replace(track);
-                    return Some(receiver);
-                }
-            }
-        }
-
-        None
-    }
-
-    /// Returns [`Receiver`]s that share provided sender id.
-    pub fn get_by_sender(
-        &mut self,
-        sender_id: u64,
-    ) -> impl Iterator<Item = &mut Receiver> {
-        self.receivers.iter_mut().filter_map(move |(_, receiver)| {
-            if receiver.sender_id == sender_id {
-                Some(receiver)
-            } else {
-                None
-            }
-        })
-    }
-}
-
-/// Local track representation, that is being sent to some remote peer.
-pub struct Sender {
-    track_id: TrackId,
-    transceiver: RtcRtpTransceiver,
-    caps: MediaType,
-}
-
-impl Sender {
-    fn new(
-        track_id: TrackId,
-        caps: MediaType,
-        peer: &Rc<RtcPeerConnection>,
-    ) -> Self {
-        let transceiver = match caps {
-            MediaType::Audio(_) => {
-                let mut init = RtcRtpTransceiverInit::new();
-                init.direction(RtcRtpTransceiverDirection::Sendonly);
-                peer.add_transceiver_with_str_and_init("audio", &init)
-            }
-            MediaType::Video(_) => {
-                let mut init = RtcRtpTransceiverInit::new();
-                init.direction(RtcRtpTransceiverDirection::Sendonly);
-                peer.add_transceiver_with_str_and_init("video", &init)
-            }
-        };
-
-        Self {
-            track_id,
-            transceiver,
-            caps,
-        }
-    }
-}
-
-/// Remote track representation that is being received from some remote peer.
-/// Basically, it can have two states: waiting and receiving. When track arrives
-/// we can save related [`RtcRtpTransceiver`][1] and actual [`MediaTrack`].
-///
-/// [1]: https://www.w3.org/TR/webrtc/#rtcrtptransceiver-interface
-pub struct Receiver {
-    track_id: TrackId,
-    caps: MediaType,
-    sender_id: u64,
-    transceiver: Option<RtcRtpTransceiver>,
-    mid: Option<String>,
-    track: Option<Rc<MediaTrack>>,
-}
-
-impl Receiver {
-    fn new(
-        track_id: TrackId,
-        caps: MediaType,
-        sender_id: u64,
-        mid: Option<String>,
-    ) -> Self {
-        Self {
-            track_id,
-            caps,
-            sender_id,
-            transceiver: None,
-            mid,
-            track: None,
         }
     }
 }

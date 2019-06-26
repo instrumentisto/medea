@@ -22,7 +22,7 @@ use wasm_bindgen_futures::spawn_local;
 use crate::{
     api::{connection::Connection, ConnectionHandle},
     media::{MediaManager, MediaStream},
-    peer::{PeerEvent, PeerEventHandler, PeerId, PeerRepository, Sdp},
+    peer::{PeerEvent, PeerEventHandler, PeerId, PeerRepository},
     rpc::RpcClient,
     utils::{Callback2, WasmErr},
 };
@@ -197,7 +197,7 @@ impl EventHandler for InnerRoom {
                         let peer_rc1 = Rc::clone(&peer_rc);
                         Either::B(
                             peer_rc
-                                .set_remote_description(Sdp::Offer(offer))
+                                .set_remote_offer(&offer)
                                 .and_then(move |_| {
                                     peer_rc.create_and_set_answer()
                                 })
@@ -225,17 +225,12 @@ impl EventHandler for InnerRoom {
         mids: Option<HashMap<u64, String>>,
     ) {
         if let Some(peer) = self.peers.get_peer(peer_id) {
-            if let Some(mids) = mids {
-                peer.set_recv_mids(mids);
-            }
-
-            spawn_local(
-                peer.set_remote_description(Sdp::Answer(sdp_answer))
-                    .or_else(|err| {
-                        err.log_err();
-                        Err(())
-                    }),
-            );
+            spawn_local(peer.set_remote_answer(&sdp_answer, mids).or_else(
+                |err| {
+                    err.log_err();
+                    Err(())
+                },
+            ));
         } else {
             // TODO: No peer, whats next?
             WasmErr::build_from_str(format!(
