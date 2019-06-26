@@ -31,7 +31,7 @@ use crate::{
     log::prelude::*,
     media::IceUser,
     signalling::{
-        control::participant::{Participant, ParticipantsLoadError},
+        control::{Participant, ParticipantsLoadError, parse_participants},
         room::{ActFuture, RoomError},
         Room,
     },
@@ -101,32 +101,10 @@ impl ParticipantService {
         reconnect_timeout: Duration,
         turn: Box<dyn TurnAuthService>,
     ) -> Result<Self, ParticipantsLoadError> {
-        let participants = Participant::load_store(room_spec)?;
-
-        debug!(
-            "Created ParticipantService with participants: {:?}.",
-            participants
-                .iter()
-                .map(|(id, p)| {
-                    format!(
-                        "{{ id: {}, receivers: {:?}, publishers: {:?} }};",
-                        id,
-                        p.receivers()
-                            .into_iter()
-                            .map(|(id, _)| id.to_string())
-                            .collect::<Vec<String>>(),
-                        p.publishers()
-                            .into_iter()
-                            .map(|(id, _)| id.to_string())
-                            .collect::<Vec<String>>()
-                    )
-                })
-                .collect::<Vec<String>>()
-        );
 
         Ok(Self {
             room_id: room_spec.id().clone(),
-            participants,
+            participants: parse_participants(room_spec)?,
             turn,
             connections: HashMap::new(),
             reconnect_timeout,
