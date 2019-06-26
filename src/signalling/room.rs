@@ -38,7 +38,7 @@ pub type Id = u64;
 pub type ActFuture<I, E> =
     Box<dyn ActorFuture<Actor = Room, Item = I, Error = E>>;
 
-#[derive(Fail, Debug)]
+#[derive(Debug, Fail)]
 #[allow(clippy::module_name_repetitions)]
 pub enum RoomError {
     #[fail(display = "Couldn't find Peer with [id = {}]", _0)]
@@ -430,6 +430,21 @@ impl Handler<CloseRoom> for Room {
     }
 }
 
+// Close room on `SIGINT`, `SIGTERM`, `SIGQUIT` signals.
+impl Handler<ShutdownResult> for Room {
+    type Result = Result<(), Box<dyn std::error::Error + Send>>;
+
+    fn handle(
+        &mut self,
+        _: ShutdownResult,
+        ctx: &mut Self::Context,
+    ) -> Result<(), Box<dyn std::error::Error + Send>> {
+        info!("Shutting down Room: {:?}", self.id);
+        ctx.notify(CloseRoom {});
+        Ok(())
+    }
+}
+
 impl Handler<RpcConnectionClosed> for Room {
     type Result = ();
 
@@ -444,8 +459,6 @@ impl Handler<RpcConnectionClosed> for Room {
             .connection_closed(ctx, msg.member_id, &msg.reason);
     }
 }
-
-
 
 #[cfg(test)]
 mod test {

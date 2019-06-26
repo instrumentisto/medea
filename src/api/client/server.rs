@@ -88,7 +88,7 @@ pub struct Context {
 pub fn run(rooms: RoomsRepository, config: Conf) {
     let server_addr = config.server.bind_addr();
 
-    HttpServer::new(move || {
+    let actix_server = HttpServer::new(move || {
         App::new()
             .data(Context {
                 rooms: rooms.clone(),
@@ -100,11 +100,49 @@ pub fn run(rooms: RoomsRepository, config: Conf) {
                     .route(actix_web::web::get().to_async(ws_index)),
             )
     })
+    .disable_signals()
     .bind(server_addr)
     .unwrap()
     .start();
 
+    let server_wrapper = actors::ServerWrapper(actix_server);
+
     info!("Started HTTP server on {:?}", server_addr);
+
+    //server_wrapper.start()
+}
+
+pub mod actors {
+    use actix::{Actor, AsyncContext, Context, Handler, Recipient, WrapFuture};
+    use tokio::prelude::future::Future;
+
+    use crate::log::prelude::*;
+    use crate::utils::graceful_shutdown::ShutdownResult;
+    use actix_web::dev::Server;
+
+    pub struct ServerWrapper(pub Server);
+
+    impl Actor for ServerWrapper {
+        type Context = Context<Self>;
+    }
+
+    impl Handler<ShutdownResult> for ServerWrapper {
+        type Result = Result<(), Box<dyn std::error::Error + Send>>;
+
+        fn handle(
+            &mut self,
+            _: ShutdownResult,
+            ctx: &mut Self::Context,
+        ) -> Result<(), Box<dyn std::error::Error + Send>> {
+            info!("Shutting down Actix Web Server");
+            ctx.wait(
+                self.0
+                    .stop(true)
+                    .into_actor(self),
+            );
+            Ok(())
+        }
+    }
 }
 
 #[cfg(test)]
