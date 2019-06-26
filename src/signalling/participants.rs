@@ -197,9 +197,6 @@ impl ParticipantService {
                             room.participants.take_member(member_id)
                         {
                             member.ice_user.replace(ice);
-                            room.participants
-                                .connections
-                                .insert(member_id, con);
                             room.participants.insert_member(member);
                             room.participants
                                 .connections
