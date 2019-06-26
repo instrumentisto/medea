@@ -68,8 +68,10 @@ fn main() {
     let rooms = hashmap! {1 => room};
     let rooms_repo = RoomsRepository::new(rooms);
 
-    let _ = server::run(rooms_repo, config);
-    // graceful_shutdown.subscribe(2, http_server.recipient().clone());
-
+    let http_server = server::run(rooms_repo, config);
+    graceful_shutdown.do_send(ShutdownSubscribe {
+        priority: 2,
+        who: http_server.recipient(),
+    });
     let _ = sys.run();
 }

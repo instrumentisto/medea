@@ -66,6 +66,7 @@ impl From<PeerStateError> for RoomError {
 }
 
 /// Media server room with its [`Member`]s.
+#[derive(Debug)]
 pub struct Room {
     id: Id,
 
@@ -258,16 +259,6 @@ impl Room {
         Ok(Box::new(wrap_future(
             self.participants.send_event_to_member(to_member_id, event),
         )))
-    }
-}
-
-impl fmt::Debug for Room {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "Room {{ id: {:?}, participants: {:?}, peers: {:?} }}",
-            self.id, self.participants, self.peers
-        )
     }
 }
 
