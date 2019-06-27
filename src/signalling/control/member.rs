@@ -29,4 +29,12 @@ impl Member {
     pub fn set_connection(&mut self, connection: Box<dyn RpcConnection>) {
         self.connection = Some(connection)
     }
+
+    pub fn remove_connection(&mut self) {
+        self.connection = None;
+    }
+
+    pub fn is_connected(&self) -> bool {
+        self.connection.is_some()
+    }
 }

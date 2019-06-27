@@ -135,7 +135,8 @@ impl MembersManager {
         &self,
         participant_id: &MemberId,
     ) -> bool {
-        self.connections.contains_key(participant_id)
+        let member = self.participants.get(participant_id).unwrap();
+        member.is_connected()
             && !self.drop_connection_tasks.contains_key(participant_id)
     }
 
@@ -167,7 +168,7 @@ impl MembersManager {
         ctx: &mut Context<Room>,
         participant_id: MemberId,
         con: Box<dyn RpcConnection>,
-    ) -> ActFuture<Rc<Member>, MemberServiceErr> {
+    ) -> ActFuture<&Member, MemberServiceErr> {
         let participant = match self.get_participant_by_id(&participant_id) {
             None => {
                 return Box::new(wrap_future(future::err(
@@ -178,7 +179,7 @@ impl MembersManager {
         };
 
         // lookup previous participant connection
-        if let Some(mut connection) = self.connections.remove(&participant_id) {
+        if let Some(mut connection) = participant.connection() {
             debug!(
                 "Closing old RpcConnection for participant {}",
                 participant_id
@@ -243,7 +244,8 @@ impl MembersManager {
         let closed_at = Instant::now();
         match reason {
             ClosedReason::Closed => {
-                self.connections.remove(&participant_id);
+                let member = self.participants.get(&participant_id).unwrap();
+                member.remove_connection();
 
                 ctx.spawn(wrap_future(
                     self.delete_ice_user(&participant_id).map_err(|err| {
