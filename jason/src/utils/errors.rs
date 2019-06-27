@@ -4,23 +4,15 @@ use std::{
 };
 
 use medea_client_api_proto as proto;
-use wasm_bindgen::JsValue;
+use wasm_bindgen::{JsValue, JsCast};
 use web_sys::console;
 
 /// Generic application error.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum WasmErr {
-    JsError(JsValue),
-    Other(Cow<'static, str>),
-}
-
-impl Clone for WasmErr {
-    fn clone(&self) -> Self {
-        match self {
-            WasmErr::JsError(err) => WasmErr::JsError(err.clone()),
-            WasmErr::Other(err) => WasmErr::Other(err.clone()),
-        }
-    }
+    JsError(js_sys::Error),
+    Custom(Cow<'static, str>),
+    Untyped(JsValue)
 }
 
 impl WasmErr {
@@ -37,33 +29,40 @@ impl WasmErr {
     where
         S: Into<Cow<'static, str>>,
     {
-        WasmErr::Other(msg.into())
+        WasmErr::Custom(msg.into())
     }
 }
 
 impl Display for WasmErr {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         match self {
-            WasmErr::JsError(val) => match val.as_string() {
+            WasmErr::JsError(err) => write!(f, "{}", String::from(err.to_string())),
+            WasmErr::Custom(reason) => write!(f, "{}", reason),
+            WasmErr::Untyped(val) => match val.as_string() {
                 Some(reason) => write!(f, "{}", reason),
-                None => write!(f, "no str representation for JsError"),
-            },
-            WasmErr::Other(reason) => write!(f, "{}", reason),
+                None => {
+                    write!(f, "no str representation for JsError")
+                },
+            }
         }
     }
 }
 
 impl From<JsValue> for WasmErr {
     fn from(val: JsValue) -> Self {
-        WasmErr::JsError(val)
+        match val.dyn_into::<js_sys::Error>() {
+            Ok(err) => WasmErr::JsError(err),
+            Err(val)=> WasmErr::Untyped(val)
+        }
     }
 }
 
 impl From<WasmErr> for JsValue {
     fn from(err: WasmErr) -> Self {
         match err {
-            WasmErr::JsError(value) => value,
-            WasmErr::Other(reason) => Self::from_str(&reason),
+            WasmErr::JsError(value) => value.into(),
+            WasmErr::Untyped(value) => value,
+            WasmErr::Custom(reason) => Self::from_str(&reason),
         }
     }
 }
@@ -72,7 +71,7 @@ macro_rules! impl_from_error {
     ($error:ty) => {
         impl From<$error> for WasmErr {
             fn from(error: $error) -> Self {
-                WasmErr::Other(format!("{}", error).into())
+                WasmErr::Custom(format!("{}", error).into())
             }
         }
     };

@@ -347,21 +347,18 @@ impl Peer<WaitLocalHaveRemote> {
 impl Peer<Stable> {
     pub fn get_mids(
         &self,
-    ) -> Result<Option<StdHashMap<TrackId, String>>, PeerError> {
-        if self.context.senders.is_empty() {
-            Ok(None)
-        } else {
-            let mut mids = StdHashMap::new();
-            for (track_id, track) in self.context.senders.iter() {
-                mids.insert(
-                    *track_id,
-                    track
-                        .mid()
-                        .ok_or_else(|| PeerError::MidsMismatch(track.id))?,
-                );
-            }
-            Ok(Some(mids))
+    ) -> Result<StdHashMap<TrackId, String>, PeerError> {
+
+        let mut mids = StdHashMap::new();
+        for (track_id, track) in self.context.senders.iter() {
+            mids.insert(
+                *track_id,
+                track
+                    .mid()
+                    .ok_or_else(|| PeerError::MidsMismatch(track.id))?,
+            );
         }
+        Ok(mids)
     }
 }
 

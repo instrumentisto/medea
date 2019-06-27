@@ -38,13 +38,13 @@ pub enum Command {
     MakeSdpOffer {
         peer_id: u64,
         sdp_offer: String,
-        mids: Option<HashMap<u64, String>>,
+        mids: HashMap<u64, String>,
     },
     /// Web Client sends SDP Answer.
     MakeSdpAnswer {
         peer_id: u64,
         sdp_answer: String,
-        mids: Option<HashMap<u64, String>>,
+        mids: HashMap<u64, String>,
     },
     /// Web Client sends Ice Candidate.
     SetIceCandidate {
@@ -74,7 +74,7 @@ pub enum Event {
     SdpAnswerMade {
         peer_id: u64,
         sdp_answer: String,
-        mids: Option<HashMap<u64, String>>,
+        mids: HashMap<u64, String>,
     },
 
     /// Media Server notifies Web Client about necessity to apply specified

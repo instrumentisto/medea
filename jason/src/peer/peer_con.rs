@@ -161,7 +161,7 @@ impl PeerConnection {
     /// [2]: https://www.w3.org/TR/webrtc/#rtcrtptransceiver-interface
     pub fn get_send_mids(
         &self,
-    ) -> Result<Option<HashMap<u64, String>>, WasmErr> {
+    ) -> Result<HashMap<u64, String>, WasmErr> {
         self.media_connections.borrow().get_send_mids()
     }
 
@@ -215,11 +215,9 @@ impl PeerConnection {
     pub fn set_remote_answer(
         &self,
         answer: &str,
-        mids: Option<HashMap<u64, String>>,
+        mids: HashMap<u64, String>,
     ) -> impl Future<Item = (), Error = WasmErr> {
-        if let Some(mids) = mids {
-            self.media_connections.borrow_mut().set_recv_mids(mids);
-        }
+        self.media_connections.borrow_mut().set_recv_mids(mids);
 
         let mut desc = RtcSessionDescriptionInit::new(RtcSdpType::Answer);
         desc.sdp(answer);

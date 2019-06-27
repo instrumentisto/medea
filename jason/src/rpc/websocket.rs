@@ -43,7 +43,7 @@ impl TryFrom<u16> for State {
             1 => Ok(State::OPEN),
             2 => Ok(State::CLOSING),
             3 => Ok(State::CLOSED),
-            _ => Err(WasmErr::Other(
+            _ => Err(WasmErr::Custom(
                 format!("Could not cast {} to State variant", value).into(),
             )),
         }

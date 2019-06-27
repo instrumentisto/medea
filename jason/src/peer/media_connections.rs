@@ -37,11 +37,7 @@ impl MediaConnections {
     /// Returns map of track id to corresponding transceiver mid.
     pub fn get_send_mids(
         &self,
-    ) -> Result<Option<HashMap<u64, String>>, WasmErr> {
-        if self.senders.is_empty() {
-            return Ok(None);
-        }
-
+    ) -> Result<HashMap<u64, String>, WasmErr> {
         let mut mids = HashMap::new();
         for (track_id, sender) in &self.senders {
             mids.insert(
@@ -52,7 +48,7 @@ impl MediaConnections {
             );
         }
 
-        Ok(Some(mids))
+        Ok(mids)
     }
 
     // TODO: Doesnt really updates anything, but only generates new senders and

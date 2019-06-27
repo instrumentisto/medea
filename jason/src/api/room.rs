@@ -221,7 +221,7 @@ impl EventHandler for InnerRoom {
         &mut self,
         peer_id: PeerId,
         sdp_answer: String,
-        mids: Option<HashMap<u64, String>>,
+        mids: HashMap<u64, String>,
     ) {
         if let Some(peer) = self.peers.get_peer(peer_id) {
             spawn_local(peer.set_remote_answer(&sdp_answer, mids).or_else(

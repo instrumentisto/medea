@@ -158,17 +158,13 @@ impl Room {
         &mut self,
         from_peer_id: PeerId,
         sdp_offer: String,
-        mids: Option<StdHashMap<u64, String>>,
+        mids: StdHashMap<u64, String>,
     ) -> Result<ActFuture<(), RoomError>, RoomError> {
         let mut from_peer: Peer<WaitLocalSdp> =
             self.peers.take_inner_peer(from_peer_id)?;
 
         if from_peer.is_sender() {
-            from_peer.set_mids(mids.ok_or_else(|| {
-                RoomError::ClientError(String::from(
-                    "Peer is sender but did not provide any mids",
-                ))
-            })?)?;
+            from_peer.set_mids(mids)?;
         }
 
         let to_peer_id = from_peer.partner_peer_id();
@@ -210,17 +206,13 @@ impl Room {
         &mut self,
         from_peer_id: PeerId,
         sdp_answer: String,
-        mids: Option<StdHashMap<u64, String>>,
+        mids: StdHashMap<u64, String>,
     ) -> Result<ActFuture<(), RoomError>, RoomError> {
         let mut from_peer: Peer<WaitLocalHaveRemote> =
             self.peers.take_inner_peer(from_peer_id)?;
 
         if from_peer.is_sender() {
-            from_peer.set_mids(mids.ok_or_else(|| {
-                RoomError::ClientError(String::from(
-                    "Peer is sender but did not provide any mids",
-                ))
-            })?)?;
+            from_peer.set_mids(mids)?;
         }
 
         let to_peer_id = from_peer.partner_peer_id();
