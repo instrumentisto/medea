@@ -58,12 +58,11 @@ fn main() {
     let rooms = hashmap! {1 => room};
     let rooms_repo = RoomsRepository::new(rooms);
 
-    //todo make http_server not ()
     let http_server = server::run(rooms_repo, config);
-//    graceful_shutdown.do_send(ShutdownSubscribe {
-//        priority: 2,
-//        who: http_server.recipient(),
-//    });
+    graceful_shutdown.do_send(ShutdownSubscribe {
+        priority: 2,
+        who: http_server.recipient(),
+    });
 
     let _ = sys.run();
 }

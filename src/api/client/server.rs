@@ -11,6 +11,7 @@ use futures::{
     Future,
 };
 use serde::Deserialize;
+use actix::{Actor, Addr};
 
 use crate::{
     api::{
@@ -85,7 +86,7 @@ pub struct Context {
 }
 
 /// Starts HTTP server for handling WebSocket connections of Client API.
-pub fn run(rooms: RoomsRepository, config: Conf) {
+pub fn run(rooms: RoomsRepository, config: Conf) -> Addr<actors::ServerWrapper> {
     let server_addr = config.server.bind_addr();
 
     let actix_server = HttpServer::new(move || {
@@ -109,7 +110,7 @@ pub fn run(rooms: RoomsRepository, config: Conf) {
 
     info!("Started HTTP server on {:?}", server_addr);
 
-    //server_wrapper.start()
+    server_wrapper.start()
 }
 
 pub mod actors {
