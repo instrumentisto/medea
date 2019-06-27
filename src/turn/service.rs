@@ -71,8 +71,10 @@ impl TurnAuthService for Addr<Service> {
         users: Vec<Rc<RefCell<IceUser>>>,
     ) -> Box<dyn Future<Item = (), Error = TurnServiceErr>> {
         // leave only non static users
-        let users: Vec<Rc<RefCell<IceUser>>> =
-            users.into_iter().filter(|u| !u.is_static()).collect();
+        let users: Vec<Rc<RefCell<IceUser>>> = users
+            .into_iter()
+            .filter(|u| !u.borrow().is_static())
+            .collect();
 
         if users.is_empty() {
             Box::new(futures::future::ok(()))

@@ -39,6 +39,26 @@ impl EndpointsManager {
         ice_users
     }
 
+    pub fn get_publishers_by_member_id(
+        &self,
+        id: &MemberId,
+    ) -> HashMap<&PublishEndpointId, &WebRtcPublishEndpoint> {
+        self.publishers
+            .iter()
+            .filter(|(_, p)| p.owner() == id)
+            .collect()
+    }
+
+    pub fn get_receivers_by_member_id(
+        &self,
+        id: &MemberId,
+    ) -> HashMap<&PlayEndpointId, &WebRtcPlayEndpoint> {
+        self.receivers
+            .iter()
+            .filter(|(_, p)| p.owner() == id)
+            .collect()
+    }
+
     pub fn take_ice_user_by_member_id(
         &mut self,
         member_id: &MemberId,

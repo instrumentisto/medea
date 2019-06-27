@@ -4,12 +4,18 @@ use super::{
 };
 use crate::{
     api::{
-        client::rpc_connection::RpcConnection,
+        client::rpc_connection::{AuthorizationError, RpcConnection},
         control::{MemberId, RoomSpec},
     },
     media::IceUser,
     signalling::{
-        control::member::Member,
+        control::{
+            member::Member,
+            play_endpoint::{Id as PlayEndpointId, WebRtcPlayEndpoint},
+            publish_endpoint::{
+                Id as PublishEndpointId, WebRtcPublishEndpoint,
+            },
+        },
         members_manager::MemberServiceErr,
         room::{ActFuture, Room, RoomError},
     },
@@ -61,8 +67,31 @@ impl Pipeline {
         self.members.send_event_to_participant(member_id, event)
     }
 
-    pub fn get_member_by_id(&self, id: &MemberId) -> &Member {
+    pub fn get_member_by_id(&self, id: &MemberId) -> Option<&Member> {
         self.members.get_participant_by_id(id)
+    }
+
+    pub fn get_member_by_id_and_credentials(
+        &self,
+        id: &MemberId,
+        credentials: &str,
+    ) -> Result<&Member, AuthorizationError> {
+        self.members
+            .get_participant_by_id_and_credentials(id, credentials)
+    }
+
+    pub fn get_publishers_by_member_id(
+        &self,
+        id: &MemberId,
+    ) -> HashMap<&PublishEndpointId, &WebRtcPublishEndpoint> {
+        self.endpoints.get_publishers_by_member_id(id)
+    }
+
+    pub fn get_receivers_by_member_id(
+        &self,
+        id: &MemberId,
+    ) -> HashMap<&PlayEndpointId, &WebRtcPlayEndpoint> {
+        self.endpoints.get_receivers_by_member_id(id)
     }
 
     pub fn connection_established(

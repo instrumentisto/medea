@@ -388,8 +388,10 @@ impl Room {
         participant: &Member,
         ctx: &mut <Self as Actor>::Context,
     ) {
+        let participant_publishers =
+            self.pipeline.get_publishers_by_member_id(participant.id());
         // Create all connected publish endpoints.
-        for (_, publish) in participant.publishers() {
+        for (_, publish) in participant_publishers() {
             for receiver in publish.receivers() {
                 let receiver = unit_option_unwrap!(
                     receiver.upgrade(),
@@ -436,8 +438,8 @@ impl Room {
             };
 
             if self
-                .participants
-                .participant_has_connection(&plays_publisher_participant.id())
+                .pipeline
+                .is_member_has_connection(&plays_publisher_participant.id())
                 && !play.is_connected()
             {
                 self.connect_participants(
@@ -499,11 +501,8 @@ impl Handler<Authorize> for Room {
         msg: Authorize,
         _ctx: &mut Self::Context,
     ) -> Self::Result {
-        self.participants
-            .get_participant_by_id_and_credentials(
-                &msg.member_id,
-                &msg.credentials,
-            )
+        self.pipeline
+            .get_member_by_id_and_credentials(&msg.member_id, &msg.credentials)
             .map(|_| ())
     }
 }
@@ -626,7 +625,7 @@ impl Handler<RpcConnectionEstablished> for Room {
         let member_id = msg.member_id;
 
         let fut = self
-            .participants
+            .pipeline
             .connection_established(ctx, member_id.clone(), msg.connection)
             .map_err(|err, _, _| {
                 error!("RpcConnectionEstablished error {:?}", err)
@@ -675,7 +674,7 @@ impl Handler<RpcConnectionClosed> for Room {
             self.peers.connection_closed(&msg.member_id, ctx);
         }
 
-        self.participants
+        self.pipeline
             .connection_closed(ctx, msg.member_id, &msg.reason);
     }
 }
