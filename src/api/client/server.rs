@@ -1,5 +1,6 @@
 //! HTTP server for handling WebSocket connections of Client API.
 
+use actix::{Actor, Addr};
 use actix_web::{
     middleware,
     web::{resource, Data, Path, Payload},
@@ -85,10 +86,13 @@ pub struct Context {
 }
 
 /// Starts HTTP server for handling WebSocket connections of Client API.
-pub fn run(rooms: RoomsRepository, config: Conf) {
+pub fn run(
+    rooms: RoomsRepository,
+    config: Conf,
+) -> Addr<actors::ServerWrapper> {
     let server_addr = config.server.bind_addr();
 
-    HttpServer::new(move || {
+    let actix_server = HttpServer::new(move || {
         App::new()
             .data(Context {
                 rooms: rooms.clone(),
@@ -100,18 +104,49 @@ pub fn run(rooms: RoomsRepository, config: Conf) {
                     .route(actix_web::web::get().to_async(ws_index)),
             )
     })
+    .disable_signals()
     .bind(server_addr)
     .unwrap()
     .start();
 
-    info!("Started HTTP server on 0.0.0.0:8080");
+    let server_wrapper = actors::ServerWrapper(actix_server);
+
+    info!("Started HTTP server on {:?}", server_addr);
+
+    server_wrapper.start()
+}
+
+pub mod actors {
+    use actix::{Actor, AsyncContext, Context, Handler, WrapFuture};
+
+    use crate::{log::prelude::*, utils::graceful_shutdown::ShutdownResult};
+    use actix_web::dev::Server;
+
+    pub struct ServerWrapper(pub Server);
+
+    impl Actor for ServerWrapper {
+        type Context = Context<Self>;
+    }
+
+    impl Handler<ShutdownResult> for ServerWrapper {
+        type Result = Result<(), Box<dyn std::error::Error + Send>>;
+
+        fn handle(
+            &mut self,
+            _: ShutdownResult,
+            ctx: &mut Self::Context,
+        ) -> Result<(), Box<dyn std::error::Error + Send>> {
+            info!("Shutting down Actix Web Server");
+            ctx.wait(self.0.stop(true).into_actor(self));
+            Ok(())
+        }
+    }
 }
 
 #[cfg(test)]
 mod test {
     use std::{ops::Add, thread, time::Duration};
 
-    use actix::Actor as _;
     use actix_http::{ws::Message, HttpService};
     use actix_http_test::{TestServer, TestServerRuntime};
     use futures::{future::IntoFuture as _, sink::Sink as _, Stream as _};

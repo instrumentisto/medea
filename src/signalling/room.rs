@@ -28,6 +28,7 @@ use crate::{
     },
     signalling::{participants::ParticipantService, peers::PeerRepository},
     turn::TurnAuthService,
+    utils::graceful_shutdown::ShutdownResult,
 };
 
 /// ID of [`Room`].
@@ -37,7 +38,7 @@ pub type Id = u64;
 pub type ActFuture<I, E> =
     Box<dyn ActorFuture<Actor = Room, Item = I, Error = E>>;
 
-#[derive(Fail, Debug)]
+#[derive(Debug, Fail)]
 #[allow(clippy::module_name_repetitions)]
 pub enum RoomError {
     #[fail(display = "Couldn't find Peer with [id = {}]", _0)]
@@ -426,6 +427,21 @@ impl Handler<CloseRoom> for Room {
         info!("Closing Room [id = {:?}]", self.id);
         let drop_fut = self.participants.drop_connections(ctx);
         ctx.wait(wrap_future(drop_fut));
+    }
+}
+
+// Close room on `SIGINT`, `SIGTERM`, `SIGQUIT` signals.
+impl Handler<ShutdownResult> for Room {
+    type Result = Result<(), Box<dyn std::error::Error + Send>>;
+
+    fn handle(
+        &mut self,
+        _: ShutdownResult,
+        ctx: &mut Self::Context,
+    ) -> Result<(), Box<dyn std::error::Error + Send>> {
+        info!("Shutting down Room: {:?}", self.id);
+        ctx.notify(CloseRoom {});
+        Ok(())
     }
 }
 

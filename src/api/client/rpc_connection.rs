@@ -1,6 +1,6 @@
 //! [`RpcConnection`] with related messages.
 
-use core::fmt;
+use std::fmt;
 
 use actix::Message;
 use futures::Future;

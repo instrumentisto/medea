@@ -19,6 +19,7 @@ use crate::{
     media::create_peers,
     signalling::{Room, RoomsRepository},
     turn::new_turn_auth_service,
+    utils::graceful_shutdown::{self, ShutdownSubscribe},
 };
 
 fn main() {
@@ -39,6 +40,8 @@ fn main() {
     };
     let peers = create_peers(1, 2);
 
+    let graceful_shutdown = graceful_shutdown::create(5000);
+
     let turn_auth_service =
         new_turn_auth_service(&config).expect("Unable to start turn service");
 
@@ -47,10 +50,19 @@ fn main() {
     let room = Room::start_in_arbiter(&Arbiter::new(), move |_| {
         Room::new(1, members, peers, rpc_reconnect_timeout, turn_auth_service)
     });
+    graceful_shutdown.do_send(ShutdownSubscribe {
+        priority: 2,
+        who: room.clone().recipient(),
+    });
 
     let rooms = hashmap! {1 => room};
     let rooms_repo = RoomsRepository::new(rooms);
 
-    server::run(rooms_repo, config);
+    let http_server = server::run(rooms_repo, config);
+    graceful_shutdown.do_send(ShutdownSubscribe {
+        priority: 2,
+        who: http_server.recipient(),
+    });
+
     let _ = sys.run();
 }
