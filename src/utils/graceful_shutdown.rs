@@ -1,6 +1,8 @@
 //! A class to handle shutdown signals and to shut down system
 
 use std::{collections::BTreeMap, time::Duration, mem};
+use std::sync::mpsc::channel;
+
 
 use actix::{self, actors, prelude::fut::WrapFuture, Actor, Addr,
             Message, AsyncContext, Context, Handler,
@@ -122,8 +124,8 @@ impl Handler<SignalMessage> for GracefulShutdown {
                 .map(|_| {
                     System::current().stop();
                 })
-                .map_err(|_| {
-                    error!("Error trying to shut down system gracefully.");
+                .map_err(|e| {
+                    error!("Error trying to shut down system gracefully: {:?}", e);
                     System::current().stop();
                 })
                 .into_actor(self),
@@ -156,9 +158,16 @@ pub fn create(
     let graceful_shutdown = GracefulShutdown::new(shutdown_timeout);
     //todo spawn on a new thread
     //todo test
-    //let shutdown_arbiter = Arbiter::new();
-    //let graceful_shutdown_addr = shutdown_arbiter.send(graceful_shutdown);
-    let graceful_shutdown_addr = graceful_shutdown.start();
+    let (tx, rx) = channel();
+    let shutdown_arbiter = Arbiter::new();
+    let graceful_shutdown_addr = shutdown_arbiter.send(
+        futures::future::ok::<(), ()>(())
+            .map(move |_| {
+                tx.send(graceful_shutdown.start());
+            })
+            .map_err(|_| {})
+    );
+    let graceful_shutdown_addr = rx.recv().unwrap();
     SignalHandler::start(graceful_shutdown_addr.clone().recipient());
     graceful_shutdown_addr
 }
