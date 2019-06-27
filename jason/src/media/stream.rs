@@ -2,8 +2,10 @@
 //!
 //! [1]: https://www.w3.org/TR/mediacapture-streams/#mediastream
 
-use std::collections::HashMap;
-use std::rc::{Rc, Weak};
+use std::{
+    collections::HashMap,
+    rc::{Rc, Weak},
+};
 
 use medea_client_api_proto::MediaType;
 use wasm_bindgen::{prelude::*, JsValue};

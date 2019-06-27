@@ -43,7 +43,13 @@ fn main() {
 
     let rpc_reconnect_timeout = config.rpc.reconnect_timeout;
     let room = Room::start_in_arbiter(&Arbiter::new(), move |_| {
-        Room::new(1, members, create_peers(1, 2), rpc_reconnect_timeout, turn_auth_service)
+        Room::new(
+            1,
+            members,
+            create_peers(1, 2),
+            rpc_reconnect_timeout,
+            turn_auth_service,
+        )
     });
 
     let rooms = hashmap! {1 => room};

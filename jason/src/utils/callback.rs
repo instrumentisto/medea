@@ -5,12 +5,12 @@ use std::{cell::RefCell, marker::PhantomData};
 use wasm_bindgen::JsValue;
 
 /// Wrapper for single arg JS functions.
-pub struct Callback<A: Into<JsValue>> {
+pub struct Callback<A> {
     f: RefCell<Option<js_sys::Function>>,
     _phantom: PhantomData<A>,
 }
 
-impl<A: Into<JsValue>> Default for Callback<A> {
+impl<A> Default for Callback<A> {
     fn default() -> Self {
         Self {
             f: RefCell::new(None),
@@ -39,7 +39,7 @@ impl<A: Into<JsValue>> Callback<A> {
     }
 }
 
-impl<A: Into<JsValue>> From<js_sys::Function> for Callback<A> {
+impl<A> From<js_sys::Function> for Callback<A> {
     fn from(f: js_sys::Function) -> Self {
         Self {
             f: RefCell::new(Some(f)),
@@ -52,13 +52,13 @@ impl<A: Into<JsValue>> From<js_sys::Function> for Callback<A> {
 /// conditionally invoke function passing one of two args, e.g. first arg in
 /// case of success, and second as error.
 #[allow(clippy::module_name_repetitions)]
-pub struct Callback2<A: Into<JsValue>, B: Into<JsValue>> {
+pub struct Callback2<A, B> {
     f: RefCell<Option<js_sys::Function>>,
     _phantom: PhantomData<A>,
     _phantom2: PhantomData<B>,
 }
 
-impl<A: Into<JsValue>, B: Into<JsValue>> Default for Callback2<A, B> {
+impl<A, B> Default for Callback2<A, B> {
     fn default() -> Self {
         Self {
             f: RefCell::new(None),
@@ -108,9 +108,7 @@ impl<A: Into<JsValue>, B: Into<JsValue>> Callback2<A, B> {
     }
 }
 
-impl<A: Into<JsValue>, B: Into<JsValue>> From<js_sys::Function>
-    for Callback2<A, B>
-{
+impl<A, B> From<js_sys::Function> for Callback2<A, B> {
     fn from(f: js_sys::Function) -> Self {
         Self {
             f: RefCell::new(Some(f)),

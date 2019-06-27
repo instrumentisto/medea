@@ -9,10 +9,10 @@ use crate::utils::WasmErr;
 /// [`EventTarget`](https://developer.mozilla.org/ru/docs/Web/API/EventTarget)
 /// event. Implement drop that drops provided closure and unregisters
 /// event handler.
-pub struct EventListener<
+pub struct EventListener<T, A>
+where
     T: Deref<Target = EventTarget>,
-    A: FromWasmAbi + 'static,
-> {
+{
     event_name: &'static str,
     target: Rc<T>,
     closure: Closure<dyn FnMut(A)>,
@@ -66,9 +66,7 @@ impl<T: Deref<Target = EventTarget>, A: FromWasmAbi + 'static>
     }
 }
 
-impl<T: Deref<Target = EventTarget>, A: FromWasmAbi + 'static> Drop
-    for EventListener<T, A>
-{
+impl<T: Deref<Target = EventTarget>, A> Drop for EventListener<T, A> {
     fn drop(&mut self) {
         if let Err(err) = (self.target.as_ref() as &web_sys::EventTarget)
             .remove_event_listener_with_callback(

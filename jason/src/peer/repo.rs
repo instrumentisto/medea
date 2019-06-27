@@ -1,11 +1,12 @@
 use futures::sync::mpsc::UnboundedSender;
-use std::collections::HashMap;
-use std::rc::Rc;
+use std::{collections::HashMap, rc::Rc};
 
 use medea_client_api_proto::IceServer;
 
-use crate::peer::{PeerConnection, PeerEvent, PeerId};
-use crate::utils::WasmErr;
+use crate::{
+    peer::{PeerConnection, PeerEvent, PeerId},
+    utils::WasmErr,
+};
 
 /// [`PeerConnection`] factory and repository.
 #[allow(clippy::module_name_repetitions)]

@@ -8,8 +8,7 @@ use std::{
 };
 
 use futures::{
-    future::Either,
-    future::{Future as _, IntoFuture},
+    future::{Either, Future as _, IntoFuture},
     stream::Stream as _,
     sync::mpsc::{unbounded, UnboundedSender},
 };
