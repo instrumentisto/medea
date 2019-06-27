@@ -17,6 +17,7 @@ use crate::{
     media::IceUser,
     turn::repo::{TurnDatabase, TurnDatabaseErr},
 };
+use std::rc::Rc;
 
 static TURN_PASS_LEN: usize = 16;
 
@@ -34,7 +35,7 @@ pub trait TurnAuthService: fmt::Debug + Send {
     /// Deletes batch of [`IceUser`]s.
     fn delete(
         &self,
-        users: Vec<IceUser>,
+        users: Vec<Rc<IceUser>>,
     ) -> Box<dyn Future<Item = (), Error = TurnServiceErr>>;
 }
 
@@ -67,7 +68,7 @@ impl TurnAuthService for Addr<Service> {
     /// Sends [`DeleteRoom`] to [`Service`].
     fn delete(
         &self,
-        users: Vec<IceUser>,
+        users: Vec<Rc<IceUser>>,
     ) -> Box<dyn Future<Item = (), Error = TurnServiceErr>> {
         // leave only non static users
         let users: Vec<IceUser> =

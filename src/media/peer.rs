@@ -18,7 +18,7 @@ use crate::{
     log::prelude::*,
     media::{MediaTrack, TrackId},
     signalling::{
-        control::endpoint::{Id as EndpointId, WebRtcPublishEndpoint},
+        control::publish_endpoint::{Id as EndpointId, WebRtcPublishEndpoint},
         peers::Counter,
     },
 };

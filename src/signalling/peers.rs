@@ -13,14 +13,14 @@ use crate::{
     log::prelude::*,
     media::{Peer, PeerId, PeerStateMachine},
     signalling::{
-        control::participant::Participant,
         room::{PeersRemoved, Room, RoomError},
+        control::member::Member,
     },
 };
 
 #[derive(Debug)]
 pub struct PeerRepository {
-    /// [`Peer`]s of [`Participant`]s in this [`Room`].
+    /// [`Peer`]s of [`Member`]s in this [`Room`].
     peers: HashMap<PeerId, PeerStateMachine>,
 
     /// Count of [`Peer`]s in this [`Room`].
@@ -69,13 +69,13 @@ impl PeerRepository {
             .ok_or_else(|| RoomError::PeerNotFound(peer_id))
     }
 
-    /// Create and interconnect [`Peer`]s based on [`Participant`].
+    /// Create and interconnect [`Peer`]s based on [`Member`].
     ///
     /// Returns IDs of created [`Peer`]s. `(first_peer_id, second_peer_id)`.
     pub fn create_peers(
         &mut self,
-        first_member: &Participant,
-        second_member: &Participant,
+        first_member: &Member,
+        second_member: &Member,
     ) -> (u64, u64) {
         debug!(
             "Created peer between {} and {}.",
@@ -130,7 +130,7 @@ impl PeerRepository {
         }
     }
 
-    /// Returns all [`Peer`]s of specified [`Participant`].
+    /// Returns all [`Peer`]s of specified [`Member`].
     pub fn get_peers_by_member_id(
         &self,
         member_id: &MemberId,
@@ -162,10 +162,10 @@ impl PeerRepository {
         }
     }
 
-    /// Close all related to disconnected [`Participant`] [`Peer`]s and partner
+    /// Close all related to disconnected [`Member`] [`Peer`]s and partner
     /// [`Peer`]s.
     ///
-    /// Send [`Event::PeersRemoved`] to all affected [`Participant`]s.
+    /// Send [`Event::PeersRemoved`] to all affected [`Member`]s.
     pub fn connection_closed(
         &mut self,
         member_id: &MemberId,

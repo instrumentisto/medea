@@ -1,5 +1,5 @@
 //! Room definitions and implementations. Room is responsible for media
-//! connection establishment between concrete [`Participant`]s.
+//! connection establishment between concrete [`Member`]s.
 
 use std::time::Duration;
 
@@ -18,7 +18,7 @@ use crate::{
             AuthorizationError, Authorize, ClosedReason, CommandMessage,
             RpcConnectionClosed, RpcConnectionEstablished,
         },
-        control::{MemberId, RoomId, RoomSpec, TryFromElementError},
+        control::{RoomId, RoomSpec, TryFromElementError},
     },
     log::prelude::*,
     media::{
@@ -26,12 +26,13 @@ use crate::{
         WaitLocalHaveRemote, WaitLocalSdp, WaitRemoteSdp,
     },
     signalling::{
-        control::participant::{Participant, ParticipantsLoadError},
-        participants::ParticipantService,
+        members_manager::MembersManager,
         peers::PeerRepository,
+        control::member::{Member, MemberId},
     },
     turn::TurnAuthService,
 };
+use crate::signalling::pipeline::Pipeline;
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
 pub type ActFuture<I, E> =
@@ -141,25 +142,24 @@ impl From<TryFromElementError> for RoomError {
     }
 }
 
-impl From<ParticipantsLoadError> for RoomError {
-    fn from(err: ParticipantsLoadError) -> Self {
-        RoomError::BadRoomSpec(format!(
-            "Error while loading room spec. {}",
-            err
-        ))
-    }
-}
+//impl From<MembersLoadError> for RoomError {
+//    fn from(err: MembersLoadError) -> Self {
+//        RoomError::BadRoomSpec(format!(
+//            "Error while loading room spec. {}",
+//            err
+//        ))
+//    }
+//}
 
-/// Media server room with its [`Participant`]s.
+/// Media server room with its [`Member`]s.
 #[derive(Debug)]
 pub struct Room {
     id: RoomId,
 
-    /// [`RpcConnection`]s of [`Participant`]s in this [`Room`].
-    pub participants: ParticipantService,
-
-    /// [`Peer`]s of [`Participant`]s in this [`Room`].
+    /// [`Peer`]s of [`Member`]s in this [`Room`].
     peers: PeerRepository,
+
+    pipeline: Pipeline,
 }
 
 impl Room {
@@ -175,11 +175,7 @@ impl Room {
         Ok(Self {
             id: room_spec.id().clone(),
             peers: PeerRepository::from(HashMap::new()),
-            participants: ParticipantService::new(
-                room_spec,
-                reconnect_timeout,
-                turn,
-            )?,
+            pipeline: Pipeline::new(),
         })
     }
 
@@ -238,7 +234,7 @@ impl Room {
         )))
     }
 
-    /// Sends [`Event::PeersRemoved`] to [`Participant`].
+    /// Sends [`Event::PeersRemoved`] to [`Member`].
     fn send_peers_removed(
         &mut self,
         member_id: MemberId,
@@ -364,12 +360,12 @@ impl Room {
         )))
     }
 
-    /// Create [`Peer`]s between [`Participant`]s and interconnect it by control
+    /// Create [`Peer`]s between [`Member`]s and interconnect it by control
     /// API spec.
     fn connect_participants(
         &mut self,
-        first_member: &Participant,
-        second_member: &Participant,
+        first_member: &Member,
+        second_member: &Member,
         ctx: &mut <Self as Actor>::Context,
     ) {
         debug!(
@@ -384,15 +380,15 @@ impl Room {
         self.connect_peers(ctx, first_peer_id, second_peer_id);
     }
 
-    /// Create and interconnect all [`Peer`]s between connected [`Participant`]
-    /// and all available at this moment [`Participant`].
+    /// Create and interconnect all [`Peer`]s between connected [`Member`]
+    /// and all available at this moment [`Member`].
     ///
     /// Availability is determines by checking [`RpcConnection`] of all
-    /// [`Participant`]s from [`WebRtcPlayEndpoint`]s and from receivers of
-    /// connected [`Participant`].
+    /// [`Member`]s from [`WebRtcPlayEndpoint`]s and from receivers of
+    /// connected [`Member`].
     fn init_participant_connections(
         &mut self,
-        participant: &Participant,
+        participant: &Member,
         ctx: &mut <Self as Actor>::Context,
     ) {
         // Create all connected publish endpoints.
@@ -459,7 +455,7 @@ impl Room {
     }
 
     /// Check state of interconnected [`Peer`]s and sends [`Event`] about
-    /// [`Peer`] created to remote [`Participant`].
+    /// [`Peer`] created to remote [`Member`].
     fn connect_peers(
         &mut self,
         ctx: &mut Context<Self>,
@@ -517,7 +513,7 @@ impl Handler<Authorize> for Room {
     }
 }
 
-/// Signal of removing [`Participant`]'s [`Peer`]s.
+/// Signal of removing [`Member`]'s [`Peer`]s.
 #[derive(Debug, Message)]
 #[rtype(result = "Result<(), ()>")]
 pub struct PeersRemoved {
@@ -528,9 +524,9 @@ pub struct PeersRemoved {
 impl Handler<PeersRemoved> for Room {
     type Result = ActFuture<(), ()>;
 
-    /// Send [`Event::PeersRemoved`] to remote [`Participant`].
+    /// Send [`Event::PeersRemoved`] to remote [`Member`].
     ///
-    /// Delete all removed [`PeerId`]s from all [`Participant`]'s
+    /// Delete all removed [`PeerId`]s from all [`Member`]'s
     /// endpoints.
     #[allow(clippy::single_match_else)]
     fn handle(
@@ -548,7 +544,7 @@ impl Handler<PeersRemoved> for Room {
             participant.peers_removed(&msg.peers_id);
         } else {
             error!(
-                "Participant with id {} for which received \
+                "Member with id {} for which received \
                  Event::PeersRemoved not found. Closing room.",
                 msg.member_id
             );
@@ -622,9 +618,9 @@ impl Handler<CommandMessage> for Room {
 impl Handler<RpcConnectionEstablished> for Room {
     type Result = ActFuture<(), ()>;
 
-    /// Saves new [`RpcConnection`] in [`ParticipantService`], initiates media
+    /// Saves new [`RpcConnection`] in [`MemberService`], initiates media
     /// establishment between members.
-    /// Create and interconnect all available [`Participant`]'s [`Peer`]s.
+    /// Create and interconnect all available [`Member`]'s [`Peer`]s.
     fn handle(
         &mut self,
         msg: RpcConnectionEstablished,
@@ -656,7 +652,7 @@ pub struct CloseRoom {}
 impl Handler<CloseRoom> for Room {
     type Result = ();
 
-    /// Sends to remote [`Participant`] the [`Event`] about [`Peer`] removed.
+    /// Sends to remote [`Member`] the [`Event`] about [`Peer`] removed.
     /// Closes all active [`RpcConnection`]s.
     fn handle(
         &mut self,
@@ -664,7 +660,7 @@ impl Handler<CloseRoom> for Room {
         ctx: &mut Self::Context,
     ) -> Self::Result {
         info!("Closing Room [id = {:?}]", self.id);
-        let drop_fut = self.participants.drop_connections(ctx);
+        let drop_fut = self.pipeline.drop_connections(ctx);
         ctx.wait(wrap_future(drop_fut));
     }
 }
@@ -672,8 +668,8 @@ impl Handler<CloseRoom> for Room {
 impl Handler<RpcConnectionClosed> for Room {
     type Result = ();
 
-    /// Passes message to [`ParticipantService`] to cleanup stored connections.
-    /// Remove all related for disconnected [`Participant`] [`Peer`]s.
+    /// Passes message to [`MemberService`] to cleanup stored connections.
+    /// Remove all related for disconnected [`Member`] [`Peer`]s.
     fn handle(&mut self, msg: RpcConnectionClosed, ctx: &mut Self::Context) {
         info!(
             "RpcConnectionClosed for member {}, reason {:?}",
