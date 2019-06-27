@@ -15,3 +15,37 @@ pub struct WebRtcPlayEndpoint {
     ice_user: Option<Rc<IceUser>>,
     peer_id: Option<PeerId>
 }
+
+impl WebRtcPlayEndpoint {
+    pub fn src(&self) -> &PublishEndpointId {
+        &self.src
+    }
+
+    pub fn owner(&self) -> &MemberId {
+        &self.owner
+    }
+
+    pub fn is_connected(&self) -> bool {
+        self.peer_id.is_some()
+    }
+
+    pub fn set_peer_id(&mut self, peer_id: PeerId) {
+        self.peer_id = Some(peer_id)
+    }
+    
+    pub fn peer_id(&self) -> &Option<PeerId> {
+       &self.peer_id
+    }
+
+    pub fn reset(&mut self) {
+        self.peer_id = None;
+    }
+
+    pub fn take_ice_user(&mut self) -> Option<Rc<IceUser>> {
+        self.ice_user.take()
+    }
+
+    pub fn set_ice_user(&mut self, user: Rc<IceUser>) {
+        self.ice_user = Some(user);
+    }
+}
