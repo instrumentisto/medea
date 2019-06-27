@@ -31,7 +31,7 @@ use crate::{
     log::prelude::*,
     media::IceUser,
     signalling::{
-        control::{Participant, ParticipantsLoadError, parse_participants},
+        control::{parse_participants, Participant, ParticipantsLoadError},
         room::{ActFuture, RoomError},
         Room,
     },
@@ -101,7 +101,6 @@ impl ParticipantService {
         reconnect_timeout: Duration,
         turn: Box<dyn TurnAuthService>,
     ) -> Result<Self, ParticipantsLoadError> {
-
         Ok(Self {
             room_id: room_spec.id().clone(),
             participants: parse_participants(room_spec)?,

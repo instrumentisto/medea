@@ -381,7 +381,7 @@ impl Room {
         let (first_peer_id, second_peer_id) =
             self.peers.create_peers(first_member, second_member);
 
-        ctx.notify(ConnectPeers(first_peer_id, second_peer_id));
+        self.connect_peers(ctx, first_peer_id, second_peer_id);
     }
 
     /// Create and interconnect all [`Peer`]s between connected [`Participant`]
@@ -457,6 +457,39 @@ impl Room {
             }
         }
     }
+
+    /// Check state of interconnected [`Peer`]s and sends [`Event`] about
+    /// [`Peer`] created to remote [`Participant`].
+    fn connect_peers(
+        &mut self,
+        ctx: &mut Context<Self>,
+        first_peer: PeerId,
+        second_peer: PeerId,
+    ) {
+        let fut: ActFuture<(), ()> = match self
+            .send_peer_created(first_peer, second_peer)
+        {
+            Ok(res) => {
+                Box::new(res.map_err(|err, _, ctx: &mut Context<Self>| {
+                    error!(
+                        "Failed handle command, because {}. Room will be \
+                         stopped.",
+                        err
+                    );
+                    ctx.notify(CloseRoom {})
+                }))
+            }
+            Err(err) => {
+                error!(
+                    "Failed handle command, because {}. Room will be stopped.",
+                    err
+                );
+                ctx.notify(CloseRoom {});
+                Box::new(wrap_future(future::ok(())))
+            }
+        };
+        ctx.spawn(fut);
+    }
 }
 
 /// [`Actor`] implementation that provides an ergonomic way
@@ -481,44 +514,6 @@ impl Handler<Authorize> for Room {
                 &msg.credentials,
             )
             .map(|_| ())
-    }
-}
-
-/// Signal of start signaling between specified [`Peer`]'s.
-#[derive(Debug, Message)]
-#[rtype(result = "Result<(), ()>")]
-pub struct ConnectPeers(PeerId, PeerId);
-
-impl Handler<ConnectPeers> for Room {
-    type Result = ActFuture<(), ()>;
-
-    /// Check state of interconnected [`Peer`]s and sends [`Event`] about
-    /// [`Peer`] created to remote [`Participant`].
-    fn handle(
-        &mut self,
-        msg: ConnectPeers,
-        ctx: &mut Self::Context,
-    ) -> Self::Result {
-        match self.send_peer_created(msg.0, msg.1) {
-            Ok(res) => {
-                Box::new(res.map_err(|err, _, ctx: &mut Context<Self>| {
-                    error!(
-                        "Failed handle command, because {}. Room will be \
-                         stopped.",
-                        err
-                    );
-                    ctx.notify(CloseRoom {})
-                }))
-            }
-            Err(err) => {
-                error!(
-                    "Failed handle command, because {}. Room will be stopped.",
-                    err
-                );
-                ctx.notify(CloseRoom {});
-                Box::new(wrap_future(future::ok(())))
-            }
-        }
     }
 }
 
