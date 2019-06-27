@@ -1,6 +1,6 @@
 //! A class to handle shutdown signals and to shut down system
 
-use std::{collections::BTreeMap, mem, sync::mpsc::channel, time::Duration};
+use std::{collections::BTreeMap, mem, time::Duration};
 
 use actix::{
     self, prelude::fut::WrapFuture, Actor, Addr, Arbiter, AsyncContext,
@@ -159,16 +159,8 @@ impl Handler<ShutdownSubscribe> for GracefulShutdown {
 
 pub fn create(shutdown_timeout: u64) -> Addr<GracefulShutdown> {
     let graceful_shutdown = GracefulShutdown::new(shutdown_timeout);
-    let (tx, rx) = channel();
     let shutdown_arbiter = Arbiter::new();
-    shutdown_arbiter.send(
-        futures::future::ok::<(), ()>(())
-            .map(move |_| {
-                let _ = tx.send(graceful_shutdown.start());
-            })
-            .map_err(|_| {}),
-    );
-    let graceful_shutdown_addr = rx.recv().unwrap();
+    let graceful_shutdown_addr = Actor::start_in_arbiter(&shutdown_arbiter, |_| graceful_shutdown);
     SignalHandler::start(graceful_shutdown_addr.clone().recipient());
     graceful_shutdown_addr
 }
