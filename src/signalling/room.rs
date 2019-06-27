@@ -229,8 +229,7 @@ impl Room {
         };
         self.peers.add_peer(sender);
         Ok(Box::new(wrap_future(
-            self.participants
-                .send_event_to_participant(member_id, peer_created),
+            self.pipeline.send_event_to_participant(member_id, peer_created),
         )))
     }
 
@@ -240,7 +239,7 @@ impl Room {
         member_id: MemberId,
         peers: Vec<PeerId>,
     ) -> ActFuture<(), RoomError> {
-        Box::new(wrap_future(self.participants.send_event_to_participant(
+        Box::new(wrap_future(self.pipeline.send_event_to_participant(
             member_id,
             Event::PeersRemoved { peer_ids: peers },
         )))
@@ -284,7 +283,7 @@ impl Room {
         self.peers.add_peer(to_peer);
 
         Ok(Box::new(wrap_future(
-            self.participants
+            self.pipeline
                 .send_event_to_participant(to_member_id, event),
         )))
     }
@@ -317,7 +316,7 @@ impl Room {
         self.peers.add_peer(to_peer);
 
         Ok(Box::new(wrap_future(
-            self.participants
+            self.pipeline
                 .send_event_to_participant(to_member_id, event),
         )))
     }
@@ -355,7 +354,7 @@ impl Room {
         };
 
         Ok(Box::new(wrap_future(
-            self.participants
+            self.pipeline
                 .send_event_to_participant(to_member_id, event),
         )))
     }
@@ -410,8 +409,8 @@ impl Room {
                 );
 
                 if self
-                    .participants
-                    .participant_has_connection(&receiver_owner.id())
+                    .pipeline
+                    .is_member_has_connection(&receiver_owner.id())
                     && !receiver.is_connected()
                 {
                     self.connect_participants(
@@ -539,7 +538,7 @@ impl Handler<PeersRemoved> for Room {
             msg.peers_id, msg.member_id
         );
         if let Some(participant) =
-            self.participants.get_participant_by_id(&msg.member_id)
+            self.pipeline.get_member_by_id(&msg.member_id)
         {
             participant.peers_removed(&msg.peers_id);
         } else {

@@ -73,7 +73,7 @@ impl EndpointsManager {
         self.ice_users
             .get(member_id)
             .as_ref()
-            .map(IceUser::servers_list)
+            .map(|u| u.borrow().servers_list())
     }
 
     pub fn insert_receiver(
@@ -95,14 +95,14 @@ impl EndpointsManager {
     pub fn get_publisher_by_id(
         &self,
         id: &PublishEndpointId,
-    ) -> &WebRtcPublishEndpoint {
+    ) -> Option<&WebRtcPublishEndpoint> {
         self.publishers.get(id)
     }
 
     pub fn get_receiver_by_id(
         &self,
         id: &PlayEndpointId,
-    ) -> &WebRtcPlayEndpoint {
+    ) -> Option<&WebRtcPlayEndpoint> {
         self.receivers.get(id)
     }
 }
