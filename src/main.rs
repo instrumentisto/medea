@@ -19,17 +19,17 @@ use crate::{
     media::create_peers,
     signalling::{Room, RoomsRepository},
     turn::new_turn_auth_service,
+    utils::graceful_shutdown::{self, ShutdownSubscribe},
 };
-
-use crate::utils::graceful_shutdown::ShutdownSubscribe;
-use crate::utils::graceful_shutdown;
 
 fn main() {
     dotenv().ok();
     let logger = log::new_dual_logger(std::io::stdout(), std::io::stderr());
     let _scope_guard = slog_scope::set_global_logger(logger);
     slog_stdlog::init().unwrap();
+
     let sys = System::new("medea");
+
     let config = Conf::parse().unwrap();
 
     info!("{:?}", config);

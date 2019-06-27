@@ -93,8 +93,8 @@ pub struct Track {
     pub media_type: MediaType,
 }
 
-/// Representation of [`RTCIceServer`][1] (item of `iceServers` field
-/// from [`RTCConfiguration`][2]).
+/// Representation of [RTCIceServer][1] (item of `iceServers` field
+/// from [RTCConfiguration][2]).
 ///
 /// [1]: https://developer.mozilla.org/en-US/docs/Web/API/RTCIceServer
 /// [2]: https://developer.mozilla.org/en-US/docs/Web/API/RTCConfiguration

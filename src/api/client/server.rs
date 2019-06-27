@@ -1,5 +1,6 @@
 //! HTTP server for handling WebSocket connections of Client API.
 
+use actix::{Actor, Addr};
 use actix_web::{
     middleware,
     web::{resource, Data, Path, Payload},
@@ -11,7 +12,6 @@ use futures::{
     Future,
 };
 use serde::Deserialize;
-use actix::{Actor, Addr};
 
 use crate::{
     api::{
@@ -86,7 +86,10 @@ pub struct Context {
 }
 
 /// Starts HTTP server for handling WebSocket connections of Client API.
-pub fn run(rooms: RoomsRepository, config: Conf) -> Addr<actors::ServerWrapper> {
+pub fn run(
+    rooms: RoomsRepository,
+    config: Conf,
+) -> Addr<actors::ServerWrapper> {
     let server_addr = config.server.bind_addr();
 
     let actix_server = HttpServer::new(move || {
@@ -114,11 +117,9 @@ pub fn run(rooms: RoomsRepository, config: Conf) -> Addr<actors::ServerWrapper> 
 }
 
 pub mod actors {
-    use actix::{Actor, AsyncContext, Context, Handler, Recipient, WrapFuture};
-    use tokio::prelude::future::Future;
+    use actix::{Actor, AsyncContext, Context, Handler, WrapFuture};
 
-    use crate::log::prelude::*;
-    use crate::utils::graceful_shutdown::ShutdownResult;
+    use crate::{log::prelude::*, utils::graceful_shutdown::ShutdownResult};
     use actix_web::dev::Server;
 
     pub struct ServerWrapper(pub Server);
@@ -136,11 +137,7 @@ pub mod actors {
             ctx: &mut Self::Context,
         ) -> Result<(), Box<dyn std::error::Error + Send>> {
             info!("Shutting down Actix Web Server");
-            ctx.wait(
-                self.0
-                    .stop(true)
-                    .into_actor(self),
-            );
+            ctx.wait(self.0.stop(true).into_actor(self));
             Ok(())
         }
     }
@@ -150,7 +147,6 @@ pub mod actors {
 mod test {
     use std::{ops::Add, thread, time::Duration};
 
-    use actix::Actor as _;
     use actix_http::{ws::Message, HttpService};
     use actix_http_test::{TestServer, TestServerRuntime};
     use futures::{future::IntoFuture as _, sink::Sink as _, Stream as _};

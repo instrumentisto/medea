@@ -1,28 +1,29 @@
 //! A class to handle shutdown signals and to shut down system
 
-use std::{collections::BTreeMap, time::Duration, mem};
-use std::sync::mpsc::channel;
+use std::{collections::BTreeMap, mem, sync::mpsc::channel, time::Duration};
 
-
-use actix::{self, actors, prelude::fut::WrapFuture, Actor, Addr,
-            Message, AsyncContext, Context, Handler,
-            Recipient, System, MailboxError, Arbiter};
+use actix::{
+    self, prelude::fut::WrapFuture, Actor, Addr, Arbiter, AsyncContext,
+    Context, Handler, MailboxError, Message, Recipient, System,
+};
 
 use tokio::prelude::future::{join_all, Future};
 
-use crate::log::prelude::*;
-use crate::utils::signal_handler::*;
+use crate::{log::prelude::*, utils::signal_handler::*};
 
-use tokio::prelude::{Poll, Async};
-use actix::prelude::fut::ActorFuture;
-
-
-type ShutdownFutureType = Box<dyn Future<
-    Item = std::vec::Vec<
-        std::result::Result<(),
-            std::boxed::Box<(dyn std::error::Error + std::marker::Send + 'static)>>>,
-    Error = MailboxError>>;
-
+type ShutdownFutureType = Box<
+    dyn Future<
+        Item = std::vec::Vec<
+            std::result::Result<
+                (),
+                std::boxed::Box<
+                    (dyn std::error::Error + std::marker::Send + 'static),
+                >,
+            >,
+        >,
+        Error = MailboxError,
+    >,
+>;
 
 #[derive(Debug)]
 pub struct ShutdownResult;
@@ -50,9 +51,7 @@ pub struct GracefulShutdown {
 }
 
 impl GracefulShutdown {
-    fn new(
-        shutdown_timeout: u64,
-    ) -> Self {
+    fn new(shutdown_timeout: u64) -> Self {
         Self {
             recipients: BTreeMap::new(),
             shutdown_timeout,
@@ -71,22 +70,23 @@ impl Handler<SignalMessage> for GracefulShutdown {
         match msg.0 {
             SignalKind::Int => {
                 error!("SIGINT received, exiting");
-            },
+            }
             SignalKind::Hup => {
                 error!("SIGHUP received, reloading");
-            },
+            }
             SignalKind::Term => {
                 error!("SIGTERM received, stopping");
-            },
+            }
             SignalKind::Quit => {
                 error!("SIGQUIT received, exiting");
-            },
+            }
         };
 
         let mut shutdown_future: ShutdownFutureType =
             Box::new(futures::future::ok::<
                 Vec<Result<(), Box<(dyn std::error::Error + Send + 'static)>>>,
-                MailboxError> (vec![Ok(())] ));
+                MailboxError,
+            >(vec![Ok(())]));
 
         for recipients in self.recipients.values() {
             let mut this_priority_futures_vec =
@@ -99,12 +99,13 @@ impl Handler<SignalMessage> for GracefulShutdown {
 
             let this_priority_futures = join_all(this_priority_futures_vec);
             let new_shutdown_future =
-                Box::new(shutdown_future
-                    .then(|_| {this_priority_futures}));
-            // we need to rewrite shutdown_future, otherwise compiler thinks we moved value
+                Box::new(shutdown_future.then(|_| this_priority_futures));
+            // we need to rewrite shutdown_future, otherwise compiler thinks we
+            // moved value
             shutdown_future = Box::new(futures::future::ok::<
                 Vec<Result<(), Box<(dyn std::error::Error + Send + 'static)>>>,
-                MailboxError> (vec![Ok(())] ));
+                MailboxError,
+            >(vec![Ok(())]));
             mem::replace(&mut shutdown_future, new_shutdown_future);
         }
 
@@ -125,7 +126,10 @@ impl Handler<SignalMessage> for GracefulShutdown {
                     System::current().stop();
                 })
                 .map_err(|e| {
-                    error!("Error trying to shut down system gracefully: {:?}", e);
+                    error!(
+                        "Error trying to shut down system gracefully: {:?}",
+                        e
+                    );
                     System::current().stop();
                 })
                 .into_actor(self),
@@ -137,7 +141,8 @@ impl Handler<ShutdownSubscribe> for GracefulShutdown {
     type Result = ();
 
     fn handle(&mut self, msg: ShutdownSubscribe, _: &mut Context<Self>) {
-        // todo: may be a bug: may subscribe same address multiple times with the same/different priorities
+        // todo: may be a bug: may subscribe same address multiple times with
+        // the same/different priorities
 
         let vec_with_current_priority = self.recipients.get_mut(&msg.priority);
         if let Some(vector) = vec_with_current_priority {
@@ -152,20 +157,16 @@ impl Handler<ShutdownSubscribe> for GracefulShutdown {
     }
 }
 
-pub fn create(
-    shutdown_timeout: u64,
-) -> Addr<GracefulShutdown> {
+pub fn create(shutdown_timeout: u64) -> Addr<GracefulShutdown> {
     let graceful_shutdown = GracefulShutdown::new(shutdown_timeout);
-    //todo spawn on a new thread
-    //todo test
     let (tx, rx) = channel();
     let shutdown_arbiter = Arbiter::new();
-    let graceful_shutdown_addr = shutdown_arbiter.send(
+    shutdown_arbiter.send(
         futures::future::ok::<(), ()>(())
             .map(move |_| {
-                tx.send(graceful_shutdown.start());
+                let _ = tx.send(graceful_shutdown.start());
             })
-            .map_err(|_| {})
+            .map_err(|_| {}),
     );
     let graceful_shutdown_addr = rx.recv().unwrap();
     SignalHandler::start(graceful_shutdown_addr.clone().recipient());
