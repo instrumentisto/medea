@@ -50,7 +50,7 @@ pub struct Authorize {
 #[derive(Debug)]
 pub enum AuthorizationError {
     /// Authorizing [`Participant`] does not exists in the [`Room`].
-    ParticipantNotExists,
+    MemberNotExists,
     /// Provided credentials are invalid.
     InvalidCredentials,
 }

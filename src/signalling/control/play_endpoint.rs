@@ -4,7 +4,7 @@ use std::rc::Rc;
 use crate::media::IceUser;
 use crate::media::PeerId;
 
-#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Id(String);
 
 #[derive(Debug)]

@@ -5,7 +5,7 @@ use crate::media::IceUser;
 use crate::media::PeerId;
 use hashbrown::HashSet;
 
-#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Id(String);
 
 #[derive(Debug)]
@@ -44,7 +44,7 @@ impl WebRtcPublishEndpoint {
 
     pub fn remove_peer_ids(&mut self, peer_ids: &[PeerId]) {
         for peer_id in peer_ids {
-            self.remove_peer_id(peer_id)
+            self.remove_peer_id(peer_id);
         }
     }
 }

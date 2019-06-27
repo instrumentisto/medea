@@ -21,4 +21,12 @@ impl Member {
     pub fn id(&self) -> &MemberId {
         &self.id
     }
+
+    pub fn credentials(&self) -> &str {
+        &self.credentials
+    }
+
+    pub fn set_connection(&mut self, connection: Box<dyn RpcConnection>) {
+        self.connection = Some(connection)
+    }
 }

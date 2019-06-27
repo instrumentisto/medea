@@ -11,6 +11,8 @@ use redis::{ConnectionInfo, RedisError};
 use tokio::prelude::*;
 
 use crate::{log::prelude::*, media::IceUser};
+use std::rc::Rc;
+use std::cell::RefCell;
 
 #[derive(Fail, Debug)]
 pub enum TurnDatabaseErr {
@@ -86,14 +88,14 @@ impl TurnDatabase {
     /// Deletes batch of provided [`IceUser`]s.
     pub fn remove(
         &mut self,
-        users: &[IceUser],
+        users: &[Rc<RefCell<IceUser>>],
     ) -> impl Future<Item = (), Error = bb8::RunError<TurnDatabaseErr>> {
         debug!("Remove ICE users: {:?}", users);
         let mut delete_keys = Vec::with_capacity(users.len());
 
         for user in users {
             delete_keys
-                .push(format!("turn/realm/medea/user/{}/key", user.user()));
+                .push(format!("turn/realm/medea/user/{}/key", user.borrow().user()));
         }
 
         self.pool.run(|connection| {

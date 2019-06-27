@@ -159,7 +159,7 @@ pub struct Room {
     /// [`Peer`]s of [`Member`]s in this [`Room`].
     peers: PeerRepository,
 
-    pipeline: Pipeline,
+    pub pipeline: Pipeline,
 }
 
 impl Room {

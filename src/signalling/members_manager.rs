@@ -104,8 +104,8 @@ impl MembersManager {
     pub fn get_participant_by_id(
         &self,
         id: &MemberId,
-    ) -> Option<Rc<Member>> {
-        self.participants.get(id).cloned()
+    ) -> Option<&Member> {
+        self.participants.get(id)
     }
 
     /// Lookup [`Member`] by provided id and credentials. Returns
@@ -117,11 +117,11 @@ impl MembersManager {
         &self,
         participant_id: &MemberId,
         credentials: &str,
-    ) -> Result<Rc<Member>, AuthorizationError> {
+    ) -> Result<&Member, AuthorizationError> {
         match self.get_participant_by_id(participant_id) {
             Some(participant) => {
-                if participant.credentials().eq(credentials) {
-                    Ok(participant.clone())
+                if participant.credentials() == credentials {
+                    Ok(participant)
                 } else {
                     Err(AuthorizationError::InvalidCredentials)
                 }
@@ -206,8 +206,8 @@ impl MembersManager {
                 })
                 .and_then(
                     move |ice: IceUser, room: &mut Room, _| {
-                        room.participants
-                            .insert_connection(participant_id.clone(), con);
+                        room.pipeline.insert_connection(&participant_id, con);
+
                         participant.replace_ice_user(ice);
 
                         wrap_future(future::ok(participant))
@@ -218,12 +218,14 @@ impl MembersManager {
     }
 
     /// Insert new [`RpcConnection`] into this [`MemberService`].
-    fn insert_connection(
+    pub fn insert_connection(
         &mut self,
-        participant_id: MemberId,
+        participant_id: &MemberId,
         conn: Box<dyn RpcConnection>,
     ) {
-        self.connections.insert(participant_id, conn);
+        if let Some(member) = self.participants.get_mut(&participant_id) {
+            member.set_connection(conn);
+        }
     }
 
     /// If [`ClosedReason::Closed`], then removes [`RpcConnection`] associated

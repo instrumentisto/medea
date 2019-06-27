@@ -11,10 +11,12 @@ use medea_client_api_proto::IceServer;
 use crate::signalling::room::Room;
 use futures::Future;
 use actix::Context;
+use crate::media::PeerId;
+use std::cell::RefCell;
 
 #[derive(Debug)]
 pub struct EndpointsManager {
-    ice_users: HashMap<MemberId, Rc<IceUser>>,
+    ice_users: HashMap<MemberId, Rc<RefCell<IceUser>>>,
     publishers: HashMap<PublishEndpointId, WebRtcPublishEndpoint>,
     receivers: HashMap<PlayEndpointId, WebRtcPlayEndpoint>,
 }
@@ -29,18 +31,18 @@ impl EndpointsManager {
         }
     }
 
-    pub fn take_ice_users(&mut self) -> HashMap<MemberId, Rc<IceUser>> {
+    pub fn take_ice_users(&mut self) -> HashMap<MemberId, Rc<RefCell<IceUser>>> {
         let mut ice_users = HashMap::new();
         std::mem::swap(&mut self.ice_users, &mut ice_users);
 
         ice_users
     }
 
-    pub fn take_ice_user_by_member_id(&mut self, member_id: &MemberId) -> Option<IceUser> {
+    pub fn take_ice_user_by_member_id(&mut self, member_id: &MemberId) -> Option<Rc<RefCell<IceUser>>> {
         self.ice_users.remove(member_id)
     }
 
-    pub fn replace_ice_user(&mut self, member_id: MemberId, mut new_ice_user: Rc<IceUser>) -> Option<Rc<IceUser>> {
+    pub fn replace_ice_user(&mut self, member_id: MemberId, mut new_ice_user: Rc<RefCell<IceUser>>) -> Option<Rc<RefCell<IceUser>>> {
         self.ice_users.insert(member_id.clone(), new_ice_user)
     }
 
