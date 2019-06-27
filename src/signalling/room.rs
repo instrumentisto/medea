@@ -229,7 +229,8 @@ impl Room {
         };
         self.peers.add_peer(sender);
         Ok(Box::new(wrap_future(
-            self.pipeline.send_event_to_participant(member_id, peer_created),
+            self.pipeline
+                .send_event_to_participant(member_id, peer_created),
         )))
     }
 
@@ -283,8 +284,7 @@ impl Room {
         self.peers.add_peer(to_peer);
 
         Ok(Box::new(wrap_future(
-            self.pipeline
-                .send_event_to_participant(to_member_id, event),
+            self.pipeline.send_event_to_participant(to_member_id, event),
         )))
     }
 
@@ -316,8 +316,7 @@ impl Room {
         self.peers.add_peer(to_peer);
 
         Ok(Box::new(wrap_future(
-            self.pipeline
-                .send_event_to_participant(to_member_id, event),
+            self.pipeline.send_event_to_participant(to_member_id, event),
         )))
     }
 
@@ -354,8 +353,7 @@ impl Room {
         };
 
         Ok(Box::new(wrap_future(
-            self.pipeline
-                .send_event_to_participant(to_member_id, event),
+            self.pipeline.send_event_to_participant(to_member_id, event),
         )))
     }
 
@@ -408,9 +406,7 @@ impl Room {
                     receiver,
                 );
 
-                if self
-                    .pipeline
-                    .is_member_has_connection(&receiver_owner.id())
+                if self.pipeline.is_member_has_connection(&receiver_owner.id())
                     && !receiver.is_connected()
                 {
                     self.connect_participants(

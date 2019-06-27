@@ -200,7 +200,7 @@ impl MembersManager {
                 .and_then(
                     move |ice: IceUser, room: &mut Room, _| {
                         room.pipeline.insert_connection(&participant_id, con);
-                        
+
                         participant.replace_ice_user(ice);
 
                         wrap_future(future::ok(participant))

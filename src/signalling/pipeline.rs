@@ -8,7 +8,11 @@ use crate::{
         control::{MemberId, RoomSpec},
     },
     media::IceUser,
-    signalling::room::Room,
+    signalling::{
+        control::member::Member,
+        members_manager::MemberServiceErr,
+        room::{ActFuture, Room, RoomError},
+    },
     turn::service::TurnAuthService,
 };
 use actix::Context;
@@ -17,12 +21,8 @@ use futures::{
     Future,
 };
 use hashbrown::{hash_map::IntoIter as _, HashMap};
-use std::{cell::RefCell, convert::TryFrom, rc::Rc, time::Duration};
 use medea_client_api_proto::Event;
-use crate::signalling::room::RoomError;
-use crate::signalling::room::ActFuture;
-use crate::signalling::members_manager::MemberServiceErr;
-use crate::signalling::control::member::Member;
+use std::{cell::RefCell, convert::TryFrom, rc::Rc, time::Duration};
 
 #[derive(Debug)]
 pub struct Pipeline {
@@ -47,10 +47,17 @@ impl Pipeline {
     }
 
     pub fn is_member_has_connection(&self, id: &MemberId) -> bool {
-        self.members.get_participant_by_id(id).unwrap().is_connected()
+        self.members
+            .get_participant_by_id(id)
+            .unwrap()
+            .is_connected()
     }
 
-    pub fn send_event_to_participant(&mut self, member_id: MemberId, event: Event) -> impl Future<Item = (), Error = RoomError> {
+    pub fn send_event_to_participant(
+        &mut self,
+        member_id: MemberId,
+        event: Event,
+    ) -> impl Future<Item = (), Error = RoomError> {
         self.members.send_event_to_participant(member_id, event)
     }
 
@@ -58,10 +65,14 @@ impl Pipeline {
         self.members.get_participant_by_id(id)
     }
 
-    pub fn connection_established(&mut self, ctx: &mut Context<Room>, id: MemberId, connection: Box<dyn RpcConnection>) -> ActFuture<&Member, MemberServiceErr> {
+    pub fn connection_established(
+        &mut self,
+        ctx: &mut Context<Room>,
+        id: MemberId,
+        connection: Box<dyn RpcConnection>,
+    ) -> ActFuture<&Member, MemberServiceErr> {
         self.members.connection_established(ctx, id, connection)
     }
-
 
     fn test(
         &mut self,
