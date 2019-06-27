@@ -155,34 +155,42 @@ endif
 # Usage:
 # 	make test.e2e [dockerized=(yes|no)] [logs=(yes|no)]
 
-medea-env-dockerized = MEDEA_SERVER_BIND_PORT=8081 \
-	$(if $(call eq,$(logs),yes),,RUST_LOG=warn) \
-	MEDEA_SERVER_STATIC_SPECS_PATH=tests/specs
-
-medea-env-debug = RUST_BACKTRACE=1 \
+medea-env = RUST_BACKTRACE=1 \
 	MEDEA_SERVER.BIND_PORT=8081 \
-	MEDEA_SERVER.STATIC_SPECS_PATH=./tests/specs \
-	$(if $(call eq,$(logs),yes),,RUST_LOG=warn)
+	$(if $(call eq,$(logs),yes),,RUST_LOG=warn) \
+	MEDEA_SERVER.STATIC_SPECS_PATH=tests/specs
 
-test.e2e: up.coturn
+test.e2e:
+ifeq ($(coturn),no)
+else
+	@make up.coturn
+endif
 ifeq ($(dockerized),no)
-	@make down.medea dockerized=yes
 	@make down.medea dockerized=no
 
-	cargo build
-	env $(medea-env-debug) $(if $(call eq,$(logs),yes),,RUST_LOG=warn) cargo run &
+	cargo build $(if $(call eq,$(release),yes),--release)
+	env $(medea-env) $(if $(call eq,$(logs),yes),,RUST_LOG=warn) cargo run $(if $(call eq,$(release),yes),--release) &
+
 	sleep 1
 	- cargo test --test e2e
 
 	@make down.medea
+ifeq ($(coturn),no)
+else
+	@make down.coturn
+endif
 else
 	@make down.medea dockerized=yes
 	@make down.medea dockerized=no
+	@make up.coturn
 
-	env $(medea-env-dockerized) docker-compose -f docker-compose.medea.yml up -d --build
-	docker-compose -f docker-compose.medea.yml logs &
-	- cargo test --test e2e
-	- @make down.medea dockerized=yes
+	docker run --rm --network=host -v "$(PWD)":/app -w /app \
+			   -v "$(PWD)/.cache/medea/registry":/usr/local/cargo/registry \
+			   -v "$(PWD)/.cache/medea/target":/app/target \
+		rust:latest \
+			make test.e2e dockerized=no coturn=no release=yes
+
+	@make down.coturn
 endif
 
 

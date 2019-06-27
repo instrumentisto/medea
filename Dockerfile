@@ -17,6 +17,15 @@ RUN mkdir -p /out/etc/ \
 
 COPY / /app/
 
+RUN mkdir -p /app/target
+RUN mkdir -p /usr/local/cargo
+
+VOLUME .cache/medea:/app/target
+VOLUME .cache/cargo:/usr/local/cargo
+
+RUN touch /app/target
+RUN ls /app
+
 # Build project distribution.
 RUN cd /app \
  # Compile project.

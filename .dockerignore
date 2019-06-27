@@ -1,1 +1,9 @@
-target
+*
+!Cargo.toml
+!Cargo.lock
+!src
+!crates
+!jason/Cargo.toml
+!jason/src
+!proto
+!Makefile
