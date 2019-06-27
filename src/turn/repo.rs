@@ -11,8 +11,7 @@ use redis::{ConnectionInfo, RedisError};
 use tokio::prelude::*;
 
 use crate::{log::prelude::*, media::IceUser};
-use std::rc::Rc;
-use std::cell::RefCell;
+use std::{cell::RefCell, rc::Rc};
 
 #[derive(Fail, Debug)]
 pub enum TurnDatabaseErr {
@@ -94,8 +93,10 @@ impl TurnDatabase {
         let mut delete_keys = Vec::with_capacity(users.len());
 
         for user in users {
-            delete_keys
-                .push(format!("turn/realm/medea/user/{}/key", user.borrow().user()));
+            delete_keys.push(format!(
+                "turn/realm/medea/user/{}/key",
+                user.borrow().user()
+            ));
         }
 
         self.pool.run(|connection| {

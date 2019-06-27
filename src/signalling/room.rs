@@ -26,13 +26,13 @@ use crate::{
         WaitLocalHaveRemote, WaitLocalSdp, WaitRemoteSdp,
     },
     signalling::{
+        control::member::{Member, MemberId},
         members_manager::MembersManager,
         peers::PeerRepository,
-        control::member::{Member, MemberId},
+        pipeline::Pipeline,
     },
     turn::TurnAuthService,
 };
-use crate::signalling::pipeline::Pipeline;
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
 pub type ActFuture<I, E> =
@@ -142,7 +142,7 @@ impl From<TryFromElementError> for RoomError {
     }
 }
 
-//impl From<MembersLoadError> for RoomError {
+// impl From<MembersLoadError> for RoomError {
 //    fn from(err: MembersLoadError) -> Self {
 //        RoomError::BadRoomSpec(format!(
 //            "Error while loading room spec. {}",
@@ -544,8 +544,8 @@ impl Handler<PeersRemoved> for Room {
             participant.peers_removed(&msg.peers_id);
         } else {
             error!(
-                "Member with id {} for which received \
-                 Event::PeersRemoved not found. Closing room.",
+                "Member with id {} for which received Event::PeersRemoved not \
+                 found. Closing room.",
                 msg.member_id
             );
             ctx.notify(CloseRoom {});

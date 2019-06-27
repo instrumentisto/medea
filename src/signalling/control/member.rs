@@ -6,7 +6,7 @@ pub use crate::api::control::MemberId;
 pub struct Member {
     id: MemberId,
     credentials: String,
-    connection: Option<Box<dyn RpcConnection>>
+    connection: Option<Box<dyn RpcConnection>>,
 }
 
 impl Member {

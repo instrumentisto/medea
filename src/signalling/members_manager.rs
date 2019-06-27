@@ -31,9 +31,9 @@ use crate::{
     log::prelude::*,
     media::IceUser,
     signalling::{
+        control::member::Member,
         room::{ActFuture, RoomError},
         Room,
-        control::member::Member,
     },
     turn::{TurnAuthService, TurnServiceErr, UnreachablePolicy},
 };
@@ -43,10 +43,7 @@ use crate::{
 pub enum MemberServiceErr {
     #[fail(display = "TurnService Error in MemberService: {}", _0)]
     TurnServiceErr(TurnServiceErr),
-    #[fail(
-        display = "Mailbox error when accessing MemberService: {}",
-        _0
-    )]
+    #[fail(display = "Mailbox error when accessing MemberService: {}", _0)]
     MailBoxErr(MailboxError),
     #[fail(display = "Member with Id [{}] was not found", _0)]
     MemberNotFound(MemberId),
@@ -101,10 +98,7 @@ impl MembersManager {
     }
 
     /// Lookup [`Member`] by provided id.
-    pub fn get_participant_by_id(
-        &self,
-        id: &MemberId,
-    ) -> Option<&Member> {
+    pub fn get_participant_by_id(&self, id: &MemberId) -> Option<&Member> {
         self.participants.get(id)
     }
 
@@ -202,9 +196,7 @@ impl MembersManager {
                     self.room_id.clone(),
                     UnreachablePolicy::ReturnErr,
                 ))
-                .map_err(|err, _: &mut Room, _| {
-                    MemberServiceErr::from(err)
-                })
+                .map_err(|err, _: &mut Room, _| MemberServiceErr::from(err))
                 .and_then(
                     move |ice: IceUser, room: &mut Room, _| {
                         room.pipeline.insert_connection(&participant_id, con);

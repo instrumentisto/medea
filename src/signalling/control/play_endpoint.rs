@@ -1,8 +1,9 @@
 use super::publish_endpoint::Id as PublishEndpointId;
-use crate::api::control::MemberId;
+use crate::{
+    api::control::MemberId,
+    media::{IceUser, PeerId},
+};
 use std::rc::Rc;
-use crate::media::IceUser;
-use crate::media::PeerId;
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Id(String);
@@ -13,7 +14,7 @@ pub struct WebRtcPlayEndpoint {
     src: PublishEndpointId,
     owner: MemberId,
     ice_user: Option<Rc<IceUser>>,
-    peer_id: Option<PeerId>
+    peer_id: Option<PeerId>,
 }
 
 impl WebRtcPlayEndpoint {
@@ -32,9 +33,9 @@ impl WebRtcPlayEndpoint {
     pub fn set_peer_id(&mut self, peer_id: PeerId) {
         self.peer_id = Some(peer_id)
     }
-    
+
     pub fn peer_id(&self) -> &Option<PeerId> {
-       &self.peer_id
+        &self.peer_id
     }
 
     pub fn reset(&mut self) {

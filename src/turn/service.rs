@@ -17,8 +17,7 @@ use crate::{
     media::IceUser,
     turn::repo::{TurnDatabase, TurnDatabaseErr},
 };
-use std::rc::Rc;
-use std::cell::RefCell;
+use std::{cell::RefCell, rc::Rc};
 
 static TURN_PASS_LEN: usize = 16;
 

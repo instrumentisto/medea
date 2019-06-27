@@ -13,8 +13,8 @@ use crate::{
     log::prelude::*,
     media::{Peer, PeerId, PeerStateMachine},
     signalling::{
-        room::{PeersRemoved, Room, RoomError},
         control::member::Member,
+        room::{PeersRemoved, Room, RoomError},
     },
 };
 
