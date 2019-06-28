@@ -15,8 +15,12 @@ use medea_macro::enum_delegate;
 
 use crate::{
     api::control::MemberId,
+    log::prelude::*,
     media::{MediaTrack, TrackId},
-    signalling::{endpoints_manager::EndpointsManager, peers::Counter},
+    signalling::{
+        control::endpoint::{Id as EndpointId, WebRtcPublishEndpoint},
+        peers::Counter,
+    },
 };
 
 /// Newly initialized [`Peer`] ready to signalling.
@@ -257,88 +261,61 @@ impl Peer<New> {
         &mut self,
         partner_peer: &mut Peer<New>,
         tracks_count: &mut Counter,
-        member_id: &MemberId,
-        endpoints_manager: &EndpointsManager,
+        publish_endpoints: HashMap<EndpointId, Rc<WebRtcPublishEndpoint>>,
     ) {
         let partner_id = self.partner_member_id();
         let self_id = self.id();
-        let mut publish_endpoints =
-            endpoints_manager.get_publishers_by_member_id(member_id);
 
         publish_endpoints
-            .iter_mut()
-            .for_each(|(_, e)| e.borrow_mut().add_peer_id(self_id));
+            .into_iter()
+            .flat_map(|(_m, e)| {
+                e.add_peer_id(self_id);
+                e.receivers()
+                    .into_iter()
+                    .filter_map(|e| {
+                        let upgraded_play = e.upgrade();
+                        if upgraded_play.is_none() {
+                            warn!(
+                                "Empty weak pointer of publisher's play \
+                                 endpoint. {:?}.",
+                                e
+                            );
+                        }
+                        upgraded_play
+                    })
+                    .filter_map(|p| {
+                        let owner = p.owner().upgrade();
+                        if owner.is_none() {
+                            warn!(
+                                "Empty weak pointer for publisher's play's \
+                                 owner participant. {:?}.",
+                                p
+                            );
+                        }
+                        owner.map(|owner| (p, owner))
+                    })
+                    .filter(|(e, owner)| {
+                        owner.id() == partner_id && !e.is_connected()
+                    })
+            })
+            .for_each(|(e, _)| {
+                let track_audio = Rc::new(MediaTrack::new(
+                    tracks_count.next_id(),
+                    MediaType::Audio(AudioSettings {}),
+                ));
+                let track_video = Rc::new(MediaTrack::new(
+                    tracks_count.next_id(),
+                    MediaType::Video(VideoSettings {}),
+                ));
 
-        // pub fn get_publish_sinks(&mut self, member_id; &MemberId, partner_id:
-        // &MemberId) -> Vec<&mut WebRtcPlayEndpoint>
-        let mut publish_sinks =
-            endpoints_manager.get_publish_sinks(member_id, &partner_id);
+                self.add_sender(track_video.clone());
+                self.add_sender(track_audio.clone());
 
-        for sink in publish_sinks {
-            let track_audio = Rc::new(MediaTrack::new(
-                tracks_count.next_id(),
-                MediaType::Audio(AudioSettings {}),
-            ));
-            let track_video = Rc::new(MediaTrack::new(
-                tracks_count.next_id(),
-                MediaType::Video(VideoSettings {}),
-            ));
+                partner_peer.add_receiver(track_video);
+                partner_peer.add_receiver(track_audio);
 
-            self.add_sender(track_video.clone());
-            self.add_sender(track_audio.clone());
-
-            partner_peer.add_receiver(track_video);
-            partner_peer.add_receiver(track_audio);
-
-            sink.borrow_mut().set_peer_id(partner_peer.id());
-        }
-
-        //        publish_endpoints
-        //            .into_iter()
-        //            .map(|(m, e)| {
-        //                e.add_peer_id(self_id);
-        //                (m, e)
-        //            })
-        //            .flat_map(|(_m, e)| {
-        //                e.sinks()
-        //                    .iter()
-        //                    .filter_map(|e: &PlayerId| {
-        //                        endpoints_manager.get_mut_receiver_by_id(e)
-        ////                        if play.is_none() {
-        ////                            warn!(
-        ////                                "Empty weak pointer of publisher's
-        //// play \                                 endpoint. {:?}.",
-        ////                                e
-        ////                            );
-        ////                        }
-        ////                        play.map(|play| (e, play))
-        //                    })
-        //                    .map(|p| {
-        //                        let owner_id = p.owner();
-        //                        (p, owner_id)
-        //                    })
-        //                    .filter(|(e, owner_id)| {
-        //                        **owner_id == partner_id && !e.is_connected()
-        //                    })
-        //            })
-        //            .for_each(|(e, _)| {
-        //                let track_audio = Rc::new(MediaTrack::new(
-        //                    tracks_count.next_id(),
-        //                    MediaType::Audio(AudioSettings {}),
-        //                ));
-        //                let track_video = Rc::new(MediaTrack::new(
-        //                    tracks_count.next_id(),
-        //                    MediaType::Video(VideoSettings {}),
-        //                ));
-        //
-        //                self.add_sender(track_video.clone());
-        //                self.add_sender(track_audio.clone());
-        //
-        //                partner_peer.add_receiver(track_video);
-        //                partner_peer.add_receiver(track_audio);
-        //
-        //                e.set_peer_id(partner_peer.id());
-        //            });
+                e.connect(partner_peer.id());
+            });
     }
 
     /// Transition new [`Peer`] into state of waiting for local description.

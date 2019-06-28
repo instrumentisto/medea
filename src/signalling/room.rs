@@ -1,5 +1,5 @@
 //! Room definitions and implementations. Room is responsible for media
-//! connection establishment between concrete [`Member`]s.
+//! connection establishment between concrete [`Participant`]s.
 
 use std::time::Duration;
 
@@ -18,7 +18,7 @@ use crate::{
             AuthorizationError, Authorize, ClosedReason, CommandMessage,
             RpcConnectionClosed, RpcConnectionEstablished,
         },
-        control::{RoomId, RoomSpec, TryFromElementError},
+        control::{MemberId, RoomId, RoomSpec, TryFromElementError},
     },
     log::prelude::*,
     media::{
@@ -26,7 +26,9 @@ use crate::{
         WaitLocalHaveRemote, WaitLocalSdp, WaitRemoteSdp,
     },
     signalling::{
-        control::member::MemberId, peers::PeerRepository, pipeline::Pipeline,
+        control::participant::{Participant, ParticipantsLoadError},
+        participants::ParticipantService,
+        peers::PeerRepository,
     },
     turn::TurnAuthService,
 };
@@ -139,24 +141,25 @@ impl From<TryFromElementError> for RoomError {
     }
 }
 
-// impl From<MembersLoadError> for RoomError {
-//    fn from(err: MembersLoadError) -> Self {
-//        RoomError::BadRoomSpec(format!(
-//            "Error while loading room spec. {}",
-//            err
-//        ))
-//    }
-//}
+impl From<ParticipantsLoadError> for RoomError {
+    fn from(err: ParticipantsLoadError) -> Self {
+        RoomError::BadRoomSpec(format!(
+            "Error while loading room spec. {}",
+            err
+        ))
+    }
+}
 
-/// Media server room with its [`Member`]s.
+/// Media server room with its [`Participant`]s.
 #[derive(Debug)]
 pub struct Room {
     id: RoomId,
 
-    /// [`Peer`]s of [`Member`]s in this [`Room`].
-    peers: PeerRepository,
+    /// [`RpcConnection`]s of [`Participant`]s in this [`Room`].
+    pub participants: ParticipantService,
 
-    pub pipeline: Pipeline,
+    /// [`Peer`]s of [`Participant`]s in this [`Room`].
+    peers: PeerRepository,
 }
 
 impl Room {
@@ -172,7 +175,11 @@ impl Room {
         Ok(Self {
             id: room_spec.id().clone(),
             peers: PeerRepository::from(HashMap::new()),
-            pipeline: Pipeline::new(turn, reconnect_timeout, room_spec),
+            participants: ParticipantService::new(
+                room_spec,
+                reconnect_timeout,
+                turn,
+            )?,
         })
     }
 
@@ -212,12 +219,12 @@ impl Room {
 
         let sender = sender.start();
         let member_id = sender.member_id();
-        self.pipeline.get_ice_servers(&member_id);
         let ice_servers = self
-            .pipeline
-            .get_ice_servers(&member_id)
+            .participants
+            .get_participant_by_id(&member_id)
+            .ok_or_else(|| RoomError::MemberNotFound(member_id.clone()))?
+            .servers_list()
             .ok_or_else(|| RoomError::NoTurnCredentials(member_id.clone()))?;
-
         let peer_created = Event::PeerCreated {
             peer_id: sender.id(),
             sdp_offer: None,
@@ -226,18 +233,18 @@ impl Room {
         };
         self.peers.add_peer(sender);
         Ok(Box::new(wrap_future(
-            self.pipeline
+            self.participants
                 .send_event_to_participant(member_id, peer_created),
         )))
     }
 
-    /// Sends [`Event::PeersRemoved`] to [`Member`].
+    /// Sends [`Event::PeersRemoved`] to [`Participant`].
     fn send_peers_removed(
         &mut self,
         member_id: MemberId,
         peers: Vec<PeerId>,
     ) -> ActFuture<(), RoomError> {
-        Box::new(wrap_future(self.pipeline.send_event_to_participant(
+        Box::new(wrap_future(self.participants.send_event_to_participant(
             member_id,
             Event::PeersRemoved { peer_ids: peers },
         )))
@@ -261,11 +268,11 @@ impl Room {
         let to_peer = to_peer.set_remote_sdp(sdp_offer.clone());
 
         let to_member_id = to_peer.member_id();
-
-        // TODO: better error
         let ice_servers = self
-            .pipeline
-            .get_ice_servers(&to_member_id)
+            .participants
+            .get_participant_by_id(&to_member_id)
+            .ok_or_else(|| RoomError::MemberNotFound(to_member_id.clone()))?
+            .servers_list()
             .ok_or_else(|| {
                 RoomError::NoTurnCredentials(to_member_id.clone())
             })?;
@@ -281,7 +288,8 @@ impl Room {
         self.peers.add_peer(to_peer);
 
         Ok(Box::new(wrap_future(
-            self.pipeline.send_event_to_participant(to_member_id, event),
+            self.participants
+                .send_event_to_participant(to_member_id, event),
         )))
     }
 
@@ -313,7 +321,8 @@ impl Room {
         self.peers.add_peer(to_peer);
 
         Ok(Box::new(wrap_future(
-            self.pipeline.send_event_to_participant(to_member_id, event),
+            self.participants
+                .send_event_to_participant(to_member_id, event),
         )))
     }
 
@@ -350,96 +359,107 @@ impl Room {
         };
 
         Ok(Box::new(wrap_future(
-            self.pipeline.send_event_to_participant(to_member_id, event),
+            self.participants
+                .send_event_to_participant(to_member_id, event),
         )))
     }
 
-    /// Create [`Peer`]s between [`Member`]s and interconnect it by control
+    /// Create [`Peer`]s between [`Participant`]s and interconnect it by control
     /// API spec.
     fn connect_participants(
         &mut self,
-        first_member: &MemberId,
-        second_member: &MemberId,
+        first_member: &Participant,
+        second_member: &Participant,
         ctx: &mut <Self as Actor>::Context,
     ) {
         debug!(
             "Created peer member {} with member {}",
-            first_member, second_member
+            first_member.id(),
+            second_member.id()
         );
 
-        let (first_peer_id, second_peer_id) = self.peers.create_peers(
-            first_member,
-            second_member,
-            self.pipeline.endpoints_manager(),
-        );
+        let (first_peer_id, second_peer_id) =
+            self.peers.create_peers(first_member, second_member);
 
         self.connect_peers(ctx, first_peer_id, second_peer_id);
     }
 
-    /// Create and interconnect all [`Peer`]s between connected [`Member`]
-    /// and all available at this moment [`Member`].
+    /// Create and interconnect all [`Peer`]s between connected [`Participant`]
+    /// and all available at this moment [`Participant`].
     ///
     /// Availability is determines by checking [`RpcConnection`] of all
-    /// [`Member`]s from [`WebRtcPlayEndpoint`]s and from receivers of
-    /// connected [`Member`].
+    /// [`Participant`]s from [`WebRtcPlayEndpoint`]s and from receivers of
+    /// connected [`Participant`].
     fn init_participant_connections(
         &mut self,
-        member_id: &MemberId,
+        participant: &Participant,
         ctx: &mut <Self as Actor>::Context,
     ) {
-        let participant_publishers =
-            self.pipeline.get_publishers_by_member_id(member_id);
         // Create all connected publish endpoints.
-        for (_, publish) in participant_publishers {
-            for receiver in publish.borrow().sinks() {
-                let q = self.pipeline.get_receiver_by_id(&receiver);
+        for (_, publish) in participant.publishers() {
+            for receiver in publish.receivers() {
                 let receiver = unit_option_unwrap!(
-                    q,
+                    receiver.upgrade(),
                     ctx,
                     "Empty weak pointer for publisher receiver. {:?}.",
                     publish,
                 );
 
+                let receiver_owner = unit_option_unwrap!(
+                    receiver.owner().upgrade(),
+                    ctx,
+                    "Empty weak pointer for publisher's receiver's owner. \
+                     {:?}.",
+                    receiver,
+                );
+
                 if self
-                    .pipeline
-                    .is_member_has_connection(&receiver.borrow().owner())
-                    && !receiver.borrow().is_connected()
+                    .participants
+                    .participant_has_connection(&receiver_owner.id())
+                    && !receiver.is_connected()
                 {
                     self.connect_participants(
-                        member_id,
-                        &receiver.borrow().owner(),
+                        &participant,
+                        &receiver_owner,
                         ctx,
                     );
                 }
             }
         }
 
-        let member_receivers =
-            self.pipeline.get_receivers_by_member_id(member_id);
         // Create all connected play's receivers peers.
-        for (_, play) in member_receivers {
-            let plays_publisher_id = {
-                let q = self.pipeline.get_publisher_by_id(play.borrow().src());
+        for (_, play) in participant.receivers() {
+            let plays_publisher_participant = {
                 let play_publisher = unit_option_unwrap!(
-                    q,
+                    play.publisher().upgrade(),
                     ctx,
                     "Empty weak pointer for play's publisher. {:?}.",
                     play,
                 );
-                let q = play_publisher.borrow().owner();
-                q
+                unit_option_unwrap!(
+                    play_publisher.owner().upgrade(),
+                    ctx,
+                    "Empty weak pointer for play's publisher owner. {:?}.",
+                    play_publisher,
+                )
             };
 
-            if self.pipeline.is_member_has_connection(&plays_publisher_id)
-                && !play.borrow().is_connected()
+            if self
+                .participants
+                .participant_has_connection(&plays_publisher_participant.id())
+                && !play.is_connected()
             {
-                self.connect_participants(member_id, &plays_publisher_id, ctx);
+                self.connect_participants(
+                    &participant,
+                    &plays_publisher_participant,
+                    ctx,
+                );
             }
         }
     }
 
     /// Check state of interconnected [`Peer`]s and sends [`Event`] about
-    /// [`Peer`] created to remote [`Member`].
+    /// [`Peer`] created to remote [`Participant`].
     fn connect_peers(
         &mut self,
         ctx: &mut Context<Self>,
@@ -488,13 +508,16 @@ impl Handler<Authorize> for Room {
         msg: Authorize,
         _ctx: &mut Self::Context,
     ) -> Self::Result {
-        self.pipeline
-            .get_member_by_id_and_credentials(&msg.member_id, &msg.credentials)
+        self.participants
+            .get_participant_by_id_and_credentials(
+                &msg.member_id,
+                &msg.credentials,
+            )
             .map(|_| ())
     }
 }
 
-/// Signal of removing [`Member`]'s [`Peer`]s.
+/// Signal of removing [`Participant`]'s [`Peer`]s.
 #[derive(Debug, Message)]
 #[rtype(result = "Result<(), ()>")]
 pub struct PeersRemoved {
@@ -505,9 +528,9 @@ pub struct PeersRemoved {
 impl Handler<PeersRemoved> for Room {
     type Result = ActFuture<(), ()>;
 
-    /// Send [`Event::PeersRemoved`] to remote [`Member`].
+    /// Send [`Event::PeersRemoved`] to remote [`Participant`].
     ///
-    /// Delete all removed [`PeerId`]s from all [`Member`]'s
+    /// Delete all removed [`PeerId`]s from all [`Participant`]'s
     /// endpoints.
     #[allow(clippy::single_match_else)]
     fn handle(
@@ -519,7 +542,19 @@ impl Handler<PeersRemoved> for Room {
             "Peers {:?} removed for member '{}'.",
             msg.peers_id, msg.member_id
         );
-        self.pipeline.peers_removed(&msg.peers_id);
+        if let Some(participant) =
+            self.participants.get_participant_by_id(&msg.member_id)
+        {
+            participant.peers_removed(&msg.peers_id);
+        } else {
+            error!(
+                "Participant with id {} for which received \
+                 Event::PeersRemoved not found. Closing room.",
+                msg.member_id
+            );
+            ctx.notify(CloseRoom {});
+            return Box::new(wrap_future(future::err(())));
+        }
 
         Box::new(
             self.send_peers_removed(msg.member_id, msg.peers_id)
@@ -587,9 +622,9 @@ impl Handler<CommandMessage> for Room {
 impl Handler<RpcConnectionEstablished> for Room {
     type Result = ActFuture<(), ()>;
 
-    /// Saves new [`RpcConnection`] in [`MemberService`], initiates media
+    /// Saves new [`RpcConnection`] in [`ParticipantService`], initiates media
     /// establishment between members.
-    /// Create and interconnect all available [`Member`]'s [`Peer`]s.
+    /// Create and interconnect all available [`Participant`]'s [`Peer`]s.
     fn handle(
         &mut self,
         msg: RpcConnectionEstablished,
@@ -600,16 +635,13 @@ impl Handler<RpcConnectionEstablished> for Room {
         let member_id = msg.member_id;
 
         let fut = self
-            .pipeline
+            .participants
             .connection_established(ctx, member_id.clone(), msg.connection)
             .map_err(|err, _, _| {
                 error!("RpcConnectionEstablished error {:?}", err)
             })
             .map(move |participant, room, ctx| {
-                room.init_participant_connections(
-                    &participant.borrow().id(),
-                    ctx,
-                );
+                room.init_participant_connections(&participant, ctx);
             });
         Box::new(fut)
     }
@@ -624,7 +656,7 @@ pub struct CloseRoom {}
 impl Handler<CloseRoom> for Room {
     type Result = ();
 
-    /// Sends to remote [`Member`] the [`Event`] about [`Peer`] removed.
+    /// Sends to remote [`Participant`] the [`Event`] about [`Peer`] removed.
     /// Closes all active [`RpcConnection`]s.
     fn handle(
         &mut self,
@@ -632,7 +664,7 @@ impl Handler<CloseRoom> for Room {
         ctx: &mut Self::Context,
     ) -> Self::Result {
         info!("Closing Room [id = {:?}]", self.id);
-        let drop_fut = self.pipeline.drop_connections(ctx);
+        let drop_fut = self.participants.drop_connections(ctx);
         ctx.wait(wrap_future(drop_fut));
     }
 }
@@ -640,8 +672,8 @@ impl Handler<CloseRoom> for Room {
 impl Handler<RpcConnectionClosed> for Room {
     type Result = ();
 
-    /// Passes message to [`MemberService`] to cleanup stored connections.
-    /// Remove all related for disconnected [`Member`] [`Peer`]s.
+    /// Passes message to [`ParticipantService`] to cleanup stored connections.
+    /// Remove all related for disconnected [`Participant`] [`Peer`]s.
     fn handle(&mut self, msg: RpcConnectionClosed, ctx: &mut Self::Context) {
         info!(
             "RpcConnectionClosed for member {}, reason {:?}",
@@ -652,7 +684,7 @@ impl Handler<RpcConnectionClosed> for Room {
             self.peers.connection_closed(&msg.member_id, ctx);
         }
 
-        self.pipeline
-            .connection_closed(ctx, msg.member_id, msg.reason);
+        self.participants
+            .connection_closed(ctx, msg.member_id, &msg.reason);
     }
 }

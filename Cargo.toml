@@ -34,7 +34,7 @@ config = "0.9"
 dotenv = "0.13"
 failure = "0.1"
 futures = "0.1"
-hashbrown = "0.5"
+hashbrown = "0.1"
 humantime = "1.2"
 macro-attr = "0.2"
 medea-client-api-proto = { path = "proto/client-api", features = ["medea"] }

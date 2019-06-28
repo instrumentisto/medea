@@ -1,5 +1,9 @@
 //! Signalling representation of control spec.
 
-pub mod member;
-pub mod play_endpoint;
-pub mod publish_endpoint;
+pub mod endpoint;
+pub mod participant;
+
+#[doc(inline)]
+pub use self::participant::{
+    parse_participants, Participant, ParticipantsLoadError,
+};

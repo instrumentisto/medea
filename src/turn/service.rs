@@ -17,7 +17,6 @@ use crate::{
     media::IceUser,
     turn::repo::{TurnDatabase, TurnDatabaseErr},
 };
-use std::{cell::RefCell, rc::Rc};
 
 static TURN_PASS_LEN: usize = 16;
 
@@ -35,7 +34,7 @@ pub trait TurnAuthService: fmt::Debug + Send {
     /// Deletes batch of [`IceUser`]s.
     fn delete(
         &self,
-        users: Vec<Rc<RefCell<IceUser>>>,
+        users: Vec<IceUser>,
     ) -> Box<dyn Future<Item = (), Error = TurnServiceErr>>;
 }
 
@@ -68,14 +67,11 @@ impl TurnAuthService for Addr<Service> {
     /// Sends [`DeleteRoom`] to [`Service`].
     fn delete(
         &self,
-        users: Vec<Rc<RefCell<IceUser>>>,
+        users: Vec<IceUser>,
     ) -> Box<dyn Future<Item = (), Error = TurnServiceErr>> {
         // leave only non static users
-        let users: Vec<String> = users
-            .into_iter()
-            .filter(|u| !u.borrow().is_static())
-            .map(|u| u.borrow().user().to_string())
-            .collect();
+        let users: Vec<IceUser> =
+            users.into_iter().filter(|u| !u.is_static()).collect();
 
         if users.is_empty() {
             Box::new(futures::future::ok(()))
@@ -260,7 +256,7 @@ impl Handler<CreateIceUser> for Service {
 /// Deletes all users from given room in redis.
 #[derive(Debug, Message)]
 #[rtype(result = "Result<(), TurnServiceErr>")]
-struct DeleteIceUsers(Vec<String>);
+struct DeleteIceUsers(Vec<IceUser>);
 
 impl Handler<DeleteIceUsers> for Service {
     type Result = ActFuture<(), TurnServiceErr>;
@@ -307,7 +303,7 @@ pub mod test {
 
         fn delete(
             &self,
-            _: Vec<Rc<RefCell<IceUser>>>,
+            _: Vec<IceUser>,
         ) -> Box<dyn Future<Item = (), Error = TurnServiceErr>> {
             Box::new(future::ok(()))
         }

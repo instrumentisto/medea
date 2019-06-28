@@ -13,14 +13,14 @@ use crate::{
     log::prelude::*,
     media::{Peer, PeerId, PeerStateMachine},
     signalling::{
-        endpoints_manager::EndpointsManager,
+        control::participant::Participant,
         room::{PeersRemoved, Room, RoomError},
     },
 };
 
 #[derive(Debug)]
 pub struct PeerRepository {
-    /// [`Peer`]s of [`Member`]s in this [`Room`].
+    /// [`Peer`]s of [`Participant`]s in this [`Room`].
     peers: HashMap<PeerId, PeerStateMachine>,
 
     /// Count of [`Peer`]s in this [`Room`].
@@ -69,46 +69,44 @@ impl PeerRepository {
             .ok_or_else(|| RoomError::PeerNotFound(peer_id))
     }
 
-    /// Create and interconnect [`Peer`]s based on [`Member`].
+    /// Create and interconnect [`Peer`]s based on [`Participant`].
     ///
     /// Returns IDs of created [`Peer`]s. `(first_peer_id, second_peer_id)`.
     pub fn create_peers(
         &mut self,
-        first_member_id: &MemberId,
-        second_member_id: &MemberId,
-        endpoints_manager: &mut EndpointsManager,
+        first_member: &Participant,
+        second_member: &Participant,
     ) -> (u64, u64) {
         debug!(
             "Created peer between {} and {}.",
-            first_member_id, second_member_id
+            first_member.id(),
+            second_member.id()
         );
         let first_peer_id = self.peers_count.next_id();
         let second_peer_id = self.peers_count.next_id();
 
         let mut first_peer = Peer::new(
             first_peer_id,
-            first_member_id.clone(),
+            first_member.id().clone(),
             second_peer_id,
-            second_member_id.clone(),
+            second_member.id().clone(),
         );
         let mut second_peer = Peer::new(
             second_peer_id,
-            second_member_id.clone(),
+            second_member.id().clone(),
             first_peer_id,
-            first_member_id.clone(),
+            first_member.id().clone(),
         );
 
         first_peer.add_publish_endpoints(
             &mut second_peer,
             &mut self.tracks_count,
-            first_member_id,
-            endpoints_manager,
+            first_member.publishers(),
         );
         second_peer.add_publish_endpoints(
             &mut first_peer,
             &mut self.tracks_count,
-            second_member_id,
-            endpoints_manager,
+            second_member.publishers(),
         );
 
         self.add_peer(first_peer);
@@ -132,7 +130,7 @@ impl PeerRepository {
         }
     }
 
-    /// Returns all [`Peer`]s of specified [`Member`].
+    /// Returns all [`Peer`]s of specified [`Participant`].
     pub fn get_peers_by_member_id(
         &self,
         member_id: &MemberId,
@@ -164,10 +162,10 @@ impl PeerRepository {
         }
     }
 
-    /// Close all related to disconnected [`Member`] [`Peer`]s and partner
+    /// Close all related to disconnected [`Participant`] [`Peer`]s and partner
     /// [`Peer`]s.
     ///
-    /// Send [`Event::PeersRemoved`] to all affected [`Member`]s.
+    /// Send [`Event::PeersRemoved`] to all affected [`Participant`]s.
     pub fn connection_closed(
         &mut self,
         member_id: &MemberId,

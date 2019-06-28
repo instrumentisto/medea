@@ -63,7 +63,7 @@ fn ws_index(
                     &r,
                     payload,
                 ),
-                Err(AuthorizationError::MemberNotExists) => {
+                Err(AuthorizationError::ParticipantNotExists) => {
                     Ok(HttpResponse::NotFound().into())
                 }
                 Err(AuthorizationError::InvalidCredentials) => {
