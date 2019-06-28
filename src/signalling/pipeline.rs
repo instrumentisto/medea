@@ -32,6 +32,7 @@ use futures::{
 use hashbrown::HashMap;
 use medea_client_api_proto::{Event, IceServer};
 use std::{cell::RefCell, rc::Rc, time::Duration};
+use crate::media::PeerId;
 
 #[derive(Debug)]
 pub struct Pipeline {
@@ -161,6 +162,10 @@ impl Pipeline {
 
     pub fn get_ice_servers(&self, id: &MemberId) -> Option<Vec<IceServer>> {
         self.endpoints.get_servers_list_by_member_id(id)
+    }
+
+    pub fn peers_removed(&mut self, peers_id: &[PeerId]) {
+        self.endpoints.peers_removed(peers_id)
     }
 
     pub fn get_receiver_by_id(

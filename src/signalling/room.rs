@@ -518,19 +518,7 @@ impl Handler<PeersRemoved> for Room {
             "Peers {:?} removed for member '{}'.",
             msg.peers_id, msg.member_id
         );
-        if let Some(participant) =
-            self.pipeline.get_member_by_id(&msg.member_id)
-        {
-            participant.peers_removed(&msg.peers_id);
-        } else {
-            error!(
-                "Member with id {} for which received Event::PeersRemoved not \
-                 found. Closing room.",
-                msg.member_id
-            );
-            ctx.notify(CloseRoom {});
-            return Box::new(wrap_future(future::err(())));
-        }
+        self.pipeline.peers_removed(&msg.peers_id);
 
         Box::new(
             self.send_peers_removed(msg.member_id, msg.peers_id)
