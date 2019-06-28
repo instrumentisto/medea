@@ -265,7 +265,7 @@ impl Peer<New> {
         partner_peer: &mut Peer<New>,
         tracks_count: &mut Counter,
         member_id: &MemberId,
-        endpoints_manager: &mut EndpointsManager,
+        endpoints_manager: &EndpointsManager,
     ) {
         use crate::signalling::control::play_endpoint::Id as PlayerId;
         let partner_id = self.partner_member_id();

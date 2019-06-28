@@ -58,6 +58,7 @@ impl Pipeline {
         self.members
             .get_participant_by_id(id)
             .unwrap()
+            .borrow()
             .is_connected()
     }
 
@@ -69,7 +70,7 @@ impl Pipeline {
         self.members.send_event_to_participant(member_id, event)
     }
 
-    pub fn get_member_by_id(&self, id: &MemberId) -> Option<&Member> {
+    pub fn get_member_by_id(&self, id: &MemberId) -> Option<Rc<RefCell<Member>>> {
         self.members.get_participant_by_id(id)
     }
 
@@ -77,7 +78,7 @@ impl Pipeline {
         &self,
         id: &MemberId,
         credentials: &str,
-    ) -> Result<&Member, AuthorizationError> {
+    ) -> Result<Rc<RefCell<Member>>, AuthorizationError> {
         self.members
             .get_participant_by_id_and_credentials(id, credentials)
     }
@@ -85,14 +86,18 @@ impl Pipeline {
     pub fn get_publishers_by_member_id(
         &self,
         id: &MemberId,
-    ) -> HashMap<&PublishEndpointId, &WebRtcPublishEndpoint> {
+    ) -> HashMap<&PublishEndpointId, Rc<RefCell<WebRtcPublishEndpoint>>> {
         self.endpoints.get_publishers_by_member_id(id)
+    }
+
+    pub fn endpoints_manager(&self) -> &EndpointsManager {
+        &self.endpoints
     }
 
     pub fn get_receivers_by_member_id(
         &self,
         id: &MemberId,
-    ) -> HashMap<&PlayEndpointId, &WebRtcPlayEndpoint> {
+    ) -> HashMap<&PlayEndpointId, Rc<RefCell<WebRtcPlayEndpoint>>> {
         self.endpoints.get_receivers_by_member_id(id)
     }
 

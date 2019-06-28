@@ -33,6 +33,7 @@ use crate::{
     },
     turn::TurnAuthService,
 };
+use core::borrow::Borrow;
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
 pub type ActFuture<I, E> =
@@ -361,8 +362,8 @@ impl Room {
     /// API spec.
     fn connect_participants(
         &mut self,
-        first_member: &Member,
-        second_member: &Member,
+        first_member: &MemberId,
+        second_member: &MemberId,
         ctx: &mut <Self as Actor>::Context,
     ) {
         debug!(
@@ -372,7 +373,7 @@ impl Room {
         );
 
         let (first_peer_id, second_peer_id) =
-            self.peers.create_peers(first_member, second_member);
+            self.peers.create_peers(first_member, second_member, self.pipeline.endpoints_manager());
 
         self.connect_peers(ctx, first_peer_id, second_peer_id);
     }
@@ -443,7 +444,7 @@ impl Room {
                 && !play.is_connected()
             {
                 self.connect_participants(
-                    &participant,
+                    participant.id(),
                     &plays_publisher_participant,
                     ctx,
                 );

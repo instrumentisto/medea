@@ -30,7 +30,6 @@ impl EndpointsManager {
         }
     }
 
-
     // TODO: rename
     pub fn get_publish_sinks(&mut self, member_id: &MemberId, partner_id: &MemberId) -> Vec<Rc<RefCell<WebRtcPlayEndpoint>>> {
         self.get_publishers_by_member_id(member_id)
@@ -52,11 +51,11 @@ impl EndpointsManager {
     pub fn get_publishers_by_member_id(
         &self,
         id: &MemberId,
-    ) -> HashMap<PublishEndpointId, Rc<RefCell<WebRtcPublishEndpoint>>> {
+    ) -> HashMap<&PublishEndpointId, Rc<RefCell<WebRtcPublishEndpoint>>> {
         self.publishers
             .iter()
-            .map(|(id, p)| (id.clone(), p.clone()))
-            .filter(|(id, p)| p.borrow().owner() == id)
+            .map(|(id, p)| (id, p.clone()))
+            .filter(|(_, p)| p.borrow().owner() == id)
             .collect()
     }
 
@@ -89,13 +88,13 @@ impl EndpointsManager {
     pub fn peers_removed(&mut self, peer_ids: &[PeerId]) {
         self.publishers
             .iter()
-            .for_each(|(_, p)| p.remove_peer_ids(peer_ids));
+            .for_each(|(_, p)| p.borrow_mut().remove_peer_ids(peer_ids));
 
         self.receivers
             .iter()
-            .filter_map(|(_, p)| p.peer_id().map(|id| (id, p)))
+            .filter_map(|(_, p)| p.borrow().peer_id().map(|id| (id, p)))
             .filter(|(id, _)| peer_ids.contains(&id))
-            .for_each(|(_, p)| p.reset());
+            .for_each(|(_, p)| p.borrow_mut().reset());
     }
 
     pub fn get_servers_list_by_member_id(

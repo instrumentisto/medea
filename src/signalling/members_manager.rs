@@ -73,7 +73,7 @@ pub struct MembersManager {
     room_id: RoomId,
 
     /// [`Member`]s which currently are present in this [`Room`].
-    participants: HashMap<MemberId, Member>,
+    participants: HashMap<MemberId, Rc<RefCell<Member>>>,
 
     /// Timeout for close [`RpcConnection`] after receiving
     /// [`RpcConnectionClosed`] message.
@@ -100,8 +100,8 @@ impl MembersManager {
     }
 
     /// Lookup [`Member`] by provided id.
-    pub fn get_participant_by_id(&self, id: &MemberId) -> Option<&Member> {
-        self.participants.get(id)
+    pub fn get_participant_by_id(&self, id: &MemberId) -> Option<Rc<RefCell<Member>>> {
+        self.participants.get(id).map(Rc::clone)
     }
 
     /// Lookup [`Member`] by provided id and credentials. Returns
@@ -113,10 +113,10 @@ impl MembersManager {
         &self,
         participant_id: &MemberId,
         credentials: &str,
-    ) -> Result<&Member, AuthorizationError> {
+    ) -> Result<Rc<RefCell<Member>>, AuthorizationError> {
         match self.get_participant_by_id(participant_id) {
             Some(participant) => {
-                if participant.credentials() == credentials {
+                if participant.borrow().credentials() == credentials {
                     Ok(participant)
                 } else {
                     Err(AuthorizationError::InvalidCredentials)
@@ -132,7 +132,7 @@ impl MembersManager {
         participant_id: &MemberId,
     ) -> bool {
         let member = self.participants.get(participant_id).unwrap();
-        member.is_connected()
+        member.borrow().is_connected()
             && !self.drop_connection_tasks.contains_key(participant_id)
     }
 
@@ -144,7 +144,7 @@ impl MembersManager {
     ) -> impl Future<Item = (), Error = RoomError> {
         let member = self.get_participant_by_id(&participant_id).unwrap();
 
-        match member.connection() {
+        match member.borrow().connection() {
             Some(conn) => {
                 Either::A(conn.send_event(EventMessage::from(event)).map_err(
                     move |_| RoomError::UnableToSendEvent(participant_id),
@@ -165,7 +165,7 @@ impl MembersManager {
         pipeline: &Pipeline,
         participant_id: MemberId,
         con: Box<dyn RpcConnection>,
-    ) -> ActFuture<&Member, MemberServiceErr> {
+    ) -> ActFuture<Rc<RefCell<Member>>, MemberServiceErr> {
         let participant = match self.get_participant_by_id(&participant_id) {
             None => {
                 return Box::new(wrap_future(future::err(
@@ -176,7 +176,7 @@ impl MembersManager {
         };
 
         // lookup previous participant connection
-        if let Some(mut connection) = participant.connection() {
+        if let Some(mut connection) = participant.borrow().connection() {
             debug!(
                 "Closing old RpcConnection for participant {}",
                 participant_id
@@ -219,7 +219,7 @@ impl MembersManager {
         conn: Box<dyn RpcConnection>,
     ) {
         if let Some(member) = self.participants.get_mut(&participant_id) {
-            member.set_connection(conn);
+            member.borrow_mut().set_connection(conn);
         }
     }
 
@@ -239,7 +239,7 @@ impl MembersManager {
         match reason {
             ClosedReason::Closed => {
                 let member = self.participants.get(&participant_id).unwrap();
-                member.remove_connection();
+                member.borrow_mut().remove_connection();
 
                 ctx.spawn(wrap_future(
                     self.delete_ice_user(&participant_id).map_err(|err| {
@@ -273,7 +273,7 @@ impl MembersManager {
         participant_id: &MemberId,
     ) -> Box<dyn Future<Item = (), Error = TurnServiceErr>> {
         match self.get_participant_by_id(&participant_id) {
-            Some(participant) => match participant.take_ice_user() {
+            Some(participant) => match participant.borrow_mut().take_ice_user() {
                 Some(ice_user) => self.turn.delete(vec![ice_user]),
                 None => Box::new(future::ok(())),
             },
@@ -293,7 +293,7 @@ impl MembersManager {
 
         let mut close_fut = Vec::new();
         for (id, participant) in self.participants {
-            close_fut.push(participant.take_connection().unwrap().close());
+            close_fut.push(participant.borrow_mut().take_connection().unwrap().close());
         }
 
         join_all(close_fut).map(|_| ())
