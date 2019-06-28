@@ -2,8 +2,8 @@ use std::io;
 
 use actix::prelude::{Message, Recipient};
 use actix_rt::spawn;
-
 use futures::{Async, Future, Poll, Stream};
+use tokio::prelude::stream::futures_unordered;
 
 /// Different kinds of process signals
 #[derive(PartialEq, Clone, Copy, Debug)]
@@ -125,7 +125,7 @@ impl Future for SignalHandler {
                         }
                         Ok(Async::NotReady) => break,
                         Ok(Async::Ready(Some(sig))) => {
-                            self.srv.do_send(SignalMessage(sig))
+                            let _ = self.srv.do_send(SignalMessage(sig));
                         }
                     }
                 }
