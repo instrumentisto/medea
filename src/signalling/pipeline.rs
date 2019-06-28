@@ -154,6 +154,14 @@ impl Pipeline {
         self.endpoints.get_servers_list_by_member_id(id)
     }
 
+    pub fn get_receiver_by_id(&self, id: &PlayEndpointId) -> Option<Rc<RefCell<WebRtcPlayEndpoint>>> {
+        self.endpoints.get_receiver_by_id(id)
+    }
+
+    pub fn get_publisher_by_id(&self, id: &PublishEndpointId) -> Option<Rc<RefCell<WebRtcPublishEndpoint>>> {
+        self.endpoints.get_publisher_by_id(id)
+    }
+
     fn test(
         &mut self,
         ice_users: Vec<Rc<RefCell<IceUser>>>,

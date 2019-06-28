@@ -382,66 +382,65 @@ impl Room {
     /// connected [`Member`].
     fn init_participant_connections(
         &mut self,
-        participant: &Member,
+        member_id: &MemberId,
         ctx: &mut <Self as Actor>::Context,
     ) {
         let participant_publishers =
-            self.pipeline.get_publishers_by_member_id(participant.id());
+            self.pipeline.get_publishers_by_member_id(member_id);
         // Create all connected publish endpoints.
-        for (_, publish) in participant_publishers() {
-            for receiver in publish.receivers() {
+        for (_, publish) in participant_publishers {
+            for receiver in publish.borrow().sinks() {
+                let q = self.pipeline.get_receiver_by_id(receiver);
                 let receiver = unit_option_unwrap!(
-                    receiver.upgrade(),
+                    q,
                     ctx,
                     "Empty weak pointer for publisher receiver. {:?}.",
                     publish,
                 );
 
-                let receiver_owner = unit_option_unwrap!(
-                    receiver.owner().upgrade(),
-                    ctx,
-                    "Empty weak pointer for publisher's receiver's owner. \
-                     {:?}.",
-                    receiver,
-                );
+//                let q = self.pipeline.get_member_by_id(receiver.borrow().owner());
+//                let receiver_owner = unit_option_unwrap!(
+//                    q,
+//                    ctx,
+//                    "Empty weak pointer for publisher's receiver's owner. \
+//                     {:?}.",
+//                    receiver,
+//                );
 
-                if self.pipeline.is_member_has_connection(&receiver_owner.id())
-                    && !receiver.is_connected()
+                if self.pipeline.is_member_has_connection(receiver.borrow().owner())
+                    && !receiver.borrow().is_connected()
                 {
                     self.connect_participants(
-                        &participant,
-                        &receiver_owner,
+                        member_id,
+                        receiver.borrow().owner(),
                         ctx,
                     );
                 }
             }
         }
 
+        let member_receivers = self.pipeline.get_receivers_by_member_id(member_id);
         // Create all connected play's receivers peers.
-        for (_, play) in participant.receivers() {
-            let plays_publisher_participant = {
+        for (_, play) in member_receivers {
+            let plays_publisher_id = {
+                let q = self.pipeline.get_publisher_by_id(play.borrow().src());
                 let play_publisher = unit_option_unwrap!(
-                    play.publisher().upgrade(),
+                    q,
                     ctx,
                     "Empty weak pointer for play's publisher. {:?}.",
                     play,
                 );
-                unit_option_unwrap!(
-                    play_publisher.owner().upgrade(),
-                    ctx,
-                    "Empty weak pointer for play's publisher owner. {:?}.",
-                    play_publisher,
-                )
+                play_publisher.borrow().owner()
             };
 
             if self
                 .pipeline
-                .is_member_has_connection(&plays_publisher_participant.id())
-                && !play.is_connected()
+                .is_member_has_connection(&plays_publisher_id)
+                && !play.borrow().is_connected()
             {
                 self.connect_participants(
-                    participant.id(),
-                    &plays_publisher_participant,
+                    member_id,
+                    &plays_publisher_id,
                     ctx,
                 );
             }
