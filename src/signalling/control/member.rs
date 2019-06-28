@@ -34,12 +34,12 @@ impl Member {
         self.connection.take()
     }
 
-    pub fn id(&self) -> &MemberId {
-        &self.id
+    pub fn id(&self) -> MemberId {
+        self.id.clone()
     }
 
-    pub fn credentials(&self) -> &str {
-        &self.credentials
+    pub fn credentials(&self) -> String {
+        self.credentials.clone()
     }
 
     pub fn set_connection(&mut self, connection: Box<dyn RpcConnection>) {

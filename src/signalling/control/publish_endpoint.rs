@@ -32,12 +32,12 @@ impl WebRtcPublishEndpoint {
         self.sinks.iter().cloned().collect()
     }
 
-    pub fn owner(&self) -> &MemberId {
-        &self.owner
+    pub fn owner(&self) -> MemberId {
+        self.owner.clone()
     }
 
-    pub fn peer_ids(&self) -> &HashSet<PeerId> {
-        &self.peer_ids
+    pub fn peer_ids(&self) -> HashSet<PeerId> {
+        self.peer_ids.clone()
     }
 
     pub fn reset(&mut self) {

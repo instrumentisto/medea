@@ -118,7 +118,7 @@ impl Pipeline {
     pub fn get_publishers_by_member_id(
         &self,
         id: &MemberId,
-    ) -> HashMap<&PublishEndpointId, Rc<RefCell<WebRtcPublishEndpoint>>> {
+    ) -> HashMap<PublishEndpointId, Rc<RefCell<WebRtcPublishEndpoint>>> {
         self.endpoints.get_publishers_by_member_id(id)
     }
 
@@ -129,7 +129,7 @@ impl Pipeline {
     pub fn get_receivers_by_member_id(
         &self,
         id: &MemberId,
-    ) -> HashMap<&PlayEndpointId, Rc<RefCell<WebRtcPlayEndpoint>>> {
+    ) -> HashMap<PlayEndpointId, Rc<RefCell<WebRtcPlayEndpoint>>> {
         self.endpoints.get_receivers_by_member_id(id)
     }
 

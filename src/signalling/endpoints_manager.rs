@@ -68,22 +68,22 @@ impl EndpointsManager {
     pub fn get_publishers_by_member_id(
         &self,
         id: &MemberId,
-    ) -> HashMap<&PublishEndpointId, Rc<RefCell<WebRtcPublishEndpoint>>> {
+    ) -> HashMap<PublishEndpointId, Rc<RefCell<WebRtcPublishEndpoint>>> {
         self.publishers
             .iter()
-            .map(|(id, p)| (id, p.clone()))
-            .filter(|(_, p)| p.borrow().owner() == id)
+            .map(|(id, p)| (id.clone(), p.clone()))
+            .filter(|(_, p)| &p.borrow().owner() == id)
             .collect()
     }
 
     pub fn get_receivers_by_member_id(
         &self,
         id: &MemberId,
-    ) -> HashMap<&PlayEndpointId, Rc<RefCell<WebRtcPlayEndpoint>>> {
+    ) -> HashMap<PlayEndpointId, Rc<RefCell<WebRtcPlayEndpoint>>> {
         self.receivers
             .iter()
-            .map(|(id, p)| (id, Rc::clone(p)))
-            .filter(|(_, p)| p.borrow().owner() == id)
+            .map(|(id, p)| (id.clone(), Rc::clone(p)))
+            .filter(|(_, p)| &p.borrow().owner() == id)
             .collect()
     }
 

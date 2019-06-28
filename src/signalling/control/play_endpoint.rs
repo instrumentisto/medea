@@ -22,8 +22,8 @@ impl WebRtcPlayEndpoint {
         &self.src
     }
 
-    pub fn owner(&self) -> &MemberId {
-        &self.owner
+    pub fn owner(&self) -> MemberId {
+        self.owner.clone()
     }
 
     pub fn is_connected(&self) -> bool {
@@ -34,8 +34,8 @@ impl WebRtcPlayEndpoint {
         self.peer_id = Some(peer_id)
     }
 
-    pub fn peer_id(&self) -> &Option<PeerId> {
-        &self.peer_id
+    pub fn peer_id(&self) -> Option<PeerId> {
+        self.peer_id.clone()
     }
 
     pub fn reset(&mut self) {

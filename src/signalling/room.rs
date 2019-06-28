@@ -402,12 +402,12 @@ impl Room {
 
                 if self
                     .pipeline
-                    .is_member_has_connection(receiver.borrow().owner())
+                    .is_member_has_connection(&receiver.borrow().owner())
                     && !receiver.borrow().is_connected()
                 {
                     self.connect_participants(
                         member_id,
-                        receiver.borrow().owner(),
+                        &receiver.borrow().owner(),
                         ctx,
                     );
                 }
@@ -426,7 +426,8 @@ impl Room {
                     "Empty weak pointer for play's publisher. {:?}.",
                     play,
                 );
-                play_publisher.borrow().owner()
+                let q = play_publisher.borrow().owner();
+                q
             };
 
             if self.pipeline.is_member_has_connection(&plays_publisher_id)
@@ -606,7 +607,7 @@ impl Handler<RpcConnectionEstablished> for Room {
             })
             .map(move |participant, room, ctx| {
                 room.init_participant_connections(
-                    participant.borrow().id(),
+                    &participant.borrow().id(),
                     ctx,
                 );
             });
