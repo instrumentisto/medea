@@ -172,7 +172,7 @@ impl Room {
         Ok(Self {
             id: room_spec.id().clone(),
             peers: PeerRepository::from(HashMap::new()),
-            pipeline: Pipeline::new(),
+            pipeline: Pipeline::new(turn, reconnect_timeout, room_spec),
         })
     }
 

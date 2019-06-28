@@ -238,28 +238,29 @@ impl MembersManager {
     pub fn connection_closed(
         &mut self,
         ctx: &mut Context<Room>,
-        participant_id: &MemberId,
+        member_id: &MemberId,
         reason: &ClosedReason,
     ) {
+        let member_id = member_id.clone(); // TODO: temp
         let closed_at = Instant::now();
         match reason {
             ClosedReason::Closed => {
-                let member = self.participants.get(&participant_id).unwrap();
+                let member = self.participants.get(&member_id).unwrap();
                 member.borrow_mut().remove_connection();
 
                 // ctx.notify(CloseRoom {})
             }
             ClosedReason::Lost => {
                 self.drop_connection_tasks.insert(
-                    participant_id.clone(),
+                    member_id.clone(),
                     ctx.run_later(self.reconnect_timeout, move |_, ctx| {
                         info!(
                             "Member {} connection lost at {:?}. Room will be \
                              stopped.",
-                            &participant_id, closed_at
+                            &member_id, closed_at
                         );
                         ctx.notify(RpcConnectionClosed {
-                            member_id: participant_id.clone(),
+                            member_id: member_id.clone(),
                             reason: ClosedReason::Closed,
                         })
                     }),

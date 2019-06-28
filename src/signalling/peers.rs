@@ -76,7 +76,7 @@ impl PeerRepository {
         &mut self,
         first_member_id: &MemberId,
         second_member_id: &MemberId,
-        endpoints_manager: &EndpointsManager,
+        endpoints_manager: &mut EndpointsManager,
     ) -> (u64, u64) {
         debug!(
             "Created peer between {} and {}.",
@@ -107,13 +107,13 @@ impl PeerRepository {
             &mut second_peer,
             &mut self.tracks_count,
             first_member_id,
-            &endpoints_manager,
+            endpoints_manager,
         );
         second_peer.add_publish_endpoints(
             &mut first_peer,
             &mut self.tracks_count,
             second_member_id,
-            &endpoints_manager,
+            endpoints_manager,
         );
 
         self.add_peer(first_peer);

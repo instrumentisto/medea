@@ -122,8 +122,8 @@ impl Pipeline {
         self.endpoints.get_publishers_by_member_id(id)
     }
 
-    pub fn endpoints_manager(&self) -> &EndpointsManager {
-        &self.endpoints
+    pub fn endpoints_manager(&mut self) -> &mut EndpointsManager {
+        &mut self.endpoints
     }
 
     pub fn get_receivers_by_member_id(
