@@ -95,10 +95,7 @@ impl TurnDatabase {
         let mut delete_keys = Vec::with_capacity(users.len());
 
         for user in users {
-            delete_keys.push(format!(
-                "turn/realm/medea/user/{}/key",
-                user
-            ));
+            delete_keys.push(format!("turn/realm/medea/user/{}/key", user));
         }
 
         self.pool.run(|connection| {

@@ -10,7 +10,7 @@ use crate::{
         control::{MemberId, RoomId, RoomSpec},
     },
     log::prelude::*,
-    media::IceUser,
+    media::{IceUser, PeerId},
     signalling::{
         control::{
             member::Member,
@@ -32,7 +32,6 @@ use futures::{
 use hashbrown::HashMap;
 use medea_client_api_proto::{Event, IceServer};
 use std::{cell::RefCell, rc::Rc, time::Duration};
-use crate::media::PeerId;
 
 #[derive(Debug)]
 pub struct Pipeline {
@@ -157,7 +156,8 @@ impl Pipeline {
         id: MemberId,
         connection: Box<dyn RpcConnection>,
     ) -> ActFuture<Rc<RefCell<Member>>, MemberServiceErr> {
-        self.members.connection_established(ctx, &self, id, connection)
+        self.members
+            .connection_established(ctx, &self, id, connection)
     }
 
     pub fn get_ice_servers(&self, id: &MemberId) -> Option<Vec<IceServer>> {

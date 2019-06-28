@@ -605,7 +605,10 @@ impl Handler<RpcConnectionEstablished> for Room {
                 error!("RpcConnectionEstablished error {:?}", err)
             })
             .map(move |participant, room, ctx| {
-                room.init_participant_connections(participant.borrow().id(), ctx);
+                room.init_participant_connections(
+                    participant.borrow().id(),
+                    ctx,
+                );
             });
         Box::new(fut)
     }
