@@ -156,8 +156,8 @@ impl Pipeline {
         ctx: &mut Context<Room>,
         id: MemberId,
         connection: Box<dyn RpcConnection>,
-    ) -> ActFuture<&Member, MemberServiceErr> {
-        // self.members.connection_established(ctx, &self, id, connection)
+    ) -> ActFuture<Rc<RefCell<Member>>, MemberServiceErr> {
+        self.members.connection_established(ctx, &self, id, connection)
     }
 
     pub fn get_ice_servers(&self, id: &MemberId) -> Option<Vec<IceServer>> {
