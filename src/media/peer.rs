@@ -15,7 +15,6 @@ use medea_macro::enum_delegate;
 
 use crate::{
     api::control::MemberId,
-    log::prelude::*,
     media::{MediaTrack, TrackId},
     signalling::{
         control::endpoint::{Id as EndpointId, WebRtcPublishEndpoint},
@@ -270,35 +269,11 @@ impl Peer<New> {
             .into_iter()
             .flat_map(|(_m, e)| {
                 e.add_peer_id(self_id);
-                e.receivers()
-                    .into_iter()
-                    .filter_map(|e| {
-                        let upgraded_play = e.upgrade();
-                        if upgraded_play.is_none() {
-                            warn!(
-                                "Empty weak pointer of publisher's play \
-                                 endpoint. {:?}.",
-                                e
-                            );
-                        }
-                        upgraded_play
-                    })
-                    .filter_map(|p| {
-                        let owner = p.owner().upgrade();
-                        if owner.is_none() {
-                            warn!(
-                                "Empty weak pointer for publisher's play's \
-                                 owner participant. {:?}.",
-                                p
-                            );
-                        }
-                        owner.map(|owner| (p, owner))
-                    })
-                    .filter(|(e, owner)| {
-                        owner.id() == partner_id && !e.is_connected()
-                    })
+                e.receivers().into_iter().filter(|e| {
+                    e.owner().id() == partner_id && !e.is_connected()
+                })
             })
-            .for_each(|(e, _)| {
+            .for_each(|e| {
                 let track_audio = Rc::new(MediaTrack::new(
                     tracks_count.next_id(),
                     MediaType::Audio(AudioSettings {}),

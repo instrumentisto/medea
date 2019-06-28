@@ -1,6 +1,10 @@
 //! Signalling representation of endpoints.
 
-use std::{cell::RefCell, fmt::Display, rc::Weak};
+use std::{
+    cell::RefCell,
+    fmt::Display,
+    rc::{Rc, Weak},
+};
 
 use hashbrown::HashSet;
 
@@ -52,12 +56,16 @@ impl WebRtcPlayEndpointInner {
         self.src.clone()
     }
 
-    fn owner(&self) -> Weak<Participant> {
+    fn owner(&self) -> Rc<Participant> {
+        Weak::upgrade(&self.owner).unwrap()
+    }
+
+    fn weak_owner(&self) -> Weak<Participant> {
         Weak::clone(&self.owner)
     }
 
-    fn publisher(&self) -> Weak<WebRtcPublishEndpoint> {
-        self.publisher.clone()
+    fn publisher(&self) -> Rc<WebRtcPublishEndpoint> {
+        Weak::upgrade(&self.publisher).unwrap()
     }
 
     fn is_connected(&self) -> bool {
@@ -79,7 +87,7 @@ impl WebRtcPlayEndpointInner {
 
 impl Drop for WebRtcPlayEndpointInner {
     fn drop(&mut self) {
-        if let Some(receiver_publisher) = self.publisher().upgrade() {
+        if let Some(receiver_publisher) = self.publisher.upgrade() {
             receiver_publisher.remove_empty_weaks_from_receivers();
         }
     }
@@ -113,12 +121,17 @@ impl WebRtcPlayEndpoint {
     }
 
     /// Returns owner [`Participant`] of this [`WebRtcPlayEndpoint`].
-    pub fn owner(&self) -> Weak<Participant> {
+    pub fn owner(&self) -> Rc<Participant> {
         self.0.borrow().owner()
     }
 
+    // TODO: explain this
+    pub fn weak_owner(&self) -> Weak<Participant> {
+        self.0.borrow().weak_owner()
+    }
+
     /// Returns publisher's [`WebRtcPublishEndpoint`].
-    pub fn publisher(&self) -> Weak<WebRtcPublishEndpoint> {
+    pub fn publisher(&self) -> Rc<WebRtcPublishEndpoint> {
         self.0.borrow().publisher()
     }
 
@@ -174,9 +187,9 @@ struct WebRtcPublishEndpointInner {
 
 impl Drop for WebRtcPublishEndpointInner {
     fn drop(&mut self) {
-        for receiver in self.receivers().iter().filter_map(|r| Weak::upgrade(r))
-        {
-            if let Some(receiver_owner) = receiver.owner().upgrade() {
+        // TODO: add comments
+        for receiver in self.receivers.iter().filter_map(|r| Weak::upgrade(r)) {
+            if let Some(receiver_owner) = receiver.weak_owner().upgrade() {
                 receiver_owner.remove_receiver(&receiver.id())
             }
         }
@@ -188,12 +201,15 @@ impl WebRtcPublishEndpointInner {
         self.receivers.push(receiver);
     }
 
-    fn receivers(&self) -> Vec<Weak<WebRtcPlayEndpoint>> {
-        self.receivers.clone()
+    fn receivers(&self) -> Vec<Rc<WebRtcPlayEndpoint>> {
+        self.receivers
+            .iter()
+            .map(|p| Weak::upgrade(p).unwrap())
+            .collect()
     }
 
-    fn owner(&self) -> Weak<Participant> {
-        Weak::clone(&self.owner)
+    fn owner(&self) -> Rc<Participant> {
+        Weak::upgrade(&self.owner).unwrap()
     }
 
     fn add_peer_id(&mut self, peer_id: PeerId) {
@@ -248,12 +264,12 @@ impl WebRtcPublishEndpoint {
     }
 
     /// Returns all receivers of this [`WebRtcPublishEndpoint`].
-    pub fn receivers(&self) -> Vec<Weak<WebRtcPlayEndpoint>> {
+    pub fn receivers(&self) -> Vec<Rc<WebRtcPlayEndpoint>> {
         self.0.borrow().receivers()
     }
 
     /// Returns owner [`Participant`] of this [`WebRtcPublishEndpoint`].
-    pub fn owner(&self) -> Weak<Participant> {
+    pub fn owner(&self) -> Rc<Participant> {
         self.0.borrow().owner()
     }
 

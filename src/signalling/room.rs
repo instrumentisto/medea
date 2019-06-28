@@ -37,74 +37,6 @@ use crate::{
 pub type ActFuture<I, E> =
     Box<dyn ActorFuture<Actor = Room, Item = I, Error = E>>;
 
-/// Macro for unwrapping Option.
-///
-/// If [`Option::None`] then `error!` with provided message will be
-/// called, [`CloseRoom`] emitted to [`Room`] context and function
-/// will be returned with provided return expression.
-///
-/// You can use `format!` syntax in this macro to provide some debug info.
-///
-/// ## Usage
-/// ```ignore
-/// option_unwrap!(
-///     foo.some_weak_pointer().upgrade(), // Some Option type
-///     ctx, // Context of Room
-///     (), // This will be returned from function in None case
-///     "Empty Weak pointer for bar with ID {}", // Error message
-///     foo.id(), // format! syntax
-/// );
-/// ```
-macro_rules! option_unwrap {
-    ($e:expr, $ctx:expr, $ret:expr, $msg:expr, $( $x:expr ),* $(,)?) => {
-        if let Some(e) = $e {
-            e
-        } else {
-            error!(
-                "[ROOM]: {} Room will be closed.",
-                format!($msg, $( $x, )*)
-            );
-            $ctx.notify(CloseRoom {});
-            return $ret;
-        }
-    };
-
-    ($e:expr, $ctx:expr, $ret:expr, $msg:expr $(,)?) => {
-        if let Some(e) = $e {
-            e
-        } else {
-            error!("[ROOM]: {} Room will be closed.", $msg);
-            $ctx.notify(CloseRoom {});
-            return $ret;
-        }
-    };
-}
-
-/// Macro for unwrapping Option that work similar as [`option_unwrap!`], but
-/// always return `()` when None case happened. This will close Room when
-/// `Option::None`.
-///
-/// Read more info in [`option_unwrap!`] docs.
-///
-/// ## Usage
-/// ```ignore
-/// unit_option_unwrap!(
-///     foo.some_weak_pointer().upgrade(), // Some Option type
-///     ctx, // Context of Room
-///     "Empty Weak pointer for bar with ID {}", // Error message
-///     foo.id(), // format! syntax
-/// );
-/// ```
-macro_rules! unit_option_unwrap {
-    ($e:expr, $ctx:expr, $msg:tt, $( $x:expr ),* $(,)?) => {
-        option_unwrap!($e, $ctx, (), $msg, $( $x, )*);
-    };
-
-    ($e:expr, $ctx:expr, $msg:expr $(,)?) => {
-        option_unwrap!($e, $ctx, (), $msg);
-    };
-}
-
 #[allow(clippy::module_name_repetitions)]
 #[derive(Debug, Fail)]
 pub enum RoomError {
@@ -398,20 +330,7 @@ impl Room {
         // Create all connected publish endpoints.
         for (_, publish) in participant.publishers() {
             for receiver in publish.receivers() {
-                let receiver = unit_option_unwrap!(
-                    receiver.upgrade(),
-                    ctx,
-                    "Empty weak pointer for publisher receiver. {:?}.",
-                    publish,
-                );
-
-                let receiver_owner = unit_option_unwrap!(
-                    receiver.owner().upgrade(),
-                    ctx,
-                    "Empty weak pointer for publisher's receiver's owner. \
-                     {:?}.",
-                    receiver,
-                );
+                let receiver_owner = receiver.owner();
 
                 if self
                     .participants
@@ -429,29 +348,16 @@ impl Room {
 
         // Create all connected play's receivers peers.
         for (_, play) in participant.receivers() {
-            let plays_publisher_participant = {
-                let play_publisher = unit_option_unwrap!(
-                    play.publisher().upgrade(),
-                    ctx,
-                    "Empty weak pointer for play's publisher. {:?}.",
-                    play,
-                );
-                unit_option_unwrap!(
-                    play_publisher.owner().upgrade(),
-                    ctx,
-                    "Empty weak pointer for play's publisher owner. {:?}.",
-                    play_publisher,
-                )
-            };
+            let plays_publisher_owner = play.publisher().owner();
 
             if self
                 .participants
-                .participant_has_connection(&plays_publisher_participant.id())
+                .participant_has_connection(&plays_publisher_owner.id())
                 && !play.is_connected()
             {
                 self.connect_participants(
                     &participant,
-                    &plays_publisher_participant,
+                    &plays_publisher_owner,
                     ctx,
                 );
             }

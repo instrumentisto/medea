@@ -392,14 +392,13 @@ mod participant_loading_tests {
         let is_caller_has_responder_in_receivers = caller_publish_endpoint
             .receivers()
             .into_iter()
-            .map(|p| p.upgrade().unwrap())
             .filter(|p| Rc::ptr_eq(p, &responder_play_endpoint))
             .count()
             == 1;
         assert!(is_caller_has_responder_in_receivers);
 
         assert!(Rc::ptr_eq(
-            &responder_play_endpoint.publisher().upgrade().unwrap(),
+            &responder_play_endpoint.publisher(),
             &caller_publish_endpoint
         ));
 
@@ -420,7 +419,6 @@ mod participant_loading_tests {
             some_participant_publisher
                 .receivers()
                 .into_iter()
-                .map(|p| p.upgrade().unwrap())
                 .filter(|p| Rc::ptr_eq(p, &responder_play2_endpoint))
                 .count()
                 == 1;
