@@ -27,6 +27,10 @@ impl WebRtcPublishEndpoint {
         self.sinks.push(id);
     }
 
+    pub fn sinks(&self) -> Vec<&PlayerEndpointId> {
+        self.sinks.iter().collect()
+    }
+
     pub fn owner(&self) -> &MemberId {
         &self.owner
     }

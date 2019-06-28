@@ -29,6 +29,8 @@ use futures::{
 use hashbrown::{hash_map::IntoIter as _, HashMap};
 use medea_client_api_proto::Event;
 use std::{cell::RefCell, convert::TryFrom, rc::Rc, time::Duration};
+use crate::turn::{TurnServiceErr, UnreachablePolicy};
+use crate::api::control::RoomId;
 
 #[derive(Debug)]
 pub struct Pipeline {
@@ -92,6 +94,14 @@ impl Pipeline {
         id: &MemberId,
     ) -> HashMap<&PlayEndpointId, &WebRtcPlayEndpoint> {
         self.endpoints.get_receivers_by_member_id(id)
+    }
+
+    pub fn create_turn(&self, member_id: MemberId, room_id: RoomId, policy: UnreachablePolicy) -> Box<dyn Future<Item = IceUser, Error = TurnServiceErr>> {
+        self.turn.create(member_id, room_id, policy)
+    }
+
+    pub fn replace_ice_user(&mut self, member_id: &MemberId, ice_user: Rc<RefCell<IceUser>>) -> Option<Rc<RefCell<IceUser>>>{
+        self.endpoints.replace_ice_user(member_id.clone(), ice_user)
     }
 
     pub fn connection_established(

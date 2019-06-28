@@ -17,6 +17,7 @@ use crate::{
         room::{PeersRemoved, Room, RoomError},
     },
 };
+use crate::signalling::endpoints_manager::EndpointsManager;
 
 #[derive(Debug)]
 pub struct PeerRepository {
@@ -74,39 +75,43 @@ impl PeerRepository {
     /// Returns IDs of created [`Peer`]s. `(first_peer_id, second_peer_id)`.
     pub fn create_peers(
         &mut self,
-        first_member: &Member,
-        second_member: &Member,
+        first_member_id: &MemberId,
+        second_member_id: &MemberId,
+        endpoints_manager: &mut EndpointsManager,
     ) -> (u64, u64) {
         debug!(
             "Created peer between {} and {}.",
-            first_member.id(),
-            second_member.id()
+            first_member_id,
+            second_member_id
         );
         let first_peer_id = self.peers_count.next_id();
         let second_peer_id = self.peers_count.next_id();
 
         let mut first_peer = Peer::new(
             first_peer_id,
-            first_member.id().clone(),
+            first_member_id.clone(),
             second_peer_id,
-            second_member.id().clone(),
+            second_member_id.clone(),
         );
         let mut second_peer = Peer::new(
             second_peer_id,
-            second_member.id().clone(),
+            second_member_id.clone(),
             first_peer_id,
-            first_member.id().clone(),
+            first_member_id.clone(),
         );
+
+        let first_publishers = endpoints_manager.get_mut_publishers_by_member_id(first_member_id);
+        let second_publishers = endpoints_manager.get_mut_publishers_by_member_id(second_member_id);
 
         first_peer.add_publish_endpoints(
             &mut second_peer,
             &mut self.tracks_count,
-            first_member.publishers(),
+            first_publishers,
         );
         second_peer.add_publish_endpoints(
             &mut first_peer,
             &mut self.tracks_count,
-            second_member.publishers(),
+            second_publishers,
         );
 
         self.add_peer(first_peer);

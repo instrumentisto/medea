@@ -16,8 +16,8 @@ use std::{cell::RefCell, rc::Rc};
 #[derive(Debug)]
 pub struct EndpointsManager {
     ice_users: HashMap<MemberId, Rc<RefCell<IceUser>>>,
-    publishers: HashMap<PublishEndpointId, WebRtcPublishEndpoint>,
-    receivers: HashMap<PlayEndpointId, WebRtcPlayEndpoint>,
+    publishers: HashMap<PublishEndpointId, Rc<RefCell<WebRtcPublishEndpoint>>>,
+    receivers: HashMap<PlayEndpointId, Rc<RefCell<WebRtcPlayEndpoint>>>,
 }
 
 impl EndpointsManager {
@@ -28,6 +28,16 @@ impl EndpointsManager {
             publishers: HashMap::new(),
             receivers: HashMap::new(),
         }
+    }
+
+
+    // TODO: rename
+    pub fn get_publish_sinks(&mut self, member_id: &MemberId, partner_id: &MemberId) -> Vec<Rc<RefCell<WebRtcPlayEndpoint>>> {
+        self.get_publishers_by_member_id(member_id)
+            .into_iter()
+            .flat_map(|(_, p)| p.borrow().sinks().into_iter())
+            .filter_map(|id| self.get_receiver_by_id(id))
+            .collect()
     }
 
     pub fn take_ice_users(
@@ -42,20 +52,22 @@ impl EndpointsManager {
     pub fn get_publishers_by_member_id(
         &self,
         id: &MemberId,
-    ) -> HashMap<&PublishEndpointId, &WebRtcPublishEndpoint> {
+    ) -> HashMap<PublishEndpointId, Rc<RefCell<WebRtcPublishEndpoint>>> {
         self.publishers
             .iter()
-            .filter(|(_, p)| p.owner() == id)
+            .map(|(id, p)| (id.clone(), p.clone()))
+            .filter(|(id, p)| p.borrow().owner() == id)
             .collect()
     }
 
     pub fn get_receivers_by_member_id(
         &self,
         id: &MemberId,
-    ) -> HashMap<&PlayEndpointId, &WebRtcPlayEndpoint> {
+    ) -> HashMap<&PlayEndpointId, Rc<RefCell<WebRtcPlayEndpoint>>> {
         self.receivers
             .iter()
-            .filter(|(_, p)| p.owner() == id)
+            .map(|(id, p)| (id, Rc::clone(p)))
+            .filter(|(_, p)| p.borrow().owner() == id)
             .collect()
     }
 
@@ -101,7 +113,7 @@ impl EndpointsManager {
         id: PlayEndpointId,
         receiver: WebRtcPlayEndpoint,
     ) {
-        self.receivers.insert(id, receiver);
+        self.receivers.insert(id, Rc::new(RefCell::new(receiver)));
     }
 
     pub fn insert_publisher(
@@ -109,20 +121,20 @@ impl EndpointsManager {
         id: PublishEndpointId,
         publisher: WebRtcPublishEndpoint,
     ) {
-        self.publishers.insert(id, publisher);
+        self.publishers.insert(id, Rc::new(RefCell::new(publisher)));
     }
 
     pub fn get_publisher_by_id(
         &self,
         id: &PublishEndpointId,
-    ) -> Option<&WebRtcPublishEndpoint> {
-        self.publishers.get(id)
+    ) -> Option<Rc<RefCell<WebRtcPublishEndpoint>>> {
+        self.publishers.get(id).map(Rc::clone)
     }
 
     pub fn get_receiver_by_id(
         &self,
         id: &PlayEndpointId,
-    ) -> Option<&WebRtcPlayEndpoint> {
-        self.receivers.get(id)
+    ) -> Option<Rc<RefCell<WebRtcPlayEndpoint>>> {
+        self.receivers.get(id).map(Rc::clone)
     }
 }

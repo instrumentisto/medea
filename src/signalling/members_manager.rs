@@ -37,6 +37,8 @@ use crate::{
     },
     turn::{TurnAuthService, TurnServiceErr, UnreachablePolicy},
 };
+use crate::signalling::pipeline::Pipeline;
+use std::cell::RefCell;
 
 #[derive(Fail, Debug)]
 #[allow(clippy::module_name_repetitions)]
@@ -160,6 +162,7 @@ impl MembersManager {
     pub fn connection_established(
         &mut self,
         ctx: &mut Context<Room>,
+        pipeline: &Pipeline,
         participant_id: MemberId,
         con: Box<dyn RpcConnection>,
     ) -> ActFuture<&Member, MemberServiceErr> {
@@ -191,7 +194,7 @@ impl MembersManager {
             ))
         } else {
             Box::new(
-                wrap_future(self.turn.create(
+                wrap_future(pipeline.create_turn(
                     participant_id.clone(),
                     self.room_id.clone(),
                     UnreachablePolicy::ReturnErr,
@@ -200,8 +203,7 @@ impl MembersManager {
                 .and_then(
                     move |ice: IceUser, room: &mut Room, _| {
                         room.pipeline.insert_connection(&participant_id, con);
-
-                        participant.replace_ice_user(ice);
+                        room.pipeline.replace_ice_user(&participant_id, Rc::new(RefCell::new(ice)));
 
                         wrap_future(future::ok(participant))
                     },
