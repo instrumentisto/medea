@@ -156,11 +156,21 @@ impl MembersManager {
         }
     }
 
+    pub fn cancel_close_connection(&mut self, ctx: &mut Context<Room>, member_id: &MemberId) {
+         // cancel RpcConnection close task, since connection is
+        // reestablished
+        if let Some(handler) =
+            self.drop_connection_tasks.remove(member_id)
+        {
+            ctx.cancel_future(handler);
+        }
+    }
+
     /// Saves provided [`RpcConnection`], registers [`ICEUser`].
     /// If [`Member`] already has any other [`RpcConnection`],
     /// then it will be closed.
     pub fn connection_established(
-        &mut self,
+        &self,
         ctx: &mut Context<Room>,
         pipeline: &Pipeline,
         participant_id: MemberId,
@@ -182,13 +192,7 @@ impl MembersManager {
                 participant_id
             );
 
-            // cancel RpcConnection close task, since connection is
-            // reestablished
-            if let Some(handler) =
-                self.drop_connection_tasks.remove(&participant_id)
-            {
-                ctx.cancel_future(handler);
-            }
+
             let member_clone = Rc::clone(&participant);
             Box::new(wrap_future(
                 participant.borrow_mut().close_connection().unwrap().then(move |_| Ok(member_clone)),

@@ -98,11 +98,6 @@ impl PeerRepository {
             first_member_id.clone(),
         );
 
-        let first_publishers =
-            endpoints_manager.get_publishers_by_member_id(first_member_id);
-        let second_publishers =
-            endpoints_manager.get_publishers_by_member_id(second_member_id);
-
         first_peer.add_publish_endpoints(
             &mut second_peer,
             &mut self.tracks_count,

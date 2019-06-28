@@ -156,6 +156,8 @@ impl Pipeline {
         id: MemberId,
         connection: Box<dyn RpcConnection>,
     ) -> ActFuture<Rc<RefCell<Member>>, MemberServiceErr> {
+        // TODO: Maybe this is bad.
+        self.members.cancel_close_connection(ctx, &id);
         self.members
             .connection_established(ctx, &self, id, connection)
     }

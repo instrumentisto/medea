@@ -1,8 +1,7 @@
 use crate::api::client::rpc_connection::RpcConnection;
+use crate::api::client::rpc_connection::EventMessage;
 
 pub use crate::api::control::MemberId;
-use medea_client_api_proto::Event;
-use crate::api::client::rpc_connection::EventMessage;
 use failure::Fail;
 use futures::Future;
 

@@ -11,7 +11,6 @@ use redis::{ConnectionInfo, RedisError};
 use tokio::prelude::*;
 
 use crate::{log::prelude::*, media::IceUser};
-use std::{cell::RefCell, rc::Rc};
 
 #[derive(Fail, Debug)]
 pub enum TurnDatabaseErr {
