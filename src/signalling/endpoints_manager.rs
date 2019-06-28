@@ -3,20 +3,17 @@ use super::control::{
     publish_endpoint::{Id as PublishEndpointId, WebRtcPublishEndpoint},
 };
 use crate::{
-    api::control::{MemberId, RoomSpec},
+    api::{
+        client::rpc_connection::ClosedReason,
+        control::{MemberId, RoomSpec},
+    },
     media::{IceUser, PeerId},
     signalling::room::Room,
 };
 use actix::Context;
-use futures::Future;
 use hashbrown::HashMap;
 use medea_client_api_proto::IceServer;
 use std::{cell::RefCell, rc::Rc};
-use crate::api::client::rpc_connection::ClosedReason;
-use actix::fut::wrap_future;
-use actix::AsyncContext as _;
-
-use crate::log::prelude::*;
 
 #[derive(Debug)]
 pub struct EndpointsManager {

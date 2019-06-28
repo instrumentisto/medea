@@ -36,7 +36,7 @@ use crate::{
         room::{ActFuture, RoomError},
         Room,
     },
-    turn::{TurnAuthService, TurnServiceErr, UnreachablePolicy},
+    turn::{TurnServiceErr, UnreachablePolicy},
 };
 use std::cell::RefCell;
 

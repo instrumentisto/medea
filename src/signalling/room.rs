@@ -26,10 +26,7 @@ use crate::{
         WaitLocalHaveRemote, WaitLocalSdp, WaitRemoteSdp,
     },
     signalling::{
-        control::member::{Member, MemberId},
-        members_manager::MembersManager,
-        peers::PeerRepository,
-        pipeline::Pipeline,
+        control::member::MemberId, peers::PeerRepository, pipeline::Pipeline,
     },
     turn::TurnAuthService,
 };
@@ -216,7 +213,9 @@ impl Room {
         let sender = sender.start();
         let member_id = sender.member_id();
         self.pipeline.get_ice_servers(&member_id);
-        let ice_servers = self.pipeline.get_ice_servers(&member_id)
+        let ice_servers = self
+            .pipeline
+            .get_ice_servers(&member_id)
             .ok_or_else(|| RoomError::NoTurnCredentials(member_id.clone()))?;
 
         let peer_created = Event::PeerCreated {
@@ -264,8 +263,12 @@ impl Room {
         let to_member_id = to_peer.member_id();
 
         // TODO: better error
-        let ice_servers = self.pipeline.get_ice_servers(&to_member_id)
-            .ok_or_else(|| RoomError::NoTurnCredentials(to_member_id.clone()))?;
+        let ice_servers = self
+            .pipeline
+            .get_ice_servers(&to_member_id)
+            .ok_or_else(|| {
+                RoomError::NoTurnCredentials(to_member_id.clone())
+            })?;
 
         let event = Event::PeerCreated {
             peer_id: to_peer.id(),
@@ -361,8 +364,7 @@ impl Room {
     ) {
         debug!(
             "Created peer member {} with member {}",
-            first_member,
-            second_member
+            first_member, second_member
         );
 
         let (first_peer_id, second_peer_id) = self.peers.create_peers(
@@ -398,16 +400,9 @@ impl Room {
                     publish,
                 );
 
-//                let q = self.pipeline.get_member_by_id(receiver.borrow().owner());
-//                let receiver_owner = unit_option_unwrap!(
-//                    q,
-//                    ctx,
-//                    "Empty weak pointer for publisher's receiver's owner. \
-//                     {:?}.",
-//                    receiver,
-//                );
-
-                if self.pipeline.is_member_has_connection(receiver.borrow().owner())
+                if self
+                    .pipeline
+                    .is_member_has_connection(receiver.borrow().owner())
                     && !receiver.borrow().is_connected()
                 {
                     self.connect_participants(
@@ -419,7 +414,8 @@ impl Room {
             }
         }
 
-        let member_receivers = self.pipeline.get_receivers_by_member_id(member_id);
+        let member_receivers =
+            self.pipeline.get_receivers_by_member_id(member_id);
         // Create all connected play's receivers peers.
         for (_, play) in member_receivers {
             let plays_publisher_id = {
@@ -433,16 +429,10 @@ impl Room {
                 play_publisher.borrow().owner()
             };
 
-            if self
-                .pipeline
-                .is_member_has_connection(&plays_publisher_id)
+            if self.pipeline.is_member_has_connection(&plays_publisher_id)
                 && !play.borrow().is_connected()
             {
-                self.connect_participants(
-                    member_id,
-                    &plays_publisher_id,
-                    ctx,
-                );
+                self.connect_participants(member_id, &plays_publisher_id, ctx);
             }
         }
     }

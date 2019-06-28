@@ -15,16 +15,8 @@ use medea_macro::enum_delegate;
 
 use crate::{
     api::control::MemberId,
-    log::prelude::*,
     media::{MediaTrack, TrackId},
-    signalling::{
-        control::{
-            play_endpoint::WebRtcPlayEndpoint,
-            publish_endpoint::{Id as EndpointId, WebRtcPublishEndpoint},
-        },
-        endpoints_manager::EndpointsManager,
-        peers::Counter,
-    },
+    signalling::{endpoints_manager::EndpointsManager, peers::Counter},
 };
 
 /// Newly initialized [`Peer`] ready to signalling.
@@ -266,9 +258,8 @@ impl Peer<New> {
         partner_peer: &mut Peer<New>,
         tracks_count: &mut Counter,
         member_id: &MemberId,
-        endpoints_manager: &EndpointsManager,
+        endpoints_manager: &mut EndpointsManager,
     ) {
-        use crate::signalling::control::play_endpoint::Id as PlayerId;
         let partner_id = self.partner_member_id();
         let self_id = self.id();
         let mut publish_endpoints =

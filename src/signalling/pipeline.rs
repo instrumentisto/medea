@@ -4,9 +4,12 @@ use super::{
 };
 use crate::{
     api::{
-        client::rpc_connection::{AuthorizationError, RpcConnection},
+        client::rpc_connection::{
+            AuthorizationError, ClosedReason, RpcConnection,
+        },
         control::{MemberId, RoomId, RoomSpec},
     },
+    log::prelude::*,
     media::IceUser,
     signalling::{
         control::{
@@ -21,15 +24,14 @@ use crate::{
     },
     turn::{service::TurnAuthService, TurnServiceErr, UnreachablePolicy},
 };
-use actix::Context;
-use futures::{future::{join_all, Either, IntoFuture}, Future, future};
-use hashbrown::{hash_map::IntoIter as _, HashMap};
+use actix::{fut::wrap_future, AsyncContext, Context};
+use futures::{
+    future::{self, join_all, Either},
+    Future,
+};
+use hashbrown::HashMap;
 use medea_client_api_proto::{Event, IceServer};
-use std::{cell::RefCell, convert::TryFrom, rc::Rc, time::Duration};
-use crate::api::client::rpc_connection::ClosedReason;
-use actix::fut::wrap_future;
-use crate::log::prelude::*;
-use actix::AsyncContext;
+use std::{cell::RefCell, rc::Rc, time::Duration};
 
 #[derive(Debug)]
 pub struct Pipeline {
@@ -85,23 +87,30 @@ impl Pipeline {
             .get_participant_by_id_and_credentials(id, credentials)
     }
 
-    pub fn connection_closed(&mut self, ctx: &mut Context<Room>, member_id: MemberId, close_reason: ClosedReason) {
+    pub fn connection_closed(
+        &mut self,
+        ctx: &mut Context<Room>,
+        member_id: MemberId,
+        close_reason: ClosedReason,
+    ) {
         ctx.spawn(wrap_future(
-            self.delete_ice_user(&member_id).map_err(|err| {
-                error!("Error deleting IceUser {:?}", err)
-            }),
+            self.delete_ice_user(&member_id)
+                .map_err(|err| error!("Error deleting IceUser {:?}", err)),
         ));
-        self.members.connection_closed(ctx, &member_id, &close_reason);
+        self.members
+            .connection_closed(ctx, &member_id, &close_reason);
     }
 
-    pub fn delete_ice_user(&mut self, member_id: &MemberId) -> Box<dyn Future<Item = (), Error = TurnServiceErr>>{
+    pub fn delete_ice_user(
+        &mut self,
+        member_id: &MemberId,
+    ) -> Box<dyn Future<Item = (), Error = TurnServiceErr>> {
         let ice_user = self.endpoints.take_ice_user_by_member_id(member_id);
         match self.get_member_by_id(member_id) {
-            Some(participant) => match ice_user
-                {
-                    Some(ice_user) => self.turn.delete(vec![ice_user]),
-                    None => Box::new(future::ok(())),
-                },
+            Some(participant) => match ice_user {
+                Some(ice_user) => self.turn.delete(vec![ice_user]),
+                None => Box::new(future::ok(())),
+            },
             None => Box::new(future::ok(())),
         }
     }
@@ -147,18 +156,24 @@ impl Pipeline {
         id: MemberId,
         connection: Box<dyn RpcConnection>,
     ) -> ActFuture<&Member, MemberServiceErr> {
-        //self.members.connection_established(ctx, &self, id, connection)
+        // self.members.connection_established(ctx, &self, id, connection)
     }
 
     pub fn get_ice_servers(&self, id: &MemberId) -> Option<Vec<IceServer>> {
         self.endpoints.get_servers_list_by_member_id(id)
     }
 
-    pub fn get_receiver_by_id(&self, id: &PlayEndpointId) -> Option<Rc<RefCell<WebRtcPlayEndpoint>>> {
+    pub fn get_receiver_by_id(
+        &self,
+        id: &PlayEndpointId,
+    ) -> Option<Rc<RefCell<WebRtcPlayEndpoint>>> {
         self.endpoints.get_receiver_by_id(id)
     }
 
-    pub fn get_publisher_by_id(&self, id: &PublishEndpointId) -> Option<Rc<RefCell<WebRtcPublishEndpoint>>> {
+    pub fn get_publisher_by_id(
+        &self,
+        id: &PublishEndpointId,
+    ) -> Option<Rc<RefCell<WebRtcPublishEndpoint>>> {
         self.endpoints.get_publisher_by_id(id)
     }
 
