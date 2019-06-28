@@ -84,10 +84,12 @@ impl TurnDatabase {
         })
     }
 
+    // TODO: explain username
+
     /// Deletes batch of provided [`IceUser`]s.
     pub fn remove(
         &mut self,
-        users: &[Rc<RefCell<IceUser>>],
+        users: &[String],
     ) -> impl Future<Item = (), Error = bb8::RunError<TurnDatabaseErr>> {
         debug!("Remove ICE users: {:?}", users);
         let mut delete_keys = Vec::with_capacity(users.len());
@@ -95,7 +97,7 @@ impl TurnDatabase {
         for user in users {
             delete_keys.push(format!(
                 "turn/realm/medea/user/{}/key",
-                user.borrow().user()
+                user
             ));
         }
 

@@ -71,9 +71,10 @@ impl TurnAuthService for Addr<Service> {
         users: Vec<Rc<RefCell<IceUser>>>,
     ) -> Box<dyn Future<Item = (), Error = TurnServiceErr>> {
         // leave only non static users
-        let users: Vec<Rc<RefCell<IceUser>>> = users
+        let users: Vec<String> = users
             .into_iter()
             .filter(|u| !u.borrow().is_static())
+            .map(|u| u.borrow().user().to_string())
             .collect();
 
         if users.is_empty() {
@@ -259,7 +260,7 @@ impl Handler<CreateIceUser> for Service {
 /// Deletes all users from given room in redis.
 #[derive(Debug, Message)]
 #[rtype(result = "Result<(), TurnServiceErr>")]
-struct DeleteIceUsers(Vec<Rc<RefCell<IceUser>>>);
+struct DeleteIceUsers(Vec<String>);
 
 impl Handler<DeleteIceUsers> for Service {
     type Result = ActFuture<(), TurnServiceErr>;
