@@ -12,6 +12,11 @@ use futures::Future;
 use hashbrown::HashMap;
 use medea_client_api_proto::IceServer;
 use std::{cell::RefCell, rc::Rc};
+use crate::api::client::rpc_connection::ClosedReason;
+use actix::fut::wrap_future;
+use actix::AsyncContext as _;
+
+use crate::log::prelude::*;
 
 #[derive(Debug)]
 pub struct EndpointsManager {
@@ -30,8 +35,20 @@ impl EndpointsManager {
         }
     }
 
+    pub fn connection_closed(
+        &mut self,
+        ctx: &mut Context<Room>,
+        participant_id: MemberId,
+        reason: &ClosedReason,
+    ) {
+    }
+
     // TODO: rename
-    pub fn get_publish_sinks(&mut self, member_id: &MemberId, partner_id: &MemberId) -> Vec<Rc<RefCell<WebRtcPlayEndpoint>>> {
+    pub fn get_publish_sinks(
+        &mut self,
+        member_id: &MemberId,
+        partner_id: &MemberId,
+    ) -> Vec<Rc<RefCell<WebRtcPlayEndpoint>>> {
         self.get_publishers_by_member_id(member_id)
             .into_iter()
             .flat_map(|(_, p)| p.borrow().sinks().into_iter())

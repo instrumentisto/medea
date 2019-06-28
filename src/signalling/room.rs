@@ -33,7 +33,6 @@ use crate::{
     },
     turn::TurnAuthService,
 };
-use core::borrow::Borrow;
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
 pub type ActFuture<I, E> =
@@ -372,8 +371,11 @@ impl Room {
             second_member.id()
         );
 
-        let (first_peer_id, second_peer_id) =
-            self.peers.create_peers(first_member, second_member, self.pipeline.endpoints_manager());
+        let (first_peer_id, second_peer_id) = self.peers.create_peers(
+            first_member,
+            second_member,
+            self.pipeline.endpoints_manager(),
+        );
 
         self.connect_peers(ctx, first_peer_id, second_peer_id);
     }
@@ -676,6 +678,6 @@ impl Handler<RpcConnectionClosed> for Room {
         }
 
         self.pipeline
-            .connection_closed(ctx, msg.member_id, &msg.reason);
+            .connection_closed(ctx, msg.member_id, msg.reason);
     }
 }

@@ -18,12 +18,14 @@ use crate::{
     log::prelude::*,
     media::{MediaTrack, TrackId},
     signalling::{
-        control::publish_endpoint::{Id as EndpointId, WebRtcPublishEndpoint},
+        control::{
+            play_endpoint::WebRtcPlayEndpoint,
+            publish_endpoint::{Id as EndpointId, WebRtcPublishEndpoint},
+        },
+        endpoints_manager::EndpointsManager,
         peers::Counter,
     },
 };
-use crate::signalling::endpoints_manager::EndpointsManager;
-use crate::signalling::control::play_endpoint::WebRtcPlayEndpoint;
 
 /// Newly initialized [`Peer`] ready to signalling.
 #[derive(Debug, PartialEq)]
@@ -255,7 +257,6 @@ impl Peer<New> {
         }
     }
 
-
     /// Add all publish endpoints to this [`Peer`].
     ///
     /// This also create [`Peer`]s for [`WebRtcPlayEndpoint`]s that
@@ -270,13 +271,17 @@ impl Peer<New> {
         use crate::signalling::control::play_endpoint::Id as PlayerId;
         let partner_id = self.partner_member_id();
         let self_id = self.id();
-        let mut publish_endpoints = endpoints_manager.get_publishers_by_member_id(member_id);
+        let mut publish_endpoints =
+            endpoints_manager.get_publishers_by_member_id(member_id);
 
-        publish_endpoints.iter_mut()
+        publish_endpoints
+            .iter_mut()
             .for_each(|(_, e)| e.borrow_mut().add_peer_id(self_id));
 
-        // pub fn get_publish_sinks(&mut self, member_id; &MemberId, partner_id: &MemberId) -> Vec<&mut WebRtcPlayEndpoint>
-        let mut publish_sinks = endpoints_manager.get_publish_sinks(member_id, &partner_id);
+        // pub fn get_publish_sinks(&mut self, member_id; &MemberId, partner_id:
+        // &MemberId) -> Vec<&mut WebRtcPlayEndpoint>
+        let mut publish_sinks =
+            endpoints_manager.get_publish_sinks(member_id, &partner_id);
 
         for sink in publish_sinks {
             let track_audio = Rc::new(MediaTrack::new(
@@ -297,53 +302,52 @@ impl Peer<New> {
             sink.borrow_mut().set_peer_id(partner_peer.id());
         }
 
-
-//        publish_endpoints
-//            .into_iter()
-//            .map(|(m, e)| {
-//                e.add_peer_id(self_id);
-//                (m, e)
-//            })
-//            .flat_map(|(_m, e)| {
-//                e.sinks()
-//                    .iter()
-//                    .filter_map(|e: &PlayerId| {
-//                        endpoints_manager.get_mut_receiver_by_id(e)
-////                        if play.is_none() {
-////                            warn!(
-////                                "Empty weak pointer of publisher's play \
-////                                 endpoint. {:?}.",
-////                                e
-////                            );
-////                        }
-////                        play.map(|play| (e, play))
-//                    })
-//                    .map(|p| {
-//                        let owner_id = p.owner();
-//                        (p, owner_id)
-//                    })
-//                    .filter(|(e, owner_id)| {
-//                        **owner_id == partner_id && !e.is_connected()
-//                    })
-//            })
-//            .for_each(|(e, _)| {
-//                let track_audio = Rc::new(MediaTrack::new(
-//                    tracks_count.next_id(),
-//                    MediaType::Audio(AudioSettings {}),
-//                ));
-//                let track_video = Rc::new(MediaTrack::new(
-//                    tracks_count.next_id(),
-//                    MediaType::Video(VideoSettings {}),
-//                ));
-//
-//                self.add_sender(track_video.clone());
-//                self.add_sender(track_audio.clone());
-//
-//                partner_peer.add_receiver(track_video);
-//                partner_peer.add_receiver(track_audio);
-//
-//                e.set_peer_id(partner_peer.id());
-//            });
+        //        publish_endpoints
+        //            .into_iter()
+        //            .map(|(m, e)| {
+        //                e.add_peer_id(self_id);
+        //                (m, e)
+        //            })
+        //            .flat_map(|(_m, e)| {
+        //                e.sinks()
+        //                    .iter()
+        //                    .filter_map(|e: &PlayerId| {
+        //                        endpoints_manager.get_mut_receiver_by_id(e)
+        ////                        if play.is_none() {
+        ////                            warn!(
+        ////                                "Empty weak pointer of publisher's
+        //// play \                                 endpoint. {:?}.",
+        ////                                e
+        ////                            );
+        ////                        }
+        ////                        play.map(|play| (e, play))
+        //                    })
+        //                    .map(|p| {
+        //                        let owner_id = p.owner();
+        //                        (p, owner_id)
+        //                    })
+        //                    .filter(|(e, owner_id)| {
+        //                        **owner_id == partner_id && !e.is_connected()
+        //                    })
+        //            })
+        //            .for_each(|(e, _)| {
+        //                let track_audio = Rc::new(MediaTrack::new(
+        //                    tracks_count.next_id(),
+        //                    MediaType::Audio(AudioSettings {}),
+        //                ));
+        //                let track_video = Rc::new(MediaTrack::new(
+        //                    tracks_count.next_id(),
+        //                    MediaType::Video(VideoSettings {}),
+        //                ));
+        //
+        //                self.add_sender(track_video.clone());
+        //                self.add_sender(track_audio.clone());
+        //
+        //                partner_peer.add_receiver(track_video);
+        //                partner_peer.add_receiver(track_audio);
+        //
+        //                e.set_peer_id(partner_peer.id());
+        //            });
     }
 
     /// Transition new [`Peer`] into state of waiting for local description.

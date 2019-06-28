@@ -32,12 +32,12 @@ use crate::{
     media::IceUser,
     signalling::{
         control::member::Member,
+        pipeline::Pipeline,
         room::{ActFuture, RoomError},
         Room,
     },
     turn::{TurnAuthService, TurnServiceErr, UnreachablePolicy},
 };
-use crate::signalling::pipeline::Pipeline;
 use std::cell::RefCell;
 
 #[derive(Fail, Debug)]
@@ -100,7 +100,10 @@ impl MembersManager {
     }
 
     /// Lookup [`Member`] by provided id.
-    pub fn get_participant_by_id(&self, id: &MemberId) -> Option<Rc<RefCell<Member>>> {
+    pub fn get_participant_by_id(
+        &self,
+        id: &MemberId,
+    ) -> Option<Rc<RefCell<Member>>> {
         self.participants.get(id).map(Rc::clone)
     }
 
@@ -203,7 +206,10 @@ impl MembersManager {
                 .and_then(
                     move |ice: IceUser, room: &mut Room, _| {
                         room.pipeline.insert_connection(&participant_id, con);
-                        room.pipeline.replace_ice_user(&participant_id, Rc::new(RefCell::new(ice)));
+                        room.pipeline.replace_ice_user(
+                            &participant_id,
+                            Rc::new(RefCell::new(ice)),
+                        );
 
                         wrap_future(future::ok(participant))
                     },
@@ -232,7 +238,7 @@ impl MembersManager {
     pub fn connection_closed(
         &mut self,
         ctx: &mut Context<Room>,
-        participant_id: MemberId,
+        participant_id: &MemberId,
         reason: &ClosedReason,
     ) {
         let closed_at = Instant::now();
@@ -241,11 +247,6 @@ impl MembersManager {
                 let member = self.participants.get(&participant_id).unwrap();
                 member.borrow_mut().remove_connection();
 
-                ctx.spawn(wrap_future(
-                    self.delete_ice_user(&participant_id).map_err(|err| {
-                        error!("Error deleting IceUser {:?}", err)
-                    }),
-                ));
                 // ctx.notify(CloseRoom {})
             }
             ClosedReason::Lost => {
@@ -258,26 +259,12 @@ impl MembersManager {
                             &participant_id, closed_at
                         );
                         ctx.notify(RpcConnectionClosed {
-                            member_id: participant_id,
+                            member_id: participant_id.clone(),
                             reason: ClosedReason::Closed,
                         })
                     }),
                 );
             }
-        }
-    }
-
-    /// Deletes [`IceUser`] associated with provided [`Member`].
-    fn delete_ice_user(
-        &mut self,
-        participant_id: &MemberId,
-    ) -> Box<dyn Future<Item = (), Error = TurnServiceErr>> {
-        match self.get_participant_by_id(&participant_id) {
-            Some(participant) => match participant.borrow_mut().take_ice_user() {
-                Some(ice_user) => self.turn.delete(vec![ice_user]),
-                None => Box::new(future::ok(())),
-            },
-            None => Box::new(future::ok(())),
         }
     }
 
@@ -293,7 +280,9 @@ impl MembersManager {
 
         let mut close_fut = Vec::new();
         for (id, participant) in self.participants {
-            close_fut.push(participant.borrow_mut().take_connection().unwrap().close());
+            close_fut.push(
+                participant.borrow_mut().take_connection().unwrap().close(),
+            );
         }
 
         join_all(close_fut).map(|_| ())

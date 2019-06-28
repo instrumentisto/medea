@@ -14,10 +14,10 @@ use crate::{
     media::{Peer, PeerId, PeerStateMachine},
     signalling::{
         control::member::Member,
+        endpoints_manager::EndpointsManager,
         room::{PeersRemoved, Room, RoomError},
     },
 };
-use crate::signalling::endpoints_manager::EndpointsManager;
 
 #[derive(Debug)]
 pub struct PeerRepository {
@@ -81,8 +81,7 @@ impl PeerRepository {
     ) -> (u64, u64) {
         debug!(
             "Created peer between {} and {}.",
-            first_member_id,
-            second_member_id
+            first_member_id, second_member_id
         );
         let first_peer_id = self.peers_count.next_id();
         let second_peer_id = self.peers_count.next_id();
@@ -100,8 +99,10 @@ impl PeerRepository {
             first_member_id.clone(),
         );
 
-        let first_publishers = endpoints_manager.get_publishers_by_member_id(first_member_id);
-        let second_publishers = endpoints_manager.get_publishers_by_member_id(second_member_id);
+        let first_publishers =
+            endpoints_manager.get_publishers_by_member_id(first_member_id);
+        let second_publishers =
+            endpoints_manager.get_publishers_by_member_id(second_member_id);
 
         first_peer.add_publish_endpoints(
             &mut second_peer,
