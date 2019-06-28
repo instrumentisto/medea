@@ -258,7 +258,7 @@ impl Peer<New> {
         partner_peer: &mut Peer<New>,
         tracks_count: &mut Counter,
         member_id: &MemberId,
-        endpoints_manager: &mut EndpointsManager,
+        endpoints_manager: &EndpointsManager,
     ) {
         let partner_id = self.partner_member_id();
         let self_id = self.id();

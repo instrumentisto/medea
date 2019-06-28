@@ -1,6 +1,10 @@
 use crate::api::client::rpc_connection::RpcConnection;
 
 pub use crate::api::control::MemberId;
+use medea_client_api_proto::Event;
+use crate::api::client::rpc_connection::EventMessage;
+use failure::Fail;
+use futures::Future;
 
 #[derive(Debug)]
 pub struct Member {
@@ -9,9 +13,21 @@ pub struct Member {
     connection: Option<Box<dyn RpcConnection>>,
 }
 
+#[derive(Debug, Fail)]
+pub enum MemberError {
+    #[fail(display = "Rpc connection is empty.")]
+    RpcConnectionEmpty
+}
+
 impl Member {
-    pub fn connection(&self) -> Option<&Box<dyn RpcConnection>> {
-        self.connection.as_ref()
+    pub fn close_connection(&mut self) -> Result<Box<dyn Future<Item = (), Error = ()>>, MemberError> {
+        let connection = self.connection.as_mut().ok_or(MemberError::RpcConnectionEmpty)?;
+        Ok(connection.close())
+    }
+
+    pub fn send_event(&mut self, event: EventMessage) -> Result<Box<dyn Future<Item = (), Error = ()>>, MemberError>{
+        let connection = self.connection.as_mut().ok_or(MemberError::RpcConnectionEmpty)?;
+        Ok(connection.send_event(event))
     }
 
     pub fn take_connection(&mut self) -> Option<Box<dyn RpcConnection>> {

@@ -392,7 +392,7 @@ impl Room {
         // Create all connected publish endpoints.
         for (_, publish) in participant_publishers {
             for receiver in publish.borrow().sinks() {
-                let q = self.pipeline.get_receiver_by_id(receiver);
+                let q = self.pipeline.get_receiver_by_id(&receiver);
                 let receiver = unit_option_unwrap!(
                     q,
                     ctx,

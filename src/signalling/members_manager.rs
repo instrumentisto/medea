@@ -147,15 +147,12 @@ impl MembersManager {
     ) -> impl Future<Item = (), Error = RoomError> {
         let member = self.get_participant_by_id(&participant_id).unwrap();
 
-        match member.borrow().connection() {
-            Some(conn) => {
-                Either::A(conn.send_event(EventMessage::from(event)).map_err(
-                    move |_| RoomError::UnableToSendEvent(participant_id),
-                ))
-            }
-            None => Either::B(future::err(RoomError::ConnectionNotExists(
-                participant_id,
-            ))),
+        if member.borrow().is_connected() {
+            Either::A(member.borrow_mut().send_event(EventMessage::from(event)).unwrap().map_err(
+                move |_| RoomError::UnableToSendEvent(participant_id),
+            ))
+        } else {
+            Either::B(future::err(RoomError::ConnectionNotExists(participant_id)))
         }
     }
 
@@ -179,7 +176,7 @@ impl MembersManager {
         };
 
         // lookup previous participant connection
-        if let Some(mut connection) = participant.borrow().connection() {
+        if participant.borrow().is_connected() {
             debug!(
                 "Closing old RpcConnection for participant {}",
                 participant_id
@@ -192,8 +189,9 @@ impl MembersManager {
             {
                 ctx.cancel_future(handler);
             }
+            let member_clone = Rc::clone(&participant);
             Box::new(wrap_future(
-                connection.close().then(move |_| Ok(participant)),
+                participant.borrow_mut().close_connection().unwrap().then(move |_| Ok(member_clone)),
             ))
         } else {
             Box::new(
@@ -280,7 +278,7 @@ impl MembersManager {
         });
 
         let mut close_fut = Vec::new();
-        for (id, participant) in self.participants {
+        for (id, participant) in &self.participants {
             close_fut.push(
                 participant.borrow_mut().take_connection().unwrap().close(),
             );

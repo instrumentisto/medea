@@ -42,14 +42,17 @@ impl EndpointsManager {
 
     // TODO: rename
     pub fn get_publish_sinks(
-        &mut self,
+        &self,
         member_id: &MemberId,
         partner_id: &MemberId,
     ) -> Vec<Rc<RefCell<WebRtcPlayEndpoint>>> {
+        // TODO: useless clone. Maybe fix??
         self.get_publishers_by_member_id(member_id)
             .into_iter()
-            .flat_map(|(_, p)| p.borrow().sinks().into_iter())
-            .filter_map(|id| self.get_receiver_by_id(id))
+            .flat_map(|(_, p)| {
+                p.borrow().sinks().into_iter()
+            })
+            .filter_map(|id| self.get_receiver_by_id(&id))
             .collect()
     }
 
