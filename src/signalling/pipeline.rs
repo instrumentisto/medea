@@ -24,7 +24,7 @@ use crate::{
 use actix::Context;
 use futures::{future::{join_all, Either, IntoFuture}, Future, future};
 use hashbrown::{hash_map::IntoIter as _, HashMap};
-use medea_client_api_proto::Event;
+use medea_client_api_proto::{Event, IceServer};
 use std::{cell::RefCell, convert::TryFrom, rc::Rc, time::Duration};
 use crate::api::client::rpc_connection::ClosedReason;
 use actix::fut::wrap_future;
@@ -148,6 +148,10 @@ impl Pipeline {
         connection: Box<dyn RpcConnection>,
     ) -> ActFuture<&Member, MemberServiceErr> {
         //self.members.connection_established(ctx, &self, id, connection)
+    }
+
+    pub fn get_ice_servers(&self, id: &MemberId) -> Option<Vec<IceServer>> {
+        self.endpoints.get_servers_list_by_member_id(id)
     }
 
     fn test(

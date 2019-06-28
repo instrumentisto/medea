@@ -215,12 +215,10 @@ impl Room {
 
         let sender = sender.start();
         let member_id = sender.member_id();
-        let ice_servers = self
-            .participants
-            .get_participant_by_id(&member_id)
-            .ok_or_else(|| RoomError::MemberNotFound(member_id.clone()))?
-            .servers_list()
+        self.pipeline.get_ice_servers(&member_id);
+        let ice_servers = self.pipeline.get_ice_servers(&member_id)
             .ok_or_else(|| RoomError::NoTurnCredentials(member_id.clone()))?;
+
         let peer_created = Event::PeerCreated {
             peer_id: sender.id(),
             sdp_offer: None,
@@ -264,14 +262,10 @@ impl Room {
         let to_peer = to_peer.set_remote_sdp(sdp_offer.clone());
 
         let to_member_id = to_peer.member_id();
-        let ice_servers = self
-            .participants
-            .get_participant_by_id(&to_member_id)
-            .ok_or_else(|| RoomError::MemberNotFound(to_member_id.clone()))?
-            .servers_list()
-            .ok_or_else(|| {
-                RoomError::NoTurnCredentials(to_member_id.clone())
-            })?;
+
+        // TODO: better error
+        let ice_servers = self.pipeline.get_ice_servers(&to_member_id)
+            .ok_or_else(|| RoomError::NoTurnCredentials(to_member_id.clone()))?;
 
         let event = Event::PeerCreated {
             peer_id: to_peer.id(),
@@ -367,8 +361,8 @@ impl Room {
     ) {
         debug!(
             "Created peer member {} with member {}",
-            first_member.id(),
-            second_member.id()
+            first_member,
+            second_member
         );
 
         let (first_peer_id, second_peer_id) = self.peers.create_peers(
