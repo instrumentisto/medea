@@ -188,7 +188,7 @@ impl ParticipantService {
                     self.room_id,
                     UnreachablePolicy::ReturnErr,
                 ))
-                .map_err(move |err, _: &mut Room, _| {
+                .map_err(|err, _: &mut Room, _| {
                     ParticipantServiceErr::from(err)
                 })
                 .and_then(
