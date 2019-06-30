@@ -159,9 +159,7 @@ impl PeerConnection {
     ///
     /// [1]: https://tools.ietf.org/html/rfc4566#section-5.14
     /// [2]: https://www.w3.org/TR/webrtc/#rtcrtptransceiver-interface
-    pub fn get_send_mids(
-        &self,
-    ) -> Result<HashMap<u64, String>, WasmErr> {
+    pub fn get_send_mids(&self) -> Result<HashMap<u64, String>, WasmErr> {
         self.media_connections.borrow().get_send_mids()
     }
 

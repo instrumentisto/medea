@@ -4,7 +4,7 @@ use std::{
 };
 
 use medea_client_api_proto as proto;
-use wasm_bindgen::{JsValue, JsCast};
+use wasm_bindgen::{JsCast, JsValue};
 use web_sys::console;
 
 /// Generic application error.
@@ -12,7 +12,7 @@ use web_sys::console;
 pub enum WasmErr {
     JsError(js_sys::Error),
     Custom(Cow<'static, str>),
-    Untyped(JsValue)
+    Untyped(JsValue),
 }
 
 impl WasmErr {
@@ -36,14 +36,14 @@ impl WasmErr {
 impl Display for WasmErr {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         match self {
-            WasmErr::JsError(err) => write!(f, "{}", String::from(err.to_string())),
+            WasmErr::JsError(err) => {
+                write!(f, "{}", String::from(err.to_string()))
+            }
             WasmErr::Custom(reason) => write!(f, "{}", reason),
             WasmErr::Untyped(val) => match val.as_string() {
                 Some(reason) => write!(f, "{}", reason),
-                None => {
-                    write!(f, "no str representation for JsError")
-                },
-            }
+                None => write!(f, "no str representation for JsError"),
+            },
         }
     }
 }
@@ -52,7 +52,7 @@ impl From<JsValue> for WasmErr {
     fn from(val: JsValue) -> Self {
         match val.dyn_into::<js_sys::Error>() {
             Ok(err) => WasmErr::JsError(err),
-            Err(val)=> WasmErr::Untyped(val)
+            Err(val) => WasmErr::Untyped(val),
         }
     }
 }

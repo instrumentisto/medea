@@ -130,21 +130,10 @@ impl InnerRoom {
             on_new_connection: Rc::new(Callback2::default()),
         }
     }
-}
 
-/// RPC event handlers.
-impl EventHandler for InnerRoom {
-    /// Creates [`PeerConnection`] with provided ID, all new [`Connections`]
-    /// based on provided tracks. If provided sdp offer is Some, then offer is
-    /// applied to created peer, and [`Command::MakeSdpAnswer`] is emitted back
-    /// to RPC server.
-    fn on_peer_created(
-        &mut self,
-        peer_id: PeerId,
-        sdp_offer: Option<String>,
-        tracks: Vec<Track>,
-        ice_servers: Vec<IceServer>,
-    ) {
+    /// Creates new [`Connection`]s based on senders and receivers of provided
+    /// tracks
+    fn create_connections_from_tracks(&mut self, tracks: &Vec<Track>) {
         let create_connection = |room: &mut Self, member_id: &u64| {
             if !room.connections.contains_key(member_id) {
                 let con = Connection::new(*member_id);
@@ -166,45 +155,58 @@ impl EventHandler for InnerRoom {
                 }
             }
         }
+    }
+}
 
+/// RPC event handlers.
+impl EventHandler for InnerRoom {
+    /// Creates [`PeerConnection`] with provided ID, all new [`Connections`]
+    /// based on provided tracks. If provided sdp offer is Some, then offer is
+    /// applied to created peer, and [`Command::MakeSdpAnswer`] is emitted back
+    /// to RPC server.
+    fn on_peer_created(
+        &mut self,
+        peer_id: PeerId,
+        sdp_offer: Option<String>,
+        tracks: Vec<Track>,
+        ice_servers: Vec<IceServer>,
+    ) {
         // Create peer
         let peer = match self.peers.create(peer_id, ice_servers) {
-            Ok(peer) => peer,
+            Ok(peer) => Rc::clone(peer),
             Err(err) => {
                 err.log_err();
                 return;
             }
         };
 
+        self.create_connections_from_tracks(&tracks);
+
         let rpc = Rc::clone(&self.rpc);
-        let peer_rc = Rc::clone(peer);
         // sync provided tracks and process sdp
         spawn_local(
             peer.update_tracks(tracks, &self.media_manager)
                 .and_then(move |_| match sdp_offer {
-                    None => Either::A(peer_rc.create_and_set_offer().and_then(
+                    None => Either::A(peer.create_and_set_offer().and_then(
                         move |sdp_offer: String| {
                             rpc.send_command(Command::MakeSdpOffer {
                                 peer_id,
                                 sdp_offer,
-                                mids: peer_rc.get_send_mids().unwrap(),
+                                mids: peer.get_send_mids().unwrap(),
                             });
                             Ok(())
                         },
                     )),
                     Some(offer) => {
-                        let peer_rc1 = Rc::clone(&peer_rc);
+                        let peer_rc = Rc::clone(&peer);
                         Either::B(
-                            peer_rc
-                                .set_remote_offer(&offer)
-                                .and_then(move |_| {
-                                    peer_rc.create_and_set_answer()
-                                })
+                            peer.set_remote_offer(&offer)
+                                .and_then(move |_| peer.create_and_set_answer())
                                 .and_then(move |sdp_answer| {
                                     rpc.send_command(Command::MakeSdpAnswer {
                                         peer_id,
                                         sdp_answer,
-                                        mids: peer_rc1.get_send_mids().unwrap(),
+                                        mids: peer_rc.get_send_mids().unwrap(),
                                     });
                                     Ok(())
                                 }),
@@ -216,7 +218,6 @@ impl EventHandler for InnerRoom {
     }
 
     /// Applies specified SDP Answer to specified [`PeerConnection`].
-    // TODO: pass mids to peer.
     fn on_sdp_answer_made(
         &mut self,
         peer_id: PeerId,
@@ -265,6 +266,7 @@ impl EventHandler for InnerRoom {
 
     /// Disposes specified RTCPeerConnection's.
     fn on_peers_removed(&mut self, peer_ids: Vec<PeerId>) {
+        // TODO: drop connections
         peer_ids.iter().for_each(|id| {
             self.peers.remove(*id);
         })
