@@ -127,16 +127,21 @@ impl WebRtcPlayEndpoint {
     }
 
     /// Returns owner [`Member`] of this [`WebRtcPlayEndpoint`].
+    ///
+    /// __This function will panic if pointer is empty.__
     pub fn owner(&self) -> Rc<Member> {
         self.0.borrow().owner()
     }
 
-    // TODO: explain this
+    /// Returns `Weak` pointer to owner [`Member`] of this
+    /// [`WebRtcPlayEndpoint`].
     pub fn weak_owner(&self) -> Weak<Member> {
         self.0.borrow().weak_owner()
     }
 
     /// Returns publisher's [`WebRtcPublishEndpoint`].
+    ///
+    /// __This function will panic if pointer is empty.__
     pub fn publisher(&self) -> Rc<WebRtcPublishEndpoint> {
         self.0.borrow().publisher()
     }
@@ -193,7 +198,6 @@ struct WebRtcPublishEndpointInner {
 
 impl Drop for WebRtcPublishEndpointInner {
     fn drop(&mut self) {
-        // TODO: add comments
         for receiver in self.sinks.iter().filter_map(|r| Weak::upgrade(r)) {
             if let Some(receiver_owner) = receiver.weak_owner().upgrade() {
                 receiver_owner.remove_receiver(&receiver.id())
@@ -270,11 +274,15 @@ impl WebRtcPublishEndpoint {
     }
 
     /// Returns all sinks of this [`WebRtcPublishEndpoint`].
+    ///
+    /// __This function will panic if meet empty pointer.__
     pub fn sinks(&self) -> Vec<Rc<WebRtcPlayEndpoint>> {
         self.0.borrow().sinks()
     }
 
     /// Returns owner [`Member`] of this [`WebRtcPublishEndpoint`].
+    ///
+    /// __This function will panic if pointer is empty.__
     pub fn owner(&self) -> Rc<Member> {
         self.0.borrow().owner()
     }
