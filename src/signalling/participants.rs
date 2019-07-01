@@ -1,5 +1,5 @@
-//! [`Member`] is member with [`RpcConnection`]. [`MemberService`]
-//! stores [`Member`]s and associated [`RpcConnection`]s, handles
+//! Participant is [`Member`] with [`RpcConnection`]. [`ParticipantService`]
+//! stores [`Members`] and associated [`RpcConnection`]s, handles
 //! [`RpcConnection`] authorization, establishment, message sending, Turn
 //! credentials management.
 
@@ -64,10 +64,9 @@ impl From<MailboxError> for ParticipantServiceErr {
     }
 }
 
-/// [`Member`] is member of [`Room`] with [`RpcConnection`].
-/// [`ParticipantService`] stores [`Member`]s and associated
-/// [`RpcConnection`]s, handles [`RpcConnection`] authorization, establishment,
-/// message sending.
+/// Participant is [`Member`] with [`RpcConnection`]. [`ParticipantService`]
+/// stores [`Member`]s and associated [`RpcConnection`]s, handles
+/// [`RpcConnection`] authorization, establishment, message sending.
 #[derive(Debug)]
 pub struct ParticipantService {
     /// [`Room`]s id from which this [`ParticipantService`] was created.

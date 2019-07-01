@@ -39,7 +39,7 @@ struct RequestParams {
 /// Handles all HTTP requests, performs WebSocket handshake (upgrade) and starts
 /// new [`WsSession`] for WebSocket connection.
 fn ws_index(
-    r: HttpRequest,
+    request: HttpRequest,
     info: Path<RequestParams>,
     state: Data<Context>,
     payload: Payload,
@@ -60,7 +60,7 @@ fn ws_index(
                         room,
                         state.config.idle_timeout,
                     ),
-                    &r,
+                    &request,
                     payload,
                 ),
                 Err(AuthorizationError::MemberNotExists) => {
