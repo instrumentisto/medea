@@ -21,6 +21,8 @@ use crate::{
     turn::new_turn_auth_service,
     utils::graceful_shutdown::{self, ShutdownSubscribe},
 };
+use std::thread;
+use std::time::Duration;
 
 fn main() {
     dotenv().ok();
@@ -33,36 +35,38 @@ fn main() {
     let config = Conf::parse().unwrap();
 
     info!("{:?}", config);
+    {
+        let members = hashmap! {
+            1 => Member::new(1, "caller_credentials".to_owned()),
+            2 => Member::new(2, "responder_credentials".to_owned()),
+        };
+        let peers = create_peers(1, 2);
 
-    let members = hashmap! {
-        1 => Member::new(1, "caller_credentials".to_owned()),
-        2 => Member::new(2, "responder_credentials".to_owned()),
-    };
-    let peers = create_peers(1, 2);
+        let graceful_shutdown = graceful_shutdown::create(config.system_config.shutdown_timeout);
 
-    let graceful_shutdown = graceful_shutdown::create(5000);
+        let turn_auth_service =
+            new_turn_auth_service(&config).expect("Unable to start turn service");
 
-    let turn_auth_service =
-        new_turn_auth_service(&config).expect("Unable to start turn service");
+        let rpc_reconnect_timeout = config.rpc.reconnect_timeout;
 
-    let rpc_reconnect_timeout = config.rpc.reconnect_timeout;
+        let room = Room::start_in_arbiter(&Arbiter::new(), move |_| {
+            Room::new(1, members, peers, rpc_reconnect_timeout, turn_auth_service)
+        });
+        graceful_shutdown.do_send(ShutdownSubscribe {
+            priority: 2,
+            who: room.clone().recipient(),
+        });
 
-    let room = Room::start_in_arbiter(&Arbiter::new(), move |_| {
-        Room::new(1, members, peers, rpc_reconnect_timeout, turn_auth_service)
-    });
-    graceful_shutdown.do_send(ShutdownSubscribe {
-        priority: 2,
-        who: room.clone().recipient(),
-    });
+        let rooms = hashmap! {1 => room};
+        let rooms_repo = RoomsRepository::new(rooms);
 
-    let rooms = hashmap! {1 => room};
-    let rooms_repo = RoomsRepository::new(rooms);
+        let http_server = server::run(rooms_repo, config);
+        graceful_shutdown.do_send(ShutdownSubscribe {
+            priority: 2,
+            who: http_server.recipient(),
+        });
 
-    let http_server = server::run(rooms_repo, config);
-    graceful_shutdown.do_send(ShutdownSubscribe {
-        priority: 2,
-        who: http_server.recipient(),
-    });
-
-    let _ = sys.run();
+        let _ = sys.run();
+    }
+    thread::sleep(Duration::from_millis(300));
 }

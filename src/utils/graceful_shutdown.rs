@@ -1,8 +1,7 @@
 //! A class to handle shutdown signals and to shut down system
 
 use std::{
-    collections::BTreeMap, mem, time::Duration,
-    thread,
+    collections::BTreeMap, mem, time::Duration
 };
 
 use actix::{
@@ -129,7 +128,6 @@ impl Handler<SignalMessage> for GracefulShutdown {
 
         ctx.spawn(
             shutdown_future
-                .map(|_| ())
                 .map_err(|e| {
                     error!(
                         "Error trying to shut down system gracefully: {:?}",
@@ -137,7 +135,6 @@ impl Handler<SignalMessage> for GracefulShutdown {
                     );
                 })
                 .then(|_| {
-                    thread::sleep(Duration::from_millis(300));
                     System::current().stop();
                     future::ok::<(), ()>(())
                 })

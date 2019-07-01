@@ -3,6 +3,7 @@
 pub mod rpc;
 pub mod server;
 pub mod turn;
+pub mod system_config;
 
 use std::env;
 
@@ -14,6 +15,7 @@ pub use self::{
     rpc::Rpc,
     server::Server,
     turn::{Redis, Turn},
+    system_config::SystemConfiguration,
 };
 
 /// CLI argument that is responsible for holding application configuration
@@ -33,6 +35,8 @@ pub struct Conf {
     pub server: Server,
     /// TURN server settings.
     pub turn: Turn,
+    // More settings
+    pub system_config: SystemConfiguration,
 }
 
 impl Conf {
