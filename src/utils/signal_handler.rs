@@ -19,11 +19,6 @@ pub enum SignalKind {
     Quit,
 }
 
-pub struct SignalMessage(pub SignalKind);
-
-impl Message for SignalMessage {
-    type Result = ();
-}
 
 pub struct SignalHandler {
     srv: Recipient<SignalMessage>,

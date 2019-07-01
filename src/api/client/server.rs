@@ -119,7 +119,7 @@ pub fn run(
 pub mod actors {
     use actix::{Actor, AsyncContext, Context, Handler, WrapFuture};
 
-    use crate::{log::prelude::*, utils::graceful_shutdown::ShutdownResult};
+    use crate::{log::prelude::*, utils::graceful_shutdown::ShutdownMessage};
     use actix_web::dev::Server;
 
     pub struct ServerWrapper(pub Server);
@@ -128,12 +128,12 @@ pub mod actors {
         type Context = Context<Self>;
     }
 
-    impl Handler<ShutdownResult> for ServerWrapper {
+    impl Handler<ShutdownMessage> for ServerWrapper {
         type Result = Result<(), Box<dyn std::error::Error + Send>>;
 
         fn handle(
             &mut self,
-            _: ShutdownResult,
+            _: ShutdownMessage,
             ctx: &mut Self::Context,
         ) -> Result<(), Box<dyn std::error::Error + Send>> {
             info!("Shutting down Actix Web Server");

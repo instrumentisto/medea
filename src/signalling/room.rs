@@ -28,7 +28,7 @@ use crate::{
     },
     signalling::{participants::ParticipantService, peers::PeerRepository},
     turn::TurnAuthService,
-    utils::graceful_shutdown::ShutdownResult,
+    utils::graceful_shutdown::ShutdownMessage,
 };
 
 /// ID of [`Room`].
@@ -431,12 +431,12 @@ impl Handler<CloseRoom> for Room {
 }
 
 // Close room on `SIGINT`, `SIGTERM`, `SIGQUIT` signals.
-impl Handler<ShutdownResult> for Room {
+impl Handler<ShutdownMessage> for Room {
     type Result = Result<(), Box<dyn std::error::Error + Send>>;
 
     fn handle(
         &mut self,
-        _: ShutdownResult,
+        _: ShutdownMessage,
         ctx: &mut Self::Context,
     ) -> Result<(), Box<dyn std::error::Error + Send>> {
         info!("Shutting down Room: {:?}", self.id);

@@ -1,6 +1,9 @@
 //! Medea media server application.
 
 #[macro_use]
+extern crate lazy_static;
+
+#[macro_use]
 pub mod utils;
 pub mod api;
 pub mod conf;
@@ -8,8 +11,6 @@ pub mod log;
 pub mod media;
 pub mod signalling;
 pub mod turn;
-
-use std::{thread, time::Duration};
 
 use actix::prelude::*;
 use dotenv::dotenv;
@@ -21,8 +22,9 @@ use crate::{
     media::create_peers,
     signalling::{Room, RoomsRepository},
     turn::new_turn_auth_service,
-    utils::graceful_shutdown::{self, ShutdownSubscribe},
+    utils::graceful_shutdown::{self},
 };
+use core::borrow::BorrowMut;
 
 fn main() {
     dotenv().ok();
@@ -30,19 +32,19 @@ fn main() {
     let _scope_guard = slog_scope::set_global_logger(logger);
     slog_stdlog::init().unwrap();
 
-    let sys = System::new("medea");
+//    let sys = System::new("medea");
 
     let config = Conf::parse().unwrap();
-
     info!("{:?}", config);
-    {
+
+    actix::run(|| {
         let members = hashmap! {
             1 => Member::new(1, "caller_credentials".to_owned()),
             2 => Member::new(2, "responder_credentials".to_owned()),
         };
         let peers = create_peers(1, 2);
 
-        let graceful_shutdown =
+        let mut graceful_shutdown =
             graceful_shutdown::create(config.system_config.shutdown_timeout);
 
         let turn_auth_service = new_turn_auth_service(&config)
@@ -59,21 +61,14 @@ fn main() {
                 turn_auth_service,
             )
         });
-        graceful_shutdown.do_send(ShutdownSubscribe {
-            priority: 2,
-            who: room.clone().recipient(),
-        });
+        graceful_shutdown.borrow_mut().subscribe(room.clone().recipient(), 1);
 
         let rooms = hashmap! {1 => room};
         let rooms_repo = RoomsRepository::new(rooms);
 
         let http_server = server::run(rooms_repo, config);
-        graceful_shutdown.do_send(ShutdownSubscribe {
-            priority: 2,
-            who: http_server.recipient(),
-        });
+        graceful_shutdown.borrow_mut().subscribe(http_server.recipient(), 2);
 
-        let _ = sys.run();
-    }
-    thread::sleep(Duration::from_millis(300));
+        futures::future::ok(())
+    });
 }
