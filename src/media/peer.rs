@@ -163,7 +163,7 @@ pub struct Peer<S> {
 }
 
 impl<T> Peer<T> {
-    /// Returns ID of [`Participant`] associated with this [`Peer`].
+    /// Returns ID of [`Member`] associated with this [`Peer`].
     pub fn member_id(&self) -> MemberId {
         self.context.member_id.clone()
     }
@@ -178,7 +178,7 @@ impl<T> Peer<T> {
         self.context.partner_peer
     }
 
-    /// Returns ID of interconnected [`Participant`].
+    /// Returns ID of interconnected [`Member`].
     pub fn partner_member_id(&self) -> MemberId {
         self.context.partner_member.clone()
     }
@@ -229,7 +229,7 @@ impl<T> Peer<T> {
 }
 
 impl Peer<New> {
-    /// Creates new [`Peer`] for [`Participant`].
+    /// Creates new [`Peer`] for [`Member`].
     pub fn new(
         id: Id,
         member_id: MemberId,

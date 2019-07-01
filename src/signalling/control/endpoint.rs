@@ -13,7 +13,7 @@ use crate::{
     media::PeerId,
 };
 
-use super::participant::Participant;
+use super::participant::Member;
 
 /// ID of endpoint.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -44,8 +44,8 @@ struct WebRtcPlayEndpointInner {
     /// [`WebRtcPlayEndpoint`] receive data.
     publisher: Weak<WebRtcPublishEndpoint>,
 
-    /// Owner [`Participant`] of this [`WebRtcPlayEndpoint`].
-    owner: Weak<Participant>,
+    /// Owner [`Member`] of this [`WebRtcPlayEndpoint`].
+    owner: Weak<Member>,
 
     /// [`PeerId`] of [`Peer`] created for this [`WebRtcPlayEndpoint`].
     ///
@@ -62,11 +62,11 @@ impl WebRtcPlayEndpointInner {
         self.src.clone()
     }
 
-    fn owner(&self) -> Rc<Participant> {
+    fn owner(&self) -> Rc<Member> {
         Weak::upgrade(&self.owner).unwrap()
     }
 
-    fn weak_owner(&self) -> Weak<Participant> {
+    fn weak_owner(&self) -> Weak<Member> {
         Weak::clone(&self.owner)
     }
 
@@ -110,7 +110,7 @@ impl WebRtcPlayEndpoint {
         id: Id,
         src: SrcUri,
         publisher: Weak<WebRtcPublishEndpoint>,
-        owner: Weak<Participant>,
+        owner: Weak<Member>,
     ) -> Self {
         Self(RefCell::new(WebRtcPlayEndpointInner {
             id,
@@ -126,13 +126,13 @@ impl WebRtcPlayEndpoint {
         self.0.borrow().src()
     }
 
-    /// Returns owner [`Participant`] of this [`WebRtcPlayEndpoint`].
-    pub fn owner(&self) -> Rc<Participant> {
+    /// Returns owner [`Member`] of this [`WebRtcPlayEndpoint`].
+    pub fn owner(&self) -> Rc<Member> {
         self.0.borrow().owner()
     }
 
     // TODO: explain this
-    pub fn weak_owner(&self) -> Weak<Participant> {
+    pub fn weak_owner(&self) -> Weak<Member> {
         self.0.borrow().weak_owner()
     }
 
@@ -180,8 +180,8 @@ struct WebRtcPublishEndpointInner {
     /// All receivers of this [`WebRtcPublishEndpoint`].
     receivers: Vec<Weak<WebRtcPlayEndpoint>>,
 
-    /// Owner [`Participant`] of this [`WebRtcPublishEndpoint`].
-    owner: Weak<Participant>,
+    /// Owner [`Member`] of this [`WebRtcPublishEndpoint`].
+    owner: Weak<Member>,
 
     /// [`PeerId`] of all [`Peer`]s created for this [`WebRtcPublishEndpoint`].
     ///
@@ -214,7 +214,7 @@ impl WebRtcPublishEndpointInner {
             .collect()
     }
 
-    fn owner(&self) -> Rc<Participant> {
+    fn owner(&self) -> Rc<Member> {
         Weak::upgrade(&self.owner).unwrap()
     }
 
@@ -253,7 +253,7 @@ impl WebRtcPublishEndpoint {
         id: Id,
         p2p: P2pMode,
         receivers: Vec<Weak<WebRtcPlayEndpoint>>,
-        owner: Weak<Participant>,
+        owner: Weak<Member>,
     ) -> Self {
         Self(RefCell::new(WebRtcPublishEndpointInner {
             id,
@@ -274,8 +274,8 @@ impl WebRtcPublishEndpoint {
         self.0.borrow().receivers()
     }
 
-    /// Returns owner [`Participant`] of this [`WebRtcPublishEndpoint`].
-    pub fn owner(&self) -> Rc<Participant> {
+    /// Returns owner [`Member`] of this [`WebRtcPublishEndpoint`].
+    pub fn owner(&self) -> Rc<Member> {
         self.0.borrow().owner()
     }
 
