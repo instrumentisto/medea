@@ -31,7 +31,7 @@ use crate::{
     log::prelude::*,
     media::IceUser,
     signalling::{
-        control::{parse_participants, Member, MembersLoadError},
+        control::{parse_members, Member, MembersLoadError},
         room::{ActFuture, RoomError},
         Room,
     },
@@ -74,7 +74,7 @@ pub struct ParticipantService {
     room_id: RoomId,
 
     /// [`Member`]s which currently are present in this [`Room`].
-    participants: HashMap<MemberId, Rc<Member>>,
+    members: HashMap<MemberId, Rc<Member>>,
 
     /// Service for managing authorization on Turn server.
     turn: Box<dyn TurnAuthService>,
@@ -103,7 +103,7 @@ impl ParticipantService {
     ) -> Result<Self, MembersLoadError> {
         Ok(Self {
             room_id: room_spec.id().clone(),
-            participants: parse_participants(room_spec)?,
+            members: parse_members(room_spec)?,
             turn,
             connections: HashMap::new(),
             reconnect_timeout,
@@ -112,8 +112,8 @@ impl ParticipantService {
     }
 
     /// Lookup [`Member`] by provided id.
-    pub fn get_participant_by_id(&self, id: &MemberId) -> Option<Rc<Member>> {
-        self.participants.get(id).cloned()
+    pub fn get_member_by_id(&self, id: &MemberId) -> Option<Rc<Member>> {
+        self.members.get(id).cloned()
     }
 
     /// Lookup [`Member`] by provided id and credentials. Returns
@@ -121,15 +121,15 @@ impl ParticipantService {
     /// [`MemberId`] failed. Returns
     /// [`Err(AuthorizationError::InvalidCredentials)`] if [`Member`]
     /// was found, but incorrect credentials was provided.
-    pub fn get_participant_by_id_and_credentials(
+    pub fn get_member_by_id_and_credentials(
         &self,
-        participant_id: &MemberId,
+        member_id: &MemberId,
         credentials: &str,
     ) -> Result<Rc<Member>, AuthorizationError> {
-        match self.get_participant_by_id(participant_id) {
-            Some(participant) => {
-                if participant.credentials().eq(credentials) {
-                    Ok(participant.clone())
+        match self.get_member_by_id(member_id) {
+            Some(member) => {
+                if member.credentials().eq(credentials) {
+                    Ok(member.clone())
                 } else {
                     Err(AuthorizationError::InvalidCredentials)
                 }
@@ -139,28 +139,24 @@ impl ParticipantService {
     }
 
     /// Checks if [`Member`] has **active** [`RcpConnection`].
-    pub fn participant_has_connection(
-        &self,
-        participant_id: &MemberId,
-    ) -> bool {
-        self.connections.contains_key(participant_id)
-            && !self.drop_connection_tasks.contains_key(participant_id)
+    pub fn member_has_connection(&self, member_id: &MemberId) -> bool {
+        self.connections.contains_key(member_id)
+            && !self.drop_connection_tasks.contains_key(member_id)
     }
 
     /// Send [`Event`] to specified remote [`Member`].
-    pub fn send_event_to_participant(
+    pub fn send_event_to_member(
         &mut self,
-        participant_id: MemberId,
+        member_id: MemberId,
         event: Event,
     ) -> impl Future<Item = (), Error = RoomError> {
-        match self.connections.get(&participant_id) {
-            Some(conn) => {
-                Either::A(conn.send_event(EventMessage::from(event)).map_err(
-                    move |_| RoomError::UnableToSendEvent(participant_id),
-                ))
-            }
+        match self.connections.get(&member_id) {
+            Some(conn) => Either::A(
+                conn.send_event(EventMessage::from(event))
+                    .map_err(move |_| RoomError::UnableToSendEvent(member_id)),
+            ),
             None => Either::B(future::err(RoomError::ConnectionNotExists(
-                participant_id,
+                member_id,
             ))),
         }
     }
@@ -171,39 +167,33 @@ impl ParticipantService {
     pub fn connection_established(
         &mut self,
         ctx: &mut Context<Room>,
-        participant_id: MemberId,
+        member_id: MemberId,
         con: Box<dyn RpcConnection>,
     ) -> ActFuture<Rc<Member>, ParticipantServiceErr> {
-        let participant = match self.get_participant_by_id(&participant_id) {
+        let member = match self.get_member_by_id(&member_id) {
             None => {
                 return Box::new(wrap_future(future::err(
-                    ParticipantServiceErr::ParticipantNotFound(participant_id),
+                    ParticipantServiceErr::ParticipantNotFound(member_id),
                 )));
             }
-            Some(participant) => participant,
+            Some(member) => member,
         };
 
-        // lookup previous participant connection
-        if let Some(mut connection) = self.connections.remove(&participant_id) {
-            debug!(
-                "Closing old RpcConnection for participant {}",
-                participant_id
-            );
+        // lookup previous member connection
+        if let Some(mut connection) = self.connections.remove(&member_id) {
+            debug!("Closing old RpcConnection for participant {}", member_id);
 
             // cancel RpcConnection close task, since connection is
             // reestablished
-            if let Some(handler) =
-                self.drop_connection_tasks.remove(&participant_id)
+            if let Some(handler) = self.drop_connection_tasks.remove(&member_id)
             {
                 ctx.cancel_future(handler);
             }
-            Box::new(wrap_future(
-                connection.close().then(move |_| Ok(participant)),
-            ))
+            Box::new(wrap_future(connection.close().then(move |_| Ok(member))))
         } else {
             Box::new(
                 wrap_future(self.turn.create(
-                    participant_id.clone(),
+                    member_id.clone(),
                     self.room_id.clone(),
                     UnreachablePolicy::ReturnErr,
                 ))
@@ -212,11 +202,10 @@ impl ParticipantService {
                 })
                 .and_then(
                     move |ice: IceUser, room: &mut Room, _| {
-                        room.participants
-                            .insert_connection(participant_id.clone(), con);
-                        participant.replace_ice_user(ice);
+                        room.members.insert_connection(member_id.clone(), con);
+                        member.replace_ice_user(ice);
 
-                        wrap_future(future::ok(participant))
+                        wrap_future(future::ok(member))
                     },
                 ),
             )
@@ -226,10 +215,10 @@ impl ParticipantService {
     /// Insert new [`RpcConnection`] into this [`ParticipantService`].
     fn insert_connection(
         &mut self,
-        participant_id: MemberId,
+        member_id: MemberId,
         conn: Box<dyn RpcConnection>,
     ) {
-        self.connections.insert(participant_id, conn);
+        self.connections.insert(member_id, conn);
     }
 
     /// If [`ClosedReason::Closed`], then removes [`RpcConnection`] associated
@@ -241,16 +230,16 @@ impl ParticipantService {
     pub fn connection_closed(
         &mut self,
         ctx: &mut Context<Room>,
-        participant_id: MemberId,
+        member_id: MemberId,
         reason: &ClosedReason,
     ) {
         let closed_at = Instant::now();
         match reason {
             ClosedReason::Closed => {
-                self.connections.remove(&participant_id);
+                self.connections.remove(&member_id);
 
                 ctx.spawn(wrap_future(
-                    self.delete_ice_user(&participant_id).map_err(|err| {
+                    self.delete_ice_user(&member_id).map_err(|err| {
                         error!("Error deleting IceUser {:?}", err)
                     }),
                 ));
@@ -258,15 +247,15 @@ impl ParticipantService {
             }
             ClosedReason::Lost => {
                 self.drop_connection_tasks.insert(
-                    participant_id.clone(),
+                    member_id.clone(),
                     ctx.run_later(self.reconnect_timeout, move |_, ctx| {
                         info!(
                             "Member {} connection lost at {:?}. Room will be \
                              stopped.",
-                            &participant_id, closed_at
+                            &member_id, closed_at
                         );
                         ctx.notify(RpcConnectionClosed {
-                            member_id: participant_id,
+                            member_id,
                             reason: ClosedReason::Closed,
                         })
                     }),
@@ -278,10 +267,10 @@ impl ParticipantService {
     /// Deletes [`IceUser`] associated with provided [`Member`].
     fn delete_ice_user(
         &mut self,
-        participant_id: &MemberId,
+        member_id: &MemberId,
     ) -> Box<dyn Future<Item = (), Error = TurnServiceErr>> {
-        match self.get_participant_by_id(&participant_id) {
-            Some(participant) => match participant.take_ice_user() {
+        match self.get_member_by_id(&member_id) {
+            Some(member) => match member.take_ice_user() {
                 Some(ice_user) => self.turn.delete(vec![ice_user]),
                 None => Box::new(future::ok(())),
             },
@@ -310,9 +299,9 @@ impl ParticipantService {
 
         // deleting all IceUsers
         let remove_ice_users = Box::new({
-            let mut room_users = Vec::with_capacity(self.participants.len());
+            let mut room_users = Vec::with_capacity(self.members.len());
 
-            self.participants.iter().for_each(|(_, data)| {
+            self.members.iter().for_each(|(_, data)| {
                 if let Some(ice_user) = data.take_ice_user() {
                     room_users.push(ice_user);
                 }

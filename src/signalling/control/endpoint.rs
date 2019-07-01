@@ -13,7 +13,7 @@ use crate::{
     media::PeerId,
 };
 
-use super::participant::Member;
+use super::member::Member;
 
 /// ID of endpoint.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]

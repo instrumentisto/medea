@@ -97,7 +97,7 @@ impl Member {
         {
             let publisher_id =
                 MemberId(spec_play_endpoint.src.member_id.to_string());
-            let publisher_participant = store.get(&publisher_id).map_or(
+            let publisher_member = store.get(&publisher_id).map_or(
                 Err(MembersLoadError::MemberNotFound(publisher_id)),
                 Ok,
             )?;
@@ -123,7 +123,7 @@ impl Member {
                     Ok,
                 )?;
 
-            if let Some(publisher) = publisher_participant.get_publisher_by_id(
+            if let Some(publisher) = publisher_member.get_publisher_by_id(
                 &EndpointId(spec_play_endpoint.src.endpoint_id.to_string()),
             ) {
                 let new_play_endpoint_id =
@@ -145,7 +145,7 @@ impl Member {
                     new_publish_id.clone(),
                     publisher_endpoint.p2p.clone(),
                     Vec::new(),
-                    Rc::downgrade(&publisher_participant),
+                    Rc::downgrade(&publisher_member),
                 ));
 
                 let new_self_play_id = EndpointId(spec_play_name.to_string());
@@ -158,7 +158,7 @@ impl Member {
 
                 new_publish.add_receiver(Rc::downgrade(&new_self_play));
 
-                publisher_participant.insert_publisher(new_publish);
+                publisher_member.insert_publisher(new_publish);
 
                 self.insert_receiver(new_self_play);
             }
@@ -280,26 +280,26 @@ impl Member {
 /// load all related to this [`Member`]s receivers and publishers.
 ///
 /// Returns store of all [`Member`]s loaded from [`RoomSpec`].
-pub fn parse_participants(
+pub fn parse_members(
     room_spec: &RoomSpec,
 ) -> Result<HashMap<MemberId, Rc<Member>>, MembersLoadError> {
-    let members = room_spec.members()?;
-    let mut participants = HashMap::new();
+    let members_spec = room_spec.members()?;
+    let mut members = HashMap::new();
 
-    for (id, member) in &members {
-        participants.insert(
+    for (id, member) in &members_spec {
+        members.insert(
             id.clone(),
             Rc::new(Member::new(id.clone(), member.credentials().to_string())),
         );
     }
 
-    for (_, participant) in &participants {
-        participant.load(room_spec, &participants)?;
+    for (_, member) in &members {
+        member.load(room_spec, &members)?;
     }
 
     debug!(
         "Created ParticipantService with participants: {:?}.",
-        participants
+        members
             .iter()
             .map(|(id, p)| {
                 format!(
@@ -318,7 +318,7 @@ pub fn parse_participants(
             .collect::<Vec<String>>()
     );
 
-    Ok(participants)
+    Ok(members)
 }
 
 #[cfg(test)]
@@ -375,7 +375,7 @@ mod tests {
     fn get_test_store() -> HashMap<MemberId, Rc<Member>> {
         let room_element: Element = serde_yaml::from_str(TEST_SPEC).unwrap();
         let room_spec = RoomSpec::try_from(&room_element).unwrap();
-        parse_participants(&room_spec).unwrap()
+        parse_members(&room_spec).unwrap()
     }
 
     #[test]
@@ -403,24 +403,22 @@ mod tests {
             &caller_publish_endpoint
         ));
 
-        let some_participant = store.get(&id("some-member")).unwrap();
-        assert!(some_participant.receivers().is_empty());
-        assert_eq!(some_participant.publishers().len(), 1);
+        let some_member = store.get(&id("some-member")).unwrap();
+        assert!(some_member.receivers().is_empty());
+        assert_eq!(some_member.publishers().len(), 1);
 
         let responder_play2_endpoint =
             responder.get_receiver_by_id(&id("play2")).unwrap();
-        let some_participant_publisher = some_participant
-            .get_publisher_by_id(&id("publish"))
-            .unwrap();
-        assert_eq!(some_participant_publisher.receivers().len(), 1);
-        let is_some_participant_has_responder_in_receivers =
-            some_participant_publisher
-                .receivers()
-                .into_iter()
-                .filter(|p| Rc::ptr_eq(p, &responder_play2_endpoint))
-                .count()
-                == 1;
-        assert!(is_some_participant_has_responder_in_receivers);
+        let some_member_publisher =
+            some_member.get_publisher_by_id(&id("publish")).unwrap();
+        assert_eq!(some_member_publisher.receivers().len(), 1);
+        let is_some_member_has_responder_in_receivers = some_member_publisher
+            .receivers()
+            .into_iter()
+            .filter(|p| Rc::ptr_eq(p, &responder_play2_endpoint))
+            .count()
+            == 1;
+        assert!(is_some_member_has_responder_in_receivers);
     }
 
     #[test]
