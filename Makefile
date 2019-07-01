@@ -149,11 +149,8 @@ endif
 # Run Rust e2e tests of project.
 # If logs set to "yes" then medea print all logs to stdout.
 #
-# Defaults:
-# 	dockerized=yes logs=no
-#
 # Usage:
-# 	make test.e2e [dockerized=(yes|no)] [logs=(yes|no)]
+# 	make test.e2e [dockerized=(YES|no)] [logs=(yes|NO)] [coturn=(YES|no)]
 
 medea-env = RUST_BACKTRACE=1 \
 	MEDEA_SERVER.BIND_PORT=8081 \
