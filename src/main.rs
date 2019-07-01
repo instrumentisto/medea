@@ -9,6 +9,8 @@ pub mod media;
 pub mod signalling;
 pub mod turn;
 
+use std::{thread, time::Duration};
+
 use actix::prelude::*;
 use dotenv::dotenv;
 use log::prelude::*;
@@ -21,8 +23,6 @@ use crate::{
     turn::new_turn_auth_service,
     utils::graceful_shutdown::{self, ShutdownSubscribe},
 };
-use std::thread;
-use std::time::Duration;
 
 fn main() {
     dotenv().ok();
@@ -42,15 +42,22 @@ fn main() {
         };
         let peers = create_peers(1, 2);
 
-        let graceful_shutdown = graceful_shutdown::create(config.system_config.shutdown_timeout);
+        let graceful_shutdown =
+            graceful_shutdown::create(config.system_config.shutdown_timeout);
 
-        let turn_auth_service =
-            new_turn_auth_service(&config).expect("Unable to start turn service");
+        let turn_auth_service = new_turn_auth_service(&config)
+            .expect("Unable to start turn service");
 
         let rpc_reconnect_timeout = config.rpc.reconnect_timeout;
 
         let room = Room::start_in_arbiter(&Arbiter::new(), move |_| {
-            Room::new(1, members, peers, rpc_reconnect_timeout, turn_auth_service)
+            Room::new(
+                1,
+                members,
+                peers,
+                rpc_reconnect_timeout,
+                turn_auth_service,
+            )
         });
         graceful_shutdown.do_send(ShutdownSubscribe {
             priority: 2,

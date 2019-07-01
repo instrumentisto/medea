@@ -2,8 +2,8 @@
 
 pub mod rpc;
 pub mod server;
-pub mod turn;
 pub mod system_config;
+pub mod turn;
 
 use std::env;
 
@@ -14,8 +14,8 @@ use serde::{Deserialize, Serialize};
 pub use self::{
     rpc::Rpc,
     server::Server,
-    turn::{Redis, Turn},
     system_config::SystemConfiguration,
+    turn::{Redis, Turn},
 };
 
 /// CLI argument that is responsible for holding application configuration

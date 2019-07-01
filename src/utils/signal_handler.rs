@@ -3,6 +3,7 @@ use std::io;
 use actix::prelude::{Message, Recipient};
 use actix_rt::spawn;
 use futures::{Async, Future, Poll, Stream};
+#[cfg(unix)]
 use tokio::prelude::stream::futures_unordered;
 
 /// Different kinds of process signals
