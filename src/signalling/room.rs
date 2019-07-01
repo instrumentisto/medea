@@ -325,7 +325,7 @@ impl Room {
     ) {
         // Create all connected publish endpoints.
         for (_, publish) in member.publishers() {
-            for receiver in publish.receivers() {
+            for receiver in publish.sinks() {
                 let receiver_owner = receiver.owner();
 
                 if self.members.member_has_connection(&receiver_owner.id())

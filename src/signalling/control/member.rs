@@ -137,7 +137,7 @@ impl Member {
 
                 self.insert_receiver(Rc::clone(&new_play_endpoint));
 
-                publisher.add_receiver(Rc::downgrade(&new_play_endpoint));
+                publisher.add_sink(Rc::downgrade(&new_play_endpoint));
             } else {
                 let new_publish_id =
                     EndpointId(spec_play_endpoint.src.endpoint_id.to_string());
@@ -156,7 +156,7 @@ impl Member {
                     Rc::downgrade(&this_member),
                 ));
 
-                new_publish.add_receiver(Rc::downgrade(&new_self_play));
+                new_publish.add_sink(Rc::downgrade(&new_self_play));
 
                 publisher_member.insert_publisher(new_publish);
 
@@ -391,7 +391,7 @@ mod tests {
             responder.get_receiver_by_id(&id("play")).unwrap();
 
         let is_caller_has_responder_in_receivers = caller_publish_endpoint
-            .receivers()
+            .sinks()
             .into_iter()
             .filter(|p| Rc::ptr_eq(p, &responder_play_endpoint))
             .count()
@@ -411,9 +411,9 @@ mod tests {
             responder.get_receiver_by_id(&id("play2")).unwrap();
         let some_member_publisher =
             some_member.get_publisher_by_id(&id("publish")).unwrap();
-        assert_eq!(some_member_publisher.receivers().len(), 1);
+        assert_eq!(some_member_publisher.sinks().len(), 1);
         let is_some_member_has_responder_in_receivers = some_member_publisher
-            .receivers()
+            .sinks()
             .into_iter()
             .filter(|p| Rc::ptr_eq(p, &responder_play2_endpoint))
             .count()
@@ -450,11 +450,11 @@ mod tests {
             some_member.get_publisher_by_id(&id("publish")).unwrap();
 
         responder.remove_receiver(&id("play"));
-        assert_eq!(caller_publisher.receivers().len(), 0);
-        assert_eq!(some_member_publisher.receivers().len(), 1);
+        assert_eq!(caller_publisher.sinks().len(), 0);
+        assert_eq!(some_member_publisher.sinks().len(), 1);
 
         responder.remove_receiver(&id("play2"));
-        assert_eq!(caller_publisher.receivers().len(), 0);
-        assert_eq!(some_member_publisher.receivers().len(), 0);
+        assert_eq!(caller_publisher.sinks().len(), 0);
+        assert_eq!(some_member_publisher.sinks().len(), 0);
     }
 }

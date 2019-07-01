@@ -269,7 +269,7 @@ impl Peer<New> {
             .into_iter()
             .flat_map(|(_m, e)| {
                 e.add_peer_id(self_id);
-                e.receivers().into_iter().filter(|e| {
+                e.sinks().into_iter().filter(|e| {
                     e.owner().id() == partner_id && !e.is_connected()
                 })
             })

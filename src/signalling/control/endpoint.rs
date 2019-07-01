@@ -94,7 +94,7 @@ impl WebRtcPlayEndpointInner {
 impl Drop for WebRtcPlayEndpointInner {
     fn drop(&mut self) {
         if let Some(receiver_publisher) = self.publisher.upgrade() {
-            receiver_publisher.remove_empty_weaks_from_receivers();
+            receiver_publisher.remove_empty_weaks_from_sinks();
         }
     }
 }
@@ -177,8 +177,8 @@ struct WebRtcPublishEndpointInner {
     /// P2P connection mode for this [`WebRtcPublishEndpoint`].
     p2p: P2pMode,
 
-    /// All receivers of this [`WebRtcPublishEndpoint`].
-    receivers: Vec<Weak<WebRtcPlayEndpoint>>,
+    /// All sinks of this [`WebRtcPublishEndpoint`].
+    sinks: Vec<Weak<WebRtcPlayEndpoint>>,
 
     /// Owner [`Member`] of this [`WebRtcPublishEndpoint`].
     owner: Weak<Member>,
@@ -194,7 +194,7 @@ struct WebRtcPublishEndpointInner {
 impl Drop for WebRtcPublishEndpointInner {
     fn drop(&mut self) {
         // TODO: add comments
-        for receiver in self.receivers.iter().filter_map(|r| Weak::upgrade(r)) {
+        for receiver in self.sinks.iter().filter_map(|r| Weak::upgrade(r)) {
             if let Some(receiver_owner) = receiver.weak_owner().upgrade() {
                 receiver_owner.remove_receiver(&receiver.id())
             }
@@ -203,12 +203,12 @@ impl Drop for WebRtcPublishEndpointInner {
 }
 
 impl WebRtcPublishEndpointInner {
-    fn add_receiver(&mut self, receiver: Weak<WebRtcPlayEndpoint>) {
-        self.receivers.push(receiver);
+    fn add_sinks(&mut self, sink: Weak<WebRtcPlayEndpoint>) {
+        self.sinks.push(sink);
     }
 
-    fn receivers(&self) -> Vec<Rc<WebRtcPlayEndpoint>> {
-        self.receivers
+    fn sinks(&self) -> Vec<Rc<WebRtcPlayEndpoint>> {
+        self.sinks
             .iter()
             .map(|p| Weak::upgrade(p).unwrap())
             .collect()
@@ -252,26 +252,26 @@ impl WebRtcPublishEndpoint {
     pub fn new(
         id: Id,
         p2p: P2pMode,
-        receivers: Vec<Weak<WebRtcPlayEndpoint>>,
+        sinks: Vec<Weak<WebRtcPlayEndpoint>>,
         owner: Weak<Member>,
     ) -> Self {
         Self(RefCell::new(WebRtcPublishEndpointInner {
             id,
             p2p,
-            receivers,
+            sinks,
             owner,
             peer_ids: HashSet::new(),
         }))
     }
 
-    /// Add receiver for this [`WebRtcPublishEndpoint`].
-    pub fn add_receiver(&self, receiver: Weak<WebRtcPlayEndpoint>) {
-        self.0.borrow_mut().add_receiver(receiver)
+    /// Add sink for this [`WebRtcPublishEndpoint`].
+    pub fn add_sink(&self, sink: Weak<WebRtcPlayEndpoint>) {
+        self.0.borrow_mut().add_sinks(sink)
     }
 
-    /// Returns all receivers of this [`WebRtcPublishEndpoint`].
-    pub fn receivers(&self) -> Vec<Rc<WebRtcPlayEndpoint>> {
-        self.0.borrow().receivers()
+    /// Returns all sinks of this [`WebRtcPublishEndpoint`].
+    pub fn sinks(&self) -> Vec<Rc<WebRtcPlayEndpoint>> {
+        self.0.borrow().sinks()
     }
 
     /// Returns owner [`Member`] of this [`WebRtcPublishEndpoint`].
@@ -312,12 +312,9 @@ impl WebRtcPublishEndpoint {
         self.0.borrow().id.clone()
     }
 
-    /// Remove all empty Weak pointers from receivers of this
+    /// Remove all empty Weak pointers from sinks of this
     /// [`WebRtcPublishEndpoint`].
-    pub fn remove_empty_weaks_from_receivers(&self) {
-        self.0
-            .borrow_mut()
-            .receivers
-            .retain(|e| e.upgrade().is_some());
+    pub fn remove_empty_weaks_from_sinks(&self) {
+        self.0.borrow_mut().sinks.retain(|e| e.upgrade().is_some());
     }
 }
