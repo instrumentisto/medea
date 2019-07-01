@@ -21,6 +21,12 @@ impl Display for Id {
     }
 }
 
+impl From<String> for Id {
+    fn from(s: String) -> Self {
+        Self(s)
+    }
+}
+
 /// Newtype for [`Element::Member`] variant.
 #[allow(clippy::module_name_repetitions)]
 #[derive(Clone, Debug)]

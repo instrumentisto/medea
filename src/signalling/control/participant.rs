@@ -328,16 +328,14 @@ pub fn parse_participants(
 }
 
 #[cfg(test)]
-mod participant_loading_tests {
+mod tests {
     use std::rc::Rc;
 
-    use crate::api::control::Element;
+    use crate::api::control::{Element, MemberId};
 
     use super::*;
 
-    #[test]
-    pub fn load_store() {
-        let spec = r#"
+    const TEST_SPEC: &str = r#"
             kind: Room
             id: test-call
             spec:
@@ -374,20 +372,29 @@ mod participant_loading_tests {
                         spec:
                           src: "local://test-call/some-member/publish"
         "#;
-        let room_element: Element = serde_yaml::from_str(&spec).unwrap();
+
+    #[inline]
+    fn id<T: From<String>>(s: &str) -> T {
+        T::from(s.to_string())
+    }
+
+    fn get_test_store() -> HashMap<MemberId, Rc<Participant>> {
+        let room_element: Element = serde_yaml::from_str(TEST_SPEC).unwrap();
         let room_spec = RoomSpec::try_from(&room_element).unwrap();
-        let store = parse_participants(&room_spec).unwrap();
+        parse_participants(&room_spec).unwrap()
+    }
 
-        let caller = store.get(&ParticipantId("caller".to_string())).unwrap();
-        let responder =
-            store.get(&ParticipantId("responder".to_string())).unwrap();
+    #[test]
+    pub fn load_store() {
+        let store = get_test_store();
 
-        let caller_publish_endpoint = caller
-            .get_publisher_by_id(&EndpointId("publish".to_string()))
-            .unwrap();
-        let responder_play_endpoint = responder
-            .get_receiver_by_id(&EndpointId("play".to_string()))
-            .unwrap();
+        let caller = store.get(&id("caller")).unwrap();
+        let responder = store.get(&id("responder")).unwrap();
+
+        let caller_publish_endpoint =
+            caller.get_publisher_by_id(&id("publish")).unwrap();
+        let responder_play_endpoint =
+            responder.get_receiver_by_id(&id("play")).unwrap();
 
         let is_caller_has_responder_in_receivers = caller_publish_endpoint
             .receivers()
@@ -402,17 +409,14 @@ mod participant_loading_tests {
             &caller_publish_endpoint
         ));
 
-        let some_participant = store
-            .get(&ParticipantId("some-member".to_string()))
-            .unwrap();
+        let some_participant = store.get(&id("some-member")).unwrap();
         assert!(some_participant.receivers().is_empty());
         assert_eq!(some_participant.publishers().len(), 1);
 
-        let responder_play2_endpoint = responder
-            .get_receiver_by_id(&EndpointId("play2".to_string()))
-            .unwrap();
+        let responder_play2_endpoint =
+            responder.get_receiver_by_id(&id("play2")).unwrap();
         let some_participant_publisher = some_participant
-            .get_publisher_by_id(&EndpointId("publish".to_string()))
+            .get_publisher_by_id(&id("publish"))
             .unwrap();
         assert_eq!(some_participant_publisher.receivers().len(), 1);
         let is_some_participant_has_responder_in_receivers =
@@ -423,5 +427,42 @@ mod participant_loading_tests {
                 .count()
                 == 1;
         assert!(is_some_participant_has_responder_in_receivers);
+    }
+
+    #[test]
+    fn publisher_delete_all_their_players() {
+        let store = get_test_store();
+
+        let caller = store.get(&id("caller")).unwrap();
+        let some_member = store.get(&id("some-member")).unwrap();
+        let responder = store.get(&id("responder")).unwrap();
+
+        caller.remove_publisher(&id("publish"));
+        assert_eq!(responder.receivers().len(), 1);
+
+        some_member.remove_publisher(&id("publish"));
+        assert_eq!(responder.receivers().len(), 0);
+    }
+
+    #[test]
+    fn player_delete_self_from_publisher_sink() {
+        let store = get_test_store();
+
+        let caller = store.get(&id("caller")).unwrap();
+        let some_member = store.get(&id("some-member")).unwrap();
+        let responder = store.get(&id("responder")).unwrap();
+
+        let caller_publisher =
+            caller.get_publisher_by_id(&id("publish")).unwrap();
+        let some_member_publisher =
+            some_member.get_publisher_by_id(&id("publish")).unwrap();
+
+        responder.remove_receiver(&id("play"));
+        assert_eq!(caller_publisher.receivers().len(), 0);
+        assert_eq!(some_member_publisher.receivers().len(), 1);
+
+        responder.remove_receiver(&id("play2"));
+        assert_eq!(caller_publisher.receivers().len(), 0);
+        assert_eq!(some_member_publisher.receivers().len(), 0);
     }
 }

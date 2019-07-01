@@ -25,6 +25,12 @@ impl Display for Id {
     }
 }
 
+impl From<String> for Id {
+    fn from(s: String) -> Self {
+        Self(s)
+    }
+}
+
 #[derive(Debug, Clone)]
 struct WebRtcPlayEndpointInner {
     /// ID of this [`WebRtcPlayEndpoint`].
