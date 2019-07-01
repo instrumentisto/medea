@@ -1,13 +1,20 @@
 //! A class to handle shutdown signals and to shut down system
 
-use std::{collections::BTreeMap, mem, time::Duration};
+use std::{
+    collections::BTreeMap, mem, time::Duration,
+    thread,
+};
 
 use actix::{
     self, prelude::fut::WrapFuture, Actor, Addr, Arbiter, AsyncContext,
     Context, Handler, MailboxError, Message, Recipient, System,
 };
 
-use tokio::prelude::future::{join_all, Future};
+use tokio::prelude::{
+    future::{join_all, Future},
+};
+
+use futures::future;
 
 use crate::{log::prelude::*, utils::signal_handler::*};
 
@@ -122,15 +129,17 @@ impl Handler<SignalMessage> for GracefulShutdown {
 
         ctx.spawn(
             shutdown_future
-                .map(|_| {
-                    System::current().stop();
-                })
+                .map(|_| ())
                 .map_err(|e| {
                     error!(
                         "Error trying to shut down system gracefully: {:?}",
                         e
                     );
+                })
+                .then(|_| {
+                    thread::sleep(Duration::from_millis(300));
                     System::current().stop();
+                    future::ok::<(), ()>(())
                 })
                 .into_actor(self),
         );
