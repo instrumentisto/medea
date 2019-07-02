@@ -32,8 +32,6 @@ fn main() {
     let _scope_guard = slog_scope::set_global_logger(logger);
     slog_stdlog::init().unwrap();
 
-//    let sys = System::new("medea");
-
     let config = Conf::parse().unwrap();
     info!("{:?}", config);
 
@@ -44,9 +42,7 @@ fn main() {
         };
         let peers = create_peers(1, 2);
 
-        let mut graceful_shutdown =
-            graceful_shutdown::create(config.system_config.shutdown_timeout);
-
+        graceful_shutdown::create(config.system_config.shutdown_timeout, System::current());
         let turn_auth_service = new_turn_auth_service(&config)
             .expect("Unable to start turn service");
 
@@ -61,13 +57,13 @@ fn main() {
                 turn_auth_service,
             )
         });
-        graceful_shutdown.borrow_mut().subscribe(room.clone().recipient(), 1);
+        graceful_shutdown::subscribe(room.clone().recipient(), 1);
 
         let rooms = hashmap! {1 => room};
         let rooms_repo = RoomsRepository::new(rooms);
 
         let http_server = server::run(rooms_repo, config);
-        graceful_shutdown.borrow_mut().subscribe(http_server.recipient(), 2);
+        graceful_shutdown::subscribe(http_server.recipient(), 2);
 
         futures::future::ok(())
     });
