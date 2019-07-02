@@ -147,6 +147,7 @@ pub mod actors {
 mod test {
     use std::{ops::Add, thread, time::Duration};
 
+    use actix::Actor as _;
     use actix_http::{ws::Message, HttpService};
     use actix_http_test::{TestServer, TestServerRuntime};
     use futures::{future::IntoFuture as _, sink::Sink as _, Stream as _};

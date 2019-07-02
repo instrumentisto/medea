@@ -1,9 +1,6 @@
 //! A class to handle shutdown signals and to shut down system
 //! Actix system has to be running for it to work.
 
-// review
-// remove all unwraps
-
 use std::{collections::BTreeMap, mem, sync::Mutex, thread, time::Duration};
 
 use actix::{self, MailboxError, Message, Recipient, System};
