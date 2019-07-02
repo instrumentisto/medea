@@ -22,9 +22,8 @@ use crate::{
     media::create_peers,
     signalling::{Room, RoomsRepository},
     turn::new_turn_auth_service,
-    utils::graceful_shutdown::{self},
+    utils::graceful_shutdown,
 };
-use core::borrow::BorrowMut;
 
 fn main() {
     dotenv().ok();
@@ -42,7 +41,10 @@ fn main() {
         };
         let peers = create_peers(1, 2);
 
-        graceful_shutdown::create(config.system_config.shutdown_timeout, System::current());
+        graceful_shutdown::create(
+            config.system_config.shutdown_timeout,
+            System::current(),
+        );
         let turn_auth_service = new_turn_auth_service(&config)
             .expect("Unable to start turn service");
 
@@ -66,5 +68,6 @@ fn main() {
         graceful_shutdown::subscribe(http_server.recipient(), 2);
 
         futures::future::ok(())
-    });
+    })
+    .expect("unable to start medea");
 }
