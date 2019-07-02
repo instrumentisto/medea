@@ -157,7 +157,6 @@ pub fn create(shutdown_timeout: u64, actix_system: System) {
 
     #[cfg(unix)]
     {
-        use tokio::prelude::stream::futures_unordered;
         use tokio_signal::unix::{Signal, SIGHUP, SIGINT, SIGQUIT, SIGTERM};
 
         {
@@ -211,7 +210,7 @@ pub fn create(shutdown_timeout: u64, actix_system: System) {
                     actix_system_for_sigterm.stop();
                 });
                 self::handle_shutdown(SignalKind::Term);
-                actix_system_for_sigint.stop();
+                actix_system_for_sigterm.stop();
                 Ok(())
             });
             thread::spawn(move || {
@@ -231,7 +230,7 @@ pub fn create(shutdown_timeout: u64, actix_system: System) {
                     actix_system_for_sigquit.stop();
                 });
                 self::handle_shutdown(SignalKind::Quit);
-                actix_system_for_sigint.stop();
+                actix_system_for_sigquit.stop();
                 Ok(())
             });
             thread::spawn(move || {
