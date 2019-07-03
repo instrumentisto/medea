@@ -24,6 +24,7 @@ use crate::{
     conf::{Conf, Rpc},
     log::prelude::*,
     signalling::{RoomId, RoomsRepository},
+    graceful_shutdown
 };
 
 /// Parameters of new WebSocket connection creation HTTP request.
@@ -121,6 +122,9 @@ pub mod actors {
 
     use crate::{log::prelude::*, utils::graceful_shutdown::ShutdownMessage};
     use actix_web::dev::Server;
+    use tokio::prelude::Future;
+    use tokio::prelude::future::IntoFuture;
+    use crate::utils::graceful_shutdown;
 
     pub struct ServerWrapper(pub Server);
 
@@ -129,16 +133,21 @@ pub mod actors {
     }
 
     impl Handler<ShutdownMessage> for ServerWrapper {
-        type Result = Result<(), Box<dyn std::error::Error + Send>>;
+        type Result = graceful_shutdown::ShutdownMessageResult;
 
         fn handle(
             &mut self,
             _: ShutdownMessage,
             ctx: &mut Self::Context,
-        ) -> Result<(), Box<dyn std::error::Error + Send>> {
+        ) -> Self::Result {
             info!("Shutting down Actix Web Server");
-            ctx.wait(self.0.stop(true).into_actor(self));
-            Ok(())
+
+            Ok(Box::new(self.0.stop(true)
+                         .then(move |_| {
+                            info!("time passed");
+                            std::thread::sleep(std::time::Duration::from_millis(2000));
+                            futures::future::ok(Ok(()))
+                        })))
         }
     }
 }

@@ -1,10 +1,7 @@
 use core::fmt;
 use std::net::SocketAddr;
 
-use actix::{
-    fut::wrap_future, Actor, ActorFuture, Addr, Arbiter, Context, Handler,
-    MailboxError, Message, WrapFuture,
-};
+use actix::{fut::wrap_future, Actor, ActorFuture, Addr, Arbiter, Context, Handler, MailboxError, Message, WrapFuture, System};
 use bb8::RunError;
 use failure::Fail;
 use futures::future::{err, ok, Future};
@@ -18,6 +15,7 @@ use crate::{
     signalling::RoomId,
     turn::repo::{TurnDatabase, TurnDatabaseErr},
 };
+use std::sync::mpsc::SyncSender;
 
 static TURN_PASS_LEN: usize = 16;
 
@@ -181,8 +179,8 @@ pub fn new_turn_auth_service(
         static_user: None,
     };
 
-    let service = Service::start_in_arbiter(&Arbiter::new(), move |_| service);
-    Ok(Box::new(service))
+    let service_addr = Service::start_in_arbiter(&Arbiter::new(), move |_| service);
+    Ok(Box::new(service_addr))
 }
 
 impl Service {

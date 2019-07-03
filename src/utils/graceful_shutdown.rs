@@ -13,16 +13,13 @@ use lazy_static;
 
 use crate::log::prelude::*;
 
+pub type ShutdownMessageResult = Result<
+    Box<dyn Future<Item = (), Error = Box<dyn std::error::Error + Send>> + std::marker::Send>,
+    ()>;
+
 type ShutdownFutureType = Box<
     dyn Future<
-        Item = std::vec::Vec<
-            std::result::Result<
-                (),
-                std::boxed::Box<
-                    (dyn std::error::Error + std::marker::Send + 'static),
-                >,
-            >,
-        >,
+        Item = std::vec::Vec<ShutdownMessageResult>,
         Error = MailboxError,
     >,
 >;
@@ -50,7 +47,7 @@ pub enum SignalKind {
 pub struct ShutdownMessage;
 
 impl Message for ShutdownMessage {
-    type Result = Result<(), Box<dyn std::error::Error + Send>>;
+    type Result = self::ShutdownMessageResult;
 }
 
 /// Subscribe to exit events, with priority
@@ -95,10 +92,11 @@ fn handle_shutdown(msg: SignalKind) {
     }
 
     let mut shutdown_future: ShutdownFutureType =
-        Box::new(futures::future::ok::<
-            Vec<Result<(), Box<(dyn std::error::Error + Send + 'static)>>>,
-            MailboxError,
-        >(vec![Ok(())]));
+        Box::new(
+            futures::future::ok::<
+                        Vec<ShutdownMessageResult>,
+                        MailboxError,>
+                (vec![Ok(Box::new(futures::future::ok(())))] ));
 
     for recipients_values in recipients.values() {
         let mut this_priority_futures_vec =
@@ -148,11 +146,12 @@ pub fn create(shutdown_timeout: u64, actix_system: System) {
                 thread::spawn(move || {
                     let shutdown_timeout = STATIC_TIMEOUT.lock().unwrap();
                     thread::sleep(Duration::from_millis(*shutdown_timeout));
-                    actix_system_for_sigint_move.stop();
+                    std::process::exit(0x0100);
                 });
 
                 self::handle_shutdown(SignalKind::Int);
-                actix_system_for_sigint.stop();
+//                actix_system_for_sigint.stop();
+                std::process::exit(0x0100);
                 Ok(())
             });
             thread::spawn(move || {

@@ -8,7 +8,9 @@ use actix::{
     Message,
 };
 use failure::Fail;
-use futures::future;
+use futures::{
+    future, Future
+};
 use hashbrown::HashMap;
 
 use medea_client_api_proto::{Command, Event, IceCandidate};
@@ -29,7 +31,9 @@ use crate::{
     signalling::{participants::ParticipantService, peers::PeerRepository},
     turn::TurnAuthService,
     utils::graceful_shutdown::ShutdownMessage,
+    graceful_shutdown
 };
+
 
 /// ID of [`Room`].
 pub type Id = u64;
@@ -432,16 +436,21 @@ impl Handler<CloseRoom> for Room {
 
 // Close room on `SIGINT`, `SIGTERM`, `SIGQUIT` signals.
 impl Handler<ShutdownMessage> for Room {
-    type Result = Result<(), Box<dyn std::error::Error + Send>>;
+    type Result = graceful_shutdown::ShutdownMessageResult;
 
     fn handle(
         &mut self,
         _: ShutdownMessage,
         ctx: &mut Self::Context,
-    ) -> Result<(), Box<dyn std::error::Error + Send>> {
+    ) -> Self::Result {
         info!("Shutting down Room: {:?}", self.id);
         ctx.notify(CloseRoom {});
-        Ok(())
+        Ok(Box::new(futures::future::ok(())
+            .map(|_| {
+                // todo: close room dynamically
+                std::thread::sleep(std::time::Duration::from_millis(2000));
+                Ok(())
+        })))
     }
 }
 
