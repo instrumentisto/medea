@@ -1,3 +1,5 @@
+//! WebRTC related endpoints.
+
 pub mod play_endpoint;
 pub mod publish_endpoint;
 

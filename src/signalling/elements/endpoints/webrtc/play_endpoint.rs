@@ -1,3 +1,5 @@
+//! [`WebRtcPlayEndpoint`] implementation.
+
 use std::{
     cell::RefCell,
     rc::{Rc, Weak},

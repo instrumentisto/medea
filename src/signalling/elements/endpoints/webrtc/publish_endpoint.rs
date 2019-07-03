@@ -1,3 +1,5 @@
+//! [`WebRtcPublishEndpoint`] implementation.
+
 use std::{
     cell::RefCell,
     rc::{Rc, Weak},
