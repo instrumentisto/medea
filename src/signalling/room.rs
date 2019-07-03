@@ -301,6 +301,8 @@ impl Room {
     /// Add `send` track to source member's [`Peer`] and `recv` to
     /// sink member's [`Peer`].
     ///
+    /// Returns [`PeerId`]s of newly created [`Peer`] if some created.
+    ///
     /// __This will panic if provide endpoints with already interconnected
     /// [`Peer`]s!__
     fn connect_endpoints(
@@ -327,7 +329,7 @@ impl Room {
                 .add_publisher(&mut sink_peer, self.peers.get_tracks_counter());
 
             src.add_peer_id(src_peer_id);
-            sink.connect(sink_peer_id);
+            sink.set_peer_id(sink_peer_id);
 
             self.peers.add_peer(src_peer);
             self.peers.add_peer(sink_peer);
@@ -339,7 +341,7 @@ impl Room {
                 .add_publisher(&mut sink_peer, self.peers.get_tracks_counter());
 
             src.add_peer_id(src_peer.id());
-            sink.connect(sink_peer.id());
+            sink.set_peer_id(sink_peer.id());
 
             let src_peer_id = src_peer.id();
             let sink_peer_id = sink_peer.id();

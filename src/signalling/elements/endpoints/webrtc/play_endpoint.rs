@@ -143,7 +143,7 @@ impl WebRtcPlayEndpoint {
     }
 
     /// Save [`PeerId`] of this [`WebRtcPlayEndpoint`].
-    pub fn connect(&self, peer_id: PeerId) {
+    pub fn set_peer_id(&self, peer_id: PeerId) {
         self.0.borrow_mut().set_peer_id(peer_id);
     }
 
