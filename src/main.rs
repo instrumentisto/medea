@@ -24,6 +24,7 @@ use crate::{
     turn::new_turn_auth_service,
     utils::graceful_shutdown,
 };
+use std::panic;
 
 fn main() {
     dotenv().ok();

@@ -161,6 +161,30 @@ pub fn create(shutdown_timeout: u64, actix_system: System) {
                     .unwrap();
             });
         }
+        {
+            // SIGTERM
+            let sigint_stream = Signal::new(SIGTERM).flatten_stream();
+            let actix_system_for_sigint = actix_system.clone();
+            let sigint_handler = sigint_stream.for_each(move |_| {
+
+                let actix_system_for_sigint_move = actix_system_for_sigint.clone();
+
+                thread::spawn(move || {
+                    let shutdown_timeout = STATIC_TIMEOUT.lock().unwrap();
+                    thread::sleep(Duration::from_millis(*shutdown_timeout));
+                    actix_system_for_sigint_move.stop();
+                });
+
+                self::handle_shutdown(SignalKind::Term);
+                actix_system_for_sigint.stop();
+                Ok(())
+            });
+            thread::spawn(move || {
+                tokio::runtime::current_thread::block_on_all(sigint_handler)
+                    .ok()
+                    .unwrap();
+            });
+        }
 //        {
 //            // SIGHUP
 //            let sighup_stream = Signal::new(SIGHUP).flatten_stream();
@@ -178,27 +202,6 @@ pub fn create(shutdown_timeout: u64, actix_system: System) {
 //            });
 //            thread::spawn(move || {
 //                tokio::runtime::current_thread::block_on_all(sighup_handler)
-//                    .ok()
-//                    .unwrap();
-//            });
-//        }
-//        {
-//            // SIGTERM
-//            let sigterm_stream = Signal::new(SIGTERM).flatten_stream();
-//            let actix_system_for_sigterm_move = actix_system.clone();
-//            let actix_system_for_sigterm = actix_system.clone();
-//            let sigterm_handler = sigterm_stream.for_each(move |_| {
-//                thread::spawn(move || {
-//                    let shutdown_timeout = STATIC_TIMEOUT.lock().unwrap();
-//                    thread::sleep(Duration::from_millis(*shutdown_timeout));
-//                    actix_system_for_sigterm_move.stop();
-//                });
-//                self::handle_shutdown(SignalKind::Term);
-//                actix_system_for_sigterm.stop();
-//                Ok(())
-//            });
-//            thread::spawn(move || {
-//                tokio::runtime::current_thread::block_on_all(sigterm_handler)
 //                    .ok()
 //                    .unwrap();
 //            });
