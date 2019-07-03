@@ -48,10 +48,10 @@ struct MemberInner {
     id: MemberId,
 
     /// All [`WebRtcPublishEndpoint`]s of this [`Member`].
-    publishers: HashMap<WebRtcPublishId, Rc<WebRtcPublishEndpoint>>,
+    srcs: HashMap<WebRtcPublishId, Rc<WebRtcPublishEndpoint>>,
 
     /// All [`WebRtcPlayEndpoint`]s of this [`Member`].
-    receivers: HashMap<WebRtcPlayId, Rc<WebRtcPlayEndpoint>>,
+    sinks: HashMap<WebRtcPlayId, Rc<WebRtcPlayEndpoint>>,
 
     /// Credentials for this [`Member`].
     credentials: String,
@@ -68,14 +68,14 @@ impl Member {
     fn new(id: MemberId, credentials: String) -> Self {
         Self(RefCell::new(MemberInner {
             id,
-            publishers: HashMap::new(),
-            receivers: HashMap::new(),
+            srcs: HashMap::new(),
+            sinks: HashMap::new(),
             credentials,
             ice_user: None,
         }))
     }
 
-    /// Load all publishers and receivers of this [`Member`].
+    /// Load all srcs and sinks of this [`Member`].
     fn load(
         &self,
         room_spec: &RoomSpec,
@@ -124,7 +124,7 @@ impl Member {
                 )?;
 
             if let Some(publisher) =
-                publisher_member.get_publisher_by_id(&WebRtcPublishId(
+                publisher_member.get_src_by_id(&WebRtcPublishId(
                     spec_play_endpoint.src.endpoint_id.to_string(),
                 ))
             {
@@ -137,7 +137,7 @@ impl Member {
                     Rc::downgrade(&this_member),
                 ));
 
-                self.insert_receiver(Rc::clone(&new_play_endpoint));
+                self.insert_sink(Rc::clone(&new_play_endpoint));
 
                 publisher.add_sink(Rc::downgrade(&new_play_endpoint));
             } else {
@@ -161,9 +161,9 @@ impl Member {
 
                 new_publish.add_sink(Rc::downgrade(&new_self_play));
 
-                publisher_member.insert_publisher(new_publish);
+                publisher_member.insert_src(new_publish);
 
-                self.insert_receiver(new_self_play);
+                self.insert_sink(new_self_play);
             }
         }
 
@@ -172,8 +172,8 @@ impl Member {
         this_member_spec.publish_endpoints().into_iter().for_each(
             |(name, e)| {
                 let endpoint_id = WebRtcPublishId(name.clone());
-                if self.publishers().get(&endpoint_id).is_none() {
-                    self.insert_publisher(Rc::new(WebRtcPublishEndpoint::new(
+                if self.srcs().get(&endpoint_id).is_none() {
+                    self.insert_src(Rc::new(WebRtcPublishEndpoint::new(
                         endpoint_id,
                         e.p2p.clone(),
                         Vec::new(),
@@ -190,11 +190,11 @@ impl Member {
     ///
     /// All [`PeerId`]s related to this [`Member`] will be removed.
     pub fn peers_removed(&self, peer_ids: &[PeerId]) {
-        self.publishers()
+        self.srcs()
             .into_iter()
             .for_each(|(_, p)| p.remove_peer_ids(peer_ids));
 
-        self.receivers()
+        self.sinks()
             .into_iter()
             .filter_map(|(_, p)| p.peer_id().map(|id| (id, p)))
             .filter(|(id, _)| peer_ids.contains(&id))
@@ -227,62 +227,54 @@ impl Member {
     }
 
     /// Returns all publishers of this [`Member`].
-    pub fn publishers(
-        &self,
-    ) -> HashMap<WebRtcPublishId, Rc<WebRtcPublishEndpoint>> {
-        self.0.borrow().publishers.clone()
+    pub fn srcs(&self) -> HashMap<WebRtcPublishId, Rc<WebRtcPublishEndpoint>> {
+        self.0.borrow().srcs.clone()
     }
 
-    /// Returns all receivers of this [`Member`].
-    pub fn receivers(&self) -> HashMap<WebRtcPlayId, Rc<WebRtcPlayEndpoint>> {
-        self.0.borrow().receivers.clone()
+    /// Returns all sinks endpoints of this [`Member`].
+    pub fn sinks(&self) -> HashMap<WebRtcPlayId, Rc<WebRtcPlayEndpoint>> {
+        self.0.borrow().sinks.clone()
     }
 
-    /// Insert receiver into this [`Member`].
-    pub fn insert_receiver(&self, endpoint: Rc<WebRtcPlayEndpoint>) {
-        self.0
-            .borrow_mut()
-            .receivers
-            .insert(endpoint.id(), endpoint);
+    /// Insert sink endpoint into this [`Member`].
+    pub fn insert_sink(&self, endpoint: Rc<WebRtcPlayEndpoint>) {
+        self.0.borrow_mut().sinks.insert(endpoint.id(), endpoint);
     }
 
-    /// Insert publisher into this [`Member`].
-    pub fn insert_publisher(&self, endpoint: Rc<WebRtcPublishEndpoint>) {
-        self.0
-            .borrow_mut()
-            .publishers
-            .insert(endpoint.id(), endpoint);
+    /// Insert source endpoint into this [`Member`].
+    pub fn insert_src(&self, endpoint: Rc<WebRtcPublishEndpoint>) {
+        self.0.borrow_mut().srcs.insert(endpoint.id(), endpoint);
     }
 
-    /// Lookup [`WebRtcPublishEndpoint`] publisher by [`EndpointId`].
-    pub fn get_publisher_by_id(
+    /// Lookup [`WebRtcPublishEndpoint`] source endpoint by [`EndpointId`].
+    pub fn get_src_by_id(
         &self,
         id: &WebRtcPublishId,
     ) -> Option<Rc<WebRtcPublishEndpoint>> {
-        self.0.borrow().publishers.get(id).cloned()
+        self.0.borrow().srcs.get(id).cloned()
     }
 
-    /// Lookup [`WebRtcPlayEndpoint`] receiver by [`EndpointId`].
-    pub fn get_receiver_by_id(
+    /// Lookup [`WebRtcPlayEndpoint`] sink endpoint by [`EndpointId`].
+    pub fn get_sink_by_id(
         &self,
         id: &WebRtcPlayId,
     ) -> Option<Rc<WebRtcPlayEndpoint>> {
-        self.0.borrow().receivers.get(id).cloned()
+        self.0.borrow().sinks.get(id).cloned()
     }
 
-    /// Remove receiver [`WebRtcPlayEndpoint`] from this [`Member`].
-    pub fn remove_receiver(&self, id: &WebRtcPlayId) {
-        self.0.borrow_mut().receivers.remove(id);
+    /// Remove sink [`WebRtcPlayEndpoint`] from this [`Member`].
+    pub fn remove_sink(&self, id: &WebRtcPlayId) {
+        self.0.borrow_mut().sinks.remove(id);
     }
 
-    /// Remove receiver [`WebRtcPublishEndpoint`] from this [`Member`].
-    pub fn remove_publisher(&self, id: &WebRtcPublishId) {
-        self.0.borrow_mut().publishers.remove(id);
+    /// Remove source [`WebRtcPublishEndpoint`] from this [`Member`].
+    pub fn remove_src(&self, id: &WebRtcPublishId) {
+        self.0.borrow_mut().srcs.remove(id);
     }
 }
 
 /// Creates all empty [`Member`] from [`RoomSpec`] and then
-/// load all related to this [`Member`]s receivers and publishers.
+/// load all related to this [`Member`]s srcs and sinks endpoints.
 ///
 /// Returns store of all [`Member`]s loaded from [`RoomSpec`].
 pub fn parse_members(
@@ -308,13 +300,13 @@ pub fn parse_members(
             .iter()
             .map(|(id, p)| {
                 format!(
-                    "{{ id: {}, receivers: {:?}, publishers: {:?} }};",
+                    "{{ id: {}, sinks: {:?}, srcs: {:?} }};",
                     id,
-                    p.receivers()
+                    p.sinks()
                         .into_iter()
                         .map(|(id, _)| id.to_string())
                         .collect::<Vec<String>>(),
-                    p.publishers()
+                    p.srcs()
                         .into_iter()
                         .map(|(id, _)| id.to_string())
                         .collect::<Vec<String>>()
@@ -391,17 +383,17 @@ mod tests {
         let responder = store.get(&id("responder")).unwrap();
 
         let caller_publish_endpoint =
-            caller.get_publisher_by_id(&id("publish")).unwrap();
+            caller.get_src_by_id(&id("publish")).unwrap();
         let responder_play_endpoint =
-            responder.get_receiver_by_id(&id("play")).unwrap();
+            responder.get_sink_by_id(&id("play")).unwrap();
 
-        let is_caller_has_responder_in_receivers = caller_publish_endpoint
+        let is_caller_has_responder_in_sinks = caller_publish_endpoint
             .sinks()
             .into_iter()
             .filter(|p| Rc::ptr_eq(p, &responder_play_endpoint))
             .count()
             == 1;
-        assert!(is_caller_has_responder_in_receivers);
+        assert!(is_caller_has_responder_in_sinks);
 
         assert!(Rc::ptr_eq(
             &responder_play_endpoint.publisher(),
@@ -409,21 +401,21 @@ mod tests {
         ));
 
         let some_member = store.get(&id("some-member")).unwrap();
-        assert!(some_member.receivers().is_empty());
-        assert_eq!(some_member.publishers().len(), 1);
+        assert!(some_member.sinks().is_empty());
+        assert_eq!(some_member.srcs().len(), 1);
 
         let responder_play2_endpoint =
-            responder.get_receiver_by_id(&id("play2")).unwrap();
+            responder.get_sink_by_id(&id("play2")).unwrap();
         let some_member_publisher =
-            some_member.get_publisher_by_id(&id("publish")).unwrap();
+            some_member.get_src_by_id(&id("publish")).unwrap();
         assert_eq!(some_member_publisher.sinks().len(), 1);
-        let is_some_member_has_responder_in_receivers = some_member_publisher
+        let is_some_member_has_responder_in_sinks = some_member_publisher
             .sinks()
             .into_iter()
             .filter(|p| Rc::ptr_eq(p, &responder_play2_endpoint))
             .count()
             == 1;
-        assert!(is_some_member_has_responder_in_receivers);
+        assert!(is_some_member_has_responder_in_sinks);
     }
 
     #[test]
@@ -434,11 +426,11 @@ mod tests {
         let some_member = store.get(&id("some-member")).unwrap();
         let responder = store.get(&id("responder")).unwrap();
 
-        caller.remove_publisher(&id("publish"));
-        assert_eq!(responder.receivers().len(), 1);
+        caller.remove_src(&id("publish"));
+        assert_eq!(responder.sinks().len(), 1);
 
-        some_member.remove_publisher(&id("publish"));
-        assert_eq!(responder.receivers().len(), 0);
+        some_member.remove_src(&id("publish"));
+        assert_eq!(responder.sinks().len(), 0);
     }
 
     #[test]
@@ -449,16 +441,15 @@ mod tests {
         let some_member = store.get(&id("some-member")).unwrap();
         let responder = store.get(&id("responder")).unwrap();
 
-        let caller_publisher =
-            caller.get_publisher_by_id(&id("publish")).unwrap();
+        let caller_publisher = caller.get_src_by_id(&id("publish")).unwrap();
         let some_member_publisher =
-            some_member.get_publisher_by_id(&id("publish")).unwrap();
+            some_member.get_src_by_id(&id("publish")).unwrap();
 
-        responder.remove_receiver(&id("play"));
+        responder.remove_sink(&id("play"));
         assert_eq!(caller_publisher.sinks().len(), 0);
         assert_eq!(some_member_publisher.sinks().len(), 1);
 
-        responder.remove_receiver(&id("play2"));
+        responder.remove_sink(&id("play2"));
         assert_eq!(caller_publisher.sinks().len(), 0);
         assert_eq!(some_member_publisher.sinks().len(), 0);
     }

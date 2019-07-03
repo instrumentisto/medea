@@ -57,7 +57,7 @@ impl Drop for WebRtcPublishEndpointInner {
     fn drop(&mut self) {
         for receiver in self.sinks.iter().filter_map(|r| Weak::upgrade(r)) {
             if let Some(receiver_owner) = receiver.weak_owner().upgrade() {
-                receiver_owner.remove_receiver(&receiver.id())
+                receiver_owner.remove_sink(&receiver.id())
             }
         }
     }

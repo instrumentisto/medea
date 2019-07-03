@@ -101,12 +101,12 @@ impl PeerRepository {
         first_peer.add_publish_endpoints(
             &mut second_peer,
             &mut self.tracks_count,
-            first_member.publishers(),
+            first_member.srcs(),
         );
         second_peer.add_publish_endpoints(
             &mut first_peer,
             &mut self.tracks_count,
-            second_member.publishers(),
+            second_member.srcs(),
         );
 
         self.add_peer(first_peer);

@@ -324,7 +324,7 @@ impl Room {
         ctx: &mut <Self as Actor>::Context,
     ) {
         // Create all connected publish endpoints.
-        for (_, publish) in member.publishers() {
+        for (_, publish) in member.srcs() {
             for receiver in publish.sinks() {
                 let receiver_owner = receiver.owner();
 
@@ -337,7 +337,7 @@ impl Room {
         }
 
         // Create all connected play's receivers peers.
-        for (_, play) in member.receivers() {
+        for (_, play) in member.sinks() {
             let plays_publisher_owner = play.publisher().owner();
 
             if self
