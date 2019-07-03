@@ -9,8 +9,7 @@ use macro_attr::*;
 use newtype_derive::{newtype_fmt, NewtypeDisplay, NewtypeFrom};
 
 use crate::{
-    api::control::endpoint::SrcUri, media::PeerId,
-    signalling::control::member::Member,
+    api::control::endpoint::SrcUri, media::PeerId, signalling::elements::Member,
 };
 
 use super::publish_endpoint::WebRtcPublishEndpoint;

@@ -26,9 +26,9 @@ use crate::{
         WaitLocalHaveRemote, WaitLocalSdp, WaitRemoteSdp,
     },
     signalling::{
-        control::member::{Member, MembersLoadError},
-        elements::endpoints::webrtc::{
-            WebRtcPlayEndpoint, WebRtcPublishEndpoint,
+        elements::{
+            endpoints::webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
+            Member, MembersLoadError,
         },
         participants::ParticipantService,
         peers::PeerRepository,

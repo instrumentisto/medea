@@ -10,10 +10,10 @@ use crate::{
     api::control::{MemberId, MemberSpec, RoomSpec, TryFromElementError},
     log::prelude::*,
     media::{IceUser, PeerId},
-    signalling::elements::endpoints::webrtc::{
-        WebRtcPlayEndpoint, WebRtcPlayId, WebRtcPublishEndpoint,
-        WebRtcPublishId,
-    },
+};
+
+use super::endpoints::webrtc::{
+    WebRtcPlayEndpoint, WebRtcPlayId, WebRtcPublishEndpoint, WebRtcPublishId,
 };
 
 /// Errors which may occur while loading [`Member`]s from [`RoomSpec`].

@@ -11,7 +11,7 @@ use newtype_derive::{newtype_fmt, NewtypeDisplay, NewtypeFrom};
 
 use crate::{
     api::control::endpoint::P2pMode, media::PeerId,
-    signalling::control::member::Member,
+    signalling::elements::Member,
 };
 
 use super::play_endpoint::WebRtcPlayEndpoint;

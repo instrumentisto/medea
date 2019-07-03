@@ -31,7 +31,7 @@ use crate::{
     log::prelude::*,
     media::IceUser,
     signalling::{
-        control::{parse_members, Member, MembersLoadError},
+        elements::{parse_members, Member, MembersLoadError},
         room::{ActFuture, RoomError},
         Room,
     },
