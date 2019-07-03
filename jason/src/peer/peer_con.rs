@@ -270,7 +270,7 @@ impl PeerConnection {
     pub fn update_tracks(
         &self,
         tracks: Vec<Track>,
-        media_manager: &Rc<MediaManager>,
+        media_manager: &MediaManager,
     ) -> impl Future<Item = (), Error = WasmErr> {
         for track in tracks {
             self.media_connections.borrow_mut().update_track(track);
@@ -279,7 +279,6 @@ impl PeerConnection {
         if let Some(media_request) =
             self.media_connections.borrow().get_request()
         {
-            let media_manager = Rc::clone(media_manager);
             let connections = Rc::clone(&self.media_connections);
             let get_media = media_manager.get_stream(media_request).and_then(
                 move |stream| {
