@@ -16,10 +16,7 @@ use medea_macro::enum_delegate;
 use crate::{
     api::control::MemberId,
     media::{MediaTrack, TrackId},
-    signalling::{
-        elements::endpoints::webrtc::{WebRtcPublishEndpoint, WebRtcPublishId},
-        peers::Counter,
-    },
+    signalling::peers::Counter,
 };
 
 /// Newly initialized [`Peer`] ready to signalling.
@@ -252,45 +249,27 @@ impl Peer<New> {
         }
     }
 
-    /// Add all publish endpoints to this [`Peer`].
-    ///
-    /// This also create [`Peer`]s for [`WebRtcPlayEndpoint`]s that
-    /// receive something from us.
-    pub fn add_publish_endpoints(
+    /// Add `send` tracks to self and add `recv` for this `send`
+    /// to `partner_peer`.
+    pub fn add_publisher(
         &mut self,
         partner_peer: &mut Peer<New>,
         tracks_count: &mut Counter,
-        publish_endpoints: HashMap<WebRtcPublishId, Rc<WebRtcPublishEndpoint>>,
     ) {
-        let partner_id = self.partner_member_id();
-        let self_id = self.id();
+        let track_audio = Rc::new(MediaTrack::new(
+            tracks_count.next_id(),
+            MediaType::Audio(AudioSettings {}),
+        ));
+        let track_video = Rc::new(MediaTrack::new(
+            tracks_count.next_id(),
+            MediaType::Video(VideoSettings {}),
+        ));
 
-        publish_endpoints
-            .into_iter()
-            .flat_map(|(_m, e)| {
-                e.add_peer_id(self_id);
-                e.sinks().into_iter().filter(|e| {
-                    e.owner().id() == partner_id && !e.is_connected()
-                })
-            })
-            .for_each(|e| {
-                let track_audio = Rc::new(MediaTrack::new(
-                    tracks_count.next_id(),
-                    MediaType::Audio(AudioSettings {}),
-                ));
-                let track_video = Rc::new(MediaTrack::new(
-                    tracks_count.next_id(),
-                    MediaType::Video(VideoSettings {}),
-                ));
+        self.add_sender(track_video.clone());
+        self.add_sender(track_audio.clone());
 
-                self.add_sender(track_video.clone());
-                self.add_sender(track_audio.clone());
-
-                partner_peer.add_receiver(track_video);
-                partner_peer.add_receiver(track_audio);
-
-                e.connect(partner_peer.id());
-            });
+        partner_peer.add_receiver(track_video);
+        partner_peer.add_receiver(track_audio);
     }
 
     /// Transition new [`Peer`] into state of waiting for local description.
