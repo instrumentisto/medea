@@ -11,7 +11,7 @@ use hashbrown::HashMap;
 use crate::{
     api::control::MemberId,
     log::prelude::*,
-    media::{Peer, PeerId, PeerStateMachine},
+    media::{New, Peer, PeerId, PeerStateMachine},
     signalling::{
         control::member::Member,
         room::{PeersRemoved, Room, RoomError},
@@ -69,14 +69,12 @@ impl PeerRepository {
             .ok_or_else(|| RoomError::PeerNotFound(peer_id))
     }
 
-    /// Create and interconnect [`Peer`]s based on [`Member`].
-    ///
-    /// Returns IDs of created [`Peer`]s. `(first_peer_id, second_peer_id)`.
+    /// Create interconnected [`Peer`]s for provided [`Member`]s.
     pub fn create_peers(
         &mut self,
         first_member: &Member,
         second_member: &Member,
-    ) -> (u64, u64) {
+    ) -> (Peer<New>, Peer<New>) {
         debug!(
             "Created peer between {} and {}.",
             first_member.id(),
@@ -85,34 +83,47 @@ impl PeerRepository {
         let first_peer_id = self.peers_count.next_id();
         let second_peer_id = self.peers_count.next_id();
 
-        let mut first_peer = Peer::new(
+        let first_peer = Peer::new(
             first_peer_id,
             first_member.id().clone(),
             second_peer_id,
             second_member.id().clone(),
         );
-        let mut second_peer = Peer::new(
+        let second_peer = Peer::new(
             second_peer_id,
             second_member.id().clone(),
             first_peer_id,
             first_member.id().clone(),
         );
 
-        first_peer.add_publish_endpoints(
-            &mut second_peer,
-            &mut self.tracks_count,
-            first_member.srcs(),
-        );
-        second_peer.add_publish_endpoints(
-            &mut first_peer,
-            &mut self.tracks_count,
-            second_member.srcs(),
-        );
+        (first_peer, second_peer)
+    }
 
-        self.add_peer(first_peer);
-        self.add_peer(second_peer);
+    /// Returns mutable reference to track counter.
+    pub fn get_tracks_counter(&mut self) -> &mut Counter {
+        &mut self.tracks_count
+    }
 
-        (first_peer_id, second_peer_id)
+    /// Lookup [`Peer`] of [`Member`] with ID `member_id` which
+    /// connected with `partner_member_id`.
+    ///
+    /// Return Some(peer_id, partner_peer_id) if that [`Peer`] found.
+    ///
+    /// Return None if that [`Peer`] not found.
+    pub fn get_peer_by_members_ids(
+        &self,
+        member_id: &MemberId,
+        partner_member_id: &MemberId,
+    ) -> Option<(PeerId, PeerId)> {
+        for (_, peer) in &self.peers {
+            if &peer.member_id() == member_id
+                && &peer.partner_member_id() == partner_member_id
+            {
+                return Some((peer.id(), peer.partner_peer_id()));
+            }
+        }
+
+        None
     }
 
     /// Returns borrowed [`Peer`] by its ID.

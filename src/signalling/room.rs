@@ -1,7 +1,7 @@
 //! Room definitions and implementations. Room is responsible for media
 //! connection establishment between concrete [`Member`]s.
 
-use std::time::Duration;
+use std::{rc::Rc, time::Duration};
 
 use actix::{
     fut::wrap_future, Actor, ActorFuture, AsyncContext, Context, Handler,
@@ -27,6 +27,9 @@ use crate::{
     },
     signalling::{
         control::member::{Member, MembersLoadError},
+        elements::endpoints::webrtc::{
+            WebRtcPlayEndpoint, WebRtcPublishEndpoint,
+        },
         participants::ParticipantService,
         peers::PeerRepository,
     },
@@ -292,24 +295,51 @@ impl Room {
         )))
     }
 
-    /// Create [`Peer`]s between [`Member`]s and interconnect it by control
-    /// API spec.
-    fn connect_members(
+    fn connect_endpoints(
         &mut self,
-        first_member: &Member,
-        second_member: &Member,
-        ctx: &mut <Self as Actor>::Context,
-    ) {
-        debug!(
-            "Created peer member {} with member {}",
-            first_member.id(),
-            second_member.id()
-        );
+        src: &Rc<WebRtcPublishEndpoint>,
+        sink: &Rc<WebRtcPlayEndpoint>,
+    ) -> Option<(PeerId, PeerId)> {
+        let src_owner = src.owner();
+        let sink_owner = sink.owner();
 
-        let (first_peer_id, second_peer_id) =
-            self.peers.create_peers(first_member, second_member);
+        if let Some((src_peer_id, sink_peer_id)) = self
+            .peers
+            .get_peer_by_members_ids(&src_owner.id(), &sink_owner.id())
+        {
+            let mut src_peer: Peer<New> =
+                self.peers.take_inner_peer(src_peer_id).unwrap();
+            let mut sink_peer: Peer<New> =
+                self.peers.take_inner_peer(sink_peer_id).unwrap();
 
-        self.connect_peers(ctx, first_peer_id, second_peer_id);
+            src_peer
+                .add_publisher(&mut sink_peer, self.peers.get_tracks_counter());
+
+            src.add_peer_id(src_peer_id);
+            sink.connect(sink_peer_id);
+
+            self.peers.add_peer(src_peer);
+            self.peers.add_peer(sink_peer);
+        } else {
+            let (mut src_peer, mut sink_peer) =
+                self.peers.create_peers(&src_owner, &sink_owner);
+
+            src_peer
+                .add_publisher(&mut sink_peer, self.peers.get_tracks_counter());
+
+            src.add_peer_id(src_peer.id());
+            sink.connect(sink_peer.id());
+
+            let src_peer_id = src_peer.id();
+            let sink_peer_id = sink_peer.id();
+
+            self.peers.add_peer(src_peer);
+            self.peers.add_peer(sink_peer);
+
+            return Some((src_peer_id, sink_peer_id));
+        };
+
+        None
     }
 
     /// Create and interconnect all [`Peer`]s between connected [`Member`]
@@ -323,6 +353,8 @@ impl Room {
         member: &Member,
         ctx: &mut <Self as Actor>::Context,
     ) {
+        let mut created_peers: Vec<(PeerId, PeerId)> = Vec::new();
+
         // Create all connected publish endpoints.
         for (_, publish) in member.srcs() {
             for receiver in publish.sinks() {
@@ -331,22 +363,33 @@ impl Room {
                 if self.members.member_has_connection(&receiver_owner.id())
                     && !receiver.is_connected()
                 {
-                    self.connect_members(&member, &receiver_owner, ctx);
+                    if let Some(p) = self.connect_endpoints(&publish, &receiver)
+                    {
+                        created_peers.push(p)
+                    }
                 }
             }
         }
 
         // Create all connected play's receivers peers.
         for (_, play) in member.sinks() {
-            let plays_publisher_owner = play.src().owner();
+            let plays_publisher = play.src();
+            let plays_publisher_owner = plays_publisher.owner();
 
             if self
                 .members
                 .member_has_connection(&plays_publisher_owner.id())
                 && !play.is_connected()
             {
-                self.connect_members(&member, &plays_publisher_owner, ctx);
+                if let Some(p) = self.connect_endpoints(&plays_publisher, &play)
+                {
+                    created_peers.push(p);
+                }
             }
+        }
+
+        for (first_peer_id, second_peer_id) in created_peers {
+            self.connect_peers(ctx, first_peer_id, second_peer_id);
         }
     }
 
