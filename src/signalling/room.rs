@@ -2,6 +2,7 @@
 //! connection establishment between concrete [`Member`]s.
 
 use std::time::Duration;
+use std::collections::HashSet;
 
 use actix::{
     fut::wrap_future, Actor, ActorFuture, AsyncContext, Context, Handler,
@@ -9,7 +10,7 @@ use actix::{
 };
 use failure::Fail;
 use futures::future;
-use hashbrown::HashMap;
+use hashbrown::{HashMap};
 use medea_client_api_proto::{Command, Event, IceCandidate};
 
 use crate::{
@@ -323,6 +324,8 @@ impl Room {
         member: &Member,
         ctx: &mut <Self as Actor>::Context,
     ) {
+        let mut to_connect = HashMap::new();
+
         // Create all connected publish endpoints.
         for (_, publish) in member.srcs() {
             for receiver in publish.sinks() {
@@ -331,7 +334,8 @@ impl Room {
                 if self.members.member_has_connection(&receiver_owner.id())
                     && !receiver.is_connected()
                 {
-                    self.connect_members(&member, &receiver_owner, ctx);
+                    to_connect.insert(receiver_owner.id(), receiver_owner);
+//                    self.connect_members(&member, &receiver_owner, ctx);
                 }
             }
         }
@@ -345,8 +349,13 @@ impl Room {
                 .member_has_connection(&plays_publisher_owner.id())
                 && !play.is_connected()
             {
-                self.connect_members(&member, &plays_publisher_owner, ctx);
+                to_connect.insert(plays_publisher_owner.id(), plays_publisher_owner);
+//                self.connect_members(&member, &plays_publisher_owner, ctx);
             }
+        }
+
+        for (_, member_to_connect) in to_connect {
+            self.connect_members(&member, &member_to_connect, ctx);
         }
     }
 
