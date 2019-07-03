@@ -1,8 +1,10 @@
 //! Member definitions and implementations.
 
-use std::{convert::TryFrom, fmt::Display};
+use std::convert::TryFrom;
 
 use hashbrown::HashMap;
+use macro_attr::*;
+use newtype_derive::{newtype_fmt, NewtypeDisplay, NewtypeFrom};
 use serde::Deserialize;
 
 use super::{
@@ -11,20 +13,19 @@ use super::{
     Element, TryFromElementError,
 };
 
-/// ID of `Member`.
-#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq)]
-pub struct Id(pub String);
-
-impl Display for Id {
-    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(fmt, "{}", self.0)
-    }
-}
-
-impl From<String> for Id {
-    fn from(s: String) -> Self {
-        Self(s)
-    }
+macro_attr! {
+    /// ID of `Member`.
+    #[derive(
+        Clone,
+        Debug,
+        Deserialize,
+        Eq,
+        Hash,
+        PartialEq,
+        NewtypeFrom!,
+        NewtypeDisplay!
+    )]
+    pub struct Id(pub String);
 }
 
 /// Newtype for [`Element::Member`] variant.

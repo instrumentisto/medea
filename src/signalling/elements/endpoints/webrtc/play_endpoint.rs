@@ -1,8 +1,10 @@
 use std::{
     cell::RefCell,
-    fmt::Display,
     rc::{Rc, Weak},
 };
+
+use macro_attr::*;
+use newtype_derive::{newtype_fmt, NewtypeDisplay, NewtypeFrom};
 
 use crate::{
     api::control::endpoint::SrcUri, media::PeerId,
@@ -13,20 +15,10 @@ use super::publish_endpoint::WebRtcPublishEndpoint;
 
 pub use Id as WebRtcPlayId;
 
-/// ID of endpoint.
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct Id(pub String);
-
-impl Display for Id {
-    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(fmt, "{}", self.0)
-    }
-}
-
-impl From<String> for Id {
-    fn from(s: String) -> Self {
-        Self(s)
-    }
+macro_attr! {
+    /// ID of endpoint.
+    #[derive(Clone, Debug, Eq, Hash, PartialEq, NewtypeFrom!, NewtypeDisplay!)]
+    pub struct Id(pub String);
 }
 
 #[derive(Debug, Clone)]
