@@ -1,5 +1,6 @@
 //! Medea media server application.
 
+// TODO: just use lazy_static::lazy_static; where you need it
 #[macro_use]
 extern crate lazy_static;
 
@@ -61,6 +62,8 @@ fn main() {
                     turn_auth_service,
                 )
             });
+
+            // TODO: do subscribe in Room::new, server::run
             graceful_shutdown::subscribe(room.clone().recipient(), 1);
 
             let rooms = hashmap! {1 => room};

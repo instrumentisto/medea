@@ -24,6 +24,7 @@ type ShutdownFutureType = Box<
     >,
 >;
 
+// TODO: why not use simple struct?
 lazy_static! {
     static ref STATIC_RECIPIENTS: Mutex<BTreeMap<u8, Vec<Recipient<ShutdownMessage>>>> =
         Mutex::new(BTreeMap::new());
@@ -130,6 +131,18 @@ fn handle_shutdown(msg: SignalKind) {
 pub fn create(shutdown_timeout: u64, actix_system: System) {
     let mut global_shutdown_timeout = STATIC_TIMEOUT.lock().unwrap();
     *global_shutdown_timeout = shutdown_timeout;
+
+    //TODO: this looks much less boilerplate:
+    //    let int = Signal::new(SIGINT).flatten_stream();
+    //    let term = Signal::new(SIGTERM).flatten_stream();
+    //    let quit = Signal::new(SIGQUIT).flatten_stream();
+    //
+    //    let signal_stream = int.select(term).select(quit);
+    //
+    //    tokio::runtime::current_thread::run(signal_stream.into_future().and_then(move|(signal, _)|{
+    //          my handler
+    //    }).map_err(|err| ()));
+    //
 
     #[cfg(unix)]
     {
