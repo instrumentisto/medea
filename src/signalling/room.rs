@@ -295,6 +295,14 @@ impl Room {
         )))
     }
 
+    /// Create [`Peer`] for endpoints if [`Peer`] between endpoint's members
+    /// not exist.
+    ///
+    /// Add `send` track to source member's [`Peer`] and `recv` to
+    /// sink member's [`Peer`].
+    ///
+    /// __This will panic if provide endpoints with already interconnected
+    /// [`Peer`]s!__
     fn connect_endpoints(
         &mut self,
         src: &Rc<WebRtcPublishEndpoint>,
@@ -307,6 +315,9 @@ impl Room {
             .peers
             .get_peer_by_members_ids(&src_owner.id(), &sink_owner.id())
         {
+            // TODO: when dynamic patching of [`Room`] will be done then we need
+            //       rewrite this code to updating [`Peer`]s in not
+            //       [`Peer<New>`] state.
             let mut src_peer: Peer<New> =
                 self.peers.take_inner_peer(src_peer_id).unwrap();
             let mut sink_peer: Peer<New> =
