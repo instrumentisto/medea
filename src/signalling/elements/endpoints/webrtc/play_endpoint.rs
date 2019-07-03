@@ -36,11 +36,11 @@ struct WebRtcPlayEndpointInner {
 
     /// Source URI of [`WebRtcPublishEndpoint`] from which this
     /// [`WebRtcPlayEndpoint`] receive data.
-    src: SrcUri,
+    src_uri: SrcUri,
 
     /// Publisher [`WebRtcPublishEndpoint`] from which this
     /// [`WebRtcPlayEndpoint`] receive data.
-    publisher: Weak<WebRtcPublishEndpoint>,
+    src: Weak<WebRtcPublishEndpoint>,
 
     /// Owner [`Member`] of this [`WebRtcPlayEndpoint`].
     owner: Weak<Member>,
@@ -56,8 +56,8 @@ struct WebRtcPlayEndpointInner {
 }
 
 impl WebRtcPlayEndpointInner {
-    fn src(&self) -> SrcUri {
-        self.src.clone()
+    fn src_uri(&self) -> SrcUri {
+        self.src_uri.clone()
     }
 
     fn owner(&self) -> Rc<Member> {
@@ -68,8 +68,8 @@ impl WebRtcPlayEndpointInner {
         Weak::clone(&self.owner)
     }
 
-    fn publisher(&self) -> Rc<WebRtcPublishEndpoint> {
-        Weak::upgrade(&self.publisher).unwrap()
+    fn src(&self) -> Rc<WebRtcPublishEndpoint> {
+        Weak::upgrade(&self.src).unwrap()
     }
 
     fn is_connected(&self) -> bool {
@@ -91,7 +91,7 @@ impl WebRtcPlayEndpointInner {
 
 impl Drop for WebRtcPlayEndpointInner {
     fn drop(&mut self) {
-        if let Some(receiver_publisher) = self.publisher.upgrade() {
+        if let Some(receiver_publisher) = self.src.upgrade() {
             receiver_publisher.remove_empty_weaks_from_sinks();
         }
     }
@@ -106,22 +106,22 @@ impl WebRtcPlayEndpoint {
     /// Create new [`WebRtcPlayEndpoint`].
     pub fn new(
         id: Id,
-        src: SrcUri,
+        src_uri: SrcUri,
         publisher: Weak<WebRtcPublishEndpoint>,
         owner: Weak<Member>,
     ) -> Self {
         Self(RefCell::new(WebRtcPlayEndpointInner {
             id,
-            src,
-            publisher,
+            src_uri,
+            src: publisher,
             owner,
             peer_id: None,
         }))
     }
 
     /// Returns [`SrcUri`] of this [`WebRtcPlayEndpoint`].
-    pub fn src(&self) -> SrcUri {
-        self.0.borrow().src()
+    pub fn src_uri(&self) -> SrcUri {
+        self.0.borrow().src_uri()
     }
 
     /// Returns owner [`Member`] of this [`WebRtcPlayEndpoint`].
@@ -137,11 +137,11 @@ impl WebRtcPlayEndpoint {
         self.0.borrow().weak_owner()
     }
 
-    /// Returns publisher's [`WebRtcPublishEndpoint`].
+    /// Returns source's [`WebRtcPublishEndpoint`].
     ///
     /// __This function will panic if pointer is empty.__
-    pub fn publisher(&self) -> Rc<WebRtcPublishEndpoint> {
-        self.0.borrow().publisher()
+    pub fn src(&self) -> Rc<WebRtcPublishEndpoint> {
+        self.0.borrow().src()
     }
 
     /// Check that peer connection established for this [`WebRtcPlayEndpoint`].

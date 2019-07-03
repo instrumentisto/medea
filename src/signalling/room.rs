@@ -338,7 +338,7 @@ impl Room {
 
         // Create all connected play's receivers peers.
         for (_, play) in member.sinks() {
-            let plays_publisher_owner = play.publisher().owner();
+            let plays_publisher_owner = play.src().owner();
 
             if self
                 .members

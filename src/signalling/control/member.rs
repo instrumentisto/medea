@@ -396,7 +396,7 @@ mod tests {
         assert!(is_caller_has_responder_in_sinks);
 
         assert!(Rc::ptr_eq(
-            &responder_play_endpoint.publisher(),
+            &responder_play_endpoint.src(),
             &caller_publish_endpoint
         ));
 
