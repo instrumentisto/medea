@@ -17,7 +17,7 @@ use crate::{
     api::control::MemberId,
     media::{MediaTrack, TrackId},
     signalling::{
-        control::endpoint::{Id as EndpointId, WebRtcPublishEndpoint},
+        elements::endpoints::webrtc::{WebRtcPublishEndpoint, WebRtcPublishId},
         peers::Counter,
     },
 };
@@ -260,7 +260,7 @@ impl Peer<New> {
         &mut self,
         partner_peer: &mut Peer<New>,
         tracks_count: &mut Counter,
-        publish_endpoints: HashMap<EndpointId, Rc<WebRtcPublishEndpoint>>,
+        publish_endpoints: HashMap<WebRtcPublishId, Rc<WebRtcPublishEndpoint>>,
     ) {
         let partner_id = self.partner_member_id();
         let self_id = self.id();

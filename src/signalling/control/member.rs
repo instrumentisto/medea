@@ -10,10 +10,10 @@ use crate::{
     api::control::{MemberId, MemberSpec, RoomSpec, TryFromElementError},
     log::prelude::*,
     media::{IceUser, PeerId},
-};
-
-use super::endpoint::{
-    Id as EndpointId, WebRtcPlayEndpoint, WebRtcPublishEndpoint,
+    signalling::elements::endpoints::webrtc::{
+        WebRtcPlayEndpoint, WebRtcPlayId, WebRtcPublishEndpoint,
+        WebRtcPublishId,
+    },
 };
 
 /// Errors which may occur while loading [`Member`]s from [`RoomSpec`].
@@ -48,10 +48,10 @@ struct MemberInner {
     id: MemberId,
 
     /// All [`WebRtcPublishEndpoint`]s of this [`Member`].
-    publishers: HashMap<EndpointId, Rc<WebRtcPublishEndpoint>>,
+    publishers: HashMap<WebRtcPublishId, Rc<WebRtcPublishEndpoint>>,
 
     /// All [`WebRtcPlayEndpoint`]s of this [`Member`].
-    receivers: HashMap<EndpointId, Rc<WebRtcPlayEndpoint>>,
+    receivers: HashMap<WebRtcPlayId, Rc<WebRtcPlayEndpoint>>,
 
     /// Credentials for this [`Member`].
     credentials: String,
@@ -123,11 +123,13 @@ impl Member {
                     Ok,
                 )?;
 
-            if let Some(publisher) = publisher_member.get_publisher_by_id(
-                &EndpointId(spec_play_endpoint.src.endpoint_id.to_string()),
-            ) {
+            if let Some(publisher) =
+                publisher_member.get_publisher_by_id(&WebRtcPublishId(
+                    spec_play_endpoint.src.endpoint_id.to_string(),
+                ))
+            {
                 let new_play_endpoint_id =
-                    EndpointId(spec_play_name.to_string());
+                    WebRtcPlayId(spec_play_name.to_string());
                 let new_play_endpoint = Rc::new(WebRtcPlayEndpoint::new(
                     new_play_endpoint_id.clone(),
                     spec_play_endpoint.src.clone(),
@@ -139,8 +141,9 @@ impl Member {
 
                 publisher.add_sink(Rc::downgrade(&new_play_endpoint));
             } else {
-                let new_publish_id =
-                    EndpointId(spec_play_endpoint.src.endpoint_id.to_string());
+                let new_publish_id = WebRtcPublishId(
+                    spec_play_endpoint.src.endpoint_id.to_string(),
+                );
                 let new_publish = Rc::new(WebRtcPublishEndpoint::new(
                     new_publish_id.clone(),
                     publisher_endpoint.p2p.clone(),
@@ -148,7 +151,7 @@ impl Member {
                     Rc::downgrade(&publisher_member),
                 ));
 
-                let new_self_play_id = EndpointId(spec_play_name.to_string());
+                let new_self_play_id = WebRtcPlayId(spec_play_name.to_string());
                 let new_self_play = Rc::new(WebRtcPlayEndpoint::new(
                     new_self_play_id.clone(),
                     spec_play_endpoint.src.clone(),
@@ -168,7 +171,7 @@ impl Member {
         // to which none [`WebRtcPlayEndpoint`] refers.
         this_member_spec.publish_endpoints().into_iter().for_each(
             |(name, e)| {
-                let endpoint_id = EndpointId(name.clone());
+                let endpoint_id = WebRtcPublishId(name.clone());
                 if self.publishers().get(&endpoint_id).is_none() {
                     self.insert_publisher(Rc::new(WebRtcPublishEndpoint::new(
                         endpoint_id,
@@ -224,12 +227,14 @@ impl Member {
     }
 
     /// Returns all publishers of this [`Member`].
-    pub fn publishers(&self) -> HashMap<EndpointId, Rc<WebRtcPublishEndpoint>> {
+    pub fn publishers(
+        &self,
+    ) -> HashMap<WebRtcPublishId, Rc<WebRtcPublishEndpoint>> {
         self.0.borrow().publishers.clone()
     }
 
     /// Returns all receivers of this [`Member`].
-    pub fn receivers(&self) -> HashMap<EndpointId, Rc<WebRtcPlayEndpoint>> {
+    pub fn receivers(&self) -> HashMap<WebRtcPlayId, Rc<WebRtcPlayEndpoint>> {
         self.0.borrow().receivers.clone()
     }
 
@@ -252,7 +257,7 @@ impl Member {
     /// Lookup [`WebRtcPublishEndpoint`] publisher by [`EndpointId`].
     pub fn get_publisher_by_id(
         &self,
-        id: &EndpointId,
+        id: &WebRtcPublishId,
     ) -> Option<Rc<WebRtcPublishEndpoint>> {
         self.0.borrow().publishers.get(id).cloned()
     }
@@ -260,18 +265,18 @@ impl Member {
     /// Lookup [`WebRtcPlayEndpoint`] receiver by [`EndpointId`].
     pub fn get_receiver_by_id(
         &self,
-        id: &EndpointId,
+        id: &WebRtcPlayId,
     ) -> Option<Rc<WebRtcPlayEndpoint>> {
         self.0.borrow().receivers.get(id).cloned()
     }
 
     /// Remove receiver [`WebRtcPlayEndpoint`] from this [`Member`].
-    pub fn remove_receiver(&self, id: &EndpointId) {
+    pub fn remove_receiver(&self, id: &WebRtcPlayId) {
         self.0.borrow_mut().receivers.remove(id);
     }
 
     /// Remove receiver [`WebRtcPublishEndpoint`] from this [`Member`].
-    pub fn remove_publisher(&self, id: &EndpointId) {
+    pub fn remove_publisher(&self, id: &WebRtcPublishId) {
         self.0.borrow_mut().publishers.remove(id);
     }
 }

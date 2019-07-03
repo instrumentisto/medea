@@ -1,4 +1,5 @@
 pub mod control;
+pub mod elements;
 pub mod participants;
 pub mod peers;
 pub mod room;
