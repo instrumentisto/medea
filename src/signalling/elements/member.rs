@@ -7,8 +7,9 @@ use hashbrown::HashMap;
 use medea_client_api_proto::IceServer;
 
 use crate::{
-    api::control::serde::{
-        MemberId, SerdeMemberSpec, SerdeRoomSpec, TryFromElementError,
+    api::control::{
+        model::MemberId,
+        serde::{SerdeMemberSpec, SerdeRoomSpec, TryFromElementError},
     },
     log::prelude::*,
     media::{IceUser, PeerId},

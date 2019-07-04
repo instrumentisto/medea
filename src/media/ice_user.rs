@@ -2,7 +2,7 @@ use std::net::SocketAddr;
 
 use medea_client_api_proto::IceServer;
 
-use crate::api::control::serde::RoomId;
+use crate::api::control::model::RoomId;
 
 /// Credentials on Turn server.
 #[derive(Clone, Debug)]

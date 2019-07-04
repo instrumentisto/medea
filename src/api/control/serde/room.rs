@@ -8,13 +8,13 @@ use newtype_derive::{newtype_fmt, NewtypeDisplay, NewtypeFrom};
 use serde::Deserialize;
 
 use super::{
-    member::SerdeMemberSpec, pipeline::Pipeline, Element, MemberId,
-    TryFromElementError,
+    member::SerdeMemberSpec, pipeline::Pipeline, Element, TryFromElementError,
 };
-use crate::api::control::model::{member::MemberSpec, room::RoomSpec};
+use crate::api::control::model::{
+    member::MemberSpec, room::RoomSpec, MemberId,
+};
 
-pub use crate::api::control::model::room::Id;
-pub use Id as RoomId;
+use crate::api::control::model::room::Id;
 
 /// [`crate::signalling::room::Room`] specification.
 /// Newtype for [`Element::Room`]

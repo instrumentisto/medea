@@ -13,14 +13,13 @@ use super::{
     Element, TryFromElementError,
 };
 
-pub use crate::api::control::model::member::Id;
 use crate::api::control::{
     model::{
         endpoint::webrtc::{
             WebRtcPlayEndpoint, WebRtcPlayId, WebRtcPublishEndpoint,
             WebRtcPublishId,
         },
-        member::MemberSpec,
+        member::{Id, MemberSpec},
         MemberId,
     },
     serde::Endpoint,

@@ -14,11 +14,10 @@ use self::{
     endpoint::{SerdeWebRtcPlayEndpoint, SerdeWebRtcPublishEndpoint},
     pipeline::Pipeline,
 };
+use super::model::RoomId;
 
 pub use self::{
-    endpoint::Endpoint,
-    member::{Id as MemberId, SerdeMemberSpec},
-    room::{Id as RoomId, SerdeRoomSpec},
+    endpoint::Endpoint, member::SerdeMemberSpec, room::SerdeRoomSpec,
 };
 
 /// Errors that can occur when we try transform some spec from [`Element`].
