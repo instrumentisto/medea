@@ -2,6 +2,7 @@
 
 pub mod endpoint;
 pub mod member;
+pub mod model;
 pub mod pipeline;
 pub mod room;
 
@@ -11,7 +12,7 @@ use failure::{Error, Fail};
 use serde::Deserialize;
 
 use self::{
-    endpoint::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
+    endpoint::{SerdeWebRtcPlayEndpoint, SerdeWebRtcPublishEndpoint},
     pipeline::Pipeline,
 };
 
@@ -48,11 +49,11 @@ pub enum Element {
 
     /// Represent [`WebRtcPublishEndpoint`].
     /// Can transform into [`Endpoint`] enum by `Endpoint::try_from`.
-    WebRtcPublishEndpoint { spec: WebRtcPublishEndpoint },
+    WebRtcPublishEndpoint { spec: SerdeWebRtcPublishEndpoint },
 
     /// Represent [`WebRtcPlayEndpoint`].
     /// Can transform into [`Endpoint`] enum by `Endpoint::try_from`.
-    WebRtcPlayEndpoint { spec: WebRtcPlayEndpoint },
+    WebRtcPlayEndpoint { spec: SerdeWebRtcPlayEndpoint },
 }
 
 /// Load [`RoomSpec`] from file with YAML format.

@@ -8,25 +8,13 @@ use newtype_derive::{newtype_fmt, NewtypeDisplay, NewtypeFrom};
 use serde::Deserialize;
 
 use super::{
-    endpoint::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
+    endpoint::{SerdeWebRtcPlayEndpoint, SerdeWebRtcPublishEndpoint},
     pipeline::Pipeline,
     Element, TryFromElementError,
 };
 
-macro_attr! {
-    /// ID of `Member`.
-    #[derive(
-        Clone,
-        Debug,
-        Deserialize,
-        Eq,
-        Hash,
-        PartialEq,
-        NewtypeFrom!,
-        NewtypeDisplay!
-    )]
-    pub struct Id(pub String);
-}
+use crate::api::control::model::endpoint::webrtc::WebRtcPublishId;
+pub use crate::api::control::model::member::Id;
 
 /// Newtype for [`Element::Member`] variant.
 #[allow(clippy::module_name_repetitions)]
@@ -41,7 +29,7 @@ pub struct MemberSpec {
 
 impl MemberSpec {
     /// Returns all [`WebRtcPlayEndpoint`]s of this [`MemberSpec`].
-    pub fn play_endpoints(&self) -> HashMap<&String, &WebRtcPlayEndpoint> {
+    pub fn play_endpoints(&self) -> HashMap<&String, &SerdeWebRtcPlayEndpoint> {
         self.pipeline
             .iter()
             .filter_map(|(id, e)| match e {
@@ -54,11 +42,13 @@ impl MemberSpec {
     /// Returns all [`WebRtcPublishEndpoint`]s of this [`MemberSpec`].
     pub fn publish_endpoints(
         &self,
-    ) -> HashMap<&String, &WebRtcPublishEndpoint> {
+    ) -> HashMap<WebRtcPublishId, &SerdeWebRtcPublishEndpoint> {
         self.pipeline
             .iter()
             .filter_map(|(id, e)| match e {
-                Element::WebRtcPublishEndpoint { spec } => Some((id, spec)),
+                Element::WebRtcPublishEndpoint { spec } => {
+                    Some((WebRtcPublishId(id.clone()), spec))
+                }
                 _ => None,
             })
             .collect()

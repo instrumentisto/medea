@@ -18,11 +18,7 @@ use super::play_endpoint::WebRtcPlayEndpoint;
 
 pub use Id as WebRtcPublishId;
 
-macro_attr! {
-    /// ID of endpoint.
-    #[derive(Clone, Debug, Eq, Hash, PartialEq, NewtypeFrom!, NewtypeDisplay!)]
-    pub struct Id(pub String);
-}
+pub use crate::api::control::model::endpoint::webrtc::publish_endpoint::Id;
 
 #[derive(Debug, Clone)]
 struct WebRtcPublishEndpointInner {

@@ -9,18 +9,15 @@ use macro_attr::*;
 use newtype_derive::{newtype_fmt, NewtypeDisplay, NewtypeFrom};
 
 use crate::{
-    api::control::endpoint::SrcUri, media::PeerId, signalling::elements::Member,
+    api::control::endpoint::SerdeSrcUri, media::PeerId,
+    signalling::elements::Member,
 };
 
 use super::publish_endpoint::WebRtcPublishEndpoint;
 
 pub use Id as WebRtcPlayId;
 
-macro_attr! {
-    /// ID of endpoint.
-    #[derive(Clone, Debug, Eq, Hash, PartialEq, NewtypeFrom!, NewtypeDisplay!)]
-    pub struct Id(pub String);
-}
+pub use crate::api::control::model::endpoint::webrtc::play_endpoint::Id;
 
 #[derive(Debug, Clone)]
 struct WebRtcPlayEndpointInner {
@@ -29,7 +26,7 @@ struct WebRtcPlayEndpointInner {
 
     /// Source URI of [`WebRtcPublishEndpoint`] from which this
     /// [`WebRtcPlayEndpoint`] receive data.
-    src_uri: SrcUri,
+    src_uri: SerdeSrcUri,
 
     /// Publisher [`WebRtcPublishEndpoint`] from which this
     /// [`WebRtcPlayEndpoint`] receive data.
@@ -49,7 +46,7 @@ struct WebRtcPlayEndpointInner {
 }
 
 impl WebRtcPlayEndpointInner {
-    fn src_uri(&self) -> SrcUri {
+    fn src_uri(&self) -> SerdeSrcUri {
         self.src_uri.clone()
     }
 
@@ -99,7 +96,7 @@ impl WebRtcPlayEndpoint {
     /// Create new [`WebRtcPlayEndpoint`].
     pub fn new(
         id: Id,
-        src_uri: SrcUri,
+        src_uri: SerdeSrcUri,
         publisher: Weak<WebRtcPublishEndpoint>,
         owner: Weak<Member>,
     ) -> Self {
@@ -113,7 +110,7 @@ impl WebRtcPlayEndpoint {
     }
 
     /// Returns [`SrcUri`] of this [`WebRtcPlayEndpoint`].
-    pub fn src_uri(&self) -> SrcUri {
+    pub fn src_uri(&self) -> SerdeSrcUri {
         self.0.borrow().src_uri()
     }
 
