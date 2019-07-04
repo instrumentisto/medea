@@ -32,11 +32,10 @@ fn parse_src_uri(value: &str) -> SerdeSrcUri {
     }
 
     let uri_body = value.chars().skip(8).collect::<String>();
-    let mut uri_body_splitted: Vec<&str> =
-        uri_body.rsplit('/').collect();
+    let mut uri_body_splitted: Vec<&str> = uri_body.rsplit('/').collect();
     let uri_body_splitted_len = uri_body_splitted.len();
     if uri_body_splitted_len != 3 {
-        let error_msg = if uri_body_splitted_len == 0 {
+        let _error_msg = if uri_body_splitted_len == 0 {
             "room_id, member_id, endpoint_id"
         } else if uri_body_splitted_len == 1 {
             "member_id, endpoint_id"

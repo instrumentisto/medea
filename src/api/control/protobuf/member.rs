@@ -6,7 +6,6 @@ use crate::{
             model::{
                 endpoint::webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
                 member::MemberSpec,
-                MemberId,
             },
             protobuf::{
                 webrtc_play_endpoint::GrpcWebRtcPlayEndpoint,
@@ -65,10 +64,6 @@ impl MemberSpec for GrpcMember {
 
     fn credentials(&self) -> &String {
         // TODO: deal with it
-        unimplemented!()
-    }
-
-    fn id(&self) -> &MemberId {
         unimplemented!()
     }
 

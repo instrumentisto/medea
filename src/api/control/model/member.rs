@@ -32,8 +32,6 @@ pub trait MemberSpec {
 
     fn credentials(&self) -> &String;
 
-    fn id(&self) -> &MemberId;
-
     fn get_webrtc_play_by_id(
         &self,
         id: &WebRtcPlayId,

@@ -34,11 +34,27 @@ impl RoomSpec for CreateRequestSpec {
         }
     }
 
-    fn id(&self) -> &RoomId {
-        unimplemented!()
+    fn id(&self) -> RoomId {
+        if self.0.has_id() {
+            RoomId(self.0.get_id().to_string())
+        } else {
+            panic!()
+        }
     }
 
-    fn get_member_by_id(&self, _id: &MemberId) -> Option<Box<&dyn MemberSpec>> {
-        unimplemented!()
+    fn get_member_by_id(&self, id: &MemberId) -> Option<Box<dyn MemberSpec>> {
+        if self.0.has_room() {
+            let room = self.0.get_room();
+            let element = room.pipeline.get(&id.0)?;
+            if element.has_member() {
+                let member = element.get_member().clone();
+                let member = GrpcMember(member);
+                Some(Box::new(member) as Box<dyn MemberSpec>)
+            } else {
+                None
+            }
+        } else {
+            panic!()
+        }
     }
 }

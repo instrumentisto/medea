@@ -24,7 +24,7 @@ pub use Id as RoomId;
 pub trait RoomSpec {
     fn members(&self) -> HashMap<MemberId, Box<dyn MemberSpec>>;
 
-    fn id(&self) -> &Id;
+    fn id(&self) -> Id;
 
-    fn get_member_by_id(&self, id: &MemberId) -> Option<Box<&dyn MemberSpec>>;
+    fn get_member_by_id(&self, id: &MemberId) -> Option<Box<dyn MemberSpec>>;
 }

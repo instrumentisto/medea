@@ -11,7 +11,6 @@ use crate::api::control::{
             WebRtcPublishId,
         },
         member::MemberSpec,
-        MemberId,
     },
     serde::Endpoint,
 };
@@ -98,11 +97,6 @@ impl MemberSpec for SerdeMemberSpec {
 
     fn credentials(&self) -> &String {
         &self.credentials
-    }
-
-    fn id(&self) -> &MemberId {
-        // TODO: maybe delete this func???
-        unimplemented!()
     }
 
     fn get_webrtc_play_by_id(

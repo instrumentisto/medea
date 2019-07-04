@@ -69,12 +69,14 @@ impl RoomSpec for ParsedSerdeRoomSpec {
             .collect()
     }
 
-    fn id(&self) -> &Id {
-        &self.id
+    fn id(&self) -> Id {
+        self.id.clone()
     }
 
-    fn get_member_by_id(&self, id: &MemberId) -> Option<Box<&MemberSpec>> {
-        self.members.get(id).map(|m| Box::new(m as &MemberSpec))
+    fn get_member_by_id(&self, id: &MemberId) -> Option<Box<dyn MemberSpec>> {
+        self.members
+            .get(id)
+            .map(|m| Box::new(m.clone()) as Box<dyn MemberSpec>)
     }
 }
 
