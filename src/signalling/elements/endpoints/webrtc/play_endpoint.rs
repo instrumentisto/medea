@@ -18,6 +18,7 @@ use super::publish_endpoint::WebRtcPublishEndpoint;
 pub use Id as WebRtcPlayId;
 
 pub use crate::api::control::model::endpoint::webrtc::play_endpoint::Id;
+use crate::api::control::model::endpoint::webrtc::SrcUri;
 
 #[derive(Debug, Clone)]
 struct WebRtcPlayEndpointInner {
@@ -26,7 +27,7 @@ struct WebRtcPlayEndpointInner {
 
     /// Source URI of [`WebRtcPublishEndpoint`] from which this
     /// [`WebRtcPlayEndpoint`] receive data.
-    src_uri: SerdeSrcUri,
+    src_uri: SrcUri,
 
     /// Publisher [`WebRtcPublishEndpoint`] from which this
     /// [`WebRtcPlayEndpoint`] receive data.
@@ -96,7 +97,7 @@ impl WebRtcPlayEndpoint {
     /// Create new [`WebRtcPlayEndpoint`].
     pub fn new(
         id: Id,
-        src_uri: SerdeSrcUri,
+        src_uri: SrcUri,
         publisher: Weak<WebRtcPublishEndpoint>,
         owner: Weak<Member>,
     ) -> Self {
@@ -110,7 +111,7 @@ impl WebRtcPlayEndpoint {
     }
 
     /// Returns [`SrcUri`] of this [`WebRtcPlayEndpoint`].
-    pub fn src_uri(&self) -> SerdeSrcUri {
+    pub fn src_uri(&self) -> SrcUri {
         self.0.borrow().src_uri()
     }
 

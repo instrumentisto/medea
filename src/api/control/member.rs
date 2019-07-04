@@ -22,7 +22,7 @@ use crate::api::control::{
         },
         member::MemberSpec,
     },
-    MemberId,
+    Endpoint, MemberId,
 };
 
 /// Newtype for [`Element::Member`] variant.
@@ -109,16 +109,29 @@ impl MemberSpec for SerdeMemberSpec {
 
     fn get_webrtc_play_by_id(
         &self,
-        id: WebRtcPlayId,
-    ) -> Option<Box<&WebRtcPlayEndpoint>> {
-        unimplemented!()
+        id: &WebRtcPlayId,
+    ) -> Option<Box<dyn WebRtcPlayEndpoint>> {
+        let element = self.pipeline.get(&id.0)?;
+
+        if let Some(endpoint) = Endpoint::try_from(element).ok() {
+            if let Endpoint::WebRtcPlay(e) = endpoint {
+                return Some(Box::new(e) as Box<dyn WebRtcPlayEndpoint>);
+            }
+        }
+        None
     }
 
     fn get_webrtc_publish_by_id(
         &self,
-        id: WebRtcPublishId,
-    ) -> Option<Box<&WebRtcPublishEndpoint>> {
-        unimplemented!()
+        id: &WebRtcPublishId,
+    ) -> Option<Box<dyn WebRtcPublishEndpoint>> {
+        let element = self.pipeline.get(&id.0)?;
+        if let Some(endpoint) = Endpoint::try_from(element).ok() {
+            if let Endpoint::WebRtcPublish(e) = endpoint {
+                return Some(Box::new(e) as Box<dyn WebRtcPublishEndpoint>);
+            }
+        }
+        None
     }
 }
 

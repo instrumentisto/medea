@@ -1,11 +1,15 @@
-use crate::api::control::model::{
-    endpoint::webrtc::publish_endpoint::WebRtcPublishId, member::MemberId,
-    room::RoomId,
+use crate::api::control::{
+    endpoint::SerdeSrcUri,
+    model::{
+        endpoint::webrtc::publish_endpoint::WebRtcPublishId, member::MemberId,
+        room::RoomId,
+    },
 };
 use macro_attr::*;
 use newtype_derive::{newtype_fmt, NewtypeDisplay, NewtypeFrom};
 use serde::Deserialize;
 
+use std::fmt::Debug;
 pub use Id as WebRtcPlayId;
 macro_attr! {
     /// ID of [`Room`].
@@ -22,14 +26,6 @@ macro_attr! {
     pub struct Id(pub String);
 }
 
-pub trait SrcUri {
-    fn room_id(&self) -> &RoomId;
-
-    fn member_id(&self) -> &MemberId;
-
-    fn endpoint_id(&self) -> &WebRtcPublishId;
-}
-
 pub trait WebRtcPlayEndpoint {
-    fn src(&self) -> Box<&dyn SrcUri>;
+    fn src(&self) -> &SerdeSrcUri;
 }

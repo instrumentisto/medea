@@ -47,7 +47,7 @@ impl SerdeRoomSpec {
     }
 }
 
-struct ParsedSerdeRoomSpec {
+pub struct ParsedSerdeRoomSpec {
     id: Id,
     members: HashMap<MemberId, SerdeMemberSpec>,
 }
@@ -71,6 +71,10 @@ impl RoomSpec for ParsedSerdeRoomSpec {
 
     fn id(&self) -> &Id {
         &self.id
+    }
+
+    fn get_member_by_id(&self, id: &MemberId) -> Option<Box<&MemberSpec>> {
+        self.members.get(id).map(|m| Box::new(m as &MemberSpec))
     }
 }
 

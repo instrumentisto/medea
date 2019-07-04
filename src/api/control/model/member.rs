@@ -36,11 +36,11 @@ pub trait MemberSpec {
 
     fn get_webrtc_play_by_id(
         &self,
-        id: WebRtcPlayId,
-    ) -> Option<Box<&dyn WebRtcPlayEndpoint>>;
+        id: &WebRtcPlayId,
+    ) -> Option<Box<dyn WebRtcPlayEndpoint>>;
 
     fn get_webrtc_publish_by_id(
         &self,
-        id: WebRtcPublishId,
-    ) -> Option<Box<&dyn WebRtcPublishEndpoint>>;
+        id: &WebRtcPublishId,
+    ) -> Option<Box<dyn WebRtcPublishEndpoint>>;
 }

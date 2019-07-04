@@ -67,8 +67,8 @@ pub struct SerdeWebRtcPlayEndpoint {
 }
 
 impl WebRtcPlayEndpoint for SerdeWebRtcPlayEndpoint {
-    fn src(&self) -> Box<&SrcUri> {
-        Box::new(&self.src)
+    fn src(&self) -> &SrcUri {
+        &self.src
     }
 }
 
@@ -81,20 +81,6 @@ pub struct SerdeSrcUri {
     pub member_id: MemberId,
     /// Control ID of [`Endpoint`]
     pub endpoint_id: WebRtcPublishId,
-}
-
-impl SrcUri for SerdeSrcUri {
-    fn room_id(&self) -> &RoomId {
-        &self.room_id
-    }
-
-    fn member_id(&self) -> &MemberId {
-        &self.member_id
-    }
-
-    fn endpoint_id(&self) -> &WebRtcPublishId {
-        &self.endpoint_id
-    }
 }
 
 /// Serde deserializer for [`SrcUri`].
