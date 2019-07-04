@@ -8,7 +8,7 @@ use std::{
 use hashbrown::HashSet;
 
 use crate::{
-    api::control::serde::endpoint::P2pMode, media::PeerId,
+    api::control::model::endpoint::webrtc::P2pMode, media::PeerId,
     signalling::elements::Member,
 };
 

@@ -1,8 +1,8 @@
-use crate::api::control::serde::endpoint::SerdeSrcUri;
-
 use macro_attr::*;
 use newtype_derive::{newtype_fmt, NewtypeDisplay, NewtypeFrom};
 use serde::Deserialize;
+
+use crate::api::control::serde::endpoint::SerdeSrcUri;
 
 pub use Id as WebRtcPlayId;
 

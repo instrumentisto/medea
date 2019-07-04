@@ -37,15 +37,6 @@ impl TryFrom<&Element> for SerdeEndpoint {
     }
 }
 
-/// Peer-to-peer mode of [`WebRtcPublishEndpoint`].
-#[derive(Clone, Deserialize, Debug)]
-pub enum P2pMode {
-    /// Always connect peer-to-peer.
-    Always,
-    Never,
-    IfPossible,
-}
-
 /// Media element which is able to publish media data for another client via
 /// WebRTC.
 #[allow(clippy::module_name_repetitions)]
