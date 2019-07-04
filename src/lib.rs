@@ -14,13 +14,14 @@ use failure::Fail;
 use hashbrown::HashMap;
 
 use crate::{
-    api::control::{model::RoomId, serde::load_static_specs_from_dir},
+    api::control::{
+        model::{room::RoomSpec, RoomId},
+        serde::{load_static_specs_from_dir, room::ParsedSerdeRoomSpec},
+    },
     conf::Conf,
     signalling::{room::RoomError, Room},
     turn::service,
 };
-use crate::api::control::serde::room::ParsedSerdeRoomSpec;
-use crate::api::control::model::room::RoomSpec;
 
 /// Errors which can happen while server starting.
 #[derive(Debug, Fail)]
@@ -86,8 +87,12 @@ pub fn start_static_rooms(
             let room = Room::start_in_arbiter(&arbiter, move |_| {
                 let parsed_spec = ParsedSerdeRoomSpec::new(&spec).unwrap();
                 let parsed_spec = Box::new(&parsed_spec as &RoomSpec);
-                Room::new(&parsed_spec, rpc_reconnect_timeout, turn_auth_service)
-                    .unwrap()
+                Room::new(
+                    &parsed_spec,
+                    rpc_reconnect_timeout,
+                    turn_auth_service,
+                )
+                .unwrap()
             });
             rooms.insert(room_id, room);
         }

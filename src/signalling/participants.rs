@@ -27,7 +27,7 @@ use crate::{
             RpcConnectionClosed,
         },
         control::{
-            model::{MemberId, RoomId},
+            model::{room::RoomSpec, MemberId, RoomId},
             serde::SerdeRoomSpec,
         },
     },
@@ -40,7 +40,6 @@ use crate::{
     },
     turn::{TurnAuthService, TurnServiceErr, UnreachablePolicy},
 };
-use crate::api::control::model::room::RoomSpec;
 
 #[derive(Fail, Debug)]
 #[allow(clippy::module_name_repetitions)]

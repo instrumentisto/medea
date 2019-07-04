@@ -322,7 +322,7 @@ pub fn parse_members(
         );
     }
 
-//    let spec = ParsedSerdeRoomSpec::new(&room_spec)?;
+    //    let spec = ParsedSerdeRoomSpec::new(&room_spec)?;
 
     for (_, member) in &members {
         member.load(room_spec, &members)?;
@@ -356,7 +356,8 @@ pub fn parse_members(
 mod tests {
     use std::rc::Rc;
 
-    use crate::api::control::serde::{Element, MemberId};
+    use crate::api::control::{model::MemberId, serde::Element};
+    use std::convert::TryFrom as _;
 
     use super::*;
 
@@ -406,6 +407,8 @@ mod tests {
     fn get_test_store() -> HashMap<MemberId, Rc<Member>> {
         let room_element: Element = serde_yaml::from_str(TEST_SPEC).unwrap();
         let room_spec = SerdeRoomSpec::try_from(&room_element).unwrap();
+        let room_spec = ParsedSerdeRoomSpec::new(&room_spec).unwrap();
+        let room_spec = Box::new(&room_spec as &RoomSpec);
         parse_members(&room_spec).unwrap()
     }
 

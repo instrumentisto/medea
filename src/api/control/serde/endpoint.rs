@@ -184,6 +184,11 @@ mod src_uri_deserialization_tests {
         src: SerdeSrcUri,
     }
 
+    #[inline]
+    fn id<T: From<String>>(s: &str) -> T {
+        T::from(s.to_string())
+    }
+
     #[test]
     fn deserialize() {
         let valid_json_uri =
@@ -191,12 +196,9 @@ mod src_uri_deserialization_tests {
         let local_uri: SrcUriTest =
             serde_json::from_str(valid_json_uri).unwrap();
 
-        assert_eq!(
-            local_uri.src.member_id,
-            MemberId(String::from("member_id"))
-        );
-        assert_eq!(local_uri.src.room_id, String::from("room_id"));
-        assert_eq!(local_uri.src.endpoint_id, String::from("endpoint_id"));
+        assert_eq!(local_uri.src.member_id, id("member_id"));
+        assert_eq!(local_uri.src.room_id, id("room_id"));
+        assert_eq!(local_uri.src.endpoint_id, id("endpoint_id"));
     }
 
     #[test]

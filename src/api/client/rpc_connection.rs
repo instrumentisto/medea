@@ -107,7 +107,7 @@ pub mod test {
                 ClosedReason, CommandMessage, EventMessage, RpcConnection,
                 RpcConnectionClosed, RpcConnectionEstablished,
             },
-            control::MemberId,
+            control::model::MemberId,
         },
         signalling::Room,
     };

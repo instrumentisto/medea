@@ -19,7 +19,7 @@ use crate::{
             RpcConnectionClosed, RpcConnectionEstablished,
         },
         control::{
-            model::{MemberId, RoomId},
+            model::{room::RoomSpec, MemberId, RoomId},
             serde::{SerdeRoomSpec, TryFromElementError},
         },
     },
@@ -38,7 +38,6 @@ use crate::{
     },
     turn::TurnAuthService,
 };
-use crate::api::control::model::room::RoomSpec;
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
 pub type ActFuture<I, E> =
