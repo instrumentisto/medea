@@ -206,14 +206,9 @@ impl Room {
         &mut self,
         from_peer_id: PeerId,
         sdp_answer: String,
-        mids: StdHashMap<u64, String>,
     ) -> Result<ActFuture<(), RoomError>, RoomError> {
-        let mut from_peer: Peer<WaitLocalHaveRemote> =
+        let from_peer: Peer<WaitLocalHaveRemote> =
             self.peers.take_inner_peer(from_peer_id)?;
-
-        if from_peer.is_sender() {
-            from_peer.set_mids(mids)?;
-        }
 
         let to_peer_id = from_peer.partner_peer_id();
         let to_peer: Peer<WaitRemoteSdp> =
@@ -226,7 +221,6 @@ impl Room {
         let event = Event::SdpAnswerMade {
             peer_id: to_peer_id,
             sdp_answer,
-            mids: from_peer.get_mids()?,
         };
 
         self.peers.add_peer(from_peer);
@@ -354,8 +348,7 @@ impl Handler<CommandMessage> for Room {
             Command::MakeSdpAnswer {
                 peer_id,
                 sdp_answer,
-                mids,
-            } => self.handle_make_sdp_answer(peer_id, sdp_answer, mids),
+            } => self.handle_make_sdp_answer(peer_id, sdp_answer),
             Command::SetIceCandidate { peer_id, candidate } => {
                 self.handle_set_ice_candidate(peer_id, candidate)
             }
@@ -544,12 +537,18 @@ mod test {
                     tracks: vec![
                         Track {
                             id: 1,
-                            direction: Direction::Send { receivers: vec![2] },
+                            direction: Direction::Send {
+                                receivers: vec![2],
+                                mid: None
+                            },
                             media_type: MediaType::Audio(AudioSettings {}),
                         },
                         Track {
                             id: 2,
-                            direction: Direction::Send { receivers: vec![2] },
+                            direction: Direction::Send {
+                                receivers: vec![2],
+                                mid: None
+                            },
                             media_type: MediaType::Video(VideoSettings {}),
                         },
                     ],
@@ -573,7 +572,6 @@ mod test {
                 serde_json::to_string(&Event::SdpAnswerMade {
                     peer_id: 1,
                     sdp_answer: "responder_answer".into(),
-                    mids: None
                 })
                 .unwrap(),
                 serde_json::to_string(&Event::IceCandidateDiscovered {

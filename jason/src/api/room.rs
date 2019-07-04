@@ -145,7 +145,7 @@ impl InnerRoom {
         // iterate through tracks and create all connections
         for track in tracks.as_slice() {
             match &track.direction {
-                Direction::Send { ref receivers } => {
+                Direction::Send { ref receivers, .. } => {
                     for receiver in receivers {
                         create_connection(self, receiver);
                     }
@@ -183,54 +183,59 @@ impl EventHandler for InnerRoom {
         self.create_connections_from_tracks(&tracks);
 
         let rpc = Rc::clone(&self.rpc);
-        // sync provided tracks and process sdp
-        spawn_local(
-            peer.update_tracks(tracks, &self.media_manager)
-                .and_then(move |_| match sdp_offer {
-                    None => Either::A(peer.create_and_set_offer().and_then(
-                        move |sdp_offer: String| {
+
+        let fut = match sdp_offer {
+            // this is offerrer
+            None => Either::A(
+                peer.update_tracks(tracks, &self.media_manager)
+                    .and_then(move |_| {
+                        peer.create_and_set_offer().and_then(move |sdp_offer| {
                             rpc.send_command(Command::MakeSdpOffer {
                                 peer_id,
                                 sdp_offer,
-                                mids: peer.get_send_mids().unwrap(),
+                                mids: peer.get_mids().unwrap(),
                             });
                             Ok(())
-                        },
-                    )),
-                    Some(offer) => {
-                        let peer_rc = Rc::clone(&peer);
-                        Either::B(
-                            peer.set_remote_offer(&offer)
-                                .and_then(move |_| peer.create_and_set_answer())
-                                .and_then(move |sdp_answer| {
-                                    rpc.send_command(Command::MakeSdpAnswer {
-                                        peer_id,
-                                        sdp_answer,
-                                        mids: peer_rc.get_send_mids().unwrap(),
-                                    });
-                                    Ok(())
-                                }),
-                        )
-                    }
-                })
-                .map_err(|err: WasmErr| err.log_err()),
-        );
+                        })
+                    })
+                    .map_err(|err| err.log_err()),
+            ),
+            Some(offer) => {
+                // this is answerer
+                let media_manager = Rc::clone(&self.media_manager);
+                Either::B(
+                    peer.set_remote_offer(&offer)
+                        .and_then(move |_| {
+                            peer.create_and_set_answer().and_then(
+                                move |sdp_answer| {
+                                    peer.update_tracks(tracks, &media_manager)
+                                        .and_then(move |_| {
+                                            rpc.send_command(
+                                                Command::MakeSdpAnswer {
+                                                    peer_id,
+                                                    sdp_answer,
+                                                },
+                                            );
+                                            Ok(())
+                                        })
+                                },
+                            )
+                        })
+                        .map_err(|err| err.log_err()),
+                )
+            }
+        };
+
+        spawn_local(fut);
     }
 
     /// Applies specified SDP Answer to specified [`PeerConnection`].
-    fn on_sdp_answer_made(
-        &mut self,
-        peer_id: PeerId,
-        sdp_answer: String,
-        mids: HashMap<u64, String>,
-    ) {
+    fn on_sdp_answer_made(&mut self, peer_id: PeerId, sdp_answer: String) {
         if let Some(peer) = self.peers.get_peer(peer_id) {
-            spawn_local(peer.set_remote_answer(&sdp_answer, mids).or_else(
-                |err| {
-                    err.log_err();
-                    Err(())
-                },
-            ));
+            spawn_local(peer.set_remote_answer(&sdp_answer).or_else(|err| {
+                err.log_err();
+                Err(())
+            }));
         } else {
             // TODO: No peer, whats next?
             WasmErr::build_from_str(format!(

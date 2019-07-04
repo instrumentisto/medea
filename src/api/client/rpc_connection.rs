@@ -182,14 +182,13 @@ pub mod test {
                             Command::MakeSdpAnswer {
                                 peer_id,
                                 sdp_answer: "responder_answer".into(),
-                                mids: Some(mids),
                             },
                         )),
                         None => self.room.do_send(CommandMessage::from(
                             Command::MakeSdpOffer {
                                 peer_id,
                                 sdp_offer: "caller_offer".into(),
-                                mids: Some(mids),
+                                mids: mids,
                             },
                         )),
                     }
@@ -217,7 +216,6 @@ pub mod test {
                 Event::SdpAnswerMade {
                     peer_id: _,
                     sdp_answer: _,
-                    mids: _,
                 } => {}
             }
         }

@@ -41,11 +41,7 @@ pub enum Command {
         mids: HashMap<u64, String>,
     },
     /// Web Client sends SDP Answer.
-    MakeSdpAnswer {
-        peer_id: u64,
-        sdp_answer: String,
-        mids: HashMap<u64, String>,
-    },
+    MakeSdpAnswer { peer_id: u64, sdp_answer: String },
     /// Web Client sends Ice Candidate.
     SetIceCandidate {
         peer_id: u64,
@@ -71,11 +67,7 @@ pub enum Event {
     },
     /// Media Server notifies Web Client about necessity to apply specified SDP
     /// Answer to Web Client's RTCPeerConnection.
-    SdpAnswerMade {
-        peer_id: u64,
-        sdp_answer: String,
-        mids: HashMap<u64, String>,
-    },
+    SdpAnswerMade { peer_id: u64, sdp_answer: String },
 
     /// Media Server notifies Web Client about necessity to apply specified
     /// ICE Candidate.
@@ -131,8 +123,14 @@ pub struct IceServer {
 #[cfg_attr(feature = "jason", derive(Deserialize))]
 #[cfg_attr(test, derive(Debug, PartialEq))]
 pub enum Direction {
-    Send { receivers: Vec<u64> },
-    Recv { sender: u64, mid: Option<String> },
+    Send {
+        receivers: Vec<u64>,
+        mid: Option<String>,
+    },
+    Recv {
+        sender: u64,
+        mid: Option<String>,
+    },
 }
 
 /// Type of [`Track`].
@@ -312,7 +310,6 @@ mod test {
         let event = ServerMsg::Event(Event::SdpAnswerMade {
             peer_id: 45,
             sdp_answer: "answer".to_owned(),
-            mids: None,
         });
         #[cfg_attr(nightly, rustfmt::skip)]
             let event_str =
@@ -320,8 +317,7 @@ mod test {
                 \"event\":\"SdpAnswerMade\",\
                 \"data\":{\
                     \"peer_id\":45,\
-	                \"sdp_answer\":\"answer\",\
-	                \"mids\":null\
+                    \"sdp_answer\":\"answer\"\
                 }\
             }";
 

@@ -35,7 +35,7 @@ impl MediaConnections {
     }
 
     /// Returns map of track id to corresponding transceiver mid.
-    pub fn get_send_mids(&self) -> Result<HashMap<u64, String>, WasmErr> {
+    pub fn get_mids(&self) -> Result<HashMap<u64, String>, WasmErr> {
         let mut mids = HashMap::new();
         for (track_id, sender) in &self.senders {
             mids.insert(
@@ -46,27 +46,44 @@ impl MediaConnections {
             );
         }
 
+        for (track_id, receiver) in &self.receivers {
+            mids.insert(
+                *track_id,
+                receiver.transceiver.mid().ok_or_else(|| {
+                    WasmErr::build_from_str("Peer has senders without mid")
+                })?,
+            );
+        }
+
         Ok(mids)
     }
 
     // TODO: Doesnt really updates anything, but only generates new senders and
     //       receivers atm.
-    pub fn update_track(&mut self, track: Track) {
+    pub fn update_track(&mut self, track: Track) -> Result<(), WasmErr> {
         match track.direction {
-            Direction::Send { .. } => {
+            Direction::Send { receivers, mid } => {
                 self.need_new_stream = true;
+
                 self.senders.insert(
                     track.id,
-                    Sender::new(track.id, track.media_type, &self.peer),
+                    Sender::new(track.id, track.media_type, &self.peer, mid)?,
                 );
             }
             Direction::Recv { sender, mid } => {
                 self.receivers.insert(
                     track.id,
-                    Receiver::new(track.id, track.media_type, sender, mid),
+                    Receiver::new(
+                        track.id,
+                        track.media_type,
+                        sender,
+                        &self.peer,
+                        mid,
+                    ),
                 );
             }
         }
+        Ok(())
     }
 
     /// Check if [`Sender`]s require new [`MediaStream`].
@@ -141,7 +158,7 @@ impl MediaConnections {
                         receiver.caps.clone(),
                     );
 
-                    receiver.transceiver.replace(transceiver);
+                    receiver.transceiver = transceiver;
                     receiver.track.replace(track);
                     return Some(receiver);
                 }
@@ -149,15 +166,6 @@ impl MediaConnections {
         }
 
         None
-    }
-
-    /// Update this peer [`Receiver`]s mids.
-    pub fn set_recv_mids(&mut self, mids: HashMap<u64, String>) {
-        for (track_id, mid) in mids {
-            if let Some(receiver) = self.receivers.get_mut(&track_id) {
-                receiver.mid.replace(mid);
-            }
-        }
     }
 
     /// Returns [`Receiver`]s that share provided sender id.
@@ -187,25 +195,52 @@ impl Sender {
         track_id: TrackId,
         caps: MediaType,
         peer: &Rc<RtcPeerConnection>,
-    ) -> Self {
-        let transceiver = match caps {
-            MediaType::Audio(_) => {
-                let mut init = RtcRtpTransceiverInit::new();
-                init.direction(RtcRtpTransceiverDirection::Sendonly);
-                peer.add_transceiver_with_str_and_init("audio", &init)
-            }
-            MediaType::Video(_) => {
-                let mut init = RtcRtpTransceiverInit::new();
-                init.direction(RtcRtpTransceiverDirection::Sendonly);
-                peer.add_transceiver_with_str_and_init("video", &init)
-            }
+        mid: Option<String>
+    ) -> Result<Self, WasmErr> {
+
+        let transceiver = match mid {
+            None => match caps {
+                MediaType::Audio(_) => {
+                    let mut init = RtcRtpTransceiverInit::new();
+                    init.direction(RtcRtpTransceiverDirection::Sendonly);
+                    peer.add_transceiver_with_str_and_init("audio", &init)
+                }
+                MediaType::Video(_) => {
+                    let mut init = RtcRtpTransceiverInit::new();
+                    init.direction(RtcRtpTransceiverDirection::Sendonly);
+                    peer.add_transceiver_with_str_and_init("video", &init)
+                }
+            },
+            Some(mid) => {
+
+                let mut transceiver = None;
+
+                // find transceiver in peer transceiver by provided mid
+                let transceivers = js_sys::try_iter(&peer.get_transceivers()).unwrap().unwrap();
+                for tr in transceivers {
+                    let tr: RtcRtpTransceiver = RtcRtpTransceiver::from(tr.unwrap());
+                    if let Some(tr_mid) = tr.mid(){
+                        if mid.eq(&tr_mid){
+                            transceiver = Some(tr);
+                            break;
+                        }
+                    }
+                }
+
+                match transceiver {
+                    None => {
+                        return Err(WasmErr::build_from_str(format!("Unable to find transceiver with provided mid {}", mid)))
+                    },
+                    Some(tr) => tr,
+                }
+            },
         };
 
-        Self {
+        Ok(Self {
             track_id,
             transceiver,
             caps,
-        }
+        })
     }
 }
 
@@ -218,7 +253,7 @@ pub struct Receiver {
     track_id: TrackId,
     caps: MediaType,
     sender_id: u64,
-    transceiver: Option<RtcRtpTransceiver>,
+    transceiver: RtcRtpTransceiver,
     mid: Option<String>,
     track: Option<Rc<MediaTrack>>,
 }
@@ -228,13 +263,27 @@ impl Receiver {
         track_id: TrackId,
         caps: MediaType,
         sender_id: u64,
+        peer: &Rc<RtcPeerConnection>,
         mid: Option<String>,
     ) -> Self {
+        let transceiver = match caps {
+            MediaType::Audio(_) => {
+                let mut init = RtcRtpTransceiverInit::new();
+                init.direction(RtcRtpTransceiverDirection::Recvonly);
+                peer.add_transceiver_with_str_and_init("audio", &init)
+            }
+            MediaType::Video(_) => {
+                let mut init = RtcRtpTransceiverInit::new();
+                init.direction(RtcRtpTransceiverDirection::Recvonly);
+                peer.add_transceiver_with_str_and_init("video", &init)
+            }
+        };
+
         Self {
             track_id,
             caps,
             sender_id,
-            transceiver: None,
+            transceiver,
             mid,
             track: None,
         }

@@ -159,8 +159,8 @@ impl PeerConnection {
     ///
     /// [1]: https://tools.ietf.org/html/rfc4566#section-5.14
     /// [2]: https://www.w3.org/TR/webrtc/#rtcrtptransceiver-interface
-    pub fn get_send_mids(&self) -> Result<HashMap<u64, String>, WasmErr> {
-        self.media_connections.borrow().get_send_mids()
+    pub fn get_mids(&self) -> Result<HashMap<u64, String>, WasmErr> {
+        self.media_connections.borrow().get_mids()
     }
 
     /// Obtain SDP Offer from underlying [`RTCPeerConnection`][1] and set it as
@@ -171,6 +171,13 @@ impl PeerConnection {
     pub fn create_and_set_offer(
         &self,
     ) -> impl Future<Item = String, Error = WasmErr> {
+        use web_sys::console;
+        console::error_1(&wasm_bindgen::JsValue::from(
+            "before create_and_set_offer",
+        ));
+        console::error_1(&self.peer.get_transceivers());
+        let peer_rc = Rc::clone(&self.peer);
+
         let inner = Rc::clone(&self.peer);
         JsFuture::from(self.peer.create_offer())
             .map(RtcSessionDescription::from)
@@ -193,6 +200,13 @@ impl PeerConnection {
     pub fn create_and_set_answer(
         &self,
     ) -> impl Future<Item = String, Error = WasmErr> {
+        use web_sys::console;
+        console::error_1(&wasm_bindgen::JsValue::from(
+            "before create_and_set_answer",
+        ));
+        console::error_1(&self.peer.get_transceivers());
+        let peer_rc = Rc::clone(&self.peer);
+
         let inner = Rc::clone(&self.peer);
         JsFuture::from(self.peer.create_answer())
             .map(RtcSessionDescription::from)
@@ -213,10 +227,7 @@ impl PeerConnection {
     pub fn set_remote_answer(
         &self,
         answer: &str,
-        mids: HashMap<u64, String>,
     ) -> impl Future<Item = (), Error = WasmErr> {
-        self.media_connections.borrow_mut().set_recv_mids(mids);
-
         let mut desc = RtcSessionDescriptionInit::new(RtcSdpType::Answer);
         desc.sdp(answer);
 

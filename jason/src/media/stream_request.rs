@@ -75,7 +75,7 @@ impl SimpleStreamRequest {
                     MediaType::Audio(audio.clone()),
                 ))
             } else {
-                return Err(WasmErr::build_from_str(
+                return Err(WasmErr::from(
                     "Provided MediaStream was expected to have single audio \
                      track",
                 ));
@@ -100,7 +100,7 @@ impl SimpleStreamRequest {
                     MediaType::Video(video.clone()),
                 ))
             } else {
-                return Err(WasmErr::build_from_str(
+                return Err(WasmErr:from(
                     "Provided MediaStream was expected to have single video \
                      track",
                 ));
