@@ -71,13 +71,13 @@ impl SerdeMemberSpec {
 impl MemberSpec for SerdeMemberSpec {
     fn webrtc_play_endpoints(
         &self,
-    ) -> HashMap<WebRtcPlayId, Box<&WebRtcPlayEndpoint>> {
+    ) -> HashMap<WebRtcPlayId, Box<dyn WebRtcPlayEndpoint>> {
         self.pipeline
             .iter()
             .filter_map(|(id, e)| match e {
                 Element::WebRtcPlayEndpoint { spec } => Some((
                     WebRtcPlayId(id.clone()),
-                    Box::new(spec as &WebRtcPlayEndpoint),
+                    Box::new(spec.clone()) as Box<dyn WebRtcPlayEndpoint>,
                 )),
                 _ => None,
             })
@@ -86,13 +86,13 @@ impl MemberSpec for SerdeMemberSpec {
 
     fn webrtc_publish_endpoints(
         &self,
-    ) -> HashMap<WebRtcPublishId, Box<&WebRtcPublishEndpoint>> {
+    ) -> HashMap<WebRtcPublishId, Box<dyn WebRtcPublishEndpoint>> {
         self.pipeline
             .iter()
             .filter_map(|(id, e)| match e {
                 Element::WebRtcPublishEndpoint { spec } => Some((
                     WebRtcPublishId(id.clone()),
-                    Box::new(spec as &WebRtcPublishEndpoint),
+                    Box::new(spec.clone()) as Box<dyn WebRtcPublishEndpoint>,
                 )),
                 _ => None,
             })

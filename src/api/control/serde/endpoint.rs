@@ -53,8 +53,8 @@ pub struct SerdeWebRtcPublishEndpoint {
 }
 
 impl WebRtcPublishEndpoint for SerdeWebRtcPublishEndpoint {
-    fn p2p(&self) -> &P2pMode {
-        &self.p2p
+    fn p2p(&self) -> P2pMode {
+        self.p2p.clone()
     }
 }
 
@@ -67,8 +67,8 @@ pub struct SerdeWebRtcPlayEndpoint {
 }
 
 impl WebRtcPlayEndpoint for SerdeWebRtcPlayEndpoint {
-    fn src(&self) -> &SrcUri {
-        &self.src
+    fn src(&self) -> SrcUri {
+        self.src.clone()
     }
 }
 

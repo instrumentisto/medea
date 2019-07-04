@@ -24,11 +24,11 @@ pub use Id as MemberId;
 pub trait MemberSpec {
     fn webrtc_play_endpoints(
         &self,
-    ) -> HashMap<WebRtcPlayId, Box<&dyn WebRtcPlayEndpoint>>;
+    ) -> HashMap<WebRtcPlayId, Box<dyn WebRtcPlayEndpoint>>;
 
     fn webrtc_publish_endpoints(
         &self,
-    ) -> HashMap<WebRtcPublishId, Box<&dyn WebRtcPublishEndpoint>>;
+    ) -> HashMap<WebRtcPublishId, Box<dyn WebRtcPublishEndpoint>>;
 
     fn credentials(&self) -> &String;
 

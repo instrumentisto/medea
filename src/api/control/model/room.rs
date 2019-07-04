@@ -22,7 +22,7 @@ macro_attr! {
 pub use Id as RoomId;
 
 pub trait RoomSpec {
-    fn members(&self) -> HashMap<&MemberId, Box<&dyn MemberSpec>>;
+    fn members(&self) -> HashMap<MemberId, Box<dyn MemberSpec>>;
 
     fn id(&self) -> &Id;
 

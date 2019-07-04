@@ -25,5 +25,5 @@ macro_attr! {
 }
 
 pub trait WebRtcPlayEndpoint {
-    fn src(&self) -> &SerdeSrcUri;
+    fn src(&self) -> SerdeSrcUri;
 }

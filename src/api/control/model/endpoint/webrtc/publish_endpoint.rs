@@ -21,5 +21,5 @@ macro_attr! {
 pub use Id as WebRtcPublishId;
 
 pub trait WebRtcPublishEndpoint {
-    fn p2p(&self) -> &P2pMode;
+    fn p2p(&self) -> P2pMode;
 }

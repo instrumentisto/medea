@@ -62,10 +62,12 @@ impl ParsedSerdeRoomSpec {
 }
 
 impl RoomSpec for ParsedSerdeRoomSpec {
-    fn members(&self) -> HashMap<&MemberId, Box<&MemberSpec>> {
+    fn members(&self) -> HashMap<MemberId, Box<dyn MemberSpec>> {
         self.members
             .iter()
-            .map(|(id, member)| (id, Box::new(member as &MemberSpec)))
+            .map(|(id, member)| {
+                (id.clone(), Box::new(member.clone()) as Box<dyn MemberSpec>)
+            })
             .collect()
     }
 
