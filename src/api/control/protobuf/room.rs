@@ -8,7 +8,7 @@ use crate::api::{
 use super::member::GrpcMember;
 
 #[allow(dead_code)]
-struct CreateRequestSpec(CreateRequest);
+pub struct CreateRequestSpec(pub CreateRequest);
 
 impl RoomSpec for CreateRequestSpec {
     fn members(&self) -> HashMap<MemberId, Box<dyn MemberSpec>> {

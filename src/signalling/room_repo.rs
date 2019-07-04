@@ -32,4 +32,8 @@ impl RoomsRepository {
     pub fn remove(&self, id: &RoomId) {
         self.rooms.lock().unwrap().remove(id);
     }
+
+    pub fn add(&self, id: RoomId, room: Addr<Room>) {
+        self.rooms.lock().unwrap().insert(id, room);
+    }
 }

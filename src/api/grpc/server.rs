@@ -16,6 +16,12 @@ use crate::{
 };
 
 use super::protos::control_grpc::{create_control_api, ControlApi};
+use crate::{
+    api::control::{model::room::RoomSpec, protobuf::room::CreateRequestSpec},
+    conf::Conf,
+    signalling::Room,
+};
+use std::time::Duration;
 
 #[derive(Clone)]
 struct ControlApiService {
@@ -26,11 +32,25 @@ impl ControlApi for ControlApiService {
     fn create(
         &mut self,
         _ctx: RpcContext,
-        _req: CreateRequest,
+        req: CreateRequest,
         _sink: UnarySink<Response>,
     ) {
-        self.room_repository
-            .remove(&RoomId("pub-sub-video-call".to_string()));
+        // TODO
+        let room_id = RoomId(req.get_id().to_string());
+
+        let room = Room::start_in_arbiter(&Arbiter::new(), |_| {
+            let room_spec = CreateRequestSpec(req);
+            let room_spec = Box::new(&room_spec as &RoomSpec);
+
+            let turn_auth_service =
+                crate::turn::service::new_turn_auth_service(&Conf::default())
+                    .expect("Unable to start turn service");
+            Room::new(&room_spec, Duration::from_secs(10), turn_auth_service)
+                .unwrap()
+        });
+
+        self.room_repository.add(room_id, room);
+
         debug!("{:?}", self.room_repository);
     }
 
