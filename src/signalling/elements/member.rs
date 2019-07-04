@@ -7,10 +7,7 @@ use hashbrown::HashMap;
 use medea_client_api_proto::IceServer;
 
 use crate::{
-    api::control::{
-        model::MemberId,
-        serde::{SerdeRoomSpec, TryFromElementError},
-    },
+    api::control::{model::MemberId, serde::TryFromElementError},
     log::prelude::*,
     media::{IceUser, PeerId},
 };
@@ -18,9 +15,7 @@ use crate::{
 use super::endpoints::webrtc::{
     WebRtcPlayEndpoint, WebRtcPlayId, WebRtcPublishEndpoint, WebRtcPublishId,
 };
-use crate::api::control::{
-    model::room::RoomSpec, serde::room::ParsedSerdeRoomSpec,
-};
+use crate::api::control::model::room::RoomSpec;
 
 /// Errors which may occur while loading [`Member`]s from [`RoomSpec`].
 #[derive(Debug, Fail)]
@@ -354,10 +349,12 @@ pub fn parse_members(
 
 #[cfg(test)]
 mod tests {
-    use std::rc::Rc;
+    use std::{convert::TryFrom as _, rc::Rc};
 
-    use crate::api::control::{model::MemberId, serde::Element};
-    use std::convert::TryFrom as _;
+    use crate::api::control::{
+        model::MemberId,
+        serde::{room::ParsedSerdeRoomSpec, Element, SerdeRoomSpec},
+    };
 
     use super::*;
 

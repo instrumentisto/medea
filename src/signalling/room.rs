@@ -20,7 +20,7 @@ use crate::{
         },
         control::{
             model::{room::RoomSpec, MemberId, RoomId},
-            serde::{SerdeRoomSpec, TryFromElementError},
+            serde::TryFromElementError,
         },
     },
     log::prelude::*,
