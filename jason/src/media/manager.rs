@@ -96,6 +96,6 @@ impl MediaManager {
 
 impl Drop for InnerMediaManager {
     fn drop(&mut self) {
-        WasmErr::build_from_str("Drop for InnerMediaManager").log_err();
+        WasmErr::from("Drop for InnerMediaManager").log_err();
     }
 }

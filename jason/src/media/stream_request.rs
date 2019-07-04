@@ -100,7 +100,7 @@ impl SimpleStreamRequest {
                     MediaType::Video(video.clone()),
                 ))
             } else {
-                return Err(WasmErr:from(
+                return Err(WasmErr::from(
                     "Provided MediaStream was expected to have single video \
                      track",
                 ));
@@ -116,15 +116,15 @@ impl TryFrom<StreamRequest> for SimpleStreamRequest {
 
     fn try_from(value: StreamRequest) -> Result<Self, Self::Error> {
         if value.video.len() > 1 {
-            Err(WasmErr::build_from_str(
+            Err(WasmErr::from(
                 "Only one video track allowed in SimpleStreamRequest",
             ))
         } else if value.audio.len() > 1 {
-            Err(WasmErr::build_from_str(
+            Err(WasmErr::from(
                 "Only one audio track allowed in SimpleStreamRequest",
             ))
         } else if value.video.len() + value.audio.len() < 1 {
-            Err(WasmErr::build_from_str(
+            Err(WasmErr::from(
                 "SimpleStreamRequest should have at least on track",
             ))
         } else {

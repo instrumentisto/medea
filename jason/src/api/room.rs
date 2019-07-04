@@ -41,7 +41,7 @@ impl RoomHandle {
             inner.borrow_mut().on_new_connection.set_func(f);
             Ok(())
         } else {
-            Err(WasmErr::build_from_str("Detached state").into())
+            Err(WasmErr::from("Detached state").into())
         }
     }
 }
@@ -238,7 +238,7 @@ impl EventHandler for InnerRoom {
             }));
         } else {
             // TODO: No peer, whats next?
-            WasmErr::build_from_str(format!(
+            WasmErr::from(format!(
                 "Peer with id {} doesnt exist",
                 peer_id
             ));
@@ -262,7 +262,7 @@ impl EventHandler for InnerRoom {
             );
         } else {
             // TODO: No peer, whats next?
-            WasmErr::build_from_str(format!(
+            WasmErr::from(format!(
                 "Peer with id {} doesnt exist",
                 peer_id
             ));
@@ -308,7 +308,7 @@ impl PeerEventHandler for InnerRoom {
         remote_stream: MediaStream,
     ) {
         match self.connections.get(&sender_id) {
-            None => WasmErr::build_from_str(
+            None => WasmErr::from(
                 "NewRemoteStream from sender without connection",
             )
             .log_err(),

@@ -24,27 +24,17 @@ impl WasmErr {
     pub fn log_err(&self) {
         console::error_1(&JsValue::from_str(&format!("{}", self)));
     }
+}
 
-    pub fn build_from_str<S>(msg: S) -> Self
-    where
-        S: Into<Cow<'static, str>>,
-    {
-        WasmErr::Custom(msg.into())
+impl From<&'static str> for WasmErr {
+    fn from(msg: &'static str) -> Self {
+        WasmErr::Custom(Cow::Borrowed(msg))
     }
 }
 
-impl Display for WasmErr {
-    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        match self {
-            WasmErr::JsError(err) => {
-                write!(f, "{}", String::from(err.to_string()))
-            }
-            WasmErr::Custom(reason) => write!(f, "{}", reason),
-            WasmErr::Untyped(val) => match val.as_string() {
-                Some(reason) => write!(f, "{}", reason),
-                None => write!(f, "no str representation for JsError"),
-            },
-        }
+impl From<String> for WasmErr {
+    fn from(msg: String) -> Self {
+        WasmErr::Custom(Cow::Owned(msg))
     }
 }
 
@@ -67,6 +57,21 @@ impl From<WasmErr> for JsValue {
     }
 }
 
+impl Display for WasmErr {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        match self {
+            WasmErr::JsError(err) => {
+                write!(f, "{}", String::from(err.to_string()))
+            }
+            WasmErr::Custom(reason) => write!(f, "{}", reason),
+            WasmErr::Untyped(val) => match val.as_string() {
+                Some(reason) => write!(f, "{}", reason),
+                None => write!(f, "no str representation for JsError"),
+            },
+        }
+    }
+}
+
 macro_rules! impl_from_error {
     ($error:ty) => {
         impl From<$error> for WasmErr {
@@ -79,5 +84,5 @@ macro_rules! impl_from_error {
 
 impl_from_error!(std::cell::BorrowError);
 impl_from_error!(serde_json::error::Error);
-// TODO: improve macro to use generics
+//// TODO: improve macro to use generics
 impl_from_error!(futures::sync::mpsc::SendError<proto::Event>);

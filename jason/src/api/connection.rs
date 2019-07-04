@@ -37,7 +37,7 @@ impl ConnectionHandle {
             inner.borrow_mut().on_remote_stream.set_func(f);
             Ok(())
         } else {
-            Err(WasmErr::build_from_str("Detached state").into())
+            Err(WasmErr::from("Detached state").into())
         }
     }
 
@@ -46,7 +46,7 @@ impl ConnectionHandle {
         if let Some(inner) = self.0.upgrade() {
             Ok(inner.borrow().remote_member)
         } else {
-            Err(WasmErr::build_from_str("Detached state").into())
+            Err(WasmErr::from("Detached state").into())
         }
     }
 }

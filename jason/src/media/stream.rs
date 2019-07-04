@@ -101,7 +101,7 @@ impl MediaStreamHandle {
     pub fn get_media_stream(&self) -> Result<SysMediaStream, JsValue> {
         match self.0.upgrade() {
             Some(inner) => Ok(inner.stream.clone()),
-            None => Err(WasmErr::build_from_str("Detached state").into()),
+            None => Err(WasmErr::from("Detached state").into()),
         }
     }
 }

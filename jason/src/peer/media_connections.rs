@@ -41,7 +41,7 @@ impl MediaConnections {
             mids.insert(
                 *track_id,
                 sender.transceiver.mid().ok_or_else(|| {
-                    WasmErr::build_from_str("Peer has senders without mid")
+                    WasmErr::from("Peer has senders without mid")
                 })?,
             );
         }
@@ -50,7 +50,7 @@ impl MediaConnections {
             mids.insert(
                 *track_id,
                 receiver.transceiver.mid().ok_or_else(|| {
-                    WasmErr::build_from_str("Peer has senders without mid")
+                    WasmErr::from("Peer has senders without mid")
                 })?,
             );
         }
@@ -109,7 +109,7 @@ impl MediaConnections {
         for sender in self.senders.values() {
             if !stream.has_track(sender.track_id) {
                 return future::Either::A(future::err(
-                    WasmErr::build_from_str(
+                    WasmErr::from(
                         "Stream does not have all necessary tracks",
                     ),
                 ));
@@ -229,7 +229,7 @@ impl Sender {
 
                 match transceiver {
                     None => {
-                        return Err(WasmErr::build_from_str(format!("Unable to find transceiver with provided mid {}", mid)))
+                        return Err(WasmErr::from(format!("Unable to find transceiver with provided mid {}", mid)))
                     },
                     Some(tr) => tr,
                 }
