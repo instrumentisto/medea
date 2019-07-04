@@ -8,7 +8,7 @@ use hashbrown::HashMap;
 use crate::{api::control::RoomId, signalling::Room};
 
 /// Repository that stores [`Room`]s addresses.
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Debug)]
 pub struct RoomsRepository {
     // TODO: Use crossbeam's concurrent hashmap when its done.
     //       [Tracking](https://github.com/crossbeam-rs/rfcs/issues/32).
@@ -27,5 +27,9 @@ impl RoomsRepository {
     pub fn get(&self, id: &RoomId) -> Option<Addr<Room>> {
         let rooms = self.rooms.lock().unwrap();
         rooms.get(id).cloned()
+    }
+
+    pub fn remove(&self, id: &RoomId) {
+        self.rooms.lock().unwrap().remove(id);
     }
 }
