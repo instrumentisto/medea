@@ -45,7 +45,6 @@ impl TurnDatabase {
         // Its safe to unwrap here, since this err comes directly from mio and
         // means that mio doesnt have bindings for this target, which wont
         // happen.
-        debug!("runtime created in repo.rs");
         let mut runtime = tokio::runtime::Runtime::new()
             .expect("Unable to create a runtime in TurnDatabase");
         let pool = runtime.block_on(future::lazy(move || {

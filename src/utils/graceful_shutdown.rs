@@ -125,20 +125,7 @@ fn handle_shutdown() {
 
 pub fn create(shutdown_timeout: u64, actix_system: System) {
     let mut global_shutdown_timeout = STATIC_STRUCT.timeout.lock().unwrap();
-
     *global_shutdown_timeout = shutdown_timeout;
-
-    //TODO: this looks much less boilerplate:
-    //    let int = Signal::new(SIGINT).flatten_stream();
-    //    let term = Signal::new(SIGTERM).flatten_stream();
-    //    let quit = Signal::new(SIGQUIT).flatten_stream();
-    //
-    //    let signal_stream = int.select(term).select(quit);
-    //
-    //    tokio::runtime::current_thread::run(signal_stream.into_future().and_then(move|(signal, _)|{
-    //          my handler
-    //    }).map_err(|err| ()));
-    //
 
     #[cfg(unix)]
     {
@@ -154,22 +141,17 @@ pub fn create(shutdown_timeout: u64, actix_system: System) {
             .select(sigquit_stream)
             .select(sighup_stream);
 
-
-        let actix_system_for_sigint = actix_system.clone();
+        let actix_system_for_signal = actix_system.clone();
         let handler = move |signal| {
-
-            let actix_system_for_sigint_move = actix_system_for_sigint.clone();
-
+            let actix_system_for_signal_move = actix_system_for_signal.clone();
             thread::spawn(move || {
                 let shutdown_timeout = STATIC_STRUCT.timeout.lock().unwrap();
                 thread::sleep(Duration::from_millis(*shutdown_timeout));
-//                    std::process::exit(0x0100);
-                actix_system_for_sigint_move.stop();
+                actix_system_for_signal_move.stop();
             });
 
             self::handle_shutdown();
-            actix_system_for_sigint.stop();
-//                std::process::exit(0x0100);
+            actix_system_for_signal.stop();
         };
 
         thread::spawn(move || {
@@ -180,46 +162,4 @@ pub fn create(shutdown_timeout: u64, actix_system: System) {
         });
     }
 
-//        {
-//            // SIGHUP
-//            let sighup_stream = Signal::new(SIGHUP).flatten_stream();
-//            let actix_system_for_sighup_move = actix_system.clone();
-//            let actix_system_for_sighup = actix_system.clone();
-//            let sighup_handler = sighup_stream.for_each(move |_| {
-//                thread::spawn( || {
-//                    let shutdown_timeout = STATIC_TIMEOUT.lock().unwrap();
-//                    thread::sleep(Duration::from_millis(*shutdown_timeout));
-//                    actix_system_for_sighup_move.stop();
-//                });
-//                self::handle_shutdown(SignalKind::Hup);
-//                actix_system_for_sighup.stop();
-//                Ok(())
-//            });
-//            thread::spawn(move || {
-//                tokio::runtime::current_thread::block_on_all(sighup_handler)
-//                    .ok()
-//                    .unwrap();
-//            });
-//        }
-//        {
-//            // SIGQUIT
-//            let sigquit_stream = Signal::new(SIGQUIT).flatten_stream();
-//            let actix_system_for_sigquit_move = actix_system.clone();
-//            let actix_system_for_sigquit = actix_system.clone();
-//            let sigquit_handler = sigquit_stream.for_each(move |_| {
-//                thread::spawn(move || {
-//                    let shutdown_timeout = STATIC_TIMEOUT.lock().unwrap();
-//                    thread::sleep(Duration::from_millis(*shutdown_timeout));
-//                    actix_system_for_sigquit_move.stop();
-//                });
-//                self::handle_shutdown(SignalKind::Quit);
-//                actix_system_for_sigquit.stop();
-//                Ok(())
-//            });
-//            thread::spawn(move || {
-//                tokio::runtime::current_thread::block_on_all(sigquit_handler)
-//                    .ok()
-//                    .unwrap();
-//            });
-//        }
 }

@@ -22,6 +22,7 @@ use crate::{
     utils::graceful_shutdown,
 };
 use std::panic;
+use std::time::Duration;
 
 fn main() {
     dotenv().ok();
@@ -32,43 +33,42 @@ fn main() {
     let config = Conf::parse().unwrap();
     info!("{:?}", config);
 
-    actix::run(|| {
-//        futures::future::lazy(|| {
-            let members = hashmap! {
-            1 => Member::new(1, "caller_credentials".to_owned()),
-            2 => Member::new(2, "responder_credentials".to_owned()),
-        };
+    let sys = System::new("medea");
 
-            let peers = create_peers(1, 2);
+    let members = hashmap! {
+    1 => Member::new(1, "caller_credentials".to_owned()),
+    2 => Member::new(2, "responder_credentials".to_owned()),
+    };
 
-            graceful_shutdown::create(
-                config.system_config.shutdown_timeout,
-                System::current(),
-            );
-            let turn_auth_service = new_turn_auth_service(&config)
-                .expect("Unable to start turn service");
+    let peers = create_peers(1, 2);
 
-            let rpc_reconnect_timeout = config.rpc.reconnect_timeout;
+    graceful_shutdown::create(
+        config.system_config.shutdown_timeout,
+        System::current(),
+    );
 
-            let room = Room::start_in_arbiter(&Arbiter::new(), move |_| {
-                Room::new(
-                    1,
-                    members,
-                    peers,
-                    rpc_reconnect_timeout,
-                    turn_auth_service,
-                )
-            });
-            graceful_shutdown::subscribe(room.clone().recipient(), 1);
 
-            let rooms = hashmap! {1 => room};
-            let rooms_repo = RoomsRepository::new(rooms);
+    let turn_auth_service = new_turn_auth_service(&config)
+        .expect("Unable to start turn service");
 
-            server::run(rooms_repo, config);
+    let rpc_reconnect_timeout = config.rpc.reconnect_timeout;
 
-            futures::future::ok(())
-    //        })
-        })
-    .expect("unable to start medea");
+    let room = Room::start_in_arbiter(&Arbiter::new(), move |_| {
+        Room::new(
+            1,
+            members,
+            peers,
+            rpc_reconnect_timeout,
+            turn_auth_service,
+        )
+    });
+    graceful_shutdown::subscribe(room.clone().recipient(), 1);
 
+    let rooms = hashmap! {1 => room};
+    let rooms_repo = RoomsRepository::new(rooms);
+
+    server::run(rooms_repo, config);
+
+    let _ = sys.run();
+    std::process::exit(1);
 }
