@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use actix::{Actor, Addr, Arbiter, Context};
 use futures::future::Future;
@@ -6,22 +6,20 @@ use grpcio::{Environment, RpcContext, Server, ServerBuilder, UnarySink};
 
 use crate::{
     api::{
-        control::model::RoomId,
+        control::{
+            model::{room::RoomSpec, RoomId},
+            protobuf::room::CreateRequestSpec,
+        },
         grpc::protos::control::{
             ApplyRequest, CreateRequest, GetResponse, IdRequest, Response,
         },
     },
+    conf::Conf,
     log::prelude::*,
-    signalling::room_repo::RoomsRepository,
+    signalling::{room_repo::RoomsRepository, Room},
 };
 
 use super::protos::control_grpc::{create_control_api, ControlApi};
-use crate::{
-    api::control::{model::room::RoomSpec, protobuf::room::CreateRequestSpec},
-    conf::Conf,
-    signalling::Room,
-};
-use std::time::Duration;
 
 #[derive(Clone)]
 struct ControlApiService {

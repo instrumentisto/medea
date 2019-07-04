@@ -8,18 +8,18 @@ use crate::{
                 member::MemberSpec,
             },
             protobuf::{
-                webrtc_play_endpoint::GrpcWebRtcPlayEndpoint,
-                webrtc_publish_endpoint::GrpcWebRtcPublishEndpoint,
+                webrtc_play_endpoint::GrpcWebRtcPlayEndpointSpecImpl,
+                webrtc_publish_endpoint::GrpcWebRtcPublishEndpointSpecImpl,
             },
         },
-        grpc::protos::control::Member,
+        grpc::protos::control::Member as MemberProto,
     },
     signalling::elements::endpoints::webrtc::{WebRtcPlayId, WebRtcPublishId},
 };
 
-pub struct GrpcMember(pub Member);
+pub struct GrpcMemberSpecImpl(pub MemberProto);
 
-impl MemberSpec for GrpcMember {
+impl MemberSpec for GrpcMemberSpecImpl {
     fn webrtc_play_endpoints(
         &self,
     ) -> HashMap<WebRtcPlayId, Box<dyn WebRtcPlayEndpoint>> {
@@ -31,7 +31,7 @@ impl MemberSpec for GrpcMember {
                     let endpoint = element.get_webrtc_play().clone();
                     Some((
                         WebRtcPlayId(id.clone()),
-                        Box::new(GrpcWebRtcPlayEndpoint(endpoint))
+                        Box::new(GrpcWebRtcPlayEndpointSpecImpl(endpoint))
                             as Box<dyn WebRtcPlayEndpoint>,
                     ))
                 } else {
@@ -52,7 +52,7 @@ impl MemberSpec for GrpcMember {
                     let endpoint = element.get_webrtc_pub().clone();
                     Some((
                         WebRtcPublishId(id.clone()),
-                        Box::new(GrpcWebRtcPublishEndpoint(endpoint))
+                        Box::new(GrpcWebRtcPublishEndpointSpecImpl(endpoint))
                             as Box<dyn WebRtcPublishEndpoint>,
                     ))
                 } else {
@@ -78,7 +78,7 @@ impl MemberSpec for GrpcMember {
         let element = self.0.pipeline.get(&id.0)?;
         if element.has_webrtc_play() {
             let play = element.get_webrtc_play().clone();
-            let play = GrpcWebRtcPlayEndpoint(play);
+            let play = GrpcWebRtcPlayEndpointSpecImpl(play);
             Some(Box::new(play) as Box<dyn WebRtcPlayEndpoint>)
         } else {
             None
@@ -92,7 +92,7 @@ impl MemberSpec for GrpcMember {
         let element = self.0.pipeline.get(&id.0)?;
         if element.has_webrtc_pub() {
             let publish = element.get_webrtc_pub().clone();
-            let play = GrpcWebRtcPublishEndpoint(publish);
+            let play = GrpcWebRtcPublishEndpointSpecImpl(publish);
             Some(Box::new(play) as Box<dyn WebRtcPublishEndpoint>)
         } else {
             None

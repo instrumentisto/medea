@@ -16,7 +16,7 @@ use hashbrown::HashMap;
 use crate::{
     api::control::{
         model::{room::RoomSpec, RoomId},
-        serde::{load_static_specs_from_dir, room::ParsedSerdeRoomSpec},
+        serde::{load_static_specs_from_dir, room::SerdeRoomSpecImpl},
     },
     conf::Conf,
     signalling::{room::RoomError, Room},
@@ -85,7 +85,7 @@ pub fn start_static_rooms(
             let room_id = spec.id().clone();
             let rpc_reconnect_timeout = config.rpc.reconnect_timeout;
             let room = Room::start_in_arbiter(&arbiter, move |_| {
-                let parsed_spec = ParsedSerdeRoomSpec::new(&spec).unwrap();
+                let parsed_spec = SerdeRoomSpecImpl::new(&spec).unwrap();
                 let parsed_spec = Box::new(&parsed_spec as &RoomSpec);
                 Room::new(
                     &parsed_spec,

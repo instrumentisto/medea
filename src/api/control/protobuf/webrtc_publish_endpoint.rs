@@ -4,14 +4,14 @@ use crate::api::{
         serde::endpoint::P2pMode,
     },
     grpc::protos::control::{
-        WebRtcPublishEndpoint as WebRtcPublishEndpointDto,
+        WebRtcPublishEndpoint as WebRtcPublishEndpointProto,
         WebRtcPublishEndpoint_P2P,
     },
 };
 
-pub struct GrpcWebRtcPublishEndpoint(pub WebRtcPublishEndpointDto);
+pub struct GrpcWebRtcPublishEndpointSpecImpl(pub WebRtcPublishEndpointProto);
 
-impl WebRtcPublishEndpoint for GrpcWebRtcPublishEndpoint {
+impl WebRtcPublishEndpoint for GrpcWebRtcPublishEndpointSpecImpl {
     fn p2p(&self) -> P2pMode {
         if self.0.has_p2p() {
             let p2p = self.0.get_p2p();

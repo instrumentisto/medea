@@ -12,11 +12,11 @@ use crate::api::control::{
         },
         member::MemberSpec,
     },
-    serde::Endpoint,
+    serde::SerdeEndpoint,
 };
 
 use super::{
-    endpoint::{SerdeWebRtcPlayEndpoint, SerdeWebRtcPublishEndpoint},
+    endpoint::{SerdeWebRtcPlayEndpointImpl, SerdeWebRtcPublishEndpointImpl},
     pipeline::Pipeline,
     Element, TryFromElementError,
 };
@@ -24,7 +24,7 @@ use super::{
 /// Newtype for [`Element::Member`] variant.
 #[allow(clippy::module_name_repetitions)]
 #[derive(Clone, Debug)]
-pub struct SerdeMemberSpec {
+pub struct SerdeMemberSpecImpl {
     /// Spec of this `Member`.
     pipeline: Pipeline,
 
@@ -32,9 +32,11 @@ pub struct SerdeMemberSpec {
     credentials: String,
 }
 
-impl SerdeMemberSpec {
+impl SerdeMemberSpecImpl {
     /// Returns all [`WebRtcPlayEndpoint`]s of this [`MemberSpec`].
-    pub fn play_endpoints(&self) -> HashMap<&String, &SerdeWebRtcPlayEndpoint> {
+    pub fn play_endpoints(
+        &self,
+    ) -> HashMap<&String, &SerdeWebRtcPlayEndpointImpl> {
         self.pipeline
             .iter()
             .filter_map(|(id, e)| match e {
@@ -47,7 +49,7 @@ impl SerdeMemberSpec {
     /// Returns all [`WebRtcPublishEndpoint`]s of this [`MemberSpec`].
     pub fn publish_endpoints(
         &self,
-    ) -> HashMap<WebRtcPublishId, &SerdeWebRtcPublishEndpoint> {
+    ) -> HashMap<WebRtcPublishId, &SerdeWebRtcPublishEndpointImpl> {
         self.pipeline
             .iter()
             .filter_map(|(id, e)| match e {
@@ -64,7 +66,7 @@ impl SerdeMemberSpec {
     }
 }
 
-impl MemberSpec for SerdeMemberSpec {
+impl MemberSpec for SerdeMemberSpecImpl {
     fn webrtc_play_endpoints(
         &self,
     ) -> HashMap<WebRtcPlayId, Box<dyn WebRtcPlayEndpoint>> {
@@ -105,8 +107,8 @@ impl MemberSpec for SerdeMemberSpec {
     ) -> Option<Box<dyn WebRtcPlayEndpoint>> {
         let element = self.pipeline.get(&id.0)?;
 
-        if let Some(endpoint) = Endpoint::try_from(element).ok() {
-            if let Endpoint::WebRtcPlay(e) = endpoint {
+        if let Some(endpoint) = SerdeEndpoint::try_from(element).ok() {
+            if let SerdeEndpoint::WebRtcPlay(e) = endpoint {
                 return Some(Box::new(e) as Box<dyn WebRtcPlayEndpoint>);
             }
         }
@@ -118,8 +120,8 @@ impl MemberSpec for SerdeMemberSpec {
         id: &WebRtcPublishId,
     ) -> Option<Box<dyn WebRtcPublishEndpoint>> {
         let element = self.pipeline.get(&id.0)?;
-        if let Some(endpoint) = Endpoint::try_from(element).ok() {
-            if let Endpoint::WebRtcPublish(e) = endpoint {
+        if let Some(endpoint) = SerdeEndpoint::try_from(element).ok() {
+            if let SerdeEndpoint::WebRtcPublish(e) = endpoint {
                 return Some(Box::new(e) as Box<dyn WebRtcPublishEndpoint>);
             }
         }
@@ -127,7 +129,7 @@ impl MemberSpec for SerdeMemberSpec {
     }
 }
 
-impl TryFrom<&Element> for SerdeMemberSpec {
+impl TryFrom<&Element> for SerdeMemberSpecImpl {
     type Error = TryFromElementError;
 
     fn try_from(from: &Element) -> Result<Self, Self::Error> {

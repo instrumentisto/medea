@@ -127,7 +127,7 @@ mod test {
 
     use super::*;
     use crate::api::control::{
-        model::room::RoomSpec, serde::room::ParsedSerdeRoomSpec,
+        model::room::RoomSpec, serde::room::SerdeRoomSpecImpl,
     };
 
     /// Creates [`RoomsRepository`] for tests filled with a single [`Room`].
@@ -139,7 +139,7 @@ mod test {
 
         let room_id = room_spec.id.clone();
         let client_room = Room::start_in_arbiter(&Arbiter::new(), move |_| {
-            let room_spec = ParsedSerdeRoomSpec::new(&room_spec).unwrap();
+            let room_spec = SerdeRoomSpecImpl::new(&room_spec).unwrap();
             let room_spec = Box::new(&room_spec as &RoomSpec);
             let client_room = Room::new(
                 &room_spec,

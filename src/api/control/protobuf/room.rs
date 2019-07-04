@@ -5,7 +5,7 @@ use crate::api::{
     grpc::protos::control::CreateRequest,
 };
 
-use super::member::GrpcMember;
+use super::member::GrpcMemberSpecImpl;
 
 #[allow(dead_code)]
 pub struct CreateRequestSpec(pub CreateRequest);
@@ -22,7 +22,7 @@ impl RoomSpec for CreateRequestSpec {
                         let member = e.get_member();
                         return Some((
                             MemberId(id.clone()),
-                            Box::new(GrpcMember(member.clone()))
+                            Box::new(GrpcMemberSpecImpl(member.clone()))
                                 as Box<dyn MemberSpec>,
                         ));
                     }
@@ -48,7 +48,7 @@ impl RoomSpec for CreateRequestSpec {
             let element = room.pipeline.get(&id.0)?;
             if element.has_member() {
                 let member = element.get_member().clone();
-                let member = GrpcMember(member);
+                let member = GrpcMemberSpecImpl(member);
                 Some(Box::new(member) as Box<dyn MemberSpec>)
             } else {
                 None

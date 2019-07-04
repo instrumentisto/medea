@@ -353,7 +353,7 @@ mod tests {
 
     use crate::api::control::{
         model::MemberId,
-        serde::{room::ParsedSerdeRoomSpec, Element, SerdeRoomSpec},
+        serde::{room::SerdeRoomSpecImpl, Element, SerdeRoomSpecDto},
     };
 
     use super::*;
@@ -403,8 +403,8 @@ mod tests {
 
     fn get_test_store() -> HashMap<MemberId, Rc<Member>> {
         let room_element: Element = serde_yaml::from_str(TEST_SPEC).unwrap();
-        let room_spec = SerdeRoomSpec::try_from(&room_element).unwrap();
-        let room_spec = ParsedSerdeRoomSpec::new(&room_spec).unwrap();
+        let room_spec = SerdeRoomSpecDto::try_from(&room_element).unwrap();
+        let room_spec = SerdeRoomSpecImpl::new(&room_spec).unwrap();
         let room_spec = Box::new(&room_spec as &RoomSpec);
         parse_members(&room_spec).unwrap()
     }

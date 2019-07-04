@@ -16,21 +16,21 @@ use super::{Element, TryFromElementError};
 /// [`Endpoint`] represents a media element that one or more media data streams
 /// flow through.
 #[derive(Debug)]
-pub enum Endpoint {
-    WebRtcPublish(SerdeWebRtcPublishEndpoint),
-    WebRtcPlay(SerdeWebRtcPlayEndpoint),
+pub enum SerdeEndpoint {
+    WebRtcPublish(SerdeWebRtcPublishEndpointImpl),
+    WebRtcPlay(SerdeWebRtcPlayEndpointImpl),
 }
 
-impl TryFrom<&Element> for Endpoint {
+impl TryFrom<&Element> for SerdeEndpoint {
     type Error = TryFromElementError;
 
     fn try_from(from: &Element) -> Result<Self, Self::Error> {
         match from {
             Element::WebRtcPlayEndpoint { spec } => {
-                Ok(Endpoint::WebRtcPlay(spec.clone()))
+                Ok(SerdeEndpoint::WebRtcPlay(spec.clone()))
             }
             Element::WebRtcPublishEndpoint { spec } => {
-                Ok(Endpoint::WebRtcPublish(spec.clone()))
+                Ok(SerdeEndpoint::WebRtcPublish(spec.clone()))
             }
             _ => Err(TryFromElementError::NotEndpoint),
         }
@@ -50,12 +50,12 @@ pub enum P2pMode {
 /// WebRTC.
 #[allow(clippy::module_name_repetitions)]
 #[derive(Clone, Deserialize, Debug)]
-pub struct SerdeWebRtcPublishEndpoint {
+pub struct SerdeWebRtcPublishEndpointImpl {
     /// Peer-to-peer mode.
     pub p2p: P2pMode,
 }
 
-impl WebRtcPublishEndpoint for SerdeWebRtcPublishEndpoint {
+impl WebRtcPublishEndpoint for SerdeWebRtcPublishEndpointImpl {
     fn p2p(&self) -> P2pMode {
         self.p2p.clone()
     }
@@ -64,12 +64,12 @@ impl WebRtcPublishEndpoint for SerdeWebRtcPublishEndpoint {
 /// Media element which is able to play media data for client via WebRTC.
 #[allow(clippy::module_name_repetitions)]
 #[derive(Clone, Deserialize, Debug)]
-pub struct SerdeWebRtcPlayEndpoint {
+pub struct SerdeWebRtcPlayEndpointImpl {
     /// Source URI in format `local://{room_id}/{member_id}/{endpoint_id}`.
     pub src: SerdeSrcUri,
 }
 
-impl WebRtcPlayEndpoint for SerdeWebRtcPlayEndpoint {
+impl WebRtcPlayEndpoint for SerdeWebRtcPlayEndpointImpl {
     fn src(&self) -> SrcUri {
         self.src.clone()
     }

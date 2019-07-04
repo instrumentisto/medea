@@ -11,26 +11,29 @@ use crate::api::control::model::{
 };
 
 use super::{
-    member::SerdeMemberSpec, pipeline::Pipeline, Element, TryFromElementError,
+    member::SerdeMemberSpecImpl, pipeline::Pipeline, Element,
+    TryFromElementError,
 };
 
 /// [`crate::signalling::room::Room`] specification.
 /// Newtype for [`Element::Room`]
 #[allow(clippy::module_name_repetitions)]
 #[derive(Clone, Debug)]
-pub struct SerdeRoomSpec {
+pub struct SerdeRoomSpecDto {
     pub id: Id,
     pub pipeline: Pipeline,
 }
 
-impl SerdeRoomSpec {
+impl SerdeRoomSpecDto {
     /// Returns all [`MemberSpec`]s of this [`RoomSpec`].
     pub fn members(
         &self,
-    ) -> Result<HashMap<MemberId, SerdeMemberSpec>, TryFromElementError> {
-        let mut members: HashMap<MemberId, SerdeMemberSpec> = HashMap::new();
+    ) -> Result<HashMap<MemberId, SerdeMemberSpecImpl>, TryFromElementError>
+    {
+        let mut members: HashMap<MemberId, SerdeMemberSpecImpl> =
+            HashMap::new();
         for (control_id, element) in self.pipeline.iter() {
-            let member_spec = SerdeMemberSpec::try_from(element)?;
+            let member_spec = SerdeMemberSpecImpl::try_from(element)?;
             let member_id = MemberId(control_id.clone());
 
             members.insert(member_id.clone(), member_spec);
@@ -45,13 +48,15 @@ impl SerdeRoomSpec {
     }
 }
 
-pub struct ParsedSerdeRoomSpec {
+pub struct SerdeRoomSpecImpl {
     id: Id,
-    members: HashMap<MemberId, SerdeMemberSpec>,
+    members: HashMap<MemberId, SerdeMemberSpecImpl>,
 }
 
-impl ParsedSerdeRoomSpec {
-    pub fn new(room_spec: &SerdeRoomSpec) -> Result<Self, TryFromElementError> {
+impl SerdeRoomSpecImpl {
+    pub fn new(
+        room_spec: &SerdeRoomSpecDto,
+    ) -> Result<Self, TryFromElementError> {
         Ok(Self {
             id: room_spec.id.clone(),
             members: room_spec.members()?,
@@ -59,7 +64,7 @@ impl ParsedSerdeRoomSpec {
     }
 }
 
-impl RoomSpec for ParsedSerdeRoomSpec {
+impl RoomSpec for SerdeRoomSpecImpl {
     fn members(&self) -> HashMap<MemberId, Box<dyn MemberSpec>> {
         self.members
             .iter()
@@ -80,7 +85,7 @@ impl RoomSpec for ParsedSerdeRoomSpec {
     }
 }
 
-impl TryFrom<&Element> for SerdeRoomSpec {
+impl TryFrom<&Element> for SerdeRoomSpecDto {
     type Error = TryFromElementError;
 
     fn try_from(from: &Element) -> Result<Self, Self::Error> {

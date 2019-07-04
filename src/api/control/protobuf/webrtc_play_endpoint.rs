@@ -4,14 +4,14 @@ use crate::{
             model::{endpoint::webrtc::WebRtcPlayEndpoint, MemberId, RoomId},
             serde::endpoint::SerdeSrcUri,
         },
-        grpc::protos::control::WebRtcPlayEndpoint as WebRtcPlayEndpointDto,
+        grpc::protos::control::WebRtcPlayEndpoint as WebRtcPlayEndpointProto,
     },
     signalling::elements::endpoints::webrtc::WebRtcPublishId,
 };
 
-pub struct GrpcWebRtcPlayEndpoint(pub WebRtcPlayEndpointDto);
+pub struct GrpcWebRtcPlayEndpointSpecImpl(pub WebRtcPlayEndpointProto);
 
-impl WebRtcPlayEndpoint for GrpcWebRtcPlayEndpoint {
+impl WebRtcPlayEndpoint for GrpcWebRtcPlayEndpointSpecImpl {
     fn src(&self) -> SerdeSrcUri {
         if self.0.has_src() {
             let src = self.0.get_src();
