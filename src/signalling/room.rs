@@ -18,7 +18,7 @@ use crate::{
             AuthorizationError, Authorize, ClosedReason, CommandMessage,
             RpcConnectionClosed, RpcConnectionEstablished,
         },
-        control::{MemberId, RoomId, RoomSpec, TryFromElementError},
+        control::{MemberId, RoomId, SerdeRoomSpec, TryFromElementError},
     },
     log::prelude::*,
     media::{
@@ -103,7 +103,7 @@ impl Room {
     /// Returns [`RoomError::BadRoomSpec`] when error while [`Element`]
     /// transformation happens.
     pub fn new(
-        room_spec: &RoomSpec,
+        room_spec: &SerdeRoomSpec,
         reconnect_timeout: Duration,
         turn: Box<dyn TurnAuthService>,
     ) -> Result<Self, RoomError> {

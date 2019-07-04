@@ -13,13 +13,22 @@ use super::{
     Element, TryFromElementError,
 };
 
-use crate::api::control::model::endpoint::webrtc::WebRtcPublishId;
 pub use crate::api::control::model::member::Id;
+use crate::api::control::{
+    model::{
+        endpoint::webrtc::{
+            WebRtcPlayEndpoint, WebRtcPlayId, WebRtcPublishEndpoint,
+            WebRtcPublishId,
+        },
+        member::MemberSpec,
+    },
+    MemberId,
+};
 
 /// Newtype for [`Element::Member`] variant.
 #[allow(clippy::module_name_repetitions)]
 #[derive(Clone, Debug)]
-pub struct MemberSpec {
+pub struct SerdeMemberSpec {
     /// Spec of this `Member`.
     pipeline: Pipeline,
 
@@ -27,7 +36,7 @@ pub struct MemberSpec {
     credentials: String,
 }
 
-impl MemberSpec {
+impl SerdeMemberSpec {
     /// Returns all [`WebRtcPlayEndpoint`]s of this [`MemberSpec`].
     pub fn play_endpoints(&self) -> HashMap<&String, &SerdeWebRtcPlayEndpoint> {
         self.pipeline
@@ -59,7 +68,61 @@ impl MemberSpec {
     }
 }
 
-impl TryFrom<&Element> for MemberSpec {
+impl MemberSpec for SerdeMemberSpec {
+    fn webrtc_play_endpoints(
+        &self,
+    ) -> HashMap<WebRtcPlayId, Box<&WebRtcPlayEndpoint>> {
+        self.pipeline
+            .iter()
+            .filter_map(|(id, e)| match e {
+                Element::WebRtcPlayEndpoint { spec } => Some((
+                    WebRtcPlayId(id.clone()),
+                    Box::new(spec as &WebRtcPlayEndpoint),
+                )),
+                _ => None,
+            })
+            .collect()
+    }
+
+    fn webrtc_publish_endpoints(
+        &self,
+    ) -> HashMap<WebRtcPublishId, Box<&WebRtcPublishEndpoint>> {
+        self.pipeline
+            .iter()
+            .filter_map(|(id, e)| match e {
+                Element::WebRtcPublishEndpoint { spec } => Some((
+                    WebRtcPublishId(id.clone()),
+                    Box::new(spec as &WebRtcPublishEndpoint),
+                )),
+                _ => None,
+            })
+            .collect()
+    }
+
+    fn credentials(&self) -> &String {
+        &self.credentials
+    }
+
+    fn id(&self) -> &MemberId {
+        self.id()
+    }
+
+    fn get_webrtc_play_by_id(
+        &self,
+        id: WebRtcPlayId,
+    ) -> Option<Box<&WebRtcPlayEndpoint>> {
+        unimplemented!()
+    }
+
+    fn get_webrtc_publish_by_id(
+        &self,
+        id: WebRtcPublishId,
+    ) -> Option<Box<&WebRtcPublishEndpoint>> {
+        unimplemented!()
+    }
+}
+
+impl TryFrom<&Element> for SerdeMemberSpec {
     type Error = TryFromElementError;
 
     fn try_from(from: &Element) -> Result<Self, Self::Error> {

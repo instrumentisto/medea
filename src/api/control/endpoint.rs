@@ -52,12 +52,24 @@ pub struct SerdeWebRtcPublishEndpoint {
     pub p2p: P2pMode,
 }
 
+impl WebRtcPublishEndpoint for SerdeWebRtcPublishEndpoint {
+    fn p2p(&self) -> &P2pMode {
+        &self.p2p
+    }
+}
+
 /// Media element which is able to play media data for client via WebRTC.
 #[allow(clippy::module_name_repetitions)]
 #[derive(Clone, Deserialize, Debug)]
 pub struct SerdeWebRtcPlayEndpoint {
     /// Source URI in format `local://{room_id}/{member_id}/{endpoint_id}`.
     pub src: SerdeSrcUri,
+}
+
+impl WebRtcPlayEndpoint for SerdeWebRtcPlayEndpoint {
+    fn src(&self) -> Box<&SrcUri> {
+        Box::new(&self.src)
+    }
 }
 
 /// Special uri with pattern `local://{room_id}/{member_id}/{endpoint_id}`.

@@ -7,7 +7,9 @@ use hashbrown::HashMap;
 use medea_client_api_proto::IceServer;
 
 use crate::{
-    api::control::{MemberId, MemberSpec, RoomSpec, TryFromElementError},
+    api::control::{
+        MemberId, SerdeMemberSpec, SerdeRoomSpec, TryFromElementError,
+    },
     log::prelude::*,
     media::{IceUser, PeerId},
 };
@@ -78,10 +80,10 @@ impl Member {
     /// Load all srcs and sinks of this [`Member`].
     fn load(
         &self,
-        room_spec: &RoomSpec,
+        room_spec: &SerdeRoomSpec,
         store: &HashMap<MemberId, Rc<Self>>,
     ) -> Result<(), MembersLoadError> {
-        let this_member_spec = MemberSpec::try_from(
+        let this_member_spec = SerdeMemberSpec::try_from(
             room_spec
                 .pipeline
                 .get(&self.id().0)
@@ -101,7 +103,7 @@ impl Member {
                 Err(MembersLoadError::MemberNotFound(publisher_id)),
                 Ok,
             )?;
-            let publisher_spec = MemberSpec::try_from(
+            let publisher_spec = SerdeMemberSpec::try_from(
                 room_spec
                     .pipeline
                     .get(&spec_play_endpoint.src.member_id.to_string())
@@ -278,7 +280,7 @@ impl Member {
 ///
 /// Returns store of all [`Member`]s loaded from [`RoomSpec`].
 pub fn parse_members(
-    room_spec: &RoomSpec,
+    room_spec: &SerdeRoomSpec,
 ) -> Result<HashMap<MemberId, Rc<Member>>, MembersLoadError> {
     let members_spec = room_spec.members()?;
     let mut members = HashMap::new();
@@ -371,7 +373,7 @@ mod tests {
 
     fn get_test_store() -> HashMap<MemberId, Rc<Member>> {
         let room_element: Element = serde_yaml::from_str(TEST_SPEC).unwrap();
-        let room_spec = RoomSpec::try_from(&room_element).unwrap();
+        let room_spec = SerdeRoomSpec::try_from(&room_element).unwrap();
         parse_members(&room_spec).unwrap()
     }
 

@@ -1,6 +1,7 @@
+use crate::api::control::endpoint::P2pMode;
 use macro_attr::*;
 use newtype_derive::{newtype_fmt, NewtypeDisplay, NewtypeFrom};
-use serde::Deserialize;
+use serde::Deserialize; // TODO: temp
 
 macro_attr! {
     /// ID of [`Room`].
@@ -18,10 +19,6 @@ macro_attr! {
 }
 
 pub use Id as WebRtcPublishId;
-
-pub enum P2pMode {
-    Always,
-}
 
 pub trait WebRtcPublishEndpoint {
     fn p2p(&self) -> &P2pMode;

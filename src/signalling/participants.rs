@@ -26,7 +26,7 @@ use crate::{
             AuthorizationError, ClosedReason, EventMessage, RpcConnection,
             RpcConnectionClosed,
         },
-        control::{MemberId, RoomId, RoomSpec},
+        control::{MemberId, RoomId, SerdeRoomSpec},
     },
     log::prelude::*,
     media::IceUser,
@@ -96,7 +96,7 @@ pub struct ParticipantService {
 impl ParticipantService {
     /// Create new [`ParticipantService`] from [`RoomSpec`].
     pub fn new(
-        room_spec: &RoomSpec,
+        room_spec: &SerdeRoomSpec,
         reconnect_timeout: Duration,
         turn: Box<dyn TurnAuthService>,
     ) -> Result<Self, MembersLoadError> {

@@ -18,8 +18,8 @@ use self::{
 
 pub use self::{
     endpoint::Endpoint,
-    member::{Id as MemberId, MemberSpec},
-    room::{Id as RoomId, RoomSpec},
+    member::{Id as MemberId, SerdeMemberSpec},
+    room::{Id as RoomId, SerdeRoomSpec},
 };
 
 /// Errors that can occur when we try transform some spec from [`Element`].
@@ -57,12 +57,14 @@ pub enum Element {
 }
 
 /// Load [`RoomSpec`] from file with YAML format.
-pub fn load_from_yaml_file<P: AsRef<Path>>(path: P) -> Result<RoomSpec, Error> {
+pub fn load_from_yaml_file<P: AsRef<Path>>(
+    path: P,
+) -> Result<SerdeRoomSpec, Error> {
     let mut file = File::open(path)?;
     let mut buf = String::new();
     file.read_to_string(&mut buf)?;
     let parsed: Element = serde_yaml::from_str(&buf)?;
-    let room = RoomSpec::try_from(&parsed)?;
+    let room = SerdeRoomSpec::try_from(&parsed)?;
 
     Ok(room)
 }
@@ -70,7 +72,7 @@ pub fn load_from_yaml_file<P: AsRef<Path>>(path: P) -> Result<RoomSpec, Error> {
 /// Load all [`RoomSpec`] from YAML files from provided path.
 pub fn load_static_specs_from_dir<P: AsRef<Path>>(
     path: P,
-) -> Result<Vec<RoomSpec>, Error> {
+) -> Result<Vec<SerdeRoomSpec>, Error> {
     let mut specs = Vec::new();
     for entry in std::fs::read_dir(path)? {
         let entry = entry?;
