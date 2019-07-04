@@ -13,4 +13,8 @@ pub struct Grpc {
     /// Port to bind gRPC server to. Defaults to `8080`.
     #[default(50_051)]
     pub bind_port: u16,
+
+    /// Completion queue count of gRPC server. Defaults to `2`.
+    #[default(2)]
+    pub completion_queue_count: usize,
 }

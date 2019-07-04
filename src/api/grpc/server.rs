@@ -105,12 +105,13 @@ impl Actor for GrpcServer {
 pub fn run(room_repo: RoomsRepository, conf: Conf) -> Addr<GrpcServer> {
     let bind_ip = conf.grpc.bind_ip.clone().to_string();
     let bind_port = conf.grpc.bind_port;
+    let cq_count = conf.grpc.completion_queue_count;
 
     let service = create_control_api(ControlApiService {
         config: conf,
         room_repository: room_repo,
     });
-    let env = Arc::new(Environment::new(1));
+    let env = Arc::new(Environment::new(cq_count));
 
     info!("Starting gRPC server on {}:{}", bind_ip, bind_port);
 
