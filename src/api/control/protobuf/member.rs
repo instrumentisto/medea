@@ -63,6 +63,7 @@ impl MemberSpec for GrpcMember {
     }
 
     fn credentials(&self) -> &String {
+        // TODO: deal with it
         unimplemented!()
     }
 
@@ -74,13 +75,27 @@ impl MemberSpec for GrpcMember {
         &self,
         id: &WebRtcPlayId,
     ) -> Option<Box<dyn WebRtcPlayEndpoint>> {
-        unimplemented!()
+        let element = self.0.pipeline.get(&id.0)?;
+        if element.has_webrtc_play() {
+            let play = element.get_webrtc_play().clone();
+            let play = GrpcWebRtcPlayEndpoint(play);
+            Some(Box::new(play) as Box<dyn WebRtcPlayEndpoint>)
+        } else {
+            None
+        }
     }
 
     fn get_webrtc_publish_by_id(
         &self,
         id: &WebRtcPublishId,
     ) -> Option<Box<dyn WebRtcPublishEndpoint>> {
-        unimplemented!()
+        let element = self.0.pipeline.get(&id.0)?;
+        if element.has_webrtc_pub() {
+            let publish = element.get_webrtc_pub().clone();
+            let play = GrpcWebRtcPublishEndpoint(publish);
+            Some(Box::new(play) as Box<dyn WebRtcPublishEndpoint>)
+        } else {
+            None
+        }
     }
 }
