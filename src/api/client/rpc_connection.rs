@@ -188,7 +188,7 @@ pub mod test {
                             Command::MakeSdpOffer {
                                 peer_id,
                                 sdp_offer: "caller_offer".into(),
-                                mids: mids,
+                                mids,
                             },
                         )),
                     }

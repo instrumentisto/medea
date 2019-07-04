@@ -8,7 +8,7 @@ use std::{
 };
 
 use futures::{
-    future::{Either, Future as _, IntoFuture},
+    future::{self, Future as _, IntoFuture},
     stream::Stream as _,
     sync::mpsc::{unbounded, UnboundedSender},
 };
@@ -133,7 +133,7 @@ impl InnerRoom {
 
     /// Creates new [`Connection`]s based on senders and receivers of provided
     /// tracks
-    fn create_connections_from_tracks(&mut self, tracks: &Vec<Track>) {
+    fn create_connections_from_tracks(&mut self, tracks: &[Track]) {
         let create_connection = |room: &mut Self, member_id: &u64| {
             if !room.connections.contains_key(member_id) {
                 let con = Connection::new(*member_id);
@@ -143,7 +143,7 @@ impl InnerRoom {
         };
 
         // iterate through tracks and create all connections
-        for track in tracks.as_slice() {
+        for track in tracks {
             match &track.direction {
                 Direction::Send { ref receivers, .. } => {
                     for receiver in receivers {
@@ -184,11 +184,23 @@ impl EventHandler for InnerRoom {
 
         let rpc = Rc::clone(&self.rpc);
 
+        let media_manager = Rc::clone(&self.media_manager);
         let fut = match sdp_offer {
             // this is offerrer
-            None => Either::A(
-                peer.update_tracks(tracks, &self.media_manager)
-                    .and_then(move |_| {
+            None => future::Either::A(
+                peer.update_tracks(tracks)
+                    .and_then(move |stream_request| match stream_request {
+                        None => future::Either::A(future::ok(peer)),
+                        Some(stream_request) => future::Either::B(
+                            media_manager.get_stream(stream_request).and_then(
+                                move |s| {
+                                    peer.insert_local_stream(&s);
+                                    Ok(peer)
+                                },
+                            ),
+                        ),
+                    })
+                    .and_then(move |peer| {
                         peer.create_and_set_offer().and_then(move |sdp_offer| {
                             rpc.send_command(Command::MakeSdpOffer {
                                 peer_id,
@@ -202,24 +214,30 @@ impl EventHandler for InnerRoom {
             ),
             Some(offer) => {
                 // this is answerer
-                let media_manager = Rc::clone(&self.media_manager);
-                Either::B(
+                let peer_rc = Rc::clone(&peer);
+                future::Either::B(
                     peer.set_remote_offer(&offer)
                         .and_then(move |_| {
-                            peer.create_and_set_answer().and_then(
-                                move |sdp_answer| {
-                                    peer.update_tracks(tracks, &media_manager)
-                                        .and_then(move |_| {
-                                            rpc.send_command(
-                                                Command::MakeSdpAnswer {
-                                                    peer_id,
-                                                    sdp_answer,
-                                                },
-                                            );
-                                            Ok(())
-                                        })
+                            peer_rc.update_tracks(tracks).and_then(
+                                move |stream_request| match stream_request {
+                                    None => future::Either::A(future::ok(())),
+                                    Some(stream_request) => future::Either::B(
+                                        media_manager
+                                            .get_stream(stream_request)
+                                            .and_then(move |s| {
+                                                peer_rc.insert_local_stream(&s);
+                                                Ok(())
+                                            }),
+                                    ),
                                 },
                             )
+                        })
+                        .and_then(move |_| peer.create_and_set_answer())
+                        .map(move |sdp_answer| {
+                            rpc.send_command(Command::MakeSdpAnswer {
+                                peer_id,
+                                sdp_answer,
+                            })
                         })
                         .map_err(|err| err.log_err()),
                 )
@@ -238,10 +256,7 @@ impl EventHandler for InnerRoom {
             }));
         } else {
             // TODO: No peer, whats next?
-            WasmErr::from(format!(
-                "Peer with id {} doesnt exist",
-                peer_id
-            ));
+            WasmErr::from(format!("Peer with id {} doesnt exist", peer_id));
         }
     }
 
@@ -262,10 +277,7 @@ impl EventHandler for InnerRoom {
             );
         } else {
             // TODO: No peer, whats next?
-            WasmErr::from(format!(
-                "Peer with id {} doesnt exist",
-                peer_id
-            ));
+            WasmErr::from(format!("Peer with id {} doesnt exist", peer_id));
         }
     }
 
@@ -308,10 +320,10 @@ impl PeerEventHandler for InnerRoom {
         remote_stream: MediaStream,
     ) {
         match self.connections.get(&sender_id) {
-            None => WasmErr::from(
-                "NewRemoteStream from sender without connection",
-            )
-            .log_err(),
+            None => {
+                WasmErr::from("NewRemoteStream from sender without connection")
+                    .log_err()
+            }
             Some(connection) => connection.new_remote_stream(&remote_stream),
         }
     }

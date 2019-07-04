@@ -58,7 +58,7 @@ impl Inner {
 }
 
 /// Handles close messsage from remote server.
-fn on_close(inner_rc: &Rc<RefCell<Inner>>, close_msg: CloseMsg) {
+fn on_close(inner_rc: &RefCell<Inner>, close_msg: CloseMsg) {
     let mut inner = inner_rc.borrow_mut();
     inner.sock.take();
     inner.heartbeat.stop();

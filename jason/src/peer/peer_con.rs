@@ -11,7 +11,7 @@ use web_sys::{
 };
 
 use crate::{
-    media::{MediaManager, MediaStream, MediaTrack},
+    media::{MediaStream, MediaTrack, StreamRequest},
     peer::{ice_server::RtcIceServers, media_connections::MediaConnections},
     utils::{EventListener, WasmErr},
 };
@@ -176,7 +176,6 @@ impl PeerConnection {
             "before create_and_set_offer",
         ));
         console::error_1(&self.peer.get_transceivers());
-        let peer_rc = Rc::clone(&self.peer);
 
         let inner = Rc::clone(&self.peer);
         JsFuture::from(self.peer.create_offer())
@@ -205,7 +204,6 @@ impl PeerConnection {
             "before create_and_set_answer",
         ));
         console::error_1(&self.peer.get_transceivers());
-        let peer_rc = Rc::clone(&self.peer);
 
         let inner = Rc::clone(&self.peer);
         JsFuture::from(self.peer.create_answer())
@@ -274,6 +272,15 @@ impl PeerConnection {
         .map_err(Into::into)
     }
 
+    pub fn insert_local_stream(
+        &self,
+        stream: &MediaStream,
+    ) -> impl Future<Item = (), Error = WasmErr> {
+        self.media_connections
+            .borrow_mut()
+            .insert_local_stream(stream)
+    }
+
     /// Update peers tracks.
     ///
     /// Synchronize provided tracks with this [`PeerConnection`] [`Sender`]s and
@@ -281,25 +288,18 @@ impl PeerConnection {
     pub fn update_tracks(
         &self,
         tracks: Vec<Track>,
-        media_manager: &MediaManager,
-    ) -> impl Future<Item = (), Error = WasmErr> {
+    ) -> impl Future<Item = Option<StreamRequest>, Error = WasmErr> {
         for track in tracks {
-            self.media_connections.borrow_mut().update_track(track);
+            if let Err(err) =
+                self.media_connections.borrow_mut().update_track(track)
+            {
+                return future::Either::A(future::err(err));
+            }
         }
 
-        if let Some(media_request) =
-            self.media_connections.borrow().get_request()
-        {
-            let connections = Rc::clone(&self.media_connections);
-            let get_media = media_manager.get_stream(media_request).and_then(
-                move |stream| {
-                    connections.borrow_mut().insert_local_stream(&stream)
-                },
-            );
-            future::Either::B(get_media)
-        } else {
-            future::Either::A(future::ok(()))
-        }
+        future::Either::B(future::ok(
+            self.media_connections.borrow().get_request(),
+        ))
     }
 }
 
