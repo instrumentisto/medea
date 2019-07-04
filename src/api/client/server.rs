@@ -90,7 +90,7 @@ pub struct Context {
 pub fn run(
     rooms: RoomsRepository,
     config: Conf,
-) -> Addr<actors::ServerWrapper> {
+) {
     let server_addr = config.server.bind_addr();
 
     let actix_server = HttpServer::new(move || {
@@ -110,11 +110,10 @@ pub fn run(
     .unwrap()
     .start();
 
-    let server_wrapper = actors::ServerWrapper(actix_server);
-
     info!("Started HTTP server on {:?}", server_addr);
 
-    server_wrapper.start()
+    let server_wrapper_addr = actors::ServerWrapper(actix_server).start();
+    graceful_shutdown::subscribe(server_wrapper_addr.recipient(), 5);
 }
 
 pub mod actors {
@@ -216,6 +215,7 @@ mod test {
 
     #[test]
     fn ping_pong_and_disconnects_on_idle() {
+        let config = Conf::parse().unwrap();
         let conf = Conf {
             rpc: Rpc {
                 idle_timeout: Duration::new(2, 0),
@@ -223,6 +223,7 @@ mod test {
             },
             turn: Turn::default(),
             server: Server::default(),
+            system_config: config.system_config,
         };
 
         let mut server = ws_server(conf.clone());

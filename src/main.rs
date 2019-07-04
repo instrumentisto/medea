@@ -59,15 +59,12 @@ fn main() {
                     turn_auth_service,
                 )
             });
-
-            // TODO: do subscribe in Room::new, server::run
             graceful_shutdown::subscribe(room.clone().recipient(), 1);
 
             let rooms = hashmap! {1 => room};
             let rooms_repo = RoomsRepository::new(rooms);
 
-            let http_server = server::run(rooms_repo, config);
-            graceful_shutdown::subscribe(http_server.recipient(), 2);
+            server::run(rooms_repo, config);
 
             futures::future::ok(())
     //        })
