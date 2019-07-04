@@ -146,7 +146,7 @@ pub mod actors {
                          .then(move |_| {
                             info!("time passed");
                             std::thread::sleep(std::time::Duration::from_millis(2000));
-                            futures::future::ok(Ok(()))
+                            futures::future::ok(())
                         })))
         }
     }

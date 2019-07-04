@@ -1,9 +1,5 @@
 //! Medea media server application.
 
-// TODO: just use lazy_static::lazy_static; where you need it
-#[macro_use]
-extern crate lazy_static;
-
 #[macro_use]
 pub mod utils;
 pub mod api;
@@ -31,7 +27,7 @@ fn main() {
     dotenv().ok();
     let logger = log::new_dual_logger(std::io::stdout(), std::io::stderr());
     let _scope_guard = slog_scope::set_global_logger(logger);
-    slog_stdlog::init().unwrap();
+    let _log_guard = slog_stdlog::init().unwrap();
 
     let config = Conf::parse().unwrap();
     info!("{:?}", config);
@@ -42,6 +38,7 @@ fn main() {
             1 => Member::new(1, "caller_credentials".to_owned()),
             2 => Member::new(2, "responder_credentials".to_owned()),
         };
+
             let peers = create_peers(1, 2);
 
             graceful_shutdown::create(
@@ -75,5 +72,6 @@ fn main() {
             futures::future::ok(())
     //        })
         })
-    .expect("unable to start medea")
+    .expect("unable to start medea");
+
 }

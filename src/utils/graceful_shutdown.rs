@@ -9,7 +9,7 @@ use tokio::prelude::{
     stream::*,
 };
 
-use lazy_static;
+use lazy_static::lazy_static;
 
 use crate::log::prelude::*;
 
@@ -24,24 +24,29 @@ type ShutdownFutureType = Box<
     >,
 >;
 
-// TODO: why not use simple struct?
-lazy_static! {
-    static ref STATIC_RECIPIENTS: Mutex<BTreeMap<u8, Vec<Recipient<ShutdownMessage>>>> =
-        Mutex::new(BTreeMap::new());
-    static ref STATIC_TIMEOUT: Mutex<u64> = Mutex::new(100_u64);
+//// TODO: why not use simple struct?
+//lazy_static! {
+//    static ref STATIC_RECIPIENTS: Mutex<BTreeMap<u8, Vec<Recipient<ShutdownMessage>>>> =
+//        Mutex::new(BTreeMap::new());
+//    static ref STATIC_TIMEOUT: Mutex<u64> = Mutex::new(100_u64);
+//}
+
+lazy_static!{
+    static ref STATIC_STRUCT: StaticShutdown = StaticShutdown::new();
 }
 
-/// Different kinds of process signals
-#[derive(PartialEq, Clone, Copy, Debug)]
-pub enum SignalKind {
-    /// SIGHUP
-    Hup,
-    /// SIGINT
-    Int,
-    /// SIGTERM
-    Term,
-    /// SIGQUIT
-    Quit,
+struct StaticShutdown {
+    pub recipients: Mutex<BTreeMap<u8, Vec<Recipient<ShutdownMessage>>>>,
+    pub timeout: Mutex<u64>,
+}
+
+impl StaticShutdown {
+    fn new() -> Self {
+        Self {
+            recipients: Mutex::new(BTreeMap::new()),
+            timeout: Mutex::new(100_u64),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -56,7 +61,7 @@ pub fn subscribe(who: Recipient<ShutdownMessage>, priority: u8) {
     // todo: may be a bug: may subscribe same address multiple times with
     // the same/different priorities
 
-    let mut recipients = STATIC_RECIPIENTS.lock().unwrap();
+    let mut recipients = STATIC_STRUCT.recipients.lock().unwrap();
 
     let vec_with_current_priority = recipients.get_mut(&priority);
     if let Some(vector) = vec_with_current_priority {
@@ -70,23 +75,10 @@ pub fn subscribe(who: Recipient<ShutdownMessage>, priority: u8) {
     }
 }
 
-fn handle_shutdown(msg: SignalKind) {
-    match msg {
-        SignalKind::Int => {
-            error!("SIGINT received, exiting");
-        }
-        SignalKind::Hup => {
-            error!("SIGHUP received, reloading");
-        }
-        SignalKind::Term => {
-            error!("SIGTERM received, stopping");
-        }
-        SignalKind::Quit => {
-            error!("SIGQUIT received, exiting");
-        }
-    };
+fn handle_shutdown() {
+    error!("SIGINT, SIGHUP, SIGTERM or SIGQUIT received, exiting");
 
-    let recipients = STATIC_RECIPIENTS.lock().unwrap();
+    let mut recipients = STATIC_STRUCT.recipients.lock().unwrap();
 
     if recipients.is_empty() {
         return;
@@ -96,8 +88,9 @@ fn handle_shutdown(msg: SignalKind) {
         Box::new(
             futures::future::ok::<
                         Vec<ShutdownMessageResult>,
-                        MailboxError,>
-                (vec![Ok(Box::new(futures::future::ok(())))] ));
+                        MailboxError>
+                (vec![Ok(Box::new(futures::future::ok(()) )) ] )
+        );
 
     for recipients_values in recipients.values() {
         let mut this_priority_futures_vec =
@@ -113,10 +106,12 @@ fn handle_shutdown(msg: SignalKind) {
             Box::new(shutdown_future.then(|_| this_priority_futures));
         // we need to rewrite shutdown_future, otherwise compiler thinks we
         // moved value
-        shutdown_future = Box::new(futures::future::ok::<
-            Vec<Result<(), Box<(dyn std::error::Error + Send + 'static)>>>,
-            MailboxError,
-        >(vec![Ok(())]));
+        shutdown_future = Box::new(
+            futures::future::ok::<
+                Vec<ShutdownMessageResult>,
+                MailboxError,>
+                (vec![Ok(Box::new(futures::future::ok(())))] ));
+
         mem::replace(&mut shutdown_future, new_shutdown_future);
     }
 
@@ -129,7 +124,8 @@ fn handle_shutdown(msg: SignalKind) {
 }
 
 pub fn create(shutdown_timeout: u64, actix_system: System) {
-    let mut global_shutdown_timeout = STATIC_TIMEOUT.lock().unwrap();
+    let mut global_shutdown_timeout = STATIC_STRUCT.timeout.lock().unwrap();
+
     *global_shutdown_timeout = shutdown_timeout;
 
     //TODO: this looks much less boilerplate:
@@ -148,55 +144,42 @@ pub fn create(shutdown_timeout: u64, actix_system: System) {
     {
         use tokio_signal::unix::{Signal, SIGHUP, SIGINT, SIGQUIT, SIGTERM};
 
-        {
-            // SIGINT
-            let sigint_stream = Signal::new(SIGINT).flatten_stream();
-            let actix_system_for_sigint = actix_system.clone();
-            let sigint_handler = sigint_stream.for_each(move |_| {
+         // SIGINT
+        let sigint_stream = Signal::new(SIGINT).flatten_stream();
+        let sigterm_stream = Signal::new(SIGTERM).flatten_stream();
+        let sigquit_stream = Signal::new(SIGQUIT).flatten_stream();
+        let sighup_stream = Signal::new(SIGHUP  ).flatten_stream();
+        let signals_stream = sigint_stream
+            .select(sigterm_stream)
+            .select(sigquit_stream)
+            .select(sighup_stream);
 
-                let actix_system_for_sigint_move = actix_system_for_sigint.clone();
 
-                thread::spawn(move || {
-                    let shutdown_timeout = STATIC_TIMEOUT.lock().unwrap();
-                    thread::sleep(Duration::from_millis(*shutdown_timeout));
-                    std::process::exit(0x0100);
-                });
+        let actix_system_for_sigint = actix_system.clone();
+        let handler = move |signal| {
 
-                self::handle_shutdown(SignalKind::Int);
-//                actix_system_for_sigint.stop();
-                std::process::exit(0x0100);
-                Ok(())
-            });
+            let actix_system_for_sigint_move = actix_system_for_sigint.clone();
+
             thread::spawn(move || {
-                tokio::runtime::current_thread::block_on_all(sigint_handler)
-                    .ok()
-                    .unwrap();
+                let shutdown_timeout = STATIC_STRUCT.timeout.lock().unwrap();
+                thread::sleep(Duration::from_millis(*shutdown_timeout));
+//                    std::process::exit(0x0100);
+                actix_system_for_sigint_move.stop();
             });
-        }
-        {
-            // SIGTERM
-            let sigint_stream = Signal::new(SIGTERM).flatten_stream();
-            let actix_system_for_sigint = actix_system.clone();
-            let sigint_handler = sigint_stream.for_each(move |_| {
 
-                let actix_system_for_sigint_move = actix_system_for_sigint.clone();
+            self::handle_shutdown();
+            actix_system_for_sigint.stop();
+//                std::process::exit(0x0100);
+        };
 
-                thread::spawn(move || {
-                    let shutdown_timeout = STATIC_TIMEOUT.lock().unwrap();
-                    thread::sleep(Duration::from_millis(*shutdown_timeout));
-                    actix_system_for_sigint_move.stop();
-                });
+        thread::spawn(move || {
+            tokio::runtime::current_thread::run(
+                signals_stream.into_future()
+                .map(handler)
+                    .map_err(|err| ()));
+        });
+    }
 
-                self::handle_shutdown(SignalKind::Term);
-                actix_system_for_sigint.stop();
-                Ok(())
-            });
-            thread::spawn(move || {
-                tokio::runtime::current_thread::block_on_all(sigint_handler)
-                    .ok()
-                    .unwrap();
-            });
-        }
 //        {
 //            // SIGHUP
 //            let sighup_stream = Signal::new(SIGHUP).flatten_stream();
@@ -239,5 +222,4 @@ pub fn create(shutdown_timeout: u64, actix_system: System) {
 //                    .unwrap();
 //            });
 //        }
-    }
 }

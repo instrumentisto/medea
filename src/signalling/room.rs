@@ -449,7 +449,6 @@ impl Handler<ShutdownMessage> for Room {
             .map(|_| {
                 // todo: close room dynamically
                 std::thread::sleep(std::time::Duration::from_millis(2000));
-                Ok(())
         })))
     }
 }
