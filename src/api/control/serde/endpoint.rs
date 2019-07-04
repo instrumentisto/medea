@@ -41,6 +41,8 @@ impl TryFrom<&Element> for Endpoint {
 pub enum P2pMode {
     /// Always connect peer-to-peer.
     Always,
+    Never,
+    IfPossible,
 }
 
 /// Media element which is able to publish media data for another client via
