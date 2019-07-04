@@ -27,8 +27,8 @@ fn main() -> Result<(), Error> {
         rooms.iter().map(|(id, _)| &id.0).collect::<Vec<&String>>()
     );
     let room_repo = RoomsRepository::new(rooms);
-    server::run(room_repo.clone(), config);
-    let _addr = grpc::server::run(room_repo);
+    server::run(room_repo.clone(), config.clone());
+    let _addr = grpc::server::run(room_repo, config);
 
     let _ = sys.run();
 

@@ -26,6 +26,7 @@ use std::time::Duration;
 #[derive(Clone)]
 struct ControlApiService {
     room_repository: RoomsRepository,
+    config: Conf,
 }
 
 impl ControlApi for ControlApiService {
@@ -91,8 +92,8 @@ impl Actor for GrpcServer {
     type Context = Context<Self>;
 
     fn started(&mut self, _ctx: &mut Self::Context) {
-        debug!("Start gRPC server.");
         self.server.start();
+        debug!("gRPC server started.");
     }
 
     fn stopped(&mut self, _ctx: &mut Self::Context) {
@@ -101,15 +102,21 @@ impl Actor for GrpcServer {
     }
 }
 
-pub fn run(room_repo: RoomsRepository) -> Addr<GrpcServer> {
+pub fn run(room_repo: RoomsRepository, conf: Conf) -> Addr<GrpcServer> {
+    let bind_ip = conf.grpc.bind_ip.clone().to_string();
+    let bind_port = conf.grpc.bind_port;
+
     let service = create_control_api(ControlApiService {
+        config: conf,
         room_repository: room_repo,
     });
     let env = Arc::new(Environment::new(1));
 
+    info!("Starting gRPC server on {}:{}", bind_ip, bind_port);
+
     let server = ServerBuilder::new(env)
         .register_service(service)
-        .bind("127.0.0.1", 50_051)
+        .bind(bind_ip, bind_port)
         .build()
         .unwrap();
 

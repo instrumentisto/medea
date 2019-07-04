@@ -80,3 +80,17 @@ static_specs_path = "dev/specs"
 #
 # Default:
 #   connection_timeout = "5s"
+
+
+
+
+[grpc]
+# IP address to bind gRPC server to.
+#
+# Default:
+#   bind_ip = "0.0.0.0"
+
+# Port to bind gRPC server to.
+#
+# Default:
+#   bind_port = 50_051

@@ -1,5 +1,6 @@
 //! Provides application configuration options.
 
+pub mod grpc;
 pub mod rpc;
 pub mod server;
 pub mod turn;
@@ -11,6 +12,7 @@ use failure::Error;
 use serde::{Deserialize, Serialize};
 
 pub use self::{
+    grpc::Grpc,
     rpc::Rpc,
     server::Server,
     turn::{Redis, Turn},
@@ -33,6 +35,8 @@ pub struct Conf {
     pub server: Server,
     /// TURN server settings.
     pub turn: Turn,
+
+    pub grpc: Grpc,
 }
 
 impl Conf {
