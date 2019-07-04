@@ -40,6 +40,7 @@ use crate::{
     },
     turn::{TurnAuthService, TurnServiceErr, UnreachablePolicy},
 };
+use crate::api::control::model::room::RoomSpec;
 
 #[derive(Fail, Debug)]
 #[allow(clippy::module_name_repetitions)]
@@ -99,7 +100,7 @@ pub struct ParticipantService {
 impl ParticipantService {
     /// Create new [`ParticipantService`] from [`RoomSpec`].
     pub fn new(
-        room_spec: &SerdeRoomSpec,
+        room_spec: &Box<&dyn RoomSpec>,
         reconnect_timeout: Duration,
         turn: Box<dyn TurnAuthService>,
     ) -> Result<Self, MembersLoadError> {

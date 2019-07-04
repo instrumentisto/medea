@@ -38,6 +38,7 @@ use crate::{
     },
     turn::TurnAuthService,
 };
+use crate::api::control::model::room::RoomSpec;
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
 pub type ActFuture<I, E> =
@@ -106,7 +107,7 @@ impl Room {
     /// Returns [`RoomError::BadRoomSpec`] when error while [`Element`]
     /// transformation happens.
     pub fn new(
-        room_spec: &SerdeRoomSpec,
+        room_spec: &Box<&dyn RoomSpec>,
         reconnect_timeout: Duration,
         turn: Box<dyn TurnAuthService>,
     ) -> Result<Self, RoomError> {

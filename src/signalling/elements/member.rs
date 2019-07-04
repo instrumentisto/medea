@@ -84,7 +84,7 @@ impl Member {
     /// Load all srcs and sinks of this [`Member`].
     fn load(
         &self,
-        room_spec: Box<&dyn RoomSpec>,
+        room_spec: &Box<&dyn RoomSpec>,
         store: &HashMap<MemberId, Rc<Self>>,
     ) -> Result<(), MembersLoadError> {
         //        let this_member_spec = SerdeMemberSpec::try_from(
@@ -310,9 +310,9 @@ impl Member {
 ///
 /// Returns store of all [`Member`]s loaded from [`RoomSpec`].
 pub fn parse_members(
-    room_spec: &SerdeRoomSpec,
+    room_spec: &Box<&dyn RoomSpec>,
 ) -> Result<HashMap<MemberId, Rc<Member>>, MembersLoadError> {
-    let members_spec = room_spec.members()?;
+    let members_spec = room_spec.members();
     let mut members = HashMap::new();
 
     for (id, member) in &members_spec {
@@ -322,10 +322,10 @@ pub fn parse_members(
         );
     }
 
-    let spec = ParsedSerdeRoomSpec::new(&room_spec)?;
+//    let spec = ParsedSerdeRoomSpec::new(&room_spec)?;
 
     for (_, member) in &members {
-        member.load(Box::new(&spec as &RoomSpec), &members)?;
+        member.load(room_spec, &members)?;
     }
 
     debug!(
