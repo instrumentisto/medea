@@ -6,7 +6,7 @@ use grpcio::{Environment, RpcContext, Server, ServerBuilder, UnarySink};
 
 use crate::{
     api::{
-        control::RoomId,
+        control::model::RoomId,
         grpc::protos::control::{
             ApplyRequest, CreateRequest, GetResponse, IdRequest, Response,
         },

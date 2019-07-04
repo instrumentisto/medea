@@ -1,10 +1,8 @@
 use crate::api::control::{
-    endpoint::SerdeSrcUri,
-    model::{
-        endpoint::webrtc::publish_endpoint::WebRtcPublishId, member::MemberId,
-        room::RoomId,
-    },
+    model::{MemberId, RoomId, WebRtcPublishId},
+    serde::endpoint::SerdeSrcUri,
 };
+
 use macro_attr::*;
 use newtype_derive::{newtype_fmt, NewtypeDisplay, NewtypeFrom};
 use serde::Deserialize;

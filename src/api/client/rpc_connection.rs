@@ -8,7 +8,7 @@ use macro_attr::*;
 use medea_client_api_proto::{Command, Event};
 use newtype_derive::NewtypeFrom;
 
-use crate::api::control::MemberId;
+use crate::api::control::serde::MemberId;
 
 macro_attr! {
     /// Wrapper [`Command`] for implements actix [`Message`].

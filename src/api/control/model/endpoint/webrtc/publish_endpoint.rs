@@ -1,4 +1,4 @@
-use crate::api::control::endpoint::P2pMode;
+use crate::api::control::serde::endpoint::P2pMode;
 use macro_attr::*;
 use newtype_derive::{newtype_fmt, NewtypeDisplay, NewtypeFrom};
 use serde::Deserialize; // TODO: temp

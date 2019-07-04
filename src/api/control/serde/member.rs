@@ -21,8 +21,9 @@ use crate::api::control::{
             WebRtcPublishId,
         },
         member::MemberSpec,
+        MemberId,
     },
-    Endpoint, MemberId,
+    serde::Endpoint,
 };
 
 /// Newtype for [`Element::Member`] variant.

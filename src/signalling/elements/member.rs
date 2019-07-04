@@ -7,7 +7,7 @@ use hashbrown::HashMap;
 use medea_client_api_proto::IceServer;
 
 use crate::{
-    api::control::{
+    api::control::serde::{
         MemberId, SerdeMemberSpec, SerdeRoomSpec, TryFromElementError,
     },
     log::prelude::*,
@@ -17,7 +17,9 @@ use crate::{
 use super::endpoints::webrtc::{
     WebRtcPlayEndpoint, WebRtcPlayId, WebRtcPublishEndpoint, WebRtcPublishId,
 };
-use crate::api::control::{model::room::RoomSpec, room::ParsedSerdeRoomSpec};
+use crate::api::control::{
+    model::room::RoomSpec, serde::room::ParsedSerdeRoomSpec,
+};
 
 /// Errors which may occur while loading [`Member`]s from [`RoomSpec`].
 #[derive(Debug, Fail)]
@@ -87,7 +89,7 @@ impl Member {
         //        let this_member_spec = SerdeMemberSpec::try_from(
         //            room_spec
         //                .get_member_by_id(&self.id())
-        //                
+        //
         // .map_or(Err(MembersLoadError::MemberNotFound(self.id())), Ok)?,
         //        )?;
 
@@ -111,11 +113,11 @@ impl Member {
             //            let publisher_spec = SerdeMemberSpec::try_from(
             //                room_spec
             //                    .pipeline
-            //                    
+            //
             // .get(&spec_play_endpoint.src().member_id.to_string())
             //                    .map_or(
             //                        Err(MembersLoadError::MemberNotFound(
-            //                            
+            //
             // spec_play_endpoint.src().member_id.clone(),
             //                        )),
             //                        Ok,
@@ -144,7 +146,7 @@ impl Member {
             //                .get(&spec_play_endpoint.src().endpoint_id)
             //                .map_or(
             //                    Err(MembersLoadError::EndpointNotFound(
-            //                        
+            //
             // spec_play_endpoint.src().endpoint_id.clone().0, // TODO: tmp
             //                    )),
             //                    Ok,
@@ -352,7 +354,7 @@ pub fn parse_members(
 mod tests {
     use std::rc::Rc;
 
-    use crate::api::control::{Element, MemberId};
+    use crate::api::control::serde::{Element, MemberId};
 
     use super::*;
 

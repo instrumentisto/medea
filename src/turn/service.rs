@@ -12,7 +12,7 @@ use rand::{distributions::Alphanumeric, Rng};
 use redis::ConnectionInfo;
 
 use crate::{
-    api::control::{MemberId, RoomId},
+    api::control::serde::{MemberId, RoomId},
     conf::Conf,
     media::IceUser,
     turn::repo::{TurnDatabase, TurnDatabaseErr},

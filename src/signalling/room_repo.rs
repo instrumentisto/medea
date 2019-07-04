@@ -5,7 +5,7 @@ use std::sync::{Arc, Mutex};
 use actix::Addr;
 use hashbrown::HashMap;
 
-use crate::{api::control::RoomId, signalling::Room};
+use crate::{api::control::serde::RoomId, signalling::Room};
 
 /// Repository that stores [`Room`]s addresses.
 #[derive(Clone, Default, Debug)]

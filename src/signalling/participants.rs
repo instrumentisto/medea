@@ -26,7 +26,10 @@ use crate::{
             AuthorizationError, ClosedReason, EventMessage, RpcConnection,
             RpcConnectionClosed,
         },
-        control::{MemberId, RoomId, SerdeRoomSpec},
+        control::{
+            model::{MemberId, RoomId},
+            serde::SerdeRoomSpec,
+        },
     },
     log::prelude::*,
     media::IceUser,
