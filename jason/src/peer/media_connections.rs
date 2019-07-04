@@ -116,8 +116,6 @@ impl MediaConnections {
 
         let mut promises = Vec::new();
         for sender in self.senders.values() {
-            let sender: &Sender = sender;
-
             if let Some(track) = stream.get_track_by_id(sender.track_id) {
                 promises.push(
                     JsFuture::from(
@@ -144,7 +142,6 @@ impl MediaConnections {
         transceiver: RtcRtpTransceiver,
         track: web_sys::MediaStreamTrack,
     ) -> Option<&Receiver> {
-        // should be safe to unwrap
         let mid = transceiver.mid().unwrap();
 
         for receiver in &mut self.receivers.values_mut() {
@@ -156,7 +153,6 @@ impl MediaConnections {
                         receiver.caps.clone(),
                     );
 
-                    receiver.transceiver = transceiver;
                     receiver.track.replace(track);
                     return Some(receiver);
                 }
@@ -212,6 +208,8 @@ pub struct Sender {
 }
 
 impl Sender {
+    /// Creates new transceiver if mid is None, or retrieves existing
+    /// transceiver by provided mid. Errors if transceiver lookup fails.
     fn new(
         track_id: TrackId,
         caps: MediaType,
@@ -262,6 +260,10 @@ pub struct Receiver {
 }
 
 impl Receiver {
+    /// Creates new transceiver if mid is None, or retrieves existing
+    /// transceiver by provided mid. Errors if transceiver lookup fails. Track
+    /// in created receiver is None, since receiver must be created before
+    /// actual track arrives.
     fn new(
         track_id: TrackId,
         caps: MediaType,

@@ -71,7 +71,7 @@ fn on_close(inner_rc: &RefCell<Inner>, close_msg: CloseMsg) {
 }
 
 /// Handles messages from remote server.
-fn on_message(inner_rc: &Rc<RefCell<Inner>>, msg: Result<ServerMsg, WasmErr>) {
+fn on_message(inner_rc: &RefCell<Inner>, msg: Result<ServerMsg, WasmErr>) {
     let inner = inner_rc.borrow();
     match msg {
         Ok(ServerMsg::Pong(_num)) => {
