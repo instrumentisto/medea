@@ -119,9 +119,7 @@ mod test {
     use futures::{future::IntoFuture as _, sink::Sink as _, Stream as _};
 
     use crate::{
-        api::control,
-        conf::{Conf, Server, Turn},
-        signalling::Room,
+        api::control, conf::Conf, signalling::Room,
         turn::new_turn_auth_service_mock,
     };
 
@@ -182,8 +180,7 @@ mod test {
                 idle_timeout: Duration::new(2, 0),
                 reconnect_timeout: Default::default(),
             },
-            turn: Turn::default(),
-            server: Server::default(),
+            ..Default::default()
         };
 
         let mut server = ws_server(conf.clone());
