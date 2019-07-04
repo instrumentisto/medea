@@ -91,7 +91,8 @@ message Room {
 message Member {
   optional string on_join = 1;
   optional string on_leave = 2;
-  map<string, Member.Element> pipeline = 3;
+  required string credentials = 3;
+  map<string, Member.Element> pipeline = 4;
 
   message Element {
     oneof el {

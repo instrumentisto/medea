@@ -30,7 +30,7 @@ pub trait MemberSpec {
         &self,
     ) -> HashMap<WebRtcPublishId, Box<dyn WebRtcPublishEndpoint>>;
 
-    fn credentials(&self) -> &String;
+    fn credentials(&self) -> &str;
 
     fn get_webrtc_play_by_id(
         &self,

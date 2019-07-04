@@ -4091,6 +4091,7 @@ pub struct Member {
     // message fields
     on_join: ::protobuf::SingularField<::std::string::String>,
     on_leave: ::protobuf::SingularField<::std::string::String>,
+    credentials: ::protobuf::SingularField<::std::string::String>,
     pub pipeline: ::std::collections::HashMap<::std::string::String, Member_Element>,
     // special fields
     pub unknown_fields: ::protobuf::UnknownFields,
@@ -4180,7 +4181,43 @@ impl Member {
         self.on_leave.take().unwrap_or_else(|| ::std::string::String::new())
     }
 
-    // repeated .medea.Member.PipelineEntry pipeline = 3;
+    // required string credentials = 3;
+
+
+    pub fn get_credentials(&self) -> &str {
+        match self.credentials.as_ref() {
+            Some(v) => &v,
+            None => "",
+        }
+    }
+    pub fn clear_credentials(&mut self) {
+        self.credentials.clear();
+    }
+
+    pub fn has_credentials(&self) -> bool {
+        self.credentials.is_some()
+    }
+
+    // Param is passed by value, moved
+    pub fn set_credentials(&mut self, v: ::std::string::String) {
+        self.credentials = ::protobuf::SingularField::some(v);
+    }
+
+    // Mutable pointer to the field.
+    // If field is not initialized, it is initialized with default value first.
+    pub fn mut_credentials(&mut self) -> &mut ::std::string::String {
+        if self.credentials.is_none() {
+            self.credentials.set_default();
+        }
+        self.credentials.as_mut().unwrap()
+    }
+
+    // Take field
+    pub fn take_credentials(&mut self) -> ::std::string::String {
+        self.credentials.take().unwrap_or_else(|| ::std::string::String::new())
+    }
+
+    // repeated .medea.Member.PipelineEntry pipeline = 4;
 
 
     pub fn get_pipeline(&self) -> &::std::collections::HashMap<::std::string::String, Member_Element> {
@@ -4208,6 +4245,9 @@ impl Member {
 
 impl ::protobuf::Message for Member {
     fn is_initialized(&self) -> bool {
+        if self.credentials.is_none() {
+            return false;
+        }
         true
     }
 
@@ -4222,6 +4262,9 @@ impl ::protobuf::Message for Member {
                     ::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.on_leave)?;
                 },
                 3 => {
+                    ::protobuf::rt::read_singular_string_into(wire_type, is, &mut self.credentials)?;
+                },
+                4 => {
                     ::protobuf::rt::read_map_into::<::protobuf::types::ProtobufTypeString, ::protobuf::types::ProtobufTypeMessage<Member_Element>>(wire_type, is, &mut self.pipeline)?;
                 },
                 _ => {
@@ -4242,7 +4285,10 @@ impl ::protobuf::Message for Member {
         if let Some(ref v) = self.on_leave.as_ref() {
             my_size += ::protobuf::rt::string_size(2, &v);
         }
-        my_size += ::protobuf::rt::compute_map_size::<::protobuf::types::ProtobufTypeString, ::protobuf::types::ProtobufTypeMessage<Member_Element>>(3, &self.pipeline);
+        if let Some(ref v) = self.credentials.as_ref() {
+            my_size += ::protobuf::rt::string_size(3, &v);
+        }
+        my_size += ::protobuf::rt::compute_map_size::<::protobuf::types::ProtobufTypeString, ::protobuf::types::ProtobufTypeMessage<Member_Element>>(4, &self.pipeline);
         my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
         self.cached_size.set(my_size);
         my_size
@@ -4255,7 +4301,10 @@ impl ::protobuf::Message for Member {
         if let Some(ref v) = self.on_leave.as_ref() {
             os.write_string(2, &v)?;
         }
-        ::protobuf::rt::write_map_with_cached_sizes::<::protobuf::types::ProtobufTypeString, ::protobuf::types::ProtobufTypeMessage<Member_Element>>(3, &self.pipeline, os)?;
+        if let Some(ref v) = self.credentials.as_ref() {
+            os.write_string(3, &v)?;
+        }
+        ::protobuf::rt::write_map_with_cached_sizes::<::protobuf::types::ProtobufTypeString, ::protobuf::types::ProtobufTypeMessage<Member_Element>>(4, &self.pipeline, os)?;
         os.write_unknown_fields(self.get_unknown_fields())?;
         ::std::result::Result::Ok(())
     }
@@ -4308,6 +4357,11 @@ impl ::protobuf::Message for Member {
                     |m: &Member| { &m.on_leave },
                     |m: &mut Member| { &mut m.on_leave },
                 ));
+                fields.push(::protobuf::reflect::accessor::make_singular_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
+                    "credentials",
+                    |m: &Member| { &m.credentials },
+                    |m: &mut Member| { &mut m.credentials },
+                ));
                 fields.push(::protobuf::reflect::accessor::make_map_accessor::<_, ::protobuf::types::ProtobufTypeString, ::protobuf::types::ProtobufTypeMessage<Member_Element>>(
                     "pipeline",
                     |m: &Member| { &m.pipeline },
@@ -4337,6 +4391,7 @@ impl ::protobuf::Clear for Member {
     fn clear(&mut self) {
         self.on_join.clear();
         self.on_leave.clear();
+        self.credentials.clear();
         self.pipeline.clear();
         self.unknown_fields.clear();
     }
@@ -6291,34 +6346,35 @@ static file_descriptor_proto_data: &'static [u8] = b"\
     \x04\x20\x01(\x0b2\x0c.medea.RelayH\0R\x05relay\x12<\n\x0bwebrtc_play\
     \x18\x05\x20\x01(\x0b2\x19.medea.WebRtcPlayEndpointH\0R\nwebrtcPlay\x12=\
     \n\nwebrtc_pub\x18\x06\x20\x01(\x0b2\x1c.medea.WebRtcPublishEndpointH\0R\
-    \twebrtcPubB\x04\n\x02el\"\xda\x03\n\x06Member\x12\x17\n\x07on_join\x18\
+    \twebrtcPubB\x04\n\x02el\"\xfc\x03\n\x06Member\x12\x17\n\x07on_join\x18\
     \x01\x20\x01(\tR\x06onJoin\x12\x19\n\x08on_leave\x18\x02\x20\x01(\tR\x07\
-    onLeave\x127\n\x08pipeline\x18\x03\x20\x03(\x0b2\x1b.medea.Member.Pipeli\
-    neEntryR\x08pipeline\x1aR\n\rPipelineEntry\x12\x10\n\x03key\x18\x01\x20\
-    \x01(\tR\x03key\x12+\n\x05value\x18\x02\x20\x01(\x0b2\x15.medea.Member.E\
-    lementR\x05value:\x028\x01\x1a\x8e\x02\n\x07Element\x12\x1e\n\x03hub\x18\
-    \x01\x20\x01(\x0b2\n.medea.HubH\0R\x03hub\x12:\n\rfile_recorder\x18\x02\
-    \x20\x01(\x0b2\x13.medea.FileRecorderH\0R\x0cfileRecorder\x12$\n\x05rela\
-    y\x18\x03\x20\x01(\x0b2\x0c.medea.RelayH\0R\x05relay\x12<\n\x0bwebrtc_pl\
-    ay\x18\x04\x20\x01(\x0b2\x19.medea.WebRtcPlayEndpointH\0R\nwebrtcPlay\
-    \x12=\n\nwebrtc_pub\x18\x05\x20\x01(\x0b2\x1c.medea.WebRtcPublishEndpoin\
-    tH\0R\twebrtcPubB\x04\n\x02el\"\xc7\x01\n\x15WebRtcPublishEndpoint\x129\
-    \n\x03p2p\x18\x01\x20\x01(\x0e2\x20.medea.WebRtcPublishEndpoint.P2P:\x05\
-    NEVERR\x03p2p\x12\x10\n\x03dst\x18\x02\x20\x01(\tR\x03dst\x12\x19\n\x08o\
-    n_start\x18\x03\x20\x01(\tR\x07onStart\x12\x17\n\x07on_stop\x18\x04\x20\
-    \x01(\tR\x06onStop\"-\n\x03P2P\x12\t\n\x05NEVER\x10\0\x12\x0f\n\x0bIF_PO\
-    SSIBLE\x10\x01\x12\n\n\x06ALWAYS\x10\x02\"Z\n\x12WebRtcPlayEndpoint\x12\
-    \x10\n\x03src\x18\x01\x20\x02(\tR\x03src\x12\x19\n\x08on_start\x18\x02\
-    \x20\x01(\tR\x07onStart\x12\x17\n\x07on_stop\x18\x03\x20\x01(\tR\x06onSt\
-    op\"\x05\n\x03Hub\"f\n\x0cFileRecorder\x12\x10\n\x03src\x18\x01\x20\x02(\
-    \tR\x03src\x12\x10\n\x03dst\x18\x02\x20\x02(\tR\x03dst\x12\x19\n\x08on_s\
-    tart\x18\x03\x20\x01(\tR\x07onStart\x12\x17\n\x07on_stop\x18\x04\x20\x01\
-    (\tR\x06onStop\"+\n\x05Relay\x12\x10\n\x03src\x18\x01\x20\x02(\tR\x03src\
-    \x12\x10\n\x03dst\x18\x02\x20\x01(\tR\x03dst2\xc6\x01\n\nControlApi\x12/\
-    \n\x06Create\x12\x14.medea.CreateRequest\x1a\x0f.medea.Response\x12-\n\
-    \x05Apply\x12\x13.medea.ApplyRequest\x1a\x0f.medea.Response\x12+\n\x06De\
-    lete\x12\x10.medea.IdRequest\x1a\x0f.medea.Response\x12+\n\x03Get\x12\
-    \x10.medea.IdRequest\x1a\x12.medea.GetResponse\
+    onLeave\x12\x20\n\x0bcredentials\x18\x03\x20\x02(\tR\x0bcredentials\x127\
+    \n\x08pipeline\x18\x04\x20\x03(\x0b2\x1b.medea.Member.PipelineEntryR\x08\
+    pipeline\x1aR\n\rPipelineEntry\x12\x10\n\x03key\x18\x01\x20\x01(\tR\x03k\
+    ey\x12+\n\x05value\x18\x02\x20\x01(\x0b2\x15.medea.Member.ElementR\x05va\
+    lue:\x028\x01\x1a\x8e\x02\n\x07Element\x12\x1e\n\x03hub\x18\x01\x20\x01(\
+    \x0b2\n.medea.HubH\0R\x03hub\x12:\n\rfile_recorder\x18\x02\x20\x01(\x0b2\
+    \x13.medea.FileRecorderH\0R\x0cfileRecorder\x12$\n\x05relay\x18\x03\x20\
+    \x01(\x0b2\x0c.medea.RelayH\0R\x05relay\x12<\n\x0bwebrtc_play\x18\x04\
+    \x20\x01(\x0b2\x19.medea.WebRtcPlayEndpointH\0R\nwebrtcPlay\x12=\n\nwebr\
+    tc_pub\x18\x05\x20\x01(\x0b2\x1c.medea.WebRtcPublishEndpointH\0R\twebrtc\
+    PubB\x04\n\x02el\"\xc7\x01\n\x15WebRtcPublishEndpoint\x129\n\x03p2p\x18\
+    \x01\x20\x01(\x0e2\x20.medea.WebRtcPublishEndpoint.P2P:\x05NEVERR\x03p2p\
+    \x12\x10\n\x03dst\x18\x02\x20\x01(\tR\x03dst\x12\x19\n\x08on_start\x18\
+    \x03\x20\x01(\tR\x07onStart\x12\x17\n\x07on_stop\x18\x04\x20\x01(\tR\x06\
+    onStop\"-\n\x03P2P\x12\t\n\x05NEVER\x10\0\x12\x0f\n\x0bIF_POSSIBLE\x10\
+    \x01\x12\n\n\x06ALWAYS\x10\x02\"Z\n\x12WebRtcPlayEndpoint\x12\x10\n\x03s\
+    rc\x18\x01\x20\x02(\tR\x03src\x12\x19\n\x08on_start\x18\x02\x20\x01(\tR\
+    \x07onStart\x12\x17\n\x07on_stop\x18\x03\x20\x01(\tR\x06onStop\"\x05\n\
+    \x03Hub\"f\n\x0cFileRecorder\x12\x10\n\x03src\x18\x01\x20\x02(\tR\x03src\
+    \x12\x10\n\x03dst\x18\x02\x20\x02(\tR\x03dst\x12\x19\n\x08on_start\x18\
+    \x03\x20\x01(\tR\x07onStart\x12\x17\n\x07on_stop\x18\x04\x20\x01(\tR\x06\
+    onStop\"+\n\x05Relay\x12\x10\n\x03src\x18\x01\x20\x02(\tR\x03src\x12\x10\
+    \n\x03dst\x18\x02\x20\x01(\tR\x03dst2\xc6\x01\n\nControlApi\x12/\n\x06Cr\
+    eate\x12\x14.medea.CreateRequest\x1a\x0f.medea.Response\x12-\n\x05Apply\
+    \x12\x13.medea.ApplyRequest\x1a\x0f.medea.Response\x12+\n\x06Delete\x12\
+    \x10.medea.IdRequest\x1a\x0f.medea.Response\x12+\n\x03Get\x12\x10.medea.\
+    IdRequest\x1a\x12.medea.GetResponse\
 ";
 
 static mut file_descriptor_proto_lazy: ::protobuf::lazy::Lazy<::protobuf::descriptor::FileDescriptorProto> = ::protobuf::lazy::Lazy {

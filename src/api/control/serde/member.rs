@@ -95,7 +95,7 @@ impl MemberSpec for SerdeMemberSpec {
             .collect()
     }
 
-    fn credentials(&self) -> &String {
+    fn credentials(&self) -> &str {
         &self.credentials
     }
 

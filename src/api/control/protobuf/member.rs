@@ -62,9 +62,13 @@ impl MemberSpec for GrpcMember {
             .collect()
     }
 
-    fn credentials(&self) -> &String {
-        // TODO: deal with it
-        unimplemented!()
+    fn credentials(&self) -> &str {
+        if self.0.has_credentials() {
+            self.0.get_credentials()
+        } else {
+            // TODO: deal with it
+            unimplemented!()
+        }
     }
 
     fn get_webrtc_play_by_id(
