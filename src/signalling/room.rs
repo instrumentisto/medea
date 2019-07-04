@@ -268,7 +268,6 @@ impl Room {
 
 /// [`Actor`] implementation that provides an ergonomic way
 /// to interact with [`Room`].
-// TODO: close connections on signal (gracefull shutdown)
 impl Actor for Room {
     type Context = Context<Self>;
 }
@@ -444,11 +443,15 @@ impl Handler<ShutdownMessage> for Room {
         ctx: &mut Self::Context,
     ) -> Self::Result {
         info!("Shutting down Room: {:?}", self.id);
-        ctx.notify(CloseRoom {});
+        ctx.notify(CloseRoom {} );
+
         Ok(Box::new(futures::future::ok(())
-            .map(|_| {
+            .then(move |_: Result<(), ()>| {
                 // todo: close room dynamically
+                error!("now i will wait 2 secs");
                 std::thread::sleep(std::time::Duration::from_millis(2000));
+                error!("2 secs waited!");
+                futures::future::ok::<(), std::boxed::Box<dyn std::error::Error + std::marker::Send>>(())
         })))
     }
 }

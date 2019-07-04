@@ -1,7 +1,8 @@
 //! A class to handle shutdown signals and to shut down system
 //! Actix system has to be running for it to work.
 
-use std::{collections::BTreeMap, mem, sync::Mutex, thread, time::Duration};
+use std::{collections::BTreeMap, mem, sync::Mutex, thread, time::Duration,
+          sync::mpsc::channel};
 
 use actix::{self, MailboxError, Message, Recipient, System};
 use tokio::prelude::{
@@ -12,17 +13,18 @@ use tokio::prelude::{
 use lazy_static::lazy_static;
 
 use crate::log::prelude::*;
+use tokio::runtime::Runtime;
 
 pub type ShutdownMessageResult = Result<
     Box<dyn Future<Item = (), Error = Box<dyn std::error::Error + Send>> + std::marker::Send>,
     ()>;
 
-type ShutdownFutureType = Box<
+type ShutdownFutureType =
     dyn Future<
         Item = std::vec::Vec<ShutdownMessageResult>,
         Error = MailboxError,
-    >,
->;
+    >
+;
 
 //// TODO: why not use simple struct?
 //lazy_static! {
@@ -84,21 +86,34 @@ fn handle_shutdown() {
         return;
     }
 
-    let mut shutdown_future: ShutdownFutureType =
-        Box::new(
-            futures::future::ok::<
-                        Vec<ShutdownMessageResult>,
-                        MailboxError>
-                (vec![Ok(Box::new(futures::future::ok(()) )) ] )
-        );
+    let mut shutdown_future: Box<ShutdownFutureType> =
+            Box::new(vec![Ok(Box::new(futures::future::ok(())
+                .map(|_| {
+                    error!("executing sample future in graceful_shutdown");
+                }
+                )))] );
 
     for recipients_values in recipients.values() {
         let mut this_priority_futures_vec =
             Vec::with_capacity(recipients.len());
 
         for recipient in recipients_values {
-            let send_fut = recipient.send(ShutdownMessage {});
-            this_priority_futures_vec.push(send_fut);
+
+            let (tx, rx) = channel();
+            let tx2 = tx.clone();
+            actix_rt::spawn(recipient.send(ShutdownMessage {})
+                .map(move |res| {
+                    println!("RESULT");
+                    tx.send(res);
+                })
+                .map_err(move |_| {
+                    tx2.send(Ok(Box::new(futures::future::ok(()))));
+                })
+            );
+
+            let recipient_shutdown_fut = rx.recv().unwrap();
+
+            this_priority_futures_vec.push(recipient_shutdown_fut);
         }
 
         let this_priority_futures = join_all(this_priority_futures_vec);
@@ -109,18 +124,29 @@ fn handle_shutdown() {
         shutdown_future = Box::new(
             futures::future::ok::<
                 Vec<ShutdownMessageResult>,
-                MailboxError,>
-                (vec![Ok(Box::new(futures::future::ok(())))] ));
+                ()>
+                (vec![Ok(Box::new(futures::future::ok(())
+                    .map(|_| {
+                        error!("executing sample future in graceful_shutdown");
+                    }
+                )))] ));
 
         mem::replace(&mut shutdown_future, new_shutdown_future);
     }
 
-    let _ = shutdown_future
+    error!("EXECUTING FUTURE");
+
+
+    shutdown_future
         .map(|_| ())
-        .map_err(|e| {
-            error!("Error trying to shut down system gracefully: {:?}", e);
-        })
-        .wait();
+            .map_err(|e| {
+                error!("Error trying to shut down system gracefully: {:?}", e);
+            })
+            .wait();
+
+
+    error!("SIGINT, SIGHUP, SIGTERM or SIGQUIT received, EXITED");
+
 }
 
 pub fn create(shutdown_timeout: u64, actix_system: System) {
@@ -152,6 +178,7 @@ pub fn create(shutdown_timeout: u64, actix_system: System) {
 
             self::handle_shutdown();
             actix_system_for_signal.stop();
+//            actix_system_for_signal.stop();
         };
 
         thread::spawn(move || {
