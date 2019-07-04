@@ -5,9 +5,6 @@ use std::{
     rc::{Rc, Weak},
 };
 
-use macro_attr::*;
-use newtype_derive::{newtype_fmt, NewtypeDisplay, NewtypeFrom};
-
 use crate::{
     api::control::serde::endpoint::SerdeSrcUri, media::PeerId,
     signalling::elements::Member,

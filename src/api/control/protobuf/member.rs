@@ -1,10 +1,12 @@
+use hashbrown::HashMap;
+
 use crate::{
     api::{
         control::{
             model::{
                 endpoint::webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
                 member::MemberSpec,
-                MemberId, RoomId,
+                MemberId,
             },
             protobuf::{
                 webrtc_play_endpoint::GrpcWebRtcPlayEndpoint,
@@ -15,7 +17,6 @@ use crate::{
     },
     signalling::elements::endpoints::webrtc::{WebRtcPlayId, WebRtcPublishId},
 };
-use hashbrown::HashMap;
 
 pub struct GrpcMember(pub Member);
 

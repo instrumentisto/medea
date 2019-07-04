@@ -3,18 +3,16 @@
 use std::convert::TryFrom;
 
 use hashbrown::HashMap;
-use macro_attr::*;
-use newtype_derive::{newtype_fmt, NewtypeDisplay, NewtypeFrom};
-use serde::Deserialize;
+
+use crate::api::control::model::{
+    member::MemberSpec,
+    room::{Id, RoomSpec},
+    MemberId,
+};
 
 use super::{
     member::SerdeMemberSpec, pipeline::Pipeline, Element, TryFromElementError,
 };
-use crate::api::control::model::{
-    member::MemberSpec, room::RoomSpec, MemberId,
-};
-
-use crate::api::control::model::room::Id;
 
 /// [`crate::signalling::room::Room`] specification.
 /// Newtype for [`Element::Room`]

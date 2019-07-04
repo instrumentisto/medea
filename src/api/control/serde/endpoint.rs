@@ -7,10 +7,11 @@ use serde::{
     Deserialize,
 };
 
-use crate::api::control::model::{endpoint::webrtc::*, member::MemberId};
+use crate::api::control::model::{
+    endpoint::webrtc::*, member::MemberId, room::RoomId,
+};
 
 use super::{Element, TryFromElementError};
-use crate::api::control::model::room::RoomId;
 
 /// [`Endpoint`] represents a media element that one or more media data streams
 /// flow through.

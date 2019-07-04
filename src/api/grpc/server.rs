@@ -25,9 +25,9 @@ struct ControlApiService {
 impl ControlApi for ControlApiService {
     fn create(
         &mut self,
-        ctx: RpcContext,
-        req: CreateRequest,
-        sink: UnarySink<Response>,
+        _ctx: RpcContext,
+        _req: CreateRequest,
+        _sink: UnarySink<Response>,
     ) {
         self.room_repository
             .remove(&RoomId("pub-sub-video-call".to_string()));
@@ -36,27 +36,27 @@ impl ControlApi for ControlApiService {
 
     fn apply(
         &mut self,
-        ctx: RpcContext,
-        req: ApplyRequest,
-        sink: UnarySink<Response>,
+        _ctx: RpcContext,
+        _req: ApplyRequest,
+        _sink: UnarySink<Response>,
     ) {
         unimplemented!()
     }
 
     fn delete(
         &mut self,
-        ctx: RpcContext,
-        req: IdRequest,
-        sink: UnarySink<Response>,
+        _ctx: RpcContext,
+        _req: IdRequest,
+        _sink: UnarySink<Response>,
     ) {
         unimplemented!()
     }
 
     fn get(
         &mut self,
-        ctx: RpcContext,
-        req: IdRequest,
-        sink: UnarySink<GetResponse>,
+        _ctx: RpcContext,
+        _req: IdRequest,
+        _sink: UnarySink<GetResponse>,
     ) {
         unimplemented!()
     }
@@ -70,14 +70,14 @@ pub struct GrpcServer {
 impl Actor for GrpcServer {
     type Context = Context<Self>;
 
-    fn started(&mut self, ctx: &mut Self::Context) {
+    fn started(&mut self, _ctx: &mut Self::Context) {
         debug!("Start gRPC server.");
         self.server.start();
     }
 
-    fn stopped(&mut self, ctx: &mut Self::Context) {
+    fn stopped(&mut self, _ctx: &mut Self::Context) {
         debug!("Shutdown gRPC.");
-        self.server.shutdown().wait();
+        self.server.shutdown().wait().unwrap();
     }
 }
 
@@ -87,7 +87,7 @@ pub fn run(room_repo: RoomsRepository) -> Addr<GrpcServer> {
     });
     let env = Arc::new(Environment::new(1));
 
-    let mut server = ServerBuilder::new(env)
+    let server = ServerBuilder::new(env)
         .register_service(service)
         .bind("127.0.0.1", 50_051)
         .build()

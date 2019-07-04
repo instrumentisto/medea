@@ -1,21 +1,13 @@
-use crate::{
-    api::{
-        control::{
-            model::{
-                endpoint::webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
-                member::MemberSpec,
-                MemberId, RoomId,
-            },
-            serde::endpoint::{P2pMode, SerdeSrcUri},
-        },
-        grpc::protos::control::{
-            WebRtcPublishEndpoint as WebRtcPublishEndpointDto,
-            WebRtcPublishEndpoint_P2P,
-        },
+use crate::api::{
+    control::{
+        model::endpoint::webrtc::WebRtcPublishEndpoint,
+        serde::endpoint::P2pMode,
     },
-    signalling::elements::endpoints::webrtc::{WebRtcPlayId, WebRtcPublishId},
+    grpc::protos::control::{
+        WebRtcPublishEndpoint as WebRtcPublishEndpointDto,
+        WebRtcPublishEndpoint_P2P,
+    },
 };
-use hashbrown::HashMap;
 
 pub struct GrpcWebRtcPublishEndpoint(pub WebRtcPublishEndpointDto);
 

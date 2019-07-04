@@ -28,7 +28,7 @@ fn main() -> Result<(), Error> {
     );
     let room_repo = RoomsRepository::new(rooms);
     server::run(room_repo.clone(), config);
-    let addr = grpc::server::run(room_repo);
+    let _addr = grpc::server::run(room_repo);
 
     let _ = sys.run();
 

@@ -1,6 +1,6 @@
 //! [`Member`] is member of [`Room`] with [`RpcConnection`].
 
-use std::{cell::RefCell, convert::TryFrom as _, rc::Rc};
+use std::{cell::RefCell, rc::Rc};
 
 use failure::Fail;
 use hashbrown::HashMap;
@@ -9,7 +9,7 @@ use medea_client_api_proto::IceServer;
 use crate::{
     api::control::{
         model::MemberId,
-        serde::{SerdeMemberSpec, SerdeRoomSpec, TryFromElementError},
+        serde::{SerdeRoomSpec, TryFromElementError},
     },
     log::prelude::*,
     media::{IceUser, PeerId},
@@ -133,11 +133,12 @@ impl Member {
                     )),
                     Ok,
                 )?;
-
-            let publisher_endpoint = publisher_spec.get_webrtc_publish_by_id(&spec_play_endpoint.src().endpoint_id)
+            // TODO: Maybe use EndpointId in MembersLoadError::EndpointNotFound?
+            let publisher_endpoint = publisher_spec
+                .get_webrtc_publish_by_id(&spec_play_endpoint.src().endpoint_id)
                 .map_or(
                     Err(MembersLoadError::EndpointNotFound(
-                        spec_play_endpoint.src().endpoint_id.clone().0, // TODO: tmp
+                        spec_play_endpoint.src().endpoint_id.clone().0,
                     )),
                     Ok,
                 )?;

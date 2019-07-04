@@ -1,10 +1,13 @@
-use super::member::GrpcMember;
+use hashbrown::HashMap;
+
 use crate::api::{
     control::model::{member::MemberSpec, room::RoomSpec, MemberId, RoomId},
     grpc::protos::control::CreateRequest,
 };
-use hashbrown::HashMap;
 
+use super::member::GrpcMember;
+
+#[allow(dead_code)]
 struct CreateRequestSpec(CreateRequest);
 
 impl RoomSpec for CreateRequestSpec {
@@ -35,7 +38,7 @@ impl RoomSpec for CreateRequestSpec {
         unimplemented!()
     }
 
-    fn get_member_by_id(&self, id: &MemberId) -> Option<Box<&dyn MemberSpec>> {
+    fn get_member_by_id(&self, _id: &MemberId) -> Option<Box<&dyn MemberSpec>> {
         unimplemented!()
     }
 }

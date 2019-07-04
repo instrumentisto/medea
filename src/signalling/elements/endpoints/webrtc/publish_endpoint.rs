@@ -6,8 +6,6 @@ use std::{
 };
 
 use hashbrown::HashSet;
-use macro_attr::*;
-use newtype_derive::{newtype_fmt, NewtypeDisplay, NewtypeFrom};
 
 use crate::{
     api::control::serde::endpoint::P2pMode, media::PeerId,

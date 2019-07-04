@@ -3,15 +3,6 @@
 use std::convert::TryFrom;
 
 use hashbrown::HashMap;
-use macro_attr::*;
-use newtype_derive::{newtype_fmt, NewtypeDisplay, NewtypeFrom};
-use serde::Deserialize;
-
-use super::{
-    endpoint::{SerdeWebRtcPlayEndpoint, SerdeWebRtcPublishEndpoint},
-    pipeline::Pipeline,
-    Element, TryFromElementError,
-};
 
 use crate::api::control::{
     model::{
@@ -19,10 +10,16 @@ use crate::api::control::{
             WebRtcPlayEndpoint, WebRtcPlayId, WebRtcPublishEndpoint,
             WebRtcPublishId,
         },
-        member::{Id, MemberSpec},
+        member::MemberSpec,
         MemberId,
     },
     serde::Endpoint,
+};
+
+use super::{
+    endpoint::{SerdeWebRtcPlayEndpoint, SerdeWebRtcPublishEndpoint},
+    pipeline::Pipeline,
+    Element, TryFromElementError,
 };
 
 /// Newtype for [`Element::Member`] variant.
@@ -104,7 +101,8 @@ impl MemberSpec for SerdeMemberSpec {
     }
 
     fn id(&self) -> &MemberId {
-        self.id()
+        // TODO: maybe delete this func???
+        unimplemented!()
     }
 
     fn get_webrtc_play_by_id(
