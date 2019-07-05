@@ -1,4 +1,4 @@
-use actix::{System, Arbiter, Actor as _};
+use actix::{Actor as _, Arbiter, System};
 use failure::Error;
 use medea::{
     api::client::server,
@@ -8,8 +8,7 @@ use medea::{
     start_static_rooms,
 };
 
-use medea::api::grpc;
-use medea::App;
+use medea::{api::grpc, App};
 use std::sync::Arc;
 
 fn main() -> Result<(), Error> {
@@ -31,9 +30,8 @@ fn main() -> Result<(), Error> {
     );
     let room_repo = RoomsRepository::new(rooms, Arc::clone(&app));
     server::run(room_repo.clone(), config.clone());
-    let room_repo_addr = RoomsRepository::start_in_arbiter(&Arbiter::new(), move |_| {
-        room_repo
-    });
+    let room_repo_addr =
+        RoomsRepository::start_in_arbiter(&Arbiter::new(), move |_| room_repo);
     let _addr = grpc::server::run(room_repo_addr, app);
 
     let _ = sys.run();

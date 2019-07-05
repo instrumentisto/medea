@@ -1,8 +1,12 @@
-use medea::api::grpc::protos::control_grpc::ControlApiClient;
-use medea::api::grpc::protos::control::{CreateRequest, Room, Member, WebRtcPlayEndpoint, WebRtcPublishEndpoint, Member_Element, WebRtcPublishEndpoint_P2P, Room_Element};
-use std::sync::Arc;
-use grpcio::{EnvBuilder, ChannelBuilder};
-use std::collections::HashMap;
+use grpcio::{ChannelBuilder, EnvBuilder};
+use medea::api::grpc::protos::{
+    control::{
+        CreateRequest, Member, Member_Element, Room, Room_Element,
+        WebRtcPlayEndpoint, WebRtcPublishEndpoint, WebRtcPublishEndpoint_P2P,
+    },
+    control_grpc::ControlApiClient,
+};
+use std::{collections::HashMap, sync::Arc};
 
 fn main() {
     let env = Arc::new(EnvBuilder::new().build());

@@ -34,8 +34,9 @@ pub struct App {
 
 impl App {
     pub fn new(config: Conf) -> Self {
-        let turn_auth_service = crate::turn::service::new_turn_auth_service(&config)
-            .expect("Unable to start turn service");
+        let turn_auth_service =
+            crate::turn::service::new_turn_auth_service(&config)
+                .expect("Unable to start turn service");
         Self {
             config,
             turn_service: Arc::new(turn_auth_service),

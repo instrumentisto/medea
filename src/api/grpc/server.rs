@@ -41,35 +41,41 @@ impl ControlApi for ControlApiService {
         let room_id = RoomId(req.get_id().to_string());
 
         let msg = StartRoom {
-            room: CreateRequestSpec(req)
+            room: CreateRequestSpec(req),
         };
 
-
-        let sid: HashMap<String, String> = msg.room.members().iter()
+        let sid: HashMap<String, String> = msg
+            .room
+            .members()
+            .iter()
             .map(|(id, member)| {
                 let addr = &self.app.config.server.bind_ip;
                 let port = self.app.config.server.bind_port;
                 let base_uri = format!("{}:{}", addr, port);
 
-                let uri = format!("wss://{}/{}/{}/{}", base_uri, &room_id, id, member.credentials());
+                let uri = format!(
+                    "wss://{}/{}/{}/{}",
+                    base_uri,
+                    &room_id,
+                    id,
+                    member.credentials()
+                );
 
                 (id.clone().to_string(), uri)
             })
             .collect();
 
-        ctx.spawn(self.room_repository.send(msg)
-            .map_err(|e| ())
-            .and_then(move |_| {
+        ctx.spawn(self.room_repository.send(msg).map_err(|e| ()).and_then(
+            move |_| {
                 let mut res = Response::new();
                 res.set_sid(sid);
-                sink.success(res)
-                    .map_err(|_| ())
-            })
-        );
+                sink.success(res).map_err(|_| ())
+            },
+        ));
 
-//        self.room_repository.add(room_id, room);
+        //        self.room_repository.add(room_id, room);
 
-        //debug!("{:?}", self.room_repository);
+        // debug!("{:?}", self.room_repository);
     }
 
     fn apply(
@@ -119,7 +125,10 @@ impl Actor for GrpcServer {
     }
 }
 
-pub fn run(room_repo: Addr<RoomsRepository>, app: Arc<App>) -> Addr<GrpcServer> {
+pub fn run(
+    room_repo: Addr<RoomsRepository>,
+    app: Arc<App>,
+) -> Addr<GrpcServer> {
     let bind_ip = app.config.grpc.bind_ip.clone().to_string();
     let bind_port = app.config.grpc.bind_port;
     let cq_count = app.config.grpc.completion_queue_count;

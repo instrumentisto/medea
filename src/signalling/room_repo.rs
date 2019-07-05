@@ -1,16 +1,20 @@
 //! Repository that stores [`Room`]s addresses.
 
-use std::sync::{Arc, Mutex};
-use std::collections::HashMap as StdHashMap;
+use std::{
+    collections::HashMap as StdHashMap,
+    sync::{Arc, Mutex},
+};
 
-use actix::{Addr, Actor, Context, Message, Handler, Arbiter};
+use actix::{Actor, Addr, Arbiter, Context, Handler, Message};
 use hashbrown::HashMap;
 
-use crate::{api::control::model::RoomId, signalling::Room};
-use crate::api::control::model::room::RoomSpec;
-use crate::conf::Conf;
+use crate::{
+    api::control::model::{room::RoomSpec, RoomId},
+    conf::Conf,
+    signalling::Room,
+    App,
+};
 use std::time::Duration;
-use crate::App;
 
 /// Repository that stores [`Room`]s addresses.
 #[derive(Clone, Debug)]
@@ -59,24 +63,21 @@ pub struct StartRoom<T: 'static + RoomSpec + Send> {
 impl<T: 'static + RoomSpec + Send> Handler<StartRoom<T>> for RoomsRepository {
     type Result = ();
 
-    fn handle(&mut self, msg: StartRoom<T>, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(
+        &mut self,
+        msg: StartRoom<T>,
+        ctx: &mut Self::Context,
+    ) -> Self::Result {
         let room_id = msg.room.id();
 
-        // TODO: don't use mock turn!!!!
-//        let turn_auth_service =
-//            crate::turn::service::new_turn_auth_service(&Conf::default())
-//                .expect("Unable to start turn service");
         let turn = Arc::clone(&self.app.turn_service);
 
         let room = Room::start_in_arbiter(&Arbiter::new(), move |_| {
             let room = msg.room;
             let room = Box::new(&room as &(RoomSpec));
-            Room::new(&room, Duration::from_secs(10), turn)
-                .unwrap()
+            Room::new(&room, Duration::from_secs(10), turn).unwrap()
         });
 
         self.rooms.lock().unwrap().insert(room_id, room);
     }
 }
-
-
