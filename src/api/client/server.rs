@@ -1,6 +1,6 @@
 //! HTTP server for handling WebSocket connections of Client API.
 
-use actix::{Actor, Addr};
+use actix::Actor;
 use actix_web::{
     middleware,
     web::{resource, Data, Path, Payload},
@@ -22,9 +22,9 @@ use crate::{
         control::MemberId,
     },
     conf::{Conf, Rpc},
+    graceful_shutdown,
     log::prelude::*,
     signalling::{RoomId, RoomsRepository},
-    graceful_shutdown
 };
 
 /// Parameters of new WebSocket connection creation HTTP request.
@@ -87,10 +87,7 @@ pub struct Context {
 }
 
 /// Starts HTTP server for handling WebSocket connections of Client API.
-pub fn run(
-    rooms: RoomsRepository,
-    config: Conf,
-) {
+pub fn run(rooms: RoomsRepository, config: Conf) {
     let server_addr = config.server.bind_addr();
 
     let actix_server = HttpServer::new(move || {
@@ -117,13 +114,14 @@ pub fn run(
 }
 
 pub mod actors {
-    use actix::{Actor, AsyncContext, Context, Handler, WrapFuture};
+    use actix::{Actor, Context, Handler};
 
-    use crate::{log::prelude::*, utils::graceful_shutdown::ShutdownMessage};
+    use crate::{
+        log::prelude::*,
+        utils::graceful_shutdown::{self, ShutdownMessage},
+    };
     use actix_web::dev::Server;
     use tokio::prelude::Future;
-    use tokio::prelude::future::IntoFuture;
-    use crate::utils::graceful_shutdown;
 
     pub struct ServerWrapper(pub Server);
 
@@ -137,14 +135,13 @@ pub mod actors {
         fn handle(
             &mut self,
             _: ShutdownMessage,
-            ctx: &mut Self::Context,
+            _: &mut Self::Context,
         ) -> Self::Result {
             info!("Shutting down Actix Web Server");
 
-            Ok(Box::new(self.0.stop(true)
-                         .then(move |_| {
-                            futures::future::ok(())
-                        })))
+            Ok(Box::new(
+                self.0.stop(true).then(move |_| futures::future::ok(())),
+            ))
         }
     }
 }

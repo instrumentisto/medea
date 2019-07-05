@@ -21,16 +21,12 @@ use crate::{
     turn::new_turn_auth_service,
     utils::graceful_shutdown,
 };
-use std::panic;
-use std::time::Duration;
-use std::mem::ManuallyDrop;
-use tokio::prelude::*;
 
 fn main() {
     dotenv().ok();
     let logger = log::new_dual_logger(std::io::stdout(), std::io::stderr());
     let _scope_guard = slog_scope::set_global_logger(logger);
-    let _log_guard = slog_stdlog::init().unwrap();
+    let _ = slog_stdlog::init().unwrap();
 
     let config = Conf::parse().unwrap();
     info!("{:?}", config);
@@ -49,20 +45,13 @@ fn main() {
         System::current(),
     );
 
-
-    let turn_auth_service = new_turn_auth_service(&config)
-        .expect("Unable to start turn service");
+    let turn_auth_service =
+        new_turn_auth_service(&config).expect("Unable to start turn service");
 
     let rpc_reconnect_timeout = config.rpc.reconnect_timeout;
 
     let room = Room::start_in_arbiter(&Arbiter::new(), move |_| {
-        Room::new(
-            1,
-            members,
-            peers,
-            rpc_reconnect_timeout,
-            turn_auth_service,
-        )
+        Room::new(1, members, peers, rpc_reconnect_timeout, turn_auth_service)
     });
     graceful_shutdown::subscribe(room.clone().recipient(), 1);
 
@@ -71,7 +60,5 @@ fn main() {
 
     server::run(rooms_repo, config);
 
-        sys.run();
-
-
+    let _ = sys.run();
 }

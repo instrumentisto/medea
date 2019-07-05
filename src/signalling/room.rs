@@ -8,9 +8,7 @@ use actix::{
     Message,
 };
 use failure::Fail;
-use futures::{
-    future, Future
-};
+use futures::{future, Future};
 use hashbrown::HashMap;
 
 use medea_client_api_proto::{Command, Event, IceCandidate};
@@ -23,6 +21,7 @@ use crate::{
         },
         control::{Member, MemberId},
     },
+    graceful_shutdown,
     log::prelude::*,
     media::{
         New, Peer, PeerId, PeerStateError, PeerStateMachine,
@@ -31,9 +30,7 @@ use crate::{
     signalling::{participants::ParticipantService, peers::PeerRepository},
     turn::TurnAuthService,
     utils::graceful_shutdown::ShutdownMessage,
-    graceful_shutdown
 };
-
 
 /// ID of [`Room`].
 pub type Id = u64;
@@ -443,14 +440,15 @@ impl Handler<ShutdownMessage> for Room {
         ctx: &mut Self::Context,
     ) -> Self::Result {
         info!("Shutting down Room: {:?}", self.id);
-        ctx.notify(CloseRoom {} );
+        ctx.notify(CloseRoom {});
 
-        Ok(Box::new(futures::future::ok(())
-            .then(move |_: Result<(), ()>| {
+        Ok(Box::new(futures::future::ok(()).then(
+            move |_: Result<(), ()>| {
                 // todo: close room dynamically
                 std::thread::sleep(std::time::Duration::from_millis(200));
                 futures::future::ok(())
-        })))
+            },
+        )))
     }
 }
 
