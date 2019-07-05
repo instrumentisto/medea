@@ -17,13 +17,16 @@ use tokio::runtime::Runtime;
 
 pub type ShutdownMessageResult = Result<
     Box<dyn Future<Item = (), Error = Box<dyn std::error::Error + Send>> + std::marker::Send>,
-    ()>;
+    ()
+>;
 
 type ShutdownFutureType =
     dyn Future<
-        Item = std::vec::Vec<ShutdownMessageResult>,
-        Error = MailboxError,
-    >
+        Item = Vec<
+            ()
+            >,
+        Error = std::boxed::Box<dyn std::error::Error + std::marker::Send>
+    > + std::marker::Send
 ;
 
 //// TODO: why not use simple struct?
@@ -81,37 +84,43 @@ fn handle_shutdown() {
     error!("SIGINT, SIGHUP, SIGTERM or SIGQUIT received, exiting");
 
     let mut recipients = STATIC_STRUCT.recipients.lock().unwrap();
+    let mut tokio_runtime = Runtime::new().unwrap();
 
     if recipients.is_empty() {
         return;
     }
 
     let mut shutdown_future: Box<ShutdownFutureType> =
-            Box::new(vec![Ok(Box::new(futures::future::ok(())
-                .map(|_| {
-                    error!("executing sample future in graceful_shutdown");
-                }
-                )))] );
+            Box::new(
+                futures::future::ok(vec![])
+            );
 
     for recipients_values in recipients.values() {
+
         let mut this_priority_futures_vec =
             Vec::with_capacity(recipients.len());
 
         for recipient in recipients_values {
-
             let (tx, rx) = channel();
             let tx2 = tx.clone();
-            actix_rt::spawn(recipient.send(ShutdownMessage {})
-                .map(move |res| {
-                    println!("RESULT");
-                    tx.send(res);
-                })
-                .map_err(move |_| {
-                    tx2.send(Ok(Box::new(futures::future::ok(()))));
-                })
-            );
+            let send_future = recipient.send(ShutdownMessage {});
 
-            let recipient_shutdown_fut = rx.recv().unwrap();
+            tokio_runtime.spawn(
+                    send_future
+//                        futures::future::err::
+//                            <Box<dyn Future<Item = (), Error = Box<dyn std::error::Error + Send>> + std::marker::Send>, ()>
+//                            (())
+                    .map(move |res| {
+                        tx.send(res);
+                    })
+                    .map_err(move |e| {
+                        error!("Error sending shutdown message: {:?}", e);
+                        tx2.send(Ok(Box::new(futures::future::ok(()))));
+                    })
+                );
+
+            let recipient_shutdown_fut = rx.recv().unwrap().unwrap();
+//            tokio_runtime.block_on(recipient_shutdown_fut);
 
             this_priority_futures_vec.push(recipient_shutdown_fut);
         }
@@ -122,31 +131,25 @@ fn handle_shutdown() {
         // we need to rewrite shutdown_future, otherwise compiler thinks we
         // moved value
         shutdown_future = Box::new(
-            futures::future::ok::<
-                Vec<ShutdownMessageResult>,
-                ()>
-                (vec![Ok(Box::new(futures::future::ok(())
-                    .map(|_| {
-                        error!("executing sample future in graceful_shutdown");
-                    }
-                )))] ));
+            futures::future::ok(())
+                .map(|_| {
+                    vec![]
+                })
+        );
 
         mem::replace(&mut shutdown_future, new_shutdown_future);
     }
 
-    error!("EXECUTING FUTURE");
-
-
-    shutdown_future
-        .map(|_| ())
+    tokio_runtime.block_on(
+        shutdown_future
+            .map(|_| ())
             .map_err(|e| {
                 error!("Error trying to shut down system gracefully: {:?}", e);
             })
-            .wait();
+        );
 
-
-    error!("SIGINT, SIGHUP, SIGTERM or SIGQUIT received, EXITED");
-
+    tokio_runtime.shutdown_on_idle()
+        .wait().unwrap();
 }
 
 pub fn create(shutdown_timeout: u64, actix_system: System) {
@@ -169,16 +172,17 @@ pub fn create(shutdown_timeout: u64, actix_system: System) {
 
         let actix_system_for_signal = actix_system.clone();
         let handler = move |signal| {
-            let actix_system_for_signal_move = actix_system_for_signal.clone();
-            thread::spawn(move || {
-                let shutdown_timeout = STATIC_STRUCT.timeout.lock().unwrap();
-                thread::sleep(Duration::from_millis(*shutdown_timeout));
-                actix_system_for_signal_move.stop();
-            });
+//            let actix_system_for_signal_move = actix_system_for_signal.clone();
+//            thread::spawn(move || {
+//                let shutdown_timeout = STATIC_STRUCT.timeout.lock().unwrap();
+//                thread::sleep(Duration::from_millis(*shutdown_timeout));
+//                actix_system_for_signal_move.stop();
+//            });
 
-            self::handle_shutdown();
-            actix_system_for_signal.stop();
-//            actix_system_for_signal.stop();
+            thread::spawn(move || {
+                self::handle_shutdown();
+                actix_system_for_signal.stop();
+            });
         };
 
         thread::spawn(move || {

@@ -451,7 +451,7 @@ impl Handler<ShutdownMessage> for Room {
                 error!("now i will wait 2 secs");
                 std::thread::sleep(std::time::Duration::from_millis(2000));
                 error!("2 secs waited!");
-                futures::future::ok::<(), std::boxed::Box<dyn std::error::Error + std::marker::Send>>(())
+                futures::future::ok(())
         })))
     }
 }
