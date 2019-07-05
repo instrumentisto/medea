@@ -171,12 +171,6 @@ impl PeerConnection {
     pub fn create_and_set_offer(
         &self,
     ) -> impl Future<Item = String, Error = WasmErr> {
-        use web_sys::console;
-        console::error_1(&wasm_bindgen::JsValue::from(
-            "before create_and_set_offer",
-        ));
-        console::error_1(&self.peer.get_transceivers());
-
         let inner = Rc::clone(&self.peer);
         JsFuture::from(self.peer.create_offer())
             .map(RtcSessionDescription::from)
@@ -199,12 +193,6 @@ impl PeerConnection {
     pub fn create_and_set_answer(
         &self,
     ) -> impl Future<Item = String, Error = WasmErr> {
-        use web_sys::console;
-        console::error_1(&wasm_bindgen::JsValue::from(
-            "before create_and_set_answer",
-        ));
-        console::error_1(&self.peer.get_transceivers());
-
         let inner = Rc::clone(&self.peer);
         JsFuture::from(self.peer.create_answer())
             .map(RtcSessionDescription::from)
