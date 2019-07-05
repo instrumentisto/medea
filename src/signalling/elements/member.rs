@@ -1,13 +1,13 @@
 //! [`Member`] is member of [`Room`] with [`RpcConnection`].
 
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, convert::TryFrom as _, rc::Rc};
 
 use failure::Fail;
 use hashbrown::HashMap;
 use medea_client_api_proto::IceServer;
 
 use crate::{
-    api::control::{model::MemberId, serde::TryFromElementError},
+    api::control::{MemberId, MemberSpec, RoomSpec, TryFromElementError},
     log::prelude::*,
     media::{IceUser, PeerId},
 };
@@ -15,7 +15,6 @@ use crate::{
 use super::endpoints::webrtc::{
     WebRtcPlayEndpoint, WebRtcPlayId, WebRtcPublishEndpoint, WebRtcPublishId,
 };
-use crate::api::control::model::room::RoomSpec;
 
 /// Errors which may occur while loading [`Member`]s from [`RoomSpec`].
 #[derive(Debug, Fail)]
@@ -79,86 +78,61 @@ impl Member {
     /// Load all srcs and sinks of this [`Member`].
     fn load(
         &self,
-        room_spec: &Box<&dyn RoomSpec>,
+        room_spec: &RoomSpec,
         store: &HashMap<MemberId, Rc<Self>>,
     ) -> Result<(), MembersLoadError> {
-        //        let this_member_spec = SerdeMemberSpec::try_from(
-        //            room_spec
-        //                .get_member_by_id(&self.id())
-        //
-        // .map_or(Err(MembersLoadError::MemberNotFound(self.id())), Ok)?,
-        //        )?;
-
-        let this_member_spec = room_spec
-            .get_member_by_id(&self.id())
-            .map_or(Err(MembersLoadError::MemberNotFound(self.id())), Ok)?;
+        let this_member_spec = MemberSpec::try_from(
+            room_spec
+                .pipeline
+                .get(&self.id().0)
+                .map_or(Err(MembersLoadError::MemberNotFound(self.id())), Ok)?,
+        )?;
 
         let this_member = store
             .get(&self.id())
             .map_or(Err(MembersLoadError::MemberNotFound(self.id())), Ok)?;
 
         for (spec_play_name, spec_play_endpoint) in
-            this_member_spec.webrtc_play_endpoints()
+            this_member_spec.play_endpoints()
         {
             let publisher_id =
-                MemberId(spec_play_endpoint.src().member_id.to_string());
+                MemberId(spec_play_endpoint.src.member_id.to_string());
             let publisher_member = store.get(&publisher_id).map_or(
                 Err(MembersLoadError::MemberNotFound(publisher_id)),
                 Ok,
             )?;
-            //            let publisher_spec = SerdeMemberSpec::try_from(
-            //                room_spec
-            //                    .pipeline
-            //
-            // .get(&spec_play_endpoint.src().member_id.to_string())
-            //                    .map_or(
-            //                        Err(MembersLoadError::MemberNotFound(
-            //
-            // spec_play_endpoint.src().member_id.clone(),
-            //                        )),
-            //                        Ok,
-            //                    )?,
-            //            )?;
+            let publisher_spec = MemberSpec::try_from(
+                room_spec
+                    .pipeline
+                    .get(&spec_play_endpoint.src.member_id.to_string())
+                    .map_or(
+                        Err(MembersLoadError::MemberNotFound(
+                            spec_play_endpoint.src.member_id.clone(),
+                        )),
+                        Ok,
+                    )?,
+            )?;
 
-            let publisher_spec = room_spec
-                .get_member_by_id(&spec_play_endpoint.src().member_id)
-                .map_or(
-                    Err(MembersLoadError::MemberNotFound(
-                        spec_play_endpoint.src().member_id.clone(),
-                    )),
-                    Ok,
-                )?;
-            // TODO: Maybe use EndpointId in MembersLoadError::EndpointNotFound?
-            let publisher_endpoint = publisher_spec
-                .get_webrtc_publish_by_id(&spec_play_endpoint.src().endpoint_id)
+            let publisher_endpoint = *publisher_spec
+                .publish_endpoints()
+                .get(&spec_play_endpoint.src.endpoint_id)
                 .map_or(
                     Err(MembersLoadError::EndpointNotFound(
-                        spec_play_endpoint.src().endpoint_id.clone().0,
+                        spec_play_endpoint.src.endpoint_id.clone(),
                     )),
                     Ok,
                 )?;
-
-            //            let publisher_endpoint = publisher_spec
-            //                .webrtc_publish_endpoints()
-            //                .get(&spec_play_endpoint.src().endpoint_id)
-            //                .map_or(
-            //                    Err(MembersLoadError::EndpointNotFound(
-            //
-            // spec_play_endpoint.src().endpoint_id.clone().0, // TODO: tmp
-            //                    )),
-            //                    Ok,
-            //                )?;
 
             if let Some(publisher) =
                 publisher_member.get_src_by_id(&WebRtcPublishId(
-                    spec_play_endpoint.src().endpoint_id.to_string(),
+                    spec_play_endpoint.src.endpoint_id.to_string(),
                 ))
             {
                 let new_play_endpoint_id =
                     WebRtcPlayId(spec_play_name.to_string());
                 let new_play_endpoint = Rc::new(WebRtcPlayEndpoint::new(
                     new_play_endpoint_id.clone(),
-                    spec_play_endpoint.src().clone(),
+                    spec_play_endpoint.src.clone(),
                     Rc::downgrade(&publisher),
                     Rc::downgrade(&this_member),
                 ));
@@ -168,11 +142,11 @@ impl Member {
                 publisher.add_sink(Rc::downgrade(&new_play_endpoint));
             } else {
                 let new_publish_id = WebRtcPublishId(
-                    spec_play_endpoint.src().endpoint_id.to_string(),
+                    spec_play_endpoint.src.endpoint_id.to_string(),
                 );
                 let new_publish = Rc::new(WebRtcPublishEndpoint::new(
                     new_publish_id.clone(),
-                    publisher_endpoint.p2p().clone(),
+                    publisher_endpoint.p2p.clone(),
                     Vec::new(),
                     Rc::downgrade(&publisher_member),
                 ));
@@ -180,7 +154,7 @@ impl Member {
                 let new_self_play_id = WebRtcPlayId(spec_play_name.to_string());
                 let new_self_play = Rc::new(WebRtcPlayEndpoint::new(
                     new_self_play_id.clone(),
-                    spec_play_endpoint.src().clone(),
+                    spec_play_endpoint.src.clone(),
                     Rc::downgrade(&new_publish),
                     Rc::downgrade(&this_member),
                 ));
@@ -195,20 +169,19 @@ impl Member {
 
         // This is necessary to create [`WebRtcPublishEndpoint`],
         // to which none [`WebRtcPlayEndpoint`] refers.
-        this_member_spec
-            .webrtc_publish_endpoints()
-            .into_iter()
-            .for_each(|(name, e)| {
-                let endpoint_id = WebRtcPublishId(name.clone().0); // TODO: tmp
+        this_member_spec.publish_endpoints().into_iter().for_each(
+            |(name, e)| {
+                let endpoint_id = WebRtcPublishId(name.clone());
                 if self.srcs().get(&endpoint_id).is_none() {
                     self.insert_src(Rc::new(WebRtcPublishEndpoint::new(
                         endpoint_id,
-                        e.p2p().clone(),
+                        e.p2p.clone(),
                         Vec::new(),
                         Rc::downgrade(&this_member),
                     )));
                 }
-            });
+            },
+        );
 
         Ok(())
     }
@@ -305,9 +278,9 @@ impl Member {
 ///
 /// Returns store of all [`Member`]s loaded from [`RoomSpec`].
 pub fn parse_members(
-    room_spec: &Box<&dyn RoomSpec>,
+    room_spec: &RoomSpec,
 ) -> Result<HashMap<MemberId, Rc<Member>>, MembersLoadError> {
-    let members_spec = room_spec.members();
+    let members_spec = room_spec.members()?;
     let mut members = HashMap::new();
 
     for (id, member) in &members_spec {
@@ -316,8 +289,6 @@ pub fn parse_members(
             Rc::new(Member::new(id.clone(), member.credentials().to_string())),
         );
     }
-
-    //    let spec = ParsedSerdeRoomSpec::new(&room_spec)?;
 
     for (_, member) in &members {
         member.load(room_spec, &members)?;
@@ -349,12 +320,9 @@ pub fn parse_members(
 
 #[cfg(test)]
 mod tests {
-    use std::{convert::TryFrom as _, rc::Rc};
+    use std::rc::Rc;
 
-    use crate::api::control::{
-        model::MemberId,
-        serde::{room::SerdeRoomSpecImpl, Element, SerdeRoomSpecDto},
-    };
+    use crate::api::control::{Element, MemberId};
 
     use super::*;
 
@@ -403,9 +371,7 @@ mod tests {
 
     fn get_test_store() -> HashMap<MemberId, Rc<Member>> {
         let room_element: Element = serde_yaml::from_str(TEST_SPEC).unwrap();
-        let room_spec = SerdeRoomSpecDto::try_from(&room_element).unwrap();
-        let room_spec = SerdeRoomSpecImpl::new(&room_spec).unwrap();
-        let room_spec = Box::new(&room_spec as &RoomSpec);
+        let room_spec = RoomSpec::try_from(&room_element).unwrap();
         parse_members(&room_spec).unwrap()
     }
 

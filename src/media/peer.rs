@@ -14,7 +14,7 @@ use medea_client_api_proto::{
 use medea_macro::enum_delegate;
 
 use crate::{
-    api::control::model::MemberId,
+    api::control::MemberId,
     media::{MediaTrack, TrackId},
     signalling::peers::Counter,
 };

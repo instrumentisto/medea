@@ -26,7 +26,7 @@ use crate::{
             AuthorizationError, ClosedReason, EventMessage, RpcConnection,
             RpcConnectionClosed,
         },
-        control::model::{room::RoomSpec, MemberId, RoomId},
+        control::{MemberId, RoomId, RoomSpec},
     },
     log::prelude::*,
     media::IceUser,
@@ -37,7 +37,6 @@ use crate::{
     },
     turn::{TurnAuthService, TurnServiceErr, UnreachablePolicy},
 };
-use std::sync::Arc;
 
 #[derive(Fail, Debug)]
 #[allow(clippy::module_name_repetitions)]
@@ -77,7 +76,7 @@ pub struct ParticipantService {
     members: HashMap<MemberId, Rc<Member>>,
 
     /// Service for managing authorization on Turn server.
-    turn: Arc<Box<dyn TurnAuthService + Send + Sync>>,
+    turn: Box<dyn TurnAuthService>,
 
     /// Established [`RpcConnection`]s of [`Members`]s in this [`Room`].
     // TODO: Replace Box<dyn RpcConnection>> with enum,
@@ -97,9 +96,9 @@ pub struct ParticipantService {
 impl ParticipantService {
     /// Create new [`ParticipantService`] from [`RoomSpec`].
     pub fn new(
-        room_spec: &Box<&dyn RoomSpec>,
+        room_spec: &RoomSpec,
         reconnect_timeout: Duration,
-        turn: Arc<Box<dyn TurnAuthService + Send + Sync>>,
+        turn: Box<dyn TurnAuthService>,
     ) -> Result<Self, MembersLoadError> {
         Ok(Self {
             room_id: room_spec.id().clone(),

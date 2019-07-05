@@ -14,10 +14,7 @@ use failure::Fail;
 use hashbrown::HashMap;
 
 use crate::{
-    api::control::{
-        model::{room::RoomSpec, RoomId},
-        serde::{load_static_specs_from_dir, room::SerdeRoomSpecImpl},
-    },
+    api::control::{load_static_specs_from_dir, room::RoomSpec, RoomId},
     conf::Conf,
     signalling::{room::RoomError, Room},
     turn::service,

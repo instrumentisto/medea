@@ -9,7 +9,7 @@ use actix::{AsyncContext as _, Context};
 use hashbrown::HashMap;
 
 use crate::{
-    api::control::model::MemberId,
+    api::control::MemberId,
     log::prelude::*,
     media::{New, Peer, PeerId, PeerStateMachine},
     signalling::{

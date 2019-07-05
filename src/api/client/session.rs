@@ -16,7 +16,7 @@ use crate::{
             ClosedReason, CommandMessage, EventMessage, RpcConnection,
             RpcConnectionClosed, RpcConnectionEstablished,
         },
-        control::model::MemberId,
+        control::MemberId,
     },
     log::prelude::*,
     signalling::Room,

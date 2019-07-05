@@ -8,7 +8,7 @@ use macro_attr::*;
 use medea_client_api_proto::{Command, Event};
 use newtype_derive::NewtypeFrom;
 
-use crate::api::control::model::MemberId;
+use crate::api::control::MemberId;
 
 macro_attr! {
     /// Wrapper [`Command`] for implements actix [`Message`].
@@ -107,7 +107,7 @@ pub mod test {
                 ClosedReason, CommandMessage, EventMessage, RpcConnection,
                 RpcConnectionClosed, RpcConnectionEstablished,
             },
-            control::model::MemberId,
+            control::MemberId,
         },
         signalling::Room,
     };

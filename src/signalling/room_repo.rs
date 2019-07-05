@@ -9,7 +9,7 @@ use actix::{Actor, Addr, Arbiter, Context, Handler, Message};
 use hashbrown::HashMap;
 
 use crate::{
-    api::control::model::{room::RoomSpec, RoomId},
+    api::control::{room::RoomSpec, RoomId},
     conf::Conf,
     signalling::{
         room::{CloseRoom, RoomError},

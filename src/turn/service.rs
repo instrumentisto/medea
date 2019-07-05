@@ -12,7 +12,7 @@ use rand::{distributions::Alphanumeric, Rng};
 use redis::ConnectionInfo;
 
 use crate::{
-    api::control::model::{MemberId, RoomId},
+    api::control::{MemberId, RoomId},
     conf::Conf,
     media::IceUser,
     turn::repo::{TurnDatabase, TurnDatabaseErr},
@@ -154,7 +154,7 @@ struct Service {
 #[allow(clippy::module_name_repetitions)]
 pub fn new_turn_auth_service(
     config: &Conf,
-) -> Result<Box<dyn TurnAuthService + Sync + Send>, TurnServiceErr> {
+) -> Result<Box<dyn TurnAuthService>, TurnServiceErr> {
     let turn_db = TurnDatabase::new(
         config.turn.db.redis.connection_timeout,
         ConnectionInfo {
@@ -276,7 +276,7 @@ impl Handler<DeleteIceUsers> for Service {
     }
 }
 
-// TODO: add cfg[test] here
+#[cfg(test)]
 pub mod test {
     use futures::future;
 
@@ -310,8 +310,7 @@ pub mod test {
     }
 
     #[allow(clippy::module_name_repetitions)]
-    pub fn new_turn_auth_service_mock() -> Box<dyn TurnAuthService + Sync + Send>
-    {
+    pub fn new_turn_auth_service_mock() -> Box<dyn TurnAuthService> {
         Box::new(TurnAuthServiceMock {})
     }
 

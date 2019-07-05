@@ -2,35 +2,72 @@
 
 use std::{convert::TryFrom, fmt};
 
+use macro_attr::*;
+use newtype_derive::{newtype_fmt, NewtypeDisplay, NewtypeFrom};
 use serde::{
     de::{self, Deserializer, Error, Unexpected, Visitor},
     Deserialize,
 };
 
-use crate::api::control::model::{
-    endpoint::webrtc::*, member::MemberId, room::RoomId,
-};
+use super::{Element, TryFromElementError, RoomId, MemberId};
 
-use super::{Element, TryFromElementError};
+macro_attr! {
+    /// ID of [`Room`].
+    #[derive(
+        Clone,
+        Debug,
+        Deserialize,
+        Eq,
+        Hash,
+        PartialEq,
+        NewtypeFrom!,
+        NewtypeDisplay!,
+    )]
+    pub struct WebRtcPublishId(pub String);
+}
+
+macro_attr! {
+    /// ID of [`Room`].
+    #[derive(
+        Clone,
+        Debug,
+        Deserialize,
+        Eq,
+        Hash,
+        PartialEq,
+        NewtypeFrom!,
+        NewtypeDisplay!,
+    )]
+    pub struct WebRtcPlayId(pub String);
+}
+
+/// Peer-to-peer mode of [`WebRtcPublishEndpoint`].
+#[derive(Clone, Deserialize, Debug)]
+pub enum P2pMode {
+    /// Always connect peer-to-peer.
+    Always,
+    Never,
+    IfPossible,
+}
 
 /// [`Endpoint`] represents a media element that one or more media data streams
 /// flow through.
 #[derive(Debug)]
-pub enum SerdeEndpoint {
-    WebRtcPublish(SerdeWebRtcPublishEndpointImpl),
-    WebRtcPlay(SerdeWebRtcPlayEndpointImpl),
+pub enum Endpoint {
+    WebRtcPublish(WebRtcPublishEndpoint),
+    WebRtcPlay(WebRtcPlayEndpoint),
 }
 
-impl TryFrom<&Element> for SerdeEndpoint {
+impl TryFrom<&Element> for Endpoint {
     type Error = TryFromElementError;
 
     fn try_from(from: &Element) -> Result<Self, Self::Error> {
         match from {
             Element::WebRtcPlayEndpoint { spec } => {
-                Ok(SerdeEndpoint::WebRtcPlay(spec.clone()))
+                Ok(Endpoint::WebRtcPlay(spec.clone()))
             }
             Element::WebRtcPublishEndpoint { spec } => {
-                Ok(SerdeEndpoint::WebRtcPublish(spec.clone()))
+                Ok(Endpoint::WebRtcPublish(spec.clone()))
             }
             _ => Err(TryFromElementError::NotEndpoint),
         }
@@ -41,34 +78,34 @@ impl TryFrom<&Element> for SerdeEndpoint {
 /// WebRTC.
 #[allow(clippy::module_name_repetitions)]
 #[derive(Clone, Deserialize, Debug)]
-pub struct SerdeWebRtcPublishEndpointImpl {
+pub struct WebRtcPublishEndpoint {
     /// Peer-to-peer mode.
     pub p2p: P2pMode,
 }
 
-impl WebRtcPublishEndpoint for SerdeWebRtcPublishEndpointImpl {
-    fn p2p(&self) -> P2pMode {
-        self.p2p.clone()
-    }
-}
+// impl WebRtcPublishEndpoint for WebRtcPublishEndpoint {
+// fn p2p(&self) -> P2pMode {
+// self.p2p.clone()
+// }
+// }
 
 /// Media element which is able to play media data for client via WebRTC.
 #[allow(clippy::module_name_repetitions)]
 #[derive(Clone, Deserialize, Debug)]
-pub struct SerdeWebRtcPlayEndpointImpl {
+pub struct WebRtcPlayEndpoint {
     /// Source URI in format `local://{room_id}/{member_id}/{endpoint_id}`.
-    pub src: SerdeSrcUri,
+    pub src: SrcUri,
 }
 
-impl WebRtcPlayEndpoint for SerdeWebRtcPlayEndpointImpl {
-    fn src(&self) -> SrcUri {
-        self.src.clone()
-    }
-}
+// impl WebRtcPlayEndpoint for WebRtcPlayEndpoint {
+// fn src(&self) -> SrcUri {
+// self.src.clone()
+// }
+// }
 
 /// Special uri with pattern `local://{room_id}/{member_id}/{endpoint_id}`.
 #[derive(Clone, Debug)]
-pub struct SerdeSrcUri {
+pub struct SrcUri {
     /// ID of [`Room`]
     pub room_id: RoomId,
     /// ID of `Member`
@@ -79,7 +116,7 @@ pub struct SerdeSrcUri {
 
 /// Serde deserializer for [`SrcUri`].
 /// Deserialize URIs with pattern `local://{room_id}/{member_id}/{endpoint_id}`.
-impl<'de> Deserialize<'de> for SerdeSrcUri {
+impl<'de> Deserialize<'de> for SrcUri {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
@@ -87,7 +124,7 @@ impl<'de> Deserialize<'de> for SerdeSrcUri {
         struct SrcUriVisitor;
 
         impl<'de> Visitor<'de> for SrcUriVisitor {
-            type Value = SerdeSrcUri;
+            type Value = SrcUri;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
                 formatter.write_str(
@@ -95,7 +132,7 @@ impl<'de> Deserialize<'de> for SerdeSrcUri {
                 )
             }
 
-            fn visit_str<E>(self, value: &str) -> Result<SerdeSrcUri, E>
+            fn visit_str<E>(self, value: &str) -> Result<SrcUri, E>
             where
                 E: de::Error,
             {
@@ -152,7 +189,7 @@ impl<'de> Deserialize<'de> for SerdeSrcUri {
                     )));
                 }
 
-                Ok(SerdeSrcUri {
+                Ok(SrcUri {
                     room_id: RoomId(room_id),
                     member_id: MemberId(member_id),
                     endpoint_id: WebRtcPublishId(endpoint_id),
@@ -172,7 +209,7 @@ mod src_uri_deserialization_tests {
 
     #[derive(Deserialize)]
     struct SrcUriTest {
-        src: SerdeSrcUri,
+        src: SrcUri,
     }
 
     #[inline]

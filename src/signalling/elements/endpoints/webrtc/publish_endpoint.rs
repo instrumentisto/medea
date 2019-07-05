@@ -6,9 +6,11 @@ use std::{
 };
 
 use hashbrown::HashSet;
+use macro_attr::*;
+use newtype_derive::{newtype_fmt, NewtypeDisplay, NewtypeFrom};
 
 use crate::{
-    api::control::model::endpoint::webrtc::P2pMode, media::PeerId,
+    api::control::endpoint::P2pMode, media::PeerId,
     signalling::elements::Member,
 };
 
@@ -16,7 +18,11 @@ use super::play_endpoint::WebRtcPlayEndpoint;
 
 pub use Id as WebRtcPublishId;
 
-pub use crate::api::control::model::endpoint::webrtc::publish_endpoint::Id;
+macro_attr! {
+    /// ID of endpoint.
+    #[derive(Clone, Debug, Eq, Hash, PartialEq, NewtypeFrom!, NewtypeDisplay!)]
+    pub struct Id(pub String);
+}
 
 #[derive(Debug, Clone)]
 struct WebRtcPublishEndpointInner {

@@ -18,7 +18,7 @@ use crate::{
             rpc_connection::{AuthorizationError, Authorize},
             session::WsSession,
         },
-        control::model::{MemberId, RoomId},
+        control::{MemberId, RoomId},
     },
     conf::{Conf, Rpc},
     log::prelude::*,
