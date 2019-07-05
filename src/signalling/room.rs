@@ -448,9 +448,7 @@ impl Handler<ShutdownMessage> for Room {
         Ok(Box::new(futures::future::ok(())
             .then(move |_: Result<(), ()>| {
                 // todo: close room dynamically
-                error!("now i will wait 2 secs");
-                std::thread::sleep(std::time::Duration::from_millis(2000));
-                error!("2 secs waited!");
+                std::thread::sleep(std::time::Duration::from_millis(200));
                 futures::future::ok(())
         })))
     }

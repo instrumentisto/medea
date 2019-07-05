@@ -143,8 +143,6 @@ pub mod actors {
 
             Ok(Box::new(self.0.stop(true)
                          .then(move |_| {
-                            info!("time passed");
-                            std::thread::sleep(std::time::Duration::from_millis(2000));
                             futures::future::ok(())
                         })))
         }
