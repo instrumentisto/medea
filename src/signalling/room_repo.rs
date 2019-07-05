@@ -11,7 +11,10 @@ use hashbrown::HashMap;
 use crate::{
     api::control::model::{room::RoomSpec, RoomId},
     conf::Conf,
-    signalling::{room::RoomError, Room},
+    signalling::{
+        room::{CloseRoom, RoomError},
+        Room,
+    },
     App,
 };
 use std::time::Duration;
@@ -85,5 +88,24 @@ impl<T: 'static + RoomSpec + Send> Handler<StartRoom<T>> for RoomsRepository {
 
         self.rooms.lock().unwrap().insert(room_id, room);
         Ok(())
+    }
+}
+
+#[derive(Message)]
+#[rtype(result = "()")]
+pub struct DeleteRoom(pub RoomId);
+
+impl Handler<DeleteRoom> for RoomsRepository {
+    type Result = ();
+
+    fn handle(
+        &mut self,
+        msg: DeleteRoom,
+        ctx: &mut Self::Context,
+    ) -> Self::Result {
+        if let Some(room) = self.rooms.lock().unwrap().get(&msg.0) {
+            room.do_send(CloseRoom {});
+            self.rooms.lock().unwrap().remove(&msg.0);
+        }
     }
 }

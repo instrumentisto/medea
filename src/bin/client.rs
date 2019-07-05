@@ -1,11 +1,12 @@
 use grpcio::{ChannelBuilder, EnvBuilder};
 use medea::api::grpc::protos::{
     control::{
-        CreateRequest, Member, Member_Element, Room, Room_Element,
+        CreateRequest, IdRequest, Member, Member_Element, Room, Room_Element,
         WebRtcPlayEndpoint, WebRtcPublishEndpoint, WebRtcPublishEndpoint_P2P,
     },
     control_grpc::ControlApiClient,
 };
+use protobuf::RepeatedField;
 use std::{collections::HashMap, sync::Arc};
 
 fn main() {
@@ -53,4 +54,12 @@ fn main() {
     } else {
         println!("Receiver: {:?}", reply.get_sid());
     }
+
+    let mut delete_request = IdRequest::new();
+    let mut rooms = RepeatedField::new();
+    rooms.push("local://pub-sub-video-call".to_string());
+    delete_request.set_id(rooms);
+
+    let reply = client.delete(&delete_request).expect("delete");
+    println!("{:?}", reply);
 }
