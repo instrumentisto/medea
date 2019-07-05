@@ -1,4 +1,4 @@
-use actix::System;
+use actix::{System, Arbiter, Actor as _};
 use failure::Error;
 use medea::{
     api::client::server,
@@ -28,7 +28,10 @@ fn main() -> Result<(), Error> {
     );
     let room_repo = RoomsRepository::new(rooms);
     server::run(room_repo.clone(), config.clone());
-    let _addr = grpc::server::run(room_repo, config);
+    let room_repo_addr = RoomsRepository::start_in_arbiter(&Arbiter::new(), move |_| {
+        room_repo
+    });
+    let _addr = grpc::server::run(room_repo_addr, config);
 
     let _ = sys.run();
 

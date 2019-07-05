@@ -20,10 +20,11 @@ use crate::{
 };
 
 use super::protos::control_grpc::{create_control_api, ControlApi};
+use crate::signalling::room_repo::StartRoom;
 
 #[derive(Clone)]
 struct ControlApiService {
-    room_repository: RoomsRepository,
+    room_repository: Addr<RoomsRepository>,
     config: Conf,
 }
 
@@ -37,20 +38,15 @@ impl ControlApi for ControlApiService {
         // TODO
         let room_id = RoomId(req.get_id().to_string());
 
-        let room = Room::start_in_arbiter(&Arbiter::new(), |_| {
-            let room_spec = CreateRequestSpec(req);
-            let room_spec = Box::new(&room_spec as &RoomSpec);
+        let msg = StartRoom {
+            room: CreateRequestSpec(req)
+        };
 
-            let turn_auth_service =
-                crate::turn::service::new_turn_auth_service(&Conf::default())
-                    .expect("Unable to start turn service");
-            Room::new(&room_spec, Duration::from_secs(10), turn_auth_service)
-                .unwrap()
-        });
+        self.room_repository.do_send(msg);
 
-        self.room_repository.add(room_id, room);
+//        self.room_repository.add(room_id, room);
 
-        debug!("{:?}", self.room_repository);
+        //debug!("{:?}", self.room_repository);
     }
 
     fn apply(
@@ -100,7 +96,7 @@ impl Actor for GrpcServer {
     }
 }
 
-pub fn run(room_repo: RoomsRepository, conf: Conf) -> Addr<GrpcServer> {
+pub fn run(room_repo: Addr<RoomsRepository>, conf: Conf) -> Addr<GrpcServer> {
     let bind_ip = conf.grpc.bind_ip.clone().to_string();
     let bind_port = conf.grpc.bind_port;
     let cq_count = conf.grpc.completion_queue_count;
