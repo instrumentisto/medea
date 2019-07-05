@@ -127,13 +127,20 @@ mod test {
     use crate::api::control::{
         model::room::RoomSpec, serde::room::SerdeRoomSpecImpl,
     };
+    use std::sync::Arc;
 
     /// Creates [`RoomsRepository`] for tests filled with a single [`Room`].
-    fn room(conf: Rpc) -> RoomsRepository {
+    fn room(conf: Conf) -> RoomsRepository {
         let room_spec = control::serde::load_from_yaml_file(
             "tests/specs/pub_sub_video_call.yml",
         )
         .unwrap();
+
+        let app = Arc::new(crate::App {
+            config: conf,
+            turn_service: Arc::new(new_turn_auth_service_mock()),
+        });
+        let app_cloned = Arc::clone(&app);
 
         let room_id = room_spec.id.clone();
         let client_room = Room::start_in_arbiter(&Arbiter::new(), move |_| {
@@ -141,8 +148,8 @@ mod test {
             let room_spec = Box::new(&room_spec as &RoomSpec);
             let client_room = Room::new(
                 &room_spec,
-                conf.reconnect_timeout,
-                new_turn_auth_service_mock(),
+                app.config.rpc.reconnect_timeout,
+                Arc::new(new_turn_auth_service_mock()),
             )
             .unwrap();
             client_room
@@ -151,7 +158,7 @@ mod test {
             room_id => client_room,
         };
 
-        RoomsRepository::new(room_hash_map)
+        RoomsRepository::new(room_hash_map, app_cloned)
     }
 
     /// Creates test WebSocket server of Client API which can handle requests.
@@ -160,7 +167,7 @@ mod test {
             HttpService::new(
                 App::new()
                     .data(Context {
-                        rooms: room(conf.rpc.clone()),
+                        rooms: room(conf.clone()),
                         config: conf.rpc.clone(),
                     })
                     .service(

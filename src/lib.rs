@@ -28,20 +28,8 @@ use std::sync::Arc;
 
 #[derive(Debug)]
 pub struct App {
-    config: Conf,
-    turn_service: Arc<Box<dyn TurnAuthService + Sync + Send>>,
-}
-
-impl App {
-    pub fn new(config: Conf) -> Self {
-        let turn_auth_service =
-            crate::turn::service::new_turn_auth_service(&config)
-                .expect("Unable to start turn service");
-        Self {
-            config,
-            turn_service: Arc::new(turn_auth_service),
-        }
-    }
+    pub config: Conf,
+    pub turn_service: Arc<Box<dyn TurnAuthService + Sync + Send>>,
 }
 
 /// Errors which can happen while server starting.

@@ -8,7 +8,7 @@ use medea::{
     start_static_rooms,
 };
 
-use medea::{api::grpc, App};
+use medea::{api::grpc, turn::new_turn_auth_service, App};
 use std::sync::Arc;
 
 fn main() -> Result<(), Error> {
@@ -21,7 +21,10 @@ fn main() -> Result<(), Error> {
 
     let config = Conf::parse()?;
     info!("{:?}", config);
-    let app = Arc::new(App::new(config.clone()));
+    let app = Arc::new(App {
+        config: config.clone(),
+        turn_service: Arc::new(new_turn_auth_service(&config).unwrap()),
+    });
 
     let rooms = start_static_rooms(Arc::clone(&app))?;
     info!(
