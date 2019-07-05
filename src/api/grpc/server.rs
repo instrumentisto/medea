@@ -17,6 +17,7 @@ use crate::{
     conf::Conf,
     log::prelude::*,
     signalling::{room_repo::RoomsRepository, Room},
+    App,
 };
 
 use super::protos::control_grpc::{create_control_api, ControlApi};
@@ -25,7 +26,7 @@ use crate::signalling::room_repo::StartRoom;
 #[derive(Clone)]
 struct ControlApiService {
     room_repository: Addr<RoomsRepository>,
-    config: Conf,
+    config: Arc<App>,
 }
 
 impl ControlApi for ControlApiService {
@@ -96,13 +97,13 @@ impl Actor for GrpcServer {
     }
 }
 
-pub fn run(room_repo: Addr<RoomsRepository>, conf: Conf) -> Addr<GrpcServer> {
-    let bind_ip = conf.grpc.bind_ip.clone().to_string();
-    let bind_port = conf.grpc.bind_port;
-    let cq_count = conf.grpc.completion_queue_count;
+pub fn run(room_repo: Addr<RoomsRepository>, app: Arc<App>) -> Addr<GrpcServer> {
+    let bind_ip = app.config.grpc.bind_ip.clone().to_string();
+    let bind_port = app.config.grpc.bind_port;
+    let cq_count = app.config.grpc.completion_queue_count;
 
     let service = create_control_api(ControlApiService {
-        config: conf,
+        config: app,
         room_repository: room_repo,
     });
     let env = Arc::new(Environment::new(cq_count));

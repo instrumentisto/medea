@@ -1,7 +1,7 @@
 //! Room definitions and implementations. Room is responsible for media
 //! connection establishment between concrete [`Member`]s.
 
-use std::{rc::Rc, time::Duration};
+use std::{rc::Rc, time::Duration, sync::Arc};
 
 use actix::{
     fut::wrap_future, Actor, ActorFuture, AsyncContext, Context, Handler,
@@ -108,7 +108,7 @@ impl Room {
     pub fn new(
         room_spec: &Box<&dyn RoomSpec>,
         reconnect_timeout: Duration,
-        turn: Box<dyn TurnAuthService>,
+        turn: Arc<Box<dyn TurnAuthService + Send + Sync>>,
     ) -> Result<Self, RoomError> {
         Ok(Self {
             id: room_spec.id().clone(),

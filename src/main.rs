@@ -9,6 +9,8 @@ use medea::{
 };
 
 use medea::api::grpc;
+use medea::App;
+use std::sync::Arc;
 
 fn main() -> Result<(), Error> {
     dotenv::dotenv().ok();
@@ -20,18 +22,19 @@ fn main() -> Result<(), Error> {
 
     let config = Conf::parse()?;
     info!("{:?}", config);
+    let app = Arc::new(App::new(config.clone()));
 
-    let rooms = start_static_rooms(&config)?;
+    let rooms = start_static_rooms(Arc::clone(&app))?;
     info!(
         "Loaded rooms: {:?}",
         rooms.iter().map(|(id, _)| &id.0).collect::<Vec<&String>>()
     );
-    let room_repo = RoomsRepository::new(rooms);
+    let room_repo = RoomsRepository::new(rooms, Arc::clone(&app));
     server::run(room_repo.clone(), config.clone());
     let room_repo_addr = RoomsRepository::start_in_arbiter(&Arbiter::new(), move |_| {
         room_repo
     });
-    let _addr = grpc::server::run(room_repo_addr, config);
+    let _addr = grpc::server::run(room_repo_addr, app);
 
     let _ = sys.run();
 

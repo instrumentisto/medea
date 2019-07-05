@@ -37,6 +37,7 @@ use crate::{
     },
     turn::{TurnAuthService, TurnServiceErr, UnreachablePolicy},
 };
+use std::sync::Arc;
 
 #[derive(Fail, Debug)]
 #[allow(clippy::module_name_repetitions)]
@@ -76,7 +77,7 @@ pub struct ParticipantService {
     members: HashMap<MemberId, Rc<Member>>,
 
     /// Service for managing authorization on Turn server.
-    turn: Box<dyn TurnAuthService>,
+    turn: Arc<Box<dyn TurnAuthService + Send + Sync>>,
 
     /// Established [`RpcConnection`]s of [`Members`]s in this [`Room`].
     // TODO: Replace Box<dyn RpcConnection>> with enum,
@@ -98,7 +99,7 @@ impl ParticipantService {
     pub fn new(
         room_spec: &Box<&dyn RoomSpec>,
         reconnect_timeout: Duration,
-        turn: Box<dyn TurnAuthService>,
+        turn: Arc<Box<dyn TurnAuthService + Send + Sync>>,
     ) -> Result<Self, MembersLoadError> {
         Ok(Self {
             room_id: room_spec.id().clone(),

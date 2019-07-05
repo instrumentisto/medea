@@ -9,20 +9,23 @@ use crate::{api::control::model::RoomId, signalling::Room};
 use crate::api::control::model::room::RoomSpec;
 use crate::conf::Conf;
 use std::time::Duration;
+use crate::App;
 
 /// Repository that stores [`Room`]s addresses.
-#[derive(Clone, Default, Debug)]
+#[derive(Clone, Debug)]
 pub struct RoomsRepository {
     // TODO: Use crossbeam's concurrent hashmap when its done.
     //       [Tracking](https://github.com/crossbeam-rs/rfcs/issues/32).
     rooms: Arc<Mutex<HashMap<RoomId, Addr<Room>>>>,
+    app: Arc<App>,
 }
 
 impl RoomsRepository {
     /// Creates new [`Room`]s repository with passed-in [`Room`]s.
-    pub fn new(rooms: HashMap<RoomId, Addr<Room>>) -> Self {
+    pub fn new(rooms: HashMap<RoomId, Addr<Room>>, app: Arc<App>) -> Self {
         Self {
             rooms: Arc::new(Mutex::new(rooms)),
+            app,
         }
     }
 
@@ -62,12 +65,12 @@ impl<T: 'static + RoomSpec + Send> Handler<StartRoom<T>> for RoomsRepository {
 //        let turn_auth_service =
 //            crate::turn::service::new_turn_auth_service(&Conf::default())
 //                .expect("Unable to start turn service");
+        let turn = Arc::clone(&self.app.turn_service);
 
-        let turn_auth_service = crate::turn::service::test::new_turn_auth_service_mock();
         let room = Room::start_in_arbiter(&Arbiter::new(), move |_| {
             let room = msg.room;
             let room = Box::new(&room as &(RoomSpec));
-            Room::new(&room, Duration::from_secs(10), turn_auth_service)
+            Room::new(&room, Duration::from_secs(10), turn)
                 .unwrap()
         });
 
