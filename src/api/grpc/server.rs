@@ -21,7 +21,10 @@ use crate::{
 };
 
 use super::protos::control_grpc::{create_control_api, ControlApi};
-use crate::signalling::room_repo::StartRoom;
+use crate::{
+    api::grpc::protos::control::Error, signalling::room_repo::StartRoom,
+};
+use futures::future::Either;
 use std::collections::HashMap;
 
 #[derive(Clone)]
@@ -66,10 +69,21 @@ impl ControlApi for ControlApiService {
             .collect();
 
         ctx.spawn(self.room_repository.send(msg).map_err(|e| ()).and_then(
-            move |_| {
-                let mut res = Response::new();
-                res.set_sid(sid);
-                sink.success(res).map_err(|_| ())
+            move |r| {
+                if r.is_ok() {
+                    let mut res = Response::new();
+                    res.set_sid(sid);
+                    Either::A(sink.success(res).map_err(|_| ()))
+                } else {
+                    let mut res = Response::new();
+                    let mut error = Error::new();
+                    error.set_status(500);
+                    error.set_code(500);
+                    error.set_text(String::new());
+                    error.set_element(String::new());
+                    res.set_error(error);
+                    Either::B(sink.success(res).map_err(|_| ()))
+                }
             },
         ));
 

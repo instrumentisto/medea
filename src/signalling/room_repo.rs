@@ -11,7 +11,7 @@ use hashbrown::HashMap;
 use crate::{
     api::control::model::{room::RoomSpec, RoomId},
     conf::Conf,
-    signalling::Room,
+    signalling::{room::RoomError, Room},
     App,
 };
 use std::time::Duration;
@@ -55,13 +55,13 @@ impl Actor for RoomsRepository {
 
 // TODO: return sids.
 #[derive(Message)]
-#[rtype(result = "()")]
+#[rtype(result = "Result<(), RoomError>")]
 pub struct StartRoom<T: 'static + RoomSpec + Send> {
     pub room: T,
 }
 
 impl<T: 'static + RoomSpec + Send> Handler<StartRoom<T>> for RoomsRepository {
-    type Result = ();
+    type Result = Result<(), RoomError>;
 
     fn handle(
         &mut self,
@@ -72,6 +72,11 @@ impl<T: 'static + RoomSpec + Send> Handler<StartRoom<T>> for RoomsRepository {
 
         let turn = Arc::clone(&self.app.turn_service);
 
+        {
+            let room = Box::new(&msg.room as &(RoomSpec));
+            Room::new(&room, Duration::from_secs(10), Arc::clone(&turn))?;
+        }
+
         let room = Room::start_in_arbiter(&Arbiter::new(), move |_| {
             let room = msg.room;
             let room = Box::new(&room as &(RoomSpec));
@@ -79,5 +84,6 @@ impl<T: 'static + RoomSpec + Send> Handler<StartRoom<T>> for RoomsRepository {
         });
 
         self.rooms.lock().unwrap().insert(room_id, room);
+        Ok(())
     }
 }

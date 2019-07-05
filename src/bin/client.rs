@@ -48,5 +48,9 @@ fn main() {
     req.set_id("grpc-test".to_string());
 
     let reply = client.create(&req).expect("rpc");
-    println!("Receiver: {:?}", reply.get_sid());
+    if reply.has_error() {
+        println!("Error: {:?}", reply.get_error());
+    } else {
+        println!("Receiver: {:?}", reply.get_sid());
+    }
 }
