@@ -58,9 +58,12 @@ impl<T: 'static + RoomSpec + Send> Handler<StartRoom<T>> for RoomsRepository {
     fn handle(&mut self, msg: StartRoom<T>, ctx: &mut Self::Context) -> Self::Result {
         let room_id = msg.room.id();
 
-        let turn_auth_service =
-            crate::turn::service::new_turn_auth_service(&Conf::default())
-                .expect("Unable to start turn service");
+        // TODO: don't use mock turn!!!!
+//        let turn_auth_service =
+//            crate::turn::service::new_turn_auth_service(&Conf::default())
+//                .expect("Unable to start turn service");
+
+        let turn_auth_service = crate::turn::service::test::new_turn_auth_service_mock();
         let room = Room::start_in_arbiter(&Arbiter::new(), move |_| {
             let room = msg.room;
             let room = Box::new(&room as &(RoomSpec));

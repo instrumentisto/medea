@@ -16,7 +16,7 @@ fn main() {
     let mut play_endpoint = WebRtcPlayEndpoint::new();
     let mut publish_endpoint = WebRtcPublishEndpoint::new();
 
-    play_endpoint.set_src("local://grpc-test/publisher".to_string());
+    play_endpoint.set_src("local://grpc-test/publisher/publish".to_string());
     let mut play_endpoint_element = Member_Element::new();
     play_endpoint_element.set_webrtc_play(play_endpoint);
     let mut responder_pipeline = HashMap::new();

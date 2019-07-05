@@ -276,7 +276,7 @@ impl Handler<DeleteIceUsers> for Service {
     }
 }
 
-#[cfg(test)]
+// TODO: add cfg[test] here
 pub mod test {
     use futures::future;
 
