@@ -1,6 +1,7 @@
 //! Repository that stores [`Room`]s addresses.
 
 use std::sync::{Arc, Mutex};
+use std::collections::HashMap as StdHashMap;
 
 use actix::{Addr, Actor, Context, Message, Handler, Arbiter};
 use hashbrown::HashMap;
@@ -48,7 +49,7 @@ impl Actor for RoomsRepository {
     type Context = Context<Self>;
 }
 
-
+// TODO: return sids.
 #[derive(Message)]
 #[rtype(result = "()")]
 pub struct StartRoom<T: 'static + RoomSpec + Send> {

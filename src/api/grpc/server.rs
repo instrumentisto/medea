@@ -22,19 +22,20 @@ use crate::{
 
 use super::protos::control_grpc::{create_control_api, ControlApi};
 use crate::signalling::room_repo::StartRoom;
+use std::collections::HashMap;
 
 #[derive(Clone)]
 struct ControlApiService {
     room_repository: Addr<RoomsRepository>,
-    config: Arc<App>,
+    app: Arc<App>,
 }
 
 impl ControlApi for ControlApiService {
     fn create(
         &mut self,
-        _ctx: RpcContext,
+        ctx: RpcContext,
         req: CreateRequest,
-        _sink: UnarySink<Response>,
+        sink: UnarySink<Response>,
     ) {
         // TODO
         let room_id = RoomId(req.get_id().to_string());
@@ -43,7 +44,28 @@ impl ControlApi for ControlApiService {
             room: CreateRequestSpec(req)
         };
 
-        self.room_repository.do_send(msg);
+
+        let sid: HashMap<String, String> = msg.room.members().iter()
+            .map(|(id, member)| {
+                let addr = &self.app.config.server.bind_ip;
+                let port = self.app.config.server.bind_port;
+                let base_uri = format!("{}:{}", addr, port);
+
+                let uri = format!("wss://{}/{}/{}/{}", base_uri, &room_id, id, member.credentials());
+
+                (id.clone().to_string(), uri)
+            })
+            .collect();
+
+        ctx.spawn(self.room_repository.send(msg)
+            .map_err(|e| ())
+            .and_then(move |_| {
+                let mut res = Response::new();
+                res.set_sid(sid);
+                sink.success(res)
+                    .map_err(|_| ())
+            })
+        );
 
 //        self.room_repository.add(room_id, room);
 
@@ -103,7 +125,7 @@ pub fn run(room_repo: Addr<RoomsRepository>, app: Arc<App>) -> Addr<GrpcServer> 
     let cq_count = app.config.grpc.completion_queue_count;
 
     let service = create_control_api(ControlApiService {
-        config: app,
+        app: app,
         room_repository: room_repo,
     });
     let env = Arc::new(Environment::new(cq_count));
