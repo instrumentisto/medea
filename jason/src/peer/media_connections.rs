@@ -20,7 +20,7 @@ use crate::{
 pub struct MediaConnections {
     peer: Rc<RtcPeerConnection>,
     need_new_stream: bool,
-    senders: HashMap<TrackId, Sender>,
+    senders: HashMap<TrackId, Rc<Sender>>,
     receivers: HashMap<TrackId, Receiver>,
 }
 
@@ -99,8 +99,13 @@ impl MediaConnections {
         }
     }
 
-    /// Inserts tracks from provided [`MediaStream`] into stored [`Sender`]s
-    /// based on track ids. Stream must have all required tracks.
+    /// Inserts tracks from provided [`MediaStream`] into [`Sender`]s
+    /// based on track ids. Provided [`MediaStream`] must have all required [`MediaTrack`]s.
+    /// [`MediaTrack`]s are inserted in [`Senders`] [`RTCRtpTransceiver`][1]s with [replaceTrack][2]
+    /// changing transceivers direction to sendonly.
+    ///
+    /// [1]: https://www.w3.org/TR/webrtc/#rtcrtptransceiver-interface
+    /// [2]: https://www.w3.org/TR/webrtc/#dom-rtcrtpsender-replacetrack
     pub fn insert_local_stream(
         &mut self,
         stream: &MediaStream,
@@ -117,6 +122,7 @@ impl MediaConnections {
         let mut promises = Vec::new();
         for sender in self.senders.values() {
             if let Some(track) = stream.get_track_by_id(sender.track_id) {
+                let sender = Rc::clone(sender);
                 promises.push(
                     JsFuture::from(
                         sender
@@ -124,6 +130,14 @@ impl MediaConnections {
                             .sender()
                             .replace_track(Some(track.track())),
                     )
+                    .and_then(move |_| {
+                        // TODO: also do RTCRtpSender.setStreams when its
+                        //       implemented
+                        sender.transceiver.set_direction(
+                            RtcRtpTransceiverDirection::Sendonly,
+                        );
+                        Ok(())
+                    })
                     .map_err(WasmErr::from),
                 );
             }
@@ -142,19 +156,19 @@ impl MediaConnections {
         transceiver: RtcRtpTransceiver,
         track: web_sys::MediaStreamTrack,
     ) -> Option<&Receiver> {
-        let mid = transceiver.mid().unwrap();
+        if let Some(mid) = transceiver.mid() {
+            for receiver in &mut self.receivers.values_mut() {
+                if let Some(recv_mid) = &receiver.mid() {
+                    if recv_mid == &mid {
+                        let track = MediaTrack::new(
+                            receiver.track_id,
+                            track,
+                            receiver.caps.clone(),
+                        );
 
-        for receiver in &mut self.receivers.values_mut() {
-            if let Some(recv_mid) = &receiver.mid {
-                if recv_mid == &mid {
-                    let track = MediaTrack::new(
-                        receiver.track_id,
-                        track,
-                        receiver.caps.clone(),
-                    );
-
-                    receiver.track.replace(track);
-                    return Some(receiver);
+                        receiver.track.replace(track);
+                        return Some(receiver);
+                    }
                 }
             }
         }
@@ -215,7 +229,7 @@ impl Sender {
         caps: MediaType,
         peer: &RtcPeerConnection,
         mid: Option<String>,
-    ) -> Result<Self, WasmErr> {
+    ) -> Result<Rc<Self>, WasmErr> {
         let transceiver = match mid {
             None => match caps {
                 MediaType::Audio(_) => {
@@ -239,11 +253,11 @@ impl Sender {
             }
         };
 
-        Ok(Self {
+        Ok(Rc::new(Self {
             track_id,
             transceiver,
             caps,
-        })
+        }))
     }
 }
 
@@ -255,7 +269,6 @@ pub struct Receiver {
     caps: MediaType,
     sender_id: u64,
     transceiver: RtcRtpTransceiver,
-    mid: Option<String>,
     track: Option<Rc<MediaTrack>>,
 }
 
@@ -271,31 +284,25 @@ impl Receiver {
         peer: &RtcPeerConnection,
         mid: Option<String>,
     ) -> Result<Self, WasmErr> {
-        let (transceiver, mid) = match mid {
-            None => (
-                match caps {
-                    MediaType::Audio(_) => {
-                        let mut init = RtcRtpTransceiverInit::new();
-                        init.direction(RtcRtpTransceiverDirection::Recvonly);
-                        peer.add_transceiver_with_str_and_init("audio", &init)
-                    }
-                    MediaType::Video(_) => {
-                        let mut init = RtcRtpTransceiverInit::new();
-                        init.direction(RtcRtpTransceiverDirection::Recvonly);
-                        peer.add_transceiver_with_str_and_init("video", &init)
-                    }
-                },
-                None,
-            ),
-            Some(mid) => (
-                get_transceiver_by_mid(&peer, &mid).ok_or_else(|| {
-                    WasmErr::from(format!(
-                        "Unable to find transceiver with provided mid {}",
-                        &mid
-                    ))
-                })?,
-                Some(mid),
-            ),
+        let transceiver = match mid {
+            None => match caps {
+                MediaType::Audio(_) => {
+                    let mut init = RtcRtpTransceiverInit::new();
+                    init.direction(RtcRtpTransceiverDirection::Recvonly);
+                    peer.add_transceiver_with_str_and_init("audio", &init)
+                }
+                MediaType::Video(_) => {
+                    let mut init = RtcRtpTransceiverInit::new();
+                    init.direction(RtcRtpTransceiverDirection::Recvonly);
+                    peer.add_transceiver_with_str_and_init("video", &init)
+                }
+            },
+            Some(mid) => get_transceiver_by_mid(&peer, &mid).ok_or_else(|| {
+                WasmErr::from(format!(
+                    "Unable to find transceiver with provided mid {}",
+                    &mid
+                ))
+            })?,
         };
 
         Ok(Self {
@@ -303,7 +310,6 @@ impl Receiver {
             caps,
             sender_id,
             transceiver,
-            mid,
             track: None,
         })
     }
@@ -314,5 +320,9 @@ impl Receiver {
 
     pub fn track(&self) -> Option<&Rc<MediaTrack>> {
         self.track.as_ref()
+    }
+
+    pub fn mid(&self) -> Option<String> {
+        self.transceiver.mid()
     }
 }

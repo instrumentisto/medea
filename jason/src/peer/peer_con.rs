@@ -40,6 +40,9 @@ pub enum PeerEvent {
 
 #[allow(clippy::module_name_repetitions)]
 pub struct PeerConnection {
+
+    id: Id,
+
     /// Underlying [`RtcPeerConnection`].
     peer: Rc<RtcPeerConnection>,
 
@@ -109,6 +112,9 @@ impl PeerConnection {
             Rc::clone(&peer),
             "track",
             move |track_event: RtcTrackEvent| {
+
+                WasmErr::from(format!("on_track {:?}", &peer_id)).log_err();
+
                 let mut connections = connections_rc.borrow_mut();
                 let transceiver = track_event.transceiver();
                 let track = track_event.track();
@@ -144,6 +150,7 @@ impl PeerConnection {
         )?;
 
         Ok(Self {
+            id: peer_id,
             peer,
             _on_ice_candidate: on_ice_candidate,
             _on_track: on_track,
@@ -171,7 +178,8 @@ impl PeerConnection {
     pub fn create_and_set_offer(
         &self,
     ) -> impl Future<Item = String, Error = WasmErr> {
-        let inner = Rc::clone(&self.peer);
+        let peer = Rc::clone(&self.peer);
+        let media_connections = Rc::clone(&self.media_connections);
         JsFuture::from(self.peer.create_offer())
             .map(RtcSessionDescription::from)
             .and_then(move |offer: RtcSessionDescription| {
@@ -179,7 +187,7 @@ impl PeerConnection {
                 let mut desc =
                     RtcSessionDescriptionInit::new(RtcSdpType::Offer);
                 desc.sdp(&offer);
-                JsFuture::from(inner.set_local_description(&desc))
+                JsFuture::from(peer.set_local_description(&desc))
                     .map(move |_| offer)
             })
             .map_err(Into::into)
@@ -277,6 +285,9 @@ impl PeerConnection {
         &self,
         tracks: Vec<Track>,
     ) -> impl Future<Item = Option<StreamRequest>, Error = WasmErr> {
+
+        WasmErr::from(format!("update_tracks {:?}", self.id)).log_err();
+
         for track in tracks {
             if let Err(err) =
                 self.media_connections.borrow_mut().update_track(track)

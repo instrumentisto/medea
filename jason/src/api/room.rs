@@ -185,36 +185,35 @@ impl EventHandler for InnerRoom {
         let rpc = Rc::clone(&self.rpc);
 
         let media_manager = Rc::clone(&self.media_manager);
+        let peer_rc = Rc::clone(&peer);
         let fut = match sdp_offer {
             // this is offerrer
             None => future::Either::A(
                 peer.update_tracks(tracks)
                     .and_then(move |stream_request| match stream_request {
-                        None => future::Either::A(future::ok(peer)),
+                        None => future::Either::A(future::ok(())),
                         Some(stream_request) => future::Either::B(
                             media_manager.get_stream(stream_request).and_then(
-                                move |s| {
-                                    peer.insert_local_stream(&s);
-                                    Ok(peer)
-                                },
+                                move |s| peer.insert_local_stream(&s),
                             ),
                         ),
                     })
-                    .and_then(move |peer| {
-                        peer.create_and_set_offer().and_then(move |sdp_offer| {
-                            rpc.send_command(Command::MakeSdpOffer {
-                                peer_id,
-                                sdp_offer,
-                                mids: peer.get_mids().unwrap(),
-                            });
-                            Ok(())
-                        })
+                    .and_then(move |_| {
+                        peer_rc.create_and_set_offer().and_then(
+                            move |sdp_offer| {
+                                rpc.send_command(Command::MakeSdpOffer {
+                                    peer_id,
+                                    sdp_offer,
+                                    mids: peer_rc.get_mids().unwrap(),
+                                });
+                                Ok(())
+                            },
+                        )
                     })
                     .map_err(|err| err.log_err()),
             ),
             Some(offer) => {
                 // this is answerer
-                let peer_rc = Rc::clone(&peer);
                 future::Either::B(
                     peer.set_remote_offer(&offer)
                         .and_then(move |_| {
@@ -225,8 +224,7 @@ impl EventHandler for InnerRoom {
                                         media_manager
                                             .get_stream(stream_request)
                                             .and_then(move |s| {
-                                                peer_rc.insert_local_stream(&s);
-                                                Ok(())
+                                                peer_rc.insert_local_stream(&s)
                                             }),
                                     ),
                                 },
