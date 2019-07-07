@@ -35,7 +35,7 @@ impl MediaConnections {
     }
 
     /// Returns map of track id to corresponding transceiver mid.
-    pub fn get_mids(&self) -> Result<HashMap<u64, String>, WasmErr> {
+    pub fn get_mids(&mut self) -> Result<HashMap<u64, String>, WasmErr> {
         let mut mids = HashMap::new();
         for (track_id, sender) in &self.senders {
             mids.insert(
@@ -46,11 +46,11 @@ impl MediaConnections {
             );
         }
 
-        for (track_id, receiver) in &self.receivers {
+        for (track_id, receiver) in self.receivers.iter_mut() {
             mids.insert(
                 *track_id,
-                receiver.transceiver.mid().ok_or_else(|| {
-                    WasmErr::from("Peer has senders without mid")
+                receiver.mid().map(|mid| mid.to_owned()).ok_or_else(|| {
+                    WasmErr::from("Peer has receivers without mid")
                 })?,
             );
         }
@@ -60,27 +60,34 @@ impl MediaConnections {
 
     // TODO: Doesnt really updates anything, but only generates new senders and
     //       receivers atm.
-    pub fn update_track(&mut self, track: Track) -> Result<(), WasmErr> {
-        match track.direction {
-            Direction::Send { mid, .. } => {
-                self.need_new_stream = true;
+    pub fn update_tracks(&mut self, tracks: Vec<Track>) -> Result<(), WasmErr> {
+        for track in tracks {
+            match track.direction {
+                Direction::Send { mid, .. } => {
+                    self.need_new_stream = true;
 
-                self.senders.insert(
-                    track.id,
-                    Sender::new(track.id, track.media_type, &self.peer, mid)?,
-                );
-            }
-            Direction::Recv { sender, mid } => {
-                self.receivers.insert(
-                    track.id,
-                    Receiver::new(
+                    self.senders.insert(
                         track.id,
-                        track.media_type,
-                        sender,
-                        &self.peer,
-                        mid,
-                    )?,
-                );
+                        Sender::new(
+                            track.id,
+                            track.media_type,
+                            &self.peer,
+                            mid,
+                        )?,
+                    );
+                }
+                Direction::Recv { sender, mid } => {
+                    self.receivers.insert(
+                        track.id,
+                        Receiver::new(
+                            track.id,
+                            track.media_type,
+                            sender,
+                            &self.peer,
+                            mid,
+                        ),
+                    );
+                }
             }
         }
         Ok(())
@@ -100,8 +107,9 @@ impl MediaConnections {
     }
 
     /// Inserts tracks from provided [`MediaStream`] into [`Sender`]s
-    /// based on track ids. Provided [`MediaStream`] must have all required [`MediaTrack`]s.
-    /// [`MediaTrack`]s are inserted in [`Senders`] [`RTCRtpTransceiver`][1]s with [replaceTrack][2]
+    /// based on track ids. Provided [`MediaStream`] must have all required
+    /// [`MediaTrack`]s. [`MediaTrack`]s are inserted in [`Senders`]
+    /// [`RTCRtpTransceiver`][1]s with [replaceTrack][2]
     /// changing transceivers direction to sendonly.
     ///
     /// [1]: https://www.w3.org/TR/webrtc/#rtcrtptransceiver-interface
@@ -166,6 +174,7 @@ impl MediaConnections {
                             receiver.caps.clone(),
                         );
 
+                        receiver.transceiver.replace(transceiver);
                         receiver.track.replace(track);
                         return Some(receiver);
                     }
@@ -262,13 +271,16 @@ impl Sender {
 }
 
 /// Remote track representation that is being received from some remote peer.
+/// Basically, it can have two states: new and established. When track arrives
+/// we can save related [`RtcRtpTransceiver`][1] and actual [`MediaTrack`].
 ///
 /// [1]: https://www.w3.org/TR/webrtc/#rtcrtptransceiver-interface
 pub struct Receiver {
     track_id: TrackId,
     caps: MediaType,
     sender_id: u64,
-    transceiver: RtcRtpTransceiver,
+    transceiver: Option<RtcRtpTransceiver>,
+    mid: Option<String>,
     track: Option<Rc<MediaTrack>>,
 }
 
@@ -283,35 +295,31 @@ impl Receiver {
         sender_id: u64,
         peer: &RtcPeerConnection,
         mid: Option<String>,
-    ) -> Result<Self, WasmErr> {
+    ) -> Self {
         let transceiver = match mid {
             None => match caps {
                 MediaType::Audio(_) => {
                     let mut init = RtcRtpTransceiverInit::new();
                     init.direction(RtcRtpTransceiverDirection::Recvonly);
-                    peer.add_transceiver_with_str_and_init("audio", &init)
+                    Some(peer.add_transceiver_with_str_and_init("audio", &init))
                 }
                 MediaType::Video(_) => {
                     let mut init = RtcRtpTransceiverInit::new();
                     init.direction(RtcRtpTransceiverDirection::Recvonly);
-                    peer.add_transceiver_with_str_and_init("video", &init)
+                    Some(peer.add_transceiver_with_str_and_init("video", &init))
                 }
             },
-            Some(mid) => get_transceiver_by_mid(&peer, &mid).ok_or_else(|| {
-                WasmErr::from(format!(
-                    "Unable to find transceiver with provided mid {}",
-                    &mid
-                ))
-            })?,
+            Some(_) => None,
         };
 
-        Ok(Self {
+        Self {
             track_id,
             caps,
             sender_id,
             transceiver,
+            mid,
             track: None,
-        })
+        }
     }
 
     pub fn sender_id(&self) -> u64 {
@@ -322,7 +330,11 @@ impl Receiver {
         self.track.as_ref()
     }
 
-    pub fn mid(&self) -> Option<String> {
-        self.transceiver.mid()
+    pub fn mid(&mut self) -> Option<&str> {
+        if self.mid.is_none() && self.transceiver.is_some() {
+            self.mid = self.transceiver.as_ref().unwrap().mid()
+        }
+
+        self.mid.as_ref().map(|mid| mid.as_str())
     }
 }

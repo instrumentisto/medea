@@ -4,6 +4,7 @@ use std::{collections::HashMap, rc::Rc};
 use medea_client_api_proto::IceServer;
 
 use crate::{
+    media::MediaManager,
     peer::{PeerConnection, PeerEvent, PeerId},
     utils::WasmErr,
 };
@@ -17,15 +18,21 @@ pub struct PeerRepository {
     /// Sender that will be injected to all [`Peers`] created by this
     /// repository.
     peer_events_sender: UnboundedSender<PeerEvent>,
+
+    media_manager: Rc<MediaManager>,
 }
 
 impl PeerRepository {
     /// Creates new [`PeerRepository`] saving provided sender to be injected in
     /// all peers that will be created by this repository.
-    pub fn new(peer_events_sender: UnboundedSender<PeerEvent>) -> Self {
+    pub fn new(
+        peer_events_sender: UnboundedSender<PeerEvent>,
+        media_manager: Rc<MediaManager>,
+    ) -> Self {
         Self {
             peers: HashMap::new(),
             peer_events_sender,
+            media_manager,
         }
     }
 
@@ -40,6 +47,7 @@ impl PeerRepository {
             id,
             &self.peer_events_sender,
             ice_servers,
+            Rc::clone(&self.media_manager),
         )?);
         self.peers.insert(id, peer);
         Ok(self.peers.get(&id).unwrap())

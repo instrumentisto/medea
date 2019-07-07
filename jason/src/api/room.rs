@@ -54,9 +54,9 @@ impl Room {
     pub fn new(rpc: &Rc<RpcClient>, media_manager: &Rc<MediaManager>) -> Self {
         let (tx, rx) = unbounded();
         let room = Rc::new(RefCell::new(InnerRoom::new(
-            Rc::clone(&rpc),
+            Rc::clone(rpc),
             tx,
-            Rc::clone(&media_manager),
+            Rc::clone(media_manager),
         )));
 
         let inner = Rc::downgrade(&room);
@@ -110,7 +110,6 @@ impl Room {
 /// and Rust-side handle ([`Room`]).
 struct InnerRoom {
     rpc: Rc<RpcClient>,
-    media_manager: Rc<MediaManager>,
     peers: PeerRepository,
     connections: HashMap<u64, Connection>,
     on_new_connection: Rc<Callback2<ConnectionHandle, WasmErr>>,
@@ -124,8 +123,7 @@ impl InnerRoom {
     ) -> Self {
         Self {
             rpc,
-            media_manager,
-            peers: PeerRepository::new(peer_events_sender),
+            peers: PeerRepository::new(peer_events_sender, media_manager),
             connections: HashMap::new(),
             on_new_connection: Rc::new(Callback2::default()),
         }
@@ -183,53 +181,24 @@ impl EventHandler for InnerRoom {
         self.create_connections_from_tracks(&tracks);
 
         let rpc = Rc::clone(&self.rpc);
-
-        let media_manager = Rc::clone(&self.media_manager);
-        let peer_rc = Rc::clone(&peer);
         let fut = match sdp_offer {
             // this is offerrer
             None => future::Either::A(
-                peer.update_tracks(tracks)
-                    .and_then(move |stream_request| match stream_request {
-                        None => future::Either::A(future::ok(())),
-                        Some(stream_request) => future::Either::B(
-                            media_manager.get_stream(stream_request).and_then(
-                                move |s| peer.insert_local_stream(&s),
-                            ),
-                        ),
-                    })
-                    .and_then(move |_| {
-                        peer_rc.create_and_set_offer().and_then(
-                            move |sdp_offer| {
-                                rpc.send_command(Command::MakeSdpOffer {
-                                    peer_id,
-                                    sdp_offer,
-                                    mids: peer_rc.get_mids().unwrap(),
-                                });
-                                Ok(())
-                            },
-                        )
+                peer.create_and_set_offer(tracks)
+                    .and_then(move |sdp_offer| {
+                        rpc.send_command(Command::MakeSdpOffer {
+                            peer_id,
+                            sdp_offer,
+                            mids: peer.get_mids().unwrap(),
+                        });
+                        Ok(())
                     })
                     .map_err(|err| err.log_err()),
             ),
             Some(offer) => {
                 // this is answerer
                 future::Either::B(
-                    peer.set_remote_offer(&offer)
-                        .and_then(move |_| {
-                            peer_rc.update_tracks(tracks).and_then(
-                                move |stream_request| match stream_request {
-                                    None => future::Either::A(future::ok(())),
-                                    Some(stream_request) => future::Either::B(
-                                        media_manager
-                                            .get_stream(stream_request)
-                                            .and_then(move |s| {
-                                                peer_rc.insert_local_stream(&s)
-                                            }),
-                                    ),
-                                },
-                            )
-                        })
+                    peer.process_offer(&offer, tracks)
                         .and_then(move |_| peer.create_and_set_answer())
                         .map(move |sdp_answer| {
                             rpc.send_command(Command::MakeSdpAnswer {
