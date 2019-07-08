@@ -6,7 +6,7 @@ use std::{
 };
 
 use actix::{AsyncContext as _, Context};
-use hashbrown::HashMap;
+use hashbrown::{HashMap, HashSet};
 
 use crate::{
     api::control::MemberId,
@@ -171,6 +171,39 @@ impl PeerRepository {
             Some(peer) => peer.try_into().map_err(Into::into),
             None => Err(RoomError::PeerNotFound(peer_id)),
         }
+    }
+
+    pub fn remove_peer(
+        &mut self,
+        member_id: MemberId,
+        peer_id: PeerId,
+        ctx: &mut Context<Room>,
+    ) {
+        if let Some(_) = self.peers.remove(&peer_id) {
+            ctx.notify(PeersRemoved {
+                member_id,
+                peers_id: vec![peer_id],
+            })
+        }
+    }
+
+    pub fn remove_peers(
+        &mut self,
+        member_id: MemberId,
+        peer_ids: HashSet<PeerId>,
+        ctx: &mut Context<Room>,
+    ) {
+        let mut removed_peer_ids = Vec::new();
+        for peer_id in peer_ids {
+            if let Some(_) = self.peers.remove(&peer_id) {
+                removed_peer_ids.push(peer_id);
+            }
+        }
+
+        ctx.notify(PeersRemoved {
+            member_id,
+            peers_id: removed_peer_ids,
+        })
     }
 
     /// Close all related to disconnected [`Member`] [`Peer`]s and partner

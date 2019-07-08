@@ -14,6 +14,7 @@ fn main() {
     let ch = ChannelBuilder::new(env).connect("localhost:50051");
     let client = ControlApiClient::new(ch);
 
+    // Create room
     let mut req = CreateRequest::new();
     let mut room = Room::new();
     let mut publisher = Member::new();
@@ -55,6 +56,7 @@ fn main() {
         println!("Receiver: {:?}", reply.get_sid());
     }
 
+    // Delete room
     let mut delete_request = IdRequest::new();
     let mut rooms = RepeatedField::new();
     rooms.push("local://pub-sub-video-call".to_string());
@@ -63,6 +65,16 @@ fn main() {
     let reply = client.delete(&delete_request).expect("delete");
     println!("{:?}", reply);
 
+    // Delete endpoint
+    let mut delete_endpoint_req = IdRequest::new();
+    let mut endpoints = RepeatedField::new();
+    endpoints.push("local://video-call-1/caller".to_string());
+    delete_endpoint_req.set_id(endpoints);
+
+    let reply = client.delete(&delete_endpoint_req).expect("delete member");
+    println!("{:?}", reply);
+
+    // Delete member
     let mut delete_member_req = IdRequest::new();
     let mut members = RepeatedField::new();
     members.push("local://video-call-1/caller".to_string());

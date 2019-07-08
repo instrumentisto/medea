@@ -8,7 +8,7 @@ use hashbrown::HashMap;
 use crate::{
     api::control::{room::RoomSpec, MemberId, RoomId},
     signalling::{
-        room::{CloseRoom, DeleteMember, RoomError},
+        room::{CloseRoom, DeleteEndpoint, DeleteMember, RoomError},
         Room,
     },
     App,
@@ -121,5 +121,32 @@ impl Handler<DeleteMemberFromRoom> for RoomsRepository {
     ) -> Self::Result {
         let room = self.get(&msg.room_id).unwrap(); // TODO
         room.do_send(DeleteMember(msg.member_id));
+    }
+}
+
+#[derive(Message)]
+#[rtype(result = "()")]
+pub struct DeleteEndpointFromMember {
+    pub room_id: RoomId,
+    pub member_id: MemberId,
+    pub endpoint_id: String,
+}
+
+impl Handler<DeleteEndpointFromMember> for RoomsRepository {
+    type Result = ();
+
+    fn handle(
+        &mut self,
+        msg: DeleteEndpointFromMember,
+        _ctx: &mut Self::Context,
+    ) -> Self::Result {
+        if let Some(room) = self.get(&msg.room_id) {
+            room.do_send(DeleteEndpoint {
+                endpoint_id: msg.endpoint_id,
+                member_id: msg.member_id,
+            });
+        } else {
+            panic!()
+        }
     }
 }

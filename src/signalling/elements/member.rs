@@ -271,6 +271,20 @@ impl Member {
     pub fn remove_src(&self, id: &WebRtcPublishId) {
         self.0.borrow_mut().srcs.remove(id);
     }
+
+    pub fn take_sink(
+        &self,
+        id: &WebRtcPlayId,
+    ) -> Option<Rc<WebRtcPlayEndpoint>> {
+        self.0.borrow_mut().sinks.remove(id)
+    }
+
+    pub fn take_src(
+        &self,
+        id: &WebRtcPublishId,
+    ) -> Option<Rc<WebRtcPublishEndpoint>> {
+        self.0.borrow_mut().srcs.remove(id)
+    }
 }
 
 /// Creates all empty [`Member`] from [`RoomSpec`] and then

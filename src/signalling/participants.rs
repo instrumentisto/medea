@@ -315,7 +315,11 @@ impl ParticipantService {
         join_all(close_fut).map(|_| ())
     }
 
-    pub fn delete_member(&mut self, member_id: &MemberId, ctx: &mut Context<Room>) {
+    pub fn delete_member(
+        &mut self,
+        member_id: &MemberId,
+        ctx: &mut Context<Room>,
+    ) {
         if let Some(drop) = self.drop_connection_tasks.remove(member_id) {
             ctx.cancel_future(drop);
         }

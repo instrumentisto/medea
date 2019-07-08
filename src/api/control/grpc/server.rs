@@ -19,7 +19,9 @@ use crate::{
 use super::protos::control_grpc::{create_control_api, ControlApi};
 use crate::{
     api::control::{grpc::protos::control::Error, local_uri::LocalUri},
-    signalling::room_repo::{DeleteMemberFromRoom, DeleteRoom, StartRoom},
+    signalling::room_repo::{
+        DeleteEndpointFromMember, DeleteMemberFromRoom, DeleteRoom, StartRoom,
+    },
 };
 use futures::future::Either;
 use std::collections::HashMap;
@@ -113,8 +115,12 @@ impl ControlApi for ControlApiService {
                     room_id: uri.room_id.unwrap(),
                     member_id: uri.member_id.unwrap(),
                 });
-            } else {
-                unimplemented!()
+            } else if uri.is_endpoint_uri() {
+                self.room_repository.do_send(DeleteEndpointFromMember {
+                    room_id: uri.room_id.unwrap(),
+                    member_id: uri.member_id.unwrap(),
+                    endpoint_id: uri.endpoint_id.unwrap(),
+                });
             }
         }
 

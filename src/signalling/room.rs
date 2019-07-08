@@ -27,7 +27,10 @@ use crate::{
     },
     signalling::{
         elements::{
-            endpoints::webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
+            endpoints::webrtc::{
+                WebRtcPlayEndpoint, WebRtcPlayId, WebRtcPublishEndpoint,
+                WebRtcPublishId,
+            },
             Member, MembersLoadError,
         },
         participants::ParticipantService,
@@ -645,5 +648,36 @@ impl Handler<DeleteMember> for Room {
         ctx: &mut Self::Context,
     ) -> Self::Result {
         self.members.delete_member(&msg.0, ctx);
+    }
+}
+
+#[derive(Debug, Message)]
+#[rtype(result = "()")]
+pub struct DeleteEndpoint {
+    pub member_id: MemberId,
+    pub endpoint_id: String,
+}
+
+impl Handler<DeleteEndpoint> for Room {
+    type Result = ();
+
+    fn handle(
+        &mut self,
+        msg: DeleteEndpoint,
+        ctx: &mut Self::Context,
+    ) -> Self::Result {
+        let member = self.members.get_member_by_id(&msg.member_id).unwrap();
+        let play_id = WebRtcPlayId(msg.endpoint_id);
+        if let Some(endpoint) = member.take_sink(&play_id) {
+            if let Some(peer_id) = endpoint.peer_id() {
+                self.peers.remove_peer(msg.member_id.clone(), peer_id, ctx);
+            }
+        }
+
+        let publish_id = WebRtcPublishId(play_id.0);
+        if let Some(endpoint) = member.take_src(&publish_id) {
+            let peer_ids = endpoint.peer_ids();
+            self.peers.remove_peers(msg.member_id, peer_ids, ctx);
+        }
     }
 }
