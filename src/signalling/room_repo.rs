@@ -93,9 +93,13 @@ impl Handler<DeleteRoom> for RoomsRepository {
         msg: DeleteRoom,
         _ctx: &mut Self::Context,
     ) -> Self::Result {
+        let mut is_need_remove = false;
         if let Some(room) = self.rooms.lock().unwrap().get(&msg.0) {
             room.do_send(CloseRoom {});
-            self.rooms.lock().unwrap().remove(&msg.0);
+            is_need_remove = true;
+        }
+        if is_need_remove {
+            self.remove(&msg.0);
         }
     }
 }

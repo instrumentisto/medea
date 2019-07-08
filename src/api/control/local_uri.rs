@@ -55,4 +55,22 @@ impl LocalUri {
             endpoint_id,
         })
     }
+
+    pub fn is_room_uri(&self) -> bool {
+        self.room_id.is_some()
+            && self.member_id.is_none()
+            && self.endpoint_id.is_none()
+    }
+
+    pub fn is_member_uri(&self) -> bool {
+        self.room_id.is_some()
+            && self.member_id.is_some()
+            && self.endpoint_id.is_none()
+    }
+
+    pub fn is_endpoint_uri(&self) -> bool {
+        self.room_id.is_some()
+            && self.member_id.is_some()
+            && self.endpoint_id.is_some()
+    }
 }

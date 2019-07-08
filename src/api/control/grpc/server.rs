@@ -18,8 +18,8 @@ use crate::{
 
 use super::protos::control_grpc::{create_control_api, ControlApi};
 use crate::{
-    api::control::grpc::protos::control::Error,
-    signalling::room_repo::StartRoom,
+    api::control::{grpc::protos::control::Error, local_uri::LocalUri},
+    signalling::room_repo::{DeleteRoom, StartRoom},
 };
 use futures::future::Either;
 use std::collections::HashMap;
@@ -96,21 +96,27 @@ impl ControlApi for ControlApiService {
 
     fn delete(
         &mut self,
-        _ctx: RpcContext,
-        _req: IdRequest,
-        _sink: UnarySink<Response>,
+        ctx: RpcContext,
+        req: IdRequest,
+        sink: UnarySink<Response>,
     ) {
-        //        for id in req.get_id() {
-        //            let uri = parse_local_uri(id).unwrap(); // TODO
-        //            if uri.is_room_id() {
-        //                self.room_repository
-        //                    .do_send(DeleteRoom(uri.room_id.unwrap()))
-        //            }
-        //        }
-        //
-        //        let mut resp = Response::new();
-        //        resp.set_sid(HashMap::new());
-        //        ctx.spawn(sink.success(resp).map_err(|_| ()));
+        for id in req.get_id() {
+            let uri = LocalUri::parse(id).unwrap(); // TODO
+
+            if uri.is_room_uri() {
+                self.room_repository
+                    .do_send(DeleteRoom(uri.room_id.unwrap()));
+            } else {
+                unimplemented!()
+            }
+        }
+
+        let mut resp = Response::new();
+        resp.set_sid(HashMap::new());
+        ctx.spawn(
+            sink.success(resp)
+                .map_err(|e| error!("gRPC response failed. {:?}", e)),
+        );
     }
 
     fn get(
