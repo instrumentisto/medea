@@ -2,7 +2,7 @@
 
 use std::sync::{Arc, Mutex};
 
-use actix::{Actor, Addr, Arbiter, Context, Handler, Message};
+use actix::{Actor, Addr, Context, Handler, Message};
 use hashbrown::HashMap;
 
 use crate::{
@@ -13,7 +13,6 @@ use crate::{
     },
     App,
 };
-use std::time::Duration;
 
 /// Repository that stores [`Room`]s addresses.
 #[derive(Clone, Debug)]
@@ -70,18 +69,14 @@ impl Handler<StartRoom> for RoomsRepository {
 
         let turn = Arc::clone(&self.app.turn_service);
 
-        // TODO: spawn in current arbiter.
-        {
-            //            let room = Box::new(&msg.room as &(RoomSpec));
-            //            Room::new(&room, Duration::from_secs(10),
-            // Arc::clone(&turn))?;
-        }
+        let room = Room::new(
+            &room,
+            self.app.config.rpc.reconnect_timeout.clone(),
+            turn,
+        )?;
+        let room_addr = room.start();
 
-        let room = Room::start_in_arbiter(&Arbiter::new(), move |_| {
-            Room::new(&room, Duration::from_secs(10), turn).unwrap()
-        });
-
-        self.rooms.lock().unwrap().insert(room_id, room);
+        self.rooms.lock().unwrap().insert(room_id, room_addr);
         Ok(())
     }
 }

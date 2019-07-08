@@ -9,7 +9,7 @@ pub mod media;
 pub mod signalling;
 pub mod turn;
 
-use actix::prelude::*;
+use actix::{Actor as _, Addr};
 use failure::Fail;
 use hashbrown::HashMap;
 
@@ -76,7 +76,6 @@ pub fn start_static_rooms(
             Err(e) => return Err(ServerStartError::LoadSpec(e)),
         };
         let mut rooms = HashMap::new();
-        let arbiter = Arbiter::new();
 
         for spec in room_specs {
             if rooms.contains_key(spec.id()) {
@@ -90,15 +89,17 @@ pub fn start_static_rooms(
 
             let room_id = spec.id().clone();
             let rpc_reconnect_timeout = config.rpc.reconnect_timeout;
-            let room = Room::start_in_arbiter(&arbiter, move |_| {
-                Room::new(
-                    &spec,
-                    rpc_reconnect_timeout,
-                    Arc::new(turn_auth_service),
-                )
-                .unwrap()
-            });
-            rooms.insert(room_id, room);
+
+            let room = Room::new(
+                &spec,
+                rpc_reconnect_timeout,
+                Arc::new(turn_auth_service),
+            )
+            .unwrap();
+
+            let room_addr = room.start();
+
+            rooms.insert(room_id, room_addr);
         }
 
         Ok(rooms)
