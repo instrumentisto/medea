@@ -50,12 +50,7 @@ impl RoomSpec {
                 return Err(TryFromProtobufError::MemberElementNotFound);
             }
             let member = MemberSpec::try_from(room_element.get_member())?;
-            // TODO: temporary
-            let element = Element::Member {
-                spec: member.pipeline,
-                credentials: member.credentials,
-            };
-            pipeline.insert(id.clone(), element);
+            pipeline.insert(id.clone(), member.into());
         }
 
         let pipeline = Pipeline::new(pipeline);
@@ -83,34 +78,6 @@ impl RoomSpec {
         &self.id
     }
 }
-
-// impl TryFrom<&RoomProto> for RoomSpec {
-//    type Error = TryFromProtobufError;
-//
-//    fn try_from(value: &RoomProto) -> Result<Self, Self::Error> {
-//        let mut pipeline = StdHashMap::new();
-//        for (id, room_element) in value.get_pipeline() {
-//            if !room_element.has_member() {
-//                return Err(TryFromProtobufError::MemberElementNotFound);
-//            }
-//            let member = MemberSpec::try_from(room_element.get_member())?;
-//            // TODO: temporary
-//            let element = Element::Member {
-//                spec: member.pipeline,
-//                credentials: member.credentials,
-//            };
-//            pipeline.insert(id.clone(), element);
-//        }
-//
-//        let pipeline = Pipeline::new(pipeline);
-//
-//        Ok(Self {
-//            pipeline,
-//            // TODO:
-//            id: Id("unimplemented".to_string()),
-//        })
-//    }
-//}
 
 impl TryFrom<&Element> for RoomSpec {
     type Error = TryFromElementError;

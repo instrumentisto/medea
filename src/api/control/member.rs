@@ -37,12 +37,19 @@ macro_attr! {
 #[derive(Clone, Debug)]
 pub struct MemberSpec {
     /// Spec of this `Member`.
-    // TODO: remove pub
-    pub pipeline: Pipeline,
+    pipeline: Pipeline,
 
     /// Credentials to authorize `Member` with.
-    // TODO: remove pub
-    pub credentials: String,
+    credentials: String,
+}
+
+impl Into<Element> for MemberSpec {
+    fn into(self) -> Element {
+        Element::Member {
+            spec: self.pipeline,
+            credentials: self.credentials,
+        }
+    }
 }
 
 impl MemberSpec {
@@ -84,17 +91,7 @@ impl TryFrom<&MemberProto> for MemberSpec {
         let mut pipeline = StdHashMap::new();
         for (id, member_element) in value.get_pipeline() {
             let endpoint = Endpoint::try_from(member_element)?;
-            // TODO: this is temporary
-            //       Need rewrite element logic.
-            let element = match endpoint {
-                Endpoint::WebRtcPublish(e) => {
-                    Element::WebRtcPublishEndpoint { spec: e }
-                }
-                Endpoint::WebRtcPlay(e) => {
-                    Element::WebRtcPlayEndpoint { spec: e }
-                }
-            };
-            pipeline.insert(id.clone(), element);
+            pipeline.insert(id.clone(), endpoint.into());
         }
         let pipeline = Pipeline::new(pipeline);
 
@@ -104,7 +101,6 @@ impl TryFrom<&MemberProto> for MemberSpec {
 
         Ok(Self {
             pipeline,
-            // TODO: error
             credentials: value.get_credentials().to_string(),
         })
     }

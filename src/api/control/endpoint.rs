@@ -83,6 +83,17 @@ pub enum Endpoint {
     WebRtcPlay(WebRtcPlayEndpoint),
 }
 
+impl Into<Element> for Endpoint {
+    fn into(self) -> Element {
+        match self {
+            Endpoint::WebRtcPublish(e) => {
+                Element::WebRtcPublishEndpoint { spec: e }
+            }
+            Endpoint::WebRtcPlay(e) => Element::WebRtcPlayEndpoint { spec: e },
+        }
+    }
+}
+
 impl TryFrom<&MemberElementProto> for Endpoint {
     type Error = TryFromProtobufError;
 
