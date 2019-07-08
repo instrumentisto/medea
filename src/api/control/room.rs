@@ -69,6 +69,9 @@ impl TryFrom<&RoomProto> for RoomSpec {
     fn try_from(value: &RoomProto) -> Result<Self, Self::Error> {
         let mut pipeline = StdHashMap::new();
         for (id, room_element) in value.get_pipeline() {
+            if !room_element.has_member() {
+                return Err(TryFromProtobufError::MemberElementNotFound);
+            }
             let member = MemberSpec::try_from(room_element.get_member())?;
             // TODO: temporary
             let element = Element::Member {

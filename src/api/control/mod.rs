@@ -26,6 +26,16 @@ use crate::api::control::endpoint::SrcParseError;
 pub enum TryFromProtobufError {
     #[fail(display = "Src uri parse error: {:?}", _0)]
     SrcUriError(SrcParseError),
+    #[fail(display = "Src uri for publish endpoint not provided.")]
+    SrcUriNotFound,
+    #[fail(display = "Room element not provided.")]
+    RoomElementNotFound,
+    #[fail(display = "Member element not provided.")]
+    MemberElementNotFound,
+    #[fail(display = "P2p mode for play endpoint not provided.")]
+    P2pModeNotFound,
+    #[fail(display = "Credentials for member not provided.")]
+    MemberCredentialsNotFound,
 }
 
 // TODO: Maybe better way for do it???

@@ -132,10 +132,13 @@ impl TryFrom<&WebRtcPublishEndpointProto> for WebRtcPublishEndpoint {
     fn try_from(
         value: &WebRtcPublishEndpointProto,
     ) -> Result<Self, Self::Error> {
-        // TODO: check for null
-        Ok(Self {
-            p2p: P2pMode::try_from(value.get_p2p())?,
-        })
+        if value.has_p2p() {
+            Ok(Self {
+                p2p: P2pMode::try_from(value.get_p2p())?,
+            })
+        } else {
+            Err(TryFromProtobufError::P2pModeNotFound)
+        }
     }
 }
 
@@ -157,9 +160,13 @@ impl TryFrom<&WebRtcPlayEndpointProto> for WebRtcPlayEndpoint {
     type Error = TryFromProtobufError;
 
     fn try_from(value: &WebRtcPlayEndpointProto) -> Result<Self, Self::Error> {
-        Ok(Self {
-            src: parse_src_uri(value.get_src())?,
-        })
+        if value.has_src() {
+            Ok(Self {
+                src: parse_src_uri(value.get_src())?,
+            })
+        } else {
+            Err(TryFromProtobufError::SrcUriNotFound)
+        }
     }
 }
 
