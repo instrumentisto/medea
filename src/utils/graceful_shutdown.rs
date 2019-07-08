@@ -1,8 +1,9 @@
 //! A class to handle shutdown signals and to shut down system
 //! Actix system has to be running for it to work.
 
-use std::{collections::BTreeMap, mem, sync::Mutex, thread, time::{Duration, Instant},
-          sync::mpsc::channel};
+use std::{collections::{BTreeMap, HashMap, hash_map::DefaultHasher}, mem, sync::Mutex, thread,
+          time::{Duration, Instant}, sync::mpsc::channel,
+          hash::{Hash, Hasher}};
 
 use actix::{self, MailboxError, Message, Recipient, System,
             Handler, WrapFuture, AsyncContext, Addr, Arbiter};
@@ -74,7 +75,7 @@ impl Message for ShutdownSignalDetected {
 
 pub struct GracefulShutdown {
     /// [`Actor`]s to send message when graceful shutdown
-    recipients: BTreeMap<u8, Vec<Recipient<ShutdownMessage>>>,
+    recipients: BTreeMap<u8, HashMap<u64, Recipient<ShutdownMessage>>>,
 
     /// Timeout after which all [`Actors`] will be forced shutdown
     shutdown_timeout: u64,
@@ -137,11 +138,10 @@ impl Handler<ShutdownSignalDetected> for GracefulShutdown {
             );
 
         for recipients_values in self.recipients.values() {
-
             let mut this_priority_futures_vec =
                 Vec::with_capacity(self.recipients.len());
 
-            for recipient in recipients_values {
+            for recipient in recipients_values.values() {
                 let (tx, rx) = channel();
                 let tx2 = tx.clone();
 
@@ -195,7 +195,6 @@ impl Handler<ShutdownSignalDetected> for GracefulShutdown {
                 })
                 .then(move |_| {
                     System::current().stop();
-//                    system_to_stop.stop();
                     future::ok::<(), ()>(())
                 })
                 .into_actor(self)
@@ -210,15 +209,19 @@ impl Handler<ShutdownSubscribe> for GracefulShutdown {
         //ask
         //todo replace vec to hashset
 
-        let vec_with_current_priority = self.recipients.get_mut(&msg.priority);
-        if let Some(vector) = vec_with_current_priority {
-            vector.push(msg.who);
+        let hashmap_with_current_priority = self.recipients.get_mut(&msg.priority);
+
+        let mut hasher = DefaultHasher::new();
+        msg.who.hash(&mut hasher);
+
+        if let Some(hashmap) = hashmap_with_current_priority {
+            hashmap.insert(hasher.finish(), msg.who);
         } else {
-            self.recipients.insert(msg.priority, Vec::new());
+            self.recipients.insert(msg.priority, HashMap::new());
             // unwrap should not panic because we have inserted new empty vector
             // with the key we are trying to get in the line above /\
-            let vector = self.recipients.get_mut(&msg.priority).unwrap();
-            vector.push(msg.who);
+            let hashmap = self.recipients.get_mut(&msg.priority).unwrap();
+            hashmap.insert(hasher.finish(), msg.who);
         }
     }
 }
@@ -229,9 +232,11 @@ impl Handler<ShutdownUnsubscribe> for GracefulShutdown {
     fn handle(&mut self, msg: ShutdownUnsubscribe, _: &mut Context<Self>) {
         let vec_with_current_priority = self.recipients.get_mut(&msg.priority);
 
-        if let Some(vector) = vec_with_current_priority {
-            //ask
-            vector.retain(|x| *x != msg.who);
+        let mut hasher = DefaultHasher::new();
+        msg.who.hash(&mut hasher);
+
+        if let Some(hashmap) = vec_with_current_priority {
+            hashmap.remove(&hasher.finish());
         } else {
             return;
         }
