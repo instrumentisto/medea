@@ -91,43 +91,6 @@ impl TryFrom<&RoomProto> for RoomSpec {
     }
 }
 
-// pub struct SerdeRoomSpecImpl {
-// id: Id,
-// members: HashMap<MemberId, MemberSpec>,
-// }
-//
-// impl SerdeRoomSpecImpl {
-// pub fn new(
-// room_spec: &SerdeRoomSpecDto,
-// ) -> Result<Self, TryFromElementError> {
-// Ok(Self {
-// id: room_spec.id.clone(),
-// members: room_spec.members()?,
-// })
-// }
-// }
-//
-// impl RoomSpec for SerdeRoomSpecImpl {
-// fn members(&self) -> HashMap<MemberId, Box<dyn MemberSpec>> {
-// self.members
-// .iter()
-// .map(|(id, member)| {
-// (id.clone(), Box::new(member.clone()) as Box<dyn MemberSpec>)
-// })
-// .collect()
-// }
-//
-// fn id(&self) -> Id {
-// self.id.clone()
-// }
-//
-// fn get_member_by_id(&self, id: &MemberId) -> Option<Box<dyn MemberSpec>> {
-// self.members
-// .get(id)
-// .map(|m| Box::new(m.clone()) as Box<dyn MemberSpec>)
-// }
-// }
-
 impl TryFrom<&Element> for RoomSpec {
     type Error = TryFromElementError;
 

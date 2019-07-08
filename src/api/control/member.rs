@@ -113,69 +113,6 @@ impl TryFrom<&MemberProto> for MemberSpec {
     }
 }
 
-// impl MemberSpec for MemberSpec {
-// fn webrtc_play_endpoints(
-// &self,
-// ) -> HashMap<WebRtcPlayId, Box<dyn WebRtcPlayEndpoint>> {
-// self.pipeline
-// .iter()
-// .filter_map(|(id, e)| match e {
-// Element::WebRtcPlayEndpoint { spec } => Some((
-// WebRtcPlayId(id.clone()),
-// Box::new(spec.clone()) as Box<dyn WebRtcPlayEndpoint>,
-// )),
-// _ => None,
-// })
-// .collect()
-// }
-//
-// fn webrtc_publish_endpoints(
-// &self,
-// ) -> HashMap<WebRtcPublishId, Box<dyn WebRtcPublishEndpoint>> {
-// self.pipeline
-// .iter()
-// .filter_map(|(id, e)| match e {
-// Element::WebRtcPublishEndpoint { spec } => Some((
-// WebRtcPublishId(id.clone()),
-// Box::new(spec.clone()) as Box<dyn WebRtcPublishEndpoint>,
-// )),
-// _ => None,
-// })
-// .collect()
-// }
-//
-// fn credentials(&self) -> &str {
-// &self.credentials
-// }
-//
-// fn get_webrtc_play_by_id(
-// &self,
-// id: &WebRtcPlayId,
-// ) -> Option<Box<dyn WebRtcPlayEndpoint>> {
-// let element = self.pipeline.get(&id.0)?;
-//
-// if let Some(endpoint) = SerdeEndpoint::try_from(element).ok() {
-// if let SerdeEndpoint::WebRtcPlay(e) = endpoint {
-// return Some(Box::new(e) as Box<dyn WebRtcPlayEndpoint>);
-// }
-// }
-// None
-// }
-//
-// fn get_webrtc_publish_by_id(
-// &self,
-// id: &WebRtcPublishId,
-// ) -> Option<Box<dyn WebRtcPublishEndpoint>> {
-// let element = self.pipeline.get(&id.0)?;
-// if let Some(endpoint) = SerdeEndpoint::try_from(element).ok() {
-// if let SerdeEndpoint::WebRtcPublish(e) = endpoint {
-// return Some(Box::new(e) as Box<dyn WebRtcPublishEndpoint>);
-// }
-// }
-// None
-// }
-// }
-
 impl TryFrom<&Element> for MemberSpec {
     type Error = TryFromElementError;
 

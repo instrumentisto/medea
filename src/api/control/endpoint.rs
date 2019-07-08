@@ -142,12 +142,6 @@ impl TryFrom<&WebRtcPublishEndpointProto> for WebRtcPublishEndpoint {
     }
 }
 
-// impl WebRtcPublishEndpoint for WebRtcPublishEndpoint {
-// fn p2p(&self) -> P2pMode {
-// self.p2p.clone()
-// }
-// }
-
 /// Media element which is able to play media data for client via WebRTC.
 #[allow(clippy::module_name_repetitions)]
 #[derive(Clone, Deserialize, Debug)]
@@ -169,12 +163,6 @@ impl TryFrom<&WebRtcPlayEndpointProto> for WebRtcPlayEndpoint {
         }
     }
 }
-
-// impl WebRtcPlayEndpoint for WebRtcPlayEndpoint {
-// fn src(&self) -> SrcUri {
-// self.src.clone()
-// }
-// }
 
 /// Special uri with pattern `local://{room_id}/{member_id}/{endpoint_id}`.
 #[derive(Clone, Debug)]
