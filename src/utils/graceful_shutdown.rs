@@ -12,6 +12,8 @@ use tokio::prelude::{
     stream::*,
 };
 use tokio::timer::Delay;
+use futures::future::IntoFuture;
+use tokio::prelude::FutureExt;
 
 use lazy_static::lazy_static;
 
@@ -111,6 +113,7 @@ impl Handler<ShutdownSignalDetected> for GracefulShutdown {
 
         if self.recipients.is_empty() {
             error!("GracefulShutdown: No subscribers registered");
+            self.system.stop();
             return;
         }
 
@@ -133,6 +136,7 @@ impl Handler<ShutdownSignalDetected> for GracefulShutdown {
 
                 tokio_runtime.spawn(
                     send_future
+                        .into_future()
                         .map(move |res| {
                             tx.send(res);
                         })
@@ -140,11 +144,10 @@ impl Handler<ShutdownSignalDetected> for GracefulShutdown {
                             error!("Error sending shutdown message: {:?}", e);
                             tx2.send(Ok(Box::new(futures::future::ok(()))));
                         })
+//                        .into_actor(self)
                 );
 
                 let recipient_shutdown_fut = rx.recv().unwrap().unwrap();
-                error!("got response!");
-//            tokio_runtime.block_on(recipient_shutdown_fut);
 
                 this_priority_futures_vec.push(recipient_shutdown_fut);
             }
@@ -165,25 +168,21 @@ impl Handler<ShutdownSignalDetected> for GracefulShutdown {
         }
 
         let system_to_stop = self.system.clone();
-        tokio_runtime.spawn(
+        ctx.spawn(
             shutdown_future
-//                Delay::new(Instant::now() + Duration::from_millis(200))
-                .select2(Delay::new(Instant::now() + Duration::from_millis(self.shutdown_timeout)))
+                .timeout(Duration::from_millis(self.shutdown_timeout))
                 .map_err(|e| {
                     error!(
-                        "Error trying to shut down system gracefully"
+                        "Error trying to shut down system gracefully: {:?}",
+                        e
                     );
                 })
-//                    .into_actor(self)
-                    .then(move |_| {
-                    info!("GRACEFUL STOP");
+                .then(move |_| {
                     system_to_stop.stop();
                     future::ok::<(), ()>(())
                 })
+                .into_actor(self)
         );
-
-        tokio_runtime.shutdown_on_idle()
-            .wait().unwrap();
     }
 }
 

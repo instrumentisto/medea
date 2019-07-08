@@ -1,7 +1,7 @@
 //! Room definitions and implementations. Room is responsible for media
 //! connection establishment between concrete [`Member`]s.
 
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use actix::{
     fut::wrap_future, Actor, ActorFuture, AsyncContext, Context, Handler,
@@ -10,6 +10,8 @@ use actix::{
 use failure::Fail;
 use futures::{future, Future};
 use hashbrown::HashMap;
+use tokio::timer::Delay;
+
 
 use medea_client_api_proto::{Command, Event, IceCandidate};
 
@@ -445,8 +447,10 @@ impl Handler<ShutdownMessage> for Room {
         Ok(Box::new(futures::future::ok(()).then(
             move |_: Result<(), ()>| {
                 // todo: close room dynamically
-                std::thread::sleep(std::time::Duration::from_millis(200));
-                futures::future::ok(())
+                Delay::new(Instant::now() + Duration::from_millis(500))
+                    .then(|_| {
+                        futures::future::ok(())
+                    })
             },
         )))
     }
