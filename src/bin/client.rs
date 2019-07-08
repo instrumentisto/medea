@@ -1,5 +1,5 @@
 use grpcio::{ChannelBuilder, EnvBuilder};
-use medea::api::grpc::protos::{
+use medea::api::control::grpc::protos::{
     control::{
         CreateRequest, IdRequest, Member, Member_Element, Room, Room_Element,
         WebRtcPlayEndpoint, WebRtcPublishEndpoint, WebRtcPublishEndpoint_P2P,

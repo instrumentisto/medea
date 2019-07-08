@@ -10,7 +10,7 @@ use serde::{
     Deserialize,
 };
 
-use crate::api::grpc::protos::control::{
+use crate::api::control::grpc::protos::control::{
     Member_Element as MemberElementProto,
     WebRtcPlayEndpoint as WebRtcPlayEndpointProto,
     WebRtcPublishEndpoint as WebRtcPublishEndpointProto,

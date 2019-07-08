@@ -7,10 +7,8 @@ use macro_attr::*;
 use newtype_derive::{newtype_fmt, NewtypeDisplay, NewtypeFrom};
 use serde::Deserialize;
 
-use crate::api::{
-    control::endpoint::{
-        WebRtcPlayEndpoint, WebRtcPublishEndpoint, WebRtcPublishId,
-    },
+use crate::api::control::{
+    endpoint::{WebRtcPlayEndpoint, WebRtcPublishEndpoint, WebRtcPublishId},
     grpc::protos::control::Member as MemberProto,
 };
 

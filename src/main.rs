@@ -8,7 +8,7 @@ use medea::{
     start_static_rooms,
 };
 
-use medea::{api::grpc, turn::new_turn_auth_service, App};
+use medea::{api::control::grpc, turn::new_turn_auth_service, App};
 use std::sync::Arc;
 
 fn main() -> Result<(), Error> {

@@ -5,11 +5,11 @@ use futures::future::Future;
 use grpcio::{Environment, RpcContext, Server, ServerBuilder, UnarySink};
 
 use crate::{
-    api::{
-        control::{RoomId, RoomSpec},
+    api::control::{
         grpc::protos::control::{
             ApplyRequest, CreateRequest, GetResponse, IdRequest, Response,
         },
+        RoomId, RoomSpec,
     },
     log::prelude::*,
     signalling::room_repo::RoomsRepository,
@@ -18,7 +18,8 @@ use crate::{
 
 use super::protos::control_grpc::{create_control_api, ControlApi};
 use crate::{
-    api::grpc::protos::control::Error, signalling::room_repo::StartRoom,
+    api::control::grpc::protos::control::Error,
+    signalling::room_repo::StartRoom,
 };
 use futures::future::Either;
 use std::collections::HashMap;

@@ -1,6 +1,7 @@
 //! Implementation of Control API.
 
 pub mod endpoint;
+pub mod grpc;
 pub mod member;
 pub mod pipeline;
 pub mod room;
