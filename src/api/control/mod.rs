@@ -1,6 +1,7 @@
 //! Implementation of Control API.
 
-pub mod endpoint;
+// pub mod endpoint;
+pub mod endpoints;
 pub mod grpc;
 pub mod local_uri;
 pub mod member;
@@ -13,16 +14,21 @@ use failure::{Error, Fail};
 use serde::Deserialize;
 
 use self::{
-    endpoint::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
+    endpoints::{
+        webrtc_play_endpoint::{SrcParseError, WebRtcPlayEndpoint},
+        webrtc_publish_endpoint::WebRtcPublishEndpoint,
+    },
     pipeline::Pipeline,
 };
 
 pub use self::{
-    endpoint::{Endpoint, WebRtcPlayId, WebRtcPublishId},
+    endpoints::{
+        webrtc_play_endpoint::WebRtcPlayId,
+        webrtc_publish_endpoint::WebRtcPublishId, Endpoint,
+    },
     member::{Id as MemberId, MemberSpec},
     room::{Id as RoomId, RoomSpec},
 };
-use crate::api::control::endpoint::SrcParseError;
 
 #[derive(Debug, Fail)]
 pub enum TryFromProtobufError {

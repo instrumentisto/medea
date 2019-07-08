@@ -6,7 +6,9 @@ use std::{
 };
 
 use crate::{
-    api::control::endpoint::{SrcUri, WebRtcPlayId as Id},
+    api::control::endpoints::webrtc_play_endpoint::{
+        SrcUri, WebRtcPlayId as Id,
+    },
     media::PeerId,
     signalling::elements::Member,
 };

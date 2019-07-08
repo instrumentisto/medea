@@ -8,7 +8,10 @@ use newtype_derive::{newtype_fmt, NewtypeDisplay, NewtypeFrom};
 use serde::Deserialize;
 
 use crate::api::control::{
-    endpoint::{WebRtcPlayEndpoint, WebRtcPublishEndpoint, WebRtcPublishId},
+    endpoints::{
+        webrtc_play_endpoint::WebRtcPlayEndpoint,
+        webrtc_publish_endpoint::{WebRtcPublishEndpoint, WebRtcPublishId},
+    },
     grpc::protos::control::Member as MemberProto,
     Endpoint, TryFromProtobufError,
 };
