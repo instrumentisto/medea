@@ -22,6 +22,8 @@ use crate::{
     utils::graceful_shutdown::{self, ShutdownSubscribe},
 };
 
+use crate::utils::graceful_shutdown::ShutdownUnsubscribe;
+
 fn main() {
     dotenv().ok();
     let logger = log::new_dual_logger(std::io::stdout(), std::io::stderr());

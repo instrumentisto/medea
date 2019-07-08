@@ -51,6 +51,16 @@ impl Message for ShutdownSubscribe {
     type Result = ();
 }
 
+/// Subscribe to exit events, with priority
+pub struct ShutdownUnsubscribe {
+    pub priority: u8,
+    pub who: Recipient<ShutdownMessage>,
+}
+
+impl Message for ShutdownUnsubscribe {
+    type Result = ();
+}
+
 
 /// Send this when a signal is detected
 #[cfg(unix)]
@@ -202,6 +212,20 @@ impl Handler<ShutdownSubscribe> for GracefulShutdown {
             // with the key we are trying to get in the line above /\
             let vector = self.recipients.get_mut(&msg.priority).unwrap();
             vector.push(msg.who);
+        }
+    }
+}
+
+impl Handler<ShutdownUnsubscribe> for GracefulShutdown {
+    type Result = ();
+
+    fn handle(&mut self, msg: ShutdownUnsubscribe, _: &mut Context<Self>) {
+        let vec_with_current_priority = self.recipients.get_mut(&msg.priority);
+
+        if let Some(vector) = vec_with_current_priority {
+            vector.retain(|x| *x != msg.who);
+        } else {
+            return;
         }
     }
 }
