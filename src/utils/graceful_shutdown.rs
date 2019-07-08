@@ -19,7 +19,7 @@ use lazy_static::lazy_static;
 
 use crate::log::prelude::*;
 use tokio::runtime::Runtime;
-
+//todo error unittype
 pub type ShutdownMessageResult = Result<
     Box<dyn Future<Item = (), Error = Box<dyn std::error::Error + Send>> + std::marker::Send>,
     ()
@@ -79,6 +79,7 @@ pub struct GracefulShutdown {
     /// Timeout after which all [`Actors`] will be forced shutdown
     shutdown_timeout: u64,
 
+    //ask
     /// Timeout after which all [`Actors`] will be forced shutdown
     system: actix::System,
 }
@@ -98,6 +99,7 @@ impl Actor for GracefulShutdown {
 }
 
 impl Handler<ShutdownSignalDetected> for GracefulShutdown {
+    // todo result is future
     type Result = ();
 
     fn handle(&mut self, msg: ShutdownSignalDetected, ctx: &mut Context<Self>) {
@@ -142,19 +144,23 @@ impl Handler<ShutdownSignalDetected> for GracefulShutdown {
             for recipient in recipients_values {
                 let (tx, rx) = channel();
                 let tx2 = tx.clone();
+
                 let send_future = recipient.send(ShutdownMessage {});
 
+
+                //todo async handle
+                //ask
                 tokio_runtime.spawn(
                     send_future
                         .into_future()
                         .map(move |res| {
+                            //todo execute result
                             tx.send(res);
                         })
                         .map_err(move |e| {
                             error!("Error sending shutdown message: {:?}", e);
                             tx2.send(Ok(Box::new(futures::future::ok(()))));
                         })
-//                        .into_actor(self)
                 );
 
                 let recipient_shutdown_fut = rx.recv().unwrap().unwrap();
@@ -188,7 +194,8 @@ impl Handler<ShutdownSignalDetected> for GracefulShutdown {
                     );
                 })
                 .then(move |_| {
-                    system_to_stop.stop();
+                    System::current().stop();
+//                    system_to_stop.stop();
                     future::ok::<(), ()>(())
                 })
                 .into_actor(self)
@@ -200,8 +207,8 @@ impl Handler<ShutdownSubscribe> for GracefulShutdown {
     type Result = ();
 
     fn handle(&mut self, msg: ShutdownSubscribe, _: &mut Context<Self>) {
-        // todo: may be a bug: may subscribe same address multiple times with
-        // the same/different priorities
+        //ask
+        //todo replace vec to hashset
 
         let vec_with_current_priority = self.recipients.get_mut(&msg.priority);
         if let Some(vector) = vec_with_current_priority {
@@ -223,6 +230,7 @@ impl Handler<ShutdownUnsubscribe> for GracefulShutdown {
         let vec_with_current_priority = self.recipients.get_mut(&msg.priority);
 
         if let Some(vector) = vec_with_current_priority {
+            //ask
             vector.retain(|x| *x != msg.who);
         } else {
             return;
@@ -232,9 +240,7 @@ impl Handler<ShutdownUnsubscribe> for GracefulShutdown {
 
 
 pub fn create(shutdown_timeout: u64, system: actix::System) -> Addr<GracefulShutdown> {
-    let graceful_shutdown = GracefulShutdown::start_in_arbiter(&Arbiter::new(), move |_| {
-            GracefulShutdown::new(shutdown_timeout, system)
-        });
+    let graceful_shutdown = GracefulShutdown::new(shutdown_timeout, system).start();
     let graceful_shutdown_recipient = graceful_shutdown.clone().recipient();
     #[cfg(not(unix))]
     {
@@ -249,7 +255,7 @@ pub fn create(shutdown_timeout: u64, system: actix::System) -> Addr<GracefulShut
         let sigint_stream = Signal::new(SIGINT).flatten_stream();
         let sigterm_stream = Signal::new(SIGTERM).flatten_stream();
         let sigquit_stream = Signal::new(SIGQUIT).flatten_stream();
-        let sighup_stream = Signal::new(SIGHUP  ).flatten_stream();
+        let sighup_stream = Signal::new(SIGHUP).flatten_stream();
         let signals_stream = sigint_stream
             .select(sigterm_stream)
             .select(sigquit_stream)
@@ -259,6 +265,7 @@ pub fn create(shutdown_timeout: u64, system: actix::System) -> Addr<GracefulShut
             graceful_shutdown_recipient.do_send(ShutdownSignalDetected(signal));
         };
 
+        // todo inject to actor context
         thread::spawn(move || {
             tokio::run(
                 signals_stream.into_future()

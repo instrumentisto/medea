@@ -442,7 +442,8 @@ impl Handler<ShutdownMessage> for Room {
         ctx: &mut Self::Context,
     ) -> Self::Result {
         info!("Shutting down Room: {:?}", self.id);
-//        ctx.notify(CloseRoom {});
+        //todo return future
+        ctx.notify(CloseRoom {});
 
         Ok(Box::new(futures::future::ok(()).then(
             move |_: Result<(), ()>| {
