@@ -37,33 +37,30 @@ impl ControlApi for ControlApiService {
         req: CreateRequest,
         sink: UnarySink<Response>,
     ) {
-        // TODO
         let room_id = RoomId(req.get_id().to_string());
-
-        // TODO
         let room = RoomSpec::try_from_protobuf(room_id.clone(), req.get_room())
             .unwrap();
 
-        //        let sid: HashMap<String, String> = msg
-        //            .room
-        //            .members()
-        //            .iter()
-        //            .map(|(id, member)| {
-        //                let addr = &self.app.config.server.bind_ip;
-        //                let port = self.app.config.server.bind_port;
-        //                let base_uri = format!("{}:{}", addr, port);
-        //
-        //                let uri = format!(
-        //                    "wss://{}/{}/{}/{}",
-        //                    base_uri,
-        //                    &room_id,
-        //                    id,
-        //                    member.credentials()
-        //                );
-        //
-        //                (id.clone().to_string(), uri)
-        //            })
-        //            .collect();
+        let sid: HashMap<String, String> = room
+            .members()
+            .unwrap()
+            .iter()
+            .map(|(id, member)| {
+                let addr = &self.app.config.server.bind_ip;
+                let port = self.app.config.server.bind_port;
+                let base_uri = format!("{}:{}", addr, port);
+
+                let uri = format!(
+                    "wss://{}/{}/{}/{}",
+                    base_uri,
+                    &room_id,
+                    id,
+                    member.credentials()
+                );
+
+                (id.clone().to_string(), uri)
+            })
+            .collect();
 
         ctx.spawn(
             self.room_repository
@@ -72,7 +69,7 @@ impl ControlApi for ControlApiService {
                 .and_then(move |r| {
                     if r.is_ok() {
                         let mut res = Response::new();
-                        res.set_sid(HashMap::new());
+                        res.set_sid(sid);
                         Either::A(sink.success(res).map_err(|_| ()))
                     } else {
                         let mut res = Response::new();
@@ -86,10 +83,6 @@ impl ControlApi for ControlApiService {
                     }
                 }),
         );
-
-        //        self.room_repository.add(room_id, room);
-
-        // debug!("{:?}", self.room_repository);
     }
 
     fn apply(
