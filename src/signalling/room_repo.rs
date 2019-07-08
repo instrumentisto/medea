@@ -6,9 +6,9 @@ use actix::{Actor, Addr, Context, Handler, Message};
 use hashbrown::HashMap;
 
 use crate::{
-    api::control::{room::RoomSpec, RoomId},
+    api::control::{room::RoomSpec, MemberId, RoomId},
     signalling::{
-        room::{CloseRoom, RoomError},
+        room::{CloseRoom, DeleteMember, RoomError},
         Room,
     },
     App,
@@ -101,5 +101,25 @@ impl Handler<DeleteRoom> for RoomsRepository {
         if is_need_remove {
             self.remove(&msg.0);
         }
+    }
+}
+
+#[derive(Message)]
+#[rtype(result = "()")]
+pub struct DeleteMemberFromRoom {
+    pub member_id: MemberId,
+    pub room_id: RoomId,
+}
+
+impl Handler<DeleteMemberFromRoom> for RoomsRepository {
+    type Result = ();
+
+    fn handle(
+        &mut self,
+        msg: DeleteMemberFromRoom,
+        _ctx: &mut Self::Context,
+    ) -> Self::Result {
+        let room = self.get(&msg.room_id).unwrap(); // TODO
+        room.do_send(DeleteMember(msg.member_id));
     }
 }

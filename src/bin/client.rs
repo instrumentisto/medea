@@ -46,7 +46,7 @@ fn main() {
     room_pipeline.insert("responder".to_string(), responder_member_element);
     room.set_pipeline(room_pipeline);
     req.set_room(room);
-    req.set_id("grpc-test".to_string());
+    req.set_id("local://grpc-test".to_string());
 
     let reply = client.create(&req).expect("rpc");
     if reply.has_error() {
@@ -61,5 +61,13 @@ fn main() {
     delete_request.set_id(rooms);
 
     let reply = client.delete(&delete_request).expect("delete");
+    println!("{:?}", reply);
+
+    let mut delete_member_req = IdRequest::new();
+    let mut members = RepeatedField::new();
+    members.push("local://video-call-1/caller".to_string());
+    delete_member_req.set_id(members);
+
+    let reply = client.delete(&delete_member_req).expect("delete member");
     println!("{:?}", reply);
 }

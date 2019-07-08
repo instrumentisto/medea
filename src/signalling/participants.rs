@@ -314,4 +314,24 @@ impl ParticipantService {
 
         join_all(close_fut).map(|_| ())
     }
+
+    pub fn delete_member(&mut self, member_id: &MemberId, ctx: &mut Context<Room>) {
+        if let Some(drop) = self.drop_connection_tasks.remove(member_id) {
+            ctx.cancel_future(drop);
+        }
+
+        if let Some(mut conn) = self.connections.remove(member_id) {
+            ctx.spawn(wrap_future(conn.close()));
+        }
+
+        if let Some(member) = self.members.remove(member_id) {
+            if let Some(ice_user) = member.take_ice_user() {
+                let delete_ice_user_fut = self
+                    .turn
+                    .delete(vec![ice_user])
+                    .map_err(|err| error!("Error removing IceUser {:?}", err));
+                ctx.spawn(wrap_future(delete_ice_user_fut));
+            }
+        }
+    }
 }

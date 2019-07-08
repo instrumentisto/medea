@@ -631,3 +631,19 @@ impl Handler<RpcConnectionClosed> for Room {
             .connection_closed(ctx, msg.member_id, &msg.reason);
     }
 }
+
+#[derive(Debug, Message)]
+#[rtype(result = "()")]
+pub struct DeleteMember(pub MemberId);
+
+impl Handler<DeleteMember> for Room {
+    type Result = ();
+
+    fn handle(
+        &mut self,
+        msg: DeleteMember,
+        ctx: &mut Self::Context,
+    ) -> Self::Result {
+        self.members.delete_member(&msg.0, ctx);
+    }
+}

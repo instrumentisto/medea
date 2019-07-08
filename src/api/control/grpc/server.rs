@@ -9,7 +9,7 @@ use crate::{
         grpc::protos::control::{
             ApplyRequest, CreateRequest, GetResponse, IdRequest, Response,
         },
-        RoomId, RoomSpec,
+        RoomSpec,
     },
     log::prelude::*,
     signalling::room_repo::RoomsRepository,
@@ -19,7 +19,7 @@ use crate::{
 use super::protos::control_grpc::{create_control_api, ControlApi};
 use crate::{
     api::control::{grpc::protos::control::Error, local_uri::LocalUri},
-    signalling::room_repo::{DeleteRoom, StartRoom},
+    signalling::room_repo::{DeleteMemberFromRoom, DeleteRoom, StartRoom},
 };
 use futures::future::Either;
 use std::collections::HashMap;
@@ -37,7 +37,9 @@ impl ControlApi for ControlApiService {
         req: CreateRequest,
         sink: UnarySink<Response>,
     ) {
-        let room_id = RoomId(req.get_id().to_string());
+        let local_uri = LocalUri::parse(req.get_id()).unwrap();
+        let room_id = local_uri.room_id.unwrap();
+
         let room = RoomSpec::try_from_protobuf(room_id.clone(), req.get_room())
             .unwrap();
 
@@ -106,6 +108,11 @@ impl ControlApi for ControlApiService {
             if uri.is_room_uri() {
                 self.room_repository
                     .do_send(DeleteRoom(uri.room_id.unwrap()));
+            } else if uri.is_member_uri() {
+                self.room_repository.do_send(DeleteMemberFromRoom {
+                    room_id: uri.room_id.unwrap(),
+                    member_id: uri.member_id.unwrap(),
+                });
             } else {
                 unimplemented!()
             }
