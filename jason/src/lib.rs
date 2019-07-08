@@ -1,4 +1,4 @@
-pub mod api;
+pub mod jason;
 pub mod media;
 pub mod peer;
 pub mod rpc;
@@ -14,7 +14,10 @@ pub mod utils;
 pub use console_error_panic_hook::set_once as set_panic_hook;
 
 #[doc(inline)]
-pub use self::api::{Jason, RoomHandle};
+pub use self::{
+    jason::{Jason, RoomHandle, ConnectionHandle},
+    media::MediaStreamHandle,
+};
 
 // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global
 // allocator.

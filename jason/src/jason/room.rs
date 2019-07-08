@@ -19,7 +19,7 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 
 use crate::{
-    api::{connection::Connection, ConnectionHandle},
+    jason::{connection::Connection, ConnectionHandle},
     media::{MediaManager, MediaStream},
     peer::{PeerEvent, PeerEventHandler, PeerId, PeerRepository},
     rpc::RpcClient,
