@@ -1,4 +1,4 @@
-use std::{convert::TryFrom, sync::Arc, time::Duration};
+use std::{convert::TryFrom, sync::Arc};
 
 use actix::{Actor, Addr, Arbiter, Context};
 use futures::future::Future;
@@ -11,16 +11,14 @@ use crate::{
             ApplyRequest, CreateRequest, GetResponse, IdRequest, Response,
         },
     },
-    conf::Conf,
     log::prelude::*,
-    signalling::{room_repo::RoomsRepository, Room},
+    signalling::room_repo::RoomsRepository,
     App,
 };
 
 use super::protos::control_grpc::{create_control_api, ControlApi};
 use crate::{
-    api::grpc::protos::control::Error,
-    signalling::room_repo::{DeleteRoom, StartRoom},
+    api::grpc::protos::control::Error, signalling::room_repo::StartRoom,
 };
 use futures::future::Either;
 use std::collections::HashMap;
@@ -67,7 +65,7 @@ impl ControlApi for ControlApiService {
         ctx.spawn(
             self.room_repository
                 .send(StartRoom(room_id, room))
-                .map_err(|e| ())
+                .map_err(|e| error!("Start room mailbox error. {:?}", e))
                 .and_then(move |r| {
                     if r.is_ok() {
                         let mut res = Response::new();
@@ -102,9 +100,9 @@ impl ControlApi for ControlApiService {
 
     fn delete(
         &mut self,
-        ctx: RpcContext,
-        req: IdRequest,
-        sink: UnarySink<Response>,
+        _ctx: RpcContext,
+        _req: IdRequest,
+        _sink: UnarySink<Response>,
     ) {
         //        for id in req.get_id() {
         //            let uri = parse_local_uri(id).unwrap(); // TODO

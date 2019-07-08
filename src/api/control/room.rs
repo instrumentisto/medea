@@ -7,9 +7,7 @@ use macro_attr::*;
 use newtype_derive::{newtype_fmt, NewtypeDisplay, NewtypeFrom};
 use serde::Deserialize;
 
-use crate::api::grpc::protos::control::{
-    Room as RoomProto, Room_Element as RoomElementProto,
-};
+use crate::api::grpc::protos::control::Room as RoomProto;
 
 use super::{
     member::MemberSpec, pipeline::Pipeline, Element, MemberId,

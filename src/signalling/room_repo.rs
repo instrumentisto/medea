@@ -1,16 +1,12 @@
 //! Repository that stores [`Room`]s addresses.
 
-use std::{
-    collections::HashMap as StdHashMap,
-    sync::{Arc, Mutex},
-};
+use std::sync::{Arc, Mutex};
 
 use actix::{Actor, Addr, Arbiter, Context, Handler, Message};
 use hashbrown::HashMap;
 
 use crate::{
     api::control::{room::RoomSpec, RoomId},
-    conf::Conf,
     signalling::{
         room::{CloseRoom, RoomError},
         Room,
@@ -67,7 +63,7 @@ impl Handler<StartRoom> for RoomsRepository {
     fn handle(
         &mut self,
         msg: StartRoom,
-        ctx: &mut Self::Context,
+        _ctx: &mut Self::Context,
     ) -> Self::Result {
         let room_id = msg.0;
         let room = msg.1;
@@ -100,7 +96,7 @@ impl Handler<DeleteRoom> for RoomsRepository {
     fn handle(
         &mut self,
         msg: DeleteRoom,
-        ctx: &mut Self::Context,
+        _ctx: &mut Self::Context,
     ) -> Self::Result {
         if let Some(room) = self.rooms.lock().unwrap().get(&msg.0) {
             room.do_send(CloseRoom {});

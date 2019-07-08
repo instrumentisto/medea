@@ -9,12 +9,9 @@ use serde::Deserialize;
 
 use crate::api::{
     control::endpoint::{
-        WebRtcPlayEndpoint, WebRtcPlayId, WebRtcPublishEndpoint,
-        WebRtcPublishId,
+        WebRtcPlayEndpoint, WebRtcPublishEndpoint, WebRtcPublishId,
     },
-    grpc::protos::control::{
-        Member as MemberProto, Member_Element as MemberElementProto,
-    },
+    grpc::protos::control::Member as MemberProto,
 };
 
 use super::{pipeline::Pipeline, Element, TryFromElementError};
