@@ -40,6 +40,29 @@ pub struct RoomSpec {
 }
 
 impl RoomSpec {
+    pub fn try_from_protobuf(
+        id: Id,
+        proto: &RoomProto,
+    ) -> Result<Self, TryFromProtobufError> {
+        let mut pipeline = StdHashMap::new();
+        for (id, room_element) in proto.get_pipeline() {
+            if !room_element.has_member() {
+                return Err(TryFromProtobufError::MemberElementNotFound);
+            }
+            let member = MemberSpec::try_from(room_element.get_member())?;
+            // TODO: temporary
+            let element = Element::Member {
+                spec: member.pipeline,
+                credentials: member.credentials,
+            };
+            pipeline.insert(id.clone(), element);
+        }
+
+        let pipeline = Pipeline::new(pipeline);
+
+        Ok(Self { pipeline, id })
+    }
+
     /// Returns all [`MemberSpec`]s of this [`RoomSpec`].
     pub fn members(
         &self,
@@ -61,33 +84,33 @@ impl RoomSpec {
     }
 }
 
-impl TryFrom<&RoomProto> for RoomSpec {
-    type Error = TryFromProtobufError;
-
-    fn try_from(value: &RoomProto) -> Result<Self, Self::Error> {
-        let mut pipeline = StdHashMap::new();
-        for (id, room_element) in value.get_pipeline() {
-            if !room_element.has_member() {
-                return Err(TryFromProtobufError::MemberElementNotFound);
-            }
-            let member = MemberSpec::try_from(room_element.get_member())?;
-            // TODO: temporary
-            let element = Element::Member {
-                spec: member.pipeline,
-                credentials: member.credentials,
-            };
-            pipeline.insert(id.clone(), element);
-        }
-
-        let pipeline = Pipeline::new(pipeline);
-
-        Ok(Self {
-            pipeline,
-            // TODO:
-            id: Id("unimplemented".to_string()),
-        })
-    }
-}
+// impl TryFrom<&RoomProto> for RoomSpec {
+//    type Error = TryFromProtobufError;
+//
+//    fn try_from(value: &RoomProto) -> Result<Self, Self::Error> {
+//        let mut pipeline = StdHashMap::new();
+//        for (id, room_element) in value.get_pipeline() {
+//            if !room_element.has_member() {
+//                return Err(TryFromProtobufError::MemberElementNotFound);
+//            }
+//            let member = MemberSpec::try_from(room_element.get_member())?;
+//            // TODO: temporary
+//            let element = Element::Member {
+//                spec: member.pipeline,
+//                credentials: member.credentials,
+//            };
+//            pipeline.insert(id.clone(), element);
+//        }
+//
+//        let pipeline = Pipeline::new(pipeline);
+//
+//        Ok(Self {
+//            pipeline,
+//            // TODO:
+//            id: Id("unimplemented".to_string()),
+//        })
+//    }
+//}
 
 impl TryFrom<&Element> for RoomSpec {
     type Error = TryFromElementError;

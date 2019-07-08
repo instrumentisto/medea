@@ -1,4 +1,4 @@
-use std::{convert::TryFrom, sync::Arc};
+use std::sync::Arc;
 
 use actix::{Actor, Addr, Arbiter, Context};
 use futures::future::Future;
@@ -39,7 +39,9 @@ impl ControlApi for ControlApiService {
         // TODO
         let room_id = RoomId(req.get_id().to_string());
 
-        let room = RoomSpec::try_from(req.get_room()).unwrap();
+        // TODO
+        let room = RoomSpec::try_from_protobuf(room_id.clone(), req.get_room())
+            .unwrap();
 
         //        let sid: HashMap<String, String> = msg
         //            .room
