@@ -45,7 +45,7 @@ impl PeerRepository {
     ) -> Result<&Rc<PeerConnection>, WasmErr> {
         let peer = Rc::new(PeerConnection::new(
             id,
-            &self.peer_events_sender,
+            self.peer_events_sender.clone(),
             ice_servers,
             Rc::clone(&self.media_manager),
         )?);
