@@ -1,30 +1,27 @@
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use actix::{Actor, Addr, Arbiter, Context};
-use futures::future::Future;
+use futures::future::{Either, Future};
 use grpcio::{Environment, RpcContext, Server, ServerBuilder, UnarySink};
 
 use crate::{
     api::control::{
         grpc::protos::control::{
-            ApplyRequest, CreateRequest, GetResponse, IdRequest, Response,
+            ApplyRequest, CreateRequest, Error, GetResponse, IdRequest,
+            Response,
         },
+        local_uri::LocalUri,
         RoomSpec,
     },
     log::prelude::*,
-    signalling::room_repo::RoomsRepository,
+    signalling::room_repo::{
+        DeleteEndpointFromMember, DeleteMemberFromRoom, DeleteRoom,
+        RoomsRepository, StartRoom,
+    },
     App,
 };
 
 use super::protos::control_grpc::{create_control_api, ControlApi};
-use crate::{
-    api::control::{grpc::protos::control::Error, local_uri::LocalUri},
-    signalling::room_repo::{
-        DeleteEndpointFromMember, DeleteMemberFromRoom, DeleteRoom, StartRoom,
-    },
-};
-use futures::future::Either;
-use std::collections::HashMap;
 
 #[derive(Clone)]
 struct ControlApiService {

@@ -7,13 +7,14 @@ use macro_attr::*;
 use newtype_derive::{newtype_fmt, NewtypeDisplay, NewtypeFrom};
 use serde::Deserialize;
 
-use crate::api::control::grpc::protos::control::Room as RoomProto;
+use crate::api::control::{
+    grpc::protos::control::Room as RoomProto, TryFromProtobufError,
+};
 
 use super::{
     member::MemberSpec, pipeline::Pipeline, Element, MemberId,
     TryFromElementError,
 };
-use crate::api::control::TryFromProtobufError;
 
 macro_attr! {
     /// ID of [`Room`].

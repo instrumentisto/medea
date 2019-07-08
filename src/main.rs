@@ -1,15 +1,16 @@
+use std::sync::Arc;
+
 use actix::{Actor as _, Arbiter, System};
 use failure::Error;
 use medea::{
-    api::client::server,
+    api::{client::server, control::grpc},
     conf::Conf,
     log::{self, prelude::*},
     signalling::room_repo::RoomsRepository,
     start_static_rooms,
+    turn::new_turn_auth_service,
+    App,
 };
-
-use medea::{api::control::grpc, turn::new_turn_auth_service, App};
-use std::sync::Arc;
 
 fn main() -> Result<(), Error> {
     dotenv::dotenv().ok();

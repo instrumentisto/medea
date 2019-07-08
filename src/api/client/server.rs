@@ -110,7 +110,7 @@ pub fn run(rooms: RoomsRepository, config: Conf) {
 
 #[cfg(test)]
 mod test {
-    use std::{ops::Add, thread, time::Duration};
+    use std::{ops::Add, sync::Arc, thread, time::Duration};
 
     use actix::{Actor as _, Arbiter};
     use actix_http::{ws::Message, HttpService};
@@ -124,7 +124,6 @@ mod test {
     };
 
     use super::*;
-    use std::sync::Arc;
 
     /// Creates [`RoomsRepository`] for tests filled with a single [`Room`].
     fn room(conf: Conf) -> RoomsRepository {

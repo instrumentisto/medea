@@ -9,6 +9,8 @@ pub mod media;
 pub mod signalling;
 pub mod turn;
 
+use std::sync::Arc;
+
 use actix::{Actor as _, Addr};
 use failure::Fail;
 use hashbrown::HashMap;
@@ -17,11 +19,8 @@ use crate::{
     api::control::{load_static_specs_from_dir, RoomId},
     conf::Conf,
     signalling::{room::RoomError, Room},
-    turn::service,
+    turn::{service, TurnAuthService},
 };
-
-use crate::turn::TurnAuthService;
-use std::sync::Arc;
 
 #[derive(Debug)]
 pub struct App {
