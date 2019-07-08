@@ -154,7 +154,7 @@ struct Service {
 #[allow(clippy::module_name_repetitions)]
 pub fn new_turn_auth_service(
     config: &Conf,
-) -> Result<Box<dyn TurnAuthService>, TurnServiceErr> {
+) -> Result<Box<dyn TurnAuthService + Send + Sync>, TurnServiceErr> {
     let turn_db = TurnDatabase::new(
         config.turn.db.redis.connection_timeout,
         ConnectionInfo {

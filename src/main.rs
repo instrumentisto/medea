@@ -26,7 +26,7 @@ fn main() -> Result<(), Error> {
         turn_service: Arc::new(new_turn_auth_service(&config).unwrap()),
     });
 
-    let rooms = start_static_rooms(Arc::clone(&app))?;
+    let rooms = start_static_rooms(&app.config)?;
     info!(
         "Loaded rooms: {:?}",
         rooms.iter().map(|(id, _)| &id.0).collect::<Vec<&String>>()

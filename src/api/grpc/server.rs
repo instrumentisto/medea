@@ -1,4 +1,4 @@
-use std::{sync::Arc, time::Duration};
+use std::{convert::TryFrom, sync::Arc, time::Duration};
 
 use actix::{Actor, Addr, Arbiter, Context};
 use futures::future::Future;
@@ -6,10 +6,7 @@ use grpcio::{Environment, RpcContext, Server, ServerBuilder, UnarySink};
 
 use crate::{
     api::{
-        control::{
-            model::{room::RoomSpec, RoomId},
-            protobuf::room::CreateRequestSpec,
-        },
+        control::{RoomId, RoomSpec},
         grpc::protos::control::{
             ApplyRequest, CreateRequest, GetResponse, IdRequest, Response,
         },
@@ -22,10 +19,7 @@ use crate::{
 
 use super::protos::control_grpc::{create_control_api, ControlApi};
 use crate::{
-    api::{
-        control::model::local_uri::{parse_local_uri, LocalUri},
-        grpc::protos::control::Error,
-    },
+    api::grpc::protos::control::Error,
     signalling::room_repo::{DeleteRoom, StartRoom},
 };
 use futures::future::Either;
@@ -47,49 +41,50 @@ impl ControlApi for ControlApiService {
         // TODO
         let room_id = RoomId(req.get_id().to_string());
 
-        let msg = StartRoom {
-            room: CreateRequestSpec(req),
-        };
+        let room = RoomSpec::try_from(req.get_room()).unwrap();
 
-        let sid: HashMap<String, String> = msg
-            .room
-            .members()
-            .iter()
-            .map(|(id, member)| {
-                let addr = &self.app.config.server.bind_ip;
-                let port = self.app.config.server.bind_port;
-                let base_uri = format!("{}:{}", addr, port);
+        //        let sid: HashMap<String, String> = msg
+        //            .room
+        //            .members()
+        //            .iter()
+        //            .map(|(id, member)| {
+        //                let addr = &self.app.config.server.bind_ip;
+        //                let port = self.app.config.server.bind_port;
+        //                let base_uri = format!("{}:{}", addr, port);
+        //
+        //                let uri = format!(
+        //                    "wss://{}/{}/{}/{}",
+        //                    base_uri,
+        //                    &room_id,
+        //                    id,
+        //                    member.credentials()
+        //                );
+        //
+        //                (id.clone().to_string(), uri)
+        //            })
+        //            .collect();
 
-                let uri = format!(
-                    "wss://{}/{}/{}/{}",
-                    base_uri,
-                    &room_id,
-                    id,
-                    member.credentials()
-                );
-
-                (id.clone().to_string(), uri)
-            })
-            .collect();
-
-        ctx.spawn(self.room_repository.send(msg).map_err(|e| ()).and_then(
-            move |r| {
-                if r.is_ok() {
-                    let mut res = Response::new();
-                    res.set_sid(sid);
-                    Either::A(sink.success(res).map_err(|_| ()))
-                } else {
-                    let mut res = Response::new();
-                    let mut error = Error::new();
-                    error.set_status(500);
-                    error.set_code(500);
-                    error.set_text(String::new());
-                    error.set_element(String::new());
-                    res.set_error(error);
-                    Either::B(sink.success(res).map_err(|_| ()))
-                }
-            },
-        ));
+        ctx.spawn(
+            self.room_repository
+                .send(StartRoom(room_id, room))
+                .map_err(|e| ())
+                .and_then(move |r| {
+                    if r.is_ok() {
+                        let mut res = Response::new();
+                        res.set_sid(HashMap::new());
+                        Either::A(sink.success(res).map_err(|_| ()))
+                    } else {
+                        let mut res = Response::new();
+                        let mut error = Error::new();
+                        error.set_status(500);
+                        error.set_code(500);
+                        error.set_text(String::new());
+                        error.set_element(String::new());
+                        res.set_error(error);
+                        Either::B(sink.success(res).map_err(|_| ()))
+                    }
+                }),
+        );
 
         //        self.room_repository.add(room_id, room);
 
@@ -111,17 +106,17 @@ impl ControlApi for ControlApiService {
         req: IdRequest,
         sink: UnarySink<Response>,
     ) {
-        for id in req.get_id() {
-            let uri = parse_local_uri(id).unwrap(); // TODO
-            if uri.is_room_id() {
-                self.room_repository
-                    .do_send(DeleteRoom(uri.room_id.unwrap()))
-            }
-        }
-
-        let mut resp = Response::new();
-        resp.set_sid(HashMap::new());
-        ctx.spawn(sink.success(resp).map_err(|_| ()));
+        //        for id in req.get_id() {
+        //            let uri = parse_local_uri(id).unwrap(); // TODO
+        //            if uri.is_room_id() {
+        //                self.room_repository
+        //                    .do_send(DeleteRoom(uri.room_id.unwrap()))
+        //            }
+        //        }
+        //
+        //        let mut resp = Response::new();
+        //        resp.set_sid(HashMap::new());
+        //        ctx.spawn(sink.success(resp).map_err(|_| ()));
     }
 
     fn get(

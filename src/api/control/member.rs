@@ -101,11 +101,11 @@ impl TryFrom<&MemberProto> for MemberSpec {
         }
         let pipeline = Pipeline::new(pipeline);
 
-        Self {
+        Ok(Self {
             pipeline,
             // TODO: error
             credentials: value.get_credentials().to_string(),
-        }
+        })
     }
 }
 

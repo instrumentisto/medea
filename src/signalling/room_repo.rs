@@ -59,30 +59,29 @@ impl Actor for RoomsRepository {
 // TODO: return sids.
 #[derive(Message)]
 #[rtype(result = "Result<(), RoomError>")]
-pub struct StartRoom<T: 'static + RoomSpec + Send> {
-    pub room: T,
-}
+pub struct StartRoom(pub RoomId, pub RoomSpec);
 
-impl<T: 'static + RoomSpec + Send> Handler<StartRoom<T>> for RoomsRepository {
+impl Handler<StartRoom> for RoomsRepository {
     type Result = Result<(), RoomError>;
 
     fn handle(
         &mut self,
-        msg: StartRoom<T>,
+        msg: StartRoom,
         ctx: &mut Self::Context,
     ) -> Self::Result {
-        let room_id = msg.room.id();
+        let room_id = msg.0;
+        let room = msg.1;
 
         let turn = Arc::clone(&self.app.turn_service);
 
+        // TODO: spawn in current arbiter.
         {
-            let room = Box::new(&msg.room as &(RoomSpec));
-            Room::new(&room, Duration::from_secs(10), Arc::clone(&turn))?;
+            //            let room = Box::new(&msg.room as &(RoomSpec));
+            //            Room::new(&room, Duration::from_secs(10),
+            // Arc::clone(&turn))?;
         }
 
         let room = Room::start_in_arbiter(&Arbiter::new(), move |_| {
-            let room = msg.room;
-            let room = Box::new(&room as &(RoomSpec));
             Room::new(&room, Duration::from_secs(10), turn).unwrap()
         });
 

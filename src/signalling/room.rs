@@ -18,7 +18,7 @@ use crate::{
             AuthorizationError, Authorize, ClosedReason, CommandMessage,
             RpcConnectionClosed, RpcConnectionEstablished,
         },
-        control::{room::RoomSpec, RoomId, TryFromElementError},
+        control::{room::RoomSpec, MemberId, RoomId, TryFromElementError},
     },
     log::prelude::*,
     media::{

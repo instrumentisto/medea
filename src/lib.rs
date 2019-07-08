@@ -14,7 +14,7 @@ use failure::Fail;
 use hashbrown::HashMap;
 
 use crate::{
-    api::control::{load_static_specs_from_dir, room::RoomSpec, RoomId},
+    api::control::{load_static_specs_from_dir, RoomId},
     conf::Conf,
     signalling::{room::RoomError, Room},
     turn::service,
@@ -68,9 +68,9 @@ impl From<RoomError> for ServerStartError {
 /// Returns [`ServerStartError::BadRoomSpec`]
 /// if some error happened while creating room from spec.
 pub fn start_static_rooms(
-    app: Arc<App>,
+    config: &Conf,
 ) -> Result<HashMap<RoomId, Addr<Room>>, ServerStartError> {
-    if let Some(static_specs_path) = &app.config.server.static_specs_path {
+    if let Some(static_specs_path) = &config.server.static_specs_path {
         let room_specs = match load_static_specs_from_dir(static_specs_path) {
             Ok(r) => r,
             Err(e) => return Err(ServerStartError::LoadSpec(e)),
@@ -85,18 +85,16 @@ pub fn start_static_rooms(
                 ));
             }
 
-            let turn_auth_service = service::new_turn_auth_service(&app.config)
+            let turn_auth_service = service::new_turn_auth_service(&config)
                 .expect("Unable to start turn service");
 
             let room_id = spec.id().clone();
-            let rpc_reconnect_timeout = app.config.rpc.reconnect_timeout;
+            let rpc_reconnect_timeout = config.rpc.reconnect_timeout;
             let room = Room::start_in_arbiter(&arbiter, move |_| {
-                let parsed_spec = SerdeRoomSpecImpl::new(&spec).unwrap();
-                let parsed_spec = Box::new(&parsed_spec as &RoomSpec);
                 Room::new(
-                    &parsed_spec,
+                    &spec,
                     rpc_reconnect_timeout,
-                    Arc::new(turn_auth_service), // TODO: tmp
+                    Arc::new(turn_auth_service),
                 )
                 .unwrap()
             });

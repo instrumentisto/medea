@@ -2,6 +2,7 @@
 
 use std::{convert::TryFrom, fmt};
 
+use failure::Fail;
 use macro_attr::*;
 use newtype_derive::{newtype_fmt, NewtypeDisplay, NewtypeFrom};
 use serde::{
@@ -59,17 +60,18 @@ pub enum P2pMode {
     IfPossible,
 }
 
+// TODO: use From
 impl TryFrom<WebRtcPublishEndpointP2pProto> for P2pMode {
     type Error = TryFromProtobufError;
 
     fn try_from(
         value: WebRtcPublishEndpointP2pProto,
     ) -> Result<Self, Self::Error> {
-        match value {
+        Ok(match value {
             WebRtcPublishEndpointP2pProto::ALWAYS => P2pMode::Always,
             WebRtcPublishEndpointP2pProto::IF_POSSIBLE => P2pMode::IfPossible,
             WebRtcPublishEndpointP2pProto::NEVER => P2pMode::Never,
-        }
+        })
     }
 }
 
@@ -87,11 +89,11 @@ impl TryFrom<&MemberElementProto> for Endpoint {
     fn try_from(value: &MemberElementProto) -> Result<Self, Self::Error> {
         if value.has_webrtc_play() {
             let play = WebRtcPlayEndpoint::try_from(value.get_webrtc_play())?;
-            return Endpoint::WebRtcPlay(play);
+            return Ok(Endpoint::WebRtcPlay(play));
         } else if value.has_webrtc_pub() {
             let publish =
                 WebRtcPublishEndpoint::try_from(value.get_webrtc_pub())?;
-            return Endpoint::WebRtcPublish(publish);
+            return Ok(Endpoint::WebRtcPublish(publish));
         } else {
             // TODO
             unimplemented!()
@@ -131,9 +133,9 @@ impl TryFrom<&WebRtcPublishEndpointProto> for WebRtcPublishEndpoint {
         value: &WebRtcPublishEndpointProto,
     ) -> Result<Self, Self::Error> {
         // TODO: check for null
-        Self {
+        Ok(Self {
             p2p: P2pMode::try_from(value.get_p2p())?,
-        }
+        })
     }
 }
 
@@ -155,9 +157,9 @@ impl TryFrom<&WebRtcPlayEndpointProto> for WebRtcPlayEndpoint {
     type Error = TryFromProtobufError;
 
     fn try_from(value: &WebRtcPlayEndpointProto) -> Result<Self, Self::Error> {
-        Self {
+        Ok(Self {
             src: parse_src_uri(value.get_src())?,
-        }
+        })
     }
 }
 
@@ -189,7 +191,7 @@ pub enum SrcParseError {
     MissingField(String),
 }
 
-fn parse_src_uri(text: &str) -> Result<SrcUri, SrcParseError> {
+fn parse_src_uri(value: &str) -> Result<SrcUri, SrcParseError> {
     let protocol_name: String = value.chars().take(8).collect();
     if protocol_name != "local://" {
         return Err(SrcParseError::InvalidValue(format!(
@@ -214,7 +216,7 @@ fn parse_src_uri(text: &str) -> Result<SrcUri, SrcParseError> {
                 uri_body, uri_body_splitted_len
             )));
         };
-        return Err(Error::missing_field(error_msg));
+        return Err(SrcParseError::MissingField(error_msg.to_string()));
     }
     let room_id = uri_body_splitted.pop().unwrap().to_string();
     if room_id.is_empty() {

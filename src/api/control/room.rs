@@ -69,7 +69,7 @@ impl TryFrom<&RoomProto> for RoomSpec {
     fn try_from(value: &RoomProto) -> Result<Self, Self::Error> {
         let mut pipeline = StdHashMap::new();
         for (id, room_element) in value.get_pipeline() {
-            let member = MemberSpec::try_from(&room_element)?;
+            let member = MemberSpec::try_from(room_element.get_member())?;
             // TODO: temporary
             let element = Element::Member {
                 spec: member.pipeline,
@@ -80,11 +80,11 @@ impl TryFrom<&RoomProto> for RoomSpec {
 
         let pipeline = Pipeline::new(pipeline);
 
-        Self {
+        Ok(Self {
             pipeline,
             // TODO:
             id: Id("unimplemented".to_string()),
-        }
+        })
     }
 }
 
