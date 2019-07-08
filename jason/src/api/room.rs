@@ -198,7 +198,7 @@ impl EventHandler for InnerRoom {
             Some(offer) => {
                 // this is answerer
                 future::Either::B(
-                    peer.process_offer(&offer, tracks)
+                    peer.process_offer(offer, tracks)
                         .and_then(move |_| peer.create_and_set_answer())
                         .map(move |sdp_answer| {
                             rpc.send_command(Command::MakeSdpAnswer {
@@ -217,7 +217,7 @@ impl EventHandler for InnerRoom {
     /// Applies specified SDP Answer to specified [`PeerConnection`].
     fn on_sdp_answer_made(&mut self, peer_id: PeerId, sdp_answer: String) {
         if let Some(peer) = self.peers.get_peer(peer_id) {
-            spawn_local(peer.set_remote_answer(&sdp_answer).or_else(|err| {
+            spawn_local(peer.set_remote_answer(sdp_answer).or_else(|err| {
                 err.log_err();
                 Err(())
             }));

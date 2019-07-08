@@ -8,13 +8,13 @@ use futures::{
 };
 use medea_client_api_proto::{Direction, MediaType, Track};
 use wasm_bindgen_futures::JsFuture;
-use web_sys::{
-    RtcPeerConnection, RtcRtpTransceiver, RtcRtpTransceiverDirection,
-    RtcRtpTransceiverInit,
-};
+use web_sys::{RtcRtpTransceiver, RtcRtpTransceiverDirection};
 
 use crate::{
     media::{MediaStream, MediaTrack, StreamRequest, TrackId},
+    peer::peer_con::{
+        RtcPeerConnection, TransceiverDirection, TransceiverType,
+    },
     utils::WasmErr,
 };
 
@@ -219,29 +219,6 @@ impl MediaConnections {
     }
 }
 
-/// Find transceiver in peer transceivers by provided mid.
-// TODO: create wrapper for RtcPeerConnection
-fn get_transceiver_by_mid(
-    peer: &RtcPeerConnection,
-    mid: &str,
-) -> Option<RtcRtpTransceiver> {
-    let mut transceiver = None;
-
-    let transceivers =
-        js_sys::try_iter(&peer.get_transceivers()).unwrap().unwrap();
-    for tr in transceivers {
-        let tr: RtcRtpTransceiver = RtcRtpTransceiver::from(tr.unwrap());
-        if let Some(tr_mid) = tr.mid() {
-            if mid.eq(&tr_mid) {
-                transceiver = Some(tr);
-                break;
-            }
-        }
-    }
-
-    transceiver
-}
-
 /// Local track representation, that is being sent to some remote peer.
 pub struct Sender {
     track_id: TrackId,
@@ -260,19 +237,17 @@ impl Sender {
     ) -> Result<Rc<Self>, WasmErr> {
         let transceiver = match mid {
             None => match caps {
-                MediaType::Audio(_) => {
-                    let mut init = RtcRtpTransceiverInit::new();
-                    init.direction(RtcRtpTransceiverDirection::Sendonly);
-                    peer.add_transceiver_with_str_and_init("audio", &init)
-                }
-                MediaType::Video(_) => {
-                    let mut init = RtcRtpTransceiverInit::new();
-                    init.direction(RtcRtpTransceiverDirection::Sendonly);
-                    peer.add_transceiver_with_str_and_init("video", &init)
-                }
+                MediaType::Audio(_) => peer.add_transceiver(
+                    &TransceiverType::Audio,
+                    &TransceiverDirection::Sendonly,
+                ),
+                MediaType::Video(_) => peer.add_transceiver(
+                    &TransceiverType::Video,
+                    &TransceiverDirection::Sendonly,
+                ),
             },
             Some(mid) => {
-                get_transceiver_by_mid(&peer, &mid).ok_or_else(|| {
+                peer.get_transceiver_by_mid(&mid).ok_or_else(|| {
                     WasmErr::from(format!(
                         "Unable to find transceiver with provided mid {}",
                         mid
@@ -317,16 +292,14 @@ impl Receiver {
     ) -> Self {
         let transceiver = match mid {
             None => match caps {
-                MediaType::Audio(_) => {
-                    let mut init = RtcRtpTransceiverInit::new();
-                    init.direction(RtcRtpTransceiverDirection::Recvonly);
-                    Some(peer.add_transceiver_with_str_and_init("audio", &init))
-                }
-                MediaType::Video(_) => {
-                    let mut init = RtcRtpTransceiverInit::new();
-                    init.direction(RtcRtpTransceiverDirection::Recvonly);
-                    Some(peer.add_transceiver_with_str_and_init("video", &init))
-                }
+                MediaType::Audio(_) => Some(peer.add_transceiver(
+                    &TransceiverType::Audio,
+                    &TransceiverDirection::Recvonly,
+                )),
+                MediaType::Video(_) => Some(peer.add_transceiver(
+                    &TransceiverType::Video,
+                    &TransceiverDirection::Recvonly,
+                )),
             },
             Some(_) => None,
         };
