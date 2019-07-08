@@ -130,8 +130,6 @@ impl Handler<ShutdownSignalDetected> for GracefulShutdown {
             return;
         }
 
-        let mut tokio_runtime = Runtime::new().unwrap();
-
         let mut shutdown_future: Box<ShutdownFutureType> =
             Box::new(
                 futures::future::ok(vec![])
@@ -149,19 +147,26 @@ impl Handler<ShutdownSignalDetected> for GracefulShutdown {
 
 
                 //todo async handle
-                //ask
-                tokio_runtime.spawn(
-                    send_future
+
+                /*
+                    type:
+futures::future::then::Then<
+futures::future::map_err::MapErr<
+           actix::prelude::RecipientRequest<
+                                       utils::graceful_shutdown::ShutdownMessage>, [closure]>,
+
+
+Result<Result<Box<dyn futures::future::Future<Error = std::boxed::Box<dyn std::error::Error + std::marker::Send>, Item = ()> + std::marker::Send>, ()>, ()>, [closure]>
+                */
+
+                let x: () = send_future
                         .into_future()
-                        .map(move |res| {
-                            //todo execute result
-                            tx.send(res);
-                        })
                         .map_err(move |e| {
                             error!("Error sending shutdown message: {:?}", e);
-                            tx2.send(Ok(Box::new(futures::future::ok(()))));
                         })
-                );
+                        .then(|future| {
+                            future
+                        });
 
                 let recipient_shutdown_fut = rx.recv().unwrap().unwrap();
 
