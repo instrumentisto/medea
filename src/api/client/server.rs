@@ -124,17 +124,13 @@ mod test {
     };
 
     use super::*;
-    use crate::api::control::{
-        model::room::RoomSpec, serde::room::SerdeRoomSpecImpl,
-    };
     use std::sync::Arc;
 
     /// Creates [`RoomsRepository`] for tests filled with a single [`Room`].
     fn room(conf: Conf) -> RoomsRepository {
-        let room_spec = control::serde::load_from_yaml_file(
-            "tests/specs/pub_sub_video_call.yml",
-        )
-        .unwrap();
+        let room_spec =
+            control::load_from_yaml_file("tests/specs/pub_sub_video_call.yml")
+                .unwrap();
 
         let app = Arc::new(crate::App {
             config: conf,
@@ -144,8 +140,6 @@ mod test {
 
         let room_id = room_spec.id.clone();
         let client_room = Room::start_in_arbiter(&Arbiter::new(), move |_| {
-            let room_spec = SerdeRoomSpecImpl::new(&room_spec).unwrap();
-            let room_spec = Box::new(&room_spec as &RoomSpec);
             let client_room = Room::new(
                 &room_spec,
                 app.config.rpc.reconnect_timeout,
