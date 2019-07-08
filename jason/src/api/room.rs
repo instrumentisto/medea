@@ -104,7 +104,7 @@ impl Room {
     }
 }
 
-/// Actual room. Manages concrete `RTCPeerConnection`s, handles Medea events.
+/// Actual room. Manages concrete [`PeerConnection`]s, handles Medea events.
 ///
 /// Shared between JS-side handle ([`RoomHandle`])
 /// and Rust-side handle ([`Room`]).
@@ -248,7 +248,7 @@ impl EventHandler for InnerRoom {
         }
     }
 
-    /// Disposes specified RTCPeerConnection's.
+    /// Disposes specified [`PeeConnections`]s.
     fn on_peers_removed(&mut self, peer_ids: Vec<PeerId>) {
         // TODO: drop connections
         peer_ids.iter().for_each(|id| {

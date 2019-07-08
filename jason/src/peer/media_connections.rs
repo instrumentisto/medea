@@ -1,5 +1,7 @@
 use std::{collections::HashMap, rc::Rc};
 
+use std::cell::RefCell;
+
 use futures::{
     future::{self, join_all},
     Future,
@@ -16,28 +18,32 @@ use crate::{
     utils::WasmErr,
 };
 
-/// Stores [`Peer`]s [`Sender`]s and [`Receiver`]s.
-pub struct MediaConnections {
+struct InnerMediaConnections {
     peer: Rc<RtcPeerConnection>,
     need_new_stream: bool,
     senders: HashMap<TrackId, Rc<Sender>>,
     receivers: HashMap<TrackId, Receiver>,
 }
 
+/// Stores [`Peer`]s [`Sender`]s and [`Receiver`]s.
+pub struct MediaConnections(RefCell<InnerMediaConnections>);
+
 impl MediaConnections {
     pub fn new(peer: Rc<RtcPeerConnection>) -> Self {
-        Self {
+        Self(RefCell::new(InnerMediaConnections {
             peer,
             need_new_stream: false,
             senders: HashMap::new(),
             receivers: HashMap::new(),
-        }
+        }))
     }
 
     /// Returns map of track id to corresponding transceiver mid.
-    pub fn get_mids(&mut self) -> Result<HashMap<u64, String>, WasmErr> {
+    pub fn get_mids(&self) -> Result<HashMap<u64, String>, WasmErr> {
+        let mut inner = self.0.borrow_mut();
+
         let mut mids = HashMap::new();
-        for (track_id, sender) in &self.senders {
+        for (track_id, sender) in &inner.senders {
             mids.insert(
                 *track_id,
                 sender.transceiver.mid().ok_or_else(|| {
@@ -46,12 +52,15 @@ impl MediaConnections {
             );
         }
 
-        for (track_id, receiver) in self.receivers.iter_mut() {
+        for (track_id, receiver) in &mut inner.receivers {
             mids.insert(
                 *track_id,
-                receiver.mid().map(|mid| mid.to_owned()).ok_or_else(|| {
-                    WasmErr::from("Peer has receivers without mid")
-                })?,
+                receiver
+                    .mid()
+                    .map(std::borrow::ToOwned::to_owned)
+                    .ok_or_else(|| {
+                        WasmErr::from("Peer has receivers without mid")
+                    })?,
             );
         }
 
@@ -60,33 +69,33 @@ impl MediaConnections {
 
     // TODO: Doesnt really updates anything, but only generates new senders and
     //       receivers atm.
-    pub fn update_tracks(&mut self, tracks: Vec<Track>) -> Result<(), WasmErr> {
+    pub fn update_tracks(&self, tracks: Vec<Track>) -> Result<(), WasmErr> {
+        let mut inner = self.0.borrow_mut();
+
         for track in tracks {
             match track.direction {
                 Direction::Send { mid, .. } => {
-                    self.need_new_stream = true;
+                    inner.need_new_stream = true;
 
-                    self.senders.insert(
+                    let sender = Sender::new(
                         track.id,
-                        Sender::new(
-                            track.id,
-                            track.media_type,
-                            &self.peer,
-                            mid,
-                        )?,
-                    );
+                        track.media_type,
+                        &inner.peer,
+                        mid,
+                    )?;
+
+                    inner.senders.insert(track.id, sender);
                 }
                 Direction::Recv { sender, mid } => {
-                    self.receivers.insert(
+                    let receiver = Receiver::new(
                         track.id,
-                        Receiver::new(
-                            track.id,
-                            track.media_type,
-                            sender,
-                            &self.peer,
-                            mid,
-                        ),
+                        track.media_type,
+                        sender,
+                        &inner.peer,
+                        mid,
                     );
+
+                    inner.receivers.insert(track.id, receiver);
                 }
             }
         }
@@ -95,9 +104,11 @@ impl MediaConnections {
 
     /// Check if [`Sender`]s require new [`MediaStream`].
     pub fn get_request(&self) -> Option<StreamRequest> {
-        if self.need_new_stream {
+        let inner = self.0.borrow();
+
+        if inner.need_new_stream {
             let mut media_request = StreamRequest::default();
-            for (track_id, sender) in &self.senders {
+            for (track_id, sender) in &inner.senders {
                 media_request.add_track_request(*track_id, sender.caps.clone());
             }
             Some(media_request)
@@ -115,11 +126,13 @@ impl MediaConnections {
     /// [1]: https://www.w3.org/TR/webrtc/#rtcrtptransceiver-interface
     /// [2]: https://www.w3.org/TR/webrtc/#dom-rtcrtpsender-replacetrack
     pub fn insert_local_stream(
-        &mut self,
+        &self,
         stream: &MediaStream,
     ) -> impl Future<Item = (), Error = WasmErr> {
-        // validate that provided stream have all tracks that we need
-        for sender in self.senders.values() {
+        let inner = self.0.borrow();
+
+        // validate inner provided stream have all tracks that we need
+        for sender in inner.senders.values() {
             if !stream.has_track(sender.track_id) {
                 return future::Either::A(future::err(WasmErr::from(
                     "Stream does not have all necessary tracks",
@@ -128,7 +141,7 @@ impl MediaConnections {
         }
 
         let mut promises = Vec::new();
-        for sender in self.senders.values() {
+        for sender in inner.senders.values() {
             if let Some(track) = stream.get_track_by_id(sender.track_id) {
                 let sender = Rc::clone(sender);
                 promises.push(
@@ -155,17 +168,18 @@ impl MediaConnections {
     }
 
     /// Find associated [`Receiver`] by transceiver's mid and update it with
-    /// [`StreamTrack`] and [`RtcRtpTransceiver`][1] and return found
-    /// [`Receiver`].
+    /// [`StreamTrack`] and [`RtcRtpTransceiver`][1] and its sender.
     ///
     /// [1]: https://www.w3.org/TR/webrtc/#rtcrtptransceiver-interface
     pub fn add_remote_track(
-        &mut self,
+        &self,
         transceiver: RtcRtpTransceiver,
         track: web_sys::MediaStreamTrack,
-    ) -> Option<&Receiver> {
+    ) -> Option<u64> {
+        let mut inner = self.0.borrow_mut();
+
         if let Some(mid) = transceiver.mid() {
-            for receiver in &mut self.receivers.values_mut() {
+            for receiver in &mut inner.receivers.values_mut() {
                 if let Some(recv_mid) = &receiver.mid() {
                     if recv_mid == &mid {
                         let track = MediaTrack::new(
@@ -176,7 +190,7 @@ impl MediaConnections {
 
                         receiver.transceiver.replace(transceiver);
                         receiver.track.replace(track);
-                        return Some(receiver);
+                        return Some(receiver.sender_id);
                     }
                 }
             }
@@ -185,18 +199,23 @@ impl MediaConnections {
         None
     }
 
-    /// Returns [`Receiver`]s that share provided sender id.
-    pub fn get_by_sender(
-        &mut self,
+    pub fn get_tracks_by_sender(
+        &self,
         sender_id: u64,
-    ) -> impl Iterator<Item = &mut Receiver> {
-        self.receivers.iter_mut().filter_map(move |(_, receiver)| {
+    ) -> Option<Vec<Rc<MediaTrack>>> {
+        let inner = self.0.borrow();
+
+        let mut tracks: Vec<Rc<MediaTrack>> = Vec::new();
+        for receiver in inner.receivers.values() {
             if receiver.sender_id == sender_id {
-                Some(receiver)
-            } else {
-                None
+                match receiver.track() {
+                    None => return None,
+                    Some(ref track) => tracks.push(Rc::clone(track)),
+                }
             }
-        })
+        }
+
+        Some(tracks)
     }
 }
 
@@ -322,19 +341,17 @@ impl Receiver {
         }
     }
 
-    pub fn sender_id(&self) -> u64 {
-        self.sender_id
-    }
-
     pub fn track(&self) -> Option<&Rc<MediaTrack>> {
         self.track.as_ref()
     }
 
+    /// Returns [`Receiver`]s. Will try to fetch it from underlying transceiver
+    /// if current value is None.
     pub fn mid(&mut self) -> Option<&str> {
         if self.mid.is_none() && self.transceiver.is_some() {
             self.mid = self.transceiver.as_ref().unwrap().mid()
         }
 
-        self.mid.as_ref().map(|mid| mid.as_str())
+        self.mid.as_ref().map(String::as_str)
     }
 }

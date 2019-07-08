@@ -1,4 +1,4 @@
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::{collections::HashMap, rc::Rc};
 
 use futures::{future, sync::mpsc::UnboundedSender, Future};
 use medea_client_api_proto::{Direction, IceServer, Track};
@@ -11,7 +11,7 @@ use web_sys::{
 };
 
 use crate::{
-    media::{MediaManager, MediaStream, MediaTrack, StreamRequest},
+    media::{MediaManager, MediaStream},
     peer::{ice_server::RtcIceServers, media_connections::MediaConnections},
     utils::{EventListener, WasmErr},
 };
@@ -60,7 +60,7 @@ pub struct PeerConnection {
     _on_track: EventListener<RtcPeerConnection, RtcTrackEvent>,
 
     /// [`Sender`]s and [`Receivers`] of this [`PeerConnection`].
-    media_connections: Rc<RefCell<MediaConnections>>,
+    media_connections: Rc<MediaConnections>,
 
     media_manager: Rc<MediaManager>,
 }
@@ -81,8 +81,7 @@ impl PeerConnection {
 
         let peer =
             Rc::new(RtcPeerConnection::new_with_configuration(&peer_conf)?);
-        let connections =
-            Rc::new(RefCell::new(MediaConnections::new(Rc::clone(&peer))));
+        let connections = Rc::new(MediaConnections::new(Rc::clone(&peer)));
 
         // Bind to `icecandidate` event.
         let sender = peer_events_sender.clone();
@@ -112,32 +111,25 @@ impl PeerConnection {
             Rc::clone(&peer),
             "track",
             move |track_event: RtcTrackEvent| {
-                let mut connections = connections_rc.borrow_mut();
+                let connections = &connections_rc;
                 let transceiver = track_event.transceiver();
                 let track = track_event.track();
 
-                if let Some(receiver) =
+                if let Some(sender_id) =
                     connections.add_remote_track(transceiver, track)
                 {
-                    let sender_id = receiver.sender_id();
-
-                    // gather all tracks from new track sender, break if still
-                    // waiting for some tracks
-                    let mut tracks: Vec<Rc<MediaTrack>> = Vec::new();
-                    for receiver in connections.get_by_sender(sender_id) {
-                        match receiver.track() {
-                            None => return,
-                            Some(ref track) => tracks.push(Rc::clone(track)),
-                        }
-                    }
-
-                    // got all tracks from this sender, so emit
-                    // PeerEvent::NewRemoteStream
-                    let _ = sender.unbounded_send(PeerEvent::NewRemoteStream {
-                        peer_id,
-                        sender_id,
-                        remote_stream: MediaStream::from_tracks(tracks),
-                    });
+                    if let Some(tracks) =
+                        connections.get_tracks_by_sender(sender_id)
+                    {
+                        // got all tracks from this sender, so emit
+                        // PeerEvent::NewRemoteStream
+                        let _ =
+                            sender.unbounded_send(PeerEvent::NewRemoteStream {
+                                peer_id,
+                                sender_id,
+                                remote_stream: MediaStream::from_tracks(tracks),
+                            });
+                    };
                 } else {
                     // TODO: means that this peer is out of sync, should be
                     //       handled somehow (propagated to medea to init peer
@@ -164,7 +156,7 @@ impl PeerConnection {
     /// [1]: https://tools.ietf.org/html/rfc4566#section-5.14
     /// [2]: https://www.w3.org/TR/webrtc/#rtcrtptransceiver-interface
     pub fn get_mids(&self) -> Result<HashMap<u64, String>, WasmErr> {
-        self.media_connections.borrow_mut().get_mids()
+        self.media_connections.get_mids()
     }
 
     /// Obtain SDP Offer from underlying [`RTCPeerConnection`][1] and set it as
@@ -176,24 +168,20 @@ impl PeerConnection {
         &self,
         tracks: Vec<Track>,
     ) -> impl Future<Item = String, Error = WasmErr> {
-        if let Err(err) =
-            self.media_connections.borrow_mut().update_tracks(tracks)
-        {
+        if let Err(err) = self.media_connections.update_tracks(tracks) {
             return future::Either::A(future::err(err));
         }
 
         let peer = Rc::clone(&self.peer);
         future::Either::B(
-            match self.media_connections.borrow().get_request() {
+            match self.media_connections.get_request() {
                 None => future::Either::A(future::ok::<_, WasmErr>(())),
                 Some(request) => {
                     let media_connections = Rc::clone(&self.media_connections);
                     future::Either::B(
                         self.media_manager.get_stream(request).and_then(
                             move |stream| {
-                                media_connections
-                                    .borrow_mut()
-                                    .insert_local_stream(&stream)
+                                media_connections.insert_local_stream(&stream)
                             },
                         ),
                     )
@@ -224,7 +212,7 @@ impl PeerConnection {
     pub fn create_and_set_answer(
         &self,
     ) -> impl Future<Item = String, Error = WasmErr> {
-        let inner = Rc::clone(&self.peer);
+        let peer = Rc::clone(&self.peer);
         JsFuture::from(self.peer.create_answer())
             .map(RtcSessionDescription::from)
             .and_then(move |answer: RtcSessionDescription| {
@@ -232,7 +220,7 @@ impl PeerConnection {
                 let mut desc =
                     RtcSessionDescriptionInit::new(RtcSdpType::Answer);
                 desc.sdp(&answer);
-                JsFuture::from(inner.set_local_description(&desc))
+                JsFuture::from(peer.set_local_description(&desc))
                     .map(move |_| answer)
             })
             .map_err(Into::into)
@@ -253,7 +241,10 @@ impl PeerConnection {
             .map_err(Into::into)
     }
 
-    /// Updates underlying [`RTCPeerConnection`][1] remote SDP.
+    /// Updates [`PeerConnection`] tracks and sets remote offer.
+    /// `set_remote_description` will create all transceivers and fire all
+    /// `on_track` events, so it updates [`Receiver`]s before
+    /// `set_remote_description` and update [`Sender`]s after.
     ///
     /// [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
     pub fn process_offer(
@@ -269,30 +260,27 @@ impl PeerConnection {
             });
 
         // update receivers
-        self.media_connections
-            .borrow_mut()
-            .update_tracks(recv)
-            .unwrap();
+        self.media_connections.update_tracks(recv).unwrap();
 
-        // set remote offer
         let mut desc = RtcSessionDescriptionInit::new(RtcSdpType::Offer);
         desc.sdp(offer);
 
         let media_connections = Rc::clone(&self.media_connections);
-        let media_connections2 = Rc::clone(&self.media_connections);
         let media_manager = Rc::clone(&self.media_manager);
         JsFuture::from(self.peer.set_remote_description(&desc))
             .map_err(Into::into)
             .and_then(move |_| {
-                let mut con_ref = media_connections.borrow_mut();
-                con_ref.update_tracks(send).map(|_| con_ref.get_request())
+                media_connections
+                    .update_tracks(send)
+                    .map(|_| media_connections.get_request())
+                    .map(|req| (req, media_connections))
             })
-            .and_then(move |request: Option<StreamRequest>| match request {
+            .and_then(move |(request, cons)| match request {
                 None => future::Either::A(future::ok::<_, WasmErr>(())),
                 Some(request) => future::Either::B(
-                    media_manager.get_stream(request).and_then(move |s| {
-                        media_connections2.borrow_mut().insert_local_stream(&s)
-                    }),
+                    media_manager
+                        .get_stream(request)
+                        .and_then(move |s| cons.insert_local_stream(&s)),
                 ),
             })
     }
