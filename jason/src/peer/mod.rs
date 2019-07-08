@@ -130,7 +130,8 @@ impl PeerConnection {
         self.media_connections.get_mids()
     }
 
-    pub fn create_and_set_offer(
+    /// Sync provided tracks creating send and recv transceivers, requesting local stream if required. Get, set and return sdp offer.
+    pub fn get_offer(
         &self,
         tracks: Vec<Track>,
     ) -> impl Future<Item = String, Error = WasmErr> {

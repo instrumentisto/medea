@@ -36,7 +36,7 @@ struct InnerMediaManager {
 impl MediaManager {
     /// Obtain [`MediaStream`] based on provided [`StreamRequest`]. Acquired
     /// streams are cached and cloning existing stream is preferable to
-    /// obtaining new. on_local_stream callback will be invoked each time this
+    /// obtaining new. `on_local_stream` callback will be invoked each time this
     /// function succeeds.
     // TODO: lookup stream by caps, and return its copy if found
     pub fn get_stream(
@@ -91,11 +91,5 @@ impl MediaManager {
     /// obtains [`MediaStream`].
     pub fn set_on_local_stream(&self, f: js_sys::Function) {
         self.0.borrow_mut().on_local_stream.set_func(f);
-    }
-}
-
-impl Drop for InnerMediaManager {
-    fn drop(&mut self) {
-        WasmErr::from("Drop for InnerMediaManager").log_err();
     }
 }

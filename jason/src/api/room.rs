@@ -184,7 +184,7 @@ impl EventHandler for InnerRoom {
         let fut = match sdp_offer {
             // this is offerrer
             None => future::Either::A(
-                peer.create_and_set_offer(tracks)
+                peer.get_offer(tracks)
                     .and_then(move |sdp_offer| {
                         rpc.send_command(Command::MakeSdpOffer {
                             peer_id,
