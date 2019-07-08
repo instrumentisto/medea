@@ -3,6 +3,7 @@
 use std::sync::{Arc, Mutex};
 
 use actix::{Actor, Addr, Context, Handler, Message};
+use failure::Fail;
 use hashbrown::HashMap;
 
 use crate::{
@@ -13,6 +14,12 @@ use crate::{
     },
     App,
 };
+
+#[derive(Debug, Fail)]
+pub enum RoomRepoError {
+    #[fail(display = "Room with id {} not found.", _0)]
+    RoomNotFound(RoomId),
+}
 
 /// Repository that stores [`Room`]s addresses.
 #[derive(Clone, Debug)]
@@ -82,50 +89,56 @@ impl Handler<StartRoom> for RoomsRepository {
 }
 
 #[derive(Message)]
-#[rtype(result = "()")]
+#[rtype(result = "Result<(), RoomRepoError>")]
 pub struct DeleteRoom(pub RoomId);
 
 impl Handler<DeleteRoom> for RoomsRepository {
-    type Result = ();
+    type Result = Result<(), RoomRepoError>;
 
     fn handle(
         &mut self,
         msg: DeleteRoom,
         _ctx: &mut Self::Context,
     ) -> Self::Result {
-        let mut is_need_remove = false;
         if let Some(room) = self.rooms.lock().unwrap().get(&msg.0) {
             room.do_send(CloseRoom {});
-            is_need_remove = true;
+        } else {
+            return Err(RoomRepoError::RoomNotFound(msg.0));
         }
-        if is_need_remove {
-            self.remove(&msg.0);
-        }
+
+        self.remove(&msg.0);
+
+        Ok(())
     }
 }
 
 #[derive(Message)]
-#[rtype(result = "()")]
+#[rtype(result = "Result<(), RoomRepoError>")]
 pub struct DeleteMemberFromRoom {
     pub member_id: MemberId,
     pub room_id: RoomId,
 }
 
 impl Handler<DeleteMemberFromRoom> for RoomsRepository {
-    type Result = ();
+    type Result = Result<(), RoomRepoError>;
 
     fn handle(
         &mut self,
         msg: DeleteMemberFromRoom,
         _ctx: &mut Self::Context,
     ) -> Self::Result {
-        let room = self.get(&msg.room_id).unwrap(); // TODO
-        room.do_send(DeleteMember(msg.member_id));
+        if let Some(room) = self.get(&msg.room_id) {
+            room.do_send(DeleteMember(msg.member_id));
+        } else {
+            return Err(RoomRepoError::RoomNotFound(msg.room_id));
+        }
+
+        Ok(())
     }
 }
 
 #[derive(Message)]
-#[rtype(result = "()")]
+#[rtype(result = "Result<(), RoomRepoError>")]
 pub struct DeleteEndpointFromMember {
     pub room_id: RoomId,
     pub member_id: MemberId,
@@ -133,7 +146,7 @@ pub struct DeleteEndpointFromMember {
 }
 
 impl Handler<DeleteEndpointFromMember> for RoomsRepository {
-    type Result = ();
+    type Result = Result<(), RoomRepoError>;
 
     fn handle(
         &mut self,
@@ -146,7 +159,9 @@ impl Handler<DeleteEndpointFromMember> for RoomsRepository {
                 member_id: msg.member_id,
             });
         } else {
-            panic!()
+            return Err(RoomRepoError::RoomNotFound(msg.room_id));
         }
+
+        Ok(())
     }
 }
