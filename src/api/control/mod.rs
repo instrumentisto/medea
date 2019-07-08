@@ -2,6 +2,7 @@
 
 pub mod endpoint;
 pub mod grpc;
+pub mod local_uri;
 pub mod member;
 pub mod pipeline;
 pub mod room;

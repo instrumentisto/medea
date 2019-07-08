@@ -6,7 +6,7 @@ use failure::Fail;
 use macro_attr::*;
 use newtype_derive::{newtype_fmt, NewtypeDisplay, NewtypeFrom};
 use serde::{
-    de::{self, Deserializer, Error, Unexpected, Visitor},
+    de::{self, Deserializer, Error, Visitor},
     Deserialize,
 };
 
@@ -18,6 +18,7 @@ use crate::api::control::grpc::protos::control::{
 };
 
 use super::{
+    local_uri::{LocalUri, LocalUriParseError},
     Element, MemberId, RoomId, TryFromElementError, TryFromProtobufError,
 };
 
@@ -167,7 +168,7 @@ impl TryFrom<&WebRtcPlayEndpointProto> for WebRtcPlayEndpoint {
     fn try_from(value: &WebRtcPlayEndpointProto) -> Result<Self, Self::Error> {
         if value.has_src() {
             Ok(Self {
-                src: parse_src_uri(value.get_src())?,
+                src: SrcUri::parse(value.get_src())?,
             })
         } else {
             Err(TryFromProtobufError::SrcUriNotFound)
@@ -189,68 +190,42 @@ pub struct SrcUri {
 // TODO
 #[derive(Debug, Fail)]
 pub enum SrcParseError {
-    #[fail(display = "Invalid value {}", _0)]
-    InvalidValue(String),
-    #[fail(display = "Custom error {}", _0)]
-    Custom(String),
-    #[fail(display = "Missing field {}", _0)]
-    MissingField(String),
+    #[fail(display = "Missing fields {:?} in '{}' local URI.", _1, _0)]
+    MissingField(String, Vec<String>),
+    #[fail(display = "Local URI '{}' parse error: {:?}", _0, _1)]
+    LocalUriParseError(String, LocalUriParseError),
 }
 
-fn parse_src_uri(value: &str) -> Result<SrcUri, SrcParseError> {
-    let protocol_name: String = value.chars().take(8).collect();
-    if protocol_name != "local://" {
-        return Err(SrcParseError::InvalidValue(format!(
-            "{} in {}",
-            protocol_name, value
-        )));
-    }
+impl SrcUri {
+    pub fn parse(value: &str) -> Result<Self, SrcParseError> {
+        let local_uri = LocalUri::parse(value).map_err(|e| {
+            SrcParseError::LocalUriParseError(value.to_string(), e)
+        })?;
 
-    let uri_body = value.chars().skip(8).collect::<String>();
-    let mut uri_body_splitted: Vec<&str> = uri_body.rsplit('/').collect();
-    let uri_body_splitted_len = uri_body_splitted.len();
-    if uri_body_splitted_len != 3 {
-        let error_msg = if uri_body_splitted_len == 0 {
-            "room_id, member_id, endpoint_id"
-        } else if uri_body_splitted_len == 1 {
-            "member_id, endpoint_id"
-        } else if uri_body_splitted_len == 2 {
-            "endpoint_id"
+        let mut missing_fields = Vec::new();
+        if local_uri.room_id.is_none() {
+            missing_fields.push("room_id".to_string());
+        }
+        if local_uri.member_id.is_none() {
+            missing_fields.push("member_id".to_string());
+        }
+        if local_uri.endpoint_id.is_none() {
+            missing_fields.push("endpoint_id".to_string());
+        }
+
+        if !missing_fields.is_empty() {
+            return Err(SrcParseError::MissingField(
+                value.to_string(),
+                missing_fields,
+            ));
         } else {
-            return Err(SrcParseError::Custom(format!(
-                "Too many fields: {}. Expecting 3 fields, found {}.",
-                uri_body, uri_body_splitted_len
-            )));
-        };
-        return Err(SrcParseError::MissingField(error_msg.to_string()));
+            Ok(Self {
+                room_id: local_uri.room_id.unwrap(),
+                member_id: local_uri.member_id.unwrap(),
+                endpoint_id: WebRtcPublishId(local_uri.endpoint_id.unwrap()),
+            })
+        }
     }
-    let room_id = uri_body_splitted.pop().unwrap().to_string();
-    if room_id.is_empty() {
-        return Err(SrcParseError::Custom(format!(
-            "room_id in {} is empty!",
-            value
-        )));
-    }
-    let member_id = uri_body_splitted.pop().unwrap().to_string();
-    if member_id.is_empty() {
-        return Err(SrcParseError::Custom(format!(
-            "member_id in {} is empty!",
-            value
-        )));
-    }
-    let endpoint_id = uri_body_splitted.pop().unwrap().to_string();
-    if endpoint_id.is_empty() {
-        return Err(SrcParseError::Custom(format!(
-            "endpoint_id in {} is empty!",
-            value
-        )));
-    }
-
-    Ok(SrcUri {
-        room_id: RoomId(room_id),
-        member_id: MemberId(member_id),
-        endpoint_id: WebRtcPublishId(endpoint_id),
-    })
 }
 
 /// Serde deserializer for [`SrcUri`].
@@ -275,64 +250,10 @@ impl<'de> Deserialize<'de> for SrcUri {
             where
                 E: de::Error,
             {
-                let protocol_name: String = value.chars().take(8).collect();
-                if protocol_name != "local://" {
-                    return Err(Error::invalid_value(
-                        Unexpected::Str(&format!(
-                            "{} in {}",
-                            protocol_name, value
-                        )),
-                        &self,
-                    ));
+                match SrcUri::parse(value) {
+                    Ok(src_uri) => Ok(src_uri),
+                    Err(e) => Err(Error::custom(e)),
                 }
-
-                let uri_body = value.chars().skip(8).collect::<String>();
-                let mut uri_body_splitted: Vec<&str> =
-                    uri_body.rsplit('/').collect();
-                let uri_body_splitted_len = uri_body_splitted.len();
-                if uri_body_splitted_len != 3 {
-                    let error_msg = if uri_body_splitted_len == 0 {
-                        "room_id, member_id, endpoint_id"
-                    } else if uri_body_splitted_len == 1 {
-                        "member_id, endpoint_id"
-                    } else if uri_body_splitted_len == 2 {
-                        "endpoint_id"
-                    } else {
-                        return Err(Error::custom(format!(
-                            "Too many fields: {}. Expecting 3 fields, found \
-                             {}.",
-                            uri_body, uri_body_splitted_len
-                        )));
-                    };
-                    return Err(Error::missing_field(error_msg));
-                }
-                let room_id = uri_body_splitted.pop().unwrap().to_string();
-                if room_id.is_empty() {
-                    return Err(Error::custom(format!(
-                        "room_id in {} is empty!",
-                        value
-                    )));
-                }
-                let member_id = uri_body_splitted.pop().unwrap().to_string();
-                if member_id.is_empty() {
-                    return Err(Error::custom(format!(
-                        "member_id in {} is empty!",
-                        value
-                    )));
-                }
-                let endpoint_id = uri_body_splitted.pop().unwrap().to_string();
-                if endpoint_id.is_empty() {
-                    return Err(Error::custom(format!(
-                        "endpoint_id in {} is empty!",
-                        value
-                    )));
-                }
-
-                Ok(SrcUri {
-                    room_id: RoomId(room_id),
-                    member_id: MemberId(member_id),
-                    endpoint_id: WebRtcPublishId(endpoint_id),
-                })
             }
         }
 
