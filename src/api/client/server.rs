@@ -6,6 +6,7 @@ use actix_web::{
     web::{resource, Data, Path, Payload},
     App, HttpRequest, HttpResponse, HttpServer,
 };
+use actix::Addr;
 use actix_web_actors::ws;
 use futures::{
     future::{self, Either},
@@ -26,6 +27,8 @@ use crate::{
     log::prelude::*,
     signalling::{RoomId, RoomsRepository},
 };
+
+use self::actors::ServerWrapper;
 
 /// Parameters of new WebSocket connection creation HTTP request.
 #[derive(Debug, Deserialize)]
@@ -87,7 +90,7 @@ pub struct Context {
 }
 
 /// Starts HTTP server for handling WebSocket connections of Client API.
-pub fn run(rooms: RoomsRepository, config: Conf) {
+pub fn run(rooms: RoomsRepository, config: Conf) -> Addr<ServerWrapper> {
     let server_addr = config.server.bind_addr();
 
     let actix_server = HttpServer::new(move || {
@@ -110,7 +113,7 @@ pub fn run(rooms: RoomsRepository, config: Conf) {
     info!("Started HTTP server on {:?}", server_addr);
 
     let server_wrapper_addr = actors::ServerWrapper(actix_server).start();
-    graceful_shutdown::subscribe(server_wrapper_addr.recipient(), 5);
+    server_wrapper_addr
 }
 
 pub mod actors {

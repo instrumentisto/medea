@@ -1,16 +1,17 @@
 //! A class to handle shutdown signals and to shut down system
 //! Actix system has to be running for it to work.
 
-use std::{collections::BTreeMap, mem, sync::Mutex, thread, time::Duration,
+use std::{collections::BTreeMap, mem, sync::Mutex, thread, time::{Duration, Instant},
           sync::mpsc::channel};
 
 use actix::{self, MailboxError, Message, Recipient, System,
-            Handler, WrapFuture, AsyncContext, Addr};
+            Handler, WrapFuture, AsyncContext, Addr, Arbiter};
 use actix::prelude::{Actor, Context};
 use tokio::prelude::{
     future::{self, join_all, Future},
     stream::*,
 };
+use tokio::timer::Delay;
 
 use lazy_static::lazy_static;
 
@@ -48,12 +49,16 @@ impl Message for ShutdownSubscribe {
     type Result = ();
 }
 
-/// Send this when a signal is detected
-struct ShutdownSignalDetected;
 
+/// Send this when a signal is detected
+#[cfg(unix)]
+struct ShutdownSignalDetected(Option<i32>);
+
+#[cfg(unix)]
 impl Message for ShutdownSignalDetected {
     type Result = ();
 }
+
 
 pub struct GracefulShutdown {
     /// [`Actor`]s to send message when graceful shutdown
@@ -61,13 +66,17 @@ pub struct GracefulShutdown {
 
     /// Timeout after which all [`Actors`] will be forced shutdown
     shutdown_timeout: u64,
+
+    /// Timeout after which all [`Actors`] will be forced shutdown
+    system: actix::System,
 }
 
 impl GracefulShutdown {
-    fn new(shutdown_timeout: u64) -> Self {
+    fn new(shutdown_timeout: u64, system: actix::System) -> Self {
         Self {
             recipients: BTreeMap::new(),
             shutdown_timeout,
+            system
         }
     }
 }
@@ -80,26 +89,32 @@ impl Handler<ShutdownSignalDetected> for GracefulShutdown {
     type Result = ();
 
     fn handle(&mut self, msg: ShutdownSignalDetected, ctx: &mut Context<Self>) {
-//        match msg.0 {
-//            SignalKind::Int => {
-//                error!("SIGINT received, exiting");
-//            }
-//            SignalKind::Hup => {
-//                error!("SIGHUP received, reloading");
-//            }
-//            SignalKind::Term => {
-//                error!("SIGTERM received, stopping");
-//            }
-//            SignalKind::Quit => {
-//                error!("SIGQUIT received, exiting");
-//            }
-//        };
+        use tokio_signal::unix::{SIGHUP, SIGINT, SIGQUIT, SIGTERM};
 
-        let mut tokio_runtime = Runtime::new().unwrap();
+        match msg.0 {
+            Some(SIGINT) => {
+                error!("SIGINT received, exiting");
+            },
+            Some(SIGHUP) => {
+                error!("SIGHUP received, reloading");
+            },
+            Some(SIGTERM) => {
+                error!("SIGTERM received, stopping");
+            },
+            Some(SIGQUIT) => {
+                error!("SIGQUIT received, exiting");
+            },
+            _ => {
+                error!("Exit signal received, exiting");
+            }
+        };
 
         if self.recipients.is_empty() {
+            error!("GracefulShutdown: No subscribers registered");
             return;
         }
+
+        let mut tokio_runtime = Runtime::new().unwrap();
 
         let mut shutdown_future: Box<ShutdownFutureType> =
             Box::new(
@@ -116,7 +131,7 @@ impl Handler<ShutdownSignalDetected> for GracefulShutdown {
                 let tx2 = tx.clone();
                 let send_future = recipient.send(ShutdownMessage {});
 
-                tokio::spawn(
+                tokio_runtime.spawn(
                     send_future
                         .map(move |res| {
                             tx.send(res);
@@ -128,6 +143,7 @@ impl Handler<ShutdownSignalDetected> for GracefulShutdown {
                 );
 
                 let recipient_shutdown_fut = rx.recv().unwrap().unwrap();
+                error!("got response!");
 //            tokio_runtime.block_on(recipient_shutdown_fut);
 
                 this_priority_futures_vec.push(recipient_shutdown_fut);
@@ -148,32 +164,26 @@ impl Handler<ShutdownSignalDetected> for GracefulShutdown {
             mem::replace(&mut shutdown_future, new_shutdown_future);
         }
 
-        let shutdown_timeout_move = self.shutdown_timeout;
-        ctx.run_later(
-            Duration::from_millis(shutdown_timeout_move),
-            move |_, _| {
-                System::current().stop();
-            },
-        );
-
-        if self.recipients.is_empty() {
-            return;
-        }
-
-        ctx.spawn(
+        let system_to_stop = self.system.clone();
+        tokio_runtime.spawn(
             shutdown_future
+//                Delay::new(Instant::now() + Duration::from_millis(200))
+                .select2(Delay::new(Instant::now() + Duration::from_millis(self.shutdown_timeout)))
                 .map_err(|e| {
                     error!(
-                        "Error trying to shut down system gracefully: {:?}",
-                        e
+                        "Error trying to shut down system gracefully"
                     );
                 })
-                .then(|_| {
-                    System::current().stop();
+//                    .into_actor(self)
+                    .then(move |_| {
+                    info!("GRACEFUL STOP");
+                    system_to_stop.stop();
                     future::ok::<(), ()>(())
                 })
-                .into_actor(self),
         );
+
+        tokio_runtime.shutdown_on_idle()
+            .wait().unwrap();
     }
 }
 
@@ -198,8 +208,10 @@ impl Handler<ShutdownSubscribe> for GracefulShutdown {
 }
 
 
-pub fn create(shutdown_timeout: u64) -> Addr<GracefulShutdown> {
-    let graceful_shutdown = GracefulShutdown::new(shutdown_timeout).start();
+pub fn create(shutdown_timeout: u64, system: actix::System) -> Addr<GracefulShutdown> {
+    let graceful_shutdown = GracefulShutdown::start_in_arbiter(&Arbiter::new(), move |_| {
+            GracefulShutdown::new(shutdown_timeout, system)
+        });
     let graceful_shutdown_recipient = graceful_shutdown.clone().recipient();
     #[cfg(not(unix))]
     {
@@ -220,8 +232,8 @@ pub fn create(shutdown_timeout: u64) -> Addr<GracefulShutdown> {
             .select(sigquit_stream)
             .select(sighup_stream);
 
-        let handler = move |signal| {
-            graceful_shutdown_recipient.do_send(ShutdownSignalDetected {});
+        let handler = move |(signal, _)| {
+            graceful_shutdown_recipient.do_send(ShutdownSignalDetected(signal));
         };
 
         thread::spawn(move || {
