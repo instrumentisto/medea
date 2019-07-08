@@ -20,6 +20,20 @@ pub use self::{
     member::{Id as MemberId, MemberSpec},
     room::{Id as RoomId, RoomSpec},
 };
+use crate::api::control::endpoint::SrcParseError;
+
+#[derive(Debug, Fail)]
+pub enum TryFromProtobufError {
+    #[fail(display = "Src uri parse error: {:?}", _0)]
+    SrcUriError(SrcParseError),
+}
+
+// TODO: Maybe better way for do it???
+impl From<SrcParseError> for TryFromProtobufError {
+    fn from(from: SrcParseError) -> Self {
+        TryFromProtobufError::SrcUriError(from)
+    }
+}
 
 /// Errors that can occur when we try transform some spec from [`Element`].
 /// This error used in all [`TryFrom`] of Control API.

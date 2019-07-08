@@ -19,6 +19,10 @@ pub struct Pipeline {
 }
 
 impl Pipeline {
+    pub fn new(pipeline: HashMap<String, Element>) -> Self {
+        Self { pipeline }
+    }
+
     pub fn iter(&self) -> impl Iterator<Item = (&String, &Element)> {
         self.into_iter()
     }

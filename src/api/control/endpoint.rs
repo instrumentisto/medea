@@ -9,7 +9,16 @@ use serde::{
     Deserialize,
 };
 
-use super::{Element, TryFromElementError, RoomId, MemberId};
+use crate::api::grpc::protos::control::{
+    Member_Element as MemberElementProto,
+    WebRtcPlayEndpoint as WebRtcPlayEndpointProto,
+    WebRtcPublishEndpoint as WebRtcPublishEndpointProto,
+    WebRtcPublishEndpoint_P2P as WebRtcPublishEndpointP2pProto,
+};
+
+use super::{
+    Element, MemberId, RoomId, TryFromElementError, TryFromProtobufError,
+};
 
 macro_attr! {
     /// ID of [`Room`].
@@ -50,12 +59,44 @@ pub enum P2pMode {
     IfPossible,
 }
 
+impl TryFrom<WebRtcPublishEndpointP2pProto> for P2pMode {
+    type Error = TryFromProtobufError;
+
+    fn try_from(
+        value: WebRtcPublishEndpointP2pProto,
+    ) -> Result<Self, Self::Error> {
+        match value {
+            WebRtcPublishEndpointP2pProto::ALWAYS => P2pMode::Always,
+            WebRtcPublishEndpointP2pProto::IF_POSSIBLE => P2pMode::IfPossible,
+            WebRtcPublishEndpointP2pProto::NEVER => P2pMode::Never,
+        }
+    }
+}
+
 /// [`Endpoint`] represents a media element that one or more media data streams
 /// flow through.
 #[derive(Debug)]
 pub enum Endpoint {
     WebRtcPublish(WebRtcPublishEndpoint),
     WebRtcPlay(WebRtcPlayEndpoint),
+}
+
+impl TryFrom<&MemberElementProto> for Endpoint {
+    type Error = TryFromProtobufError;
+
+    fn try_from(value: &MemberElementProto) -> Result<Self, Self::Error> {
+        if value.has_webrtc_play() {
+            let play = WebRtcPlayEndpoint::try_from(value.get_webrtc_play())?;
+            return Endpoint::WebRtcPlay(play);
+        } else if value.has_webrtc_pub() {
+            let publish =
+                WebRtcPublishEndpoint::try_from(value.get_webrtc_pub())?;
+            return Endpoint::WebRtcPublish(publish);
+        } else {
+            // TODO
+            unimplemented!()
+        }
+    }
 }
 
 impl TryFrom<&Element> for Endpoint {
@@ -83,6 +124,19 @@ pub struct WebRtcPublishEndpoint {
     pub p2p: P2pMode,
 }
 
+impl TryFrom<&WebRtcPublishEndpointProto> for WebRtcPublishEndpoint {
+    type Error = TryFromProtobufError;
+
+    fn try_from(
+        value: &WebRtcPublishEndpointProto,
+    ) -> Result<Self, Self::Error> {
+        // TODO: check for null
+        Self {
+            p2p: P2pMode::try_from(value.get_p2p())?,
+        }
+    }
+}
+
 // impl WebRtcPublishEndpoint for WebRtcPublishEndpoint {
 // fn p2p(&self) -> P2pMode {
 // self.p2p.clone()
@@ -95,6 +149,16 @@ pub struct WebRtcPublishEndpoint {
 pub struct WebRtcPlayEndpoint {
     /// Source URI in format `local://{room_id}/{member_id}/{endpoint_id}`.
     pub src: SrcUri,
+}
+
+impl TryFrom<&WebRtcPlayEndpointProto> for WebRtcPlayEndpoint {
+    type Error = TryFromProtobufError;
+
+    fn try_from(value: &WebRtcPlayEndpointProto) -> Result<Self, Self::Error> {
+        Self {
+            src: parse_src_uri(value.get_src())?,
+        }
+    }
 }
 
 // impl WebRtcPlayEndpoint for WebRtcPlayEndpoint {
@@ -112,6 +176,73 @@ pub struct SrcUri {
     pub member_id: MemberId,
     /// Control ID of [`Endpoint`]
     pub endpoint_id: WebRtcPublishId,
+}
+
+// TODO
+#[derive(Debug, Fail)]
+pub enum SrcParseError {
+    #[fail(display = "Invalid value {}", _0)]
+    InvalidValue(String),
+    #[fail(display = "Custom error {}", _0)]
+    Custom(String),
+    #[fail(display = "Missing field {}", _0)]
+    MissingField(String),
+}
+
+fn parse_src_uri(text: &str) -> Result<SrcUri, SrcParseError> {
+    let protocol_name: String = value.chars().take(8).collect();
+    if protocol_name != "local://" {
+        return Err(SrcParseError::InvalidValue(format!(
+            "{} in {}",
+            protocol_name, value
+        )));
+    }
+
+    let uri_body = value.chars().skip(8).collect::<String>();
+    let mut uri_body_splitted: Vec<&str> = uri_body.rsplit('/').collect();
+    let uri_body_splitted_len = uri_body_splitted.len();
+    if uri_body_splitted_len != 3 {
+        let error_msg = if uri_body_splitted_len == 0 {
+            "room_id, member_id, endpoint_id"
+        } else if uri_body_splitted_len == 1 {
+            "member_id, endpoint_id"
+        } else if uri_body_splitted_len == 2 {
+            "endpoint_id"
+        } else {
+            return Err(SrcParseError::Custom(format!(
+                "Too many fields: {}. Expecting 3 fields, found {}.",
+                uri_body, uri_body_splitted_len
+            )));
+        };
+        return Err(Error::missing_field(error_msg));
+    }
+    let room_id = uri_body_splitted.pop().unwrap().to_string();
+    if room_id.is_empty() {
+        return Err(SrcParseError::Custom(format!(
+            "room_id in {} is empty!",
+            value
+        )));
+    }
+    let member_id = uri_body_splitted.pop().unwrap().to_string();
+    if member_id.is_empty() {
+        return Err(SrcParseError::Custom(format!(
+            "member_id in {} is empty!",
+            value
+        )));
+    }
+    let endpoint_id = uri_body_splitted.pop().unwrap().to_string();
+    if endpoint_id.is_empty() {
+        return Err(SrcParseError::Custom(format!(
+            "endpoint_id in {} is empty!",
+            value
+        )));
+    }
+
+    Ok(SrcUri {
+        room_id: RoomId(room_id),
+        member_id: MemberId(member_id),
+        endpoint_id: WebRtcPublishId(endpoint_id),
+    })
 }
 
 /// Serde deserializer for [`SrcUri`].

@@ -1,16 +1,21 @@
 //! Room definitions and implementations.
 
-use std::convert::TryFrom;
+use std::{collections::HashMap as StdHashMap, convert::TryFrom};
 
 use hashbrown::HashMap;
 use macro_attr::*;
 use newtype_derive::{newtype_fmt, NewtypeDisplay, NewtypeFrom};
 use serde::Deserialize;
 
+use crate::api::grpc::protos::control::{
+    Room as RoomProto, Room_Element as RoomElementProto,
+};
+
 use super::{
     member::MemberSpec, pipeline::Pipeline, Element, MemberId,
     TryFromElementError,
 };
+use crate::api::control::TryFromProtobufError;
 
 macro_attr! {
     /// ID of [`Room`].
@@ -55,6 +60,31 @@ impl RoomSpec {
     /// Returns ID of this [`RoomSpec`]
     pub fn id(&self) -> &Id {
         &self.id
+    }
+}
+
+impl TryFrom<&RoomProto> for RoomSpec {
+    type Error = TryFromProtobufError;
+
+    fn try_from(value: &RoomProto) -> Result<Self, Self::Error> {
+        let mut pipeline = StdHashMap::new();
+        for (id, room_element) in value.get_pipeline() {
+            let member = MemberSpec::try_from(&room_element)?;
+            // TODO: temporary
+            let element = Element::Member {
+                spec: member.pipeline,
+                credentials: member.credentials,
+            };
+            pipeline.insert(id.clone(), element);
+        }
+
+        let pipeline = Pipeline::new(pipeline);
+
+        Self {
+            pipeline,
+            // TODO:
+            id: Id("unimplemented".to_string()),
+        }
     }
 }
 
