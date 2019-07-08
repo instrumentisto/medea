@@ -5,22 +5,13 @@ use std::{
     rc::{Rc, Weak},
 };
 
-use macro_attr::*;
-use newtype_derive::{newtype_fmt, NewtypeDisplay, NewtypeFrom};
-
 use crate::{
-    api::control::endpoint::SrcUri, media::PeerId, signalling::elements::Member,
+    api::control::endpoint::{SrcUri, WebRtcPlayId as Id},
+    media::PeerId,
+    signalling::elements::Member,
 };
 
 use super::publish_endpoint::WebRtcPublishEndpoint;
-
-pub use Id as WebRtcPlayId;
-
-macro_attr! {
-    /// ID of endpoint.
-    #[derive(Clone, Debug, Eq, Hash, PartialEq, NewtypeFrom!, NewtypeDisplay!)]
-    pub struct Id(pub String);
-}
 
 #[derive(Debug, Clone)]
 struct WebRtcPlayEndpointInner {

@@ -7,14 +7,15 @@ use hashbrown::HashMap;
 use medea_client_api_proto::IceServer;
 
 use crate::{
-    api::control::{MemberId, MemberSpec, RoomSpec, TryFromElementError},
+    api::control::{
+        MemberId, MemberSpec, RoomSpec, TryFromElementError, WebRtcPlayId,
+        WebRtcPublishId,
+    },
     log::prelude::*,
     media::{IceUser, PeerId},
 };
 
-use super::endpoints::webrtc::{
-    WebRtcPlayEndpoint, WebRtcPlayId, WebRtcPublishEndpoint, WebRtcPublishId,
-};
+use super::endpoints::webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint};
 
 /// Errors which may occur while loading [`Member`]s from [`RoomSpec`].
 #[derive(Debug, Fail)]
@@ -141,9 +142,7 @@ impl Member {
 
                 publisher.add_sink(Rc::downgrade(&new_play_endpoint));
             } else {
-                let new_publish_id = WebRtcPublishId(
-                    spec_play_endpoint.src.endpoint_id.to_string(),
-                );
+                let new_publish_id = &spec_play_endpoint.src.endpoint_id;
                 let new_publish = Rc::new(WebRtcPublishEndpoint::new(
                     new_publish_id.clone(),
                     publisher_endpoint.p2p.clone(),
@@ -170,8 +169,7 @@ impl Member {
         // This is necessary to create [`WebRtcPublishEndpoint`],
         // to which none [`WebRtcPlayEndpoint`] refers.
         this_member_spec.publish_endpoints().into_iter().for_each(
-            |(name, e)| {
-                let endpoint_id = WebRtcPublishId(name.to_string()); // TODO
+            |(endpoint_id, e)| {
                 if self.srcs().get(&endpoint_id).is_none() {
                     self.insert_src(Rc::new(WebRtcPublishEndpoint::new(
                         endpoint_id,

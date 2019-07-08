@@ -18,7 +18,7 @@ use self::{
 };
 
 pub use self::{
-    endpoint::Endpoint,
+    endpoint::{Endpoint, WebRtcPlayId, WebRtcPublishId},
     member::{Id as MemberId, MemberSpec},
     room::{Id as RoomId, RoomSpec},
 };

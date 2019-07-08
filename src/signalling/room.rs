@@ -18,7 +18,10 @@ use crate::{
             AuthorizationError, Authorize, ClosedReason, CommandMessage,
             RpcConnectionClosed, RpcConnectionEstablished,
         },
-        control::{room::RoomSpec, MemberId, RoomId, TryFromElementError},
+        control::{
+            room::RoomSpec, MemberId, RoomId, TryFromElementError,
+            WebRtcPlayId, WebRtcPublishId,
+        },
     },
     log::prelude::*,
     media::{
@@ -27,10 +30,7 @@ use crate::{
     },
     signalling::{
         elements::{
-            endpoints::webrtc::{
-                WebRtcPlayEndpoint, WebRtcPlayId, WebRtcPublishEndpoint,
-                WebRtcPublishId,
-            },
+            endpoints::webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
             Member, MembersLoadError,
         },
         participants::ParticipantService,
