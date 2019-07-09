@@ -8,8 +8,13 @@ use std::{
 use hashbrown::HashSet;
 
 use crate::{
-    api::control::endpoints::webrtc_publish_endpoint::{
-        P2pMode, WebRtcPublishId as Id,
+    api::control::{
+        endpoints::webrtc_publish_endpoint::{P2pMode, WebRtcPublishId as Id},
+        grpc::protos::control::{
+            Member_Element as ElementProto,
+            WebRtcPublishEndpoint as WebRtcPublishEndpointProto,
+            WebRtcPublishEndpoint_P2P as WebRtcPublishEndpointP2pProto,
+        },
     },
     media::PeerId,
     signalling::elements::Member,
@@ -167,5 +172,20 @@ impl WebRtcPublishEndpoint {
     /// [`WebRtcPublishEndpoint`].
     pub fn remove_empty_weaks_from_sinks(&self) {
         self.0.borrow_mut().sinks.retain(|e| e.upgrade().is_some());
+    }
+
+    pub fn p2p(&self) -> P2pMode {
+        self.0.borrow().p2p.clone()
+    }
+}
+
+impl Into<ElementProto> for Rc<WebRtcPublishEndpoint> {
+    fn into(self) -> ElementProto {
+        let mut element = ElementProto::new();
+        let mut publish = WebRtcPublishEndpointProto::new();
+        publish.set_p2p(self.p2p().into());
+        element.set_webrtc_pub(publish);
+
+        element
     }
 }

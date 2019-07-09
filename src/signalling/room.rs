@@ -2,6 +2,7 @@
 //! connection establishment between concrete [`Member`]s.
 
 use std::{rc::Rc, sync::Arc, time::Duration};
+use std::collections::HashMap as StdHashMap;
 
 use actix::{
     fut::wrap_future, Actor, ActorFuture, AsyncContext, Context, Handler,
@@ -22,6 +23,10 @@ use crate::{
             room::RoomSpec, MemberId, RoomId, TryFromElementError,
             WebRtcPlayId, WebRtcPublishId,
         },
+        control::grpc::protos::control::{
+            Element as ElementProto,
+            Room as RoomProto,
+        }
     },
     log::prelude::*,
     media::{
@@ -448,6 +453,23 @@ impl Room {
 // TODO: close connections on signal (graceful shutdown)
 impl Actor for Room {
     type Context = Context<Self>;
+}
+
+impl Into<ElementProto> for Room {
+    fn into(self) -> ElementProto {
+        let mut element = ElementProto::new();
+        let mut room = RoomProto::new();
+
+        let mut pipeline = StdHashMap::new();
+        for (id, member) in self.members.members() {
+            pipeline.insert(id.to_string(), member.into());
+        }
+        room.set_pipeline(pipeline);
+
+        element.set_room(room);
+
+        element
+    }
 }
 
 impl Handler<Authorize> for Room {

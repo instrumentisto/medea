@@ -52,6 +52,15 @@ impl TryFrom<&WebRtcPlayEndpointProto> for WebRtcPlayEndpoint {
     }
 }
 
+// TODO
+#[derive(Debug, Fail)]
+pub enum SrcParseError {
+    #[fail(display = "Missing fields {:?} in '{}' local URI.", _1, _0)]
+    MissingField(String, Vec<String>),
+    #[fail(display = "Local URI '{}' parse error: {:?}", _0, _1)]
+    LocalUriParseError(String, LocalUriParseError),
+}
+
 /// Special uri with pattern `local://{room_id}/{member_id}/{endpoint_id}`.
 #[derive(Clone, Debug)]
 pub struct SrcUri {
@@ -61,15 +70,6 @@ pub struct SrcUri {
     pub member_id: MemberId,
     /// Control ID of [`Endpoint`]
     pub endpoint_id: WebRtcPublishId,
-}
-
-// TODO
-#[derive(Debug, Fail)]
-pub enum SrcParseError {
-    #[fail(display = "Missing fields {:?} in '{}' local URI.", _1, _0)]
-    MissingField(String, Vec<String>),
-    #[fail(display = "Local URI '{}' parse error: {:?}", _0, _1)]
-    LocalUriParseError(String, LocalUriParseError),
 }
 
 impl SrcUri {
@@ -134,5 +134,15 @@ impl<'de> Deserialize<'de> for SrcUri {
         }
 
         deserializer.deserialize_identifier(SrcUriVisitor)
+    }
+}
+
+impl fmt::Display for SrcUri {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "local://{}/{}/{}",
+            self.room_id, self.member_id, self.endpoint_id
+        )
     }
 }

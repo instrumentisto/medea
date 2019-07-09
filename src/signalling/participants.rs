@@ -116,6 +116,10 @@ impl ParticipantService {
         self.members.get(id).cloned()
     }
 
+    pub fn members(&self) -> HashMap<MemberId, Rc<Member>> {
+        self.members.clone()
+    }
+
     /// Lookup [`Member`] by provided id and credentials. Returns
     /// [`Err(AuthorizationError::MemberNotExists)`] if lookup by
     /// [`MemberId`] failed. Returns

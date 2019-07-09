@@ -1,6 +1,7 @@
 //! [`Member`] is member of [`Room`] with [`RpcConnection`].
 
 use std::{cell::RefCell, convert::TryFrom as _, rc::Rc};
+use std::collections::HashMap as StdHashMap;
 
 use failure::Fail;
 use hashbrown::HashMap;
@@ -8,6 +9,9 @@ use medea_client_api_proto::IceServer;
 
 use crate::{
     api::control::{
+        grpc::protos::control::{
+            Member as MemberProto, Room_Element as ElementProto,
+        },
         MemberId, MemberSpec, RoomSpec, TryFromElementError, WebRtcPlayId,
         WebRtcPublishId,
     },
@@ -16,6 +20,7 @@ use crate::{
 };
 
 use super::endpoints::webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint};
+use crate::api::control::grpc::protos::control::Member_Element;
 
 /// Errors which may occur while loading [`Member`]s from [`RoomSpec`].
 #[derive(Debug, Fail)]
@@ -328,6 +333,30 @@ pub fn parse_members(
     );
 
     Ok(members)
+}
+
+impl Into<ElementProto> for Rc<Member> {
+    fn into(self) -> ElementProto {
+        let mut element = ElementProto::new();
+        let mut member = MemberProto::new();
+
+        let mut member_pipeline = StdHashMap::new();
+        for (id, play) in self.sinks() {
+            member_pipeline
+                .insert(id.to_string(), play.into());
+        }
+        for (id, publish) in self.srcs() {
+            member_pipeline
+                .insert(id.to_string(), publish.into());
+        }
+        member.set_pipeline(member_pipeline);
+
+        member.set_credentials(self.credentials());
+
+        element.set_member(member);
+
+        element
+    }
 }
 
 #[cfg(test)]

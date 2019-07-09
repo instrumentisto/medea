@@ -6,8 +6,12 @@ use std::{
 };
 
 use crate::{
-    api::control::endpoints::webrtc_play_endpoint::{
-        SrcUri, WebRtcPlayId as Id,
+    api::control::{
+        endpoints::webrtc_play_endpoint::{SrcUri, WebRtcPlayId as Id},
+        grpc::protos::control::{
+            Member_Element as ElementProto,
+            WebRtcPlayEndpoint as WebRtcPlayEndpointProto,
+        },
     },
     media::PeerId,
     signalling::elements::Member,
@@ -155,5 +159,16 @@ impl WebRtcPlayEndpoint {
     /// Returns ID of this [`WebRtcPlayEndpoint`].
     pub fn id(&self) -> Id {
         self.0.borrow().id.clone()
+    }
+}
+
+impl Into<ElementProto> for Rc<WebRtcPlayEndpoint> {
+    fn into(self) -> ElementProto {
+        let mut element = ElementProto::new();
+        let mut play = WebRtcPlayEndpointProto::new();
+        play.set_src(self.src_uri().to_string());
+        element.set_webrtc_play(play);
+
+        element
     }
 }

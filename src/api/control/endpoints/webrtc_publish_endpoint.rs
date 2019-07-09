@@ -51,6 +51,16 @@ impl TryFrom<WebRtcPublishEndpointP2pProto> for P2pMode {
     }
 }
 
+impl Into<WebRtcPublishEndpointP2pProto> for P2pMode {
+    fn into(self) -> WebRtcPublishEndpointP2pProto {
+        match self {
+            P2pMode::Always => WebRtcPublishEndpointP2pProto::ALWAYS,
+            P2pMode::IfPossible => WebRtcPublishEndpointP2pProto::IF_POSSIBLE,
+            P2pMode::Never => WebRtcPublishEndpointP2pProto::NEVER,
+        }
+    }
+}
+
 /// Media element which is able to publish media data for another client via
 /// WebRTC.
 #[allow(clippy::module_name_repetitions)]
