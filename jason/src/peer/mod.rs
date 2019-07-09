@@ -167,25 +167,32 @@ impl PeerConnection {
         &self,
         tracks: Vec<Track>,
     ) -> impl Future<Item = String, Error = WasmErr> {
-        if let Err(err) = self.0.media_connections.update_tracks(tracks) {
-            return future::Either::A(future::err(err));
-        }
-
-        let inner: Rc<InnerPeerConnection> = Rc::clone(&self.0);
-        let peer = Rc::clone(&self.0.peer);
-        future::Either::B(
-            match self.0.media_connections.get_request() {
-                None => future::Either::A(future::ok::<_, WasmErr>(())),
-                Some(request) => future::Either::B(
-                    inner.media_manager.get_stream(request).and_then(
-                        move |stream| {
-                            inner.media_connections.insert_local_stream(&stream)
-                        },
-                    ),
-                ),
+        match self.0.media_connections.update_tracks(tracks) {
+            Err(err) => future::Either::A(future::err(err)),
+            Ok(request) => {
+                let peer = Rc::clone(&self.0.peer);
+                future::Either::B(
+                    match request {
+                        None => future::Either::A(future::ok::<_, WasmErr>(())),
+                        Some(request) => {
+                            let inner: Rc<InnerPeerConnection> =
+                                Rc::clone(&self.0);
+                            future::Either::B(
+                                self.0
+                                    .media_manager
+                                    .get_stream(request)
+                                    .and_then(move |stream| {
+                                        inner
+                                            .media_connections
+                                            .insert_local_stream(&stream)
+                                    }),
+                            )
+                        }
+                    }
+                    .and_then(move |_| peer.create_and_set_offer()),
+                )
             }
-            .and_then(move |_| peer.create_and_set_offer()),
-        )
+        }
     }
 
     /// Creates an SDP answer to an offer received from a remote peer and sets
@@ -237,7 +244,6 @@ impl PeerConnection {
                 inner
                     .media_connections
                     .update_tracks(send)
-                    .map(|_| inner.media_connections.get_request())
                     .map(|req| (req, inner))
             })
             .and_then(move |(request, inner)| match request {

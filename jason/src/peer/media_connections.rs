@@ -31,10 +31,6 @@ struct InnerMediaConnections {
     /// [`Sender`]s and [`Receiver`]s.
     peer: Rc<RtcPeerConnection>,
 
-    /// If [`Sender`]s were changed in a way, that require inserting new
-    /// [`MediaStream`].
-    need_new_stream: bool,
-
     /// [`MediaTrack`] to its [`Sender`].
     senders: HashMap<TrackId, Rc<Sender>>,
 
@@ -48,7 +44,6 @@ impl MediaConnections {
     pub fn new(peer: Rc<RtcPeerConnection>) -> Self {
         Self(RefCell::new(InnerMediaConnections {
             peer,
-            need_new_stream: false,
             senders: HashMap::new(),
             receivers: HashMap::new(),
         }))
@@ -88,21 +83,27 @@ impl MediaConnections {
 
     /// Synchronize local state with provided tracks. Will create new
     /// [`Sender`]s and [`Receiver`]s for each new track, will update track (but
-    /// doesnt atm) if track is known but its settings has changed. Can change
-    /// `get_request` result if finds any new or changed send track.
-    pub fn update_tracks(&self, tracks: Vec<Track>) -> Result<(), WasmErr> {
+    /// doesnt atm) if track is known but its settings has changed. Returns
+    /// [`StreamRequest`] in case new local [`MediaStream`] is required.
+    pub fn update_tracks(
+        &self,
+        tracks: Vec<Track>,
+    ) -> Result<Option<StreamRequest>, WasmErr> {
         // TODO: Doesnt really updates anything, but only generates new senders
         //       and receivers atm.
         let mut inner = self.0.borrow_mut();
+        let mut stream_request = None;
 
         for track in tracks {
             match track.direction {
                 Direction::Send { mid, .. } => {
-                    inner.need_new_stream = true;
+                    stream_request
+                        .get_or_insert_with(StreamRequest::default)
+                        .add_track_request(track.id, track.media_type.clone());
 
                     let sender = Sender::new(
                         track.id,
-                        track.media_type,
+                        &track.media_type,
                         &inner.peer,
                         mid,
                     )?;
@@ -122,22 +123,19 @@ impl MediaConnections {
                 }
             }
         }
-        Ok(())
-    }
 
-    /// Check if [`Sender`]s require new [`MediaStream`].
-    pub fn get_request(&self) -> Option<StreamRequest> {
-        let inner = self.0.borrow();
+        // build StreamRequest
+        //        if senders_updated {
+        //            let mut media_request = StreamRequest::default();
+        //            for (track_id, sender) in &inner.senders {
+        //                media_request.add_track_request(*track_id,
+        // sender.caps.clone());            }
+        //            Ok(Some(media_request))
+        //        } else {
+        //            Ok(None)
+        //        }
 
-        if inner.need_new_stream {
-            let mut media_request = StreamRequest::default();
-            for (track_id, sender) in &inner.senders {
-                media_request.add_track_request(*track_id, sender.caps.clone());
-            }
-            Some(media_request)
-        } else {
-            None
-        }
+        Ok(stream_request)
     }
 
     /// Inserts tracks from provided [`MediaStream`] into [`Sender`]s
@@ -246,7 +244,6 @@ impl MediaConnections {
 pub struct Sender {
     track_id: TrackId,
     transceiver: RtcRtpTransceiver,
-    caps: MediaType,
 }
 
 impl Sender {
@@ -254,7 +251,7 @@ impl Sender {
     /// transceiver by provided mid. Errors if transceiver lookup fails.
     fn new(
         track_id: TrackId,
-        caps: MediaType,
+        caps: &MediaType,
         peer: &RtcPeerConnection,
         mid: Option<String>,
     ) -> Result<Rc<Self>, WasmErr> {
@@ -282,7 +279,6 @@ impl Sender {
         Ok(Rc::new(Self {
             track_id,
             transceiver,
-            caps,
         }))
     }
 }
