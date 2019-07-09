@@ -40,7 +40,8 @@ fn main() {
 
     let peers = create_peers(1, 2);
 
-    let graceful_shutdown_addr = graceful_shutdown::create(config.system_config.shutdown_timeout);
+    let graceful_shutdown_addr =
+        graceful_shutdown::create(config.system_config.shutdown_timeout);
 
     let turn_auth_service =
         new_turn_auth_service(&config).expect("Unable to start turn service");
@@ -50,17 +51,19 @@ fn main() {
     let room = Room::start_in_arbiter(&Arbiter::new(), move |_| {
         Room::new(1, members, peers, rpc_reconnect_timeout, turn_auth_service)
     });
-    graceful_shutdown_addr.do_send(ShutdownSubscribe{
+    graceful_shutdown_addr.do_send(ShutdownSubscribe {
         who: room.clone().recipient(),
-        priority: 1 });
+        priority: 1,
+    });
 
     let rooms = hashmap! {1 => room};
     let rooms_repo = RoomsRepository::new(rooms);
 
     let server_addr = server::run(rooms_repo, config);
-    graceful_shutdown_addr.do_send(ShutdownSubscribe{
+    graceful_shutdown_addr.do_send(ShutdownSubscribe {
         who: server_addr.recipient(),
-        priority: 5 });
+        priority: 5,
+    });
 
     let _ = sys.run();
 }

@@ -1,75 +1,70 @@
 //! A class to handle shutdown signals and to shut down system
 //! Actix system has to be running for it to work.
 
-use std::{collections::{BTreeMap, HashSet},
-          mem, time::Duration
+use std::{
+    collections::{BTreeMap, HashSet},
+    mem,
+    time::Duration,
 };
 
-use actix::{self, Message, Recipient, System,
-            Handler, AsyncContext, Addr};
-use actix::prelude::{Actor, Context};
+use actix::{
+    self, ActorFuture, StreamHandler,
+    prelude::{Actor, Context},
+    Addr, AsyncContext, Handler, Message, Recipient, System,
+    ResponseActFuture, WrapFuture,
+};
+use futures::future::IntoFuture;
 use tokio::prelude::{
     future::{self, join_all, Future},
     stream::*,
+    FutureExt,
 };
-use futures::future::IntoFuture;
-use tokio::prelude::FutureExt;
 
 use crate::log::prelude::*;
-pub type ShutdownMessageResult = Result<
-    Box<dyn Future<Item = (), Error = ()> + std::marker::Send>, ()
+pub type ShutdownMessageResult =
+    Result<Box<(dyn Future<Item = (), Error = ()> + std::marker::Send)>, ()>;
+
+type ShutdownFutureType = dyn Future<
+    Item = Vec<
+        Result<
+            Box<
+                dyn futures::future::Future<Error = (), Item = ()>
+                    + std::marker::Send,
+            >,
+            (),
+        >,
+    >,
+    Error = (),
 >;
 
-type ShutdownFutureType =
-    dyn Future<
-        Item = Vec<
-            Result<Box<dyn futures::future::Future<Error = (), Item = ()> + std::marker::Send>, ()>>,
-        Error = ()
-    >;
-
-type ShutdownSignalDetectedResult = Result<
-    Box<dyn Future<
-        Item = (),
-        Error = ()
-    >>,
-()>;
-
 #[derive(Debug)]
+#[derive(Message)]
+#[rtype(result = "ShutdownMessageResult")]
 pub struct ShutdownMessage;
 
-impl Message for ShutdownMessage {
-    type Result = ShutdownMessageResult;
-}
 
 /// Subscribe to exit events, with priority
+#[derive(Message)]
+#[rtype(result = "()")]
 pub struct ShutdownSubscribe {
     pub priority: u8,
     pub who: Recipient<ShutdownMessage>,
 }
 
-impl Message for ShutdownSubscribe {
-    type Result = ();
-}
-
-//todo #[derive(Message)]
 /// Subscribe to exit events, with priority
+#[derive(Message)]
+#[rtype(result = "()")]
 pub struct ShutdownUnsubscribe {
     pub priority: u8,
     pub who: Recipient<ShutdownMessage>,
 }
 
-impl Message for ShutdownUnsubscribe {
-    type Result = ();
-}
 
 /// Send this when a signal is detected
 #[cfg(unix)]
+#[derive(Message)]
+#[rtype(result = "Result<(),()>")]
 struct ShutdownSignalDetected(i32);
-
-#[cfg(unix)]
-impl Message for ShutdownSignalDetected {
-    type Result = ShutdownSignalDetectedResult;
-}
 
 
 pub struct GracefulShutdown {
@@ -94,56 +89,67 @@ impl Actor for GracefulShutdown {
 
     fn started(&mut self, ctx: &mut Self::Context) {
         #[cfg(not(unix))]
-            {
-                error!("Unable to use graceful_shutdown: only UNIX signals are supported");
-                return;
-            }
+        {
+            error!(
+                "Unable to use graceful_shutdown: only UNIX signals are \
+                 supported"
+            );
+            return;
+        }
         #[cfg(unix)]
-            {
-                use tokio_signal::unix::{Signal, SIGHUP, SIGINT, SIGQUIT, SIGTERM};
+        {
+            use tokio_signal::unix::{
+                Signal, SIGHUP, SIGINT, SIGQUIT, SIGTERM,
+            };
 
-                let sigint_stream = Signal::new(SIGINT).flatten_stream();
-                let sigterm_stream = Signal::new(SIGTERM).flatten_stream();
-                let sigquit_stream = Signal::new(SIGQUIT).flatten_stream();
-                let sighup_stream = Signal::new(SIGHUP).flatten_stream();
-                let signals_stream = sigint_stream
-                    .select(sigterm_stream)
-                    .select(sigquit_stream)
-                    .select(sighup_stream);
+            let sigint_stream = Signal::new(SIGINT).flatten_stream();
+            let sigterm_stream = Signal::new(SIGTERM).flatten_stream();
+            let sigquit_stream = Signal::new(SIGQUIT).flatten_stream();
+            let sighup_stream = Signal::new(SIGHUP).flatten_stream();
+            let signals_stream = sigint_stream
+                .select(sigterm_stream)
+                .select(sigquit_stream)
+                .select(sighup_stream);
 
-                ctx.add_message_stream(signals_stream
-                    .map(move |signal| {
-                        ShutdownSignalDetected(signal)
-                    })
-                    .map_err(|_| ())
-                );
-
-            }
+            ctx.add_message_stream(
+                //todo log errors
+                signals_stream
+                    .map(move |signal| ShutdownSignalDetected(signal))
+                    .map_err(|e| {
+                        error!("Error getting shutdown signal {:?}", e);
+                    }),
+            );
+        }
     }
 }
 
 #[cfg(unix)]
 impl Handler<ShutdownSignalDetected> for GracefulShutdown {
-    type Result = ShutdownSignalDetectedResult;
+    type Result = ResponseActFuture<Self, (), ()>;
 
-    fn handle(&mut self, msg: ShutdownSignalDetected, _: &mut Context<Self>)
-            -> Self::Result {
+    fn handle(
+        &mut self,
+        msg: ShutdownSignalDetected,
+        _: &mut Context<Self>,
+    ) -> ResponseActFuture<Self, (), ()> {
         use tokio_signal::unix::{SIGHUP, SIGINT, SIGQUIT, SIGTERM};
 
         match msg.0 {
-            SIGINT=> {
-                error!("SIGINT received, exiting");
-            },
+            SIGINT => {
+                //todo info
+                info!("SIGINT received, exiting");
+            }
             SIGHUP => {
-                error!("SIGHUP received, reloading");
-            },
+                info!("SIGHUP received, reloading");
+            }
             SIGTERM => {
-                error!("SIGTERM received, stopping");
-            },
+                info!("SIGTERM received, stopping");
+            }
             SIGQUIT => {
-                error!("SIGQUIT received, exiting");
-            },
+                info!("SIGQUIT received, exiting");
+            }
             _ => {
+                //todo on top
                 error!("Exit signal received, exiting");
             }
         };
@@ -153,9 +159,7 @@ impl Handler<ShutdownSignalDetected> for GracefulShutdown {
         }
 
         let mut shutdown_future: Box<ShutdownFutureType> =
-            Box::new(
-                futures::future::ok(vec![])
-            );
+            Box::new(futures::future::ok(vec![]));
 
         for recipients_values in self.recipients.values() {
             let mut this_priority_futures_vec =
@@ -163,16 +167,14 @@ impl Handler<ShutdownSignalDetected> for GracefulShutdown {
 
             for recipient in recipients_values.iter() {
                 let send_future = recipient.send(ShutdownMessage {});
-                //todo async handle
+                // todo async handle
 
                 let recipient_shutdown_fut = send_future
-                        .into_future()
-                        .map_err(move |e| {
-                            error!("Error sending shutdown message: {:?}", e);
-                        })
-                        .then(|future| {
-                            future
-                        });
+                    .into_future()
+                    .map_err(move |e| {
+                        error!("Error sending shutdown message: {:?}", e);
+                    })
+                    .then(|future| future);
 
                 this_priority_futures_vec.push(recipient_shutdown_fut);
             }
@@ -182,17 +184,12 @@ impl Handler<ShutdownSignalDetected> for GracefulShutdown {
                 Box::new(shutdown_future.then(|_| this_priority_futures));
             // we need to rewrite shutdown_future, otherwise compiler thinks we
             // moved value
-            shutdown_future = Box::new(
-                futures::future::ok(())
-                    .map(|_| {
-                        vec![]
-                    })
-            );
+            shutdown_future = Box::new(futures::future::ok(()).map(|_| vec![]));
 
             mem::replace(&mut shutdown_future, new_shutdown_future);
         }
 
-        Ok(Box::new(
+        Box::new(
             shutdown_future
                 .timeout(Duration::from_millis(self.shutdown_timeout))
                 .map_err(|e| {
@@ -205,7 +202,8 @@ impl Handler<ShutdownSignalDetected> for GracefulShutdown {
                     System::current().stop();
                     future::ok::<(), ()>(())
                 })
-        ))
+                .into_actor(self),
+        )
     }
 }
 
@@ -213,17 +211,19 @@ impl Handler<ShutdownSubscribe> for GracefulShutdown {
     type Result = ();
 
     fn handle(&mut self, msg: ShutdownSubscribe, _: &mut Context<Self>) {
-        //ask
-        //todo replace vec to hashset
+        // ask
+        // todo replace vec to hashset
 
-        let hashset_with_current_priority = self.recipients.get_mut(&msg.priority);
+        let hashset_with_current_priority =
+            self.recipients.get_mut(&msg.priority);
 
         if let Some(hashset) = hashset_with_current_priority {
             hashset.insert(msg.who);
         } else {
             self.recipients.insert(msg.priority, HashSet::new());
-            // unwrap should not panic because we have inserted new empty hashset
-            // with the key we are trying to get in the line above /\
+            // unwrap should not panic because we have inserted new empty
+            // hashset with the key we are trying to get in the line
+            // above /\
             let hashset = self.recipients.get_mut(&msg.priority).unwrap();
             hashset.insert(msg.who);
         }
@@ -234,7 +234,8 @@ impl Handler<ShutdownUnsubscribe> for GracefulShutdown {
     type Result = ();
 
     fn handle(&mut self, msg: ShutdownUnsubscribe, _: &mut Context<Self>) {
-        let hashset_with_current_priority = self.recipients.get_mut(&msg.priority);
+        let hashset_with_current_priority =
+            self.recipients.get_mut(&msg.priority);
 
         if let Some(hashset) = hashset_with_current_priority {
             hashset.remove(&msg.who);
@@ -243,7 +244,6 @@ impl Handler<ShutdownUnsubscribe> for GracefulShutdown {
         }
     }
 }
-
 
 pub fn create(shutdown_timeout: u64) -> Addr<GracefulShutdown> {
     let graceful_shutdown = GracefulShutdown::new(shutdown_timeout).start();

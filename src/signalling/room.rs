@@ -70,7 +70,7 @@ impl From<PeerStateError> for RoomError {
 pub enum RoomState {
     Started,
     Stopping,
-    Stopped
+    Stopped,
 }
 
 /// Media server room with its [`Member`]s.
@@ -106,7 +106,7 @@ impl Room {
                 turn,
                 reconnect_timeout,
             ),
-            state: RoomState::Started
+            state: RoomState::Started,
         }
     }
 
@@ -318,7 +318,12 @@ impl Handler<ConnectPeers> for Room {
                          stopped.",
                         err
                     );
-                    ctx.notify(CloseRoom {})
+                    ctx.spawn(wrap_future(
+                        ctx.address().send(CloseRoom {})
+                            .then(|fut| fut))
+                        .map(|_,_,_| ())
+                        .map_err(|_,_,_| ())
+                    );
                 }))
             }
             Err(err) => {
@@ -326,7 +331,12 @@ impl Handler<ConnectPeers> for Room {
                     "Failed handle command, because {}. Room will be stopped.",
                     err
                 );
-                ctx.notify(CloseRoom {});
+                ctx.spawn(wrap_future(
+                    ctx.address().send(CloseRoom {})
+                        .then(|fut| fut))
+                    .map(|_,_,_| ())
+                    .map_err(|_,_,_| ())
+                );
                 Box::new(wrap_future(future::ok(())))
             }
         }
@@ -364,7 +374,12 @@ impl Handler<CommandMessage> for Room {
                          stopped.",
                         err
                     );
-                    ctx.notify(CloseRoom {})
+                    ctx.spawn(wrap_future(
+                        ctx.address().send(CloseRoom {})
+                            .then(|fut| fut))
+                            .map(|_,_,_| ())
+                            .map_err(|_,_,_| ())
+                    );
                 }))
             }
             Err(err) => {
@@ -372,7 +387,12 @@ impl Handler<CommandMessage> for Room {
                     "Failed handle command, because {}. Room will be stopped.",
                     err
                 );
-                ctx.notify(CloseRoom {});
+                ctx.spawn(wrap_future(
+                    ctx.address().send(CloseRoom {})
+                        .then(|fut| fut))
+                    .map(|_,_,_| ())
+                    .map_err(|_,_,_| ())
+                );
                 Box::new(wrap_future(future::ok(())))
             }
         }
@@ -421,12 +441,12 @@ impl Handler<RpcConnectionEstablished> for Room {
 
 /// Signal of close [`Room`].
 #[derive(Debug, Message)]
-#[rtype(result = "()")]
+#[rtype(result = "Result<Box<(dyn Future<Item = (), Error = ()> + Send)>, ()>")]
 #[allow(clippy::module_name_repetitions)]
 pub struct CloseRoom {}
 
 impl Handler<CloseRoom> for Room {
-    type Result = ();
+    type Result = Result<Box<(dyn Future<Item = (), Error = ()> + Send)>, ()>;
 
     /// Sends to remote [`Member`] the [`Event`] about [`Peer`] removed.
     /// Closes all active [`RpcConnection`]s.
@@ -438,8 +458,11 @@ impl Handler<CloseRoom> for Room {
         info!("Closing Room [id = {:?}]", self.id);
         self.state = RoomState::Stopping;
         let drop_fut = self.participants.drop_connections(ctx);
-        ctx.wait(wrap_future(drop_fut));
-        self.state = RoomState::Stopped;
+
+        //todo return future
+//        ctx.wait(wrap_future(drop_fut));
+
+        Ok(Box::new(drop_fut))
     }
 }
 
@@ -454,10 +477,7 @@ impl Handler<ShutdownMessage> for Room {
     ) -> Self::Result {
         info!("Shutting down Room: {:?}", self.id);
 
-        Ok(Box::new(
-            ctx.address().send(CloseRoom {})
-                .map_err(|_| ())
-        ))
+        Ok(Box::new(ctx.address().send(CloseRoom {}).map(|_| ()).map_err(|_| ())))
     }
 }
 

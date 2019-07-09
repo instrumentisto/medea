@@ -1,9 +1,9 @@
 use core::fmt;
 use std::net::SocketAddr;
 
-use actix::{fut::wrap_future, Actor, ActorFuture, Addr,
-            Arbiter, Context, Handler, MailboxError,
-            Message, WrapFuture
+use actix::{
+    fut::wrap_future, Actor, ActorFuture, Addr, Arbiter, Context, Handler,
+    MailboxError, Message, WrapFuture,
 };
 use bb8::RunError;
 use failure::Fail;
@@ -181,7 +181,8 @@ pub fn new_turn_auth_service(
         static_user: None,
     };
 
-    let service_addr = Service::start_in_arbiter(&Arbiter::new(), move |_| service);
+    let service_addr =
+        Service::start_in_arbiter(&Arbiter::new(), move |_| service);
     Ok(Box::new(service_addr))
 }
 

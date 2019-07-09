@@ -230,7 +230,12 @@ impl ParticipantService {
                         error!("Error deleting IceUser {:?}", err)
                     }),
                 ));
-                ctx.notify(CloseRoom {})
+                ctx.spawn(wrap_future(
+                    ctx.address().send(CloseRoom {})
+                        .then(|fut| fut))
+                    .map(|_,_,_| ())
+                    .map_err(|_,_,_| ())
+                );
             }
             ClosedReason::Lost => {
                 self.drop_connection_tasks.insert(
@@ -274,23 +279,27 @@ impl ParticipantService {
     pub fn drop_connections(
         &mut self,
         ctx: &mut Context<Room>,
-    ) -> impl Future<Item = (), Error = ()> {
+    ) -> impl Future<Item = (), Error = ()> + std::marker::Send {
         // canceling all drop_connection_tasks
         self.drop_connection_tasks.drain().for_each(|(_, handle)| {
             ctx.cancel_future(handle);
         });
 
         // closing all RpcConnection's
-        let mut close_fut = self.connections.drain().fold(
+//        let mut close_fut =
+            self.connections.drain().fold(
             vec![],
             |mut futures, (_, mut connection)| {
-                futures.push(connection.close());
+                futures.push(connection.close(
+
+                ));
                 futures
             },
         );
 
         // deleting all IceUsers
-        let remove_ice_users = Box::new({
+//        let remove_ice_users =
+            Box::new({
             let mut room_users = Vec::with_capacity(self.members.len());
 
             self.members.iter_mut().for_each(|(_, data)| {
@@ -302,8 +311,9 @@ impl ParticipantService {
                 .delete(room_users)
                 .map_err(|err| error!("Error removing IceUsers {:?}", err))
         });
-        close_fut.push(remove_ice_users);
+//        close_fut.push(remove_ice_users);
 
-        join_all(close_fut).map(|_| ())
+//        join_all(close_fut).map(|_| ())
+        futures::future::ok(())
     }
 }

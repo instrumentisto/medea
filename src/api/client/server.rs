@@ -1,12 +1,11 @@
 //! HTTP server for handling WebSocket connections of Client API.
 
-use actix::Actor;
+use actix::{Actor, Addr};
 use actix_web::{
     middleware,
     web::{resource, Data, Path, Payload},
     App, HttpRequest, HttpResponse, HttpServer,
 };
-use actix::Addr;
 use actix_web_actors::ws;
 use futures::{
     future::{self, Either},
