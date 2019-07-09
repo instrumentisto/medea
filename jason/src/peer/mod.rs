@@ -89,15 +89,15 @@ impl PeerConnection {
 
         // Bind to `icecandidate` event.
         let inner_rc = Rc::clone(&inner);
-        inner.peer.on_ice_candidate(move |candidate| {
+        inner.peer.on_ice_candidate(Some(move |candidate| {
             Self::on_ice_candidate(&inner_rc, candidate);
-        })?;
+        }))?;
 
         // Bind to `track` event.
         let inner_rc = Rc::clone(&inner);
-        inner.peer.on_track(move |track_event| {
+        inner.peer.on_track(Some(move |track_event| {
             Self::on_track(&inner_rc, &track_event);
-        })?;
+        }))?;
 
         Ok(Self(inner))
     }
@@ -254,5 +254,12 @@ impl PeerConnection {
         self.0
             .peer
             .add_ice_candidate(candidate, sdp_m_line_index, sdp_mid)
+    }
+}
+
+impl Drop for PeerConnection {
+    fn drop(&mut self) {
+        let _ = self.0.peer.on_track::<Box<FnMut(RtcTrackEvent)>>(None);
+        let _ = self.0.peer.on_ice_candidate::<Box<FnMut(IceCandidate)>>(None);
     }
 }

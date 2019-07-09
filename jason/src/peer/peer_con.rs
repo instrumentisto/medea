@@ -75,41 +75,58 @@ impl RtcPeerConnection {
         }))))
     }
 
-    pub fn on_track<F>(&self, mut f: F) -> Result<(), WasmErr>
+    pub fn on_track<F>(&self, f: Option<F>) -> Result<(), WasmErr>
     where
         F: (FnMut(RtcTrackEvent)) + 'static,
     {
         let mut inner_mut = self.0.borrow_mut();
-        inner_mut.on_track = Some(EventListener::new_mut(
-            Rc::clone(&inner_mut.peer),
-            "track",
-            move |msg: RtcTrackEvent| {
-                f(msg);
+
+        match f {
+            None => {
+                inner_mut.on_track = None
             },
-        )?);
+            Some(mut f) => {
+                inner_mut.on_track = Some(EventListener::new_mut(
+                    Rc::clone(&inner_mut.peer),
+                    "track",
+                    move |msg: RtcTrackEvent| {
+                        f(msg);
+                    },
+                )?);
+            },
+        }
+
         Ok(())
     }
 
-    pub fn on_ice_candidate<F>(&self, mut f: F) -> Result<(), WasmErr>
+    pub fn on_ice_candidate<F>(&self, f: Option<F>) -> Result<(), WasmErr>
     where
         F: (FnMut(IceCandidate)) + 'static,
     {
         let mut inner_mut = self.0.borrow_mut();
-        inner_mut.on_ice_candidate = Some(EventListener::new_mut(
-            Rc::clone(&inner_mut.peer),
-            "icecandidate",
-            move |msg: RtcPeerConnectionIceEvent| {
-                // TODO: examine None candidates, maybe we should send them
-                //       (although no one does)
-                if let Some(candidate) = msg.candidate() {
-                    f(IceCandidate {
-                        candidate: candidate.candidate(),
-                        sdp_m_line_index: candidate.sdp_m_line_index(),
-                        sdp_mid: candidate.sdp_mid(),
-                    });
-                }
+        match f {
+            None => {
+                inner_mut.on_ice_candidate = None
             },
-        )?);
+            Some(mut f) => {
+                inner_mut.on_ice_candidate = Some(EventListener::new_mut(
+                    Rc::clone(&inner_mut.peer),
+                    "icecandidate",
+                    move |msg: RtcPeerConnectionIceEvent| {
+                        // TODO: examine None candidates, maybe we should send them
+                        //       (although no one does)
+                        if let Some(candidate) = msg.candidate() {
+                            f(IceCandidate {
+                                candidate: candidate.candidate(),
+                                sdp_m_line_index: candidate.sdp_m_line_index(),
+                                sdp_mid: candidate.sdp_mid(),
+                            });
+                        }
+                    },
+                )?);
+            },
+        }
+
         Ok(())
     }
 
@@ -268,10 +285,12 @@ impl RtcPeerConnection {
     }
 }
 
-impl Drop for InnerPeer {
+impl Drop for RtcPeerConnection {
     fn drop(&mut self) {
-        self.on_track.take();
-        self.on_ice_candidate.take();
-        self.peer.close()
+
+        let mut inner = self.0.borrow_mut();
+        inner.on_track.take();
+        inner.on_ice_candidate.take();
+        inner.peer.close();
     }
 }

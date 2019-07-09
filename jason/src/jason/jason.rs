@@ -19,7 +19,7 @@ use crate::{
 pub struct Jason(Rc<RefCell<Inner>>);
 
 #[derive(Default)]
-pub struct Inner {
+struct Inner {
     // TODO: multiple RpcClient's if rooms managed by different servers
     rpc: Option<Rc<RpcClient>>,
     media_manager: Rc<MediaManager>,
