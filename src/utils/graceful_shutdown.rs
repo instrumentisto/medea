@@ -185,8 +185,6 @@ impl Handler<ShutdownSignalDetected> for GracefulShutdown {
                 this_priority_futures_vec.push(recipient_shutdown_fut);
             }
 
-            error!("outer iter done!");
-
             let this_priority_futures = join_all(this_priority_futures_vec);
             let new_shutdown_future =
                 Box::new(shutdown_future.then(|_| this_priority_futures));

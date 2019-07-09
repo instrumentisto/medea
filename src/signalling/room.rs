@@ -12,7 +12,6 @@ use futures::{future, Future};
 use hashbrown::HashMap;
 use tokio::timer::Delay;
 
-
 use medea_client_api_proto::{Command, Event, IceCandidate};
 
 use crate::{
@@ -68,6 +67,13 @@ impl From<PeerStateError> for RoomError {
     }
 }
 
+#[derive(Debug)]
+pub enum RoomState {
+    Started,
+    Stopping,
+    Stopped
+}
+
 /// Media server room with its [`Member`]s.
 #[derive(Debug)]
 pub struct Room {
@@ -78,6 +84,9 @@ pub struct Room {
 
     /// [`Peer`]s of [`Member`]s in this [`Room`].
     peers: PeerRepository,
+
+    /// Current [`Room`]'s state
+    state: RoomState,
 }
 
 impl Room {
@@ -98,6 +107,7 @@ impl Room {
                 turn,
                 reconnect_timeout,
             ),
+            state: RoomState::Started
         }
     }
 
@@ -427,12 +437,14 @@ impl Handler<CloseRoom> for Room {
         ctx: &mut Self::Context,
     ) -> Self::Result {
         info!("Closing Room [id = {:?}]", self.id);
+        self.state = RoomState::Stopping;
         let drop_fut = self.participants.drop_connections(ctx);
         ctx.wait(wrap_future(drop_fut));
+        self.state = RoomState::Stopped;
     }
 }
 
-// Close room on `SIGINT`, `SIGTERM`, `SIGQUIT` signals.
+// Close room on `SIGINT`, `SIGTERM`, `SIGQUIT`, `SIGHUP` signals.
 impl Handler<ShutdownMessage> for Room {
     type Result = graceful_shutdown::ShutdownMessageResult;
 
@@ -442,18 +454,11 @@ impl Handler<ShutdownMessage> for Room {
         ctx: &mut Self::Context,
     ) -> Self::Result {
         info!("Shutting down Room: {:?}", self.id);
-        //todo return future
-        ctx.notify(CloseRoom {});
 
-        Ok(Box::new(futures::future::ok(()).then(
-            move |_: Result<(), ()>| {
-                // todo: close room dynamically
-                Delay::new(Instant::now() + Duration::from_millis(500))
-                    .then(|_| {
-                        futures::future::ok(())
-                    })
-            },
-        )))
+        Ok(Box::new(
+            ctx.address().send(CloseRoom {})
+                .map_err(|_| ())
+        ))
     }
 }
 
