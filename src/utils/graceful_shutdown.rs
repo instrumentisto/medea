@@ -22,17 +22,15 @@ use crate::log::prelude::*;
 use tokio::runtime::Runtime;
 //todo error unittype
 pub type ShutdownMessageResult = Result<
-    Box<dyn Future<Item = (), Error = Box<dyn std::error::Error + Send>> + std::marker::Send>,
-    ()
+    Box<dyn Future<Item = (), Error = ()> + std::marker::Send>, ()
 >;
 
 type ShutdownFutureType =
     dyn Future<
         Item = Vec<
-            ()
-            >,
-        Error = std::boxed::Box<dyn std::error::Error + std::marker::Send>
-    > + std::marker::Send
+            Result<Box<dyn futures::future::Future<Error = (), Item = ()> + std::marker::Send>, ()>>,
+        Error = ()
+    >
 ;
 
 #[derive(Debug)]
@@ -126,7 +124,7 @@ impl Handler<ShutdownSignalDetected> for GracefulShutdown {
 
         if self.recipients.is_empty() {
             error!("GracefulShutdown: No subscribers registered");
-            self.system.stop();
+            //todo stop system
             return;
         }
 
@@ -140,26 +138,11 @@ impl Handler<ShutdownSignalDetected> for GracefulShutdown {
                 Vec::with_capacity(self.recipients.len());
 
             for recipient in recipients_values.values() {
-                let (tx, rx) = channel();
-                let tx2 = tx.clone();
-
                 let send_future = recipient.send(ShutdownMessage {});
-
-
                 //todo async handle
+                //todo hashmap -> hashset
 
-                /*
-                    type:
-futures::future::then::Then<
-futures::future::map_err::MapErr<
-           actix::prelude::RecipientRequest<
-                                       utils::graceful_shutdown::ShutdownMessage>, [closure]>,
-
-
-Result<Result<Box<dyn futures::future::Future<Error = std::boxed::Box<dyn std::error::Error + std::marker::Send>, Item = ()> + std::marker::Send>, ()>, ()>, [closure]>
-                */
-
-                let x: () = send_future
+                let recipient_shutdown_fut = send_future
                         .into_future()
                         .map_err(move |e| {
                             error!("Error sending shutdown message: {:?}", e);
@@ -168,10 +151,10 @@ Result<Result<Box<dyn futures::future::Future<Error = std::boxed::Box<dyn std::e
                             future
                         });
 
-                let recipient_shutdown_fut = rx.recv().unwrap().unwrap();
-
                 this_priority_futures_vec.push(recipient_shutdown_fut);
             }
+
+            error!("outer iter done!");
 
             let this_priority_futures = join_all(this_priority_futures_vec);
             let new_shutdown_future =

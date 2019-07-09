@@ -62,7 +62,7 @@ fn main() {
     let server_addr = server::run(rooms_repo, config);
     graceful_shutdown_addr.do_send(ShutdownSubscribe{
         who: server_addr.recipient(),
-        priority: 1 });
+        priority: 5 });
 
     let _ = sys.run();
 }
