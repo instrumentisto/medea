@@ -279,20 +279,26 @@ impl ParticipantService {
     pub fn drop_connections(
         &mut self,
         ctx: &mut Context<Room>,
-    ) -> impl Future<Item = (), Error = ()> + std::marker::Send {
+    ) -> Box<impl Future<Item = (), Error = ()> + std::marker::Send> {
+        use std::sync::Arc;
+        // todo use self in sync, the rest in async
+
+        error!("participants called");
+
         // canceling all drop_connection_tasks
         self.drop_connection_tasks.drain().for_each(|(_, handle)| {
             ctx.cancel_future(handle);
         });
 
         // closing all RpcConnection's
-//        let mut close_fut =
-            self.connections.drain().fold(
-            vec![],
-            |mut futures, (_, mut connection)| {
-                futures.push(connection.close(
-
-                ));
+        let mut close_fut = self.connections.drain().fold(
+            vec![], |mut futures, (_, mut connection)| {
+                futures.push(
+                    futures::future::ok(())
+//                        .then(move |_| {
+//                            connection.close()
+//                        })
+                );
                 futures
             },
         );
@@ -313,7 +319,7 @@ impl ParticipantService {
         });
 //        close_fut.push(remove_ice_users);
 
-//        join_all(close_fut).map(|_| ())
-        futures::future::ok(())
+        Box::new(join_all(close_fut).map(|_| ()))
+//        futures::future::ok(())
     }
 }

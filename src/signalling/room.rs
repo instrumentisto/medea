@@ -321,8 +321,8 @@ impl Handler<ConnectPeers> for Room {
                     ctx.spawn(wrap_future(
                         ctx.address().send(CloseRoom {})
                             .then(|fut| fut))
-                        .map(|_,_,_| ())
-                        .map_err(|_,_,_| ())
+                            .map(|_,_,_| ())
+                            .map_err(|_,_,_| ())
                     );
                 }))
             }
@@ -459,9 +459,6 @@ impl Handler<CloseRoom> for Room {
         self.state = RoomState::Stopping;
         let drop_fut = self.participants.drop_connections(ctx);
 
-        //todo return future
-//        ctx.wait(wrap_future(drop_fut));
-
         Ok(Box::new(drop_fut))
     }
 }
@@ -477,7 +474,11 @@ impl Handler<ShutdownMessage> for Room {
     ) -> Self::Result {
         info!("Shutting down Room: {:?}", self.id);
 
-        Ok(Box::new(ctx.address().send(CloseRoom {}).map(|_| ()).map_err(|_| ())))
+        Ok(Box::new(ctx.address().send(CloseRoom {})
+            .then(|fut| fut)
+            .map(|_| ())
+            .map_err(|_| ())
+        ))
     }
 }
 
