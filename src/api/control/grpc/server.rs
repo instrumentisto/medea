@@ -26,7 +26,13 @@ use crate::{
 };
 
 use super::protos::control_grpc::{create_control_api, ControlApi};
-use crate::signalling::room_repo::{GetEndpoint, GetMember};
+use crate::signalling::{
+    room::DeleteEndpointCheck,
+    room_repo::{
+        DeleteEndpointFromMemberCheck, DeleteMemberFromRoomCheck, GetEndpoint,
+        GetMember,
+    },
+};
 
 #[derive(Debug, Fail)]
 enum ControlApiError {
@@ -186,6 +192,10 @@ impl ControlApi for ControlApiService {
         req: IdRequest,
         sink: UnarySink<Response>,
     ) {
+        //        let mut delete_room_futs = Vec::new();
+        let mut delete_member_futs = Vec::new();
+        let mut delete_endpoints_futs = Vec::new();
+
         for id in req.get_id() {
             let uri = LocalUri::parse(id).unwrap(); // TODO
 
@@ -193,25 +203,77 @@ impl ControlApi for ControlApiService {
                 self.room_repository
                     .do_send(DeleteRoom(uri.room_id.unwrap()));
             } else if uri.is_member_uri() {
-                self.room_repository.do_send(DeleteMemberFromRoom {
-                    room_id: uri.room_id.unwrap(),
-                    member_id: uri.member_id.unwrap(),
-                });
+                delete_member_futs.push(self.room_repository.send(
+                    DeleteMemberFromRoomCheck {
+                        room_id: uri.room_id.unwrap(),
+                        member_id: uri.member_id.unwrap(),
+                    },
+                ));
             } else if uri.is_endpoint_uri() {
-                self.room_repository.do_send(DeleteEndpointFromMember {
-                    room_id: uri.room_id.unwrap(),
-                    member_id: uri.member_id.unwrap(),
-                    endpoint_id: uri.endpoint_id.unwrap(),
-                });
+                delete_endpoints_futs.push(self.room_repository.send(
+                    DeleteEndpointFromMemberCheck {
+                        room_id: uri.room_id.unwrap(),
+                        member_id: uri.member_id.unwrap(),
+                        endpoint_id: uri.endpoint_id.unwrap(),
+                    },
+                ));
             }
         }
 
-        let mut resp = Response::new();
-        resp.set_sid(HashMap::new());
+        let mega_delete_member_fut =
+            futures::future::join_all(delete_member_futs);
+        let mega_delete_endpoints_fut =
+            futures::future::join_all(delete_endpoints_futs);
+
+        let room_repository_addr = self.room_repository.clone();
+
         ctx.spawn(
-            sink.success(resp)
-                .map_err(|e| error!("gRPC response failed. {:?}", e)),
+            mega_delete_endpoints_fut
+                .join(mega_delete_member_fut)
+                .map_err(|_| ())
+                .and_then(move |(member, endpoint)| {
+                    let mut members_msgs = Vec::new();
+                    let mut endpoints_msgs = Vec::new();
+                    for member_fut in member {
+                        let member_msg = member_fut.unwrap().unwrap();
+                        members_msgs.push(
+                            room_repository_addr
+                                .send(member_msg)
+                                .map_err(|_| ()),
+                        );
+                    }
+
+                    for endpoint_fut in endpoint {
+                        let endpoint_msg = endpoint_fut.unwrap().unwrap();
+                        endpoints_msgs.push(
+                            room_repository_addr
+                                .send(endpoint_msg)
+                                .map_err(|_| ()),
+                        );
+                    }
+
+                    let members_msgs = futures::future::join_all(members_msgs);
+                    let endpoints_msgs =
+                        futures::future::join_all(endpoints_msgs);
+
+                    members_msgs
+                        .join(endpoints_msgs)
+                        .map_err(|_| ())
+                        .map(|_| ())
+                        .and_then(|_| {
+                            let mut response = Response::new();
+                            response.set_sid(HashMap::new());
+                            sink.success(response).map_err(|_| ())
+                        })
+                }),
         );
+
+        //        let mut resp = Response::new();
+        //        resp.set_sid(HashMap::new());
+        //        ctx.spawn(
+        //            sink.success(resp)
+        //                .map_err(|e| error!("gRPC response failed. {:?}", e)),
+        //        );
     }
 
     fn get(
@@ -266,10 +328,10 @@ impl ControlApi for ControlApiService {
                         }
                         Err(e) => {
                             let mut error = Error::new();
-                            error.set_status(500);
-                            error.set_code(500);
-                            error.set_text(String::new());
-                            error.set_element(String::new());
+                            error.set_status(400);
+                            error.set_code(0); // TODO
+                            error.set_text(e.to_string());
+                            error.set_element(String::new()); // TODO
                             let mut response = GetResponse::new();
                             response.set_error(error);
 

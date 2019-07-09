@@ -89,7 +89,7 @@ fn main() {
     let mut room = RepeatedField::new();
     room.push("local://grpc-test".to_string());
     room.push("local://video-call-1/responder".to_string());
-    room.push("local://grpc-test/publisher/publih".to_string());
+    room.push("local://grpc-test/publisher/publish".to_string());
     get_room_request.set_id(room);
 
     let reply = client.get(&get_room_request).expect("get room");

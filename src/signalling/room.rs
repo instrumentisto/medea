@@ -751,7 +751,7 @@ impl Handler<RpcConnectionClosed> for Room {
     }
 }
 
-#[derive(Debug, Message)]
+#[derive(Debug, Message, Clone)]
 #[rtype(result = "()")]
 pub struct DeleteMember(pub MemberId);
 
@@ -768,6 +768,26 @@ impl Handler<DeleteMember> for Room {
 }
 
 #[derive(Debug, Message)]
+#[rtype(result = "Result<(), RoomError>")]
+pub struct DeleteMemberCheck(pub MemberId);
+
+impl Handler<DeleteMemberCheck> for Room {
+    type Result = Result<(), RoomError>;
+
+    fn handle(
+        &mut self,
+        msg: DeleteMemberCheck,
+        ctx: &mut Self::Context,
+    ) -> Self::Result {
+        if let None = self.members.get_member_by_id(&msg.0) {
+            panic!()
+        };
+
+        Ok(())
+    }
+}
+
+#[derive(Debug, Message, Clone)]
 #[rtype(result = "()")]
 pub struct DeleteEndpoint {
     pub member_id: MemberId,
@@ -795,5 +815,52 @@ impl Handler<DeleteEndpoint> for Room {
             let peer_ids = endpoint.peer_ids();
             self.peers.remove_peers(msg.member_id, peer_ids, ctx);
         }
+    }
+}
+
+#[derive(Debug, Message)]
+#[rtype(result = "Result<(), RoomError>")]
+pub struct DeleteEndpointCheck {
+    pub member_id: MemberId,
+    pub endpoint_id: String,
+}
+
+impl Handler<DeleteEndpointCheck> for Room {
+    type Result = Result<(), RoomError>;
+
+    fn handle(
+        &mut self,
+        msg: DeleteEndpointCheck,
+        ctx: &mut Self::Context,
+    ) -> Self::Result {
+        let member = match self.members.get_member_by_id(&msg.member_id) {
+            Some(m) => m,
+            None => panic!(),
+        };
+        let play_id = WebRtcPlayId(msg.endpoint_id);
+
+        if let Some(endpoint) = member.get_sink_by_id(&play_id) {
+            if let Some(peer_id) = endpoint.peer_id() {
+                if let Err(_) = self.peers.get_peer(peer_id) {
+                    return Ok(());
+                }
+            } else {
+                panic!()
+            }
+        }
+
+        let publish_id = WebRtcPublishId(play_id.0);
+        if let Some(endpoint) = member.get_src_by_id(&publish_id) {
+            let peer_ids = endpoint.peer_ids();
+            for peer_id in peer_ids {
+                if let Err(_) = self.peers.get_peer(peer_id) {
+                    panic!()
+                }
+            }
+        } else {
+            panic!()
+        }
+
+        Ok(())
     }
 }

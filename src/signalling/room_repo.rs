@@ -18,8 +18,9 @@ use crate::{
     },
     signalling::{
         room::{
-            CloseRoom, DeleteEndpoint, DeleteMember, RoomError, Serialize,
-            SerializeEndpoint, SerializeMember,
+            CloseRoom, DeleteEndpoint, DeleteEndpointCheck, DeleteMember,
+            DeleteMemberCheck, RoomError, Serialize, SerializeEndpoint,
+            SerializeMember,
         },
         Room,
     },
@@ -164,6 +165,46 @@ impl Handler<DeleteMemberFromRoom> for RoomsRepository {
 }
 
 #[derive(Message)]
+#[rtype(
+    result = "Result<Result<DeleteMemberFromRoom, RoomError>, RoomRepoError>"
+)]
+pub struct DeleteMemberFromRoomCheck {
+    pub member_id: MemberId,
+    pub room_id: RoomId,
+}
+
+impl Handler<DeleteMemberFromRoomCheck> for RoomsRepository {
+    type Result =
+        ActFuture<Result<DeleteMemberFromRoom, RoomError>, RoomRepoError>;
+
+    fn handle(
+        &mut self,
+        msg: DeleteMemberFromRoomCheck,
+        ctx: &mut Self::Context,
+    ) -> Self::Result {
+        let fut =
+            if let Some(room) = self.rooms.lock().unwrap().get(&msg.room_id) {
+                Either::A(
+                    room.send(DeleteMemberCheck(msg.member_id.clone()))
+                        .map_err(|e| RoomRepoError::from(e))
+                        .map(|r| {
+                            r.map(|_| DeleteMemberFromRoom {
+                                room_id: msg.room_id,
+                                member_id: msg.member_id,
+                            })
+                        }),
+                )
+            } else {
+                Either::B(futures::future::err(RoomRepoError::RoomNotFound(
+                    msg.room_id,
+                )))
+            };
+
+        Box::new(wrap_future(fut))
+    }
+}
+
+#[derive(Message)]
 #[rtype(result = "Result<(), RoomRepoError>")]
 pub struct DeleteEndpointFromMember {
     pub room_id: RoomId,
@@ -189,6 +230,49 @@ impl Handler<DeleteEndpointFromMember> for RoomsRepository {
         }
 
         Ok(())
+    }
+}
+
+#[derive(Message)]
+#[rtype(result = "Result<Result<DeleteEndpointFromMember, RoomError>, \
+                  RoomRepoError>")]
+pub struct DeleteEndpointFromMemberCheck {
+    pub room_id: RoomId,
+    pub member_id: MemberId,
+    pub endpoint_id: String,
+}
+
+impl Handler<DeleteEndpointFromMemberCheck> for RoomsRepository {
+    type Result =
+        ActFuture<Result<DeleteEndpointFromMember, RoomError>, RoomRepoError>;
+
+    fn handle(
+        &mut self,
+        msg: DeleteEndpointFromMemberCheck,
+        ctx: &mut Self::Context,
+    ) -> Self::Result {
+        let fut = if let Some(room) = self.get(&msg.room_id) {
+            Either::A(
+                room.send(DeleteEndpointCheck {
+                    member_id: msg.member_id.clone(),
+                    endpoint_id: msg.endpoint_id.clone(),
+                })
+                .map_err(|e| RoomRepoError::from(e))
+                .map(|r| {
+                    r.map(|_| DeleteEndpointFromMember {
+                        room_id: msg.room_id,
+                        member_id: msg.member_id,
+                        endpoint_id: msg.endpoint_id,
+                    })
+                }),
+            )
+        } else {
+            Either::B(futures::future::err(RoomRepoError::RoomNotFound(
+                msg.room_id,
+            )))
+        };
+
+        Box::new(wrap_future(fut))
     }
 }
 
