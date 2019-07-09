@@ -1,3 +1,11 @@
+//! [`MediaConnections`] is storage of [`RtcPeerConnection`]s [`Sender`]s and
+//! [`Receiver`]s, where [`Sender`] is mapping between some local [`MediaTrack`]
+//! being sent to remote peer and [`RtcRtpTransceiver`][1] used to send this
+//! track and [`Receiver`] being mapping between some [`MediaTrack`] received
+//! from remote peer and [`RtcRtpTransceiver`][1] used to receive this track.
+//!
+//! [1]: https://www.w3.org/TR/webrtc/#rtcrtptransceiver-interface
+
 use std::{collections::HashMap, rc::Rc};
 
 use std::cell::RefCell;
@@ -19,13 +27,21 @@ use crate::{
 };
 
 struct InnerMediaConnections {
+    /// Ref to parent [`RtcPeerConnection`]. Used to generate transceivers for
+    /// [`Sender`]s and [`Receiver`]s.
     peer: Rc<RtcPeerConnection>,
+
+    /// If [`Sender`]s were changed in a way, that require inserting new
+    /// [`MediaStream`].
     need_new_stream: bool,
+
+    /// [`MediaTrack`] to its [`Sender`].
     senders: HashMap<TrackId, Rc<Sender>>,
+
+    /// [`MediaTrack`] to its [`Receiver`].
     receivers: HashMap<TrackId, Receiver>,
 }
 
-/// Stores [`Peer`]s [`Sender`]s and [`Receiver`]s.
 pub struct MediaConnections(RefCell<InnerMediaConnections>);
 
 impl MediaConnections {
@@ -38,7 +54,10 @@ impl MediaConnections {
         }))
     }
 
-    /// Returns map of track id to corresponding transceiver mid.
+    /// Returns map of [`MediaTrack`] Id to `mid` of [`RtcRtpTransceiver`][1]
+    /// used to send/receive this track.
+    ///
+    /// [1]: https://www.w3.org/TR/webrtc/#rtcrtptransceiver-interface
     pub fn get_mids(&self) -> Result<HashMap<u64, String>, WasmErr> {
         let mut inner = self.0.borrow_mut();
 
@@ -67,9 +86,13 @@ impl MediaConnections {
         Ok(mids)
     }
 
-    // TODO: Doesnt really updates anything, but only generates new senders and
-    //       receivers atm.
+    /// Synchronize local state with provided tracks. Will create new
+    /// [`Sender`]s and [`Receiver`]s for each new track, will update track (but
+    /// doesnt atm) if track is known but its settings has changed. Can change
+    /// `get_request` result if finds any new or changed send track.
     pub fn update_tracks(&self, tracks: Vec<Track>) -> Result<(), WasmErr> {
+        // TODO: Doesnt really updates anything, but only generates new senders
+        //       and receivers atm.
         let mut inner = self.0.borrow_mut();
 
         for track in tracks {
@@ -121,7 +144,7 @@ impl MediaConnections {
     /// based on track ids. Provided [`MediaStream`] must have all required
     /// [`MediaTrack`]s. [`MediaTrack`]s are inserted in [`Senders`]
     /// [`RTCRtpTransceiver`][1]s with [replaceTrack][2]
-    /// changing transceivers direction to sendonly.
+    /// changing transceivers direction to `sendonly`.
     ///
     /// [1]: https://www.w3.org/TR/webrtc/#rtcrtptransceiver-interface
     /// [2]: https://www.w3.org/TR/webrtc/#dom-rtcrtpsender-replacetrack

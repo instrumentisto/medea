@@ -30,9 +30,9 @@ pub type Id = u64;
 
 #[dispatchable]
 #[allow(clippy::module_name_repetitions)]
-/// Events emitted from [`PeerConnection`].
+/// Events emitted from [`RtcPeerConnection`].
 pub enum PeerEvent {
-    /// [`PeerConnection`] discovered new ice candidate.
+    /// [`RtcPeerConnection`] discovered new ice candidate.
     IceCandidateDiscovered {
         peer_id: Id,
         candidate: String,
@@ -40,7 +40,7 @@ pub enum PeerEvent {
         sdp_mid: Option<String>,
     },
 
-    /// [`PeerConnection`] received new stream from remote sender.
+    /// [`RtcPeerConnection`] received new stream from remote sender.
     NewRemoteStream {
         peer_id: Id,
         sender_id: u64,
@@ -54,7 +54,7 @@ struct InnerPeerConnection {
     /// Underlying [`RtcPeerConnection`].
     peer: Rc<RtcPeerConnection>,
 
-    /// [`Sender`]s and [`Receivers`] of this [`PeerConnection`].
+    /// [`Sender`]s and [`Receivers`] of this [`RtcPeerConnection`].
     media_connections: MediaConnections,
 
     /// [`MediaManager`] that will be used to acquire local [`MediaStream`]s.
@@ -68,9 +68,9 @@ struct InnerPeerConnection {
 pub struct PeerConnection(Rc<InnerPeerConnection>);
 
 impl PeerConnection {
-    /// Create new [`PeerConnection`]. Provided  `peer_events_sender` will be
-    /// used to emit any events from [`PeerEvent`], provided `ice_servers` will
-    /// be used by created [`PeerConenction`].
+    /// Create new [`RtcPeerConnection`]. Provided `peer_events_sender` will be
+    /// used to emit [`PeerEvent`]s from this peer , provided `ice_servers` will
+    /// be used by created [`RtcPeerConnection`].
     pub fn new(
         id: Id,
         peer_events_sender: UnboundedSender<PeerEvent>,
@@ -116,9 +116,10 @@ impl PeerConnection {
         );
     }
 
-    /// Handle `track` event from underlying peer emitting
-    /// [`PeerEvent::NewRemoteStream`] event into this peers
-    /// `peer_events_sender` if all tracks from this sender arrived.
+    /// Handle `track` event from underlying peer adding new track to
+    /// `media_connections` and emitting [`PeerEvent::NewRemoteStream`]
+    /// event into this peers `peer_events_sender` if all tracks from this
+    /// sender has arrived.
     fn on_track(inner: &InnerPeerConnection, track_event: &RtcTrackEvent) {
         let transceiver = track_event.transceiver();
         let track = track_event.track();
@@ -147,10 +148,11 @@ impl PeerConnection {
     }
 
     /// Track id to mid relations of all send tracks of this
-    /// [`PeerConnection`]. mid is id of [`m= section`][1]. mids are received
+    /// [`RtcPeerConnection`]. mid is id of [`m= section`][1]. mids are received
     /// directly from registered [`RTCRtpTransceiver`][2]s, and are being
-    /// allocated on local sdp update (i.e. after `create_and_set_offer` call).
-    /// Errors if finds sending transceiver without mid.
+    /// allocated on sdp update.
+    /// Errors if finds transceiver without mid, so must be called after setting
+    /// local description if offerrer, and remote if answerer.
     ///
     /// [1]: https://tools.ietf.org/html/rfc4566#section-5.14
     /// [2]: https://www.w3.org/TR/webrtc/#rtcrtptransceiver-interface
@@ -158,8 +160,9 @@ impl PeerConnection {
         self.0.media_connections.get_mids()
     }
 
-    /// Sync provided tracks creating send and recv transceivers, requesting
-    /// local stream if required. Get, set and return sdp offer.
+    /// Sync provided tracks creating all required [`Sender`]s and
+    /// [`Receiver`]s, request local stream if required, get, set and return
+    /// sdp offer.
     pub fn get_offer(
         &self,
         tracks: Vec<Track>,
@@ -185,6 +188,9 @@ impl PeerConnection {
         )
     }
 
+    /// Creates an SDP answer to an offer received from a remote peer and sets
+    /// it as local description. Must be called only if peer already has remote
+    /// description.
     pub fn create_and_set_answer(
         &self,
     ) -> impl Future<Item = String, Error = WasmErr> {
@@ -201,7 +207,8 @@ impl PeerConnection {
         self.0.peer.set_remote_description(SdpType::Answer(answer))
     }
 
-    /// Updates [`PeerConnection`] tracks and sets remote offer.
+    /// Sync provided tracks creating all required [`Sender`]s and
+    /// [`Receiver`]s, request local stream if required.
     /// `set_remote_description` will create all transceivers and fire all
     /// `on_track` events, so it updates [`Receiver`]s before
     /// `set_remote_description` and update [`Sender`]s after.
@@ -245,6 +252,9 @@ impl PeerConnection {
             })
     }
 
+    /// Adds remote peers [ICE Candidate][1] to this peer.
+    ///
+    /// [1]: https://tools.ietf.org/html/rfc5245#section-2
     pub fn add_ice_candidate(
         &self,
         candidate: &str,
@@ -258,11 +268,12 @@ impl PeerConnection {
 }
 
 impl Drop for PeerConnection {
+    /// Drop `on_track` and `on_ice_candidate` callbacks to prevent leak.
     fn drop(&mut self) {
-        let _ = self.0.peer.on_track::<Box<FnMut(RtcTrackEvent)>>(None);
+        let _ = self.0.peer.on_track::<Box<dyn FnMut(RtcTrackEvent)>>(None);
         let _ = self
             .0
             .peer
-            .on_ice_candidate::<Box<FnMut(IceCandidate)>>(None);
+            .on_ice_candidate::<Box<dyn FnMut(IceCandidate)>>(None);
     }
 }
