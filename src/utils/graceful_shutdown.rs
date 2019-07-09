@@ -51,6 +51,7 @@ impl Message for ShutdownSubscribe {
     type Result = ();
 }
 
+//todo #[derive(Message)]
 /// Subscribe to exit events, with priority
 pub struct ShutdownUnsubscribe {
     pub priority: u8,
@@ -64,7 +65,7 @@ impl Message for ShutdownUnsubscribe {
 
 /// Send this when a signal is detected
 #[cfg(unix)]
-struct ShutdownSignalDetected(Option<i32>);
+struct ShutdownSignalDetected(i32);
 
 #[cfg(unix)]
 impl Message for ShutdownSignalDetected {
@@ -96,8 +97,38 @@ impl GracefulShutdown {
 
 impl Actor for GracefulShutdown {
     type Context = Context<Self>;
+
+    fn started(&mut self, ctx: &mut Self::Context) {
+        #[cfg(not(unix))]
+            {
+                error!("Unable to use graceful_shutdown: only UNIX signals are supported");
+                return;
+            }
+        #[cfg(unix)]
+            {
+                use tokio_signal::unix::{Signal, SIGHUP, SIGINT, SIGQUIT, SIGTERM};
+
+                let sigint_stream = Signal::new(SIGINT).flatten_stream();
+                let sigterm_stream = Signal::new(SIGTERM).flatten_stream();
+                let sigquit_stream = Signal::new(SIGQUIT).flatten_stream();
+                let sighup_stream = Signal::new(SIGHUP).flatten_stream();
+                let signals_stream = sigint_stream
+                    .select(sigterm_stream)
+                    .select(sigquit_stream)
+                    .select(sighup_stream);
+
+                ctx.add_message_stream(signals_stream
+                    .map(move |signal| {
+                        ShutdownSignalDetected(signal)
+                    })
+                    .map_err(|_| ())
+                );
+
+            }
+    }
 }
 
+#[cfg(unix)]
 impl Handler<ShutdownSignalDetected> for GracefulShutdown {
     // todo result is future
     type Result = ();
@@ -106,16 +137,16 @@ impl Handler<ShutdownSignalDetected> for GracefulShutdown {
         use tokio_signal::unix::{SIGHUP, SIGINT, SIGQUIT, SIGTERM};
 
         match msg.0 {
-            Some(SIGINT) => {
+            SIGINT=> {
                 error!("SIGINT received, exiting");
             },
-            Some(SIGHUP) => {
+            SIGHUP => {
                 error!("SIGHUP received, reloading");
             },
-            Some(SIGTERM) => {
+            SIGTERM => {
                 error!("SIGTERM received, stopping");
             },
-            Some(SIGQUIT) => {
+            SIGQUIT => {
                 error!("SIGQUIT received, exiting");
             },
             _ => {
@@ -228,39 +259,5 @@ impl Handler<ShutdownUnsubscribe> for GracefulShutdown {
 
 pub fn create(shutdown_timeout: u64, system: actix::System) -> Addr<GracefulShutdown> {
     let graceful_shutdown = GracefulShutdown::new(shutdown_timeout, system).start();
-    let graceful_shutdown_recipient = graceful_shutdown.clone().recipient();
-    #[cfg(not(unix))]
-    {
-        error!("Unable to use graceful_shutdown: only UNIX signals are supported");
-        return graceful_shutdown;
-    }
-    #[cfg(unix)]
-    {
-        use tokio_signal::unix::{Signal, SIGHUP, SIGINT, SIGQUIT, SIGTERM};
-
-         // SIGINT
-        let sigint_stream = Signal::new(SIGINT).flatten_stream();
-        let sigterm_stream = Signal::new(SIGTERM).flatten_stream();
-        let sigquit_stream = Signal::new(SIGQUIT).flatten_stream();
-        let sighup_stream = Signal::new(SIGHUP).flatten_stream();
-        let signals_stream = sigint_stream
-            .select(sigterm_stream)
-            .select(sigquit_stream)
-            .select(sighup_stream);
-
-        let handler = move |(signal, _)| {
-            graceful_shutdown_recipient.do_send(ShutdownSignalDetected(signal));
-        };
-
-        // todo inject to actor context
-        thread::spawn(move || {
-            tokio::run(
-                signals_stream.into_future()
-                    .map(handler)
-                    .map_err(|err| ())
-            );
-        });
-    }
-
     graceful_shutdown
 }
