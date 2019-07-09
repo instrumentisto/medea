@@ -24,6 +24,7 @@ use crate::{
             grpc::protos::control::{
                 Element as ElementProto, Room as RoomProto,
             },
+            local_uri::LocalUri,
             room::RoomSpec,
             MemberId, RoomId, TryFromElementError, WebRtcPlayId,
             WebRtcPublishId,
@@ -463,7 +464,13 @@ impl Into<ElementProto> for &mut Room {
 
         let mut pipeline = StdHashMap::new();
         for (id, member) in self.members.members() {
-            pipeline.insert(id.to_string(), member.into());
+            let local_uri = LocalUri {
+                room_id: Some(self.get_id()),
+                member_id: Some(id),
+                endpoint_id: None,
+            };
+
+            pipeline.insert(local_uri.to_string(), member.into());
         }
         room.set_pipeline(pipeline);
 

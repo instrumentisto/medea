@@ -11,8 +11,8 @@ use hashbrown::HashMap;
 
 use crate::{
     api::control::{
-        grpc::protos::control::Element as ElementProto, room::RoomSpec,
-        MemberId, RoomId,
+        grpc::protos::control::Element as ElementProto, local_uri::LocalUri,
+        room::RoomSpec, MemberId, RoomId,
     },
     signalling::{
         room::{CloseRoom, DeleteEndpoint, DeleteMember, RoomError, Serialize},
@@ -198,7 +198,14 @@ impl Handler<GetRoom> for RoomsRepository {
                 futs.push(
                     room.send(Serialize)
                         .map_err(|_| RoomRepoError::Unknow)
-                        .map(move |r| (room_id.to_string(), r.unwrap())),
+                        .map(move |r| {
+                            let local_uri = LocalUri {
+                                room_id: Some(room_id),
+                                member_id: None,
+                                endpoint_id: None,
+                            };
+                            (local_uri.to_string(), r.unwrap())
+                        }),
                 )
             } else {
                 return Box::new(wrap_future(futures::future::err(

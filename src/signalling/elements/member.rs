@@ -14,15 +14,17 @@ use crate::{
         grpc::protos::control::{
             Member as MemberProto, Room_Element as ElementProto,
         },
-        MemberId, MemberSpec, RoomSpec, TryFromElementError, WebRtcPlayId,
-        WebRtcPublishId,
+        MemberId, MemberSpec, RoomId, RoomSpec, TryFromElementError,
+        WebRtcPlayId, WebRtcPublishId,
     },
     log::prelude::*,
     media::{IceUser, PeerId},
 };
 
 use super::endpoints::webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint};
-use crate::api::control::grpc::protos::control::Member_Element;
+use crate::api::control::{
+    grpc::protos::control::Member_Element, local_uri::LocalUri,
+};
 
 /// Errors which may occur while loading [`Member`]s from [`RoomSpec`].
 #[derive(Debug, Fail)]
@@ -53,6 +55,8 @@ pub struct Member(RefCell<MemberInner>);
 #[allow(clippy::module_name_repetitions)]
 #[derive(Debug)]
 struct MemberInner {
+    room_id: RoomId,
+
     id: MemberId,
 
     /// All [`WebRtcPublishEndpoint`]s of this [`Member`].
@@ -73,13 +77,14 @@ impl Member {
     ///
     /// To fill this [`Member`], you need to call the [`Member::load`]
     /// function.
-    fn new(id: MemberId, credentials: String) -> Self {
+    fn new(id: MemberId, credentials: String, room_id: RoomId) -> Self {
         Self(RefCell::new(MemberInner {
             id,
             srcs: HashMap::new(),
             sinks: HashMap::new(),
             credentials,
             ice_user: None,
+            room_id,
         }))
     }
 
@@ -290,6 +295,10 @@ impl Member {
     ) -> Option<Rc<WebRtcPublishEndpoint>> {
         self.0.borrow_mut().srcs.remove(id)
     }
+
+    pub fn room_id(&self) -> RoomId {
+        self.0.borrow().room_id.clone()
+    }
 }
 
 /// Creates all empty [`Member`] from [`RoomSpec`] and then
@@ -305,7 +314,11 @@ pub fn parse_members(
     for (id, member) in &members_spec {
         members.insert(
             id.clone(),
-            Rc::new(Member::new(id.clone(), member.credentials().to_string())),
+            Rc::new(Member::new(
+                id.clone(),
+                member.credentials().to_string(),
+                room_spec.id.clone(),
+            )),
         );
     }
 
@@ -344,10 +357,21 @@ impl Into<ElementProto> for Rc<Member> {
 
         let mut member_pipeline = StdHashMap::new();
         for (id, play) in self.sinks() {
-            member_pipeline.insert(id.to_string(), play.into());
+            let local_uri = LocalUri {
+                room_id: Some(self.room_id()),
+                member_id: Some(self.id()),
+                endpoint_id: Some(id.to_string()),
+            };
+            member_pipeline.insert(local_uri.to_string(), play.into());
         }
         for (id, publish) in self.srcs() {
-            member_pipeline.insert(id.to_string(), publish.into());
+            let local_uri = LocalUri {
+                room_id: Some(self.room_id()),
+                member_id: Some(self.id()),
+                endpoint_id: Some(id.to_string()),
+            };
+
+            member_pipeline.insert(local_uri.to_string(), publish.into());
         }
         member.set_pipeline(member_pipeline);
 

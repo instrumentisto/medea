@@ -1,6 +1,9 @@
+use std::fmt;
+
 use failure::Fail;
 
 use super::{MemberId, RoomId};
+use crate::api::control::endpoints::webrtc_play_endpoint::SrcUri;
 
 #[derive(Debug, Fail)]
 pub enum LocalUriParseError {
@@ -72,5 +75,22 @@ impl LocalUri {
         self.room_id.is_some()
             && self.member_id.is_some()
             && self.endpoint_id.is_some()
+    }
+}
+
+impl fmt::Display for LocalUri {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "local://")?;
+        if let Some(room_id) = &self.room_id {
+            write!(f, "{}", room_id)?;
+            if let Some(member_id) = &self.member_id {
+                write!(f, "/{}", member_id)?;
+                if let Some(endpoint_id) = &self.endpoint_id {
+                    write!(f, "/{}", endpoint_id)?
+                }
+            }
+        }
+
+        Ok(())
     }
 }
