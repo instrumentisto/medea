@@ -251,16 +251,39 @@ impl ControlApi for ControlApiService {
             .join3(member_fut, endpoint_fut)
             .map_err(|_| ())
             .and_then(|(room, member, endpoint)| {
-                let elements = room
-                    .unwrap()
+                let mut elements = HashMap::new();
+
+                let elements_result = room
                     .into_iter()
-                    .chain(member.unwrap().into_iter())
-                    .chain(endpoint.unwrap().into_iter())
-                    .collect();
+                    .chain(member.into_iter())
+                    .chain(endpoint.into_iter())
+                    .flat_map(|e| e.into_iter());
+
+                for element in elements_result {
+                    match element {
+                        Ok((id, o)) => {
+                            elements.insert(id, o);
+                        }
+                        Err(e) => {
+                            let mut error = Error::new();
+                            error.set_status(500);
+                            error.set_code(500);
+                            error.set_text(String::new());
+                            error.set_element(String::new());
+                            let mut response = GetResponse::new();
+                            response.set_error(error);
+
+                            return Either::A(
+                                sink.success(response).map_err(|_| ()),
+                            );
+                        }
+                    }
+                }
+
                 let mut response = GetResponse::new();
                 response.set_elements(elements);
 
-                sink.success(response).map_err(|_| ())
+                Either::B(sink.success(response).map_err(|_| ()))
             });
 
         ctx.spawn(mega_future);

@@ -5,7 +5,9 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use actix::{Actor, ActorFuture, Addr, Context, Handler, Message};
+use actix::{
+    Actor, ActorFuture, Addr, Context, Handler, MailboxError, Message,
+};
 use failure::Fail;
 use hashbrown::HashMap;
 
@@ -33,8 +35,16 @@ type ActFuture<I, E> =
 pub enum RoomRepoError {
     #[fail(display = "Room with id {} not found.", _0)]
     RoomNotFound(RoomId),
+    #[fail(display = "Mailbox error: {:?}", _0)]
+    MailboxError(MailboxError),
     #[fail(display = "Unknow error.")]
     Unknow,
+}
+
+impl From<MailboxError> for RoomRepoError {
+    fn from(e: MailboxError) -> Self {
+        RoomRepoError::MailboxError(e)
+    }
 }
 
 /// Repository that stores [`Room`]s addresses.
@@ -183,11 +193,15 @@ impl Handler<DeleteEndpointFromMember> for RoomsRepository {
 }
 
 #[derive(Message)]
-#[rtype(result = "Result<Vec<(String, ElementProto)>, RoomRepoError>")]
+#[rtype(result = "Result<Vec<Result<(String, ElementProto), RoomError>>, \
+                  RoomRepoError>")]
 pub struct GetRoom(pub Vec<RoomId>);
 
 impl Handler<GetRoom> for RoomsRepository {
-    type Result = ActFuture<Vec<(String, ElementProto)>, RoomRepoError>;
+    type Result = ActFuture<
+        Vec<Result<(String, ElementProto), RoomError>>,
+        RoomRepoError,
+    >;
 
     fn handle(
         &mut self,
@@ -200,14 +214,16 @@ impl Handler<GetRoom> for RoomsRepository {
             if let Some(room) = self.rooms.lock().unwrap().get(&room_id) {
                 futs.push(
                     room.send(Serialize)
-                        .map_err(|_| RoomRepoError::Unknow)
-                        .map(move |r| {
-                            let local_uri = LocalUri {
-                                room_id: Some(room_id),
-                                member_id: None,
-                                endpoint_id: None,
-                            };
-                            (local_uri.to_string(), r.unwrap())
+                        .map_err(|e| RoomRepoError::from(e))
+                        .map(move |result| {
+                            result.map(|r| {
+                                let local_uri = LocalUri {
+                                    room_id: Some(room_id),
+                                    member_id: None,
+                                    endpoint_id: None,
+                                };
+                                (local_uri.to_string(), r)
+                            })
                         }),
                 )
             } else {
@@ -222,11 +238,15 @@ impl Handler<GetRoom> for RoomsRepository {
 }
 
 #[derive(Message)]
-#[rtype(result = "Result<Vec<(String, ElementProto)>, RoomRepoError>")]
+#[rtype(result = "Result<Vec<Result<(String, ElementProto), RoomError>>, \
+                  RoomRepoError>")]
 pub struct GetMember(pub Vec<(RoomId, MemberId)>);
 
 impl Handler<GetMember> for RoomsRepository {
-    type Result = ActFuture<Vec<(String, ElementProto)>, RoomRepoError>;
+    type Result = ActFuture<
+        Vec<Result<(String, ElementProto), RoomError>>,
+        RoomRepoError,
+    >;
 
     fn handle(
         &mut self,
@@ -239,14 +259,17 @@ impl Handler<GetMember> for RoomsRepository {
             if let Some(room) = self.rooms.lock().unwrap().get(&room_id) {
                 futs.push(
                     room.send(SerializeMember(member_id.clone()))
-                        .map_err(|_| RoomRepoError::Unknow)
-                        .map(|r| {
-                            let local_uri = LocalUri {
-                                room_id: Some(room_id),
-                                member_id: Some(member_id),
-                                endpoint_id: None,
-                            };
-                            (local_uri.to_string(), r.unwrap())
+                        .map_err(|e| RoomRepoError::from(e))
+                        .map(|result| {
+                            result.map(|r| {
+                                let local_uri = LocalUri {
+                                    room_id: Some(room_id),
+                                    member_id: Some(member_id),
+                                    endpoint_id: None,
+                                };
+
+                                (local_uri.to_string(), r)
+                            })
                         }),
                 )
             } else {
@@ -261,11 +284,15 @@ impl Handler<GetMember> for RoomsRepository {
 }
 
 #[derive(Message)]
-#[rtype(result = "Result<Vec<(String, ElementProto)>, RoomRepoError>")]
+#[rtype(result = "Result<Vec<Result<(String, ElementProto), RoomError>>, \
+                  RoomRepoError>")]
 pub struct GetEndpoint(pub Vec<(RoomId, MemberId, String)>);
 
 impl Handler<GetEndpoint> for RoomsRepository {
-    type Result = ActFuture<Vec<(String, ElementProto)>, RoomRepoError>;
+    type Result = ActFuture<
+        Vec<Result<(String, ElementProto), RoomError>>,
+        RoomRepoError,
+    >;
 
     fn handle(
         &mut self,
@@ -281,14 +308,16 @@ impl Handler<GetEndpoint> for RoomsRepository {
                         member_id.clone(),
                         endpoint_id.clone(),
                     ))
-                    .map_err(|_| RoomRepoError::Unknow)
-                    .map(|r| {
-                        let local_uri = LocalUri {
-                            room_id: Some(room_id),
-                            member_id: Some(member_id),
-                            endpoint_id: Some(endpoint_id),
-                        };
-                        (local_uri.to_string(), r.unwrap())
+                    .map_err(|e| RoomRepoError::from(e))
+                    .map(|result| {
+                        result.map(|r| {
+                            let local_uri = LocalUri {
+                                room_id: Some(room_id),
+                                member_id: Some(member_id),
+                                endpoint_id: Some(endpoint_id),
+                            };
+                            (local_uri.to_string(), r)
+                        })
                     }),
                 );
             } else {

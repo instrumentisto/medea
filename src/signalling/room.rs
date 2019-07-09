@@ -58,6 +58,8 @@ pub enum RoomError {
     PeerNotFound(PeerId),
     #[fail(display = "Couldn't find Member with [id = {}]", _0)]
     MemberNotFound(MemberId),
+    #[fail(display = "Endpoint with ID '{}' not found.", _0)]
+    EndpointNotFound(String),
     #[fail(display = "Member [id = {}] does not have Turn credentials", _0)]
     NoTurnCredentials(MemberId),
     #[fail(display = "Couldn't find RpcConnection with Member [id = {}]", _0)]
@@ -482,11 +484,11 @@ impl Into<ElementProto> for &mut Room {
 }
 
 #[derive(Message)]
-#[rtype(result = "Result<ElementProto, ()>")]
+#[rtype(result = "Result<ElementProto, RoomError>")]
 pub struct Serialize;
 
 impl Handler<Serialize> for Room {
-    type Result = Result<ElementProto, ()>;
+    type Result = Result<ElementProto, RoomError>;
 
     fn handle(
         &mut self,
@@ -498,18 +500,22 @@ impl Handler<Serialize> for Room {
 }
 
 #[derive(Message)]
-#[rtype(result = "Result<ElementProto, ()>")]
+#[rtype(result = "Result<ElementProto, RoomError>")]
 pub struct SerializeMember(pub MemberId);
 
 impl Handler<SerializeMember> for Room {
-    type Result = Result<ElementProto, ()>;
+    type Result = Result<ElementProto, RoomError>;
 
     fn handle(
         &mut self,
         msg: SerializeMember,
         ctx: &mut Self::Context,
     ) -> Self::Result {
-        let member = self.members.get_member_by_id(&msg.0).unwrap(); // TODO
+        let member = self
+            .members
+            .get_member_by_id(&msg.0)
+            .map_or(Err(RoomError::MemberNotFound(msg.0)), Ok)?;
+
         let mut member_element: Room_Element = member.into();
         let member = member_element.take_member();
 
@@ -521,18 +527,22 @@ impl Handler<SerializeMember> for Room {
 }
 
 #[derive(Message)]
-#[rtype(result = "Result<ElementProto, ()>")]
+#[rtype(result = "Result<ElementProto, RoomError>")]
 pub struct SerializeEndpoint(pub MemberId, pub String);
 
 impl Handler<SerializeEndpoint> for Room {
-    type Result = Result<ElementProto, ()>;
+    type Result = Result<ElementProto, RoomError>;
 
     fn handle(
         &mut self,
         msg: SerializeEndpoint,
         ctx: &mut Self::Context,
     ) -> Self::Result {
-        let member = self.members.get_member_by_id(&msg.0).unwrap(); // TODO
+        let member = self
+            .members
+            .get_member_by_id(&msg.0)
+            .map_or(Err(RoomError::MemberNotFound(msg.0)), Ok)?; // TODO
+
         let endpoint_id = WebRtcPublishId(msg.1);
         let mut element = ElementProto::new();
 
@@ -548,7 +558,7 @@ impl Handler<SerializeEndpoint> for Room {
                 let endpoint = member_element.take_webrtc_play();
                 element.set_webrtc_play(endpoint);
             } else {
-                panic!(); // TODO
+                return Err(RoomError::EndpointNotFound(endpoint_id.0));
             }
         }
 
