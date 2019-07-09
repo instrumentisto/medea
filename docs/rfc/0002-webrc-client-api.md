@@ -171,9 +171,11 @@ struct Track {
 enum TrackDirection {
     Send {
       receivers: Vec<u64>,
+      mid: Option<String>,
     },
     Recv {
       sender: u64,
+      mid: Option<String>,
     },
 }
 
@@ -253,7 +255,8 @@ The most important part of `Peer` object is a list of `Track`s.
       },
       "direction": {
         "Send": {
-          "receivers": [2]
+          "receivers": [2],
+          "mid": null
         }
       }
     }, {
@@ -263,7 +266,8 @@ The most important part of `Peer` object is a list of `Track`s.
       },
       "direction": {
         "Send": {
-          "receivers": [2]
+          "receivers": [2],
+          "mid": null
         }
       }
     }, {
@@ -273,7 +277,8 @@ The most important part of `Peer` object is a list of `Track`s.
       },
       "direction": {
         "Recv": {
-          "sender": 2
+          "sender": 2,
+          "mid": null
         }
       }
     }, {
@@ -283,7 +288,8 @@ The most important part of `Peer` object is a list of `Track`s.
       },
       "direction": {
         "Recv": {
-          "sender": 2
+          "sender": 2,
+          "mid": null
         }
       }
     }
@@ -326,7 +332,8 @@ After negotiation is done and media starts flowing, `Web Client` might receive n
       },
       "direction": {
         "Send": {
-          "receivers": []
+          "receivers": [],
+          "mid": null
         }
       }
     }]
@@ -849,10 +856,11 @@ struct RemoveTracks {
 struct MakeSdpOffer {
     peer_id: u64,
     sdp_offer: String,
+    mids: HashMap<TrackId, String>,
 }
 ```
 
-`Web Client` sends [SDP Offer] to one if its `Peer`s.
+`Web Client` sends [SDP Offer] to one if its `Peer`s. `mids` section specifies transceivers mids used by each `Track`. 
 
 `Web Client` can send it:
 1. As reaction to `PeerCreated {sdp_offer: None}` event.
@@ -1057,7 +1065,8 @@ struct GetMembers {
             },
             "direction": {
               "Send": {
-                "receivers": [2]
+                "receivers": [2],
+                "mid": null
               }
             }
           }, {
@@ -1067,7 +1076,8 @@ struct GetMembers {
             },
             "direction": {
               "Send": {
-                "receivers": [2]
+                "receivers": [2],
+                "mid": null
               }
             }
           }, {
@@ -1077,7 +1087,8 @@ struct GetMembers {
             },
             "direction": {
               "Recv": {
-                "sender": 2
+                "sender": 2,
+                "mid": null
               }
             }
           }, {
@@ -1087,7 +1098,8 @@ struct GetMembers {
             },
             "direction": {
               "Recv": {
-                "sender": 2
+                "sender": 2,
+                "mid": null
               }
             }
           }]
@@ -1113,6 +1125,12 @@ struct GetMembers {
       "data": {
         "peer_id": 1,
         "sdp_offer": "user1_sendrecv_offer"
+      },
+      "mids": {
+         "1":"0",
+         "2":"1",
+         "3":"2",
+         "4":"3"
       }
     }
     ```
@@ -1132,7 +1150,8 @@ struct GetMembers {
             },
             "direction": {
               "Recv": {
-                "sender": 1
+                "sender": 1,
+                "mid": "0"
               }
             }
           }, {
@@ -1142,7 +1161,8 @@ struct GetMembers {
             },
             "direction": {
               "Recv": {
-                "sender": 1
+                "sender": 1,
+                "mid": "1"
               }
             }
           }, {
@@ -1152,7 +1172,8 @@ struct GetMembers {
             },
             "direction": {
               "Send": {
-                "receivers": [1]
+                "receivers": [1],
+                "mid": "2"
               }
             }
           }, {
@@ -1162,7 +1183,8 @@ struct GetMembers {
             },
             "direction": {
               "Send": {
-                "receivers": [1]
+                "receivers": [1],
+                "mid": "3"
               }
             }
           }]
@@ -1488,7 +1510,8 @@ struct GetMembers {
             },
             "direction": {
               "Send": {
-                "receivers": []
+                "receivers": [],
+                "mid": "0"
               }
             }
           }, {
@@ -1498,7 +1521,8 @@ struct GetMembers {
             },
             "direction": {
               "Send": {
-                "receivers": []
+                "receivers": [],
+                "mid": "1"
               }
             }
           }]
@@ -1587,7 +1611,8 @@ struct GetMembers {
             },
             "direction": {
               "Recv": {
-                "sender": 1
+                "sender": 1,
+                "mid": "0"
               }
             }
           }, {
@@ -1597,7 +1622,8 @@ struct GetMembers {
             },
             "direction": {
               "Recv": {
-                "sender": 1
+                "sender": 1,
+                "mid": "1"
               }
             }
           }]
@@ -1730,7 +1756,8 @@ struct GetMembers {
             },
             "direction": {
               "Recv": {
-                "sender": 1
+                "sender": 1,
+                "mid": "0"
               }
             }
           }, {
@@ -1740,7 +1767,8 @@ struct GetMembers {
             },
             "direction": {
               "Recv": {
-                "sender": 1
+                "sender": 1,
+                "mid": "1"
               }
             }
           }]
