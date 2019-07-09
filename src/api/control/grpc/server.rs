@@ -1,6 +1,7 @@
 use std::{collections::HashMap, sync::Arc};
 
 use actix::{Actor, Addr, Arbiter, Context};
+use failure::Fail;
 use futures::future::{Either, Future};
 use grpcio::{Environment, RpcContext, Server, ServerBuilder, UnarySink};
 
@@ -10,18 +11,49 @@ use crate::{
             ApplyRequest, CreateRequest, Error, GetResponse, IdRequest,
             Response,
         },
-        local_uri::LocalUri,
-        RoomSpec,
+        local_uri::{LocalUri, LocalUriParseError},
+        RoomSpec, TryFromElementError, TryFromProtobufError,
     },
     log::prelude::*,
-    signalling::room_repo::{
-        DeleteEndpointFromMember, DeleteMemberFromRoom, DeleteRoom,
-        RoomsRepository, StartRoom,
+    signalling::{
+        room::RoomError,
+        room_repo::{
+            DeleteEndpointFromMember, DeleteMemberFromRoom, DeleteRoom,
+            RoomsRepository, StartRoom,
+        },
     },
     App,
 };
 
 use super::protos::control_grpc::{create_control_api, ControlApi};
+
+#[derive(Debug, Fail)]
+enum ControlApiError {
+    #[fail(display = "{:?}", _0)]
+    LocalUri(LocalUriParseError),
+    #[fail(display = "{:?}", _0)]
+    TryFromProtobuf(TryFromProtobufError),
+    #[fail(display = "{:?}", _0)]
+    TryFromElement(TryFromElementError),
+}
+
+impl From<LocalUriParseError> for ControlApiError {
+    fn from(from: LocalUriParseError) -> Self {
+        ControlApiError::LocalUri(from)
+    }
+}
+
+impl From<TryFromProtobufError> for ControlApiError {
+    fn from(from: TryFromProtobufError) -> Self {
+        ControlApiError::TryFromProtobuf(from)
+    }
+}
+
+impl From<TryFromElementError> for ControlApiError {
+    fn from(from: TryFromElementError) -> Self {
+        ControlApiError::TryFromElement(from)
+    }
+}
 
 #[derive(Clone)]
 struct ControlApiService {
@@ -29,22 +61,22 @@ struct ControlApiService {
     app: Arc<App>,
 }
 
-impl ControlApi for ControlApiService {
-    fn create(
+impl ControlApiService {
+    pub fn create_room(
         &mut self,
-        ctx: RpcContext,
         req: CreateRequest,
-        sink: UnarySink<Response>,
-    ) {
-        let local_uri = LocalUri::parse(req.get_id()).unwrap();
+    ) -> Result<
+        impl Future<Item = HashMap<String, String>, Error = ()>,
+        ControlApiError,
+    > {
+        let local_uri = LocalUri::parse(req.get_id())?;
         let room_id = local_uri.room_id.unwrap();
 
-        let room = RoomSpec::try_from_protobuf(room_id.clone(), req.get_room())
-            .unwrap();
+        let room =
+            RoomSpec::try_from_protobuf(room_id.clone(), req.get_room())?;
 
         let sid: HashMap<String, String> = room
-            .members()
-            .unwrap()
+            .members()?
             .iter()
             .map(|(id, member)| {
                 let addr = &self.app.config.server.bind_ip;
@@ -63,27 +95,79 @@ impl ControlApi for ControlApiService {
             })
             .collect();
 
-        ctx.spawn(
-            self.room_repository
-                .send(StartRoom(room_id, room))
-                .map_err(|e| error!("Start room mailbox error. {:?}", e))
-                .and_then(move |r| {
-                    if r.is_ok() {
-                        let mut res = Response::new();
-                        res.set_sid(sid);
-                        Either::A(sink.success(res).map_err(|_| ()))
-                    } else {
-                        let mut res = Response::new();
-                        let mut error = Error::new();
-                        error.set_status(500);
-                        error.set_code(500);
-                        error.set_text(String::new());
+        // TODO: errors from `SendRoom` not bubbled up.
+        Ok(self
+            .room_repository
+            .send(StartRoom(room_id, room))
+            .map_err(|e| error!("Start room mailbox error. {:?}", e))
+            .map(move |_| sid))
+    }
+}
+
+impl ControlApi for ControlApiService {
+    fn create(
+        &mut self,
+        ctx: RpcContext,
+        req: CreateRequest,
+        sink: UnarySink<Response>,
+    ) {
+        let local_uri = LocalUri::parse(req.get_id()).unwrap();
+
+        let create = {
+            if local_uri.is_room_uri() {
+                self.create_room(req)
+            } else {
+                unimplemented!()
+            }
+        };
+
+        match create {
+            Ok(fut) => ctx.spawn(fut.and_then(move |r| {
+                let mut response = Response::new();
+                response.set_sid(r);
+                sink.success(response).map_err(|_| ())
+            })),
+            Err(e) => {
+                let mut res = Response::new();
+                let mut error = Error::new();
+
+                match e {
+                    ControlApiError::TryFromProtobuf(e) => match e {
+                        TryFromProtobufError::MemberElementNotFound
+                        | TryFromProtobufError::MemberCredentialsNotFound
+                        | TryFromProtobufError::P2pModeNotFound
+                        | TryFromProtobufError::SrcUriNotFound
+                        | TryFromProtobufError::RoomElementNotFound => {
+                            error.set_status(404);
+                            error.set_code(0);
+                            error.set_text(e.to_string());
+                            error.set_element(String::new());
+                        }
+                        TryFromProtobufError::SrcUriError(e) => {
+                            error.set_status(400);
+                            error.set_code(0);
+                            error.set_text(e.to_string());
+                            error.set_element(String::new());
+                        }
+                    },
+                    ControlApiError::TryFromElement(e) => {
+                        error.set_status(400);
+                        error.set_code(0);
+                        error.set_text(e.to_string());
                         error.set_element(String::new());
-                        res.set_error(error);
-                        Either::B(sink.success(res).map_err(|_| ()))
                     }
-                }),
-        );
+                    ControlApiError::LocalUri(e) => {
+                        error.set_status(400);
+                        error.set_code(0);
+                        error.set_text(e.to_string());
+                        error.set_element(String::new());
+                    }
+                }
+
+                res.set_error(error);
+                ctx.spawn(sink.success(res).map_err(|_| ()));
+            }
+        }
     }
 
     fn apply(
