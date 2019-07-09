@@ -21,7 +21,6 @@ use lazy_static::lazy_static;
 
 use crate::log::prelude::*;
 use tokio::runtime::Runtime;
-//todo error unittype
 pub type ShutdownMessageResult = Result<
     Box<dyn Future<Item = (), Error = ()> + std::marker::Send>, ()
 >;
@@ -31,8 +30,14 @@ type ShutdownFutureType =
         Item = Vec<
             Result<Box<dyn futures::future::Future<Error = (), Item = ()> + std::marker::Send>, ()>>,
         Error = ()
-    >
-;
+    >;
+
+type ShutdownSignalDetectedResult = Result<
+    Box<dyn Future<
+        Item = (),
+        Error = ()
+    >>,
+()>;
 
 #[derive(Debug)]
 pub struct ShutdownMessage;
@@ -62,14 +67,13 @@ impl Message for ShutdownUnsubscribe {
     type Result = ();
 }
 
-
 /// Send this when a signal is detected
 #[cfg(unix)]
 struct ShutdownSignalDetected(i32);
 
 #[cfg(unix)]
 impl Message for ShutdownSignalDetected {
-    type Result = ();
+    type Result = ShutdownSignalDetectedResult;
 }
 
 
@@ -130,10 +134,10 @@ impl Actor for GracefulShutdown {
 
 #[cfg(unix)]
 impl Handler<ShutdownSignalDetected> for GracefulShutdown {
-    // todo result is future
-    type Result = ();
+    type Result = ShutdownSignalDetectedResult;
 
-    fn handle(&mut self, msg: ShutdownSignalDetected, ctx: &mut Context<Self>) {
+    fn handle(&mut self, msg: ShutdownSignalDetected, ctx: &mut Context<Self>)
+            -> Self::Result {
         use tokio_signal::unix::{SIGHUP, SIGINT, SIGQUIT, SIGTERM};
 
         match msg.0 {
@@ -156,8 +160,6 @@ impl Handler<ShutdownSignalDetected> for GracefulShutdown {
 
         if self.recipients.is_empty() {
             error!("GracefulShutdown: No subscribers registered");
-            //todo stop system
-            return;
         }
 
         let mut shutdown_future: Box<ShutdownFutureType> =
@@ -201,7 +203,7 @@ impl Handler<ShutdownSignalDetected> for GracefulShutdown {
         }
 
         let system_to_stop = self.system.clone();
-        ctx.spawn(
+        Ok(Box::new(
             shutdown_future
                 .timeout(Duration::from_millis(self.shutdown_timeout))
                 .map_err(|e| {
@@ -214,8 +216,7 @@ impl Handler<ShutdownSignalDetected> for GracefulShutdown {
                     System::current().stop();
                     future::ok::<(), ()>(())
                 })
-                .into_actor(self)
-        );
+        ))
     }
 }
 
