@@ -26,6 +26,7 @@ use crate::{
 };
 
 use super::protos::control_grpc::{create_control_api, ControlApi};
+use crate::signalling::room_repo::GetMember;
 
 #[derive(Debug, Fail)]
 enum ControlApiError {
@@ -223,12 +224,15 @@ impl ControlApi for ControlApiService {
 
         for uri in req.get_id() {
             let local_uri = LocalUri::parse(uri).unwrap();
-            room_ids.push(local_uri.room_id.unwrap());
+            room_ids.push((
+                local_uri.room_id.unwrap(),
+                local_uri.member_id.unwrap(),
+            ));
         }
 
         ctx.spawn(
             self.room_repository
-                .send(GetRoom(room_ids))
+                .send(GetMember(room_ids))
                 .map_err(|e| ())
                 .and_then(|r| {
                     let result = r.unwrap();

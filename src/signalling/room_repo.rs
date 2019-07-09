@@ -15,7 +15,10 @@ use crate::{
         room::RoomSpec, MemberId, RoomId,
     },
     signalling::{
-        room::{CloseRoom, DeleteEndpoint, DeleteMember, RoomError, Serialize},
+        room::{
+            CloseRoom, DeleteEndpoint, DeleteMember, RoomError, Serialize,
+            SerializeMember,
+        },
         Room,
     },
     App,
@@ -202,6 +205,45 @@ impl Handler<GetRoom> for RoomsRepository {
                             let local_uri = LocalUri {
                                 room_id: Some(room_id),
                                 member_id: None,
+                                endpoint_id: None,
+                            };
+                            (local_uri.to_string(), r.unwrap())
+                        }),
+                )
+            } else {
+                return Box::new(wrap_future(futures::future::err(
+                    RoomRepoError::RoomNotFound(room_id),
+                )));
+            }
+        }
+
+        Box::new(wrap_future(futures::future::join_all(futs)))
+    }
+}
+
+#[derive(Message)]
+#[rtype(result = "Result<Vec<(String, ElementProto)>, RoomRepoError>")]
+pub struct GetMember(pub Vec<(RoomId, MemberId)>);
+
+impl Handler<GetMember> for RoomsRepository {
+    type Result = ActFuture<Vec<(String, ElementProto)>, RoomRepoError>;
+
+    fn handle(
+        &mut self,
+        msg: GetMember,
+        ctx: &mut Self::Context,
+    ) -> Self::Result {
+        let mut futs = Vec::new();
+
+        for (room_id, member_id) in msg.0 {
+            if let Some(room) = self.rooms.lock().unwrap().get(&room_id) {
+                futs.push(
+                    room.send(SerializeMember(member_id.clone()))
+                        .map_err(|_| RoomRepoError::Unknow)
+                        .map(|r| {
+                            let local_uri = LocalUri {
+                                room_id: Some(room_id),
+                                member_id: Some(member_id),
                                 endpoint_id: None,
                             };
                             (local_uri.to_string(), r.unwrap())

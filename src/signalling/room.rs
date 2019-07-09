@@ -22,7 +22,8 @@ use crate::{
         },
         control::{
             grpc::protos::control::{
-                Element as ElementProto, Room as RoomProto,
+                Element as ElementProto, Member_Element, Room as RoomProto,
+                Room_Element,
             },
             local_uri::LocalUri,
             room::RoomSpec,
@@ -493,6 +494,29 @@ impl Handler<Serialize> for Room {
         ctx: &mut Self::Context,
     ) -> Self::Result {
         Ok(self.into())
+    }
+}
+
+#[derive(Message)]
+#[rtype(result = "Result<ElementProto, ()>")]
+pub struct SerializeMember(pub MemberId);
+
+impl Handler<SerializeMember> for Room {
+    type Result = Result<ElementProto, ()>;
+
+    fn handle(
+        &mut self,
+        msg: SerializeMember,
+        ctx: &mut Self::Context,
+    ) -> Self::Result {
+        let member = self.members.get_member_by_id(&msg.0).unwrap(); // TODO
+        let mut member_element: Room_Element = member.into();
+        let member = member_element.take_member();
+
+        let mut element = ElementProto::new();
+        element.set_member(member);
+
+        Ok(element)
     }
 }
 
