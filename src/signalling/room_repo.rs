@@ -1,24 +1,37 @@
 //! Repository that stores [`Room`]s addresses.
 
-use std::sync::{Arc, Mutex};
+use std::{
+    collections::HashMap as StdHashMap,
+    sync::{Arc, Mutex},
+};
 
-use actix::{Actor, Addr, Context, Handler, Message};
+use actix::{Actor, ActorFuture, Addr, Context, Handler, Message};
 use failure::Fail;
 use hashbrown::HashMap;
 
 use crate::{
-    api::control::{room::RoomSpec, MemberId, RoomId},
+    api::control::{
+        grpc::protos::control::Element as ElementProto, room::RoomSpec,
+        MemberId, RoomId,
+    },
     signalling::{
-        room::{CloseRoom, DeleteEndpoint, DeleteMember, RoomError},
+        room::{CloseRoom, DeleteEndpoint, DeleteMember, RoomError, Serialize},
         Room,
     },
     App,
 };
+use actix::fut::wrap_future;
+use futures::future::{Either, Future};
+
+type ActFuture<I, E> =
+    Box<dyn ActorFuture<Actor = RoomsRepository, Item = I, Error = E>>;
 
 #[derive(Debug, Fail)]
 pub enum RoomRepoError {
     #[fail(display = "Room with id {} not found.", _0)]
     RoomNotFound(RoomId),
+    #[fail(display = "Unknow error.")]
+    Unknow,
 }
 
 /// Repository that stores [`Room`]s addresses.
@@ -163,5 +176,39 @@ impl Handler<DeleteEndpointFromMember> for RoomsRepository {
         }
 
         Ok(())
+    }
+}
+
+#[derive(Message)]
+#[rtype(result = "Result<StdHashMap<String, ElementProto>, RoomRepoError>")]
+pub struct GetRoom(pub RoomId);
+
+impl Handler<GetRoom> for RoomsRepository {
+    type Result = ActFuture<StdHashMap<String, ElementProto>, RoomRepoError>;
+
+    fn handle(
+        &mut self,
+        msg: GetRoom,
+        ctx: &mut Self::Context,
+    ) -> Self::Result {
+        let fut = {
+            if let Some(room) = self.rooms.lock().unwrap().get(&msg.0) {
+                Either::A(
+                    room.send(Serialize)
+                        .map_err(|_| RoomRepoError::Unknow)
+                        .map(move |r| {
+                            let mut ee = StdHashMap::new();
+                            ee.insert(msg.0.to_string(), r.unwrap()); // TODO
+                            ee
+                        }),
+                )
+            } else {
+                Either::B(futures::future::err(RoomRepoError::RoomNotFound(
+                    msg.0,
+                )))
+            }
+        };
+
+        Box::new(wrap_future(fut))
     }
 }

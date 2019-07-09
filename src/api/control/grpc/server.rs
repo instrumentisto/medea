@@ -19,7 +19,7 @@ use crate::{
         room::RoomError,
         room_repo::{
             DeleteEndpointFromMember, DeleteMemberFromRoom, DeleteRoom,
-            RoomsRepository, StartRoom,
+            GetRoom, RoomsRepository, StartRoom,
         },
     },
     App,
@@ -215,11 +215,24 @@ impl ControlApi for ControlApiService {
 
     fn get(
         &mut self,
-        _ctx: RpcContext,
-        _req: IdRequest,
-        _sink: UnarySink<GetResponse>,
+        ctx: RpcContext,
+        req: IdRequest,
+        sink: UnarySink<GetResponse>,
     ) {
-        unimplemented!()
+        let local_uri = LocalUri::parse(&req.get_id()[0]).unwrap();
+
+        ctx.spawn(
+            self.room_repository
+                .send(GetRoom(local_uri.room_id.clone().unwrap()))
+                .map_err(|e| ())
+                .and_then(|r| {
+                    let result = r.unwrap();
+                    let mut response = GetResponse::new();
+                    response.set_elements(result);
+
+                    sink.success(response).map_err(|_| ())
+                }),
+        );
     }
 }
 

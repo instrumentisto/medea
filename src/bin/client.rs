@@ -83,4 +83,13 @@ fn main() {
 
     let reply = client.delete(&delete_member_req).expect("delete member");
     println!("{:?}", reply);
+
+    // Get room
+    let mut get_room_request = IdRequest::new();
+    let mut room = RepeatedField::new();
+    room.push("local://grpc-test".to_string());
+    get_room_request.set_id(room);
+
+    let reply = client.get(&get_room_request).expect("get room");
+    println!("{:?}", reply);
 }

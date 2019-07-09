@@ -1,8 +1,9 @@
 //! Room definitions and implementations. Room is responsible for media
 //! connection establishment between concrete [`Member`]s.
 
-use std::{rc::Rc, sync::Arc, time::Duration};
-use std::collections::HashMap as StdHashMap;
+use std::{
+    collections::HashMap as StdHashMap, rc::Rc, sync::Arc, time::Duration,
+};
 
 use actix::{
     fut::wrap_future, Actor, ActorFuture, AsyncContext, Context, Handler,
@@ -20,13 +21,13 @@ use crate::{
             RpcConnectionClosed, RpcConnectionEstablished,
         },
         control::{
-            room::RoomSpec, MemberId, RoomId, TryFromElementError,
-            WebRtcPlayId, WebRtcPublishId,
+            grpc::protos::control::{
+                Element as ElementProto, Room as RoomProto,
+            },
+            room::RoomSpec,
+            MemberId, RoomId, TryFromElementError, WebRtcPlayId,
+            WebRtcPublishId,
         },
-        control::grpc::protos::control::{
-            Element as ElementProto,
-            Room as RoomProto,
-        }
     },
     log::prelude::*,
     media::{
@@ -455,7 +456,7 @@ impl Actor for Room {
     type Context = Context<Self>;
 }
 
-impl Into<ElementProto> for Room {
+impl Into<ElementProto> for &mut Room {
     fn into(self) -> ElementProto {
         let mut element = ElementProto::new();
         let mut room = RoomProto::new();
@@ -469,6 +470,22 @@ impl Into<ElementProto> for Room {
         element.set_room(room);
 
         element
+    }
+}
+
+#[derive(Message)]
+#[rtype(result = "Result<ElementProto, ()>")]
+pub struct Serialize;
+
+impl Handler<Serialize> for Room {
+    type Result = Result<ElementProto, ()>;
+
+    fn handle(
+        &mut self,
+        msg: Serialize,
+        ctx: &mut Self::Context,
+    ) -> Self::Result {
+        Ok(self.into())
     }
 }
 

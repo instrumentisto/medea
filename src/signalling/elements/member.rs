@@ -1,7 +1,9 @@
 //! [`Member`] is member of [`Room`] with [`RpcConnection`].
 
-use std::{cell::RefCell, convert::TryFrom as _, rc::Rc};
-use std::collections::HashMap as StdHashMap;
+use std::{
+    cell::RefCell, collections::HashMap as StdHashMap, convert::TryFrom as _,
+    rc::Rc,
+};
 
 use failure::Fail;
 use hashbrown::HashMap;
@@ -342,12 +344,10 @@ impl Into<ElementProto> for Rc<Member> {
 
         let mut member_pipeline = StdHashMap::new();
         for (id, play) in self.sinks() {
-            member_pipeline
-                .insert(id.to_string(), play.into());
+            member_pipeline.insert(id.to_string(), play.into());
         }
         for (id, publish) in self.srcs() {
-            member_pipeline
-                .insert(id.to_string(), publish.into());
+            member_pipeline.insert(id.to_string(), publish.into());
         }
         member.set_pipeline(member_pipeline);
 
