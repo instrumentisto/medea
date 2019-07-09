@@ -23,7 +23,6 @@ use crate::{
         control::MemberId,
     },
     conf::{Conf, Rpc},
-    graceful_shutdown,
     log::prelude::*,
     signalling::{RoomId, RoomsRepository},
 };

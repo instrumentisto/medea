@@ -2,25 +2,20 @@
 //! Actix system has to be running for it to work.
 
 use std::{collections::{BTreeMap, HashSet},
-          mem, sync::Mutex, thread,
-          time::{Duration, Instant}, sync::mpsc::channel,
-          hash::{Hash, Hasher}};
+          mem, time::Duration
+};
 
-use actix::{self, MailboxError, Message, Recipient, System,
-            Handler, WrapFuture, AsyncContext, Addr, Arbiter};
+use actix::{self, Message, Recipient, System,
+            Handler, AsyncContext, Addr};
 use actix::prelude::{Actor, Context};
 use tokio::prelude::{
     future::{self, join_all, Future},
     stream::*,
 };
-use tokio::timer::Delay;
 use futures::future::IntoFuture;
 use tokio::prelude::FutureExt;
 
-use lazy_static::lazy_static;
-
 use crate::log::prelude::*;
-use tokio::runtime::Runtime;
 pub type ShutdownMessageResult = Result<
     Box<dyn Future<Item = (), Error = ()> + std::marker::Send>, ()
 >;
@@ -83,18 +78,13 @@ pub struct GracefulShutdown {
 
     /// Timeout after which all [`Actors`] will be forced shutdown
     shutdown_timeout: u64,
-
-    //ask
-    /// Timeout after which all [`Actors`] will be forced shutdown
-    system: actix::System,
 }
 
 impl GracefulShutdown {
-    fn new(shutdown_timeout: u64, system: actix::System) -> Self {
+    fn new(shutdown_timeout: u64) -> Self {
         Self {
             recipients: BTreeMap::new(),
             shutdown_timeout,
-            system
         }
     }
 }
@@ -136,7 +126,7 @@ impl Actor for GracefulShutdown {
 impl Handler<ShutdownSignalDetected> for GracefulShutdown {
     type Result = ShutdownSignalDetectedResult;
 
-    fn handle(&mut self, msg: ShutdownSignalDetected, ctx: &mut Context<Self>)
+    fn handle(&mut self, msg: ShutdownSignalDetected, _: &mut Context<Self>)
             -> Self::Result {
         use tokio_signal::unix::{SIGHUP, SIGINT, SIGQUIT, SIGTERM};
 
@@ -202,7 +192,6 @@ impl Handler<ShutdownSignalDetected> for GracefulShutdown {
             mem::replace(&mut shutdown_future, new_shutdown_future);
         }
 
-        let system_to_stop = self.system.clone();
         Ok(Box::new(
             shutdown_future
                 .timeout(Duration::from_millis(self.shutdown_timeout))
@@ -256,7 +245,7 @@ impl Handler<ShutdownUnsubscribe> for GracefulShutdown {
 }
 
 
-pub fn create(shutdown_timeout: u64, system: actix::System) -> Addr<GracefulShutdown> {
-    let graceful_shutdown = GracefulShutdown::new(shutdown_timeout, system).start();
+pub fn create(shutdown_timeout: u64) -> Addr<GracefulShutdown> {
+    let graceful_shutdown = GracefulShutdown::new(shutdown_timeout).start();
     graceful_shutdown
 }

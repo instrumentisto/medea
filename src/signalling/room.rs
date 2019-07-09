@@ -1,7 +1,7 @@
 //! Room definitions and implementations. Room is responsible for media
 //! connection establishment between concrete [`Member`]s.
 
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use actix::{
     fut::wrap_future, Actor, ActorFuture, AsyncContext, Context, Handler,
@@ -10,7 +10,6 @@ use actix::{
 use failure::Fail;
 use futures::{future, Future};
 use hashbrown::HashMap;
-use tokio::timer::Delay;
 
 use medea_client_api_proto::{Command, Event, IceCandidate};
 

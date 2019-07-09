@@ -1,7 +1,10 @@
 use core::fmt;
 use std::net::SocketAddr;
 
-use actix::{fut::wrap_future, Actor, ActorFuture, Addr, Arbiter, Context, Handler, MailboxError, Message, WrapFuture, System};
+use actix::{fut::wrap_future, Actor, ActorFuture, Addr,
+            Arbiter, Context, Handler, MailboxError,
+            Message, WrapFuture
+};
 use bb8::RunError;
 use failure::Fail;
 use futures::future::{err, ok, Future};
@@ -15,7 +18,6 @@ use crate::{
     signalling::RoomId,
     turn::repo::{TurnDatabase, TurnDatabaseErr},
 };
-use std::sync::mpsc::SyncSender;
 
 static TURN_PASS_LEN: usize = 16;
 

@@ -33,7 +33,6 @@ failure = "0.1"
 futures = "0.1"
 hashbrown = "0.1"
 humantime = "1.2"
-lazy_static = "1.3.0"
 macro-attr = "0.2"
 medea-client-api-proto = { path = "proto/client-api", features = ["medea"] }
 medea-macro = { path = "crates/medea-macro" }

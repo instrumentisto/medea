@@ -22,8 +22,6 @@ use crate::{
     utils::graceful_shutdown::{self, ShutdownSubscribe},
 };
 
-use crate::utils::graceful_shutdown::ShutdownUnsubscribe;
-
 fn main() {
     dotenv().ok();
     let logger = log::new_dual_logger(std::io::stdout(), std::io::stderr());
@@ -42,7 +40,7 @@ fn main() {
 
     let peers = create_peers(1, 2);
 
-    let graceful_shutdown_addr = graceful_shutdown::create(config.system_config.shutdown_timeout, System::current());
+    let graceful_shutdown_addr = graceful_shutdown::create(config.system_config.shutdown_timeout);
 
     let turn_auth_service =
         new_turn_auth_service(&config).expect("Unable to start turn service");
