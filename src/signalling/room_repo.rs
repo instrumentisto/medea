@@ -142,8 +142,8 @@ impl Handler<DeleteRoom> for RoomsRepository {
 #[derive(Message)]
 #[rtype(result = "Result<(), RoomRepoError>")]
 pub struct DeleteMemberFromRoom {
-    pub member_id: MemberId,
-    pub room_id: RoomId,
+    member_id: MemberId,
+    room_id: RoomId,
 }
 
 impl Handler<DeleteMemberFromRoom> for RoomsRepository {
@@ -207,9 +207,9 @@ impl Handler<DeleteMemberFromRoomCheck> for RoomsRepository {
 #[derive(Message)]
 #[rtype(result = "Result<(), RoomRepoError>")]
 pub struct DeleteEndpointFromMember {
-    pub room_id: RoomId,
-    pub member_id: MemberId,
-    pub endpoint_id: String,
+    room_id: RoomId,
+    member_id: MemberId,
+    endpoint_id: String,
 }
 
 impl Handler<DeleteEndpointFromMember> for RoomsRepository {
