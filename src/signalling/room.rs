@@ -520,6 +520,42 @@ impl Handler<SerializeMember> for Room {
     }
 }
 
+#[derive(Message)]
+#[rtype(result = "Result<ElementProto, ()>")]
+pub struct SerializeEndpoint(pub MemberId, pub String);
+
+impl Handler<SerializeEndpoint> for Room {
+    type Result = Result<ElementProto, ()>;
+
+    fn handle(
+        &mut self,
+        msg: SerializeEndpoint,
+        ctx: &mut Self::Context,
+    ) -> Self::Result {
+        let member = self.members.get_member_by_id(&msg.0).unwrap(); // TODO
+        let endpoint_id = WebRtcPublishId(msg.1);
+        let mut element = ElementProto::new();
+
+        if let Some(endpoint) = member.get_src_by_id(&endpoint_id) {
+            let mut member_element: Member_Element = endpoint.into();
+            let endpoint = member_element.take_webrtc_pub();
+            element.set_webrtc_pub(endpoint);
+        } else {
+            let endpoint_id = WebRtcPlayId(endpoint_id.0);
+
+            if let Some(endpoint) = member.get_sink_by_id(&endpoint_id) {
+                let mut member_element: Member_Element = endpoint.into();
+                let endpoint = member_element.take_webrtc_play();
+                element.set_webrtc_play(endpoint);
+            } else {
+                panic!(); // TODO
+            }
+        }
+
+        Ok(element)
+    }
+}
+
 impl Handler<Authorize> for Room {
     type Result = Result<(), AuthorizationError>;
 

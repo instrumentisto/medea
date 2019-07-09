@@ -69,7 +69,7 @@ fn main() {
     // Delete endpoint
     let mut delete_endpoint_req = IdRequest::new();
     let mut endpoints = RepeatedField::new();
-    endpoints.push("local://video-call-1/caller".to_string());
+    endpoints.push("local://video-call-1/caller/publish".to_string());
     delete_endpoint_req.set_id(endpoints);
 
     let reply = client.delete(&delete_endpoint_req).expect("delete member");
@@ -89,6 +89,7 @@ fn main() {
     let mut room = RepeatedField::new();
     room.push("local://grpc-test".to_string());
     room.push("local://video-call-1/responder".to_string());
+    room.push("local://grpc-test/publisher/publish".to_string());
     get_room_request.set_id(room);
 
     let reply = client.get(&get_room_request).expect("get room");

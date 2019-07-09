@@ -26,7 +26,7 @@ use crate::{
 };
 
 use super::protos::control_grpc::{create_control_api, ControlApi};
-use crate::signalling::room_repo::GetMember;
+use crate::signalling::room_repo::{GetEndpoint, GetMember};
 
 #[derive(Debug, Fail)]
 enum ControlApiError {
@@ -245,20 +245,23 @@ impl ControlApi for ControlApiService {
 
         let room_fut = self.room_repository.send(GetRoom(room_ids));
         let member_fut = self.room_repository.send(GetMember(member_ids));
+        let endpoint_fut = self.room_repository.send(GetEndpoint(endpoint_ids));
 
-        let mega_future = room_fut.join(member_fut).map_err(|_| ()).and_then(
-            |(room, member)| {
+        let mega_future = room_fut
+            .join3(member_fut, endpoint_fut)
+            .map_err(|_| ())
+            .and_then(|(room, member, endpoint)| {
                 let elements = room
                     .unwrap()
                     .into_iter()
                     .chain(member.unwrap().into_iter())
+                    .chain(endpoint.unwrap().into_iter())
                     .collect();
                 let mut response = GetResponse::new();
                 response.set_elements(elements);
 
                 sink.success(response).map_err(|_| ())
-            },
-        );
+            });
 
         ctx.spawn(mega_future);
     }
