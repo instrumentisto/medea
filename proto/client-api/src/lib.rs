@@ -268,10 +268,13 @@ mod test {
 
     #[test]
     fn command() {
+        let mut mids = HashMap::new();
+        mids.insert(0, String::from("1"));
+
         let command = ClientMsg::Command(Command::MakeSdpOffer {
             peer_id: 77,
             sdp_offer: "offer".to_owned(),
-            mids: None,
+            mids,
         });
         #[cfg_attr(nightly, rustfmt::skip)]
             let command_str =
@@ -280,7 +283,7 @@ mod test {
                 \"data\":{\
                     \"peer_id\":77,\
 	                \"sdp_offer\":\"offer\",\
-	                \"mids\":null\
+	                \"mids\":{\"0\":\"1\"}\
                 }\
             }";
 

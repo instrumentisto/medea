@@ -386,15 +386,6 @@ pub fn create_peers(
     responder_peer.add_receiver(track_audio);
     responder_peer.add_receiver(track_video);
 
-    let track_audio =
-        Arc::new(MediaTrack::new(3, MediaType::Audio(AudioSettings {})));
-    let track_video =
-        Arc::new(MediaTrack::new(4, MediaType::Video(VideoSettings {})));
-    responder_peer.add_sender(track_audio.clone());
-    responder_peer.add_sender(track_video.clone());
-    caller_peer.add_receiver(track_audio);
-    caller_peer.add_receiver(track_video);
-
     hashmap!(
         caller_peer_id => PeerStateMachine::New(caller_peer),
         responder_peer_id => PeerStateMachine::New(responder_peer),
