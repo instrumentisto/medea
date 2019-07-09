@@ -1,7 +1,8 @@
 //! A class to handle shutdown signals and to shut down system
 //! Actix system has to be running for it to work.
 
-use std::{collections::{BTreeMap, HashMap, hash_map::DefaultHasher}, mem, sync::Mutex, thread,
+use std::{collections::{BTreeMap, HashSet},
+          mem, sync::Mutex, thread,
           time::{Duration, Instant}, sync::mpsc::channel,
           hash::{Hash, Hasher}};
 
@@ -73,7 +74,7 @@ impl Message for ShutdownSignalDetected {
 
 pub struct GracefulShutdown {
     /// [`Actor`]s to send message when graceful shutdown
-    recipients: BTreeMap<u8, HashMap<u64, Recipient<ShutdownMessage>>>,
+    recipients: BTreeMap<u8, HashSet<Recipient<ShutdownMessage>>>,
 
     /// Timeout after which all [`Actors`] will be forced shutdown
     shutdown_timeout: u64,
@@ -137,10 +138,9 @@ impl Handler<ShutdownSignalDetected> for GracefulShutdown {
             let mut this_priority_futures_vec =
                 Vec::with_capacity(self.recipients.len());
 
-            for recipient in recipients_values.values() {
+            for recipient in recipients_values.iter() {
                 let send_future = recipient.send(ShutdownMessage {});
                 //todo async handle
-                //todo hashmap -> hashset
 
                 let recipient_shutdown_fut = send_future
                         .into_future()
@@ -197,19 +197,16 @@ impl Handler<ShutdownSubscribe> for GracefulShutdown {
         //ask
         //todo replace vec to hashset
 
-        let hashmap_with_current_priority = self.recipients.get_mut(&msg.priority);
+        let hashset_with_current_priority = self.recipients.get_mut(&msg.priority);
 
-        let mut hasher = DefaultHasher::new();
-        msg.who.hash(&mut hasher);
-
-        if let Some(hashmap) = hashmap_with_current_priority {
-            hashmap.insert(hasher.finish(), msg.who);
+        if let Some(hashset) = hashset_with_current_priority {
+            hashset.insert(msg.who);
         } else {
-            self.recipients.insert(msg.priority, HashMap::new());
-            // unwrap should not panic because we have inserted new empty vector
+            self.recipients.insert(msg.priority, HashSet::new());
+            // unwrap should not panic because we have inserted new empty hashset
             // with the key we are trying to get in the line above /\
-            let hashmap = self.recipients.get_mut(&msg.priority).unwrap();
-            hashmap.insert(hasher.finish(), msg.who);
+            let hashset = self.recipients.get_mut(&msg.priority).unwrap();
+            hashset.insert(msg.who);
         }
     }
 }
@@ -218,13 +215,10 @@ impl Handler<ShutdownUnsubscribe> for GracefulShutdown {
     type Result = ();
 
     fn handle(&mut self, msg: ShutdownUnsubscribe, _: &mut Context<Self>) {
-        let vec_with_current_priority = self.recipients.get_mut(&msg.priority);
+        let hashset_with_current_priority = self.recipients.get_mut(&msg.priority);
 
-        let mut hasher = DefaultHasher::new();
-        msg.who.hash(&mut hasher);
-
-        if let Some(hashmap) = vec_with_current_priority {
-            hashmap.remove(&hasher.finish());
+        if let Some(hashset) = hashset_with_current_priority {
+            hashset.remove(&msg.who);
         } else {
             return;
         }
