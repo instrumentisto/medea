@@ -260,6 +260,9 @@ impl PeerConnection {
 impl Drop for PeerConnection {
     fn drop(&mut self) {
         let _ = self.0.peer.on_track::<Box<FnMut(RtcTrackEvent)>>(None);
-        let _ = self.0.peer.on_ice_candidate::<Box<FnMut(IceCandidate)>>(None);
+        let _ = self
+            .0
+            .peer
+            .on_ice_candidate::<Box<FnMut(IceCandidate)>>(None);
     }
 }

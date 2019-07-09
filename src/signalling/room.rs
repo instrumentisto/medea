@@ -163,9 +163,7 @@ impl Room {
         let mut from_peer: Peer<WaitLocalSdp> =
             self.peers.take_inner_peer(from_peer_id)?;
 
-        if from_peer.is_sender() {
-            from_peer.set_mids(mids)?;
-        }
+        from_peer.set_mids(mids)?;
 
         let to_peer_id = from_peer.partner_peer_id();
         let to_peer: Peer<New> = self.peers.take_inner_peer(to_peer_id)?;

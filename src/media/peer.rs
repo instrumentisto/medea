@@ -219,6 +219,7 @@ impl<T> Peer<T> {
             })
     }
 
+    /// Checks if this [`Peer`] has any send tracks.
     pub fn is_sender(&self) -> bool {
         !self.context.senders.is_empty()
     }
@@ -292,6 +293,8 @@ impl Peer<WaitLocalSdp> {
         }
     }
 
+    /// Set tracks mids. Provided `mids` must have entries for all [`Peer`]s
+    /// tracks.
     pub fn set_mids(
         &mut self,
         mut mids: StdHashMap<TrackId, String>,
@@ -335,20 +338,6 @@ impl Peer<WaitLocalHaveRemote> {
             state: Stable {},
         }
     }
-
-    pub fn set_mids(
-        &mut self,
-        mut mids: StdHashMap<TrackId, String>,
-    ) -> Result<(), PeerError> {
-        for (id, track) in self.context.senders.iter_mut() {
-            let mid = mids
-                .remove(&id)
-                .ok_or_else(|| PeerError::MidsMismatch(track.id))?;
-            track.set_mid(mid)
-        }
-
-        Ok(())
-    }
 }
 
 impl Peer<Stable> {
@@ -385,6 +374,15 @@ pub fn create_peers(
     caller_peer.add_sender(track_video.clone());
     responder_peer.add_receiver(track_audio);
     responder_peer.add_receiver(track_video);
+
+    let track_audio =
+        Arc::new(MediaTrack::new(3, MediaType::Audio(AudioSettings {})));
+    let track_video =
+        Arc::new(MediaTrack::new(4, MediaType::Video(VideoSettings {})));
+    responder_peer.add_sender(track_audio.clone());
+    responder_peer.add_sender(track_video.clone());
+    caller_peer.add_receiver(track_audio);
+    caller_peer.add_receiver(track_video);
 
     hashmap!(
         caller_peer_id => PeerStateMachine::New(caller_peer),

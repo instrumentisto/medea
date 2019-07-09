@@ -82,9 +82,7 @@ impl RtcPeerConnection {
         let mut inner_mut = self.0.borrow_mut();
 
         match f {
-            None => {
-                inner_mut.on_track = None
-            },
+            None => inner_mut.on_track = None,
             Some(mut f) => {
                 inner_mut.on_track = Some(EventListener::new_mut(
                     Rc::clone(&inner_mut.peer),
@@ -93,7 +91,7 @@ impl RtcPeerConnection {
                         f(msg);
                     },
                 )?);
-            },
+            }
         }
 
         Ok(())
@@ -105,16 +103,14 @@ impl RtcPeerConnection {
     {
         let mut inner_mut = self.0.borrow_mut();
         match f {
-            None => {
-                inner_mut.on_ice_candidate = None
-            },
+            None => inner_mut.on_ice_candidate = None,
             Some(mut f) => {
                 inner_mut.on_ice_candidate = Some(EventListener::new_mut(
                     Rc::clone(&inner_mut.peer),
                     "icecandidate",
                     move |msg: RtcPeerConnectionIceEvent| {
-                        // TODO: examine None candidates, maybe we should send them
-                        //       (although no one does)
+                        // TODO: examine None candidates, maybe we should send
+                        //       them (although no one does)
                         if let Some(candidate) = msg.candidate() {
                             f(IceCandidate {
                                 candidate: candidate.candidate(),
@@ -124,7 +120,7 @@ impl RtcPeerConnection {
                         }
                     },
                 )?);
-            },
+            }
         }
 
         Ok(())
@@ -287,7 +283,6 @@ impl RtcPeerConnection {
 
 impl Drop for RtcPeerConnection {
     fn drop(&mut self) {
-
         let mut inner = self.0.borrow_mut();
         inner.on_track.take();
         inner.on_ice_candidate.take();
