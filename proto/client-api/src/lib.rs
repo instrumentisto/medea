@@ -118,6 +118,7 @@ pub struct IceServer {
     pub credential: Option<String>,
 }
 
+//TODO: Use different struct without mids in TracksApplied event
 /// Direction of [`Track`].
 #[cfg_attr(feature = "medea", derive(Serialize))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
