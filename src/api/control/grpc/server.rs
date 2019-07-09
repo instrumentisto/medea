@@ -2,7 +2,7 @@ use std::{collections::HashMap, sync::Arc};
 
 use actix::{Actor, Addr, Arbiter, Context};
 use failure::Fail;
-use futures::future::{Either, Future};
+use futures::future::{Either, Future, IntoFuture};
 use grpcio::{Environment, RpcContext, Server, ServerBuilder, UnarySink};
 
 use crate::{
@@ -221,30 +221,46 @@ impl ControlApi for ControlApiService {
         sink: UnarySink<GetResponse>,
     ) {
         let mut room_ids = Vec::new();
+        let mut member_ids = Vec::new();
+        let mut endpoint_ids = Vec::new();
 
         for uri in req.get_id() {
             let local_uri = LocalUri::parse(uri).unwrap();
-            room_ids.push((
-                local_uri.room_id.unwrap(),
-                local_uri.member_id.unwrap(),
-            ));
+
+            if local_uri.is_room_uri() {
+                room_ids.push(local_uri.room_id.unwrap());
+            } else if local_uri.is_member_uri() {
+                member_ids.push((
+                    local_uri.room_id.unwrap(),
+                    local_uri.member_id.unwrap(),
+                ));
+            } else if local_uri.is_endpoint_uri() {
+                endpoint_ids.push((
+                    local_uri.room_id.unwrap(),
+                    local_uri.member_id.unwrap(),
+                    local_uri.endpoint_id.unwrap(),
+                ));
+            }
         }
 
-        ctx.spawn(
-            self.room_repository
-                .send(GetMember(room_ids))
-                .map_err(|e| ())
-                .and_then(|r| {
-                    let result = r.unwrap();
+        let room_fut = self.room_repository.send(GetRoom(room_ids));
+        let member_fut = self.room_repository.send(GetMember(member_ids));
 
-                    let elements = result.into_iter().collect();
+        let mega_future = room_fut.join(member_fut).map_err(|_| ()).and_then(
+            |(room, member)| {
+                let elements = room
+                    .unwrap()
+                    .into_iter()
+                    .chain(member.unwrap().into_iter())
+                    .collect();
+                let mut response = GetResponse::new();
+                response.set_elements(elements);
 
-                    let mut response = GetResponse::new();
-                    response.set_elements(elements);
-
-                    sink.success(response).map_err(|_| ())
-                }),
+                sink.success(response).map_err(|_| ())
+            },
         );
+
+        ctx.spawn(mega_future);
     }
 }
 

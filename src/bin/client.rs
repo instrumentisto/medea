@@ -87,7 +87,7 @@ fn main() {
     // Get room
     let mut get_room_request = IdRequest::new();
     let mut room = RepeatedField::new();
-    room.push("local://grpc-test/publisher".to_string());
+    room.push("local://grpc-test".to_string());
     room.push("local://video-call-1/responder".to_string());
     get_room_request.set_id(room);
 
