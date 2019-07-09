@@ -180,35 +180,33 @@ impl Handler<DeleteEndpointFromMember> for RoomsRepository {
 }
 
 #[derive(Message)]
-#[rtype(result = "Result<StdHashMap<String, ElementProto>, RoomRepoError>")]
-pub struct GetRoom(pub RoomId);
+#[rtype(result = "Result<Vec<(String, ElementProto)>, RoomRepoError>")]
+pub struct GetRoom(pub Vec<RoomId>);
 
 impl Handler<GetRoom> for RoomsRepository {
-    type Result = ActFuture<StdHashMap<String, ElementProto>, RoomRepoError>;
+    type Result = ActFuture<Vec<(String, ElementProto)>, RoomRepoError>;
 
     fn handle(
         &mut self,
         msg: GetRoom,
         ctx: &mut Self::Context,
     ) -> Self::Result {
-        let fut = {
-            if let Some(room) = self.rooms.lock().unwrap().get(&msg.0) {
-                Either::A(
+        let mut futs = Vec::new();
+
+        for room_id in msg.0 {
+            if let Some(room) = self.rooms.lock().unwrap().get(&room_id) {
+                futs.push(
                     room.send(Serialize)
                         .map_err(|_| RoomRepoError::Unknow)
-                        .map(move |r| {
-                            let mut ee = StdHashMap::new();
-                            ee.insert(msg.0.to_string(), r.unwrap()); // TODO
-                            ee
-                        }),
+                        .map(move |r| (room_id.to_string(), r.unwrap())),
                 )
             } else {
-                Either::B(futures::future::err(RoomRepoError::RoomNotFound(
-                    msg.0,
-                )))
+                return Box::new(wrap_future(futures::future::err(
+                    RoomRepoError::RoomNotFound(room_id),
+                )));
             }
-        };
+        }
 
-        Box::new(wrap_future(fut))
+        Box::new(wrap_future(futures::future::join_all(futs)))
     }
 }

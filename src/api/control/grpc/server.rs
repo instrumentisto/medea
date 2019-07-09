@@ -219,16 +219,24 @@ impl ControlApi for ControlApiService {
         req: IdRequest,
         sink: UnarySink<GetResponse>,
     ) {
-        let local_uri = LocalUri::parse(&req.get_id()[0]).unwrap();
+        let mut room_ids = Vec::new();
+
+        for uri in req.get_id() {
+            let local_uri = LocalUri::parse(uri).unwrap();
+            room_ids.push(local_uri.room_id.unwrap());
+        }
 
         ctx.spawn(
             self.room_repository
-                .send(GetRoom(local_uri.room_id.clone().unwrap()))
+                .send(GetRoom(room_ids))
                 .map_err(|e| ())
                 .and_then(|r| {
                     let result = r.unwrap();
+
+                    let elements = result.into_iter().collect();
+
                     let mut response = GetResponse::new();
-                    response.set_elements(result);
+                    response.set_elements(elements);
 
                     sink.success(response).map_err(|_| ())
                 }),

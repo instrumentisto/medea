@@ -88,6 +88,7 @@ fn main() {
     let mut get_room_request = IdRequest::new();
     let mut room = RepeatedField::new();
     room.push("local://grpc-test".to_string());
+    room.push("local://video-call-1".to_string());
     get_room_request.set_id(room);
 
     let reply = client.get(&get_room_request).expect("get room");
