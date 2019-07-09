@@ -16,13 +16,14 @@ use crate::{
     },
     log::prelude::*,
     signalling::room_repo::{
-        DeleteEndpointFromMemberCheck, DeleteMemberFromRoomCheck, DeleteRoom,
-        GetEndpoint, GetMember, GetRoom, RoomsRepository, StartRoom,
+        DeleteEndpointFromMemberCheck, DeleteMemberFromRoomCheck, GetEndpoint,
+        GetMember, GetRoom, RoomsRepository, StartRoom,
     },
     App,
 };
 
 use super::protos::control_grpc::{create_control_api, ControlApi};
+use crate::signalling::room_repo::DeleteRoomCheck;
 
 #[derive(Debug, Fail)]
 enum ControlApiError {
@@ -182,7 +183,7 @@ impl ControlApi for ControlApiService {
         req: IdRequest,
         sink: UnarySink<Response>,
     ) {
-        //        let mut delete_room_futs = Vec::new();
+        let mut delete_room_futs = Vec::new();
         let mut delete_member_futs = Vec::new();
         let mut delete_endpoints_futs = Vec::new();
 
@@ -190,8 +191,10 @@ impl ControlApi for ControlApiService {
             let uri = LocalUri::parse(id).unwrap(); // TODO
 
             if uri.is_room_uri() {
-                self.room_repository
-                    .do_send(DeleteRoom(uri.room_id.unwrap()));
+                delete_room_futs.push(
+                    self.room_repository
+                        .send(DeleteRoomCheck(uri.room_id.unwrap())),
+                );
             } else if uri.is_member_uri() {
                 delete_member_futs.push(self.room_repository.send(
                     DeleteMemberFromRoomCheck {
@@ -210,6 +213,7 @@ impl ControlApi for ControlApiService {
             }
         }
 
+        let mega_delete_room_fut = futures::future::join_all(delete_room_futs);
         let mega_delete_member_fut =
             futures::future::join_all(delete_member_futs);
         let mega_delete_endpoints_fut =
@@ -219,11 +223,13 @@ impl ControlApi for ControlApiService {
 
         ctx.spawn(
             mega_delete_endpoints_fut
-                .join(mega_delete_member_fut)
+                .join3(mega_delete_member_fut, mega_delete_room_fut)
                 .map_err(|_| ())
-                .and_then(move |(member, endpoint)| {
+                .and_then(move |(member, endpoint, room)| {
                     let mut members_msgs = Vec::new();
                     let mut endpoints_msgs = Vec::new();
+                    let mut room_msgs = Vec::new();
+
                     for member_fut in member {
                         let member_msg = member_fut.unwrap().unwrap();
                         members_msgs.push(
@@ -242,12 +248,20 @@ impl ControlApi for ControlApiService {
                         );
                     }
 
+                    for room_fut in room {
+                        let room_msg = room_fut.unwrap();
+                        room_msgs.push(
+                            room_repository_addr.send(room_msg).map_err(|_| ()),
+                        );
+                    }
+
                     let members_msgs = futures::future::join_all(members_msgs);
                     let endpoints_msgs =
                         futures::future::join_all(endpoints_msgs);
+                    let room_msgs = futures::future::join_all(room_msgs);
 
                     members_msgs
-                        .join(endpoints_msgs)
+                        .join3(endpoints_msgs, room_msgs)
                         .map_err(|_| ())
                         .map(|_| ())
                         .and_then(|_| {

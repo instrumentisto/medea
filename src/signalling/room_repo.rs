@@ -114,7 +114,7 @@ impl Handler<StartRoom> for RoomsRepository {
 
 #[derive(Message)]
 #[rtype(result = "Result<(), RoomRepoError>")]
-pub struct DeleteRoom(pub RoomId);
+pub struct DeleteRoom(RoomId);
 
 impl Handler<DeleteRoom> for RoomsRepository {
     type Result = Result<(), RoomRepoError>;
@@ -133,6 +133,26 @@ impl Handler<DeleteRoom> for RoomsRepository {
         self.remove(&msg.0);
 
         Ok(())
+    }
+}
+
+#[derive(Message)]
+#[rtype(result = "Result<DeleteRoom, RoomRepoError>")]
+pub struct DeleteRoomCheck(pub RoomId);
+
+impl Handler<DeleteRoomCheck> for RoomsRepository {
+    type Result = Result<DeleteRoom, RoomRepoError>;
+
+    fn handle(
+        &mut self,
+        msg: DeleteRoomCheck,
+        _ctx: &mut Self::Context,
+    ) -> Self::Result {
+        if let None = self.rooms.lock().unwrap().get(&msg.0) {
+            Err(RoomRepoError::RoomNotFound(msg.0))
+        } else {
+            Ok(DeleteRoom(msg.0))
+        }
     }
 }
 
