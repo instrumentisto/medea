@@ -3,7 +3,6 @@ use std::fmt;
 use failure::Fail;
 
 use super::{MemberId, RoomId};
-use crate::api::control::endpoints::webrtc_play_endpoint::SrcUri;
 
 #[derive(Debug, Fail)]
 pub enum LocalUriParseError {

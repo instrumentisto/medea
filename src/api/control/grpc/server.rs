@@ -2,7 +2,7 @@ use std::{collections::HashMap, sync::Arc};
 
 use actix::{Actor, Addr, Arbiter, Context};
 use failure::Fail;
-use futures::future::{Either, Future, IntoFuture};
+use futures::future::{Either, Future};
 use grpcio::{Environment, RpcContext, Server, ServerBuilder, UnarySink};
 
 use crate::{
@@ -15,24 +15,14 @@ use crate::{
         RoomSpec, TryFromElementError, TryFromProtobufError,
     },
     log::prelude::*,
-    signalling::{
-        room::RoomError,
-        room_repo::{
-            DeleteEndpointFromMember, DeleteMemberFromRoom, DeleteRoom,
-            GetRoom, RoomsRepository, StartRoom,
-        },
+    signalling::room_repo::{
+        DeleteEndpointFromMemberCheck, DeleteMemberFromRoomCheck, DeleteRoom,
+        GetEndpoint, GetMember, GetRoom, RoomsRepository, StartRoom,
     },
     App,
 };
 
 use super::protos::control_grpc::{create_control_api, ControlApi};
-use crate::signalling::{
-    room::DeleteEndpointCheck,
-    room_repo::{
-        DeleteEndpointFromMemberCheck, DeleteMemberFromRoomCheck, GetEndpoint,
-        GetMember,
-    },
-};
 
 #[derive(Debug, Fail)]
 enum ControlApiError {

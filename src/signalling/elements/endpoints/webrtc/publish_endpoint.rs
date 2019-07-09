@@ -13,7 +13,6 @@ use crate::{
         grpc::protos::control::{
             Member_Element as ElementProto,
             WebRtcPublishEndpoint as WebRtcPublishEndpointProto,
-            WebRtcPublishEndpoint_P2P as WebRtcPublishEndpointP2pProto,
         },
     },
     media::PeerId,

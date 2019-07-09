@@ -1,14 +1,13 @@
 //! Repository that stores [`Room`]s addresses.
 
-use std::{
-    collections::HashMap as StdHashMap,
-    sync::{Arc, Mutex},
-};
+use std::sync::{Arc, Mutex};
 
 use actix::{
-    Actor, ActorFuture, Addr, Context, Handler, MailboxError, Message,
+    fut::wrap_future, Actor, ActorFuture, Addr, Context, Handler, MailboxError,
+    Message,
 };
 use failure::Fail;
+use futures::future::{Either, Future};
 use hashbrown::HashMap;
 
 use crate::{
@@ -26,8 +25,6 @@ use crate::{
     },
     App,
 };
-use actix::fut::wrap_future;
-use futures::future::{Either, Future};
 
 type ActFuture<I, E> =
     Box<dyn ActorFuture<Actor = RoomsRepository, Item = I, Error = E>>;
@@ -180,7 +177,7 @@ impl Handler<DeleteMemberFromRoomCheck> for RoomsRepository {
     fn handle(
         &mut self,
         msg: DeleteMemberFromRoomCheck,
-        ctx: &mut Self::Context,
+        _ctx: &mut Self::Context,
     ) -> Self::Result {
         let fut =
             if let Some(room) = self.rooms.lock().unwrap().get(&msg.room_id) {
@@ -249,7 +246,7 @@ impl Handler<DeleteEndpointFromMemberCheck> for RoomsRepository {
     fn handle(
         &mut self,
         msg: DeleteEndpointFromMemberCheck,
-        ctx: &mut Self::Context,
+        _ctx: &mut Self::Context,
     ) -> Self::Result {
         let fut = if let Some(room) = self.get(&msg.room_id) {
             Either::A(
@@ -290,7 +287,7 @@ impl Handler<GetRoom> for RoomsRepository {
     fn handle(
         &mut self,
         msg: GetRoom,
-        ctx: &mut Self::Context,
+        _ctx: &mut Self::Context,
     ) -> Self::Result {
         let mut futs = Vec::new();
 
@@ -335,7 +332,7 @@ impl Handler<GetMember> for RoomsRepository {
     fn handle(
         &mut self,
         msg: GetMember,
-        ctx: &mut Self::Context,
+        _ctx: &mut Self::Context,
     ) -> Self::Result {
         let mut futs = Vec::new();
 
@@ -381,7 +378,7 @@ impl Handler<GetEndpoint> for RoomsRepository {
     fn handle(
         &mut self,
         msg: GetEndpoint,
-        ctx: &mut Self::Context,
+        _ctx: &mut Self::Context,
     ) -> Self::Result {
         let mut futs = Vec::new();
 

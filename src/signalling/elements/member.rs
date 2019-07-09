@@ -14,6 +14,7 @@ use crate::{
         grpc::protos::control::{
             Member as MemberProto, Room_Element as ElementProto,
         },
+        local_uri::LocalUri,
         MemberId, MemberSpec, RoomId, RoomSpec, TryFromElementError,
         WebRtcPlayId, WebRtcPublishId,
     },
@@ -22,9 +23,6 @@ use crate::{
 };
 
 use super::endpoints::webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint};
-use crate::api::control::{
-    grpc::protos::control::Member_Element, local_uri::LocalUri,
-};
 
 /// Errors which may occur while loading [`Member`]s from [`RoomSpec`].
 #[derive(Debug, Fail)]

@@ -492,8 +492,8 @@ impl Handler<Serialize> for Room {
 
     fn handle(
         &mut self,
-        msg: Serialize,
-        ctx: &mut Self::Context,
+        _msg: Serialize,
+        _ctx: &mut Self::Context,
     ) -> Self::Result {
         Ok(self.into())
     }
@@ -509,7 +509,7 @@ impl Handler<SerializeMember> for Room {
     fn handle(
         &mut self,
         msg: SerializeMember,
-        ctx: &mut Self::Context,
+        _ctx: &mut Self::Context,
     ) -> Self::Result {
         let member = self
             .members
@@ -536,7 +536,7 @@ impl Handler<SerializeEndpoint> for Room {
     fn handle(
         &mut self,
         msg: SerializeEndpoint,
-        ctx: &mut Self::Context,
+        _ctx: &mut Self::Context,
     ) -> Self::Result {
         let member = self
             .members
@@ -777,7 +777,7 @@ impl Handler<DeleteMemberCheck> for Room {
     fn handle(
         &mut self,
         msg: DeleteMemberCheck,
-        ctx: &mut Self::Context,
+        _ctx: &mut Self::Context,
     ) -> Self::Result {
         if let None = self.members.get_member_by_id(&msg.0) {
             panic!()
@@ -831,7 +831,7 @@ impl Handler<DeleteEndpointCheck> for Room {
     fn handle(
         &mut self,
         msg: DeleteEndpointCheck,
-        ctx: &mut Self::Context,
+        _ctx: &mut Self::Context,
     ) -> Self::Result {
         let member = match self.members.get_member_by_id(&msg.member_id) {
             Some(m) => m,
