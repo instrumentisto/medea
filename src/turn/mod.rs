@@ -6,4 +6,4 @@ pub use self::service::{
 };
 
 #[cfg(test)]
-pub use self::service::test::new_turn_auth_service_mock;
+pub use self::service::test::get_turn_service_mock;

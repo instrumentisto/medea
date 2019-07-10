@@ -119,8 +119,7 @@ mod test {
     use futures::{future::IntoFuture as _, sink::Sink as _, Stream as _};
 
     use crate::{
-        api::control, conf::Conf, signalling::Room,
-        turn::new_turn_auth_service_mock,
+        api::control, conf::Conf, signalling::Room, turn::get_turn_service_mock,
     };
 
     use super::*;
@@ -133,7 +132,7 @@ mod test {
 
         let app = Arc::new(crate::App {
             config: conf,
-            turn_service: Arc::new(new_turn_auth_service_mock()),
+            turn_service: Arc::new(get_turn_service_mock()),
         });
         let app_cloned = Arc::clone(&app);
 
@@ -142,7 +141,7 @@ mod test {
             let client_room = Room::new(
                 &room_spec,
                 app.config.rpc.reconnect_timeout,
-                Arc::new(new_turn_auth_service_mock()),
+                Arc::new(get_turn_service_mock()),
             )
             .unwrap();
             client_room

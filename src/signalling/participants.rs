@@ -29,8 +29,8 @@ use crate::{
         },
         control::{
             endpoints::{
-                webrtc_play_endpoint::WebRtcPlayEndpoint as WebRtcPlayEndpointSpec,
-                webrtc_publish_endpoint::WebRtcPublishEndpoint as WebRtcPublishEndpointSpec,
+                WebRtcPlayEndpoint as WebRtcPlayEndpointSpec,
+                WebRtcPublishEndpoint as WebRtcPublishEndpointSpec,
             },
             grpc::protos::control::Error as ErrorProto,
             local_uri::LocalUri,

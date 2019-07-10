@@ -310,8 +310,7 @@ pub mod test {
     }
 
     #[allow(clippy::module_name_repetitions)]
-    pub fn new_turn_auth_service_mock() -> Box<dyn TurnAuthService + Send + Sync>
-    {
+    pub fn get_turn_service_mock() -> Box<dyn TurnAuthService + Send + Sync> {
         Box::new(TurnAuthServiceMock {})
     }
 

@@ -9,10 +9,10 @@ use crate::api::control::grpc::protos::control::{
 
 use super::{Element, TryFromElementError, TryFromProtobufError};
 
-use self::{
-    webrtc_play_endpoint::WebRtcPlayEndpoint,
-    webrtc_publish_endpoint::WebRtcPublishEndpoint,
-};
+#[doc(inline)]
+pub use webrtc_play_endpoint::WebRtcPlayEndpoint;
+#[doc(inline)]
+pub use webrtc_publish_endpoint::WebRtcPublishEndpoint;
 
 /// [`Endpoint`] represents a media element that one or more media data streams
 /// flow through.
