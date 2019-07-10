@@ -32,6 +32,7 @@ use crate::{
                 webrtc_play_endpoint::WebRtcPlayEndpoint as WebRtcPlayEndpointSpec,
                 webrtc_publish_endpoint::WebRtcPublishEndpoint as WebRtcPublishEndpointSpec,
             },
+            grpc::protos::control::Error as ErrorProto,
             local_uri::LocalUri,
             MemberId, MemberSpec, RoomId, RoomSpec, WebRtcPlayId,
             WebRtcPublishId,
@@ -66,6 +67,8 @@ pub enum ParticipantServiceErr {
     ParticipantNotFound(LocalUri),
     #[fail(display = "Endpoint [id = {}] not found.", _0)]
     EndpointNotFound(LocalUri),
+    #[fail(display = "Participant [id = {}] already exists.", _0)]
+    ParticipantAlreadyExists(LocalUri),
 }
 
 impl From<TurnServiceErr> for ParticipantServiceErr {
@@ -87,6 +90,42 @@ impl From<MemberError> for ParticipantServiceErr {
                 ParticipantServiceErr::EndpointNotFound(e)
             }
         }
+    }
+}
+
+impl Into<ErrorProto> for &ParticipantServiceErr {
+    fn into(self) -> ErrorProto {
+        let mut error = ErrorProto::new();
+        match &self {
+            ParticipantServiceErr::EndpointNotFound(id) => {
+                error.set_element(id.to_string()); // TODO
+                error.set_code(0); // TODO
+                error.set_status(404);
+                error.set_text(self.to_string());
+            }
+            ParticipantServiceErr::ParticipantNotFound(id) => {
+                error.set_element(id.to_string()); // TODO
+                error.set_code(0); // TODO
+                error.set_status(404);
+                error.set_text(self.to_string());
+            }
+            ParticipantServiceErr::ParticipantAlreadyExists(id) => {
+                error.set_element(id.to_string());
+                error.set_code(0); // TODO
+                error.set_status(400);
+                error.set_text(self.to_string());
+            }
+            _ => {
+                error.set_element(String::new());
+                error.set_code(0); // TODO
+                error.set_status(500);
+                error.set_text(format!(
+                    "Unknow ParticipantService error. {:?}",
+                    self
+                ));
+            }
+        }
+        error
     }
 }
 
@@ -391,6 +430,11 @@ impl ParticipantService {
         id: MemberId,
         spec: MemberSpec,
     ) -> Result<(), ParticipantServiceErr> {
+        if self.members.get(&id).is_some() {
+            return Err(ParticipantServiceErr::ParticipantAlreadyExists(
+                self.get_local_uri(id),
+            ));
+        }
         let signalling_member = Rc::new(Member::new(
             id.clone(),
             spec.credentials().to_string(),

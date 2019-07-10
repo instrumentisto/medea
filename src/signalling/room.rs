@@ -125,29 +125,7 @@ impl Into<ErrorProto> for RoomError {
                 error.set_status(404);
                 error.set_text(self.to_string());
             }
-            RoomError::ParticipantServiceErr(e) => match e {
-                ParticipantServiceErr::EndpointNotFound(id) => {
-                    error.set_element(id.to_string()); // TODO
-                    error.set_code(0); // TODO
-                    error.set_status(404);
-                    error.set_text(self.to_string());
-                }
-                ParticipantServiceErr::ParticipantNotFound(id) => {
-                    error.set_element(id.to_string()); // TODO
-                    error.set_code(0); // TODO
-                    error.set_status(404);
-                    error.set_text(self.to_string());
-                }
-                _ => {
-                    error.set_element(String::new());
-                    error.set_code(0); // TODO
-                    error.set_status(500);
-                    error.set_text(format!(
-                        "Unknow ParticipantService error. {:?}",
-                        e
-                    ));
-                }
-            },
+            RoomError::ParticipantServiceErr(e) => error = e.into(),
             _ => {
                 error.set_element(String::new());
                 error.set_code(0); // TODO
