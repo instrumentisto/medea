@@ -4,8 +4,8 @@
 use std::time::Duration;
 
 use actix::{
-    fut::wrap_future, Actor, ActorFuture,
-    AsyncContext, Context, Handler, Message,
+    fut::wrap_future, Actor, ActorFuture, AsyncContext, Context, Handler,
+    Message,
 };
 use failure::Fail;
 use futures::{future, Future};
@@ -323,10 +323,10 @@ impl Handler<ConnectPeers> for Room {
                             ctx.address()
                                 .send(CloseRoom {})
                                 .map_err(|_| ())
-                                .and_then(std::result::Result::unwrap)
+                                .and_then(std::result::Result::unwrap),
                         )
-                            .map(|_, _, _| ())
-                            .map_err(|_, _, _| ()),
+                        .map(|_, _, _| ())
+                        .map_err(|_, _, _| ()),
                     );
                 }))
             }
@@ -340,10 +340,10 @@ impl Handler<ConnectPeers> for Room {
                         ctx.address()
                             .send(CloseRoom {})
                             .map_err(|_| ())
-                            .and_then(std::result::Result::unwrap)
+                            .and_then(std::result::Result::unwrap),
                     )
-                        .map(|_, _, _| ())
-                        .map_err(|_, _, _| ()),
+                    .map(|_, _, _| ())
+                    .map_err(|_, _, _| ()),
                 );
                 Box::new(wrap_future(future::ok(())))
             }
@@ -387,10 +387,10 @@ impl Handler<CommandMessage> for Room {
                             ctx.address()
                                 .send(CloseRoom {})
                                 .map_err(|_| ())
-                                .and_then(std::result::Result::unwrap)
+                                .and_then(std::result::Result::unwrap),
                         )
-                            .map(|_, _, _| ())
-                            .map_err(|_, _, _| ()),
+                        .map(|_, _, _| ())
+                        .map_err(|_, _, _| ()),
                     );
                 }))
             }
@@ -404,10 +404,10 @@ impl Handler<CommandMessage> for Room {
                         ctx.address()
                             .send(CloseRoom {})
                             .map_err(|_| ())
-                            .and_then(std::result::Result::unwrap)
+                            .and_then(std::result::Result::unwrap),
                     )
-                        .map(|_, _, _| ())
-                        .map_err(|_, _, _| ()),
+                    .map(|_, _, _| ())
+                    .map_err(|_, _, _| ()),
                 );
                 Box::new(wrap_future(future::ok(())))
             }
@@ -475,11 +475,13 @@ impl Handler<CloseRoom> for Room {
         self.state = RoomState::Stopping;
 
         let room_recipient = ctx.address().recipient();
-        let drop_fut = self.participants.drop_connections(ctx)
-            .then(move |_| {
-                match room_recipient.try_send(RoomClosed{}) {
+        let drop_fut =
+            self.participants.drop_connections(ctx).then(move |_| {
+                match room_recipient.try_send(RoomClosed {}) {
                     Ok(_) => (),
-                    Err(e) => error!("Cannot change Room's state to closed: {:?}", e),
+                    Err(e) => {
+                        error!("Cannot change Room's state to closed: {:?}", e)
+                    }
                 };
                 futures::future::ok(())
             });
@@ -522,11 +524,9 @@ struct RoomClosed {}
 impl Handler<RoomClosed> for Room {
     type Result = ();
 
-    fn handle(
-        &mut self,
-        _msg: RoomClosed,
-        _: &mut Self::Context,
-    ) { self.state = RoomState::Stopped; }
+    fn handle(&mut self, _msg: RoomClosed, _: &mut Self::Context) {
+        self.state = RoomState::Stopped;
+    }
 }
 
 impl Handler<RpcConnectionClosed> for Room {

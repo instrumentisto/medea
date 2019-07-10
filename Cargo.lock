@@ -1127,7 +1127,6 @@ dependencies = [
  "actix 0.8.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "actix-http 0.2.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "actix-http-test 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "actix-rt 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "actix-web 1.0.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "actix-web-actors 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "bb8 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",

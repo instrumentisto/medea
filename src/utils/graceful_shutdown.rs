@@ -8,14 +8,16 @@ use std::{
 };
 
 use actix::{
-    self, Addr, AsyncContext, Handler, Message,
-    prelude::{Actor, Context}, Recipient,
-    ResponseActFuture, System, WrapFuture,
+    self,
+    prelude::{Actor, Context},
+    Addr, AsyncContext, Handler, Message, Recipient, ResponseActFuture, System,
+    WrapFuture,
 };
 
 use tokio::prelude::{
-    future::{self, Future, join_all},
-    FutureExt, stream::*,
+    future::{self, join_all, Future},
+    stream::*,
+    FutureExt,
 };
 
 use crate::log::prelude::*;
@@ -96,11 +98,9 @@ impl Actor for GracefulShutdown {
                 .select(sighup_stream);
 
             ctx.add_message_stream(
-                signals_stream
-                    .map(ShutdownSignalDetected)
-                    .map_err(|e| {
-                        error!("Error getting shutdown signal {:?}", e);
-                    }),
+                signals_stream.map(ShutdownSignalDetected).map_err(|e| {
+                    error!("Error getting shutdown signal {:?}", e);
+                }),
             );
         }
     }

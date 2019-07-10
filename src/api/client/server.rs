@@ -2,12 +2,14 @@
 
 use actix::{Actor, Addr};
 use actix_web::{
+    middleware,
+    web::{resource, Data, Path, Payload},
     App, HttpRequest, HttpResponse, HttpServer,
-    middleware, web::{Data, Path, Payload, resource},
 };
 use actix_web_actors::ws;
 use futures::{
-    future::{self, Either}, Future,
+    future::{self, Either},
+    Future,
 };
 use serde::Deserialize;
 
@@ -149,7 +151,7 @@ mod test {
     use std::{ops::Add, thread, time::Duration};
 
     use actix::Actor as _;
-    use actix_http::{HttpService, ws::Message};
+    use actix_http::{ws::Message, HttpService};
     use actix_http_test::{TestServer, TestServerRuntime};
     use futures::{future::IntoFuture as _, sink::Sink as _, Stream as _};
 

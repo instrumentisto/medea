@@ -11,7 +11,8 @@ use actix::{
 };
 use failure::Fail;
 use futures::{
-    future::{self, join_all, Either}, Future,
+    future::{self, join_all, Either},
+    Future,
 };
 use hashbrown::HashMap;
 
@@ -234,7 +235,7 @@ impl ParticipantService {
                         ctx.address()
                             .send(CloseRoom {})
                             .map_err(|_| ())
-                            .and_then(std::result::Result::unwrap)
+                            .and_then(std::result::Result::unwrap),
                     )
                     .map(|_, _, _| ())
                     .map_err(|_, _, _| ()),
