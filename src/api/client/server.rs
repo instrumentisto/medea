@@ -7,8 +7,7 @@ use actix_web::{
 };
 use actix_web_actors::ws;
 use futures::{
-    future::{self, Either},
-    Future,
+    future::{self, Either}, Future,
 };
 use serde::Deserialize;
 

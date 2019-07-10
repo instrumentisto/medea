@@ -11,8 +11,7 @@ use actix::{
 };
 use failure::Fail;
 use futures::{
-    future::{self, join_all, Either},
-    Future,
+    future::{self, join_all, Either}, Future,
 };
 use hashbrown::HashMap;
 

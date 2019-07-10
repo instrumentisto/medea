@@ -8,19 +8,18 @@ use std::{
 };
 
 use actix::{
-    self,
-    prelude::{Actor, Context},
-    Addr, AsyncContext, Handler, Message, Recipient,
+    self, Addr, AsyncContext, Handler, Message,
+    prelude::{Actor, Context}, Recipient,
     ResponseActFuture, System, WrapFuture,
 };
 
 use tokio::prelude::{
-    future::{self, join_all, Future},
-    stream::*,
-    FutureExt,
+    future::{self, Future, join_all},
+    FutureExt, stream::*,
 };
 
 use crate::log::prelude::*;
+
 pub type ShutdownMessageResult =
     Result<Box<(dyn Future<Item = (), Error = ()> + std::marker::Send)>, ()>;
 

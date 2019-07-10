@@ -4,8 +4,8 @@
 use std::time::Duration;
 
 use actix::{
-    fut::wrap_future, Actor, ActorFuture, AsyncContext, Context, Handler,
-    Message,
+    fut::wrap_future, Actor, ActorFuture,
+    AsyncContext, Context, Handler, Message,
 };
 use failure::Fail;
 use futures::{future, Future};
@@ -21,7 +21,6 @@ use crate::{
         },
         control::{Member, MemberId},
     },
-    graceful_shutdown,
     log::prelude::*,
     media::{
         New, Peer, PeerId, PeerStateError, PeerStateMachine,
@@ -29,7 +28,7 @@ use crate::{
     },
     signalling::{participants::ParticipantService, peers::PeerRepository},
     turn::TurnAuthService,
-    utils::graceful_shutdown::ShutdownMessage,
+    utils::graceful_shutdown::{self, ShutdownMessage},
 };
 
 /// ID of [`Room`].
