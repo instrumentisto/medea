@@ -27,7 +27,7 @@ use crate::{
             },
             local_uri::LocalUri,
             room::RoomSpec,
-            MemberId, RoomId, TryFromElementError, WebRtcPlayId,
+            MemberId, MemberSpec, RoomId, TryFromElementError, WebRtcPlayId,
             WebRtcPublishId,
         },
     },
@@ -861,6 +861,23 @@ impl Handler<DeleteEndpointCheck> for Room {
             panic!()
         }
 
+        Ok(())
+    }
+}
+
+#[derive(Message, Debug)]
+#[rtype(result = "Result<(), RoomError>")]
+pub struct CreateMember(pub MemberId, pub MemberSpec);
+
+impl Handler<CreateMember> for Room {
+    type Result = Result<(), RoomError>;
+
+    fn handle(
+        &mut self,
+        msg: CreateMember,
+        ctx: &mut Self::Context,
+    ) -> Self::Result {
+        self.members.create_member(msg.0, msg.1);
         Ok(())
     }
 }

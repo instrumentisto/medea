@@ -27,12 +27,15 @@ use crate::{
             AuthorizationError, ClosedReason, EventMessage, RpcConnection,
             RpcConnectionClosed,
         },
-        control::{MemberId, RoomId, RoomSpec},
+        control::{MemberId, MemberSpec, RoomId, RoomSpec, WebRtcPlayId},
     },
     log::prelude::*,
     media::IceUser,
     signalling::{
-        elements::{parse_members, Member, MembersLoadError},
+        elements::{
+            endpoints::webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
+            parse_members, Member, MembersLoadError,
+        },
         room::{ActFuture, RoomError},
         Room,
     },
@@ -341,5 +344,82 @@ impl ParticipantService {
                 ctx.spawn(wrap_future(delete_ice_user_fut));
             }
         }
+    }
+
+    pub fn create_member(&mut self, id: MemberId, spec: MemberSpec) {
+        let signalling_member = Rc::new(Member::new(
+            id.clone(),
+            spec.credentials().to_string(),
+            self.room_id.clone(),
+        ));
+
+        for (id, publish) in spec.publish_endpoints() {
+            let signalling_publish = Rc::new(WebRtcPublishEndpoint::new(
+                id.clone(),
+                publish.p2p.clone(),
+                Vec::new(),
+                Rc::downgrade(&signalling_member),
+            ));
+            signalling_member.insert_src(signalling_publish);
+        }
+
+        for (id, play) in spec.play_endpoints() {
+            let partner_member =
+                self.get_member_by_id(&play.src.member_id).unwrap();
+            let src =
+                partner_member.get_src_by_id(&play.src.endpoint_id).unwrap();
+
+            let sink = Rc::new(WebRtcPlayEndpoint::new(
+                id.clone(),
+                play.src.clone(),
+                Rc::downgrade(&src),
+                Rc::downgrade(&signalling_member),
+            ));
+
+            src.add_sink(Rc::downgrade(&sink));
+            signalling_member.insert_sink(sink);
+        }
+
+        self.members.insert(id, signalling_member);
+
+        //        for (id, member) in &members {
+        //            let signalling_member = Rc::new(Member::new(
+        //                id.clone(),
+        //                member.credentials().to_string(),
+        //                self.room_id.clone(),
+        //            ));
+        //            for (id, publish) in member.publish_endpoints() {
+        //                let signalling_publish =
+        // Rc::new(WebRtcPublishEndpoint::new(                    
+        // id.clone(),                    publish.p2p.clone(),
+        //                    Vec::new(),
+        //                    Rc::downgrade(&signalling_member),
+        //                ));
+        //                signalling_member.insert_src(signalling_publish);
+        //            }
+        //            self.members.insert(id.clone(), signalling_member);
+        //        }
+        //
+        //        for (id, member) in members {
+        //            let signalling_member =
+        // self.get_member_by_id(&id).unwrap();            for (id,
+        // play) in member.play_endpoints() {                let
+        // partner_member =                    
+        // self.get_member_by_id(&play.src.member_id).unwrap();
+        //                let src = partner_member
+        //                    .get_src_by_id(&play.src.endpoint_id)
+        //                    .unwrap();
+        //
+        //                let sink = Rc::new(WebRtcPlayEndpoint::new(
+        //                    id.clone(),
+        //                    play.src.clone(),
+        //                    Rc::downgrade(&src),
+        //                    Rc::downgrade(&signalling_member),
+        //                ));
+        //
+        //                src.add_sink(Rc::downgrade(&sink));
+        //                signalling_member.insert_sink(sink);
+        //            }
+        //        }
     }
 }

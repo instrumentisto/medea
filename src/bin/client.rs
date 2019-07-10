@@ -9,6 +9,7 @@ use medea::api::control::grpc::protos::{
     control_grpc::ControlApiClient,
 };
 use protobuf::RepeatedField;
+use std::time::Duration;
 
 fn main() {
     let env = Arc::new(EnvBuilder::new().build());
@@ -16,9 +17,11 @@ fn main() {
     let client = ControlApiClient::new(ch);
 
     create_room(&client);
-    delete_room(&client);
-    delete_endpoint(&client);
-    delete_member(&client);
+    //    delete_room(&client);
+    //    delete_endpoint(&client);
+    //    delete_member(&client);
+    create_member(&client);
+    //    std::thread::sleep(Duration::from_secs(1));
     get_room(&client);
 }
 
@@ -65,6 +68,25 @@ fn create_room(client: &ControlApiClient) {
     }
 }
 
+fn create_member(client: &ControlApiClient) {
+    let mut create_member_request = CreateRequest::new();
+    let mut member = Member::new();
+    let mut member_pipeline = HashMap::new();
+
+    let mut play_endpoint = WebRtcPlayEndpoint::new();
+    play_endpoint.set_src("local://grpc-test/publisher/publish".to_string());
+    let mut member_element = Member_Element::new();
+    member_element.set_webrtc_play(play_endpoint);
+    member_pipeline.insert("play".to_string(), member_element);
+
+    member.set_credentials("test".to_string());
+    member.set_pipeline(member_pipeline);
+    create_member_request.set_id("local://grpc-test/player".to_string());
+    create_member_request.set_member(member);
+
+    let reply = client.create(&create_member_request);
+}
+
 fn delete_room(client: &ControlApiClient) {
     let mut delete_request = IdRequest::new();
     let mut rooms = RepeatedField::new();
@@ -104,5 +126,5 @@ fn get_room(client: &ControlApiClient) {
     get_room_request.set_id(room);
 
     let reply = client.get(&get_room_request).expect("get room");
-    println!("{:?}", reply);
+    println!("{:#?}", reply);
 }

@@ -13,13 +13,13 @@ use hashbrown::HashMap;
 use crate::{
     api::control::{
         grpc::protos::control::Element as ElementProto, local_uri::LocalUri,
-        room::RoomSpec, MemberId, RoomId,
+        room::RoomSpec, MemberId, MemberSpec, RoomId,
     },
     signalling::{
         room::{
-            CloseRoom, DeleteEndpoint, DeleteEndpointCheck, DeleteMember,
-            DeleteMemberCheck, RoomError, Serialize, SerializeEndpoint,
-            SerializeMember,
+            CloseRoom, CreateMember, DeleteEndpoint, DeleteEndpointCheck,
+            DeleteMember, DeleteMemberCheck, RoomError, Serialize,
+            SerializeEndpoint, SerializeMember,
         },
         Room,
     },
@@ -429,5 +429,30 @@ impl Handler<GetEndpoint> for RoomsRepository {
         }
 
         Box::new(wrap_future(futures::future::join_all(futs)))
+    }
+}
+
+#[derive(Message)]
+#[rtype(result = "Result<(), RoomRepoError>")]
+pub struct CreateMemberInRoom {
+    pub room_id: RoomId,
+    pub member_id: MemberId,
+    pub spec: MemberSpec,
+}
+
+impl Handler<CreateMemberInRoom> for RoomsRepository {
+    type Result = Result<(), RoomRepoError>;
+
+    fn handle(
+        &mut self,
+        msg: CreateMemberInRoom,
+        ctx: &mut Self::Context,
+    ) -> Self::Result {
+        if let Some(room) = self.rooms.lock().unwrap().get(&msg.room_id) {
+            room.do_send(CreateMember(msg.member_id, msg.spec));
+        } else {
+            unimplemented!()
+        }
+        Ok(())
     }
 }

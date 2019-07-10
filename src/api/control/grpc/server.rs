@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, convert::TryFrom, sync::Arc};
 
 use actix::{Actor, Addr, Arbiter, Context};
 use failure::Fail;
@@ -23,7 +23,10 @@ use crate::{
 };
 
 use super::protos::control_grpc::{create_control_api, ControlApi};
-use crate::signalling::room_repo::DeleteRoomCheck;
+use crate::{
+    api::control::MemberSpec,
+    signalling::room_repo::{CreateMemberInRoom, DeleteRoomCheck},
+};
 
 #[derive(Debug, Fail)]
 enum ControlApiError {
@@ -114,6 +117,16 @@ impl ControlApi for ControlApiService {
         let create = {
             if local_uri.is_room_uri() {
                 self.create_room(req)
+            } else if local_uri.is_member_uri() {
+                let member_spec =
+                    MemberSpec::try_from(req.get_member()).unwrap();
+                self.room_repository.do_send(CreateMemberInRoom {
+                    room_id: local_uri.room_id.unwrap(),
+                    member_id: local_uri.member_id.unwrap(),
+                    spec: member_spec,
+                });
+
+                return;
             } else {
                 unimplemented!()
             }

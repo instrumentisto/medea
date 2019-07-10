@@ -13,7 +13,7 @@ use crate::api::control::{
         webrtc_publish_endpoint::{WebRtcPublishEndpoint, WebRtcPublishId},
     },
     grpc::protos::control::Member as MemberProto,
-    Endpoint, TryFromProtobufError,
+    Endpoint, TryFromProtobufError, WebRtcPlayId,
 };
 
 use super::{pipeline::Pipeline, Element, TryFromElementError};
@@ -55,11 +55,13 @@ impl Into<Element> for MemberSpec {
 
 impl MemberSpec {
     /// Returns all [`WebRtcPlayEndpoint`]s of this [`MemberSpec`].
-    pub fn play_endpoints(&self) -> HashMap<&String, &WebRtcPlayEndpoint> {
+    pub fn play_endpoints(&self) -> HashMap<WebRtcPlayId, &WebRtcPlayEndpoint> {
         self.pipeline
             .iter()
             .filter_map(|(id, e)| match e {
-                Element::WebRtcPlayEndpoint { spec } => Some((id, spec)),
+                Element::WebRtcPlayEndpoint { spec } => {
+                    Some((WebRtcPlayId(id.clone()), spec))
+                }
                 _ => None,
             })
             .collect()

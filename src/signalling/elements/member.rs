@@ -75,7 +75,8 @@ impl Member {
     ///
     /// To fill this [`Member`], you need to call the [`Member::load`]
     /// function.
-    fn new(id: MemberId, credentials: String, room_id: RoomId) -> Self {
+    // TODO: private
+    pub fn new(id: MemberId, credentials: String, room_id: RoomId) -> Self {
         Self(RefCell::new(MemberInner {
             id,
             srcs: HashMap::new(),
@@ -87,7 +88,8 @@ impl Member {
     }
 
     /// Load all srcs and sinks of this [`Member`].
-    fn load(
+    // TODO: private
+    pub fn load(
         &self,
         room_spec: &RoomSpec,
         store: &HashMap<MemberId, Rc<Self>>,
