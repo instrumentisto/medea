@@ -2,6 +2,7 @@
 //! connection establishment between concrete [`Member`]s.
 
 use std::time::Duration;
+use std::sync::Arc;
 
 use actix::{
     fut::wrap_future, Actor, ActorFuture, AsyncContext, Context, Handler,
@@ -458,7 +459,6 @@ impl Handler<CloseRoom> for Room {
         info!("Closing Room [id = {:?}]", self.id);
         self.state = RoomState::Stopping;
         let drop_fut = self.participants.drop_connections(ctx);
-
         Ok(Box::new(drop_fut))
     }
 }

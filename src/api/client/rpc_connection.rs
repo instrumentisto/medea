@@ -27,7 +27,7 @@ pub trait RpcConnection: fmt::Debug + Send {
     /// Closes [`RpcConnection`].
     /// No [`RpcConnectionClosed`] signals should be emitted.
     /// Always returns success.
-    fn close(&mut self) -> Box<dyn Future<Item = (), Error = ()>>;
+    fn close(&mut self) -> Box<dyn Future<Item = (), Error = ()> + Send>;
 
     /// Sends [`Event`] to remote [`Member`].
     fn send_event(
@@ -208,7 +208,7 @@ pub mod test {
     }
 
     impl RpcConnection for Addr<TestConnection> {
-        fn close(&mut self) -> Box<dyn Future<Item = (), Error = ()>> {
+        fn close(&mut self) -> Box<dyn Future<Item = (), Error = ()> + Send> {
             let fut = self.send(Close {}).map_err(|_| ());
             Box::new(fut)
         }

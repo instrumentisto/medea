@@ -36,7 +36,7 @@ pub trait TurnAuthService: fmt::Debug + Send {
     fn delete(
         &self,
         users: Vec<IceUser>,
-    ) -> Box<dyn Future<Item = (), Error = TurnServiceErr>>;
+    ) -> Box<dyn Future<Item = (), Error = TurnServiceErr> + Send>;
 }
 
 impl TurnAuthService for Addr<Service> {
@@ -69,7 +69,7 @@ impl TurnAuthService for Addr<Service> {
     fn delete(
         &self,
         users: Vec<IceUser>,
-    ) -> Box<dyn Future<Item = (), Error = TurnServiceErr>> {
+    ) -> Box<dyn Future<Item = (), Error = TurnServiceErr> + Send> {
         // leave only non static users
         let users: Vec<IceUser> =
             users.into_iter().filter(|u| !u.is_static()).collect();

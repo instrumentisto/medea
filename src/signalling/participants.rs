@@ -276,14 +276,11 @@ impl ParticipantService {
     }
 
     /// Cancels all connection close tasks, closes all [`RpcConnection`]s,
+    /// deletes all [`IceUser`]s
     pub fn drop_connections(
         &mut self,
         ctx: &mut Context<Room>,
-    ) -> Box<impl Future<Item = (), Error = ()> + std::marker::Send> {
-        use std::sync::Arc;
-        // todo use self in sync, the rest in async
-
-        error!("participants called");
+    ) -> Box<impl Future<Item = (), Error = ()> + Send> {
 
         // canceling all drop_connection_tasks
         self.drop_connection_tasks.drain().for_each(|(_, handle)| {
@@ -293,19 +290,13 @@ impl ParticipantService {
         // closing all RpcConnection's
         let mut close_fut = self.connections.drain().fold(
             vec![], |mut futures, (_, mut connection)| {
-                futures.push(
-                    futures::future::ok(())
-//                        .then(move |_| {
-//                            connection.close()
-//                        })
-                );
+                futures.push(connection.close());
                 futures
             },
         );
 
         // deleting all IceUsers
-//        let remove_ice_users =
-            Box::new({
+        let remove_ice_users = Box::new({
             let mut room_users = Vec::with_capacity(self.members.len());
 
             self.members.iter_mut().for_each(|(_, data)| {
@@ -313,13 +304,13 @@ impl ParticipantService {
                     room_users.push(ice_user);
                 }
             });
+
             self.turn
                 .delete(room_users)
                 .map_err(|err| error!("Error removing IceUsers {:?}", err))
         });
-//        close_fut.push(remove_ice_users);
+        close_fut.push(remove_ice_users);
 
         Box::new(join_all(close_fut).map(|_| ()))
-//        futures::future::ok(())
     }
 }

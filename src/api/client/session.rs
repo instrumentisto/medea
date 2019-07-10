@@ -149,7 +149,7 @@ impl RpcConnection for Addr<WsSession> {
     /// Closes [`WsSession`] by sending itself "normal closure" close message.
     ///
     /// Never returns error.
-    fn close(&mut self) -> Box<dyn Future<Item = (), Error = ()>> {
+    fn close(&mut self) -> Box<dyn Future<Item = (), Error = ()> + Send> {
         let fut = self
             .send(Close {
                 reason: Some(ws::CloseCode::Normal.into()),
