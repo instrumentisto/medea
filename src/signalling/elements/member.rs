@@ -53,7 +53,7 @@ impl From<TryFromElementError> for MembersLoadError {
 #[derive(Debug, Fail)]
 pub enum MemberError {
     #[fail(display = "Endpoint with ID '{}' not found.", _0)]
-    EndpointNotFound(String),
+    EndpointNotFound(LocalUri),
 }
 
 /// [`Member`] is member of [`Room`] with [`RpcConnection`].
@@ -274,16 +274,22 @@ impl Member {
         self.0.borrow().srcs.get(id).cloned()
     }
 
+    fn get_local_uri(&self) -> LocalUri {
+        LocalUri::new(Some(self.room_id()), Some(self.id()), None)
+    }
+
     pub fn get_src(
         &self,
         id: &WebRtcPublishId,
     ) -> Result<Rc<WebRtcPublishEndpoint>, MemberError> {
-        self.0
-            .borrow()
-            .srcs
-            .get(id)
-            .cloned()
-            .map_or(Err(MemberError::EndpointNotFound(id.to_string())), Ok)
+        self.0.borrow().srcs.get(id).cloned().map_or_else(
+            || {
+                let mut local_uri = self.get_local_uri();
+                local_uri.endpoint_id = Some(id.to_string());
+                Err(MemberError::EndpointNotFound(local_uri))
+            },
+            Ok,
+        )
     }
 
     /// Lookup [`WebRtcPlayEndpoint`] sink endpoint by [`EndpointId`].
@@ -298,12 +304,14 @@ impl Member {
         &self,
         id: &WebRtcPlayId,
     ) -> Result<Rc<WebRtcPlayEndpoint>, MemberError> {
-        self.0
-            .borrow()
-            .sinks
-            .get(id)
-            .cloned()
-            .map_or(Err(MemberError::EndpointNotFound(id.to_string())), Ok)
+        self.0.borrow().sinks.get(id).cloned().map_or_else(
+            || {
+                let mut local_uri = self.get_local_uri();
+                local_uri.endpoint_id = Some(id.to_string());
+                Err(MemberError::EndpointNotFound(local_uri))
+            },
+            Ok,
+        )
     }
 
     /// Remove sink [`WebRtcPlayEndpoint`] from this [`Member`].

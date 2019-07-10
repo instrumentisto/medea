@@ -60,7 +60,7 @@ pub enum RoomError {
     #[fail(display = "Couldn't find Member with [id = {}]", _0)]
     MemberNotFound(MemberId),
     #[fail(display = "Endpoint with ID '{}' not found.", _0)]
-    EndpointNotFound(String),
+    EndpointNotFound(LocalUri),
     #[fail(display = "Member [id = {}] does not have Turn credentials", _0)]
     NoTurnCredentials(MemberId),
     #[fail(display = "Couldn't find RpcConnection with Member [id = {}]", _0)]
@@ -572,13 +572,10 @@ impl Handler<SerializeEndpoint> for Room {
         } else {
             let endpoint_id = WebRtcPlayId(endpoint_id.0);
 
-            if let Some(endpoint) = member.get_sink_by_id(&endpoint_id) {
-                let mut member_element: Member_Element = endpoint.into();
-                let endpoint = member_element.take_webrtc_play();
-                element.set_webrtc_play(endpoint);
-            } else {
-                return Err(RoomError::EndpointNotFound(endpoint_id.0));
-            }
+            let endpoint = member.get_sink(&endpoint_id)?;
+            let mut member_element: Member_Element = endpoint.into();
+            let endpoint = member_element.take_webrtc_play();
+            element.set_webrtc_play(endpoint);
         }
 
         Ok(element)

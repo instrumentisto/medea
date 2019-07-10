@@ -12,6 +12,7 @@ pub enum LocalUriParseError {
     TooManyFields(usize),
 }
 
+#[derive(Debug)]
 pub struct LocalUri {
     /// ID of [`Room`]
     pub room_id: Option<RoomId>,
@@ -22,6 +23,18 @@ pub struct LocalUri {
 }
 
 impl LocalUri {
+    pub fn new(
+        room_id: Option<RoomId>,
+        member_id: Option<MemberId>,
+        endpoint_id: Option<String>,
+    ) -> Self {
+        Self {
+            room_id,
+            member_id,
+            endpoint_id,
+        }
+    }
+
     pub fn parse(value: &str) -> Result<Self, LocalUriParseError> {
         let protocol_name: String = value.chars().take(8).collect();
         if protocol_name != "local://" {

@@ -32,6 +32,7 @@ use crate::{
                 webrtc_play_endpoint::WebRtcPlayEndpoint as WebRtcPlayEndpointSpec,
                 webrtc_publish_endpoint::WebRtcPublishEndpoint as WebRtcPublishEndpointSpec,
             },
+            local_uri::LocalUri,
             MemberId, MemberSpec, RoomId, RoomSpec, WebRtcPlayId,
             WebRtcPublishId,
         },
@@ -64,7 +65,7 @@ pub enum ParticipantServiceErr {
     #[fail(display = "Participant with Id [{}] was not found", _0)]
     ParticipantNotFound(MemberId),
     #[fail(display = "Endpoint not found.")]
-    EndpointNotFound(String),
+    EndpointNotFound(LocalUri),
 }
 
 impl From<TurnServiceErr> for ParticipantServiceErr {
