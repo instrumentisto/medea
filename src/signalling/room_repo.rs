@@ -433,7 +433,7 @@ impl Handler<GetEndpoint> for RoomsRepository {
 }
 
 #[derive(Message)]
-#[rtype(result = "Result<(), RoomRepoError>")]
+#[rtype(result = "Result<Result<(), RoomError>, RoomRepoError>")]
 pub struct CreateMemberInRoom {
     pub room_id: RoomId,
     pub member_id: MemberId,
@@ -441,24 +441,31 @@ pub struct CreateMemberInRoom {
 }
 
 impl Handler<CreateMemberInRoom> for RoomsRepository {
-    type Result = Result<(), RoomRepoError>;
+    type Result = ActFuture<Result<(), RoomError>, RoomRepoError>;
 
     fn handle(
         &mut self,
         msg: CreateMemberInRoom,
         ctx: &mut Self::Context,
     ) -> Self::Result {
-        if let Some(room) = self.rooms.lock().unwrap().get(&msg.room_id) {
-            room.do_send(CreateMember(msg.member_id, msg.spec));
-        } else {
-            unimplemented!()
-        }
-        Ok(())
+        let fut =
+            if let Some(room) = self.rooms.lock().unwrap().get(&msg.room_id) {
+                Either::A(
+                    room.send(CreateMember(msg.member_id, msg.spec))
+                        .map_err(|e| RoomRepoError::from(e)),
+                )
+            } else {
+                Either::B(futures::future::err(RoomRepoError::RoomNotFound(
+                    msg.room_id,
+                )))
+            };
+
+        Box::new(wrap_future(fut))
     }
 }
 
 #[derive(Message)]
-#[rtype(result = "Result<(), RoomRepoError>")]
+#[rtype(result = "Result<Result<(), RoomError>, RoomRepoError>")]
 pub struct CreateEndpointInRoom {
     pub room_id: RoomId,
     pub member_id: MemberId,
@@ -467,23 +474,29 @@ pub struct CreateEndpointInRoom {
 }
 
 impl Handler<CreateEndpointInRoom> for RoomsRepository {
-    type Result = Result<(), RoomRepoError>;
+    type Result = ActFuture<Result<(), RoomError>, RoomRepoError>;
 
     fn handle(
         &mut self,
         msg: CreateEndpointInRoom,
         ctx: &mut Self::Context,
     ) -> Self::Result {
-        if let Some(room) = self.rooms.lock().unwrap().get(&msg.room_id) {
-            room.do_send(CreateEndpoint {
-                member_id: msg.member_id,
-                endpoint_id: msg.endpoint_id,
-                spec: msg.spec,
-            });
-        } else {
-            unimplemented!()
-        }
+        let fut =
+            if let Some(room) = self.rooms.lock().unwrap().get(&msg.room_id) {
+                Either::A(
+                    room.send(CreateEndpoint {
+                        member_id: msg.member_id,
+                        endpoint_id: msg.endpoint_id,
+                        spec: msg.spec,
+                    })
+                    .map_err(|e| RoomRepoError::from(e)),
+                )
+            } else {
+                Either::B(futures::future::err(RoomRepoError::RoomNotFound(
+                    msg.room_id,
+                )))
+            };
 
-        Ok(())
+        Box::new(wrap_future(fut))
     }
 }
