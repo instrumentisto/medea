@@ -8,12 +8,12 @@ use std::{
 };
 
 use actix::{
-    self, ActorFuture, StreamHandler,
+    self,
     prelude::{Actor, Context},
-    Addr, AsyncContext, Handler, Message, Recipient, System,
-    ResponseActFuture, WrapFuture,
+    Addr, AsyncContext, Handler, Message, Recipient,
+    ResponseActFuture, System, WrapFuture,
 };
-use futures::future::IntoFuture;
+
 use tokio::prelude::{
     future::{self, join_all, Future},
     stream::*,
@@ -24,16 +24,11 @@ use crate::log::prelude::*;
 pub type ShutdownMessageResult =
     Result<Box<(dyn Future<Item = (), Error = ()> + std::marker::Send)>, ()>;
 
-type ShutdownFutureType = dyn Future<
-    Item = Vec<()>,
-    Error = (),
->;
+type ShutdownFutureType = dyn Future<Item = Vec<()>, Error = ()>;
 
-#[derive(Debug)]
-#[derive(Message)]
+#[derive(Debug, Message)]
 #[rtype(result = "ShutdownMessageResult")]
 pub struct ShutdownMessage;
-
 
 /// Subscribe to exit events, with priority
 #[derive(Message)]
@@ -51,13 +46,11 @@ pub struct ShutdownUnsubscribe {
     pub who: Recipient<ShutdownMessage>,
 }
 
-
 /// Send this when a signal is detected
 #[cfg(unix)]
 #[derive(Message)]
 #[rtype(result = "Result<(),()>")]
 struct ShutdownSignalDetected(i32);
-
 
 pub struct GracefulShutdown {
     /// [`Actor`]s to send message when graceful shutdown
@@ -104,9 +97,8 @@ impl Actor for GracefulShutdown {
                 .select(sighup_stream);
 
             ctx.add_message_stream(
-                //todo log errors
                 signals_stream
-                    .map(move |signal| ShutdownSignalDetected(signal))
+                    .map(ShutdownSignalDetected)
                     .map_err(|e| {
                         error!("Error getting shutdown signal {:?}", e);
                     }),
@@ -121,30 +113,10 @@ impl Handler<ShutdownSignalDetected> for GracefulShutdown {
 
     fn handle(
         &mut self,
-        msg: ShutdownSignalDetected,
+        _: ShutdownSignalDetected,
         _: &mut Context<Self>,
     ) -> ResponseActFuture<Self, (), ()> {
-        use tokio_signal::unix::{SIGHUP, SIGINT, SIGQUIT, SIGTERM};
-
-        match msg.0 {
-            SIGINT => {
-                //todo info
-                info!("SIGINT received, exiting");
-            }
-            SIGHUP => {
-                info!("SIGHUP received, reloading");
-            }
-            SIGTERM => {
-                info!("SIGTERM received, stopping");
-            }
-            SIGQUIT => {
-                info!("SIGQUIT received, exiting");
-            }
-            _ => {
-                //todo on top
-                error!("Exit signal received, exiting");
-            }
-        };
+        info!("Exit signal received, exiting");
 
         if self.recipients.is_empty() {
             error!("GracefulShutdown: No subscribers registered");
@@ -164,9 +136,7 @@ impl Handler<ShutdownSignalDetected> for GracefulShutdown {
                     .map_err(|e| {
                         error!("Error sending shutdown message: {:?}", e);
                     })
-                    .and_then(|future| {
-                        future.unwrap()
-                    });
+                    .and_then(std::result::Result::unwrap);
 
                 this_priority_futures_vec.push(recipient_shutdown_fut);
             }
@@ -203,9 +173,6 @@ impl Handler<ShutdownSubscribe> for GracefulShutdown {
     type Result = ();
 
     fn handle(&mut self, msg: ShutdownSubscribe, _: &mut Context<Self>) {
-        // ask
-        // todo replace vec to hashset
-
         let hashset_with_current_priority =
             self.recipients.get_mut(&msg.priority);
 
@@ -238,6 +205,5 @@ impl Handler<ShutdownUnsubscribe> for GracefulShutdown {
 }
 
 pub fn create(shutdown_timeout: u64) -> Addr<GracefulShutdown> {
-    let graceful_shutdown = GracefulShutdown::new(shutdown_timeout).start();
-    graceful_shutdown
+    GracefulShutdown::new(shutdown_timeout).start()
 }

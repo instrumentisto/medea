@@ -2,7 +2,6 @@
 //! connection establishment between concrete [`Member`]s.
 
 use std::time::Duration;
-use std::sync::Arc;
 
 use actix::{
     fut::wrap_future, Actor, ActorFuture, AsyncContext, Context, Handler,
@@ -68,6 +67,7 @@ impl From<PeerStateError> for RoomError {
 }
 
 #[derive(Debug)]
+#[allow(clippy::module_name_repetitions)]
 pub enum RoomState {
     Started,
     Stopping,
@@ -319,11 +319,12 @@ impl Handler<ConnectPeers> for Room {
                          stopped.",
                         err
                     );
-                    ctx.spawn(wrap_future(
-                        ctx.address().send(CloseRoom {})
-                            .then(|fut| fut))
-                            .map(|_,_,_| ())
-                            .map_err(|_,_,_| ())
+                    ctx.spawn(
+                        wrap_future(
+                            ctx.address().send(CloseRoom {}).then(|fut| fut),
+                        )
+                        .map(|_, _, _| ())
+                        .map_err(|_, _, _| ()),
                     );
                 }))
             }
@@ -332,11 +333,12 @@ impl Handler<ConnectPeers> for Room {
                     "Failed handle command, because {}. Room will be stopped.",
                     err
                 );
-                ctx.spawn(wrap_future(
-                    ctx.address().send(CloseRoom {})
-                        .then(|fut| fut))
-                    .map(|_,_,_| ())
-                    .map_err(|_,_,_| ())
+                ctx.spawn(
+                    wrap_future(
+                        ctx.address().send(CloseRoom {}).then(|fut| fut),
+                    )
+                    .map(|_, _, _| ())
+                    .map_err(|_, _, _| ()),
                 );
                 Box::new(wrap_future(future::ok(())))
             }
@@ -375,11 +377,12 @@ impl Handler<CommandMessage> for Room {
                          stopped.",
                         err
                     );
-                    ctx.spawn(wrap_future(
-                        ctx.address().send(CloseRoom {})
-                            .then(|fut| fut))
-                            .map(|_,_,_| ())
-                            .map_err(|_,_,_| ())
+                    ctx.spawn(
+                        wrap_future(
+                            ctx.address().send(CloseRoom {}).then(|fut| fut),
+                        )
+                        .map(|_, _, _| ())
+                        .map_err(|_, _, _| ()),
                     );
                 }))
             }
@@ -388,11 +391,12 @@ impl Handler<CommandMessage> for Room {
                     "Failed handle command, because {}. Room will be stopped.",
                     err
                 );
-                ctx.spawn(wrap_future(
-                    ctx.address().send(CloseRoom {})
-                        .then(|fut| fut))
-                    .map(|_,_,_| ())
-                    .map_err(|_,_,_| ())
+                ctx.spawn(
+                    wrap_future(
+                        ctx.address().send(CloseRoom {}).then(|fut| fut),
+                    )
+                    .map(|_, _, _| ())
+                    .map_err(|_, _, _| ()),
                 );
                 Box::new(wrap_future(future::ok(())))
             }
@@ -476,13 +480,12 @@ impl Handler<ShutdownMessage> for Room {
 
         let room_id = self.id;
         Ok(Box::new(
-            ctx.address().send(CloseRoom {})
+            ctx.address()
+                .send(CloseRoom {})
                 .map_err(|_| ())
-                .and_then(|fut| {
-                    fut.unwrap()
-                })
+                .and_then(std::result::Result::unwrap)
                 .map(|_| ())
-                .map_err(move |_| error!("Error closing room {:?}", room_id))
+                .map_err(move |_| error!("Error closing room {:?}", room_id)),
         ))
     }
 }

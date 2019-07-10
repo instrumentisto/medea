@@ -26,7 +26,7 @@ fn main() {
     dotenv().ok();
     let logger = log::new_dual_logger(std::io::stdout(), std::io::stderr());
     let _scope_guard = slog_scope::set_global_logger(logger);
-    let _ = slog_stdlog::init().unwrap();
+    slog_stdlog::init().unwrap();
 
     let config = Conf::parse().unwrap();
     info!("{:?}", config);

@@ -230,11 +230,12 @@ impl ParticipantService {
                         error!("Error deleting IceUser {:?}", err)
                     }),
                 ));
-                ctx.spawn(wrap_future(
-                    ctx.address().send(CloseRoom {})
-                        .then(|fut| fut))
-                    .map(|_,_,_| ())
-                    .map_err(|_,_,_| ())
+                ctx.spawn(
+                    wrap_future(
+                        ctx.address().send(CloseRoom {}).then(|fut| fut),
+                    )
+                    .map(|_, _, _| ())
+                    .map_err(|_, _, _| ()),
                 );
             }
             ClosedReason::Lost => {
@@ -281,7 +282,6 @@ impl ParticipantService {
         &mut self,
         ctx: &mut Context<Room>,
     ) -> Box<impl Future<Item = (), Error = ()> + Send> {
-
         // canceling all drop_connection_tasks
         self.drop_connection_tasks.drain().for_each(|(_, handle)| {
             ctx.cancel_future(handle);
@@ -289,7 +289,8 @@ impl ParticipantService {
 
         // closing all RpcConnection's
         let mut close_fut = self.connections.drain().fold(
-            vec![], |mut futures, (_, mut connection)| {
+            vec![],
+            |mut futures, (_, mut connection)| {
                 futures.push(connection.close());
                 futures
             },

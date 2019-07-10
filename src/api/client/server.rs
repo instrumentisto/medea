@@ -110,8 +110,7 @@ pub fn run(rooms: RoomsRepository, config: Conf) -> Addr<ServerWrapper> {
 
     info!("Started HTTP server on {:?}", server_addr);
 
-    let server_wrapper_addr = actors::ServerWrapper(actix_server).start();
-    server_wrapper_addr
+    actors::ServerWrapper(actix_server).start()
 }
 
 pub mod actors {
@@ -141,9 +140,7 @@ pub mod actors {
             info!("Shutting down Actix Web Server");
 
             Ok(Box::new(
-                self.0.stop(true).then(move |_| {
-                    futures::future::ok(())
-                }),
+                self.0.stop(true).then(move |_| futures::future::ok(())),
             ))
         }
     }
