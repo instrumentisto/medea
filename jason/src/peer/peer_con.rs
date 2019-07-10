@@ -80,6 +80,7 @@ pub struct RtcPeerConnection(Rc<RefCell<InnerPeer>>);
 
 impl RtcPeerConnection {
     pub fn new(ice_servers: Vec<IceServer>) -> Result<Self, WasmErr> {
+        // TODO: RTCBundlePolicy = "max-bundle"?
         let mut peer_conf = RtcConfiguration::new();
         peer_conf.ice_servers(&RtcIceServers::from(ice_servers));
 

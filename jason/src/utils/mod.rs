@@ -1,3 +1,5 @@
+//! Miscellaneous utility structs and functions.
+
 mod callback;
 mod errors;
 mod event_listener;
