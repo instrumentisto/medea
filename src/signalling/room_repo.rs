@@ -455,7 +455,6 @@ impl Handler<CreateMemberInRoom> for RoomsRepository {
                         .map_err(|e| RoomRepoError::from(e)),
                 )
             } else {
-                println!("jhfkljdshfajdshf");
                 Either::B(futures::future::err(RoomRepoError::RoomNotFound(
                     msg.room_id,
                 )))

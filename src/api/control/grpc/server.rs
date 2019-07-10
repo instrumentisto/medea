@@ -94,6 +94,7 @@ impl ControlApiService {
     pub fn create_room(
         &mut self,
         req: CreateRequest,
+        local_uri: LocalUri,
     ) -> impl Future<
         Item = Result<
             Result<HashMap<String, String>, RoomError>,
@@ -101,8 +102,6 @@ impl ControlApiService {
         >,
         Error = ControlApiError,
     > {
-        let local_uri = fut_try!(LocalUri::parse(req.get_id()));
-
         let room_id = local_uri.room_id.unwrap();
 
         let room = fut_try!(RoomSpec::try_from_protobuf(
@@ -141,6 +140,7 @@ impl ControlApiService {
     pub fn create_member(
         &mut self,
         req: CreateRequest,
+        local_uri: LocalUri,
     ) -> impl Future<
         Item = Result<
             Result<HashMap<String, String>, RoomError>,
@@ -148,26 +148,24 @@ impl ControlApiService {
         >,
         Error = ControlApiError,
     > {
-        let local_uri = LocalUri::parse(req.get_id()).unwrap();
+        let member_spec = fut_try!(MemberSpec::try_from(req.get_member()));
 
-        let member_spec = MemberSpec::try_from(req.get_member()).unwrap();
-
-        self.room_repository
-            .send(CreateMemberInRoom {
-                room_id: local_uri.room_id.unwrap(),
-                member_id: local_uri.member_id.unwrap(),
-                spec: member_spec,
-            })
-            .map_err(|e| ControlApiError::from(e))
-            .map(|r| {
-                println!("{:?}", r);
-                r.map(|r| r.map(|r| HashMap::new()))
-            })
+        Either::A(
+            self.room_repository
+                .send(CreateMemberInRoom {
+                    room_id: local_uri.room_id.unwrap(),
+                    member_id: local_uri.member_id.unwrap(),
+                    spec: member_spec,
+                })
+                .map_err(|e| ControlApiError::from(e))
+                .map(|r| r.map(|r| r.map(|r| HashMap::new()))),
+        )
     }
 
     pub fn create_endpoint(
         &mut self,
         req: CreateRequest,
+        local_uri: LocalUri,
     ) -> impl Future<
         Item = Result<
             Result<HashMap<String, String>, RoomError>,
@@ -175,18 +173,18 @@ impl ControlApiService {
         >,
         Error = ControlApiError,
     > {
-        let local_uri = LocalUri::parse(req.get_id()).unwrap();
-
-        let endpoint = Endpoint::try_from(&req).unwrap();
-        self.room_repository
-            .send(CreateEndpointInRoom {
-                room_id: local_uri.room_id.unwrap(),
-                member_id: local_uri.member_id.unwrap(),
-                endpoint_id: local_uri.endpoint_id.unwrap(),
-                spec: endpoint,
-            })
-            .map_err(|e| ControlApiError::from(e))
-            .map(|r| r.map(|r| r.map(|r| HashMap::new())))
+        let endpoint = fut_try!(Endpoint::try_from(&req));
+        Either::A(
+            self.room_repository
+                .send(CreateEndpointInRoom {
+                    room_id: local_uri.room_id.unwrap(),
+                    member_id: local_uri.member_id.unwrap(),
+                    endpoint_id: local_uri.endpoint_id.unwrap(),
+                    spec: endpoint,
+                })
+                .map_err(|e| ControlApiError::from(e))
+                .map(|r| r.map(|r| r.map(|r| HashMap::new()))),
+        )
     }
 }
 
@@ -271,17 +269,68 @@ impl ControlApi for ControlApiService {
         let local_uri = LocalUri::parse(req.get_id()).unwrap();
 
         if local_uri.is_room_uri() {
-            ctx.spawn(self.create_room(req).map_err(|_| ()).and_then(
-                move |r| sink.success(create_response(r)).map_err(|_| ()),
-            ));
+            if req.has_room() {
+                ctx.spawn(
+                    self.create_room(req, local_uri).map_err(|_| ()).and_then(
+                        move |r| {
+                            sink.success(create_response(r)).map_err(|_| ())
+                        },
+                    ),
+                );
+            } else {
+                let mut error_response = Response::new();
+                let mut error = Error::new();
+                error.set_status(400);
+                error.set_code(0);
+                error.set_text(
+                    "ID for room but element is not room.".to_string(),
+                );
+                error.set_element(String::new());
+                error_response.set_error(error);
+                ctx.spawn(sink.success(error_response).map_err(|_| ()));
+            }
         } else if local_uri.is_member_uri() {
-            ctx.spawn(self.create_member(req).map_err(|_| ()).and_then(
-                move |r| sink.success(create_response(r)).map_err(|_| ()),
-            ));
+            if req.has_member() {
+                ctx.spawn(
+                    self.create_member(req, local_uri)
+                        .map_err(|_| ())
+                        .and_then(move |r| {
+                            sink.success(create_response(r)).map_err(|_| ())
+                        }),
+                );
+            } else {
+                let mut error_response = Response::new();
+                let mut error = Error::new();
+                error.set_status(400);
+                error.set_code(0);
+                error.set_text(
+                    "ID for member but element is not member.".to_string(),
+                );
+                error.set_element(String::new());
+                error_response.set_error(error);
+                ctx.spawn(sink.success(error_response).map_err(|_| ()));
+            }
         } else if local_uri.is_endpoint_uri() {
-            ctx.spawn(self.create_endpoint(req).map_err(|_| ()).and_then(
-                move |r| sink.success(create_response(r)).map_err(|_| ()),
-            ));
+            if req.has_webrtc_pub() || req.has_webrtc_play() {
+                ctx.spawn(
+                    self.create_endpoint(req, local_uri)
+                        .map_err(|_| ())
+                        .and_then(move |r| {
+                            sink.success(create_response(r)).map_err(|_| ())
+                        }),
+                );
+            } else {
+                let mut error_response = Response::new();
+                let mut error = Error::new();
+                error.set_status(400);
+                error.set_code(0);
+                error.set_text(
+                    "ID for endpoint but element is not endpoint.".to_string(),
+                );
+                error.set_element(String::new());
+                error_response.set_error(error);
+                ctx.spawn(sink.success(error_response).map_err(|_| ()));
+            }
         } else {
             let mut error_response = Response::new();
             let mut error = Error::new();
@@ -397,13 +446,6 @@ impl ControlApi for ControlApiService {
                         })
                 }),
         );
-
-        //        let mut resp = Response::new();
-        //        resp.set_sid(HashMap::new());
-        //        ctx.spawn(
-        //            sink.success(resp)
-        //                .map_err(|e| error!("gRPC response failed. {:?}", e)),
-        //        );
     }
 
     fn get(
