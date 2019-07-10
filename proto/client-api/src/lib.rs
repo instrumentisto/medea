@@ -27,7 +27,10 @@ pub enum ClientMsg {
     Command(Command),
 }
 
-/// WebSocket message from Web Client to Media Server.
+/// WebSocket message from Web Client to Media Server. `mids` associates track
+/// with transceiver mid, mid is id of [`m= section`][1] in SDP.
+///
+/// [1]: https://tools.ietf.org/html/rfc4566#section-5.14
 #[allow(dead_code)]
 #[cfg_attr(feature = "medea", derive(Deserialize))]
 #[cfg_attr(feature = "jason", derive(Serialize))]
