@@ -57,6 +57,13 @@ impl Conf {
 
         Ok(cfg.try_into()?)
     }
+
+    pub fn get_base_rpc_url(&self) -> String {
+        // TODO: maybe create host config value and use it?
+        let addr = &self.server.bind_ip;
+        let port = self.server.bind_port;
+        format!("wss://{}:{}", addr, port)
+    }
 }
 
 /// Returns the path to the configuration file, if it's set via CLI `args`

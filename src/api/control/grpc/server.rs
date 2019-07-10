@@ -111,13 +111,11 @@ impl ControlApiService {
         let sid: HashMap<String, String> = fut_try!(room.members())
             .iter()
             .map(|(id, member)| {
-                let addr = &self.app.config.server.bind_ip;
-                let port = self.app.config.server.bind_port;
-                let base_uri = format!("{}:{}", addr, port);
+                let base_url = self.app.config.get_base_rpc_url();
 
                 let uri = format!(
-                    "wss://{}/{}/{}/{}",
-                    base_uri,
+                    "{}/{}/{}/{}",
+                    base_url,
                     &room_id,
                     id,
                     member.credentials()
@@ -127,7 +125,6 @@ impl ControlApiService {
             })
             .collect();
 
-        // TODO: errors from `SendRoom` not bubbled up.
         Either::A(
             self.room_repository
                 .send(StartRoom(room_id, room))
@@ -136,7 +133,6 @@ impl ControlApiService {
         )
     }
 
-    // TODO: return sids
     pub fn create_member(
         &mut self,
         req: CreateRequest,
@@ -148,17 +144,31 @@ impl ControlApiService {
         >,
         Error = ControlApiError,
     > {
-        let member_spec = fut_try!(MemberSpec::try_from(req.get_member()));
+        let spec = fut_try!(MemberSpec::try_from(req.get_member()));
+
+        let room_id = local_uri.room_id.unwrap();
+        let member_id = local_uri.member_id.unwrap();
+
+        let base_url = self.app.config.get_base_rpc_url();
+        let sid = format!(
+            "{}/{}/{}/{}",
+            base_url,
+            room_id,
+            member_id,
+            spec.credentials()
+        );
+        let mut sids = HashMap::new();
+        sids.insert(member_id.to_string(), sid);
 
         Either::A(
             self.room_repository
                 .send(CreateMemberInRoom {
-                    room_id: local_uri.room_id.unwrap(),
-                    member_id: local_uri.member_id.unwrap(),
-                    spec: member_spec,
+                    room_id,
+                    member_id,
+                    spec,
                 })
                 .map_err(|e| ControlApiError::from(e))
-                .map(|r| r.map(|r| r.map(|_| HashMap::new()))),
+                .map(|r| r.map(|r| r.map(|_| sids))),
         )
     }
 
