@@ -63,7 +63,7 @@ pub enum ParticipantServiceErr {
     )]
     MailBoxErr(MailboxError),
     #[fail(display = "Participant with Id [{}] was not found", _0)]
-    ParticipantNotFound(MemberId),
+    ParticipantNotFound(LocalUri),
     #[fail(display = "Endpoint not found.")]
     EndpointNotFound(LocalUri),
 }
@@ -141,12 +141,18 @@ impl ParticipantService {
         self.members.get(id).cloned()
     }
 
+    fn get_local_uri(&self, member_id: MemberId) -> LocalUri {
+        LocalUri::new(Some(self.room_id.clone()), Some(member_id), None)
+    }
+
     pub fn get_member(
         &self,
         id: &MemberId,
     ) -> Result<Rc<Member>, ParticipantServiceErr> {
         self.members.get(id).cloned().map_or(
-            Err(ParticipantServiceErr::ParticipantNotFound(id.clone())),
+            Err(ParticipantServiceErr::ParticipantNotFound(
+                self.get_local_uri(id.clone()),
+            )),
             Ok,
         )
     }
@@ -212,7 +218,9 @@ impl ParticipantService {
         let member = match self.get_member_by_id(&member_id) {
             None => {
                 return Box::new(wrap_future(future::err(
-                    ParticipantServiceErr::ParticipantNotFound(member_id),
+                    ParticipantServiceErr::ParticipantNotFound(
+                        self.get_local_uri(member_id),
+                    ),
                 )));
             }
             Some(member) => member,

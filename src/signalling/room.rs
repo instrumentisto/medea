@@ -57,8 +57,6 @@ pub type ActFuture<I, E> =
 pub enum RoomError {
     #[fail(display = "Couldn't find Peer with [id = {}]", _0)]
     PeerNotFound(PeerId),
-    #[fail(display = "Couldn't find Member with [id = {}]", _0)]
-    MemberNotFound(MemberId),
     #[fail(display = "Endpoint with ID '{}' not found.", _0)]
     EndpointNotFound(LocalUri),
     #[fail(display = "Member [id = {}] does not have Turn credentials", _0)]
@@ -188,10 +186,11 @@ impl Room {
         let member_id = sender.member_id();
         let ice_servers = self
             .members
-            .get_member_by_id(&member_id)
-            .ok_or_else(|| RoomError::MemberNotFound(member_id.clone()))?
+            .get_member(&member_id)?
             .servers_list()
-            .ok_or_else(|| RoomError::NoTurnCredentials(member_id.clone()))?;
+            .ok_or_else(|| {
+            RoomError::NoTurnCredentials(member_id.clone())
+        })?;
         let peer_created = Event::PeerCreated {
             peer_id: sender.id(),
             sdp_offer: None,
@@ -236,8 +235,7 @@ impl Room {
         let to_member_id = to_peer.member_id();
         let ice_servers = self
             .members
-            .get_member_by_id(&to_member_id)
-            .ok_or_else(|| RoomError::MemberNotFound(to_member_id.clone()))?
+            .get_member(&to_member_id)?
             .servers_list()
             .ok_or_else(|| {
                 RoomError::NoTurnCredentials(to_member_id.clone())
@@ -530,10 +528,7 @@ impl Handler<SerializeMember> for Room {
         msg: SerializeMember,
         _ctx: &mut Self::Context,
     ) -> Self::Result {
-        let member = self
-            .members
-            .get_member_by_id(&msg.0)
-            .map_or(Err(RoomError::MemberNotFound(msg.0)), Ok)?;
+        let member = self.members.get_member(&msg.0)?;
 
         let mut member_element: Room_Element = member.into();
         let member = member_element.take_member();
@@ -557,10 +552,7 @@ impl Handler<SerializeEndpoint> for Room {
         msg: SerializeEndpoint,
         _ctx: &mut Self::Context,
     ) -> Self::Result {
-        let member = self
-            .members
-            .get_member_by_id(&msg.0)
-            .map_or(Err(RoomError::MemberNotFound(msg.0)), Ok)?; // TODO
+        let member = self.members.get_member(&msg.0)?;
 
         let endpoint_id = WebRtcPublishId(msg.1);
         let mut element = ElementProto::new();
