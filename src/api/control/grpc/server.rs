@@ -203,20 +203,7 @@ fn create_response(
             }
             Err(e) => error = e.into(),
         },
-        Err(e) => match &e {
-            RoomRepoError::RoomNotFound(id) => {
-                error.set_element(id.to_string());
-                error.set_code(0); // TODO
-                error.set_status(404);
-                error.set_text(e.to_string());
-            }
-            _ => {
-                error.set_element(String::new());
-                error.set_code(0); // TODO
-                error.set_status(500);
-                error.set_text(format!("Unknow RoomRepo error. {:?}", e));
-            }
-        },
+        Err(e) => error = e.into(),
     }
 
     let mut error_response = Response::new();
