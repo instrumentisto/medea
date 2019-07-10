@@ -69,6 +69,8 @@ pub enum ParticipantServiceErr {
     EndpointNotFound(LocalUri),
     #[fail(display = "Participant [id = {}] already exists.", _0)]
     ParticipantAlreadyExists(LocalUri),
+    #[fail(display = "Endpoint [id = {}] already exists.", _0)]
+    EndpointAlreadyExists(LocalUri),
 }
 
 impl From<TurnServiceErr> for ParticipantServiceErr {
@@ -110,6 +112,12 @@ impl Into<ErrorProto> for &ParticipantServiceErr {
                 error.set_text(self.to_string());
             }
             ParticipantServiceErr::ParticipantAlreadyExists(id) => {
+                error.set_element(id.to_string());
+                error.set_code(0); // TODO
+                error.set_status(400);
+                error.set_text(self.to_string());
+            }
+            ParticipantServiceErr::EndpointAlreadyExists(id) => {
                 error.set_element(id.to_string());
                 error.set_code(0); // TODO
                 error.set_status(400);
@@ -482,12 +490,12 @@ impl ParticipantService {
         endpoint_id: WebRtcPlayId,
         spec: WebRtcPlayEndpointSpec,
     ) -> Result<(), ParticipantServiceErr> {
-        debug!(
-            "Created sink endpoint with ID '{}' for member '{}' in room with \
-             ID '{}'",
-            endpoint_id, member_id, self.room_id
-        );
         let member = self.get_member(&member_id)?;
+        if member.get_sink_by_id(&endpoint_id).is_some() {
+            return Err(ParticipantServiceErr::EndpointAlreadyExists(
+                member.get_local_uri(endpoint_id.to_string()),
+            ));
+        }
 
         let partner_member = self.get_member(&spec.src.member_id)?;
         let src = partner_member.get_src(&spec.src.endpoint_id)?;
@@ -511,12 +519,13 @@ impl ParticipantService {
         endpoint_id: WebRtcPublishId,
         spec: WebRtcPublishEndpointSpec,
     ) -> Result<(), ParticipantServiceErr> {
-        debug!(
-            "Created src endpoint with ID '{}' for member '{}' in room with \
-             ID '{}'",
-            endpoint_id, member_id, self.room_id
-        );
         let member = self.get_member(&member_id)?;
+
+        if member.get_src_by_id(&endpoint_id).is_some() {
+            return Err(ParticipantServiceErr::EndpointAlreadyExists(
+                member.get_local_uri(endpoint_id.to_string()),
+            ));
+        }
 
         let src = Rc::new(WebRtcPublishEndpoint::new(
             endpoint_id,

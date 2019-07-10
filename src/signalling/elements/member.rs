@@ -274,8 +274,8 @@ impl Member {
         self.0.borrow().srcs.get(id).cloned()
     }
 
-    fn get_local_uri(&self) -> LocalUri {
-        LocalUri::new(Some(self.room_id()), Some(self.id()), None)
+    pub fn get_local_uri(&self, endpoint_id: String) -> LocalUri {
+        LocalUri::new(Some(self.room_id()), Some(self.id()), Some(endpoint_id))
     }
 
     pub fn get_src(
@@ -284,9 +284,9 @@ impl Member {
     ) -> Result<Rc<WebRtcPublishEndpoint>, MemberError> {
         self.0.borrow().srcs.get(id).cloned().map_or_else(
             || {
-                let mut local_uri = self.get_local_uri();
-                local_uri.endpoint_id = Some(id.to_string());
-                Err(MemberError::EndpointNotFound(local_uri))
+                Err(MemberError::EndpointNotFound(
+                    self.get_local_uri(id.to_string()),
+                ))
             },
             Ok,
         )
@@ -306,9 +306,9 @@ impl Member {
     ) -> Result<Rc<WebRtcPlayEndpoint>, MemberError> {
         self.0.borrow().sinks.get(id).cloned().map_or_else(
             || {
-                let mut local_uri = self.get_local_uri();
-                local_uri.endpoint_id = Some(id.to_string());
-                Err(MemberError::EndpointNotFound(local_uri))
+                Err(MemberError::EndpointNotFound(
+                    self.get_local_uri(id.to_string()),
+                ))
             },
             Ok,
         )
