@@ -133,7 +133,7 @@ impl ControlApiService {
             self.room_repository
                 .send(StartRoom(room_id, room))
                 .map_err(|e| ControlApiError::from(e))
-                .map(move |_| Ok(Ok(sid))),
+                .map(move |r| r.map(|_| Ok(sid))),
         )
     }
 

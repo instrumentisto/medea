@@ -57,7 +57,7 @@ pub type ActFuture<I, E> =
 pub enum RoomError {
     #[fail(display = "Couldn't find Peer with [id = {}]", _0)]
     PeerNotFound(PeerId),
-    #[fail(display = "Endpoint with ID '{}' not found.", _0)]
+    #[fail(display = "Endpoint [id = {}] not found.", _0)]
     EndpointNotFound(LocalUri),
     #[fail(display = "Member [id = {}] does not have Turn credentials", _0)]
     NoTurnCredentials(MemberId),

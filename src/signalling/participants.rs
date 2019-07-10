@@ -62,9 +62,9 @@ pub enum ParticipantServiceErr {
         _0
     )]
     MailBoxErr(MailboxError),
-    #[fail(display = "Participant with Id [{}] was not found", _0)]
+    #[fail(display = "Participant [id = {}] not found", _0)]
     ParticipantNotFound(LocalUri),
-    #[fail(display = "Endpoint not found.")]
+    #[fail(display = "Endpoint [id = {}] not found.", _0)]
     EndpointNotFound(LocalUri),
 }
 

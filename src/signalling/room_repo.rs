@@ -33,12 +33,22 @@ type ActFuture<I, E> =
 
 #[derive(Debug, Fail)]
 pub enum RoomRepoError {
-    #[fail(display = "Room with id {} not found.", _0)]
+    #[fail(display = "Room [id = {}] not found.", _0)]
     RoomNotFound(LocalUri),
     #[fail(display = "Mailbox error: {:?}", _0)]
     MailboxError(MailboxError),
+    #[fail(display = "Room [id = {}] already exists.", _0)]
+    RoomAlreadyExists(LocalUri),
+    #[fail(display = "{}", _0)]
+    RoomError(RoomError),
     #[fail(display = "Unknow error.")]
     Unknow,
+}
+
+impl From<RoomError> for RoomRepoError {
+    fn from(err: RoomError) -> Self {
+        RoomRepoError::RoomError(err)
+    }
 }
 
 impl Into<ErrorProto> for RoomRepoError {
@@ -49,6 +59,12 @@ impl Into<ErrorProto> for RoomRepoError {
                 error.set_element(id.to_string());
                 error.set_code(0); // TODO
                 error.set_status(404);
+                error.set_text(self.to_string());
+            }
+            RoomRepoError::RoomAlreadyExists(id) => {
+                error.set_element(id.to_string());
+                error.set_code(0); // TODO
+                error.set_status(400); // TODO: Maybe 409??
                 error.set_text(self.to_string());
             }
             _ => {
@@ -111,11 +127,11 @@ fn get_local_uri(room_id: RoomId) -> LocalUri {
 
 // TODO: return sids.
 #[derive(Message)]
-#[rtype(result = "Result<(), RoomError>")]
+#[rtype(result = "Result<(), RoomRepoError>")]
 pub struct StartRoom(pub RoomId, pub RoomSpec);
 
 impl Handler<StartRoom> for RoomsRepository {
-    type Result = Result<(), RoomError>;
+    type Result = Result<(), RoomRepoError>;
 
     fn handle(
         &mut self,
@@ -123,6 +139,13 @@ impl Handler<StartRoom> for RoomsRepository {
         _ctx: &mut Self::Context,
     ) -> Self::Result {
         let room_id = msg.0;
+
+        if self.rooms.lock().unwrap().get(&room_id).is_some() {
+            return Err(RoomRepoError::RoomAlreadyExists(get_local_uri(
+                room_id,
+            )));
+        }
+
         let room = msg.1;
 
         let turn = Arc::clone(&self.app.turn_service);
