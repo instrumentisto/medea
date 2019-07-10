@@ -886,7 +886,7 @@ impl Handler<CreateMember> for Room {
     fn handle(
         &mut self,
         msg: CreateMember,
-        ctx: &mut Self::Context,
+        _ctx: &mut Self::Context,
     ) -> Self::Result {
         self.members.create_member(msg.0, msg.1)?;
         Ok(())
@@ -907,7 +907,7 @@ impl Handler<CreateEndpoint> for Room {
     fn handle(
         &mut self,
         msg: CreateEndpoint,
-        ctx: &mut Self::Context,
+        _ctx: &mut Self::Context,
     ) -> Self::Result {
         match msg.spec {
             EndpointSpec::WebRtcPlay(e) => {

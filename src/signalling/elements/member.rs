@@ -11,10 +11,7 @@ use medea_client_api_proto::IceServer;
 
 use crate::{
     api::control::{
-        endpoints::{
-            webrtc_play_endpoint::WebRtcPlayEndpoint as WebRtcPlayEndpointSpec,
-            webrtc_publish_endpoint::WebRtcPublishEndpoint as WebRtcPublishEndpointSpec,
-        },
+        endpoints::webrtc_play_endpoint::WebRtcPlayEndpoint as WebRtcPlayEndpointSpec,
         grpc::protos::control::{
             Member as MemberProto, Room_Element as ElementProto,
         },

@@ -46,7 +46,6 @@ use crate::{
             member::MemberError,
             parse_members, Member, MembersLoadError,
         },
-        participants::ParticipantServiceErr::ParticipantNotFound,
         room::{ActFuture, RoomError},
         Room,
     },
@@ -474,7 +473,7 @@ impl ParticipantService {
         }
 
         // This is needed for atomicity.
-        for (id, sink) in signalling_member.sinks() {
+        for (_, sink) in signalling_member.sinks() {
             let src = sink.src();
             src.add_sink(Rc::downgrade(&sink));
         }

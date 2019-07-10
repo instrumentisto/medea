@@ -26,7 +26,6 @@ use super::protos::control_grpc::{create_control_api, ControlApi};
 use crate::{
     api::control::{Endpoint, MemberSpec},
     signalling::{
-        participants::ParticipantServiceErr,
         room::RoomError,
         room_repo::{
             CreateEndpointInRoom, CreateMemberInRoom, DeleteRoomCheck,
@@ -159,7 +158,7 @@ impl ControlApiService {
                     spec: member_spec,
                 })
                 .map_err(|e| ControlApiError::from(e))
-                .map(|r| r.map(|r| r.map(|r| HashMap::new()))),
+                .map(|r| r.map(|r| r.map(|_| HashMap::new()))),
         )
     }
 
@@ -184,7 +183,7 @@ impl ControlApiService {
                     spec: endpoint,
                 })
                 .map_err(|e| ControlApiError::from(e))
-                .map(|r| r.map(|r| r.map(|r| HashMap::new()))),
+                .map(|r| r.map(|r| r.map(|_| HashMap::new()))),
         )
     }
 }
@@ -192,19 +191,17 @@ impl ControlApiService {
 fn create_response(
     result: Result<Result<HashMap<String, String>, RoomError>, RoomRepoError>,
 ) -> Response {
-    let mut error = Error::new();
-
-    match result {
+    let error: Error = match result {
         Ok(r) => match r {
             Ok(sid) => {
                 let mut response = Response::new();
                 response.set_sid(sid);
                 return response;
             }
-            Err(e) => error = e.into(),
+            Err(e) => e.into(),
         },
-        Err(e) => error = e.into(),
-    }
+        Err(e) => e.into(),
+    };
 
     let mut error_response = Response::new();
     error_response.set_error(error);

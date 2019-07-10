@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use std::{collections::HashMap, sync::Arc};
 
 use grpcio::{ChannelBuilder, EnvBuilder};
@@ -9,7 +11,6 @@ use medea::api::control::grpc::protos::{
     control_grpc::ControlApiClient,
 };
 use protobuf::RepeatedField;
-use std::time::Duration;
 
 fn main() {
     let env = Arc::new(EnvBuilder::new().build());

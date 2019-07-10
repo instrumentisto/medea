@@ -500,7 +500,7 @@ impl Handler<CreateMemberInRoom> for RoomsRepository {
     fn handle(
         &mut self,
         msg: CreateMemberInRoom,
-        ctx: &mut Self::Context,
+        _ctx: &mut Self::Context,
     ) -> Self::Result {
         let fut =
             if let Some(room) = self.rooms.lock().unwrap().get(&msg.room_id) {
@@ -533,7 +533,7 @@ impl Handler<CreateEndpointInRoom> for RoomsRepository {
     fn handle(
         &mut self,
         msg: CreateEndpointInRoom,
-        ctx: &mut Self::Context,
+        _ctx: &mut Self::Context,
     ) -> Self::Result {
         let fut =
             if let Some(room) = self.rooms.lock().unwrap().get(&msg.room_id) {
