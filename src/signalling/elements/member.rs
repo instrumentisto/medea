@@ -11,6 +11,10 @@ use medea_client_api_proto::IceServer;
 
 use crate::{
     api::control::{
+        endpoints::{
+            webrtc_play_endpoint::WebRtcPlayEndpoint as WebRtcPlayEndpointSpec,
+            webrtc_publish_endpoint::WebRtcPublishEndpoint as WebRtcPublishEndpointSpec,
+        },
         grpc::protos::control::{
             Member as MemberProto, Room_Element as ElementProto,
         },
@@ -298,6 +302,24 @@ impl Member {
 
     pub fn room_id(&self) -> RoomId {
         self.0.borrow().room_id.clone()
+    }
+
+    pub fn create_sink(
+        member: Rc<Self>,
+        id: WebRtcPlayId,
+        spec: WebRtcPlayEndpointSpec,
+    ) {
+        let src = member.get_src_by_id(&spec.src.endpoint_id).unwrap();
+
+        let sink = Rc::new(WebRtcPlayEndpoint::new(
+            id,
+            spec.src,
+            Rc::downgrade(&src),
+            Rc::downgrade(&member),
+        ));
+
+        src.add_sink(Rc::downgrade(&sink));
+        member.insert_sink(sink);
     }
 }
 

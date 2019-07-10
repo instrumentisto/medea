@@ -27,8 +27,8 @@ use crate::{
             },
             local_uri::LocalUri,
             room::RoomSpec,
-            MemberId, MemberSpec, RoomId, TryFromElementError, WebRtcPlayId,
-            WebRtcPublishId,
+            Endpoint as EndpointSpec, MemberId, MemberSpec, RoomId,
+            TryFromElementError, WebRtcPlayId, WebRtcPublishId,
         },
     },
     log::prelude::*,
@@ -878,6 +878,43 @@ impl Handler<CreateMember> for Room {
         ctx: &mut Self::Context,
     ) -> Self::Result {
         self.members.create_member(msg.0, msg.1);
+        Ok(())
+    }
+}
+
+#[derive(Message, Debug)]
+#[rtype(result = "Result<(), RoomError>")]
+pub struct CreateEndpoint {
+    pub member_id: MemberId,
+    pub endpoint_id: String,
+    pub spec: EndpointSpec,
+}
+
+impl Handler<CreateEndpoint> for Room {
+    type Result = Result<(), RoomError>;
+
+    fn handle(
+        &mut self,
+        msg: CreateEndpoint,
+        ctx: &mut Self::Context,
+    ) -> Self::Result {
+        match msg.spec {
+            EndpointSpec::WebRtcPlay(e) => {
+                self.members.create_sink_endpoint(
+                    msg.member_id,
+                    WebRtcPlayId(msg.endpoint_id),
+                    e,
+                );
+            }
+            EndpointSpec::WebRtcPublish(e) => {
+                self.members.create_src_endpoint(
+                    msg.member_id,
+                    WebRtcPublishId(msg.endpoint_id),
+                    e,
+                );
+            }
+        }
+
         Ok(())
     }
 }

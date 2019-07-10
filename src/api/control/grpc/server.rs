@@ -24,8 +24,10 @@ use crate::{
 
 use super::protos::control_grpc::{create_control_api, ControlApi};
 use crate::{
-    api::control::MemberSpec,
-    signalling::room_repo::{CreateMemberInRoom, DeleteRoomCheck},
+    api::control::{Endpoint, MemberSpec},
+    signalling::room_repo::{
+        CreateEndpointInRoom, CreateMemberInRoom, DeleteRoomCheck,
+    },
 };
 
 #[derive(Debug, Fail)]
@@ -124,6 +126,16 @@ impl ControlApi for ControlApiService {
                     room_id: local_uri.room_id.unwrap(),
                     member_id: local_uri.member_id.unwrap(),
                     spec: member_spec,
+                });
+
+                return;
+            } else if local_uri.is_endpoint_uri() {
+                let endpoint = Endpoint::try_from(&req).unwrap();
+                self.room_repository.do_send(CreateEndpointInRoom {
+                    room_id: local_uri.room_id.unwrap(),
+                    member_id: local_uri.member_id.unwrap(),
+                    endpoint_id: local_uri.endpoint_id.unwrap(),
+                    spec: endpoint,
                 });
 
                 return;

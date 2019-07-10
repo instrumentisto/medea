@@ -27,7 +27,14 @@ use crate::{
             AuthorizationError, ClosedReason, EventMessage, RpcConnection,
             RpcConnectionClosed,
         },
-        control::{MemberId, MemberSpec, RoomId, RoomSpec, WebRtcPlayId},
+        control::{
+            endpoints::{
+                webrtc_play_endpoint::WebRtcPlayEndpoint as WebRtcPlayEndpointSpec,
+                webrtc_publish_endpoint::WebRtcPublishEndpoint as WebRtcPublishEndpointSpec,
+            },
+            MemberId, MemberSpec, RoomId, RoomSpec, WebRtcPlayId,
+            WebRtcPublishId,
+        },
     },
     log::prelude::*,
     media::IceUser,
@@ -381,45 +388,56 @@ impl ParticipantService {
         }
 
         self.members.insert(id, signalling_member);
+    }
 
-        //        for (id, member) in &members {
-        //            let signalling_member = Rc::new(Member::new(
-        //                id.clone(),
-        //                member.credentials().to_string(),
-        //                self.room_id.clone(),
-        //            ));
-        //            for (id, publish) in member.publish_endpoints() {
-        //                let signalling_publish =
-        // Rc::new(WebRtcPublishEndpoint::new(                    
-        // id.clone(),                    publish.p2p.clone(),
-        //                    Vec::new(),
-        //                    Rc::downgrade(&signalling_member),
-        //                ));
-        //                signalling_member.insert_src(signalling_publish);
-        //            }
-        //            self.members.insert(id.clone(), signalling_member);
-        //        }
-        //
-        //        for (id, member) in members {
-        //            let signalling_member =
-        // self.get_member_by_id(&id).unwrap();            for (id,
-        // play) in member.play_endpoints() {                let
-        // partner_member =                    
-        // self.get_member_by_id(&play.src.member_id).unwrap();
-        //                let src = partner_member
-        //                    .get_src_by_id(&play.src.endpoint_id)
-        //                    .unwrap();
-        //
-        //                let sink = Rc::new(WebRtcPlayEndpoint::new(
-        //                    id.clone(),
-        //                    play.src.clone(),
-        //                    Rc::downgrade(&src),
-        //                    Rc::downgrade(&signalling_member),
-        //                ));
-        //
-        //                src.add_sink(Rc::downgrade(&sink));
-        //                signalling_member.insert_sink(sink);
-        //            }
-        //        }
+    pub fn create_sink_endpoint(
+        &mut self,
+        member_id: MemberId,
+        endpoint_id: WebRtcPlayId,
+        spec: WebRtcPlayEndpointSpec,
+    ) {
+        debug!(
+            "Created sink endpoint with ID '{}' for member '{}' in room with \
+             ID '{}'",
+            endpoint_id, member_id, self.room_id
+        );
+        let member = self.get_member_by_id(&member_id).unwrap();
+
+        let partner_member =
+            self.get_member_by_id(&spec.src.member_id).unwrap();
+        let src = partner_member.get_src_by_id(&spec.src.endpoint_id).unwrap();
+
+        let sink = Rc::new(WebRtcPlayEndpoint::new(
+            endpoint_id,
+            spec.src,
+            Rc::downgrade(&src),
+            Rc::downgrade(&member),
+        ));
+
+        src.add_sink(Rc::downgrade(&sink));
+        member.insert_sink(sink);
+    }
+
+    pub fn create_src_endpoint(
+        &mut self,
+        member_id: MemberId,
+        endpoint_id: WebRtcPublishId,
+        spec: WebRtcPublishEndpointSpec,
+    ) {
+        debug!(
+            "Created src endpoint with ID '{}' for member '{}' in room with \
+             ID '{}'",
+            endpoint_id, member_id, self.room_id
+        );
+        let member = self.get_member_by_id(&member_id).unwrap();
+
+        let src = Rc::new(WebRtcPublishEndpoint::new(
+            endpoint_id,
+            spec.p2p,
+            Vec::new(),
+            Rc::downgrade(&member),
+        ));
+
+        member.insert_src(src);
     }
 }

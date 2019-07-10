@@ -13,13 +13,13 @@ use hashbrown::HashMap;
 use crate::{
     api::control::{
         grpc::protos::control::Element as ElementProto, local_uri::LocalUri,
-        room::RoomSpec, MemberId, MemberSpec, RoomId,
+        room::RoomSpec, Endpoint as EndpointSpec, MemberId, MemberSpec, RoomId,
     },
     signalling::{
         room::{
-            CloseRoom, CreateMember, DeleteEndpoint, DeleteEndpointCheck,
-            DeleteMember, DeleteMemberCheck, RoomError, Serialize,
-            SerializeEndpoint, SerializeMember,
+            CloseRoom, CreateEndpoint, CreateMember, DeleteEndpoint,
+            DeleteEndpointCheck, DeleteMember, DeleteMemberCheck, RoomError,
+            Serialize, SerializeEndpoint, SerializeMember,
         },
         Room,
     },
@@ -453,6 +453,37 @@ impl Handler<CreateMemberInRoom> for RoomsRepository {
         } else {
             unimplemented!()
         }
+        Ok(())
+    }
+}
+
+#[derive(Message)]
+#[rtype(result = "Result<(), RoomRepoError>")]
+pub struct CreateEndpointInRoom {
+    pub room_id: RoomId,
+    pub member_id: MemberId,
+    pub endpoint_id: String,
+    pub spec: EndpointSpec,
+}
+
+impl Handler<CreateEndpointInRoom> for RoomsRepository {
+    type Result = Result<(), RoomRepoError>;
+
+    fn handle(
+        &mut self,
+        msg: CreateEndpointInRoom,
+        ctx: &mut Self::Context,
+    ) -> Self::Result {
+        if let Some(room) = self.rooms.lock().unwrap().get(&msg.room_id) {
+            room.do_send(CreateEndpoint {
+                member_id: msg.member_id,
+                endpoint_id: msg.endpoint_id,
+                spec: msg.spec,
+            });
+        } else {
+            unimplemented!()
+        }
+
         Ok(())
     }
 }

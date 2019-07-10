@@ -22,6 +22,7 @@ fn main() {
     //    delete_member(&client);
     create_member(&client);
     //    std::thread::sleep(Duration::from_secs(1));
+    create_endpoint(&client);
     get_room(&client);
 }
 
@@ -85,6 +86,17 @@ fn create_member(client: &ControlApiClient) {
     create_member_request.set_member(member);
 
     let reply = client.create(&create_member_request);
+}
+
+fn create_endpoint(client: &ControlApiClient) {
+    let mut create_endpoint_request = CreateRequest::new();
+    let mut endpoint = WebRtcPublishEndpoint::new();
+    endpoint.set_p2p(WebRtcPublishEndpoint_P2P::ALWAYS);
+    create_endpoint_request
+        .set_id("local://grpc-test/player/create-publish".to_string());
+    create_endpoint_request.set_webrtc_pub(endpoint);
+
+    client.create(&create_endpoint_request);
 }
 
 fn delete_room(client: &ControlApiClient) {
