@@ -26,6 +26,7 @@ use super::protos::control_grpc::{create_control_api, ControlApi};
 use crate::{
     api::control::{Endpoint, MemberSpec},
     signalling::{
+        participants::ParticipantServiceErr,
         room::RoomError,
         room_repo::{
             CreateEndpointInRoom, CreateMemberInRoom, DeleteRoomCheck,
@@ -158,7 +159,10 @@ impl ControlApiService {
                 spec: member_spec,
             })
             .map_err(|e| ControlApiError::from(e))
-            .map(|r| r.map(|r| r.map(|r| HashMap::new())))
+            .map(|r| {
+                println!("{:?}", r);
+                r.map(|r| r.map(|r| HashMap::new()))
+            })
     }
 
     pub fn create_endpoint(
@@ -186,6 +190,77 @@ impl ControlApiService {
     }
 }
 
+fn create_response(
+    result: Result<Result<HashMap<String, String>, RoomError>, RoomRepoError>,
+) -> Response {
+    let mut error = Error::new();
+
+    match result {
+        Ok(r) => match r {
+            Ok(sid) => {
+                let mut response = Response::new();
+                response.set_sid(sid);
+                return response;
+            }
+            Err(e) => match &e {
+                RoomError::EndpointNotFound(id) => {
+                    error.set_element(id.to_string()); // TODO
+                    error.set_code(0); // TODO
+                    error.set_status(404);
+                    error.set_text(e.to_string());
+                }
+                RoomError::MemberNotFound(id) => {
+                    error.set_element(id.to_string()); // TODO
+                    error.set_code(0); // TODO
+                    error.set_status(404);
+                    error.set_text(e.to_string());
+                }
+                RoomError::ParticipantServiceErr(e) => match e {
+                    ParticipantServiceErr::EndpointNotFound(id) => {
+                        error.set_element(id.to_string()); // TODO
+                        error.set_code(0); // TODO
+                        error.set_status(404);
+                        error.set_text(e.to_string());
+                    }
+                    _ => {
+                        error.set_element(String::new());
+                        error.set_code(0); // TODO
+                        error.set_status(500);
+                        error.set_text(format!(
+                            "Unknow ParticipantService error. {:?}",
+                            e
+                        ));
+                    }
+                },
+                _ => {
+                    error.set_element(String::new());
+                    error.set_code(0); // TODO
+                    error.set_status(500);
+                    error.set_text(format!("Unknow RoomError error. {:?}", e));
+                }
+            },
+        },
+        Err(e) => match &e {
+            RoomRepoError::RoomNotFound(id) => {
+                error.set_element(id.to_string());
+                error.set_code(0); // TODO
+                error.set_status(404);
+                error.set_text(e.to_string());
+            }
+            _ => {
+                error.set_element(String::new());
+                error.set_code(0); // TODO
+                error.set_status(500);
+                error.set_text(format!("Unknow RoomRepo error. {:?}", e));
+            }
+        },
+    }
+
+    let mut error_response = Response::new();
+    error_response.set_error(error);
+    error_response
+}
+
 impl ControlApi for ControlApiService {
     fn create(
         &mut self,
@@ -197,85 +272,26 @@ impl ControlApi for ControlApiService {
 
         if local_uri.is_room_uri() {
             ctx.spawn(self.create_room(req).map_err(|_| ()).and_then(
-                move |r| {
-                    let mut response = Response::new();
-                    response.set_sid(r.unwrap().unwrap());
-                    sink.success(response).map_err(|_| ())
-                },
+                move |r| sink.success(create_response(r)).map_err(|_| ()),
             ));
         } else if local_uri.is_member_uri() {
             ctx.spawn(self.create_member(req).map_err(|_| ()).and_then(
-                move |r| {
-                    let mut response = Response::new();
-                    response.set_sid(r.unwrap().unwrap());
-                    sink.success(response).map_err(|_| ())
-                },
+                move |r| sink.success(create_response(r)).map_err(|_| ()),
             ));
         } else if local_uri.is_endpoint_uri() {
             ctx.spawn(self.create_endpoint(req).map_err(|_| ()).and_then(
-                move |r| {
-                    let mut response = Response::new();
-                    response.set_sid(r.unwrap().unwrap());
-                    sink.success(response).map_err(|_| ())
-                },
+                move |r| sink.success(create_response(r)).map_err(|_| ()),
             ));
         } else {
-            unimplemented!()
+            let mut error_response = Response::new();
+            let mut error = Error::new();
+            error.set_status(400);
+            error.set_code(0);
+            error.set_text(format!("Invalid ID '{}'.", req.get_id()));
+            error.set_element(local_uri.to_string());
+            error_response.set_error(error);
+            ctx.spawn(sink.success(error_response).map_err(|_| ()));
         }
-
-        //        ctx.spawn(create.and_then(move |r| {
-        //            let mut response = Response::new();
-        //            response.set_sid(r.unwrap().unwrap());
-        //            sink.success(response).map_err(|_| ())
-        //        }));
-
-        //        match create {
-        //            Ok(fut) => ctx.spawn(fut.and_then(move |r| {
-        //                let mut response = Response::new();
-        //                response.set_sid(r);
-        //                sink.success(response).map_err(|_| ())
-        //            })),
-        //            Err(e) => {
-        //                let mut res = Response::new();
-        //                let mut error = Error::new();
-        //
-        //                match e {
-        //                    ControlApiError::TryFromProtobuf(e) => match e {
-        //                        TryFromProtobufError::MemberElementNotFound
-        //                        |
-        // TryFromProtobufError::MemberCredentialsNotFound
-        // | TryFromProtobufError::P2pModeNotFound
-        // | TryFromProtobufError::SrcUriNotFound
-        // | TryFromProtobufError::RoomElementNotFound => {
-        // error.set_status(404);
-        // error.set_code(0);
-        // error.set_text(e.to_string());
-        // error.set_element(String::new());                        }
-        //                        TryFromProtobufError::SrcUriError(e) => {
-        //                            error.set_status(400);
-        //                            error.set_code(0);
-        //                            error.set_text(e.to_string());
-        //                            error.set_element(String::new());
-        //                        }
-        //                    },
-        //                    ControlApiError::TryFromElement(e) => {
-        //                        error.set_status(400);
-        //                        error.set_code(0);
-        //                        error.set_text(e.to_string());
-        //                        error.set_element(String::new());
-        //                    }
-        //                    ControlApiError::LocalUri(e) => {
-        //                        error.set_status(400);
-        //                        error.set_code(0);
-        //                        error.set_text(e.to_string());
-        //                        error.set_element(String::new());
-        //                    }
-        //                }
-        //
-        //                res.set_error(error);
-        //                ctx.spawn(sink.success(res).map_err(|_| ()));
-        //            }
-        //        }
     }
 
     fn apply(
