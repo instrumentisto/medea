@@ -137,6 +137,7 @@ impl ControlApiService {
         )
     }
 
+    // TODO: return sids
     pub fn create_member(
         &mut self,
         req: CreateRequest,
@@ -200,43 +201,7 @@ fn create_response(
                 response.set_sid(sid);
                 return response;
             }
-            Err(e) => match &e {
-                RoomError::EndpointNotFound(id) => {
-                    error.set_element(id.to_string()); // TODO
-                    error.set_code(0); // TODO
-                    error.set_status(404);
-                    error.set_text(e.to_string());
-                }
-                RoomError::ParticipantServiceErr(e) => match e {
-                    ParticipantServiceErr::EndpointNotFound(id) => {
-                        error.set_element(id.to_string()); // TODO
-                        error.set_code(0); // TODO
-                        error.set_status(404);
-                        error.set_text(e.to_string());
-                    }
-                    ParticipantServiceErr::ParticipantNotFound(id) => {
-                        error.set_element(id.to_string()); // TODO
-                        error.set_code(0); // TODO
-                        error.set_status(404);
-                        error.set_text(e.to_string());
-                    }
-                    _ => {
-                        error.set_element(String::new());
-                        error.set_code(0); // TODO
-                        error.set_status(500);
-                        error.set_text(format!(
-                            "Unknow ParticipantService error. {:?}",
-                            e
-                        ));
-                    }
-                },
-                _ => {
-                    error.set_element(String::new());
-                    error.set_code(0); // TODO
-                    error.set_status(500);
-                    error.set_text(format!("Unknow RoomError error. {:?}", e));
-                }
-            },
+            Err(e) => error = e.into(),
         },
         Err(e) => match &e {
             RoomRepoError::RoomNotFound(id) => {
@@ -483,33 +448,42 @@ impl ControlApi for ControlApiService {
 
         let mega_future = room_fut
             .join3(member_fut, endpoint_fut)
-            .map_err(|_| ())
+            .map_err(|e| println!("{:?}", e))
             .and_then(|(room, member, endpoint)| {
                 let mut elements = HashMap::new();
+                let mut elements_results = Vec::new();
 
-                let elements_result = room
-                    .into_iter()
-                    .chain(member.into_iter())
-                    .chain(endpoint.into_iter())
-                    .flat_map(|e| e.into_iter());
+                let results = vec![room, member, endpoint];
 
-                for element in elements_result {
+                let closure = |_| ();
+
+                for result in results {
+                    match result {
+                        Ok(o) => {
+                            elements_results.push(o);
+                        }
+                        Err(e) => {
+                            let mut response = GetResponse::new();
+                            let error: Error = e.into();
+                            response.set_error(error);
+                            return sink.success(response).map_err(closure);
+                        }
+                    }
+                }
+
+                let elements_results =
+                    elements_results.into_iter().flat_map(|e| e.into_iter());
+
+                for element in elements_results {
                     match element {
                         Ok((id, o)) => {
                             elements.insert(id, o);
                         }
                         Err(e) => {
-                            let mut error = Error::new();
-                            error.set_status(400);
-                            error.set_code(0); // TODO
-                            error.set_text(e.to_string());
-                            error.set_element(String::new()); // TODO
                             let mut response = GetResponse::new();
+                            let error: Error = e.into();
                             response.set_error(error);
-
-                            return Either::A(
-                                sink.success(response).map_err(|_| ()),
-                            );
+                            return sink.success(response).map_err(closure);
                         }
                     }
                 }
@@ -517,7 +491,7 @@ impl ControlApi for ControlApiService {
                 let mut response = GetResponse::new();
                 response.set_elements(elements);
 
-                Either::B(sink.success(response).map_err(|_| ()))
+                sink.success(response).map_err(closure)
             });
 
         ctx.spawn(mega_future);

@@ -22,8 +22,8 @@ use crate::{
         },
         control::{
             grpc::protos::control::{
-                Element as ElementProto, Member_Element, Room as RoomProto,
-                Room_Element,
+                Element as ElementProto, Error as ErrorProto, Member_Element,
+                Room as RoomProto, Room_Element,
             },
             local_uri::LocalUri,
             room::RoomSpec,
@@ -71,7 +71,7 @@ pub enum RoomError {
     BadRoomSpec(String),
     #[fail(display = "Turn service error: {}", _0)]
     TurnServiceError(String),
-    #[fail(display = "{:?}", _0)]
+    #[fail(display = "{}", _0)]
     ParticipantServiceErr(ParticipantServiceErr),
 }
 
@@ -112,6 +112,50 @@ impl From<MemberError> for RoomError {
                 RoomError::EndpointNotFound(id)
             }
         }
+    }
+}
+
+impl Into<ErrorProto> for RoomError {
+    fn into(self) -> ErrorProto {
+        let mut error = ErrorProto::new();
+        match &self {
+            RoomError::EndpointNotFound(id) => {
+                error.set_element(id.to_string()); // TODO
+                error.set_code(0); // TODO
+                error.set_status(404);
+                error.set_text(self.to_string());
+            }
+            RoomError::ParticipantServiceErr(e) => match e {
+                ParticipantServiceErr::EndpointNotFound(id) => {
+                    error.set_element(id.to_string()); // TODO
+                    error.set_code(0); // TODO
+                    error.set_status(404);
+                    error.set_text(self.to_string());
+                }
+                ParticipantServiceErr::ParticipantNotFound(id) => {
+                    error.set_element(id.to_string()); // TODO
+                    error.set_code(0); // TODO
+                    error.set_status(404);
+                    error.set_text(self.to_string());
+                }
+                _ => {
+                    error.set_element(String::new());
+                    error.set_code(0); // TODO
+                    error.set_status(500);
+                    error.set_text(format!(
+                        "Unknow ParticipantService error. {:?}",
+                        e
+                    ));
+                }
+            },
+            _ => {
+                error.set_element(String::new());
+                error.set_code(0); // TODO
+                error.set_status(500);
+                error.set_text(format!("Unknow RoomError error. {:?}", self));
+            }
+        }
+        error
     }
 }
 

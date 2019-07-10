@@ -12,8 +12,10 @@ use hashbrown::HashMap;
 
 use crate::{
     api::control::{
-        grpc::protos::control::Element as ElementProto, local_uri::LocalUri,
-        room::RoomSpec, Endpoint as EndpointSpec, MemberId, MemberSpec, RoomId,
+        grpc::protos::control::{Element as ElementProto, Error as ErrorProto},
+        local_uri::LocalUri,
+        room::RoomSpec,
+        Endpoint as EndpointSpec, MemberId, MemberSpec, RoomId,
     },
     signalling::{
         room::{
@@ -37,6 +39,27 @@ pub enum RoomRepoError {
     MailboxError(MailboxError),
     #[fail(display = "Unknow error.")]
     Unknow,
+}
+
+impl Into<ErrorProto> for RoomRepoError {
+    fn into(self) -> ErrorProto {
+        let mut error = ErrorProto::new();
+        match &self {
+            RoomRepoError::RoomNotFound(id) => {
+                error.set_element(id.to_string());
+                error.set_code(0); // TODO
+                error.set_status(404);
+                error.set_text(self.to_string());
+            }
+            _ => {
+                error.set_element(String::new());
+                error.set_code(0); // TODO
+                error.set_status(500);
+                error.set_text(format!("Unknow RoomRepo error. {:?}", self));
+            }
+        }
+        error
+    }
 }
 
 impl From<MailboxError> for RoomRepoError {
