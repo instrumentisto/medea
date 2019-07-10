@@ -141,7 +141,9 @@ pub mod actors {
             info!("Shutting down Actix Web Server");
 
             Ok(Box::new(
-                self.0.stop(true).then(move |_| futures::future::ok(())),
+                self.0.stop(true).then(move |_| {
+                    futures::future::ok(())
+                }),
             ))
         }
     }

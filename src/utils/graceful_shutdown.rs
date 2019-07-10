@@ -25,15 +25,7 @@ pub type ShutdownMessageResult =
     Result<Box<(dyn Future<Item = (), Error = ()> + std::marker::Send)>, ()>;
 
 type ShutdownFutureType = dyn Future<
-    Item = Vec<
-        Result<
-            Box<
-                dyn futures::future::Future<Error = (), Item = ()>
-                    + std::marker::Send,
-            >,
-            (),
-        >,
-    >,
+    Item = Vec<()>,
     Error = (),
 >;
 
@@ -167,14 +159,14 @@ impl Handler<ShutdownSignalDetected> for GracefulShutdown {
 
             for recipient in recipients_values.iter() {
                 let send_future = recipient.send(ShutdownMessage {});
-                // todo async handle
 
                 let recipient_shutdown_fut = send_future
-                    .into_future()
-                    .map_err(move |e| {
+                    .map_err(|e| {
                         error!("Error sending shutdown message: {:?}", e);
                     })
-                    .then(|future| future);
+                    .and_then(|future| {
+                        future.unwrap()
+                    });
 
                 this_priority_futures_vec.push(recipient_shutdown_fut);
             }

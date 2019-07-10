@@ -474,10 +474,15 @@ impl Handler<ShutdownMessage> for Room {
     ) -> Self::Result {
         info!("Shutting down Room: {:?}", self.id);
 
-        Ok(Box::new(ctx.address().send(CloseRoom {})
-            .then(|fut| fut)
-            .map(|_| ())
-            .map_err(|_| ())
+        let room_id = self.id;
+        Ok(Box::new(
+            ctx.address().send(CloseRoom {})
+                .map_err(|_| ())
+                .and_then(|fut| {
+                    fut.unwrap()
+                })
+                .map(|_| ())
+                .map_err(move |_| error!("Error closing room {:?}", room_id))
         ))
     }
 }
