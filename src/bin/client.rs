@@ -63,11 +63,7 @@ fn create_room(client: &ControlApiClient) {
     req.set_id("local://grpc-test".to_string());
 
     let reply = client.create(&req).expect("rpc");
-    if reply.has_error() {
-        println!("Error: {:?}", reply.get_error());
-    } else {
-        println!("Receiver: {:?}", reply.get_sid());
-    }
+    println!("{:?}", reply);
 }
 
 fn create_member(client: &ControlApiClient) {

@@ -99,13 +99,13 @@ impl Into<ErrorProto> for &ParticipantServiceErr {
         let mut error = ErrorProto::new();
         match &self {
             ParticipantServiceErr::EndpointNotFound(id) => {
-                error.set_element(id.to_string()); // TODO
+                error.set_element(id.to_string());
                 error.set_code(0); // TODO
                 error.set_status(404);
                 error.set_text(self.to_string());
             }
             ParticipantServiceErr::ParticipantNotFound(id) => {
-                error.set_element(id.to_string()); // TODO
+                error.set_element(id.to_string());
                 error.set_code(0); // TODO
                 error.set_status(404);
                 error.set_text(self.to_string());

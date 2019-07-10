@@ -12,27 +12,23 @@ use crate::{
             Response,
         },
         local_uri::{LocalUri, LocalUriParseError},
-        RoomSpec, TryFromElementError, TryFromProtobufError,
+        Endpoint, MemberSpec, RoomSpec, TryFromElementError,
+        TryFromProtobufError,
     },
     log::prelude::*,
-    signalling::room_repo::{
-        DeleteEndpointFromMemberCheck, DeleteMemberFromRoomCheck, GetEndpoint,
-        GetMember, GetRoom, RoomsRepository, StartRoom,
+    signalling::{
+        room::RoomError,
+        room_repo::{
+            CreateEndpointInRoom, CreateMemberInRoom,
+            DeleteEndpointFromMemberCheck, DeleteMemberFromRoomCheck,
+            DeleteRoomCheck, GetEndpoint, GetMember, GetRoom, RoomRepoError,
+            RoomsRepository, StartRoom,
+        },
     },
     App,
 };
 
 use super::protos::control_grpc::{create_control_api, ControlApi};
-use crate::{
-    api::control::{Endpoint, MemberSpec},
-    signalling::{
-        room::RoomError,
-        room_repo::{
-            CreateEndpointInRoom, CreateMemberInRoom, DeleteRoomCheck,
-            RoomRepoError,
-        },
-    },
-};
 
 #[derive(Debug, Fail)]
 enum ControlApiError {

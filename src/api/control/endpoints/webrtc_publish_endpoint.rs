@@ -36,18 +36,13 @@ pub enum P2pMode {
     IfPossible,
 }
 
-// TODO: use From
-impl TryFrom<WebRtcPublishEndpointP2pProto> for P2pMode {
-    type Error = TryFromProtobufError;
-
-    fn try_from(
-        value: WebRtcPublishEndpointP2pProto,
-    ) -> Result<Self, Self::Error> {
-        Ok(match value {
+impl From<WebRtcPublishEndpointP2pProto> for P2pMode {
+    fn from(value: WebRtcPublishEndpointP2pProto) -> Self {
+        match value {
             WebRtcPublishEndpointP2pProto::ALWAYS => P2pMode::Always,
             WebRtcPublishEndpointP2pProto::IF_POSSIBLE => P2pMode::IfPossible,
             WebRtcPublishEndpointP2pProto::NEVER => P2pMode::Never,
-        })
+        }
     }
 }
 
@@ -78,7 +73,7 @@ impl TryFrom<&WebRtcPublishEndpointProto> for WebRtcPublishEndpoint {
     ) -> Result<Self, Self::Error> {
         if value.has_p2p() {
             Ok(Self {
-                p2p: P2pMode::try_from(value.get_p2p())?,
+                p2p: P2pMode::from(value.get_p2p()),
             })
         } else {
             Err(TryFromProtobufError::P2pModeNotFound)

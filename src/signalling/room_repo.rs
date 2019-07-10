@@ -125,7 +125,6 @@ fn get_local_uri(room_id: RoomId) -> LocalUri {
     LocalUri::new(Some(room_id), None, None)
 }
 
-// TODO: return sids.
 #[derive(Message)]
 #[rtype(result = "Result<(), RoomRepoError>")]
 pub struct StartRoom(pub RoomId, pub RoomSpec);

@@ -46,7 +46,6 @@ pub enum TryFromProtobufError {
     MemberCredentialsNotFound,
 }
 
-// TODO: Maybe better way for do it???
 impl From<SrcParseError> for TryFromProtobufError {
     fn from(from: SrcParseError) -> Self {
         TryFromProtobufError::SrcUriError(from)

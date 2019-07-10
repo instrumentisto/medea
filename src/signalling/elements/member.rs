@@ -95,8 +95,7 @@ impl Member {
     }
 
     /// Load all srcs and sinks of this [`Member`].
-    // TODO: private
-    pub fn load(
+    fn load(
         &self,
         room_spec: &RoomSpec,
         store: &HashMap<MemberId, Rc<Self>>,

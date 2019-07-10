@@ -120,7 +120,7 @@ impl Into<ErrorProto> for RoomError {
         let mut error = ErrorProto::new();
         match &self {
             RoomError::EndpointNotFound(id) => {
-                error.set_element(id.to_string()); // TODO
+                error.set_element(id.to_string());
                 error.set_code(0); // TODO
                 error.set_status(404);
                 error.set_text(self.to_string());
