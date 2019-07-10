@@ -29,8 +29,8 @@ where
     )
     .map(Fuse);
     let drain = slog_envlogger::new(drain).fuse();
-    let async_drain = Async::new(drain).build().fuse();
-    add_default_keys(&Logger::root(async_drain, o!()))
+    let drain = Async::new(drain).build().fuse();
+    add_default_keys(&Logger::root(drain, o!()))
 }
 
 /// Builds JSON [`Logger`] which writes all its logs to the specified writer.

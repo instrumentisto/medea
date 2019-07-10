@@ -2,9 +2,8 @@
 
 use actix::{Actor, Addr};
 use actix_web::{
-    middleware,
-    web::{resource, Data, Path, Payload},
     App, HttpRequest, HttpResponse, HttpServer,
+    middleware, web::{Data, Path, Payload, resource},
 };
 use actix_web_actors::ws;
 use futures::{
@@ -115,13 +114,13 @@ pub fn run(rooms: RoomsRepository, config: Conf) -> Addr<ServerWrapper> {
 
 pub mod actors {
     use actix::{Actor, Context, Handler};
+    use actix_web::dev::Server;
+    use tokio::prelude::Future;
 
     use crate::{
         log::prelude::*,
         utils::graceful_shutdown::{self, ShutdownMessage},
     };
-    use actix_web::dev::Server;
-    use tokio::prelude::Future;
 
     pub struct ServerWrapper(pub Server);
 
@@ -151,7 +150,7 @@ mod test {
     use std::{ops::Add, thread, time::Duration};
 
     use actix::Actor as _;
-    use actix_http::{ws::Message, HttpService};
+    use actix_http::{HttpService, ws::Message};
     use actix_http_test::{TestServer, TestServerRuntime};
     use futures::{future::IntoFuture as _, sink::Sink as _, Stream as _};
 

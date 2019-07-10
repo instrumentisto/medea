@@ -232,7 +232,10 @@ impl ParticipantService {
                 ));
                 ctx.spawn(
                     wrap_future(
-                        ctx.address().send(CloseRoom {}).then(|fut| fut),
+                        ctx.address()
+                            .send(CloseRoom {})
+                            .map_err(|_| ())
+                            .and_then(std::result::Result::unwrap)
                     )
                     .map(|_, _, _| ())
                     .map_err(|_, _, _| ()),
