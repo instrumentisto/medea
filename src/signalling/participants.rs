@@ -41,8 +41,10 @@ use crate::{
     signalling::{
         elements::{
             endpoints::webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
+            member::MemberError,
             parse_members, Member, MembersLoadError,
         },
+        participants::ParticipantServiceErr::ParticipantNotFound,
         room::{ActFuture, RoomError},
         Room,
     },
@@ -61,6 +63,8 @@ pub enum ParticipantServiceErr {
     MailBoxErr(MailboxError),
     #[fail(display = "Participant with Id [{}] was not found", _0)]
     ParticipantNotFound(MemberId),
+    #[fail(display = "Endpoint not found.")]
+    EndpointNotFound(String),
 }
 
 impl From<TurnServiceErr> for ParticipantServiceErr {
@@ -72,6 +76,16 @@ impl From<TurnServiceErr> for ParticipantServiceErr {
 impl From<MailboxError> for ParticipantServiceErr {
     fn from(err: MailboxError) -> Self {
         ParticipantServiceErr::MailBoxErr(err)
+    }
+}
+
+impl From<MemberError> for ParticipantServiceErr {
+    fn from(err: MemberError) -> Self {
+        match err {
+            MemberError::EndpointNotFound(e) => {
+                ParticipantServiceErr::EndpointNotFound(e)
+            }
+        }
     }
 }
 
@@ -124,6 +138,16 @@ impl ParticipantService {
     /// Lookup [`Member`] by provided id.
     pub fn get_member_by_id(&self, id: &MemberId) -> Option<Rc<Member>> {
         self.members.get(id).cloned()
+    }
+
+    pub fn get_member(
+        &self,
+        id: &MemberId,
+    ) -> Result<Rc<Member>, ParticipantServiceErr> {
+        self.members.get(id).cloned().map_or(
+            Err(ParticipantServiceErr::ParticipantNotFound(id.clone())),
+            Ok,
+        )
     }
 
     pub fn members(&self) -> HashMap<MemberId, Rc<Member>> {
@@ -353,7 +377,11 @@ impl ParticipantService {
         }
     }
 
-    pub fn create_member(&mut self, id: MemberId, spec: MemberSpec) {
+    pub fn create_member(
+        &mut self,
+        id: MemberId,
+        spec: MemberSpec,
+    ) -> Result<(), ParticipantServiceErr> {
         let signalling_member = Rc::new(Member::new(
             id.clone(),
             spec.credentials().to_string(),
@@ -371,10 +399,8 @@ impl ParticipantService {
         }
 
         for (id, play) in spec.play_endpoints() {
-            let partner_member =
-                self.get_member_by_id(&play.src.member_id).unwrap();
-            let src =
-                partner_member.get_src_by_id(&play.src.endpoint_id).unwrap();
+            let partner_member = self.get_member(&play.src.member_id)?;
+            let src = partner_member.get_src(&play.src.endpoint_id)?;
 
             let sink = Rc::new(WebRtcPlayEndpoint::new(
                 id.clone(),
@@ -383,11 +409,18 @@ impl ParticipantService {
                 Rc::downgrade(&signalling_member),
             ));
 
-            src.add_sink(Rc::downgrade(&sink));
             signalling_member.insert_sink(sink);
         }
 
+        // This is needed for atomicity.
+        for (id, sink) in signalling_member.sinks() {
+            let src = sink.src();
+            src.add_sink(Rc::downgrade(&sink));
+        }
+
         self.members.insert(id, signalling_member);
+
+        Ok(())
     }
 
     pub fn create_sink_endpoint(
@@ -395,17 +428,16 @@ impl ParticipantService {
         member_id: MemberId,
         endpoint_id: WebRtcPlayId,
         spec: WebRtcPlayEndpointSpec,
-    ) {
+    ) -> Result<(), ParticipantServiceErr> {
         debug!(
             "Created sink endpoint with ID '{}' for member '{}' in room with \
              ID '{}'",
             endpoint_id, member_id, self.room_id
         );
-        let member = self.get_member_by_id(&member_id).unwrap();
+        let member = self.get_member(&member_id)?;
 
-        let partner_member =
-            self.get_member_by_id(&spec.src.member_id).unwrap();
-        let src = partner_member.get_src_by_id(&spec.src.endpoint_id).unwrap();
+        let partner_member = self.get_member(&spec.src.member_id)?;
+        let src = partner_member.get_src(&spec.src.endpoint_id)?;
 
         let sink = Rc::new(WebRtcPlayEndpoint::new(
             endpoint_id,
@@ -416,6 +448,8 @@ impl ParticipantService {
 
         src.add_sink(Rc::downgrade(&sink));
         member.insert_sink(sink);
+
+        Ok(())
     }
 
     pub fn create_src_endpoint(
@@ -423,13 +457,13 @@ impl ParticipantService {
         member_id: MemberId,
         endpoint_id: WebRtcPublishId,
         spec: WebRtcPublishEndpointSpec,
-    ) {
+    ) -> Result<(), ParticipantServiceErr> {
         debug!(
             "Created src endpoint with ID '{}' for member '{}' in room with \
              ID '{}'",
             endpoint_id, member_id, self.room_id
         );
-        let member = self.get_member_by_id(&member_id).unwrap();
+        let member = self.get_member(&member_id)?;
 
         let src = Rc::new(WebRtcPublishEndpoint::new(
             endpoint_id,
@@ -439,5 +473,7 @@ impl ParticipantService {
         ));
 
         member.insert_src(src);
+
+        Ok(())
     }
 }

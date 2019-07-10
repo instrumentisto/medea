@@ -50,6 +50,12 @@ impl From<TryFromElementError> for MembersLoadError {
     }
 }
 
+#[derive(Debug, Fail)]
+pub enum MemberError {
+    #[fail(display = "Endpoint with ID '{}' not found.", _0)]
+    EndpointNotFound(String),
+}
+
 /// [`Member`] is member of [`Room`] with [`RpcConnection`].
 #[derive(Debug)]
 pub struct Member(RefCell<MemberInner>);
@@ -268,12 +274,36 @@ impl Member {
         self.0.borrow().srcs.get(id).cloned()
     }
 
+    pub fn get_src(
+        &self,
+        id: &WebRtcPublishId,
+    ) -> Result<Rc<WebRtcPublishEndpoint>, MemberError> {
+        self.0
+            .borrow()
+            .srcs
+            .get(id)
+            .cloned()
+            .map_or(Err(MemberError::EndpointNotFound(id.to_string())), Ok)
+    }
+
     /// Lookup [`WebRtcPlayEndpoint`] sink endpoint by [`EndpointId`].
     pub fn get_sink_by_id(
         &self,
         id: &WebRtcPlayId,
     ) -> Option<Rc<WebRtcPlayEndpoint>> {
         self.0.borrow().sinks.get(id).cloned()
+    }
+
+    pub fn get_sink(
+        &self,
+        id: &WebRtcPlayId,
+    ) -> Result<Rc<WebRtcPlayEndpoint>, MemberError> {
+        self.0
+            .borrow()
+            .sinks
+            .get(id)
+            .cloned()
+            .map_or(Err(MemberError::EndpointNotFound(id.to_string())), Ok)
     }
 
     /// Remove sink [`WebRtcPlayEndpoint`] from this [`Member`].

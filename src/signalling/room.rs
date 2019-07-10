@@ -39,9 +39,10 @@ use crate::{
     signalling::{
         elements::{
             endpoints::webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
+            member::MemberError,
             Member, MembersLoadError,
         },
-        participants::ParticipantService,
+        participants::{ParticipantService, ParticipantServiceErr},
         peers::PeerRepository,
     },
     turn::TurnAuthService,
@@ -72,6 +73,8 @@ pub enum RoomError {
     BadRoomSpec(String),
     #[fail(display = "Turn service error: {}", _0)]
     TurnServiceError(String),
+    #[fail(display = "{:?}", _0)]
+    ParticipantServiceErr(ParticipantServiceErr),
 }
 
 impl From<PeerStateError> for RoomError {
@@ -95,6 +98,22 @@ impl From<MembersLoadError> for RoomError {
             "Error while loading room spec. {}",
             err
         ))
+    }
+}
+
+impl From<ParticipantServiceErr> for RoomError {
+    fn from(err: ParticipantServiceErr) -> Self {
+        RoomError::ParticipantServiceErr(err)
+    }
+}
+
+impl From<MemberError> for RoomError {
+    fn from(err: MemberError) -> Self {
+        match err {
+            MemberError::EndpointNotFound(id) => {
+                RoomError::EndpointNotFound(id)
+            }
+        }
     }
 }
 
@@ -779,9 +798,7 @@ impl Handler<DeleteMemberCheck> for Room {
         msg: DeleteMemberCheck,
         _ctx: &mut Self::Context,
     ) -> Self::Result {
-        if let None = self.members.get_member_by_id(&msg.0) {
-            panic!()
-        };
+        self.members.get_member(&msg.0)?;
 
         Ok(())
     }
@@ -802,7 +819,7 @@ impl Handler<DeleteEndpoint> for Room {
         msg: DeleteEndpoint,
         ctx: &mut Self::Context,
     ) -> Self::Result {
-        let member = self.members.get_member_by_id(&msg.member_id).unwrap();
+        let member = self.members.get_member(&msg.member_id).unwrap();
         let play_id = WebRtcPlayId(msg.endpoint_id);
         if let Some(endpoint) = member.take_sink(&play_id) {
             if let Some(peer_id) = endpoint.peer_id() {
@@ -833,33 +850,16 @@ impl Handler<DeleteEndpointCheck> for Room {
         msg: DeleteEndpointCheck,
         _ctx: &mut Self::Context,
     ) -> Self::Result {
-        let member = match self.members.get_member_by_id(&msg.member_id) {
-            Some(m) => m,
-            None => panic!(),
-        };
+        let member = self.members.get_member(&msg.member_id)?;
+
         let play_id = WebRtcPlayId(msg.endpoint_id);
 
-        if let Some(endpoint) = member.get_sink_by_id(&play_id) {
-            if let Some(peer_id) = endpoint.peer_id() {
-                if let Err(_) = self.peers.get_peer(peer_id) {
-                    return Ok(());
-                }
-            } else {
-                panic!()
-            }
+        if let Some(_) = member.get_sink_by_id(&play_id) {
+            return Ok(());
         }
 
         let publish_id = WebRtcPublishId(play_id.0);
-        if let Some(endpoint) = member.get_src_by_id(&publish_id) {
-            let peer_ids = endpoint.peer_ids();
-            for peer_id in peer_ids {
-                if let Err(_) = self.peers.get_peer(peer_id) {
-                    panic!()
-                }
-            }
-        } else {
-            panic!()
-        }
+        member.get_src(&publish_id)?;
 
         Ok(())
     }
@@ -877,7 +877,7 @@ impl Handler<CreateMember> for Room {
         msg: CreateMember,
         ctx: &mut Self::Context,
     ) -> Self::Result {
-        self.members.create_member(msg.0, msg.1);
+        self.members.create_member(msg.0, msg.1)?;
         Ok(())
     }
 }
@@ -904,14 +904,14 @@ impl Handler<CreateEndpoint> for Room {
                     msg.member_id,
                     WebRtcPlayId(msg.endpoint_id),
                     e,
-                );
+                )?;
             }
             EndpointSpec::WebRtcPublish(e) => {
                 self.members.create_src_endpoint(
                     msg.member_id,
                     WebRtcPublishId(msg.endpoint_id),
                     e,
-                );
+                )?;
             }
         }
 
