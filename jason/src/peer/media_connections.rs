@@ -85,12 +85,12 @@ impl MediaConnections {
     /// [`Sender`]s and [`Receiver`]s for each new track, will update track (but
     /// doesnt atm) if track is known but its settings has changed. Returns
     /// [`StreamRequest`] in case new local [`MediaStream`] is required.
+    // TODO: Doesnt really updates anything, but only generates new senders
+    //       and receivers atm.
     pub fn update_tracks(
         &self,
         tracks: Vec<Track>,
     ) -> Result<Option<StreamRequest>, WasmErr> {
-        // TODO: Doesnt really updates anything, but only generates new senders
-        //       and receivers atm.
         let mut inner = self.0.borrow_mut();
         let mut stream_request = None;
 
@@ -123,17 +123,6 @@ impl MediaConnections {
                 }
             }
         }
-
-        // build StreamRequest
-        //        if senders_updated {
-        //            let mut media_request = StreamRequest::default();
-        //            for (track_id, sender) in &inner.senders {
-        //                media_request.add_track_request(*track_id,
-        // sender.caps.clone());            }
-        //            Ok(Some(media_request))
-        //        } else {
-        //            Ok(None)
-        //        }
 
         Ok(stream_request)
     }
@@ -220,6 +209,8 @@ impl MediaConnections {
         None
     }
 
+    /// Returns [`MediaTrack`]s being received from specified sender only if
+    /// already receiving all [`MediaTrack`]s.
     pub fn get_tracks_by_sender(
         &self,
         sender_id: u64,
@@ -247,7 +238,7 @@ pub struct Sender {
 }
 
 impl Sender {
-    /// Creates new transceiver if mid is None, or retrieves existing
+    /// Creates new transceiver if mid is `None`, or retrieves existing
     /// transceiver by provided mid. Errors if transceiver lookup fails.
     fn new(
         track_id: TrackId,
@@ -284,7 +275,7 @@ impl Sender {
 }
 
 /// Remote track representation that is being received from some remote peer.
-/// Basically, it can have two states: new and established. When track arrives
+/// Basically, it can have two states: waiting and receiving. When track arrives
 /// we can save related [`RtcRtpTransceiver`][1] and actual [`MediaTrack`].
 ///
 /// [1]: https://www.w3.org/TR/webrtc/#rtcrtptransceiver-interface
@@ -298,10 +289,10 @@ pub struct Receiver {
 }
 
 impl Receiver {
-    /// Creates new transceiver if mid is None, or retrieves existing
-    /// transceiver by provided mid. Errors if transceiver lookup fails. Track
-    /// in created receiver is None, since receiver must be created before
-    /// actual track arrives.
+    /// Creates new transceiver if provided mid is `None`, or retrieves existing
+    /// transceiver by provided mid from provided peer. Errors if transceiver
+    /// lookup fails. `track` in created receiver is `None`, since receiver
+    /// must be created before actual track arrives,
     fn new(
         track_id: TrackId,
         caps: MediaType,
@@ -338,7 +329,7 @@ impl Receiver {
     }
 
     /// Returns [`Receiver`]s. Will try to fetch it from underlying transceiver
-    /// if current value is None.
+    /// if current value is `None`.
     pub fn mid(&mut self) -> Option<&str> {
         if self.mid.is_none() && self.transceiver.is_some() {
             self.mid = self.transceiver.as_ref().unwrap().mid()

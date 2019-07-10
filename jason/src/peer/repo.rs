@@ -15,16 +15,16 @@ pub struct PeerRepository {
     /// Peer id to [`PeerConnection`],
     peers: HashMap<PeerId, Rc<PeerConnection>>,
 
-    /// Sender that will be injected to all [`Peers`] created by this
+    /// Sender that will be injected to all [`PeerConnection`]s created by this
     /// repository.
     peer_events_sender: UnboundedSender<PeerEvent>,
 
+    /// [`MediaManager`] that will be injected to all [`PeerConnection`]s.
     media_manager: Rc<MediaManager>,
 }
 
 impl PeerRepository {
-    /// Creates new [`PeerRepository`] saving provided sender to be injected in
-    /// all peers that will be created by this repository.
+    /// Creates new [`PeerRepository`].
     pub fn new(
         peer_events_sender: UnboundedSender<PeerEvent>,
         media_manager: Rc<MediaManager>,
@@ -37,7 +37,7 @@ impl PeerRepository {
     }
 
     /// Creates new [`PeerConnection`] with provided id injecting provided ice
-    /// servers and stored [`PeerEvent`] sender.
+    /// servers, stored [`PeerEvent`] sender and [`MediaManager`].
     pub fn create(
         &mut self,
         id: PeerId,

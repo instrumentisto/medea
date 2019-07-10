@@ -15,27 +15,44 @@ use crate::{
     utils::{EventListener, WasmErr},
 };
 
+/// [`RTCIceCandidate`][1] wrapper.
+///
+/// [1]: https://www.w3.org/TR/webrtc/#rtcicecandidate-interface
 pub struct IceCandidate {
     pub candidate: String,
     pub sdp_m_line_index: Option<u16>,
     pub sdp_mid: Option<String>,
 }
 
+/// [`RTCRtpTransceiver`][1] [`kind`][2] wrapper.
+///
+/// [1]: https://www.w3.org/TR/webrtc/#dom-rtcrtptransceiver
+/// [2]: https://www.w3.org/TR/webrtc/#dfn-transceiver-kind
 pub enum TransceiverType {
     Audio,
     Video,
 }
 
+/// [`RTCRtpTransceiverDirection`][1] wrapper.
+///
+/// [1]:https://www.w3.org/TR/webrtc/#dom-rtcrtptransceiverdirection
+// TODO: sendrecv optimization
 pub enum TransceiverDirection {
     Sendonly,
     Recvonly,
 }
 
+/// [`RTCSdpType`] wrapper.
+///
+/// [1]: https://www.w3.org/TR/webrtc/#dom-rtcsdptype
 pub enum SdpType {
     Offer(String),
     Answer(String),
 }
 
+/// [`https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection`][1] wrapper.
+///
+/// [1]: https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection
 struct InnerPeer {
     /// Underlying [`RtcPeerConnection`][1].
     ///
@@ -75,6 +92,9 @@ impl RtcPeerConnection {
         }))))
     }
 
+    /// Set [`RTCTrackEvent`][1] handler.
+    ///
+    /// [1]: https://www.w3.org/TR/webrtc/#rtctrackevent
     pub fn on_track<F>(&self, f: Option<F>) -> Result<(), WasmErr>
     where
         F: (FnMut(RtcTrackEvent)) + 'static,
@@ -97,6 +117,9 @@ impl RtcPeerConnection {
         Ok(())
     }
 
+    /// Set [`RTCPeerConnectionIceEvent`][1] handler.
+    ///
+    /// [1]: https://www.w3.org/TR/webrtc/#dom-rtcpeerconnectioniceevent
     pub fn on_ice_candidate<F>(&self, f: Option<F>) -> Result<(), WasmErr>
     where
         F: (FnMut(IceCandidate)) + 'static,
@@ -153,7 +176,7 @@ impl RtcPeerConnection {
     }
 
     /// Obtain SDP Answer from underlying [`RTCPeerConnection`][1] and set it as
-    /// local description. Should be called whenever remote description is
+    /// local description. Should be called whenever remote description has
     /// changed.
     ///
     /// [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
@@ -201,6 +224,10 @@ impl RtcPeerConnection {
             .map_err(Into::into)
     }
 
+    /// Instructs the [`RTCPeerConnection`][1] to apply the supplied SDP as the
+    /// remote offer or answer. Changes the local media state.
+    ///
+    /// [1]: https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection
     pub fn set_remote_description(
         &self,
         sdp: SdpType,
@@ -227,6 +254,11 @@ impl RtcPeerConnection {
         .map(|_| ())
     }
 
+    /// Create a new [`RTCRtpTransceiver`][1] and add it to the [`set of
+    /// transceivers`][2].
+    ///
+    /// [1]: https://www.w3.org/TR/webrtc/#dom-rtcrtptransceiver
+    /// [2]: https://www.w3.org/TR/webrtc/#transceivers-set
     pub fn add_transceiver(
         &self,
         tr_type: &TransceiverType,
@@ -256,7 +288,11 @@ impl RtcPeerConnection {
         }
     }
 
-    /// Find transceiver in peer transceivers by provided mid.
+    /// Find [`RTCRtpTransceiver`][1] in peers [`set of transceivers`][2] by
+    /// provided mid.
+    ///
+    /// [1]: https://www.w3.org/TR/webrtc/#dom-rtcrtptransceiver
+    /// [2]: https://www.w3.org/TR/webrtc/#transceivers-set
     pub fn get_transceiver_by_mid(
         &self,
         mid: &str,
@@ -282,6 +318,11 @@ impl RtcPeerConnection {
 }
 
 impl Drop for RtcPeerConnection {
+    /// Drop `on_track` and `on_ice_candidate` callbacks and [`close`][1]
+    /// underlying [`RTCPeerConnection`][2]
+    ///
+    /// [1]: https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close
+    /// [2]: https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection
     fn drop(&mut self) {
         let mut inner = self.0.borrow_mut();
         inner.on_track.take();
