@@ -13,6 +13,8 @@ use std::{convert::TryFrom as _, fs::File, io::Read as _, path::Path};
 use failure::{Error, Fail};
 use serde::Deserialize;
 
+use crate::api::control::grpc::protos::control::Error as ErrorProto;
+
 use self::{
     endpoints::{
         webrtc_play_endpoint::{SrcParseError, WebRtcPlayEndpoint},
@@ -49,6 +51,25 @@ pub enum TryFromProtobufError {
 impl From<SrcParseError> for TryFromProtobufError {
     fn from(from: SrcParseError) -> Self {
         TryFromProtobufError::SrcUriError(from)
+    }
+}
+
+impl Into<ErrorProto> for &TryFromProtobufError {
+    fn into(self) -> ErrorProto {
+        let mut error = ErrorProto::new();
+        match self {
+            TryFromProtobufError::SrcUriError(e) => {
+                error = e.into();
+            }
+            _ => {
+                // TODO
+                error.set_code(0);
+                error.set_status(400);
+                error.set_text(self.to_string());
+                error.set_element(String::new());
+            }
+        }
+        error
     }
 }
 

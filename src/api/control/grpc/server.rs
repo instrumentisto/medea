@@ -66,6 +66,29 @@ impl From<MailboxError> for ControlApiError {
     }
 }
 
+impl Into<Error> for ControlApiError {
+    fn into(self) -> Error {
+        let mut error = Error::new();
+        match &self {
+            ControlApiError::LocalUri(e) => error = e.into(),
+            ControlApiError::TryFromProtobuf(e) => error = e.into(),
+            ControlApiError::MailboxError(e) => {
+                error.set_status(500);
+                error.set_code(0);
+                error.set_text(format!("Internal server error. {:?}", e));
+                error.set_element(String::new());
+            }
+            _ => {
+                error.set_status(500);
+                error.set_code(0);
+                error.set_text(format!("Internal server error. {:?}", self));
+                error.set_element(String::new());
+            }
+        }
+        error
+    }
+}
+
 macro_rules! fut_try {
     ($call:expr) => {
         match $call {
@@ -195,16 +218,22 @@ impl ControlApiService {
 }
 
 fn create_response(
-    result: Result<Result<HashMap<String, String>, RoomError>, RoomRepoError>,
+    result: Result<
+        Result<Result<HashMap<String, String>, RoomError>, RoomRepoError>,
+        ControlApiError,
+    >,
 ) -> Response {
     let error: Error = match result {
         Ok(r) => match r {
-            Ok(sid) => {
-                let mut response = Response::new();
-                response.set_sid(sid);
-                return response;
-            }
-            Err(ref e) => e.into(),
+            Ok(r) => match r {
+                Ok(sid) => {
+                    let mut response = Response::new();
+                    response.set_sid(sid);
+                    return response;
+                }
+                Err(ref e) => e.into(),
+            },
+            Err(e) => e.into(),
         },
         Err(e) => e.into(),
     };
@@ -243,13 +272,9 @@ impl ControlApi for ControlApiService {
 
         if local_uri.is_room_uri() {
             if req.has_room() {
-                ctx.spawn(
-                    self.create_room(req, local_uri).map_err(|_| ()).and_then(
-                        move |r| {
-                            sink.success(create_response(r)).map_err(|_| ())
-                        },
-                    ),
-                );
+                ctx.spawn(self.create_room(req, local_uri).then(move |r| {
+                    sink.success(create_response(r)).map_err(|_| ())
+                }));
             } else {
                 let mut error_response = Response::new();
                 let mut error = Error::new();
@@ -264,13 +289,9 @@ impl ControlApi for ControlApiService {
             }
         } else if local_uri.is_member_uri() {
             if req.has_member() {
-                ctx.spawn(
-                    self.create_member(req, local_uri)
-                        .map_err(|_| ())
-                        .and_then(move |r| {
-                            sink.success(create_response(r)).map_err(|_| ())
-                        }),
-                );
+                ctx.spawn(self.create_member(req, local_uri).then(move |r| {
+                    sink.success(create_response(r)).map_err(|_| ())
+                }));
             } else {
                 let mut error_response = Response::new();
                 let mut error = Error::new();
@@ -285,13 +306,9 @@ impl ControlApi for ControlApiService {
             }
         } else if local_uri.is_endpoint_uri() {
             if req.has_webrtc_pub() || req.has_webrtc_play() {
-                ctx.spawn(
-                    self.create_endpoint(req, local_uri)
-                        .map_err(|_| ())
-                        .and_then(move |r| {
-                            sink.success(create_response(r)).map_err(|_| ())
-                        }),
-                );
+                ctx.spawn(self.create_endpoint(req, local_uri).then(
+                    move |r| sink.success(create_response(r)).map_err(|_| ()),
+                ));
             } else {
                 let mut error_response = Response::new();
                 let mut error = Error::new();

@@ -2,14 +2,38 @@ use std::fmt;
 
 use failure::Fail;
 
+use crate::api::control::grpc::protos::control::Error as ErrorProto;
+
 use super::{MemberId, RoomId};
 
 #[derive(Debug, Fail)]
 pub enum LocalUriParseError {
-    #[fail(display = "Provided URIs protocol is not 'local://'")]
-    NotLocal(String),
-    #[fail(display = "Too many paths in provided URI")]
-    TooManyFields(usize),
+    #[fail(display = "Provided URIs protocol is not 'local://'.")]
+    NotLocal(String, String),
+    #[fail(display = "Too many ({}) paths in provided URI.", _0)]
+    TooManyFields(usize, String),
+}
+
+impl Into<ErrorProto> for &LocalUriParseError {
+    fn into(self) -> ErrorProto {
+        let mut error = ErrorProto::new();
+        match &self {
+            LocalUriParseError::NotLocal(_, text) => {
+                error.set_code(0);
+                error.set_status(400);
+                error.set_text(self.to_string());
+                error.set_element(text.clone())
+            }
+            LocalUriParseError::TooManyFields(_, text) => {
+                error.set_code(0);
+                error.set_status(400);
+                error.set_text(self.to_string());
+                error.set_element(text.clone())
+            }
+        }
+
+        error
+    }
 }
 
 #[derive(Debug)]
@@ -38,7 +62,10 @@ impl LocalUri {
     pub fn parse(value: &str) -> Result<Self, LocalUriParseError> {
         let protocol_name: String = value.chars().take(8).collect();
         if protocol_name != "local://" {
-            return Err(LocalUriParseError::NotLocal(protocol_name));
+            return Err(LocalUriParseError::NotLocal(
+                protocol_name,
+                value.to_string(),
+            ));
         }
 
         let uri_body = value.chars().skip(8).collect::<String>();
@@ -48,6 +75,7 @@ impl LocalUri {
         if uri_body_splitted_len > 3 {
             return Err(LocalUriParseError::TooManyFields(
                 uri_body_splitted_len,
+                value.to_string(),
             ));
         }
 

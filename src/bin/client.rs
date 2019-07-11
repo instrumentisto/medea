@@ -62,7 +62,7 @@ fn create_room(client: &ControlApiClient) {
     req.set_room(room);
     req.set_id("local://grpc-test".to_string());
 
-    let reply = client.create(&req).expect("rpc");
+    let reply = client.create(&req).expect("create room");
     println!("{:?}", reply);
 }
 
@@ -82,7 +82,9 @@ fn create_member(client: &ControlApiClient) {
     create_member_request.set_id("local://grpc-test/player".to_string());
     create_member_request.set_member(member);
 
-    let reply = client.create(&create_member_request).unwrap();
+    let reply = client
+        .create(&create_member_request)
+        .expect("create member");
     println!("{:?}", reply)
 }
 
@@ -94,7 +96,9 @@ fn create_endpoint(client: &ControlApiClient) {
         .set_id("local://grpc-test/player/create-publish".to_string());
     create_endpoint_request.set_webrtc_pub(endpoint);
 
-    let reply = client.create(&create_endpoint_request).unwrap();
+    let reply = client
+        .create(&create_endpoint_request)
+        .expect("create endpoint");
     println!("{:?}", reply);
 }
 
@@ -104,7 +108,7 @@ fn delete_room(client: &ControlApiClient) {
     rooms.push("local://pub-sub-video-call".to_string());
     delete_request.set_id(rooms);
 
-    let reply = client.delete(&delete_request).expect("delete");
+    let reply = client.delete(&delete_request).expect("delete room");
     println!("{:?}", reply);
 }
 

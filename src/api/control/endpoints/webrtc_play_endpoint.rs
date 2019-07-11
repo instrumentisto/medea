@@ -10,7 +10,9 @@ use serde::{
 
 use crate::api::control::{
     endpoints::webrtc_publish_endpoint::WebRtcPublishId,
-    grpc::protos::control::WebRtcPlayEndpoint as WebRtcPlayEndpointProto,
+    grpc::protos::control::{
+        Error as ErrorProto, WebRtcPlayEndpoint as WebRtcPlayEndpointProto,
+    },
     local_uri::{LocalUri, LocalUriParseError},
     MemberId, RoomId, TryFromProtobufError,
 };
@@ -59,6 +61,24 @@ pub enum SrcParseError {
     MissingField(String, Vec<String>),
     #[fail(display = "Local URI '{}' parse error: {:?}", _0, _1)]
     LocalUriParseError(String, LocalUriParseError),
+}
+
+impl Into<ErrorProto> for &SrcParseError {
+    fn into(self) -> ErrorProto {
+        let mut error = ErrorProto::new();
+        match &self {
+            SrcParseError::MissingField(text, _) => {
+                error.set_code(0);
+                error.set_status(400);
+                error.set_element(text.clone());
+                error.set_text(self.to_string());
+            }
+            SrcParseError::LocalUriParseError(_, e) => {
+                error = e.into();
+            }
+        }
+        error
+    }
 }
 
 /// Special uri with pattern `local://{room_id}/{member_id}/{endpoint_id}`.
