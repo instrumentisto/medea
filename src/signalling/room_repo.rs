@@ -67,6 +67,9 @@ impl Into<ErrorProto> for RoomRepoError {
                 error.set_status(400); // TODO: Maybe 409??
                 error.set_text(self.to_string());
             }
+            RoomRepoError::RoomError(e) => {
+                error = e.into();
+            }
             _ => {
                 error.set_element(String::new());
                 error.set_code(0); // TODO

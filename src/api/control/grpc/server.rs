@@ -204,7 +204,7 @@ fn create_response(
                 response.set_sid(sid);
                 return response;
             }
-            Err(e) => e.into(),
+            Err(ref e) => e.into(),
         },
         Err(e) => e.into(),
     };
@@ -513,7 +513,7 @@ impl ControlApi for ControlApiService {
                         Ok((id, o)) => {
                             elements.insert(id, o);
                         }
-                        Err(e) => {
+                        Err(ref e) => {
                             let mut response = GetResponse::new();
                             let error: Error = e.into();
                             response.set_error(error);

@@ -66,6 +66,8 @@ pub enum ParticipantServiceErr {
     ParticipantNotFound(LocalUri),
     #[fail(display = "Endpoint [id = {}] not found.", _0)]
     EndpointNotFound(LocalUri),
+    #[fail(display = "{}", _0)]
+    MemberError(MemberError),
     #[fail(display = "Participant [id = {}] already exists.", _0)]
     ParticipantAlreadyExists(LocalUri),
     #[fail(display = "Endpoint [id = {}] already exists.", _0)]
@@ -86,11 +88,7 @@ impl From<MailboxError> for ParticipantServiceErr {
 
 impl From<MemberError> for ParticipantServiceErr {
     fn from(err: MemberError) -> Self {
-        match err {
-            MemberError::EndpointNotFound(e) => {
-                ParticipantServiceErr::EndpointNotFound(e)
-            }
-        }
+        ParticipantServiceErr::MemberError(err)
     }
 }
 

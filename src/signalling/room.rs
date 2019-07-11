@@ -57,8 +57,8 @@ pub type ActFuture<I, E> =
 pub enum RoomError {
     #[fail(display = "Couldn't find Peer with [id = {}]", _0)]
     PeerNotFound(PeerId),
-    #[fail(display = "Endpoint [id = {}] not found.", _0)]
-    EndpointNotFound(LocalUri),
+    #[fail(display = "{}", _0)]
+    MemberError(MemberError),
     #[fail(display = "Member [id = {}] does not have Turn credentials", _0)]
     NoTurnCredentials(MemberId),
     #[fail(display = "Couldn't find RpcConnection with Member [id = {}]", _0)]
@@ -67,6 +67,10 @@ pub enum RoomError {
     UnableToSendEvent(MemberId),
     #[fail(display = "PeerError: {}", _0)]
     PeerStateError(PeerStateError),
+    #[fail(display = "{}", _0)]
+    MembersLoadError(MembersLoadError),
+    #[fail(display = "{}", _0)]
+    TryFromElementError(TryFromElementError),
     #[fail(display = "Generic room error: {}", _0)]
     BadRoomSpec(String),
     #[fail(display = "Turn service error: {}", _0)]
@@ -83,19 +87,13 @@ impl From<PeerStateError> for RoomError {
 
 impl From<TryFromElementError> for RoomError {
     fn from(err: TryFromElementError) -> Self {
-        RoomError::BadRoomSpec(format!(
-            "Element located in wrong place. {}",
-            err
-        ))
+        RoomError::TryFromElementError(err)
     }
 }
 
 impl From<MembersLoadError> for RoomError {
     fn from(err: MembersLoadError) -> Self {
-        RoomError::BadRoomSpec(format!(
-            "Error while loading room spec. {}",
-            err
-        ))
+        RoomError::MembersLoadError(err)
     }
 }
 
@@ -107,25 +105,17 @@ impl From<ParticipantServiceErr> for RoomError {
 
 impl From<MemberError> for RoomError {
     fn from(err: MemberError) -> Self {
-        match err {
-            MemberError::EndpointNotFound(id) => {
-                RoomError::EndpointNotFound(id)
-            }
-        }
+        RoomError::MemberError(err)
     }
 }
 
-impl Into<ErrorProto> for RoomError {
+impl Into<ErrorProto> for &RoomError {
     fn into(self) -> ErrorProto {
         let mut error = ErrorProto::new();
         match &self {
-            RoomError::EndpointNotFound(id) => {
-                error.set_element(id.to_string());
-                error.set_code(0); // TODO
-                error.set_status(404);
-                error.set_text(self.to_string());
-            }
+            RoomError::MemberError(e) => error = e.into(),
             RoomError::ParticipantServiceErr(e) => error = e.into(),
+            RoomError::MembersLoadError(e) => error = e.into(),
             _ => {
                 error.set_element(String::new());
                 error.set_code(0); // TODO

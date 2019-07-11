@@ -13,7 +13,8 @@ use crate::{
     api::control::{
         endpoints::WebRtcPlayEndpoint as WebRtcPlayEndpointSpec,
         grpc::protos::control::{
-            Member as MemberProto, Room_Element as ElementProto,
+            Error as ErrorProto, Member as MemberProto,
+            Room_Element as ElementProto,
         },
         local_uri::LocalUri,
         MemberId, MemberSpec, RoomId, RoomSpec, TryFromElementError,
@@ -30,27 +31,86 @@ use super::endpoints::webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint};
 pub enum MembersLoadError {
     /// Errors that can occur when we try transform some spec from [`Element`].
     #[fail(display = "TryFromElementError: {}", _0)]
-    TryFromError(TryFromElementError),
+    TryFromError(TryFromElementError, LocalUri),
 
     /// [`Member`] not found.
-    #[fail(display = "Member with id '{}' not found.", _0)]
-    MemberNotFound(MemberId),
+    #[fail(display = "Member [id = {}] not found.", _0)]
+    MemberNotFound(LocalUri),
 
-    /// [`Endpoint`] not found.
-    #[fail(display = "Endpoint with id '{}' not found.", _0)]
-    EndpointNotFound(String),
-}
+    #[fail(
+        display = "Play endpoint [id = {}] not found while loading spec,",
+        _0
+    )]
+    PlayEndpointNotFound(LocalUri),
 
-impl From<TryFromElementError> for MembersLoadError {
-    fn from(err: TryFromElementError) -> Self {
-        MembersLoadError::TryFromError(err)
-    }
+    #[fail(
+        display = "Publish endpoint [id = {}] not found while loading spec.",
+        _0
+    )]
+    PublishEndpointNotFound(LocalUri),
 }
 
 #[derive(Debug, Fail)]
 pub enum MemberError {
-    #[fail(display = "Endpoint with ID '{}' not found.", _0)]
-    EndpointNotFound(LocalUri),
+    #[fail(display = "Publish endpoint [id = {}] not found.", _0)]
+    PublishEndpointNotFound(LocalUri),
+
+    #[fail(display = "Play endpoint [id = {}] not found.", _0)]
+    PlayEndpointNotFound(LocalUri),
+}
+
+impl Into<ErrorProto> for &MembersLoadError {
+    fn into(self) -> ErrorProto {
+        let mut error = ErrorProto::new();
+        match &self {
+            MembersLoadError::TryFromError(_, id) => {
+                error.set_element(id.to_string());
+                error.set_code(0); // TODO
+                error.set_status(400);
+                error.set_text(self.to_string());
+            }
+            MembersLoadError::MemberNotFound(id) => {
+                error.set_element(id.to_string());
+                error.set_code(0); // TODO
+                error.set_status(400);
+                error.set_text(self.to_string());
+            }
+            MembersLoadError::PublishEndpointNotFound(id) => {
+                error.set_element(id.to_string());
+                error.set_code(0); // TODO
+                error.set_status(400);
+                error.set_text(self.to_string());
+            }
+            MembersLoadError::PlayEndpointNotFound(id) => {
+                error.set_element(id.to_string());
+                error.set_code(0); // TODO
+                error.set_status(400);
+                error.set_text(self.to_string());
+            }
+        }
+        error
+    }
+}
+
+impl Into<ErrorProto> for &MemberError {
+    fn into(self) -> ErrorProto {
+        let mut error = ErrorProto::new();
+        match &self {
+            MemberError::PlayEndpointNotFound(id) => {
+                error.set_element(id.to_string());
+                error.set_code(0); // TODO
+                error.set_status(400);
+                error.set_text(self.to_string());
+            }
+            MemberError::PublishEndpointNotFound(id) => {
+                error.set_element(id.to_string());
+                error.set_code(0); // TODO
+                error.set_status(400);
+                error.set_text(self.to_string());
+            }
+        }
+        error
+    }
 }
 
 /// [`Member`] is member of [`Room`] with [`RpcConnection`].
@@ -94,22 +154,49 @@ impl Member {
         }))
     }
 
+    fn get_member_from_room_spec(
+        &self,
+        room_spec: &RoomSpec,
+        member_id: &MemberId,
+    ) -> Result<MemberSpec, MembersLoadError> {
+        let element = room_spec.pipeline.get(&member_id.0).map_or(
+            Err(MembersLoadError::MemberNotFound(LocalUri::new(
+                Some(self.room_id()),
+                Some(member_id.clone()),
+                None,
+            ))),
+            Ok,
+        )?;
+
+        MemberSpec::try_from(element).map_err(|e| {
+            MembersLoadError::TryFromError(
+                e,
+                LocalUri::new(
+                    Some(self.room_id()),
+                    Some(member_id.clone()),
+                    None,
+                ),
+            )
+        })
+    }
+
     /// Load all srcs and sinks of this [`Member`].
     fn load(
         &self,
         room_spec: &RoomSpec,
         store: &HashMap<MemberId, Rc<Self>>,
     ) -> Result<(), MembersLoadError> {
-        let this_member_spec = MemberSpec::try_from(
-            room_spec
-                .pipeline
-                .get(&self.id().0)
-                .map_or(Err(MembersLoadError::MemberNotFound(self.id())), Ok)?,
-        )?;
+        let self_id = self.id();
 
-        let this_member = store
-            .get(&self.id())
-            .map_or(Err(MembersLoadError::MemberNotFound(self.id())), Ok)?;
+        let this_member_spec =
+            self.get_member_from_room_spec(room_spec, &self_id)?;
+
+        let this_member = store.get(&self.id()).map_or(
+            Err(MembersLoadError::MemberNotFound(
+                self.get_member_local_uri(),
+            )),
+            Ok,
+        )?;
 
         for (spec_play_name, spec_play_endpoint) in
             this_member_spec.play_endpoints()
@@ -117,27 +204,26 @@ impl Member {
             let publisher_id =
                 MemberId(spec_play_endpoint.src.member_id.to_string());
             let publisher_member = store.get(&publisher_id).map_or(
-                Err(MembersLoadError::MemberNotFound(publisher_id)),
+                Err(MembersLoadError::MemberNotFound(LocalUri::new(
+                    Some(self.room_id()),
+                    Some(publisher_id),
+                    None,
+                ))),
                 Ok,
             )?;
-            let publisher_spec = MemberSpec::try_from(
-                room_spec
-                    .pipeline
-                    .get(&spec_play_endpoint.src.member_id.to_string())
-                    .map_or(
-                        Err(MembersLoadError::MemberNotFound(
-                            spec_play_endpoint.src.member_id.clone(),
-                        )),
-                        Ok,
-                    )?,
+            let publisher_spec = self.get_member_from_room_spec(
+                room_spec,
+                &spec_play_endpoint.src.member_id,
             )?;
 
             let publisher_endpoint = *publisher_spec
                 .publish_endpoints()
                 .get(&spec_play_endpoint.src.endpoint_id)
                 .map_or(
-                    Err(MembersLoadError::EndpointNotFound(
-                        spec_play_endpoint.src.endpoint_id.to_string(),
+                    Err(MembersLoadError::PublishEndpointNotFound(
+                        publisher_member.get_local_uri(
+                            spec_play_endpoint.src.endpoint_id.to_string(),
+                        ),
                     )),
                     Ok,
                 )?;
@@ -200,6 +286,10 @@ impl Member {
         );
 
         Ok(())
+    }
+
+    fn get_member_local_uri(&self) -> LocalUri {
+        LocalUri::new(Some(self.room_id()), Some(self.id()), None)
     }
 
     /// Notify [`Member`] that some [`Peer`]s removed.
@@ -280,7 +370,7 @@ impl Member {
     ) -> Result<Rc<WebRtcPublishEndpoint>, MemberError> {
         self.0.borrow().srcs.get(id).cloned().map_or_else(
             || {
-                Err(MemberError::EndpointNotFound(
+                Err(MemberError::PublishEndpointNotFound(
                     self.get_local_uri(id.to_string()),
                 ))
             },
@@ -302,7 +392,7 @@ impl Member {
     ) -> Result<Rc<WebRtcPlayEndpoint>, MemberError> {
         self.0.borrow().sinks.get(id).cloned().map_or_else(
             || {
-                Err(MemberError::EndpointNotFound(
+                Err(MemberError::PlayEndpointNotFound(
                     self.get_local_uri(id.to_string()),
                 ))
             },
@@ -364,7 +454,16 @@ impl Member {
 pub fn parse_members(
     room_spec: &RoomSpec,
 ) -> Result<HashMap<MemberId, Rc<Member>>, MembersLoadError> {
-    let members_spec = room_spec.members()?;
+    // TODO: maybe improve error?
+    let members_spec = match room_spec.members() {
+        Ok(o) => o,
+        Err(e) => {
+            return Err(MembersLoadError::TryFromError(
+                e,
+                LocalUri::new(Some(room_spec.id.clone()), None, None),
+            ))
+        }
+    };
     let mut members = HashMap::new();
 
     for (id, member) in &members_spec {
