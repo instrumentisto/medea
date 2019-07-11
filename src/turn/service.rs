@@ -2,8 +2,8 @@ use core::fmt;
 use std::net::SocketAddr;
 
 use actix::{
-    fut::wrap_future, Actor, ActorFuture, Addr, Arbiter, Context, Handler,
-    MailboxError, Message, WrapFuture,
+    fut::wrap_future, Actor, ActorFuture, Addr, Context, Handler, MailboxError,
+    Message, WrapFuture,
 };
 use bb8::RunError;
 use failure::Fail;
@@ -13,7 +13,7 @@ use redis::ConnectionInfo;
 
 use crate::{
     api::control::MemberId,
-    conf::Conf,
+    conf::Turn,
     media::IceUser,
     signalling::RoomId,
     turn::repo::{TurnDatabase, TurnDatabaseErr},
@@ -153,36 +153,34 @@ struct Service {
 
 /// Create new instance [`TurnAuthService`].
 #[allow(clippy::module_name_repetitions)]
-pub fn new_turn_auth_service(
-    config: &Conf,
-) -> Result<Box<dyn TurnAuthService>, TurnServiceErr> {
-    let turn_db = TurnDatabase::new(
-        config.turn.db.redis.connection_timeout,
+pub fn new_turn_auth_service<'a>(
+    turn_config: Turn,
+) -> impl Future<Item = Box<dyn TurnAuthService + 'a>, Error = TurnServiceErr> {
+    TurnDatabase::new(
+        turn_config.db.redis.connection_timeout,
         ConnectionInfo {
             addr: Box::new(redis::ConnectionAddr::Tcp(
-                config.turn.db.redis.ip.to_string(),
-                config.turn.db.redis.port,
+                turn_config.db.redis.ip.to_string(),
+                turn_config.db.redis.port,
             )),
-            db: config.turn.db.redis.db_number,
-            passwd: if config.turn.db.redis.pass.is_empty() {
+            db: turn_config.db.redis.db_number,
+            passwd: if turn_config.db.redis.pass.is_empty() {
                 None
             } else {
-                Some(config.turn.db.redis.pass.clone())
+                Some(turn_config.db.redis.pass.clone())
             },
         },
-    )?;
-
-    let service = Service {
+    )
+    .map(move |turn_db| Service {
         turn_db,
-        db_pass: config.turn.db.redis.pass.clone(),
-        turn_address: config.turn.addr(),
-        turn_username: config.turn.user.clone(),
-        turn_password: config.turn.pass.clone(),
+        db_pass: turn_config.db.redis.pass.clone(),
+        turn_address: turn_config.addr(),
+        turn_username: turn_config.user.clone(),
+        turn_password: turn_config.pass.clone(),
         static_user: None,
-    };
-
-    let service = Service::start_in_arbiter(&Arbiter::new(), move |_| service);
-    Ok(Box::new(service))
+    })
+    .map::<_, Box<dyn TurnAuthService>>(|service| Box::new(service.start()))
+    .map_err(TurnServiceErr::from)
 }
 
 impl Service {

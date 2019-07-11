@@ -85,26 +85,27 @@ pub struct Context {
 }
 
 /// Starts HTTP server for handling WebSocket connections of Client API.
-pub fn run(rooms: RoomsRepository, config: Conf) {
+pub fn run(
+    rooms: RoomsRepository,
+    config: Conf,
+) -> impl Future<Item = actix_server::Server, Error = std::io::Error> {
     let server_addr = config.server.bind_addr();
-
-    HttpServer::new(move || {
-        App::new()
-            .data(Context {
-                rooms: rooms.clone(),
-                config: config.rpc.clone(),
-            })
-            .wrap(middleware::Logger::default())
-            .service(
-                resource("/ws/{room_id}/{member_id}/{credentials}")
-                    .route(actix_web::web::get().to_async(ws_index)),
-            )
+    future::lazy(move || {
+        HttpServer::new(move || {
+            App::new()
+                .data(Context {
+                    rooms: rooms.clone(),
+                    config: config.rpc.clone(),
+                })
+                .wrap(middleware::Logger::default())
+                .service(
+                    resource("/ws/{room_id}/{member_id}/{credentials}")
+                        .route(actix_web::web::get().to_async(ws_index)),
+                )
+        })
+        .bind(server_addr)
     })
-    .bind(server_addr)
-    .unwrap()
-    .start();
-
-    info!("Started HTTP server on 0.0.0.0:8080");
+    .map(HttpServer::start)
 }
 
 #[cfg(test)]
