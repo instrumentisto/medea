@@ -4,10 +4,9 @@ use std::fmt;
 
 use failure::Fail;
 
-use crate::api::control::grpc::protos::control::Error as ErrorProto;
+use crate::api::error_codes::ErrorCode;
 
 use super::{MemberId, RoomId};
-use crate::api::error_codes::ErrorCode;
 
 #[derive(Debug, Fail)]
 pub enum LocalUriParseError {

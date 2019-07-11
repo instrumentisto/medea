@@ -11,9 +11,7 @@ use serde::{
 use crate::api::{
     control::{
         endpoints::webrtc_publish_endpoint::WebRtcPublishId,
-        grpc::protos::control::{
-            Error as ErrorProto, WebRtcPlayEndpoint as WebRtcPlayEndpointProto,
-        },
+        grpc::protos::control::WebRtcPlayEndpoint as WebRtcPlayEndpointProto,
         local_uri::{LocalUri, LocalUriParseError},
         MemberId, RoomId, TryFromProtobufError,
     },

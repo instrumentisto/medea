@@ -13,12 +13,9 @@ use hashbrown::HashMap;
 use crate::{
     api::{
         control::{
-            grpc::protos::control::{
-                Element as ElementProto, Error as ErrorProto,
-            },
-            local_uri::LocalUri,
-            room::RoomSpec,
-            Endpoint as EndpointSpec, MemberId, MemberSpec, RoomId,
+            grpc::protos::control::Element as ElementProto,
+            local_uri::LocalUri, room::RoomSpec, Endpoint as EndpointSpec,
+            MemberId, MemberSpec, RoomId,
         },
         error_codes::ErrorCode,
     },

@@ -22,8 +22,8 @@ use crate::{
         },
         control::{
             grpc::protos::control::{
-                Element as ElementProto, Error as ErrorProto, Member_Element,
-                Room as RoomProto, Room_Element,
+                Element as ElementProto, Member_Element, Room as RoomProto,
+                Room_Element,
             },
             local_uri::LocalUri,
             room::RoomSpec,

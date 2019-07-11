@@ -8,33 +8,31 @@ use futures::future::{Either, Future};
 use grpcio::{Environment, RpcContext, Server, ServerBuilder, UnarySink};
 
 use crate::{
-    api::control::{
-        grpc::protos::control::{
-            ApplyRequest, CreateRequest, Error, GetResponse, IdRequest,
-            Response,
+    api::{
+        control::{
+            grpc::protos::control::{
+                ApplyRequest, CreateRequest, Error, GetResponse, IdRequest,
+                Response,
+            },
+            local_uri::{LocalUri, LocalUriParseError},
+            Endpoint, MemberSpec, RoomSpec, TryFromElementError,
+            TryFromProtobufError,
         },
-        local_uri::{LocalUri, LocalUriParseError},
-        Endpoint, MemberSpec, RoomSpec, TryFromElementError,
-        TryFromProtobufError,
+        error_codes::ErrorCode,
     },
     log::prelude::*,
     signalling::{
         room::RoomError,
         room_repo::{
-            CreateEndpointInRoom, CreateMemberInRoom, GetEndpoint, GetMember,
-            GetRoom, RoomRepoError, RoomsRepository, StartRoom,
+            CreateEndpointInRoom, CreateMemberInRoom, DeleteEndpointFromMember,
+            DeleteMemberFromRoom, DeleteRoom, GetEndpoint, GetMember, GetRoom,
+            RoomRepoError, RoomsRepository, StartRoom,
         },
     },
     App,
 };
 
 use super::protos::control_grpc::{create_control_api, ControlApi};
-use crate::{
-    api::error_codes::ErrorCode,
-    signalling::room_repo::{
-        DeleteEndpointFromMember, DeleteMemberFromRoom, DeleteRoom,
-    },
-};
 
 #[derive(Debug, Fail)]
 enum ControlApiError {

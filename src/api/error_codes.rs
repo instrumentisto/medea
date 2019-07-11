@@ -8,8 +8,7 @@
 //! * __1300...1399__ Conflicts
 
 use crate::api::control::{
-    grpc::protos::control::Error as ErrorProto,
-    local_uri::{LocalUri, LocalUriParseError},
+    grpc::protos::control::Error as ErrorProto, local_uri::LocalUri,
 };
 
 /// Medea control API errors.

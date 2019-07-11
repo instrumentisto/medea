@@ -13,7 +13,7 @@ use std::{convert::TryFrom as _, fs::File, io::Read as _, path::Path};
 use failure::{Error, Fail};
 use serde::Deserialize;
 
-use crate::api::control::grpc::protos::control::Error as ErrorProto;
+use crate::api::error_codes::ErrorCode;
 
 use self::{
     endpoints::{
@@ -31,7 +31,6 @@ pub use self::{
     member::{Id as MemberId, MemberSpec},
     room::{Id as RoomId, RoomSpec},
 };
-use crate::api::error_codes::ErrorCode;
 
 #[derive(Debug, Fail)]
 pub enum TryFromProtobufError {
