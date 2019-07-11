@@ -37,6 +37,7 @@ use crate::{
             MemberId, MemberSpec, RoomId, RoomSpec, WebRtcPlayId,
             WebRtcPublishId,
         },
+        error_codes::ErrorCode,
     },
     log::prelude::*,
     media::IceUser,
@@ -92,45 +93,23 @@ impl From<MemberError> for ParticipantServiceErr {
     }
 }
 
-impl Into<ErrorProto> for &ParticipantServiceErr {
-    fn into(self) -> ErrorProto {
-        let mut error = ErrorProto::new();
-        match &self {
+impl Into<ErrorCode> for ParticipantServiceErr {
+    fn into(self) -> ErrorCode {
+        match self {
             ParticipantServiceErr::EndpointNotFound(id) => {
-                error.set_element(id.to_string());
-                error.set_code(0); // TODO
-                error.set_status(404);
-                error.set_text(self.to_string());
+                ErrorCode::EndpointNotFound(id)
             }
             ParticipantServiceErr::ParticipantNotFound(id) => {
-                error.set_element(id.to_string());
-                error.set_code(0); // TODO
-                error.set_status(404);
-                error.set_text(self.to_string());
+                ErrorCode::MemberNotFound(id)
             }
             ParticipantServiceErr::ParticipantAlreadyExists(id) => {
-                error.set_element(id.to_string());
-                error.set_code(0); // TODO
-                error.set_status(400);
-                error.set_text(self.to_string());
+                ErrorCode::MemberAlreadyExists(id)
             }
             ParticipantServiceErr::EndpointAlreadyExists(id) => {
-                error.set_element(id.to_string());
-                error.set_code(0); // TODO
-                error.set_status(400);
-                error.set_text(self.to_string());
+                ErrorCode::EndpointAlreadyExists(id)
             }
-            _ => {
-                error.set_element(String::new());
-                error.set_code(0); // TODO
-                error.set_status(500);
-                error.set_text(format!(
-                    "Unknow ParticipantService error. {:?}",
-                    self
-                ));
-            }
+            _ => ErrorCode::UnknownError(self.to_string()),
         }
-        error
     }
 }
 

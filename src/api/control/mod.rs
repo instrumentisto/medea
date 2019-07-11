@@ -31,6 +31,7 @@ pub use self::{
     member::{Id as MemberId, MemberSpec},
     room::{Id as RoomId, RoomSpec},
 };
+use crate::api::error_codes::ErrorCode;
 
 #[derive(Debug, Fail)]
 pub enum TryFromProtobufError {
@@ -54,22 +55,12 @@ impl From<SrcParseError> for TryFromProtobufError {
     }
 }
 
-impl Into<ErrorProto> for &TryFromProtobufError {
-    fn into(self) -> ErrorProto {
-        let mut error = ErrorProto::new();
+impl Into<ErrorCode> for TryFromProtobufError {
+    fn into(self) -> ErrorCode {
         match self {
-            TryFromProtobufError::SrcUriError(e) => {
-                error = e.into();
-            }
-            _ => {
-                // TODO
-                error.set_code(0);
-                error.set_status(400);
-                error.set_text(self.to_string());
-                error.set_element(String::new());
-            }
+            TryFromProtobufError::SrcUriError(e) => e.into(),
+            _ => ErrorCode::UnknownError(self.to_string()),
         }
-        error
     }
 }
 

@@ -7,34 +7,26 @@ use failure::Fail;
 use crate::api::control::grpc::protos::control::Error as ErrorProto;
 
 use super::{MemberId, RoomId};
+use crate::api::error_codes::ErrorCode;
 
 #[derive(Debug, Fail)]
 pub enum LocalUriParseError {
     #[fail(display = "Provided URIs protocol is not 'local://'.")]
-    NotLocal(String, String),
+    NotLocal(String),
     #[fail(display = "Too many ({}) paths in provided URI.", _0)]
     TooManyFields(usize, String),
 }
 
-impl Into<ErrorProto> for &LocalUriParseError {
-    fn into(self) -> ErrorProto {
-        let mut error = ErrorProto::new();
-        match &self {
-            LocalUriParseError::NotLocal(_, text) => {
-                error.set_code(0);
-                error.set_status(400);
-                error.set_text(self.to_string());
-                error.set_element(text.clone())
+impl Into<ErrorCode> for LocalUriParseError {
+    fn into(self) -> ErrorCode {
+        match self {
+            LocalUriParseError::NotLocal(text) => {
+                ErrorCode::ElementIdIsNotLocal(text)
             }
             LocalUriParseError::TooManyFields(_, text) => {
-                error.set_code(0);
-                error.set_status(400);
-                error.set_text(self.to_string());
-                error.set_element(text.clone())
+                ErrorCode::ElementIdIsTooLong(text)
             }
         }
-
-        error
     }
 }
 
@@ -72,10 +64,7 @@ impl LocalUri {
     pub fn parse(value: &str) -> Result<Self, LocalUriParseError> {
         let protocol_name: String = value.chars().take(8).collect();
         if protocol_name != "local://" {
-            return Err(LocalUriParseError::NotLocal(
-                protocol_name,
-                value.to_string(),
-            ));
+            return Err(LocalUriParseError::NotLocal(value.to_string()));
         }
 
         let uri_body = value.chars().skip(8).collect::<String>();

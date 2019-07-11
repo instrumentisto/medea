@@ -30,6 +30,7 @@ use crate::{
             Endpoint as EndpointSpec, MemberId, MemberSpec, RoomId,
             TryFromElementError, WebRtcPlayId, WebRtcPublishId,
         },
+        error_codes::ErrorCode,
     },
     log::prelude::*,
     media::{
@@ -109,21 +110,14 @@ impl From<MemberError> for RoomError {
     }
 }
 
-impl Into<ErrorProto> for &RoomError {
-    fn into(self) -> ErrorProto {
-        let mut error = ErrorProto::new();
-        match &self {
-            RoomError::MemberError(e) => error = e.into(),
-            RoomError::ParticipantServiceErr(e) => error = e.into(),
-            RoomError::MembersLoadError(e) => error = e.into(),
-            _ => {
-                error.set_element(String::new());
-                error.set_code(0); // TODO
-                error.set_status(500);
-                error.set_text(format!("Unknow RoomError error. {:?}", self));
-            }
+impl Into<ErrorCode> for RoomError {
+    fn into(self) -> ErrorCode {
+        match self {
+            RoomError::MemberError(e) => e.into(),
+            RoomError::MembersLoadError(e) => e.into(),
+            RoomError::ParticipantServiceErr(e) => e.into(),
+            _ => ErrorCode::UnknownError(self.to_string()),
         }
-        error
     }
 }
 

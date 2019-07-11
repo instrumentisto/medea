@@ -29,8 +29,11 @@ use crate::{
 };
 
 use super::protos::control_grpc::{create_control_api, ControlApi};
-use crate::signalling::room_repo::{
-    DeleteEndpointFromMember, DeleteMemberFromRoom, DeleteRoom,
+use crate::{
+    api::error_codes::ErrorCode,
+    signalling::room_repo::{
+        DeleteEndpointFromMember, DeleteMemberFromRoom, DeleteRoom,
+    },
 };
 
 #[derive(Debug, Fail)]
@@ -78,26 +81,13 @@ impl From<MailboxError> for ControlApiError {
     }
 }
 
-impl Into<Error> for ControlApiError {
-    fn into(self) -> Error {
-        let mut error = Error::new();
-        match &self {
-            ControlApiError::LocalUri(e) => error = e.into(),
-            ControlApiError::TryFromProtobuf(e) => error = e.into(),
-            ControlApiError::MailboxError(e) => {
-                error.set_status(500);
-                error.set_code(0);
-                error.set_text(format!("Internal server error. {:?}", e));
-                error.set_element(String::new());
-            }
-            _ => {
-                error.set_status(500);
-                error.set_code(0);
-                error.set_text(format!("Internal server error. {:?}", self));
-                error.set_element(String::new());
-            }
+impl Into<ErrorCode> for ControlApiError {
+    fn into(self) -> ErrorCode {
+        match self {
+            ControlApiError::LocalUri(e) => e.into(),
+            ControlApiError::TryFromProtobuf(e) => e.into(),
+            _ => ErrorCode::UnknownError(self.to_string()),
         }
-        error
     }
 }
 
@@ -259,7 +249,7 @@ fn create_response(
         ControlApiError,
     >,
 ) -> Response {
-    let error: Error = match result {
+    let error: ErrorCode = match result {
         Ok(r) => match r {
             Ok(r) => match r {
                 Ok(sid) => {
@@ -267,7 +257,7 @@ fn create_response(
                     response.set_sid(sid);
                     return response;
                 }
-                Err(ref e) => e.into(),
+                Err(e) => e.into(),
             },
             Err(e) => e.into(),
         },
@@ -275,7 +265,7 @@ fn create_response(
     };
 
     let mut error_response = Response::new();
-    error_response.set_error(error);
+    error_response.set_error(error.into());
     error_response
 }
 
@@ -474,8 +464,8 @@ impl ControlApi for ControlApiService {
                         }
                         Err(e) => {
                             let mut response = GetResponse::new();
-                            let error: Error = e.into();
-                            response.set_error(error);
+                            let error: ErrorCode = e.into();
+                            response.set_error(error.into());
                             return sink.success(response).map_err(closure);
                         }
                     }
@@ -489,10 +479,10 @@ impl ControlApi for ControlApiService {
                         Ok((id, o)) => {
                             elements.insert(id, o);
                         }
-                        Err(ref e) => {
+                        Err(e) => {
                             let mut response = GetResponse::new();
-                            let error: Error = e.into();
-                            response.set_error(error);
+                            let error: ErrorCode = e.into();
+                            response.set_error(error.into());
                             return sink.success(response).map_err(closure);
                         }
                     }

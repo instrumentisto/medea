@@ -8,13 +8,16 @@ use serde::{
     Deserialize,
 };
 
-use crate::api::control::{
-    endpoints::webrtc_publish_endpoint::WebRtcPublishId,
-    grpc::protos::control::{
-        Error as ErrorProto, WebRtcPlayEndpoint as WebRtcPlayEndpointProto,
+use crate::api::{
+    control::{
+        endpoints::webrtc_publish_endpoint::WebRtcPublishId,
+        grpc::protos::control::{
+            Error as ErrorProto, WebRtcPlayEndpoint as WebRtcPlayEndpointProto,
+        },
+        local_uri::{LocalUri, LocalUriParseError},
+        MemberId, RoomId, TryFromProtobufError,
     },
-    local_uri::{LocalUri, LocalUriParseError},
-    MemberId, RoomId, TryFromProtobufError,
+    error_codes::ErrorCode,
 };
 
 macro_attr! {
@@ -63,21 +66,14 @@ pub enum SrcParseError {
     LocalUriParseError(String, LocalUriParseError),
 }
 
-impl Into<ErrorProto> for &SrcParseError {
-    fn into(self) -> ErrorProto {
-        let mut error = ErrorProto::new();
-        match &self {
-            SrcParseError::MissingField(text, _) => {
-                error.set_code(0);
-                error.set_status(400);
-                error.set_element(text.clone());
-                error.set_text(self.to_string());
+impl Into<ErrorCode> for SrcParseError {
+    fn into(self) -> ErrorCode {
+        match self {
+            SrcParseError::MissingField(text, fields) => {
+                ErrorCode::MissingFieldsInSrcUri(text, fields)
             }
-            SrcParseError::LocalUriParseError(_, e) => {
-                error = e.into();
-            }
+            SrcParseError::LocalUriParseError(_, err) => err.into(),
         }
-        error
     }
 }
 

@@ -11,11 +11,16 @@ use futures::future::{Either, Future};
 use hashbrown::HashMap;
 
 use crate::{
-    api::control::{
-        grpc::protos::control::{Element as ElementProto, Error as ErrorProto},
-        local_uri::LocalUri,
-        room::RoomSpec,
-        Endpoint as EndpointSpec, MemberId, MemberSpec, RoomId,
+    api::{
+        control::{
+            grpc::protos::control::{
+                Element as ElementProto, Error as ErrorProto,
+            },
+            local_uri::LocalUri,
+            room::RoomSpec,
+            Endpoint as EndpointSpec, MemberId, MemberSpec, RoomId,
+        },
+        error_codes::ErrorCode,
     },
     signalling::{
         room::{
@@ -51,33 +56,16 @@ impl From<RoomError> for RoomRepoError {
     }
 }
 
-impl Into<ErrorProto> for RoomRepoError {
-    fn into(self) -> ErrorProto {
-        let mut error = ErrorProto::new();
-        match &self {
-            RoomRepoError::RoomNotFound(id) => {
-                error.set_element(id.to_string());
-                error.set_code(0); // TODO
-                error.set_status(404);
-                error.set_text(self.to_string());
-            }
+impl Into<ErrorCode> for RoomRepoError {
+    fn into(self) -> ErrorCode {
+        match self {
+            RoomRepoError::RoomNotFound(id) => ErrorCode::RoomNotFound(id),
             RoomRepoError::RoomAlreadyExists(id) => {
-                error.set_element(id.to_string());
-                error.set_code(0); // TODO
-                error.set_status(400); // TODO: Maybe 409??
-                error.set_text(self.to_string());
+                ErrorCode::RoomAlreadyExists(id)
             }
-            RoomRepoError::RoomError(e) => {
-                error = e.into();
-            }
-            _ => {
-                error.set_element(String::new());
-                error.set_code(0); // TODO
-                error.set_status(500);
-                error.set_text(format!("Unknow RoomRepo error. {:?}", self));
-            }
+            RoomRepoError::RoomError(e) => e.into(),
+            _ => ErrorCode::UnknownError(self.to_string()),
         }
-        error
     }
 }
 

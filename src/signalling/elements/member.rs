@@ -25,6 +25,7 @@ use crate::{
 };
 
 use super::endpoints::webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint};
+use crate::api::error_codes::ErrorCode;
 
 /// Errors which may occur while loading [`Member`]s from [`RoomSpec`].
 #[derive(Debug, Fail)]
@@ -59,36 +60,28 @@ pub enum MemberError {
     PlayEndpointNotFound(LocalUri),
 }
 
-impl Into<ErrorProto> for &MembersLoadError {
-    fn into(self) -> ErrorProto {
-        let mut error = ErrorProto::new();
-        match &self {
-            MembersLoadError::TryFromError(_, id) => {
-                error.set_element(id.to_string());
-                error.set_code(0); // TODO
-                error.set_status(400);
-                error.set_text(self.to_string());
-            }
+impl Into<ErrorCode> for MembersLoadError {
+    fn into(self) -> ErrorCode {
+        match self {
+            MembersLoadError::TryFromError(e, id) => match e {
+                TryFromElementError::NotEndpoint => {
+                    ErrorCode::NotEndpointInSpec(id)
+                }
+                TryFromElementError::NotMember => {
+                    ErrorCode::NotMemberInSpec(id)
+                }
+                TryFromElementError::NotRoom => ErrorCode::NotRoomInSpec(id),
+            },
             MembersLoadError::MemberNotFound(id) => {
-                error.set_element(id.to_string());
-                error.set_code(0); // TODO
-                error.set_status(400);
-                error.set_text(self.to_string());
+                ErrorCode::MemberNotFound(id)
             }
             MembersLoadError::PublishEndpointNotFound(id) => {
-                error.set_element(id.to_string());
-                error.set_code(0); // TODO
-                error.set_status(400);
-                error.set_text(self.to_string());
+                ErrorCode::PublishEndpointNotFound(id)
             }
             MembersLoadError::PlayEndpointNotFound(id) => {
-                error.set_element(id.to_string());
-                error.set_code(0); // TODO
-                error.set_status(400);
-                error.set_text(self.to_string());
+                ErrorCode::PlayEndpointNotFound(id)
             }
         }
-        error
     }
 }
 
@@ -110,6 +103,19 @@ impl Into<ErrorProto> for &MemberError {
             }
         }
         error
+    }
+}
+
+impl Into<ErrorCode> for MemberError {
+    fn into(self) -> ErrorCode {
+        match self {
+            MemberError::PlayEndpointNotFound(id) => {
+                ErrorCode::PlayEndpointNotFound(id)
+            }
+            MemberError::PublishEndpointNotFound(id) => {
+                ErrorCode::PublishEndpointNotFound(id)
+            }
+        }
     }
 }
 
