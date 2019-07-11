@@ -791,24 +791,6 @@ impl Handler<DeleteMember> for Room {
     }
 }
 
-#[derive(Debug, Message)]
-#[rtype(result = "Result<(), RoomError>")]
-pub struct DeleteMemberCheck(pub MemberId);
-
-impl Handler<DeleteMemberCheck> for Room {
-    type Result = Result<(), RoomError>;
-
-    fn handle(
-        &mut self,
-        msg: DeleteMemberCheck,
-        _ctx: &mut Self::Context,
-    ) -> Self::Result {
-        self.members.get_member(&msg.0)?;
-
-        Ok(())
-    }
-}
-
 #[derive(Debug, Message, Clone)]
 #[rtype(result = "()")]
 pub struct DeleteEndpoint {
@@ -824,49 +806,22 @@ impl Handler<DeleteEndpoint> for Room {
         msg: DeleteEndpoint,
         ctx: &mut Self::Context,
     ) -> Self::Result {
-        let member = self.members.get_member(&msg.member_id).unwrap();
-        let play_id = WebRtcPlayId(msg.endpoint_id);
-        if let Some(endpoint) = member.take_sink(&play_id) {
-            if let Some(peer_id) = endpoint.peer_id() {
-                self.peers.remove_peer(msg.member_id.clone(), peer_id, ctx);
+        if let Some(member) = self.members.get_member_by_id(&msg.member_id) {
+            let play_id = WebRtcPlayId(msg.endpoint_id);
+            if let Some(endpoint) = member.take_sink(&play_id) {
+                if let Some(peer_id) = endpoint.peer_id() {
+                    self.peers.remove_peer(msg.member_id.clone(), peer_id, ctx);
+                }
             }
+
+            let publish_id = WebRtcPublishId(play_id.0);
+            if let Some(endpoint) = member.take_src(&publish_id) {
+                let peer_ids = endpoint.peer_ids();
+                self.peers.remove_peers(msg.member_id, peer_ids, ctx);
+            }
+        } else {
+            return;
         }
-
-        let publish_id = WebRtcPublishId(play_id.0);
-        if let Some(endpoint) = member.take_src(&publish_id) {
-            let peer_ids = endpoint.peer_ids();
-            self.peers.remove_peers(msg.member_id, peer_ids, ctx);
-        }
-    }
-}
-
-#[derive(Debug, Message)]
-#[rtype(result = "Result<(), RoomError>")]
-pub struct DeleteEndpointCheck {
-    pub member_id: MemberId,
-    pub endpoint_id: String,
-}
-
-impl Handler<DeleteEndpointCheck> for Room {
-    type Result = Result<(), RoomError>;
-
-    fn handle(
-        &mut self,
-        msg: DeleteEndpointCheck,
-        _ctx: &mut Self::Context,
-    ) -> Self::Result {
-        let member = self.members.get_member(&msg.member_id)?;
-
-        let play_id = WebRtcPlayId(msg.endpoint_id);
-
-        if let Some(_) = member.get_sink_by_id(&play_id) {
-            return Ok(());
-        }
-
-        let publish_id = WebRtcPublishId(play_id.0);
-        member.get_src(&publish_id)?;
-
-        Ok(())
     }
 }
 

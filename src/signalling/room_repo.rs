@@ -20,9 +20,8 @@ use crate::{
     signalling::{
         room::{
             CloseRoom, CreateEndpoint, CreateMember, DeleteEndpoint,
-            DeleteEndpointCheck, DeleteMember, DeleteMemberCheck, RoomError,
-            SerializeProtobufEndpoint, SerializeProtobufMember,
-            SerializeProtobufRoom,
+            DeleteMember, RoomError, SerializeProtobufEndpoint,
+            SerializeProtobufMember, SerializeProtobufRoom,
         },
         Room,
     },
@@ -167,7 +166,7 @@ impl Handler<StartRoom> for RoomsRepository {
 
 #[derive(Message)]
 #[rtype(result = "Result<(), RoomRepoError>")]
-pub struct DeleteRoom(RoomId);
+pub struct DeleteRoom(pub RoomId);
 
 impl Handler<DeleteRoom> for RoomsRepository {
     type Result = Result<(), RoomRepoError>;
@@ -177,43 +176,21 @@ impl Handler<DeleteRoom> for RoomsRepository {
         msg: DeleteRoom,
         _ctx: &mut Self::Context,
     ) -> Self::Result {
-        if let Some(room) = self.rooms.lock().unwrap().get(&msg.0) {
+        let mut room_repo = self.rooms.lock().unwrap();
+        if let Some(room) = room_repo.get(&msg.0) {
             room.do_send(CloseRoom {});
-        } else {
-            return Err(RoomRepoError::RoomNotFound(get_local_uri(msg.0)));
+            room_repo.remove(&msg.0);
         }
-
-        self.remove(&msg.0);
 
         Ok(())
     }
 }
 
 #[derive(Message)]
-#[rtype(result = "Result<DeleteRoom, RoomRepoError>")]
-pub struct DeleteRoomCheck(pub RoomId);
-
-impl Handler<DeleteRoomCheck> for RoomsRepository {
-    type Result = Result<DeleteRoom, RoomRepoError>;
-
-    fn handle(
-        &mut self,
-        msg: DeleteRoomCheck,
-        _ctx: &mut Self::Context,
-    ) -> Self::Result {
-        if let None = self.rooms.lock().unwrap().get(&msg.0) {
-            Err(RoomRepoError::RoomNotFound(get_local_uri(msg.0)))
-        } else {
-            Ok(DeleteRoom(msg.0))
-        }
-    }
-}
-
-#[derive(Message)]
 #[rtype(result = "Result<(), RoomRepoError>")]
 pub struct DeleteMemberFromRoom {
-    member_id: MemberId,
-    room_id: RoomId,
+    pub member_id: MemberId,
+    pub room_id: RoomId,
 }
 
 impl Handler<DeleteMemberFromRoom> for RoomsRepository {
@@ -237,51 +214,11 @@ impl Handler<DeleteMemberFromRoom> for RoomsRepository {
 }
 
 #[derive(Message)]
-#[rtype(
-    result = "Result<Result<DeleteMemberFromRoom, RoomError>, RoomRepoError>"
-)]
-pub struct DeleteMemberFromRoomCheck {
-    pub member_id: MemberId,
-    pub room_id: RoomId,
-}
-
-impl Handler<DeleteMemberFromRoomCheck> for RoomsRepository {
-    type Result =
-        ActFuture<Result<DeleteMemberFromRoom, RoomError>, RoomRepoError>;
-
-    fn handle(
-        &mut self,
-        msg: DeleteMemberFromRoomCheck,
-        _ctx: &mut Self::Context,
-    ) -> Self::Result {
-        let fut =
-            if let Some(room) = self.rooms.lock().unwrap().get(&msg.room_id) {
-                Either::A(
-                    room.send(DeleteMemberCheck(msg.member_id.clone()))
-                        .map_err(|e| RoomRepoError::from(e))
-                        .map(|r| {
-                            r.map(|_| DeleteMemberFromRoom {
-                                room_id: msg.room_id,
-                                member_id: msg.member_id,
-                            })
-                        }),
-                )
-            } else {
-                Either::B(futures::future::err(RoomRepoError::RoomNotFound(
-                    get_local_uri(msg.room_id),
-                )))
-            };
-
-        Box::new(wrap_future(fut))
-    }
-}
-
-#[derive(Message)]
 #[rtype(result = "Result<(), RoomRepoError>")]
 pub struct DeleteEndpointFromMember {
-    room_id: RoomId,
-    member_id: MemberId,
-    endpoint_id: String,
+    pub room_id: RoomId,
+    pub member_id: MemberId,
+    pub endpoint_id: String,
 }
 
 impl Handler<DeleteEndpointFromMember> for RoomsRepository {
@@ -297,56 +234,9 @@ impl Handler<DeleteEndpointFromMember> for RoomsRepository {
                 endpoint_id: msg.endpoint_id,
                 member_id: msg.member_id,
             });
-        } else {
-            return Err(RoomRepoError::RoomNotFound(get_local_uri(
-                msg.room_id,
-            )));
         }
 
         Ok(())
-    }
-}
-
-#[derive(Message)]
-#[rtype(result = "Result<Result<DeleteEndpointFromMember, RoomError>, \
-                  RoomRepoError>")]
-pub struct DeleteEndpointFromMemberCheck {
-    pub room_id: RoomId,
-    pub member_id: MemberId,
-    pub endpoint_id: String,
-}
-
-impl Handler<DeleteEndpointFromMemberCheck> for RoomsRepository {
-    type Result =
-        ActFuture<Result<DeleteEndpointFromMember, RoomError>, RoomRepoError>;
-
-    fn handle(
-        &mut self,
-        msg: DeleteEndpointFromMemberCheck,
-        _ctx: &mut Self::Context,
-    ) -> Self::Result {
-        let fut = if let Some(room) = self.get(&msg.room_id) {
-            Either::A(
-                room.send(DeleteEndpointCheck {
-                    member_id: msg.member_id.clone(),
-                    endpoint_id: msg.endpoint_id.clone(),
-                })
-                .map_err(|e| RoomRepoError::from(e))
-                .map(|r| {
-                    r.map(|_| DeleteEndpointFromMember {
-                        room_id: msg.room_id,
-                        member_id: msg.member_id,
-                        endpoint_id: msg.endpoint_id,
-                    })
-                }),
-            )
-        } else {
-            Either::B(futures::future::err(RoomRepoError::RoomNotFound(
-                get_local_uri(msg.room_id),
-            )))
-        };
-
-        Box::new(wrap_future(fut))
     }
 }
 

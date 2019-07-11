@@ -18,12 +18,12 @@ fn main() {
     let client = ControlApiClient::new(ch);
 
     create_room(&client);
-    //    delete_room(&client);
-    //    delete_endpoint(&client);
-    //    delete_member(&client);
-    create_member(&client);
+    delete_room(&client);
+    //        delete_endpoint(&client);
+    //        delete_member(&client);
+    //    create_member(&client);
     //    std::thread::sleep(Duration::from_secs(1));
-    create_endpoint(&client);
+    //    create_endpoint(&client);
     get_room(&client);
 }
 

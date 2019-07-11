@@ -21,16 +21,17 @@ use crate::{
     signalling::{
         room::RoomError,
         room_repo::{
-            CreateEndpointInRoom, CreateMemberInRoom,
-            DeleteEndpointFromMemberCheck, DeleteMemberFromRoomCheck,
-            DeleteRoomCheck, GetEndpoint, GetMember, GetRoom, RoomRepoError,
-            RoomsRepository, StartRoom,
+            CreateEndpointInRoom, CreateMemberInRoom, GetEndpoint, GetMember,
+            GetRoom, RoomRepoError, RoomsRepository, StartRoom,
         },
     },
     App,
 };
 
 use super::protos::control_grpc::{create_control_api, ControlApi};
+use crate::signalling::room_repo::{
+    DeleteEndpointFromMember, DeleteMemberFromRoom, DeleteRoom,
+};
 
 #[derive(Debug, Fail)]
 enum ControlApiError {
@@ -377,19 +378,18 @@ impl ControlApi for ControlApiService {
 
             if uri.is_room_uri() {
                 delete_room_futs.push(
-                    self.room_repository
-                        .send(DeleteRoomCheck(uri.room_id.unwrap())),
+                    self.room_repository.send(DeleteRoom(uri.room_id.unwrap())),
                 );
             } else if uri.is_member_uri() {
                 delete_member_futs.push(self.room_repository.send(
-                    DeleteMemberFromRoomCheck {
+                    DeleteMemberFromRoom {
                         room_id: uri.room_id.unwrap(),
                         member_id: uri.member_id.unwrap(),
                     },
                 ));
             } else if uri.is_endpoint_uri() {
                 delete_endpoints_futs.push(self.room_repository.send(
-                    DeleteEndpointFromMemberCheck {
+                    DeleteEndpointFromMember {
                         room_id: uri.room_id.unwrap(),
                         member_id: uri.member_id.unwrap(),
                         endpoint_id: uri.endpoint_id.unwrap(),
@@ -404,56 +404,20 @@ impl ControlApi for ControlApiService {
         let mega_delete_endpoints_fut =
             futures::future::join_all(delete_endpoints_futs);
 
-        let room_repository_addr = self.room_repository.clone();
-
         ctx.spawn(
             mega_delete_endpoints_fut
                 .join3(mega_delete_member_fut, mega_delete_room_fut)
                 .map_err(|_| ())
                 .and_then(move |(member, endpoint, room)| {
-                    let mut members_msgs = Vec::new();
-                    let mut endpoints_msgs = Vec::new();
-                    let mut room_msgs = Vec::new();
-
-                    for member_fut in member {
-                        let member_msg = member_fut.unwrap().unwrap();
-                        members_msgs.push(
-                            room_repository_addr
-                                .send(member_msg)
-                                .map_err(|_| ()),
-                        );
-                    }
-
-                    for endpoint_fut in endpoint {
-                        let endpoint_msg = endpoint_fut.unwrap().unwrap();
-                        endpoints_msgs.push(
-                            room_repository_addr
-                                .send(endpoint_msg)
-                                .map_err(|_| ()),
-                        );
-                    }
-
-                    for room_fut in room {
-                        let room_msg = room_fut.unwrap();
-                        room_msgs.push(
-                            room_repository_addr.send(room_msg).map_err(|_| ()),
-                        );
-                    }
-
-                    let members_msgs = futures::future::join_all(members_msgs);
-                    let endpoints_msgs =
-                        futures::future::join_all(endpoints_msgs);
-                    let room_msgs = futures::future::join_all(room_msgs);
-
-                    members_msgs
-                        .join3(endpoints_msgs, room_msgs)
-                        .map_err(|_| ())
-                        .map(|_| ())
-                        .and_then(|_| {
-                            let mut response = Response::new();
-                            response.set_sid(HashMap::new());
-                            sink.success(response).map_err(|_| ())
-                        })
+                    member
+                        .into_iter()
+                        .chain(endpoint.into_iter())
+                        .chain(room.into_iter())
+                        .for_each(|r| r.unwrap());
+                    // TODO
+                    let mut response = Response::new();
+                    response.set_sid(HashMap::new());
+                    sink.success(response).map_err(|_| ())
                 }),
         );
     }
