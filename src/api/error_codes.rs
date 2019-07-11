@@ -49,6 +49,11 @@ pub enum ErrorCode {
     ///
     /// Code: __1203__.
     InvalidSrcUri(LocalUri),
+    // TODO: simplify names
+    ElementIdForRoomButElementIsNot(String),
+    ElementIdForMemberButElementIsNot(String),
+    ElementIdForEndpointButElementIsNot(String),
+    InvalidElementUri(String),
 
     /////////////////////////////////
     // Parse errors (1300 - 1399) //
@@ -138,6 +143,38 @@ impl Into<ErrorProto> for ErrorCode {
                 );
                 error.set_element(id.to_string());
                 error.set_code(1203);
+            }
+            ErrorCode::ElementIdForRoomButElementIsNot(id) => {
+                error.set_text(
+                    "You provided ID for Room but element's spec is not for \
+                     Room."
+                        .to_string(),
+                );
+                error.set_element(id);
+                error.set_code(1204);
+            }
+            ErrorCode::ElementIdForMemberButElementIsNot(id) => {
+                error.set_text(
+                    "You provided ID for Member but element's spec is not for \
+                     Member."
+                        .to_string(),
+                );
+                error.set_element(id);
+                error.set_code(1205);
+            }
+            ErrorCode::ElementIdForEndpointButElementIsNot(id) => {
+                error.set_text(
+                    "You provided ID for Endpoint but element's spec is not \
+                     for Endpoint."
+                        .to_string(),
+                );
+                error.set_element(id);
+                error.set_code(1206);
+            }
+            ErrorCode::InvalidElementUri(id) => {
+                error.set_text("Invalid element's URI".to_string());
+                error.set_element(id);
+                error.set_code(1207);
             }
 
             /////////////////////////////////

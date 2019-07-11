@@ -269,6 +269,17 @@ fn create_response(
     error_response
 }
 
+fn error_response(
+    sink: UnarySink<Response>,
+    error_code: ErrorCode,
+) -> impl Future<Item = (), Error = ()> {
+    let mut response = Response::new();
+    let error: Error = error_code.into();
+    response.set_error(error);
+
+    sink.success(response).map_err(|_| ())
+}
+
 impl ControlApi for ControlApiService {
     /// Implementation for `Create` method of gRPC control API.
     fn create(
@@ -285,16 +296,12 @@ impl ControlApi for ControlApiService {
                     sink.success(create_response(r)).map_err(|_| ())
                 }));
             } else {
-                let mut error_response = Response::new();
-                let mut error = Error::new();
-                error.set_status(400);
-                error.set_code(0);
-                error.set_text(
-                    "ID for room but element is not room.".to_string(),
-                );
-                error.set_element(String::new());
-                error_response.set_error(error);
-                ctx.spawn(sink.success(error_response).map_err(|_| ()));
+                ctx.spawn(error_response(
+                    sink,
+                    ErrorCode::ElementIdForRoomButElementIsNot(
+                        req.get_id().to_string(),
+                    ),
+                ));
             }
         } else if local_uri.is_member_uri() {
             if req.has_member() {
@@ -302,16 +309,12 @@ impl ControlApi for ControlApiService {
                     sink.success(create_response(r)).map_err(|_| ())
                 }));
             } else {
-                let mut error_response = Response::new();
-                let mut error = Error::new();
-                error.set_status(400);
-                error.set_code(0);
-                error.set_text(
-                    "ID for member but element is not member.".to_string(),
-                );
-                error.set_element(String::new());
-                error_response.set_error(error);
-                ctx.spawn(sink.success(error_response).map_err(|_| ()));
+                ctx.spawn(error_response(
+                    sink,
+                    ErrorCode::ElementIdForMemberButElementIsNot(
+                        req.get_id().to_string(),
+                    ),
+                ));
             }
         } else if local_uri.is_endpoint_uri() {
             if req.has_webrtc_pub() || req.has_webrtc_play() {
@@ -319,26 +322,18 @@ impl ControlApi for ControlApiService {
                     move |r| sink.success(create_response(r)).map_err(|_| ()),
                 ));
             } else {
-                let mut error_response = Response::new();
-                let mut error = Error::new();
-                error.set_status(400);
-                error.set_code(0);
-                error.set_text(
-                    "ID for endpoint but element is not endpoint.".to_string(),
-                );
-                error.set_element(String::new());
-                error_response.set_error(error);
-                ctx.spawn(sink.success(error_response).map_err(|_| ()));
+                ctx.spawn(error_response(
+                    sink,
+                    ErrorCode::ElementIdForEndpointButElementIsNot(
+                        req.get_id().to_string(),
+                    ),
+                ));
             }
         } else {
-            let mut error_response = Response::new();
-            let mut error = Error::new();
-            error.set_status(400);
-            error.set_code(0);
-            error.set_text(format!("Invalid ID '{}'.", req.get_id()));
-            error.set_element(local_uri.to_string());
-            error_response.set_error(error);
-            ctx.spawn(sink.success(error_response).map_err(|_| ()));
+            ctx.spawn(error_response(
+                sink,
+                ErrorCode::InvalidElementUri(req.get_id().to_string()),
+            ));
         }
     }
 
