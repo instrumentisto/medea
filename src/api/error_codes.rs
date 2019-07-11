@@ -1,8 +1,18 @@
+//! All errors which medea can return to control API user.
+//!
+//! # Error codes ranges
+//! * __1000...1000__ Unknow server error
+//! * __1001...1099__ Not found errors
+//! * __1100...1199__ Spec errors
+//! * __1200...1299__ Parse errors
+//! * __1300...1399__ Conflicts
+
 use crate::api::control::{
     grpc::protos::control::Error as ErrorProto,
     local_uri::{LocalUri, LocalUriParseError},
 };
 
+/// Medea control API errors.
 pub enum ErrorCode {
     /// Unknown server error.
     ///
@@ -28,45 +38,79 @@ pub enum ErrorCode {
     ///
     /// Code: __1004__.
     RoomNotFound(LocalUri),
+    /// Endpoint not found.
+    ///
+    /// Code: __1005__.
     EndpointNotFound(LocalUri),
 
     //////////////////////////////////////
-    // Spec errors (1200 - 1299 codes) //
+    // Spec errors (1100 - 1199 codes) //
     ////////////////////////////////////
     /// Medea expects `Room` element in pipeline but received not him.
     ///
-    /// Code: __1200__.
+    /// Code: __1100__.
     NotRoomInSpec(LocalUri),
     /// Medea expects `Member` element in pipeline but received not him.
     ///
-    /// Code: __1201__.
+    /// Code: __1101__.
     NotMemberInSpec(LocalUri),
     /// Medea expects `Endpoint` element in pipeline but received not him.
     ///
-    /// Code: __1202__.
+    /// Code: __1102__.
     NotEndpointInSpec(LocalUri),
     /// Invalid source URI in play endpoint.
     ///
-    /// Code: __1203__.
+    /// Code: __1103__.
     InvalidSrcUri(LocalUri),
-    // TODO: simplify names
+    /// Provided element ID to Room element but element spec is not for Room.
+    ///
+    /// Code: __1104__.
     ElementIdForRoomButElementIsNot(String),
+    /// Provided element ID to Member element but element spec is not for
+    /// Member.
+    ///
+    /// Code: __1105__.
     ElementIdForMemberButElementIsNot(String),
+    /// Provided element ID to Endpoint element but element spec is not for
+    /// Endpoint.
+    ///
+    /// Code: __1106__.
     ElementIdForEndpointButElementIsNot(String),
+    /// Invalid ID for element.
+    ///
+    /// Code: __1107__
     InvalidElementUri(String),
 
     /////////////////////////////////
-    // Parse errors (1300 - 1399) //
+    // Parse errors (1200 - 1299) //
     ///////////////////////////////
+    /// Element's ID don't have "local://" prefix.
+    ///
+    /// Code: __1200__.
     ElementIdIsNotLocal(String),
+    /// Element's ID have too many paths (slashes).
+    ///
+    /// Code: __1201__.
     ElementIdIsTooLong(String),
+    /// Source URI in publish endpoint missing some fields.
+    ///
+    /// Code: __1202__.
     MissingFieldsInSrcUri(String, Vec<String>),
 
     /////////////////////////////
-    // Conflict (1400 - 1499) //
+    // Conflict (1300 - 1399) //
     ///////////////////////////
+    /// Member already exists.
+    ///
+    /// Code: __1300__.
     MemberAlreadyExists(LocalUri),
+    /// Endpoint already exists.
+    ///
+    /// Code: __1301__.
     EndpointAlreadyExists(LocalUri),
+    /// Room already exists.
+    ///
+    /// Code: __1302__.
     RoomAlreadyExists(LocalUri),
 }
 
@@ -114,35 +158,35 @@ impl Into<ErrorProto> for ErrorCode {
             }
 
             //////////////////////////////////////
-            // Spec errors (1200 - 1299 codes) //
+            // Spec errors (1100 - 1199 codes) //
             ////////////////////////////////////
             ErrorCode::NotRoomInSpec(id) => {
                 error.set_text(
                     "Expecting Room element but it's not.".to_string(),
                 );
                 error.set_element(id.to_string());
-                error.set_code(1200);
+                error.set_code(1100);
             }
             ErrorCode::NotMemberInSpec(id) => {
                 error.set_text(
                     "Expecting Member element but it's not.".to_string(),
                 );
                 error.set_element(id.to_string());
-                error.set_code(1201);
+                error.set_code(1101);
             }
             ErrorCode::NotEndpointInSpec(id) => {
                 error.set_text(
                     "Expecting Member element but it's not.".to_string(),
                 );
                 error.set_element(id.to_string());
-                error.set_code(1202);
+                error.set_code(1102);
             }
             ErrorCode::InvalidSrcUri(id) => {
                 error.set_text(
                     "Invalid source ID in publish endpoint spec.".to_string(),
                 );
                 error.set_element(id.to_string());
-                error.set_code(1203);
+                error.set_code(1103);
             }
             ErrorCode::ElementIdForRoomButElementIsNot(id) => {
                 error.set_text(
@@ -151,7 +195,7 @@ impl Into<ErrorProto> for ErrorCode {
                         .to_string(),
                 );
                 error.set_element(id);
-                error.set_code(1204);
+                error.set_code(1104);
             }
             ErrorCode::ElementIdForMemberButElementIsNot(id) => {
                 error.set_text(
@@ -160,7 +204,7 @@ impl Into<ErrorProto> for ErrorCode {
                         .to_string(),
                 );
                 error.set_element(id);
-                error.set_code(1205);
+                error.set_code(1105);
             }
             ErrorCode::ElementIdForEndpointButElementIsNot(id) => {
                 error.set_text(
@@ -169,16 +213,16 @@ impl Into<ErrorProto> for ErrorCode {
                         .to_string(),
                 );
                 error.set_element(id);
-                error.set_code(1206);
+                error.set_code(1106);
             }
             ErrorCode::InvalidElementUri(id) => {
                 error.set_text("Invalid element's URI".to_string());
                 error.set_element(id);
-                error.set_code(1207);
+                error.set_code(1107);
             }
 
             /////////////////////////////////
-            // Parse errors (1300 - 1399) //
+            // Parse errors (1200 - 1299) //
             ///////////////////////////////
             ErrorCode::ElementIdIsNotLocal(uri) => {
                 error.set_text(
@@ -186,14 +230,14 @@ impl Into<ErrorProto> for ErrorCode {
                         .to_string(),
                 );
                 error.set_element(uri);
-                error.set_code(1300);
+                error.set_code(1200);
             }
             ErrorCode::ElementIdIsTooLong(uri) => {
                 error.set_text(
                     "In provided element's ID too many slashes.".to_string(),
                 );
                 error.set_element(uri);
-                error.set_code(1301);
+                error.set_code(1201);
             }
             ErrorCode::MissingFieldsInSrcUri(uri, fields) => {
                 error.set_text(format!(
@@ -201,26 +245,26 @@ impl Into<ErrorProto> for ErrorCode {
                     fields
                 ));
                 error.set_element(uri);
-                error.set_code(1302);
+                error.set_code(1202);
             }
 
             /////////////////////////////
-            // Conflict (1400 - 1499) //
+            // Conflict (1300 - 1399) //
             ///////////////////////////
             ErrorCode::MemberAlreadyExists(id) => {
                 error.set_text("Member already exists.".to_string());
                 error.set_element(id.to_string());
-                error.set_code(1400);
+                error.set_code(1300);
             }
             ErrorCode::EndpointAlreadyExists(id) => {
                 error.set_text("Endpoint already exists.".to_string());
                 error.set_element(id.to_string());
-                error.set_code(1401);
+                error.set_code(1301);
             }
             ErrorCode::RoomAlreadyExists(id) => {
                 error.set_text("Room already exists.".to_string());
                 error.set_element(id.to_string());
-                error.set_code(1402);
+                error.set_code(1302);
             }
         }
 
