@@ -41,6 +41,7 @@ pub struct RoomSpec {
 }
 
 impl RoomSpec {
+    /// Deserialize [`RoomSpec`] from protobuf object.
     pub fn try_from_protobuf(
         id: Id,
         proto: &RoomProto,

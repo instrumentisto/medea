@@ -10,7 +10,7 @@ pub struct Grpc {
     #[default(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)))]
     pub bind_ip: IpAddr,
 
-    /// Port to bind gRPC server to. Defaults to `8080`.
+    /// Port to bind gRPC server to. Defaults to `50_051`.
     #[default(50_051)]
     pub bind_port: u16,
 

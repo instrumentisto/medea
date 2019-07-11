@@ -1,3 +1,5 @@
+//! URI for pointing to some medea element.
+
 use std::fmt;
 
 use failure::Fail;

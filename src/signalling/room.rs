@@ -870,6 +870,7 @@ impl Handler<DeleteEndpointCheck> for Room {
     }
 }
 
+/// Create new [`Member`] in this [`Room`].
 #[derive(Message, Debug)]
 #[rtype(result = "Result<(), RoomError>")]
 pub struct CreateMember(pub MemberId, pub MemberSpec);
@@ -877,7 +878,6 @@ pub struct CreateMember(pub MemberId, pub MemberSpec);
 impl Handler<CreateMember> for Room {
     type Result = Result<(), RoomError>;
 
-    /// Create new [`Member`] in this [`Room`].
     fn handle(
         &mut self,
         msg: CreateMember,
@@ -888,6 +888,7 @@ impl Handler<CreateMember> for Room {
     }
 }
 
+/// Create new `Endpoint` from [`EndpointSpec`].
 #[derive(Message, Debug)]
 #[rtype(result = "Result<(), RoomError>")]
 pub struct CreateEndpoint {
@@ -899,7 +900,6 @@ pub struct CreateEndpoint {
 impl Handler<CreateEndpoint> for Room {
     type Result = Result<(), RoomError>;
 
-    /// Create new `Endpoint` from [`EndpointSpec`].
     fn handle(
         &mut self,
         msg: CreateEndpoint,

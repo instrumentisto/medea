@@ -93,7 +93,7 @@ static_specs_path = "dev/specs"
 # Port to bind gRPC server to.
 #
 # Default:
-#   bind_port = 50_051
+#   bind_port = 50051
 
 # Completion queue count of gRPC server.
 #

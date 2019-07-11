@@ -1,3 +1,5 @@
+//! Implementation of gRPC control API.
+
 use std::{collections::HashMap, convert::TryFrom, sync::Arc};
 
 use actix::{Actor, Addr, Arbiter, Context, MailboxError};

@@ -1,3 +1,5 @@
+//! WebRtcPublish
+
 use std::convert::TryFrom;
 
 use macro_attr::*;

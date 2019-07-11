@@ -90,6 +90,7 @@ impl MemberSpec {
 impl TryFrom<&MemberProto> for MemberSpec {
     type Error = TryFromProtobufError;
 
+    /// Serialize [`MemberSpec`] from protobuf object.
     fn try_from(value: &MemberProto) -> Result<Self, Self::Error> {
         let mut pipeline = StdHashMap::new();
         for (id, member_element) in value.get_pipeline() {
