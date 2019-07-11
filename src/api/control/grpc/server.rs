@@ -102,6 +102,25 @@ macro_rules! fut_try {
     };
 }
 
+macro_rules! parse_local_uri {
+    ($uri:expr, $ctx:expr, $sink:expr, $response:ty) => {
+        match LocalUri::parse($uri) {
+            Ok(o) => o,
+            Err(e) => {
+                let mut error_response = <$response>::new();
+                let mut error = Error::new();
+                error.set_status(400);
+                error.set_code(0);
+                error.set_text(format!("Invalid ID [id = {}]. {}", $uri, e));
+                error.set_element($uri.to_string());
+                error_response.set_error(error);
+                $ctx.spawn($sink.success(error_response).map_err(|_| ()));
+                return;
+            }
+        }
+    };
+}
+
 #[derive(Clone)]
 struct ControlApiService {
     room_repository: Addr<RoomsRepository>,
@@ -244,31 +263,13 @@ fn create_response(
 }
 
 impl ControlApi for ControlApiService {
-    // TODO: Fix bug with error in src uri of spec
     fn create(
         &mut self,
         ctx: RpcContext,
         req: CreateRequest,
         sink: UnarySink<Response>,
     ) {
-        let local_uri = match LocalUri::parse(req.get_id()) {
-            Ok(o) => o,
-            Err(e) => {
-                let mut error_response = Response::new();
-                let mut error = Error::new();
-                error.set_status(400);
-                error.set_code(0);
-                error.set_text(format!(
-                    "Invalid ID [id = {}]. {}",
-                    req.get_id(),
-                    e
-                ));
-                error.set_element(req.get_id().to_string());
-                error_response.set_error(error);
-                ctx.spawn(sink.success(error_response).map_err(|_| ()));
-                return;
-            }
-        };
+        let local_uri = parse_local_uri!(req.get_id(), ctx, sink, Response);
 
         if local_uri.is_room_uri() {
             if req.has_room() {
@@ -353,20 +354,7 @@ impl ControlApi for ControlApiService {
         let mut delete_endpoints_futs = Vec::new();
 
         for id in req.get_id() {
-            let uri = match LocalUri::parse(id) {
-                Ok(o) => o,
-                Err(e) => {
-                    let mut error_response = Response::new();
-                    let mut error = Error::new();
-                    error.set_status(400);
-                    error.set_code(0);
-                    error.set_text(format!("Invalid ID [id = {}]. {}", id, e));
-                    error.set_element(id.clone());
-                    error_response.set_error(error);
-                    ctx.spawn(sink.success(error_response).map_err(|_| ()));
-                    return;
-                }
-            };
+            let uri = parse_local_uri!(id, ctx, sink, Response);
 
             if uri.is_room_uri() {
                 delete_room_futs.push(
@@ -462,20 +450,7 @@ impl ControlApi for ControlApiService {
         let mut endpoint_ids = Vec::new();
 
         for id in req.get_id() {
-            let local_uri = match LocalUri::parse(id) {
-                Ok(o) => o,
-                Err(e) => {
-                    let mut error_response = GetResponse::new();
-                    let mut error = Error::new();
-                    error.set_status(400);
-                    error.set_code(0);
-                    error.set_text(format!("Invalid ID [id = {}]. {}", id, e));
-                    error.set_element(id.clone());
-                    error_response.set_error(error);
-                    ctx.spawn(sink.success(error_response).map_err(|_| ()));
-                    return;
-                }
-            };
+            let local_uri = parse_local_uri!(id, ctx, sink, GetResponse);
 
             if local_uri.is_room_uri() {
                 room_ids.push(local_uri.room_id.unwrap());
