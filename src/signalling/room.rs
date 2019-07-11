@@ -514,14 +514,15 @@ impl Into<ElementProto> for &mut Room {
 
 #[derive(Message)]
 #[rtype(result = "Result<ElementProto, RoomError>")]
-pub struct Serialize;
+pub struct SerializeProtobufRoom;
 
-impl Handler<Serialize> for Room {
+impl Handler<SerializeProtobufRoom> for Room {
     type Result = Result<ElementProto, RoomError>;
 
+    /// Serialize this [`Room`] to protobuf object.
     fn handle(
         &mut self,
-        _msg: Serialize,
+        _msg: SerializeProtobufRoom,
         _ctx: &mut Self::Context,
     ) -> Self::Result {
         Ok(self.into())
@@ -530,14 +531,15 @@ impl Handler<Serialize> for Room {
 
 #[derive(Message)]
 #[rtype(result = "Result<ElementProto, RoomError>")]
-pub struct SerializeMember(pub MemberId);
+pub struct SerializeProtobufMember(pub MemberId);
 
-impl Handler<SerializeMember> for Room {
+impl Handler<SerializeProtobufMember> for Room {
     type Result = Result<ElementProto, RoomError>;
 
+    /// Serialize [`Member`] to protobuf object.
     fn handle(
         &mut self,
-        msg: SerializeMember,
+        msg: SerializeProtobufMember,
         _ctx: &mut Self::Context,
     ) -> Self::Result {
         let member = self.members.get_member(&msg.0)?;
@@ -554,14 +556,16 @@ impl Handler<SerializeMember> for Room {
 
 #[derive(Message)]
 #[rtype(result = "Result<ElementProto, RoomError>")]
-pub struct SerializeEndpoint(pub MemberId, pub String);
+pub struct SerializeProtobufEndpoint(pub MemberId, pub String);
 
-impl Handler<SerializeEndpoint> for Room {
+impl Handler<SerializeProtobufEndpoint> for Room {
     type Result = Result<ElementProto, RoomError>;
 
+    /// Serialize [`WebRtcPlayEndpoint`] or [`WebRtcPublishEndpoint`] to
+    /// protobuf object.
     fn handle(
         &mut self,
-        msg: SerializeEndpoint,
+        msg: SerializeProtobufEndpoint,
         _ctx: &mut Self::Context,
     ) -> Self::Result {
         let member = self.members.get_member(&msg.0)?;
@@ -873,6 +877,7 @@ pub struct CreateMember(pub MemberId, pub MemberSpec);
 impl Handler<CreateMember> for Room {
     type Result = Result<(), RoomError>;
 
+    /// Create new [`Member`] in this [`Room`].
     fn handle(
         &mut self,
         msg: CreateMember,
@@ -894,6 +899,7 @@ pub struct CreateEndpoint {
 impl Handler<CreateEndpoint> for Room {
     type Result = Result<(), RoomError>;
 
+    /// Create new `Endpoint` from [`EndpointSpec`].
     fn handle(
         &mut self,
         msg: CreateEndpoint,

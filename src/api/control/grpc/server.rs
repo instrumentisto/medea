@@ -32,12 +32,21 @@ use super::protos::control_grpc::{create_control_api, ControlApi};
 
 #[derive(Debug, Fail)]
 enum ControlApiError {
+    /// Error when parsing ID of element.
     #[fail(display = "{:?}", _0)]
     LocalUri(LocalUriParseError),
+
+    /// This error is rather abnormal, since what it catches must be caught at
+    /// the level of the gRPC.
     #[fail(display = "{:?}", _0)]
     TryFromProtobuf(TryFromProtobufError),
+
+    /// This error is rather abnormal, since what it catches must be caught at
+    /// the level of the gRPC.
     #[fail(display = "{:?}", _0)]
     TryFromElement(TryFromElementError),
+
+    /// Wrapped [`MailboxError`].
     #[fail(display = "{:?}", _0)]
     MailboxError(MailboxError),
 }
@@ -128,6 +137,7 @@ struct ControlApiService {
 }
 
 impl ControlApiService {
+    /// Implementation of `Create` method for `Room` element.
     pub fn create_room(
         &mut self,
         req: CreateRequest,
@@ -171,6 +181,7 @@ impl ControlApiService {
         )
     }
 
+    /// Implementation of `Create` method for `Member` element.
     pub fn create_member(
         &mut self,
         req: CreateRequest,
@@ -210,6 +221,8 @@ impl ControlApiService {
         )
     }
 
+    /// Implementation of `Create` method for `WebRtcPublishEndpoint` and
+    /// `WebRtcPlayEndpoint` elements.
     pub fn create_endpoint(
         &mut self,
         req: CreateRequest,
@@ -236,6 +249,7 @@ impl ControlApiService {
     }
 }
 
+/// Generate [`Response`] for `Create` method of all elements.
 fn create_response(
     result: Result<
         Result<Result<HashMap<String, String>, RoomError>, RoomRepoError>,
@@ -263,6 +277,7 @@ fn create_response(
 }
 
 impl ControlApi for ControlApiService {
+    /// Implementation for `Create` method of gRPC control API.
     fn create(
         &mut self,
         ctx: RpcContext,
@@ -334,6 +349,7 @@ impl ControlApi for ControlApiService {
         }
     }
 
+    /// Implementation for `Apply` method of gRPC control API.
     fn apply(
         &mut self,
         _ctx: RpcContext,
@@ -343,6 +359,7 @@ impl ControlApi for ControlApiService {
         unimplemented!()
     }
 
+    /// Implementation for `Delete` method of gRPC control API.
     fn delete(
         &mut self,
         ctx: RpcContext,
@@ -439,6 +456,7 @@ impl ControlApi for ControlApiService {
         );
     }
 
+    /// Implementation for `Get` method of gRPC control API.
     fn get(
         &mut self,
         ctx: RpcContext,
@@ -524,6 +542,7 @@ impl ControlApi for ControlApiService {
     }
 }
 
+/// Actor wrapper for `grcio` gRPC server.
 #[allow(clippy::module_name_repetitions)]
 pub struct GrpcServer {
     server: Server,
@@ -543,6 +562,7 @@ impl Actor for GrpcServer {
     }
 }
 
+/// Run gRPC server in actix actor.
 pub fn run(
     room_repo: Addr<RoomsRepository>,
     app: Arc<App>,

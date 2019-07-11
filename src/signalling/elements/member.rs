@@ -154,6 +154,11 @@ impl Member {
         }))
     }
 
+    /// Lookup [`MemberSpec`] by ID from [`MemberSpec`].
+    ///
+    /// Returns [`MembersLoadError::MemberNotFound`] when member not found.
+    /// Returns [`MembersLoadError::TryFromError`] when found element which is
+    /// not [`MemberSpec`].
     fn get_member_from_room_spec(
         &self,
         room_spec: &RoomSpec,
@@ -288,6 +293,7 @@ impl Member {
         Ok(())
     }
 
+    /// Return [`LocalUri`] for this [`Member`].
     fn get_member_local_uri(&self) -> LocalUri {
         LocalUri::new(Some(self.room_id()), Some(self.id()), None)
     }
@@ -386,6 +392,10 @@ impl Member {
         self.0.borrow().sinks.get(id).cloned()
     }
 
+    /// Lookup [`WebRtcPlayEndpoint`] sink endpoint by [`EndpointId`].
+    ///
+    /// Returns [`MemberError::PlayEndpointNotFound`] when
+    /// [`WebRtcPlayEndpoint`] not found.
     pub fn get_sink(
         &self,
         id: &WebRtcPlayId,
@@ -410,6 +420,7 @@ impl Member {
         self.0.borrow_mut().srcs.remove(id);
     }
 
+    /// Take sink from [`Member`]'s `sinks`.
     pub fn take_sink(
         &self,
         id: &WebRtcPlayId,
@@ -417,6 +428,7 @@ impl Member {
         self.0.borrow_mut().sinks.remove(id)
     }
 
+    /// Take src from [`Member`]'s `srsc`.
     pub fn take_src(
         &self,
         id: &WebRtcPublishId,
@@ -428,6 +440,11 @@ impl Member {
         self.0.borrow().room_id.clone()
     }
 
+    /// Create new [`WebRtcPlayEndpoint`] based on provided
+    /// [`WebRtcPlayEndpointSpec`].
+    ///
+    /// This function will add created [`WebRtcPlayEndpoint`] to src's
+    /// [`WebRtcPublishEndpoint`] and to provided [`Member`].
     pub fn create_sink(
         member: Rc<Self>,
         id: WebRtcPlayId,

@@ -185,17 +185,25 @@ impl ParticipantService {
         self.members.get(id).cloned()
     }
 
-    fn get_local_uri(&self, member_id: MemberId) -> LocalUri {
+    /// Generate [`LocalUri`] which point to some [`Member`] in this `Room`.
+    ///
+    /// __Note__ this function don't check presence of [`Member`] in this
+    /// `Room`.
+    fn get_local_uri_to_member(&self, member_id: MemberId) -> LocalUri {
         LocalUri::new(Some(self.room_id.clone()), Some(member_id), None)
     }
 
+    /// Lookup [`Member`] by [`MemberId`].
+    ///
+    /// Returns [`ParticipantServiceErr::ParticipantNotFound`] if member not
+    /// found.
     pub fn get_member(
         &self,
         id: &MemberId,
     ) -> Result<Rc<Member>, ParticipantServiceErr> {
         self.members.get(id).cloned().map_or(
             Err(ParticipantServiceErr::ParticipantNotFound(
-                self.get_local_uri(id.clone()),
+                self.get_local_uri_to_member(id.clone()),
             )),
             Ok,
         )
@@ -263,7 +271,7 @@ impl ParticipantService {
             None => {
                 return Box::new(wrap_future(future::err(
                     ParticipantServiceErr::ParticipantNotFound(
-                        self.get_local_uri(member_id),
+                        self.get_local_uri_to_member(member_id),
                     ),
                 )));
             }
@@ -406,6 +414,9 @@ impl ParticipantService {
         join_all(close_fut).map(|_| ())
     }
 
+    /// Delete [`Member`] from [`ParticipantService`], remove this user from
+    /// [`TurnAuthService`], close RPC connection with him and remove drop
+    /// connection task.
     pub fn delete_member(
         &mut self,
         member_id: &MemberId,
@@ -430,6 +441,13 @@ impl ParticipantService {
         }
     }
 
+    /// Create new [`Member`] in this [`ParticipantService`].
+    ///
+    /// This function will check that new [`Member`]'s ID is not present in
+    /// [`ParticipantService`].
+    ///
+    /// Returns [`ParticipantServiceErr::ParticipantAlreadyExists`] when
+    /// [`Member`]'s ID already presented in [`ParticipantService`].
     pub fn create_member(
         &mut self,
         id: MemberId,
@@ -437,7 +455,7 @@ impl ParticipantService {
     ) -> Result<(), ParticipantServiceErr> {
         if self.members.get(&id).is_some() {
             return Err(ParticipantServiceErr::ParticipantAlreadyExists(
-                self.get_local_uri(id),
+                self.get_local_uri_to_member(id),
             ));
         }
         let signalling_member = Rc::new(Member::new(
@@ -481,6 +499,13 @@ impl ParticipantService {
         Ok(())
     }
 
+    /// Create new [`WebRtcPlayEndpoint`] in specified [`Member`].
+    ///
+    /// This function will check that new [`WebRtcPlayEndpoint`]'s ID is not
+    /// present in [`ParticipantService`].
+    ///
+    /// Returns [`ParticipantServiceErr::EndpointAlreadyExists`] when
+    /// [`WebRtcPlayEndpoint`]'s ID already presented in [`Member`].
     pub fn create_sink_endpoint(
         &mut self,
         member_id: MemberId,
@@ -510,6 +535,13 @@ impl ParticipantService {
         Ok(())
     }
 
+    /// Create new [`WebRtcPlayEndpoint`] in specified [`Member`].
+    ///
+    /// This function will check that new [`WebRtcPublishEndpoint`]'s ID is not
+    /// present in [`ParticipantService`].
+    ///
+    /// Returns [`ParticipantServiceErr::EndpointAlreadyExists`] when
+    /// [`WebRtcPublishEndpoint`]'s ID already presented in [`Member`].
     pub fn create_src_endpoint(
         &mut self,
         member_id: MemberId,

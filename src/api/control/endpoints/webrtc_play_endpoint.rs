@@ -82,6 +82,7 @@ impl Into<ErrorProto> for &SrcParseError {
 }
 
 /// Special uri with pattern `local://{room_id}/{member_id}/{endpoint_id}`.
+/// This uri can pointing only to [`WebRtcPublishEndpoint`].
 #[derive(Clone, Debug)]
 pub struct SrcUri {
     /// ID of [`Room`]
@@ -93,6 +94,10 @@ pub struct SrcUri {
 }
 
 impl SrcUri {
+    /// Parse [`SrcUri`] from str.
+    ///
+    /// Returns [`SrcParseError::LocalUriParseError`] when some error happened
+    /// while parsing URI.
     pub fn parse(value: &str) -> Result<Self, SrcParseError> {
         let local_uri = LocalUri::parse(value).map_err(|e| {
             SrcParseError::LocalUriParseError(value.to_string(), e)

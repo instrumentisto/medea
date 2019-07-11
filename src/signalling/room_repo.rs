@@ -21,7 +21,8 @@ use crate::{
         room::{
             CloseRoom, CreateEndpoint, CreateMember, DeleteEndpoint,
             DeleteEndpointCheck, DeleteMember, DeleteMemberCheck, RoomError,
-            Serialize, SerializeEndpoint, SerializeMember,
+            SerializeProtobufEndpoint, SerializeProtobufMember,
+            SerializeProtobufRoom,
         },
         Room,
     },
@@ -370,7 +371,7 @@ impl Handler<GetRoom> for RoomsRepository {
         for room_id in msg.0 {
             if let Some(room) = self.rooms.lock().unwrap().get(&room_id) {
                 futs.push(
-                    room.send(Serialize)
+                    room.send(SerializeProtobufRoom)
                         .map_err(|e| RoomRepoError::from(e))
                         .map(move |result| {
                             result.map(|r| {
@@ -415,7 +416,7 @@ impl Handler<GetMember> for RoomsRepository {
         for (room_id, member_id) in msg.0 {
             if let Some(room) = self.rooms.lock().unwrap().get(&room_id) {
                 futs.push(
-                    room.send(SerializeMember(member_id.clone()))
+                    room.send(SerializeProtobufMember(member_id.clone()))
                         .map_err(|e| RoomRepoError::from(e))
                         .map(|result| {
                             result.map(|r| {
@@ -461,7 +462,7 @@ impl Handler<GetEndpoint> for RoomsRepository {
         for (room_id, member_id, endpoint_id) in msg.0 {
             if let Some(room) = self.rooms.lock().unwrap().get(&room_id) {
                 futs.push(
-                    room.send(SerializeEndpoint(
+                    room.send(SerializeProtobufEndpoint(
                         member_id.clone(),
                         endpoint_id.clone(),
                     ))

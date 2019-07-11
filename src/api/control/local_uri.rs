@@ -36,6 +36,9 @@ impl Into<ErrorProto> for &LocalUriParseError {
     }
 }
 
+/// Uri in format "local://room_id/member_id/endpoint_id"
+/// This kind of uri used for pointing to some element in spec (`Room`,
+/// `Member`, `WebRtcPlayEndpoint`, `WebRtcPublishEndpoint`, etc).
 #[derive(Debug)]
 pub struct LocalUri {
     /// ID of [`Room`]
@@ -47,6 +50,7 @@ pub struct LocalUri {
 }
 
 impl LocalUri {
+    /// Create new [`LocalUri`] with provided IDs.
     pub fn new(
         room_id: Option<RoomId>,
         member_id: Option<MemberId>,
@@ -59,6 +63,10 @@ impl LocalUri {
         }
     }
 
+    /// Parse [`LocalUri`] from str.
+    ///
+    /// Returns [`LocalUriParse::NotLocal`] when uri is not "local://"
+    /// Returns [`LocalUriParse::TooManyFields`] when uri have too many paths.
     pub fn parse(value: &str) -> Result<Self, LocalUriParseError> {
         let protocol_name: String = value.chars().take(8).collect();
         if protocol_name != "local://" {
@@ -99,18 +107,21 @@ impl LocalUri {
         })
     }
 
+    /// Return true if this [`LocalUri`] pointing to `Room` element.
     pub fn is_room_uri(&self) -> bool {
         self.room_id.is_some()
             && self.member_id.is_none()
             && self.endpoint_id.is_none()
     }
 
+    /// Return true if this [`LocalUri`] pointing to `Member` element.
     pub fn is_member_uri(&self) -> bool {
         self.room_id.is_some()
             && self.member_id.is_some()
             && self.endpoint_id.is_none()
     }
 
+    /// Return true if this [`LocalUri`] pointing to `Endpoint` element.
     pub fn is_endpoint_uri(&self) -> bool {
         self.room_id.is_some()
             && self.member_id.is_some()
