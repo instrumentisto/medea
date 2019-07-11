@@ -108,11 +108,8 @@ macro_rules! parse_local_uri {
             Ok(o) => o,
             Err(e) => {
                 let mut error_response = <$response>::new();
-                let mut error = Error::new();
-                error.set_status(400);
-                error.set_code(0);
-                error.set_text(format!("Invalid ID [id = {}]. {}", $uri, e));
-                error.set_element($uri.to_string());
+                let error: ErrorCode = e.into();
+                let error: Error = error.into();
                 error_response.set_error(error);
                 $ctx.spawn($sink.success(error_response).map_err(|_| ()));
                 return;
