@@ -6,6 +6,7 @@ use std::time::Duration;
 
 /// RPC connection settings.
 #[derive(Clone, Debug, Deserialize, Serialize, SmartDefault)]
+#[serde(default)]
 pub struct Rpc {
     /// Duration, after which remote RPC client will be considered idle if no
     /// heartbeat messages received. Defaults to `10s`.

@@ -1,6 +1,6 @@
 //! [`RpcConnection`] with related messages.
 
-use std::fmt;
+use core::fmt;
 
 use actix::Message;
 use futures::Future;
@@ -162,6 +162,7 @@ pub mod test {
                     peer_id,
                     sdp_offer,
                     tracks: _,
+                    ice_servers: _,
                 } => {
                     match sdp_offer {
                         Some(_) => self.room.do_send(CommandMessage::from(

@@ -1,10 +1,15 @@
 //! HTTP server for handling WebSocket connections of Client API.
 
 use actix_web::{
-    http, middleware, server, ws, App, AsyncResponder, FutureResponse,
-    HttpRequest, HttpResponse, Path, State,
+    middleware,
+    web::{resource, Data, Path, Payload},
+    App, HttpRequest, HttpResponse, HttpServer,
 };
-use futures::{future, Future as _};
+use actix_web_actors::ws;
+use futures::{
+    future::{self, Either},
+    Future,
+};
 use serde::Deserialize;
 
 use crate::{
@@ -34,29 +39,29 @@ struct RequestParams {
 /// Handles all HTTP requests, performs WebSocket handshake (upgrade) and starts
 /// new [`WsSession`] for WebSocket connection.
 fn ws_index(
-    (r, info, state): (
-        HttpRequest<Context>,
-        Path<RequestParams>,
-        State<Context>,
-    ),
-) -> FutureResponse<HttpResponse> {
+    request: HttpRequest,
+    info: Path<RequestParams>,
+    state: Data<Context>,
+    payload: Payload,
+) -> impl Future<Item = HttpResponse, Error = actix_web::Error> {
     debug!("Request params: {:?}", info);
 
     match state.rooms.get(info.room_id) {
-        Some(room) => room
-            .send(Authorize {
+        Some(room) => Either::A(
+            room.send(Authorize {
                 member_id: info.member_id,
                 credentials: info.credentials.clone(),
             })
             .from_err()
             .and_then(move |res| match res {
                 Ok(_) => ws::start(
-                    &r.drop_state(),
                     WsSession::new(
                         info.member_id,
                         room,
                         state.config.idle_timeout,
                     ),
+                    &request,
+                    payload,
                 ),
                 Err(AuthorizationError::MemberNotExists) => {
                     Ok(HttpResponse::NotFound().into())
@@ -64,9 +69,9 @@ fn ws_index(
                 Err(AuthorizationError::InvalidCredentials) => {
                     Ok(HttpResponse::Forbidden().into())
                 }
-            })
-            .responder(),
-        None => future::ok(HttpResponse::NotFound().into()).responder(),
+            }),
+        ),
+        None => Either::B(future::ok(HttpResponse::NotFound().into())),
     }
 }
 
@@ -81,17 +86,19 @@ pub struct Context {
 
 /// Starts HTTP server for handling WebSocket connections of Client API.
 pub fn run(rooms: RoomsRepository, config: Conf) {
-    let server_addr = config.server.get_bind_addr();
+    let server_addr = config.server.bind_addr();
 
-    server::new(move || {
-        App::with_state(Context {
-            rooms: rooms.clone(),
-            config: config.rpc.clone(),
-        })
-        .middleware(middleware::Logger::default())
-        .resource("/ws/{room_id}/{member_id}/{credentials}", |r| {
-            r.method(http::Method::GET).with(ws_index)
-        })
+    HttpServer::new(move || {
+        App::new()
+            .data(Context {
+                rooms: rooms.clone(),
+                config: config.rpc.clone(),
+            })
+            .wrap(middleware::Logger::default())
+            .service(
+                resource("/ws/{room_id}/{member_id}/{credentials}")
+                    .route(actix_web::web::get().to_async(ws_index)),
+            )
     })
     .bind(server_addr)
     .unwrap()
@@ -104,15 +111,17 @@ pub fn run(rooms: RoomsRepository, config: Conf) {
 mod test {
     use std::{ops::Add, thread, time::Duration};
 
-    use actix::Arbiter;
-    use actix_web::{http, test, App};
-    use futures::Stream;
+    use actix::Actor as _;
+    use actix_http::{ws::Message, HttpService};
+    use actix_http_test::{TestServer, TestServerRuntime};
+    use futures::{future::IntoFuture as _, sink::Sink as _, Stream as _};
 
     use crate::{
         api::control::Member,
-        conf::{Conf, Server},
+        conf::{Conf, Server, Turn},
         media::create_peers,
         signalling::Room,
+        turn::new_turn_auth_service_mock,
     };
 
     use super::*;
@@ -120,64 +129,97 @@ mod test {
     /// Creates [`RoomsRepository`] for tests filled with a single [`Room`].
     fn room(conf: Rpc) -> RoomsRepository {
         let members = hashmap! {
-            1 => Member{id: 1, credentials: "caller_credentials".into()},
-            2 => Member{id: 2, credentials: "responder_credentials".into()},
+            1 => Member{
+                id: 1,
+                credentials: "caller_credentials".into(),
+                ice_user: None
+            },
+            2 => Member{
+                id: 2,
+                credentials: "responder_credentials".into(),
+                ice_user: None
+            },
         };
-        let room = Arbiter::start(move |_| {
-            Room::new(1, members, create_peers(1, 2), conf.reconnect_timeout)
-        });
+        let room = Room::new(
+            1,
+            members,
+            create_peers(1, 2),
+            conf.reconnect_timeout,
+            new_turn_auth_service_mock(),
+        )
+        .start();
         let rooms = hashmap! {1 => room};
         RoomsRepository::new(rooms)
     }
 
     /// Creates test WebSocket server of Client API which can handle requests.
-    fn ws_server(conf: Conf) -> test::TestServer {
-        test::TestServer::with_factory(move || {
-            App::with_state(Context {
-                rooms: room(conf.rpc.clone()),
-                config: conf.rpc.clone(),
-            })
-            .resource("/ws/{room_id}/{member_id}/{credentials}", |r| {
-                r.method(http::Method::GET).with(ws_index)
-            })
+    fn ws_server(conf: Conf) -> TestServerRuntime {
+        TestServer::new(move || {
+            HttpService::new(
+                App::new()
+                    .data(Context {
+                        rooms: room(conf.rpc.clone()),
+                        config: conf.rpc.clone(),
+                    })
+                    .service(
+                        resource("/ws/{room_id}/{member_id}/{credentials}")
+                            .route(actix_web::web::get().to_async(ws_index)),
+                    ),
+            )
         })
     }
 
     #[test]
-    fn responses_with_pong() {
-        let mut server = ws_server(Conf::default());
-        let (read, mut write) =
-            server.ws_at("/ws/1/1/caller_credentials").unwrap();
-
-        write.text(r#"{"ping":33}"#);
-        let (item, _) = server.execute(read.into_future()).unwrap();
-        assert_eq!(Some(ws::Message::Text(r#"{"pong":33}"#.into())), item);
-    }
-
-    #[test]
-    fn disconnects_on_idle() {
+    fn ping_pong_and_disconnects_on_idle() {
         let conf = Conf {
             rpc: Rpc {
                 idle_timeout: Duration::new(2, 0),
                 reconnect_timeout: Default::default(),
             },
+            turn: Turn::default(),
             server: Server::default(),
         };
 
         let mut server = ws_server(conf.clone());
-        let (read, mut write) =
-            server.ws_at("/ws/1/1/caller_credentials").unwrap();
+        let socket = server.ws_at("/ws/1/1/caller_credentials").unwrap();
 
-        write.text(r#"{"ping":33}"#);
-        let (item, read) = server.execute(read.into_future()).unwrap();
-        assert_eq!(Some(ws::Message::Text(r#"{"pong":33}"#.into())), item);
+        server
+            .block_on(
+                socket
+                    .send(Message::Text(r#"{"ping": 33}"#.into()))
+                    .into_future()
+                    .map_err(|e| panic!("{:?}", e))
+                    .and_then(|socket| {
+                        socket
+                            .into_future()
+                            .map_err(|(e, _)| panic!("{:?}", e))
+                            .and_then(|(item, read)| {
+                                assert_eq!(
+                                    Some(ws::Frame::Text(Some(
+                                        r#"{"pong":33}"#.into()
+                                    ))),
+                                    item
+                                );
 
-        thread::sleep(conf.rpc.idle_timeout.add(Duration::from_secs(1)));
+                                thread::sleep(
+                                    conf.rpc
+                                        .idle_timeout
+                                        .add(Duration::from_secs(1)),
+                                );
 
-        let (item, _) = server.execute(read.into_future()).unwrap();
-        assert_eq!(
-            Some(ws::Message::Close(Some(ws::CloseCode::Normal.into()))),
-            item
-        );
+                                read.into_future()
+                                    .map_err(|(e, _)| panic!("{:?}", e))
+                                    .map(|(item, _)| {
+                                        assert_eq!(
+                                            Some(ws::Frame::Close(Some(
+                                                ws::CloseCode::Normal.into()
+                                            ))),
+                                            item
+                                        );
+                                    })
+                            })
+                    }),
+            )
+            .unwrap();
     }
 }

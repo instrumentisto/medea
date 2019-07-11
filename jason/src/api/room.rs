@@ -2,14 +2,15 @@
 
 use std::{
     cell::RefCell,
+    ops::DerefMut,
     rc::{Rc, Weak},
 };
 
 use futures::{
-    future::{Future, IntoFuture},
-    stream::Stream,
+    future::{Future as _, IntoFuture},
+    stream::Stream as _,
 };
-use medea_client_api_proto::{Event, IceCandidate, Track};
+use medea_client_api_proto::{EventHandler, IceCandidate, IceServer, Track};
 use wasm_bindgen::{prelude::*, JsValue};
 use wasm_bindgen_futures::spawn_local;
 use web_sys::console;
@@ -31,52 +32,20 @@ impl Room {
     /// Creates new [`Room`] associating it with provided [`RpcClient`].
     pub fn new(rpc: &Rc<RpcClient>) -> Self {
         let room = Rc::new(RefCell::new(InnerRoom::new(Rc::clone(&rpc))));
-
         let inner = Rc::downgrade(&room);
 
         let process_msg_task = rpc
             .subscribe()
-            .for_each(move |event| {
-                // TODO: macro for convenient dispatch
-                match inner.upgrade() {
-                    Some(inner) => {
-                        let mut inner = inner.borrow_mut();
-                        match event {
-                            Event::PeerCreated {
-                                peer_id,
-                                sdp_offer,
-                                tracks,
-                            } => {
-                                inner.on_peer_created(
-                                    peer_id, &sdp_offer, &tracks,
-                                );
-                            }
-                            Event::SdpAnswerMade {
-                                peer_id,
-                                sdp_answer,
-                            } => {
-                                inner.on_sdp_answer(peer_id, &sdp_answer);
-                            }
-                            Event::IceCandidateDiscovered {
-                                peer_id,
-                                candidate,
-                            } => {
-                                inner.on_ice_candidate_discovered(
-                                    peer_id, &candidate,
-                                );
-                            }
-                            Event::PeersRemoved { peer_ids } => {
-                                inner.on_peers_removed(&peer_ids);
-                            }
-                        };
-                        Ok(())
-                    }
-                    None => {
-                        // InnerSession is gone, which means that Room was
-                        // dropped. Not supposed to happen, since InnerSession
-                        // should drop its tx by unsubbing from RpcClient.
-                        Err(())
-                    }
+            .for_each(move |event| match inner.upgrade() {
+                Some(inner) => {
+                    event.dispatch_with(inner.borrow_mut().deref_mut());
+                    Ok(())
+                }
+                None => {
+                    // InnerSession is gone, which means that Room was
+                    // dropped. Not supposed to happen, since InnerSession
+                    // should drop its tx by unsubbing from RpcClient.
+                    Err(())
                 }
             })
             .into_future()
@@ -108,35 +77,34 @@ impl InnerRoom {
     fn new(rpc: Rc<RpcClient>) -> Self {
         Self { rpc }
     }
+}
 
+impl EventHandler for InnerRoom {
     /// Creates RTCPeerConnection with provided ID.
     fn on_peer_created(
         &mut self,
-        _peer_id: u64,
-        _sdp_offer: &Option<String>,
-        _tracks: &[Track],
+        _: u64,
+        _: Option<String>,
+        _: Vec<Track>,
+        _: Vec<IceServer>,
     ) {
         console::log_1(&JsValue::from_str("on_peer_created invoked"));
     }
 
     /// Applies specified SDP Answer to specified RTCPeerConnection.
-    fn on_sdp_answer(&mut self, _peer_id: u64, _sdp_answer: &str) {
+    fn on_sdp_answer_made(&mut self, _: u64, _: String) {
         console::log_1(&JsValue::from_str("on_sdp_answer invoked"));
     }
 
     /// Applies specified ICE Candidate to specified RTCPeerConnection.
-    fn on_ice_candidate_discovered(
-        &mut self,
-        _peer_id: u64,
-        _candidate: &IceCandidate,
-    ) {
+    fn on_ice_candidate_discovered(&mut self, _: u64, _: IceCandidate) {
         console::log_1(&JsValue::from_str(
             "on_ice_candidate_discovered invoked",
         ));
     }
 
     /// Disposes specified RTCPeerConnection's.
-    fn on_peers_removed(&mut self, _peer_ids: &[u64]) {
+    fn on_peers_removed(&mut self, _: Vec<u64>) {
         console::log_1(&JsValue::from_str("on_peers_removed invoked"));
     }
 }

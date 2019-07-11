@@ -1,8 +1,9 @@
+use medea_macro::dispatchable;
 use serde::{de::Deserializer, ser::Serializer, Deserialize, Serialize};
 
 // TODO: should be properly shared between medea and jason
-#[cfg_attr(test, derive(PartialEq, Debug))]
 #[allow(dead_code)]
+#[cfg_attr(test, derive(Debug, PartialEq))]
 /// Message sent by `Media Server` to `Client`.
 pub enum ServerMsg {
     /// `pong` message that server answers with to WebSocket client in response
@@ -13,8 +14,8 @@ pub enum ServerMsg {
     Event(Event),
 }
 
-#[cfg_attr(test, derive(PartialEq, Debug))]
 #[allow(dead_code)]
+#[cfg_attr(test, derive(Debug, PartialEq))]
 /// Message from 'Client' to 'Media Server'.
 pub enum ClientMsg {
     /// `ping` message that WebSocket client is expected to send to the server
@@ -25,11 +26,11 @@ pub enum ClientMsg {
 }
 
 /// WebSocket message from Web Client to Media Server.
-#[cfg_attr(test, derive(PartialEq, Debug))]
+#[allow(dead_code)]
 #[cfg_attr(feature = "medea", derive(Deserialize))]
 #[cfg_attr(feature = "jason", derive(Serialize))]
+#[cfg_attr(test, derive(Debug, PartialEq))]
 #[serde(tag = "command", content = "data")]
-#[allow(dead_code)]
 pub enum Command {
     /// Web Client sends SDP Offer.
     MakeSdpOffer { peer_id: u64, sdp_offer: String },
@@ -43,11 +44,12 @@ pub enum Command {
 }
 
 /// WebSocket message from Medea to Jason.
+#[allow(dead_code)]
+#[dispatchable]
 #[cfg_attr(feature = "medea", derive(Serialize))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
-#[cfg_attr(test, derive(PartialEq, Debug))]
+#[cfg_attr(test, derive(Debug, PartialEq))]
 #[serde(tag = "event", content = "data")]
-#[allow(dead_code)]
 pub enum Event {
     /// Media Server notifies Web Client about necessity of RTCPeerConnection
     /// creation.
@@ -55,6 +57,7 @@ pub enum Event {
         peer_id: u64,
         sdp_offer: Option<String>,
         tracks: Vec<Track>,
+        ice_servers: Vec<IceServer>,
     },
     /// Media Server notifies Web Client about necessity to apply specified SDP
     /// Answer to Web Client's RTCPeerConnection.
@@ -73,27 +76,44 @@ pub enum Event {
 }
 
 /// Represents [`RtcIceCandidateInit`] object.
-#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct IceCandidate {
     pub candidate: String,
     pub sdp_m_line_index: Option<u16>,
     pub sdp_mid: Option<String>,
 }
 
-/// [`Track] with specified direction.
+/// [`Track`] with specified direction.
 #[cfg_attr(feature = "medea", derive(Serialize))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
-#[cfg_attr(test, derive(PartialEq, Debug))]
+#[cfg_attr(test, derive(Debug, PartialEq))]
 pub struct Track {
     pub id: u64,
     pub direction: Direction,
     pub media_type: MediaType,
 }
 
+/// Representation of [RTCIceServer][1] (item of `iceServers` field
+/// from [RTCConfiguration][2]).
+///
+/// [1]: https://developer.mozilla.org/en-US/docs/Web/API/RTCIceServer
+/// [2]: https://developer.mozilla.org/en-US/docs/Web/API/RTCConfiguration
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "medea", derive(Serialize))]
+#[cfg_attr(feature = "jason", derive(Deserialize))]
+#[cfg_attr(test, derive(PartialEq))]
+pub struct IceServer {
+    pub urls: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub username: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub credential: Option<String>,
+}
+
 /// Direction of [`Track`].
 #[cfg_attr(feature = "medea", derive(Serialize))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
-#[cfg_attr(test, derive(PartialEq, Debug))]
+#[cfg_attr(test, derive(Debug, PartialEq))]
 pub enum Direction {
     Send { receivers: Vec<u64> },
     Recv { sender: u64 },

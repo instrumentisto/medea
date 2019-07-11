@@ -2,5 +2,7 @@
 /*.iml
 .DS_Store
 
+/.cache/
+
 /target/
 **/*.rs.bk

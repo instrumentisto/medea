@@ -1,15 +1,21 @@
 //! Participant is [`Member`] with [`RpcConnection`]. [`ParticipantService`]
 //! stores [`Members`] and associated [`RpcConnection`]s, handles
-//! [`RpcConnection`] authorization, establishment, message sending.
+//! [`RpcConnection`] authorization, establishment, message sending, Turn
+//! credentials management.
 
 use std::time::{Duration, Instant};
 
-use actix::{fut::wrap_future, AsyncContext, Context, SpawnHandle};
+use actix::{
+    fut::wrap_future, ActorFuture, AsyncContext, Context, MailboxError,
+    SpawnHandle,
+};
+use failure::Fail;
 use futures::{
     future::{self, join_all, Either},
     Future,
 };
 use hashbrown::HashMap;
+
 use medea_client_api_proto::Event;
 
 use crate::{
@@ -21,19 +27,51 @@ use crate::{
         control::{Member, MemberId},
     },
     log::prelude::*,
+    media::IceUser,
     signalling::{
-        room::{CloseRoom, RoomError},
-        Room,
+        room::{ActFuture, CloseRoom, RoomError},
+        Room, RoomId,
     },
+    turn::{TurnAuthService, TurnServiceErr, UnreachablePolicy},
 };
+
+#[derive(Fail, Debug)]
+#[allow(clippy::module_name_repetitions)]
+pub enum ParticipantServiceErr {
+    #[fail(display = "TurnService Error in ParticipantService: {}", _0)]
+    TurnServiceErr(TurnServiceErr),
+    #[fail(
+        display = "Mailbox error when accessing ParticipantService: {}",
+        _0
+    )]
+    MailBoxErr(MailboxError),
+}
+
+impl From<TurnServiceErr> for ParticipantServiceErr {
+    fn from(err: TurnServiceErr) -> Self {
+        ParticipantServiceErr::TurnServiceErr(err)
+    }
+}
+
+impl From<MailboxError> for ParticipantServiceErr {
+    fn from(err: MailboxError) -> Self {
+        ParticipantServiceErr::MailBoxErr(err)
+    }
+}
 
 /// Participant is [`Member`] with [`RpcConnection`]. [`ParticipantService`]
 /// stores [`Members`] and associated [`RpcConnection`]s, handles
 /// [`RpcConnection`] authorization, establishment, message sending.
 #[derive(Debug)]
 pub struct ParticipantService {
+    /// [`Room`]s id from which this [`ParticipantService`] was created.
+    room_id: RoomId,
+
     /// [`Member`]s which currently are present in this [`Room`].
     members: HashMap<MemberId, Member>,
+
+    /// Service for managing authorization on Turn server.
+    turn: Box<dyn TurnAuthService>,
 
     /// Established [`RpcConnection`]s of [`Member`]s in this [`Room`].
     // TODO: Replace Box<dyn RpcConnection>> with enum,
@@ -52,11 +90,15 @@ pub struct ParticipantService {
 
 impl ParticipantService {
     pub fn new(
+        room_id: RoomId,
         members: HashMap<MemberId, Member>,
+        turn: Box<dyn TurnAuthService>,
         reconnect_timeout: Duration,
     ) -> Self {
         Self {
+            room_id,
             members,
+            turn,
             connections: HashMap::new(),
             reconnect_timeout,
             drop_connection_tasks: HashMap::new(),
@@ -84,6 +126,18 @@ impl ParticipantService {
         }
     }
 
+    pub fn get_member(&self, member_id: MemberId) -> Option<&Member> {
+        self.members.get(&member_id)
+    }
+
+    pub fn take_member(&mut self, member_id: MemberId) -> Option<Member> {
+        self.members.remove(&member_id)
+    }
+
+    pub fn insert_member(&mut self, member: Member) {
+        self.members.insert(member.id, member);
+    }
+
     /// Checks if [`Member`] has **active** [`RcpConnection`].
     pub fn member_has_connection(&self, member_id: MemberId) -> bool {
         self.connections.contains_key(&member_id)
@@ -107,12 +161,60 @@ impl ParticipantService {
         }
     }
 
+    /// Saves provided [`RpcConnection`], registers [`ICEUser`].
+    /// If [`Member`] already has any other [`RpcConnection`],
+    /// then it will be closed.
+    pub fn connection_established(
+        &mut self,
+        ctx: &mut Context<Room>,
+        member_id: MemberId,
+        con: Box<dyn RpcConnection>,
+    ) -> ActFuture<(), ParticipantServiceErr> {
+        // lookup previous member connection
+        if let Some(mut connection) = self.connections.remove(&member_id) {
+            debug!("Closing old RpcConnection for member {}", member_id);
+
+            // cancel RpcConnection close task, since connection is
+            // reestablished
+            if let Some(handler) = self.drop_connection_tasks.remove(&member_id)
+            {
+                ctx.cancel_future(handler);
+            }
+            Box::new(wrap_future(connection.close().then(|_| Ok(()))))
+        } else {
+            Box::new(
+                wrap_future(self.turn.create(
+                    member_id,
+                    self.room_id,
+                    UnreachablePolicy::ReturnErr,
+                ))
+                .map_err(|err, _: &mut Room, _| {
+                    ParticipantServiceErr::from(err)
+                })
+                .and_then(
+                    move |ice: IceUser, room: &mut Room, _| {
+                        if let Some(mut member) =
+                            room.participants.take_member(member_id)
+                        {
+                            member.ice_user.replace(ice);
+                            room.participants.insert_member(member);
+                            room.participants
+                                .connections
+                                .insert(member_id, con);
+                        };
+                        wrap_future(future::ok(()))
+                    },
+                ),
+            )
+        }
+    }
+
     /// If [`ClosedReason::Closed`], then removes [`RpcConnection`] associated
     /// with specified user [`Member`] from the storage and closes the room.
     /// If [`ClosedReason::Lost`], then creates delayed task that emits
     /// [`ClosedReason::Closed`].
     // TODO: Dont close the room. It is being closed atm, because we have
-    //      no way to handle absence of RtcPeerConnection when.
+    //      no way to handle absence of RtcPeerConnection.
     pub fn connection_closed(
         &mut self,
         ctx: &mut Context<Room>,
@@ -123,6 +225,11 @@ impl ParticipantService {
         match reason {
             ClosedReason::Closed => {
                 self.connections.remove(&member_id);
+                ctx.spawn(wrap_future(
+                    self.delete_ice_user(member_id).map_err(|err| {
+                        error!("Error deleting IceUser {:?}", err)
+                    }),
+                ));
                 ctx.notify(CloseRoom {})
             }
             ClosedReason::Lost => {
@@ -144,47 +251,58 @@ impl ParticipantService {
         }
     }
 
-    /// Stores provided [`RpcConnection`] for given [`Member`] in the [`Room`].
-    /// If [`Member`] already has any other [`RpcConnection`],
-    /// then it will be closed.
-    pub fn connection_established(
+    /// Deletes [`IceUser`] associated with provided [`Member`].
+    fn delete_ice_user(
         &mut self,
-        ctx: &mut Context<Room>,
         member_id: MemberId,
-        con: Box<dyn RpcConnection>,
-    ) {
-        // lookup previous member connection
-        if let Some(mut connection) = self.connections.remove(&member_id) {
-            debug!("Closing old RpcConnection for member {}", member_id);
+    ) -> Box<dyn Future<Item = (), Error = TurnServiceErr>> {
+        match self.members.remove(&member_id) {
+            Some(mut member) => {
+                let delete_fut = match member.ice_user.take() {
+                    Some(ice_user) => self.turn.delete(vec![ice_user]),
+                    None => Box::new(future::ok(())),
+                };
+                self.members.insert(member_id, member);
 
-            // cancel RpcConnection close task, since connection is
-            // reestablished
-            if let Some(handler) = self.drop_connection_tasks.remove(&member_id)
-            {
-                ctx.cancel_future(handler);
+                delete_fut
             }
-            ctx.spawn(wrap_future(connection.close()));
-        } else {
-            self.connections.insert(member_id, con);
+            None => Box::new(future::ok(())),
         }
     }
 
-    /// Cancels all connection close tasks, closes all [`RpcConnection`]s.
+    /// Cancels all connection close tasks, closes all [`RpcConnection`]s,
     pub fn drop_connections(
         &mut self,
         ctx: &mut Context<Room>,
     ) -> impl Future<Item = (), Error = ()> {
+        // canceling all drop_connection_tasks
         self.drop_connection_tasks.drain().for_each(|(_, handle)| {
             ctx.cancel_future(handle);
         });
 
-        let close_fut = self.connections.drain().fold(
+        // closing all RpcConnection's
+        let mut close_fut = self.connections.drain().fold(
             vec![],
             |mut futures, (_, mut connection)| {
                 futures.push(connection.close());
                 futures
             },
         );
+
+        // deleting all IceUsers
+        let remove_ice_users = Box::new({
+            let mut room_users = Vec::with_capacity(self.members.len());
+
+            self.members.iter_mut().for_each(|(_, data)| {
+                if let Some(ice_user) = data.ice_user.take() {
+                    room_users.push(ice_user);
+                }
+            });
+            self.turn
+                .delete(room_users)
+                .map_err(|err| error!("Error removing IceUsers {:?}", err))
+        });
+        close_fut.push(remove_ice_users);
 
         join_all(close_fut).map(|_| ())
     }

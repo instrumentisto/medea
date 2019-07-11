@@ -1,6 +1,76 @@
 [server]
+# IP address to bind HTTP server to.
+#
+# Default:
+#   bind_ip = "0.0.0.0"
+
+# Port to bind HTTP server to.
+#
+# Default:
+#   bind_port = 8080
+
+
+
+
+[rpc]
 # Duration, after which remote RPC client will be considered idle if no
 # heartbeat messages received.
 #
 # Default:
 #   idle_timeout = "10s"
+
+# Duration, after which the server deletes the client session if
+# the remote RPC client does not reconnect after it is idle.
+#
+# Default:
+#   reconnect_timeout = "10s"
+
+
+
+
+[turn]
+# Turn server IP address.
+#
+# Default:
+#   ip = "127.0.0.1"
+
+# Turn server port.
+#
+# Default:
+#   port = 3478
+
+# Static user on Turn server.
+#
+# Default:
+#   user = "USER"
+
+# Static user password on Turn server.
+#
+# Default:
+#   pass = "PASS"
+
+[turn.db.redis]
+# Host of Coturn's Redis database.
+#
+# Default:
+#   host = "127.0.0.1"
+
+# Port of Coturn's Redis database for client connections.
+#
+# Default:
+#   port = 6379
+
+# Password to connect to Coturn's Redis database with.
+#
+# Default:
+#   pass = "turn"
+
+# Number of Coturn's database in Redis.
+#
+# Default:
+#   db_number = 0
+
+# Timeout for establishing connection with Coturn's Redis database.
+#
+# Default:
+#   connection_timeout = "5s"
