@@ -65,10 +65,6 @@ impl WebRtcPlayEndpointInner {
         Weak::upgrade(&self.src).unwrap()
     }
 
-    fn is_connected(&self) -> bool {
-        self.peer_id.is_some()
-    }
-
     fn set_peer_id(&mut self, peer_id: PeerId) {
         self.peer_id = Some(peer_id)
     }
@@ -135,11 +131,6 @@ impl WebRtcPlayEndpoint {
     /// __This function will panic if pointer is empty.__
     pub fn src(&self) -> Rc<WebRtcPublishEndpoint> {
         self.0.borrow().src()
-    }
-
-    /// Check that peer connection established for this [`WebRtcPlayEndpoint`].
-    pub fn is_connected(&self) -> bool {
-        self.0.borrow().is_connected()
     }
 
     /// Save [`PeerId`] of this [`WebRtcPlayEndpoint`].

@@ -369,14 +369,15 @@ impl Room {
         let mut created_peers: Vec<(PeerId, PeerId)> = Vec::new();
 
         // Create all connected publish endpoints.
-        for (_, publish) in member.srcs() {
-            for receiver in publish.sinks() {
+        for (_, publisher) in member.srcs() {
+            for receiver in publisher.sinks() {
                 let receiver_owner = receiver.owner();
 
-                if self.members.member_has_connection(&receiver_owner.id())
-                    && !receiver.is_connected()
+                if receiver.peer_id().is_none()
+                    && self.members.member_has_connection(&receiver_owner.id())
                 {
-                    if let Some(p) = self.connect_endpoints(&publish, &receiver)
+                    if let Some(p) =
+                        self.connect_endpoints(&publisher, &receiver)
                     {
                         created_peers.push(p)
                     }
@@ -385,17 +386,13 @@ impl Room {
         }
 
         // Create all connected play's receivers peers.
-        for (_, play) in member.sinks() {
-            let plays_publisher = play.src();
-            let plays_publisher_owner = plays_publisher.owner();
+        for (_, receiver) in member.sinks() {
+            let publisher = receiver.src();
 
-            if self
-                .members
-                .member_has_connection(&plays_publisher_owner.id())
-                && !play.is_connected()
+            if receiver.peer_id().is_none()
+                && self.members.member_has_connection(&publisher.owner().id())
             {
-                if let Some(p) = self.connect_endpoints(&plays_publisher, &play)
-                {
+                if let Some(p) = self.connect_endpoints(&publisher, &receiver) {
                     created_peers.push(p);
                 }
             }
@@ -573,17 +570,15 @@ impl Handler<RpcConnectionEstablished> for Room {
         msg: RpcConnectionEstablished,
         ctx: &mut Self::Context,
     ) -> Self::Result {
-        info!("RpcConnectionEstablished for member {}", msg.member_id);
-
-        let member_id = msg.member_id;
+        info!("RpcConnectionEstablished for member {}", &msg.member_id);
 
         let fut = self
             .members
-            .connection_established(ctx, member_id.clone(), msg.connection)
+            .connection_established(ctx, msg.member_id, msg.connection)
             .map_err(|err, _, _| {
                 error!("RpcConnectionEstablished error {:?}", err)
             })
-            .map(move |member, room, ctx| {
+            .map(|member, room, ctx| {
                 room.init_member_connections(&member, ctx);
             });
         Box::new(fut)
@@ -628,6 +623,6 @@ impl Handler<RpcConnectionClosed> for Room {
         }
 
         self.members
-            .connection_closed(ctx, msg.member_id, &msg.reason);
+            .connection_closed(msg.member_id, &msg.reason, ctx);
     }
 }

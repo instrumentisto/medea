@@ -228,9 +228,9 @@ impl ParticipantService {
     //      no way to handle absence of RpcConnection.
     pub fn connection_closed(
         &mut self,
-        ctx: &mut Context<Room>,
         member_id: MemberId,
         reason: &ClosedReason,
+        ctx: &mut Context<Room>,
     ) {
         let closed_at = Instant::now();
         match reason {
