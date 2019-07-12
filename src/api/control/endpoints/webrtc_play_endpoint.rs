@@ -19,7 +19,7 @@ use crate::api::{
 };
 
 macro_attr! {
-    /// ID of [`Room`].
+    /// ID of [`WebRtcPlayEndpoint`].
     #[derive(
         Clone,
         Debug,

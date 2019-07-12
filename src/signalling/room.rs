@@ -506,6 +506,7 @@ impl Into<ElementProto> for &mut Room {
     }
 }
 
+/// Serialize this [`Room`] to protobuf object.
 #[derive(Message)]
 #[rtype(result = "Result<ElementProto, RoomError>")]
 pub struct SerializeProtobufRoom;
@@ -523,6 +524,7 @@ impl Handler<SerializeProtobufRoom> for Room {
     }
 }
 
+/// Serialize [`Member`] from this [`Room`] to protobuf object.
 #[derive(Message)]
 #[rtype(result = "Result<ElementProto, RoomError>")]
 pub struct SerializeProtobufMember(pub MemberId);
@@ -548,6 +550,7 @@ impl Handler<SerializeProtobufMember> for Room {
     }
 }
 
+/// Serialize endpoint from this [`Room`] to protobuf object.
 #[derive(Message)]
 #[rtype(result = "Result<ElementProto, RoomError>")]
 pub struct SerializeProtobufEndpoint(pub MemberId, pub String);
@@ -761,6 +764,7 @@ impl Handler<RpcConnectionClosed> for Room {
     }
 }
 
+/// Signal for delete [`Member`] from this [`Room`]
 #[derive(Debug, Message, Clone)]
 #[rtype(result = "()")]
 pub struct DeleteMember(pub MemberId);
@@ -795,6 +799,7 @@ impl Handler<DeleteMember> for Room {
     }
 }
 
+/// Signal for delete endpoint from this [`Room`]
 #[derive(Debug, Message, Clone)]
 #[rtype(result = "()")]
 pub struct DeleteEndpoint {

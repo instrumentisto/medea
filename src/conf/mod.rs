@@ -36,6 +36,7 @@ pub struct Conf {
     /// TURN server settings.
     pub turn: Turn,
 
+    /// gRPC server settings.
     pub grpc: Grpc,
 }
 

@@ -1,4 +1,5 @@
 //! RPC connection settings.
+
 use serde::{Deserialize, Serialize};
 use smart_default::SmartDefault;
 

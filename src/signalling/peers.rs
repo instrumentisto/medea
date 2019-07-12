@@ -175,6 +175,8 @@ impl PeerRepository {
 
     /// Delete [`PeerStateMachine`]s from this [`PeerRepository`] and send
     /// [`PeersRemoved`] to [`Member`]s.
+    ///
+    /// __Note:__ this also delete partner peers.
     pub fn remove_peers(
         &mut self,
         member_id: MemberId,
@@ -207,6 +209,10 @@ impl PeerRepository {
         }
     }
 
+    /// Delete [`PeerStateMachine`] from this [`PeerRepository`] and send
+    /// [`PeersRemoved`] to [`Member`]s.
+    ///
+    /// __Note:__ this also delete partner peer.
     pub fn remove_peer(
         &mut self,
         member_id: MemberId,

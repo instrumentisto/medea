@@ -10,8 +10,11 @@ use super::{MemberId, RoomId};
 
 #[derive(Debug, Fail)]
 pub enum LocalUriParseError {
+    /// Protocol of provided URI is not "local://".
     #[fail(display = "Provided URIs protocol is not 'local://'.")]
     NotLocal(String),
+
+    /// Too many paths in provided URI.
     #[fail(display = "Too many ({}) paths in provided URI.", _0)]
     TooManyFields(usize, String),
 }

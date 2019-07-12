@@ -187,6 +187,7 @@ impl ParticipantService {
         )
     }
 
+    /// Returns all [`Member`] from this [`ParticipantService`].
     pub fn members(&self) -> HashMap<MemberId, Rc<Member>> {
         self.members.clone()
     }

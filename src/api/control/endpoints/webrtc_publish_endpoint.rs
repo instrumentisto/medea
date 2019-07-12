@@ -15,7 +15,7 @@ use crate::api::control::{
 };
 
 macro_attr! {
-    /// ID of [`Room`].
+    /// ID of [`WebRtcPublishEndpoint`].
     #[derive(
         Clone,
         Debug,

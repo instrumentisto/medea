@@ -23,6 +23,7 @@ use self::{
     pipeline::Pipeline,
 };
 
+#[doc(inline)]
 pub use self::{
     endpoints::{
         webrtc_play_endpoint::WebRtcPlayId,

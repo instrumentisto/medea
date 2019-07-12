@@ -109,6 +109,10 @@ impl Actor for RoomsRepository {
     type Context = Context<Self>;
 }
 
+/// Returns [`LocalUri`] pointing to [`Room`].
+///
+/// __Note__ this function don't check presence of [`Room`] in this
+/// [`RoomsRepository`].
 fn get_local_uri_to_room(room_id: RoomId) -> LocalUri {
     LocalUri::new(Some(room_id), None, None)
 }
@@ -149,6 +153,7 @@ impl Handler<StartRoom> for RoomsRepository {
     }
 }
 
+/// Signal for delete [`Room`].
 #[derive(Message)]
 #[rtype(result = "Result<(), RoomRepoError>")]
 pub struct DeleteRoom(pub RoomId);
@@ -171,6 +176,7 @@ impl Handler<DeleteRoom> for RoomsRepository {
     }
 }
 
+/// Signal for delete [`Member`] from [`Room`].
 #[derive(Message)]
 #[rtype(result = "Result<(), RoomRepoError>")]
 pub struct DeleteMemberFromRoom {
@@ -198,6 +204,7 @@ impl Handler<DeleteMemberFromRoom> for RoomsRepository {
     }
 }
 
+/// Signal for delete [`Endpoint`] from [`Member`].
 #[derive(Message)]
 #[rtype(result = "Result<(), RoomRepoError>")]
 pub struct DeleteEndpointFromMember {
@@ -225,6 +232,7 @@ impl Handler<DeleteEndpointFromMember> for RoomsRepository {
     }
 }
 
+/// Signal for get serialized to protobuf object [`Room`].
 #[derive(Message)]
 #[rtype(result = "Result<Vec<Result<(String, ElementProto), RoomError>>, \
                   RoomRepoError>")]
@@ -270,6 +278,7 @@ impl Handler<GetRoom> for RoomsRepository {
     }
 }
 
+/// Signal for get serialized to protobuf object [`Member`].
 #[derive(Message)]
 #[rtype(result = "Result<Vec<Result<(String, ElementProto), RoomError>>, \
                   RoomRepoError>")]
@@ -316,6 +325,7 @@ impl Handler<GetMember> for RoomsRepository {
     }
 }
 
+/// Signal for get serialized to protobuf object `Endpoint`.
 #[derive(Message)]
 #[rtype(result = "Result<Vec<Result<(String, ElementProto), RoomError>>, \
                   RoomRepoError>")]
@@ -364,6 +374,7 @@ impl Handler<GetEndpoint> for RoomsRepository {
     }
 }
 
+/// Signal for create new [`Member`] in [`Room`]
 #[derive(Message)]
 #[rtype(result = "Result<Result<(), RoomError>, RoomRepoError>")]
 pub struct CreateMemberInRoom {
@@ -396,6 +407,7 @@ impl Handler<CreateMemberInRoom> for RoomsRepository {
     }
 }
 
+/// Signal for create new [`Endpoint`] in [`Room`]
 #[derive(Message)]
 #[rtype(result = "Result<Result<(), RoomError>, RoomRepoError>")]
 pub struct CreateEndpointInRoom {

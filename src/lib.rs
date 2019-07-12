@@ -22,6 +22,7 @@ use crate::{
     turn::{service, TurnAuthService},
 };
 
+/// Global app context.
 #[derive(Debug)]
 pub struct App {
     pub config: Conf,

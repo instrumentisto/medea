@@ -1,8 +1,11 @@
+//! gRPC server settings.
+
 use std::net::{IpAddr, Ipv4Addr};
 
 use serde::{Deserialize, Serialize};
 use smart_default::SmartDefault;
 
+/// gRPC server settings.
 #[derive(Clone, Debug, Deserialize, Serialize, SmartDefault)]
 #[serde(default)]
 pub struct Grpc {

@@ -19,7 +19,7 @@ use crate::api::control::{
 use super::{pipeline::Pipeline, Element, TryFromElementError};
 
 macro_attr! {
-    /// ID of [`Room`].
+    /// ID of [`Member`].
     #[derive(
         Clone,
         Debug,

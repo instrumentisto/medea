@@ -1,3 +1,5 @@
+//! Endpoint elements of medea spec.
+
 pub mod webrtc_play_endpoint;
 pub mod webrtc_publish_endpoint;
 

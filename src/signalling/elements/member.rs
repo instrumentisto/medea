@@ -38,12 +38,14 @@ pub enum MembersLoadError {
     #[fail(display = "Member [id = {}] not found.", _0)]
     MemberNotFound(LocalUri),
 
+    /// [`WebRtcPlayEndpoint`] not found.
     #[fail(
         display = "Play endpoint [id = {}] not found while loading spec,",
         _0
     )]
     PlayEndpointNotFound(LocalUri),
 
+    /// [`WebRtcPublishEndpoint`] not found.
     #[fail(
         display = "Publish endpoint [id = {}] not found while loading spec.",
         _0
@@ -370,7 +372,7 @@ impl Member {
         self.0.borrow_mut().srcs.insert(endpoint.id(), endpoint);
     }
 
-    /// Lookup [`WebRtcPublishEndpoint`] source endpoint by [`EndpointId`].
+    /// Lookup [`WebRtcPublishEndpoint`] source endpoint by [`WebRtcPublishId`].
     pub fn get_src_by_id(
         &self,
         id: &WebRtcPublishId,
@@ -378,6 +380,10 @@ impl Member {
         self.0.borrow().srcs.get(id).cloned()
     }
 
+    /// Lookup [`WebRtcPublishEndpoint`] source endpoint by [`WebRtcPublishId`].
+    ///
+    /// Returns [`MeberError::PublishEndpointNotFound`] when
+    /// [`WebRtcPublishEndpoint`] not found.
     pub fn get_src(
         &self,
         id: &WebRtcPublishId,
@@ -479,7 +485,6 @@ impl Member {
 pub fn parse_members(
     room_spec: &RoomSpec,
 ) -> Result<HashMap<MemberId, Rc<Member>>, MembersLoadError> {
-    // TODO: maybe improve error?
     let members_spec = match room_spec.members() {
         Ok(o) => o,
         Err(e) => {
