@@ -46,7 +46,7 @@ use crate::{
             member::MemberError,
             parse_members, Member, MembersLoadError,
         },
-        room::{ActFuture, RoomError},
+        room::{ActFuture, DeleteEndpoint, RoomError},
         Room,
     },
     turn::{TurnAuthService, TurnServiceErr, UnreachablePolicy},
@@ -409,6 +409,7 @@ impl ParticipantService {
         }
 
         if let Some(member) = self.members.remove(member_id) {
+            for (id, sink) in member.sinks() {}
             if let Some(ice_user) = member.take_ice_user() {
                 let delete_ice_user_fut = self
                     .turn

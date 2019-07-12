@@ -173,22 +173,6 @@ impl PeerRepository {
         }
     }
 
-    /// Delete [`PeerStateMachine`] from this [`PeerRepository`] and send
-    /// [`PeersRemoved`] to [`Member`].
-    pub fn remove_peer(
-        &mut self,
-        member_id: MemberId,
-        peer_id: PeerId,
-        ctx: &mut Context<Room>,
-    ) {
-        if let Some(_) = self.peers.remove(&peer_id) {
-            ctx.notify(PeersRemoved {
-                member_id,
-                peers_id: vec![peer_id],
-            })
-        }
-    }
-
     /// Delete [`PeerStateMachine`]s from this [`PeerRepository`] and send
     /// [`PeersRemoved`] to [`Member`]s.
     pub fn remove_peers(
@@ -197,17 +181,41 @@ impl PeerRepository {
         peer_ids: HashSet<PeerId>,
         ctx: &mut Context<Room>,
     ) {
-        let mut removed_peer_ids = Vec::new();
+        let mut removed_peers = HashMap::new();
         for peer_id in peer_ids {
-            if let Some(_) = self.peers.remove(&peer_id) {
-                removed_peer_ids.push(peer_id);
+            if let Some(peer) = self.peers.remove(&peer_id) {
+                let partner_peer_id = peer.partner_peer_id();
+                let partner_member_id = peer.partner_member_id();
+                if let Some(peer) = self.peers.remove(&partner_peer_id) {
+                    removed_peers
+                        .entry(partner_member_id)
+                        .or_insert(Vec::new())
+                        .push(partner_peer_id);
+                }
+                removed_peers
+                    .entry(member_id.clone())
+                    .or_insert(Vec::new())
+                    .push(peer_id);
             }
         }
 
-        ctx.notify(PeersRemoved {
-            member_id,
-            peers_id: removed_peer_ids,
-        })
+        for (member_id, removed_peers_ids) in removed_peers {
+            ctx.notify(PeersRemoved {
+                member_id,
+                peers_id: removed_peers_ids,
+            })
+        }
+    }
+
+    pub fn remove_peer(
+        &mut self,
+        member_id: MemberId,
+        peer_id: PeerId,
+        ctx: &mut Context<Room>,
+    ) {
+        let mut peers_id = HashSet::new();
+        peers_id.insert(peer_id);
+        self.remove_peers(member_id, peers_id, ctx);
     }
 
     /// Close all related to disconnected [`Member`] [`Peer`]s and partner

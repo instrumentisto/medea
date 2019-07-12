@@ -11,7 +11,7 @@ use actix::{
 };
 use failure::Fail;
 use futures::future;
-use hashbrown::HashMap;
+use hashbrown::{HashMap, HashSet};
 use medea_client_api_proto::{Command, Event, IceCandidate};
 
 use crate::{
@@ -626,14 +626,6 @@ impl Handler<PeersRemoved> for Room {
         );
         if let Some(member) = self.members.get_member_by_id(&msg.member_id) {
             member.peers_removed(&msg.peers_id);
-        } else {
-            error!(
-                "Participant with id {} for which received \
-                 Event::PeersRemoved not found. Closing room.",
-                msg.member_id
-            );
-            ctx.notify(CloseRoom {});
-            return Box::new(wrap_future(future::err(())));
         }
 
         Box::new(
@@ -781,6 +773,24 @@ impl Handler<DeleteMember> for Room {
         msg: DeleteMember,
         ctx: &mut Self::Context,
     ) -> Self::Result {
+        debug!("Delete Member [id = {}] in room [id = {}].", msg.0, self.id);
+        if let Some(member) = self.members.get_member_by_id(&msg.0) {
+            let mut peers = HashSet::new();
+            for (id, sink) in member.sinks() {
+                if let Some(peer_id) = sink.peer_id() {
+                    peers.insert(peer_id);
+                }
+            }
+
+            for (id, src) in member.srcs() {
+                for peer_id in src.peer_ids() {
+                    peers.insert(peer_id);
+                }
+            }
+
+            self.peers.remove_peers(member.id(), peers, ctx);
+        }
+
         self.members.delete_member(&msg.0, ctx);
     }
 }
