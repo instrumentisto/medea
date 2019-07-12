@@ -67,18 +67,15 @@ pub struct WebRtcPublishEndpoint {
     pub p2p: P2pMode,
 }
 
+// TODO: make it From
 impl TryFrom<&WebRtcPublishEndpointProto> for WebRtcPublishEndpoint {
     type Error = TryFromProtobufError;
 
     fn try_from(
         value: &WebRtcPublishEndpointProto,
     ) -> Result<Self, Self::Error> {
-        if value.has_p2p() {
-            Ok(Self {
-                p2p: P2pMode::from(value.get_p2p()),
-            })
-        } else {
-            Err(TryFromProtobufError::P2pModeNotFound)
-        }
+        Ok(Self {
+            p2p: P2pMode::from(value.get_p2p()),
+        })
     }
 }

@@ -1,4 +1,4 @@
-syntax = "proto2";
+syntax = "proto3";
 
 import "google/protobuf/any.proto";
 
@@ -11,7 +11,7 @@ service ControlApi {
   rpc Get (IdRequest) returns (GetResponse);
 }
 message CreateRequest {
-  required string id = 1;
+  string id = 1;
   oneof el {
     Hub hub = 2;
     FileRecorder file_recorder = 3;
@@ -23,7 +23,7 @@ message CreateRequest {
   }
 }
 message ApplyRequest {
-  required string id = 1;
+  string id = 1;
   oneof el {
     Hub hub = 2;
     FileRecorder file_recorder = 3;
@@ -33,11 +33,11 @@ message ApplyRequest {
     WebRtcPlayEndpoint webrtc_play = 7;
     WebRtcPublishEndpoint webrtc_pub = 8;
   }
-  optional Policy policy = 9 [default = APPLY];
+  Policy policy = 9;
 
   enum Policy {
-    APPLY = 1;
-    APPEND = 2;
+    APPLY = 0;
+    APPEND = 1;
   }
 }
 message IdRequest {
@@ -45,19 +45,19 @@ message IdRequest {
 }
 message Response {
   map<string, string> sid = 1;
-  optional Error error = 2;
+  Error error = 2;
 }
 message GetResponse {
   map<string, Element> elements = 1;
-  optional Error error = 2;
+  Error error = 2;
 }
 message Error {
-  required uint32 status = 1;
-  required uint32 code = 2;
-  required string text = 3;
-  optional string doc = 4;
-  required string element = 5;
-  optional google.protobuf.Any details = 6;
+  uint32 status = 1;
+  uint32 code = 2;
+  string text = 3;
+  string doc = 4;
+  string element = 5;
+  google.protobuf.Any details = 6;
   repeated string backtrace = 7;
 }
 
@@ -89,9 +89,9 @@ message Room {
 }
 
 message Member {
-  optional string on_join = 1;
-  optional string on_leave = 2;
-  required string credentials = 3;
+  string on_join = 1;
+  string on_leave = 2;
+  string credentials = 3;
   map<string, Member.Element> pipeline = 4;
 
   message Element {
@@ -106,10 +106,10 @@ message Member {
 }
 
 message WebRtcPublishEndpoint {
-  optional P2P p2p = 1 [default = NEVER];
-  optional string dst = 2;
-  optional string on_start = 3;
-  optional string on_stop = 4;
+  P2P p2p = 1;
+  string dst = 2;
+  string on_start = 3;
+  string on_stop = 4;
 
   enum P2P {
     NEVER = 0;
@@ -119,21 +119,21 @@ message WebRtcPublishEndpoint {
 }
 
 message WebRtcPlayEndpoint {
-  required string src = 1;
-  optional string on_start = 2;
-  optional string on_stop = 3;
+  string src = 1;
+  string on_start = 2;
+  string on_stop = 3;
 }
 
 message Hub {}
 
 message FileRecorder {
-  required string src = 1;
-  required string dst = 2;
-  optional string on_start = 3;
-  optional string on_stop = 4;
+  string src = 1;
+  string dst = 2;
+  string on_start = 3;
+  string on_stop = 4;
 }
 
 message Relay {
-  required string src = 1;
-  optional string dst = 2;
+  string src = 1;
+  string dst = 2;
 }

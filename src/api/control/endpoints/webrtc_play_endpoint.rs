@@ -47,13 +47,10 @@ impl TryFrom<&WebRtcPlayEndpointProto> for WebRtcPlayEndpoint {
     type Error = TryFromProtobufError;
 
     fn try_from(value: &WebRtcPlayEndpointProto) -> Result<Self, Self::Error> {
-        if value.has_src() {
-            Ok(Self {
-                src: SrcUri::parse(value.get_src())?,
-            })
-        } else {
-            Err(TryFromProtobufError::SrcUriNotFound)
-        }
+        // TODO: think about absent src uri.
+        Ok(Self {
+            src: SrcUri::parse(value.get_src())?,
+        })
     }
 }
 
