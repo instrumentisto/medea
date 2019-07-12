@@ -273,6 +273,7 @@ impl Room {
         )))
     }
 
+    /// Returns a future which is called during [`Room`]'s shutdown
     fn get_drop_fut(&mut self, ctx: &mut Context<Room>)
     -> Box<dyn Future<Item = (), Error = ()> + Send> {
         info!("Closing Room [id = {:?}]", self.id);
