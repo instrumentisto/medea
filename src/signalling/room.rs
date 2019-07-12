@@ -272,6 +272,24 @@ impl Room {
             self.participants.send_event_to_member(to_member_id, event),
         )))
     }
+
+    fn get_drop_fut(&mut self, ctx: &mut Context<Room>)
+    -> Box<dyn Future<Item = (), Error = ()> + Send> {
+        info!("Closing Room [id = {:?}]", self.id);
+        self.state = RoomState::Stopping;
+        let room_recipient = ctx.address().recipient();
+        let drop_fut =
+            self.participants.drop_connections(ctx).then(move |_| {
+                match room_recipient.try_send(RoomSetStopped {}) {
+                    Ok(_) => (),
+                    Err(e) => {
+                        error!("Cannot change Room's state to closed: {:?}", e)
+                    }
+                };
+                futures::future::ok(())
+            });
+        Box::new(drop_fut)
+    }
 }
 
 /// [`Actor`] implementation that provides an ergonomic way
@@ -318,16 +336,7 @@ impl Handler<ConnectPeers> for Room {
                          stopped.",
                         err
                     );
-                    ctx.spawn(
-                        wrap_future(
-                            ctx.address()
-                                .send(CloseRoom {})
-                                .map_err(|_| ())
-                                .and_then(std::result::Result::unwrap),
-                        )
-                        .map(|_, _, _| ())
-                        .map_err(|_, _, _| ()),
-                    );
+                    ctx.notify(CloseRoom {});
                 }))
             }
             Err(err) => {
@@ -335,16 +344,7 @@ impl Handler<ConnectPeers> for Room {
                     "Failed handle command, because {}. Room will be stopped.",
                     err
                 );
-                ctx.spawn(
-                    wrap_future(
-                        ctx.address()
-                            .send(CloseRoom {})
-                            .map_err(|_| ())
-                            .and_then(std::result::Result::unwrap),
-                    )
-                    .map(|_, _, _| ())
-                    .map_err(|_, _, _| ()),
-                );
+                ctx.notify(CloseRoom {});
                 Box::new(wrap_future(future::ok(())))
             }
         }
@@ -382,16 +382,8 @@ impl Handler<CommandMessage> for Room {
                          stopped.",
                         err
                     );
-                    ctx.spawn(
-                        wrap_future(
-                            ctx.address()
-                                .send(CloseRoom {})
-                                .map_err(|_| ())
-                                .and_then(std::result::Result::unwrap),
-                        )
-                        .map(|_, _, _| ())
-                        .map_err(|_, _, _| ()),
-                    );
+                    ctx.notify(CloseRoom {});
+
                 }))
             }
             Err(err) => {
@@ -399,16 +391,8 @@ impl Handler<CommandMessage> for Room {
                     "Failed handle command, because {}. Room will be stopped.",
                     err
                 );
-                ctx.spawn(
-                    wrap_future(
-                        ctx.address()
-                            .send(CloseRoom {})
-                            .map_err(|_| ())
-                            .and_then(std::result::Result::unwrap),
-                    )
-                    .map(|_, _, _| ())
-                    .map_err(|_, _, _| ()),
-                );
+                ctx.notify(CloseRoom {});
+
                 Box::new(wrap_future(future::ok(())))
             }
         }
@@ -457,12 +441,12 @@ impl Handler<RpcConnectionEstablished> for Room {
 
 /// Signal of close [`Room`].
 #[derive(Debug, Message)]
-#[rtype(result = "Result<Box<(dyn Future<Item = (), Error = ()> + Send)>, ()>")]
+#[rtype(result = "()")]
 #[allow(clippy::module_name_repetitions)]
 pub struct CloseRoom {}
 
 impl Handler<CloseRoom> for Room {
-    type Result = Result<Box<(dyn Future<Item = (), Error = ()> + Send)>, ()>;
+    type Result = ();
 
     /// Sends to remote [`Member`] the [`Event`] about [`Peer`] removed.
     /// Closes all active [`RpcConnection`]s.
@@ -470,24 +454,13 @@ impl Handler<CloseRoom> for Room {
         &mut self,
         _msg: CloseRoom,
         ctx: &mut Self::Context,
-    ) -> Self::Result {
-        info!("Closing Room [id = {:?}]", self.id);
-        self.state = RoomState::Stopping;
-
-        let room_recipient = ctx.address().recipient();
-        let drop_fut =
-            self.participants.drop_connections(ctx).then(move |_| {
-                match room_recipient.try_send(RoomClosed {}) {
-                    Ok(_) => (),
-                    Err(e) => {
-                        error!("Cannot change Room's state to closed: {:?}", e)
-                    }
-                };
-                futures::future::ok(())
-            });
-
-
-        Ok(Box::new(drop_fut))
+    ) {
+        let drop_future = self.get_drop_fut(ctx);
+        ctx.wait(
+            wrap_future(
+                drop_future
+            )
+        );
     }
 }
 
@@ -504,14 +477,11 @@ impl Handler<ShutdownMessage> for Room {
 
         let room_id = self.id;
         Ok(Box::new(
-            ctx.address()
-                .send(CloseRoom {})
-                .map_err(|_| ())
-                .and_then(std::result::Result::unwrap)
-                .map(|_| ())
-                .map_err(move |_| {
-                    error!("Error closing room {:?}", room_id);
-                }),
+            self.get_drop_fut(ctx)
+            .map(|_| ())
+            .map_err(move |_| {
+                error!("Error closing room {:?}", room_id);
+            }),
         ))
     }
 }
@@ -520,12 +490,12 @@ impl Handler<ShutdownMessage> for Room {
 #[derive(Message)]
 #[rtype(result = "()")]
 #[allow(clippy::module_name_repetitions)]
-struct RoomClosed {}
+struct RoomSetStopped {}
 
-impl Handler<RoomClosed> for Room {
+impl Handler<RoomSetStopped> for Room {
     type Result = ();
 
-    fn handle(&mut self, _msg: RoomClosed, _: &mut Self::Context) {
+    fn handle(&mut self, _msg: RoomSetStopped, _: &mut Self::Context) {
         self.state = RoomState::Stopped;
     }
 }

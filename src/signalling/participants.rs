@@ -230,16 +230,7 @@ impl ParticipantService {
                         error!("Error deleting IceUser {:?}", err)
                     }),
                 ));
-                ctx.spawn(
-                    wrap_future(
-                        ctx.address()
-                            .send(CloseRoom {})
-                            .map_err(|_| ())
-                            .and_then(std::result::Result::unwrap),
-                    )
-                    .map(|_, _, _| ())
-                    .map_err(|_, _, _| ()),
-                );
+                ctx.notify(CloseRoom {})
             }
             ClosedReason::Lost => {
                 self.drop_connection_tasks.insert(

@@ -23,7 +23,7 @@ use tokio::prelude::{
 use crate::log::prelude::*;
 
 pub type ShutdownMessageResult =
-Result<Box<(dyn Future<Item = (), Error = ()> + std::marker::Send)>, ()>;
+Result<Box<(dyn Future<Item = (), Error = ()> + Send)>, ()>;
 
 type ShutdownFutureType = dyn Future<Item = Vec<()>, Error = ()>;
 
