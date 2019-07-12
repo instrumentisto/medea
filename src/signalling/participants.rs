@@ -491,7 +491,11 @@ impl ParticipantService {
         spec: WebRtcPlayEndpointSpec,
     ) -> Result<(), ParticipantServiceErr> {
         let member = self.get_member(&member_id)?;
-        if member.get_sink_by_id(&endpoint_id).is_some() {
+        if member.get_sink_by_id(&endpoint_id).is_some()
+            || member
+                .get_src_by_id(&WebRtcPublishId(endpoint_id.0.clone()))
+                .is_some()
+        {
             return Err(ParticipantServiceErr::EndpointAlreadyExists(
                 member.get_local_uri_to_endpoint(endpoint_id.to_string()),
             ));
@@ -528,7 +532,11 @@ impl ParticipantService {
     ) -> Result<(), ParticipantServiceErr> {
         let member = self.get_member(&member_id)?;
 
-        if member.get_src_by_id(&endpoint_id).is_some() {
+        if member.get_src_by_id(&endpoint_id).is_some()
+            || member
+                .get_sink_by_id(&WebRtcPlayId(endpoint_id.0.clone()))
+                .is_some()
+        {
             return Err(ParticipantServiceErr::EndpointAlreadyExists(
                 member.get_local_uri_to_endpoint(endpoint_id.to_string()),
             ));
