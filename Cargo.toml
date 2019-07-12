@@ -17,7 +17,7 @@ members = [
 ]
 
 [profile.release]
-lto = "thin"
+opt-level = "s"  # Tell `rustc` to optimize for small code size.
 
 [dependencies]
 actix = "0.8"

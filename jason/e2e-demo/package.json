@@ -2,8 +2,8 @@
   "name": "jason-e2e-demo",
   "private": true,
   "scripts": {
-    "start": "webpack-dev-server -d --open --port 8081",
-    "build": "webpack"
+    "start": "webpack-dev-server -d --config webpack.dev.js --open --port 8081",
+    "build": "webpack --config webpack.prod.js"
   },
   "devDependencies": {
     "@wasm-tool/wasm-pack-plugin": "^0.2",

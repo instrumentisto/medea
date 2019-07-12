@@ -6,13 +6,11 @@ const HtmlWebpackPlugin = require("html-webpack-plugin");
 const dist = path.resolve(__dirname, "dist");
 
 module.exports = {
+  mode: 'production',
   entry: "./js/index.js",
   output: {
     path: dist,
     filename: "bundle.js"
-  },
-  devServer: {
-    contentBase: dist,
   },
   plugins: [
     new HtmlWebpackPlugin({
@@ -20,8 +18,7 @@ module.exports = {
     }),
     new WasmPackPlugin({
       crateDirectory: path.resolve(__dirname, '../'),
-      // WasmPackPlugin defaults to compiling in "dev" profile.
-      // To change that, use `forceMode: 'release'`.
-    }),
+      forceMode: 'production'
+    })
   ]
 };

@@ -15,6 +15,8 @@ eq = $(if $(or $(1),$(2)),$(and $(findstring $(1),$(2)),\
 # Aliases #
 ###########
 
+build: build.jason
+
 # Resolve all project dependencies.
 #
 # Usage:
@@ -42,6 +44,34 @@ up:
 
 
 test: test.unit
+
+
+
+
+##################
+# Build commands #
+##################
+
+# Build Jason E2E demo in production mode.
+#
+# Usage:
+#	make build.jason
+
+build.jason:
+	@rm -rf jason/e2e-demo/dist/
+	npm run build --prefix=jason/e2e-demo
+	@make opt.jason
+
+
+# Optimize wasm binary.
+#
+# Usage:
+#	make opt.wasm [file=(|<wasm-file>)]
+
+wasm-file = $(if $(call eq,$(file),),$(shell find jason/e2e-demo/dist -name '*.module.wasm'),$(file))
+
+opt.jason:
+	wasm-opt $(wasm-file) -Os -d -o $(wasm-file)
 
 
 
@@ -185,8 +215,10 @@ up.medea:
 # .PHONY section #
 ##################
 
-.PHONY: cargo cargo.fmt cargo.lint \
+.PHONY: build build.jason \
+		cargo cargo.fmt cargo.lint \
         docs docs.rust \
+        opt.jason \
         test test.unit \
         up up.coturn up.jason up.medea \
         yarn
