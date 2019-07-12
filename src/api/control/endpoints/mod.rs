@@ -43,8 +43,7 @@ impl TryFrom<&MemberElementProto> for Endpoint {
             let play = WebRtcPlayEndpoint::try_from(value.get_webrtc_play())?;
             Ok(Endpoint::WebRtcPlay(play))
         } else if value.has_webrtc_pub() {
-            let publish =
-                WebRtcPublishEndpoint::try_from(value.get_webrtc_pub())?;
+            let publish = WebRtcPublishEndpoint::from(value.get_webrtc_pub());
             Ok(Endpoint::WebRtcPublish(publish))
         } else {
             // TODO implement another endpoints when they will be implemented
@@ -61,8 +60,7 @@ impl TryFrom<&CreateRequest> for Endpoint {
             let play = WebRtcPlayEndpoint::try_from(value.get_webrtc_play())?;
             Ok(Endpoint::WebRtcPlay(play))
         } else if value.has_webrtc_pub() {
-            let publish =
-                WebRtcPublishEndpoint::try_from(value.get_webrtc_pub())?;
+            let publish = WebRtcPublishEndpoint::from(value.get_webrtc_pub());
             Ok(Endpoint::WebRtcPublish(publish))
         } else {
             // TODO implement another endpoints when they will be implemented

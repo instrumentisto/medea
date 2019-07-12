@@ -1,17 +1,12 @@
 //! `WebRtcPublishEndpoint` implementation.
 
-use std::convert::TryFrom;
-
 use macro_attr::*;
 use newtype_derive::{newtype_fmt, NewtypeDisplay, NewtypeFrom};
 use serde::Deserialize;
 
-use crate::api::control::{
-    grpc::protos::control::{
-        WebRtcPublishEndpoint as WebRtcPublishEndpointProto,
-        WebRtcPublishEndpoint_P2P as WebRtcPublishEndpointP2pProto,
-    },
-    TryFromProtobufError,
+use crate::api::control::grpc::protos::control::{
+    WebRtcPublishEndpoint as WebRtcPublishEndpointProto,
+    WebRtcPublishEndpoint_P2P as WebRtcPublishEndpointP2pProto,
 };
 
 macro_attr! {
@@ -67,15 +62,10 @@ pub struct WebRtcPublishEndpoint {
     pub p2p: P2pMode,
 }
 
-// TODO: make it From
-impl TryFrom<&WebRtcPublishEndpointProto> for WebRtcPublishEndpoint {
-    type Error = TryFromProtobufError;
-
-    fn try_from(
-        value: &WebRtcPublishEndpointProto,
-    ) -> Result<Self, Self::Error> {
-        Ok(Self {
+impl From<&WebRtcPublishEndpointProto> for WebRtcPublishEndpoint {
+    fn from(value: &WebRtcPublishEndpointProto) -> Self {
+        Self {
             p2p: P2pMode::from(value.get_p2p()),
-        })
+        }
     }
 }
