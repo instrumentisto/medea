@@ -447,7 +447,6 @@ impl ParticipantService {
             let signalling_publish = Rc::new(WebRtcPublishEndpoint::new(
                 id.clone(),
                 publish.p2p.clone(),
-                Vec::new(),
                 Rc::downgrade(&signalling_member),
             ));
             signalling_member.insert_src(signalling_publish);
@@ -546,7 +545,6 @@ impl ParticipantService {
         let src = Rc::new(WebRtcPublishEndpoint::new(
             endpoint_id,
             spec.p2p,
-            Vec::new(),
             Rc::downgrade(&member),
         ));
 

@@ -100,16 +100,11 @@ pub struct WebRtcPublishEndpoint(RefCell<WebRtcPublishEndpointInner>);
 
 impl WebRtcPublishEndpoint {
     /// Create new [`WebRtcPublishEndpoint`].
-    pub fn new(
-        id: Id,
-        p2p: P2pMode,
-        sinks: Vec<Weak<WebRtcPlayEndpoint>>,
-        owner: Weak<Member>,
-    ) -> Self {
+    pub fn new(id: Id, p2p: P2pMode, owner: Weak<Member>) -> Self {
         Self(RefCell::new(WebRtcPublishEndpointInner {
             id,
             p2p,
-            sinks,
+            sinks: Vec::new(),
             owner,
             peer_ids: HashSet::new(),
         }))

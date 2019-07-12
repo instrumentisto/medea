@@ -240,7 +240,6 @@ impl Member {
                 let new_publish = Rc::new(WebRtcPublishEndpoint::new(
                     new_publish_id.clone(),
                     publisher_endpoint.p2p.clone(),
-                    Vec::new(),
                     Rc::downgrade(&publisher_member),
                 ));
 
@@ -268,7 +267,6 @@ impl Member {
                     self.insert_src(Rc::new(WebRtcPublishEndpoint::new(
                         endpoint_id,
                         e.p2p.clone(),
-                        Vec::new(),
                         Rc::downgrade(&this_member),
                     )));
                 }
