@@ -4,7 +4,7 @@ use std::{collections::HashMap, convert::TryFrom, sync::Arc};
 
 use actix::{Actor, Addr, Arbiter, Context, MailboxError};
 use failure::Fail;
-use futures::future::{Either, Future};
+use futures::future::{self, Either, Future};
 use grpcio::{Environment, RpcContext, Server, ServerBuilder, UnarySink};
 
 use crate::{
@@ -89,6 +89,10 @@ impl Into<ErrorCode> for ControlApiError {
     }
 }
 
+/// Try to unwrap some [`Result`] and if it `Err` then return err future with
+/// [`ControlApiError`].
+///
+/// __Note:__ this macro returns [`Either::B`].
 macro_rules! fut_try {
     ($call:expr) => {
         match $call {
@@ -102,19 +106,39 @@ macro_rules! fut_try {
     };
 }
 
+/// Macro for parse [`LocalUri`] and send error to client if some error occurs.
+///
+/// See `send_error_response` doc for details about arguments for this macro.
 macro_rules! parse_local_uri {
     ($uri:expr, $ctx:expr, $sink:expr, $response:ty) => {
         match LocalUri::parse($uri) {
             Ok(o) => o,
             Err(e) => {
-                let mut error_response = <$response>::new();
                 let error: ErrorCode = e.into();
-                let error: Error = error.into();
-                error_response.set_error(error);
-                $ctx.spawn($sink.success(error_response).map_err(|_| ()));
-                return;
+                send_error_response!($ctx, $sink, error, $response);
             }
         }
+    };
+}
+
+/// Macro for send [`Error`] to client and `return` from current function.
+///
+/// `$error_code` - some object which can tranform into [`Error`] by `Into`
+/// trait.
+///
+/// `$response` - is type of response ([`GetResponse`], [`Response`]
+/// etc).
+macro_rules! send_error_response {
+    ($ctx:tt, $sink:tt, $error_code:expr, $response:ty) => {
+        let mut response = <$response>::new();
+        let error: Error = $error_code.into();
+        response.set_error(error);
+
+        $ctx.spawn($sink.success(response).map_err(|e| {
+            warn!("Error while sending Error response by gRPC. {:?}", e)
+        }));
+
+        return;
     };
 }
 
@@ -247,19 +271,6 @@ fn get_response_for_create(
     error_response
 }
 
-fn get_error_response_future(
-    sink: UnarySink<Response>,
-    error_code: ErrorCode,
-) -> impl Future<Item = (), Error = ()> {
-    let mut response = Response::new();
-    let error: Error = error_code.into();
-    response.set_error(error);
-
-    sink.success(response).map_err(|e| {
-        warn!("Error while sending Error response by gRPC. {:?}", e)
-    })
-}
-
 impl ControlApi for ControlApiService {
     /// Implementation for `Create` method of gRPC control API.
     fn create(
@@ -276,12 +287,14 @@ impl ControlApi for ControlApiService {
                     sink.success(get_response_for_create(r)).map_err(|_| ())
                 }));
             } else {
-                ctx.spawn(get_error_response_future(
+                send_error_response!(
+                    ctx,
                     sink,
                     ErrorCode::ElementIdForRoomButElementIsNot(
                         req.get_id().to_string(),
                     ),
-                ));
+                    Response
+                );
             }
         } else if local_uri.is_member_uri() {
             if req.has_member() {
@@ -294,12 +307,14 @@ impl ControlApi for ControlApiService {
                     })
                 }));
             } else {
-                ctx.spawn(get_error_response_future(
+                send_error_response!(
+                    ctx,
                     sink,
                     ErrorCode::ElementIdForMemberButElementIsNot(
                         req.get_id().to_string(),
                     ),
-                ));
+                    Response
+                );
             }
         } else if local_uri.is_endpoint_uri() {
             if req.has_webrtc_pub() || req.has_webrtc_play() {
@@ -315,18 +330,22 @@ impl ControlApi for ControlApiService {
                     },
                 ));
             } else {
-                ctx.spawn(get_error_response_future(
+                send_error_response!(
+                    ctx,
                     sink,
                     ErrorCode::ElementIdForEndpointButElementIsNot(
                         req.get_id().to_string(),
                     ),
-                ));
+                    Response
+                );
             }
         } else {
-            ctx.spawn(get_error_response_future(
+            send_error_response!(
+                ctx,
                 sink,
                 ErrorCode::InvalidElementUri(req.get_id().to_string()),
-            ));
+                Response
+            );
         }
     }
 
@@ -373,18 +392,22 @@ impl ControlApi for ControlApiService {
                         endpoint_id: uri.endpoint_id.unwrap(),
                     },
                 ));
+            } else {
+                send_error_response!(
+                    ctx,
+                    sink,
+                    ErrorCode::InvalidElementUri(id.to_string()),
+                    Response
+                );
             }
         }
 
-        let mega_delete_room_fut = futures::future::join_all(delete_room_futs);
-        let mega_delete_member_fut =
-            futures::future::join_all(delete_member_futs);
-        let mega_delete_endpoints_fut =
-            futures::future::join_all(delete_endpoints_futs);
-
         ctx.spawn(
-            mega_delete_endpoints_fut
-                .join3(mega_delete_member_fut, mega_delete_room_fut)
+            future::join_all(delete_room_futs)
+                .join3(
+                    future::join_all(delete_member_futs),
+                    future::join_all(delete_endpoints_futs),
+                )
                 .then(move |result| {
                     let map_err_closure = |e| {
                         warn!(
@@ -457,6 +480,13 @@ impl ControlApi for ControlApiService {
                     local_uri.member_id.unwrap(),
                     local_uri.endpoint_id.unwrap(),
                 ));
+            } else {
+                send_error_response!(
+                    ctx,
+                    sink,
+                    ErrorCode::InvalidElementUri(id.to_string()),
+                    GetResponse
+                );
             }
         }
 
@@ -464,71 +494,68 @@ impl ControlApi for ControlApiService {
         let member_fut = self.room_repository.send(GetMember(member_ids));
         let endpoint_fut = self.room_repository.send(GetEndpoint(endpoint_ids));
 
-        let mega_future =
-            room_fut.join3(member_fut, endpoint_fut).then(|result| {
-                let grpc_err_closure =
-                    |e| warn!("Error while sending Get response. {:?}", e);
+        ctx.spawn(room_fut.join3(member_fut, endpoint_fut).then(|result| {
+            let grpc_err_closure =
+                |e| warn!("Error while sending Get response. {:?}", e);
 
-                match result {
-                    Ok((room, member, endpoint)) => {
-                        let mut elements = HashMap::new();
-                        let mut elements_results = Vec::new();
+            match result {
+                Ok((room, member, endpoint)) => {
+                    let mut elements = HashMap::new();
+                    let mut elements_results = Vec::new();
 
-                        let results = vec![room, member, endpoint];
+                    let results = vec![room, member, endpoint];
 
-                        for result in results {
-                            match result {
-                                Ok(o) => {
-                                    elements_results.push(o);
-                                }
-                                Err(e) => {
-                                    let mut response = GetResponse::new();
-                                    let error: ErrorCode = e.into();
-                                    response.set_error(error.into());
-                                    return sink
-                                        .success(response)
-                                        .map_err(grpc_err_closure);
-                                }
+                    for result in results {
+                        match result {
+                            Ok(o) => {
+                                elements_results.push(o);
+                            }
+                            Err(e) => {
+                                let mut response = GetResponse::new();
+                                let error: ErrorCode = e.into();
+                                response.set_error(error.into());
+                                return sink
+                                    .success(response)
+                                    .map_err(grpc_err_closure);
                             }
                         }
+                    }
 
-                        let elements_results = elements_results
-                            .into_iter()
-                            .flat_map(std::iter::IntoIterator::into_iter);
+                    let elements_results = elements_results
+                        .into_iter()
+                        .flat_map(std::iter::IntoIterator::into_iter);
 
-                        for element in elements_results {
-                            match element {
-                                Ok((id, o)) => {
-                                    elements.insert(id, o);
-                                }
-                                Err(e) => {
-                                    let mut response = GetResponse::new();
-                                    let error: ErrorCode = e.into();
-                                    response.set_error(error.into());
-                                    return sink
-                                        .success(response)
-                                        .map_err(grpc_err_closure);
-                                }
+                    for element in elements_results {
+                        match element {
+                            Ok((id, o)) => {
+                                elements.insert(id, o);
+                            }
+                            Err(e) => {
+                                let mut response = GetResponse::new();
+                                let error: ErrorCode = e.into();
+                                response.set_error(error.into());
+                                return sink
+                                    .success(response)
+                                    .map_err(grpc_err_closure);
                             }
                         }
-
-                        let mut response = GetResponse::new();
-                        response.set_elements(elements);
-
-                        sink.success(response).map_err(grpc_err_closure)
                     }
-                    Err(e) => {
-                        warn!("Control API Get method mailbox error. {:?}", e);
-                        let mut response = GetResponse::new();
-                        let error: Error =
-                            ErrorCode::UnknownError(format!("{:?}", e)).into();
-                        response.set_error(error);
-                        sink.success(response).map_err(grpc_err_closure)
-                    }
+
+                    let mut response = GetResponse::new();
+                    response.set_elements(elements);
+
+                    sink.success(response).map_err(grpc_err_closure)
                 }
-            });
-
-        ctx.spawn(mega_future);
+                Err(e) => {
+                    warn!("Control API Get method mailbox error. {:?}", e);
+                    let mut response = GetResponse::new();
+                    let error: Error =
+                        ErrorCode::UnknownError(format!("{:?}", e)).into();
+                    response.set_error(error);
+                    sink.success(response).map_err(grpc_err_closure)
+                }
+            }
+        }));
     }
 }
 
