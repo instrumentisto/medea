@@ -224,7 +224,9 @@ impl ControlApiService {
 }
 
 /// Generate [`Response`] for `Create` method of all elements.
-fn create_response(result: Result<CreateResult, ControlApiError>) -> Response {
+fn get_response_for_create(
+    result: Result<CreateResult, ControlApiError>,
+) -> Response {
     let error: ErrorCode = match result {
         Ok(r) => match r {
             Ok(r) => match r {
@@ -245,7 +247,7 @@ fn create_response(result: Result<CreateResult, ControlApiError>) -> Response {
     error_response
 }
 
-fn error_response(
+fn get_error_response_future(
     sink: UnarySink<Response>,
     error_code: ErrorCode,
 ) -> impl Future<Item = (), Error = ()> {
@@ -271,10 +273,10 @@ impl ControlApi for ControlApiService {
         if local_uri.is_room_uri() {
             if req.has_room() {
                 ctx.spawn(self.create_room(&req, local_uri).then(move |r| {
-                    sink.success(create_response(r)).map_err(|_| ())
+                    sink.success(get_response_for_create(r)).map_err(|_| ())
                 }));
             } else {
-                ctx.spawn(error_response(
+                ctx.spawn(get_error_response_future(
                     sink,
                     ErrorCode::ElementIdForRoomButElementIsNot(
                         req.get_id().to_string(),
@@ -284,7 +286,7 @@ impl ControlApi for ControlApiService {
         } else if local_uri.is_member_uri() {
             if req.has_member() {
                 ctx.spawn(self.create_member(&req, local_uri).then(move |r| {
-                    sink.success(create_response(r)).map_err(|e| {
+                    sink.success(get_response_for_create(r)).map_err(|e| {
                         warn!(
                             "Error while sending Create response by gRPC. {:?}",
                             e
@@ -292,7 +294,7 @@ impl ControlApi for ControlApiService {
                     })
                 }));
             } else {
-                ctx.spawn(error_response(
+                ctx.spawn(get_error_response_future(
                     sink,
                     ErrorCode::ElementIdForMemberButElementIsNot(
                         req.get_id().to_string(),
@@ -303,7 +305,7 @@ impl ControlApi for ControlApiService {
             if req.has_webrtc_pub() || req.has_webrtc_play() {
                 ctx.spawn(self.create_endpoint(&req, local_uri).then(
                     move |r| {
-                        sink.success(create_response(r)).map_err(|e| {
+                        sink.success(get_response_for_create(r)).map_err(|e| {
                             warn!(
                                 "Error while sending Create response by gRPC. \
                                  {:?}",
@@ -313,7 +315,7 @@ impl ControlApi for ControlApiService {
                     },
                 ));
             } else {
-                ctx.spawn(error_response(
+                ctx.spawn(get_error_response_future(
                     sink,
                     ErrorCode::ElementIdForEndpointButElementIsNot(
                         req.get_id().to_string(),
@@ -321,7 +323,7 @@ impl ControlApi for ControlApiService {
                 ));
             }
         } else {
-            ctx.spawn(error_response(
+            ctx.spawn(get_error_response_future(
                 sink,
                 ErrorCode::InvalidElementUri(req.get_id().to_string()),
             ));

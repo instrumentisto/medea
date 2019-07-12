@@ -1,6 +1,5 @@
 //! Implementation of Control API.
 
-// pub mod endpoint;
 pub mod endpoints;
 pub mod grpc;
 pub mod local_uri;
@@ -33,18 +32,30 @@ pub use self::{
     room::{Id as RoomId, RoomSpec},
 };
 
+/// Errors which may occur while deserialize protobuf spec.
 #[derive(Debug, Fail)]
 pub enum TryFromProtobufError {
+    /// Error while parsing src uri of [`WebRtcPlayEndpoint`].
     #[fail(display = "Src uri parse error: {:?}", _0)]
     SrcUriError(SrcParseError),
+
+    /// Src URI not provided for [`WebRtcPlayEndpoint`].
     #[fail(display = "Src uri for publish endpoint not provided.")]
     SrcUriNotFound,
+
+    /// Room element not provided.
     #[fail(display = "Room element not provided.")]
     RoomElementNotFound,
+
+    /// Member element not provided.
     #[fail(display = "Member element not provided.")]
     MemberElementNotFound,
+
+    /// [`P2pMode`] not found.
     #[fail(display = "P2p mode for play endpoint not provided.")]
     P2pModeNotFound,
+
+    /// Member credentials not found.
     #[fail(display = "Credentials for member not provided.")]
     MemberCredentialsNotFound,
 }
@@ -69,10 +80,15 @@ impl Into<ErrorCode> for TryFromProtobufError {
 #[allow(clippy::pub_enum_variant_names)]
 #[derive(Debug, Fail)]
 pub enum TryFromElementError {
+    /// Element is not Endpoint.
     #[fail(display = "Element is not Endpoint")]
     NotEndpoint,
+
+    /// Element is not Room.
     #[fail(display = "Element is not Room")]
     NotRoom,
+
+    /// Element is not Member.
     #[fail(display = "Element is not Member")]
     NotMember,
 }

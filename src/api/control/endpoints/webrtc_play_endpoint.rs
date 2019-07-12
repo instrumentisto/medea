@@ -1,3 +1,5 @@
+//! `WebRtcPlayEndpoint` implementation.
+
 use std::{convert::TryFrom, fmt};
 
 use failure::Fail;
