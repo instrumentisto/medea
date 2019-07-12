@@ -402,9 +402,6 @@ impl ControlApi for ControlApiService {
         ctx.spawn(
             mega_delete_endpoints_fut
                 .join3(mega_delete_member_fut, mega_delete_room_fut)
-                .map_err(|e| {
-                    warn!("Control API Delete method mailbox error. {:?}", e)
-                })
                 .then(move |result| {
                     let map_err_closure = |e| {
                         warn!(
@@ -414,12 +411,21 @@ impl ControlApi for ControlApiService {
                     };
                     match result {
                         Ok((member, endpoint, room)) => {
-                            member
+                            let results = member
                                 .into_iter()
                                 .chain(endpoint.into_iter())
-                                .chain(room.into_iter())
-                                .for_each(|r| r.unwrap());
-                            // TODO
+                                .chain(room.into_iter());
+                            for result in results {
+                                if let Err(e) = result {
+                                    let mut response = Response::new();
+                                    let error: ErrorCode = e.into();
+                                    response.set_error(error.into());
+                                    return sink
+                                        .success(response)
+                                        .map_err(map_err_closure);
+                                }
+                            }
+
                             let mut response = Response::new();
                             response.set_sid(HashMap::new());
                             sink.success(response).map_err(map_err_closure)
