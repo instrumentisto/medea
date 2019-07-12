@@ -203,9 +203,7 @@ impl Member {
             self.get_member_from_room_spec(room_spec, &self_id)?;
 
         let this_member = store.get(&self.id()).map_or(
-            Err(MembersLoadError::MemberNotFound(
-                self.get_member_local_uri(),
-            )),
+            Err(MembersLoadError::MemberNotFound(self.get_local_uri())),
             Ok,
         )?;
 
@@ -232,7 +230,7 @@ impl Member {
                 .get(&spec_play_endpoint.src.endpoint_id)
                 .map_or(
                     Err(MembersLoadError::PublishEndpointNotFound(
-                        publisher_member.get_local_uri(
+                        publisher_member.get_local_uri_to_endpoint(
                             spec_play_endpoint.src.endpoint_id.to_string(),
                         ),
                     )),
@@ -299,9 +297,17 @@ impl Member {
         Ok(())
     }
 
-    /// Return [`LocalUri`] for this [`Member`].
-    fn get_member_local_uri(&self) -> LocalUri {
+    /// Return [`LocalUri`] to this [`Member`].
+    fn get_local_uri(&self) -> LocalUri {
         LocalUri::new(Some(self.room_id()), Some(self.id()), None)
+    }
+
+    /// Return [`LocalUri`] to some endpoint from this [`Member`].
+    ///
+    /// __Note__ this function don't check presence of `Endpoint` in this
+    /// [`Member`].
+    pub fn get_local_uri_to_endpoint(&self, endpoint_id: String) -> LocalUri {
+        LocalUri::new(Some(self.room_id()), Some(self.id()), Some(endpoint_id))
     }
 
     /// Notify [`Member`] that some [`Peer`]s removed.
@@ -372,10 +378,6 @@ impl Member {
         self.0.borrow().srcs.get(id).cloned()
     }
 
-    pub fn get_local_uri(&self, endpoint_id: String) -> LocalUri {
-        LocalUri::new(Some(self.room_id()), Some(self.id()), Some(endpoint_id))
-    }
-
     pub fn get_src(
         &self,
         id: &WebRtcPublishId,
@@ -383,7 +385,7 @@ impl Member {
         self.0.borrow().srcs.get(id).cloned().map_or_else(
             || {
                 Err(MemberError::PublishEndpointNotFound(
-                    self.get_local_uri(id.to_string()),
+                    self.get_local_uri_to_endpoint(id.to_string()),
                 ))
             },
             Ok,
@@ -409,7 +411,7 @@ impl Member {
         self.0.borrow().sinks.get(id).cloned().map_or_else(
             || {
                 Err(MemberError::PlayEndpointNotFound(
-                    self.get_local_uri(id.to_string()),
+                    self.get_local_uri_to_endpoint(id.to_string()),
                 ))
             },
             Ok,

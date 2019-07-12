@@ -493,7 +493,7 @@ impl ParticipantService {
         let member = self.get_member(&member_id)?;
         if member.get_sink_by_id(&endpoint_id).is_some() {
             return Err(ParticipantServiceErr::EndpointAlreadyExists(
-                member.get_local_uri(endpoint_id.to_string()),
+                member.get_local_uri_to_endpoint(endpoint_id.to_string()),
             ));
         }
 
@@ -530,7 +530,7 @@ impl ParticipantService {
 
         if member.get_src_by_id(&endpoint_id).is_some() {
             return Err(ParticipantServiceErr::EndpointAlreadyExists(
-                member.get_local_uri(endpoint_id.to_string()),
+                member.get_local_uri_to_endpoint(endpoint_id.to_string()),
             ));
         }
 

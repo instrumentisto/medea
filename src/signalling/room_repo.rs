@@ -109,7 +109,7 @@ impl Actor for RoomsRepository {
     type Context = Context<Self>;
 }
 
-fn get_local_uri(room_id: RoomId) -> LocalUri {
+fn get_local_uri_to_room(room_id: RoomId) -> LocalUri {
     LocalUri::new(Some(room_id), None, None)
 }
 
@@ -128,9 +128,9 @@ impl Handler<StartRoom> for RoomsRepository {
         let room_id = msg.0;
 
         if self.rooms.lock().unwrap().get(&room_id).is_some() {
-            return Err(RoomRepoError::RoomAlreadyExists(get_local_uri(
-                room_id,
-            )));
+            return Err(RoomRepoError::RoomAlreadyExists(
+                get_local_uri_to_room(room_id),
+            ));
         }
 
         let room = msg.1;
@@ -189,7 +189,7 @@ impl Handler<DeleteMemberFromRoom> for RoomsRepository {
         if let Some(room) = self.get(&msg.room_id) {
             room.do_send(DeleteMember(msg.member_id));
         } else {
-            return Err(RoomRepoError::RoomNotFound(get_local_uri(
+            return Err(RoomRepoError::RoomNotFound(get_local_uri_to_room(
                 msg.room_id,
             )));
         }
@@ -261,7 +261,7 @@ impl Handler<GetRoom> for RoomsRepository {
                 )
             } else {
                 return Box::new(wrap_future(futures::future::err(
-                    RoomRepoError::RoomNotFound(get_local_uri(room_id)),
+                    RoomRepoError::RoomNotFound(get_local_uri_to_room(room_id)),
                 )));
             }
         }
@@ -307,7 +307,7 @@ impl Handler<GetMember> for RoomsRepository {
                 )
             } else {
                 return Box::new(wrap_future(futures::future::err(
-                    RoomRepoError::RoomNotFound(get_local_uri(room_id)),
+                    RoomRepoError::RoomNotFound(get_local_uri_to_room(room_id)),
                 )));
             }
         }
@@ -355,7 +355,7 @@ impl Handler<GetEndpoint> for RoomsRepository {
                 );
             } else {
                 return Box::new(wrap_future(futures::future::err(
-                    RoomRepoError::RoomNotFound(get_local_uri(room_id)),
+                    RoomRepoError::RoomNotFound(get_local_uri_to_room(room_id)),
                 )));
             }
         }
@@ -388,7 +388,7 @@ impl Handler<CreateMemberInRoom> for RoomsRepository {
                 )
             } else {
                 Either::B(futures::future::err(RoomRepoError::RoomNotFound(
-                    get_local_uri(msg.room_id),
+                    get_local_uri_to_room(msg.room_id),
                 )))
             };
 
@@ -425,7 +425,7 @@ impl Handler<CreateEndpointInRoom> for RoomsRepository {
                 )
             } else {
                 Either::B(futures::future::err(RoomRepoError::RoomNotFound(
-                    get_local_uri(msg.room_id),
+                    get_local_uri_to_room(msg.room_id),
                 )))
             };
 
