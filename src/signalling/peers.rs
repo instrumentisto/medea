@@ -186,7 +186,7 @@ impl PeerRepository {
             if let Some(peer) = self.peers.remove(&peer_id) {
                 let partner_peer_id = peer.partner_peer_id();
                 let partner_member_id = peer.partner_member_id();
-                if let Some(peer) = self.peers.remove(&partner_peer_id) {
+                if let Some(_) = self.peers.remove(&partner_peer_id) {
                     removed_peers
                         .entry(partner_member_id)
                         .or_insert(Vec::new())

@@ -618,7 +618,7 @@ impl Handler<PeersRemoved> for Room {
     fn handle(
         &mut self,
         msg: PeersRemoved,
-        ctx: &mut Self::Context,
+        _ctx: &mut Self::Context,
     ) -> Self::Result {
         info!(
             "Peers {:?} removed for member '{}'.",
@@ -776,13 +776,13 @@ impl Handler<DeleteMember> for Room {
         debug!("Delete Member [id = {}] in room [id = {}].", msg.0, self.id);
         if let Some(member) = self.members.get_member_by_id(&msg.0) {
             let mut peers = HashSet::new();
-            for (id, sink) in member.sinks() {
+            for (_, sink) in member.sinks() {
                 if let Some(peer_id) = sink.peer_id() {
                     peers.insert(peer_id);
                 }
             }
 
-            for (id, src) in member.srcs() {
+            for (_, src) in member.srcs() {
                 for peer_id in src.peer_ids() {
                     peers.insert(peer_id);
                 }
