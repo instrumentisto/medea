@@ -90,20 +90,22 @@ impl Actor for GracefulShutdown {
                     Signal, SIGHUP, SIGINT, SIGQUIT, SIGTERM,
                 };
 
-                let sigint_stream = Signal::new(SIGINT).flatten_stream();
-                let sigterm_stream = Signal::new(SIGTERM).flatten_stream();
-                let sigquit_stream = Signal::new(SIGQUIT).flatten_stream();
-                let sighup_stream = Signal::new(SIGHUP).flatten_stream();
-                let signals_stream = sigint_stream
-                    .select(sigterm_stream)
-                    .select(sigquit_stream)
-                    .select(sighup_stream);
+
+                let mut signals_stream: Box<Stream<Error = std::io::Error, Item = i32>> = Box::new(
+                    Signal::new(SIGINT).flatten_stream()
+
+                );
+                for s in [SIGHUP, SIGQUIT, SIGTERM].into_iter() {
+                    signals_stream = Box::new(signals_stream.select(Signal::new(*s).flatten_stream()));
+                }
 
                 ctx.add_message_stream(
-                    signals_stream.map(ShutdownSignalDetected).map_err(|e| {
-                        error!("Error getting shutdown signal {:?}", e);
-                    }),
-                );
+                    signals_stream
+                        .map(ShutdownSignalDetected)
+                        .map_err(|e| {
+                            error!("Error getting shutdown signal");
+                        }),
+                )
             }
     }
 }
