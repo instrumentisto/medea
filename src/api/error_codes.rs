@@ -117,7 +117,6 @@ pub enum ErrorCode {
 impl Into<ErrorProto> for ErrorCode {
     fn into(self) -> ErrorProto {
         let mut error = ErrorProto::new();
-        error.set_status(0);
         match self {
             ErrorCode::UnknownError(msg) => {
                 error.set_text(format!(

@@ -52,7 +52,6 @@ message GetResponse {
   Error error = 2;
 }
 message Error {
-  uint32 status = 1;
   uint32 code = 2;
   string text = 3;
   string doc = 4;
