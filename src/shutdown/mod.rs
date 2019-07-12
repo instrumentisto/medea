@@ -79,7 +79,7 @@ impl Actor for GracefulShutdown {
     fn started(&mut self, ctx: &mut Self::Context) {
         #[cfg(not(unix))]
             {
-                error!(
+                warning!(
                     "Unable to use graceful_shutdown: only UNIX signals are supported"
                 );
                 return;
