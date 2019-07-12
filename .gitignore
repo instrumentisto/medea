@@ -6,3 +6,7 @@
 
 /target/
 **/*.rs.bk
+
+/src/api/control/grpc/protos
+!/src/api/control/grpc/protos/mod.rs
+!/src/api/control/grpc/protos/control.proto
