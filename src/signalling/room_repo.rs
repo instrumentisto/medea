@@ -3,8 +3,8 @@
 use std::sync::{Arc, Mutex};
 
 use actix::{
-    fut::wrap_future, Actor, ActorFuture, Addr, Context, Handler, MailboxError,
-    Message,
+    fut::wrap_future, Actor, ActorFuture, Addr, AsyncContext, Context, Handler,
+    MailboxError, Message,
 };
 use failure::Fail;
 use futures::future::{Either, Future};
@@ -21,9 +21,9 @@ use crate::{
     },
     signalling::{
         room::{
-            CloseRoom, CreateEndpoint, CreateMember, DeleteEndpoint,
-            DeleteMember, RoomError, SerializeProtobufEndpoint,
-            SerializeProtobufMember, SerializeProtobufRoom,
+            CreateEndpoint, CreateMember, Delete, DeleteEndpoint, DeleteMember,
+            RoomError, SerializeProtobufEndpoint, SerializeProtobufMember,
+            SerializeProtobufRoom,
         },
         Room,
     },
@@ -162,12 +162,19 @@ impl Handler<DeleteRoom> for RoomsRepository {
     fn handle(
         &mut self,
         msg: DeleteRoom,
-        _ctx: &mut Self::Context,
+        ctx: &mut Self::Context,
     ) -> Self::Result {
-        let mut room_repo = self.rooms.lock().unwrap();
+        let room_repo = self.rooms.lock().unwrap();
         if let Some(room) = room_repo.get(&msg.0) {
-            room.do_send(CloseRoom {});
-            room_repo.remove(&msg.0);
+            let rooms = Arc::clone(&self.rooms);
+            // TODO: handle errors
+            ctx.spawn(wrap_future(
+                room.send(Delete)
+                    .map(move |_| {
+                        rooms.lock().unwrap().remove(&msg.0);
+                    })
+                    .map_err(|_| ()),
+            ));
         }
 
         Ok(())
