@@ -28,7 +28,7 @@ use crate::{
     },
     signalling::{participants::ParticipantService, peers::PeerRepository},
     turn::TurnAuthService,
-    utils::graceful_shutdown::{self, ShutdownMessage},
+    shutdown::{ShutdownMessage, ShutdownMessageResult},
 };
 
 /// ID of [`Room`].
@@ -486,13 +486,14 @@ impl Handler<CloseRoom> for Room {
                 futures::future::ok(())
             });
 
+
         Ok(Box::new(drop_fut))
     }
 }
 
 // Close room on `SIGINT`, `SIGTERM`, `SIGQUIT`, `SIGHUP` signals.
 impl Handler<ShutdownMessage> for Room {
-    type Result = graceful_shutdown::ShutdownMessageResult;
+    type Result = ShutdownMessageResult;
 
     fn handle(
         &mut self,

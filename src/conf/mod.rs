@@ -2,7 +2,7 @@
 
 pub mod rpc;
 pub mod server;
-pub mod system_config;
+pub mod shutdown_config;
 pub mod turn;
 
 use std::env;
@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 pub use self::{
     rpc::Rpc,
     server::Server,
-    system_config::SystemConfiguration,
+    shutdown_config::ShutdownConfiguration,
     turn::{Redis, Turn},
 };
 
@@ -36,7 +36,7 @@ pub struct Conf {
     /// TURN server settings.
     pub turn: Turn,
     // More settings
-    pub system_config: SystemConfiguration,
+    pub system_config: ShutdownConfiguration,
 }
 
 impl Conf {

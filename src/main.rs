@@ -7,6 +7,7 @@ pub mod conf;
 pub mod log;
 pub mod media;
 pub mod signalling;
+pub mod shutdown;
 pub mod turn;
 
 use actix::prelude::*;
@@ -19,7 +20,7 @@ use crate::{
     media::create_peers,
     signalling::{Room, RoomsRepository},
     turn::new_turn_auth_service,
-    utils::graceful_shutdown::{self, ShutdownSubscribe},
+    shutdown::{ShutdownSubscribe},
 };
 
 fn main() {
@@ -41,7 +42,7 @@ fn main() {
     let peers = create_peers(1, 2);
 
     let graceful_shutdown_addr =
-        graceful_shutdown::create(config.system_config.shutdown_timeout);
+        shutdown::create(config.system_config.timeout);
 
     let turn_auth_service =
         new_turn_auth_service(&config).expect("Unable to start turn service");

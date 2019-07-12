@@ -76,7 +76,7 @@
 #   connection_timeout = "5s"
 
 
-[system_configuration]
+[shutdown]
 # Number of milliseconds given to shutdown gracefully
 # Default:
-#   shutdown_timeout = 5000
+#   timeout = 5000

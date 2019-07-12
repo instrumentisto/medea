@@ -5,7 +5,7 @@ use smart_default::*;
 
 #[derive(Clone, Debug, Deserialize, Serialize, SmartDefault)]
 #[serde(default)]
-pub struct SystemConfiguration {
+pub struct ShutdownConfiguration {
     #[default(5000)]
-    pub shutdown_timeout: u64,
+    pub timeout: u64,
 }

@@ -23,7 +23,7 @@ use tokio::prelude::{
 use crate::log::prelude::*;
 
 pub type ShutdownMessageResult =
-    Result<Box<(dyn Future<Item = (), Error = ()> + std::marker::Send)>, ()>;
+Result<Box<(dyn Future<Item = (), Error = ()> + std::marker::Send)>, ()>;
 
 type ShutdownFutureType = dyn Future<Item = Vec<()>, Error = ()>;
 
@@ -75,34 +75,34 @@ impl Actor for GracefulShutdown {
 
     fn started(&mut self, ctx: &mut Self::Context) {
         #[cfg(not(unix))]
-        {
-            error!(
-                "Unable to use graceful_shutdown: only UNIX signals are \
+            {
+                error!(
+                    "Unable to use graceful_shutdown: only UNIX signals are \
                  supported"
-            );
-            return;
-        }
+                );
+                return;
+            }
         #[cfg(unix)]
-        {
-            use tokio_signal::unix::{
-                Signal, SIGHUP, SIGINT, SIGQUIT, SIGTERM,
-            };
+            {
+                use tokio_signal::unix::{
+                    Signal, SIGHUP, SIGINT, SIGQUIT, SIGTERM,
+                };
 
-            let sigint_stream = Signal::new(SIGINT).flatten_stream();
-            let sigterm_stream = Signal::new(SIGTERM).flatten_stream();
-            let sigquit_stream = Signal::new(SIGQUIT).flatten_stream();
-            let sighup_stream = Signal::new(SIGHUP).flatten_stream();
-            let signals_stream = sigint_stream
-                .select(sigterm_stream)
-                .select(sigquit_stream)
-                .select(sighup_stream);
+                let sigint_stream = Signal::new(SIGINT).flatten_stream();
+                let sigterm_stream = Signal::new(SIGTERM).flatten_stream();
+                let sigquit_stream = Signal::new(SIGQUIT).flatten_stream();
+                let sighup_stream = Signal::new(SIGHUP).flatten_stream();
+                let signals_stream = sigint_stream
+                    .select(sigterm_stream)
+                    .select(sigquit_stream)
+                    .select(sighup_stream);
 
-            ctx.add_message_stream(
-                signals_stream.map(ShutdownSignalDetected).map_err(|e| {
-                    error!("Error getting shutdown signal {:?}", e);
-                }),
-            );
-        }
+                ctx.add_message_stream(
+                    signals_stream.map(ShutdownSignalDetected).map_err(|e| {
+                        error!("Error getting shutdown signal {:?}", e);
+                    }),
+                );
+            }
     }
 }
 

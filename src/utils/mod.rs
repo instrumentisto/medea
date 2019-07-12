@@ -1,6 +1,5 @@
 //! Helper utils used in project.
 
-pub mod graceful_shutdown;
 
 /// Creates new [`hashbrown::HashMap`] from a list of key-value pairs.
 ///

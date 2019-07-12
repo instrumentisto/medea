@@ -120,7 +120,7 @@ pub mod actors {
 
     use crate::{
         log::prelude::*,
-        utils::graceful_shutdown::{self, ShutdownMessage},
+        shutdown::{ShutdownMessage, ShutdownMessageResult},
     };
 
     pub struct ServerWrapper(pub Server);
@@ -130,7 +130,7 @@ pub mod actors {
     }
 
     impl Handler<ShutdownMessage> for ServerWrapper {
-        type Result = graceful_shutdown::ShutdownMessageResult;
+        type Result = ShutdownMessageResult;
 
         fn handle(
             &mut self,
