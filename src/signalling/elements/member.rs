@@ -129,7 +129,6 @@ impl Member {
     ///
     /// To fill this [`Member`], you need to call the [`Member::load`]
     /// function.
-    // TODO: private
     pub fn new(id: MemberId, credentials: String, room_id: RoomId) -> Self {
         Self(RefCell::new(MemberInner {
             id,

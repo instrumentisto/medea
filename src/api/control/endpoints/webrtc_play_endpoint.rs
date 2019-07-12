@@ -55,7 +55,6 @@ impl TryFrom<&WebRtcPlayEndpointProto> for WebRtcPlayEndpoint {
     }
 }
 
-// TODO
 #[derive(Debug, Fail)]
 pub enum SrcParseError {
     #[fail(display = "Missing fields {:?} in '{}' local URI.", _1, _0)]

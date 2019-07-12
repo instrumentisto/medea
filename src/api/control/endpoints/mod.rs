@@ -47,7 +47,7 @@ impl TryFrom<&MemberElementProto> for Endpoint {
                 WebRtcPublishEndpoint::try_from(value.get_webrtc_pub())?;
             Ok(Endpoint::WebRtcPublish(publish))
         } else {
-            // TODO
+            // TODO implement another endpoints when they will be implemented
             unimplemented!()
         }
     }
@@ -65,7 +65,7 @@ impl TryFrom<&CreateRequest> for Endpoint {
                 WebRtcPublishEndpoint::try_from(value.get_webrtc_pub())?;
             Ok(Endpoint::WebRtcPublish(publish))
         } else {
-            // TODO
+            // TODO implement another endpoints when they will be implemented
             unimplemented!()
         }
     }

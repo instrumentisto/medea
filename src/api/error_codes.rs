@@ -12,6 +12,7 @@ use crate::api::control::{
 };
 
 /// Medea control API errors.
+// TODO: write macro for generating error codes.
 pub enum ErrorCode {
     /// Unknown server error.
     ///
@@ -153,7 +154,7 @@ impl Into<ErrorProto> for ErrorCode {
             ErrorCode::EndpointNotFound(id) => {
                 error.set_text("Endpoint not found.".to_string());
                 error.set_element(id.to_string());
-                error.set_code(1405);
+                error.set_code(1005);
             }
 
             //////////////////////////////////////
