@@ -18,11 +18,10 @@ fn main() {
     let client = ControlApiClient::new(ch);
 
     create_room(&client);
-    //    delete_room(&client);
-    //    delete_endpoint(&client);
-    //        delete_member(&client);
-    //    create_member(&client);
-    //    std::thread::sleep(Duration::from_secs(1));
+    delete_room(&client);
+    delete_endpoint(&client);
+    delete_member(&client);
+    create_member(&client);
     create_endpoint(&client);
     get_room(&client);
 }
@@ -93,7 +92,7 @@ fn create_endpoint(client: &ControlApiClient) {
     let mut endpoint = WebRtcPublishEndpoint::new();
     endpoint.set_p2p(WebRtcPublishEndpoint_P2P::ALWAYS);
     create_endpoint_request
-        .set_id("local://grpc-test/responder/play".to_string());
+        .set_id("local://grpc-test/responder/publish".to_string());
     create_endpoint_request.set_webrtc_pub(endpoint);
 
     let reply = client
