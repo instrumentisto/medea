@@ -507,6 +507,7 @@ impl Into<ElementProto> for &mut Room {
 }
 
 /// Serialize this [`Room`] to protobuf object.
+#[allow(clippy::module_name_repetitions)]
 #[derive(Message)]
 #[rtype(result = "Result<ElementProto, RoomError>")]
 pub struct SerializeProtobufRoom;
@@ -792,7 +793,7 @@ impl Handler<DeleteMember> for Room {
                 }
             }
 
-            self.peers.remove_peers(member.id(), peers, ctx);
+            self.peers.remove_peers(&member.id(), peers, ctx);
         }
 
         self.members.delete_member(&msg.0, ctx);
@@ -819,14 +820,14 @@ impl Handler<DeleteEndpoint> for Room {
             let play_id = WebRtcPlayId(msg.endpoint_id);
             if let Some(endpoint) = member.take_sink(&play_id) {
                 if let Some(peer_id) = endpoint.peer_id() {
-                    self.peers.remove_peer(msg.member_id.clone(), peer_id, ctx);
+                    self.peers.remove_peer(&msg.member_id, peer_id, ctx);
                 }
             }
 
             let publish_id = WebRtcPublishId(play_id.0);
             if let Some(endpoint) = member.take_src(&publish_id) {
                 let peer_ids = endpoint.peer_ids();
-                self.peers.remove_peers(msg.member_id, peer_ids, ctx);
+                self.peers.remove_peers(&msg.member_id, peer_ids, ctx);
             }
         } else {
             return;
@@ -847,7 +848,7 @@ impl Handler<CreateMember> for Room {
         msg: CreateMember,
         _ctx: &mut Self::Context,
     ) -> Self::Result {
-        self.members.create_member(msg.0, msg.1)?;
+        self.members.create_member(msg.0, &msg.1)?;
         Ok(())
     }
 }
@@ -872,14 +873,14 @@ impl Handler<CreateEndpoint> for Room {
         match msg.spec {
             EndpointSpec::WebRtcPlay(e) => {
                 self.members.create_sink_endpoint(
-                    msg.member_id,
+                    &msg.member_id,
                     WebRtcPlayId(msg.endpoint_id),
                     e,
                 )?;
             }
             EndpointSpec::WebRtcPublish(e) => {
                 self.members.create_src_endpoint(
-                    msg.member_id,
+                    &msg.member_id,
                     WebRtcPublishId(msg.endpoint_id),
                     e,
                 )?;

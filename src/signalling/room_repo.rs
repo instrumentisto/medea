@@ -33,6 +33,7 @@ use crate::{
 type ActFuture<I, E> =
     Box<dyn ActorFuture<Actor = RoomsRepository, Item = I, Error = E>>;
 
+#[allow(clippy::module_name_repetitions)]
 #[derive(Debug, Fail)]
 pub enum RoomRepoError {
     #[fail(display = "Room [id = {}] not found.", _0)]
@@ -141,11 +142,8 @@ impl Handler<StartRoom> for RoomsRepository {
 
         let turn = Arc::clone(&self.app.turn_service);
 
-        let room = Room::new(
-            &room,
-            self.app.config.rpc.reconnect_timeout.clone(),
-            turn,
-        )?;
+        let room =
+            Room::new(&room, self.app.config.rpc.reconnect_timeout, turn)?;
         let room_addr = room.start();
 
         self.rooms.lock().unwrap().insert(room_id, room_addr);
@@ -255,7 +253,7 @@ impl Handler<GetRoom> for RoomsRepository {
             if let Some(room) = self.rooms.lock().unwrap().get(&room_id) {
                 futs.push(
                     room.send(SerializeProtobufRoom)
-                        .map_err(|e| RoomRepoError::from(e))
+                        .map_err(RoomRepoError::from)
                         .map(move |result| {
                             result.map(|r| {
                                 let local_uri = LocalUri {
@@ -301,7 +299,7 @@ impl Handler<GetMember> for RoomsRepository {
             if let Some(room) = self.rooms.lock().unwrap().get(&room_id) {
                 futs.push(
                     room.send(SerializeProtobufMember(member_id.clone()))
-                        .map_err(|e| RoomRepoError::from(e))
+                        .map_err(RoomRepoError::from)
                         .map(|result| {
                             result.map(|r| {
                                 let local_uri = LocalUri {
@@ -351,7 +349,7 @@ impl Handler<GetEndpoint> for RoomsRepository {
                         member_id.clone(),
                         endpoint_id.clone(),
                     ))
-                    .map_err(|e| RoomRepoError::from(e))
+                    .map_err(RoomRepoError::from)
                     .map(|result| {
                         result.map(|r| {
                             let local_uri = LocalUri {
@@ -395,7 +393,7 @@ impl Handler<CreateMemberInRoom> for RoomsRepository {
             if let Some(room) = self.rooms.lock().unwrap().get(&msg.room_id) {
                 Either::A(
                     room.send(CreateMember(msg.member_id, msg.spec))
-                        .map_err(|e| RoomRepoError::from(e)),
+                        .map_err(RoomRepoError::from),
                 )
             } else {
                 Either::B(futures::future::err(RoomRepoError::RoomNotFound(
@@ -433,7 +431,7 @@ impl Handler<CreateEndpointInRoom> for RoomsRepository {
                         endpoint_id: msg.endpoint_id,
                         spec: msg.spec,
                     })
-                    .map_err(|e| RoomRepoError::from(e)),
+                    .map_err(RoomRepoError::from),
                 )
             } else {
                 Either::B(futures::future::err(RoomRepoError::RoomNotFound(

@@ -108,17 +108,17 @@ impl SrcUri {
             missing_fields.push("endpoint_id".to_string());
         }
 
-        if !missing_fields.is_empty() {
-            return Err(SrcParseError::MissingField(
-                value.to_string(),
-                missing_fields,
-            ));
-        } else {
+        if missing_fields.is_empty() {
             Ok(Self {
                 room_id: local_uri.room_id.unwrap(),
                 member_id: local_uri.member_id.unwrap(),
                 endpoint_id: WebRtcPublishId(local_uri.endpoint_id.unwrap()),
             })
+        } else {
+            Err(SrcParseError::MissingField(
+                value.to_string(),
+                missing_fields,
+            ))
         }
     }
 }

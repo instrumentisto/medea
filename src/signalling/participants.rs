@@ -430,7 +430,7 @@ impl ParticipantService {
     pub fn create_member(
         &mut self,
         id: MemberId,
-        spec: MemberSpec,
+        spec: &MemberSpec,
     ) -> Result<(), ParticipantServiceErr> {
         if self.members.get(&id).is_some() {
             return Err(ParticipantServiceErr::ParticipantAlreadyExists(
@@ -487,7 +487,7 @@ impl ParticipantService {
     /// [`WebRtcPlayEndpoint`]'s ID already presented in [`Member`].
     pub fn create_sink_endpoint(
         &mut self,
-        member_id: MemberId,
+        member_id: &MemberId,
         endpoint_id: WebRtcPlayId,
         spec: WebRtcPlayEndpointSpec,
     ) -> Result<(), ParticipantServiceErr> {
@@ -527,7 +527,7 @@ impl ParticipantService {
     /// [`WebRtcPublishEndpoint`]'s ID already presented in [`Member`].
     pub fn create_src_endpoint(
         &mut self,
-        member_id: MemberId,
+        member_id: &MemberId,
         endpoint_id: WebRtcPublishId,
         spec: WebRtcPublishEndpointSpec,
     ) -> Result<(), ParticipantServiceErr> {

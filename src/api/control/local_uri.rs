@@ -8,6 +8,7 @@ use crate::api::error_codes::ErrorCode;
 
 use super::{MemberId, RoomId};
 
+#[allow(clippy::module_name_repetitions)]
 #[derive(Debug, Fail)]
 pub enum LocalUriParseError {
     /// Protocol of provided URI is not "local://".
@@ -32,6 +33,7 @@ impl Into<ErrorCode> for LocalUriParseError {
     }
 }
 
+#[allow(clippy::doc_markdown)]
 /// Uri in format "local://room_id/member_id/endpoint_id"
 /// This kind of uri used for pointing to some element in spec (`Room`,
 /// `Member`, `WebRtcPlayEndpoint`, `WebRtcPublishEndpoint`, etc).
@@ -91,7 +93,7 @@ impl LocalUri {
         let endpoint_id = uri_body_splitted
             .pop()
             .filter(|p| !p.is_empty())
-            .map(|p| p.to_string());
+            .map(std::string::ToString::to_string);
 
         Ok(Self {
             room_id,

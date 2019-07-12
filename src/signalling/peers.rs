@@ -179,7 +179,7 @@ impl PeerRepository {
     /// __Note:__ this also delete partner peers.
     pub fn remove_peers(
         &mut self,
-        member_id: MemberId,
+        member_id: &MemberId,
         peer_ids: HashSet<PeerId>,
         ctx: &mut Context<Room>,
     ) {
@@ -188,7 +188,7 @@ impl PeerRepository {
             if let Some(peer) = self.peers.remove(&peer_id) {
                 let partner_peer_id = peer.partner_peer_id();
                 let partner_member_id = peer.partner_member_id();
-                if let Some(_) = self.peers.remove(&partner_peer_id) {
+                if self.peers.remove(&partner_peer_id).is_some() {
                     removed_peers
                         .entry(partner_member_id)
                         .or_insert(Vec::new())
@@ -215,13 +215,13 @@ impl PeerRepository {
     /// __Note:__ this also delete partner peer.
     pub fn remove_peer(
         &mut self,
-        member_id: MemberId,
+        member_id: &MemberId,
         peer_id: PeerId,
         ctx: &mut Context<Room>,
     ) {
-        let mut peers_id = HashSet::new();
-        peers_id.insert(peer_id);
-        self.remove_peers(member_id, peers_id, ctx);
+        let mut peers_id_to_delete = HashSet::new();
+        peers_id_to_delete.insert(peer_id);
+        self.remove_peers(&member_id, peers_id_to_delete, ctx);
     }
 
     /// Close all related to disconnected [`Member`] [`Peer`]s and partner

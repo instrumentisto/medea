@@ -13,8 +13,7 @@ use crate::{
     api::control::{
         endpoints::WebRtcPlayEndpoint as WebRtcPlayEndpointSpec,
         grpc::protos::control::{
-            Error as ErrorProto, Member as MemberProto,
-            Room_Element as ElementProto,
+            Member as MemberProto, Room_Element as ElementProto,
         },
         local_uri::LocalUri,
         MemberId, MemberSpec, RoomId, RoomSpec, TryFromElementError,
@@ -53,6 +52,7 @@ pub enum MembersLoadError {
     PublishEndpointNotFound(LocalUri),
 }
 
+#[allow(clippy::module_name_repetitions)]
 #[derive(Debug, Fail)]
 pub enum MemberError {
     #[fail(display = "Publish endpoint [id = {}] not found.", _0)]
@@ -84,27 +84,6 @@ impl Into<ErrorCode> for MembersLoadError {
                 ErrorCode::PlayEndpointNotFound(id)
             }
         }
-    }
-}
-
-impl Into<ErrorProto> for &MemberError {
-    fn into(self) -> ErrorProto {
-        let mut error = ErrorProto::new();
-        match &self {
-            MemberError::PlayEndpointNotFound(id) => {
-                error.set_element(id.to_string());
-                error.set_code(0); // TODO
-                error.set_status(400);
-                error.set_text(self.to_string());
-            }
-            MemberError::PublishEndpointNotFound(id) => {
-                error.set_element(id.to_string());
-                error.set_code(0); // TODO
-                error.set_status(400);
-                error.set_text(self.to_string());
-            }
-        }
-        error
     }
 }
 
@@ -460,7 +439,7 @@ impl Member {
     /// This function will add created [`WebRtcPlayEndpoint`] to src's
     /// [`WebRtcPublishEndpoint`] and to provided [`Member`].
     pub fn create_sink(
-        member: Rc<Self>,
+        member: &Rc<Self>,
         id: WebRtcPlayId,
         spec: WebRtcPlayEndpointSpec,
     ) {

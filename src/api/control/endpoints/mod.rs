@@ -41,11 +41,11 @@ impl TryFrom<&MemberElementProto> for Endpoint {
     fn try_from(value: &MemberElementProto) -> Result<Self, Self::Error> {
         if value.has_webrtc_play() {
             let play = WebRtcPlayEndpoint::try_from(value.get_webrtc_play())?;
-            return Ok(Endpoint::WebRtcPlay(play));
+            Ok(Endpoint::WebRtcPlay(play))
         } else if value.has_webrtc_pub() {
             let publish =
                 WebRtcPublishEndpoint::try_from(value.get_webrtc_pub())?;
-            return Ok(Endpoint::WebRtcPublish(publish));
+            Ok(Endpoint::WebRtcPublish(publish))
         } else {
             // TODO
             unimplemented!()
@@ -59,11 +59,11 @@ impl TryFrom<&CreateRequest> for Endpoint {
     fn try_from(value: &CreateRequest) -> Result<Self, Self::Error> {
         if value.has_webrtc_play() {
             let play = WebRtcPlayEndpoint::try_from(value.get_webrtc_play())?;
-            return Ok(Endpoint::WebRtcPlay(play));
+            Ok(Endpoint::WebRtcPlay(play))
         } else if value.has_webrtc_pub() {
             let publish =
                 WebRtcPublishEndpoint::try_from(value.get_webrtc_pub())?;
-            return Ok(Endpoint::WebRtcPublish(publish));
+            Ok(Endpoint::WebRtcPublish(publish))
         } else {
             // TODO
             unimplemented!()

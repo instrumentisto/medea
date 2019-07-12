@@ -1,4 +1,4 @@
-//! WebRtcPublish
+//! `WebRtcPublishEndpoint` implementation.
 
 use std::convert::TryFrom;
 

@@ -128,7 +128,7 @@ impl ControlApiService {
     /// Implementation of `Create` method for `Room` element.
     pub fn create_room(
         &mut self,
-        req: CreateRequest,
+        req: &CreateRequest,
         local_uri: LocalUri,
     ) -> impl Future<
         Item = Result<
@@ -164,7 +164,7 @@ impl ControlApiService {
         Either::A(
             self.room_repository
                 .send(StartRoom(room_id, room))
-                .map_err(|e| ControlApiError::from(e))
+                .map_err(ControlApiError::from)
                 .map(move |r| r.map(|_| Ok(sid))),
         )
     }
@@ -172,7 +172,7 @@ impl ControlApiService {
     /// Implementation of `Create` method for `Member` element.
     pub fn create_member(
         &mut self,
-        req: CreateRequest,
+        req: &CreateRequest,
         local_uri: LocalUri,
     ) -> impl Future<
         Item = Result<
@@ -204,7 +204,7 @@ impl ControlApiService {
                     member_id,
                     spec,
                 })
-                .map_err(|e| ControlApiError::from(e))
+                .map_err(ControlApiError::from)
                 .map(|r| r.map(|r| r.map(|_| sids))),
         )
     }
@@ -213,7 +213,7 @@ impl ControlApiService {
     /// `WebRtcPlayEndpoint` elements.
     pub fn create_endpoint(
         &mut self,
-        req: CreateRequest,
+        req: &CreateRequest,
         local_uri: LocalUri,
     ) -> impl Future<
         Item = Result<
@@ -222,7 +222,7 @@ impl ControlApiService {
         >,
         Error = ControlApiError,
     > {
-        let endpoint = fut_try!(Endpoint::try_from(&req));
+        let endpoint = fut_try!(Endpoint::try_from(req));
         Either::A(
             self.room_repository
                 .send(CreateEndpointInRoom {
@@ -231,7 +231,7 @@ impl ControlApiService {
                     endpoint_id: local_uri.endpoint_id.unwrap(),
                     spec: endpoint,
                 })
-                .map_err(|e| ControlApiError::from(e))
+                .map_err(ControlApiError::from)
                 .map(|r| r.map(|r| r.map(|_| HashMap::new()))),
         )
     }
@@ -289,7 +289,7 @@ impl ControlApi for ControlApiService {
 
         if local_uri.is_room_uri() {
             if req.has_room() {
-                ctx.spawn(self.create_room(req, local_uri).then(move |r| {
+                ctx.spawn(self.create_room(&req, local_uri).then(move |r| {
                     sink.success(create_response(r)).map_err(|_| ())
                 }));
             } else {
@@ -302,7 +302,7 @@ impl ControlApi for ControlApiService {
             }
         } else if local_uri.is_member_uri() {
             if req.has_member() {
-                ctx.spawn(self.create_member(req, local_uri).then(move |r| {
+                ctx.spawn(self.create_member(&req, local_uri).then(move |r| {
                     sink.success(create_response(r)).map_err(|e| {
                         warn!(
                             "Error while sending Create response by gRPC. {:?}",
@@ -320,7 +320,7 @@ impl ControlApi for ControlApiService {
             }
         } else if local_uri.is_endpoint_uri() {
             if req.has_webrtc_pub() || req.has_webrtc_play() {
-                ctx.spawn(self.create_endpoint(req, local_uri).then(
+                ctx.spawn(self.create_endpoint(&req, local_uri).then(
                     move |r| {
                         sink.success(create_response(r)).map_err(|e| {
                             warn!(
@@ -511,7 +511,7 @@ impl ControlApi for ControlApiService {
 
                         let elements_results = elements_results
                             .into_iter()
-                            .flat_map(|e| e.into_iter());
+                            .flat_map(std::iter::IntoIterator::into_iter);
 
                         for element in elements_results {
                             match element {
@@ -574,7 +574,7 @@ pub fn run(
     room_repo: Addr<RoomsRepository>,
     app: Arc<App>,
 ) -> Addr<GrpcServer> {
-    let bind_ip = app.config.grpc.bind_ip.clone().to_string();
+    let bind_ip = app.config.grpc.bind_ip.to_string();
     let bind_port = app.config.grpc.bind_port;
     let cq_count = app.config.grpc.completion_queue_count;
 
