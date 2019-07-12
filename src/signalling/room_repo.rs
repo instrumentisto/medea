@@ -230,17 +230,16 @@ impl Handler<DeleteEndpointFromMember> for RoomsRepository {
     }
 }
 
+/// Type alias for result of Get request.
+type GetResults = Vec<Result<(String, ElementProto), RoomError>>;
+
 /// Signal for get serialized to protobuf object [`Room`].
 #[derive(Message)]
-#[rtype(result = "Result<Vec<Result<(String, ElementProto), RoomError>>, \
-                  RoomRepoError>")]
+#[rtype(result = "Result<GetResults, RoomRepoError>")]
 pub struct GetRoom(pub Vec<RoomId>);
 
 impl Handler<GetRoom> for RoomsRepository {
-    type Result = ActFuture<
-        Vec<Result<(String, ElementProto), RoomError>>,
-        RoomRepoError,
-    >;
+    type Result = ActFuture<GetResults, RoomRepoError>;
 
     fn handle(
         &mut self,
@@ -278,15 +277,11 @@ impl Handler<GetRoom> for RoomsRepository {
 
 /// Signal for get serialized to protobuf object [`Member`].
 #[derive(Message)]
-#[rtype(result = "Result<Vec<Result<(String, ElementProto), RoomError>>, \
-                  RoomRepoError>")]
+#[rtype(result = "Result<GetResults, RoomRepoError>")]
 pub struct GetMember(pub Vec<(RoomId, MemberId)>);
 
 impl Handler<GetMember> for RoomsRepository {
-    type Result = ActFuture<
-        Vec<Result<(String, ElementProto), RoomError>>,
-        RoomRepoError,
-    >;
+    type Result = ActFuture<GetResults, RoomRepoError>;
 
     fn handle(
         &mut self,
@@ -325,15 +320,11 @@ impl Handler<GetMember> for RoomsRepository {
 
 /// Signal for get serialized to protobuf object `Endpoint`.
 #[derive(Message)]
-#[rtype(result = "Result<Vec<Result<(String, ElementProto), RoomError>>, \
-                  RoomRepoError>")]
+#[rtype(result = "Result<GetResults, RoomRepoError>")]
 pub struct GetEndpoint(pub Vec<(RoomId, MemberId, String)>);
 
 impl Handler<GetEndpoint> for RoomsRepository {
-    type Result = ActFuture<
-        Vec<Result<(String, ElementProto), RoomError>>,
-        RoomRepoError,
-    >;
+    type Result = ActFuture<GetResults, RoomRepoError>;
 
     fn handle(
         &mut self,

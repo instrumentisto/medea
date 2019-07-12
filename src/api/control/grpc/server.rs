@@ -118,6 +118,10 @@ macro_rules! parse_local_uri {
     };
 }
 
+/// Type alias for result of Create request.
+type CreateResult =
+    Result<Result<HashMap<String, String>, RoomError>, RoomRepoError>;
+
 #[derive(Clone)]
 struct ControlApiService {
     room_repository: Addr<RoomsRepository>,
@@ -130,13 +134,7 @@ impl ControlApiService {
         &mut self,
         req: &CreateRequest,
         local_uri: LocalUri,
-    ) -> impl Future<
-        Item = Result<
-            Result<HashMap<String, String>, RoomError>,
-            RoomRepoError,
-        >,
-        Error = ControlApiError,
-    > {
+    ) -> impl Future<Item = CreateResult, Error = ControlApiError> {
         let room_id = local_uri.room_id.unwrap();
 
         let room = fut_try!(RoomSpec::try_from_protobuf(
@@ -174,13 +172,7 @@ impl ControlApiService {
         &mut self,
         req: &CreateRequest,
         local_uri: LocalUri,
-    ) -> impl Future<
-        Item = Result<
-            Result<HashMap<String, String>, RoomError>,
-            RoomRepoError,
-        >,
-        Error = ControlApiError,
-    > {
+    ) -> impl Future<Item = CreateResult, Error = ControlApiError> {
         let spec = fut_try!(MemberSpec::try_from(req.get_member()));
 
         let room_id = local_uri.room_id.unwrap();
@@ -215,13 +207,7 @@ impl ControlApiService {
         &mut self,
         req: &CreateRequest,
         local_uri: LocalUri,
-    ) -> impl Future<
-        Item = Result<
-            Result<HashMap<String, String>, RoomError>,
-            RoomRepoError,
-        >,
-        Error = ControlApiError,
-    > {
+    ) -> impl Future<Item = CreateResult, Error = ControlApiError> {
         let endpoint = fut_try!(Endpoint::try_from(req));
         Either::A(
             self.room_repository
@@ -238,12 +224,7 @@ impl ControlApiService {
 }
 
 /// Generate [`Response`] for `Create` method of all elements.
-fn create_response(
-    result: Result<
-        Result<Result<HashMap<String, String>, RoomError>, RoomRepoError>,
-        ControlApiError,
-    >,
-) -> Response {
+fn create_response(result: Result<CreateResult, ControlApiError>) -> Response {
     let error: ErrorCode = match result {
         Ok(r) => match r {
             Ok(r) => match r {
