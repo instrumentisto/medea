@@ -272,7 +272,9 @@ fn error_response(
     let error: Error = error_code.into();
     response.set_error(error);
 
-    sink.success(response).map_err(|_| ())
+    sink.success(response).map_err(|e| {
+        warn!("Error while sending Error response by gRPC. {:?}", e)
+    })
 }
 
 impl ControlApi for ControlApiService {
@@ -301,7 +303,12 @@ impl ControlApi for ControlApiService {
         } else if local_uri.is_member_uri() {
             if req.has_member() {
                 ctx.spawn(self.create_member(req, local_uri).then(move |r| {
-                    sink.success(create_response(r)).map_err(|_| ())
+                    sink.success(create_response(r)).map_err(|e| {
+                        warn!(
+                            "Error while sending Create response by gRPC. {:?}",
+                            e
+                        )
+                    })
                 }));
             } else {
                 ctx.spawn(error_response(
@@ -314,7 +321,15 @@ impl ControlApi for ControlApiService {
         } else if local_uri.is_endpoint_uri() {
             if req.has_webrtc_pub() || req.has_webrtc_play() {
                 ctx.spawn(self.create_endpoint(req, local_uri).then(
-                    move |r| sink.success(create_response(r)).map_err(|_| ()),
+                    move |r| {
+                        sink.success(create_response(r)).map_err(|e| {
+                            warn!(
+                                "Error while sending Create response by gRPC. \
+                                 {:?}",
+                                e
+                            )
+                        })
+                    },
                 ));
             } else {
                 ctx.spawn(error_response(
@@ -387,17 +402,41 @@ impl ControlApi for ControlApiService {
         ctx.spawn(
             mega_delete_endpoints_fut
                 .join3(mega_delete_member_fut, mega_delete_room_fut)
-                .map_err(|_| ())
-                .and_then(move |(member, endpoint, room)| {
-                    member
-                        .into_iter()
-                        .chain(endpoint.into_iter())
-                        .chain(room.into_iter())
-                        .for_each(|r| r.unwrap());
-                    // TODO
-                    let mut response = Response::new();
-                    response.set_sid(HashMap::new());
-                    sink.success(response).map_err(|_| ())
+                .map_err(|e| {
+                    warn!("Control API Delete method mailbox error. {:?}", e)
+                })
+                .then(move |result| {
+                    let map_err_closure = |e| {
+                        warn!(
+                            "Error while sending Delete response by gRPC. {:?}",
+                            e
+                        )
+                    };
+                    match result {
+                        Ok((member, endpoint, room)) => {
+                            member
+                                .into_iter()
+                                .chain(endpoint.into_iter())
+                                .chain(room.into_iter())
+                                .for_each(|r| r.unwrap());
+                            // TODO
+                            let mut response = Response::new();
+                            response.set_sid(HashMap::new());
+                            sink.success(response).map_err(map_err_closure)
+                        }
+                        Err(e) => {
+                            warn!(
+                                "Control API Delete method mailbox error. {:?}",
+                                e
+                            );
+                            let mut response = Response::new();
+                            let error: Error =
+                                ErrorCode::UnknownError(format!("{:?}", e))
+                                    .into();
+                            response.set_error(error);
+                            sink.success(response).map_err(map_err_closure)
+                        }
+                    }
                 }),
         );
     }
@@ -436,52 +475,68 @@ impl ControlApi for ControlApiService {
         let member_fut = self.room_repository.send(GetMember(member_ids));
         let endpoint_fut = self.room_repository.send(GetEndpoint(endpoint_ids));
 
-        let mega_future = room_fut
-            .join3(member_fut, endpoint_fut)
-            .map_err(|e| println!("{:?}", e))
-            .and_then(|(room, member, endpoint)| {
-                let mut elements = HashMap::new();
-                let mut elements_results = Vec::new();
+        let mega_future =
+            room_fut.join3(member_fut, endpoint_fut).then(|result| {
+                let grpc_err_closure =
+                    |e| warn!("Error while sending Get response. {:?}", e);
 
-                let results = vec![room, member, endpoint];
+                match result {
+                    Ok((room, member, endpoint)) => {
+                        let mut elements = HashMap::new();
+                        let mut elements_results = Vec::new();
 
-                let closure = |_| ();
+                        let results = vec![room, member, endpoint];
 
-                for result in results {
-                    match result {
-                        Ok(o) => {
-                            elements_results.push(o);
+                        for result in results {
+                            match result {
+                                Ok(o) => {
+                                    elements_results.push(o);
+                                }
+                                Err(e) => {
+                                    let mut response = GetResponse::new();
+                                    let error: ErrorCode = e.into();
+                                    response.set_error(error.into());
+                                    return sink
+                                        .success(response)
+                                        .map_err(grpc_err_closure);
+                                }
+                            }
                         }
-                        Err(e) => {
-                            let mut response = GetResponse::new();
-                            let error: ErrorCode = e.into();
-                            response.set_error(error.into());
-                            return sink.success(response).map_err(closure);
+
+                        let elements_results = elements_results
+                            .into_iter()
+                            .flat_map(|e| e.into_iter());
+
+                        for element in elements_results {
+                            match element {
+                                Ok((id, o)) => {
+                                    elements.insert(id, o);
+                                }
+                                Err(e) => {
+                                    let mut response = GetResponse::new();
+                                    let error: ErrorCode = e.into();
+                                    response.set_error(error.into());
+                                    return sink
+                                        .success(response)
+                                        .map_err(grpc_err_closure);
+                                }
+                            }
                         }
+
+                        let mut response = GetResponse::new();
+                        response.set_elements(elements);
+
+                        sink.success(response).map_err(grpc_err_closure)
+                    }
+                    Err(e) => {
+                        warn!("Control API Get method mailbox error. {:?}", e);
+                        let mut response = GetResponse::new();
+                        let error: Error =
+                            ErrorCode::UnknownError(format!("{:?}", e)).into();
+                        response.set_error(error);
+                        sink.success(response).map_err(grpc_err_closure)
                     }
                 }
-
-                let elements_results =
-                    elements_results.into_iter().flat_map(|e| e.into_iter());
-
-                for element in elements_results {
-                    match element {
-                        Ok((id, o)) => {
-                            elements.insert(id, o);
-                        }
-                        Err(e) => {
-                            let mut response = GetResponse::new();
-                            let error: ErrorCode = e.into();
-                            response.set_error(error.into());
-                            return sink.success(response).map_err(closure);
-                        }
-                    }
-                }
-
-                let mut response = GetResponse::new();
-                response.set_elements(elements);
-
-                sink.success(response).map_err(closure)
             });
 
         ctx.spawn(mega_future);
