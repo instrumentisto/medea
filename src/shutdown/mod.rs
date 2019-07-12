@@ -27,12 +27,15 @@ Result<Box<(dyn Future<Item = (), Error = ()> + std::marker::Send)>, ()>;
 
 type ShutdownFutureType = dyn Future<Item = Vec<()>, Error = ()>;
 
+#[derive(Ord, PartialOrd, PartialEq, Eq, Copy, Clone)]
+pub struct Priority(pub u8);
+
 #[derive(Debug, Message)]
 #[rtype(result = "ShutdownMessageResult")]
 pub struct ShutdownMessage;
 
 pub struct Subscriber {
-    pub priority: u8,
+    pub priority: Priority,
     pub addr: Recipient<ShutdownMessage>,
 }
 
@@ -55,7 +58,7 @@ struct ShutdownSignalDetected(i32);
 
 pub struct GracefulShutdown {
     /// [`Actor`]s to send message when graceful shutdown
-    recipients: BTreeMap<u8, HashSet<Recipient<ShutdownMessage>>>,
+    recipients: BTreeMap<Priority, HashSet<Recipient<ShutdownMessage>>>,
 
     /// Timeout after which all [`Actors`] will be forced shutdown
     shutdown_timeout: u64,

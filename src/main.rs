@@ -54,7 +54,7 @@ fn main() {
     graceful_shutdown_addr.do_send(shutdown::Subscribe (
         shutdown::Subscriber {
             addr: room.clone().recipient(),
-            priority: 1,
+            priority: shutdown::Priority(1),
         }));
 
     let rooms = hashmap! {1 => room};
@@ -64,7 +64,7 @@ fn main() {
     graceful_shutdown_addr.do_send(shutdown::Subscribe (
         shutdown::Subscriber {
             addr: server_addr.recipient(),
-            priority: 5,
+            priority: shutdown::Priority(5),
         }));
 
     let _ = sys.run();
