@@ -31,21 +31,21 @@ type ShutdownFutureType = dyn Future<Item = Vec<()>, Error = ()>;
 #[rtype(result = "ShutdownMessageResult")]
 pub struct ShutdownMessage;
 
-/// Subscribe to exit events, with priority
-#[derive(Message)]
-#[rtype(result = "()")]
-pub struct ShutdownSubscribe {
+pub struct Subscriber {
     pub priority: u8,
-    pub who: Recipient<ShutdownMessage>,
+    pub addr: Recipient<ShutdownMessage>,
 }
 
-/// Subscribe to exit events, with priority
+/// Subscribe to shutdown messages
 #[derive(Message)]
 #[rtype(result = "()")]
-pub struct ShutdownUnsubscribe {
-    pub priority: u8,
-    pub who: Recipient<ShutdownMessage>,
-}
+pub struct Subscribe(pub Subscriber);
+
+/// Unsubscribe from shutdown messages
+#[derive(Message)]
+#[rtype(result = "()")]
+pub struct Unsubscribe(pub Subscriber);
+
 
 /// Send this when a signal is detected
 #[cfg(unix)]
@@ -77,8 +77,7 @@ impl Actor for GracefulShutdown {
         #[cfg(not(unix))]
             {
                 error!(
-                    "Unable to use graceful_shutdown: only UNIX signals are \
-                 supported"
+                    "Unable to use graceful_shutdown: only UNIX signals are supported"
                 );
                 return;
             }
@@ -168,35 +167,35 @@ impl Handler<ShutdownSignalDetected> for GracefulShutdown {
     }
 }
 
-impl Handler<ShutdownSubscribe> for GracefulShutdown {
+impl Handler<Subscribe> for GracefulShutdown {
     type Result = ();
 
-    fn handle(&mut self, msg: ShutdownSubscribe, _: &mut Context<Self>) {
+    fn handle(&mut self, msg: Subscribe, _: &mut Context<Self>) {
         let hashset_with_current_priority =
-            self.recipients.get_mut(&msg.priority);
+            self.recipients.get_mut(&msg.0.priority);
 
         if let Some(hashset) = hashset_with_current_priority {
-            hashset.insert(msg.who);
+            hashset.insert(msg.0.addr);
         } else {
-            self.recipients.insert(msg.priority, HashSet::new());
+            self.recipients.insert(msg.0.priority, HashSet::new());
             // unwrap should not panic because we have inserted new empty
             // hashset with the key we are trying to get in the line
             // above /\
-            let hashset = self.recipients.get_mut(&msg.priority).unwrap();
-            hashset.insert(msg.who);
+            let hashset = self.recipients.get_mut(&msg.0.priority).unwrap();
+            hashset.insert(msg.0.addr);
         }
     }
 }
 
-impl Handler<ShutdownUnsubscribe> for GracefulShutdown {
+impl Handler<Unsubscribe> for GracefulShutdown {
     type Result = ();
 
-    fn handle(&mut self, msg: ShutdownUnsubscribe, _: &mut Context<Self>) {
+    fn handle(&mut self, msg: Unsubscribe, _: &mut Context<Self>) {
         let hashset_with_current_priority =
-            self.recipients.get_mut(&msg.priority);
+            self.recipients.get_mut(&msg.0.priority);
 
         if let Some(hashset) = hashset_with_current_priority {
-            hashset.remove(&msg.who);
+            hashset.remove(&msg.0.addr);
         } else {
             return;
         }

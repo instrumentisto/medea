@@ -20,7 +20,6 @@ use crate::{
     media::create_peers,
     signalling::{Room, RoomsRepository},
     turn::new_turn_auth_service,
-    shutdown::{ShutdownSubscribe},
 };
 
 fn main() {
@@ -52,19 +51,21 @@ fn main() {
     let room = Room::start_in_arbiter(&Arbiter::new(), move |_| {
         Room::new(1, members, peers, rpc_reconnect_timeout, turn_auth_service)
     });
-    graceful_shutdown_addr.do_send(ShutdownSubscribe {
-        who: room.clone().recipient(),
-        priority: 1,
-    });
+    graceful_shutdown_addr.do_send(shutdown::Subscribe (
+        shutdown::Subscriber {
+            addr: room.clone().recipient(),
+            priority: 1,
+        }));
 
     let rooms = hashmap! {1 => room};
     let rooms_repo = RoomsRepository::new(rooms);
 
     let server_addr = server::run(rooms_repo, config);
-    graceful_shutdown_addr.do_send(ShutdownSubscribe {
-        who: server_addr.recipient(),
-        priority: 5,
-    });
+    graceful_shutdown_addr.do_send(shutdown::Subscribe (
+        shutdown::Subscriber {
+            addr: server_addr.recipient(),
+            priority: 5,
+        }));
 
     let _ = sys.run();
 }
