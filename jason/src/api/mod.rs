@@ -1,4 +1,5 @@
 //! External Jason API accessible from JS.
+
 mod connection;
 mod room;
 
@@ -9,9 +10,9 @@ use js_sys::Promise;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::future_to_promise;
 
-use crate::{
-    jason::room::Room, media::MediaManager, rpc::RpcClient, set_panic_hook,
-};
+use crate::{media::MediaManager, rpc::RpcClient, set_panic_hook};
+
+use self::room::Room;
 
 #[doc(inline)]
 pub use self::{connection::ConnectionHandle, room::RoomHandle};
@@ -28,7 +29,7 @@ struct Inner {
     rooms: Vec<Room>,
 }
 
-/// Main application handler.
+/// Main library handler.
 ///
 /// Responsible for managing shared transports, local media
 /// and room initialization.
@@ -40,7 +41,7 @@ impl Jason {
         Self::default()
     }
 
-    /// Entering room with provided token.
+    /// Performs entering to a [`Room`] by the authorization `token`.
     ///
     /// Establishes connection with media server (if it doesn't already exist).
     /// Fails if unable to connect to media server.
@@ -68,15 +69,16 @@ impl Jason {
         future_to_promise(fut)
     }
 
-    /// Set `on_local_stream` callback, which will be invoked once media
+    /// Sets `on_local_stream` callback, which will be invoked once media
     /// acquisition request will resolve returning [`MediaStreamHandle`] or
     /// [`WasmErr`].
+    #[inline]
     pub fn on_local_stream(&self, f: js_sys::Function) {
         self.0.borrow_mut().media_manager.set_on_local_stream(f);
     }
 
-    /// Drops Jason and all related objects (Rooms, Connections, Streams etc. ).
-    /// All objects related to this Jason instance will be detached (you will
-    /// still hold them, but unable to use).
+    /// Drops [`Jason`] API object, so all related objects (rooms, connections,
+    /// streams etc.) respectively. All objects related to this [`Jason`] API
+    /// object will be detached (you will still hold them, but unable to use).
     pub fn dispose(self) {}
 }

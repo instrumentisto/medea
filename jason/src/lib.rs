@@ -1,4 +1,4 @@
-pub mod jason;
+pub mod api;
 pub mod media;
 pub mod peer;
 pub mod rpc;
@@ -15,7 +15,7 @@ pub use console_error_panic_hook::set_once as set_panic_hook;
 
 #[doc(inline)]
 pub use self::{
-    jason::{ConnectionHandle, Jason, RoomHandle},
+    api::{ConnectionHandle, Jason, RoomHandle},
     media::MediaStreamHandle,
 };
 

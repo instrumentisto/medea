@@ -1,4 +1,4 @@
-//! Wrappers and adapters for [`MediaStream`][1] and relate objects.
+//! [MediaStream][1] related objects.
 //!
 //! [1]: https://www.w3.org/TR/mediacapture-streams/#mediastream
 
@@ -11,29 +11,29 @@ use medea_client_api_proto::MediaType;
 use wasm_bindgen::{prelude::*, JsValue};
 use web_sys::MediaStream as SysMediaStream;
 
-use crate::{
-    media::{MediaTrack, TrackId},
-    utils::WasmErr,
-};
+use crate::utils::WasmErr;
 
-/// [`MediaStream`] object wrapper.
+use super::{MediaTrack, TrackId};
+
+/// Actual data of a [`MediaStream`].
 ///
-/// Shared between JS-side handle ([`MediaStreamHandle`])
-/// and Rust-side handle ([`MediaStream`]).
+/// Shared between JS side ([`MediaStreamHandle`]) and Rust side
+/// ([`MediaStream`]).
 struct InnerStream {
-    /// Actual [`MediaStream`][1] object.
+    /// Actual underlying [MediaStream][1] object.
     ///
     /// [1]: https://www.w3.org/TR/mediacapture-streams/#mediastream
     stream: SysMediaStream,
 
-    /// List of [`MediaStream`]s audio tracks.
+    /// List of audio tracks.
     audio_tracks: HashMap<u64, Rc<MediaTrack>>,
 
-    /// List of [`MediaStream`]s video tracks.
+    /// List of video tracks.
     video_tracks: HashMap<u64, Rc<MediaTrack>>,
 }
 
 impl InnerStream {
+    /// Instantiates new [`InnerStream`].
     fn new() -> Self {
         Self {
             stream: SysMediaStream::new().unwrap(),
@@ -42,7 +42,7 @@ impl InnerStream {
         }
     }
 
-    /// Adds provided track.
+    /// Adds provided [`MediaTrack`] to a stream.
     fn add_track(&mut self, track: Rc<MediaTrack>) {
         self.stream.add_track(track.track());
         let caps = track.caps();
@@ -57,26 +57,36 @@ impl InnerStream {
     }
 }
 
-/// Rust-side [`MediaStream`] handle.
+/// Representation of [MediaStream][1] object.
+///
+/// It's used on Rust side and represents a handle to [`InnerStream`] data.
+///
+/// For using [`MediaStream`] on JS side, consider the [`MediaStreamHandle`].
+///
+/// [1]: https://www.w3.org/TR/mediacapture-streams/#mediastream
 #[allow(clippy::module_name_repetitions)]
 pub struct MediaStream(Rc<InnerStream>);
 
 impl MediaStream {
-    pub fn from_tracks(tracks: Vec<Rc<MediaTrack>>) -> Self {
+    /// Creates new [`MediaStream`] from a given collection of [`MediaTrack`]s.
+    pub fn from_tracks<I>(tracks: I) -> Self
+    where
+        I: IntoIterator<Item = Rc<MediaTrack>>,
+    {
         let mut stream = InnerStream::new();
-
         for track in tracks {
             stream.add_track(track);
         }
-
         Self(Rc::new(stream))
     }
 
-    pub fn has_track(&self, track_id: TrackId) -> bool {
-        self.0.video_tracks.contains_key(&track_id)
-            || self.0.audio_tracks.contains_key(&track_id)
+    /// Checks if [`MediaStream`] contains a [`MediaTrack`] with specified ID.
+    pub fn has_track(&self, id: TrackId) -> bool {
+        self.0.video_tracks.contains_key(&id)
+            || self.0.audio_tracks.contains_key(&id)
     }
 
+    /// Returns a [`MediaTrack`] of [`MediaStream`] by its ID, if any.
     pub fn get_track_by_id(&self, track_id: TrackId) -> Option<Rc<MediaTrack>> {
         match self.0.video_tracks.get(&track_id) {
             Some(track) => Some(Rc::clone(track)),
@@ -87,17 +97,23 @@ impl MediaStream {
         }
     }
 
+    /// Instantiates new [`MediaStreamHandle`] for use on JS side.
     pub fn new_handle(&self) -> MediaStreamHandle {
         MediaStreamHandle(Rc::downgrade(&self.0))
     }
 }
 
-/// JS-side [`MediaStream`] handle.
+/// JS side handle to [`MediaStream`].
+///
+/// Actually, represents a [`Weak`]-based handle to [`InnerStream`].
+///
+/// For using [`MediaStreamHandle`] on Rust side, consider the [`MediaStream`].
 #[wasm_bindgen]
 pub struct MediaStreamHandle(Weak<InnerStream>);
 
 #[wasm_bindgen]
 impl MediaStreamHandle {
+    /// Returns the underlying [`MediaStream`][`SysMediaStream`] object.
     pub fn get_media_stream(&self) -> Result<SysMediaStream, JsValue> {
         match self.0.upgrade() {
             Some(inner) => Ok(inner.stream.clone()),

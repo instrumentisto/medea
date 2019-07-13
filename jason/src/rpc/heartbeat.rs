@@ -10,7 +10,7 @@ use crate::{
 
 /// Responsible for sending/handling keep-alive requests, detecting connection
 /// loss.
-// TODO: Implement connection loss deteection.
+// TODO: Implement connection loss detection.
 pub struct Heartbeat(Rc<RefCell<InnerHeartbeat>>);
 
 struct InnerHeartbeat {

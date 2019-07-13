@@ -2,9 +2,9 @@
 //!
 //! [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
 
+mod conn;
 mod ice_server;
-mod media_connections;
-mod peer_con;
+mod media;
 mod repo;
 
 use std::{collections::HashMap, rc::Rc};
@@ -16,11 +16,12 @@ use web_sys::RtcTrackEvent;
 
 use crate::{
     media::{MediaManager, MediaStream},
-    peer::{
-        media_connections::MediaConnections,
-        peer_con::{IceCandidate, RtcPeerConnection, SdpType},
-    },
     utils::WasmErr,
+};
+
+use self::{
+    conn::{IceCandidate, RtcPeerConnection, SdpType},
+    media::MediaConnections,
 };
 
 #[doc(inline)]
@@ -71,10 +72,10 @@ impl PeerConnection {
     /// Create new [`RtcPeerConnection`]. Provided `peer_events_sender` will be
     /// used to emit [`PeerEvent`]s from this peer , provided `ice_servers` will
     /// be used by created [`RtcPeerConnection`].
-    pub fn new(
+    pub fn new<I: IntoIterator<Item = IceServer>>(
         id: Id,
         peer_events_sender: UnboundedSender<PeerEvent>,
-        ice_servers: Vec<IceServer>,
+        ice_servers: I,
         media_manager: Rc<MediaManager>,
     ) -> Result<Self, WasmErr> {
         let peer = Rc::new(RtcPeerConnection::new(ice_servers)?);

@@ -1,4 +1,4 @@
-//! [`MediaStreamConstraints`][1] adapters.
+//! [MediaStreamConstraints][1] related objects.
 //!
 //! [1]: https://www.w3.org/TR/mediacapture-streams/#dom-mediastreamconstraints
 
@@ -7,19 +7,19 @@ use std::{collections::HashMap, convert::TryFrom};
 use medea_client_api_proto::{AudioSettings, MediaType, VideoSettings};
 use wasm_bindgen::JsValue;
 
-use crate::{
-    media::{MediaStream, MediaTrack, TrackId},
-    utils::WasmErr,
-};
+use crate::utils::WasmErr;
 
-/// [`MediaStreamConstraints`][1] object representation. Used when calling
-/// [`getUserMedia()`][2] to specify what kinds of tracks should be included in
-/// the returned [`MediaStream`][3], and, optionally, to establish constraints
-/// for those track's settings.
+use super::{MediaStream, MediaTrack, TrackId};
+
+/// Representation of [MediaStreamConstraints][1] object.
+///
+/// It's used for invoking [`getUserMedia()`][2] to specify what kinds of tracks
+/// should be included into returned [`MediaStream`], and, optionally,
+/// to establish constraints for those [`MediaTrack`]'s settings.
 ///
 /// [1]: https://www.w3.org/TR/mediacapture-streams/#dom-mediastreamconstraints
 /// [2]:
-/// https://www.w3.org/TR/mediacapture-streams/#dom-mediadevices-getusermedia()
+/// https://www.w3.org/TR/mediacapture-streams/#dom-mediadevices-getusermedia
 /// [3]: https://www.w3.org/TR/mediacapture-streams/#mediastream
 #[derive(Default)]
 pub struct StreamRequest {
@@ -28,7 +28,7 @@ pub struct StreamRequest {
 }
 
 impl StreamRequest {
-    /// Add track request to this [`StreamRequest`].
+    /// Adds track request to this [`StreamRequest`].
     pub fn add_track_request(&mut self, track_id: TrackId, caps: MediaType) {
         match caps {
             MediaType::Audio(audio) => {
@@ -41,8 +41,8 @@ impl StreamRequest {
     }
 }
 
-/// Subtype of [`StreamRequest`], which can have max one track of each kind and
-/// must have at least one track of any kind.
+/// Subtype of [`StreamRequest`], which can have maximum one track of each kind
+/// and must have at least one track of any kind.
 #[allow(clippy::module_name_repetitions)]
 pub struct SimpleStreamRequest {
     audio: Option<(u64, AudioSettings)>,
@@ -50,7 +50,7 @@ pub struct SimpleStreamRequest {
 }
 
 impl SimpleStreamRequest {
-    /// Parse raw [`web_sys::MediaStream`] and return [`MediaStream`].
+    /// Parses raw [`web_sys::MediaStream`] and returns [`MediaStream`].
     pub fn parse_stream(
         &self,
         stream: &web_sys::MediaStream,
@@ -58,13 +58,11 @@ impl SimpleStreamRequest {
         let mut tracks = Vec::new();
 
         if let Some((id, audio)) = &self.audio {
-            let audio_tracks: Vec<web_sys::MediaStreamTrack> =
+            let audio_tracks: Vec<_> =
                 js_sys::try_iter(&stream.get_audio_tracks())
                     .unwrap()
                     .unwrap()
-                    .map(|track| {
-                        web_sys::MediaStreamTrack::from(track.unwrap())
-                    })
+                    .map(|tr| web_sys::MediaStreamTrack::from(tr.unwrap()))
                     .collect();
 
             if audio_tracks.len() == 1 {
@@ -83,13 +81,11 @@ impl SimpleStreamRequest {
         }
 
         if let Some((id, video)) = &self.video {
-            let video_tracks: Vec<web_sys::MediaStreamTrack> =
+            let video_tracks: Vec<_> =
                 js_sys::try_iter(&stream.get_video_tracks())
                     .unwrap()
                     .unwrap()
-                    .map(|track| {
-                        web_sys::MediaStreamTrack::from(track.unwrap())
-                    })
+                    .map(|tr| web_sys::MediaStreamTrack::from(tr.unwrap()))
                     .collect();
 
             if video_tracks.len() == 1 {

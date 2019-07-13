@@ -1,25 +1,30 @@
-//! Wrapper for array of [`RtcIceServer`][1].
+//! Collection of [`RtcIceServer`][1]s.
 //!
 //! [1]: https://www.w3.org/TR/webrtc/#rtciceserver-dictionary
+
 use std::ops::Deref;
 
+use js_sys::Array as JsArray;
 use medea_client_api_proto::IceServer;
 use wasm_bindgen::JsValue;
 use web_sys::RtcIceServer;
 
-/// Wrapper for array of [`RtcIceServer`][1].
+/// Collection of [`RtcIceServer`]s (see [RTCIceServer][1]).
 ///
 /// [1]: https://www.w3.org/TR/webrtc/#rtciceserver-dictionary
-pub struct RtcIceServers(js_sys::Array);
+pub struct RtcIceServers(JsArray);
 
-impl From<Vec<IceServer>> for RtcIceServers {
-    fn from(servers: Vec<IceServer>) -> Self {
-        let inner = js_sys::Array::new();
+impl<I> From<I> for RtcIceServers
+where
+    I: IntoIterator<Item = IceServer>,
+{
+    fn from(servers: I) -> Self {
+        let inner = JsArray::new();
 
         for ice_server in servers {
             let mut server = RtcIceServer::new();
 
-            let urls = js_sys::Array::new();
+            let urls = JsArray::new();
             for url in ice_server.urls {
                 urls.push(&JsValue::from(url));
             }
@@ -41,7 +46,7 @@ impl From<Vec<IceServer>> for RtcIceServers {
 }
 
 impl Deref for RtcIceServers {
-    type Target = js_sys::Array;
+    type Target = JsArray;
 
     fn deref(&self) -> &Self::Target {
         &self.0

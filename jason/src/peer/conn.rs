@@ -1,6 +1,7 @@
+use std::{cell::RefCell, rc::Rc};
+
 use futures::Future;
 use medea_client_api_proto::IceServer;
-use std::{cell::RefCell, rc::Rc};
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
     RtcConfiguration, RtcIceCandidateInit,
@@ -10,12 +11,11 @@ use web_sys::{
     RtcTrackEvent,
 };
 
-use crate::{
-    peer::ice_server::RtcIceServers,
-    utils::{EventListener, WasmErr},
-};
+use crate::utils::{EventListener, WasmErr};
 
-/// [`RTCIceCandidate`][1] wrapper.
+use super::ice_server::RtcIceServers;
+
+/// [RTCIceCandidate][1] representation.
 ///
 /// [1]: https://www.w3.org/TR/webrtc/#rtcicecandidate-interface
 pub struct IceCandidate {
@@ -24,62 +24,96 @@ pub struct IceCandidate {
     pub sdp_mid: Option<String>,
 }
 
-/// [`RTCRtpTransceiver`][1] [`kind`][2] wrapper.
+/// Representation of [RTCRtpTransceiver][1]'s [kind][2].
 ///
 /// [1]: https://www.w3.org/TR/webrtc/#dom-rtcrtptransceiver
 /// [2]: https://www.w3.org/TR/webrtc/#dfn-transceiver-kind
-pub enum TransceiverType {
+#[derive(Clone, Copy)]
+pub enum TransceiverKind {
     Audio,
     Video,
 }
 
-/// [`RTCRtpTransceiverDirection`][1] wrapper.
+impl TransceiverKind {
+    /// Returns string representation of a [`TransceiverKind`].
+    pub fn as_str(self) -> &'static str {
+        match self {
+            TransceiverKind::Audio => "audio",
+            TransceiverKind::Video => "video",
+        }
+    }
+}
+
+/// Representation of [RTCRtpTransceiverDirection][1].
 ///
 /// [1]:https://www.w3.org/TR/webrtc/#dom-rtcrtptransceiverdirection
+#[derive(Clone, Copy)]
 // TODO: sendrecv optimization
 pub enum TransceiverDirection {
     Sendonly,
     Recvonly,
 }
 
-/// [`RTCSdpType`] wrapper.
+impl From<TransceiverDirection> for RtcRtpTransceiverDirection {
+    fn from(direction: TransceiverDirection) -> Self {
+        use TransceiverDirection::*;
+        match direction {
+            Sendonly => RtcRtpTransceiverDirection::Sendonly,
+            Recvonly => RtcRtpTransceiverDirection::Recvonly,
+        }
+    }
+}
+
+/// Representation of [RTCSdpType].
 ///
-/// [1]: https://www.w3.org/TR/webrtc/#dom-rtcsdptype
+/// [RTCSdpType]: https://www.w3.org/TR/webrtc/#dom-rtcsdptype
 pub enum SdpType {
     Offer(String),
     Answer(String),
 }
 
-/// [`https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection`][1] wrapper.
+/// Helper wrapper for [RTCPeerConnection][1].
 ///
 /// [1]: https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection
 struct InnerPeer {
-    /// Underlying [`RtcPeerConnection`][1].
+    /// Underlying [RTCPeerConnection][1].
     ///
     /// [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
     peer: Rc<SysRtcPeerConnection>,
 
-    /// [`RtcPeerConnection`][1]s [`on_ice_candidate`][2] callback. Which
-    /// fires when [`RtcPeerConnection`][1] discovers new ice candidate.
+    /// [`onicecandidate`][2] callback of [RTCPeerConnection][1] to handle
+    /// [`icecandidate`][3] event. It fires when [RTCPeerConnection][1]
+    /// discovers a new [RTCIceCandidate][4].
     ///
     /// [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
     /// [2]: https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-onicecandidate
+    /// [3]: https://www.w3.org/TR/webrtc/#event-icecandidate
+    /// [4]: https://www.w3.org/TR/webrtc/#dom-rtcicecandidate
     on_ice_candidate:
         Option<EventListener<SysRtcPeerConnection, RtcPeerConnectionIceEvent>>,
 
-    /// [`RtcPeerConnection`][1]'s [`on_track`][2] callback. Which fires when
-    /// [`RtcPeerConnection`][1] receives new [`StreamTrack`] from remote
-    /// peer.
+    /// [`ontrack`][2] callback of [RTCPeerConnection][1] to handle
+    /// [`track`][3] event. It fires when [RTCPeerConnection][1] receives
+    /// new [MediaStreamTrack][4] from remote peer.
     ///
     /// [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
     /// [2]: https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-ontrack
+    /// [3]: https://www.w3.org/TR/webrtc/#event-track
+    /// [4]: https://developer.mozilla.org/en-US/docs/Web/API/MediaStreamTrack
     on_track: Option<EventListener<SysRtcPeerConnection, RtcTrackEvent>>,
 }
 
+/// Representation of [RTCPeerConnection][1].
+///
+/// [1]: https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection
 pub struct RtcPeerConnection(Rc<RefCell<InnerPeer>>);
 
 impl RtcPeerConnection {
-    pub fn new(ice_servers: Vec<IceServer>) -> Result<Self, WasmErr> {
+    /// Instantiates new [`RtcPeerConnection`].
+    pub fn new<I>(ice_servers: I) -> Result<Self, WasmErr>
+    where
+        I: IntoIterator<Item = IceServer>,
+    {
         // TODO: RTCBundlePolicy = "max-bundle"?
         let mut peer_conf = RtcConfiguration::new();
         peer_conf.ice_servers(&RtcIceServers::from(ice_servers));
@@ -93,20 +127,21 @@ impl RtcPeerConnection {
         }))))
     }
 
-    /// Set [`RTCTrackEvent`][1] handler.
+    /// Sets handler for [`RtcTrackEvent`] event (see [RTCTrackEvent][1] and
+    /// [`ontrack` callback][2]).
     ///
     /// [1]: https://www.w3.org/TR/webrtc/#rtctrackevent
+    /// [2]: https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-ontrack
     pub fn on_track<F>(&self, f: Option<F>) -> Result<(), WasmErr>
     where
-        F: (FnMut(RtcTrackEvent)) + 'static,
+        F: 'static + FnMut(RtcTrackEvent),
     {
-        let mut inner_mut = self.0.borrow_mut();
-
+        let mut conn = self.0.borrow_mut();
         match f {
-            None => inner_mut.on_track = None,
+            None => conn.on_track = None,
             Some(mut f) => {
-                inner_mut.on_track = Some(EventListener::new_mut(
-                    Rc::clone(&inner_mut.peer),
+                conn.on_track = Some(EventListener::new_mut(
+                    Rc::clone(&conn.peer),
                     "track",
                     move |msg: RtcTrackEvent| {
                         f(msg);
@@ -114,43 +149,44 @@ impl RtcPeerConnection {
                 )?);
             }
         }
-
         Ok(())
     }
 
-    /// Set [`RTCPeerConnectionIceEvent`][1] handler.
+    /// Sets handler for [`RtcPeerConnectionIceEvent`] event
+    /// (see [RTCPeerConnectionIceEvent][1] and [`onicecandidate` callback][2]).
     ///
     /// [1]: https://www.w3.org/TR/webrtc/#dom-rtcpeerconnectioniceevent
+    /// [2]: https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-onicecandidate
     pub fn on_ice_candidate<F>(&self, f: Option<F>) -> Result<(), WasmErr>
     where
-        F: (FnMut(IceCandidate)) + 'static,
+        F: 'static + FnMut(IceCandidate),
     {
-        let mut inner_mut = self.0.borrow_mut();
+        let mut conn = self.0.borrow_mut();
         match f {
-            None => inner_mut.on_ice_candidate = None,
+            None => conn.on_ice_candidate = None,
             Some(mut f) => {
-                inner_mut.on_ice_candidate = Some(EventListener::new_mut(
-                    Rc::clone(&inner_mut.peer),
+                conn.on_ice_candidate = Some(EventListener::new_mut(
+                    Rc::clone(&conn.peer),
                     "icecandidate",
                     move |msg: RtcPeerConnectionIceEvent| {
                         // TODO: examine None candidates, maybe we should send
                         //       them (although no one does)
-                        if let Some(candidate) = msg.candidate() {
+                        if let Some(c) = msg.candidate() {
                             f(IceCandidate {
-                                candidate: candidate.candidate(),
-                                sdp_m_line_index: candidate.sdp_m_line_index(),
-                                sdp_mid: candidate.sdp_mid(),
+                                candidate: c.candidate(),
+                                sdp_m_line_index: c.sdp_m_line_index(),
+                                sdp_mid: c.sdp_mid(),
                             });
                         }
                     },
                 )?);
             }
         }
-
         Ok(())
     }
 
-    /// Adds remote [`RTCPeerConnection`][1]s [ICE Candidate][2] to this peer.
+    /// Adds remote [RTCPeerConnection][1]'s [ICE candidate][2] to this
+    /// [`RtcPeerConnection`].
     ///
     /// [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
     /// [2]: https://tools.ietf.org/html/rfc5245#section-2
@@ -176,18 +212,17 @@ impl RtcPeerConnection {
         .map_err(Into::into)
     }
 
-    /// Obtain SDP Answer from underlying [`RTCPeerConnection`][1] and set it as
-    /// local description. Should be called whenever remote description has
-    /// changed.
+    /// Obtains [SDP answer][`SdpType::Answer`] from the underlying
+    /// [RTCPeerConnection][`SysRtcPeerConnection`] and sets it as a local
+    /// description.
     ///
-    /// [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
+    /// Should be called whenever remote description has been changed.
     pub fn create_and_set_answer(
         &self,
     ) -> impl Future<Item = String, Error = WasmErr> {
-        let inner = self.0.borrow();
-
-        let peer: Rc<SysRtcPeerConnection> = Rc::clone(&inner.peer);
-        JsFuture::from(inner.peer.create_answer())
+        let conn = self.0.borrow();
+        let peer: Rc<SysRtcPeerConnection> = Rc::clone(&conn.peer);
+        JsFuture::from(conn.peer.create_answer())
             .map(RtcSessionDescription::from)
             .and_then(move |answer: RtcSessionDescription| {
                 let answer = answer.sdp();
@@ -200,17 +235,17 @@ impl RtcPeerConnection {
             .map_err(Into::into)
     }
 
-    /// Obtain SDP Offer from underlying [`RTCPeerConnection`][1] and set it as
-    /// local description. Should be called after changing local tracks, but
-    /// not all changes require renegotiation.
+    /// Obtains [SDP offer][`SdpType::Offer`] from the underlying
+    /// [RTCPeerConnection][`SysRtcPeerConnection`] and sets it as a local
+    /// description.
     ///
-    /// [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
+    /// Should be called after local tracks changes, which require
+    /// renegotiation.
     pub fn create_and_set_offer(
         &self,
     ) -> impl Future<Item = String, Error = WasmErr> {
-        let inner = self.0.borrow();
-
-        let peer: Rc<SysRtcPeerConnection> = Rc::clone(&inner.peer);
+        let conn = self.0.borrow();
+        let peer: Rc<SysRtcPeerConnection> = Rc::clone(&conn.peer);
         JsFuture::from(peer.create_offer())
             .map(RtcSessionDescription::from)
             .and_then(move |offer: RtcSessionDescription| {
@@ -225,10 +260,11 @@ impl RtcPeerConnection {
             .map_err(Into::into)
     }
 
-    /// Instructs the [`RTCPeerConnection`][1] to apply the supplied SDP as the
-    /// remote offer or answer. Changes the local media state.
+    /// Instructs the underlying [RTCPeerConnection][`SysRtcPeerConnection`]
+    /// to apply the supplied [SDP][`SdpType`] as the remote
+    /// [offer][`SdpType::Offer`] or [answer][`SdpType::Answer`].
     ///
-    /// [1]: https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection
+    /// Changes the local media state.
     pub fn set_remote_description(
         &self,
         sdp: SdpType,
@@ -255,42 +291,26 @@ impl RtcPeerConnection {
         .map(|_| ())
     }
 
-    /// Create a new [`RTCRtpTransceiver`][1] and add it to the [`set of
-    /// transceivers`][2].
+    /// Creates new [`RtcRtpTransceiver`] (see [RTCRtpTransceiver][1])
+    /// and adds it to the [set of this RTCPeerConnection's transceivers][2].
     ///
     /// [1]: https://www.w3.org/TR/webrtc/#dom-rtcrtptransceiver
     /// [2]: https://www.w3.org/TR/webrtc/#transceivers-set
     pub fn add_transceiver(
         &self,
-        tr_type: &TransceiverType,
-        direction: &TransceiverDirection,
+        kind: TransceiverKind,
+        direction: TransceiverDirection,
     ) -> RtcRtpTransceiver {
         let mut init = RtcRtpTransceiverInit::new();
-        match *direction {
-            TransceiverDirection::Sendonly => {
-                init.direction(RtcRtpTransceiverDirection::Sendonly)
-            }
-            TransceiverDirection::Recvonly => {
-                init.direction(RtcRtpTransceiverDirection::Recvonly)
-            }
-        };
-
-        match *tr_type {
-            TransceiverType::Audio => self
-                .0
-                .borrow()
-                .peer
-                .add_transceiver_with_str_and_init("audio", &init),
-            TransceiverType::Video => self
-                .0
-                .borrow()
-                .peer
-                .add_transceiver_with_str_and_init("video", &init),
-        }
+        init.direction(direction.into());
+        self.0
+            .borrow()
+            .peer
+            .add_transceiver_with_str_and_init(kind.as_str(), &init)
     }
 
-    /// Find [`RTCRtpTransceiver`][1] in peers [`set of transceivers`][2] by
-    /// provided mid.
+    /// Returns [`RtcRtpTransceiver`] (see [RTCRtpTransceiver][1]) from a
+    /// [set of this RTCPeerConnection's transceivers][2] by provided `mid`.
     ///
     /// [1]: https://www.w3.org/TR/webrtc/#dom-rtcrtptransceiver
     /// [2]: https://www.w3.org/TR/webrtc/#transceivers-set
@@ -319,11 +339,12 @@ impl RtcPeerConnection {
 }
 
 impl Drop for RtcPeerConnection {
-    /// Drop `on_track` and `on_ice_candidate` callbacks and [`close`][1]
-    /// underlying [`RTCPeerConnection`][2]
+    /// Drops [`on_track`][`RtcPeerConnection::on_track`] and
+    /// [`on_ice_candidate`][`RtcPeerConnection::on_ice_candidate`] callbacks,
+    /// and [closes][1] the underlying
+    /// [RTCPeerConnection][`SysRtcPeerConnection`].
     ///
     /// [1]: https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close
-    /// [2]: https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection
     fn drop(&mut self) {
         let mut inner = self.0.borrow_mut();
         inner.on_track.take();

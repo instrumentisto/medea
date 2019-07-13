@@ -91,8 +91,8 @@ impl<A1: Into<JsValue>, A2: Into<JsValue>> Callback2<A1, A2> {
         self.f.borrow().as_ref().map(|f| {
             f.call2(
                 &JsValue::NULL,
-                &arg1.map(|a| a.into()).unwrap_or(JsValue::NULL),
-                &arg2.map(|a| a.into()).unwrap_or(JsValue::NULL),
+                &arg1.map_or(JsValue::NULL, Into::into),
+                &arg2.map_or(JsValue::NULL, Into::into),
             )
         })
     }
