@@ -162,7 +162,6 @@ impl Room {
     ) -> Result<ActFuture<(), RoomError>, RoomError> {
         let mut from_peer: Peer<WaitLocalSdp> =
             self.peers.take_inner_peer(from_peer_id)?;
-
         from_peer.set_mids(mids)?;
 
         let to_peer_id = from_peer.partner_peer_id();
@@ -238,21 +237,21 @@ impl Room {
     ) -> Result<ActFuture<(), RoomError>, RoomError> {
         let from_peer = self.peers.get_peer(from_peer_id)?;
         if let PeerStateMachine::New(_) = from_peer {
-            return Err(RoomError::PeerError(PeerError::WrongState(
+            Err(PeerError::WrongState(
                 from_peer_id,
                 "Not New",
                 format!("{}", from_peer),
-            )));
+            ))?
         }
 
         let to_peer_id = from_peer.partner_peer_id();
         let to_peer = self.peers.get_peer(to_peer_id)?;
         if let PeerStateMachine::New(_) = to_peer {
-            return Err(RoomError::PeerError(PeerError::WrongState(
+            Err(PeerError::WrongState(
                 to_peer_id,
                 "Not New",
                 format!("{}", to_peer),
-            )));
+            ))?
         }
 
         let to_member_id = to_peer.member_id();
@@ -399,7 +398,7 @@ impl Handler<RpcConnectionEstablished> for Room {
                         .get_peers_by_member_id(member_id)
                         .into_iter()
                         .for_each(|peer| {
-                            // only New peers should be connected
+                            // Only New peers should be connected.
                             if let PeerStateMachine::New(peer) = peer {
                                 if room.participants.member_has_connection(
                                     peer.partner_member_id(),

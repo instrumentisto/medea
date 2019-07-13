@@ -13,7 +13,7 @@ use redis::ConnectionInfo;
 
 use crate::{
     api::control::MemberId,
-    conf::Turn,
+    conf,
     media::IceUser,
     signalling::RoomId,
     turn::repo::{TurnDatabase, TurnDatabaseErr},
@@ -154,29 +154,33 @@ struct Service {
 /// Create new instance [`TurnAuthService`].
 #[allow(clippy::module_name_repetitions)]
 pub fn new_turn_auth_service<'a>(
-    turn_config: Turn,
+    cf: &conf::Turn,
 ) -> impl Future<Item = Box<dyn TurnAuthService + 'a>, Error = TurnServiceErr> {
+    let db_pass = cf.db.redis.pass.clone();
+    let turn_address = cf.addr();
+    let turn_username = cf.user.clone();
+    let turn_password = cf.pass.clone();
     TurnDatabase::new(
-        turn_config.db.redis.connection_timeout,
+        cf.db.redis.connection_timeout,
         ConnectionInfo {
             addr: Box::new(redis::ConnectionAddr::Tcp(
-                turn_config.db.redis.ip.to_string(),
-                turn_config.db.redis.port,
+                cf.db.redis.ip.to_string(),
+                cf.db.redis.port,
             )),
-            db: turn_config.db.redis.db_number,
-            passwd: if turn_config.db.redis.pass.is_empty() {
+            db: cf.db.redis.db_number,
+            passwd: if cf.db.redis.pass.is_empty() {
                 None
             } else {
-                Some(turn_config.db.redis.pass.clone())
+                Some(cf.db.redis.pass.clone())
             },
         },
     )
     .map(move |turn_db| Service {
         turn_db,
-        db_pass: turn_config.db.redis.pass.clone(),
-        turn_address: turn_config.addr(),
-        turn_username: turn_config.user.clone(),
-        turn_password: turn_config.pass.clone(),
+        db_pass,
+        turn_address,
+        turn_username,
+        turn_password,
         static_user: None,
     })
     .map::<_, Box<dyn TurnAuthService>>(|service| Box::new(service.start()))

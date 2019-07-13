@@ -213,7 +213,7 @@ impl ParticipantService {
     /// with specified user [`Member`] from the storage and closes the room.
     /// If [`ClosedReason::Lost`], then creates delayed task that emits
     /// [`ClosedReason::Closed`].
-    // TODO: Dont close the room. It is being closed atm, because we have
+    // TODO: Don't close the room. It is being closed atm, because we have
     //       no way to handle absence of RpcConnection.
     pub fn connection_closed(
         &mut self,

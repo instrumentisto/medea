@@ -860,7 +860,7 @@ struct MakeSdpOffer {
 }
 ```
 
-`Web Client` sends [SDP Offer] to one if its `Peer`s. `mids` section specifies transceivers mids used by each `Track`. 
+`Web Client` sends [SDP Offer] to one if its `Peer`s. `mids` section specifies for each `Track`  its transceivers [media descriptions](https://tools.ietf.org/html/rfc4566#section-5.14). 
 
 `Web Client` can send it:
 1. As reaction to `PeerCreated {sdp_offer: None}` event.
@@ -1127,10 +1127,10 @@ struct GetMembers {
         "sdp_offer": "user1_sendrecv_offer"
       },
       "mids": {
-         "1":"0",
-         "2":"1",
-         "3":"2",
-         "4":"3"
+         "1": "0",
+         "2": "1",
+         "3": "2",
+         "4": "3"
       }
     }
     ```

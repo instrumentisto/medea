@@ -27,10 +27,7 @@ pub enum ClientMsg {
     Command(Command),
 }
 
-/// WebSocket message from Web Client to Media Server. `mids` associates track
-/// with transceiver mid, mid is id of [`m= section`][1] in SDP.
-///
-/// [1]: https://tools.ietf.org/html/rfc4566#section-5.14
+/// WebSocket message from Web Client to Media Server.
 #[allow(dead_code)]
 #[cfg_attr(feature = "medea", derive(Deserialize))]
 #[cfg_attr(feature = "jason", derive(Serialize))]
@@ -41,6 +38,12 @@ pub enum Command {
     MakeSdpOffer {
         peer_id: u64,
         sdp_offer: String,
+        /// Associations between [`Track`] and transceiver's [media
+        /// description][1].
+        ///
+        /// `mid` is basically an ID of [`m=<media>` section][1] in SDP.
+        ///
+        /// [1]: https://tools.ietf.org/html/rfc4566#section-5.14
         mids: HashMap<u64, String>,
     },
     /// Web Client sends SDP Answer.
@@ -84,7 +87,7 @@ pub enum Event {
     PeersRemoved { peer_ids: Vec<u64> },
 }
 
-/// Represents [`RtcIceCandidateInit`][1] object.
+/// Represents [RTCIceCandidateInit][1] object.
 ///
 /// [1]: https://www.w3.org/TR/webrtc/#dom-rtcicecandidateinit
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -104,8 +107,8 @@ pub struct Track {
     pub media_type: MediaType,
 }
 
-/// Representation of [`RTCIceServer`][1] (item of `iceServers` field
-/// from [`RTCConfiguration`][2]).
+/// Representation of [RTCIceServer][1] (item of `iceServers` field
+/// from [RTCConfiguration][2]).
 ///
 /// [1]: https://developer.mozilla.org/en-US/docs/Web/API/RTCIceServer
 /// [2]: https://developer.mozilla.org/en-US/docs/Web/API/RTCConfiguration
@@ -121,11 +124,11 @@ pub struct IceServer {
     pub credential: Option<String>,
 }
 
-// TODO: Use different struct without mids in TracksApplied event
 /// Direction of [`Track`].
 #[cfg_attr(feature = "medea", derive(Serialize))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
 #[cfg_attr(test, derive(Debug, PartialEq))]
+// TODO: Use different struct without mids in TracksApplied event.
 pub enum Direction {
     Send {
         receivers: Vec<u64>,

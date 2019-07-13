@@ -164,19 +164,6 @@ pub mod test {
                     tracks,
                     ice_servers: _,
                 } => {
-                    let mut mid = 0;
-                    let mids = tracks
-                        .into_iter()
-                        .filter_map(|t| match t.direction {
-                            Direction::Send { .. } => {
-                                let result = Some((t.id, mid.to_string()));
-                                mid += 1;
-                                result
-                            }
-                            Direction::Recv { .. } => None,
-                        })
-                        .collect();
-
                     match sdp_offer {
                         Some(_) => self.room.do_send(CommandMessage::from(
                             Command::MakeSdpAnswer {
@@ -188,7 +175,15 @@ pub mod test {
                             Command::MakeSdpOffer {
                                 peer_id,
                                 sdp_offer: "caller_offer".into(),
-                                mids,
+                                mids: tracks
+                                    .into_iter()
+                                    .filter_map(|t| match t.direction {
+                                        Direction::Send { .. } => Some(t.id),
+                                        Direction::Recv { .. } => None,
+                                    })
+                                    .enumerate()
+                                    .map(|(mid, id)| (id, mid.to_string()))
+                                    .collect(),
                             },
                         )),
                     }

@@ -35,18 +35,18 @@ pub struct TurnDatabase {
 impl TurnDatabase {
     /// New TurnDatabase
     pub fn new<S: Into<ConnectionInfo> + Clone>(
-        connection_timeout: Duration,
-        connection_info: S,
+        conn_timeout: Duration,
+        conn_info: S,
     ) -> impl Future<Item = Self, Error = TurnDatabaseErr> {
-        future::lazy(move || redis::Client::open(connection_info.into()))
+        future::lazy(move || redis::Client::open(conn_info.into()))
             .and_then(RedisConnectionManager::new)
-            .and_then(move |connection_manager| {
+            .and_then(move |conn_mngr| {
                 Pool::builder()
-                    .connection_timeout(connection_timeout)
-                    .build(connection_manager)
+                    .connection_timeout(conn_timeout)
+                    .build(conn_mngr)
             })
             .map(RedisPool::new)
-            .map(|redis_pool| Self { pool: redis_pool })
+            .map(|pool| Self { pool })
             .map_err(TurnDatabaseErr::from)
     }
 

@@ -9,5 +9,6 @@ doc-valid-idents = [
     "OAuth", "OpenGL", "OpenSSH", "OpenSSL", "OpenStreetMap", "TrueType",
     "iOS", "macOS", "TeX", "LaTeX", "BibTeX", "BibLaTeX", "MinGW",
     "WebSocket",
+    "MediaStreamTrack",
     "RTCIceServer", "RTCConfiguration",
 ]

@@ -5,8 +5,7 @@
 #![allow(clippy::use_self)]
 
 use std::{
-    collections::HashMap as StdHashMap, convert::TryFrom, fmt::Display,
-    sync::Arc,
+    collections::HashMap as StdHashMap, convert::TryFrom, fmt, sync::Arc,
 };
 
 use failure::Fail;
@@ -52,7 +51,7 @@ pub enum PeerError {
     )]
     WrongState(Id, &'static str, String),
     #[fail(
-        display = "Peer is sending Track [{:?}], but did not provide its mid",
+        display = "Peer is sending Track [{}] without providing its mid",
         _0
     )]
     MidsMismatch(TrackId),
@@ -82,8 +81,8 @@ pub enum PeerStateMachine {
     Stable(Peer<Stable>),
 }
 
-impl Display for PeerStateMachine {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+impl fmt::Display for PeerStateMachine {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             PeerStateMachine::WaitRemoteSdp(_) => write!(f, "WaitRemoteSdp"),
             PeerStateMachine::New(_) => write!(f, "New"),
@@ -282,7 +281,7 @@ impl Peer<New> {
 }
 
 impl Peer<WaitLocalSdp> {
-    /// Set local description and transition [`Peer`]
+    /// Sets local description and transition [`Peer`]
     /// to [`WaitRemoteSDP`] state.
     pub fn set_local_sdp(self, sdp_offer: String) -> Peer<WaitRemoteSdp> {
         let mut context = self.context;
@@ -293,31 +292,30 @@ impl Peer<WaitLocalSdp> {
         }
     }
 
-    /// Set tracks mids. Provided `mids` must have entries for all [`Peer`]s
-    /// tracks.
+    /// Sets tracks `mids`.
+    ///
+    /// Provided `mids` must have entries for all [`Peer`]s tracks.
     pub fn set_mids(
         &mut self,
         mut mids: StdHashMap<TrackId, String>,
     ) -> Result<(), PeerError> {
-        for (id, track) in self.context.senders.iter_mut() {
+        for (id, track) in self
+            .context
+            .senders
+            .iter_mut()
+            .chain(self.context.receivers.iter_mut())
+        {
             let mid = mids
                 .remove(&id)
                 .ok_or_else(|| PeerError::MidsMismatch(track.id))?;
             track.set_mid(mid)
         }
-        for (id, track) in self.context.receivers.iter_mut() {
-            let mid = mids
-                .remove(&id)
-                .ok_or_else(|| PeerError::MidsMismatch(track.id))?;
-            track.set_mid(mid)
-        }
-
         Ok(())
     }
 }
 
 impl Peer<WaitRemoteSdp> {
-    /// Set remote description and transition [`Peer`] to [`Stable`] state.
+    /// Sets remote description and transition [`Peer`] to [`Stable`] state.
     pub fn set_remote_sdp(self, sdp_answer: &str) -> Peer<Stable> {
         let mut context = self.context;
         context.sdp_answer = Some(sdp_answer.to_string());
@@ -329,7 +327,7 @@ impl Peer<WaitRemoteSdp> {
 }
 
 impl Peer<WaitLocalHaveRemote> {
-    /// Set local description and transition [`Peer`] to [`Stable`] state.
+    /// Sets local description and transition [`Peer`] to [`Stable`] state.
     pub fn set_local_sdp(self, sdp_answer: String) -> Peer<Stable> {
         let mut context = self.context;
         context.sdp_answer = Some(sdp_answer);
@@ -342,7 +340,7 @@ impl Peer<WaitLocalHaveRemote> {
 
 impl Peer<Stable> {
     pub fn get_mids(&self) -> Result<StdHashMap<TrackId, String>, PeerError> {
-        let mut mids = StdHashMap::new();
+        let mut mids = StdHashMap::with_capacity(self.context.senders.len());
         for (track_id, track) in self.context.senders.iter() {
             mids.insert(
                 *track_id,
