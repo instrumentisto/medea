@@ -13,14 +13,18 @@ pub use self::{
     event_listener::EventListener,
 };
 
-/// Returns [`Window`] object. Panics if unable to access it.
+/// Returns [`Window`] object.
+///
+/// # Panics
+///
+/// When global [`Window`] object is inaccessible.
 pub fn window() -> Window {
-    // Cannot use `lazy_static` since `window` is `!Sync`, safe to unwrap.
+    // Cannot use `lazy_static` since `window` is `!Sync`.
+    // Safe to unwrap.
     web_sys::window().unwrap()
 }
 
-/// Wrapper around interval timer ID. Implements Drop that clears interval with
-/// provided ID.
+/// Wrapper around interval timer ID.
 pub struct IntervalHandle(pub i32);
 
 impl Drop for IntervalHandle {

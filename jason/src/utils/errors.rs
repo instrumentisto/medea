@@ -1,7 +1,4 @@
-use std::{
-    borrow::Cow,
-    fmt::{Display, Formatter},
-};
+use std::{borrow::Cow, fmt};
 
 use medea_client_api_proto as proto;
 use wasm_bindgen::{JsCast, JsValue};
@@ -16,11 +13,10 @@ pub enum WasmErr {
 }
 
 impl WasmErr {
-    // TODO:
-    // 1. Send err to remote
-    // probably should be possible only in debug build:
-    // 2. Stacktrace?
-    // 3. Medea state snapshot?
+    // TODO: 1. Send err to remote
+    //          probably should be possible only in debug build:
+    //       2. Stacktrace?
+    //       3. Medea state snapshot?
     pub fn log_err(&self) {
         console::error_1(&JsValue::from_str(&format!("{}", self)));
     }
@@ -50,15 +46,15 @@ impl From<JsValue> for WasmErr {
 impl From<WasmErr> for JsValue {
     fn from(err: WasmErr) -> Self {
         match err {
-            WasmErr::JsError(value) => value.into(),
-            WasmErr::Untyped(value) => value,
+            WasmErr::JsError(val) => val.into(),
             WasmErr::Custom(reason) => Self::from_str(&reason),
+            WasmErr::Untyped(val) => val,
         }
     }
 }
 
-impl Display for WasmErr {
-    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+impl fmt::Display for WasmErr {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             WasmErr::JsError(err) => {
                 write!(f, "{}", String::from(err.to_string()))
@@ -84,5 +80,5 @@ macro_rules! impl_from_error {
 
 impl_from_error!(std::cell::BorrowError);
 impl_from_error!(serde_json::error::Error);
-//// TODO: improve macro to use generics
+// TODO: improve macro to use generics
 impl_from_error!(futures::sync::mpsc::SendError<proto::Event>);

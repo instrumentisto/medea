@@ -2,118 +2,121 @@
 
 use std::{cell::RefCell, marker::PhantomData};
 
+use js_sys::Function as JsFunction;
 use wasm_bindgen::JsValue;
 
-/// Wrapper for single arg JS functions.
+/// Wrapper for a single argument JS function.
 pub struct Callback<A> {
-    f: RefCell<Option<js_sys::Function>>,
-    _phantom: PhantomData<A>,
+    f: RefCell<Option<JsFunction>>,
+    _arg: PhantomData<A>,
 }
 
 impl<A> Default for Callback<A> {
+    #[inline]
     fn default() -> Self {
         Self {
             f: RefCell::new(None),
-            _phantom: PhantomData,
+            _arg: PhantomData,
         }
     }
 }
 
 impl<A: Into<JsValue>> Callback<A> {
     /// Sets inner JS function.
-    pub fn set_func(&self, f: js_sys::Function) {
+    #[inline]
+    pub fn set_func(&self, f: JsFunction) {
         self.f.borrow_mut().replace(f);
     }
 
-    /// Invokes JS function if any. Returns `true` if function is set and was
-    /// invoked, false otherwise.
-    pub fn call(&self, arg: A) -> bool {
-        match self.f.borrow().as_ref() {
-            None => false,
-            Some(f) => {
-                let _ = f.call1(&JsValue::NULL, &arg.into());
-
-                true
-            }
-        }
+    /// Invokes JS function if any.
+    ///
+    /// Returns `None` if no callback is set, otherwise returns its invocation
+    /// result.
+    pub fn call(&self, arg: A) -> Option<Result<JsValue, JsValue>> {
+        self.f
+            .borrow()
+            .as_ref()
+            .map(|f| f.call1(&JsValue::NULL, &arg.into()))
     }
 }
 
-impl<A> From<js_sys::Function> for Callback<A> {
-    fn from(f: js_sys::Function) -> Self {
+impl<A> From<JsFunction> for Callback<A> {
+    #[inline]
+    fn from(f: JsFunction) -> Self {
         Self {
             f: RefCell::new(Some(f)),
-            _phantom: PhantomData,
+            _arg: PhantomData,
         }
     }
 }
 
-/// Wrapper for JS functions with two args. Can be used if you need to
-/// conditionally invoke function passing one of two args, e.g. first arg in
-/// case of success, and second as error.
+/// Wrapper for a JS functions with two arguments.
+///
+/// Can be used if you need to conditionally invoke function passing one of two
+/// args, e.g. first arg in case of success, and second as error.
 #[allow(clippy::module_name_repetitions)]
-pub struct Callback2<A, B> {
-    f: RefCell<Option<js_sys::Function>>,
-    _phantom: PhantomData<A>,
-    _phantom2: PhantomData<B>,
+pub struct Callback2<A1, A2> {
+    f: RefCell<Option<JsFunction>>,
+    _arg1: PhantomData<A1>,
+    _arg2: PhantomData<A2>,
 }
 
-impl<A, B> Default for Callback2<A, B> {
+impl<A1, A2> Default for Callback2<A1, A2> {
+    #[inline]
     fn default() -> Self {
         Self {
             f: RefCell::new(None),
-            _phantom: PhantomData,
-            _phantom2: PhantomData,
+            _arg1: PhantomData,
+            _arg2: PhantomData,
         }
     }
 }
 
-impl<A: Into<JsValue>, B: Into<JsValue>> Callback2<A, B> {
+impl<A1: Into<JsValue>, A2: Into<JsValue>> Callback2<A1, A2> {
     /// Sets inner JS function.
-    pub fn set_func(&self, f: js_sys::Function) {
+    #[inline]
+    pub fn set_func(&self, f: JsFunction) {
         self.f.borrow_mut().replace(f);
     }
 
-    /// Call JS function passing both args.
-    pub fn call(&self, arg1: Option<A>, arg2: Option<B>) -> bool {
-        fn arg_to_jsvalue<A: Into<JsValue>>(arg: Option<A>) -> JsValue {
-            match arg {
-                None => JsValue::NULL,
-                Some(inner) => inner.into(),
-            }
-        }
-
-        match self.f.borrow().as_ref() {
-            None => false,
-            Some(f) => {
-                let _ = f.call2(
-                    &JsValue::NULL,
-                    &arg_to_jsvalue(arg1),
-                    &arg_to_jsvalue(arg2),
-                );
-
-                true
-            }
-        }
+    /// Invokes JS function passing both arguments.
+    ///
+    /// Returns `None` if no callback is set, otherwise returns its invocation
+    /// result.
+    pub fn call(
+        &self,
+        arg1: Option<A1>,
+        arg2: Option<A2>,
+    ) -> Option<Result<JsValue, JsValue>> {
+        self.f.borrow().as_ref().map(|f| {
+            f.call2(
+                &JsValue::NULL,
+                &arg1.map(|a| a.into()).unwrap_or(JsValue::NULL),
+                &arg2.map(|a| a.into()).unwrap_or(JsValue::NULL),
+            )
+        })
     }
 
-    /// Call JS function passing only first arg.
-    pub fn call1(&self, arg1: A) -> bool {
+    /// Invokes JS function passing only first argument.
+    #[inline]
+    pub fn call1(&self, arg1: A1) -> Option<Result<JsValue, JsValue>> {
         self.call(Some(arg1), None)
     }
 
-    /// Call JS function passing only second arg.
-    pub fn call2(&self, arg2: B) -> bool {
+    /// Invokes JS function passing only second argument.
+    #[inline]
+    pub fn call2(&self, arg2: A2) -> Option<Result<JsValue, JsValue>> {
         self.call(None, Some(arg2))
     }
 }
 
-impl<A, B> From<js_sys::Function> for Callback2<A, B> {
-    fn from(f: js_sys::Function) -> Self {
+impl<A1, A2> From<JsFunction> for Callback2<A1, A2> {
+    #[inline]
+    fn from(f: JsFunction) -> Self {
         Self {
             f: RefCell::new(Some(f)),
-            _phantom: PhantomData,
-            _phantom2: PhantomData,
+            _arg1: PhantomData,
+            _arg2: PhantomData,
         }
     }
 }
