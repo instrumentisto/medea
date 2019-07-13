@@ -106,19 +106,19 @@ yarn:
 # Generate project documentation of Rust sources.
 #
 # Usage:
-#	make docs.rust [open=(yes|no)] [clean=(no|yes)] [crate=(@all|medea|jason|<crate-name>)]
+#	make docs.rust [crate=(@all|medea|jason|<crate-name>)]
+#	               [open=(yes|no)] [clean=(no|yes)]
 
-doc-crate = $(if $(call eq,$(crate),),@all,$(crate))
+docs-rust-crate = $(if $(call eq,$(crate),),@all,$(crate))
 
 docs.rust:
 ifeq ($(clean),yes)
 	@rm -rf target/doc/
 endif
-ifeq ($(doc-crate),@all)
-	cargo +nightly doc --all --no-deps $(if $(call eq,$(open),no),,--open)
-else
-	cargo +nightly doc --package $(doc-crate) --no-deps $(if $(call eq,$(open),no),,--open)
-endif
+	cargo +nightly doc \
+		$(if $(call eq,$(docs-rust-crate),@all),--all,-p $(docs-rust-crate)) \
+		--no-deps \
+		$(if $(call eq,$(open),no),,--open)
 
 
 
