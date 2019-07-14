@@ -266,8 +266,8 @@ pub struct Receiver {
 
 impl Receiver {
     /// Creates new [`RtcRtpTransceiver`] if provided `mid` is `None`,
-    /// otherwise retrieves existing [`RtcRtpTransceiver`] via provided `mid`
-    /// from a provided [`RtcPeerConnection`].
+    /// otherwise creates [`Receiver`] without [`RtcRtpTransceiver`]. It will be
+    /// injected when [`MediaTrack`] arrives.
     ///
     /// `track` field in the created [`Receiver`] will be `None`,
     /// since [`Receiver`] must be created before the actual [`MediaTrack`]
@@ -291,8 +291,7 @@ impl Receiver {
                     TransceiverDirection::Recvonly,
                 )),
             },
-            // TODO: retrieve existing RtcRtpTransceiver by mid
-            Some(_) => unimplemented!(),
+            Some(_) => None,
         };
         Self {
             track_id,
