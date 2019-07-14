@@ -2,17 +2,15 @@ version: '2'
 
 services:
   webclient:
+    container_name: nginx
+    image: nginx:stable-alpine
     ports:
-      - "3478:3478"      # turn/stun tcp coturn
-      - "3478:3478/udp"  # turn/stun udp coturn
-      - "9093:9093"
-    expose:
-      - "9321"          # metrics openvidu
+      - "80:80"
     volumes:
-      - ./demo:/usr/share/nginx/html
-      - ./demo/node_modules/instrumentisto-browser/static/js:/usr/share/nginx/html/js
+      - .:/usr/share/nginx/html
+      - ./node_modules/jason-alexlapa/:/usr/share/nginx/html/js
   coturn:
-    container_name: ${COMPOSE_PROJECT_NAME}-coturn
+    container_name: coturn
     image: instrumentisto/coturn:4.5
     depends_on: ["coturn-db"]
     command:
@@ -22,7 +20,7 @@ services:
       - ../../.cache/coturn/data:/var/lib/coturn
     network_mode: host
   coturn-db:
-    container_name: ${COMPOSE_PROJECT_NAME}-coturn-db
+    container_name: redis
     image: redis:alpine
     command: ["redis-server", "/etc/redis.conf"]
     ports:
