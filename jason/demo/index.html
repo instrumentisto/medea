@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Chat</title>
+  <meta http-equiv='Content-Type' content='text/html; charset=UTF-8'/>
+
+  <script type="text/javascript">
+    async function responder() {
+      const rust = await import("../../pkg");
+
+      let responder = new rust.Jason();
+
+      let responder_room = await responder.join_room("ws://localhost:8080/ws/1/2/responder_credentials");
+
+      responder.on_local_stream(function (stream, error) {
+        if (stream) {
+          var video = document.createElement("video");
+
+          video.srcObject = stream.get_media_stream();
+          document.body.appendChild(video);
+          video.play();
+        } else {
+          console.log(error);
+        }
+      });
+      responder_room.on_new_connection(function (connection) {
+        console.log("responder got new connection with member " + connection.member_id());
+        connection.on_remote_stream(function (stream) {
+          console.log("got video from remote member " + connection.member_id());
+
+          var video = document.createElement("video");
+
+          video.srcObject = stream.get_media_stream();
+          document.body.appendChild(video);
+          video.play();
+        });
+      });
+    }
+
+    async function caller() {
+      const rust = await import("../../pkg");
+
+      let caller = new rust.Jason();
+
+      let caller_room = await caller.join_room("ws://localhost:8080/ws/1/1/caller_credentials");
+
+      caller_room.on_new_connection(function (connection) {
+        console.log("caller got new connection with member " + connection.member_id());
+        connection.on_remote_stream(function (stream) {
+          console.log("got video from remote member " + connection.member_id());
+
+          var video = document.createElement("video");
+
+          video.srcObject = stream.get_media_stream();
+          document.body.appendChild(video);
+          video.play();
+        });
+      });
+      caller.on_local_stream(function (stream, error) {
+        if (stream) {
+          var video = document.createElement("video");
+
+          video.srcObject = stream.get_media_stream();
+          document.body.appendChild(video);
+          video.play();
+        } else {
+          console.log(error);
+        }
+      });
+    }
+  </script>
+
+  <style>
+    .video-call {
+      display: flex;
+      flex-flow: row nowrap;
+      width: 100%;
+      flex-wrap: nowrap;
+      flex-direction: row;
+    }
+
+    .video {
+      display: flex;
+      justify-content: center;
+      flex-direction: column;
+      margin-right: 10px;
+      text-align: center;
+    }
+
+    .video > video {
+      background: dimgrey;
+    }
+
+    .connect-btns {
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+<div class="video-call">
+  <div class="video">
+    <video id="yourvid" muted autoplay width="100%" height="100%"></video>
+    <b>You</b>
+  </div>
+  <div class="video">
+    <video id="partnervid" autoplay width="100%" height="100%"></video>
+    <b>Partner</b>
+  </div>
+</div>
+<div class="connect-btns">
+  <button onclick="caller()">Start caller session</button>
+  <button onclick="responder()">Start responder session</button>
+</div>
+
+</body>
+</html>
