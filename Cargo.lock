@@ -1015,6 +1015,7 @@ dependencies = [
  "js-sys 0.3.24 (registry+https://github.com/rust-lang/crates.io-index)",
  "macro-attr 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "medea-client-api-proto 0.1.0-dev",
+ "medea-macro 0.1.0-dev",
  "newtype_derive 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.93 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_json 1.0.39 (registry+https://github.com/rust-lang/crates.io-index)",

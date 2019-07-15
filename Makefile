@@ -74,7 +74,7 @@ cargo.fmt:
 #	make cargo.lint
 
 cargo.lint:
-	cargo clippy --all -- -D clippy::pedantic -D warnings
+	cargo +nightly clippy --all -- -D clippy::pedantic -D warnings
 
 
 
@@ -106,13 +106,19 @@ yarn:
 # Generate project documentation of Rust sources.
 #
 # Usage:
-#	make docs.rust [open=(yes|no)] [clean=(no|yes)]
+#	make docs.rust [crate=(@all|medea|jason|<crate-name>)]
+#	               [open=(yes|no)] [clean=(no|yes)]
+
+docs-rust-crate = $(if $(call eq,$(crate),),@all,$(crate))
 
 docs.rust:
 ifeq ($(clean),yes)
 	@rm -rf target/doc/
 endif
-	cargo +nightly doc $(if $(call eq,$(open),no),,--open)
+	cargo +nightly doc \
+		$(if $(call eq,$(docs-rust-crate),@all),--all,-p $(docs-rust-crate)) \
+		--no-deps \
+		$(if $(call eq,$(open),no),,--open)
 
 
 

@@ -19,6 +19,7 @@ use crate::{
     signalling::{room::RoomError, Room},
     turn::service,
 };
+use bb8::Pool;
 
 /// Errors which can happen while server starting.
 #[derive(Debug, Fail)]
@@ -76,7 +77,8 @@ pub fn start_static_rooms(
                 ));
             }
 
-            let turn_auth_service = service::new_turn_auth_service(&config)
+            let turn_auth_service = service::new_turn_auth_service(&config.turn)
+                .wait()
                 .expect("Unable to start turn service");
 
             let room_id = spec.id().clone();

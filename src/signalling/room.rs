@@ -1,7 +1,7 @@
 //! Room definitions and implementations. Room is responsible for media
 //! connection establishment between concrete [`Member`]s.
 
-use std::{rc::Rc, time::Duration};
+use std::{collections::HashMap as StdHashMap, rc::Rc, time::Duration};
 
 use actix::{
     fut::wrap_future, Actor, ActorFuture, AsyncContext, Context, Handler,
@@ -22,8 +22,8 @@ use crate::{
     },
     log::prelude::*,
     media::{
-        New, Peer, PeerId, PeerStateError, PeerStateMachine,
-        WaitLocalHaveRemote, WaitLocalSdp, WaitRemoteSdp,
+        New, Peer, PeerError, PeerId, PeerStateMachine, WaitLocalHaveRemote,
+        WaitLocalSdp, WaitRemoteSdp,
     },
     signalling::{
         elements::{
@@ -54,16 +54,18 @@ pub enum RoomError {
     #[fail(display = "Unable to send event to Member [id = {}]", _0)]
     UnableToSendEvent(MemberId),
     #[fail(display = "PeerError: {}", _0)]
-    PeerStateError(PeerStateError),
-    #[fail(display = "Generic room error: {}", _0)]
+    PeerError(PeerError),
+    #[fail(display = "Generic room error {}", _0)]
     BadRoomSpec(String),
     #[fail(display = "Turn service error: {}", _0)]
     TurnServiceError(String),
+    #[fail(display = "Client error:{}", _0)]
+    ClientError(String),
 }
 
-impl From<PeerStateError> for RoomError {
-    fn from(err: PeerStateError) -> Self {
-        RoomError::PeerStateError(err)
+impl From<PeerError> for RoomError {
+    fn from(err: PeerError) -> Self {
+        RoomError::PeerError(err)
     }
 }
 
@@ -192,9 +194,12 @@ impl Room {
         &mut self,
         from_peer_id: PeerId,
         sdp_offer: String,
+        mids: StdHashMap<u64, String>,
     ) -> Result<ActFuture<(), RoomError>, RoomError> {
-        let from_peer: Peer<WaitLocalSdp> =
+        let mut from_peer: Peer<WaitLocalSdp> =
             self.peers.take_inner_peer(from_peer_id)?;
+        from_peer.set_mids(mids)?;
+
         let to_peer_id = from_peer.partner_peer_id();
         let to_peer: Peer<New> = self.peers.take_inner_peer(to_peer_id)?;
 
@@ -237,6 +242,7 @@ impl Room {
     ) -> Result<ActFuture<(), RoomError>, RoomError> {
         let from_peer: Peer<WaitLocalHaveRemote> =
             self.peers.take_inner_peer(from_peer_id)?;
+
         let to_peer_id = from_peer.partner_peer_id();
         let to_peer: Peer<WaitRemoteSdp> =
             self.peers.take_inner_peer(to_peer_id)?;
@@ -267,21 +273,23 @@ impl Room {
     ) -> Result<ActFuture<(), RoomError>, RoomError> {
         let from_peer = self.peers.get_peer(from_peer_id)?;
         if let PeerStateMachine::New(_) = from_peer {
-            return Err(RoomError::PeerStateError(PeerStateError::WrongState(
+            return Err(PeerError::WrongState(
                 from_peer_id,
                 "Not New",
                 format!("{}", from_peer),
-            )));
+            )
+            .into());
         }
 
         let to_peer_id = from_peer.partner_peer_id();
         let to_peer = self.peers.get_peer(to_peer_id)?;
         if let PeerStateMachine::New(_) = to_peer {
-            return Err(RoomError::PeerStateError(PeerStateError::WrongState(
+            return Err(PeerError::WrongState(
                 to_peer_id,
                 "Not New",
                 format!("{}", to_peer),
-            )));
+            )
+            .into());
         }
 
         let to_member_id = to_peer.member_id();
@@ -527,9 +535,11 @@ impl Handler<CommandMessage> for Room {
         ctx: &mut Self::Context,
     ) -> Self::Result {
         let result = match msg.into() {
-            Command::MakeSdpOffer { peer_id, sdp_offer } => {
-                self.handle_make_sdp_offer(peer_id, sdp_offer)
-            }
+            Command::MakeSdpOffer {
+                peer_id,
+                sdp_offer,
+                mids,
+            } => self.handle_make_sdp_offer(peer_id, sdp_offer, mids),
             Command::MakeSdpAnswer {
                 peer_id,
                 sdp_answer,
@@ -629,5 +639,191 @@ impl Handler<RpcConnectionClosed> for Room {
 
         self.members
             .connection_closed(ctx, msg.member_id, &msg.reason);
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use std::sync::{atomic::AtomicUsize, Arc, Mutex};
+
+    use actix::{Addr, System};
+
+    use medea_client_api_proto::{
+        AudioSettings, Direction, IceServer, MediaType, Track, VideoSettings,
+    };
+
+    use crate::{
+        api::client::rpc_connection::test::TestConnection, media::create_peers,
+        turn::new_turn_auth_service_mock,
+    };
+
+    use super::*;
+
+    fn start_room() -> Addr<Room> {
+        let members = hashmap! {
+            1 => Member{
+                id: 1,
+                credentials: "caller_credentials".to_owned(),
+                ice_user: None
+            },
+            2 => Member{
+                id: 2,
+                credentials: "responder_credentials".to_owned(),
+                ice_user: None
+            },
+        };
+        Room::new(
+            1,
+            members,
+            create_peers(1, 2),
+            Duration::from_secs(10),
+            new_turn_auth_service_mock(),
+        )
+        .start()
+    }
+
+    #[test]
+    fn start_signaling() {
+        let stopped = Arc::new(AtomicUsize::new(0));
+        let caller_events = Arc::new(Mutex::new(vec![]));
+        let caller_events_clone = Arc::clone(&caller_events);
+        let responder_events = Arc::new(Mutex::new(vec![]));
+        let responder_events_clone = Arc::clone(&responder_events);
+
+        System::run(move || {
+            let room = start_room();
+            let room_clone = room.clone();
+            let stopped_clone = stopped.clone();
+
+            TestConnection {
+                events: caller_events_clone,
+                member_id: 1,
+                room: room_clone,
+                stopped: stopped_clone,
+            }
+            .start();
+
+            TestConnection {
+                events: responder_events_clone,
+                member_id: 2,
+                room,
+                stopped,
+            }
+            .start();
+        })
+        .unwrap();
+
+        let caller_events = caller_events.lock().unwrap();
+        let responder_events = responder_events.lock().unwrap();
+        assert_eq!(
+            caller_events.to_vec(),
+            vec![
+                serde_json::to_string(&Event::PeerCreated {
+                    peer_id: 1,
+                    sdp_offer: None,
+                    tracks: vec![
+                        Track {
+                            id: 1,
+                            direction: Direction::Send {
+                                receivers: vec![2],
+                                mid: None
+                            },
+                            media_type: MediaType::Audio(AudioSettings {}),
+                        },
+                        Track {
+                            id: 2,
+                            direction: Direction::Send {
+                                receivers: vec![2],
+                                mid: None
+                            },
+                            media_type: MediaType::Video(VideoSettings {}),
+                        },
+                    ],
+                    ice_servers: vec![
+                        IceServer {
+                            urls: vec!["stun:5.5.5.5:1234".to_string()],
+                            username: None,
+                            credential: None,
+                        },
+                        IceServer {
+                            urls: vec![
+                                "turn:5.5.5.5:1234".to_string(),
+                                "turn:5.5.5.5:1234?transport=tcp".to_string()
+                            ],
+                            username: Some("username".to_string()),
+                            credential: Some("password".to_string()),
+                        },
+                    ],
+                })
+                .unwrap(),
+                serde_json::to_string(&Event::SdpAnswerMade {
+                    peer_id: 1,
+                    sdp_answer: "responder_answer".into(),
+                })
+                .unwrap(),
+                serde_json::to_string(&Event::IceCandidateDiscovered {
+                    peer_id: 1,
+                    candidate: IceCandidate {
+                        candidate: "ice_candidate".to_owned(),
+                        sdp_m_line_index: None,
+                        sdp_mid: None
+                    },
+                })
+                .unwrap(),
+            ]
+        );
+
+        assert_eq!(
+            responder_events.to_vec(),
+            vec![
+                serde_json::to_string(&Event::PeerCreated {
+                    peer_id: 2,
+                    sdp_offer: Some("caller_offer".into()),
+                    tracks: vec![
+                        Track {
+                            id: 1,
+                            direction: Direction::Recv {
+                                sender: 1,
+                                mid: Some(String::from("0"))
+                            },
+                            media_type: MediaType::Audio(AudioSettings {}),
+                        },
+                        Track {
+                            id: 2,
+                            direction: Direction::Recv {
+                                sender: 1,
+                                mid: Some(String::from("1"))
+                            },
+                            media_type: MediaType::Video(VideoSettings {}),
+                        },
+                    ],
+                    ice_servers: vec![
+                        IceServer {
+                            urls: vec!["stun:5.5.5.5:1234".to_string()],
+                            username: None,
+                            credential: None,
+                        },
+                        IceServer {
+                            urls: vec![
+                                "turn:5.5.5.5:1234".to_string(),
+                                "turn:5.5.5.5:1234?transport=tcp".to_string()
+                            ],
+                            username: Some("username".to_string()),
+                            credential: Some("password".to_string()),
+                        },
+                    ],
+                })
+                .unwrap(),
+                serde_json::to_string(&Event::IceCandidateDiscovered {
+                    peer_id: 2,
+                    candidate: IceCandidate {
+                        candidate: "ice_candidate".to_owned(),
+                        sdp_m_line_index: None,
+                        sdp_mid: None
+                    },
+                })
+                .unwrap(),
+            ]
+        );
     }
 }

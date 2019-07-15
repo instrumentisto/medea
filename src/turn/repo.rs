@@ -30,34 +30,24 @@ impl From<RedisError> for TurnDatabaseErr {
 #[derive(Debug)]
 pub struct TurnDatabase {
     pool: RedisPool,
-    info: ConnectionInfo,
 }
 
 impl TurnDatabase {
     /// New TurnDatabase
     pub fn new<S: Into<ConnectionInfo> + Clone>(
-        connection_timeout: Duration,
-        connection_info: S,
-    ) -> Result<Self, TurnDatabaseErr> {
-        let client = redis::Client::open(connection_info.clone().into())?;
-        let connection_manager = RedisConnectionManager::new(client)?;
-
-        // Its safe to unwrap here, since this err comes directly from mio and
-        // means that mio doesnt have bindings for this target, which wont
-        // happen.
-        let mut runtime = tokio::runtime::Runtime::new()
-            .expect("Unable to create a runtime in TurnDatabase");
-        let pool = runtime.block_on(future::lazy(move || {
-            Pool::builder()
-                .connection_timeout(connection_timeout)
-                .build(connection_manager)
-        }))?;
-        let redis_pool = RedisPool::new(pool);
-
-        Ok(Self {
-            pool: redis_pool,
-            info: connection_info.into(),
-        })
+        conn_timeout: Duration,
+        conn_info: S,
+    ) -> impl Future<Item = Self, Error = TurnDatabaseErr> {
+        future::lazy(move || redis::Client::open(conn_info.into()))
+            .and_then(RedisConnectionManager::new)
+            .and_then(move |conn_mngr| {
+                Pool::builder()
+                    .connection_timeout(conn_timeout)
+                    .build(conn_mngr)
+            })
+            .map(RedisPool::new)
+            .map(|pool| Self { pool })
+            .map_err(TurnDatabaseErr::from)
     }
 
     /// Inserts provided [`IceUser`] into remote Redis database.

@@ -8,7 +8,7 @@ use futures::future::{Future, IntoFuture};
 use macro_attr::*;
 use medea_client_api_proto::{ClientMsg, ServerMsg};
 use newtype_derive::NewtypeFrom;
-use web_sys::{CloseEvent, Event, MessageEvent, WebSocket as BackingSocket};
+use web_sys::{CloseEvent, Event, MessageEvent, WebSocket as SysWebSocket};
 
 use crate::{
     rpc::CloseMsg,
@@ -43,7 +43,7 @@ impl TryFrom<u16> for State {
             1 => Ok(State::OPEN),
             2 => Ok(State::CLOSING),
             3 => Ok(State::CLOSED),
-            _ => Err(WasmErr::Other(
+            _ => Err(WasmErr::Custom(
                 format!("Could not cast {} to State variant", value).into(),
             )),
         }
@@ -51,12 +51,12 @@ impl TryFrom<u16> for State {
 }
 
 struct InnerSocket {
-    socket: Rc<BackingSocket>,
+    socket: Rc<SysWebSocket>,
     socket_state: State,
-    on_open: Option<EventListener<BackingSocket, Event>>,
-    on_message: Option<EventListener<BackingSocket, MessageEvent>>,
-    on_close: Option<EventListener<BackingSocket, CloseEvent>>,
-    on_error: Option<EventListener<BackingSocket, Event>>,
+    on_open: Option<EventListener<SysWebSocket, Event>>,
+    on_message: Option<EventListener<SysWebSocket, MessageEvent>>,
+    on_close: Option<EventListener<SysWebSocket, CloseEvent>>,
+    on_error: Option<EventListener<SysWebSocket, Event>>,
 }
 
 pub struct WebSocket(Rc<RefCell<InnerSocket>>);
@@ -65,7 +65,7 @@ impl InnerSocket {
     fn new(url: &str) -> Result<Self, WasmErr> {
         Ok(Self {
             socket_state: State::CONNECTING,
-            socket: Rc::new(BackingSocket::new(url)?),
+            socket: Rc::new(SysWebSocket::new(url)?),
             on_open: None,
             on_message: None,
             on_close: None,
@@ -131,7 +131,7 @@ impl WebSocket {
                         Ok(socket)
                     })
                     .select(rx_close.then(|_| {
-                        Err(WasmErr::from_str("Failed to init WebSocket"))
+                        Err(WasmErr::from("Failed to init WebSocket"))
                     }))
                     .map(|(socket, _)| socket)
                     .map_err(|(err, _)| err)
@@ -183,7 +183,7 @@ impl WebSocket {
                 .socket
                 .send_with_str(&serde_json::to_string(msg)?)
                 .map_err(WasmErr::from),
-            _ => Err(WasmErr::from_str("Underlying socket is closed")),
+            _ => Err(WasmErr::from("Underlying socket is closed")),
         }
     }
 }
@@ -230,7 +230,7 @@ impl TryFrom<&MessageEvent> for ServerMessage {
         let payload = msg
             .data()
             .as_string()
-            .ok_or_else(|| WasmErr::from_str("Payload is not string"))?;
+            .ok_or_else(|| WasmErr::from("Payload is not string"))?;
 
         serde_json::from_str::<ServerMsg>(&payload)
             .map_err(WasmErr::from)

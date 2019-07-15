@@ -1,5 +1,7 @@
 //! HTTP server for handling WebSocket connections of Client API.
 
+use std::io;
+
 use actix_web::{
     middleware,
     web::{Data, Path, Payload},
@@ -85,7 +87,7 @@ pub struct Context {
 }
 
 /// Starts HTTP server for handling WebSocket connections of Client API.
-pub fn run(rooms: RoomsRepository, config: Conf) {
+pub fn run(rooms: RoomsRepository, config: Conf) -> io::Result<()> {
     let server_addr = config.server.bind_addr();
     HttpServer::new(move || {
         App::new()
@@ -101,11 +103,12 @@ pub fn run(rooms: RoomsRepository, config: Conf) {
                 .route(actix_web::web::get().to_async(ws_index)),
             )
     })
-    .bind(server_addr)
-    .unwrap()
+    .bind(server_addr)?
     .start();
 
-    info!("Started HTTP server on 0.0.0.0:8080");
+    info!("Started HTTP server on {}", server_addr);
+
+    Ok(())
 }
 
 #[cfg(test)]

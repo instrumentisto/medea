@@ -58,7 +58,7 @@ impl Inner {
 }
 
 /// Handles close messsage from remote server.
-fn on_close(inner_rc: &Rc<RefCell<Inner>>, close_msg: CloseMsg) {
+fn on_close(inner_rc: &RefCell<Inner>, close_msg: CloseMsg) {
     let mut inner = inner_rc.borrow_mut();
     inner.sock.take();
     inner.heartbeat.stop();
@@ -71,7 +71,7 @@ fn on_close(inner_rc: &Rc<RefCell<Inner>>, close_msg: CloseMsg) {
 }
 
 /// Handles messages from remote server.
-fn on_message(inner_rc: &Rc<RefCell<Inner>>, msg: Result<ServerMsg, WasmErr>) {
+fn on_message(inner_rc: &RefCell<Inner>, msg: Result<ServerMsg, WasmErr>) {
     let inner = inner_rc.borrow();
     match msg {
         Ok(ServerMsg::Pong(_num)) => {
@@ -144,7 +144,7 @@ impl RpcClient {
 
     /// Sends Command to Medea.
     // TODO: proper sub registry
-    pub fn _send_command(&self, command: Command) {
+    pub fn send_command(&self, command: Command) {
         let socket_borrow = &self.0.borrow().sock;
 
         // TODO: no socket? we dont really want this method to return err
