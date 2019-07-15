@@ -10,7 +10,7 @@ use crate::{
 
 /// Responsible for sending/handling keep-alive requests, detecting connection
 /// loss.
-// TODO: Implement connection loss deteection.
+// TODO: Implement connection loss detection.
 pub struct Heartbeat(Rc<RefCell<InnerHeartbeat>>);
 
 struct InnerHeartbeat {
@@ -30,7 +30,7 @@ impl InnerHeartbeat {
     /// Returns error no open socket.
     fn send_now(&mut self) -> Result<(), WasmErr> {
         match self.socket.as_ref() {
-            None => Err(WasmErr::from_str("Unable to ping: no socket")),
+            None => Err(WasmErr::from("Unable to ping: no socket")),
             Some(socket) => {
                 self.num += 1;
                 socket.send(&ClientMsg::Ping(self.num))

@@ -1,6 +1,6 @@
 //! [`RpcConnection`] with related messages.
 
-use core::fmt;
+use std::fmt;
 
 use actix::Message;
 use futures::Future;
@@ -97,7 +97,7 @@ pub mod test {
         System,
     };
     use futures::future::Future;
-    use medea_client_api_proto::{Command, Event, IceCandidate};
+    use medea_client_api_proto::{Command, Direction, Event, IceCandidate};
 
     use crate::{
         api::{
@@ -161,7 +161,7 @@ pub mod test {
                 Event::PeerCreated {
                     peer_id,
                     sdp_offer,
-                    tracks: _,
+                    tracks,
                     ice_servers: _,
                 } => {
                     match sdp_offer {
@@ -175,6 +175,15 @@ pub mod test {
                             Command::MakeSdpOffer {
                                 peer_id,
                                 sdp_offer: "caller_offer".into(),
+                                mids: tracks
+                                    .into_iter()
+                                    .filter_map(|t| match t.direction {
+                                        Direction::Send { .. } => Some(t.id),
+                                        Direction::Recv { .. } => None,
+                                    })
+                                    .enumerate()
+                                    .map(|(mid, id)| (id, mid.to_string()))
+                                    .collect(),
                             },
                         )),
                     }

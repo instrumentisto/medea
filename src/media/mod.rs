@@ -6,8 +6,8 @@ pub mod track;
 pub use self::{
     ice_user::IceUser,
     peer::{
-        create_peers, Id as PeerId, New, Peer, PeerStateError,
-        PeerStateMachine, WaitLocalHaveRemote, WaitLocalSdp, WaitRemoteSdp,
+        create_peers, Id as PeerId, New, Peer, PeerError, PeerStateMachine,
+        WaitLocalHaveRemote, WaitLocalSdp, WaitRemoteSdp,
     },
     track::{Id as TrackId, MediaTrack},
 };
