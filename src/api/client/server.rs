@@ -120,7 +120,7 @@ pub mod actors {
 
     use crate::{
         log::prelude::*,
-        shutdown::{ShutdownMessage, ShutdownMessageResult},
+        shutdown::{ShutdownMessage},
     };
     use actix::fut::wrap_future;
 

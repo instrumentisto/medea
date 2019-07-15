@@ -8,7 +8,7 @@ use actix::{
     Message,
 };
 use failure::Fail;
-use futures::{future, Future};
+use futures::future;
 use hashbrown::HashMap;
 
 use medea_client_api_proto::{Command, Event, IceCandidate};
@@ -26,7 +26,7 @@ use crate::{
         New, Peer, PeerId, PeerStateError, PeerStateMachine,
         WaitLocalHaveRemote, WaitLocalSdp, WaitRemoteSdp,
     },
-    shutdown::{ShutdownMessage, ShutdownMessageResult},
+    shutdown::{ShutdownMessage},
     signalling::{participants::ParticipantService, peers::PeerRepository},
     turn::TurnAuthService,
 };
@@ -274,7 +274,7 @@ impl Room {
     }
 
     /// Returns a future which is called during [`Room`]'s shutdown
-    fn get_drop_fut(
+    fn get_close_room_fut(
         &mut self,
         ctx: &mut Context<Room>,
     ) -> ActFuture<(), ()> {
@@ -297,7 +297,7 @@ impl Room {
 
     /// Method to close [`Room`]
     fn close_room(&mut self, ctx: &mut Context<Self>) {
-        let drop_future = self.get_drop_fut(ctx);
+        let drop_future = self.get_close_room_fut(ctx);
         ctx.wait(drop_future);
     }
 }
@@ -459,8 +459,7 @@ impl Handler<ShutdownMessage> for Room {
     ) -> Self::Result {
         info!("Shut down signal received for Room: {:?}", self.id);
 
-        //todo refactor
-        self.get_drop_fut(ctx)
+        self.get_close_room_fut(ctx)
     }
 }
 

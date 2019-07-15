@@ -22,16 +22,13 @@ use tokio::prelude::{
 
 use crate::log::prelude::*;
 
-pub type ShutdownMessageResult =
-    Result<(), ()>;
-
-type ShutdownFutureType = dyn Future<Item = Vec<ShutdownMessageResult>, Error = ()>;
+type ShutdownFutureType = dyn Future<Item = Vec<Result<(), ()>>, Error = ()>;
 
 #[derive(Ord, PartialOrd, PartialEq, Eq, Copy, Clone)]
 pub struct Priority(pub u8);
 
 #[derive(Debug, Message)]
-#[rtype(result = "ShutdownMessageResult")]
+#[rtype(result = "Result<(),()>")]
 pub struct ShutdownMessage;
 
 pub struct Subscriber {
