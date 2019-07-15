@@ -154,10 +154,7 @@ impl StreamHandler<Frame, WsProtocolError> for TestMember {
                             sdp_offer: "caller_offer".into(),
                             mids: tracks
                                 .into_iter()
-                                .filter_map(|t| match t.direction {
-                                    Direction::Send { .. } => Some(t.id),
-                                    Direction::Recv { .. } => None,
-                                })
+                                .map(|t| t.id)
                                 .enumerate()
                                 .map(|(mid, id)| (id, mid.to_string()))
                                 .collect(),
