@@ -277,27 +277,28 @@ impl Room {
     fn get_drop_fut(
         &mut self,
         ctx: &mut Context<Room>,
-    ) -> Box<dyn Future<Item = (), Error = ()> + Send> {
+    ) -> ActFuture<(), ()> {
         info!("Closing Room [id = {:?}]", self.id);
         self.state = RoomState::Stopping;
-        let room_recipient = ctx.address().recipient();
+        let room_id = self.id;
         let drop_fut =
-            self.participants.drop_connections(ctx).then(move |_| {
-                match room_recipient.try_send(RoomSetStopped {}) {
-                    Ok(_) => (),
-                    Err(e) => {
-                        error!("Cannot change Room's state to closed: {:?}", e)
-                    }
-                };
-                futures::future::ok(())
-            });
+            wrap_future(
+                self.participants.drop_connections(ctx)
+            )
+                .map(move |_, room: &mut Room, _| {
+                    room.state = RoomState::Stopped;
+                })
+                .map_err(move |_,_,_| {
+                    error!("Error closing room {:?}", room_id);
+                });
+
         Box::new(drop_fut)
     }
 
     /// Method to close [`Room`]
     fn close_room(&mut self, ctx: &mut Context<Self>) {
         let drop_future = self.get_drop_fut(ctx);
-        ctx.wait(wrap_future(drop_future));
+        ctx.wait(drop_future);
     }
 }
 
@@ -449,7 +450,7 @@ impl Handler<RpcConnectionEstablished> for Room {
 
 // Close room on `SIGINT`, `SIGTERM`, `SIGQUIT`, `SIGHUP` signals.
 impl Handler<ShutdownMessage> for Room {
-    type Result = ShutdownMessageResult;
+    type Result = ActFuture<(),()>;
 
     fn handle(
         &mut self,
@@ -458,12 +459,8 @@ impl Handler<ShutdownMessage> for Room {
     ) -> Self::Result {
         info!("Shut down signal received for Room: {:?}", self.id);
 
-        let room_id = self.id;
-        Ok(Box::new(self.get_drop_fut(ctx).map(|_| ()).map_err(
-            move |_| {
-                error!("Error closing room {:?}", room_id);
-            },
-        )))
+        //todo refactor
+        self.get_drop_fut(ctx)
     }
 }
 

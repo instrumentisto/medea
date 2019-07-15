@@ -114,7 +114,7 @@ pub fn run(rooms: RoomsRepository, config: Conf) -> Addr<ServerWrapper> {
 }
 
 pub mod actors {
-    use actix::{Actor, Context, Handler};
+    use actix::{Actor, Context, Handler, ActorFuture};
     use actix_web::dev::Server;
     use tokio::prelude::Future;
 
@@ -122,6 +122,7 @@ pub mod actors {
         log::prelude::*,
         shutdown::{ShutdownMessage, ShutdownMessageResult},
     };
+    use actix::fut::wrap_future;
 
     pub struct ServerWrapper(pub Server);
 
@@ -130,7 +131,7 @@ pub mod actors {
     }
 
     impl Handler<ShutdownMessage> for ServerWrapper {
-        type Result = ShutdownMessageResult;
+        type Result = Box<dyn ActorFuture<Actor = ServerWrapper, Item = (), Error = ()>>;
 
         fn handle(
             &mut self,
@@ -139,9 +140,12 @@ pub mod actors {
         ) -> Self::Result {
             info!("Shutting down Actix Web Server");
 
-            Ok(Box::new(
-                self.0.stop(true).then(move |_| futures::future::ok(())),
-            ))
+            Box::new(
+                wrap_future(
+                    self.0.stop(true)
+                        .then(move |_| futures::future::ok(()))
+                )
+            )
         }
     }
 }

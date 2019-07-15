@@ -23,9 +23,9 @@ use tokio::prelude::{
 use crate::log::prelude::*;
 
 pub type ShutdownMessageResult =
-    Result<Box<(dyn Future<Item = (), Error = ()> + Send)>, ()>;
+    Result<(), ()>;
 
-type ShutdownFutureType = dyn Future<Item = Vec<()>, Error = ()>;
+type ShutdownFutureType = dyn Future<Item = Vec<ShutdownMessageResult>, Error = ()>;
 
 #[derive(Ord, PartialOrd, PartialEq, Eq, Copy, Clone)]
 pub struct Priority(pub u8);
@@ -136,8 +136,7 @@ impl Handler<ShutdownSignalDetected> for GracefulShutdown {
                 let recipient_shutdown_fut = send_future
                     .map_err(|e| {
                         error!("Error sending shutdown message: {:?}", e);
-                    })
-                    .and_then(std::result::Result::unwrap);
+                    });
 
                 this_priority_futures_vec.push(recipient_shutdown_fut);
             }
