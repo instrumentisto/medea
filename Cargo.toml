@@ -23,10 +23,7 @@ lto = "thin"
 actix = "0.8"
 actix-web = "1.0"
 actix-web-actors = "1.0"
-# TODO: use version from crates.io when commit
-# https://github.com/actix/actix-web/commit/ff724e239db50210a9913de6e214be214f41befa#diff-c39fd968c2b6beb9a6960dd533618bcbR41
-# will be released in crates.io.
-awc = { git = "https://github.com/actix/actix-web" }
+awc = "0.2"
 bb8 = "0.3"
 bb8-redis = "0.3"
 chrono = "0.4"
