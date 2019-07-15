@@ -12,7 +12,7 @@ use std::{convert::TryFrom as _, fs::File, io::Read as _, path::Path};
 use failure::{Error, Fail};
 use serde::Deserialize;
 
-use crate::api::error_codes::ErrorCode;
+use crate::api::error_codes::{Backtrace, ErrorCode};
 
 use self::{
     endpoints::{
@@ -78,7 +78,7 @@ impl Into<ErrorCode> for TryFromProtobufError {
 /// Errors that can occur when we try transform some spec from [`Element`].
 /// This error used in all [`TryFrom`] of Control API.
 #[allow(clippy::pub_enum_variant_names)]
-#[derive(Debug, Fail)]
+#[derive(Debug, Fail, Clone)]
 pub enum TryFromElementError {
     /// Element is not Endpoint.
     #[fail(display = "Element is not Endpoint")]
@@ -91,6 +91,16 @@ pub enum TryFromElementError {
     /// Element is not Member.
     #[fail(display = "Element is not Member")]
     NotMember,
+}
+
+impl Into<Backtrace> for &TryFromElementError {
+    fn into(self) -> Backtrace {
+        let mut backtrace = Backtrace::new();
+        match self {
+            _ => backtrace.push(self),
+        }
+        backtrace
+    }
 }
 
 /// Entity for parsing Control API request.

@@ -99,11 +99,7 @@ impl TryFrom<&MemberProto> for MemberSpec {
         }
         let pipeline = Pipeline::new(pipeline);
 
-        // TODO: think about absent credentials.
-        // if !value.has_credentials() {
-        //     return Err(TryFromProtobufError::MemberCredentialsNotFound);
-        // }
-
+        // Credentials here maybe absent.
         Ok(Self {
             pipeline,
             credentials: value.get_credentials().to_string(),

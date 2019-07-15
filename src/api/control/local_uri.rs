@@ -4,7 +4,7 @@ use std::fmt;
 
 use failure::Fail;
 
-use crate::api::error_codes::ErrorCode;
+use crate::api::error_codes::{Backtrace, ErrorCode};
 
 use super::{MemberId, RoomId};
 
@@ -26,15 +26,24 @@ pub enum LocalUriParseError {
 
 impl Into<ErrorCode> for LocalUriParseError {
     fn into(self) -> ErrorCode {
+        let backtrace: Backtrace = (&self).into();
         match self {
             LocalUriParseError::NotLocal(text) => {
-                ErrorCode::ElementIdIsNotLocal(text)
+                ErrorCode::ElementIdIsNotLocal(text, backtrace)
             }
             LocalUriParseError::TooManyFields(_, text) => {
-                ErrorCode::ElementIdIsTooLong(text)
+                ErrorCode::ElementIdIsTooLong(text, backtrace)
             }
-            LocalUriParseError::Empty => ErrorCode::EmptyElementId,
+            LocalUriParseError::Empty => ErrorCode::EmptyElementId(backtrace),
         }
+    }
+}
+
+impl Into<Backtrace> for &LocalUriParseError {
+    fn into(self) -> Backtrace {
+        let mut backtrace = Backtrace::new();
+        backtrace.push(self);
+        backtrace
     }
 }
 
@@ -42,7 +51,7 @@ impl Into<ErrorCode> for LocalUriParseError {
 /// Uri in format "local://room_id/member_id/endpoint_id"
 /// This kind of uri used for pointing to some element in spec (`Room`,
 /// `Member`, `WebRtcPlayEndpoint`, `WebRtcPublishEndpoint`, etc).
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct LocalUri {
     /// ID of [`Room`]
     pub room_id: Option<RoomId>,

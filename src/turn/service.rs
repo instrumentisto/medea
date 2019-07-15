@@ -12,7 +12,10 @@ use rand::{distributions::Alphanumeric, Rng};
 use redis::ConnectionInfo;
 
 use crate::{
-    api::control::{MemberId, RoomId},
+    api::{
+        control::{MemberId, RoomId},
+        error_codes::Backtrace,
+    },
     conf::Conf,
     media::IceUser,
     turn::repo::{TurnDatabase, TurnDatabaseErr},
@@ -119,6 +122,24 @@ impl From<bb8::RunError<TurnDatabaseErr>> for TurnServiceErr {
 impl From<MailboxError> for TurnServiceErr {
     fn from(err: MailboxError) -> Self {
         TurnServiceErr::MailboxErr(err)
+    }
+}
+
+impl Into<Backtrace> for &TurnServiceErr {
+    fn into(self) -> Backtrace {
+        let mut backtrace = Backtrace::new();
+        backtrace.push(&self);
+        match self {
+            TurnServiceErr::TurnAuthRepoErr(e) => {
+                backtrace.merge(e.into());
+            }
+            TurnServiceErr::MailboxErr(e) => {
+                backtrace.push(e);
+            }
+            TurnServiceErr::TimedOut => {}
+        }
+
+        backtrace
     }
 }
 

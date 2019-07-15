@@ -18,7 +18,7 @@ use crate::{
             Endpoint, MemberSpec, RoomSpec, TryFromElementError,
             TryFromProtobufError,
         },
-        error_codes::ErrorCode,
+        error_codes::{Backtrace, ErrorCode},
     },
     log::prelude::*,
     signalling::{
@@ -292,6 +292,7 @@ impl ControlApi for ControlApiService {
                     sink,
                     ErrorCode::ElementIdForRoomButElementIsNot(
                         req.get_id().to_string(),
+                        Backtrace::new()
                     ),
                     Response
                 );
@@ -312,6 +313,7 @@ impl ControlApi for ControlApiService {
                     sink,
                     ErrorCode::ElementIdForMemberButElementIsNot(
                         req.get_id().to_string(),
+                        Backtrace::new()
                     ),
                     Response
                 );
@@ -335,6 +337,7 @@ impl ControlApi for ControlApiService {
                     sink,
                     ErrorCode::ElementIdForEndpointButElementIsNot(
                         req.get_id().to_string(),
+                        Backtrace::new()
                     ),
                     Response
                 );
@@ -343,7 +346,10 @@ impl ControlApi for ControlApiService {
             send_error_response!(
                 ctx,
                 sink,
-                ErrorCode::InvalidElementUri(req.get_id().to_string()),
+                ErrorCode::InvalidElementUri(
+                    req.get_id().to_string(),
+                    Backtrace::new()
+                ),
                 Response
             );
         }
@@ -396,7 +402,10 @@ impl ControlApi for ControlApiService {
                 send_error_response!(
                     ctx,
                     sink,
-                    ErrorCode::InvalidElementUri(id.to_string()),
+                    ErrorCode::InvalidElementUri(
+                        id.to_string(),
+                        Backtrace::new()
+                    ),
                     Response
                 );
             }
@@ -484,7 +493,10 @@ impl ControlApi for ControlApiService {
                 send_error_response!(
                     ctx,
                     sink,
-                    ErrorCode::InvalidElementUri(id.to_string()),
+                    ErrorCode::InvalidElementUri(
+                        id.to_string(),
+                        Backtrace::new()
+                    ),
                     GetResponse
                 );
             }

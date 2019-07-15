@@ -10,7 +10,7 @@ use futures::future::Future;
 use redis::{ConnectionInfo, RedisError};
 use tokio::prelude::*;
 
-use crate::{log::prelude::*, media::IceUser};
+use crate::{api::error_codes::Backtrace, log::prelude::*, media::IceUser};
 
 #[derive(Fail, Debug)]
 pub enum TurnDatabaseErr {
@@ -21,6 +21,19 @@ pub enum TurnDatabaseErr {
 impl From<RedisError> for TurnDatabaseErr {
     fn from(err: RedisError) -> Self {
         TurnDatabaseErr::RedisError(err)
+    }
+}
+
+impl Into<Backtrace> for &TurnDatabaseErr {
+    fn into(self) -> Backtrace {
+        let mut backtrace = Backtrace::new();
+        backtrace.push(self);
+        match self {
+            TurnDatabaseErr::RedisError(e) => {
+                backtrace.push(e);
+            }
+        }
+        backtrace
     }
 }
 

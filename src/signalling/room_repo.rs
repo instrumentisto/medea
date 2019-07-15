@@ -17,7 +17,7 @@ use crate::{
             local_uri::LocalUri, room::RoomSpec, Endpoint as EndpointSpec,
             MemberId, MemberSpec, RoomId,
         },
-        error_codes::ErrorCode,
+        error_codes::{Backtrace, ErrorCode},
     },
     log::prelude::*,
     signalling::{
@@ -57,14 +57,37 @@ impl From<RoomError> for RoomRepoError {
 
 impl Into<ErrorCode> for RoomRepoError {
     fn into(self) -> ErrorCode {
+        let backtrace = (&self).into();
         match self {
-            RoomRepoError::RoomNotFound(id) => ErrorCode::RoomNotFound(id),
-            RoomRepoError::RoomAlreadyExists(id) => {
-                ErrorCode::RoomAlreadyExists(id)
+            RoomRepoError::RoomNotFound(ref id) => {
+                ErrorCode::RoomNotFound(id.clone(), backtrace)
+            }
+            RoomRepoError::RoomAlreadyExists(ref id) => {
+                ErrorCode::RoomAlreadyExists(id.clone(), backtrace)
             }
             RoomRepoError::RoomError(e) => e.into(),
             _ => ErrorCode::UnknownError(self.to_string()),
         }
+    }
+}
+
+impl Into<Backtrace> for &RoomRepoError {
+    fn into(self) -> Backtrace {
+        let mut backtrace = Backtrace::new();
+        match self {
+            RoomRepoError::RoomNotFound(_) => backtrace.push(self),
+            RoomRepoError::RoomAlreadyExists(_) => backtrace.push(self),
+            RoomRepoError::RoomError(e) => {
+                backtrace.push(self);
+                backtrace.merge(e.into());
+            }
+            RoomRepoError::MailboxError(e) => {
+                backtrace.push(self);
+                backtrace.push(e);
+            }
+            RoomRepoError::Unknow => {}
+        }
+        backtrace
     }
 }
 

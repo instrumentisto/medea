@@ -14,7 +14,7 @@ use medea_client_api_proto::{
 use medea_macro::enum_delegate;
 
 use crate::{
-    api::control::MemberId,
+    api::{control::MemberId, error_codes::Backtrace},
     media::{MediaTrack, TrackId},
     signalling::peers::Counter,
 };
@@ -57,6 +57,16 @@ impl PeerStateError {
         expected: &'static str,
     ) -> Self {
         PeerStateError::WrongState(peer.id(), expected, format!("{}", peer))
+    }
+}
+
+impl Into<Backtrace> for &PeerStateError {
+    fn into(self) -> Backtrace {
+        let mut backtrace = Backtrace::new();
+        match self {
+            PeerStateError::WrongState(..) => backtrace.push(self),
+        }
+        backtrace
     }
 }
 

@@ -30,7 +30,7 @@ use crate::{
             Endpoint as EndpointSpec, MemberId, MemberSpec, RoomId,
             TryFromElementError, WebRtcPlayId, WebRtcPublishId,
         },
-        error_codes::ErrorCode,
+        error_codes::{Backtrace, ErrorCode},
     },
     log::prelude::*,
     media::{
@@ -118,6 +118,38 @@ impl Into<ErrorCode> for RoomError {
             RoomError::ParticipantServiceErr(e) => e.into(),
             _ => ErrorCode::UnknownError(self.to_string()),
         }
+    }
+}
+
+impl Into<Backtrace> for &RoomError {
+    fn into(self) -> Backtrace {
+        let mut backtrace = Backtrace::new();
+        match self {
+            RoomError::MemberError(e) => {
+                backtrace.push(self);
+                backtrace.merge(e.into());
+            }
+            RoomError::MembersLoadError(e) => {
+                backtrace.push(self);
+                backtrace.merge(e.into());
+            }
+            RoomError::ParticipantServiceErr(e) => {
+                backtrace.push(self);
+                backtrace.merge(e.into());
+            }
+            RoomError::PeerStateError(e) => {
+                backtrace.push(self);
+                backtrace.merge(e.into());
+            }
+            RoomError::TryFromElementError(e) => {
+                backtrace.push(self);
+                backtrace.merge(e.into())
+            }
+            _ => {
+                backtrace.push(self);
+            }
+        }
+        backtrace
     }
 }
 
