@@ -7,24 +7,29 @@
 //! * __1200...1299__ Parse errors
 //! * __1300...1399__ Conflicts
 
+use lazy_static::lazy_static;
 use protobuf::RepeatedField;
 
 use crate::api::control::{
     grpc::protos::control::Error as ErrorProto, local_uri::LocalUri,
 };
 
+/// Backtrace of nested errors for debugging purposes.
 #[derive(Debug)]
 pub struct Backtrace(pub Vec<String>);
 
 impl Backtrace {
+    /// Create new empty [`Backtrace`].
     pub fn new() -> Self {
         Self(Vec::new())
     }
 
+    /// Add error to [`Backtrace`].
     pub fn push<T: std::fmt::Debug>(&mut self, error: &T) {
         self.0.push(format!("{:?}", error));
     }
 
+    /// Merge this [`Backtrace`] with another [`Backtrace`].
     pub fn merge(&mut self, mut another_backtrace: Backtrace) {
         self.0.append(&mut another_backtrace.0);
     }
@@ -148,6 +153,7 @@ pub enum ErrorCode {
 
 impl Into<ErrorProto> for ErrorCode {
     fn into(self) -> ErrorProto {
+        // TODO: configure backtrace
         let mut error = ErrorProto::new();
         match self {
             ErrorCode::UnknownError(msg) => {
