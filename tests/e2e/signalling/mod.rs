@@ -16,9 +16,8 @@ use awc::{
     BoxedSocket,
 };
 use futures::{future::Future, sink::Sink, stream::SplitSink, Stream};
-use medea_client_api_proto::{Command, Direction, Event, IceCandidate};
+use medea_client_api_proto::{Command, Event, IceCandidate};
 use serde_json::error::Error as SerdeError;
-use std::collections::HashMap;
 
 /// Medea client for testing purposes.
 pub struct TestMember {

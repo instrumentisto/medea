@@ -59,7 +59,7 @@ fn three_members_p2p_video_call() {
                                     .iter()
                                     .filter_map(|t| match &t.direction {
                                         // TODO
-                                        Direction::Recv { sender, mid } => {
+                                        Direction::Recv { sender, .. } => {
                                             Some(sender)
                                         }
                                         _ => None,
@@ -73,9 +73,9 @@ fn three_members_p2p_video_call() {
                                 let send_count = tracks
                                     .iter()
                                     .filter_map(|t| match &t.direction {
-                                        Direction::Send { receivers, mid } => {
-                                            Some(receivers)
-                                        }
+                                        Direction::Send {
+                                            receivers, ..
+                                        } => Some(receivers),
                                         _ => None,
                                     })
                                     .map(|receivers| {
