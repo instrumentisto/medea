@@ -19,9 +19,10 @@ use crate::{
         },
         error_codes::ErrorCode,
     },
+    log::prelude::*,
     signalling::{
         room::{
-            CreateEndpoint, CreateMember, Delete, DeleteEndpoint, DeleteMember,
+            Close, CreateEndpoint, CreateMember, DeleteEndpoint, DeleteMember,
             RoomError, SerializeProtobufEndpoint, SerializeProtobufMember,
             SerializeProtobufRoom,
         },
@@ -167,13 +168,12 @@ impl Handler<DeleteRoom> for RoomsRepository {
         let room_repo = self.rooms.lock().unwrap();
         if let Some(room) = room_repo.get(&msg.0) {
             let rooms = Arc::clone(&self.rooms);
-            // TODO: handle errors
             ctx.spawn(wrap_future(
-                room.send(Delete)
+                room.send(Close)
                     .map(move |_| {
                         rooms.lock().unwrap().remove(&msg.0);
                     })
-                    .map_err(|_| ()),
+                    .map_err(|e| warn!("Close room mailbox error {:?}.", e)),
             ));
         }
 

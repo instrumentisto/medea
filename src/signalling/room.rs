@@ -765,15 +765,14 @@ impl Handler<RpcConnectionClosed> for Room {
     }
 }
 
-// TODO: maybe better naming
 #[derive(Message, Debug)]
 #[rtype(result = "()")]
-pub struct Delete;
+pub struct Close;
 
-impl Handler<Delete> for Room {
+impl Handler<Close> for Room {
     type Result = ();
 
-    fn handle(&mut self, _: Delete, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, _: Close, ctx: &mut Self::Context) -> Self::Result {
         for (id, member) in self.members.members() {
             if self.members.member_has_connection(&id) {
                 let peer_ids_to_remove: HashSet<PeerId> = member
@@ -794,6 +793,8 @@ impl Handler<Delete> for Room {
                 self.members.delete_member(&member_id, ctx);
             }
         }
+        let drop_fut = self.members.drop_connections(ctx);
+        ctx.wait(wrap_future(drop_fut));
     }
 }
 

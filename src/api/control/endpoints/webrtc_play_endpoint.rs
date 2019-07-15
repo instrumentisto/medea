@@ -47,7 +47,6 @@ impl TryFrom<&WebRtcPlayEndpointProto> for WebRtcPlayEndpoint {
     type Error = TryFromProtobufError;
 
     fn try_from(value: &WebRtcPlayEndpointProto) -> Result<Self, Self::Error> {
-        // TODO: think about absent src uri.
         Ok(Self {
             src: SrcUri::parse(value.get_src())?,
         })
