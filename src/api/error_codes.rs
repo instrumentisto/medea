@@ -7,7 +7,6 @@
 //! * __1200...1299__ Parse errors
 //! * __1300...1399__ Conflicts
 
-use lazy_static::lazy_static;
 use protobuf::RepeatedField;
 
 use crate::api::control::{

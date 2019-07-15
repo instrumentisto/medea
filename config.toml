@@ -1,4 +1,9 @@
 [server]
+# Server host
+#
+# Default:
+#   host = "localhost:8080"
+
 # IP address to bind HTTP server to.
 #
 # Default:

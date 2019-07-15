@@ -9,6 +9,10 @@ use smart_default::SmartDefault;
 #[derive(Clone, Debug, Deserialize, Serialize, SmartDefault)]
 #[serde(default)]
 pub struct Server {
+    /// Server host.
+    #[default("localhost:8080".to_string())]
+    pub host: String,
+
     /// IP address to bind HTTP server to. Defaults to `0.0.0.0`.
     #[default(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)))]
     pub bind_ip: IpAddr,

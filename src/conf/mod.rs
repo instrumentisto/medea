@@ -60,10 +60,7 @@ impl Conf {
     }
 
     pub fn get_base_rpc_url(&self) -> String {
-        // TODO: maybe create host config value and use it?
-        let addr = &self.server.bind_ip;
-        let port = self.server.bind_port;
-        format!("wss://{}:{}", addr, port)
+        format!("wss://{}", self.server.host)
     }
 }
 
