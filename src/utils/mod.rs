@@ -1,6 +1,5 @@
 //! Helper utils used in project.
 
-
 /// Creates new [`hashbrown::HashMap`] from a list of key-value pairs.
 ///
 /// ## Example

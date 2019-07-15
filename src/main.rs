@@ -6,8 +6,8 @@ pub mod api;
 pub mod conf;
 pub mod log;
 pub mod media;
-pub mod signalling;
 pub mod shutdown;
+pub mod signalling;
 pub mod turn;
 
 use actix::prelude::*;
@@ -40,8 +40,7 @@ fn main() {
 
     let peers = create_peers(1, 2);
 
-    let graceful_shutdown_addr =
-        shutdown::create(config.system_config.timeout);
+    let graceful_shutdown_addr = shutdown::create(config.system_config.timeout);
 
     let turn_auth_service =
         new_turn_auth_service(&config).expect("Unable to start turn service");
@@ -51,21 +50,19 @@ fn main() {
     let room = Room::start_in_arbiter(&Arbiter::new(), move |_| {
         Room::new(1, members, peers, rpc_reconnect_timeout, turn_auth_service)
     });
-    graceful_shutdown_addr.do_send(shutdown::Subscribe (
-        shutdown::Subscriber {
-            addr: room.clone().recipient(),
-            priority: shutdown::Priority(1),
-        }));
+    graceful_shutdown_addr.do_send(shutdown::Subscribe(shutdown::Subscriber {
+        addr: room.clone().recipient(),
+        priority: shutdown::Priority(1),
+    }));
 
     let rooms = hashmap! {1 => room};
     let rooms_repo = RoomsRepository::new(rooms);
 
     let server_addr = server::run(rooms_repo, config);
-    graceful_shutdown_addr.do_send(shutdown::Subscribe (
-        shutdown::Subscriber {
-            addr: server_addr.recipient(),
-            priority: shutdown::Priority(5),
-        }));
+    graceful_shutdown_addr.do_send(shutdown::Subscribe(shutdown::Subscriber {
+        addr: server_addr.recipient(),
+        priority: shutdown::Priority(5),
+    }));
 
     let _ = sys.run();
 }

@@ -29,7 +29,7 @@ use crate::{
     log::prelude::*,
     media::IceUser,
     signalling::{
-        room::{ActFuture, CloseRoom, RoomError},
+        room::{ActFuture, RoomError},
         Room, RoomId,
     },
     turn::{TurnAuthService, TurnServiceErr, UnreachablePolicy},
@@ -230,7 +230,6 @@ impl ParticipantService {
                         error!("Error deleting IceUser {:?}", err)
                     }),
                 ));
-                ctx.notify(CloseRoom {})
             }
             ClosedReason::Lost => {
                 self.drop_connection_tasks.insert(

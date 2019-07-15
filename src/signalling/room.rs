@@ -26,9 +26,9 @@ use crate::{
         New, Peer, PeerId, PeerStateError, PeerStateMachine,
         WaitLocalHaveRemote, WaitLocalSdp, WaitRemoteSdp,
     },
+    shutdown::{ShutdownMessage, ShutdownMessageResult},
     signalling::{participants::ParticipantService, peers::PeerRepository},
     turn::TurnAuthService,
-    shutdown::{ShutdownMessage, ShutdownMessageResult},
 };
 
 /// ID of [`Room`].
@@ -274,8 +274,10 @@ impl Room {
     }
 
     /// Returns a future which is called during [`Room`]'s shutdown
-    fn get_drop_fut(&mut self, ctx: &mut Context<Room>)
-    -> Box<dyn Future<Item = (), Error = ()> + Send> {
+    fn get_drop_fut(
+        &mut self,
+        ctx: &mut Context<Room>,
+    ) -> Box<dyn Future<Item = (), Error = ()> + Send> {
         info!("Closing Room [id = {:?}]", self.id);
         self.state = RoomState::Stopping;
         let room_recipient = ctx.address().recipient();
@@ -290,6 +292,12 @@ impl Room {
                 futures::future::ok(())
             });
         Box::new(drop_fut)
+    }
+
+    /// Method to close [`Room`]
+    fn close_room(&mut self, ctx: &mut Context<Self>) {
+        let drop_future = self.get_drop_fut(ctx);
+        ctx.wait(wrap_future(drop_future));
     }
 }
 
@@ -330,22 +338,22 @@ impl Handler<ConnectPeers> for Room {
         ctx: &mut Self::Context,
     ) -> Self::Result {
         match self.send_peer_created(msg.0, msg.1) {
-            Ok(res) => {
-                Box::new(res.map_err(|err, _, ctx: &mut Context<Self>| {
+            Ok(res) => Box::new(res.map_err(
+                |err, room, ctx: &mut Context<Self>| {
                     error!(
                         "Failed handle command, because {}. Room will be \
                          stopped.",
                         err
                     );
-                    ctx.notify(CloseRoom {});
-                }))
-            }
+                    room.close_room(ctx);
+                },
+            )),
             Err(err) => {
                 error!(
                     "Failed handle command, because {}. Room will be stopped.",
                     err
                 );
-                ctx.notify(CloseRoom {});
+                self.close_room(ctx);
                 Box::new(wrap_future(future::ok(())))
             }
         }
@@ -376,23 +384,22 @@ impl Handler<CommandMessage> for Room {
         };
 
         match result {
-            Ok(res) => {
-                Box::new(res.map_err(|err, _, ctx: &mut Context<Self>| {
+            Ok(res) => Box::new(res.map_err(
+                |err, room, ctx: &mut Context<Self>| {
                     error!(
                         "Failed handle command, because {}. Room will be \
                          stopped.",
                         err
                     );
-                    ctx.notify(CloseRoom {});
-
-                }))
-            }
+                    room.close_room(ctx);
+                },
+            )),
             Err(err) => {
                 error!(
                     "Failed handle command, because {}. Room will be stopped.",
                     err
                 );
-                ctx.notify(CloseRoom {});
+                self.close_room(ctx);
 
                 Box::new(wrap_future(future::ok(())))
             }
@@ -440,31 +447,6 @@ impl Handler<RpcConnectionEstablished> for Room {
     }
 }
 
-/// Signal of close [`Room`].
-#[derive(Debug, Message)]
-#[rtype(result = "()")]
-#[allow(clippy::module_name_repetitions)]
-pub struct CloseRoom {}
-
-impl Handler<CloseRoom> for Room {
-    type Result = ();
-
-    /// Sends to remote [`Member`] the [`Event`] about [`Peer`] removed.
-    /// Closes all active [`RpcConnection`]s.
-    fn handle(
-        &mut self,
-        _msg: CloseRoom,
-        ctx: &mut Self::Context,
-    ) {
-        let drop_future = self.get_drop_fut(ctx);
-        ctx.wait(
-            wrap_future(
-                drop_future
-            )
-        );
-    }
-}
-
 // Close room on `SIGINT`, `SIGTERM`, `SIGQUIT`, `SIGHUP` signals.
 impl Handler<ShutdownMessage> for Room {
     type Result = ShutdownMessageResult;
@@ -474,16 +456,14 @@ impl Handler<ShutdownMessage> for Room {
         _: ShutdownMessage,
         ctx: &mut Self::Context,
     ) -> Self::Result {
-        info!("Shutting down Room: {:?}", self.id);
+        info!("Shut down signal received for Room: {:?}", self.id);
 
         let room_id = self.id;
-        Ok(Box::new(
-            self.get_drop_fut(ctx)
-            .map(|_| ())
-            .map_err(move |_| {
+        Ok(Box::new(self.get_drop_fut(ctx).map(|_| ()).map_err(
+            move |_| {
                 error!("Error closing room {:?}", room_id);
-            }),
-        ))
+            },
+        )))
     }
 }
 
