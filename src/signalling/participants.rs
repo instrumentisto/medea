@@ -37,6 +37,7 @@ use crate::{
     },
     turn::{TurnAuthService, TurnServiceErr, UnreachablePolicy},
 };
+use std::sync::{Arc, Mutex};
 
 #[derive(Fail, Debug)]
 #[allow(clippy::module_name_repetitions)]
@@ -76,7 +77,7 @@ pub struct ParticipantService {
     members: HashMap<MemberId, Rc<Member>>,
 
     /// Service for managing authorization on Turn server.
-    turn: Box<dyn TurnAuthService>,
+    turn: Arc<Mutex<Box<dyn TurnAuthService>>>,
 
     /// Established [`RpcConnection`]s of [`Members`]s in this [`Room`].
     // TODO: Replace Box<dyn RpcConnection>> with enum,
@@ -98,7 +99,7 @@ impl ParticipantService {
     pub fn new(
         room_spec: &RoomSpec,
         reconnect_timeout: Duration,
-        turn: Box<dyn TurnAuthService>,
+        turn: Arc<Mutex<Box<dyn TurnAuthService>>>,
     ) -> Result<Self, MembersLoadError> {
         Ok(Self {
             room_id: room_spec.id().clone(),
@@ -191,7 +192,7 @@ impl ParticipantService {
             Box::new(wrap_future(connection.close().then(move |_| Ok(member))))
         } else {
             Box::new(
-                wrap_future(self.turn.create(
+                wrap_future(self.turn.lock().unwrap().create(
                     member_id.clone(),
                     self.room_id.clone(),
                     UnreachablePolicy::ReturnErr,
@@ -270,7 +271,9 @@ impl ParticipantService {
     ) -> Box<dyn Future<Item = (), Error = TurnServiceErr>> {
         match self.get_member_by_id(&member_id) {
             Some(member) => match member.take_ice_user() {
-                Some(ice_user) => self.turn.delete(vec![ice_user]),
+                Some(ice_user) => {
+                    self.turn.lock().unwrap().delete(vec![ice_user])
+                }
                 None => Box::new(future::ok(())),
             },
             None => Box::new(future::ok(())),
@@ -306,6 +309,8 @@ impl ParticipantService {
                 }
             });
             self.turn
+                .lock()
+                .unwrap()
                 .delete(room_users)
                 .map_err(|err| error!("Error removing IceUsers {:?}", err))
         });

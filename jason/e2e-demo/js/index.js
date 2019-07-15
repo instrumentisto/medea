@@ -4,8 +4,8 @@ async function f() {
     let caller = new rust.Jason();
     let responder = new rust.Jason();
 
-    let caller_room = await caller.join_room("ws://localhost:8080/ws/1/1/caller_credentials");
-    let responder_room = await responder.join_room("ws://localhost:8080/ws/1/2/responder_credentials");
+    let caller_room = await caller.join_room("ws://localhost:8080/ws/pub-pub-video-call/caller/test");
+    let responder_room = await responder.join_room("ws://localhost:8080/ws/pub-pub-video-call/responder/test");
 
     caller_room.on_new_connection(function (connection) {
         console.log("caller got new connection with member " + connection.member_id());

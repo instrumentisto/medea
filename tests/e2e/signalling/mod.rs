@@ -16,8 +16,9 @@ use awc::{
     BoxedSocket,
 };
 use futures::{future::Future, sink::Sink, stream::SplitSink, Stream};
-use medea_client_api_proto::{Command, Event, IceCandidate};
+use medea_client_api_proto::{Command, Direction, Event, IceCandidate};
 use serde_json::error::Error as SerdeError;
+use std::collections::HashMap;
 
 /// Medea client for testing purposes.
 pub struct TestMember {
@@ -137,23 +138,32 @@ impl StreamHandler<Frame, WsProtocolError> for TestMember {
                 (self.test_fn)(&event, ctx);
 
                 if let Event::PeerCreated {
-                    peer_id, sdp_offer, ..
+                    peer_id,
+                    sdp_offer,
+                    tracks,
+                    ..
                 } = event
                 {
                     match sdp_offer {
-                        Some(_) => {
-                            self.send_command(Command::MakeSdpAnswer {
-                                peer_id,
-                                sdp_answer: "responder_answer".to_string(),
-                            });
-                        }
-                        None => {
-                            self.send_command(Command::MakeSdpOffer {
-                                peer_id,
-                                sdp_offer: "caller_offer".to_string(),
-                            });
-                        }
+                        Some(_) => self.send_command(Command::MakeSdpAnswer {
+                            peer_id,
+                            sdp_answer: "responder_answer".into(),
+                        }),
+                        None => self.send_command(Command::MakeSdpOffer {
+                            peer_id,
+                            sdp_offer: "caller_offer".into(),
+                            mids: tracks
+                                .into_iter()
+                                .filter_map(|t| match t.direction {
+                                    Direction::Send { .. } => Some(t.id),
+                                    Direction::Recv { .. } => None,
+                                })
+                                .enumerate()
+                                .map(|(mid, id)| (id, mid.to_string()))
+                                .collect(),
+                        }),
                     }
+
                     self.send_command(Command::SetIceCandidate {
                         peer_id,
                         candidate: IceCandidate {

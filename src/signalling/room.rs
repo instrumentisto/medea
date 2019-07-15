@@ -35,6 +35,7 @@ use crate::{
     },
     turn::TurnAuthService,
 };
+use std::sync::{Arc, Mutex};
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
 pub type ActFuture<I, E> =
@@ -107,7 +108,7 @@ impl Room {
     pub fn new(
         room_spec: &RoomSpec,
         reconnect_timeout: Duration,
-        turn: Box<dyn TurnAuthService>,
+        turn: Arc<Mutex<Box<dyn TurnAuthService>>>,
     ) -> Result<Self, RoomError> {
         Ok(Self {
             id: room_spec.id().clone(),

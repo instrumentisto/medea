@@ -1,5 +1,6 @@
 use actix::System;
 use failure::Error;
+use futures::future::Future;
 use medea::{
     api::client::server,
     conf::Conf,
@@ -14,20 +15,24 @@ fn main() -> Result<(), Error> {
     let _scope_guard = slog_scope::set_global_logger(logger);
     slog_stdlog::init()?;
 
-    let sys = System::new("medea");
-
     let config = Conf::parse()?;
     info!("{:?}", config);
 
-    let rooms = start_static_rooms(&config)?;
-    info!(
-        "Loaded rooms: {:?}",
-        rooms.iter().map(|(id, _)| &id.0).collect::<Vec<&String>>()
-    );
-    let room_repo = RoomsRepository::new(rooms);
-    server::run(room_repo, config);
-
-    let _ = sys.run();
+    actix::run(|| {
+        start_static_rooms(&config)
+            .map_err(|e| error!("Turn: {:?}", e))
+            .and_then(|res| {
+                let rooms = res.unwrap();
+                info!(
+                    "Loaded rooms: {:?}",
+                    rooms.iter().map(|(id, _)| &id.0).collect::<Vec<&String>>()
+                );
+                let room_repo = RoomsRepository::new(rooms);
+                server::run(room_repo, config)
+                    .map_err(|e| error!("Server {:?}", e))
+            })
+    })
+    .unwrap();
 
     Ok(())
 }
