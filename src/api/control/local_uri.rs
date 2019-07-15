@@ -18,6 +18,10 @@ pub enum LocalUriParseError {
     /// Too many paths in provided URI.
     #[fail(display = "Too many ({}) paths in provided URI.", _0)]
     TooManyFields(usize, String),
+
+    /// Provided empty `&str`.
+    #[fail(display = "You provided empty local uri.")]
+    Empty,
 }
 
 impl Into<ErrorCode> for LocalUriParseError {
@@ -29,6 +33,7 @@ impl Into<ErrorCode> for LocalUriParseError {
             LocalUriParseError::TooManyFields(_, text) => {
                 ErrorCode::ElementIdIsTooLong(text)
             }
+            LocalUriParseError::Empty => ErrorCode::EmptyElementId,
         }
     }
 }
@@ -66,6 +71,9 @@ impl LocalUri {
     /// Returns [`LocalUriParse::NotLocal`] when uri is not "local://"
     /// Returns [`LocalUriParse::TooManyFields`] when uri have too many paths.
     pub fn parse(value: &str) -> Result<Self, LocalUriParseError> {
+        if value.is_empty() {
+            return Err(LocalUriParseError::Empty);
+        }
         let protocol_name: String = value.chars().take(8).collect();
         if protocol_name != "local://" {
             return Err(LocalUriParseError::NotLocal(value.to_string()));

@@ -96,6 +96,10 @@ pub enum ErrorCode {
     ///
     /// Code: __1202__.
     MissingFieldsInSrcUri(String, Vec<String>),
+    /// Empty element ID.
+    ///
+    /// Code: __1203__.
+    EmptyElementId,
 
     /////////////////////////////
     // Conflict (1300 - 1399) //
@@ -245,6 +249,11 @@ impl Into<ErrorProto> for ErrorCode {
                 ));
                 error.set_element(uri);
                 error.set_code(1202);
+            }
+            ErrorCode::EmptyElementId => {
+                error.set_text("Provided empty element ID.".to_string());
+                error.set_element(String::new());
+                error.set_code(1203);
             }
 
             /////////////////////////////
