@@ -164,8 +164,7 @@ medea-env = RUST_BACKTRACE=1 \
 	MEDEA_SERVER.STATIC_SPECS_PATH=tests/specs
 
 test.e2e:
-ifeq ($(coturn),no)
-else
+ifneq ($(coturn),no)
 	@make up.coturn
 endif
 ifeq ($(dockerized),no)
@@ -178,8 +177,7 @@ ifeq ($(dockerized),no)
 	- cargo test --test e2e
 
 	@make down.medea
-ifeq ($(coturn),no)
-else
+ifneq ($(coturn),no)
 	@make down.coturn
 endif
 else
