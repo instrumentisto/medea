@@ -237,21 +237,23 @@ impl Room {
     ) -> Result<ActFuture<(), RoomError>, RoomError> {
         let from_peer = self.peers.get_peer(from_peer_id)?;
         if let PeerStateMachine::New(_) = from_peer {
-            Err(PeerError::WrongState(
+            return Err(PeerError::WrongState(
                 from_peer_id,
                 "Not New",
                 format!("{}", from_peer),
-            ))?
+            )
+            .into());
         }
 
         let to_peer_id = from_peer.partner_peer_id();
         let to_peer = self.peers.get_peer(to_peer_id)?;
         if let PeerStateMachine::New(_) = to_peer {
-            Err(PeerError::WrongState(
+            return Err(PeerError::WrongState(
                 to_peer_id,
                 "Not New",
                 format!("{}", to_peer),
-            ))?
+            )
+            .into());
         }
 
         let to_member_id = to_peer.member_id();
