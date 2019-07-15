@@ -124,7 +124,6 @@ pub struct IceServer {
 /// Direction of [`Track`].
 #[cfg_attr(feature = "medea", derive(Serialize, Debug, Clone, PartialEq))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
-#[cfg_attr(test, derive(Debug, PartialEq))]
 // TODO: Use different struct without mids in TracksApplied event.
 pub enum Direction {
     Send {

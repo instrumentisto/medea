@@ -280,6 +280,8 @@ impl Handler<DeleteIceUsers> for Service {
 
 #[cfg(test)]
 pub mod test {
+    use std::sync::{Arc, Mutex};
+
     use futures::future;
 
     use crate::media::IceUser;
@@ -312,8 +314,9 @@ pub mod test {
     }
 
     #[allow(clippy::module_name_repetitions)]
-    pub fn new_turn_auth_service_mock() -> Box<dyn TurnAuthService> {
-        Box::new(TurnAuthServiceMock {})
+    pub fn new_turn_auth_service_mock() -> Arc<Mutex<Box<dyn TurnAuthService>>>
+    {
+        Arc::new(Mutex::new(Box::new(TurnAuthServiceMock {})))
     }
 
 }
