@@ -13,7 +13,7 @@ use redis::ConnectionInfo;
 
 use crate::{
     api::control::{MemberId, RoomId},
-    conf::{self, Conf},
+    conf,
     media::IceUser,
     turn::repo::{TurnDatabase, TurnDatabaseErr},
 };

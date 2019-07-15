@@ -19,7 +19,6 @@ use crate::{
     signalling::{room::RoomError, Room},
     turn::{service, TurnServiceErr},
 };
-use bb8::Pool;
 use futures::future::Either;
 use std::sync::{Arc, Mutex};
 

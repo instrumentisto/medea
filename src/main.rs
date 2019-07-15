@@ -1,4 +1,3 @@
-use actix::System;
 use failure::Error;
 use futures::future::Future;
 use medea::{
