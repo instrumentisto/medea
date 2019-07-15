@@ -9,26 +9,24 @@ use std::{
 
 use actix::{
     self,
-    prelude::{Actor, Context},
-    Addr, AsyncContext, Handler, Message, Recipient, ResponseActFuture, System,
+    Addr,
+    AsyncContext, Handler, Message, prelude::{Actor, Context}, Recipient, ResponseActFuture, System,
     WrapFuture,
 };
-
 use tokio::prelude::{
-    future::{self, join_all, Future},
-    stream::*,
+    future::{self, Future, join_all},
     FutureExt,
+    stream::*,
 };
 
 use crate::log::prelude::*;
-
-type ShutdownFutureType = dyn Future<Item = Vec<Result<(), ()>>, Error = ()>;
 
 #[derive(Ord, PartialOrd, PartialEq, Eq, Copy, Clone)]
 pub struct Priority(pub u8);
 
 #[derive(Debug, Message)]
 #[rtype(result = "Result<(),()>")]
+#[allow(clippy::module_name_repetitions)]
 pub struct ShutdownMessage;
 
 pub struct Subscriber {
@@ -52,6 +50,7 @@ pub struct Unsubscribe(pub Subscriber);
 #[rtype(result = "Result<(),()>")]
 struct ShutdownSignalDetected(i32);
 
+#[allow(clippy::module_name_repetitions)]
 pub struct GracefulShutdown {
     /// [`Actor`]s to send message when graceful shutdown
     recipients: BTreeMap<Priority, HashSet<Recipient<ShutdownMessage>>>,
@@ -90,7 +89,7 @@ impl Actor for GracefulShutdown {
             let mut signals_stream: Box<
                 dyn Stream<Error = std::io::Error, Item = i32>,
             > = Box::new(Signal::new(SIGINT).flatten_stream());
-            for s in [SIGHUP, SIGQUIT, SIGTERM].into_iter() {
+            for s in &[SIGHUP, SIGQUIT, SIGTERM] {
                 signals_stream = Box::new(
                     signals_stream.select(Signal::new(*s).flatten_stream()),
                 );
@@ -120,7 +119,7 @@ impl Handler<ShutdownSignalDetected> for GracefulShutdown {
             error!("GracefulShutdown: No subscribers registered");
         }
 
-        let mut shutdown_future: Box<ShutdownFutureType> =
+        let mut shutdown_future: Box<dyn Future<Item = Vec<Result<(), ()>>, Error = ()>> =
             Box::new(futures::future::ok(vec![]));
 
         for recipients_values in self.recipients.values() {
@@ -130,10 +129,9 @@ impl Handler<ShutdownSignalDetected> for GracefulShutdown {
             for recipient in recipients_values.iter() {
                 let send_future = recipient.send(ShutdownMessage {});
 
-                let recipient_shutdown_fut = send_future
-                    .map_err(|e| {
-                        error!("Error sending shutdown message: {:?}", e);
-                    });
+                let recipient_shutdown_fut = send_future.map_err(|e| {
+                    error!("Error sending shutdown message: {:?}", e);
+                });
 
                 this_priority_futures_vec.push(recipient_shutdown_fut);
             }

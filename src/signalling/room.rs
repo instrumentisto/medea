@@ -4,8 +4,8 @@
 use std::time::Duration;
 
 use actix::{
-    fut::wrap_future, Actor, ActorFuture, AsyncContext, Context, Handler,
-    Message,
+    Actor, ActorFuture, AsyncContext, Context,
+    fut::wrap_future, Handler, Message,
 };
 use failure::Fail;
 use futures::future;
@@ -26,7 +26,7 @@ use crate::{
         New, Peer, PeerId, PeerStateError, PeerStateMachine,
         WaitLocalHaveRemote, WaitLocalSdp, WaitRemoteSdp,
     },
-    shutdown::{ShutdownMessage},
+    shutdown::ShutdownMessage,
     signalling::{participants::ParticipantService, peers::PeerRepository},
     turn::TurnAuthService,
 };
@@ -276,21 +276,18 @@ impl Room {
     /// Returns a future which is called during [`Room`]'s shutdown
     fn get_close_room_fut(
         &mut self,
-        ctx: &mut Context<Room>,
+        ctx: &mut Context<Self>,
     ) -> ActFuture<(), ()> {
         info!("Closing Room [id = {:?}]", self.id);
         self.state = RoomState::Stopping;
         let room_id = self.id;
-        let drop_fut =
-            wrap_future(
-                self.participants.drop_connections(ctx)
-            )
-                .map(move |_, room: &mut Room, _| {
-                    room.state = RoomState::Stopped;
-                })
-                .map_err(move |_,_,_| {
-                    error!("Error closing room {:?}", room_id);
-                });
+        let drop_fut = wrap_future(self.participants.drop_connections(ctx))
+            .map(move |_, room: &mut Self, _| {
+                room.state = RoomState::Stopped;
+            })
+            .map_err(move |_, _, _| {
+                error!("Error closing room {:?}", room_id);
+            });
 
         Box::new(drop_fut)
     }
@@ -339,16 +336,16 @@ impl Handler<ConnectPeers> for Room {
         ctx: &mut Self::Context,
     ) -> Self::Result {
         match self.send_peer_created(msg.0, msg.1) {
-            Ok(res) => Box::new(res.map_err(
-                |err, room, ctx: &mut Context<Self>| {
+            Ok(res) => {
+                Box::new(res.map_err(|err, room, ctx: &mut Context<Self>| {
                     error!(
                         "Failed handle command, because {}. Room will be \
                          stopped.",
                         err
                     );
                     room.close_room(ctx);
-                },
-            )),
+                }))
+            }
             Err(err) => {
                 error!(
                     "Failed handle command, because {}. Room will be stopped.",
@@ -385,16 +382,16 @@ impl Handler<CommandMessage> for Room {
         };
 
         match result {
-            Ok(res) => Box::new(res.map_err(
-                |err, room, ctx: &mut Context<Self>| {
+            Ok(res) => {
+                Box::new(res.map_err(|err, room, ctx: &mut Context<Self>| {
                     error!(
                         "Failed handle command, because {}. Room will be \
                          stopped.",
                         err
                     );
                     room.close_room(ctx);
-                },
-            )),
+                }))
+            }
             Err(err) => {
                 error!(
                     "Failed handle command, because {}. Room will be stopped.",
@@ -450,7 +447,7 @@ impl Handler<RpcConnectionEstablished> for Room {
 
 // Close room on `SIGINT`, `SIGTERM`, `SIGQUIT`, `SIGHUP` signals.
 impl Handler<ShutdownMessage> for Room {
-    type Result = ActFuture<(),()>;
+    type Result = ActFuture<(), ()>;
 
     fn handle(
         &mut self,
@@ -494,7 +491,7 @@ impl Handler<RpcConnectionClosed> for Room {
 
 #[cfg(test)]
 mod test {
-    use std::sync::{atomic::AtomicUsize, Arc, Mutex};
+    use std::sync::{Arc, atomic::AtomicUsize, Mutex};
 
     use actix::{Addr, System};
 

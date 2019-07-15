@@ -1,16 +1,7 @@
 //! Medea media server application.
 
-#[macro_use]
-pub mod utils;
-pub mod api;
-pub mod conf;
-pub mod log;
-pub mod media;
-pub mod shutdown;
-pub mod signalling;
-pub mod turn;
-
 use actix::prelude::*;
+
 use dotenv::dotenv;
 use log::prelude::*;
 
@@ -21,6 +12,16 @@ use crate::{
     signalling::{Room, RoomsRepository},
     turn::new_turn_auth_service,
 };
+
+#[macro_use]
+pub mod utils;
+pub mod api;
+pub mod conf;
+pub mod log;
+pub mod media;
+pub mod shutdown;
+pub mod signalling;
+pub mod turn;
 
 fn main() {
     dotenv().ok();

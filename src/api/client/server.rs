@@ -2,9 +2,8 @@
 
 use actix::{Actor, Addr};
 use actix_web::{
-    middleware,
-    web::{resource, Data, Path, Payload},
     App, HttpRequest, HttpResponse, HttpServer,
+    middleware, web::{Data, Path, Payload, resource},
 };
 use actix_web_actors::ws;
 use futures::{
@@ -114,15 +113,12 @@ pub fn run(rooms: RoomsRepository, config: Conf) -> Addr<ServerWrapper> {
 }
 
 pub mod actors {
-    use actix::{Actor, Context, Handler, ActorFuture};
+    use actix::{Actor, ActorFuture, Context, Handler};
+    use actix::fut::wrap_future;
     use actix_web::dev::Server;
     use tokio::prelude::Future;
 
-    use crate::{
-        log::prelude::*,
-        shutdown::{ShutdownMessage},
-    };
-    use actix::fut::wrap_future;
+    use crate::{log::prelude::*, shutdown::ShutdownMessage};
 
     pub struct ServerWrapper(pub Server);
 
@@ -131,7 +127,7 @@ pub mod actors {
     }
 
     impl Handler<ShutdownMessage> for ServerWrapper {
-        type Result = Box<dyn ActorFuture<Actor = ServerWrapper, Item = (), Error = ()>>;
+        type Result = Box<dyn ActorFuture<Actor = Self, Item = (), Error = ()>>;
 
         fn handle(
             &mut self,
@@ -140,12 +136,9 @@ pub mod actors {
         ) -> Self::Result {
             info!("Shutting down Actix Web Server");
 
-            Box::new(
-                wrap_future(
-                    self.0.stop(true)
-                        .then(move |_| futures::future::ok(()))
-                )
-            )
+            Box::new(wrap_future(
+                self.0.stop(true).then(move |_| futures::future::ok(())),
+            ))
         }
     }
 }
@@ -155,7 +148,7 @@ mod test {
     use std::{ops::Add, thread, time::Duration};
 
     use actix::Actor as _;
-    use actix_http::{ws::Message, HttpService};
+    use actix_http::{HttpService, ws::Message};
     use actix_http_test::{TestServer, TestServerRuntime};
     use futures::{future::IntoFuture as _, sink::Sink as _, Stream as _};
 
