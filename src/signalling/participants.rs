@@ -28,7 +28,7 @@ use crate::{
                 WebRtcPlayEndpoint as WebRtcPlayEndpointSpec,
                 WebRtcPublishEndpoint as WebRtcPublishEndpointSpec,
             },
-            local_uri::LocalUri,
+            local_uri::{IsEndpointId, IsMemberId, LocalUri},
             MemberId, MemberSpec, RoomId, RoomSpec, WebRtcPlayId,
             WebRtcPublishId,
         },
@@ -60,15 +60,15 @@ pub enum ParticipantServiceErr {
     )]
     MailBoxErr(MailboxError),
     #[fail(display = "Participant [id = {}] not found", _0)]
-    ParticipantNotFound(LocalUri),
+    ParticipantNotFound(LocalUri<IsMemberId>),
     #[fail(display = "Endpoint [id = {}] not found.", _0)]
-    EndpointNotFound(LocalUri),
+    EndpointNotFound(LocalUri<IsEndpointId>),
     #[fail(display = "{}", _0)]
     MemberError(MemberError),
     #[fail(display = "Participant [id = {}] already exists.", _0)]
-    ParticipantAlreadyExists(LocalUri),
+    ParticipantAlreadyExists(LocalUri<IsMemberId>),
     #[fail(display = "Endpoint [id = {}] already exists.", _0)]
-    EndpointAlreadyExists(LocalUri),
+    EndpointAlreadyExists(LocalUri<IsEndpointId>),
 }
 
 impl From<TurnServiceErr> for ParticipantServiceErr {
@@ -158,8 +158,11 @@ impl ParticipantService {
     ///
     /// __Note__ this function don't check presence of [`Member`] in this
     /// `Room`.
-    fn get_local_uri_to_member(&self, member_id: MemberId) -> LocalUri {
-        LocalUri::new(Some(self.room_id.clone()), Some(member_id), None)
+    fn get_local_uri_to_member(
+        &self,
+        member_id: MemberId,
+    ) -> LocalUri<IsMemberId> {
+        LocalUri::<IsMemberId>::new(self.room_id.clone(), member_id)
     }
 
     /// Lookup [`Member`] by [`MemberId`].

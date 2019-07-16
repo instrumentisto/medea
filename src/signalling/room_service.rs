@@ -12,8 +12,9 @@ use crate::{
         control::{
             endpoints::Endpoint as EndpointSpec,
             grpc::protos::control::Element as ElementProto,
-            load_static_specs_from_dir, local_uri::LocalUri, MemberId,
-            MemberSpec, RoomId, RoomSpec,
+            load_static_specs_from_dir,
+            local_uri::{IsEndpointId, IsMemberId, IsRoomId, LocalUri},
+            MemberId, MemberSpec, RoomId, RoomSpec,
         },
         error_codes::ErrorCode,
     },
@@ -37,11 +38,11 @@ type ActFuture<I, E> =
 #[derive(Debug, Fail)]
 pub enum RoomServiceError {
     #[fail(display = "Room [id = {}] not found.", _0)]
-    RoomNotFound(LocalUri),
+    RoomNotFound(LocalUri<IsRoomId>),
     #[fail(display = "Mailbox error: {:?}", _0)]
     MailboxError(MailboxError),
     #[fail(display = "Room [id = {}] already exists.", _0)]
-    RoomAlreadyExists(LocalUri),
+    RoomAlreadyExists(LocalUri<IsRoomId>),
     #[fail(display = "{}", _0)]
     RoomError(RoomError),
     #[fail(display = "Failed to load static specs. {:?}", _0)]
@@ -99,8 +100,8 @@ impl Actor for RoomService {
 ///
 /// __Note__ this function don't check presence of [`Room`] in this
 /// [`RoomService`].
-fn get_local_uri_to_room(room_id: RoomId) -> LocalUri {
-    LocalUri::new(Some(room_id), None, None)
+fn get_local_uri_to_room(room_id: RoomId) -> LocalUri<IsRoomId> {
+    LocalUri::<IsRoomId>::new(room_id)
 }
 
 /// Signal for load all static specs and start [`Room`]s.
@@ -287,11 +288,8 @@ impl Handler<GetRoom> for RoomService {
                         .map_err(RoomServiceError::from)
                         .map(move |result| {
                             result.map(|r| {
-                                let local_uri = LocalUri {
-                                    room_id: Some(room_id),
-                                    member_id: None,
-                                    endpoint_id: None,
-                                };
+                                let local_uri =
+                                    LocalUri::<IsRoomId>::new(room_id);
                                 (local_uri.to_string(), r)
                             })
                         }),
@@ -331,11 +329,9 @@ impl Handler<GetMember> for RoomService {
                         .map_err(RoomServiceError::from)
                         .map(|result| {
                             result.map(|r| {
-                                let local_uri = LocalUri {
-                                    room_id: Some(room_id),
-                                    member_id: Some(member_id),
-                                    endpoint_id: None,
-                                };
+                                let local_uri = LocalUri::<IsMemberId>::new(
+                                    room_id, member_id,
+                                );
 
                                 (local_uri.to_string(), r)
                             })
@@ -379,11 +375,11 @@ impl Handler<GetEndpoint> for RoomService {
                     .map_err(RoomServiceError::from)
                     .map(|result| {
                         result.map(|r| {
-                            let local_uri = LocalUri {
-                                room_id: Some(room_id),
-                                member_id: Some(member_id),
-                                endpoint_id: Some(endpoint_id),
-                            };
+                            let local_uri = LocalUri::<IsEndpointId>::new(
+                                room_id,
+                                member_id,
+                                endpoint_id,
+                            );
                             (local_uri.to_string(), r)
                         })
                     }),

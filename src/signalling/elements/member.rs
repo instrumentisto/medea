@@ -24,42 +24,45 @@ use crate::{
 };
 
 use super::endpoints::webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint};
-use crate::api::error_codes::ErrorCode;
+use crate::api::{
+    control::local_uri::{IsEndpointId, IsMemberId, IsRoomId, LocalUriType},
+    error_codes::ErrorCode,
+};
 
 /// Errors which may occur while loading [`Member`]s from [`RoomSpec`].
 #[derive(Debug, Fail)]
 pub enum MembersLoadError {
     /// Errors that can occur when we try transform some spec from [`Element`].
     #[fail(display = "TryFromElementError: {}", _0)]
-    TryFromError(TryFromElementError, LocalUri),
+    TryFromError(TryFromElementError, LocalUriType),
 
     /// [`Member`] not found.
     #[fail(display = "Member [id = {}] not found.", _0)]
-    MemberNotFound(LocalUri),
+    MemberNotFound(LocalUri<IsMemberId>),
 
     /// [`WebRtcPlayEndpoint`] not found.
     #[fail(
         display = "Play endpoint [id = {}] not found while loading spec,",
         _0
     )]
-    PlayEndpointNotFound(LocalUri),
+    PlayEndpointNotFound(LocalUri<IsEndpointId>),
 
     /// [`WebRtcPublishEndpoint`] not found.
     #[fail(
         display = "Publish endpoint [id = {}] not found while loading spec.",
         _0
     )]
-    PublishEndpointNotFound(LocalUri),
+    PublishEndpointNotFound(LocalUri<IsEndpointId>),
 }
 
 #[allow(clippy::module_name_repetitions)]
 #[derive(Debug, Fail)]
 pub enum MemberError {
     #[fail(display = "Publish endpoint [id = {}] not found.", _0)]
-    PublishEndpointNotFound(LocalUri),
+    PublishEndpointNotFound(LocalUri<IsEndpointId>),
 
     #[fail(display = "Play endpoint [id = {}] not found.", _0)]
-    PlayEndpointNotFound(LocalUri),
+    PlayEndpointNotFound(LocalUri<IsEndpointId>),
 }
 
 impl Into<ErrorCode> for MembersLoadError {
@@ -151,22 +154,19 @@ impl Member {
         member_id: &MemberId,
     ) -> Result<MemberSpec, MembersLoadError> {
         let element = room_spec.pipeline.get(&member_id.0).map_or(
-            Err(MembersLoadError::MemberNotFound(LocalUri::new(
-                Some(self.room_id()),
-                Some(member_id.clone()),
-                None,
-            ))),
+            Err(MembersLoadError::MemberNotFound(
+                LocalUri::<IsMemberId>::new(self.room_id(), member_id.clone()),
+            )),
             Ok,
         )?;
 
         MemberSpec::try_from(element).map_err(|e| {
             MembersLoadError::TryFromError(
                 e,
-                LocalUri::new(
-                    Some(self.room_id()),
-                    Some(member_id.clone()),
-                    None,
-                ),
+                LocalUriType::Member(LocalUri::<IsMemberId>::new(
+                    self.room_id(),
+                    member_id.clone(),
+                )),
             )
         })
     }
@@ -193,11 +193,9 @@ impl Member {
             let publisher_id =
                 MemberId(spec_play_endpoint.src.member_id.to_string());
             let publisher_member = store.get(&publisher_id).map_or(
-                Err(MembersLoadError::MemberNotFound(LocalUri::new(
-                    Some(self.room_id()),
-                    Some(publisher_id),
-                    None,
-                ))),
+                Err(MembersLoadError::MemberNotFound(
+                    LocalUri::<IsMemberId>::new(self.room_id(), publisher_id),
+                )),
                 Ok,
             )?;
             let publisher_spec = self.get_member_from_room_spec(
@@ -276,16 +274,19 @@ impl Member {
     }
 
     /// Return [`LocalUri`] to this [`Member`].
-    fn get_local_uri(&self) -> LocalUri {
-        LocalUri::new(Some(self.room_id()), Some(self.id()), None)
+    fn get_local_uri(&self) -> LocalUri<IsMemberId> {
+        LocalUri::<IsMemberId>::new(self.room_id(), self.id())
     }
 
     /// Return [`LocalUri`] to some endpoint from this [`Member`].
     ///
     /// __Note__ this function don't check presence of `Endpoint` in this
     /// [`Member`].
-    pub fn get_local_uri_to_endpoint(&self, endpoint_id: String) -> LocalUri {
-        LocalUri::new(Some(self.room_id()), Some(self.id()), Some(endpoint_id))
+    pub fn get_local_uri_to_endpoint(
+        &self,
+        endpoint_id: String,
+    ) -> LocalUri<IsEndpointId> {
+        LocalUri::<IsEndpointId>::new(self.room_id(), self.id(), endpoint_id)
     }
 
     /// Notify [`Member`] that some [`Peer`]s removed.
@@ -466,7 +467,9 @@ pub fn parse_members(
         Err(e) => {
             return Err(MembersLoadError::TryFromError(
                 e,
-                LocalUri::new(Some(room_spec.id.clone()), None, None),
+                LocalUriType::Room(LocalUri::<IsRoomId>::new(
+                    room_spec.id.clone(),
+                )),
             ))
         }
     };
@@ -518,19 +521,11 @@ impl Into<ElementProto> for Rc<Member> {
 
         let mut member_pipeline = StdHashMap::new();
         for (id, play) in self.sinks() {
-            let local_uri = LocalUri {
-                room_id: Some(self.room_id()),
-                member_id: Some(self.id()),
-                endpoint_id: Some(id.to_string()),
-            };
+            let local_uri = self.get_local_uri_to_endpoint(id.to_string());
             member_pipeline.insert(local_uri.to_string(), play.into());
         }
         for (id, publish) in self.srcs() {
-            let local_uri = LocalUri {
-                room_id: Some(self.room_id()),
-                member_id: Some(self.id()),
-                endpoint_id: Some(id.to_string()),
-            };
+            let local_uri = self.get_local_uri_to_endpoint(id.to_string());
 
             member_pipeline.insert(local_uri.to_string(), publish.into());
         }

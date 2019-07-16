@@ -23,7 +23,7 @@ use crate::{
                 Element as ElementProto, Member_Element, Room as RoomProto,
                 Room_Element,
             },
-            local_uri::LocalUri,
+            local_uri::{IsMemberId, LocalUri},
             room::RoomSpec,
             Endpoint as EndpointSpec, MemberId, MemberSpec, RoomId,
             TryFromElementError, WebRtcPlayId, WebRtcPublishId,
@@ -488,11 +488,7 @@ impl Into<ElementProto> for &mut Room {
 
         let mut pipeline = StdHashMap::new();
         for (id, member) in self.members.members() {
-            let local_uri = LocalUri {
-                room_id: Some(self.get_id()),
-                member_id: Some(id),
-                endpoint_id: None,
-            };
+            let local_uri = LocalUri::<IsMemberId>::new(self.get_id(), id);
 
             pipeline.insert(local_uri.to_string(), member.into());
         }

@@ -7,6 +7,9 @@ use failure::Fail;
 use crate::api::error_codes::ErrorCode;
 
 use super::{MemberId, RoomId};
+use crate::api::control::{
+    endpoints::webrtc_play_endpoint::SrcUri, WebRtcPublishId,
+};
 
 #[allow(clippy::module_name_repetitions)]
 #[derive(Debug, Fail)]
@@ -18,6 +21,9 @@ pub enum LocalUriParseError {
     /// Too many paths in provided URI.
     #[fail(display = "Too many ({}) paths in provided URI.", _0)]
     TooManyFields(usize, String),
+
+    #[fail(display = "Missing fields. {}", _0)]
+    MissingFields(String),
 
     /// Provided empty `&str`.
     #[fail(display = "You provided empty local uri.")]
@@ -34,8 +40,131 @@ impl Into<ErrorCode> for LocalUriParseError {
                 ErrorCode::ElementIdIsTooLong(text)
             }
             LocalUriParseError::Empty => ErrorCode::EmptyElementId,
+            LocalUriParseError::MissingFields(text) => {
+                ErrorCode::MissingFieldsInSrcUri(text)
+            }
         }
     }
+}
+
+#[derive(Debug)]
+pub struct IsRoomId(RoomId);
+#[derive(Debug)]
+pub struct IsMemberId(LocalUri<IsRoomId>, MemberId);
+#[derive(Debug)]
+pub struct IsEndpointId(LocalUri<IsMemberId>, String);
+
+#[derive(Debug)]
+pub struct LocalUri<T> {
+    state: T,
+}
+
+impl LocalUriType {
+    pub fn parse(value: &str) -> Result<LocalUriType, LocalUriParseError> {
+        let inner = LocalUriInner::parse(value)?;
+        if inner.is_room_uri() {
+            Ok(LocalUriType::Room(LocalUri::<IsRoomId>::new(
+                inner.room_id.unwrap(),
+            )))
+        } else if inner.is_member_uri() {
+            Ok(LocalUriType::Member(LocalUri::<IsMemberId>::new(
+                inner.room_id.unwrap(),
+                inner.member_id.unwrap(),
+            )))
+        } else if inner.is_endpoint_uri() {
+            Ok(LocalUriType::Endpoint(LocalUri::<IsEndpointId>::new(
+                inner.room_id.unwrap(),
+                inner.member_id.unwrap(),
+                inner.endpoint_id.unwrap(),
+            )))
+        } else {
+            Err(LocalUriParseError::MissingFields(value.to_string()))
+        }
+    }
+}
+
+impl LocalUri<IsRoomId> {
+    pub fn new(room_id: RoomId) -> LocalUri<IsRoomId> {
+        LocalUri {
+            state: IsRoomId(room_id),
+        }
+    }
+
+    pub fn room_id(&self) -> &RoomId {
+        &self.state.0
+    }
+
+    pub fn take_room_id(self) -> RoomId {
+        self.state.0
+    }
+}
+
+impl LocalUri<IsMemberId> {
+    pub fn new(room_id: RoomId, member_id: MemberId) -> LocalUri<IsMemberId> {
+        LocalUri {
+            state: IsMemberId(LocalUri::<IsRoomId>::new(room_id), member_id),
+        }
+    }
+
+    pub fn room_id(&self) -> &RoomId {
+        &self.state.0.room_id()
+    }
+
+    pub fn member_id(&self) -> &MemberId {
+        &self.state.1
+    }
+
+    pub fn take_member_id(self) -> (MemberId, LocalUri<IsRoomId>) {
+        (self.state.1, self.state.0)
+    }
+}
+
+impl LocalUri<IsEndpointId> {
+    pub fn new(
+        room_id: RoomId,
+        member_id: MemberId,
+        endpoint_id: String,
+    ) -> LocalUri<IsEndpointId> {
+        LocalUri {
+            state: IsEndpointId(
+                LocalUri::<IsMemberId>::new(room_id, member_id),
+                endpoint_id,
+            ),
+        }
+    }
+
+    pub fn room_id(&self) -> &RoomId {
+        &self.state.0.room_id()
+    }
+
+    pub fn member_id(&self) -> &MemberId {
+        &self.state.0.member_id()
+    }
+
+    pub fn endpoint_id(&self) -> &str {
+        &self.state.1
+    }
+
+    pub fn take_endpoint_id(self) -> (String, LocalUri<IsMemberId>) {
+        (self.state.1, self.state.0)
+    }
+}
+
+impl Into<SrcUri> for LocalUri<IsEndpointId> {
+    fn into(self) -> SrcUri {
+        SrcUri {
+            room_id: self.state.0.state.0.state.0,
+            member_id: self.state.0.state.1,
+            endpoint_id: WebRtcPublishId(self.state.1),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum LocalUriType {
+    Room(LocalUri<IsRoomId>),
+    Member(LocalUri<IsMemberId>),
+    Endpoint(LocalUri<IsEndpointId>),
 }
 
 #[allow(clippy::doc_markdown)]
@@ -43,34 +172,21 @@ impl Into<ErrorCode> for LocalUriParseError {
 /// This kind of uri used for pointing to some element in spec (`Room`,
 /// `Member`, `WebRtcPlayEndpoint`, `WebRtcPublishEndpoint`, etc).
 #[derive(Debug, Clone)]
-pub struct LocalUri {
+struct LocalUriInner {
     /// ID of [`Room`]
-    pub room_id: Option<RoomId>,
+    room_id: Option<RoomId>,
     /// ID of `Member`
-    pub member_id: Option<MemberId>,
+    member_id: Option<MemberId>,
     /// Control ID of [`Endpoint`]
-    pub endpoint_id: Option<String>,
+    endpoint_id: Option<String>,
 }
 
-impl LocalUri {
-    /// Create new [`LocalUri`] with provided IDs.
-    pub fn new(
-        room_id: Option<RoomId>,
-        member_id: Option<MemberId>,
-        endpoint_id: Option<String>,
-    ) -> Self {
-        Self {
-            room_id,
-            member_id,
-            endpoint_id,
-        }
-    }
-
+impl LocalUriInner {
     /// Parse [`LocalUri`] from str.
     ///
     /// Returns [`LocalUriParse::NotLocal`] when uri is not "local://"
     /// Returns [`LocalUriParse::TooManyFields`] when uri have too many paths.
-    pub fn parse(value: &str) -> Result<Self, LocalUriParseError> {
+    fn parse(value: &str) -> Result<Self, LocalUriParseError> {
         if value.is_empty() {
             return Err(LocalUriParseError::Empty);
         }
@@ -111,40 +227,51 @@ impl LocalUri {
     }
 
     /// Return true if this [`LocalUri`] pointing to `Room` element.
-    pub fn is_room_uri(&self) -> bool {
+    fn is_room_uri(&self) -> bool {
         self.room_id.is_some()
             && self.member_id.is_none()
             && self.endpoint_id.is_none()
     }
 
     /// Return true if this [`LocalUri`] pointing to `Member` element.
-    pub fn is_member_uri(&self) -> bool {
+    fn is_member_uri(&self) -> bool {
         self.room_id.is_some()
             && self.member_id.is_some()
             && self.endpoint_id.is_none()
     }
 
     /// Return true if this [`LocalUri`] pointing to `Endpoint` element.
-    pub fn is_endpoint_uri(&self) -> bool {
+    fn is_endpoint_uri(&self) -> bool {
         self.room_id.is_some()
             && self.member_id.is_some()
             && self.endpoint_id.is_some()
     }
 }
 
-impl fmt::Display for LocalUri {
+impl fmt::Display for LocalUri<IsRoomId> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "local://")?;
-        if let Some(room_id) = &self.room_id {
-            write!(f, "{}", room_id)?;
-            if let Some(member_id) = &self.member_id {
-                write!(f, "/{}", member_id)?;
-                if let Some(endpoint_id) = &self.endpoint_id {
-                    write!(f, "/{}", endpoint_id)?
-                }
-            }
-        }
+        write!(f, "local://{}", self.state.0)
+    }
+}
 
-        Ok(())
+impl fmt::Display for LocalUri<IsMemberId> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}/{}", self.state.0, self.state.1)
+    }
+}
+
+impl fmt::Display for LocalUri<IsEndpointId> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}/{}", self.state.0, self.state.1)
+    }
+}
+
+impl fmt::Display for LocalUriType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            LocalUriType::Room(e) => write!(f, "{}", e),
+            LocalUriType::Member(e) => write!(f, "{}", e),
+            LocalUriType::Endpoint(e) => write!(f, "{}", e),
+        }
     }
 }

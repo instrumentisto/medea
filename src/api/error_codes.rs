@@ -8,7 +8,8 @@
 //! * __1300...1399__ Conflicts
 
 use crate::api::control::{
-    grpc::protos::control::Error as ErrorProto, local_uri::LocalUri,
+    grpc::protos::control::Error as ErrorProto,
+    local_uri::{IsEndpointId, IsMemberId, IsRoomId, LocalUri, LocalUriType},
 };
 
 /// Medea control API errors.
@@ -25,23 +26,23 @@ pub enum ErrorCode {
     /// Publish endpoint not found.
     ///
     /// Code: __1001__.
-    PublishEndpointNotFound(LocalUri),
+    PublishEndpointNotFound(LocalUri<IsEndpointId>),
     /// Play endpoint not found.
     ///
     /// Code: __1002__.
-    PlayEndpointNotFound(LocalUri),
+    PlayEndpointNotFound(LocalUri<IsEndpointId>),
     /// Member not found.
     ///
     /// Code: __1003__.
-    MemberNotFound(LocalUri),
+    MemberNotFound(LocalUri<IsMemberId>),
     /// Room not found.
     ///
     /// Code: __1004__.
-    RoomNotFound(LocalUri),
+    RoomNotFound(LocalUri<IsRoomId>),
     /// Endpoint not found.
     ///
     /// Code: __1005__.
-    EndpointNotFound(LocalUri),
+    EndpointNotFound(LocalUri<IsEndpointId>),
 
     //////////////////////////////////////
     // Spec errors (1100 - 1199 codes) //
@@ -49,19 +50,19 @@ pub enum ErrorCode {
     /// Medea expects `Room` element in pipeline but received not him.
     ///
     /// Code: __1100__.
-    NotRoomInSpec(LocalUri),
+    NotRoomInSpec(LocalUriType),
     /// Medea expects `Member` element in pipeline but received not him.
     ///
     /// Code: __1101__.
-    NotMemberInSpec(LocalUri),
+    NotMemberInSpec(LocalUriType),
     /// Medea expects `Endpoint` element in pipeline but received not him.
     ///
     /// Code: __1102__.
-    NotEndpointInSpec(LocalUri),
+    NotEndpointInSpec(LocalUriType),
     /// Invalid source URI in play endpoint.
     ///
     /// Code: __1103__.
-    InvalidSrcUri(LocalUri),
+    InvalidSrcUri(LocalUri<IsEndpointId>),
     /// Provided element ID to Room element but element spec is not for Room.
     ///
     /// Code: __1104__.
@@ -80,6 +81,10 @@ pub enum ErrorCode {
     ///
     /// Code: __1107__
     InvalidElementUri(String),
+    /// Provided not source URI in [`WebRtcPlayEndpoint`].
+    ///
+    /// Code: __1108__.
+    NotSourceUri(String),
 
     /////////////////////////////////
     // Parse errors (1200 - 1299) //
@@ -92,10 +97,10 @@ pub enum ErrorCode {
     ///
     /// Code: __1201__.
     ElementIdIsTooLong(String),
-    /// Source URI in publish endpoint missing some fields.
+    /// Missing some fields in element's ID.
     ///
     /// Code: __1202__.
-    MissingFieldsInSrcUri(String, Vec<String>),
+    MissingFieldsInSrcUri(String),
     /// Empty element ID.
     ///
     /// Code: __1203__.
@@ -107,15 +112,15 @@ pub enum ErrorCode {
     /// Member already exists.
     ///
     /// Code: __1300__.
-    MemberAlreadyExists(LocalUri),
+    MemberAlreadyExists(LocalUri<IsMemberId>),
     /// Endpoint already exists.
     ///
     /// Code: __1301__.
-    EndpointAlreadyExists(LocalUri),
+    EndpointAlreadyExists(LocalUri<IsEndpointId>),
     /// Room already exists.
     ///
     /// Code: __1302__.
-    RoomAlreadyExists(LocalUri),
+    RoomAlreadyExists(LocalUri<IsRoomId>),
 }
 
 impl Into<ErrorProto> for ErrorCode {
@@ -224,6 +229,11 @@ impl Into<ErrorProto> for ErrorCode {
                 error.set_element(id);
                 error.set_code(1107);
             }
+            ErrorCode::NotSourceUri(id) => {
+                error.set_text("Provided not source URI".to_string());
+                error.set_element(id);
+                error.set_code(1108);
+            }
 
             /////////////////////////////////
             // Parse errors (1200 - 1299) //
@@ -243,11 +253,9 @@ impl Into<ErrorProto> for ErrorCode {
                 error.set_element(uri);
                 error.set_code(1201);
             }
-            ErrorCode::MissingFieldsInSrcUri(uri, fields) => {
-                error.set_text(format!(
-                    "Missing {:?} fields in element ID.",
-                    fields
-                ));
+            ErrorCode::MissingFieldsInSrcUri(uri) => {
+                error
+                    .set_text("Missing some fields in element ID.".to_string());
                 error.set_element(uri);
                 error.set_code(1202);
             }

@@ -14,7 +14,7 @@ use crate::api::{
     control::{
         endpoints::webrtc_publish_endpoint::WebRtcPublishId,
         grpc::protos::control::WebRtcPlayEndpoint as WebRtcPlayEndpointProto,
-        local_uri::{LocalUri, LocalUriParseError},
+        local_uri::{LocalUriParseError, LocalUriType},
         MemberId, RoomId, TryFromProtobufError,
     },
     error_codes::ErrorCode,
@@ -55,8 +55,8 @@ impl TryFrom<&WebRtcPlayEndpointProto> for WebRtcPlayEndpoint {
 
 #[derive(Debug, Fail)]
 pub enum SrcParseError {
-    #[fail(display = "Missing fields {:?} in '{}' local URI.", _1, _0)]
-    MissingField(String, Vec<String>),
+    #[fail(display = "Provided not src uri {}", _0)]
+    NotSrcUri(String),
     #[fail(display = "Local URI '{}' parse error: {:?}", _0, _1)]
     LocalUriParseError(String, LocalUriParseError),
 }
@@ -64,9 +64,7 @@ pub enum SrcParseError {
 impl Into<ErrorCode> for SrcParseError {
     fn into(self) -> ErrorCode {
         match self {
-            SrcParseError::MissingField(text, fields) => {
-                ErrorCode::MissingFieldsInSrcUri(text, fields)
-            }
+            SrcParseError::NotSrcUri(text) => ErrorCode::NotSourceUri(text),
             SrcParseError::LocalUriParseError(_, err) => err.into(),
         }
     }
@@ -90,32 +88,14 @@ impl SrcUri {
     /// Returns [`SrcParseError::LocalUriParseError`] when some error happened
     /// while parsing URI.
     pub fn parse(value: &str) -> Result<Self, SrcParseError> {
-        let local_uri = LocalUri::parse(value).map_err(|e| {
+        let local_uri = LocalUriType::parse(value).map_err(|e| {
             SrcParseError::LocalUriParseError(value.to_string(), e)
         })?;
 
-        let mut missing_fields = Vec::new();
-        if local_uri.room_id.is_none() {
-            missing_fields.push("room_id".to_string());
-        }
-        if local_uri.member_id.is_none() {
-            missing_fields.push("member_id".to_string());
-        }
-        if local_uri.endpoint_id.is_none() {
-            missing_fields.push("endpoint_id".to_string());
-        }
-
-        if missing_fields.is_empty() {
-            Ok(Self {
-                room_id: local_uri.room_id.unwrap(),
-                member_id: local_uri.member_id.unwrap(),
-                endpoint_id: WebRtcPublishId(local_uri.endpoint_id.unwrap()),
-            })
+        if let LocalUriType::Endpoint(endpoint_uri) = local_uri {
+            Ok(endpoint_uri.into())
         } else {
-            Err(SrcParseError::MissingField(
-                value.to_string(),
-                missing_fields,
-            ))
+            Err(SrcParseError::NotSrcUri(value.to_string()))
         }
     }
 }

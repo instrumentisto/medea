@@ -17,7 +17,7 @@ use crate::{
                 ApplyRequest, CreateRequest, Error, GetResponse, IdRequest,
                 Response,
             },
-            local_uri::{LocalUri, LocalUriParseError},
+            local_uri::{LocalUri, LocalUriParseError, LocalUriType},
             Endpoint, MemberSpec, RoomSpec, TryFromElementError,
             TryFromProtobufError,
         },
@@ -36,6 +36,7 @@ use crate::{
 };
 
 use super::protos::control_grpc::{create_control_api, ControlApi};
+use crate::api::control::local_uri::{IsEndpointId, IsMemberId, IsRoomId};
 
 #[derive(Debug, Fail)]
 enum ControlApiError {
@@ -114,7 +115,7 @@ macro_rules! fut_try {
 /// See `send_error_response` doc for details about arguments for this macro.
 macro_rules! parse_local_uri {
     ($uri:expr, $ctx:expr, $sink:expr, $response:ty) => {
-        match LocalUri::parse($uri) {
+        match LocalUriType::parse($uri) {
             Ok(o) => o,
             Err(e) => {
                 let error: ErrorCode = e.into();
@@ -160,9 +161,9 @@ impl ControlApiService {
     pub fn create_room(
         &mut self,
         req: &CreateRequest,
-        local_uri: LocalUri,
+        local_uri: LocalUri<IsRoomId>,
     ) -> impl Future<Item = CreateResult, Error = ControlApiError> {
-        let room_id = local_uri.room_id.unwrap();
+        let room_id = local_uri.take_room_id();
 
         let room = fut_try!(RoomSpec::try_from_protobuf(
             room_id.clone(),
@@ -198,12 +199,12 @@ impl ControlApiService {
     pub fn create_member(
         &mut self,
         req: &CreateRequest,
-        local_uri: LocalUri,
+        local_uri: LocalUri<IsMemberId>,
     ) -> impl Future<Item = CreateResult, Error = ControlApiError> {
         let spec = fut_try!(MemberSpec::try_from(req.get_member()));
 
-        let room_id = local_uri.room_id.unwrap();
-        let member_id = local_uri.member_id.unwrap();
+        let (member_id, room_uri) = local_uri.take_member_id();
+        let room_id = room_uri.take_room_id();
 
         let base_url = self.app.config.get_base_rpc_url();
         let sid = format!(
@@ -233,15 +234,19 @@ impl ControlApiService {
     pub fn create_endpoint(
         &mut self,
         req: &CreateRequest,
-        local_uri: LocalUri,
+        local_uri: LocalUri<IsEndpointId>,
     ) -> impl Future<Item = CreateResult, Error = ControlApiError> {
         let endpoint = fut_try!(Endpoint::try_from(req));
+        let (endpoint_id, member_uri) = local_uri.take_endpoint_id();
+        let (member_id, room_uri) = member_uri.take_member_id();
+        let room_id = room_uri.take_room_id();
+
         Either::A(
             self.room_service
                 .send(CreateEndpointInRoom {
-                    room_id: local_uri.room_id.unwrap(),
-                    member_id: local_uri.member_id.unwrap(),
-                    endpoint_id: local_uri.endpoint_id.unwrap(),
+                    room_id: room_id,
+                    member_id: member_id,
+                    endpoint_id: endpoint_id,
                     spec: endpoint,
                 })
                 .map_err(ControlApiError::from)
@@ -284,72 +289,93 @@ impl ControlApi for ControlApiService {
     ) {
         let local_uri = parse_local_uri!(req.get_id(), ctx, sink, Response);
 
-        if local_uri.is_room_uri() {
-            if req.has_room() {
-                ctx.spawn(self.create_room(&req, local_uri).then(move |r| {
-                    sink.success(get_response_for_create(r)).map_err(|_| ())
-                }));
-            } else {
-                send_error_response!(
-                    ctx,
-                    sink,
-                    ErrorCode::ElementIdForRoomButElementIsNot(
-                        req.get_id().to_string(),
-                    ),
-                    Response
-                );
+        match local_uri {
+            LocalUriType::Room(local_uri) => {
+                if req.has_room() {
+                    ctx.spawn(self.create_room(&req, local_uri).then(
+                        move |r| {
+                            sink.success(get_response_for_create(r))
+                                .map_err(|_| ())
+                        },
+                    ));
+                } else {
+                    send_error_response!(
+                        ctx,
+                        sink,
+                        ErrorCode::ElementIdForRoomButElementIsNot(
+                            req.get_id().to_string(),
+                        ),
+                        Response
+                    );
+                }
             }
-        } else if local_uri.is_member_uri() {
-            if req.has_member() {
-                ctx.spawn(self.create_member(&req, local_uri).then(move |r| {
-                    sink.success(get_response_for_create(r)).map_err(|e| {
-                        warn!(
-                            "Error while sending Create response by gRPC. {:?}",
-                            e
-                        )
-                    })
-                }));
-            } else {
-                send_error_response!(
-                    ctx,
-                    sink,
-                    ErrorCode::ElementIdForMemberButElementIsNot(
-                        req.get_id().to_string(),
-                    ),
-                    Response
-                );
-            }
-        } else if local_uri.is_endpoint_uri() {
-            if req.has_webrtc_pub() || req.has_webrtc_play() {
-                ctx.spawn(self.create_endpoint(&req, local_uri).then(
-                    move |r| {
-                        sink.success(get_response_for_create(r)).map_err(|e| {
-                            warn!(
-                                "Error while sending Create response by gRPC. \
-                                 {:?}",
-                                e
+            LocalUriType::Member(local_uri) => {
+                if req.has_member() {
+                    ctx.spawn(self.create_member(&req, local_uri).then(
+                        move |r| {
+                            sink.success(get_response_for_create(r)).map_err(
+                                |e| {
+                                    warn!(
+                                        "Error while sending Create response \
+                                         by gRPC. {:?}",
+                                        e
+                                    )
+                                },
                             )
-                        })
-                    },
-                ));
-            } else {
-                send_error_response!(
-                    ctx,
-                    sink,
-                    ErrorCode::ElementIdForEndpointButElementIsNot(
-                        req.get_id().to_string(),
-                    ),
-                    Response
-                );
+                        },
+                    ));
+                } else {
+                    send_error_response!(
+                        ctx,
+                        sink,
+                        ErrorCode::ElementIdForMemberButElementIsNot(
+                            req.get_id().to_string(),
+                        ),
+                        Response
+                    );
+                }
             }
-        } else {
-            send_error_response!(
-                ctx,
-                sink,
-                ErrorCode::InvalidElementUri(req.get_id().to_string(),),
-                Response
-            );
+            LocalUriType::Endpoint(local_uri) => {
+                if req.has_webrtc_pub() || req.has_webrtc_play() {
+                    ctx.spawn(self.create_endpoint(&req, local_uri).then(
+                        move |r| {
+                            sink.success(get_response_for_create(r)).map_err(
+                                |e| {
+                                    warn!(
+                                        "Error while sending Create response \
+                                         by gRPC. {:?}",
+                                        e
+                                    )
+                                },
+                            )
+                        },
+                    ));
+                } else {
+                    send_error_response!(
+                        ctx,
+                        sink,
+                        ErrorCode::ElementIdForEndpointButElementIsNot(
+                            req.get_id().to_string(),
+                        ),
+                        Response
+                    );
+                }
+            }
         }
+
+        // TODO
+        //        if local_uri.is_room_uri() {
+        //        } else if local_uri.is_member_uri() {
+        //        } else if local_uri.is_endpoint_uri() {
+        //        } else {
+        //            send_error_response!(
+        //                ctx,
+        //                sink,
+        //
+        // ErrorCode::InvalidElementUri(req.get_id().to_string()),
+        //                Response
+        //            );
+        //        }
     }
 
     /// Implementation for `Apply` method of gRPC control API.
@@ -376,33 +402,45 @@ impl ControlApi for ControlApiService {
         for id in req.get_id() {
             let uri = parse_local_uri!(id, ctx, sink, Response);
 
-            if uri.is_room_uri() {
-                delete_room_futs.push(
-                    self.room_service.send(DeleteRoom(uri.room_id.unwrap())),
-                );
-            } else if uri.is_member_uri() {
-                delete_member_futs.push(self.room_service.send(
-                    DeleteMemberFromRoom {
-                        room_id: uri.room_id.unwrap(),
-                        member_id: uri.member_id.unwrap(),
-                    },
-                ));
-            } else if uri.is_endpoint_uri() {
-                delete_endpoints_futs.push(self.room_service.send(
-                    DeleteEndpointFromMember {
-                        room_id: uri.room_id.unwrap(),
-                        member_id: uri.member_id.unwrap(),
-                        endpoint_id: uri.endpoint_id.unwrap(),
-                    },
-                ));
-            } else {
-                send_error_response!(
-                    ctx,
-                    sink,
-                    ErrorCode::InvalidElementUri(id.to_string(),),
-                    Response
-                );
+            match uri {
+                LocalUriType::Room(uri) => {
+                    delete_room_futs.push(
+                        self.room_service.send(DeleteRoom(uri.take_room_id())),
+                    );
+                }
+                LocalUriType::Member(uri) => {
+                    let (member_id, room_uri) = uri.take_member_id();
+                    let room_id = room_uri.take_room_id();
+                    delete_member_futs.push(
+                        self.room_service
+                            .send(DeleteMemberFromRoom { room_id, member_id }),
+                    );
+                }
+                LocalUriType::Endpoint(uri) => {
+                    let (endpoint_id, member_uri) = uri.take_endpoint_id();
+                    let (member_id, room_uri) = member_uri.take_member_id();
+                    let room_id = room_uri.take_room_id();
+                    delete_endpoints_futs.push(self.room_service.send(
+                        DeleteEndpointFromMember {
+                            room_id,
+                            member_id,
+                            endpoint_id,
+                        },
+                    ));
+                }
             }
+            // TODO
+            //            if uri.is_room_uri() {
+            //            } else if uri.is_member_uri() {
+            //            } else if uri.is_endpoint_uri() {
+            //            } else {
+            //                send_error_response!(
+            //                    ctx,
+            //                    sink,
+            //                    ErrorCode::InvalidElementUri(id.to_string()),
+            //                    Response
+            //                );
+            //            }
         }
 
         ctx.spawn(
@@ -470,27 +508,35 @@ impl ControlApi for ControlApiService {
         for id in req.get_id() {
             let local_uri = parse_local_uri!(id, ctx, sink, GetResponse);
 
-            if local_uri.is_room_uri() {
-                room_ids.push(local_uri.room_id.unwrap());
-            } else if local_uri.is_member_uri() {
-                member_ids.push((
-                    local_uri.room_id.unwrap(),
-                    local_uri.member_id.unwrap(),
-                ));
-            } else if local_uri.is_endpoint_uri() {
-                endpoint_ids.push((
-                    local_uri.room_id.unwrap(),
-                    local_uri.member_id.unwrap(),
-                    local_uri.endpoint_id.unwrap(),
-                ));
-            } else {
-                send_error_response!(
-                    ctx,
-                    sink,
-                    ErrorCode::InvalidElementUri(id.to_string(),),
-                    GetResponse
-                );
+            match local_uri {
+                LocalUriType::Room(room_uri) => {
+                    room_ids.push(room_uri.take_room_id());
+                }
+                LocalUriType::Member(member_uri) => {
+                    let (member_id, room_uri) = member_uri.take_member_id();
+                    let room_id = room_uri.take_room_id();
+                    member_ids.push((room_id, member_id));
+                }
+                LocalUriType::Endpoint(endpoint_uri) => {
+                    let (endpoint_id, member_uri) =
+                        endpoint_uri.take_endpoint_id();
+                    let (member_id, room_uri) = member_uri.take_member_id();
+                    let room_id = room_uri.take_room_id();
+                    endpoint_ids.push((room_id, member_id, endpoint_id));
+                }
             }
+            // TODO
+            //            if local_uri.is_room_uri() {
+            //            } else if local_uri.is_member_uri() {
+            //            } else if local_uri.is_endpoint_uri() {
+            //            } else {
+            //                send_error_response!(
+            //                    ctx,
+            //                    sink,
+            //                    ErrorCode::InvalidElementUri(id.to_string(),),
+            //                    GetResponse
+            //                );
+            //            }
         }
 
         let room_fut = self.room_service.send(GetRoom(room_ids));
