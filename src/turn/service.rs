@@ -2,8 +2,8 @@ use core::fmt;
 use std::net::SocketAddr;
 
 use actix::{
-    fut::wrap_future, Actor, ActorFuture, Addr, Arbiter, Context, Handler,
-    MailboxError, Message, WrapFuture,
+    fut::wrap_future, Actor, ActorFuture, Addr, Context, Handler, MailboxError,
+    Message, WrapFuture,
 };
 use bb8::RunError;
 use failure::Fail;
@@ -16,10 +16,14 @@ use crate::{
         control::{MemberId, RoomId},
         error_codes::Backtrace,
     },
-    conf::Conf,
+    conf,
     media::IceUser,
     turn::repo::{TurnDatabase, TurnDatabaseErr},
 };
+
+/// Boxed [`TurnAuthService`] which can be [`Sync`] and [`Send`].
+#[allow(clippy::module_name_repetitions)]
+pub type BoxedTurnAuthService = Box<dyn TurnAuthService + Sync + Send>;
 
 static TURN_PASS_LEN: usize = 16;
 
@@ -174,35 +178,37 @@ struct Service {
 /// Create new instance [`TurnAuthService`].
 #[allow(clippy::module_name_repetitions)]
 pub fn new_turn_auth_service(
-    config: &Conf,
-) -> Result<Box<dyn TurnAuthService + Send + Sync>, TurnServiceErr> {
-    let turn_db = TurnDatabase::new(
-        config.turn.db.redis.connection_timeout,
+    cf: &conf::Turn,
+) -> impl Future<Item = BoxedTurnAuthService, Error = TurnServiceErr> {
+    let db_pass = cf.db.redis.pass.clone();
+    let turn_address = cf.addr();
+    let turn_username = cf.user.clone();
+    let turn_password = cf.pass.clone();
+    TurnDatabase::new(
+        cf.db.redis.connection_timeout,
         ConnectionInfo {
             addr: Box::new(redis::ConnectionAddr::Tcp(
-                config.turn.db.redis.ip.to_string(),
-                config.turn.db.redis.port,
+                cf.db.redis.ip.to_string(),
+                cf.db.redis.port,
             )),
-            db: config.turn.db.redis.db_number,
-            passwd: if config.turn.db.redis.pass.is_empty() {
+            db: cf.db.redis.db_number,
+            passwd: if cf.db.redis.pass.is_empty() {
                 None
             } else {
-                Some(config.turn.db.redis.pass.clone())
+                Some(cf.db.redis.pass.clone())
             },
         },
-    )?;
-
-    let service = Service {
+    )
+    .map(move |turn_db| Service {
         turn_db,
-        db_pass: config.turn.db.redis.pass.clone(),
-        turn_address: config.turn.addr(),
-        turn_username: config.turn.user.clone(),
-        turn_password: config.turn.pass.clone(),
+        db_pass,
+        turn_address,
+        turn_username,
+        turn_password,
         static_user: None,
-    };
-
-    let service = Service::start_in_arbiter(&Arbiter::new(), move |_| service);
-    Ok(Box::new(service))
+    })
+    .map::<_, BoxedTurnAuthService>(|service| Box::new(service.start()))
+    .map_err(TurnServiceErr::from)
 }
 
 impl Service {
@@ -299,6 +305,8 @@ impl Handler<DeleteIceUsers> for Service {
 
 #[cfg(test)]
 pub mod test {
+    use std::sync::Arc;
+
     use futures::future;
 
     use crate::media::IceUser;
@@ -331,8 +339,8 @@ pub mod test {
     }
 
     #[allow(clippy::module_name_repetitions)]
-    pub fn get_turn_service_mock() -> Box<dyn TurnAuthService + Send + Sync> {
-        Box::new(TurnAuthServiceMock {})
+    pub fn new_turn_auth_service_mock() -> Arc<BoxedTurnAuthService> {
+        Arc::new(Box::new(TurnAuthServiceMock {}))
     }
 
 }

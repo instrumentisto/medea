@@ -1,5 +1,7 @@
 //! HTTP server for handling WebSocket connections of Client API.
 
+use std::io;
+
 use actix_web::{
     middleware,
     web::{Data, Path, Payload},
@@ -85,7 +87,7 @@ pub struct Context {
 }
 
 /// Starts HTTP server for handling WebSocket connections of Client API.
-pub fn run(rooms: RoomsRepository, config: Conf) {
+pub fn run(rooms: RoomsRepository, config: Conf) -> io::Result<()> {
     let server_addr = config.server.bind_addr();
     HttpServer::new(move || {
         App::new()
@@ -101,11 +103,12 @@ pub fn run(rooms: RoomsRepository, config: Conf) {
                 .route(actix_web::web::get().to_async(ws_index)),
             )
     })
-    .bind(server_addr)
-    .unwrap()
+    .bind(server_addr)?
     .start();
 
-    info!("Started HTTP server on 0.0.0.0:8080");
+    info!("Started HTTP server on {}", server_addr);
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -119,7 +122,8 @@ mod test {
     use futures::{future::IntoFuture as _, sink::Sink as _, Stream as _};
 
     use crate::{
-        api::control, conf::Conf, signalling::Room, turn::get_turn_service_mock,
+        api::control, conf::Conf, signalling::Room,
+        turn::new_turn_auth_service_mock,
     };
 
     use super::*;
@@ -132,7 +136,7 @@ mod test {
 
         let app = Arc::new(crate::App {
             config: conf,
-            turn_service: Arc::new(get_turn_service_mock()),
+            turn_service: new_turn_auth_service_mock(),
         });
         let app_cloned = Arc::clone(&app);
 
@@ -141,7 +145,7 @@ mod test {
             let client_room = Room::new(
                 &room_spec,
                 app.config.rpc.reconnect_timeout,
-                Arc::new(get_turn_service_mock()),
+                new_turn_auth_service_mock(),
             )
             .unwrap();
             client_room

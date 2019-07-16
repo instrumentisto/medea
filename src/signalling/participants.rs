@@ -49,7 +49,7 @@ use crate::{
         room::{ActFuture, RoomError},
         Room,
     },
-    turn::{TurnAuthService, TurnServiceErr, UnreachablePolicy},
+    turn::{BoxedTurnAuthService, TurnServiceErr, UnreachablePolicy},
 };
 
 #[derive(Fail, Debug)]
@@ -145,7 +145,7 @@ pub struct ParticipantService {
     members: HashMap<MemberId, Rc<Member>>,
 
     /// Service for managing authorization on Turn server.
-    turn: Arc<Box<dyn TurnAuthService + Send + Sync>>,
+    turn: Arc<BoxedTurnAuthService>,
 
     /// Established [`RpcConnection`]s of [`Members`]s in this [`Room`].
     // TODO: Replace Box<dyn RpcConnection>> with enum,
@@ -167,7 +167,7 @@ impl ParticipantService {
     pub fn new(
         room_spec: &RoomSpec,
         reconnect_timeout: Duration,
-        turn: Arc<Box<dyn TurnAuthService + Send + Sync>>,
+        turn: Arc<BoxedTurnAuthService>,
     ) -> Result<Self, MembersLoadError> {
         Ok(Self {
             room_id: room_spec.id().clone(),
@@ -321,16 +321,16 @@ impl ParticipantService {
     }
 
     /// If [`ClosedReason::Closed`], then removes [`RpcConnection`] associated
-    /// with specified user [`Member`] from the storage and closes the
-    /// room. If [`ClosedReason::Lost`], then creates delayed task that
-    /// emits [`ClosedReason::Closed`].
-    // TODO: Dont close the room. It is being closed atm, because we have
-    //      no way to handle absence of RpcConnection.
+    /// with specified user [`Member`] from the storage and closes the room.
+    /// If [`ClosedReason::Lost`], then creates delayed task that emits
+    /// [`ClosedReason::Closed`].
+    // TODO: Don't close the room. It is being closed atm, because we have
+    //       no way to handle absence of RpcConnection.
     pub fn connection_closed(
         &mut self,
-        ctx: &mut Context<Room>,
         member_id: MemberId,
         reason: &ClosedReason,
+        ctx: &mut Context<Room>,
     ) {
         let closed_at = Instant::now();
         match reason {

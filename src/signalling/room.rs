@@ -34,8 +34,8 @@ use crate::{
     },
     log::prelude::*,
     media::{
-        New, Peer, PeerId, PeerStateError, PeerStateMachine,
-        WaitLocalHaveRemote, WaitLocalSdp, WaitRemoteSdp,
+        New, Peer, PeerError, PeerId, PeerStateMachine, WaitLocalHaveRemote,
+        WaitLocalSdp, WaitRemoteSdp,
     },
     signalling::{
         elements::{
@@ -46,7 +46,7 @@ use crate::{
         participants::{ParticipantService, ParticipantServiceErr},
         peers::PeerRepository,
     },
-    turn::TurnAuthService,
+    turn::BoxedTurnAuthService,
 };
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
@@ -67,7 +67,7 @@ pub enum RoomError {
     #[fail(display = "Unable to send event to Member [id = {}]", _0)]
     UnableToSendEvent(MemberId),
     #[fail(display = "PeerError: {}", _0)]
-    PeerStateError(PeerStateError),
+    PeerError(PeerError),
     #[fail(display = "{}", _0)]
     MembersLoadError(MembersLoadError),
     #[fail(display = "{}", _0)]
@@ -78,11 +78,13 @@ pub enum RoomError {
     TurnServiceError(String),
     #[fail(display = "{}", _0)]
     ParticipantServiceErr(ParticipantServiceErr),
+    #[fail(display = "Client error:{}", _0)]
+    ClientError(String),
 }
 
-impl From<PeerStateError> for RoomError {
-    fn from(err: PeerStateError) -> Self {
-        RoomError::PeerStateError(err)
+impl From<PeerError> for RoomError {
+    fn from(err: PeerError) -> Self {
+        RoomError::PeerError(err)
     }
 }
 
@@ -137,7 +139,7 @@ impl Into<Backtrace> for &RoomError {
                 backtrace.push(self);
                 backtrace.merge(e.into());
             }
-            RoomError::PeerStateError(e) => {
+            RoomError::PeerError(e) => {
                 backtrace.push(self);
                 backtrace.merge(e.into());
             }
@@ -173,7 +175,7 @@ impl Room {
     pub fn new(
         room_spec: &RoomSpec,
         reconnect_timeout: Duration,
-        turn: Arc<Box<dyn TurnAuthService + Send + Sync>>,
+        turn: Arc<BoxedTurnAuthService>,
     ) -> Result<Self, RoomError> {
         Ok(Self {
             id: room_spec.id().clone(),
@@ -261,9 +263,12 @@ impl Room {
         &mut self,
         from_peer_id: PeerId,
         sdp_offer: String,
+        mids: StdHashMap<u64, String>,
     ) -> Result<ActFuture<(), RoomError>, RoomError> {
-        let from_peer: Peer<WaitLocalSdp> =
+        let mut from_peer: Peer<WaitLocalSdp> =
             self.peers.take_inner_peer(from_peer_id)?;
+        from_peer.set_mids(mids)?;
+
         let to_peer_id = from_peer.partner_peer_id();
         let to_peer: Peer<New> = self.peers.take_inner_peer(to_peer_id)?;
 
@@ -305,6 +310,7 @@ impl Room {
     ) -> Result<ActFuture<(), RoomError>, RoomError> {
         let from_peer: Peer<WaitLocalHaveRemote> =
             self.peers.take_inner_peer(from_peer_id)?;
+
         let to_peer_id = from_peer.partner_peer_id();
         let to_peer: Peer<WaitRemoteSdp> =
             self.peers.take_inner_peer(to_peer_id)?;
@@ -335,21 +341,23 @@ impl Room {
     ) -> Result<ActFuture<(), RoomError>, RoomError> {
         let from_peer = self.peers.get_peer(from_peer_id)?;
         if let PeerStateMachine::New(_) = from_peer {
-            return Err(RoomError::PeerStateError(PeerStateError::WrongState(
+            return Err(PeerError::WrongState(
                 from_peer_id,
                 "Not New",
                 format!("{}", from_peer),
-            )));
+            )
+            .into());
         }
 
         let to_peer_id = from_peer.partner_peer_id();
         let to_peer = self.peers.get_peer(to_peer_id)?;
         if let PeerStateMachine::New(_) = to_peer {
-            return Err(RoomError::PeerStateError(PeerStateError::WrongState(
+            return Err(PeerError::WrongState(
                 to_peer_id,
                 "Not New",
                 format!("{}", to_peer),
-            )));
+            )
+            .into());
         }
 
         let to_member_id = to_peer.member_id();
@@ -437,14 +445,15 @@ impl Room {
         let mut created_peers: Vec<(PeerId, PeerId)> = Vec::new();
 
         // Create all connected publish endpoints.
-        for (_, publish) in member.srcs() {
-            for receiver in publish.sinks() {
+        for (_, publisher) in member.srcs() {
+            for receiver in publisher.sinks() {
                 let receiver_owner = receiver.owner();
 
-                if self.members.member_has_connection(&receiver_owner.id())
-                    && !receiver.is_connected()
+                if receiver.peer_id().is_none()
+                    && self.members.member_has_connection(&receiver_owner.id())
                 {
-                    if let Some(p) = self.connect_endpoints(&publish, &receiver)
+                    if let Some(p) =
+                        self.connect_endpoints(&publisher, &receiver)
                     {
                         created_peers.push(p)
                     }
@@ -453,17 +462,13 @@ impl Room {
         }
 
         // Create all connected play's receivers peers.
-        for (_, play) in member.sinks() {
-            let plays_publisher = play.src();
-            let plays_publisher_owner = plays_publisher.owner();
+        for (_, receiver) in member.sinks() {
+            let publisher = receiver.src();
 
-            if self
-                .members
-                .member_has_connection(&plays_publisher_owner.id())
-                && !play.is_connected()
+            if receiver.peer_id().is_none()
+                && self.members.member_has_connection(&publisher.owner().id())
             {
-                if let Some(p) = self.connect_endpoints(&plays_publisher, &play)
-                {
+                if let Some(p) = self.connect_endpoints(&publisher, &receiver) {
                     created_peers.push(p);
                 }
             }
@@ -692,9 +697,11 @@ impl Handler<CommandMessage> for Room {
         ctx: &mut Self::Context,
     ) -> Self::Result {
         let result = match msg.into() {
-            Command::MakeSdpOffer { peer_id, sdp_offer } => {
-                self.handle_make_sdp_offer(peer_id, sdp_offer)
-            }
+            Command::MakeSdpOffer {
+                peer_id,
+                sdp_offer,
+                mids,
+            } => self.handle_make_sdp_offer(peer_id, sdp_offer, mids),
             Command::MakeSdpAnswer {
                 peer_id,
                 sdp_answer,
@@ -738,17 +745,15 @@ impl Handler<RpcConnectionEstablished> for Room {
         msg: RpcConnectionEstablished,
         ctx: &mut Self::Context,
     ) -> Self::Result {
-        info!("RpcConnectionEstablished for member {}", msg.member_id);
-
-        let member_id = msg.member_id;
+        info!("RpcConnectionEstablished for member {}", &msg.member_id);
 
         let fut = self
             .members
-            .connection_established(ctx, member_id.clone(), msg.connection)
+            .connection_established(ctx, msg.member_id, msg.connection)
             .map_err(|err, _, _| {
                 error!("RpcConnectionEstablished error {:?}", err)
             })
-            .map(move |member, room, ctx| {
+            .map(|member, room, ctx| {
                 room.init_member_connections(&member, ctx);
             });
         Box::new(fut)
@@ -793,7 +798,7 @@ impl Handler<RpcConnectionClosed> for Room {
         }
 
         self.members
-            .connection_closed(ctx, msg.member_id, &msg.reason);
+            .connection_closed(msg.member_id, &msg.reason, ctx);
     }
 }
 

@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use medea_macro::dispatchable;
 use serde::{de::Deserializer, ser::Serializer, Deserialize, Serialize};
 
@@ -33,7 +35,17 @@ pub enum ClientMsg {
 #[serde(tag = "command", content = "data")]
 pub enum Command {
     /// Web Client sends SDP Offer.
-    MakeSdpOffer { peer_id: u64, sdp_offer: String },
+    MakeSdpOffer {
+        peer_id: u64,
+        sdp_offer: String,
+        /// Associations between [`Track`] and transceiver's [media
+        /// description][1].
+        ///
+        /// `mid` is basically an ID of [`m=<media>` section][1] in SDP.
+        ///
+        /// [1]: https://tools.ietf.org/html/rfc4566#section-5.14
+        mids: HashMap<u64, String>,
+    },
     /// Web Client sends SDP Answer.
     MakeSdpAnswer { peer_id: u64, sdp_answer: String },
     /// Web Client sends Ice Candidate.
@@ -74,7 +86,9 @@ pub enum Event {
     PeersRemoved { peer_ids: Vec<u64> },
 }
 
-/// Represents [`RtcIceCandidateInit`] object.
+/// Represents [RTCIceCandidateInit][1] object.
+///
+/// [1]: https://www.w3.org/TR/webrtc/#dom-rtcicecandidateinit
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct IceCandidate {
     pub candidate: String,
@@ -110,9 +124,16 @@ pub struct IceServer {
 /// Direction of [`Track`].
 #[cfg_attr(feature = "medea", derive(Serialize, Debug, Clone, PartialEq))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
+// TODO: Use different struct without mids in TracksApplied event.
 pub enum Direction {
-    Send { receivers: Vec<u64> },
-    Recv { sender: u64 },
+    Send {
+        receivers: Vec<u64>,
+        mid: Option<String>,
+    },
+    Recv {
+        sender: u64,
+        mid: Option<String>,
+    },
 }
 
 /// Type of [`Track`].
@@ -244,9 +265,13 @@ mod test {
 
     #[test]
     fn command() {
+        let mut mids = HashMap::new();
+        mids.insert(0, String::from("1"));
+
         let command = ClientMsg::Command(Command::MakeSdpOffer {
             peer_id: 77,
             sdp_offer: "offer".to_owned(),
+            mids,
         });
         #[cfg_attr(nightly, rustfmt::skip)]
             let command_str =
@@ -254,7 +279,8 @@ mod test {
                 \"command\":\"MakeSdpOffer\",\
                 \"data\":{\
                     \"peer_id\":77,\
-                    \"sdp_offer\":\"offer\"\
+	                \"sdp_offer\":\"offer\",\
+	                \"mids\":{\"0\":\"1\"}\
                 }\
             }";
 

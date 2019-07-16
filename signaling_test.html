@@ -8,6 +8,7 @@
 
         var socket;
         var pcs = {};
+        var transceivers = [];
 
         function connectSocket(caller) {
             let role = caller ? "caller/test" : "responder/test";
@@ -20,9 +21,7 @@
         };
 
         function handleSocketMessage(message) {
-
             var msg = JSON.parse(message.data);
-
             switch (msg.event) {
                 case 'PeerCreated':
                     handlePeerCreated(msg.data);
@@ -36,41 +35,52 @@
             }
         }
 
-        async function handlePeerCreated(msg) {
-            var sendAudio = false;
-            var sendVideo = false;
-            var recvAudio = false;
-            var recvVideo = false;
-
-            msg.tracks.forEach((track) => {
-
-                if (track.media_type.Audio != undefined) {
-                    if (track.direction.Send != undefined) {
-                        sendAudio = true;
-                    }
-
-                    if (track.direction.Recv != undefined) {
-                        recvAudio = true;
-                    }
-
-                }
-                if (track.media_type.Video != undefined) {
-                    if (track.direction.Send != undefined) {
-                        sendVideo = true;
-                    }
-
-                    if (track.direction.Recv != undefined) {
-                        recvVideo = true;
-                    }
+        function get_mids() {
+            var mids = {};
+            console.log(transceivers);
+            transceivers.forEach(function (v, i) {
+                if (v != undefined) {
+                    mids[i] = v.mid;
                 }
             });
 
+            return mids;
+        }
+
+        async function handlePeerCreated(msg) {
             var configuration = { iceServers: msg.ice_servers };
             pcs[msg.peer_id] = new RTCPeerConnection(configuration);
+            pcs[msg.peer_id] = new RTCPeerConnection();
 
             var pc = pcs[msg.peer_id];
+
+            var sendAudio = false;
+            var sendVideo = false;
+
+            msg.tracks.forEach((track) => {
+                var transceiver;
+                if (track.direction.Send != undefined) {
+                    if (track.media_type.Audio != undefined) {
+                        sendAudio = true;
+                        transceiver = pc.addTransceiver("audio", {
+                            direction: "sendonly"
+                        })
+                    } else {
+                        sendVideo = true;
+                        transceiver = pc.addTransceiver("video", {
+                            direction: "sendonly"
+                        })
+                    }
+                }
+
+                transceivers[track.id] = transceiver;
+            });
+
             pc.ontrack = function (e) {
-                partnervid.srcObject = e.streams[0];
+                console.log(e);
+                if (!partnervid.srcObject) {
+                    partnervid.srcObject = e.streams[0];
+                }
             };
 
             if (sendVideo || sendAudio) {
@@ -82,45 +92,41 @@
                 yourvid.srcObject = stream;
 
                 stream.getTracks().forEach((track) => {
-                    pc.addTrack(track, stream);
+                    if (track.kind == "audio"){
+                        transceivers[1].sender.replaceTrack(track);
+                    } else {
+                        transceivers[2].sender.replaceTrack(track);
+                    }
                 });
             }
 
-
-            var mediaConstraints = {
-                'mandatory': {
-                    'OfferToReceiveAudio': recvAudio,
-                    'OfferToReceiveVideo': recvVideo
-                }
-            };
-
             if (msg.sdp_offer != undefined && msg.sdp_offer != null) {
                 pc.setRemoteDescription(new RTCSessionDescription(JSON.parse(msg.sdp_offer)));
-                var answer = await pc.createAnswer(mediaConstraints);
-                pc.setLocalDescription(answer);
+                var answer = await pc.createAnswer();
+                await pc.setLocalDescription(answer);
 
                 socket.send(JSON.stringify({
                     command: "MakeSdpAnswer",
                     data: {
                         peer_id: msg.peer_id,
-                        sdp_answer: JSON.stringify(answer)
+                        sdp_answer: JSON.stringify(answer),
+                        mids: get_mids()
                     }
                 }));
             } else {
-                var offer = await pc.createOffer(mediaConstraints);
-                pc.setLocalDescription(offer);
+                var offer = await pc.createOffer();
+                await pc.setLocalDescription(offer);
                 socket.send(JSON.stringify({
                     command: "MakeSdpOffer",
                     data: {
                         peer_id: msg.peer_id,
-                        sdp_offer: JSON.stringify(offer)
+                        sdp_offer: JSON.stringify(offer),
+                        mids: get_mids()
                     }
                 }));
             }
 
-
             pc.onicecandidate = function (e) {
-
                 if (e.candidate) {
                     socket.send(JSON.stringify({
                         command: "SetIceCandidate",
@@ -134,7 +140,6 @@
                         }
                     }))
                 }
-
             };
         }
 

@@ -11,7 +11,7 @@ pub mod turn;
 
 use std::sync::Arc;
 
-use actix::{Actor as _, Addr};
+use actix::prelude::*;
 use failure::Fail;
 use hashbrown::HashMap;
 
@@ -19,14 +19,14 @@ use crate::{
     api::control::{load_static_specs_from_dir, RoomId},
     conf::Conf,
     signalling::{room::RoomError, Room},
-    turn::{service, TurnAuthService},
+    turn::{service, BoxedTurnAuthService, TurnServiceErr},
 };
 
 /// Global app context.
 #[derive(Debug)]
 pub struct App {
     pub config: Conf,
-    pub turn_service: Arc<Box<dyn TurnAuthService + Sync + Send>>,
+    pub turn_service: Arc<BoxedTurnAuthService>,
 }
 
 /// Errors which can happen while server starting.
@@ -58,6 +58,7 @@ impl From<RoomError> for ServerStartError {
     }
 }
 
+// TODO: refactor this
 /// Parses static [`Room`]s from config and starts them in separate arbiters.
 ///
 /// Returns [`ServerStartError::DuplicateRoomId`] if find duplicated room ID.
@@ -68,42 +69,49 @@ impl From<RoomError> for ServerStartError {
 /// Returns [`ServerStartError::BadRoomSpec`]
 /// if some error happened while creating room from spec.
 pub fn start_static_rooms(
-    config: &Conf,
-) -> Result<HashMap<RoomId, Addr<Room>>, ServerStartError> {
-    if let Some(static_specs_path) = &config.server.static_specs_path {
-        let room_specs = match load_static_specs_from_dir(static_specs_path) {
-            Ok(r) => r,
-            Err(e) => return Err(ServerStartError::LoadSpec(e)),
-        };
-        let mut rooms = HashMap::new();
+    conf: &Conf,
+) -> impl Future<
+    Item = Result<
+        (HashMap<RoomId, Addr<Room>>, Arc<BoxedTurnAuthService>),
+        ServerStartError,
+    >,
+    Error = TurnServiceErr,
+> {
+    let config = conf.clone();
+    service::new_turn_auth_service(&conf.turn)
+        .map(Arc::new)
+        .map(move |turn_auth_service| {
+            if let Some(static_specs_path) =
+                config.server.static_specs_path.clone()
+            {
+                let room_specs =
+                    match load_static_specs_from_dir(static_specs_path) {
+                        Ok(r) => r,
+                        Err(e) => return Err(ServerStartError::LoadSpec(e)),
+                    };
+                let mut rooms = HashMap::new();
+                let arbiter = Arbiter::new();
 
-        for spec in room_specs {
-            if rooms.contains_key(spec.id()) {
-                return Err(ServerStartError::DuplicateRoomId(
-                    spec.id().clone(),
-                ));
+                for spec in room_specs {
+                    if rooms.contains_key(spec.id()) {
+                        return Err(ServerStartError::DuplicateRoomId(
+                            spec.id().clone(),
+                        ));
+                    }
+
+                    let room_id = spec.id().clone();
+                    let rpc_reconnect_timeout = config.rpc.reconnect_timeout;
+                    let turn_cloned = Arc::clone(&turn_auth_service);
+                    let room = Room::start_in_arbiter(&arbiter, move |_| {
+                        Room::new(&spec, rpc_reconnect_timeout, turn_cloned)
+                            .unwrap()
+                    });
+                    rooms.insert(room_id, room);
+                }
+
+                Ok((rooms, turn_auth_service))
+            } else {
+                Ok((HashMap::new(), turn_auth_service))
             }
-
-            let turn_auth_service = service::new_turn_auth_service(&config)
-                .expect("Unable to start turn service");
-
-            let room_id = spec.id().clone();
-            let rpc_reconnect_timeout = config.rpc.reconnect_timeout;
-
-            let room = Room::new(
-                &spec,
-                rpc_reconnect_timeout,
-                Arc::new(turn_auth_service),
-            )
-            .unwrap();
-
-            let room_addr = room.start();
-
-            rooms.insert(room_id, room_addr);
-        }
-
-        Ok(rooms)
-    } else {
-        Ok(HashMap::new())
-    }
+        })
 }
