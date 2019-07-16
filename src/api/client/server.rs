@@ -113,7 +113,7 @@ pub fn run(rooms: RoomsRepository, config: Conf) -> io::Result<()> {
 
 #[cfg(test)]
 mod test {
-    use std::{ops::Add, sync::Arc, thread, time::Duration};
+    use std::{ops::Add, thread, time::Duration};
 
     use actix::{Actor as _, Arbiter};
     use actix_http::{ws::Message, HttpService};
@@ -123,7 +123,7 @@ mod test {
 
     use crate::{
         api::control, conf::Conf, signalling::Room,
-        turn::new_turn_auth_service_mock,
+        turn::new_turn_auth_service_mock, AppContext,
     };
 
     use super::*;
@@ -134,19 +134,11 @@ mod test {
             control::load_from_yaml_file("tests/specs/pub_sub_video_call.yml")
                 .unwrap();
 
-        let app = Arc::new(crate::App {
-            config: conf,
-            turn_service: new_turn_auth_service_mock(),
-        });
+        let app = AppContext::new(conf, new_turn_auth_service_mock());
 
         let room_id = room_spec.id.clone();
         let client_room = Room::start_in_arbiter(&Arbiter::new(), move |_| {
-            let client_room = Room::new(
-                &room_spec,
-                app.config.rpc.reconnect_timeout,
-                new_turn_auth_service_mock(),
-            )
-            .unwrap();
+            let client_room = Room::new(&room_spec, app.clone()).unwrap();
             client_room
         });
         let room_hash_map = hashmap! {

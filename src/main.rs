@@ -1,4 +1,4 @@
-use std::{cell::Cell, rc::Rc, sync::Arc};
+use std::{cell::Cell, rc::Rc};
 
 use actix::Actor;
 use failure::Error;
@@ -13,7 +13,7 @@ use medea::{
         room_service::{RoomService, StartStaticRooms},
     },
     turn::new_turn_auth_service,
-    App,
+    AppContext,
 };
 
 fn main() -> Result<(), Error> {
@@ -33,16 +33,12 @@ fn main() -> Result<(), Error> {
     actix::run(move || {
         new_turn_auth_service(&config.turn)
             .map_err(|e| error!("{:?}", e))
-            .map(Arc::new)
             .and_then(move |turn_service| {
-                let app = Arc::new(App {
-                    config: config.clone(),
-                    turn_service,
-                });
+                let app_context = AppContext::new(config.clone(), turn_service);
 
                 let room_repo = RoomsRepository::new(HashMap::new());
                 let room_service =
-                    RoomService::new(room_repo.clone(), Arc::clone(&app))
+                    RoomService::new(room_repo.clone(), app_context.clone())
                         .start();
 
                 room_service
@@ -57,7 +53,8 @@ fn main() -> Result<(), Error> {
                         }
                     })
                     .map(move |_| {
-                        let grpc_addr = grpc::server::run(room_service, app);
+                        let grpc_addr =
+                            grpc::server::run(room_service, app_context);
                         grpc_addr_clone.set(Some(grpc_addr));
                     })
                     .and_then(move |_| {

@@ -32,7 +32,7 @@ use crate::{
             RoomService, RoomServiceError, StartRoom,
         },
     },
-    App,
+    AppContext,
 };
 
 use super::protos::control_grpc::{create_control_api, ControlApi};
@@ -151,8 +151,8 @@ type CreateResult =
 
 #[derive(Clone)]
 struct ControlApiService {
-    room_repository: Addr<RoomService>,
-    app: Arc<App>,
+    room_service: Addr<RoomService>,
+    app: AppContext,
 }
 
 impl ControlApiService {
@@ -187,7 +187,7 @@ impl ControlApiService {
             .collect();
 
         Either::A(
-            self.room_repository
+            self.room_service
                 .send(StartRoom(room_id, room))
                 .map_err(ControlApiError::from)
                 .map(move |r| r.map(|_| Ok(sid))),
@@ -217,7 +217,7 @@ impl ControlApiService {
         sids.insert(member_id.to_string(), sid);
 
         Either::A(
-            self.room_repository
+            self.room_service
                 .send(CreateMemberInRoom {
                     room_id,
                     member_id,
@@ -237,7 +237,7 @@ impl ControlApiService {
     ) -> impl Future<Item = CreateResult, Error = ControlApiError> {
         let endpoint = fut_try!(Endpoint::try_from(req));
         Either::A(
-            self.room_repository
+            self.room_service
                 .send(CreateEndpointInRoom {
                     room_id: local_uri.room_id.unwrap(),
                     member_id: local_uri.member_id.unwrap(),
@@ -378,17 +378,17 @@ impl ControlApi for ControlApiService {
 
             if uri.is_room_uri() {
                 delete_room_futs.push(
-                    self.room_repository.send(DeleteRoom(uri.room_id.unwrap())),
+                    self.room_service.send(DeleteRoom(uri.room_id.unwrap())),
                 );
             } else if uri.is_member_uri() {
-                delete_member_futs.push(self.room_repository.send(
+                delete_member_futs.push(self.room_service.send(
                     DeleteMemberFromRoom {
                         room_id: uri.room_id.unwrap(),
                         member_id: uri.member_id.unwrap(),
                     },
                 ));
             } else if uri.is_endpoint_uri() {
-                delete_endpoints_futs.push(self.room_repository.send(
+                delete_endpoints_futs.push(self.room_service.send(
                     DeleteEndpointFromMember {
                         room_id: uri.room_id.unwrap(),
                         member_id: uri.member_id.unwrap(),
@@ -493,9 +493,9 @@ impl ControlApi for ControlApiService {
             }
         }
 
-        let room_fut = self.room_repository.send(GetRoom(room_ids));
-        let member_fut = self.room_repository.send(GetMember(member_ids));
-        let endpoint_fut = self.room_repository.send(GetEndpoint(endpoint_ids));
+        let room_fut = self.room_service.send(GetRoom(room_ids));
+        let member_fut = self.room_service.send(GetMember(member_ids));
+        let endpoint_fut = self.room_service.send(GetEndpoint(endpoint_ids));
 
         ctx.spawn(room_fut.join3(member_fut, endpoint_fut).then(|result| {
             let grpc_err_closure =
@@ -583,14 +583,14 @@ impl Actor for GrpcServer {
 }
 
 /// Run gRPC server in actix actor.
-pub fn run(room_repo: Addr<RoomService>, app: Arc<App>) -> Addr<GrpcServer> {
+pub fn run(room_repo: Addr<RoomService>, app: AppContext) -> Addr<GrpcServer> {
     let bind_ip = app.config.grpc.bind_ip.to_string();
     let bind_port = app.config.grpc.bind_port;
     let cq_count = app.config.grpc.completion_queue_count;
 
     let service = create_control_api(ControlApiService {
         app,
-        room_repository: room_repo,
+        room_service: room_repo,
     });
     let env = Arc::new(Environment::new(cq_count));
 

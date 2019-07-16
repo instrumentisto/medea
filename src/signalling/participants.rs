@@ -3,11 +3,7 @@
 //! [`RpcConnection`] authorization, establishment, message sending, Turn
 //! credentials management.
 
-use std::{
-    rc::Rc,
-    sync::Arc,
-    time::{Duration, Instant},
-};
+use std::{rc::Rc, time::Instant};
 
 use actix::{
     fut::wrap_future, ActorFuture, AsyncContext, Context, MailboxError,
@@ -49,7 +45,8 @@ use crate::{
         room::{ActFuture, RoomError},
         Room,
     },
-    turn::{BoxedTurnAuthService, TurnServiceErr, UnreachablePolicy},
+    turn::{TurnServiceErr, UnreachablePolicy},
+    AppContext,
 };
 
 #[derive(Fail, Debug)]
@@ -123,17 +120,13 @@ pub struct ParticipantService {
     /// [`Member`]s which currently are present in this [`Room`].
     members: HashMap<MemberId, Rc<Member>>,
 
-    /// Service for managing authorization on Turn server.
-    turn: Arc<BoxedTurnAuthService>,
+    /// Global app context.
+    app: AppContext,
 
     /// Established [`RpcConnection`]s of [`Members`]s in this [`Room`].
     // TODO: Replace Box<dyn RpcConnection>> with enum,
     //       as the set of all possible RpcConnection types is not closed.
     connections: HashMap<MemberId, Box<dyn RpcConnection>>,
-
-    /// Timeout for close [`RpcConnection`] after receiving
-    /// [`RpcConnectionClosed`] message.
-    reconnect_timeout: Duration,
 
     /// Stores [`RpcConnection`] drop tasks.
     /// If [`RpcConnection`] is lost, [`Room`] waits for connection_timeout
@@ -145,15 +138,13 @@ impl ParticipantService {
     /// Create new [`ParticipantService`] from [`RoomSpec`].
     pub fn new(
         room_spec: &RoomSpec,
-        reconnect_timeout: Duration,
-        turn: Arc<BoxedTurnAuthService>,
+        context: AppContext,
     ) -> Result<Self, MembersLoadError> {
         Ok(Self {
             room_id: room_spec.id().clone(),
             members: parse_members(room_spec)?,
-            turn,
+            app: context,
             connections: HashMap::new(),
-            reconnect_timeout,
             drop_connection_tasks: HashMap::new(),
         })
     }
@@ -270,7 +261,7 @@ impl ParticipantService {
             Box::new(wrap_future(connection.close().then(move |_| Ok(member))))
         } else {
             Box::new(
-                wrap_future(self.turn.create(
+                wrap_future(self.app.turn_service.create(
                     member_id.clone(),
                     self.room_id.clone(),
                     UnreachablePolicy::ReturnErr,
@@ -326,17 +317,20 @@ impl ParticipantService {
             ClosedReason::Lost => {
                 self.drop_connection_tasks.insert(
                     member_id.clone(),
-                    ctx.run_later(self.reconnect_timeout, move |_, ctx| {
-                        info!(
-                            "Member {} connection lost at {:?}. Room will be \
-                             stopped.",
-                            &member_id, closed_at
-                        );
-                        ctx.notify(RpcConnectionClosed {
-                            member_id,
-                            reason: ClosedReason::Closed,
-                        })
-                    }),
+                    ctx.run_later(
+                        self.app.config.rpc.reconnect_timeout,
+                        move |_, ctx| {
+                            info!(
+                                "Member {} connection lost at {:?}. Room will \
+                                 be stopped.",
+                                &member_id, closed_at
+                            );
+                            ctx.notify(RpcConnectionClosed {
+                                member_id,
+                                reason: ClosedReason::Closed,
+                            })
+                        },
+                    ),
                 );
             }
         }
@@ -349,7 +343,7 @@ impl ParticipantService {
     ) -> Box<dyn Future<Item = (), Error = TurnServiceErr>> {
         match self.get_member_by_id(&member_id) {
             Some(member) => match member.take_ice_user() {
-                Some(ice_user) => self.turn.delete(vec![ice_user]),
+                Some(ice_user) => self.app.turn_service.delete(vec![ice_user]),
                 None => Box::new(future::ok(())),
             },
             None => Box::new(future::ok(())),
@@ -384,7 +378,8 @@ impl ParticipantService {
                     room_users.push(ice_user);
                 }
             });
-            self.turn
+            self.app
+                .turn_service
                 .delete(room_users)
                 .map_err(|err| error!("Error removing IceUsers {:?}", err))
         });
@@ -411,10 +406,10 @@ impl ParticipantService {
 
         if let Some(member) = self.members.remove(member_id) {
             if let Some(ice_user) = member.take_ice_user() {
-                let delete_ice_user_fut = self
-                    .turn
-                    .delete(vec![ice_user])
-                    .map_err(|err| error!("Error removing IceUser {:?}", err));
+                let delete_ice_user_fut =
+                    self.app.turn_service.delete(vec![ice_user]).map_err(
+                        |err| error!("Error removing IceUser {:?}", err),
+                    );
                 ctx.spawn(wrap_future(delete_ice_user_fut));
             }
         }

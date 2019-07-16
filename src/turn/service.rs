@@ -284,8 +284,6 @@ impl Handler<DeleteIceUsers> for Service {
 
 #[cfg(test)]
 pub mod test {
-    use std::sync::Arc;
-
     use futures::future;
 
     use crate::media::IceUser;
@@ -318,8 +316,8 @@ pub mod test {
     }
 
     #[allow(clippy::module_name_repetitions)]
-    pub fn new_turn_auth_service_mock() -> Arc<BoxedTurnAuthService> {
-        Arc::new(Box::new(TurnAuthServiceMock {}))
+    pub fn new_turn_auth_service_mock() -> BoxedTurnAuthService {
+        Box::new(TurnAuthServiceMock {})
     }
 
 }

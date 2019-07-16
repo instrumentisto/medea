@@ -1,9 +1,7 @@
 //! Room definitions and implementations. Room is responsible for media
 //! connection establishment between concrete [`Member`]s.
 
-use std::{
-    collections::HashMap as StdHashMap, rc::Rc, sync::Arc, time::Duration,
-};
+use std::{collections::HashMap as StdHashMap, rc::Rc};
 
 use actix::{
     fut::wrap_future, Actor, ActorFuture, AsyncContext, Context, Handler,
@@ -46,7 +44,7 @@ use crate::{
         participants::{ParticipantService, ParticipantServiceErr},
         peers::PeerRepository,
     },
-    turn::BoxedTurnAuthService,
+    AppContext,
 };
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
@@ -142,17 +140,12 @@ impl Room {
     /// transformation happens.
     pub fn new(
         room_spec: &RoomSpec,
-        reconnect_timeout: Duration,
-        turn: Arc<BoxedTurnAuthService>,
+        context: AppContext,
     ) -> Result<Self, RoomError> {
         Ok(Self {
             id: room_spec.id().clone(),
             peers: PeerRepository::from(HashMap::new()),
-            members: ParticipantService::new(
-                room_spec,
-                reconnect_timeout,
-                turn,
-            )?,
+            members: ParticipantService::new(room_spec, context)?,
         })
     }
 

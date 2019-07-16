@@ -14,8 +14,17 @@ use std::sync::Arc;
 use crate::{conf::Conf, turn::BoxedTurnAuthService};
 
 /// Global app context.
-#[derive(Debug)]
-pub struct App {
-    pub config: Conf,
+#[derive(Debug, Clone)]
+pub struct AppContext {
+    pub config: Arc<Conf>,
     pub turn_service: Arc<BoxedTurnAuthService>,
+}
+
+impl AppContext {
+    pub fn new(config: Conf, turn: BoxedTurnAuthService) -> Self {
+        Self {
+            config: Arc::new(config),
+            turn_service: Arc::new(turn),
+        }
+    }
 }

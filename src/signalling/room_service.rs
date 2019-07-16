@@ -1,4 +1,4 @@
-use std::sync::Arc;
+//! Service which control [`Room`].
 
 use actix::{
     fut::wrap_future, Actor, ActorFuture, AsyncContext as _, Context, Handler,
@@ -27,7 +27,7 @@ use crate::{
         room_repo::RoomsRepository,
         Room,
     },
-    App,
+    AppContext,
 };
 
 type ActFuture<I, E> =
@@ -76,13 +76,17 @@ impl From<MailboxError> for RoomServiceError {
 }
 
 /// Service for controlling [`Room`]s.
+#[derive(Debug)]
 pub struct RoomService {
+    /// Repository that stores [`Room`]s addresses.
     room_repo: RoomsRepository,
-    app: Arc<App>,
+
+    /// Global app context.
+    app: AppContext,
 }
 
 impl RoomService {
-    pub fn new(room_repo: RoomsRepository, app: Arc<App>) -> Self {
+    pub fn new(room_repo: RoomsRepository, app: AppContext) -> Self {
         Self { room_repo, app }
     }
 }
@@ -131,22 +135,12 @@ impl Handler<StartStaticRooms> for RoomService {
 
                 let room_id = spec.id().clone();
 
-                let rpc_reconnect_timeout =
-                    self.app.config.rpc.reconnect_timeout;
-                let turn_cloned = Arc::clone(&self.app.turn_service);
-
-                // TODO: app context
-                let room =
-                    Room::new(&spec, rpc_reconnect_timeout, turn_cloned)?
-                        .start();
+                let room = Room::new(&spec, self.app.clone())?.start();
 
                 self.room_repo.add(room_id, room);
             }
-
-            Ok(())
-        } else {
-            Ok(())
         }
+        Ok(())
     }
 }
 
@@ -172,10 +166,7 @@ impl Handler<StartRoom> for RoomService {
 
         let room = msg.1;
 
-        let turn = Arc::clone(&self.app.turn_service);
-
-        let room =
-            Room::new(&room, self.app.config.rpc.reconnect_timeout, turn)?;
+        let room = Room::new(&room, self.app.clone())?;
         let room_addr = room.start();
 
         debug!("New Room [id = {}] started.", room_id);
