@@ -150,11 +150,13 @@ struct Service {
     static_user: Option<IceUser>,
 }
 
+type SyncTurnAuthService = Box<dyn TurnAuthService + Sync>;
+
 /// Create new instance [`TurnAuthService`].
 #[allow(clippy::module_name_repetitions)]
-pub fn new_turn_auth_service<'a>(
+pub fn new_turn_auth_service(
     cf: &conf::Turn,
-) -> impl Future<Item = Box<dyn TurnAuthService + 'a>, Error = TurnServiceErr> {
+) -> impl Future<Item = SyncTurnAuthService, Error = TurnServiceErr> {
     let db_pass = cf.db.redis.pass.clone();
     let turn_address = cf.addr();
     let turn_username = cf.user.clone();
@@ -182,7 +184,7 @@ pub fn new_turn_auth_service<'a>(
         turn_password,
         static_user: None,
     })
-    .map::<_, Box<dyn TurnAuthService>>(|service| Box::new(service.start()))
+    .map::<_, SyncTurnAuthService>(|service| Box::new(service.start()))
     .map_err(TurnServiceErr::from)
 }
 
@@ -280,7 +282,7 @@ impl Handler<DeleteIceUsers> for Service {
 
 #[cfg(test)]
 pub mod test {
-    use std::sync::{Arc, Mutex};
+    use std::sync::Arc;
 
     use futures::future;
 
@@ -314,9 +316,9 @@ pub mod test {
     }
 
     #[allow(clippy::module_name_repetitions)]
-    pub fn new_turn_auth_service_mock() -> Arc<Mutex<Box<dyn TurnAuthService>>>
+    pub fn new_turn_auth_service_mock() -> Arc<Box<dyn TurnAuthService + Sync>>
     {
-        Arc::new(Mutex::new(Box::new(TurnAuthServiceMock {})))
+        Arc::new(Box::new(TurnAuthServiceMock {}))
     }
 
 }

@@ -9,6 +9,8 @@ pub mod media;
 pub mod signalling;
 pub mod turn;
 
+use std::sync::Arc;
+
 use actix::prelude::*;
 use failure::Fail;
 use hashbrown::HashMap;
@@ -20,7 +22,6 @@ use crate::{
     turn::{service, TurnServiceErr},
 };
 use futures::future::Either;
-use std::sync::{Arc, Mutex};
 
 /// Errors which can happen while server starting.
 #[derive(Debug, Fail)]
@@ -70,7 +71,7 @@ pub fn start_static_rooms(
     if let Some(static_specs_path) = config.server.static_specs_path.clone() {
         Either::A(
             service::new_turn_auth_service(&config.turn)
-                .map(|t| Arc::new(Mutex::new(t)))
+                .map(|t| Arc::new(t))
                 .map(move |turn_auth_service| {
                     let room_specs =
                         match load_static_specs_from_dir(static_specs_path) {

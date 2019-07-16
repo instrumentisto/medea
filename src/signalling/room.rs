@@ -1,7 +1,9 @@
 //! Room definitions and implementations. Room is responsible for media
 //! connection establishment between concrete [`Member`]s.
 
-use std::{collections::HashMap as StdHashMap, rc::Rc, time::Duration};
+use std::{
+    collections::HashMap as StdHashMap, rc::Rc, sync::Arc, time::Duration,
+};
 
 use actix::{
     fut::wrap_future, Actor, ActorFuture, AsyncContext, Context, Handler,
@@ -35,7 +37,6 @@ use crate::{
     },
     turn::TurnAuthService,
 };
-use std::sync::{Arc, Mutex};
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
 pub type ActFuture<I, E> =
@@ -108,7 +109,7 @@ impl Room {
     pub fn new(
         room_spec: &RoomSpec,
         reconnect_timeout: Duration,
-        turn: Arc<Mutex<Box<dyn TurnAuthService>>>,
+        turn: Arc<Box<dyn TurnAuthService + Sync>>,
     ) -> Result<Self, RoomError> {
         Ok(Self {
             id: room_spec.id().clone(),
