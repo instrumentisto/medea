@@ -1,5 +1,8 @@
 //! Implementation of gRPC control API.
 
+// Fix clippy needless_return in macro.
+#![allow(clippy::needless_return)]
+
 use std::{collections::HashMap, convert::TryFrom, sync::Arc};
 
 use actix::{Actor, Addr, Arbiter, Context, MailboxError};

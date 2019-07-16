@@ -75,8 +75,8 @@ impl Into<Backtrace> for &RoomRepoError {
     fn into(self) -> Backtrace {
         let mut backtrace = Backtrace::new();
         match self {
-            RoomRepoError::RoomNotFound(_) => backtrace.push(self),
-            RoomRepoError::RoomAlreadyExists(_) => backtrace.push(self),
+            RoomRepoError::RoomNotFound(_)
+            | RoomRepoError::RoomAlreadyExists(_) => backtrace.push(self),
             RoomRepoError::RoomError(e) => {
                 backtrace.push(self);
                 backtrace.merge(e.into());

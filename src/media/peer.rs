@@ -69,8 +69,9 @@ impl Into<Backtrace> for &PeerError {
     fn into(self) -> Backtrace {
         let mut backtrace = Backtrace::new();
         match self {
-            PeerError::WrongState(..) => backtrace.push(self),
-            PeerError::MidsMismatch(..) => backtrace.push(self),
+            PeerError::WrongState(..) | PeerError::MidsMismatch(..) => {
+                backtrace.push(self)
+            }
         }
         backtrace
     }

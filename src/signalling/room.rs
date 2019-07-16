@@ -899,8 +899,6 @@ impl Handler<DeleteEndpoint> for Room {
                 let peer_ids = endpoint.peer_ids();
                 self.peers.remove_peers(&msg.member_id, peer_ids, ctx);
             }
-        } else {
-            return;
         }
     }
 }

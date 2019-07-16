@@ -14,7 +14,7 @@ use crate::api::control::{
 };
 
 /// Backtrace of nested errors for debugging purposes.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Backtrace(pub Vec<String>);
 
 impl Backtrace {
@@ -29,7 +29,7 @@ impl Backtrace {
     }
 
     /// Merge this [`Backtrace`] with another [`Backtrace`].
-    pub fn merge(&mut self, mut another_backtrace: Backtrace) {
+    pub fn merge(&mut self, mut another_backtrace: Self) {
         self.0.append(&mut another_backtrace.0);
     }
 }

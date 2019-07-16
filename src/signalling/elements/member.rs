@@ -94,11 +94,9 @@ impl Into<Backtrace> for &MembersLoadError {
     fn into(self) -> Backtrace {
         let mut backtrace = Backtrace::new();
         backtrace.push(self);
-        match self {
-            MembersLoadError::TryFromError(e, _) => {
-                backtrace.merge(e.into());
-            }
-            _ => {}
+
+        if let MembersLoadError::TryFromError(e, _) = self {
+            backtrace.merge(e.into());
         }
         backtrace
     }
@@ -108,10 +106,8 @@ impl Into<Backtrace> for &MemberError {
     fn into(self) -> Backtrace {
         let mut backtrace = Backtrace::new();
         match self {
-            MemberError::PlayEndpointNotFound(_) => {
-                backtrace.push(self);
-            }
-            MemberError::PublishEndpointNotFound(_) => {
+            MemberError::PlayEndpointNotFound(_)
+            | MemberError::PublishEndpointNotFound(_) => {
                 backtrace.push(self);
             }
         }
