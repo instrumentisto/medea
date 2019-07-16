@@ -24,7 +24,7 @@ use crate::{
     },
     conf::{Conf, Rpc},
     log::prelude::*,
-    signalling::room_repo::RoomsRepository,
+    signalling::room_repo::RoomRepository,
 };
 
 /// Parameters of new WebSocket connection creation HTTP request.
@@ -80,14 +80,14 @@ fn ws_index(
 /// Context for [`App`] which holds all the necessary dependencies.
 pub struct Context {
     /// Repository of all currently existing [`Room`]s in application.
-    pub rooms: RoomsRepository,
+    pub rooms: RoomRepository,
 
     /// Settings of application.
     pub config: Rpc,
 }
 
 /// Starts HTTP server for handling WebSocket connections of Client API.
-pub fn run(rooms: RoomsRepository, config: Conf) -> io::Result<()> {
+pub fn run(rooms: RoomRepository, config: Conf) -> io::Result<()> {
     let server_addr = config.server.bind_addr();
     HttpServer::new(move || {
         App::new()
@@ -129,7 +129,7 @@ mod test {
     use super::*;
 
     /// Creates [`RoomsRepository`] for tests filled with a single [`Room`].
-    fn room(conf: Conf) -> RoomsRepository {
+    fn room(conf: Conf) -> RoomRepository {
         let room_spec =
             control::load_from_yaml_file("tests/specs/pub_sub_video_call.yml")
                 .unwrap();
@@ -145,7 +145,7 @@ mod test {
             room_id => client_room,
         };
 
-        RoomsRepository::new(room_hash_map)
+        RoomRepository::new(room_hash_map)
     }
 
     /// Creates test WebSocket server of Client API which can handle requests.

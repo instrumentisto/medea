@@ -9,7 +9,7 @@ use medea::{
     conf::Conf,
     log::{self, prelude::*},
     signalling::{
-        room_repo::RoomsRepository,
+        room_repo::RoomRepository,
         room_service::{RoomService, StartStaticRooms},
     },
     turn::new_turn_auth_service,
@@ -36,7 +36,7 @@ fn main() -> Result<(), Error> {
             .and_then(move |turn_service| {
                 let app_context = AppContext::new(config.clone(), turn_service);
 
-                let room_repo = RoomsRepository::new(HashMap::new());
+                let room_repo = RoomRepository::new(HashMap::new());
                 let room_service =
                     RoomService::new(room_repo.clone(), app_context.clone())
                         .start();

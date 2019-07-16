@@ -24,7 +24,7 @@ use crate::{
             RoomError, SerializeProtobufEndpoint, SerializeProtobufMember,
             SerializeProtobufRoom,
         },
-        room_repo::RoomsRepository,
+        room_repo::RoomRepository,
         Room,
     },
     AppContext,
@@ -79,14 +79,14 @@ impl From<MailboxError> for RoomServiceError {
 #[derive(Debug)]
 pub struct RoomService {
     /// Repository that stores [`Room`]s addresses.
-    room_repo: RoomsRepository,
+    room_repo: RoomRepository,
 
     /// Global app context.
     app: AppContext,
 }
 
 impl RoomService {
-    pub fn new(room_repo: RoomsRepository, app: AppContext) -> Self {
+    pub fn new(room_repo: RoomRepository, app: AppContext) -> Self {
         Self { room_repo, app }
     }
 }
@@ -103,6 +103,7 @@ fn get_local_uri_to_room(room_id: RoomId) -> LocalUri {
     LocalUri::new(Some(room_id), None, None)
 }
 
+/// Signal for load all static specs and start [`Room`]s.
 #[derive(Message)]
 #[rtype(result = "Result<(), RoomServiceError>")]
 pub struct StartStaticRooms;
