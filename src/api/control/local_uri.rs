@@ -7,12 +7,12 @@ use std::fmt;
 
 use failure::Fail;
 
-use crate::api::error_codes::ErrorCode;
+use crate::api::{
+    control::{endpoints::webrtc_play_endpoint::SrcUri, WebRtcPublishId},
+    error_codes::ErrorCode,
+};
 
 use super::{MemberId, RoomId};
-use crate::api::control::{
-    endpoints::webrtc_play_endpoint::SrcUri, WebRtcPublishId,
-};
 
 #[allow(clippy::module_name_repetitions)]
 #[derive(Debug, Fail)]

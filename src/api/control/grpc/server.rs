@@ -17,7 +17,10 @@ use crate::{
                 ApplyRequest, CreateRequest, Error, GetResponse, IdRequest,
                 Response,
             },
-            local_uri::{LocalUri, LocalUriParseError, LocalUriType},
+            local_uri::{
+                IsEndpointId, IsMemberId, IsRoomId, LocalUri,
+                LocalUriParseError, LocalUriType,
+            },
             Endpoint, MemberSpec, RoomSpec, TryFromElementError,
             TryFromProtobufError,
         },
@@ -36,7 +39,6 @@ use crate::{
 };
 
 use super::protos::control_grpc::{create_control_api, ControlApi};
-use crate::api::control::local_uri::{IsEndpointId, IsMemberId, IsRoomId};
 
 #[derive(Debug, Fail)]
 enum ControlApiError {

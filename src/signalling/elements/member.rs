@@ -10,24 +10,25 @@ use hashbrown::HashMap;
 use medea_client_api_proto::IceServer;
 
 use crate::{
-    api::control::{
-        endpoints::WebRtcPlayEndpoint as WebRtcPlayEndpointSpec,
-        grpc::protos::control::{
-            Member as MemberProto, Room_Element as ElementProto,
+    api::{
+        control::{
+            endpoints::WebRtcPlayEndpoint as WebRtcPlayEndpointSpec,
+            grpc::protos::control::{
+                Member as MemberProto, Room_Element as ElementProto,
+            },
+            local_uri::{
+                IsEndpointId, IsMemberId, IsRoomId, LocalUri, LocalUriType,
+            },
+            MemberId, MemberSpec, RoomId, RoomSpec, TryFromElementError,
+            WebRtcPlayId, WebRtcPublishId,
         },
-        local_uri::LocalUri,
-        MemberId, MemberSpec, RoomId, RoomSpec, TryFromElementError,
-        WebRtcPlayId, WebRtcPublishId,
+        error_codes::ErrorCode,
     },
     log::prelude::*,
     media::{IceUser, PeerId},
 };
 
 use super::endpoints::webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint};
-use crate::api::{
-    control::local_uri::{IsEndpointId, IsMemberId, IsRoomId, LocalUriType},
-    error_codes::ErrorCode,
-};
 
 /// Errors which may occur while loading [`Member`]s from [`RoomSpec`].
 #[derive(Debug, Fail)]
