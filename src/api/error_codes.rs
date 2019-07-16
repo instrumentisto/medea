@@ -7,41 +7,9 @@
 //! * __1200...1299__ Parse errors
 //! * __1300...1399__ Conflicts
 
-use protobuf::RepeatedField;
-
 use crate::api::control::{
     grpc::protos::control::Error as ErrorProto, local_uri::LocalUri,
 };
-
-/// Backtrace of nested errors for debugging purposes.
-#[derive(Debug, Default)]
-pub struct Backtrace(pub Vec<String>);
-
-impl Backtrace {
-    /// Create new empty [`Backtrace`].
-    pub fn new() -> Self {
-        Self(Vec::new())
-    }
-
-    /// Add error to [`Backtrace`].
-    pub fn push<T: std::fmt::Debug>(&mut self, error: &T) {
-        self.0.push(format!("{:?}", error));
-    }
-
-    /// Merge this [`Backtrace`] with another [`Backtrace`].
-    pub fn merge(&mut self, mut another_backtrace: Self) {
-        self.0.append(&mut another_backtrace.0);
-    }
-}
-
-impl Into<RepeatedField<String>> for Backtrace {
-    fn into(self) -> RepeatedField<String> {
-        let mut repeated_field = RepeatedField::new();
-        self.0.into_iter().for_each(|e| repeated_field.push(e));
-
-        repeated_field
-    }
-}
 
 /// Medea control API errors.
 // TODO: write macro for generating error codes.
@@ -57,23 +25,23 @@ pub enum ErrorCode {
     /// Publish endpoint not found.
     ///
     /// Code: __1001__.
-    PublishEndpointNotFound(LocalUri, Backtrace),
+    PublishEndpointNotFound(LocalUri),
     /// Play endpoint not found.
     ///
     /// Code: __1002__.
-    PlayEndpointNotFound(LocalUri, Backtrace),
+    PlayEndpointNotFound(LocalUri),
     /// Member not found.
     ///
     /// Code: __1003__.
-    MemberNotFound(LocalUri, Backtrace),
+    MemberNotFound(LocalUri),
     /// Room not found.
     ///
     /// Code: __1004__.
-    RoomNotFound(LocalUri, Backtrace),
+    RoomNotFound(LocalUri),
     /// Endpoint not found.
     ///
     /// Code: __1005__.
-    EndpointNotFound(LocalUri, Backtrace),
+    EndpointNotFound(LocalUri),
 
     //////////////////////////////////////
     // Spec errors (1100 - 1199 codes) //
@@ -81,37 +49,37 @@ pub enum ErrorCode {
     /// Medea expects `Room` element in pipeline but received not him.
     ///
     /// Code: __1100__.
-    NotRoomInSpec(LocalUri, Backtrace),
+    NotRoomInSpec(LocalUri),
     /// Medea expects `Member` element in pipeline but received not him.
     ///
     /// Code: __1101__.
-    NotMemberInSpec(LocalUri, Backtrace),
+    NotMemberInSpec(LocalUri),
     /// Medea expects `Endpoint` element in pipeline but received not him.
     ///
     /// Code: __1102__.
-    NotEndpointInSpec(LocalUri, Backtrace),
+    NotEndpointInSpec(LocalUri),
     /// Invalid source URI in play endpoint.
     ///
     /// Code: __1103__.
-    InvalidSrcUri(LocalUri, Backtrace),
+    InvalidSrcUri(LocalUri),
     /// Provided element ID to Room element but element spec is not for Room.
     ///
     /// Code: __1104__.
-    ElementIdForRoomButElementIsNot(String, Backtrace),
+    ElementIdForRoomButElementIsNot(String),
     /// Provided element ID to Member element but element spec is not for
     /// Member.
     ///
     /// Code: __1105__.
-    ElementIdForMemberButElementIsNot(String, Backtrace),
+    ElementIdForMemberButElementIsNot(String),
     /// Provided element ID to Endpoint element but element spec is not for
     /// Endpoint.
     ///
     /// Code: __1106__.
-    ElementIdForEndpointButElementIsNot(String, Backtrace),
+    ElementIdForEndpointButElementIsNot(String),
     /// Invalid ID for element.
     ///
     /// Code: __1107__
-    InvalidElementUri(String, Backtrace),
+    InvalidElementUri(String),
 
     /////////////////////////////////
     // Parse errors (1200 - 1299) //
@@ -119,19 +87,19 @@ pub enum ErrorCode {
     /// Element's ID don't have "local://" prefix.
     ///
     /// Code: __1200__.
-    ElementIdIsNotLocal(String, Backtrace),
+    ElementIdIsNotLocal(String),
     /// Element's ID have too many paths (slashes).
     ///
     /// Code: __1201__.
-    ElementIdIsTooLong(String, Backtrace),
+    ElementIdIsTooLong(String),
     /// Source URI in publish endpoint missing some fields.
     ///
     /// Code: __1202__.
-    MissingFieldsInSrcUri(String, Vec<String>, Backtrace),
+    MissingFieldsInSrcUri(String, Vec<String>),
     /// Empty element ID.
     ///
     /// Code: __1203__.
-    EmptyElementId(Backtrace),
+    EmptyElementId,
 
     /////////////////////////////
     // Conflict (1300 - 1399) //
@@ -139,15 +107,15 @@ pub enum ErrorCode {
     /// Member already exists.
     ///
     /// Code: __1300__.
-    MemberAlreadyExists(LocalUri, Backtrace),
+    MemberAlreadyExists(LocalUri),
     /// Endpoint already exists.
     ///
     /// Code: __1301__.
-    EndpointAlreadyExists(LocalUri, Backtrace),
+    EndpointAlreadyExists(LocalUri),
     /// Room already exists.
     ///
     /// Code: __1302__.
-    RoomAlreadyExists(LocalUri, Backtrace),
+    RoomAlreadyExists(LocalUri),
 }
 
 impl Into<ErrorProto> for ErrorCode {
@@ -167,73 +135,64 @@ impl Into<ErrorProto> for ErrorCode {
             ////////////////////////////////////
             // Not found (1001 - 1099 codes) //
             //////////////////////////////////
-            ErrorCode::PublishEndpointNotFound(id, backtrace) => {
+            ErrorCode::PublishEndpointNotFound(id) => {
                 error.set_text("Publish endpoint not found".to_string());
                 error.set_element(id.to_string());
                 error.set_code(1001);
-                error.set_backtrace(backtrace.into())
             }
-            ErrorCode::PlayEndpointNotFound(id, backtrace) => {
+            ErrorCode::PlayEndpointNotFound(id) => {
                 error.set_text("Play endpoint not found.".to_string());
                 error.set_element(id.to_string());
                 error.set_code(1002);
-                error.set_backtrace(backtrace.into())
             }
-            ErrorCode::MemberNotFound(id, backtrace) => {
+            ErrorCode::MemberNotFound(id) => {
                 error.set_text("Member not found.".to_string());
                 error.set_element(id.to_string());
                 error.set_code(1003);
-                error.set_backtrace(backtrace.into())
             }
-            ErrorCode::RoomNotFound(id, backtrace) => {
+            ErrorCode::RoomNotFound(id) => {
                 error.set_text("Room not found.".to_string());
                 error.set_element(id.to_string());
                 error.set_code(1004);
-                error.set_backtrace(backtrace.into())
             }
-            ErrorCode::EndpointNotFound(id, backtrace) => {
+            ErrorCode::EndpointNotFound(id) => {
                 error.set_text("Endpoint not found.".to_string());
                 error.set_element(id.to_string());
                 error.set_code(1005);
-                error.set_backtrace(backtrace.into())
             }
 
             //////////////////////////////////////
             // Spec errors (1100 - 1199 codes) //
             ////////////////////////////////////
-            ErrorCode::NotRoomInSpec(id, backtrace) => {
+            ErrorCode::NotRoomInSpec(id) => {
                 error.set_text(
                     "Expecting Room element but it's not.".to_string(),
                 );
                 error.set_element(id.to_string());
                 error.set_code(1100);
-                error.set_backtrace(backtrace.into());
             }
-            ErrorCode::NotMemberInSpec(id, backtrace) => {
+            ErrorCode::NotMemberInSpec(id) => {
                 error.set_text(
                     "Expecting Member element but it's not.".to_string(),
                 );
                 error.set_element(id.to_string());
                 error.set_code(1101);
-                error.set_backtrace(backtrace.into());
             }
-            ErrorCode::NotEndpointInSpec(id, backtrace) => {
+            ErrorCode::NotEndpointInSpec(id) => {
                 error.set_text(
                     "Expecting Member element but it's not.".to_string(),
                 );
                 error.set_element(id.to_string());
                 error.set_code(1102);
-                error.set_backtrace(backtrace.into());
             }
-            ErrorCode::InvalidSrcUri(id, backtrace) => {
+            ErrorCode::InvalidSrcUri(id) => {
                 error.set_text(
                     "Invalid source ID in publish endpoint spec.".to_string(),
                 );
                 error.set_element(id.to_string());
                 error.set_code(1103);
-                error.set_backtrace(backtrace.into());
             }
-            ErrorCode::ElementIdForRoomButElementIsNot(id, backtrace) => {
+            ErrorCode::ElementIdForRoomButElementIsNot(id) => {
                 error.set_text(
                     "You provided ID for Room but element's spec is not for \
                      Room."
@@ -241,9 +200,8 @@ impl Into<ErrorProto> for ErrorCode {
                 );
                 error.set_element(id);
                 error.set_code(1104);
-                error.set_backtrace(backtrace.into());
             }
-            ErrorCode::ElementIdForMemberButElementIsNot(id, backtrace) => {
+            ErrorCode::ElementIdForMemberButElementIsNot(id) => {
                 error.set_text(
                     "You provided ID for Member but element's spec is not for \
                      Member."
@@ -251,9 +209,8 @@ impl Into<ErrorProto> for ErrorCode {
                 );
                 error.set_element(id);
                 error.set_code(1105);
-                error.set_backtrace(backtrace.into());
             }
-            ErrorCode::ElementIdForEndpointButElementIsNot(id, backtrace) => {
+            ErrorCode::ElementIdForEndpointButElementIsNot(id) => {
                 error.set_text(
                     "You provided ID for Endpoint but element's spec is not \
                      for Endpoint."
@@ -261,71 +218,62 @@ impl Into<ErrorProto> for ErrorCode {
                 );
                 error.set_element(id);
                 error.set_code(1106);
-                error.set_backtrace(backtrace.into());
             }
-            ErrorCode::InvalidElementUri(id, backtrace) => {
+            ErrorCode::InvalidElementUri(id) => {
                 error.set_text("Invalid element's URI".to_string());
                 error.set_element(id);
                 error.set_code(1107);
-                error.set_backtrace(backtrace.into());
             }
 
             /////////////////////////////////
             // Parse errors (1200 - 1299) //
             ///////////////////////////////
-            ErrorCode::ElementIdIsNotLocal(uri, backtrace) => {
+            ErrorCode::ElementIdIsNotLocal(uri) => {
                 error.set_text(
                     "Element's ID's URI has not have 'local://' protocol."
                         .to_string(),
                 );
                 error.set_element(uri);
                 error.set_code(1200);
-                error.set_backtrace(backtrace.into());
             }
-            ErrorCode::ElementIdIsTooLong(uri, backtrace) => {
+            ErrorCode::ElementIdIsTooLong(uri) => {
                 error.set_text(
                     "In provided element's ID too many slashes.".to_string(),
                 );
                 error.set_element(uri);
                 error.set_code(1201);
-                error.set_backtrace(backtrace.into());
             }
-            ErrorCode::MissingFieldsInSrcUri(uri, fields, backtrace) => {
+            ErrorCode::MissingFieldsInSrcUri(uri, fields) => {
                 error.set_text(format!(
                     "Missing {:?} fields in element ID.",
                     fields
                 ));
                 error.set_element(uri);
                 error.set_code(1202);
-                error.set_backtrace(backtrace.into());
             }
-            ErrorCode::EmptyElementId(backtrace) => {
+            ErrorCode::EmptyElementId => {
                 error.set_text("Provided empty element ID.".to_string());
                 error.set_element(String::new());
                 error.set_code(1203);
-                error.set_backtrace(backtrace.into());
             }
 
             /////////////////////////////
             // Conflict (1300 - 1399) //
             ///////////////////////////
-            ErrorCode::MemberAlreadyExists(id, backtrace) => {
+            ErrorCode::MemberAlreadyExists(id) => {
                 error.set_text("Member already exists.".to_string());
                 error.set_element(id.to_string());
                 error.set_code(1300);
-                error.set_backtrace(backtrace.into());
             }
-            ErrorCode::EndpointAlreadyExists(id, backtrace) => {
+            ErrorCode::EndpointAlreadyExists(id) => {
                 error.set_text("Endpoint already exists.".to_string());
                 error.set_element(id.to_string());
                 error.set_code(1301);
-                error.set_backtrace(backtrace.into());
             }
-            ErrorCode::RoomAlreadyExists(id, backtrace) => {
+            ErrorCode::RoomAlreadyExists(id) => {
                 error.set_text("Room already exists.".to_string());
                 error.set_element(id.to_string());
                 error.set_code(1302);
-                error.set_backtrace(backtrace.into());
             }
         }
 

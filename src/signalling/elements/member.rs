@@ -24,7 +24,7 @@ use crate::{
 };
 
 use super::endpoints::webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint};
-use crate::api::error_codes::{Backtrace, ErrorCode};
+use crate::api::error_codes::ErrorCode;
 
 /// Errors which may occur while loading [`Member`]s from [`RoomSpec`].
 #[derive(Debug, Fail)]
@@ -64,66 +64,37 @@ pub enum MemberError {
 
 impl Into<ErrorCode> for MembersLoadError {
     fn into(self) -> ErrorCode {
-        let backtrace: Backtrace = (&self).into();
         match self {
             MembersLoadError::TryFromError(e, id) => match e {
                 TryFromElementError::NotEndpoint => {
-                    ErrorCode::NotEndpointInSpec(id, backtrace)
+                    ErrorCode::NotEndpointInSpec(id)
                 }
                 TryFromElementError::NotMember => {
-                    ErrorCode::NotMemberInSpec(id, backtrace)
+                    ErrorCode::NotMemberInSpec(id)
                 }
-                TryFromElementError::NotRoom => {
-                    ErrorCode::NotRoomInSpec(id, backtrace)
-                }
+                TryFromElementError::NotRoom => ErrorCode::NotRoomInSpec(id),
             },
             MembersLoadError::MemberNotFound(id) => {
-                ErrorCode::MemberNotFound(id, backtrace)
+                ErrorCode::MemberNotFound(id)
             }
             MembersLoadError::PublishEndpointNotFound(id) => {
-                ErrorCode::PublishEndpointNotFound(id, backtrace)
+                ErrorCode::PublishEndpointNotFound(id)
             }
             MembersLoadError::PlayEndpointNotFound(id) => {
-                ErrorCode::PlayEndpointNotFound(id, backtrace)
+                ErrorCode::PlayEndpointNotFound(id)
             }
         }
-    }
-}
-// TODO: fmt
-impl Into<Backtrace> for &MembersLoadError {
-    fn into(self) -> Backtrace {
-        let mut backtrace = Backtrace::new();
-        backtrace.push(self);
-
-        if let MembersLoadError::TryFromError(e, _) = self {
-            backtrace.merge(e.into());
-        }
-        backtrace
-    }
-}
-
-impl Into<Backtrace> for &MemberError {
-    fn into(self) -> Backtrace {
-        let mut backtrace = Backtrace::new();
-        match self {
-            MemberError::PlayEndpointNotFound(_)
-            | MemberError::PublishEndpointNotFound(_) => {
-                backtrace.push(self);
-            }
-        }
-        backtrace
     }
 }
 
 impl Into<ErrorCode> for MemberError {
     fn into(self) -> ErrorCode {
-        let backtrace: Backtrace = (&self).into();
         match self {
             MemberError::PlayEndpointNotFound(id) => {
-                ErrorCode::PlayEndpointNotFound(id, backtrace)
+                ErrorCode::PlayEndpointNotFound(id)
             }
             MemberError::PublishEndpointNotFound(id) => {
-                ErrorCode::PublishEndpointNotFound(id, backtrace)
+                ErrorCode::PublishEndpointNotFound(id)
             }
         }
     }

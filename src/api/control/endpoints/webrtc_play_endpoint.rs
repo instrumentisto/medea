@@ -17,7 +17,7 @@ use crate::api::{
         local_uri::{LocalUri, LocalUriParseError},
         MemberId, RoomId, TryFromProtobufError,
     },
-    error_codes::{Backtrace, ErrorCode},
+    error_codes::ErrorCode,
 };
 
 macro_attr! {
@@ -63,27 +63,12 @@ pub enum SrcParseError {
 
 impl Into<ErrorCode> for SrcParseError {
     fn into(self) -> ErrorCode {
-        let backtrace: Backtrace = (&self).into();
         match self {
             SrcParseError::MissingField(text, fields) => {
-                ErrorCode::MissingFieldsInSrcUri(text, fields, backtrace)
+                ErrorCode::MissingFieldsInSrcUri(text, fields)
             }
             SrcParseError::LocalUriParseError(_, err) => err.into(),
         }
-    }
-}
-
-impl Into<Backtrace> for &SrcParseError {
-    fn into(self) -> Backtrace {
-        let mut backtrace = Backtrace::new();
-        backtrace.push(self);
-        match self {
-            SrcParseError::MissingField(..) => {}
-            SrcParseError::LocalUriParseError(_, e) => {
-                backtrace.merge(e.into());
-            }
-        }
-        backtrace
     }
 }
 

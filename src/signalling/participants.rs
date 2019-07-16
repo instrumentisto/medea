@@ -36,7 +36,7 @@ use crate::{
             MemberId, MemberSpec, RoomId, RoomSpec, WebRtcPlayId,
             WebRtcPublishId,
         },
-        error_codes::{Backtrace, ErrorCode},
+        error_codes::ErrorCode,
     },
     log::prelude::*,
     media::IceUser,
@@ -92,41 +92,20 @@ impl From<MemberError> for ParticipantServiceErr {
     }
 }
 
-impl Into<Backtrace> for &ParticipantServiceErr {
-    fn into(self) -> Backtrace {
-        let mut backtrace = Backtrace::new();
-        backtrace.push(self);
-        match self {
-            ParticipantServiceErr::MemberError(e) => {
-                backtrace.merge(e.into());
-            }
-            ParticipantServiceErr::TurnServiceErr(e) => {
-                backtrace.merge(e.into());
-            }
-            ParticipantServiceErr::MailBoxErr(e) => {
-                backtrace.push(e);
-            }
-            _ => {}
-        }
-        backtrace
-    }
-}
-
 impl Into<ErrorCode> for ParticipantServiceErr {
     fn into(self) -> ErrorCode {
-        let backtrace: Backtrace = (&self).into();
-        match &self {
+        match self {
             ParticipantServiceErr::EndpointNotFound(id) => {
-                ErrorCode::EndpointNotFound(id.clone(), backtrace)
+                ErrorCode::EndpointNotFound(id)
             }
             ParticipantServiceErr::ParticipantNotFound(id) => {
-                ErrorCode::MemberNotFound(id.clone(), backtrace)
+                ErrorCode::MemberNotFound(id)
             }
             ParticipantServiceErr::ParticipantAlreadyExists(id) => {
-                ErrorCode::MemberAlreadyExists(id.clone(), backtrace)
+                ErrorCode::MemberAlreadyExists(id)
             }
             ParticipantServiceErr::EndpointAlreadyExists(id) => {
-                ErrorCode::EndpointAlreadyExists(id.clone(), backtrace)
+                ErrorCode::EndpointAlreadyExists(id)
             }
             _ => ErrorCode::UnknownError(self.to_string()),
         }

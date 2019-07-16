@@ -12,7 +12,7 @@ use std::{convert::TryFrom as _, fs::File, io::Read as _, path::Path};
 use failure::{Error, Fail};
 use serde::Deserialize;
 
-use crate::api::error_codes::{Backtrace, ErrorCode};
+use crate::api::error_codes::ErrorCode;
 
 use self::{
     endpoints::{
@@ -91,16 +91,6 @@ pub enum TryFromElementError {
     /// Element is not Member.
     #[fail(display = "Element is not Member")]
     NotMember,
-}
-
-impl Into<Backtrace> for &TryFromElementError {
-    fn into(self) -> Backtrace {
-        let mut backtrace = Backtrace::new();
-        match self {
-            _ => backtrace.push(self),
-        }
-        backtrace
-    }
 }
 
 /// Entity for parsing Control API request.

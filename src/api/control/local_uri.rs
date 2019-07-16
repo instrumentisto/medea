@@ -4,7 +4,7 @@ use std::fmt;
 
 use failure::Fail;
 
-use crate::api::error_codes::{Backtrace, ErrorCode};
+use crate::api::error_codes::ErrorCode;
 
 use super::{MemberId, RoomId};
 
@@ -26,24 +26,15 @@ pub enum LocalUriParseError {
 
 impl Into<ErrorCode> for LocalUriParseError {
     fn into(self) -> ErrorCode {
-        let backtrace: Backtrace = (&self).into();
         match self {
             LocalUriParseError::NotLocal(text) => {
-                ErrorCode::ElementIdIsNotLocal(text, backtrace)
+                ErrorCode::ElementIdIsNotLocal(text)
             }
             LocalUriParseError::TooManyFields(_, text) => {
-                ErrorCode::ElementIdIsTooLong(text, backtrace)
+                ErrorCode::ElementIdIsTooLong(text)
             }
-            LocalUriParseError::Empty => ErrorCode::EmptyElementId(backtrace),
+            LocalUriParseError::Empty => ErrorCode::EmptyElementId,
         }
-    }
-}
-
-impl Into<Backtrace> for &LocalUriParseError {
-    fn into(self) -> Backtrace {
-        let mut backtrace = Backtrace::new();
-        backtrace.push(self);
-        backtrace
     }
 }
 
