@@ -18,6 +18,10 @@ use crate::{
     turn::repo::{TurnDatabase, TurnDatabaseErr},
 };
 
+/// Boxed [`TurnAuthService`] which can be [`Sync`] and [`Send`].
+#[allow(clippy::module_name_repetitions)]
+pub type BoxedTurnAuthService = Box<dyn TurnAuthService + Sync + Send>;
+
 static TURN_PASS_LEN: usize = 16;
 
 #[allow(clippy::module_name_repetitions)]
@@ -150,13 +154,11 @@ struct Service {
     static_user: Option<IceUser>,
 }
 
-type SyncTurnAuthService = Box<dyn TurnAuthService + Sync>;
-
 /// Create new instance [`TurnAuthService`].
 #[allow(clippy::module_name_repetitions)]
 pub fn new_turn_auth_service(
     cf: &conf::Turn,
-) -> impl Future<Item = SyncTurnAuthService, Error = TurnServiceErr> {
+) -> impl Future<Item = BoxedTurnAuthService, Error = TurnServiceErr> {
     let db_pass = cf.db.redis.pass.clone();
     let turn_address = cf.addr();
     let turn_username = cf.user.clone();
@@ -184,7 +186,7 @@ pub fn new_turn_auth_service(
         turn_password,
         static_user: None,
     })
-    .map::<_, SyncTurnAuthService>(|service| Box::new(service.start()))
+    .map::<_, BoxedTurnAuthService>(|service| Box::new(service.start()))
     .map_err(TurnServiceErr::from)
 }
 
@@ -316,8 +318,7 @@ pub mod test {
     }
 
     #[allow(clippy::module_name_repetitions)]
-    pub fn new_turn_auth_service_mock() -> Arc<Box<dyn TurnAuthService + Sync>>
-    {
+    pub fn new_turn_auth_service_mock() -> Arc<BoxedTurnAuthService> {
         Arc::new(Box::new(TurnAuthServiceMock {}))
     }
 

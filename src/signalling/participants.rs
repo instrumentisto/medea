@@ -36,7 +36,7 @@ use crate::{
         room::{ActFuture, RoomError},
         Room,
     },
-    turn::{TurnAuthService, TurnServiceErr, UnreachablePolicy},
+    turn::{BoxedTurnAuthService, TurnServiceErr, UnreachablePolicy},
 };
 
 #[derive(Fail, Debug)]
@@ -77,7 +77,7 @@ pub struct ParticipantService {
     members: HashMap<MemberId, Rc<Member>>,
 
     /// Service for managing authorization on Turn server.
-    turn: Arc<Box<dyn TurnAuthService + Sync>>,
+    turn: Arc<BoxedTurnAuthService>,
 
     /// Established [`RpcConnection`]s of [`Members`]s in this [`Room`].
     // TODO: Replace Box<dyn RpcConnection>> with enum,
@@ -99,7 +99,7 @@ impl ParticipantService {
     pub fn new(
         room_spec: &RoomSpec,
         reconnect_timeout: Duration,
-        turn: Arc<Box<dyn TurnAuthService + Sync>>,
+        turn: Arc<BoxedTurnAuthService>,
     ) -> Result<Self, MembersLoadError> {
         Ok(Self {
             room_id: room_spec.id().clone(),

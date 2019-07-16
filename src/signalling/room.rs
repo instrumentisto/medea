@@ -35,7 +35,7 @@ use crate::{
         participants::ParticipantService,
         peers::PeerRepository,
     },
-    turn::TurnAuthService,
+    turn::BoxedTurnAuthService,
 };
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
@@ -109,7 +109,7 @@ impl Room {
     pub fn new(
         room_spec: &RoomSpec,
         reconnect_timeout: Duration,
-        turn: Arc<Box<dyn TurnAuthService + Sync>>,
+        turn: Arc<BoxedTurnAuthService>,
     ) -> Result<Self, RoomError> {
         Ok(Self {
             id: room_spec.id().clone(),

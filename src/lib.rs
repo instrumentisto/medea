@@ -71,7 +71,7 @@ pub fn start_static_rooms(
     if let Some(static_specs_path) = config.server.static_specs_path.clone() {
         Either::A(
             service::new_turn_auth_service(&config.turn)
-                .map(|t| Arc::new(t))
+                .map(Arc::new)
                 .map(move |turn_auth_service| {
                     let room_specs =
                         match load_static_specs_from_dir(static_specs_path) {
