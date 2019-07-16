@@ -57,7 +57,6 @@ message Error {
   string doc = 4;
   string element = 5;
   google.protobuf.Any details = 6;
-  repeated string backtrace = 7;
 }
 
 message Element {
@@ -106,7 +105,6 @@ message Member {
 
 message WebRtcPublishEndpoint {
   P2P p2p = 1;
-  string dst = 2;
   string on_start = 3;
   string on_stop = 4;
 
@@ -127,6 +125,8 @@ message Hub {}
 
 message FileRecorder {
   string src = 1;
+  // TODO: Delete if while implementing FileRecorder this field
+  //       did not become useful.
   string dst = 2;
   string on_start = 3;
   string on_stop = 4;
@@ -134,5 +134,7 @@ message FileRecorder {
 
 message Relay {
   string src = 1;
+  // TODO: Delete if while implementing Relay this field
+  //       did not become useful.
   string dst = 2;
 }
