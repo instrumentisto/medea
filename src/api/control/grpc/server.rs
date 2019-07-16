@@ -244,9 +244,9 @@ impl ControlApiService {
         Either::A(
             self.room_service
                 .send(CreateEndpointInRoom {
-                    room_id: room_id,
-                    member_id: member_id,
-                    endpoint_id: endpoint_id,
+                    room_id,
+                    member_id,
+                    endpoint_id,
                     spec: endpoint,
                 })
                 .map_err(ControlApiError::from)

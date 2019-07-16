@@ -1,5 +1,8 @@
 //! URI for pointing to some medea element.
 
+// Bug in clippy.
+#![allow(clippy::use_self)]
+
 use std::fmt;
 
 use failure::Fail;
@@ -60,7 +63,7 @@ pub struct LocalUri<T> {
 }
 
 impl LocalUriType {
-    pub fn parse(value: &str) -> Result<LocalUriType, LocalUriParseError> {
+    pub fn parse(value: &str) -> Result<Self, LocalUriParseError> {
         let inner = LocalUriInner::parse(value)?;
         if inner.is_room_uri() {
             Ok(LocalUriType::Room(LocalUri::<IsRoomId>::new(
@@ -84,8 +87,8 @@ impl LocalUriType {
 }
 
 impl LocalUri<IsRoomId> {
-    pub fn new(room_id: RoomId) -> LocalUri<IsRoomId> {
-        LocalUri {
+    pub fn new(room_id: RoomId) -> Self {
+        Self {
             state: IsRoomId(room_id),
         }
     }
@@ -100,8 +103,8 @@ impl LocalUri<IsRoomId> {
 }
 
 impl LocalUri<IsMemberId> {
-    pub fn new(room_id: RoomId, member_id: MemberId) -> LocalUri<IsMemberId> {
-        LocalUri {
+    pub fn new(room_id: RoomId, member_id: MemberId) -> Self {
+        Self {
             state: IsMemberId(LocalUri::<IsRoomId>::new(room_id), member_id),
         }
     }
@@ -124,8 +127,8 @@ impl LocalUri<IsEndpointId> {
         room_id: RoomId,
         member_id: MemberId,
         endpoint_id: String,
-    ) -> LocalUri<IsEndpointId> {
-        LocalUri {
+    ) -> Self {
+        Self {
             state: IsEndpointId(
                 LocalUri::<IsMemberId>::new(room_id, member_id),
                 endpoint_id,
@@ -160,6 +163,7 @@ impl Into<SrcUri> for LocalUri<IsEndpointId> {
     }
 }
 
+#[allow(clippy::module_name_repetitions)]
 #[derive(Debug)]
 pub enum LocalUriType {
     Room(LocalUri<IsRoomId>),
