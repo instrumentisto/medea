@@ -835,6 +835,11 @@ impl Handler<DeleteMember> for Room {
         }
 
         self.members.delete_member(&msg.0, ctx);
+
+        debug!(
+            "Member [id = {}] removed from Room [id = {}].",
+            msg.0, self.id
+        );
     }
 }
 
@@ -854,20 +859,34 @@ impl Handler<DeleteEndpoint> for Room {
         msg: DeleteEndpoint,
         ctx: &mut Self::Context,
     ) -> Self::Result {
-        if let Some(member) = self.members.get_member_by_id(&msg.member_id) {
-            let play_id = WebRtcPlayId(msg.endpoint_id);
-            if let Some(endpoint) = member.take_sink(&play_id) {
-                if let Some(peer_id) = endpoint.peer_id() {
-                    self.peers.remove_peer(&msg.member_id, peer_id, ctx);
-                }
-            }
+        let member_id = msg.member_id;
+        let endpoint_id = msg.endpoint_id;
 
-            let publish_id = WebRtcPublishId(play_id.0);
-            if let Some(endpoint) = member.take_src(&publish_id) {
-                let peer_ids = endpoint.peer_ids();
-                self.peers.remove_peers(&msg.member_id, peer_ids, ctx);
-            }
-        }
+        let endpoint_id =
+            if let Some(member) = self.members.get_member_by_id(&member_id) {
+                let play_id = WebRtcPlayId(endpoint_id);
+                if let Some(endpoint) = member.take_sink(&play_id) {
+                    if let Some(peer_id) = endpoint.peer_id() {
+                        self.peers.remove_peer(&member_id, peer_id, ctx);
+                    }
+                }
+
+                let publish_id = WebRtcPublishId(play_id.0);
+                if let Some(endpoint) = member.take_src(&publish_id) {
+                    let peer_ids = endpoint.peer_ids();
+                    self.peers.remove_peers(&member_id, peer_ids, ctx);
+                }
+
+                publish_id.0
+            } else {
+                endpoint_id
+            };
+
+        debug!(
+            "Endpoint [id = {}] removed in Member [id = {}] from Room [id = \
+             {}].",
+            endpoint_id, member_id, self.id
+        );
     }
 }
 
@@ -884,7 +903,8 @@ impl Handler<CreateMember> for Room {
         msg: CreateMember,
         _ctx: &mut Self::Context,
     ) -> Self::Result {
-        self.members.create_member(msg.0, &msg.1)?;
+        self.members.create_member(msg.0.clone(), &msg.1)?;
+        debug!("Create Member [id = {}] in Room [id = {}].", msg.0, self.id);
         Ok(())
     }
 }
@@ -910,14 +930,14 @@ impl Handler<CreateEndpoint> for Room {
             EndpointSpec::WebRtcPlay(e) => {
                 self.members.create_sink_endpoint(
                     &msg.member_id,
-                    WebRtcPlayId(msg.endpoint_id),
+                    &WebRtcPlayId(msg.endpoint_id),
                     e,
                 )?;
             }
             EndpointSpec::WebRtcPublish(e) => {
                 self.members.create_src_endpoint(
                     &msg.member_id,
-                    WebRtcPublishId(msg.endpoint_id),
+                    &WebRtcPublishId(msg.endpoint_id),
                     e,
                 )?;
             }

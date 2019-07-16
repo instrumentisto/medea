@@ -487,7 +487,7 @@ impl ParticipantService {
     pub fn create_sink_endpoint(
         &mut self,
         member_id: &MemberId,
-        endpoint_id: WebRtcPlayId,
+        endpoint_id: &WebRtcPlayId,
         spec: WebRtcPlayEndpointSpec,
     ) -> Result<(), ParticipantServiceErr> {
         let member = self.get_member(&member_id)?;
@@ -505,7 +505,7 @@ impl ParticipantService {
         let src = partner_member.get_src(&spec.src.endpoint_id)?;
 
         let sink = Rc::new(WebRtcPlayEndpoint::new(
-            endpoint_id,
+            endpoint_id.clone(),
             spec.src,
             Rc::downgrade(&src),
             Rc::downgrade(&member),
@@ -513,6 +513,12 @@ impl ParticipantService {
 
         src.add_sink(Rc::downgrade(&sink));
         member.insert_sink(sink);
+
+        debug!(
+            "Create WebRtcPlayEndpoint [id = {}] for Member [id = {}] in Room \
+             [id = {}].",
+            endpoint_id, member_id, self.room_id
+        );
 
         Ok(())
     }
@@ -527,7 +533,7 @@ impl ParticipantService {
     pub fn create_src_endpoint(
         &mut self,
         member_id: &MemberId,
-        endpoint_id: WebRtcPublishId,
+        endpoint_id: &WebRtcPublishId,
         spec: WebRtcPublishEndpointSpec,
     ) -> Result<(), ParticipantServiceErr> {
         let member = self.get_member(&member_id)?;
@@ -543,12 +549,18 @@ impl ParticipantService {
         }
 
         let src = Rc::new(WebRtcPublishEndpoint::new(
-            endpoint_id,
+            endpoint_id.clone(),
             spec.p2p,
             Rc::downgrade(&member),
         ));
 
         member.insert_src(src);
+
+        debug!(
+            "Create WebRtcPublishEndpoint [id = {}] for Member [id = {}] in \
+             Room [id = {}]",
+            endpoint_id, member_id, self.room_id
+        );
 
         Ok(())
     }

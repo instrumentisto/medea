@@ -17,14 +17,13 @@ fn main() {
     let ch = ChannelBuilder::new(env).connect("localhost:50051");
     let client = ControlApiClient::new(ch);
 
-    //    create_room(&client);
-    //    delete_endpoint(&client);
-    //    delete_member(&client);
-    //    create_member(&client);
-    //    create_endpoint(&client);
-    //    get_room(&client);
+    create_room(&client);
     delete_room(&client);
-    //    get_room(&client);
+    delete_endpoint(&client);
+    delete_member(&client);
+    create_member(&client);
+    create_endpoint(&client);
+    get_room(&client);
 }
 
 fn create_room(client: &ControlApiClient) {

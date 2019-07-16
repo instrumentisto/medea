@@ -147,7 +147,9 @@ impl Handler<StartRoom> for RoomsRepository {
             Room::new(&room, self.app.config.rpc.reconnect_timeout, turn)?;
         let room_addr = room.start();
 
+        debug!("New Room [id = {}] started.", room_id);
         self.rooms.lock().unwrap().insert(room_id, room_addr);
+
         Ok(())
     }
 }
@@ -172,6 +174,7 @@ impl Handler<DeleteRoom> for RoomsRepository {
                 room.send(Close)
                     .map(move |_| {
                         rooms.lock().unwrap().remove(&msg.0);
+                        debug!("Room [id = {}] removed.", msg.0);
                     })
                     .map_err(|e| warn!("Close room mailbox error {:?}.", e)),
             ));
