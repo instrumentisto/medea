@@ -138,7 +138,6 @@ mod test {
             config: conf,
             turn_service: new_turn_auth_service_mock(),
         });
-        let app_cloned = Arc::clone(&app);
 
         let room_id = room_spec.id.clone();
         let client_room = Room::start_in_arbiter(&Arbiter::new(), move |_| {
@@ -154,7 +153,7 @@ mod test {
             room_id => client_room,
         };
 
-        RoomsRepository::new(room_hash_map, app_cloned)
+        RoomsRepository::new(room_hash_map)
     }
 
     /// Creates test WebSocket server of Client API which can handle requests.

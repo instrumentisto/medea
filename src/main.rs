@@ -7,7 +7,7 @@ use medea::{
     api::client::server,
     conf::Conf,
     log::{self, prelude::*},
-    signalling::room_repo::RoomsRepository,
+    signalling::{room_repo::RoomsRepository, room_service::RoomService},
     start_static_rooms, App,
 };
 use std::{cell::Cell, rc::Rc};
@@ -38,11 +38,15 @@ fn main() -> Result<(), Error> {
                     "Loaded rooms: {:?}",
                     rooms.iter().map(|(id, _)| &id.0).collect::<Vec<&String>>()
                 );
-                let room_repo = RoomsRepository::new(rooms, Arc::clone(&app));
-                let room_repo_addr = room_repo.clone().start();
+                let room_repo = RoomsRepository::new(rooms);
+
+                let room_service =
+                    RoomService::new(room_repo.clone(), Arc::clone(&app))
+                        .start();
                 grpc_addr_clone.set(Some(
-                    medea::api::control::grpc::server::run(room_repo_addr, app),
+                    medea::api::control::grpc::server::run(room_service, app),
                 ));
+
                 server::run(room_repo, config)
                     .map_err(|e| error!("Server {:?}", e))
             })

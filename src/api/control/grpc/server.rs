@@ -26,10 +26,10 @@ use crate::{
     log::prelude::*,
     signalling::{
         room::RoomError,
-        room_repo::{
+        room_service::{
             CreateEndpointInRoom, CreateMemberInRoom, DeleteEndpointFromMember,
             DeleteMemberFromRoom, DeleteRoom, GetEndpoint, GetMember, GetRoom,
-            RoomRepoError, RoomsRepository, StartRoom,
+            RoomService, RoomServiceError, StartRoom,
         },
     },
     App,
@@ -147,11 +147,11 @@ macro_rules! send_error_response {
 
 /// Type alias for result of Create request.
 type CreateResult =
-    Result<Result<HashMap<String, String>, RoomError>, RoomRepoError>;
+    Result<Result<HashMap<String, String>, RoomError>, RoomServiceError>;
 
 #[derive(Clone)]
 struct ControlApiService {
-    room_repository: Addr<RoomsRepository>,
+    room_repository: Addr<RoomService>,
     app: Arc<App>,
 }
 
@@ -583,10 +583,7 @@ impl Actor for GrpcServer {
 }
 
 /// Run gRPC server in actix actor.
-pub fn run(
-    room_repo: Addr<RoomsRepository>,
-    app: Arc<App>,
-) -> Addr<GrpcServer> {
+pub fn run(room_repo: Addr<RoomService>, app: Arc<App>) -> Addr<GrpcServer> {
     let bind_ip = app.config.grpc.bind_ip.to_string();
     let bind_port = app.config.grpc.bind_port;
     let cq_count = app.config.grpc.completion_queue_count;
