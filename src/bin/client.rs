@@ -17,13 +17,14 @@ fn main() {
     let ch = ChannelBuilder::new(env).connect("localhost:50051");
     let client = ControlApiClient::new(ch);
 
-    create_room(&client);
+    //    create_room(&client);
+    //    delete_endpoint(&client);
+    //    delete_member(&client);
+    //    create_member(&client);
+    //    create_endpoint(&client);
+    //    get_room(&client);
     delete_room(&client);
-    delete_endpoint(&client);
-    delete_member(&client);
-    create_member(&client);
-    create_endpoint(&client);
-    get_room(&client);
+    //    get_room(&client);
 }
 
 fn create_room(client: &ControlApiClient) {
@@ -104,7 +105,7 @@ fn create_endpoint(client: &ControlApiClient) {
 fn delete_room(client: &ControlApiClient) {
     let mut delete_request = IdRequest::new();
     let mut rooms = RepeatedField::new();
-    rooms.push("local://pub-sub-video-call".to_string());
+    rooms.push("local://pub-pub-video-call".to_string());
     delete_request.set_id(rooms);
 
     let reply = client.delete(&delete_request).expect("delete room");
@@ -134,9 +135,10 @@ fn delete_member(client: &ControlApiClient) {
 fn get_room(client: &ControlApiClient) {
     let mut get_room_request = IdRequest::new();
     let mut room = RepeatedField::new();
-    room.push("local://grpc-test".to_string());
-    room.push("local://video-call-1/responder".to_string());
-    room.push("local://grpc-test/publisher/publish".to_string());
+    //    room.push("local://grpc-test".to_string());
+    //    room.push("local://video-call-1/responder".to_string());
+    //    room.push("local://grpc-test/publisher/publish".to_string());
+    room.push("local://pub-pub-video-call".to_string());
     get_room_request.set_id(room);
 
     let reply = client.get(&get_room_request).expect("get room");

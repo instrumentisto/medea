@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use actix::Actor as _;
 use failure::Error;
 use futures::future::Future;
 use medea::{
@@ -9,6 +10,7 @@ use medea::{
     signalling::room_repo::RoomsRepository,
     start_static_rooms, App,
 };
+use std::{cell::Cell, rc::Rc};
 
 fn main() -> Result<(), Error> {
     dotenv::dotenv().ok();
@@ -19,10 +21,13 @@ fn main() -> Result<(), Error> {
     let config = Conf::parse()?;
     info!("{:?}", config);
 
-    actix::run(|| {
+    let grpc_addr = Rc::new(Cell::new(None));
+    let grpc_addr_clone = Rc::clone(&grpc_addr);
+
+    actix::run(move || {
         start_static_rooms(&config)
             .map_err(|e| error!("Turn: {:?}", e))
-            .and_then(|res| {
+            .and_then(move |res| {
                 let (rooms, turn_service) = res.unwrap();
                 let app = Arc::new(App {
                     config: config.clone(),
@@ -33,7 +38,11 @@ fn main() -> Result<(), Error> {
                     "Loaded rooms: {:?}",
                     rooms.iter().map(|(id, _)| &id.0).collect::<Vec<&String>>()
                 );
-                let room_repo = RoomsRepository::new(rooms, app);
+                let room_repo = RoomsRepository::new(rooms, Arc::clone(&app));
+                let room_repo_addr = room_repo.clone().start();
+                grpc_addr_clone.set(Some(
+                    medea::api::control::grpc::server::run(room_repo_addr, app),
+                ));
                 server::run(room_repo, config)
                     .map_err(|e| error!("Server {:?}", e))
             })
