@@ -52,7 +52,6 @@ impl TestMember {
 
     /// Send command to the server.
     fn send_command(&mut self, msg: Command) {
-        // self.writer.text(&serde_json::to_string(&msg).unwrap());
         let json = serde_json::to_string(&msg).unwrap();
         self.writer.start_send(WsMessage::Text(json)).unwrap();
         self.writer.poll_complete().unwrap();
