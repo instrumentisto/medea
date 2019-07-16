@@ -135,7 +135,6 @@ endif
 
 
 
-
 ###################
 # Docker commands #
 ###################
@@ -149,13 +148,14 @@ docker-build-image-name = $(IMAGE_NAME)$(if $(call eq,$(IMAGE),),,/$(IMAGE))
 
 docker.build:
 ifneq ($(no-cache),yes)
-	docker run --rm --network=host -v "$(PWD)":/app -w /app \
+	docker run -u $(shell id -u):$(shell id -g) --rm --network=host -v "$(PWD)":/app -w /app \
 	           -e CARGO_HOME=.cache/cargo \
 		rust:$(RUST_VER) \
 			cargo build --bin=medea \
 				$(if $(call eq,$(debug),no),--release,)
 endif
-	docker build --network=host --force-rm \
+	@echo "!target/$(if $(call eq,$(debug),no),release,debug)/" >> .dockerignore
+	- docker build --network=host --force-rm \
 		$(if $(call eq,$(no-cache),yes),\
 			--no-cache --pull,) \
 		$(if $(call eq,$(IMAGE),),\
@@ -166,6 +166,7 @@ endif
 				$(call eq,$(debug),no),--release,) \
 			--build-arg cargo_home=.cache/cargo,) \
 		-t $(docker-build-image-name):$(if $(call eq,$(TAG),),dev,$(TAG)) .
+	@sed -i '/!target\/$(if $(call eq,$(debug),no),release,debug)/d' .dockerignore
 
 
 ####################

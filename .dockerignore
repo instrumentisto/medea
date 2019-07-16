@@ -1,10 +1,19 @@
 *
+# Medea sources and manifest
 !Cargo.toml
 !Cargo.lock
 !src
+
+# Medea uses this crates
 !crates
 !proto
+
+# We dont need jason while building medea, but since its
+# in medea's workspace we must give cargo this files
 !jason/Cargo.toml
-!jason/src
-!Makefile
+!jason/src/lib.rs
+
+# Medea dependencies cache
 !.cache/cargo/
+
+# !target/&{mode} will be added and removed dynamically
