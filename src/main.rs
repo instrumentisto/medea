@@ -1,16 +1,20 @@
-use std::sync::Arc;
+use std::{cell::Cell, rc::Rc, sync::Arc};
 
-use actix::Actor as _;
+use actix::Actor;
 use failure::Error;
 use futures::future::Future;
+use hashbrown::HashMap;
 use medea::{
-    api::client::server,
+    api::{client, control::grpc},
     conf::Conf,
     log::{self, prelude::*},
-    signalling::{room_repo::RoomsRepository, room_service::RoomService},
-    start_static_rooms, App,
+    signalling::{
+        room_repo::RoomsRepository,
+        room_service::{RoomService, StartStaticRooms},
+    },
+    turn::new_turn_auth_service,
+    App,
 };
-use std::{cell::Cell, rc::Rc};
 
 fn main() -> Result<(), Error> {
     dotenv::dotenv().ok();
@@ -21,34 +25,46 @@ fn main() -> Result<(), Error> {
     let config = Conf::parse()?;
     info!("{:?}", config);
 
+    // This is crutch for existence of gRPC server throughout the all app's
+    // lifetime.
     let grpc_addr = Rc::new(Cell::new(None));
     let grpc_addr_clone = Rc::clone(&grpc_addr);
 
     actix::run(move || {
-        start_static_rooms(&config)
-            .map_err(|e| error!("Turn: {:?}", e))
-            .and_then(move |res| {
-                let (rooms, turn_service) = res.unwrap();
+        new_turn_auth_service(&config.turn)
+            .map_err(|e| error!("{:?}", e))
+            .map(Arc::new)
+            .and_then(move |turn_service| {
                 let app = Arc::new(App {
                     config: config.clone(),
                     turn_service,
                 });
 
-                info!(
-                    "Loaded rooms: {:?}",
-                    rooms.iter().map(|(id, _)| &id.0).collect::<Vec<&String>>()
-                );
-                let room_repo = RoomsRepository::new(rooms);
-
+                let room_repo = RoomsRepository::new(HashMap::new());
                 let room_service =
                     RoomService::new(room_repo.clone(), Arc::clone(&app))
                         .start();
-                grpc_addr_clone.set(Some(
-                    medea::api::control::grpc::server::run(room_service, app),
-                ));
 
-                server::run(room_repo, config)
-                    .map_err(|e| error!("Server {:?}", e))
+                room_service
+                    .clone()
+                    .send(StartStaticRooms)
+                    .map_err(|e| {
+                        error!("StartStaticRooms mailbox error: {:?}", e)
+                    })
+                    .map(|result| {
+                        if let Err(e) = result {
+                            panic!("{}", e);
+                        }
+                    })
+                    .map(move |_| {
+                        let grpc_addr = grpc::server::run(room_service, app);
+                        grpc_addr_clone.set(Some(grpc_addr));
+                    })
+                    .and_then(move |_| {
+                        client::server::run(room_repo, config).map_err(|e| {
+                            error!("Client server startup error. {:?}", e)
+                        })
+                    })
             })
     })
     .unwrap();

@@ -12,7 +12,8 @@ use crate::{
         control::{
             endpoints::Endpoint as EndpointSpec,
             grpc::protos::control::Element as ElementProto,
-            local_uri::LocalUri, MemberId, MemberSpec, RoomId, RoomSpec,
+            load_static_specs_from_dir, local_uri::LocalUri, MemberId,
+            MemberSpec, RoomId, RoomSpec,
         },
         error_codes::ErrorCode,
     },
@@ -43,6 +44,8 @@ pub enum RoomServiceError {
     RoomAlreadyExists(LocalUri),
     #[fail(display = "{}", _0)]
     RoomError(RoomError),
+    #[fail(display = "Failed to load static specs. {:?}", _0)]
+    FailedToLoadStaticSpecs(failure::Error),
     #[fail(display = "Unknow error.")]
     Unknow,
 }
@@ -94,6 +97,57 @@ impl Actor for RoomService {
 /// [`RoomService`].
 fn get_local_uri_to_room(room_id: RoomId) -> LocalUri {
     LocalUri::new(Some(room_id), None, None)
+}
+
+#[derive(Message)]
+#[rtype(result = "Result<(), RoomServiceError>")]
+pub struct StartStaticRooms;
+
+impl Handler<StartStaticRooms> for RoomService {
+    type Result = Result<(), RoomServiceError>;
+
+    fn handle(
+        &mut self,
+        _: StartStaticRooms,
+        _: &mut Self::Context,
+    ) -> Self::Result {
+        if let Some(static_specs_path) =
+            self.app.config.server.static_specs_path.clone()
+        {
+            let room_specs = match load_static_specs_from_dir(static_specs_path)
+            {
+                Ok(r) => r,
+                Err(e) => {
+                    return Err(RoomServiceError::FailedToLoadStaticSpecs(e))
+                }
+            };
+
+            for spec in room_specs {
+                if self.room_repo.is_contains_room_with_id(spec.id()) {
+                    return Err(RoomServiceError::RoomAlreadyExists(
+                        get_local_uri_to_room(spec.id),
+                    ));
+                }
+
+                let room_id = spec.id().clone();
+
+                let rpc_reconnect_timeout =
+                    self.app.config.rpc.reconnect_timeout;
+                let turn_cloned = Arc::clone(&self.app.turn_service);
+
+                // TODO: app context
+                let room =
+                    Room::new(&spec, rpc_reconnect_timeout, turn_cloned)?
+                        .start();
+
+                self.room_repo.add(room_id, room);
+            }
+
+            Ok(())
+        } else {
+            Ok(())
+        }
+    }
 }
 
 #[derive(Message)]

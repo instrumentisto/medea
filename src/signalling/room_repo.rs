@@ -36,4 +36,8 @@ impl RoomsRepository {
     pub fn add(&self, id: RoomId, room: Addr<Room>) {
         self.rooms.lock().unwrap().insert(id, room);
     }
+
+    pub fn is_contains_room_with_id(&self, id: &RoomId) -> bool {
+        self.rooms.lock().unwrap().contains_key(id)
+    }
 }
