@@ -2,8 +2,9 @@
 
 use std::io;
 
-use actix::{Actor, Addr};
+use actix::{Actor, Addr, Handler, ResponseActFuture, WrapFuture as _};
 use actix_web::{
+    dev::Server as ActixServer,
     middleware,
     web::{resource, Data, Path, Payload},
     App, HttpRequest, HttpResponse, HttpServer,
@@ -25,10 +26,9 @@ use crate::{
     },
     conf::{Conf, Rpc},
     log::prelude::*,
+    shutdown::ShutdownGracefully,
     signalling::{RoomId, RoomsRepository},
 };
-
-use self::actors::ServerWrapper;
 
 /// Parameters of new WebSocket connection creation HTTP request.
 #[derive(Debug, Deserialize)]
@@ -89,57 +89,50 @@ pub struct Context {
     pub config: Rpc,
 }
 
-/// Starts HTTP server for handling WebSocket connections of Client API.
-pub fn run(
-    rooms: RoomsRepository,
-    config: Conf,
-) -> io::Result<Addr<ServerWrapper>> {
-    let server_addr = config.server.bind_addr();
+/// HTTP server that handles WebSocket connections of Client API.
+pub struct Server(ActixServer);
 
-    let server = HttpServer::new(move || {
-        App::new()
-            .data(Context {
-                rooms: rooms.clone(),
-                config: config.rpc.clone(),
-            })
-            .wrap(middleware::Logger::default())
-            .service(
-                resource("/ws/{room_id}/{member_id}/{credentials}")
-                    .route(actix_web::web::get().to_async(ws_index)),
-            )
-    })
-    .disable_signals()
-    .bind(server_addr)?
-    .start();
+impl Server {
+    /// Starts Client API HTTP server.
+    pub fn run(rooms: RoomsRepository, config: Conf) -> io::Result<Addr<Self>> {
+        let server_addr = config.server.bind_addr();
 
-    info!("Started HTTP server on {}", server_addr);
+        let server = HttpServer::new(move || {
+            App::new()
+                .data(Context {
+                    rooms: rooms.clone(),
+                    config: config.rpc.clone(),
+                })
+                .wrap(middleware::Logger::default())
+                .service(
+                    resource("/ws/{room_id}/{member_id}/{credentials}")
+                        .route(actix_web::web::get().to_async(ws_index)),
+                )
+        })
+        .disable_signals()
+        .bind(server_addr)?
+        .start();
 
-    Ok(ServerWrapper(server).start())
+        info!("Started Client API HTTP server on {}", server_addr);
+
+        Ok(Self(server).start())
+    }
 }
 
-pub mod actors {
-    use actix::{Actor, Context, Handler, ResponseActFuture, WrapFuture as _};
-    use actix_web::dev::Server;
+impl Actor for Server {
+    type Context = actix::Context<Self>;
+}
 
-    use crate::{log::prelude::*, shutdown::ShutdownGracefully};
+impl Handler<ShutdownGracefully> for Server {
+    type Result = ResponseActFuture<Self, (), ()>;
 
-    pub struct ServerWrapper(pub Server);
-
-    impl Actor for ServerWrapper {
-        type Context = Context<Self>;
-    }
-
-    impl Handler<ShutdownGracefully> for ServerWrapper {
-        type Result = ResponseActFuture<Self, (), ()>;
-
-        fn handle(
-            &mut self,
-            _: ShutdownGracefully,
-            _: &mut Self::Context,
-        ) -> Self::Result {
-            info!("Shutting down HTTP server");
-            Box::new(self.0.stop(true).into_actor(self))
-        }
+    fn handle(
+        &mut self,
+        _: ShutdownGracefully,
+        _: &mut Self::Context,
+    ) -> Self::Result {
+        info!("Shutting down Client API HTTP server");
+        Box::new(self.0.stop(true).into_actor(self))
     }
 }
 

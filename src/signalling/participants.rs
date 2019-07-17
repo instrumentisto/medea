@@ -269,8 +269,8 @@ impl ParticipantService {
         }
     }
 
-    /// Cancels all connection close tasks, closes all [`RpcConnection`]s,
-    /// deletes all [`IceUser`]s
+    /// Cancels all connection close tasks, closes all [`RpcConnection`]s and
+    /// deletes all [`IceUser`]s.
     pub fn drop_connections(
         &mut self,
         ctx: &mut Context<Room>,
@@ -298,13 +298,12 @@ impl ParticipantService {
                     room_users.push(ice_user);
                 }
             });
-
             self.turn
                 .delete(room_users)
                 .map_err(|err| error!("Error removing IceUsers {:?}", err))
         });
         close_fut.push(remove_ice_users);
 
-        Box::new(join_all(close_fut).map(|_| ()))
+        join_all(close_fut).map(|_| ())
     }
 }

@@ -66,11 +66,14 @@ impl From<PeerError> for RoomError {
     }
 }
 
+/// Possible states of [`Room`].
 #[derive(Debug)]
-#[allow(clippy::module_name_repetitions)]
-pub enum RoomState {
+enum State {
+    /// [`Room`] has been started and is operating at the moment.
     Started,
+    /// [`Room`] is stopping at the moment.
     Stopping,
+    /// [`Room`] is stopped and can be removed.
     Stopped,
 }
 
@@ -85,8 +88,8 @@ pub struct Room {
     /// [`Peer`]s of [`Member`]s in this [`Room`].
     peers: PeerRepository,
 
-    /// Current [`Room`]'s state
-    state: RoomState,
+    /// Current state of this [`Room`].
+    state: State,
 }
 
 impl Room {
@@ -107,7 +110,7 @@ impl Room {
                 turn,
                 reconnect_timeout,
             ),
-            state: RoomState::Started,
+            state: State::Started,
         }
     }
 
@@ -280,32 +283,27 @@ impl Room {
         )))
     }
 
-    /// Returns a future which is called during [`Room`]'s shutdown
-    fn get_close_room_fut(
+    /// Closes [`Room`] gracefully, by dropping all the connections and moving
+    /// into [`State::Stopped`].
+    fn close_gracefully(
         &mut self,
         ctx: &mut Context<Self>,
     ) -> ResponseActFuture<Self, (), ()> {
         info!("Closing Room [id = {:?}]", self.id);
-        self.state = RoomState::Stopping;
+        self.state = State::Stopping;
+
         let room_id = self.id;
-        let drop_fut = self
-            .participants
-            .drop_connections(ctx)
-            .into_actor(self)
-            .map(move |_, room: &mut Self, _| {
-                room.state = RoomState::Stopped;
-            })
-            .map_err(move |_, _, _| {
-                error!("Error closing room {:?}", room_id);
-            });
-
-        Box::new(drop_fut)
-    }
-
-    /// Method to close [`Room`]
-    fn close_room(&mut self, ctx: &mut Context<Self>) {
-        let drop_future = self.get_close_room_fut(ctx);
-        ctx.wait(drop_future);
+        Box::new(
+            self.participants
+                .drop_connections(ctx)
+                .into_actor(self)
+                .map(move |_, room: &mut Self, _| {
+                    room.state = State::Stopped;
+                })
+                .map_err(move |_, _, _| {
+                    error!("Error closing room {:?}", room_id);
+                }),
+        )
     }
 }
 
@@ -347,13 +345,16 @@ impl Handler<ConnectPeers> for Room {
     ) -> Self::Result {
         match self.send_peer_created(msg.0, msg.1) {
             Ok(res) => {
-                Box::new(res.map_err(|err, room, ctx: &mut Context<Self>| {
+                Box::new(res.then(|res, room, ctx| -> ActFuture<(), ()> {
+                    if res.is_ok() {
+                        return Box::new(future::ok(()).into_actor(room));
+                    }
                     error!(
                         "Failed handle command, because {}. Room will be \
                          stopped.",
-                        err
+                        res.unwrap_err(),
                     );
-                    room.close_room(ctx);
+                    room.close_gracefully(ctx)
                 }))
             }
             Err(err) => {
@@ -361,8 +362,7 @@ impl Handler<ConnectPeers> for Room {
                     "Failed handle command, because {}. Room will be stopped.",
                     err
                 );
-                self.close_room(ctx);
-                Box::new(wrap_future(future::ok(())))
+                self.close_gracefully(ctx)
             }
         }
     }
@@ -395,13 +395,16 @@ impl Handler<CommandMessage> for Room {
 
         match result {
             Ok(res) => {
-                Box::new(res.map_err(|err, room, ctx: &mut Context<Self>| {
+                Box::new(res.then(|res, room, ctx| -> ActFuture<(), ()> {
+                    if res.is_ok() {
+                        return Box::new(future::ok(()).into_actor(room));
+                    }
                     error!(
                         "Failed handle command, because {}. Room will be \
                          stopped.",
-                        err
+                        res.unwrap_err(),
                     );
-                    room.close_room(ctx);
+                    room.close_gracefully(ctx)
                 }))
             }
             Err(err) => {
@@ -409,9 +412,7 @@ impl Handler<CommandMessage> for Room {
                     "Failed handle command, because {}. Room will be stopped.",
                     err
                 );
-                self.close_room(ctx);
-
-                Box::new(wrap_future(future::ok(())))
+                self.close_gracefully(ctx)
             }
         }
     }
@@ -458,7 +459,6 @@ impl Handler<RpcConnectionEstablished> for Room {
     }
 }
 
-// Close room on `SIGINT`, `SIGTERM`, `SIGQUIT`, `SIGHUP` signals.
 impl Handler<ShutdownGracefully> for Room {
     type Result = ResponseActFuture<Self, (), ()>;
 
@@ -468,21 +468,7 @@ impl Handler<ShutdownGracefully> for Room {
         ctx: &mut Self::Context,
     ) -> Self::Result {
         info!("Shutdown signal received for Room: {:?}", self.id);
-        self.get_close_room_fut(ctx)
-    }
-}
-
-/// Signal to change [`Room`]'s state to closed.
-#[derive(Message)]
-#[rtype(result = "()")]
-#[allow(clippy::module_name_repetitions)]
-struct RoomSetStopped {}
-
-impl Handler<RoomSetStopped> for Room {
-    type Result = ();
-
-    fn handle(&mut self, _msg: RoomSetStopped, _: &mut Self::Context) {
-        self.state = RoomState::Stopped;
+        self.close_gracefully(ctx)
     }
 }
 

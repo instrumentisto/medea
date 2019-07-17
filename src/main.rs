@@ -18,7 +18,7 @@ use futures::IntoFuture as _;
 use log::prelude::*;
 
 use crate::{
-    api::{client::server, control::Member},
+    api::{client::server::Server, control::Member},
     conf::Conf,
     media::create_peers,
     shutdown::GracefulShutdown,
@@ -57,32 +57,48 @@ fn main() -> io::Result<()> {
                     turn_auth_service,
                 )
                 .start();
-
-                let graceful_shutdown_addr =
+                Ok((room, config))
+            })
+            .and_then(|(room, config)| {
+                let graceful_shutdown =
                     GracefulShutdown::new(config.shutdown.timeout).start();
-                graceful_shutdown_addr.do_send(shutdown::Subscribe(
-                    shutdown::Subscriber {
+                graceful_shutdown
+                    .send(shutdown::Subscribe(shutdown::Subscriber {
                         addr: room.clone().recipient(),
-                        priority: shutdown::Priority(1),
-                    },
-                ));
-
+                        priority: shutdown::Priority(2),
+                    }))
+                    .map_err(|e| {
+                        error!("Shutdown subscription failed for Room: {}", e)
+                    })
+                    .map(move |_| (room, graceful_shutdown, config))
+            })
+            .map(|(room, graceful_shutdown, config)| {
                 let rooms = hashmap! {1 => room};
                 let rooms_repo = RoomsRepository::new(rooms);
-
-                server::run(rooms_repo, config)
-                    .map_err(|err| {
-                        error!("Error starting application {:?}", err)
+                (rooms_repo, graceful_shutdown, config)
+            })
+            .and_then(|(rooms_repo, graceful_shutdown, config)| {
+                Server::run(rooms_repo, config)
+                    .map_err(|e| {
+                        error!("Error starting Client API HTTP server {:?}", e)
                     })
-                    .map(|server_addr| {
-                        graceful_shutdown_addr.do_send(shutdown::Subscribe(
-                            shutdown::Subscriber {
-                                addr: server_addr.recipient(),
-                                priority: shutdown::Priority(5),
-                            },
-                        ));
+                    .map(|server| {
+                        graceful_shutdown
+                            .send(shutdown::Subscribe(shutdown::Subscriber {
+                                addr: server.recipient(),
+                                priority: shutdown::Priority(1),
+                            }))
+                            .map_err(|e| {
+                                error!(
+                                    "Shutdown subscription failed for Client \
+                                     API HTTP server: {}",
+                                    e
+                                )
+                            })
+                            .map(|_| ())
                     })
                     .into_future()
+                    .flatten()
             })
     })
 }

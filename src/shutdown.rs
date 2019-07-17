@@ -67,7 +67,8 @@ impl Actor for GracefulShutdown {
         #[cfg(not(unix))]
         {
             warning!(
-                "Graceful shutdown is disabled: only UNIX signals are supported"
+                "Graceful shutdown is disabled: only UNIX signals are \
+                 supported"
             );
             return;
         }
