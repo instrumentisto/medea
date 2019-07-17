@@ -3,14 +3,17 @@
 //! [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
 
 #![allow(clippy::use_self)]
+
+use std::{
+    collections::HashMap as StdHashMap, convert::TryFrom, fmt, sync::Arc,
+};
+
 use failure::Fail;
 use hashbrown::HashMap;
 use medea_client_api_proto::{
     AudioSettings, Direction, MediaType, Track, VideoSettings,
 };
 use medea_macro::enum_delegate;
-
-use std::{convert::TryFrom, fmt::Display, sync::Arc};
 
 use crate::{
     api::control::MemberId,
@@ -40,21 +43,26 @@ pub struct Stable {}
 /// Produced when unwrapping [`PeerStateMachine`] to [`Peer`] with wrong state.
 #[derive(Fail, Debug)]
 #[allow(clippy::module_name_repetitions)]
-pub enum PeerStateError {
+pub enum PeerError {
     #[fail(
         display = "Cannot unwrap Peer from PeerStateMachine [id = {}]. \
                    Expected state {} was {}",
         _0, _1, _2
     )]
     WrongState(Id, &'static str, String),
+    #[fail(
+        display = "Peer is sending Track [{}] without providing its mid",
+        _0
+    )]
+    MidsMismatch(TrackId),
 }
 
-impl PeerStateError {
+impl PeerError {
     pub fn new_wrong_state(
         peer: &PeerStateMachine,
         expected: &'static str,
     ) -> Self {
-        PeerStateError::WrongState(peer.id(), expected, format!("{}", peer))
+        PeerError::WrongState(peer.id(), expected, format!("{}", peer))
     }
 }
 
@@ -73,8 +81,8 @@ pub enum PeerStateMachine {
     Stable(Peer<Stable>),
 }
 
-impl Display for PeerStateMachine {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+impl fmt::Display for PeerStateMachine {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             PeerStateMachine::WaitRemoteSdp(_) => write!(f, "WaitRemoteSdp"),
             PeerStateMachine::New(_) => write!(f, "New"),
@@ -90,14 +98,14 @@ impl Display for PeerStateMachine {
 macro_rules! impl_peer_converts {
     ($peer_type:tt) => {
         impl<'a> TryFrom<&'a PeerStateMachine> for &'a Peer<$peer_type> {
-            type Error = PeerStateError;
+            type Error = PeerError;
 
             fn try_from(
                 peer: &'a PeerStateMachine,
             ) -> Result<Self, Self::Error> {
                 match peer {
                     PeerStateMachine::$peer_type(peer) => Ok(peer),
-                    _ => Err(PeerStateError::WrongState(
+                    _ => Err(PeerError::WrongState(
                         1,
                         stringify!($peer_type),
                         format!("{}", peer),
@@ -107,12 +115,12 @@ macro_rules! impl_peer_converts {
         }
 
         impl TryFrom<PeerStateMachine> for Peer<$peer_type> {
-            type Error = PeerStateError;
+            type Error = PeerError;
 
             fn try_from(peer: PeerStateMachine) -> Result<Self, Self::Error> {
                 match peer {
                     PeerStateMachine::$peer_type(peer) => Ok(peer),
-                    _ => Err(PeerStateError::WrongState(
+                    _ => Err(PeerError::WrongState(
                         1,
                         stringify!($peer_type),
                         format!("{}", peer),
@@ -188,6 +196,7 @@ impl<T> Peer<T> {
                     media_type: track.media_type.clone(),
                     direction: Direction::Send {
                         receivers: vec![self.context.partner_peer],
+                        mid: track.mid(),
                     },
                 });
                 tracks
@@ -202,12 +211,14 @@ impl<T> Peer<T> {
                     media_type: track.media_type.clone(),
                     direction: Direction::Recv {
                         sender: self.context.partner_peer,
+                        mid: track.mid(),
                     },
                 });
                 tracks
             })
     }
 
+    /// Checks if this [`Peer`] has any send tracks.
     pub fn is_sender(&self) -> bool {
         !self.context.senders.is_empty()
     }
@@ -270,7 +281,7 @@ impl Peer<New> {
 }
 
 impl Peer<WaitLocalSdp> {
-    /// Set local description and transition [`Peer`]
+    /// Sets local description and transition [`Peer`]
     /// to [`WaitRemoteSDP`] state.
     pub fn set_local_sdp(self, sdp_offer: String) -> Peer<WaitRemoteSdp> {
         let mut context = self.context;
@@ -280,10 +291,31 @@ impl Peer<WaitLocalSdp> {
             state: WaitRemoteSdp {},
         }
     }
+
+    /// Sets tracks `mids`.
+    ///
+    /// Provided `mids` must have entries for all [`Peer`]s tracks.
+    pub fn set_mids(
+        &mut self,
+        mut mids: StdHashMap<TrackId, String>,
+    ) -> Result<(), PeerError> {
+        for (id, track) in self
+            .context
+            .senders
+            .iter_mut()
+            .chain(self.context.receivers.iter_mut())
+        {
+            let mid = mids
+                .remove(&id)
+                .ok_or_else(|| PeerError::MidsMismatch(track.id))?;
+            track.set_mid(mid)
+        }
+        Ok(())
+    }
 }
 
 impl Peer<WaitRemoteSdp> {
-    /// Set remote description and transition [`Peer`] to [`Stable`] state.
+    /// Sets remote description and transition [`Peer`] to [`Stable`] state.
     pub fn set_remote_sdp(self, sdp_answer: &str) -> Peer<Stable> {
         let mut context = self.context;
         context.sdp_answer = Some(sdp_answer.to_string());
@@ -295,7 +327,7 @@ impl Peer<WaitRemoteSdp> {
 }
 
 impl Peer<WaitLocalHaveRemote> {
-    /// Set local description and transition [`Peer`] to [`Stable`] state.
+    /// Sets local description and transition [`Peer`] to [`Stable`] state.
     pub fn set_local_sdp(self, sdp_answer: String) -> Peer<Stable> {
         let mut context = self.context;
         context.sdp_answer = Some(sdp_answer);
@@ -306,6 +338,60 @@ impl Peer<WaitLocalHaveRemote> {
     }
 }
 
+impl Peer<Stable> {
+    pub fn get_mids(&self) -> Result<StdHashMap<TrackId, String>, PeerError> {
+        let mut mids = StdHashMap::with_capacity(self.context.senders.len());
+        for (track_id, track) in self.context.senders.iter() {
+            mids.insert(
+                *track_id,
+                track
+                    .mid()
+                    .ok_or_else(|| PeerError::MidsMismatch(track.id))?,
+            );
+        }
+        Ok(mids)
+    }
+}
+
+/// Creates 1<=>1 [`Room`].
+#[cfg(not(test))]
+pub fn create_peers(
+    caller: MemberId,
+    responder: MemberId,
+) -> HashMap<MemberId, PeerStateMachine> {
+    let caller_peer_id = 1;
+    let responder_peer_id = 2;
+    let mut caller_peer =
+        Peer::new(caller_peer_id, caller, responder_peer_id, responder_peer_id);
+    let mut responder_peer =
+        Peer::new(responder_peer_id, responder, caller_peer_id, caller_peer_id);
+
+    let track_audio =
+        Arc::new(MediaTrack::new(1, MediaType::Audio(AudioSettings {})));
+    let track_video =
+        Arc::new(MediaTrack::new(2, MediaType::Video(VideoSettings {})));
+    caller_peer.add_sender(track_audio.clone());
+    caller_peer.add_sender(track_video.clone());
+    responder_peer.add_receiver(track_audio);
+    responder_peer.add_receiver(track_video);
+
+    let track_audio =
+        Arc::new(MediaTrack::new(3, MediaType::Audio(AudioSettings {})));
+    let track_video =
+        Arc::new(MediaTrack::new(4, MediaType::Video(VideoSettings {})));
+    responder_peer.add_sender(track_audio.clone());
+    responder_peer.add_sender(track_video.clone());
+    caller_peer.add_receiver(track_audio);
+    caller_peer.add_receiver(track_video);
+
+    hashmap!(
+        caller_peer_id => PeerStateMachine::New(caller_peer),
+        responder_peer_id => PeerStateMachine::New(responder_peer),
+    )
+}
+
+/// Creates 1=>1 [`Room`].
+#[cfg(test)]
 pub fn create_peers(
     caller: MemberId,
     responder: MemberId,

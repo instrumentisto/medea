@@ -1,5 +1,7 @@
 //! HTTP server for handling WebSocket connections of Client API.
 
+use std::io;
+
 use actix::{Actor, Addr};
 use actix_web::{
     App, HttpRequest, HttpResponse, HttpServer,
@@ -87,10 +89,10 @@ pub struct Context {
 }
 
 /// Starts HTTP server for handling WebSocket connections of Client API.
-pub fn run(rooms: RoomsRepository, config: Conf) -> Addr<ServerWrapper> {
+pub fn run(rooms: RoomsRepository, config: Conf) -> io::Result<Addr<ServerWrapper>> {
     let server_addr = config.server.bind_addr();
 
-    let actix_server = HttpServer::new(move || {
+    let server = HttpServer::new(move || {
         App::new()
             .data(Context {
                 rooms: rooms.clone(),
@@ -103,13 +105,12 @@ pub fn run(rooms: RoomsRepository, config: Conf) -> Addr<ServerWrapper> {
             )
     })
     .disable_signals()
-    .bind(server_addr)
-    .unwrap()
+    .bind(server_addr)?
     .start();
 
-    info!("Started HTTP server on {:?}", server_addr);
+    info!("Started HTTP server on {}", server_addr);
 
-    actors::ServerWrapper(actix_server).start()
+    Ok(ServerWrapper(actix_server).start())
 }
 
 pub mod actors {

@@ -1,14 +1,26 @@
+//! Miscellaneous utility structs and functions.
+
+mod callback;
 mod errors;
 mod event_listener;
 
 use web_sys::Window;
 
 #[doc(inline)]
-pub use self::{errors::WasmErr, event_listener::EventListener};
+pub use self::{
+    callback::{Callback, Callback2},
+    errors::WasmErr,
+    event_listener::EventListener,
+};
 
-/// Returns [`Window`] object. Panics if unable to access it.
+/// Returns [`Window`] object.
+///
+/// # Panics
+///
+/// When global [`Window`] object is inaccessible.
 pub fn window() -> Window {
-    // Cannot use `lazy_static` since `window` is `!Sync` safe to unwrap.
+    // Cannot use `lazy_static` since `window` is `!Sync`.
+    // Safe to unwrap.
     web_sys::window().unwrap()
 }
 
