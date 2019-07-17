@@ -364,20 +364,6 @@ impl ControlApi for ControlApiService {
                 }
             }
         }
-
-        // TODO
-        //        if local_uri.is_room_uri() {
-        //        } else if local_uri.is_member_uri() {
-        //        } else if local_uri.is_endpoint_uri() {
-        //        } else {
-        //            send_error_response!(
-        //                ctx,
-        //                sink,
-        //
-        // ErrorCode::InvalidElementUri(req.get_id().to_string()),
-        //                Response
-        //            );
-        //        }
     }
 
     /// Implementation for `Apply` method of gRPC control API.
@@ -431,18 +417,6 @@ impl ControlApi for ControlApiService {
                     ));
                 }
             }
-            // TODO
-            //            if uri.is_room_uri() {
-            //            } else if uri.is_member_uri() {
-            //            } else if uri.is_endpoint_uri() {
-            //            } else {
-            //                send_error_response!(
-            //                    ctx,
-            //                    sink,
-            //                    ErrorCode::InvalidElementUri(id.to_string()),
-            //                    Response
-            //                );
-            //            }
         }
 
         ctx.spawn(
@@ -527,18 +501,6 @@ impl ControlApi for ControlApiService {
                     endpoint_ids.push((room_id, member_id, endpoint_id));
                 }
             }
-            // TODO
-            //            if local_uri.is_room_uri() {
-            //            } else if local_uri.is_member_uri() {
-            //            } else if local_uri.is_endpoint_uri() {
-            //            } else {
-            //                send_error_response!(
-            //                    ctx,
-            //                    sink,
-            //                    ErrorCode::InvalidElementUri(id.to_string(),),
-            //                    GetResponse
-            //                );
-            //            }
         }
 
         let room_fut = self.room_service.send(GetRoom(room_ids));

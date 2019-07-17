@@ -1,16 +1,17 @@
 //! URI for pointing to some medea element.
 
-// Bug in clippy.
+// Fix bug in clippy.
 #![allow(clippy::use_self)]
 
 use std::fmt;
 
 use failure::Fail;
 
-use crate::api::error_codes::ErrorCode;
+use crate::api::{
+    control::endpoints::webrtc_play_endpoint::SrcUri, error_codes::ErrorCode,
+};
 
 use super::{MemberId, RoomId};
-use crate::api::control::endpoints::webrtc_play_endpoint::SrcUri;
 
 #[allow(clippy::module_name_repetitions)]
 #[derive(Debug, Fail)]
@@ -48,13 +49,19 @@ impl Into<ErrorCode> for LocalUriParseError {
     }
 }
 
+/// State of [`LocalUri`] which points to `Room`.
 #[derive(Debug)]
 pub struct IsRoomId(RoomId);
+
+/// State of [`LocalUri`] which points to `Member`.
 #[derive(Debug)]
 pub struct IsMemberId(LocalUri<IsRoomId>, MemberId);
+
+/// State of [`LocalUri`] which points to `Endpoint`.
 #[derive(Debug)]
 pub struct IsEndpointId(LocalUri<IsMemberId>, String);
 
+#[allow(clippy::doc_markdown)]
 /// Uri in format "local://room_id/member_id/endpoint_id"
 /// This kind of uri used for pointing to some element in spec (`Room`,
 /// `Member`, `WebRtcPlayEndpoint`, `WebRtcPublishEndpoint`, etc) based on his
@@ -100,30 +107,6 @@ pub struct IsEndpointId(LocalUri<IsMemberId>, String);
 #[derive(Debug)]
 pub struct LocalUri<T> {
     state: T,
-}
-
-impl LocalUriType {
-    pub fn parse(value: &str) -> Result<Self, LocalUriParseError> {
-        let inner = LocalUriInner::parse(value)?;
-        if inner.is_room_uri() {
-            Ok(LocalUriType::Room(LocalUri::<IsRoomId>::new(
-                inner.room_id.unwrap(),
-            )))
-        } else if inner.is_member_uri() {
-            Ok(LocalUriType::Member(LocalUri::<IsMemberId>::new(
-                inner.room_id.unwrap(),
-                inner.member_id.unwrap(),
-            )))
-        } else if inner.is_endpoint_uri() {
-            Ok(LocalUriType::Endpoint(LocalUri::<IsEndpointId>::new(
-                inner.room_id.unwrap(),
-                inner.member_id.unwrap(),
-                inner.endpoint_id.unwrap(),
-            )))
-        } else {
-            Err(LocalUriParseError::MissingFields(value.to_string()))
-        }
-    }
 }
 
 impl LocalUri<IsRoomId> {
@@ -213,15 +196,6 @@ impl From<SrcUri> for LocalUri<IsEndpointId> {
             uri.endpoint_id.0,
         )
     }
-}
-
-/// Enum for store all kinds of [`LocalUri`]s.
-#[allow(clippy::module_name_repetitions)]
-#[derive(Debug)]
-pub enum LocalUriType {
-    Room(LocalUri<IsRoomId>),
-    Member(LocalUri<IsMemberId>),
-    Endpoint(LocalUri<IsEndpointId>),
 }
 
 #[allow(clippy::doc_markdown)]
@@ -317,6 +291,39 @@ impl fmt::Display for LocalUri<IsMemberId> {
 impl fmt::Display for LocalUri<IsEndpointId> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}/{}", self.state.0, self.state.1)
+    }
+}
+
+/// Enum for store all kinds of [`LocalUri`]s.
+#[allow(clippy::module_name_repetitions)]
+#[derive(Debug)]
+pub enum LocalUriType {
+    Room(LocalUri<IsRoomId>),
+    Member(LocalUri<IsMemberId>),
+    Endpoint(LocalUri<IsEndpointId>),
+}
+
+impl LocalUriType {
+    pub fn parse(value: &str) -> Result<Self, LocalUriParseError> {
+        let inner = LocalUriInner::parse(value)?;
+        if inner.is_room_uri() {
+            Ok(LocalUriType::Room(LocalUri::<IsRoomId>::new(
+                inner.room_id.unwrap(),
+            )))
+        } else if inner.is_member_uri() {
+            Ok(LocalUriType::Member(LocalUri::<IsMemberId>::new(
+                inner.room_id.unwrap(),
+                inner.member_id.unwrap(),
+            )))
+        } else if inner.is_endpoint_uri() {
+            Ok(LocalUriType::Endpoint(LocalUri::<IsEndpointId>::new(
+                inner.room_id.unwrap(),
+                inner.member_id.unwrap(),
+                inner.endpoint_id.unwrap(),
+            )))
+        } else {
+            Err(LocalUriParseError::MissingFields(value.to_string()))
+        }
     }
 }
 
