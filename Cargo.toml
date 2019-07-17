@@ -15,6 +15,7 @@ members = [
     "crates/medea-macro",
     "jason",
     "proto/client-api",
+    "control-api-mock",
 ]
 
 [profile.release]
