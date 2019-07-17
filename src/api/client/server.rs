@@ -181,6 +181,7 @@ mod test {
             },
             turn: Turn::default(),
             server: Server::default(),
+            log: Default::default(),
         };
 
         let mut server = ws_server(conf.clone());

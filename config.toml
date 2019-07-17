@@ -74,3 +74,12 @@
 #
 # Default:
 #   connection_timeout = "5s"
+
+[log.app]
+# Maximum allowed level of application log entries.
+#
+# Possible values:
+#   ["OFF", "CRITICAL", "ERROR", "WARN", "INFO", "DEBUG", "TRACE"]
+#
+# Default:
+#   level = "INFO"
