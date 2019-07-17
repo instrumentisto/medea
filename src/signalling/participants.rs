@@ -274,7 +274,7 @@ impl ParticipantService {
     pub fn drop_connections(
         &mut self,
         ctx: &mut Context<Room>,
-    ) -> Box<impl Future<Item = (), Error = ()> + Send> {
+    ) -> impl Future<Item = (), Error = ()> {
         // canceling all drop_connection_tasks
         self.drop_connection_tasks.drain().for_each(|(_, handle)| {
             ctx.cancel_future(handle);

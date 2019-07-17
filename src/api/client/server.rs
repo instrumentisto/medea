@@ -118,11 +118,10 @@ pub fn run(
 }
 
 pub mod actors {
-    use actix::{fut::wrap_future, Actor, ActorFuture, Context, Handler};
+    use actix::{Actor, Context, Handler, ResponseActFuture, WrapFuture as _};
     use actix_web::dev::Server;
-    use tokio::prelude::Future;
 
-    use crate::{log::prelude::*, shutdown::ShutdownMessage};
+    use crate::{log::prelude::*, shutdown::ShutdownGracefully};
 
     pub struct ServerWrapper(pub Server);
 
@@ -130,19 +129,16 @@ pub mod actors {
         type Context = Context<Self>;
     }
 
-    impl Handler<ShutdownMessage> for ServerWrapper {
-        type Result = Box<dyn ActorFuture<Actor = Self, Item = (), Error = ()>>;
+    impl Handler<ShutdownGracefully> for ServerWrapper {
+        type Result = ResponseActFuture<Self, (), ()>;
 
         fn handle(
             &mut self,
-            _: ShutdownMessage,
+            _: ShutdownGracefully,
             _: &mut Self::Context,
         ) -> Self::Result {
-            info!("Shutting down Actix Web Server");
-
-            Box::new(wrap_future(
-                self.0.stop(true).then(move |_| futures::future::ok(())),
-            ))
+            info!("Shutting down HTTP server");
+            Box::new(self.0.stop(true).into_actor(self))
         }
     }
 }
@@ -156,11 +152,8 @@ mod test {
     use futures::{future::IntoFuture as _, sink::Sink as _, Stream as _};
 
     use crate::{
-        api::control::Member,
-        conf::Conf,
-        media::create_peers,
-        signalling::Room,
-        turn::new_turn_auth_service_mock,
+        api::control::Member, conf::Conf, media::create_peers,
+        signalling::Room, turn::new_turn_auth_service_mock,
     };
 
     use super::*;

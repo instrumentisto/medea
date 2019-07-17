@@ -21,6 +21,7 @@ use crate::{
     api::{client::server, control::Member},
     conf::Conf,
     media::create_peers,
+    shutdown::GracefulShutdown,
     signalling::{Room, RoomsRepository},
     turn::new_turn_auth_service,
 };
@@ -58,7 +59,7 @@ fn main() -> io::Result<()> {
                 .start();
 
                 let graceful_shutdown_addr =
-                    shutdown::create(config.shutdown.timeout);
+                    GracefulShutdown::new(config.shutdown.timeout).start();
                 graceful_shutdown_addr.do_send(shutdown::Subscribe(
                     shutdown::Subscriber {
                         addr: room.clone().recipient(),

@@ -1,4 +1,4 @@
-//! More system settings
+//! Application shutdown settings.
 
 use std::time::Duration;
 

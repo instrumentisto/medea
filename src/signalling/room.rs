@@ -5,7 +5,7 @@ use std::{collections::HashMap as StdHashMap, time::Duration};
 
 use actix::{
     fut::wrap_future, Actor, ActorFuture, AsyncContext, Context, Handler,
-    Message,
+    Message, ResponseActFuture, WrapFuture as _,
 };
 use failure::Fail;
 use futures::future;
@@ -25,7 +25,7 @@ use crate::{
         New, Peer, PeerError, PeerId, PeerStateMachine, WaitLocalHaveRemote,
         WaitLocalSdp, WaitRemoteSdp,
     },
-    shutdown::ShutdownMessage,
+    shutdown::ShutdownGracefully,
     signalling::{participants::ParticipantService, peers::PeerRepository},
     turn::TurnAuthService,
 };
@@ -284,11 +284,14 @@ impl Room {
     fn get_close_room_fut(
         &mut self,
         ctx: &mut Context<Self>,
-    ) -> ActFuture<(), ()> {
+    ) -> ResponseActFuture<Self, (), ()> {
         info!("Closing Room [id = {:?}]", self.id);
         self.state = RoomState::Stopping;
         let room_id = self.id;
-        let drop_fut = wrap_future(self.participants.drop_connections(ctx))
+        let drop_fut = self
+            .participants
+            .drop_connections(ctx)
+            .into_actor(self)
             .map(move |_, room: &mut Self, _| {
                 room.state = RoomState::Stopped;
             })
@@ -456,16 +459,15 @@ impl Handler<RpcConnectionEstablished> for Room {
 }
 
 // Close room on `SIGINT`, `SIGTERM`, `SIGQUIT`, `SIGHUP` signals.
-impl Handler<ShutdownMessage> for Room {
-    type Result = ActFuture<(), ()>;
+impl Handler<ShutdownGracefully> for Room {
+    type Result = ResponseActFuture<Self, (), ()>;
 
     fn handle(
         &mut self,
-        _: ShutdownMessage,
+        _: ShutdownGracefully,
         ctx: &mut Self::Context,
     ) -> Self::Result {
-        info!("Shut down signal received for Room: {:?}", self.id);
-
+        info!("Shutdown signal received for Room: {:?}", self.id);
         self.get_close_room_fut(ctx)
     }
 }
