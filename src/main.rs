@@ -30,7 +30,7 @@ fn main() -> io::Result<()> {
     let config = Conf::parse().unwrap();
 
     if let Some(lvl) = config.log.app.level() {
-        std::env::set_var("RUST_LOG", lvl.to_string());
+        std::env::set_var("RUST_LOG", lvl.as_str());
     }
 
     let logger = log::new_dual_logger(std::io::stdout(), std::io::stderr());
