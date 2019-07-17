@@ -10,19 +10,16 @@ use hashbrown::HashMap;
 use medea_client_api_proto::IceServer;
 
 use crate::{
-    api::{
-        control::{
-            endpoints::WebRtcPlayEndpoint as WebRtcPlayEndpointSpec,
-            grpc::protos::control::{
-                Member as MemberProto, Room_Element as ElementProto,
-            },
-            local_uri::{
-                IsEndpointId, IsMemberId, IsRoomId, LocalUri, LocalUriType,
-            },
-            MemberId, MemberSpec, RoomId, RoomSpec, TryFromElementError,
-            WebRtcPlayId, WebRtcPublishId,
+    api::control::{
+        endpoints::WebRtcPlayEndpoint as WebRtcPlayEndpointSpec,
+        grpc::protos::control::{
+            Member as MemberProto, Room_Element as ElementProto,
         },
-        error_codes::ErrorCode,
+        local_uri::{
+            IsEndpointId, IsMemberId, IsRoomId, LocalUri, LocalUriType,
+        },
+        MemberId, MemberSpec, RoomId, RoomSpec, TryFromElementError,
+        WebRtcPlayId, WebRtcPublishId,
     },
     log::prelude::*,
     media::{IceUser, PeerId},
@@ -64,44 +61,6 @@ pub enum MemberError {
 
     #[fail(display = "Play endpoint [id = {}] not found.", _0)]
     PlayEndpointNotFound(LocalUri<IsEndpointId>),
-}
-
-impl Into<ErrorCode> for MembersLoadError {
-    fn into(self) -> ErrorCode {
-        match self {
-            MembersLoadError::TryFromError(e, id) => match e {
-                TryFromElementError::NotEndpoint => {
-                    ErrorCode::NotEndpointInSpec(id)
-                }
-                TryFromElementError::NotMember => {
-                    ErrorCode::NotMemberInSpec(id)
-                }
-                TryFromElementError::NotRoom => ErrorCode::NotRoomInSpec(id),
-            },
-            MembersLoadError::MemberNotFound(id) => {
-                ErrorCode::MemberNotFound(id)
-            }
-            MembersLoadError::PublishEndpointNotFound(id) => {
-                ErrorCode::PublishEndpointNotFound(id)
-            }
-            MembersLoadError::PlayEndpointNotFound(id) => {
-                ErrorCode::PlayEndpointNotFound(id)
-            }
-        }
-    }
-}
-
-impl Into<ErrorCode> for MemberError {
-    fn into(self) -> ErrorCode {
-        match self {
-            MemberError::PlayEndpointNotFound(id) => {
-                ErrorCode::PlayEndpointNotFound(id)
-            }
-            MemberError::PublishEndpointNotFound(id) => {
-                ErrorCode::PublishEndpointNotFound(id)
-            }
-        }
-    }
 }
 
 /// [`Member`] is member of [`Room`] with [`RpcConnection`].

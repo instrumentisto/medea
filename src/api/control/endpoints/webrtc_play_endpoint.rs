@@ -10,14 +10,11 @@ use serde::{
     Deserialize,
 };
 
-use crate::api::{
-    control::{
-        endpoints::webrtc_publish_endpoint::WebRtcPublishId,
-        grpc::protos::control::WebRtcPlayEndpoint as WebRtcPlayEndpointProto,
-        local_uri::{IsEndpointId, LocalUri, LocalUriParseError, LocalUriType},
-        MemberId, RoomId, TryFromProtobufError,
-    },
-    error_codes::ErrorCode,
+use crate::api::control::{
+    endpoints::webrtc_publish_endpoint::WebRtcPublishId,
+    grpc::protos::control::WebRtcPlayEndpoint as WebRtcPlayEndpointProto,
+    local_uri::{IsEndpointId, LocalUri, LocalUriParseError, LocalUriType},
+    MemberId, RoomId, TryFromProtobufError,
 };
 
 macro_attr! {
@@ -59,15 +56,6 @@ pub enum SrcParseError {
     NotSrcUri(String),
     #[fail(display = "Local URI '{}' parse error: {:?}", _0, _1)]
     LocalUriParseError(String, LocalUriParseError),
-}
-
-impl Into<ErrorCode> for SrcParseError {
-    fn into(self) -> ErrorCode {
-        match self {
-            SrcParseError::NotSrcUri(text) => ErrorCode::NotSourceUri(text),
-            SrcParseError::LocalUriParseError(_, err) => err.into(),
-        }
-    }
 }
 
 /// Special uri with pattern `local://{room_id}/{member_id}/{endpoint_id}`.

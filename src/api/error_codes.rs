@@ -7,9 +7,22 @@
 //! * __1200...1299__ Parse errors
 //! * __1300...1399__ Conflicts
 
-use crate::api::control::{
-    grpc::protos::control::Error as ErrorProto,
-    local_uri::{IsEndpointId, IsMemberId, IsRoomId, LocalUri, LocalUriType},
+use crate::{
+    api::control::{
+        endpoints::webrtc_play_endpoint::SrcParseError,
+        grpc::protos::control::Error as ErrorProto,
+        local_uri::{
+            IsEndpointId, IsMemberId, IsRoomId, LocalUri, LocalUriParseError,
+            LocalUriType,
+        },
+        TryFromElementError, TryFromProtobufError,
+    },
+    signalling::{
+        elements::{member::MemberError, MembersLoadError},
+        participants::ParticipantServiceErr,
+        room::RoomError,
+        room_service::RoomServiceError,
+    },
 };
 
 /// Medea control API errors.
@@ -285,5 +298,122 @@ impl Into<ErrorProto> for ErrorCode {
         }
 
         error
+    }
+}
+
+impl From<ParticipantServiceErr> for ErrorCode {
+    fn from(err: ParticipantServiceErr) -> Self {
+        match err {
+            ParticipantServiceErr::EndpointNotFound(id) => {
+                ErrorCode::EndpointNotFound(id)
+            }
+            ParticipantServiceErr::ParticipantNotFound(id) => {
+                ErrorCode::MemberNotFound(id)
+            }
+            ParticipantServiceErr::ParticipantAlreadyExists(id) => {
+                ErrorCode::MemberAlreadyExists(id)
+            }
+            ParticipantServiceErr::EndpointAlreadyExists(id) => {
+                ErrorCode::EndpointAlreadyExists(id)
+            }
+            _ => ErrorCode::UnknownError(err.to_string()),
+        }
+    }
+}
+
+impl From<TryFromProtobufError> for ErrorCode {
+    fn from(err: TryFromProtobufError) -> Self {
+        match err {
+            TryFromProtobufError::SrcUriError(e) => e.into(),
+            _ => ErrorCode::UnknownError(err.to_string()),
+        }
+    }
+}
+
+impl From<LocalUriParseError> for ErrorCode {
+    fn from(err: LocalUriParseError) -> Self {
+        match err {
+            LocalUriParseError::NotLocal(text) => {
+                ErrorCode::ElementIdIsNotLocal(text)
+            }
+            LocalUriParseError::TooManyFields(_, text) => {
+                ErrorCode::ElementIdIsTooLong(text)
+            }
+            LocalUriParseError::Empty => ErrorCode::EmptyElementId,
+            LocalUriParseError::MissingFields(text) => {
+                ErrorCode::MissingFieldsInSrcUri(text)
+            }
+        }
+    }
+}
+
+impl From<RoomError> for ErrorCode {
+    fn from(err: RoomError) -> Self {
+        match err {
+            RoomError::MemberError(e) => e.into(),
+            RoomError::MembersLoadError(e) => e.into(),
+            RoomError::ParticipantServiceErr(e) => e.into(),
+            _ => ErrorCode::UnknownError(err.to_string()),
+        }
+    }
+}
+
+impl From<MembersLoadError> for ErrorCode {
+    fn from(err: MembersLoadError) -> Self {
+        match err {
+            MembersLoadError::TryFromError(e, id) => match e {
+                TryFromElementError::NotEndpoint => {
+                    ErrorCode::NotEndpointInSpec(id)
+                }
+                TryFromElementError::NotMember => {
+                    ErrorCode::NotMemberInSpec(id)
+                }
+                TryFromElementError::NotRoom => ErrorCode::NotRoomInSpec(id),
+            },
+            MembersLoadError::MemberNotFound(id) => {
+                ErrorCode::MemberNotFound(id)
+            }
+            MembersLoadError::PublishEndpointNotFound(id) => {
+                ErrorCode::PublishEndpointNotFound(id)
+            }
+            MembersLoadError::PlayEndpointNotFound(id) => {
+                ErrorCode::PlayEndpointNotFound(id)
+            }
+        }
+    }
+}
+
+impl From<MemberError> for ErrorCode {
+    fn from(err: MemberError) -> Self {
+        match err {
+            MemberError::PlayEndpointNotFound(id) => {
+                ErrorCode::PlayEndpointNotFound(id)
+            }
+            MemberError::PublishEndpointNotFound(id) => {
+                ErrorCode::PublishEndpointNotFound(id)
+            }
+        }
+    }
+}
+
+impl From<SrcParseError> for ErrorCode {
+    fn from(err: SrcParseError) -> Self {
+        match err {
+            SrcParseError::NotSrcUri(text) => ErrorCode::NotSourceUri(text),
+            SrcParseError::LocalUriParseError(_, err) => err.into(),
+        }
+    }
+}
+
+impl From<RoomServiceError> for ErrorCode {
+    fn from(err: RoomServiceError) -> Self {
+        match err {
+            RoomServiceError::RoomNotFound(id) => ErrorCode::RoomNotFound(id),
+            RoomServiceError::RoomAlreadyExists(id) => {
+                ErrorCode::RoomAlreadyExists(id)
+            }
+            RoomServiceError::RoomError(e) => e.into(),
+            _ => ErrorCode::UnknownError(err.to_string()),
+        }
     }
 }

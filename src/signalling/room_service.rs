@@ -8,15 +8,12 @@ use failure::Fail;
 use futures::future::{Either, Future};
 
 use crate::{
-    api::{
-        control::{
-            endpoints::Endpoint as EndpointSpec,
-            grpc::protos::control::Element as ElementProto,
-            load_static_specs_from_dir,
-            local_uri::{IsEndpointId, IsMemberId, IsRoomId, LocalUri},
-            MemberId, MemberSpec, RoomId, RoomSpec,
-        },
-        error_codes::ErrorCode,
+    api::control::{
+        endpoints::Endpoint as EndpointSpec,
+        grpc::protos::control::Element as ElementProto,
+        load_static_specs_from_dir,
+        local_uri::{IsEndpointId, IsMemberId, IsRoomId, LocalUri},
+        MemberId, MemberSpec, RoomId, RoomSpec,
     },
     log::prelude::*,
     signalling::{
@@ -54,19 +51,6 @@ pub enum RoomServiceError {
 impl From<RoomError> for RoomServiceError {
     fn from(err: RoomError) -> Self {
         RoomServiceError::RoomError(err)
-    }
-}
-
-impl Into<ErrorCode> for RoomServiceError {
-    fn into(self) -> ErrorCode {
-        match self {
-            RoomServiceError::RoomNotFound(id) => ErrorCode::RoomNotFound(id),
-            RoomServiceError::RoomAlreadyExists(id) => {
-                ErrorCode::RoomAlreadyExists(id)
-            }
-            RoomServiceError::RoomError(e) => e.into(),
-            _ => ErrorCode::UnknownError(self.to_string()),
-        }
     }
 }
 

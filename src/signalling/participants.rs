@@ -32,7 +32,6 @@ use crate::{
             MemberId, MemberSpec, RoomId, RoomSpec, WebRtcPlayId,
             WebRtcPublishId,
         },
-        error_codes::ErrorCode,
     },
     log::prelude::*,
     media::IceUser,
@@ -86,26 +85,6 @@ impl From<MailboxError> for ParticipantServiceErr {
 impl From<MemberError> for ParticipantServiceErr {
     fn from(err: MemberError) -> Self {
         ParticipantServiceErr::MemberError(err)
-    }
-}
-
-impl Into<ErrorCode> for ParticipantServiceErr {
-    fn into(self) -> ErrorCode {
-        match self {
-            ParticipantServiceErr::EndpointNotFound(id) => {
-                ErrorCode::EndpointNotFound(id)
-            }
-            ParticipantServiceErr::ParticipantNotFound(id) => {
-                ErrorCode::MemberNotFound(id)
-            }
-            ParticipantServiceErr::ParticipantAlreadyExists(id) => {
-                ErrorCode::MemberAlreadyExists(id)
-            }
-            ParticipantServiceErr::EndpointAlreadyExists(id) => {
-                ErrorCode::EndpointAlreadyExists(id)
-            }
-            _ => ErrorCode::UnknownError(self.to_string()),
-        }
     }
 }
 

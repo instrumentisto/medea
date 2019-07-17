@@ -7,9 +7,7 @@ use std::fmt;
 
 use failure::Fail;
 
-use crate::api::{
-    control::endpoints::webrtc_play_endpoint::SrcUri, error_codes::ErrorCode,
-};
+use crate::api::control::endpoints::webrtc_play_endpoint::SrcUri;
 
 use super::{MemberId, RoomId};
 
@@ -30,23 +28,6 @@ pub enum LocalUriParseError {
     /// Provided empty `&str`.
     #[fail(display = "You provided empty local uri.")]
     Empty,
-}
-
-impl Into<ErrorCode> for LocalUriParseError {
-    fn into(self) -> ErrorCode {
-        match self {
-            LocalUriParseError::NotLocal(text) => {
-                ErrorCode::ElementIdIsNotLocal(text)
-            }
-            LocalUriParseError::TooManyFields(_, text) => {
-                ErrorCode::ElementIdIsTooLong(text)
-            }
-            LocalUriParseError::Empty => ErrorCode::EmptyElementId,
-            LocalUriParseError::MissingFields(text) => {
-                ErrorCode::MissingFieldsInSrcUri(text)
-            }
-        }
-    }
 }
 
 /// State of [`LocalUri`] which points to `Room`.
