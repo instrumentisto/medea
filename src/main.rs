@@ -9,7 +9,7 @@ pub mod media;
 pub mod signalling;
 pub mod turn;
 
-use std::io;
+use std::{env, io};
 
 use actix::prelude::*;
 use dotenv::dotenv;
@@ -26,13 +26,11 @@ use crate::{
 
 fn main() -> io::Result<()> {
     dotenv().ok();
-
     let config = Conf::parse().unwrap();
 
-    if let Some(lvl) = config.log.app.level() {
-        std::env::set_var("RUST_LOG", lvl.as_str());
+    if let Some(lvl) = config.log.level() {
+        env::set_var("RUST_LOG", lvl.as_str());
     }
-
     let logger = log::new_dual_logger(std::io::stdout(), std::io::stderr());
     let _scope_guard = slog_scope::set_global_logger(logger);
     slog_stdlog::init().unwrap();

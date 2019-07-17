@@ -3,7 +3,7 @@
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, ToSocketAddrs as _};
 
 use serde::{Deserialize, Serialize};
-use smart_default::*;
+use smart_default::SmartDefault;
 
 /// HTTP server settings.
 #[derive(Clone, Debug, Deserialize, Serialize, SmartDefault)]

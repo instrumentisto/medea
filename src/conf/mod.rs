@@ -1,6 +1,6 @@
 //! Provides application configuration options.
 
-pub mod logs;
+pub mod log;
 pub mod rpc;
 pub mod server;
 pub mod turn;
@@ -12,7 +12,7 @@ use failure::Error;
 use serde::{Deserialize, Serialize};
 
 pub use self::{
-    logs::Logs,
+    log::Log,
     rpc::Rpc,
     server::Server,
     turn::{Redis, Turn},
@@ -35,8 +35,8 @@ pub struct Conf {
     pub server: Server,
     /// TURN server settings.
     pub turn: Turn,
-    /// Logs settings.
-    pub log: Logs,
+    /// Logging settings.
+    pub log: Log,
 }
 
 impl Conf {
@@ -247,19 +247,19 @@ mod tests {
 
     #[test]
     #[serial]
-    fn log_level_conf() {
+    fn log_conf() {
         let default_conf = Conf::default();
 
-        env::set_var("MEDEA_LOG.APP.LEVEL", "WARN");
+        env::set_var("MEDEA_LOG.LEVEL", "WARN");
 
         let env_conf = Conf::parse().unwrap();
 
-        assert_ne!(default_conf.log.app.level(), env_conf.log.app.level());
+        assert_ne!(default_conf.log.level(), env_conf.log.level());
 
-        assert_eq!(env_conf.log.app.level(), Some(slog::Level::Warning));
+        assert_eq!(env_conf.log.level(), Some(slog::Level::Warning));
 
-        env::set_var("MEDEA_LOG.APP.LEVEL", "OFF");
+        env::set_var("MEDEA_LOG.LEVEL", "OFF");
 
-        assert_eq!(Conf::parse().unwrap().log.app.level(), None);
+        assert_eq!(Conf::parse().unwrap().log.level(), None);
     }
 }

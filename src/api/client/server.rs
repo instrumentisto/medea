@@ -120,10 +120,7 @@ mod test {
     use futures::{future::IntoFuture as _, sink::Sink as _, Stream as _};
 
     use crate::{
-        api::control::Member,
-        conf::{Conf, Server, Turn},
-        media::create_peers,
-        signalling::Room,
+        api::control::Member, media::create_peers, signalling::Room,
         turn::new_turn_auth_service_mock,
     };
 
@@ -174,14 +171,10 @@ mod test {
 
     #[test]
     fn ping_pong_and_disconnects_on_idle() {
-        let conf = Conf {
-            rpc: Rpc {
-                idle_timeout: Duration::new(2, 0),
-                reconnect_timeout: Default::default(),
-            },
-            turn: Turn::default(),
-            server: Server::default(),
-            log: Default::default(),
+        let mut conf = Conf::default();
+        conf.rpc = Rpc {
+            idle_timeout: Duration::new(2, 0),
+            reconnect_timeout: Default::default(),
         };
 
         let mut server = ws_server(conf.clone());
