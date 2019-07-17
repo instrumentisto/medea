@@ -4,8 +4,8 @@
 use std::{collections::HashMap as StdHashMap, time::Duration};
 
 use actix::{
-    Actor, ActorFuture, AsyncContext, Context,
-    fut::wrap_future, Handler, Message,
+    fut::wrap_future, Actor, ActorFuture, AsyncContext, Context, Handler,
+    Message,
 };
 use failure::Fail;
 use futures::future;
@@ -501,7 +501,7 @@ impl Handler<RpcConnectionClosed> for Room {
 
 #[cfg(test)]
 mod test {
-    use std::sync::{Arc, atomic::AtomicUsize, Mutex};
+    use std::sync::{atomic::AtomicUsize, Arc, Mutex};
 
     use actix::{Addr, System};
 

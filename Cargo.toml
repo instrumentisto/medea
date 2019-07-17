@@ -21,7 +21,6 @@ lto = "thin"
 
 [dependencies]
 actix = "0.8"
-actix-rt = "0.2.3"
 actix-web = "1.0"
 actix-web-actors = "1.0"
 bb8 = "0.3"
@@ -50,9 +49,8 @@ slog-scope = "4.1"
 slog-stdlog = "3.0"
 smart-default = "0.5"
 tokio = "0.1"
-tokio-signal = "0.2.7"
+tokio-signal = "0.2"
 toml = "0.4"
-
 [dependencies.serde-humantime]
     git = "https://github.com/tailhook/serde-humantime"
     branch = "serde_wrapper"

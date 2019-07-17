@@ -76,7 +76,10 @@
 #   connection_timeout = "5s"
 
 
+
+
 [shutdown]
-# Number of milliseconds given to shutdown gracefully
+# Maximum duration given to shutdown the whole application gracefully.
+#
 # Default:
-#   timeout = 5000
+#   timeout = "1s"

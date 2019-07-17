@@ -1,9 +1,9 @@
 //! Provides application configuration options.
 
-pub mod rpc;
-pub mod server;
-pub mod shutdown_config;
-pub mod turn;
+mod rpc;
+mod server;
+mod shutdown;
+mod turn;
 
 use std::env;
 
@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 pub use self::{
     rpc::Rpc,
     server::Server,
-    shutdown_config::ShutdownConfiguration,
+    shutdown::Shutdown,
     turn::{Redis, Turn},
 };
 
@@ -35,8 +35,8 @@ pub struct Conf {
     pub server: Server,
     /// TURN server settings.
     pub turn: Turn,
-    // More settings
-    pub system_config: ShutdownConfiguration,
+    /// Application shutdown settings.
+    pub shutdown: Shutdown,
 }
 
 impl Conf {
@@ -243,5 +243,18 @@ mod tests {
         assert_eq!(env_conf.turn.ip, Ipv4Addr::new(5, 5, 5, 5));
         assert_eq!(env_conf.turn.port, 1234);
         assert_eq!(env_conf.turn.addr(), "5.5.5.5:1234".parse().unwrap());
+    }
+
+    #[test]
+    #[serial]
+    fn shutdown_conf_test() {
+        let default_conf = Conf::default();
+
+        env::set_var("MEDEA_SHUTDOWN.TIMEOUT", "700ms");
+
+        let env_conf = Conf::parse().unwrap();
+
+        assert_ne!(default_conf.shutdown.timeout, env_conf.shutdown.timeout);
+        assert_eq!(env_conf.shutdown.timeout, Duration::from_millis(700));
     }
 }

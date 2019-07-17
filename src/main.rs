@@ -6,6 +6,7 @@ pub mod api;
 pub mod conf;
 pub mod log;
 pub mod media;
+pub mod shutdown;
 pub mod signalling;
 pub mod turn;
 
@@ -56,11 +57,14 @@ fn main() -> io::Result<()> {
                 )
                 .start();
 
-                let graceful_shutdown_addr = shutdown::create(config.system_config.timeout);
-                graceful_shutdown_addr.do_send(shutdown::Subscribe(shutdown::Subscriber {
-                    addr: room.clone().recipient(),
-                    priority: shutdown::Priority(1),
-                }));
+                let graceful_shutdown_addr =
+                    shutdown::create(config.shutdown.timeout);
+                graceful_shutdown_addr.do_send(shutdown::Subscribe(
+                    shutdown::Subscriber {
+                        addr: room.clone().recipient(),
+                        priority: shutdown::Priority(1),
+                    },
+                ));
 
                 let rooms = hashmap! {1 => room};
                 let rooms_repo = RoomsRepository::new(rooms);
@@ -70,10 +74,12 @@ fn main() -> io::Result<()> {
                         error!("Error starting application {:?}", err)
                     })
                     .map(|server_addr| {
-                        graceful_shutdown_addr.do_send(shutdown::Subscribe(shutdown::Subscriber {
-                            addr: server_addr.recipient(),
-                            priority: shutdown::Priority(5),
-                        }));
+                        graceful_shutdown_addr.do_send(shutdown::Subscribe(
+                            shutdown::Subscriber {
+                                addr: server_addr.recipient(),
+                                priority: shutdown::Priority(5),
+                            },
+                        ));
                     })
                     .into_future()
             })

@@ -4,8 +4,9 @@ use std::io;
 
 use actix::{Actor, Addr};
 use actix_web::{
+    middleware,
+    web::{resource, Data, Path, Payload},
     App, HttpRequest, HttpResponse, HttpServer,
-    middleware, web::{Data, Path, Payload, resource},
 };
 use actix_web_actors::ws;
 use futures::{
@@ -89,7 +90,10 @@ pub struct Context {
 }
 
 /// Starts HTTP server for handling WebSocket connections of Client API.
-pub fn run(rooms: RoomsRepository, config: Conf) -> io::Result<Addr<ServerWrapper>> {
+pub fn run(
+    rooms: RoomsRepository,
+    config: Conf,
+) -> io::Result<Addr<ServerWrapper>> {
     let server_addr = config.server.bind_addr();
 
     let server = HttpServer::new(move || {
@@ -110,12 +114,11 @@ pub fn run(rooms: RoomsRepository, config: Conf) -> io::Result<Addr<ServerWrappe
 
     info!("Started HTTP server on {}", server_addr);
 
-    Ok(ServerWrapper(actix_server).start())
+    Ok(ServerWrapper(server).start())
 }
 
 pub mod actors {
-    use actix::{Actor, ActorFuture, Context, Handler};
-    use actix::fut::wrap_future;
+    use actix::{fut::wrap_future, Actor, ActorFuture, Context, Handler};
     use actix_web::dev::Server;
     use tokio::prelude::Future;
 
@@ -148,13 +151,13 @@ pub mod actors {
 mod test {
     use std::{ops::Add, thread, time::Duration};
 
-    use actix_http::{HttpService, ws::Message};
+    use actix_http::{ws::Message, HttpService};
     use actix_http_test::{TestServer, TestServerRuntime};
     use futures::{future::IntoFuture as _, sink::Sink as _, Stream as _};
 
     use crate::{
         api::control::Member,
-        conf::{Conf, Server, Turn},
+        conf::Conf,
         media::create_peers,
         signalling::Room,
         turn::new_turn_auth_service_mock,
@@ -207,15 +210,10 @@ mod test {
 
     #[test]
     fn ping_pong_and_disconnects_on_idle() {
-        let config = Conf::parse().unwrap();
-        let conf = Conf {
-            rpc: Rpc {
-                idle_timeout: Duration::new(2, 0),
-                reconnect_timeout: Default::default(),
-            },
-            turn: Turn::default(),
-            server: Server::default(),
-            system_config: config.system_config,
+        let mut conf = Conf::default();
+        conf.rpc = Rpc {
+            idle_timeout: Duration::new(2, 0),
+            reconnect_timeout: Default::default(),
         };
 
         let mut server = ws_server(conf.clone());

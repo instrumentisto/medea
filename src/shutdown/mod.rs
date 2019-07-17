@@ -56,14 +56,14 @@ pub struct GracefulShutdown {
     recipients: BTreeMap<Priority, HashSet<Recipient<ShutdownMessage>>>,
 
     /// Timeout after which all [`Actors`] will be forced shutdown
-    shutdown_timeout: u64,
+    timeout: Duration,
 }
 
 impl GracefulShutdown {
-    fn new(shutdown_timeout: u64) -> Self {
+    fn new(timeout: Duration) -> Self {
         Self {
             recipients: BTreeMap::new(),
-            shutdown_timeout,
+            timeout,
         }
     }
 }
@@ -148,7 +148,7 @@ impl Handler<ShutdownSignalDetected> for GracefulShutdown {
 
         Box::new(
             shutdown_future
-                .timeout(Duration::from_millis(self.shutdown_timeout))
+                .timeout(self.timeout)
                 .map_err(|e| {
                     error!(
                         "Error trying to shut down system gracefully: {:?}",
@@ -199,6 +199,6 @@ impl Handler<Unsubscribe> for GracefulShutdown {
     }
 }
 
-pub fn create(shutdown_timeout: u64) -> Addr<GracefulShutdown> {
-    GracefulShutdown::new(shutdown_timeout).start()
+pub fn create(timeout: Duration) -> Addr<GracefulShutdown> {
+    GracefulShutdown::new(timeout).start()
 }
