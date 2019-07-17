@@ -1,7 +1,5 @@
 syntax = "proto3";
 
-import "google/protobuf/any.proto";
-
 package medea;
 
 service ControlApi {
@@ -56,7 +54,6 @@ message Error {
   string text = 3;
   string doc = 4;
   string element = 5;
-  google.protobuf.Any details = 6;
 }
 
 message Element {

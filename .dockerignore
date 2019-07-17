@@ -7,3 +7,4 @@
 !jason/src
 !proto
 !Makefile
+!build.rs

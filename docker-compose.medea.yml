@@ -2,7 +2,7 @@ version: "2"
 
 services:
   medea:
-    container_name: ${COMPOSE_PROJECT_NAME}-backend
+    container_name: ${COMPOSE_PROJECT_NAME}
     image: ${COMPOSE_IMAGE_NAME}:${COMPOSE_IMAGE_VER}
     build: .
     ports:

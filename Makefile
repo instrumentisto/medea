@@ -46,6 +46,14 @@ test: test.unit test.e2e
 
 
 
+##########
+# Docker #
+##########
+
+# Build base project Docker image.
+docker.build:
+	docker build -t medea-build -f build/medea/Dockerfile .
+
 ##################
 # Cargo commands #
 ##################
@@ -185,10 +193,11 @@ else
 	@make down.medea dockerized=no
 	@make up.coturn
 
+	docker build -t medea-build -f build/medea/Dockerfile .
 	docker run --rm --network=host -v "$(PWD)":/app -w /app \
 			   -v "$(PWD)/.cache/medea/registry":/usr/local/cargo/registry \
 			   -v "$(PWD)/.cache/medea/target":/app/target \
-		rust:latest \
+		medea-build:latest \
 			make test.e2e dockerized=no coturn=no release=yes
 
 	@make down.coturn
@@ -236,6 +245,7 @@ up.jason:
 up.medea: up.coturn
 ifeq ($(dockerized),yes)
 	@make down.medea
+	@make docker.build
 	docker-compose -f docker-compose.medea.yml up
 	@make down.coturn
 else
