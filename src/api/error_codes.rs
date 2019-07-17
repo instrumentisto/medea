@@ -125,7 +125,6 @@ pub enum ErrorCode {
 
 impl Into<ErrorProto> for ErrorCode {
     fn into(self) -> ErrorProto {
-        // TODO: configure backtrace
         let mut error = ErrorProto::new();
         match self {
             ErrorCode::UnknownError(msg) => {

@@ -7,12 +7,10 @@ use std::fmt;
 
 use failure::Fail;
 
-use crate::api::{
-    control::{endpoints::webrtc_play_endpoint::SrcUri, WebRtcPublishId},
-    error_codes::ErrorCode,
-};
+use crate::api::error_codes::ErrorCode;
 
 use super::{MemberId, RoomId};
+use crate::api::control::endpoints::webrtc_play_endpoint::SrcUri;
 
 #[allow(clippy::module_name_repetitions)]
 #[derive(Debug, Fail)]
@@ -57,6 +55,48 @@ pub struct IsMemberId(LocalUri<IsRoomId>, MemberId);
 #[derive(Debug)]
 pub struct IsEndpointId(LocalUri<IsMemberId>, String);
 
+/// Uri in format "local://room_id/member_id/endpoint_id"
+/// This kind of uri used for pointing to some element in spec (`Room`,
+/// `Member`, `WebRtcPlayEndpoint`, `WebRtcPublishEndpoint`, etc) based on his
+/// state.
+///
+/// [`LocalUri`] can be in three states: [`IsRoomId`], [`IsMemberId`],
+/// [`IsRoomId`]. This is used for compile time guarantees that some
+/// [`LocalUri`] have all mandatory fields.
+///
+/// You also can take value from [`LocalUri`] without copy, but you have to do
+/// it consistently. For example, if you wish to get [`RoomId`], [`MemberId`]
+/// and [`EndpointId`] from [`LocalUri<IsEndpointId>`] you should to make this
+/// steps:
+///
+/// ```
+/// # use crate::api::control::local_uri::{LocalUri, IsEndpointId};
+/// # use crate::api::control::{RoomId, MemberId};
+/// let orig_room_id = RoomId("room".to_string());
+/// let orig_member_id = MemberId("member".to_string());
+/// let orig_endpoint_id = "endpoint".to_string();
+///
+/// // Create new LocalUri for endpoint.
+/// let local_uri = LocalUri::<IsEndpointId>::new(
+///     orig_room_id.clone(),
+///     orig_member_id.clone(),
+///     orig_endpoint_id.clone()
+/// );
+///
+/// // We can get reference to room_id from this LocalUri but can't take room_id
+/// // without this consistency.
+/// let (endpoint_id, member_uri) = local_uri.take_endpoint_id();
+/// assert_eq!(endpoint_id, orig_endpoint_id);
+///
+/// let (member_id, room_uri) = member_uri.take_member_id();
+/// assert_eq!(member_id, orig_member_id);
+///
+/// let room_id = room_uri.take_room_id();
+/// assert_eq!(room_id, orig_room_id);
+/// ```
+///
+/// This is necessary so that it is not possible to get the address in the
+/// wrong state ("local://room_id//endpoint_id" for example).
 #[derive(Debug)]
 pub struct LocalUri<T> {
     state: T,
@@ -87,42 +127,50 @@ impl LocalUriType {
 }
 
 impl LocalUri<IsRoomId> {
+    /// Create new [`LocalUri`] in [`IsRoomId`] state.
     pub fn new(room_id: RoomId) -> Self {
         Self {
             state: IsRoomId(room_id),
         }
     }
 
+    /// Returns reference to [`RoomId`].
     pub fn room_id(&self) -> &RoomId {
         &self.state.0
     }
 
+    /// Returns [`RoomId`].
     pub fn take_room_id(self) -> RoomId {
         self.state.0
     }
 }
 
 impl LocalUri<IsMemberId> {
+    /// Create new [`LocalUri`] in [`IsMemberId`] state.
     pub fn new(room_id: RoomId, member_id: MemberId) -> Self {
         Self {
             state: IsMemberId(LocalUri::<IsRoomId>::new(room_id), member_id),
         }
     }
 
+    /// Returns reference to [`RoomId`].
     pub fn room_id(&self) -> &RoomId {
         &self.state.0.room_id()
     }
 
+    /// Returns reference to [`MemberId`].
     pub fn member_id(&self) -> &MemberId {
         &self.state.1
     }
 
+    /// Return [`MemberId`] and [`LocalUri`] in state [`IsRoomId`].
     pub fn take_member_id(self) -> (MemberId, LocalUri<IsRoomId>) {
         (self.state.1, self.state.0)
     }
 }
 
 impl LocalUri<IsEndpointId> {
+    /// Create new [`LocalUri`] in [`IsEndpointId`] state.
     pub fn new(
         room_id: RoomId,
         member_id: MemberId,
@@ -136,33 +184,38 @@ impl LocalUri<IsEndpointId> {
         }
     }
 
+    /// Returns reference to [`RoomId`].
     pub fn room_id(&self) -> &RoomId {
         &self.state.0.room_id()
     }
 
+    /// Returns reference to [`MemberId`].
     pub fn member_id(&self) -> &MemberId {
         &self.state.0.member_id()
     }
 
+    /// Returns reference to endpoint ID.
     pub fn endpoint_id(&self) -> &str {
         &self.state.1
     }
 
+    /// Return endpoint id and [`LocalUri`] in state [`IsMemberId`].
     pub fn take_endpoint_id(self) -> (String, LocalUri<IsMemberId>) {
         (self.state.1, self.state.0)
     }
 }
 
-impl Into<SrcUri> for LocalUri<IsEndpointId> {
-    fn into(self) -> SrcUri {
-        SrcUri {
-            room_id: self.state.0.state.0.state.0,
-            member_id: self.state.0.state.1,
-            endpoint_id: WebRtcPublishId(self.state.1),
-        }
+impl From<SrcUri> for LocalUri<IsEndpointId> {
+    fn from(uri: SrcUri) -> Self {
+        LocalUri::<IsEndpointId>::new(
+            uri.room_id,
+            uri.member_id,
+            uri.endpoint_id.0,
+        )
     }
 }
 
+/// Enum for store all kinds of [`LocalUri`]s.
 #[allow(clippy::module_name_repetitions)]
 #[derive(Debug)]
 pub enum LocalUriType {
@@ -172,9 +225,6 @@ pub enum LocalUriType {
 }
 
 #[allow(clippy::doc_markdown)]
-/// Uri in format "local://room_id/member_id/endpoint_id"
-/// This kind of uri used for pointing to some element in spec (`Room`,
-/// `Member`, `WebRtcPlayEndpoint`, `WebRtcPublishEndpoint`, etc).
 #[derive(Debug, Clone)]
 struct LocalUriInner {
     /// ID of [`Room`]

@@ -14,7 +14,7 @@ use crate::api::{
     control::{
         endpoints::webrtc_publish_endpoint::WebRtcPublishId,
         grpc::protos::control::WebRtcPlayEndpoint as WebRtcPlayEndpointProto,
-        local_uri::{LocalUriParseError, LocalUriType},
+        local_uri::{IsEndpointId, LocalUri, LocalUriParseError, LocalUriType},
         MemberId, RoomId, TryFromProtobufError,
     },
     error_codes::ErrorCode,
@@ -96,6 +96,20 @@ impl SrcUri {
             Ok(endpoint_uri.into())
         } else {
             Err(SrcParseError::NotSrcUri(value.to_string()))
+        }
+    }
+}
+
+impl From<LocalUri<IsEndpointId>> for SrcUri {
+    fn from(uri: LocalUri<IsEndpointId>) -> Self {
+        let (endpoint_id, member_uri) = uri.take_endpoint_id();
+        let (member_id, room_uri) = member_uri.take_member_id();
+        let room_id = room_uri.take_room_id();
+
+        Self {
+            room_id,
+            member_id,
+            endpoint_id: WebRtcPublishId(endpoint_id),
         }
     }
 }
