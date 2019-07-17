@@ -22,3 +22,5 @@ slog-async = "2.3"
 slog-stdlog = "3.0"
 slog-envlogger = "2.1"
 dotenv = "0.13"
+medea = { path = "../" }
+protobuf = "2.7"

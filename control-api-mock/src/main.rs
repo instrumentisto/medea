@@ -1,8 +1,8 @@
-use slog::{o, Drain};
-
 pub mod client;
 pub mod prelude;
 pub mod server;
+
+use slog::{o, Drain};
 
 fn main() {
     dotenv::dotenv().ok();

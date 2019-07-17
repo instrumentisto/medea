@@ -4,12 +4,18 @@ mod room;
 
 use actix_web::{middleware, App, HttpServer};
 
-pub struct Context {}
+use crate::client::ControlClient;
+
+pub struct Context {
+    client: ControlClient,
+}
 
 pub fn run() {
     HttpServer::new(|| {
         App::new()
-            .data(Context {})
+            .data(Context {
+                client: ControlClient::new(),
+            })
             .wrap(middleware::Logger::default())
             .service(
                 actix_web::web::resource("/{room_id}").route(
