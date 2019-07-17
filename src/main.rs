@@ -39,10 +39,10 @@ fn main() -> io::Result<()> {
 
     info!("{:?}", config);
 
-    actix::run(move || {
+    actix::run(|| {
         new_turn_auth_service(&config.turn)
             .map_err(|err| error!("Error creating TurnAuthService {:?}", err))
-            .and_then(move |turn_auth_service| {
+            .and_then(|turn_auth_service| {
                 let members = hashmap! {
                     1 => Member::new(1, "caller_credentials".to_owned()),
                     2 => Member::new(2, "responder_credentials".to_owned()),

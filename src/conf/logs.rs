@@ -24,7 +24,7 @@ pub struct AppLog {
 }
 
 impl AppLog {
-    /// Returns application logging level. None if disabled.
+    /// Returns configured application logging level. None if disabled.
     pub fn level(&self) -> Option<slog::Level> {
         slog::Level::from_str(&self.level).ok()
     }
