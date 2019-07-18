@@ -29,7 +29,7 @@ use crate::{
     log::prelude::*,
     media::IceUser,
     signalling::{
-        room::{ActFuture, CloseRoom, RoomError},
+        room::{ActFuture, RoomError},
         Room, RoomId,
     },
     turn::{TurnAuthService, TurnServiceErr, UnreachablePolicy},
@@ -213,8 +213,6 @@ impl ParticipantService {
     /// with specified user [`Member`] from the storage and closes the room.
     /// If [`ClosedReason::Lost`], then creates delayed task that emits
     /// [`ClosedReason::Closed`].
-    // TODO: Don't close the room. It is being closed atm, because we have
-    //       no way to handle absence of RpcConnection.
     pub fn connection_closed(
         &mut self,
         ctx: &mut Context<Room>,
@@ -230,7 +228,8 @@ impl ParticipantService {
                         error!("Error deleting IceUser {:?}", err)
                     }),
                 ));
-                ctx.notify(CloseRoom {})
+                // TODO: we have no way to handle absence of RpcConnection right
+                //       now.
             }
             ClosedReason::Lost => {
                 self.drop_connection_tasks.insert(
@@ -270,7 +269,8 @@ impl ParticipantService {
         }
     }
 
-    /// Cancels all connection close tasks, closes all [`RpcConnection`]s,
+    /// Cancels all connection close tasks, closes all [`RpcConnection`]s and
+    /// deletes all [`IceUser`]s.
     pub fn drop_connections(
         &mut self,
         ctx: &mut Context<Room>,

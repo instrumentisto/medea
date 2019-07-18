@@ -86,3 +86,12 @@
 #
 # Default:
 #   level = "INFO"
+
+
+
+
+[shutdown]
+# Maximum duration given to shutdown the whole application gracefully.
+#
+# Default:
+#   timeout = "1s"

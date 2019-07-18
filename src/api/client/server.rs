@@ -2,7 +2,9 @@
 
 use std::io;
 
+use actix::{Actor, Addr, Handler, ResponseActFuture, WrapFuture as _};
 use actix_web::{
+    dev::Server as ActixServer,
     middleware,
     web::{resource, Data, Path, Payload},
     App, HttpRequest, HttpResponse, HttpServer,
@@ -24,6 +26,7 @@ use crate::{
     },
     conf::{Conf, Rpc},
     log::prelude::*,
+    shutdown::ShutdownGracefully,
     signalling::{RoomId, RoomsRepository},
 };
 
@@ -86,42 +89,64 @@ pub struct Context {
     pub config: Rpc,
 }
 
-/// Starts HTTP server for handling WebSocket connections of Client API.
-pub fn run(rooms: RoomsRepository, config: Conf) -> io::Result<()> {
-    let server_addr = config.server.bind_addr();
+/// HTTP server that handles WebSocket connections of Client API.
+pub struct Server(ActixServer);
 
-    HttpServer::new(move || {
-        App::new()
-            .data(Context {
-                rooms: rooms.clone(),
-                config: config.rpc.clone(),
-            })
-            .wrap(middleware::Logger::default())
-            .service(
-                resource("/ws/{room_id}/{member_id}/{credentials}")
-                    .route(actix_web::web::get().to_async(ws_index)),
-            )
-    })
-    .bind(server_addr)?
-    .start();
+impl Server {
+    /// Starts Client API HTTP server.
+    pub fn run(rooms: RoomsRepository, config: Conf) -> io::Result<Addr<Self>> {
+        let server_addr = config.server.bind_addr();
 
-    info!("Started HTTP server on {}", server_addr);
+        let server = HttpServer::new(move || {
+            App::new()
+                .data(Context {
+                    rooms: rooms.clone(),
+                    config: config.rpc.clone(),
+                })
+                .wrap(middleware::Logger::default())
+                .service(
+                    resource("/ws/{room_id}/{member_id}/{credentials}")
+                        .route(actix_web::web::get().to_async(ws_index)),
+                )
+        })
+        .disable_signals()
+        .bind(server_addr)?
+        .start();
 
-    Ok(())
+        info!("Started Client API HTTP server on {}", server_addr);
+
+        Ok(Self(server).start())
+    }
+}
+
+impl Actor for Server {
+    type Context = actix::Context<Self>;
+}
+
+impl Handler<ShutdownGracefully> for Server {
+    type Result = ResponseActFuture<Self, (), ()>;
+
+    fn handle(
+        &mut self,
+        _: ShutdownGracefully,
+        _: &mut Self::Context,
+    ) -> Self::Result {
+        info!("Shutting down Client API HTTP server");
+        Box::new(self.0.stop(true).into_actor(self))
+    }
 }
 
 #[cfg(test)]
 mod test {
     use std::{ops::Add, thread, time::Duration};
 
-    use actix::Actor as _;
     use actix_http::{ws::Message, HttpService};
     use actix_http_test::{TestServer, TestServerRuntime};
     use futures::{future::IntoFuture as _, sink::Sink as _, Stream as _};
 
     use crate::{
-        api::control::Member, media::create_peers, signalling::Room,
-        turn::new_turn_auth_service_mock,
+        api::control::Member, conf::Conf, media::create_peers,
+        signalling::Room, turn::new_turn_auth_service_mock,
     };
 
     use super::*;

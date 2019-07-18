@@ -49,6 +49,7 @@ slog-scope = "4.1"
 slog-stdlog = "3.0"
 smart-default = "0.5"
 tokio = "0.1"
+tokio-signal = "0.2"
 toml = "0.4"
 [dependencies.serde-humantime]
     git = "https://github.com/tailhook/serde-humantime"

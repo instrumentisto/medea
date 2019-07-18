@@ -3,6 +3,7 @@
 pub mod log;
 pub mod rpc;
 pub mod server;
+pub mod shutdown;
 pub mod turn;
 
 use std::env;
@@ -15,6 +16,7 @@ pub use self::{
     log::Log,
     rpc::Rpc,
     server::Server,
+    shutdown::Shutdown,
     turn::{Redis, Turn},
 };
 
@@ -37,6 +39,8 @@ pub struct Conf {
     pub turn: Turn,
     /// Logging settings.
     pub log: Log,
+    /// Application shutdown settings.
+    pub shutdown: Shutdown,
 }
 
 impl Conf {
@@ -261,5 +265,18 @@ mod tests {
         env::set_var("MEDEA_LOG.LEVEL", "OFF");
 
         assert_eq!(Conf::parse().unwrap().log.level(), None);
+    }
+
+    #[test]
+    #[serial]
+    fn shutdown_conf_test() {
+        let default_conf = Conf::default();
+
+        env::set_var("MEDEA_SHUTDOWN.TIMEOUT", "700ms");
+
+        let env_conf = Conf::parse().unwrap();
+
+        assert_ne!(default_conf.shutdown.timeout, env_conf.shutdown.timeout);
+        assert_eq!(env_conf.shutdown.timeout, Duration::from_millis(700));
     }
 }
