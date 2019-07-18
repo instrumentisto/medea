@@ -4,7 +4,7 @@ use actix_web::{
 };
 use futures::Future;
 use medea::api::control::grpc::protos::control::{
-    CreateRequest as CreateRequestProto, Member_Element as MemberElementProto,
+    Member_Element as MemberElementProto,
     WebRtcPlayEndpoint as WebRtcPlayEndpointProto,
     WebRtcPublishEndpoint as WebRtcPublishEndpointProto,
     WebRtcPublishEndpoint_P2P as P2pModeProto,
@@ -15,7 +15,6 @@ use crate::{
     prelude::*,
     server::{Context, Response},
 };
-use medea::api::control::TryFromProtobufError::P2pModeNotFound;
 
 #[allow(clippy::module_name_repetitions)]
 #[derive(Debug, Deserialize)]

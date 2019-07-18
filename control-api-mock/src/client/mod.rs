@@ -1,10 +1,5 @@
 use std::{fmt, sync::Arc};
 
-use crate::server::{
-    endpoint::{Endpoint, EndpointPath},
-    member::{Member, MemberPath},
-    room::{Room, RoomPath},
-};
 use actix_web::web::Path;
 use futures::Future;
 use grpcio::{ChannelBuilder, EnvBuilder, Error};
@@ -14,13 +9,19 @@ use medea::api::control::grpc::protos::{
 };
 use protobuf::RepeatedField;
 
+use crate::server::{
+    endpoint::{Endpoint, EndpointPath},
+    member::{Member, MemberPath},
+    room::{Room, RoomPath},
+};
+
 #[derive(Clone, Debug)]
 pub struct RoomUri {
     room_id: String,
 }
 
 impl From<Path<RoomPath>> for RoomUri {
-    fn from(mut path: Path<RoomPath>) -> Self {
+    fn from(path: Path<RoomPath>) -> Self {
         Self {
             room_id: path.room_id.clone(),
         }
@@ -79,26 +80,6 @@ impl fmt::Display for EndpointUri {
             self.room_id, self.member_id, self.endpoint_id
         )
     }
-}
-
-fn local_uri(text: &str) -> String {
-    format!("local://{}", text)
-}
-
-fn room_local_uri(room_id: &str) -> String {
-    local_uri(room_id)
-}
-
-fn member_local_uri(room_id: &str, member_id: &str) -> String {
-    local_uri(&format!("{}/{}", room_id, member_id))
-}
-
-fn endpoint_local_uri(
-    room_id: &str,
-    member_id: &str,
-    endpoint_id: &str,
-) -> String {
-    local_uri(&format!("{}/{}/{}", room_id, member_id, endpoint_id))
 }
 
 fn id_request(ids: Vec<String>) -> IdRequest {

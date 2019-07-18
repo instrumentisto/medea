@@ -1,11 +1,11 @@
+use std::collections::HashMap;
+
 use actix_web::{
-    web::{Data, Path},
+    web::{Data, Json, Path},
     HttpResponse,
 };
 use futures::Future;
-use medea::api::control::grpc::protos::control::{
-    Room as RoomProto, Room_Element as RoomElementProto,
-};
+use medea::api::control::grpc::protos::control::Room as RoomProto;
 use serde::{Deserialize, Serialize};
 
 use super::Context;
@@ -14,8 +14,6 @@ use crate::{
     prelude::*,
     server::{member::Member, Response},
 };
-use actix_web::web::Json;
-use std::collections::HashMap;
 
 #[allow(clippy::module_name_repetitions)]
 #[derive(Debug, Deserialize)]

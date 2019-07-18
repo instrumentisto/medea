@@ -1,5 +1,7 @@
+use std::collections::HashMap;
+
 use actix_web::{
-    web::{Data, Path},
+    web::{Data, Json, Path},
     HttpResponse,
 };
 use futures::Future;
@@ -12,8 +14,6 @@ use crate::{
     prelude::*,
     server::{endpoint::Endpoint, Context, Response},
 };
-use actix_web::web::Json;
-use std::collections::HashMap;
 
 #[allow(clippy::module_name_repetitions)]
 #[derive(Debug, Deserialize)]
