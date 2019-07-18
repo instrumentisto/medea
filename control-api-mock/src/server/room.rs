@@ -31,7 +31,7 @@ pub fn delete(
 ) -> impl Future<Item = HttpResponse, Error = ()> {
     state
         .client
-        .delete_room(path.into())
+        .delete_single(RoomUri::from(path))
         .map(|r| Response::from(r).into())
         .map_err(|e| error!("{:?}", e))
 }

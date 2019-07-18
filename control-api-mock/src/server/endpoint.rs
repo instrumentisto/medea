@@ -32,7 +32,7 @@ pub fn delete(
 ) -> impl Future<Item = HttpResponse, Error = ()> {
     state
         .client
-        .delete_endpoint(path.into())
+        .delete_single(EndpointUri::from(path))
         .map(|r| Response::from(r).into())
         .map_err(|e| error!("{:?}", e))
 }

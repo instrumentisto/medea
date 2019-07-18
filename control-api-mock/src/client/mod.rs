@@ -123,15 +123,6 @@ impl ControlClient {
         self.grpc_client.create_async(&req).unwrap()
     }
 
-    pub fn delete_member(
-        &self,
-        uri: MemberUri,
-    ) -> impl Future<Item = Response, Error = Error> {
-        let req = id_request(vec![uri.to_string()]);
-
-        self.grpc_client.delete_async(&req).unwrap()
-    }
-
     pub fn create_member(
         &self,
         uri: MemberUri,
@@ -141,15 +132,6 @@ impl ControlClient {
         req.set_member(member.into());
         req.set_id(uri.to_string());
         self.grpc_client.create_async(&req).unwrap()
-    }
-
-    pub fn delete_endpoint(
-        &self,
-        uri: EndpointUri,
-    ) -> impl Future<Item = Response, Error = Error> {
-        let req = id_request(vec![uri.to_string()]);
-
-        self.grpc_client.delete_async(&req).unwrap()
     }
 
     pub fn create_endpoint(
@@ -187,6 +169,24 @@ impl ControlClient {
         let req = id_request(uris);
 
         self.grpc_client.get_async(&req).unwrap()
+    }
+
+    pub fn delete_single<T: fmt::Display>(
+        &self,
+        uri: T,
+    ) -> impl Future<Item = Response, Error = Error> {
+        let req = id_request(vec![uri.to_string()]);
+
+        self.grpc_client.delete_async(&req).unwrap()
+    }
+
+    pub fn delete_batch(
+        &self,
+        ids: Vec<String>,
+    ) -> impl Future<Item = Response, Error = Error> {
+        let req = id_request(ids);
+
+        self.grpc_client.delete_async(&req).unwrap()
     }
 }
 

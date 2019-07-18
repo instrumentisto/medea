@@ -35,7 +35,11 @@ pub fn run() {
                 client: ControlClient::new(),
             })
             .wrap(middleware::Logger::default())
-            .service(web::resource("/").route(web::get().to_async(batch_get)))
+            .service(
+                web::resource("/")
+                    .route(web::get().to_async(batch_get))
+                    .route(web::delete().to_async(batch_delete)),
+            )
             .service(
                 web::resource("/{room_id}")
                     .route(web::delete().to_async(room::delete))
@@ -73,6 +77,17 @@ pub fn batch_get(
         .client
         .get_batch(data.ids.clone())
         .map(|r| GetResponse::from(r).into())
+        .map_err(|e| error!("{:?}", e))
+}
+
+pub fn batch_delete(
+    state: Data<Context>,
+    data: Json<BatchId>,
+) -> impl Future<Item = HttpResponse, Error = ()> {
+    state
+        .client
+        .delete_batch(data.0.ids)
+        .map(|r| Response::from(r).into())
         .map_err(|e| error!("{:?}", e))
 }
 
