@@ -46,7 +46,8 @@ pub fn run() {
             .service(
                 web::resource("/{room_id}/{member_id}/{endpoint_id}")
                     .route(web::delete().to_async(endpoint::delete))
-                    .route(web::post().to_async(endpoint::create)),
+                    .route(web::post().to_async(endpoint::create))
+                    .route(web::get().to_async(endpoint::get)),
             )
     })
     .bind("0.0.0.0:8000")

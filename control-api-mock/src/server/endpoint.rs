@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     prelude::*,
-    server::{Context, Response},
+    server::{Context, GetResponse, Response},
 };
 
 #[allow(clippy::module_name_repetitions)]
@@ -153,5 +153,16 @@ pub fn create(
         .client
         .create_endpoint(path.into(), data.0)
         .map(|r| Response::from(r).into())
+        .map_err(|e| error!("{:?}", e))
+}
+
+pub fn get(
+    path: Path<EndpointPath>,
+    state: Data<Context>,
+) -> impl Future<Item = HttpResponse, Error = ()> {
+    state
+        .client
+        .get_endpoint(path.into())
+        .map(|r| GetResponse::from(r).into())
         .map_err(|e| error!("{:?}", e))
 }

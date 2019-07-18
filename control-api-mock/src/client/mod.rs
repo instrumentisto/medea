@@ -123,6 +123,15 @@ impl ControlClient {
         self.grpc_client.create_async(&req).unwrap()
     }
 
+    pub fn get_room(
+        &self,
+        uri: RoomUri,
+    ) -> impl Future<Item = GetResponse, Error = Error> {
+        let req = id_request(vec![uri.to_string()]);
+
+        self.grpc_client.get_async(&req).unwrap()
+    }
+
     pub fn delete_member(
         &self,
         uri: MemberUri,
@@ -178,6 +187,15 @@ impl ControlClient {
         }
 
         self.grpc_client.create_async(&req).unwrap()
+    }
+
+    pub fn get_endpoint(
+        &self,
+        uri: EndpointUri,
+    ) -> impl Future<Item = GetResponse, Error = Error> {
+        let req = id_request(vec![uri.to_string()]);
+
+        self.grpc_client.get_async(&req).unwrap()
     }
 }
 
