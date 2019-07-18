@@ -14,7 +14,7 @@ use super::Context;
 
 use crate::{
     prelude::*,
-    server::{member::Member, Response},
+    server::{member::Member, GetResponse, Response},
 };
 use medea::api::control::TryFromProtobufError::RoomElementNotFound;
 
@@ -99,5 +99,16 @@ pub fn create(
         .client
         .create_room(path.into(), data.0)
         .map(|r| Response::from(r).into())
+        .map_err(|e| error!("{:?}", e))
+}
+
+pub fn get(
+    path: Path<RoomPath>,
+    state: Data<Context>,
+) -> impl Future<Item = HttpResponse, Error = ()> {
+    state
+        .client
+        .get_room(path.into())
+        .map(|r| GetResponse::from(r).into())
         .map_err(|e| error!("{:?}", e))
 }
