@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     prelude::*,
-    server::{endpoint::Endpoint, Context, Response},
+    server::{endpoint::Endpoint, Context, GetResponse, Response},
 };
 
 #[allow(clippy::module_name_repetitions)]
@@ -62,6 +62,18 @@ impl Into<RoomElementProto> for Member {
     }
 }
 
+impl From<MemberProto> for Member {
+    fn from(mut proto: MemberProto) -> Self {
+        let mut member_pipeline = HashMap::new();
+        for (id, endpoint) in proto.take_pipeline() {
+            member_pipeline.insert(id, endpoint.into());
+        }
+        Self {
+            pipeline: member_pipeline,
+        }
+    }
+}
+
 pub fn create(
     path: Path<MemberPath>,
     state: Data<Context>,
@@ -71,5 +83,16 @@ pub fn create(
         .client
         .create_member(path.into(), data.0)
         .map(|r| Response::from(r).into())
+        .map_err(|e| error!("{:?}", e))
+}
+
+pub fn get(
+    path: Path<MemberPath>,
+    state: Data<Context>,
+) -> impl Future<Item = HttpResponse, Error = ()> {
+    state
+        .client
+        .get_member(path.into())
+        .map(|r| GetResponse::from(r).into())
         .map_err(|e| error!("{:?}", e))
 }

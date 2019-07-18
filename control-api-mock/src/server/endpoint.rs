@@ -127,6 +127,22 @@ impl Into<MemberElementProto> for Endpoint {
     }
 }
 
+impl From<MemberElementProto> for Endpoint {
+    fn from(mut proto: MemberElementProto) -> Self {
+        if proto.has_webrtc_play() {
+            Endpoint::WebRtcPlayEndpoint {
+                spec: proto.take_webrtc_play().into(),
+            }
+        } else if proto.has_webrtc_pub() {
+            Endpoint::WebRtcPublishEndpoint {
+                spec: proto.take_webrtc_pub().into(),
+            }
+        } else {
+            unimplemented!()
+        }
+    }
+}
+
 #[allow(clippy::needless_pass_by_value)]
 pub fn create(
     path: Path<EndpointPath>,
