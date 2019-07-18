@@ -7,19 +7,22 @@ use std::collections::HashMap;
 use actix_web::{middleware, web, App, HttpResponse, HttpServer};
 use medea::api::control::grpc::protos::control::{
     Element as ElementProto, Error as ErrorProto,
-    GetResponse as GetResponseProto, Member_Element as MemberElementProto,
-    Response as ResponseProto, Room_Element as RoomElementProto,
+    GetResponse as GetResponseProto, Response as ResponseProto,
+    Room_Element as RoomElementProto,
 };
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::{
     client::ControlClient,
+    prelude::*,
     server::{
         endpoint::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
         member::Member,
         room::Room,
     },
 };
+use actix_web::web::{Data, Json};
+use futures::Future;
 
 pub struct Context {
     client: ControlClient,
@@ -32,6 +35,7 @@ pub fn run() {
                 client: ControlClient::new(),
             })
             .wrap(middleware::Logger::default())
+            .service(web::resource("/").route(web::get().to_async(batch_get)))
             .service(
                 web::resource("/{room_id}")
                     .route(web::delete().to_async(room::delete))
@@ -54,6 +58,22 @@ pub fn run() {
     .bind("0.0.0.0:8000")
     .unwrap()
     .start();
+}
+
+#[derive(Deserialize, Debug)]
+pub struct BatchId {
+    ids: Vec<String>,
+}
+
+pub fn batch_get(
+    state: Data<Context>,
+    data: Json<BatchId>,
+) -> impl Future<Item = HttpResponse, Error = ()> {
+    state
+        .client
+        .get_batch(data.ids.clone())
+        .map(|r| GetResponse::from(r).into())
+        .map_err(|e| error!("{:?}", e))
 }
 
 #[derive(Debug, Serialize)]

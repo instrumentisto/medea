@@ -12,6 +12,7 @@ use medea::api::control::grpc::protos::control::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    client::EndpointUri,
     prelude::*,
     server::{Context, GetResponse, Response},
 };
@@ -162,7 +163,7 @@ pub fn get(
 ) -> impl Future<Item = HttpResponse, Error = ()> {
     state
         .client
-        .get_endpoint(path.into())
+        .get_single(EndpointUri::from(path))
         .map(|r| GetResponse::from(r).into())
         .map_err(|e| error!("{:?}", e))
 }

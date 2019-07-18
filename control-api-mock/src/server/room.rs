@@ -13,10 +13,10 @@ use serde::{Deserialize, Serialize};
 use super::Context;
 
 use crate::{
+    client::RoomUri,
     prelude::*,
     server::{member::Member, GetResponse, Response},
 };
-use medea::api::control::TryFromProtobufError::RoomElementNotFound;
 
 #[allow(clippy::module_name_repetitions)]
 #[derive(Debug, Deserialize)]
@@ -108,7 +108,7 @@ pub fn get(
 ) -> impl Future<Item = HttpResponse, Error = ()> {
     state
         .client
-        .get_room(path.into())
+        .get_single(RoomUri::from(path))
         .map(|r| GetResponse::from(r).into())
         .map_err(|e| error!("{:?}", e))
 }
