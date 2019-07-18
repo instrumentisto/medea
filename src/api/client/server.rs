@@ -145,8 +145,8 @@ mod test {
     use futures::{future::IntoFuture as _, sink::Sink as _, Stream as _};
 
     use crate::{
-        api::control::Member, conf::Conf, media::create_peers, signalling::Room,
-        turn::new_turn_auth_service_mock,
+        api::control::Member, conf::Conf, media::create_peers,
+        signalling::Room, turn::new_turn_auth_service_mock,
     };
 
     use super::*;
