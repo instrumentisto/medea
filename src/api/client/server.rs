@@ -109,9 +109,9 @@ impl Server {
                         .route(actix_web::web::get().to_async(ws_index)),
                 )
         })
-            .disable_signals()
-            .bind(server_addr)?
-            .start();
+        .disable_signals()
+        .bind(server_addr)?
+        .start();
 
         info!("Started Client API HTTP server on {}", server_addr);
 

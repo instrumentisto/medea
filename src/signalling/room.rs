@@ -35,7 +35,7 @@ pub type Id = u64;
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
 pub type ActFuture<I, E> =
-Box<dyn ActorFuture<Actor = Room, Item = I, Error = E>>;
+    Box<dyn ActorFuture<Actor = Room, Item = I, Error = E>>;
 
 #[derive(Debug, Fail)]
 #[allow(clippy::module_name_repetitions)]
@@ -257,7 +257,8 @@ impl Room {
                 from_peer_id,
                 "Not New",
                 format!("{}", from_peer),
-            ).into());
+            )
+            .into());
         }
 
         let to_peer_id = from_peer.partner_peer_id();
@@ -267,7 +268,8 @@ impl Room {
                 to_peer_id,
                 "Not New",
                 format!("{}", to_peer),
-            ).into());
+            )
+            .into());
         }
 
         let to_member_id = to_peer.member_id();

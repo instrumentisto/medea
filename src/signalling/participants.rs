@@ -41,8 +41,8 @@ pub enum ParticipantServiceErr {
     #[fail(display = "TurnService Error in ParticipantService: {}", _0)]
     TurnServiceErr(TurnServiceErr),
     #[fail(
-    display = "Mailbox error when accessing ParticipantService: {}",
-    _0
+        display = "Mailbox error when accessing ParticipantService: {}",
+        _0
     )]
     MailBoxErr(MailboxError),
 }

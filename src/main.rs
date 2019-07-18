@@ -54,7 +54,7 @@ fn main() -> io::Result<()> {
                     config.rpc.reconnect_timeout,
                     turn_auth_service,
                 )
-                    .start();
+                .start();
                 Ok((room, config))
             })
             .and_then(|(room, config)| {
