@@ -29,7 +29,8 @@ pub fn run() {
             )
             .service(
                 web::resource("/{room_id}/{member_id}")
-                    .route(web::delete().to_async(member::delete)),
+                    .route(web::delete().to_async(member::delete))
+                    .route(web::post().to_async(member::create)),
             )
             .service(
                 web::resource("/{room_id}/{member_id}/{endpoint_id}")

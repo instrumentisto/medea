@@ -2,7 +2,7 @@ use std::{fmt, sync::Arc};
 
 use crate::server::{
     endpoint::{Endpoint, EndpointPath},
-    member::MemberPath,
+    member::{Member, MemberPath},
     room::RoomPath,
 };
 use actix_web::web::Path;
@@ -136,6 +136,17 @@ impl ControlClient {
         let req = id_request(vec![uri.to_string()]);
 
         self.grpc_client.delete_async(&req).unwrap()
+    }
+
+    pub fn create_member(
+        &self,
+        uri: MemberUri,
+        member: Member,
+    ) -> impl Future<Item = Response, Error = Error> {
+        let mut req = CreateRequest::new();
+        req.set_member(member.into());
+        req.set_id(uri.to_string());
+        self.grpc_client.create_async(&req).unwrap()
     }
 
     pub fn delete_endpoint(

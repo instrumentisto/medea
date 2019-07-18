@@ -4,7 +4,7 @@ use actix_web::{
 };
 use futures::Future;
 use medea::api::control::grpc::protos::control::{
-    CreateRequest as CreateRequestProto,
+    CreateRequest as CreateRequestProto, Member_Element as MemberElementProto,
     WebRtcPlayEndpoint as WebRtcPlayEndpointProto,
     WebRtcPublishEndpoint as WebRtcPublishEndpointProto,
     WebRtcPublishEndpoint_P2P as P2pModeProto,
@@ -111,6 +111,21 @@ impl From<WebRtcPlayEndpointProto> for WebRtcPlayEndpoint {
 pub enum Endpoint {
     WebRtcPublishEndpoint { spec: WebRtcPublishEndpoint },
     WebRtcPlayEndpoint { spec: WebRtcPlayEndpoint },
+}
+
+impl Into<MemberElementProto> for Endpoint {
+    fn into(self) -> MemberElementProto {
+        let mut proto = MemberElementProto::new();
+        match self {
+            Endpoint::WebRtcPlayEndpoint { spec } => {
+                proto.set_webrtc_play(spec.into())
+            }
+            Endpoint::WebRtcPublishEndpoint { spec } => {
+                proto.set_webrtc_pub(spec.into())
+            }
+        }
+        proto
+    }
 }
 
 #[allow(clippy::needless_pass_by_value)]
