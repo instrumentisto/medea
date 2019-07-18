@@ -16,5 +16,5 @@ fn main() {
 
     let sys = actix::System::new("control-api-mock");
     server::run();
-    let _ = sys.run().unwrap();
+    sys.run().unwrap();
 }

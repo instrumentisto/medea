@@ -1,29 +1,28 @@
 use actix_web::{
     web::{Data, Path},
-    Error, HttpResponse,
+    HttpResponse,
 };
 use futures::Future;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
 use super::Context;
 
-use crate::prelude::*;
+use crate::{prelude::*, server::Response};
 
+#[allow(clippy::module_name_repetitions)]
 #[derive(Debug, Deserialize)]
 pub struct RoomPath {
     room_id: String,
 }
 
-#[derive(Debug, Serialize)]
-pub struct HelloWorld {}
-
-pub fn delete_room(
+#[allow(clippy::needless_pass_by_value)]
+pub fn delete(
     path: Path<RoomPath>,
     state: Data<Context>,
 ) -> impl Future<Item = HttpResponse, Error = ()> {
     state
         .client
-        .delete_room(path.room_id.clone())
-        .map(|r| HttpResponse::Ok().json(HelloWorld {}))
+        .delete_room(&path.room_id)
+        .map(|r| Response::from(r).into())
         .map_err(|e| error!("{:?}", e))
 }
