@@ -4,7 +4,7 @@ use actix_web::web::Path;
 use futures::Future;
 use grpcio::{ChannelBuilder, EnvBuilder, Error};
 use medea::api::control::grpc::protos::{
-    control::{CreateRequest, IdRequest, Response},
+    control::{CreateRequest, GetResponse, IdRequest, Response},
     control_grpc::ControlApiClient,
 };
 use protobuf::RepeatedField;
@@ -14,7 +14,6 @@ use crate::server::{
     member::{Member, MemberPath},
     room::{Room, RoomPath},
 };
-use medea::api::control::grpc::protos::control::GetResponse;
 
 #[derive(Clone, Debug)]
 pub struct RoomUri {
@@ -24,7 +23,7 @@ pub struct RoomUri {
 impl From<Path<RoomPath>> for RoomUri {
     fn from(path: Path<RoomPath>) -> Self {
         Self {
-            room_id: path.room_id.clone(),
+            room_id: path.into_inner().room_id,
         }
     }
 }
@@ -43,9 +42,10 @@ pub struct MemberUri {
 
 impl From<Path<MemberPath>> for MemberUri {
     fn from(path: Path<MemberPath>) -> Self {
+        let path = path.into_inner();
         Self {
-            room_id: path.room_id.clone(),
-            member_id: path.member_id.clone(),
+            room_id: path.room_id,
+            member_id: path.member_id,
         }
     }
 }
@@ -65,10 +65,11 @@ pub struct EndpointUri {
 
 impl From<Path<EndpointPath>> for EndpointUri {
     fn from(path: Path<EndpointPath>) -> Self {
+        let path = path.into_inner();
         Self {
-            room_id: path.room_id.clone(),
-            member_id: path.member_id.clone(),
-            endpoint_id: path.endpoint_id.clone(),
+            room_id: path.room_id,
+            member_id: path.member_id,
+            endpoint_id: path.endpoint_id,
         }
     }
 }
@@ -104,7 +105,7 @@ impl ControlClient {
 
     pub fn delete_room(
         &self,
-        uri: RoomUri,
+        uri: &RoomUri,
     ) -> impl Future<Item = Response, Error = Error> {
         let req = id_request(vec![uri.to_string()]);
 
@@ -113,7 +114,7 @@ impl ControlClient {
 
     pub fn create_room(
         &self,
-        uri: RoomUri,
+        uri: &RoomUri,
         room: Room,
     ) -> impl Future<Item = Response, Error = Error> {
         let mut req = CreateRequest::new();
@@ -125,7 +126,7 @@ impl ControlClient {
 
     pub fn create_member(
         &self,
-        uri: MemberUri,
+        uri: &MemberUri,
         member: Member,
     ) -> impl Future<Item = Response, Error = Error> {
         let mut req = CreateRequest::new();
@@ -136,7 +137,7 @@ impl ControlClient {
 
     pub fn create_endpoint(
         &self,
-        uri: EndpointUri,
+        uri: &EndpointUri,
         endpoint: Endpoint,
     ) -> impl Future<Item = Response, Error = Error> {
         let mut req = CreateRequest::new();

@@ -10,13 +10,13 @@ use medea::api::control::grpc::protos::control::{
 };
 use serde::{Deserialize, Serialize};
 
-use super::Context;
-
 use crate::{
     client::RoomUri,
     prelude::*,
     server::{member::Member, GetResponse, Response},
 };
+
+use super::Context;
 
 #[allow(clippy::module_name_repetitions)]
 #[derive(Debug, Deserialize)]
@@ -32,8 +32,8 @@ pub fn delete(
     state
         .client
         .delete_single(RoomUri::from(path))
-        .map(|r| Response::from(r).into())
         .map_err(|e| error!("{:?}", e))
+        .map(|r| Response::from(r).into())
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -41,6 +41,7 @@ pub struct Room {
     pipeline: HashMap<String, RoomElement>,
 }
 
+#[allow(clippy::module_name_repetitions)]
 #[derive(Serialize, Deserialize, Debug)]
 pub enum RoomElement {
     Member(Member),
@@ -90,6 +91,7 @@ impl From<RoomProto> for Room {
     }
 }
 
+#[allow(clippy::needless_pass_by_value)]
 pub fn create(
     path: Path<RoomPath>,
     state: Data<Context>,
@@ -97,11 +99,12 @@ pub fn create(
 ) -> impl Future<Item = HttpResponse, Error = ()> {
     state
         .client
-        .create_room(path.into(), data.0)
-        .map(|r| Response::from(r).into())
+        .create_room(&path.into(), data.0)
         .map_err(|e| error!("{:?}", e))
+        .map(|r| Response::from(r).into())
 }
 
+#[allow(clippy::needless_pass_by_value)]
 pub fn get(
     path: Path<RoomPath>,
     state: Data<Context>,
@@ -109,6 +112,6 @@ pub fn get(
     state
         .client
         .get_single(RoomUri::from(path))
-        .map(|r| GetResponse::from(r).into())
         .map_err(|e| error!("{:?}", e))
+        .map(|r| GetResponse::from(r).into())
 }

@@ -4,7 +4,12 @@ pub mod room;
 
 use std::collections::HashMap;
 
-use actix_web::{middleware, web, App, HttpResponse, HttpServer};
+use actix_web::{
+    middleware,
+    web::{self, Data, Json},
+    App, HttpResponse, HttpServer,
+};
+use futures::Future;
 use medea::api::control::grpc::protos::control::{
     Element as ElementProto, Error as ErrorProto,
     GetResponse as GetResponseProto, Response as ResponseProto,
@@ -21,8 +26,6 @@ use crate::{
         room::Room,
     },
 };
-use actix_web::web::{Data, Json};
-use futures::Future;
 
 pub struct Context {
     client: ControlClient,
@@ -65,30 +68,32 @@ pub fn run() {
 }
 
 #[derive(Deserialize, Debug)]
-pub struct BatchId {
+pub struct BatchIdsRequest {
     ids: Vec<String>,
 }
 
+#[allow(clippy::needless_pass_by_value)]
 pub fn batch_get(
     state: Data<Context>,
-    data: Json<BatchId>,
+    data: Json<BatchIdsRequest>,
 ) -> impl Future<Item = HttpResponse, Error = ()> {
     state
         .client
         .get_batch(data.ids.clone())
-        .map(|r| GetResponse::from(r).into())
         .map_err(|e| error!("{:?}", e))
+        .map(|r| GetResponse::from(r).into())
 }
 
+#[allow(clippy::needless_pass_by_value)]
 pub fn batch_delete(
     state: Data<Context>,
-    data: Json<BatchId>,
+    data: Json<BatchIdsRequest>,
 ) -> impl Future<Item = HttpResponse, Error = ()> {
     state
         .client
         .delete_batch(data.0.ids)
-        .map(|r| Response::from(r).into())
         .map_err(|e| error!("{:?}", e))
+        .map(|r| Response::from(r).into())
 }
 
 #[derive(Debug, Serialize)]
@@ -143,14 +148,6 @@ impl From<ResponseProto> for Response {
 }
 
 #[derive(Serialize, Debug)]
-pub struct GetResponse {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub elements: Option<HashMap<String, Element>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub error: Option<ErrorResponse>,
-}
-
-#[derive(Serialize, Debug)]
 #[serde(tag = "kind")]
 pub enum Element {
     Member(Member),
@@ -194,6 +191,14 @@ impl Into<RoomElementProto> for Element {
         }
         proto
     }
+}
+
+#[derive(Serialize, Debug)]
+pub struct GetResponse {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub elements: Option<HashMap<String, Element>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<ErrorResponse>,
 }
 
 impl From<GetResponseProto> for GetResponse {

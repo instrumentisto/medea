@@ -31,8 +31,8 @@ pub fn delete(
     state
         .client
         .delete_single(MemberUri::from(path))
-        .map(|r| Response::from(r).into())
         .map_err(|e| error!("{:?}", e))
+        .map(|r| Response::from(r).into())
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -55,14 +55,6 @@ impl Into<MemberProto> for Member {
     }
 }
 
-impl Into<RoomElementProto> for Member {
-    fn into(self) -> RoomElementProto {
-        let mut proto = RoomElementProto::new();
-        proto.set_member(self.into());
-        proto
-    }
-}
-
 impl From<MemberProto> for Member {
     fn from(mut proto: MemberProto) -> Self {
         let mut member_pipeline = HashMap::new();
@@ -75,6 +67,15 @@ impl From<MemberProto> for Member {
     }
 }
 
+impl Into<RoomElementProto> for Member {
+    fn into(self) -> RoomElementProto {
+        let mut proto = RoomElementProto::new();
+        proto.set_member(self.into());
+        proto
+    }
+}
+
+#[allow(clippy::needless_pass_by_value)]
 pub fn create(
     path: Path<MemberPath>,
     state: Data<Context>,
@@ -82,11 +83,12 @@ pub fn create(
 ) -> impl Future<Item = HttpResponse, Error = ()> {
     state
         .client
-        .create_member(path.into(), data.0)
-        .map(|r| Response::from(r).into())
+        .create_member(&path.into(), data.0)
         .map_err(|e| error!("{:?}", e))
+        .map(|r| Response::from(r).into())
 }
 
+#[allow(clippy::needless_pass_by_value)]
 pub fn get(
     path: Path<MemberPath>,
     state: Data<Context>,
@@ -94,6 +96,6 @@ pub fn get(
     state
         .client
         .get_single(MemberUri::from(path))
-        .map(|r| GetResponse::from(r).into())
         .map_err(|e| error!("{:?}", e))
+        .map(|r| GetResponse::from(r).into())
 }

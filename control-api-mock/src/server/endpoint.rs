@@ -33,8 +33,8 @@ pub fn delete(
     state
         .client
         .delete_single(EndpointUri::from(path))
-        .map(|r| Response::from(r).into())
         .map_err(|e| error!("{:?}", e))
+        .map(|r| Response::from(r).into())
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -55,7 +55,7 @@ impl Into<P2pModeProto> for P2pMode {
 }
 
 impl From<P2pModeProto> for P2pMode {
-    fn from(proto: P2pModeProto) -> P2pMode {
+    fn from(proto: P2pModeProto) -> Self {
         match proto {
             P2pModeProto::ALWAYS => P2pMode::Always,
             P2pModeProto::IF_POSSIBLE => P2pMode::IfPossible,
@@ -64,6 +64,7 @@ impl From<P2pModeProto> for P2pMode {
     }
 }
 
+#[allow(clippy::module_name_repetitions)]
 #[derive(Serialize, Deserialize, Debug)]
 pub struct WebRtcPublishEndpoint {
     p2p: P2pMode,
@@ -85,6 +86,7 @@ impl From<WebRtcPublishEndpointProto> for WebRtcPublishEndpoint {
     }
 }
 
+#[allow(clippy::module_name_repetitions)]
 #[derive(Serialize, Deserialize, Debug)]
 pub struct WebRtcPlayEndpoint {
     src: String,
@@ -152,11 +154,12 @@ pub fn create(
 ) -> impl Future<Item = HttpResponse, Error = ()> {
     state
         .client
-        .create_endpoint(path.into(), data.0)
-        .map(|r| Response::from(r).into())
+        .create_endpoint(&path.into(), data.0)
         .map_err(|e| error!("{:?}", e))
+        .map(|r| Response::from(r).into())
 }
 
+#[allow(clippy::needless_pass_by_value)]
 pub fn get(
     path: Path<EndpointPath>,
     state: Data<Context>,
@@ -164,6 +167,6 @@ pub fn get(
     state
         .client
         .get_single(EndpointUri::from(path))
-        .map(|r| GetResponse::from(r).into())
         .map_err(|e| error!("{:?}", e))
+        .map(|r| GetResponse::from(r).into())
 }
