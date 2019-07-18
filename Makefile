@@ -17,7 +17,7 @@ eq = $(if $(or $(1),$(2)),$(and $(findstring $(1),$(2)),\
 
 IMAGE_NAME := $(strip $(shell grep 'COMPOSE_IMAGE_NAME=' .env | cut -d '=' -f2))
 
-RUST_VER := 1.36.0
+RUST_VER := 1.36
 
 
 
@@ -27,6 +27,7 @@ RUST_VER := 1.36.0
 ###########
 
 build: docker.build
+
 
 # Resolve all project dependencies.
 #
@@ -135,39 +136,6 @@ endif
 
 
 
-###################
-# Docker commands #
-###################
-
-# Build medea project Docker image.
-#
-# Usage:
-#	make docker.build [TAG=(dev|<tag>)] [debug=(yes|no)] [no-cache=(no|yes)]
-
-docker-build-image-name = $(IMAGE_NAME)$(if $(call eq,$(IMAGE),),,/$(IMAGE))
-
-docker.build:
-ifneq ($(no-cache),yes)
-	docker run -u $(shell id -u):$(shell id -g) --rm --network=host -v "$(PWD)":/app -w /app \
-	           -e CARGO_HOME=.cache/cargo \
-		rust:$(RUST_VER) \
-			cargo build --bin=medea \
-				$(if $(call eq,$(debug),no),--release,)
-endif
-	@echo "!target/$(if $(call eq,$(debug),no),release,debug)/" >> .dockerignore
-	- docker build --network=host --force-rm \
-		$(if $(call eq,$(no-cache),yes),\
-			--no-cache --pull,) \
-		$(if $(call eq,$(IMAGE),),\
-			--build-arg rust_ver=$(RUST_VER) \
-			--build-arg rustc_mode=$(if \
-				$(call eq,$(debug),no),release,debug) \
-			--build-arg rustc_opts=$(if \
-				$(call eq,$(debug),no),--release,) \
-			--build-arg cargo_home=.cache/cargo,) \
-		-t $(docker-build-image-name):$(if $(call eq,$(TAG),),dev,$(TAG)) .
-	@sed -i '/!target\/$(if $(call eq,$(debug),no),release,debug)/d' .dockerignore
-
 
 ####################
 # Testing commands #
@@ -196,6 +164,49 @@ endif
 	cargo test -p $(test-unit-crate)
 endif
 endif
+
+
+
+
+###################
+# Docker commands #
+###################
+
+# Build medea project Docker image.
+#
+# Usage:
+#	make docker.build [TAG=(dev|<tag>)]
+#	                  [debug=(yes|no)] [no-cache=(no|yes)]
+
+docker-build-image-name = $(IMAGE_NAME)
+
+docker.build:
+ifneq ($(no-cache),yes)
+	docker run --rm --network=host -v "$(PWD)":/app -w /app \
+	           -u $(shell id -u):$(shell id -g) \
+	           -e CARGO_HOME=.cache/cargo \
+		rust:$(RUST_VER) \
+			cargo build --bin=medea \
+				$(if $(call eq,$(debug),no),--release,)
+endif
+	$(call docker.build.clean.ignore)
+	@echo "!target/$(if $(call eq,$(debug),no),release,debug)/" >> .dockerignore
+	docker build --network=host --force-rm \
+		$(if $(call eq,$(no-cache),yes),\
+			--no-cache --pull,) \
+		$(if $(call eq,$(IMAGE),),\
+			--build-arg rust_ver=$(RUST_VER) \
+			--build-arg rustc_mode=$(if \
+				$(call eq,$(debug),no),release,debug) \
+			--build-arg rustc_opts=$(if \
+				$(call eq,$(debug),no),--release,) \
+			--build-arg cargo_home=.cache/cargo,) \
+		-t $(docker-build-image-name):$(if $(call eq,$(TAG),),dev,$(TAG)) .
+	$(call docker.build.clean.ignore)
+define docker.build.clean.ignore
+	@sed -i $(if $(call eq,$(shell uname -s),Darwin),'',) \
+		/^!target\/d .dockerignore
+endef
 
 
 
@@ -238,7 +249,8 @@ up.medea:
 ##################
 
 .PHONY: build cargo cargo.fmt cargo.lint \
-        docker.build docs docs.rust \
+        docker.build \
+        docs docs.rust \
         test test.unit \
         up up.coturn up.jason up.medea \
         yarn

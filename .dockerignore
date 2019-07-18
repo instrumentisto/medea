@@ -1,19 +1,20 @@
 *
-# Medea sources and manifest
+
+# Medea sources and manifest.
 !Cargo.toml
 !Cargo.lock
-!src
+!src/
 
-# Medea uses this crates
-!crates
-!proto
+# Medea uses this sub-crates.
+!crates/
+!proto/
 
-# We dont need jason while building medea, but since its
-# in medea's workspace we must give cargo this files
+# We don't need Jason while building Medea, but since it's in Medea's workspace,
+# Cargo should be able to see these files.
 !jason/Cargo.toml
 !jason/src/lib.rs
 
-# Medea dependencies cache
+# Medea dependencies cache.
 !.cache/cargo/
 
-# !target/&{mode} will be added and removed dynamically
+# !target/{mode} is added and removed dynamically to reduce image build times.
