@@ -6,7 +6,7 @@ use std::{
 };
 
 use serde::{Deserialize, Serialize};
-use smart_default::*;
+use smart_default::SmartDefault;
 
 /// STUN/TURN server settings.
 #[derive(Clone, Debug, Deserialize, Serialize, SmartDefault)]
