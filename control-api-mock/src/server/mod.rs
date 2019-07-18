@@ -1,10 +1,10 @@
-mod endpoint;
-mod member;
-mod room;
+pub mod endpoint;
+pub mod member;
+pub mod room;
 
 use std::collections::HashMap;
 
-use actix_web::{middleware, App, HttpResponse, HttpServer};
+use actix_web::{middleware, web, App, HttpResponse, HttpServer};
 use medea::api::control::grpc::protos::control::{
     Error as ErrorProto, Response as ResponseProto,
 };
@@ -24,18 +24,17 @@ pub fn run() {
             })
             .wrap(middleware::Logger::default())
             .service(
-                actix_web::web::resource("/{room_id}")
-                    .route(actix_web::web::delete().to_async(room::delete)),
+                web::resource("/{room_id}")
+                    .route(web::delete().to_async(room::delete)),
             )
             .service(
-                actix_web::web::resource("/{room_id}/{member_id}")
-                    .route(actix_web::web::delete().to_async(member::delete)),
+                web::resource("/{room_id}/{member_id}")
+                    .route(web::delete().to_async(member::delete)),
             )
             .service(
-                actix_web::web::resource(
-                    "/{room_id}/{member_id}/{endpoint_id}",
-                )
-                .route(actix_web::web::delete().to_async(endpoint::delete)),
+                web::resource("/{room_id}/{member_id}/{endpoint_id}")
+                    .route(web::delete().to_async(endpoint::delete))
+                    .route(web::post().to_async(endpoint::create)),
             )
     })
     .bind("0.0.0.0:8000")

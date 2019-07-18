@@ -13,8 +13,8 @@ use crate::{
 #[allow(clippy::module_name_repetitions)]
 #[derive(Debug, Deserialize)]
 pub struct MemberPath {
-    room_id: String,
-    member_id: String,
+    pub room_id: String,
+    pub member_id: String,
 }
 
 #[allow(clippy::needless_pass_by_value)]
@@ -24,7 +24,7 @@ pub fn delete(
 ) -> impl Future<Item = HttpResponse, Error = ()> {
     state
         .client
-        .delete_room(&path.room_id)
+        .delete_member(path.into())
         .map(|r| Response::from(r).into())
         .map_err(|e| error!("{:?}", e))
 }
