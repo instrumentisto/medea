@@ -1,3 +1,5 @@
+//! Implementation of client for medea's gRPC control API.
+
 use std::{fmt, sync::Arc};
 
 use actix_web::web::Path;
@@ -15,6 +17,7 @@ use crate::server::{
     room::{Room, RoomPath},
 };
 
+/// Uri to `Room` element.
 #[derive(Clone, Debug)]
 pub struct RoomUri {
     room_id: String,
@@ -34,6 +37,7 @@ impl fmt::Display for RoomUri {
     }
 }
 
+/// Uri to `Member` element.
 #[derive(Clone, Debug)]
 pub struct MemberUri {
     room_id: String,
@@ -56,6 +60,7 @@ impl fmt::Display for MemberUri {
     }
 }
 
+/// Uri to `Endpoint` element.
 #[derive(Clone, Debug)]
 pub struct EndpointUri {
     room_id: String,
@@ -84,6 +89,7 @@ impl fmt::Display for EndpointUri {
     }
 }
 
+/// Create new [`IdRequest`] with provided IDs.
 fn id_request(ids: Vec<String>) -> IdRequest {
     let mut req = IdRequest::new();
     let ids = RepeatedField::from(ids);
@@ -91,27 +97,24 @@ fn id_request(ids: Vec<String>) -> IdRequest {
     req
 }
 
+/// Client for medea's control API.
 #[allow(clippy::module_name_repetitions)]
 pub struct ControlClient {
     grpc_client: ControlApiClient,
 }
 
 impl ControlClient {
+    /// Create new client for medea's control API.
+    ///
+    /// __Note that call of this function is not check availability of control
+    /// API's gRPC server. He's availability check only on some method call.__
     pub fn new() -> Self {
         Self {
             grpc_client: get_grpc_client(),
         }
     }
 
-    pub fn delete_room(
-        &self,
-        uri: &RoomUri,
-    ) -> impl Future<Item = Response, Error = Error> {
-        let req = id_request(vec![uri.to_string()]);
-
-        self.grpc_client.delete_async(&req).unwrap()
-    }
-
+    /// Create `Room` element.
     pub fn create_room(
         &self,
         uri: &RoomUri,
@@ -124,6 +127,7 @@ impl ControlClient {
         self.grpc_client.create_async(&req).unwrap()
     }
 
+    /// Create `Member` element.
     pub fn create_member(
         &self,
         uri: &MemberUri,
@@ -135,6 +139,7 @@ impl ControlClient {
         self.grpc_client.create_async(&req).unwrap()
     }
 
+    /// Create `Endpoint` element.
     pub fn create_endpoint(
         &self,
         uri: &EndpointUri,
@@ -154,6 +159,7 @@ impl ControlClient {
         self.grpc_client.create_async(&req).unwrap()
     }
 
+    /// Single get element.
     pub fn get_single<T: fmt::Display>(
         &self,
         uri: T,
@@ -163,6 +169,7 @@ impl ControlClient {
         self.grpc_client.get_async(&req).unwrap()
     }
 
+    /// Get batch of elements.
     pub fn get_batch(
         &self,
         uris: Vec<String>,
@@ -172,6 +179,7 @@ impl ControlClient {
         self.grpc_client.get_async(&req).unwrap()
     }
 
+    /// Delete single element.
     pub fn delete_single<T: fmt::Display>(
         &self,
         uri: T,
@@ -181,6 +189,7 @@ impl ControlClient {
         self.grpc_client.delete_async(&req).unwrap()
     }
 
+    /// Delete batch of elements.
     pub fn delete_batch(
         &self,
         ids: Vec<String>,
@@ -197,6 +206,7 @@ impl Default for ControlClient {
     }
 }
 
+/// Get gRPC client for control API.
 fn get_grpc_client() -> ControlApiClient {
     let env = Arc::new(EnvBuilder::new().build());
     let ch = ChannelBuilder::new(env).connect("localhost:50051");

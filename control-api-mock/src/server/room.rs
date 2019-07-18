@@ -1,3 +1,5 @@
+//! `Room` element related methods and entities.
+
 use std::collections::HashMap;
 
 use actix_web::{
@@ -18,12 +20,18 @@ use crate::{
 
 use super::Context;
 
+/// Path to `Room` in REST API.
 #[allow(clippy::module_name_repetitions)]
 #[derive(Debug, Deserialize)]
 pub struct RoomPath {
     pub room_id: String,
 }
 
+/// `DELETE /{room_id}`
+///
+/// Delete room.
+///
+/// _For batch delete use `DELETE /`._
 #[allow(clippy::needless_pass_by_value)]
 pub fn delete(
     path: Path<RoomPath>,
@@ -36,11 +44,14 @@ pub fn delete(
         .map(|r| Response::from(r).into())
 }
 
+/// Control API's `Room` representation.
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Room {
+    /// Pipeline of `Room`.
     pipeline: HashMap<String, RoomElement>,
 }
 
+/// Element of [`Room`]'s pipeline.
 #[allow(clippy::module_name_repetitions)]
 #[derive(Serialize, Deserialize, Debug)]
 pub enum RoomElement {
@@ -91,6 +102,9 @@ impl From<RoomProto> for Room {
     }
 }
 
+/// `POST /{room_id}`
+///
+/// Create new `Room`.
 #[allow(clippy::needless_pass_by_value)]
 pub fn create(
     path: Path<RoomPath>,
@@ -104,6 +118,11 @@ pub fn create(
         .map(|r| Response::from(r).into())
 }
 
+/// `GET /{room_id}`
+///
+/// Get single `Room`.
+///
+/// _For batch get use `GET /`._
 #[allow(clippy::needless_pass_by_value)]
 pub fn get(
     path: Path<RoomPath>,

@@ -1,3 +1,5 @@
+//! REST API server implementation.
+
 pub mod endpoint;
 pub mod member;
 pub mod room;
@@ -27,10 +29,12 @@ use crate::{
     },
 };
 
+/// Context of actix-web server.
 pub struct Context {
     client: ControlClient,
 }
 
+/// Run actix-web REST API server.
 pub fn run() {
     HttpServer::new(|| {
         App::new()
@@ -67,11 +71,17 @@ pub fn run() {
     .start();
 }
 
+/// Some batch ID's request. Used for batch delete and get.
 #[derive(Deserialize, Debug)]
 pub struct BatchIdsRequest {
+    /// Elements ids.
     ids: Vec<String>,
 }
 
+/// `GET /`
+///
+/// Batch get elements. With this method you can get getheterogeneous set of
+/// elements.
 #[allow(clippy::needless_pass_by_value)]
 pub fn batch_get(
     state: Data<Context>,
@@ -84,6 +94,10 @@ pub fn batch_get(
         .map(|r| GetResponse::from(r).into())
 }
 
+/// `DELETE /`
+///
+/// Batch delete elements. With this method you can delete getheterogeneous set
+/// of elements.
 #[allow(clippy::needless_pass_by_value)]
 pub fn batch_delete(
     state: Data<Context>,
@@ -96,10 +110,16 @@ pub fn batch_delete(
         .map(|r| Response::from(r).into())
 }
 
+/// Error object. Returns when some error happened on control API's side.
 #[derive(Debug, Serialize)]
 pub struct ErrorResponse {
+    /// Medea's code of error.
     pub code: u32,
+
+    /// Text of error.
     pub text: String,
+
+    /// Element's ID with which error happened.
     pub element: String,
 }
 
@@ -113,10 +133,16 @@ impl Into<ErrorResponse> for ErrorProto {
     }
 }
 
+/// Response which return sids.
+///
+/// Used for delete and create methods.
 #[derive(Debug, Serialize)]
 pub struct Response {
+    /// Links for connect.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sid: Option<HashMap<String, String>>,
+
+    /// Error if something happened on control API's side.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<ErrorResponse>,
 }
@@ -147,6 +173,7 @@ impl From<ResponseProto> for Response {
     }
 }
 
+/// Union of all elements which exists in medea.
 #[derive(Serialize, Debug)]
 #[serde(tag = "kind")]
 pub enum Element {
@@ -193,10 +220,14 @@ impl Into<RoomElementProto> for Element {
     }
 }
 
+/// Response on batch get requests.
 #[derive(Serialize, Debug)]
 pub struct GetResponse {
+    /// Requested elements. Key - element's ID, value - requested element.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub elements: Option<HashMap<String, Element>>,
+
+    /// Error if something happened on control API's side.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<ErrorResponse>,
 }
@@ -232,10 +263,14 @@ impl Into<HttpResponse> for GetResponse {
     }
 }
 
+/// Response on single get request.
 #[derive(Serialize, Debug)]
 pub struct SingleGetResponse {
+    /// Requested element.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub element: Option<Element>,
+
+    /// Error if something happened on control API's side.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<ErrorResponse>,
 }

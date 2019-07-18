@@ -1,3 +1,5 @@
+//! Endpoint related methods and entities.
+
 use actix_web::{
     web::{Data, Json, Path},
     HttpResponse,
@@ -17,6 +19,7 @@ use crate::{
     server::{Context, Response, SingleGetResponse},
 };
 
+/// Path to `Endpoint` in REST API.
 #[allow(clippy::module_name_repetitions)]
 #[derive(Debug, Deserialize)]
 pub struct EndpointPath {
@@ -25,6 +28,10 @@ pub struct EndpointPath {
     pub endpoint_id: String,
 }
 
+/// `DELETE /{room_id}/{member_id}/{endpoint_id}`
+///  Delete `Endpoint`.
+///
+/// _For batch delete use `DELETE /`._
 #[allow(clippy::needless_pass_by_value)]
 pub fn delete(
     path: Path<EndpointPath>,
@@ -37,6 +44,7 @@ pub fn delete(
         .map(|r| Response::from(r).into())
 }
 
+/// P2p mode of [`WebRtcPublishEndpoint`].
 #[derive(Serialize, Deserialize, Debug)]
 pub enum P2pMode {
     Always,
@@ -64,9 +72,11 @@ impl From<P2pModeProto> for P2pMode {
     }
 }
 
+/// Control API's `WebRtcPublishEndpoint` representation.
 #[allow(clippy::module_name_repetitions)]
 #[derive(Serialize, Deserialize, Debug)]
 pub struct WebRtcPublishEndpoint {
+    /// Mode of connection for this [`WebRtcPublishEndpoint`].
     p2p: P2pMode,
 }
 
@@ -86,9 +96,12 @@ impl From<WebRtcPublishEndpointProto> for WebRtcPublishEndpoint {
     }
 }
 
+/// Control API's `WebRtcPlayEndpoint` representation.
 #[allow(clippy::module_name_repetitions)]
 #[derive(Serialize, Deserialize, Debug)]
 pub struct WebRtcPlayEndpoint {
+    /// URI in format `local://{room_id}/{member_id}/{endpoint_id}` pointing to
+    /// [`WebRtcPublishEndpoint`] which this [`WebRtcPlayEndpoint`] plays.
     src: String,
 }
 
@@ -108,6 +121,7 @@ impl From<WebRtcPlayEndpointProto> for WebRtcPlayEndpoint {
     }
 }
 
+/// Some `Endpoint` representation.
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "kind")]
 pub enum Endpoint {
@@ -146,6 +160,9 @@ impl From<MemberElementProto> for Endpoint {
     }
 }
 
+/// `POST /{room_id}/{member_id}/{endpoint_id}`
+///
+/// Create new `Endpoint`.
 #[allow(clippy::needless_pass_by_value)]
 pub fn create(
     path: Path<EndpointPath>,
@@ -159,6 +176,11 @@ pub fn create(
         .map(|r| Response::from(r).into())
 }
 
+/// `GET /{room_id}/{member_id}/{endpoint_id}`
+///
+/// Get single `Endpoint`.
+///
+/// For batch get use `GET /`.
 #[allow(clippy::needless_pass_by_value)]
 pub fn get(
     path: Path<EndpointPath>,

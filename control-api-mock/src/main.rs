@@ -1,3 +1,5 @@
+//! Mock server for gRPC medea's control API.
+
 pub mod client;
 pub mod prelude;
 pub mod server;

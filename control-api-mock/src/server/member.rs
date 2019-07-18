@@ -1,3 +1,5 @@
+//! `Member` element related methods and entities.
+
 use std::collections::HashMap;
 
 use actix_web::{
@@ -16,6 +18,7 @@ use crate::{
     server::{endpoint::Endpoint, Context, Response, SingleGetResponse},
 };
 
+/// Path to member in REST API.
 #[allow(clippy::module_name_repetitions)]
 #[derive(Debug, Deserialize)]
 pub struct MemberPath {
@@ -23,6 +26,11 @@ pub struct MemberPath {
     pub member_id: String,
 }
 
+/// `DELETE /{room_id}/{member_id}`
+///
+/// Delete single `Member`.
+///
+/// _For batch delete use `DELETE /`._
 #[allow(clippy::needless_pass_by_value)]
 pub fn delete(
     path: Path<MemberPath>,
@@ -35,8 +43,10 @@ pub fn delete(
         .map(|r| Response::from(r).into())
 }
 
+/// Entity that represents control API `Member`.
 #[derive(Deserialize, Serialize, Debug)]
 pub struct Member {
+    /// Pipeline of control API `Member`.
     pipeline: HashMap<String, Endpoint>,
 }
 
@@ -48,7 +58,7 @@ impl Into<MemberProto> for Member {
             memebers_elements.insert(id, endpoint.into());
         }
         proto.set_pipeline(memebers_elements);
-        // TODO
+        // TODO when credentials will generate on server, remove this.
         proto.set_credentials("test".to_string());
 
         proto
@@ -75,6 +85,9 @@ impl Into<RoomElementProto> for Member {
     }
 }
 
+/// `POST /{room_id}/{member_id}`
+///
+/// Create new `Member`.
 #[allow(clippy::needless_pass_by_value)]
 pub fn create(
     path: Path<MemberPath>,
@@ -88,6 +101,11 @@ pub fn create(
         .map(|r| Response::from(r).into())
 }
 
+/// `GET /{room_id}/{member_id}`
+///
+/// Get single `Member`.
+///
+/// _For batch get use `GET /`._
 #[allow(clippy::needless_pass_by_value)]
 pub fn get(
     path: Path<MemberPath>,
