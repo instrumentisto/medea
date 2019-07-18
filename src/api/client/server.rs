@@ -131,7 +131,7 @@ impl Handler<ShutdownGracefully> for Server {
         _: ShutdownGracefully,
         _: &mut Self::Context,
     ) -> Self::Result {
-        info!("Shutting down Client API HTTP server");
+        info!("Server received ShutdownGracefully message so shutting down");
         Box::new(self.0.stop(true).into_actor(self))
     }
 }

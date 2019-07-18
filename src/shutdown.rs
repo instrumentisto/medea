@@ -11,8 +11,8 @@ use actix::{
     WrapFuture as _,
 };
 use failure::Fail;
-use futures::{future, stream, Future, Stream};
-use tokio::{timer::timeout, util::FutureExt as _};
+use futures::{future, stream::iter_ok, Future, Stream};
+use tokio::util::FutureExt as _;
 
 use crate::log::prelude::*;
 
@@ -132,6 +132,7 @@ impl Handler<OsSignal> for GracefulShutdown {
         let by_priority: Vec<_> = self
             .subs
             .values()
+            .rev()
             .map(|addrs| {
                 let addrs: Vec<_> = addrs
                     .iter()
@@ -147,16 +148,18 @@ impl Handler<OsSignal> for GracefulShutdown {
             .collect();
 
         Box::new(
-            stream::unfold(by_priority, |mut v| {
-                v.pop().map(|fut| Ok((fut, v)))
-            })
-            .collect()
-            .timeout(self.timeout)
-            .map_err(|e: timeout::Error<()>| {
-                error!("Graceful shutdown has timed out: {:?}", e)
-            })
-            .map(|_| System::current().stop())
-            .into_actor(self),
+            iter_ok::<_, ()>(by_priority)
+                .for_each(|row| row.map(|_| ()))
+                .timeout(self.timeout)
+                .map_err(|_| {
+                    error!("Graceful shutdown has timed out, stopping system");
+                    System::current().stop()
+                })
+                .map(|_| {
+                    info!("Graceful shutdown succeeded, stopping system");
+                    System::current().stop()
+                })
+                .into_actor(self),
         )
     }
 }

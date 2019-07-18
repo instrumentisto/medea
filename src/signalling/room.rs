@@ -467,7 +467,10 @@ impl Handler<ShutdownGracefully> for Room {
         _: ShutdownGracefully,
         ctx: &mut Self::Context,
     ) -> Self::Result {
-        info!("Shutdown signal received for Room: {:?}", self.id);
+        info!(
+            "Room: {:?} received ShutdownGracefully message so shutting down",
+            self.id
+        );
         self.close_gracefully(ctx)
     }
 }
