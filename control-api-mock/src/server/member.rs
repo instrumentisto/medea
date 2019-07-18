@@ -3,7 +3,9 @@ use actix_web::{
     HttpResponse,
 };
 use futures::Future;
-use medea::api::control::grpc::protos::control::Member as MemberProto;
+use medea::api::control::grpc::protos::control::{
+    Member as MemberProto, Room_Element as RoomElementProto,
+};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -48,6 +50,14 @@ impl Into<MemberProto> for Member {
         // TODO
         proto.set_credentials("test".to_string());
 
+        proto
+    }
+}
+
+impl Into<RoomElementProto> for Member {
+    fn into(self) -> RoomElementProto {
+        let mut proto = RoomElementProto::new();
+        proto.set_member(self.into());
         proto
     }
 }

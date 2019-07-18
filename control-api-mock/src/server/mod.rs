@@ -25,7 +25,8 @@ pub fn run() {
             .wrap(middleware::Logger::default())
             .service(
                 web::resource("/{room_id}")
-                    .route(web::delete().to_async(room::delete)),
+                    .route(web::delete().to_async(room::delete))
+                    .route(web::post().to_async(room::create)),
             )
             .service(
                 web::resource("/{room_id}/{member_id}")

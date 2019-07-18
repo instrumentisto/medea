@@ -3,13 +3,13 @@ use std::{fmt, sync::Arc};
 use crate::server::{
     endpoint::{Endpoint, EndpointPath},
     member::{Member, MemberPath},
-    room::RoomPath,
+    room::{Room, RoomPath},
 };
 use actix_web::web::Path;
 use futures::Future;
 use grpcio::{ChannelBuilder, EnvBuilder, Error};
 use medea::api::control::grpc::protos::{
-    control::{CreateRequest, IdRequest, Response, Room},
+    control::{CreateRequest, IdRequest, Response},
     control_grpc::ControlApiClient,
 };
 use protobuf::RepeatedField;
@@ -127,6 +127,18 @@ impl ControlClient {
         let req = id_request(vec![uri.to_string()]);
 
         self.grpc_client.delete_async(&req).unwrap()
+    }
+
+    pub fn create_room(
+        &self,
+        uri: RoomUri,
+        room: Room,
+    ) -> impl Future<Item = Response, Error = Error> {
+        let mut req = CreateRequest::new();
+        req.set_room(room.into());
+        req.set_id(uri.to_string());
+
+        self.grpc_client.create_async(&req).unwrap()
     }
 
     pub fn delete_member(
