@@ -1,9 +1,10 @@
 //! Provides application configuration options.
 
-mod rpc;
-mod server;
-mod shutdown;
-mod turn;
+pub mod log;
+pub mod rpc;
+pub mod server;
+pub mod shutdown;
+pub mod turn;
 
 use std::env;
 
@@ -12,6 +13,7 @@ use failure::Error;
 use serde::{Deserialize, Serialize};
 
 pub use self::{
+    log::Log,
     rpc::Rpc,
     server::Server,
     shutdown::Shutdown,
@@ -35,6 +37,8 @@ pub struct Conf {
     pub server: Server,
     /// TURN server settings.
     pub turn: Turn,
+    /// Logging settings.
+    pub log: Log,
     /// Application shutdown settings.
     pub shutdown: Shutdown,
 }
@@ -200,7 +204,7 @@ mod tests {
 
     #[test]
     #[serial]
-    fn redis_conf_test() {
+    fn redis_conf() {
         let default_conf = Conf::default();
 
         env::set_var("MEDEA_TURN.DB.REDIS.IP", "5.5.5.5");
@@ -229,7 +233,7 @@ mod tests {
 
     #[test]
     #[serial]
-    fn turn_conf_test() {
+    fn turn_conf() {
         let default_conf = Conf::default();
 
         env::set_var("MEDEA_TURN.IP", "5.5.5.5");
@@ -243,6 +247,24 @@ mod tests {
         assert_eq!(env_conf.turn.ip, Ipv4Addr::new(5, 5, 5, 5));
         assert_eq!(env_conf.turn.port, 1234);
         assert_eq!(env_conf.turn.addr(), "5.5.5.5:1234".parse().unwrap());
+    }
+
+    #[test]
+    #[serial]
+    fn log_conf() {
+        let default_conf = Conf::default();
+
+        env::set_var("MEDEA_LOG.LEVEL", "WARN");
+
+        let env_conf = Conf::parse().unwrap();
+
+        assert_ne!(default_conf.log.level(), env_conf.log.level());
+
+        assert_eq!(env_conf.log.level(), Some(slog::Level::Warning));
+
+        env::set_var("MEDEA_LOG.LEVEL", "OFF");
+
+        assert_eq!(Conf::parse().unwrap().log.level(), None);
     }
 
     #[test]

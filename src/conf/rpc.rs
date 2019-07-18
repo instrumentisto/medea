@@ -1,6 +1,6 @@
 //! RPC connection settings.
 use serde::{Deserialize, Serialize};
-use smart_default::*;
+use smart_default::SmartDefault;
 
 use std::time::Duration;
 
