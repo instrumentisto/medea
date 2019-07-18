@@ -74,3 +74,24 @@
 #
 # Default:
 #   connection_timeout = "5s"
+
+
+
+
+[log]
+# Maximum allowed level of application log entries.
+#
+# Possible values:
+#   "OFF", "CRITICAL", "ERROR", "WARN", "INFO", "DEBUG", "TRACE"
+#
+# Default:
+#   level = "INFO"
+
+
+
+
+[shutdown]
+# Maximum duration given to shutdown the whole application gracefully.
+#
+# Default:
+#   timeout = "5s"
