@@ -231,3 +231,41 @@ impl Into<HttpResponse> for GetResponse {
         }
     }
 }
+
+#[derive(Serialize, Debug)]
+pub struct SingleGetResponse {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub element: Option<Element>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<ErrorResponse>,
+}
+
+impl From<GetResponseProto> for SingleGetResponse {
+    fn from(mut proto: GetResponseProto) -> Self {
+        if proto.has_error() {
+            Self {
+                element: None,
+                error: Some(proto.take_error().into()),
+            }
+        } else {
+            Self {
+                error: None,
+                element: proto
+                    .take_elements()
+                    .into_iter()
+                    .map(|(_, e)| e.into())
+                    .next(),
+            }
+        }
+    }
+}
+
+impl Into<HttpResponse> for SingleGetResponse {
+    fn into(self) -> HttpResponse {
+        if self.error.is_some() {
+            HttpResponse::BadRequest().json(self)
+        } else {
+            HttpResponse::Ok().json(self)
+        }
+    }
+}

@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     client::RoomUri,
     prelude::*,
-    server::{member::Member, GetResponse, Response},
+    server::{member::Member, Response, SingleGetResponse},
 };
 
 use super::Context;
@@ -113,5 +113,5 @@ pub fn get(
         .client
         .get_single(RoomUri::from(path))
         .map_err(|e| error!("{:?}", e))
-        .map(|r| GetResponse::from(r).into())
+        .map(|r| SingleGetResponse::from(r).into())
 }
