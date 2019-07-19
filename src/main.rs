@@ -64,9 +64,14 @@ fn main() -> Result<(), Error> {
                     .map(move |_| {
                         let grpc_addr =
                             grpc::server::run(room_service, app_context);
+                        graceful_shutdown.do_send(shutdown::Subscribe(
+                            shutdown::Subscriber {
+                                priority: shutdown::Priority(1),
+                                addr: grpc_addr.clone().recipient(),
+                            },
+                        ));
                         grpc_addr_clone.set(Some(grpc_addr));
-                    })
-                    .map(move |_| {
+
                         let server = Server::run(room_repo, config).unwrap();
                         graceful_shutdown.do_send(shutdown::Subscribe(
                             shutdown::Subscriber {

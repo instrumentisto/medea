@@ -5,7 +5,10 @@
 
 use std::{collections::HashMap, convert::TryFrom, sync::Arc};
 
-use actix::{Actor, Addr, Arbiter, Context, MailboxError};
+use actix::{
+    Actor, Addr, Arbiter, Context, Handler, MailboxError, ResponseActFuture,
+    WrapFuture as _,
+};
 use failure::Fail;
 use futures::future::{self, Either, Future};
 use grpcio::{Environment, RpcContext, Server, ServerBuilder, UnarySink};
@@ -39,6 +42,7 @@ use crate::{
 };
 
 use super::protos::control_grpc::{create_control_api, ControlApi};
+use crate::shutdown::ShutdownGracefully;
 
 #[derive(Debug, Fail)]
 enum ControlApiError {
@@ -589,6 +593,26 @@ impl Actor for GrpcServer {
     fn stopped(&mut self, _ctx: &mut Self::Context) {
         debug!("Shutdown gRPC.");
         self.server.shutdown().wait().unwrap();
+    }
+}
+
+impl Handler<ShutdownGracefully> for GrpcServer {
+    type Result = ResponseActFuture<Self, (), ()>;
+
+    fn handle(
+        &mut self,
+        _: ShutdownGracefully,
+        _: &mut Self::Context,
+    ) -> Self::Result {
+        info!(
+            "gRPC server received ShutdownGracefully message so shutting down.",
+        );
+        Box::new(
+            self.server
+                .shutdown()
+                .map_err(|e| warn!("{:?}", e))
+                .into_actor(self),
+        )
     }
 }
 
