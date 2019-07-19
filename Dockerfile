@@ -8,7 +8,7 @@ ARG rustc_mode=release
 ARG rustc_opts=--release
 ARG cargo_home=/usr/local/cargo
 
-# Create the user and group files that will be used in the running container to
+# Create user and group files, which will be used in a running container to
 # run the process as an unprivileged user.
 RUN mkdir -p /out/etc/ \
  && echo 'nobody:x:65534:65534:nobody:/:' > /out/etc/passwd \

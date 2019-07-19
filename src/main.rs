@@ -5,9 +5,13 @@ use failure::Error;
 use futures::future::Future;
 use hashbrown::HashMap;
 use medea::{
-    api::{client, control::grpc},
+    api::{
+        client::{self, server::Server},
+        control::grpc,
+    },
     conf::Conf,
     log::{self, prelude::*},
+    shutdown::{self, GracefulShutdown},
     signalling::{
         room_repo::RoomRepository,
         room_service::{RoomService, StartStaticRooms},
@@ -32,14 +36,22 @@ fn main() -> Result<(), Error> {
 
     actix::run(move || {
         new_turn_auth_service(&config.turn)
-            .map_err(|e| error!("{:?}", e))
-            .and_then(move |turn_service| {
+            .map_err(move |e| error!("{:?}", e))
+            .map(|turn_service| {
+                let graceful_shutdown =
+                    GracefulShutdown::new(config.shutdown.timeout).start();
+                (turn_service, graceful_shutdown, config)
+            })
+            .and_then(move |(turn_service, graceful_shutdown, config)| {
                 let app_context = AppContext::new(config.clone(), turn_service);
 
                 let room_repo = RoomRepository::new(HashMap::new());
-                let room_service =
-                    RoomService::new(room_repo.clone(), app_context.clone())
-                        .start();
+                let room_service = RoomService::new(
+                    room_repo.clone(),
+                    app_context.clone(),
+                    graceful_shutdown.clone(),
+                )
+                .start();
 
                 room_service
                     .clone()
@@ -57,10 +69,14 @@ fn main() -> Result<(), Error> {
                             grpc::server::run(room_service, app_context);
                         grpc_addr_clone.set(Some(grpc_addr));
                     })
-                    .and_then(move |_| {
-                        client::server::run(room_repo, config).map_err(|e| {
-                            error!("Client server startup error. {:?}", e)
-                        })
+                    .map(move |_| {
+                        let server = Server::run(room_repo, config).unwrap();
+                        graceful_shutdown.do_send(shutdown::Subscribe(
+                            shutdown::Subscriber {
+                                priority: shutdown::Priority(1),
+                                addr: server.recipient(),
+                            },
+                        ));
                     })
             })
     })
