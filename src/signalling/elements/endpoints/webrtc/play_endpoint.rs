@@ -5,13 +5,14 @@ use std::{
     rc::{Rc, Weak},
 };
 
+use medea_grpc_proto::control::{
+    Member_Element as ElementProto,
+    WebRtcPlayEndpoint as WebRtcPlayEndpointProto,
+};
+
 use crate::{
     api::control::{
         endpoints::webrtc_play_endpoint::{SrcUri, WebRtcPlayId as Id},
-        grpc::protos::control::{
-            Member_Element as ElementProto,
-            WebRtcPlayEndpoint as WebRtcPlayEndpointProto,
-        },
     },
     media::PeerId,
     signalling::elements::Member,

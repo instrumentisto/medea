@@ -5,7 +5,7 @@ pub mod webrtc_publish_endpoint;
 
 use std::convert::TryFrom;
 
-use crate::api::control::grpc::protos::control::{
+use medea_grpc_proto::control::{
     CreateRequest, Member_Element as MemberElementProto,
 };
 

@@ -1,0 +1,14 @@
+[package]
+name = "medea-grpc-proto"
+version = "0.1.0-dev"
+edition = "2018"
+description = "Client API protocol implementation for Medea media server"
+authors = ["Instrumentisto Team <developer@instrumentisto.com>"]
+homepage = "https://github.com/instrumentisto/medea"
+readme = "README.md"
+repository = "https://github.com/instrumentisto/medea"
+
+[dependencies]
+grpcio = "0.4"
+futures = "0.1"
+protobuf = "2.7"

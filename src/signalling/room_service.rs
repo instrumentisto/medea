@@ -6,11 +6,11 @@ use actix::{
 };
 use failure::Fail;
 use futures::future::{Either, Future};
+use medea_grpc_proto::control::Element as ElementProto;
 
 use crate::{
     api::control::{
         endpoints::Endpoint as EndpointSpec,
-        grpc::protos::control::Element as ElementProto,
         load_static_specs_from_dir,
         local_uri::{IsEndpointId, IsMemberId, IsRoomId, LocalUri},
         MemberId, MemberSpec, RoomId, RoomSpec,

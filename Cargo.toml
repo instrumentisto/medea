@@ -15,6 +15,7 @@ members = [
     "crates/medea-macro",
     "jason",
     "proto/client-api",
+    "proto/grpc",
 ]
 
 [profile.release]
@@ -38,6 +39,7 @@ hashbrown = "0.1"
 humantime = "1.2"
 macro-attr = "0.2"
 medea-client-api-proto = { path = "proto/client-api", features = ["medea"] }
+medea-grpc-proto = { path = "proto/grpc" }
 medea-macro = { path = "crates/medea-macro" }
 newtype_derive = "0.1"
 protobuf = "2.7"

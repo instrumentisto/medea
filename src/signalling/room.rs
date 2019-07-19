@@ -11,6 +11,10 @@ use failure::Fail;
 use futures::future;
 use hashbrown::{HashMap, HashSet};
 use medea_client_api_proto::{Command, Event, IceCandidate};
+use medea_grpc_proto::control::{
+    Element as ElementProto, Member_Element, Room as RoomProto,
+    Room_Element,
+};
 
 use crate::{
     api::{
@@ -19,10 +23,6 @@ use crate::{
             RpcConnectionClosed, RpcConnectionEstablished,
         },
         control::{
-            grpc::protos::control::{
-                Element as ElementProto, Member_Element, Room as RoomProto,
-                Room_Element,
-            },
             local_uri::{IsMemberId, LocalUri},
             room::RoomSpec,
             Endpoint as EndpointSpec, MemberId, MemberSpec, RoomId,

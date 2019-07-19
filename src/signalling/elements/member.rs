@@ -8,13 +8,13 @@ use std::{
 use failure::Fail;
 use hashbrown::HashMap;
 use medea_client_api_proto::IceServer;
+use medea_grpc_proto::control::{
+    Member as MemberProto, Room_Element as ElementProto,
+};
 
 use crate::{
     api::control::{
         endpoints::WebRtcPlayEndpoint as WebRtcPlayEndpointSpec,
-        grpc::protos::control::{
-            Member as MemberProto, Room_Element as ElementProto,
-        },
         local_uri::{
             IsEndpointId, IsMemberId, IsRoomId, LocalUri, LocalUriType,
         },

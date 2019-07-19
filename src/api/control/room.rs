@@ -6,9 +6,10 @@ use hashbrown::HashMap;
 use macro_attr::*;
 use newtype_derive::{newtype_fmt, NewtypeDisplay, NewtypeFrom};
 use serde::Deserialize;
+use medea_grpc_proto::control::Room as RoomProto;
 
 use crate::api::control::{
-    grpc::protos::control::Room as RoomProto, TryFromProtobufError,
+    TryFromProtobufError,
 };
 
 use super::{

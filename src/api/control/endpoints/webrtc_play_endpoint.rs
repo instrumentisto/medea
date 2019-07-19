@@ -9,10 +9,10 @@ use serde::{
     de::{self, Deserializer, Error, Visitor},
     Deserialize,
 };
+use medea_grpc_proto::control::WebRtcPlayEndpoint as WebRtcPlayEndpointProto;
 
 use crate::api::control::{
     endpoints::webrtc_publish_endpoint::WebRtcPublishId,
-    grpc::protos::control::WebRtcPlayEndpoint as WebRtcPlayEndpointProto,
     local_uri::{IsEndpointId, LocalUri, LocalUriParseError, LocalUriType},
     MemberId, RoomId, TryFromProtobufError,
 };

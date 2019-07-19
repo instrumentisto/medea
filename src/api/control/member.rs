@@ -6,13 +6,13 @@ use hashbrown::HashMap;
 use macro_attr::*;
 use newtype_derive::{newtype_fmt, NewtypeDisplay, NewtypeFrom};
 use serde::Deserialize;
+use medea_grpc_proto::control::Member as MemberProto;
 
 use crate::api::control::{
     endpoints::{
         webrtc_play_endpoint::WebRtcPlayEndpoint,
         webrtc_publish_endpoint::{WebRtcPublishEndpoint, WebRtcPublishId},
     },
-    grpc::protos::control::Member as MemberProto,
     Endpoint, TryFromProtobufError, WebRtcPlayId,
 };
 

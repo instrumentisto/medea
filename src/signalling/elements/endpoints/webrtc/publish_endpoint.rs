@@ -6,14 +6,14 @@ use std::{
 };
 
 use hashbrown::HashSet;
+use medea_grpc_proto::control::{
+    Member_Element as ElementProto,
+    WebRtcPublishEndpoint as WebRtcPublishEndpointProto,
+};
 
 use crate::{
     api::control::{
         endpoints::webrtc_publish_endpoint::{P2pMode, WebRtcPublishId as Id},
-        grpc::protos::control::{
-            Member_Element as ElementProto,
-            WebRtcPublishEndpoint as WebRtcPublishEndpointProto,
-        },
     },
     media::PeerId,
     signalling::elements::Member,
