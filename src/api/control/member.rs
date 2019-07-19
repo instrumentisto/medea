@@ -17,6 +17,9 @@ use crate::api::control::{
 };
 
 use super::{pipeline::Pipeline, Element, TryFromElementError};
+use rand::{distributions::Alphanumeric, Rng};
+
+const MEMBER_CREDENTIALS_LEN: usize = 32;
 
 macro_attr! {
     /// ID of [`Member`].
@@ -87,6 +90,13 @@ impl MemberSpec {
     }
 }
 
+fn generate_member_credentials() -> String {
+    rand::thread_rng()
+        .sample_iter(&Alphanumeric)
+        .take(MEMBER_CREDENTIALS_LEN)
+        .collect()
+}
+
 impl TryFrom<&MemberProto> for MemberSpec {
     type Error = TryFromProtobufError;
 
@@ -99,10 +109,17 @@ impl TryFrom<&MemberProto> for MemberSpec {
         }
         let pipeline = Pipeline::new(pipeline);
 
+        let proto_credentials = value.get_credentials();
+        let credentials = if proto_credentials.is_empty() {
+            generate_member_credentials()
+        } else {
+            proto_credentials.to_string()
+        };
+
         // Credentials here maybe absent.
         Ok(Self {
             pipeline,
-            credentials: value.get_credentials().to_string(),
+            credentials,
         })
     }
 }

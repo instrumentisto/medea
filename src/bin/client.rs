@@ -48,7 +48,7 @@ fn create_room(client: &ControlApiClient) {
     let mut publisher_pipeline = HashMap::new();
     publisher_pipeline.insert("publish".to_string(), publish_endpoint_element);
     publisher.set_pipeline(publisher_pipeline);
-    publisher.set_credentials("test".to_string());
+    //    publisher.set_credentials("test".to_string());
 
     let mut publisher_member_element = Room_Element::new();
     publisher_member_element.set_member(publisher);
