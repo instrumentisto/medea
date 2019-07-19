@@ -1,5 +1,3 @@
-use std::{cell::Cell, rc::Rc};
-
 use actix::Actor;
 use failure::Error;
 use futures::future::Future;
@@ -25,11 +23,6 @@ fn main() -> Result<(), Error> {
 
     let config = Conf::parse()?;
     info!("{:?}", config);
-
-    // This is crutch for existence of gRPC server throughout the all app's
-    // lifetime.
-    let grpc_addr = Rc::new(Cell::new(None));
-    let grpc_addr_clone = Rc::clone(&grpc_addr);
 
     actix::run(move || {
         new_turn_auth_service(&config.turn)
@@ -70,7 +63,6 @@ fn main() -> Result<(), Error> {
                                 addr: grpc_addr.clone().recipient(),
                             },
                         ));
-                        grpc_addr_clone.set(Some(grpc_addr));
 
                         let server = Server::run(room_repo, config).unwrap();
                         graceful_shutdown.do_send(shutdown::Subscribe(
