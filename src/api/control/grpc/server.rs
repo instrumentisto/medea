@@ -589,11 +589,6 @@ impl Actor for GrpcServer {
         self.server.start();
         debug!("gRPC server started.");
     }
-
-    fn stopped(&mut self, _ctx: &mut Self::Context) {
-        debug!("Shutdown gRPC.");
-        self.server.shutdown().wait().unwrap();
-    }
 }
 
 impl Handler<ShutdownGracefully> for GrpcServer {
