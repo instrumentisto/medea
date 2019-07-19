@@ -5,10 +5,7 @@ use failure::Error;
 use futures::future::Future;
 use hashbrown::HashMap;
 use medea::{
-    api::{
-        client::{self, server::Server},
-        control::grpc,
-    },
+    api::{client::server::Server, control::grpc},
     conf::Conf,
     log::{self, prelude::*},
     shutdown::{self, GracefulShutdown},

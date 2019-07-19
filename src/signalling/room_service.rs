@@ -199,6 +199,12 @@ impl Handler<DeleteRoom> for RoomService {
         ctx: &mut Self::Context,
     ) -> Self::Result {
         if let Some(room) = self.room_repo.get(&msg.0) {
+            self.graceful_shutdown.do_send(shutdown::Unsubscribe(
+                shutdown::Subscriber {
+                    priority: shutdown::Priority(2),
+                    addr: room.clone().recipient(),
+                },
+            ));
             let rooms = self.room_repo.clone();
             ctx.spawn(wrap_future(
                 room.send(Close)
