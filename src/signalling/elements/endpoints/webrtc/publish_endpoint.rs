@@ -10,8 +10,11 @@ use macro_attr::*;
 use newtype_derive::{newtype_fmt, NewtypeDisplay, NewtypeFrom};
 
 use crate::{
-    api::control::endpoint::P2pMode, media::PeerId,
-    signalling::elements::Member,
+    api::control::endpoint::P2pMode,
+    media::PeerId,
+    signalling::elements::{
+        endpoints::webrtc::play_endpoint::WeakWebRtcPlayEndpoint, Member,
+    },
 };
 
 use super::play_endpoint::WebRtcPlayEndpoint;
@@ -33,7 +36,7 @@ struct WebRtcPublishEndpointInner {
     p2p: P2pMode,
 
     /// All sinks of this [`WebRtcPublishEndpoint`].
-    sinks: Vec<Weak<WebRtcPlayEndpoint>>,
+    sinks: Vec<WeakWebRtcPlayEndpoint>,
 
     /// Owner [`Member`] of this [`WebRtcPublishEndpoint`].
     owner: Weak<Member>,
@@ -48,7 +51,7 @@ struct WebRtcPublishEndpointInner {
 
 impl Drop for WebRtcPublishEndpointInner {
     fn drop(&mut self) {
-        for receiver in self.sinks.iter().filter_map(|r| Weak::upgrade(r)) {
+        for receiver in self.sinks.iter().filter_map(|r| r.safe_upgrade()) {
             if let Some(receiver_owner) = receiver.weak_owner().upgrade() {
                 receiver_owner.remove_sink(&receiver.id())
             }
@@ -57,15 +60,12 @@ impl Drop for WebRtcPublishEndpointInner {
 }
 
 impl WebRtcPublishEndpointInner {
-    fn add_sinks(&mut self, sink: Weak<WebRtcPlayEndpoint>) {
+    fn add_sinks(&mut self, sink: WeakWebRtcPlayEndpoint) {
         self.sinks.push(sink);
     }
 
-    fn sinks(&self) -> Vec<Rc<WebRtcPlayEndpoint>> {
-        self.sinks
-            .iter()
-            .map(|p| Weak::upgrade(p).unwrap())
-            .collect()
+    fn sinks(&self) -> Vec<WebRtcPlayEndpoint> {
+        self.sinks.iter().map(|p| p.upgrade()).collect()
     }
 
     fn owner(&self) -> Rc<Member> {
@@ -106,7 +106,7 @@ impl WebRtcPublishEndpoint {
     pub fn new(
         id: Id,
         p2p: P2pMode,
-        sinks: Vec<Weak<WebRtcPlayEndpoint>>,
+        sinks: Vec<WeakWebRtcPlayEndpoint>,
         owner: Weak<Member>,
     ) -> Self {
         Self(RefCell::new(WebRtcPublishEndpointInner {
@@ -119,14 +119,14 @@ impl WebRtcPublishEndpoint {
     }
 
     /// Add sink for this [`WebRtcPublishEndpoint`].
-    pub fn add_sink(&self, sink: Weak<WebRtcPlayEndpoint>) {
+    pub fn add_sink(&self, sink: WeakWebRtcPlayEndpoint) {
         self.0.borrow_mut().add_sinks(sink)
     }
 
     /// Returns all sinks of this [`WebRtcPublishEndpoint`].
     ///
     /// __This function will panic if meet empty pointer.__
-    pub fn sinks(&self) -> Vec<Rc<WebRtcPlayEndpoint>> {
+    pub fn sinks(&self) -> Vec<WebRtcPlayEndpoint> {
         self.0.borrow().sinks()
     }
 
@@ -173,6 +173,9 @@ impl WebRtcPublishEndpoint {
     /// Remove all empty Weak pointers from sinks of this
     /// [`WebRtcPublishEndpoint`].
     pub fn remove_empty_weaks_from_sinks(&self) {
-        self.0.borrow_mut().sinks.retain(|e| e.upgrade().is_some());
+        self.0
+            .borrow_mut()
+            .sinks
+            .retain(|e| e.safe_upgrade().is_some());
     }
 }

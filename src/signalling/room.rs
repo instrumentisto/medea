@@ -334,7 +334,7 @@ impl Room {
     fn connect_endpoints(
         &mut self,
         src: &Rc<WebRtcPublishEndpoint>,
-        sink: &Rc<WebRtcPlayEndpoint>,
+        sink: &WebRtcPlayEndpoint,
     ) -> Option<(PeerId, PeerId)> {
         let src_owner = src.owner();
         let sink_owner = sink.owner();

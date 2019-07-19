@@ -88,8 +88,8 @@ impl Drop for WebRtcPlayEndpointInner {
 
 /// Signalling representation of `WebRtcPlayEndpoint`.
 #[allow(clippy::module_name_repetitions)]
-#[derive(Debug)]
-pub struct WebRtcPlayEndpoint(RefCell<WebRtcPlayEndpointInner>);
+#[derive(Debug, Clone)]
+pub struct WebRtcPlayEndpoint(Rc<RefCell<WebRtcPlayEndpointInner>>);
 
 impl WebRtcPlayEndpoint {
     /// Create new [`WebRtcPlayEndpoint`].
@@ -99,13 +99,13 @@ impl WebRtcPlayEndpoint {
         publisher: Weak<WebRtcPublishEndpoint>,
         owner: Weak<Member>,
     ) -> Self {
-        Self(RefCell::new(WebRtcPlayEndpointInner {
+        Self(Rc::new(RefCell::new(WebRtcPlayEndpointInner {
             id,
             src_uri,
             src: publisher,
             owner,
             peer_id: None,
-        }))
+        })))
     }
 
     /// Returns [`SrcUri`] of this [`WebRtcPlayEndpoint`].
@@ -153,5 +153,22 @@ impl WebRtcPlayEndpoint {
     /// Returns ID of this [`WebRtcPlayEndpoint`].
     pub fn id(&self) -> Id {
         self.0.borrow().id.clone()
+    }
+
+    pub fn downgrade(&self) -> WeakWebRtcPlayEndpoint {
+        WeakWebRtcPlayEndpoint(Rc::downgrade(&self.0))
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct WeakWebRtcPlayEndpoint(Weak<RefCell<WebRtcPlayEndpointInner>>);
+
+impl WeakWebRtcPlayEndpoint {
+    pub fn upgrade(&self) -> WebRtcPlayEndpoint {
+        WebRtcPlayEndpoint(self.0.upgrade().unwrap())
+    }
+
+    pub fn safe_upgrade(&self) -> Option<WebRtcPlayEndpoint> {
+        self.0.upgrade().map(|i| WebRtcPlayEndpoint(i))
     }
 }

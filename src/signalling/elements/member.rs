@@ -51,7 +51,7 @@ struct MemberInner {
     srcs: HashMap<WebRtcPublishId, Rc<WebRtcPublishEndpoint>>,
 
     /// All [`WebRtcPlayEndpoint`]s of this [`Member`].
-    sinks: HashMap<WebRtcPlayId, Rc<WebRtcPlayEndpoint>>,
+    sinks: HashMap<WebRtcPlayId, WebRtcPlayEndpoint>,
 
     /// Credentials for this [`Member`].
     credentials: String,
@@ -130,16 +130,16 @@ impl Member {
             {
                 let new_play_endpoint_id =
                     WebRtcPlayId(spec_play_name.to_string());
-                let new_play_endpoint = Rc::new(WebRtcPlayEndpoint::new(
+                let new_play_endpoint = WebRtcPlayEndpoint::new(
                     new_play_endpoint_id.clone(),
                     spec_play_endpoint.src.clone(),
                     Rc::downgrade(&publisher),
                     Rc::downgrade(&this_member),
-                ));
+                );
 
-                self.insert_sink(Rc::clone(&new_play_endpoint));
+                self.insert_sink(new_play_endpoint.clone());
 
-                publisher.add_sink(Rc::downgrade(&new_play_endpoint));
+                publisher.add_sink(new_play_endpoint.downgrade());
             } else {
                 let new_publish_id = WebRtcPublishId(
                     spec_play_endpoint.src.endpoint_id.to_string(),
@@ -152,14 +152,14 @@ impl Member {
                 ));
 
                 let new_self_play_id = WebRtcPlayId(spec_play_name.to_string());
-                let new_self_play = Rc::new(WebRtcPlayEndpoint::new(
+                let new_self_play = WebRtcPlayEndpoint::new(
                     new_self_play_id.clone(),
                     spec_play_endpoint.src.clone(),
                     Rc::downgrade(&new_publish),
                     Rc::downgrade(&this_member),
-                ));
+                );
 
-                new_publish.add_sink(Rc::downgrade(&new_self_play));
+                new_publish.add_sink(new_self_play.downgrade());
 
                 publisher_member.insert_src(new_publish);
 
@@ -232,12 +232,12 @@ impl Member {
     }
 
     /// Returns all sinks endpoints of this [`Member`].
-    pub fn sinks(&self) -> HashMap<WebRtcPlayId, Rc<WebRtcPlayEndpoint>> {
+    pub fn sinks(&self) -> HashMap<WebRtcPlayId, WebRtcPlayEndpoint> {
         self.0.borrow().sinks.clone()
     }
 
     /// Insert sink endpoint into this [`Member`].
-    pub fn insert_sink(&self, endpoint: Rc<WebRtcPlayEndpoint>) {
+    pub fn insert_sink(&self, endpoint: WebRtcPlayEndpoint) {
         self.0.borrow_mut().sinks.insert(endpoint.id(), endpoint);
     }
 
@@ -258,7 +258,7 @@ impl Member {
     pub fn get_sink_by_id(
         &self,
         id: &WebRtcPlayId,
-    ) -> Option<Rc<WebRtcPlayEndpoint>> {
+    ) -> Option<WebRtcPlayEndpoint> {
         self.0.borrow().sinks.get(id).cloned()
     }
 
