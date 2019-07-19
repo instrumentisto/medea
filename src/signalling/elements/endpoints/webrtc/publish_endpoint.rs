@@ -98,8 +98,8 @@ impl WebRtcPublishEndpointInner {
 
 /// Signalling representation of `WebRtcPublishEndpoint`.
 #[allow(clippy::module_name_repetitions)]
-#[derive(Debug)]
-pub struct WebRtcPublishEndpoint(RefCell<WebRtcPublishEndpointInner>);
+#[derive(Debug, Clone)]
+pub struct WebRtcPublishEndpoint(Rc<RefCell<WebRtcPublishEndpointInner>>);
 
 impl WebRtcPublishEndpoint {
     /// Create new [`WebRtcPublishEndpoint`].
@@ -109,13 +109,13 @@ impl WebRtcPublishEndpoint {
         sinks: Vec<WeakWebRtcPlayEndpoint>,
         owner: Weak<Member>,
     ) -> Self {
-        Self(RefCell::new(WebRtcPublishEndpointInner {
+        Self(Rc::new(RefCell::new(WebRtcPublishEndpointInner {
             id,
             p2p,
             sinks,
             owner,
             peer_ids: HashSet::new(),
-        }))
+        })))
     }
 
     /// Add sink for this [`WebRtcPublishEndpoint`].
@@ -177,5 +177,29 @@ impl WebRtcPublishEndpoint {
             .borrow_mut()
             .sinks
             .retain(|e| e.safe_upgrade().is_some());
+    }
+
+    /// Downgrade [`WeakWebRtcPublishEndpoint`] to weak pointer
+    /// [`WeakWebRtcPublishEndpoint`].
+    pub fn downgrade(&self) -> WeakWebRtcPublishEndpoint {
+        WeakWebRtcPublishEndpoint(Rc::downgrade(&self.0))
+    }
+}
+
+/// Weak pointer to [`WebRtcPublishEndpoint`].
+#[derive(Debug, Clone)]
+pub struct WeakWebRtcPublishEndpoint(Weak<RefCell<WebRtcPublishEndpointInner>>);
+
+impl WeakWebRtcPublishEndpoint {
+    /// Upgrade weak pointer to strong pointer.
+    ///
+    /// This function will __panic__ if weak pointer is `None`.
+    pub fn upgrade(&self) -> WebRtcPublishEndpoint {
+        WebRtcPublishEndpoint(self.0.upgrade().unwrap())
+    }
+
+    /// Safe upgrade to [`WebRtcPlayEndpoint`].
+    pub fn safe_upgrade(&self) -> Option<WebRtcPublishEndpoint> {
+        self.0.upgrade().map(|i| WebRtcPublishEndpoint(i))
     }
 }

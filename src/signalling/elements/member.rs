@@ -48,7 +48,7 @@ struct MemberInner {
     id: MemberId,
 
     /// All [`WebRtcPublishEndpoint`]s of this [`Member`].
-    srcs: HashMap<WebRtcPublishId, Rc<WebRtcPublishEndpoint>>,
+    srcs: HashMap<WebRtcPublishId, WebRtcPublishEndpoint>,
 
     /// All [`WebRtcPlayEndpoint`]s of this [`Member`].
     sinks: HashMap<WebRtcPlayId, WebRtcPlayEndpoint>,
@@ -133,7 +133,7 @@ impl Member {
                 let new_play_endpoint = WebRtcPlayEndpoint::new(
                     new_play_endpoint_id.clone(),
                     spec_play_endpoint.src.clone(),
-                    Rc::downgrade(&publisher),
+                    publisher.downgrade(),
                     Rc::downgrade(&this_member),
                 );
 
@@ -144,18 +144,18 @@ impl Member {
                 let new_publish_id = WebRtcPublishId(
                     spec_play_endpoint.src.endpoint_id.to_string(),
                 );
-                let new_publish = Rc::new(WebRtcPublishEndpoint::new(
+                let new_publish = WebRtcPublishEndpoint::new(
                     new_publish_id.clone(),
                     publisher_endpoint.p2p.clone(),
                     Vec::new(),
                     Rc::downgrade(&publisher_member),
-                ));
+                );
 
                 let new_self_play_id = WebRtcPlayId(spec_play_name.to_string());
                 let new_self_play = WebRtcPlayEndpoint::new(
                     new_self_play_id.clone(),
                     spec_play_endpoint.src.clone(),
-                    Rc::downgrade(&new_publish),
+                    new_publish.downgrade(),
                     Rc::downgrade(&this_member),
                 );
 
@@ -173,12 +173,12 @@ impl Member {
             |(name, e)| {
                 let endpoint_id = WebRtcPublishId(name.clone());
                 if self.srcs().get(&endpoint_id).is_none() {
-                    self.insert_src(Rc::new(WebRtcPublishEndpoint::new(
+                    self.insert_src(WebRtcPublishEndpoint::new(
                         endpoint_id,
                         e.p2p.clone(),
                         Vec::new(),
                         Rc::downgrade(&this_member),
-                    )));
+                    ));
                 }
             },
         );
@@ -227,7 +227,7 @@ impl Member {
     }
 
     /// Returns all publishers of this [`Member`].
-    pub fn srcs(&self) -> HashMap<WebRtcPublishId, Rc<WebRtcPublishEndpoint>> {
+    pub fn srcs(&self) -> HashMap<WebRtcPublishId, WebRtcPublishEndpoint> {
         self.0.borrow().srcs.clone()
     }
 
@@ -242,7 +242,7 @@ impl Member {
     }
 
     /// Insert source endpoint into this [`Member`].
-    pub fn insert_src(&self, endpoint: Rc<WebRtcPublishEndpoint>) {
+    pub fn insert_src(&self, endpoint: WebRtcPublishEndpoint) {
         self.0.borrow_mut().srcs.insert(endpoint.id(), endpoint);
     }
 
@@ -250,7 +250,7 @@ impl Member {
     pub fn get_src_by_id(
         &self,
         id: &WebRtcPublishId,
-    ) -> Option<Rc<WebRtcPublishEndpoint>> {
+    ) -> Option<WebRtcPublishEndpoint> {
         self.0.borrow().srcs.get(id).cloned()
     }
 

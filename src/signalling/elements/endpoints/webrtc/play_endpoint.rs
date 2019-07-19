@@ -9,7 +9,11 @@ use macro_attr::*;
 use newtype_derive::{newtype_fmt, NewtypeDisplay, NewtypeFrom};
 
 use crate::{
-    api::control::endpoint::SrcUri, media::PeerId, signalling::elements::Member,
+    api::control::endpoint::SrcUri,
+    media::PeerId,
+    signalling::elements::{
+        endpoints::webrtc::publish_endpoint::WeakWebRtcPublishEndpoint, Member,
+    },
 };
 
 use super::publish_endpoint::WebRtcPublishEndpoint;
@@ -33,7 +37,7 @@ struct WebRtcPlayEndpointInner {
 
     /// Publisher [`WebRtcPublishEndpoint`] from which this
     /// [`WebRtcPlayEndpoint`] receive data.
-    src: Weak<WebRtcPublishEndpoint>,
+    src: WeakWebRtcPublishEndpoint,
 
     /// Owner [`Member`] of this [`WebRtcPlayEndpoint`].
     owner: Weak<Member>,
@@ -61,8 +65,8 @@ impl WebRtcPlayEndpointInner {
         Weak::clone(&self.owner)
     }
 
-    fn src(&self) -> Rc<WebRtcPublishEndpoint> {
-        Weak::upgrade(&self.src).unwrap()
+    fn src(&self) -> WebRtcPublishEndpoint {
+        self.src.upgrade()
     }
 
     fn set_peer_id(&mut self, peer_id: PeerId) {
@@ -80,7 +84,7 @@ impl WebRtcPlayEndpointInner {
 
 impl Drop for WebRtcPlayEndpointInner {
     fn drop(&mut self) {
-        if let Some(receiver_publisher) = self.src.upgrade() {
+        if let Some(receiver_publisher) = self.src.safe_upgrade() {
             receiver_publisher.remove_empty_weaks_from_sinks();
         }
     }
@@ -96,7 +100,7 @@ impl WebRtcPlayEndpoint {
     pub fn new(
         id: Id,
         src_uri: SrcUri,
-        publisher: Weak<WebRtcPublishEndpoint>,
+        publisher: WeakWebRtcPublishEndpoint,
         owner: Weak<Member>,
     ) -> Self {
         Self(Rc::new(RefCell::new(WebRtcPlayEndpointInner {
@@ -129,7 +133,7 @@ impl WebRtcPlayEndpoint {
     /// Returns source's [`WebRtcPublishEndpoint`].
     ///
     /// __This function will panic if pointer is empty.__
-    pub fn src(&self) -> Rc<WebRtcPublishEndpoint> {
+    pub fn src(&self) -> WebRtcPublishEndpoint {
         self.0.borrow().src()
     }
 
@@ -155,19 +159,26 @@ impl WebRtcPlayEndpoint {
         self.0.borrow().id.clone()
     }
 
+    /// Downgrade [`WeakWebRtcPlayEndpoint`] to weak pointer
+    /// [`WeakWebRtcPlayEndpoint`].
     pub fn downgrade(&self) -> WeakWebRtcPlayEndpoint {
         WeakWebRtcPlayEndpoint(Rc::downgrade(&self.0))
     }
 }
 
+/// Weak pointer to [`WebRtcPlayEndpoint`].
 #[derive(Debug, Clone)]
 pub struct WeakWebRtcPlayEndpoint(Weak<RefCell<WebRtcPlayEndpointInner>>);
 
 impl WeakWebRtcPlayEndpoint {
+    /// Upgrade weak pointer to strong pointer.
+    ///
+    /// This function will __panic__ if weak pointer is `None`.
     pub fn upgrade(&self) -> WebRtcPlayEndpoint {
         WebRtcPlayEndpoint(self.0.upgrade().unwrap())
     }
 
+    /// Safe upgrade to [`WebRtcPlayEndpoint`].
     pub fn safe_upgrade(&self) -> Option<WebRtcPlayEndpoint> {
         self.0.upgrade().map(|i| WebRtcPlayEndpoint(i))
     }
