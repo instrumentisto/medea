@@ -145,36 +145,27 @@ mod test {
     use futures::{future::IntoFuture as _, sink::Sink as _, Stream as _};
 
     use crate::{
-        api::control::Member, conf::Conf, media::create_peers,
-        signalling::Room, turn::new_turn_auth_service_mock,
+        api::control, conf::Conf, signalling::Room,
+        turn::new_turn_auth_service_mock, AppContext,
     };
 
     use super::*;
 
     /// Creates [`RoomRepository`] for tests filled with a single [`Room`].
-    fn room(conf: Rpc) -> RoomRepository {
-        let members = hashmap! {
-            1 => Member{
-                id: 1,
-                credentials: "caller_credentials".into(),
-                ice_user: None
-            },
-            2 => Member{
-                id: 2,
-                credentials: "responder_credentials".into(),
-                ice_user: None
-            },
+    fn room(conf: Conf) -> RoomRepository {
+        let room_spec =
+            control::load_from_yaml_file("tests/specs/pub_sub_video_call.yml")
+                .unwrap();
+
+        let app = AppContext::new(conf, new_turn_auth_service_mock());
+
+        let room_id = room_spec.id.clone();
+        let client_room = Room::new(&room_spec, app.clone()).unwrap().start();
+        let room_hash_map = hashmap! {
+            room_id => client_room,
         };
-        let room = Room::new(
-            1,
-            members,
-            create_peers(1, 2),
-            conf.reconnect_timeout,
-            new_turn_auth_service_mock(),
-        )
-        .start();
-        let rooms = hashmap! {1 => room};
-        RoomRepository::new(rooms)
+
+        RoomRepository::new(room_hash_map)
     }
 
     /// Creates test WebSocket server of Client API which can handle requests.
@@ -183,8 +174,8 @@ mod test {
             HttpService::new(
                 App::new()
                     .data(Context {
-                        rooms: room(conf.rpc.clone()),
                         config: conf.rpc.clone(),
+                        rooms: room(conf.clone()),
                     })
                     .service(
                         resource("/ws/{room_id}/{member_id}/{credentials}")
@@ -196,14 +187,17 @@ mod test {
 
     #[test]
     fn ping_pong_and_disconnects_on_idle() {
-        let mut conf = Conf::default();
-        conf.rpc = Rpc {
-            idle_timeout: Duration::new(2, 0),
-            reconnect_timeout: Default::default(),
+        let conf = Conf {
+            rpc: Rpc {
+                idle_timeout: Duration::new(2, 0),
+                ..Default::default()
+            },
+            ..Default::default()
         };
 
         let mut server = ws_server(conf.clone());
-        let socket = server.ws_at("/ws/1/1/caller_credentials").unwrap();
+        let socket =
+            server.ws_at("/ws/pub-sub-video-call/caller/test").unwrap();
 
         server
             .block_on(
