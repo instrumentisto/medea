@@ -2,10 +2,12 @@
 
 use std::io;
 
+use actix::{Actor, Addr, Handler, ResponseActFuture, WrapFuture as _};
 use actix_web::{
+    dev::Server as ActixServer,
     middleware,
-    web::{Data, Path, Payload},
-    App, Error, HttpRequest, HttpResponse, HttpServer,
+    web::{resource, Data, Path, Payload},
+    App, HttpRequest, HttpResponse, HttpServer,
 };
 use actix_web_actors::ws;
 use futures::{
@@ -24,6 +26,7 @@ use crate::{
     },
     conf::{Conf, Rpc},
     log::prelude::*,
+    shutdown::ShutdownGracefully,
     signalling::room_repo::RoomRepository,
 };
 
@@ -45,7 +48,7 @@ fn ws_index(
     info: Path<RequestParams>,
     state: Data<Context>,
     payload: Payload,
-) -> impl Future<Item = HttpResponse, Error = Error> {
+) -> impl Future<Item = HttpResponse, Error = actix_web::Error> {
     debug!("Request params: {:?}", info);
 
     match state.rooms.get(&info.room_id) {
@@ -86,66 +89,92 @@ pub struct Context {
     pub config: Rpc,
 }
 
-/// Starts HTTP server for handling WebSocket connections of Client API.
-pub fn run(rooms: RoomRepository, config: Conf) -> io::Result<()> {
-    let server_addr = config.server.bind_addr();
-    HttpServer::new(move || {
-        App::new()
-            .data(Context {
-                rooms: rooms.clone(),
-                config: config.rpc.clone(),
-            })
-            .wrap(middleware::Logger::default())
-            .service(
-                actix_web::web::resource(
-                    "/ws/{room_id}/{member_id}/{credentials}",
+/// HTTP server that handles WebSocket connections of Client API.
+pub struct Server(ActixServer);
+
+impl Server {
+    /// Starts Client API HTTP server.
+    pub fn run(rooms: RoomRepository, config: Conf) -> io::Result<Addr<Self>> {
+        let server_addr = config.server.bind_addr();
+
+        let server = HttpServer::new(move || {
+            App::new()
+                .data(Context {
+                    rooms: rooms.clone(),
+                    config: config.rpc.clone(),
+                })
+                .wrap(middleware::Logger::default())
+                .service(
+                    resource("/ws/{room_id}/{member_id}/{credentials}")
+                        .route(actix_web::web::get().to_async(ws_index)),
                 )
-                .route(actix_web::web::get().to_async(ws_index)),
-            )
-    })
-    .bind(server_addr)?
-    .start();
+        })
+        .disable_signals()
+        .bind(server_addr)?
+        .start();
 
-    info!("Started HTTP server on {}", server_addr);
+        info!("Started Client API HTTP server on {}", server_addr);
 
-    Ok(())
+        Ok(Self(server).start())
+    }
+}
+
+impl Actor for Server {
+    type Context = actix::Context<Self>;
+}
+
+impl Handler<ShutdownGracefully> for Server {
+    type Result = ResponseActFuture<Self, (), ()>;
+
+    fn handle(
+        &mut self,
+        _: ShutdownGracefully,
+        _: &mut Self::Context,
+    ) -> Self::Result {
+        info!("Server received ShutdownGracefully message so shutting down");
+        Box::new(self.0.stop(true).into_actor(self))
+    }
 }
 
 #[cfg(test)]
 mod test {
     use std::{ops::Add, thread, time::Duration};
 
-    use actix::{Actor as _, Arbiter};
     use actix_http::{ws::Message, HttpService};
     use actix_http_test::{TestServer, TestServerRuntime};
-    use actix_web::App;
     use futures::{future::IntoFuture as _, sink::Sink as _, Stream as _};
 
     use crate::{
-        api::control, conf::Conf, signalling::Room,
-        turn::new_turn_auth_service_mock, AppContext,
+        api::control::Member, conf::Conf, media::create_peers,
+        signalling::Room, turn::new_turn_auth_service_mock,
     };
 
     use super::*;
 
-    /// Creates [`RoomsRepository`] for tests filled with a single [`Room`].
-    fn room(conf: Conf) -> RoomRepository {
-        let room_spec =
-            control::load_from_yaml_file("tests/specs/pub_sub_video_call.yml")
-                .unwrap();
-
-        let app = AppContext::new(conf, new_turn_auth_service_mock());
-
-        let room_id = room_spec.id.clone();
-        let client_room = Room::start_in_arbiter(&Arbiter::new(), move |_| {
-            let client_room = Room::new(&room_spec, app.clone()).unwrap();
-            client_room
-        });
-        let room_hash_map = hashmap! {
-            room_id => client_room,
+    /// Creates [`RoomRepository`] for tests filled with a single [`Room`].
+    fn room(conf: Rpc) -> RoomRepository {
+        let members = hashmap! {
+            1 => Member{
+                id: 1,
+                credentials: "caller_credentials".into(),
+                ice_user: None
+            },
+            2 => Member{
+                id: 2,
+                credentials: "responder_credentials".into(),
+                ice_user: None
+            },
         };
-
-        RoomRepository::new(room_hash_map)
+        let room = Room::new(
+            1,
+            members,
+            create_peers(1, 2),
+            conf.reconnect_timeout,
+            new_turn_auth_service_mock(),
+        )
+        .start();
+        let rooms = hashmap! {1 => room};
+        RoomRepository::new(rooms)
     }
 
     /// Creates test WebSocket server of Client API which can handle requests.
@@ -154,14 +183,12 @@ mod test {
             HttpService::new(
                 App::new()
                     .data(Context {
-                        rooms: room(conf.clone()),
+                        rooms: room(conf.rpc.clone()),
                         config: conf.rpc.clone(),
                     })
                     .service(
-                        actix_web::web::resource(
-                            "/ws/{room_id}/{member_id}/{credentials}",
-                        )
-                        .route(actix_web::web::get().to_async(ws_index)),
+                        resource("/ws/{room_id}/{member_id}/{credentials}")
+                            .route(actix_web::web::get().to_async(ws_index)),
                     ),
             )
         })
@@ -169,17 +196,14 @@ mod test {
 
     #[test]
     fn ping_pong_and_disconnects_on_idle() {
-        let conf = Conf {
-            rpc: Rpc {
-                idle_timeout: Duration::new(2, 0),
-                reconnect_timeout: Default::default(),
-            },
-            ..Default::default()
+        let mut conf = Conf::default();
+        conf.rpc = Rpc {
+            idle_timeout: Duration::new(2, 0),
+            reconnect_timeout: Default::default(),
         };
 
         let mut server = ws_server(conf.clone());
-        let socket =
-            server.ws_at("/ws/pub-sub-video-call/caller/test").unwrap();
+        let socket = server.ws_at("/ws/1/1/caller_credentials").unwrap();
 
         server
             .block_on(

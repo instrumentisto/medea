@@ -1,8 +1,8 @@
 //! Service which control [`Room`].
 
 use actix::{
-    fut::wrap_future, Actor, ActorFuture, AsyncContext as _, Context, Handler,
-    MailboxError, Message,
+    fut::wrap_future, Actor, ActorFuture, Addr, AsyncContext as _, Context,
+    Handler, MailboxError, Message,
 };
 use failure::Fail;
 use futures::future::{Either, Future};
@@ -16,6 +16,7 @@ use crate::{
         MemberId, MemberSpec, RoomId, RoomSpec,
     },
     log::prelude::*,
+    shutdown::{self, GracefulShutdown},
     signalling::{
         room::{
             Close, CreateEndpoint, CreateMember, DeleteEndpoint, DeleteMember,
@@ -61,18 +62,27 @@ impl From<MailboxError> for RoomServiceError {
 }
 
 /// Service for controlling [`Room`]s.
-#[derive(Debug)]
 pub struct RoomService {
     /// Repository that stores [`Room`]s addresses.
     room_repo: RoomRepository,
 
     /// Global app context.
     app: AppContext,
+
+    graceful_shutdown: Addr<GracefulShutdown>,
 }
 
 impl RoomService {
-    pub fn new(room_repo: RoomRepository, app: AppContext) -> Self {
-        Self { room_repo, app }
+    pub fn new(
+        room_repo: RoomRepository,
+        app: AppContext,
+        graceful_shutdown: Addr<GracefulShutdown>,
+    ) -> Self {
+        Self {
+            room_repo,
+            app,
+            graceful_shutdown,
+        }
     }
 }
 
@@ -122,6 +132,12 @@ impl Handler<StartStaticRooms> for RoomService {
                 let room_id = spec.id().clone();
 
                 let room = Room::new(&spec, self.app.clone())?.start();
+                self.graceful_shutdown.do_send(shutdown::Subscribe(
+                    shutdown::Subscriber {
+                        priority: shutdown::Priority(2),
+                        addr: room.clone().recipient(),
+                    },
+                ));
 
                 self.room_repo.add(room_id, room);
             }
@@ -155,6 +171,13 @@ impl Handler<StartRoom> for RoomService {
         let room = Room::new(&room, self.app.clone())?;
         let room_addr = room.start();
 
+        self.graceful_shutdown.do_send(shutdown::Subscribe(
+            shutdown::Subscriber {
+                priority: shutdown::Priority(2),
+                addr: room_addr.clone().recipient(),
+            },
+        ));
+
         debug!("New Room [id = {}] started.", room_id);
         self.room_repo.add(room_id, room_addr);
 
@@ -176,6 +199,12 @@ impl Handler<DeleteRoom> for RoomService {
         ctx: &mut Self::Context,
     ) -> Self::Result {
         if let Some(room) = self.room_repo.get(&msg.0) {
+            self.graceful_shutdown.do_send(shutdown::Unsubscribe(
+                shutdown::Subscriber {
+                    priority: shutdown::Priority(2),
+                    addr: room.clone().recipient(),
+                },
+            ));
             let rooms = self.room_repo.clone();
             ctx.spawn(wrap_future(
                 room.send(Close)
