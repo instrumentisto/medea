@@ -15,7 +15,9 @@ eq = $(if $(or $(1),$(2)),$(and $(findstring $(1),$(2)),\
 # Project parameters #
 ######################
 
-IMAGE_NAME := $(strip $(shell grep 'COMPOSE_IMAGE_NAME=' .env | cut -d '=' -f2))
+MEDEA_IMAGE_NAME := $(strip $(shell grep 'COMPOSE_IMAGE_NAME=' .env | cut -d '=' -f2))
+DEMO_IMAGE_NAME := $(strip $(shell grep 'DEMO_IMAGE_NAME=' .env | cut -d '=' -f2))
+
 
 RUST_VER := 1.36
 
@@ -26,7 +28,7 @@ RUST_VER := 1.36
 # Aliases #
 ###########
 
-build: docker.build
+build: docker.build.medea
 
 
 # Resolve all project dependencies.
@@ -97,18 +99,24 @@ cargo.lint:
 # Yarn commands #
 #################
 
-# Resolve NPM project dependencies with Yarn.
+# Resolve Yarn project dependencies.
 #
 # Optional 'cmd' parameter may be used for handy usage of docker-wrapped Yarn,
-# for example: make yarn cmd='upgrade'
+# for example: make yarn.deps cmd='upgrade'
 #
 # Usage:
-#	make yarn [cmd=(install|<yarn-cmd>)]
+#	make yarn [cmd=('install --pure-lockfile'|<yarn-cmd>)]
+#	          [proj=(e2e|demo)]
 
-yarn-cmd =
+yarn-cmd = $(if $(call eq,$(cmd),),install --pure-lockfile,$(cmd))
+yarn-proj =$(if $(call eq,$(proj),demo),jason/demo,jason/e2e-demo)
 
 yarn:
-	yarn --cwd=jason/e2e-demo/ $(if $(call eq,$(cmd),),install,$(cmd))
+	docker run --rm --network=host -v "$(PWD)":/app -w /app \
+	           -e YARN_CACHE_FOLDER=.cache/yarn/ \
+	           -u $(shell id -u):$(shell id -g) \
+		node:latest yarn --cwd=$(if $(call eq,$(proj),demo),jason/demo,jason/e2e-demo) \
+		$(yarn-cmd) --non-interactive
 
 
 
@@ -175,12 +183,12 @@ endif
 # Build medea project Docker image.
 #
 # Usage:
-#	make docker.build [TAG=(dev|<tag>)]
+#	make docker.build.medea [TAG=(dev|<tag>)]
 #	                  [debug=(yes|no)] [no-cache=(no|yes)]
 
-docker-build-image-name = $(IMAGE_NAME)
+docker-build-medea-image-name = $(MEDEA_IMAGE_NAME)
 
-docker.build:
+docker.build.medea:
 ifneq ($(no-cache),yes)
 	docker run --rm --network=host -v "$(PWD)":/app -w /app \
 	           -u $(shell id -u):$(shell id -g) \
@@ -201,13 +209,26 @@ endif
 			--build-arg rustc_opts=$(if \
 				$(call eq,$(debug),no),--release,) \
 			--build-arg cargo_home=.cache/cargo,) \
-		-t $(docker-build-image-name):$(if $(call eq,$(TAG),),dev,$(TAG)) .
+		-t $(docker-build-medea-image-name):$(if $(call eq,$(TAG),),dev,$(TAG)) .
 	$(call docker.build.clean.ignore)
 define docker.build.clean.ignore
 	@sed -i $(if $(call eq,$(shell uname -s),Darwin),'',) \
 		/^!target\/d .dockerignore
 endef
 
+
+
+
+# Build demo project Docker image.
+#
+# Usage:
+#	make docker.build.demo [TAG=(dev|<tag>)]
+
+docker-build-demo-image-name = $(DEMO_IMAGE_NAME)
+
+docker.build.demo:
+	@make yarn proj=demo
+	docker build -t $(docker-build-demo-image-name):$(if $(call eq,$(TAG),),dev,$(TAG)) jason/demo
 
 
 
@@ -249,7 +270,8 @@ up.medea:
 ##################
 
 .PHONY: build cargo cargo.fmt cargo.lint \
-        docker.build \
+        docker.build.medea \
+        docker.build.demo \
         docs docs.rust \
         test test.unit \
         up up.coturn up.jason up.medea \

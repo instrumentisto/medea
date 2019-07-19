@@ -1,14 +1,18 @@
 version: '2'
-
 services:
   webclient:
-    container_name: nginx
-    image: nginx:stable-alpine
+    container_name: webclient
+    image: instrumentisto/medea-demo:dev
     ports:
       - "80:80"
+  coturn-db:
+    container_name: coturn-db
+    image: redis:alpine
+    command: ["redis-server", "/etc/redis.conf"]
+    ports:
+      - "6379:6379"    # coturn redis
     volumes:
-      - .:/usr/share/nginx/html
-      - ./node_modules/jason-alexlapa/:/usr/share/nginx/html/js
+      - ../../dev/coturn/redis.conf:/etc/redis.conf:ro
   coturn:
     container_name: coturn
     image: instrumentisto/coturn:4.5
@@ -19,11 +23,9 @@ services:
       - ../../dev/coturn/turnserver.conf:/etc/coturn/turnserver.conf:ro
       - ../../.cache/coturn/data:/var/lib/coturn
     network_mode: host
-  coturn-db:
-    container_name: redis
-    image: redis:alpine
-    command: ["redis-server", "/etc/redis.conf"]
+  medea:
+    container_name: medea
+    image: instrumentisto/medea:dev
+    depends_on: ["coturn-db"]
     ports:
-      - "6379:6379"    # coturn redis
-    volumes:
-      - ../../dev/coturn/redis.conf:/etc/redis.conf:ro
+      - "8080:8080"    # web-socket http server
