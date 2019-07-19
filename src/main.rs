@@ -1,11 +1,10 @@
-use actix::Actor;
 use failure::Error;
 use futures::future::{Future, IntoFuture as _};
 use medea::{
-    api::client::server::{self, Server},
+    api::client::server::Server,
     conf::Conf,
     log::{self, prelude::*},
-    shutdown::{self, GracefulShutdown},
+    shutdown,
     signalling::room_repo::RoomsRepository,
     start_static_rooms,
 };
@@ -22,13 +21,12 @@ fn main() -> Result<(), Error> {
     actix::run(|| {
         start_static_rooms(&config)
             .map_err(|e| error!("Turn: {:?}", e))
-            .map(|res| {
-                let graceful_shutdown =
-                    GracefulShutdown::new(config.shutdown.timeout).start();
+            .map(Result::unwrap)
+            .map(move |(res, graceful_shutdown)| {
                 (res, graceful_shutdown, config)
             })
             .map(|(res, graceful_shutdown, config)| {
-                let rooms = res.unwrap();
+                let rooms = res;
                 info!(
                     "Loaded rooms: {:?}",
                     rooms.iter().map(|(id, _)| &id.0).collect::<Vec<&String>>()

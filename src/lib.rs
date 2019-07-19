@@ -19,6 +19,7 @@ use hashbrown::HashMap;
 use crate::{
     api::control::{load_static_specs_from_dir, RoomId},
     conf::Conf,
+    shutdown::GracefulShutdown,
     signalling::{room::RoomError, Room},
     turn::{service, TurnServiceErr},
 };
@@ -62,12 +63,20 @@ impl From<RoomError> for ServerStartError {
 ///
 /// Returns [`ServerStartError::BadRoomSpec`]
 /// if some error happened while creating room from spec.
+// This is not the most beautiful solution, but at the moment let it be. In the
+// 32-grpc-dynamic-control-api branch, this logic is changed and everything will
+// look better.
 pub fn start_static_rooms(
     conf: &Conf,
 ) -> impl Future<
-    Item = Result<HashMap<RoomId, Addr<Room>>, ServerStartError>,
+    Item = Result<
+        (HashMap<RoomId, Addr<Room>>, Addr<GracefulShutdown>),
+        ServerStartError,
+    >,
     Error = TurnServiceErr,
 > {
+    let graceful_shutdown =
+        GracefulShutdown::new(conf.shutdown.timeout).start();
     let config = conf.clone();
     if let Some(static_specs_path) = config.server.static_specs_path.clone() {
         Either::A(
@@ -104,13 +113,19 @@ pub fn start_static_rooms(
                                 )
                                 .unwrap()
                             });
+                        graceful_shutdown.do_send(shutdown::Subscribe(
+                            shutdown::Subscriber {
+                                addr: room.clone().recipient(),
+                                priority: shutdown::Priority(2),
+                            },
+                        ));
                         rooms.insert(room_id, room);
                     }
 
-                    Ok(rooms)
+                    Ok((rooms, graceful_shutdown))
                 }),
         )
     } else {
-        Either::B(futures::future::ok(Ok(HashMap::new())))
+        Either::B(futures::future::ok(Ok((HashMap::new(), graceful_shutdown))))
     }
 }

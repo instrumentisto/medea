@@ -38,7 +38,6 @@ use crate::{
     },
     turn::BoxedTurnAuthService,
 };
-use futures::future::Either;
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
 pub type ActFuture<I, E> =
