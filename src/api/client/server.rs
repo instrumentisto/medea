@@ -145,35 +145,30 @@ mod test {
     use futures::{future::IntoFuture as _, sink::Sink as _, Stream as _};
 
     use crate::{
-        api::control::Member, conf::Conf, media::create_peers,
-        signalling::Room, turn::new_turn_auth_service_mock,
+        api::control, conf::Conf, signalling::Room,
+        turn::new_turn_auth_service_mock,
     };
 
     use super::*;
 
     /// Creates [`RoomsRepository`] for tests filled with a single [`Room`].
     fn room(conf: Rpc) -> RoomsRepository {
-        let members = hashmap! {
-            1 => Member{
-                id: 1,
-                credentials: "caller_credentials".into(),
-                ice_user: None
-            },
-            2 => Member{
-                id: 2,
-                credentials: "responder_credentials".into(),
-                ice_user: None
-            },
-        };
-        let room = Room::new(
-            1,
-            members,
-            create_peers(1, 2),
+        let room_spec =
+            control::load_from_yaml_file("tests/specs/pub_sub_video_call.yml")
+                .unwrap();
+
+        let room_id = room_spec.id.clone();
+        let client_room = Room::new(
+            &room_spec,
             conf.reconnect_timeout,
             new_turn_auth_service_mock(),
         )
+        .unwrap()
         .start();
-        let rooms = hashmap! {1 => room};
+        let rooms = hashmap! {
+            room_id => client_room,
+        };
+
         RoomsRepository::new(rooms)
     }
 
@@ -203,7 +198,8 @@ mod test {
         };
 
         let mut server = ws_server(conf.clone());
-        let socket = server.ws_at("/ws/1/1/caller_credentials").unwrap();
+        let socket =
+            server.ws_at("/ws/pub-sub-video-call/caller/test").unwrap();
 
         server
             .block_on(
