@@ -48,6 +48,11 @@ pub fn delete(
 pub struct Member {
     /// Pipeline of control API `Member`.
     pipeline: HashMap<String, Endpoint>,
+
+    /// Optional member credentials.
+    ///
+    /// If `None` then credentials will be generated on server side.
+    credentials: Option<String>,
 }
 
 impl Into<MemberProto> for Member {
@@ -58,8 +63,10 @@ impl Into<MemberProto> for Member {
             memebers_elements.insert(id, endpoint.into());
         }
         proto.set_pipeline(memebers_elements);
-        // TODO when credentials will generate on server, remove this.
-        proto.set_credentials("test".to_string());
+
+        if let Some(credentials) = self.credentials {
+            proto.set_credentials(credentials);
+        }
 
         proto
     }
@@ -73,6 +80,7 @@ impl From<MemberProto> for Member {
         }
         Self {
             pipeline: member_pipeline,
+            credentials: Some(proto.take_credentials()),
         }
     }
 }
