@@ -11,9 +11,23 @@ eq = $(if $(or $(1),$(2)),$(and $(findstring $(1),$(2)),\
 
 
 
+######################
+# Project parameters #
+######################
+
+IMAGE_NAME := $(strip $(shell grep 'COMPOSE_IMAGE_NAME=' .env | cut -d '=' -f2))
+
+RUST_VER := 1.36
+
+
+
+
 ###########
 # Aliases #
 ###########
+
+build: docker.build
+
 
 # Resolve all project dependencies.
 #
@@ -197,6 +211,49 @@ endif
 
 
 
+###################
+# Docker commands #
+###################
+
+# Build medea project Docker image.
+#
+# Usage:
+#	make docker.build [TAG=(dev|<tag>)]
+#	                  [debug=(yes|no)] [no-cache=(no|yes)]
+
+docker-build-image-name = $(IMAGE_NAME)
+
+docker.build:
+ifneq ($(no-cache),yes)
+	docker run --rm --network=host -v "$(PWD)":/app -w /app \
+	           -u $(shell id -u):$(shell id -g) \
+	           -e CARGO_HOME=.cache/cargo \
+		rust:$(RUST_VER) \
+			cargo build --bin=medea \
+				$(if $(call eq,$(debug),no),--release,)
+endif
+	$(call docker.build.clean.ignore)
+	@echo "!target/$(if $(call eq,$(debug),no),release,debug)/" >> .dockerignore
+	docker build --network=host --force-rm \
+		$(if $(call eq,$(no-cache),yes),\
+			--no-cache --pull,) \
+		$(if $(call eq,$(IMAGE),),\
+			--build-arg rust_ver=$(RUST_VER) \
+			--build-arg rustc_mode=$(if \
+				$(call eq,$(debug),no),release,debug) \
+			--build-arg rustc_opts=$(if \
+				$(call eq,$(debug),no),--release,) \
+			--build-arg cargo_home=.cache/cargo,) \
+		-t $(docker-build-image-name):$(if $(call eq,$(TAG),),dev,$(TAG)) .
+	$(call docker.build.clean.ignore)
+define docker.build.clean.ignore
+	@sed -i $(if $(call eq,$(shell uname -s),Darwin),'',) \
+		/^!target\/d .dockerignore
+endef
+
+
+
+
 ####################
 # Running commands #
 ####################
@@ -288,7 +345,8 @@ down.coturn:
 # .PHONY section #
 ##################
 
-.PHONY: cargo cargo.fmt cargo.lint \
+.PHONY: build cargo cargo.fmt cargo.lint \
+        docker.build \
         docs docs.rust \
         test.e2e test test.unit \
         up up.coturn up.jason up.medea \

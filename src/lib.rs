@@ -6,6 +6,7 @@ pub mod api;
 pub mod conf;
 pub mod log;
 pub mod media;
+pub mod shutdown;
 pub mod signalling;
 pub mod turn;
 

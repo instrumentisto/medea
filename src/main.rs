@@ -1,9 +1,11 @@
+use actix::Actor;
 use failure::Error;
-use futures::future::Future;
+use futures::future::{Future, IntoFuture as _};
 use medea::{
-    api::client::server,
+    api::client::server::{self, Server},
     conf::Conf,
     log::{self, prelude::*},
+    shutdown::{self, GracefulShutdown},
     signalling::room_repo::RoomsRepository,
     start_static_rooms,
 };
@@ -20,15 +22,35 @@ fn main() -> Result<(), Error> {
     actix::run(|| {
         start_static_rooms(&config)
             .map_err(|e| error!("Turn: {:?}", e))
-            .and_then(|res| {
+            .map(|res| {
+                let graceful_shutdown =
+                    GracefulShutdown::new(config.shutdown.timeout).start();
+                (res, graceful_shutdown, config)
+            })
+            .map(|(res, graceful_shutdown, config)| {
                 let rooms = res.unwrap();
                 info!(
                     "Loaded rooms: {:?}",
                     rooms.iter().map(|(id, _)| &id.0).collect::<Vec<&String>>()
                 );
                 let room_repo = RoomsRepository::new(rooms);
-                server::run(room_repo, config)
-                    .map_err(|e| error!("Server {:?}", e))
+
+                (room_repo, graceful_shutdown, config)
+            })
+            .and_then(|(room_repo, graceful_shutdown, config)| {
+                Server::run(room_repo, config)
+                    .map_err(|e| error!("Error starting server: {:?}", e))
+                    .map(|server| {
+                        graceful_shutdown
+                            .send(shutdown::Subscribe(shutdown::Subscriber {
+                                addr: server.recipient(),
+                                priority: shutdown::Priority(1),
+                            }))
+                            .map_err(|e| error!("Shutdown sub: {}", e))
+                            .map(|_| ())
+                    })
+                    .into_future()
+                    .flatten()
             })
     })
     .unwrap();

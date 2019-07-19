@@ -9,7 +9,7 @@ ARG rustc_mode=release
 ARG rustc_opts=--release
 ARG cargo_home=/usr/local/cargo
 
-# Create the user and group files that will be used in the running container to
+# Create user and group files, which will be used in a running container to
 # run the process as an unprivileged user.
 RUN mkdir -p /out/etc/ \
  && echo 'nobody:x:65534:65534:nobody:/:' > /out/etc/passwd \
@@ -17,22 +17,12 @@ RUN mkdir -p /out/etc/ \
 
 COPY / /app/
 
-RUN mkdir -p /app/target
-RUN mkdir -p /usr/local/cargo
-
-VOLUME .cache/medea:/app/target
-VOLUME .cache/cargo:/usr/local/cargo
-
-RUN touch /app/target
-RUN ls /app
-
 # Build project distribution.
 RUN cd /app \
  # Compile project.
  && CARGO_HOME="${cargo_home}" \
     # TODO: use --out-dir once stabilized
-    # TODO: use --offline once stabilized
-    # TODO: https://github.com/rust-lang/cargo/issues/5655
+    # TODO: https://github.com/rust-lang/cargo/issues/6790
     cargo build --bin=medea ${rustc_opts} \
  # Prepare the binary and all dependent dynamic libraries.
  && cp /app/target/${rustc_mode}/medea /out/medea \
@@ -57,4 +47,3 @@ COPY --from=dist /out/ /
 USER nobody:nobody
 
 ENTRYPOINT ["/medea"]
-

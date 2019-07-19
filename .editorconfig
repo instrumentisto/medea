@@ -36,3 +36,7 @@ indent_size = 4
 [Dockerfile]
 indent_style = space
 indent_size = 4
+
+[hooks/*]
+indent_style = space
+indent_size = 2

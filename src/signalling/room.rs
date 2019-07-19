@@ -7,7 +7,7 @@ use std::{
 
 use actix::{
     fut::wrap_future, Actor, ActorFuture, AsyncContext, Context, Handler,
-    Message,
+    Message, ResponseActFuture, WrapFuture as _,
 };
 use failure::Fail;
 use futures::future;
@@ -27,6 +27,7 @@ use crate::{
         New, Peer, PeerError, PeerId, PeerStateMachine, WaitLocalHaveRemote,
         WaitLocalSdp, WaitRemoteSdp,
     },
+    shutdown::ShutdownGracefully,
     signalling::{
         elements::{
             endpoints::webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
@@ -37,6 +38,7 @@ use crate::{
     },
     turn::BoxedTurnAuthService,
 };
+use futures::future::Either;
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
 pub type ActFuture<I, E> =
@@ -89,6 +91,17 @@ impl From<MembersLoadError> for RoomError {
     }
 }
 
+/// Possible states of [`Room`].
+#[derive(Debug)]
+enum State {
+    /// [`Room`] has been started and is operating at the moment.
+    Started,
+    /// [`Room`] is stopping at the moment.
+    Stopping,
+    /// [`Room`] is stopped and can be removed.
+    Stopped,
+}
+
 /// Media server room with its [`Member`]s.
 #[derive(Debug)]
 pub struct Room {
@@ -99,6 +112,9 @@ pub struct Room {
 
     /// [`Peer`]s of [`Member`]s in this [`Room`].
     peers: PeerRepository,
+
+    /// Current state of this [`Room`].
+    state: State,
 }
 
 impl Room {
@@ -119,6 +135,7 @@ impl Room {
                 reconnect_timeout,
                 turn,
             )?,
+            state: State::Started,
         })
     }
 
@@ -425,13 +442,16 @@ impl Room {
             .send_peer_created(first_peer, second_peer)
         {
             Ok(res) => {
-                Box::new(res.map_err(|err, _, ctx: &mut Context<Self>| {
+                Box::new(res.then(|res, room, ctx| -> ActFuture<(), ()> {
+                    if res.is_ok() {
+                        return Box::new(future::ok(()).into_actor(room));
+                    }
                     error!(
                         "Failed handle command, because {}. Room will be \
                          stopped.",
-                        err
+                        res.unwrap_err(),
                     );
-                    ctx.notify(CloseRoom {})
+                    room.close_gracefully(ctx)
                 }))
             }
             Err(err) => {
@@ -439,17 +459,38 @@ impl Room {
                     "Failed handle command, because {}. Room will be stopped.",
                     err
                 );
-                ctx.notify(CloseRoom {});
-                Box::new(wrap_future(future::ok(())))
+                self.close_gracefully(ctx)
             }
         };
+
         ctx.spawn(fut);
+    }
+
+    /// Closes [`Room`] gracefully, by dropping all the connections and moving
+    /// into [`State::Stopped`].
+    fn close_gracefully(
+        &mut self,
+        ctx: &mut Context<Self>,
+    ) -> ResponseActFuture<Self, (), ()> {
+        info!("Closing Room [id = {:?}]", self.id);
+        self.state = State::Stopping;
+
+        Box::new(
+            self.members
+                .drop_connections(ctx)
+                .into_actor(self)
+                .map(move |_, room: &mut Self, _| {
+                    room.state = State::Stopped;
+                })
+                .map_err(move |_, room, _| {
+                    error!("Error closing room {:?}", room.id);
+                }),
+        )
     }
 }
 
 /// [`Actor`] implementation that provides an ergonomic way
 /// to interact with [`Room`].
-// TODO: close connections on signal (graceful shutdown)
 impl Actor for Room {
     type Context = Context<Self>;
 }
@@ -502,24 +543,31 @@ impl Handler<PeersRemoved> for Room {
                  Event::PeersRemoved not found. Closing room.",
                 msg.member_id
             );
-            ctx.notify(CloseRoom {});
-            return Box::new(wrap_future(future::err(())));
+
+            return Box::new(self.close_gracefully(ctx));
         }
 
-        Box::new(
-            self.send_peers_removed(msg.member_id, msg.peers_id)
-                .map_err(|err, _, ctx: &mut Context<Self>| match err {
-                    RoomError::ConnectionNotExists(_) => (),
-                    _ => {
-                        error!(
-                            "Failed PeersEvent command, because {}. Room will \
-                             be stopped.",
-                            err
-                        );
-                        ctx.notify(CloseRoom {})
+        Box::new(self.send_peers_removed(msg.member_id, msg.peers_id).then(
+            |err, room, ctx: &mut Context<Self>| {
+                if let Err(e) = err {
+                    match e {
+                        RoomError::ConnectionNotExists(_) => {
+                            Box::new(future::ok(()).into_actor(room))
+                        }
+                        _ => {
+                            error!(
+                                "Failed PeersEvent command, because {}. Room \
+                                 will be stopped.",
+                                e
+                            );
+                            room.close_gracefully(ctx)
+                        }
                     }
-                }),
-        )
+                } else {
+                    Box::new(future::ok(()).into_actor(room))
+                }
+            },
+        ))
     }
 }
 
@@ -550,13 +598,16 @@ impl Handler<CommandMessage> for Room {
 
         match result {
             Ok(res) => {
-                Box::new(res.map_err(|err, _, ctx: &mut Context<Self>| {
+                Box::new(res.then(|res, room, ctx| -> ActFuture<(), ()> {
+                    if res.is_ok() {
+                        return Box::new(future::ok(()).into_actor(room));
+                    }
                     error!(
                         "Failed handle command, because {}. Room will be \
                          stopped.",
-                        err
+                        res.unwrap_err(),
                     );
-                    ctx.notify(CloseRoom {})
+                    room.close_gracefully(ctx)
                 }))
             }
             Err(err) => {
@@ -564,8 +615,7 @@ impl Handler<CommandMessage> for Room {
                     "Failed handle command, because {}. Room will be stopped.",
                     err
                 );
-                ctx.notify(CloseRoom {});
-                Box::new(wrap_future(future::ok(())))
+                self.close_gracefully(ctx)
             }
         }
     }
@@ -597,25 +647,19 @@ impl Handler<RpcConnectionEstablished> for Room {
     }
 }
 
-/// Signal of close [`Room`].
-#[allow(clippy::module_name_repetitions)]
-#[derive(Debug, Message)]
-#[rtype(result = "()")]
-pub struct CloseRoom {}
+impl Handler<ShutdownGracefully> for Room {
+    type Result = ResponseActFuture<Self, (), ()>;
 
-impl Handler<CloseRoom> for Room {
-    type Result = ();
-
-    /// Sends to remote [`Member`] the [`Event`] about [`Peer`] removed.
-    /// Closes all active [`RpcConnection`]s.
     fn handle(
         &mut self,
-        _msg: CloseRoom,
+        _: ShutdownGracefully,
         ctx: &mut Self::Context,
     ) -> Self::Result {
-        info!("Closing Room [id = {:?}]", self.id);
-        let drop_fut = self.members.drop_connections(ctx);
-        ctx.wait(wrap_future(drop_fut));
+        info!(
+            "Room: {:?} received ShutdownGracefully message so shutting down",
+            self.id
+        );
+        self.close_gracefully(ctx)
     }
 }
 
