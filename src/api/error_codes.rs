@@ -7,9 +7,7 @@
 //! * __1200...1299__ Parse errors
 //! * __1300...1399__ Conflicts
 
-use medea_grpc_proto::control::{
-    Error as ErrorProto,
-};
+use medea_grpc_proto::control::Error as ErrorProto;
 
 use crate::{
     api::control::{

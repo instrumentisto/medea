@@ -4,9 +4,10 @@ use std::{collections::HashMap as StdHashMap, convert::TryFrom};
 
 use hashbrown::HashMap;
 use macro_attr::*;
-use newtype_derive::{newtype_fmt, NewtypeDisplay, NewtypeFrom};
-use serde::Deserialize;
 use medea_grpc_proto::control::Member as MemberProto;
+use newtype_derive::{newtype_fmt, NewtypeDisplay, NewtypeFrom};
+use rand::{distributions::Alphanumeric, Rng};
+use serde::Deserialize;
 
 use crate::api::control::{
     endpoints::{
@@ -17,7 +18,6 @@ use crate::api::control::{
 };
 
 use super::{pipeline::Pipeline, Element, TryFromElementError};
-use rand::{distributions::Alphanumeric, Rng};
 
 const MEMBER_CREDENTIALS_LEN: usize = 32;
 

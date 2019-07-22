@@ -1,7 +1,7 @@
 //! Room definitions and implementations. Room is responsible for media
 //! connection establishment between concrete [`Member`]s.
 
-use std::{collections::HashMap as StdHashMap};
+use std::collections::HashMap as StdHashMap;
 
 use actix::{
     fut::wrap_future, Actor, ActorFuture, AsyncContext, Context, Handler,
@@ -12,8 +12,7 @@ use futures::future;
 use hashbrown::{HashMap, HashSet};
 use medea_client_api_proto::{Command, Event, IceCandidate};
 use medea_grpc_proto::control::{
-    Element as ElementProto, Member_Element, Room as RoomProto,
-    Room_Element,
+    Element as ElementProto, Member_Element, Room as RoomProto, Room_Element,
 };
 
 use crate::{

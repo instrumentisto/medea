@@ -1,8 +1,10 @@
 //! [`Member`] is member of [`Room`] with [`RpcConnection`].
 
 use std::{
-    cell::RefCell, collections::HashMap as StdHashMap, convert::TryFrom as _,
-    rc::Rc,
+    cell::RefCell,
+    collections::HashMap as StdHashMap,
+    convert::TryFrom as _,
+    rc::{Rc, Weak},
 };
 
 use failure::Fail;
@@ -26,7 +28,6 @@ use crate::{
 };
 
 use super::endpoints::webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint};
-use std::rc::Weak;
 
 /// Errors which may occur while loading [`Member`]s from [`RoomSpec`].
 #[derive(Debug, Fail)]
@@ -195,11 +196,11 @@ impl Member {
                 publisher.add_sink(new_play_endpoint.downgrade());
             } else {
                 let new_publish_id = &spec_play_endpoint.src.endpoint_id;
-                let new_publish = Rc::new(WebRtcPublishEndpoint::new(
+                let new_publish = WebRtcPublishEndpoint::new(
                     new_publish_id.clone(),
                     publisher_endpoint.p2p.clone(),
                     publisher_member.downgrade(),
-                ));
+                );
 
                 let new_self_play_id = WebRtcPlayId(spec_play_name.to_string());
                 let new_self_play = WebRtcPlayEndpoint::new(
@@ -325,7 +326,7 @@ impl Member {
     pub fn get_src(
         &self,
         id: &WebRtcPublishId,
-    ) -> Result<Rc<WebRtcPublishEndpoint>, MemberError> {
+    ) -> Result<WebRtcPublishEndpoint, MemberError> {
         self.0.borrow().srcs.get(id).cloned().map_or_else(
             || {
                 Err(MemberError::PublishEndpointNotFound(
@@ -351,7 +352,7 @@ impl Member {
     pub fn get_sink(
         &self,
         id: &WebRtcPlayId,
-    ) -> Result<Rc<WebRtcPlayEndpoint>, MemberError> {
+    ) -> Result<WebRtcPlayEndpoint, MemberError> {
         self.0.borrow().sinks.get(id).cloned().map_or_else(
             || {
                 Err(MemberError::PlayEndpointNotFound(
@@ -373,10 +374,7 @@ impl Member {
     }
 
     /// Take sink from [`Member`]'s `sinks`.
-    pub fn take_sink(
-        &self,
-        id: &WebRtcPlayId,
-    ) -> Option<Rc<WebRtcPlayEndpoint>> {
+    pub fn take_sink(&self, id: &WebRtcPlayId) -> Option<WebRtcPlayEndpoint> {
         self.0.borrow_mut().sinks.remove(id)
     }
 
@@ -384,7 +382,7 @@ impl Member {
     pub fn take_src(
         &self,
         id: &WebRtcPublishId,
-    ) -> Option<Rc<WebRtcPublishEndpoint>> {
+    ) -> Option<WebRtcPublishEndpoint> {
         self.0.borrow_mut().srcs.remove(id)
     }
 
@@ -414,6 +412,7 @@ impl Member {
         src.add_sink(sink.downgrade());
         member.insert_sink(sink);
     }
+
     /// Downgrade strong [`Member`]'s pointer to weak [`WeakMember`] pointer.
     pub fn downgrade(&self) -> WeakMember {
         WeakMember(Rc::downgrade(&self.0))
@@ -505,7 +504,7 @@ pub fn parse_members(
     Ok(members)
 }
 
-impl Into<ElementProto> for Rc<Member> {
+impl Into<ElementProto> for Member {
     fn into(self) -> ElementProto {
         let mut element = ElementProto::new();
         let mut member = MemberProto::new();

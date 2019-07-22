@@ -4,12 +4,12 @@ use std::{convert::TryFrom, fmt};
 
 use failure::Fail;
 use macro_attr::*;
+use medea_grpc_proto::control::WebRtcPlayEndpoint as WebRtcPlayEndpointProto;
 use newtype_derive::{newtype_fmt, NewtypeDisplay, NewtypeFrom};
 use serde::{
     de::{self, Deserializer, Error, Visitor},
     Deserialize,
 };
-use medea_grpc_proto::control::WebRtcPlayEndpoint as WebRtcPlayEndpointProto;
 
 use crate::api::control::{
     endpoints::webrtc_publish_endpoint::WebRtcPublishId,

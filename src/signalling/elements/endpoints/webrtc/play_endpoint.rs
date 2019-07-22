@@ -11,16 +11,17 @@ use medea_grpc_proto::control::{
 };
 
 use crate::{
-    api::control::{
-        endpoints::webrtc_play_endpoint::{SrcUri, WebRtcPlayId as Id},
+    api::control::endpoints::webrtc_play_endpoint::{
+        SrcUri, WebRtcPlayId as Id,
     },
     media::PeerId,
-    signalling::elements::Member,
+    signalling::elements::{
+        endpoints::webrtc::publish_endpoint::WeakWebRtcPublishEndpoint,
+        member::WeakMember, Member,
+    },
 };
 
 use super::publish_endpoint::WebRtcPublishEndpoint;
-use crate::signalling::elements::endpoints::webrtc::publish_endpoint::WeakWebRtcPublishEndpoint;
-use crate::signalling::elements::member::WeakMember;
 
 #[derive(Debug, Clone)]
 struct WebRtcPlayEndpointInner {
@@ -188,7 +189,7 @@ impl WeakWebRtcPlayEndpoint {
     }
 }
 
-impl Into<ElementProto> for Rc<WebRtcPlayEndpoint> {
+impl Into<ElementProto> for WebRtcPlayEndpoint {
     fn into(self) -> ElementProto {
         let mut element = ElementProto::new();
         let mut play = WebRtcPlayEndpointProto::new();

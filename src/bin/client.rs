@@ -3,7 +3,7 @@
 use std::{collections::HashMap, sync::Arc};
 
 use grpcio::{ChannelBuilder, EnvBuilder};
-use medea::api::control::grpc::protos::{
+use medea_grpc_proto::{
     control::{
         CreateRequest, IdRequest, Member, Member_Element, Room, Room_Element,
         WebRtcPlayEndpoint, WebRtcPublishEndpoint, WebRtcPublishEndpoint_P2P,

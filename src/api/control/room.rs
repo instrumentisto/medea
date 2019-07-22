@@ -4,13 +4,11 @@ use std::{collections::HashMap as StdHashMap, convert::TryFrom};
 
 use hashbrown::HashMap;
 use macro_attr::*;
+use medea_grpc_proto::control::Room as RoomProto;
 use newtype_derive::{newtype_fmt, NewtypeDisplay, NewtypeFrom};
 use serde::Deserialize;
-use medea_grpc_proto::control::Room as RoomProto;
 
-use crate::api::control::{
-    TryFromProtobufError,
-};
+use crate::api::control::TryFromProtobufError;
 
 use super::{
     member::MemberSpec, pipeline::Pipeline, Element, MemberId,

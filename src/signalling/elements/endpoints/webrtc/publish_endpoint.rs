@@ -12,16 +12,17 @@ use medea_grpc_proto::control::{
 };
 
 use crate::{
-    api::control::{
-        endpoints::webrtc_publish_endpoint::{P2pMode, WebRtcPublishId as Id},
+    api::control::endpoints::webrtc_publish_endpoint::{
+        P2pMode, WebRtcPublishId as Id,
     },
     media::PeerId,
-    signalling::elements::Member,
+    signalling::elements::{
+        endpoints::webrtc::play_endpoint::WeakWebRtcPlayEndpoint,
+        member::WeakMember, Member,
+    },
 };
 
 use super::play_endpoint::WebRtcPlayEndpoint;
-use crate::signalling::elements::endpoints::webrtc::play_endpoint::WeakWebRtcPlayEndpoint;
-use crate::signalling::elements::member::WeakMember;
 
 #[derive(Debug, Clone)]
 struct WebRtcPublishEndpointInner {
@@ -106,11 +107,7 @@ pub struct WebRtcPublishEndpoint(Rc<RefCell<WebRtcPublishEndpointInner>>);
 
 impl WebRtcPublishEndpoint {
     /// Create new [`WebRtcPublishEndpoint`].
-    pub fn new(
-        id: Id,
-        p2p: P2pMode,
-        owner: WeakMember,
-    ) -> Self {
+    pub fn new(id: Id, p2p: P2pMode, owner: WeakMember) -> Self {
         Self(Rc::new(RefCell::new(WebRtcPublishEndpointInner {
             id,
             p2p,
@@ -181,6 +178,10 @@ impl WebRtcPublishEndpoint {
             .retain(|e| e.safe_upgrade().is_some());
     }
 
+    pub fn p2p(&self) -> P2pMode {
+        self.0.borrow().p2p.clone()
+    }
+
     /// Downgrade [`WeakWebRtcPublishEndpoint`] to weak pointer
     /// [`WeakWebRtcPublishEndpoint`].
     pub fn downgrade(&self) -> WeakWebRtcPublishEndpoint {
@@ -212,13 +213,9 @@ impl WeakWebRtcPublishEndpoint {
     pub fn safe_upgrade(&self) -> Option<WebRtcPublishEndpoint> {
         self.0.upgrade().map(WebRtcPublishEndpoint)
     }
-
-    pub fn p2p(&self) -> P2pMode {
-        self.0.borrow().p2p.clone()
-    }
 }
 
-impl Into<ElementProto> for Rc<WebRtcPublishEndpoint> {
+impl Into<ElementProto> for WebRtcPublishEndpoint {
     fn into(self) -> ElementProto {
         let mut element = ElementProto::new();
         let mut publish = WebRtcPublishEndpointProto::new();

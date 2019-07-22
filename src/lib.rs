@@ -1,14 +1,14 @@
 //! Medea media server application.
 
 #[macro_use]
-mod utils;
-mod api;
-mod conf;
-mod log;
-mod media;
-mod shutdown;
-mod signalling;
-mod turn;
+pub mod utils;
+pub mod api;
+pub mod conf;
+pub mod log;
+pub mod media;
+pub mod shutdown;
+pub mod signalling;
+pub mod turn;
 
 use std::sync::Arc;
 

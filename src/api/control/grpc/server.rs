@@ -14,8 +14,7 @@ use futures::future::{self, Either, Future};
 use grpcio::{Environment, RpcContext, Server, ServerBuilder, UnarySink};
 use medea_grpc_proto::{
     control::{
-        ApplyRequest, CreateRequest, Error, GetResponse, IdRequest,
-        Response,
+        ApplyRequest, CreateRequest, Error, GetResponse, IdRequest, Response,
     },
     control_grpc::{create_control_api, ControlApi},
 };
