@@ -22,5 +22,5 @@ slog-async = "2.3"
 slog-stdlog = "3.0"
 slog-envlogger = "2.1"
 dotenv = "0.13"
-medea = { path = "../" }
+medea-grpc-proto = { path = "../proto/grpc"}
 protobuf = "2.7"

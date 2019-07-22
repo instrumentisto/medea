@@ -7,7 +7,7 @@ use actix_web::{
     HttpResponse,
 };
 use futures::Future;
-use medea::api::control::grpc::protos::control::{
+use medea_grpc_proto::control::{
     Room as RoomProto, Room_Element as RoomElementProto,
 };
 use serde::{Deserialize, Serialize};
