@@ -52,7 +52,11 @@ struct WebRtcPublishEndpointInner {
 
 impl Drop for WebRtcPublishEndpointInner {
     fn drop(&mut self) {
-        for receiver in self.sinks.iter().filter_map(|r| r.safe_upgrade()) {
+        for receiver in self
+            .sinks
+            .iter()
+            .filter_map(WeakWebRtcPlayEndpoint::safe_upgrade)
+        {
             if let Some(receiver_owner) = receiver.weak_owner().safe_upgrade() {
                 receiver_owner.remove_sink(&receiver.id())
             }
@@ -66,7 +70,10 @@ impl WebRtcPublishEndpointInner {
     }
 
     fn sinks(&self) -> Vec<WebRtcPlayEndpoint> {
-        self.sinks.iter().map(|p| p.upgrade()).collect()
+        self.sinks
+            .iter()
+            .map(WeakWebRtcPlayEndpoint::upgrade)
+            .collect()
     }
 
     fn owner(&self) -> Member {
@@ -195,6 +202,7 @@ impl WebRtcPublishEndpoint {
 }
 
 /// Weak pointer to [`WebRtcPublishEndpoint`].
+#[allow(clippy::module_name_repetitions)]
 #[derive(Debug, Clone)]
 pub struct WeakWebRtcPublishEndpoint(Weak<RefCell<WebRtcPublishEndpointInner>>);
 
@@ -208,6 +216,6 @@ impl WeakWebRtcPublishEndpoint {
 
     /// Safe upgrade to [`WebRtcPlayEndpoint`].
     pub fn safe_upgrade(&self) -> Option<WebRtcPublishEndpoint> {
-        self.0.upgrade().map(|i| WebRtcPublishEndpoint(i))
+        self.0.upgrade().map(WebRtcPublishEndpoint)
     }
 }

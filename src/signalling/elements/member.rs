@@ -287,6 +287,7 @@ impl Member {
 }
 
 /// Weak pointer to [`Member`].
+#[allow(clippy::module_name_repetitions)]
 #[derive(Clone, Debug)]
 pub struct WeakMember(Weak<RefCell<MemberInner>>);
 
@@ -300,7 +301,7 @@ impl WeakMember {
 
     /// Safe upgrade to [`Member`].
     pub fn safe_upgrade(&self) -> Option<Member> {
-        Weak::upgrade(&self.0).map(|m| Member(m))
+        Weak::upgrade(&self.0).map(Member)
     }
 }
 

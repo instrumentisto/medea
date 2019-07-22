@@ -175,6 +175,7 @@ impl WebRtcPlayEndpoint {
 }
 
 /// Weak pointer to [`WebRtcPlayEndpoint`].
+#[allow(clippy::module_name_repetitions)]
 #[derive(Debug, Clone)]
 pub struct WeakWebRtcPlayEndpoint(Weak<RefCell<WebRtcPlayEndpointInner>>);
 
@@ -188,6 +189,6 @@ impl WeakWebRtcPlayEndpoint {
 
     /// Safe upgrade to [`WebRtcPlayEndpoint`].
     pub fn safe_upgrade(&self) -> Option<WebRtcPlayEndpoint> {
-        self.0.upgrade().map(|i| WebRtcPlayEndpoint(i))
+        self.0.upgrade().map(WebRtcPlayEndpoint)
     }
 }
