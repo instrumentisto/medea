@@ -1,7 +1,7 @@
 //! Room definitions and implementations. Room is responsible for media
 //! connection establishment between concrete [`Member`]s.
 
-use std::{collections::HashMap as StdHashMap, rc::Rc};
+use std::{collections::HashMap as StdHashMap};
 
 use actix::{
     fut::wrap_future, Actor, ActorFuture, AsyncContext, Context, Handler,
@@ -348,8 +348,8 @@ impl Room {
     /// [`Peer`]s!__
     fn connect_endpoints(
         &mut self,
-        src: &Rc<WebRtcPublishEndpoint>,
-        sink: &Rc<WebRtcPlayEndpoint>,
+        src: &WebRtcPublishEndpoint,
+        sink: &WebRtcPlayEndpoint,
     ) -> Option<(PeerId, PeerId)> {
         let src_owner = src.owner();
         let sink_owner = sink.owner();

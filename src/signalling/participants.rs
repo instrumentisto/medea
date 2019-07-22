@@ -97,7 +97,7 @@ pub struct ParticipantService {
     room_id: RoomId,
 
     /// [`Member`]s which currently are present in this [`Room`].
-    members: HashMap<MemberId, Rc<Member>>,
+    members: HashMap<MemberId, Member>,
 
     /// Global app context.
     app: AppContext,
@@ -129,7 +129,7 @@ impl ParticipantService {
     }
 
     /// Lookup [`Member`] by provided id.
-    pub fn get_member_by_id(&self, id: &MemberId) -> Option<Rc<Member>> {
+    pub fn get_member_by_id(&self, id: &MemberId) -> Option<Member> {
         self.members.get(id).cloned()
     }
 
@@ -174,7 +174,7 @@ impl ParticipantService {
         &self,
         member_id: &MemberId,
         credentials: &str,
-    ) -> Result<Rc<Member>, AuthorizationError> {
+    ) -> Result<Member, AuthorizationError> {
         match self.get_member_by_id(member_id) {
             Some(member) => {
                 if member.credentials().eq(credentials) {
@@ -218,7 +218,7 @@ impl ParticipantService {
         ctx: &mut Context<Room>,
         member_id: MemberId,
         con: Box<dyn RpcConnection>,
-    ) -> ActFuture<Rc<Member>, ParticipantServiceErr> {
+    ) -> ActFuture<Member, ParticipantServiceErr> {
         let member = match self.get_member_by_id(&member_id) {
             None => {
                 return Box::new(wrap_future(future::err(

@@ -26,6 +26,7 @@ use crate::{
 };
 
 use super::endpoints::webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint};
+use std::rc::Weak;
 
 /// Errors which may occur while loading [`Member`]s from [`RoomSpec`].
 #[derive(Debug, Fail)]
@@ -64,8 +65,8 @@ pub enum MemberError {
 }
 
 /// [`Member`] is member of [`Room`] with [`RpcConnection`].
-#[derive(Debug)]
-pub struct Member(RefCell<MemberInner>);
+#[derive(Clone, Debug)]
+pub struct Member(Rc<RefCell<MemberInner>>);
 
 #[allow(clippy::module_name_repetitions)]
 #[derive(Debug)]
@@ -75,10 +76,10 @@ struct MemberInner {
     id: MemberId,
 
     /// All [`WebRtcPublishEndpoint`]s of this [`Member`].
-    srcs: HashMap<WebRtcPublishId, Rc<WebRtcPublishEndpoint>>,
+    srcs: HashMap<WebRtcPublishId, WebRtcPublishEndpoint>,
 
     /// All [`WebRtcPlayEndpoint`]s of this [`Member`].
-    sinks: HashMap<WebRtcPlayId, Rc<WebRtcPlayEndpoint>>,
+    sinks: HashMap<WebRtcPlayId, WebRtcPlayEndpoint>,
 
     /// Credentials for this [`Member`].
     credentials: String,
@@ -93,14 +94,14 @@ impl Member {
     /// To fill this [`Member`], you need to call the [`Member::load`]
     /// function.
     pub fn new(id: MemberId, credentials: String, room_id: RoomId) -> Self {
-        Self(RefCell::new(MemberInner {
+        Self(Rc::new(RefCell::new(MemberInner {
             id,
             srcs: HashMap::new(),
             sinks: HashMap::new(),
             credentials,
             ice_user: None,
             room_id,
-        }))
+        })))
     }
 
     /// Lookup [`MemberSpec`] by ID from [`MemberSpec`].
@@ -135,7 +136,7 @@ impl Member {
     fn load(
         &self,
         room_spec: &RoomSpec,
-        store: &HashMap<MemberId, Rc<Self>>,
+        store: &HashMap<MemberId, Self>,
     ) -> Result<(), MembersLoadError> {
         let self_id = self.id();
 
@@ -182,33 +183,33 @@ impl Member {
             {
                 let new_play_endpoint_id =
                     WebRtcPlayId(spec_play_name.to_string());
-                let new_play_endpoint = Rc::new(WebRtcPlayEndpoint::new(
+                let new_play_endpoint = WebRtcPlayEndpoint::new(
                     new_play_endpoint_id.clone(),
                     spec_play_endpoint.src.clone(),
-                    Rc::downgrade(&publisher),
-                    Rc::downgrade(&this_member),
-                ));
+                    publisher.downgrade(),
+                    this_member.downgrade(),
+                );
 
-                self.insert_sink(Rc::clone(&new_play_endpoint));
+                self.insert_sink(new_play_endpoint.clone());
 
-                publisher.add_sink(Rc::downgrade(&new_play_endpoint));
+                publisher.add_sink(new_play_endpoint.downgrade());
             } else {
                 let new_publish_id = &spec_play_endpoint.src.endpoint_id;
                 let new_publish = Rc::new(WebRtcPublishEndpoint::new(
                     new_publish_id.clone(),
                     publisher_endpoint.p2p.clone(),
-                    Rc::downgrade(&publisher_member),
+                    publisher_member.downgrade(),
                 ));
 
                 let new_self_play_id = WebRtcPlayId(spec_play_name.to_string());
-                let new_self_play = Rc::new(WebRtcPlayEndpoint::new(
+                let new_self_play = WebRtcPlayEndpoint::new(
                     new_self_play_id.clone(),
                     spec_play_endpoint.src.clone(),
-                    Rc::downgrade(&new_publish),
-                    Rc::downgrade(&this_member),
-                ));
+                    new_publish.downgrade(),
+                    this_member.downgrade(),
+                );
 
-                new_publish.add_sink(Rc::downgrade(&new_self_play));
+                new_publish.add_sink(new_self_play.downgrade());
 
                 publisher_member.insert_src(new_publish);
 
@@ -221,11 +222,11 @@ impl Member {
         this_member_spec.publish_endpoints().into_iter().for_each(
             |(endpoint_id, e)| {
                 if self.srcs().get(&endpoint_id).is_none() {
-                    self.insert_src(Rc::new(WebRtcPublishEndpoint::new(
+                    self.insert_src(WebRtcPublishEndpoint::new(
                         endpoint_id,
                         e.p2p.clone(),
-                        Rc::downgrade(&this_member),
-                    )));
+                        this_member.downgrade(),
+                    ));
                 }
             },
         );
@@ -290,22 +291,22 @@ impl Member {
     }
 
     /// Returns all publishers of this [`Member`].
-    pub fn srcs(&self) -> HashMap<WebRtcPublishId, Rc<WebRtcPublishEndpoint>> {
+    pub fn srcs(&self) -> HashMap<WebRtcPublishId, WebRtcPublishEndpoint> {
         self.0.borrow().srcs.clone()
     }
 
     /// Returns all sinks endpoints of this [`Member`].
-    pub fn sinks(&self) -> HashMap<WebRtcPlayId, Rc<WebRtcPlayEndpoint>> {
+    pub fn sinks(&self) -> HashMap<WebRtcPlayId, WebRtcPlayEndpoint> {
         self.0.borrow().sinks.clone()
     }
 
     /// Insert sink endpoint into this [`Member`].
-    pub fn insert_sink(&self, endpoint: Rc<WebRtcPlayEndpoint>) {
+    pub fn insert_sink(&self, endpoint: WebRtcPlayEndpoint) {
         self.0.borrow_mut().sinks.insert(endpoint.id(), endpoint);
     }
 
     /// Insert source endpoint into this [`Member`].
-    pub fn insert_src(&self, endpoint: Rc<WebRtcPublishEndpoint>) {
+    pub fn insert_src(&self, endpoint: WebRtcPublishEndpoint) {
         self.0.borrow_mut().srcs.insert(endpoint.id(), endpoint);
     }
 
@@ -313,7 +314,7 @@ impl Member {
     pub fn get_src_by_id(
         &self,
         id: &WebRtcPublishId,
-    ) -> Option<Rc<WebRtcPublishEndpoint>> {
+    ) -> Option<WebRtcPublishEndpoint> {
         self.0.borrow().srcs.get(id).cloned()
     }
 
@@ -339,7 +340,7 @@ impl Member {
     pub fn get_sink_by_id(
         &self,
         id: &WebRtcPlayId,
-    ) -> Option<Rc<WebRtcPlayEndpoint>> {
+    ) -> Option<WebRtcPlayEndpoint> {
         self.0.borrow().sinks.get(id).cloned()
     }
 
@@ -403,15 +404,45 @@ impl Member {
     ) {
         let src = member.get_src_by_id(&spec.src.endpoint_id).unwrap();
 
-        let sink = Rc::new(WebRtcPlayEndpoint::new(
+        let sink = WebRtcPlayEndpoint::new(
             id,
             spec.src,
-            Rc::downgrade(&src),
-            Rc::downgrade(&member),
-        ));
+            src.downgrade(),
+            member.downgrade(),
+        );
 
-        src.add_sink(Rc::downgrade(&sink));
+        src.add_sink(sink.downgrade());
         member.insert_sink(sink);
+    }
+    /// Downgrade strong [`Member`]'s pointer to weak [`WeakMember`] pointer.
+    pub fn downgrade(&self) -> WeakMember {
+        WeakMember(Rc::downgrade(&self.0))
+    }
+
+    /// Compares pointers. If both pointers point to the same address, then
+    /// returns true.
+    #[cfg(test)]
+    pub fn ptr_eq(&self, another_member: &Self) -> bool {
+        Rc::ptr_eq(&self.0, &another_member.0)
+    }
+}
+
+/// Weak pointer to [`Member`].
+#[allow(clippy::module_name_repetitions)]
+#[derive(Clone, Debug)]
+pub struct WeakMember(Weak<RefCell<MemberInner>>);
+
+impl WeakMember {
+    /// Upgrade weak pointer to strong pointer.
+    ///
+    /// This function will __panic__ if weak pointer is `None`.
+    pub fn upgrade(&self) -> Member {
+        Member(Weak::upgrade(&self.0).unwrap())
+    }
+
+    /// Safe upgrade to [`Member`].
+    pub fn safe_upgrade(&self) -> Option<Member> {
+        Weak::upgrade(&self.0).map(Member)
     }
 }
 
@@ -421,7 +452,7 @@ impl Member {
 /// Returns store of all [`Member`]s loaded from [`RoomSpec`].
 pub fn parse_members(
     room_spec: &RoomSpec,
-) -> Result<HashMap<MemberId, Rc<Member>>, MembersLoadError> {
+) -> Result<HashMap<MemberId, Member>, MembersLoadError> {
     let members_spec = match room_spec.members() {
         Ok(o) => o,
         Err(e) => {
@@ -438,11 +469,11 @@ pub fn parse_members(
     for (id, member) in &members_spec {
         members.insert(
             id.clone(),
-            Rc::new(Member::new(
+            Member::new(
                 id.clone(),
                 member.credentials().to_string(),
                 room_spec.id.clone(),
-            )),
+            ),
         );
     }
 
@@ -501,8 +532,6 @@ impl Into<ElementProto> for Rc<Member> {
 
 #[cfg(test)]
 mod tests {
-    use std::rc::Rc;
-
     use crate::api::control::{Element, MemberId};
 
     use super::*;
@@ -550,7 +579,7 @@ mod tests {
         T::from(s.to_string())
     }
 
-    fn get_test_store() -> HashMap<MemberId, Rc<Member>> {
+    fn get_test_store() -> HashMap<MemberId, Member> {
         let room_element: Element = serde_yaml::from_str(TEST_SPEC).unwrap();
         let room_spec = RoomSpec::try_from(&room_element).unwrap();
         parse_members(&room_spec).unwrap()
@@ -571,15 +600,14 @@ mod tests {
         let is_caller_has_responder_in_sinks = caller_publish_endpoint
             .sinks()
             .into_iter()
-            .filter(|p| Rc::ptr_eq(p, &responder_play_endpoint))
+            .filter(|p| p.ptr_eq(&responder_play_endpoint))
             .count()
             == 1;
         assert!(is_caller_has_responder_in_sinks);
 
-        assert!(Rc::ptr_eq(
-            &responder_play_endpoint.src(),
-            &caller_publish_endpoint
-        ));
+        assert!(responder_play_endpoint
+            .src()
+            .ptr_eq(&caller_publish_endpoint));
 
         let some_member = store.get(&id("some-member")).unwrap();
         assert!(some_member.sinks().is_empty());
@@ -593,7 +621,7 @@ mod tests {
         let is_some_member_has_responder_in_sinks = some_member_publisher
             .sinks()
             .into_iter()
-            .filter(|p| Rc::ptr_eq(p, &responder_play2_endpoint))
+            .filter(|p| p.ptr_eq(&responder_play2_endpoint))
             .count()
             == 1;
         assert!(is_some_member_has_responder_in_sinks);
