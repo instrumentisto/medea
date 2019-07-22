@@ -95,6 +95,24 @@ cargo.lint:
 
 
 
+######################
+# wasm-pack commands #
+######################
+
+
+# Build and publish Jason application to npm
+#
+# Usage:
+#	make publish.jason
+
+publish.jason:
+	rm -rf jason/pkg
+	wasm-pack build -t web --no-typescript jason
+	wasm-pack publish
+
+
+
+
 #################
 # Yarn commands #
 #################

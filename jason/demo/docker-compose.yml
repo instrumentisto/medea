@@ -5,14 +5,22 @@ services:
     image: instrumentisto/medea-demo:dev
     ports:
       - "80:80"
+      - "6379:6379"    # coturn redis
+      - "8080:8080"    # web-socket http server
+  medea:
+    container_name: medea
+    image: instrumentisto/medea:dev
+    depends_on: ["coturn-db"]
+    environment:
+      MEDEA_LOG.LEVER: "DEBUG"
+    network_mode: service:webclient
   coturn-db:
     container_name: coturn-db
     image: redis:alpine
     command: ["redis-server", "/etc/redis.conf"]
-    ports:
-      - "6379:6379"    # coturn redis
     volumes:
       - ../../dev/coturn/redis.conf:/etc/redis.conf:ro
+    network_mode: service:webclient
   coturn:
     container_name: coturn
     image: instrumentisto/coturn:4.5
@@ -23,9 +31,3 @@ services:
       - ../../dev/coturn/turnserver.conf:/etc/coturn/turnserver.conf:ro
       - ../../.cache/coturn/data:/var/lib/coturn
     network_mode: host
-  medea:
-    container_name: medea
-    image: instrumentisto/medea:dev
-    depends_on: ["coturn-db"]
-    ports:
-      - "8080:8080"    # web-socket http server

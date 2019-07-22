@@ -4,70 +4,43 @@
   <title>Chat</title>
   <meta http-equiv='Content-Type' content='text/html; charset=UTF-8'/>
 
-  <script type="text/javascript">
-    async function responder() {
-      const rust = await import("../../pkg");
+  <script type="module">
 
-      let responder = new rust.Jason();
+    import init, {Jason, RoomHandle, MediaStreamHandle, ConnectionHandle} from './js/jason_alexlapa.js';
 
-      let responder_room = await responder.join_room("ws://localhost:8080/ws/1/2/responder_credentials");
+    export async function run(credentials) {
+      // modes
+      await init();
 
-      responder.on_local_stream(function (stream, error) {
+      let jason = new Jason();
+
+      jason.on_local_stream(function (stream, error) {
         if (stream) {
-          var video = document.createElement("video");
+          let local_video = document.getElementById("yourvid");
 
-          video.srcObject = stream.get_media_stream();
-          document.body.appendChild(video);
-          video.play();
+          local_video.srcObject = stream.get_media_stream();
+          local_video.play();
         } else {
-          console.log(error);
+          console.error(error);
         }
       });
-      responder_room.on_new_connection(function (connection) {
-        console.log("responder got new connection with member " + connection.member_id());
+
+      let room = await jason.join_room(credentials);
+
+      room.on_new_connection(function (connection) {
         connection.on_remote_stream(function (stream) {
-          console.log("got video from remote member " + connection.member_id());
+          let remote_video = document.getElementById("partnervid");
 
-          var video = document.createElement("video");
-
-          video.srcObject = stream.get_media_stream();
-          document.body.appendChild(video);
-          video.play();
+          remote_video.srcObject = stream.get_media_stream();
+          remote_video.play();
         });
       });
     }
 
-    async function caller() {
-      const rust = await import("/js/jason_alexlapa.js");
-
-      let caller = new rust.Jason();
-
-      let caller_room = await caller.join_room("ws://localhost:8080/ws/1/1/caller_credentials");
-
-      caller_room.on_new_connection(function (connection) {
-        console.log("caller got new connection with member " + connection.member_id());
-        connection.on_remote_stream(function (stream) {
-          console.log("got video from remote member " + connection.member_id());
-
-          var video = document.createElement("video");
-
-          video.srcObject = stream.get_media_stream();
-          document.body.appendChild(video);
-          video.play();
-        });
-      });
-      caller.on_local_stream(function (stream, error) {
-        if (stream) {
-          var video = document.createElement("video");
-
-          video.srcObject = stream.get_media_stream();
-          document.body.appendChild(video);
-          video.play();
-        } else {
-          console.log(error);
-        }
-      });
+    window.connect_room = async function connect_room(credentials) {
+      run(credentials)
     }
+
   </script>
 
   <style>
@@ -108,8 +81,8 @@
   </div>
 </div>
 <div class="connect-btns">
-  <button onclick="caller()">Start caller session</button>
-  <button onclick="responder()">Start responder session</button>
+  <button onclick="window.connect_room('ws://localhost:8080/ws/1/1/caller_credentials')">Start caller session</button>
+  <button onclick="window.connect_room('ws://localhost:8080/ws/1/2/responder_credentials')">Start responder session</button>
 </div>
 
 </body>
