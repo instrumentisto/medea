@@ -19,6 +19,7 @@ use crate::{
 
 use super::play_endpoint::WebRtcPlayEndpoint;
 
+use crate::signalling::elements::member::WeakMember;
 pub use Id as WebRtcPublishId;
 
 macro_attr! {
@@ -39,7 +40,7 @@ struct WebRtcPublishEndpointInner {
     sinks: Vec<WeakWebRtcPlayEndpoint>,
 
     /// Owner [`Member`] of this [`WebRtcPublishEndpoint`].
-    owner: Weak<Member>,
+    owner: WeakMember,
 
     /// [`PeerId`] of all [`Peer`]s created for this [`WebRtcPublishEndpoint`].
     ///
@@ -52,7 +53,7 @@ struct WebRtcPublishEndpointInner {
 impl Drop for WebRtcPublishEndpointInner {
     fn drop(&mut self) {
         for receiver in self.sinks.iter().filter_map(|r| r.safe_upgrade()) {
-            if let Some(receiver_owner) = receiver.weak_owner().upgrade() {
+            if let Some(receiver_owner) = receiver.weak_owner().safe_upgrade() {
                 receiver_owner.remove_sink(&receiver.id())
             }
         }
@@ -68,8 +69,8 @@ impl WebRtcPublishEndpointInner {
         self.sinks.iter().map(|p| p.upgrade()).collect()
     }
 
-    fn owner(&self) -> Rc<Member> {
-        Weak::upgrade(&self.owner).unwrap()
+    fn owner(&self) -> Member {
+        self.owner.upgrade()
     }
 
     fn add_peer_id(&mut self, peer_id: PeerId) {
@@ -107,7 +108,7 @@ impl WebRtcPublishEndpoint {
         id: Id,
         p2p: P2pMode,
         sinks: Vec<WeakWebRtcPlayEndpoint>,
-        owner: Weak<Member>,
+        owner: WeakMember,
     ) -> Self {
         Self(Rc::new(RefCell::new(WebRtcPublishEndpointInner {
             id,
@@ -133,7 +134,7 @@ impl WebRtcPublishEndpoint {
     /// Returns owner [`Member`] of this [`WebRtcPublishEndpoint`].
     ///
     /// __This function will panic if pointer is empty.__
-    pub fn owner(&self) -> Rc<Member> {
+    pub fn owner(&self) -> Member {
         self.0.borrow().owner()
     }
 

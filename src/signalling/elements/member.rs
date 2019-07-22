@@ -15,6 +15,7 @@ use crate::{
 use super::endpoints::webrtc::{
     WebRtcPlayEndpoint, WebRtcPlayId, WebRtcPublishEndpoint, WebRtcPublishId,
 };
+use std::rc::Weak;
 
 /// Errors which may occur while loading [`Member`]s from [`RoomSpec`].
 #[derive(Debug, Fail)]
@@ -39,8 +40,8 @@ impl From<TryFromElementError> for MembersLoadError {
 }
 
 /// [`Member`] is member of [`Room`] with [`RpcConnection`].
-#[derive(Debug)]
-pub struct Member(RefCell<MemberInner>);
+#[derive(Clone, Debug)]
+pub struct Member(Rc<RefCell<MemberInner>>);
 
 #[allow(clippy::module_name_repetitions)]
 #[derive(Debug)]
@@ -66,20 +67,20 @@ impl Member {
     /// To fill this [`Member`], you need to call the [`Member::load`]
     /// function.
     fn new(id: MemberId, credentials: String) -> Self {
-        Self(RefCell::new(MemberInner {
+        Self(Rc::new(RefCell::new(MemberInner {
             id,
             srcs: HashMap::new(),
             sinks: HashMap::new(),
             credentials,
             ice_user: None,
-        }))
+        })))
     }
 
     /// Load all srcs and sinks of this [`Member`].
     fn load(
         &self,
         room_spec: &RoomSpec,
-        store: &HashMap<MemberId, Rc<Self>>,
+        store: &HashMap<MemberId, Self>,
     ) -> Result<(), MembersLoadError> {
         let this_member_spec = MemberSpec::try_from(
             room_spec
@@ -134,7 +135,7 @@ impl Member {
                     new_play_endpoint_id.clone(),
                     spec_play_endpoint.src.clone(),
                     publisher.downgrade(),
-                    Rc::downgrade(&this_member),
+                    this_member.downgrade(),
                 );
 
                 self.insert_sink(new_play_endpoint.clone());
@@ -148,7 +149,7 @@ impl Member {
                     new_publish_id.clone(),
                     publisher_endpoint.p2p.clone(),
                     Vec::new(),
-                    Rc::downgrade(&publisher_member),
+                    publisher_member.downgrade(),
                 );
 
                 let new_self_play_id = WebRtcPlayId(spec_play_name.to_string());
@@ -156,7 +157,7 @@ impl Member {
                     new_self_play_id.clone(),
                     spec_play_endpoint.src.clone(),
                     new_publish.downgrade(),
-                    Rc::downgrade(&this_member),
+                    this_member.downgrade(),
                 );
 
                 new_publish.add_sink(new_self_play.downgrade());
@@ -177,7 +178,7 @@ impl Member {
                         endpoint_id,
                         e.p2p.clone(),
                         Vec::new(),
-                        Rc::downgrade(&this_member),
+                        this_member.downgrade(),
                     ));
                 }
             },
@@ -271,6 +272,29 @@ impl Member {
     pub fn remove_src(&self, id: &WebRtcPublishId) {
         self.0.borrow_mut().srcs.remove(id);
     }
+
+    /// Downgrade strong [`Member`]'s pointer to weak [`WeakMember`] pointer.
+    pub fn downgrade(&self) -> WeakMember {
+        WeakMember(Rc::downgrade(&self.0))
+    }
+}
+
+/// Weak pointer to [`Member`].
+#[derive(Clone, Debug)]
+pub struct WeakMember(Weak<RefCell<MemberInner>>);
+
+impl WeakMember {
+    /// Upgrade weak pointer to strong pointer.
+    ///
+    /// This function will __panic__ if weak pointer is `None`.
+    pub fn upgrade(&self) -> Member {
+        Member(Weak::upgrade(&self.0).unwrap())
+    }
+
+    /// Safe upgrade to [`Member`].
+    pub fn safe_upgrade(&self) -> Option<Member> {
+        Weak::upgrade(&self.0).map(|m| Member(m))
+    }
 }
 
 /// Creates all empty [`Member`] from [`RoomSpec`] and then
@@ -279,14 +303,14 @@ impl Member {
 /// Returns store of all [`Member`]s loaded from [`RoomSpec`].
 pub fn parse_members(
     room_spec: &RoomSpec,
-) -> Result<HashMap<MemberId, Rc<Member>>, MembersLoadError> {
+) -> Result<HashMap<MemberId, Member>, MembersLoadError> {
     let members_spec = room_spec.members()?;
     let mut members = HashMap::new();
 
     for (id, member) in &members_spec {
         members.insert(
             id.clone(),
-            Rc::new(Member::new(id.clone(), member.credentials().to_string())),
+            Member::new(id.clone(), member.credentials().to_string()),
         );
     }
 

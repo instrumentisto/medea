@@ -18,6 +18,7 @@ use crate::{
 
 use super::publish_endpoint::WebRtcPublishEndpoint;
 
+use crate::signalling::elements::member::WeakMember;
 pub use Id as WebRtcPlayId;
 
 macro_attr! {
@@ -40,7 +41,7 @@ struct WebRtcPlayEndpointInner {
     src: WeakWebRtcPublishEndpoint,
 
     /// Owner [`Member`] of this [`WebRtcPlayEndpoint`].
-    owner: Weak<Member>,
+    owner: WeakMember,
 
     /// [`PeerId`] of [`Peer`] created for this [`WebRtcPlayEndpoint`].
     ///
@@ -57,12 +58,12 @@ impl WebRtcPlayEndpointInner {
         self.src_uri.clone()
     }
 
-    fn owner(&self) -> Rc<Member> {
-        Weak::upgrade(&self.owner).unwrap()
+    fn owner(&self) -> Member {
+        self.owner.upgrade()
     }
 
-    fn weak_owner(&self) -> Weak<Member> {
-        Weak::clone(&self.owner)
+    fn weak_owner(&self) -> WeakMember {
+        self.owner.clone()
     }
 
     fn src(&self) -> WebRtcPublishEndpoint {
@@ -101,7 +102,7 @@ impl WebRtcPlayEndpoint {
         id: Id,
         src_uri: SrcUri,
         publisher: WeakWebRtcPublishEndpoint,
-        owner: Weak<Member>,
+        owner: WeakMember,
     ) -> Self {
         Self(Rc::new(RefCell::new(WebRtcPlayEndpointInner {
             id,
@@ -120,13 +121,13 @@ impl WebRtcPlayEndpoint {
     /// Returns owner [`Member`] of this [`WebRtcPlayEndpoint`].
     ///
     /// __This function will panic if pointer is empty.__
-    pub fn owner(&self) -> Rc<Member> {
+    pub fn owner(&self) -> Member {
         self.0.borrow().owner()
     }
 
     /// Returns `Weak` pointer to owner [`Member`] of this
     /// [`WebRtcPlayEndpoint`].
-    pub fn weak_owner(&self) -> Weak<Member> {
+    pub fn weak_owner(&self) -> WeakMember {
         self.0.borrow().weak_owner()
     }
 
