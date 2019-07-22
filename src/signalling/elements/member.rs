@@ -277,6 +277,13 @@ impl Member {
     pub fn downgrade(&self) -> WeakMember {
         WeakMember(Rc::downgrade(&self.0))
     }
+
+    /// Compares pointers. If both pointers point to the same address, then
+    /// returns true.
+    #[cfg(test)]
+    pub fn ptr_eq(&self, another_member: &Self) -> bool {
+        Rc::ptr_eq(&self.0, &another_member.0)
+    }
 }
 
 /// Weak pointer to [`Member`].
@@ -344,8 +351,6 @@ pub fn parse_members(
 
 #[cfg(test)]
 mod tests {
-    use std::rc::Rc;
-
     use crate::api::control::{Element, MemberId};
 
     use super::*;
@@ -393,7 +398,7 @@ mod tests {
         T::from(s.to_string())
     }
 
-    fn get_test_store() -> HashMap<MemberId, Rc<Member>> {
+    fn get_test_store() -> HashMap<MemberId, Member> {
         let room_element: Element = serde_yaml::from_str(TEST_SPEC).unwrap();
         let room_spec = RoomSpec::try_from(&room_element).unwrap();
         parse_members(&room_spec).unwrap()
@@ -414,15 +419,14 @@ mod tests {
         let is_caller_has_responder_in_sinks = caller_publish_endpoint
             .sinks()
             .into_iter()
-            .filter(|p| Rc::ptr_eq(p, &responder_play_endpoint))
+            .filter(|p| p.ptr_eq(&responder_play_endpoint))
             .count()
             == 1;
         assert!(is_caller_has_responder_in_sinks);
 
-        assert!(Rc::ptr_eq(
-            &responder_play_endpoint.src(),
-            &caller_publish_endpoint
-        ));
+        assert!(responder_play_endpoint
+            .src()
+            .ptr_eq(&caller_publish_endpoint));
 
         let some_member = store.get(&id("some-member")).unwrap();
         assert!(some_member.sinks().is_empty());
@@ -436,7 +440,7 @@ mod tests {
         let is_some_member_has_responder_in_sinks = some_member_publisher
             .sinks()
             .into_iter()
-            .filter(|p| Rc::ptr_eq(p, &responder_play2_endpoint))
+            .filter(|p| p.ptr_eq(&responder_play2_endpoint))
             .count()
             == 1;
         assert!(is_some_member_has_responder_in_sinks);

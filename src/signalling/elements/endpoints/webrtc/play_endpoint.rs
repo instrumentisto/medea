@@ -165,6 +165,13 @@ impl WebRtcPlayEndpoint {
     pub fn downgrade(&self) -> WeakWebRtcPlayEndpoint {
         WeakWebRtcPlayEndpoint(Rc::downgrade(&self.0))
     }
+
+    /// Compares pointers. If both pointers point to the same address, then
+    /// returns true.
+    #[cfg(test)]
+    pub fn ptr_eq(&self, another_play: &Self) -> bool {
+        Rc::ptr_eq(&self.0, &another_play.0)
+    }
 }
 
 /// Weak pointer to [`WebRtcPlayEndpoint`].
