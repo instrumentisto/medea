@@ -27,8 +27,7 @@ actix-web = "1.0"
 actix-web-actors = "1.0"
 awc = "0.2"
 bb8 = "0.3"
-# TODO: delete this when https://github.com/khuey/bb8/pull/25 will be released.
-bb8-redis = { git = "https://github.com/khuey/bb8" }
+bb8-redis = "0.3"
 chrono = "0.4"
 config = "0.9"
 dotenv = "0.13"
