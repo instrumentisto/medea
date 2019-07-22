@@ -26,6 +26,7 @@ use self::{
 
 #[doc(inline)]
 pub use self::{repo::PeerRepository, Id as PeerId};
+use wasm_bindgen::JsValue;
 
 pub type Id = u64;
 
@@ -115,6 +116,10 @@ impl PeerConnection {
                 sdp_mid: candidate.sdp_mid,
             },
         );
+    }
+
+    pub fn get_stats(&self) -> impl Future<Item = JsValue, Error = WasmErr>{
+        self.0.peer.get_stats()
     }
 
     /// Handle `track` event from underlying peer adding new track to

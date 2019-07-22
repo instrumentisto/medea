@@ -12,11 +12,13 @@ use futures::{
     stream::Stream as _,
     sync::mpsc::{unbounded, UnboundedSender},
 };
+use js_sys::Promise;
 use medea_client_api_proto::{
     Command, Direction, EventHandler, IceCandidate, IceServer, Track,
 };
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
+use wasm_bindgen_futures::future_to_promise;
 
 use crate::{
     media::{MediaManager, MediaStream},
@@ -49,6 +51,12 @@ impl RoomHandle {
                 room.borrow_mut().on_new_connection.set_func(f);
             })
             .ok_or_else(|| WasmErr::from("Detached state").into())
+    }
+
+    pub fn get_stats(&self) -> Promise {
+        self.0.upgrade().unwrap()
+            .borrow()
+            .get_stats()
     }
 }
 
@@ -141,6 +149,12 @@ impl InnerRoom {
             connections: HashMap::new(),
             on_new_connection: Rc::new(Callback2::default()),
         }
+    }
+
+    pub fn get_stats(&self) -> Promise {
+        let fut = self.peers.get(1).unwrap().get_stats()
+            .map_err(JsValue::from);
+        future_to_promise(fut)
     }
 
     /// Creates new [`Connection`]s basing on senders and receivers of provided

@@ -7,6 +7,8 @@ async function f() {
     let caller_room = await caller.join_room("ws://localhost:8080/ws/pub-pub-video-call/caller/test");
     let responder_room = await responder.join_room("ws://localhost:8080/ws/pub-pub-video-call/responder/test");
 
+    window.caller_room = caller_room;
+
     caller_room.on_new_connection(function (connection) {
         console.log("caller got new connection with member " + connection.member_id());
         connection.on_remote_stream(function (stream) {
