@@ -8,13 +8,13 @@ homepage = "https://github.com/instrumentisto/medea"
 # documentation = "https://docs.rs/medea"
 readme = "README.md"
 repository = "https://github.com/instrumentisto/medea"
-build = "build.rs"
 
 [workspace]
 members = [
     "crates/medea-macro",
     "jason",
     "proto/client-api",
+    "proto/grpc",
     "control-api-mock",
 ]
 
@@ -27,8 +27,7 @@ actix-web = "1.0"
 actix-web-actors = "1.0"
 awc = "0.2"
 bb8 = "0.3"
-# TODO: delete this when https://github.com/khuey/bb8/pull/25 will be released.
-bb8-redis = { git = "https://github.com/khuey/bb8" }
+bb8-redis = "0.3"
 chrono = "0.4"
 config = "0.9"
 dotenv = "0.13"
@@ -39,6 +38,7 @@ hashbrown = "0.1"
 humantime = "1.2"
 macro-attr = "0.2"
 medea-client-api-proto = { path = "proto/client-api", features = ["medea"] }
+medea-grpc-proto = { path = "proto/grpc" }
 medea-macro = { path = "crates/medea-macro" }
 newtype_derive = "0.1"
 protobuf = "2.7"
@@ -69,5 +69,3 @@ serial_test = "0.2"
 serial_test_derive = "0.2"
 actix-codec = "0.1.2"
 
-[build-dependencies]
-protoc-grpcio = "0.3"

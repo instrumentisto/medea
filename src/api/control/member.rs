@@ -4,7 +4,9 @@ use std::{collections::HashMap as StdHashMap, convert::TryFrom};
 
 use hashbrown::HashMap;
 use macro_attr::*;
+use medea_grpc_proto::control::Member as MemberProto;
 use newtype_derive::{newtype_fmt, NewtypeDisplay, NewtypeFrom};
+use rand::{distributions::Alphanumeric, Rng};
 use serde::Deserialize;
 
 use crate::api::control::{
@@ -12,12 +14,10 @@ use crate::api::control::{
         webrtc_play_endpoint::WebRtcPlayEndpoint,
         webrtc_publish_endpoint::{WebRtcPublishEndpoint, WebRtcPublishId},
     },
-    grpc::protos::control::Member as MemberProto,
     Endpoint, TryFromProtobufError, WebRtcPlayId,
 };
 
 use super::{pipeline::Pipeline, Element, TryFromElementError};
-use rand::{distributions::Alphanumeric, Rng};
 
 const MEMBER_CREDENTIALS_LEN: usize = 32;
 

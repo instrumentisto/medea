@@ -5,16 +5,20 @@ use std::{
     rc::{Rc, Weak},
 };
 
+use medea_grpc_proto::control::{
+    Member_Element as ElementProto,
+    WebRtcPlayEndpoint as WebRtcPlayEndpointProto,
+};
+
 use crate::{
-    api::control::{
-        endpoints::webrtc_play_endpoint::{SrcUri, WebRtcPlayId as Id},
-        grpc::protos::control::{
-            Member_Element as ElementProto,
-            WebRtcPlayEndpoint as WebRtcPlayEndpointProto,
-        },
+    api::control::endpoints::webrtc_play_endpoint::{
+        SrcUri, WebRtcPlayId as Id,
     },
     media::PeerId,
-    signalling::elements::Member,
+    signalling::elements::{
+        endpoints::webrtc::publish_endpoint::WeakWebRtcPublishEndpoint,
+        member::WeakMember, Member,
+    },
 };
 
 use super::publish_endpoint::WebRtcPublishEndpoint;
@@ -30,10 +34,10 @@ struct WebRtcPlayEndpointInner {
 
     /// Publisher [`WebRtcPublishEndpoint`] from which this
     /// [`WebRtcPlayEndpoint`] receive data.
-    src: Weak<WebRtcPublishEndpoint>,
+    src: WeakWebRtcPublishEndpoint,
 
     /// Owner [`Member`] of this [`WebRtcPlayEndpoint`].
-    owner: Weak<Member>,
+    owner: WeakMember,
 
     /// [`PeerId`] of [`Peer`] created for this [`WebRtcPlayEndpoint`].
     ///
@@ -50,16 +54,16 @@ impl WebRtcPlayEndpointInner {
         self.src_uri.clone()
     }
 
-    fn owner(&self) -> Rc<Member> {
-        Weak::upgrade(&self.owner).unwrap()
+    fn owner(&self) -> Member {
+        self.owner.upgrade()
     }
 
-    fn weak_owner(&self) -> Weak<Member> {
-        Weak::clone(&self.owner)
+    fn weak_owner(&self) -> WeakMember {
+        self.owner.clone()
     }
 
-    fn src(&self) -> Rc<WebRtcPublishEndpoint> {
-        Weak::upgrade(&self.src).unwrap()
+    fn src(&self) -> WebRtcPublishEndpoint {
+        self.src.upgrade()
     }
 
     fn set_peer_id(&mut self, peer_id: PeerId) {
@@ -77,7 +81,7 @@ impl WebRtcPlayEndpointInner {
 
 impl Drop for WebRtcPlayEndpointInner {
     fn drop(&mut self) {
-        if let Some(receiver_publisher) = self.src.upgrade() {
+        if let Some(receiver_publisher) = self.src.safe_upgrade() {
             receiver_publisher.remove_empty_weaks_from_sinks();
         }
     }
@@ -85,24 +89,24 @@ impl Drop for WebRtcPlayEndpointInner {
 
 /// Signalling representation of `WebRtcPlayEndpoint`.
 #[allow(clippy::module_name_repetitions)]
-#[derive(Debug)]
-pub struct WebRtcPlayEndpoint(RefCell<WebRtcPlayEndpointInner>);
+#[derive(Debug, Clone)]
+pub struct WebRtcPlayEndpoint(Rc<RefCell<WebRtcPlayEndpointInner>>);
 
 impl WebRtcPlayEndpoint {
     /// Create new [`WebRtcPlayEndpoint`].
     pub fn new(
         id: Id,
         src_uri: SrcUri,
-        publisher: Weak<WebRtcPublishEndpoint>,
-        owner: Weak<Member>,
+        publisher: WeakWebRtcPublishEndpoint,
+        owner: WeakMember,
     ) -> Self {
-        Self(RefCell::new(WebRtcPlayEndpointInner {
+        Self(Rc::new(RefCell::new(WebRtcPlayEndpointInner {
             id,
             src_uri,
             src: publisher,
             owner,
             peer_id: None,
-        }))
+        })))
     }
 
     /// Returns [`SrcUri`] of this [`WebRtcPlayEndpoint`].
@@ -113,20 +117,20 @@ impl WebRtcPlayEndpoint {
     /// Returns owner [`Member`] of this [`WebRtcPlayEndpoint`].
     ///
     /// __This function will panic if pointer is empty.__
-    pub fn owner(&self) -> Rc<Member> {
+    pub fn owner(&self) -> Member {
         self.0.borrow().owner()
     }
 
     /// Returns `Weak` pointer to owner [`Member`] of this
     /// [`WebRtcPlayEndpoint`].
-    pub fn weak_owner(&self) -> Weak<Member> {
+    pub fn weak_owner(&self) -> WeakMember {
         self.0.borrow().weak_owner()
     }
 
     /// Returns source's [`WebRtcPublishEndpoint`].
     ///
     /// __This function will panic if pointer is empty.__
-    pub fn src(&self) -> Rc<WebRtcPublishEndpoint> {
+    pub fn src(&self) -> WebRtcPublishEndpoint {
         self.0.borrow().src()
     }
 
@@ -151,9 +155,41 @@ impl WebRtcPlayEndpoint {
     pub fn id(&self) -> Id {
         self.0.borrow().id.clone()
     }
+
+    /// Downgrade [`WeakWebRtcPlayEndpoint`] to weak pointer
+    /// [`WeakWebRtcPlayEndpoint`].
+    pub fn downgrade(&self) -> WeakWebRtcPlayEndpoint {
+        WeakWebRtcPlayEndpoint(Rc::downgrade(&self.0))
+    }
+
+    /// Compares pointers. If both pointers point to the same address, then
+    /// returns true.
+    #[cfg(test)]
+    pub fn ptr_eq(&self, another_play: &Self) -> bool {
+        Rc::ptr_eq(&self.0, &another_play.0)
+    }
 }
 
-impl Into<ElementProto> for Rc<WebRtcPlayEndpoint> {
+/// Weak pointer to [`WebRtcPlayEndpoint`].
+#[allow(clippy::module_name_repetitions)]
+#[derive(Debug, Clone)]
+pub struct WeakWebRtcPlayEndpoint(Weak<RefCell<WebRtcPlayEndpointInner>>);
+
+impl WeakWebRtcPlayEndpoint {
+    /// Upgrade weak pointer to strong pointer.
+    ///
+    /// This function will __panic__ if weak pointer is `None`.
+    pub fn upgrade(&self) -> WebRtcPlayEndpoint {
+        WebRtcPlayEndpoint(self.0.upgrade().unwrap())
+    }
+
+    /// Safe upgrade to [`WebRtcPlayEndpoint`].
+    pub fn safe_upgrade(&self) -> Option<WebRtcPlayEndpoint> {
+        self.0.upgrade().map(WebRtcPlayEndpoint)
+    }
+}
+
+impl Into<ElementProto> for WebRtcPlayEndpoint {
     fn into(self) -> ElementProto {
         let mut element = ElementProto::new();
         let mut play = WebRtcPlayEndpointProto::new();

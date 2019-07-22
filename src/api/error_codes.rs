@@ -7,10 +7,11 @@
 //! * __1200...1299__ Parse errors
 //! * __1300...1399__ Conflicts
 
+use medea_grpc_proto::control::Error as ErrorProto;
+
 use crate::{
     api::control::{
         endpoints::webrtc_play_endpoint::SrcParseError,
-        grpc::protos::control::Error as ErrorProto,
         local_uri::{
             IsEndpointId, IsMemberId, IsRoomId, LocalUri, LocalUriParseError,
             LocalUriType,

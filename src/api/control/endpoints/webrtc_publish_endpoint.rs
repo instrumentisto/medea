@@ -4,7 +4,7 @@ use macro_attr::*;
 use newtype_derive::{newtype_fmt, NewtypeDisplay, NewtypeFrom};
 use serde::Deserialize;
 
-use crate::api::control::grpc::protos::control::{
+use medea_grpc_proto::control::{
     WebRtcPublishEndpoint as WebRtcPublishEndpointProto,
     WebRtcPublishEndpoint_P2P as WebRtcPublishEndpointP2pProto,
 };

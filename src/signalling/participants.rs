@@ -3,7 +3,7 @@
 //! [`RpcConnection`] authorization, establishment, message sending, Turn
 //! credentials management.
 
-use std::{rc::Rc, time::Instant};
+use std::time::Instant;
 
 use actix::{
     fut::wrap_future, ActorFuture, AsyncContext, Context, MailboxError,
@@ -97,7 +97,7 @@ pub struct ParticipantService {
     room_id: RoomId,
 
     /// [`Member`]s which currently are present in this [`Room`].
-    members: HashMap<MemberId, Rc<Member>>,
+    members: HashMap<MemberId, Member>,
 
     /// Global app context.
     app: AppContext,
@@ -129,7 +129,7 @@ impl ParticipantService {
     }
 
     /// Lookup [`Member`] by provided id.
-    pub fn get_member_by_id(&self, id: &MemberId) -> Option<Rc<Member>> {
+    pub fn get_member_by_id(&self, id: &MemberId) -> Option<Member> {
         self.members.get(id).cloned()
     }
 
@@ -151,7 +151,7 @@ impl ParticipantService {
     pub fn get_member(
         &self,
         id: &MemberId,
-    ) -> Result<Rc<Member>, ParticipantServiceErr> {
+    ) -> Result<Member, ParticipantServiceErr> {
         self.members.get(id).cloned().map_or(
             Err(ParticipantServiceErr::ParticipantNotFound(
                 self.get_local_uri_to_member(id.clone()),
@@ -161,7 +161,7 @@ impl ParticipantService {
     }
 
     /// Returns all [`Member`] from this [`ParticipantService`].
-    pub fn members(&self) -> HashMap<MemberId, Rc<Member>> {
+    pub fn members(&self) -> HashMap<MemberId, Member> {
         self.members.clone()
     }
 
@@ -174,7 +174,7 @@ impl ParticipantService {
         &self,
         member_id: &MemberId,
         credentials: &str,
-    ) -> Result<Rc<Member>, AuthorizationError> {
+    ) -> Result<Member, AuthorizationError> {
         match self.get_member_by_id(member_id) {
             Some(member) => {
                 if member.credentials().eq(credentials) {
@@ -218,7 +218,7 @@ impl ParticipantService {
         ctx: &mut Context<Room>,
         member_id: MemberId,
         con: Box<dyn RpcConnection>,
-    ) -> ActFuture<Rc<Member>, ParticipantServiceErr> {
+    ) -> ActFuture<Member, ParticipantServiceErr> {
         let member = match self.get_member_by_id(&member_id) {
             None => {
                 return Box::new(wrap_future(future::err(
@@ -414,18 +414,18 @@ impl ParticipantService {
                 self.get_local_uri_to_member(id),
             ));
         }
-        let signalling_member = Rc::new(Member::new(
+        let signalling_member = Member::new(
             id.clone(),
             spec.credentials().to_string(),
             self.room_id.clone(),
-        ));
+        );
 
         for (id, publish) in spec.publish_endpoints() {
-            let signalling_publish = Rc::new(WebRtcPublishEndpoint::new(
+            let signalling_publish = WebRtcPublishEndpoint::new(
                 id.clone(),
                 publish.p2p.clone(),
-                Rc::downgrade(&signalling_member),
-            ));
+                signalling_member.downgrade(),
+            );
             signalling_member.insert_src(signalling_publish);
         }
 
@@ -433,12 +433,12 @@ impl ParticipantService {
             let partner_member = self.get_member(&play.src.member_id)?;
             let src = partner_member.get_src(&play.src.endpoint_id)?;
 
-            let sink = Rc::new(WebRtcPlayEndpoint::new(
+            let sink = WebRtcPlayEndpoint::new(
                 id.clone(),
                 play.src.clone(),
-                Rc::downgrade(&src),
-                Rc::downgrade(&signalling_member),
-            ));
+                src.downgrade(),
+                signalling_member.downgrade(),
+            );
 
             signalling_member.insert_sink(sink);
         }
@@ -446,7 +446,7 @@ impl ParticipantService {
         // This is needed for atomicity.
         for (_, sink) in signalling_member.sinks() {
             let src = sink.src();
-            src.add_sink(Rc::downgrade(&sink));
+            src.add_sink(sink.downgrade());
         }
 
         self.members.insert(id, signalling_member);
@@ -481,14 +481,14 @@ impl ParticipantService {
         let partner_member = self.get_member(&spec.src.member_id)?;
         let src = partner_member.get_src(&spec.src.endpoint_id)?;
 
-        let sink = Rc::new(WebRtcPlayEndpoint::new(
+        let sink = WebRtcPlayEndpoint::new(
             endpoint_id.clone(),
             spec.src,
-            Rc::downgrade(&src),
-            Rc::downgrade(&member),
-        ));
+            src.downgrade(),
+            member.downgrade(),
+        );
 
-        src.add_sink(Rc::downgrade(&sink));
+        src.add_sink(sink.downgrade());
         member.insert_sink(sink);
 
         debug!(
@@ -525,11 +525,11 @@ impl ParticipantService {
             ));
         }
 
-        let src = Rc::new(WebRtcPublishEndpoint::new(
+        let src = WebRtcPublishEndpoint::new(
             endpoint_id.clone(),
             spec.p2p,
-            Rc::downgrade(&member),
-        ));
+            member.downgrade(),
+        );
 
         member.insert_src(src);
 

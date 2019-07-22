@@ -4,6 +4,7 @@ use std::{convert::TryFrom, fmt};
 
 use failure::Fail;
 use macro_attr::*;
+use medea_grpc_proto::control::WebRtcPlayEndpoint as WebRtcPlayEndpointProto;
 use newtype_derive::{newtype_fmt, NewtypeDisplay, NewtypeFrom};
 use serde::{
     de::{self, Deserializer, Error, Visitor},
@@ -12,7 +13,6 @@ use serde::{
 
 use crate::api::control::{
     endpoints::webrtc_publish_endpoint::WebRtcPublishId,
-    grpc::protos::control::WebRtcPlayEndpoint as WebRtcPlayEndpointProto,
     local_uri::{IsEndpointId, LocalUri, LocalUriParseError, LocalUriType},
     MemberId, RoomId, TryFromProtobufError,
 };

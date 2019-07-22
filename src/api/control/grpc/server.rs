@@ -12,14 +12,16 @@ use actix::{
 use failure::Fail;
 use futures::future::{self, Either, Future};
 use grpcio::{Environment, RpcContext, Server, ServerBuilder, UnarySink};
+use medea_grpc_proto::{
+    control::{
+        ApplyRequest, CreateRequest, Error, GetResponse, IdRequest, Response,
+    },
+    control_grpc::{create_control_api, ControlApi},
+};
 
 use crate::{
     api::{
         control::{
-            grpc::protos::control::{
-                ApplyRequest, CreateRequest, Error, GetResponse, IdRequest,
-                Response,
-            },
             local_uri::{
                 IsEndpointId, IsMemberId, IsRoomId, LocalUri,
                 LocalUriParseError, LocalUriType,
@@ -41,7 +43,6 @@ use crate::{
     AppContext,
 };
 
-use super::protos::control_grpc::{create_control_api, ControlApi};
 use crate::shutdown::ShutdownGracefully;
 
 #[derive(Debug, Fail)]
