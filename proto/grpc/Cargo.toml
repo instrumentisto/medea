@@ -7,8 +7,12 @@ authors = ["Instrumentisto Team <developer@instrumentisto.com>"]
 homepage = "https://github.com/instrumentisto/medea"
 readme = "README.md"
 repository = "https://github.com/instrumentisto/medea"
+build = "build.rs"
 
 [dependencies]
 grpcio = "0.4"
 futures = "0.1"
 protobuf = "2.7"
+
+[build-dependencies]
+protoc-grpcio = "0.3"

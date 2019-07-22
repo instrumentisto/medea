@@ -7,5 +7,5 @@
 /target/
 **/*.rs.bk
 
-!/proto/grpc/src
+/proto/grpc/src
 !/proto/grpc/src/lib.rs

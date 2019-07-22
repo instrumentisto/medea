@@ -1,6 +1,6 @@
 fn main() {
-    let proto_root = "proto/grpc";
-    let proto_output = "proto/grpc/src";
+    let proto_root = ".";
+    let proto_output = "./src";
     println!("cargo:rerun-if-changed={}", proto_root);
     protoc_grpcio::compile_grpc_protos(
         &["control.proto"],
