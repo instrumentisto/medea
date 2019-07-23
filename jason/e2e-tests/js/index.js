@@ -24,6 +24,7 @@ async function f() {
   caller.on_local_stream(function (stream, error) {
     if (stream) {
       var video = document.createElement("video");
+      video.className = 'caller-video';
 
       video.srcObject = stream.get_media_stream();
       document.body.appendChild(video);
@@ -36,6 +37,7 @@ async function f() {
   responder.on_local_stream(function (stream, error) {
     if (stream) {
       var video = document.createElement("video");
+      video.className = 'responder-video';
 
       video.srcObject = stream.get_media_stream();
       document.body.appendChild(video);
@@ -60,11 +62,6 @@ async function f() {
   return {
     caller: caller_room,
     responder: responder_room,
-    test: {
-      helloWorld: function () {
-        console.log("Hello world!");
-      }
-    }
     }
 }
 
