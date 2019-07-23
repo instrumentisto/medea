@@ -21,23 +21,23 @@ use crate::{
 };
 
 /// Newly initialized [`Peer`] ready to signalling.
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct New {}
 
 /// [`Peer`] doesnt have remote SDP and is waiting for local SDP.
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct WaitLocalSdp {}
 
 /// [`Peer`] has remote SDP and is waiting for local SDP.
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct WaitLocalHaveRemote {}
 
 /// [`Peer`] has local SDP and is waiting for remote SDP.
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct WaitRemoteSdp {}
 
 /// SDP exchange ended.
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Stable {}
 
 /// Produced when unwrapping [`PeerStateMachine`] to [`Peer`] with wrong state.
@@ -72,7 +72,7 @@ impl PeerError {
 #[enum_delegate(pub fn member_id(&self) -> MemberId)]
 #[enum_delegate(pub fn partner_peer_id(&self) -> Id)]
 #[enum_delegate(pub fn partner_member_id(&self) -> Id)]
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum PeerStateMachine {
     New(Peer<New>),
     WaitLocalSdp(Peer<WaitLocalSdp>),
@@ -146,7 +146,7 @@ impl_peer_converts!(Stable);
 /// ID of [`Peer`].
 pub type Id = u64;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Context {
     id: Id,
     member_id: MemberId,
@@ -159,7 +159,7 @@ pub struct Context {
 }
 
 /// [`RTCPeerConnection`] representation.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Peer<S> {
     context: Context,
     state: S,
