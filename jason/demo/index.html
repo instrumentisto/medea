@@ -1,88 +1,94 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Chat</title>
-  <meta http-equiv='Content-Type' content='text/html; charset=UTF-8'/>
+    <title>Chat</title>
+    <meta http-equiv='Content-Type' content='text/html; charset=UTF-8'/>
 
-  <script type="module">
+    <script type="module">
 
-    import init, {Jason, RoomHandle, MediaStreamHandle, ConnectionHandle} from './js/jason_alexlapa.js';
+        import init, {Jason} from './js/jason_alexlapa.js';
 
-    export async function run(credentials) {
-      // modes
-      await init();
+        var inited = false;
 
-      let jason = new Jason();
+        export async function run(credentials) {
+            // modes
+            if (!inited) {
+                await init();
+                inited = true;
+            }
 
-      jason.on_local_stream(function (stream, error) {
-        if (stream) {
-          let local_video = document.getElementById("yourvid");
+            let jason = new Jason();
 
-          local_video.srcObject = stream.get_media_stream();
-          local_video.play();
-        } else {
-          console.error(error);
+            jason.on_local_stream(function (stream, error) {
+                if (stream) {
+                    let local_video = document.getElementById("yourvid");
+
+                    local_video.srcObject = stream.get_media_stream();
+                    local_video.play();
+                } else {
+                    console.error(error);
+                }
+            });
+
+            let room = await jason.join_room(credentials);
+
+            room.on_new_connection(function (connection) {
+                connection.on_remote_stream(function (stream) {
+                    let remote_video = document.getElementById("partnervid");
+
+                    remote_video.srcObject = stream.get_media_stream();
+                    remote_video.play();
+                });
+            });
         }
-      });
 
-      let room = await jason.join_room(credentials);
+        window.connect_room = async function connect_room(credentials) {
+            run(credentials)
+        }
 
-      room.on_new_connection(function (connection) {
-        connection.on_remote_stream(function (stream) {
-          let remote_video = document.getElementById("partnervid");
+    </script>
 
-          remote_video.srcObject = stream.get_media_stream();
-          remote_video.play();
-        });
-      });
-    }
+    <style>
+        .video-call {
+            display: flex;
+            flex-flow: row nowrap;
+            width: 100%;
+            flex-wrap: nowrap;
+            flex-direction: row;
+        }
 
-    window.connect_room = async function connect_room(credentials) {
-      run(credentials)
-    }
+        .video {
+            display: flex;
+            justify-content: center;
+            flex-direction: column;
+            margin-right: 10px;
+            text-align: center;
+        }
 
-  </script>
+        .video > video {
+            background: dimgrey;
+        }
 
-  <style>
-    .video-call {
-      display: flex;
-      flex-flow: row nowrap;
-      width: 100%;
-      flex-wrap: nowrap;
-      flex-direction: row;
-    }
-
-    .video {
-      display: flex;
-      justify-content: center;
-      flex-direction: column;
-      margin-right: 10px;
-      text-align: center;
-    }
-
-    .video > video {
-      background: dimgrey;
-    }
-
-    .connect-btns {
-      margin-top: 10px;
-    }
-  </style>
+        .connect-btns {
+            margin-top: 10px;
+        }
+    </style>
 </head>
 <body>
 <div class="video-call">
-  <div class="video">
-    <video id="yourvid" muted autoplay width="100%" height="100%"></video>
-    <b>You</b>
-  </div>
-  <div class="video">
-    <video id="partnervid" autoplay width="100%" height="100%"></video>
-    <b>Partner</b>
-  </div>
+    <div class="video">
+        <video id="yourvid" muted autoplay width="100%" height="100%"></video>
+        <b>You</b>
+    </div>
+    <div class="video">
+        <video id="partnervid" autoplay width="100%" height="100%"></video>
+        <b>Partner</b>
+    </div>
 </div>
 <div class="connect-btns">
-  <button onclick="window.connect_room('ws://localhost:8080/ws/1/1/caller_credentials')">Start caller session</button>
-  <button onclick="window.connect_room('ws://localhost:8080/ws/1/2/responder_credentials')">Start responder session</button>
+    <button onclick="window.connect_room('ws://localhost:8080/ws/1/1/caller_credentials')">Start caller session</button>
+    <button onclick="window.connect_room('ws://localhost:8080/ws/1/2/responder_credentials')">Start responder session
+    </button>
 </div>
 
 </body>
