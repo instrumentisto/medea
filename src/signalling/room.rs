@@ -525,7 +525,7 @@ mod test {
             members,
             create_peers(1, 2),
             Duration::from_secs(10),
-            new_turn_auth_service_mock(),
+            Arc::new(new_turn_auth_service_mock()),
         )
         .start()
     }
