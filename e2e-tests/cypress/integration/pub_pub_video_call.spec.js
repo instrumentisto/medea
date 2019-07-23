@@ -1,10 +1,13 @@
 context('Pub<=>Pub video call', () => {
-  beforeEach(() => {
+  function deleteTestRoom() {
     cy.request({
       url: 'http://localhost:8000/pub-pub-e2e-call',
       method: 'DELETE',
     });
+  }
 
+  beforeEach(() => {
+    deleteTestRoom();
     cy.request({
       url: 'http://localhost:8000/pub-pub-e2e-call',
       method: 'POST',
@@ -51,6 +54,10 @@ context('Pub<=>Pub video call', () => {
     });
 
     cy.visit('http://localhost:8082');
+  });
+
+  afterEach(() => {
+    deleteTestRoom();
   });
 
   it('open video call and rtc packets sending', () => {

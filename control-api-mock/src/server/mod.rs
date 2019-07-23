@@ -47,6 +47,7 @@ pub fn run() {
                     .route(web::get().to_async(batch_get))
                     .route(web::delete().to_async(batch_delete)),
             )
+            .service(web::resource("hb").route(web::get().to_async(heartbeat)))
             .service(
                 web::resource("/{room_id}")
                     .route(web::delete().to_async(room::delete))
@@ -69,6 +70,16 @@ pub fn run() {
     .bind("0.0.0.0:8000")
     .unwrap()
     .start();
+}
+
+pub fn heartbeat(
+    state: Data<Context>,
+) -> impl Future<Item = HttpResponse, Error = ()> {
+    state
+        .client
+        .get_single("")
+        .map_err(|_| ())
+        .map(|_| HttpResponse::Ok().body("Ok".to_string()))
 }
 
 /// Some batch ID's request. Used for batch delete and get.

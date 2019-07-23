@@ -191,6 +191,19 @@ ifeq ($(dockerized),no)
 	- cargo test --test e2e
 
 	@make down.medea
+
+	# Full medea e2e tests with cypress
+	cargo run & echo $$! > /tmp/e2e_medea.pid
+	cargo run -p control-api-mock & echo $$! > /tmp/e2e_control_api_mock.pid
+	npm run start --prefix=e2e-tests & echo $$! >/tmp/e2e_jason.pid
+
+	e2e-tests/node_modules/.bin/wait-on http-get://localhost:8082 http-get://localhost:8000/hb
+
+	yarn --cwd=e2e-tests/ run cypress run -b chromium
+	kill $$(cat /tmp/e2e_jason.pid)
+	kill $$(cat /tmp/e2e_medea.pid)
+	kill $$(cat /tmp/e2e_control_api_mock.pid)
+	rm -f /tmp/e2e_jason.pid /tmp/e2e_medea.pid /tmp/e2e_control_api_mock.pid
 ifneq ($(coturn),no)
 	@make down.coturn
 endif

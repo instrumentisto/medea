@@ -16,7 +16,7 @@ module.exports = (on, config) => {
     // You can generate empty video for tests with command
     // "ffmpeg -t 100 -s 640x480 -f rawvideo -pix_fmt rgb24 -r 25 -i /dev/zero empty.mjpeg"
     // then specify path in line below:
-    // args.push('--use-file-for-fake-video-capture=/home/relmay/Projects/work/medea/empty.mjpeg');
+    // args.push('--use-file-for-fake-video-capture=empty.mjpeg');
     return args
   })
 };

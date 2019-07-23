@@ -12,5 +12,8 @@
     "webpack": "^4.29",
     "webpack-cli": "^3.3",
     "webpack-dev-server": "^3.2"
+  },
+  "dependencies": {
+    "wait-on": "^3.3.0"
   }
 }
