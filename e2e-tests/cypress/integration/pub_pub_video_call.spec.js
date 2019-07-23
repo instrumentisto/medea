@@ -1,4 +1,4 @@
-context('Video call', () => {
+context('Pub<=>Pub video call', () => {
   beforeEach(() => {
     cy.request({
       url: 'http://localhost:8000/pub-pub-e2e-call',

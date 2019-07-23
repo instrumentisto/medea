@@ -19,7 +19,7 @@ module.exports = {
       template: 'index.html'
     }),
     new WasmPackPlugin({
-      crateDirectory: path.resolve(__dirname, '../'),
+      crateDirectory: path.resolve(__dirname, '../jason'),
       // WasmPackPlugin defaults to compiling in "dev" profile.
       // To change that, use `forceMode: 'release'`.
     }),

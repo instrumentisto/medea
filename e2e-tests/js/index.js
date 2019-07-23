@@ -1,5 +1,5 @@
 async function startPubPubVideoCall() {
-  const rust = await import("../../pkg");
+  const rust = await import("../../jason/pkg");
 
   let caller = new rust.Jason();
   let responder = new rust.Jason();
