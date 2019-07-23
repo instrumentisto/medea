@@ -109,6 +109,7 @@ yarn-cmd =
 
 yarn:
 	yarn --cwd=jason/e2e-demo/ $(if $(call eq,$(cmd),),install,$(cmd))
+	yarn --cwd=e2e-tests $(if $(call eq,$(cmd),),install,$(cmd))
 
 
 
