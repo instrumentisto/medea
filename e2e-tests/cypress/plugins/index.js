@@ -12,6 +12,11 @@
 // the project's config changing)
 
 module.exports = (on, config) => {
-  // `on` is used to hook into various events Cypress emits
-  // `config` is the resolved Cypress config
-}
+  on('before:browser:launch', (browser = {}, args) => {
+    // You can generate empty video for tests with command
+    // "ffmpeg -t 100 -s 640x480 -f rawvideo -pix_fmt rgb24 -r 25 -i /dev/zero empty.mjpeg"
+    // then specify path in line below:
+    // args.push('--use-file-for-fake-video-capture=/home/relmay/Projects/work/medea/empty.mjpeg');
+    return args
+  })
+};

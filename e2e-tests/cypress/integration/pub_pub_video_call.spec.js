@@ -82,21 +82,68 @@ context('Pub<=>Pub video call', () => {
       expect(inboundPackets).to.be.greaterThan(5);
     }
 
+    function diff(o, n) {
+      let objO = {}, objN = {};
+      for (let i = 0; i < o.length; i++) {
+        objO[o[i]] = 1;
+      }
+      for (let i = 0; i < n.length; i++) {
+        objN[n[i]] = 1;
+      }
+      let added = 0; let removed = 0;
+
+      for (let i in objO) {
+        if (i in objN) {
+          delete objN[i];
+        }
+        else {
+          removed += 1;
+        }
+      }
+      for (let i in objN) {
+        added += 1;
+      }
+
+      return added + removed
+    }
+
+    function checkVideoDiff(videoEl) {
+      let canvas = document.createElement('canvas');
+      canvas.height = videoEl.videoHeight / 2;
+      canvas.width = videoEl.videoWidth / 2;
+
+      let context = canvas.getContext('2d');
+      context.drawImage(videoEl, canvas.width, canvas.height, canvas.width, canvas.height);
+      let imgEl = document.createElement('img');
+      imgEl.src = canvas.toDataURL();
+      let firstData = context.getImageData(0, 0, canvas.width, canvas.height);
+
+      context.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
+      imgEl.src = canvas.toDataURL();
+      let secondData = context.getImageData(0, 0, canvas.width, canvas.height);
+
+      let dataDiff = diff(firstData.data, secondData.data);
+
+      expect(dataDiff).to.be.greaterThan(50);
+    }
+
     cy.window()
       .then((win) => {
         return startVideoCall(win)
           .then((response) => {
             cy.wait(1000);
-            cy.get('.callers-partner-video')
+            cy.get('#callers-partner-video')
               .then((el) => {
+                checkVideoDiff(el[0]);
                 expect(el[0].srcObject.getTracks().length).to.be.eq(2);
                 response.caller.get_stats()
                   .then((stats) => {
                     checkStats(stats);
                   })
               });
-            cy.get('.responders-partner-video')
+            cy.get('#responders-partner-video')
               .then((el) => {
+                checkVideoDiff(el[0]);
                 response.responder.get_stats()
                   .then((stats) => {
                     expect(el[0].srcObject.getTracks().length).to.be.eq(2);

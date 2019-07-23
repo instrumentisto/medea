@@ -13,7 +13,7 @@ async function startPubPubVideoCall() {
       console.log("got video from remote member " + connection.member_id());
 
       let video = document.createElement("video");
-      video.className = 'callers-partner-video';
+      video.id = 'callers-partner-video';
 
       video.srcObject = stream.get_media_stream();
       document.body.appendChild(video);
@@ -49,7 +49,7 @@ async function startPubPubVideoCall() {
       console.log("got video from remote member " + connection.member_id());
 
       let video = document.createElement("video");
-      video.className = 'responders-partner-video';
+      video.id = 'responders-partner-video';
 
       video.srcObject = stream.get_media_stream();
       document.body.appendChild(video);
