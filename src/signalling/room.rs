@@ -99,7 +99,7 @@ impl Room {
         members: HashMap<MemberId, Member>,
         peers: HashMap<PeerId, PeerStateMachine>,
         reconnect_timeout: Duration,
-        turn: Arc<Box<dyn TurnAuthService>>,
+        turn: Arc<dyn TurnAuthService>,
     ) -> Self {
         Self {
             id,
@@ -525,7 +525,7 @@ mod test {
             members,
             create_peers(1, 2),
             Duration::from_secs(10),
-            Arc::new(new_turn_auth_service_mock()),
+            new_turn_auth_service_mock(),
         )
         .start()
     }

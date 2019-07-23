@@ -138,7 +138,7 @@ impl Handler<ShutdownGracefully> for Server {
 
 #[cfg(test)]
 mod test {
-    use std::{ops::Add, sync::Arc, thread, time::Duration};
+    use std::{ops::Add, thread, time::Duration};
 
     use actix_http::{ws::Message, HttpService};
     use actix_http_test::{TestServer, TestServerRuntime};
@@ -170,7 +170,7 @@ mod test {
             members,
             create_peers(1, 2),
             conf.reconnect_timeout,
-            Arc::new(new_turn_auth_service_mock()),
+            new_turn_auth_service_mock(),
         )
         .start();
         let rooms = hashmap! {1 => room};

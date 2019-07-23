@@ -47,7 +47,6 @@ fn main() -> io::Result<()> {
                     1 => Member::new(1, "caller_credentials".to_owned()),
                     2 => Member::new(2, "responder_credentials".to_owned()),
                 };
-                let turn_auth_service = Arc::new(turn_auth_service);
 
                 let rooms = (0..1000)
                     .map(|i: u64| {
