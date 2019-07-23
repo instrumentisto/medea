@@ -116,7 +116,7 @@ cargo.lint:
 
 publish.jason:
 	rm -rf jason/pkg
-	wasm-pack build -t web --no-typescript jason
+	wasm-pack build -t web jason
 	wasm-pack publish
 
 
@@ -301,6 +301,8 @@ up.medea:
         docker.build.demo \
         docs docs.rust \
         test test.unit \
+        publish.jason \
         up up.coturn up.jason up.medea \
+        up.dev up.demo \
         yarn
 
