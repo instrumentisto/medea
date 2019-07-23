@@ -1,11 +1,11 @@
-async function f() {
+async function startPubPubVideoCall() {
   const rust = await import("../../pkg");
 
   let caller = new rust.Jason();
   let responder = new rust.Jason();
 
-  let caller_room = await caller.join_room("ws://localhost:8080/ws/pub-pub-video-call/caller/test");
-  let responder_room = await responder.join_room("ws://localhost:8080/ws/pub-pub-video-call/responder/test");
+  let caller_room = await caller.join_room("ws://localhost:8080/ws/pub-pub-e2e-call/caller/test");
+  let responder_room = await responder.join_room("ws://localhost:8080/ws/pub-pub-e2e-call/responder/test");
 
   caller_room.on_new_connection(function(connection) {
     console.log("caller got new connection with member " + connection.member_id());
@@ -13,6 +13,7 @@ async function f() {
       console.log("got video from remote member " + connection.member_id());
 
       let video = document.createElement("video");
+      video.className = 'callers-partner-video';
 
       video.srcObject = stream.get_media_stream();
       document.body.appendChild(video);
@@ -22,7 +23,6 @@ async function f() {
   caller.on_local_stream(function(stream, error) {
     if (stream) {
       let video = document.createElement("video");
-      video.className = 'caller-video';
 
       video.srcObject = stream.get_media_stream();
       document.body.appendChild(video);
@@ -35,7 +35,6 @@ async function f() {
   responder.on_local_stream(function(stream, error) {
     if (stream) {
       let video = document.createElement("video");
-      video.className = 'responder-video';
 
       video.srcObject = stream.get_media_stream();
       document.body.appendChild(video);
@@ -50,6 +49,7 @@ async function f() {
       console.log("got video from remote member " + connection.member_id());
 
       let video = document.createElement("video");
+      video.className = 'responders-partner-video';
 
       video.srcObject = stream.get_media_stream();
       document.body.appendChild(video);
@@ -63,5 +63,4 @@ async function f() {
   }
 }
 
-
-window.f = f;
+window.startPubPubVideoCall = startPubPubVideoCall;
