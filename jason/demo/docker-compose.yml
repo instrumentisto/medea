@@ -7,6 +7,8 @@ services:
       - "80:80"
       - "6379:6379"    # coturn redis
       - "8080:8080"    # web-socket http server
+    volumes:
+      - ./conf:/etc/nginx/conf.d
   medea:
     container_name: demo-medea
     image: instrumentisto/medea:dev
