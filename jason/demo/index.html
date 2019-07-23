@@ -48,6 +48,50 @@
 
     </script>
 
+    <script type="text/javascript">
+
+
+        var baseUrl = "ws://localhost:8080/ws/";
+
+        window.onload = function () {
+            var chooseRoomDiv = document.getElementById('choose-room');
+            var videoCallDiv = document.getElementById('video-call');
+            var chooseRoomButton = document.getElementById('choose-room-btn');
+            var roomIdInput = document.getElementById('room-id-input');
+
+            var joinCallerButton = document.getElementById('join-caller');
+            var joinResponderButton = document.getElementById('join-responder');
+
+            var bindJoinButtons = function(roomId){
+                joinCallerButton.onclick = function () {
+                    window.connect_room(baseUrl+roomId+'/1/caller_credentials')
+                };
+                joinResponderButton.onclick = function () {
+                    window.connect_room(baseUrl+roomId+'/2/responder_credentials')
+                };
+            };
+
+            let roomId = sessionId = window.location.hash.replace("#", "");
+
+            if (roomId) {
+                bindJoinButtons(roomId);
+                chooseRoomDiv.style.display = "none";
+                videoCallDiv.style.display = "";
+            } else {
+                chooseRoomButton.onclick = function() {
+                    let roomId = roomIdInput.value;
+
+                    window.location.hash=roomId;
+                    bindJoinButtons(roomId);
+
+                    chooseRoomDiv.style.display = "none";
+                    videoCallDiv.style.display = "";
+                };
+            }
+        };
+
+    </script>
+
     <style>
         .video-call {
             display: flex;
@@ -75,20 +119,28 @@
     </style>
 </head>
 <body>
-<div class="video-call">
-    <div class="video">
-        <video id="yourvid" muted autoplay width="100%" height="100%"></video>
-        <b>You</b>
-    </div>
-    <div class="video">
-        <video id="partnervid" autoplay width="100%" height="100%"></video>
-        <b>Partner</b>
-    </div>
+
+<div id="choose-room">
+    <input id="room-id-input">
+    <button id="choose-room-btn" type="submit">JOIN</button>
 </div>
-<div class="connect-btns">
-    <button onclick="window.connect_room('ws://localhost:8080/ws/1/1/caller_credentials')">Start caller session</button>
-    <button onclick="window.connect_room('ws://localhost:8080/ws/1/2/responder_credentials')">Start responder session
-    </button>
+
+<div id="video-call" style="display: none">
+    <div class="video-call">
+        <div class="video">
+            <video id="yourvid" muted autoplay width="100%" height="100%"></video>
+            <b>You</b>
+        </div>
+        <div class="video">
+            <video id="partnervid" autoplay width="100%" height="100%"></video>
+            <b>Partner</b>
+        </div>
+    </div>
+    <div class="connect-btns">
+        <button id="join-caller">Start caller session</button>
+        <button id="join-responder">Start responder session
+        </button>
+    </div>
 </div>
 
 </body>
