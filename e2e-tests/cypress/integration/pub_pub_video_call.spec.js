@@ -83,20 +83,21 @@ context('Pub<=>Pub video call', () => {
     }
 
     function diff(o, n) {
-      let objO = {}, objN = {};
+      let objO = {},
+        objN = {};
       for (let i = 0; i < o.length; i++) {
         objO[o[i]] = 1;
       }
       for (let i = 0; i < n.length; i++) {
         objN[n[i]] = 1;
       }
-      let added = 0; let removed = 0;
+      let added = 0;
+      let removed = 0;
 
       for (let i in objO) {
         if (i in objN) {
           delete objN[i];
-        }
-        else {
+        } else {
           removed += 1;
         }
       }
@@ -133,24 +134,28 @@ context('Pub<=>Pub video call', () => {
           .then((response) => {
             cy.wait(1000);
             cy.get('#callers-partner-video')
-              .then((el) => {
-                checkVideoDiff(el[0]);
-                expect(el[0].srcObject.getTracks().length).to.be.eq(2);
+              .then((elements) => {
+                const el = elements[0];
+                checkVideoDiff(el);
+                expect(el.srcObject.getTracks().length).to.be.eq(2);
+
                 response.caller.get_stats()
                   .then((stats) => {
                     checkStats(stats);
                   })
               });
             cy.get('#responders-partner-video')
-              .then((el) => {
-                checkVideoDiff(el[0]);
+              .then((elements) => {
+                const el = elements[0];
+                checkVideoDiff(el);
+                expect(el.srcObject.getTracks().length).to.be.eq(2);
+
                 response.responder.get_stats()
                   .then((stats) => {
-                    expect(el[0].srcObject.getTracks().length).to.be.eq(2);
                     checkStats(stats);
                   })
               });
           })
       });
   })
-})
+});
