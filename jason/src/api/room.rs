@@ -152,9 +152,21 @@ impl InnerRoom {
     }
 
     pub fn get_stats(&self) -> Promise {
-        let fut = self.peers.get(1).unwrap().get_stats()
-            .map_err(JsValue::from);
-        future_to_promise(fut)
+        use serde::Serialize as _;
+        let mut futs = Vec::new();
+        for (id, peer) in self.peers.peers() {
+            futs.push(peer.get_stats());
+        }
+
+        future_to_promise(future::join_all(futs)
+            .map(|e| {
+                let mut js_array = js_sys::Array::new();
+                for id in e {
+                    js_array.push(&id);
+                }
+                js_array.into()
+            })
+            .map_err(JsValue::from))
     }
 
     /// Creates new [`Connection`]s basing on senders and receivers of provided

@@ -43,6 +43,7 @@ impl PeerRepository {
         id: PeerId,
         ice_servers: I,
     ) -> Result<&Rc<PeerConnection>, WasmErr> {
+        web_sys::console::log_1(&format!("Created Peer [id = {}].", id).into());
         let peer = Rc::new(PeerConnection::new(
             id,
             self.peer_events_sender.clone(),
@@ -51,6 +52,10 @@ impl PeerRepository {
         )?);
         self.peers.insert(id, peer);
         Ok(self.peers.get(&id).unwrap())
+    }
+
+    pub fn peers(&self) -> HashMap<PeerId, Rc<PeerConnection>>{
+        self.peers.clone()
     }
 
     /// Returns [`PeerConnection`] stored in repository by its ID.
