@@ -6,6 +6,8 @@ use medea_client_api_proto::IceServer;
 use crate::{media::MediaManager, utils::WasmErr};
 
 use super::{PeerConnection, PeerEvent, PeerId};
+use futures::Future;
+use wasm_bindgen::JsValue;
 
 /// [`PeerConnection`] factory and repository.
 #[allow(clippy::module_name_repetitions)]
@@ -54,8 +56,20 @@ impl PeerRepository {
         Ok(self.peers.get(&id).unwrap())
     }
 
-    pub fn peers(&self) -> HashMap<PeerId, Rc<PeerConnection>> {
-        self.peers.clone()
+    /// Returns future which resolves into [RTCStatsReport][1]
+    /// for all [RtcPeerConnection][2]s from this [`PeerRepository`].
+    ///
+    /// [1]: https://developer.mozilla.org/en-US/docs/Web/API/RTCStatsReport
+    /// [2]: https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection
+    pub fn get_stats_for_all_peer_connections(
+        &self,
+    ) -> impl Future<Item = Vec<JsValue>, Error = WasmErr> {
+        let mut futs = Vec::new();
+        for (_, peer) in &self.peers {
+            futs.push(peer.get_stats());
+        }
+
+        futures::future::join_all(futs)
     }
 
     /// Returns [`PeerConnection`] stored in repository by its ID.

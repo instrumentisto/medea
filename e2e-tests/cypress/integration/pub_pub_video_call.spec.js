@@ -146,7 +146,7 @@ context('Pub<=>Pub video call', () => {
                 checkVideoDiff(el);
                 expect(el.srcObject.getTracks().length).to.be.eq(2);
 
-                response.caller.get_stats()
+                response.caller.get_stats_for_peer_connections()
                   .then((stats) => {
                     checkStats(stats);
                   })
@@ -157,7 +157,7 @@ context('Pub<=>Pub video call', () => {
                 checkVideoDiff(el);
                 expect(el.srcObject.getTracks().length).to.be.eq(2);
 
-                response.responder.get_stats()
+                response.responder.get_stats_for_peer_connections()
                   .then((stats) => {
                     checkStats(stats);
                   })

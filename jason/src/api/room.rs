@@ -52,8 +52,17 @@ impl RoomHandle {
             .ok_or_else(|| WasmErr::from("Detached state").into())
     }
 
-    pub fn get_stats(&self) -> Promise {
-        self.0.upgrade().unwrap().borrow().get_stats()
+    /// Returns promise which resolves into [RTCStatsReport][1]
+    /// for all [RtcPeerConnection][2]s from this room.
+    ///
+    /// [1]: https://developer.mozilla.org/en-US/docs/Web/API/RTCStatsReport
+    /// [2]: https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection
+    pub fn get_stats_for_peer_connections(&self) -> Promise {
+        self.0
+            .upgrade()
+            .unwrap()
+            .borrow()
+            .get_stats_of_peer_connections()
     }
 }
 
@@ -148,23 +157,23 @@ impl InnerRoom {
         }
     }
 
-    pub fn get_stats(&self) -> Promise {
-        use serde::Serialize as _;
-        let mut futs = Vec::new();
-        for (id, peer) in self.peers.peers() {
-            futs.push(peer.get_stats());
-        }
-
+    /// Returns promise which resolves into [RTCStatsReport][1]
+    /// for all [RtcPeerConnection][2]s from this room.
+    ///
+    /// [1]: https://developer.mozilla.org/en-US/docs/Web/API/RTCStatsReport
+    /// [2]: https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection
+    pub fn get_stats_of_peer_connections(&self) -> Promise {
         future_to_promise(
-            future::join_all(futs)
+            self.peers
+                .get_stats_for_all_peer_connections()
+                .map_err(JsValue::from)
                 .map(|e| {
-                    let mut js_array = js_sys::Array::new();
+                    let js_array = js_sys::Array::new();
                     for id in e {
                         js_array.push(&id);
                     }
                     js_array.into()
-                })
-                .map_err(JsValue::from),
+                }),
         )
     }
 
