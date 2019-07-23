@@ -139,7 +139,7 @@ context('Pub<=>Pub video call', () => {
       .then((win) => {
         return startVideoCall(win)
           .then((response) => {
-            cy.wait(1000);
+            cy.wait(500);
             cy.get('#callers-partner-video')
               .then((elements) => {
                 const el = elements[0];

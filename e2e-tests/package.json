@@ -2,7 +2,7 @@
   "name": "medea-e2e-tests",
   "private": true,
   "scripts": {
-    "start": "webpack-dev-server -d --open --port 8082",
+    "start": "webpack-dev-server -d --port 8082",
     "build": "webpack"
   },
   "devDependencies": {
