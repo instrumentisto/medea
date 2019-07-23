@@ -48,13 +48,22 @@ lint: cargo.lint
 fmt: cargo.fmt
 
 
-# Run all project application locally in development mode.
+# Run Medea and Jason e2e-demo in host
 #
 # Usage:
-#	make up
+#	make up.dev
 
-up:
+up.dev:
 	$(MAKE) -j3 up.coturn up.jason up.medea
+
+
+# Run Medea and Jasom demo in docker
+#
+# Usage:
+#	make up.demo
+
+up.demo:
+	docker-compose -f jason/demo/docker-compose.yml up
 
 
 test: test.unit
