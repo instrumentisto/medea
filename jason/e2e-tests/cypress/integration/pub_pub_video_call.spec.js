@@ -72,9 +72,9 @@ context('Video call', () => {
       stats.forEach(resp => {
         resp.forEach(report => {
           if (report.type === 'outbound-rtp') {
-            outboundPackets = report.packetsSent;
+            outboundPackets += report.packetsSent;
           } else if (report.type === 'inbound-rtp') {
-            inboundPackets = report.packetsReceived;
+            inboundPackets += report.packetsReceived;
           }
         });
       });
@@ -88,16 +88,18 @@ context('Video call', () => {
           .then((response) => {
             cy.wait(1000);
             cy.get('.callers-partner-video')
-              .then(() => {
+              .then((el) => {
+                expect(el[0].srcObject.getTracks().length).to.be.eq(2);
                 response.caller.get_stats()
                   .then((stats) => {
                     checkStats(stats);
                   })
               });
             cy.get('.responders-partner-video')
-              .then(() => {
+              .then((el) => {
                 response.responder.get_stats()
                   .then((stats) => {
+                    expect(el[0].srcObject.getTracks().length).to.be.eq(2);
                     checkStats(stats);
                   })
               });
