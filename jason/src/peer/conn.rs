@@ -2,7 +2,7 @@ use std::{cell::RefCell, rc::Rc};
 
 use futures::Future;
 use medea_client_api_proto::IceServer;
-use wasm_bindgen_futures::JsFuture;
+use wasm_bindgen_futures::{spawn_local, JsFuture};
 use web_sys::{
     RtcConfiguration, RtcIceCandidateInit,
     RtcPeerConnection as SysRtcPeerConnection, RtcPeerConnectionIceEvent,
@@ -10,7 +10,6 @@ use web_sys::{
     RtcSdpType, RtcSessionDescription, RtcSessionDescriptionInit,
     RtcTrackEvent,
 };
-use wasm_bindgen_futures::spawn_local;
 
 use crate::utils::{EventListener, WasmErr};
 
@@ -120,8 +119,6 @@ impl RtcPeerConnection {
         let mut peer_conf = RtcConfiguration::new();
         peer_conf.ice_servers(&RtcIceServers::from(ice_servers));
 
-        web_sys::console::log_1(&"Test".to_string().into());
-
         Ok(Self(Rc::new(RefCell::new(InnerPeer {
             peer: Rc::new(SysRtcPeerConnection::new_with_configuration(
                 &peer_conf,
@@ -134,8 +131,7 @@ impl RtcPeerConnection {
     pub fn get_stats(&self) -> impl Future<Item = JsValue, Error = WasmErr> {
         let conn = self.0.borrow();
 
-        JsFuture::from(conn.peer.get_stats())
-            .map_err(Into::into)
+        JsFuture::from(conn.peer.get_stats()).map_err(Into::into)
     }
 
     /// Sets handler for [`RtcTrackEvent`] event (see [RTCTrackEvent][1] and

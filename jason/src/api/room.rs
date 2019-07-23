@@ -17,8 +17,7 @@ use medea_client_api_proto::{
     Command, Direction, EventHandler, IceCandidate, IceServer, Track,
 };
 use wasm_bindgen::prelude::*;
-use wasm_bindgen_futures::spawn_local;
-use wasm_bindgen_futures::future_to_promise;
+use wasm_bindgen_futures::{future_to_promise, spawn_local};
 
 use crate::{
     media::{MediaManager, MediaStream},
@@ -54,9 +53,7 @@ impl RoomHandle {
     }
 
     pub fn get_stats(&self) -> Promise {
-        self.0.upgrade().unwrap()
-            .borrow()
-            .get_stats()
+        self.0.upgrade().unwrap().borrow().get_stats()
     }
 }
 
@@ -158,15 +155,17 @@ impl InnerRoom {
             futs.push(peer.get_stats());
         }
 
-        future_to_promise(future::join_all(futs)
-            .map(|e| {
-                let mut js_array = js_sys::Array::new();
-                for id in e {
-                    js_array.push(&id);
-                }
-                js_array.into()
-            })
-            .map_err(JsValue::from))
+        future_to_promise(
+            future::join_all(futs)
+                .map(|e| {
+                    let mut js_array = js_sys::Array::new();
+                    for id in e {
+                        js_array.push(&id);
+                    }
+                    js_array.into()
+                })
+                .map_err(JsValue::from),
+        )
     }
 
     /// Creates new [`Connection`]s basing on senders and receivers of provided

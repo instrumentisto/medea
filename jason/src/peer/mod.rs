@@ -118,7 +118,7 @@ impl PeerConnection {
         );
     }
 
-    pub fn get_stats(&self) -> impl Future<Item = JsValue, Error = WasmErr>{
+    pub fn get_stats(&self) -> impl Future<Item = JsValue, Error = WasmErr> {
         self.0.peer.get_stats()
     }
 

@@ -54,7 +54,7 @@ impl PeerRepository {
         Ok(self.peers.get(&id).unwrap())
     }
 
-    pub fn peers(&self) -> HashMap<PeerId, Rc<PeerConnection>>{
+    pub fn peers(&self) -> HashMap<PeerId, Rc<PeerConnection>> {
         self.peers.clone()
     }
 
