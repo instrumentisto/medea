@@ -1,4 +1,5 @@
-version: '2'
+version: "2"
+
 services:
   webclient:
     container_name: demo-webclient
@@ -8,7 +9,7 @@ services:
       - "6379:6379"    # coturn redis
       - "8080:8080"    # web-socket http server
     volumes:
-      - ./conf:/etc/nginx/conf.d
+      - ./conf/nginx.vh.conf:/etc/nginx/conf.d/default.conf
   medea:
     container_name: demo-medea
     image: instrumentisto/medea:dev

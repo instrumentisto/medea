@@ -1,4 +1,12 @@
-FROM nginx:alpine
+# https://hub.docker.com/_/nginx
+FROM nginx:stable-alpine
 
-COPY index.html /usr/share/nginx/html
-COPY ./node_modules/jason-alexlapa/ /usr/share/nginx/html/js
+
+COPY conf/nginx.vh.conf /etc/nginx/conf.d/default.conf
+
+
+COPY index.html /app/
+COPY node_modules/jason-alexlapa/ /app/js/
+
+
+WORKDIR /app

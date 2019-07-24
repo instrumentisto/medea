@@ -16,8 +16,7 @@ eq = $(if $(or $(1),$(2)),$(and $(findstring $(1),$(2)),\
 ######################
 
 MEDEA_IMAGE_NAME := $(strip $(shell grep 'COMPOSE_IMAGE_NAME=' .env | cut -d '=' -f2))
-DEMO_IMAGE_NAME := $(strip $(shell grep 'DEMO_IMAGE_NAME=' .env | cut -d '=' -f2))
-
+DEMO_IMAGE_NAME := instrumentisto/medea-demo
 
 RUST_VER := 1.36
 
@@ -48,7 +47,7 @@ lint: cargo.lint
 fmt: cargo.fmt
 
 
-# Run Medea and Jason e2e-demo in host
+# Run Medea and Jason development environment.
 #
 # Usage:
 #	make up.dev
@@ -57,13 +56,7 @@ up.dev:
 	$(MAKE) -j3 up.coturn up.jason up.medea
 
 
-# Run Medea and Jasom demo in docker
-#
-# Usage:
-#	make up.demo
-
-up.demo:
-	docker-compose -f jason/demo/docker-compose.yml up
+up.demo: docker.up.demo
 
 
 test: test.unit
@@ -104,6 +97,36 @@ cargo.lint:
 
 
 
+#################
+# Yarn commands #
+#################
+
+# Resolve NPM project dependencies with Yarn.
+#
+# Optional 'cmd' parameter may be used for handy usage of docker-wrapped Yarn,
+# for example: make yarn cmd='upgrade'
+#
+# Usage:
+#	make yarn [cmd=('install --pure-lockfile'|<yarn-cmd>)]
+#	          [proj=(e2e|demo)]
+#	          [dockerized=(yes|no)]
+
+yarn-cmd = $(if $(call eq,$(cmd),),install --pure-lockfile,$(cmd))
+yarn-proj-dir = $(if $(call eq,$(proj),demo),jason/demo,jason/e2e-demo)
+
+yarn:
+ifneq ($(dockerized),no)
+	docker run --rm --network=host -v "$(PWD)":/app -w /app \
+	           -u $(shell id -u):$(shell id -g) \
+		node:latest \
+			make yarn cmd='$(yarn-cmd)' proj=$(proj) dockerized=no
+else
+	yarn --cwd=$(yarn-proj-dir) $(yarn-cmd)
+endif
+
+
+
+
 ######################
 # wasm-pack commands #
 ######################
@@ -118,32 +141,6 @@ publish.jason:
 	rm -rf jason/pkg
 	wasm-pack build -t web jason
 	wasm-pack publish
-
-
-
-
-#################
-# Yarn commands #
-#################
-
-# Resolve Yarn project dependencies.
-#
-# Optional 'cmd' parameter may be used for handy usage of docker-wrapped Yarn,
-# for example: make yarn.deps cmd='upgrade'
-#
-# Usage:
-#	make yarn [cmd=('install --pure-lockfile'|<yarn-cmd>)]
-#	          [proj=(e2e|demo)]
-
-yarn-cmd = $(if $(call eq,$(cmd),),install --pure-lockfile,$(cmd))
-yarn-proj =$(if $(call eq,$(proj),demo),jason/demo,jason/e2e-demo)
-
-yarn:
-	docker run --rm --network=host -v "$(PWD)":/app -w /app \
-	           -e YARN_CACHE_FOLDER=.cache/yarn/ \
-	           -u $(shell id -u):$(shell id -g) \
-		node:latest yarn --cwd=$(if $(call eq,$(proj),demo),jason/demo,jason/e2e-demo) \
-		$(yarn-cmd) --non-interactive
 
 
 
@@ -207,6 +204,20 @@ endif
 # Docker commands #
 ###################
 
+# Build Docker image for demo application.
+#
+# Usage:
+#	make docker.build.demo [TAG=(dev|<tag>)]
+
+docker-build-demo-image-name = $(DEMO_IMAGE_NAME)
+
+docker.build.demo:
+	@make yarn proj=demo
+	docker build \
+		-t $(docker-build-demo-image-name):$(if $(call eq,$(TAG),),dev,$(TAG)) \
+		jason/demo
+
+
 # Build medea project Docker image.
 #
 # Usage:
@@ -244,18 +255,24 @@ define docker.build.clean.ignore
 endef
 
 
-
-
-# Build demo project Docker image.
+# Stop demo application in Docker Compose environment
+# and remove all related containers.
 #
 # Usage:
-#	make docker.build.demo [TAG=(dev|<tag>)]
+#	make docker.down.demo
 
-docker-build-demo-image-name = $(DEMO_IMAGE_NAME)
+docker.down.demo:
+	docker-compose -f jason/demo/docker-compose.yml down --rmi=local -v
 
-docker.build.demo:
-	@make yarn proj=demo
-	docker build -t $(docker-build-demo-image-name):$(if $(call eq,$(TAG),),dev,$(TAG)) jason/demo
+
+# Run demo application in Docker Compose environment.
+#
+# Usage:
+#	make docker.up.demo
+
+docker.up.demo: docker.down.demo
+	docker-compose -f jason/demo/docker-compose.yml up
+
 
 
 
@@ -297,12 +314,9 @@ up.medea:
 ##################
 
 .PHONY: build cargo cargo.fmt cargo.lint \
-        docker.build.medea \
-        docker.build.demo \
+        docker.build.demo docker.build.medea docker.down.demo docker.up.demo \
         docs docs.rust \
         test test.unit \
         publish.jason \
-        up up.coturn up.jason up.medea \
-        up.dev up.demo \
+        up up.coturn up.demo up.dev up.jason up.medea \
         yarn
-
