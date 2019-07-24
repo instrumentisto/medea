@@ -54,6 +54,7 @@ pub struct Room {
 /// Element of [`Room`]'s pipeline.
 #[allow(clippy::module_name_repetitions)]
 #[derive(Serialize, Deserialize, Debug)]
+#[serde(tag = "kind")]
 pub enum RoomElement {
     Member(Member),
 }
