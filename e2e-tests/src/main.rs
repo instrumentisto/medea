@@ -1,4 +1,4 @@
-use fantoccini::Client;
+use fantoccini::{Client, Locator};
 use futures::Future as _;
 use serde_json::json;
 use std::{
@@ -60,8 +60,13 @@ fn main() {
             client
                 .map_err(|e| panic!("{:?}", e))
                 .and_then(move |client| client.goto(&test_url))
-                .map(|client| {
-                    std::thread::sleep_ms(5000);
+                .and_then(|client| {
+                    client.wait_for_find(Locator::Id("test-end"))
+                })
+                .map(|_| {
+                    // TODO: this is used for debug
+                    println!("Tests passed!");
+                    std::thread::sleep_ms(3000);
                 })
                 .map_err(|_| ()),
         );
