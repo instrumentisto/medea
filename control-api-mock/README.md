@@ -4,6 +4,14 @@ Medea's control API mock server
 This app supposed to be used for e2e tests and for debugging purposes.
 
 ## Endpoints
+### `GET /hb`
+Checks connection with medea's gRPC control API.
+
+This is used for waiting before e2e tests start until all needed services
+startup.
+
+Returns `200 OK` with body "Ok." when gRPC control API go online.
+
 ### `GET /`
 Batch get elements from medea.
 _Elements can be heterogeneous._

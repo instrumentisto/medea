@@ -1,4 +1,7 @@
 context('Pub<=>Pub video call', () => {
+  /**
+   * This function deletes room used in this context's tests from medea.
+   */
   function deleteTestRoom() {
     cy.request({
       url: 'http://localhost:8000/pub-pub-e2e-call',
@@ -60,7 +63,20 @@ context('Pub<=>Pub video call', () => {
     deleteTestRoom();
   });
 
-  it('open video call and rtc packets sending', () => {
+  it('open video call and works', () => {
+    /**
+     * Promise which start PubPubVideoCall.
+     *
+     * Note that returned promise is Cypress.Promise because Cypress don't work
+     * with vanilla Promises.
+     *
+     * This function require window root object because it is only way
+     * because this is the only way to call a function in the test application.
+     *
+     * This promise resolving when video call started.
+     * This promise rejecting when some error occured in startPubPubVideoCall.
+     * @param win root window object
+     */
     function startVideoCall(win) {
       return new Cypress.Promise((resolve, reject) => {
         win.startPubPubVideoCall()
@@ -73,6 +89,12 @@ context('Pub<=>Pub video call', () => {
       })
     }
 
+    /**
+     * Takes array of RTCStatsReport and count "outbound-rtp" and "inbound-rtp"
+     * for all RTCStatsReport. If "outbound-rtp"'s "packetsSent" or "inbound-rtp"'s
+     * "packetsReceived" < 5 then test failed.
+     * @param stats array of RTCStatsReports
+     */
     function checkStats(stats) {
       let outboundPackets = 0;
       let inboundPackets = 0;
@@ -89,6 +111,15 @@ context('Pub<=>Pub video call', () => {
       expect(inboundPackets).to.be.greaterThan(5);
     }
 
+    /**
+     * Return difference between two arrays.
+     *
+     * In this test it's used for comparing images received from partner.
+     *
+     * @param o first array
+     * @param n second array
+     * @returns {number} number of how arrays are different
+     */
     function diff(o, n) {
       let objO = {},
         objN = {};
@@ -115,6 +146,16 @@ context('Pub<=>Pub video call', () => {
       return added + removed
     }
 
+    /**
+     * Get two images from provided video element with some small interval
+     * and check that they are different.
+     *
+     * Test will fail if difference between this two images are less than 50.
+     *
+     * Use for testing that video which we receiving from partner are not static.
+     *
+     * @param videoEl video element
+     */
     function checkVideoDiff(videoEl) {
       let canvas = document.createElement('canvas');
       canvas.height = videoEl.videoHeight / 2;

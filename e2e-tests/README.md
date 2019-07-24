@@ -7,8 +7,8 @@ Contains app with function for e2e testing and the testing code themselves.
 
 For testing is using [cypress] javascript framework.
 
-At this moment, tests can be run only 
-in the browser `chromium` because [cypress]'s electron 
+At this moment, tests can be run only
+in the browser `chromium` because [cypress]'s electron
 and chrome is too old for APIs which we use.
 
 Test application exposing on `8082` port.

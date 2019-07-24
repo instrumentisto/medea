@@ -2,6 +2,7 @@ use std::{cell::RefCell, rc::Rc};
 
 use futures::Future;
 use medea_client_api_proto::IceServer;
+use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
     RtcConfiguration, RtcIceCandidateInit,
@@ -14,7 +15,6 @@ use web_sys::{
 use crate::utils::{EventListener, WasmErr};
 
 use super::ice_server::RtcIceServers;
-use wasm_bindgen::JsValue;
 
 /// [RTCIceCandidate][1] representation.
 ///

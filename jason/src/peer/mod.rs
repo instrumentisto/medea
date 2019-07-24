@@ -12,6 +12,7 @@ use std::{collections::HashMap, rc::Rc};
 use futures::{future, sync::mpsc::UnboundedSender, Future};
 use medea_client_api_proto::{Direction, IceServer, Track};
 use medea_macro::dispatchable;
+use wasm_bindgen::JsValue;
 use web_sys::RtcTrackEvent;
 
 use crate::{
@@ -26,7 +27,6 @@ use self::{
 
 #[doc(inline)]
 pub use self::{repo::PeerRepository, Id as PeerId};
-use wasm_bindgen::JsValue;
 
 pub type Id = u64;
 

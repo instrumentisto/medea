@@ -1,13 +1,12 @@
 use std::{collections::HashMap, rc::Rc};
 
-use futures::sync::mpsc::UnboundedSender;
+use futures::{sync::mpsc::UnboundedSender, Future};
 use medea_client_api_proto::IceServer;
+use wasm_bindgen::JsValue;
 
 use crate::{media::MediaManager, utils::WasmErr};
 
 use super::{PeerConnection, PeerEvent, PeerId};
-use futures::Future;
-use wasm_bindgen::JsValue;
 
 /// [`PeerConnection`] factory and repository.
 #[allow(clippy::module_name_repetitions)]
@@ -45,7 +44,6 @@ impl PeerRepository {
         id: PeerId,
         ice_servers: I,
     ) -> Result<&Rc<PeerConnection>, WasmErr> {
-        web_sys::console::log_1(&format!("Created Peer [id = {}].", id).into());
         let peer = Rc::new(PeerConnection::new(
             id,
             self.peer_events_sender.clone(),

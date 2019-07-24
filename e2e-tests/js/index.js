@@ -1,3 +1,10 @@
+/**
+ * Start Pub<=>Pub video call.
+ *
+ * This function is used in all tests from "Pub<=>Pub video call" context.
+ *
+ * @returns {Promise<{caller, responder}>} promise return created caller's and receiver's rooms
+ */
 async function startPubPubVideoCall() {
   const rust = await import("../../jason/pkg");
 
