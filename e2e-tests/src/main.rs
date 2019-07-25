@@ -11,6 +11,7 @@ use serde::Deserialize;
 use serde_json::json;
 use webdriver::capabilities::Capabilities;
 use yansi::Paint;
+use std::io::stdin;
 
 pub fn generate_html(test_js: &str) -> String {
     include_str!("../test_template.html").replace("{{{}}}", test_js)
@@ -32,48 +33,66 @@ struct TestStats {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct TestError {
-    message: Option<String>,
-    show_diff: Option<bool>,
-    actual: Option<String>,
-    expected: Option<String>,
-    stack: Option<String>,
+    message: String,
+//    show_diff: bool,
+//    actual: String,
+//    expected: String,
+    stack: String,
+}
+
+//#[derive(Debug, Deserialize)]
+//#[serde(rename_all = "camelCase")]
+//struct TestResult {
+//    title: String,
+//    full_title: String,
+//    duration: u32,
+//    err: TestError,
+//}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SuccessTestResult {
+    title: String,
+    full_title: String,
+    duration: u32,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct TestResult {
+struct FailureTestResult {
     title: String,
     full_title: String,
-    duration: u32,
+    current_retry: i32,
     err: TestError,
 }
 
-impl fmt::Display for TestResult {
+impl fmt::Display for FailureTestResult {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.err.message.is_some() {
-            write!(
-                f,
-                "   {}\n\n",
-                Paint::red(format!(
-                    "test {} ... failed ({} ms)",
-                    self.full_title, self.duration
-                ))
-            )?;
-            write!(f, "   Message: {}", self.err.message.as_ref().unwrap())?;
-            if let Some(stack) = &self.err.stack {
-                write!(f, "\n   Stacktrace:\n\n   {}\n\n", stack)?;
-            }
-        } else {
-            write!(
-                f,
-                "   {}\n",
-                Paint::green(format!(
-                    "test {} ... ok ({} ms)",
-                    self.full_title, self.duration
-                ))
-            )?;
-        }
+        write!(
+            f,
+            "   {}\n\n",
+            Paint::red(format!(
+                "test {} ... failed ({} retry)",
+                self.full_title, self.current_retry
+            ))
+        )?;
+        write!(f, "   Message: {}", self.err.message)?;
+        write!(f, "\n   Stacktrace:\n\n   {}\n\n", self.err.stack)?;
+        Ok(())
+    }
+}
 
+
+impl fmt::Display for SuccessTestResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "   {}\n",
+            Paint::green(format!(
+                "test {} ... ok ({} ms)",
+                self.full_title, self.duration
+            ))
+        )?;
         Ok(())
     }
 }
@@ -82,9 +101,9 @@ impl fmt::Display for TestResult {
 #[serde(rename_all = "camelCase")]
 struct TestResults {
     stats: TestStats,
-    tests: Vec<TestResult>,
-    failures: Vec<TestResult>,
-    passes: Vec<TestResult>,
+//    tests: Vec<TestResult>,
+    failures: Vec<FailureTestResult>,
+    passes: Vec<SuccessTestResult>,
 }
 
 impl TestResults {
@@ -172,18 +191,25 @@ fn main() {
                 .map_err(|e| panic!("{:?}", e))
                 .and_then(move |client| client.goto(&test_url))
                 .and_then(|client| {
+                    std::thread::sleep_ms(1000);
                     client.wait_for_find(Locator::Id("test-end"))
                 })
                 .map(|e| e.client())
                 .and_then(|mut client| {
-                    client.persist();
-                    client.execute("return console.logs[0][0]", Vec::new())
+                    client.execute("return console.logs", Vec::new()).map(move |e| (e, client))
                 })
-                .map(|result| {
-                    let result = result.as_str().unwrap();
-                    let result: TestResults =
-                        serde_json::from_str(&result).unwrap();
-                    result
+                .map(|(result, client)| {
+                    let logs = result.as_array().unwrap();
+                    for message in logs {
+                        let message = message.as_array().unwrap()[0].as_str().unwrap();
+                        if let Ok(test_results) = serde_json::from_str::<TestResults>(message) {
+                            return test_results
+                        }
+                    }
+                    let mut a = String::new();
+                    println!("Logs don't have tests results.");
+                    stdin().read_line(&mut a);
+                    panic!();
                 })
                 .map(|result| {
                     println!("{}", result);

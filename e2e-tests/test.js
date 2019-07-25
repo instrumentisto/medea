@@ -1,4 +1,5 @@
 let assert = chai.assert;
+let expect = chai.expect;
 
 function delay(interval)
 {
@@ -18,10 +19,7 @@ describe('Some dummy test', () => {
         let responderRoom = await responder.join_room("ws://localhost:8080/ws/pub-pub-e2e-call/responder/test");
 
         callerRoom.on_new_connection((connection) => {
-            console.log("caller got new connection with member " + connection.member_id());
             connection.on_remote_stream((stream) => {
-                console.log("got video from remote member " + connection.member_id());
-
                 let video = document.createElement("video");
                 video.id = 'callers-partner-video';
 
@@ -54,10 +52,7 @@ describe('Some dummy test', () => {
             }
         });
         responderRoom.on_new_connection((connection) => {
-            console.log("responder got new connection with member " + connection.member_id());
             connection.on_remote_stream(function(stream) {
-                console.log("got video from remote member " + connection.member_id());
-
                 let video = document.createElement("video");
                 video.id = 'responders-partner-video';
 
@@ -74,9 +69,129 @@ describe('Some dummy test', () => {
         document.body.appendChild(successEl);
     });
 
-    delay(2000);
+    // delay(2000);
 
     it('success', () => {
         assert.equal('bar', 'bar');
     })
+
+    it('call', async () => {
+        const sleep = (milliseconds) => {
+            return new Promise(resolve => setTimeout(resolve, milliseconds))
+        };
+
+        const waitForElement = (id) => {
+            return new Promise(resolve => {
+                let interval = setInterval(() => {
+                    let waitedEl = document.getElementById(id);
+                    if(waitedEl != null) {
+                        clearInterval(interval);
+                        resolve(waitedEl);
+                    }
+                }, 50)
+            })
+        };
+
+        const waitForVideo = (videoEl) => {
+            return new Promise(resolve => {
+                let interval = setInterval(() => {
+                    if(videoEl.videoWidth !== 0) {
+                        clearInterval(interval);
+                        resolve()
+                    }
+                }, 50)
+            })
+        };
+
+        /**
+         * Takes array of RTCStatsReport and count "outbound-rtp" and "inbound-rtp"
+         * for all RTCStatsReport. If "outbound-rtp"'s "packetsSent" or "inbound-rtp"'s
+         * "packetsReceived" < 5 then test failed.
+         * @param stats array of RTCStatsReports
+         */
+        function checkStats(stats) {
+            let outboundPackets = 0;
+            let inboundPackets = 0;
+            stats.forEach(resp => {
+                resp.forEach(report => {
+                    if (report.type === 'outbound-rtp') {
+                        outboundPackets += report.packetsSent;
+                    } else if (report.type === 'inbound-rtp') {
+                        inboundPackets += report.packetsReceived;
+                    }
+                });
+            });
+            expect(outboundPackets).to.be.greaterThan(5);
+            expect(inboundPackets).to.be.greaterThan(5);
+        }
+
+        /**
+         * Return difference between two arrays.
+         *
+         * In this test it's used for comparing images received from partner.
+         *
+         * @param o first array
+         * @param n second array
+         * @returns {number} number of how arrays are different
+         */
+        function diff(o, n) {
+            let objO = {},
+                objN = {};
+            for (let i = 0; i < o.length; i++) {
+                objO[o[i]] = 1;
+            }
+            for (let i = 0; i < n.length; i++) {
+                objN[n[i]] = 1;
+            }
+            let added = 0;
+            let removed = 0;
+
+            for (let i in objO) {
+                if (i in objN) {
+                    delete objN[i];
+                } else {
+                    removed += 1;
+                }
+            }
+            for (let i in objN) {
+                added += 1;
+            }
+
+            return added + removed
+        }
+
+        /**
+         * Get two images from provided video element with some small interval
+         * and check that they are different.
+         *
+         * Test will fail if difference between this two images are less than 50.
+         *
+         * Use for testing that video which we receiving from partner are not static.
+         *
+         * @param videoEl video element
+         */
+        async function checkVideoDiff(videoEl) {
+            let canvas = document.createElement('canvas');
+            canvas.height = videoEl.videoHeight / 2;
+            canvas.width = videoEl.videoWidth / 2;
+
+            let context = canvas.getContext('2d');
+            context.drawImage(videoEl, canvas.width, canvas.height, canvas.width, canvas.height);
+            let imgEl = document.createElement('img');
+            imgEl.src = canvas.toDataURL();
+            let firstData = context.getImageData(0, 0, canvas.width, canvas.height);
+
+            context.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
+            imgEl.src = canvas.toDataURL();
+            let secondData = context.getImageData(0, 0, canvas.width, canvas.height);
+
+            let dataDiff = diff(firstData.data, secondData.data);
+
+            assert.isAtLeast(dataDiff, 10, 'Video which we receiving from partner looks static.');
+        }
+
+        let video = await waitForElement('callers-partner-video');
+        await waitForVideo(video);
+        await checkVideoDiff(video);
+    }).timeout(2000)
 });
