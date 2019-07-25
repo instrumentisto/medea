@@ -84,7 +84,7 @@ impl fmt::Display for SuccessTestResult {
             f,
             "   {}\n",
             Paint::green(format!(
-                "test {} ... ok ({} ms)",
+                "test {} ... ok ({}ms)",
                 self.full_title, self.duration
             ))
         )?;
@@ -125,7 +125,8 @@ impl fmt::Display for TestResults {
         write!(f, "suites: {}; ", self.stats.suites)?;
         write!(f, "tests: {}; ", self.stats.tests)?;
         write!(f, "passes: {}; ", self.stats.passes)?;
-        write!(f, "failures: {}.\n", self.stats.failures)?;
+        write!(f, "failures: {}; ", self.stats.failures)?;
+        write!(f, "total duration: {}ms.\n", self.stats.duration)?;
 
         Ok(())
     }
@@ -159,7 +160,7 @@ pub fn run_tests(
                             format!("file://{}", test_path.display());
                         println!(
                             "\nRunning {} test...",
-                            test_path.file_name().unwrap().to_str().unwrap()
+                            test.file_name().unwrap().to_str().unwrap()
                         );
                         Either::A(
                             client
