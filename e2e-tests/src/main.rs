@@ -10,6 +10,7 @@ use serde::Deserialize;
 use webdriver::capabilities::Capabilities;
 use std::time::SystemTime;
 use std::fmt;
+use yansi::Paint;
 
 pub fn generate_html(test_js: &str) -> String {
     format!(include_str!("../test_template.html"), test_js)
@@ -66,12 +67,15 @@ struct TestResult {
 
 impl fmt::Display for TestResult {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Desire: {}\n", self.full_title)?;
-        write!(f, "Test name: {}\n", self.title)?;
-        write!(f, "Duration: {}\n", self.duration)?;
 
         if self.err.message.is_some() {
-            write!(f, "Error: {}\n", self.err)?;
+            write!(f, "   {}\n\n", Paint::red(format!("test {} ... failed ({} ms)", self.full_title, self.duration)))?;
+            write!(f, "   Message: {}", self.err.message.as_ref().unwrap())?;
+            if let Some(stack) = &self.err.stack {
+                write!(f, "\n   Stacktrace:\n\n   {}\n\n", stack)?;
+            }
+        } else {
+            write!(f, "   {}\n", Paint::green(format!("test {} ... ok ({} ms)", self.full_title, self.duration)))?;
         }
 
         Ok(())
@@ -89,21 +93,23 @@ struct TestResults {
 
 impl fmt::Display for TestResults {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Passed tests ({}):\n", self.stats.passes)?;
+        write!(f, "\nPassed tests ({}):\n\n", self.stats.passes)?;
         for passed in &self.passes {
-            write!(f, "Passed tests:\n{}", passed)?;
+            write!(f, "{}\n", passed)?;
         }
 
-        write!(f, "Failed tests ({}):\n", self.stats.failures)?;
-        for failure in &self.failures {
-            write!(f, "{}", failure)?;
+        if !self.failures.is_empty() {
+            write!(f, "\nFailed tests ({}):\n\n", self.stats.failures)?;
+            for failure in &self.failures {
+                write!(f, "{}", failure)?;
+            }
         }
 
-        write!(f, "Stats:\n")?;
-        write!(f, "Suites: {}\n", self.stats.suites)?;
-        write!(f, "Tests: {}\n", self.stats.tests)?;
-        write!(f, "Passes: {}\n", self.stats.passes)?;
-        write!(f, "Failures: {}\n", self.stats.failures)?;
+        write!(f, "{}", Paint::yellow("Summary: "))?;
+        write!(f, "suites: {}; ", self.stats.suites)?;
+        write!(f, "tests: {}; ", self.stats.tests)?;
+        write!(f, "passes: {}; ", self.stats.passes)?;
+        write!(f, "failures: {}.\n", self.stats.failures)?;
 
         Ok(())
     }
@@ -169,7 +175,6 @@ fn main() {
                 })
                 .map(|result| {
                     println!("{}", result);
-                    println!("Tests passed!");
                     std::thread::sleep_ms(3000);
                 })
                 .map_err(|_| ()),
