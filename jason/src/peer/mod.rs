@@ -20,7 +20,7 @@ use crate::{
 };
 
 use self::{
-    conn::{IceCandidate, RtcPeerConnection, SdpType},
+    conn::{IceCandidate, RtcPeerConnection, SdpType, TransceiverKind},
     media::MediaConnections,
 };
 
@@ -101,6 +101,34 @@ impl PeerConnection {
         }))?;
 
         Ok(Self(inner))
+    }
+
+    /// Mute all audio tracks for all [`Sender`]s.
+    pub fn mute_audio(&self) -> Result<(), WasmErr> {
+        self.0
+            .media_connections
+            .enable_sender(TransceiverKind::Audio, false)
+    }
+
+    /// Unmute all audio tracks for all [`Sender`]s.
+    pub fn unmute_audio(&self) -> Result<(), WasmErr> {
+        self.0
+            .media_connections
+            .enable_sender(TransceiverKind::Audio, true)
+    }
+
+    /// Mute all video tracks for all [`Sender`]s.
+    pub fn mute_video(&self) -> Result<(), WasmErr> {
+        self.0
+            .media_connections
+            .enable_sender(TransceiverKind::Video, false)
+    }
+
+    /// Unmute all video tracks for all [`Sender`]s.
+    pub fn unmute_video(&self) -> Result<(), WasmErr> {
+        self.0
+            .media_connections
+            .enable_sender(TransceiverKind::Video, true)
     }
 
     /// Handle `icecandidate` event from underlying peer emitting

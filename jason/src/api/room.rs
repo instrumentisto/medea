@@ -27,6 +27,23 @@ use crate::{
 
 use super::{connection::Connection, ConnectionHandle};
 
+macro_rules! map_all_peers {
+    ($v:expr, $func:ident) => {{
+        $v.0.upgrade()
+            .ok_or_else(|| WasmErr::from("Detached state").into())
+            .and_then(|room| {
+                room.borrow()
+                    .peers
+                    .get_all()
+                    .iter()
+                    .map(|peer| peer.$func())
+                    .collect::<Result<Vec<_>, _>>()
+                    .map(|_| ())
+                    .map_err(Into::into)
+            })
+    }};
+}
+
 /// JS side handle to [`Room`] where all the media happens.
 ///
 /// Actually, represents a [`Weak`]-based handle to [`InnerRoom`].
@@ -49,6 +66,26 @@ impl RoomHandle {
                 room.borrow_mut().on_new_connection.set_func(f);
             })
             .ok_or_else(|| WasmErr::from("Detached state").into())
+    }
+
+    /// Mute local audio [`Track`]s for all [`PeerConnection`]s this [`Room`].
+    pub fn mute_audio(&mut self) -> Result<(), JsValue> {
+        map_all_peers!(self, mute_audio)
+    }
+
+    /// Unmute local audio [`Track`]s for all [`PeerConnection`]s this [`Room`].
+    pub fn unmute_audio(&mut self) -> Result<(), JsValue> {
+        map_all_peers!(self, unmute_audio)
+    }
+
+    /// Mute local video [`Track`]s for all [`PeerConnection`]s this [`Room`].
+    pub fn mute_video(&mut self) -> Result<(), JsValue> {
+        map_all_peers!(self, mute_video)
+    }
+
+    /// Unmute local video [`Track`]s for all [`PeerConnection`]s this [`Room`].
+    pub fn unmute_video(&mut self) -> Result<(), JsValue> {
+        map_all_peers!(self, unmute_video)
     }
 }
 

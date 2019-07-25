@@ -64,4 +64,10 @@ impl PeerRepository {
     pub fn remove(&mut self, id: PeerId) {
         self.peers.remove(&id);
     }
+
+    /// Returns all [`PeerConnection`]s stored in repository.
+    #[inline]
+    pub fn get_all(&self) -> Vec<&Rc<PeerConnection>> {
+        self.peers.values().collect()
+    }
 }

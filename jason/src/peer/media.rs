@@ -45,6 +45,34 @@ impl MediaConnections {
         }))
     }
 
+    /// Set enabled property for all [`MediaTrack`]s of [`Senders`] with given
+    /// [`TransceiverKind`].
+    pub fn enable_sender(
+        &self,
+        kind: TransceiverKind,
+        enabled: bool,
+    ) -> Result<(), WasmErr> {
+        let s = self.0.borrow();
+        s.senders
+            .iter()
+            .filter_map(|(_, sender)| {
+                if sender.kind != kind {
+                    return None;
+                }
+                Some(match sender.transceiver.sender().track() {
+                    None => {
+                        Err(WasmErr::from("Peer has senders without track"))
+                    }
+                    Some(track) => {
+                        track.set_enabled(enabled);
+                        Ok(())
+                    }
+                })
+            })
+            .collect::<Result<Vec<_>, _>>()
+            .map(|_| ())
+    }
+
     /// Returns mapping from a [`MediaTrack`] ID to a `mid` of
     /// this track's [`RtcRtpTransceiver`].
     pub fn get_mids(&self) -> Result<HashMap<u64, String>, WasmErr> {
@@ -210,6 +238,7 @@ impl MediaConnections {
 pub struct Sender {
     track_id: TrackId,
     transceiver: RtcRtpTransceiver,
+    kind: TransceiverKind,
 }
 
 impl Sender {
@@ -223,17 +252,12 @@ impl Sender {
         peer: &RtcPeerConnection,
         mid: Option<String>,
     ) -> Result<Rc<Self>, WasmErr> {
+        let kind = match caps {
+            MediaType::Audio(_) => TransceiverKind::Audio,
+            MediaType::Video(_) => TransceiverKind::Video,
+        };
         let transceiver = match mid {
-            None => match caps {
-                MediaType::Audio(_) => peer.add_transceiver(
-                    TransceiverKind::Audio,
-                    TransceiverDirection::Sendonly,
-                ),
-                MediaType::Video(_) => peer.add_transceiver(
-                    TransceiverKind::Video,
-                    TransceiverDirection::Sendonly,
-                ),
-            },
+            None => peer.add_transceiver(kind, TransceiverDirection::Sendonly),
             Some(mid) => {
                 peer.get_transceiver_by_mid(&mid).ok_or_else(|| {
                     WasmErr::from(format!(
@@ -246,6 +270,7 @@ impl Sender {
         Ok(Rc::new(Self {
             track_id,
             transceiver,
+            kind,
         }))
     }
 }
