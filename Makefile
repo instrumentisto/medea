@@ -128,24 +128,6 @@ endif
 
 
 
-######################
-# wasm-pack commands #
-######################
-
-
-# Build and publish Jason application to npm
-#
-# Usage:
-#	make publish.jason
-
-publish.jason:
-	rm -rf jason/pkg
-	wasm-pack build -t web jason
-	wasm-pack publish
-
-
-
-
 ##########################
 # Documentation commands #
 ##########################
@@ -197,6 +179,23 @@ endif
 	cargo test -p $(test-unit-crate)
 endif
 endif
+
+
+
+
+######################
+# Releasing commands #
+######################
+
+# Build and publish Jason application to npm
+#
+# Usage:
+#	make release.jason
+
+release.jason:
+	@rm -rf jason/pkg/
+	wasm-pack build -t web jason
+	wasm-pack publish
 
 
 
@@ -318,7 +317,7 @@ up.medea:
         cargo cargo.fmt cargo.lint \
         docker.build.demo docker.build.medea docker.down.demo docker.up.demo \
         docs docs.rust \
+        release.jason \
         test test.unit \
-        publish.jason \
         up up.coturn up.demo up.dev up.jason up.medea \
         yarn
