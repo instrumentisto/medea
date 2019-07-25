@@ -142,6 +142,7 @@ pub fn generate_html_test(test_path: &PathBuf) -> PathBuf {
     html_test_file_path
 }
 
+// TODO: refactor
 pub fn run_tests(
     paths_to_tests: Vec<PathBuf>,
     caps: Capabilities,
@@ -219,28 +220,6 @@ pub fn run_tests(
         .map_err(|_| ())
 }
 
-// pub fn run_test(path_to_tests: PathBuf, caps: Capabilities) -> impl
-// Future<Item = (), Error = ()> {    let test_path =
-// generate_html_test(&path_to_tests);    let test_url = format!("file://{}", test_path.display());
-//    let client =
-//        Client::with_capabilities("http://localhost:9515", caps);
-//    client
-//        .map_err(|e| panic!("{:?}", e))
-//        .and_then(move |client| client.goto(&test_url))
-//        .and_then(|client| {
-//            client.wait_for_find(Locator::Id("test-end"))
-//        })
-//        .map(|e| e.client())
-//        .and_then(|mut client| {
-//            client
-//                .execute("return console.logs", Vec::new())
-//                .map(move |e| (e, client))
-//        })
-//        .and_then(|(result, mut client)| {
-//        })
-//        .map_err(|e| panic!("{:?}", e))
-//}
-
 // TODO: make optional headless
 fn main() {
     let path_to_tests = std::env::args().skip(1).next().unwrap();
@@ -263,15 +242,15 @@ fn main() {
     capabilities.insert("moz:firefoxOptions".to_string(), firefox_settings);
 
     // TODO: chrome
-    {
-        let chrome_settings = json!({
-            "args": [
-                "--use-fake-device-for-media-stream",
-                "--use-fake-ui-for-media-stream"
-            ]
-        });
-        capabilities.insert("goog:chromeOptions".to_string(), chrome_settings);
-    }
+
+    let chrome_settings = json!({
+        "args": [
+            "--use-fake-device-for-media-stream",
+            "--use-fake-ui-for-media-stream",
+            "--disable-web-security",
+        ]
+    });
+    capabilities.insert("goog:chromeOptions".to_string(), chrome_settings);
 
     if path_to_tests.is_dir() {
         //        let mut test_runners = Vec::new();
@@ -290,9 +269,6 @@ fn main() {
 
         tokio::run(run_tests(tests_paths, capabilities.clone()))
     } else {
-        unimplemented!()
-        //        tokio::run(
-        //            run_test(path_to_tests, capabilities)
-        //        );
+        tokio::run(run_tests(vec![path_to_tests], capabilities));
     }
 }
