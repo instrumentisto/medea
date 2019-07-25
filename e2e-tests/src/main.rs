@@ -136,7 +136,13 @@ fn main() {
     let mut capabilities = Capabilities::new();
     let firefox_settings = json!({
         "prefs": {
-            "media.navigator.streams.fake": true
+            "media.navigator.streams.fake": true,
+            "security.fileuri.strict_origin_policy": false,
+            "media.navigator.permission.disabled": true,
+            "media.autoplay.enabled": true,
+            "media.autoplay.enabled.user-gestures-needed ": false,
+            "media.autoplay.ask-permission": false,
+            "media.autoplay.default": 0,
         }
     });
     capabilities.insert("moz:firefoxOptions".to_string(), firefox_settings);
@@ -170,6 +176,7 @@ fn main() {
                 })
                 .map(|e| e.client())
                 .and_then(|mut client| {
+                    client.persist();
                     client.execute("return console.logs[0][0]", Vec::new())
                 })
                 .map(|result| {
