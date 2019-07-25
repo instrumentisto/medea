@@ -6,10 +6,107 @@ use std::{
     io::prelude::*,
     path::PathBuf,
 };
+use serde::Deserialize;
 use webdriver::capabilities::Capabilities;
+use std::time::SystemTime;
+use std::fmt;
 
 pub fn generate_html(test_js: &str) -> String {
     format!(include_str!("../test_template.html"), test_js)
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct TestStats {
+    suites: i32,
+    tests: i32,
+    passes: i32,
+    pending: i32,
+    failures: i32,
+    start: String,
+    end: String,
+    duration: u32,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct TestError {
+    message: Option<String>,
+    show_diff: Option<bool>,
+    actual: Option<String>,
+    expected: Option<String>,
+    stack: Option<String>,
+}
+
+impl fmt::Display for TestError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Message: {}\n", self.message.as_ref().unwrap());
+        if let Some(expected) = &self.expected {
+            write!(f, "Expected: {}\n", expected);
+        }
+        if let Some(actual) = &self.actual {
+            write!(f, "Actual: {}\n", actual);
+        }
+        if let Some(stack) = &self.stack {
+            write!(f, "Stacktrace: {}", stack)?;
+        }
+
+        Ok(())
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct TestResult {
+    title: String,
+    full_title: String,
+    duration: u32,
+    err: TestError,
+}
+
+impl fmt::Display for TestResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Desire: {}\n", self.full_title)?;
+        write!(f, "Test name: {}\n", self.title)?;
+        write!(f, "Duration: {}\n", self.duration)?;
+
+        if self.err.message.is_some() {
+            write!(f, "Error: {}\n", self.err)?;
+        }
+
+        Ok(())
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct TestResults {
+    stats: TestStats,
+    tests: Vec<TestResult>,
+    failures: Vec<TestResult>,
+    passes: Vec<TestResult>,
+}
+
+impl fmt::Display for TestResults {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Passed tests ({}):\n", self.stats.passes)?;
+        for passed in &self.passes {
+            write!(f, "Passed tests:\n{}", passed)?;
+        }
+
+        write!(f, "Failed tests ({}):\n", self.stats.failures)?;
+        for failure in &self.failures {
+            write!(f, "{}", failure)?;
+        }
+
+        write!(f, "Stats:\n")?;
+        write!(f, "Suites: {}\n", self.stats.suites)?;
+        write!(f, "Tests: {}\n", self.stats.tests)?;
+        write!(f, "Passes: {}\n", self.stats.passes)?;
+        write!(f, "Failures: {}\n", self.stats.failures)?;
+
+        Ok(())
+    }
 }
 
 pub fn generate_html_test(test_path: &PathBuf) {
@@ -63,8 +160,15 @@ fn main() {
                 .and_then(|client| {
                     client.wait_for_find(Locator::Id("test-end"))
                 })
-                .map(|_| {
-                    // TODO: this is used for debug
+                .map(|e| e.client())
+                .and_then(|mut client| client.execute("return console.logs[0][0]", Vec::new()))
+                .map(|result| {
+                    let result = result.as_str().unwrap();
+                    let result: TestResults = serde_json::from_str(&result).unwrap();
+                    result
+                })
+                .map(|result| {
+                    println!("{}", result);
                     println!("Tests passed!");
                     std::thread::sleep_ms(3000);
                 })

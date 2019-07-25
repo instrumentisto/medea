@@ -14,8 +14,10 @@ describe('Some dummy test', () => {
         let successEl = document.createElement('div');
         successEl.id = 'test-end';
         document.body.appendChild(successEl);
-    })
-    delay(2000)
+    });
+
+    delay(2000);
+
     it('success', () => {
         assert.equal('bar', 'bar');
     })
