@@ -15,7 +15,9 @@ eq = $(if $(or $(1),$(2)),$(and $(findstring $(1),$(2)),\
 # Project parameters #
 ######################
 
-IMAGE_NAME := $(strip $(shell grep 'COMPOSE_IMAGE_NAME=' .env | cut -d '=' -f2))
+MEDEA_IMAGE_NAME := $(strip \
+	$(shell grep 'COMPOSE_IMAGE_NAME=' .env | cut -d '=' -f2))
+DEMO_IMAGE_NAME := instrumentisto/medea-demo
 
 RUST_VER := 1.36
 
@@ -26,7 +28,7 @@ RUST_VER := 1.36
 # Aliases #
 ###########
 
-build: docker.build
+build: docker.build.medea
 
 
 # Resolve all project dependencies.
@@ -46,12 +48,15 @@ lint: cargo.lint
 fmt: cargo.fmt
 
 
-# Run all project application locally in development mode.
+up.demo: docker.up.demo
+
+
+# Run Medea and Jason development environment.
 #
 # Usage:
-#	make up
+#	make up.dev
 
-up:
+up.dev:
 	$(MAKE) -j3 up.coturn up.jason up.medea
 
 
@@ -103,12 +108,22 @@ cargo.lint:
 # for example: make yarn cmd='upgrade'
 #
 # Usage:
-#	make yarn [cmd=(install|<yarn-cmd>)]
+#	make yarn [cmd=('install --pure-lockfile'|<yarn-cmd>)]
+#	          [proj=(e2e|demo)]
+#	          [dockerized=(yes|no)]
 
-yarn-cmd =
+yarn-cmd = $(if $(call eq,$(cmd),),install --pure-lockfile,$(cmd))
+yarn-proj-dir = $(if $(call eq,$(proj),demo),jason/demo,jason/e2e-demo)
 
 yarn:
-	yarn --cwd=jason/e2e-demo/ $(if $(call eq,$(cmd),),install,$(cmd))
+ifneq ($(dockerized),no)
+	docker run --rm --network=host -v "$(PWD)":/app -w /app \
+	           -u $(shell id -u):$(shell id -g) \
+		node:latest \
+			make yarn cmd='$(yarn-cmd)' proj=$(proj) dockerized=no
+else
+	yarn --cwd=$(yarn-proj-dir) $(yarn-cmd)
+endif
 
 
 
@@ -168,19 +183,50 @@ endif
 
 
 
+######################
+# Releasing commands #
+######################
+
+# Build and publish Jason application to npm
+#
+# Usage:
+#	make release.jason
+
+release.jason:
+	@rm -rf jason/pkg/
+	wasm-pack build -t web jason
+	wasm-pack publish
+
+
+
+
 ###################
 # Docker commands #
 ###################
 
+# Build Docker image for demo application.
+#
+# Usage:
+#	make docker.build.demo [TAG=(dev|<tag>)]
+
+docker-build-demo-image-name = $(DEMO_IMAGE_NAME)
+
+docker.build.demo:
+	@make yarn proj=demo
+	docker build \
+		-t $(docker-build-demo-image-name):$(if $(call eq,$(TAG),),dev,$(TAG)) \
+		jason/demo
+
+
 # Build medea project Docker image.
 #
 # Usage:
-#	make docker.build [TAG=(dev|<tag>)]
+#	make docker.build.medea [TAG=(dev|<tag>)]
 #	                  [debug=(yes|no)] [no-cache=(no|yes)]
 
-docker-build-image-name = $(IMAGE_NAME)
+docker-build-medea-image-name = $(MEDEA_IMAGE_NAME)
 
-docker.build:
+docker.build.medea:
 ifneq ($(no-cache),yes)
 	docker run --rm --network=host -v "$(PWD)":/app -w /app \
 	           -u $(shell id -u):$(shell id -g) \
@@ -201,12 +247,31 @@ endif
 			--build-arg rustc_opts=$(if \
 				$(call eq,$(debug),no),--release,) \
 			--build-arg cargo_home=.cache/cargo,) \
-		-t $(docker-build-image-name):$(if $(call eq,$(TAG),),dev,$(TAG)) .
+		-t $(docker-build-medea-image-name):$(if $(call eq,$(TAG),),dev,$(TAG)) .
 	$(call docker.build.clean.ignore)
 define docker.build.clean.ignore
 	@sed -i $(if $(call eq,$(shell uname -s),Darwin),'',) \
 		/^!target\/d .dockerignore
 endef
+
+
+# Stop demo application in Docker Compose environment
+# and remove all related containers.
+#
+# Usage:
+#	make docker.down.demo
+
+docker.down.demo:
+	docker-compose -f jason/demo/docker-compose.yml down --rmi=local -v
+
+
+# Run demo application in Docker Compose environment.
+#
+# Usage:
+#	make docker.up.demo
+
+docker.up.demo: docker.down.demo
+	docker-compose -f jason/demo/docker-compose.yml up
 
 
 
@@ -248,10 +313,11 @@ up.medea:
 # .PHONY section #
 ##################
 
-.PHONY: build cargo cargo.fmt cargo.lint \
-        docker.build \
+.PHONY: build \
+        cargo cargo.fmt cargo.lint \
+        docker.build.demo docker.build.medea docker.down.demo docker.up.demo \
         docs docs.rust \
+        release.jason \
         test test.unit \
-        up up.coturn up.jason up.medea \
+        up up.coturn up.demo up.dev up.jason up.medea \
         yarn
-

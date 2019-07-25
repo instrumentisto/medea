@@ -3,7 +3,10 @@
 //! [`RpcConnection`] authorization, establishment, message sending, Turn
 //! credentials management.
 
-use std::time::{Duration, Instant};
+use std::{
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 use actix::{
     fut::wrap_future, ActorFuture, AsyncContext, Context, MailboxError,
@@ -71,7 +74,7 @@ pub struct ParticipantService {
     members: HashMap<MemberId, Member>,
 
     /// Service for managing authorization on Turn server.
-    turn: Box<dyn TurnAuthService>,
+    turn: Arc<dyn TurnAuthService>,
 
     /// Established [`RpcConnection`]s of [`Member`]s in this [`Room`].
     // TODO: Replace Box<dyn RpcConnection>> with enum,
@@ -92,7 +95,7 @@ impl ParticipantService {
     pub fn new(
         room_id: RoomId,
         members: HashMap<MemberId, Member>,
-        turn: Box<dyn TurnAuthService>,
+        turn: Arc<dyn TurnAuthService>,
         reconnect_timeout: Duration,
     ) -> Self {
         Self {

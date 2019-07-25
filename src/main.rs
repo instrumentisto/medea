@@ -10,7 +10,7 @@ pub mod shutdown;
 pub mod signalling;
 pub mod turn;
 
-use std::{env, io};
+use std::{env, io, sync::Arc};
 
 use actix::prelude::*;
 use dotenv::dotenv;
@@ -47,32 +47,52 @@ fn main() -> io::Result<()> {
                     1 => Member::new(1, "caller_credentials".to_owned()),
                     2 => Member::new(2, "responder_credentials".to_owned()),
                 };
-                let room = Room::new(
-                    1,
-                    members,
-                    create_peers(1, 2),
-                    config.rpc.reconnect_timeout,
-                    turn_auth_service,
-                )
-                .start();
-                Ok((room, config))
+
+                let rooms = (0..1000)
+                    .map(|i: u64| {
+                        (
+                            i,
+                            Room::new(
+                                i,
+                                members.clone(),
+                                create_peers(1, 2),
+                                config.rpc.reconnect_timeout,
+                                Arc::clone(&turn_auth_service),
+                            )
+                            .start(),
+                        )
+                    })
+                    .collect();
+
+                Ok((rooms, config))
             })
-            .and_then(|(room, config)| {
+            .and_then(|(rooms, config): (Vec<(u64, Addr<Room>)>, _)| {
                 let graceful_shutdown =
                     GracefulShutdown::new(config.shutdown.timeout).start();
-                graceful_shutdown
-                    .send(shutdown::Subscribe(shutdown::Subscriber {
-                        addr: room.clone().recipient(),
-                        priority: shutdown::Priority(2),
-                    }))
-                    .map_err(|e| {
-                        error!("Shutdown subscription failed for Room: {}", e)
+
+                let futures: Vec<_> = rooms
+                    .iter()
+                    .map(|(_, room)| {
+                        graceful_shutdown
+                            .send(shutdown::Subscribe(shutdown::Subscriber {
+                                addr: room.clone().recipient(),
+                                priority: shutdown::Priority(2),
+                            }))
+                            .map_err(|e| {
+                                error!(
+                                    "Shutdown subscription failed for Room: {}",
+                                    e
+                                )
+                            })
                     })
-                    .map(move |_| (room, graceful_shutdown, config))
+                    .collect();
+
+                futures::future::join_all(futures)
+                    .map(move |_| (rooms, graceful_shutdown, config))
             })
-            .map(|(room, graceful_shutdown, config)| {
-                let rooms = hashmap! {1 => room};
-                let rooms_repo = RoomsRepository::new(rooms);
+            .map(|(rooms, graceful_shutdown, config)| {
+                let rooms_repo =
+                    RoomsRepository::new(rooms.into_iter().collect());
                 (rooms_repo, graceful_shutdown, config)
             })
             .and_then(|(rooms_repo, graceful_shutdown, config)| {

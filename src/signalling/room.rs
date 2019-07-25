@@ -1,7 +1,7 @@
 //! Room definitions and implementations. Room is responsible for media
 //! connection establishment between concrete [`Member`]s.
 
-use std::{collections::HashMap as StdHashMap, time::Duration};
+use std::{collections::HashMap as StdHashMap, sync::Arc, time::Duration};
 
 use actix::{
     fut::wrap_future, Actor, ActorFuture, AsyncContext, Context, Handler,
@@ -99,7 +99,7 @@ impl Room {
         members: HashMap<MemberId, Member>,
         peers: HashMap<PeerId, PeerStateMachine>,
         reconnect_timeout: Duration,
-        turn: Box<dyn TurnAuthService>,
+        turn: Arc<dyn TurnAuthService>,
     ) -> Self {
         Self {
             id,
