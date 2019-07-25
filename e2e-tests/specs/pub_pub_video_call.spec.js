@@ -194,7 +194,7 @@ describe('Pub<=>Pub video call', () => {
 
             let dataDiff = diff(firstData.data, secondData.data);
 
-            assert.isAtLeast(dataDiff, 1000, 'Video which we receiving from partner looks static.');
+            assert.isAtLeast(dataDiff, 10, 'Video which we receiving from partner looks static.');
         }
 
         let callerVideo = await waitForElement(callerPartnerVideo);

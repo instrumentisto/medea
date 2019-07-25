@@ -157,6 +157,10 @@ pub fn run_tests(
                         let test_path = generate_html_test(&test);
                         let test_url =
                             format!("file://{}", test_path.display());
+                        println!(
+                            "\nRunning {} test...",
+                            test_path.file_name().unwrap().to_str().unwrap()
+                        );
                         Either::A(
                             client
                                 .goto(&test_url)
