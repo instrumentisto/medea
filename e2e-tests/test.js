@@ -10,8 +10,38 @@ function delay(interval)
     }).timeout(interval + 100)
 }
 
-describe('Some dummy test', () => {
-    before(async () => {
+describe('Pub<=>Pub video call', () => {
+    const sleep = (milliseconds) => {
+        return new Promise(resolve => setTimeout(resolve, milliseconds))
+    };
+
+    const waitForElement = (id) => {
+        return new Promise(resolve => {
+            let interval = setInterval(() => {
+                let waitedEl = document.getElementById(id);
+                if(waitedEl != null) {
+                    clearInterval(interval);
+                    resolve(waitedEl);
+                }
+            }, 50)
+        })
+    };
+
+    const waitForVideo = (videoEl) => {
+        return new Promise(resolve => {
+            let interval = setInterval(() => {
+                if(videoEl.videoWidth !== 0) {
+                    clearInterval(interval);
+                    resolve()
+                }
+            }, 50)
+        })
+    };
+
+    const callerPartnerVideo = 'callers-partner-video';
+    const responderPartnerVideo = 'responder-partner-video';
+
+    async function startPubPubVideoCall() {
         let caller = await window.getJason();
         let responder = await window.getJason();
 
@@ -21,7 +51,7 @@ describe('Some dummy test', () => {
         callerRoom.on_new_connection((connection) => {
             connection.on_remote_stream((stream) => {
                 let video = document.createElement("video");
-                video.id = 'callers-partner-video';
+                video.id = callerPartnerVideo;
 
                 video.srcObject = stream.get_media_stream();
                 document.body.appendChild(video);
@@ -54,14 +84,27 @@ describe('Some dummy test', () => {
         responderRoom.on_new_connection((connection) => {
             connection.on_remote_stream(function(stream) {
                 let video = document.createElement("video");
-                video.id = 'responders-partner-video';
+                video.id = responderPartnerVideo;
 
                 video.srcObject = stream.get_media_stream();
                 document.body.appendChild(video);
                 video.play();
             });
         });
-    })
+
+        return {
+            caller: callerRoom,
+            responder: responderRoom
+        }
+    }
+
+    let rooms;
+
+    before(async () => {
+        rooms = await startPubPubVideoCall();
+        let video = await waitForElement(callerPartnerVideo);
+        await waitForVideo(video);
+    });
 
     after(() => {
         let successEl = document.createElement('div');
@@ -69,40 +112,7 @@ describe('Some dummy test', () => {
         document.body.appendChild(successEl);
     });
 
-    // delay(2000);
-
-    it('success', () => {
-        assert.equal('bar', 'bar');
-    })
-
-    it('call', async () => {
-        const sleep = (milliseconds) => {
-            return new Promise(resolve => setTimeout(resolve, milliseconds))
-        };
-
-        const waitForElement = (id) => {
-            return new Promise(resolve => {
-                let interval = setInterval(() => {
-                    let waitedEl = document.getElementById(id);
-                    if(waitedEl != null) {
-                        clearInterval(interval);
-                        resolve(waitedEl);
-                    }
-                }, 50)
-            })
-        };
-
-        const waitForVideo = (videoEl) => {
-            return new Promise(resolve => {
-                let interval = setInterval(() => {
-                    if(videoEl.videoWidth !== 0) {
-                        clearInterval(interval);
-                        resolve()
-                    }
-                }, 50)
-            })
-        };
-
+    it('send rtc packets', async () => {
         /**
          * Takes array of RTCStatsReport and count "outbound-rtp" and "inbound-rtp"
          * for all RTCStatsReport. If "outbound-rtp"'s "packetsSent" or "inbound-rtp"'s
@@ -121,10 +131,17 @@ describe('Some dummy test', () => {
                     }
                 });
             });
-            expect(outboundPackets).to.be.greaterThan(5);
-            expect(inboundPackets).to.be.greaterThan(5);
+            assert.isAtLeast(outboundPackets, 5, 'outbound-rtp packets not sending');
+            assert.isAtLeast(inboundPackets, 5, 'inbound-rtp packets not sending');
         }
 
+        let callerStats = await rooms.caller.get_stats_for_peer_connections();
+        checkStats(callerStats);
+        let responderStats = await rooms.responder.get_stats_for_peer_connections();
+        checkStats(responderStats);
+    });
+
+    it('video not static', async () => {
         /**
          * Return difference between two arrays.
          *
@@ -190,8 +207,16 @@ describe('Some dummy test', () => {
             assert.isAtLeast(dataDiff, 10, 'Video which we receiving from partner looks static.');
         }
 
-        let video = await waitForElement('callers-partner-video');
-        await waitForVideo(video);
-        await checkVideoDiff(video);
-    }).timeout(2000)
+        let callerVideo = await waitForElement(callerPartnerVideo);
+        await checkVideoDiff(callerVideo);
+        let responderVideo = await waitForElement(responderPartnerVideo);
+        await checkVideoDiff(responderVideo)
+    });
+
+    it('media tracks count valid', async () => {
+        let callerVideo = await waitForElement(callerPartnerVideo);
+        assert.lengthOf(callerVideo.srcObject.getTracks(), 2, "Caller video don't have 2 tracks");
+        let responderVideo = await waitForElement(responderPartnerVideo);
+        assert.lengthOf(responderVideo.srcObject.getTracks(), 2, "Responder video don't have 2 tracks");
+    })
 });

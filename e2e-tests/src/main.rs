@@ -9,9 +9,9 @@ use fantoccini::{Client, Locator};
 use futures::Future as _;
 use serde::Deserialize;
 use serde_json::json;
+use std::io::stdin;
 use webdriver::capabilities::Capabilities;
 use yansi::Paint;
-use std::io::stdin;
 
 pub fn generate_html(test_js: &str) -> String {
     include_str!("../test_template.html").replace("{{{}}}", test_js)
@@ -34,15 +34,15 @@ struct TestStats {
 #[serde(rename_all = "camelCase")]
 struct TestError {
     message: String,
-//    show_diff: bool,
-//    actual: String,
-//    expected: String,
+    //    show_diff: bool,
+    //    actual: String,
+    //    expected: String,
     stack: String,
 }
 
 //#[derive(Debug, Deserialize)]
 //#[serde(rename_all = "camelCase")]
-//struct TestResult {
+// struct TestResult {
 //    title: String,
 //    full_title: String,
 //    duration: u32,
@@ -82,7 +82,6 @@ impl fmt::Display for FailureTestResult {
     }
 }
 
-
 impl fmt::Display for SuccessTestResult {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
@@ -101,7 +100,7 @@ impl fmt::Display for SuccessTestResult {
 #[serde(rename_all = "camelCase")]
 struct TestResults {
     stats: TestStats,
-//    tests: Vec<TestResult>,
+    //    tests: Vec<TestResult>,
     failures: Vec<FailureTestResult>,
     passes: Vec<SuccessTestResult>,
 }
@@ -191,25 +190,33 @@ fn main() {
                 .map_err(|e| panic!("{:?}", e))
                 .and_then(move |client| client.goto(&test_url))
                 .and_then(|client| {
-                    std::thread::sleep_ms(1000);
                     client.wait_for_find(Locator::Id("test-end"))
                 })
                 .map(|e| e.client())
                 .and_then(|mut client| {
-                    client.execute("return console.logs", Vec::new()).map(move |e| (e, client))
+                    client
+                        .execute("return console.logs", Vec::new())
+                        .map(move |e| (e, client))
                 })
-                .map(|(result, client)| {
+                .and_then(|(result, mut client)| {
                     let logs = result.as_array().unwrap();
                     for message in logs {
-                        let message = message.as_array().unwrap()[0].as_str().unwrap();
-                        if let Ok(test_results) = serde_json::from_str::<TestResults>(message) {
-                            return test_results
+                        let message =
+                            message.as_array().unwrap()[0].as_str().unwrap();
+                        if let Ok(test_results) =
+                            serde_json::from_str::<TestResults>(message)
+                        {
+                            return client.close().map(move |_| test_results);
                         }
                     }
-                    let mut a = String::new();
-                    println!("Logs don't have tests results.");
-                    stdin().read_line(&mut a);
-                    panic!();
+                    for messages in logs {
+                        let messages = messages.as_array().unwrap();
+                        for message in messages {
+                            let message = message.as_str().unwrap();
+                            println!("{}", message);
+                        }
+                    }
+                    panic!("Tests result not found in console logs.");
                 })
                 .map(|result| {
                     println!("{}", result);
