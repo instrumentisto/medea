@@ -91,6 +91,12 @@ struct TestResults {
     passes: Vec<TestResult>,
 }
 
+impl TestResults {
+    pub fn is_has_error(&self) -> bool {
+        !self.failures.is_empty()
+    }
+}
+
 impl fmt::Display for TestResults {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "\nPassed tests ({}):\n\n", self.stats.passes)?;
@@ -175,7 +181,9 @@ fn main() {
                 })
                 .map(|result| {
                     println!("{}", result);
-                    std::thread::sleep_ms(3000);
+                    if result.is_has_error() {
+                        std::process::exit(1);
+                    }
                 })
                 .map_err(|_| ()),
         );
