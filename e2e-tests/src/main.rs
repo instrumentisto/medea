@@ -6,7 +6,7 @@ use std::{
 };
 
 use fantoccini::{Client, Locator};
-use futures::Future as _;
+use futures::Future;
 use serde::Deserialize;
 use serde_json::json;
 use std::io::stdin;
@@ -136,12 +136,55 @@ pub fn generate_html_test(test_path: &PathBuf) -> PathBuf {
     html_test_file_path
 }
 
+pub fn run_test(path_to_tests: PathBuf, caps: Capabilities) -> impl Future<Item = (), Error = ()> {
+    let test_path = generate_html_test(&path_to_tests);
+    let test_url = format!("file://{}", test_path.display());
+    let client =
+        Client::with_capabilities("http://localhost:9515", caps);
+    client
+        .map_err(|e| panic!("{:?}", e))
+        .and_then(move |client| client.goto(&test_url))
+        .and_then(|client| {
+            client.wait_for_find(Locator::Id("test-end"))
+        })
+        .map(|e| e.client())
+        .and_then(|mut client| {
+            client
+                .execute("return console.logs", Vec::new())
+                .map(move |e| (e, client))
+        })
+        .and_then(|(result, mut client)| {
+            let logs = result.as_array().unwrap();
+            for message in logs {
+                let message =
+                    message.as_array().unwrap()[0].as_str().unwrap();
+                if let Ok(test_results) =
+                serde_json::from_str::<TestResults>(message)
+                {
+                    println!("{}", test_results);
+                    return client.close().map(move |_| {
+                        if test_results.is_has_error() {
+                            std::process::exit(1)
+                        }
+                    })
+                }
+            }
+            for messages in logs {
+                let messages = messages.as_array().unwrap();
+                for message in messages {
+                    let message = message.as_str().unwrap();
+                    println!("{}", message);
+                }
+            }
+            panic!("Tests result not found in console logs.");
+        })
+        .map_err(|e| panic!("{:?}", e))
+}
+
 fn main() {
     let path_to_tests = std::env::args().skip(1).next().unwrap();
     let path_to_tests = PathBuf::from(path_to_tests);
     let path_to_tests = canonicalize(path_to_tests).unwrap();
-
-    let test_path = generate_html_test(&path_to_tests);
 
     let mut capabilities = Capabilities::new();
     let firefox_settings = json!({
@@ -153,7 +196,8 @@ fn main() {
             "media.autoplay.enabled.user-gestures-needed ": false,
             "media.autoplay.ask-permission": false,
             "media.autoplay.default": 0,
-        }
+        },
+        "args": ["--headless"]
     });
     capabilities.insert("moz:firefoxOptions".to_string(), firefox_settings);
 
@@ -169,52 +213,26 @@ fn main() {
     }
 
     if path_to_tests.is_dir() {
-        unimplemented!("dir")
-    } else {
-        let client =
-            Client::with_capabilities("http://localhost:9515", capabilities.clone());
-        let test_url = format!("file://{}", test_path.display());
+//        let mut test_runners = Vec::new();
+        let mut tests_paths = Vec::new();
+        for entry in std::fs::read_dir(path_to_tests).unwrap() {
+            let entry = entry.unwrap();
+            let path = entry.path();
+            if path.is_file() {
+                if let Some(ext) = path.extension() {
+                    if ext == "js" {
+                        tests_paths.push(path);
+                    }
+                }
+            }
+        }
 
+        for test in tests_paths {
+            tokio::run(run_test(test, capabilities.clone()))
+        }
+    } else {
         tokio::run(
-            client
-                .map_err(|e| panic!("{:?}", e))
-                .and_then(move |client| client.goto(&test_url))
-                .and_then(|client| {
-                    client.wait_for_find(Locator::Id("test-end"))
-                })
-                .map(|e| e.client())
-                .and_then(|mut client| {
-                    client
-                        .execute("return console.logs", Vec::new())
-                        .map(move |e| (e, client))
-                })
-                .and_then(|(result, mut client)| {
-                    let logs = result.as_array().unwrap();
-                    for message in logs {
-                        let message =
-                            message.as_array().unwrap()[0].as_str().unwrap();
-                        if let Ok(test_results) =
-                            serde_json::from_str::<TestResults>(message)
-                        {
-                            println!("{}", test_results);
-                            return client.close().map(move |_| test_results);
-                        }
-                    }
-                    for messages in logs {
-                        let messages = messages.as_array().unwrap();
-                        for message in messages {
-                            let message = message.as_str().unwrap();
-                            println!("{}", message);
-                        }
-                    }
-                    panic!("Tests result not found in console logs.");
-                })
-                .map(|result| {
-                    if result.is_has_error() {
-                        std::process::exit(1);
-                    }
-                })
-                .map_err(|e| panic!("{:?}", e)),
+            run_test(path_to_tests, capabilities)
         );
     }
 }
