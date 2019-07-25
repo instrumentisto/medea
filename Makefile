@@ -15,7 +15,8 @@ eq = $(if $(or $(1),$(2)),$(and $(findstring $(1),$(2)),\
 # Project parameters #
 ######################
 
-MEDEA_IMAGE_NAME := $(strip $(shell grep 'COMPOSE_IMAGE_NAME=' .env | cut -d '=' -f2))
+MEDEA_IMAGE_NAME := $(strip \
+	$(shell grep 'COMPOSE_IMAGE_NAME=' .env | cut -d '=' -f2))
 DEMO_IMAGE_NAME := instrumentisto/medea-demo
 
 RUST_VER := 1.36
@@ -47,6 +48,9 @@ lint: cargo.lint
 fmt: cargo.fmt
 
 
+up.demo: docker.up.demo
+
+
 # Run Medea and Jason development environment.
 #
 # Usage:
@@ -54,9 +58,6 @@ fmt: cargo.fmt
 
 up.dev:
 	$(MAKE) -j3 up.coturn up.jason up.medea
-
-
-up.demo: docker.up.demo
 
 
 test: test.unit
@@ -313,7 +314,8 @@ up.medea:
 # .PHONY section #
 ##################
 
-.PHONY: build cargo cargo.fmt cargo.lint \
+.PHONY: build \
+        cargo cargo.fmt cargo.lint \
         docker.build.demo docker.build.medea docker.down.demo docker.up.demo \
         docs docs.rust \
         test test.unit \

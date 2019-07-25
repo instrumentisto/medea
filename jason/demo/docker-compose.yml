@@ -7,7 +7,7 @@ services:
     ports:
       - "80:80"
       - "6379:6379"    # coturn redis
-      - "8080:8080"    # web-socket http server
+      - "8080:8080"    # medea ws
     volumes:
       - ./conf/nginx.vh.conf:/etc/nginx/conf.d/default.conf
   medea:
@@ -16,13 +16,6 @@ services:
     depends_on: ["coturn-db"]
     environment:
       MEDEA_LOG.LEVEL: "DEBUG"
-    network_mode: service:webclient
-  coturn-db:
-    container_name: demo-coturn-db
-    image: redis:alpine
-    command: ["redis-server", "/etc/redis.conf"]
-    volumes:
-      - ../../dev/coturn/redis.conf:/etc/redis.conf:ro
     network_mode: service:webclient
   coturn:
     container_name: demo-coturn
@@ -34,3 +27,10 @@ services:
       - ../../dev/coturn/turnserver.conf:/etc/coturn/turnserver.conf:ro
       - ../../.cache/coturn/data:/var/lib/coturn
     network_mode: host
+  coturn-db:
+    container_name: demo-coturn-db
+    image: redis:alpine
+    command: ["redis-server", "/etc/redis.conf"]
+    volumes:
+      - ../../dev/coturn/redis.conf:/etc/redis.conf:ro
+    network_mode: service:webclient
