@@ -34,20 +34,8 @@ struct TestStats {
 #[serde(rename_all = "camelCase")]
 struct TestError {
     message: String,
-    //    show_diff: bool,
-    //    actual: String,
-    //    expected: String,
     stack: String,
 }
-
-//#[derive(Debug, Deserialize)]
-//#[serde(rename_all = "camelCase")]
-// struct TestResult {
-//    title: String,
-//    full_title: String,
-//    duration: u32,
-//    err: TestError,
-//}
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -206,6 +194,7 @@ fn main() {
                         if let Ok(test_results) =
                             serde_json::from_str::<TestResults>(message)
                         {
+                            println!("{}", test_results);
                             return client.close().map(move |_| test_results);
                         }
                     }
@@ -219,12 +208,11 @@ fn main() {
                     panic!("Tests result not found in console logs.");
                 })
                 .map(|result| {
-                    println!("{}", result);
                     if result.is_has_error() {
                         std::process::exit(1);
                     }
                 })
-                .map_err(|_| ()),
+                .map_err(|e| panic!("{:?}", e)),
         );
     }
 }

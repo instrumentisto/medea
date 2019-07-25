@@ -1,14 +1,4 @@
 let assert = chai.assert;
-let expect = chai.expect;
-
-function delay(interval)
-{
-    return it('should delay', done =>
-    {
-        setTimeout(() => done(), interval)
-
-    }).timeout(interval + 100)
-}
 
 describe('Pub<=>Pub video call', () => {
     const sleep = (milliseconds) => {
@@ -187,7 +177,7 @@ describe('Pub<=>Pub video call', () => {
          *
          * @param videoEl video element
          */
-        async function checkVideoDiff(videoEl) {
+        function checkVideoDiff(videoEl) {
             let canvas = document.createElement('canvas');
             canvas.height = videoEl.videoHeight / 2;
             canvas.width = videoEl.videoWidth / 2;
@@ -208,9 +198,9 @@ describe('Pub<=>Pub video call', () => {
         }
 
         let callerVideo = await waitForElement(callerPartnerVideo);
-        await checkVideoDiff(callerVideo);
+        checkVideoDiff(callerVideo);
         let responderVideo = await waitForElement(responderPartnerVideo);
-        await checkVideoDiff(responderVideo)
+        checkVideoDiff(responderVideo)
     });
 
     it('media tracks count valid', async () => {
