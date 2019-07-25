@@ -13,7 +13,7 @@ use webdriver::capabilities::Capabilities;
 use yansi::Paint;
 
 pub fn generate_html(test_js: &str) -> String {
-    format!(include_str!("../test_template.html"), test_js)
+    include_str!("../test_template.html").replace("{{{}}}", test_js)
 }
 
 #[derive(Debug, Deserialize)]
