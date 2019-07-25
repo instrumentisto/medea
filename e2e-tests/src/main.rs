@@ -1,15 +1,15 @@
-use fantoccini::{Client, Locator};
-use futures::Future as _;
-use serde_json::json;
 use std::{
+    fmt,
     fs::{canonicalize, File},
     io::prelude::*,
     path::PathBuf,
 };
+
+use fantoccini::{Client, Locator};
+use futures::Future as _;
 use serde::Deserialize;
+use serde_json::json;
 use webdriver::capabilities::Capabilities;
-use std::time::SystemTime;
-use std::fmt;
 use yansi::Paint;
 
 pub fn generate_html(test_js: &str) -> String {
@@ -39,23 +39,6 @@ struct TestError {
     stack: Option<String>,
 }
 
-impl fmt::Display for TestError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Message: {}\n", self.message.as_ref().unwrap());
-        if let Some(expected) = &self.expected {
-            write!(f, "Expected: {}\n", expected);
-        }
-        if let Some(actual) = &self.actual {
-            write!(f, "Actual: {}\n", actual);
-        }
-        if let Some(stack) = &self.stack {
-            write!(f, "Stacktrace: {}", stack)?;
-        }
-
-        Ok(())
-    }
-}
-
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct TestResult {
@@ -67,15 +50,28 @@ struct TestResult {
 
 impl fmt::Display for TestResult {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-
         if self.err.message.is_some() {
-            write!(f, "   {}\n\n", Paint::red(format!("test {} ... failed ({} ms)", self.full_title, self.duration)))?;
+            write!(
+                f,
+                "   {}\n\n",
+                Paint::red(format!(
+                    "test {} ... failed ({} ms)",
+                    self.full_title, self.duration
+                ))
+            )?;
             write!(f, "   Message: {}", self.err.message.as_ref().unwrap())?;
             if let Some(stack) = &self.err.stack {
                 write!(f, "\n   Stacktrace:\n\n   {}\n\n", stack)?;
             }
         } else {
-            write!(f, "   {}\n", Paint::green(format!("test {} ... ok ({} ms)", self.full_title, self.duration)))?;
+            write!(
+                f,
+                "   {}\n",
+                Paint::green(format!(
+                    "test {} ... ok ({} ms)",
+                    self.full_title, self.duration
+                ))
+            )?;
         }
 
         Ok(())
@@ -124,7 +120,7 @@ impl fmt::Display for TestResults {
 pub fn generate_html_test(test_path: &PathBuf) {
     let mut file = File::open(test_path).unwrap();
     let mut content = String::new();
-    file.read_to_string(&mut content);
+    file.read_to_string(&mut content).unwrap();
     let mut file = File::create("test.html").unwrap();
     let test_html = generate_html(&content);
     file.write_all(test_html.as_bytes()).unwrap();
@@ -173,10 +169,13 @@ fn main() {
                     client.wait_for_find(Locator::Id("test-end"))
                 })
                 .map(|e| e.client())
-                .and_then(|mut client| client.execute("return console.logs[0][0]", Vec::new()))
+                .and_then(|mut client| {
+                    client.execute("return console.logs[0][0]", Vec::new())
+                })
                 .map(|result| {
                     let result = result.as_str().unwrap();
-                    let result: TestResults = serde_json::from_str(&result).unwrap();
+                    let result: TestResults =
+                        serde_json::from_str(&result).unwrap();
                     result
                 })
                 .map(|result| {
