@@ -11,26 +11,39 @@ use clap::ArgMatches;
 
 use crate::mocha_result::TestResults;
 
+struct TestRunner {
+    pub tests: Vec<PathBuf>,
+    pub test_addr: String,
+}
+
 pub fn run(
     path_to_tests: PathBuf,
     opts: ArgMatches,
 ) -> impl Future<Item = (), Error = ()> {
     if path_to_tests.is_dir() {
         let tests_paths = get_all_tests_paths(path_to_tests);
-        run_tests(tests_paths, &opts)
+        let runner = TestRunner {
+            tests: tests_paths,
+            test_addr: opts.value_of("tests_files_addr").unwrap().to_string(),
+        };
+        run_tests(runner, &opts)
     } else {
-        run_tests(vec![path_to_tests], &opts)
+        let runner = TestRunner {
+            tests: vec![path_to_tests],
+            test_addr: opts.value_of("tests_files_addr").unwrap().to_string(),
+        };
+        run_tests(runner, &opts)
     }
 }
 
 fn run_tests(
-    paths_to_tests: Vec<PathBuf>,
+    runner: TestRunner,
     opts: &ArgMatches,
 ) -> impl Future<Item = (), Error = ()> {
     let caps = get_webdriver_capabilities(opts);
-    Client::with_capabilities("http://localhost:9515", caps)
+    Client::with_capabilities(opts.value_of("webdriver_addr").unwrap(), caps)
         .map_err(|e| panic!("Client session start error: {:?}", e))
-        .and_then(|client| tests_loop(client, paths_to_tests))
+        .and_then(|client| tests_loop(client, runner))
 }
 
 fn generate_html(test_js: &str) -> String {
@@ -55,8 +68,8 @@ fn generate_html_test(test_path: &PathBuf) -> PathBuf {
 
 fn check_test_results(
     mut client: Client,
-    tests: Vec<PathBuf>,
-) -> impl Future<Item = Loop<(), (Client, Vec<PathBuf>)>, Error = CmdError> {
+    runner: TestRunner,
+) -> impl Future<Item = Loop<(), (Client, TestRunner)>, Error = CmdError> {
     client
         .execute("return console.logs", Vec::new())
         .map(move |e| (e, client))
@@ -71,7 +84,7 @@ fn check_test_results(
                     if test_results.is_has_error() {
                         return Ok(Loop::Break(()));
                     } else {
-                        return Ok(Loop::Continue((client, tests)));
+                        return Ok(Loop::Continue((client, runner)));
                     }
                 }
             }
@@ -94,19 +107,19 @@ fn wait_for_tests_end(
         .map(|e| e.client())
 }
 
-fn get_url_to_test(test_path: PathBuf) -> String {
+fn get_url_to_test(runner: &TestRunner, test_path: PathBuf) -> String {
     let filename = test_path.file_name().unwrap().to_str().unwrap();
-    format!("http://{}/specs/{}", crate::TESTS_ADDR, filename)
+    format!("http://{}/specs/{}", runner.test_addr, filename)
 }
 
 fn tests_loop(
     client: Client,
-    tests: Vec<PathBuf>,
+    runner: TestRunner,
 ) -> impl Future<Item = (), Error = ()> {
-    futures::future::loop_fn((client, tests), |(client, mut tests)| {
-        if let Some(test) = tests.pop() {
+    futures::future::loop_fn((client, runner), |(client, mut runner)| {
+        if let Some(test) = runner.tests.pop() {
             let test_path = generate_html_test(&test);
-            let test_url = get_url_to_test(test_path);
+            let test_url = get_url_to_test(&runner, test_path);
             println!(
                 "\nRunning {} test...",
                 test.file_name().unwrap().to_str().unwrap()
@@ -115,7 +128,7 @@ fn tests_loop(
                 client
                     .goto(&test_url)
                     .and_then(|client| wait_for_tests_end(client))
-                    .and_then(|client| check_test_results(client, tests)),
+                    .and_then(|client| check_test_results(client, runner)),
             )
         } else {
             Either::B(futures::future::ok(Loop::Break(())))

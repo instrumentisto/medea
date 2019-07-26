@@ -8,19 +8,17 @@ use actix_files::NamedFile;
 use actix_web::{
     dev::Server, web, App, HttpRequest, HttpServer, Result as HttpResult,
 };
-use futures::Future;
 use clap::{App as ClapApp, Arg, ArgMatches};
-
-pub const TESTS_ADDR: &str = "127.0.0.1:8088";
+use futures::Future;
 
 fn index(req: HttpRequest) -> HttpResult<NamedFile> {
     let path: PathBuf = req.match_info().query("filename").parse().unwrap();
     Ok(NamedFile::open(path)?)
 }
 
-fn run_http_server() -> Server {
+fn run_http_server(addr: &str) -> Server {
     HttpServer::new(|| App::new().route("{filename:.*}", web::get().to(index)))
-        .bind(TESTS_ADDR)
+        .bind(addr)
         .unwrap()
         .start()
 }
@@ -33,23 +31,38 @@ fn get_path_to_tests_from_args(opts: &ArgMatches) -> PathBuf {
 }
 
 fn main() {
-    let matches = ClapApp::new("e2e-tests-runner")
+    let opts = ClapApp::new("e2e-tests-runner")
         .arg(
             Arg::with_name("headless")
-            .help("Run tests in headless browser")
-            .long("headless")
+                .help("Run tests in headless browser")
+                .long("headless"),
         )
         .arg(
             Arg::with_name("specs_path")
                 .help("Path to specs")
                 .index(1)
-                .required(true)
+                .required(true),
+        )
+        .arg(
+            Arg::with_name("tests_files_addr")
+                .help("Where host tests files")
+                .default_value("localhost:8088")
+                .long("files-host")
+                .short("f"),
+        )
+        .arg(
+            Arg::with_name("webdriver_addr")
+                .help("Address of webdriver")
+                .default_value("http://localhost:4444")
+                .long("webdriver-addr")
+                .short("w"),
         )
         .get_matches();
     actix::run(|| {
-        let server = run_http_server();
-        let path_to_tests = get_path_to_tests_from_args(&matches);
-        test_runner::run(path_to_tests, matches)
+        let server =
+            run_http_server(opts.value_of("tests_files_addr").unwrap());
+        let path_to_tests = get_path_to_tests_from_args(&opts);
+        test_runner::run(path_to_tests, opts)
             .and_then(move |_| server.stop(true))
             .map(|_| System::current().stop())
     })
