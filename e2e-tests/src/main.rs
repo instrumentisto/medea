@@ -1,7 +1,6 @@
 mod mocha_result;
 
 use std::{
-    fmt,
     fs::{canonicalize, File},
     io::prelude::*,
     path::PathBuf,
@@ -17,11 +16,8 @@ use futures::{
     future::{Either, Loop},
     Future,
 };
-use serde::Deserialize;
 use serde_json::json;
-use std::io::stdin;
 use webdriver::capabilities::Capabilities;
-use yansi::Paint;
 
 use crate::mocha_result::TestResults;
 
@@ -102,7 +98,7 @@ fn tests_loop(
     client: Client,
     tests: Vec<PathBuf>,
 ) -> impl Future<Item = (), Error = ()> {
-    futures::future::loop_fn((client, tests), |(mut client, mut tests)| {
+    futures::future::loop_fn((client, tests), |(client, mut tests)| {
         if let Some(test) = tests.pop() {
             let test_path = generate_html_test(&test);
             let test_url = get_url_to_test(test_path);
@@ -114,13 +110,13 @@ fn tests_loop(
                 client
                     .goto(&test_url)
                     .and_then(|client| wait_for_tests_end(client))
-                    .and_then(|mut client| check_test_results(client, tests)),
+                    .and_then(|client| check_test_results(client, tests)),
             )
         } else {
             Either::B(futures::future::ok(Loop::Break(())))
         }
     })
-    .map_err(|e| ())
+    .map_err(|e| panic!("WebDriver command error: {:?}", e))
 }
 
 fn run_tests(
@@ -128,7 +124,7 @@ fn run_tests(
     caps: Capabilities,
 ) -> impl Future<Item = (), Error = ()> {
     Client::with_capabilities("http://localhost:9515", caps)
-        .map_err(|_| ())
+        .map_err(|e| panic!("Client session start error: {:?}", e))
         .and_then(|client| tests_loop(client, paths_to_tests))
 }
 
@@ -206,5 +202,6 @@ fn main() {
         }
         .and_then(move |_| server.stop(true))
         .map(|_| System::current().stop())
-    });
+    })
+    .unwrap();
 }
