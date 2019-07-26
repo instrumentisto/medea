@@ -1,4 +1,5 @@
-/// E2e tests runner.
+//! E2e tests runner.
+
 pub mod mocha_result;
 pub mod test_runner;
 
@@ -50,20 +51,20 @@ fn main() {
         )
         .arg(
             Arg::with_name("specs_path")
-                .help("Path to specs")
+                .help("Path to specs/spec")
                 .index(1)
                 .required(true),
         )
         .arg(
             Arg::with_name("tests_files_addr")
-                .help("Where host tests files")
+                .help("Address for tests files host server")
                 .default_value("localhost:9000")
                 .long("files-host")
                 .short("f"),
         )
         .arg(
             Arg::with_name("webdriver_addr")
-                .help("Address of webdriver")
+                .help("Address to running webdriver")
                 .default_value("http://localhost:4444")
                 .long("webdriver-addr")
                 .short("w"),

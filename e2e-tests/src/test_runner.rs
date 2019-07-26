@@ -82,7 +82,7 @@ impl TestRunner {
 
     /// Check results of tests.
     ///
-    /// This will break test loop if some error finded in tests results.
+    /// This will break test loop if some error found in tests results.
     fn check_test_results(
         self,
         mut client: Client,

@@ -239,7 +239,7 @@ describe('Pub<=>Pub video call', () => {
          * Get two images from provided video element with some small interval
          * and check that they are different.
          *
-         * Test will fail if difference between this two images are less than 50.
+         * Test will fail if difference between this two images are less than 10.
          *
          * Use for testing that video which we receiving from partner are not static.
          *

@@ -1,6 +1,8 @@
-/// Objects which will be returned from mocha tests.
-use serde::Deserialize;
+//! Objects which will be returned from mocha tests.
+
 use std::fmt;
+
+use serde::Deserialize;
 use yansi::Paint;
 
 /// Results of mocha tests.
