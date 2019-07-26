@@ -1,10 +1,9 @@
 let assert = chai.assert;
 
 describe('Pub<=>Pub video call', () => {
-    const sleep = (milliseconds) => {
-        return new Promise(resolve => setTimeout(resolve, milliseconds))
-    };
-
+    /**
+     * Send POST request for create pub-pub-e2e-call to control-api-mock.
+     */
     async function createRoom() {
         await axios({
             method: 'post',
@@ -51,10 +50,18 @@ describe('Pub<=>Pub video call', () => {
         }})
     }
 
+    /**
+     * Send DELETE pub-pub-e2e-call request to control-api-room.
+     */
     async function deleteRoom() {
         await axios.delete('http://localhost:8000/pub-pub-e2e-call')
     }
 
+    /**
+     * Promise for wait for element with provided ID to appear.
+     * This promise try fro getElementById and if element is not null
+     * then promise resolves with that ID.
+     */
     const waitForElement = (id) => {
         return new Promise(resolve => {
             let interval = setInterval(() => {
@@ -67,6 +74,12 @@ describe('Pub<=>Pub video call', () => {
         })
     };
 
+    /**
+     *  Promise for wait for video to appear.
+     *  This promise will check videoWidth parameter
+     *  of provided video element. If videoWidth > 0 then
+     *  we think that video is loaded.
+     */
     const waitForVideo = (videoEl) => {
         return new Promise(resolve => {
             let interval = setInterval(() => {
@@ -81,6 +94,11 @@ describe('Pub<=>Pub video call', () => {
     const callerPartnerVideo = 'callers-partner-video';
     const responderPartnerVideo = 'responder-partner-video';
 
+    /**
+     * Start Pub<=>Pub video call.
+     *
+     * This function returns caller room and responder room objects.
+     */
     async function startPubPubVideoCall() {
         let caller = await window.getJason();
         let responder = await window.getJason();
