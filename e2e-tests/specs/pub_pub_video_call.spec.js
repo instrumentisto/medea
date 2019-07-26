@@ -5,6 +5,56 @@ describe('Pub<=>Pub video call', () => {
         return new Promise(resolve => setTimeout(resolve, milliseconds))
     };
 
+    async function createRoom() {
+        await axios({
+            method: 'post',
+            url: 'http://localhost:8000/pub-pub-e2e-call',
+            data: {
+            pipeline: {
+                caller: {
+                    kind: 'Member',
+                    credentials: 'test',
+                    pipeline: {
+                        publish: {
+                            kind: 'WebRtcPublishEndpoint',
+                            spec: {
+                                p2p: 'Always'
+                            }
+                        },
+                        play: {
+                            kind: 'WebRtcPlayEndpoint',
+                            spec: {
+                                src: 'local://pub-pub-e2e-call/responder/publish',
+                            }
+                        }
+                    }
+                },
+                responder: {
+                    kind: 'Member',
+                    credentials: 'test',
+                    pipeline: {
+                        publish: {
+                            kind: 'WebRtcPublishEndpoint',
+                            spec: {
+                                p2p: 'Always',
+                            }
+                        },
+                        play: {
+                            kind: 'WebRtcPlayEndpoint',
+                            spec: {
+                                src: 'local://pub-pub-e2e-call/caller/publish',
+                            }
+                        }
+                    }
+                }
+            }
+        }})
+    }
+
+    async function deleteRoom() {
+        await axios.delete('http://localhost:8000/pub-pub-e2e-call')
+    }
+
     const waitForElement = (id) => {
         return new Promise(resolve => {
             let interval = setInterval(() => {
@@ -91,12 +141,15 @@ describe('Pub<=>Pub video call', () => {
     let rooms;
 
     before(async () => {
+        await deleteRoom();
+        await createRoom();
         rooms = await startPubPubVideoCall();
         let video = await waitForElement(callerPartnerVideo);
         await waitForVideo(video);
     });
 
-    after(() => {
+    after(async () => {
+        await deleteRoom();
         let successEl = document.createElement('div');
         successEl.id = 'test-end';
         document.body.appendChild(successEl);

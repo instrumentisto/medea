@@ -24,3 +24,4 @@ slog-envlogger = "2.1"
 dotenv = "0.13"
 medea-grpc-proto = { path = "../proto/grpc"}
 protobuf = "2.7"
+actix-cors = "0.1"

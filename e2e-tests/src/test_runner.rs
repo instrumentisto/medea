@@ -172,6 +172,7 @@ fn get_webdriver_capabilities(opts: &ArgMatches) -> Capabilities {
         "prefs": {
             "media.navigator.streams.fake": true,
             "security.fileuri.strict_origin_policy": false,
+            "network.http.refere.XOriginPolicy": false,
             "media.navigator.permission.disabled": true,
             "media.autoplay.enabled": true,
             "media.autoplay.enabled.user-gestures-needed ": false,

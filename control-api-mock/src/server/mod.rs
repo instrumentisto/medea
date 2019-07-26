@@ -6,6 +6,7 @@ pub mod room;
 
 use std::collections::HashMap;
 
+use actix_cors::Cors;
 use actix_web::{
     middleware,
     web::{self, Data, Json},
@@ -28,6 +29,7 @@ use crate::{
         room::Room,
     },
 };
+use actix_web::http::header;
 
 /// Context of actix-web server.
 pub struct Context {
@@ -38,6 +40,17 @@ pub struct Context {
 pub fn run() {
     HttpServer::new(|| {
         App::new()
+            .wrap(
+                Cors::new()
+                    .allowed_origin("http://localhost:8088")
+                    .allowed_methods(vec!["GET", "POST", "DELETE", "OPTION"])
+                    .allowed_headers(vec![
+                        header::AUTHORIZATION,
+                        header::ACCEPT,
+                    ])
+                    .allowed_header(header::CONTENT_TYPE)
+                    .max_age(3600),
+            )
             .data(Context {
                 client: ControlClient::new(),
             })
