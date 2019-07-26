@@ -7,26 +7,27 @@ use futures::{
 };
 use serde_json::json;
 use webdriver::capabilities::Capabilities;
+use clap::ArgMatches;
 
 use crate::mocha_result::TestResults;
 
 pub fn run(
     path_to_tests: PathBuf,
-    is_headless: bool,
+    opts: ArgMatches,
 ) -> impl Future<Item = (), Error = ()> {
     if path_to_tests.is_dir() {
         let tests_paths = get_all_tests_paths(path_to_tests);
-        run_tests(tests_paths, is_headless)
+        run_tests(tests_paths, &opts)
     } else {
-        run_tests(vec![path_to_tests], is_headless)
+        run_tests(vec![path_to_tests], &opts)
     }
 }
 
 fn run_tests(
     paths_to_tests: Vec<PathBuf>,
-    is_headless: bool,
+    opts: &ArgMatches,
 ) -> impl Future<Item = (), Error = ()> {
-    let caps = get_webdriver_capabilities(is_headless);
+    let caps = get_webdriver_capabilities(opts);
     Client::with_capabilities("http://localhost:9515", caps)
         .map_err(|e| panic!("Client session start error: {:?}", e))
         .and_then(|client| tests_loop(client, paths_to_tests))
@@ -139,7 +140,7 @@ fn get_all_tests_paths(path_to_test_dir: PathBuf) -> Vec<PathBuf> {
     tests_paths
 }
 
-fn get_webdriver_capabilities(is_headless: bool) -> Capabilities {
+fn get_webdriver_capabilities(opts: &ArgMatches) -> Capabilities {
     let mut capabilities = Capabilities::new();
 
     let mut firefox_args = Vec::new();
@@ -148,7 +149,7 @@ fn get_webdriver_capabilities(is_headless: bool) -> Capabilities {
         "--use-fake-ui-for-media-stream",
         "--disable-web-security",
     ];
-    if is_headless {
+    if opts.is_present("headless") {
         firefox_args.push("--headless");
         chrome_args.push("--headless");
     }
