@@ -5,7 +5,10 @@ use std::{
     path::PathBuf,
 };
 
-use fantoccini::{Client, Locator};
+use actix::System;
+use actix_files::NamedFile;
+use actix_web::{web, App, HttpRequest, HttpServer, Result as HttpResult};
+use fantoccini::{error::CmdError, Client, Locator};
 use futures::{
     future::{Either, Loop},
     Future,
@@ -15,10 +18,8 @@ use serde_json::json;
 use std::io::stdin;
 use webdriver::capabilities::Capabilities;
 use yansi::Paint;
-use actix_web::{HttpRequest, HttpServer, App, web};
-use actix_files::NamedFile;
-use actix_web::Result as HttpResult;
-use actix::System;
+
+const TESTS_ADDR: &str = "127.0.0.1:8088";
 
 fn index(req: HttpRequest) -> HttpResult<NamedFile> {
     let path: PathBuf = req.match_info().query("filename").parse().unwrap();
@@ -152,123 +153,123 @@ pub fn generate_html_test(test_path: &PathBuf) -> PathBuf {
     html_test_file_path
 }
 
-// TODO: refactor
+fn check_test_results(
+    mut client: Client,
+    tests: Vec<PathBuf>,
+) -> impl Future<Item = Loop<(), (Client, Vec<PathBuf>)>, Error = CmdError> {
+    client
+        .execute("return console.logs", Vec::new())
+        .map(move |e| (e, client))
+        .and_then(move |(result, client)| {
+            let logs = result.as_array().unwrap();
+            for message in logs {
+                let message = message.as_array().unwrap()[0].as_str().unwrap();
+                if let Ok(test_results) =
+                    serde_json::from_str::<TestResults>(message)
+                {
+                    println!("{}", test_results);
+                    if test_results.is_has_error() {
+                        return Ok(Loop::Break(()));
+                    } else {
+                        return Ok(Loop::Continue((client, tests)));
+                    }
+                }
+            }
+            for messages in logs {
+                let messages = messages.as_array().unwrap();
+                for message in messages {
+                    let message = message.as_str().unwrap();
+                    println!("{}", message);
+                }
+            }
+            panic!("Tests result not found in console logs.");
+        })
+}
+
+fn wait_for_tests_end(
+    client: Client,
+) -> impl Future<Item = Client, Error = CmdError> {
+    client
+        .wait_for_find(Locator::Id("test-end"))
+        .map(|e| e.client())
+}
+
+fn get_url_to_test(test_path: PathBuf) -> String {
+    let filename = test_path.file_name().unwrap().to_str().unwrap();
+    format!("http://localhost:8088/specs/{}", filename)
+}
+
+fn tests_loop(
+    client: Client,
+    tests: Vec<PathBuf>,
+) -> impl Future<Item = (), Error = ()> {
+    futures::future::loop_fn((client, tests), |(mut client, mut tests)| {
+        if let Some(test) = tests.pop() {
+            let test_path = generate_html_test(&test);
+            let test_url = get_url_to_test(test_path);
+            println!(
+                "\nRunning {} test...",
+                test.file_name().unwrap().to_str().unwrap()
+            );
+            Either::A(
+                client
+                    .goto(&test_url)
+                    .and_then(|client| wait_for_tests_end(client))
+                    .and_then(|mut client| check_test_results(client, tests)),
+            )
+        } else {
+            Either::B(futures::future::ok(Loop::Break(())))
+        }
+    })
+    .map_err(|e| ())
+}
+
 pub fn run_tests(
     paths_to_tests: Vec<PathBuf>,
     caps: Capabilities,
 ) -> impl Future<Item = (), Error = ()> {
     Client::with_capabilities("http://localhost:9515", caps)
         .map_err(|_| ())
-        .and_then(|client| {
-            futures::future::loop_fn(
-                (client, paths_to_tests),
-                |(mut client, mut tests)| {
-                    if let Some(test) = tests.pop() {
-                        let test_path = generate_html_test(&test);
-                        let filename = test_path.file_name().unwrap().to_str().unwrap();
-                        let test_url = format!("http://localhost:8088/specs/{}", filename);
-                        println!(
-                            "\nRunning {} test...",
-                            test.file_name().unwrap().to_str().unwrap()
-                        );
-                        Either::A(
-                            client
-                                .goto(&test_url)
-                                .and_then(|client| {
-                                    client
-                                        .wait_for_find(Locator::Id("test-end"))
-                                })
-                                .map(|e| e.client())
-                                .and_then(|mut client| {
-                                    client
-                                        .execute(
-                                            "return console.logs",
-                                            Vec::new(),
-                                        )
-                                        .map(move |e| (e, client))
-                                })
-                                .and_then(move |(result, client)| {
-                                    let logs = result.as_array().unwrap();
-                                    for message in logs {
-                                        let message =
-                                            message.as_array().unwrap()[0]
-                                                .as_str()
-                                                .unwrap();
-                                        if let Ok(test_results) =
-                                            serde_json::from_str::<TestResults>(
-                                                message,
-                                            )
-                                        {
-                                            println!("{}", test_results);
-                                            if test_results.is_has_error() {
-                                                return Ok(Loop::Break(()));
-                                            } else {
-                                                return Ok(Loop::Continue((
-                                                    client, tests,
-                                                )));
-                                            }
-                                        }
-                                    }
-                                    for messages in logs {
-                                        let messages =
-                                            messages.as_array().unwrap();
-                                        for message in messages {
-                                            let message =
-                                                message.as_str().unwrap();
-                                            println!("{}", message);
-                                        }
-                                    }
-                                    panic!(
-                                        "Tests result not found in console \
-                                         logs."
-                                    );
-                                }),
-                        )
-                    } else {
-                        Either::B(futures::future::ok(Loop::Break(())))
-                    }
-                },
-            )
-            .map_err(|e| ())
-        })
-        .map_err(|_| ())
+        .and_then(|client| tests_loop(client, paths_to_tests))
 }
 
 // TODO: make optional headless
 fn main() {
     actix::run(|| {
-        let server = HttpServer::new(|| App::new().route("{filename:.*}", web::get().to(index)))
-            .bind("127.0.0.1:8088")
-            .unwrap()
-            .start();
+        let server = HttpServer::new(|| {
+            App::new().route("{filename:.*}", web::get().to(index))
+        })
+        .bind(TESTS_ADDR)
+        .unwrap()
+        .start();
         let path_to_tests = std::env::args().skip(1).next().unwrap();
         let path_to_tests = PathBuf::from(path_to_tests);
         let path_to_tests = canonicalize(path_to_tests).unwrap();
 
         let mut capabilities = Capabilities::new();
         let firefox_settings = json!({
-        "prefs": {
-            "media.navigator.streams.fake": true,
-            "security.fileuri.strict_origin_policy": false,
-            "media.navigator.permission.disabled": true,
-            "media.autoplay.enabled": true,
-            "media.autoplay.enabled.user-gestures-needed ": false,
-            "media.autoplay.ask-permission": false,
-            "media.autoplay.default": 0,
-        },
-        "args": ["--headless"]
-    });
+            "prefs": {
+                "media.navigator.streams.fake": true,
+                "security.fileuri.strict_origin_policy": false,
+                "media.navigator.permission.disabled": true,
+                "media.autoplay.enabled": true,
+                "media.autoplay.enabled.user-gestures-needed ": false,
+                "media.autoplay.ask-permission": false,
+                "media.autoplay.default": 0,
+            },
+            "args": ["--headless"]
+        });
         capabilities.insert("moz:firefoxOptions".to_string(), firefox_settings);
 
         // TODO: chrome
 
         let chrome_settings = json!({
-        "args": [
-            "--use-fake-device-for-media-stream",
-            "--use-fake-ui-for-media-stream",
-            "--disable-web-security",
-        ]
-    });
+            "args": [
+                "--use-fake-device-for-media-stream",
+                "--use-fake-ui-for-media-stream",
+                "--disable-web-security",
+            ]
+        });
         capabilities.insert("goog:chromeOptions".to_string(), chrome_settings);
 
         if path_to_tests.is_dir() {
@@ -290,7 +291,7 @@ fn main() {
         } else {
             run_tests(vec![path_to_tests], capabilities)
         }
-            .and_then(move |_| server.stop(true))
-            .map(|_| System::current().stop())
+        .and_then(move |_| server.stop(true))
+        .map(|_| System::current().stop())
     });
 }
