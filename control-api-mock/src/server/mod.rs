@@ -40,18 +40,7 @@ pub struct Context {
 pub fn run() {
     HttpServer::new(|| {
         App::new()
-            .wrap(
-                Cors::new()
-                    .allowed_origin("http://localhost:9000")
-                    .allowed_origin("http://localhost:9001")
-                    .allowed_methods(vec!["GET", "POST", "DELETE", "OPTION"])
-                    .allowed_headers(vec![
-                        header::AUTHORIZATION,
-                        header::ACCEPT,
-                    ])
-                    .allowed_header(header::CONTENT_TYPE)
-                    .max_age(3600),
-            )
+            .wrap(Cors::new())
             .data(Context {
                 client: ControlClient::new(),
             })
