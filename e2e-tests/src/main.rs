@@ -25,18 +25,26 @@ fn run_http_server() -> Server {
 }
 
 fn get_path_to_tests_from_args() -> PathBuf {
-    let path_to_tests = std::env::args().skip(1).next().unwrap();
+    let path_to_tests = std::env::args().last().unwrap();
     let path_to_tests = PathBuf::from(path_to_tests);
     let path_to_tests = canonicalize(path_to_tests).unwrap();
     path_to_tests
 }
 
-// TODO: make optional headless
+fn is_headless() -> bool {
+    for arg in std::env::args() {
+        if arg == "--headless" {
+            return true;
+        }
+    }
+    false
+}
+
 fn main() {
     actix::run(|| {
         let server = run_http_server();
         let path_to_tests = get_path_to_tests_from_args();
-        test_runner::run(path_to_tests)
+        test_runner::run(path_to_tests, is_headless())
             .and_then(move |_| server.stop(true))
             .map(|_| System::current().stop())
     })

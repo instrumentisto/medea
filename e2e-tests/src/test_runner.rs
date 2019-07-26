@@ -10,13 +10,26 @@ use webdriver::capabilities::Capabilities;
 
 use crate::mocha_result::TestResults;
 
-pub fn run(path_to_tests: PathBuf) -> impl Future<Item = (), Error = ()> {
+pub fn run(
+    path_to_tests: PathBuf,
+    is_headless: bool,
+) -> impl Future<Item = (), Error = ()> {
     if path_to_tests.is_dir() {
         let tests_paths = get_all_tests_paths(path_to_tests);
-        run_tests(tests_paths)
+        run_tests(tests_paths, is_headless)
     } else {
-        run_tests(vec![path_to_tests])
+        run_tests(vec![path_to_tests], is_headless)
     }
+}
+
+fn run_tests(
+    paths_to_tests: Vec<PathBuf>,
+    is_headless: bool,
+) -> impl Future<Item = (), Error = ()> {
+    let caps = get_webdriver_capabilities(is_headless);
+    Client::with_capabilities("http://localhost:9515", caps)
+        .map_err(|e| panic!("Client session start error: {:?}", e))
+        .and_then(|client| tests_loop(client, paths_to_tests))
 }
 
 fn generate_html(test_js: &str) -> String {
@@ -110,15 +123,6 @@ fn tests_loop(
     .map_err(|e| panic!("WebDriver command error: {:?}", e))
 }
 
-fn run_tests(
-    paths_to_tests: Vec<PathBuf>,
-) -> impl Future<Item = (), Error = ()> {
-    let caps = get_webdriver_capabilities();
-    Client::with_capabilities("http://localhost:9515", caps)
-        .map_err(|e| panic!("Client session start error: {:?}", e))
-        .and_then(|client| tests_loop(client, paths_to_tests))
-}
-
 fn get_all_tests_paths(path_to_test_dir: PathBuf) -> Vec<PathBuf> {
     let mut tests_paths = Vec::new();
     for entry in std::fs::read_dir(path_to_test_dir).unwrap() {
@@ -135,8 +139,19 @@ fn get_all_tests_paths(path_to_test_dir: PathBuf) -> Vec<PathBuf> {
     tests_paths
 }
 
-fn get_webdriver_capabilities() -> Capabilities {
+fn get_webdriver_capabilities(is_headless: bool) -> Capabilities {
     let mut capabilities = Capabilities::new();
+
+    let mut firefox_args = Vec::new();
+    let mut chrome_args = vec![
+        "--use-fake-device-for-media-stream",
+        "--use-fake-ui-for-media-stream",
+        "--disable-web-security",
+    ];
+    if is_headless {
+        firefox_args.push("--headless");
+        chrome_args.push("--headless");
+    }
 
     let firefox_settings = json!({
         "prefs": {
@@ -148,17 +163,11 @@ fn get_webdriver_capabilities() -> Capabilities {
             "media.autoplay.ask-permission": false,
             "media.autoplay.default": 0,
         },
-        "args": ["--headless"]
+        "args": firefox_args
     });
     capabilities.insert("moz:firefoxOptions".to_string(), firefox_settings);
 
-    let chrome_settings = json!({
-        "args": [
-            "--use-fake-device-for-media-stream",
-            "--use-fake-ui-for-media-stream",
-            "--disable-web-security",
-        ]
-    });
+    let chrome_settings = json!({ "args": chrome_args });
     capabilities.insert("goog:chromeOptions".to_string(), chrome_settings);
 
     capabilities
