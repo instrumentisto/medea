@@ -31,12 +31,19 @@
         ui: 'bdd',
         reporter: 'json'
     });
+
+    // root after() for signal for test-runner that tests done.
+    after(() => {
+        let successEl = document.createElement('div');
+        successEl.id = 'test-end';
+        document.body.appendChild(successEl);
+    });
 </script>
 <script>
 {{{}}}
 </script>
 <script>
-    mocha.run()
+    mocha.run();
 </script>
 </body>
 

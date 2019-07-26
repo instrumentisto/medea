@@ -150,9 +150,6 @@ describe('Pub<=>Pub video call', () => {
 
     after(async () => {
         await deleteRoom();
-        let successEl = document.createElement('div');
-        successEl.id = 'test-end';
-        document.body.appendChild(successEl);
     });
 
     it('send rtc packets', async () => {
