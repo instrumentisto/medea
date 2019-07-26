@@ -23,7 +23,7 @@ spec:
     spec:
       containers:
         - name: medea
-          image: instrumentisto/medea:edge
+          image: instrumentisto/medea:dev
           ports:
             - containerPort: 8080
           env:
@@ -31,4 +31,4 @@ spec:
               value: "0.0.0.0"
             - name: MEDEA_SERVER.BIND_PORT
               value: "8080"
-          imagePullPolicy: Always
+          imagePullPolicy: IfNotPresent

@@ -21,7 +21,5 @@ spec:
     spec:
       containers:
         - name: kurento
-          image: alexlapa/medea-demo:edge
-          ports:
-            - containerPort: 80
-          imagePullPolicy: Always
+          image: instrumentisto/medea-demo:dev
+          imagePullPolicy: IfNotPresent

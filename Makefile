@@ -218,7 +218,8 @@ docker-build-demo-image-name = $(DEMO_IMAGE_NAME)
 
 docker.build.demo:
 	@make yarn proj=demo
-	docker build \
+	$(docker-env) \
+	docker build $(if $(call eq,$(minikube),yes),,--network=host) \
 		-t $(docker-build-demo-image-name):$(if $(call eq,$(TAG),),dev,$(TAG)) \
 		jason/demo
 
@@ -226,8 +227,8 @@ docker.build.demo:
 # Build medea project Docker image.
 #
 # Usage:
-#	make docker.build.medea [TAG=(dev|<tag>)]
-#	                  [debug=(yes|no)] [no-cache=(no|yes)]
+#	make docker.build.medea [TAG=(dev|<tag>)] [debug=(yes|no)]
+#	                  [no-cache=(no|yes)] [minikube=(no|yes)]
 
 docker-build-medea-image-name = $(MEDEA_IMAGE_NAME)
 
@@ -243,7 +244,7 @@ endif
 	$(call docker.build.clean.ignore)
 	@echo "!target/$(if $(call eq,$(debug),no),release,debug)/" >> .dockerignore
 	$(docker-env) \
-	docker build --network=host --force-rm \
+	docker build $(if $(call eq,$(minikube),yes),,--network=host) --force-rm \
 		$(if $(call eq,$(no-cache),yes),\
 			--no-cache --pull,) \
 		$(if $(call eq,$(IMAGE),),\
@@ -321,7 +322,6 @@ up.medea:
 
 helm-cluster = $(if $(call eq,$(cluster),),minikube,$(cluster))
 
-
 # Upgrade (or initialize) Tiller (server side of Helm) of Minikube.
 #
 # Usage:
@@ -334,21 +334,6 @@ helm.init:
 			--client-only,\
 			--kube-context=minikube --tiller-namespace=kube-system \
 				$(if $(call eq,$(upgrade),no),,--upgrade))
-
-
-# Build Helm package from project Helm chart.
-#
-# Usage:
-#	make helm.build
-
-helm-build-ver = $(subst v,,$(DEMO_VERSION))
-
-helm.build:
-	@mkdir -p _build/artifacts/rootfs/helm/
-	helm package --destination=_helm/artifacts/ \
-	             --app-version=$(helm-build-ver) \
-	             --version=$(helm-build-ver) \
-		_helm/medea-demo/
 
 
 helm-dep-cmd = $(if $(call eq,$(cmd),),build,$(cmd))
@@ -364,32 +349,10 @@ helm.dep:
 #                [release=(dev|<current-git-branch>|<release-name>)]
 
 helm.up:
-ifeq ($(wildcard my.$(helm-cluster).vals.yaml),)
-	touch my.$(helm-cluster).vals.yaml
-endif
-ifeq ($(helm-cluster),minikube)
 ifeq ($(rebuild),yes)
-	@make docker.build no-cache=$(no-cache) minikube=yes TAG=dev
+	@make docker.build.medea no-cache=$(no-cache) minikube=yes TAG=dev
 endif
-ifeq ($(minikube-mount-pid),)
-	minikube mount "$(PWD):/mount/artifacts" &
-endif
-endif
-	helm upgrade --install $(helm-cluster-args) \
-		$(helm-release) _helm/artifacts/ \
-			--namespace=$(helm-release-namespace) \
-			$(if $(call eq,$(CI_SERVER),yes),\
-				--set labels.app=$(CI_ENVIRONMENT_SLUG) \
-				--set labels."app\.gitlab\.com\/env"=$(CI_ENVIRONMENT_SLUG) \
-				--set labels."app\.gitlab\.com\/app"=$(CI_PROJECT_PATH_SLUG) ,)\
-			$(if $(call eq,$(helm-cluster),review),\
-				--values=_dev/staging.vals.yaml )\
-			--values=_dev/$(helm-cluster).vals.yaml \
-			--values=my.$(helm-cluster).vals.yaml \
-			$(if $(call eq,$(helm-cluster),review),\
-				--set ingress.hosts={"$(helm-up-review-app-domain)"} \
-				--set image.tag="$(CURRENT_BRANCH)" )\
-			--set deployment.revision=$(shell date +%s) \
+	helm upgrade --install minikube _helm/medea-demo/ \
 			$(if $(call eq,$(wait),no),,\
 				--wait )
 
@@ -397,18 +360,10 @@ endif
 # Remove Helm release of project from Kubernetes Minikube cluster.
 #
 # Usage:
-#	make helm.down [cluster=(minikube|review|staging)]
-#                  [release=(dev|<current-git-branch>|<release-name>)]
+#	make helm.down
 
 helm.down:
-ifeq ($(helm-cluster),minikube)
-ifneq ($(minikube-mount-pid),)
-	kill $(minikube-mount-pid)
-endif
-endif
-	$(if $(shell helm ls $(helm-cluster-args) | grep '$(helm-release)'),\
-		helm del --purge $(helm-cluster-args) $(helm-release) ,\
-		@echo "--> No $(helm-release) release found in $(helm-cluster) cluster")
+	helm del --purge minikube
 
 
 # Lint project Helm chart.

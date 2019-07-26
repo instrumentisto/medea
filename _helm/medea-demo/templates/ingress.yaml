@@ -2,8 +2,6 @@ kind: Ingress
 apiVersion: extensions/v1beta1
 metadata:
   name: webclient
-  labels:
-    app: webclient
 spec:
   rules:
     - host: medea-demo.test
@@ -13,7 +11,3 @@ spec:
             backend:
               serviceName: webclient
               servicePort: 80
-          - path: /
-            backend:
-              serviceName: medea
-              servicePort: 8080
