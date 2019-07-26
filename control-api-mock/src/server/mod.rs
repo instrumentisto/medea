@@ -42,7 +42,8 @@ pub fn run() {
         App::new()
             .wrap(
                 Cors::new()
-                    .allowed_origin("http://localhost:8088")
+                    .allowed_origin("http://localhost:9000")
+                    .allowed_origin("http://localhost:9001")
                     .allowed_methods(vec!["GET", "POST", "DELETE", "OPTION"])
                     .allowed_headers(vec![
                         header::AUTHORIZATION,

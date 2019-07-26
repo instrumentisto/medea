@@ -48,7 +48,7 @@ fn main() {
         .arg(
             Arg::with_name("tests_files_addr")
                 .help("Where host tests files")
-                .default_value("localhost:8088")
+                .default_value("localhost:9000")
                 .long("files-host")
                 .short("f"),
         )

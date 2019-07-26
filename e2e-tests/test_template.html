@@ -3,6 +3,9 @@
     <meta http-equiv="Content-type" content="text/html; charset=utf-8" />
     <title>Medea's e2e test</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/mocha/6.2.0/mocha.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/0.19.0/axios.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mocha/6.2.0/mocha.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chai/4.2.0/chai.js"></script>
     <script type="module">
         import init, {Jason} from "/jason-pkg/jason.js";
 
@@ -17,9 +20,6 @@
 
 <body>
 <div id="mocha"></div>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/axios/0.19.0/axios.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/mocha/6.2.0/mocha.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/chai/4.2.0/chai.js"></script>
 <script>
     console.stdlog = console.log.bind(console);
     console.logs = [];
