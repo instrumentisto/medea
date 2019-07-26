@@ -1,0 +1,15 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: webclient
+  labels:
+    app: webclient
+    tier: frontend
+spec:
+  selector:
+    app: webclient
+    tier: frontend
+  ports:
+    - name: webclient
+      port: 80
+      targetPort: 80

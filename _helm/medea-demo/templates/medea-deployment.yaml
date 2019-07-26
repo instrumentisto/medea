@@ -1,0 +1,34 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: medea
+  labels:
+    app: medea
+    tier: backend
+spec:
+  serviceName: medea
+  replicas: 1
+  hostNetwork: true
+  dnsPolicy: ClusterFirstWithHostNet
+  selector:
+    matchLabels:
+      app: medea
+      tier: backend
+  template:
+    metadata:
+      labels:
+        app: medea
+        tier: backend
+        version: 0.0.1
+    spec:
+      containers:
+        - name: medea
+          image: instrumentisto/medea:edge
+          ports:
+            - containerPort: 8080
+          env:
+            - name: MEDEA_SERVER.BIND_IP
+              value: "0.0.0.0"
+            - name: MEDEA_SERVER.BIND_PORT
+              value: "8080"
+          imagePullPolicy: Always

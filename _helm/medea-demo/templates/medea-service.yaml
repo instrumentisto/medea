@@ -1,0 +1,15 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: medea
+  labels:
+    app: medea
+    tier: backend
+spec:
+  selector:
+    app: medea
+    tier: backend
+  ports:
+    - name: medea
+      port: 8080
+      targetPort: 8080

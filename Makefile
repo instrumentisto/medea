@@ -15,8 +15,10 @@ eq = $(if $(or $(1),$(2)),$(and $(findstring $(1),$(2)),\
 # Project parameters #
 ######################
 
-MEDEA_IMAGE_NAME := $(strip $(shell grep 'COMPOSE_IMAGE_NAME=' .env | cut -d '=' -f2))
-DEMO_IMAGE_NAME := $(strip $(shell grep 'DEMO_IMAGE_NAME=' .env | cut -d '=' -f2))
+MEDEA_IMAGE_NAME := $(strip \
+	$(shell grep 'COMPOSE_IMAGE_NAME=' .env | cut -d '=' -f2))
+DEMO_IMAGE_NAME := instrumentisto/medea-demo
+DEMO_VERSION ?= $(strip $(shell grep '"version": ' jason/demo/package.json | cut -d '"' -f4))
 
 
 RUST_VER := 1.36
@@ -48,22 +50,16 @@ lint: cargo.lint
 fmt: cargo.fmt
 
 
-# Run Medea and Jason e2e-demo in host
+up.demo: docker.up.demo
+
+
+# Run Medea and Jason development environment.
 #
 # Usage:
 #	make up.dev
 
 up.dev:
 	$(MAKE) -j3 up.coturn up.jason up.medea
-
-
-# Run Medea and Jasom demo in docker
-#
-# Usage:
-#	make up.demo
-
-up.demo:
-	docker-compose -f jason/demo/docker-compose.yml up
 
 
 test: test.unit
@@ -104,46 +100,32 @@ cargo.lint:
 
 
 
-######################
-# wasm-pack commands #
-######################
-
-
-# Build and publish Jason application to npm
-#
-# Usage:
-#	make publish.jason
-
-publish.jason:
-	rm -rf jason/pkg
-	wasm-pack build -t web jason
-	wasm-pack publish
-
-
-
-
 #################
 # Yarn commands #
 #################
 
-# Resolve Yarn project dependencies.
+# Resolve NPM project dependencies with Yarn.
 #
 # Optional 'cmd' parameter may be used for handy usage of docker-wrapped Yarn,
-# for example: make yarn.deps cmd='upgrade'
+# for example: make yarn cmd='upgrade'
 #
 # Usage:
 #	make yarn [cmd=('install --pure-lockfile'|<yarn-cmd>)]
 #	          [proj=(e2e|demo)]
+#	          [dockerized=(yes|no)]
 
 yarn-cmd = $(if $(call eq,$(cmd),),install --pure-lockfile,$(cmd))
-yarn-proj =$(if $(call eq,$(proj),demo),jason/demo,jason/e2e-demo)
+yarn-proj-dir = $(if $(call eq,$(proj),demo),jason/demo,jason/e2e-demo)
 
 yarn:
+ifneq ($(dockerized),no)
 	docker run --rm --network=host -v "$(PWD)":/app -w /app \
-	           -e YARN_CACHE_FOLDER=.cache/yarn/ \
 	           -u $(shell id -u):$(shell id -g) \
-		node:latest yarn --cwd=$(if $(call eq,$(proj),demo),jason/demo,jason/e2e-demo) \
-		$(yarn-cmd) --non-interactive
+		node:latest \
+			make yarn cmd='$(yarn-cmd)' proj=$(proj) dockerized=no
+else
+	yarn --cwd=$(yarn-proj-dir) $(yarn-cmd)
+endif
 
 
 
@@ -203,9 +185,43 @@ endif
 
 
 
+######################
+# Releasing commands #
+######################
+
+# Build and publish Jason application to npm
+#
+# Usage:
+#	make release.jason
+
+release.jason:
+	@rm -rf jason/pkg/
+	wasm-pack build -t web jason
+	wasm-pack publish
+
+
+
+
 ###################
 # Docker commands #
 ###################
+
+docker-env = $(strip $(if $(call eq,$(minikube),yes),\
+	$(subst export,,$(shell minikube docker-env | cut -d '\#' -f1)),))
+
+# Build Docker image for demo application.
+#
+# Usage:
+#	make docker.build.demo [TAG=(dev|<tag>)] [minikube=(no|yes)]
+
+docker-build-demo-image-name = $(DEMO_IMAGE_NAME)
+
+docker.build.demo:
+	@make yarn proj=demo
+	docker build \
+		-t $(docker-build-demo-image-name):$(if $(call eq,$(TAG),),dev,$(TAG)) \
+		jason/demo
+
 
 # Build medea project Docker image.
 #
@@ -226,6 +242,7 @@ ifneq ($(no-cache),yes)
 endif
 	$(call docker.build.clean.ignore)
 	@echo "!target/$(if $(call eq,$(debug),no),release,debug)/" >> .dockerignore
+	$(docker-env) \
 	docker build --network=host --force-rm \
 		$(if $(call eq,$(no-cache),yes),\
 			--no-cache --pull,) \
@@ -244,18 +261,24 @@ define docker.build.clean.ignore
 endef
 
 
-
-
-# Build demo project Docker image.
+# Stop demo application in Docker Compose environment
+# and remove all related containers.
 #
 # Usage:
-#	make docker.build.demo [TAG=(dev|<tag>)]
+#	make docker.down.demo
 
-docker-build-demo-image-name = $(DEMO_IMAGE_NAME)
+docker.down.demo:
+	docker-compose -f jason/demo/docker-compose.yml down --rmi=local -v
 
-docker.build.demo:
-	@make yarn proj=demo
-	docker build -t $(docker-build-demo-image-name):$(if $(call eq,$(TAG),),dev,$(TAG)) jason/demo
+
+# Run demo application in Docker Compose environment.
+#
+# Usage:
+#	make docker.up.demo
+
+docker.up.demo: docker.down.demo
+	docker-compose -f jason/demo/docker-compose.yml up
+
 
 
 
@@ -292,17 +315,157 @@ up.medea:
 
 
 
+##############################
+# Helm and Minikube commands #
+##############################
+
+helm-cluster = $(if $(call eq,$(cluster),),minikube,$(cluster))
+
+
+# Upgrade (or initialize) Tiller (server side of Helm) of Minikube.
+#
+# Usage:
+#	make helm.init [client-only=no [upgrade=(yes|no)]]
+#	               [client-only=yes]
+
+helm.init:
+	helm init --wait \
+		$(if $(call eq,$(client-only),yes),\
+			--client-only,\
+			--kube-context=minikube --tiller-namespace=kube-system \
+				$(if $(call eq,$(upgrade),no),,--upgrade))
+
+
+# Build Helm package from project Helm chart.
+#
+# Usage:
+#	make helm.build
+
+helm-build-ver = $(subst v,,$(DEMO_VERSION))
+
+helm.build:
+	@mkdir -p _build/artifacts/rootfs/helm/
+	helm package --destination=_helm/artifacts/ \
+	             --app-version=$(helm-build-ver) \
+	             --version=$(helm-build-ver) \
+		_helm/medea-demo/
+
+
+helm-dep-cmd = $(if $(call eq,$(cmd),),build,$(cmd))
+
+helm.dep:
+	helm dep $(helm-dep-cmd) _helm/medea-demo/
+
+
+# Run project in Minikube Kubernetes cluster as Helm release.
+#
+# Usage:
+#	make helm.up [rebuild=(no|yes) [no-cache=(no|yes)]] [wait=(yes|no)]
+#                [release=(dev|<current-git-branch>|<release-name>)]
+
+helm.up:
+ifeq ($(wildcard my.$(helm-cluster).vals.yaml),)
+	touch my.$(helm-cluster).vals.yaml
+endif
+ifeq ($(helm-cluster),minikube)
+ifeq ($(rebuild),yes)
+	@make docker.build no-cache=$(no-cache) minikube=yes TAG=dev
+endif
+ifeq ($(minikube-mount-pid),)
+	minikube mount "$(PWD):/mount/artifacts" &
+endif
+endif
+	helm upgrade --install $(helm-cluster-args) \
+		$(helm-release) _helm/artifacts/ \
+			--namespace=$(helm-release-namespace) \
+			$(if $(call eq,$(CI_SERVER),yes),\
+				--set labels.app=$(CI_ENVIRONMENT_SLUG) \
+				--set labels."app\.gitlab\.com\/env"=$(CI_ENVIRONMENT_SLUG) \
+				--set labels."app\.gitlab\.com\/app"=$(CI_PROJECT_PATH_SLUG) ,)\
+			$(if $(call eq,$(helm-cluster),review),\
+				--values=_dev/staging.vals.yaml )\
+			--values=_dev/$(helm-cluster).vals.yaml \
+			--values=my.$(helm-cluster).vals.yaml \
+			$(if $(call eq,$(helm-cluster),review),\
+				--set ingress.hosts={"$(helm-up-review-app-domain)"} \
+				--set image.tag="$(CURRENT_BRANCH)" )\
+			--set deployment.revision=$(shell date +%s) \
+			$(if $(call eq,$(wait),no),,\
+				--wait )
+
+
+# Remove Helm release of project from Kubernetes Minikube cluster.
+#
+# Usage:
+#	make helm.down [cluster=(minikube|review|staging)]
+#                  [release=(dev|<current-git-branch>|<release-name>)]
+
+helm.down:
+ifeq ($(helm-cluster),minikube)
+ifneq ($(minikube-mount-pid),)
+	kill $(minikube-mount-pid)
+endif
+endif
+	$(if $(shell helm ls $(helm-cluster-args) | grep '$(helm-release)'),\
+		helm del --purge $(helm-cluster-args) $(helm-release) ,\
+		@echo "--> No $(helm-release) release found in $(helm-cluster) cluster")
+
+
+# Lint project Helm chart.
+#
+# Usage:
+#	make helm.lint
+
+helm.lint:
+	helm lint _helm/medea-demo/
+
+
+# Bootstrap Minikube cluster (local Kubernetes) for development environment.
+#
+# The bootsrap script is updated automatically to the latest version every day.
+# For manual update use 'update=yes' command option.
+#
+# Usage:
+#	make minikube.boot [update=(no|yes)]
+#	                   [driver=(virtualbox|hyperkit|hyperv)]
+#	                   [k8s-version=<kubernetes-version>]
+
+minikube.boot:
+ifeq ($(update),yes)
+	$(call minikube.boot.download)
+else
+ifeq ($(wildcard $(HOME)/.minikube/bootstrap.sh),)
+	$(call minikube.boot.download)
+else
+ifneq ($(shell find $(HOME)/.minikube/bootstrap.sh -mmin +1440),)
+	$(call minikube.boot.download)
+endif
+endif
+endif
+	@$(if $(cal eq,$(driver),),,MINIKUBE_VM_DRIVER=$(driver)) \
+	 $(if $(cal eq,$(k8s-version),),,MINIKUBE_K8S_VER=$(k8s-version)) \
+		$(HOME)/.minikube/bootstrap.sh
+define minikube.boot.download
+	$()
+	@mkdir -p $(HOME)/.minikube/
+	@rm -f $(HOME)/.minikube/bootstrap.sh
+	curl -fL -o $(HOME)/.minikube/bootstrap.sh \
+		https://raw.githubusercontent.com/instrumentisto/toolchain/master/minikube/bootstrap.sh
+	@chmod +x $(HOME)/.minikube/bootstrap.sh
+endef
+
+
+
+
 ##################
 # .PHONY section #
 ##################
 
-.PHONY: build cargo cargo.fmt cargo.lint \
-        docker.build.medea \
-        docker.build.demo \
+.PHONY: build \
+        cargo cargo.fmt cargo.lint \
+        docker.build.demo docker.build.medea docker.down.demo docker.up.demo \
         docs docs.rust \
+        release.jason \
         test test.unit \
-        publish.jason \
-        up up.coturn up.jason up.medea \
-        up.dev up.demo \
+        up up.coturn up.demo up.dev up.jason up.medea \
         yarn
-
