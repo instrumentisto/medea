@@ -129,7 +129,7 @@ describe('Pub<=>Pub video call', () => {
         checkStats(callerStats);
         let responderStats = await rooms.responder.get_stats_for_peer_connections();
         checkStats(responderStats);
-    });
+    }).retries(2);
 
     it('video not static', async () => {
         /**

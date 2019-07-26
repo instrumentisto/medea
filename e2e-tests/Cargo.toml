@@ -12,3 +12,6 @@ serde = { version = "1.0", features = ["derive"] }
 tokio = "0.1"
 futures = "0.1"
 yansi = "0.5"
+actix-web = "1.0"
+actix-files = "0.1"
+actix = "0.8"
