@@ -77,6 +77,7 @@ pub fn run() {
 /// Checks connection with medea's gRPC control API.
 /// This is used for waiting before e2e tests start until all needed services
 /// startup.
+#[allow(clippy::needless_pass_by_value)]
 pub fn heartbeat(
     state: Data<Context>,
 ) -> impl Future<Item = HttpResponse, Error = ()> {

@@ -63,7 +63,7 @@ impl PeerRepository {
         &self,
     ) -> impl Future<Item = Vec<JsValue>, Error = WasmErr> {
         let mut futs = Vec::new();
-        for (_, peer) in &self.peers {
+        for peer in self.peers.values() {
             futs.push(peer.get_stats());
         }
 

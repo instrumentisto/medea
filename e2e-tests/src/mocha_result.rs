@@ -20,7 +20,7 @@ impl fmt::Display for TestResults {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "\nPassed tests ({}):\n\n", self.stats.passes)?;
         for passed in &self.passes {
-            write!(f, "{}\n", passed)?;
+            writeln!(f, "{}", passed)?;
         }
 
         if !self.failures.is_empty() {
@@ -35,7 +35,7 @@ impl fmt::Display for TestResults {
         write!(f, "tests: {}; ", self.stats.tests)?;
         write!(f, "passes: {}; ", self.stats.passes)?;
         write!(f, "failures: {}; ", self.stats.failures)?;
-        write!(f, "total duration: {}ms.\n", self.stats.duration)?;
+        writeln!(f, "total duration: {}ms.", self.stats.duration)?;
 
         Ok(())
     }
@@ -71,9 +71,9 @@ pub struct SuccessTestResult {
 
 impl fmt::Display for SuccessTestResult {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
+        writeln!(
             f,
-            "   {}\n",
+            "   {}",
             Paint::green(format!(
                 "test {} ... ok ({}ms)",
                 self.full_title, self.duration

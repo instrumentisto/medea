@@ -13,6 +13,7 @@ use futures::Future;
 
 use crate::test_runner::TestRunner;
 
+#[allow(clippy::needless_pass_by_value)]
 fn index(req: HttpRequest) -> HttpResult<NamedFile> {
     let path: PathBuf = req.match_info().query("filename").parse().unwrap();
     Ok(NamedFile::open(path)?)
@@ -28,8 +29,7 @@ fn run_http_server(addr: &str) -> Server {
 fn get_path_to_tests_from_args(opts: &ArgMatches) -> PathBuf {
     let path_to_tests = opts.value_of("specs_path").unwrap();
     let path_to_tests = PathBuf::from(path_to_tests);
-    let path_to_tests = canonicalize(path_to_tests).unwrap();
-    path_to_tests
+    canonicalize(path_to_tests).unwrap()
 }
 
 fn main() {
@@ -60,11 +60,12 @@ fn main() {
                 .short("w"),
         )
         .get_matches();
+
     actix::run(|| {
         let server =
             run_http_server(opts.value_of("tests_files_addr").unwrap());
         let path_to_tests = get_path_to_tests_from_args(&opts);
-        TestRunner::run(path_to_tests, opts)
+        TestRunner::run(path_to_tests, &opts)
             .and_then(move |_| server.stop(true))
             .map(|_| System::current().stop())
     })
