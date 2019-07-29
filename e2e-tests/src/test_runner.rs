@@ -12,6 +12,26 @@ use serde_json::json;
 use webdriver::capabilities::Capabilities;
 
 use crate::mocha_result::TestResults;
+use fantoccini::error::NewSessionError;
+
+#[derive(Debug)]
+pub enum Error {
+    CmdErr(CmdError),
+    NewSessionError(NewSessionError),
+    TestResultsNotFoundInLogs,
+}
+
+impl From<CmdError> for Error {
+    fn from(err: CmdError) -> Self {
+        Error::CmdErr(err)
+    }
+}
+
+impl From<NewSessionError> for Error {
+    fn from(err: NewSessionError) -> Self {
+        Error::NewSessionError(err)
+    }
+}
 
 /// Medea's e2e tests runner.
 ///
@@ -26,7 +46,7 @@ impl TestRunner {
     pub fn run(
         path_to_tests: PathBuf,
         opts: &ArgMatches,
-    ) -> impl Future<Item = (), Error = ()> {
+    ) -> impl Future<Item = (), Error = Error> {
         let test_addr = opts.value_of("tests_files_addr").unwrap().to_string();
         if path_to_tests.is_dir() {
             let tests = get_all_tests_paths(path_to_tests);
@@ -45,20 +65,24 @@ impl TestRunner {
     fn run_tests(
         self,
         opts: &ArgMatches,
-    ) -> impl Future<Item = (), Error = ()> {
+    ) -> impl Future<Item = (), Error = Error> {
         let caps = get_webdriver_capabilities(opts);
         Client::with_capabilities(
             opts.value_of("webdriver_addr").unwrap(),
             caps,
         )
-        .map_err(|e| panic!("Client session start error: {:?}", e))
+        .map_err(Error::from)
         .and_then(|client| self.tests_loop(client))
+        .map_err(Error::from)
     }
 
     /// Tests loop which alternately launches tests in browser.
     ///
     /// This future resolve when all tests completed or when test failed.
-    fn tests_loop(self, client: Client) -> impl Future<Item = (), Error = ()> {
+    fn tests_loop(
+        self,
+        client: Client,
+    ) -> impl Future<Item = (), Error = Error> {
         futures::future::loop_fn((client, self), |(client, mut runner)| {
             if let Some(test) = runner.tests.pop() {
                 let test_path = generate_and_save_test_html(&test);
@@ -71,13 +95,15 @@ impl TestRunner {
                     client
                         .goto(&test_url)
                         .and_then(wait_for_test_end)
-                        .and_then(|client| runner.check_test_results(client)),
+                        .map_err(Error::from)
+                        .and_then(|client| runner.check_test_results(client))
+                        .map_err(Error::from),
                 )
             } else {
                 Either::B(futures::future::ok(Loop::Break(())))
             }
         })
-        .map_err(|e| panic!("WebDriver command error: {:?}", e))
+        .map_err(Error::from)
     }
 
     /// Check results of tests.
@@ -86,9 +112,10 @@ impl TestRunner {
     fn check_test_results(
         self,
         mut client: Client,
-    ) -> impl Future<Item = Loop<(), (Client, Self)>, Error = CmdError> {
+    ) -> impl Future<Item = Loop<(), (Client, Self)>, Error = Error> {
         client
             .execute("return console.logs", Vec::new())
+            .map_err(Error::from)
             .map(move |e| (e, client))
             .and_then(move |(result, client)| {
                 let logs = result.as_array().unwrap();
@@ -113,7 +140,7 @@ impl TestRunner {
                         println!("{}", message);
                     }
                 }
-                panic!("Tests result not found in console logs.");
+                Err(Error::TestResultsNotFoundInLogs)
             })
     }
 

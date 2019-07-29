@@ -76,6 +76,7 @@ fn main() {
             run_test_files_server(opts.value_of("tests_files_addr").unwrap());
         let path_to_tests = get_path_to_tests_from_args(&opts);
         TestRunner::run(path_to_tests, &opts)
+            .map_err(|e| panic!("{:?}", e))
             .and_then(move |_| server.stop(true))
             .map(|_| System::current().stop())
     })
