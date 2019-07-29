@@ -11,10 +11,10 @@ use actix_web::{
     dev::Server, web, App, HttpRequest, HttpServer, Result as HttpResult,
 };
 use clap::{App as ClapApp, Arg, ArgMatches};
+use failure::Fail;
 use futures::Future;
 
-use crate::test_runner::TestRunner;
-use std::path::Path;
+use crate::test_runner::{Error, TestRunner};
 
 /// HTTP endpoint which return requested file from this dir.
 /// Used for loading tests.
@@ -50,18 +50,6 @@ fn get_path_to_tests_from_args(opts: &ArgMatches) -> PathBuf {
     test_path
 }
 
-fn delete_all_tests_htmls(path_test_dir: &Path) {
-    for entry in std::fs::read_dir(path_test_dir).unwrap() {
-        let entry = entry.unwrap();
-        let path = entry.path();
-        if let Some(ext) = path.extension() {
-            if ext == "html" {
-                std::fs::remove_file(path).unwrap();
-            }
-        }
-    }
-}
-
 fn main() {
     let opts = ClapApp::new("e2e-tests-runner")
         .arg(
@@ -95,18 +83,8 @@ fn main() {
             run_test_files_server(opts.value_of("tests_files_addr").unwrap());
         let path_to_tests = get_path_to_tests_from_args(&opts);
         TestRunner::run(path_to_tests, &opts)
-            .map_err(|e| panic!("{:?}", e))
+            .map_err(|e| panic!("{}", e))
             .and_then(move |_| server.stop(true))
-            .then(move |_| {
-                let test_path = get_path_to_tests_from_args(&opts);
-                if test_path.is_file() {
-                    let test_dir = test_path.parent().unwrap();
-                    delete_all_tests_htmls(&test_dir);
-                } else {
-                    delete_all_tests_htmls(&test_path);
-                }
-                futures::future::ok(())
-            })
             .map(|_| System::current().stop())
     })
     .unwrap();

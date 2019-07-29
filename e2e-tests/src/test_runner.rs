@@ -1,9 +1,17 @@
 //! Implementation for run tests in browser, check and print results.
 
-use std::{fs::File, io::prelude::*, path::PathBuf};
+use std::{
+    fs::File,
+    io::prelude::*,
+    path::{Path, PathBuf},
+};
 
 use clap::ArgMatches;
-use fantoccini::{error::CmdError, Client, Locator};
+use failure::Fail;
+use fantoccini::{
+    error::{CmdError, NewSessionError},
+    Client, Locator,
+};
 use futures::{
     future::{Either, Loop},
     Future,
@@ -12,13 +20,19 @@ use serde_json::json;
 use webdriver::capabilities::Capabilities;
 
 use crate::mocha_result::TestResults;
-use fantoccini::error::NewSessionError;
 
-#[derive(Debug)]
+#[derive(Debug, Fail)]
 pub enum Error {
+    #[fail(display = "WebDriver command failed: {:?}", _0)]
     CmdErr(CmdError),
+    #[fail(display = "WebDriver startup failed: {:?}", _0)]
     NewSessionError(NewSessionError),
+    #[fail(display = "Test results not found in browser logs. Probably \
+                      something wrong with template. See printed browser \
+                      logs for more info.")]
     TestResultsNotFoundInLogs,
+    #[fail(display = "Some test failed.")]
+    TestsFailed,
 }
 
 impl From<CmdError> for Error {
@@ -30,6 +44,19 @@ impl From<CmdError> for Error {
 impl From<NewSessionError> for Error {
     fn from(err: NewSessionError) -> Self {
         Error::NewSessionError(err)
+    }
+}
+
+// TODO: return Result
+fn delete_all_tests_htmls(path_test_dir: &Path) {
+    for entry in std::fs::read_dir(path_test_dir).unwrap() {
+        let entry = entry.unwrap();
+        let path = entry.path();
+        if let Some(ext) = path.extension() {
+            if ext == "html" {
+                std::fs::remove_file(path).unwrap();
+            }
+        }
     }
 }
 
@@ -49,15 +76,22 @@ impl TestRunner {
     ) -> impl Future<Item = (), Error = Error> {
         let test_addr = opts.value_of("tests_files_addr").unwrap().to_string();
         if path_to_tests.is_dir() {
-            let tests = get_all_tests_paths(path_to_tests);
+            let tests = get_all_tests_paths(&path_to_tests);
             let runner = Self { test_addr, tests };
-            runner.run_tests(&opts)
+            Either::A(runner.run_tests(&opts).then(move |err| {
+                delete_all_tests_htmls(&path_to_tests);
+                err
+            }))
         } else {
             let runner = Self {
                 test_addr,
-                tests: vec![path_to_tests],
+                tests: vec![path_to_tests.clone()],
             };
-            runner.run_tests(&opts)
+            Either::B(runner.run_tests(&opts).then(move |err| {
+                let test_dir = path_to_tests.parent().unwrap();
+                delete_all_tests_htmls(&test_dir);
+                err
+            }))
         }
     }
 
@@ -127,7 +161,7 @@ impl TestRunner {
                     {
                         println!("{}", test_results);
                         if test_results.is_has_error() {
-                            return Ok(Loop::Break(()));
+                            return Err(Error::TestsFailed);
                         } else {
                             return Ok(Loop::Continue((client, self)));
                         }
@@ -184,7 +218,7 @@ fn wait_for_test_end(
 }
 
 /// Get all paths to spec files from provided dir.
-fn get_all_tests_paths(path_to_test_dir: PathBuf) -> Vec<PathBuf> {
+fn get_all_tests_paths(path_to_test_dir: &PathBuf) -> Vec<PathBuf> {
     let mut tests_paths = Vec::new();
     for entry in std::fs::read_dir(path_to_test_dir).unwrap() {
         let entry = entry.unwrap();
