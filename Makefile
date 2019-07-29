@@ -197,6 +197,7 @@ ifeq ($(dockerized),no)
 	# Full medea e2e tests with cypress
 	cargo build $(if $(call eq,$(release),yes),--release)
 	cargo build -p control-api-mock
+	cd jason && wasm-pack build --target web --out-dir ../_dev/jason-pkg
 
 	env $(if $(call eq,$(logs),yes),,RUST_LOG=warn) cargo run --bin medea \
 		$(if $(call eq,$(release),yes),--release) & \
@@ -208,11 +209,11 @@ ifeq ($(dockerized),no)
 
 	sleep 2
 
-	- cd e2e-tests && cargo run -- -w http://localhost:9515 -f localhost:50000 \
+	- cargo run -p e2e-tests-runner -- -w http://localhost:9515 -f localhost:50000 \
 	 	--headless
 	kill $$(cat /tmp/chromedriver.pid)
 
-	- cd e2e-tests && cargo run -- -w http://localhost:4444 -f localhost:50001 \
+	- cargo run -p e2e-tests-runner -- -w http://localhost:4444 -f localhost:50001 \
 		--headless
 	kill $$(cat /tmp/geckodriver.pid)
 
