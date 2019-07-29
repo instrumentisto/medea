@@ -13,15 +13,15 @@ use fantoccini::{
     Client, Locator,
 };
 use futures::{
-    future::{self, Either, Loop},
+    future::{Either, Loop},
     Future,
 };
 use serde_json::json;
 use webdriver::capabilities::Capabilities;
 
 use crate::mocha_result::TestResults;
-use actix::Arbiter;
 
+#[allow(clippy::pub_enum_variant_names)]
 #[derive(Debug, Fail)]
 pub enum Error {
     #[fail(display = "WebDriver command failed: {:?}", _0)]
@@ -132,7 +132,8 @@ impl TestRunner {
                         .and_then(wait_for_test_end)
                         .map_err(Error::from)
                         .and_then(|client| runner.check_test_results(client))
-                        .map_err(Error::from),
+                        .map_err(Error::from)
+                        .map(Loop::Continue),
                 )
             } else {
                 Either::B(futures::future::ok(Loop::Break(())))
@@ -143,11 +144,16 @@ impl TestRunner {
 
     /// Check results of tests.
     ///
-    /// This will break test loop if some error found in tests results.
+    /// This function will close WebDriver's session if some error happen.
+    ///
+    /// Returns [`Error::TestsFailed`] if some test failed.
+    ///
+    /// Returns [`Error::TestResultsNotFoundInLogs`] if mocha results not found
+    /// in JS side console logs.
     fn check_test_results(
         self,
         mut client: Client,
-    ) -> impl Future<Item = Loop<(), (Client, Self)>, Error = Error> {
+    ) -> impl Future<Item = (Client, Self), Error = Error> {
         client
             .execute("return console.logs", Vec::new())
             .map_err(|e| panic!("{:?}", e))
@@ -164,7 +170,7 @@ impl TestRunner {
                         if test_results.is_has_error() {
                             return Err((client, Error::TestsFailed));
                         } else {
-                            return Ok(Loop::Continue((client, self)));
+                            return Ok((client, self));
                         }
                     }
                 }

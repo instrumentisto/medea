@@ -14,5 +14,5 @@ doc-valid-idents = [
     "RTCPeerConnection", "RTCPeerConnectionIceEvent",
     "RTCRtpTransceiver", "RTCRtpTransceiverDirection",
     "RTCSdpType", "RTCIceCandidateInit",
-    "gRPC",
+    "gRPC", "WebDriver",
 ]

@@ -29,7 +29,6 @@ use crate::{
         room::Room,
     },
 };
-use actix_web::http::header;
 
 /// Context of actix-web server.
 pub struct Context {

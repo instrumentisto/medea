@@ -11,10 +11,9 @@ use actix_web::{
     dev::Server, web, App, HttpRequest, HttpServer, Result as HttpResult,
 };
 use clap::{App as ClapApp, Arg, ArgMatches};
-use failure::Fail;
 use futures::Future;
 
-use crate::test_runner::{Error, TestRunner};
+use crate::test_runner::TestRunner;
 
 /// HTTP endpoint which return requested file from this dir.
 /// Used for loading tests.
