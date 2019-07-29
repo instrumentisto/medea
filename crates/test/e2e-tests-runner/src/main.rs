@@ -10,7 +10,10 @@ use actix_files::NamedFile;
 use actix_web::{
     dev::Server, web, App, HttpRequest, HttpServer, Result as HttpResult,
 };
-use clap::{App as ClapApp, Arg, ArgMatches};
+use clap::{
+    app_from_crate, crate_authors, crate_description, crate_name,
+    crate_version, Arg, ArgMatches,
+};
 use futures::Future;
 
 use crate::test_runner::TestRunner;
@@ -45,7 +48,7 @@ pub fn get_path_to_tests() -> PathBuf {
 /// Returns [`PathBuf`] to test/test dir from clap's [`ArgMatches`].
 fn get_path_to_tests_from_args(opts: &ArgMatches) -> PathBuf {
     let mut test_path = get_path_to_tests();
-    if let Some(path_to_test) = opts.value_of("specs_path") {
+    if let Some(path_to_test) = opts.value_of("spec_path") {
         test_path.push(path_to_test);
         if !test_path.exists() {
             // TOOD: maybe print message
@@ -56,27 +59,27 @@ fn get_path_to_tests_from_args(opts: &ArgMatches) -> PathBuf {
 }
 
 fn main() {
-    let opts = ClapApp::new("e2e-tests-runner")
+    let opts = app_from_crate!()
         .arg(
             Arg::with_name("headless")
-                .help("Run tests in headless browser")
+                .help("Run tests in headless browser.")
                 .long("headless"),
         )
         .arg(
-            Arg::with_name("specs_path")
-                .help("Path to specs/spec")
+            Arg::with_name("spec_path")
+                .help("Run only specified spec.")
                 .index(1),
         )
         .arg(
             Arg::with_name("tests_files_addr")
-                .help("Address for tests files host server")
+                .help("Address where html test files will be hosted.")
                 .default_value("localhost:9000")
                 .long("files-host")
                 .short("f"),
         )
         .arg(
             Arg::with_name("webdriver_addr")
-                .help("Address to running webdriver")
+                .help("Address to running webdriver.")
                 .default_value("http://localhost:4444")
                 .long("webdriver-addr")
                 .short("w"),
