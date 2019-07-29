@@ -12,11 +12,11 @@ repository = "https://github.com/instrumentisto/medea"
 [workspace]
 members = [
     "crates/medea-macro",
+    "crates/test/control-api-mock",
+    "crates/test/e2e-tests-runner",
     "jason",
     "proto/client-api",
     "proto/grpc",
-    "crates/test/control-api-mock",
-    "crates/test/e2e-tests-runner",
 ]
 
 [profile.release]

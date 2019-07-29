@@ -1,19 +1,23 @@
 [package]
 name = "e2e-tests-runner"
-version = "0.1.0"
-authors = ["Semen Evdokimov <evdokimovs@protonmail.ch>"]
+version = "0.1.0-dev"
 edition = "2018"
+description = "E2E tests runner for medea."
+authors = ["Instrumentisto Team <developer@instrumentisto.com>"]
+homepage = "https://github.com/instrumentisto/medea"
+readme = "README.md"
+repository = "https://github.com/instrumentisto/medea"
 
 [dependencies]
-fantoccini = "0.11"
-webdriver = "0.39"
-serde_json = "1.0"
-serde = { version = "1.0", features = ["derive"] }
-tokio = "0.1"
-futures = "0.1"
-yansi = "0.5"
+actix = "0.8"
 actix-web = "1.0"
 actix-files = "0.1"
 clap = "2.33"
-actix = "0.8"
 failure = "0.1"
+fantoccini = "0.11"
+futures = "0.1"
+serde_json = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+tokio = "0.1"
+webdriver = "0.39"
+yansi = "0.5"
