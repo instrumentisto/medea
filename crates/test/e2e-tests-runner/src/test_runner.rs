@@ -2,7 +2,7 @@
 
 use std::{
     fs::File,
-    io::prelude::*,
+    io::{prelude::*, Error as IoError},
     path::{Path, PathBuf},
 };
 
@@ -57,17 +57,17 @@ impl From<NewSessionError> for Error {
 }
 
 /// Delete all generated tests html from test dir.
-// TODO: return Result
-fn delete_all_tests_htmls(path_test_dir: &Path) {
-    for entry in std::fs::read_dir(path_test_dir).unwrap() {
-        let entry = entry.unwrap();
+fn delete_all_tests_htmls(path_test_dir: &Path) -> Result<(), IoError> {
+    for entry in std::fs::read_dir(path_test_dir)? {
+        let entry = entry?;
         let path = entry.path();
         if let Some(ext) = path.extension() {
             if ext == "html" {
-                std::fs::remove_file(path).unwrap();
+                std::fs::remove_file(path)?;
             }
         }
     }
+    Ok(())
 }
 
 /// Medea's e2e tests runner.
@@ -89,7 +89,7 @@ impl TestRunner {
             let tests = get_all_tests_paths(&path_to_tests);
             let runner = Self { test_addr, tests };
             Either::A(runner.run_tests(&opts).then(move |err| {
-                delete_all_tests_htmls(&path_to_tests);
+                delete_all_tests_htmls(&path_to_tests).unwrap();
                 err
             }))
         } else {
@@ -99,7 +99,7 @@ impl TestRunner {
             };
             Either::B(runner.run_tests(&opts).then(move |err| {
                 let test_dir = path_to_tests.parent().unwrap();
-                delete_all_tests_htmls(&test_dir);
+                delete_all_tests_htmls(&test_dir).unwrap();
                 err
             }))
         }
@@ -265,6 +265,7 @@ fn get_webdriver_capabilities(opts: &ArgMatches) -> Capabilities {
         "--use-fake-device-for-media-stream",
         "--use-fake-ui-for-media-stream",
         "--disable-web-security",
+        "--no-sandbox"
     ];
     if opts.is_present("headless") {
         firefox_args.push("--headless");
@@ -274,8 +275,6 @@ fn get_webdriver_capabilities(opts: &ArgMatches) -> Capabilities {
     let firefox_settings = json!({
         "prefs": {
             "media.navigator.streams.fake": true,
-            "security.fileuri.strict_origin_policy": false,
-            "network.http.refere.XOriginPolicy": false,
             "media.navigator.permission.disabled": true,
             "media.autoplay.enabled": true,
             "media.autoplay.enabled.user-gestures-needed ": false,
