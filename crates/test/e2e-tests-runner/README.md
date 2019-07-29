@@ -4,7 +4,7 @@ Medea's e2e tests runner
 This program is used for running e2e tests jobs in browser
 with [WebDriver].
 
-Runner load tests only from `./specs` dir.
+Runner load tests only from `e2e-tests` root project dir.
 
 __All that is described below is needed for a better understanding of 
 how everything works. If you just want to run the tests, 
@@ -59,7 +59,7 @@ __1. Run [coturn]__
 
 __2. Build [jason] with target web__
 
-`$ wasm-pack build --target web --out-dir _dev/jason-pkg`
+`$ cd jason && wasm-pack build --target web --out-dir .cache/jason-pkg && cd ../`
 
 __3. Run [medea]__
 
@@ -73,7 +73,7 @@ __5. Run some [WebDriver] ([chromedriver] in this example)__
 
 `$ chromedriver -p 9515`
 
-__6. Run all tests from `./specs` path__
+__6. Run all tests from `e2e-tests` root project dir__
 
 `$ cargo run -p e2e-tests-runner -- -w http://localhost:9515 -f localhost:50000`
 

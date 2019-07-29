@@ -194,7 +194,7 @@ ifeq ($(dockerized),no)
 
 	@make down.medea
 
-	# Full medea e2e tests with cypress
+	# Full medea e2e tests with jason
 	cargo build $(if $(call eq,$(release),yes),--release)
 	cargo build -p control-api-mock
 	cd jason && wasm-pack build --target web --out-dir ../_dev/jason-pkg
