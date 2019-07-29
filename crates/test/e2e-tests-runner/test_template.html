@@ -6,7 +6,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/0.19.0/axios.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mocha/6.2.0/mocha.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/chai/4.2.0/chai.js"></script>
-    <script src="/e2e-tests/helpers/base.js"></script>
+    <!--Include all helpers from e2e-tests/helpers dir-->
+    <helpers/>
     <script type="module">
         import init, {Jason} from "/.cache/jason-pkg/jason.js";
 
@@ -44,7 +45,7 @@
 </script>
 
 <!--Test file including-->
-<script src="/e2e-tests/{{{}}}"></script>
+<script src="/e2e-tests/{{{test}}}"></script>
 
 <script>
     mocha.run();

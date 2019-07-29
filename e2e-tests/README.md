@@ -14,11 +14,9 @@ This tests will be running in real browser (`chromium`, `firefox`) by
 [e2e-tests-runner] and all results will be printed in terminal.
 
 Also in every test you can use already writen helpers from helpers path.
-If you wish add some helpers to some already existing file then use
-simple do it. Or else you wish create new file in helpers directory then
-you also need add this file into [test_template.html]. In this file
-you may add whatever you want (script, css, text). This is a file in the 
-context of which all tests will run.
+All files from `e2e-tests/helpers` will be included into test html as `<script>`.
+In [test_template.html] file you may add whatever you want (script, css, text). 
+This is a file in the context of which all tests will run.
 
 For interacting with [jason] you may call async function `window.getJason()`.
 This function will return new `Jason` object with whom you can interact as you wish.
