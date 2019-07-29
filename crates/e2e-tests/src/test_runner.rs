@@ -13,13 +13,14 @@ use fantoccini::{
     Client, Locator,
 };
 use futures::{
-    future::{Either, Loop},
+    future::{self, Either, Loop},
     Future,
 };
 use serde_json::json;
 use webdriver::capabilities::Capabilities;
 
 use crate::mocha_result::TestResults;
+use actix::Arbiter;
 
 #[derive(Debug, Fail)]
 pub enum Error {
@@ -149,7 +150,7 @@ impl TestRunner {
     ) -> impl Future<Item = Loop<(), (Client, Self)>, Error = Error> {
         client
             .execute("return console.logs", Vec::new())
-            .map_err(Error::from)
+            .map_err(|e| panic!("{:?}", e))
             .map(move |e| (e, client))
             .and_then(move |(result, client)| {
                 let logs = result.as_array().unwrap();
@@ -161,7 +162,7 @@ impl TestRunner {
                     {
                         println!("{}", test_results);
                         if test_results.is_has_error() {
-                            return Err(Error::TestsFailed);
+                            return Err((client, Error::TestsFailed));
                         } else {
                             return Ok(Loop::Continue((client, self)));
                         }
@@ -174,14 +175,15 @@ impl TestRunner {
                         println!("{}", message);
                     }
                 }
-                Err(Error::TestResultsNotFoundInLogs)
+                Err((client, Error::TestResultsNotFoundInLogs))
             })
+            .or_else(|(mut client, err)| client.close().then(move |_| Err(err)))
     }
 
     /// Returns url which runner will open.
     fn get_url_to_test(&self, test_path: &PathBuf) -> String {
         let filename = test_path.file_name().unwrap().to_str().unwrap();
-        format!("http://{}/specs/{}", self.test_addr, filename)
+        format!("http://{}/e2e-tests/{}", self.test_addr, filename)
     }
 }
 

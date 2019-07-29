@@ -16,7 +16,7 @@ members = [
     "proto/client-api",
     "proto/grpc",
     "control-api-mock",
-    "e2e-tests",
+    "crates/e2e-tests",
 ]
 
 [profile.release]
