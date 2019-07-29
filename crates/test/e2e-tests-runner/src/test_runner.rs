@@ -21,17 +21,25 @@ use webdriver::capabilities::Capabilities;
 
 use crate::mocha_result::TestResults;
 
+/// Errors which can occur in [`TestRunner`].
 #[allow(clippy::pub_enum_variant_names)]
 #[derive(Debug, Fail)]
 pub enum Error {
+    /// WebDriver command failed.
     #[fail(display = "WebDriver command failed: {:?}", _0)]
     CmdErr(CmdError),
+
+    /// WebDriver startup failed.
     #[fail(display = "WebDriver startup failed: {:?}", _0)]
     NewSessionError(NewSessionError),
+
+    /// Test results not found in browser logs.
     #[fail(display = "Test results not found in browser logs. Probably \
                       something wrong with template. See printed browser \
                       logs for more info.")]
     TestResultsNotFoundInLogs,
+
+    /// Some test failed.
     #[fail(display = "Some test failed.")]
     TestsFailed,
 }
@@ -48,6 +56,7 @@ impl From<NewSessionError> for Error {
     }
 }
 
+/// Delete all generated tests html from test dir.
 // TODO: return Result
 fn delete_all_tests_htmls(path_test_dir: &Path) {
     for entry in std::fs::read_dir(path_test_dir).unwrap() {
@@ -114,6 +123,8 @@ impl TestRunner {
     /// Tests loop which alternately launches tests in browser.
     ///
     /// This future resolve when all tests completed or when test failed.
+    ///
+    /// Returns [`Error::TestsFailed`] if some test failed.
     fn tests_loop(
         self,
         client: Client,
