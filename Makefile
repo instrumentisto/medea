@@ -186,7 +186,8 @@ ifeq ($(dockerized),no)
 	@make down.medea dockerized=no
 
 	cargo build $(if $(call eq,$(release),yes),--release)
-	env $(medea-env) $(if $(call eq,$(logs),yes),,RUST_LOG=warn) cargo run --bin medea $(if $(call eq,$(release),yes),--release) &
+	env $(medea-env) $(if $(call eq,$(logs),yes),,RUST_LOG=warn) cargo run \
+		--bin medea $(if $(call eq,$(release),yes),--release) &
 
 	sleep 1
 	- cargo test --test e2e
@@ -194,17 +195,33 @@ ifeq ($(dockerized),no)
 	@make down.medea
 
 	# Full medea e2e tests with cypress
-	cargo run & echo $$! > /tmp/e2e_medea.pid
-	cargo run -p control-api-mock & echo $$! > /tmp/e2e_control_api_mock.pid
-	npm run start --prefix=e2e-tests & echo $$! >/tmp/e2e_jason.pid
+	cargo build $(if $(call eq,$(release),yes),--release)
+	cargo build -p control-api-mock
 
-	e2e-tests/node_modules/.bin/wait-on http-get://localhost:8082 http-get://localhost:8000/hb
+	env $(if $(call eq,$(logs),yes),,RUST_LOG=warn) cargo run --bin medea \
+		$(if $(call eq,$(release),yes),--release) & \
+		echo $$! > /tmp/e2e_medea.pid
+	env RUST_LOG=warn cargo run -p control-api-mock & \
+		echo $$! > /tmp/e2e_control_api_mock.pid
+	chromedriver --port=9515 --log-level=OFF & echo $$! > /tmp/chromedriver.pid
+	geckodriver --port 4444 --log fatal & echo $$! > /tmp/geckodriver.pid
 
-	yarn --cwd=e2e-tests/ run cypress run -b chromium
-	kill $$(cat /tmp/e2e_jason.pid)
+	sleep 2
+
+	- cd e2e-tests && cargo run -- -w http://localhost:9515 -f localhost:50000 \
+	 	--headless
+	kill $$(cat /tmp/chromedriver.pid)
+
+	- cd e2e-tests && cargo run -- -w http://localhost:4444 -f localhost:50001 \
+		--headless
+	kill $$(cat /tmp/geckodriver.pid)
+
 	kill $$(cat /tmp/e2e_medea.pid)
 	kill $$(cat /tmp/e2e_control_api_mock.pid)
-	rm -f /tmp/e2e_jason.pid /tmp/e2e_medea.pid /tmp/e2e_control_api_mock.pid
+	rm -f /tmp/e2e_medea.pid \
+		/tmp/e2e_control_api_mock.pid \
+		/tmp/chromedriver.pid \
+		/tmp/geckodriver.pid
 ifneq ($(coturn),no)
 	@make down.coturn
 endif
