@@ -3,7 +3,7 @@
 pub mod mocha_result;
 pub mod test_runner;
 
-use std::{fs::canonicalize, path::PathBuf};
+use std::path::PathBuf;
 
 use actix::System;
 use actix_files::NamedFile;
@@ -38,9 +38,16 @@ fn run_test_files_server(addr: &str) -> Server {
 
 /// Returns [`PathBuf`] to test/test dir from clap's [`ArgMatches`].
 fn get_path_to_tests_from_args(opts: &ArgMatches) -> PathBuf {
-    let path_to_tests = opts.value_of("specs_path").unwrap();
-    let path_to_tests = PathBuf::from(path_to_tests);
-    canonicalize(path_to_tests).unwrap()
+    let mut test_path = std::env::current_dir().unwrap();
+    test_path.push("specs");
+    if let Some(path_to_test) = opts.value_of("specs_path") {
+        test_path.push(path_to_test);
+        if !test_path.exists() {
+            // TOOD: maybe print message
+            panic!("Test '{}' doesn't exist!", path_to_test);
+        }
+    }
+    test_path
 }
 
 fn delete_all_tests_htmls(path_test_dir: &Path) {
@@ -65,8 +72,7 @@ fn main() {
         .arg(
             Arg::with_name("specs_path")
                 .help("Path to specs/spec")
-                .index(1)
-                .required(true),
+                .index(1),
         )
         .arg(
             Arg::with_name("tests_files_addr")
