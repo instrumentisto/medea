@@ -14,6 +14,7 @@ use clap::{App as ClapApp, Arg, ArgMatches};
 use futures::Future;
 
 use crate::test_runner::TestRunner;
+use std::path::Path;
 
 /// HTTP endpoint which return requested file from this dir.
 /// Used for loading tests.
@@ -40,6 +41,18 @@ fn get_path_to_tests_from_args(opts: &ArgMatches) -> PathBuf {
     let path_to_tests = opts.value_of("specs_path").unwrap();
     let path_to_tests = PathBuf::from(path_to_tests);
     canonicalize(path_to_tests).unwrap()
+}
+
+fn delete_all_tests_htmls(path_test_dir: &Path) {
+    for entry in std::fs::read_dir(path_test_dir).unwrap() {
+        let entry = entry.unwrap();
+        let path = entry.path();
+        if let Some(ext) = path.extension() {
+            if ext == "html" {
+                std::fs::remove_file(path).unwrap();
+            }
+        }
+    }
 }
 
 fn main() {
@@ -78,6 +91,16 @@ fn main() {
         TestRunner::run(path_to_tests, &opts)
             .map_err(|e| panic!("{:?}", e))
             .and_then(move |_| server.stop(true))
+            .then(move |_| {
+                let test_path = get_path_to_tests_from_args(&opts);
+                if test_path.is_file() {
+                    let test_dir = test_path.parent().unwrap();
+                    delete_all_tests_htmls(&test_dir);
+                } else {
+                    delete_all_tests_htmls(&test_path);
+                }
+                futures::future::ok(())
+            })
             .map(|_| System::current().stop())
     })
     .unwrap();
