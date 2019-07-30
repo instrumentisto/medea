@@ -336,12 +336,6 @@ helm.init:
 				$(if $(call eq,$(upgrade),no),,--upgrade))
 
 
-helm-dep-cmd = $(if $(call eq,$(cmd),),build,$(cmd))
-
-helm.dep:
-	helm dep $(helm-dep-cmd) _helm/medea-demo/
-
-
 # Run project in Minikube Kubernetes cluster as Helm release.
 #
 # Usage:
@@ -363,7 +357,9 @@ endif
 #	make helm.down
 
 helm.down:
-	helm del --purge minikube
+	$(if $(shell helm ls | grep 'minikube'),\
+		helm del --purge minikube ,\
+		@echo "--> No 'minikube' release found in $(helm-cluster) cluster")
 
 
 # Lint project Helm chart.
@@ -421,6 +417,8 @@ endef
         docker.build.demo docker.build.medea docker.down.demo docker.up.demo \
         docs docs.rust \
         release.jason \
+        helm helm.down helm.init helm.up \
+        minikube.boot \
         test test.unit \
         up up.coturn up.demo up.dev up.jason up.medea \
         yarn

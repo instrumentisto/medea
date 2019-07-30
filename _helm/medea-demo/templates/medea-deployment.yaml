@@ -46,17 +46,6 @@ spec:
           args:
             - --verbose
             - --log-file=stdout
-#            - --external-ip=$(EXTERNAL_IP)
-#            - --listening-ip=$(EXTERNAL_IP)
-#            - --relay-ip=$(EXTERNAL_IP)
-#            - --external-ip=192.168.99.100
-#            - --listening-ip=192.168.99.100
-#            - --relay-ip=192.168.99.100
-#          env:
-#            - name: EXTERNAL_IP
-#              valueFrom:
-#                fieldRef:
-#                  fieldPath: status.hostIP
           ports:
             - name: turn
               containerPort: 3478
