@@ -5,9 +5,6 @@
 # https://hub.docker.com/_/rust
 ARG rust_ver=latest
 FROM rust:${rust_ver} AS dist
-ARG rustc_mode=release
-ARG rustc_opts=--release
-ARG cargo_home=/usr/local/cargo
 
 # Create the user and group files that will be used in the running container to
 # run the process as an unprivileged user.
