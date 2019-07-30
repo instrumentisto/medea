@@ -1,5 +1,4 @@
-use core::fmt;
-use std::net::SocketAddr;
+use std::{fmt, net::SocketAddr};
 
 use actix::{
     fut::wrap_future, Actor, ActorFuture, Addr, Context, Handler, MailboxError,

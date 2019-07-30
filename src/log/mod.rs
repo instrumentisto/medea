@@ -6,13 +6,14 @@ use chrono::Local;
 use slog::{
     o, Drain, Duplicate, FnValue, Fuse, Level, Logger, PushFnValue, Record,
 };
-use slog_async::Async;
+use slog_async::{Async, OverflowStrategy};
 use slog_json::Json;
 
 pub mod prelude;
 
 /// Builds JSON [`Logger`] which prints all its log records to `w_out` writer,
-/// but WARN level (and higher) to `w_err` writer.
+/// but WARN level (and higher) to `w_err` writer. Logger will use [`Async`]
+/// drain with channel size of 2048 entries and [`OverflowStrategy::Block`].
 ///
 /// Created [`Logger`] produces log records with `lvl`, `time` and `msg` fields
 /// by default.
@@ -29,7 +30,11 @@ where
     )
     .map(Fuse);
     let drain = slog_envlogger::new(drain).fuse();
-    let drain = Async::new(drain).build().fuse();
+    let drain = Async::new(drain)
+        .chan_size(2048)
+        .overflow_strategy(OverflowStrategy::Block)
+        .build()
+        .fuse();
     add_default_keys(&Logger::root(drain, o!()))
 }
 
