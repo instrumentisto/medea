@@ -29,6 +29,10 @@ indent_size = 2
 indent_style = space
 indent_size = 2
 
+[*.html]
+indent_style = space
+indent_size = 4
+
 [Makefile]
 indent_style = tab
 indent_size = 4
@@ -38,5 +42,9 @@ indent_style = space
 indent_size = 4
 
 [hooks/*]
+indent_style = space
+indent_size = 2
+
+[**/nginx{/*,.*}.conf]
 indent_style = space
 indent_size = 2
