@@ -256,6 +256,7 @@ else
 	@make up.coturn
 
 	docker build -t medea-build -f build/medea/Dockerfile .
+#	docker build -t medea-geckodriver -f build/geckodriver/Dockerfile .
 
 #	$(run-medea-container) make test.e2e dockerized=no coturn=no release=yes
 
@@ -265,16 +266,34 @@ else
 	$(run-medea-container) cargo build -p control-api-mock
 	$(run-medea-container-d) cargo run -p control-api-mock > /tmp/control-api-mock.docker.uid
 
-	docker run --rm -d --network=host drupalci/chromedriver:dev > /tmp/chromedriver.docker.uid
 
 	$(run-medea-container) cargo build -p e2e-tests-runner
-	$(run-medea-container) cargo run -p e2e-tests-runner -- -f localhost:$(test-runner-port) -w http://localhost:9515 --headless
+
+	########################
+	# Run tests in chrome #
+	########################
+	docker run --rm -d --network=host drupalci/chromedriver:dev > /tmp/chromedriver.docker.uid
+	$(run-medea-container) cargo run -p e2e-tests-runner -- \
+		-f localhost:$(test-runner-port) \
+		-w http://localhost:9515 \
+		--headless
+	docker container kill $$(cat /tmp/chromedriver.docker.uid)
+	rm -f /tmp/chromedriver.docker.uid
+
+	########################
+	# Run tests in firefox #
+	########################
+	docker run --rm -d --network=host medea-geckodriver > /tmp/geckodriver.docker.uid
+	$(run-medea-container) cargo run -p e2e-tests-runner -- \
+		-f localhost:$(test-runner-port) \
+		-w http://localhost:4444 \
+		--headless
+	docker container kill $$(cat /tmp/geckodriver.docker.uid)
+	rm -f /tmp/geckodriver.docker.uid
 
 	docker container stop $$(cat /tmp/control-api-mock.docker.uid)
 	docker container stop $$(cat /tmp/medea.docker.uid)
-	docker container kill $$(cat /tmp/chromedriver.docker.uid)
-
-	rm -f /tmp/control-api-mock.docker.uid /tmp/medea.docker.uid /tmp/chromedriver.docker.uid
+	rm -f /tmp/control-api-mock.docker.uid /tmp/medea.docker.uid
 
 	@make down.coturn
 endif
