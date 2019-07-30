@@ -11,11 +11,11 @@ spec:
     - host: medea-demo.test
       http:
         paths:
-          - path: /app
-            backend:
-              serviceName: webclient
-              servicePort: webclient-port
           - path: /ws
             backend:
               serviceName: medea
               servicePort: medea-http
+          - path: /
+            backend:
+              serviceName: webclient
+              servicePort: webclient-port
