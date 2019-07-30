@@ -192,6 +192,16 @@ medea-env = RUST_BACKTRACE=1 \
 	$(if $(call eq,$(logs),yes),,RUST_LOG=warn) \
 	MEDEA_SERVER.STATIC_SPECS_PATH=tests/specs
 
+chromedriver-port = 50000
+geckodriver-port = 50001
+test-runner-port = 51000
+
+run-medea-command = docker run --rm --network=host -v "$(PWD)":/app -w /app \
+                    	-v "$(PWD)/.cache/medea/registry":/usr/local/cargo/registry \
+                    	-v "$(PWD)/.cache/medea/target":/app/target
+run-medea-container-d =  $(run-medea-command) -d medea-build:latest
+run-medea-container = $(run-medea-command) medea-build:latest
+
 test.e2e:
 ifneq ($(coturn),no)
 	@make up.coturn
@@ -218,16 +228,16 @@ ifeq ($(dockerized),no)
 		echo $$! > /tmp/e2e_medea.pid
 	env RUST_LOG=warn cargo run -p control-api-mock & \
 		echo $$! > /tmp/e2e_control_api_mock.pid
-	chromedriver --port=9515 --log-level=OFF & echo $$! > /tmp/chromedriver.pid
-	geckodriver --port 4444 --log fatal & echo $$! > /tmp/geckodriver.pid
+	chromedriver --port=$(chromedriver-port) --log-level=OFF & echo $$! > /tmp/chromedriver.pid
+	geckodriver --port $(geckodriver-port) --log fatal & echo $$! > /tmp/geckodriver.pid
 
 	sleep 2
 
-	- cargo run -p e2e-tests-runner -- -w http://localhost:9515 -f localhost:50000 \
+	- cargo run -p e2e-tests-runner -- -w http://localhost:$(chromedriver-port) -f localhost:$(test-runner-port) \
 	 	--headless
 	kill $$(cat /tmp/chromedriver.pid)
 
-	- cargo run -p e2e-tests-runner -- -w http://localhost:4444 -f localhost:50001 \
+	- cargo run -p e2e-tests-runner -- -w http://localhost:$(geckodriver-port) -f localhost:$(test-runner-port) \
 		--headless
 	kill $$(cat /tmp/geckodriver.pid)
 
@@ -246,11 +256,25 @@ else
 	@make up.coturn
 
 	docker build -t medea-build -f build/medea/Dockerfile .
-	docker run --rm --network=host -v "$(PWD)":/app -w /app \
-			   -v "$(PWD)/.cache/medea/registry":/usr/local/cargo/registry \
-			   -v "$(PWD)/.cache/medea/target":/app/target \
-		medea-build:latest \
-			make test.e2e dockerized=no coturn=no release=yes
+
+#	$(run-medea-container) make test.e2e dockerized=no coturn=no release=yes
+
+	$(run-medea-container) cargo build
+	$(run-medea-container-d) cargo run > /tmp/medea.docker.uid
+
+	$(run-medea-container) cargo build -p control-api-mock
+	$(run-medea-container-d) cargo run -p control-api-mock > /tmp/control-api-mock.docker.uid
+
+	docker run --rm -d --network=host drupalci/chromedriver:dev > /tmp/chromedriver.docker.uid
+
+	$(run-medea-container) cargo build -p e2e-tests-runner
+	$(run-medea-container) cargo run -p e2e-tests-runner -- -f localhost:$(test-runner-port) -w http://localhost:9515 --headless
+
+	docker container stop $$(cat /tmp/control-api-mock.docker.uid)
+	docker container stop $$(cat /tmp/medea.docker.uid)
+	docker container kill $$(cat /tmp/chromedriver.docker.uid)
+
+	rm -f /tmp/control-api-mock.docker.uid /tmp/medea.docker.uid /tmp/chromedriver.docker.uid
 
 	@make down.coturn
 endif
