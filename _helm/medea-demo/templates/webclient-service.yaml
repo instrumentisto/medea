@@ -10,6 +10,6 @@ spec:
     app: webclient
     tier: frontend
   ports:
-    - name: webclient
-      port: 80
+    - name: webclient-port
+      port: 443
       targetPort: 80

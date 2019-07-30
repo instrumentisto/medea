@@ -3,11 +3,19 @@ apiVersion: extensions/v1beta1
 metadata:
   name: webclient
 spec:
+  tls:
+    - hosts:
+        - medea-demo.test
+      secretName: medea-demo-cert
   rules:
     - host: medea-demo.test
       http:
         paths:
-          - path: /
+          - path: /app
             backend:
               serviceName: webclient
-              servicePort: 80
+              servicePort: webclient-port
+          - path: /ws
+            backend:
+              serviceName: medea
+              servicePort: medea-http
