@@ -228,16 +228,29 @@ ifeq ($(dockerized),no)
 		echo $$! > /tmp/e2e_medea.pid
 	env RUST_LOG=warn cargo run -p control-api-mock & \
 		echo $$! > /tmp/e2e_control_api_mock.pid
-	chromedriver --port=$(chromedriver-port) --log-level=OFF & echo $$! > /tmp/chromedriver.pid
-	geckodriver --port $(geckodriver-port) --log fatal & echo $$! > /tmp/geckodriver.pid
+	chromedriver --port=$(chromedriver-port) --log-level=OFF \
+		& echo $$! > /tmp/chromedriver.pid
+	geckodriver --port $(geckodriver-port) \
+		--log fatal \
+		& echo $$! > /tmp/geckodriver.pid
 
 	sleep 2
 
-	- cargo run -p e2e-tests-runner -- -w http://localhost:$(chromedriver-port) -f localhost:$(test-runner-port) \
+	########################
+	# Run tests in chrome #
+	########################
+	- cargo run -p e2e-tests-runner -- \
+		-w http://localhost:$(chromedriver-port) \
+		-f localhost:$(test-runner-port) \
 	 	--headless
 	kill $$(cat /tmp/chromedriver.pid)
 
-	- cargo run -p e2e-tests-runner -- -w http://localhost:$(geckodriver-port) -f localhost:$(test-runner-port) \
+	########################
+	# Run tests in firefox #
+	########################
+	- cargo run -p e2e-tests-runner -- \
+		-w http://localhost:$(geckodriver-port) \
+		-f localhost:$(test-runner-port) \
 		--headless
 	kill $$(cat /tmp/geckodriver.pid)
 
@@ -255,10 +268,11 @@ else
 	@make down.medea dockerized=no
 	@make up.coturn
 
+	# TODO: publish it to docker hub
 	docker build -t medea-build -f build/medea/Dockerfile .
-#	docker build -t medea-geckodriver -f build/geckodriver/Dockerfile .
+	docker build -t medea-geckodriver -f build/geckodriver/Dockerfile .
 
-#	$(run-medea-container) make test.e2e dockerized=no coturn=no release=yes
+	$(run-medea-container) make test.e2e dockerized=no coturn=no release=yes
 
 	$(run-medea-container) cargo build
 	$(run-medea-container-d) cargo run > /tmp/medea.docker.uid
