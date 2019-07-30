@@ -1,0 +1,18 @@
+apiVersion: v1
+data:
+  redis.conf: |
+    requirepass turn
+    timeout 0
+    tcp-keepalive 60
+  coturn.turnserver.conf: |
+    lt-cred-mech
+    fingerprint
+    no-cli
+    no-tls
+    no-dtls
+    realm=medea
+    redis-userdb="ip=127.0.0.1 port=6379 dbname=0 password=turn"
+    user=USER:PASS
+kind: ConfigMap
+metadata:
+  name: medea.config

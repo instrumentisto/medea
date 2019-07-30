@@ -17,9 +17,8 @@ spec:
       labels:
         app: webclient
         tier: frontend
-        version: 0.0.1
     spec:
       containers:
-        - name: kurento
+        - name: webclient
           image: instrumentisto/medea-demo:dev
           imagePullPolicy: IfNotPresent

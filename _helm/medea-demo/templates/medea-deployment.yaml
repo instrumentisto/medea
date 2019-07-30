@@ -6,29 +6,78 @@ metadata:
     app: medea
     tier: backend
 spec:
-  serviceName: medea
-  replicas: 1
-  hostNetwork: true
-  dnsPolicy: ClusterFirstWithHostNet
   selector:
     matchLabels:
       app: medea
       tier: backend
   template:
+    spec:
+      hostNetwork: true
+      containers:
+        - name: medea
+          image: instrumentisto/medea:dev
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: medea-http
+              containerPort: 8080
+          env:
+            - name: MEDEA_LOG.LEVEL
+              value: 'DEBUG'
+        - name: coturn-db
+          image: redis:alpine
+          imagePullPolicy: IfNotPresent
+          args: ['redis-server', '/etc/redis.conf']
+          volumeMounts:
+            - name: config
+              subPath: redis.conf
+              mountPath: /etc/redis.conf
+              readOnly: true
+          livenessProbe:
+            exec:
+              command: ['redis-cli', 'ping']
+            initialDelaySeconds: 30
+          readinessProbe:
+            exec:
+              command: ['redis-cli', 'ping']
+            initialDelaySeconds: 5
+        - name: coturn
+          image: instrumentisto/coturn:4.5
+          imagePullPolicy: Always
+          args:
+            - --verbose
+            - --log-file=stdout
+#            - --external-ip=$(EXTERNAL_IP)
+#            - --listening-ip=$(EXTERNAL_IP)
+#            - --relay-ip=$(EXTERNAL_IP)
+#            - --external-ip=192.168.99.100
+#            - --listening-ip=192.168.99.100
+#            - --relay-ip=192.168.99.100
+#          env:
+#            - name: EXTERNAL_IP
+#              valueFrom:
+#                fieldRef:
+#                  fieldPath: status.hostIP
+          ports:
+            - name: turn
+              containerPort: 3478
+              protocol: TCP
+            - name: turn-udp
+              containerPort: 3478
+              protocol: UDP
+          volumeMounts:
+            - name: config
+              subPath: coturn.turnserver.conf
+              mountPath: /etc/coturn/turnserver.conf
+              readOnly: true
+            - name: coturn-data
+              mountPath: /var/lib/coturn
+      volumes:
+        - name: config
+          configMap:
+            name: medea.config
+        - name: coturn-data
+          emptyDir: {}
     metadata:
       labels:
         app: medea
         tier: backend
-        version: 0.0.1
-    spec:
-      containers:
-        - name: medea
-          image: instrumentisto/medea:dev
-          ports:
-            - containerPort: 8080
-          env:
-            - name: MEDEA_SERVER.BIND_IP
-              value: "0.0.0.0"
-            - name: MEDEA_SERVER.BIND_PORT
-              value: "8080"
-          imagePullPolicy: IfNotPresent
