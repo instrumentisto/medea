@@ -16,5 +16,7 @@ RUN apt-get update
 RUN apt-get install -y cmake protobuf-compiler golang
 ENV GOPATH /usr/lib/go
 
+RUN cargo install wasm-pack
+
 COPY / /app/
 WORKDIR "/app"

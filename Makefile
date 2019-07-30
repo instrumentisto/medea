@@ -60,7 +60,7 @@ up.dev:
 	$(MAKE) -j3 up.coturn up.jason up.medea
 
 
-test: test.unit test.e2e
+test: test.unit test.signalling test.e2e
 
 
 
@@ -181,6 +181,22 @@ endif
 endif
 
 
+test.signalling:
+ifneq ($(coturn),no)
+	@make up.coturn
+endif
+	@make down.medea dockerized=no
+
+	cargo build $(if $(call eq,$(release),yes),--release)
+	env $(medea-env) $(if $(call eq,$(logs),yes),,RUST_LOG=warn) cargo run \
+		--bin medea $(if $(call eq,$(release),yes),--release) &
+
+	sleep 1
+	- cargo test --test e2e
+
+	@make down.medea
+
+
 # Run Rust e2e tests of project.
 # If logs set to "yes" then medea print all logs to stdout.
 #
@@ -207,18 +223,6 @@ ifneq ($(coturn),no)
 	@make up.coturn
 endif
 ifeq ($(dockerized),no)
-	@make down.medea dockerized=no
-
-	cargo build $(if $(call eq,$(release),yes),--release)
-	env $(medea-env) $(if $(call eq,$(logs),yes),,RUST_LOG=warn) cargo run \
-		--bin medea $(if $(call eq,$(release),yes),--release) &
-
-	sleep 1
-	- cargo test --test e2e
-
-	@make down.medea
-
-	# Full medea e2e tests with jason
 	cargo build $(if $(call eq,$(release),yes),--release)
 	cargo build -p control-api-mock
 	cd jason && wasm-pack build --target web --out-dir ../_dev/jason-pkg
@@ -272,7 +276,7 @@ else
 	docker build -t medea-build -f build/medea/Dockerfile .
 	docker build -t medea-geckodriver -f build/geckodriver/Dockerfile .
 
-	$(run-medea-container) make test.e2e dockerized=no coturn=no release=yes
+	$(run-medea-container) make test.signalling dockerized=no coturn=no release=yes
 
 	$(run-medea-container) cargo build
 	$(run-medea-container-d) cargo run > /tmp/medea.docker.uid
