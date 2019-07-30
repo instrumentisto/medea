@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Chat</title>
+    <meta http-equiv='Content-Type' content='text/html; charset=UTF-8'/>
+
+    <script type="module">
+
+        import init, {Jason} from './js/jason_alexlapa.js';
+
+        var inited = false;
+
+        export async function run(credentials) {
+
+            if (!inited) {
+                await init();
+                inited = true;
+            }
+
+            let jason = new Jason();
+
+            jason.on_local_stream(function (stream, error) {
+                if (stream) {
+                    let local_video = document.getElementById("yourvid");
+
+                    local_video.srcObject = stream.get_media_stream();
+                    local_video.play();
+                } else {
+                    console.error(error);
+                }
+            });
+
+            let room = await jason.join_room(credentials);
+
+            room.on_new_connection(function (connection) {
+                connection.on_remote_stream(function (stream) {
+                    let remote_video = document.getElementById("partnervid");
+
+                    remote_video.srcObject = stream.get_media_stream();
+                    remote_video.play();
+                });
+            });
+        }
+
+        window.connect_room = async function connect_room(credentials) {
+            run(credentials)
+        }
+
+    </script>
+
+    <script type="text/javascript">
+
+
+        var baseUrl = "ws://localhost:8080/ws/";
+
+        window.onload = function () {
+            var chooseRoomDiv = document.getElementById('choose-room');
+            var videoCallDiv = document.getElementById('video-call');
+            var chooseRoomButton = document.getElementById('choose-room-btn');
+            var roomIdInput = document.getElementById('room-id-input');
+
+            var joinCallerButton = document.getElementById('join-caller');
+            var joinResponderButton = document.getElementById('join-responder');
+
+            var bindJoinButtons = function(roomId){
+                joinCallerButton.onclick = function () {
+                    window.connect_room(baseUrl+roomId+'/1/caller_credentials')
+                };
+                joinResponderButton.onclick = function () {
+                    window.connect_room(baseUrl+roomId+'/2/responder_credentials')
+                };
+            };
+
+            let roomId = sessionId = window.location.hash.replace("#", "");
+
+            if (roomId) {
+                bindJoinButtons(roomId);
+                chooseRoomDiv.style.display = "none";
+                videoCallDiv.style.display = "";
+            } else {
+                chooseRoomButton.onclick = function() {
+                    let roomId = roomIdInput.value;
+
+                    window.location.hash=roomId;
+                    bindJoinButtons(roomId);
+
+                    chooseRoomDiv.style.display = "none";
+                    videoCallDiv.style.display = "";
+                };
+            }
+        };
+
+    </script>
+
+    <style>
+        .video-call {
+            display: flex;
+            flex-flow: row nowrap;
+            width: 100%;
+            flex-wrap: nowrap;
+            flex-direction: row;
+        }
+
+        .video {
+            display: flex;
+            justify-content: center;
+            flex-direction: column;
+            margin-right: 10px;
+            text-align: center;
+        }
+
+        .video > video {
+            background: dimgrey;
+        }
+
+        .connect-btns {
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+
+<div id="choose-room">
+    <input id="room-id-input">
+    <button id="choose-room-btn" type="submit">JOIN</button>
+</div>
+
+<div id="video-call" style="display: none">
+    <div class="video-call">
+        <div class="video">
+            <video id="yourvid" muted autoplay width="100%" height="100%"></video>
+            <b>You</b>
+        </div>
+        <div class="video">
+            <video id="partnervid" autoplay width="100%" height="100%"></video>
+            <b>Partner</b>
+        </div>
+    </div>
+    <div class="connect-btns">
+        <button id="join-caller">Start caller session</button>
+        <button id="join-responder">Start responder session
+        </button>
+    </div>
+</div>
+
+</body>
+</html>
