@@ -181,6 +181,11 @@ endif
 endif
 
 
+# Run medea's signalling tests.
+#
+# Usage:
+#   make test.signalling [release=(no|yes)] [logs=(no|yes)]
+
 test.signalling:
 ifneq ($(coturn),no)
 	@make up.coturn
@@ -223,9 +228,11 @@ ifneq ($(coturn),no)
 	@make up.coturn
 endif
 ifeq ($(dockerized),no)
+	@make test.signalling coturn=no
+
 	cargo build $(if $(call eq,$(release),yes),--release)
 	cargo build -p control-api-mock
-	cd jason && wasm-pack build --target web --out-dir ../_dev/jason-pkg
+	$(run-medea-container) sh -c "cd jason && wasm-pack build --target web --out-dir ../.cache/jason-pkg"
 
 	env $(if $(call eq,$(logs),yes),,RUST_LOG=warn) cargo run --bin medea \
 		$(if $(call eq,$(release),yes),--release) & \
@@ -275,6 +282,8 @@ else
 	# TODO: publish it to docker hub
 	docker build -t medea-build -f build/medea/Dockerfile .
 	docker build -t medea-geckodriver -f build/geckodriver/Dockerfile .
+
+	$(run-medea-container) sh -c "cd jason && wasm-pack build --target web --out-dir ../.cache/jason-pkg"
 
 	$(run-medea-container) make test.signalling dockerized=no coturn=no release=yes
 
