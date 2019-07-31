@@ -10,9 +10,9 @@ use serde::Deserialize;
 use super::{
     endpoint::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
     pipeline::Pipeline,
+    room::RoomElement,
     TryFromElementError,
 };
-use crate::api::control::room::RoomElement;
 
 macro_attr! {
     /// ID of `Member`.

@@ -10,17 +10,13 @@ use std::{convert::TryFrom as _, fs::File, io::Read as _, path::Path};
 use failure::{Error, Fail};
 use serde::Deserialize;
 
-use self::{
-    endpoint::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
-    pipeline::Pipeline,
-};
+use self::pipeline::Pipeline;
 
 pub use self::{
     endpoint::Endpoint,
     member::{Id as MemberId, MemberSpec},
-    room::{Id as RoomId, RoomSpec},
+    room::{Id as RoomId, RoomElement, RoomSpec},
 };
-use crate::api::control::room::RoomElement;
 
 #[derive(Clone, Deserialize, Debug)]
 #[serde(tag = "kind")]
@@ -38,36 +34,10 @@ pub enum RootElement {
 #[allow(clippy::pub_enum_variant_names)]
 #[derive(Debug, Fail)]
 pub enum TryFromElementError {
-    #[fail(display = "Element is not Endpoint")]
-    NotEndpoint,
     #[fail(display = "Element is not Room")]
     NotRoom,
     #[fail(display = "Element is not Member")]
     NotMember,
-}
-
-/// Entity for parsing Control API request.
-#[derive(Clone, Deserialize, Debug)]
-#[serde(tag = "kind")]
-pub enum Element {
-    /// Represent [`RoomSpec`].
-    /// Can transform into [`RoomSpec`] by `RoomSpec::try_from`.
-    Room { id: RoomId, spec: Pipeline<Element> },
-
-    /// Represent [`MemberSpec`].
-    /// Can transform into [`MemberSpec`] by `MemberSpec::try_from`.
-    Member {
-        spec: Pipeline<Element>,
-        credentials: String,
-    },
-
-    /// Represent [`WebRtcPublishEndpoint`].
-    /// Can transform into [`Endpoint`] enum by `Endpoint::try_from`.
-    WebRtcPublishEndpoint { spec: WebRtcPublishEndpoint },
-
-    /// Represent [`WebRtcPlayEndpoint`].
-    /// Can transform into [`Endpoint`] enum by `Endpoint::try_from`.
-    WebRtcPlayEndpoint { spec: WebRtcPlayEndpoint },
 }
 
 /// Load [`RoomSpec`] from file with YAML format.
