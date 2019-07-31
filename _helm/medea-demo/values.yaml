@@ -11,6 +11,11 @@ demo:
     pullPolicy: IfNotPresent
 
 ingress:
+  enabled: yes
+
   # Hosts must be specified without "www." part.
   hosts:
     - medea-demo.test
+
+  tls:
+    enabled: yes

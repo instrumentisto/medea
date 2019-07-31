@@ -1,14 +1,20 @@
+{{- if .Values.ingress.enabled -}}
+{{- range $i, $host := .Values.ingress.hosts }}
+---
 kind: Ingress
 apiVersion: extensions/v1beta1
 metadata:
-  name: webclient
+  name: webclient.{{ $host }}
 spec:
+{{- if $.Values.ingress.tls.enabled }}
   tls:
     - hosts:
-        - medea-demo.test
+        - {{ $host | quote }}
+        - {{ printf "www.%s" $host | quote }}
       secretName: medea-demo-cert
+{{- end }}
   rules:
-    - host: medea-demo.test
+    - host: {{ $host | quote }}
       http:
         paths:
           - path: /ws
@@ -19,3 +25,16 @@ spec:
             backend:
               serviceName: webclient
               servicePort: http
+    - host: {{ printf "www.%s" $host | quote }}
+      http:
+        paths:
+          - path: /ws
+            backend:
+              serviceName: medea
+              servicePort: http
+          - path: /
+            backend:
+              serviceName: webclient
+              servicePort: http
+{{- end }}
+{{- end -}}
