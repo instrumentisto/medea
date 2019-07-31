@@ -17,8 +17,9 @@ spec:
         - name: medea
           image: "{{ $.Values.medea.image.repository }}:{{ $.Values.medea.image.tag }}"
           imagePullPolicy: {{ $.Values.medea.image.pullPolicy }}
-          args:
-            - --conf /etc/medea.toml
+          env:
+            - name: MEDEA_CONF
+              value: '/etc/medea.toml'
           ports:
             - name: medea-http
               containerPort: 8080
