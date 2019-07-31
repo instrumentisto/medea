@@ -14,10 +14,10 @@ use crate::api::control::{
         webrtc_play_endpoint::WebRtcPlayEndpoint,
         webrtc_publish_endpoint::{WebRtcPublishEndpoint, WebRtcPublishId},
     },
-    Endpoint, TryFromProtobufError, WebRtcPlayId,
+    pipeline::Pipeline,
+    room::RoomElement,
+    Endpoint, TryFromElementError, TryFromProtobufError, WebRtcPlayId,
 };
-
-use super::{pipeline::Pipeline, Element, TryFromElementError};
 
 const MEMBER_CREDENTIALS_LEN: usize = 32;
 
@@ -36,20 +36,33 @@ macro_attr! {
     pub struct Id(pub String);
 }
 
+#[allow(clippy::module_name_repetitions)]
+#[derive(Clone, Deserialize, Debug)]
+#[serde(tag = "kind")]
+pub enum MemberElement {
+    /// Represent [`WebRtcPublishEndpoint`].
+    /// Can transform into [`Endpoint`] enum by `Endpoint::try_from`.
+    WebRtcPublishEndpoint { spec: WebRtcPublishEndpoint },
+
+    /// Represent [`WebRtcPlayEndpoint`].
+    /// Can transform into [`Endpoint`] enum by `Endpoint::try_from`.
+    WebRtcPlayEndpoint { spec: WebRtcPlayEndpoint },
+}
+
 /// Newtype for [`Element::Member`] variant.
 #[allow(clippy::module_name_repetitions)]
 #[derive(Clone, Debug)]
 pub struct MemberSpec {
     /// Spec of this `Member`.
-    pipeline: Pipeline,
+    pipeline: Pipeline<MemberElement>,
 
     /// Credentials to authorize `Member` with.
     credentials: String,
 }
 
-impl Into<Element> for MemberSpec {
-    fn into(self) -> Element {
-        Element::Member {
+impl Into<RoomElement> for MemberSpec {
+    fn into(self) -> RoomElement {
+        RoomElement::Member {
             spec: self.pipeline,
             credentials: self.credentials,
         }
@@ -62,7 +75,7 @@ impl MemberSpec {
         self.pipeline
             .iter()
             .filter_map(|(id, e)| match e {
-                Element::WebRtcPlayEndpoint { spec } => {
+                MemberElement::WebRtcPlayEndpoint { spec } => {
                     Some((WebRtcPlayId(id.clone()), spec))
                 }
                 _ => None,
@@ -77,7 +90,7 @@ impl MemberSpec {
         self.pipeline
             .iter()
             .filter_map(|(id, e)| match e {
-                Element::WebRtcPublishEndpoint { spec } => {
+                MemberElement::WebRtcPublishEndpoint { spec } => {
                     Some((WebRtcPublishId(id.clone()), spec))
                 }
                 _ => None,
@@ -124,12 +137,14 @@ impl TryFrom<&MemberProto> for MemberSpec {
     }
 }
 
-impl TryFrom<&Element> for MemberSpec {
+impl TryFrom<&RoomElement> for MemberSpec {
     type Error = TryFromElementError;
 
-    fn try_from(from: &Element) -> Result<Self, Self::Error> {
+    // TODO: delete this allow when some new RoomElement will be added.
+    #[allow(unreachable_patterns)]
+    fn try_from(from: &RoomElement) -> Result<Self, Self::Error> {
         match from {
-            Element::Member { spec, credentials } => Ok(Self {
+            RoomElement::Member { spec, credentials } => Ok(Self {
                 pipeline: spec.clone(),
                 credentials: credentials.clone(),
             }),

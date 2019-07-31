@@ -9,7 +9,7 @@ use medea_grpc_proto::control::{
     CreateRequest, Member_Element as MemberElementProto,
 };
 
-use super::{Element, TryFromElementError, TryFromProtobufError};
+use super::{member::MemberElement, TryFromElementError, TryFromProtobufError};
 
 #[doc(inline)]
 pub use webrtc_play_endpoint::WebRtcPlayEndpoint;
@@ -24,13 +24,15 @@ pub enum Endpoint {
     WebRtcPlay(WebRtcPlayEndpoint),
 }
 
-impl Into<Element> for Endpoint {
-    fn into(self) -> Element {
+impl Into<MemberElement> for Endpoint {
+    fn into(self) -> MemberElement {
         match self {
             Endpoint::WebRtcPublish(e) => {
-                Element::WebRtcPublishEndpoint { spec: e }
+                MemberElement::WebRtcPublishEndpoint { spec: e }
             }
-            Endpoint::WebRtcPlay(e) => Element::WebRtcPlayEndpoint { spec: e },
+            Endpoint::WebRtcPlay(e) => {
+                MemberElement::WebRtcPlayEndpoint { spec: e }
+            }
         }
     }
 }
@@ -69,18 +71,17 @@ impl TryFrom<&CreateRequest> for Endpoint {
     }
 }
 
-impl TryFrom<&Element> for Endpoint {
+impl TryFrom<&MemberElement> for Endpoint {
     type Error = TryFromElementError;
 
-    fn try_from(from: &Element) -> Result<Self, Self::Error> {
+    fn try_from(from: &MemberElement) -> Result<Self, Self::Error> {
         match from {
-            Element::WebRtcPlayEndpoint { spec } => {
+            MemberElement::WebRtcPlayEndpoint { spec } => {
                 Ok(Endpoint::WebRtcPlay(spec.clone()))
             }
-            Element::WebRtcPublishEndpoint { spec } => {
+            MemberElement::WebRtcPublishEndpoint { spec } => {
                 Ok(Endpoint::WebRtcPublish(spec.clone()))
             }
-            _ => Err(TryFromElementError::NotEndpoint),
         }
     }
 }

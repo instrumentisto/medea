@@ -10,40 +10,38 @@ use std::{
 
 use serde::Deserialize;
 
-use crate::api::control::Element;
-
 /// Entity that represents some pipeline of spec.
 #[derive(Clone, Deserialize, Debug)]
-pub struct Pipeline {
-    pipeline: HashMap<String, Element>,
+pub struct Pipeline<T> {
+    pipeline: HashMap<String, T>,
 }
 
-impl Pipeline {
-    pub fn new(pipeline: HashMap<String, Element>) -> Self {
+impl<T> Pipeline<T> {
+    pub fn new(pipeline: HashMap<String, T>) -> Self {
         Self { pipeline }
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = (&String, &Element)> {
+    pub fn iter(&self) -> impl Iterator<Item = (&String, &T)> {
         self.into_iter()
     }
 
-    pub fn get(&self, id: &str) -> Option<&Element> {
+    pub fn get(&self, id: &str) -> Option<&T> {
         self.pipeline.get(id)
     }
 }
 
-impl IntoIterator for Pipeline {
-    type IntoIter = IntoIter<String, Element>;
-    type Item = (String, Element);
+impl<T> IntoIterator for Pipeline<T> {
+    type IntoIter = IntoIter<String, T>;
+    type Item = (String, T);
 
     fn into_iter(self) -> Self::IntoIter {
         self.pipeline.into_iter()
     }
 }
 
-impl<'a> IntoIterator for &'a Pipeline {
-    type IntoIter = Iter<'a, String, Element>;
-    type Item = (&'a String, &'a Element);
+impl<'a, T> IntoIterator for &'a Pipeline<T> {
+    type IntoIter = Iter<'a, String, T>;
+    type Item = (&'a String, &'a T);
 
     fn into_iter(self) -> Self::IntoIter {
         self.pipeline.iter()
