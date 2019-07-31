@@ -4,8 +4,8 @@ data:
     {{- tpl (.Files.Get "conf/redis.conf") . | nindent 4 }}
   coturn.turnserver.conf: |
     {{- tpl (.Files.Get "conf/turnserver.conf") . | nindent 4 }}
-  medea.conf.toml: |
-    {{- tpl (.Files.Get "conf/medea-conf.toml") . | nindent 4 }}
+  medea.toml: |
+    {{- tpl (.Files.Get "conf/medea.toml") . | nindent 4 }}
 kind: ConfigMap
 metadata:
   name: medea.config
