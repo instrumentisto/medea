@@ -29,6 +29,7 @@ macro_attr! {
     pub struct Id(pub String);
 }
 
+#[allow(clippy::module_name_repetitions)]
 #[derive(Clone, Deserialize, Debug)]
 #[serde(tag = "kind")]
 pub enum MemberElement {
