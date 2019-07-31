@@ -69,35 +69,31 @@ pub enum ErrorCode {
     ///
     /// Code: __1101__.
     NotMemberInSpec(LocalUriType),
-    /// Medea expects `Endpoint` element in pipeline but received not him.
-    ///
-    /// Code: __1102__.
-    NotEndpointInSpec(LocalUriType),
     /// Invalid source URI in play endpoint.
     ///
-    /// Code: __1103__.
+    /// Code: __1102__.
     InvalidSrcUri(LocalUri<IsEndpointId>),
     /// Provided element ID to Room element but element spec is not for Room.
     ///
-    /// Code: __1104__.
+    /// Code: __1103__.
     ElementIdForRoomButElementIsNot(String),
     /// Provided element ID to Member element but element spec is not for
     /// Member.
     ///
-    /// Code: __1105__.
+    /// Code: __1104__.
     ElementIdForMemberButElementIsNot(String),
     /// Provided element ID to Endpoint element but element spec is not for
     /// Endpoint.
     ///
-    /// Code: __1106__.
+    /// Code: __1105__.
     ElementIdForEndpointButElementIsNot(String),
     /// Invalid ID for element.
     ///
-    /// Code: __1107__
+    /// Code: __1106__
     InvalidElementUri(String),
     /// Provided not source URI in [`WebRtcPlayEndpoint`].
     ///
-    /// Code: __1108__.
+    /// Code: __1107__.
     NotSourceUri(String),
 
     /////////////////////////////////
@@ -196,19 +192,12 @@ impl Into<ErrorProto> for ErrorCode {
                 error.set_element(id.to_string());
                 error.set_code(1101);
             }
-            ErrorCode::NotEndpointInSpec(id) => {
-                error.set_text(
-                    "Expecting Member element but it's not.".to_string(),
-                );
-                error.set_element(id.to_string());
-                error.set_code(1102);
-            }
             ErrorCode::InvalidSrcUri(id) => {
                 error.set_text(
                     "Invalid source ID in publish endpoint spec.".to_string(),
                 );
                 error.set_element(id.to_string());
-                error.set_code(1103);
+                error.set_code(1102);
             }
             ErrorCode::ElementIdForRoomButElementIsNot(id) => {
                 error.set_text(
@@ -217,7 +206,7 @@ impl Into<ErrorProto> for ErrorCode {
                         .to_string(),
                 );
                 error.set_element(id);
-                error.set_code(1104);
+                error.set_code(1103);
             }
             ErrorCode::ElementIdForMemberButElementIsNot(id) => {
                 error.set_text(
@@ -226,7 +215,7 @@ impl Into<ErrorProto> for ErrorCode {
                         .to_string(),
                 );
                 error.set_element(id);
-                error.set_code(1105);
+                error.set_code(1104);
             }
             ErrorCode::ElementIdForEndpointButElementIsNot(id) => {
                 error.set_text(
@@ -235,17 +224,17 @@ impl Into<ErrorProto> for ErrorCode {
                         .to_string(),
                 );
                 error.set_element(id);
-                error.set_code(1106);
+                error.set_code(1105);
             }
             ErrorCode::InvalidElementUri(id) => {
                 error.set_text("Invalid element's URI".to_string());
                 error.set_element(id);
-                error.set_code(1107);
+                error.set_code(1106);
             }
             ErrorCode::NotSourceUri(id) => {
                 error.set_text("Provided not source URI".to_string());
                 error.set_element(id);
-                error.set_code(1108);
+                error.set_code(1107);
             }
 
             /////////////////////////////////
@@ -363,9 +352,6 @@ impl From<MembersLoadError> for ErrorCode {
     fn from(err: MembersLoadError) -> Self {
         match err {
             MembersLoadError::TryFromError(e, id) => match e {
-                TryFromElementError::NotEndpoint => {
-                    ErrorCode::NotEndpointInSpec(id)
-                }
                 TryFromElementError::NotMember => {
                     ErrorCode::NotMemberInSpec(id)
                 }
