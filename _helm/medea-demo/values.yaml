@@ -1,0 +1,16 @@
+medea:
+  image:
+    repository: instrumentisto/medea
+    tag: dev
+    pullPolicy: IfNotPresent
+
+demo:
+  image:
+    repository: instrumentisto/medea-demo
+    tag: dev
+    pullPolicy: IfNotPresent
+
+ingress:
+  # Hosts must be specified without "www." part.
+  hosts:
+    - medea-demo.test

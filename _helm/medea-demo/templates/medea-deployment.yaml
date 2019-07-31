@@ -15,8 +15,8 @@ spec:
       hostNetwork: true
       containers:
         - name: medea
-          image: instrumentisto/medea:dev
-          imagePullPolicy: IfNotPresent
+          image: "{{ $.Values.medea.image.repository }}:{{ $.Values.medea.image.tag }}"
+          imagePullPolicy: {{ $.Values.medea.image.pullPolicy }}
           ports:
             - name: medea-http
               containerPort: 8080

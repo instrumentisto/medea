@@ -20,5 +20,5 @@ spec:
     spec:
       containers:
         - name: webclient
-          image: instrumentisto/medea-demo:dev
-          imagePullPolicy: IfNotPresent
+          image: "{{ $.Values.demo.image.repository }}:{{ $.Values.demo.image.tag }}"
+          imagePullPolicy: {{ $.Values.demo.image.pullPolicy }}
