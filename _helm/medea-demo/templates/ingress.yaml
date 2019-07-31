@@ -14,8 +14,8 @@ spec:
           - path: /ws
             backend:
               serviceName: medea
-              servicePort: medea-http
+              servicePort: http
           - path: /
             backend:
               serviceName: webclient
-              servicePort: webclient-port
+              servicePort: http

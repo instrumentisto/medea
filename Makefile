@@ -18,8 +18,6 @@ eq = $(if $(or $(1),$(2)),$(and $(findstring $(1),$(2)),\
 MEDEA_IMAGE_NAME := $(strip \
 	$(shell grep 'COMPOSE_IMAGE_NAME=' .env | cut -d '=' -f2))
 DEMO_IMAGE_NAME := instrumentisto/medea-demo
-DEMO_VERSION ?= $(strip $(shell grep '"version": ' jason/demo/package.json | cut -d '"' -f4))
-
 
 RUST_VER := 1.36
 

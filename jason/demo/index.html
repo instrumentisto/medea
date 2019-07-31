@@ -49,11 +49,16 @@
     </script>
 
     <script type="text/javascript">
+        var baseUrl;
 
-
-        var baseUrl = "wss://medea-demo.test/ws/";
+        if (document.location.protocol === "http:") {
+            baseUrl = "ws://" + document.location.host + ":8080/ws/";
+        } else {
+            baseUrl = "wss://" + document.location.host + "/ws/";
+        }
 
         window.onload = function () {
+
             var chooseRoomDiv = document.getElementById('choose-room');
             var videoCallDiv = document.getElementById('video-call');
             var chooseRoomButton = document.getElementById('choose-room-btn');
@@ -62,12 +67,12 @@
             var joinCallerButton = document.getElementById('join-caller');
             var joinResponderButton = document.getElementById('join-responder');
 
-            var bindJoinButtons = function(roomId){
+            var bindJoinButtons = function (roomId) {
                 joinCallerButton.onclick = function () {
-                    window.connect_room(baseUrl+roomId+'/1/caller_credentials')
+                    window.connect_room(baseUrl + roomId + '/1/caller_credentials')
                 };
                 joinResponderButton.onclick = function () {
-                    window.connect_room(baseUrl+roomId+'/2/responder_credentials')
+                    window.connect_room(baseUrl + roomId + '/2/responder_credentials')
                 };
             };
 
@@ -78,10 +83,10 @@
                 chooseRoomDiv.style.display = "none";
                 videoCallDiv.style.display = "";
             } else {
-                chooseRoomButton.onclick = function() {
+                chooseRoomButton.onclick = function () {
                     let roomId = roomIdInput.value;
 
-                    window.location.hash=roomId;
+                    window.location.hash = roomId;
                     bindJoinButtons(roomId);
 
                     chooseRoomDiv.style.display = "none";
