@@ -531,7 +531,7 @@ impl Into<ElementProto> for Member {
 
 #[cfg(test)]
 mod tests {
-    use crate::api::control::{Element, MemberId};
+    use crate::api::control::{MemberId, RootElement};
 
     use super::*;
 
@@ -579,7 +579,8 @@ mod tests {
     }
 
     fn get_test_store() -> HashMap<MemberId, Member> {
-        let room_element: Element = serde_yaml::from_str(TEST_SPEC).unwrap();
+        let room_element: RootElement =
+            serde_yaml::from_str(TEST_SPEC).unwrap();
         let room_spec = RoomSpec::try_from(&room_element).unwrap();
         parse_members(&room_spec).unwrap()
     }
