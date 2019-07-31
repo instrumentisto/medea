@@ -10,8 +10,6 @@ use std::{
 
 use serde::Deserialize;
 
-use crate::api::control::Element;
-
 /// Entity that represents some pipeline of spec.
 #[derive(Clone, Deserialize, Debug)]
 pub struct Pipeline<T> {

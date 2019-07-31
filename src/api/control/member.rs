@@ -10,8 +10,9 @@ use serde::Deserialize;
 use super::{
     endpoint::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
     pipeline::Pipeline,
-    Element, TryFromElementError,
+    TryFromElementError,
 };
+use crate::api::control::room::RoomElement;
 
 macro_attr! {
     /// ID of `Member`.
@@ -28,12 +29,24 @@ macro_attr! {
     pub struct Id(pub String);
 }
 
+#[derive(Clone, Deserialize, Debug)]
+#[serde(tag = "kind")]
+pub enum MemberElement {
+    /// Represent [`WebRtcPublishEndpoint`].
+    /// Can transform into [`Endpoint`] enum by `Endpoint::try_from`.
+    WebRtcPublishEndpoint { spec: WebRtcPublishEndpoint },
+
+    /// Represent [`WebRtcPlayEndpoint`].
+    /// Can transform into [`Endpoint`] enum by `Endpoint::try_from`.
+    WebRtcPlayEndpoint { spec: WebRtcPlayEndpoint },
+}
+
 /// Newtype for [`Element::Member`] variant.
 #[allow(clippy::module_name_repetitions)]
 #[derive(Clone, Debug)]
 pub struct MemberSpec {
     /// Spec of this `Member`.
-    pipeline: Pipeline<Element>,
+    pipeline: Pipeline<MemberElement>,
 
     /// Credentials to authorize `Member` with.
     credentials: String,
@@ -45,7 +58,7 @@ impl MemberSpec {
         self.pipeline
             .iter()
             .filter_map(|(id, e)| match e {
-                Element::WebRtcPlayEndpoint { spec } => Some((id, spec)),
+                MemberElement::WebRtcPlayEndpoint { spec } => Some((id, spec)),
                 _ => None,
             })
             .collect()
@@ -58,7 +71,9 @@ impl MemberSpec {
         self.pipeline
             .iter()
             .filter_map(|(id, e)| match e {
-                Element::WebRtcPublishEndpoint { spec } => Some((id, spec)),
+                MemberElement::WebRtcPublishEndpoint { spec } => {
+                    Some((id, spec))
+                }
                 _ => None,
             })
             .collect()
@@ -69,12 +84,14 @@ impl MemberSpec {
     }
 }
 
-impl TryFrom<&Element> for MemberSpec {
+impl TryFrom<&RoomElement> for MemberSpec {
     type Error = TryFromElementError;
 
-    fn try_from(from: &Element) -> Result<Self, Self::Error> {
+    // TODO: delete this allow when some new RoomElement will be added.
+    #[allow(unreachable_patterns)]
+    fn try_from(from: &RoomElement) -> Result<Self, Self::Error> {
         match from {
-            Element::Member { spec, credentials } => Ok(Self {
+            RoomElement::Member { spec, credentials } => Ok(Self {
                 pipeline: spec.clone(),
                 credentials: credentials.clone(),
             }),

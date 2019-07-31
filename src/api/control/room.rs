@@ -8,8 +8,9 @@ use newtype_derive::{newtype_fmt, NewtypeDisplay, NewtypeFrom};
 use serde::Deserialize;
 
 use super::{
-    member::MemberSpec, pipeline::Pipeline, Element, MemberId,
-    TryFromElementError,
+    member::{MemberElement, MemberSpec},
+    pipeline::Pipeline,
+    MemberId, RootElement, TryFromElementError,
 };
 
 macro_attr! {
@@ -27,13 +28,24 @@ macro_attr! {
     pub struct Id(pub String);
 }
 
+#[derive(Clone, Deserialize, Debug)]
+#[serde(tag = "kind")]
+pub enum RoomElement {
+    /// Represent [`MemberSpec`].
+    /// Can transform into [`MemberSpec`] by `MemberSpec::try_from`.
+    Member {
+        spec: Pipeline<MemberElement>,
+        credentials: String,
+    },
+}
+
 /// [`crate::signalling::room::Room`] specification.
 /// Newtype for [`Element::Room`]
 #[allow(clippy::module_name_repetitions)]
 #[derive(Clone, Debug)]
 pub struct RoomSpec {
     pub id: Id,
-    pub pipeline: Pipeline<Element>,
+    pub pipeline: Pipeline<RoomElement>,
 }
 
 impl RoomSpec {
@@ -58,12 +70,14 @@ impl RoomSpec {
     }
 }
 
-impl TryFrom<&Element> for RoomSpec {
+impl TryFrom<&RootElement> for RoomSpec {
     type Error = TryFromElementError;
 
-    fn try_from(from: &Element) -> Result<Self, Self::Error> {
+    // TODO: delete this allow when some new RootElement will be added.
+    #[allow(unreachable_patterns)]
+    fn try_from(from: &RootElement) -> Result<Self, Self::Error> {
         match from {
-            Element::Room { id, spec } => Ok(Self {
+            RootElement::Room { id, spec } => Ok(Self {
                 id: id.clone(),
                 pipeline: spec.clone(),
             }),

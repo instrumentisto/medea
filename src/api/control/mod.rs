@@ -20,6 +20,18 @@ pub use self::{
     member::{Id as MemberId, MemberSpec},
     room::{Id as RoomId, RoomSpec},
 };
+use crate::api::control::room::RoomElement;
+
+#[derive(Clone, Deserialize, Debug)]
+#[serde(tag = "kind")]
+pub enum RootElement {
+    /// Represent [`RoomSpec`].
+    /// Can transform into [`RoomSpec`] by `RoomSpec::try_from`.
+    Room {
+        id: RoomId,
+        spec: Pipeline<RoomElement>,
+    },
+}
 
 /// Errors that can occur when we try transform some spec from [`Element`].
 /// This error used in all [`TryFrom`] of Control API.
@@ -63,7 +75,7 @@ pub fn load_from_yaml_file<P: AsRef<Path>>(path: P) -> Result<RoomSpec, Error> {
     let mut file = File::open(path)?;
     let mut buf = String::new();
     file.read_to_string(&mut buf)?;
-    let parsed: Element = serde_yaml::from_str(&buf)?;
+    let parsed: RootElement = serde_yaml::from_str(&buf)?;
     let room = RoomSpec::try_from(&parsed)?;
 
     Ok(room)
