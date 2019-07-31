@@ -33,7 +33,7 @@ macro_attr! {
 #[derive(Clone, Debug)]
 pub struct RoomSpec {
     pub id: Id,
-    pub pipeline: Pipeline,
+    pub pipeline: Pipeline<Element>,
 }
 
 impl RoomSpec {

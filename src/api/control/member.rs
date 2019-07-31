@@ -33,7 +33,7 @@ macro_attr! {
 #[derive(Clone, Debug)]
 pub struct MemberSpec {
     /// Spec of this `Member`.
-    pipeline: Pipeline,
+    pipeline: Pipeline<Element>,
 
     /// Credentials to authorize `Member` with.
     credentials: String,

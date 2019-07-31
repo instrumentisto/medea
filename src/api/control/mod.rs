@@ -40,11 +40,14 @@ pub enum TryFromElementError {
 pub enum Element {
     /// Represent [`RoomSpec`].
     /// Can transform into [`RoomSpec`] by `RoomSpec::try_from`.
-    Room { id: RoomId, spec: Pipeline },
+    Room { id: RoomId, spec: Pipeline<Element> },
 
     /// Represent [`MemberSpec`].
     /// Can transform into [`MemberSpec`] by `MemberSpec::try_from`.
-    Member { spec: Pipeline, credentials: String },
+    Member {
+        spec: Pipeline<Element>,
+        credentials: String,
+    },
 
     /// Represent [`WebRtcPublishEndpoint`].
     /// Can transform into [`Endpoint`] enum by `Endpoint::try_from`.
