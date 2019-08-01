@@ -15,4 +15,4 @@ futures = "0.1"
 protobuf = "2.7"
 
 [build-dependencies]
-protoc-grpcio = "0.3"
+protoc-grpcio = "1.0"
