@@ -24,7 +24,7 @@ services:
     command:
       - --log-file=stdout
     volumes:
-      - ../../_dev/coturn/turnserver.conf:/etc/coturn/turnserver.conf:ro
+      - ../../dev/coturn/turnserver.conf:/etc/coturn/turnserver.conf:ro
       - ../../.cache/coturn/data:/var/lib/coturn
     network_mode: host
   coturn-db:
@@ -32,5 +32,5 @@ services:
     image: redis:alpine
     command: ["redis-server", "/etc/redis.conf"]
     volumes:
-      - ../../_dev/coturn/redis.conf:/etc/redis.conf:ro
+      - ../../dev/coturn/redis.conf:/etc/redis.conf:ro
     network_mode: service:webclient
