@@ -2,39 +2,52 @@
 {{- range $i, $host := .Values.ingress.hosts }}
 ---
 kind: Ingress
-apiVersion: extensions/v1beta1
+apiVersion: networking.k8s.io/v1beta1
 metadata:
-  name: webclient.{{ $host }}
+  name: {{ template "medea-demo.fullname" $ }}.{{ $host }}
+  namespace: {{ $.Release.Namespace | quote }}
+  labels:
+    helm.sh/chart: {{ template "medea-demo.chart" $ }}
+    app.kubernetes.io/name: {{ template "medea-demo.name" $ }}
+    app.kubernetes.io/instance: {{ $.Release.Name | quote }}
+    app.kubernetes.io/managed-by: {{ $.Release.Service | quote }}
+    app.kubernetes.io/version: {{ $.Chart.AppVersion | quote }}
+    app.kubernetes.io/component: ingress
+  {{- with $.Values.labels }}
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  annotations:
+  {{- if and $.Values.ingress.tls.enabled $.Values.ingress.tls.auto }}
+    kubernetes.io/tls-acme: "true"
+  {{- end }}
+  {{- if not $.Values.ingress.tls.enabled }}
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+  {{- end }}
+  {{- with $.Values.ingress.annotations }}
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
-{{- if $.Values.ingress.tls.enabled }}
-  tls:
-    - hosts:
-        - {{ $host | quote }}
-        - {{ printf "www.%s" $host | quote }}
-      secretName: medea-demo-cert
-{{- end }}
   rules:
     - host: {{ $host | quote }}
       http:
         paths:
           - path: /ws
             backend:
-              serviceName: medea
+              serviceName: {{ template "medea-demo.fullname" $ }}-server
               servicePort: http
           - path: /
             backend:
-              serviceName: webclient
+              serviceName: {{ template "medea-demo.fullname" $ }}-web-client
               servicePort: http
-    - host: {{ printf "www.%s" $host | quote }}
-      http:
-        paths:
-          - path: /ws
-            backend:
-              serviceName: medea
-              servicePort: http
-          - path: /
-            backend:
-              serviceName: webclient
-              servicePort: http
+{{- if $.Values.ingress.tls.enabled }}
+  tls:
+    - secretName: {{ if $.Values.ingress.tls.auto -}}
+                    {{ printf "%s.tls" ($host | trunc 48) | quote }}
+                  {{- else -}}
+                    {{ required (print `TLS Secret name must be specified for host ` $host ` !`) (index $.Values.ingress.tls.secretName $host) | quote }}
+                  {{- end }}
+      hosts:
+        - {{ $host | quote }}
+{{- end }}
 {{- end }}
 {{- end -}}
