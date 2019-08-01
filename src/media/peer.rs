@@ -105,7 +105,7 @@ macro_rules! impl_peer_converts {
                 match peer {
                     PeerStateMachine::$peer_type(peer) => Ok(peer),
                     _ => Err(PeerError::WrongState(
-                        1,
+                        peer.id(),
                         stringify!($peer_type),
                         format!("{}", peer),
                     )),
@@ -120,7 +120,7 @@ macro_rules! impl_peer_converts {
                 match peer {
                     PeerStateMachine::$peer_type(peer) => Ok(peer),
                     _ => Err(PeerError::WrongState(
-                        1,
+                        peer.id(),
                         stringify!($peer_type),
                         format!("{}", peer),
                     )),
