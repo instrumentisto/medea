@@ -29,7 +29,7 @@ use crate::{
             Endpoint, MemberSpec, RoomSpec, TryFromElementError,
             TryFromProtobufError,
         },
-        error_codes::ErrorCode,
+        error_codes::{ErrorCode, ErrorResponse},
     },
     log::prelude::*,
     signalling::{
@@ -46,7 +46,7 @@ use crate::{
 use crate::shutdown::ShutdownGracefully;
 
 #[derive(Debug, Fail)]
-enum ControlApiError {
+pub enum ControlApiError {
     /// Error when parsing ID of element.
     #[fail(display = "{:?}", _0)]
     LocalUri(LocalUriParseError),
@@ -90,16 +90,6 @@ impl From<MailboxError> for ControlApiError {
     }
 }
 
-impl Into<ErrorCode> for ControlApiError {
-    fn into(self) -> ErrorCode {
-        match self {
-            ControlApiError::LocalUri(e) => e.into(),
-            ControlApiError::TryFromProtobuf(e) => e.into(),
-            _ => ErrorCode::UnknownError(self.to_string()),
-        }
-    }
-}
-
 /// Try to unwrap some [`Result`] and if it `Err` then return err future with
 /// [`ControlApiError`].
 ///
@@ -125,7 +115,7 @@ macro_rules! parse_local_uri {
         match LocalUriType::parse($uri) {
             Ok(o) => o,
             Err(e) => {
-                let error: ErrorCode = e.into();
+                let error: ErrorResponse = e.into();
                 send_error_response!($ctx, $sink, error, $response);
             }
         }
@@ -266,7 +256,7 @@ impl ControlApiService {
 fn get_response_for_create(
     result: Result<CreateResult, ControlApiError>,
 ) -> Response {
-    let error: ErrorCode = match result {
+    let error: ErrorResponse = match result {
         Ok(r) => match r {
             Ok(r) => match r {
                 Ok(sid) => {
@@ -309,8 +299,9 @@ impl ControlApi for ControlApiService {
                     send_error_response!(
                         ctx,
                         sink,
-                        ErrorCode::ElementIdForRoomButElementIsNot(
-                            req.get_id().to_string(),
+                        ErrorResponse::new(
+                            ErrorCode::ElementIdForRoomButElementIsNot,
+                            &req.get_id(),
                         ),
                         Response
                     );
@@ -335,8 +326,9 @@ impl ControlApi for ControlApiService {
                     send_error_response!(
                         ctx,
                         sink,
-                        ErrorCode::ElementIdForMemberButElementIsNot(
-                            req.get_id().to_string(),
+                        ErrorResponse::new(
+                            ErrorCode::ElementIdForMemberButElementIsNot,
+                            &req.get_id(),
                         ),
                         Response
                     );
@@ -361,8 +353,9 @@ impl ControlApi for ControlApiService {
                     send_error_response!(
                         ctx,
                         sink,
-                        ErrorCode::ElementIdForEndpointButElementIsNot(
-                            req.get_id().to_string(),
+                        ErrorResponse::new(
+                            ErrorCode::ElementIdForEndpointButElementIsNot,
+                            &req.get_id(),
                         ),
                         Response
                     );
@@ -446,7 +439,7 @@ impl ControlApi for ControlApiService {
                             for result in results {
                                 if let Err(e) = result {
                                     let mut response = Response::new();
-                                    let error: ErrorCode = e.into();
+                                    let error: ErrorResponse = e.into();
                                     response.set_error(error.into());
                                     return sink
                                         .success(response)
@@ -465,7 +458,7 @@ impl ControlApi for ControlApiService {
                             );
                             let mut response = Response::new();
                             let error: Error =
-                                ErrorCode::UnknownError(format!("{:?}", e))
+                                ErrorResponse::unknown(&format!("{:?}", e))
                                     .into();
                             response.set_error(error);
                             sink.success(response).map_err(map_err_closure)
@@ -530,7 +523,7 @@ impl ControlApi for ControlApiService {
                             }
                             Err(e) => {
                                 let mut response = GetResponse::new();
-                                let error: ErrorCode = e.into();
+                                let error: ErrorResponse = e.into();
                                 response.set_error(error.into());
                                 return sink
                                     .success(response)
@@ -550,7 +543,7 @@ impl ControlApi for ControlApiService {
                             }
                             Err(e) => {
                                 let mut response = GetResponse::new();
-                                let error: ErrorCode = e.into();
+                                let error: ErrorResponse = e.into();
                                 response.set_error(error.into());
                                 return sink
                                     .success(response)
@@ -568,7 +561,7 @@ impl ControlApi for ControlApiService {
                     warn!("Control API Get method mailbox error. {:?}", e);
                     let mut response = GetResponse::new();
                     let error: Error =
-                        ErrorCode::UnknownError(format!("{:?}", e)).into();
+                        ErrorResponse::unknown(&format!("{:?}", e)).into();
                     response.set_error(error);
                     sink.success(response).map_err(grpc_err_closure)
                 }
