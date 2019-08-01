@@ -1,22 +1,22 @@
 version: "2"
 
 services:
-  webclient:
-    container_name: demo-webclient
+  web-client:
+    container_name: demo-web-client
     image: instrumentisto/medea-demo:dev
     ports:
       - "80:80"
       - "6379:6379"    # coturn redis
       - "8080:8080"    # medea ws
     volumes:
-      - ./conf/nginx.vh.conf:/etc/nginx/conf.d/default.conf
+      - ./chart/medea-demo/conf/nginx.vh.conf:/etc/nginx/conf.d/default.conf
   medea:
     container_name: demo-medea
     image: instrumentisto/medea:dev
     depends_on: ["coturn-db"]
     environment:
       MEDEA_LOG.LEVEL: "DEBUG"
-    network_mode: service:webclient
+    network_mode: service:web-client
   coturn:
     container_name: demo-coturn
     image: instrumentisto/coturn:4.5
@@ -33,4 +33,4 @@ services:
     command: ["redis-server", "/etc/redis.conf"]
     volumes:
       - ../../dev/coturn/redis.conf:/etc/redis.conf:ro
-    network_mode: service:webclient
+    network_mode: service:web-client

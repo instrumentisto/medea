@@ -49,16 +49,10 @@
     </script>
 
     <script type="text/javascript">
-        var baseUrl;
-
-        if (document.location.protocol === "http:") {
-            baseUrl = "ws://" + document.location.host + ":8080/ws/";
-        } else {
-            baseUrl = "wss://" + document.location.host + "/ws/";
-        }
+        var baseUrl = (document.location.protocol === "http:" ? "ws" : "wss") +
+            "://" + document.location.host + "/ws/";
 
         window.onload = function () {
-
             var chooseRoomDiv = document.getElementById('choose-room');
             var videoCallDiv = document.getElementById('video-call');
             var chooseRoomButton = document.getElementById('choose-room-btn');
