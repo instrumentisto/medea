@@ -6,6 +6,7 @@ fn main() {
         &["control.proto"],
         &[proto_root],
         &proto_output,
+        None,
     )
     .expect("Failed to compile gRPC definitions!");
 }
