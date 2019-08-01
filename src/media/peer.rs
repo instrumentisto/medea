@@ -217,16 +217,6 @@ impl<T> Peer<T> {
             })
     }
 
-    /// Returns all senders [`MediaTrack`].
-    pub fn get_senders(&self) -> Vec<Rc<MediaTrack>> {
-        self.context
-            .senders
-            .iter()
-            .map(|(_key, value)| value)
-            .cloned()
-            .collect()
-    }
-
     /// Checks if this [`Peer`] has any send tracks.
     pub fn is_sender(&self) -> bool {
         !self.context.senders.is_empty()

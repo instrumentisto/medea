@@ -142,20 +142,19 @@ impl PeerRepository {
     }
 
     /// Returns all [`Peer`]s of specified [`Member`].
-    pub fn get_peers_by_member_id(
-        &self,
-        member_id: &MemberId,
-    ) -> Vec<&PeerStateMachine> {
+    pub fn get_peers_by_member_id<'a>(
+        &'a self,
+        member_id: &'a MemberId,
+    ) -> impl Iterator<Item = &'a PeerStateMachine> {
         self.peers
             .iter()
-            .filter_map(|(_, peer)| {
+            .filter_map(move |(_, peer)| {
                 if &peer.member_id() == member_id {
                     Some(peer)
                 } else {
                     None
                 }
             })
-            .collect()
     }
 
     /// Returns owned [`Peer`] by its ID.
@@ -186,10 +185,8 @@ impl PeerRepository {
             HashMap::new();
 
         self.get_peers_by_member_id(member_id)
-            .into_iter()
             .for_each(|peer| {
                 self.get_peers_by_member_id(&peer.partner_member_id())
-                    .into_iter()
                     .filter(|partner_peer| {
                         &partner_peer.partner_member_id() == member_id
                     })
