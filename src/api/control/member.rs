@@ -1,6 +1,6 @@
 //! Member definitions and implementations.
 
-use std::{collections::HashMap, convert::TryFrom};
+use std::{convert::TryFrom};
 
 use macro_attr::*;
 use newtype_derive::{newtype_fmt, NewtypeDisplay, NewtypeFrom};
@@ -55,20 +55,31 @@ pub struct MemberSpec {
 
 impl MemberSpec {
     /// Returns all [`WebRtcPlayEndpoint`]s of this [`MemberSpec`].
-    pub fn play_endpoints(&self) -> HashMap<&String, &WebRtcPlayEndpoint> {
-        self.pipeline
-            .iter()
-            .filter_map(|(id, e)| match e {
-                MemberElement::WebRtcPlayEndpoint { spec } => Some((id, spec)),
-                _ => None,
-            })
-            .collect()
+    pub fn play_endpoints(
+        &self,
+    ) -> impl Iterator<Item = (&String, &WebRtcPlayEndpoint)> {
+        self.pipeline.iter().filter_map(|(id, e)| match e {
+            MemberElement::WebRtcPlayEndpoint { spec } => Some((id, spec)),
+            _ => None,
+        })
+    }
+
+    pub fn get_publish_endpoint(
+        &self,
+        id: &str,
+    ) -> Option<&WebRtcPublishEndpoint> {
+        let e = self.pipeline.get(id)?;
+        if let MemberElement::WebRtcPublishEndpoint { spec } = e {
+            Some(spec)
+        } else {
+            None
+        }
     }
 
     /// Returns all [`WebRtcPublishEndpoint`]s of this [`MemberSpec`].
     pub fn publish_endpoints(
         &self,
-    ) -> HashMap<&String, &WebRtcPublishEndpoint> {
+    ) -> impl Iterator<Item = (&String, &WebRtcPublishEndpoint)> {
         self.pipeline
             .iter()
             .filter_map(|(id, e)| match e {
@@ -77,7 +88,6 @@ impl MemberSpec {
                 }
                 _ => None,
             })
-            .collect()
     }
 
     pub fn credentials(&self) -> &str {

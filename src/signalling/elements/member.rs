@@ -117,9 +117,8 @@ impl Member {
                     )?,
             )?;
 
-            let publisher_endpoint = *publisher_spec
-                .publish_endpoints()
-                .get(&spec_play_endpoint.src.endpoint_id)
+            let publisher_endpoint = publisher_spec
+                .get_publish_endpoint(&spec_play_endpoint.src.endpoint_id)
                 .map_or(
                     Err(MembersLoadError::EndpointNotFound(
                         spec_play_endpoint.src.endpoint_id.clone(),
@@ -173,7 +172,7 @@ impl Member {
 
         // This is necessary to create [`WebRtcPublishEndpoint`],
         // to which none [`WebRtcPlayEndpoint`] refers.
-        this_member_spec.publish_endpoints().into_iter().for_each(
+        this_member_spec.publish_endpoints().for_each(
             |(name, e)| {
                 let endpoint_id = WebRtcPublishId(name.clone());
                 if self.srcs().get(&endpoint_id).is_none() {
