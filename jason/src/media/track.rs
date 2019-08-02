@@ -7,8 +7,8 @@ use std::rc::Rc;
 use medea_client_api_proto::MediaType;
 use web_sys::MediaStreamTrack;
 
-/// ID of [`MediaTrack`].
-pub type Id = u64;
+pub use medea_client_api_proto::TrackId as Id;
+pub use Id as TrackId;
 
 /// Representation of [MediaStreamTrack][1].
 ///
@@ -22,7 +22,7 @@ pub struct MediaTrack {
 
 impl MediaTrack {
     /// Instantiates new [`MediaTrack`].
-    pub fn new(id: u64, track: MediaStreamTrack, caps: MediaType) -> Rc<Self> {
+    pub fn new(id: Id, track: MediaStreamTrack, caps: MediaType) -> Rc<Self> {
         Rc::new(Self { id, track, caps })
     }
 

@@ -26,10 +26,10 @@ struct InnerStream {
     stream: SysMediaStream,
 
     /// List of audio tracks.
-    audio_tracks: HashMap<u64, Rc<MediaTrack>>,
+    audio_tracks: HashMap<TrackId, Rc<MediaTrack>>,
 
     /// List of video tracks.
-    video_tracks: HashMap<u64, Rc<MediaTrack>>,
+    video_tracks: HashMap<TrackId, Rc<MediaTrack>>,
 }
 
 impl InnerStream {

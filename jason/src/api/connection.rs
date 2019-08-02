@@ -11,13 +11,14 @@ use crate::{
     media::{MediaStream, MediaStreamHandle},
     utils::{Callback, WasmErr},
 };
+use medea_client_api_proto::PeerId;
 
 /// Actual data of a connection with a specific remote [`Member`].
 ///
 /// Shared between JS side ([`ConnectionHandle`]) and
 /// Rust side ([`Connection`]).
 struct InnerConnection {
-    remote_member: u64,
+    remote_member: PeerId,
     on_remote_stream: Callback<MediaStreamHandle>,
 }
 
@@ -48,7 +49,7 @@ impl ConnectionHandle {
     pub fn member_id(&self) -> Result<u64, JsValue> {
         self.0
             .upgrade()
-            .map(|conn| conn.borrow().remote_member)
+            .map(|conn| conn.borrow().remote_member.0)
             .ok_or_else(|| WasmErr::from("Detached state").into())
     }
 }
@@ -61,7 +62,7 @@ pub(crate) struct Connection(Rc<RefCell<InnerConnection>>);
 impl Connection {
     /// Instantiates new [`Connection`] for a given [`Member`].
     #[inline]
-    pub(crate) fn new(member_id: u64) -> Self {
+    pub(crate) fn new(member_id: PeerId) -> Self {
         Self(Rc::new(RefCell::new(InnerConnection {
             remote_member: member_id,
             on_remote_stream: Callback::default(),

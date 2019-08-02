@@ -20,7 +20,7 @@ macro_attr! {
     #[cfg_attr(feature = "medea", derive(Deserialize))]
     #[cfg_attr(feature = "jason", derive(Serialize))]
     #[cfg_attr(test, derive(Debug, PartialEq ))]
-    #[derive(Clone, Copy, NewtypeDisplay!, PartialEq, Debug, Hash, Eq, Default)]
+    #[derive(Clone, Copy, NewtypeDisplay!, NewtypeDeref!, PartialEq, Debug, Hash, Eq, Default)]
     pub struct TrackId(pub u64);
 }
 
