@@ -10,7 +10,7 @@ use actix::{
 use failure::Fail;
 use futures::future;
 use hashbrown::HashMap;
-use medea_client_api_proto::{Command, Event, IceCandidate};
+use medea_client_api_proto::{Command, Event, IceCandidate, TrackId};
 
 use crate::{
     api::{
@@ -210,7 +210,7 @@ impl Room {
         &mut self,
         from_peer_id: PeerId,
         sdp_offer: String,
-        mids: StdHashMap<u64, String>,
+        mids: StdHashMap<TrackId, String>,
     ) -> Result<ActFuture<(), RoomError>, RoomError> {
         let mut from_peer: Peer<WaitLocalSdp> =
             self.peers.take_inner_peer(from_peer_id)?;

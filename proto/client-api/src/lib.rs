@@ -15,6 +15,15 @@ macro_attr! {
     pub struct PeerId(pub u64);
 }
 
+macro_attr! {
+    /// ID of [`MediaTrack`].
+    #[cfg_attr(feature = "medea", derive(Deserialize))]
+    #[cfg_attr(feature = "jason", derive(Serialize))]
+    #[cfg_attr(test, derive(Debug, PartialEq ))]
+    #[derive(Clone, Copy, NewtypeDisplay!, PartialEq, Debug, Hash, Eq, Default)]
+    pub struct TrackId(pub u64);
+}
+
 pub trait Incrementable: Sized + Clone {
     fn increment(&self) -> Self;
 }
@@ -25,9 +34,9 @@ impl Incrementable for PeerId {
     }
 }
 
-impl Incrementable for u64 {
+impl Incrementable for TrackId {
     fn increment(&self) -> Self {
-        self + 1
+        TrackId(self.0 + 1)
     }
 }
 
@@ -72,7 +81,7 @@ pub enum Command {
         /// `mid` is basically an ID of [`m=<media>` section][1] in SDP.
         ///
         /// [1]: https://tools.ietf.org/html/rfc4566#section-5.14
-        mids: HashMap<u64, String>,
+        mids: HashMap<TrackId, String>,
     },
     /// Web Client sends SDP Answer.
     MakeSdpAnswer { peer_id: PeerId, sdp_answer: String },
@@ -128,7 +137,7 @@ pub struct IceCandidate {
 #[cfg_attr(feature = "medea", derive(Serialize, Debug, Clone, PartialEq))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
 pub struct Track {
-    pub id: u64,
+    pub id: TrackId,
     pub direction: Direction,
     pub media_type: MediaType,
 }
