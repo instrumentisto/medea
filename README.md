@@ -1,2 +1,2 @@
-# medea
-Medea media server
+GitHub Pages content for Medea
+==============================
