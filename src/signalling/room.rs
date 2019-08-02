@@ -1,7 +1,7 @@
 //! Room definitions and implementations. Room is responsible for media
 //! connection establishment between concrete [`Member`]s.
 
-use std::{collections::HashMap as StdHashMap, sync::Arc, time::Duration};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use actix::{
     fut::wrap_future, Actor, ActorFuture, AsyncContext, Context, Handler,
@@ -10,7 +10,6 @@ use actix::{
 use failure::Fail;
 use futures::future;
 use medea_client_api_proto::{Command, Event, IceCandidate, TrackId};
-use std::collections::HashMap;
 
 use crate::{
     api::{
@@ -210,7 +209,7 @@ impl Room {
         &mut self,
         from_peer_id: PeerId,
         sdp_offer: String,
-        mids: StdHashMap<TrackId, String>,
+        mids: HashMap<TrackId, String>,
     ) -> Result<ActFuture<(), RoomError>, RoomError> {
         let mut from_peer: Peer<WaitLocalSdp> =
             self.peers.take_inner_peer(from_peer_id)?;

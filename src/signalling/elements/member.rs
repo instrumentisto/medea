@@ -1,10 +1,14 @@
 //! [`Member`] is member of [`Room`] with [`RpcConnection`].
 
-use std::{cell::RefCell, convert::TryFrom as _, rc::Rc};
+use std::{
+    cell::RefCell,
+    collections::HashMap,
+    convert::TryFrom as _,
+    rc::{Rc, Weak},
+};
 
 use failure::Fail;
 use medea_client_api_proto::IceServer;
-use std::collections::HashMap;
 
 use crate::{
     api::control::{MemberId, MemberSpec, RoomSpec, TryFromElementError},
@@ -15,7 +19,6 @@ use crate::{
 use super::endpoints::webrtc::{
     WebRtcPlayEndpoint, WebRtcPlayId, WebRtcPublishEndpoint, WebRtcPublishId,
 };
-use std::rc::Weak;
 
 /// Errors which may occur while loading [`Member`]s from [`RoomSpec`].
 #[derive(Debug, Fail)]

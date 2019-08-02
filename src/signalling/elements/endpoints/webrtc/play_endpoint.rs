@@ -12,13 +12,13 @@ use crate::{
     api::control::endpoint::SrcUri,
     media::PeerId,
     signalling::elements::{
-        endpoints::webrtc::publish_endpoint::WeakWebRtcPublishEndpoint, Member,
+        endpoints::webrtc::publish_endpoint::WeakWebRtcPublishEndpoint,
+        member::WeakMember, Member,
     },
 };
 
 use super::publish_endpoint::WebRtcPublishEndpoint;
 
-use crate::signalling::elements::member::WeakMember;
 pub use Id as WebRtcPlayId;
 
 macro_attr! {

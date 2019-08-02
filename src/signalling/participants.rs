@@ -4,6 +4,7 @@
 //! credentials management.
 
 use std::{
+    collections::HashMap,
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -18,7 +19,6 @@ use futures::{
     Future,
 };
 use medea_client_api_proto::Event;
-use std::collections::HashMap;
 
 use crate::{
     api::{

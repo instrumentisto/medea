@@ -2,24 +2,24 @@
 
 use std::{
     cell::RefCell,
+    collections::HashSet,
     rc::{Rc, Weak},
 };
 
 use macro_attr::*;
 use newtype_derive::{newtype_fmt, NewtypeDisplay, NewtypeFrom};
-use std::collections::HashSet;
 
 use crate::{
     api::control::endpoint::P2pMode,
     media::PeerId,
     signalling::elements::{
-        endpoints::webrtc::play_endpoint::WeakWebRtcPlayEndpoint, Member,
+        endpoints::webrtc::play_endpoint::WeakWebRtcPlayEndpoint,
+        member::WeakMember, Member,
     },
 };
 
 use super::play_endpoint::WebRtcPlayEndpoint;
 
-use crate::signalling::elements::member::WeakMember;
 pub use Id as WebRtcPublishId;
 
 macro_attr! {

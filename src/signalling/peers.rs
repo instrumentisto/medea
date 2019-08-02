@@ -1,13 +1,13 @@
 //! Repository that stores [`Room`]s [`Peer`]s.
 
 use std::{
+    collections::HashMap,
     convert::{TryFrom, TryInto},
     fmt,
 };
 
 use actix::{AsyncContext as _, Context};
 use medea_client_api_proto::Incrementable;
-use std::collections::HashMap;
 
 use crate::{
     api::control::MemberId,

@@ -4,14 +4,13 @@
 
 #![allow(clippy::use_self)]
 
-use std::{collections::HashMap as StdHashMap, convert::TryFrom, fmt, rc::Rc};
+use std::{collections::HashMap, convert::TryFrom, fmt, rc::Rc};
 
 use failure::Fail;
 use medea_client_api_proto::{
     AudioSettings, Direction, MediaType, Track, VideoSettings,
 };
 use medea_macro::enum_delegate;
-use std::collections::HashMap;
 
 use crate::{
     api::control::MemberId,
@@ -322,7 +321,7 @@ impl Peer<WaitLocalSdp> {
     /// Provided `mids` must have entries for all [`Peer`]s tracks.
     pub fn set_mids(
         &mut self,
-        mut mids: StdHashMap<TrackId, String>,
+        mut mids: HashMap<TrackId, String>,
     ) -> Result<(), PeerError> {
         for (id, track) in self
             .context
@@ -364,8 +363,8 @@ impl Peer<WaitLocalHaveRemote> {
 }
 
 impl Peer<Stable> {
-    pub fn get_mids(&self) -> Result<StdHashMap<TrackId, String>, PeerError> {
-        let mut mids = StdHashMap::with_capacity(self.context.senders.len());
+    pub fn get_mids(&self) -> Result<HashMap<TrackId, String>, PeerError> {
+        let mut mids = HashMap::with_capacity(self.context.senders.len());
         for (track_id, track) in self.context.senders.iter() {
             mids.insert(
                 *track_id,

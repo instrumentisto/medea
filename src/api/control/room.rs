@@ -1,11 +1,10 @@
 //! Room definitions and implementations.
 
-use std::convert::TryFrom;
+use std::{collections::HashMap, convert::TryFrom};
 
 use macro_attr::*;
 use newtype_derive::{newtype_fmt, NewtypeDisplay, NewtypeFrom};
 use serde::Deserialize;
-use std::collections::HashMap;
 
 use super::{
     member::{MemberElement, MemberSpec},

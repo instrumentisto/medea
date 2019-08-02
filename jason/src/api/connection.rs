@@ -5,13 +5,13 @@ use std::{
     rc::{Rc, Weak},
 };
 
+use medea_client_api_proto::PeerId;
 use wasm_bindgen::prelude::*;
 
 use crate::{
     media::{MediaStream, MediaStreamHandle},
     utils::{Callback, WasmErr},
 };
-use medea_client_api_proto::PeerId;
 
 /// Actual data of a connection with a specific remote [`Member`].
 ///
