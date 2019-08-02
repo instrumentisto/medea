@@ -15,7 +15,7 @@ services:
     image: instrumentisto/medea:dev
     depends_on: ["coturn-db"]
     environment:
-      MEDEA_LOG.LEVEL: "DEBUG"
+      MEDEA_LOG_LEVEL: "DEBUG"
     network_mode: service:web-client
   coturn:
     container_name: demo-coturn

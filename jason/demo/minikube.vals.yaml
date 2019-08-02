@@ -1,0 +1,32 @@
+# Values for `medea-demo` Helm chart deployed into Minikube cluster.
+#
+# NOTE: To temporary override these values DO NOT change them here, but rather
+#       declare overridden values in `my.minikube.vals.yaml` file.
+
+server:
+  image:
+    tag: dev
+    pullPolicy: IfNotPresent
+  coturn:
+    image:
+      tag: 4.5
+      pullPolicy: Always
+  coturn-db:
+    image:
+      tag: alpine
+      pullPolicy: Always
+
+web-client:
+  image:
+    tag: dev
+    pullPolicy: IfNotPresent
+
+ingress:
+  enabled: yes
+  hosts:
+    - medea-demo.test
+  tls:
+    enabled: yes
+    auto: no
+    secretName:
+      medea-demo.test: medea-demo.test.tls

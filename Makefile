@@ -254,9 +254,7 @@ docker-build-demo-image-name = $(DEMO_IMAGE_NAME)
 docker.build.demo:
 	@make yarn proj=demo
 	$(docker-env) \
-	docker build --force-rm \
-		$(if $(call eq,$(minikube),yes),,\
-			--network=host) \
+	docker build $(if $(call eq,$(minikube),yes),,--network=host) --force-rm \
 		-t $(docker-build-demo-image-name):$(if $(call eq,$(TAG),),dev,$(TAG)) \
 		jason/demo
 
@@ -282,9 +280,7 @@ endif
 	$(call docker.build.clean.ignore)
 	@echo "!target/$(if $(call eq,$(debug),no),release,debug)/" >> .dockerignore
 	$(docker-env) \
-	docker build --force-rm \
-		$(if $(call eq,$(minikube),yes),,\
-			--network=host) \
+	docker build $(if $(call eq,$(minikube),yes),,--network=host) --force-rm \
 		$(if $(call eq,$(no-cache),yes),\
 			--no-cache --pull,) \
 		$(if $(call eq,$(IMAGE),),\
