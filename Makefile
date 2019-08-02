@@ -329,7 +329,7 @@ helm-cluster-args = $(strip \
 	--kube-context=$(helm-cluster) --tiller-namespace=$(helm-namespace))
 
 helm-chart = $(if $(call eq,$(chart),),medea-demo,$(chart))
-helm-chart-dir = jason/demo/chart/
+helm-chart-dir = jason/demo/chart/medea-demo/
 helm-release = $(if $(call eq,$(release),),dev,$(release))-$(helm-chart)
 helm-release-namespace = default
 
@@ -341,6 +341,19 @@ helm-release-namespace = default
 
 helm:
 	helm $(helm-cluster-args) $(if $(call eq,$(cmd),),--help,$(cmd))
+
+
+# Build Helm package from project Helm chart.
+#
+# Usage:
+#	make helm.build [chart=medea-demo] [VERSION=<proj-version>]
+
+helm-build-dir = .cache/helm/charts/
+helm-build-ver = $(subst v,,$(VERSION))
+
+helm.build:
+	@mkdir -p $(helm-build-dir)
+	helm package --destination=$(helm-build-dir) $(helm-chart-dir)
 
 
 # Remove Helm release of project Helm chart from Kubernetes cluster.
@@ -461,7 +474,7 @@ endef
         docker.build.demo docker.build.medea docker.down.demo docker.up.demo \
         docs docs.rust \
         down.demo \
-        helm helm.down helm.init helm.lint helm.list helm.up \
+        helm helm.build helm.down helm.init helm.lint helm.list helm.up \
         minikube.boot \
         release.jason \
         test test.unit \
