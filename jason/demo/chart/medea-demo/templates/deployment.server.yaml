@@ -16,6 +16,8 @@ metadata:
 spec:
   replicas: 1
   revisionHistoryLimit: {{ .Values.server.deployment.revisionHistoryLimit }}
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app.kubernetes.io/name: {{ template "medea-demo.name" . }}
@@ -143,7 +145,7 @@ spec:
           args:
             - redis-server
             - /etc/redis.conf
-            - --requirepass="$(MEDEA_TURN.DB.REDIS.PASS)"
+            - --requirepass $(MEDEA_TURN.DB.REDIS.PASS)
           env:
             - name: MEDEA_TURN.DB.REDIS.PASS
               valueFrom:

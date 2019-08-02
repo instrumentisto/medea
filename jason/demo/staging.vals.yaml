@@ -1,0 +1,63 @@
+# Values for `medea-demo` Helm chart deployed into 'staging' Kubernetes cluster.
+#
+# NOTE: To temporary override these values DO NOT change them here, but rather
+#       declare overridden values in `my.staging.vals.yaml` file.
+
+server:
+  image:
+    tag: edge
+    pullPolicy: Always
+  conf:
+    server:
+      bind_port: 9980
+    turn:
+      pass: changeme
+
+  coturn:
+    image:
+      tag: 4.5
+      pullPolicy: Always
+    conf:
+      listening_port: 9934
+
+  coturn-db:
+    image:
+      tag: alpine
+      pullPolicy: Always
+    conf:
+      port: 9963
+      requirepass: changeme
+
+  deployment:
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+            - matchExpressions:
+                - key: "role/application"
+                  operator: In
+                  values: ["true"]
+
+
+web-client:
+  image:
+    tag: edge
+    pullPolicy: Always
+
+  deployment:
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+            - matchExpressions:
+                - key: "role/application"
+                  operator: In
+                  values: ["true"]
+
+
+ingress:
+  hosts:
+    - demo.medea.stg.t11913.org
+  tls:
+    enabled: yes
+    auto: yes

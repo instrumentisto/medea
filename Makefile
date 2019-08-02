@@ -329,20 +329,23 @@ docker.up.demo: docker.down.demo
 ##############################
 
 helm-cluster = $(if $(call eq,$(cluster),),minikube,$(cluster))
-helm-namespace = kube-system
+helm-namespace = $(if $(call eq,$(helm-cluster),minikube),kube,staging)-system
 helm-cluster-args = $(strip \
 	--kube-context=$(helm-cluster) --tiller-namespace=$(helm-namespace))
 
 helm-chart = $(if $(call eq,$(chart),),medea-demo,$(chart))
 helm-chart-dir = jason/demo/chart/medea-demo
-helm-release = $(if $(call eq,$(release),),dev,$(release))-$(helm-chart)
-helm-release-namespace = default
+helm-chart-vals-dir = jason/demo
+
+helm-release = $(if $(call eq,$(release),),,$(release)-)$(helm-chart)
+helm-release-namespace = $(strip \
+	$(if $(call eq,$(helm-cluster),staging),staging,default))
 
 # Run Helm command in context of concrete Kubernetes cluster.
 #
 # Usage:
 #	make helm [cmd=(--help|'<command>')]
-#	          [cluster=minikube]
+#	          [cluster=(minikube|staging)]
 
 helm:
 	helm $(helm-cluster-args) $(if $(call eq,$(cmd),),--help,$(cmd))
@@ -351,11 +354,11 @@ helm:
 # Remove Helm release of project Helm chart from Kubernetes cluster.
 #
 # Usage:
-#	make helm.down [chart=medea-demo] [release=(dev|<release-name>)]
-#	               [cluster=minikube]
+#	make helm.down [chart=medea-demo] [release=<release-name>]
+#	               [cluster=(minikube|staging)]
 
 helm.down:
-	$(if $(shell helm ls | grep '$(helm-release)'),\
+	$(if $(shell helm ls $(helm-cluster-args) | grep '$(helm-release)'),\
 		helm del --purge $(helm-cluster-args) $(helm-release) ,\
 		@echo "--> No '$(helm-release)' release found in $(helm-cluster) cluster")
 
@@ -386,7 +389,7 @@ helm.lint:
 # List all Helm releases in Kubernetes cluster.
 #
 # Usage:
-#	make helm.list [cluster=minikube]
+#	make helm.list [cluster=(minikube|staging)]
 
 helm.list:
 	helm ls $(helm-cluster-args)
@@ -395,7 +398,7 @@ helm.list:
 # Build Helm package from project Helm chart.
 #
 # Usage:
-#	make helm.build [chart=medea-demo]
+#	make helm.package [chart=medea-demo]
 
 helm-package-dir = .cache/helm/packages
 
@@ -432,11 +435,15 @@ endif
 # Run project Helm chart in Kubernetes cluster as Helm release.
 #
 # Usage:
-#	make helm.up [chart=medea-demo] [release=(dev|<release-name>)]
+#	make helm.up [chart=medea-demo] [release=<release-name>]
 #	             [cluster=minikube [rebuild=(no|yes) [no-cache=(no|yes)]]]
+#	             [cluster=staging]
 #	             [wait=(yes|no)]
 
 helm.up:
+ifeq ($(wildcard $(helm-chart-vals-dir)/my.$(helm-cluster).vals.yaml),)
+	touch $(helm-chart-vals-dir)/my.$(helm-cluster).vals.yaml
+endif
 ifeq ($(helm-cluster),minikube)
 ifeq ($(helm-chart),medea-demo)
 ifeq ($(rebuild),yes)
@@ -445,14 +452,13 @@ ifeq ($(rebuild),yes)
 endif
 endif
 endif
-	helm upgrade --install $(helm-cluster-args) \
+	helm upgrade --install --force $(helm-cluster-args) \
 		$(helm-release) $(helm-chart-dir)/ \
 			--namespace=$(helm-release-namespace) \
-			$(if $(call eq,$(helm-chart),medea-demo),\
-				--values=jason/demo/$(helm-cluster).vals.yaml \
-				--values=jason/demo/my.$(helm-cluster).vals.yaml \
-				--set server.deployment.revision=$(shell date +%s) \
-				--set web-client.deployment.revision=$(shell date +%s) ,)\
+			--values=$(helm-chart-vals-dir)/$(helm-cluster).vals.yaml \
+			--values=$(helm-chart-vals-dir)/my.$(helm-cluster).vals.yaml \
+			--set server.deployment.revision=$(shell date +%s) \
+			--set web-client.deployment.revision=$(shell date +%s) \
 			$(if $(call eq,$(wait),no),,\
 				--wait )
 
