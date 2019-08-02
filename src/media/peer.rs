@@ -358,7 +358,7 @@ impl Peer<WaitLocalHaveRemote> {
 impl Peer<Stable> {
     pub fn get_mids(&self) -> Result<HashMap<TrackId, String>, PeerError> {
         let mut mids = HashMap::with_capacity(self.context.senders.len());
-        for (track_id, track) in self.context.senders.iter() {
+        for (track_id, track) in &self.context.senders {
             mids.insert(
                 *track_id,
                 track

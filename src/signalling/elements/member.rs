@@ -325,7 +325,7 @@ pub fn parse_members(
         );
     }
 
-    for (_, member) in &members {
+    for member in members.values() {
         member.load(room_spec, &members)?;
     }
 

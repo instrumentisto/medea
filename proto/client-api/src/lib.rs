@@ -29,13 +29,13 @@ pub trait Incrementable: Sized + Clone {
 
 impl Incrementable for PeerId {
     fn increment(&self) -> Self {
-        PeerId(self.0 + 1)
+        Self(self.0 + 1)
     }
 }
 
 impl Incrementable for TrackId {
     fn increment(&self) -> Self {
-        TrackId(self.0 + 1)
+        Self(self.0 + 1)
     }
 }
 

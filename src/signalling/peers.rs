@@ -116,7 +116,7 @@ impl PeerRepository {
         member_id: &MemberId,
         partner_member_id: &MemberId,
     ) -> Option<(PeerId, PeerId)> {
-        for (_, peer) in &self.peers {
+        for peer in self.peers.values() {
             if &peer.member_id() == member_id
                 && &peer.partner_member_id() == partner_member_id
             {
@@ -191,18 +191,18 @@ impl PeerRepository {
                 .for_each(|partner_peer| {
                     peers_to_remove
                         .entry(partner_peer.member_id())
-                        .or_insert(Vec::new())
+                        .or_insert_with(Vec::new)
                         .push(partner_peer.id());
                 });
 
             peers_to_remove
                 .entry(peer.partner_member_id())
-                .or_insert(Vec::new())
+                .or_insert_with(Vec::new)
                 .push(peer.id());
 
             peers_to_remove
                 .entry(peer.member_id())
-                .or_insert(Vec::new())
+                .or_insert_with(Vec::new)
                 .push(peer.id());
         });
 
