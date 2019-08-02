@@ -21,6 +21,8 @@ DEMO_IMAGE_NAME := instrumentisto/medea-demo
 
 RUST_VER := 1.36
 
+CURRENT_BRANCH := $(strip $(shell git branch | grep \* | cut -d ' ' -f2))
+
 
 
 
@@ -234,6 +236,9 @@ release.jason:
 	wasm-pack publish
 
 
+release.helm: helm.package.release
+
+
 
 
 ###################
@@ -329,7 +334,7 @@ helm-cluster-args = $(strip \
 	--kube-context=$(helm-cluster) --tiller-namespace=$(helm-namespace))
 
 helm-chart = $(if $(call eq,$(chart),),medea-demo,$(chart))
-helm-chart-dir = jason/demo/chart/medea-demo/
+helm-chart-dir = jason/demo/chart/medea-demo
 helm-release = $(if $(call eq,$(release),),dev,$(release))-$(helm-chart)
 helm-release-namespace = default
 
@@ -341,19 +346,6 @@ helm-release-namespace = default
 
 helm:
 	helm $(helm-cluster-args) $(if $(call eq,$(cmd),),--help,$(cmd))
-
-
-# Build Helm package from project Helm chart.
-#
-# Usage:
-#	make helm.build [chart=medea-demo] [VERSION=<proj-version>]
-
-helm-build-dir = .cache/helm/charts/
-helm-build-ver = $(subst v,,$(VERSION))
-
-helm.build:
-	@mkdir -p $(helm-build-dir)
-	helm package --destination=$(helm-build-dir) $(helm-chart-dir)
 
 
 # Remove Helm release of project Helm chart from Kubernetes cluster.
@@ -388,7 +380,7 @@ helm.init:
 #	make helm.lint [chart=medea-demo]
 
 helm.lint:
-	helm lint $(helm-chart-dir)
+	helm lint $(helm-chart-dir)/
 
 
 # List all Helm releases in Kubernetes cluster.
@@ -398,6 +390,43 @@ helm.lint:
 
 helm.list:
 	helm ls $(helm-cluster-args)
+
+
+# Build Helm package from project Helm chart.
+#
+# Usage:
+#	make helm.build [chart=medea-demo]
+
+helm-package-dir = .cache/helm/packages
+
+helm.package:
+	@rm -rf $(helm-package-dir)
+	@mkdir -p $(helm-package-dir)/
+	helm package --destination=$(helm-package-dir)/ $(helm-chart-dir)/
+
+
+# Build and publish project Helm package to GitHub Pages.
+#
+# Usage:
+#	make helm.package.release [chart=medea-demo] [build=(yes|no)]
+
+helm.package.release:
+ifneq ($(build),no)
+	@make helm.package chart=$(helm-chart)
+endif
+	git fetch origin gh-pages:gh-pages
+	git checkout gh-pages
+	git reset --hard
+	@mkdir -p charts/
+	cp -rf $(helm-package-dir)/* charts/
+	if [ -n "$$(git add -v charts/)" ]; then \
+		helm repo index charts/ \
+			--url=https://instrumentisto.github.io/medea/charts ; \
+		git add -v charts/ ; \
+		git commit -m "Release '$(helm-chart)' Helm chart" ; \
+	fi
+	git checkout $(CURRENT_BRANCH)
+	git push origin gh-pages
 
 
 # Run project Helm chart in Kubernetes cluster as Helm release.
@@ -417,7 +446,7 @@ endif
 endif
 endif
 	helm upgrade --install $(helm-cluster-args) \
-		$(helm-release) $(helm-release-dir) \
+		$(helm-release) $(helm-chart-dir)/ \
 			--namespace=$(helm-release-namespace) \
 			$(if $(call eq,$(helm-chart),medea-demo),\
 				--values=jason/demo/$(helm-cluster).vals.yaml \
@@ -474,9 +503,10 @@ endef
         docker.build.demo docker.build.medea docker.down.demo docker.up.demo \
         docs docs.rust \
         down.demo \
-        helm helm.build helm.down helm.init helm.lint helm.list helm.up \
+        helm helm.down helm.init helm.lint helm.list \
+        	helm.package helm.package.release helm.up \
         minikube.boot \
-        release.jason \
+        release.jason release.helm \
         test test.unit \
         up up.coturn up.demo up.dev up.jason up.medea \
         yarn
