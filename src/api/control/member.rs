@@ -1,6 +1,6 @@
 //! Member definitions and implementations.
 
-use std::{convert::TryFrom};
+use std::convert::TryFrom;
 
 use macro_attr::*;
 use newtype_derive::{newtype_fmt, NewtypeDisplay, NewtypeFrom};
@@ -80,14 +80,10 @@ impl MemberSpec {
     pub fn publish_endpoints(
         &self,
     ) -> impl Iterator<Item = (&String, &WebRtcPublishEndpoint)> {
-        self.pipeline
-            .iter()
-            .filter_map(|(id, e)| match e {
-                MemberElement::WebRtcPublishEndpoint { spec } => {
-                    Some((id, spec))
-                }
-                _ => None,
-            })
+        self.pipeline.iter().filter_map(|(id, e)| match e {
+            MemberElement::WebRtcPublishEndpoint { spec } => Some((id, spec)),
+            _ => None,
+        })
     }
 
     pub fn credentials(&self) -> &str {

@@ -172,19 +172,17 @@ impl Member {
 
         // This is necessary to create [`WebRtcPublishEndpoint`],
         // to which none [`WebRtcPlayEndpoint`] refers.
-        this_member_spec.publish_endpoints().for_each(
-            |(name, e)| {
-                let endpoint_id = WebRtcPublishId(name.clone());
-                if self.srcs().get(&endpoint_id).is_none() {
-                    self.insert_src(WebRtcPublishEndpoint::new(
-                        endpoint_id,
-                        e.p2p.clone(),
-                        Vec::new(),
-                        this_member.downgrade(),
-                    ));
-                }
-            },
-        );
+        this_member_spec.publish_endpoints().for_each(|(name, e)| {
+            let endpoint_id = WebRtcPublishId(name.clone());
+            if self.srcs().get(&endpoint_id).is_none() {
+                self.insert_src(WebRtcPublishEndpoint::new(
+                    endpoint_id,
+                    e.p2p.clone(),
+                    Vec::new(),
+                    this_member.downgrade(),
+                ));
+            }
+        });
 
         Ok(())
     }

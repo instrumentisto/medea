@@ -7,32 +7,45 @@ use serde::{de::Deserializer, ser::Serializer, Deserialize, Serialize};
 
 macro_attr! {
     /// ID of [`Peer`].
-    #[cfg_attr(feature = "medea", derive(Deserialize))]
+    #[cfg_attr(
+        feature = "medea",
+        derive(Deserialize, Debug, Hash, Eq, Default, PartialEq)
+    )]
     #[cfg_attr(feature = "jason", derive(Serialize))]
     #[cfg_attr(test, derive(Debug, PartialEq ))]
-    #[derive(Clone, Copy, NewtypeDisplay!, PartialEq, Debug, Hash, Eq, Default)]
+    #[derive(Clone, Copy, NewtypeDisplay!)]
     pub struct PeerId(pub u64);
 }
 
 macro_attr! {
     /// ID of [`MediaTrack`].
-    #[cfg_attr(feature = "medea", derive(Deserialize))]
+    #[cfg_attr(
+        feature = "medea",
+        derive(Deserialize, Debug, Hash, Eq, Default, PartialEq)
+    )]
     #[cfg_attr(feature = "jason", derive(Serialize))]
     #[cfg_attr(test, derive(Debug, PartialEq ))]
-    #[derive(Clone, Copy, NewtypeDisplay!, PartialEq, Debug, Hash, Eq, Default)]
+    #[derive(Clone, Copy, NewtypeDisplay!)]
     pub struct TrackId(pub u64);
 }
 
+/// Trait for providing function `increment()` which return current value + 1.
+#[cfg(feature = "medea")]
 pub trait Incrementable: Sized + Clone {
+    /// Returns current value + 1.
+    ///
+    /// This function don't mutate `self`.
     fn increment(&self) -> Self;
 }
 
+#[cfg(feature = "medea")]
 impl Incrementable for PeerId {
     fn increment(&self) -> Self {
         Self(self.0 + 1)
     }
 }
 
+#[cfg(feature = "medea")]
 impl Incrementable for TrackId {
     fn increment(&self) -> Self {
         Self(self.0 + 1)
