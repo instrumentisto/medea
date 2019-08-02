@@ -2,14 +2,13 @@
 
 use std::{
     cell::RefCell,
-    collections::HashMap as StdHashMap,
+    collections::HashMap,
     convert::TryFrom as _,
     rc::{Rc, Weak},
 };
 
 use failure::Fail;
-use hashbrown::HashMap;
-use medea_client_api_proto::IceServer;
+use medea_client_api_proto::{IceServer, PeerId};
 use medea_grpc_proto::control::{
     Member as MemberProto, Room_Element as ElementProto,
 };
@@ -24,7 +23,7 @@ use crate::{
         WebRtcPlayId, WebRtcPublishId,
     },
     log::prelude::*,
-    media::{IceUser, PeerId},
+    media::IceUser,
 };
 
 use super::endpoints::webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint};
@@ -165,9 +164,8 @@ impl Member {
                 &spec_play_endpoint.src.member_id,
             )?;
 
-            let publisher_endpoint = *publisher_spec
-                .publish_endpoints()
-                .get(&spec_play_endpoint.src.endpoint_id)
+            let publisher_endpoint = publisher_spec
+                .get_publish_endpoint(&spec_play_endpoint.src.endpoint_id)
                 .map_or(
                     Err(MembersLoadError::PublishEndpointNotFound(
                         publisher_member.get_local_uri_to_endpoint(
@@ -220,8 +218,9 @@ impl Member {
 
         // This is necessary to create [`WebRtcPublishEndpoint`],
         // to which none [`WebRtcPlayEndpoint`] refers.
-        this_member_spec.publish_endpoints().into_iter().for_each(
-            |(endpoint_id, e)| {
+        this_member_spec
+            .publish_endpoints()
+            .for_each(|(endpoint_id, e)| {
                 if self.srcs().get(&endpoint_id).is_none() {
                     self.insert_src(WebRtcPublishEndpoint::new(
                         endpoint_id,
@@ -229,8 +228,7 @@ impl Member {
                         this_member.downgrade(),
                     ));
                 }
-            },
-        );
+            });
 
         Ok(())
     }
@@ -476,7 +474,7 @@ pub fn parse_members(
         );
     }
 
-    for (_, member) in &members {
+    for member in members.values() {
         member.load(room_spec, &members)?;
     }
 
@@ -509,7 +507,7 @@ impl Into<ElementProto> for Member {
         let mut element = ElementProto::new();
         let mut member = MemberProto::new();
 
-        let mut member_pipeline = StdHashMap::new();
+        let mut member_pipeline = HashMap::new();
         for (id, play) in self.sinks() {
             let local_uri = self.get_local_uri_to_endpoint(id.to_string());
             member_pipeline.insert(local_uri.to_string(), play.into());

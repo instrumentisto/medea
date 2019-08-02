@@ -2,10 +2,11 @@
 
 use std::{
     cell::RefCell,
+    collections::HashSet,
     rc::{Rc, Weak},
 };
 
-use hashbrown::HashSet;
+use medea_client_api_proto::PeerId;
 use medea_grpc_proto::control::{
     Member_Element as ElementProto,
     WebRtcPublishEndpoint as WebRtcPublishEndpointProto,
@@ -15,7 +16,6 @@ use crate::{
     api::control::endpoints::webrtc_publish_endpoint::{
         P2pMode, WebRtcPublishId as Id,
     },
-    media::PeerId,
     signalling::elements::{
         endpoints::webrtc::play_endpoint::WeakWebRtcPlayEndpoint,
         member::WeakMember, Member,

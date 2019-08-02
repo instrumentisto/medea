@@ -3,7 +3,7 @@
 //! [`RpcConnection`] authorization, establishment, message sending, Turn
 //! credentials management.
 
-use std::time::Instant;
+use std::{collections::HashMap, time::Instant};
 
 use actix::{
     fut::wrap_future, ActorFuture, AsyncContext, Context, MailboxError,
@@ -14,7 +14,6 @@ use futures::{
     future::{self, join_all, Either},
     Future,
 };
-use hashbrown::HashMap;
 use medea_client_api_proto::Event;
 
 use crate::{

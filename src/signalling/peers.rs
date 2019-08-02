@@ -1,17 +1,18 @@
 //! Repository that stores [`Room`]s [`Peer`]s.
 
 use std::{
+    collections::{HashMap, HashSet},
     convert::{TryFrom, TryInto},
     fmt,
 };
 
 use actix::{AsyncContext as _, Context};
-use hashbrown::{HashMap, HashSet};
+use medea_client_api_proto::{Incrementable, PeerId, TrackId};
 
 use crate::{
     api::control::MemberId,
     log::prelude::*,
-    media::{New, Peer, PeerId, PeerStateMachine},
+    media::{New, Peer, PeerStateMachine},
     signalling::{
         elements::Member,
         room::{PeersRemoved, Room, RoomError},
@@ -24,29 +25,29 @@ pub struct PeerRepository {
     peers: HashMap<PeerId, PeerStateMachine>,
 
     /// Count of [`Peer`]s in this [`Room`].
-    peers_count: Counter,
+    peers_count: Counter<PeerId>,
 
     /// Count of [`MediaTrack`]s in this [`Room`].
-    tracks_count: Counter,
+    tracks_count: Counter<TrackId>,
 }
 
 /// Simple ID counter.
 #[derive(Default, Debug)]
-pub struct Counter {
-    count: u64,
+pub struct Counter<T: Incrementable + Copy> {
+    count: T,
 }
 
-impl Counter {
+impl<T: Incrementable + Copy> Counter<T> {
     /// Returns id and increase counter.
-    pub fn next_id(&mut self) -> u64 {
+    pub fn next_id(&mut self) -> T {
         let id = self.count;
-        self.count += 1;
+        self.count = self.count.increment();
 
         id
     }
 }
 
-impl fmt::Display for Counter {
+impl<T: Incrementable + std::fmt::Display + Copy> fmt::Display for Counter<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.count)
     }
@@ -100,7 +101,7 @@ impl PeerRepository {
     }
 
     /// Returns mutable reference to track counter.
-    pub fn get_tracks_counter(&mut self) -> &mut Counter {
+    pub fn get_tracks_counter(&mut self) -> &mut Counter<TrackId> {
         &mut self.tracks_count
     }
 
@@ -115,7 +116,7 @@ impl PeerRepository {
         member_id: &MemberId,
         partner_member_id: &MemberId,
     ) -> Option<(PeerId, PeerId)> {
-        for (_, peer) in &self.peers {
+        for peer in self.peers.values() {
             if &peer.member_id() == member_id
                 && &peer.partner_member_id() == partner_member_id
             {
@@ -142,20 +143,17 @@ impl PeerRepository {
     }
 
     /// Returns all [`Peer`]s of specified [`Member`].
-    pub fn get_peers_by_member_id(
-        &self,
-        member_id: &MemberId,
-    ) -> Vec<&PeerStateMachine> {
-        self.peers
-            .iter()
-            .filter_map(|(_, peer)| {
-                if &peer.member_id() == member_id {
-                    Some(peer)
-                } else {
-                    None
-                }
-            })
-            .collect()
+    pub fn get_peers_by_member_id<'a>(
+        &'a self,
+        member_id: &'a MemberId,
+    ) -> impl Iterator<Item = &'a PeerStateMachine> {
+        self.peers.iter().filter_map(move |(_, peer)| {
+            if &peer.member_id() == member_id {
+                Some(peer)
+            } else {
+                None
+            }
+        })
     }
 
     /// Returns owned [`Peer`] by its ID.
@@ -236,31 +234,28 @@ impl PeerRepository {
         let mut peers_to_remove: HashMap<MemberId, Vec<PeerId>> =
             HashMap::new();
 
-        self.get_peers_by_member_id(member_id)
-            .into_iter()
-            .for_each(|peer| {
-                self.get_peers_by_member_id(&peer.partner_member_id())
-                    .into_iter()
-                    .filter(|partner_peer| {
-                        &partner_peer.partner_member_id() == member_id
-                    })
-                    .for_each(|partner_peer| {
-                        peers_to_remove
-                            .entry(partner_peer.member_id())
-                            .or_insert(Vec::new())
-                            .push(partner_peer.id());
-                    });
+        self.get_peers_by_member_id(member_id).for_each(|peer| {
+            self.get_peers_by_member_id(&peer.partner_member_id())
+                .filter(|partner_peer| {
+                    &partner_peer.partner_member_id() == member_id
+                })
+                .for_each(|partner_peer| {
+                    peers_to_remove
+                        .entry(partner_peer.member_id())
+                        .or_insert_with(Vec::new)
+                        .push(partner_peer.id());
+                });
 
-                peers_to_remove
-                    .entry(peer.partner_member_id())
-                    .or_insert(Vec::new())
-                    .push(peer.id());
+            peers_to_remove
+                .entry(peer.partner_member_id())
+                .or_insert_with(Vec::new)
+                .push(peer.id());
 
-                peers_to_remove
-                    .entry(peer.member_id())
-                    .or_insert(Vec::new())
-                    .push(peer.id());
-            });
+            peers_to_remove
+                .entry(peer.member_id())
+                .or_insert_with(Vec::new)
+                .push(peer.id());
+        });
 
         for (peer_member_id, peers_id) in peers_to_remove {
             for peer_id in &peers_id {

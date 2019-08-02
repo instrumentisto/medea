@@ -1,7 +1,8 @@
+use std::collections::HashMap;
+
 use actix::Actor;
 use failure::Error;
 use futures::future::Future;
-use hashbrown::HashMap;
 use medea::{
     api::{client::server::Server, control::grpc},
     conf::Conf,
