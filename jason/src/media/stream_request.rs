@@ -4,12 +4,14 @@
 
 use std::{collections::HashMap, convert::TryFrom};
 
-use medea_client_api_proto::{AudioSettings, MediaType, VideoSettings};
+use medea_client_api_proto::{
+    AudioSettings, MediaType, TrackId, VideoSettings,
+};
 use wasm_bindgen::JsValue;
 
 use crate::utils::WasmErr;
 
-use super::{MediaStream, MediaTrack, TrackId};
+use super::{MediaStream, MediaTrack};
 
 /// Representation of [MediaStreamConstraints][1] object.
 ///
@@ -23,8 +25,8 @@ use super::{MediaStream, MediaTrack, TrackId};
 /// [3]: https://www.w3.org/TR/mediacapture-streams/#mediastream
 #[derive(Default)]
 pub struct StreamRequest {
-    audio: HashMap<u64, AudioSettings>,
-    video: HashMap<u64, VideoSettings>,
+    audio: HashMap<TrackId, AudioSettings>,
+    video: HashMap<TrackId, VideoSettings>,
 }
 
 impl StreamRequest {
@@ -45,8 +47,8 @@ impl StreamRequest {
 /// and must have at least one track of any kind.
 #[allow(clippy::module_name_repetitions)]
 pub struct SimpleStreamRequest {
-    audio: Option<(u64, AudioSettings)>,
-    video: Option<(u64, VideoSettings)>,
+    audio: Option<(TrackId, AudioSettings)>,
+    video: Option<(TrackId, VideoSettings)>,
 }
 
 impl SimpleStreamRequest {

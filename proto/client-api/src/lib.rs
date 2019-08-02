@@ -1,7 +1,56 @@
 use std::collections::HashMap;
 
+use macro_attr::*;
 use medea_macro::dispatchable;
+use newtype_derive::*;
 use serde::{de::Deserializer, ser::Serializer, Deserialize, Serialize};
+
+macro_attr! {
+    /// ID of [`Peer`].
+    #[cfg_attr(
+        feature = "medea",
+        derive(Deserialize, Debug, Hash, Eq, Default, PartialEq)
+    )]
+    #[cfg_attr(feature = "jason", derive(Serialize))]
+    #[cfg_attr(test, derive(Debug, PartialEq ))]
+    #[derive(Clone, Copy, NewtypeDisplay!)]
+    pub struct PeerId(pub u64);
+}
+
+macro_attr! {
+    /// ID of [`MediaTrack`].
+    #[cfg_attr(
+        feature = "medea",
+        derive(Deserialize, Debug, Hash, Eq, Default, PartialEq)
+    )]
+    #[cfg_attr(feature = "jason", derive(Serialize))]
+    #[cfg_attr(test, derive(Debug, PartialEq ))]
+    #[derive(Clone, Copy, NewtypeDisplay!)]
+    pub struct TrackId(pub u64);
+}
+
+/// Trait for providing function `increment()` which return current value + 1.
+#[cfg(feature = "medea")]
+pub trait Incrementable: Sized + Clone {
+    /// Returns current value + 1.
+    ///
+    /// This function don't mutate `self`.
+    fn increment(&self) -> Self;
+}
+
+#[cfg(feature = "medea")]
+impl Incrementable for PeerId {
+    fn increment(&self) -> Self {
+        Self(self.0 + 1)
+    }
+}
+
+#[cfg(feature = "medea")]
+impl Incrementable for TrackId {
+    fn increment(&self) -> Self {
+        Self(self.0 + 1)
+    }
+}
 
 // TODO: should be properly shared between medea and jason
 #[allow(dead_code)]
@@ -36,7 +85,7 @@ pub enum ClientMsg {
 pub enum Command {
     /// Web Client sends SDP Offer.
     MakeSdpOffer {
-        peer_id: u64,
+        peer_id: PeerId,
         sdp_offer: String,
         /// Associations between [`Track`] and transceiver's [media
         /// description][1].
@@ -44,13 +93,13 @@ pub enum Command {
         /// `mid` is basically an ID of [`m=<media>` section][1] in SDP.
         ///
         /// [1]: https://tools.ietf.org/html/rfc4566#section-5.14
-        mids: HashMap<u64, String>,
+        mids: HashMap<TrackId, String>,
     },
     /// Web Client sends SDP Answer.
-    MakeSdpAnswer { peer_id: u64, sdp_answer: String },
+    MakeSdpAnswer { peer_id: PeerId, sdp_answer: String },
     /// Web Client sends Ice Candidate.
     SetIceCandidate {
-        peer_id: u64,
+        peer_id: PeerId,
         candidate: IceCandidate,
     },
 }
@@ -65,25 +114,25 @@ pub enum Event {
     /// Media Server notifies Web Client about necessity of RTCPeerConnection
     /// creation.
     PeerCreated {
-        peer_id: u64,
+        peer_id: PeerId,
         sdp_offer: Option<String>,
         tracks: Vec<Track>,
         ice_servers: Vec<IceServer>,
     },
     /// Media Server notifies Web Client about necessity to apply specified SDP
     /// Answer to Web Client's RTCPeerConnection.
-    SdpAnswerMade { peer_id: u64, sdp_answer: String },
+    SdpAnswerMade { peer_id: PeerId, sdp_answer: String },
 
     /// Media Server notifies Web Client about necessity to apply specified
     /// ICE Candidate.
     IceCandidateDiscovered {
-        peer_id: u64,
+        peer_id: PeerId,
         candidate: IceCandidate,
     },
 
     /// Media Server notifies Web Client about necessity of RTCPeerConnection
     /// close.
-    PeersRemoved { peer_ids: Vec<u64> },
+    PeersRemoved { peer_ids: Vec<PeerId> },
 }
 
 /// Represents [RTCIceCandidateInit][1] object.
@@ -100,7 +149,7 @@ pub struct IceCandidate {
 #[cfg_attr(feature = "medea", derive(Serialize, Debug, Clone, PartialEq))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
 pub struct Track {
-    pub id: u64,
+    pub id: TrackId,
     pub direction: Direction,
     pub media_type: MediaType,
 }
@@ -127,11 +176,11 @@ pub struct IceServer {
 // TODO: Use different struct without mids in TracksApplied event.
 pub enum Direction {
     Send {
-        receivers: Vec<u64>,
+        receivers: Vec<PeerId>,
         mid: Option<String>,
     },
     Recv {
-        sender: u64,
+        sender: PeerId,
         mid: Option<String>,
     },
 }

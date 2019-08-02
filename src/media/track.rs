@@ -6,8 +6,7 @@ use std::cell::RefCell;
 
 use medea_client_api_proto::MediaType;
 
-/// ID of [`MediaTrack`].
-pub type Id = u64;
+use medea_client_api_proto::TrackId as Id;
 
 /// Representation of [MediaStreamTrack][1] object.
 ///

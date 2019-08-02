@@ -1,8 +1,7 @@
 //! Room definitions and implementations.
 
-use std::{collections::HashMap as StdHashMap, convert::TryFrom};
+use std::{collections::HashMap, convert::TryFrom};
 
-use hashbrown::HashMap;
 use macro_attr::*;
 use medea_grpc_proto::control::Room as RoomProto;
 use newtype_derive::{newtype_fmt, NewtypeDisplay, NewtypeFrom};
@@ -31,6 +30,7 @@ macro_attr! {
     pub struct Id(pub String);
 }
 
+/// Element of [`Room`]'s [`Pipeline`].
 #[allow(clippy::module_name_repetitions)]
 #[derive(Clone, Deserialize, Debug)]
 #[serde(tag = "kind")]
@@ -58,7 +58,7 @@ impl RoomSpec {
         id: Id,
         proto: &RoomProto,
     ) -> Result<Self, TryFromProtobufError> {
-        let mut pipeline = StdHashMap::new();
+        let mut pipeline = HashMap::new();
         for (id, room_element) in proto.get_pipeline() {
             if !room_element.has_member() {
                 return Err(TryFromProtobufError::MemberElementNotFound);

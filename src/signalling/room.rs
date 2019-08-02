@@ -1,7 +1,7 @@
 //! Room definitions and implementations. Room is responsible for media
 //! connection establishment between concrete [`Member`]s.
 
-use std::collections::HashMap as StdHashMap;
+use std::collections::{HashMap, HashSet};
 
 use actix::{
     fut::wrap_future, Actor, ActorFuture, AsyncContext, Context, Handler,
@@ -9,8 +9,7 @@ use actix::{
 };
 use failure::Fail;
 use futures::future;
-use hashbrown::{HashMap, HashSet};
-use medea_client_api_proto::{Command, Event, IceCandidate};
+use medea_client_api_proto::{Command, Event, IceCandidate, PeerId, TrackId};
 use medea_grpc_proto::control::{
     Element as ElementProto, Member_Element, Room as RoomProto, Room_Element,
 };
@@ -30,7 +29,7 @@ use crate::{
     },
     log::prelude::*,
     media::{
-        New, Peer, PeerError, PeerId, PeerStateMachine, WaitLocalHaveRemote,
+        New, Peer, PeerError, PeerStateMachine, WaitLocalHaveRemote,
         WaitLocalSdp, WaitRemoteSdp,
     },
     shutdown::ShutdownGracefully,
@@ -227,7 +226,7 @@ impl Room {
         &mut self,
         from_peer_id: PeerId,
         sdp_offer: String,
-        mids: StdHashMap<u64, String>,
+        mids: HashMap<TrackId, String>,
     ) -> Result<ActFuture<(), RoomError>, RoomError> {
         let mut from_peer: Peer<WaitLocalSdp> =
             self.peers.take_inner_peer(from_peer_id)?;
@@ -513,7 +512,7 @@ impl Into<ElementProto> for &mut Room {
         let mut element = ElementProto::new();
         let mut room = RoomProto::new();
 
-        let mut pipeline = StdHashMap::new();
+        let mut pipeline = HashMap::new();
         for (id, member) in self.members.members() {
             let local_uri = LocalUri::<IsMemberId>::new(self.get_id(), id);
 

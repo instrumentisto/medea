@@ -2,7 +2,6 @@
 
 use std::{collections::HashMap as StdHashMap, convert::TryFrom};
 
-use hashbrown::HashMap;
 use macro_attr::*;
 use medea_grpc_proto::control::Member as MemberProto;
 use newtype_derive::{newtype_fmt, NewtypeDisplay, NewtypeFrom};
@@ -36,6 +35,7 @@ macro_attr! {
     pub struct Id(pub String);
 }
 
+/// Element of [`Member`]'s [`Pipeline`].
 #[allow(clippy::module_name_repetitions)]
 #[derive(Clone, Deserialize, Debug)]
 #[serde(tag = "kind")]
@@ -71,31 +71,39 @@ impl Into<RoomElement> for MemberSpec {
 
 impl MemberSpec {
     /// Returns all [`WebRtcPlayEndpoint`]s of this [`MemberSpec`].
-    pub fn play_endpoints(&self) -> HashMap<WebRtcPlayId, &WebRtcPlayEndpoint> {
-        self.pipeline
-            .iter()
-            .filter_map(|(id, e)| match e {
-                MemberElement::WebRtcPlayEndpoint { spec } => {
-                    Some((WebRtcPlayId(id.clone()), spec))
-                }
-                _ => None,
-            })
-            .collect()
+    pub fn play_endpoints(
+        &self,
+    ) -> impl Iterator<Item = (WebRtcPlayId, &WebRtcPlayEndpoint)> {
+        self.pipeline.iter().filter_map(|(id, e)| match e {
+            MemberElement::WebRtcPlayEndpoint { spec } => {
+                Some((WebRtcPlayId(id.clone()), spec))
+            }
+            _ => None,
+        })
+    }
+
+    pub fn get_publish_endpoint(
+        &self,
+        id: &WebRtcPublishId,
+    ) -> Option<&WebRtcPublishEndpoint> {
+        let e = self.pipeline.get(&id.0)?;
+        if let MemberElement::WebRtcPublishEndpoint { spec } = e {
+            Some(spec)
+        } else {
+            None
+        }
     }
 
     /// Returns all [`WebRtcPublishEndpoint`]s of this [`MemberSpec`].
     pub fn publish_endpoints(
         &self,
-    ) -> HashMap<WebRtcPublishId, &WebRtcPublishEndpoint> {
-        self.pipeline
-            .iter()
-            .filter_map(|(id, e)| match e {
-                MemberElement::WebRtcPublishEndpoint { spec } => {
-                    Some((WebRtcPublishId(id.clone()), spec))
-                }
-                _ => None,
-            })
-            .collect()
+    ) -> impl Iterator<Item = (WebRtcPublishId, &WebRtcPublishEndpoint)> {
+        self.pipeline.iter().filter_map(|(id, e)| match e {
+            MemberElement::WebRtcPublishEndpoint { spec } => {
+                Some((WebRtcPublishId(id.clone()), spec))
+            }
+            _ => None,
+        })
     }
 
     pub fn credentials(&self) -> &str {
