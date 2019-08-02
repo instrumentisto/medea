@@ -3,8 +3,8 @@
 use std::{cell::RefCell, convert::TryFrom as _, rc::Rc};
 
 use failure::Fail;
-use hashbrown::HashMap;
 use medea_client_api_proto::IceServer;
+use std::collections::HashMap;
 
 use crate::{
     api::control::{MemberId, MemberSpec, RoomSpec, TryFromElementError},

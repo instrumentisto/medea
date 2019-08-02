@@ -5,9 +5,9 @@ use std::{
     rc::{Rc, Weak},
 };
 
-use hashbrown::HashSet;
 use macro_attr::*;
 use newtype_derive::{newtype_fmt, NewtypeDisplay, NewtypeFrom};
+use std::collections::HashSet;
 
 use crate::{
     api::control::endpoint::P2pMode,

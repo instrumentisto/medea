@@ -7,11 +7,11 @@
 use std::{collections::HashMap as StdHashMap, convert::TryFrom, fmt, rc::Rc};
 
 use failure::Fail;
-use hashbrown::HashMap;
 use medea_client_api_proto::{
     AudioSettings, Direction, MediaType, Track, VideoSettings,
 };
 use medea_macro::enum_delegate;
+use std::collections::HashMap;
 
 use crate::{
     api::control::MemberId,

@@ -1,8 +1,7 @@
 //! Member definitions and implementations.
 
-use std::convert::TryFrom;
+use std::{collections::HashMap, convert::TryFrom};
 
-use hashbrown::HashMap;
 use macro_attr::*;
 use newtype_derive::{newtype_fmt, NewtypeDisplay, NewtypeFrom};
 use serde::Deserialize;

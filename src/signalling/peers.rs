@@ -6,8 +6,8 @@ use std::{
 };
 
 use actix::{AsyncContext as _, Context};
-use hashbrown::HashMap;
 use medea_client_api_proto::Incrementable;
+use std::collections::HashMap;
 
 use crate::{
     api::control::MemberId,

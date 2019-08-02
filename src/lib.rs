@@ -14,7 +14,7 @@ use std::sync::Arc;
 
 use actix::prelude::*;
 use failure::Fail;
-use hashbrown::HashMap;
+use std::collections::HashMap;
 
 use crate::{
     api::control::{load_static_specs_from_dir, RoomId},

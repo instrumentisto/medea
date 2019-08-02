@@ -17,8 +17,8 @@ use futures::{
     future::{self, join_all, Either},
     Future,
 };
-use hashbrown::HashMap;
 use medea_client_api_proto::Event;
+use std::collections::HashMap;
 
 use crate::{
     api::{
