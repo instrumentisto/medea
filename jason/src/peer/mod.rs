@@ -10,7 +10,9 @@ mod repo;
 use std::{collections::HashMap, rc::Rc};
 
 use futures::{future, sync::mpsc::UnboundedSender, Future};
-use medea_client_api_proto::{Direction, IceServer, Track, TrackId};
+use medea_client_api_proto::{
+    Direction, IceServer, PeerId as Id, Track, TrackId,
+};
 use medea_macro::dispatchable;
 use web_sys::RtcTrackEvent;
 
@@ -26,11 +28,6 @@ use self::{
 
 #[doc(inline)]
 pub use self::repo::PeerRepository;
-// TODO:
-#[doc(inline)]
-pub use medea_client_api_proto::PeerId as Id;
-#[doc(inline)]
-pub use Id as PeerId;
 
 #[dispatchable]
 #[allow(clippy::module_name_repetitions)]

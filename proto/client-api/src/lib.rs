@@ -1,13 +1,12 @@
 use std::collections::HashMap;
 
-use medea_macro::dispatchable;
-use serde::{de::Deserializer, ser::Serializer, Deserialize, Serialize};
-// TODO: cfg_attr
 use macro_attr::*;
+use medea_macro::dispatchable;
 use newtype_derive::*;
+use serde::{de::Deserializer, ser::Serializer, Deserialize, Serialize};
 
-// TODO: cfg_attr
 macro_attr! {
+    /// ID of [`Peer`].
     #[cfg_attr(feature = "medea", derive(Deserialize))]
     #[cfg_attr(feature = "jason", derive(Serialize))]
     #[cfg_attr(test, derive(Debug, PartialEq ))]

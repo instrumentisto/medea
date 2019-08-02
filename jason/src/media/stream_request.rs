@@ -4,12 +4,14 @@
 
 use std::{collections::HashMap, convert::TryFrom};
 
-use medea_client_api_proto::{AudioSettings, MediaType, VideoSettings};
+use medea_client_api_proto::{
+    AudioSettings, MediaType, TrackId, VideoSettings,
+};
 use wasm_bindgen::JsValue;
 
 use crate::utils::WasmErr;
 
-use super::{MediaStream, MediaTrack, TrackId};
+use super::{MediaStream, MediaTrack};
 
 /// Representation of [MediaStreamConstraints][1] object.
 ///

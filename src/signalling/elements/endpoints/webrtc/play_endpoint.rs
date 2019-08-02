@@ -6,11 +6,11 @@ use std::{
 };
 
 use macro_attr::*;
+use medea_client_api_proto::PeerId;
 use newtype_derive::{newtype_fmt, NewtypeDisplay, NewtypeFrom};
 
 use crate::{
     api::control::endpoint::SrcUri,
-    media::PeerId,
     signalling::elements::{
         endpoints::webrtc::publish_endpoint::WeakWebRtcPublishEndpoint,
         member::WeakMember, Member,

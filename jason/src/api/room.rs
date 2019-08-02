@@ -13,14 +13,14 @@ use futures::{
     sync::mpsc::{unbounded, UnboundedSender},
 };
 use medea_client_api_proto::{
-    Command, Direction, EventHandler, IceCandidate, IceServer, Track,
+    Command, Direction, EventHandler, IceCandidate, IceServer, PeerId, Track,
 };
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 
 use crate::{
     media::{MediaManager, MediaStream},
-    peer::{PeerEvent, PeerEventHandler, PeerId, PeerRepository},
+    peer::{PeerEvent, PeerEventHandler, PeerRepository},
     rpc::RpcClient,
     utils::{Callback2, WasmErr},
 };

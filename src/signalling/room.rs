@@ -9,7 +9,7 @@ use actix::{
 };
 use failure::Fail;
 use futures::future;
-use medea_client_api_proto::{Command, Event, IceCandidate, TrackId};
+use medea_client_api_proto::{Command, Event, IceCandidate, PeerId, TrackId};
 
 use crate::{
     api::{
@@ -21,7 +21,7 @@ use crate::{
     },
     log::prelude::*,
     media::{
-        New, Peer, PeerError, PeerId, PeerStateMachine, WaitLocalHaveRemote,
+        New, Peer, PeerError, PeerStateMachine, WaitLocalHaveRemote,
         WaitLocalSdp, WaitRemoteSdp,
     },
     shutdown::ShutdownGracefully,

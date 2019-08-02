@@ -3,14 +3,14 @@
 use std::{borrow::ToOwned, cell::RefCell, collections::HashMap, rc::Rc};
 
 use futures::{future, Future};
-use medea_client_api_proto::{Direction, MediaType, PeerId, Track};
+use medea_client_api_proto::{Direction, MediaType, PeerId, Track, TrackId};
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
     MediaStreamTrack, RtcRtpTransceiver, RtcRtpTransceiverDirection,
 };
 
 use crate::{
-    media::{MediaStream, MediaTrack, StreamRequest, TrackId},
+    media::{MediaStream, MediaTrack, StreamRequest},
     utils::WasmErr,
 };
 

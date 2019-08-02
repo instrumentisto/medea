@@ -8,12 +8,12 @@ use std::{
 };
 
 use failure::Fail;
-use medea_client_api_proto::IceServer;
+use medea_client_api_proto::{IceServer, PeerId};
 
 use crate::{
     api::control::{MemberId, MemberSpec, RoomSpec, TryFromElementError},
     log::prelude::*,
-    media::{IceUser, PeerId},
+    media::IceUser,
 };
 
 use super::endpoints::webrtc::{

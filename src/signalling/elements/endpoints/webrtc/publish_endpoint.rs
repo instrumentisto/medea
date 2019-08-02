@@ -7,11 +7,11 @@ use std::{
 };
 
 use macro_attr::*;
+use medea_client_api_proto::PeerId;
 use newtype_derive::{newtype_fmt, NewtypeDisplay, NewtypeFrom};
 
 use crate::{
     api::control::endpoint::P2pMode,
-    media::PeerId,
     signalling::elements::{
         endpoints::webrtc::play_endpoint::WeakWebRtcPlayEndpoint,
         member::WeakMember, Member,

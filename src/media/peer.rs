@@ -8,14 +8,13 @@ use std::{collections::HashMap, convert::TryFrom, fmt, rc::Rc};
 
 use failure::Fail;
 use medea_client_api_proto::{
-    AudioSettings, Direction, MediaType, Track, VideoSettings,
+    AudioSettings, Direction, MediaType, PeerId as Id, Track, TrackId,
+    VideoSettings,
 };
 use medea_macro::enum_delegate;
 
 use crate::{
-    api::control::MemberId,
-    media::{MediaTrack, TrackId},
-    signalling::peers::Counter,
+    api::control::MemberId, media::MediaTrack, signalling::peers::Counter,
 };
 
 /// Newly initialized [`Peer`] ready to signalling.
@@ -141,11 +140,6 @@ impl_peer_converts!(WaitLocalHaveRemote);
 impl_peer_converts!(WaitRemoteSdp);
 impl_peer_converts!(Stable);
 
-/// ID of [`Peer`].
-pub use medea_client_api_proto::PeerId as Id;
-// TODO: remove pub use
-pub use Id as PeerId;
-
 #[derive(Debug)]
 pub struct Context {
     id: Id,
@@ -255,7 +249,6 @@ impl Peer<New> {
         partner_peer: &mut Peer<New>,
         tracks_count: &mut Counter<TrackId>,
     ) {
-        // TODO: fix it
         let track_audio = Rc::new(MediaTrack::new(
             tracks_count.next_id(),
             MediaType::Audio(AudioSettings {}),

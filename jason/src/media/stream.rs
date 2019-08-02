@@ -7,13 +7,13 @@ use std::{
     rc::{Rc, Weak},
 };
 
-use medea_client_api_proto::MediaType;
+use medea_client_api_proto::{MediaType, TrackId};
 use wasm_bindgen::{prelude::*, JsValue};
 use web_sys::MediaStream as SysMediaStream;
 
 use crate::utils::WasmErr;
 
-use super::{MediaTrack, TrackId};
+use super::MediaTrack;
 
 /// Actual data of a [`MediaStream`].
 ///

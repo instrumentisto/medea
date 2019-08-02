@@ -7,12 +7,12 @@ use std::{
 };
 
 use actix::{AsyncContext as _, Context};
-use medea_client_api_proto::Incrementable;
+use medea_client_api_proto::{Incrementable, PeerId, TrackId};
 
 use crate::{
     api::control::MemberId,
     log::prelude::*,
-    media::{New, Peer, PeerId, PeerStateMachine, TrackId},
+    media::{New, Peer, PeerStateMachine},
     signalling::{
         elements::Member,
         room::{PeersRemoved, Room, RoomError},

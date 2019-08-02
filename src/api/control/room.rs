@@ -27,6 +27,7 @@ macro_attr! {
     pub struct Id(pub String);
 }
 
+/// Element of [`Room`]'s [`Pipeline`].
 #[allow(clippy::module_name_repetitions)]
 #[derive(Clone, Deserialize, Debug)]
 #[serde(tag = "kind")]
