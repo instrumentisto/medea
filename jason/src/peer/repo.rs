@@ -1,12 +1,12 @@
 use std::{collections::HashMap, rc::Rc};
 
 use futures::{sync::mpsc::UnboundedSender, Future};
-use medea_client_api_proto::IceServer;
+use medea_client_api_proto::{IceServer, PeerId};
 use wasm_bindgen::JsValue;
 
 use crate::{media::MediaManager, utils::WasmErr};
 
-use super::{PeerConnection, PeerEvent, PeerId};
+use super::{PeerConnection, PeerEvent};
 
 /// [`PeerConnection`] factory and repository.
 #[allow(clippy::module_name_repetitions)]

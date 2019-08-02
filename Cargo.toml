@@ -36,7 +36,6 @@ dotenv = "0.14"
 failure = "0.1"
 futures = "0.1"
 grpcio = "0.4"
-hashbrown = "0.5"
 humantime = "1.2"
 macro-attr = "0.2"
 medea-client-api-proto = { path = "proto/client-api", features = ["medea"] }

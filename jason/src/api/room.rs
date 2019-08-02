@@ -14,14 +14,14 @@ use futures::{
 };
 use js_sys::Promise;
 use medea_client_api_proto::{
-    Command, Direction, EventHandler, IceCandidate, IceServer, Track,
+    Command, Direction, EventHandler, IceCandidate, IceServer, PeerId, Track,
 };
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::{future_to_promise, spawn_local};
 
 use crate::{
     media::{MediaManager, MediaStream},
-    peer::{PeerEvent, PeerEventHandler, PeerId, PeerRepository},
+    peer::{PeerEvent, PeerEventHandler, PeerRepository},
     rpc::RpcClient,
     utils::{Callback2, WasmErr},
 };
@@ -137,7 +137,7 @@ impl Room {
 struct InnerRoom {
     rpc: Rc<RpcClient>,
     peers: PeerRepository,
-    connections: HashMap<u64, Connection>,
+    connections: HashMap<PeerId, Connection>,
     on_new_connection: Rc<Callback2<ConnectionHandle, WasmErr>>,
 }
 
@@ -180,7 +180,7 @@ impl InnerRoom {
     /// Creates new [`Connection`]s basing on senders and receivers of provided
     /// [`Track`]s.
     fn create_connections_from_tracks(&mut self, tracks: &[Track]) {
-        let create_connection = |room: &mut Self, member_id: &u64| {
+        let create_connection = |room: &mut Self, member_id: &PeerId| {
             if !room.connections.contains_key(member_id) {
                 let con = Connection::new(*member_id);
                 room.on_new_connection.call1(con.new_handle());
@@ -331,7 +331,7 @@ impl PeerEventHandler for InnerRoom {
     fn on_new_remote_stream(
         &mut self,
         _: PeerId,
-        sender_id: u64,
+        sender_id: PeerId,
         remote_stream: MediaStream,
     ) {
         match self.connections.get(&sender_id) {
