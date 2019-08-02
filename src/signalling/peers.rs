@@ -7,11 +7,12 @@ use std::{
 
 use actix::{AsyncContext as _, Context};
 use hashbrown::HashMap;
+use medea_client_api_proto::Incrementable;
 
 use crate::{
     api::control::MemberId,
     log::prelude::*,
-    media::{New, Peer, PeerId, PeerStateMachine},
+    media::{New, Peer, PeerId, PeerStateMachine, TrackId},
     signalling::{
         elements::Member,
         room::{PeersRemoved, Room, RoomError},
@@ -24,29 +25,29 @@ pub struct PeerRepository {
     peers: HashMap<PeerId, PeerStateMachine>,
 
     /// Count of [`Peer`]s in this [`Room`].
-    peers_count: Counter,
+    peers_count: Counter<PeerId>,
 
     /// Count of [`MediaTrack`]s in this [`Room`].
-    tracks_count: Counter,
+    tracks_count: Counter<TrackId>,
 }
 
 /// Simple ID counter.
 #[derive(Default, Debug)]
-pub struct Counter {
-    count: u64,
+pub struct Counter<T: Incrementable + Copy> {
+    count: T,
 }
 
-impl Counter {
+impl<T: Incrementable + Copy> Counter<T> {
     /// Returns id and increase counter.
-    pub fn next_id(&mut self) -> PeerId {
+    pub fn next_id(&mut self) -> T {
         let id = self.count;
-        self.count += 1;
+        self.count = self.count.increment();
 
-        PeerId(id)
+        id
     }
 }
 
-impl fmt::Display for Counter {
+impl<T: Incrementable + std::fmt::Display + Copy> fmt::Display for Counter<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.count)
     }
@@ -100,7 +101,7 @@ impl PeerRepository {
     }
 
     /// Returns mutable reference to track counter.
-    pub fn get_tracks_counter(&mut self) -> &mut Counter {
+    pub fn get_tracks_counter(&mut self) -> &mut Counter<TrackId> {
         &mut self.tracks_count
     }
 

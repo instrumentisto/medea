@@ -254,15 +254,15 @@ impl Peer<New> {
     pub fn add_publisher(
         &mut self,
         partner_peer: &mut Peer<New>,
-        tracks_count: &mut Counter,
+        tracks_count: &mut Counter<TrackId>,
     ) {
         // TODO: fix it
         let track_audio = Rc::new(MediaTrack::new(
-            tracks_count.next_id().0,
+            tracks_count.next_id(),
             MediaType::Audio(AudioSettings {}),
         ));
         let track_video = Rc::new(MediaTrack::new(
-            tracks_count.next_id().0,
+            tracks_count.next_id(),
             MediaType::Video(VideoSettings {}),
         ));
 

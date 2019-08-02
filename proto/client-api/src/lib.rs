@@ -11,8 +11,24 @@ macro_attr! {
     #[cfg_attr(feature = "medea", derive(Deserialize))]
     #[cfg_attr(feature = "jason", derive(Serialize))]
     #[cfg_attr(test, derive(Debug, PartialEq ))]
-    #[derive(Clone, Copy, NewtypeFrom!, NewtypeAddAssign!, NewtypeDisplay!, PartialEq, Debug, Hash, Eq)]
+    #[derive(Clone, Copy, NewtypeDisplay!, PartialEq, Debug, Hash, Eq, Default)]
     pub struct PeerId(pub u64);
+}
+
+pub trait Incrementable: Sized + Clone {
+    fn increment(&self) -> Self;
+}
+
+impl Incrementable for PeerId {
+    fn increment(&self) -> Self {
+        PeerId(self.0 + 1)
+    }
+}
+
+impl Incrementable for u64 {
+    fn increment(&self) -> Self {
+        self + 1
+    }
 }
 
 // TODO: should be properly shared between medea and jason
