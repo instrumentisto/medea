@@ -2,6 +2,18 @@ use std::collections::HashMap;
 
 use medea_macro::dispatchable;
 use serde::{de::Deserializer, ser::Serializer, Deserialize, Serialize};
+// TODO: cfg_attr
+use macro_attr::*;
+use newtype_derive::*;
+
+// TODO: cfg_attr
+macro_attr! {
+    #[cfg_attr(feature = "medea", derive(Deserialize))]
+    #[cfg_attr(feature = "jason", derive(Serialize))]
+    #[cfg_attr(test, derive(Debug, PartialEq ))]
+    #[derive(Clone, Copy, NewtypeFrom!, NewtypeAddAssign!, NewtypeDisplay!, PartialEq, Debug, Hash, Eq)]
+    pub struct PeerId(pub u64);
+}
 
 // TODO: should be properly shared between medea and jason
 #[allow(dead_code)]
@@ -36,7 +48,7 @@ pub enum ClientMsg {
 pub enum Command {
     /// Web Client sends SDP Offer.
     MakeSdpOffer {
-        peer_id: u64,
+        peer_id: PeerId,
         sdp_offer: String,
         /// Associations between [`Track`] and transceiver's [media
         /// description][1].
@@ -47,10 +59,10 @@ pub enum Command {
         mids: HashMap<u64, String>,
     },
     /// Web Client sends SDP Answer.
-    MakeSdpAnswer { peer_id: u64, sdp_answer: String },
+    MakeSdpAnswer { peer_id: PeerId, sdp_answer: String },
     /// Web Client sends Ice Candidate.
     SetIceCandidate {
-        peer_id: u64,
+        peer_id: PeerId,
         candidate: IceCandidate,
     },
 }
@@ -65,25 +77,25 @@ pub enum Event {
     /// Media Server notifies Web Client about necessity of RTCPeerConnection
     /// creation.
     PeerCreated {
-        peer_id: u64,
+        peer_id: PeerId,
         sdp_offer: Option<String>,
         tracks: Vec<Track>,
         ice_servers: Vec<IceServer>,
     },
     /// Media Server notifies Web Client about necessity to apply specified SDP
     /// Answer to Web Client's RTCPeerConnection.
-    SdpAnswerMade { peer_id: u64, sdp_answer: String },
+    SdpAnswerMade { peer_id: PeerId, sdp_answer: String },
 
     /// Media Server notifies Web Client about necessity to apply specified
     /// ICE Candidate.
     IceCandidateDiscovered {
-        peer_id: u64,
+        peer_id: PeerId,
         candidate: IceCandidate,
     },
 
     /// Media Server notifies Web Client about necessity of RTCPeerConnection
     /// close.
-    PeersRemoved { peer_ids: Vec<u64> },
+    PeersRemoved { peer_ids: Vec<PeerId> },
 }
 
 /// Represents [RTCIceCandidateInit][1] object.
@@ -127,11 +139,11 @@ pub struct IceServer {
 // TODO: Use different struct without mids in TracksApplied event.
 pub enum Direction {
     Send {
-        receivers: Vec<u64>,
+        receivers: Vec<PeerId>,
         mid: Option<String>,
     },
     Recv {
-        sender: u64,
+        sender: PeerId,
         mid: Option<String>,
     },
 }

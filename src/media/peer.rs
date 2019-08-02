@@ -143,7 +143,9 @@ impl_peer_converts!(WaitRemoteSdp);
 impl_peer_converts!(Stable);
 
 /// ID of [`Peer`].
-pub type Id = u64;
+pub use medea_client_api_proto::PeerId as Id;
+// TODO: remove pub use
+pub use Id as PeerId;
 
 #[derive(Debug)]
 pub struct Context {
@@ -254,12 +256,13 @@ impl Peer<New> {
         partner_peer: &mut Peer<New>,
         tracks_count: &mut Counter,
     ) {
+        // TODO: fix it
         let track_audio = Rc::new(MediaTrack::new(
-            tracks_count.next_id(),
+            tracks_count.next_id().0,
             MediaType::Audio(AudioSettings {}),
         ));
         let track_video = Rc::new(MediaTrack::new(
-            tracks_count.next_id(),
+            tracks_count.next_id().0,
             MediaType::Video(VideoSettings {}),
         ));
 
