@@ -17,6 +17,7 @@ use crate::{
 use super::conn::{RtcPeerConnection, TransceiverDirection, TransceiverKind};
 
 /// Actual data of [`MediaConnections`] storage.
+#[derive(Debug)]
 struct InnerMediaConnections {
     /// Ref to parent [`RtcPeerConnection`]. Used to generate transceivers for
     /// [`Sender`]s and [`Receiver`]s.
@@ -31,6 +32,7 @@ struct InnerMediaConnections {
 
 /// Storage of [`RtcPeerConnection`]'s [`Sender`] and [`Receiver`] tracks.
 #[allow(clippy::module_name_repetitions)]
+#[derive(Debug)]
 pub struct MediaConnections(RefCell<InnerMediaConnections>);
 
 impl MediaConnections {
@@ -71,6 +73,27 @@ impl MediaConnections {
             })
             .collect::<Result<Vec<_>, _>>()
             .map(|_| ())
+    }
+
+    /// Returns true if all [`MediaTrack`]s of [`Senders`] with given
+    /// [`TransceiverKind`] is enabled or false otherwise.
+    pub fn enabled_sender(
+        &self,
+        kind: TransceiverKind,
+    ) -> Result<bool, WasmErr> {
+        let s = self.0.borrow();
+        s.senders.iter().fold(Ok(true), |acc, (_, sender)| {
+            if sender.kind != kind {
+                return acc;
+            }
+            match sender.transceiver.sender().track() {
+                None => Err(WasmErr::from("Peer has senders without track")),
+                Some(track) => match acc {
+                    Ok(enabled) => Ok(enabled && track.enabled()),
+                    Err(e) => Err(e),
+                },
+            }
+        })
     }
 
     /// Returns mapping from a [`MediaTrack`] ID to a `mid` of
@@ -235,6 +258,7 @@ impl MediaConnections {
 
 /// Representation of a local [`MediaTrack`] that is being sent to some remote
 /// peer.
+#[derive(Debug)]
 pub struct Sender {
     track_id: TrackId,
     transceiver: RtcRtpTransceiver,
@@ -280,6 +304,7 @@ impl Sender {
 ///
 /// We can save related [`RtcRtpTransceiver`] and the actual [`MediaTrack`]
 /// only when [`MediaTrack`] data arrives.
+#[derive(Debug)]
 pub struct Receiver {
     track_id: TrackId,
     caps: MediaType,

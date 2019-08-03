@@ -14,6 +14,7 @@ pub type Id = u64;
 ///
 /// [1]: https://www.w3.org/TR/mediacapture-streams/#mediastreamtrack
 #[allow(clippy::module_name_repetitions)]
+#[derive(Debug)]
 pub struct MediaTrack {
     id: Id,
     track: MediaStreamTrack,

@@ -19,11 +19,11 @@ use super::{
 
 /// Manager that is responsible for [`MediaStream`] acquisition and storing.
 #[allow(clippy::module_name_repetitions)]
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct MediaManager(Rc<RefCell<InnerMediaManager>>);
 
 /// Actual data of [`MediaManager`].
-#[derive(Default)]
+#[derive(Default, Debug)]
 struct InnerMediaManager {
     /// Obtained streams.
     streams: Vec<Rc<MediaStream>>,
@@ -43,7 +43,7 @@ impl MediaManager {
     /// `on_local_stream` callback will be invoked each time this function
     /// succeeds.
     // TODO: lookup stream by caps, and return its copy if found
-    pub(crate) fn get_stream(
+    pub fn get_stream(
         &self,
         caps: StreamRequest,
     ) -> impl Future<Item = Rc<MediaStream>, Error = WasmErr> {
@@ -88,7 +88,7 @@ impl MediaManager {
     /// Sets `on_local_stream` callback that will be invoked when
     /// [`MediaManager`] obtains [`MediaStream`].
     #[inline]
-    pub(crate) fn set_on_local_stream(&self, f: js_sys::Function) {
+    pub fn set_on_local_stream(&self, f: js_sys::Function) {
         self.0.borrow_mut().on_local_stream.set_func(f);
     }
 }

@@ -25,12 +25,16 @@ use self::{
 };
 
 #[doc(inline)]
-pub use self::{repo::PeerRepository, Id as PeerId};
+pub use self::{
+    repo::{PeerRepository, Repository},
+    Id as PeerId,
+};
 
 pub type Id = u64;
 
 #[dispatchable]
 #[allow(clippy::module_name_repetitions)]
+#[derive(Debug)]
 /// Events emitted from [`RtcPeerConnection`].
 pub enum PeerEvent {
     /// [`RtcPeerConnection`] discovered new ice candidate.
@@ -49,6 +53,7 @@ pub enum PeerEvent {
     },
 }
 
+#[derive(Debug)]
 struct InnerPeerConnection {
     id: Id,
 
@@ -66,6 +71,7 @@ struct InnerPeerConnection {
 }
 
 #[allow(clippy::module_name_repetitions)]
+#[derive(Debug)]
 pub struct PeerConnection(Rc<InnerPeerConnection>);
 
 impl PeerConnection {
@@ -110,6 +116,13 @@ impl PeerConnection {
             .enable_sender(TransceiverKind::Audio, false)
     }
 
+    /// Returns `true` if the all audio tracks for all [`Sender`]s is not muted.
+    pub fn enabled_audio(&self) -> Result<bool, WasmErr> {
+        self.0
+            .media_connections
+            .enabled_sender(TransceiverKind::Audio)
+    }
+
     /// Unmute all audio tracks for all [`Sender`]s.
     pub fn unmute_audio(&self) -> Result<(), WasmErr> {
         self.0
@@ -122,6 +135,12 @@ impl PeerConnection {
         self.0
             .media_connections
             .enable_sender(TransceiverKind::Video, false)
+    }
+
+    pub fn enabled_video(&self) -> Result<bool, WasmErr> {
+        self.0
+            .media_connections
+            .enabled_sender(TransceiverKind::Video)
     }
 
     /// Unmute all video tracks for all [`Sender`]s.

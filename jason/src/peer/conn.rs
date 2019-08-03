@@ -28,7 +28,7 @@ pub struct IceCandidate {
 ///
 /// [1]: https://www.w3.org/TR/webrtc/#dom-rtcrtptransceiver
 /// [2]: https://www.w3.org/TR/webrtc/#dfn-transceiver-kind
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub enum TransceiverKind {
     Audio,
     Video,
@@ -75,6 +75,7 @@ pub enum SdpType {
 /// Helper wrapper for [RTCPeerConnection][1].
 ///
 /// [1]: https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection
+#[derive(Debug)]
 struct InnerPeer {
     /// Underlying [RTCPeerConnection][1].
     ///
@@ -106,6 +107,7 @@ struct InnerPeer {
 /// Representation of [RTCPeerConnection][1].
 ///
 /// [1]: https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection
+#[derive(Debug)]
 pub struct RtcPeerConnection(Rc<RefCell<InnerPeer>>);
 
 impl RtcPeerConnection {
