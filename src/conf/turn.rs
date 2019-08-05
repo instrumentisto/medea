@@ -14,7 +14,7 @@ use smart_default::SmartDefault;
 pub struct Turn {
     /// Database settings
     pub db: Db,
-    /// IP address STUN/TURN server. Defaults to `127.0.0.1`.
+    /// Host address STUN/TURN server. Defaults to `localhost`.
     #[default("localhost".to_string())]
     pub host: String,
     /// Port to connect TURN server. Defaults to `3478`.
@@ -29,7 +29,7 @@ pub struct Turn {
 }
 
 impl Turn {
-    /// Builds [`SocketAddr`] from `ip` and `port`.
+    /// Builds [`String`] addr from `host` and `port`.
     #[inline]
     pub fn addr(&self) -> String {
         format!("{}:{}", self.host, self.port)
