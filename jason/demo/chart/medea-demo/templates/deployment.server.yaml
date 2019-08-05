@@ -102,9 +102,13 @@ spec:
           {{- end }}
           env:
             - name: EXTERNAL_IP
+            {{- if $coturn.conf.external_ip }}
+              value: {{ $coturn.conf.external_ip | quote }}
+            {{- else }}
               valueFrom:
                 fieldRef:
                   fieldPath: status.hostIP
+            {{- end }}
             - name: MEDEA_TURN.PASS
               valueFrom:
                 secretKeyRef:

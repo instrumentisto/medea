@@ -64,6 +64,9 @@ server:
     # Coturn TURN server configuration.
     conf:
       listening_port: 3478
+      # IP adress to be used by Coturn as `external-ip`.
+      # If empty then `status.hostIP` of Pod will be used.
+      external_ip: ""
 
     extraArgs: []
       # - --verbose
