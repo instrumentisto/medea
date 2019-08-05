@@ -12,7 +12,6 @@ macro_attr! {
         derive(Deserialize, Debug, Hash, Eq, Default, PartialEq)
     )]
     #[cfg_attr(feature = "jason", derive(Serialize))]
-    #[cfg_attr(test, derive(Debug, PartialEq ))]
     #[derive(Clone, Copy, NewtypeDisplay!)]
     pub struct PeerId(pub u64);
 }
@@ -24,7 +23,6 @@ macro_attr! {
         derive(Deserialize, Debug, Hash, Eq, Default, PartialEq)
     )]
     #[cfg_attr(feature = "jason", derive(Serialize))]
-    #[cfg_attr(test, derive(Debug, PartialEq ))]
     #[derive(Clone, Copy, NewtypeDisplay!)]
     pub struct TrackId(pub u64);
 }
@@ -315,10 +313,10 @@ mod test {
     #[test]
     fn command() {
         let mut mids = HashMap::new();
-        mids.insert(0, String::from("1"));
+        mids.insert(TrackId(0), String::from("1"));
 
         let command = ClientMsg::Command(Command::MakeSdpOffer {
-            peer_id: 77,
+            peer_id: PeerId(77),
             sdp_offer: "offer".to_owned(),
             mids,
         });
@@ -357,7 +355,7 @@ mod test {
     #[test]
     fn event() {
         let event = ServerMsg::Event(Event::SdpAnswerMade {
-            peer_id: 45,
+            peer_id: PeerId(45),
             sdp_answer: "answer".to_owned(),
         });
         #[cfg_attr(nightly, rustfmt::skip)]
