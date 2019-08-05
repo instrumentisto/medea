@@ -1,8 +1,7 @@
 use std::{cell::Cell, rc::Rc};
 
 use actix::{AsyncContext as _, Context, System};
-use medea::media::PeerId;
-use medea_client_api_proto::{Direction, Event};
+use medea_client_api_proto::{Direction, Event, PeerId};
 
 use crate::signalling::{CloseSocket, TestMember};
 
