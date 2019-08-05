@@ -89,12 +89,13 @@ spec:
         - name: coturn
           image: "{{ $coturn.image.repository }}:{{ $coturn.image.tag }}"
           imagePullPolicy: {{ $coturn.image.pullPolicy }}
+          command: ["turnserver"]
           args:
             - --log-file=stdout
             - --external-ip=$(EXTERNAL_IP)
             - --listening-ip=$(EXTERNAL_IP)
             - --relay-ip=$(EXTERNAL_IP)
-            - --redis-userdb="ip=127.0.0.1 port={{ $coturnDb.conf.port }} dbname={{ .Values.server.conf.turn.db.redis.db_number }} password=$(MEDEA_TURN.DB.REDIS.PASS)"
+            - --redis-userdb=ip=127.0.0.1 port={{ $coturnDb.conf.port }} dbname={{ .Values.server.conf.turn.db.redis.db_number }} password=$(MEDEA_TURN.DB.REDIS.PASS)
             - --user={{ .Values.server.conf.turn.user }}:$(MEDEA_TURN.PASS)
           {{- with $coturn.extraArgs }}
             {{- toYaml . | nindent 12 }}
