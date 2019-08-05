@@ -1,7 +1,7 @@
 //! STUN/TURN server settings.
 
 use std::{
-    net::{IpAddr, Ipv4Addr, SocketAddr, ToSocketAddrs as _},
+    net::{IpAddr, Ipv4Addr},
     time::Duration,
 };
 
@@ -15,8 +15,8 @@ pub struct Turn {
     /// Database settings
     pub db: Db,
     /// IP address STUN/TURN server. Defaults to `127.0.0.1`.
-    #[default(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)))]
-    pub ip: IpAddr,
+    #[default("localhost".to_string())]
+    pub host: String,
     /// Port to connect TURN server. Defaults to `3478`.
     #[default = 3478]
     pub port: u16,
@@ -31,12 +31,8 @@ pub struct Turn {
 impl Turn {
     /// Builds [`SocketAddr`] from `ip` and `port`.
     #[inline]
-    pub fn addr(&self) -> SocketAddr {
-        (self.ip, self.port)
-            .to_socket_addrs()
-            .unwrap()
-            .next()
-            .unwrap()
+    pub fn addr(&self) -> String {
+        format!("{}:{}", self.host, self.port)
     }
 }
 
