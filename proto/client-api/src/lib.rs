@@ -36,19 +36,21 @@ pub trait Incrementable: Sized + Clone {
     fn increment(&self) -> Self;
 }
 
-#[cfg(feature = "medea")]
-impl Incrementable for PeerId {
-    fn increment(&self) -> Self {
-        Self(self.0 + 1)
-    }
+/// Implement [`Incrementable`] trait for newtype with any numeric type.
+macro_rules! impl_incrementable {
+    ($name:ty) => {
+        impl Incrementable for $name {
+            fn increment(&self) -> Self {
+                Self(self.0 + 1)
+            }
+        }
+    };
 }
 
 #[cfg(feature = "medea")]
-impl Incrementable for TrackId {
-    fn increment(&self) -> Self {
-        Self(self.0 + 1)
-    }
-}
+impl_incrementable!(PeerId);
+#[cfg(feature = "medea")]
+impl_incrementable!(TrackId);
 
 // TODO: should be properly shared between medea and jason
 #[allow(dead_code)]
