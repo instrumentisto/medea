@@ -8,24 +8,24 @@ pub trait PeerRepository {
     fn insert(
         &mut self,
         id: PeerId,
-        peer: Rc<PeerConnection>,
-    ) -> Option<Rc<PeerConnection>>;
+        peer: Rc<dyn PeerConnection>,
+    ) -> Option<Rc<dyn PeerConnection>>;
 
     /// Returns [`PeerConnection`] stored in repository by its ID.
-    fn get(&self, id: PeerId) -> Option<Rc<PeerConnection>>;
+    fn get(&self, id: PeerId) -> Option<Rc<dyn PeerConnection>>;
 
     /// Removes [`PeerConnection`] stored in repository by its ID.
     fn remove(&mut self, id: PeerId);
 
     /// Returns all [`PeerConnection`]s stored in repository.
-    fn get_all(&self) -> Vec<Rc<PeerConnection>>;
+    fn get_all(&self) -> Vec<Rc<dyn PeerConnection>>;
 }
 
 /// [`PeerConnection`] factory and repository.
 #[derive(Default)]
 pub struct Repository {
     /// Peer id to [`PeerConnection`],
-    peers: HashMap<PeerId, Rc<PeerConnection>>,
+    peers: HashMap<PeerId, Rc<dyn PeerConnection>>,
 }
 
 impl PeerRepository for Repository {
@@ -34,14 +34,14 @@ impl PeerRepository for Repository {
     fn insert(
         &mut self,
         id: PeerId,
-        peer: Rc<PeerConnection>,
-    ) -> Option<Rc<PeerConnection>> {
+        peer: Rc<dyn PeerConnection>,
+    ) -> Option<Rc<dyn PeerConnection>> {
         self.peers.insert(id, peer)
     }
 
     /// Returns [`PeerConnection`] stored in repository by its ID.
     #[inline]
-    fn get(&self, id: PeerId) -> Option<Rc<PeerConnection>> {
+    fn get(&self, id: PeerId) -> Option<Rc<dyn PeerConnection>> {
         self.peers.get(&id).cloned()
     }
 
@@ -53,7 +53,7 @@ impl PeerRepository for Repository {
 
     /// Returns all [`PeerConnection`]s stored in repository.
     #[inline]
-    fn get_all(&self) -> Vec<Rc<PeerConnection>> {
+    fn get_all(&self) -> Vec<Rc<dyn PeerConnection>> {
         self.peers.values().cloned().collect()
     }
 }

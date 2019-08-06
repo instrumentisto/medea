@@ -19,7 +19,7 @@ IMAGE_NAME := $(strip $(shell grep 'COMPOSE_IMAGE_NAME=' .env | cut -d '=' -f2))
 
 RUST_VER := 1.36
 
-CHROMEDRIVER_OPTIONS := $(strip $(shell grep 'CHROMEDRIVER_OPTIONS=' .env | cut -d '=' -f2))
+CHROMEDRIVER_CLIENT_ARGS := $(strip $(shell grep 'CHROMEDRIVER_CLIENT_ARGS=' .env | cut -d '=' -f2))
 
 
 ###########
@@ -159,7 +159,7 @@ ifeq ($(test-unit-crate),medea)
 	cargo test --bin medea
 else
 ifeq ($(test-unit-crate),jason)
-	export CHROMEDRIVER_OPTIONS="$(CHROMEDRIVER_OPTIONS)"; \
+	export CHROMEDRIVER_CLIENT_ARGS="$(CHROMEDRIVER_CLIENT_ARGS)"; \
 	wasm-pack test --headless --chrome jason
 endif
 	cargo test -p $(test-unit-crate)

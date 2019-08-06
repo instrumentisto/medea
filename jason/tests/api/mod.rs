@@ -1,76 +1,251 @@
 #![cfg(target_arch = "wasm32")]
 
-use std::rc::Rc;
+use std::{collections::HashMap, rc::Rc};
 
-use futures::{Future, Stream};
-use mockers::Scenario;
-use mockers_derive::mocked;
-use wasm_bindgen::JsValue;
+use futures::{sync::mpsc::unbounded, Future, Stream};
+use mockall::{predicate::*, *};
 use wasm_bindgen_test::*;
 
-use medea_client_api_proto::{Command, Event};
+use medea_client_api_proto::{Command, Event, Track};
 
-use futures::sync::mpsc::unbounded;
 use jason::{
     api::Room,
     media::MediaManager,
-    peer::{PeerConnection, PeerId},
+    peer::{PeerConnection, PeerId, PeerRepository},
+    rpc::RpcClient,
+    utils::WasmErr,
 };
 
 wasm_bindgen_test_configure!(run_in_browser);
 
-#[mocked(RpcClientMock, extern, module = "::jason::rpc")]
-trait RpcClient {
-    fn subscribe(&self) -> Box<dyn Stream<Item = Event, Error = ()>>;
-    fn unsub(&self);
-    fn send_command(&self, command: Command);
+mock! {
+    RpcClient {}
+    trait RpcClient {
+        fn subscribe(&self) -> Box<dyn Stream<Item = Event, Error = ()>>;
+        fn unsub(&self);
+        fn send_command(&self, command: Command);
+    }
 }
 
-#[mocked(PeerRepositoryMock, extern, module = "::jason::peer")]
-pub trait PeerRepository {
-    /// Stores [`PeerConnection`] in repository.
-    fn insert(
-        &mut self,
-        id: PeerId,
-        peer: Rc<PeerConnection>,
-    ) -> Option<Rc<PeerConnection>>;
-
-    /// Returns [`PeerConnection`] stored in repository by its ID.
-    fn get(&self, id: PeerId) -> Option<Rc<PeerConnection>>;
-
-    /// Removes [`PeerConnection`] stored in repository by its ID.
-    fn remove(&mut self, id: PeerId);
-
-    /// Returns all [`PeerConnection`]s stored in repository.
-    fn get_all(&self) -> Vec<Rc<PeerConnection>>;
+mock! {
+    PeerRepository {}
+    pub trait PeerRepository {
+        fn insert(
+            &mut self,
+            id: PeerId,
+            peer: Rc<PeerConnection>,
+        ) -> Option<Rc<PeerConnection>>;
+        fn get(&self, id: PeerId) -> Option<Rc<PeerConnection>>;
+        fn remove(&mut self, id: PeerId);
+        fn get_all(&self) -> Vec<Rc<PeerConnection>>;
+    }
 }
 
-#[wasm_bindgen_test(async)]
-fn mute_audio() -> impl Future<Item = (), Error = JsValue> {
+mock! {
+    PeerConnection {}
+    pub trait PeerConnection {
+        fn mute_audio(&self) -> Result<(), WasmErr>;
+        fn enabled_audio(&self) -> Result<bool, WasmErr>;
+        fn unmute_audio(&self) -> Result<(), WasmErr>;
+        fn mute_video(&self) -> Result<(), WasmErr>;
+        fn enabled_video(&self) -> Result<bool, WasmErr>;
+        fn unmute_video(&self) -> Result<(), WasmErr>;
+        fn get_mids(&self) -> Result<HashMap<u64, String>, WasmErr>;
+        fn get_offer(
+            &self,
+            tracks: Vec<Track>,
+        ) -> Box<dyn Future<Item = String, Error = WasmErr>>;
+        fn create_and_set_answer(
+            &self,
+        ) -> Box<dyn Future<Item = String, Error = WasmErr>>;
+        fn set_remote_answer(
+            &self,
+            answer: String,
+        ) -> Box<dyn Future<Item = (), Error = WasmErr>>;
+        fn process_offer(
+            &self,
+            offer: String,
+            tracks: Vec<Track>,
+        ) -> Box<dyn Future<Item = (), Error = WasmErr>>;
+        fn add_ice_candidate(
+            &self,
+            candidate: &str,
+            sdp_m_line_index: Option<u16>,
+            sdp_mid: &Option<String>,
+        ) -> Box<dyn Future<Item = (), Error = WasmErr>>;
+    }
+}
+
+#[wasm_bindgen_test]
+fn mute_audio_success() {
     let media_manager = Rc::new(MediaManager::default());
-    let _event = Event::PeerCreated {
-        peer_id: 1,
-        ice_servers: vec![],
-        sdp_offer: None,
-        tracks: vec![],
-    };
     let (_event_sender, event_receiver) = unbounded();
-    // let stream = Box::new(once::<_, ()>(Ok(event)));
-    // let stream = Box::new(futures::done(Ok(event)).into_stream());
+    let mut rpc = MockRpcClient::new();
+    let mut repo = MockPeerRepository::new();
 
-    let scenario = Scenario::new();
-    let (rpc, rpc_handle) = scenario.create_mock::<RpcClientMock>();
-    let (peers, peers_handle) = scenario.create_mock::<PeerRepositoryMock>();
-    scenario
-        .expect(rpc_handle.subscribe().and_return(Box::new(event_receiver)));
-    scenario.expect(peers_handle.get_all().and_return(vec![]));
-    // scenario.expect(rpc_handle.subscribe().and_return(stream));
-    // scenario.expect(rpc_handle.send_command(ANY).and_return(()));
-    scenario.expect(rpc_handle.unsub().and_return(()));
+    rpc.expect_subscribe()
+        .return_once(move || Box::new(event_receiver));
+    repo.expect_get_all().returning(move || {
+        let mut peer = MockPeerConnection::new();
+        peer.expect_mute_audio().returning(|| Ok(()));
+        vec![Rc::new(peer) as Rc<dyn PeerConnection>]
+    });
+    rpc.expect_unsub().return_const(());
 
-    let room = Room::new(Rc::new(rpc), Box::new(peers), &media_manager);
+    let room = Room::new(Rc::new(rpc), Box::new(repo), &media_manager);
     let handle = room.new_handle();
     assert!(handle.mute_audio().is_ok());
+}
 
-    futures::done(Ok(()))
+#[wasm_bindgen_test]
+fn mute_audio_error() {
+    let media_manager = Rc::new(MediaManager::default());
+    let (_event_sender, event_receiver) = unbounded();
+    let mut rpc = MockRpcClient::new();
+    let mut repo = MockPeerRepository::new();
+
+    rpc.expect_subscribe()
+        .return_once(move || Box::new(event_receiver));
+    repo.expect_get_all().returning(move || {
+        let mut peer = MockPeerConnection::new();
+        peer.expect_mute_audio()
+            .returning(|| Err(WasmErr::from("error".to_string())));
+        vec![Rc::new(peer) as Rc<dyn PeerConnection>]
+    });
+    rpc.expect_unsub().return_const(());
+
+    let room = Room::new(Rc::new(rpc), Box::new(repo), &media_manager);
+    let handle = room.new_handle();
+    assert!(handle.mute_audio().is_err());
+}
+
+#[wasm_bindgen_test]
+fn unmute_audio_success() {
+    let (_event_sender, event_receiver) = unbounded();
+    let media_manager = Rc::new(MediaManager::default());
+    let mut rpc = MockRpcClient::new();
+    let mut repo = MockPeerRepository::new();
+
+    rpc.expect_subscribe()
+        .return_once(move || Box::new(event_receiver));
+    repo.expect_get_all().returning(move || {
+        let mut peer = MockPeerConnection::new();
+        peer.expect_unmute_audio().returning(|| Ok(()));
+        vec![Rc::new(peer) as Rc<dyn PeerConnection>]
+    });
+    rpc.expect_unsub().return_const(());
+
+    let room = Room::new(Rc::new(rpc), Box::new(repo), &media_manager);
+    let handle = room.new_handle();
+    assert!(handle.unmute_audio().is_ok());
+}
+
+#[wasm_bindgen_test]
+fn unmute_audio_error() {
+    let media_manager = Rc::new(MediaManager::default());
+    let (_event_sender, event_receiver) = unbounded();
+    let mut rpc = MockRpcClient::new();
+    let mut repo = MockPeerRepository::new();
+
+    rpc.expect_subscribe()
+        .return_once(move || Box::new(event_receiver));
+    repo.expect_get_all().returning(move || {
+        let mut peer = MockPeerConnection::new();
+        peer.expect_unmute_audio()
+            .returning(|| Err(WasmErr::from("error".to_string())));
+        vec![Rc::new(peer) as Rc<dyn PeerConnection>]
+    });
+    rpc.expect_unsub().return_const(());
+
+    let room = Room::new(Rc::new(rpc), Box::new(repo), &media_manager);
+    let handle = room.new_handle();
+    assert!(handle.unmute_audio().is_err());
+}
+
+#[wasm_bindgen_test]
+fn mute_video_success() {
+    let media_manager = Rc::new(MediaManager::default());
+    let (_event_sender, event_receiver) = unbounded();
+    let mut rpc = MockRpcClient::new();
+    let mut repo = MockPeerRepository::new();
+
+    rpc.expect_subscribe()
+        .return_once(move || Box::new(event_receiver));
+    repo.expect_get_all().returning(move || {
+        let mut peer = MockPeerConnection::new();
+        peer.expect_mute_video().returning(|| Ok(()));
+        vec![Rc::new(peer) as Rc<dyn PeerConnection>]
+    });
+    rpc.expect_unsub().return_const(());
+
+    let room = Room::new(Rc::new(rpc), Box::new(repo), &media_manager);
+    let handle = room.new_handle();
+    assert!(handle.mute_video().is_ok());
+}
+
+#[wasm_bindgen_test]
+fn mute_video_error() {
+    let media_manager = Rc::new(MediaManager::default());
+    let (_event_sender, event_receiver) = unbounded();
+    let mut rpc = MockRpcClient::new();
+    let mut repo = MockPeerRepository::new();
+
+    rpc.expect_subscribe()
+        .return_once(move || Box::new(event_receiver));
+    repo.expect_get_all().returning(move || {
+        let mut peer = MockPeerConnection::new();
+        peer.expect_mute_video()
+            .returning(|| Err(WasmErr::from("error".to_string())));
+        vec![Rc::new(peer) as Rc<dyn PeerConnection>]
+    });
+    rpc.expect_unsub().return_const(());
+
+    let room = Room::new(Rc::new(rpc), Box::new(repo), &media_manager);
+    let handle = room.new_handle();
+    assert!(handle.mute_video().is_err());
+}
+
+//------ Unmute video -----
+
+#[wasm_bindgen_test]
+fn unmute_video_success() {
+    let media_manager = Rc::new(MediaManager::default());
+    let (_event_sender, event_receiver) = unbounded();
+    let mut rpc = MockRpcClient::new();
+    let mut repo = MockPeerRepository::new();
+
+    rpc.expect_subscribe()
+        .return_once(move || Box::new(event_receiver));
+    repo.expect_get_all().returning(move || {
+        let mut peer = MockPeerConnection::new();
+        peer.expect_unmute_video().returning(|| Ok(()));
+        vec![Rc::new(peer) as Rc<dyn PeerConnection>]
+    });
+    rpc.expect_unsub().return_const(());
+
+    let room = Room::new(Rc::new(rpc), Box::new(repo), &media_manager);
+    let handle = room.new_handle();
+    assert!(handle.unmute_video().is_ok());
+}
+
+#[wasm_bindgen_test]
+fn unmute_video_error() {
+    let media_manager = Rc::new(MediaManager::default());
+    let (_event_sender, event_receiver) = unbounded();
+    let mut rpc = MockRpcClient::new();
+    let mut repo = MockPeerRepository::new();
+
+    rpc.expect_subscribe()
+        .return_once(move || Box::new(event_receiver));
+    repo.expect_get_all().returning(move || {
+        let mut peer = MockPeerConnection::new();
+        peer.expect_unmute_video()
+            .returning(|| Err(WasmErr::from("error".to_string())));
+        vec![Rc::new(peer) as Rc<dyn PeerConnection>]
+    });
+    rpc.expect_unsub().return_const(());
+
+    let room = Room::new(Rc::new(rpc), Box::new(repo), &media_manager);
+    let handle = room.new_handle();
+    assert!(handle.unmute_video().is_err());
 }

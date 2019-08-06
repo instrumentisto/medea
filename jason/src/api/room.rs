@@ -26,7 +26,7 @@ use crate::{
 };
 
 use super::{connection::Connection, ConnectionHandle};
-use crate::peer::PeerConnection;
+use crate::peer::{self, PeerConnection};
 
 macro_rules! map_all_peers {
     ($v:expr, $func:ident) => {{
@@ -37,7 +37,8 @@ macro_rules! map_all_peers {
                     .peers
                     .get_all()
                     .iter()
-                    .map(|peer| peer.$func())
+                    .map(Rc::as_ref)
+                    .map(peer::PeerConnection::$func)
                     .collect::<Result<Vec<_>, _>>()
                     .map(|_| ())
                     .map_err(Into::into)
@@ -222,8 +223,8 @@ impl InnerRoom {
         &mut self,
         id: PeerId,
         ice_servers: I,
-    ) -> Result<Rc<PeerConnection>, WasmErr> {
-        let peer = Rc::new(PeerConnection::new(
+    ) -> Result<Rc<dyn PeerConnection>, WasmErr> {
+        let peer = Rc::new(peer::Connection::new(
             id,
             self.peer_event_sender.clone(),
             ice_servers,
