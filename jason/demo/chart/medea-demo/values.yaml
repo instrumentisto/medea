@@ -1,0 +1,166 @@
+# Additional labels to apply to all Kubernetes resources created by this chart.
+labels: {}
+  # app.kubernetes.io/part-of: frontend
+
+
+server:
+  image:
+    repository: instrumentisto/medea
+    tag: latest
+    pullPolicy: IfNotPresent
+
+  # Medea media server configuration:
+  # https://github.com/instrumentisto/medea/blob/master/config.toml
+  # NOTE: Options declared by 'coturn' and 'coturn-db' services below (like
+  #       ports and passwords) are auto-wired and specifying them in this
+  #       configuration will have no effect.
+  conf:
+    server:
+      bind_port: 8080
+    turn:
+      user: USER
+      pass: PASS
+      db:
+        redis:
+          db_number: 0
+
+  deployment:
+    revisionHistoryLimit: 0
+
+    # Optional revision number that may used for fine-grained Deployment rollouts.
+    revision: ""
+
+    annotations: {}
+      # kubernetes.io/change-cause=kubectl set ...
+
+    affinity: {}
+      # nodeAffinity:
+      #   requiredDuringSchedulingIgnoredDuringExecution:
+      #     nodeSelectorTerms:
+      #       - matchExpressions:
+      #         - key: node-label-key
+      #           operator: In
+      #           values: ["node-label-value"]
+
+    tolerations: []
+      # - key: "node.alpha.kubernetes.io/unreachable"
+      #   operator: "Exists"
+      #   effect: "NoExecute"
+
+    resources: {}
+      # limits:
+      #   cpu: 100m
+      #   memory: 128Mi
+      # requests:
+      #   cpu: 100m
+      #   memory: 128Mi
+
+  coturn:
+    image:
+      repository: instrumentisto/coturn
+      tag: 4.5
+      pullPolicy: IfNotPresent
+
+    # Coturn TURN server configuration.
+    conf:
+      listening_port: 3478
+      # IP adress to be used by Coturn as `external-ip`.
+      # If empty then `status.hostIP` of Pod will be used.
+      external_ip: ""
+
+    extraArgs: []
+      # - --verbose
+
+    resources: {}
+      # limits:
+      #   cpu: 100m
+      #   memory: 128Mi
+      # requests:
+      #   cpu: 100m
+      #   memory: 128Mi
+
+  coturn-db:
+    image:
+      repository: redis
+      tag: alpine
+      pullPolicy: IfNotPresent
+
+    # Redis server configuration:
+    # http://download.redis.io/redis-stable/redis.conf
+    conf:
+      port: 6379
+      requirepass: turn
+      timeout: 0
+      tcp-keepalive: 60
+
+    resources: {}
+      # limits:
+      #   cpu: 100m
+      #   memory: 128Mi
+      # requests:
+      #   cpu: 100m
+      #   memory: 128Mi
+
+
+web-client:
+  image:
+    repository: instrumentisto/medea-demo
+    tag: latest
+    pullPolicy: IfNotPresent
+
+  conf:
+    # Optional custom Nginx vhost configuration.
+    nginx: ""
+    # nginx: |
+    #   server {
+    #     listen         80 default_server;
+    #     ...
+
+  deployment:
+    replicas: 1
+    revisionHistoryLimit: 0
+
+    # Optional revision number that may used for fine-grained Deployment rollouts.
+    revision: ""
+
+    annotations: {}
+      # kubernetes.io/change-cause=kubectl set ...
+
+    affinity: {}
+      # nodeAffinity:
+      #   requiredDuringSchedulingIgnoredDuringExecution:
+      #     nodeSelectorTerms:
+      #       - matchExpressions:
+      #         - key: node-label-key
+      #           operator: In
+      #           values: ["node-label-value"]
+
+    tolerations: []
+      # - key: "node.alpha.kubernetes.io/unreachable"
+      #   operator: "Exists"
+      #   effect: "NoExecute"
+
+    resources: {}
+      # limits:
+      #   cpu: 100m
+      #   memory: 128Mi
+      # requests:
+      #   cpu: 100m
+      #   memory: 128Mi
+
+
+ingress:
+  enabled: yes
+
+  hosts:
+    - medea-demo.test
+
+  tls:
+    enabled: yes
+    auto: no
+    # Not required when "auto" is enabled.
+    secretName:
+      medea-demo.test: medea-demo.test.tls
+
+  annotations:
+    kubernetes.io/ingress.class: nginx

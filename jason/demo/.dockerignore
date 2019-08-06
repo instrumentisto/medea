@@ -1,0 +1,8 @@
+.DS_Store
+
+chart/
+!chart/medea-demo/conf/nginx.vh.conf
+
+*.vals.yaml
+
+yarn-error.log
