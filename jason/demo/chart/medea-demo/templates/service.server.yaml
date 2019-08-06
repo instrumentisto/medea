@@ -1,0 +1,25 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: {{ template "medea-demo.fullname" . }}-server
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    helm.sh/chart: {{ template "medea-demo.chart" . }}
+    app.kubernetes.io/name: {{ template "medea-demo.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name | quote }}
+    app.kubernetes.io/managed-by: {{ .Release.Service | quote }}
+    app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+    app.kubernetes.io/component: server
+  {{- with .Values.labels }}
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  selector:
+    app.kubernetes.io/name: {{ template "medea-demo.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name | quote }}
+    app.kubernetes.io/component: server
+  ports:
+    - name: http
+      port: 80
+      targetPort: {{ .Values.server.conf.server.bind_port }}
+      protocol: TCP
