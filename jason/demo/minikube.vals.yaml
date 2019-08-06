@@ -8,6 +8,10 @@ server:
     tag: dev
     pullPolicy: IfNotPresent
 
+  conf:
+    turn:
+      host: medea-demo.test
+
   coturn:
     image:
       tag: 4.5
