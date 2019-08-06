@@ -1,0 +1,5 @@
+/node_modules/
+
+/my.*.vals.yaml
+
+/yarn-error.log

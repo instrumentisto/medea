@@ -1,5 +1,4 @@
-use core::fmt;
-use std::net::SocketAddr;
+use std::{fmt, net::SocketAddr, sync::Arc};
 
 use actix::{
     fut::wrap_future, Actor, ActorFuture, Addr, Context, Handler, MailboxError,
@@ -155,7 +154,7 @@ struct Service {
 #[allow(clippy::module_name_repetitions)]
 pub fn new_turn_auth_service<'a>(
     cf: &conf::Turn,
-) -> impl Future<Item = Box<dyn TurnAuthService + 'a>, Error = TurnServiceErr> {
+) -> impl Future<Item = Arc<dyn TurnAuthService + 'a>, Error = TurnServiceErr> {
     let db_pass = cf.db.redis.pass.clone();
     let turn_address = cf.addr();
     let turn_username = cf.user.clone();
@@ -183,7 +182,7 @@ pub fn new_turn_auth_service<'a>(
         turn_password,
         static_user: None,
     })
-    .map::<_, Box<dyn TurnAuthService>>(|service| Box::new(service.start()))
+    .map::<_, Arc<dyn TurnAuthService>>(|service| Arc::new(service.start()))
     .map_err(TurnServiceErr::from)
 }
 
@@ -313,8 +312,8 @@ pub mod test {
     }
 
     #[allow(clippy::module_name_repetitions)]
-    pub fn new_turn_auth_service_mock() -> Box<dyn TurnAuthService> {
-        Box::new(TurnAuthServiceMock {})
+    pub fn new_turn_auth_service_mock() -> Arc<dyn TurnAuthService> {
+        Arc::new(TurnAuthServiceMock {})
     }
 
 }
