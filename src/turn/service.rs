@@ -1,4 +1,4 @@
-use std::{fmt, net::SocketAddr, sync::Arc};
+use std::{fmt, sync::Arc};
 
 use actix::{
     fut::wrap_future, Actor, ActorFuture, Addr, Context, Handler, MailboxError,
@@ -141,7 +141,7 @@ struct Service {
     /// TurnAuthRepo password.
     db_pass: String,
     /// Turn server address.
-    turn_address: SocketAddr,
+    turn_address: String,
     /// Turn server static user.
     turn_username: String,
     /// Turn server static user password.
@@ -199,7 +199,7 @@ impl Service {
     fn static_user(&mut self) -> IceUser {
         if self.static_user.is_none() {
             self.static_user.replace(IceUser::new(
-                self.turn_address,
+                self.turn_address.clone(),
                 self.turn_username.clone(),
                 self.turn_password.clone(),
             ));
@@ -233,25 +233,27 @@ impl Handler<CreateIceUser> for Service {
         _ctx: &mut Self::Context,
     ) -> Self::Result {
         let ice_user = IceUser::build(
-            self.turn_address,
+            self.turn_address.clone(),
             msg.room_id,
             &msg.member_id.to_string(),
             self.new_password(TURN_PASS_LEN),
         );
 
-        Box::new(self.turn_db.insert(&ice_user).into_actor(self).then(
-            move |result, act, _| {
-                wrap_future(match result {
-                    Ok(_) => ok(ice_user),
-                    Err(e) => match msg.policy {
-                        UnreachablePolicy::ReturnErr => err(e.into()),
-                        UnreachablePolicy::ReturnStatic => {
-                            ok(act.static_user())
-                        }
-                    },
-                })
-            },
-        ))
+        Box::new(
+            self.turn_db.insert(&ice_user).into_actor(self).then(
+                move |result, act, _| {
+                    wrap_future(match result {
+                        Ok(_) => ok(ice_user),
+                        Err(e) => match msg.policy {
+                            UnreachablePolicy::ReturnErr => err(e.into()),
+                            UnreachablePolicy::ReturnStatic => {
+                                ok(act.static_user())
+                            }
+                        },
+                    })
+                },
+            ),
+        )
     }
 }
 
@@ -315,5 +317,4 @@ pub mod test {
     pub fn new_turn_auth_service_mock() -> Arc<dyn TurnAuthService> {
         Arc::new(TurnAuthServiceMock {})
     }
-
 }

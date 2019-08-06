@@ -1,5 +1,3 @@
-use std::net::SocketAddr;
-
 use medea_client_api_proto::IceServer;
 
 use crate::signalling::RoomId;
@@ -8,7 +6,7 @@ use crate::signalling::RoomId;
 #[derive(Clone, Debug)]
 pub struct IceUser {
     /// Address of Turn server.
-    address: SocketAddr,
+    address: String,
     /// Username for authorization.
     user: String,
     /// Password for authorization.
@@ -22,7 +20,7 @@ pub struct IceUser {
 impl IceUser {
     /// Build new non static [`IceUser`].
     pub fn build(
-        address: SocketAddr,
+        address: String,
         room_id: RoomId,
         name: &str,
         pass: String,
@@ -36,7 +34,7 @@ impl IceUser {
     }
 
     /// Build new static [`IceUser`].
-    pub fn new(address: SocketAddr, user: String, pass: String) -> Self {
+    pub fn new(address: String, user: String, pass: String) -> Self {
         Self {
             address,
             user,
@@ -65,7 +63,7 @@ impl IceUser {
         vec![stun, turn]
     }
 
-    pub fn address(&self) -> &SocketAddr {
+    pub fn address(&self) -> &str {
         &self.address
     }
 

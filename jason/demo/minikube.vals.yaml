@@ -7,6 +7,9 @@ server:
   image:
     tag: dev
     pullPolicy: IfNotPresent
+  conf:
+    turn:
+      host: medea-demo.test
 
   coturn:
     image:
