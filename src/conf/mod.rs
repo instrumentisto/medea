@@ -244,17 +244,17 @@ mod tests {
     fn turn_conf() {
         let default_conf = Conf::default();
 
-        env::set_var("MEDEA_TURN.IP", "5.5.5.5");
+        env::set_var("MEDEA_TURN.HOST", "example.com");
         env::set_var("MEDEA_TURN.PORT", "1234");
 
         let env_conf = Conf::parse().unwrap();
 
-        assert_ne!(default_conf.turn.ip, env_conf.turn.ip);
+        assert_ne!(default_conf.turn.host, env_conf.turn.host);
         assert_ne!(default_conf.turn.port, env_conf.turn.port);
 
-        assert_eq!(env_conf.turn.ip, Ipv4Addr::new(5, 5, 5, 5));
+        assert_eq!(env_conf.turn.host, "example.com");
         assert_eq!(env_conf.turn.port, 1234);
-        assert_eq!(env_conf.turn.addr(), "5.5.5.5:1234".parse().unwrap());
+        assert_eq!(env_conf.turn.addr(), "example.com:1234");
     }
 
     #[test]

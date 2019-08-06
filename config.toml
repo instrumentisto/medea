@@ -40,10 +40,10 @@ static_specs_path = "dev/specs"
 
 
 [turn]
-# Turn server IP address.
+# Turn server host.
 #
 # Default:
-#   ip = "127.0.0.1"
+#   host = "localhost"
 
 # Turn server port.
 #
