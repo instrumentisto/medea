@@ -4,6 +4,8 @@
 
 /.cache/
 
+/charts/
+
 /target/
 **/*.rs.bk
 
