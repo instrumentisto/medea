@@ -40,17 +40,19 @@
                     remote_video.play();
                 });
             });
+
+            return room;
         }
 
         window.connect_room = async function connect_room(credentials) {
-            run(credentials)
+            window.room = await run(credentials);
         }
 
     </script>
 
     <script type="text/javascript">
         var baseUrl = (document.location.protocol === "http:" ? "ws" : "wss") +
-            "://" + document.location.host + "/ws/";
+            "://" + document.location.host + ":8080/ws/";
 
         window.onload = function () {
             var chooseRoomDiv = document.getElementById('choose-room');
@@ -60,6 +62,25 @@
 
             var joinCallerButton = document.getElementById('join-caller');
             var joinResponderButton = document.getElementById('join-responder');
+
+            var toggleAudio = document.getElementById('toggle-audio');
+            var toggleVideo = document.getElementById('toggle-video');
+
+            toggleAudio.addEventListener('change', (event) => {
+                if (event.target.checked) {
+                    window.room.unmute_audio();
+                } else {
+                    window.room.mute_audio();
+                }
+            });
+
+            toggleVideo.addEventListener('change', (event) => {
+                if (event.target.checked) {
+                    window.room.unmute_video();
+                } else {
+                    window.room.mute_video();
+                }
+            });
 
             var bindJoinButtons = function (roomId) {
                 joinCallerButton.onclick = function () {
@@ -112,7 +133,7 @@
             background: dimgrey;
         }
 
-        .connect-btns {
+        .btn-group {
             margin-top: 10px;
         }
     </style>
@@ -135,10 +156,15 @@
             <b>Partner</b>
         </div>
     </div>
-    <div class="connect-btns">
+    <div class="btn-group">
         <button id="join-caller">Start caller session</button>
-        <button id="join-responder">Start responder session
-        </button>
+        <button id="join-responder">Start responder session</button>
+    </div>
+    <div class="btn-group">
+        <input id="toggle-audio" type="checkbox" checked>
+        <label for="toggle-audio">toggle local audio</label>
+        <input id="toggle-video" type="checkbox" checked>
+        <label for="toggle-video">toggle local video</label>
     </div>
 </div>
 
