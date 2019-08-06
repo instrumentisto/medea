@@ -28,15 +28,15 @@ fn three_members_p2p_video_call() {
                     assert_eq!(ice_servers.len(), 2);
                     assert_eq!(
                         ice_servers[0].urls[0],
-                        "stun:127.0.0.1:3478".to_string()
+                        "stun:localhost:3478".to_string()
                     );
                     assert_eq!(
                         ice_servers[1].urls[0],
-                        "turn:127.0.0.1:3478".to_string()
+                        "turn:localhost:3478".to_string()
                     );
                     assert_eq!(
                         ice_servers[1].urls[1],
-                        "turn:127.0.0.1:3478?transport=tcp".to_string()
+                        "turn:localhost:3478?transport=tcp".to_string()
                     );
 
                     peer_created_count += 1;
