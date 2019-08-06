@@ -1,4 +1,4 @@
-use std::{fmt, net::SocketAddr};
+use std::fmt;
 
 use actix::{
     fut::wrap_future, Actor, ActorFuture, Addr, Context, Handler, MailboxError,
@@ -144,7 +144,7 @@ struct Service {
     /// TurnAuthRepo password.
     db_pass: String,
     /// Turn server address.
-    turn_address: SocketAddr,
+    turn_address: String,
     /// Turn server static user.
     turn_username: String,
     /// Turn server static user password.
@@ -202,7 +202,7 @@ impl Service {
     fn static_user(&mut self) -> IceUser {
         if self.static_user.is_none() {
             self.static_user.replace(IceUser::new(
-                self.turn_address,
+                self.turn_address.clone(),
                 self.turn_username.clone(),
                 self.turn_password.clone(),
             ));
@@ -236,7 +236,7 @@ impl Handler<CreateIceUser> for Service {
         _ctx: &mut Self::Context,
     ) -> Self::Result {
         let ice_user = IceUser::build(
-            self.turn_address,
+            self.turn_address.clone(),
             &msg.room_id,
             &msg.member_id.to_string(),
             self.new_password(TURN_PASS_LEN),
@@ -318,5 +318,4 @@ pub mod test {
     pub fn new_turn_auth_service_mock() -> BoxedTurnAuthService {
         Box::new(TurnAuthServiceMock {})
     }
-
 }

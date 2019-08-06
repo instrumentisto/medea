@@ -1,7 +1,8 @@
 //! STUN/TURN server settings.
 
 use std::{
-    net::{IpAddr, Ipv4Addr, SocketAddr, ToSocketAddrs as _},
+    borrow::Cow,
+    net::{IpAddr, Ipv4Addr},
     time::Duration,
 };
 
@@ -14,9 +15,9 @@ use smart_default::SmartDefault;
 pub struct Turn {
     /// Database settings
     pub db: Db,
-    /// IP address STUN/TURN server. Defaults to `127.0.0.1`.
-    #[default(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)))]
-    pub ip: IpAddr,
+    /// Host of STUN/TURN server. Defaults to `localhost`.
+    #[default = "localhost"]
+    pub host: Cow<'static, str>,
     /// Port to connect TURN server. Defaults to `3478`.
     #[default = 3478]
     pub port: u16,
@@ -29,14 +30,10 @@ pub struct Turn {
 }
 
 impl Turn {
-    /// Builds [`SocketAddr`] from `ip` and `port`.
+    /// Builds [`String`] addr from `host` and `port`.
     #[inline]
-    pub fn addr(&self) -> SocketAddr {
-        (self.ip, self.port)
-            .to_socket_addrs()
-            .unwrap()
-            .next()
-            .unwrap()
+    pub fn addr(&self) -> String {
+        format!("{}:{}", self.host, self.port)
     }
 }
 
