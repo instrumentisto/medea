@@ -11,7 +11,7 @@ server:
     server:
       bind_port: 9980
     turn:
-      ip: 178.162.214.89
+      host: demo.medea.stg.t11913.org
       pass: changeme
 
   coturn:
