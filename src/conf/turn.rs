@@ -1,6 +1,7 @@
 //! STUN/TURN server settings.
 
 use std::{
+    borrow::Cow,
     net::{IpAddr, Ipv4Addr},
     time::Duration,
 };
@@ -14,9 +15,9 @@ use smart_default::SmartDefault;
 pub struct Turn {
     /// Database settings
     pub db: Db,
-    /// Host address STUN/TURN server. Defaults to `localhost`.
-    #[default("localhost".to_string())]
-    pub host: String,
+    /// Host of STUN/TURN server. Defaults to `localhost`.
+    #[default = "localhost"]
+    pub host: Cow<'static, str>,
     /// Port to connect TURN server. Defaults to `3478`.
     #[default = 3478]
     pub port: u16,

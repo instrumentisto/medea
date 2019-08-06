@@ -244,9 +244,9 @@ mod tests {
         assert_ne!(default_conf.turn.host, env_conf.turn.host);
         assert_ne!(default_conf.turn.port, env_conf.turn.port);
 
-        assert_eq!(&env_conf.turn.host, "example.com");
+        assert_eq!(env_conf.turn.host, "example.com");
         assert_eq!(env_conf.turn.port, 1234);
-        assert_eq!(&env_conf.turn.addr(), "example.com:1234");
+        assert_eq!(env_conf.turn.addr(), "example.com:1234");
     }
 
     #[test]

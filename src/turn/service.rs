@@ -239,19 +239,21 @@ impl Handler<CreateIceUser> for Service {
             self.new_password(TURN_PASS_LEN),
         );
 
-        Box::new(self.turn_db.insert(&ice_user).into_actor(self).then(
-            move |result, act, _| {
-                wrap_future(match result {
-                    Ok(_) => ok(ice_user),
-                    Err(e) => match msg.policy {
-                        UnreachablePolicy::ReturnErr => err(e.into()),
-                        UnreachablePolicy::ReturnStatic => {
-                            ok(act.static_user())
-                        }
-                    },
-                })
-            },
-        ))
+        Box::new(
+            self.turn_db.insert(&ice_user).into_actor(self).then(
+                move |result, act, _| {
+                    wrap_future(match result {
+                        Ok(_) => ok(ice_user),
+                        Err(e) => match msg.policy {
+                            UnreachablePolicy::ReturnErr => err(e.into()),
+                            UnreachablePolicy::ReturnStatic => {
+                                ok(act.static_user())
+                            }
+                        },
+                    })
+                },
+            ),
+        )
     }
 }
 
@@ -315,5 +317,4 @@ pub mod test {
     pub fn new_turn_auth_service_mock() -> Arc<dyn TurnAuthService> {
         Arc::new(TurnAuthServiceMock {})
     }
-
 }
