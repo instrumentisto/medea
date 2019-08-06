@@ -21,6 +21,8 @@ DEMO_IMAGE_NAME := instrumentisto/medea-demo
 
 RUST_VER := 1.36
 
+CURRENT_BRANCH := $(strip $(shell git branch | grep \* | cut -d ' ' -f2))
+
 
 
 
@@ -48,6 +50,33 @@ lint: cargo.lint
 fmt: cargo.fmt
 
 
+test: test.unit test.e2e
+
+
+
+
+####################
+# Running commands #
+####################
+
+down.demo: docker.down.demo
+
+
+# Run Coturn STUN/TURN server.
+#
+# Defaults:
+# 	logs=no
+#
+# Usage:
+#	make up.coturn [logs=(yes|no)]
+
+up.coturn:
+	docker-compose -f docker-compose.coturn.yml up -d
+ifeq ($(logs),yes)
+	docker-compose -f docker-compose.coturn.yml logs &
+endif
+
+
 up.demo: docker.up.demo
 
 
@@ -60,7 +89,71 @@ up.dev:
 	$(MAKE) -j3 up.coturn up.jason up.medea
 
 
-test: test.unit test.e2e
+# Run Jason E2E demo in development mode.
+#
+# Usage:
+#	make up.jason
+
+up.jason:
+	npm run start --prefix=jason/e2e-demo
+
+
+
+# Run Medea media server in development mode.
+#
+# Defaults:
+# 	dockerized=no
+#
+# Usage:
+#	make up.medea  [dockerized=(yes|no)]
+
+up.medea: up.coturn
+ifeq ($(dockerized),yes)
+	@make down.medea
+	docker-compose -f docker-compose.medea.yml up
+	@make down.coturn
+else
+	cargo run --bin medea
+endif
+
+
+
+
+#####################
+# Stopping commands #
+#####################
+
+# Stop all related to Medea services.
+
+down:
+	@make down.medea dockerized=yes
+	@make down.medea dockerized=no
+	@make down.coturn
+
+
+# Stop Medea media server.
+#
+# Defaults:
+# 	dockerized=no
+#
+# Usage:
+# 	make down.medea [dockerized=(yes|no)]
+
+down.medea:
+ifeq ($(dockerized),yes)
+	docker-compose -f docker-compose.medea.yml down
+else
+	- killall medea
+endif
+
+
+# Stop dockerized coturn.
+#
+# Usage:
+# 	make down.coturn
+
+down.coturn:
+	docker-compose -f docker-compose.coturn.yml down -t 1
 
 
 
@@ -241,22 +334,30 @@ release.jason:
 	wasm-pack publish
 
 
+release.helm: helm.package.release
+
+
 
 
 ###################
 # Docker commands #
 ###################
 
+docker-env = $(strip $(if $(call eq,$(minikube),yes),\
+	$(subst export,,$(shell minikube docker-env | cut -d '\#' -f1)),))
+
 # Build Docker image for demo application.
 #
 # Usage:
 #	make docker.build.demo [TAG=(dev|<tag>)]
+#	                       [minikube=(no|yes)]
 
 docker-build-demo-image-name = $(DEMO_IMAGE_NAME)
 
 docker.build.demo:
 	@make yarn proj=demo
-	docker build \
+	$(docker-env) \
+	docker build $(if $(call eq,$(minikube),yes),,--network=host) --force-rm \
 		-t $(docker-build-demo-image-name):$(if $(call eq,$(TAG),),dev,$(TAG)) \
 		jason/demo
 
@@ -264,8 +365,9 @@ docker.build.demo:
 # Build medea project Docker image.
 #
 # Usage:
-#	make docker.build.medea [TAG=(dev|<tag>)]
-#	                  [debug=(yes|no)] [no-cache=(no|yes)]
+#	make docker.build.medea [TAG=(dev|<tag>)] [debug=(yes|no)]
+#	                        [no-cache=(no|yes)]
+#	                        [minikube=(no|yes)]
 
 docker-build-medea-image-name = $(MEDEA_IMAGE_NAME)
 
@@ -280,7 +382,8 @@ ifneq ($(no-cache),yes)
 endif
 	$(call docker.build.clean.ignore)
 	@echo "!target/$(if $(call eq,$(debug),no),release,debug)/" >> .dockerignore
-	docker build --network=host --force-rm \
+	$(docker-env) \
+	docker build $(if $(call eq,$(minikube),yes),,--network=host) --force-rm \
 		$(if $(call eq,$(no-cache),yes),\
 			--no-cache --pull,) \
 		$(if $(call eq,$(IMAGE),),\
@@ -319,89 +422,178 @@ docker.up.demo: docker.down.demo
 
 
 
-####################
-# Running commands #
-####################
+##############################
+# Helm and Minikube commands #
+##############################
 
-# Run Coturn STUN/TURN server.
-#
-# Defaults:
-# 	logs=no
+helm-cluster = $(if $(call eq,$(cluster),),minikube,$(cluster))
+helm-namespace = $(if $(call eq,$(helm-cluster),minikube),kube,staging)-system
+helm-cluster-args = $(strip \
+	--kube-context=$(helm-cluster) --tiller-namespace=$(helm-namespace))
+
+helm-chart = $(if $(call eq,$(chart),),medea-demo,$(chart))
+helm-chart-dir = jason/demo/chart/medea-demo
+helm-chart-vals-dir = jason/demo
+
+helm-release = $(if $(call eq,$(release),),,$(release)-)$(helm-chart)
+helm-release-namespace = $(strip \
+	$(if $(call eq,$(helm-cluster),staging),staging,default))
+
+# Run Helm command in context of concrete Kubernetes cluster.
 #
 # Usage:
-#	make up.coturn [logs=(yes|no)]
+#	make helm [cmd=(--help|'<command>')]
+#	          [cluster=(minikube|staging)]
 
-up.coturn:
-	docker-compose -f docker-compose.coturn.yml up -d
-ifeq ($(logs),yes)
-	docker-compose -f docker-compose.coturn.yml logs &
+helm:
+	helm $(helm-cluster-args) $(if $(call eq,$(cmd),),--help,$(cmd))
+
+
+# Remove Helm release of project Helm chart from Kubernetes cluster.
+#
+# Usage:
+#	make helm.down [chart=medea-demo] [release=<release-name>]
+#	               [cluster=(minikube|staging)]
+
+helm.down:
+	$(if $(shell helm ls $(helm-cluster-args) | grep '$(helm-release)'),\
+		helm del --purge $(helm-cluster-args) $(helm-release) ,\
+		@echo "--> No '$(helm-release)' release found in $(helm-cluster) cluster")
+
+
+# Upgrade (or initialize) Tiller (server side of Helm) of Minikube.
+#
+# Usage:
+#	make helm.init [client-only=no [upgrade=(yes|no)]]
+#	               [client-only=yes]
+
+helm.init:
+	helm init --wait \
+		$(if $(call eq,$(client-only),yes),\
+			--client-only,\
+			--kube-context=minikube --tiller-namespace=kube-system \
+				$(if $(call eq,$(upgrade),no),,--upgrade))
+
+
+# Lint project Helm chart.
+#
+# Usage:
+#	make helm.lint [chart=medea-demo]
+
+helm.lint:
+	helm lint $(helm-chart-dir)/
+
+
+# List all Helm releases in Kubernetes cluster.
+#
+# Usage:
+#	make helm.list [cluster=(minikube|staging)]
+
+helm.list:
+	helm ls $(helm-cluster-args)
+
+
+# Build Helm package from project Helm chart.
+#
+# Usage:
+#	make helm.package [chart=medea-demo]
+
+helm-package-dir = .cache/helm/packages
+
+helm.package:
+	@rm -rf $(helm-package-dir)
+	@mkdir -p $(helm-package-dir)/
+	helm package --destination=$(helm-package-dir)/ $(helm-chart-dir)/
+
+
+# Build and publish project Helm package to GitHub Pages.
+#
+# Usage:
+#	make helm.package.release [chart=medea-demo] [build=(yes|no)]
+
+helm.package.release:
+ifneq ($(build),no)
+	@make helm.package chart=$(helm-chart)
 endif
+	git fetch origin gh-pages:gh-pages
+	git checkout gh-pages
+	git reset --hard
+	@mkdir -p charts/
+	cp -rf $(helm-package-dir)/* charts/
+	if [ -n "$$(git add -v charts/)" ]; then \
+		helm repo index charts/ \
+			--url=https://instrumentisto.github.io/medea/charts ; \
+		git add -v charts/ ; \
+		git commit -m "Release '$(helm-chart)' Helm chart" ; \
+	fi
+	git checkout $(CURRENT_BRANCH)
+	git push origin gh-pages
 
 
-# Run Jason E2E demo in development mode.
+# Run project Helm chart in Kubernetes cluster as Helm release.
 #
 # Usage:
-#	make up.jason
+#	make helm.up [chart=medea-demo] [release=<release-name>]
+#	             [cluster=minikube [rebuild=(no|yes) [no-cache=(no|yes)]]]
+#	             [cluster=staging]
+#	             [wait=(yes|no)]
 
-up.jason:
-	npm run start --prefix=jason/e2e-demo
+helm.up:
+ifeq ($(wildcard $(helm-chart-vals-dir)/my.$(helm-cluster).vals.yaml),)
+	touch $(helm-chart-vals-dir)/my.$(helm-cluster).vals.yaml
+endif
+ifeq ($(helm-cluster),minikube)
+ifeq ($(helm-chart),medea-demo)
+ifeq ($(rebuild),yes)
+	@make docker.build.demo minikube=yes TAG=dev
+	@make docker.build.medea no-cache=$(no-cache) minikube=yes TAG=dev
+endif
+endif
+endif
+	helm upgrade --install --force $(helm-cluster-args) \
+		$(helm-release) $(helm-chart-dir)/ \
+			--namespace=$(helm-release-namespace) \
+			--values=$(helm-chart-vals-dir)/$(helm-cluster).vals.yaml \
+			--values=$(helm-chart-vals-dir)/my.$(helm-cluster).vals.yaml \
+			--set server.deployment.revision=$(shell date +%s) \
+			--set web-client.deployment.revision=$(shell date +%s) \
+			$(if $(call eq,$(wait),no),,\
+				--wait )
 
 
-# Run Medea media server in development mode.
+# Bootstrap Minikube cluster (local Kubernetes) for development environment.
 #
-# Defaults:
-# 	dockerized=no
+# The bootsrap script is updated automatically to the latest version every day.
+# For manual update use 'update=yes' command option.
 #
 # Usage:
-#	make up.medea  [dockerized=(yes|no)]
+#	make minikube.boot [update=(no|yes)]
+#	                   [driver=(virtualbox|hyperkit|hyperv)]
+#	                   [k8s-version=<kubernetes-version>]
 
-up.medea: up.coturn
-ifeq ($(dockerized),yes)
-	@make down.medea
-	docker-compose -f docker-compose.medea.yml up
-	@make down.coturn
+minikube.boot:
+ifeq ($(update),yes)
+	$(call minikube.boot.download)
 else
-	cargo run --bin medea
-endif
-
-
-
-
-#####################
-# Stopping commands #
-#####################
-
-# Stop all related to Medea services.
-
-down:
-	@make down.medea dockerized=yes
-	@make down.medea dockerized=no
-	@make down.coturn
-
-
-# Stop Medea media server.
-#
-# Defaults:
-# 	dockerized=no
-#
-# Usage:
-# 	make down.medea [dockerized=(yes|no)]
-
-down.medea:
-ifeq ($(dockerized),yes)
-	docker-compose -f docker-compose.medea.yml down
+ifeq ($(wildcard $(HOME)/.minikube/bootstrap.sh),)
+	$(call minikube.boot.download)
 else
-	- killall medea
+ifneq ($(shell find $(HOME)/.minikube/bootstrap.sh -mmin +1440),)
+	$(call minikube.boot.download)
 endif
-
-
-# Stop dockerized coturn.
-#
-# Usage:
-# 	make down.coturn
-
-down.coturn:
-	docker-compose -f docker-compose.coturn.yml down -t 1
+endif
+endif
+	@$(if $(cal eq,$(driver),),,MINIKUBE_VM_DRIVER=$(driver)) \
+	 $(if $(cal eq,$(k8s-version),),,MINIKUBE_K8S_VER=$(k8s-version)) \
+		$(HOME)/.minikube/bootstrap.sh
+define minikube.boot.download
+	$()
+	@mkdir -p $(HOME)/.minikube/
+	@rm -f $(HOME)/.minikube/bootstrap.sh
+	curl -fL -o $(HOME)/.minikube/bootstrap.sh \
+		https://raw.githubusercontent.com/instrumentisto/toolchain/master/minikube/bootstrap.sh
+	@chmod +x $(HOME)/.minikube/bootstrap.sh
+endef
 
 
 
@@ -414,8 +606,12 @@ down.coturn:
         cargo cargo.fmt cargo.lint \
         docker.build.demo docker.build.medea docker.down.demo docker.up.demo \
         docs docs.rust \
-        down down.coturn down.medea \
-        release.jason \
-        test test.unit \
-        up up.coturn up.demo up.dev up.jason up.medea \
+        down.demo \
+        helm helm.down helm.init helm.lint helm.list \
+        	helm.package helm.package.release helm.up \
+        minikube.boot \
+        release.jason release.helm \
+        test test.unit test.e2e \
+        up.coturn up.demo up.dev up.jason up.medea \
+        down down.medea down.coturn \
         yarn
