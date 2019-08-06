@@ -1,0 +1,10 @@
+[*.tpl]
+indent_style = space
+indent_size = 2
+max_line_length = off
+
+[*.txt]
+max_line_length = off
+
+[*.yaml]
+max_line_length = off
