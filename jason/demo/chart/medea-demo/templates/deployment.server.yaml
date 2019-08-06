@@ -1,0 +1,181 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: {{ template "medea-demo.fullname" . }}-server
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    helm.sh/chart: {{ template "medea-demo.chart" . }}
+    app.kubernetes.io/name: {{ template "medea-demo.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name | quote }}
+    app.kubernetes.io/managed-by: {{ .Release.Service | quote }}
+    app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+    app.kubernetes.io/component: server
+  {{- with .Values.labels }}
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  replicas: 1
+  revisionHistoryLimit: {{ .Values.server.deployment.revisionHistoryLimit }}
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ template "medea-demo.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name | quote }}
+      app.kubernetes.io/component: server
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ template "medea-demo.name" . }}
+        app.kubernetes.io/instance: {{ .Release.Name | quote }}
+        app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+        app.kubernetes.io/component: server
+      {{- with .Values.labels }}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      annotations:
+        checksum/conf: {{ pick (include (print $.Template.BasePath "/configmap.server.yaml") . | fromYaml) "data" | toYaml | sha256sum }}
+        checksum/cred: {{ pick (include (print $.Template.BasePath "/secret.server.yaml") . | fromYaml) "data" | toYaml | sha256sum }}
+      {{- with .Values.server.deployment.revision }}
+        revision: {{ . | quote }}
+      {{- end }}
+      {{- with .Values.server.deployment.annotations }}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+    {{- with .Values.server.deployment.affinity }}
+      affinity: {{- toYaml . | nindent 8 }}
+    {{- end }}
+    {{- with .Values.server.deployment.tolerations }}
+      tolerations: {{- toYaml . | nindent 8 }}
+    {{- end }}
+      containers:
+      {{- $coturnDb := index .Values "server" "coturn-db" }}
+      {{- $coturn := .Values.server.coturn }}
+        - name: medea
+          image: "{{ .Values.server.image.repository }}:{{ .Values.server.image.tag }}"
+          imagePullPolicy: {{ .Values.server.image.pullPolicy }}
+          env:
+            - name: MEDEA_CONF
+              value: /etc/medea.toml
+            - name: MEDEA_TURN.PORT
+              value: {{ $coturn.conf.listening_port | quote }}
+            - name: MEDEA_TURN.DB.REDIS.PORT
+              value: {{ $coturnDb.conf.port | quote }}
+          envFrom:
+            - secretRef:
+                name: {{ template "medea-demo.fullname" . }}.server.cred
+          ports:
+            - name: http
+              containerPort: {{ .Values.server.conf.server.bind_port }}
+          volumeMounts:
+            - name: conf
+              subPath: medea.toml
+              mountPath: /etc/medea.toml
+              readOnly: true
+        {{- with .Values.server.deployment.resources }}
+          resources: {{- toYaml . | nindent 12 }}
+        {{- end }}
+          livenessProbe:
+            tcpSocket:
+              port: {{ .Values.server.conf.server.bind_port }}
+            initialDelaySeconds: 3
+          readinessProbe:
+            tcpSocket:
+              port: {{ .Values.server.conf.server.bind_port }}
+            initialDelaySeconds: 5
+        - name: coturn
+          image: "{{ $coturn.image.repository }}:{{ $coturn.image.tag }}"
+          imagePullPolicy: {{ $coturn.image.pullPolicy }}
+          command: ["turnserver"]
+          args:
+            - --log-file=stdout
+            - --external-ip=$(EXTERNAL_IP)
+            - --listening-ip=$(EXTERNAL_IP)
+            - --relay-ip=$(EXTERNAL_IP)
+            - --redis-userdb=ip=127.0.0.1 port={{ $coturnDb.conf.port }} dbname={{ .Values.server.conf.turn.db.redis.db_number }} password=$(MEDEA_TURN.DB.REDIS.PASS)
+            - --user={{ .Values.server.conf.turn.user }}:$(MEDEA_TURN.PASS)
+          {{- with $coturn.extraArgs }}
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          env:
+            - name: EXTERNAL_IP
+            {{- if $coturn.conf.external_ip }}
+              value: {{ $coturn.conf.external_ip | quote }}
+            {{- else }}
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+            {{- end }}
+            - name: MEDEA_TURN.PASS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ template "medea-demo.fullname" . }}.server.cred
+                  key: MEDEA_TURN.PASS
+            - name: MEDEA_TURN.DB.REDIS.PASS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ template "medea-demo.fullname" . }}.server.cred
+                  key: MEDEA_TURN.DB.REDIS.PASS
+          ports:
+            - name: turn
+              containerPort: {{ $coturn.conf.listening_port }}
+              protocol: TCP
+            - name: turn-udp
+              containerPort: {{ $coturn.conf.listening_port }}
+              protocol: UDP
+          volumeMounts:
+            - name: conf
+              subPath: turnserver.conf
+              mountPath: /etc/coturn/turnserver.conf
+              readOnly: true
+            - name: coturn-data
+              mountPath: /var/lib/coturn
+        {{- with $coturn.resources }}
+          resources: {{- toYaml . | nindent 12 }}
+        {{- end }}
+          livenessProbe:
+            tcpSocket:
+              port: {{ $coturn.conf.listening_port }}
+            initialDelaySeconds: 3
+          readinessProbe:
+            tcpSocket:
+              port: {{ $coturn.conf.listening_port }}
+            initialDelaySeconds: 5
+        - name: coturn-db
+          image: "{{ $coturnDb.image.repository }}:{{ $coturnDb.image.tag }}"
+          imagePullPolicy: {{ $coturnDb.image.pullPolicy }}
+          args:
+            - redis-server
+            - /etc/redis.conf
+            - --requirepass $(MEDEA_TURN.DB.REDIS.PASS)
+          env:
+            - name: MEDEA_TURN.DB.REDIS.PASS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ template "medea-demo.fullname" . }}.server.cred
+                  key: MEDEA_TURN.DB.REDIS.PASS
+          volumeMounts:
+            - name: conf
+              subPath: redis.conf
+              mountPath: /etc/redis.conf
+              readOnly: true
+        {{- with $coturnDb.resources }}
+          resources: {{- toYaml . | nindent 12 }}
+        {{- end }}
+          livenessProbe:
+            exec:
+              command: ['redis-cli', 'ping']
+            initialDelaySeconds: 3
+          readinessProbe:
+            exec:
+              command: ['redis-cli', 'ping']
+            initialDelaySeconds: 5
+      volumes:
+        - name: conf
+          configMap:
+            name: {{ template "medea-demo.fullname" . }}.server.conf
+        - name: coturn-data
+          emptyDir: {}

@@ -1,0 +1,23 @@
+{{- $webClient := index .Values "web-client" -}}
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: {{ template "medea-demo.fullname" . }}.web-client.conf
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    helm.sh/chart: {{ template "medea-demo.chart" . }}
+    app.kubernetes.io/name: {{ template "medea-demo.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name | quote }}
+    app.kubernetes.io/managed-by: {{ .Release.Service | quote }}
+    app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+    app.kubernetes.io/component: web-client
+  {{- with .Values.labels }}
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+data:
+  nginx.vh.conf: |
+  {{- if $webClient.conf.nginx }}
+    {{- $webClient.conf.nginx | nindent 4 }}
+  {{- else }}
+    {{- tpl (.Files.Get "conf/nginx.vh.conf") . | nindent 4 }}
+  {{- end }}
