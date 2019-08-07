@@ -36,7 +36,7 @@ pub trait RpcClient {
 // 2. Reconnect.
 // 3. Disconnect if no pongs.
 // 4. Buffering if no socket?
-pub struct Client(Rc<RefCell<Inner>>);
+pub struct WebsocketRpcClient(Rc<RefCell<Inner>>);
 
 /// Inner state of [`RpcClient`].
 struct Inner {
@@ -102,7 +102,7 @@ fn on_message(inner_rc: &RefCell<Inner>, msg: Result<ServerMsg, WasmErr>) {
     }
 }
 
-impl Client {
+impl WebsocketRpcClient {
     pub fn new(token: String, ping_interval: i32) -> Self {
         Self(Inner::new(token, ping_interval))
     }
@@ -134,7 +134,7 @@ impl Client {
     }
 }
 
-impl RpcClient for Client {
+impl RpcClient for WebsocketRpcClient {
     /// Returns Stream of all Events received by this [`RpcClient`].
     // TODO: proper sub registry
     fn subscribe(&self) -> Box<dyn Stream<Item = Event, Error = ()>> {
@@ -162,7 +162,7 @@ impl RpcClient for Client {
     }
 }
 
-impl Drop for Client {
+impl Drop for WebsocketRpcClient {
     /// Drops related connection and its [`Heartbeat`].
     fn drop(&mut self) {
         self.0.borrow_mut().sock.take();

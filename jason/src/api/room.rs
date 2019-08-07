@@ -104,19 +104,15 @@ impl Room {
     pub fn new(
         rpc: Rc<dyn RpcClient>,
         peers: Box<dyn PeerRepository>,
-        mngr: &Rc<MediaManager>,
+        mngr: Rc<MediaManager>,
     ) -> Self {
         let (tx, rx) = unbounded();
-        let events = rpc.subscribe();
-        let room = Rc::new(RefCell::new(InnerRoom::new(
-            rpc,
-            peers,
-            tx,
-            Rc::clone(mngr),
-        )));
+        let events_stream = rpc.subscribe();
+
+        let room = Rc::new(RefCell::new(InnerRoom::new(rpc, peers, tx, mngr)));
 
         let inner = Rc::downgrade(&room);
-        let handle_medea_event = events
+        let handle_medea_event = events_stream
             .for_each(move |event| match inner.upgrade() {
                 Some(inner) => {
                     event.dispatch_with(inner.borrow_mut().deref_mut());

@@ -12,13 +12,13 @@ use wasm_bindgen_futures::future_to_promise;
 
 use crate::{
     media::MediaManager,
-    rpc::{Client, RpcClient},
+    peer::Repository,
+    rpc::{RpcClient, WebsocketRpcClient},
     set_panic_hook,
 };
 
 #[doc(inline)]
 pub use self::{connection::ConnectionHandle, room::Room, room::RoomHandle};
-use crate::peer::Repository;
 
 #[wasm_bindgen]
 #[derive(Default)]
@@ -27,7 +27,7 @@ pub struct Jason(Rc<RefCell<Inner>>);
 #[derive(Default)]
 struct Inner {
     // TODO: multiple RpcClient's if rooms managed by different servers
-    rpc: Option<Rc<Client>>,
+    rpc: Option<Rc<dyn RpcClient>>,
     media_manager: Rc<MediaManager>,
     rooms: Vec<Room>,
 }
@@ -50,19 +50,18 @@ impl Jason {
     /// Fails if unable to connect to media server.
     /// Effectively returns `Result<RoomHandle, WasmErr>`.
     pub fn join_room(&self, token: String) -> Promise {
-        let mut rpc = Client::new(token, 3000);
+        let mut rpc = WebsocketRpcClient::new(token, 3000);
         let media_manager = Rc::clone(&self.0.borrow().media_manager);
 
         let inner = Rc::clone(&self.0);
         let fut = rpc
             .init()
             .and_then(move |()| {
-                let rpc = Rc::new(rpc);
-                let peers = Box::new(Repository::default());
+                let rpc: Rc<dyn RpcClient> = Rc::new(rpc);
                 let room = Room::new(
-                    Rc::clone(&rpc) as Rc<dyn RpcClient>,
-                    peers,
-                    &media_manager,
+                    Rc::clone(&rpc),
+                    Box::new(Repository::default()),
+                    media_manager,
                 );
 
                 let handle = room.new_handle();
