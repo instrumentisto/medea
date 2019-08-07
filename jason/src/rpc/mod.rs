@@ -102,7 +102,7 @@ impl RpcClient {
     }
 
     /// Creates new WebSocket connection to remote media server.
-    /// Starts [`Heatbeat`] if connection succeeds and binds handlers
+    /// Starts `Heartbeat` if connection succeeds and binds handlers
     /// on receiving messages from server and closing socket.
     pub fn init(&mut self) -> impl Future<Item = (), Error = WasmErr> {
         let inner = Rc::clone(&self.0);

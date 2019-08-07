@@ -1,6 +1,6 @@
 //! Helper utils used in project.
 
-/// Creates new [`hashbrown::HashMap`] from a list of key-value pairs.
+/// Creates new [hashbrown] `HashMap` from a list of key-value pairs.
 ///
 /// ## Example
 ///
@@ -13,6 +13,8 @@
 /// assert_eq!(map["b"], 2);
 /// assert_eq!(map.get("c"), None);
 /// ```
+///
+/// [hashbrown]:https://crates.io/crates/hashbrown
 #[macro_export]
 macro_rules! hashmap {
     (@single $($x:tt)*) => (());

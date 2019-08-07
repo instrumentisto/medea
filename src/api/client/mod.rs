@@ -1,4 +1,6 @@
-//! Implementation of Client API.
+//! Implementation of [Client API].
+//!
+//! [Client API]: http://tiny.cc/c80uaz
 
 mod session;
 

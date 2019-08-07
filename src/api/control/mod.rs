@@ -1,4 +1,6 @@
-//! Implementation of Control API.
+//! Implementation of [Control API].
+//!
+//! [Control API]: http://tiny.cc/380uaz
 
 mod member;
 

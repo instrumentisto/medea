@@ -1,4 +1,7 @@
 //! Repository that stores [`Room`]s [`Peer`]s.
+//!
+//! [`Room`]: crate::signalling::Room
+//! [`Peer`]: crate::media::peer::Peer
 
 use hashbrown::HashMap;
 
@@ -13,11 +16,16 @@ use crate::{
 #[derive(Debug)]
 pub struct PeerRepository {
     /// [`Peer`]s of [`Member`]s in this [`Room`].
+    ///
+    /// [`Member`]: crate::api::control::member::Member
+    /// [`Room`]: crate::signalling::Room
     peers: HashMap<PeerId, PeerStateMachine>,
 }
 
 impl PeerRepository {
     /// Store [`Peer`] in [`Room`].
+    ///
+    /// [`Room`]: crate::signalling::Room
     pub fn add_peer<S: Into<PeerStateMachine>>(&mut self, peer: S) {
         let peer = peer.into();
         self.peers.insert(peer.id(), peer);
@@ -51,6 +59,8 @@ impl PeerRepository {
     /// Returns [`Peer`] of specified [`Member`].
     ///
     /// Panic if [`Peer`] not exists.
+    ///
+    /// [`Member`]: crate::api::control::member::Member
     pub fn get_peers_by_member_id(
         &self,
         member_id: MemberId,

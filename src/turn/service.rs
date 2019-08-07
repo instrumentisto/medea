@@ -1,3 +1,8 @@
+//! Implementation of managing [coturn] [TURN] server.
+//!
+//! [coturn]: https://github.com/coturn/coturn
+//! [TURN]: https://webrtcglossary.com/turn/
+
 use std::{fmt, sync::Arc};
 
 use actix::{
@@ -64,7 +69,7 @@ impl TurnAuthService for Addr<Service> {
         )
     }
 
-    /// Sends [`DeleteRoom`] to [`Service`].
+    /// Sends `DeleteRoom` to [`Service`].
     fn delete(
         &self,
         users: Vec<IceUser>,
@@ -91,6 +96,7 @@ impl TurnAuthService for Addr<Service> {
 type ActFuture<I, E> =
     Box<dyn ActorFuture<Actor = Service, Item = I, Error = E>>;
 
+/// Error which can happen in [`TurnAuthService`].
 #[derive(Debug, Fail)]
 pub enum TurnServiceErr {
     #[fail(display = "Error accessing TurnAuthRepo: {}", _0)]
@@ -239,21 +245,19 @@ impl Handler<CreateIceUser> for Service {
             self.new_password(TURN_PASS_LEN),
         );
 
-        Box::new(
-            self.turn_db.insert(&ice_user).into_actor(self).then(
-                move |result, act, _| {
-                    wrap_future(match result {
-                        Ok(_) => ok(ice_user),
-                        Err(e) => match msg.policy {
-                            UnreachablePolicy::ReturnErr => err(e.into()),
-                            UnreachablePolicy::ReturnStatic => {
-                                ok(act.static_user())
-                            }
-                        },
-                    })
-                },
-            ),
-        )
+        Box::new(self.turn_db.insert(&ice_user).into_actor(self).then(
+            move |result, act, _| {
+                wrap_future(match result {
+                    Ok(_) => ok(ice_user),
+                    Err(e) => match msg.policy {
+                        UnreachablePolicy::ReturnErr => err(e.into()),
+                        UnreachablePolicy::ReturnStatic => {
+                            ok(act.static_user())
+                        }
+                    },
+                })
+            },
+        ))
     }
 }
 
