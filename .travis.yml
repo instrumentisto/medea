@@ -7,7 +7,7 @@ jobs:
 
   include:
     - stage: lints
-      rust: nightly
+      rust: nightly-2019-08-03 # TODO: use nightly when clippy will be fixed
       name: "Clippy"
       before_script: rustup component add clippy
       script: make lint
