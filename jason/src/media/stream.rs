@@ -19,7 +19,6 @@ use super::{MediaTrack, TrackId};
 ///
 /// Shared between JS side ([`MediaStreamHandle`]) and Rust side
 /// ([`MediaStream`]).
-#[derive(Debug)]
 struct InnerStream {
     /// Actual underlying [MediaStream][1] object.
     ///
@@ -66,7 +65,6 @@ impl InnerStream {
 ///
 /// [1]: https://www.w3.org/TR/mediacapture-streams/#mediastream
 #[allow(clippy::module_name_repetitions)]
-#[derive(Debug)]
 pub struct MediaStream(Rc<InnerStream>);
 
 impl MediaStream {
@@ -111,7 +109,6 @@ impl MediaStream {
 ///
 /// For using [`MediaStreamHandle`] on Rust side, consider the [`MediaStream`].
 #[wasm_bindgen]
-#[derive(Debug)]
 pub struct MediaStreamHandle(Weak<InnerStream>);
 
 #[wasm_bindgen]

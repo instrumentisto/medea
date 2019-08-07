@@ -17,7 +17,6 @@ use crate::{
 use super::conn::{RtcPeerConnection, TransceiverDirection, TransceiverKind};
 
 /// Actual data of [`MediaConnections`] storage.
-#[derive(Debug)]
 struct InnerMediaConnections {
     /// Ref to parent [`RtcPeerConnection`]. Used to generate transceivers for
     /// [`Sender`]s and [`Receiver`]s.
@@ -32,7 +31,6 @@ struct InnerMediaConnections {
 
 /// Storage of [`RtcPeerConnection`]'s [`Sender`] and [`Receiver`] tracks.
 #[allow(clippy::module_name_repetitions)]
-#[derive(Debug)]
 pub struct MediaConnections(RefCell<InnerMediaConnections>);
 
 impl MediaConnections {
@@ -258,7 +256,6 @@ impl MediaConnections {
 
 /// Representation of a local [`MediaTrack`] that is being sent to some remote
 /// peer.
-#[derive(Debug)]
 pub struct Sender {
     track_id: TrackId,
     transceiver: RtcRtpTransceiver,
@@ -304,7 +301,6 @@ impl Sender {
 ///
 /// We can save related [`RtcRtpTransceiver`] and the actual [`MediaTrack`]
 /// only when [`MediaTrack`] data arrives.
-#[derive(Debug)]
 pub struct Receiver {
     track_id: TrackId,
     caps: MediaType,

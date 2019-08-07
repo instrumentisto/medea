@@ -34,7 +34,6 @@ pub type Id = u64;
 
 #[dispatchable]
 #[allow(clippy::module_name_repetitions)]
-#[derive(Debug)]
 /// Events emitted from [`RtcPeerConnection`].
 pub enum PeerEvent {
     /// [`RtcPeerConnection`] discovered new ice candidate.
@@ -53,7 +52,6 @@ pub enum PeerEvent {
     },
 }
 
-#[derive(Debug)]
 struct InnerPeerConnection {
     id: Id,
 
@@ -148,7 +146,6 @@ pub trait PeerConnection {
     ) -> Box<dyn Future<Item = (), Error = WasmErr>>;
 }
 
-#[derive(Debug)]
 pub struct Connection(Rc<InnerPeerConnection>);
 
 impl Connection {

@@ -19,11 +19,11 @@ use super::{
 
 /// Manager that is responsible for [`MediaStream`] acquisition and storing.
 #[allow(clippy::module_name_repetitions)]
-#[derive(Default, Debug)]
+#[derive(Default)]
 pub struct MediaManager(Rc<RefCell<InnerMediaManager>>);
 
 /// Actual data of [`MediaManager`].
-#[derive(Default, Debug)]
+#[derive(Default)]
 struct InnerMediaManager {
     /// Obtained streams.
     streams: Vec<Rc<MediaStream>>,

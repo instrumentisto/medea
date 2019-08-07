@@ -6,7 +6,6 @@ use web_sys::EventTarget;
 use crate::utils::WasmErr;
 
 /// Wrapper for closure that handles some [`EventTarget`] event.
-#[derive(Debug)]
 pub struct EventListener<T, A>
 where
     T: Deref<Target = EventTarget>,

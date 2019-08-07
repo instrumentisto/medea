@@ -78,7 +78,6 @@ mock! {
 
 #[wasm_bindgen_test]
 fn mute_audio_success() {
-    let media_manager = Rc::new(MediaManager::default());
     let (_event_sender, event_receiver) = unbounded();
     let mut rpc = MockRpcClient::new();
     let mut repo = MockPeerRepository::new();
@@ -92,14 +91,13 @@ fn mute_audio_success() {
     });
     rpc.expect_unsub().return_const(());
 
-    let room = Room::new(Rc::new(rpc), Box::new(repo), &media_manager);
+    let room = Room::new(Rc::new(rpc), Box::new(repo), Rc::new(MediaManager::default()));
     let handle = room.new_handle();
     assert!(handle.mute_audio().is_ok());
 }
 
 #[wasm_bindgen_test]
 fn mute_audio_error() {
-    let media_manager = Rc::new(MediaManager::default());
     let (_event_sender, event_receiver) = unbounded();
     let mut rpc = MockRpcClient::new();
     let mut repo = MockPeerRepository::new();
@@ -114,7 +112,7 @@ fn mute_audio_error() {
     });
     rpc.expect_unsub().return_const(());
 
-    let room = Room::new(Rc::new(rpc), Box::new(repo), &media_manager);
+    let room = Room::new(Rc::new(rpc), Box::new(repo), Rc::new(MediaManager::default()));
     let handle = room.new_handle();
     assert!(handle.mute_audio().is_err());
 }
@@ -122,7 +120,6 @@ fn mute_audio_error() {
 #[wasm_bindgen_test]
 fn unmute_audio_success() {
     let (_event_sender, event_receiver) = unbounded();
-    let media_manager = Rc::new(MediaManager::default());
     let mut rpc = MockRpcClient::new();
     let mut repo = MockPeerRepository::new();
 
@@ -135,14 +132,13 @@ fn unmute_audio_success() {
     });
     rpc.expect_unsub().return_const(());
 
-    let room = Room::new(Rc::new(rpc), Box::new(repo), &media_manager);
+    let room = Room::new(Rc::new(rpc), Box::new(repo), Rc::new(MediaManager::default()));
     let handle = room.new_handle();
     assert!(handle.unmute_audio().is_ok());
 }
 
 #[wasm_bindgen_test]
 fn unmute_audio_error() {
-    let media_manager = Rc::new(MediaManager::default());
     let (_event_sender, event_receiver) = unbounded();
     let mut rpc = MockRpcClient::new();
     let mut repo = MockPeerRepository::new();
@@ -157,14 +153,13 @@ fn unmute_audio_error() {
     });
     rpc.expect_unsub().return_const(());
 
-    let room = Room::new(Rc::new(rpc), Box::new(repo), &media_manager);
+    let room = Room::new(Rc::new(rpc), Box::new(repo), Rc::new(MediaManager::default()));
     let handle = room.new_handle();
     assert!(handle.unmute_audio().is_err());
 }
 
 #[wasm_bindgen_test]
 fn mute_video_success() {
-    let media_manager = Rc::new(MediaManager::default());
     let (_event_sender, event_receiver) = unbounded();
     let mut rpc = MockRpcClient::new();
     let mut repo = MockPeerRepository::new();
@@ -178,14 +173,13 @@ fn mute_video_success() {
     });
     rpc.expect_unsub().return_const(());
 
-    let room = Room::new(Rc::new(rpc), Box::new(repo), &media_manager);
+    let room = Room::new(Rc::new(rpc), Box::new(repo), Rc::new(MediaManager::default()));
     let handle = room.new_handle();
     assert!(handle.mute_video().is_ok());
 }
 
 #[wasm_bindgen_test]
 fn mute_video_error() {
-    let media_manager = Rc::new(MediaManager::default());
     let (_event_sender, event_receiver) = unbounded();
     let mut rpc = MockRpcClient::new();
     let mut repo = MockPeerRepository::new();
@@ -200,7 +194,7 @@ fn mute_video_error() {
     });
     rpc.expect_unsub().return_const(());
 
-    let room = Room::new(Rc::new(rpc), Box::new(repo), &media_manager);
+    let room = Room::new(Rc::new(rpc), Box::new(repo), Rc::new(MediaManager::default()));
     let handle = room.new_handle();
     assert!(handle.mute_video().is_err());
 }
@@ -209,7 +203,6 @@ fn mute_video_error() {
 
 #[wasm_bindgen_test]
 fn unmute_video_success() {
-    let media_manager = Rc::new(MediaManager::default());
     let (_event_sender, event_receiver) = unbounded();
     let mut rpc = MockRpcClient::new();
     let mut repo = MockPeerRepository::new();
@@ -223,14 +216,13 @@ fn unmute_video_success() {
     });
     rpc.expect_unsub().return_const(());
 
-    let room = Room::new(Rc::new(rpc), Box::new(repo), &media_manager);
+    let room = Room::new(Rc::new(rpc), Box::new(repo), Rc::new(MediaManager::default()));
     let handle = room.new_handle();
     assert!(handle.unmute_video().is_ok());
 }
 
 #[wasm_bindgen_test]
 fn unmute_video_error() {
-    let media_manager = Rc::new(MediaManager::default());
     let (_event_sender, event_receiver) = unbounded();
     let mut rpc = MockRpcClient::new();
     let mut repo = MockPeerRepository::new();
@@ -245,7 +237,7 @@ fn unmute_video_error() {
     });
     rpc.expect_unsub().return_const(());
 
-    let room = Room::new(Rc::new(rpc), Box::new(repo), &media_manager);
+     let room = Room::new(Rc::new(rpc), Box::new(repo), Rc::new(MediaManager::default()));
     let handle = room.new_handle();
     assert!(handle.unmute_video().is_err());
 }
