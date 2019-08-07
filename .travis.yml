@@ -1,5 +1,7 @@
 language: rust
 
+cache: cargo
+
 jobs:
   allow_failures:
     - rust: nightly
@@ -17,6 +19,15 @@ jobs:
       name: "Rustfmt"
       before_script: rustup component add rustfmt
       script: make fmt check=yes
+
+    - stage: build
+      rust: stable
+      name: "Build jason (Rust stable)"
+      before_script:
+        - make yarn dockerized=no
+        - curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+      script:
+        - wasm-pack build -t web jason
 
     - stage: build
       rust: stable
