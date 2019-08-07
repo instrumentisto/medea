@@ -1,5 +1,5 @@
 [package]
-name = "jason"
+name = "medea-jason"
 version = "0.1.0-dev"
 edition = "2018"
 description = "Medea media server client application"
