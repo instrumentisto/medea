@@ -45,32 +45,14 @@ impl MediaConnections {
         }))
     }
 
-    /// Set enabled property for all [`MediaTrack`]s of [`Senders`] with given
-    /// [`TransceiverKind`].
-    pub fn enable_sender(
-        &self,
-        kind: TransceiverKind,
-        enabled: bool,
-    ) -> Result<(), WasmErr> {
+    /// Enables or disables all [`Sender`]s with specified [`TransceiverKind`]
+    /// [`MediaTrack`]s.
+    pub fn toggle_send_media(&self, kind: TransceiverKind, enabled: bool) {
         let s = self.0.borrow();
         s.senders
             .iter()
-            .filter_map(|(_, sender)| {
-                if sender.kind != kind {
-                    return None;
-                }
-                Some(match sender.transceiver.sender().track() {
-                    None => {
-                        Err(WasmErr::from("Peer has senders without track"))
-                    }
-                    Some(track) => {
-                        track.set_enabled(enabled);
-                        Ok(())
-                    }
-                })
-            })
-            .collect::<Result<Vec<_>, _>>()
-            .map(|_| ())
+            .filter(|(_, sender)| sender.kind == kind)
+            .for_each(|(_, sender)| sender.set_track_enabled(enabled))
     }
 
     /// Returns true if all [`MediaTrack`]s of [`Senders`] with given
@@ -293,6 +275,13 @@ impl Sender {
             transceiver,
             kind,
         }))
+    }
+
+    /// Enable or disable this [`Sender`]s track.
+    fn set_track_enabled(&self, enabled: bool) {
+        if let Some(track) = self.transceiver.sender().track() {
+            track.set_enabled(enabled);
+        }
     }
 }
 

@@ -28,24 +28,6 @@ use crate::{
 use super::{connection::Connection, ConnectionHandle};
 use crate::peer::{self, PeerConnection};
 
-macro_rules! map_all_peers {
-    ($v:expr, $func:ident) => {{
-        $v.0.upgrade()
-            .ok_or_else(|| WasmErr::from("Detached state").into())
-            .and_then(|room| {
-                room.borrow()
-                    .peers
-                    .get_all()
-                    .iter()
-                    .map(Rc::as_ref)
-                    .map(peer::PeerConnection::$func)
-                    .collect::<Result<Vec<_>, _>>()
-                    .map(|_| ())
-                    .map_err(Into::into)
-            })
-    }};
-}
-
 /// JS side handle to [`Room`] where all the media happens.
 ///
 /// Actually, represents a [`Weak`]-based handle to [`InnerRoom`].
@@ -72,22 +54,46 @@ impl RoomHandle {
 
     /// Mute local audio [`Track`]s for all [`PeerConnection`]s this [`Room`].
     pub fn mute_audio(&self) -> Result<(), JsValue> {
-        map_all_peers!(self, mute_audio)
+        match self.0.upgrade() {
+            Some(inner) => {
+                inner.borrow().toggle_send_audio(false);
+                Ok(())
+            }
+            None => Err(WasmErr::from("Detached state").into()),
+        }
     }
 
     /// Unmute local audio [`Track`]s for all [`PeerConnection`]s this [`Room`].
     pub fn unmute_audio(&self) -> Result<(), JsValue> {
-        map_all_peers!(self, unmute_audio)
+        match self.0.upgrade() {
+            Some(inner) => {
+                inner.borrow().toggle_send_audio(true);
+                Ok(())
+            }
+            None => Err(WasmErr::from("Detached state").into()),
+        }
     }
 
     /// Mute local video [`Track`]s for all [`PeerConnection`]s this [`Room`].
     pub fn mute_video(&self) -> Result<(), JsValue> {
-        map_all_peers!(self, mute_video)
+        match self.0.upgrade() {
+            Some(inner) => {
+                inner.borrow().toggle_send_video(false);
+                Ok(())
+            }
+            None => Err(WasmErr::from("Detached state").into()),
+        }
     }
 
     /// Unmute local video [`Track`]s for all [`PeerConnection`]s this [`Room`].
     pub fn unmute_video(&self) -> Result<(), JsValue> {
-        map_all_peers!(self, unmute_video)
+        match self.0.upgrade() {
+            Some(inner) => {
+                inner.borrow().toggle_send_video(true);
+                Ok(())
+            }
+            None => Err(WasmErr::from("Detached state").into()),
+        }
     }
 }
 
@@ -228,6 +234,18 @@ impl InnerRoom {
         )?);
         self.peers.insert(id, peer);
         Ok(self.peers.get(id).unwrap())
+    }
+
+    pub fn toggle_send_audio(&self, enabled: bool) {
+        for peer in self.peers.get_all() {
+            peer.toggle_send_audio(enabled);
+        }
+    }
+
+    pub fn toggle_send_video(&self, enabled: bool) {
+        for peer in self.peers.get_all() {
+            peer.toggle_send_video(enabled);
+        }
     }
 }
 

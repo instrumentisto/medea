@@ -70,23 +70,17 @@ struct InnerPeerConnection {
 
 #[allow(clippy::module_name_repetitions)]
 pub trait PeerConnection {
-    /// Mute all audio tracks for all [`Sender`]s.
-    fn mute_audio(&self) -> Result<(), WasmErr>;
+    /// Disable or enable all video tracks for all [`Sender`]s.
+    fn toggle_send_video(&self, enabled: bool);
+
+    /// Disable or enable all audio tracks for all [`Sender`]s.
+    fn toggle_send_audio(&self, enabled: bool);
 
     /// Returns `true` if the all audio tracks for all [`Sender`]s is not muted.
     fn enabled_audio(&self) -> Result<bool, WasmErr>;
 
-    /// Unmute all audio tracks for all [`Sender`]s.
-    fn unmute_audio(&self) -> Result<(), WasmErr>;
-
-    /// Mute all video tracks for all [`Sender`]s.
-    fn mute_video(&self) -> Result<(), WasmErr>;
-
     /// Returns `true` if the all video tracks for all [`Sender`]s is not muted.
     fn enabled_video(&self) -> Result<bool, WasmErr>;
-
-    /// Unmute all video tracks for all [`Sender`]s.
-    fn unmute_video(&self) -> Result<(), WasmErr>;
 
     /// Track id to mid relations of all send tracks of this
     /// [`RtcPeerConnection`]. mid is id of [`m= section`][1]. mids are received
@@ -230,11 +224,18 @@ impl Connection {
 }
 
 impl PeerConnection for Connection {
-    /// Mute all audio tracks for all [`Sender`]s.
-    fn mute_audio(&self) -> Result<(), WasmErr> {
+    /// Disable or enable all audio tracks for all [`Sender`]s.
+    fn toggle_send_audio(&self, enabled: bool) {
         self.0
             .media_connections
-            .enable_sender(TransceiverKind::Audio, false)
+            .toggle_send_media(TransceiverKind::Audio, enabled)
+    }
+
+    /// Disable or enable all video tracks for all [`Sender`]s.
+    fn toggle_send_video(&self, enabled: bool) {
+        self.0
+            .media_connections
+            .toggle_send_media(TransceiverKind::Video, enabled)
     }
 
     /// Returns `true` if the all audio tracks for all [`Sender`]s is not muted.
@@ -244,31 +245,10 @@ impl PeerConnection for Connection {
             .enabled_sender(TransceiverKind::Audio)
     }
 
-    /// Unmute all audio tracks for all [`Sender`]s.
-    fn unmute_audio(&self) -> Result<(), WasmErr> {
-        self.0
-            .media_connections
-            .enable_sender(TransceiverKind::Audio, true)
-    }
-
-    /// Mute all video tracks for all [`Sender`]s.
-    fn mute_video(&self) -> Result<(), WasmErr> {
-        self.0
-            .media_connections
-            .enable_sender(TransceiverKind::Video, false)
-    }
-
     fn enabled_video(&self) -> Result<bool, WasmErr> {
         self.0
             .media_connections
             .enabled_sender(TransceiverKind::Video)
-    }
-
-    /// Unmute all video tracks for all [`Sender`]s.
-    fn unmute_video(&self) -> Result<(), WasmErr> {
-        self.0
-            .media_connections
-            .enable_sender(TransceiverKind::Video, true)
     }
 
     /// Track id to mid relations of all send tracks of this
@@ -291,7 +271,7 @@ impl PeerConnection for Connection {
         &self,
         tracks: Vec<Track>,
     ) -> Box<dyn Future<Item = String, Error = WasmErr>> {
-        let fut = match self.0.media_connections.update_tracks(tracks) {
+        Box::new(match self.0.media_connections.update_tracks(tracks) {
             Err(err) => future::Either::A(future::err(err)),
             Ok(request) => {
                 let peer = Rc::clone(&self.0.peer);
@@ -316,8 +296,7 @@ impl PeerConnection for Connection {
                     .and_then(move |_| peer.create_and_set_offer()),
                 )
             }
-        };
-        Box::new(fut)
+        })
     }
 
     /// Creates an SDP answer to an offer received from a remote peer and sets
