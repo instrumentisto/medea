@@ -58,4 +58,4 @@ install:
 notifications:
   email:
     on_success: never
-    on_failure: never # TODO: set to always when .travis.yml will be debugged
+    on_failure: always
