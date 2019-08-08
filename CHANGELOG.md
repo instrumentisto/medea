@@ -18,7 +18,7 @@ Initial release.
 [0.1.0]: https://github.com/instrumentisto/medea/releases/tag/medea-0.1.0
 [Coturn]: https://github.com/coturn/coturn
 [WebRTC signalling]: https://webrtcglossary.com/signaling/
-[#12]: https://github.com/instrumentisto/medea/pull/18
+[#12]: https://github.com/instrumentisto/medea/pull/12
 [#15]: https://github.com/instrumentisto/medea/pull/15
 [#16]: https://github.com/instrumentisto/medea/pull/16
 [#20]: https://github.com/instrumentisto/medea/pull/20
