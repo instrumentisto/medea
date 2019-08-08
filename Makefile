@@ -303,9 +303,9 @@ else
 	@make down.medea dockerized=no
 	@make up.coturn
 
-	docker run --rm --network=host -v "$(PWD)":/app -w /app \
-			   -v "$(PWD)/.cache/medea/registry":/usr/local/cargo/registry \
-			   -v "$(PWD)/.cache/medea/target":/app/target \
+	docker run --rm --network=host -v "./":/app -w /app \
+			   -v "./.cache/medea/registry":/usr/local/cargo/registry \
+			   -v "./.cache/medea/target":/app/target \
 		rust:latest \
 			make test.e2e dockerized=no coturn=no release=yes
 
