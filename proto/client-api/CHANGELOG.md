@@ -4,7 +4,7 @@
 
 Initial release.
 
-#### Implemented
+### Implemented
 
 - Server messages:
   - `Pong`

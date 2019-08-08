@@ -4,11 +4,11 @@
 
 Initial release.
 
-#### Implemented
+### Implemented
 
-- Setup toolchain (#17)
-- Setup transport and messaging (#18)
-- Signalling (#22):
+- Setup toolchain ([#17])
+- Setup transport and messaging ([#18])
+- Signalling ([#22]):
   - handle RPC events:
     - `PeerCreated`
     - `SdpAnswerMade`
@@ -18,10 +18,13 @@ Initial release.
     - `MakeSdpOffer`
     - `MakeSdpAnswer`
     - `SetIceCandidate`
-- Media management (#22):
+- Media management ([#22]):
   - `MediaStream` management
   - `RTCPeerConnection` management
-- P2P video calls (#22)
+- P2P video calls ([#22])
 
 
 [0.1.0]: https://github.com/instrumentisto/medea/releases/tag/medea-jason-0.1.0
+[#17]: https://github.com/instrumentisto/medea/pull/17
+[#18]: https://github.com/instrumentisto/medea/pull/18
+[#22]: https://github.com/instrumentisto/medea/pull/22
