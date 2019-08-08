@@ -221,15 +221,65 @@ endif
 # Releasing commands #
 ######################
 
+# Build and publish Jason to NPM and crates.io.
+#
+# Note that this command will use CARGO_TOKEN and NPM_TOKEN enviroment
+# variables for publishing.
+#
+# Usage:
+#   make release.jason
+
+release.jason: release.npm.jason release.crates.jason
+
+
 # Build and publish Jason application to npm
+#
+# Note that this command will use NPM_TOKEN enviroment
+# variable for publishing.
 #
 # Usage:
 #	make release.jason
 
-release.jason:
+release.npm.jason:
 	@rm -rf jason/pkg/
 	wasm-pack build -t web jason
 	wasm-pack publish
+
+
+# Build and publish Jason to crates.io
+#
+# Note that this command will use CARGO_TOKEN enviroment
+# variable for publishing.
+#
+# Usage:
+#   make release.crates.jason
+
+release.crates.jason:
+	cd jason && cargo publish --token ${CARGO_TOKEN}
+
+
+# Build and publish Medea to crates.io
+#
+# Note that this command will use CARGO_TOKEN enviroment
+# variable for publishing.
+#
+# Usage:
+#   make release.crates.medea
+
+release.crates.medea:
+	cargo publish --token ${CARGO_TOKEN}
+
+
+# Build and publish Medea client API proto to crates.io
+#
+# Note that this command will use CARGO_TOKEN enviroment
+# variable for publishing.
+#
+# Usage:
+#   make release.crates.medea-client-api-proto
+
+release.crates.medea-client-api-proto:
+	cd proto/client-api && cargo publish --token ${CARGO_TOKEN}
 
 
 release.helm: helm.package.release
@@ -508,7 +558,8 @@ endef
         helm helm.down helm.init helm.lint helm.list \
         	helm.package helm.package.release helm.up \
         minikube.boot \
-        release.jason release.helm \
+        release.jason release.crates.jason release.npm.jason release.helm \
+        release.crates.medea release.crates.medea-client-api-proto \
         test test.unit \
         up up.coturn up.demo up.dev up.jason up.medea \
         yarn
