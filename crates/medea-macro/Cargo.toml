@@ -6,6 +6,7 @@ description = "Macros for Medea media server project"
 authors = ["Instrumentisto Team <developer@instrumentisto.com>"]
 homepage = "https://github.com/instrumentisto/medea"
 # documentation = "https://docs.rs/medea-macro"
+publish = false
 repository = "https://github.com/instrumentisto/medea"
 
 [lib]

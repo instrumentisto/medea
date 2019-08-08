@@ -5,6 +5,7 @@ edition = "2018"
 description = "Medea media server client application"
 authors = ["Instrumentisto Team <developer@instrumentisto.com>"]
 homepage = "https://github.com/instrumentisto/medea"
+license = "MPL 2.0"
 readme = "README.md"
 repository = "https://github.com/instrumentisto/medea"
 
