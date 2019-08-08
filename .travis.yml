@@ -1,5 +1,8 @@
 language: rust
 
+services:
+  - docker
+
 cache:
   cargo: true
   directories:
