@@ -165,22 +165,13 @@ impl MediaConnections {
         }
 
         let promises = s.senders.values().filter_map(|sndr| {
-            if let Some(tr) = stream.get_track_by_id(sndr.track_id) {
-                let sndr = Rc::clone(sndr);
-                let fut = JsFuture::from(
-                    sndr.transceiver.sender().replace_track(Some(tr.track())),
-                )
-                .and_then(move |_| {
-                    // TODO: also do RTCRtpSender.setStreams when its
-                    //       implemented
-                    sndr.transceiver
-                        .set_direction(RtcRtpTransceiverDirection::Sendonly);
-                    Ok(())
-                })
-                .map_err(WasmErr::from);
-                return Some(fut);
+            match stream.get_track_by_id(sndr.track_id) {
+                Some(track) => Some(Sender::insert_and_enable_track(
+                    Rc::clone(sndr),
+                    track,
+                )),
+                None => None,
             }
-            None
         });
         let promises: Vec<_> = promises.collect();
         future::Either::B(future::join_all(promises).map(|_| ()))
@@ -234,12 +225,31 @@ impl MediaConnections {
         }
         Some(tracks)
     }
+
+    /// Returns track by its id and direction.
+    pub fn get_track_by_id(
+        &self,
+        direction: TransceiverDirection,
+        id: TrackId,
+    ) -> Option<Rc<MediaTrack>> {
+        let inner = self.0.borrow();
+        match direction {
+            TransceiverDirection::Sendonly => inner
+                .senders
+                .get(&id)
+                .and_then(|sndr| sndr.track.borrow().clone()),
+            TransceiverDirection::Recvonly => {
+                inner.receivers.get(&id).and_then(|recv| recv.track.clone())
+            }
+        }
+    }
 }
 
 /// Representation of a local [`MediaTrack`] that is being sent to some remote
 /// peer.
 pub struct Sender {
     track_id: TrackId,
+    track: RefCell<Option<Rc<MediaTrack>>>,
     transceiver: RtcRtpTransceiver,
     kind: TransceiverKind,
 }
@@ -272,9 +282,34 @@ impl Sender {
         };
         Ok(Rc::new(Self {
             track_id,
+            track: RefCell::new(None),
             transceiver,
             kind,
         }))
+    }
+
+    /// Inserts provided [`MediaTrack`] into provided [`Sender`]s transceiver
+    /// and enables transceivers sender by changing its direction to sendonly;
+    fn insert_and_enable_track(
+        sender: Rc<Self>,
+        track: Rc<MediaTrack>,
+    ) -> impl Future<Item = (), Error = WasmErr> {
+        JsFuture::from(
+            sender
+                .transceiver
+                .sender()
+                .replace_track(Some(track.track())),
+        )
+        .and_then(move |_| {
+            // TODO: also do RTCRtpSender.setStreams when its
+            //       implemented
+            sender
+                .transceiver
+                .set_direction(RtcRtpTransceiverDirection::Sendonly);
+            sender.track.borrow_mut().replace(track);
+            Ok(())
+        })
+        .map_err(WasmErr::from)
     }
 
     /// Enable or disable this [`Sender`]s track.

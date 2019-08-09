@@ -20,7 +20,10 @@ use crate::{
 };
 
 pub use self::{
-    conn::{IceCandidate, RtcPeerConnection, SdpType, TransceiverKind},
+    conn::{
+        IceCandidate, RtcPeerConnection, SdpType, TransceiverDirection,
+        TransceiverKind,
+    },
     media::MediaConnections,
 };
 

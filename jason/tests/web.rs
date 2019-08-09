@@ -11,11 +11,6 @@ use medea_client_api_proto::{
 
 wasm_bindgen_test_configure!(run_in_browser);
 
-#[wasm_bindgen_test]
-fn some_dummy_test() {
-    assert_eq!("asd", "asd");
-}
-
 pub fn get_test_tracks() -> (Track, Track) {
     (
         Track {

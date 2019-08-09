@@ -17,7 +17,7 @@ wasm_bindgen_test_configure!(run_in_browser);
 mod media;
 
 //#[wasm_bindgen_test(async)]
-//fn mute_audio() -> impl Future<Item = (), Error = JsValue> {
+// fn mute_audio() -> impl Future<Item = (), Error = JsValue> {
 //    let (tx, _rx) = unbounded();
 //    let manager = Rc::new(MediaManager::default());
 //    let (audio_track, video_track) = get_test_tracks();
@@ -29,7 +29,7 @@ mod media;
 //}
 //
 //#[wasm_bindgen_test(async)]
-//fn unmute_audio() -> impl Future<Item = (), Error = JsValue> {
+// fn unmute_audio() -> impl Future<Item = (), Error = JsValue> {
 //    let (tx, _rx) = unbounded();
 //    let manager = Rc::new(MediaManager::default());
 //    let (audio_track, video_track) = get_test_tracks();
@@ -45,7 +45,7 @@ mod media;
 //}
 //
 //#[wasm_bindgen_test(async)]
-//fn mute_video() -> impl Future<Item = (), Error = JsValue> {
+// fn mute_video() -> impl Future<Item = (), Error = JsValue> {
 //    let (tx, _rx) = unbounded();
 //    let manager = Rc::new(MediaManager::default());
 //    let (audio_track, video_track) = get_test_tracks();
@@ -57,7 +57,7 @@ mod media;
 //}
 //
 //#[wasm_bindgen_test(async)]
-//fn unmute_video() -> impl Future<Item = (), Error = JsValue> {
+// fn unmute_video() -> impl Future<Item = (), Error = JsValue> {
 //    let (tx, _rx) = unbounded();
 //    let manager = Rc::new(MediaManager::default());
 //    let (audio_track, video_track) = get_test_tracks();

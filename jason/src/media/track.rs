@@ -41,4 +41,9 @@ impl MediaTrack {
     pub fn caps(&self) -> &MediaType {
         &self.caps
     }
+
+    /// Is undelying track enabled.
+    pub fn is_enabled(&self) -> bool {
+        self.track().enabled()
+    }
 }
