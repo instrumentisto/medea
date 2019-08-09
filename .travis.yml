@@ -58,7 +58,7 @@ jobs:
       rust: stable
       name: "E2E tests (Rust stable)"
       before_script:
-        - ls
+        - ls -la
       script: make test.e2e
 
 install:
