@@ -58,6 +58,7 @@ jobs:
       rust: stable
       name: "E2E tests (Rust stable)"
       before_script:
+        - mkdir .cache
         - ls -la
       script: make test.e2e
 
