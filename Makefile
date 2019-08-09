@@ -153,7 +153,7 @@ endif
 # 	make down.coturn
 
 down.coturn:
-	docker-compose -f docker-compose.coturn.yml down -t 1
+	docker-compose -f docker-compose.coturn.yml down
 
 
 

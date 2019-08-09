@@ -6,6 +6,15 @@ services:
 cache:
   cargo: true
 
+install:
+  - PROTOBUF_VERSION=3.3.0
+  - PROTOC_FILENAME=protoc-${PROTOBUF_VERSION}-linux-x86_64.zip
+  - pushd /home/travis
+  - wget https://github.com/google/protobuf/releases/download/v${PROTOBUF_VERSION}/${PROTOC_FILENAME}
+  - unzip ${PROTOC_FILENAME}
+  - bin/protoc --version
+  - popd
+
 jobs:
   allow_failures:
     - rust: nightly
@@ -59,17 +68,7 @@ jobs:
       name: "E2E tests (Rust stable)"
       before_script:
         - mkdir .cache
-        - ls -la
       script: make test.e2e
-
-install:
-  - PROTOBUF_VERSION=3.3.0
-  - PROTOC_FILENAME=protoc-${PROTOBUF_VERSION}-linux-x86_64.zip
-  - pushd /home/travis
-  - wget https://github.com/google/protobuf/releases/download/v${PROTOBUF_VERSION}/${PROTOC_FILENAME}
-  - unzip ${PROTOC_FILENAME}
-  - bin/protoc --version
-  - popd
 
 notifications:
   email:
