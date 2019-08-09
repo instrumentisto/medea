@@ -311,8 +311,9 @@ geckodriver-port = 50001
 test-runner-port = 51000
 
 run-medea-command = docker run --rm --network=host -v "$(PWD)":/app -w /app \
-                    	-v "$(PWD)/.cache/medea/registry":/usr/local/cargo/registry \
-                    	-v "$(PWD)/.cache/medea/target":/app/target
+						-u $(shell id -u):$(shell id -g) \
+                    	-v "$(HOME)/.cargo/registry":/usr/local/cargo/registry \
+                    	-v "$(PWD)/target":/app/target
 run-medea-container-d =  $(run-medea-command) -d medea-build:latest
 run-medea-container = $(run-medea-command) medea-build:latest
 

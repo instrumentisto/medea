@@ -1,0 +1,70 @@
+language: rust
+
+services:
+  - docker
+
+cache:
+  cargo: true
+
+jobs:
+  allow_failures:
+    - rust: nightly
+      stage: build
+
+  include:
+    - stage: lints
+      rust: nightly-2019-08-03 # TODO: use nightly when clippy will be fixed
+      name: "Clippy"
+      before_script: rustup component add clippy
+      script: make lint
+
+    - stage: formatting
+      rust: nightly
+      name: "Rustfmt"
+      before_script: rustup component add rustfmt
+      script: make fmt check=yes
+
+    - stage: build
+      rust: stable
+      name: "Build jason (Rust stable)"
+      before_script:
+        - rm -f /home/travis/.cargo/bin/wasm-pack
+        - make yarn dockerized=no
+        - curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+      script:
+        - wasm-pack build -t web jason
+
+    - stage: build
+      rust: stable
+      name: "Build medea (Rust stable)"
+      script: cargo build
+
+    - stage: build
+      rust: beta
+      name: "Build medea (Rust beta)"
+      script: cargo build
+
+    - stage: build
+      rust: nightly
+      name: "Build medea (Rust nightly)"
+      script: cargo build
+
+    - stage: tests
+      rust: stable
+      name: "Unit tests (Rust stable)"
+      script: make test.unit
+
+    - stage: tests
+      rust: stable
+      name: "E2E tests (Rust stable)"
+      script: make test.e2e
+
+
+install:
+  - rustc -vV
+  - cargo -vV
+
+notifications:
+  email:
+    on_success: never
+    on_failure: never # TODO: set to always

@@ -81,7 +81,6 @@ fn pub_sub_video_call() {
                     }
                 } else if let Event::IceCandidateDiscovered { .. } = &events[1]
                 {
-
                 } else {
                     unreachable!();
                 }
