@@ -310,8 +310,10 @@ geckodriver-port = 50001
 test-runner-port = 51000
 
 run-medea-command = docker run --rm --network=host -v "$(PWD)":/app -w /app \
+                    	--env XDG_CACHE_HOME=$(HOME) \
 						-u $(shell id -u):$(shell id -g) \
                     	-v "$(HOME)/.cargo/registry":/usr/local/cargo/registry \
+                    	-v "$(HOME):$(HOME)" \
                     	-v "$(PWD)/target":/app/target
 run-medea-container-d =  $(run-medea-command) -d medea-build:latest
 run-medea-container = $(run-medea-command) medea-build:latest
@@ -376,7 +378,7 @@ else
 	docker build -t medea-build -f build/medea/Dockerfile .
 	docker build -t medea-geckodriver -f build/geckodriver/Dockerfile .
 
-	$(run-medea-container) sh -c "cd jason && wasm-pack build --target web --out-dir ../.cache/jason-pkg"
+	$(run-medea-container) sh -c "cd jason && RUST_LOG=info wasm-pack build --target web --out-dir ../.cache/jason-pkg"
 
 	$(run-medea-container) make test.signalling dockerized=no coturn=no release=yes
 
