@@ -304,8 +304,9 @@ else
 	@make up.coturn
 
 	docker run --rm --network=host -v "$(PWD)":/app -w /app \
-			   -v "$(PWD)/.cache/medea/registry":/usr/local/cargo/registry \
-			   -v "$(PWD)/.cache/medea/target":/app/target \
+				-u $(shell id -u):$(shell id -g) \
+				-v "$(HOME).cargo/registry":/usr/local/cargo/registry \
+			   	-v "$(PWD)/target":/app/target \
 		rust:latest \
 			make test.e2e dockerized=no coturn=no release=yes
 
