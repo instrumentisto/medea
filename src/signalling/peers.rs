@@ -189,12 +189,12 @@ impl PeerRepository {
                 if self.peers.remove(&partner_peer_id).is_some() {
                     removed_peers
                         .entry(partner_member_id)
-                        .or_insert(Vec::new())
+                        .or_insert_with(Vec::new)
                         .push(partner_peer_id);
                 }
                 removed_peers
                     .entry(member_id.clone())
-                    .or_insert(Vec::new())
+                    .or_insert_with(Vec::new)
                     .push(peer_id);
             }
         }
