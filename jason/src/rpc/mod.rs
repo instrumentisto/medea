@@ -25,6 +25,7 @@ pub enum CloseMsg {
 }
 
 #[allow(clippy::module_name_repetitions)]
+#[cfg_attr(feature = "mockable", mockall::automock)]
 pub trait RpcClient {
     fn subscribe(&self) -> Box<dyn Stream<Item = Event, Error = ()>>;
     fn unsub(&self);

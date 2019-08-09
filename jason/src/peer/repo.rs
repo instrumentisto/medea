@@ -3,6 +3,7 @@ use std::{collections::HashMap, rc::Rc};
 use super::{PeerConnection, PeerId};
 
 #[allow(clippy::module_name_repetitions)]
+#[cfg_attr(feature = "mockable", mockall::automock)]
 pub trait PeerRepository {
     /// Stores [`PeerConnection`] in repository.
     fn insert(

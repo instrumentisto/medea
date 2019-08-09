@@ -30,6 +30,9 @@ pub use self::{
     Id as PeerId,
 };
 
+#[cfg(feature = "mockable")]
+pub use self::repo::MockPeerRepository;
+
 pub type Id = u64;
 
 #[dispatchable]
