@@ -255,7 +255,7 @@ endif
 # Run Rust unit tests of project.
 #
 # Usage:
-#	make test.unit [crate=(@all|medea|jason|<crate-name>)]
+#	make test.unit [crate=(@all|medea|<crate-name>)]
 
 test-unit-crate = $(if $(call eq,$(crate),),@all,$(crate))
 
@@ -264,14 +264,10 @@ ifeq ($(test-unit-crate),@all)
 	@make test.unit crate=medea-client-api-proto
 	@make test.unit crate=medea-macro
 	@make test.unit crate=medea
-	@make test.unit crate=jason
 else
 ifeq ($(test-unit-crate),medea)
 	cargo test --lib --bin medea
 else
-ifeq ($(test-unit-crate),jason)
-	wasm-pack test --headless --firefox jason
-endif
 	cargo test -p $(test-unit-crate)
 endif
 endif
