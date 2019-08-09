@@ -174,9 +174,12 @@ cargo:
 # Format Rust sources with rustfmt.
 #
 # Usage:
-#	make cargo.fmt [check=(no|yes)]
+#	make cargo.fmt [check=(no|yes)] [build=(no|yes)]
 
 cargo.fmt:
+ifeq ($(build),yes)
+	cargo build
+endif
 	cargo +nightly fmt --all $(if $(call eq,$(check),yes),-- --check,)
 
 
