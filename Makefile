@@ -305,7 +305,7 @@ else
 
 	docker run --rm --network=host -v "$(PWD)":/app -w /app \
 				-u $(shell id -u):$(shell id -g) \
-				-v "$(HOME).cargo/registry":/usr/local/cargo/registry \
+				-v "$(HOME)/.cargo/registry":/usr/local/cargo/registry \
 			   	-v "$(PWD)/target":/app/target \
 		rust:latest \
 			make test.e2e dockerized=no coturn=no release=yes
