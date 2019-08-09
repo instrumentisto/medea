@@ -31,7 +31,7 @@ jobs:
       rust: nightly
       name: "Rustfmt"
       before_script: rustup component add rustfmt
-      script: make fmt check=yes
+      script: make fmt check=yes build=yes
 
     - stage: build
       rust: stable
