@@ -1,5 +1,6 @@
-//! [`RpcConnection`](crate::api::client::rpc_connection::RpcConnection) with
-//! related messages.
+//! [`RpcConnection`] with related messages.
+//!
+//! [`RpcConnection`]: crate::api::client::rpc_connection::RpcConnection
 
 use std::fmt;
 
