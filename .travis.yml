@@ -57,6 +57,8 @@ jobs:
     - stage: tests
       rust: stable
       name: "E2E tests (Rust stable)"
+      before_script:
+        - ls
       script: make test.e2e
 
 install:
