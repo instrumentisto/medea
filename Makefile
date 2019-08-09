@@ -153,7 +153,7 @@ endif
 # 	make down.coturn
 
 down.coturn:
-	docker-compose -f docker-compose.coturn.yml down -t 1
+	docker-compose -f docker-compose.coturn.yml down
 
 
 
@@ -186,7 +186,7 @@ cargo.fmt:
 #	make cargo.lint
 
 cargo.lint:
-	cargo +nightly clippy --all -- -D clippy::pedantic -D warnings
+	cargo +nightly-2019-08-03 clippy --all -- -D clippy::pedantic -D warnings
 
 
 
@@ -261,14 +261,10 @@ ifeq ($(test-unit-crate),@all)
 	@make test.unit crate=medea-client-api-proto
 	@make test.unit crate=medea-macro
 	@make test.unit crate=medea
-	@make test.unit crate=jason
 else
 ifeq ($(test-unit-crate),medea)
 	cargo test --lib --bin medea
 else
-ifeq ($(test-unit-crate),jason)
-	wasm-pack test --headless --firefox jason
-endif
 	cargo test -p $(test-unit-crate)
 endif
 endif
@@ -309,8 +305,9 @@ else
 
 	docker build -t medea-build -f build/medea/Dockerfile .
 	docker run --rm --network=host -v "$(PWD)":/app -w /app \
-			   -v "$(PWD)/.cache/medea/registry":/usr/local/cargo/registry \
-			   -v "$(PWD)/.cache/medea/target":/app/target \
+				-u $(shell id -u):$(shell id -g) \
+				-v "$(HOME)/.cargo/registry":/usr/local/cargo/registry \
+			   	-v "$(PWD)/target":/app/target \
 		medea-build:latest \
 			make test.e2e dockerized=no coturn=no release=yes
 
