@@ -74,6 +74,7 @@ struct InnerPeerConnection {
     peer_events_sender: UnboundedSender<PeerEvent>,
 }
 
+// TODO: remove this trait
 #[allow(clippy::module_name_repetitions)]
 pub trait PeerConnection {
     /// Disable or enable all video tracks for all [`Sender`]s.
@@ -83,10 +84,10 @@ pub trait PeerConnection {
     fn toggle_send_audio(&self, enabled: bool);
 
     /// Returns `true` if the all audio tracks for all [`Sender`]s is not muted.
-    fn enabled_audio(&self) -> Result<bool, WasmErr>;
+    fn is_send_audio_enabled(&self) -> bool;
 
     /// Returns `true` if the all video tracks for all [`Sender`]s is not muted.
-    fn enabled_video(&self) -> Result<bool, WasmErr>;
+    fn is_send_video_enabled(&self) -> bool;
 
     /// Track id to mid relations of all send tracks of this
     /// [`RtcPeerConnection`]. mid is id of [`m= section`][1]. mids are received
@@ -244,14 +245,17 @@ impl PeerConnection for Connection {
             .toggle_send_media(TransceiverKind::Video, enabled)
     }
 
-    /// Returns `true` if the all audio tracks for all [`Sender`]s is not muted.
-    fn enabled_audio(&self) -> Result<bool, WasmErr> {
+    /// Returns true if all [`Sender`]s audio tracks are enabled.
+    fn is_send_audio_enabled(&self) -> Result<bool, WasmErr> {
+        // TODO: dont error here
         self.0
             .media_connections
             .enabled_sender(TransceiverKind::Audio)
     }
 
-    fn enabled_video(&self) -> Result<bool, WasmErr> {
+    /// Returns true if all [`Sender`]s video tracks are enabled.
+    fn is_send_video_enabled(&self) -> Result<bool, WasmErr> {
+        // TODO: dont error here
         self.0
             .media_connections
             .enabled_sender(TransceiverKind::Video)

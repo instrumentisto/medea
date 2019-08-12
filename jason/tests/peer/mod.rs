@@ -24,16 +24,16 @@ mod media;
     let peer = Connection::new(1, tx, vec![], manager).unwrap();
     peer.get_offer(vec![audio_track, video_track])
         .map(move |_| {
-            assert!(peer.enabled_audio().unwrap());
-            assert!(peer.enabled_video().unwrap());
+            assert!(peer.is_send_audio_enabled().unwrap());
+            assert!(peer.is_send_video_enabled().unwrap());
 
             peer.toggle_send_audio(false);
-            assert!(!peer.enabled_audio().unwrap());
-            assert!(peer.enabled_video().unwrap());
+            assert!(!peer.is_send_audio_enabled().unwrap());
+            assert!(peer.is_send_video_enabled().unwrap());
 
             peer.toggle_send_audio(true);
-            assert!(peer.enabled_audio().unwrap());
-            assert!(peer.enabled_video().unwrap());
+            assert!(peer.is_send_audio_enabled().unwrap());
+            assert!(peer.is_send_video_enabled().unwrap());
         })
         .map_err(Into::into)
 }
@@ -46,16 +46,16 @@ fn mute_unmute_video() -> impl Future<Item = (), Error = JsValue> {
     let peer = Connection::new(1, tx, vec![], manager).unwrap();
     peer.get_offer(vec![audio_track, video_track])
         .map(move |_| {
-            assert!(peer.enabled_audio().unwrap());
-            assert!(peer.enabled_video().unwrap());
+            assert!(peer.is_send_audio_enabled().unwrap());
+            assert!(peer.is_send_video_enabled().unwrap());
 
             peer.toggle_send_video(false);
-            assert!(peer.enabled_audio().unwrap());
-            assert!(!peer.enabled_video().unwrap());
+            assert!(peer.is_send_audio_enabled().unwrap());
+            assert!(!peer.is_send_video_enabled().unwrap());
 
             peer.toggle_send_video(true);
-            assert!(peer.enabled_audio().unwrap());
-            assert!(peer.enabled_video().unwrap());
+            assert!(peer.is_send_audio_enabled().unwrap());
+            assert!(peer.is_send_video_enabled().unwrap());
         })
         .map_err(Into::into)
 }
