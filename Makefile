@@ -572,6 +572,7 @@ endef
         minikube.boot \
         release.jason release.crates.jason release.npm.jason release.helm \
         release.crates.medea release.crates.medea-client-api-proto \
+        release.crates.medea-macro \
         test test.unit \
         up up.coturn up.demo up.dev up.jason up.medea \
         yarn
