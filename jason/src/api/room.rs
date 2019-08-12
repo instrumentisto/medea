@@ -27,18 +27,18 @@ use crate::{
 
 use super::{connection::Connection, ConnectionHandle};
 
-/// JS side handle to [`Room`] where all the media happens.
+/// JS side handle to `Room` where all the media happens.
 ///
-/// Actually, represents a [`Weak`]-based handle to [`InnerRoom`].
+/// Actually, represents a [`Weak`]-based handle to `InnerRoom`.
 ///
-/// For using [`RoomHandle`] on Rust side, consider the [`Room`].
+/// For using [`RoomHandle`] on Rust side, consider the `Room`.
 #[allow(clippy::module_name_repetitions)]
 #[wasm_bindgen]
 pub struct RoomHandle(Weak<RefCell<InnerRoom>>);
 
 #[wasm_bindgen]
 impl RoomHandle {
-    /// Sets callback, which will be invoked on new [`Connection`] establishing.
+    /// Sets callback, which will be invoked on new `Connection` establishing.
     pub fn on_new_connection(
         &mut self,
         f: js_sys::Function,

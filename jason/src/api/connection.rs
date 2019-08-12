@@ -23,7 +23,7 @@ struct InnerConnection {
 
 /// Connection with a specific remote `Member`, that is used on JS side.
 ///
-/// Actually, represents a [`Weak`]-based handle to [`InnerConnection`].
+/// Actually, represents a [`Weak`]-based handle to `InnerConnection`.
 #[allow(clippy::module_name_repetitions)]
 #[wasm_bindgen]
 pub struct ConnectionHandle(Weak<RefCell<InnerConnection>>);

@@ -105,7 +105,7 @@ impl MediaStream {
 
 /// JS side handle to [`MediaStream`].
 ///
-/// Actually, represents a [`Weak`]-based handle to [`InnerStream`].
+/// Actually, represents a [`Weak`]-based handle to `InnerStream`.
 ///
 /// For using [`MediaStreamHandle`] on Rust side, consider the [`MediaStream`].
 #[wasm_bindgen]
