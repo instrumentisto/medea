@@ -207,11 +207,7 @@ ifeq ($(test-unit-crate),@all)
 	@make test.unit crate=medea-macro
 	@make test.unit crate=medea
 else
-ifeq ($(test-unit-crate),medea)
-	cargo test --bin medea
-else
 	cargo test -p $(test-unit-crate)
-endif
 endif
 
 
