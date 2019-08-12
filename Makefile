@@ -282,6 +282,18 @@ release.crates.medea-client-api-proto:
 	cd proto/client-api && cargo publish --token ${CARGO_TOKEN}
 
 
+# Build and publish Medea's macro to crates.io
+#
+# Note that this command will use CARGO_TOKEN enviroment
+# variable for publishing.
+#
+# Usage:
+#   make release.crates.medea-macro
+
+release.crates.medea-macro:
+	cd crates/medea-macro && cargo publish --token ${CARGO_TOKEN}
+
+
 release.helm: helm.package.release
 
 

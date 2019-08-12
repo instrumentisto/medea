@@ -2,11 +2,11 @@
 name = "medea-macro"
 version = "0.1.0"
 edition = "2018"
-description = "Macros for Medea media server project"
+description = "Don't use this crate directly. It is internal to Medea."
 authors = ["Instrumentisto Team <developer@instrumentisto.com>"]
 homepage = "https://github.com/instrumentisto/medea"
+license = "MPL 2.0"
 # documentation = "https://docs.rs/medea-macro"
-publish = false
 repository = "https://github.com/instrumentisto/medea"
 
 [lib]
