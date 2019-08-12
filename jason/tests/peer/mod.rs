@@ -16,6 +16,28 @@ wasm_bindgen_test_configure!(run_in_browser);
 
 mod media;
 
+// Wait for https://github.com/rustwasm/wasm-pack/issues/698
+// Wait for chrome_args
+
+/// TODO: pass firefoxOptions.prefs to wasp-pack test:
+//  let request = json!({
+//                    "capabilities": {
+//                        "alwaysMatch": {
+//                            "moz:firefoxOptions": {
+//                                "prefs": {
+//                                    "media.navigator.streams.fake": true,
+//                                    "media.navigator.permission.disabled": true,
+//                                    "media.autoplay.enabled": true,
+//                                    "media.autoplay.enabled.user-gestures-needed ": false,
+//                                    "media.autoplay.ask-permission": false,
+//                                    "media.autoplay.default": 0,
+//                                },
+//                                "args": args,
+//                            }
+//                        }
+//                    }
+//                });
+
 #[wasm_bindgen_test(async)]
  fn mute_unmute_audio() -> impl Future<Item = (), Error = JsValue> {
     let (tx, _rx) = unbounded();
