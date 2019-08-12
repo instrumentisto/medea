@@ -30,7 +30,7 @@ pub enum ClientMsg {
 /// WebSocket message from Web Client to Media Server.
 #[allow(dead_code)]
 #[cfg_attr(feature = "medea", derive(Deserialize))]
-#[cfg_attr(feature = "jason", derive(Debug, Serialize))]
+#[cfg_attr(feature = "jason", derive(Serialize))]
 #[cfg_attr(test, derive(Debug, PartialEq))]
 #[serde(tag = "command", content = "data")]
 pub enum Command {
@@ -144,7 +144,7 @@ pub enum Direction {
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "medea", derive(Serialize))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
-#[cfg_attr(test, derive(Debug, PartialEq))]
+#[cfg_attr(test, derive(PartialEq))]
 pub enum MediaType {
     Audio(AudioSettings),
     Video(VideoSettings),

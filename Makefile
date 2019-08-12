@@ -213,7 +213,7 @@ ifeq ($(test-unit-crate),medea)
 else
 ifeq ($(test-unit-crate),jason)
 	export CHROMEDRIVER_CLIENT_ARGS="$(CHROMEDRIVER_CLIENT_ARGS)"; \
-	wasm-pack test --headless --chrome jason
+	wasm-pack test --headless --chrome jason -- --features mockable
 endif
 	cargo test -p $(test-unit-crate)
 endif
