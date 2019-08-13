@@ -9,17 +9,13 @@ use std::{
     fmt,
 };
 
-use actix::{AsyncContext as _, Context};
 use medea_client_api_proto::{Incrementable, PeerId, TrackId};
 
 use crate::{
     api::control::MemberId,
     log::prelude::*,
     media::{New, Peer, PeerStateMachine},
-    signalling::{
-        elements::Member,
-        room::{PeersRemoved, Room, RoomError},
-    },
+    signalling::{elements::Member, room::RoomError},
 };
 
 #[derive(Debug)]
@@ -181,17 +177,16 @@ impl PeerRepository {
         }
     }
 
-    // TODO: -> HashMap<MemberId, Vec<PeerId>>, and remove context from args
-
-    /// Close all related to disconnected [`Member`] [`Peer`]s and partner
-    /// [`Peer`]s.
+    /// Remove all related to [`Member`] [`Peer`]s.
+    /// Note that this function will also remove all partners [`Peer`]s.
     ///
-    /// Send [`Event::PeersRemoved`] to all affected [`Member`]s.
-    pub fn connection_closed(
+    /// Returns `HashMap` with all remove [`Peer`]s.
+    /// Key - [`Peer`]'s owner [`MemberId`],
+    /// value - removed [`Peer`]'s [`PeerId`].
+    pub fn remove_peers_related_to_member(
         &mut self,
         member_id: &MemberId,
-        ctx: &mut Context<Room>,
-    ) {
+    ) -> HashMap<MemberId, Vec<PeerId>> {
         let mut peers_to_remove: HashMap<MemberId, Vec<PeerId>> =
             HashMap::new();
 
@@ -213,15 +208,14 @@ impl PeerRepository {
                 .push(peer.id());
         });
 
-        for (peer_member_id, peers_id) in peers_to_remove {
-            for peer_id in &peers_id {
+        peers_to_remove
+            .values()
+            .flat_map(|peer_ids| peer_ids.iter())
+            .for_each(|peer_id| {
                 self.peers.remove(peer_id);
-            }
-            ctx.notify(PeersRemoved {
-                member_id: peer_member_id,
-                peers_id,
-            })
-        }
+            });
+
+        peers_to_remove
     }
 }
 

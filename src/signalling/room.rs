@@ -669,7 +669,13 @@ impl Handler<RpcConnectionClosed> for Room {
     type Result = ();
 
     /// Passes message to [`ParticipantService`] to cleanup stored connections.
+    ///
     /// Remove all related for disconnected [`Member`] [`Peer`]s.
+    ///
+    /// Send [`PeersRemoved`] message to [`Member`].
+    ///
+    /// Delete all removed [`PeerId`]s from all [`Member`]'s
+    /// endpoints.
     fn handle(&mut self, msg: RpcConnectionClosed, ctx: &mut Self::Context) {
         info!(
             "RpcConnectionClosed for member {}, reason {:?}",
@@ -677,7 +683,15 @@ impl Handler<RpcConnectionClosed> for Room {
         );
 
         if let ClosedReason::Closed = msg.reason {
-            self.peers.connection_closed(&msg.member_id, ctx);
+            let removed_peers =
+                self.peers.remove_peers_related_to_member(&msg.member_id);
+
+            for (peer_member_id, peers_ids) in removed_peers {
+                ctx.notify(PeersRemoved {
+                    member_id: peer_member_id,
+                    peers_id: peers_ids,
+                })
+            }
         }
 
         self.members
