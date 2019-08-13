@@ -181,6 +181,8 @@ impl PeerRepository {
         }
     }
 
+    // TODO: -> HashMap<MemberId, Vec<PeerId>>, and remove context from args
+
     /// Close all related to disconnected [`Member`] [`Peer`]s and partner
     /// [`Peer`]s.
     ///
