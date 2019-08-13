@@ -29,14 +29,6 @@ use crate::{
 
 use super::{connection::Connection, ConnectionHandle};
 
-macro_rules! inner_map {
-    ($v:expr, $closure:expr) => {{
-        $v.0.upgrade()
-            .ok_or_else(|| WasmErr::from("Detached state").into())
-            .map($closure)
-    }};
-}
-
 /// JS side handle to [`Room`] where all the media happens.
 ///
 /// Actually, represents a [`Weak`]-based handle to [`InnerRoom`].
@@ -53,7 +45,7 @@ impl RoomHandle {
         &mut self,
         f: js_sys::Function,
     ) -> Result<(), JsValue> {
-        inner_map!(self, |inner| inner
+        map_weak!(self, |inner| inner
             .borrow_mut()
             .on_new_connection
             .set_func(f))
@@ -61,22 +53,22 @@ impl RoomHandle {
 
     /// Mute local audio [`Track`]s for all [`PeerConnection`]s this [`Room`].
     pub fn mute_audio(&self) -> Result<(), JsValue> {
-        inner_map!(self, |inner| inner.borrow().toggle_send_audio(false))
+        map_weak!(self, |inner| inner.borrow().toggle_send_audio(false))
     }
 
     /// Unmute local audio [`Track`]s for all [`PeerConnection`]s this [`Room`].
     pub fn unmute_audio(&self) -> Result<(), JsValue> {
-        inner_map!(self, |inner| inner.borrow().toggle_send_audio(true))
+        map_weak!(self, |inner| inner.borrow().toggle_send_audio(true))
     }
 
     /// Mute local video [`Track`]s for all [`PeerConnection`]s this [`Room`].
     pub fn mute_video(&self) -> Result<(), JsValue> {
-        inner_map!(self, |inner| inner.borrow().toggle_send_video(false))
+        map_weak!(self, |inner| inner.borrow().toggle_send_video(false))
     }
 
     /// Unmute local video [`Track`]s for all [`PeerConnection`]s this [`Room`].
     pub fn unmute_video(&self) -> Result<(), JsValue> {
-        inner_map!(self, |inner| inner.borrow().toggle_send_video(true))
+        map_weak!(self, |inner| inner.borrow().toggle_send_video(true))
     }
 }
 

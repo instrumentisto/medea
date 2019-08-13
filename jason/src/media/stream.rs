@@ -115,9 +115,6 @@ pub struct MediaStreamHandle(Weak<InnerStream>);
 impl MediaStreamHandle {
     /// Returns the underlying [`MediaStream`][`SysMediaStream`] object.
     pub fn get_media_stream(&self) -> Result<SysMediaStream, JsValue> {
-        match self.0.upgrade() {
-            Some(inner) => Ok(inner.stream.clone()),
-            None => Err(WasmErr::from("Detached state").into()),
-        }
+        map_weak!(self, |inner| inner.stream.clone())
     }
 }
