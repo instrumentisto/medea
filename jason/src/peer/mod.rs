@@ -28,13 +28,7 @@ pub use self::{
 };
 
 #[doc(inline)]
-pub use self::{
-    repo::{PeerRepository, Repository},
-    Id as PeerId,
-};
-
-#[cfg(feature = "mockable")]
-pub use self::repo::MockPeerRepository;
+pub use self::{repo::PeerRepository, Id as PeerId};
 
 pub type Id = u64;
 
@@ -74,82 +68,10 @@ struct InnerPeerConnection {
     peer_events_sender: UnboundedSender<PeerEvent>,
 }
 
-// TODO: remove this trait
 #[allow(clippy::module_name_repetitions)]
-pub trait PeerConnection {
-    /// Disable or enable all video tracks for all [`Sender`]s.
-    fn toggle_send_video(&self, enabled: bool);
+pub struct PeerConnection(Rc<InnerPeerConnection>);
 
-    /// Disable or enable all audio tracks for all [`Sender`]s.
-    fn toggle_send_audio(&self, enabled: bool);
-
-    /// Returns `true` if the all audio tracks for all [`Sender`]s is not muted.
-    fn is_send_audio_enabled(&self) -> bool;
-
-    /// Returns `true` if the all video tracks for all [`Sender`]s is not muted.
-    fn is_send_video_enabled(&self) -> bool;
-
-    /// Track id to mid relations of all send tracks of this
-    /// [`RtcPeerConnection`]. mid is id of [`m= section`][1]. mids are received
-    /// directly from registered [`RTCRtpTransceiver`][2]s, and are being
-    /// allocated on sdp update.
-    /// Errors if finds transceiver without mid, so must be called after setting
-    /// local description if offerrer, and remote if answerer.
-    ///
-    /// [1]: https://tools.ietf.org/html/rfc4566#section-5.14
-    /// [2]: https://www.w3.org/TR/webrtc/#rtcrtptransceiver-interface
-    fn get_mids(&self) -> Result<HashMap<u64, String>, WasmErr>;
-
-    /// Sync provided tracks creating all required [`Sender`]s and
-    /// [`Receiver`]s, request local stream if required, get, set and return
-    /// sdp offer.
-    fn get_offer(
-        &self,
-        tracks: Vec<Track>,
-    ) -> Box<dyn Future<Item = String, Error = WasmErr>>;
-
-    /// Creates an SDP answer to an offer received from a remote peer and sets
-    /// it as local description. Must be called only if peer already has remote
-    /// description.
-    fn create_and_set_answer(
-        &self,
-    ) -> Box<dyn Future<Item = String, Error = WasmErr>>;
-
-    /// Updates underlying [`RTCPeerConnection`][1] remote SDP.
-    ///
-    /// [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
-    fn set_remote_answer(
-        &self,
-        answer: String,
-    ) -> Box<dyn Future<Item = (), Error = WasmErr>>;
-
-    /// Sync provided tracks creating all required [`Sender`]s and
-    /// [`Receiver`]s, request local stream if required.
-    /// `set_remote_description` will create all transceivers and fire all
-    /// `on_track` events, so it updates [`Receiver`]s before
-    /// `set_remote_description` and update [`Sender`]s after.
-    ///
-    /// [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
-    fn process_offer(
-        &self,
-        offer: String,
-        tracks: Vec<Track>,
-    ) -> Box<dyn Future<Item = (), Error = WasmErr>>;
-
-    /// Adds remote peers [ICE Candidate][1] to this peer.
-    ///
-    /// [1]: https://tools.ietf.org/html/rfc5245#section-2
-    fn add_ice_candidate(
-        &self,
-        candidate: &str,
-        sdp_m_line_index: Option<u16>,
-        sdp_mid: &Option<String>,
-    ) -> Box<dyn Future<Item = (), Error = WasmErr>>;
-}
-
-pub struct Connection(Rc<InnerPeerConnection>);
-
-impl Connection {
+impl PeerConnection {
     /// Create new [`RtcPeerConnection`]. Provided `peer_events_sender` will be
     /// used to emit [`PeerEvent`]s from this peer , provided `ice_servers` will
     /// be used by created [`RtcPeerConnection`].
@@ -182,6 +104,163 @@ impl Connection {
         }))?;
 
         Ok(Self(inner))
+    }
+
+    /// Disable or enable all audio tracks for all [`Sender`]s.
+    pub fn toggle_send_audio(&self, enabled: bool) {
+        self.0
+            .media_connections
+            .toggle_send_media(TransceiverKind::Audio, enabled)
+    }
+
+    /// Disable or enable all video tracks for all [`Sender`]s.
+    pub fn toggle_send_video(&self, enabled: bool) {
+        self.0
+            .media_connections
+            .toggle_send_media(TransceiverKind::Video, enabled)
+    }
+
+    /// Returns true if all [`Sender`]s audio tracks are enabled.
+    pub fn is_send_audio_enabled(&self) -> bool {
+        self.0
+            .media_connections
+            .enabled_sender(TransceiverKind::Audio)
+    }
+
+    /// Returns true if all [`Sender`]s video tracks are enabled.
+    pub fn is_send_video_enabled(&self) -> bool {
+        self.0
+            .media_connections
+            .enabled_sender(TransceiverKind::Video)
+    }
+
+    /// Track id to mid relations of all send tracks of this
+    /// [`RtcPeerConnection`]. mid is id of [`m= section`][1]. mids are received
+    /// directly from registered [`RTCRtpTransceiver`][2]s, and are being
+    /// allocated on sdp update.
+    /// Errors if finds transceiver without mid, so must be called after setting
+    /// local description if offerrer, and remote if answerer.
+    ///
+    /// [1]: https://tools.ietf.org/html/rfc4566#section-5.14
+    /// [2]: https://www.w3.org/TR/webrtc/#rtcrtptransceiver-interface
+    pub fn get_mids(&self) -> Result<HashMap<u64, String>, WasmErr> {
+        self.0.media_connections.get_mids()
+    }
+
+    /// Sync provided tracks creating all required [`Sender`]s and
+    /// [`Receiver`]s, request local stream if required, get, set and return
+    /// sdp offer.
+    pub fn get_offer(
+        &self,
+        tracks: Vec<Track>,
+    ) -> impl Future<Item = String, Error = WasmErr> {
+        Box::new(match self.0.media_connections.update_tracks(tracks) {
+            Err(err) => future::Either::A(future::err(err)),
+            Ok(request) => {
+                let peer = Rc::clone(&self.0.peer);
+                future::Either::B(
+                    match request {
+                        None => future::Either::A(future::ok::<_, WasmErr>(())),
+                        Some(request) => {
+                            let inner: Rc<InnerPeerConnection> =
+                                Rc::clone(&self.0);
+                            future::Either::B(
+                                self.0
+                                    .media_manager
+                                    .get_stream(request)
+                                    .and_then(move |stream| {
+                                        inner
+                                            .media_connections
+                                            .insert_local_stream(&stream)
+                                    }),
+                            )
+                        }
+                    }
+                    .and_then(move |_| peer.create_and_set_offer()),
+                )
+            }
+        })
+    }
+
+    /// Creates an SDP answer to an offer received from a remote peer and sets
+    /// it as local description. Must be called only if peer already has remote
+    /// description.
+    pub fn create_and_set_answer(
+        &self,
+    ) -> impl Future<Item = String, Error = WasmErr> {
+        Box::new(self.0.peer.create_and_set_answer())
+    }
+
+    /// Updates underlying [`RTCPeerConnection`][1] remote SDP.
+    ///
+    /// [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
+    pub fn set_remote_answer(
+        &self,
+        answer: String,
+    ) -> impl Future<Item = (), Error = WasmErr> {
+        Box::new(self.0.peer.set_remote_description(SdpType::Answer(answer)))
+    }
+
+    /// Sync provided tracks creating all required [`Sender`]s and
+    /// [`Receiver`]s, request local stream if required.
+    /// `set_remote_description` will create all transceivers and fire all
+    /// `on_track` events, so it updates [`Receiver`]s before
+    /// `set_remote_description` and update [`Sender`]s after.
+    ///
+    /// [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
+    pub fn process_offer(
+        &self,
+        offer: String,
+        tracks: Vec<Track>,
+    ) -> impl Future<Item = (), Error = WasmErr> {
+        // TODO: use drain_filter when its stable
+        let (recv, send): (Vec<_>, Vec<_>) =
+            tracks.into_iter().partition(|track| match track.direction {
+                Direction::Send { .. } => false,
+                Direction::Recv { .. } => true,
+            });
+
+        // update receivers
+        self.0.media_connections.update_tracks(recv).unwrap();
+
+        let inner: Rc<InnerPeerConnection> = Rc::clone(&self.0);
+        Box::new(
+            self.0
+                .peer
+                .set_remote_description(SdpType::Offer(offer))
+                .and_then(move |_| {
+                    inner
+                        .media_connections
+                        .update_tracks(send)
+                        .map(|req| (req, inner))
+                })
+                .and_then(move |(request, inner)| match request {
+                    None => future::Either::A(future::ok::<_, WasmErr>(())),
+                    Some(request) => future::Either::B(
+                        inner.media_manager.get_stream(request).and_then(
+                            move |s| {
+                                inner.media_connections.insert_local_stream(&s)
+                            },
+                        ),
+                    ),
+                }),
+        )
+    }
+
+    /// Adds remote peers [ICE Candidate][1] to this peer.
+    ///
+    /// [1]: https://tools.ietf.org/html/rfc5245#section-2
+    pub fn add_ice_candidate(
+        &self,
+        candidate: &str,
+        sdp_m_line_index: Option<u16>,
+        sdp_mid: &Option<String>,
+    ) -> impl Future<Item = (), Error = WasmErr> {
+        Box::new(self.0.peer.add_ice_candidate(
+            candidate,
+            sdp_m_line_index,
+            sdp_mid,
+        ))
     }
 
     /// Handle `icecandidate` event from underlying peer emitting
@@ -230,168 +309,7 @@ impl Connection {
     }
 }
 
-impl PeerConnection for Connection {
-    /// Disable or enable all audio tracks for all [`Sender`]s.
-    fn toggle_send_audio(&self, enabled: bool) {
-        self.0
-            .media_connections
-            .toggle_send_media(TransceiverKind::Audio, enabled)
-    }
-
-    /// Disable or enable all video tracks for all [`Sender`]s.
-    fn toggle_send_video(&self, enabled: bool) {
-        self.0
-            .media_connections
-            .toggle_send_media(TransceiverKind::Video, enabled)
-    }
-
-    /// Returns true if all [`Sender`]s audio tracks are enabled.
-    fn is_send_audio_enabled(&self) -> Result<bool, WasmErr> {
-        // TODO: dont error here
-        self.0
-            .media_connections
-            .enabled_sender(TransceiverKind::Audio)
-    }
-
-    /// Returns true if all [`Sender`]s video tracks are enabled.
-    fn is_send_video_enabled(&self) -> Result<bool, WasmErr> {
-        // TODO: dont error here
-        self.0
-            .media_connections
-            .enabled_sender(TransceiverKind::Video)
-    }
-
-    /// Track id to mid relations of all send tracks of this
-    /// [`RtcPeerConnection`]. mid is id of [`m= section`][1]. mids are received
-    /// directly from registered [`RTCRtpTransceiver`][2]s, and are being
-    /// allocated on sdp update.
-    /// Errors if finds transceiver without mid, so must be called after setting
-    /// local description if offerrer, and remote if answerer.
-    ///
-    /// [1]: https://tools.ietf.org/html/rfc4566#section-5.14
-    /// [2]: https://www.w3.org/TR/webrtc/#rtcrtptransceiver-interface
-    fn get_mids(&self) -> Result<HashMap<u64, String>, WasmErr> {
-        self.0.media_connections.get_mids()
-    }
-
-    /// Sync provided tracks creating all required [`Sender`]s and
-    /// [`Receiver`]s, request local stream if required, get, set and return
-    /// sdp offer.
-    fn get_offer(
-        &self,
-        tracks: Vec<Track>,
-    ) -> Box<dyn Future<Item = String, Error = WasmErr>> {
-        Box::new(match self.0.media_connections.update_tracks(tracks) {
-            Err(err) => future::Either::A(future::err(err)),
-            Ok(request) => {
-                let peer = Rc::clone(&self.0.peer);
-                future::Either::B(
-                    match request {
-                        None => future::Either::A(future::ok::<_, WasmErr>(())),
-                        Some(request) => {
-                            let inner: Rc<InnerPeerConnection> =
-                                Rc::clone(&self.0);
-                            future::Either::B(
-                                self.0
-                                    .media_manager
-                                    .get_stream(request)
-                                    .and_then(move |stream| {
-                                        inner
-                                            .media_connections
-                                            .insert_local_stream(&stream)
-                                    }),
-                            )
-                        }
-                    }
-                    .and_then(move |_| peer.create_and_set_offer()),
-                )
-            }
-        })
-    }
-
-    /// Creates an SDP answer to an offer received from a remote peer and sets
-    /// it as local description. Must be called only if peer already has remote
-    /// description.
-    fn create_and_set_answer(
-        &self,
-    ) -> Box<dyn Future<Item = String, Error = WasmErr>> {
-        Box::new(self.0.peer.create_and_set_answer())
-    }
-
-    /// Updates underlying [`RTCPeerConnection`][1] remote SDP.
-    ///
-    /// [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
-    fn set_remote_answer(
-        &self,
-        answer: String,
-    ) -> Box<dyn Future<Item = (), Error = WasmErr>> {
-        Box::new(self.0.peer.set_remote_description(SdpType::Answer(answer)))
-    }
-
-    /// Sync provided tracks creating all required [`Sender`]s and
-    /// [`Receiver`]s, request local stream if required.
-    /// `set_remote_description` will create all transceivers and fire all
-    /// `on_track` events, so it updates [`Receiver`]s before
-    /// `set_remote_description` and update [`Sender`]s after.
-    ///
-    /// [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
-    fn process_offer(
-        &self,
-        offer: String,
-        tracks: Vec<Track>,
-    ) -> Box<dyn Future<Item = (), Error = WasmErr>> {
-        // TODO: use drain_filter when its stable
-        let (recv, send): (Vec<_>, Vec<_>) =
-            tracks.into_iter().partition(|track| match track.direction {
-                Direction::Send { .. } => false,
-                Direction::Recv { .. } => true,
-            });
-
-        // update receivers
-        self.0.media_connections.update_tracks(recv).unwrap();
-
-        let inner: Rc<InnerPeerConnection> = Rc::clone(&self.0);
-        Box::new(
-            self.0
-                .peer
-                .set_remote_description(SdpType::Offer(offer))
-                .and_then(move |_| {
-                    inner
-                        .media_connections
-                        .update_tracks(send)
-                        .map(|req| (req, inner))
-                })
-                .and_then(move |(request, inner)| match request {
-                    None => future::Either::A(future::ok::<_, WasmErr>(())),
-                    Some(request) => future::Either::B(
-                        inner.media_manager.get_stream(request).and_then(
-                            move |s| {
-                                inner.media_connections.insert_local_stream(&s)
-                            },
-                        ),
-                    ),
-                }),
-        )
-    }
-
-    /// Adds remote peers [ICE Candidate][1] to this peer.
-    ///
-    /// [1]: https://tools.ietf.org/html/rfc5245#section-2
-    fn add_ice_candidate(
-        &self,
-        candidate: &str,
-        sdp_m_line_index: Option<u16>,
-        sdp_mid: &Option<String>,
-    ) -> Box<dyn Future<Item = (), Error = WasmErr>> {
-        Box::new(self.0.peer.add_ice_candidate(
-            candidate,
-            sdp_m_line_index,
-            sdp_mid,
-        ))
-    }
-}
-
-impl Drop for Connection {
+impl Drop for PeerConnection {
     /// Drop `on_track` and `on_ice_candidate` callbacks to prevent leak.
     fn drop(&mut self) {
         let _ = self.0.peer.on_track::<Box<dyn FnMut(RtcTrackEvent)>>(None);

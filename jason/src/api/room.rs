@@ -20,13 +20,22 @@ use wasm_bindgen_futures::spawn_local;
 
 use crate::{
     media::{MediaManager, MediaStream},
-    peer::{PeerEvent, PeerEventHandler, PeerId, PeerRepository},
+    peer::{
+        PeerConnection, PeerEvent, PeerEventHandler, PeerId, PeerRepository,
+    },
     rpc::RpcClient,
     utils::{Callback2, WasmErr},
 };
 
 use super::{connection::Connection, ConnectionHandle};
-use crate::peer::{self, PeerConnection};
+
+macro_rules! inner_map {
+    ($v:expr, $closure:expr) => {{
+        $v.0.upgrade()
+            .ok_or_else(|| WasmErr::from("Detached state").into())
+            .map($closure)
+    }};
+}
 
 /// JS side handle to [`Room`] where all the media happens.
 ///
@@ -44,56 +53,30 @@ impl RoomHandle {
         &mut self,
         f: js_sys::Function,
     ) -> Result<(), JsValue> {
-        self.0
-            .upgrade()
-            .map(|room| {
-                room.borrow_mut().on_new_connection.set_func(f);
-            })
-            .ok_or_else(|| WasmErr::from("Detached state").into())
+        inner_map!(self, |inner| inner
+            .borrow_mut()
+            .on_new_connection
+            .set_func(f))
     }
 
     /// Mute local audio [`Track`]s for all [`PeerConnection`]s this [`Room`].
     pub fn mute_audio(&self) -> Result<(), JsValue> {
-        match self.0.upgrade() {
-            Some(inner) => {
-                inner.borrow().toggle_send_audio(false);
-                Ok(())
-            }
-            None => Err(WasmErr::from("Detached state").into()),
-        }
+        inner_map!(self, |inner| inner.borrow().toggle_send_audio(false))
     }
 
     /// Unmute local audio [`Track`]s for all [`PeerConnection`]s this [`Room`].
     pub fn unmute_audio(&self) -> Result<(), JsValue> {
-        match self.0.upgrade() {
-            Some(inner) => {
-                inner.borrow().toggle_send_audio(true);
-                Ok(())
-            }
-            None => Err(WasmErr::from("Detached state").into()),
-        }
+        inner_map!(self, |inner| inner.borrow().toggle_send_audio(true))
     }
 
     /// Mute local video [`Track`]s for all [`PeerConnection`]s this [`Room`].
     pub fn mute_video(&self) -> Result<(), JsValue> {
-        match self.0.upgrade() {
-            Some(inner) => {
-                inner.borrow().toggle_send_video(false);
-                Ok(())
-            }
-            None => Err(WasmErr::from("Detached state").into()),
-        }
+        inner_map!(self, |inner| inner.borrow().toggle_send_video(false))
     }
 
     /// Unmute local video [`Track`]s for all [`PeerConnection`]s this [`Room`].
     pub fn unmute_video(&self) -> Result<(), JsValue> {
-        match self.0.upgrade() {
-            Some(inner) => {
-                inner.borrow().toggle_send_video(true);
-                Ok(())
-            }
-            None => Err(WasmErr::from("Detached state").into()),
-        }
+        inner_map!(self, |inner| inner.borrow().toggle_send_video(true))
     }
 }
 
@@ -109,7 +92,7 @@ impl Room {
     /// Creates new [`Room`] and associates it with a provided [`RpcClient`].
     pub fn new(
         rpc: Rc<dyn RpcClient>,
-        peers: Box<dyn PeerRepository>,
+        peers: PeerRepository,
         mngr: Rc<MediaManager>,
     ) -> Self {
         let (tx, rx) = unbounded();
@@ -168,7 +151,7 @@ impl Room {
 /// Shared between JS side ([`RoomHandle`]) and Rust side ([`Room`]).
 struct InnerRoom {
     rpc: Rc<dyn RpcClient>,
-    peers: Box<dyn PeerRepository>,
+    peers: PeerRepository,
     peer_event_sender: UnboundedSender<PeerEvent>,
     media_manager: Rc<MediaManager>,
     connections: HashMap<u64, Connection>,
@@ -180,7 +163,7 @@ impl InnerRoom {
     #[inline]
     fn new(
         rpc: Rc<dyn RpcClient>,
-        peers: Box<dyn PeerRepository>,
+        peers: PeerRepository,
         events_sender: UnboundedSender<PeerEvent>,
         media_manager: Rc<MediaManager>,
     ) -> Self {
@@ -225,8 +208,8 @@ impl InnerRoom {
         &mut self,
         id: PeerId,
         ice_servers: I,
-    ) -> Result<Rc<dyn PeerConnection>, WasmErr> {
-        let peer = Rc::new(peer::Connection::new(
+    ) -> Result<Rc<PeerConnection>, WasmErr> {
+        let peer = Rc::new(PeerConnection::new(
             id,
             self.peer_event_sender.clone(),
             ice_servers,

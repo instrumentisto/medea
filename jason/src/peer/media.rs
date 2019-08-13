@@ -57,21 +57,15 @@ impl MediaConnections {
 
     /// Returns true if all [`MediaTrack`]s of [`Senders`] with given
     /// [`TransceiverKind`] is enabled or false otherwise.
-    pub fn enabled_sender(
-        &self,
-        kind: TransceiverKind,
-    ) -> Result<bool, WasmErr> {
-        let s = self.0.borrow();
-        s.senders.iter().fold(Ok(true), |acc, (_, sender)| {
+    pub fn enabled_sender(&self, kind: TransceiverKind) -> bool {
+        let conn = self.0.borrow();
+        conn.senders.iter().fold(true, |enabled, (_, sender)| {
             if sender.kind != kind {
-                return acc;
+                return enabled;
             }
-            match sender.transceiver.sender().track() {
-                None => Err(WasmErr::from("Peer has senders without track")),
-                Some(track) => match acc {
-                    Ok(enabled) => Ok(enabled && track.enabled()),
-                    Err(e) => Err(e),
-                },
+            match sender.track.borrow().as_ref() {
+                None => enabled,
+                Some(track) => enabled && track.is_enabled(),
             }
         })
     }
