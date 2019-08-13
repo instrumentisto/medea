@@ -1,4 +1,7 @@
 //! Repository that stores [`Room`]s [`Peer`]s.
+//!
+//! [`Room`]: crate::signalling::Room
+//! [`Peer`]: crate::media::peer::Peer
 
 use std::{
     collections::{HashMap, HashSet},
@@ -22,6 +25,9 @@ use crate::{
 #[derive(Debug)]
 pub struct PeerRepository {
     /// [`Peer`]s of [`Member`]s in this [`Room`].
+    ///
+    /// [`Member`]: crate::api::control::member::Member
+    /// [`Room`]: crate::signalling::Room
     peers: HashMap<PeerId, PeerStateMachine>,
 
     /// Count of [`Peer`]s in this [`Room`].
@@ -55,6 +61,8 @@ impl<T: Incrementable + std::fmt::Display + Copy> fmt::Display for Counter<T> {
 
 impl PeerRepository {
     /// Store [`Peer`] in [`Room`].
+    ///
+    /// [`Room`]: crate::signalling::Room
     pub fn add_peer<S: Into<PeerStateMachine>>(&mut self, peer: S) {
         let peer = peer.into();
         self.peers.insert(peer.id(), peer);
@@ -143,6 +151,8 @@ impl PeerRepository {
     }
 
     /// Returns all [`Peer`]s of specified [`Member`].
+    ///
+    /// [`Member`]: crate::api::control::member::Member
     pub fn get_peers_by_member_id<'a>(
         &'a self,
         member_id: &'a MemberId,

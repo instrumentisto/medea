@@ -1,10 +1,11 @@
 [package]
-name = "jason"
-version = "0.1.0-dev"
+name = "medea-jason"
+version = "0.2.0-dev"
 edition = "2018"
 description = "Medea media server client application"
 authors = ["Instrumentisto Team <developer@instrumentisto.com>"]
 homepage = "https://github.com/instrumentisto/medea"
+license = "MPL 2.0"
 readme = "README.md"
 repository = "https://github.com/instrumentisto/medea"
 
@@ -22,7 +23,7 @@ console_error_panic_hook = { version = "0.1", optional = true }
 futures = "0.1"
 js-sys = "0.3"
 macro-attr = "0.2"
-medea-client-api-proto = { path = "../proto/client-api", features = ["jason"] }
+medea-client-api-proto = { features = ["jason"], path = "../proto/client-api" }
 medea-macro = { path = "../crates/medea-macro" }
 newtype_derive = "0.1"
 serde = { version = "1.0", features = ["derive"] }

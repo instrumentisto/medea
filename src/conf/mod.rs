@@ -13,6 +13,7 @@ use config::{Config, Environment, File};
 use failure::Error;
 use serde::{Deserialize, Serialize};
 
+#[doc(inline)]
 pub use self::{
     grpc::Grpc,
     log::Log,
