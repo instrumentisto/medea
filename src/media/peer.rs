@@ -152,7 +152,9 @@ pub struct Context {
     senders: HashMap<TrackId, Rc<MediaTrack>>,
 }
 
-/// [`RTCPeerConnection`] representation.
+/// [RtcPeerConnection] representation.
+///
+/// [RtcPeerConnection]: https://webrtcglossary.com/peerconnection/
 #[derive(Debug)]
 pub struct Peer<S> {
     context: Context,
@@ -161,6 +163,8 @@ pub struct Peer<S> {
 
 impl<T> Peer<T> {
     /// Returns ID of [`Member`] associated with this [`Peer`].
+    ///
+    /// [`Member`]: crate::api::control::member::Member
     pub fn member_id(&self) -> MemberId {
         self.context.member_id.clone()
     }
@@ -176,6 +180,8 @@ impl<T> Peer<T> {
     }
 
     /// Returns ID of interconnected [`Member`].
+    ///
+    /// [`Member`]: crate::api::control::member::Member
     pub fn partner_member_id(&self) -> MemberId {
         self.context.partner_member.clone()
     }
@@ -220,6 +226,8 @@ impl<T> Peer<T> {
 
 impl Peer<New> {
     /// Creates new [`Peer`] for [`Member`].
+    ///
+    /// [`Member`]: crate::api::control::member::Member
     pub fn new(
         id: Id,
         member_id: MemberId,
@@ -299,7 +307,7 @@ impl Peer<New> {
 
 impl Peer<WaitLocalSdp> {
     /// Sets local description and transition [`Peer`]
-    /// to [`WaitRemoteSDP`] state.
+    /// to [`WaitRemoteSdp`] state.
     pub fn set_local_sdp(self, sdp_offer: String) -> Peer<WaitRemoteSdp> {
         let mut context = self.context;
         context.sdp_offer = Some(sdp_offer);

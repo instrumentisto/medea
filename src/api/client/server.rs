@@ -83,6 +83,8 @@ fn ws_index(
 /// Context for [`App`] which holds all the necessary dependencies.
 pub struct Context {
     /// Repository of all currently existing [`Room`]s in application.
+    ///
+    /// [`Room`]: crate::signalling::Room
     pub rooms: RoomsRepository,
 
     /// Settings of application.
