@@ -1,3 +1,7 @@
+//! [TURN] server managing implementation.
+//!
+//! [TURN]: https://webrtcglossary.com/turn/
+
 pub mod repo;
 pub mod service;
 

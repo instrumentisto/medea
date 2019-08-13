@@ -1,4 +1,4 @@
-//! Connection with specific remote [`Member`].
+//! Connection with specific remote `Member`.
 
 use std::{
     cell::RefCell,
@@ -22,16 +22,16 @@ struct InnerConnection {
     on_remote_stream: Callback<MediaStreamHandle>,
 }
 
-/// Connection with a specific remote [`Member`], that is used on JS side.
+/// Connection with a specific remote `Member`, that is used on JS side.
 ///
-/// Actually, represents a [`Weak`]-based handle to [`InnerConnection`].
+/// Actually, represents a [`Weak`]-based handle to `InnerConnection`.
 #[allow(clippy::module_name_repetitions)]
 #[wasm_bindgen]
 pub struct ConnectionHandle(Weak<RefCell<InnerConnection>>);
 
 #[wasm_bindgen]
 impl ConnectionHandle {
-    /// Sets callback, which will be invoked on remote [`Member`] media stream
+    /// Sets callback, which will be invoked on remote `Member` media stream
     /// arrival.
     pub fn on_remote_stream(
         &mut self,
@@ -45,7 +45,7 @@ impl ConnectionHandle {
             .ok_or_else(|| WasmErr::from("Detached state").into())
     }
 
-    /// Returns ID of the remote [`Member`].
+    /// Returns ID of the remote `Member`.
     pub fn member_id(&self) -> Result<u64, JsValue> {
         self.0
             .upgrade()
