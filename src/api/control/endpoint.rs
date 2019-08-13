@@ -186,27 +186,24 @@ mod src_uri_deserialization_tests {
     fn return_error_when_uri_not_local() {
         let invalid_json_uri =
             r#"{ "src": "not_local://room_id/member_id/endpoint_id" }"#;
-        match serde_json::from_str::<SrcUriTest>(invalid_json_uri) {
-            Ok(_) => assert!(false),
-            Err(_) => assert!(true),
+        if serde_json::from_str::<SrcUriTest>(invalid_json_uri).is_ok() {
+            unreachable!()
         }
     }
 
     #[test]
     fn return_error_when_uri_is_not_full() {
         let invalid_json_uri = r#"{ "src": "local://room_id/member_id" }"#;
-        match serde_json::from_str::<SrcUriTest>(invalid_json_uri) {
-            Ok(_) => assert!(false),
-            Err(_) => assert!(true),
+        if serde_json::from_str::<SrcUriTest>(invalid_json_uri).is_ok() {
+            unreachable!()
         }
     }
 
     #[test]
     fn return_error_when_uri_have_empty_part() {
         let invalid_json_uri = r#"{ "src": "local://room_id//endpoint_id" }"#;
-        match serde_json::from_str::<SrcUriTest>(invalid_json_uri) {
-            Ok(_) => assert!(false),
-            Err(_) => assert!(true),
+        if serde_json::from_str::<SrcUriTest>(invalid_json_uri).is_ok() {
+            unreachable!()
         }
     }
 }
