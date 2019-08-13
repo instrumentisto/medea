@@ -521,8 +521,6 @@ pub struct PeersRemoved {
 impl Handler<PeersRemoved> for Room {
     type Result = ActFuture<(), ()>;
 
-    //TODO: notify only about peers taht are owned by this member
-
     /// Send [`Event::PeersRemoved`] to remote [`Member`].
     ///
     /// Delete all removed [`PeerId`]s from all [`Member`]'s

@@ -208,11 +208,6 @@ impl PeerRepository {
                 });
 
             peers_to_remove
-                .entry(peer.partner_member_id())
-                .or_insert_with(Vec::new)
-                .push(peer.id());
-
-            peers_to_remove
                 .entry(peer.member_id())
                 .or_insert_with(Vec::new)
                 .push(peer.id());
