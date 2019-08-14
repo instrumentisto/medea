@@ -265,7 +265,11 @@ ifeq ($(test-unit-crate),@all)
 	@make test.unit crate=medea-macro
 	@make test.unit crate=medea
 else
+ifeq ($(test-unit-crate),medea)
+	cargo test --lib --bin medea
+else
 	cargo test -p $(test-unit-crate)
+endif
 endif
 
 
@@ -276,9 +280,9 @@ endif
 # 	make test.e2e [dockerized=(YES|no)] [logs=(yes|NO)] [coturn=(YES|no)]
 
 medea-env = RUST_BACKTRACE=1 \
-	MEDEA_SERVER.BIND_PORT=8081 \
+	MEDEA_SERVER.HTTP.BIND_PORT=8081 \
 	$(if $(call eq,$(logs),yes),,RUST_LOG=warn) \
-	MEDEA_SERVER.STATIC_SPECS_PATH=tests/specs
+	MEDEA_SERVER.HTTP.STATIC_SPECS_PATH=tests/specs
 
 test.e2e:
 ifneq ($(coturn),no)
@@ -291,9 +295,8 @@ ifeq ($(dockerized),no)
 	env $(medea-env) $(if $(call eq,$(logs),yes),,RUST_LOG=warn) cargo run --bin medea $(if $(call eq,$(release),yes),--release) &
 
 	sleep 1
-	- cargo test --test e2e
-
-	@make down.medea
+	cargo test --test e2e
+	- killall medea
 ifneq ($(coturn),no)
 	@make down.coturn
 endif

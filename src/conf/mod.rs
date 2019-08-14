@@ -1,6 +1,7 @@
 //! Provides application configuration options.
 
 pub mod grpc;
+pub mod http_server;
 pub mod log;
 pub mod rpc;
 pub mod server;
@@ -16,6 +17,7 @@ use serde::{Deserialize, Serialize};
 #[doc(inline)]
 pub use self::{
     grpc::Grpc,
+    http_server::HttpServer,
     log::Log,
     rpc::Rpc,
     server::Server,
@@ -36,17 +38,16 @@ static APP_CONF_PATH_ENV_VAR_NAME: &str = "MEDEA_CONF";
 pub struct Conf {
     /// HTTP server settings.
     pub rpc: Rpc,
-    /// RPC connection settings.
+
+    /// Servers related settings.
     pub server: Server,
+
     /// TURN server settings.
     pub turn: Turn,
 
-    // TODO: move it to server section, so we will have server.http &&
-    //      server.grpc
-    /// gRPC server settings.
-    pub grpc: Grpc,
     /// Logging settings.
     pub log: Log,
+
     /// Application shutdown settings.
     pub shutdown: Shutdown,
 }
@@ -74,7 +75,7 @@ impl Conf {
     //       dont hardcode scheme, just store it in 'host' field
     //       and dont forget to update helm configs
     pub fn get_base_rpc_url(&self) -> String {
-        format!("wss://{}", self.server.host)
+        format!("wss://{}", self.server.http.host)
     }
 }
 

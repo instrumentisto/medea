@@ -112,7 +112,7 @@ impl Handler<StartStaticRooms> for RoomService {
         _: &mut Self::Context,
     ) -> Self::Result {
         if let Some(static_specs_path) =
-            self.app.config.server.static_specs_path.clone()
+            self.app.config.server.http.static_specs_path.clone()
         {
             let room_specs = match load_static_specs_from_dir(static_specs_path)
             {

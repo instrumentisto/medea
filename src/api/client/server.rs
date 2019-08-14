@@ -97,7 +97,7 @@ pub struct Server(ActixServer);
 impl Server {
     /// Starts Client API HTTP server.
     pub fn run(rooms: RoomRepository, config: Conf) -> io::Result<Addr<Self>> {
-        let server_addr = config.server.bind_addr();
+        let server_addr = config.server.http.bind_addr();
 
         let server = HttpServer::new(move || {
             App::new()

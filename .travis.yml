@@ -38,7 +38,6 @@ jobs:
       name: "Build jason (Rust stable)"
       before_script:
         - rm -f /home/travis/.cargo/bin/wasm-pack
-        - make yarn dockerized=no
         - curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
       script:
         - wasm-pack build -t web jason
