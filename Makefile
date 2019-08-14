@@ -292,7 +292,8 @@ ifeq ($(dockerized),no)
 	env $(medea-env) $(if $(call eq,$(logs),yes),,RUST_LOG=warn) cargo run $(if $(call eq,$(release),yes),--release) &
 
 	sleep 1
-	cargo test --test e2e && make down.medea dockerized=no || make down.medea dockerized=no && exit 1
+	cargo test --test e2e
+	- killall medea
 ifneq ($(coturn),no)
 	@make down.coturn
 endif
