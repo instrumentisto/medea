@@ -518,6 +518,8 @@ pub struct PeersRemoved {
     pub member_id: MemberId,
 }
 
+
+// TODO: do we really need this message atm? move this logic to send_peers_removed?
 impl Handler<PeersRemoved> for Room {
     type Result = ActFuture<(), ()>;
 
