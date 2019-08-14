@@ -16,7 +16,9 @@ server:
   #       configuration will have no effect.
   conf:
     server:
-      bind_port: 8080
+      http:
+        bind_port: 8080
+        host: ""
     turn:
       user: USER
       pass: PASS
