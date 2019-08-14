@@ -4,7 +4,24 @@ Change Log
 All user visible changes to this project will be documented in this file. This project uses to [Semantic Versioning 2.0.0].
 
 
-# TODO: do not forget to add changes
+
+
+## [0.2.0] · 2019-?-?
+[0.2.0]: https://github.com/instrumentisto/medea/releases/tag/medea-0.2.0
+
+[Milestone](https://github.com/instrumentisto/medea/milestone/2) |
+[Roadmap](https://github.com/instrumentisto/medea/issues/27)
+
+### Added
+
+- Static control API spec [#28](https://github.com/instrumentisto/medea/pull/28)
+  - parse static control api specs
+  - created interior entities for control API specs
+  - dynamically `Peer`s creation when client connects
+  - auto removing `Peer`s when `Member` disconnects
+  - E2E tests for signalling
+  
+
 
 
 
