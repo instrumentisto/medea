@@ -40,6 +40,9 @@ pub struct Conf {
     pub server: Server,
     /// TURN server settings.
     pub turn: Turn,
+
+    // TODO: move it to server section, so we will have server.http &&
+    //      server.grpc
     /// gRPC server settings.
     pub grpc: Grpc,
     /// Logging settings.
@@ -67,6 +70,9 @@ impl Conf {
         Ok(cfg.try_into()?)
     }
 
+    // TODO: any reason why this func is here and not in impl Server?
+    //       dont hardcode scheme, just store it in 'host' field
+    //       and dont forget to update helm configs
     pub fn get_base_rpc_url(&self) -> String {
         format!("wss://{}", self.server.host)
     }

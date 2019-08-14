@@ -171,6 +171,8 @@ impl Handler<StartRoom> for RoomService {
         let room = Room::new(&room, self.app.clone())?;
         let room_addr = room.start();
 
+        // TODO: lets add some static method in shutdown module to encapsulate
+        // this boilerplate
         self.graceful_shutdown.do_send(shutdown::Subscribe(
             shutdown::Subscriber {
                 priority: shutdown::Priority(2),
@@ -199,6 +201,8 @@ impl Handler<DeleteRoom> for RoomService {
         ctx: &mut Self::Context,
     ) -> Self::Result {
         if let Some(room) = self.room_repo.get(&msg.0) {
+            // TODO: lets add some static method in shutdown module to
+            // encapsulate this boilerplate
             self.graceful_shutdown.do_send(shutdown::Unsubscribe(
                 shutdown::Subscriber {
                     priority: shutdown::Priority(2),

@@ -9,6 +9,8 @@ use smart_default::SmartDefault;
 #[derive(Clone, Debug, Deserialize, Serialize, SmartDefault)]
 #[serde(default)]
 pub struct Server {
+    // TODO: change to public_url, move to RPC, improve docs, since this param
+    //      is quite important
     /// Server host.
     #[default("localhost:8080".to_string())]
     pub host: String,
