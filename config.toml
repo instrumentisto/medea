@@ -2,7 +2,7 @@
 # Server host
 #
 # Default:
-#   host = "localhost:8080"
+#   host = "ws://0.0.0.0:8080"
 
 # IP address to bind HTTP server to.
 #
@@ -19,8 +19,6 @@
 # Default:
 #   static_specs_path = None
 static_specs_path = "dev/specs"
-
-
 
 
 [server.grpc]

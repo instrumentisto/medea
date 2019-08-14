@@ -9,11 +9,17 @@ use smart_default::SmartDefault;
 #[derive(Clone, Debug, Deserialize, Serialize, SmartDefault)]
 #[serde(default)]
 pub struct HttpServer {
-    // TODO: change to public_url, move to RPC, improve docs, since this param
-    //      is quite important
-    /// Server host.
-    #[default("localhost:8080".to_string())]
-    pub host: String,
+    /// Public URI of server. Address for exposed [Client API].
+    ///
+    /// This address will be returned from [Control API] in `sids` and to
+    /// this address will connect [Jason] for start session.
+    ///
+    /// Defaults to `ws://0.0.0.0:8080`.
+    ///
+    /// [Client API]: http://tiny.cc/c80uaz
+    /// [Jason]: https://github.com/instrumentisto/medea/tree/master/jason
+    #[default("ws://0.0.0.0:8080".to_string())]
+    pub public_url: String,
 
     /// IP address to bind HTTP server to. Defaults to `0.0.0.0`.
     #[default(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)))]

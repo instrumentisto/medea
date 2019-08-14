@@ -18,7 +18,7 @@ server:
     server:
       http:
         bind_port: 8080
-        host: ""
+        public_url: ""
     turn:
       user: USER
       pass: PASS

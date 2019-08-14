@@ -70,13 +70,6 @@ impl Conf {
 
         Ok(cfg.try_into()?)
     }
-
-    // TODO: any reason why this func is here and not in impl Server?
-    //       dont hardcode scheme, just store it in 'host' field
-    //       and dont forget to update helm configs
-    pub fn get_base_rpc_url(&self) -> String {
-        format!("wss://{}", self.server.http.host)
-    }
 }
 
 /// Returns the path to the configuration file, if it's set via CLI `args`

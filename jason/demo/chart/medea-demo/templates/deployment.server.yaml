@@ -65,7 +65,7 @@ spec:
             - name: MEDEA_TURN.DB.REDIS.PORT
               value: {{ $coturnDb.conf.port | quote }}
             - name: MEDEA_SERVER.HTTP.HOST
-              value: {{ .Values.server.conf.server.http.host }}
+              value: {{ .Values.server.conf.server.http.public_url }}
           envFrom:
             - secretRef:
                 name: {{ template "medea-demo.fullname" . }}.server.cred
