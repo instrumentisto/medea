@@ -7,7 +7,7 @@ use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use actix::{
     fut::wrap_future, Actor, ActorFuture, AsyncContext, Context, Handler,
-    Message, ResponseActFuture, WrapFuture as _,
+    ResponseActFuture, WrapFuture as _,
 };
 use failure::Fail;
 use futures::future;
@@ -487,6 +487,50 @@ impl Room {
                 }),
         )
     }
+
+    /// Signal of removing [`Member`]'s [`Peer`]s.
+    fn member_peers_removed(
+        &mut self,
+        peers_id: Vec<PeerId>,
+        member_id: MemberId,
+        ctx: &mut Context<Room>,
+    ) -> ActFuture<(), ()> {
+        info!("Peers {:?} removed for member '{}'.", peers_id, member_id);
+        if let Some(member) = self.members.get_member_by_id(&member_id) {
+            member.peers_removed(&peers_id);
+        } else {
+            error!(
+                "Participant with id {} for which received \
+                 Event::PeersRemoved not found. Closing room.",
+                member_id
+            );
+
+            return Box::new(self.close_gracefully(ctx));
+        }
+
+        Box::new(self.send_peers_removed(member_id, peers_id).then(
+            |err, room, ctx: &mut Context<Self>| {
+                if let Err(e) = err {
+                    match e {
+                        RoomError::ConnectionNotExists(_)
+                        | RoomError::UnableToSendEvent(_) => {
+                            Box::new(future::ok(()).into_actor(room))
+                        }
+                        _ => {
+                            error!(
+                                "Unexpected failed PeersEvent command, \
+                                 because {}. Room will be stopped.",
+                                e
+                            );
+                            room.close_gracefully(ctx)
+                        }
+                    }
+                } else {
+                    Box::new(future::ok(()).into_actor(room))
+                }
+            },
+        ))
+    }
 }
 
 /// [`Actor`] implementation that provides an ergonomic way
@@ -507,69 +551,6 @@ impl Handler<Authorize> for Room {
         self.members
             .get_member_by_id_and_credentials(&msg.member_id, &msg.credentials)
             .map(|_| ())
-    }
-}
-
-/// Signal of removing [`Member`]'s [`Peer`]s.
-#[derive(Debug, Message)]
-#[rtype(result = "Result<(), ()>")]
-pub struct PeersRemoved {
-    pub peers_id: Vec<PeerId>,
-    pub member_id: MemberId,
-}
-
-// TODO: do we really need this message atm? move this logic to
-// send_peers_removed?
-impl Handler<PeersRemoved> for Room {
-    type Result = ActFuture<(), ()>;
-
-    /// Send [`Event::PeersRemoved`] to remote [`Member`].
-    ///
-    /// Delete all removed [`PeerId`]s from all [`Member`]'s
-    /// endpoints.
-    #[allow(clippy::single_match_else)]
-    fn handle(
-        &mut self,
-        msg: PeersRemoved,
-        ctx: &mut Self::Context,
-    ) -> Self::Result {
-        info!(
-            "Peers {:?} removed for member '{}'.",
-            msg.peers_id, msg.member_id
-        );
-        if let Some(member) = self.members.get_member_by_id(&msg.member_id) {
-            member.peers_removed(&msg.peers_id);
-        } else {
-            error!(
-                "Participant with id {} for which received \
-                 Event::PeersRemoved not found. Closing room.",
-                msg.member_id
-            );
-
-            return Box::new(self.close_gracefully(ctx));
-        }
-
-        Box::new(self.send_peers_removed(msg.member_id, msg.peers_id).then(
-            |err, room, ctx: &mut Context<Self>| {
-                if let Err(e) = err {
-                    match e {
-                        RoomError::ConnectionNotExists(_) => {
-                            Box::new(future::ok(()).into_actor(room))
-                        }
-                        _ => {
-                            error!(
-                                "Failed PeersEvent command, because {}. Room \
-                                 will be stopped.",
-                                e
-                            );
-                            room.close_gracefully(ctx)
-                        }
-                    }
-                } else {
-                    Box::new(future::ok(()).into_actor(room))
-                }
-            },
-        ))
     }
 }
 
@@ -684,19 +665,23 @@ impl Handler<RpcConnectionClosed> for Room {
             msg.member_id, msg.reason
         );
 
+        self.members
+            .connection_closed(msg.member_id.clone(), &msg.reason, ctx);
+
         if let ClosedReason::Closed = msg.reason {
             let removed_peers =
                 self.peers.remove_peers_related_to_member(&msg.member_id);
 
             for (peer_member_id, peers_ids) in removed_peers {
-                ctx.notify(PeersRemoved {
-                    member_id: peer_member_id,
-                    peers_id: peers_ids,
-                })
+                // Here we may have some problems. If two participants
+                // disconnect at one moment then sending event
+                // to another participant fail,
+                // because connection already closed but we don't know about it
+                // because message in event loop.
+                let fut =
+                    self.member_peers_removed(peers_ids, peer_member_id, ctx);
+                ctx.spawn(fut);
             }
         }
-
-        self.members
-            .connection_closed(msg.member_id, &msg.reason, ctx);
     }
 }
