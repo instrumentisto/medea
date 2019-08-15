@@ -547,6 +547,24 @@ impl Room {
             },
         ))
     }
+
+    /// Remove [`Peer`]s and call [`Room::member_peers_removed`] for every
+    /// [`Member`].
+    ///
+    /// This will delete [`Peer`]s from [`PeerRepository`] and send
+    /// [`Event::PeersRemoved`] event to [`Member`].
+    fn remove_peers(
+        &mut self,
+        member_id: &MemberId,
+        peer_ids_to_remove: HashSet<PeerId>,
+        ctx: &mut Context<Self>,
+    ) {
+        let removed_peers =
+            self.peers.remove_peers(&member_id, peer_ids_to_remove);
+        for (member_id, peers_id) in removed_peers {
+            self.member_peers_removed(peers_id, member_id, ctx);
+        }
+    }
 }
 
 /// [`Actor`] implementation that provides an ergonomic way
@@ -828,11 +846,7 @@ impl Handler<Close> for Room {
 
                 let member_id = id.clone();
 
-                let removed_peers =
-                    self.peers.remove_peers(&member_id, peer_ids_to_remove);
-                for (member_id, peers_id) in removed_peers {
-                    self.member_peers_removed(peers_id, member_id, ctx);
-                }
+                self.remove_peers(&member_id, peer_ids_to_remove, ctx);
                 self.members.delete_member(&member_id, ctx);
             }
         }
@@ -869,10 +883,7 @@ impl Handler<DeleteMember> for Room {
                 }
             }
 
-            let removed_peers = self.peers.remove_peers(&member.id(), peers);
-            for (member_id, peers_id) in removed_peers {
-                self.member_peers_removed(peers_id, member_id, ctx);
-            }
+            self.remove_peers(&member.id(), peers, ctx);
         }
 
         self.members.delete_member(&msg.0, ctx);
@@ -920,12 +931,7 @@ impl Handler<DeleteEndpoint> for Room {
             let publish_id = WebRtcPublishId(play_id.0);
             if let Some(endpoint) = member.take_src(&publish_id) {
                 let peer_ids = endpoint.peer_ids();
-                // TODO: reduce boilerplate
-                let removed_peers =
-                    self.peers.remove_peers(&member_id, peer_ids);
-                for (member_id, peers_id) in removed_peers {
-                    self.member_peers_removed(peers_id, member_id, ctx);
-                }
+                self.remove_peers(&member_id, peer_ids, ctx);
             }
 
             publish_id.0
