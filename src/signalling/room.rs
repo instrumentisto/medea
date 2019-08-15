@@ -67,25 +67,19 @@ pub enum RoomError {
 
 impl From<PeerError> for RoomError {
     fn from(err: PeerError) -> Self {
-        RoomError::PeerError(err)
+        Self::PeerError(err)
     }
 }
 
 impl From<TryFromElementError> for RoomError {
     fn from(err: TryFromElementError) -> Self {
-        RoomError::BadRoomSpec(format!(
-            "Element located in wrong place. {}",
-            err
-        ))
+        Self::BadRoomSpec(format!("Element located in wrong place. {}", err))
     }
 }
 
 impl From<MembersLoadError> for RoomError {
     fn from(err: MembersLoadError) -> Self {
-        RoomError::BadRoomSpec(format!(
-            "Error while loading room spec. {}",
-            err
-        ))
+        Self::BadRoomSpec(format!("Error while loading room spec. {}", err))
     }
 }
 

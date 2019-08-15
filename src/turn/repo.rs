@@ -20,7 +20,7 @@ pub enum TurnDatabaseErr {
 
 impl From<RedisError> for TurnDatabaseErr {
     fn from(err: RedisError) -> Self {
-        TurnDatabaseErr::RedisError(err)
+        Self::RedisError(err)
     }
 }
 

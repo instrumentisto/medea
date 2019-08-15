@@ -25,10 +25,10 @@ impl TryFrom<&MemberElement> for Endpoint {
     fn try_from(from: &MemberElement) -> Result<Self, Self::Error> {
         match from {
             MemberElement::WebRtcPlayEndpoint { spec } => {
-                Ok(Endpoint::WebRtcPlay(spec.clone()))
+                Ok(Self::WebRtcPlay(spec.clone()))
             }
             MemberElement::WebRtcPublishEndpoint { spec } => {
-                Ok(Endpoint::WebRtcPublish(spec.clone()))
+                Ok(Self::WebRtcPublish(spec.clone()))
             }
         }
     }

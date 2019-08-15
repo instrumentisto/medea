@@ -48,8 +48,8 @@ pub enum ServerStartError {
 impl From<RoomError> for ServerStartError {
     fn from(err: RoomError) -> Self {
         match err {
-            RoomError::BadRoomSpec(m) => ServerStartError::BadRoomSpec(m),
-            _ => ServerStartError::UnknownRoomError,
+            RoomError::BadRoomSpec(m) => Self::BadRoomSpec(m),
+            _ => Self::UnknownRoomError,
         }
     }
 }

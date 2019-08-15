@@ -24,21 +24,21 @@ impl WasmErr {
 
 impl From<&'static str> for WasmErr {
     fn from(msg: &'static str) -> Self {
-        WasmErr::Custom(Cow::Borrowed(msg))
+        Self::Custom(Cow::Borrowed(msg))
     }
 }
 
 impl From<String> for WasmErr {
     fn from(msg: String) -> Self {
-        WasmErr::Custom(Cow::Owned(msg))
+        Self::Custom(Cow::Owned(msg))
     }
 }
 
 impl From<JsValue> for WasmErr {
     fn from(val: JsValue) -> Self {
         match val.dyn_into::<js_sys::Error>() {
-            Ok(err) => WasmErr::JsError(err),
-            Err(val) => WasmErr::Untyped(val),
+            Ok(err) => Self::JsError(err),
+            Err(val) => Self::Untyped(val),
         }
     }
 }
@@ -56,11 +56,11 @@ impl From<WasmErr> for JsValue {
 impl fmt::Display for WasmErr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            WasmErr::JsError(err) => {
+            Self::JsError(err) => {
                 write!(f, "{}", String::from(err.to_string()))
             }
-            WasmErr::Custom(reason) => write!(f, "{}", reason),
-            WasmErr::Untyped(val) => match val.as_string() {
+            Self::Custom(reason) => write!(f, "{}", reason),
+            Self::Untyped(val) => match val.as_string() {
                 Some(reason) => write!(f, "{}", reason),
                 None => write!(f, "no str representation for JsError"),
             },
@@ -72,7 +72,7 @@ macro_rules! impl_from_error {
     ($error:ty) => {
         impl From<$error> for WasmErr {
             fn from(error: $error) -> Self {
-                WasmErr::Custom(format!("{}", error).into())
+                Self::Custom(format!("{}", error).into())
             }
         }
     };

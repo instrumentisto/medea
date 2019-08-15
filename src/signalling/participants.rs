@@ -58,13 +58,13 @@ pub enum ParticipantServiceErr {
 
 impl From<TurnServiceErr> for ParticipantServiceErr {
     fn from(err: TurnServiceErr) -> Self {
-        ParticipantServiceErr::TurnServiceErr(err)
+        Self::TurnServiceErr(err)
     }
 }
 
 impl From<MailboxError> for ParticipantServiceErr {
     fn from(err: MailboxError) -> Self {
-        ParticipantServiceErr::MailBoxErr(err)
+        Self::MailBoxErr(err)
     }
 }
 

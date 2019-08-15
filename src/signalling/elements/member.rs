@@ -38,7 +38,7 @@ pub enum MembersLoadError {
 
 impl From<TryFromElementError> for MembersLoadError {
     fn from(err: TryFromElementError) -> Self {
-        MembersLoadError::TryFromError(err)
+        Self::TryFromError(err)
     }
 }
 
