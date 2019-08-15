@@ -509,7 +509,7 @@ impl Room {
         &mut self,
         peers_id: Vec<PeerId>,
         member_id: MemberId,
-        ctx: &mut Context<Room>,
+        ctx: &mut Context<Self>,
     ) -> ActFuture<(), ()> {
         info!("Peers {:?} removed for member '{}'.", peers_id, member_id);
         if let Some(member) = self.members.get_member_by_id(&member_id) {
