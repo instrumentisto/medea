@@ -162,7 +162,7 @@ mod tests {
         let defaults = Conf::default();
         let test_config_file_path = "test_config.toml";
 
-        let data = format!("[rpc]\nidle_timeout = \"45s\"");
+        let data = "[rpc]\nidle_timeout = \"45s\"".to_owned();
         fs::write(test_config_file_path, data).unwrap();
         env::set_var(APP_CONF_PATH_ENV_VAR_NAME, test_config_file_path);
 
@@ -193,7 +193,7 @@ mod tests {
     fn conf_parse_spec_env_overrides_file() {
         let test_config_file_path = "test_config.toml";
 
-        let data = format!("[rpc]\nidle_timeout = \"47s\"");
+        let data = "[rpc]\nidle_timeout = \"47s\"".to_owned();
         fs::write(test_config_file_path, data).unwrap();
         env::set_var(APP_CONF_PATH_ENV_VAR_NAME, test_config_file_path);
 

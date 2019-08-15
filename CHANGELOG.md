@@ -6,6 +6,25 @@ All user visible changes to this project will be documented in this file. This p
 
 
 
+## [0.2.0] · 2019-?-?
+[0.2.0]: https://github.com/instrumentisto/medea/releases/tag/medea-0.2.0
+
+[Milestone](https://github.com/instrumentisto/medea/milestone/2) |
+[Roadmap](https://github.com/instrumentisto/medea/issues/27)
+
+### Added
+
+- Static control API spec [#28](https://github.com/instrumentisto/medea/pull/28)
+  - parse static control api specs
+  - created interior entities for control API specs
+  - dynamically `Peer`s creation when client connects
+  - auto removing `Peer`s when `Member` disconnects
+  - E2E tests for signalling
+  
+
+
+
+
 ## [0.1.0] · 2019-08-13
 [0.1.0]: https://github.com/instrumentisto/medea/releases/tag/medea-0.1.0
 

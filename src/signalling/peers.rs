@@ -9,17 +9,13 @@ use std::{
     fmt,
 };
 
-use actix::{AsyncContext as _, Context};
 use medea_client_api_proto::{Incrementable, PeerId, TrackId};
 
 use crate::{
     api::control::MemberId,
     log::prelude::*,
     media::{New, Peer, PeerStateMachine},
-    signalling::{
-        elements::Member,
-        room::{PeersRemoved, Room, RoomError},
-    },
+    signalling::{elements::Member, room::RoomError},
 };
 
 #[derive(Debug)]
@@ -189,8 +185,7 @@ impl PeerRepository {
         &mut self,
         member_id: &MemberId,
         peer_ids: HashSet<PeerId>,
-        ctx: &mut Context<Room>,
-    ) {
+    ) -> HashMap<MemberId, Vec<PeerId>> {
         let mut removed_peers = HashMap::new();
         for peer_id in peer_ids {
             if let Some(peer) = self.peers.remove(&peer_id) {
@@ -209,38 +204,25 @@ impl PeerRepository {
             }
         }
 
-        for (member_id, removed_peers_ids) in removed_peers {
-            ctx.notify(PeersRemoved {
-                member_id,
-                peers_id: removed_peers_ids,
-            })
-        }
+        //        for (member_id, removed_peers_ids) in removed_peers {
+        //            ctx.notify(PeersRemoved {
+        //                member_id,
+        //                peers_id: removed_peers_ids,
+        //            })
+        //        }
+        removed_peers
     }
 
-    /// Delete [`PeerStateMachine`] from this [`PeerRepository`] and send
-    /// [`PeersRemoved`] to [`Member`]s.
+    /// Remove all related to [`Member`] [`Peer`]s.
+    /// Note that this function will also remove all partners [`Peer`]s.
     ///
-    /// __Note:__ this also delete partner peer.
-    pub fn remove_peer(
+    /// Returns `HashMap` with all remove [`Peer`]s.
+    /// Key - [`Peer`]'s owner [`MemberId`],
+    /// value - removed [`Peer`]'s [`PeerId`].
+    pub fn remove_peers_related_to_member(
         &mut self,
         member_id: &MemberId,
-        peer_id: PeerId,
-        ctx: &mut Context<Room>,
-    ) {
-        let mut peers_id_to_delete = HashSet::new();
-        peers_id_to_delete.insert(peer_id);
-        self.remove_peers(&member_id, peers_id_to_delete, ctx);
-    }
-
-    /// Close all related to disconnected [`Member`] [`Peer`]s and partner
-    /// [`Peer`]s.
-    ///
-    /// Send [`Event::PeersRemoved`] to all affected [`Member`]s.
-    pub fn connection_closed(
-        &mut self,
-        member_id: &MemberId,
-        ctx: &mut Context<Room>,
-    ) {
+    ) -> HashMap<MemberId, Vec<PeerId>> {
         let mut peers_to_remove: HashMap<MemberId, Vec<PeerId>> =
             HashMap::new();
 
@@ -257,25 +239,33 @@ impl PeerRepository {
                 });
 
             peers_to_remove
-                .entry(peer.partner_member_id())
-                .or_insert_with(Vec::new)
-                .push(peer.id());
-
-            peers_to_remove
                 .entry(peer.member_id())
                 .or_insert_with(Vec::new)
                 .push(peer.id());
         });
 
-        for (peer_member_id, peers_id) in peers_to_remove {
-            for peer_id in &peers_id {
+        peers_to_remove
+            .values()
+            .flat_map(|peer_ids| peer_ids.iter())
+            .for_each(|peer_id| {
                 self.peers.remove(peer_id);
-            }
-            ctx.notify(PeersRemoved {
-                member_id: peer_member_id,
-                peers_id,
-            })
-        }
+            });
+
+        peers_to_remove
+    }
+
+    /// Delete [`PeerStateMachine`] from this [`PeerRepository`] and send
+    /// [`PeersRemoved`] to [`Member`]s.
+    ///
+    /// __Note:__ this also delete partner peer.
+    pub fn remove_peer(
+        &mut self,
+        member_id: &MemberId,
+        peer_id: PeerId,
+    ) -> HashMap<MemberId, Vec<PeerId>> {
+        let mut peers_id_to_delete = HashSet::new();
+        peers_id_to_delete.insert(peer_id);
+        self.remove_peers(&member_id, peers_id_to_delete)
     }
 }
 

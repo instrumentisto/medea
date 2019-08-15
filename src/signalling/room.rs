@@ -503,6 +503,50 @@ impl Room {
                 }),
         )
     }
+
+    /// Signal of removing [`Member`]'s [`Peer`]s.
+    fn member_peers_removed(
+        &mut self,
+        peers_id: Vec<PeerId>,
+        member_id: MemberId,
+        ctx: &mut Context<Room>,
+    ) -> ActFuture<(), ()> {
+        info!("Peers {:?} removed for member '{}'.", peers_id, member_id);
+        if let Some(member) = self.members.get_member_by_id(&member_id) {
+            member.peers_removed(&peers_id);
+        } else {
+            error!(
+                "Participant with id {} for which received \
+                 Event::PeersRemoved not found. Closing room.",
+                member_id
+            );
+
+            return Box::new(self.close_gracefully(ctx));
+        }
+
+        Box::new(self.send_peers_removed(member_id, peers_id).then(
+            |err, room, ctx: &mut Context<Self>| {
+                if let Err(e) = err {
+                    match e {
+                        RoomError::ConnectionNotExists(_)
+                        | RoomError::UnableToSendEvent(_) => {
+                            Box::new(future::ok(()).into_actor(room))
+                        }
+                        _ => {
+                            error!(
+                                "Unexpected failed PeersEvent command, \
+                                 because {}. Room will be stopped.",
+                                e
+                            );
+                            room.close_gracefully(ctx)
+                        }
+                    }
+                } else {
+                    Box::new(future::ok(()).into_actor(room))
+                }
+            },
+        ))
+    }
 }
 
 /// [`Actor`] implementation that provides an ergonomic way
@@ -627,59 +671,6 @@ impl Handler<Authorize> for Room {
     }
 }
 
-/// Signal of removing [`Member`]'s [`Peer`]s.
-#[derive(Debug, Message)]
-#[rtype(result = "Result<(), ()>")]
-pub struct PeersRemoved {
-    pub peers_id: Vec<PeerId>,
-    pub member_id: MemberId,
-}
-
-impl Handler<PeersRemoved> for Room {
-    type Result = ActFuture<(), ()>;
-
-    /// Send [`Event::PeersRemoved`] to remote [`Member`].
-    ///
-    /// Delete all removed [`PeerId`]s from all [`Member`]'s
-    /// endpoints.
-    #[allow(clippy::single_match_else)]
-    fn handle(
-        &mut self,
-        msg: PeersRemoved,
-        _ctx: &mut Self::Context,
-    ) -> Self::Result {
-        info!(
-            "Peers {:?} removed for member '{}'.",
-            msg.peers_id, msg.member_id
-        );
-        if let Some(member) = self.members.get_member_by_id(&msg.member_id) {
-            member.peers_removed(&msg.peers_id);
-        }
-
-        Box::new(self.send_peers_removed(msg.member_id, msg.peers_id).then(
-            |err, room, ctx: &mut Context<Self>| {
-                if let Err(e) = err {
-                    match e {
-                        RoomError::ConnectionNotExists(_) => {
-                            Box::new(future::ok(()).into_actor(room))
-                        }
-                        _ => {
-                            error!(
-                                "Failed PeersEvent command, because {}. Room \
-                                 will be stopped.",
-                                e
-                            );
-                            room.close_gracefully(ctx)
-                        }
-                    }
-                } else {
-                    Box::new(future::ok(()).into_actor(room))
-                }
-            },
-        ))
-    }
-}
-
 impl Handler<CommandMessage> for Room {
     type Result = ActFuture<(), ()>;
 
@@ -779,19 +770,37 @@ impl Handler<RpcConnectionClosed> for Room {
     type Result = ();
 
     /// Passes message to [`ParticipantService`] to cleanup stored connections.
+    ///
     /// Remove all related for disconnected [`Member`] [`Peer`]s.
+    ///
+    /// Send [`PeersRemoved`] message to [`Member`].
+    ///
+    /// Delete all removed [`PeerId`]s from all [`Member`]'s
+    /// endpoints.
     fn handle(&mut self, msg: RpcConnectionClosed, ctx: &mut Self::Context) {
         info!(
             "RpcConnectionClosed for member {}, reason {:?}",
             msg.member_id, msg.reason
         );
 
-        if let ClosedReason::Closed = msg.reason {
-            self.peers.connection_closed(&msg.member_id, ctx);
-        }
-
         self.members
-            .connection_closed(msg.member_id, &msg.reason, ctx);
+            .connection_closed(msg.member_id.clone(), &msg.reason, ctx);
+
+        if let ClosedReason::Closed = msg.reason {
+            let removed_peers =
+                self.peers.remove_peers_related_to_member(&msg.member_id);
+
+            for (peer_member_id, peers_ids) in removed_peers {
+                // Here we may have some problems. If two participants
+                // disconnect at one moment then sending event
+                // to another participant fail,
+                // because connection already closed but we don't know about it
+                // because message in event loop.
+                let fut =
+                    self.member_peers_removed(peers_ids, peer_member_id, ctx);
+                ctx.spawn(fut);
+            }
+        }
     }
 }
 
@@ -819,7 +828,11 @@ impl Handler<Close> for Room {
 
                 let member_id = id.clone();
 
-                self.peers.remove_peers(&member_id, peer_ids_to_remove, ctx);
+                let removed_peers =
+                    self.peers.remove_peers(&member_id, peer_ids_to_remove);
+                for (member_id, peers_id) in removed_peers {
+                    self.member_peers_removed(peers_id, member_id, ctx);
+                }
                 self.members.delete_member(&member_id, ctx);
             }
         }
@@ -856,7 +869,10 @@ impl Handler<DeleteMember> for Room {
                 }
             }
 
-            self.peers.remove_peers(&member.id(), peers, ctx);
+            let removed_peers = self.peers.remove_peers(&member.id(), peers);
+            for (member_id, peers_id) in removed_peers {
+                self.member_peers_removed(peers_id, member_id, ctx);
+            }
         }
 
         self.members.delete_member(&msg.0, ctx);
@@ -887,25 +903,35 @@ impl Handler<DeleteEndpoint> for Room {
         let member_id = msg.member_id;
         let endpoint_id = msg.endpoint_id;
 
-        let endpoint_id =
-            if let Some(member) = self.members.get_member_by_id(&member_id) {
-                let play_id = WebRtcPlayId(endpoint_id);
-                if let Some(endpoint) = member.take_sink(&play_id) {
-                    if let Some(peer_id) = endpoint.peer_id() {
-                        self.peers.remove_peer(&member_id, peer_id, ctx);
+        let endpoint_id = if let Some(member) =
+            self.members.get_member_by_id(&member_id)
+        {
+            let play_id = WebRtcPlayId(endpoint_id);
+            if let Some(endpoint) = member.take_sink(&play_id) {
+                if let Some(peer_id) = endpoint.peer_id() {
+                    let removed_peers =
+                        self.peers.remove_peer(&member_id, peer_id);
+                    for (member_id, peers_ids) in removed_peers {
+                        self.member_peers_removed(peers_ids, member_id, ctx);
                     }
                 }
+            }
 
-                let publish_id = WebRtcPublishId(play_id.0);
-                if let Some(endpoint) = member.take_src(&publish_id) {
-                    let peer_ids = endpoint.peer_ids();
-                    self.peers.remove_peers(&member_id, peer_ids, ctx);
+            let publish_id = WebRtcPublishId(play_id.0);
+            if let Some(endpoint) = member.take_src(&publish_id) {
+                let peer_ids = endpoint.peer_ids();
+                // TODO: reduce boilerplate
+                let removed_peers =
+                    self.peers.remove_peers(&member_id, peer_ids);
+                for (member_id, peers_id) in removed_peers {
+                    self.member_peers_removed(peers_id, member_id, ctx);
                 }
+            }
 
-                publish_id.0
-            } else {
-                endpoint_id
-            };
+            publish_id.0
+        } else {
+            endpoint_id
+        };
 
         debug!(
             "Endpoint [id = {}] removed in Member [id = {}] from Room [id = \

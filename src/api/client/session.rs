@@ -166,7 +166,7 @@ impl RpcConnection for Addr<WsSession> {
     ) -> Box<dyn Future<Item = (), Error = ()>> {
         let fut = self
             .send(msg)
-            .map_err(|err| error!("Failed send event {:?} ", err));
+            .map_err(|err| warn!("Failed send event {:?} ", err));
         Box::new(fut)
     }
 }
