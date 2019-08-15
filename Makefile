@@ -186,7 +186,7 @@ cargo.fmt:
 #	make cargo.lint
 
 cargo.lint:
-	cargo +nightly clippy --all -- -D clippy::pedantic -D warnings
+	cargo clippy --all -- -D clippy::pedantic -D warnings
 
 
 
