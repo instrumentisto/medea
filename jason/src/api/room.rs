@@ -53,22 +53,22 @@ impl RoomHandle {
 
     /// Mute local audio [`Track`]s for all [`PeerConnection`]s this [`Room`].
     pub fn mute_audio(&self) -> Result<(), JsValue> {
-        map_weak!(self, |inner| inner.borrow().toggle_send_audio(false))
+        map_weak!(self, |inner| inner.borrow_mut().toggle_send_audio(false))
     }
 
     /// Unmute local audio [`Track`]s for all [`PeerConnection`]s this [`Room`].
     pub fn unmute_audio(&self) -> Result<(), JsValue> {
-        map_weak!(self, |inner| inner.borrow().toggle_send_audio(true))
+        map_weak!(self, |inner| inner.borrow_mut().toggle_send_audio(true))
     }
 
     /// Mute local video [`Track`]s for all [`PeerConnection`]s this [`Room`].
     pub fn mute_video(&self) -> Result<(), JsValue> {
-        map_weak!(self, |inner| inner.borrow().toggle_send_video(false))
+        map_weak!(self, |inner| inner.borrow_mut().toggle_send_video(false))
     }
 
     /// Unmute local video [`Track`]s for all [`PeerConnection`]s this [`Room`].
     pub fn unmute_video(&self) -> Result<(), JsValue> {
-        map_weak!(self, |inner| inner.borrow().toggle_send_video(true))
+        map_weak!(self, |inner| inner.borrow_mut().toggle_send_video(true))
     }
 }
 
@@ -148,6 +148,8 @@ struct InnerRoom {
     media_manager: Rc<MediaManager>,
     connections: HashMap<u64, Connection>,
     on_new_connection: Rc<Callback2<ConnectionHandle, WasmErr>>,
+    enabled_audio: bool,
+    enabled_video: bool,
 }
 
 impl InnerRoom {
@@ -166,6 +168,8 @@ impl InnerRoom {
             media_manager,
             connections: HashMap::new(),
             on_new_connection: Rc::new(Callback2::default()),
+            enabled_audio: true,
+            enabled_video: true,
         }
     }
 
@@ -211,16 +215,18 @@ impl InnerRoom {
         Ok(self.peers.get(id).unwrap())
     }
 
-    pub fn toggle_send_audio(&self, enabled: bool) {
+    pub fn toggle_send_audio(&mut self, enabled: bool) {
         for peer in self.peers.get_all() {
             peer.toggle_send_audio(enabled);
         }
+        self.enabled_audio = enabled;
     }
 
-    pub fn toggle_send_video(&self, enabled: bool) {
+    pub fn toggle_send_video(&mut self, enabled: bool) {
         for peer in self.peers.get_all() {
             peer.toggle_send_video(enabled);
         }
+        self.enabled_video = enabled;
     }
 }
 
@@ -248,12 +254,16 @@ impl EventHandler for InnerRoom {
 
         self.create_connections_from_tracks(&tracks);
 
+        let is_enabled_audio = self.enabled_audio;
+        let is_enabled_video = self.enabled_video;
         let rpc = Rc::clone(&self.rpc);
         let fut = match sdp_offer {
             // offerer
             None => future::Either::A(
                 peer.get_offer(tracks)
                     .map(move |sdp_offer| {
+                        peer.toggle_send_audio(is_enabled_audio);
+                        peer.toggle_send_video(is_enabled_video);
                         rpc.send_command(Command::MakeSdpOffer {
                             peer_id,
                             sdp_offer,
