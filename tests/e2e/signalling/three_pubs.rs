@@ -8,7 +8,7 @@ use crate::signalling::{CloseSocket, TestMember};
 #[test]
 fn three_members_p2p_video_call() {
     System::run(|| {
-        let base_url = "ws://localhost:8081/ws/three-members-conference";
+        let base_url = "ws://0.0.0.0:8081/ws/three-members-conference";
 
         // Note that events, peer_created_count, ice_candidates
         // is separated by members.
@@ -108,8 +108,7 @@ fn three_members_p2p_video_call() {
                         })
                         .collect();
                     assert_eq!(peers_removed.len(), 1);
-                    assert_eq!(peers_removed[0].len(), 2);
-                    assert_ne!(peers_removed[0][0], peers_removed[0][1]);
+                    assert_eq!(peers_removed[0].len(), 1);
 
                     members_peers_removed.set(members_peers_removed.get() + 1);
                     // Stop when all members receive Event::PeerRemoved

@@ -1,3 +1,8 @@
+//! Client API protocol implementation for Medea media server.
+
+// TODO: when using enum's Self will be in stable, remove it.
+#![allow(clippy::use_self)]
+
 use std::collections::HashMap;
 
 use macro_attr::*;

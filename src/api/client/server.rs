@@ -83,6 +83,8 @@ fn ws_index(
 /// Context for [`App`] which holds all the necessary dependencies.
 pub struct Context {
     /// Repository of all currently existing [`Room`]s in application.
+    ///
+    /// [`Room`]: crate::signalling::Room
     pub rooms: RoomRepository,
 
     /// Settings of application.
@@ -95,7 +97,7 @@ pub struct Server(ActixServer);
 impl Server {
     /// Starts Client API HTTP server.
     pub fn run(rooms: RoomRepository, config: Conf) -> io::Result<Addr<Self>> {
-        let server_addr = config.server.bind_addr();
+        let server_addr = config.server.http.bind_addr();
 
         let server = HttpServer::new(move || {
             App::new()

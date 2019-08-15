@@ -43,7 +43,10 @@ use crate::{
     AppContext,
 };
 
-use crate::shutdown::ShutdownGracefully;
+use crate::{
+    api::control::{MemberId, RoomId},
+    shutdown::ShutdownGracefully,
+};
 
 #[derive(Debug, Fail)]
 pub enum ControlApiError {
@@ -154,6 +157,21 @@ struct ControlApiService {
 }
 
 impl ControlApiService {
+    fn get_sid(
+        &self,
+        room_id: &RoomId,
+        member_id: &MemberId,
+        credentials: &str,
+    ) -> String {
+        format!(
+            "{}/{}/{}/{}",
+            self.app.config.server.http.public_url,
+            room_id,
+            member_id,
+            credentials
+        )
+    }
+
     /// Implementation of `Create` method for `Room` element.
     pub fn create_room(
         &mut self,
@@ -170,15 +188,7 @@ impl ControlApiService {
         let sid: HashMap<String, String> = fut_try!(room.members())
             .iter()
             .map(|(id, member)| {
-                let base_url = self.app.config.get_base_rpc_url();
-
-                let uri = format!(
-                    "{}/{}/{}/{}",
-                    base_url,
-                    &room_id,
-                    id,
-                    member.credentials()
-                );
+                let uri = self.get_sid(&room_id, &id, member.credentials());
 
                 (id.clone().to_string(), uri)
             })
@@ -203,14 +213,7 @@ impl ControlApiService {
         let (member_id, room_uri) = local_uri.take_member_id();
         let room_id = room_uri.take_room_id();
 
-        let base_url = self.app.config.get_base_rpc_url();
-        let sid = format!(
-            "{}/{}/{}/{}",
-            base_url,
-            room_id,
-            member_id,
-            spec.credentials()
-        );
+        let sid = self.get_sid(&room_id, &member_id, spec.credentials());
         let mut sids = HashMap::new();
         sids.insert(member_id.to_string(), sid);
 
@@ -607,9 +610,9 @@ impl Handler<ShutdownGracefully> for GrpcServer {
 
 /// Run gRPC server in actix actor.
 pub fn run(room_repo: Addr<RoomService>, app: AppContext) -> Addr<GrpcServer> {
-    let bind_ip = app.config.grpc.bind_ip.to_string();
-    let bind_port = app.config.grpc.bind_port;
-    let cq_count = app.config.grpc.completion_queue_count;
+    let bind_ip = app.config.server.grpc.bind_ip.to_string();
+    let bind_port = app.config.server.grpc.bind_port;
+    let cq_count = app.config.server.grpc.completion_queue_count;
 
     let service = create_control_api(ControlApiService {
         app,

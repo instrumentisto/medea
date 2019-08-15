@@ -1,8 +1,8 @@
-[server]
+[server.http]
 # Server host
 #
 # Default:
-#   host = "localhost:8080"
+#   host = "ws://0.0.0.0:8080"
 
 # IP address to bind HTTP server to.
 #
@@ -19,6 +19,23 @@
 # Default:
 #   static_specs_path = None
 static_specs_path = "dev/specs"
+
+
+[server.grpc]
+# IP address to bind gRPC server to.
+#
+# Default:
+#   bind_ip = "0.0.0.0"
+
+# Port to bind gRPC server to.
+#
+# Default:
+#   bind_port = 50051
+
+# Completion queue count of gRPC server.
+#
+# Default:
+#   completion_queue_count = 2
 
 
 
@@ -85,25 +102,6 @@ static_specs_path = "dev/specs"
 #
 # Default:
 #   connection_timeout = "5s"
-
-
-
-
-[grpc]
-# IP address to bind gRPC server to.
-#
-# Default:
-#   bind_ip = "0.0.0.0"
-
-# Port to bind gRPC server to.
-#
-# Default:
-#   bind_port = 50051
-
-# Completion queue count of gRPC server.
-#
-# Default:
-#   completion_queue_count = 2
 
 
 

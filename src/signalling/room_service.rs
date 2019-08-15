@@ -112,7 +112,7 @@ impl Handler<StartStaticRooms> for RoomService {
         _: &mut Self::Context,
     ) -> Self::Result {
         if let Some(static_specs_path) =
-            self.app.config.server.static_specs_path.clone()
+            self.app.config.server.http.static_specs_path.clone()
         {
             let room_specs = match load_static_specs_from_dir(static_specs_path)
             {
@@ -132,12 +132,11 @@ impl Handler<StartStaticRooms> for RoomService {
                 let room_id = spec.id().clone();
 
                 let room = Room::new(&spec, self.app.clone())?.start();
-                self.graceful_shutdown.do_send(shutdown::Subscribe(
-                    shutdown::Subscriber {
-                        priority: shutdown::Priority(2),
-                        addr: room.clone().recipient(),
-                    },
-                ));
+                shutdown::subscribe(
+                    &self.graceful_shutdown,
+                    room.clone().recipient(),
+                    shutdown::Priority(2),
+                );
 
                 self.room_repo.add(room_id, room);
             }
@@ -171,12 +170,11 @@ impl Handler<StartRoom> for RoomService {
         let room = Room::new(&room, self.app.clone())?;
         let room_addr = room.start();
 
-        self.graceful_shutdown.do_send(shutdown::Subscribe(
-            shutdown::Subscriber {
-                priority: shutdown::Priority(2),
-                addr: room_addr.clone().recipient(),
-            },
-        ));
+        shutdown::subscribe(
+            &self.graceful_shutdown,
+            room_addr.clone().recipient(),
+            shutdown::Priority(2),
+        );
 
         debug!("New Room [id = {}] started.", room_id);
         self.room_repo.add(room_id, room_addr);
@@ -199,12 +197,11 @@ impl Handler<DeleteRoom> for RoomService {
         ctx: &mut Self::Context,
     ) -> Self::Result {
         if let Some(room) = self.room_repo.get(&msg.0) {
-            self.graceful_shutdown.do_send(shutdown::Unsubscribe(
-                shutdown::Subscriber {
-                    priority: shutdown::Priority(2),
-                    addr: room.clone().recipient(),
-                },
-            ));
+            shutdown::unsubscribe(
+                &self.graceful_shutdown,
+                room.clone().recipient(),
+                shutdown::Priority(2),
+            );
             let rooms = self.room_repo.clone();
             ctx.spawn(wrap_future(
                 room.send(Close)

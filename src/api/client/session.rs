@@ -158,13 +158,15 @@ impl RpcConnection for Addr<WsSession> {
     }
 
     /// Sends [`Event`] to Web Client.
+    ///
+    /// [`Event`]: medea_client_api_proto::Event
     fn send_event(
         &self,
         msg: EventMessage,
     ) -> Box<dyn Future<Item = (), Error = ()>> {
         let fut = self
             .send(msg)
-            .map_err(|err| error!("Failed send event {:?} ", err));
+            .map_err(|err| warn!("Failed send event {:?} ", err));
         Box::new(fut)
     }
 }
