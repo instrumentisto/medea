@@ -189,7 +189,7 @@ endif
 #	make cargo.lint
 
 cargo.lint:
-	cargo +nightly-2019-08-03 clippy --all -- -D clippy::pedantic -D warnings
+	cargo +nightly clippy --all -- -D clippy::pedantic -D warnings
 
 
 
@@ -301,9 +301,9 @@ endif
 # 	make test.e2e [dockerized=(YES|no)] [logs=(yes|NO)] [coturn=(YES|no)]
 
 medea-env = RUST_BACKTRACE=1 \
-	MEDEA_SERVER.BIND_PORT=8081 \
+	MEDEA_SERVER.HTTP.BIND_PORT=8081 \
 	$(if $(call eq,$(logs),yes),,RUST_LOG=warn) \
-	MEDEA_SERVER.STATIC_SPECS_PATH=tests/specs
+	MEDEA_SERVER.HTTP.STATIC_SPECS_PATH=tests/specs
 
 chromedriver-port = 50000
 geckodriver-port = 50001
@@ -345,7 +345,8 @@ ifeq ($(dockerized),no)
 	########################
 	# Run tests in chrome #
 	########################
-	- cargo run -p e2e-tests-runner -- \
+	# TODO: Run kill jobs also if error
+	cargo run -p e2e-tests-runner -- \
 		-w http://localhost:$(chromedriver-port) \
 		-f localhost:$(test-runner-port) \
 	 	--headless
@@ -354,7 +355,7 @@ ifeq ($(dockerized),no)
 	########################
 	# Run tests in firefox #
 	########################
-	- cargo run -p e2e-tests-runner -- \
+	cargo run -p e2e-tests-runner -- \
 		-w http://localhost:$(geckodriver-port) \
 		-f localhost:$(test-runner-port) \
 		--headless
@@ -427,15 +428,77 @@ endif
 # Releasing commands #
 ######################
 
+# Build and publish Jason to NPM and crates.io.
+#
+# Note that this command will use CARGO_TOKEN and NPM_TOKEN enviroment
+# variables for publishing.
+#
+# Usage:
+#   make release.jason
+
+release.jason: release.npm.jason release.crates.jason
+
+
 # Build and publish Jason application to npm
+#
+# Note that this command will use NPM_TOKEN enviroment
+# variable for publishing.
 #
 # Usage:
 #	make release.jason
 
-release.jason:
+release.npm.jason:
 	@rm -rf jason/pkg/
 	wasm-pack build -t web jason
 	wasm-pack publish
+
+
+# Build and publish Jason to crates.io
+#
+# Note that this command will use CARGO_TOKEN enviroment
+# variable for publishing.
+#
+# Usage:
+#   make release.crates.jason
+
+release.crates.jason:
+	cd jason && cargo publish --token ${CARGO_TOKEN}
+
+
+# Build and publish Medea to crates.io
+#
+# Note that this command will use CARGO_TOKEN enviroment
+# variable for publishing.
+#
+# Usage:
+#   make release.crates.medea
+
+release.crates.medea:
+	cargo publish --token ${CARGO_TOKEN}
+
+
+# Build and publish Medea client API proto to crates.io
+#
+# Note that this command will use CARGO_TOKEN enviroment
+# variable for publishing.
+#
+# Usage:
+#   make release.crates.medea-client-api-proto
+
+release.crates.medea-client-api-proto:
+	cd proto/client-api && cargo publish --token ${CARGO_TOKEN}
+
+
+# Build and publish Medea's macro to crates.io
+#
+# Note that this command will use CARGO_TOKEN enviroment
+# variable for publishing.
+#
+# Usage:
+#   make release.crates.medea-macro
+
+release.crates.medea-macro:
+	cd crates/medea-macro && cargo publish --token ${CARGO_TOKEN}
 
 
 release.helm: helm.package.release
@@ -714,8 +777,10 @@ endef
         helm helm.down helm.init helm.lint helm.list \
         	helm.package helm.package.release helm.up \
         minikube.boot \
-        release.jason release.helm \
         test test.signalling test.unit test.e2e \
-        up.coturn up.demo up.dev up.jason up.medea \
         down down.medea down.coturn \
+        release.jason release.crates.jason release.npm.jason release.helm \
+        release.crates.medea release.crates.medea-client-api-proto \
+        release.crates.medea-macro \ release.helm \
+        up up.coturn up.demo up.dev up.jason up.medea \
         yarn

@@ -1,3 +1,7 @@
+//! Representation of [coturn]'s user.
+//!
+//! [coturn]: https://github.com/coturn/coturn
+
 use medea_client_api_proto::IceServer;
 
 use crate::api::control::RoomId;

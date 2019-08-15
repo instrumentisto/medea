@@ -44,6 +44,10 @@ pub struct Db {
     pub redis: Redis,
 }
 
+/// Setting of [Redis] server which used by [coturn].
+///
+/// [Redis]: https://redis.io/
+/// [coturn]: https://github.com/coturn/coturn
 #[derive(Clone, Debug, Deserialize, Serialize, SmartDefault)]
 #[serde(default)]
 pub struct Redis {

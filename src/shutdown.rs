@@ -7,7 +7,7 @@ use std::{
 
 use actix::{
     prelude::{Actor, Context},
-    AsyncContext, Handler, Message, Recipient, ResponseActFuture, System,
+    Addr, AsyncContext, Handler, Message, Recipient, ResponseActFuture, System,
     WrapFuture as _,
 };
 use failure::Fail;
@@ -181,7 +181,7 @@ pub struct Subscriber {
 /// Message that [`Subscriber`] subscribes to shutdown messages with.
 #[derive(Message)]
 #[rtype(result = "Result<(), ShuttingDownError>")]
-pub struct Subscribe(pub Subscriber);
+struct Subscribe(pub Subscriber);
 
 impl Handler<Subscribe> for GracefulShutdown {
     type Result = Result<(), ShuttingDownError>;
@@ -199,6 +199,7 @@ impl Handler<Subscribe> for GracefulShutdown {
     }
 }
 
+/// Error which indicates that process is shutting down at this moment.
 #[derive(Clone, Copy, Debug, Fail)]
 #[fail(display = "Process is shutting down at the moment")]
 pub struct ShuttingDownError;
@@ -207,7 +208,7 @@ pub struct ShuttingDownError;
 /// notifications with.
 #[derive(Message)]
 #[rtype(result = "()")]
-pub struct Unsubscribe(pub Subscriber);
+struct Unsubscribe(pub Subscriber);
 
 impl Handler<Unsubscribe> for GracefulShutdown {
     type Result = ();
@@ -225,4 +226,28 @@ impl Handler<Unsubscribe> for GracefulShutdown {
             self.subs.remove(&m.0.priority);
         }
     }
+}
+
+/// Subscribe recipient to [`GracefulShutdown`].
+pub fn subscribe(
+    shutdown_addr: &Addr<GracefulShutdown>,
+    subscriber: Recipient<ShutdownGracefully>,
+    priority: Priority,
+) {
+    shutdown_addr.do_send(Subscribe(Subscriber {
+        priority,
+        addr: subscriber,
+    }));
+}
+
+/// Unsubscribe recipient from [`GracefulShutdown`].
+pub fn unsubscribe(
+    shutdown_addr: &Addr<GracefulShutdown>,
+    subscriber: Recipient<ShutdownGracefully>,
+    priority: Priority,
+) {
+    shutdown_addr.do_send(Unsubscribe(Subscriber {
+        priority,
+        addr: subscriber,
+    }));
 }

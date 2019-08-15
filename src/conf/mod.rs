@@ -1,6 +1,7 @@
 //! Provides application configuration options.
 
 pub mod grpc;
+pub mod http_server;
 pub mod log;
 pub mod rpc;
 pub mod server;
@@ -13,8 +14,10 @@ use config::{Config, Environment, File};
 use failure::Error;
 use serde::{Deserialize, Serialize};
 
+#[doc(inline)]
 pub use self::{
     grpc::Grpc,
+    http_server::HttpServer,
     log::Log,
     rpc::Rpc,
     server::Server,
@@ -35,14 +38,16 @@ static APP_CONF_PATH_ENV_VAR_NAME: &str = "MEDEA_CONF";
 pub struct Conf {
     /// HTTP server settings.
     pub rpc: Rpc,
-    /// RPC connection settings.
+
+    /// Servers related settings.
     pub server: Server,
+
     /// TURN server settings.
     pub turn: Turn,
-    /// gRPC server settings.
-    pub grpc: Grpc,
+
     /// Logging settings.
     pub log: Log,
+
     /// Application shutdown settings.
     pub shutdown: Shutdown,
 }
@@ -64,10 +69,6 @@ impl Conf {
         cfg.merge(Environment::with_prefix("MEDEA").separator("."))?;
 
         Ok(cfg.try_into()?)
-    }
-
-    pub fn get_base_rpc_url(&self) -> String {
-        format!("wss://{}", self.server.host)
     }
 }
 
@@ -161,7 +162,7 @@ mod tests {
         let defaults = Conf::default();
         let test_config_file_path = "test_config.toml";
 
-        let data = format!("[rpc]\nidle_timeout = \"45s\"");
+        let data = "[rpc]\nidle_timeout = \"45s\"".to_owned();
         fs::write(test_config_file_path, data).unwrap();
         env::set_var(APP_CONF_PATH_ENV_VAR_NAME, test_config_file_path);
 
@@ -192,7 +193,7 @@ mod tests {
     fn conf_parse_spec_env_overrides_file() {
         let test_config_file_path = "test_config.toml";
 
-        let data = format!("[rpc]\nidle_timeout = \"47s\"");
+        let data = "[rpc]\nidle_timeout = \"47s\"".to_owned();
         fs::write(test_config_file_path, data).unwrap();
         env::set_var(APP_CONF_PATH_ENV_VAR_NAME, test_config_file_path);
 

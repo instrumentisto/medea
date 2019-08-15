@@ -1,7 +1,11 @@
 //! Participant is [`Member`] with [`RpcConnection`]. [`ParticipantService`]
-//! stores [`Members`] and associated [`RpcConnection`]s, handles
+//! stores [`Member`]s and associated [`RpcConnection`]s, handles
 //! [`RpcConnection`] authorization, establishment, message sending, Turn
 //! credentials management.
+//!
+//! [`Member`]: crate::api::control::member::Member
+//! [`RpcConnection`]: crate::api::client::rpc_connection::RpcConnection
+//! [`ParticipantService`]: crate::signalling::participants::ParticipantService
 
 use std::{collections::HashMap, time::Instant};
 
@@ -209,7 +213,7 @@ impl ParticipantService {
         }
     }
 
-    /// Saves provided [`RpcConnection`], registers [`ICEUser`].
+    /// Saves provided [`RpcConnection`], registers [`IceUser`].
     /// If [`Member`] already has any other [`RpcConnection`],
     /// then it will be closed.
     pub fn connection_established(
@@ -284,6 +288,7 @@ impl ParticipantService {
         let closed_at = Instant::now();
         match reason {
             ClosedReason::Closed => {
+                debug!("Connection for member [id = {}] removed.", member_id);
                 self.connections.remove(&member_id);
 
                 ctx.spawn(wrap_future(

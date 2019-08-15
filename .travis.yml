@@ -22,7 +22,7 @@ jobs:
 
   include:
     - stage: lints
-      rust: nightly-2019-08-03 # TODO: use nightly when clippy will be fixed
+      rust: nightly
       name: "Clippy"
       before_script: rustup component add clippy
       script: make lint
@@ -38,7 +38,6 @@ jobs:
       name: "Build jason (Rust stable)"
       before_script:
         - rm -f /home/travis/.cargo/bin/wasm-pack
-        - make yarn dockerized=no
         - curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
       script:
         - wasm-pack build -t web jason
@@ -70,7 +69,50 @@ jobs:
         - mkdir .cache
       script: make test.e2e
 
+before_deploy:
+  - echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > ~/.npmrc
+  - curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
+deploy:
+  - provider: script
+    skip_cleanup: true
+    script: make release.crates.medea
+    on:
+      tags: true
+      branch: master
+      condition: $TRAVIS_TAG =~ ^medea-[0-9]+\.[0-9]+\.[0-9]+
+
+  - provider: script
+    skip_cleanup: true
+    script: make release.jason
+    on:
+      tags: true
+      branch: master
+      condition: $TRAVIS_TAG =~ ^medea-jason-[0-9]+\.[0-9]+\.[0-9]+
+
+  - provider: script
+    skip_cleanup: true
+    script: make release.crates.medea-client-api-proto
+    on:
+      tags: true
+      branch: master
+      condition: $TRAVIS_TAG =~ ^medea-client-api-proto-[0-9]+\.[0-9]+\.[0-9]+
+
+  - provider: script
+    skip_cleanup: true
+    script: make release.crates.medea-macro
+    on:
+      tags: true
+      branch: master
+      condition: $TRAVIS_TAG =~ ^medea-macro-[0-9]+\.[0-9]+\.[0-9]+
+
+  - provider: releases
+    api_key: $GH_TOKEN
+    on:
+      tags: true
+      branch: master
+
 notifications:
   email:
     on_success: never
-    on_failure: never # TODO: set to always
+    on_failure: always
