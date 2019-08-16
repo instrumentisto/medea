@@ -288,6 +288,7 @@ endif
 ifeq ($(dockerized),no)
 	@make down.medea dockerized=no
 
+	rustup update stable # TODO: remove it when docker will have rust 1.37
 	cargo build $(if $(call eq,$(release),yes),--release)
 	env $(medea-env) $(if $(call eq,$(logs),yes),,RUST_LOG=warn) cargo run $(if $(call eq,$(release),yes),--release) &
 
