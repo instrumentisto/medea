@@ -1,5 +1,7 @@
 language: rust
 
+# Comment for testing conditional CI
+
 services:
   - docker
 
