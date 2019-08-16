@@ -1,7 +1,5 @@
 language: rust
 
-# Comment for testing conditional CI
-
 services:
   - docker
 
@@ -107,13 +105,13 @@ deploy:
 
 stages:
   - name: lints
-    if: branch = master OR commit_message =~ ^.*\[run ci\]
+    if: branch = master OR commit_message =~ /.*\[run ci\]/
   - name: formatting
-    if: branch = master OR commit_message =~ ^.*\[run ci\]
+    if: branch = master OR commit_message =~ /.*\[run ci\]/
   - name: build
-    if: branch = master OR commit_message =~ ^.*\[run ci\]
+    if: branch = master OR commit_message =~ /.*\[run ci\]/
   - name: tests
-    if: branch = master OR commit_message =~ ^.*\[run ci\]
+    if: branch = master OR commit_message =~ /.*\[run ci\]/
 
 notifications:
   email:
