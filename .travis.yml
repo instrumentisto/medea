@@ -15,6 +15,7 @@ jobs:
     - stage: lints
       rust: stable
       name: "Clippy"
+      env: CACHE_NAME=clippy_cache
       before_script: rustup component add clippy
       script: make lint
 
@@ -22,11 +23,13 @@ jobs:
       rust: nightly
       name: "Rustfmt"
       before_script: rustup component add rustfmt
+      env: CACHE_NAME=formatting_cache
       script: make fmt check=yes
 
     - stage: build
       rust: stable
       name: "Build jason (Rust stable)"
+      env: CACHE_NAME=jason_cache
       before_script:
         - rm -f /home/travis/.cargo/bin/wasm-pack
         - curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
@@ -58,6 +61,15 @@ jobs:
       name: "E2E tests (Rust stable)"
       script: make test.e2e
 
+stages:
+  - name: lints
+    if: branch = master OR commit_message =~ /.*\[run ci\]/
+  - name: formatting
+    if: branch = master OR commit_message =~ /.*\[run ci\]/
+  - name: build
+    if: branch = master OR commit_message =~ /.*\[run ci\]/
+  - name: tests
+    if: branch = master OR commit_message =~ /.*\[run ci\]/
 
 install:
   - rustc -vV
@@ -102,16 +114,6 @@ deploy:
     on:
       tags: true
       branch: master
-
-stages:
-  - name: lints
-    if: branch = master OR commit_message =~ /.*\[run ci\]/
-  - name: formatting
-    if: branch = master OR commit_message =~ /.*\[run ci\]/
-  - name: build
-    if: branch = master OR commit_message =~ /.*\[run ci\]/
-  - name: tests
-    if: branch = master OR commit_message =~ /.*\[run ci\]/
 
 notifications:
   email:
