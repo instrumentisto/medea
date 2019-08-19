@@ -1,6 +1,6 @@
 [package]
 name = "medea-macro"
-version = "0.1.0"
+version = "0.1.0-dev"
 edition = "2018"
 description = "Don't use this crate directly. It is internal to Medea."
 authors = ["Instrumentisto Team <developer@instrumentisto.com>"]

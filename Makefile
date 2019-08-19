@@ -44,10 +44,18 @@ deps: cargo yarn
 docs: docs.rust
 
 
+fmt: cargo.fmt
+
+
 lint: cargo.lint
 
 
-fmt: cargo.fmt
+# Build and publish project crate everywhere.
+#
+# Usage:
+#	make release crate=(medea|medea-jason|<crate-name>)
+
+release: release.crates release.npm
 
 
 test: test.unit
@@ -166,6 +174,26 @@ endif
 
 
 
+#################
+# WASM commands #
+#################
+
+# Builds project crate as a WASM distribution unit ready for publishing to NPM.
+#
+# Usage:
+#	make wasm.build [crate=medea-jason]
+
+wasm-build-crate = $(if $(call eq,$(crate),),medea-jason,$(crate))
+
+wasm.build:
+ifeq ($(wasm-build-crate),medea-jason)
+	@rm -rf jason/pkg/
+	wasm-pack build -t web jason/
+endif
+
+
+
+
 ##########################
 # Documentation commands #
 ##########################
@@ -203,8 +231,9 @@ test-unit-crate = $(if $(call eq,$(crate),),@all,$(crate))
 
 test.unit:
 ifeq ($(test-unit-crate),@all)
-	@make test.unit crate=medea-client-api-proto
 	@make test.unit crate=medea-macro
+	@make test.unit crate=medea-client-api-proto
+	@make test.unit crate=medea-jason
 	@make test.unit crate=medea
 else
 	cargo test -p $(test-unit-crate)
@@ -217,80 +246,41 @@ endif
 # Releasing commands #
 ######################
 
-# Build and publish Jason to NPM and crates.io.
-#
-# Note that this command will use CARGO_TOKEN and NPM_TOKEN enviroment
-# variables for publishing.
+# Build and publish project crate to crates.io.
 #
 # Usage:
-#   make release.jason
+#	make release.crates crate=(medea|medea-jason|<crate-name>)
+#	                    [token=($CARGO_TOKEN|<cargo-token>)]
 
-release.jason: release.npm.jason release.crates.jason
+release-crates-token = $(if $(call eq,$(token),),${CARGO_TOKEN},$(token))
 
-
-# Build and publish Jason application to npm
-#
-# Note that this command will use NPM_TOKEN enviroment
-# variable for publishing.
-#
-# Usage:
-#	make release.jason
-
-release.npm.jason:
-	@rm -rf jason/pkg/
-	wasm-pack build -t web jason
-	wasm-pack publish
-
-
-# Build and publish Jason to crates.io
-#
-# Note that this command will use CARGO_TOKEN enviroment
-# variable for publishing.
-#
-# Usage:
-#   make release.crates.jason
-
-release.crates.jason:
-	cd jason && cargo publish --token ${CARGO_TOKEN}
-
-
-# Build and publish Medea to crates.io
-#
-# Note that this command will use CARGO_TOKEN enviroment
-# variable for publishing.
-#
-# Usage:
-#   make release.crates.medea
-
-release.crates.medea:
-	cargo publish --token ${CARGO_TOKEN}
-
-
-# Build and publish Medea client API proto to crates.io
-#
-# Note that this command will use CARGO_TOKEN enviroment
-# variable for publishing.
-#
-# Usage:
-#   make release.crates.medea-client-api-proto
-
-release.crates.medea-client-api-proto:
-	cd proto/client-api && cargo publish --token ${CARGO_TOKEN}
-
-
-# Build and publish Medea's macro to crates.io
-#
-# Note that this command will use CARGO_TOKEN enviroment
-# variable for publishing.
-#
-# Usage:
-#   make release.crates.medea-macro
-
-release.crates.medea-macro:
-	cd crates/medea-macro && cargo publish --token ${CARGO_TOKEN}
+release.crates:
+ifeq ($(crate),medea-jason)
+	cd jason/
+endif
+ifeq ($(crate),medea-client-api-proto)
+	cd proto/client-api/
+endif
+ifeq ($(crate),medea-macro)
+	cd crates/medea-macro/
+endif
+	cargo publish --token $(release-crates-token)
 
 
 release.helm: helm.package.release
+
+
+# Build and publish project crate to NPM.
+#
+# Usage:
+#	make release.npm [crate=medea-jason]
+
+release-npm-crate = $(if $(call eq,$(crate),),medea-jason,$(crate))
+
+release.npm: wasm.build
+ifeq ($(release-npm-crate),medea-jason)
+	wasm-pack publish jason/
+endif
 
 
 
@@ -566,9 +556,8 @@ endef
         helm helm.down helm.init helm.lint helm.list \
         	helm.package helm.package.release helm.up \
         minikube.boot \
-        release.jason release.crates.jason release.npm.jason release.helm \
-        release.crates.medea release.crates.medea-client-api-proto \
-        release.crates.medea-macro \
+        release release.crates release.helm release.npm \
         test test.unit \
         up up.coturn up.demo up.dev up.jason up.medea \
+        wasm.build \
         yarn

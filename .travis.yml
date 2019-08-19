@@ -2,58 +2,57 @@ language: rust
 
 cache: cargo
 
+install:
+  - rustc -vV
+  - cargo -vV
+
 jobs:
   allow_failures:
     - rust: nightly
       stage: build
 
   include:
-    - stage: lints
+    - name: Clippy
+      stage: check
       rust: nightly
-      name: "Clippy"
       before_script: rustup component add clippy
       script: make lint
 
-    - stage: formatting
+    - name: rustfmt
+      stage: check
       rust: nightly
-      name: "Rustfmt"
       before_script: rustup component add rustfmt
       script: make fmt check=yes
 
-    - stage: build
+    - name: medea-jason (stable)
+      stage: build
       rust: stable
-      name: "Build jason (Rust stable)"
       before_script:
         - rm -f /home/travis/.cargo/bin/wasm-pack
         - make yarn dockerized=no
         - curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
       script:
-        - wasm-pack build -t web jason
+        - make wasm.build crate=medea-jason
 
-    - stage: build
+    - name: medea (stable)
+      stage: build
       rust: stable
-      name: "Build medea (Rust stable)"
-      script: cargo build
+      script: cargo build --bin medea
 
-    - stage: build
+    - name: medea (beta)
+      stage: build
       rust: beta
-      name: "Build medea (Rust beta)"
-      script: cargo build
+      script: cargo build --bin medea
 
-    - stage: build
+    - name: medea (nightly)
+      stage: build
       rust: nightly
-      name: "Build medea (Rust nightly)"
       script: cargo build
 
-    - stage: tests
+    - name: unit (stable)
+      stage: test
       rust: stable
-      name: "Unit tests (Rust stable)"
-      script: make test.unit
-
-
-install:
-  - rustc -vV
-  - cargo -vV
+      script: make test.unit crate=@all
 
 before_deploy:
   - echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > ~/.npmrc
@@ -61,38 +60,56 @@ before_deploy:
 
 deploy:
   - provider: script
-    script: make release.crates.medea
+    script: make release.crates crate=medea
     on:
       tags: true
-      branch: master
+      condition: $TRAVIS_TAG =~ ^medea-[0-9]+\.[0-9]+\.[0-9]+
+  - provider: releases
+    skip_cleanup: true
+    api_key: $GH_TOKEN
+    name: $TRAVIS_TAG
+    on:
+      tags: true
       condition: $TRAVIS_TAG =~ ^medea-[0-9]+\.[0-9]+\.[0-9]+
 
   - provider: script
-    script: make release.jason
+    script: make release crate=medea-jason
     on:
       tags: true
-      branch: master
+      condition: $TRAVIS_TAG =~ ^medea-jason-[0-9]+\.[0-9]+\.[0-9]+
+  - provider: releases
+    skip_cleanup: true
+    api_key: $GH_TOKEN
+    name: $TRAVIS_TAG
+    on:
+      tags: true
       condition: $TRAVIS_TAG =~ ^medea-jason-[0-9]+\.[0-9]+\.[0-9]+
 
   - provider: script
-    script: make release.crates.medea-client-api-proto
+    script: make release.crates crate=medea-client-api-proto
     on:
       tags: true
-      branch: master
+      condition: $TRAVIS_TAG =~ ^medea-client-api-proto-[0-9]+\.[0-9]+\.[0-9]+
+  - provider: releases
+    skip_cleanup: true
+    api_key: $GH_TOKEN
+    name: $TRAVIS_TAG
+    on:
+      tags: true
       condition: $TRAVIS_TAG =~ ^medea-client-api-proto-[0-9]+\.[0-9]+\.[0-9]+
 
   - provider: script
-    script: make release.crates.medea-macro
+    script: make release.crates crate=medea-macro
     on:
       tags: true
-      branch: master
       condition: $TRAVIS_TAG =~ ^medea-macro-[0-9]+\.[0-9]+\.[0-9]+
-
   - provider: releases
+    skip_cleanup: true
     api_key: $GH_TOKEN
+    name: $TRAVIS_TAG
     on:
       tags: true
-      branch: master
+      condition: $TRAVIS_TAG =~ ^medea-macro-[0-9]+\.[0-9]+\.[0-9]+
 
 notifications:
   email:

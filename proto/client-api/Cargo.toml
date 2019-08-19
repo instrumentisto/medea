@@ -1,13 +1,16 @@
 [package]
 name = "medea-client-api-proto"
-version = "0.1.0"
+version = "0.1.0-dev"
 edition = "2018"
 description = "Client API protocol implementation for Medea media server"
 authors = ["Instrumentisto Team <developer@instrumentisto.com>"]
-homepage = "https://github.com/instrumentisto/medea"
 license = "MIT/Apache 2.0"
+documentation = "https://docs.rs/medea-client-api-proto"
+homepage = "https://github.com/instrumentisto/medea/tree/master/proto/client-api"
+repository = "https://github.com/instrumentisto/medea/tree/master/proto/client-api"
 readme = "README.md"
-repository = "https://github.com/instrumentisto/medea"
+keywords = ["medea", "client-api"]
+categories = ["api-bindings", "web-programming"]
 
 [features]
 default = ["jason", "medea"]

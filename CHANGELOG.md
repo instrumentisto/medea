@@ -6,7 +6,7 @@ All user visible changes to this project will be documented in this file. This p
 
 
 
-## [0.1.0] · 2019-08-13
+## [0.1.0] · 2019-08-19
 [0.1.0]: https://github.com/instrumentisto/medea/releases/tag/medea-0.1.0
 
 [Milestone](https://github.com/instrumentisto/medea/milestone/1) |
@@ -21,6 +21,7 @@ All user visible changes to this project will be documented in this file. This p
   [#42](https://github.com/instrumentisto/medea/pull/42).
 - Dockerized medea [#35](https://github.com/instrumentisto/medea/pull/35).
 - Graceful shutdown [#30](https://github.com/instrumentisto/medea/pull/30).
+
 
 
 
