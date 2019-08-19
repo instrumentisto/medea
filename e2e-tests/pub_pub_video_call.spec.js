@@ -7,7 +7,7 @@ describe('Pub<=>Pub video call', () => {
     async function createRoom() {
         await axios({
             method: 'post',
-            url: 'http://localhost:8000/pub-pub-e2e-call',
+            url: 'http://127.0.0.1:8000/pub-pub-e2e-call',
             data: {
             pipeline: {
                 caller: {
@@ -54,7 +54,7 @@ describe('Pub<=>Pub video call', () => {
      * Send DELETE pub-pub-e2e-call request to control-api-room.
      */
     async function deleteRoom() {
-        await axios.delete('http://localhost:8000/pub-pub-e2e-call')
+        await axios.delete('http://127.0.0.1:8000/pub-pub-e2e-call')
     }
 
     const callerPartnerVideo = 'callers-partner-video';
@@ -69,8 +69,8 @@ describe('Pub<=>Pub video call', () => {
         let caller = await window.getJason();
         let responder = await window.getJason();
 
-        let callerRoom = await caller.join_room("ws://localhost:8080/ws/pub-pub-e2e-call/caller/test");
-        let responderRoom = await responder.join_room("ws://localhost:8080/ws/pub-pub-e2e-call/responder/test");
+        let callerRoom = await caller.join_room("ws://127.0.0.1:8080/ws/pub-pub-e2e-call/caller/test");
+        let responderRoom = await responder.join_room("ws://127.0.0.1:8080/ws/pub-pub-e2e-call/responder/test");
 
         callerRoom.on_new_connection((connection) => {
             connection.on_remote_stream((stream) => {

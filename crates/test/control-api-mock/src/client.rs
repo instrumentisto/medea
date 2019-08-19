@@ -209,6 +209,6 @@ impl Default for ControlClient {
 /// Get gRPC client for control API.
 fn get_grpc_client() -> ControlApiClient {
     let env = Arc::new(EnvBuilder::new().build());
-    let ch = ChannelBuilder::new(env).connect("localhost:50051");
+    let ch = ChannelBuilder::new(env).connect("127.0.0.1:50051");
     ControlApiClient::new(ch)
 }

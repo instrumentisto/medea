@@ -73,14 +73,14 @@ fn main() {
         .arg(
             Arg::with_name("tests_files_addr")
                 .help("Address where html test files will be hosted.")
-                .default_value("localhost:9000")
+                .default_value("127.0.0.1:9000")
                 .long("files-host")
                 .short("f"),
         )
         .arg(
             Arg::with_name("webdriver_addr")
                 .help("Address to running webdriver.")
-                .default_value("http://localhost:4444")
+                .default_value("http://127.0.0.1:4444")
                 .long("webdriver-addr")
                 .short("w"),
         )

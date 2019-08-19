@@ -90,7 +90,7 @@ pub struct TestStats {
 #[serde(rename_all = "camelCase")]
 pub struct TestError {
     /// Error message.
-    pub message: String,
+    pub message: Option<String>,
 
     /// Stacktrace from JS side where exception thrown.
     pub stack: String,
@@ -151,7 +151,9 @@ impl fmt::Display for FailureTestResult {
                 self.full_title, self.current_retry
             ))
         )?;
-        write!(f, "   Message: {}", self.err.message)?;
+        if let Some(err_message) = &self.err.message {
+            write!(f, "   Message: {}", err_message)?;
+        }
         write!(f, "\n   Stacktrace:\n\n   {}\n\n", self.err.stack)?;
         Ok(())
     }

@@ -21,53 +21,67 @@ jobs:
       stage: build
 
   include:
-    - stage: lints
+    - name: Clippy
+      stage: check
       rust: nightly
-      name: "Clippy"
       before_script: rustup component add clippy
       script: make lint
 
-    - stage: formatting
+    - name: rustfmt
+      stage: check
       rust: nightly
-      name: "Rustfmt"
       before_script: rustup component add rustfmt
       script: make fmt check=yes build=yes
 
-    - stage: build
+    - name: medea-jason (stable)
+      stage: build
       rust: stable
-      name: "Build jason (Rust stable)"
       before_script:
         - rm -f /home/travis/.cargo/bin/wasm-pack
         - curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
       script:
         - wasm-pack build -t web jason
 
-    - stage: build
+    - name: medea (stable)
+      stage: build
       rust: stable
-      name: "Build medea (Rust stable)"
       script: cargo build
 
-    - stage: build
+    - name: medea (beta)
+      stage: build
       rust: beta
-      name: "Build medea (Rust beta)"
       script: cargo build
 
-    - stage: build
+    - name: medea (nightly)
+      stage: build
       rust: nightly
-      name: "Build medea (Rust nightly)"
       script: cargo build
 
-    - stage: tests
+    - name: unit (stable)
+      stage: tests
       rust: stable
-      name: "Unit tests (Rust stable)"
       script: make test.unit
 
-    - stage: tests
+    - name: signalling e2e (stable)
+      stage: tests
       rust: stable
-      name: "E2E tests (Rust stable)"
       before_script:
         - mkdir .cache
-      script: make test.e2e
+      script: make test.signalling
+
+    - name: e2e (stable, firefox)
+      stage: tests
+      rust: stable
+      before_script:
+        - mkdir .cache
+      script: make test.e2e.firefox
+
+    - name: e2e (stable, chrome)
+      stage: tests
+      rust: stable
+      before_script:
+        - mkdir .cache
+      script: make test.e2e.chrome
 
 before_deploy:
   - echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > ~/.npmrc

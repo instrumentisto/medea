@@ -189,7 +189,7 @@ endif
 #	make cargo.lint
 
 cargo.lint:
-	cargo +nightly clippy --all -- -D clippy::pedantic -D warnings
+	cargo clippy --all -- -D clippy::pedantic -D warnings
 
 
 
@@ -311,6 +311,7 @@ test-runner-port = 51000
 
 run-medea-command = docker run --rm --network=host -v "$(PWD)":/app -w /app \
                     	--env XDG_CACHE_HOME=$(HOME) \
+                    	--env RUST_BACKTRACE=1 \
 						-u $(shell id -u):$(shell id -g) \
                     	-v "$(HOME)/.cargo/registry":/usr/local/cargo/registry \
                     	-v "$(HOME):$(HOME)" \
@@ -318,13 +319,11 @@ run-medea-command = docker run --rm --network=host -v "$(PWD)":/app -w /app \
 run-medea-container-d =  $(run-medea-command) -d medea-build:latest
 run-medea-container = $(run-medea-command) medea-build:latest
 
-test.e2e:
+up.e2e.services:
 ifneq ($(coturn),no)
 	@make up.coturn
 endif
 ifeq ($(dockerized),no)
-	@make test.signalling coturn=no
-
 	cargo build $(if $(call eq,$(release),yes),--release)
 	cargo build -p control-api-mock
 	$(run-medea-container) sh -c "cd jason && wasm-pack build --target web --out-dir ../.cache/jason-pkg"
@@ -334,8 +333,115 @@ ifeq ($(dockerized),no)
 		echo $$! > /tmp/e2e_medea.pid
 	env RUST_LOG=warn cargo run -p control-api-mock & \
 		echo $$! > /tmp/e2e_control_api_mock.pid
+	sleep 2
+else
+	@make down.medea dockerized=yes
+	@make down.medea dockerized=no
+	@make up.coturn
+
+	# TODO: publish it to docker hub
+	docker build -t medea-build -f build/medea/Dockerfile .
+
+	$(run-medea-container) sh -c "cd jason && RUST_LOG=info wasm-pack build --target web --out-dir ../.cache/jason-pkg"
+
+
+	$(run-medea-container) cargo build
+	$(run-medea-container-d) cargo run > /tmp/medea.docker.uid
+
+	$(run-medea-container) cargo build -p control-api-mock
+	$(run-medea-container-d) cargo run -p control-api-mock > /tmp/control-api-mock.docker.uid
+
+	$(run-medea-container) cargo build -p e2e-tests-runner
+endif
+
+down.e2e.services:
+ifeq ($(dockerized),no)
+	kill $$(cat /tmp/e2e_medea.pid)
+	kill $$(cat /tmp/e2e_control_api_mock.pid)
+	rm -f /tmp/e2e_medea.pid \
+		/tmp/e2e_control_api_mock.pid
+ifneq ($(coturn),no)
+	@make down.coturn
+endif
+else
+	docker container stop $$(cat /tmp/control-api-mock.docker.uid)
+	docker container stop $$(cat /tmp/medea.docker.uid)
+	rm -f /tmp/control-api-mock.docker.uid /tmp/medea.docker.uid
+
+	@make down.coturn
+endif
+
+
+
+
+
+
+
+
+test.e2e.chrome:
+ifeq ($(dockerized),no)
+	@make up.e2e.services
 	chromedriver --port=$(chromedriver-port) --log-level=OFF \
 		& echo $$! > /tmp/chromedriver.pid
+
+	$(shell cargo run -p e2e-tests-runner -- \
+		-w http://localhost:$(chromedriver-port) \
+		-f localhost:$(test-runner-port) \
+	 	--headless)
+	kill $$(cat /tmp/chromedriver.pid)
+	rm -f /tmp/chromedriver.pid
+
+	@make down.e2e.services
+
+	@exit $(.SHELLSTATUS)
+else
+	docker run --rm -d --network=host drupalci/chromedriver:dev > /tmp/chromedriver.docker.uid
+	$(run-medea-container) cargo run -p e2e-tests-runner -- \
+		-f 127.0.0.1:$(test-runner-port) \
+		-w http://127.0.0.1:4444 \
+		--headless
+	docker container kill $$(cat /tmp/chromedriver.docker.uid)
+	rm -f /tmp/chromedriver.docker.uid
+
+	@make down.e2e.services
+endif
+
+test.e2e.firefox:
+ifeq ($(dockerized),no)
+	@make up.e2e.services
+
+	$(shell cargo run -p e2e-tests-runner -- \
+		-w http://127.0.0.1:$(geckodriver-port) \
+		-f 127.0.0.1:$(test-runner-port) \
+		--headless)
+	kill $$(cat /tmp/geckodriver.pid)
+	rm -f /tmp/geckodriver.pid
+
+	@make down.e2e.services
+
+	@exit $(.SHELLSTATUS)
+else
+	docker build -t medea-geckodriver -f build/geckodriver/Dockerfile .
+	@make up.e2e.services
+
+	docker run --rm -d --network=host medea-geckodriver > /tmp/geckodriver.docker.uid
+	$(run-medea-container) cargo run -p e2e-tests-runner -- \
+		-f 127.0.0.1:$(test-runner-port) \
+		-w http://127.0.0.1:4444 \
+		--headless
+
+	docker container kill $$(cat /tmp/geckodriver.docker.uid)
+	rm -f /tmp/geckodriver.docker.uid
+	@make down.e2e.services
+endif
+
+test.e2e:
+ifneq ($(coturn),no)
+	@make up.coturn
+endif
+ifeq ($(dockerized),no)
+#	@make test.signalling coturn=no
+
 	geckodriver --port $(geckodriver-port) \
 		--log fatal \
 		& echo $$! > /tmp/geckodriver.pid
@@ -357,7 +463,7 @@ ifeq ($(dockerized),no)
 	########################
 	cargo run -p e2e-tests-runner -- \
 		-w http://localhost:$(geckodriver-port) \
-		-f localhost:$(test-runner-port) \
+		-f http://localhost:$(test-runner-port) \
 		--headless
 	kill $$(cat /tmp/geckodriver.pid)
 

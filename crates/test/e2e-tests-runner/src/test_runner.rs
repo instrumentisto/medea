@@ -295,6 +295,7 @@ fn get_webdriver_capabilities(opts: &ArgMatches) -> Capabilities {
         "--use-fake-device-for-media-stream",
         "--use-fake-ui-for-media-stream",
         "--disable-web-security",
+        "--disable-dev-shm-usage",
         "--no-sandbox",
     ];
     if opts.is_present("headless") {
