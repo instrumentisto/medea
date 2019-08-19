@@ -7,10 +7,7 @@ All user visible changes to this project will be documented in this file. This p
 
 
 ## [0.1.0] · 2019-08-19
-[0.1.0]: /tree/medea-macro-0.1.0/crates/medea-macro
-
-[Milestone](/../milestone/1) |
-[Roadmap](/../../medea/issues/8)
+[0.1.0]: /../../tree/medea-macro-0.1.0/crates/medea-macro
 
 ### Added
 
