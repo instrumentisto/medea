@@ -147,6 +147,29 @@ else
 endif
 
 
+# Stop all services needed for e2e testing of medea in browsers.
+#
+# Usage:
+#   make down.e2e.services [dockerized=(yes|no)] [coturn=(yes|no)]
+
+down.e2e.services:
+ifeq ($(dockerized),no)
+	kill $$(cat /tmp/e2e_medea.pid)
+	kill $$(cat /tmp/e2e_control_api_mock.pid)
+	rm -f /tmp/e2e_medea.pid \
+		/tmp/e2e_control_api_mock.pid
+ifneq ($(coturn),no)
+	@make down.coturn
+endif
+else
+	docker container stop $$(cat /tmp/control-api-mock.docker.uid)
+	docker container stop $$(cat /tmp/medea.docker.uid)
+	rm -f /tmp/control-api-mock.docker.uid /tmp/medea.docker.uid
+
+	@make down.coturn
+endif
+
+
 # Stop dockerized coturn.
 #
 # Usage:
@@ -154,6 +177,67 @@ endif
 
 down.coturn:
 	docker-compose -f docker-compose.coturn.yml down
+
+
+# Start services needed for e2e tests of medea in browsers.
+# If logs set to "yes" then medea print all logs to stdout.
+#
+# Usage:
+# 	make test.e2e [dockerized=(YES|no)] [logs=(yes|NO)] [coturn=(YES|no)]
+
+medea-env = RUST_BACKTRACE=1 \
+	MEDEA_SERVER.HTTP.BIND_PORT=8081 \
+	$(if $(call eq,$(logs),yes),,RUST_LOG=warn) \
+	MEDEA_SERVER.HTTP.STATIC_SPECS_PATH=tests/specs
+
+chromedriver-port = 50000
+geckodriver-port = 50001
+test-runner-port = 51000
+
+run-medea-command = docker run --rm --network=host -v "$(PWD)":/app -w /app \
+                    	--env XDG_CACHE_HOME=$(HOME) \
+                    	--env RUST_BACKTRACE=1 \
+						-u $(shell id -u):$(shell id -g) \
+                    	-v "$(HOME)/.cargo/registry":/usr/local/cargo/registry \
+                    	-v "$(HOME):$(HOME)" \
+                    	-v "$(PWD)/target":/app/target
+run-medea-container-d =  $(run-medea-command) -d medea-build:latest
+run-medea-container = $(run-medea-command) medea-build:latest
+
+up.e2e.services:
+ifneq ($(coturn),no)
+	@make up.coturn
+endif
+ifeq ($(dockerized),no)
+	cargo build $(if $(call eq,$(release),yes),--release)
+	cargo build -p control-api-mock
+	$(run-medea-container) sh -c "cd jason && wasm-pack build --target web --out-dir ../.cache/jason-pkg"
+
+	env $(if $(call eq,$(logs),yes),,RUST_LOG=warn) cargo run --bin medea \
+		$(if $(call eq,$(release),yes),--release) & \
+		echo $$! > /tmp/e2e_medea.pid
+	env RUST_LOG=warn cargo run -p control-api-mock & \
+		echo $$! > /tmp/e2e_control_api_mock.pid
+	sleep 2
+else
+	@make down.medea dockerized=yes
+	@make down.medea dockerized=no
+	@make up.coturn
+
+	# TODO: publish it to docker hub
+	docker build -t medea-build -f build/medea/Dockerfile .
+
+	$(run-medea-container) sh -c "cd jason && RUST_LOG=info wasm-pack build --target web --out-dir ../.cache/jason-pkg"
+
+
+	$(run-medea-container) cargo build
+	$(run-medea-container-d) cargo run > /tmp/medea.docker.uid
+
+	$(run-medea-container) cargo build -p control-api-mock
+	$(run-medea-container-d) cargo run -p control-api-mock > /tmp/control-api-mock.docker.uid
+
+	$(run-medea-container) cargo build -p e2e-tests-runner
+endif
 
 
 
@@ -278,7 +362,7 @@ endif
 # Usage:
 #   make test.signalling [release=(no|yes)] [logs=(no|yes)]
 
-test.signalling:
+test.e2e.signalling:
 ifneq ($(coturn),no)
 	@make up.coturn
 endif
@@ -294,89 +378,11 @@ endif
 	@make down.medea
 
 
-# Run Rust e2e tests of project.
+# Run e2e tests of medea in chrome.
 # If logs set to "yes" then medea print all logs to stdout.
 #
 # Usage:
-# 	make test.e2e [dockerized=(YES|no)] [logs=(yes|NO)] [coturn=(YES|no)]
-
-medea-env = RUST_BACKTRACE=1 \
-	MEDEA_SERVER.HTTP.BIND_PORT=8081 \
-	$(if $(call eq,$(logs),yes),,RUST_LOG=warn) \
-	MEDEA_SERVER.HTTP.STATIC_SPECS_PATH=tests/specs
-
-chromedriver-port = 50000
-geckodriver-port = 50001
-test-runner-port = 51000
-
-run-medea-command = docker run --rm --network=host -v "$(PWD)":/app -w /app \
-                    	--env XDG_CACHE_HOME=$(HOME) \
-                    	--env RUST_BACKTRACE=1 \
-						-u $(shell id -u):$(shell id -g) \
-                    	-v "$(HOME)/.cargo/registry":/usr/local/cargo/registry \
-                    	-v "$(HOME):$(HOME)" \
-                    	-v "$(PWD)/target":/app/target
-run-medea-container-d =  $(run-medea-command) -d medea-build:latest
-run-medea-container = $(run-medea-command) medea-build:latest
-
-up.e2e.services:
-ifneq ($(coturn),no)
-	@make up.coturn
-endif
-ifeq ($(dockerized),no)
-	cargo build $(if $(call eq,$(release),yes),--release)
-	cargo build -p control-api-mock
-	$(run-medea-container) sh -c "cd jason && wasm-pack build --target web --out-dir ../.cache/jason-pkg"
-
-	env $(if $(call eq,$(logs),yes),,RUST_LOG=warn) cargo run --bin medea \
-		$(if $(call eq,$(release),yes),--release) & \
-		echo $$! > /tmp/e2e_medea.pid
-	env RUST_LOG=warn cargo run -p control-api-mock & \
-		echo $$! > /tmp/e2e_control_api_mock.pid
-	sleep 2
-else
-	@make down.medea dockerized=yes
-	@make down.medea dockerized=no
-	@make up.coturn
-
-	# TODO: publish it to docker hub
-	docker build -t medea-build -f build/medea/Dockerfile .
-
-	$(run-medea-container) sh -c "cd jason && RUST_LOG=info wasm-pack build --target web --out-dir ../.cache/jason-pkg"
-
-
-	$(run-medea-container) cargo build
-	$(run-medea-container-d) cargo run > /tmp/medea.docker.uid
-
-	$(run-medea-container) cargo build -p control-api-mock
-	$(run-medea-container-d) cargo run -p control-api-mock > /tmp/control-api-mock.docker.uid
-
-	$(run-medea-container) cargo build -p e2e-tests-runner
-endif
-
-down.e2e.services:
-ifeq ($(dockerized),no)
-	kill $$(cat /tmp/e2e_medea.pid)
-	kill $$(cat /tmp/e2e_control_api_mock.pid)
-	rm -f /tmp/e2e_medea.pid \
-		/tmp/e2e_control_api_mock.pid
-ifneq ($(coturn),no)
-	@make down.coturn
-endif
-else
-	docker container stop $$(cat /tmp/control-api-mock.docker.uid)
-	docker container stop $$(cat /tmp/medea.docker.uid)
-	rm -f /tmp/control-api-mock.docker.uid /tmp/medea.docker.uid
-
-	@make down.coturn
-endif
-
-
-
-
-
-
-
+# 	make test.e2e.chrome [dockerized=(YES|no)] [logs=(yes|NO)] [coturn=(YES|no)]
 
 test.e2e.chrome:
 ifeq ($(dockerized),no)
@@ -395,6 +401,8 @@ ifeq ($(dockerized),no)
 
 	@exit $(.SHELLSTATUS)
 else
+	@make up.e2e.services
+
 	docker run --rm -d --network=host drupalci/chromedriver:dev > /tmp/chromedriver.docker.uid
 	$(run-medea-container) cargo run -p e2e-tests-runner -- \
 		-f 127.0.0.1:$(test-runner-port) \
@@ -405,6 +413,13 @@ else
 
 	@make down.e2e.services
 endif
+
+
+# Run e2e tests of medea in firefox.
+# If logs set to "yes" then medea print all logs to stdout.
+#
+# Usage:
+# 	make test.e2e.firefox [dockerized=(YES|no)] [logs=(yes|NO)] [coturn=(YES|no)]
 
 test.e2e.firefox:
 ifeq ($(dockerized),no)
@@ -435,97 +450,12 @@ else
 	@make down.e2e.services
 endif
 
-test.e2e:
-ifneq ($(coturn),no)
-	@make up.coturn
-endif
-ifeq ($(dockerized),no)
-#	@make test.signalling coturn=no
 
-	geckodriver --port $(geckodriver-port) \
-		--log fatal \
-		& echo $$! > /tmp/geckodriver.pid
-
-	sleep 2
-
-	########################
-	# Run tests in chrome #
-	########################
-	# TODO: Run kill jobs also if error
-	cargo run -p e2e-tests-runner -- \
-		-w http://localhost:$(chromedriver-port) \
-		-f localhost:$(test-runner-port) \
-	 	--headless
-	kill $$(cat /tmp/chromedriver.pid)
-
-	########################
-	# Run tests in firefox #
-	########################
-	cargo run -p e2e-tests-runner -- \
-		-w http://localhost:$(geckodriver-port) \
-		-f http://localhost:$(test-runner-port) \
-		--headless
-	kill $$(cat /tmp/geckodriver.pid)
-
-	kill $$(cat /tmp/e2e_medea.pid)
-	kill $$(cat /tmp/e2e_control_api_mock.pid)
-	rm -f /tmp/e2e_medea.pid \
-		/tmp/e2e_control_api_mock.pid \
-		/tmp/chromedriver.pid \
-		/tmp/geckodriver.pid
-ifneq ($(coturn),no)
-	@make down.coturn
-endif
-else
-	@make down.medea dockerized=yes
-	@make down.medea dockerized=no
-	@make up.coturn
-
-	# TODO: publish it to docker hub
-	docker build -t medea-build -f build/medea/Dockerfile .
-	docker build -t medea-geckodriver -f build/geckodriver/Dockerfile .
-
-	$(run-medea-container) sh -c "cd jason && RUST_LOG=info wasm-pack build --target web --out-dir ../.cache/jason-pkg"
-
-	$(run-medea-container) make test.signalling dockerized=no coturn=no release=yes
-
-	$(run-medea-container) cargo build
-	$(run-medea-container-d) cargo run > /tmp/medea.docker.uid
-
-	$(run-medea-container) cargo build -p control-api-mock
-	$(run-medea-container-d) cargo run -p control-api-mock > /tmp/control-api-mock.docker.uid
-
-
-	$(run-medea-container) cargo build -p e2e-tests-runner
-
-	########################
-	# Run tests in chrome #
-	########################
-	docker run --rm -d --network=host drupalci/chromedriver:dev > /tmp/chromedriver.docker.uid
-	$(run-medea-container) cargo run -p e2e-tests-runner -- \
-		-f localhost:$(test-runner-port) \
-		-w http://localhost:9515 \
-		--headless
-	docker container kill $$(cat /tmp/chromedriver.docker.uid)
-	rm -f /tmp/chromedriver.docker.uid
-
-	########################
-	# Run tests in firefox #
-	########################
-	docker run --rm -d --network=host medea-geckodriver > /tmp/geckodriver.docker.uid
-	$(run-medea-container) cargo run -p e2e-tests-runner -- \
-		-f localhost:$(test-runner-port) \
-		-w http://localhost:4444 \
-		--headless
-	docker container kill $$(cat /tmp/geckodriver.docker.uid)
-	rm -f /tmp/geckodriver.docker.uid
-
-	docker container stop $$(cat /tmp/control-api-mock.docker.uid)
-	docker container stop $$(cat /tmp/medea.docker.uid)
-	rm -f /tmp/control-api-mock.docker.uid /tmp/medea.docker.uid
-
-	@make down.coturn
-endif
+# Run all E2E tests of medea.
+#
+# Usage:
+# 	make test.e2e [dockerized=(YES|no)] [logs=(yes|NO)] [coturn=(YES|no)]
+test.e2e: test.e2e.chrome test.e2e.firefox test.signalling
 
 
 
@@ -883,10 +813,11 @@ endef
         helm helm.down helm.init helm.lint helm.list \
         	helm.package helm.package.release helm.up \
         minikube.boot \
-        test test.signalling test.unit test.e2e \
-        down down.medea down.coturn \
+        test test.unit \
+        test.e2e test.e2e.chrome test.e2e.firefox test.e2e.signalling \
+        down down.medea down.coturn down.e2e.services \
         release.jason release.crates.jason release.npm.jason release.helm \
         release.crates.medea release.crates.medea-client-api-proto \
         release.crates.medea-macro \ release.helm \
-        up up.coturn up.demo up.dev up.jason up.medea \
+        up up.coturn up.demo up.dev up.jason up.medea up.e2e.services \
         yarn
