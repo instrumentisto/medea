@@ -11,8 +11,8 @@ All user visible changes to this project will be documented in this file. This p
 
 ### Added
 
-- `#[enum_delegate]` macro for delegating function calls to `enum` variants fields (#23);
-- `#[dispatchable]` macro for dispatching `enum`-based events (#26).
+- `#[enum_delegate]` macro for delegating function calls to `enum` variants fields ([#23](/../../issues/23));
+- `#[dispatchable]` macro for dispatching `enum`-based events ([#26](/../../issues/26)).
 
 
 
