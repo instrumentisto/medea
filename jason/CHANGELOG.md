@@ -13,14 +13,14 @@ All user visible changes to this project will be documented in this file. This p
 
 ### Added
 
-- Transport and messaging [#18](/../../pull/18):
+- Transport and messaging ([#18](/../../pull/18)):
     - Library API:
         - `new Jason()`;
         - `Jason.join_room()`;
         - `Jason.dispose()`.
     - RPC transport and heartbeat.
-- Ability to use ICE servers provided by server [#20](/../../pull/20).
-- Signalling [#22](/../../pull/22):
+- Ability to use ICE servers provided by server ([#20](/../../pull/20)).
+- Signalling ([#22](/../../pull/22)):
     - Library API:
        - `RoomHandle.on_new_connection` callback.
     - Handling of RPC events:
@@ -32,7 +32,7 @@ All user visible changes to this project will be documented in this file. This p
         - `MakeSdpOffer`;
         - `MakeSdpAnswer`;
         - `SetIceCandidate`.
-- Media management [#22](/../../pull/22):
+- Media management ([#22](/../../pull/22)):
     - Library API:
         - `MediaStreamHandle.get_media_stream()`;
         - `ConnectionHandle.on_remote_stream` callback;
