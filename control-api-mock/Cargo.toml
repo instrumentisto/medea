@@ -12,6 +12,7 @@ repository = "https://github.com/instrumentisto/medea"
 actix = "0.8"
 actix-web = "1.0"
 actix-web-actors = "1.0"
+clap = "2.33"
 futures = "0.1"
 grpcio = "0.4"
 serde = { version = "1.0", features = ["derive"] }

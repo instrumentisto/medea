@@ -11,6 +11,7 @@ use actix_web::{
     web::{self, Data, Json},
     App, HttpResponse, HttpServer,
 };
+use clap::ArgMatches;
 use futures::Future;
 use medea_grpc_proto::control::{
     Element as ElementProto, Error as ErrorProto,
@@ -35,11 +36,12 @@ pub struct Context {
 }
 
 /// Run actix-web REST API server.
-pub fn run() {
-    HttpServer::new(|| {
+pub fn run(args: &ArgMatches) {
+    let medea_addr: String = args.value_of("medea_addr").unwrap().to_string();
+    HttpServer::new(move || {
         App::new()
             .data(Context {
-                client: ControlClient::new(),
+                client: ControlClient::new(&medea_addr),
             })
             .wrap(middleware::Logger::default())
             .service(
@@ -66,7 +68,7 @@ pub fn run() {
                     .route(web::get().to_async(endpoint::get)),
             )
     })
-    .bind("0.0.0.0:8000")
+    .bind(args.value_of("addr").unwrap())
     .unwrap()
     .start();
 }
