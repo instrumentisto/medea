@@ -67,7 +67,7 @@ jobs:
       rust: stable
       before_script:
         - mkdir .cache
-      script: make test.signalling
+      script: make test.e2e.signalling
 
     - name: e2e (stable, firefox)
       stage: tests

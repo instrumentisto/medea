@@ -360,7 +360,7 @@ endif
 # Run medea's signalling tests.
 #
 # Usage:
-#   make test.signalling [release=(no|yes)] [logs=(no|yes)]
+#   make test.e2e.signalling [release=(no|yes)] [logs=(no|yes)]
 
 test.e2e.signalling:
 ifneq ($(coturn),no)
@@ -406,7 +406,7 @@ else
 	docker run --rm -d --network=host drupalci/chromedriver:dev > /tmp/chromedriver.docker.uid
 	$(run-medea-container) cargo run -p e2e-tests-runner -- \
 		-f 127.0.0.1:$(test-runner-port) \
-		-w http://127.0.0.1:4444 \
+		-w http://127.0.0.1:9515 \
 		--headless
 	docker container kill $$(cat /tmp/chromedriver.docker.uid)
 	rm -f /tmp/chromedriver.docker.uid
@@ -441,8 +441,8 @@ else
 
 	docker run --rm -d --network=host medea-geckodriver > /tmp/geckodriver.docker.uid
 	$(run-medea-container) cargo run -p e2e-tests-runner -- \
-		-f 127.0.0.1:$(test-runner-port) \
-		-w http://127.0.0.1:4444 \
+		-f localhost:$(test-runner-port) \
+		-w http://localhost:4444 \
 		--headless
 
 	docker container kill $$(cat /tmp/geckodriver.docker.uid)
@@ -455,7 +455,7 @@ endif
 #
 # Usage:
 # 	make test.e2e [dockerized=(YES|no)] [logs=(yes|NO)] [coturn=(YES|no)]
-test.e2e: test.e2e.chrome test.e2e.firefox test.signalling
+test.e2e: test.e2e.chrome test.e2e.firefox test.e2e.signalling
 
 
 
