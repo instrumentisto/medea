@@ -2,12 +2,15 @@
 name = "medea-jason"
 version = "0.1.0-dev"
 edition = "2018"
-description = "Medea media server client application"
+description = "Client library for Medea media server"
 authors = ["Instrumentisto Team <developer@instrumentisto.com>"]
-homepage = "https://github.com/instrumentisto/medea"
 license = "MPL 2.0"
+documentation = "https://docs.rs/medea-jason"
+homepage = "https://github.com/instrumentisto/medea/tree/master/jason"
+repository = "https://github.com/instrumentisto/medea/tree/master/jason"
 readme = "README.md"
-repository = "https://github.com/instrumentisto/medea"
+keywords = ["medea", "jason", "client", "client-api", "browser"]
+categories = ["multimedia", "api-bindings", "web-programming", "wasm"]
 
 [lib]
 crate-type = ["cdylib", "rlib"]

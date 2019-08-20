@@ -1,14 +1,15 @@
 Medea Client API protocol
 =========================
 
-![Crates.io](https://img.shields.io/crates/v/medea-client-api-proto)
+[![Crates.io](https://img.shields.io/crates/v/medea-client-api-proto)](https://crates.io/crates/medea-client-api-proto)
+![Crates.io license](https://img.shields.io/crates/l/medea-client-api-proto)
 
 [API Docs](https://docs.rs/medea-client-api-proto) |
 [Changelog](CHANGELOG.md)
 
 Client API protocol implementation for [Medea] media server.
 
-__Currently, in early development state.__
+__Currently, in early development phase.__
 
 
 

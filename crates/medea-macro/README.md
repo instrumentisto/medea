@@ -1,7 +1,8 @@
 medea-macro
 ===========
 
-![Crates.io](https://img.shields.io/crates/v/medea-macro)
+[![Crates.io](https://img.shields.io/crates/v/medea-macro)](https://crates.io/crates/medea-macro)
+![Crates.io license](https://img.shields.io/crates/l/medea-macro)
 
 [API Docs](https://docs.rs/medea-macro) |
 [Changelog](CHANGELOG.md)
