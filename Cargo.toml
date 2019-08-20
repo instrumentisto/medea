@@ -5,10 +5,12 @@ edition = "2018"
 description = "Medea media server"
 authors = ["Instrumentisto Team <developer@instrumentisto.com>"]
 license = "MPL 2.0"
-homepage = "https://github.com/instrumentisto/medea"
 documentation = "https://docs.rs/medea"
-readme = "README.md"
+homepage = "https://github.com/instrumentisto/medea"
 repository = "https://github.com/instrumentisto/medea"
+readme = "README.md"
+keywords = ["medea", "media-server"]
+categories = ["multimedia"]
 
 [workspace]
 members = [

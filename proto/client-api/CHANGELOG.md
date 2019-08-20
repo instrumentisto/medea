@@ -6,7 +6,7 @@ All user visible changes to this project will be documented in this file. This p
 
 
 
-## [0.1.0] · 2019-08-19
+## TBD [0.1.0] · 2019-08-??
 [0.1.0]: /../../tree/medea-client-api-proto-0.1.0/proto/client-api
 
 [Milestone](/../../milestone/1) | [Roadmap](/../../issues/8)
