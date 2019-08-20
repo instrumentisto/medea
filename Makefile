@@ -30,7 +30,7 @@ CURRENT_BRANCH := $(strip $(shell git branch | grep \* | cut -d ' ' -f2))
 # Aliases #
 ###########
 
-build: docker.build.medea
+build: docker.build.medea build.medea build.jason
 
 
 # Resolve all project dependencies.
@@ -654,6 +654,29 @@ define minikube.boot.download
 		https://raw.githubusercontent.com/instrumentisto/toolchain/master/minikube/bootstrap.sh
 	@chmod +x $(HOME)/.minikube/bootstrap.sh
 endef
+
+
+
+
+############
+# Building #
+############
+
+# Build medea.
+#
+# Usage:
+#   make build.medea
+
+build.medea:
+	cargo build -p medea
+
+
+# Build jason.
+#
+# Usage:
+#   make build.jason
+build.jason:
+	wasm-pack build -t web jason
 
 
 
