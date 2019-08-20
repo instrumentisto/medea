@@ -12,7 +12,7 @@ use wasm_bindgen_futures::future_to_promise;
 
 use crate::{
     media::MediaManager,
-    peer::PeerRepository,
+    peer,
     rpc::{RpcClient, WebsocketRpcClient},
     set_panic_hook,
 };
@@ -60,7 +60,7 @@ impl Jason {
                 let rpc: Rc<dyn RpcClient> = Rc::new(rpc);
                 let room = Room::new(
                     Rc::clone(&rpc),
-                    PeerRepository::default(),
+                    Box::new(peer::Repository::default()),
                     media_manager,
                 );
 

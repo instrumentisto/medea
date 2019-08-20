@@ -27,8 +27,13 @@ pub use self::{
     media::MediaConnections,
 };
 
+#[cfg(feature = "mockable")]
+pub use self::repo::MockPeerRepository;
 #[doc(inline)]
-pub use self::{repo::PeerRepository, Id as PeerId};
+pub use self::{
+    repo::{PeerRepository, Repository},
+    Id as PeerId,
+};
 
 pub type Id = u64;
 

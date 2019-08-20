@@ -84,7 +84,7 @@ impl Room {
     /// Creates new [`Room`] and associates it with a provided [`RpcClient`].
     pub fn new(
         rpc: Rc<dyn RpcClient>,
-        peers: PeerRepository,
+        peers: Box<dyn PeerRepository>,
         mngr: Rc<MediaManager>,
     ) -> Self {
         let (tx, rx) = unbounded();
@@ -143,7 +143,7 @@ impl Room {
 /// Shared between JS side ([`RoomHandle`]) and Rust side ([`Room`]).
 struct InnerRoom {
     rpc: Rc<dyn RpcClient>,
-    peers: PeerRepository,
+    peers: Box<dyn PeerRepository>,
     peer_event_sender: UnboundedSender<PeerEvent>,
     media_manager: Rc<MediaManager>,
     connections: HashMap<u64, Connection>,
@@ -157,7 +157,7 @@ impl InnerRoom {
     #[inline]
     fn new(
         rpc: Rc<dyn RpcClient>,
-        peers: PeerRepository,
+        peers: Box<dyn PeerRepository>,
         events_sender: UnboundedSender<PeerEvent>,
         media_manager: Rc<MediaManager>,
     ) -> Self {
@@ -168,7 +168,7 @@ impl InnerRoom {
             media_manager,
             connections: HashMap::new(),
             on_new_connection: Rc::new(Callback2::default()),
-            enabled_audio: true,
+            enabled_audio: false,
             enabled_video: true,
         }
     }
@@ -264,6 +264,7 @@ impl EventHandler for InnerRoom {
                     .map(move |sdp_offer| {
                         peer.toggle_send_audio(is_enabled_audio);
                         peer.toggle_send_video(is_enabled_video);
+                        WasmErr::from("peer created").log_err();
                         rpc.send_command(Command::MakeSdpOffer {
                             peer_id,
                             sdp_offer,
@@ -276,7 +277,11 @@ impl EventHandler for InnerRoom {
                 // answerer
                 future::Either::B(
                     peer.process_offer(offer, tracks)
-                        .and_then(move |_| peer.create_and_set_answer())
+                        .and_then(move |_| {
+                            peer.toggle_send_audio(is_enabled_audio);
+                            peer.toggle_send_video(is_enabled_video);
+                            peer.create_and_set_answer()
+                        })
                         .map(move |sdp_answer| {
                             rpc.send_command(Command::MakeSdpAnswer {
                                 peer_id,
