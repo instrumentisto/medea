@@ -37,7 +37,6 @@ jobs:
     - name: medea-jason (stable)
       stage: build
       rust: stable
-      env: RUSTC_WRAPPER=sccache
       before_script:
         - rm -f /home/travis/.cargo/bin/wasm-pack
         - curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
@@ -47,20 +46,17 @@ jobs:
     - name: medea (stable)
       stage: build
       rust: stable
-      env: RUSTC_WRAPPER=sccache
-      script: cargo build
+      script: env RUSTC_WRAPPER=sccache cargo build
 
     - name: medea (beta)
       stage: build
       rust: beta
-      env: RUSTC_WRAPPER=sccache
-      script: cargo build
+      script: env RUSTC_WRAPPER=sccache cargo build
 
     - name: medea (nightly)
       stage: build
       rust: nightly
-      env: RUSTC_WRAPPER=sccache
-      script: cargo build
+      script: env RUSTC_WRAPPER=sccache cargo build
 
     - name: unit (stable)
       stage: tests
