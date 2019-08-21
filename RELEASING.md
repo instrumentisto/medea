@@ -72,7 +72,6 @@ To perform a full releasing process manually, carefully examine `deploy` section
 [Semantic Versioning 2.0.0]: https://semver.org
 [Travis CI]: https://travis-ci.org
 
-
 [1]: https://help.github.com/en/articles/creating-releases
 [2]: https://git-scm.com/book/en/v2/Git-Basics-Tagging
 [3]: https://doc.rust-lang.org/cargo/reference/publishing.html#cargo-yank
