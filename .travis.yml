@@ -14,7 +14,7 @@ install:
   - unzip ${PROTOC_FILENAME}
   - bin/protoc --version
   - popd
-  - cargo install sccache
+  - cargo install --force sccache
 
 jobs:
   allow_failures:
