@@ -230,8 +230,14 @@ ifeq ($(test-unit-crate),@all)
 	@make test.unit crate=medea-jason
 	@make test.unit crate=medea
 else
+ifeq ($(crate),medea-jason)
 	cd $(crate-dir)/ && \
-	cargo test -p $(test-unit-crate)
+	CHROMEDRIVER_CLIENT_ARGS="$(CHROMEDRIVER_CLIENT_ARGS)" \
+    cargo test --target wasm32-unknown-unknown --features mockable
+else
+	cd $(crate-dir)/ && \
+	cargo test
+endif
 endif
 
 

@@ -10,7 +10,7 @@ use futures::{
     },
     Future,
 };
-use jason::{
+use medea_jason::{
     api::Room,
     media::MediaManager,
     peer::{self, MockPeerRepository, PeerConnection, PeerRepository},

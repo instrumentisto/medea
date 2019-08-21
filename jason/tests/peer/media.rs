@@ -5,13 +5,13 @@ use futures::Future;
 use wasm_bindgen::JsValue;
 use wasm_bindgen_test::*;
 
-use jason::{
+use medea_jason::{
     media::MediaManager,
     peer::{MediaConnections, RtcPeerConnection},
 };
 
 use crate::get_test_tracks;
-use jason::peer::{TransceiverDirection, TransceiverKind};
+use medea_jason::peer::{TransceiverDirection, TransceiverKind};
 
 wasm_bindgen_test_configure!(run_in_browser);
 

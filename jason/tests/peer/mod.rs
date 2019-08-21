@@ -5,7 +5,7 @@ use futures::{sync::mpsc::unbounded, Future};
 use wasm_bindgen::JsValue;
 use wasm_bindgen_test::*;
 
-use jason::{media::MediaManager, peer::PeerConnection};
+use medea_jason::{media::MediaManager, peer::PeerConnection};
 
 use crate::get_test_tracks;
 

@@ -3,7 +3,6 @@
 
 #[macro_use]
 pub mod utils;
-
 pub mod api;
 pub mod media;
 pub mod peer;
