@@ -54,6 +54,7 @@ lint: cargo.lint
 #
 # Usage:
 #	make release crate=(medea|medea-jason|<crate-name>)
+#	             [publish=(no|yes)]
 
 release: release.crates release.npm
 
@@ -174,26 +175,6 @@ endif
 
 
 
-#################
-# WASM commands #
-#################
-
-# Builds project crate as a WASM distribution unit ready for publishing to NPM.
-#
-# Usage:
-#	make wasm.build [crate=medea-jason]
-
-wasm-build-crate = $(if $(call eq,$(crate),),medea-jason,$(crate))
-
-wasm.build:
-ifeq ($(wasm-build-crate),medea-jason)
-	@rm -rf jason/pkg/
-	wasm-pack build -t web jason/
-endif
-
-
-
-
 ##########################
 # Documentation commands #
 ##########################
@@ -251,20 +232,28 @@ endif
 # Usage:
 #	make release.crates crate=(medea|medea-jason|<crate-name>)
 #	                    [token=($CARGO_TOKEN|<cargo-token>)]
+#	                    [publish=(no|yes)]
 
 release-crates-token = $(if $(call eq,$(token),),${CARGO_TOKEN},$(token))
-
-release.crates:
+release-crates-dir = $(error No crate '$(crate)' exists)
+ifeq ($(crate),medea)
+release-crates-dir =
+endif
 ifeq ($(crate),medea-jason)
-	cd jason/
+release-crates-dir = jason
 endif
 ifeq ($(crate),medea-client-api-proto)
-	cd proto/client-api/
+release-crates-dir = proto/client-api
 endif
 ifeq ($(crate),medea-macro)
-	cd crates/medea-macro/
+release-crates-dir = crates/medea-macro
 endif
-	cargo publish --token $(release-crates-token)
+
+release.crates:
+	cd $(release-crates-dir)/ && \
+	$(if $(call eq,$(publish),yes),\
+		cargo publish --token $(release-crates-token) ,\
+		cargo package )
 
 
 release.helm: helm.package.release
@@ -274,12 +263,19 @@ release.helm: helm.package.release
 #
 # Usage:
 #	make release.npm [crate=medea-jason]
+#	                 [publish=(no|yes)]
 
 release-npm-crate = $(if $(call eq,$(crate),),medea-jason,$(crate))
-
-release.npm: wasm.build
+release-npm-dir = $(error No NPM crate '$(release-npm-crate)' exists)
 ifeq ($(release-npm-crate),medea-jason)
-	wasm-pack publish jason/
+release-npm-dir = jason
+endif
+
+release.npm:
+	@rm -rf $(release-npm-dir)/pkg/
+	wasm-pack build -t web $(release-npm-dir)/
+ifeq ($(publish),yes)
+	wasm-pack publish $(release-npm-dir)/
 endif
 
 
@@ -559,5 +555,4 @@ endef
         release release.crates release.helm release.npm \
         test test.unit \
         up up.coturn up.demo up.dev up.jason up.medea \
-        wasm.build \
         yarn

@@ -3,6 +3,7 @@ Medea
 
 <img align="right" src="https://raw.githubusercontent.com/instrumentisto/medea/master/logo.jpg">
 
+[![Travis.org](https://img.shields.io/travis/instrumentisto/medea/master)](https://travis-ci.org/instrumentisto/medea/branches)
 [![Crates.io](https://img.shields.io/crates/v/medea)](https://crates.io/crates/medea)
 ![Crates.io license](https://img.shields.io/crates/l/medea)
 

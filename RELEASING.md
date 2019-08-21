@@ -9,16 +9,16 @@ All releases of this repository are normally made by [Travis CI] when release [G
 ## BEFORE release
 
 1. __Ensure crate's dependencies do not contain `path` option in `Cargo.toml`.__  
-While referring local dependency via `path` is neat and helpful for development, it cannot be used for publishing release version to [crates.io].
+While referring local dependency via `path` is neat and helpful for development, it cannot be used for publishing a release version to [crates.io].
 
 2. __Set the correct crate version in its `Cargo.toml`.__  
 Usually, this is a change from `x.y.z-dev` to `x.y.z`. Ensure version bump follows [Semantic Versioning 2.0.0].
 
 3. __Check release build succeeds with `cargo package`.__  
-To be sure that crate will be released OK on [crates.io] run `cargo package -p <crate-name>` and fix any appeared errors.
+To be sure that crate will be released OK on [crates.io] run `make release.crates crate=<crate-name> publish=no` and fix any appeared errors.
 
 4. __Correct and prepare crate's `CHANGELOG.md`.__  
-All its user-facing changes should be described explicitly and clear. It should contain links to all related milestones, roadmaps and diffs of this release. It should contain the correct version and date of release.
+All its user-facing changes should be described explicitly and clear. It should contain links to all related milestones and roadmaps of this release. It should contain the correct version and date of release.
 
 
 
