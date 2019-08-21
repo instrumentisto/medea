@@ -51,22 +51,22 @@ impl RoomHandle {
             .set_func(f))
     }
 
-    /// Mute local audio [`Track`]s for all [`PeerConnection`]s this [`Room`].
+    /// Mutes outbound audio in this room.
     pub fn mute_audio(&self) -> Result<(), JsValue> {
         map_weak!(self, |inner| inner.borrow_mut().toggle_send_audio(false))
     }
 
-    /// Unmute local audio [`Track`]s for all [`PeerConnection`]s this [`Room`].
+    /// Unmutes outbound audio in this room.
     pub fn unmute_audio(&self) -> Result<(), JsValue> {
         map_weak!(self, |inner| inner.borrow_mut().toggle_send_audio(true))
     }
 
-    /// Mute local video [`Track`]s for all [`PeerConnection`]s this [`Room`].
+    /// Mutes outbound video in this room.
     pub fn mute_video(&self) -> Result<(), JsValue> {
         map_weak!(self, |inner| inner.borrow_mut().toggle_send_video(false))
     }
 
-    /// Unmute local video [`Track`]s for all [`PeerConnection`]s this [`Room`].
+    /// Unmutes outbound video in this room.
     pub fn unmute_video(&self) -> Result<(), JsValue> {
         map_weak!(self, |inner| inner.borrow_mut().toggle_send_video(true))
     }
@@ -168,7 +168,7 @@ impl InnerRoom {
             media_manager,
             connections: HashMap::new(),
             on_new_connection: Rc::new(Callback2::default()),
-            enabled_audio: false,
+            enabled_audio: true,
             enabled_video: true,
         }
     }

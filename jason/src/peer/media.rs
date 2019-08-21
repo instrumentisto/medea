@@ -50,24 +50,23 @@ impl MediaConnections {
     pub fn toggle_send_media(&self, kind: TransceiverKind, enabled: bool) {
         let s = self.0.borrow();
         s.senders
-            .iter()
-            .filter(|(_, sender)| sender.kind == kind)
-            .for_each(|(_, sender)| sender.set_track_enabled(enabled))
+            .values()
+            .filter(|sender| sender.kind == kind)
+            .for_each(|sender| sender.set_track_enabled(enabled))
     }
 
-    /// Returns true if all [`MediaTrack`]s of [`Senders`] with given
-    /// [`TransceiverKind`] is enabled or false otherwise.
-    pub fn enabled_sender(&self, kind: TransceiverKind) -> bool {
+    /// Returns true if all [`MediaTrack`]s of all [`Senders`] with given
+    /// [`TransceiverKind`] are enabled or false otherwise.
+    pub fn are_senders_enabled(&self, kind: TransceiverKind) -> bool {
         let conn = self.0.borrow();
-        conn.senders.iter().fold(true, |enabled, (_, sender)| {
-            if sender.kind != kind {
-                return enabled;
+        for sender in conn.senders.values().filter(|sender| sender.kind == kind)
+        {
+            if !sender.is_track_enabled() {
+                return false;
             }
-            match sender.track.borrow().as_ref() {
-                None => enabled,
-                Some(track) => enabled && track.is_enabled(),
-            }
-        })
+        }
+
+        true
     }
 
     /// Returns mapping from a [`MediaTrack`] ID to a `mid` of
@@ -310,6 +309,14 @@ impl Sender {
     fn set_track_enabled(&self, enabled: bool) {
         if let Some(track) = self.transceiver.sender().track() {
             track.set_enabled(enabled);
+        }
+    }
+
+    /// Is sender has track and it is enabled.
+    fn is_track_enabled(&self) -> bool {
+        match self.track.borrow().as_ref() {
+            None => false,
+            Some(track) => track.is_enabled(),
         }
     }
 }

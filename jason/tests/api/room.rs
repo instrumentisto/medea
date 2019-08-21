@@ -91,7 +91,9 @@ fn get_room_and_new_peer(
     repo.expect_get_all().returning(|| vec![]);
     repo.expect_insert().returning(|_, _| None);
     let peer_clone = Rc::clone(&peer);
-    repo.expect_get().with(eq(1)).return_once_st(move |_| Some(peer_clone));
+    repo.expect_get()
+        .with(eq(1))
+        .return_once_st(move |_| Some(peer_clone));
     rpc.expect_send_command().return_const(());
     rpc.expect_unsub().return_const(());
 
@@ -116,7 +118,6 @@ fn mute_audio_room_before_init_peer() -> impl Future<Item = (), Error = JsValue>
         })
         .unwrap();
 
-
     // TODO: we gonna do this kind of stuff many-many times,
     //       create macro:
     //       let fut: impl Future<Item = (), Error = JsValue> =
@@ -128,10 +129,7 @@ fn mute_audio_room_before_init_peer() -> impl Future<Item = (), Error = JsValue>
         done.send(()).unwrap();
     });
     window()
-        .set_timeout_with_callback_and_timeout_and_arguments_0(
-            &cb.into(),
-            500,
-        )
+        .set_timeout_with_callback_and_timeout_and_arguments_0(&cb.into(), 500)
         .unwrap();
 
     wait.into_future()
@@ -141,5 +139,6 @@ fn mute_audio_room_before_init_peer() -> impl Future<Item = (), Error = JsValue>
             assert!(peer.is_send_video_enabled());
             assert!(!peer.is_send_audio_enabled());
             Ok(())
-        }).map_err(|_| WasmErr::from("canceled").into())
+        })
+        .map_err(|_| WasmErr::from("canceled").into())
 }
