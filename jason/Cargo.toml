@@ -1,6 +1,6 @@
 [package]
 name = "medea-jason"
-version = "0.1.0-dev"
+version = "0.1.0"
 edition = "2018"
 description = "Client library for Medea media server"
 authors = ["Instrumentisto Team <developer@instrumentisto.com>"]
@@ -9,8 +9,9 @@ documentation = "https://docs.rs/medea-jason"
 homepage = "https://github.com/instrumentisto/medea/tree/master/jason"
 repository = "https://github.com/instrumentisto/medea/tree/master/jason"
 readme = "README.md"
-keywords = ["medea", "jason", "client", "client-api", "browser"]
+keywords = ["medea", "jason", "webrtc", "client", "browser"]
 categories = ["multimedia", "api-bindings", "web-programming", "wasm"]
+exclude = ["/demo/", "/e2e-demo/"]
 
 [lib]
 crate-type = ["cdylib", "rlib"]
@@ -26,7 +27,7 @@ console_error_panic_hook = { version = "0.1", optional = true }
 futures = "0.1"
 js-sys = "0.3"
 macro-attr = "0.2"
-medea-client-api-proto = { path = "../proto/client-api", features = ["jason"] }
+medea-client-api-proto = { version = "0.1", features = ["jason"] }
 medea-macro = "0.1"
 newtype_derive = "0.1"
 serde = { version = "1.0", features = ["derive"] }
