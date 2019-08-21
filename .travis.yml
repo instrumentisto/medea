@@ -14,7 +14,6 @@ install:
   - unzip ${PROTOC_FILENAME}
   - bin/protoc --version
   - popd
-  - cargo install --force sccache
 
 jobs:
   allow_failures:
@@ -46,16 +45,22 @@ jobs:
     - name: medea (stable)
       stage: build
       rust: stable
+      before_script:
+        - sccache --version || cargo install sccache && sccache --version
       script: env RUSTC_WRAPPER=sccache cargo build
 
     - name: medea (beta)
       stage: build
       rust: beta
+      before_script:
+        - sccache --version || cargo install sccache && sccache --version
       script: env RUSTC_WRAPPER=sccache cargo build
 
     - name: medea (nightly)
       stage: build
       rust: nightly
+      before_script:
+        - sccache --version || cargo install sccache && sccache --version
       script: env RUSTC_WRAPPER=sccache cargo build
 
     - name: unit (stable)
