@@ -37,7 +37,7 @@ hashbrown = "0.1"
 humantime = "1.2"
 macro-attr = "0.2"
 medea-client-api-proto = { path = "proto/client-api", features = ["medea"] }
-medea-macro = { path = "crates/medea-macro" }
+medea-macro = "0.1"
 newtype_derive = "0.1"
 rand = "0.7"
 redis = "0.10"

@@ -23,6 +23,17 @@ RUST_VER := 1.36
 
 CURRENT_BRANCH := $(strip $(shell git branch | grep \* | cut -d ' ' -f2))
 
+crate-dir = .
+ifeq ($(crate),medea-jason)
+crate-dir = jason
+endif
+ifeq ($(crate),medea-client-api-proto)
+crate-dir = proto/client-api
+endif
+ifeq ($(crate),medea-macro)
+crate-dir = crates/medea-macro
+endif
+
 
 
 
@@ -217,6 +228,7 @@ ifeq ($(test-unit-crate),@all)
 	@make test.unit crate=medea-jason
 	@make test.unit crate=medea
 else
+	cd $(crate-dir)/ && \
 	cargo test -p $(test-unit-crate)
 endif
 
@@ -235,25 +247,14 @@ endif
 #	                    [publish=(no|yes)]
 
 release-crates-token = $(if $(call eq,$(token),),${CARGO_TOKEN},$(token))
-release-crates-dir = $(error No crate '$(crate)' exists)
-ifeq ($(crate),medea)
-release-crates-dir =
-endif
-ifeq ($(crate),medea-jason)
-release-crates-dir = jason
-endif
-ifeq ($(crate),medea-client-api-proto)
-release-crates-dir = proto/client-api
-endif
-ifeq ($(crate),medea-macro)
-release-crates-dir = crates/medea-macro
-endif
 
 release.crates:
-	cd $(release-crates-dir)/ && \
+ifneq ($(filter $(crate),medea medea-jason medea-client-api-proto medea-macro),)
+	cd $(crate-dir)/ && \
 	$(if $(call eq,$(publish),yes),\
 		cargo publish --token $(release-crates-token) ,\
 		cargo package --allow-dirty )
+endif
 
 
 release.helm: helm.package.release
@@ -262,20 +263,16 @@ release.helm: helm.package.release
 # Build and publish project crate to NPM.
 #
 # Usage:
-#	make release.npm [crate=medea-jason]
+#	make release.npm crate=medea-jason
 #	                 [publish=(no|yes)]
 
-release-npm-crate = $(if $(call eq,$(crate),),medea-jason,$(crate))
-release-npm-dir = $(error No NPM crate '$(release-npm-crate)' exists)
-ifeq ($(release-npm-crate),medea-jason)
-release-npm-dir = jason
-endif
-
 release.npm:
-	@rm -rf $(release-npm-dir)/pkg/
-	wasm-pack build -t web $(release-npm-dir)/
+ifneq ($(filter $(crate),medea-jason),)
+	@rm -rf $(crate-dir)/pkg/
+	wasm-pack build -t web $(crate-dir)/
 ifeq ($(publish),yes)
-	wasm-pack publish $(release-npm-dir)/
+	wasm-pack publish $(crate-dir)/
+endif
 endif
 
 
