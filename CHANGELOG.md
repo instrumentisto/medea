@@ -6,7 +6,7 @@ All user visible changes to this project will be documented in this file. This p
 
 
 
-## [0.2.0] · 2019-?-?
+## TBD [0.2.0] · 2019-?-?
 [0.2.0]: https://github.com/instrumentisto/medea/releases/tag/medea-0.2.0
 
 [Milestone](https://github.com/instrumentisto/medea/milestone/2) |
