@@ -253,7 +253,7 @@ release.crates:
 	cd $(release-crates-dir)/ && \
 	$(if $(call eq,$(publish),yes),\
 		cargo publish --token $(release-crates-token) ,\
-		cargo package )
+		cargo package --allow-dirty )
 
 
 release.helm: helm.package.release

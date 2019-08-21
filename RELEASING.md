@@ -27,7 +27,7 @@ All its user-facing changes should be described explicitly and clear. It should 
 
 1. Commit all the changes for the prepared release with a commit message:
     ```
-    Bump up '<crate-name>' version to <version>
+    Create <version> release of '<crate-name>' crate
     ```
 
 2. Apply the release Git tag. Its format must be `<crate-name>-<version>`. For example:

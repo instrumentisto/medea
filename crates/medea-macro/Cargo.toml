@@ -1,10 +1,10 @@
 [package]
 name = "medea-macro"
-version = "0.1.0-dev"
+version = "0.1.0"
 edition = "2018"
 description = "Internal macros for Medea media server project"
 authors = ["Instrumentisto Team <developer@instrumentisto.com>"]
-license = "MIT/Apache 2.0"
+license = "MIT/Apache-2.0"
 documentation = "https://docs.rs/medea-macro"
 homepage = "https://github.com/instrumentisto/medea/tree/master/crates/medea-macro"
 repository = "https://github.com/instrumentisto/medea/tree/master/crates/medea-macro"

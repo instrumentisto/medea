@@ -1,5 +1,4 @@
 language: rust
-
 cache: cargo
 
 install:
@@ -53,62 +52,70 @@ jobs:
       rust: stable
       script: make test.unit crate=@all
 
-before_deploy:
-  - echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > ~/.npmrc
-  - curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+    - name: crates.io, NPM and GitHub
+      stage: release
+      if: (tag IS present) AND (tag =~ ^medea-[a-z-]*[0-9]+\.[0-9]+\.[0-9]+)
+      cache: false
+      script: echo "Releasing $TRAVIS_TAG..."
+      before_deploy:
+        - echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > ~/.npmrc
+        - curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+      deploy:
+        - provider: script
+          skip_cleanup: true
+          script: make release.crates crate=medea publish=yes
+          on:
+            tags: true
+            condition: $TRAVIS_TAG =~ ^medea-[0-9]+\.[0-9]+\.[0-9]+
+        - provider: releases
+          skip_cleanup: true
+          api_key: $GH_TOKEN
+          name: $TRAVIS_TAG
+          on:
+            tags: true
+            condition: $TRAVIS_TAG =~ ^medea-[0-9]+\.[0-9]+\.[0-9]+
 
-deploy:
-  - provider: script
-    script: make release.crates crate=medea publish=yes
-    on:
-      tags: true
-      condition: $TRAVIS_TAG =~ ^medea-[0-9]+\.[0-9]+\.[0-9]+
-  - provider: releases
-    skip_cleanup: true
-    api_key: $GH_TOKEN
-    name: $TRAVIS_TAG
-    on:
-      tags: true
-      condition: $TRAVIS_TAG =~ ^medea-[0-9]+\.[0-9]+\.[0-9]+
+        - provider: script
+          skip_cleanup: true
+          script: make release crate=medea-jason publish=yes
+          on:
+            tags: true
+            condition: $TRAVIS_TAG =~ ^medea-jason-[0-9]+\.[0-9]+\.[0-9]+
+        - provider: releases
+          skip_cleanup: true
+          api_key: $GH_TOKEN
+          name: $TRAVIS_TAG
+          on:
+            tags: true
+            condition: $TRAVIS_TAG =~ ^medea-jason-[0-9]+\.[0-9]+\.[0-9]+
 
-  - provider: script
-    script: make release crate=medea-jason publish=yes
-    on:
-      tags: true
-      condition: $TRAVIS_TAG =~ ^medea-jason-[0-9]+\.[0-9]+\.[0-9]+
-  - provider: releases
-    skip_cleanup: true
-    api_key: $GH_TOKEN
-    name: $TRAVIS_TAG
-    on:
-      tags: true
-      condition: $TRAVIS_TAG =~ ^medea-jason-[0-9]+\.[0-9]+\.[0-9]+
+        - provider: script
+          skip_cleanup: true
+          script: make release.crates crate=medea-client-api-proto publish=yes
+          on:
+            tags: true
+            condition: $TRAVIS_TAG =~ ^medea-client-api-proto-[0-9]+\.[0-9]+\.[0-9]+
+        - provider: releases
+          skip_cleanup: true
+          api_key: $GH_TOKEN
+          name: $TRAVIS_TAG
+          on:
+            tags: true
+            condition: $TRAVIS_TAG =~ ^medea-client-api-proto-[0-9]+\.[0-9]+\.[0-9]+
 
-  - provider: script
-    script: make release.crates crate=medea-client-api-proto publish=yes
-    on:
-      tags: true
-      condition: $TRAVIS_TAG =~ ^medea-client-api-proto-[0-9]+\.[0-9]+\.[0-9]+
-  - provider: releases
-    skip_cleanup: true
-    api_key: $GH_TOKEN
-    name: $TRAVIS_TAG
-    on:
-      tags: true
-      condition: $TRAVIS_TAG =~ ^medea-client-api-proto-[0-9]+\.[0-9]+\.[0-9]+
-
-  - provider: script
-    script: make release.crates crate=medea-macro publish=yes
-    on:
-      tags: true
-      condition: $TRAVIS_TAG =~ ^medea-macro-[0-9]+\.[0-9]+\.[0-9]+
-  - provider: releases
-    skip_cleanup: true
-    api_key: $GH_TOKEN
-    name: $TRAVIS_TAG
-    on:
-      tags: true
-      condition: $TRAVIS_TAG =~ ^medea-macro-[0-9]+\.[0-9]+\.[0-9]+
+        - provider: script
+          skip_cleanup: true
+          script: make release.crates crate=medea-macro publish=yes
+          on:
+            tags: true
+            condition: $TRAVIS_TAG =~ ^medea-macro-[0-9]+\.[0-9]+\.[0-9]+
+        - provider: releases
+          skip_cleanup: true
+          api_key: $GH_TOKEN
+          name: $TRAVIS_TAG
+          on:
+            tags: true
+            condition: $TRAVIS_TAG =~ ^medea-macro-[0-9]+\.[0-9]+\.[0-9]+
 
 notifications:
   email:
