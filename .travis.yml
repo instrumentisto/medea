@@ -14,6 +14,10 @@ install:
   - unzip ${PROTOC_FILENAME}
   - bin/protoc --version
   - popd
+  - cargo install sccache
+
+env:
+  - RUSTC_WRAPPER=sccache
 
 jobs:
   allow_failures:
@@ -82,49 +86,6 @@ jobs:
       before_script:
         - mkdir .cache
       script: make test.e2e.chrome
-
-before_deploy:
-  - echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > ~/.npmrc
-  - curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
-
-deploy:
-  - provider: script
-    skip_cleanup: true
-    script: make release.crates.medea
-    on:
-      tags: true
-      branch: master
-      condition: $TRAVIS_TAG =~ ^medea-[0-9]+\.[0-9]+\.[0-9]+
-
-  - provider: script
-    skip_cleanup: true
-    script: make release.jason
-    on:
-      tags: true
-      branch: master
-      condition: $TRAVIS_TAG =~ ^medea-jason-[0-9]+\.[0-9]+\.[0-9]+
-
-  - provider: script
-    skip_cleanup: true
-    script: make release.crates.medea-client-api-proto
-    on:
-      tags: true
-      branch: master
-      condition: $TRAVIS_TAG =~ ^medea-client-api-proto-[0-9]+\.[0-9]+\.[0-9]+
-
-  - provider: script
-    skip_cleanup: true
-    script: make release.crates.medea-macro
-    on:
-      tags: true
-      branch: master
-      condition: $TRAVIS_TAG =~ ^medea-macro-[0-9]+\.[0-9]+\.[0-9]+
-
-  - provider: releases
-    api_key: $GH_TOKEN
-    on:
-      tags: true
-      branch: master
 
 notifications:
   email:
