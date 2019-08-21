@@ -3,6 +3,7 @@ pub mod ice_user;
 pub mod peer;
 pub mod track;
 
+#[doc(inline)]
 pub use self::{
     ice_user::IceUser,
     peer::{

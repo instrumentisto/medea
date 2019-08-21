@@ -1,0 +1,116 @@
+language: rust
+
+cache: cargo
+
+install:
+  - rustc -vV
+  - cargo -vV
+
+jobs:
+  allow_failures:
+    - rust: nightly
+      stage: build
+
+  include:
+    - name: Clippy
+      stage: check
+      rust: nightly
+      before_script: rustup component add clippy
+      script: make lint
+
+    - name: rustfmt
+      stage: check
+      rust: nightly
+      before_script: rustup component add rustfmt
+      script: make fmt check=yes
+
+    - name: medea-jason (stable)
+      stage: build
+      rust: stable
+      before_script:
+        - rm -f /home/travis/.cargo/bin/wasm-pack
+        - curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+      script:
+        - make release.npm crate=medea-jason publish=no
+
+    - name: medea (stable)
+      stage: build
+      rust: stable
+      script: cargo build --bin medea
+
+    - name: medea (beta)
+      stage: build
+      rust: beta
+      script: cargo build --bin medea
+
+    - name: medea (nightly)
+      stage: build
+      rust: nightly
+      script: cargo build --bin medea
+
+    - name: unit (stable)
+      stage: test
+      rust: stable
+      script: make test.unit crate=@all
+
+before_deploy:
+  - echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > ~/.npmrc
+  - curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
+deploy:
+  - provider: script
+    script: make release.crates crate=medea publish=yes
+    on:
+      tags: true
+      condition: $TRAVIS_TAG =~ ^medea-[0-9]+\.[0-9]+\.[0-9]+
+  - provider: releases
+    skip_cleanup: true
+    api_key: $GH_TOKEN
+    name: $TRAVIS_TAG
+    on:
+      tags: true
+      condition: $TRAVIS_TAG =~ ^medea-[0-9]+\.[0-9]+\.[0-9]+
+
+  - provider: script
+    script: make release crate=medea-jason publish=yes
+    on:
+      tags: true
+      condition: $TRAVIS_TAG =~ ^medea-jason-[0-9]+\.[0-9]+\.[0-9]+
+  - provider: releases
+    skip_cleanup: true
+    api_key: $GH_TOKEN
+    name: $TRAVIS_TAG
+    on:
+      tags: true
+      condition: $TRAVIS_TAG =~ ^medea-jason-[0-9]+\.[0-9]+\.[0-9]+
+
+  - provider: script
+    script: make release.crates crate=medea-client-api-proto publish=yes
+    on:
+      tags: true
+      condition: $TRAVIS_TAG =~ ^medea-client-api-proto-[0-9]+\.[0-9]+\.[0-9]+
+  - provider: releases
+    skip_cleanup: true
+    api_key: $GH_TOKEN
+    name: $TRAVIS_TAG
+    on:
+      tags: true
+      condition: $TRAVIS_TAG =~ ^medea-client-api-proto-[0-9]+\.[0-9]+\.[0-9]+
+
+  - provider: script
+    script: make release.crates crate=medea-macro publish=yes
+    on:
+      tags: true
+      condition: $TRAVIS_TAG =~ ^medea-macro-[0-9]+\.[0-9]+\.[0-9]+
+  - provider: releases
+    skip_cleanup: true
+    api_key: $GH_TOKEN
+    name: $TRAVIS_TAG
+    on:
+      tags: true
+      condition: $TRAVIS_TAG =~ ^medea-macro-[0-9]+\.[0-9]+\.[0-9]+
+
+notifications:
+  email:
+    on_success: never
+    on_failure: always

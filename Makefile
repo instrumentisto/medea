@@ -44,10 +44,19 @@ deps: cargo yarn
 docs: docs.rust
 
 
+fmt: cargo.fmt
+
+
 lint: cargo.lint
 
 
-fmt: cargo.fmt
+# Build and publish project crate everywhere.
+#
+# Usage:
+#	make release crate=(medea|medea-jason|<crate-name>)
+#	             [publish=(no|yes)]
+
+release: release.crates release.npm
 
 
 test: test.unit
@@ -203,19 +212,12 @@ test-unit-crate = $(if $(call eq,$(crate),),@all,$(crate))
 
 test.unit:
 ifeq ($(test-unit-crate),@all)
-	@make test.unit crate=medea-client-api-proto
 	@make test.unit crate=medea-macro
+	@make test.unit crate=medea-client-api-proto
+	@make test.unit crate=medea-jason
 	@make test.unit crate=medea
-	@make test.unit crate=jason
 else
-ifeq ($(test-unit-crate),medea)
-	cargo test --bin medea
-else
-ifeq ($(test-unit-crate),jason)
-	wasm-pack test --headless --firefox jason
-endif
 	cargo test -p $(test-unit-crate)
-endif
 endif
 
 
@@ -225,18 +227,56 @@ endif
 # Releasing commands #
 ######################
 
-# Build and publish Jason application to npm
+# Build and publish project crate to crates.io.
 #
 # Usage:
-#	make release.jason
+#	make release.crates crate=(medea|medea-jason|<crate-name>)
+#	                    [token=($CARGO_TOKEN|<cargo-token>)]
+#	                    [publish=(no|yes)]
 
-release.jason:
-	@rm -rf jason/pkg/
-	wasm-pack build -t web jason
-	wasm-pack publish
+release-crates-token = $(if $(call eq,$(token),),${CARGO_TOKEN},$(token))
+release-crates-dir = $(error No crate '$(crate)' exists)
+ifeq ($(crate),medea)
+release-crates-dir =
+endif
+ifeq ($(crate),medea-jason)
+release-crates-dir = jason
+endif
+ifeq ($(crate),medea-client-api-proto)
+release-crates-dir = proto/client-api
+endif
+ifeq ($(crate),medea-macro)
+release-crates-dir = crates/medea-macro
+endif
+
+release.crates:
+	cd $(release-crates-dir)/ && \
+	$(if $(call eq,$(publish),yes),\
+		cargo publish --token $(release-crates-token) ,\
+		cargo package )
 
 
 release.helm: helm.package.release
+
+
+# Build and publish project crate to NPM.
+#
+# Usage:
+#	make release.npm [crate=medea-jason]
+#	                 [publish=(no|yes)]
+
+release-npm-crate = $(if $(call eq,$(crate),),medea-jason,$(crate))
+release-npm-dir = $(error No NPM crate '$(release-npm-crate)' exists)
+ifeq ($(release-npm-crate),medea-jason)
+release-npm-dir = jason
+endif
+
+release.npm:
+	@rm -rf $(release-npm-dir)/pkg/
+	wasm-pack build -t web $(release-npm-dir)/
+ifeq ($(publish),yes)
+	wasm-pack publish $(release-npm-dir)/
+endif
 
 
 
@@ -512,7 +552,7 @@ endef
         helm helm.down helm.init helm.lint helm.list \
         	helm.package helm.package.release helm.up \
         minikube.boot \
-        release.jason release.helm \
+        release release.crates release.helm release.npm \
         test test.unit \
         up up.coturn up.demo up.dev up.jason up.medea \
         yarn

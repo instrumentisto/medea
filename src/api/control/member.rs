@@ -19,7 +19,7 @@ pub struct Member {
 }
 
 impl Member {
-    /// Returns new instance of [`Memebr`] with given credentials.
+    /// Returns new instance of [`Member`] with given credentials.
     pub fn new(id: Id, credentials: String) -> Self {
         Self {
             id,

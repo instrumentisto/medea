@@ -1,3 +1,8 @@
+//! Implementation of managing [coturn] [TURN] server.
+//!
+//! [coturn]: https://github.com/coturn/coturn
+//! [TURN]: https://webrtcglossary.com/turn/
+
 use std::{fmt, sync::Arc};
 
 use actix::{
@@ -64,7 +69,7 @@ impl TurnAuthService for Addr<Service> {
         )
     }
 
-    /// Sends [`DeleteRoom`] to [`Service`].
+    /// Sends `DeleteRoom` to [`Service`].
     fn delete(
         &self,
         users: Vec<IceUser>,
@@ -91,6 +96,7 @@ impl TurnAuthService for Addr<Service> {
 type ActFuture<I, E> =
     Box<dyn ActorFuture<Actor = Service, Item = I, Error = E>>;
 
+/// Error which can happen in [`TurnAuthService`].
 #[derive(Debug, Fail)]
 pub enum TurnServiceErr {
     #[fail(display = "Error accessing TurnAuthRepo: {}", _0)]

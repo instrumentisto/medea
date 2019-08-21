@@ -159,6 +159,8 @@ impl RpcConnection for Addr<WsSession> {
     }
 
     /// Sends [`Event`] to Web Client.
+    ///
+    /// [`Event`]: medea_client_api_proto::Event
     fn send_event(
         &self,
         msg: EventMessage,
