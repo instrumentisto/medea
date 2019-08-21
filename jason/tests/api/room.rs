@@ -10,21 +10,19 @@ use futures::{
     },
     Future,
 };
-use wasm_bindgen::prelude::*;
-use wasm_bindgen_test::*;
-
 use jason::{
     api::Room,
     media::MediaManager,
     peer::{self, MockPeerRepository, PeerConnection, PeerRepository},
     rpc::MockRpcClient,
-    utils::window,
+    utils::{window, WasmErr},
 };
 use medea_client_api_proto::Event;
+use mockall::predicate::*;
+use wasm_bindgen::prelude::*;
+use wasm_bindgen_test::*;
 
 use crate::get_test_tracks;
-use futures::sync::oneshot::Canceled;
-use jason::utils::WasmErr;
 
 wasm_bindgen_test_configure!(run_in_browser);
 
@@ -38,9 +36,9 @@ fn get_test_room_and_exist_peer() -> (Room, Rc<PeerConnection>) {
     );
     repo.insert(1, Rc::clone(&peer));
 
-    let (_event_sender, event_receiver) = unbounded();
+    let (_, event_rx) = unbounded();
     rpc.expect_subscribe()
-        .return_once(move || Box::new(event_receiver));
+        .return_once(move || Box::new(event_rx));
     rpc.expect_unsub().return_const(());
 
     let room = Room::new(Rc::new(rpc), repo, media_manager);
@@ -78,7 +76,7 @@ fn mute_unmute_video() -> impl Future<Item = (), Error = JsValue> {
 }
 
 fn get_room_and_new_peer(
-    event_receiver: UnboundedReceiver<Event>,
+    event_rx: UnboundedReceiver<Event>,
 ) -> (Room, Rc<PeerConnection>) {
     let media_manager = Rc::new(MediaManager::default());
     let mut rpc = MockRpcClient::new();
@@ -89,11 +87,11 @@ fn get_room_and_new_peer(
     );
 
     rpc.expect_subscribe()
-        .return_once(move || Box::new(event_receiver));
+        .return_once(move || Box::new(event_rx));
     repo.expect_get_all().returning(|| vec![]);
     repo.expect_insert().returning(|_, _| None);
     let peer_clone = Rc::clone(&peer);
-    repo.expect_get().return_once_st(move |_| Some(peer_clone));
+    repo.expect_get().with(eq(1)).return_once_st(move |_| Some(peer_clone));
     rpc.expect_send_command().return_const(());
     rpc.expect_unsub().return_const(());
 
@@ -104,12 +102,12 @@ fn get_room_and_new_peer(
 #[wasm_bindgen_test(async)]
 fn mute_audio_room_before_init_peer() -> impl Future<Item = (), Error = JsValue>
 {
-    let (event_sender, event_receiver) = unbounded();
-    let (room, peer) = get_room_and_new_peer(event_receiver);
+    let (event_tx, event_rx) = unbounded();
+    let (room, peer) = get_room_and_new_peer(event_rx);
     let (audio_track, video_track) = get_test_tracks();
 
     room.new_handle().mute_audio().unwrap();
-    event_sender
+    event_tx
         .unbounded_send(Event::PeerCreated {
             peer_id: 1,
             sdp_offer: None,
@@ -117,25 +115,31 @@ fn mute_audio_room_before_init_peer() -> impl Future<Item = (), Error = JsValue>
             ice_servers: vec![],
         })
         .unwrap();
+
+
+    // TODO: we gonna do this kind of stuff many-many times,
+    //       create macro:
+    //       let fut: impl Future<Item = (), Error = JsValue> =
+    //          run_after!(500, |_| {
+    //              // what to run
+    //          })
     let (done, wait) = channel();
     let cb = Closure::once_into_js(move || {
-        done.send("str").unwrap();
+        done.send(()).unwrap();
     });
     window()
         .set_timeout_with_callback_and_timeout_and_arguments_0(
             &cb.into(),
-            10_000,
+            500,
         )
         .unwrap();
+
     wait.into_future()
-        .then(move |result: Result<&str, Canceled>| {
-            result
-                .and_then(move |msg| {
-                    WasmErr::from(msg).log_err();
-                    assert!(peer.is_send_video_enabled());
-                    assert!(!peer.is_send_audio_enabled());
-                    Ok(())
-                })
-                .map_err(|_| WasmErr::from("canceled").into())
-        })
+        .and_then(move |_| {
+            // move room so it wont get dropped
+            let _ = room;
+            assert!(peer.is_send_video_enabled());
+            assert!(!peer.is_send_audio_enabled());
+            Ok(())
+        }).map_err(|_| WasmErr::from("canceled").into())
 }

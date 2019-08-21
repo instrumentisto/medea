@@ -264,7 +264,6 @@ impl EventHandler for InnerRoom {
                     .map(move |sdp_offer| {
                         peer.toggle_send_audio(is_enabled_audio);
                         peer.toggle_send_video(is_enabled_video);
-                        WasmErr::from("peer created").log_err();
                         rpc.send_command(Command::MakeSdpOffer {
                             peer_id,
                             sdp_offer,

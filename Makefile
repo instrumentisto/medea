@@ -212,11 +212,11 @@ ifeq ($(test-unit-crate),medea)
 	cargo test --bin medea
 else
 ifeq ($(test-unit-crate),jason)
+	# TODO: `use wasm-pack test` https://github.com/rustwasm/wasm-pack/issues/698
+	# Only chrome supproted atm, CHROMEDRIVER=/path/to/chromedriver must be set
 	cd jason; \
-	export CHROMEDRIVER_CLIENT_ARGS="$(CHROMEDRIVER_CLIENT_ARGS)"; \
+	CHROMEDRIVER_CLIENT_ARGS="$(CHROMEDRIVER_CLIENT_ARGS)" \
 	cargo test --target wasm32-unknown-unknown --features mockable
-#	TODO change after https://github.com/rustwasm/wasm-pack/issues/698 resolved
-#	wasm-pack test --headless --chrome jason -- --features mockable
 endif
 	cargo test -p $(test-unit-crate)
 endif
