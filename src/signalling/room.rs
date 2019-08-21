@@ -1,5 +1,7 @@
 //! Room definitions and implementations. Room is responsible for media
 //! connection establishment between concrete [`Member`]s.
+//!
+//! [`Member`]: crate::api::control::member::Member
 
 use std::{collections::HashMap as StdHashMap, sync::Arc, time::Duration};
 
@@ -83,6 +85,8 @@ pub struct Room {
     id: Id,
 
     /// [`RpcConnection`]s of [`Member`]s in this [`Room`].
+    ///
+    /// [`RpcConnection`]: crate::api::client::rpc_connection::RpcConnection
     pub participants: ParticipantService,
 
     /// [`Peer`]s of [`Member`]s in this [`Room`].
@@ -372,7 +376,7 @@ impl Handler<CommandMessage> for Room {
     type Result = ActFuture<(), ()>;
 
     /// Receives [`Command`] from Web client and passes it to corresponding
-    /// handlers. Will emit [`CloseRoom`] on any error.
+    /// handlers. Will emit `CloseRoom` on any error.
     fn handle(
         &mut self,
         msg: CommandMessage,
@@ -423,6 +427,8 @@ impl Handler<RpcConnectionEstablished> for Room {
 
     /// Saves new [`RpcConnection`] in [`ParticipantService`], initiates media
     /// establishment between members.
+    ///
+    /// [`RpcConnection`]: crate::api::client::rpc_connection::RpcConnection
     fn handle(
         &mut self,
         msg: RpcConnectionEstablished,

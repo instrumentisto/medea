@@ -1,7 +1,11 @@
 //! Participant is [`Member`] with [`RpcConnection`]. [`ParticipantService`]
-//! stores [`Members`] and associated [`RpcConnection`]s, handles
+//! stores [`Member`]s and associated [`RpcConnection`]s, handles
 //! [`RpcConnection`] authorization, establishment, message sending, Turn
 //! credentials management.
+//!
+//! [`Member`]: crate::api::control::member::Member
+//! [`RpcConnection`]: crate::api::client::rpc_connection::RpcConnection
+//! [`ParticipantService`]: crate::signalling::participants::ParticipantService
 
 use std::{
     sync::Arc,
@@ -63,7 +67,7 @@ impl From<MailboxError> for ParticipantServiceErr {
 }
 
 /// Participant is [`Member`] with [`RpcConnection`]. [`ParticipantService`]
-/// stores [`Members`] and associated [`RpcConnection`]s, handles
+/// stores [`Member`]s and associated [`RpcConnection`]s, handles
 /// [`RpcConnection`] authorization, establishment, message sending.
 #[derive(Debug)]
 pub struct ParticipantService {
@@ -141,7 +145,7 @@ impl ParticipantService {
         self.members.insert(member.id, member);
     }
 
-    /// Checks if [`Member`] has **active** [`RcpConnection`].
+    /// Checks if [`Member`] has **active** [`RpcConnection`].
     pub fn member_has_connection(&self, member_id: MemberId) -> bool {
         self.connections.contains_key(&member_id)
             && !self.drop_connection_tasks.contains_key(&member_id)
@@ -164,7 +168,7 @@ impl ParticipantService {
         }
     }
 
-    /// Saves provided [`RpcConnection`], registers [`ICEUser`].
+    /// Saves provided [`RpcConnection`], registers [`IceUser`].
     /// If [`Member`] already has any other [`RpcConnection`],
     /// then it will be closed.
     pub fn connection_established(

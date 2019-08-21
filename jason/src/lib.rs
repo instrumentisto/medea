@@ -1,5 +1,9 @@
+// TODO: when using enum's Self will be in stable, remove it.
+#![allow(clippy::use_self)]
+
 #[macro_use]
 pub mod utils;
+
 pub mod api;
 pub mod media;
 pub mod peer;

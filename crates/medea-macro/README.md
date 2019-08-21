@@ -1,15 +1,15 @@
-Medea Client API protocol
-=========================
+medea-macro
+===========
 
-[![Crates.io](https://img.shields.io/crates/v/medea-client-api-proto)](https://crates.io/crates/medea-client-api-proto)
-![Crates.io license](https://img.shields.io/crates/l/medea-client-api-proto)
+[![Crates.io](https://img.shields.io/crates/v/medea-macro)](https://crates.io/crates/medea-macro)
+![Crates.io license](https://img.shields.io/crates/l/medea-macro)
 
-[API Docs](https://docs.rs/medea-client-api-proto) |
+[API Docs](https://docs.rs/medea-macro) |
 [Changelog](CHANGELOG.md)
 
-Client API protocol implementation for [Medea] media server.
+Internal macros for [Medea] media server project.
 
-__Currently, in early development phase.__
+__DO NOT use this crate directly.__ It's for internal use by [Medea] crates only.
 
 
 

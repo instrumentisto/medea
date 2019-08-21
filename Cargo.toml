@@ -4,10 +4,13 @@ version = "0.1.0-dev"
 edition = "2018"
 description = "Medea media server"
 authors = ["Instrumentisto Team <developer@instrumentisto.com>"]
+license = "MPL 2.0"
+documentation = "https://docs.rs/medea"
 homepage = "https://github.com/instrumentisto/medea"
-# documentation = "https://docs.rs/medea"
-readme = "README.md"
 repository = "https://github.com/instrumentisto/medea"
+readme = "README.md"
+keywords = ["medea", "media-server"]
+categories = ["multimedia"]
 
 [workspace]
 members = [
@@ -34,7 +37,7 @@ hashbrown = "0.1"
 humantime = "1.2"
 macro-attr = "0.2"
 medea-client-api-proto = { path = "proto/client-api", features = ["medea"] }
-medea-macro = { path = "crates/medea-macro" }
+medea-macro = "0.1"
 newtype_derive = "0.1"
 rand = "0.7"
 redis = "0.11"

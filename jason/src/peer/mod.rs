@@ -152,8 +152,8 @@ impl PeerConnection {
         self.0.media_connections.get_mids()
     }
 
-    /// Sync provided tracks creating all required [`Sender`]s and
-    /// [`Receiver`]s, request local stream if required, get, set and return
+    /// Sync provided tracks creating all required `Sender`s and
+    /// `Receiver`s, request local stream if required, get, set and return
     /// sdp offer.
     pub fn get_offer(
         &self,
@@ -206,11 +206,11 @@ impl PeerConnection {
         Box::new(self.0.peer.set_remote_description(SdpType::Answer(answer)))
     }
 
-    /// Sync provided tracks creating all required [`Sender`]s and
-    /// [`Receiver`]s, request local stream if required.
+    /// Sync provided tracks creating all required `Sender`s and
+    /// `Receiver`s, request local stream if required.
     /// `set_remote_description` will create all transceivers and fire all
-    /// `on_track` events, so it updates [`Receiver`]s before
-    /// `set_remote_description` and update [`Sender`]s after.
+    /// `on_track` events, so it updates `Receiver`s before
+    /// `set_remote_description` and update `Sender`s after.
     ///
     /// [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
     pub fn process_offer(

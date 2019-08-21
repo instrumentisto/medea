@@ -25,6 +25,19 @@ CURRENT_BRANCH := $(strip $(shell git branch | grep \* | cut -d ' ' -f2))
 
 CHROMEDRIVER_CLIENT_ARGS := $(strip $(shell grep 'CHROMEDRIVER_CLIENT_ARGS=' .env | cut -d '=' -f2))
 
+crate-dir = .
+ifeq ($(crate),medea-jason)
+crate-dir = jason
+endif
+ifeq ($(crate),medea-client-api-proto)
+crate-dir = proto/client-api
+endif
+ifeq ($(crate),medea-macro)
+crate-dir = crates/medea-macro
+endif
+
+
+
 
 ###########
 # Aliases #
@@ -44,10 +57,19 @@ deps: cargo yarn
 docs: docs.rust
 
 
+fmt: cargo.fmt
+
+
 lint: cargo.lint
 
 
-fmt: cargo.fmt
+# Build and publish project crate everywhere.
+#
+# Usage:
+#	make release crate=(medea|medea-jason|<crate-name>)
+#	             [publish=(no|yes)]
+
+release: release.crates release.npm
 
 
 test: test.unit
@@ -203,23 +225,13 @@ test-unit-crate = $(if $(call eq,$(crate),),@all,$(crate))
 
 test.unit:
 ifeq ($(test-unit-crate),@all)
-	@make test.unit crate=medea-client-api-proto
 	@make test.unit crate=medea-macro
+	@make test.unit crate=medea-client-api-proto
+	@make test.unit crate=medea-jason
 	@make test.unit crate=medea
-	@make test.unit crate=jason
 else
-ifeq ($(test-unit-crate),medea)
-	cargo test --bin medea
-else
-ifeq ($(test-unit-crate),jason)
-	# TODO: `use wasm-pack test` https://github.com/rustwasm/wasm-pack/issues/698
-	# Only chrome supproted atm, CHROMEDRIVER=/path/to/chromedriver must be set
-	cd jason; \
-	CHROMEDRIVER_CLIENT_ARGS="$(CHROMEDRIVER_CLIENT_ARGS)" \
-	cargo test --target wasm32-unknown-unknown --features mockable
-endif
+	cd $(crate-dir)/ && \
 	cargo test -p $(test-unit-crate)
-endif
 endif
 
 
@@ -229,18 +241,41 @@ endif
 # Releasing commands #
 ######################
 
-# Build and publish Jason application to npm
+# Build and publish project crate to crates.io.
 #
 # Usage:
-#	make release.jason
+#	make release.crates crate=(medea|medea-jason|<crate-name>)
+#	                    [token=($CARGO_TOKEN|<cargo-token>)]
+#	                    [publish=(no|yes)]
 
-release.jason:
-	@rm -rf jason/pkg/
-	wasm-pack build -t web jason
-	wasm-pack publish
+release-crates-token = $(if $(call eq,$(token),),${CARGO_TOKEN},$(token))
+
+release.crates:
+ifneq ($(filter $(crate),medea medea-jason medea-client-api-proto medea-macro),)
+	cd $(crate-dir)/ && \
+	$(if $(call eq,$(publish),yes),\
+		cargo publish --token $(release-crates-token) ,\
+		cargo package --allow-dirty )
+endif
 
 
 release.helm: helm.package.release
+
+
+# Build and publish project crate to NPM.
+#
+# Usage:
+#	make release.npm crate=medea-jason
+#	                 [publish=(no|yes)]
+
+release.npm:
+ifneq ($(filter $(crate),medea-jason),)
+	@rm -rf $(crate-dir)/pkg/
+	wasm-pack build -t web $(crate-dir)/
+ifeq ($(publish),yes)
+	wasm-pack publish $(crate-dir)/
+endif
+endif
 
 
 
@@ -516,7 +551,7 @@ endef
         helm helm.down helm.init helm.lint helm.list \
         	helm.package helm.package.release helm.up \
         minikube.boot \
-        release.jason release.helm \
+        release release.crates release.helm release.npm \
         test test.unit \
         up up.coturn up.demo up.dev up.jason up.medea \
         yarn

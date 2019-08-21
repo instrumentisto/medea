@@ -1,4 +1,6 @@
 //! [`RpcConnection`] with related messages.
+//!
+//! [`RpcConnection`]: crate::api::client::rpc_connection::RpcConnection
 
 use std::fmt;
 
@@ -23,6 +25,8 @@ macro_attr! {
 }
 
 /// Abstraction over RPC connection with some remote [`Member`].
+///
+/// [`Member`]: crate::api::control::member::Member
 pub trait RpcConnection: fmt::Debug + Send {
     /// Closes [`RpcConnection`].
     /// No [`RpcConnectionClosed`] signals should be emitted.
@@ -30,6 +34,8 @@ pub trait RpcConnection: fmt::Debug + Send {
     fn close(&mut self) -> Box<dyn Future<Item = (), Error = ()>>;
 
     /// Sends [`Event`] to remote [`Member`].
+    ///
+    /// [`Member`]: crate::api::control::member::Member
     fn send_event(
         &self,
         msg: EventMessage,
@@ -41,15 +47,22 @@ pub trait RpcConnection: fmt::Debug + Send {
 #[rtype(result = "Result<(), AuthorizationError>")]
 pub struct Authorize {
     /// ID of [`Member`] to authorize [`RpcConnection`] for.
+    ///
+    /// [`Member`]: crate::api::control::member::Member
     pub member_id: MemberId,
     /// Credentials to authorize [`RpcConnection`] with.
     pub credentials: String, // TODO: &str when futures will allow references
 }
 
 /// Error of authorization [`RpcConnection`] in [`Room`].
+///
+/// [`Room`]: crate::signalling::Room
 #[derive(Debug)]
 pub enum AuthorizationError {
     /// Authorizing [`Member`] does not exists in the [`Room`].
+    ///
+    /// [`Member`]: crate::api::control::member::Member
+    /// [`Room`]: crate::signalling::Room
     MemberNotExists,
     /// Provided credentials are invalid.
     InvalidCredentials,
@@ -57,20 +70,28 @@ pub enum AuthorizationError {
 
 /// Signal of new [`RpcConnection`] being established with specified [`Member`].
 /// Transport should consider dropping connection if message result is err.
+///
+/// [`Member`]: crate::api::control::member::Member
 #[derive(Debug, Message)]
 #[rtype(result = "Result<(), ()>")]
 #[allow(clippy::module_name_repetitions)]
 pub struct RpcConnectionEstablished {
     /// ID of [`Member`] that establishes [`RpcConnection`].
+    ///
+    /// [`Member`]: crate::api::control::member::Member
     pub member_id: MemberId,
     /// Established [`RpcConnection`].
     pub connection: Box<dyn RpcConnection>,
 }
 /// Signal of existing [`RpcConnection`] of specified [`Member`] being closed.
+///
+/// [`Member`]: crate::api::control::member::Member
 #[derive(Debug, Message)]
 #[allow(clippy::module_name_repetitions)]
 pub struct RpcConnectionClosed {
     /// ID of [`Member`] which [`RpcConnection`] is closed.
+    ///
+    /// [`Member`]: crate::api::control::member::Member
     pub member_id: MemberId,
     /// Reason of why [`RpcConnection`] is closed.
     pub reason: ClosedReason,
