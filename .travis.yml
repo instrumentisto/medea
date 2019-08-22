@@ -51,9 +51,11 @@ jobs:
     - name: unit
       stage: test
       rust: stable
+      before_script:
+        - cargo install wasm-bindgen-cli
       addons:
         chrome: stable
-      script: make test.unit crate=@all
+      script: make test.unit crate=medea-jason
 
     - name: crates.io
       stage: release
