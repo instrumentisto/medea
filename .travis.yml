@@ -11,11 +11,11 @@ jobs:
       stage: build
 
   include:
-    - name: Clippy
-      stage: check
-      rust: nightly
-      before_script: rustup component add clippy
-      script: make lint
+#    - name: Clippy
+#      stage: check
+#      rust: nightly
+#      before_script: rustup component add clippy
+#      script: make lint
 
 #    - name: rustfmt
 #      stage: check
@@ -48,7 +48,7 @@ jobs:
 #      rust: nightly
 #      script: cargo build --bin medea
 
-    - name: unit (stable)
+    - name: unit
       stage: test
       rust: stable
       addons:
@@ -106,6 +106,10 @@ jobs:
         name: $TRAVIS_TAG
         on:
           tags: true
+
+stages:
+  - name: unit
+    if: (branch = master AND type != pull_request) OR commit_message =~ /.*\[run ci\]/
 
 notifications:
   email:
