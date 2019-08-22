@@ -57,9 +57,8 @@ jobs:
           packages:
             - chromium-chromedriver
       before_script:
-        - which chromedriver
-#        - cargo install wasm-bindgen-cli
-      script: make test.unit crate=medea-jason
+        - cargo install wasm-bindgen-cli
+      script: make test.unit crate=@all
 
     - name: crates.io
       stage: release
