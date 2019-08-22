@@ -1,13 +1,16 @@
 [package]
 name = "medea-macro"
-version = "0.2.0-dev"
+version = "0.1.0"
 edition = "2018"
-description = "Don't use this crate directly. It is internal to Medea."
+description = "Internal macros for Medea media server project"
 authors = ["Instrumentisto Team <developer@instrumentisto.com>"]
-homepage = "https://github.com/instrumentisto/medea"
-license = "MPL 2.0"
-# documentation = "https://docs.rs/medea-macro"
-repository = "https://github.com/instrumentisto/medea"
+license = "MIT/Apache-2.0"
+documentation = "https://docs.rs/medea-macro"
+homepage = "https://github.com/instrumentisto/medea/tree/master/crates/medea-macro"
+repository = "https://github.com/instrumentisto/medea/tree/master/crates/medea-macro"
+readme = "README.md"
+keywords = ["medea", "macro", "derive"]
+categories = ["development-tools::build-utils"]
 
 [lib]
 proc-macro = true

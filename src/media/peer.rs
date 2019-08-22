@@ -152,9 +152,9 @@ pub struct Context {
     senders: HashMap<TrackId, Rc<MediaTrack>>,
 }
 
-/// [RtcPeerConnection] representation.
+/// [RTCPeerConnection] representation.
 ///
-/// [RtcPeerConnection]: https://webrtcglossary.com/peerconnection/
+/// [RTCPeerConnection]: https://webrtcglossary.com/peerconnection/
 #[derive(Debug)]
 pub struct Peer<S> {
     context: Context,

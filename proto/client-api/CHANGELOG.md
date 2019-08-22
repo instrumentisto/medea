@@ -1,49 +1,35 @@
-Change Log
-==========
+`medea-client-api-proto` changelog
+==================================
 
-All user visible changes to this project will be documented in this file. This project uses to [Semantic Versioning 2.0.0].
-
-
-
-
-## [0.2.0] · 2019-?-?
-[0.2.0]: https://github.com/instrumentisto/medea/releases/tag/medea-client-api-proto-0.2.0
-
-[Milestone](https://github.com/instrumentisto/medea/milestone/2) |
-[Roadmap](https://github.com/instrumentisto/medea/issues/27)
-
-### Added
-
-- `PeerId` and `TrackId`
-- `Incrementable` trait for IDs
+All user visible changes to this project will be documented in this file. This project uses [Semantic Versioning 2.0.0].
 
 
 
 
-## [0.1.0] · 2019-08-13
-[0.1.0]: https://github.com/instrumentisto/medea/releases/tag/medea-client-api-proto-0.1.0
+## [0.1.0] · 2019-08-21
+[0.1.0]: /../../tree/medea-client-api-proto-0.1.0/proto/client-api
 
-[Milestone](https://github.com/instrumentisto/medea/milestone/1) |
-[Roadmap](https://github.com/instrumentisto/medea/issues/8)
+[Milestone](/../../milestone/1) | [Roadmap](/../../issues/8)
 
 ### Added
 
-- Client API RPC messages [#16](https://github.com/instrumentisto/medea/pull/16): 
+- RPC messages ([#16](/../../pull/16)):
     - Server messages:
-        - `Pong`
-        - `Event`
+        - `Pong`;
+        - `Event`.
     - Client messages:
-        - `Ping`
-        - `Command`
+        - `Ping`;
+        - `Command`.
     - Client commands:
-        - `MakeSdpOffer`
-        - `MakeSdpAnswer`
-        - `SetIceCandidate`
+        - `MakeSdpOffer`;
+        - `MakeSdpAnswer`;
+        - `SetIceCandidate`.
     - Server events:
-        - `PeerCreated`
-        - `SdpAnswerMade`
-        - `IceCandidateDiscovered`
-        - `PeersRemoved`
+        - `PeerCreated`;
+        - `SdpAnswerMade`;
+        - `IceCandidateDiscovered`;
+        - `PeersRemoved`.
+
 
 
 
