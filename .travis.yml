@@ -53,6 +53,9 @@ jobs:
       rust: stable
       addons:
         chrome: stable
+        apt:
+          packages:
+            - chromium-chromedriver
       before_script:
         - which chromedriver
 #        - cargo install wasm-bindgen-cli
