@@ -17,40 +17,42 @@ jobs:
       before_script: rustup component add clippy
       script: make lint
 
-    - name: rustfmt
-      stage: check
-      rust: nightly
-      cache: false
-      before_script: rustup component add rustfmt
-      script: make fmt check=yes
+#    - name: rustfmt
+#      stage: check
+#      rust: nightly
+#      cache: false
+#      before_script: rustup component add rustfmt
+#      script: make fmt check=yes
 
-    - name: medea-jason (stable)
-      stage: build
-      rust: stable
-      before_script:
-        - rm -f /home/travis/.cargo/bin/wasm-pack
-        - curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
-      script:
-        - make release.npm crate=medea-jason publish=no
-
-    - name: medea (stable)
-      stage: build
-      rust: stable
-      script: cargo build --bin medea
-
-    - name: medea (beta)
-      stage: build
-      rust: beta
-      script: cargo build --bin medea
-
-    - name: medea (nightly)
-      stage: build
-      rust: nightly
-      script: cargo build --bin medea
+#    - name: medea-jason (stable)
+#      stage: build
+#      rust: stable
+#      before_script:
+#        - rm -f /home/travis/.cargo/bin/wasm-pack
+#        - curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+#      script:
+#        - make release.npm crate=medea-jason publish=no
+#
+#    - name: medea (stable)
+#      stage: build
+#      rust: stable
+#      script: cargo build --bin medea
+#
+#    - name: medea (beta)
+#      stage: build
+#      rust: beta
+#      script: cargo build --bin medea
+#
+#    - name: medea (nightly)
+#      stage: build
+#      rust: nightly
+#      script: cargo build --bin medea
 
     - name: unit (stable)
       stage: test
       rust: stable
+      addons:
+        chrome: stable
       script: make test.unit crate=@all
 
     - name: crates.io
