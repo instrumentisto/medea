@@ -48,19 +48,18 @@ jobs:
 #      rust: nightly
 #      script: cargo build --bin medea
 
-    - name: test_toolchain
+    - name: unit
       stage: test
-      rust: nightly
+      rust:
+        - stable
+        - nightly
       addons:
         chrome: stable
         apt:
           packages:
             - chromium-chromedriver
-      script: cargo +nightly install wasm-bindgen-cli -Z install-upgrade
-
-    - name: unit
-      stage: test
-      rust: stable
+      before_script:
+        - cargo +nightly install wasm-bindgen-cli -Z install-upgrade
       script: make test.unit crate=@all
 
     - name: crates.io
@@ -117,8 +116,6 @@ jobs:
 
 stages:
   - name: unit
-    if: (branch = master AND type != pull_request) OR commit_message =~ /.*\[run ci\]/
-  - name: test_toolchain
     if: (branch = master AND type != pull_request) OR commit_message =~ /.*\[run ci\]/
 
 notifications:
