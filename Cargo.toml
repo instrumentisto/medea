@@ -1,16 +1,17 @@
 [package]
 name = "medea"
-version = "0.1.0-dev"
+version = "0.1.0"
 edition = "2018"
 description = "Medea media server"
 authors = ["Instrumentisto Team <developer@instrumentisto.com>"]
-license = "MPL 2.0"
+license = "MPL-2.0"
 documentation = "https://docs.rs/medea"
 homepage = "https://github.com/instrumentisto/medea"
 repository = "https://github.com/instrumentisto/medea"
 readme = "README.md"
 keywords = ["medea", "media-server"]
 categories = ["multimedia"]
+include = ["/src/", "/Cargo.*", "/CHANGELOG.md", "/LICENSE.md", "/README.md"]
 
 [workspace]
 members = [
@@ -35,6 +36,7 @@ failure = "0.1"
 futures = "0.1"
 hashbrown = "0.1"
 humantime = "1.2"
+humantime-serde = "0.1"
 macro-attr = "0.2"
 medea-client-api-proto = { version = "0.1", features = ["medea"] }
 medea-macro = "0.1"
@@ -54,9 +56,6 @@ smart-default = "0.5"
 tokio = "0.1"
 tokio-signal = "0.2"
 toml = "0.4"
-[dependencies.serde-humantime]
-    git = "https://github.com/tailhook/serde-humantime"
-    branch = "serde_wrapper"
 
 [dev-dependencies]
 actix-http = "0.2"

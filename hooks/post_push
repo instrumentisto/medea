@@ -9,7 +9,7 @@ repoName=${IMAGE_NAME:0:tagStart-1}
 origTag=${IMAGE_NAME:tagStart}
 
 # For full-versioned tag provide minor/major versions and 'latest' tags.
-if [[ "$origTag" == *"."*"."* ]]; then
+if [[ "$origTag" != *"-"* && "$origTag" == *"."*"."* ]]; then
   dot=$(expr index "$origTag" .)
   majorVer=${origTag:0:dot-1}
 
