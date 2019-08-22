@@ -1163,7 +1163,7 @@ dependencies = [
  "humantime-serde 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "macro-attr 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "medea-client-api-proto 0.2.0-dev.1",
- "medea-grpc-proto 0.1.0-dev",
+ "medea-grpc-proto 0.1.0-dev.1",
  "medea-macro 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "newtype_derive 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "protobuf 2.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1200,7 +1200,7 @@ dependencies = [
 
 [[package]]
 name = "medea-grpc-proto"
-version = "0.1.0-dev"
+version = "0.1.0-dev.1"
 dependencies = [
  "futures 0.1.28 (registry+https://github.com/rust-lang/crates.io-index)",
  "grpcio 0.4.4 (registry+https://github.com/rust-lang/crates.io-index)",
