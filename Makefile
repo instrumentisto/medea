@@ -23,6 +23,17 @@ RUST_VER := 1.36
 
 CURRENT_BRANCH := $(strip $(shell git branch | grep \* | cut -d ' ' -f2))
 
+crate-dir = .
+ifeq ($(crate),medea-jason)
+crate-dir = jason
+endif
+ifeq ($(crate),medea-client-api-proto)
+crate-dir = proto/client-api
+endif
+ifeq ($(crate),medea-macro)
+crate-dir = crates/medea-macro
+endif
+
 
 
 
@@ -30,7 +41,7 @@ CURRENT_BRANCH := $(strip $(shell git branch | grep \* | cut -d ' ' -f2))
 # Aliases #
 ###########
 
-build: docker.build.medea
+build: docker.build.medea build.medea build.jason
 
 
 # Resolve all project dependencies.
@@ -44,10 +55,19 @@ deps: cargo yarn
 docs: docs.rust
 
 
+fmt: cargo.fmt
+
+
 lint: cargo.lint
 
 
-fmt: cargo.fmt
+# Build and publish project crate everywhere.
+#
+# Usage:
+#	make release crate=(medea|medea-jason|<crate-name>)
+#	             [publish=(no|yes)]
+
+release: release.crates release.npm
 
 
 test: test.unit test.e2e
@@ -189,7 +209,7 @@ endif
 #	make cargo.lint
 
 cargo.lint:
-	cargo +nightly clippy --all -- -D clippy::pedantic -D warnings
+	cargo clippy --all -- -D clippy::pedantic -D warnings
 
 
 
@@ -261,13 +281,15 @@ test-unit-crate = $(if $(call eq,$(crate),),@all,$(crate))
 
 test.unit:
 ifeq ($(test-unit-crate),@all)
-	@make test.unit crate=medea-client-api-proto
 	@make test.unit crate=medea-macro
+	@make test.unit crate=medea-client-api-proto
+	@make test.unit crate=medea-jason
 	@make test.unit crate=medea
 else
 ifeq ($(test-unit-crate),medea)
 	cargo test --lib --bin medea
 else
+	cd $(crate-dir)/ && \
 	cargo test -p $(test-unit-crate)
 endif
 endif
@@ -289,20 +311,23 @@ ifneq ($(coturn),no)
 	@make up.coturn
 endif
 ifeq ($(dockerized),no)
-	@make down.medea dockerized=no
+	-@make down.medea dockerized=no
 
 	cargo build $(if $(call eq,$(release),yes),--release)
 	env $(medea-env) $(if $(call eq,$(logs),yes),,RUST_LOG=warn) cargo run --bin medea $(if $(call eq,$(release),yes),--release) &
 
 	sleep 1
 	cargo test --test e2e
-	- killall medea
+
+	-@make down
 ifneq ($(coturn),no)
-	@make down.coturn
+	-@make down.coturn
 endif
+	-@exit $(.SHELLSTATUS)
 else
-	@make down.medea dockerized=yes
-	@make down.medea dockerized=no
+	-@make down.medea dockerized=yes
+	-@make down.medea dockerized=no
+
 	@make up.coturn
 
 	docker build -t medea-build -f build/medea/Dockerfile .
@@ -313,7 +338,7 @@ else
 		medea-build:latest \
 			make test.e2e dockerized=no coturn=no release=yes
 
-	@make down.coturn
+	-@make down.coturn
 endif
 
 
@@ -323,80 +348,41 @@ endif
 # Releasing commands #
 ######################
 
-# Build and publish Jason to NPM and crates.io.
-#
-# Note that this command will use CARGO_TOKEN and NPM_TOKEN enviroment
-# variables for publishing.
+# Build and publish project crate to crates.io.
 #
 # Usage:
-#   make release.jason
+#	make release.crates crate=(medea|medea-jason|<crate-name>)
+#	                    [token=($CARGO_TOKEN|<cargo-token>)]
+#	                    [publish=(no|yes)]
 
-release.jason: release.npm.jason release.crates.jason
+release-crates-token = $(if $(call eq,$(token),),${CARGO_TOKEN},$(token))
 
-
-# Build and publish Jason application to npm
-#
-# Note that this command will use NPM_TOKEN enviroment
-# variable for publishing.
-#
-# Usage:
-#	make release.jason
-
-release.npm.jason:
-	@rm -rf jason/pkg/
-	wasm-pack build -t web jason
-	wasm-pack publish
-
-
-# Build and publish Jason to crates.io
-#
-# Note that this command will use CARGO_TOKEN enviroment
-# variable for publishing.
-#
-# Usage:
-#   make release.crates.jason
-
-release.crates.jason:
-	cd jason && cargo publish --token ${CARGO_TOKEN}
-
-
-# Build and publish Medea to crates.io
-#
-# Note that this command will use CARGO_TOKEN enviroment
-# variable for publishing.
-#
-# Usage:
-#   make release.crates.medea
-
-release.crates.medea:
-	cargo publish --token ${CARGO_TOKEN}
-
-
-# Build and publish Medea client API proto to crates.io
-#
-# Note that this command will use CARGO_TOKEN enviroment
-# variable for publishing.
-#
-# Usage:
-#   make release.crates.medea-client-api-proto
-
-release.crates.medea-client-api-proto:
-	cd proto/client-api && cargo publish --token ${CARGO_TOKEN}
-
-
-# Build and publish Medea's macro to crates.io
-#
-# Note that this command will use CARGO_TOKEN enviroment
-# variable for publishing.
-#
-# Usage:
-#   make release.crates.medea-macro
-
-release.crates.medea-macro:
-	cd crates/medea-macro && cargo publish --token ${CARGO_TOKEN}
+release.crates:
+ifneq ($(filter $(crate),medea medea-jason medea-client-api-proto medea-macro),)
+	cd $(crate-dir)/ && \
+	$(if $(call eq,$(publish),yes),\
+		cargo publish --token $(release-crates-token) ,\
+		cargo package --allow-dirty )
+endif
 
 
 release.helm: helm.package.release
+
+
+# Build and publish project crate to NPM.
+#
+# Usage:
+#	make release.npm crate=medea-jason
+#	                 [publish=(no|yes)]
+
+release.npm:
+ifneq ($(filter $(crate),medea-jason),)
+	@rm -rf $(crate-dir)/pkg/
+	wasm-pack build -t web $(crate-dir)/
+ifeq ($(publish),yes)
+	wasm-pack publish $(crate-dir)/
+endif
+endif
 
 
 
@@ -660,6 +646,52 @@ endef
 
 
 
+############
+# Building #
+############
+
+# Build medea.
+#
+# Usage:
+#   make build.medea [dockerized=(no|yes)]
+
+build.medea:
+ifneq ($(dockerized),yes)
+	cargo build --bin medea
+else
+	docker run --rm \
+		-v "$(PWD)":/app -w /app \
+		-u $(shell id -u):$(shell id -g) \
+		-v "$(HOME)/.cargo/registry":/usr/local/cargo/registry \
+		-v "$(PWD)/target":/app/target \
+		rust:latest \
+		make build.medea
+endif
+
+
+# Build jason.
+#
+# Usage:
+#   make build.jason [dockerized=(no|yes)]
+
+build.jason:
+ifneq ($(dockerized),yes)
+	wasm-pack build -t web jason
+else
+	docker run --rm --network=host \
+		-v "$(PWD)":/app -w /app \
+		-u $(shell id -u):$(shell id -g) \
+		-v "$(HOME)/.cargo/registry":/usr/local/cargo/registry \
+		-v "$(PWD)/target":/app/target \
+		--env XDG_CACHE_HOME=$(HOME) \
+		-v "$(HOME):$(HOME)" \
+		rust:latest \
+		sh -c "curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh && make build.jason"
+endif
+
+
+
+
 ##################
 # .PHONY section #
 ##################
@@ -673,9 +705,8 @@ endef
         	helm.package helm.package.release helm.up \
         minikube.boot \
         down down.medea down.coturn \
-        release.jason release.crates.jason release.npm.jason release.helm \
-        release.crates.medea release.crates.medea-client-api-proto \
-        release.crates.medea-macro \ release.helm \
+        release release.crates release.helm release.npm \
         test test.unit test.e2e \
         up up.coturn up.demo up.dev up.jason up.medea \
+        build build.medea build.jason \
         yarn

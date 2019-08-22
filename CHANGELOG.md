@@ -1,16 +1,15 @@
-Change Log
-==========
+`medea` changelog
+=================
 
-All user visible changes to this project will be documented in this file. This project uses to [Semantic Versioning 2.0.0].
-
-
+All user visible changes to this project will be documented in this file. This project uses [Semantic Versioning 2.0.0].
 
 
-## [0.2.0] · 2019-?-?
-[0.2.0]: https://github.com/instrumentisto/medea/releases/tag/medea-0.2.0
 
-[Milestone](https://github.com/instrumentisto/medea/milestone/2) |
-[Roadmap](https://github.com/instrumentisto/medea/issues/27)
+
+## TBD [0.2.0] · 2019-??-??
+[0.2.0]: /../../tree/medea-0.2.0
+
+[Milestone](../../milestone/2) | [Roadmap](/../../issues/27)
 
 ### Added
 
@@ -20,26 +19,27 @@ All user visible changes to this project will be documented in this file. This p
   - dynamically `Peer`s creation when client connects
   - auto removing `Peer`s when `Member` disconnects
   - E2E tests for signalling
-  
 
 
 
 
-## [0.1.0] · 2019-08-13
-[0.1.0]: https://github.com/instrumentisto/medea/releases/tag/medea-0.1.0
+## [0.1.0] · 2019-08-22
+[0.1.0]: /../../tree/medea-0.1.0
 
-[Milestone](https://github.com/instrumentisto/medea/milestone/1) |
-[Roadmap](https://github.com/instrumentisto/medea/issues/8)
+[Milestone](/../../milestone/1) | [Roadmap](/../../issues/8)
 
 ### Added
 
-- Structured logging [#12](https://github.com/instrumentisto/medea/pull/12).
-- Application configuration [#15](https://github.com/instrumentisto/medea/pull/15).
-- [WebRTC signalling] [#16](https://github.com/instrumentisto/medea/pull/16).
-- [Coturn] integration [#20](https://github.com/instrumentisto/medea/pull/20), 
-  [#42](https://github.com/instrumentisto/medea/pull/42).
-- Dockerized medea [#35](https://github.com/instrumentisto/medea/pull/35).
-- Graceful shutdown [#30](https://github.com/instrumentisto/medea/pull/30).
+- WebRTC:
+    - Basic signalling capabilities ([#16](/../../pull/16));
+    - [Coturn] integration ([#20](/../../pull/20), [#42](/../../pull/42)).
+- Deployment:
+    - Graceful shutdown ([#30](/../../pull/30));
+    - Docker image ([#35](/../../pull/35)).
+- Configuration:
+    - Ability to parse from files and env vars ([#15](/../../pull/15)).
+- Logging:
+    - Structured logging to STDOUT/STDERR ([#12](/../../pull/12)).
 
 
 

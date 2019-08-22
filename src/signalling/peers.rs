@@ -22,14 +22,19 @@ use crate::{
 pub struct PeerRepository {
     /// [`Peer`]s of [`Member`]s in this [`Room`].
     ///
-    /// [`Member`]: crate::api::control::member::Member
+    /// [`Member`]: crate::signalling::elements::member::Member
     /// [`Room`]: crate::signalling::Room
     peers: HashMap<PeerId, PeerStateMachine>,
 
     /// Count of [`Peer`]s in this [`Room`].
+    ///
+    /// [`Room`]: crate::signalling::room::Room
     peers_count: Counter<PeerId>,
 
     /// Count of [`MediaTrack`]s in this [`Room`].
+    ///
+    /// [`MediaTrack`]: crate::media::track::MediaTrack
+    /// [`Room`]: crate::signalling::room::Room
     tracks_count: Counter<TrackId>,
 }
 
@@ -148,7 +153,7 @@ impl PeerRepository {
 
     /// Returns all [`Peer`]s of specified [`Member`].
     ///
-    /// [`Member`]: crate::api::control::member::Member
+    /// [`Member`]: crate::signalling::elements::member::Member
     pub fn get_peers_by_member_id<'a>(
         &'a self,
         member_id: &'a MemberId,

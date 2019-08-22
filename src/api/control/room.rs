@@ -31,6 +31,8 @@ macro_attr! {
 }
 
 /// Element of [`Room`]'s [`Pipeline`].
+///
+/// [`Room`]: crate::signalling::room::Room
 #[allow(clippy::module_name_repetitions)]
 #[derive(Clone, Deserialize, Debug)]
 #[serde(tag = "kind")]
@@ -44,7 +46,7 @@ pub enum RoomElement {
 }
 
 /// [`crate::signalling::room::Room`] specification.
-/// Newtype for [`Element::Room`]
+/// Newtype for [`RootElement::Room`]
 #[allow(clippy::module_name_repetitions)]
 #[derive(Clone, Debug)]
 pub struct RoomSpec {

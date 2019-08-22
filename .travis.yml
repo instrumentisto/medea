@@ -1,10 +1,5 @@
 language: rust
-
-services:
-  - docker
-
-cache:
-  cargo: true
+cache: cargo
 
 install:
   - PROTOBUF_VERSION=3.3.0
@@ -14,6 +9,8 @@ install:
   - unzip ${PROTOC_FILENAME}
   - bin/protoc --version
   - popd
+  - rustc -vV
+  - cargo -vV
 
 jobs:
   allow_failures:
@@ -21,94 +18,114 @@ jobs:
       stage: build
 
   include:
-    - stage: lints
-      rust: nightly
-      name: "Clippy"
+    - name: Clippy
+      stage: check
+      rust: stable
       before_script: rustup component add clippy
       script: make lint
 
-    - stage: formatting
+    - name: rustfmt
+      stage: check
       rust: nightly
-      name: "Rustfmt"
+      cache: false
       before_script: rustup component add rustfmt
-      script: make fmt check=yes build=yes
+      script: make fmt check=yes
 
-    - stage: build
+    - name: medea-jason (stable)
+      stage: build
       rust: stable
-      name: "Build jason (Rust stable)"
       before_script:
         - rm -f /home/travis/.cargo/bin/wasm-pack
         - curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
       script:
-        - wasm-pack build -t web jason
+        - make release.npm crate=medea-jason publish=no
 
-    - stage: build
+    - name: medea (stable)
+      stage: build
       rust: stable
-      name: "Build medea (Rust stable)"
-      script: cargo build
+      script: make build.medea
 
-    - stage: build
+    - name: medea (beta)
+      stage: build
       rust: beta
-      name: "Build medea (Rust beta)"
-      script: cargo build
+      script: make build.medea
 
-    - stage: build
+    - name: medea (nightly)
+      stage: build
       rust: nightly
-      name: "Build medea (Rust nightly)"
-      script: cargo build
+      script: make build.medea
 
-    - stage: tests
+    - name: unit (stable)
+      stage: test
       rust: stable
-      name: "Unit tests (Rust stable)"
-      script: make test.unit
+      script: make test.unit crate=@all
 
-    - stage: tests
+    - name: e2e signalling (stable)
+      stage: test
       rust: stable
-      name: "E2E tests (Rust stable)"
       script: make test.e2e
 
-before_deploy:
-  - echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > ~/.npmrc
-  - curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+    - name: crates.io
+      stage: release
+      if: (tag IS present) AND (tag =~ ^medea[a-z-]*-[0-9]+\.[0-9]+\.[0-9]+)
+      cache: false
+      before_script:
+        - export MEDEA_CRATE_NAME=$(echo $TRAVIS_TAG \
+                        | sed -E "s/^(medea[a-z-]*)-[0-9]+\.[0-9]+\.[0-9]+/\1/")
+      script:
+        - echo "Releasing $MEDEA_CRATE_NAME to crates.io..."
+      deploy:
+        provider: script
+        skip_cleanup: true
+        script: make release.crates crate=$MEDEA_CRATE_NAME publish=yes
+        on:
+          tags: true
 
-deploy:
-  - provider: script
-    skip_cleanup: true
-    script: make release.crates.medea
-    on:
-      tags: true
-      branch: master
-      condition: $TRAVIS_TAG =~ ^medea-[0-9]+\.[0-9]+\.[0-9]+
+    - name: NPM
+      stage: release
+      if: (tag IS present) AND (tag =~ ^medea-jason-[0-9]+\.[0-9]+\.[0-9]+)
+      cache: false
+      before_script:
+        - export MEDEA_CRATE_NAME=$(echo $TRAVIS_TAG \
+                        | sed -E "s/^(medea[a-z-]*)-[0-9]+\.[0-9]+\.[0-9]+/\1/")
+      script:
+        - echo "Releasing $MEDEA_CRATE_NAME to NPM..."
+      before_deploy:
+        - echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > ~/.npmrc
+        - curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+      deploy:
+        provider: script
+        skip_cleanup: true
+        script: make release.npm crate=$MEDEA_CRATE_NAME publish=yes
+        on:
+          tags: true
 
-  - provider: script
-    skip_cleanup: true
-    script: make release.jason
-    on:
-      tags: true
-      branch: master
-      condition: $TRAVIS_TAG =~ ^medea-jason-[0-9]+\.[0-9]+\.[0-9]+
+    - name: GitHub
+      stage: release
+      if: (tag IS present) AND (tag =~ ^medea[a-z-]*-[0-9]+\.[0-9]+\.[0-9]+)
+      cache: false
+      before_script:
+        - export MEDEA_CRATE_NAME=$(echo $TRAVIS_TAG \
+                        | sed -E "s/^(medea[a-z-]*)-[0-9]+\.[0-9]+\.[0-9]+/\1/")
+      script:
+        - echo "Releasing $MEDEA_CRATE_NAME to GitHub..."
+      deploy:
+        provider: releases
+        skip_cleanup: true
+        api_key: $GH_TOKEN
+        name: $TRAVIS_TAG
+        on:
+          tags: true
 
-  - provider: script
-    skip_cleanup: true
-    script: make release.crates.medea-client-api-proto
-    on:
-      tags: true
-      branch: master
-      condition: $TRAVIS_TAG =~ ^medea-client-api-proto-[0-9]+\.[0-9]+\.[0-9]+
-
-  - provider: script
-    skip_cleanup: true
-    script: make release.crates.medea-macro
-    on:
-      tags: true
-      branch: master
-      condition: $TRAVIS_TAG =~ ^medea-macro-[0-9]+\.[0-9]+\.[0-9]+
-
-  - provider: releases
-    api_key: $GH_TOKEN
-    on:
-      tags: true
-      branch: master
+stages:
+  - name: check
+    if: (branch = master AND type != pull_request) OR commit_message =~ /.*\[run ci\]/
+  - name: build
+    if: (branch = master AND type != pull_request) OR commit_message =~ /.*\[run ci\]/
+  - name: test
+    if: (branch = master AND type != pull_request) OR commit_message =~ /.*\[run ci\]/
+  - name: tests
+    if: (branch = master AND type != pull_request) OR commit_message =~ /.*\[run ci\]/
 
 notifications:
   email:

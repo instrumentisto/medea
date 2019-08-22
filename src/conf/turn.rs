@@ -65,6 +65,6 @@ pub struct Redis {
     pub db_number: i64,
     /// The duration to wait to start a connection before returning err.
     #[default(Duration::from_secs(5))]
-    #[serde(with = "serde_humantime")]
+    #[serde(with = "humantime_serde")]
     pub connection_timeout: Duration,
 }
