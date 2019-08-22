@@ -1,9 +1,5 @@
 language: rust
 cache: cargo
-rust:
-  - stable
-  - nightly
-  - beta
 
 install:
   - rustc -vV
@@ -54,6 +50,9 @@ jobs:
 
     - name: unit
       stage: test
+      rust:
+        - nightly
+        - stable
       addons:
         chrome: stable
         apt:
