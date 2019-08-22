@@ -308,7 +308,7 @@ ifneq ($(coturn),no)
 	@make up.coturn
 endif
 ifeq ($(dockerized),no)
-	@make down.medea dockerized=no
+	-@make down.medea dockerized=no
 
 	cargo build $(if $(call eq,$(release),yes),--release)
 	env $(medea-env) $(if $(call eq,$(logs),yes),,RUST_LOG=warn) cargo run $(if $(call eq,$(release),yes),--release) &
@@ -316,14 +316,15 @@ ifeq ($(dockerized),no)
 	sleep 1
 	cargo test --test e2e
 
-	@make down
+	-@make down
 ifneq ($(coturn),no)
-	@make down.coturn
+	-@make down.coturn
 endif
-	@exit $(.SHELLSTATUS)
+	-@exit $(.SHELLSTATUS)
 else
-	@make down.medea dockerized=yes
-	@make down.medea dockerized=no
+	-@make down.medea dockerized=yes
+	-@make down.medea dockerized=no
+
 	@make up.coturn
 
 	docker run --rm --network=host -v "$(PWD)":/app -w /app \
@@ -333,7 +334,7 @@ else
 		rust:latest \
 			make test.e2e dockerized=no coturn=no release=yes
 
-	@make down.coturn
+	-@make down.coturn
 endif
 
 
