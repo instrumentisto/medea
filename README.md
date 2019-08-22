@@ -8,7 +8,7 @@ Medea
 ![Crates.io license](https://img.shields.io/crates/l/medea)
 
 [Code Docs](https://docs.rs/medea) |
-[Changelog](CHANGELOG.md)
+[Changelog](https://github.com/instrumentisto/medea/blob/master/CHANGELOG.md)
 
 Medea media server.
 
@@ -21,4 +21,4 @@ __Currently, in early development phase.__
 
 Copyright © 2019 Instrumentisto Team, https://github.com/instrumentisto
 
-This Source Code Form is subject to the terms of the [Mozilla Public License, v. 2.0](LICENSE.md). If a copy of the MPL was not distributed with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
+This Source Code Form is subject to the terms of the [Mozilla Public License, v. 2.0](https://github.com/instrumentisto/medea/blob/master/LICENSE.md). If a copy of the MPL was not distributed with this file, You can obtain one at http://mozilla.org/MPL/2.0/.

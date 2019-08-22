@@ -5,7 +5,7 @@ medea-macro
 ![Crates.io license](https://img.shields.io/crates/l/medea-macro)
 
 [API Docs](https://docs.rs/medea-macro) |
-[Changelog](CHANGELOG.md)
+[Changelog](https://github.com/instrumentisto/medea/blob/master/crates/medea-macro/CHANGELOG.md)
 
 Internal macros for [Medea] media server project.
 
@@ -18,8 +18,8 @@ __DO NOT use this crate directly.__ It's for internal use by [Medea] crates only
 
 This project is licensed under either of
 
-- Apache License, Version 2.0, ([LICENSE-APACHE](LICENSE-APACHE.md) or http://www.apache.org/licenses/LICENSE-2.0)
-- MIT license ([LICENSE-MIT](LICENSE-MIT.md) or http://opensource.org/licenses/MIT)
+- Apache License, Version 2.0, ([LICENSE-APACHE](https://github.com/instrumentisto/medea/blob/master/crates/medea-macro/LICENSE-APACHE.md) or http://www.apache.org/licenses/LICENSE-2.0)
+- MIT license ([LICENSE-MIT](https://github.com/instrumentisto/medea/blob/master/crates/medea-macro/LICENSE-MIT.md) or http://opensource.org/licenses/MIT)
 
 at your option.
 
