@@ -48,18 +48,21 @@ jobs:
 #      rust: nightly
 #      script: cargo build --bin medea
 
+    - name: test_toolchain
+      stage: test_toolchain
+      rust: nightly
+      script:
+        - cargo +nightly install wasm-bindgen-cli -Z install-upgrade
+        - rustup target add wasm32-unknown-unknown
+
     - name: unit
       stage: test
-      rust:
-        - nightly
-        - stable
+      rust: stable
       addons:
         chrome: stable
         apt:
           packages:
             - chromium-chromedriver
-      before_script:
-        - cargo +nightly install wasm-bindgen-cli -Z install-upgrade
       script: make test.unit crate=@all
 
     - name: crates.io
