@@ -6,6 +6,23 @@ All user visible changes to this project will be documented in this file. This p
 
 
 
+## TBD [0.2.0] · 2019-??-??
+[0.2.0]: /../../tree/medea-0.2.0
+
+[Milestone](../../milestone/2) | [Roadmap](/../../issues/27)
+
+### Added
+
+- Static control API spec [#28](https://github.com/instrumentisto/medea/pull/28)
+  - parse static control api specs
+  - created interior entities for control API specs
+  - dynamically `Peer`s creation when client connects
+  - auto removing `Peer`s when `Member` disconnects
+  - E2E tests for signalling
+
+
+
+
 ## [0.1.0] · 2019-08-22
 [0.1.0]: /../../tree/medea-0.1.0
 
@@ -23,7 +40,6 @@ All user visible changes to this project will be documented in this file. This p
     - Ability to parse from files and env vars ([#15](/../../pull/15)).
 - Logging:
     - Structured logging to STDOUT/STDERR ([#12](/../../pull/12)).
-
 
 
 
