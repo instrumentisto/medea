@@ -1,7 +1,7 @@
 //! Room definitions and implementations. Room is responsible for media
 //! connection establishment between concrete [`Member`]s.
 //!
-//! [`Member`]: crate::api::control::member::Member
+//! [`Member`]: crate::signalling::elements::member::Member
 
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
@@ -114,7 +114,7 @@ pub struct Room {
 impl Room {
     /// Create new instance of [`Room`].
     ///
-    /// Returns [`RoomError::BadRoomSpec`] when error while [`Element`]
+    /// Returns [`RoomError::BadRoomSpec`] when error while `Element`
     /// transformation happens.
     pub fn new(
         room_spec: &RoomSpec,
@@ -653,6 +653,8 @@ impl Handler<RpcConnectionClosed> for Room {
     ///
     /// Delete all removed [`PeerId`]s from all [`Member`]'s
     /// endpoints.
+    ///
+    /// [`PeersRemoved`]: medea-client-api-proto::Event::PeersRemoved
     fn handle(&mut self, msg: RpcConnectionClosed, ctx: &mut Self::Context) {
         info!(
             "RpcConnectionClosed for member {}, reason {:?}",

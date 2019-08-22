@@ -29,20 +29,26 @@ macro_attr! {
 }
 
 /// Element of [`Member`]'s [`Pipeline`].
+///
+/// [`Member`]: crate::signalling::elements::member::Member
 #[allow(clippy::module_name_repetitions)]
 #[derive(Clone, Deserialize, Debug)]
 #[serde(tag = "kind")]
 pub enum MemberElement {
     /// Represent [`WebRtcPublishEndpoint`].
     /// Can transform into [`Endpoint`] enum by `Endpoint::try_from`.
+    ///
+    /// [`Endpoint`]: crate::api::control::endpoint::Endpoint
     WebRtcPublishEndpoint { spec: WebRtcPublishEndpoint },
 
     /// Represent [`WebRtcPlayEndpoint`].
     /// Can transform into [`Endpoint`] enum by `Endpoint::try_from`.
+    ///
+    /// [`Endpoint`]: crate::api::control::endpoint::Endpoint
     WebRtcPlayEndpoint { spec: WebRtcPlayEndpoint },
 }
 
-/// Newtype for [`Element::Member`] variant.
+/// Newtype for [`RoomElement::Member`] variant.
 #[allow(clippy::module_name_repetitions)]
 #[derive(Clone, Debug)]
 pub struct MemberSpec {

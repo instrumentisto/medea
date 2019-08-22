@@ -3,7 +3,7 @@
 //! [`RpcConnection`] authorization, establishment, message sending, Turn
 //! credentials management.
 //!
-//! [`Member`]: crate::api::control::member::Member
+//! [`Member`]: crate::signalling::elements::member::Member
 //! [`RpcConnection`]: crate::api::client::rpc_connection::RpcConnection
 //! [`ParticipantService`]: crate::signalling::participants::ParticipantService
 
@@ -82,7 +82,9 @@ pub struct ParticipantService {
     /// Service for managing authorization on Turn server.
     turn: Arc<BoxedTurnAuthService>,
 
-    /// Established [`RpcConnection`]s of [`Members`]s in this [`Room`].
+    /// Established [`RpcConnection`]s of [`Member`]s in this [`Room`].
+    ///
+    /// [`Member`]: crate::signalling::elements::member::Member
     // TODO: Replace Box<dyn RpcConnection>> with enum,
     //       as the set of all possible RpcConnection types is not closed.
     connections: HashMap<MemberId, Box<dyn RpcConnection>>,
@@ -141,7 +143,7 @@ impl ParticipantService {
         }
     }
 
-    /// Checks if [`Member`] has **active** [`RcpConnection`].
+    /// Checks if [`Member`] has **active** [`RpcConnection`].
     pub fn member_has_connection(&self, member_id: &MemberId) -> bool {
         self.connections.contains_key(member_id)
             && !self.drop_connection_tasks.contains_key(member_id)

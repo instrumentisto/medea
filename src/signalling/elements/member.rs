@@ -1,4 +1,7 @@
 //! [`Member`] is member of [`Room`] with [`RpcConnection`].
+//!
+//! [`Room`]: crate::signalling::room::Room
+//! [`RpcConnection`]: crate::api::client::rpc_connection::RpcConnection
 
 use std::{
     cell::RefCell,
@@ -23,7 +26,7 @@ use super::endpoints::webrtc::{
 /// Errors which may occur while loading [`Member`]s from [`RoomSpec`].
 #[derive(Debug, Fail)]
 pub enum MembersLoadError {
-    /// Errors that can occur when we try transform some spec from [`Element`].
+    /// Errors that can occur when we try transform some spec from `Element`.
     #[fail(display = "TryFromElementError: {}", _0)]
     TryFromError(TryFromElementError),
 
@@ -32,6 +35,8 @@ pub enum MembersLoadError {
     MemberNotFound(MemberId),
 
     /// [`Endpoint`] not found.
+    ///
+    /// [`Endpoint`]: crate::api::control::endpoint::Endpoint
     #[fail(display = "Endpoint with id '{}' not found.", _0)]
     EndpointNotFound(String),
 }
@@ -43,6 +48,9 @@ impl From<TryFromElementError> for MembersLoadError {
 }
 
 /// [`Member`] is member of [`Room`] with [`RpcConnection`].
+///
+/// [`Room`]: crate::signalling::room::Room
+/// [`RpcConnection`]: crate::api::client::rpc_connection::RpcConnection
 #[derive(Clone, Debug)]
 pub struct Member(Rc<RefCell<MemberInner>>);
 
@@ -190,6 +198,8 @@ impl Member {
     /// Notify [`Member`] that some [`Peer`]s removed.
     ///
     /// All [`PeerId`]s related to this [`Member`] will be removed.
+    ///
+    /// [`Peer`]: crate::media::peer::Peer
     pub fn peers_removed(&self, peer_ids: &[PeerId]) {
         self.srcs()
             .into_iter()
@@ -247,7 +257,7 @@ impl Member {
         self.0.borrow_mut().srcs.insert(endpoint.id(), endpoint);
     }
 
-    /// Lookup [`WebRtcPublishEndpoint`] source endpoint by [`EndpointId`].
+    /// Lookup [`WebRtcPublishEndpoint`] source endpoint by [`WebRtcPublishId`].
     pub fn get_src_by_id(
         &self,
         id: &WebRtcPublishId,
@@ -255,7 +265,7 @@ impl Member {
         self.0.borrow().srcs.get(id).cloned()
     }
 
-    /// Lookup [`WebRtcPlayEndpoint`] sink endpoint by [`EndpointId`].
+    /// Lookup [`WebRtcPlayEndpoint`] sink endpoint by [`WebRtcPlayId`].
     pub fn get_sink_by_id(
         &self,
         id: &WebRtcPlayId,

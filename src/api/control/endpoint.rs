@@ -62,6 +62,8 @@ pub struct WebRtcPlayEndpoint {
 #[derive(Clone, Debug)]
 pub struct SrcUri {
     /// ID of [`Room`]
+    ///
+    /// [`Room`]: crate::signalling::room::Room
     pub room_id: String,
     /// ID of `Member`
     pub member_id: MemberId,

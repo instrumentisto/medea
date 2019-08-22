@@ -31,8 +31,10 @@ pub enum RootElement {
     },
 }
 
-/// Errors that can occur when we try transform some spec from [`Element`].
+/// Errors that can occur when we try transform some spec from `Element`.
 /// This error used in all [`TryFrom`] of Control API.
+///
+/// [`TryFrom`]: std::convert::TryFrom
 #[allow(clippy::pub_enum_variant_names)]
 #[derive(Debug, Fail)]
 pub enum TryFromElementError {

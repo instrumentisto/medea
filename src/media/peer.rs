@@ -164,7 +164,7 @@ pub struct Peer<S> {
 impl<T> Peer<T> {
     /// Returns ID of [`Member`] associated with this [`Peer`].
     ///
-    /// [`Member`]: crate::api::control::member::Member
+    /// [`Member`]: crate::signalling::elements::member::Member
     pub fn member_id(&self) -> MemberId {
         self.context.member_id.clone()
     }
@@ -181,7 +181,7 @@ impl<T> Peer<T> {
 
     /// Returns ID of interconnected [`Member`].
     ///
-    /// [`Member`]: crate::api::control::member::Member
+    /// [`Member`]: crate::signalling::elements::member::Member
     pub fn partner_member_id(&self) -> MemberId {
         self.context.partner_member.clone()
     }
@@ -227,7 +227,7 @@ impl<T> Peer<T> {
 impl Peer<New> {
     /// Creates new [`Peer`] for [`Member`].
     ///
-    /// [`Member`]: crate::api::control::member::Member
+    /// [`Member`]: crate::signalling::elements::member::Member
     pub fn new(
         id: Id,
         member_id: MemberId,
