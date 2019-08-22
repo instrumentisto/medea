@@ -648,18 +648,41 @@ endef
 # Build medea.
 #
 # Usage:
-#   make build.medea
+#   make build.medea [dockerized=(no|yes)]
 
 build.medea:
-	cargo build -p medea
+ifneq ($(dockerized),yes)
+	cargo build --bin medea
+else
+	docker run --rm \
+		-v "$(PWD)":/app -w /app \
+		-u $(shell id -u):$(shell id -g) \
+		-v "$(HOME)/.cargo/registry":/usr/local/cargo/registry \
+		-v "$(PWD)/target":/app/target \
+		rust:latest \
+		make build.medea
+endif
 
 
 # Build jason.
 #
 # Usage:
-#   make build.jason
+#   make build.jason [dockerized=(no|yes)]
+
 build.jason:
+ifneq ($(dockerized),yes)
 	wasm-pack build -t web jason
+else
+	docker run --rm --network=host \
+		-v "$(PWD)":/app -w /app \
+		-u $(shell id -u):$(shell id -g) \
+		-v "$(HOME)/.cargo/registry":/usr/local/cargo/registry \
+		-v "$(PWD)/target":/app/target \
+		--env XDG_CACHE_HOME=$(HOME) \
+		-v "$(HOME):$(HOME)" \
+		rust:latest \
+		sh -c "curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh && make build.jason"
+endif
 
 
 
@@ -680,4 +703,5 @@ build.jason:
         release release.crates release.helm release.npm \
         test test.unit test.e2e \
         up up.coturn up.demo up.dev up.jason up.medea \
+        build build.medea build.jason \
         yarn

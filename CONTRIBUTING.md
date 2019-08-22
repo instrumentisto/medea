@@ -31,7 +31,7 @@ Boot up dockerized environment for [medea] with [jason]:
 $ make up.dev
 ```
 
-In some cases you may wish boot up only [medea] without [jason]:
+Boot up only [medea] without [jason]:
 ```bash
 $ make up.medea
 ```
@@ -41,7 +41,7 @@ $ make up.medea
 
 To build/rebuild project and its Docker image use docker-wrapped command from [`Makefile`]:
 ```bash
-$ make build
+$ make build dockerized=yes
 ```
 
 To build only [medea]:
@@ -52,6 +52,11 @@ $ make build.medea
 To build only [jason]:
 ```bash
 $ make build.jason
+```
+
+To build [medea] in docker (it works with [jason] too):
+```bash
+$ make build.medea dockerized=yes
 ```
 
 
@@ -75,7 +80,7 @@ $ make lint
 
 To run unit tests command from [`Makefile`]:
 ```bash
-$ make test.unit
+$ make test.unit crate=@all
 
 # or for concrete crate only
 $ make test.unit crate=medea
