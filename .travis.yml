@@ -57,7 +57,7 @@ jobs:
           packages:
             - chromium-chromedriver
       before_script:
-        - cargo install wasm-bindgen-cli
+        - cargo +nightly install wasm-bindgen-cli -Z install-upgrade
       script: make test.unit crate=@all
 
     - name: crates.io
