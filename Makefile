@@ -229,6 +229,8 @@ ifneq ($(coturn),no)
 	@make up.coturn
 endif
 ifeq ($(dockerized),no)
+	ls -la
+	mkdir .cache/jason-pkg
 	cargo build $(if $(call eq,$(release),yes),--release)
 	cargo build -p control-api-mock
 	$(run-medea-container) sh -c "cd jason && wasm-pack build --target web --out-dir ../.cache/jason-pkg"
