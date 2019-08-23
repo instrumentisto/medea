@@ -430,7 +430,7 @@ else
 	docker run --rm -d --network=host selenoid/chrome:latest > /tmp/chromedriver.docker.uid
 	$(run-medea-container) cargo run -p e2e-tests-runner -- \
 		-f 127.0.0.1:$(test-runner-port) \
-		-w http://127.0.0.1:9515 \
+		-w http://127.0.0.1:4444 \
 		--headless
 	docker container kill $$(cat /tmp/chromedriver.docker.uid)
 	rm -f /tmp/chromedriver.docker.uid
