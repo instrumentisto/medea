@@ -13,7 +13,7 @@ All user visible changes to this project will be documented in this file. This p
 
 ### Changed
 
-- Use newtypes for track ID and peer ID ([#28](https://github.com/instrumentisto/medea/pull/28))
+- Use track ID and peer ID from `medea-client-api-proto` ([#28](/../../pull/28))
 
 
 

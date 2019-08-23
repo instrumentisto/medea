@@ -13,12 +13,16 @@ All user visible changes to this project will be documented in this file. This p
 
 ### Added
 
-- Static control API spec [#28](https://github.com/instrumentisto/medea/pull/28)
-  - parse static control api specs
-  - created interior entities for control API specs
-  - dynamically `Peer`s creation when client connects
-  - auto removing `Peer`s when `Member` disconnects
-  - E2E tests for signalling
+- Control API:
+    - Parse static control api specs ([#28]);
+    - Created interior entities for control API specs ([#28]).
+- Signalling:
+    - Dynamic `Peer`s creation when client connect ([#28]);
+    - Auto removing `Peer`s when `Member` disconnect ([#28]).
+- Testing:
+    - E2E tests for signalling ([#28]).
+
+[#28]: /../../pull/28
 
 
 
