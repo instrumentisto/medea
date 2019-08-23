@@ -229,8 +229,6 @@ ifneq ($(coturn),no)
 	@make up.coturn
 endif
 ifeq ($(dockerized),no)
-	ls -la
-	mkdir .cache/jason-pkg
 	cargo build $(if $(call eq,$(release),yes),--release)
 	cargo build -p control-api-mock
 	$(run-medea-container) sh -c "cd jason && wasm-pack build --target web --out-dir ../.cache/jason-pkg"
@@ -249,7 +247,7 @@ else
 	# TODO: publish it to docker hub
 	docker build -t medea-build -f build/medea/Dockerfile .
 
-	$(run-medea-container) sh -c "cd jason && RUST_LOG=info wasm-pack build --target web --out-dir ../.cache/jason-pkg"
+	$(run-medea-container) sh -c "ls -la && mkdir .cache && mkdir .cache/jason-pkg && cd jason && RUST_LOG=info wasm-pack build --target web --out-dir ../.cache/jason-pkg"
 
 
 	$(run-medea-container) cargo build
