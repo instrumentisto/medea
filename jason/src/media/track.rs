@@ -46,4 +46,9 @@ impl MediaTrack {
     pub fn is_enabled(&self) -> bool {
         self.track().enabled()
     }
+
+    /// Enabled or disable underlying track.
+    pub fn set_enabled(&self, enabled: bool) {
+        self.track.set_enabled(enabled)
+    }
 }

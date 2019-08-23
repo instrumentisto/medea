@@ -37,7 +37,7 @@ fn mute_unmute_audio() -> impl Future<Item = (), Error = JsValue> {
     let (tx, _rx) = unbounded();
     let manager = Rc::new(MediaManager::default());
     let (audio_track, video_track) = get_test_tracks();
-    let peer = PeerConnection::new(1, tx, vec![], manager).unwrap();
+    let peer = PeerConnection::new(1, tx, vec![], manager, true, true).unwrap();
     peer.get_offer(vec![audio_track, video_track])
         .map(move |_| {
             assert!(peer.is_send_audio_enabled());
@@ -59,7 +59,7 @@ fn mute_unmute_video() -> impl Future<Item = (), Error = JsValue> {
     let (tx, _rx) = unbounded();
     let manager = Rc::new(MediaManager::default());
     let (audio_track, video_track) = get_test_tracks();
-    let peer = PeerConnection::new(1, tx, vec![], manager).unwrap();
+    let peer = PeerConnection::new(1, tx, vec![], manager, true, true).unwrap();
     peer.get_offer(vec![audio_track, video_track])
         .map(move |_| {
             assert!(peer.is_send_audio_enabled());

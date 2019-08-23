@@ -85,9 +85,15 @@ impl PeerConnection {
         peer_events_sender: UnboundedSender<PeerEvent>,
         ice_servers: I,
         media_manager: Rc<MediaManager>,
+        enabled_audio: bool,
+        enabled_video: bool,
     ) -> Result<Self, WasmErr> {
         let peer = Rc::new(RtcPeerConnection::new(ice_servers)?);
-        let media_connections = MediaConnections::new(Rc::clone(&peer));
+        let media_connections = MediaConnections::new(
+            Rc::clone(&peer),
+            enabled_audio,
+            enabled_video,
+        );
         let inner = Rc::new(InnerPeerConnection {
             id,
             peer,
@@ -113,6 +119,7 @@ impl PeerConnection {
 
     /// Disable or enable all audio tracks for all [`Sender`]s.
     pub fn toggle_send_audio(&self, enabled: bool) {
+        WasmErr::from(format!("toggle_send_audio {}", enabled)).log_err();
         self.0
             .media_connections
             .toggle_send_media(TransceiverKind::Audio, enabled)
@@ -159,7 +166,7 @@ impl PeerConnection {
         &self,
         tracks: Vec<Track>,
     ) -> impl Future<Item = String, Error = WasmErr> {
-        Box::new(match self.0.media_connections.update_tracks(tracks) {
+        match self.0.media_connections.update_tracks(tracks) {
             Err(err) => future::Either::A(future::err(err)),
             Ok(request) => {
                 let peer = Rc::clone(&self.0.peer);
@@ -184,7 +191,7 @@ impl PeerConnection {
                     .and_then(move |_| peer.create_and_set_offer()),
                 )
             }
-        })
+        }
     }
 
     /// Creates an SDP answer to an offer received from a remote peer and sets
@@ -193,7 +200,7 @@ impl PeerConnection {
     pub fn create_and_set_answer(
         &self,
     ) -> impl Future<Item = String, Error = WasmErr> {
-        Box::new(self.0.peer.create_and_set_answer())
+        self.0.peer.create_and_set_answer()
     }
 
     /// Updates underlying [`RTCPeerConnection`][1] remote SDP.
@@ -203,7 +210,7 @@ impl PeerConnection {
         &self,
         answer: String,
     ) -> impl Future<Item = (), Error = WasmErr> {
-        Box::new(self.0.peer.set_remote_description(SdpType::Answer(answer)))
+        self.0.peer.set_remote_description(SdpType::Answer(answer))
     }
 
     /// Sync provided tracks creating all required `Sender`s and
@@ -229,27 +236,25 @@ impl PeerConnection {
         self.0.media_connections.update_tracks(recv).unwrap();
 
         let inner: Rc<InnerPeerConnection> = Rc::clone(&self.0);
-        Box::new(
-            self.0
-                .peer
-                .set_remote_description(SdpType::Offer(offer))
-                .and_then(move |_| {
-                    inner
-                        .media_connections
-                        .update_tracks(send)
-                        .map(|req| (req, inner))
-                })
-                .and_then(move |(request, inner)| match request {
-                    None => future::Either::A(future::ok::<_, WasmErr>(())),
-                    Some(request) => future::Either::B(
-                        inner.media_manager.get_stream(request).and_then(
-                            move |s| {
-                                inner.media_connections.insert_local_stream(&s)
-                            },
-                        ),
+        self.0
+            .peer
+            .set_remote_description(SdpType::Offer(offer))
+            .and_then(move |_| {
+                inner
+                    .media_connections
+                    .update_tracks(send)
+                    .map(|req| (req, inner))
+            })
+            .and_then(move |(request, inner)| match request {
+                None => future::Either::A(future::ok::<_, WasmErr>(())),
+                Some(request) => future::Either::B(
+                    inner.media_manager.get_stream(request).and_then(
+                        move |s| {
+                            inner.media_connections.insert_local_stream(&s)
+                        },
                     ),
-                }),
-        )
+                ),
+            })
     }
 
     /// Adds remote peers [ICE Candidate][1] to this peer.
@@ -261,11 +266,9 @@ impl PeerConnection {
         sdp_m_line_index: Option<u16>,
         sdp_mid: &Option<String>,
     ) -> impl Future<Item = (), Error = WasmErr> {
-        Box::new(self.0.peer.add_ice_candidate(
-            candidate,
-            sdp_m_line_index,
-            sdp_mid,
-        ))
+        self.0
+            .peer
+            .add_ice_candidate(candidate, sdp_m_line_index, sdp_mid)
     }
 
     /// Handle `icecandidate` event from underlying peer emitting

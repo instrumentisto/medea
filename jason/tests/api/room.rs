@@ -27,7 +27,15 @@ fn get_test_room_and_exist_peer() -> (Room, Rc<PeerConnection>) {
     let mut repo = Box::new(peer::Repository::default());
     let (tx, _rx) = unbounded();
     let peer = Rc::new(
-        PeerConnection::new(1, tx, vec![], Rc::clone(&media_manager)).unwrap(),
+        PeerConnection::new(
+            1,
+            tx,
+            vec![],
+            Rc::clone(&media_manager),
+            true,
+            true,
+        )
+        .unwrap(),
     );
     repo.insert(1, Rc::clone(&peer));
 
@@ -78,7 +86,15 @@ fn get_room_and_new_peer(
     let mut repo = Box::new(MockPeerRepository::new());
     let (tx, _rx) = unbounded();
     let peer = Rc::new(
-        PeerConnection::new(1, tx, vec![], Rc::clone(&media_manager)).unwrap(),
+        PeerConnection::new(
+            1,
+            tx,
+            vec![],
+            Rc::clone(&media_manager),
+            true,
+            true,
+        )
+        .unwrap(),
     );
 
     rpc.expect_subscribe()

@@ -27,8 +27,11 @@ wasm_bindgen_test_configure!(run_in_browser);
 #[wasm_bindgen_test(async)]
 fn disable_and_enable_all_tracks_in_media_manager(
 ) -> impl Future<Item = (), Error = JsValue> {
-    let media_connections =
-        MediaConnections::new(Rc::new(RtcPeerConnection::new(vec![]).unwrap()));
+    let media_connections = MediaConnections::new(
+        Rc::new(RtcPeerConnection::new(vec![]).unwrap()),
+        true,
+        true,
+    );
     let (audio_track, video_track) = get_test_tracks();
     let audio_track_id = audio_track.id;
     let video_track_id = video_track.id;

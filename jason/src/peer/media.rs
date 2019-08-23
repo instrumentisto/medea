@@ -27,6 +27,12 @@ struct InnerMediaConnections {
 
     /// [`MediaTrack`] to its [`Receiver`].
     receivers: HashMap<TrackId, Receiver>,
+
+    /// Are senders audio tracks muted.
+    enabled_audio: bool,
+
+    /// Are senders video tracks muted.
+    enabled_video: bool,
 }
 
 /// Storage of [`RtcPeerConnection`]'s [`Sender`] and [`Receiver`] tracks.
@@ -37,18 +43,28 @@ impl MediaConnections {
     /// Instantiates new [`MediaConnections`] storage for a given
     /// [`RtcPeerConnection`].
     #[inline]
-    pub fn new(peer: Rc<RtcPeerConnection>) -> Self {
+    pub fn new(
+        peer: Rc<RtcPeerConnection>,
+        enabled_audio: bool,
+        enabled_video: bool,
+    ) -> Self {
         Self(RefCell::new(InnerMediaConnections {
             peer,
             senders: HashMap::new(),
             receivers: HashMap::new(),
+            enabled_audio,
+            enabled_video,
         }))
     }
 
     /// Enables or disables all [`Sender`]s with specified [`TransceiverKind`]
     /// [`MediaTrack`]s.
     pub fn toggle_send_media(&self, kind: TransceiverKind, enabled: bool) {
-        let s = self.0.borrow();
+        let mut s = self.0.borrow_mut();
+        match kind {
+            TransceiverKind::Audio => s.enabled_audio = enabled,
+            TransceiverKind::Video => s.enabled_video = enabled,
+        };
         s.senders
             .values()
             .filter(|sender| sender.kind == kind)
@@ -136,6 +152,9 @@ impl MediaConnections {
     /// Inserts tracks from a provided [`MediaStream`] into [`Sender`]s
     /// basing on track IDs.
     ///
+    /// Enables or disables tracks in provided stream based on current media
+    /// connections state
+    ///
     /// Provided [`MediaStream`] must have all required [`MediaTrack`]s.
     /// [`MediaTrack`]s are inserted into [`Sender`]'s [`RtcRtpTransceiver`]s
     /// via [`replaceTrack` method][1], so changing [`RtcRtpTransceiver`]
@@ -156,6 +175,9 @@ impl MediaConnections {
                 )));
             }
         }
+
+        stream.toggle_audio_tracks(s.enabled_audio);
+        stream.toggle_video_tracks(s.enabled_video);
 
         let promises = s.senders.values().filter_map(|sndr| {
             match stream.get_track_by_id(sndr.track_id) {
@@ -307,7 +329,7 @@ impl Sender {
 
     /// Enable or disable this [`Sender`]s track.
     fn set_track_enabled(&self, enabled: bool) {
-        if let Some(track) = self.transceiver.sender().track() {
+        if let Some(track) = self.track.borrow().as_ref() {
             track.set_enabled(enabled);
         }
     }

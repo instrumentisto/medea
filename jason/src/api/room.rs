@@ -210,6 +210,8 @@ impl InnerRoom {
             self.peer_event_sender.clone(),
             ice_servers,
             Rc::clone(&self.media_manager),
+            self.enabled_audio,
+            self.enabled_video,
         )?);
         self.peers.insert(id, peer);
         Ok(self.peers.get(id).unwrap())
@@ -254,16 +256,12 @@ impl EventHandler for InnerRoom {
 
         self.create_connections_from_tracks(&tracks);
 
-        let is_enabled_audio = self.enabled_audio;
-        let is_enabled_video = self.enabled_video;
         let rpc = Rc::clone(&self.rpc);
         let fut = match sdp_offer {
             // offerer
             None => future::Either::A(
                 peer.get_offer(tracks)
                     .map(move |sdp_offer| {
-                        peer.toggle_send_audio(is_enabled_audio);
-                        peer.toggle_send_video(is_enabled_video);
                         rpc.send_command(Command::MakeSdpOffer {
                             peer_id,
                             sdp_offer,
@@ -276,11 +274,7 @@ impl EventHandler for InnerRoom {
                 // answerer
                 future::Either::B(
                     peer.process_offer(offer, tracks)
-                        .and_then(move |_| {
-                            peer.toggle_send_audio(is_enabled_audio);
-                            peer.toggle_send_video(is_enabled_video);
-                            peer.create_and_set_answer()
-                        })
+                        .and_then(move |_| peer.create_and_set_answer())
                         .map(move |sdp_answer| {
                             rpc.send_command(Command::MakeSdpAnswer {
                                 peer_id,
