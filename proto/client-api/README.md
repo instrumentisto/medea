@@ -5,7 +5,7 @@ Medea Client API protocol
 ![Crates.io license](https://img.shields.io/crates/l/medea-client-api-proto)
 
 [API Docs](https://docs.rs/medea-client-api-proto) |
-[Changelog](CHANGELOG.md)
+[Changelog](https://github.com/instrumentisto/medea/blob/master/proto/client-api/CHANGELOG.md)
 
 Client API protocol implementation for [Medea] media server.
 
@@ -18,8 +18,8 @@ __Currently, in early development phase.__
 
 This project is licensed under either of
 
-- Apache License, Version 2.0, ([LICENSE-APACHE](LICENSE-APACHE.md) or http://www.apache.org/licenses/LICENSE-2.0)
-- MIT license ([LICENSE-MIT](LICENSE-MIT.md) or http://opensource.org/licenses/MIT)
+- Apache License, Version 2.0, ([LICENSE-APACHE](https://github.com/instrumentisto/medea/blob/master/proto/client-api/LICENSE-APACHE.md) or http://www.apache.org/licenses/LICENSE-2.0)
+- MIT license ([LICENSE-MIT](https://github.com/instrumentisto/medea/blob/master/proto/client-api/LICENSE-MIT.md) or http://opensource.org/licenses/MIT)
 
 at your option.
 
