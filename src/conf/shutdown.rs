@@ -11,6 +11,6 @@ use smart_default::SmartDefault;
 pub struct Shutdown {
     /// Maximum duration given to shutdown the whole application gracefully.
     #[default(Duration::from_secs(5))]
-    #[serde(with = "serde_humantime")]
+    #[serde(with = "humantime_serde")]
     pub timeout: Duration,
 }

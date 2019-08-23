@@ -1,8 +1,5 @@
 //! Client API protocol implementation for Medea media server.
 
-// TODO: when using enum's Self will be in stable, remove it.
-#![allow(clippy::use_self)]
-
 use std::collections::HashMap;
 
 use macro_attr::*;
@@ -215,12 +212,12 @@ impl Serialize for ClientMsg {
         use serde::ser::SerializeStruct;
 
         match self {
-            ClientMsg::Ping(n) => {
+            Self::Ping(n) => {
                 let mut ping = serializer.serialize_struct("ping", 1)?;
                 ping.serialize_field("ping", n)?;
                 ping.end()
             }
-            ClientMsg::Command(command) => command.serialize(serializer),
+            Self::Command(command) => command.serialize(serializer),
         }
     }
 }
@@ -246,7 +243,7 @@ impl<'de> Deserialize<'de> for ClientMsg {
                 ))
             })?;
 
-            Ok(ClientMsg::Ping(n))
+            Ok(Self::Ping(n))
         } else {
             let command =
                 serde_json::from_value::<Command>(ev).map_err(|e| {
@@ -255,7 +252,7 @@ impl<'de> Deserialize<'de> for ClientMsg {
                         e
                     ))
                 })?;
-            Ok(ClientMsg::Command(command))
+            Ok(Self::Command(command))
         }
     }
 }
@@ -269,12 +266,12 @@ impl Serialize for ServerMsg {
         use serde::ser::SerializeStruct;
 
         match self {
-            ServerMsg::Pong(n) => {
+            Self::Pong(n) => {
                 let mut ping = serializer.serialize_struct("pong", 1)?;
                 ping.serialize_field("pong", n)?;
                 ping.end()
             }
-            ServerMsg::Event(command) => command.serialize(serializer),
+            Self::Event(command) => command.serialize(serializer),
         }
     }
 }
@@ -300,7 +297,7 @@ impl<'de> Deserialize<'de> for ServerMsg {
                 ))
             })?;
 
-            Ok(ServerMsg::Pong(n))
+            Ok(Self::Pong(n))
         } else {
             let event = serde_json::from_value::<Event>(ev).map_err(|e| {
                 Error::custom(format!(
@@ -308,7 +305,7 @@ impl<'de> Deserialize<'de> for ServerMsg {
                     e
                 ))
             })?;
-            Ok(ServerMsg::Event(event))
+            Ok(Self::Event(event))
         }
     }
 }

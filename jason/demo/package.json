@@ -1,6 +1,6 @@
 {
   "private": true,
   "dependencies": {
-    "jason-alexlapa": "0.1.5-dev"
+    "medea-jason": "^0.1"
   }
 }

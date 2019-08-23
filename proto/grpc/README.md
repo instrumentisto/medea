@@ -1,15 +1,24 @@
-Medea Client API protocol
+Medea Control API gRPC specs
 =========================
 
-[![Crates.io](https://img.shields.io/crates/v/medea-client-api-proto)](https://crates.io/crates/medea-client-api-proto)
-![Crates.io license](https://img.shields.io/crates/l/medea-client-api-proto)
+[![Crates.io](https://img.shields.io/crates/v/medea-grpc-proto)](https://crates.io/crates/medea-grpc-proto)
+![Crates.io license](https://img.shields.io/crates/l/medea-grpc-proto)
 
-[API Docs](https://docs.rs/medea-client-api-proto) |
-[Changelog](https://github.com/instrumentisto/medea/blob/master/proto/client-api/CHANGELOG.md)
+[Changelog](https://github.com/instrumentisto/medea/blob/master/proto/grpc/CHANGELOG.md)
 
-Client API protocol implementation for [Medea] media server.
+Compiled gRPC specs for [Medea] media server control API.
 
 __Currently, in early development phase.__
+
+
+
+
+## Prerequisites
+- CMake >= 3.8.0
+- Rust >= 1.19.0
+- binutils >= 2.22
+- LLVM and Clang >= 3.9 if you need to generate bindings at compile time.
+- [protoc](https://github.com/protocolbuffers/protobuf)
 
 
 

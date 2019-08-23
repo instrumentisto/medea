@@ -1,4 +1,7 @@
 //! [`Member`] is member of [`Room`] with [`RpcConnection`].
+//!
+//! [`Room`]: crate::signalling::room::Room
+//! [`RpcConnection`]: crate::api::client::rpc_connection::RpcConnection
 
 use std::{
     cell::RefCell,
@@ -31,7 +34,7 @@ use super::endpoints::webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint};
 /// Errors which may occur while loading [`Member`]s from [`RoomSpec`].
 #[derive(Debug, Fail)]
 pub enum MembersLoadError {
-    /// Errors that can occur when we try transform some spec from [`Element`].
+    /// Errors that can occur when we try transform some spec from `Element`.
     #[fail(display = "TryFromElementError: {}", _0)]
     TryFromError(TryFromElementError, LocalUriType),
 
@@ -65,6 +68,9 @@ pub enum MemberError {
 }
 
 /// [`Member`] is member of [`Room`] with [`RpcConnection`].
+///
+/// [`Room`]: crate::signalling::room::Room
+/// [`RpcConnection`]: crate::api::client::rpc_connection::RpcConnection
 #[derive(Clone, Debug)]
 pub struct Member(Rc<RefCell<MemberInner>>);
 
@@ -252,6 +258,8 @@ impl Member {
     /// Notify [`Member`] that some [`Peer`]s removed.
     ///
     /// All [`PeerId`]s related to this [`Member`] will be removed.
+    ///
+    /// [`Peer`]: crate::media::peer::Peer
     pub fn peers_removed(&self, peer_ids: &[PeerId]) {
         self.srcs()
             .into_iter()
@@ -335,7 +343,7 @@ impl Member {
         )
     }
 
-    /// Lookup [`WebRtcPlayEndpoint`] sink endpoint by [`EndpointId`].
+    /// Lookup [`WebRtcPlayEndpoint`] sink endpoint by [`WebRtcPlayId`].
     pub fn get_sink_by_id(
         &self,
         id: &WebRtcPlayId,

@@ -39,8 +39,8 @@ impl TransceiverKind {
     /// Returns string representation of a [`TransceiverKind`].
     pub fn as_str(self) -> &'static str {
         match self {
-            TransceiverKind::Audio => "audio",
-            TransceiverKind::Video => "video",
+            Self::Audio => "audio",
+            Self::Video => "video",
         }
     }
 }
@@ -59,8 +59,8 @@ impl From<TransceiverDirection> for RtcRtpTransceiverDirection {
     fn from(direction: TransceiverDirection) -> Self {
         use TransceiverDirection::*;
         match direction {
-            Sendonly => RtcRtpTransceiverDirection::Sendonly,
-            Recvonly => RtcRtpTransceiverDirection::Recvonly,
+            Sendonly => Self::Sendonly,
+            Recvonly => Self::Recvonly,
         }
     }
 }

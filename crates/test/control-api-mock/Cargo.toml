@@ -1,6 +1,6 @@
 [package]
 name = "control-api-mock"
-version = "0.1.0-dev"
+version = "0.1.0-dev.1"
 edition = "2018"
 description = "Mock server for medea's control API."
 authors = ["Instrumentisto Team <developer@instrumentisto.com>"]
@@ -12,6 +12,7 @@ repository = "https://github.com/instrumentisto/medea"
 actix = "0.8"
 actix-web = "1.0"
 actix-web-actors = "1.0"
+clap = "2.33"
 futures = "0.1"
 grpcio = "0.4"
 serde = { version = "1.0", features = ["derive"] }

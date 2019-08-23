@@ -108,9 +108,9 @@ impl ControlClient {
     ///
     /// __Note that call of this function is not check availability of control
     /// API's gRPC server. He's availability check only on some method call.__
-    pub fn new() -> Self {
+    pub fn new(medea_addr: &str) -> Self {
         Self {
-            grpc_client: get_grpc_client(),
+            grpc_client: get_grpc_client(medea_addr),
         }
     }
 
@@ -200,15 +200,9 @@ impl ControlClient {
     }
 }
 
-impl Default for ControlClient {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 /// Get gRPC client for control API.
-fn get_grpc_client() -> ControlApiClient {
+fn get_grpc_client(addr: &str) -> ControlApiClient {
     let env = Arc::new(EnvBuilder::new().build());
-    let ch = ChannelBuilder::new(env).connect("127.0.0.1:50051");
+    let ch = ChannelBuilder::new(env).connect(addr);
     ControlApiClient::new(ch)
 }

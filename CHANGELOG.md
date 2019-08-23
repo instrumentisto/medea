@@ -1,45 +1,49 @@
-Change Log
-==========
+`medea` changelog
+=================
 
-All user visible changes to this project will be documented in this file. This project uses to [Semantic Versioning 2.0.0].
-
-
-
-
-## [0.2.0] · 2019-?-?
-[0.2.0]: https://github.com/instrumentisto/medea/releases/tag/medea-0.2.0
-
-[Milestone](https://github.com/instrumentisto/medea/milestone/2) |
-[Roadmap](https://github.com/instrumentisto/medea/issues/27)
-
-### Added
-
-- Static control API spec [#28](https://github.com/instrumentisto/medea/pull/28)
-  - parse static control api specs
-  - created interior entities for control API specs
-  - dynamically `Peer`s creation when client connects
-  - auto removing `Peer`s when `Member` disconnects
-  - E2E tests for signalling
-  
+All user visible changes to this project will be documented in this file. This project uses [Semantic Versioning 2.0.0].
 
 
 
 
-## [0.1.0] · 2019-08-13
-[0.1.0]: https://github.com/instrumentisto/medea/releases/tag/medea-0.1.0
+## TBD [0.2.0] · 2019-??-??
+[0.2.0]: /../../tree/medea-0.2.0
 
-[Milestone](https://github.com/instrumentisto/medea/milestone/1) |
-[Roadmap](https://github.com/instrumentisto/medea/issues/8)
+[Milestone](../../milestone/2) | [Roadmap](/../../issues/27)
 
 ### Added
 
-- Structured logging [#12](https://github.com/instrumentisto/medea/pull/12).
-- Application configuration [#15](https://github.com/instrumentisto/medea/pull/15).
-- [WebRTC signalling] [#16](https://github.com/instrumentisto/medea/pull/16).
-- [Coturn] integration [#20](https://github.com/instrumentisto/medea/pull/20), 
-  [#42](https://github.com/instrumentisto/medea/pull/42).
-- Dockerized medea [#35](https://github.com/instrumentisto/medea/pull/35).
-- Graceful shutdown [#30](https://github.com/instrumentisto/medea/pull/30).
+- Dynamic control API exposed via gRPC ([#33](/../../pull/33)):
+    - `Create` method for `Room`, `Member`, `Endpoint`;
+    - `Get` method for `Room`, `Member`, `Endpoint`;
+    - `Delete` method for `Room`, `Member`, `Endpoint`.
+- Static control API spec ([#28](/../../pull/28))
+    - parse static control api specs
+    - created interior entities for control API specs
+    - dynamically `Peer`s creation when client connects
+    - auto removing `Peer`s when `Member` disconnects
+    - E2E tests for signalling
+
+
+
+
+## [0.1.0] · 2019-08-22
+[0.1.0]: /../../tree/medea-0.1.0
+
+[Milestone](/../../milestone/1) | [Roadmap](/../../issues/8)
+
+### Added
+
+- WebRTC:
+    - Basic signalling capabilities ([#16](/../../pull/16));
+    - [Coturn] integration ([#20](/../../pull/20), [#42](/../../pull/42)).
+- Deployment:
+    - Graceful shutdown ([#30](/../../pull/30));
+    - Docker image ([#35](/../../pull/35)).
+- Configuration:
+    - Ability to parse from files and env vars ([#15](/../../pull/15)).
+- Logging:
+    - Structured logging to STDOUT/STDERR ([#12](/../../pull/12)).
 
 
 

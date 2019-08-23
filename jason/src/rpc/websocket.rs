@@ -28,7 +28,7 @@ impl State {
     /// Returns `true` if socket can be closed.
     pub fn can_close(&self) -> bool {
         match self {
-            State::CONNECTING | State::OPEN => true,
+            Self::CONNECTING | Self::OPEN => true,
             _ => false,
         }
     }
@@ -39,10 +39,10 @@ impl TryFrom<u16> for State {
 
     fn try_from(value: u16) -> Result<Self, Self::Error> {
         match value {
-            0 => Ok(State::CONNECTING),
-            1 => Ok(State::OPEN),
-            2 => Ok(State::CLOSING),
-            3 => Ok(State::CLOSED),
+            0 => Ok(Self::CONNECTING),
+            1 => Ok(Self::OPEN),
+            2 => Ok(Self::CLOSING),
+            3 => Ok(Self::CLOSED),
             _ => Err(WasmErr::Custom(
                 format!("Could not cast {} to State variant", value).into(),
             )),
@@ -212,8 +212,8 @@ impl From<&CloseEvent> for CloseMsg {
         let code: u16 = event.code();
         let body = format!("{}:{}", code, event.reason());
         match code {
-            1000 => CloseMsg::Normal(body),
-            _ => CloseMsg::Disconnect(body),
+            1000 => Self::Normal(body),
+            _ => Self::Disconnect(body),
         }
     }
 }
