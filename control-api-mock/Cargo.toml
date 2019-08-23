@@ -1,6 +1,6 @@
 [package]
 name = "control-api-mock"
-version = "0.1.0-dev"
+version = "0.1.0-dev.1"
 edition = "2018"
 description = "Mock server for medea's control API."
 authors = ["Instrumentisto Team <developer@instrumentisto.com>"]

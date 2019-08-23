@@ -140,6 +140,8 @@ impl WebRtcPlayEndpoint {
     }
 
     /// Return [`PeerId`] of [`Peer`] of this [`WebRtcPlayEndpoint`].
+    ///
+    /// [`Peer`]: crate::media::peer::Peer
     pub fn peer_id(&self) -> Option<PeerId> {
         self.0.borrow().peer_id()
     }

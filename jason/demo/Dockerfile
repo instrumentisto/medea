@@ -23,6 +23,6 @@ FROM nginx:stable-alpine AS runtime
 COPY chart/medea-demo/conf/nginx.vh.conf /etc/nginx/conf.d/default.conf
 
 COPY index.html /app/
-COPY --from=dist /npm/node_modules/jason-alexlapa/ /app/js/
+COPY --from=dist /npm/node_modules/medea-jason/ /app/js/
 
 WORKDIR /app

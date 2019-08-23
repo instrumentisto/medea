@@ -1,7 +1,7 @@
 //! Room definitions and implementations. Room is responsible for media
 //! connection establishment between concrete [`Member`]s.
 //!
-//! [`Member`]: crate::api::control::member::Member
+//! [`Member`]: crate::signalling::elements::member::Member
 
 use std::collections::{HashMap, HashSet};
 
@@ -82,31 +82,31 @@ pub enum RoomError {
 
 impl From<PeerError> for RoomError {
     fn from(err: PeerError) -> Self {
-        RoomError::PeerError(err)
+        Self::PeerError(err)
     }
 }
 
 impl From<TryFromElementError> for RoomError {
     fn from(err: TryFromElementError) -> Self {
-        RoomError::TryFromElementError(err)
+        Self::TryFromElementError(err)
     }
 }
 
 impl From<MembersLoadError> for RoomError {
     fn from(err: MembersLoadError) -> Self {
-        RoomError::MembersLoadError(err)
+        Self::MembersLoadError(err)
     }
 }
 
 impl From<ParticipantServiceErr> for RoomError {
     fn from(err: ParticipantServiceErr) -> Self {
-        RoomError::ParticipantServiceErr(err)
+        Self::ParticipantServiceErr(err)
     }
 }
 
 impl From<MemberError> for RoomError {
     fn from(err: MemberError) -> Self {
-        RoomError::MemberError(err)
+        Self::MemberError(err)
     }
 }
 
@@ -141,7 +141,7 @@ pub struct Room {
 impl Room {
     /// Create new instance of [`Room`].
     ///
-    /// Returns [`RoomError::BadRoomSpec`] when error while [`Element`]
+    /// Returns [`RoomError::BadRoomSpec`] when error while `Element`
     /// transformation happens.
     pub fn new(
         room_spec: &RoomSpec,
@@ -795,6 +795,8 @@ impl Handler<RpcConnectionClosed> for Room {
     ///
     /// Delete all removed [`PeerId`]s from all [`Member`]'s
     /// endpoints.
+    ///
+    /// [`PeersRemoved`]: medea-client-api-proto::Event::PeersRemoved
     fn handle(&mut self, msg: RpcConnectionClosed, ctx: &mut Self::Context) {
         info!(
             "RpcConnectionClosed for member {}, reason {:?}",

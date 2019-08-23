@@ -112,22 +112,22 @@ pub enum TurnServiceErr {
 
 impl From<TurnDatabaseErr> for TurnServiceErr {
     fn from(err: TurnDatabaseErr) -> Self {
-        TurnServiceErr::TurnAuthRepoErr(err)
+        Self::TurnAuthRepoErr(err)
     }
 }
 
 impl From<bb8::RunError<TurnDatabaseErr>> for TurnServiceErr {
     fn from(err: bb8::RunError<TurnDatabaseErr>) -> Self {
         match err {
-            RunError::User(error) => TurnServiceErr::TurnAuthRepoErr(error),
-            RunError::TimedOut => TurnServiceErr::TimedOut,
+            RunError::User(error) => Self::TurnAuthRepoErr(error),
+            RunError::TimedOut => Self::TimedOut,
         }
     }
 }
 
 impl From<MailboxError> for TurnServiceErr {
     fn from(err: MailboxError) -> Self {
-        TurnServiceErr::MailboxErr(err)
+        Self::MailboxErr(err)
     }
 }
 
