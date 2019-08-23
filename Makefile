@@ -427,7 +427,7 @@ ifeq ($(dockerized),no)
 else
 	@make up.e2e.services
 
-	docker run --rm -d --network=host drupalci/chromedriver:dev > /tmp/chromedriver.docker.uid
+	docker run --rm -d --network=host selenoid/chrome:latest > /tmp/chromedriver.docker.uid
 	$(run-medea-container) cargo run -p e2e-tests-runner -- \
 		-f 127.0.0.1:$(test-runner-port) \
 		-w http://127.0.0.1:9515 \
