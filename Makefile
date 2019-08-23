@@ -19,7 +19,7 @@ MEDEA_IMAGE_NAME := $(strip \
 	$(shell grep 'COMPOSE_IMAGE_NAME=' .env | cut -d '=' -f2))
 DEMO_IMAGE_NAME := instrumentisto/medea-demo
 
-RUST_VER := 1.36
+RUST_VER := 1.37
 
 CURRENT_BRANCH := $(strip $(shell git branch | grep \* | cut -d ' ' -f2))
 

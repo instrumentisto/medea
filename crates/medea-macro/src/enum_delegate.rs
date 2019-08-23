@@ -53,11 +53,11 @@ pub fn derive(args: &TokenStream, input: TokenStream) -> Result<TokenStream> {
     let mut function: syn::ItemFn = syn::parse_str(&arg_function)?;
 
     let selfs_count = function
-        .decl
+        .sig
         .inputs
         .iter()
         .filter(|i| match i {
-            syn::FnArg::SelfValue(_) | syn::FnArg::SelfRef(_) => true,
+            syn::FnArg::Receiver(_) => true,
             _ => false,
         })
         .count();
@@ -68,14 +68,19 @@ pub fn derive(args: &TokenStream, input: TokenStream) -> Result<TokenStream> {
         ));
     }
 
-    let function_ident = iter::repeat(function.ident.clone());
-    let function_args =
-        iter::repeat(function.decl.clone().inputs.into_iter().filter_map(
-            |i| match i {
-                syn::FnArg::Captured(c) => Some(c.pat),
+    let function_ident = iter::repeat(function.sig.ident.clone());
+    let function_args = iter::repeat(
+        function
+            .sig
+            .inputs
+            .clone()
+            .into_iter()
+            .filter_map(|i| match i {
+                syn::FnArg::Typed(c) => Some(c.pat),
                 _ => None,
-            },
-        ));
+            })
+            .collect::<Vec<_>>(),
+    );
 
     let enum_output = quote! {
         #(#enum_name_iter::#variants(inner) => {
