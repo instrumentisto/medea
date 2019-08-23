@@ -7,9 +7,9 @@ All user visible changes to this project will be documented in this file. This p
 
 
 ## TBD [0.2.0] · 2019-??-??
-[0.2.0]: /../../tree/medea-jason-0.2.0
+[0.2.0]: /../../tree/medea-jason-0.2.0/jason
 
-[Milestone](../../milestone/2) | [Roadmap](/../../issues/27)
+[Milestone](/../../milestone/2) | [Roadmap](/../../issues/27)
 
 ### Changed
 
