@@ -3,26 +3,21 @@
 use std::rc::Rc;
 
 use futures::{
-    future::IntoFuture,
-    sync::{
-        mpsc::{unbounded, UnboundedReceiver},
-        oneshot::channel,
-    },
+    sync::mpsc::{unbounded, UnboundedReceiver},
     Future,
 };
+use medea_client_api_proto::Event;
 use medea_jason::{
     api::Room,
     media::MediaManager,
     peer::{self, MockPeerRepository, PeerConnection, PeerRepository},
     rpc::MockRpcClient,
-    utils::{window, WasmErr},
 };
-use medea_client_api_proto::Event;
 use mockall::predicate::*;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_test::*;
 
-use crate::get_test_tracks;
+use crate::{get_test_tracks, resolve_after};
 
 wasm_bindgen_test_configure!(run_in_browser);
 
@@ -118,27 +113,11 @@ fn mute_audio_room_before_init_peer() -> impl Future<Item = (), Error = JsValue>
         })
         .unwrap();
 
-    // TODO: we gonna do this kind of stuff many-many times,
-    //       create macro:
-    //       let fut: impl Future<Item = (), Error = JsValue> =
-    //          run_after!(500, |_| {
-    //              // what to run
-    //          })
-    let (done, wait) = channel();
-    let cb = Closure::once_into_js(move || {
-        done.send(()).unwrap();
-    });
-    window()
-        .set_timeout_with_callback_and_timeout_and_arguments_0(&cb.into(), 500)
-        .unwrap();
-
-    wait.into_future()
-        .and_then(move |_| {
-            // move room so it wont get dropped
-            let _ = room;
-            assert!(peer.is_send_video_enabled());
-            assert!(!peer.is_send_audio_enabled());
-            Ok(())
-        })
-        .map_err(|_| WasmErr::from("canceled").into())
+    resolve_after(500).and_then(move |_| {
+        // move room so it wont get dropped
+        let _ = room;
+        assert!(peer.is_send_video_enabled());
+        assert!(!peer.is_send_audio_enabled());
+        Ok(())
+    })
 }
