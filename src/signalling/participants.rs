@@ -8,6 +8,7 @@
 //! [`ParticipantService`]: crate::signalling::participants::ParticipantService
 
 use std::{
+    collections::HashMap,
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -21,7 +22,6 @@ use futures::{
     future::{self, join_all, Either},
     Future,
 };
-use hashbrown::HashMap;
 
 use medea_client_api_proto::Event;
 

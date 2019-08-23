@@ -3,9 +3,10 @@
 //! [`Room`]: crate::signalling::Room
 //! [`Peer`]: crate::media::peer::Peer
 
-use hashbrown::HashMap;
-
-use std::convert::{TryFrom, TryInto};
+use std::{
+    collections::HashMap,
+    convert::{TryFrom, TryInto},
+};
 
 use crate::{
     api::control::MemberId,
