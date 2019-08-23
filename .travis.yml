@@ -9,6 +9,7 @@ install:
   - unzip ${PROTOC_FILENAME}
   - bin/protoc --version
   - popd
+  - mkdir .cache
   - rustc -vV
   - cargo -vV
 
