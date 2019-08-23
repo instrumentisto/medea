@@ -73,6 +73,13 @@ release: release.crates release.npm
 test: test.unit test.e2e
 
 
+# Run all E2E tests of medea.
+#
+# Usage:
+# 	make test.e2e [dockerized=(YES|no)] [logs=(yes|NO)] [coturn=(YES|no)]
+test.e2e: test.e2e.signalling test.e2e.chrome test.e2e.firefox
+
+
 
 
 ####################
@@ -249,8 +256,7 @@ else
 
 	$(run-medea-container) sh -c "cd jason && RUST_LOG=info wasm-pack build --target web --out-dir ../.cache/jason-pkg"
 
-
-	$(run-medea-container) cargo build
+	$(run-medea-container) make build.medea optimized=yes
 	$(run-medea-container-d) cargo run > /tmp/medea.docker.uid
 
 	$(run-medea-container) cargo build -p control-api-mock
@@ -473,13 +479,6 @@ else
 	rm -f /tmp/geckodriver.docker.uid
 	@make down.e2e.services
 endif
-
-
-# Run all E2E tests of medea.
-#
-# Usage:
-# 	make test.e2e [dockerized=(YES|no)] [logs=(yes|NO)] [coturn=(YES|no)]
-test.e2e: test.e2e.chrome test.e2e.firefox test.e2e.signalling
 
 
 
@@ -793,11 +792,11 @@ endef
 # Build medea.
 #
 # Usage:
-#   make build.medea [dockerized=(no|yes)]
+#   make build.medea [dockerized=(no|yes)] [optimized=(no|yes)]
 
 build.medea:
 ifneq ($(dockerized),yes)
-	cargo build --bin medea
+	cargo build --bin medea $(if $(call eq,$(optimized),yes),--release)
 else
 	docker run --rm \
 		-v "$(PWD)":/app -w /app \
@@ -805,7 +804,7 @@ else
 		-v "$(HOME)/.cargo/registry":/usr/local/cargo/registry \
 		-v "$(PWD)/target":/app/target \
 		rust:latest \
-		make build.medea
+		make build.medea optimized=$(optimized)
 endif
 
 
