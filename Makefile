@@ -232,7 +232,6 @@ run-medea-container-d =  $(run-medea-command) -d medea-build:latest
 run-medea-container = $(run-medea-command) medea-build:latest
 
 up.e2e.services:
-	mkdir -p .cache target ~/.cargo/registry
 ifneq ($(coturn),no)
 	@make up.coturn
 endif
@@ -248,6 +247,7 @@ ifeq ($(dockerized),no)
 		echo $$! > /tmp/e2e_control_api_mock.pid
 	sleep 2
 else
+	mkdir -p .cache target ~/.cargo/registry
 	@make down.medea dockerized=yes
 	@make down.medea dockerized=no
 	@make up.coturn
@@ -392,7 +392,6 @@ endif
 #   make test.e2e.signalling [release=(no|yes)] [logs=(no|yes)]
 
 test.e2e.signalling:
-	mkdir -p .cache target ~/.cargo/registry
 ifneq ($(coturn),no)
 	@make up.coturn
 endif
@@ -408,6 +407,7 @@ ifeq ($(dockerized),no)
 
 	@make down.medea
 else
+	mkdir -p .cache target ~/.cargo/registry
 	-@make down.medea dockerized=yes
 	-@make down.medea dockerized=no
 	@make docker.build.medea-build
