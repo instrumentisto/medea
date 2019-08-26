@@ -144,6 +144,69 @@ else
 endif
 
 
+# Start services needed for e2e tests of medea in browsers.
+# If logs set to "yes" then medea print all logs to stdout.
+#
+# Usage:
+# 	make test.e2e [dockerized=(YES|no)] [logs=(yes|NO)] [coturn=(YES|no)]
+
+medea-env = RUST_BACKTRACE=1 \
+	MEDEA_SERVER.HTTP.BIND_PORT=8081 \
+	$(if $(call eq,$(logs),yes),,RUST_LOG=warn) \
+	MEDEA_SERVER.HTTP.STATIC_SPECS_PATH=tests/specs
+
+chromedriver-port = 50000
+geckodriver-port = 50001
+test-runner-port = 51000
+
+run-medea-command = docker run --rm --network=host -v "$(PWD)":/app -w /app \
+                    	--env XDG_CACHE_HOME=$(HOME) \
+                    	--env RUST_BACKTRACE=1 \
+						-u $(shell id -u):$(shell id -g) \
+                    	-v "$(HOME)/.cargo/registry":/usr/local/cargo/registry \
+                    	-v "$(HOME):$(HOME)" \
+                    	-v "$(PWD)/target":/app/target
+run-medea-container-d =  $(run-medea-command) -d medea-build:latest
+run-medea-container = $(run-medea-command) medea-build:latest
+
+up.e2e.services:
+ifneq ($(dockerized),no)
+	mkdir -p .cache target ~/.cargo/registry
+endif
+ifneq ($(coturn),no)
+	@make up.coturn
+endif
+ifeq ($(dockerized),no)
+	cargo build $(if $(call eq,$(release),yes),--release)
+	cargo build -p control-api-mock
+	$(run-medea-container) sh -c "cd jason && wasm-pack build --target web --out-dir ../.cache/jason-pkg"
+
+	env $(if $(call eq,$(logs),yes),,RUST_LOG=warn) cargo run --bin medea \
+		$(if $(call eq,$(release),yes),--release) & \
+		echo $$! > /tmp/e2e_medea.pid
+	env RUST_LOG=warn cargo run -p control-api-mock & \
+		echo $$! > /tmp/e2e_control_api_mock.pid
+	sleep 2
+else
+	@make down.medea dockerized=yes
+	@make down.medea dockerized=no
+	@make up.coturn
+
+	# TODO: publish it to docker hub
+	@make docker.build.medea-build
+
+	$(run-medea-container) sh -c "cd jason && RUST_LOG=info wasm-pack build --target web --out-dir ../.cache/jason-pkg"
+
+	$(run-medea-container) make build.medea optimized=yes
+	$(run-medea-container-d) cargo run > /tmp/medea.docker.uid
+
+	$(run-medea-container) cargo build -p control-api-mock
+	$(run-medea-container-d) cargo run -p control-api-mock > /tmp/control-api-mock.docker.uid
+
+	$(run-medea-container) cargo build -p e2e-tests-runner
+endif
+
+
 
 
 #####################
@@ -204,67 +267,6 @@ endif
 
 down.coturn:
 	docker-compose -f docker-compose.coturn.yml down
-
-
-# Start services needed for e2e tests of medea in browsers.
-# If logs set to "yes" then medea print all logs to stdout.
-#
-# Usage:
-# 	make test.e2e [dockerized=(YES|no)] [logs=(yes|NO)] [coturn=(YES|no)]
-
-medea-env = RUST_BACKTRACE=1 \
-	MEDEA_SERVER.HTTP.BIND_PORT=8081 \
-	$(if $(call eq,$(logs),yes),,RUST_LOG=warn) \
-	MEDEA_SERVER.HTTP.STATIC_SPECS_PATH=tests/specs
-
-chromedriver-port = 50000
-geckodriver-port = 50001
-test-runner-port = 51000
-
-run-medea-command = docker run --rm --network=host -v "$(PWD)":/app -w /app \
-                    	--env XDG_CACHE_HOME=$(HOME) \
-                    	--env RUST_BACKTRACE=1 \
-						-u $(shell id -u):$(shell id -g) \
-                    	-v "$(HOME)/.cargo/registry":/usr/local/cargo/registry \
-                    	-v "$(HOME):$(HOME)" \
-                    	-v "$(PWD)/target":/app/target
-run-medea-container-d =  $(run-medea-command) -d medea-build:latest
-run-medea-container = $(run-medea-command) medea-build:latest
-
-up.e2e.services:
-ifneq ($(coturn),no)
-	@make up.coturn
-endif
-ifeq ($(dockerized),no)
-	cargo build $(if $(call eq,$(release),yes),--release)
-	cargo build -p control-api-mock
-	$(run-medea-container) sh -c "cd jason && wasm-pack build --target web --out-dir ../.cache/jason-pkg"
-
-	env $(if $(call eq,$(logs),yes),,RUST_LOG=warn) cargo run --bin medea \
-		$(if $(call eq,$(release),yes),--release) & \
-		echo $$! > /tmp/e2e_medea.pid
-	env RUST_LOG=warn cargo run -p control-api-mock & \
-		echo $$! > /tmp/e2e_control_api_mock.pid
-	sleep 2
-else
-	mkdir -p .cache target ~/.cargo/registry
-	@make down.medea dockerized=yes
-	@make down.medea dockerized=no
-	@make up.coturn
-
-	# TODO: publish it to docker hub
-	@make docker.build.medea-build
-
-	$(run-medea-container) sh -c "cd jason && RUST_LOG=info wasm-pack build --target web --out-dir ../.cache/jason-pkg"
-
-	$(run-medea-container) make build.medea optimized=yes
-	$(run-medea-container-d) cargo run > /tmp/medea.docker.uid
-
-	$(run-medea-container) cargo build -p control-api-mock
-	$(run-medea-container-d) cargo run -p control-api-mock > /tmp/control-api-mock.docker.uid
-
-	$(run-medea-container) cargo build -p e2e-tests-runner
-endif
 
 
 
@@ -392,6 +394,9 @@ endif
 #   make test.e2e.signalling [release=(no|yes)] [logs=(no|yes)]
 
 test.e2e.signalling:
+ifneq ($(dockerized),no)
+	mkdir -p .cache target ~/.cargo/registry
+endif
 ifneq ($(coturn),no)
 	@make up.coturn
 endif
@@ -407,7 +412,6 @@ ifeq ($(dockerized),no)
 
 	@make down.medea
 else
-	mkdir -p .cache target ~/.cargo/registry
 	-@make down.medea dockerized=yes
 	-@make down.medea dockerized=no
 	@make docker.build.medea-build
