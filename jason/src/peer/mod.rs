@@ -58,6 +58,7 @@ pub enum PeerEvent {
 }
 
 struct InnerPeerConnection {
+    /// Unique ID of [`PeerConnection`].
     id: Id,
 
     /// Underlying [`RtcPeerConnection`].
