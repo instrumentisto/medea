@@ -2,7 +2,7 @@ language: rust
 cache: cargo
 
 install:
-  - bash ci/protoc_install.sh
+  - bash _ci/protoc_install.sh
   - rustc -vV
   - cargo -vV
 
@@ -35,7 +35,7 @@ jobs:
       script:
         - make release.npm crate=medea-jason publish=no
 
-    - name: medea (stable)
+    - name: medea (stable, optimized)
       stage: build
       rust: stable
       script: make build.medea optimized=yes

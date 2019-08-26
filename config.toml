@@ -18,7 +18,7 @@
 #
 # Default:
 #   static_specs_path = None
-static_specs_path = "dev/specs"
+static_specs_path = "_dev/specs"
 
 
 [server.grpc]

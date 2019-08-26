@@ -115,7 +115,7 @@ ifeq ($(dockerized),no)
 
 	@exit $(.SHELLSTATUS)
 else
-	docker build -t medea-geckodriver -f build/geckodriver/Dockerfile .
+	docker build -t medea-geckodriver -f _build/geckodriver/Dockerfile .
 	@make up.e2e.services
 
 	docker run --rm -d --network=host medea-geckodriver > /tmp/geckodriver.docker.uid

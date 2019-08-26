@@ -170,7 +170,7 @@ describe('Pub<=>Pub video call', () => {
         checkVideoDiff(callerVideo);
         let responderVideo = await waitForElement(responderPartnerVideo);
         checkVideoDiff(responderVideo)
-    });
+    }).retries(5);
 
     it('media tracks count valid', async () => {
         let callerVideo = await waitForElement(callerPartnerVideo);

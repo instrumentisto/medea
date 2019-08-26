@@ -85,4 +85,4 @@ docker.up.demo: docker.down.demo
 #   make docker.build.medea-build
 
 docker.build.medea-build:
-	docker build -t medea-build -f build/medea/Dockerfile .
+	docker build -t medea-build -f _build/medea/Dockerfile .

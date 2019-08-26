@@ -1,6 +1,3 @@
-# Include all Makefile modules.
-include mk/*.mk
-
 ###############################
 # Common defaults/definitions #
 ###############################
@@ -36,6 +33,12 @@ endif
 ifeq ($(crate),medea-macro)
 crate-dir = crates/medea-macro
 endif
+
+
+
+
+# Include all Makefile modules.
+include _mk/*.mk
 
 
 
