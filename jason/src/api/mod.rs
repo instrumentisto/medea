@@ -51,18 +51,16 @@ impl Jason {
     /// Effectively returns `Result<RoomHandle, WasmErr>`.
     pub fn join_room(&self, token: String) -> Promise {
         let mut rpc = WebsocketRpcClient::new(token, 3000);
-        let media_manager = Rc::clone(&self.0.borrow().media_manager);
+        let peer_repository =
+            peer::Repository::new(Rc::clone(&self.0.borrow().media_manager));
 
         let inner = Rc::clone(&self.0);
         let fut = rpc
             .init()
             .and_then(move |()| {
                 let rpc: Rc<dyn RpcClient> = Rc::new(rpc);
-                let room = Room::new(
-                    Rc::clone(&rpc),
-                    Box::new(peer::Repository::default()),
-                    media_manager,
-                );
+                let room =
+                    Room::new(Rc::clone(&rpc), Box::new(peer_repository));
 
                 let handle = room.new_handle();
 

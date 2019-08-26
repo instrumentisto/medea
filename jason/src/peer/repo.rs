@@ -1,16 +1,26 @@
 use std::{collections::HashMap, rc::Rc};
 
+use futures::sync::mpsc::UnboundedSender;
+
 use super::{PeerConnection, PeerId};
+use crate::{media::MediaManager, peer::PeerEvent, utils::WasmErr};
+use medea_client_api_proto::IceServer;
 
 #[allow(clippy::module_name_repetitions)]
 #[cfg_attr(feature = "mockable", mockall::automock)]
 pub trait PeerRepository {
-    /// Stores [`PeerConnection`] in repository.
-    fn insert(
+    /// Creates new [`PeerConnection`] with provided ID and injecting provided
+    /// [`IceServer`]s, [`PeerEvent`] sender and stored [`MediaManager`].
+    ///
+    /// [`PeerConnection`] can be created with muted audio or video [`Track`]s.
+    fn create_peer(
         &mut self,
         id: PeerId,
-        peer: Rc<PeerConnection>,
-    ) -> Option<Rc<PeerConnection>>;
+        ice_servers: Vec<IceServer>,
+        events_sender: UnboundedSender<PeerEvent>,
+        enabled_audio: bool,
+        enabled_video: bool,
+    ) -> Result<Rc<PeerConnection>, WasmErr>;
 
     /// Returns [`PeerConnection`] stored in repository by its ID.
     fn get(&self, id: PeerId) -> Option<Rc<PeerConnection>>;
@@ -23,21 +33,44 @@ pub trait PeerRepository {
 }
 
 /// [`PeerConnection`] factory and repository.
-#[derive(Default)]
 pub struct Repository {
+    /// [`MediaManager`] for injecting into new created [`PeerConnection`]s.
+    media_manager: Rc<MediaManager>,
+
     /// Peer id to [`PeerConnection`],
     peers: HashMap<PeerId, Rc<PeerConnection>>,
 }
 
+impl Repository {
+    pub fn new(media_manager: Rc<MediaManager>) -> Self {
+        Self {
+            media_manager,
+            peers: HashMap::new(),
+        }
+    }
+}
+
 impl PeerRepository for Repository {
-    /// Stores [`PeerConnection`] in repository.
-    #[inline]
-    fn insert(
+    /// Creates new [`PeerConnection`] with provided ID and injecting provided
+    /// [`IceServer`]s, stored [`PeerEvent`] sender and [`MediaManager`].
+    fn create_peer(
         &mut self,
         id: PeerId,
-        peer: Rc<PeerConnection>,
-    ) -> Option<Rc<PeerConnection>> {
-        self.peers.insert(id, peer)
+        ice_servers: Vec<IceServer>,
+        peer_events_sender: UnboundedSender<PeerEvent>,
+        enabled_audio: bool,
+        enabled_video: bool,
+    ) -> Result<Rc<PeerConnection>, WasmErr> {
+        let peer = Rc::new(PeerConnection::new(
+            id,
+            peer_events_sender,
+            ice_servers,
+            Rc::clone(&self.media_manager),
+            enabled_audio,
+            enabled_video,
+        )?);
+        self.peers.insert(id, peer);
+        Ok(self.peers.get(&id).cloned().unwrap())
     }
 
     /// Returns [`PeerConnection`] stored in repository by its ID.

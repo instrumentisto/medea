@@ -19,10 +19,8 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 
 use crate::{
-    media::{MediaManager, MediaStream},
-    peer::{
-        PeerConnection, PeerEvent, PeerEventHandler, PeerId, PeerRepository,
-    },
+    media::MediaStream,
+    peer::{PeerEvent, PeerEventHandler, PeerId, PeerRepository},
     rpc::RpcClient,
     utils::{Callback2, WasmErr},
 };
@@ -82,15 +80,11 @@ pub struct Room(Rc<RefCell<InnerRoom>>);
 
 impl Room {
     /// Creates new [`Room`] and associates it with a provided [`RpcClient`].
-    pub fn new(
-        rpc: Rc<dyn RpcClient>,
-        peers: Box<dyn PeerRepository>,
-        mngr: Rc<MediaManager>,
-    ) -> Self {
+    pub fn new(rpc: Rc<dyn RpcClient>, peers: Box<dyn PeerRepository>) -> Self {
         let (tx, rx) = unbounded();
         let events_stream = rpc.subscribe();
 
-        let room = Rc::new(RefCell::new(InnerRoom::new(rpc, peers, tx, mngr)));
+        let room = Rc::new(RefCell::new(InnerRoom::new(rpc, peers, tx)));
 
         let inner = Rc::downgrade(&room);
         let handle_medea_event = events_stream
@@ -145,7 +139,6 @@ struct InnerRoom {
     rpc: Rc<dyn RpcClient>,
     peers: Box<dyn PeerRepository>,
     peer_event_sender: UnboundedSender<PeerEvent>,
-    media_manager: Rc<MediaManager>,
     connections: HashMap<u64, Connection>,
     on_new_connection: Rc<Callback2<ConnectionHandle, WasmErr>>,
     enabled_audio: bool,
@@ -158,14 +151,12 @@ impl InnerRoom {
     fn new(
         rpc: Rc<dyn RpcClient>,
         peers: Box<dyn PeerRepository>,
-        events_sender: UnboundedSender<PeerEvent>,
-        media_manager: Rc<MediaManager>,
+        peer_event_sender: UnboundedSender<PeerEvent>,
     ) -> Self {
         Self {
             rpc,
             peers,
-            peer_event_sender: events_sender,
-            media_manager,
+            peer_event_sender,
             connections: HashMap::new(),
             on_new_connection: Rc::new(Callback2::default()),
             enabled_audio: true,
@@ -198,33 +189,18 @@ impl InnerRoom {
         }
     }
 
-    /// Creates new [`PeerConnection`] with provided ID and injecting provided
-    /// [`IceServer`]s, stored [`PeerEvent`] sender and [`MediaManager`].
-    pub fn create_peer<I: IntoIterator<Item = IceServer>>(
-        &mut self,
-        id: PeerId,
-        ice_servers: I,
-    ) -> Result<Rc<PeerConnection>, WasmErr> {
-        let peer = Rc::new(PeerConnection::new(
-            id,
-            self.peer_event_sender.clone(),
-            ice_servers,
-            Rc::clone(&self.media_manager),
-            self.enabled_audio,
-            self.enabled_video,
-        )?);
-        self.peers.insert(id, peer);
-        Ok(self.peers.get(id).unwrap())
-    }
-
-    pub fn toggle_send_audio(&mut self, enabled: bool) {
+    /// Toggles a audio send [`Track`]s of all [`PeerConnection`]s what this
+    /// [`Room`] manage.
+    fn toggle_send_audio(&mut self, enabled: bool) {
         for peer in self.peers.get_all() {
             peer.toggle_send_audio(enabled);
         }
         self.enabled_audio = enabled;
     }
 
-    pub fn toggle_send_video(&mut self, enabled: bool) {
+    /// Toggles a video send [`Track`]s of all [`PeerConnection`]s what this
+    /// [`Room`] manage.
+    fn toggle_send_video(&mut self, enabled: bool) {
         for peer in self.peers.get_all() {
             peer.toggle_send_video(enabled);
         }
@@ -246,7 +222,13 @@ impl EventHandler for InnerRoom {
         tracks: Vec<Track>,
         ice_servers: Vec<IceServer>,
     ) {
-        let peer = match self.create_peer(peer_id, ice_servers) {
+        let peer = match self.peers.create_peer(
+            peer_id,
+            ice_servers,
+            self.peer_event_sender.clone(),
+            self.enabled_audio,
+            self.enabled_video,
+        ) {
             Ok(peer) => peer,
             Err(err) => {
                 err.log_err();
