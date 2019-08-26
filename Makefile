@@ -392,6 +392,7 @@ endif
 #   make test.e2e.signalling [release=(no|yes)] [logs=(no|yes)]
 
 test.e2e.signalling:
+	mkdir -p .cache target ~/.cargo/registry
 ifneq ($(coturn),no)
 	@make up.coturn
 endif
