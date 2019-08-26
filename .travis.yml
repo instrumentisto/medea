@@ -2,7 +2,7 @@ language: rust
 cache: cargo
 
 install:
-  - bash travis_install.sh
+  - bash ci/protoc_install.sh
   - rustc -vV
   - cargo -vV
 

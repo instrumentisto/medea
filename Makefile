@@ -232,6 +232,7 @@ run-medea-container-d =  $(run-medea-command) -d medea-build:latest
 run-medea-container = $(run-medea-command) medea-build:latest
 
 up.e2e.services:
+	mkdir -p .cache target ~/.cargo/registry
 ifneq ($(coturn),no)
 	@make up.coturn
 endif
@@ -252,7 +253,7 @@ else
 	@make up.coturn
 
 	# TODO: publish it to docker hub
-	docker build -t medea-build -f build/medea/Dockerfile .
+	@make docker.build.medea-build
 
 	$(run-medea-container) sh -c "cd jason && RUST_LOG=info wasm-pack build --target web --out-dir ../.cache/jason-pkg"
 
@@ -408,6 +409,7 @@ ifeq ($(dockerized),no)
 else
 	-@make down.medea dockerized=yes
 	-@make down.medea dockerized=no
+	@make docker.build.medea-build
 
 	$(run-medea-container) make test.e2e.signalling dockerized=no coturn=no
 endif
@@ -610,6 +612,15 @@ docker.down.demo:
 
 docker.up.demo: docker.down.demo
 	docker-compose -f jason/demo/docker-compose.yml up
+
+
+# Build Dockerfile for medea building and tag it with 'medea-build' tag.
+#
+# Usage:
+#   make docker.build.medea-build
+
+docker.build.medea-build:
+	docker build -t medea-build -f build/medea/Dockerfile .
 
 
 
@@ -843,6 +854,7 @@ endif
 .PHONY: build \
         cargo cargo.fmt cargo.lint \
         docker.build.demo docker.build.medea docker.down.demo docker.up.demo \
+        docker.build.medea-build \
         docs docs.rust \
         down.demo \
         helm helm.down helm.init helm.lint helm.list \

@@ -8,6 +8,3 @@ if [[ ! $DONT_INSTALL_PROTOC ]] ; then
   bin/protoc --version
   popd || exit
 fi
-
-ls -la
-mkdir .cache
