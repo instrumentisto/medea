@@ -40,12 +40,13 @@ up.jason:
 
 
 # Run Medea media server in development mode.
+# jq flag will redirect medea logs to jq (command-line JSON processor) tool.
 #
 # Defaults:
 # 	dockerized=no
 #
 # Usage:
-#	make up.medea  [dockerized=(yes|no)]
+#	make up.medea  [dockerized=(yes|no)] [jq=(no|yes)] [jq-args=""]
 
 up.medea: up.coturn
 ifeq ($(dockerized),yes)
@@ -53,7 +54,7 @@ ifeq ($(dockerized),yes)
 	docker-compose -f docker-compose.medea.yml up
 	@make down.coturn
 else
-	cargo run --bin medea
+	cargo run --bin medea $(if $(call eq,$(jq),yes),| jq $(jq-args))
 endif
 
 
