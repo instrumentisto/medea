@@ -1,8 +1,8 @@
 //! Helper utils used in project.
 
-/// Creates new [hashbrown] `HashMap` from a list of key-value pairs.
+/// Creates new [`HashMap`] from a list of key-value pairs.
 ///
-/// ## Example
+/// # Example
 ///
 /// ```rust
 /// # use medea::hashmap;
@@ -15,7 +15,7 @@
 /// assert_eq!(map.get("c"), None);
 /// ```
 ///
-/// [hashbrown]:https://crates.io/crates/hashbrown
+/// [`HashMap`]: std::hashmap::HashMap
 #[macro_export]
 macro_rules! hashmap {
     (@single $($x:tt)*) => (());
@@ -25,7 +25,7 @@ macro_rules! hashmap {
     ($($key:expr => $value:expr),*) => {
         {
             let _cap = hashmap!(@count $($key),*);
-            let mut _map = ::hashbrown::HashMap::with_capacity(_cap);
+            let mut _map = ::std::collections::HashMap::with_capacity(_cap);
             $(
                 let _ = _map.insert($key, $value);
             )*
