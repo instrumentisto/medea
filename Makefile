@@ -160,5 +160,6 @@ endif
         down down.medea down.coturn down.e2e.services \
         release release.crates release.helm release.npm \
         up up.coturn up.demo up.dev up.jason up.medea up.e2e.services \
+        up.control-api-mock \
         build.medea build.jason \
         yarn

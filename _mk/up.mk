@@ -26,7 +26,7 @@ up.demo: docker.up.demo
 #	make up.dev
 
 up.dev:
-	$(MAKE) -j3 up.coturn up.jason up.medea
+	$(MAKE) -j4 up.coturn up.jason up.medea up.control-api-mock
 
 
 # Run Jason E2E demo in development mode.
@@ -46,7 +46,12 @@ up.jason:
 # 	dockerized=no
 #
 # Usage:
-#	make up.medea  [dockerized=(yes|no)] [jq=(no|yes)] [jq-args=""]
+#	make up.medea  [dockerized=(yes|no)]
+# 				   [jq=(no|yes)]
+#				   [jq-args=""]
+#				   [watch=(no|yes)]
+
+jq-start = $(if $(call eq,$(jq),yes),| jq -R 'fromjson?' $(jq-args))
 
 up.medea: up.coturn
 ifeq ($(dockerized),yes)
@@ -54,7 +59,11 @@ ifeq ($(dockerized),yes)
 	docker-compose -f docker-compose.medea.yml up
 	@make down.coturn
 else
-	cargo run --bin medea $(if $(call eq,$(jq),yes),| jq $(jq-args))
+ifeq ($(watch),yes)
+	cargo watch -x "run --bin medea" $(jq-start)
+else
+	cargo run --bin medea $(jq-start)
+endif
 endif
 
 
@@ -119,3 +128,6 @@ else
 
 	$(run-medea-container) cargo build -p e2e-tests-runner
 endif
+
+up.control-api-mock:
+	cargo run -p control-api-mock
