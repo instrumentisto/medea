@@ -9,4 +9,5 @@ if [[ ! $DONT_INSTALL_PROTOC ]] ; then
   popd || exit
 fi
 
+ls -la
 mkdir .cache

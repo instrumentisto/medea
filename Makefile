@@ -405,6 +405,11 @@ ifeq ($(dockerized),no)
 	- cargo test --test e2e
 
 	@make down.medea
+else
+	-@make down.medea dockerized=yes
+	-@make down.medea dockerized=no
+
+	$(run-medea-container) make test.e2e.signalling dockerized=no coturn=no
 endif
 
 
