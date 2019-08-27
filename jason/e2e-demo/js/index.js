@@ -1,63 +1,83 @@
-async function f() {
-    const rust = await import("../../pkg");
+async function gotDevices(participant, audio_select, video_select) {
+    const device_infos = await participant.media_manager().enumerate_devices();
+    console.log('Available input and output devices:', device_infos);
+    for (const device_info of device_infos) {
+        const option = document.createElement('option');
+        option.value = device_info.deviceId;
+        if (device_info.kind === 'audio') {
+            option.text = device_info.label || `Microphone ${audio_select.length + 1}`;
+            audio_select.append(option);
+        } else if (device_info.kind === 'video') {
+            option.text = device_info.label || `Camera ${video_select.length + 1}`;
+            video_select.append(option);
+        }
+    }
+}
 
-    let caller = new rust.Jason();
-    let responder = new rust.Jason();
+async function getStream(participant, local_video, audio_select, video_select) {
+    const audio_source = audio_select.value ? {deviceId: {exact: audio_select.value}} : true;
+    const video_source = video_select.value ? {deviceId: {exact: video_select.value}} : true;
+    const constraints = {
+        audio: audio_source,
+        video: video_source
+    };
+    let stream = await participant.media_manager().init_local_stream(constraints);
+    local_video.srcObject = stream;
+    local_video.play();
+}
 
-    let caller_room = await caller.join_room("ws://localhost:8080/ws/1/1/caller_credentials");
-    let responder_room = await responder.join_room("ws://localhost:8080/ws/1/2/responder_credentials");
+async function init_participant(wasm, token, frame) {
+    let local_video = $(frame).find("video[name=local-video]")[0];
+    let remote_video = $(frame).find("video[name=remote-video]")[0];
+    let audio_select = $(frame).find("select[name=audio-source]");
+    let video_select = $(frame).find("select[name=video-source]");
+    let join_button = $(frame).find("button[name=join-room]");
 
-    caller_room.on_new_connection(function (connection) {
-        console.log("caller got new connection with member " + connection.member_id());
+    let participant = new wasm.Jason();
+    let room = await participant.init_room();
+    getStream(participant, local_video, audio_select, video_select);
+    gotDevices(participant, audio_select, video_select);
+
+    audio_select.change(function() {
+        getStream(participant, local_video, audio_select, video_select);
+    });
+
+    video_select.change(function() {
+        getStream(participant, local_video, audio_select, video_select);
+    });
+
+    room.on_new_connection(function (connection) {
         connection.on_remote_stream(function (stream) {
-            console.log("got video from remote member " + connection.member_id());
-
-            var video = document.createElement("video");
-
-            video.srcObject = stream.get_media_stream();
-            document.body.appendChild(video);
-            video.play();
+            remote_video.srcObject = stream.get_media_stream();
+            remote_video.play();
         });
     });
-    caller.on_local_stream(function (stream, error) {
-        if (stream) {
-            var video = document.createElement("video");
 
-            video.srcObject = stream.get_media_stream();
-            document.body.appendChild(video);
-            video.play();
+    participant.on_local_stream(function (stream, error) {
+        if (stream) {
+            audio_select.prop( "disabled", true );
+            video_select.prop( "disabled", true );
+            local_video.srcObject = stream.get_media_stream();
+            local_video.play();
         } else {
             console.log(error);
         }
     });
 
-    responder.on_local_stream(function (stream, error) {
-        if (stream) {
-            var video = document.createElement("video");
-
-            video.srcObject = stream.get_media_stream();
-            document.body.appendChild(video);
-            video.play();
-        } else {
-            console.log(error);
-        }
+    join_button.click(function() {
+        room.join(token);
+        join_button.prop( "disabled", true );
     });
-    responder_room.on_new_connection(function (connection) {
-        console.log("responder got new connection with member " + connection.member_id());
-        connection.on_remote_stream(function (stream) {
-            console.log("got video from remote member " + connection.member_id());
 
-            var video = document.createElement("video");
-
-            video.srcObject = stream.get_media_stream();
-            document.body.appendChild(video);
-            video.play();
-        });
-    });
+    return room;
 }
 
 window.onload = async function () {
-    await f();
-};
 
+    const wasm = await import("../../pkg");
+
+    await init_participant(wasm, "ws://localhost:8080/ws/1/1/caller_credentials", "#caller");
+    await init_participant(wasm, "ws://localhost:8080/ws/1/2/responder_credentials", "#responder");
+
+};
 

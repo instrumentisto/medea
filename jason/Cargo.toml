@@ -21,6 +21,7 @@ opt-level = "s"  # Tell `rustc` to optimize for small code size.
 
 [features]
 default = ["console_error_panic_hook", "wee_alloc"]
+mockable=[]
 
 [dependencies]
 console_error_panic_hook = { version = "0.1", optional = true }
@@ -29,6 +30,7 @@ js-sys = "0.3"
 macro-attr = "0.2"
 medea-client-api-proto = { version = "0.1", features = ["jason"] }
 medea-macro = "0.1"
+mockall = "0.3"
 newtype_derive = "0.1"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
@@ -39,6 +41,7 @@ wee_alloc = { version = "0.4", optional = true }
     version = "0.3"
     features = [
         "CloseEvent", "console", "Event", "EventTarget", "MediaDevices",
+        "MediaTrackConstraints", "MediaDeviceInfo", "MediaDeviceKind",
         "MediaStream", "MediaStreamConstraints", "MediaStreamTrack",
         "MessageEvent", "Navigator", "RtcConfiguration", "RtcIceCandidate",
         "RtcIceServer", "RtcIceCandidateInit", "RtcPeerConnection",

@@ -2,25 +2,27 @@
 //!
 //! [1]: https://www.w3.org/TR/mediacapture-streams/#mediastream
 
-use std::{cell::RefCell, convert::TryFrom, rc::Rc};
+use std::{
+    cell::RefCell,
+    convert::TryFrom,
+    rc::{Rc, Weak},
+};
 
 use futures::{
     future::{self, Either, IntoFuture as _},
     Future,
 };
-use wasm_bindgen_futures::JsFuture;
-use web_sys::MediaStream as SysMediaStream;
+use js_sys::Promise;
+use wasm_bindgen::prelude::*;
+use wasm_bindgen_futures::{future_to_promise, JsFuture};
+use web_sys::{MediaDeviceKind, MediaStream as SysMediaStream};
 
 use crate::utils::{window, Callback2, WasmErr};
 
 use super::{
-    MediaStream, MediaStreamHandle, SimpleStreamRequest, StreamRequest,
+    MediaDeviceInfo, MediaStream, MediaStreamHandle, SimpleStreamRequest,
+    StreamRequest,
 };
-
-/// Manager that is responsible for [`MediaStream`] acquisition and storing.
-#[allow(clippy::module_name_repetitions)]
-#[derive(Default)]
-pub struct MediaManager(Rc<RefCell<InnerMediaManager>>);
 
 /// Actual data of [`MediaManager`].
 #[derive(Default)]
@@ -35,6 +37,43 @@ struct InnerMediaManager {
     on_local_stream: Callback2<MediaStreamHandle, WasmErr>,
 }
 
+impl InnerMediaManager {
+    /// Returns the vector of [`MediaDeviceInfo`] objects.
+    fn enumerate_devices(
+        &self,
+    ) -> impl Future<Item = Vec<MediaDeviceInfo>, Error = WasmErr> {
+        window()
+            .navigator()
+            .media_devices()
+            .into_future()
+            .and_then(|devices| devices.enumerate_devices())
+            .and_then(JsFuture::from)
+            .and_then(|infos| {
+                Ok(js_sys::Array::from(&infos)
+                    .values()
+                    .into_iter()
+                    .filter_map(|value| {
+                        let info =
+                            web_sys::MediaDeviceInfo::from(value.unwrap());
+                        match info.kind() {
+                            MediaDeviceKind::Audioinput
+                            | MediaDeviceKind::Videoinput => {
+                                Some(MediaDeviceInfo::from(info))
+                            }
+                            _ => None,
+                        }
+                    })
+                    .collect())
+            })
+            .map_err(WasmErr::from)
+    }
+}
+
+/// Manager that is responsible for [`MediaStream`] acquisition and storing.
+#[allow(clippy::module_name_repetitions)]
+#[derive(Default)]
+pub struct MediaManager(Rc<RefCell<InnerMediaManager>>);
+
 impl MediaManager {
     /// Obtain [`MediaStream`] basing on a provided [`StreamRequest`].
     /// Acquired streams are cached and cloning existing stream is preferable
@@ -43,7 +82,7 @@ impl MediaManager {
     /// `on_local_stream` callback will be invoked each time this function
     /// succeeds.
     // TODO: lookup stream by caps, and return its copy if found
-    pub(crate) fn get_stream(
+    pub fn get_stream(
         &self,
         caps: StreamRequest,
     ) -> impl Future<Item = Rc<MediaStream>, Error = WasmErr> {
@@ -88,7 +127,62 @@ impl MediaManager {
     /// Sets `on_local_stream` callback that will be invoked when
     /// [`MediaManager`] obtains [`MediaStream`].
     #[inline]
-    pub(crate) fn set_on_local_stream(&self, f: js_sys::Function) {
+    pub fn set_on_local_stream(&self, f: js_sys::Function) {
         self.0.borrow_mut().on_local_stream.set_func(f);
+    }
+
+    /// Instantiates new [`MediaManagerHandle`] for use on JS side.
+    #[inline]
+    pub fn new_handle(&self) -> MediaManagerHandle {
+        MediaManagerHandle(Rc::downgrade(&self.0))
+    }
+}
+
+/// JS side handle to [`MediaManager`].
+///
+/// Actually, represents a [`Weak`]-based handle to [`InnerMediaManager`].
+///
+/// For using [`MediaManagerHandle`] on Rust side,
+/// consider the [`MediaManager`].
+#[wasm_bindgen]
+pub struct MediaManagerHandle(Weak<RefCell<InnerMediaManager>>);
+
+#[wasm_bindgen]
+impl MediaManagerHandle {
+    /// Returns the JS array of [`MediaDeviceInfo`] objects.
+    pub fn enumerate_devices(&self) -> Promise {
+        let fut =
+            match map_weak!(self, |inner| inner.borrow().enumerate_devices()) {
+                Ok(fut) => Either::A(
+                    fut.and_then(|infos| {
+                        Ok(infos
+                            .into_iter()
+                            .fold(js_sys::Array::new(), |devices_info, info| {
+                                devices_info.push(&JsValue::from(info));
+                                devices_info
+                            })
+                            .into())
+                    })
+                    .map_err(JsValue::from),
+                ),
+                Err(e) => Either::B(future::err(e)),
+            };
+        future_to_promise(fut)
+    }
+
+    /// Returns [`SysMediaStream`] object.
+    pub fn init_local_stream(
+        &self,
+        constraints: web_sys::MediaStreamConstraints,
+    ) -> Promise {
+        let fut = window()
+            .navigator()
+            .media_devices()
+            .into_future()
+            .and_then(move |devices| {
+                devices.get_user_media_with_constraints(&constraints)
+            })
+            .and_then(JsFuture::from);
+        future_to_promise(fut)
     }
 }

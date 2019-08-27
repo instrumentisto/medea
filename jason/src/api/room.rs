@@ -8,18 +8,20 @@ use std::{
 };
 
 use futures::{
-    future::{self, Future as _, IntoFuture},
+    future::{self, Either, Future, IntoFuture},
     stream::Stream as _,
     sync::mpsc::{unbounded, UnboundedSender},
 };
+use js_sys::Promise;
+use wasm_bindgen::prelude::*;
+use wasm_bindgen_futures::{future_to_promise, spawn_local};
+
 use medea_client_api_proto::{
     Command, Direction, EventHandler, IceCandidate, IceServer, Track,
 };
-use wasm_bindgen::prelude::*;
-use wasm_bindgen_futures::spawn_local;
 
 use crate::{
-    media::{MediaManager, MediaStream},
+    media::MediaStream,
     peer::{PeerEvent, PeerEventHandler, PeerId, PeerRepository},
     rpc::RpcClient,
     utils::{Callback2, WasmErr},
@@ -40,15 +42,35 @@ pub struct RoomHandle(Weak<RefCell<InnerRoom>>);
 impl RoomHandle {
     /// Sets callback, which will be invoked on new `Connection` establishing.
     pub fn on_new_connection(
-        &mut self,
+        &self,
         f: js_sys::Function,
     ) -> Result<(), JsValue> {
-        self.0
-            .upgrade()
-            .map(|room| {
-                room.borrow_mut().on_new_connection.set_func(f);
-            })
-            .ok_or_else(|| WasmErr::from("Detached state").into())
+        map_weak!(self, |inner| inner
+            .borrow_mut()
+            .on_new_connection
+            .set_func(f))
+    }
+
+    /// Performs entering to a [`Room`].
+    ///
+    /// Establishes connection with media server (if it doesn't already exist).
+    /// Fails if unable to connect to media server.
+    /// Effectively returns `Result<(), WasmErr>`.
+    pub fn join(&self, token: &str) -> Promise {
+        let fut = match self.0.upgrade() {
+            None => Either::A(future::err::<JsValue, _>(
+                WasmErr::from("Detached state").into(),
+            )),
+            Some(inner) => {
+                let rpc = Rc::clone(&inner.borrow().rpc);
+                let fut = rpc
+                    .init(token)
+                    .map(|_| JsValue::NULL)
+                    .map_err(JsValue::from);
+                Either::B(fut)
+            }
+        };
+        future_to_promise(fut)
     }
 }
 
@@ -58,21 +80,18 @@ impl RoomHandle {
 /// It's used on Rust side and represents a handle to [`InnerRoom`] data.
 ///
 /// For using [`Room`] on JS side, consider the [`RoomHandle`].
-pub(crate) struct Room(Rc<RefCell<InnerRoom>>);
+pub struct Room(Rc<RefCell<InnerRoom>>);
 
 impl Room {
     /// Creates new [`Room`] and associates it with a provided [`RpcClient`].
-    pub(crate) fn new(rpc: &Rc<RpcClient>, mngr: &Rc<MediaManager>) -> Self {
+    pub fn new(rpc: Rc<dyn RpcClient>, peers: Box<dyn PeerRepository>) -> Self {
         let (tx, rx) = unbounded();
-        let room = Rc::new(RefCell::new(InnerRoom::new(
-            Rc::clone(rpc),
-            tx,
-            Rc::clone(mngr),
-        )));
+        let events_stream = rpc.subscribe();
+
+        let room = Rc::new(RefCell::new(InnerRoom::new(rpc, peers, tx)));
 
         let inner = Rc::downgrade(&room);
-        let handle_medea_event = rpc
-            .subscribe()
+        let handle_medea_event = events_stream
             .for_each(move |event| match inner.upgrade() {
                 Some(inner) => {
                     event.dispatch_with(inner.borrow_mut().deref_mut());
@@ -112,7 +131,7 @@ impl Room {
     /// Creates new [`RoomHandle`] used by JS side. You can create them as many
     /// as you need.
     #[inline]
-    pub(crate) fn new_handle(&self) -> RoomHandle {
+    pub fn new_handle(&self) -> RoomHandle {
         RoomHandle(Rc::downgrade(&self.0))
     }
 }
@@ -121,8 +140,9 @@ impl Room {
 ///
 /// Shared between JS side ([`RoomHandle`]) and Rust side ([`Room`]).
 struct InnerRoom {
-    rpc: Rc<RpcClient>,
-    peers: PeerRepository,
+    rpc: Rc<dyn RpcClient>,
+    peers: Box<dyn PeerRepository>,
+    peer_event_sender: UnboundedSender<PeerEvent>,
     connections: HashMap<u64, Connection>,
     on_new_connection: Rc<Callback2<ConnectionHandle, WasmErr>>,
 }
@@ -131,13 +151,14 @@ impl InnerRoom {
     /// Creates new [`InnerRoom`].
     #[inline]
     fn new(
-        rpc: Rc<RpcClient>,
-        peer_events_sender: UnboundedSender<PeerEvent>,
-        media_manager: Rc<MediaManager>,
+        rpc: Rc<dyn RpcClient>,
+        peers: Box<dyn PeerRepository>,
+        peer_event_sender: UnboundedSender<PeerEvent>,
     ) -> Self {
         Self {
             rpc,
-            peers: PeerRepository::new(peer_events_sender, media_manager),
+            peers,
+            peer_event_sender,
             connections: HashMap::new(),
             on_new_connection: Rc::new(Callback2::default()),
         }
@@ -183,8 +204,12 @@ impl EventHandler for InnerRoom {
         tracks: Vec<Track>,
         ice_servers: Vec<IceServer>,
     ) {
-        let peer = match self.peers.create(peer_id, ice_servers) {
-            Ok(peer) => Rc::clone(peer),
+        let peer = match self.peers.create(
+            peer_id,
+            ice_servers,
+            self.peer_event_sender.clone(),
+        ) {
+            Ok(peer) => peer,
             Err(err) => {
                 err.log_err();
                 return;

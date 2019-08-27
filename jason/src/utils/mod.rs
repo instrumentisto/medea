@@ -1,7 +1,8 @@
 //! Miscellaneous utility structs and functions.
 
-mod callback;
+#[macro_use]
 mod errors;
+mod callback;
 mod event_listener;
 
 use web_sys::Window;

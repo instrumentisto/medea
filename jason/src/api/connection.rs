@@ -36,20 +36,15 @@ impl ConnectionHandle {
         &mut self,
         f: js_sys::Function,
     ) -> Result<(), JsValue> {
-        self.0
-            .upgrade()
-            .map(|conn| {
-                conn.borrow_mut().on_remote_stream.set_func(f);
-            })
-            .ok_or_else(|| WasmErr::from("Detached state").into())
+        map_weak!(self, |inner| inner
+            .borrow_mut()
+            .on_remote_stream
+            .set_func(f))
     }
 
     /// Returns ID of the remote `Member`.
     pub fn member_id(&self) -> Result<u64, JsValue> {
-        self.0
-            .upgrade()
-            .map(|conn| conn.borrow().remote_member)
-            .ok_or_else(|| WasmErr::from("Detached state").into())
+        map_weak!(self, |inner| inner.borrow().remote_member)
     }
 }
 
