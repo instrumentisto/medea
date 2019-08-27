@@ -116,8 +116,8 @@ Add `[run ci]` to your commit message.
 
 
 
-[`Makefile`]: https://github.com/instrumentisto/medea/blob/master/Makefile
-[jason]: https://github.com/instrumentisto/medea/tree/master/jason
+[`Makefile`]: /Makefile
+[jason]: /jason
 [medea]: https://github.com/instrumentisto/medea
 [Rust]: https://www.rust-lang.org/
 [wasm-pack]: https://github.com/rustwasm/wasm-pack

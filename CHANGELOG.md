@@ -9,20 +9,24 @@ All user visible changes to this project will be documented in this file. This p
 ## TBD [0.2.0] · 2019-??-??
 [0.2.0]: /../../tree/medea-0.2.0
 
-[Milestone](../../milestone/2) | [Roadmap](/../../issues/27)
+[Milestone](/../../milestone/2) | [Roadmap](/../../issues/27)
 
 ### Added
 
-- Dynamic control API exposed via gRPC ([#33](/../../pull/33)):
-    - `Create` method for `Room`, `Member`, `Endpoint`;
-    - `Get` method for `Room`, `Member`, `Endpoint`;
-    - `Delete` method for `Room`, `Member`, `Endpoint`.
-- Static control API spec ([#28](/../../pull/28))
-    - parse static control api specs
-    - created interior entities for control API specs
-    - dynamically `Peer`s creation when client connects
-    - auto removing `Peer`s when `Member` disconnects
-    - E2E tests for signalling
+- Control API:
+    - Parse static control api specs ([#28]);
+    - Created interior entities for control API specs ([#28]).
+    - Dynamic control API exposed via gRPC (#[33](/../../pull/33)):
+        - `Create` method `Room`, `Member`, `Endpoint`;
+        - `Get` method for `Room`, `Member`, `Endpoint`;
+        - `Delete` method for `Room`, `Member`, `Endpoint.
+- Signalling:
+    - Dynamic `Peer`s creation when client connect ([#28]);
+    - Auto removing `Peer`s when `Member` disconnect ([#28]).
+- Testing:
+    - E2E tests for signalling ([#28]).
+
+[#28]: /../../pull/28
 
 
 
