@@ -7,13 +7,13 @@ All user visible changes to this project will be documented in this file. This p
 
 
 ## TBD [0.2.0] · 2019-??-??
-[0.2.0]: /../../tree/medea-jason-0.2.0
+[0.2.0]: /../../tree/medea-jason-0.2.0/jason
 
-[Milestone](../../milestone/2) | [Roadmap](/../../issues/27)
+[Milestone](/../../milestone/2) | [Roadmap](/../../issues/27)
 
 ### Changed
 
-- Use newtypes for track ID and peer ID ([#28](https://github.com/instrumentisto/medea/pull/28))
+- Use track ID and peer ID from `medea-client-api-proto` ([#28](/../../pull/28))
 
 
 

@@ -1,8 +1,8 @@
 //! Helper utils used in project.
 
-/// Creates new [`std::collections::HashMap`] from a list of key-value pairs.
+/// Creates new [`HashMap`] from a list of key-value pairs.
 ///
-/// ## Example
+/// # Example
 ///
 /// ```rust
 /// # use medea::hashmap;
@@ -14,6 +14,8 @@
 /// assert_eq!(map["b"], 2);
 /// assert_eq!(map.get("c"), None);
 /// ```
+///
+/// [`HashMap`]: std::hashmap::HashMap
 #[macro_export]
 macro_rules! hashmap {
     (@single $($x:tt)*) => (());

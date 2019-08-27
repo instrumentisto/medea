@@ -18,6 +18,7 @@ use futures::{
     future::{self, join_all, Either},
     Future,
 };
+
 use medea_client_api_proto::Event;
 
 use crate::{
