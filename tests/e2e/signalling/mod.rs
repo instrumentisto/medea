@@ -100,13 +100,12 @@ impl Actor for TestMember {
         if let Some(deadline) = self.deadline {
             ctx.run_later(deadline, |act, _ctx| {
                 panic!(
-                    "This test lasts more than 5 seconds. Most likely, this is \
-                 not normal. Here is all events of member: {:?}",
+                    "This test lasts more than 5 seconds. Most likely, this \
+                     is not normal. Here is all events of member: {:?}",
                     act.events
                 );
             });
         }
-
     }
 }
 

@@ -124,17 +124,17 @@ fn three_members_p2p_video_call() {
         TestMember::start(
             &format!("{}/member-1/test", base_url),
             Box::new(test_fn.clone()),
-            deadline
+            deadline,
         );
         TestMember::start(
             &format!("{}/member-2/test", base_url),
             Box::new(test_fn.clone()),
-            deadline
+            deadline,
         );
         TestMember::start(
             &format!("{}/member-3/test", base_url),
             Box::new(test_fn),
-            deadline
+            deadline,
         );
     })
     .unwrap();

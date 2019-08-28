@@ -95,12 +95,12 @@ fn pub_sub_video_call() {
         TestMember::start(
             &format!("{}/caller/test", base_url),
             Box::new(test_fn.clone()),
-            deadline
+            deadline,
         );
         TestMember::start(
             &format!("{}/responder/test", base_url),
             Box::new(test_fn),
-            deadline
+            deadline,
         );
     })
     .unwrap();

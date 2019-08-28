@@ -1,4 +1,4 @@
-`medea-jason` changelog
+1
 =======================
 
 All user visible changes to this project will be documented in this file. This project uses [Semantic Versioning 2.0.0].
@@ -12,8 +12,6 @@ All user visible changes to this project will be documented in this file. This p
 [Milestone](/../../milestone/2) | [Roadmap](/../../issues/27)
 
 ### Changed
-
-- Use track ID and peer ID from `medea-client-api-proto` ([#28](/../../pull/28))
 
 
 
