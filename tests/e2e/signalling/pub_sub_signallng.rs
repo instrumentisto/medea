@@ -6,7 +6,7 @@ use crate::signalling::TestMember;
 #[test]
 fn pub_sub_video_call() {
     System::run(|| {
-        let base_url = "ws://0.0.0.0:8081/ws/pub-sub-video-call";
+        let base_url = "ws://0.0.0.0:8080/ws/pub-sub-video-call";
 
         // Note that events is separated by members.
         // Every member will have different instance of this.
@@ -91,13 +91,16 @@ fn pub_sub_video_call() {
             }
         };
 
+        let deadline = Some(std::time::Duration::from_secs(5));
         TestMember::start(
             &format!("{}/caller/test", base_url),
             Box::new(test_fn.clone()),
+            deadline
         );
         TestMember::start(
             &format!("{}/responder/test", base_url),
             Box::new(test_fn),
+            deadline
         );
     })
     .unwrap();

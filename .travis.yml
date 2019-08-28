@@ -56,7 +56,7 @@ jobs:
     - name: e2e signalling (stable)
       stage: test
       rust: stable
-      script: make test.e2e
+      script: make test.e2e release=yes
 
     - name: crates.io
       stage: release

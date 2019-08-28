@@ -33,8 +33,6 @@ macro_attr! {
 #[cfg(feature = "medea")]
 pub trait Incrementable: Sized + Clone {
     /// Returns current value + 1.
-    ///
-    /// This function don't mutate `self`.
     fn increment(&self) -> Self;
 }
 
