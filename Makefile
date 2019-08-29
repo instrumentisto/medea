@@ -112,15 +112,28 @@ up.jason:
 	npm run start --prefix=jason/e2e-demo
 
 
-# Run Medea media server in development mode.
+# Run Medea media server.
 #
 # Usage:
-#	make up.medea 1[dockerized=(NO|yes)]
+#	make up.medea [dockerized=(NO|yes)] [background=(NO|yes)
+#	               [log=(NO|yes)]] [TAG=(dev|<docker-tag>)]
 
-up.medea: down.medea
+docker-up-tag = $(if $(call eq,$(TAG),),dev,$(TAG))
+
+up.medea:
 ifeq ($(dockerized),yes)
-	docker-compose -f docker-compose.medea.yml up
+	@make down.medea dockerized=yes
+	COMPOSE_IMAGE_NAME=$(MEDEA_IMAGE_NAME) \
+	COMPOSE_IMAGE_VER=$(docker-up-tag) \
+	docker-compose -f docker-compose.medea.yml up \
+		$(if $(call eq,$(background),yes),-d,--abort-on-container-exit)
+ifeq ($(background),yes)
+ifeq ($(log),yes)
+	docker-compose -f docker-compose.medea.yml logs -f
+endif
+endif
 else
+	@make down.medea dockerized=no
 	cargo run --bin medea
 endif
 
@@ -281,45 +294,26 @@ endif
 # If logs set to "yes" then medea print all logs to stdout.
 #
 # Usage:
-# 	make test.e2e [dockerized=(YES|no)] [logs=(yes|NO)] [coturn=(YES|no)] [release=(NO|yes)]
+# 	make test.e2e [dockerized=(YES|no)] [logs=(yes|NO)]
+#				  [release=(NO|yes)] [TAG=(dev|<docker-tag>)]
 
 medea-env = RUST_BACKTRACE=1 \
 	$(if $(call eq,$(logs),yes),,RUST_LOG=warn) \
-	MEDEA_SERVER.STATIC_SPECS_PATH=tests/specs
+	MEDEA_SERVER_STATIC_SPECS_PATH=./tests/specs
 
 test.e2e:
+	-@make down
 ifneq ($(coturn),no)
 	@make up.coturn
 endif
 ifeq ($(dockerized),no)
-	-@make down.medea dockerized=no
-
-	make build.medea dockerized=no release=$(release)
 	env $(medea-env) $(if $(call eq,$(logs),yes),,RUST_LOG=warn) cargo run $(if $(call eq,$(release),yes),--release) &
-
-	sleep 5
-	cargo test --test e2e
-
-	-@make down
-ifneq ($(coturn),no)
-	-@make down.coturn
-endif
-	-@exit $(.SHELLSTATUS)
 else
-	-@make down.medea dockerized=yes
-	-@make down.medea dockerized=no
-
-	@make up.coturn
-
-	docker run --rm --network=host -v "$(PWD)":/app -w /app \
-				-u $(shell id -u):$(shell id -g) \
-				-v "$(HOME)/.cargo/registry":/usr/local/cargo/registry \
-			   	-v "$(PWD)/target":/app/target \
-		rust:$(RUST_VER) \
-			make test.e2e dockerized=no coturn=no release=$(release)
-
-	-@make down.coturn
+	$(medea-env) make up.medea dockerized=yes background=yes logs=$(logs) TAG=$(TAG)
 endif
+	sleep 15
+	RUST_BACKTRACE=1 cargo test --test e2e
+	-@make down
 
 
 
