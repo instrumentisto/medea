@@ -53,11 +53,11 @@ jobs:
       stage: build
       rust: nightly
       script: make build.medea
-#
-#    - name: unit (stable)
-#      stage: test
-#      rust: stable
-#      script: make test.unit crate=@all
+
+    - name: unit (stable)
+      stage: test
+      rust: stable
+      script: make test.unit crate=@all
 
     - name: e2e signalling (stable)
       stage: test
