@@ -33,7 +33,7 @@ jobs:
       script:
         - make release.npm crate=medea-jason publish=no
 
-    - name: medea (stable)
+    - name: medea docker (stable)
       stage: build
       rust: stable
       script: make docker.build.medea debug=no TAG=${TRAVIS_JOB_ID}
@@ -56,7 +56,7 @@ jobs:
     - name: e2e signalling (stable)
       stage: test
       rust: stable
-      script: make test.e2e dockerized=yes TAG=${TRAVIS_JOB_ID}
+      script: make test.e2e dockerized=yes logs=yes TAG=${TRAVIS_JOB_ID}
 
     - name: crates.io
       stage: release

@@ -36,7 +36,7 @@ use crate::{
         participants::ParticipantService,
         peers::PeerRepository,
     },
-    turn::BoxedTurnAuthService,
+    turn::TurnAuthService,
 };
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
@@ -120,7 +120,7 @@ impl Room {
     pub fn new(
         room_spec: &RoomSpec,
         reconnect_timeout: Duration,
-        turn: Arc<BoxedTurnAuthService>,
+        turn: Arc<dyn TurnAuthService>,
     ) -> Result<Self, RoomError> {
         Ok(Self {
             id: room_spec.id().clone(),
@@ -285,7 +285,7 @@ impl Room {
         from_peer_id: PeerId,
         candidate: IceCandidate,
     ) -> Result<ActFuture<(), RoomError>, RoomError> {
-        let from_peer = self.peers.get_peer(from_peer_id)?;
+        let from_peer = self.peers.get_peer_by_id(from_peer_id)?;
         if let PeerStateMachine::New(_) = from_peer {
             return Err(PeerError::WrongState(
                 from_peer_id,
@@ -296,7 +296,7 @@ impl Room {
         }
 
         let to_peer_id = from_peer.partner_peer_id();
-        let to_peer = self.peers.get_peer(to_peer_id)?;
+        let to_peer = self.peers.get_peer_by_id(to_peer_id)?;
         if let PeerStateMachine::New(_) = to_peer {
             return Err(PeerError::WrongState(
                 to_peer_id,

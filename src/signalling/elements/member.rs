@@ -1,7 +1,6 @@
-//! [`Member`] is member of [`Room`] with [`RpcConnection`].
+//! [`Member`] is member of [`Room`].
 //!
 //! [`Room`]: crate::signalling::room::Room
-//! [`RpcConnection`]: crate::api::client::rpc_connection::RpcConnection
 
 use std::{
     cell::RefCell,
@@ -47,10 +46,9 @@ impl From<TryFromElementError> for MembersLoadError {
     }
 }
 
-/// [`Member`] is member of [`Room`] with [`RpcConnection`].
+/// [`Member`] is member of [`Room`].
 ///
 /// [`Room`]: crate::signalling::room::Room
-/// [`RpcConnection`]: crate::api::client::rpc_connection::RpcConnection
 #[derive(Clone, Debug)]
 pub struct Member(Rc<RefCell<MemberInner>>);
 
@@ -126,7 +124,7 @@ impl Member {
             )?;
 
             let publisher_endpoint = publisher_spec
-                .get_publish_endpoint(&spec_play_endpoint.src.endpoint_id)
+                .get_publish_endpoint_by_id(&spec_play_endpoint.src.endpoint_id)
                 .map_or(
                     Err(MembersLoadError::EndpointNotFound(
                         spec_play_endpoint.src.endpoint_id.clone(),

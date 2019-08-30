@@ -13,17 +13,21 @@ pub mod turn;
 use std::sync::Arc;
 
 use actix::prelude::*;
-use failure::Fail;
+use failure::{Error, Fail};
+use futures::future::{Either, Future, IntoFuture as _};
 use std::collections::HashMap;
 
 use crate::{
-    api::control::{load_static_specs_from_dir, RoomId},
+    api::{
+        client::server::Server,
+        control::{load_static_specs_from_dir, RoomId},
+    },
     conf::Conf,
+    log::prelude::*,
     shutdown::GracefulShutdown,
-    signalling::{room::RoomError, Room},
+    signalling::{room::RoomError, room_repo::RoomsRepository, Room},
     turn::{service, TurnServiceErr},
 };
-use futures::future::Either;
 
 /// Errors which can happen while server starting.
 #[derive(Debug, Fail)]
@@ -54,6 +58,53 @@ impl From<RoomError> for ServerStartError {
     }
 }
 
+pub fn run() -> Result<(), Error> {
+    dotenv::dotenv().ok();
+    let logger = log::new_dual_logger(std::io::stdout(), std::io::stderr());
+    let _scope_guard = slog_scope::set_global_logger(logger);
+    slog_stdlog::init()?;
+
+    let config = Conf::parse()?;
+    info!("{:?}", config);
+
+    actix::run(|| {
+        start_static_rooms(&config)
+            .map_err(|e| error!("Turn: {:?}", e))
+            .map(Result::unwrap)
+            .map(move |(res, graceful_shutdown)| {
+                (res, graceful_shutdown, config)
+            })
+            .map(|(res, graceful_shutdown, config)| {
+                let rooms = res;
+                info!(
+                    "Loaded rooms: {:?}",
+                    rooms.iter().map(|(id, _)| &id.0).collect::<Vec<&String>>()
+                );
+                let room_repo = RoomsRepository::new(rooms);
+
+                (room_repo, graceful_shutdown, config)
+            })
+            .and_then(|(room_repo, graceful_shutdown, config)| {
+                Server::run(room_repo, config)
+                    .map_err(|e| error!("Error starting server: {:?}", e))
+                    .map(|server| {
+                        graceful_shutdown
+                            .send(shutdown::Subscribe(shutdown::Subscriber {
+                                addr: server.recipient(),
+                                priority: shutdown::Priority(1),
+                            }))
+                            .map_err(|e| error!("Shutdown sub: {}", e))
+                            .map(|_| ())
+                    })
+                    .into_future()
+                    .flatten()
+            })
+    })
+    .unwrap();
+
+    Ok(())
+}
+
 /// Parses static [`Room`]s from config and starts them in separate arbiters.
 ///
 /// Returns [`ServerStartError::DuplicateRoomId`] if find duplicated room ID.
@@ -63,9 +114,7 @@ impl From<RoomError> for ServerStartError {
 ///
 /// Returns [`ServerStartError::BadRoomSpec`]
 /// if some error happened while creating room from spec.
-// This is not the most beautiful solution, but at the moment let it be. In the
-// 32-grpc-dynamic-control-api branch, this logic is changed and everything will
-// look better.
+// TODO: temporary solution, changed in 32-grpc-dynamic-control-api branch
 pub fn start_static_rooms(
     conf: &Conf,
 ) -> impl Future<
@@ -79,52 +128,42 @@ pub fn start_static_rooms(
         GracefulShutdown::new(conf.shutdown.timeout).start();
     let config = conf.clone();
     if let Some(static_specs_path) = config.server.static_specs_path.clone() {
-        Either::A(
-            service::new_turn_auth_service(&config.turn)
-                .map(Arc::new)
-                .map(move |turn_auth_service| {
-                    let room_specs =
-                        match load_static_specs_from_dir(static_specs_path) {
-                            Ok(r) => r,
-                            Err(e) => {
-                                return Err(ServerStartError::LoadSpec(e))
-                            }
-                        };
-                    let mut rooms = HashMap::new();
-                    let arbiter = Arbiter::new();
+        Either::A(service::new_turn_auth_service(&config.turn).map(
+            move |turn_auth_service| {
+                let room_specs =
+                    match load_static_specs_from_dir(static_specs_path) {
+                        Ok(r) => r,
+                        Err(e) => return Err(ServerStartError::LoadSpec(e)),
+                    };
+                let mut rooms = HashMap::new();
+                let arbiter = Arbiter::new();
 
-                    for spec in room_specs {
-                        if rooms.contains_key(spec.id()) {
-                            return Err(ServerStartError::DuplicateRoomId(
-                                spec.id().clone(),
-                            ));
-                        }
-
-                        let room_id = spec.id().clone();
-                        let rpc_reconnect_timeout =
-                            config.rpc.reconnect_timeout;
-                        let turn_cloned = Arc::clone(&turn_auth_service);
-                        let room =
-                            Room::start_in_arbiter(&arbiter, move |_| {
-                                Room::new(
-                                    &spec,
-                                    rpc_reconnect_timeout,
-                                    turn_cloned,
-                                )
-                                .unwrap()
-                            });
-                        graceful_shutdown.do_send(shutdown::Subscribe(
-                            shutdown::Subscriber {
-                                addr: room.clone().recipient(),
-                                priority: shutdown::Priority(2),
-                            },
+                for spec in room_specs {
+                    if rooms.contains_key(spec.id()) {
+                        return Err(ServerStartError::DuplicateRoomId(
+                            spec.id().clone(),
                         ));
-                        rooms.insert(room_id, room);
                     }
 
-                    Ok((rooms, graceful_shutdown))
-                }),
-        )
+                    let room_id = spec.id().clone();
+                    let rpc_reconnect_timeout = config.rpc.reconnect_timeout;
+                    let turn_cloned = Arc::clone(&turn_auth_service);
+                    let room = Room::start_in_arbiter(&arbiter, move |_| {
+                        Room::new(&spec, rpc_reconnect_timeout, turn_cloned)
+                            .unwrap()
+                    });
+                    graceful_shutdown.do_send(shutdown::Subscribe(
+                        shutdown::Subscriber {
+                            addr: room.clone().recipient(),
+                            priority: shutdown::Priority(2),
+                        },
+                    ));
+                    rooms.insert(room_id, room);
+                }
+
+                Ok((rooms, graceful_shutdown))
+            },
+        ))
     } else {
         Either::B(futures::future::ok(Ok((HashMap::new(), graceful_shutdown))))
     }

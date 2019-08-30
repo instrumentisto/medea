@@ -116,7 +116,7 @@ up.jason:
 #
 # Usage:
 #	make up.medea [dockerized=(NO|yes)] [background=(NO|yes)
-#	               [log=(NO|yes)]] [TAG=(dev|<docker-tag>)]
+#	               [logs=(NO|yes)]] [TAG=(dev|<docker-tag>)]
 
 docker-up-tag = $(if $(call eq,$(TAG),),dev,$(TAG))
 
@@ -128,7 +128,7 @@ ifeq ($(dockerized),yes)
 	docker-compose -f docker-compose.medea.yml up \
 		$(if $(call eq,$(background),yes),-d,--abort-on-container-exit)
 ifeq ($(background),yes)
-ifeq ($(log),yes)
+ifeq ($(logs),yes)
 	docker-compose -f docker-compose.medea.yml logs -f
 endif
 endif
@@ -299,6 +299,7 @@ endif
 
 medea-env = RUST_BACKTRACE=1 \
 	$(if $(call eq,$(logs),yes),,RUST_LOG=warn) \
+	MEDEA_SERVER.STATIC_SPECS_PATH=./tests/specs \
 	MEDEA_SERVER_STATIC_SPECS_PATH=./tests/specs
 
 test.e2e:
@@ -309,9 +310,9 @@ endif
 ifeq ($(dockerized),no)
 	env $(medea-env) $(if $(call eq,$(logs),yes),,RUST_LOG=warn) cargo run $(if $(call eq,$(release),yes),--release) &
 else
-	$(medea-env) make up.medea dockerized=yes background=yes logs=$(logs) TAG=$(TAG)
+	env $(medea-env) make up.medea dockerized=yes background=yes logs=$(logs) TAG=$(TAG) &
 endif
-	sleep 15
+	sleep 5
 	RUST_BACKTRACE=1 cargo test --test e2e
 	-@make down
 

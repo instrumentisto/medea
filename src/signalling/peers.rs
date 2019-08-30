@@ -70,7 +70,7 @@ impl PeerRepository {
     }
 
     /// Returns borrowed [`PeerStateMachine`] by its ID.
-    pub fn get_peer(
+    pub fn get_peer_by_id(
         &self,
         peer_id: PeerId,
     ) -> Result<&PeerStateMachine, RoomError> {
@@ -137,7 +137,7 @@ impl PeerRepository {
     }
 
     /// Returns borrowed [`Peer`] by its ID.
-    pub fn get_inner_peer<'a, S>(
+    pub fn get_inner_peer_by_id<'a, S>(
         &'a self,
         peer_id: PeerId,
     ) -> Result<&'a Peer<S>, RoomError>

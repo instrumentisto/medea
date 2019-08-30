@@ -40,7 +40,7 @@ use crate::{
         room::{ActFuture, RoomError},
         Room,
     },
-    turn::{BoxedTurnAuthService, TurnServiceErr, UnreachablePolicy},
+    turn::{TurnAuthService, TurnServiceErr, UnreachablePolicy},
 };
 
 #[derive(Fail, Debug)]
@@ -81,7 +81,7 @@ pub struct ParticipantService {
     members: HashMap<MemberId, Member>,
 
     /// Service for managing authorization on Turn server.
-    turn: Arc<BoxedTurnAuthService>,
+    turn: Arc<dyn TurnAuthService>,
 
     /// Established [`RpcConnection`]s of [`Member`]s in this [`Room`].
     ///
@@ -105,7 +105,7 @@ impl ParticipantService {
     pub fn new(
         room_spec: &RoomSpec,
         reconnect_timeout: Duration,
-        turn: Arc<BoxedTurnAuthService>,
+        turn: Arc<dyn TurnAuthService>,
     ) -> Result<Self, MembersLoadError> {
         Ok(Self {
             room_id: room_spec.id().clone(),
@@ -118,8 +118,8 @@ impl ParticipantService {
     }
 
     /// Lookup [`Member`] by provided id.
-    pub fn get_member_by_id(&self, id: &MemberId) -> Option<Member> {
-        self.members.get(id).cloned()
+    pub fn get_member_by_id(&self, id: &MemberId) -> Option<&Member> {
+        self.members.get(id)
     }
 
     /// Lookup [`Member`] by provided id and credentials. Returns
@@ -131,11 +131,11 @@ impl ParticipantService {
         &self,
         member_id: &MemberId,
         credentials: &str,
-    ) -> Result<Member, AuthorizationError> {
+    ) -> Result<&Member, AuthorizationError> {
         match self.get_member_by_id(member_id) {
             Some(member) => {
                 if member.credentials().eq(credentials) {
-                    Ok(member.clone())
+                    Ok(member)
                 } else {
                     Err(AuthorizationError::InvalidCredentials)
                 }
@@ -182,12 +182,12 @@ impl ParticipantService {
                     ParticipantServiceErr::ParticipantNotFound(member_id),
                 )));
             }
-            Some(member) => member,
+            Some(member) => member.clone(),
         };
 
         // lookup previous member connection
         if let Some(mut connection) = self.connections.remove(&member_id) {
-            debug!("Closing old RpcConnection for participant {}", member_id);
+            debug!("Closing old RpcConnection for participant {}", &member_id);
 
             // cancel RpcConnection close task, since connection is
             // reestablished
@@ -208,7 +208,7 @@ impl ParticipantService {
                 })
                 .and_then(
                     move |ice: IceUser, room: &mut Room, _| {
-                        room.members.insert_connection(member_id.clone(), con);
+                        room.members.insert_connection(member_id, con);
                         member.replace_ice_user(ice);
 
                         wrap_future(future::ok(member))
@@ -242,7 +242,6 @@ impl ParticipantService {
             ClosedReason::Closed => {
                 debug!("Connection for member [id = {}] removed.", member_id);
                 self.connections.remove(&member_id);
-
                 ctx.spawn(wrap_future(
                     self.delete_ice_user(&member_id).map_err(|err| {
                         error!("Error deleting IceUser {:?}", err)
@@ -308,7 +307,7 @@ impl ParticipantService {
         let remove_ice_users = Box::new({
             let mut room_users = Vec::with_capacity(self.members.len());
 
-            self.members.iter().for_each(|(_, data)| {
+            self.members.values().for_each(|data| {
                 if let Some(ice_user) = data.take_ice_user() {
                     room_users.push(ice_user);
                 }

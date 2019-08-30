@@ -70,7 +70,7 @@ impl MemberSpec {
         })
     }
 
-    pub fn get_publish_endpoint(
+    pub fn get_publish_endpoint_by_id(
         &self,
         id: &str,
     ) -> Option<&WebRtcPublishEndpoint> {
