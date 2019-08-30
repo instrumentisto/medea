@@ -14,27 +14,27 @@ jobs:
       stage: build
 
   include:
-    - name: Clippy
-      stage: check
-      rust: stable
-      before_script: rustup component add clippy
-      script: make lint
-
-    - name: rustfmt
-      stage: check
-      rust: nightly
-      cache: false
-      before_script: rustup component add rustfmt
-      script: make fmt check=yes
-
-    - name: medea-jason (stable)
-      stage: build
-      rust: stable
-      before_script:
-        - rm -f /home/travis/.cargo/bin/wasm-pack
-        - curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
-      script:
-        - make release.npm crate=medea-jason publish=no
+#    - name: Clippy
+#      stage: check
+#      rust: stable
+#      before_script: rustup component add clippy
+#      script: make lint
+#
+#    - name: rustfmt
+#      stage: check
+#      rust: nightly
+#      cache: false
+#      before_script: rustup component add rustfmt
+#      script: make fmt check=yes
+#
+#    - name: medea-jason (stable)
+#      stage: build
+#      rust: stable
+#      before_script:
+#        - rm -f /home/travis/.cargo/bin/wasm-pack
+#        - curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+#      script:
+#        - make release.npm crate=medea-jason publish=no
 
     - name: medea docker (stable)
       stage: build
@@ -42,26 +42,28 @@ jobs:
       script:
         - make docker.build.medea debug=no TAG=${TRAVIS_BUILD_ID}
         - make docker.tar TAGS=${TRAVIS_BUILD_ID}
+        - ls .cache/docker/
 
-    - name: medea (beta)
-      stage: build
-      rust: beta
-      script: make build.medea
-
-    - name: medea (nightly)
-      stage: build
-      rust: nightly
-      script: make build.medea
-
-    - name: unit (stable)
-      stage: test
-      rust: stable
-      script: make test.unit crate=@all
+#    - name: medea (beta)
+#      stage: build
+#      rust: beta
+#      script: make build.medea
+#
+#    - name: medea (nightly)
+#      stage: build
+#      rust: nightly
+#      script: make build.medea
+#
+#    - name: unit (stable)
+#      stage: test
+#      rust: stable
+#      script: make test.unit crate=@all
 
     - name: e2e signalling (stable)
       stage: test
       rust: stable
       script:
+        - ls .cache/
         - make docker.untar TAGS=${TRAVIS_BUILD_ID}
         - make test.e2e dockerized=yes logs=yes TAG=${TRAVIS_BUILD_ID}
 
