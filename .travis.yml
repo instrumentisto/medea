@@ -39,8 +39,10 @@ jobs:
     - name: medea docker (stable)
       stage: build
       rust: stable
-      script: make docker.build.medea debug=no TAG=${TRAVIS_BUILD_ID}
-      after_script: make docker.tar TAGS=${TRAVIS_BUILD_ID}
+      script:
+        - make docker.build.medea debug=no TAG=${TRAVIS_BUILD_ID}
+        - make docker.tar TAGS=${TRAVIS_BUILD_ID}
+        - ls .cache/docker/
 #
 #    - name: medea (beta)
 #      stage: build
@@ -60,8 +62,10 @@ jobs:
     - name: e2e signalling (stable)
       stage: test
       rust: stable
-      before_script: make docker.untar TAGS=${TRAVIS_BUILD_ID}
-      script: make test.e2e dockerized=yes logs=yes TAG=${TRAVIS_BUILD_ID}
+      script:
+        - ls .cache/
+        - make docker.untar TAGS=${TRAVIS_BUILD_ID}
+        - make test.e2e dockerized=yes logs=yes TAG=${TRAVIS_BUILD_ID}
 
     - name: crates.io
       stage: release
