@@ -449,7 +449,7 @@ docker.up.demo: docker.down.demo
 #	make docker.tar [IMAGE=(<empty>|<docker-image-postfix>)]
 #	                [TAGS=(dev|<t1>[,<t2>...])]
 
-docker-tar-image-name = $(IMAGE_NAME)$(if $(call eq,$(IMAGE),),,/$(IMAGE))
+docker-tar-image-name = $(MEDEA_IMAGE_NAME)$(if $(call eq,$(IMAGE),),,/$(IMAGE))
 docker-tar-dir = .cache/docker/$(docker-tar-image-name)
 docker-tar-tags = $(if $(call eq,$(TAGS),),dev,$(TAGS))
 
@@ -467,7 +467,7 @@ docker.tar:
 #	make docker.untar [IMAGE=(<empty>|<docker-image-postfix>)]
 #	                  [TAGS=(dev|<t1>[,<t2>...])]
 
-docker-untar-image-name = $(IMAGE_NAME)$(if $(call eq,$(IMAGE),),,/$(IMAGE))
+docker-untar-image-name = $(MEDEA_IMAGE_NAME)$(if $(call eq,$(IMAGE),),,/$(IMAGE))
 docker-untar-dir = .cache/docker/$(docker-untar-image-name)
 docker-untar-tags = $(if $(call eq,$(TAGS),),dev,$(TAGS))
 
