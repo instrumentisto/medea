@@ -11,7 +11,7 @@ use actix::{
 };
 use failure::Fail;
 use futures::future;
-use medea_client_api_proto::{Command, Event, IceCandidate};
+use medea_client_api_proto::{Command, Event, IceCandidate, IceServer};
 
 use crate::{
     api::{
@@ -63,7 +63,7 @@ pub enum RoomError {
 
 impl From<PeerError> for RoomError {
     fn from(err: PeerError) -> Self {
-        RoomError::PeerError(err)
+        Self::PeerError(err)
     }
 }
 
@@ -148,14 +148,7 @@ impl Room {
 
         let sender = sender.start();
         let member_id = sender.member_id();
-        let ice_servers = self
-            .participants
-            .get_member(member_id)
-            .ok_or_else(|| RoomError::MemberNotFound(member_id))?
-            .ice_user
-            .as_ref()
-            .ok_or_else(|| RoomError::NoTurnCredentials(member_id))?
-            .servers_list();
+        let ice_servers = self.get_ice_servers(member_id)?;
         let peer_created = Event::PeerCreated {
             peer_id: sender.id(),
             sdp_offer: None,
@@ -190,14 +183,7 @@ impl Room {
         let to_peer = to_peer.set_remote_sdp(sdp_offer.clone());
 
         let to_member_id = to_peer.member_id();
-        let ice_servers = self
-            .participants
-            .get_member(to_member_id)
-            .ok_or_else(|| RoomError::MemberNotFound(to_member_id))?
-            .ice_user
-            .as_ref()
-            .ok_or_else(|| RoomError::NoTurnCredentials(to_member_id))?
-            .servers_list();
+        let ice_servers = self.get_ice_servers(to_member_id)?;
 
         let event = Event::PeerCreated {
             peer_id: to_peer_id,
@@ -307,6 +293,21 @@ impl Room {
                     error!("Error closing room {:?}", room_id);
                 }),
         )
+    }
+
+    fn get_ice_servers(
+        &self,
+        member_id: MemberId,
+    ) -> Result<Vec<IceServer>, RoomError> {
+        let ice_servers = self
+            .participants
+            .get_member(member_id)
+            .ok_or_else(|| RoomError::MemberNotFound(member_id))?
+            .ice_user
+            .as_ref()
+            .ok_or_else(|| RoomError::NoTurnCredentials(member_id))?
+            .servers_list();
+        Ok(ice_servers)
     }
 }
 

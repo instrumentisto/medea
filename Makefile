@@ -151,7 +151,7 @@ cargo.fmt:
 #	make cargo.lint
 
 cargo.lint:
-	cargo +nightly clippy --all -- -D clippy::pedantic -D warnings
+	cargo clippy --all -- -D clippy::pedantic -D warnings
 
 
 
@@ -228,8 +228,13 @@ ifeq ($(test-unit-crate),@all)
 	@make test.unit crate=medea-jason
 	@make test.unit crate=medea
 else
+ifeq ($(crate),medea-jason)
 	cd $(crate-dir)/ && \
-	cargo test -p $(test-unit-crate)
+    cargo test --target wasm32-unknown-unknown --features mockable
+else
+	cd $(crate-dir)/ && \
+	cargo test
+endif
 endif
 
 
