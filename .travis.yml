@@ -47,7 +47,7 @@ jobs:
       rust: stable
       script:
 #        - make docker.build.medea debug=no TAG=${TRAVIS_BUILD_ID}
-        - docker login -u="$QUAIO_PASS" -p="$QUAIO_USER"
+        - docker login -u="$QUAYIO_USER" -p="$QUAYIO_PASS"
 #        - make docker.tar TAGS=${TRAVIS_BUILD_ID}
 #        - ls .cache/docker/
 
