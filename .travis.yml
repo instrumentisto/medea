@@ -1,4 +1,10 @@
 language: rust
+
+env:
+  global:
+    - secure: MLoB6bB/z1Ff6SWldgnS+o8iI7+ShuYlcPlcOrErdIc4dirRVLOhZNc+oDP4auhF5IsjTLMjRzre98I6kI2EYCHqx1HPEhiFPnA+d+tLl3l3Hgwqi2jTd1LcSnn62X9qazQNGUyhwB/itMQyswUBE7XEegNpFWYFOyvvI6JwoADwBMEA6Um9FnW2/NdkKTZvAqTjJ8o6axHLo58LGLekmUj2Fc+z5cbzbK/9CrXGvXihLs0ZGRQnKRtxknfFPKVam/aTPR5sFaAjJ5El9VjnCLJnX/uwt9rNjdK3DRwHf7Qeo3Gj867HhLi2ba4KRvhoZJcq4BEoXBZzOJWchqasPc2veOoiZOg5AUQNnjWPQ2dun3o9OaLySp3qhzQ8yxIS+9U1JLsd3pLhb2gBQNAwK92pzUS+WhwhwAv6QkODvROVJeG55N23u2a8Enk7SHR9KFFCaDqzor7vcmAtk8q7JkVwxXX6/yS43hNk9teF1Cox8kG26lYbQLA1/XXu8Z1+F0aXv5WpC9cHjWEPef87lHedB4gCs9erNJEF2gUCOpWWt/J9DCE6U9OizHuosDrqFfZQH+A3Y6c8Mh2TcLnc7BadqFUMvRwAV8bOzaBjfAVH+aGARyDbWfK8NtFtkw/lfoVLZ2nx4rPfo2oVOholRpProoj09vJe1QdruX+Sdew=
+    - secure: tXgsViat9MxuqPcPqjbnQPAVw5iQGFi5M64IvYQqDSYCc3EbBaQe+I1NMcNcHM6XZ4VzINa5xnaeh8AJC2BOcmDnNt4Af+YyCZDuz7lQsE7kvKqGSCaKnNGr23P/FTVz64wLFIFbhnClL8Q+VHLkpzsxY6utjdhGfQfsIK0kdAQ2lHuXDbqQC0GA7fiz7hD41GblsnNQLaSPoMtpFYMN8ta5pyLIlTzrZ/QjOWFV7VC46A/AlPnkzRWuGYrayep622oFFQ365uiDoSzZBFu0+nHkdVuJxN05HYfSw/m1/XLoK8Ytu0Qm12D7I9H71lkX7IEjZwr/L+WIuJQCPU8mzB+Qh3TUE2mOMVA0DMwIJ572aJQqAFi1shXsyFn5MfMptOwILUHDBYFj9RJVA/pJUeND4DlQMLjldzYbEGv8Y2jL3hW7jrb9PRlXIhlYS0UR8rwAGdWRbNKezq3Ve2Z0tyIvOYgIDAs47Yj9VHLgthLiRJ5e/ptKt7rM4grqpiQnKo01Ss60XVA6Vab2h2gvIX2GK0N4TR6Kjy0cfHbBGrsO9J7dCKXosU6/rc61AfFj+Lb/CayZ0+FKRznNNJU+Sb2uylQHksgvvCHdsg8a60rfLPLm93G01CHIEMS1Sqw9xAE5wxbMSCZeV4ZCj5A8j45R09ISrt0UodbYhQPrPfY=
+
 cache:
   cargo: true
   directories:
@@ -40,32 +46,33 @@ jobs:
       stage: build
       rust: stable
       script:
-        - make docker.build.medea debug=no TAG=${TRAVIS_BUILD_ID}
-        - make docker.tar TAGS=${TRAVIS_BUILD_ID}
-        - ls .cache/docker/
+#        - make docker.build.medea debug=no TAG=${TRAVIS_BUILD_ID}
+        - docker login -u="$QUAIO_PASS" -p="$QUAIO_USER"
+#        - make docker.tar TAGS=${TRAVIS_BUILD_ID}
+#        - ls .cache/docker/
 
-    - name: medea (beta)
-      stage: build
-      rust: beta
-      script: make build.medea
-
-    - name: medea (nightly)
-      stage: build
-      rust: nightly
-      script: make build.medea
-
-    - name: unit (stable)
-      stage: test
-      rust: stable
-      script: make test.unit crate=@all
-
-    - name: e2e signalling (stable)
-      stage: test
-      rust: stable
-      script:
-        - ls .cache/
-        - make docker.untar TAGS=${TRAVIS_BUILD_ID}
-        - make test.e2e dockerized=yes logs=yes TAG=${TRAVIS_BUILD_ID}
+#    - name: medea (beta)
+#      stage: build
+#      rust: beta
+#      script: make build.medea
+#
+#    - name: medea (nightly)
+#      stage: build
+#      rust: nightly
+#      script: make build.medea
+#
+#    - name: unit (stable)
+#      stage: test
+#      rust: stable
+#      script: make test.unit crate=@all
+#
+#    - name: e2e signalling (stable)
+#      stage: test
+#      rust: stable
+#      script:
+#        - ls .cache/
+#        - make docker.untar TAGS=${TRAVIS_BUILD_ID}
+#        - make test.e2e dockerized=yes logs=yes TAG=${TRAVIS_BUILD_ID}
 
     - name: crates.io
       stage: release
