@@ -230,7 +230,7 @@ ifeq ($(test-unit-crate),@all)
 else
 ifeq ($(crate),medea-jason)
 	cd $(crate-dir)/ && \
-    cargo test --target wasm32-unknown-unknown --features mockable
+    cargo test --target wasm32-unknown-unknown
 else
 	cd $(crate-dir)/ && \
 	cargo test
