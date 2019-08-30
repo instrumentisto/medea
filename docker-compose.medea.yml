@@ -4,7 +4,6 @@ services:
   medea:
     container_name: ${COMPOSE_PROJECT_NAME}-backend
     image: ${COMPOSE_IMAGE_NAME}:${COMPOSE_IMAGE_VER}
-    build: .
     ports:
       - "8080:8080"
     volumes:
