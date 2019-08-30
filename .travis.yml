@@ -33,10 +33,10 @@ jobs:
 #      script:
 #        - make release.npm crate=medea-jason publish=no
 
-#    - name: medea docker (stable)
-#      stage: build
-#      rust: stable
-#      script: make docker.build.medea debug=no TAG=${TRAVIS_JOB_ID}
+    - name: medea docker (stable)
+      stage: build
+      rust: stable
+      script: make docker.build.medea debug=no TAG=${TRAVIS_JOB_ID}
 #
 #    - name: medea (beta)
 #      stage: build
