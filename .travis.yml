@@ -44,15 +44,15 @@ jobs:
         - make docker.tar TAGS=${TRAVIS_BUILD_ID}
         - ls .cache/docker/
 
-#    - name: medea (beta)
-#      stage: build
-#      rust: beta
-#      script: make build.medea
-#
-#    - name: medea (nightly)
-#      stage: build
-#      rust: nightly
-#      script: make build.medea
+    - name: medea (beta)
+      stage: build
+      rust: beta
+      script: make build.medea
+
+    - name: medea (nightly)
+      stage: build
+      rust: nightly
+      script: make build.medea
 #
 #    - name: unit (stable)
 #      stage: test
