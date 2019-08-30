@@ -39,8 +39,10 @@ jobs:
     - name: medea docker (stable)
       stage: build
       rust: stable
-      script: make docker.build.medea debug=no TAG=${TRAVIS_JOB_ID}
-      after_script: make docker.tar TAGS=${TRAVIS_JOB_ID}
+      script:
+        - make docker.build.medea debug=no TAG=${TRAVIS_JOB_ID}
+        - make docker.tar TAGS=${TRAVIS_JOB_ID}
+        - ls .cache
 #
 #    - name: medea (beta)
 #      stage: build
