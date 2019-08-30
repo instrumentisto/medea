@@ -443,6 +443,39 @@ docker.up.demo: docker.down.demo
 	docker-compose -f jason/demo/docker-compose.yml up
 
 
+# Save project Docker images in a tarball file.
+#
+# Usage:
+#	make docker.tar [IMAGE=(<empty>|<docker-image-postfix>)]
+#	                [TAGS=(dev|<t1>[,<t2>...])]
+
+docker-tar-image-name = $(IMAGE_NAME)$(if $(call eq,$(IMAGE),),,/$(IMAGE))
+docker-tar-dir = .cache/docker/$(docker-tar-image-name)
+docker-tar-tags = $(if $(call eq,$(TAGS),),dev,$(TAGS))
+
+docker.tar:
+	@mkdir -p $(docker-tar-dir)/
+	docker save \
+		-o $(docker-tar-dir)/$(subst $(comma),_,$(docker-tar-tags)).tar \
+		$(foreach tag,$(subst $(comma), ,$(docker-tar-tags)),\
+			$(docker-tar-image-name):$(tag))
+
+
+# Load project Docker images from a tarball file.
+#
+# Usage:
+#	make docker.untar [IMAGE=(<empty>|<docker-image-postfix>)]
+#	                  [TAGS=(dev|<t1>[,<t2>...])]
+
+docker-untar-image-name = $(IMAGE_NAME)$(if $(call eq,$(IMAGE),),,/$(IMAGE))
+docker-untar-dir = .cache/docker/$(docker-untar-image-name)
+docker-untar-tags = $(if $(call eq,$(TAGS),),dev,$(TAGS))
+
+docker.untar:
+	docker load \
+		-i $(docker-untar-dir)/$(subst $(comma),_,$(docker-untar-tags)).tar
+
+
 
 
 ##############################
