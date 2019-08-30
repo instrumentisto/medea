@@ -47,7 +47,7 @@ jobs:
       rust: stable
       script:
 #        - make docker.build.medea debug=no TAG=${TRAVIS_BUILD_ID}
-        - echo "$QUAYIO_PASS" | docker login -u "$QUAYIO_USER" --password-stdin
+        - echo "$QUAYIO_PASS" | docker login quay.io -u "$QUAYIO_USER" --password-stdin
 #        - make docker.tar TAGS=${TRAVIS_BUILD_ID}
 #        - ls .cache/docker/
 
