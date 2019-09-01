@@ -302,11 +302,17 @@ docker-env = $(strip $(if $(call eq,$(minikube),yes),\
 docker-build-demo-image-name = $(DEMO_IMAGE_NAME)
 
 docker.build.demo:
+ifeq ($(TAG), edge)
+	docker build $(if $(call eq,$(minikube),yes),,--network=host) --force-rm \
+		-t $(docker-build-demo-image-name):$(TAG) \
+		jason
+else
 	@make yarn proj=demo
 	$(docker-env) \
 	docker build $(if $(call eq,$(minikube),yes),,--network=host) --force-rm \
 		-t $(docker-build-demo-image-name):$(if $(call eq,$(TAG),),dev,$(TAG)) \
 		jason/demo
+endif
 
 
 # Build medea project Docker image.

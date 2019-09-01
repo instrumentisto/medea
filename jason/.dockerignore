@@ -1,0 +1,11 @@
+*
+
+# Medea-jason sources and manifest.
+!Cargo.toml
+!src/
+
+# Demo source.
+!demo/index.html
+
+# Demo configs.
+!demo/chart/medea-demo/conf/
