@@ -265,17 +265,20 @@ impl Room {
         }
 
         let to_peer_id = from_peer.partner_peer_id();
-        let to_peer = self.peers.get_peer(to_peer_id)?;
-        if let PeerStateMachine::New(_) = to_peer {
-            return Err(PeerError::WrongState(
-                to_peer_id,
-                "Not New",
-                format!("{}", to_peer),
-            )
-            .into());
-        }
+        let to_member_id = {
+            let to_peer = self.peers.get_mut_peer(to_peer_id)?;
+            if let PeerStateMachine::New(_) = to_peer {
+                return Err(PeerError::WrongState(
+                    to_peer_id,
+                    "Not New",
+                    format!("{}", to_peer),
+                )
+                .into());
+            }
+            to_peer.add_ice_candidate(candidate.clone());
 
-        let to_member_id = to_peer.member_id();
+            to_peer.member_id()
+        };
         let event = Event::IceCandidateDiscovered {
             peer_id: to_peer_id,
             candidate,

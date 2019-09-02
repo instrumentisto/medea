@@ -42,6 +42,15 @@ impl PeerRepository {
             .ok_or_else(|| RoomError::PeerNotFound(peer_id))
     }
 
+    pub fn get_mut_peer(
+        &mut self,
+        peer_id: PeerId,
+    ) -> Result<&mut PeerStateMachine, RoomError> {
+        self.peers
+            .get_mut(&peer_id)
+            .ok_or_else(|| RoomError::PeerNotFound(peer_id))
+    }
+
     /// Returns borrowed [`Peer`] by its ID.
     pub fn get_inner_peer<'a, S>(
         &'a self,

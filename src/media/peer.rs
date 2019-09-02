@@ -8,7 +8,7 @@ use std::{collections::HashMap, convert::TryFrom, fmt, sync::Arc};
 
 use failure::Fail;
 use medea_client_api_proto::{
-    AudioSettings, Direction, MediaType, Track, VideoSettings,
+    AudioSettings, Direction, IceCandidate, MediaType, Track, VideoSettings,
 };
 use medea_macro::enum_delegate;
 
@@ -69,6 +69,11 @@ impl PeerError {
 #[enum_delegate(pub fn member_id(&self) -> MemberId)]
 #[enum_delegate(pub fn partner_peer_id(&self) -> Id)]
 #[enum_delegate(pub fn partner_member_id(&self) -> Id)]
+#[enum_delegate(pub fn add_ice_candidate(
+        &mut self,
+        ice_candidate: IceCandidate
+    )
+)]
 #[derive(Debug)]
 pub enum PeerStateMachine {
     New(Peer<New>),
@@ -153,6 +158,7 @@ pub struct Context {
     sdp_answer: Option<String>,
     receivers: HashMap<TrackId, Arc<MediaTrack>>,
     senders: HashMap<TrackId, Arc<MediaTrack>>,
+    ice_candidates: Vec<IceCandidate>,
 }
 
 /// [RTCPeerConnection] representation.
@@ -225,6 +231,10 @@ impl<T> Peer<T> {
     pub fn is_sender(&self) -> bool {
         !self.context.senders.is_empty()
     }
+
+    pub fn add_ice_candidate(&mut self, ice_candidate: IceCandidate) {
+        self.context.ice_candidates.push(ice_candidate);
+    }
 }
 
 impl Peer<New> {
@@ -246,6 +256,7 @@ impl Peer<New> {
             sdp_answer: None,
             receivers: HashMap::new(),
             senders: HashMap::new(),
+            ice_candidates: Vec::new(),
         };
         Self {
             context,
