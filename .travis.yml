@@ -13,7 +13,6 @@ services:
 install:
   - rustc -vV
   - cargo -vV
-  - docker -v
 
 jobs:
   allow_failures:
@@ -50,14 +49,12 @@ jobs:
         apt:
           packages:
             - pass
-#            - docker-ce
       script:
-#        - make docker.build.medea debug=no TAG=${TRAVIS_BUILD_ID}
+        - make docker.build.medea debug=no TAG=${TRAVIS_BUILD_ID}
         - ./ci/docker-pass.sh
         - echo "$QUAYIO_PASS" | docker login quay.io -u "$QUAYIO_USER" --password-stdin
-#        - "sed -i '0,/{/s/{/{\n\t"credsStore": \"pass\",/' ~/.docker/config.json"
-#        - make docker.tar TAGS=${TRAVIS_BUILD_ID}
-#        - ls .cache/docker/
+        - docker tag instrumentisto/medea:${TRAVIS_BUILD_ID} quay.io/alexlapa/medea:${TRAVIS_BUILD_ID}
+        - docker push quay.io/alexlapa/medea:${TRAVIS_BUILD_ID}
 
 #    - name: medea (beta)
 #      stage: build
