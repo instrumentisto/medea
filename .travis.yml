@@ -52,7 +52,7 @@ jobs:
       after_script:
         - ./ci/docker-pass.sh
         - echo "$QUAYIO_PASS" | docker login quay.io -u "$QUAYIO_USER" --password-stdin
-        - docker push quay.io/alexlapa/medea:${TRAVIS_BUILD_ID}
+        - docker push quay.io/instrumentisto/medea:${TRAVIS_BUILD_ID}
 
     - name: medea (beta)
       stage: build_beta
