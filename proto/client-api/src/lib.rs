@@ -45,7 +45,7 @@ pub struct Stable {
 
 pub struct PeerContext {
     pub id: u64,
-    pub ice_candidates: Vec<IceCandidate>,
+    pub ice_candidates_hash: u64,
 }
 
 pub struct Peer<T> {
@@ -141,7 +141,7 @@ pub enum Event {
 /// Represents [RTCIceCandidateInit][1] object.
 ///
 /// [1]: https://www.w3.org/TR/webrtc/#dom-rtcicecandidateinit
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize, Hash)]
 pub struct IceCandidate {
     pub candidate: String,
     pub sdp_m_line_index: Option<u16>,

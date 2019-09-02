@@ -4,7 +4,13 @@
 
 #![allow(clippy::use_self)]
 
-use std::{collections::HashMap, convert::TryFrom, fmt, sync::Arc};
+use std::{
+    collections::{hash_map::DefaultHasher, HashMap},
+    convert::TryFrom,
+    fmt,
+    hash::{Hash, Hasher},
+    sync::Arc,
+};
 
 use failure::Fail;
 use medea_client_api_proto::{
@@ -74,6 +80,7 @@ impl PeerError {
         ice_candidate: IceCandidate
     )
 )]
+#[enum_delegate(pub fn get_hash_of_ice_candidates(&self) -> u64)]
 #[derive(Debug)]
 pub enum PeerStateMachine {
     New(Peer<New>),
@@ -235,6 +242,26 @@ impl<T> Peer<T> {
     pub fn add_ice_candidate(&mut self, ice_candidate: IceCandidate) {
         self.context.ice_candidates.push(ice_candidate);
     }
+
+    pub fn get_hash_of_ice_candidates(&self) -> u64 {
+        indepondent_hash(&self.context.ice_candidates)
+    }
+}
+
+fn hash<T>(obj: &T) -> u64
+where
+    T: Hash,
+{
+    let mut hasher = DefaultHasher::new();
+    obj.hash(&mut hasher);
+    hasher.finish()
+}
+
+fn indepondent_hash<T>(obj: &Vec<T>) -> u64
+where
+    T: Hash,
+{
+    obj.iter().map(|s| hash(s)).fold(0, |acc, x| acc ^ x)
 }
 
 impl Peer<New> {
