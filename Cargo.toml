@@ -37,7 +37,7 @@ futures = "0.1"
 humantime = "1.2"
 humantime-serde = "0.1"
 macro-attr = "0.2"
-medea-client-api-proto = { version = "0.1", features = ["medea"] }
+medea-client-api-proto = { path = "proto/client-api", features = ["medea"] }
 medea-macro = "0.1"
 newtype_derive = "0.1"
 rand = "0.7"

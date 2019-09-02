@@ -8,6 +8,51 @@ use std::collections::HashMap;
 use medea_macro::dispatchable;
 use serde::{de::Deserializer, ser::Serializer, Deserialize, Serialize};
 
+pub enum PeerStateMachine {
+    New(Peer<New>),
+    WaitLocalSdp(Peer<WaitLocalSdp>),
+    WaitLocalHaveRemoteSdp(Peer<WaitLocalHaveRemote>),
+    WaitRemoteSdp(Peer<WaitRemoteSdp>),
+    Stable(Peer<Stable>),
+}
+
+pub struct Member {
+    pub peers: HashMap<u64, PeerStateMachine>,
+}
+
+pub struct Snapshot {
+    pub peers: HashMap<String, Member>,
+}
+
+pub struct New {
+    pub ice_servers: Vec<IceServer>,
+}
+
+pub struct WaitLocalSdp;
+
+pub struct WaitLocalHaveRemote {
+    pub remote_offer: String,
+}
+
+pub struct WaitRemoteSdp {
+    pub sdp_offer: String,
+}
+
+pub struct Stable {
+    pub sdp_offer: String,
+    pub remote_offer: String,
+}
+
+pub struct PeerContext {
+    pub id: u64,
+    pub ice_candidates: Vec<IceCandidate>,
+}
+
+pub struct Peer<T> {
+    pub context: PeerContext,
+    pub state: T,
+}
+
 // TODO: should be properly shared between medea and jason
 #[allow(dead_code)]
 #[cfg_attr(test, derive(Debug, PartialEq))]
@@ -65,8 +110,9 @@ pub enum Command {
 #[dispatchable]
 #[cfg_attr(feature = "medea", derive(Serialize))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
-#[cfg_attr(test, derive(Debug, PartialEq))]
+#[cfg_attr(test, derive(PartialEq))]
 #[serde(tag = "event", content = "data")]
+#[derive(Debug)]
 pub enum Event {
     /// Media Server notifies Web Client about necessity of RTCPeerConnection
     /// creation.
@@ -105,7 +151,8 @@ pub struct IceCandidate {
 /// [`Track`] with specified direction.
 #[cfg_attr(feature = "medea", derive(Serialize))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
-#[cfg_attr(test, derive(Debug, PartialEq))]
+#[cfg_attr(test, derive(PartialEq))]
+#[derive(Debug)]
 pub struct Track {
     pub id: u64,
     pub direction: Direction,
@@ -132,7 +179,8 @@ pub struct IceServer {
 /// Direction of [`Track`].
 #[cfg_attr(feature = "medea", derive(Serialize))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
-#[cfg_attr(test, derive(Debug, PartialEq))]
+#[cfg_attr(test, derive(PartialEq))]
+#[derive(Debug)]
 // TODO: Use different struct without mids in TracksApplied event.
 pub enum Direction {
     Send {
