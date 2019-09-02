@@ -116,14 +116,16 @@ up.jason:
 #
 # Usage:
 #	make up.medea [dockerized=(NO|yes)] [background=(NO|yes)
-#	               [logs=(NO|yes)]] [TAG=(dev|<docker-tag>)]
+#	              [logs=(NO|yes)]] [TAG=(dev|<docker-tag>)]
+#                 [registry=(dockerhub|<custom-registry>)]
 
+docker-image-name = $(if $(call eq,$(registry),),,$(registry)/)$(MEDEA_IMAGE_NAME)
 docker-up-tag = $(if $(call eq,$(TAG),),dev,$(TAG))
 
 up.medea:
 ifeq ($(dockerized),yes)
 	@make down.medea dockerized=yes
-	COMPOSE_IMAGE_NAME=$(MEDEA_IMAGE_NAME) \
+	COMPOSE_IMAGE_NAME=$(docker-image-name) \
 	COMPOSE_IMAGE_VER=$(docker-up-tag) \
 	docker-compose -f docker-compose.medea.yml up \
 		$(if $(call eq,$(background),yes),-d,--abort-on-container-exit)
@@ -296,6 +298,7 @@ endif
 # Usage:
 # 	make test.e2e [dockerized=(YES|no)] [logs=(yes|NO)]
 #				  [release=(NO|yes)] [TAG=(dev|<docker-tag>)]
+#                 [registry=(dockerhub|<custom-registry>)]
 
 medea-env = RUST_BACKTRACE=1 \
 	$(if $(call eq,$(logs),yes),,RUST_LOG=warn) \
@@ -310,7 +313,7 @@ endif
 ifeq ($(dockerized),no)
 	env $(medea-env) $(if $(call eq,$(logs),yes),,RUST_LOG=warn) cargo run $(if $(call eq,$(release),yes),--release) &
 else
-	env $(medea-env) make up.medea dockerized=yes background=yes logs=$(logs) TAG=$(TAG) &
+	env $(medea-env) make up.medea dockerized=yes background=yes logs=$(logs) TAG=$(TAG) registry=$(registry) &
 endif
 	sleep 5
 	RUST_BACKTRACE=1 cargo test --test e2e
@@ -389,10 +392,10 @@ docker.build.demo:
 #
 # Usage:
 #	make docker.build.medea [TAG=(dev|<tag>)] [debug=(yes|no)]
-#	                        [no-cache=(no|yes)]
-#	                        [minikube=(no|yes)]
+#	                        [no-cache=(no|yes)] [minikube=(no|yes)]
+#                           [registry=(dockerhub|<custom-registry>)]
 
-docker-build-medea-image-name = $(MEDEA_IMAGE_NAME)
+docker-build-medea-image-name = $(if $(call eq,$(registry),),,$(registry)/)$(MEDEA_IMAGE_NAME)
 
 docker.build.medea:
 ifneq ($(no-cache),yes)
@@ -441,39 +444,6 @@ docker.down.demo:
 
 docker.up.demo: docker.down.demo
 	docker-compose -f jason/demo/docker-compose.yml up
-
-
-# Save project Docker images in a tarball file.
-#
-# Usage:
-#	make docker.tar [IMAGE=(<empty>|<docker-image-postfix>)]
-#	                [TAGS=(dev|<t1>[,<t2>...])]
-
-docker-tar-image-name = $(MEDEA_IMAGE_NAME)$(if $(call eq,$(IMAGE),),,/$(IMAGE))
-docker-tar-dir = .cache/docker/$(docker-tar-image-name)
-docker-tar-tags = $(if $(call eq,$(TAGS),),dev,$(TAGS))
-
-docker.tar:
-	@mkdir -p $(docker-tar-dir)/
-	docker save \
-		-o $(docker-tar-dir)/$(subst $(comma),_,$(docker-tar-tags)).tar \
-		$(foreach tag,$(subst $(comma), ,$(docker-tar-tags)),\
-			$(docker-tar-image-name):$(tag))
-
-
-# Load project Docker images from a tarball file.
-#
-# Usage:
-#	make docker.untar [IMAGE=(<empty>|<docker-image-postfix>)]
-#	                  [TAGS=(dev|<t1>[,<t2>...])]
-
-docker-untar-image-name = $(MEDEA_IMAGE_NAME)$(if $(call eq,$(IMAGE),),,/$(IMAGE))
-docker-untar-dir = .cache/docker/$(docker-untar-image-name)
-docker-untar-tags = $(if $(call eq,$(TAGS),),dev,$(TAGS))
-
-docker.untar:
-	docker load \
-		-i $(docker-untar-dir)/$(subst $(comma),_,$(docker-untar-tags)).tar
 
 
 

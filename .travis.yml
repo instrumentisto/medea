@@ -49,11 +49,10 @@ jobs:
         apt:
           packages:
             - pass
-      script:
-        - make docker.build.medea debug=no TAG=${TRAVIS_BUILD_ID}
+      script: make docker.build.medea debug=no TAG=${TRAVIS_BUILD_ID} registry=quay.io
+      after_script:
         - ./ci/docker-pass.sh
         - echo "$QUAYIO_PASS" | docker login quay.io -u "$QUAYIO_USER" --password-stdin
-        - docker tag instrumentisto/medea:${TRAVIS_BUILD_ID} quay.io/alexlapa/medea:${TRAVIS_BUILD_ID}
         - docker push quay.io/alexlapa/medea:${TRAVIS_BUILD_ID}
 
 #    - name: medea (beta)
@@ -71,13 +70,11 @@ jobs:
 #      rust: stable
 #      script: make test.unit crate=@all
 #
-#    - name: e2e signalling (stable)
-#      stage: test
-#      rust: stable
-#      script:
-#        - ls .cache/
-#        - make docker.untar TAGS=${TRAVIS_BUILD_ID}
-#        - make test.e2e dockerized=yes logs=yes TAG=${TRAVIS_BUILD_ID}
+    - name: e2e signalling (stable)
+      stage: test
+      rust: stable
+      script:
+        - make test.e2e dockerized=yes logs=yes TAG=${TRAVIS_BUILD_ID} registry=quay.io
 
     - name: crates.io
       stage: release
