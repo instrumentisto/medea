@@ -45,8 +45,13 @@ jobs:
     - name: medea docker (stable)
       stage: build
       rust: stable
+      addons:
+        apt:
+          packages:
+            - pass
       script:
 #        - make docker.build.medea debug=no TAG=${TRAVIS_BUILD_ID}
+        - ./ci/docker-pass.sh
         - echo "$QUAYIO_PASS" | docker login quay.io -u "$QUAYIO_USER" --password-stdin
 #        - make docker.tar TAGS=${TRAVIS_BUILD_ID}
 #        - ls .cache/docker/
