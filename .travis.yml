@@ -59,18 +59,21 @@ jobs:
       stage: test
       rust: stable
       env: DONT_INSTALL_PROTOC=1
+      cache: cargo
       script: make test.e2e.signalling
 
     - name: e2e (latest Firefox, stable Rust)
       stage: test
       rust: stable
       env: DONT_INSTALL_PROTOC=1
+      cache: cargo
       script: make test.e2e.firefox
 
     - name: e2e (latest Chrome, stable Rust)
       stage: test
       rust: stable
       env: DONT_INSTALL_PROTOC=1
+      cache: cargo
       script: make test.e2e.chrome
 
     - name: crates.io
