@@ -19,6 +19,7 @@ pub use self::{
     member::{Id as MemberId, MemberSpec},
     room::{Id as RoomId, RoomElement, RoomSpec},
 };
+use std::fs::ReadDir;
 
 #[derive(Clone, Deserialize, Debug)]
 #[serde(tag = "kind")]
@@ -55,12 +56,12 @@ pub fn load_from_yaml_file<P: AsRef<Path>>(path: P) -> Result<RoomSpec, Error> {
     Ok(room)
 }
 
-/// Load all [`RoomSpec`] from YAML files from provided path.
-pub fn load_static_specs_from_dir<P: AsRef<Path>>(
-    path: P,
+/// Load all [`RoomSpec`] from YAML files from provided [`ReadDir`].
+pub fn load_static_specs_from_dir(
+    dir: ReadDir,
 ) -> Result<Vec<RoomSpec>, Error> {
     let mut specs = Vec::new();
-    for entry in std::fs::read_dir(path)? {
+    for entry in dir {
         let entry = entry?;
         let spec = load_from_yaml_file(entry.path())?;
         specs.push(spec)

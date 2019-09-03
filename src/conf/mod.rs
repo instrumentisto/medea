@@ -1,5 +1,6 @@
 //! Provides application configuration options.
 
+pub mod control;
 pub mod log;
 pub mod rpc;
 pub mod server;
@@ -14,6 +15,7 @@ use serde::{Deserialize, Serialize};
 
 #[doc(inline)]
 pub use self::{
+    control::Control,
     log::Log,
     rpc::Rpc,
     server::Server,
@@ -42,6 +44,8 @@ pub struct Conf {
     pub log: Log,
     /// Application shutdown settings.
     pub shutdown: Shutdown,
+    /// Control API settings.
+    pub control: Control,
 }
 
 impl Conf {
