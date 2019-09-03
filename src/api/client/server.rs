@@ -156,7 +156,7 @@ mod test {
     /// Creates [`RoomsRepository`] for tests filled with a single [`Room`].
     fn room(conf: Rpc) -> RoomsRepository {
         let room_spec =
-            control::load_from_yaml_file("tests/specs/pub_sub_video_call.yml")
+            control::load_from_yaml_file("tests/specs/pub-sub-video-call.yml")
                 .unwrap();
 
         let room_id = room_spec.id.clone();
