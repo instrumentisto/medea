@@ -30,9 +30,12 @@ pub struct TestMember {
     /// and display all events of this [`TestMember`]).
     events: Vec<Event>,
 
+    /// Max test lifetime, will panic when it will be exceeded.
+    deadline: Option<Duration>,
+
     /// Function which will be called at every received by this [`TestMember`]
     /// [`Event`].
-    test_fn: Box<dyn FnMut(&Event, &mut Context<TestMember>)>,
+    on_message: Box<dyn FnMut(&Event, &mut Context<TestMember>)>,
 }
 
 impl TestMember {
@@ -40,13 +43,12 @@ impl TestMember {
     /// Most likely, this ping will never be sent,
     /// because it has been established that it is sent once per 3 seconds,
     /// and there are simply no tests that last so much.
-    fn heartbeat(&self, ctx: &mut Context<Self>) {
-        ctx.run_later(Duration::from_secs(3), |act, ctx| {
+    fn start_heartbeat(&self, ctx: &mut Context<Self>) {
+        ctx.run_interval(Duration::from_secs(3), |act, _| {
             act.writer
                 .start_send(WsMessage::Text(r#"{"ping": 1}"#.to_string()))
                 .unwrap();
             act.writer.poll_complete().unwrap();
-            act.heartbeat(ctx);
         });
     }
 
@@ -58,25 +60,27 @@ impl TestMember {
     }
 
     /// Start test member in new [`Arbiter`] by given URI.
-    /// `test_fn` - is function which will be called at every [`Event`]
+    /// `on_message` - is function which will be called at every [`Event`]
     /// received from server.
     pub fn start(
         uri: &str,
-        test_fn: Box<dyn FnMut(&Event, &mut Context<TestMember>)>,
+        on_message: Box<dyn FnMut(&Event, &mut Context<TestMember>)>,
+        deadline: Option<Duration>,
     ) {
         Arbiter::spawn(
             awc::Client::new()
                 .ws(uri)
                 .connect()
                 .map_err(|e| panic!("Error: {}", e))
-                .map(|(_, framed)| {
+                .map(move |(_, framed)| {
                     let (sink, stream) = framed.split();
-                    TestMember::create(|ctx| {
+                    TestMember::create(move |ctx| {
                         TestMember::add_stream(stream, ctx);
                         TestMember {
                             writer: sink,
                             events: Vec::new(),
-                            test_fn,
+                            deadline,
+                            on_message,
                         }
                     });
                 }),
@@ -91,14 +95,17 @@ impl Actor for TestMember {
     /// The timer is needed because some tests may just stuck
     /// and listen socket forever.
     fn started(&mut self, ctx: &mut Self::Context) {
-        self.heartbeat(ctx);
-        ctx.run_later(Duration::from_secs(5), |act, _ctx| {
-            panic!(
-                "This test lasts more than 5 seconds. Most likely, this is \
-                 not normal. Here is all events of member: {:?}",
-                act.events
-            );
-        });
+        self.start_heartbeat(ctx);
+
+        if let Some(deadline) = self.deadline {
+            ctx.run_later(deadline, |act, _ctx| {
+                panic!(
+                    "This test lasts more than 5 seconds. Most likely, this \
+                     is not normal. Here is all events of member: {:?}",
+                    act.events
+                );
+            });
+        }
     }
 }
 
@@ -124,7 +131,7 @@ impl Handler<CloseSocket> for TestMember {
 
 impl StreamHandler<Frame, WsProtocolError> for TestMember {
     /// Basic signalling implementation.
-    /// A `TestMember::test_fn` [`FnMut`] function will be called for each
+    /// A `TestMember::on_message` [`FnMut`] function will be called for each
     /// [`Event`] received from test server.
     fn handle(&mut self, msg: Frame, ctx: &mut Context<Self>) {
         if let Frame::Text(txt) = msg {
@@ -133,7 +140,7 @@ impl StreamHandler<Frame, WsProtocolError> for TestMember {
             if let Ok(event) = event {
                 self.events.push(event.clone());
                 // Test function call
-                (self.test_fn)(&event, ctx);
+                (self.on_message)(&event, ctx);
 
                 if let Event::PeerCreated {
                     peer_id,

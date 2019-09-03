@@ -8,10 +8,7 @@ async function f() {
     let responder_room = await responder.join_room("ws://localhost:8080/ws/pub-pub-video-call/responder/test");
 
     caller_room.on_new_connection(function (connection) {
-        console.log("caller got new connection with member " + connection.member_id());
         connection.on_remote_stream(function (stream) {
-            console.log("got video from remote member " + connection.member_id());
-
             var video = document.createElement("video");
 
             video.srcObject = stream.get_media_stream();
@@ -43,9 +40,7 @@ async function f() {
         }
     });
     responder_room.on_new_connection(function (connection) {
-        console.log("responder got new connection with member " + connection.member_id());
         connection.on_remote_stream(function (stream) {
-            console.log("got video from remote member " + connection.member_id());
 
             var video = document.createElement("video");
 

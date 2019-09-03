@@ -5,7 +5,6 @@ use std::{
     rc::{Rc, Weak},
 };
 
-use medea_client_api_proto::PeerId;
 use wasm_bindgen::prelude::*;
 
 use crate::{
@@ -18,7 +17,6 @@ use crate::{
 /// Shared between JS side ([`ConnectionHandle`]) and
 /// Rust side ([`Connection`]).
 struct InnerConnection {
-    remote_member: PeerId,
     on_remote_stream: Callback<MediaStreamHandle>,
 }
 
@@ -44,14 +42,6 @@ impl ConnectionHandle {
             })
             .ok_or_else(|| WasmErr::from("Detached state").into())
     }
-
-    /// Returns ID of the remote `Member`.
-    pub fn member_id(&self) -> Result<u64, JsValue> {
-        self.0
-            .upgrade()
-            .map(|conn| conn.borrow().remote_member.0)
-            .ok_or_else(|| WasmErr::from("Detached state").into())
-    }
 }
 
 /// Connection with a specific remote [`Member`], that is used on Rust side.
@@ -62,9 +52,8 @@ pub(crate) struct Connection(Rc<RefCell<InnerConnection>>);
 impl Connection {
     /// Instantiates new [`Connection`] for a given [`Member`].
     #[inline]
-    pub(crate) fn new(member_id: PeerId) -> Self {
+    pub(crate) fn new() -> Self {
         Self(Rc::new(RefCell::new(InnerConnection {
-            remote_member: member_id,
             on_remote_stream: Callback::default(),
         })))
     }

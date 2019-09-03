@@ -6,6 +6,7 @@
 use std::fmt;
 
 use failure::Fail;
+use url::Url;
 
 use crate::api::control::endpoints::webrtc_play_endpoint::SrcUri;
 
@@ -19,15 +20,24 @@ pub enum LocalUriParseError {
     NotLocal(String),
 
     /// Too many paths in provided URI.
-    #[fail(display = "Too many ({}) paths in provided URI.", _0)]
-    TooManyFields(usize, String),
+    #[fail(display = "Too many paths in provided URI ({}).", _0)]
+    TooManyFields(String),
 
     #[fail(display = "Missing fields. {}", _0)]
     MissingFields(String),
 
+    #[fail(display = "Error while parsing URL. {:?}", _0)]
+    UrlParseErr(url::ParseError),
+
     /// Provided empty `&str`.
     #[fail(display = "You provided empty local uri.")]
     Empty,
+}
+
+impl From<url::ParseError> for LocalUriParseError {
+    fn from(from: url::ParseError) -> Self {
+        Self::UrlParseErr(from)
+    }
 }
 
 /// State of [`LocalUri`] which points to `Room`.
@@ -199,34 +209,39 @@ impl LocalUriInner {
         if value.is_empty() {
             return Err(LocalUriParseError::Empty);
         }
-        let protocol_name: String = value.chars().take(8).collect();
-        if protocol_name != "local://" {
+
+        let url = Url::parse(value)?;
+        if url.scheme() != "local" {
             return Err(LocalUriParseError::NotLocal(value.to_string()));
         }
 
-        let uri_body = value.chars().skip(8).collect::<String>();
-        let mut uri_body_splitted: Vec<&str> = uri_body.rsplit('/').collect();
-        let uri_body_splitted_len = uri_body_splitted.len();
-
-        if uri_body_splitted_len > 3 {
-            return Err(LocalUriParseError::TooManyFields(
-                uri_body_splitted_len,
-                value.to_string(),
-            ));
-        }
-
-        let room_id = uri_body_splitted
-            .pop()
-            .filter(|p| !p.is_empty())
-            .map(|p| RoomId(p.to_string()));
-        let member_id = uri_body_splitted
-            .pop()
-            .filter(|p| !p.is_empty())
-            .map(|p| MemberId(p.to_string()));
-        let endpoint_id = uri_body_splitted
-            .pop()
-            .filter(|p| !p.is_empty())
+        let room_id = url
+            .host()
+            .map(|id| id.to_string())
+            .filter(|id| !id.is_empty())
+            .map(RoomId);
+        let mut path = match url.path_segments() {
+            Some(path) => path,
+            None => {
+                return Ok(Self {
+                    room_id,
+                    member_id: None,
+                    endpoint_id: None,
+                })
+            }
+        };
+        let member_id = path
+            .next()
+            .filter(|id| !id.is_empty())
+            .map(|id| MemberId(id.to_string()));
+        let endpoint_id = path
+            .next()
+            .filter(|id| !id.is_empty())
             .map(std::string::ToString::to_string);
+
+        if path.next().is_some() {
+            return Err(LocalUriParseError::TooManyFields(value.to_string()));
+        }
 
         Ok(Self {
             room_id,
@@ -328,7 +343,7 @@ mod tests {
         if let LocalUriType::Room(room) = local_uri {
             assert_eq!(room.take_room_id(), RoomId("room_id".to_string()));
         } else {
-            unreachable!();
+            unreachable!("{:?}", local_uri);
         }
     }
 
@@ -365,11 +380,11 @@ mod tests {
 
     #[test]
     fn returns_parse_error_if_local_uri_not_local() {
-        match LocalUriType::parse("not_local://room_id") {
+        match LocalUriType::parse("not-local://room_id") {
             Ok(_) => unreachable!(),
             Err(e) => match e {
                 LocalUriParseError::NotLocal(_) => (),
-                _ => unreachable!(),
+                _ => unreachable!("Unreachable LocalUriParseError: {:?}", e),
             },
         }
     }
@@ -390,7 +405,7 @@ mod tests {
         match LocalUriType::parse("local://room/member/endpoint/too_many") {
             Ok(_) => unreachable!(),
             Err(e) => match e {
-                LocalUriParseError::TooManyFields(_, _) => (),
+                LocalUriParseError::TooManyFields(_) => (),
                 _ => unreachable!(),
             },
         }

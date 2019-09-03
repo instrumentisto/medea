@@ -4,9 +4,7 @@
 
 use std::cell::RefCell;
 
-use medea_client_api_proto::MediaType;
-
-use medea_client_api_proto::TrackId as Id;
+use medea_client_api_proto::{MediaType, TrackId as Id};
 
 /// Representation of [MediaStreamTrack][1] object.
 ///

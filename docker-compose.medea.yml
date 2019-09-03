@@ -4,15 +4,14 @@ services:
   medea:
     container_name: ${COMPOSE_PROJECT_NAME}
     image: ${COMPOSE_IMAGE_NAME}:${COMPOSE_IMAGE_VER}
-    build: .
     ports:
-      - "${MEDEA_SERVER_BIND_PORT}:${MEDEA_SERVER_BIND_PORT}"
+      - "8080:8080"
     volumes:
-      - ./${MEDEA_SERVER_STATIC_SPECS_PATH}:/${MEDEA_SERVER_STATIC_SPECS_PATH}
+      - ${MEDEA_SERVER_STATIC_SPECS_PATH}:/specs
       - ./config.toml:/config.toml
     network_mode: "host"
     environment:
       RUST_LOG: ${RUST_LOG}
       MEDEA_CONF: "config.toml"
       MEDEA_SERVER.HTTP.BIND_PORT: ${MEDEA_SERVER_BIND_PORT}
-      MEDEA_SERVER.HTTP.STATIC_SPECS_PATH: ${MEDEA_SERVER_STATIC_SPECS_PATH}
+      MEDEA_SERVER.HTTP.STATIC_SPECS_PATH: /specs

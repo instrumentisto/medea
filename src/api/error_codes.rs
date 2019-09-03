@@ -264,7 +264,7 @@ impl From<LocalUriParseError> for ErrorResponse {
             LocalUriParseError::NotLocal(text) => {
                 Self::new(ElementIdIsNotLocal, &text)
             }
-            LocalUriParseError::TooManyFields(_, text) => {
+            LocalUriParseError::TooManyFields(text) => {
                 Self::new(ErrorCode::ElementIdIsTooLong, &text)
             }
             LocalUriParseError::Empty => {
@@ -272,6 +272,9 @@ impl From<LocalUriParseError> for ErrorResponse {
             }
             LocalUriParseError::MissingFields(text) => {
                 Self::new(ErrorCode::MissingFieldsInSrcUri, &text)
+            }
+            LocalUriParseError::UrlParseErr(_) => {
+                Self::new(ErrorCode::InvalidSrcUri, &err.to_string())
             }
         }
     }

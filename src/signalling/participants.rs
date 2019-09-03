@@ -134,6 +134,7 @@ impl ParticipantService {
         })
     }
 
+    // TODO: try return ref
     /// Lookup [`Member`] by provided id.
     pub fn get_member_by_id(&self, id: &MemberId) -> Option<Member> {
         self.members.get(id).cloned()
@@ -184,7 +185,7 @@ impl ParticipantService {
         match self.get_member_by_id(member_id) {
             Some(member) => {
                 if member.credentials().eq(credentials) {
-                    Ok(member.clone())
+                    Ok(member)
                 } else {
                     Err(AuthorizationError::InvalidCredentials)
                 }
@@ -233,12 +234,12 @@ impl ParticipantService {
                     ),
                 )));
             }
-            Some(member) => member,
+            Some(member) => member.clone(),
         };
 
         // lookup previous member connection
         if let Some(mut connection) = self.connections.remove(&member_id) {
-            debug!("Closing old RpcConnection for participant {}", member_id);
+            debug!("Closing old RpcConnection for participant {}", &member_id);
 
             // cancel RpcConnection close task, since connection is
             // reestablished
@@ -259,7 +260,7 @@ impl ParticipantService {
                 })
                 .and_then(
                     move |ice: IceUser, room: &mut Room, _| {
-                        room.members.insert_connection(member_id.clone(), con);
+                        room.members.insert_connection(member_id, con);
                         member.replace_ice_user(ice);
 
                         wrap_future(future::ok(member))
@@ -293,7 +294,6 @@ impl ParticipantService {
             ClosedReason::Closed => {
                 debug!("Connection for member [id = {}] removed.", member_id);
                 self.connections.remove(&member_id);
-
                 ctx.spawn(wrap_future(
                     self.delete_ice_user(&member_id).map_err(|err| {
                         error!("Error deleting IceUser {:?}", err)
@@ -362,7 +362,7 @@ impl ParticipantService {
         let remove_ice_users = Box::new({
             let mut room_users = Vec::with_capacity(self.members.len());
 
-            self.members.iter().for_each(|(_, data)| {
+            self.members.values().for_each(|data| {
                 if let Some(ice_user) = data.take_ice_user() {
                     room_users.push(ice_user);
                 }

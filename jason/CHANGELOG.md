@@ -13,8 +13,6 @@ All user visible changes to this project will be documented in this file. This p
 
 ### Changed
 
-- Use track ID and peer ID from `medea-client-api-proto` ([#28](/../../pull/28))
-
 
 
 

@@ -3,7 +3,7 @@
 //! [coturn]: https://github.com/coturn/coturn
 //! [TURN]: https://webrtcglossary.com/turn/
 
-use std::fmt;
+use std::{fmt, sync::Arc};
 
 use actix::{
     fut::wrap_future, Actor, ActorFuture, Addr, Context, Handler, MailboxError,
@@ -22,15 +22,11 @@ use crate::{
     turn::repo::{TurnDatabase, TurnDatabaseErr},
 };
 
-/// Boxed [`TurnAuthService`] which can be [`Sync`] and [`Send`].
-#[allow(clippy::module_name_repetitions)]
-pub type BoxedTurnAuthService = Box<dyn TurnAuthService + Sync + Send>;
-
 static TURN_PASS_LEN: usize = 16;
 
 #[allow(clippy::module_name_repetitions)]
 /// Manages Turn server credentials.
-pub trait TurnAuthService: fmt::Debug + Send {
+pub trait TurnAuthService: fmt::Debug + Send + Sync {
     /// Generates and registers Turn credentials.
     fn create(
         &self,
@@ -161,9 +157,9 @@ struct Service {
 
 /// Create new instance [`TurnAuthService`].
 #[allow(clippy::module_name_repetitions)]
-pub fn new_turn_auth_service(
+pub fn new_turn_auth_service<'a>(
     cf: &conf::Turn,
-) -> impl Future<Item = BoxedTurnAuthService, Error = TurnServiceErr> {
+) -> impl Future<Item = Arc<dyn TurnAuthService + 'a>, Error = TurnServiceErr> {
     let db_pass = cf.db.redis.pass.clone();
     let turn_address = cf.addr();
     let turn_username = cf.user.clone();
@@ -191,7 +187,7 @@ pub fn new_turn_auth_service(
         turn_password,
         static_user: None,
     })
-    .map::<_, BoxedTurnAuthService>(|service| Box::new(service.start()))
+    .map::<_, Arc<dyn TurnAuthService>>(|service| Arc::new(service.start()))
     .map_err(TurnServiceErr::from)
 }
 
@@ -323,7 +319,7 @@ pub mod test {
     }
 
     #[allow(clippy::module_name_repetitions)]
-    pub fn new_turn_auth_service_mock() -> BoxedTurnAuthService {
-        Box::new(TurnAuthServiceMock {})
+    pub fn new_turn_auth_service_mock() -> Arc<dyn TurnAuthService> {
+        Arc::new(TurnAuthServiceMock {})
     }
 }

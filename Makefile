@@ -41,7 +41,7 @@ endif
 # Aliases #
 ###########
 
-build: docker.build.medea build.medea build.jason
+build: build.medea docker.build.medea build.jason
 
 
 # Resolve all project dependencies.
@@ -84,17 +84,11 @@ down.demo: docker.down.demo
 
 # Run Coturn STUN/TURN server.
 #
-# Defaults:
-# 	logs=no
-#
 # Usage:
-#	make up.coturn [logs=(yes|no)]
+#	make up.coturn
 
-up.coturn:
+up.coturn: down.coturn
 	docker-compose -f docker-compose.coturn.yml up -d
-ifeq ($(logs),yes)
-	docker-compose -f docker-compose.coturn.yml logs &
-endif
 
 
 up.demo: docker.up.demo
@@ -105,8 +99,8 @@ up.demo: docker.up.demo
 # Usage:
 #	make up.dev
 
-up.dev:
-	$(MAKE) -j3 up.coturn up.jason up.medea
+up.dev: up.coturn
+	$(MAKE) -j2 up.jason up.medea
 
 
 # Run Jason E2E demo in development mode.
@@ -118,21 +112,30 @@ up.jason:
 	npm run start --prefix=jason/e2e-demo
 
 
-
-# Run Medea media server in development mode.
-#
-# Defaults:
-# 	dockerized=no
+# Run Medea media server.
 #
 # Usage:
-#	make up.medea  [dockerized=(yes|no)]
+#	make up.medea [dockerized=(NO|yes)] [background=(NO|yes)
+#	              [logs=(NO|yes)]] [TAG=(dev|<docker-tag>)]
+#                 [registry=(dockerhub|<custom-registry>)]
 
-up.medea: up.coturn
+docker-image-name = $(if $(call eq,$(registry),),,$(registry)/)$(MEDEA_IMAGE_NAME)
+docker-up-tag = $(if $(call eq,$(TAG),),dev,$(TAG))
+
+up.medea:
 ifeq ($(dockerized),yes)
-	@make down.medea
-	docker-compose -f docker-compose.medea.yml up
-	@make down.coturn
+	@make down.medea dockerized=yes
+	COMPOSE_IMAGE_NAME=$(docker-image-name) \
+	COMPOSE_IMAGE_VER=$(docker-up-tag) \
+	docker-compose -f docker-compose.medea.yml up \
+		$(if $(call eq,$(background),yes),-d,--abort-on-container-exit)
+ifeq ($(background),yes)
+ifeq ($(logs),yes)
+	docker-compose -f docker-compose.medea.yml logs -f
+endif
+endif
 else
+	@make down.medea dockerized=no
 	cargo run --bin medea
 endif
 
@@ -153,11 +156,8 @@ down:
 
 # Stop Medea media server.
 #
-# Defaults:
-# 	dockerized=no
-#
 # Usage:
-# 	make down.medea [dockerized=(yes|no)]
+# 	make down.medea [dockerized=(NO|yes)]
 
 down.medea:
 ifeq ($(dockerized),yes)
@@ -299,47 +299,28 @@ endif
 # If logs set to "yes" then medea print all logs to stdout.
 #
 # Usage:
-# 	make test.e2e [dockerized=(YES|no)] [logs=(yes|NO)] [coturn=(YES|no)]
+# 	make test.e2e [dockerized=(YES|no)] [logs=(yes|NO)]
+#				  [release=(NO|yes)] [TAG=(dev|<docker-tag>)]
+#                 [registry=(dockerhub|<custom-registry>)]
 
 medea-env = RUST_BACKTRACE=1 \
-	MEDEA_SERVER.HTTP.BIND_PORT=8081 \
 	$(if $(call eq,$(logs),yes),,RUST_LOG=warn) \
-	MEDEA_SERVER.HTTP.STATIC_SPECS_PATH=tests/specs
+	MEDEA_SERVER.STATIC_SPECS_PATH=./tests/specs \
+	MEDEA_SERVER_STATIC_SPECS_PATH=./tests/specs
 
 test.e2e:
+	-@make down
 ifneq ($(coturn),no)
 	@make up.coturn
 endif
 ifeq ($(dockerized),no)
-	-@make down.medea dockerized=no
-
-	cargo build $(if $(call eq,$(release),yes),--release)
-	env $(medea-env) $(if $(call eq,$(logs),yes),,RUST_LOG=warn) cargo run --bin medea $(if $(call eq,$(release),yes),--release) &
-
-	sleep 1
-	cargo test --test e2e
-
-	-@make down
-ifneq ($(coturn),no)
-	-@make down.coturn
-endif
-	-@exit $(.SHELLSTATUS)
+	env $(medea-env) $(if $(call eq,$(logs),yes),,RUST_LOG=warn) cargo run $(if $(call eq,$(release),yes),--release) &
 else
-	-@make down.medea dockerized=yes
-	-@make down.medea dockerized=no
-
-	@make up.coturn
-
-	docker build -t medea-build -f build/medea/Dockerfile .
-	docker run --rm --network=host -v "$(PWD)":/app -w /app \
-				-u $(shell id -u):$(shell id -g) \
-				-v "$(HOME)/.cargo/registry":/usr/local/cargo/registry \
-			   	-v "$(PWD)/target":/app/target \
-		medea-build:latest \
-			make test.e2e dockerized=no coturn=no release=yes
-
-	-@make down.coturn
+	env $(medea-env) make up.medea dockerized=yes background=yes logs=$(logs) TAG=$(TAG) registry=$(registry) &
 endif
+	sleep 5
+	RUST_BACKTRACE=1 cargo test --test e2e
+	-@make down
 
 
 
@@ -410,21 +391,30 @@ docker.build.demo:
 		jason/demo
 
 
+# Build medea's build image.
+#
+# Usage:
+#   make docker.build.medea-build
+
+docker.build.medea-build:
+	docker build -t medea-build -f build/medea/Dockerfile .
+
+
 # Build medea project Docker image.
 #
 # Usage:
 #	make docker.build.medea [TAG=(dev|<tag>)] [debug=(yes|no)]
-#	                        [no-cache=(no|yes)]
-#	                        [minikube=(no|yes)]
+#	                        [no-cache=(no|yes)] [minikube=(no|yes)]
+#                           [registry=(dockerhub|<custom-registry>)]
 
-docker-build-medea-image-name = $(MEDEA_IMAGE_NAME)
+docker-build-medea-image-name = $(if $(call eq,$(registry),),,$(registry)/)$(MEDEA_IMAGE_NAME)
 
-docker.build.medea:
+docker.build.medea: docker.build.medea-build
 ifneq ($(no-cache),yes)
 	docker run --rm --network=host -v "$(PWD)":/app -w /app \
 	           -u $(shell id -u):$(shell id -g) \
 	           -e CARGO_HOME=.cache/cargo \
-		rust:$(RUST_VER) \
+		medea-build:latest \
 			cargo build --bin=medea \
 				$(if $(call eq,$(debug),no),--release,)
 endif
@@ -653,19 +643,19 @@ endef
 # Build medea.
 #
 # Usage:
-#   make build.medea [dockerized=(no|yes)]
+#   make build.medea [dockerized=(NO|yes)] [release=(NO|yes)]
 
 build.medea:
 ifneq ($(dockerized),yes)
-	cargo build --bin medea
+	cargo build --bin medea $(if $(call eq,$(release),yes),--release)
 else
 	docker run --rm \
 		-v "$(PWD)":/app -w /app \
 		-u $(shell id -u):$(shell id -g) \
 		-v "$(HOME)/.cargo/registry":/usr/local/cargo/registry \
 		-v "$(PWD)/target":/app/target \
-		rust:latest \
-		make build.medea
+		rust:$(RUST_VER) \
+		make build.medea release=$(release)
 endif
 
 
@@ -685,7 +675,7 @@ else
 		-v "$(PWD)/target":/app/target \
 		--env XDG_CACHE_HOME=$(HOME) \
 		-v "$(HOME):$(HOME)" \
-		rust:latest \
+		rust:$(RUST_VER) \
 		sh -c "curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh && make build.jason"
 endif
 
