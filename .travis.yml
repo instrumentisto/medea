@@ -7,12 +7,21 @@ env:
 
 cache: cargo
 
-services:
-  - docker
-
 install:
   - rustc -vV
   - cargo -vV
+
+stages:
+  - name: check
+    if: (branch = master AND type != pull_request) OR commit_message =~ /.*\[run ci\]/
+  - name: build
+    if: (branch = master AND type != pull_request) OR commit_message =~ /.*\[run ci\]/
+  - name: build_beta
+    if: branch = master
+  - name: test
+    if: (branch = master AND type != pull_request) OR commit_message =~ /.*\[run ci\]/
+  - name: tests
+    if: (branch = master AND type != pull_request) OR commit_message =~ /.*\[run ci\]/
 
 jobs:
   allow_failures:
@@ -44,10 +53,12 @@ jobs:
     - name: medea docker (stable)
       stage: build
       rust: stable
-      script: make docker.build.medea debug=no TAG=${TRAVIS_BUILD_ID} registry=quay.io
+      script: make docker.build.medea debug=no TAG=build-${TRAVIS_BUILD_ID} registry=quay.io
+      services:
+        - docker
       after_script:
         - echo "$QUAYIO_PASS" | docker login quay.io -u "$QUAYIO_USER" --password-stdin
-        - docker push quay.io/instrumentisto/medea:${TRAVIS_BUILD_ID}
+        - docker push quay.io/instrumentisto/medea:build-${TRAVIS_BUILD_ID}
 
     - name: medea (beta)
       stage: build_beta
@@ -67,8 +78,10 @@ jobs:
     - name: e2e signalling (stable)
       stage: test
       rust: stable
+      services:
+        - docker
       script:
-        - make test.e2e dockerized=yes logs=yes TAG=${TRAVIS_BUILD_ID} registry=quay.io
+        - make test.e2e dockerized=yes logs=yes TAG=build-${TRAVIS_BUILD_ID} registry=quay.io
 
     - name: crates.io
       stage: release
@@ -121,18 +134,6 @@ jobs:
         name: $TRAVIS_TAG
         on:
           tags: true
-
-stages:
-  - name: check
-    if: (branch = master AND type != pull_request) OR commit_message =~ /.*\[run ci\]/
-  - name: build
-    if: (branch = master AND type != pull_request) OR commit_message =~ /.*\[run ci\]/
-  - name: build_beta
-    if: branch = master
-  - name: test
-    if: (branch = master AND type != pull_request) OR commit_message =~ /.*\[run ci\]/
-  - name: tests
-    if: (branch = master AND type != pull_request) OR commit_message =~ /.*\[run ci\]/
 
 notifications:
   email:
