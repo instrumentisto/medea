@@ -1,4 +1,9 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{
+    cell::RefCell,
+    collections::hash_map::DefaultHasher,
+    hash::{Hash as _, Hasher as _},
+    rc::Rc,
+};
 
 use futures::Future;
 use medea_client_api_proto::IceServer;
@@ -81,6 +86,8 @@ struct InnerPeer {
     /// [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
     peer: Rc<SysRtcPeerConnection>,
 
+    hashed_ice_candidates: Vec<u64>,
+
     /// [`onicecandidate`][2] callback of [RTCPeerConnection][1] to handle
     /// [`icecandidate`][3] event. It fires when [RTCPeerConnection][1]
     /// discovers a new [RTCIceCandidate][4].
@@ -122,6 +129,7 @@ impl RtcPeerConnection {
             peer: Rc::new(SysRtcPeerConnection::new_with_configuration(
                 &peer_conf,
             )?),
+            hashed_ice_candidates: Vec::new(),
             on_ice_candidate: None,
             on_track: None,
         }))))
@@ -196,6 +204,16 @@ impl RtcPeerConnection {
         sdp_m_line_index: Option<u16>,
         sdp_mid: &Option<String>,
     ) -> impl Future<Item = (), Error = WasmErr> {
+        let mut hasher = DefaultHasher::new();
+        candidate.hash(&mut hasher);
+        sdp_m_line_index.hash(&mut hasher);
+        sdp_mid.hash(&mut hasher);
+        let hashed_candidate = hasher.finish();
+        self.0
+            .borrow_mut()
+            .hashed_ice_candidates
+            .push(hashed_candidate);
+
         let mut cand_init = RtcIceCandidateInit::new(&candidate);
         cand_init
             .sdp_m_line_index(sdp_m_line_index)
@@ -210,6 +228,24 @@ impl RtcPeerConnection {
         )
         .map(|_| ())
         .map_err(Into::into)
+    }
+
+    pub fn get_missing_ice_candidates(
+        &self,
+        hashed_ice_candidates: Vec<String>,
+    ) -> Vec<String> {
+        hashed_ice_candidates
+            .into_iter()
+            .map(|hash| {
+                // TODO: make it safe
+                let int_hash = u64::from_str_radix(&hash, 16).unwrap();
+                (hash, int_hash)
+            })
+            .filter(|(_, hash)| {
+                !self.0.borrow().hashed_ice_candidates.contains(&hash)
+            })
+            .map(|(str_hash, _)| str_hash)
+            .collect()
     }
 
     /// Obtains [SDP answer][`SdpType::Answer`] from the underlying

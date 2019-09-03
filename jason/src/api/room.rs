@@ -287,7 +287,7 @@ impl EventHandler for InnerRoom {
 
         for (id, peer) in snapshot.peers {
             let local_peer = if let Some(local_peer) = self.peers.get(id) {
-                local_peer
+                local_peer.clone()
             } else {
                 match peer.state {
                     PeerState::WaitLocalHaveRemoteSdp
@@ -337,6 +337,12 @@ impl EventHandler for InnerRoom {
                     // TODO: unreachable??
                     unreachable!()
                 }
+            }
+
+            let missing_ice_candidates = local_peer
+                .get_missing_ice_candidates(peer.hashed_ice_candidates);
+            if !missing_ice_candidates.is_empty() {
+                // TODO: Get missing candidates.
             }
         }
     }
