@@ -14,7 +14,8 @@ use std::{
 
 use failure::Fail;
 use medea_client_api_proto::{
-    AudioSettings, Direction, IceCandidate, MediaType, Track, VideoSettings,
+    AudioSettings, Direction, IceCandidate, MediaType, PeerState, Track,
+    VideoSettings,
 };
 use medea_macro::enum_delegate;
 
@@ -81,6 +82,8 @@ impl PeerError {
     )
 )]
 #[enum_delegate(pub fn get_hash_of_ice_candidates(&self) -> u64)]
+#[enum_delegate(pub fn sdp_offer(&self) -> Option<String>)]
+#[enum_delegate(pub fn sdp_answer(&self) -> Option<String>)]
 #[derive(Debug)]
 pub enum PeerStateMachine {
     New(Peer<New>),
@@ -88,6 +91,20 @@ pub enum PeerStateMachine {
     WaitLocalHaveRemote(Peer<WaitLocalHaveRemote>),
     WaitRemoteSdp(Peer<WaitRemoteSdp>),
     Stable(Peer<Stable>),
+}
+
+impl From<&PeerStateMachine> for PeerState {
+    fn from(peer: &PeerStateMachine) -> PeerState {
+        match peer {
+            PeerStateMachine::New(_) => PeerState::New,
+            PeerStateMachine::WaitLocalSdp(_) => PeerState::WaitLocalSdp,
+            PeerStateMachine::WaitLocalHaveRemote(_) => {
+                PeerState::WaitLocalHaveRemoteSdp
+            }
+            PeerStateMachine::WaitRemoteSdp(_) => PeerState::WaitRemoteSdp,
+            PeerStateMachine::Stable(_) => PeerState::Stable,
+        }
+    }
 }
 
 impl fmt::Display for PeerStateMachine {
@@ -245,6 +262,14 @@ impl<T> Peer<T> {
 
     pub fn get_hash_of_ice_candidates(&self) -> u64 {
         indepondent_hash(&self.context.ice_candidates)
+    }
+
+    pub fn sdp_offer(&self) -> Option<String> {
+        self.context.sdp_offer.clone()
+    }
+
+    pub fn sdp_answer(&self) -> Option<String> {
+        self.context.sdp_answer.clone()
     }
 }
 

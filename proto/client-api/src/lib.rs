@@ -8,49 +8,28 @@ use std::collections::HashMap;
 use medea_macro::dispatchable;
 use serde::{de::Deserializer, ser::Serializer, Deserialize, Serialize};
 
-pub enum PeerStateMachine {
-    New(Peer<New>),
-    WaitLocalSdp(Peer<WaitLocalSdp>),
-    WaitLocalHaveRemoteSdp(Peer<WaitLocalHaveRemote>),
-    WaitRemoteSdp(Peer<WaitRemoteSdp>),
-    Stable(Peer<Stable>),
+#[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
+pub enum PeerState {
+    New,
+    WaitLocalSdp,
+    WaitLocalHaveRemoteSdp,
+    WaitRemoteSdp,
+    Stable,
 }
 
-pub struct Member {
-    pub peers: HashMap<u64, PeerStateMachine>,
-}
-
-pub struct Snapshot {
-    pub peers: HashMap<String, Member>,
-}
-
-pub struct New {
-    pub ice_servers: Vec<IceServer>,
-}
-
-pub struct WaitLocalSdp;
-
-pub struct WaitLocalHaveRemote {
-    pub remote_offer: String,
-}
-
-pub struct WaitRemoteSdp {
-    pub sdp_offer: String,
-}
-
-pub struct Stable {
-    pub sdp_offer: String,
-    pub remote_offer: String,
-}
-
-pub struct PeerContext {
+#[derive(Deserialize, Serialize, Clone, Debug)]
+pub struct Peer {
     pub id: u64,
+    pub state: PeerState,
     pub ice_candidates_hash: u64,
+    pub sdp_offer: Option<String>,
+    pub sdp_answer: Option<String>,
 }
 
-pub struct Peer<T> {
-    pub context: PeerContext,
-    pub state: T,
+#[derive(Deserialize, Serialize, Clone, Debug)]
+pub struct Snapshot {
+    pub peers: HashMap<u64, Peer>,
+    pub ice_servers: Vec<IceServer>,
 }
 
 // TODO: should be properly shared between medea and jason
@@ -124,7 +103,10 @@ pub enum Event {
     },
     /// Media Server notifies Web Client about necessity to apply specified SDP
     /// Answer to Web Client's RTCPeerConnection.
-    SdpAnswerMade { peer_id: u64, sdp_answer: String },
+    SdpAnswerMade {
+        peer_id: u64,
+        sdp_answer: String,
+    },
 
     /// Media Server notifies Web Client about necessity to apply specified
     /// ICE Candidate.
@@ -135,7 +117,13 @@ pub enum Event {
 
     /// Media Server notifies Web Client about necessity of RTCPeerConnection
     /// close.
-    PeersRemoved { peer_ids: Vec<u64> },
+    PeersRemoved {
+        peer_ids: Vec<u64>,
+    },
+
+    RestoreState {
+        snapshot: Snapshot,
+    },
 }
 
 /// Represents [RTCIceCandidateInit][1] object.

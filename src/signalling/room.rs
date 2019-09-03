@@ -11,7 +11,9 @@ use actix::{
 };
 use failure::Fail;
 use futures::future;
-use medea_client_api_proto::{Command, Event, IceCandidate};
+use medea_client_api_proto::{
+    Command, Event, IceCandidate, Peer as PeerSnapshot, PeerState, Snapshot,
+};
 
 use crate::{
     api::{
@@ -114,6 +116,30 @@ impl Room {
                 reconnect_timeout,
             ),
             state: State::Started,
+        }
+    }
+
+    fn take_snapshot(&self, member_id: MemberId) -> Snapshot {
+        let peers = self.peers.get_peers_by_member_id(member_id);
+        let mut snapshot_peers = HashMap::new();
+        for peer in peers {
+            let state = PeerState::from(peer);
+            let id = peer.id();
+            let sdp_offer = peer.sdp_offer();
+            let sdp_answer = peer.sdp_answer();
+            let ice_candidates_hash = peer.get_hash_of_ice_candidates();
+            let peer_snap = PeerSnapshot {
+                id,
+                sdp_answer,
+                sdp_offer,
+                state,
+                ice_candidates_hash,
+            };
+            snapshot_peers.insert(id, peer_snap);
+        }
+        Snapshot {
+            peers: snapshot_peers,
+            ice_servers: Vec::new(), // TODO
         }
     }
 
@@ -295,6 +321,15 @@ impl Room {
         &mut self,
         ctx: &mut Context<Self>,
     ) -> ResponseActFuture<Self, (), ()> {
+        // TODO: remove me after debug
+//        let snapshot = self.take_snapshot(1);
+//        let second_peer = snapshot.peers.get(&1).unwrap();
+//        if second_peer.state == PeerState::Stable {
+//            println!(
+//                "{}",
+//                serde_json::to_string(&self.take_snapshot(1)).unwrap()
+//            );
+//        }
         info!("Closing Room [id = {:?}]", self.id);
         self.state = State::Stopping;
 
