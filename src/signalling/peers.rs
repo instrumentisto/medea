@@ -209,12 +209,6 @@ impl PeerRepository {
             }
         }
 
-        //        for (member_id, removed_peers_ids) in removed_peers {
-        //            ctx.notify(PeersRemoved {
-        //                member_id,
-        //                peers_id: removed_peers_ids,
-        //            })
-        //        }
         removed_peers
     }
 
