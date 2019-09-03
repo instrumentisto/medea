@@ -120,6 +120,14 @@ impl Room {
     }
 
     fn take_snapshot(&self, member_id: MemberId) -> Snapshot {
+        // TODO: Return MemberNotFound Error.
+        let member = self.participants.get_member(member_id).unwrap();
+        let ice_servers = member
+            .ice_user
+            .as_ref()
+            .map(|ice_user| ice_user.servers_list())
+            .unwrap_or(Vec::new());
+
         let peers = self.peers.get_peers_by_member_id(member_id);
         let mut snapshot_peers = HashMap::new();
         for peer in peers {
@@ -137,9 +145,10 @@ impl Room {
             };
             snapshot_peers.insert(id, peer_snap);
         }
+
         Snapshot {
             peers: snapshot_peers,
-            ice_servers: Vec::new(), // TODO
+            ice_servers,
         }
     }
 
@@ -322,14 +331,14 @@ impl Room {
         ctx: &mut Context<Self>,
     ) -> ResponseActFuture<Self, (), ()> {
         // TODO: remove me after debug
-//        let snapshot = self.take_snapshot(1);
-//        let second_peer = snapshot.peers.get(&1).unwrap();
-//        if second_peer.state == PeerState::Stable {
-//            println!(
-//                "{}",
-//                serde_json::to_string(&self.take_snapshot(1)).unwrap()
-//            );
-//        }
+        //        let snapshot = self.take_snapshot(1);
+        //        let second_peer = snapshot.peers.get(&1).unwrap();
+        //        if second_peer.state == PeerState::Stable {
+        //            println!(
+        //                "{}",
+        //                serde_json::to_string(&self.take_snapshot(1)).unwrap()
+        //            );
+        //        }
         info!("Closing Room [id = {:?}]", self.id);
         self.state = State::Stopping;
 
