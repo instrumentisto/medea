@@ -275,6 +275,11 @@ impl Room {
             .into());
         }
 
+        if candidate.candidate.is_empty() {
+            warn!("Receive last IceCandidate from peer: {}", from_peer_id);
+            return Ok(Box::new(wrap_future(future::ok(()))));
+        }
+
         let to_member_id = to_peer.member_id();
         let event = Event::IceCandidateDiscovered {
             peer_id: to_peer_id,
