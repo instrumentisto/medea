@@ -13,10 +13,12 @@ use futures::{
     sync::mpsc::{unbounded, UnboundedSender},
 };
 use medea_client_api_proto::{
-    Command, Direction, EventHandler, IceCandidate, IceServer, Track,
+    Command, Direction, EventHandler, IceCandidate, IceServer, PeerState,
+    Snapshot, Track,
 };
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
+use web_sys::RtcSignalingState;
 
 use crate::{
     media::{MediaManager, MediaStream},
@@ -268,6 +270,70 @@ impl EventHandler for InnerRoom {
         peer_ids.iter().for_each(|id| {
             self.peers.remove(*id);
         })
+    }
+
+    fn on_restore_state(&mut self, snapshot: Snapshot) {
+        for (id, peer) in snapshot.peers {
+            let local_peer = if let Some(local_peer) = self.peers.get(id) {
+                local_peer
+            } else {
+                match peer.state {
+                    PeerState::WaitLocalHaveRemoteSdp
+                    | PeerState::WaitLocalSdp => {
+                        self.on_peer_created(
+                            peer.id,
+                            peer.sdp_offer,
+                            peer.tracks,
+                            snapshot.ice_servers.clone(),
+                        );
+                    }
+                    _ => {
+                        // TODO: In principle, PeerCreated cannot come in any
+                        // state anymore.
+                        unimplemented!()
+                    }
+                }
+                continue;
+            };
+
+            match peer.state {
+                PeerState::Stable => {
+                    match local_peer.signaling_state() {
+                        RtcSignalingState::Stable => {
+                            let remote_desc =
+                                local_peer.current_remote_description();
+                            let local_desc =
+                                local_peer.current_local_description();
+                            if !(remote_desc.is_some() && local_desc.is_some())
+                            {
+                                // TODO: return error because this is not
+                                // possible
+                            }
+                        }
+                        RtcSignalingState::HaveLocalOffer => {
+                            self.on_sdp_answer_made(
+                                peer.id,
+                                peer.sdp_answer.unwrap(),
+                            );
+                        }
+                        _ => {
+                            // TODO: return error because this is not possible
+                        }
+                    }
+                }
+                _ => {
+                    // TODO: unreachable??
+                    unreachable!()
+                }
+            }
+        }
+
+        //        for (id, peer) in &self.peers {
+        //            if let None = snapshot.peers.get(id) {
+        //                unimplemented!()
+        //                // TODO: remote peer
+        //            }
+        //        }
     }
 }
 

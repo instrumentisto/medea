@@ -84,6 +84,7 @@ impl PeerError {
 #[enum_delegate(pub fn get_hash_of_ice_candidates(&self) -> u64)]
 #[enum_delegate(pub fn sdp_offer(&self) -> Option<String>)]
 #[enum_delegate(pub fn sdp_answer(&self) -> Option<String>)]
+#[enum_delegate(pub fn tracks(&self) -> Vec<Track>)]
 #[derive(Debug)]
 pub enum PeerStateMachine {
     New(Peer<New>),

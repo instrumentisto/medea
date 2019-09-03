@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use medea_macro::dispatchable;
 use serde::{de::Deserializer, ser::Serializer, Deserialize, Serialize};
 
-#[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
+#[derive(Deserialize, Serialize, Debug, PartialEq)]
 pub enum PeerState {
     New,
     WaitLocalSdp,
@@ -17,16 +17,17 @@ pub enum PeerState {
     Stable,
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug)]
+#[derive(Deserialize, Serialize, Debug)]
 pub struct Peer {
     pub id: u64,
     pub state: PeerState,
     pub ice_candidates_hash: u64,
     pub sdp_offer: Option<String>,
     pub sdp_answer: Option<String>,
+    pub tracks: Vec<Track>,
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug)]
+#[derive(Deserialize, Serialize, Debug)]
 pub struct Snapshot {
     pub peers: HashMap<u64, Peer>,
     pub ice_servers: Vec<IceServer>,

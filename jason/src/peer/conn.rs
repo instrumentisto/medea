@@ -1,7 +1,7 @@
 use std::{cell::RefCell, rc::Rc};
 
 use futures::Future;
-use medea_client_api_proto::{IceServer, PeerStateMachine};
+use medea_client_api_proto::IceServer;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
     RtcConfiguration, RtcIceCandidateInit,
@@ -125,61 +125,6 @@ impl RtcPeerConnection {
             on_ice_candidate: None,
             on_track: None,
         }))))
-    }
-
-    pub fn upgrade(&self, snapshot_peer: PeerStateMachine) {
-        match snapshot_peer {
-            PeerStateMachine::New(peer) => unimplemented!(),
-            PeerStateMachine::WaitLocalSdp(peer) => {
-                if let Some(local_sdp) =
-                    self.0.borrow().peer.current_local_description()
-                {
-                    // TODO: send MakeSdpOffer
-                } else {
-                    // TODO: nothing??
-                }
-            }
-            PeerStateMachine::WaitLocalHaveRemoteSdp(peer) => {
-                if let Some(remote_sdp) =
-                    self.0.borrow().peer.current_remote_description()
-                {
-                    if let Some(local_sdp) =
-                        self.0.borrow().peer.current_local_description()
-                    {
-                        // TODO: send MakeSdpAnswer
-                    } else {
-                        // TODO: generate local_sdp
-                        // TODO: send MakeSdpAnswer
-                    }
-                } else {
-                    unreachable!();
-                }
-            }
-            PeerStateMachine::WaitRemoteSdp(peer) => {
-                if let Some(local_sdp) =
-                    self.0.borrow().peer.current_local_description()
-                {
-                    // TODO: nothing??
-                } else {
-                    // TODO: set local_sdp
-                }
-            }
-            PeerStateMachine::Stable(_) => {
-                let peer = self.0.borrow();
-                let local_sdp_is_some =
-                    peer.current_local_description().is_some();
-                let remote_sdp_is_some =
-                    peer.current_remote_description().is_some();
-                let is_signaling_state_stable =
-                    peer.signaling_state() == RtcSignalingState::Stable;
-                if !(local_sdp_is_some
-                    && remote_sdp_is_some
-                    && is_signaling_state_stable)
-                {
-                    unreachable!()
-                }
-            }
-        }
     }
 
     /// Sets handler for [`RtcTrackEvent`] event (see [RTCTrackEvent][1] and
@@ -390,6 +335,18 @@ impl RtcPeerConnection {
         }
 
         transceiver
+    }
+
+    pub fn signaling_state(&self) -> RtcSignalingState {
+        self.0.borrow().peer.signaling_state()
+    }
+
+    pub fn current_local_description(&self) -> Option<RtcSessionDescription> {
+        self.0.borrow().peer.current_local_description()
+    }
+
+    pub fn current_remote_description(&self) -> Option<RtcSessionDescription> {
+        self.0.borrow().peer.current_remote_description()
     }
 }
 

@@ -12,7 +12,7 @@ use std::{collections::HashMap, rc::Rc};
 use futures::{future, sync::mpsc::UnboundedSender, Future};
 use medea_client_api_proto::{Direction, IceServer, Track};
 use medea_macro::dispatchable;
-use web_sys::RtcTrackEvent;
+use web_sys::{RtcSessionDescription, RtcSignalingState, RtcTrackEvent};
 
 use crate::{
     media::{MediaManager, MediaStream},
@@ -271,6 +271,18 @@ impl PeerConnection {
         self.0
             .peer
             .add_ice_candidate(candidate, sdp_m_line_index, sdp_mid)
+    }
+
+    pub fn signaling_state(&self) -> RtcSignalingState {
+        self.0.peer.signaling_state()
+    }
+
+    pub fn current_local_description(&self) -> Option<RtcSessionDescription> {
+        self.0.peer.current_local_description()
+    }
+
+    pub fn current_remote_description(&self) -> Option<RtcSessionDescription> {
+        self.0.peer.current_remote_description()
     }
 }
 
