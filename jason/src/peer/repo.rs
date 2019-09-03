@@ -1,4 +1,4 @@
-use std::{collections::HashMap, rc::Rc};
+use std::{collections::HashMap, iter::Iterator, rc::Rc};
 
 use futures::sync::mpsc::UnboundedSender;
 use medea_client_api_proto::IceServer;
@@ -63,5 +63,11 @@ impl PeerRepository {
     #[inline]
     pub fn remove(&mut self, id: PeerId) {
         self.peers.remove(&id);
+    }
+
+    pub fn iter_peers(
+        &self,
+    ) -> impl Iterator<Item = (&u64, &Rc<PeerConnection>)> {
+        self.peers.iter()
     }
 }

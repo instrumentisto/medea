@@ -273,6 +273,18 @@ impl EventHandler for InnerRoom {
     }
 
     fn on_restore_state(&mut self, snapshot: Snapshot) {
+        {
+            let removed_peers: Vec<u64> = self
+                .peers
+                .iter_peers()
+                .filter(|(id, _)| !snapshot.peers.contains_key(id))
+                .map(|(id, _)| *id)
+                .collect();
+            if !removed_peers.is_empty() {
+                self.on_peers_removed(removed_peers);
+            }
+        }
+
         for (id, peer) in snapshot.peers {
             let local_peer = if let Some(local_peer) = self.peers.get(id) {
                 local_peer
@@ -327,13 +339,6 @@ impl EventHandler for InnerRoom {
                 }
             }
         }
-
-        //        for (id, peer) in &self.peers {
-        //            if let None = snapshot.peers.get(id) {
-        //                unimplemented!()
-        //                // TODO: remote peer
-        //            }
-        //        }
     }
 }
 
