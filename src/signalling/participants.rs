@@ -134,7 +134,6 @@ impl ParticipantService {
         })
     }
 
-    // TODO: try return ref
     /// Lookup [`Member`] by provided id.
     pub fn get_member_by_id(&self, id: &MemberId) -> Option<Member> {
         self.members.get(id).cloned()
