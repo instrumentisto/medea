@@ -13,6 +13,5 @@ doc-valid-idents = [
     "RTCConfiguration", "RTCIceCandidate", "RTCIceServer",
     "RTCPeerConnection", "RTCPeerConnectionIceEvent",
     "RTCRtpTransceiver", "RTCRtpTransceiverDirection",
-    "RTCSdpType", "RTCIceCandidateInit",
-    "WebRTC", "RtcPeerConnection",
+    "RTCSdpType", "RTCIceCandidateInit"
 ]

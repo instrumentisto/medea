@@ -8,13 +8,13 @@ spec:
       credentials: test
       spec:
         pipeline:
-          # Media element which is able to receive media data from client via WebRTC.
+          # Media element which is able to receive media data from client
+          # via WebRTC.
           publish:
             kind: WebRtcPublishEndpoint
             spec:
               # Actually, it receives not media data, but ICE candidates only.
               p2p: Always
-          # Media element which is able to play media data for client via WebRTC.
     responder:
       kind: Member
       credentials: test

@@ -2,28 +2,24 @@ kind: Room
 id: three-members-conference
 spec:
   pipeline:
-    # Here we're defining a member who initiates video call.
-    caller:
+    member-1:
       kind: Member
       credentials: test
       spec:
         pipeline:
-          # Media element which is able to receive media data from client via WebRTC.
           publish:
             kind: WebRtcPublishEndpoint
             spec:
-              # Actually, it receives not media data, but ICE candidates only.
               p2p: Always
-          # Media element which is able to play media data for client via WebRTC.
           play:
             kind: WebRtcPlayEndpoint
             spec:
-              src: "local://three-members-conference/responder/publish"
+              src: "local://three-members-conference/member-2/publish"
           play2:
             kind: WebRtcPlayEndpoint
             spec:
-              src: "local://three-members-conference/responder2/publish"
-    responder:
+              src: "local://three-members-conference/member-3/publish"
+    member-2:
       kind: Member
       credentials: test
       spec:
@@ -35,13 +31,12 @@ spec:
           play1:
             kind: WebRtcPlayEndpoint
             spec:
-              src: "local://three-members-conference/caller/publish"
+              src: "local://three-members-conference/member-1/publish"
           play2:
             kind: WebRtcPlayEndpoint
             spec:
-              src: "local://three-members-conference/responder2/publish"
-
-    responder2:
+              src: "local://three-members-conference/member-3/publish"
+    member-3:
       kind: Member
       credentials: test
       spec:
@@ -53,8 +48,8 @@ spec:
           play1:
             kind: WebRtcPlayEndpoint
             spec:
-              src: "local://three-members-conference/caller/publish"
+              src: "local://three-members-conference/member-2/publish"
           play2:
             kind: WebRtcPlayEndpoint
             spec:
-              src: "local://three-members-conference/responder/publish"
+              src: "local://three-members-conference/member-1/publish"
