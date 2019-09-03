@@ -21,7 +21,7 @@ pub enum PeerState {
 pub struct Peer {
     pub id: u64,
     pub state: PeerState,
-    pub ice_candidates_hash: u64,
+    pub hashed_ice_candidates: Vec<String>,
     pub sdp_offer: Option<String>,
     pub sdp_answer: Option<String>,
     pub tracks: Vec<Track>,

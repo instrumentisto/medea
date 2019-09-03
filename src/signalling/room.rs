@@ -135,14 +135,14 @@ impl Room {
             let id = peer.id();
             let sdp_offer = peer.sdp_offer();
             let sdp_answer = peer.sdp_answer();
-            let ice_candidates_hash = peer.get_hash_of_ice_candidates();
+            let hashed_ice_candidates = peer.get_hashed_ice_candidates();
             let tracks = peer.tracks();
             let peer_snap = PeerSnapshot {
                 id,
                 sdp_answer,
                 sdp_offer,
                 state,
-                ice_candidates_hash,
+                hashed_ice_candidates,
                 tracks,
             };
             snapshot_peers.insert(id, peer_snap);

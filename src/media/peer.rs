@@ -81,7 +81,7 @@ impl PeerError {
         ice_candidate: IceCandidate
     )
 )]
-#[enum_delegate(pub fn get_hash_of_ice_candidates(&self) -> u64)]
+#[enum_delegate(pub fn get_hashed_ice_candidates(&self) -> Vec<String>)]
 #[enum_delegate(pub fn sdp_offer(&self) -> Option<String>)]
 #[enum_delegate(pub fn sdp_answer(&self) -> Option<String>)]
 #[enum_delegate(pub fn tracks(&self) -> Vec<Track>)]
@@ -261,8 +261,16 @@ impl<T> Peer<T> {
         self.context.ice_candidates.push(ice_candidate);
     }
 
-    pub fn get_hash_of_ice_candidates(&self) -> u64 {
-        indepondent_hash(&self.context.ice_candidates)
+    pub fn get_hashed_ice_candidates(&self) -> Vec<String> {
+        self.context
+            .ice_candidates
+            .iter()
+            .map(|ice_candidate| {
+                let mut hasher = DefaultHasher::new();
+                ice_candidate.hash(&mut hasher);
+                format!("{:x}", hasher.finish())
+            })
+            .collect()
     }
 
     pub fn sdp_offer(&self) -> Option<String> {
@@ -272,22 +280,6 @@ impl<T> Peer<T> {
     pub fn sdp_answer(&self) -> Option<String> {
         self.context.sdp_answer.clone()
     }
-}
-
-fn hash<T>(obj: &T) -> u64
-where
-    T: Hash,
-{
-    let mut hasher = DefaultHasher::new();
-    obj.hash(&mut hasher);
-    hasher.finish()
-}
-
-fn indepondent_hash<T>(obj: &Vec<T>) -> u64
-where
-    T: Hash,
-{
-    obj.iter().map(|s| hash(s)).fold(0, |acc, x| acc ^ x)
 }
 
 impl Peer<New> {
