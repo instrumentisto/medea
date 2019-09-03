@@ -48,7 +48,7 @@ impl<T: Incrementable + Copy> Counter<T> {
     /// Returns id and increase counter.
     pub fn next_id(&mut self) -> T {
         let id = self.count;
-        self.count = self.count.increment();
+        self.count = self.count.incr();
 
         id
     }

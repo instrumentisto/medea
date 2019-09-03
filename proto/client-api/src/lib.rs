@@ -33,14 +33,14 @@ macro_attr! {
 #[cfg(feature = "medea")]
 pub trait Incrementable: Sized + Clone {
     /// Returns current value + 1.
-    fn increment(&self) -> Self;
+    fn incr(&self) -> Self;
 }
 
 /// Implement [`Incrementable`] trait for newtype with any numeric type.
 macro_rules! impl_incrementable {
     ($name:ty) => {
         impl Incrementable for $name {
-            fn increment(&self) -> Self {
+            fn incr(&self) -> Self {
                 Self(self.0 + 1)
             }
         }
