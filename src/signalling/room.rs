@@ -326,6 +326,31 @@ impl Room {
         )))
     }
 
+    fn handle_get_ice_candidates_by_hash(
+        &mut self,
+        hashed_ice_candidates: HashMap<u64, Vec<String>>,
+    ) -> Result<ActFuture<(), RoomError>, RoomError> {
+        let mut ice_candidates = HashMap::new();
+        // TODO: this is temporary. Need provide MemberId to this function from
+        // EventMessage.
+        let mut member_id = 0;
+        for (peer_id, hashed_ice_candidates) in hashed_ice_candidates {
+            // TODO: make it safe
+            let peer = self.peers.get_peer(peer_id).unwrap();
+            member_id = peer.member_id();
+            let founded_ice_candidates =
+                peer.get_ice_candidates_by_hash(hashed_ice_candidates);
+            ice_candidates.insert(peer_id, founded_ice_candidates);
+        }
+
+        Ok(Box::new(wrap_future(
+            self.participants.send_event_to_member(
+                member_id,
+                Event::AddIceCandidates { ice_candidates },
+            ),
+        )))
+    }
+
     /// Closes [`Room`] gracefully, by dropping all the connections and moving
     /// into [`State::Stopped`].
     fn close_gracefully(
@@ -443,6 +468,9 @@ impl Handler<CommandMessage> for Room {
             Command::SetIceCandidate { peer_id, candidate } => {
                 self.handle_set_ice_candidate(peer_id, candidate)
             }
+            Command::GetIceCandidatesByHash {
+                hashed_ice_candidates,
+            } => self.handle_get_ice_candidates_by_hash(hashed_ice_candidates),
         };
 
         match result {

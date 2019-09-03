@@ -76,12 +76,18 @@ pub enum Command {
         /// [1]: https://tools.ietf.org/html/rfc4566#section-5.14
         mids: HashMap<u64, String>,
     },
+
     /// Web Client sends SDP Answer.
     MakeSdpAnswer { peer_id: u64, sdp_answer: String },
+
     /// Web Client sends Ice Candidate.
     SetIceCandidate {
         peer_id: u64,
         candidate: IceCandidate,
+    },
+
+    GetIceCandidatesByHash {
+        hashed_ice_candidates: HashMap<u64, Vec<String>>,
     },
 }
 
@@ -124,6 +130,10 @@ pub enum Event {
 
     RestoreState {
         snapshot: Snapshot,
+    },
+
+    AddIceCandidates {
+        ice_candidates: HashMap<u64, Vec<IceCandidate>>,
     },
 }
 

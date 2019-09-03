@@ -85,6 +85,11 @@ impl PeerError {
 #[enum_delegate(pub fn sdp_offer(&self) -> Option<String>)]
 #[enum_delegate(pub fn sdp_answer(&self) -> Option<String>)]
 #[enum_delegate(pub fn tracks(&self) -> Vec<Track>)]
+#[enum_delegate(pub fn get_ice_candidates_by_hash(
+        &self,
+        hashed_candidates: Vec<String>
+    ) -> Vec<IceCandidate>
+)]
 #[derive(Debug)]
 pub enum PeerStateMachine {
     New(Peer<New>),
@@ -279,6 +284,30 @@ impl<T> Peer<T> {
 
     pub fn sdp_answer(&self) -> Option<String> {
         self.context.sdp_answer.clone()
+    }
+
+    pub fn get_ice_candidates_by_hash(
+        &self,
+        hashed_candidates: Vec<String>,
+    ) -> Vec<IceCandidate> {
+        let hashed_candidates: Vec<u64> = hashed_candidates
+            .into_iter()
+            .map(|hash| {
+                // TODO: safe it
+                u64::from_str_radix(&hash, 16).unwrap()
+            })
+            .collect();
+        let mut found_candidates = Vec::new();
+        for ice_candidate in &self.context.ice_candidates {
+            let mut hasher = DefaultHasher::new();
+            ice_candidate.hash(&mut hasher);
+            let hash = hasher.finish();
+            if hashed_candidates.contains(&hash) {
+                found_candidates.push(ice_candidate.clone());
+            }
+        }
+
+        found_candidates
     }
 }
 

@@ -285,6 +285,9 @@ impl EventHandler for InnerRoom {
             }
         }
 
+        let mut needed_ice_candidates: HashMap<u64, Vec<String>> =
+            HashMap::new();
+
         for (id, peer) in snapshot.peers {
             let local_peer = if let Some(local_peer) = self.peers.get(id) {
                 local_peer.clone()
@@ -342,7 +345,22 @@ impl EventHandler for InnerRoom {
             let missing_ice_candidates = local_peer
                 .get_missing_ice_candidates(peer.hashed_ice_candidates);
             if !missing_ice_candidates.is_empty() {
-                // TODO: Get missing candidates.
+                needed_ice_candidates.insert(peer.id, missing_ice_candidates);
+            }
+        }
+        self.rpc.send_command(Command::GetIceCandidatesByHash {
+            hashed_ice_candidates: needed_ice_candidates,
+        });
+    }
+
+    fn on_add_ice_candidates(
+        &mut self,
+        ice_candidates: HashMap<u64, Vec<IceCandidate>>,
+    ) {
+        for (peer_id, ice_candidates) in ice_candidates {
+            for ice_candidate in ice_candidates {
+                (self as &mut dyn EventHandler)
+                    .on_ice_candidate_discovered(peer_id, ice_candidate)
             }
         }
     }
