@@ -187,6 +187,7 @@ impl ParticipantService {
             {
                 ctx.cancel_future(handler);
             }
+            self.connections.insert(member_id, con);
             Box::new(wrap_future(connection.close().then(|_| Ok(()))))
         } else {
             Box::new(

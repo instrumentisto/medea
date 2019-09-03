@@ -10,7 +10,7 @@ use actix::{
     Message, ResponseActFuture, WrapFuture as _,
 };
 use failure::Fail;
-use futures::future;
+use futures::future::{self, Future as _};
 use medea_client_api_proto::{
     Command, Event, IceCandidate, Peer as PeerSnapshot, PeerState, Snapshot,
 };
@@ -119,7 +119,7 @@ impl Room {
         }
     }
 
-    fn take_snapshot(&self, member_id: MemberId) -> Snapshot {
+    pub fn take_snapshot(&self, member_id: MemberId) -> Snapshot {
         // TODO: Return MemberNotFound Error.
         let member = self.participants.get_member(member_id).unwrap();
         let ice_servers = member
@@ -483,6 +483,9 @@ impl Handler<RpcConnectionEstablished> for Room {
         let member_id = msg.member_id;
         info!("RpcConnectionEstablished for member {}", msg.member_id);
 
+        // TODO: Maybe better way to detect reconnect of member??
+        let is_reconnect = self.participants.member_has_connection(member_id);
+
         let fut =
             self.participants
                 .connection_established(ctx, msg.member_id, msg.connection)
@@ -507,6 +510,27 @@ impl Handler<RpcConnectionEstablished> for Room {
                             }
                         });
                 });
+
+        if is_reconnect {
+            ctx.spawn(wrap_future(
+                self.participants
+                    .send_event_to_member(
+                        member_id,
+                        Event::RestoreState {
+                            snapshot: self.take_snapshot(member_id),
+                        },
+                    )
+                    .map_err(move |e| {
+                        // TODO: Maybe handle this error??
+                        error!(
+                            "Error while sending RestoreState event to member \
+                             [id = {}]. {:?}",
+                            member_id, e
+                        )
+                    }),
+            ));
+        }
+
         Box::new(fut)
     }
 }
