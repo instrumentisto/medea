@@ -27,17 +27,11 @@ pub enum LocalUriParseError {
     MissingFields(String),
 
     #[fail(display = "Error while parsing URL. {:?}", _0)]
-    UrlParseErr(url::ParseError),
+    UrlParseErr(String, url::ParseError),
 
     /// Provided empty `&str`.
     #[fail(display = "You provided empty local uri.")]
     Empty,
-}
-
-impl From<url::ParseError> for LocalUriParseError {
-    fn from(from: url::ParseError) -> Self {
-        Self::UrlParseErr(from)
-    }
 }
 
 /// State of [`LocalUri`] which points to `Room`.
@@ -210,7 +204,15 @@ impl LocalUriInner {
             return Err(LocalUriParseError::Empty);
         }
 
-        let url = Url::parse(value)?;
+        let url = match Url::parse(value) {
+            Ok(url) => url,
+            Err(e) => {
+                return Err(LocalUriParseError::UrlParseErr(
+                    value.to_string(),
+                    e,
+                ))
+            }
+        };
         if url.scheme() != "local" {
             return Err(LocalUriParseError::NotLocal(value.to_string()));
         }

@@ -273,8 +273,8 @@ impl From<LocalUriParseError> for ErrorResponse {
             LocalUriParseError::MissingFields(text) => {
                 Self::new(ErrorCode::MissingFieldsInSrcUri, &text)
             }
-            LocalUriParseError::UrlParseErr(_) => {
-                Self::new(ErrorCode::InvalidSrcUri, &err.to_string())
+            LocalUriParseError::UrlParseErr(id, _) => {
+                Self::new(ErrorCode::InvalidSrcUri, &id)
             }
         }
     }
