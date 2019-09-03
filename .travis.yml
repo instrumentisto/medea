@@ -63,12 +63,12 @@ jobs:
     - name: medea (beta)
       stage: build_beta
       rust: beta
-      script: make build.medea
+      script: make cargo.build crate=medea
 
     - name: medea (nightly)
       stage: build_beta
       rust: nightly
-      script: make build.medea
+      script: make cargo.build crate=medea
 
     - name: unit (stable)
       stage: test

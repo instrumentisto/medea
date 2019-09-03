@@ -628,12 +628,16 @@ endef
 # Building #
 ############
 
-# Build medea.
+# Build medea's related crates.
 #
 # Usage:
-#   make build.medea [dockerized=(NO|yes)] [release=(NO|yes)]
-
-build.medea:
+#   make build crate=(medea|medea-jason|@all) [dockerized=(yes|no)
+cargo.build:
+ifeq ($(crate),@all)
+	@make build crate=medea
+	@make build crate=medea-jason
+endif
+ifeq ($(crate),medea)
 ifneq ($(dockerized),yes)
 	cargo build --bin medea $(if $(call eq,$(release),yes),--release)
 else
@@ -645,14 +649,8 @@ else
 		rust:$(RUST_VER) \
 		make build.medea release=$(release)
 endif
-
-
-# Build jason.
-#
-# Usage:
-#   make build.jason [dockerized=(no|yes)]
-
-build.jason:
+endif
+ifeq ($(crate),medea-jason)
 ifneq ($(dockerized),yes)
 	wasm-pack build -t web jason
 else
@@ -666,7 +664,25 @@ else
 		rust:$(RUST_VER) \
 		sh -c "curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh && make build.jason"
 endif
+endif
 
+
+# Build medea.
+#
+# Usage:
+#   make build.medea [dockerized=(NO|yes)] [release=(NO|yes)]
+
+build.medea:
+	make cargo.build crate=medea
+
+
+# Build jason.
+#
+# Usage:
+#   make build.jason [dockerized=(no|yes)]
+
+build.jason:
+	make cargo.build crate=medea-jason
 
 
 
@@ -686,5 +702,5 @@ endif
         release release.crates release.helm release.npm \
         test test.unit test.e2e \
         up up.coturn up.demo up.dev up.jason up.medea \
-        build build.medea build.jason \
+        cargo.build build.medea build.jason \
         yarn
