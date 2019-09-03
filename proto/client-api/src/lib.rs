@@ -2,32 +2,27 @@
 
 use std::collections::HashMap;
 
-use macro_attr::*;
+use derive_more::Display;
 use medea_macro::dispatchable;
-use newtype_derive::*;
 use serde::{de::Deserializer, ser::Serializer, Deserialize, Serialize};
 
-macro_attr! {
-    /// ID of [`Peer`].
-    #[cfg_attr(
-        feature = "medea",
-        derive(Deserialize, Debug, Hash, Eq, Default, PartialEq)
-    )]
-    #[cfg_attr(feature = "jason", derive(Serialize))]
-    #[derive(Clone, Copy, NewtypeDisplay!)]
-    pub struct PeerId(pub u64);
-}
+/// ID of [`Peer`].
+#[cfg_attr(
+    feature = "medea",
+    derive(Deserialize, Debug, Hash, Eq, Default, PartialEq)
+)]
+#[cfg_attr(feature = "jason", derive(Serialize))]
+#[derive(Clone, Copy, Display)]
+pub struct PeerId(pub u64);
 
-macro_attr! {
-    /// ID of [`MediaTrack`].
-    #[cfg_attr(
-        feature = "medea",
-        derive(Deserialize, Debug, Hash, Eq, Default, PartialEq)
-    )]
-    #[cfg_attr(feature = "jason", derive(Serialize))]
-    #[derive(Clone, Copy, NewtypeDisplay!)]
-    pub struct TrackId(pub u64);
-}
+/// ID of [`MediaTrack`].
+#[cfg_attr(
+    feature = "medea",
+    derive(Deserialize, Debug, Hash, Eq, Default, PartialEq)
+)]
+#[cfg_attr(feature = "jason", derive(Serialize))]
+#[derive(Clone, Copy, Display)]
+pub struct TrackId(pub u64);
 
 /// Trait for providing function `increment()` which return current value + 1.
 #[cfg(feature = "medea")]
