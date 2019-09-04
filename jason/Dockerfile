@@ -11,7 +11,7 @@ RUN cargo install wasm-pack \
 WORKDIR /sources
 COPY / .
 
-RUN wasm-pack build -t web
+RUN cd jason && wasm-pack build -t web
 
 
 #
@@ -21,9 +21,9 @@ RUN wasm-pack build -t web
 # https://hub.docker.com/_/nginx
 FROM nginx:stable-alpine AS runtime
 
-COPY demo/chart/medea-demo/conf/nginx.vh.conf /etc/nginx/conf.d/default.conf
+COPY jason/demo/chart/medea-demo/conf/nginx.vh.conf /etc/nginx/conf.d/default.conf
 
 WORKDIR /app
-COPY demo/index.html .
-COPY --from=dist /sources/pkg/ ./js/
+COPY jason/demo/index.html .
+COPY --from=dist /sources/jason/pkg/ ./js/
 

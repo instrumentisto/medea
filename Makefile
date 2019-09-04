@@ -305,7 +305,7 @@ docker.build.demo:
 ifeq ($(TAG), edge)
 	docker build $(if $(call eq,$(minikube),yes),,--network=host) --force-rm \
 		-t $(docker-build-demo-image-name):$(TAG) \
-		jason
+		-f jason/Dockerfile .
 else
 	@make yarn proj=demo
 	$(docker-env) \

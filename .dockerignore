@@ -12,7 +12,9 @@
 # We don't need Jason while building Medea, but since it's in Medea's workspace,
 # Cargo should be able to see these files.
 !jason/Cargo.toml
-!jason/src/lib.rs
+!jason/src/
+!jason/demo/index.html
+!jason/demo/chart/medea-demo/conf/
 
 # Medea dependencies cache.
 !.cache/cargo/
