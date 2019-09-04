@@ -9,7 +9,11 @@ mod repo;
 
 use std::{cell::RefCell, collections::HashMap, ops::Deref, rc::Rc};
 
-use futures::{future, sync::mpsc::UnboundedSender, Future};
+use futures::{
+    future::{self, Either},
+    sync::mpsc::UnboundedSender,
+    Future,
+};
 use medea_client_api_proto::{Direction, IceServer, Track};
 use medea_macro::dispatchable;
 use web_sys::RtcTrackEvent;
@@ -26,7 +30,6 @@ use self::{
 
 #[doc(inline)]
 pub use self::{repo::PeerRepository, Id as PeerId};
-use futures::future::Either;
 
 pub type Id = u64;
 
@@ -65,8 +68,11 @@ struct InnerPeerConnection {
     /// [`PeerEvent`]s tx.
     peer_events_sender: UnboundedSender<PeerEvent>,
 
+    /// Indicates what underlying [`RtcPeerConnection`] has remote description.
     has_remote_description: bool,
 
+    /// Stores [ICE Candidate]s received before set remote description for
+    /// underlying [`RtcPeerConnection`].
     ice_candidates: Vec<(String, Option<u16>, Option<String>)>,
 }
 
@@ -217,18 +223,38 @@ impl PeerConnection {
         self.0.borrow().peer.create_and_set_answer()
     }
 
-    /// Updates underlying [`RTCPeerConnection`][1] remote SDP.
+    /// Updates underlying [`RTCPeerConnection`][1] remote SDP from answer.
     ///
     /// [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
     pub fn set_remote_answer(
         &self,
         answer: String,
     ) -> impl Future<Item = (), Error = WasmErr> {
+        self.set_remote_description(SdpType::Answer(answer))
+    }
+
+    /// Updates underlying [`RTCPeerConnection`][1] remote SDP from offer.
+    ///
+    /// [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
+    pub fn set_remote_offer(
+        &self,
+        answer: String,
+    ) -> impl Future<Item = (), Error = WasmErr> {
+        self.set_remote_description(SdpType::Offer(answer))
+    }
+
+    /// Updates underlying [`RTCPeerConnection`][1] remote SDP.
+    ///
+    /// [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
+    pub fn set_remote_description(
+        &self,
+        desc: SdpType,
+    ) -> impl Future<Item = (), Error = WasmErr> {
         let inner = Rc::clone(&self.0);
         self.0
             .borrow()
             .peer
-            .set_remote_description(SdpType::Answer(answer))
+            .set_remote_description(desc)
             .and_then(move |_| {
                 inner.borrow_mut().has_remote_description = true;
                 Ok(())
@@ -262,10 +288,7 @@ impl PeerConnection {
             .unwrap();
 
         let inner: Rc<RefCell<InnerPeerConnection>> = Rc::clone(&self.0);
-        self.0
-            .borrow()
-            .peer
-            .set_remote_description(SdpType::Offer(offer))
+        self.set_remote_description(SdpType::Offer(offer))
             .and_then(move |_| {
                 let request =
                     inner.borrow().media_connections.update_tracks(send)?;
@@ -300,6 +323,11 @@ impl PeerConnection {
         let mut inner = self.0.borrow_mut();
         if inner.has_remote_description {
             let peer = Rc::clone(&inner.peer);
+            WasmErr::from(format!(
+                "Add all stored and new candidate for peer {}",
+                inner.id
+            ))
+            .log_err();
             let mut fut = inner.ice_candidates.drain(..).fold(
                 vec![],
                 move |mut acc, (candidate, sdp_m_line_index, sdp_mid)| {
@@ -316,15 +344,16 @@ impl PeerConnection {
                 sdp_m_line_index,
                 &sdp_mid,
             ));
-            Either::A(future::join_all(fut).map(|_| ()).map_err(|e| {
-                e.log_err();
-                e
-            }))
+            Either::A(future::join_all(fut).map(|_| ()))
         } else {
             inner
                 .ice_candidates
                 .push((candidate, sdp_m_line_index, sdp_mid));
-            WasmErr::from("Not have remote desc. Candidate stored.").log_err();
+            WasmErr::from(format!(
+                "Not have remote desc for peer {}. Candidate stored.",
+                inner.id
+            ))
+            .log_err();
             Either::B(future::ok(()))
         }
     }

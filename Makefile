@@ -23,8 +23,6 @@ RUST_VER := 1.37
 
 CURRENT_BRANCH := $(strip $(shell git branch | grep \* | cut -d ' ' -f2))
 
-CHROMEDRIVER_CLIENT_ARGS := $(strip $(shell grep 'CHROMEDRIVER_CLIENT_ARGS=' .env | cut -d '=' -f2))
-
 crate-dir = .
 ifeq ($(crate),medea-jason)
 crate-dir = jason
@@ -153,7 +151,7 @@ cargo.fmt:
 #	make cargo.lint
 
 cargo.lint:
-	cargo +nightly clippy --all -- -D clippy::pedantic -D warnings
+	cargo clippy --all -- -D clippy::pedantic -D warnings
 
 
 
@@ -230,14 +228,8 @@ ifeq ($(test-unit-crate),@all)
 	@make test.unit crate=medea-jason
 	@make test.unit crate=medea
 else
-ifeq ($(crate),medea-jason)
 	cd $(crate-dir)/ && \
-	CHROMEDRIVER_CLIENT_ARGS="$(CHROMEDRIVER_CLIENT_ARGS)" \
-    cargo test --target wasm32-unknown-unknown
-else
-	cd $(crate-dir)/ && \
-	cargo test
-endif
+	cargo test -p $(test-unit-crate)
 endif
 
 
