@@ -96,42 +96,39 @@ impl Member {
             room_spec
                 .pipeline
                 .get(&self.id().0)
-                .map_or(Err(MembersLoadError::MemberNotFound(self.id())), Ok)?,
+                .ok_or_else(|| MembersLoadError::MemberNotFound(self.id()))?,
         )?;
 
         let this_member = store
             .get(&self.id())
-            .map_or(Err(MembersLoadError::MemberNotFound(self.id())), Ok)?;
+            .ok_or_else(|| MembersLoadError::MemberNotFound(self.id()))?;
 
         for (spec_play_name, spec_play_endpoint) in
             this_member_spec.play_endpoints()
         {
             let publisher_id =
                 MemberId(spec_play_endpoint.src.member_id.to_string());
-            let publisher_member = store.get(&publisher_id).map_or(
-                Err(MembersLoadError::MemberNotFound(publisher_id)),
-                Ok,
-            )?;
+            let publisher_member = store
+                .get(&publisher_id)
+                .ok_or(MembersLoadError::MemberNotFound(publisher_id))?;
             let publisher_spec = MemberSpec::try_from(
                 room_spec
                     .pipeline
                     .get(&spec_play_endpoint.src.member_id.to_string())
-                    .map_or(
-                        Err(MembersLoadError::MemberNotFound(
+                    .ok_or_else(|| {
+                        MembersLoadError::MemberNotFound(
                             spec_play_endpoint.src.member_id.clone(),
-                        )),
-                        Ok,
-                    )?,
+                        )
+                    })?,
             )?;
 
             let publisher_endpoint = publisher_spec
                 .get_publish_endpoint_by_id(&spec_play_endpoint.src.endpoint_id)
-                .map_or(
-                    Err(MembersLoadError::EndpointNotFound(
+                .ok_or_else(|| {
+                    MembersLoadError::EndpointNotFound(
                         spec_play_endpoint.src.endpoint_id.clone(),
-                    )),
-                    Ok,
-                )?;
+                    )
+                })?;
 
             if let Some(publisher) =
                 publisher_member.get_src_by_id(&WebRtcPublishId(
@@ -322,14 +319,15 @@ pub fn parse_members(
     room_spec: &RoomSpec,
 ) -> Result<HashMap<MemberId, Member>, MembersLoadError> {
     let members_spec = room_spec.members()?;
-    let mut members = HashMap::new();
 
-    for (id, member) in &members_spec {
-        members.insert(
-            id.clone(),
-            Member::new(id.clone(), member.credentials().to_string()),
-        );
-    }
+    let members: HashMap<MemberId, Member> = members_spec
+        .iter()
+        .map(|(id, member)| {
+            let new_member =
+                Member::new(id.clone(), member.credentials().to_string());
+            (id.clone(), new_member)
+        })
+        .collect();
 
     for member in members.values() {
         member.load(room_spec, &members)?;

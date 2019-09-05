@@ -274,6 +274,7 @@ impl ParticipantService {
         &mut self,
         member_id: &MemberId,
     ) -> Box<dyn Future<Item = (), Error = TurnServiceErr>> {
+        // TODO: rewrite using `Option::flatten` when it will be in stable rust.
         match self.get_member_by_id(&member_id) {
             Some(member) => match member.take_ice_user() {
                 Some(ice_user) => self.turn.delete(vec![ice_user]),

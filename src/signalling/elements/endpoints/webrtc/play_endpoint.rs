@@ -18,6 +18,7 @@ use crate::{
 
 use super::publish_endpoint::WebRtcPublishEndpoint;
 
+#[doc(inline)]
 pub use Id as WebRtcPlayId;
 
 /// ID of endpoint.

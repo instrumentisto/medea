@@ -151,13 +151,9 @@ impl PeerRepository {
         &'a self,
         member_id: &'a MemberId,
     ) -> impl Iterator<Item = &'a PeerStateMachine> {
-        self.peers.iter().filter_map(move |(_, peer)| {
-            if &peer.member_id() == member_id {
-                Some(peer)
-            } else {
-                None
-            }
-        })
+        self.peers
+            .values()
+            .filter(move |peer| &peer.member_id() == member_id)
     }
 
     /// Returns owned [`Peer`] by its ID.

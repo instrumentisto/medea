@@ -26,6 +26,9 @@ pub use self::{
     room::{Id as RoomId, RoomElement, RoomSpec},
 };
 
+/// Root elements of [Control API] spec.
+///
+/// [Control API]: http://tiny.cc/380uaz
 #[derive(Clone, Deserialize, Debug)]
 #[serde(tag = "kind")]
 pub enum RootElement {

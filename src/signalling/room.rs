@@ -391,7 +391,7 @@ impl Room {
         let mut created_peers: Vec<(PeerId, PeerId)> = Vec::new();
 
         // Create all connected publish endpoints.
-        for (_, publisher) in member.srcs() {
+        for publisher in member.srcs().values() {
             for receiver in publisher.sinks() {
                 let receiver_owner = receiver.owner();
 
@@ -408,7 +408,7 @@ impl Room {
         }
 
         // Create all connected play's receivers peers.
-        for (_, receiver) in member.sinks() {
+        for receiver in member.sinks().values() {
             let publisher = receiver.src();
 
             if receiver.peer_id().is_none()

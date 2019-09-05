@@ -83,7 +83,7 @@ impl MemberSpec {
         })
     }
 
-    /// Returns credentials of this [`Member`].
+    /// Returns credentials from this [`MemberSpec`].
     pub fn credentials(&self) -> &str {
         &self.credentials
     }

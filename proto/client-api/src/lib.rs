@@ -6,7 +6,7 @@ use derive_more::Display;
 use medea_macro::dispatchable;
 use serde::{de::Deserializer, ser::Serializer, Deserialize, Serialize};
 
-/// ID of [`Peer`].
+/// ID of `Peer`.
 #[cfg_attr(
     feature = "medea",
     derive(Deserialize, Debug, Hash, Eq, Default, PartialEq)
@@ -15,7 +15,7 @@ use serde::{de::Deserializer, ser::Serializer, Deserialize, Serialize};
 #[derive(Clone, Copy, Display)]
 pub struct PeerId(pub u64);
 
-/// ID of [`MediaTrack`].
+/// ID of `MediaTrack`.
 #[cfg_attr(
     feature = "medea",
     derive(Deserialize, Debug, Hash, Eq, Default, PartialEq)
@@ -140,7 +140,7 @@ pub struct IceCandidate {
     pub sdp_mid: Option<String>,
 }
 
-/// [`Track] with specified direction.
+/// [`Track`] with specified direction.
 #[cfg_attr(feature = "medea", derive(Serialize, Debug, Clone, PartialEq))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
 pub struct Track {

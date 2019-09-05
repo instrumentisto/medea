@@ -14,6 +14,8 @@ use super::{
 };
 
 /// ID of [`Room`].
+///
+/// [`Room`]: crate::signalling::room::Room
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, From, Display)]
 pub struct Id(pub String);
 
