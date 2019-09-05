@@ -2,7 +2,7 @@
 use std::rc::Rc;
 
 use futures::{
-    future::{self, Future as _, IntoFuture},
+    future::{self, IntoFuture},
     sync::mpsc::unbounded,
     Future, Stream,
 };
@@ -14,7 +14,6 @@ use wasm_bindgen_test::*;
 use medea_jason::{
     media::MediaManager,
     peer::{PeerConnection, PeerEvent},
-    utils::WasmErr,
 };
 
 use crate::{get_test_tracks, resolve_after};
@@ -26,7 +25,7 @@ wasm_bindgen_test_configure!(run_in_browser);
 fn add_ice_candidate_before_precess_offer(
 ) -> impl Future<Item = (), Error = JsValue> {
     let (tx1, rx1) = unbounded();
-    let (tx2, rx2) = unbounded();
+    let (tx2, _) = unbounded();
 
     let manager = Rc::new(MediaManager::default());
     let peer1 = Rc::new(
@@ -51,7 +50,7 @@ fn add_ice_candidate_before_precess_offer(
 #[wasm_bindgen_test(async)]
 fn add_ice_candidate_before_precess_answer(
 ) -> impl Future<Item = (), Error = JsValue> {
-    let (tx1, rx1) = unbounded();
+    let (tx1, _) = unbounded();
     let (tx2, rx2) = unbounded();
 
     let manager = Rc::new(MediaManager::default());
