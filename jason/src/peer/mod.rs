@@ -165,7 +165,6 @@ impl PeerConnection {
 
     /// Disable or enable all audio tracks for all [`Sender`]s.
     pub fn toggle_send_audio(&self, enabled: bool) {
-        WasmErr::from(format!("toggle_send_audio {}", enabled)).log_err();
         self.0
             .media_connections
             .toggle_send_media(TransceiverKind::Audio, enabled)
