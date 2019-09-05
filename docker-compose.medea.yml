@@ -10,6 +10,6 @@ services:
     ports:
       - "8080:8080"
     volumes:
-      - ./dev/config.toml:/dev/config.toml:ro
-      - ./dev/specs:/dev/specs:ro
+      - ./${MEDEA_CONF}:/${MEDEA_CONF}:ro
+      - ${MEDEA_CONTROL_STATIC_SPECS_DIR}:/specs:ro
     network_mode: host
