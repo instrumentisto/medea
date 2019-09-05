@@ -26,7 +26,7 @@ use crate::{
     conf::Conf,
     log::prelude::*,
     shutdown::GracefulShutdown,
-    signalling::{room::RoomError, room_repo::RoomsRepository, Room},
+    signalling::{room::RoomError, room_repo::RoomRepository, Room},
     turn::{service, TurnServiceErr},
 };
 
@@ -81,7 +81,7 @@ pub fn run() -> Result<(), Error> {
                     "Loaded rooms: {:?}",
                     rooms.iter().map(|(id, _)| &id.0).collect::<Vec<&String>>()
                 );
-                let room_repo = RoomsRepository::new(rooms);
+                let room_repo = RoomRepository::new(rooms);
 
                 (room_repo, graceful_shutdown, config)
             })

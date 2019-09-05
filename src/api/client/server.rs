@@ -27,7 +27,7 @@ use crate::{
     conf::{Conf, Rpc},
     log::prelude::*,
     shutdown::ShutdownGracefully,
-    signalling::room_repo::RoomsRepository,
+    signalling::room_repo::RoomRepository,
 };
 
 /// Parameters of new WebSocket connection creation HTTP request.
@@ -50,21 +50,22 @@ fn ws_index(
     payload: Payload,
 ) -> impl Future<Item = HttpResponse, Error = actix_web::Error> {
     debug!("Request params: {:?}", info);
+    let RequestParams {
+        room_id,
+        member_id,
+        credentials,
+    } = info.into_inner();
 
-    match state.rooms.get(&info.room_id) {
+    match state.rooms.get(&room_id) {
         Some(room) => Either::A(
             room.send(Authorize {
-                member_id: info.member_id.clone(),
-                credentials: info.credentials.clone(),
+                member_id: member_id.clone(),
+                credentials,
             })
             .from_err()
             .and_then(move |res| match res {
                 Ok(_) => ws::start(
-                    WsSession::new(
-                        info.member_id.clone(),
-                        room,
-                        state.config.idle_timeout,
-                    ),
+                    WsSession::new(member_id, room, state.config.idle_timeout),
                     &request,
                     payload,
                 ),
@@ -85,7 +86,7 @@ pub struct Context {
     /// Repository of all currently existing [`Room`]s in application.
     ///
     /// [`Room`]: crate::signalling::Room
-    pub rooms: RoomsRepository,
+    pub rooms: RoomRepository,
 
     /// Settings of application.
     pub config: Rpc,
@@ -96,7 +97,7 @@ pub struct Server(ActixServer);
 
 impl Server {
     /// Starts Client API HTTP server.
-    pub fn run(rooms: RoomsRepository, config: Conf) -> io::Result<Addr<Self>> {
+    pub fn run(rooms: RoomRepository, config: Conf) -> io::Result<Addr<Self>> {
         let server_addr = config.server.bind_addr();
 
         let server = HttpServer::new(move || {
@@ -154,7 +155,7 @@ mod test {
     use super::*;
 
     /// Creates [`RoomsRepository`] for tests filled with a single [`Room`].
-    fn room(conf: Rpc) -> RoomsRepository {
+    fn room(conf: Rpc) -> RoomRepository {
         let room_spec =
             control::load_from_yaml_file("tests/specs/pub-sub-video-call.yml")
                 .unwrap();
@@ -171,7 +172,7 @@ mod test {
             room_id => client_room,
         };
 
-        RoomsRepository::new(rooms)
+        RoomRepository::new(rooms)
     }
 
     /// Creates test WebSocket server of Client API which can handle requests.
