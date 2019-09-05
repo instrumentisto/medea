@@ -3,7 +3,7 @@
 // Fix bug in clippy.
 #![allow(clippy::use_self)]
 
-use std::fmt;
+use std::{convert::TryFrom, fmt};
 
 use failure::Fail;
 use url::Url;
@@ -194,12 +194,10 @@ struct LocalUriInner {
     endpoint_id: Option<String>,
 }
 
-impl LocalUriInner {
-    /// Parse [`LocalUri`] from str.
-    ///
-    /// Returns [`LocalUriParse::NotLocal`] when uri is not "local://"
-    /// Returns [`LocalUriParse::TooManyFields`] when uri have too many paths.
-    fn parse(value: &str) -> Result<Self, LocalUriParseError> {
+impl TryFrom<&str> for LocalUriInner {
+    type Error = LocalUriParseError;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
         if value.is_empty() {
             return Err(LocalUriParseError::Empty);
         }
@@ -251,7 +249,9 @@ impl LocalUriInner {
             endpoint_id,
         })
     }
+}
 
+impl LocalUriInner {
     /// Return true if this [`LocalUri`] pointing to `Room` element.
     fn is_room_uri(&self) -> bool {
         self.room_id.is_some()
@@ -302,8 +302,20 @@ pub enum LocalUriType {
 }
 
 impl LocalUriType {
-    pub fn parse(value: &str) -> Result<Self, LocalUriParseError> {
-        let inner = LocalUriInner::parse(value)?;
+    pub fn room_id(&self) -> &RoomId {
+        match self {
+            LocalUriType::Room(uri) => uri.room_id(),
+            LocalUriType::Member(uri) => uri.room_id(),
+            LocalUriType::Endpoint(uri) => uri.room_id(),
+        }
+    }
+}
+
+impl TryFrom<&str> for LocalUriType {
+    type Error = LocalUriParseError;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        let inner = LocalUriInner::try_from(value)?;
         if inner.is_room_uri() {
             Ok(LocalUriType::Room(LocalUri::<IsRoomId>::new(
                 inner.room_id.unwrap(),

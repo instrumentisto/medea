@@ -2,7 +2,7 @@
 
 use std::io;
 
-use actix::{Actor, Addr, Handler, ResponseActFuture, WrapFuture as _};
+use actix::{Actor, Addr, Handler, ResponseFuture, WrapFuture as _};
 use actix_web::{
     dev::Server as ActixServer,
     middleware,
@@ -126,7 +126,7 @@ impl Actor for Server {
 }
 
 impl Handler<ShutdownGracefully> for Server {
-    type Result = ResponseActFuture<Self, (), ()>;
+    type Result = ResponseFuture<(), ()>;
 
     fn handle(
         &mut self,
@@ -134,7 +134,7 @@ impl Handler<ShutdownGracefully> for Server {
         _: &mut Self::Context,
     ) -> Self::Result {
         info!("Server received ShutdownGracefully message so shutting down");
-        Box::new(self.0.stop(true).into_actor(self))
+        Box::new(self.0.stop(true))
     }
 }
 

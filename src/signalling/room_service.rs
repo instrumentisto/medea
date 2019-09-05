@@ -1,18 +1,20 @@
 //! Service which control [`Room`].
 
 use actix::{
-    fut::wrap_future, Actor, ActorFuture, Addr, AsyncContext as _, Context,
-    Handler, MailboxError, Message,
+    fut::wrap_future, Actor, ActorFuture, Addr, Context, Handler, MailboxError,
+    Message, ResponseFuture, WrapFuture as _,
 };
 use failure::Fail;
-use futures::future::{Either, Future};
+use futures::future::{self, Either, Future};
 use medea_grpc_proto::control::Element as ElementProto;
 
 use crate::{
     api::control::{
         endpoints::Endpoint as EndpointSpec,
         load_static_specs_from_dir,
-        local_uri::{IsEndpointId, IsMemberId, IsRoomId, LocalUri},
+        local_uri::{
+            IsEndpointId, IsMemberId, IsRoomId, LocalUri, LocalUriType,
+        },
         MemberId, MemberSpec, RoomId, RoomSpec,
     },
     log::prelude::*,
@@ -28,6 +30,7 @@ use crate::{
     },
     AppContext,
 };
+use serde::export::PhantomData;
 
 type ActFuture<I, E> =
     Box<dyn ActorFuture<Actor = RoomService, Item = I, Error = E>>;
@@ -46,7 +49,7 @@ pub enum RoomServiceError {
     #[fail(display = "Failed to load static specs. {:?}", _0)]
     FailedToLoadStaticSpecs(failure::Error),
     #[fail(display = "Unknow error.")]
-    Unknow,
+    Unknown,
 }
 
 impl From<RoomError> for RoomServiceError {
@@ -82,6 +85,28 @@ impl RoomService {
             room_repo,
             app,
             graceful_shutdown,
+        }
+    }
+
+    fn close_room(
+        &self,
+        id: RoomId,
+    ) -> impl ActorFuture<Item = (), Error = MailboxError> {
+        if let Some(room) = self.room_repo.get(&id) {
+            shutdown::unsubscribe(
+                &self.graceful_shutdown,
+                room.clone().recipient(),
+                shutdown::Priority(2),
+            );
+
+            actix::fut::Either::A(room.send(Close).into_actor(self).map(
+                move |_, act, _| {
+                    debug!("Room [id = {}] removed.", id);
+                    act.room_repo.remove(&id);
+                },
+            ))
+        } else {
+            actix::fut::Either::B(actix::fut::ok(()))
         }
     }
 }
@@ -165,9 +190,7 @@ impl Handler<StartRoom> for RoomService {
             ));
         }
 
-        let room = msg.1;
-
-        let room = Room::new(&room, self.app.clone())?;
+        let room = Room::new(&msg.1, self.app.clone())?;
         let room_addr = room.start();
 
         shutdown::subscribe(
@@ -186,90 +209,61 @@ impl Handler<StartRoom> for RoomService {
 /// Signal for delete [`Room`].
 #[derive(Message)]
 #[rtype(result = "Result<(), RoomServiceError>")]
-pub struct DeleteRoom(pub RoomId);
+pub struct DeleteElements<T> {
+    uris: Vec<LocalUriType>,
+    _marker: PhantomData<T>,
+}
 
-impl Handler<DeleteRoom> for RoomService {
-    type Result = Result<(), RoomServiceError>;
+pub struct NotValidated;
+pub struct Valid;
 
-    fn handle(
-        &mut self,
-        msg: DeleteRoom,
-        ctx: &mut Self::Context,
-    ) -> Self::Result {
-        if let Some(room) = self.room_repo.get(&msg.0) {
-            shutdown::unsubscribe(
-                &self.graceful_shutdown,
-                room.clone().recipient(),
-                shutdown::Priority(2),
-            );
-            let rooms = self.room_repo.clone();
-            ctx.spawn(wrap_future(
-                room.send(Close)
-                    .map(move |_| {
-                        rooms.remove(&msg.0);
-                        debug!("Room [id = {}] removed.", msg.0);
-                    })
-                    .map_err(|e| warn!("Close room mailbox error {:?}.", e)),
-            ));
+impl DeleteElements<NotValidated> {
+    pub fn new() -> DeleteElements<NotValidated> {
+        Self {
+            uris: vec![],
+            _marker: PhantomData,
         }
+    }
 
-        Ok(())
+    pub fn add_uri(&mut self, uri: LocalUriType) {
+        self.uris.push(uri);
     }
 }
 
-/// Signal for delete [`Member`] from [`Room`].
-#[derive(Message)]
-#[rtype(result = "Result<(), RoomServiceError>")]
-pub struct DeleteMemberFromRoom {
-    pub member_id: MemberId,
-    pub room_id: RoomId,
-}
-
-impl Handler<DeleteMemberFromRoom> for RoomService {
-    type Result = Result<(), RoomServiceError>;
-
-    fn handle(
-        &mut self,
-        msg: DeleteMemberFromRoom,
-        _ctx: &mut Self::Context,
-    ) -> Self::Result {
-        if let Some(room) = self.room_repo.get(&msg.room_id) {
-            room.do_send(DeleteMember(msg.member_id));
-        } else {
-            return Err(RoomServiceError::RoomNotFound(get_local_uri_to_room(
-                msg.room_id,
-            )));
+impl DeleteElements<NotValidated> {
+    pub fn validate(self) -> Result<DeleteElements<Valid>, RoomServiceError> {
+        // TODO: correct errors
+        if self.uris.is_empty() {
+            return Err(RoomServiceError::Unknown);
         }
 
-        Ok(())
+        let first_room = self.uris[0].room_id();
+        let is_same_room =
+            self.uris.iter().all(|item| item.room_id() == first_room);
+
+        if !is_same_room {
+            return Err(RoomServiceError::Unknown);
+        }
+
+        Ok(DeleteElements {
+            uris: self.uris,
+            _marker: PhantomData,
+        })
     }
 }
 
-/// Signal for delete [`Endpoint`] from [`Member`].
-#[derive(Message)]
-#[rtype(result = "Result<(), RoomServiceError>")]
-pub struct DeleteEndpointFromMember {
-    pub room_id: RoomId,
-    pub member_id: MemberId,
-    pub endpoint_id: String,
-}
-
-impl Handler<DeleteEndpointFromMember> for RoomService {
+impl Handler<DeleteElements<Valid>> for RoomService {
     type Result = Result<(), RoomServiceError>;
 
     fn handle(
         &mut self,
-        msg: DeleteEndpointFromMember,
-        _ctx: &mut Self::Context,
+        mut msg: DeleteElements<Valid>,
+        _: &mut Self::Context,
     ) -> Self::Result {
-        if let Some(room) = self.room_repo.get(&msg.room_id) {
-            room.do_send(DeleteEndpoint {
-                endpoint_id: msg.endpoint_id,
-                member_id: msg.member_id,
-            });
-        }
+        // TODO: handle room delete here, send batch to room, handle it atomically
+        //       just discard other messages if room delete present
 
-        Ok(())
+        unimplemented!()
     }
 }
 
@@ -305,7 +299,7 @@ impl Handler<GetRoom> for RoomService {
                         }),
                 )
             } else {
-                return Box::new(wrap_future(futures::future::err(
+                return Box::new(wrap_future(future::err(
                     RoomServiceError::RoomNotFound(get_local_uri_to_room(
                         room_id,
                     )),
@@ -313,7 +307,7 @@ impl Handler<GetRoom> for RoomService {
             }
         }
 
-        Box::new(wrap_future(futures::future::join_all(futs)))
+        Box::new(wrap_future(future::join_all(futs)))
     }
 }
 
@@ -348,7 +342,7 @@ impl Handler<GetMember> for RoomService {
                         }),
                 )
             } else {
-                return Box::new(wrap_future(futures::future::err(
+                return Box::new(wrap_future(future::err(
                     RoomServiceError::RoomNotFound(get_local_uri_to_room(
                         room_id,
                     )),
@@ -356,7 +350,7 @@ impl Handler<GetMember> for RoomService {
             }
         }
 
-        Box::new(wrap_future(futures::future::join_all(futs)))
+        Box::new(wrap_future(future::join_all(futs)))
     }
 }
 
@@ -395,7 +389,7 @@ impl Handler<GetEndpoint> for RoomService {
                     }),
                 );
             } else {
-                return Box::new(wrap_future(futures::future::err(
+                return Box::new(wrap_future(future::err(
                     RoomServiceError::RoomNotFound(get_local_uri_to_room(
                         room_id,
                     )),
@@ -403,7 +397,7 @@ impl Handler<GetEndpoint> for RoomService {
             }
         }
 
-        Box::new(wrap_future(futures::future::join_all(futs)))
+        Box::new(wrap_future(future::join_all(futs)))
     }
 }
 
@@ -430,7 +424,7 @@ impl Handler<CreateMemberInRoom> for RoomService {
                     .map_err(RoomServiceError::from),
             )
         } else {
-            Either::B(futures::future::err(RoomServiceError::RoomNotFound(
+            Either::B(future::err(RoomServiceError::RoomNotFound(
                 get_local_uri_to_room(msg.room_id),
             )))
         };
@@ -467,7 +461,7 @@ impl Handler<CreateEndpointInRoom> for RoomService {
                 .map_err(RoomServiceError::from),
             )
         } else {
-            Either::B(futures::future::err(RoomServiceError::RoomNotFound(
+            Either::B(future::err(RoomServiceError::RoomNotFound(
                 get_local_uri_to_room(msg.room_id),
             )))
         };

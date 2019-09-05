@@ -45,7 +45,7 @@ impl TryFrom<&WebRtcPlayEndpointProto> for WebRtcPlayEndpoint {
 
     fn try_from(value: &WebRtcPlayEndpointProto) -> Result<Self, Self::Error> {
         Ok(Self {
-            src: SrcUri::parse(value.get_src())?,
+            src: SrcUri::try_from(value.get_src())?,
         })
     }
 }
@@ -70,13 +70,11 @@ pub struct SrcUri {
     pub endpoint_id: WebRtcPublishId,
 }
 
-impl SrcUri {
-    /// Parse [`SrcUri`] from str.
-    ///
-    /// Returns [`SrcParseError::LocalUriParseError`] when some error happened
-    /// while parsing URI.
-    pub fn parse(value: &str) -> Result<Self, SrcParseError> {
-        let local_uri = LocalUriType::parse(value).map_err(|e| {
+impl TryFrom<&str> for SrcUri {
+    type Error = SrcParseError;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        let local_uri = LocalUriType::try_from(value).map_err(|e| {
             SrcParseError::LocalUriParseError(value.to_string(), e)
         })?;
 
@@ -124,7 +122,7 @@ impl<'de> Deserialize<'de> for SrcUri {
             where
                 E: de::Error,
             {
-                match SrcUri::parse(value) {
+                match SrcUri::try_from(value) {
                     Ok(src_uri) => Ok(src_uri),
                     Err(e) => Err(Error::custom(e)),
                 }

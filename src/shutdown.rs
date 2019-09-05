@@ -7,7 +7,7 @@ use std::{
 
 use actix::{
     prelude::{Actor, Context},
-    Addr, AsyncContext, Handler, Message, Recipient, ResponseActFuture, System,
+    Addr, AsyncContext, Handler, Message, Recipient, ResponseFuture, System,
     WrapFuture as _,
 };
 use failure::Fail;
@@ -104,18 +104,14 @@ struct OsSignal(i32);
 
 #[cfg(unix)]
 impl Handler<OsSignal> for GracefulShutdown {
-    type Result = ResponseActFuture<Self, (), ()>;
+    type Result = ResponseFuture<(), ()>;
 
-    fn handle(
-        &mut self,
-        sig: OsSignal,
-        _: &mut Context<Self>,
-    ) -> ResponseActFuture<Self, (), ()> {
+    fn handle(&mut self, sig: OsSignal, _: &mut Context<Self>) -> Self::Result {
         info!("OS signal '{}' received", sig.0);
 
         match self.state {
             State::InProgress => {
-                return Box::new(future::ok(()).into_actor(self));
+                return Box::new(future::ok(()));
             }
             State::Listening => {
                 self.state = State::InProgress;
@@ -126,7 +122,7 @@ impl Handler<OsSignal> for GracefulShutdown {
 
         if self.subs.is_empty() {
             System::current().stop();
-            return Box::new(future::ok(()).into_actor(self));
+            return Box::new(future::ok(()));
         }
 
         let by_priority: Vec<_> = self
@@ -158,8 +154,7 @@ impl Handler<OsSignal> for GracefulShutdown {
                 .map(|_| {
                     info!("Graceful shutdown succeeded, stopping system");
                     System::current().stop()
-                })
-                .into_actor(self),
+                }),
         )
     }
 }

@@ -6,15 +6,19 @@
 use std::{collections::HashMap, convert::TryFrom, sync::Arc};
 
 use actix::{
-    Actor, Addr, Arbiter, Context, Handler, MailboxError, ResponseActFuture,
+    Actor, Addr, Arbiter, Context, Handler, MailboxError, ResponseFuture,
     WrapFuture as _,
 };
 use failure::Fail;
-use futures::future::{self, Either, Future};
-use grpcio::{Environment, RpcContext, Server, ServerBuilder, UnarySink};
+use futures::future::{Either, Future};
+use grpcio::{
+    Environment, RpcContext, RpcStatus, RpcStatusCode, Server, ServerBuilder,
+    UnarySink, UnarySinkResult,
+};
 use medea_grpc_proto::{
     control::{
-        ApplyRequest, CreateRequest, Error, GetResponse, IdRequest, Response,
+        ApplyRequest, CreateRequest, CreateResponse, Error, GetResponse,
+        IdRequest, Response,
     },
     control_grpc::{create_control_api, ControlApi},
 };
@@ -35,9 +39,9 @@ use crate::{
     signalling::{
         room::RoomError,
         room_service::{
-            CreateEndpointInRoom, CreateMemberInRoom, DeleteEndpointFromMember,
-            DeleteMemberFromRoom, DeleteRoom, GetEndpoint, GetMember, GetRoom,
-            RoomService, RoomServiceError, StartRoom,
+            CreateEndpointInRoom, CreateMemberInRoom, DeleteElements,
+            GetEndpoint, GetMember, GetRoom, RoomService, RoomServiceError,
+            StartRoom,
         },
     },
     AppContext,
@@ -115,7 +119,7 @@ macro_rules! fut_try {
 /// See `send_error_response` doc for details about arguments for this macro.
 macro_rules! parse_local_uri {
     ($uri:expr, $ctx:expr, $sink:expr, $response:ty) => {
-        match LocalUriType::parse($uri) {
+        match LocalUriType::try_from($uri.as_ref()) {
             Ok(o) => o,
             Err(e) => {
                 let error: ErrorResponse = e.into();
@@ -258,12 +262,12 @@ impl ControlApiService {
 /// Generate [`Response`] for `Create` method of all elements.
 fn get_response_for_create(
     result: Result<CreateResult, ControlApiError>,
-) -> Response {
+) -> CreateResponse {
     let error: ErrorResponse = match result {
         Ok(r) => match r {
             Ok(r) => match r {
                 Ok(sid) => {
-                    let mut response = Response::new();
+                    let mut response = CreateResponse::new();
                     response.set_sid(sid);
                     return response;
                 }
@@ -274,97 +278,99 @@ fn get_response_for_create(
         Err(e) => e.into(),
     };
 
-    let mut error_response = Response::new();
+    let mut error_response = CreateResponse::new();
     error_response.set_error(error.into());
     error_response
 }
 
 impl ControlApi for ControlApiService {
+    // TODO: just send Vec<LocalUri>, see fn delete()
     /// Implementation for `Create` method of gRPC control API.
     fn create(
         &mut self,
         ctx: RpcContext,
         req: CreateRequest,
-        sink: UnarySink<Response>,
+        sink: UnarySink<CreateResponse>,
     ) {
-        let local_uri = parse_local_uri!(req.get_id(), ctx, sink, Response);
-
-        match local_uri {
-            LocalUriType::Room(local_uri) => {
-                if req.has_room() {
-                    ctx.spawn(self.create_room(&req, local_uri).then(
-                        move |r| {
-                            sink.success(get_response_for_create(r))
-                                .map_err(|_| ())
-                        },
-                    ));
-                } else {
-                    send_error_response!(
-                        ctx,
-                        sink,
-                        ErrorResponse::new(
-                            ErrorCode::ElementIdForRoomButElementIsNot,
-                            &req.get_id(),
-                        ),
-                        Response
-                    );
-                }
-            }
-            LocalUriType::Member(local_uri) => {
-                if req.has_member() {
-                    ctx.spawn(self.create_member(&req, local_uri).then(
-                        move |r| {
-                            sink.success(get_response_for_create(r)).map_err(
-                                |e| {
-                                    warn!(
-                                        "Error while sending Create response \
-                                         by gRPC. {:?}",
-                                        e
-                                    )
-                                },
-                            )
-                        },
-                    ));
-                } else {
-                    send_error_response!(
-                        ctx,
-                        sink,
-                        ErrorResponse::new(
-                            ErrorCode::ElementIdForMemberButElementIsNot,
-                            &req.get_id(),
-                        ),
-                        Response
-                    );
-                }
-            }
-            LocalUriType::Endpoint(local_uri) => {
-                if req.has_webrtc_pub() || req.has_webrtc_play() {
-                    ctx.spawn(self.create_endpoint(&req, local_uri).then(
-                        move |r| {
-                            sink.success(get_response_for_create(r)).map_err(
-                                |e| {
-                                    warn!(
-                                        "Error while sending Create response \
-                                         by gRPC. {:?}",
-                                        e
-                                    )
-                                },
-                            )
-                        },
-                    ));
-                } else {
-                    send_error_response!(
-                        ctx,
-                        sink,
-                        ErrorResponse::new(
-                            ErrorCode::ElementIdForEndpointButElementIsNot,
-                            &req.get_id(),
-                        ),
-                        Response
-                    );
-                }
-            }
-        }
+        //        let local_uri = parse_local_uri!(req.get_id(), ctx, sink,
+        // Response);
+        //
+        //        match local_uri {
+        //            LocalUriType::Room(local_uri) => {
+        //                if req.has_room() {
+        //                    ctx.spawn(self.create_room(&req, local_uri).then(
+        //                        move |r| {
+        //                            sink.success(get_response_for_create(r))
+        //                                .map_err(|_| ())
+        //                        },
+        //                    ));
+        //                } else {
+        //                    send_error_response!(
+        //                        ctx,
+        //                        sink,
+        //                        ErrorResponse::new(
+        //                            
+        // ErrorCode::ElementIdForRoomButElementIsNot,                  
+        // &req.get_id(),                        ),
+        //                        Response
+        //                    );
+        //                }
+        //            }
+        //            LocalUriType::Member(local_uri) => {
+        //                if req.has_member() {
+        //                    ctx.spawn(self.create_member(&req,
+        // local_uri).then(                        move |r| {
+        //                            
+        // sink.success(get_response_for_create(r)).map_err(            
+        // |e| {                                    warn!(
+        //                                        "Error while sending Create
+        // response \                                         by gRPC.
+        // {:?}",                                        e
+        //                                    )
+        //                                },
+        //                            )
+        //                        },
+        //                    ));
+        //                } else {
+        //                    send_error_response!(
+        //                        ctx,
+        //                        sink,
+        //                        ErrorResponse::new(
+        //                            
+        // ErrorCode::ElementIdForMemberButElementIsNot,                
+        // &req.get_id(),                        ),
+        //                        Response
+        //                    );
+        //                }
+        //            }
+        //            LocalUriType::Endpoint(local_uri) => {
+        //                if req.has_webrtc_pub() || req.has_webrtc_play() {
+        //                    ctx.spawn(self.create_endpoint(&req,
+        // local_uri).then(                        move |r| {
+        //                            
+        // sink.success(get_response_for_create(r)).map_err(            
+        // |e| {                                    warn!(
+        //                                        "Error while sending Create
+        // response \                                         by gRPC.
+        // {:?}",                                        e
+        //                                    )
+        //                                },
+        //                            )
+        //                        },
+        //                    ));
+        //                } else {
+        //                    send_error_response!(
+        //                        ctx,
+        //                        sink,
+        //                        ErrorResponse::new(
+        //                            
+        // ErrorCode::ElementIdForEndpointButElementIsNot,              
+        // &req.get_id(),                        ),
+        //                        Response
+        //                    );
+        //                }
+        //            }
+        //        }
     }
 
     /// Implementation for `Apply` method of gRPC control API.
@@ -372,105 +378,62 @@ impl ControlApi for ControlApiService {
         &mut self,
         _ctx: RpcContext,
         _req: ApplyRequest,
-        _sink: UnarySink<Response>,
+        sink: UnarySink<Response>,
     ) {
-        unimplemented!()
+        // TODO: poll UnarySinkResult's, log err if any
+        sink.fail(RpcStatus::new(RpcStatusCode::Unimplemented, None));
     }
 
     /// Implementation for `Delete` method of gRPC control API.
     fn delete(
         &mut self,
         ctx: RpcContext,
-        req: IdRequest,
+        mut req: IdRequest,
         sink: UnarySink<Response>,
     ) {
-        let mut delete_room_futs = Vec::new();
-        let mut delete_member_futs = Vec::new();
-        let mut delete_endpoints_futs = Vec::new();
+        let mut delete_elements = DeleteElements::new();
 
         for id in req.get_id() {
-            let uri = parse_local_uri!(id, ctx, sink, Response);
-
-            match uri {
-                LocalUriType::Room(uri) => {
-                    delete_room_futs.push(
-                        self.room_service.send(DeleteRoom(uri.take_room_id())),
-                    );
-                }
-                LocalUriType::Member(uri) => {
-                    let (member_id, room_uri) = uri.take_member_id();
-                    let room_id = room_uri.take_room_id();
-                    delete_member_futs.push(
-                        self.room_service
-                            .send(DeleteMemberFromRoom { room_id, member_id }),
-                    );
-                }
-                LocalUriType::Endpoint(uri) => {
-                    let (endpoint_id, member_uri) = uri.take_endpoint_id();
-                    let (member_id, room_uri) = member_uri.take_member_id();
-                    let room_id = room_uri.take_room_id();
-                    delete_endpoints_futs.push(self.room_service.send(
-                        DeleteEndpointFromMember {
-                            room_id,
-                            member_id,
-                            endpoint_id,
-                        },
-                    ));
-                }
-            }
+            let uri: LocalUriType = parse_local_uri!(id, ctx, sink, Response);
+            delete_elements.add_uri(uri);
         }
 
-        ctx.spawn(
-            future::join_all(delete_room_futs)
-                .join3(
-                    future::join_all(delete_member_futs),
-                    future::join_all(delete_endpoints_futs),
-                )
-                .then(move |result| {
-                    let map_err_closure = |e| {
-                        warn!(
-                            "Error while sending Delete response by gRPC. {:?}",
-                            e
-                        )
-                    };
-                    match result {
-                        Ok((member, endpoint, room)) => {
-                            let results = member
-                                .into_iter()
-                                .chain(endpoint.into_iter())
-                                .chain(room.into_iter());
-                            for result in results {
-                                if let Err(e) = result {
-                                    let mut response = Response::new();
-                                    let error: ErrorResponse = e.into();
-                                    response.set_error(error.into());
-                                    return sink
-                                        .success(response)
-                                        .map_err(map_err_closure);
-                                }
-                            }
+        let delete_elements = match delete_elements.validate() {
+            Ok(validated) => validated,
+            Err(err) => {
+                send_error_response!(
+                    ctx,
+                    sink,
+                    ErrorResponse::from(err),
+                    Response
+                );
+            }
+        };
 
-                            let mut response = Response::new();
-                            response.set_sid(HashMap::new());
-                            sink.success(response).map_err(map_err_closure)
-                        }
-                        Err(e) => {
-                            warn!(
-                                "Control API Delete method mailbox error. {:?}",
-                                e
-                            );
-                            let mut response = Response::new();
-                            let error: Error =
-                                ErrorResponse::unknown(&format!("{:?}", e))
-                                    .into();
-                            response.set_error(error);
-                            sink.success(response).map_err(map_err_closure)
-                        }
+        ctx.spawn(self.room_service.send(delete_elements).then(
+            move |result| {
+                match result {
+                    Ok(result) => {
+                        sink.success(Response::new());
                     }
-                }),
-        );
+                    Err(e) => {
+                        let mut response = Response::new();
+
+                        // TODO: dont use unknown, add some special err for all
+                        //       mailbox errs, Unavailable("ActorName") or something
+                        let error: Error =
+                            ErrorResponse::unknown(&format!("{:?}", e)).into();
+                        response.set_error(error);
+
+                        let a: UnarySinkResult = sink.success(response);
+                    }
+                }
+                Ok(())
+            },
+        ));
     }
 
+    /// TODO: just send Vec<LocalUri>, see fn delete()
     /// Implementation for `Get` method of gRPC control API.
     fn get(
         &mut self,
@@ -589,7 +552,7 @@ impl Actor for GrpcServer {
 }
 
 impl Handler<ShutdownGracefully> for GrpcServer {
-    type Result = ResponseActFuture<Self, (), ()>;
+    type Result = ResponseFuture<(), ()>;
 
     fn handle(
         &mut self,
@@ -599,12 +562,7 @@ impl Handler<ShutdownGracefully> for GrpcServer {
         info!(
             "gRPC server received ShutdownGracefully message so shutting down.",
         );
-        Box::new(
-            self.server
-                .shutdown()
-                .map_err(|e| warn!("{:?}", e))
-                .into_actor(self),
-        )
+        Box::new(self.server.shutdown().map_err(|e| warn!("{:?}", e)))
     }
 }
 

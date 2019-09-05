@@ -3,7 +3,7 @@ syntax = "proto3";
 package medea;
 
 service ControlApi {
-  rpc Create (CreateRequest) returns (Response);
+  rpc Create (CreateRequest) returns (CreateResponse);
   rpc Apply (ApplyRequest) returns (Response);
   rpc Delete (IdRequest) returns (Response);
   rpc Get (IdRequest) returns (GetResponse);
@@ -42,6 +42,9 @@ message IdRequest {
   repeated string id = 1;
 }
 message Response {
+  Error error = 1;
+}
+message CreateResponse {
   map<string, string> sid = 1;
   Error error = 2;
 }
