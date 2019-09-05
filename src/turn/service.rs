@@ -10,6 +10,7 @@ use actix::{
     Message, WrapFuture,
 };
 use bb8::RunError;
+use derive_more::Display;
 use failure::Fail;
 use futures::future::{err, ok, Future};
 use rand::{distributions::Alphanumeric, Rng};
@@ -96,13 +97,13 @@ type ActFuture<I, E> =
     Box<dyn ActorFuture<Actor = Service, Item = I, Error = E>>;
 
 /// Error which can happen in [`TurnAuthService`].
-#[derive(Debug, Fail)]
+#[derive(Debug, Fail, Display)]
 pub enum TurnServiceErr {
-    #[fail(display = "Error accessing TurnAuthRepo: {}", _0)]
+    #[display(fmt = "Error accessing TurnAuthRepo: {}", _0)]
     TurnAuthRepoErr(TurnDatabaseErr),
-    #[fail(display = "Mailbox error when accessing TurnAuthRepo: {}", _0)]
+    #[display(fmt = "Mailbox error when accessing TurnAuthRepo: {}", _0)]
     MailboxErr(MailboxError),
-    #[fail(display = "Timeout exceeded while trying to insert/delete IceUser")]
+    #[display(fmt = "Timeout exceeded while trying to insert/delete IceUser")]
     TimedOut,
 }
 

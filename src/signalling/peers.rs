@@ -8,8 +8,8 @@ use std::{
     convert::{TryFrom, TryInto},
 };
 
-use medea_client_api_proto::{Incrementable, PeerId, TrackId};
 use derive_more::Display;
+use medea_client_api_proto::{Incrementable, PeerId, TrackId};
 
 use crate::{
     api::control::MemberId,

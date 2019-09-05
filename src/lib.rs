@@ -13,6 +13,7 @@ pub mod turn;
 use std::sync::Arc;
 
 use actix::prelude::*;
+use derive_more::Display;
 use failure::{Error, Fail};
 use futures::future::{Either, Future, IntoFuture as _};
 use std::collections::HashMap;
@@ -30,22 +31,22 @@ use crate::{
 };
 
 /// Errors which can happen while server starting.
-#[derive(Debug, Fail)]
+#[derive(Debug, Fail, Display)]
 pub enum ServerStartError {
     /// Duplicate [`RoomId`] founded.
-    #[fail(display = "Duplicate of room ID '{:?}'", _0)]
+    #[display(fmt = "Duplicate of room ID '{:?}'", _0)]
     DuplicateRoomId(RoomId),
 
     /// Some error happened while loading spec.
-    #[fail(display = "Failed to load specs. {}", _0)]
+    #[display(fmt = "Failed to load specs. {}", _0)]
     LoadSpec(failure::Error),
 
     /// Some error happened while creating new room from spec.
-    #[fail(display = "Bad room spec. {}", _0)]
+    #[display(fmt = "Bad room spec. {}", _0)]
     BadRoomSpec(String),
 
     /// Unexpected error returned from room.
-    #[fail(display = "Unknown room error.")]
+    #[display(fmt = "Unknown room error.")]
     UnknownRoomError,
 }
 

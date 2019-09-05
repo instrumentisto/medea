@@ -5,6 +5,7 @@ use std::time::Duration;
 use bb8::{Pool, RunError};
 use bb8_redis::{RedisConnectionManager, RedisPool};
 use crypto::{digest::Digest, md5::Md5};
+use derive_more::Display;
 use failure::Fail;
 use futures::future::Future;
 use redis::{ConnectionInfo, RedisError};
@@ -12,9 +13,9 @@ use tokio::prelude::*;
 
 use crate::{log::prelude::*, media::IceUser};
 
-#[derive(Fail, Debug)]
+#[derive(Fail, Debug, Display)]
 pub enum TurnDatabaseErr {
-    #[fail(display = "Redis returned error: {}", _0)]
+    #[display(fmt = "Redis returned error: {}", _0)]
     RedisError(RedisError),
 }
 

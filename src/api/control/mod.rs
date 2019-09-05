@@ -14,6 +14,7 @@ use std::{
     path::Path,
 };
 
+use derive_more::Display;
 use failure::{Error, Fail};
 use serde::Deserialize;
 
@@ -41,11 +42,11 @@ pub enum RootElement {
 ///
 /// [`TryFrom`]: std::convert::TryFrom
 #[allow(clippy::pub_enum_variant_names)]
-#[derive(Debug, Fail)]
+#[derive(Debug, Fail, Display)]
 pub enum TryFromElementError {
-    #[fail(display = "Element is not Room")]
+    #[display(fmt = "Element is not Room")]
     NotRoom,
-    #[fail(display = "Element is not Member")]
+    #[display(fmt = "Element is not Room")]
     NotMember,
 }
 

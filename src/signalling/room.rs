@@ -9,6 +9,7 @@ use actix::{
     fut::wrap_future, Actor, ActorFuture, AsyncContext, Context, Handler,
     ResponseActFuture, WrapFuture as _,
 };
+use derive_more::Display;
 use failure::Fail;
 use futures::future;
 use medea_client_api_proto::{Command, Event, IceCandidate, PeerId, TrackId};
@@ -43,25 +44,25 @@ pub type ActFuture<I, E> =
     Box<dyn ActorFuture<Actor = Room, Item = I, Error = E>>;
 
 #[allow(clippy::module_name_repetitions)]
-#[derive(Debug, Fail)]
+#[derive(Debug, Fail, Display)]
 pub enum RoomError {
-    #[fail(display = "Couldn't find Peer with [id = {}]", _0)]
+    #[display(fmt = "Couldn't find Peer with [id = {}]", _0)]
     PeerNotFound(PeerId),
-    #[fail(display = "Couldn't find Member with [id = {}]", _0)]
+    #[display(fmt = "Couldn't find Member with [id = {}]", _0)]
     MemberNotFound(MemberId),
-    #[fail(display = "Member [id = {}] does not have Turn credentials", _0)]
+    #[display(fmt = "Member [id = {}] does not have Turn credentials", _0)]
     NoTurnCredentials(MemberId),
-    #[fail(display = "Couldn't find RpcConnection with Member [id = {}]", _0)]
+    #[display(fmt = "Couldn't find RpcConnection with Member [id = {}]", _0)]
     ConnectionNotExists(MemberId),
-    #[fail(display = "Unable to send event to Member [id = {}]", _0)]
+    #[display(fmt = "Unable to send event to Member [id = {}]", _0)]
     UnableToSendEvent(MemberId),
-    #[fail(display = "PeerError: {}", _0)]
+    #[display(fmt = "PeerError: {}", _0)]
     PeerError(PeerError),
-    #[fail(display = "Generic room error {}", _0)]
+    #[display(fmt = "Generic room error {}", _0)]
     BadRoomSpec(String),
-    #[fail(display = "Turn service error: {}", _0)]
+    #[display(fmt = "Turn service error: {}", _0)]
     TurnServiceError(String),
-    #[fail(display = "Client error:{}", _0)]
+    #[display(fmt = "Client error:{}", _0)]
     ClientError(String),
 }
 

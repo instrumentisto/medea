@@ -6,6 +6,7 @@
 
 use std::{collections::HashMap, convert::TryFrom, fmt, rc::Rc};
 
+use derive_more::Display;
 use failure::Fail;
 use medea_client_api_proto::{
     AudioSettings, Direction, MediaType, PeerId as Id, Track, TrackId,
@@ -38,17 +39,19 @@ pub struct WaitRemoteSdp {}
 pub struct Stable {}
 
 /// Produced when unwrapping [`PeerStateMachine`] to [`Peer`] with wrong state.
-#[derive(Fail, Debug)]
+#[derive(Fail, Debug, Display)]
 #[allow(clippy::module_name_repetitions)]
 pub enum PeerError {
-    #[fail(
-        display = "Cannot unwrap Peer from PeerStateMachine [id = {}]. \
-                   Expected state {} was {}",
-        _0, _1, _2
+    #[display(
+        fmt = "Cannot unwrap Peer from PeerStateMachine [id = {}]. Expected \
+               state {} was {}",
+        _0,
+        _1,
+        _2
     )]
     WrongState(Id, &'static str, String),
-    #[fail(
-        display = "Peer is sending Track [{}] without providing its mid",
+    #[display(
+        fmt = "Peer is sending Track [{}] without providing its mid",
         _0
     )]
     MidsMismatch(TrackId),

@@ -17,6 +17,7 @@ use actix::{
     fut::wrap_future, ActorFuture, AsyncContext, Context, MailboxError,
     SpawnHandle,
 };
+use derive_more::Display;
 use failure::Fail;
 use futures::{
     future::{self, join_all, Either},
@@ -43,17 +44,14 @@ use crate::{
     turn::{TurnAuthService, TurnServiceErr, UnreachablePolicy},
 };
 
-#[derive(Fail, Debug)]
+#[derive(Fail, Debug, Display)]
 #[allow(clippy::module_name_repetitions)]
 pub enum ParticipantServiceErr {
-    #[fail(display = "TurnService Error in ParticipantService: {}", _0)]
+    #[display(fmt = "TurnService Error in ParticipantService: {}", _0)]
     TurnServiceErr(TurnServiceErr),
-    #[fail(
-        display = "Mailbox error when accessing ParticipantService: {}",
-        _0
-    )]
+    #[display(fmt = "Mailbox error when accessing ParticipantService: {}", _0)]
     MailBoxErr(MailboxError),
-    #[fail(display = "Participant with Id [{}] was not found", _0)]
+    #[display(fmt = "Participant with Id [{}] was not found", _0)]
     ParticipantNotFound(MemberId),
 }
 

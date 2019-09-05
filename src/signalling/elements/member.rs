@@ -9,6 +9,7 @@ use std::{
     rc::{Rc, Weak},
 };
 
+use derive_more::Display;
 use failure::Fail;
 use medea_client_api_proto::{IceServer, PeerId};
 
@@ -23,20 +24,20 @@ use super::endpoints::webrtc::{
 };
 
 /// Errors which may occur while loading [`Member`]s from [`RoomSpec`].
-#[derive(Debug, Fail)]
+#[derive(Debug, Fail, Display)]
 pub enum MembersLoadError {
     /// Errors that can occur when we try transform some spec from `Element`.
-    #[fail(display = "TryFromElementError: {}", _0)]
+    #[display(fmt = "TryFromElementError: {}", _0)]
     TryFromError(TryFromElementError),
 
     /// [`Member`] not found.
-    #[fail(display = "Member with id '{}' not found.", _0)]
+    #[display(fmt = "Member with id '{}' not found.", _0)]
     MemberNotFound(MemberId),
 
     /// [`Endpoint`] not found.
     ///
     /// [`Endpoint`]: crate::api::control::endpoint::Endpoint
-    #[fail(display = "Endpoint with id '{}' not found.", _0)]
+    #[display(fmt = "Endpoint with id '{}' not found.", _0)]
     EndpointNotFound(String),
 }
 
