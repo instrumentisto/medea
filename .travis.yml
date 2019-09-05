@@ -48,9 +48,21 @@ jobs:
       rust: nightly
       script: cargo build --bin medea
 
-    - name: unit (stable)
+    - name: test_toolchain
+      stage: test_toolchain
+      rust: nightly
+      script:
+        - cargo +nightly install wasm-bindgen-cli -Z install-upgrade
+        - rustup target add wasm32-unknown-unknown
+
+    - name: unit
       stage: test
       rust: stable
+      addons:
+        chrome: stable
+        apt:
+          packages:
+            - chromium-chromedriver
       script: make test.unit crate=@all
 
     - name: crates.io
@@ -104,6 +116,16 @@ jobs:
         name: $TRAVIS_TAG
         on:
           tags: true
+
+stages:
+  - name: check
+    if: (branch = master AND type != pull_request) OR commit_message =~ /.*\[run ci\]/
+  - name: build
+    if: (branch = master AND type != pull_request) OR commit_message =~ /.*\[run ci\]/
+  - name: test_toolchain
+    if: (branch = master AND type != pull_request) OR commit_message =~ /.*\[run ci\]/
+  - name: test
+    if: (branch = master AND type != pull_request) OR commit_message =~ /.*\[run ci\]/
 
 notifications:
   email:

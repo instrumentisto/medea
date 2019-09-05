@@ -233,7 +233,7 @@ else
 ifeq ($(crate),medea-jason)
 	cd $(crate-dir)/ && \
 	CHROMEDRIVER_CLIENT_ARGS="$(CHROMEDRIVER_CLIENT_ARGS)" \
-    cargo test --target wasm32-unknown-unknown
+    cargo test --target wasm32-unknown-unknown --features mockable
 else
 	cd $(crate-dir)/ && \
 	cargo test
