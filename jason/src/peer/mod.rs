@@ -251,14 +251,28 @@ impl PeerConnection {
         desc: SdpType,
     ) -> impl Future<Item = (), Error = WasmErr> {
         let inner = Rc::clone(&self.0);
-        self.0
-            .borrow()
-            .peer
-            .set_remote_description(desc)
-            .and_then(move |_| {
-                inner.borrow_mut().has_remote_description = true;
-                Ok(())
-            })
+        let peer = Rc::clone(&self.0.borrow().peer);
+        peer.set_remote_description(desc).and_then(move |_| {
+            let mut inner = inner.borrow_mut();
+            inner.has_remote_description = true;
+            WasmErr::from(format!(
+                "Flush buffered ICE candidates for peer {}",
+                inner.id
+            ))
+            .log_err();
+            let futures = inner.ice_candidates.drain(..).fold(
+                vec![],
+                move |mut acc, (candidate, sdp_m_line_index, sdp_mid)| {
+                    acc.push(peer.add_ice_candidate(
+                        &candidate,
+                        sdp_m_line_index,
+                        &sdp_mid,
+                    ));
+                    acc
+                },
+            );
+            future::join_all(futures).map(|_| ())
+        })
     }
 
     /// Sync provided tracks creating all required `Sender`s and
@@ -320,11 +334,24 @@ impl PeerConnection {
         sdp_m_line_index: Option<u16>,
         sdp_mid: Option<String>,
     ) -> impl Future<Item = (), Error = WasmErr> {
-        self.0.borrow().peer.add_ice_candidate(
-            &candidate,
-            sdp_m_line_index,
-            &sdp_mid,
-        )
+        let mut inner = self.0.borrow_mut();
+        if inner.has_remote_description {
+            Either::A(inner.peer.add_ice_candidate(
+                &candidate,
+                sdp_m_line_index,
+                &sdp_mid,
+            ))
+        } else {
+            WasmErr::from(format!(
+                "Not have remote desc for peer {}. Candidate buffered.",
+                inner.id
+            ))
+            .log_err();
+            inner
+                .ice_candidates
+                .push((candidate, sdp_m_line_index, sdp_mid));
+            Either::B(future::ok(()))
+        }
     }
 }
 

@@ -23,6 +23,8 @@ RUST_VER := 1.37
 
 CURRENT_BRANCH := $(strip $(shell git branch | grep \* | cut -d ' ' -f2))
 
+CHROMEDRIVER_CLIENT_ARGS := $(strip $(shell grep 'CHROMEDRIVER_CLIENT_ARGS=' .env | cut -d '=' -f2))
+
 crate-dir = .
 ifeq ($(crate),medea-jason)
 crate-dir = jason
@@ -230,6 +232,7 @@ ifeq ($(test-unit-crate),@all)
 else
 ifeq ($(crate),medea-jason)
 	cd $(crate-dir)/ && \
+	CHROMEDRIVER_CLIENT_ARGS="$(CHROMEDRIVER_CLIENT_ARGS)" \
     cargo test --target wasm32-unknown-unknown
 else
 	cd $(crate-dir)/ && \
