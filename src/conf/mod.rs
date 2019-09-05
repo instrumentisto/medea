@@ -36,15 +36,22 @@ static APP_CONF_PATH_ENV_VAR_NAME: &str = "MEDEA_CONF";
 pub struct Conf {
     /// HTTP server settings.
     pub rpc: Rpc,
+
     /// RPC connection settings.
     pub server: Server,
+
     /// TURN server settings.
     pub turn: Turn,
+
     /// Logging settings.
     pub log: Log,
+
     /// Application shutdown settings.
     pub shutdown: Shutdown,
-    /// Control API settings.
+
+    /// [Control API] settings.
+    ///
+    /// [Control API]: http://tiny.cc/380uaz
     pub control: Control,
 }
 

@@ -115,15 +115,17 @@ impl ParticipantService {
         })
     }
 
-    /// Lookup [`Member`] by provided id.
+    /// Lookup [`Member`] by provided [`MemberId`].
     pub fn get_member_by_id(&self, id: &MemberId) -> Option<&Member> {
         self.members.get(id)
     }
 
-    /// Lookup [`Member`] by provided id and credentials. Returns
-    /// [`Err(AuthorizationError::MemberNotExists)`] if lookup by
-    /// [`MemberId`] failed. Returns
-    /// [`Err(AuthorizationError::InvalidCredentials)`] if [`Member`]
+    /// Lookup [`Member`] by provided [`MemberId`] and credentials.
+    ///
+    /// Returns [`Err(AuthorizationError::MemberNotExists)`] if lookup by
+    /// [`MemberId`] failed.
+    ///
+    /// Returns [`Err(AuthorizationError::InvalidCredentials)`] if [`Member`]
     /// was found, but incorrect credentials was provided.
     pub fn get_member_by_id_and_credentials(
         &self,
@@ -142,7 +144,7 @@ impl ParticipantService {
         }
     }
 
-    /// Checks if [`Member`] has **active** [`RpcConnection`].
+    /// Checks if [`Member`] has __active__ [`RpcConnection`].
     pub fn member_has_connection(&self, member_id: &MemberId) -> bool {
         self.connections.contains_key(member_id)
             && !self.drop_connection_tasks.contains_key(member_id)

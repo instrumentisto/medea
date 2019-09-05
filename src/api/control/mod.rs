@@ -1,4 +1,4 @@
-//! Implementation of [Control API].
+//! Implementation and definitions of [Control API] specs.
 //!
 //! [Control API]: http://tiny.cc/380uaz
 

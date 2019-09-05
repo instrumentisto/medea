@@ -88,15 +88,15 @@ impl PeerRepository {
 
         let first_peer = Peer::new(
             first_peer_id,
-            first_member.id().clone(),
+            first_member.id(),
             second_peer_id,
-            second_member.id().clone(),
+            second_member.id(),
         );
         let second_peer = Peer::new(
             second_peer_id,
-            second_member.id().clone(),
+            second_member.id(),
             first_peer_id,
-            first_member.id().clone(),
+            first_member.id(),
         );
 
         (first_peer, second_peer)
@@ -178,7 +178,7 @@ impl PeerRepository {
     /// Remove all related to [`Member`] [`Peer`]s.
     /// Note that this function will also remove all partners [`Peer`]s.
     ///
-    /// Returns `HashMap` with all remove [`Peer`]s.
+    /// Returns `HashMap` with all removed [`Peer`]s.
     /// Key - [`Peer`]'s owner [`MemberId`],
     /// value - removed [`Peer`]'s [`PeerId`].
     pub fn remove_peers_related_to_member(

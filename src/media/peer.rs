@@ -253,7 +253,7 @@ impl Peer<New> {
         }
     }
 
-    /// Add `send` tracks to self and add `recv` for this `send`
+    /// Add `send` tracks to `self` and add `recv` for this `send`
     /// to `partner_peer`.
     pub fn add_publisher(
         &mut self,

@@ -1,4 +1,6 @@
-//! Member definitions and implementations.
+//! Definitions and implementations of [Control API]'s `Member` element.
+//!
+//! [Control API]: http://tiny.cc/380uaz
 
 use std::convert::TryFrom;
 
@@ -58,6 +60,7 @@ impl MemberSpec {
         })
     }
 
+    /// Lookup [`WebRtcPublishEndpoint`] by ID.
     pub fn get_publish_endpoint_by_id(
         &self,
         id: &str,
@@ -80,6 +83,7 @@ impl MemberSpec {
         })
     }
 
+    /// Returns credentials of this [`Member`].
     pub fn credentials(&self) -> &str {
         &self.credentials
     }

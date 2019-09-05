@@ -1,4 +1,6 @@
-//! Room definitions and implementations.
+//! Definitions and implementations of [Control API]'s `Room` element.
+//!
+//! [Control API]: http://tiny.cc/380uaz
 
 use std::{collections::HashMap, convert::TryFrom};
 
@@ -30,8 +32,11 @@ pub enum RoomElement {
     },
 }
 
-/// [`crate::signalling::room::Room`] specification.
+/// [Control API]'s `Room` element specification
+///
 /// Newtype for [`RootElement::Room`]
+///
+/// [Control API]: http://tiny.cc/380uaz
 #[allow(clippy::module_name_repetitions)]
 #[derive(Clone, Debug)]
 pub struct RoomSpec {

@@ -10,13 +10,12 @@ pub mod shutdown;
 pub mod signalling;
 pub mod turn;
 
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use actix::prelude::*;
 use derive_more::Display;
 use failure::{Error, Fail};
 use futures::future::{Either, Future, IntoFuture as _};
-use std::collections::HashMap;
 
 use crate::{
     api::{

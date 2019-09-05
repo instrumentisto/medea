@@ -74,7 +74,7 @@ struct MemberInner {
 impl Member {
     /// Create new empty [`Member`].
     ///
-    /// To fill this [`Member`], you need to call the [`Member::load`]
+    /// To fill this [`Member`], you need to call [`Member::load`]
     /// function.
     fn new(id: MemberId, credentials: String) -> Self {
         Self(Rc::new(RefCell::new(MemberInner {
@@ -236,7 +236,7 @@ impl Member {
         self.0.borrow().credentials.clone()
     }
 
-    /// Returns all publishers of this [`Member`].
+    /// Returns all srcs of this [`Member`].
     pub fn srcs(&self) -> HashMap<WebRtcPublishId, WebRtcPublishEndpoint> {
         self.0.borrow().srcs.clone()
     }
@@ -303,7 +303,7 @@ pub struct WeakMember(Weak<RefCell<MemberInner>>);
 impl WeakMember {
     /// Upgrade weak pointer to strong pointer.
     ///
-    /// This function will __panic__ if weak pointer is `None`.
+    /// This function will __panic__ if weak pointer was dropped.
     pub fn upgrade(&self) -> Member {
         Member(Weak::upgrade(&self.0).unwrap())
     }
@@ -314,7 +314,7 @@ impl WeakMember {
     }
 }
 
-/// Creates all empty [`Member`] from [`RoomSpec`] and then
+/// Creates all empty [`Member`]s from [`RoomSpec`] and then
 /// load all related to this [`Member`]s srcs and sinks endpoints.
 ///
 /// Returns store of all [`Member`]s loaded from [`RoomSpec`].

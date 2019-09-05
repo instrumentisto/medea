@@ -1,4 +1,6 @@
-//! Control API specification Endpoint definitions.
+//! Definitions and implementations of [Control API]'s `Endpoint`s elements.
+//!
+//! [Control API]: http://tiny.cc/380uaz
 
 use std::{convert::TryFrom, fmt, str::FromStr};
 
@@ -79,13 +81,17 @@ pub struct WebRtcPlayEndpoint {
 /// Special uri with pattern `local://{room_id}/{member_id}/{endpoint_id}`.
 #[derive(Clone, Debug)]
 pub struct SrcUri {
+    /// Scheme of media element URI.
     pub scheme: Scheme,
+
     /// ID of [`Room`]
     ///
     /// [`Room`]: crate::signalling::room::Room
     pub room_id: String,
+
     /// ID of `Member`
     pub member_id: MemberId,
+
     /// Control ID of [`Endpoint`]
     pub endpoint_id: String,
 }

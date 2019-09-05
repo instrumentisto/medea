@@ -117,7 +117,7 @@ impl WebRtcPlayEndpoint {
 
     /// Returns owner [`Member`] of this [`WebRtcPlayEndpoint`].
     ///
-    /// __This function will panic if pointer is empty.__
+    /// __This function will panic if pointer to [`Member`] was dropped.__
     pub fn owner(&self) -> Member {
         self.0.borrow().owner()
     }
@@ -140,7 +140,7 @@ impl WebRtcPlayEndpoint {
         self.0.borrow_mut().set_peer_id(peer_id);
     }
 
-    /// Return [`PeerId`] of [`Peer`] of this [`WebRtcPlayEndpoint`].
+    /// Returns [`PeerId`] of this [`WebRtcPlayEndpoint`]'s [`Peer`].
     ///
     /// [`Peer`]: crate::media::peer::Peer
     pub fn peer_id(&self) -> Option<PeerId> {
@@ -149,24 +149,24 @@ impl WebRtcPlayEndpoint {
 
     /// Reset state of this [`WebRtcPlayEndpoint`].
     ///
-    /// Atm this only reset peer_id.
+    /// _Atm this only reset peer_id._
     pub fn reset(&self) {
         self.0.borrow_mut().reset()
     }
 
-    /// Returns ID of this [`WebRtcPlayEndpoint`].
+    /// Returns [`Id`] of this [`WebRtcPlayEndpoint`].
     pub fn id(&self) -> Id {
         self.0.borrow().id.clone()
     }
 
-    /// Downgrade [`WeakWebRtcPlayEndpoint`] to weak pointer
-    /// [`WeakWebRtcPlayEndpoint`].
+    /// Downgrade [`WebRtcPlayEndpoint`] to [`WeakWebRtcPlayEndpoint`] weak
+    /// pointer.
     pub fn downgrade(&self) -> WeakWebRtcPlayEndpoint {
         WeakWebRtcPlayEndpoint(Rc::downgrade(&self.0))
     }
 
-    /// Compares pointers. If both pointers point to the same address, then
-    /// returns true.
+    /// Compares [`WebRtcPlayEndpoint`]'s inner pointers. If both pointers
+    /// points to the same address, then returns `true`.
     #[cfg(test)]
     pub fn ptr_eq(&self, another_play: &Self) -> bool {
         Rc::ptr_eq(&self.0, &another_play.0)
@@ -181,12 +181,14 @@ pub struct WeakWebRtcPlayEndpoint(Weak<RefCell<WebRtcPlayEndpointInner>>);
 impl WeakWebRtcPlayEndpoint {
     /// Upgrade weak pointer to strong pointer.
     ///
-    /// This function will __panic__ if weak pointer is `None`.
+    /// This function will __panic__ if weak pointer was dropped.
     pub fn upgrade(&self) -> WebRtcPlayEndpoint {
         WebRtcPlayEndpoint(self.0.upgrade().unwrap())
     }
 
     /// Safe upgrade to [`WebRtcPlayEndpoint`].
+    ///
+    /// Returns `None` if weak pointer was dropped.
     pub fn safe_upgrade(&self) -> Option<WebRtcPlayEndpoint> {
         self.0.upgrade().map(WebRtcPlayEndpoint)
     }
