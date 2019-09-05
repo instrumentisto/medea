@@ -110,9 +110,9 @@ impl PeerRepository {
     /// Lookup [`Peer`] of [`Member`] with ID `member_id` which
     /// connected with `partner_member_id`.
     ///
-    /// Return Some(peer_id, partner_peer_id) if that [`Peer`] found.
+    /// Return `Some(peer_id, partner_peer_id)` if that [`Peer`] found.
     ///
-    /// Return None if that [`Peer`] not found.
+    /// Return `None` if that [`Peer`] not found.
     pub fn get_peer_by_members_ids(
         &self,
         member_id: &MemberId,

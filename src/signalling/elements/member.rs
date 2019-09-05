@@ -162,7 +162,7 @@ impl Member {
 
                 let new_self_play_id = WebRtcPlayId(spec_play_name.to_string());
                 let new_self_play = WebRtcPlayEndpoint::new(
-                    new_self_play_id.clone(),
+                    new_self_play_id,
                     spec_play_endpoint.src.clone(),
                     new_publish.downgrade(),
                     this_member.downgrade(),

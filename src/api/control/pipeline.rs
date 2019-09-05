@@ -14,11 +14,13 @@ pub struct Pipeline<T> {
 }
 
 impl<T> Pipeline<T> {
+    /// Iterate over pipeline by reference.
     #[inline]
     pub fn iter(&self) -> impl Iterator<Item = (&String, &T)> {
         self.into_iter()
     }
 
+    /// Lookup element of [`Pipeline`] by ID.
     #[inline]
     pub fn get(&self, id: &str) -> Option<&T> {
         self.pipeline.get(id)
