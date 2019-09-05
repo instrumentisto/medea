@@ -6,9 +6,8 @@ use std::{
     rc::{Rc, Weak},
 };
 
-use macro_attr::*;
+use derive_more::{Display, From};
 use medea_client_api_proto::PeerId;
-use newtype_derive::{newtype_fmt, NewtypeDisplay, NewtypeFrom};
 
 use crate::{
     api::control::endpoint::P2pMode,
@@ -22,11 +21,9 @@ use super::play_endpoint::WebRtcPlayEndpoint;
 
 pub use Id as WebRtcPublishId;
 
-macro_attr! {
-    /// ID of endpoint.
-    #[derive(Clone, Debug, Eq, Hash, PartialEq, NewtypeFrom!, NewtypeDisplay!)]
-    pub struct Id(pub String);
-}
+/// ID of endpoint.
+#[derive(Clone, Debug, Eq, Hash, PartialEq, From, Display)]
+pub struct Id(pub String);
 
 #[derive(Debug, Clone)]
 struct WebRtcPublishEndpointInner {

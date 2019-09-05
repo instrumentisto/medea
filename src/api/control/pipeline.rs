@@ -26,8 +26,8 @@ impl<T> Pipeline<T> {
 }
 
 impl<'a, T> IntoIterator for &'a Pipeline<T> {
-    type Item = (&'a String, &'a T);
     type IntoIter = Iter<'a, String, T>;
+    type Item = (&'a String, &'a T);
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {

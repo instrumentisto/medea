@@ -2,8 +2,7 @@
 
 use std::{collections::HashMap, convert::TryFrom};
 
-use macro_attr::*;
-use newtype_derive::{newtype_fmt, NewtypeDisplay, NewtypeFrom};
+use derive_more::{Display, From};
 use serde::Deserialize;
 
 use super::{
@@ -12,20 +11,9 @@ use super::{
     MemberId, RootElement, TryFromElementError,
 };
 
-macro_attr! {
-    /// ID of [`Room`].
-    #[derive(
-        Clone,
-        Debug,
-        Deserialize,
-        Eq,
-        Hash,
-        PartialEq,
-        NewtypeFrom!,
-        NewtypeDisplay!,
-    )]
-    pub struct Id(pub String);
-}
+/// ID of [`Room`].
+#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, From, Display)]
+pub struct Id(pub String);
 
 /// Element of [`Room`]'s [`Pipeline`].
 ///

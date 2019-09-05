@@ -128,7 +128,7 @@ pub fn start_static_rooms(
         GracefulShutdown::new(conf.shutdown.timeout).start();
     let config = conf.clone();
     let static_specs_path = config.control.static_specs_dir.clone();
-    if let Ok(static_specs_dir) = std::fs::read_dir(static_specs_path) {
+    if let Ok(static_specs_dir) = std::fs::read_dir(&static_specs_path) {
         Either::A(service::new_turn_auth_service(&config.turn).map(
             move |turn_auth_service| {
                 let room_specs =
