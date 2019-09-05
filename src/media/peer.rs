@@ -269,8 +269,8 @@ impl Peer<New> {
             MediaType::Video(VideoSettings {}),
         ));
 
-        self.add_sender(track_video.clone());
-        self.add_sender(track_audio.clone());
+        self.add_sender(Rc::clone(&track_video));
+        self.add_sender(Rc::clone(&track_audio));
 
         partner_peer.add_receiver(track_video);
         partner_peer.add_receiver(track_audio);

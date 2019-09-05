@@ -100,7 +100,8 @@ enum State {
 pub struct Room {
     id: RoomId,
 
-    /// [`RpcConnection`]s of [`Member`]s in this [`Room`].
+    /// [`Member`]s and associated [`RpcConnection`]s of this [`Room`], handles
+    /// [`RpcConnection`] authorization, establishment, message sending.
     ///
     /// [`RpcConnection`]: crate::api::client::rpc_connection::RpcConnection
     pub members: ParticipantService,
@@ -192,11 +193,13 @@ impl Room {
     fn send_peers_removed(
         &mut self,
         member_id: MemberId,
-        peers: Vec<PeerId>,
+        removed_peers_ids: Vec<PeerId>,
     ) -> ActFuture<(), RoomError> {
         Box::new(wrap_future(self.members.send_event_to_member(
             member_id,
-            Event::PeersRemoved { peer_ids: peers },
+            Event::PeersRemoved {
+                peer_ids: removed_peers_ids,
+            },
         )))
     }
 
@@ -612,7 +615,7 @@ impl Handler<RpcConnectionEstablished> for Room {
         msg: RpcConnectionEstablished,
         ctx: &mut Self::Context,
     ) -> Self::Result {
-        info!("RpcConnectionEstablished for member {}", &msg.member_id);
+        info!("RpcConnectionEstablished for member {}", msg.member_id);
 
         let fut = self
             .members

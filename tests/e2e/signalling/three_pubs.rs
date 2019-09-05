@@ -22,6 +22,7 @@ fn three_members_p2p_video_call() {
         let members_peers_removed = Rc::new(Cell::new(0));
 
         let test_fn = move |event: &Event, ctx: &mut Context<TestMember>| {
+            // TODO: this is unnecessary clone, try use events from TestMember
             events.push(event.clone());
             match event {
                 Event::PeerCreated { ice_servers, .. } => {

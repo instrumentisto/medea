@@ -174,7 +174,7 @@ impl ParticipantService {
         &mut self,
         ctx: &mut Context<Room>,
         member_id: MemberId,
-        con: Box<dyn RpcConnection>,
+        conn: Box<dyn RpcConnection>,
     ) -> ActFuture<Member, ParticipantServiceErr> {
         let member = match self.get_member_by_id(&member_id) {
             None => {
@@ -208,7 +208,7 @@ impl ParticipantService {
                 })
                 .and_then(
                     move |ice: IceUser, room: &mut Room, _| {
-                        room.members.insert_connection(member_id, con);
+                        room.members.insert_connection(member_id, conn);
                         member.replace_ice_user(ice);
 
                         wrap_future(future::ok(member))
@@ -257,7 +257,7 @@ impl ParticipantService {
                         info!(
                             "Member {} connection lost at {:?}. Room will be \
                              stopped.",
-                            &member_id, closed_at
+                            member_id, closed_at
                         );
                         ctx.notify(RpcConnectionClosed {
                             member_id,

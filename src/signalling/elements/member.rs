@@ -198,12 +198,12 @@ impl Member {
     /// [`Peer`]: crate::media::peer::Peer
     pub fn peers_removed(&self, peer_ids: &[PeerId]) {
         self.srcs()
-            .into_iter()
-            .for_each(|(_, p)| p.remove_peer_ids(peer_ids));
+            .values()
+            .for_each(|p| p.remove_peer_ids(peer_ids));
 
         self.sinks()
-            .into_iter()
-            .filter_map(|(_, p)| p.peer_id().map(|id| (id, p)))
+            .values()
+            .filter_map(|p| p.peer_id().map(|id| (id, p)))
             .filter(|(id, _)| peer_ids.contains(&id))
             .for_each(|(_, p)| p.reset());
     }

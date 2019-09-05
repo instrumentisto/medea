@@ -36,15 +36,15 @@ pub enum ServerStartError {
     #[display(fmt = "Duplicate of room ID '{:?}'", _0)]
     DuplicateRoomId(RoomId),
 
-    /// Some error happened while loading spec.
+    /// Some error happened while loading Control API spec.
     #[display(fmt = "Failed to load specs. {}", _0)]
     LoadSpec(failure::Error),
 
-    /// Some error happened while creating new room from spec.
+    /// Some error happened while creating new [`Room`] from Control API spec.
     #[display(fmt = "Bad room spec. {}", _0)]
     BadRoomSpec(String),
 
-    /// Unexpected error returned from room.
+    /// Unexpected error returned from [`Room`].
     #[display(fmt = "Unknown room error.")]
     UnknownRoomError,
 }

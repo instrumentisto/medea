@@ -22,7 +22,7 @@ use super::play_endpoint::WebRtcPlayEndpoint;
 #[doc(inline)]
 pub use Id as WebRtcPublishId;
 
-/// ID of endpoint.
+/// ID of [`WebRtcPublishEndpoint`].
 #[derive(Clone, Debug, Eq, Hash, PartialEq, From, Display)]
 pub struct Id(pub String);
 
@@ -102,7 +102,10 @@ impl WebRtcPublishEndpointInner {
     }
 }
 
-/// Signalling representation of `WebRtcPublishEndpoint`.
+/// Signalling representation of [`WebRtcPublishEndpoint`].
+///
+/// [`WebRtcPublishEndpoint`]:
+/// crate::api::control::endpoint::WebRtcPublishEndpoint
 #[allow(clippy::module_name_repetitions)]
 #[derive(Debug, Clone)]
 pub struct WebRtcPublishEndpoint(Rc<RefCell<WebRtcPublishEndpointInner>>);
@@ -161,7 +164,7 @@ impl WebRtcPublishEndpoint {
         self.0.borrow_mut().reset()
     }
 
-    /// Remove [`PeerId`] from `peer_ids`.
+    /// Remove [`PeerId`] from this [`WebRtcPublishEndpoint`]'s `peer_ids`.
     #[allow(clippy::trivially_copy_pass_by_ref)]
     pub fn remove_peer_id(&self, peer_id: &PeerId) {
         self.0.borrow_mut().remove_peer_id(peer_id)

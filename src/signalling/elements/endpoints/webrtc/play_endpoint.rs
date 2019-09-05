@@ -89,7 +89,9 @@ impl Drop for WebRtcPlayEndpointInner {
     }
 }
 
-/// Signalling representation of `WebRtcPlayEndpoint`.
+/// Signalling representation of Control API's [`WebRtcPlayEndpoint`].
+///
+/// [`WebRtcPlayEndpoint`]: crate::api::control::endpoint::WebRtcPlayEndpoint
 #[allow(clippy::module_name_repetitions)]
 #[derive(Debug, Clone)]
 pub struct WebRtcPlayEndpoint(Rc<RefCell<WebRtcPlayEndpointInner>>);
@@ -123,15 +125,15 @@ impl WebRtcPlayEndpoint {
         self.0.borrow().owner()
     }
 
-    /// Returns `Weak` pointer to owner [`Member`] of this
+    /// Returns weak pointer to owner [`Member`] of this
     /// [`WebRtcPlayEndpoint`].
     pub fn weak_owner(&self) -> WeakMember {
         self.0.borrow().weak_owner()
     }
 
-    /// Returns source's [`WebRtcPublishEndpoint`].
+    /// Returns srcs's [`WebRtcPublishEndpoint`].
     ///
-    /// __This function will panic if pointer is empty.__
+    /// __This function will panic if weak pointer was dropped.__
     pub fn src(&self) -> WebRtcPublishEndpoint {
         self.0.borrow().src()
     }

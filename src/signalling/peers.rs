@@ -78,25 +78,27 @@ impl PeerRepository {
         first_member: &Member,
         second_member: &Member,
     ) -> (Peer<New>, Peer<New>) {
+        let first_member_id = first_member.id();
+        let second_member_id = second_member.id();
+
         debug!(
             "Created peer between {} and {}.",
-            first_member.id(),
-            second_member.id()
+            first_member_id, second_member_id
         );
         let first_peer_id = self.peers_count.next_id();
         let second_peer_id = self.peers_count.next_id();
 
         let first_peer = Peer::new(
             first_peer_id,
-            first_member.id(),
+            first_member_id.clone(),
             second_peer_id,
-            second_member.id(),
+            second_member_id.clone(),
         );
         let second_peer = Peer::new(
             second_peer_id,
-            second_member.id(),
+            second_member_id,
             first_peer_id,
-            first_member.id(),
+            first_member_id,
         );
 
         (first_peer, second_peer)
@@ -214,9 +216,9 @@ impl PeerRepository {
 }
 
 impl From<HashMap<PeerId, PeerStateMachine>> for PeerRepository {
-    fn from(map: HashMap<PeerId, PeerStateMachine>) -> Self {
+    fn from(peers: HashMap<PeerId, PeerStateMachine>) -> Self {
         Self {
-            peers: map,
+            peers,
             peers_count: Counter::default(),
             tracks_count: Counter::default(),
         }

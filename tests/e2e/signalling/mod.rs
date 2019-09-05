@@ -138,7 +138,6 @@ impl StreamHandler<Frame, WsProtocolError> for TestMember {
             let txt = String::from_utf8(txt.unwrap().to_vec()).unwrap();
             let event: Result<Event, SerdeError> = serde_json::from_str(&txt);
             if let Ok(event) = event {
-                self.events.push(event.clone());
                 // Test function call
                 (self.on_message)(&event, ctx);
 
@@ -147,15 +146,15 @@ impl StreamHandler<Frame, WsProtocolError> for TestMember {
                     sdp_offer,
                     tracks,
                     ..
-                } = event
+                } = &event
                 {
                     match sdp_offer {
                         Some(_) => self.send_command(Command::MakeSdpAnswer {
-                            peer_id,
+                            peer_id: *peer_id,
                             sdp_answer: "responder_answer".into(),
                         }),
                         None => self.send_command(Command::MakeSdpOffer {
-                            peer_id,
+                            peer_id: *peer_id,
                             sdp_offer: "caller_offer".into(),
                             mids: tracks
                                 .into_iter()
@@ -167,7 +166,7 @@ impl StreamHandler<Frame, WsProtocolError> for TestMember {
                     }
 
                     self.send_command(Command::SetIceCandidate {
-                        peer_id,
+                        peer_id: *peer_id,
                         candidate: IceCandidate {
                             candidate: "ice_candidate".to_string(),
                             sdp_m_line_index: None,
@@ -175,6 +174,7 @@ impl StreamHandler<Frame, WsProtocolError> for TestMember {
                         },
                     });
                 }
+                self.events.push(event);
             }
         }
     }
