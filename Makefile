@@ -690,17 +690,15 @@ build.jason:
 # .PHONY section #
 ##################
 
-.PHONY: build \
-        cargo cargo.fmt cargo.lint \
+.PHONY: build build.jason build.medea \
+        cargo cargo.build cargo.fmt cargo.lint \
         docker.build.demo docker.build.medea docker.down.demo docker.up.demo \
         docs docs.rust \
-        down.demo \
+        down down.demo down.coturn down.medea \
         helm helm.down helm.init helm.lint helm.list \
         	helm.package helm.package.release helm.up \
         minikube.boot \
-        down down.medea down.coturn \
         release release.crates release.helm release.npm \
-        test test.unit test.e2e \
+        test test.e2e test.unit \
         up up.coturn up.demo up.dev up.jason up.medea \
-        cargo.build build.medea build.jason \
         yarn

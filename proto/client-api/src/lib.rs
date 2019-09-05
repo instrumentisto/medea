@@ -24,14 +24,14 @@ pub struct PeerId(pub u64);
 #[derive(Clone, Copy, Display)]
 pub struct TrackId(pub u64);
 
-/// Trait for providing function `increment()` which return current value + 1.
+/// Value that is able to be incremented by `1`.
 #[cfg(feature = "medea")]
 pub trait Incrementable: Sized + Clone {
     /// Returns current value + 1.
     fn incr(&self) -> Self;
 }
 
-/// Implement [`Incrementable`] trait for newtype with any numeric type.
+/// Implements [`Incrementable`] trait for newtype with any numeric type.
 macro_rules! impl_incrementable {
     ($name:ty) => {
         impl Incrementable for $name {

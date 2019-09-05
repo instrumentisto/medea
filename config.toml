@@ -13,10 +13,10 @@
 
 
 [control]
-# Path to directory with static control API specs.
+# Path to directory with static Сontrol API specs.
 #
 # Default:
-#   static_specs_dir = "./specs/"
+#   static_specs_dir = "specs/"
 
 
 

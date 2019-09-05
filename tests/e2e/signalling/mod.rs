@@ -1,4 +1,4 @@
-//! Signalling API e2e tests.
+//! Signalling API E2E tests.
 
 mod pub_sub_signallng;
 mod three_pubs;

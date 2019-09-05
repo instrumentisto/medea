@@ -6,11 +6,9 @@ services:
     image: ${COMPOSE_IMAGE_NAME}:${COMPOSE_IMAGE_VER}
     ports:
       - "8080:8080"
-    volumes:
-      - ${MEDEA_CONTROL_STATIC_SPECS_DIR}:/specs:ro
-      - ./dev/config.toml:/dev/config.toml:ro
-    network_mode: "host"
     environment:
       RUST_LOG: ${RUST_LOG}
-      MEDEA_CONF: "./dev/config.toml"
-      MEDEA_CONTROL.STATIC_SPECS_DIR: /specs
+    volumes:
+      - ./dev/config.toml:/config.toml:ro
+      - ./dev/specs:/specs:ro
+    network_mode: host
