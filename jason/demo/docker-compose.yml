@@ -17,7 +17,7 @@ services:
     environment:
       RUST_LOG: "DEBUG"
     volumes:
-      - ../../dev/specs:/specs:ro
+      - ../../_dev/specs:/specs:ro
     network_mode: service:web-client
   coturn:
     container_name: demo-coturn
@@ -27,7 +27,7 @@ services:
       - --log-file=stdout
       #- --verbose
     volumes:
-      - ../../dev/coturn/turnserver.conf:/etc/coturn/turnserver.conf:ro
+      - ../../_dev/coturn/turnserver.conf:/etc/coturn/turnserver.conf:ro
       - ../../.cache/coturn/data:/var/lib/coturn
     network_mode: host
   coturn-db:
@@ -35,5 +35,5 @@ services:
     image: redis:alpine
     command: ["redis-server", "/etc/redis.conf"]
     volumes:
-      - ../../dev/coturn/redis.conf:/etc/redis.conf:ro
+      - ../../_dev/coturn/redis.conf:/etc/redis.conf:ro
     network_mode: service:web-client

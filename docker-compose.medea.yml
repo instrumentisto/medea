@@ -7,6 +7,7 @@ services:
     environment:
       RUST_LOG: ${RUST_LOG}
       MEDEA_CONF: ${MEDEA_CONF}
+      MEDEA_CONTROL.STATIC_SPECS_DIR: /specs
     ports:
       - "8080:8080"
     volumes:
