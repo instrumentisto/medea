@@ -11,11 +11,11 @@ spec:
             kind: WebRtcPublishEndpoint
             spec:
               p2p: Always
-          play:
+          play-member-2:
             kind: WebRtcPlayEndpoint
             spec:
               src: "local://three-members-conference/member-2/publish"
-          play2:
+          play-member-3:
             kind: WebRtcPlayEndpoint
             spec:
               src: "local://three-members-conference/member-3/publish"
@@ -28,11 +28,11 @@ spec:
             kind: WebRtcPublishEndpoint
             spec:
               p2p: Always
-          play1:
+          play-member-1:
             kind: WebRtcPlayEndpoint
             spec:
               src: "local://three-members-conference/member-1/publish"
-          play2:
+          play-member-3:
             kind: WebRtcPlayEndpoint
             spec:
               src: "local://three-members-conference/member-3/publish"
@@ -45,11 +45,11 @@ spec:
             kind: WebRtcPublishEndpoint
             spec:
               p2p: Always
-          play1:
+          play-member-2:
             kind: WebRtcPlayEndpoint
             spec:
               src: "local://three-members-conference/member-2/publish"
-          play2:
+          play-member-1:
             kind: WebRtcPlayEndpoint
             spec:
               src: "local://three-members-conference/member-1/publish"

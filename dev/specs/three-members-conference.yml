@@ -17,15 +17,15 @@ spec:
               p2p: Always
           # Media element which is able to play media data for client
           # via WebRTC.
-          play:
+          play-responder-1:
             kind: WebRtcPlayEndpoint
             spec:
-              src: "local://three-members-conference/responder/publish"
-          play2:
+              src: "local://three-members-conference/responder-1/publish"
+          play-responder-2:
             kind: WebRtcPlayEndpoint
             spec:
-              src: "local://three-members-conference/responder2/publish"
-    responder:
+              src: "local://three-members-conference/responder-2/publish"
+    responder-1:
       kind: Member
       credentials: test
       spec:
@@ -34,15 +34,15 @@ spec:
             kind: WebRtcPublishEndpoint
             spec:
               p2p: Always
-          play1:
+          play-caller:
             kind: WebRtcPlayEndpoint
             spec:
               src: "local://three-members-conference/caller/publish"
-          play2:
+          play-responder-2:
             kind: WebRtcPlayEndpoint
             spec:
-              src: "local://three-members-conference/responder2/publish"
-    responder2:
+              src: "local://three-members-conference/responder-2/publish"
+    responder-2:
       kind: Member
       credentials: test
       spec:
@@ -51,11 +51,11 @@ spec:
             kind: WebRtcPublishEndpoint
             spec:
               p2p: Always
-          play1:
+          play-caller:
             kind: WebRtcPlayEndpoint
             spec:
               src: "local://three-members-conference/caller/publish"
-          play2:
+          play-responder-1:
             kind: WebRtcPlayEndpoint
             spec:
-              src: "local://three-members-conference/responder/publish"
+              src: "local://three-members-conference/responder-1/publish"

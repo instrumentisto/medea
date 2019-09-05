@@ -3,7 +3,7 @@ id: pub-sub-video-call
 spec:
   pipeline:
     # Here we're defining a member who initiates video call.
-    caller:
+    publisher:
       kind: Member
       credentials: test
       spec:
@@ -15,12 +15,12 @@ spec:
             spec:
               # Actually, it receives not media data, but ICE candidates only.
               p2p: Always
-    responder:
+    subcriber:
       kind: Member
       credentials: test
       spec:
         pipeline:
-          play:
+          play-publisher:
             kind: WebRtcPlayEndpoint
             spec:
-              src: "local://pub-sub-video-call/caller/publish"
+              src: "local://pub-sub-video-call/publisher/publish"
