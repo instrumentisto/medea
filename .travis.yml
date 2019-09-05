@@ -13,7 +13,7 @@ jobs:
   include:
     - name: Clippy
       stage: check
-      rust: nightly
+      rust: stable
       before_script: rustup component add clippy
       script: make lint
 
@@ -71,7 +71,7 @@ jobs:
       cache: false
       before_script:
         - export MEDEA_CRATE_NAME=$(echo $TRAVIS_TAG \
-                        | sed -E "s/^(medea[a-z-]*)-[0-9]+\.[0-9]+\.[0-9]+/\1/")
+          | sed -E "s/^(medea[a-z-]*)-[0-9]+\.[0-9]+\.[0-9]+/\1/")
       script:
         - echo "Releasing $MEDEA_CRATE_NAME to crates.io..."
       deploy:
@@ -87,7 +87,7 @@ jobs:
       cache: false
       before_script:
         - export MEDEA_CRATE_NAME=$(echo $TRAVIS_TAG \
-                        | sed -E "s/^(medea[a-z-]*)-[0-9]+\.[0-9]+\.[0-9]+/\1/")
+          | sed -E "s/^(medea[a-z-]*)-[0-9]+\.[0-9]+\.[0-9]+/\1/")
       script:
         - echo "Releasing $MEDEA_CRATE_NAME to NPM..."
       before_deploy:
@@ -106,7 +106,7 @@ jobs:
       cache: false
       before_script:
         - export MEDEA_CRATE_NAME=$(echo $TRAVIS_TAG \
-                        | sed -E "s/^(medea[a-z-]*)-[0-9]+\.[0-9]+\.[0-9]+/\1/")
+          | sed -E "s/^(medea[a-z-]*)-[0-9]+\.[0-9]+\.[0-9]+/\1/")
       script:
         - echo "Releasing $MEDEA_CRATE_NAME to GitHub..."
       deploy:
