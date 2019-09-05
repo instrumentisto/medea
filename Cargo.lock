@@ -1041,7 +1041,7 @@ dependencies = [
  "humantime 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "humantime-serde 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "macro-attr 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "medea-client-api-proto 0.1.0",
+ "medea-client-api-proto 0.1.1-dev",
  "medea-macro 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "newtype_derive 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "rand 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1067,7 +1067,7 @@ dependencies = [
 
 [[package]]
 name = "medea-client-api-proto"
-version = "0.1.0"
+version = "0.1.1-dev"
 dependencies = [
  "derive_more 0.15.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "medea-macro 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1077,13 +1077,13 @@ dependencies = [
 
 [[package]]
 name = "medea-jason"
-version = "0.1.0"
+version = "0.1.1-dev"
 dependencies = [
  "console_error_panic_hook 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures 0.1.28 (registry+https://github.com/rust-lang/crates.io-index)",
  "js-sys 0.3.27 (registry+https://github.com/rust-lang/crates.io-index)",
  "macro-attr 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "medea-client-api-proto 0.1.0",
+ "medea-client-api-proto 0.1.1-dev",
  "medea-macro 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "newtype_derive 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.99 (registry+https://github.com/rust-lang/crates.io-index)",

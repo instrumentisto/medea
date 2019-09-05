@@ -4,10 +4,8 @@
 
 use std::rc::Rc;
 
-use medea_client_api_proto::MediaType;
+use medea_client_api_proto::{MediaType, TrackId as Id};
 use web_sys::MediaStreamTrack;
-
-use medea_client_api_proto::TrackId as Id;
 
 /// Representation of [MediaStreamTrack][1].
 ///
