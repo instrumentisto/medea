@@ -4,11 +4,12 @@ services:
   medea:
     container_name: ${COMPOSE_PROJECT_NAME}-backend
     image: ${COMPOSE_IMAGE_NAME}:${COMPOSE_IMAGE_VER}
-    ports:
-      - "8080:8080"
     environment:
       RUST_LOG: ${RUST_LOG}
+      MEDEA_CONF: ${MEDEA_CONF}
+    ports:
+      - "8080:8080"
     volumes:
-      - ./dev/config.toml:/config.toml:ro
-      - ./dev/specs:/specs:ro
+      - ./dev/config.toml:/dev/config.toml:ro
+      - ./dev/specs:/dev/specs:ro
     network_mode: host

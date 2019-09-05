@@ -14,11 +14,10 @@ All user visible changes to this project will be documented in this file. This p
 ### Added
 
 - Control API:
-    - Parse static control api specs ([#28]);
-    - Created interior entities for control API specs ([#28]).
+    - Support for static Сontrol API specs ([#28]).
 - Signalling:
-    - Dynamic `Peer`s creation when client connect ([#28]);
-    - Auto removing `Peer`s when `Member` disconnect ([#28]).
+    - Dynamic `Peer`s creation when client connects ([#28]);
+    - Auto-removing `Peer`s when `Member` disconnects ([#28]).
 - Testing:
     - E2E tests for signalling ([#28]).
 
