@@ -10,6 +10,7 @@ repository = "https://github.com/instrumentisto/medea"
 
 [dependencies]
 actix = "0.8"
+actix-cors = "0.1"
 actix-web = "1.0"
 actix-web-actors = "1.0"
 clap = "2.33"

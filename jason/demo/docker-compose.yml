@@ -8,6 +8,8 @@ services:
       - "80:80"        # web-client http
       - "6379:6379"    # coturn redis
       - "8080:8080"    # medea ws
+      - "9050:9050"
+      - "50051:50051"
     volumes:
       - ./chart/medea-demo/conf/nginx.vh.conf:/etc/nginx/conf.d/default.conf
   medea:
@@ -15,7 +17,15 @@ services:
     image: instrumentisto/medea:dev
     depends_on: ["coturn-db"]
     environment:
-      MEDEA_LOG.LEVEL: "DEBUG"
+      RUST_LOG: "DEBUG"
+    network_mode: service:web-client
+  control-api-mock:
+    container_name: demo-control-api-mock
+    image: instrumentisto/medea-control-api-mock:dev
+    environment:
+      RUST_LOG: "DEBUG"
+    depends_on:
+      - coturn-db
     network_mode: service:web-client
   coturn:
     container_name: demo-coturn

@@ -6,6 +6,7 @@ pub mod room;
 
 use std::collections::HashMap;
 
+use actix_cors::Cors;
 use actix_web::{
     middleware,
     web::{self, Data, Json},
@@ -44,6 +45,7 @@ pub fn run(args: &ArgMatches) {
                 client: ControlClient::new(&medea_addr),
             })
             .wrap(middleware::Logger::default())
+            .wrap(Cors::new())
             .service(
                 web::resource("/")
                     .route(web::get().to_async(batch_get))

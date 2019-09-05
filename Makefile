@@ -424,7 +424,7 @@ ifneq ($(no-cache),yes)
 	docker run --rm --network=host -v "$(PWD)":/app -w /app \
 	           -u $(shell id -u):$(shell id -g) \
 	           -e CARGO_HOME=.cache/cargo \
-		rust:$(RUST_VER) \
+		medea-build:latest \
 			cargo build --bin=medea \
 				$(if $(call eq,$(debug),no),--release,)
 endif
