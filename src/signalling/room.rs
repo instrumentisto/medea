@@ -11,7 +11,6 @@ use actix::{
 };
 use failure::Fail;
 use futures::future;
-
 use medea_client_api_proto::{Command, Event, IceCandidate, PeerId, TrackId};
 
 use crate::{
@@ -74,13 +73,13 @@ impl From<PeerError> for RoomError {
 
 impl From<TryFromElementError> for RoomError {
     fn from(err: TryFromElementError) -> Self {
-        Self::BadRoomSpec(format!("Element located in wrong place. {}", err))
+        Self::BadRoomSpec(format!("Element located in wrong place: {}", err))
     }
 }
 
 impl From<MembersLoadError> for RoomError {
     fn from(err: MembersLoadError) -> Self {
-        Self::BadRoomSpec(format!("Error while loading room spec. {}", err))
+        Self::BadRoomSpec(format!("Error while loading room spec: {}", err))
     }
 }
 

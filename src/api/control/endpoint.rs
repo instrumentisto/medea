@@ -12,16 +12,17 @@ use crate::api::control::MemberId;
 
 use super::{member::MemberElement, TryFromElementError};
 
-/// [`Endpoint`] represents a media element that one or more media data streams
-/// flow through.
+/// Media element that one or more media data streams flow through.
 #[derive(Debug)]
 pub enum Endpoint {
     WebRtcPublish(WebRtcPublishEndpoint),
     WebRtcPlay(WebRtcPlayEndpoint),
 }
 
+/// Possible schemes of media elements URIs.
 #[derive(Clone, Debug)]
 pub enum Scheme {
+    /// `local://` scheme which refers to a local in-memory media element.
     Local,
 }
 
@@ -89,8 +90,8 @@ pub struct SrcUri {
     pub endpoint_id: String,
 }
 
-/// Serde deserializer for [`SrcUri`].
-/// Deserialize URIs with pattern `local://{room_id}/{member_id}/{endpoint_id}`.
+/// Deserialization for [`SrcUri`] with pattern
+/// `local://{room_id}/{member_id}/{endpoint_id}`.
 impl<'de> Deserialize<'de> for SrcUri {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -103,7 +104,7 @@ impl<'de> Deserialize<'de> for SrcUri {
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
                 formatter.write_str(
-                    "Uri in format local://room_id/member_id/endpoint_id",
+                    "URI in format local://room_id/member_id/endpoint_id",
                 )
             }
 
@@ -112,58 +113,45 @@ impl<'de> Deserialize<'de> for SrcUri {
                 E: de::Error,
             {
                 let uri = Url::parse(value).map_err(|_| {
-                    Error::custom(format!("'{}' is not URL", value))
+                    Error::custom(format!("'{}' is not URI", value))
                 })?;
-
-                let scheme = match FromStr::from_str(uri.scheme()) {
-                    Ok(scheme) => scheme,
-                    Err(_) => {
-                        return Err(Error::custom(format!(
-                            "cannot parse uri scheme \"{}\"",
+                let scheme = FromStr::from_str(uri.scheme()).map_err(|_| {
+                    Error::custom(format!(
+                        "cannot parse URI scheme '{}'",
+                        value
+                    ))
+                })?;
+                let room_id = uri
+                    .host()
+                    .ok_or_else(|| {
+                        Error::custom(format!(
+                            "cannot parse room ID from URI '{}'",
                             value
-                        )))
-                    }
-                };
-                let room_id = match uri.host() {
-                    Some(host) => host.to_string(),
-                    None => {
-                        return Err(Error::custom(format!(
-                            "cannot parse uri scheme \"{}\"",
+                        ))
+                    })?
+                    .to_string();
+                let mut path = uri.path_segments().ok_or_else(|| {
+                    Error::custom(format!(
+                        "cannot parse member and endpoint IDs from URI '{}'",
+                        value
+                    ))
+                })?;
+                let member_id = path
+                    .next()
+                    .map(|id| MemberId(id.to_owned()))
+                    .ok_or_else(|| {
+                    Error::custom(format!(
+                        "cannot parse member ID from URI '{}'",
+                        value
+                    ))
+                })?;
+                let endpoint_id =
+                    path.next().map(ToOwned::to_owned).ok_or_else(|| {
+                        Error::custom(format!(
+                            "cannot parse endpoint ID from URI '{}'",
                             value
-                        )))
-                    }
-                };
-
-                let mut path = match uri.path_segments() {
-                    Some(path) => path,
-                    None => {
-                        return Err(Error::custom(format!(
-                            "cannot parse uri segments \"{}\"",
-                            value
-                        )))
-                    }
-                };
-
-                let member_id = match path.next() {
-                    Some(member_id) => MemberId(member_id.to_owned()),
-                    None => {
-                        return Err(Error::custom(format!(
-                            "cannot parse member_id \"{}\"",
-                            value
-                        )))
-                    }
-                };
-
-                let endpoint_id = match path.next() {
-                    Some(endpoint_id) => endpoint_id.to_owned(),
-                    None => {
-                        return Err(Error::custom(format!(
-                            "cannot parse endpoint_id \"{}\"",
-                            value
-                        )))
-                    }
-                };
-
+                        ))
+                    })?;
                 Ok(SrcUri {
                     scheme,
                     room_id,
@@ -189,34 +177,32 @@ mod src_uri_deserialization_tests {
     }
 
     #[test]
-    fn deserialize() {
-        let valid_json_uri =
-            r#"{ "src": "local://room_id/member_id/endpoint_id" }"#;
-        let local_uri: SrcUriTest =
-            serde_json::from_str(valid_json_uri).unwrap();
+    fn deserializes() {
+        let uri: SrcUriTest = serde_json::from_str(
+            r#"{ "src": "local://room_id/member_id/endpoint_id" }"#,
+        )
+        .unwrap();
 
-        assert_eq!(
-            local_uri.src.member_id,
-            MemberId(String::from("member_id"))
+        assert_eq!(uri.src.member_id, MemberId("member_id".into()));
+        assert_eq!(uri.src.room_id, "room_id".to_string());
+        assert_eq!(uri.src.endpoint_id, "endpoint_id".to_string());
+    }
+
+    #[test]
+    fn errors_on_incorrect_scheme() {
+        let res = serde_json::from_str::<SrcUriTest>(
+            r#"{ "src": "not_local://room_id/member_id/endpoint_id" }"#,
         );
-        assert_eq!(local_uri.src.room_id, String::from("room_id"));
-        assert_eq!(local_uri.src.endpoint_id, String::from("endpoint_id"));
+
+        assert!(res.is_err())
     }
 
     #[test]
-    fn return_error_when_uri_not_local() {
-        let invalid_json_uri =
-            r#"{ "src": "not_local://room_id/member_id/endpoint_id" }"#;
-        if serde_json::from_str::<SrcUriTest>(invalid_json_uri).is_ok() {
-            unreachable!()
-        }
-    }
+    fn errors_when_endpoint_is_absent() {
+        let res = serde_json::from_str::<SrcUriTest>(
+            r#"{ "src": "local://room_id/member_id" }"#,
+        );
 
-    #[test]
-    fn return_error_when_uri_is_not_full() {
-        let invalid_json_uri = r#"{ "src": "local://room_id/member_id" }"#;
-        if serde_json::from_str::<SrcUriTest>(invalid_json_uri).is_ok() {
-            unreachable!()
-        }
+        assert!(res.is_err())
     }
 }

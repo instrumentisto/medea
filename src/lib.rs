@@ -167,8 +167,8 @@ pub fn start_static_rooms(
         ))
     } else {
         warn!(
-            "'./spec/' dir not found. Static control API specs will not be \
-             loaded."
+            "'{}' dir not found. Static Control API specs will not be loaded.",
+            static_specs_path
         );
         Either::B(futures::future::ok(Ok((HashMap::new(), graceful_shutdown))))
     }

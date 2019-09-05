@@ -7,7 +7,12 @@ pub mod member;
 pub mod pipeline;
 pub mod room;
 
-use std::{convert::TryFrom as _, fs::File, io::Read as _, path::Path};
+use std::{
+    convert::TryFrom as _,
+    fs::{File, ReadDir},
+    io::Read as _,
+    path::Path,
+};
 
 use failure::{Error, Fail};
 use serde::Deserialize;
@@ -19,7 +24,6 @@ pub use self::{
     member::{Id as MemberId, MemberSpec},
     room::{Id as RoomId, RoomElement, RoomSpec},
 };
-use std::fs::ReadDir;
 
 #[derive(Clone, Deserialize, Debug)]
 #[serde(tag = "kind")]
@@ -52,7 +56,6 @@ pub fn load_from_yaml_file<P: AsRef<Path>>(path: P) -> Result<RoomSpec, Error> {
     file.read_to_string(&mut buf)?;
     let parsed: RootElement = serde_yaml::from_str(&buf)?;
     let room = RoomSpec::try_from(&parsed)?;
-
     Ok(room)
 }
 
@@ -66,6 +69,5 @@ pub fn load_static_specs_from_dir(
         let spec = load_from_yaml_file(entry.path())?;
         specs.push(spec)
     }
-
     Ok(specs)
 }
