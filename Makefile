@@ -228,8 +228,13 @@ ifeq ($(test-unit-crate),@all)
 	@make test.unit crate=medea-jason
 	@make test.unit crate=medea
 else
+ifeq ($(crate),medea-jason)
 	cd $(crate-dir)/ && \
-	cargo test -p $(test-unit-crate)
+    cargo test --target wasm32-unknown-unknown
+else
+	cd $(crate-dir)/ && \
+	cargo test
+endif
 endif
 
 

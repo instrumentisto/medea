@@ -238,9 +238,9 @@ impl PeerConnection {
     /// [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
     pub fn set_remote_offer(
         &self,
-        answer: String,
+        offer: String,
     ) -> impl Future<Item = (), Error = WasmErr> {
-        self.set_remote_description(SdpType::Offer(answer))
+        self.set_remote_description(SdpType::Offer(offer))
     }
 
     /// Updates underlying [`RTCPeerConnection`][1] remote SDP.
@@ -288,7 +288,7 @@ impl PeerConnection {
             .unwrap();
 
         let inner: Rc<RefCell<InnerPeerConnection>> = Rc::clone(&self.0);
-        self.set_remote_description(SdpType::Offer(offer))
+        self.set_remote_offer(offer)
             .and_then(move |_| {
                 let request =
                     inner.borrow().media_connections.update_tracks(send)?;
@@ -320,42 +320,11 @@ impl PeerConnection {
         sdp_m_line_index: Option<u16>,
         sdp_mid: Option<String>,
     ) -> impl Future<Item = (), Error = WasmErr> {
-        let mut inner = self.0.borrow_mut();
-        if inner.has_remote_description {
-            let peer = Rc::clone(&inner.peer);
-            WasmErr::from(format!(
-                "Add all stored and new candidate for peer {}",
-                inner.id
-            ))
-            .log_err();
-            let mut fut = inner.ice_candidates.drain(..).fold(
-                vec![],
-                move |mut acc, (candidate, sdp_m_line_index, sdp_mid)| {
-                    acc.push(peer.add_ice_candidate(
-                        &candidate,
-                        sdp_m_line_index,
-                        &sdp_mid,
-                    ));
-                    acc
-                },
-            );
-            fut.push(inner.peer.add_ice_candidate(
-                &candidate,
-                sdp_m_line_index,
-                &sdp_mid,
-            ));
-            Either::A(future::join_all(fut).map(|_| ()))
-        } else {
-            inner
-                .ice_candidates
-                .push((candidate, sdp_m_line_index, sdp_mid));
-            WasmErr::from(format!(
-                "Not have remote desc for peer {}. Candidate stored.",
-                inner.id
-            ))
-            .log_err();
-            Either::B(future::ok(()))
-        }
+        self.0.borrow().peer.add_ice_candidate(
+            &candidate,
+            sdp_m_line_index,
+            &sdp_mid,
+        )
     }
 }
 
