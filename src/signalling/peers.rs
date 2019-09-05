@@ -6,10 +6,10 @@
 use std::{
     collections::HashMap,
     convert::{TryFrom, TryInto},
-    fmt,
 };
 
 use medea_client_api_proto::{Incrementable, PeerId, TrackId};
+use derive_more::Display;
 
 use crate::{
     api::control::MemberId,
@@ -39,8 +39,8 @@ pub struct PeerRepository {
 }
 
 /// Simple ID counter.
-#[derive(Default, Debug)]
-pub struct Counter<T: Incrementable + Copy> {
+#[derive(Default, Debug, Clone, Copy, Display)]
+pub struct Counter<T> {
     count: T,
 }
 
@@ -50,12 +50,6 @@ impl<T: Incrementable + Copy> Counter<T> {
         let id = self.count;
         self.count = self.count.incr();
         id
-    }
-}
-
-impl<T: Incrementable + std::fmt::Display + Copy> fmt::Display for Counter<T> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.count)
     }
 }
 
