@@ -13,7 +13,8 @@ wasm_bindgen_test_configure!(run_in_browser);
 
 mod media;
 
-/// TODO: pass firefoxOptions.prefs to wasp-pack test:
+/// TODO: enable tests in firefox, PR: rustwasm/wasm-bindgen#1744
+// firefoxOptions.prefs:
 //    let request = json!({
 //        "capabilities": {
 //            "alwaysMatch": {

@@ -118,6 +118,51 @@ impl PeerConnection {
         Ok(Self(inner))
     }
 
+    /// Handle `icecandidate` event from underlying peer emitting
+    /// [`PeerEvent::IceCandidateDiscovered`] event into this peers
+    /// `peer_events_sender`.
+    fn on_ice_candidate(inner: &InnerPeerConnection, candidate: IceCandidate) {
+        let _ = inner.peer_events_sender.unbounded_send(
+            PeerEvent::IceCandidateDiscovered {
+                peer_id: inner.id,
+                candidate: candidate.candidate,
+                sdp_m_line_index: candidate.sdp_m_line_index,
+                sdp_mid: candidate.sdp_mid,
+            },
+        );
+    }
+
+    /// Handle `track` event from underlying peer adding new track to
+    /// `media_connections` and emitting [`PeerEvent::NewRemoteStream`]
+    /// event into this peers `peer_events_sender` if all tracks from this
+    /// sender has arrived.
+    fn on_track(inner: &InnerPeerConnection, track_event: &RtcTrackEvent) {
+        let transceiver = track_event.transceiver();
+        let track = track_event.track();
+
+        if let Some(sender_id) =
+            inner.media_connections.add_remote_track(transceiver, track)
+        {
+            if let Some(tracks) =
+                inner.media_connections.get_tracks_by_sender(sender_id)
+            {
+                // got all tracks from this sender, so emit
+                // PeerEvent::NewRemoteStream
+                let _ = inner.peer_events_sender.unbounded_send(
+                    PeerEvent::NewRemoteStream {
+                        peer_id: inner.id,
+                        sender_id,
+                        remote_stream: MediaStream::from_tracks(tracks),
+                    },
+                );
+            };
+        } else {
+            // TODO: means that this peer is out of sync, should be
+            //       handled somehow (propagated to medea to init peer
+            //       recreation?)
+        }
+    }
+
     /// Disable or enable all audio tracks for all [`Sender`]s.
     pub fn toggle_send_audio(&self, enabled: bool) {
         WasmErr::from(format!("toggle_send_audio {}", enabled)).log_err();
@@ -270,51 +315,6 @@ impl PeerConnection {
         self.0
             .peer
             .add_ice_candidate(candidate, sdp_m_line_index, sdp_mid)
-    }
-
-    /// Handle `icecandidate` event from underlying peer emitting
-    /// [`PeerEvent::IceCandidateDiscovered`] event into this peers
-    /// `peer_events_sender`.
-    fn on_ice_candidate(inner: &InnerPeerConnection, candidate: IceCandidate) {
-        let _ = inner.peer_events_sender.unbounded_send(
-            PeerEvent::IceCandidateDiscovered {
-                peer_id: inner.id,
-                candidate: candidate.candidate,
-                sdp_m_line_index: candidate.sdp_m_line_index,
-                sdp_mid: candidate.sdp_mid,
-            },
-        );
-    }
-
-    /// Handle `track` event from underlying peer adding new track to
-    /// `media_connections` and emitting [`PeerEvent::NewRemoteStream`]
-    /// event into this peers `peer_events_sender` if all tracks from this
-    /// sender has arrived.
-    fn on_track(inner: &InnerPeerConnection, track_event: &RtcTrackEvent) {
-        let transceiver = track_event.transceiver();
-        let track = track_event.track();
-
-        if let Some(sender_id) =
-            inner.media_connections.add_remote_track(transceiver, track)
-        {
-            if let Some(tracks) =
-                inner.media_connections.get_tracks_by_sender(sender_id)
-            {
-                // got all tracks from this sender, so emit
-                // PeerEvent::NewRemoteStream
-                let _ = inner.peer_events_sender.unbounded_send(
-                    PeerEvent::NewRemoteStream {
-                        peer_id: inner.id,
-                        sender_id,
-                        remote_stream: MediaStream::from_tracks(tracks),
-                    },
-                );
-            };
-        } else {
-            // TODO: means that this peer is out of sync, should be
-            //       handled somehow (propagated to medea to init peer
-            //       recreation?)
-        }
     }
 }
 
