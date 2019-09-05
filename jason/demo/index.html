@@ -4,6 +4,7 @@
     <title>Chat</title>
     <meta http-equiv='Content-Type' content='text/html; charset=UTF-8'/>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/0.19.0/axios.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Faker/3.1.0/faker.min.js"></script>
 
     <script type="module">
 
@@ -140,11 +141,14 @@
 
             var joinCallerButton = document.getElementById('join-caller');
 
+            let usernameInput = document.getElementById('username');
+            usernameInput.value = faker.name.firstName();
+
             var bindJoinButtons = function (roomId) {
                 joinCallerButton.onclick = async function () {
                     let connectBtnsDiv = document.getElementsByClassName("connect-btns")[0];
                     connectBtnsDiv.style.display = 'none';
-                    let username = document.getElementById('username').value;
+                    let username = usernameInput.value;
                     try {
                         let room = await axios.get(controlUrl + roomId);
                     } catch (e) {
