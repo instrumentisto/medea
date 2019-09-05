@@ -119,6 +119,11 @@ impl PeerConnection {
         Ok(Self(inner))
     }
 
+    /// Returns inner IceCandidate's buffer len. Used in tests.
+    pub fn candidates_buffer_len(&self) -> usize {
+        self.0.borrow().ice_candidates.len()
+    }
+
     /// Handle `icecandidate` event from underlying peer emitting
     /// [`PeerEvent::IceCandidateDiscovered`] event into this peers
     /// `peer_events_sender`.
