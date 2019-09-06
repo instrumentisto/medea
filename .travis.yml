@@ -10,6 +10,8 @@ stages:
     if: (branch = master AND type != pull_request) OR commit_message =~ /.*\[run ci\]/
   - name: build
     if: (branch = master AND type != pull_request) OR commit_message =~ /.*\[run ci\]/
+  - name: build_beta
+    if: branch = master
   - name: test_toolchain
     if: (branch = master AND type != pull_request) OR commit_message =~ /.*\[run ci\]/
   - name: test
@@ -48,12 +50,12 @@ jobs:
       script: cargo build --bin medea
 
     - name: medea (beta)
-      stage: build
+      stage: build_beta
       rust: beta
       script: cargo build --bin medea
 
     - name: medea (nightly)
-      stage: build
+      stage: build_beta
       rust: nightly
       script: cargo build --bin medea
 
