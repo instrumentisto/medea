@@ -137,10 +137,15 @@ impl Room {
             let sdp_answer = peer.sdp_answer();
             let hashed_ice_candidates = peer.get_hashed_ice_candidates();
             let tracks = peer.tracks();
+            let remote_peer = self.peers.get_peer(peer.partner_peer_id()).unwrap(); // TODO (evdokimovs): panic
+            let remote_sdp_offer = remote_peer.sdp_offer();
+            let remote_sdp_answer = remote_peer.sdp_answer();
             let peer_snap = PeerSnapshot {
                 id,
                 sdp_answer,
                 sdp_offer,
+                remote_sdp_offer,
+                remote_sdp_answer,
                 state,
                 hashed_ice_candidates,
                 tracks,

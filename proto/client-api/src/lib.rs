@@ -24,6 +24,8 @@ pub struct Peer {
     pub hashed_ice_candidates: Vec<String>,
     pub sdp_offer: Option<String>,
     pub sdp_answer: Option<String>,
+    pub remote_sdp_offer: Option<String>,
+    pub remote_sdp_answer: Option<String>,
     pub tracks: Vec<Track>,
 }
 

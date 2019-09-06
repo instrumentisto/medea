@@ -328,7 +328,7 @@ impl EventHandler for InnerRoom {
                         RtcSignalingState::HaveLocalOffer => {
                             self.on_sdp_answer_made(
                                 peer.id,
-                                peer.sdp_answer.unwrap(),
+                                peer.remote_sdp_answer.unwrap(),
                             );
                         }
                         _ => {
