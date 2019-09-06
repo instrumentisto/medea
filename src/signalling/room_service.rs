@@ -22,7 +22,7 @@ use crate::{
     signalling::{
         room::{
             Close, CreateEndpoint, CreateMember, Delete, RoomError,
-            SerializeProtobufEndpoint, SerializeProtobufMember,
+            SerializeProto, SerializeProtobufEndpoint, SerializeProtobufMember,
             SerializeProtobufRoom,
         },
         room_repo::RoomRepository,
@@ -31,6 +31,7 @@ use crate::{
     AppContext,
 };
 use serde::export::PhantomData;
+use std::collections::HashMap;
 
 type ActFuture<I, E> =
     Box<dyn ActorFuture<Actor = RoomService, Item = I, Error = E>>;
@@ -299,6 +300,55 @@ impl Handler<DeleteElements<Valid>> for RoomService {
 
 /// Type alias for result of Get request.
 type GetResults = Vec<Result<(String, ElementProto), RoomError>>;
+
+#[derive(Message)]
+#[rtype(
+    result = "Result<HashMap<LocalUriType, ElementProto>, RoomServiceError>"
+)]
+pub struct Get(pub Vec<LocalUriType>);
+
+impl Handler<Get> for RoomService {
+    type Result =
+        ActFuture<HashMap<LocalUriType, ElementProto>, RoomServiceError>;
+
+    fn handle(&mut self, msg: Get, ctx: &mut Self::Context) -> Self::Result {
+        let mut rooms_elements = HashMap::new();
+        for uri in msg.0 {
+            if self.room_repo.is_contains_room_with_id(uri.room_id()) {
+                rooms_elements
+                    .entry(uri.room_id().clone())
+                    .or_insert_with(|| Vec::new())
+                    .push(uri);
+            } else {
+                // TODO: error here
+            }
+        }
+
+        let mut futs = Vec::new();
+        for (room_id, elements) in rooms_elements {
+            if let Some(room) = self.room_repo.get(&room_id) {
+                // TODO (evdokimovs): error handling
+                futs.push(room.send(SerializeProto { uris: elements }));
+            } else {
+                unimplemented!()
+                // TODO (evdokimovs): error
+            }
+        }
+
+        Box::new(wrap_future(
+            futures::future::join_all(futs)
+                .map_err(|e| RoomServiceError::from(e))
+                .map(|results| {
+                    let mut all = HashMap::new();
+                    for result in results {
+                        let result = result.unwrap();
+                        all.extend(result)
+                    }
+                    all
+                }),
+        ))
+    }
+}
 
 /// Signal for get serialized to protobuf object [`Room`].
 #[derive(Message)]

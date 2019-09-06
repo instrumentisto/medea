@@ -636,6 +636,47 @@ impl Room {
             endpoint_id, member_id, self.id
         );
     }
+
+    fn serialize_member_to_protobuf(
+        &self,
+        member_id: &MemberId,
+    ) -> Result<ElementProto, RoomError> {
+        let member = self.members.get_member(member_id)?;
+
+        let mut member_element: Room_Element = member.into();
+        let member = member_element.take_member();
+
+        let mut element = ElementProto::new();
+        element.set_member(member);
+
+        Ok(element)
+    }
+
+    fn serialize_endpoint_to_proto(
+        &self,
+        member_id: &MemberId,
+        endpoint_id: String,
+    ) -> Result<ElementProto, RoomError> {
+        let member = self.members.get_member(member_id)?;
+
+        let publish_endpoint_id = WebRtcPublishId(endpoint_id);
+        let mut element = ElementProto::new();
+
+        if let Some(endpoint) = member.get_src_by_id(&publish_endpoint_id) {
+            let mut member_element: Member_Element = endpoint.into();
+            let endpoint = member_element.take_webrtc_pub();
+            element.set_webrtc_pub(endpoint);
+        } else {
+            let play_endpoint_id = WebRtcPlayId(publish_endpoint_id.0);
+
+            let endpoint = member.get_sink(&play_endpoint_id)?;
+            let mut member_element: Member_Element = endpoint.into();
+            let endpoint = member_element.take_webrtc_play();
+            element.set_webrtc_play(endpoint);
+        }
+
+        Ok(element)
+    }
 }
 
 /// [`Actor`] implementation that provides an ergonomic way
@@ -660,6 +701,51 @@ impl Into<ElementProto> for &mut Room {
         element.set_room(room);
 
         element
+    }
+}
+
+#[derive(Message)]
+#[rtype(result = "Result<HashMap<LocalUriType, ElementProto>, RoomError>")]
+pub struct SerializeProto {
+    pub uris: Vec<LocalUriType>,
+}
+
+impl Handler<SerializeProto> for Room {
+    type Result = Result<HashMap<LocalUriType, ElementProto>, RoomError>;
+
+    fn handle(
+        &mut self,
+        msg: SerializeProto,
+        ctx: &mut Self::Context,
+    ) -> Self::Result {
+        let mut serialized = HashMap::new();
+        for uri in msg.uris {
+            match &uri {
+                LocalUriType::Room(room_uri) => {
+                    if room_uri.room_id() == &self.id {
+                        let current_room: ElementProto = self.into();
+                        serialized.insert(uri, current_room);
+                    } else {
+                        // TODO (evdokimovs): return err
+                    }
+                }
+                LocalUriType::Member(member_uri) => {
+                    let member_id = member_uri.member_id();
+                    let member_proto =
+                        self.serialize_member_to_protobuf(member_id)?;
+                    serialized.insert(uri, member_proto);
+                }
+                LocalUriType::Endpoint(endpoint_uri) => {
+                    let endpoint_id = endpoint_uri.endpoint_id().to_string();
+                    let member_id = endpoint_uri.member_id();
+                    let endpoint_proto = self
+                        .serialize_endpoint_to_proto(member_id, endpoint_id)?;
+                    serialized.insert(uri, endpoint_proto);
+                }
+            }
+        }
+
+        Ok(serialized)
     }
 }
 
@@ -696,15 +782,7 @@ impl Handler<SerializeProtobufMember> for Room {
         msg: SerializeProtobufMember,
         _ctx: &mut Self::Context,
     ) -> Self::Result {
-        let member = self.members.get_member(&msg.0)?;
-
-        let mut member_element: Room_Element = member.into();
-        let member = member_element.take_member();
-
-        let mut element = ElementProto::new();
-        element.set_member(member);
-
-        Ok(element)
+        self.serialize_member_to_protobuf(&msg.0)
     }
 }
 
@@ -723,25 +801,7 @@ impl Handler<SerializeProtobufEndpoint> for Room {
         msg: SerializeProtobufEndpoint,
         _ctx: &mut Self::Context,
     ) -> Self::Result {
-        let member = self.members.get_member(&msg.0)?;
-
-        let endpoint_id = WebRtcPublishId(msg.1);
-        let mut element = ElementProto::new();
-
-        if let Some(endpoint) = member.get_src_by_id(&endpoint_id) {
-            let mut member_element: Member_Element = endpoint.into();
-            let endpoint = member_element.take_webrtc_pub();
-            element.set_webrtc_pub(endpoint);
-        } else {
-            let endpoint_id = WebRtcPlayId(endpoint_id.0);
-
-            let endpoint = member.get_sink(&endpoint_id)?;
-            let mut member_element: Member_Element = endpoint.into();
-            let endpoint = member_element.take_webrtc_play();
-            element.set_webrtc_play(endpoint);
-        }
-
-        Ok(element)
+        self.serialize_endpoint_to_proto(&msg.0, msg.1)
     }
 }
 

@@ -50,7 +50,7 @@ use crate::{
 use crate::{
     api::control::{MemberId, RoomId},
     shutdown::ShutdownGracefully,
-    signalling::room_service::NotValidated,
+    signalling::room_service::{Get, NotValidated},
 };
 
 #[derive(Debug, Fail)]
@@ -443,96 +443,28 @@ impl ControlApi for ControlApiService {
         req: IdRequest,
         sink: UnarySink<GetResponse>,
     ) {
-        let mut room_ids = Vec::new();
-        let mut member_ids = Vec::new();
-        let mut endpoint_ids = Vec::new();
-
+        let mut uris = Vec::new();
         for id in req.get_id() {
             let local_uri = parse_local_uri!(id, ctx, sink, GetResponse);
-
-            match local_uri {
-                LocalUriType::Room(room_uri) => {
-                    room_ids.push(room_uri.take_room_id());
-                }
-                LocalUriType::Member(member_uri) => {
-                    let (member_id, room_uri) = member_uri.take_member_id();
-                    let room_id = room_uri.take_room_id();
-                    member_ids.push((room_id, member_id));
-                }
-                LocalUriType::Endpoint(endpoint_uri) => {
-                    let (endpoint_id, member_uri) =
-                        endpoint_uri.take_endpoint_id();
-                    let (member_id, room_uri) = member_uri.take_member_id();
-                    let room_id = room_uri.take_room_id();
-                    endpoint_ids.push((room_id, member_id, endpoint_id));
-                }
-            }
+            uris.push(local_uri);
         }
-
-        let room_fut = self.room_service.send(GetRoom(room_ids));
-        let member_fut = self.room_service.send(GetMember(member_ids));
-        let endpoint_fut = self.room_service.send(GetEndpoint(endpoint_ids));
-
-        ctx.spawn(room_fut.join3(member_fut, endpoint_fut).then(|result| {
-            let grpc_err_closure =
-                |e| warn!("Error while sending Get response. {:?}", e);
-
+        ctx.spawn(self.room_service.send(Get(uris)).then(|result| {
             match result {
-                Ok((room, member, endpoint)) => {
-                    let mut elements = HashMap::new();
-                    let mut elements_results = Vec::new();
-
-                    let results = vec![room, member, endpoint];
-
-                    for result in results {
-                        match result {
-                            Ok(o) => {
-                                elements_results.push(o);
-                            }
-                            Err(e) => {
-                                let mut response = GetResponse::new();
-                                let error: ErrorResponse = e.into();
-                                response.set_error(error.into());
-                                return sink
-                                    .success(response)
-                                    .map_err(grpc_err_closure);
-                            }
-                        }
-                    }
-
-                    let elements_results = elements_results
-                        .into_iter()
-                        .flat_map(std::iter::IntoIterator::into_iter);
-
-                    for element in elements_results {
-                        match element {
-                            Ok((id, o)) => {
-                                elements.insert(id, o);
-                            }
-                            Err(e) => {
-                                let mut response = GetResponse::new();
-                                let error: ErrorResponse = e.into();
-                                response.set_error(error.into());
-                                return sink
-                                    .success(response)
-                                    .map_err(grpc_err_closure);
-                            }
-                        }
-                    }
-
+                Ok(resp) => {
                     let mut response = GetResponse::new();
-                    response.set_elements(elements);
-
-                    sink.success(response).map_err(grpc_err_closure)
+                    let resp = response.set_elements(
+                        resp.unwrap()
+                            .into_iter()
+                            .map(|(id, value)| (id.to_string(), value))
+                            .collect(),
+                    );
+                    // TODO (evdokimovs): remove this unwrap.
+                    sink.success(response).map_err(|e| {
+                        error!("Error while get.") // TODO (evdokimovs): better
+                                                   // response
+                    })
                 }
-                Err(e) => {
-                    warn!("Control API Get method mailbox error. {:?}", e);
-                    let mut response = GetResponse::new();
-                    let error: Error =
-                        ErrorResponse::unknown(&format!("{:?}", e)).into();
-                    response.set_error(error);
-                    sink.success(response).map_err(grpc_err_closure)
-                }
+                _ => unimplemented!()
             }
         }));
     }

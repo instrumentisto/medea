@@ -35,15 +35,15 @@ pub enum LocalUriParseError {
 }
 
 /// State of [`LocalUri`] which points to `Room`.
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Hash, Eq)]
 pub struct IsRoomId(RoomId);
 
 /// State of [`LocalUri`] which points to `Member`.
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Hash, Eq)]
 pub struct IsMemberId(LocalUri<IsRoomId>, MemberId);
 
 /// State of [`LocalUri`] which points to `Endpoint`.
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Hash, Eq)]
 pub struct IsEndpointId(LocalUri<IsMemberId>, String);
 
 #[allow(clippy::doc_markdown)]
@@ -89,7 +89,7 @@ pub struct IsEndpointId(LocalUri<IsMemberId>, String);
 ///
 /// This is necessary so that it is not possible to get the address in the
 /// wrong state ("local://room_id//endpoint_id" for example).
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Hash, Eq)]
 pub struct LocalUri<T> {
     state: T,
 }
@@ -184,7 +184,7 @@ impl From<SrcUri> for LocalUri<IsEndpointId> {
 }
 
 #[allow(clippy::doc_markdown)]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Hash, Eq)]
 struct LocalUriInner {
     /// ID of [`Room`]
     room_id: Option<RoomId>,
@@ -294,7 +294,7 @@ impl fmt::Display for LocalUri<IsEndpointId> {
 
 /// Enum for store all kinds of [`LocalUri`]s.
 #[allow(clippy::module_name_repetitions)]
-#[derive(Debug)]
+#[derive(Debug, Hash, PartialEq, Eq)]
 pub enum LocalUriType {
     Room(LocalUri<IsRoomId>),
     Member(LocalUri<IsMemberId>),
