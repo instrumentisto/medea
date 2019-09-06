@@ -19,6 +19,8 @@ use futures::{future::Future, sink::Sink, stream::SplitSink, Stream};
 use medea_client_api_proto::{Command, Event, IceCandidate};
 use serde_json::error::Error as SerdeError;
 
+pub type MessageHandler = Box<dyn FnMut(&Event, &mut Context<TestMember>, Vec<&Event>)>;
+
 /// Medea client for testing purposes.
 pub struct TestMember {
     /// Writer to WebSocket.
@@ -35,7 +37,7 @@ pub struct TestMember {
 
     /// Function which will be called at every received by this [`TestMember`]
     /// [`Event`].
-    on_message: Box<dyn FnMut(&Event, &mut Context<TestMember>, Vec<&Event>)>,
+    on_message: MessageHandler,
 }
 
 impl TestMember {
@@ -64,9 +66,7 @@ impl TestMember {
     /// received from server.
     pub fn start(
         uri: &str,
-        on_message: Box<
-            dyn FnMut(&Event, &mut Context<TestMember>, Vec<&Event>),
-        >,
+        on_message: MessageHandler,
         deadline: Option<Duration>,
     ) {
         Arbiter::spawn(
@@ -161,7 +161,7 @@ impl StreamHandler<Frame, WsProtocolError> for TestMember {
                             peer_id: *peer_id,
                             sdp_offer: "caller_offer".into(),
                             mids: tracks
-                                .into_iter()
+                                .iter()
                                 .map(|t| t.id)
                                 .enumerate()
                                 .map(|(mid, id)| (id, mid.to_string()))
