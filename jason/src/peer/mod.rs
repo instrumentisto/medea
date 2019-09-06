@@ -260,11 +260,6 @@ impl PeerConnection {
         peer.set_remote_description(desc).and_then(move |_| {
             let mut inner = inner.borrow_mut();
             inner.has_remote_description = true;
-            WasmErr::from(format!(
-                "Flush buffered ICE candidates for peer {}",
-                inner.id
-            ))
-            .log_err();
             let futures = inner.ice_candidates.drain(..).fold(
                 vec![],
                 move |mut acc, (candidate, sdp_m_line_index, sdp_mid)| {
@@ -347,11 +342,6 @@ impl PeerConnection {
                 &sdp_mid,
             ))
         } else {
-            WasmErr::from(format!(
-                "Not have remote desc for peer {}. Candidate buffered.",
-                inner.id
-            ))
-            .log_err();
             inner
                 .ice_candidates
                 .push((candidate, sdp_m_line_index, sdp_mid));
