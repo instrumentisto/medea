@@ -24,7 +24,7 @@ use super::endpoints::webrtc::{
 };
 
 /// Errors which may occur while loading [`Member`]s from [`RoomSpec`].
-#[derive(Debug, Fail, Display)]
+#[derive(Debug, Display, Fail)]
 pub enum MembersLoadError {
     /// Errors that can occur when we try transform some spec from `Element`.
     #[display(fmt = "TryFromElementError: {}", _0)]
@@ -56,6 +56,7 @@ pub struct Member(Rc<RefCell<MemberInner>>);
 #[allow(clippy::module_name_repetitions)]
 #[derive(Debug)]
 struct MemberInner {
+    /// ID of this [`Member`].
     id: MemberId,
 
     /// All [`WebRtcPublishEndpoint`]s of this [`Member`].
@@ -108,9 +109,10 @@ impl Member {
         {
             let publisher_id =
                 MemberId(spec_play_endpoint.src.member_id.to_string());
-            let publisher_member = store
-                .get(&publisher_id)
-                .ok_or(MembersLoadError::MemberNotFound(publisher_id))?;
+            let publisher_member =
+                store.get(&publisher_id).ok_or_else(|| {
+                    MembersLoadError::MemberNotFound(publisher_id)
+                })?;
             let publisher_spec = MemberSpec::try_from(
                 room_spec
                     .pipeline
@@ -138,7 +140,7 @@ impl Member {
                 let new_play_endpoint_id =
                     WebRtcPlayId(spec_play_name.to_string());
                 let new_play_endpoint = WebRtcPlayEndpoint::new(
-                    new_play_endpoint_id.clone(),
+                    new_play_endpoint_id,
                     spec_play_endpoint.src.clone(),
                     publisher.downgrade(),
                     this_member.downgrade(),
@@ -152,7 +154,7 @@ impl Member {
                     spec_play_endpoint.src.endpoint_id.to_string(),
                 );
                 let new_publish = WebRtcPublishEndpoint::new(
-                    new_publish_id.clone(),
+                    new_publish_id,
                     publisher_endpoint.p2p.clone(),
                     Vec::new(),
                     publisher_member.downgrade(),

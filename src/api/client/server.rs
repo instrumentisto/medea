@@ -160,7 +160,6 @@ mod test {
             control::load_from_yaml_file("tests/specs/pub-sub-video-call.yml")
                 .unwrap();
 
-        let room_id = room_spec.id.clone();
         let client_room = Room::new(
             &room_spec,
             conf.reconnect_timeout,
@@ -169,7 +168,7 @@ mod test {
         .unwrap()
         .start();
         let rooms = hashmap! {
-            room_id => client_room,
+            room_spec.id => client_room,
         };
 
         RoomRepository::new(rooms)

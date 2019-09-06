@@ -26,7 +26,7 @@ pub use Id as WebRtcPublishId;
 #[derive(Clone, Debug, Eq, Hash, PartialEq, From, Display)]
 pub struct Id(pub String);
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 struct WebRtcPublishEndpointInner {
     /// ID of this [`WebRtcPublishEndpoint`].
     id: Id,
@@ -205,7 +205,7 @@ impl WebRtcPublishEndpoint {
 
 /// Weak pointer to [`WebRtcPublishEndpoint`].
 #[allow(clippy::module_name_repetitions)]
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub struct WeakWebRtcPublishEndpoint(Weak<RefCell<WebRtcPublishEndpointInner>>);
 
 impl WeakWebRtcPublishEndpoint {

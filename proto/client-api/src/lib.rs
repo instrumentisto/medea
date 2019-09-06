@@ -26,7 +26,7 @@ pub struct TrackId(pub u64);
 
 /// Value that is able to be incremented by `1`.
 #[cfg(feature = "medea")]
-pub trait Incrementable: Sized + Clone {
+pub trait Incrementable {
     /// Returns current value + 1.
     fn incr(&self) -> Self;
 }

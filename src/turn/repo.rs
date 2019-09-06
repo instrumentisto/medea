@@ -13,7 +13,7 @@ use tokio::prelude::*;
 
 use crate::{log::prelude::*, media::IceUser};
 
-#[derive(Fail, Debug, Display)]
+#[derive(Debug, Display, Fail)]
 pub enum TurnDatabaseErr {
     #[display(fmt = "Redis returned error: {}", _0)]
     RedisError(RedisError),

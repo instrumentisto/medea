@@ -97,7 +97,7 @@ type ActFuture<I, E> =
     Box<dyn ActorFuture<Actor = Service, Item = I, Error = E>>;
 
 /// Error which can happen in [`TurnAuthService`].
-#[derive(Debug, Fail, Display)]
+#[derive(Display, Debug, Fail)]
 pub enum TurnServiceErr {
     #[display(fmt = "Error accessing TurnAuthRepo: {}", _0)]
     TurnAuthRepoErr(TurnDatabaseErr),

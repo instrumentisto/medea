@@ -45,7 +45,7 @@ pub enum RootElement {
 ///
 /// [`TryFrom`]: std::convert::TryFrom
 #[allow(clippy::pub_enum_variant_names)]
-#[derive(Debug, Fail, Display)]
+#[derive(Debug, Display, Fail)]
 pub enum TryFromElementError {
     #[display(fmt = "Element is not Room")]
     NotRoom,

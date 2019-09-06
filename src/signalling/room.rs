@@ -477,10 +477,10 @@ impl Room {
             self.members
                 .drop_connections(ctx)
                 .into_actor(self)
-                .map(move |_, room: &mut Self, _| {
+                .map(|_, room: &mut Self, _| {
                     room.state = State::Stopped;
                 })
-                .map_err(move |_, room, _| {
+                .map_err(|_, room, _| {
                     error!("Error closing room {:?}", room.id);
                 }),
         )

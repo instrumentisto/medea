@@ -92,7 +92,7 @@ pub struct SrcUri {
     /// ID of `Member`
     pub member_id: MemberId,
 
-    /// Control ID of [`Endpoint`]
+    /// Control API ID of [`Endpoint`]
     pub endpoint_id: String,
 }
 

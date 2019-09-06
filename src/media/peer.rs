@@ -39,7 +39,7 @@ pub struct WaitRemoteSdp {}
 pub struct Stable {}
 
 /// Produced when unwrapping [`PeerStateMachine`] to [`Peer`] with wrong state.
-#[derive(Fail, Debug, Display)]
+#[derive(Debug, Display, Fail)]
 #[allow(clippy::module_name_repetitions)]
 pub enum PeerError {
     #[display(

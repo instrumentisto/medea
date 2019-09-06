@@ -187,7 +187,7 @@ impl ParticipantService {
 
         // lookup previous member connection
         if let Some(mut connection) = self.connections.remove(&member_id) {
-            debug!("Closing old RpcConnection for participant {}", &member_id);
+            debug!("Closing old RpcConnection for member [id = {}]", member_id);
 
             // cancel RpcConnection close task, since connection is
             // reestablished
