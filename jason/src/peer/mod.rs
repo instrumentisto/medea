@@ -295,34 +295,37 @@ impl PeerConnection {
             });
 
         // update receivers
-        self.0
-            .borrow()
-            .media_connections
-            .update_tracks(recv)
-            .unwrap();
+        if let Err(err) = self.0.borrow().media_connections.update_tracks(recv)
+        {
+            return future::Either::A(future::err(err));
+        }
 
         let inner: Rc<RefCell<InnerPeerConnection>> = Rc::clone(&self.0);
-        self.set_remote_offer(offer)
-            .and_then(move |_| {
-                let request =
-                    inner.borrow().media_connections.update_tracks(send)?;
-                Ok((request, inner))
-            })
-            .and_then(|(request, inner)| match request {
-                None => future::Either::A(future::ok::<_, WasmErr>(())),
-                Some(request) => {
-                    let media_manager =
-                        Rc::clone(&inner.borrow().media_manager);
-                    future::Either::B(
-                        media_manager.get_stream(request).and_then(move |s| {
-                            inner
-                                .borrow()
-                                .media_connections
-                                .insert_local_stream(&s)
-                        }),
-                    )
-                }
-            })
+        future::Either::B(
+            self.set_remote_offer(offer)
+                .and_then(move |_| {
+                    let request =
+                        inner.borrow().media_connections.update_tracks(send)?;
+                    Ok((request, inner))
+                })
+                .and_then(|(request, inner)| match request {
+                    None => future::Either::A(future::ok::<_, WasmErr>(())),
+                    Some(request) => {
+                        let media_manager =
+                            Rc::clone(&inner.borrow().media_manager);
+                        future::Either::B(
+                            media_manager.get_stream(request).and_then(
+                                move |s| {
+                                    inner
+                                        .borrow()
+                                        .media_connections
+                                        .insert_local_stream(&s)
+                                },
+                            ),
+                        )
+                    }
+                }),
+        )
     }
 
     /// Adds remote peers [ICE Candidate][1] to this peer.

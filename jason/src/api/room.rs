@@ -198,12 +198,13 @@ impl EventHandler for InnerRoom {
             // offerer
             None => future::Either::A(
                 peer.get_offer(tracks)
-                    .map(move |sdp_offer| {
-                        rpc.send_command(Command::MakeSdpOffer {
+                    .map(move |sdp_offer| match peer.get_mids() {
+                        Ok(mids) => rpc.send_command(Command::MakeSdpOffer {
                             peer_id,
                             sdp_offer,
-                            mids: peer.get_mids().unwrap(),
-                        })
+                            mids,
+                        }),
+                        Err(err) => err.log_err(),
                     })
                     .map_err(|err| err.log_err()),
             ),
