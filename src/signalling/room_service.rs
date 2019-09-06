@@ -1,8 +1,8 @@
 //! Service which control [`Room`].
 
 use actix::{
-    fut::wrap_future, Actor, ActorFuture, Addr, AsyncContext as _, Context,
-    Handler, MailboxError, Message, WrapFuture as _,
+    fut::wrap_future, Actor, ActorFuture, Addr, Context, Handler, MailboxError,
+    Message,
 };
 use failure::Fail;
 use futures::future::{self, Either, Future};
@@ -253,8 +253,8 @@ impl Handler<DeleteElements<Valid>> for RoomService {
 
     fn handle(
         &mut self,
-        mut msg: DeleteElements<Valid>,
-        ctx: &mut Context<RoomService>,
+        msg: DeleteElements<Valid>,
+        _: &mut Context<RoomService>,
     ) -> Self::Result {
         let mut deletes_from_room: Vec<LocalUriType> = Vec::new();
         let room_messages_futs: Vec<
@@ -325,7 +325,7 @@ impl Handler<Get> for RoomService {
     type Result =
         ActFuture<HashMap<LocalUriType, ElementProto>, RoomServiceError>;
 
-    fn handle(&mut self, msg: Get, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: Get, _: &mut Self::Context) -> Self::Result {
         let mut rooms_elements = HashMap::new();
         for uri in msg.0 {
             if self.room_repo.is_contains_room_with_id(uri.room_id()) {

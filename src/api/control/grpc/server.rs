@@ -12,7 +12,7 @@ use failure::Fail;
 use futures::future::{Either, Future};
 use grpcio::{
     Environment, RpcContext, RpcStatus, RpcStatusCode, Server, ServerBuilder,
-    UnarySink, UnarySinkResult,
+    UnarySink,
 };
 use medea_grpc_proto::{
     control::{
@@ -387,7 +387,7 @@ impl ControlApi for ControlApiService {
     fn delete(
         &mut self,
         ctx: RpcContext,
-        mut req: IdRequest,
+        req: IdRequest,
         sink: UnarySink<Response>,
     ) {
         let mut delete_elements = DeleteElements::new();
@@ -409,28 +409,44 @@ impl ControlApi for ControlApiService {
             }
         };
 
-        ctx.spawn(self.room_service.send(delete_elements).then(
-            move |result| {
-                match result {
-                    Ok(result) => {
-                        sink.success(Response::new());
-                    }
-                    Err(e) => {
-                        let mut response = Response::new();
+        ctx.spawn(
+            self.room_service
+                .send(delete_elements)
+                .then(move |result| {
+                    match result {
+                        Ok(result) => match result {
+                            Ok(_) => sink.success(Response::new()),
+                            Err(e) => {
+                                let mut response = Response::new();
+                                response
+                                    .set_error(ErrorResponse::from(e).into());
+                                sink.success(response)
+                            }
+                        },
+                        Err(e) => {
+                            let mut response = Response::new();
 
-                        // TODO: dont use unknown, add some special err for all
-                        //       mailbox errs, Unavailable("ActorName") or
-                        // something
-                        let error: Error =
-                            ErrorResponse::unknown(&format!("{:?}", e)).into();
-                        response.set_error(error);
+                            // TODO: dont use unknown, add some special err for
+                            // all       mailbox
+                            // errs, Unavailable("ActorName") or
+                            // something
+                            let error: Error =
+                                ErrorResponse::unknown(&format!("{:?}", e))
+                                    .into();
+                            response.set_error(error);
 
-                        let a: UnarySinkResult = sink.success(response);
+                            sink.success(response)
+                        }
                     }
-                }
-                Ok(())
-            },
-        ));
+                })
+                .map_err(|e| {
+                    warn!(
+                        "Error while sending response on Delete request by \
+                         gRPC: {:?}",
+                        e
+                    )
+                }),
+        );
     }
 
     /// Implementation for `Get` method of gRPC control API.
@@ -445,38 +461,41 @@ impl ControlApi for ControlApiService {
             let local_uri = parse_local_uri!(id, ctx, sink, GetResponse);
             uris.push(local_uri);
         }
-        ctx.spawn(self.room_service.send(Get(uris)).then(|mailbox_result| {
-            let err = |e| {
-                warn!(
-                    "Error while sending response on Get request by gRPC. {:?}",
-                    e
-                );
-            };
-            match mailbox_result {
-                Ok(room_service_result) => match room_service_result {
-                    Ok(elements) => {
-                        let mut response = GetResponse::new();
-                        let resp = response.set_elements(
-                            elements
-                                .into_iter()
-                                .map(|(id, value)| (id.to_string(), value))
-                                .collect(),
-                        );
-                        sink.success(response).map_err(err)
-                    }
+        ctx.spawn(
+            self.room_service
+                .send(Get(uris))
+                .then(|mailbox_result| match mailbox_result {
+                    Ok(room_service_result) => match room_service_result {
+                        Ok(elements) => {
+                            let mut response = GetResponse::new();
+                            response.set_elements(
+                                elements
+                                    .into_iter()
+                                    .map(|(id, value)| (id.to_string(), value))
+                                    .collect(),
+                            );
+                            sink.success(response)
+                        }
+                        Err(e) => {
+                            let mut response = GetResponse::new();
+                            response.set_error(ErrorResponse::from(e).into());
+                            sink.success(response)
+                        }
+                    },
                     Err(e) => {
                         let mut response = GetResponse::new();
-                        response.set_error(ErrorResponse::from(e).into());
-                        sink.success(response).map_err(err)
+                        response.set_error(ErrorResponse::unknown(&e).into());
+                        sink.success(response)
                     }
-                },
-                Err(e) => {
-                    let mut response = GetResponse::new();
-                    response.set_error(ErrorResponse::unknown(&e).into());
-                    sink.success(response).map_err(err)
-                }
-            }
-        }));
+                })
+                .map_err(|e| {
+                    warn!(
+                        "Error while sending response on Get request by gRPC: \
+                         {:?}",
+                        e
+                    )
+                }),
+        );
     }
 }
 
