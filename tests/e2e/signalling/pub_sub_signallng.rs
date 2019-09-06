@@ -10,10 +10,9 @@ fn pub_sub_video_call() {
 
         // Note that events is separated by members.
         // Every member will have different instance of this.
-        let mut events = Vec::new();
-        let test_fn = move |event: &Event, _: &mut Context<TestMember>| {
-            events.push(event.clone());
-
+        let test_fn = move |event: &Event,
+                            _: &mut Context<TestMember>,
+                            events: Vec<&Event>| {
             // Start checking result of test.
             if let Event::IceCandidateDiscovered { .. } = event {
                 let peers_count = events

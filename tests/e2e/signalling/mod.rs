@@ -35,7 +35,7 @@ pub struct TestMember {
 
     /// Function which will be called at every received by this [`TestMember`]
     /// [`Event`].
-    on_message: Box<dyn FnMut(&Event, &mut Context<TestMember>)>,
+    on_message: Box<dyn FnMut(&Event, &mut Context<TestMember>, Vec<&Event>)>,
 }
 
 impl TestMember {
@@ -64,7 +64,9 @@ impl TestMember {
     /// received from server.
     pub fn start(
         uri: &str,
-        on_message: Box<dyn FnMut(&Event, &mut Context<TestMember>)>,
+        on_message: Box<
+            dyn FnMut(&Event, &mut Context<TestMember>, Vec<&Event>),
+        >,
         deadline: Option<Duration>,
     ) {
         Arbiter::spawn(
@@ -138,8 +140,10 @@ impl StreamHandler<Frame, WsProtocolError> for TestMember {
             let txt = String::from_utf8(txt.unwrap().to_vec()).unwrap();
             let event: Result<Event, SerdeError> = serde_json::from_str(&txt);
             if let Ok(event) = event {
+                let mut events: Vec<&Event> = self.events.iter().collect();
+                events.push(&event);
                 // Test function call
-                (self.on_message)(&event, ctx);
+                (self.on_message)(&event, ctx, events);
 
                 if let Event::PeerCreated {
                     peer_id,
