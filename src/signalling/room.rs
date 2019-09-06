@@ -24,7 +24,7 @@ use crate::{
             RpcConnectionClosed, RpcConnectionEstablished,
         },
         control::{
-            local_uri::{IsMemberId, LocalUri},
+            local_uri::{IsMemberId, LocalUri, LocalUriType},
             room::RoomSpec,
             Endpoint as EndpointSpec, MemberId, MemberSpec, RoomId,
             TryFromElementError, WebRtcPlayId, WebRtcPublishId,
@@ -566,6 +566,76 @@ impl Room {
             self.member_peers_removed(peers_id, member_id, ctx);
         }
     }
+
+    /// Signal for delete [`Member`] from this [`Room`]
+    fn delete_member(&mut self, member_id: MemberId, ctx: &mut Context<Self>) {
+        debug!(
+            "Delete Member [id = {}] in room [id = {}].",
+            member_id, self.id
+        );
+        if let Some(member) = self.members.get_member_by_id(&member_id) {
+            let mut peers = HashSet::new();
+            for (_, sink) in member.sinks() {
+                if let Some(peer_id) = sink.peer_id() {
+                    peers.insert(peer_id);
+                }
+            }
+
+            for (_, src) in member.srcs() {
+                for peer_id in src.peer_ids() {
+                    peers.insert(peer_id);
+                }
+            }
+
+            self.remove_peers(&member.id(), peers, ctx);
+        }
+
+        self.members.delete_member(&member_id, ctx);
+
+        debug!(
+            "Member [id = {}] removed from Room [id = {}].",
+            member_id, self.id
+        );
+    }
+
+    /// Signal for delete endpoint from this [`Room`]
+    fn delete_endpoint(
+        &mut self,
+        member_id: MemberId,
+        endpoint_id: String,
+        ctx: &mut Context<Self>,
+    ) {
+        let endpoint_id = if let Some(member) =
+            self.members.get_member_by_id(&member_id)
+        {
+            let play_id = WebRtcPlayId(endpoint_id);
+            if let Some(endpoint) = member.take_sink(&play_id) {
+                if let Some(peer_id) = endpoint.peer_id() {
+                    let removed_peers =
+                        self.peers.remove_peer(&member_id, peer_id);
+                    for (member_id, peers_ids) in removed_peers {
+                        self.member_peers_removed(peers_ids, member_id, ctx);
+                    }
+                }
+            }
+
+            let publish_id = WebRtcPublishId(play_id.0);
+            if let Some(endpoint) = member.take_src(&publish_id) {
+                let peer_ids = endpoint.peer_ids();
+                self.remove_peers(&member_id, peer_ids, ctx);
+            }
+
+            publish_id.0
+        } else {
+            endpoint_id
+        };
+
+        debug!(
+            "Endpoint [id = {}] removed in Member [id = {}] from Room [id = \
+             {}].",
+            endpoint_id, member_id, self.id
+        );
+    }
 }
 
 /// [`Actor`] implementation that provides an ergonomic way
@@ -858,95 +928,37 @@ impl Handler<Close> for Room {
     }
 }
 
-/// Signal for delete [`Member`] from this [`Room`]
-#[derive(Debug, Message, Clone)]
+#[derive(Message, Debug)]
 #[rtype(result = "()")]
-pub struct DeleteMember(pub MemberId);
+pub struct Delete(pub Vec<LocalUriType>);
 
-impl Handler<DeleteMember> for Room {
+impl Handler<Delete> for Room {
     type Result = ();
 
-    fn handle(
-        &mut self,
-        msg: DeleteMember,
-        ctx: &mut Self::Context,
-    ) -> Self::Result {
-        debug!("Delete Member [id = {}] in room [id = {}].", msg.0, self.id);
-        if let Some(member) = self.members.get_member_by_id(&msg.0) {
-            let mut peers = HashSet::new();
-            for (_, sink) in member.sinks() {
-                if let Some(peer_id) = sink.peer_id() {
-                    peers.insert(peer_id);
+    fn handle(&mut self, msg: Delete, ctx: &mut Self::Context) {
+        let mut member_ids = Vec::new();
+        let mut endpoint_ids = Vec::new();
+        for id in msg.0 {
+            match id {
+                LocalUriType::Member(member_uri) => {
+                    member_ids.push(member_uri);
                 }
-            }
-
-            for (_, src) in member.srcs() {
-                for peer_id in src.peer_ids() {
-                    peers.insert(peer_id);
+                LocalUriType::Endpoint(endpoint_uri) => {
+                    endpoint_ids.push(endpoint_uri);
                 }
+                // TODO (evdokimovs): better message
+                _ => warn!("Delete method in Room found LocalUri<Room>."),
             }
-
-            self.remove_peers(&member.id(), peers, ctx);
         }
-
-        self.members.delete_member(&msg.0, ctx);
-
-        debug!(
-            "Member [id = {}] removed from Room [id = {}].",
-            msg.0, self.id
-        );
-    }
-}
-
-/// Signal for delete endpoint from this [`Room`]
-#[derive(Debug, Message, Clone)]
-#[rtype(result = "()")]
-pub struct DeleteEndpoint {
-    pub member_id: MemberId,
-    pub endpoint_id: String,
-}
-
-impl Handler<DeleteEndpoint> for Room {
-    type Result = ();
-
-    fn handle(
-        &mut self,
-        msg: DeleteEndpoint,
-        ctx: &mut Self::Context,
-    ) -> Self::Result {
-        let member_id = msg.member_id;
-        let endpoint_id = msg.endpoint_id;
-
-        let endpoint_id = if let Some(member) =
-            self.members.get_member_by_id(&member_id)
-        {
-            let play_id = WebRtcPlayId(endpoint_id);
-            if let Some(endpoint) = member.take_sink(&play_id) {
-                if let Some(peer_id) = endpoint.peer_id() {
-                    let removed_peers =
-                        self.peers.remove_peer(&member_id, peer_id);
-                    for (member_id, peers_ids) in removed_peers {
-                        self.member_peers_removed(peers_ids, member_id, ctx);
-                    }
-                }
-            }
-
-            let publish_id = WebRtcPublishId(play_id.0);
-            if let Some(endpoint) = member.take_src(&publish_id) {
-                let peer_ids = endpoint.peer_ids();
-                self.remove_peers(&member_id, peer_ids, ctx);
-            }
-
-            publish_id.0
-        } else {
-            endpoint_id
-        };
-
-        debug!(
-            "Endpoint [id = {}] removed in Member [id = {}] from Room [id = \
-             {}].",
-            endpoint_id, member_id, self.id
-        );
+        member_ids.into_iter().for_each(|uri| {
+            let (member_id, _) = uri.take_member_id();
+            self.delete_member(member_id, ctx);
+        });
+        endpoint_ids.into_iter().for_each(|uri| {
+            let (endpoint_id, member_uri) = uri.take_endpoint_id();
+            let (member_id, _) = member_uri.take_member_id();
+            self.delete_endpoint(member_id, endpoint_id, ctx);
+        });
     }
 }
 

@@ -50,6 +50,7 @@ use crate::{
 use crate::{
     api::control::{MemberId, RoomId},
     shutdown::ShutdownGracefully,
+    signalling::room_service::NotValidated,
 };
 
 #[derive(Debug, Fail)]
@@ -309,8 +310,8 @@ impl ControlApi for ControlApiService {
         //                        ctx,
         //                        sink,
         //                        ErrorResponse::new(
-        //                            
-        // ErrorCode::ElementIdForRoomButElementIsNot,                  
+        //
+        // ErrorCode::ElementIdForRoomButElementIsNot,
         // &req.get_id(),                        ),
         //                        Response
         //                    );
@@ -320,8 +321,8 @@ impl ControlApi for ControlApiService {
         //                if req.has_member() {
         //                    ctx.spawn(self.create_member(&req,
         // local_uri).then(                        move |r| {
-        //                            
-        // sink.success(get_response_for_create(r)).map_err(            
+        //
+        // sink.success(get_response_for_create(r)).map_err(
         // |e| {                                    warn!(
         //                                        "Error while sending Create
         // response \                                         by gRPC.
@@ -336,8 +337,8 @@ impl ControlApi for ControlApiService {
         //                        ctx,
         //                        sink,
         //                        ErrorResponse::new(
-        //                            
-        // ErrorCode::ElementIdForMemberButElementIsNot,                
+        //
+        // ErrorCode::ElementIdForMemberButElementIsNot,
         // &req.get_id(),                        ),
         //                        Response
         //                    );
@@ -347,8 +348,8 @@ impl ControlApi for ControlApiService {
         //                if req.has_webrtc_pub() || req.has_webrtc_play() {
         //                    ctx.spawn(self.create_endpoint(&req,
         // local_uri).then(                        move |r| {
-        //                            
-        // sink.success(get_response_for_create(r)).map_err(            
+        //
+        // sink.success(get_response_for_create(r)).map_err(
         // |e| {                                    warn!(
         //                                        "Error while sending Create
         // response \                                         by gRPC.
@@ -363,8 +364,8 @@ impl ControlApi for ControlApiService {
         //                        ctx,
         //                        sink,
         //                        ErrorResponse::new(
-        //                            
-        // ErrorCode::ElementIdForEndpointButElementIsNot,              
+        //
+        // ErrorCode::ElementIdForEndpointButElementIsNot,
         // &req.get_id(),                        ),
         //                        Response
         //                    );
@@ -420,7 +421,8 @@ impl ControlApi for ControlApiService {
                         let mut response = Response::new();
 
                         // TODO: dont use unknown, add some special err for all
-                        //       mailbox errs, Unavailable("ActorName") or something
+                        //       mailbox errs, Unavailable("ActorName") or
+                        // something
                         let error: Error =
                             ErrorResponse::unknown(&format!("{:?}", e)).into();
                         response.set_error(error);

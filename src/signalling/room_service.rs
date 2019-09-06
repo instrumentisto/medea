@@ -21,8 +21,8 @@ use crate::{
     shutdown::{self, GracefulShutdown},
     signalling::{
         room::{
-            Close, CreateEndpoint, CreateMember, DeleteEndpoint, DeleteMember,
-            RoomError, SerializeProtobufEndpoint, SerializeProtobufMember,
+            Close, CreateEndpoint, CreateMember, Delete, RoomError,
+            SerializeProtobufEndpoint, SerializeProtobufMember,
             SerializeProtobufRoom,
         },
         room_repo::RoomRepository,
@@ -88,10 +88,7 @@ impl RoomService {
         }
     }
 
-    fn close_room(
-        &self,
-        id: RoomId,
-    ) -> impl ActorFuture<Item = (), Error = MailboxError> {
+    fn close_room(&self, id: RoomId) -> ActFuture<(), MailboxError> {
         if let Some(room) = self.room_repo.get(&id) {
             shutdown::unsubscribe(
                 &self.graceful_shutdown,
@@ -99,14 +96,12 @@ impl RoomService {
                 shutdown::Priority(2),
             );
 
-            actix::fut::Either::A(room.send(Close).into_actor(self).map(
-                move |_, act, _| {
-                    debug!("Room [id = {}] removed.", id);
-                    act.room_repo.remove(&id);
-                },
-            ))
+            Box::new(room.send(Close).into_actor(self).map(move |_, act, _| {
+                debug!("Room [id = {}] removed.", id);
+                act.room_repo.remove(&id);
+            }))
         } else {
-            actix::fut::Either::B(actix::fut::ok(()))
+            Box::new(actix::fut::ok(()))
         }
     }
 }
@@ -228,9 +223,7 @@ impl DeleteElements<NotValidated> {
     pub fn add_uri(&mut self, uri: LocalUriType) {
         self.uris.push(uri);
     }
-}
 
-impl DeleteElements<NotValidated> {
     pub fn validate(self) -> Result<DeleteElements<Valid>, RoomServiceError> {
         // TODO: correct errors
         if self.uris.is_empty() {
@@ -258,12 +251,49 @@ impl Handler<DeleteElements<Valid>> for RoomService {
     fn handle(
         &mut self,
         mut msg: DeleteElements<Valid>,
-        _: &mut Self::Context,
+        ctx: &mut Context<RoomService>,
     ) -> Self::Result {
-        // TODO: handle room delete here, send batch to room, handle it atomically
-        //       just discard other messages if room delete present
+        use actix::AsyncContext as _;
+        // TODO: handle room delete here, send batch to room, handle it
+        // atomically       just discard other messages if room delete
+        // present
+        let mut deletes_from_room: Vec<LocalUriType> = Vec::new();
+        let is_room_message = msg
+            .uris
+            .into_iter()
+            .filter_map(|l| {
+                if let LocalUriType::Room(room_id) = l {
+                    Some(room_id)
+                } else {
+                    deletes_from_room.push(l);
+                    None
+                }
+            })
+            .map(|room_id| {
+                // TODO (evdokimovs): Error handling
+                ctx.spawn(
+                    self.close_room(room_id.take_room_id())
+                        .map_err(|_, _, _| ()),
+                );
+            })
+            .count()
+            > 0;
 
-        unimplemented!()
+        if !is_room_message && !deletes_from_room.is_empty() {
+            let room_id = deletes_from_room[0].room_id().clone();
+            // TODO (evdokimovs): print warns on URIs which not deleted.
+            let deletes_from_room: Vec<LocalUriType> = deletes_from_room
+                .into_iter()
+                .filter(|uri| uri.room_id() == &room_id)
+                .collect();
+            // TODO (evdokimovs): handle None.
+            if let Some(room) = self.room_repo.get(&room_id) {
+                // TODO (evdokimovs): handle errors.
+                room.do_send(Delete(deletes_from_room));
+            }
+        }
+
+        Ok(())
     }
 }
 
