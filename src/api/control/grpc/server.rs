@@ -32,7 +32,7 @@ use crate::{
             Endpoint, MemberSpec, RoomSpec, TryFromElementError,
             TryFromProtobufError,
         },
-        error_codes::ErrorResponse,
+        error_codes::{ErrorCode, ErrorResponse},
     },
     log::prelude::*,
     signalling::{
@@ -287,11 +287,89 @@ impl ControlApi for ControlApiService {
     /// Implementation for `Create` method of gRPC control API.
     fn create(
         &mut self,
-        _ctx: RpcContext,
-        _req: CreateRequest,
-        _sink: UnarySink<CreateResponse>,
+        ctx: RpcContext,
+        req: CreateRequest,
+        sink: UnarySink<CreateResponse>,
     ) {
-        unimplemented!()
+        let local_uri =
+            parse_local_uri!(req.get_id(), ctx, sink, CreateResponse);
+
+        match local_uri {
+            LocalUriType::Room(local_uri) => {
+                if req.has_room() {
+                    ctx.spawn(self.create_room(&req, local_uri).then(
+                        move |r| {
+                            sink.success(get_response_for_create(r))
+                                .map_err(|_| ())
+                        },
+                    ));
+                } else {
+                    send_error_response!(
+                        ctx,
+                        sink,
+                        ErrorResponse::new(
+                            ErrorCode::ElementIdForRoomButElementIsNot,
+                            &req.get_id(),
+                        ),
+                        CreateResponse
+                    );
+                }
+            }
+            LocalUriType::Member(local_uri) => {
+                if req.has_member() {
+                    ctx.spawn(self.create_member(&req, local_uri).then(
+                        move |r| {
+                            sink.success(get_response_for_create(r)).map_err(
+                                |e| {
+                                    warn!(
+                                        "Error while sending Create response \
+                                         by gRPC. {:?}",
+                                        e
+                                    )
+                                },
+                            )
+                        },
+                    ));
+                } else {
+                    send_error_response!(
+                        ctx,
+                        sink,
+                        ErrorResponse::new(
+                            ErrorCode::ElementIdForMemberButElementIsNot,
+                            &req.get_id(),
+                        ),
+                        CreateResponse
+                    );
+                }
+            }
+            LocalUriType::Endpoint(local_uri) => {
+                if req.has_webrtc_pub() || req.has_webrtc_play() {
+                    ctx.spawn(self.create_endpoint(&req, local_uri).then(
+                        move |r| {
+                            sink.success(get_response_for_create(r)).map_err(
+                                |e| {
+                                    warn!(
+                                        "Error while sending Create response \
+                                         by gRPC. {:?}",
+                                        e
+                                    )
+                                },
+                            )
+                        },
+                    ));
+                } else {
+                    send_error_response!(
+                        ctx,
+                        sink,
+                        ErrorResponse::new(
+                            ErrorCode::ElementIdForEndpointButElementIsNot,
+                            &req.get_id(),
+                        ),
+                        CreateResponse
+                    );
+                }
+            }
+        }
     }
 
     /// Implementation for `Apply` method of gRPC control API.
