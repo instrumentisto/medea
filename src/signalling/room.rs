@@ -716,7 +716,7 @@ impl Handler<SerializeProto> for Room {
     fn handle(
         &mut self,
         msg: SerializeProto,
-        ctx: &mut Self::Context,
+        _: &mut Self::Context,
     ) -> Self::Result {
         let mut serialized = HashMap::new();
         for uri in msg.uris {
@@ -746,62 +746,6 @@ impl Handler<SerializeProto> for Room {
         }
 
         Ok(serialized)
-    }
-}
-
-/// Serialize this [`Room`] to protobuf object.
-#[allow(clippy::module_name_repetitions)]
-#[derive(Message)]
-#[rtype(result = "Result<ElementProto, RoomError>")]
-pub struct SerializeProtobufRoom;
-
-impl Handler<SerializeProtobufRoom> for Room {
-    type Result = Result<ElementProto, RoomError>;
-
-    /// Serialize this [`Room`] to protobuf object.
-    fn handle(
-        &mut self,
-        _msg: SerializeProtobufRoom,
-        _ctx: &mut Self::Context,
-    ) -> Self::Result {
-        Ok(self.into())
-    }
-}
-
-/// Serialize [`Member`] from this [`Room`] to protobuf object.
-#[derive(Message)]
-#[rtype(result = "Result<ElementProto, RoomError>")]
-pub struct SerializeProtobufMember(pub MemberId);
-
-impl Handler<SerializeProtobufMember> for Room {
-    type Result = Result<ElementProto, RoomError>;
-
-    /// Serialize [`Member`] to protobuf object.
-    fn handle(
-        &mut self,
-        msg: SerializeProtobufMember,
-        _ctx: &mut Self::Context,
-    ) -> Self::Result {
-        self.serialize_member_to_protobuf(&msg.0)
-    }
-}
-
-/// Serialize endpoint from this [`Room`] to protobuf object.
-#[derive(Message)]
-#[rtype(result = "Result<ElementProto, RoomError>")]
-pub struct SerializeProtobufEndpoint(pub MemberId, pub String);
-
-impl Handler<SerializeProtobufEndpoint> for Room {
-    type Result = Result<ElementProto, RoomError>;
-
-    /// Serialize [`WebRtcPlayEndpoint`] or [`WebRtcPublishEndpoint`] to
-    /// protobuf object.
-    fn handle(
-        &mut self,
-        msg: SerializeProtobufEndpoint,
-        _ctx: &mut Self::Context,
-    ) -> Self::Result {
-        self.serialize_endpoint_to_proto(&msg.0, msg.1)
     }
 }
 

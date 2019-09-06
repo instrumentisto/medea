@@ -7,7 +7,6 @@ use std::{collections::HashMap, convert::TryFrom, sync::Arc};
 
 use actix::{
     Actor, Addr, Arbiter, Context, Handler, MailboxError, ResponseFuture,
-    WrapFuture as _,
 };
 use failure::Fail;
 use futures::future::{Either, Future};
@@ -33,15 +32,14 @@ use crate::{
             Endpoint, MemberSpec, RoomSpec, TryFromElementError,
             TryFromProtobufError,
         },
-        error_codes::{ErrorCode, ErrorResponse},
+        error_codes::ErrorResponse,
     },
     log::prelude::*,
     signalling::{
         room::RoomError,
         room_service::{
             CreateEndpointInRoom, CreateMemberInRoom, DeleteElements,
-            GetEndpoint, GetMember, GetRoom, RoomService, RoomServiceError,
-            StartRoom,
+            RoomService, RoomServiceError, StartRoom,
         },
     },
     AppContext,
@@ -50,7 +48,7 @@ use crate::{
 use crate::{
     api::control::{MemberId, RoomId},
     shutdown::ShutdownGracefully,
-    signalling::room_service::{Get, NotValidated},
+    signalling::room_service::Get,
 };
 
 #[derive(Debug, Fail)]
@@ -289,9 +287,9 @@ impl ControlApi for ControlApiService {
     /// Implementation for `Create` method of gRPC control API.
     fn create(
         &mut self,
-        ctx: RpcContext,
-        req: CreateRequest,
-        sink: UnarySink<CreateResponse>,
+        _ctx: RpcContext,
+        _req: CreateRequest,
+        _sink: UnarySink<CreateResponse>,
     ) {
         //        let local_uri = parse_local_uri!(req.get_id(), ctx, sink,
         // Response);
@@ -464,7 +462,7 @@ impl ControlApi for ControlApiService {
                                                    // response
                     })
                 }
-                _ => unimplemented!()
+                _ => unimplemented!(),
             }
         }));
     }

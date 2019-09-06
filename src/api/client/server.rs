@@ -2,7 +2,7 @@
 
 use std::io;
 
-use actix::{Actor, Addr, Handler, ResponseFuture, WrapFuture as _};
+use actix::{Actor, Addr, Handler, ResponseFuture};
 use actix_web::{
     dev::Server as ActixServer,
     middleware,

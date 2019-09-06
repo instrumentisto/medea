@@ -8,7 +8,6 @@ use std::{
 use actix::{
     prelude::{Actor, Context},
     Addr, AsyncContext, Handler, Message, Recipient, ResponseFuture, System,
-    WrapFuture as _,
 };
 use failure::Fail;
 use futures::{future, stream::iter_ok, Future, Stream};

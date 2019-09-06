@@ -2,7 +2,7 @@
 
 use actix::{
     fut::wrap_future, Actor, ActorFuture, Addr, Context, Handler, MailboxError,
-    Message, ResponseFuture, WrapFuture as _,
+    Message, WrapFuture as _,
 };
 use failure::Fail;
 use futures::future::{self, Either, Future};
@@ -12,9 +12,7 @@ use crate::{
     api::control::{
         endpoints::Endpoint as EndpointSpec,
         load_static_specs_from_dir,
-        local_uri::{
-            IsEndpointId, IsMemberId, IsRoomId, LocalUri, LocalUriType,
-        },
+        local_uri::{IsRoomId, LocalUri, LocalUriType},
         MemberId, MemberSpec, RoomId, RoomSpec,
     },
     log::prelude::*,
@@ -22,8 +20,7 @@ use crate::{
     signalling::{
         room::{
             Close, CreateEndpoint, CreateMember, Delete, RoomError,
-            SerializeProto, SerializeProtobufEndpoint, SerializeProtobufMember,
-            SerializeProtobufRoom,
+            SerializeProto,
         },
         room_repo::RoomRepository,
         Room,
@@ -298,9 +295,6 @@ impl Handler<DeleteElements<Valid>> for RoomService {
     }
 }
 
-/// Type alias for result of Get request.
-type GetResults = Vec<Result<(String, ElementProto), RoomError>>;
-
 #[derive(Message)]
 #[rtype(
     result = "Result<HashMap<LocalUriType, ElementProto>, RoomServiceError>"
@@ -347,137 +341,6 @@ impl Handler<Get> for RoomService {
                     all
                 }),
         ))
-    }
-}
-
-/// Signal for get serialized to protobuf object [`Room`].
-#[derive(Message)]
-#[rtype(result = "Result<GetResults, RoomServiceError>")]
-pub struct GetRoom(pub Vec<RoomId>);
-
-impl Handler<GetRoom> for RoomService {
-    type Result = ActFuture<GetResults, RoomServiceError>;
-
-    fn handle(
-        &mut self,
-        msg: GetRoom,
-        _ctx: &mut Self::Context,
-    ) -> Self::Result {
-        let mut futs = Vec::new();
-
-        for room_id in msg.0 {
-            if let Some(room) = self.room_repo.get(&room_id) {
-                futs.push(
-                    room.send(SerializeProtobufRoom)
-                        .map_err(RoomServiceError::from)
-                        .map(move |result| {
-                            result.map(|r| {
-                                let local_uri =
-                                    LocalUri::<IsRoomId>::new(room_id);
-                                (local_uri.to_string(), r)
-                            })
-                        }),
-                )
-            } else {
-                return Box::new(wrap_future(future::err(
-                    RoomServiceError::RoomNotFound(get_local_uri_to_room(
-                        room_id,
-                    )),
-                )));
-            }
-        }
-
-        Box::new(wrap_future(future::join_all(futs)))
-    }
-}
-
-/// Signal for get serialized to protobuf object [`Member`].
-#[derive(Message)]
-#[rtype(result = "Result<GetResults, RoomServiceError>")]
-pub struct GetMember(pub Vec<(RoomId, MemberId)>);
-
-impl Handler<GetMember> for RoomService {
-    type Result = ActFuture<GetResults, RoomServiceError>;
-
-    fn handle(
-        &mut self,
-        msg: GetMember,
-        _ctx: &mut Self::Context,
-    ) -> Self::Result {
-        let mut futs = Vec::new();
-
-        for (room_id, member_id) in msg.0 {
-            if let Some(room) = self.room_repo.get(&room_id) {
-                futs.push(
-                    room.send(SerializeProtobufMember(member_id.clone()))
-                        .map_err(RoomServiceError::from)
-                        .map(|result| {
-                            result.map(|r| {
-                                let local_uri = LocalUri::<IsMemberId>::new(
-                                    room_id, member_id,
-                                );
-
-                                (local_uri.to_string(), r)
-                            })
-                        }),
-                )
-            } else {
-                return Box::new(wrap_future(future::err(
-                    RoomServiceError::RoomNotFound(get_local_uri_to_room(
-                        room_id,
-                    )),
-                )));
-            }
-        }
-
-        Box::new(wrap_future(future::join_all(futs)))
-    }
-}
-
-/// Signal for get serialized to protobuf object `Endpoint`.
-#[derive(Message)]
-#[rtype(result = "Result<GetResults, RoomServiceError>")]
-pub struct GetEndpoint(pub Vec<(RoomId, MemberId, String)>);
-
-impl Handler<GetEndpoint> for RoomService {
-    type Result = ActFuture<GetResults, RoomServiceError>;
-
-    fn handle(
-        &mut self,
-        msg: GetEndpoint,
-        _ctx: &mut Self::Context,
-    ) -> Self::Result {
-        let mut futs = Vec::new();
-
-        for (room_id, member_id, endpoint_id) in msg.0 {
-            if let Some(room) = self.room_repo.get(&room_id) {
-                futs.push(
-                    room.send(SerializeProtobufEndpoint(
-                        member_id.clone(),
-                        endpoint_id.clone(),
-                    ))
-                    .map_err(RoomServiceError::from)
-                    .map(|result| {
-                        result.map(|r| {
-                            let local_uri = LocalUri::<IsEndpointId>::new(
-                                room_id,
-                                member_id,
-                                endpoint_id,
-                            );
-                            (local_uri.to_string(), r)
-                        })
-                    }),
-                );
-            } else {
-                return Box::new(wrap_future(future::err(
-                    RoomServiceError::RoomNotFound(get_local_uri_to_room(
-                        room_id,
-                    )),
-                )));
-            }
-        }
-
-        Box::new(wrap_future(future::join_all(futs)))
     }
 }
 
