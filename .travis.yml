@@ -14,8 +14,6 @@ stages:
     if: branch = master
   - name: test
     if: (branch = master AND type != pull_request) OR commit_message =~ /.*\[run ci\]/
-  - name: tests
-    if: (branch = master AND type != pull_request) OR commit_message =~ /.*\[run ci\]/
 
 jobs:
   allow_failures:
