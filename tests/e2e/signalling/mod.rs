@@ -19,7 +19,8 @@ use futures::{future::Future, sink::Sink, stream::SplitSink, Stream};
 use medea_client_api_proto::{Command, Event, IceCandidate};
 use serde_json::error::Error as SerdeError;
 
-pub type MessageHandler = Box<dyn FnMut(&Event, &mut Context<TestMember>, Vec<&Event>)>;
+pub type MessageHandler =
+    Box<dyn FnMut(&Event, &mut Context<TestMember>, Vec<&Event>)>;
 
 /// Medea client for testing purposes.
 pub struct TestMember {
