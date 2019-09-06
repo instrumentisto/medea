@@ -275,11 +275,6 @@ impl Room {
             .into());
         }
 
-        if candidate.candidate.is_empty() {
-            warn!("Receive last IceCandidate from peer: {}", from_peer_id);
-            return Ok(Box::new(wrap_future(future::ok(()))));
-        }
-
         let to_member_id = to_peer.member_id();
         let event = Event::IceCandidateDiscovered {
             peer_id: to_peer_id,
@@ -397,7 +392,16 @@ impl Handler<CommandMessage> for Room {
                 sdp_answer,
             } => self.handle_make_sdp_answer(peer_id, sdp_answer),
             Command::SetIceCandidate { peer_id, candidate } => {
-                self.handle_set_ice_candidate(peer_id, candidate)
+                // TODO: add e2e test
+                if candidate.candidate.is_empty() {
+                    warn!("Empty candidate from Peer: {}, ignoring", peer_id);
+                    let fut: Box<
+                        dyn ActorFuture<Actor = _, Item = _, Error = _>,
+                    > = Box::new(actix::fut::ok(()));
+                    Ok(fut)
+                } else {
+                    self.handle_set_ice_candidate(peer_id, candidate)
+                }
             }
         };
 

@@ -241,7 +241,7 @@ impl PeerConnection {
     /// Updates underlying [`RTCPeerConnection`][1] remote SDP from offer.
     ///
     /// [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
-    pub fn set_remote_offer(
+    fn set_remote_offer(
         &self,
         offer: String,
     ) -> impl Future<Item = (), Error = WasmErr> {
@@ -251,7 +251,7 @@ impl PeerConnection {
     /// Updates underlying [`RTCPeerConnection`][1] remote SDP.
     ///
     /// [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
-    pub fn set_remote_description(
+    fn set_remote_description(
         &self,
         desc: SdpType,
     ) -> impl Future<Item = (), Error = WasmErr> {
