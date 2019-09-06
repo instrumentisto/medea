@@ -227,6 +227,17 @@ pub enum ErrorCode {
     /// Code: __1302__.
     #[display(fmt = "Room already exists.")]
     RoomAlreadyExists = 1302,
+
+    ///////////////////////////////////////////
+    // Internal server errors (1400 - 1499) //
+    /////////////////////////////////////////
+    // TODO: Maybe print errors to log for this kind of errors??
+    /// [`LocalUriType`] with some [`RoomId`] provided
+    /// to [`Room`] with not this [`Room`]'s [`RoomId`].
+    #[display(
+        fmt = "Local URI provided to 'Room' which have different RoomId."
+    )]
+    UriProvidedToWrongRoom = 1400,
 }
 
 impl From<ParticipantServiceErr> for ErrorResponse {
@@ -286,6 +297,9 @@ impl From<RoomError> for ErrorResponse {
             RoomError::MemberError(e) => e.into(),
             RoomError::MembersLoadError(e) => e.into(),
             RoomError::ParticipantServiceErr(e) => e.into(),
+            RoomError::WrongRoomId(uri, _) => {
+                Self::new(ErrorCode::UriProvidedToWrongRoom, &uri)
+            }
             _ => Self::unknown(&err),
         }
     }

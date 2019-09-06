@@ -79,6 +79,11 @@ pub enum RoomError {
     ParticipantServiceErr(ParticipantServiceErr),
     #[fail(display = "Client error:{}", _0)]
     ClientError(String),
+    #[fail(
+        display = "Given LocalUri [uri = {}] to wrong room [id = {}]",
+        _0, _1
+    )]
+    WrongRoomId(LocalUriType, RoomId),
 }
 
 impl From<PeerError> for RoomError {
@@ -706,9 +711,7 @@ impl Into<ElementProto> for &mut Room {
 
 #[derive(Message)]
 #[rtype(result = "Result<HashMap<LocalUriType, ElementProto>, RoomError>")]
-pub struct SerializeProto {
-    pub uris: Vec<LocalUriType>,
-}
+pub struct SerializeProto(pub Vec<LocalUriType>);
 
 impl Handler<SerializeProto> for Room {
     type Result = Result<HashMap<LocalUriType, ElementProto>, RoomError>;
@@ -719,14 +722,17 @@ impl Handler<SerializeProto> for Room {
         _: &mut Self::Context,
     ) -> Self::Result {
         let mut serialized = HashMap::new();
-        for uri in msg.uris {
+        for uri in msg.0 {
             match &uri {
                 LocalUriType::Room(room_uri) => {
                     if room_uri.room_id() == &self.id {
                         let current_room: ElementProto = self.into();
                         serialized.insert(uri, current_room);
                     } else {
-                        // TODO (evdokimovs): return err
+                        return Err(RoomError::WrongRoomId(
+                            uri,
+                            self.id.clone(),
+                        ));
                     }
                 }
                 LocalUriType::Member(member_uri) => {

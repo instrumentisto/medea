@@ -349,7 +349,7 @@ impl Handler<Get> for RoomService {
         let mut futs = Vec::new();
         for (room_id, elements) in rooms_elements {
             if let Some(room) = self.room_repo.get(&room_id) {
-                futs.push(room.send(SerializeProto { uris: elements }));
+                futs.push(room.send(SerializeProto(elements)));
             } else {
                 return Box::new(actix::fut::err(
                     RoomServiceError::RoomNotFound(get_local_uri_to_room(
@@ -391,7 +391,7 @@ impl Handler<CreateMemberInRoom> for RoomService {
     fn handle(
         &mut self,
         msg: CreateMemberInRoom,
-        _ctx: &mut Self::Context,
+        _: &mut Self::Context,
     ) -> Self::Result {
         let fut = if let Some(room) = self.room_repo.get(&msg.room_id) {
             Either::A(
