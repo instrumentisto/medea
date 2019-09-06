@@ -35,15 +35,15 @@ pub enum LocalUriParseError {
 }
 
 /// State of [`LocalUri`] which points to `Room`.
-#[derive(Debug, PartialEq, Hash, Eq)]
+#[derive(Debug, PartialEq, Hash, Eq, Clone)]
 pub struct IsRoomId(RoomId);
 
 /// State of [`LocalUri`] which points to `Member`.
-#[derive(Debug, PartialEq, Hash, Eq)]
+#[derive(Debug, PartialEq, Hash, Eq, Clone)]
 pub struct IsMemberId(LocalUri<IsRoomId>, MemberId);
 
 /// State of [`LocalUri`] which points to `Endpoint`.
-#[derive(Debug, PartialEq, Hash, Eq)]
+#[derive(Debug, PartialEq, Hash, Eq, Clone)]
 pub struct IsEndpointId(LocalUri<IsMemberId>, String);
 
 #[allow(clippy::doc_markdown)]
@@ -89,7 +89,7 @@ pub struct IsEndpointId(LocalUri<IsMemberId>, String);
 ///
 /// This is necessary so that it is not possible to get the address in the
 /// wrong state ("local://room_id//endpoint_id" for example).
-#[derive(Debug, PartialEq, Hash, Eq)]
+#[derive(Debug, PartialEq, Hash, Eq, Clone)]
 pub struct LocalUri<T> {
     state: T,
 }
@@ -294,7 +294,7 @@ impl fmt::Display for LocalUri<IsEndpointId> {
 
 /// Enum for store all kinds of [`LocalUri`]s.
 #[allow(clippy::module_name_repetitions)]
-#[derive(Debug, Hash, PartialEq, Eq)]
+#[derive(Debug, Hash, PartialEq, Eq, Clone)]
 pub enum LocalUriType {
     Room(LocalUri<IsRoomId>),
     Member(LocalUri<IsMemberId>),

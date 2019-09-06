@@ -134,8 +134,8 @@ fn delete_member(client: &ControlApiClient) {
 fn get_room(client: &ControlApiClient) {
     let mut get_room_request = IdRequest::new();
     let mut room = RepeatedField::new();
-    //    room.push("local://grpc-test".to_string());
-    room.push("local://video-call-1/responder".to_string());
+    room.push("local://grpc-test".to_string());
+    //    room.push("local://video-call-1/responder".to_string());
     //    room.push("local://grpc-test/publisher/publish".to_string());
     // room.push("local://pub-pub-video-call".to_string());
     get_room_request.set_id(room);

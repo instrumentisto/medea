@@ -291,85 +291,7 @@ impl ControlApi for ControlApiService {
         _req: CreateRequest,
         _sink: UnarySink<CreateResponse>,
     ) {
-        //        let local_uri = parse_local_uri!(req.get_id(), ctx, sink,
-        // Response);
-        //
-        //        match local_uri {
-        //            LocalUriType::Room(local_uri) => {
-        //                if req.has_room() {
-        //                    ctx.spawn(self.create_room(&req, local_uri).then(
-        //                        move |r| {
-        //                            sink.success(get_response_for_create(r))
-        //                                .map_err(|_| ())
-        //                        },
-        //                    ));
-        //                } else {
-        //                    send_error_response!(
-        //                        ctx,
-        //                        sink,
-        //                        ErrorResponse::new(
-        //
-        // ErrorCode::ElementIdForRoomButElementIsNot,
-        // &req.get_id(),                        ),
-        //                        Response
-        //                    );
-        //                }
-        //            }
-        //            LocalUriType::Member(local_uri) => {
-        //                if req.has_member() {
-        //                    ctx.spawn(self.create_member(&req,
-        // local_uri).then(                        move |r| {
-        //
-        // sink.success(get_response_for_create(r)).map_err(
-        // |e| {                                    warn!(
-        //                                        "Error while sending Create
-        // response \                                         by gRPC.
-        // {:?}",                                        e
-        //                                    )
-        //                                },
-        //                            )
-        //                        },
-        //                    ));
-        //                } else {
-        //                    send_error_response!(
-        //                        ctx,
-        //                        sink,
-        //                        ErrorResponse::new(
-        //
-        // ErrorCode::ElementIdForMemberButElementIsNot,
-        // &req.get_id(),                        ),
-        //                        Response
-        //                    );
-        //                }
-        //            }
-        //            LocalUriType::Endpoint(local_uri) => {
-        //                if req.has_webrtc_pub() || req.has_webrtc_play() {
-        //                    ctx.spawn(self.create_endpoint(&req,
-        // local_uri).then(                        move |r| {
-        //
-        // sink.success(get_response_for_create(r)).map_err(
-        // |e| {                                    warn!(
-        //                                        "Error while sending Create
-        // response \                                         by gRPC.
-        // {:?}",                                        e
-        //                                    )
-        //                                },
-        //                            )
-        //                        },
-        //                    ));
-        //                } else {
-        //                    send_error_response!(
-        //                        ctx,
-        //                        sink,
-        //                        ErrorResponse::new(
-        //
-        // ErrorCode::ElementIdForEndpointButElementIsNot,
-        // &req.get_id(),                        ),
-        //                        Response
-        //                    );
-        //                }
-        //            }
-        //        }
+        unimplemented!()
     }
 
     /// Implementation for `Apply` method of gRPC control API.
@@ -433,7 +355,6 @@ impl ControlApi for ControlApiService {
         ));
     }
 
-    /// TODO: just send Vec<LocalUri>, see fn delete()
     /// Implementation for `Get` method of gRPC control API.
     fn get(
         &mut self,
@@ -446,23 +367,36 @@ impl ControlApi for ControlApiService {
             let local_uri = parse_local_uri!(id, ctx, sink, GetResponse);
             uris.push(local_uri);
         }
-        ctx.spawn(self.room_service.send(Get(uris)).then(|result| {
-            match result {
-                Ok(resp) => {
+        ctx.spawn(self.room_service.send(Get(uris)).then(|mailbox_result| {
+            let err = |e| {
+                warn!(
+                    "Error while sending response on Get request by gRPC. {:?}",
+                    e
+                );
+            };
+            match mailbox_result {
+                Ok(room_service_result) => match room_service_result {
+                    Ok(elements) => {
+                        let mut response = GetResponse::new();
+                        let resp = response.set_elements(
+                            elements
+                                .into_iter()
+                                .map(|(id, value)| (id.to_string(), value))
+                                .collect(),
+                        );
+                        sink.success(response).map_err(err)
+                    }
+                    Err(e) => {
+                        let mut response = GetResponse::new();
+                        response.set_error(ErrorResponse::from(e).into());
+                        sink.success(response).map_err(err)
+                    }
+                },
+                Err(e) => {
                     let mut response = GetResponse::new();
-                    let resp = response.set_elements(
-                        resp.unwrap()
-                            .into_iter()
-                            .map(|(id, value)| (id.to_string(), value))
-                            .collect(),
-                    );
-                    // TODO (evdokimovs): remove this unwrap.
-                    sink.success(response).map_err(|e| {
-                        error!("Error while get.") // TODO (evdokimovs): better
-                                                   // response
-                    })
+                    response.set_error(ErrorResponse::unknown(&e).into());
+                    sink.success(response).map_err(err)
                 }
-                _ => unimplemented!(),
             }
         }));
     }

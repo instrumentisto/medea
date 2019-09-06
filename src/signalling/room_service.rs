@@ -314,31 +314,43 @@ impl Handler<Get> for RoomService {
                     .or_insert_with(|| Vec::new())
                     .push(uri);
             } else {
-                // TODO: error here
+                if let LocalUriType::Room(room_uri) = uri {
+                    return Box::new(actix::fut::err(
+                        RoomServiceError::RoomNotFound(room_uri),
+                    ));
+                } else {
+                    return Box::new(actix::fut::err(
+                        RoomServiceError::Unknown,
+                    ));
+                }
             }
         }
 
         let mut futs = Vec::new();
         for (room_id, elements) in rooms_elements {
             if let Some(room) = self.room_repo.get(&room_id) {
-                // TODO (evdokimovs): error handling
                 futs.push(room.send(SerializeProto { uris: elements }));
             } else {
-                unimplemented!()
-                // TODO (evdokimovs): error
+                return Box::new(actix::fut::err(
+                    RoomServiceError::RoomNotFound(get_local_uri_to_room(
+                        room_id,
+                    )),
+                ));
             }
         }
 
         Box::new(wrap_future(
             futures::future::join_all(futs)
                 .map_err(|e| RoomServiceError::from(e))
-                .map(|results| {
+                .and_then(|results| {
                     let mut all = HashMap::new();
                     for result in results {
-                        let result = result.unwrap();
-                        all.extend(result)
+                        match result {
+                            Ok(res) => all.extend(res),
+                            Err(e) => return Err(RoomServiceError::from(e)),
+                        }
                     }
-                    all
+                    Ok(all)
                 }),
         ))
     }
