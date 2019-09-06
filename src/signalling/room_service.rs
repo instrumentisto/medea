@@ -1,8 +1,8 @@
 //! Service which control [`Room`].
 
 use actix::{
-    fut::wrap_future, Actor, ActorFuture, Addr, Context, Handler, MailboxError,
-    Message, WrapFuture as _,
+    fut::wrap_future, Actor, ActorFuture, Addr, AsyncContext as _, Context,
+    Handler, MailboxError, Message, WrapFuture as _,
 };
 use failure::Fail;
 use futures::future::{self, Either, Future};
@@ -86,7 +86,10 @@ impl RoomService {
         }
     }
 
-    fn close_room(&self, id: RoomId) -> ActFuture<(), MailboxError> {
+    fn close_room(
+        &self,
+        id: RoomId,
+    ) -> Box<dyn Future<Item = (), Error = MailboxError>> {
         if let Some(room) = self.room_repo.get(&id) {
             shutdown::unsubscribe(
                 &self.graceful_shutdown,
@@ -94,12 +97,14 @@ impl RoomService {
                 shutdown::Priority(2),
             );
 
-            Box::new(room.send(Close).into_actor(self).map(move |_, act, _| {
+            let room_repo = self.room_repo.clone();
+
+            Box::new(room.send(Close).map(move |_| {
                 debug!("Room [id = {}] removed.", id);
-                act.room_repo.remove(&id);
+                room_repo.remove(&id);
             }))
         } else {
-            Box::new(actix::fut::ok(()))
+            Box::new(futures::future::ok(()))
         }
     }
 }
@@ -244,19 +249,17 @@ impl DeleteElements<NotValidated> {
 }
 
 impl Handler<DeleteElements<Valid>> for RoomService {
-    type Result = Result<(), RoomServiceError>;
+    type Result = ActFuture<(), RoomServiceError>;
 
     fn handle(
         &mut self,
         mut msg: DeleteElements<Valid>,
         ctx: &mut Context<RoomService>,
     ) -> Self::Result {
-        use actix::AsyncContext as _;
-        // TODO: handle room delete here, send batch to room, handle it
-        // atomically       just discard other messages if room delete
-        // present
         let mut deletes_from_room: Vec<LocalUriType> = Vec::new();
-        let is_room_message = msg
+        let room_messages_futs: Vec<
+            Box<dyn Future<Item = (), Error = MailboxError>>,
+        > = msg
             .uris
             .into_iter()
             .filter_map(|l| {
@@ -267,31 +270,48 @@ impl Handler<DeleteElements<Valid>> for RoomService {
                     None
                 }
             })
-            .map(|room_id| {
-                // TODO (evdokimovs): Error handling
-                ctx.spawn(
-                    self.close_room(room_id.take_room_id())
-                        .map_err(|_, _, _| ()),
-                );
-            })
-            .count()
-            > 0;
+            .map(|room_id| self.close_room(room_id.take_room_id()))
+            .collect();
 
-        if !is_room_message && !deletes_from_room.is_empty() {
+        if !room_messages_futs.is_empty() {
+            Box::new(wrap_future(
+                futures::future::join_all(room_messages_futs)
+                    .map(|_| ())
+                    .map_err(|e| RoomServiceError::from(e)),
+            ))
+        } else if !deletes_from_room.is_empty() {
             let room_id = deletes_from_room[0].room_id().clone();
-            // TODO (evdokimovs): print warns on URIs which not deleted.
+            let mut ignored_ids = Vec::new();
             let deletes_from_room: Vec<LocalUriType> = deletes_from_room
                 .into_iter()
-                .filter(|uri| uri.room_id() == &room_id)
+                .filter_map(|uri| {
+                    if uri.room_id() == &room_id {
+                        Some(uri)
+                    } else {
+                        ignored_ids.push(uri);
+                        None
+                    }
+                })
                 .collect();
-            // TODO (evdokimovs): handle None.
-            if let Some(room) = self.room_repo.get(&room_id) {
-                // TODO (evdokimovs): handle errors.
-                room.do_send(Delete(deletes_from_room));
+            if !ignored_ids.is_empty() {
+                warn!(
+                    "Some ids from Get request was ignored: {:?}",
+                    ignored_ids
+                );
             }
+            if let Some(room) = self.room_repo.get(&room_id) {
+                Box::new(wrap_future(
+                    room.send(Delete(deletes_from_room))
+                        .map_err(|e| RoomServiceError::from(e)),
+                ))
+            } else {
+                Box::new(actix::fut::err(RoomServiceError::RoomNotFound(
+                    get_local_uri_to_room(room_id),
+                )))
+            }
+        } else {
+            Box::new(actix::fut::ok(()))
         }
-
-        Ok(())
     }
 }
 
