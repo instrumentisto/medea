@@ -197,7 +197,7 @@ cargo:
 #	make cargo.fmt [check=(no|yes)]
 
 cargo.fmt:
-	cargo fmt --all $(if $(call eq,$(check),yes),-- --check,)
+	cargo +nightly fmt --all $(if $(call eq,$(check),yes),-- --check,)
 
 
 # Lint Rust sources with clippy.

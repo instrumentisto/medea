@@ -30,7 +30,7 @@ jobs:
 
     - name: rustfmt
       stage: check
-      rust: stable
+      rust: nightly
       cache: false
       before_script: rustup component add rustfmt
       script: make fmt check=yes
