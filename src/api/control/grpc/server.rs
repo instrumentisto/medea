@@ -375,12 +375,25 @@ impl ControlApi for ControlApiService {
     /// Implementation for `Apply` method of gRPC control API.
     fn apply(
         &mut self,
-        _ctx: RpcContext,
+        ctx: RpcContext,
         _req: ApplyRequest,
         sink: UnarySink<Response>,
     ) {
-        // TODO: poll UnarySinkResult's, log err if any
-        sink.fail(RpcStatus::new(RpcStatusCode::Unimplemented, None));
+        ctx.spawn(
+            sink.fail(RpcStatus::new(
+                RpcStatusCode::Unimplemented,
+                Some("Apply method currently is unimplemented.".to_string()),
+            ))
+            .map(|_| {
+                info!(
+                    "An unimplemented gRPC Control API method 'Apply' was \
+                     called."
+                );
+            })
+            .map_err(|e| {
+                warn!("Unimplemented method Apply error: {:?}", e);
+            }),
+        );
     }
 
     /// Implementation for `Delete` method of gRPC control API.

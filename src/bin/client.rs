@@ -5,8 +5,9 @@ use std::{collections::HashMap, sync::Arc};
 use grpcio::{ChannelBuilder, EnvBuilder};
 use medea_grpc_proto::{
     control::{
-        CreateRequest, IdRequest, Member, Member_Element, Room, Room_Element,
-        WebRtcPlayEndpoint, WebRtcPublishEndpoint, WebRtcPublishEndpoint_P2P,
+        ApplyRequest, CreateRequest, IdRequest, Member, Member_Element, Room,
+        Room_Element, WebRtcPlayEndpoint, WebRtcPublishEndpoint,
+        WebRtcPublishEndpoint_P2P,
     },
     control_grpc::ControlApiClient,
 };
@@ -17,6 +18,8 @@ fn main() {
     let ch = ChannelBuilder::new(env).connect("localhost:50051");
     let client = ControlApiClient::new(ch);
 
+    unimplemented_apply(&client);
+    return;
     create_room(&client);
     delete_room(&client);
     delete_endpoint(&client);
@@ -24,6 +27,12 @@ fn main() {
     create_member(&client);
     create_endpoint(&client);
     get_room(&client);
+}
+
+fn unimplemented_apply(client: &ControlApiClient) {
+    let mut req = ApplyRequest::new();
+    let reply = client.apply(&req).expect("Apply error");
+    println!("{:?}", reply);
 }
 
 fn create_room(client: &ControlApiClient) {
