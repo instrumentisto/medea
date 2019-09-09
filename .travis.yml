@@ -60,10 +60,12 @@ jobs:
 
     - name: unit medea-macro
       stage: test
+      cache: false
       rust: stable
       script: make test.unit crate=medea-macro
 
     - name: unit medea-client-api-proto
+      cache: false
       stage: test
       rust: stable
       script: make test.unit crate=medea-client-api-proto
@@ -94,7 +96,7 @@ jobs:
       cache: false
       before_script:
         - export MEDEA_CRATE_NAME=$(echo $TRAVIS_TAG \
-                        | sed -E "s/^(medea[a-z-]*)-[0-9]+\.[0-9]+\.[0-9]+/\1/")
+          | sed -E "s/^(medea[a-z-]*)-[0-9]+\.[0-9]+\.[0-9]+/\1/")
       script:
         - echo "Releasing $MEDEA_CRATE_NAME to crates.io..."
       deploy:
@@ -110,7 +112,7 @@ jobs:
       cache: false
       before_script:
         - export MEDEA_CRATE_NAME=$(echo $TRAVIS_TAG \
-                        | sed -E "s/^(medea[a-z-]*)-[0-9]+\.[0-9]+\.[0-9]+/\1/")
+          | sed -E "s/^(medea[a-z-]*)-[0-9]+\.[0-9]+\.[0-9]+/\1/")
       script:
         - echo "Releasing $MEDEA_CRATE_NAME to NPM..."
       before_deploy:
@@ -129,7 +131,7 @@ jobs:
       cache: false
       before_script:
         - export MEDEA_CRATE_NAME=$(echo $TRAVIS_TAG \
-                        | sed -E "s/^(medea[a-z-]*)-[0-9]+\.[0-9]+\.[0-9]+/\1/")
+          | sed -E "s/^(medea[a-z-]*)-[0-9]+\.[0-9]+\.[0-9]+/\1/")
       script:
         - echo "Releasing $MEDEA_CRATE_NAME to GitHub..."
       deploy:
