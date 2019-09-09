@@ -5,10 +5,21 @@ install:
   - rustc -vV
   - cargo -vV
 
+stages:
+  - name: check
+    if: (branch = master AND type != pull_request) OR commit_message =~ /.*\[run ci\]/
+  - name: build
+    if: (branch = master AND type != pull_request) OR commit_message =~ /.*\[run ci\]/
+  - name: build_beta
+    if: branch = master
+  - name: test_toolchain
+    if: (branch = master AND type != pull_request) OR commit_message =~ /.*\[run ci\]/
+  - name: test
+    if: (branch = master AND type != pull_request) OR commit_message =~ /.*\[run ci\]/
+
 jobs:
   allow_failures:
     - rust: nightly
-      stage: build
 
   include:
     - name: Clippy
@@ -39,12 +50,12 @@ jobs:
       script: cargo build --bin medea
 
     - name: medea (beta)
-      stage: build
+      stage: build_beta
       rust: beta
       script: cargo build --bin medea
 
     - name: medea (nightly)
-      stage: build
+      stage: build_beta
       rust: nightly
       script: cargo build --bin medea
 
@@ -116,16 +127,6 @@ jobs:
         name: $TRAVIS_TAG
         on:
           tags: true
-
-stages:
-  - name: check
-    if: (branch = master AND type != pull_request) OR commit_message =~ /.*\[run ci\]/
-  - name: build
-    if: (branch = master AND type != pull_request) OR commit_message =~ /.*\[run ci\]/
-  - name: test_toolchain
-    if: (branch = master AND type != pull_request) OR commit_message =~ /.*\[run ci\]/
-  - name: test
-    if: (branch = master AND type != pull_request) OR commit_message =~ /.*\[run ci\]/
 
 notifications:
   email:

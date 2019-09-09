@@ -278,28 +278,32 @@ impl PeerConnection {
             });
 
         // update receivers
-        self.0.media_connections.update_tracks(recv).unwrap();
+        if let Err(err) = self.0.media_connections.update_tracks(recv) {
+            return future::Either::A(future::err(err));
+        }
 
         let inner: Rc<InnerPeerConnection> = Rc::clone(&self.0);
-        self.0
-            .peer
-            .set_remote_description(SdpType::Offer(offer))
-            .and_then(move |_| {
-                inner
-                    .media_connections
-                    .update_tracks(send)
-                    .map(|req| (req, inner))
-            })
-            .and_then(move |(request, inner)| match request {
-                None => future::Either::A(future::ok::<_, WasmErr>(())),
-                Some(request) => future::Either::B(
-                    inner.media_manager.get_stream(request).and_then(
-                        move |s| {
-                            inner.media_connections.insert_local_stream(&s)
-                        },
+        future::Either::B(
+            self.0
+                .peer
+                .set_remote_description(SdpType::Offer(offer))
+                .and_then(move |_| {
+                    inner
+                        .media_connections
+                        .update_tracks(send)
+                        .map(|req| (req, inner))
+                })
+                .and_then(move |(request, inner)| match request {
+                    None => future::Either::A(future::ok::<_, WasmErr>(())),
+                    Some(request) => future::Either::B(
+                        inner.media_manager.get_stream(request).and_then(
+                            move |s| {
+                                inner.media_connections.insert_local_stream(&s)
+                            },
+                        ),
                     ),
-                ),
-            })
+                }),
+        )
     }
 
     /// Adds remote peers [ICE Candidate][1] to this peer.
