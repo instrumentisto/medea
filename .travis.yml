@@ -73,7 +73,7 @@ jobs:
       rust: stable
       script: make test.unit crate=medea
 
-    - name: unit medea-macro
+    - name: unit medea-jason
       stage: test
       # run on stable when -Z install-upgrade is out
       # tracking: rust-lang/cargo#6797
@@ -86,7 +86,7 @@ jobs:
       before_script:
         - cargo +nightly install wasm-bindgen-cli -Z install-upgrade
         - rustup target add wasm32-unknown-unknown
-      script: make test.unit crate=medea-macro
+      script: make test.unit crate=medea-jason
 
     - name: crates.io
       stage: release
