@@ -1,4 +1,4 @@
-//! Implementation of [Control API].
+//! Implementation and definitions of [Control API] specs.
 //!
 //! [Control API]: http://tiny.cc/380uaz
 
@@ -9,8 +9,14 @@ pub mod member;
 pub mod pipeline;
 pub mod room;
 
-use std::{convert::TryFrom as _, fs::File, io::Read as _, path::Path};
+use std::{
+    convert::TryFrom as _,
+    fs::{File, ReadDir},
+    io::Read as _,
+    path::Path,
+};
 
+use derive_more::{Display, From};
 use failure::{Error, Fail};
 use serde::Deserialize;
 
@@ -62,6 +68,9 @@ impl From<SrcParseError> for TryFromProtobufError {
     }
 }
 
+/// Root elements of [Control API] spec.
+///
+/// [Control API]: http://tiny.cc/380uaz
 #[derive(Clone, Deserialize, Debug)]
 #[serde(tag = "kind")]
 pub enum RootElement {
@@ -89,27 +98,44 @@ pub enum TryFromElementError {
     NotMember,
 }
 
+#[derive(From, Debug, Fail, Display)]
+pub enum LoadStaticControlSpecsError {
+    #[display(fmt = "Directory with specs not found.")]
+    SpecDirNotFound,
+    #[display(fmt = "I/O error while reading specs. {:?}", _0)]
+    IoError(std::io::Error),
+    #[display(
+        fmt = "Try from element error while loading static specs. {:?}",
+        _0
+    )]
+    TryFromElementError(TryFromElementError),
+    #[display(fmt = "Error while deserialization static spec. {:?}", _0)]
+    YamlDeserializationError(serde_yaml::Error),
+}
+
 /// Load [`RoomSpec`] from file with YAML format.
-pub fn load_from_yaml_file<P: AsRef<Path>>(path: P) -> Result<RoomSpec, Error> {
+pub fn load_from_yaml_file<P: AsRef<Path>>(
+    path: P,
+) -> Result<RoomSpec, LoadStaticControlSpecsError> {
     let mut file = File::open(path)?;
     let mut buf = String::new();
     file.read_to_string(&mut buf)?;
     let parsed: RootElement = serde_yaml::from_str(&buf)?;
     let room = RoomSpec::try_from(&parsed)?;
-
     Ok(room)
 }
 
 /// Load all [`RoomSpec`] from YAML files from provided path.
 pub fn load_static_specs_from_dir<P: AsRef<Path>>(
     path: P,
-) -> Result<Vec<RoomSpec>, Error> {
+) -> Result<Vec<RoomSpec>, LoadStaticControlSpecsError> {
     let mut specs = Vec::new();
-    for entry in std::fs::read_dir(path)? {
+    for entry in std::fs::read_dir(path)
+        .map_err(|_| LoadStaticControlSpecsError::SpecDirNotFound)?
+    {
         let entry = entry?;
         let spec = load_from_yaml_file(entry.path())?;
         specs.push(spec)
     }
-
     Ok(specs)
 }

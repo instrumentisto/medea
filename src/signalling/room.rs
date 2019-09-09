@@ -9,9 +9,9 @@ use actix::{
     fut::wrap_future, Actor, ActorFuture, AsyncContext, Context, Handler,
     Message, ResponseActFuture, WrapFuture as _,
 };
+use derive_more::Display;
 use failure::Fail;
 use futures::future;
-
 use medea_client_api_proto::{Command, Event, IceCandidate, PeerId, TrackId};
 use medea_grpc_proto::control::{Element as ElementProto, Room as RoomProto};
 
@@ -51,35 +51,36 @@ pub type ActFuture<I, E> =
     Box<dyn ActorFuture<Actor = Room, Item = I, Error = E>>;
 
 #[allow(clippy::module_name_repetitions)]
-#[derive(Debug, Fail)]
+#[derive(Debug, Fail, Display)]
 pub enum RoomError {
-    #[fail(display = "Couldn't find Peer with [id = {}]", _0)]
+    #[display(fmt = "Couldn't find Peer with [id = {}]", _0)]
     PeerNotFound(PeerId),
-    #[fail(display = "{}", _0)]
+    #[display(fmt = "{}", _0)]
     MemberError(MemberError),
-    #[fail(display = "Member [id = {}] does not have Turn credentials", _0)]
+    #[display(fmt = "Member [id = {}] does not have Turn credentials", _0)]
     NoTurnCredentials(MemberId),
-    #[fail(display = "Couldn't find RpcConnection with Member [id = {}]", _0)]
+    #[display(fmt = "Couldn't find RpcConnection with Member [id = {}]", _0)]
     ConnectionNotExists(MemberId),
-    #[fail(display = "Unable to send event to Member [id = {}]", _0)]
+    #[display(fmt = "Unable to send event to Member [id = {}]", _0)]
     UnableToSendEvent(MemberId),
-    #[fail(display = "PeerError: {}", _0)]
+    #[display(fmt = "PeerError: {}", _0)]
     PeerError(PeerError),
-    #[fail(display = "{}", _0)]
+    #[display(fmt = "{}", _0)]
     MembersLoadError(MembersLoadError),
-    #[fail(display = "{}", _0)]
+    #[display(fmt = "{}", _0)]
     TryFromElementError(TryFromElementError),
-    #[fail(display = "Generic room error: {}", _0)]
+    #[display(fmt = "Generic room error: {}", _0)]
     BadRoomSpec(String),
-    #[fail(display = "Turn service error: {}", _0)]
+    #[display(fmt = "Turn service error: {}", _0)]
     TurnServiceError(String),
-    #[fail(display = "{}", _0)]
+    #[display(fmt = "{}", _0)]
     ParticipantServiceErr(ParticipantServiceErr),
-    #[fail(display = "Client error:{}", _0)]
+    #[display(fmt = "Client error:{}", _0)]
     ClientError(String),
-    #[fail(
-        display = "Given LocalUri [uri = {}] to wrong room [id = {}]",
-        _0, _1
+    #[display(
+        fmt = "Given LocalUri [uri = {}] to wrong room [id = {}]",
+        _0,
+        _1
     )]
     WrongRoomId(LocalUriType, RoomId),
 }
@@ -130,7 +131,8 @@ enum State {
 pub struct Room {
     id: RoomId,
 
-    /// [`RpcConnection`]s of [`Member`]s in this [`Room`].
+    /// [`Member`]s and associated [`RpcConnection`]s of this [`Room`], handles
+    /// [`RpcConnection`] authorization, establishment, message sending.
     ///
     /// [`RpcConnection`]: crate::api::client::rpc_connection::RpcConnection
     pub members: ParticipantService,
@@ -218,11 +220,13 @@ impl Room {
     fn send_peers_removed(
         &mut self,
         member_id: MemberId,
-        peers: Vec<PeerId>,
+        removed_peers_ids: Vec<PeerId>,
     ) -> ActFuture<(), RoomError> {
         Box::new(wrap_future(self.members.send_event_to_member(
             member_id,
-            Event::PeersRemoved { peer_ids: peers },
+            Event::PeersRemoved {
+                peer_ids: removed_peers_ids,
+            },
         )))
     }
 
@@ -416,7 +420,7 @@ impl Room {
         let mut created_peers: Vec<(PeerId, PeerId)> = Vec::new();
 
         // Create all connected publish endpoints.
-        for (_, publisher) in member.srcs() {
+        for publisher in member.srcs().values() {
             for receiver in publisher.sinks() {
                 let receiver_owner = receiver.owner();
 
@@ -433,7 +437,7 @@ impl Room {
         }
 
         // Create all connected play's receivers peers.
-        for (_, receiver) in member.sinks() {
+        for receiver in member.sinks().values() {
             let publisher = receiver.src();
 
             if receiver.peer_id().is_none()
@@ -499,10 +503,10 @@ impl Room {
             self.members
                 .drop_connections(ctx)
                 .into_actor(self)
-                .map(move |_, room: &mut Self, _| {
+                .map(|_, room: &mut Self, _| {
                     room.state = State::Stopped;
                 })
-                .map_err(move |_, room, _| {
+                .map_err(|_, room, _| {
                     error!("Error closing room {:?}", room.id);
                 }),
         )
@@ -791,7 +795,7 @@ impl Handler<RpcConnectionEstablished> for Room {
         msg: RpcConnectionEstablished,
         ctx: &mut Self::Context,
     ) -> Self::Result {
-        info!("RpcConnectionEstablished for member {}", &msg.member_id);
+        info!("RpcConnectionEstablished for member {}", msg.member_id);
 
         let fut = self
             .members

@@ -2,10 +2,9 @@
 
 use std::{convert::TryFrom, fmt};
 
+use derive_more::{Display, From};
 use failure::Fail;
-use macro_attr::*;
 use medea_grpc_proto::control::WebRtcPlayEndpoint as WebRtcPlayEndpointProto;
-use newtype_derive::{newtype_fmt, NewtypeDisplay, NewtypeFrom};
 use serde::{
     de::{self, Deserializer, Error, Visitor},
     Deserialize,
@@ -17,20 +16,9 @@ use crate::api::control::{
     MemberId, RoomId, TryFromProtobufError,
 };
 
-macro_attr! {
-    /// ID of [`WebRtcPlayEndpoint`].
-    #[derive(
-        Clone,
-        Debug,
-        Deserialize,
-        Eq,
-        Hash,
-        PartialEq,
-        NewtypeFrom!,
-        NewtypeDisplay!,
-    )]
-    pub struct WebRtcPlayId(pub String);
-}
+/// ID of [`WebRtcPlayEndpoint`].
+#[derive(Clone, Debug, Deserialize, Display, Eq, Hash, PartialEq, From)]
+pub struct WebRtcPlayId(pub String);
 
 /// Media element which is able to play media data for client via WebRTC.
 #[allow(clippy::module_name_repetitions)]

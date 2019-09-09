@@ -13,7 +13,7 @@ use crate::{
         endpoints::Endpoint as EndpointSpec,
         load_static_specs_from_dir,
         local_uri::{IsRoomId, LocalUri, LocalUriType},
-        MemberId, MemberSpec, RoomId, RoomSpec,
+        LoadStaticControlSpecsError, MemberId, MemberSpec, RoomId, RoomSpec,
     },
     log::prelude::*,
     shutdown::{self, GracefulShutdown},
@@ -44,7 +44,7 @@ pub enum RoomServiceError {
     #[fail(display = "{}", _0)]
     RoomError(RoomError),
     #[fail(display = "Failed to load static specs. {:?}", _0)]
-    FailedToLoadStaticSpecs(failure::Error),
+    FailedToLoadStaticSpecs(LoadStaticControlSpecsError),
     #[fail(display = "Empty URIs list.")]
     EmptyUrisList,
     #[fail(display = "Room not found for element [id = {}]", _0)]
@@ -62,6 +62,12 @@ pub enum RoomServiceError {
 impl From<RoomError> for RoomServiceError {
     fn from(err: RoomError) -> Self {
         RoomServiceError::RoomError(err)
+    }
+}
+
+impl From<LoadStaticControlSpecsError> for RoomServiceError {
+    fn from(err: LoadStaticControlSpecsError) -> Self {
+        Self::FailedToLoadStaticSpecs(err)
     }
 }
 
@@ -137,35 +143,27 @@ impl Handler<StartStaticRooms> for RoomService {
         _: StartStaticRooms,
         _: &mut Self::Context,
     ) -> Self::Result {
-        if let Some(static_specs_path) =
-            self.app.config.server.http.static_specs_path.clone()
-        {
-            let room_specs = match load_static_specs_from_dir(static_specs_path)
-            {
-                Ok(r) => r,
-                Err(e) => {
-                    return Err(RoomServiceError::FailedToLoadStaticSpecs(e))
-                }
-            };
+        let room_specs = load_static_specs_from_dir(
+            self.app.config.control.static_specs_dir.clone(),
+        )?;
 
-            for spec in room_specs {
-                if self.room_repo.is_contains_room_with_id(spec.id()) {
-                    return Err(RoomServiceError::RoomAlreadyExists(
-                        get_local_uri_to_room(spec.id),
-                    ));
-                }
-
-                let room_id = spec.id().clone();
-
-                let room = Room::new(&spec, self.app.clone())?.start();
-                shutdown::subscribe(
-                    &self.graceful_shutdown,
-                    room.clone().recipient(),
-                    shutdown::Priority(2),
-                );
-
-                self.room_repo.add(room_id, room);
+        for spec in room_specs {
+            if self.room_repo.is_contains_room_with_id(spec.id()) {
+                return Err(RoomServiceError::RoomAlreadyExists(
+                    get_local_uri_to_room(spec.id),
+                ));
             }
+
+            let room_id = spec.id().clone();
+
+            let room = Room::new(&spec, self.app.clone())?.start();
+            shutdown::subscribe(
+                &self.graceful_shutdown,
+                room.clone().recipient(),
+                shutdown::Priority(2),
+            );
+
+            self.room_repo.add(room_id, room);
         }
         Ok(())
     }

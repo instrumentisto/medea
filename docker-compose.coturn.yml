@@ -9,7 +9,7 @@ services:
       - --log-file=stdout
       #- --Verbose
     volumes:
-      - ./dev/coturn/turnserver.conf:/etc/coturn/turnserver.conf:ro
+      - ./_dev/coturn/turnserver.conf:/etc/coturn/turnserver.conf:ro
       - ./.cache/coturn/data:/var/lib/coturn
     network_mode: host
   coturn-db:
@@ -19,4 +19,4 @@ services:
     ports:
       - "6379:6379"    # coturn redis
     volumes:
-      - ./dev/coturn/redis.conf:/etc/redis.conf:ro
+      - ./_dev/coturn/redis.conf:/etc/redis.conf:ro

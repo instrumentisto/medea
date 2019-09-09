@@ -12,6 +12,7 @@ use std::{collections::HashMap, time::Instant};
 use actix::{
     fut::wrap_future, ActorFuture, AsyncContext, Context, SpawnHandle,
 };
+use derive_more::Display;
 use failure::Fail;
 use futures::{
     future::{self, join_all, Either},
@@ -51,20 +52,20 @@ use crate::{
     AppContext,
 };
 
-#[derive(Fail, Debug)]
+#[derive(Fail, Debug, Display)]
 #[allow(clippy::module_name_repetitions)]
 pub enum ParticipantServiceErr {
-    #[fail(display = "TurnService Error in ParticipantService: {}", _0)]
+    #[display(fmt = "TurnService Error in ParticipantService: {}", _0)]
     TurnServiceErr(TurnServiceErr),
-    #[fail(display = "Participant [id = {}] not found", _0)]
+    #[display(fmt = "Participant [id = {}] not found", _0)]
     ParticipantNotFound(LocalUri<IsMemberId>),
-    #[fail(display = "Endpoint [id = {}] not found.", _0)]
+    #[display(fmt = "Endpoint [id = {}] not found.", _0)]
     EndpointNotFound(LocalUri<IsEndpointId>),
-    #[fail(display = "{}", _0)]
+    #[display(fmt = "{}", _0)]
     MemberError(MemberError),
-    #[fail(display = "Participant [id = {}] already exists.", _0)]
+    #[display(fmt = "Participant [id = {}] already exists.", _0)]
     ParticipantAlreadyExists(LocalUri<IsMemberId>),
-    #[fail(display = "Endpoint [id = {}] already exists.", _0)]
+    #[display(fmt = "Endpoint [id = {}] already exists.", _0)]
     EndpointAlreadyExists(LocalUri<IsEndpointId>),
 }
 
@@ -159,10 +160,12 @@ impl ParticipantService {
         self.members.clone()
     }
 
-    /// Lookup [`Member`] by provided id and credentials. Returns
-    /// [`Err(AuthorizationError::MemberNotExists)`] if lookup by
-    /// [`MemberId`] failed. Returns
-    /// [`Err(AuthorizationError::InvalidCredentials)`] if [`Member`]
+    /// Lookup [`Member`] by provided [`MemberId`] and credentials.
+    ///
+    /// Returns [`Err(AuthorizationError::MemberNotExists)`] if lookup by
+    /// [`MemberId`] failed.
+    ///
+    /// Returns [`Err(AuthorizationError::InvalidCredentials)`] if [`Member`]
     /// was found, but incorrect credentials was provided.
     pub fn get_member_by_id_and_credentials(
         &self,
@@ -181,7 +184,7 @@ impl ParticipantService {
         }
     }
 
-    /// Checks if [`Member`] has **active** [`RpcConnection`].
+    /// Checks if [`Member`] has __active__ [`RpcConnection`].
     pub fn member_has_connection(&self, member_id: &MemberId) -> bool {
         self.connections.contains_key(member_id)
             && !self.drop_connection_tasks.contains_key(member_id)
@@ -211,7 +214,7 @@ impl ParticipantService {
         &mut self,
         ctx: &mut Context<Room>,
         member_id: MemberId,
-        con: Box<dyn RpcConnection>,
+        conn: Box<dyn RpcConnection>,
     ) -> ActFuture<Member, ParticipantServiceErr> {
         let member = match self.get_member_by_id(&member_id) {
             None => {
@@ -226,7 +229,7 @@ impl ParticipantService {
 
         // lookup previous member connection
         if let Some(mut connection) = self.connections.remove(&member_id) {
-            debug!("Closing old RpcConnection for participant {}", &member_id);
+            debug!("Closing old RpcConnection for member [id = {}]", member_id);
 
             // cancel RpcConnection close task, since connection is
             // reestablished
@@ -247,7 +250,7 @@ impl ParticipantService {
                 })
                 .and_then(
                     move |ice: IceUser, room: &mut Room, _| {
-                        room.members.insert_connection(member_id, con);
+                        room.members.insert_connection(member_id, conn);
                         member.replace_ice_user(ice);
 
                         wrap_future(future::ok(member))
@@ -298,7 +301,7 @@ impl ParticipantService {
                             info!(
                                 "Member {} connection lost at {:?}. Room will \
                                  be stopped.",
-                                &member_id, closed_at
+                                member_id, closed_at
                             );
                             ctx.notify(RpcConnectionClosed {
                                 member_id,
@@ -316,6 +319,7 @@ impl ParticipantService {
         &mut self,
         member_id: &MemberId,
     ) -> Box<dyn Future<Item = (), Error = TurnServiceErr>> {
+        // TODO: rewrite using `Option::flatten` when it will be in stable rust.
         match self.get_member_by_id(&member_id) {
             Some(member) => match member.take_ice_user() {
                 Some(ice_user) => self.app.turn_service.delete(vec![ice_user]),

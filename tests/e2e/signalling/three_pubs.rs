@@ -13,7 +13,6 @@ fn three_members_p2p_video_call() {
         // Note that events, peer_created_count, ice_candidates
         // is separated by members.
         // Every member will have different instance of this.
-        let mut events = Vec::new();
         let mut peer_created_count = 0;
         let mut ice_candidates = 0;
 
@@ -21,8 +20,9 @@ fn three_members_p2p_video_call() {
         let members_tested = Rc::new(Cell::new(0));
         let members_peers_removed = Rc::new(Cell::new(0));
 
-        let test_fn = move |event: &Event, ctx: &mut Context<TestMember>| {
-            events.push(event.clone());
+        let test_fn = move |event: &Event,
+                            ctx: &mut Context<TestMember>,
+                            events: Vec<&Event>| {
             match event {
                 Event::PeerCreated { ice_servers, .. } => {
                     assert_eq!(ice_servers.len(), 2);

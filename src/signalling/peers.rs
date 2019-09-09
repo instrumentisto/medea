@@ -6,9 +6,9 @@
 use std::{
     collections::{HashMap, HashSet},
     convert::{TryFrom, TryInto},
-    fmt,
 };
 
+use derive_more::Display;
 use medea_client_api_proto::{Incrementable, PeerId, TrackId};
 
 use crate::{
@@ -39,8 +39,8 @@ pub struct PeerRepository {
 }
 
 /// Simple ID counter.
-#[derive(Default, Debug)]
-pub struct Counter<T: Incrementable + Copy> {
+#[derive(Default, Debug, Clone, Copy, Display)]
+pub struct Counter<T> {
     count: T,
 }
 
@@ -48,15 +48,8 @@ impl<T: Incrementable + Copy> Counter<T> {
     /// Returns id and increase counter.
     pub fn next_id(&mut self) -> T {
         let id = self.count;
-        self.count = self.count.increment();
-
+        self.count = self.count.incr();
         id
-    }
-}
-
-impl<T: Incrementable + std::fmt::Display + Copy> fmt::Display for Counter<T> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.count)
     }
 }
 
@@ -85,25 +78,27 @@ impl PeerRepository {
         first_member: &Member,
         second_member: &Member,
     ) -> (Peer<New>, Peer<New>) {
+        let first_member_id = first_member.id();
+        let second_member_id = second_member.id();
+
         debug!(
             "Created peer between {} and {}.",
-            first_member.id(),
-            second_member.id()
+            first_member_id, second_member_id
         );
         let first_peer_id = self.peers_count.next_id();
         let second_peer_id = self.peers_count.next_id();
 
         let first_peer = Peer::new(
             first_peer_id,
-            first_member.id().clone(),
+            first_member_id.clone(),
             second_peer_id,
-            second_member.id().clone(),
+            second_member_id.clone(),
         );
         let second_peer = Peer::new(
             second_peer_id,
-            second_member.id().clone(),
+            second_member_id,
             first_peer_id,
-            first_member.id().clone(),
+            first_member_id,
         );
 
         (first_peer, second_peer)
@@ -117,9 +112,9 @@ impl PeerRepository {
     /// Lookup [`Peer`] of [`Member`] with ID `member_id` which
     /// connected with `partner_member_id`.
     ///
-    /// Return Some(peer_id, partner_peer_id) if that [`Peer`] found.
+    /// Return `Some(peer_id, partner_peer_id)` if that [`Peer`] found.
     ///
-    /// Return None if that [`Peer`] not found.
+    /// Return `None` if that [`Peer`] not found.
     pub fn get_peer_by_members_ids(
         &self,
         member_id: &MemberId,
@@ -158,13 +153,9 @@ impl PeerRepository {
         &'a self,
         member_id: &'a MemberId,
     ) -> impl Iterator<Item = &'a PeerStateMachine> {
-        self.peers.iter().filter_map(move |(_, peer)| {
-            if &peer.member_id() == member_id {
-                Some(peer)
-            } else {
-                None
-            }
-        })
+        self.peers
+            .values()
+            .filter(move |peer| &peer.member_id() == member_id)
     }
 
     /// Returns owned [`Peer`] by its ID.
@@ -215,7 +206,7 @@ impl PeerRepository {
     /// Remove all related to [`Member`] [`Peer`]s.
     /// Note that this function will also remove all partners [`Peer`]s.
     ///
-    /// Returns `HashMap` with all remove [`Peer`]s.
+    /// Returns `HashMap` with all removed [`Peer`]s.
     /// Key - [`Peer`]'s owner [`MemberId`],
     /// value - removed [`Peer`]'s [`PeerId`].
     pub fn remove_peers_related_to_member(
@@ -269,9 +260,9 @@ impl PeerRepository {
 }
 
 impl From<HashMap<PeerId, PeerStateMachine>> for PeerRepository {
-    fn from(map: HashMap<PeerId, PeerStateMachine>) -> Self {
+    fn from(peers: HashMap<PeerId, PeerStateMachine>) -> Self {
         Self {
-            peers: map,
+            peers,
             peers_count: Counter::default(),
             tracks_count: Counter::default(),
         }

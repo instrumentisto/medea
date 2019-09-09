@@ -21,8 +21,8 @@ All user visible changes to this project will be documented in this file. This p
         - `Get` method for `Room`, `Member`, `Endpoint`;
         - `Delete` method for `Room`, `Member`, `Endpoint.
 - Signalling:
-    - Dynamic `Peer`s creation when client connect ([#28]);
-    - Auto removing `Peer`s when `Member` disconnect ([#28]).
+    - Dynamic `Peer`s creation when client connects ([#28]);
+    - Auto-removing `Peer`s when `Member` disconnects ([#28]).
 - Testing:
     - E2E tests for signalling ([#28]).
 
@@ -48,6 +48,7 @@ All user visible changes to this project will be documented in this file. This p
     - Ability to parse from files and env vars ([#15](/../../pull/15)).
 - Logging:
     - Structured logging to STDOUT/STDERR ([#12](/../../pull/12)).
+
 
 
 

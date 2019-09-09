@@ -9,6 +9,7 @@ use actix::{
     prelude::{Actor, Context},
     Addr, AsyncContext, Handler, Message, Recipient, ResponseFuture, System,
 };
+use derive_more::Display;
 use failure::Fail;
 use futures::{future, stream::iter_ok, Future, Stream};
 use tokio::util::FutureExt as _;
@@ -194,8 +195,8 @@ impl Handler<Subscribe> for GracefulShutdown {
 }
 
 /// Error which indicates that process is shutting down at this moment.
-#[derive(Clone, Copy, Debug, Fail)]
-#[fail(display = "Process is shutting down at the moment")]
+#[derive(Clone, Copy, Debug, Fail, Display)]
+#[display(fmt = "Process is shutting down at the moment")]
 pub struct ShuttingDownError;
 
 /// Message that [`Subscriber`] unsubscribes from receiving shutdown

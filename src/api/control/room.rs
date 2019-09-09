@@ -1,10 +1,11 @@
-//! Room definitions and implementations.
+//! Definitions and implementations of [Control API]'s `Room` element.
+//!
+//! [Control API]: http://tiny.cc/380uaz
 
 use std::{collections::HashMap, convert::TryFrom};
 
-use macro_attr::*;
+use derive_more::{Display, From};
 use medea_grpc_proto::control::Room as RoomProto;
-use newtype_derive::{newtype_fmt, NewtypeDisplay, NewtypeFrom};
 use serde::Deserialize;
 
 use crate::api::control::TryFromProtobufError;
@@ -15,20 +16,11 @@ use super::{
     MemberId, RootElement, TryFromElementError,
 };
 
-macro_attr! {
-    /// ID of [`Room`].
-    #[derive(
-        Clone,
-        Debug,
-        Deserialize,
-        Eq,
-        Hash,
-        PartialEq,
-        NewtypeFrom!,
-        NewtypeDisplay!,
-    )]
-    pub struct Id(pub String);
-}
+/// ID of [`Room`].
+///
+/// [`Room`]: crate::signalling::room::Room
+#[derive(Clone, Debug, Deserialize, Display, Eq, Hash, PartialEq, From)]
+pub struct Id(pub String);
 
 /// Element of [`Room`]'s [`Pipeline`].
 ///
@@ -45,8 +37,11 @@ pub enum RoomElement {
     },
 }
 
-/// [`crate::signalling::room::Room`] specification.
+/// [Control API]'s `Room` element specification
+///
 /// Newtype for [`RootElement::Room`]
+///
+/// [Control API]: http://tiny.cc/380uaz
 #[allow(clippy::module_name_repetitions)]
 #[derive(Clone, Debug)]
 pub struct RoomSpec {

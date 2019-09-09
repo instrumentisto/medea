@@ -1,6 +1,6 @@
 [package]
 name = "medea"
-version = "0.1.0"
+version = "0.2.0-dev"
 edition = "2018"
 description = "Medea media server"
 authors = ["Instrumentisto Team <developer@instrumentisto.com>"]
@@ -39,11 +39,9 @@ futures = "0.1"
 grpcio = "0.4"
 humantime = "1.2"
 humantime-serde = "0.1"
-macro-attr = "0.2"
 medea-client-api-proto = { path = "proto/client-api", features = ["medea"] }
 medea-grpc-proto = { path = "proto/grpc" }
 medea-macro = "0.1"
-newtype_derive = "0.1"
 protobuf = "2.7"
 rand = "0.7"
 redis = "0.11"
@@ -64,9 +62,9 @@ toml = "0.5"
 url = "2.1"
 
 [dev-dependencies]
+actix-codec = "0.1"
 actix-http = "0.2"
 actix-http-test = "0.2"
+awc = "0.2"
 serial_test = "0.2"
 serial_test_derive = "0.2"
-actix-codec = "0.1.2"
-awc = "0.2"

@@ -1,10 +1,11 @@
-//! Member definitions and implementations.
+//! Definitions and implementations of [Control API]'s `Member` element.
+//!
+//! [Control API]: http://tiny.cc/380uaz
 
 use std::{collections::HashMap as StdHashMap, convert::TryFrom};
 
-use macro_attr::*;
+use derive_more::{Display, From};
 use medea_grpc_proto::control::Member as MemberProto;
-use newtype_derive::{newtype_fmt, NewtypeDisplay, NewtypeFrom};
 use rand::{distributions::Alphanumeric, Rng};
 use serde::Deserialize;
 
@@ -20,20 +21,9 @@ use crate::api::control::{
 
 const MEMBER_CREDENTIALS_LEN: usize = 32;
 
-macro_attr! {
-    /// ID of [`Member`].
-    #[derive(
-        Clone,
-        Debug,
-        Deserialize,
-        Eq,
-        Hash,
-        PartialEq,
-        NewtypeFrom!,
-        NewtypeDisplay!,
-    )]
-    pub struct Id(pub String);
-}
+/// ID of `Member`.
+#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, From, Display)]
+pub struct Id(pub String);
 
 /// Element of [`Member`]'s [`Pipeline`].
 ///
@@ -88,6 +78,7 @@ impl MemberSpec {
         })
     }
 
+    /// Lookup [`WebRtcPublishEndpoint`] by ID.
     pub fn get_publish_endpoint_by_id(
         &self,
         id: &WebRtcPublishId,
@@ -112,6 +103,7 @@ impl MemberSpec {
         })
     }
 
+    /// Returns credentials from this [`MemberSpec`].
     pub fn credentials(&self) -> &str {
         &self.credentials
     }

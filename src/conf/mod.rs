@@ -1,5 +1,6 @@
 //! Provides application configuration options.
 
+pub mod control;
 pub mod grpc;
 pub mod http_server;
 pub mod log;
@@ -16,6 +17,7 @@ use serde::{Deserialize, Serialize};
 
 #[doc(inline)]
 pub use self::{
+    control::Control,
     grpc::Grpc,
     http_server::HttpServer,
     log::Log,
@@ -39,7 +41,7 @@ pub struct Conf {
     /// HTTP server settings.
     pub rpc: Rpc,
 
-    /// Servers related settings.
+    /// RPC connection settings.
     pub server: Server,
 
     /// TURN server settings.
@@ -50,6 +52,11 @@ pub struct Conf {
 
     /// Application shutdown settings.
     pub shutdown: Shutdown,
+
+    /// [Control API] settings.
+    ///
+    /// [Control API]: http://tiny.cc/380uaz
+    pub control: Control,
 }
 
 impl Conf {

@@ -1,7 +1,6 @@
 //! `WebRtcPublishEndpoint` implementation.
 
-use macro_attr::*;
-use newtype_derive::{newtype_fmt, NewtypeDisplay, NewtypeFrom};
+use derive_more::{Display, From};
 use serde::Deserialize;
 
 use medea_grpc_proto::control::{
@@ -9,20 +8,9 @@ use medea_grpc_proto::control::{
     WebRtcPublishEndpoint_P2P as WebRtcPublishEndpointP2pProto,
 };
 
-macro_attr! {
-    /// ID of [`WebRtcPublishEndpoint`].
-    #[derive(
-        Clone,
-        Debug,
-        Deserialize,
-        Eq,
-        Hash,
-        PartialEq,
-        NewtypeFrom!,
-        NewtypeDisplay!,
-    )]
-    pub struct WebRtcPublishId(pub String);
-}
+/// ID of [`WebRtcPublishEndpoint`].
+#[derive(Clone, Debug, Deserialize, Display, Eq, Hash, PartialEq, From)]
+pub struct WebRtcPublishId(pub String);
 
 /// Peer-to-peer mode of [`WebRtcPublishEndpoint`].
 #[derive(Clone, Deserialize, Debug)]

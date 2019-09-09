@@ -100,7 +100,10 @@ impl WebRtcPublishEndpointInner {
     }
 }
 
-/// Signalling representation of `WebRtcPublishEndpoint`.
+/// Signalling representation of [`WebRtcPublishEndpoint`].
+///
+/// [`WebRtcPublishEndpoint`]:
+/// crate::api::control::endpoint::WebRtcPublishEndpoint
 #[allow(clippy::module_name_repetitions)]
 #[derive(Debug, Clone)]
 pub struct WebRtcPublishEndpoint(Rc<RefCell<WebRtcPublishEndpointInner>>);
@@ -117,12 +120,13 @@ impl WebRtcPublishEndpoint {
         })))
     }
 
-    /// Add sink for this [`WebRtcPublishEndpoint`].
+    /// Add [`WebRtcPlayEndpoint`] (sink) to this [`WebRtcPublishEndpoint`].
     pub fn add_sink(&self, sink: WeakWebRtcPlayEndpoint) {
         self.0.borrow_mut().add_sinks(sink)
     }
 
-    /// Returns all sinks of this [`WebRtcPublishEndpoint`].
+    /// Returns all [`WebRtcPlayEndpoint`]s (sinks) of this
+    /// [`WebRtcPublishEndpoint`].
     ///
     /// __This function will panic if meet empty pointer.__
     pub fn sinks(&self) -> Vec<WebRtcPlayEndpoint> {
@@ -131,7 +135,7 @@ impl WebRtcPublishEndpoint {
 
     /// Returns owner [`Member`] of this [`WebRtcPublishEndpoint`].
     ///
-    /// __This function will panic if pointer is empty.__
+    /// __This function will panic if pointer to [`Member`] was dropped.__
     pub fn owner(&self) -> Member {
         self.0.borrow().owner()
     }
@@ -141,19 +145,19 @@ impl WebRtcPublishEndpoint {
         self.0.borrow_mut().add_peer_id(peer_id)
     }
 
-    /// Returns all [`PeerId`] of this [`WebRtcPublishEndpoint`].
+    /// Returns all [`PeerId`]s of this [`WebRtcPublishEndpoint`].
     pub fn peer_ids(&self) -> HashSet<PeerId> {
         self.0.borrow().peer_ids()
     }
 
     /// Reset state of this [`WebRtcPublishEndpoint`].
     ///
-    /// Atm this only reset peer_ids.
+    /// _Atm this only reset `peer_ids`._
     pub fn reset(&self) {
         self.0.borrow_mut().reset()
     }
 
-    /// Remove [`PeerId`] from peer_ids.
+    /// Remove [`PeerId`] from this [`WebRtcPublishEndpoint`]'s `peer_ids`.
     #[allow(clippy::trivially_copy_pass_by_ref)]
     pub fn remove_peer_id(&self, peer_id: &PeerId) {
         self.0.borrow_mut().remove_peer_id(peer_id)
@@ -164,12 +168,12 @@ impl WebRtcPublishEndpoint {
         self.0.borrow_mut().remove_peer_ids(peer_ids)
     }
 
-    /// Returns ID of this [`WebRtcPublishEndpoint`].
+    /// Returns [`Id`] of this [`WebRtcPublishEndpoint`].
     pub fn id(&self) -> Id {
         self.0.borrow().id.clone()
     }
 
-    /// Remove all empty Weak pointers from sinks of this
+    /// Remove all dropped [`Weak`] pointers from sinks of this
     /// [`WebRtcPublishEndpoint`].
     pub fn remove_empty_weaks_from_sinks(&self) {
         self.0
@@ -182,14 +186,14 @@ impl WebRtcPublishEndpoint {
         self.0.borrow().p2p.clone()
     }
 
-    /// Downgrade [`WeakWebRtcPublishEndpoint`] to weak pointer
+    /// Downgrade [`WebRtcPublishEndpoint`] to weak pointer
     /// [`WeakWebRtcPublishEndpoint`].
     pub fn downgrade(&self) -> WeakWebRtcPublishEndpoint {
         WeakWebRtcPublishEndpoint(Rc::downgrade(&self.0))
     }
 
-    /// Compares pointers. If both pointers point to the same address, then
-    /// returns true.
+    /// Compares [`WebRtcPublishEndpoint`]'s inner pointers. If both pointers
+    /// points to the same address, then returns `true`.
     #[cfg(test)]
     pub fn ptr_eq(&self, another_publish: &Self) -> bool {
         Rc::ptr_eq(&self.0, &another_publish.0)
@@ -198,18 +202,20 @@ impl WebRtcPublishEndpoint {
 
 /// Weak pointer to [`WebRtcPublishEndpoint`].
 #[allow(clippy::module_name_repetitions)]
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub struct WeakWebRtcPublishEndpoint(Weak<RefCell<WebRtcPublishEndpointInner>>);
 
 impl WeakWebRtcPublishEndpoint {
     /// Upgrade weak pointer to strong pointer.
     ///
-    /// This function will __panic__ if weak pointer is `None`.
+    /// This function will __panic__ if weak pointer was dropped.
     pub fn upgrade(&self) -> WebRtcPublishEndpoint {
         WebRtcPublishEndpoint(self.0.upgrade().unwrap())
     }
 
     /// Safe upgrade to [`WebRtcPlayEndpoint`].
+    ///
+    /// Returns `None` if weak pointer was dropped.
     pub fn safe_upgrade(&self) -> Option<WebRtcPublishEndpoint> {
         self.0.upgrade().map(WebRtcPublishEndpoint)
     }

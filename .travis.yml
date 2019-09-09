@@ -1,25 +1,20 @@
 language: rust
-
-env:
-  global:
-    - secure: O14lnD45q3oyuMtKU7Jfy1e+LSs91UZPnNuTPT9IZNoHPgJM77mdK1bwu5SqSXpmDEaq3uQBBhIKEKxiOgogiRAGcALnjSLIe02qrw8kR4hhB7IsuCsfJA3rgnH5NrSxV2ja5wHUkTtYORIB30GX/SU4qNw8C+HeAcXDaxPRNJYuIkE41jW121PDgheS7Ti49ui5JOKss/FdpI8Ii5xXvNf9Z60MSJKPsM8yaj+RiqDccXrFuyppVE/Ezn95gdJh1Sr7BUaP521FOhOYl4bvMEV0pHHMwaPD0b2Ku0yJ+GrZiZ2YqTmsNiaa4hN2AAv38w46KfhQuvJg173cEGf6hCrrF+IOQvmGG977xSO7tci2l5idjIZ1xtXsLQ9Yp49DBxd1s2I20j+fHmCImH1cV4+hEnMTQLITzemS3MkHIxbEgcMyssjZD7FASNU1C3fbeeHEG3JPM/hHj0mlGlhv7T54gL5Q7Qggnj+xsE44yU18bP0K/G48QBLeXDSfZzeaCbrif9bALAVnUMhRMSuW9EfOHcu7juaBAj5mPxWfN4CoQgqBFPh+V+q6+WViV0/5djoKlrOy323hNTg+CXIqWn9RYIbxbyRMGXIU6Z78Sr6Yls+8tK1cpdXOzQ6CMeUJh2H264hFMM1ZGvlQ+VYqRYMCViuVW4Aofuqr1zfsnz0=
-    - secure: xm+WIGYVoYvjAlWOaoli0YZ4LMFBKd7pG0qno4zrDMGrz1AwLRK6dce0+ROvIdEcuOror2j4wryYgDRMLYgxzhXeMMVFkxZuB1MmeC8VHirf0jNHNNihWwnEyTDGtj5VXijD/ipo4jiskBZEsg/oW97iFUudjl/rNT2R0Gy420QgGV4p3m9jTjBBL6giIQUNK0g+5aIkCfb4U/4gcpFA5nZJgyfQtnKKmVnEPl26vbU+Ui7F/wqTK0a7AJT3RCaEddtu7E5DKNnk4/45e4//LKNEE8I2KGqWlqWXqFYs+Cno1trDOcKm0yiTIquvbZsrOuH7wN1il4qVcsdgQLps2kFahpJyQJbJJViBkbqnlwRJDnxtszbrxSGW6HiVMSSd8AOthwJd3n7lMkBDwrwG9Dx7MiNY/NIdRxufEuoOw/6tj31oBJhM1s+/Fhjzlz0j5R5spTtcaNg6Q0Gi+F283jjwvobIzvUUKKSt4I1UZLTQNSzxrWTJZ4kJBG1JiTxH7BwHMtxhiaZn5ajk5HfVXScmBknZIovsylj5UXp1d5IhXUNq4jTXTdybOurhQ1XLVz/hw64oOIQkuftaNHuQMe3oB69aWLWpS6+r3k1ZCT/WODbS3xlhp/MXO3WLD4WY1OWJ522t/YOUQX3j72bZADlQOcU/OWQ5LWNC3XGibrk=
-
 cache: cargo
 
-services:
-  - docker
-
 install:
-  - PROTOBUF_VERSION=3.3.0
-  - PROTOC_FILENAME=protoc-${PROTOBUF_VERSION}-linux-x86_64.zip
-  - pushd /home/travis
-  - wget https://github.com/google/protobuf/releases/download/v${PROTOBUF_VERSION}/${PROTOC_FILENAME}
-  - unzip ${PROTOC_FILENAME}
-  - bin/protoc --version
-  - popd
+  - bash _ci/protoc_install.sh
   - rustc -vV
   - cargo -vV
+
+stages:
+  - name: check
+    if: (branch = master AND type != pull_request) OR commit_message =~ /.*\[run ci\]/
+  - name: build
+    if: (branch = master AND type != pull_request) OR commit_message =~ /.*\[run ci\]/
+  - name: build_beta
+    if: branch = master
+  - name: test
+    if: (branch = master AND type != pull_request) OR commit_message =~ /.*\[run ci\]/
 
 jobs:
   allow_failures:
@@ -36,6 +31,7 @@ jobs:
       stage: check
       rust: nightly
       cache: false
+      env: DONT_INSTALL_PROTOC=1
       before_script: rustup component add rustfmt
       script: make fmt check=yes
 
@@ -51,20 +47,23 @@ jobs:
     - name: medea docker (stable)
       stage: build
       rust: stable
-      script: make docker.build.medea debug=no TAG=${TRAVIS_BUILD_ID} registry=quay.io
+      env: DONT_INSTALL_PROTOC=1
+      script: make docker.build.medea debug=no TAG=build-${TRAVIS_BUILD_ID} registry=quay.io
+      services:
+        - docker
       after_script:
         - echo "$QUAYIO_PASS" | docker login quay.io -u "$QUAYIO_USER" --password-stdin
-        - docker push quay.io/instrumentisto/medea:${TRAVIS_BUILD_ID}
+        - docker push quay.io/instrumentisto/medea:build-${TRAVIS_BUILD_ID}
 
     - name: medea (beta)
-      stage: build_unstable
+      stage: build_beta
       rust: beta
-      script: make build.medea
+      script: make cargo.build crate=medea
 
     - name: medea (nightly)
-      stage: build_unstable
+      stage: build_beta
       rust: nightly
-      script: make build.medea
+      script: make cargo.build crate=medea
 
     - name: unit (stable)
       stage: test
@@ -74,8 +73,11 @@ jobs:
     - name: e2e signalling (stable)
       stage: test
       rust: stable
+      env: DONT_INSTALL_PROTOC=1
+      services:
+        - docker
       script:
-        - make test.e2e dockerized=yes logs=yes TAG=${TRAVIS_BUILD_ID} registry=quay.io
+        - make test.e2e dockerized=yes logs=yes TAG=build-${TRAVIS_BUILD_ID} registry=quay.io
 
     - name: crates.io
       stage: release
@@ -128,18 +130,6 @@ jobs:
         name: $TRAVIS_TAG
         on:
           tags: true
-
-stages:
-  - name: check
-    if: (branch = master AND type != pull_request) OR commit_message =~ /.*\[run ci\]/
-  - name: build
-    if: (branch = master AND type != pull_request) OR commit_message =~ /.*\[run ci\]/
-  - name: build_unstable
-    if: branch = master
-  - name: test
-    if: (branch = master AND type != pull_request) OR commit_message =~ /.*\[run ci\]/
-  - name: tests
-    if: (branch = master AND type != pull_request) OR commit_message =~ /.*\[run ci\]/
 
 notifications:
   email:

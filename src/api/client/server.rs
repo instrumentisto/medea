@@ -50,21 +50,22 @@ fn ws_index(
     payload: Payload,
 ) -> impl Future<Item = HttpResponse, Error = actix_web::Error> {
     debug!("Request params: {:?}", info);
+    let RequestParams {
+        room_id,
+        member_id,
+        credentials,
+    } = info.into_inner();
 
-    match state.rooms.get(&info.room_id) {
+    match state.rooms.get(&room_id) {
         Some(room) => Either::A(
             room.send(Authorize {
-                member_id: info.member_id.clone(),
-                credentials: info.credentials.clone(),
+                member_id: member_id.clone(),
+                credentials,
             })
             .from_err()
             .and_then(move |res| match res {
                 Ok(_) => ws::start(
-                    WsSession::new(
-                        info.member_id.clone(),
-                        room,
-                        state.config.idle_timeout,
-                    ),
+                    WsSession::new(member_id, room, state.config.idle_timeout),
                     &request,
                     payload,
                 ),
@@ -156,7 +157,7 @@ mod test {
     /// Creates [`RoomRepository`] for tests filled with a single [`Room`].
     fn room(conf: Conf) -> RoomRepository {
         let room_spec =
-            control::load_from_yaml_file("tests/specs/pub_sub_video_call.yml")
+            control::load_from_yaml_file("tests/specs/pub-sub-video-call.yml")
                 .unwrap();
 
         let app = AppContext::new(conf, new_turn_auth_service_mock());

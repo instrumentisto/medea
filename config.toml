@@ -14,11 +14,14 @@
 # Default:
 #   bind_port = 8080
 
-# Path to directory with static control API specs.
+
+
+
+[control]
+# Path to directory with static Сontrol API specs.
 #
 # Default:
-#   static_specs_path = None
-static_specs_path = "dev/specs"
+#   static_specs_dir = "specs/"
 
 
 [server.grpc]

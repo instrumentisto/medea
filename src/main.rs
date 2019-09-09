@@ -4,13 +4,16 @@ use actix::Actor;
 use failure::Error;
 use futures::future::Future;
 use medea::{
-    api::{client::server::Server, control::grpc},
+    api::{
+        client::server::Server,
+        control::{grpc, LoadStaticControlSpecsError},
+    },
     conf::Conf,
     log::{self, prelude::*},
     shutdown::{self, GracefulShutdown},
     signalling::{
         room_repo::RoomRepository,
-        room_service::{RoomService, StartStaticRooms},
+        room_service::{RoomService, RoomServiceError, StartStaticRooms},
     },
     turn::new_turn_auth_service,
     AppContext,
@@ -52,7 +55,15 @@ fn main() -> Result<(), Error> {
                     })
                     .map(|result| {
                         if let Err(e) = result {
-                            panic!("{}", e);
+                            match e {
+                                RoomServiceError::FailedToLoadStaticSpecs(e) => match e {
+                                    LoadStaticControlSpecsError::SpecDirNotFound => {
+                                        warn!("Specs dir not exists. Control API specs not loaded.");
+                                    }
+                                    _ => panic!("{}", e)
+                                }
+                                _ => panic!("{}", e)
+                            }
                         }
                     })
                     .map(move |_| {

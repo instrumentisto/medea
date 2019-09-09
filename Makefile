@@ -305,8 +305,8 @@ endif
 
 medea-env = RUST_BACKTRACE=1 \
 	$(if $(call eq,$(logs),yes),,RUST_LOG=warn) \
-	MEDEA_SERVER.STATIC_SPECS_PATH=./tests/specs \
-	MEDEA_SERVER_STATIC_SPECS_PATH=./tests/specs
+	MEDEA_CONTROL.STATIC_SPECS_DIR=./tests/specs \
+	MEDEA_CONTROL_STATIC_SPECS_DIR=./tests/specs
 
 test.e2e:
 	-@make down
@@ -640,12 +640,16 @@ endef
 # Building #
 ############
 
-# Build medea.
+# Build medea's related crates.
 #
 # Usage:
-#   make build.medea [dockerized=(NO|yes)] [release=(NO|yes)]
-
-build.medea:
+#   make build crate=(medea|medea-jason|@all) [dockerized=(yes|no)
+cargo.build:
+ifeq ($(crate),@all)
+	@make build crate=medea
+	@make build crate=medea-jason
+endif
+ifeq ($(crate),medea)
 ifneq ($(dockerized),yes)
 	cargo build --bin medea $(if $(call eq,$(release),yes),--release)
 else
@@ -657,14 +661,8 @@ else
 		rust:$(RUST_VER) \
 		make build.medea release=$(release)
 endif
-
-
-# Build jason.
-#
-# Usage:
-#   make build.jason [dockerized=(no|yes)]
-
-build.jason:
+endif
+ifeq ($(crate),medea-jason)
 ifneq ($(dockerized),yes)
 	wasm-pack build -t web jason
 else
@@ -678,7 +676,25 @@ else
 		rust:$(RUST_VER) \
 		sh -c "curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh && make build.jason"
 endif
+endif
 
+
+# Build medea.
+#
+# Usage:
+#   make build.medea [dockerized=(NO|yes)] [release=(NO|yes)]
+
+build.medea:
+	make cargo.build crate=medea
+
+
+# Build jason.
+#
+# Usage:
+#   make build.jason [dockerized=(no|yes)]
+
+build.jason:
+	make cargo.build crate=medea-jason
 
 
 
@@ -686,17 +702,15 @@ endif
 # .PHONY section #
 ##################
 
-.PHONY: build \
-        cargo cargo.fmt cargo.lint \
+.PHONY: build build.jason build.medea \
+        cargo cargo.build cargo.fmt cargo.lint \
         docker.build.demo docker.build.medea docker.down.demo docker.up.demo \
         docs docs.rust \
-        down.demo \
+        down down.demo down.coturn down.medea \
         helm helm.down helm.init helm.lint helm.list \
         	helm.package helm.package.release helm.up \
         minikube.boot \
-        down down.medea down.coturn \
         release release.crates release.helm release.npm \
-        test test.unit test.e2e \
+        test test.e2e test.unit \
         up up.coturn up.demo up.dev up.jason up.medea \
-        build build.medea build.jason \
         yarn

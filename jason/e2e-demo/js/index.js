@@ -10,7 +10,6 @@ async function f() {
     caller_room.on_new_connection(function (connection) {
         connection.on_remote_stream(function (stream) {
             var video = document.createElement("video");
-
             video.srcObject = stream.get_media_stream();
             document.body.appendChild(video);
             video.play();
@@ -41,9 +40,7 @@ async function f() {
     });
     responder_room.on_new_connection(function (connection) {
         connection.on_remote_stream(function (stream) {
-
             var video = document.createElement("video");
-
             video.srcObject = stream.get_media_stream();
             document.body.appendChild(video);
             video.play();

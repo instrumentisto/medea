@@ -1,4 +1,4 @@
-//! Signalling API e2e tests.
+//! Signalling API E2E tests.
 
 mod pub_sub_signallng;
 mod three_pubs;
@@ -19,6 +19,9 @@ use futures::{future::Future, sink::Sink, stream::SplitSink, Stream};
 use medea_client_api_proto::{Command, Event, IceCandidate};
 use serde_json::error::Error as SerdeError;
 
+pub type MessageHandler =
+    Box<dyn FnMut(&Event, &mut Context<TestMember>, Vec<&Event>)>;
+
 /// Medea client for testing purposes.
 pub struct TestMember {
     /// Writer to WebSocket.
@@ -35,7 +38,7 @@ pub struct TestMember {
 
     /// Function which will be called at every received by this [`TestMember`]
     /// [`Event`].
-    on_message: Box<dyn FnMut(&Event, &mut Context<TestMember>)>,
+    on_message: MessageHandler,
 }
 
 impl TestMember {
@@ -64,7 +67,7 @@ impl TestMember {
     /// received from server.
     pub fn start(
         uri: &str,
-        on_message: Box<dyn FnMut(&Event, &mut Context<TestMember>)>,
+        on_message: MessageHandler,
         deadline: Option<Duration>,
     ) {
         Arbiter::spawn(
@@ -138,27 +141,28 @@ impl StreamHandler<Frame, WsProtocolError> for TestMember {
             let txt = String::from_utf8(txt.unwrap().to_vec()).unwrap();
             let event: Result<Event, SerdeError> = serde_json::from_str(&txt);
             if let Ok(event) = event {
-                self.events.push(event.clone());
+                let mut events: Vec<&Event> = self.events.iter().collect();
+                events.push(&event);
                 // Test function call
-                (self.on_message)(&event, ctx);
+                (self.on_message)(&event, ctx, events);
 
                 if let Event::PeerCreated {
                     peer_id,
                     sdp_offer,
                     tracks,
                     ..
-                } = event
+                } = &event
                 {
                     match sdp_offer {
                         Some(_) => self.send_command(Command::MakeSdpAnswer {
-                            peer_id,
+                            peer_id: *peer_id,
                             sdp_answer: "responder_answer".into(),
                         }),
                         None => self.send_command(Command::MakeSdpOffer {
-                            peer_id,
+                            peer_id: *peer_id,
                             sdp_offer: "caller_offer".into(),
                             mids: tracks
-                                .into_iter()
+                                .iter()
                                 .map(|t| t.id)
                                 .enumerate()
                                 .map(|(mid, id)| (id, mid.to_string()))
@@ -167,7 +171,7 @@ impl StreamHandler<Frame, WsProtocolError> for TestMember {
                     }
 
                     self.send_command(Command::SetIceCandidate {
-                        peer_id,
+                        peer_id: *peer_id,
                         candidate: IceCandidate {
                             candidate: "ice_candidate".to_string(),
                             sdp_m_line_index: None,
@@ -175,6 +179,7 @@ impl StreamHandler<Frame, WsProtocolError> for TestMember {
                         },
                     });
                 }
+                self.events.push(event);
             }
         }
     }

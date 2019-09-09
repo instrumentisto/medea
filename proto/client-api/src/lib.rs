@@ -2,45 +2,40 @@
 
 use std::collections::HashMap;
 
-use macro_attr::*;
+use derive_more::Display;
 use medea_macro::dispatchable;
-use newtype_derive::*;
 use serde::{de::Deserializer, ser::Serializer, Deserialize, Serialize};
 
-macro_attr! {
-    /// ID of [`Peer`].
-    #[cfg_attr(
-        feature = "medea",
-        derive(Deserialize, Debug, Hash, Eq, Default, PartialEq)
-    )]
-    #[cfg_attr(feature = "jason", derive(Serialize))]
-    #[derive(Clone, Copy, NewtypeDisplay!)]
-    pub struct PeerId(pub u64);
-}
+/// ID of `Peer`.
+#[cfg_attr(
+    feature = "medea",
+    derive(Deserialize, Debug, Hash, Eq, Default, PartialEq)
+)]
+#[cfg_attr(feature = "jason", derive(Serialize))]
+#[derive(Clone, Copy, Display)]
+pub struct PeerId(pub u64);
 
-macro_attr! {
-    /// ID of [`MediaTrack`].
-    #[cfg_attr(
-        feature = "medea",
-        derive(Deserialize, Debug, Hash, Eq, Default, PartialEq)
-    )]
-    #[cfg_attr(feature = "jason", derive(Serialize))]
-    #[derive(Clone, Copy, NewtypeDisplay!)]
-    pub struct TrackId(pub u64);
-}
+/// ID of `MediaTrack`.
+#[cfg_attr(
+    feature = "medea",
+    derive(Deserialize, Debug, Hash, Eq, Default, PartialEq)
+)]
+#[cfg_attr(feature = "jason", derive(Serialize))]
+#[derive(Clone, Copy, Display)]
+pub struct TrackId(pub u64);
 
-/// Trait for providing function `increment()` which return current value + 1.
+/// Value that is able to be incremented by `1`.
 #[cfg(feature = "medea")]
-pub trait Incrementable: Sized + Clone {
+pub trait Incrementable {
     /// Returns current value + 1.
-    fn increment(&self) -> Self;
+    fn incr(&self) -> Self;
 }
 
-/// Implement [`Incrementable`] trait for newtype with any numeric type.
+/// Implements [`Incrementable`] trait for newtype with any numeric type.
 macro_rules! impl_incrementable {
     ($name:ty) => {
         impl Incrementable for $name {
-            fn increment(&self) -> Self {
+            fn incr(&self) -> Self {
                 Self(self.0 + 1)
             }
         }
@@ -145,7 +140,7 @@ pub struct IceCandidate {
     pub sdp_mid: Option<String>,
 }
 
-/// [`Track] with specified direction.
+/// [`Track`] with specified direction.
 #[cfg_attr(feature = "medea", derive(Serialize, Debug, Clone, PartialEq))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
 pub struct Track {
