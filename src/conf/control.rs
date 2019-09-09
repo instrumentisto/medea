@@ -1,10 +1,11 @@
+use crate::conf::Grpc;
 use serde::{Deserialize, Serialize};
 use smart_default::SmartDefault;
 
 /// [Control API] settings.
 ///
 /// [Control API]: http://tiny.cc/380uaz
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, SmartDefault)]
+#[derive(Clone, Debug, Deserialize, Serialize, SmartDefault)]
 #[serde(default)]
 pub struct Control {
     /// Path to directory with static [Сontrol API] specs.
@@ -12,4 +13,6 @@ pub struct Control {
     /// [Control API]: http://tiny.cc/380uaz
     #[default(String::from("specs/"))]
     pub static_specs_dir: String,
+
+    pub grpc: Grpc,
 }

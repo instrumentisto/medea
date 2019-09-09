@@ -5,7 +5,6 @@ pub mod grpc;
 pub mod http_server;
 pub mod log;
 pub mod rpc;
-pub mod server;
 pub mod shutdown;
 pub mod turn;
 
@@ -19,10 +18,9 @@ use serde::{Deserialize, Serialize};
 pub use self::{
     control::Control,
     grpc::Grpc,
-    http_server::HttpServer,
+    http_server::Client,
     log::Log,
     rpc::Rpc,
-    server::Server,
     shutdown::Shutdown,
     turn::{Redis, Turn},
 };
@@ -41,8 +39,10 @@ pub struct Conf {
     /// HTTP server settings.
     pub rpc: Rpc,
 
-    /// RPC connection settings.
-    pub server: Server,
+    /// [Client API] connection settings.
+    ///
+    /// [Client API]: http://tiny.cc/c80uaz
+    pub client: Client,
 
     /// TURN server settings.
     pub turn: Turn,

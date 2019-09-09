@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use actix::Actor;
+use actix::{Actor, Addr};
 use failure::Error;
 use futures::future::Future;
 use medea::{
@@ -18,6 +18,30 @@ use medea::{
     turn::new_turn_auth_service,
     AppContext,
 };
+
+fn start_static_rooms(
+    room_service: &Addr<RoomService>,
+) -> impl Future<Item = (), Error = ()> {
+    room_service
+        .send(StartStaticRooms)
+        .map_err(|e| error!("StartStaticRooms mailbox error: {:?}", e))
+        .map(|result| {
+            if let Err(e) = result {
+                match e {
+                    RoomServiceError::FailedToLoadStaticSpecs(e) => match e {
+                        LoadStaticControlSpecsError::SpecDirNotFound => {
+                            warn!(
+                                "Specs dir not exists. Control API specs not \
+                                 loaded."
+                            );
+                        }
+                        _ => panic!("{}", e),
+                    },
+                    _ => panic!("{}", e),
+                }
+            }
+        })
+}
 
 fn main() -> Result<(), Error> {
     dotenv::dotenv().ok();
@@ -47,41 +71,22 @@ fn main() -> Result<(), Error> {
                 )
                 .start();
 
-                room_service
-                    .clone()
-                    .send(StartStaticRooms)
-                    .map_err(|e| {
-                        error!("StartStaticRooms mailbox error: {:?}", e)
-                    })
-                    .map(|result| {
-                        if let Err(e) = result {
-                            match e {
-                                RoomServiceError::FailedToLoadStaticSpecs(e) => match e {
-                                    LoadStaticControlSpecsError::SpecDirNotFound => {
-                                        warn!("Specs dir not exists. Control API specs not loaded.");
-                                    }
-                                    _ => panic!("{}", e)
-                                }
-                                _ => panic!("{}", e)
-                            }
-                        }
-                    })
-                    .map(move |_| {
-                        let grpc_addr =
-                            grpc::server::run(room_service, app_context);
-                        shutdown::subscribe(
-                            &graceful_shutdown,
-                            grpc_addr.clone().recipient(),
-                            shutdown::Priority(1),
-                        );
+                start_static_rooms(&room_service).map(move |_| {
+                    let grpc_addr =
+                        grpc::server::run(room_service, app_context);
+                    shutdown::subscribe(
+                        &graceful_shutdown,
+                        grpc_addr.clone().recipient(),
+                        shutdown::Priority(1),
+                    );
 
-                        let server = Server::run(room_repo, config).unwrap();
-                        shutdown::subscribe(
-                            &graceful_shutdown,
-                            server.recipient(),
-                            shutdown::Priority(1),
-                        );
-                    })
+                    let server = Server::run(room_repo, config).unwrap();
+                    shutdown::subscribe(
+                        &graceful_shutdown,
+                        server.recipient(),
+                        shutdown::Priority(1),
+                    );
+                })
             })
     })
     .unwrap();

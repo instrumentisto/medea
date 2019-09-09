@@ -353,7 +353,7 @@ mod tests {
 
     #[test]
     fn parse_local_uri_to_room_element() {
-        let local_uri = LocalUriType::parse("local://room_id").unwrap();
+        let local_uri = LocalUriType::try_from("local://room_id").unwrap();
         if let LocalUriType::Room(room) = local_uri {
             assert_eq!(room.take_room_id(), RoomId("room_id".to_string()));
         } else {
@@ -364,7 +364,7 @@ mod tests {
     #[test]
     fn parse_local_uri_to_element_of_room() {
         let local_uri =
-            LocalUriType::parse("local://room_id/room_element_id").unwrap();
+            LocalUriType::try_from("local://room_id/room_element_id").unwrap();
         if let LocalUriType::Member(member) = local_uri {
             let (element_id, room_uri) = member.take_member_id();
             assert_eq!(element_id, MemberId("room_element_id".to_string()));
@@ -377,9 +377,10 @@ mod tests {
 
     #[test]
     fn parse_local_uri_to_endpoint() {
-        let local_uri =
-            LocalUriType::parse("local://room_id/room_element_id/endpoint_id")
-                .unwrap();
+        let local_uri = LocalUriType::try_from(
+            "local://room_id/room_element_id/endpoint_id",
+        )
+        .unwrap();
         if let LocalUriType::Endpoint(endpoint) = local_uri {
             let (endpoint_id, member_uri) = endpoint.take_endpoint_id();
             assert_eq!(endpoint_id, "endpoint_id".to_string());
@@ -394,7 +395,7 @@ mod tests {
 
     #[test]
     fn returns_parse_error_if_local_uri_not_local() {
-        match LocalUriType::parse("not-local://room_id") {
+        match LocalUriType::try_from("not-local://room_id") {
             Ok(_) => unreachable!(),
             Err(e) => match e {
                 LocalUriParseError::NotLocal(_) => (),
@@ -405,7 +406,7 @@ mod tests {
 
     #[test]
     fn returns_parse_error_if_local_uri_empty() {
-        match LocalUriType::parse("") {
+        match LocalUriType::try_from("") {
             Ok(_) => unreachable!(),
             Err(e) => match e {
                 LocalUriParseError::Empty => (),
@@ -416,7 +417,7 @@ mod tests {
 
     #[test]
     fn returns_error_if_local_uri_have_too_many_paths() {
-        match LocalUriType::parse("local://room/member/endpoint/too_many") {
+        match LocalUriType::try_from("local://room/member/endpoint/too_many") {
             Ok(_) => unreachable!(),
             Err(e) => match e {
                 LocalUriParseError::TooManyFields(_) => (),
@@ -432,7 +433,7 @@ mod tests {
             "local://room_id/member_id",
             "local://room_id/member_id/endpoint_id",
         ] {
-            let local_uri = LocalUriType::parse(&local_uri_str).unwrap();
+            let local_uri = LocalUriType::try_from(local_uri_str).unwrap();
             assert_eq!(local_uri_str.to_string(), local_uri.to_string());
         }
     }
@@ -444,7 +445,7 @@ mod tests {
             "local:////endpoint_id",
             "local:///member_id/endpoint_id",
         ] {
-            match LocalUriType::parse(local_uri_str) {
+            match LocalUriType::try_from(local_uri_str) {
                 Ok(_) => unreachable!(local_uri_str),
                 Err(e) => match e {
                     LocalUriParseError::MissingFields(_) => (),

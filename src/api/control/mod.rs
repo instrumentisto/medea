@@ -9,15 +9,10 @@ pub mod member;
 pub mod pipeline;
 pub mod room;
 
-use std::{
-    convert::TryFrom as _,
-    fs::{File, ReadDir},
-    io::Read as _,
-    path::Path,
-};
+use std::{convert::TryFrom as _, fs::File, io::Read as _, path::Path};
 
 use derive_more::{Display, From};
-use failure::{Error, Fail};
+use failure::Fail;
 use serde::Deserialize;
 
 use self::{

@@ -8,7 +8,7 @@ use smart_default::SmartDefault;
 /// HTTP server settings.
 #[derive(Clone, Debug, Deserialize, Serialize, SmartDefault)]
 #[serde(default)]
-pub struct HttpServer {
+pub struct Client {
     /// Public URI of server. Address for exposed [Client API].
     ///
     /// This address will be returned from [Control API] in `sids` and to
@@ -33,7 +33,7 @@ pub struct HttpServer {
     pub static_specs_path: Option<String>,
 }
 
-impl HttpServer {
+impl Client {
     /// Builds [`SocketAddr`] from `bind_ip` and `bind_port`.
     #[inline]
     pub fn bind_addr(&self) -> SocketAddr {
@@ -60,27 +60,21 @@ mod server_spec {
     fn overrides_defaults_and_gets_bind_addr() {
         let default_conf = Conf::default();
 
-        env::set_var("MEDEA_SERVER.HTTP.BIND_IP", "5.5.5.5");
-        env::set_var("MEDEA_SERVER.HTTP.BIND_PORT", "1234");
+        env::set_var("MEDEA_CLIENT.BIND_IP", "5.5.5.5");
+        env::set_var("MEDEA_CLIENT.BIND_PORT", "1234");
 
         let env_conf = Conf::parse().unwrap();
 
-        env::remove_var("MEDEA_SERVER.HTTP.BIND_IP");
-        env::remove_var("MEDEA_SERVER.HTTP.BIND_PORT");
+        env::remove_var("MEDEA_CLIENT.BIND_IP");
+        env::remove_var("MEDEA_CLIENT.BIND_PORT");
 
-        assert_ne!(
-            default_conf.server.http.bind_ip,
-            env_conf.server.http.bind_ip
-        );
-        assert_ne!(
-            default_conf.server.http.bind_port,
-            env_conf.server.http.bind_port
-        );
+        assert_ne!(default_conf.client.bind_ip, env_conf.client.bind_ip);
+        assert_ne!(default_conf.client.bind_port, env_conf.client.bind_port);
 
-        assert_eq!(env_conf.server.http.bind_ip, Ipv4Addr::new(5, 5, 5, 5));
-        assert_eq!(env_conf.server.http.bind_port, 1234);
+        assert_eq!(env_conf.client.bind_ip, Ipv4Addr::new(5, 5, 5, 5));
+        assert_eq!(env_conf.client.bind_port, 1234);
         assert_eq!(
-            env_conf.server.http.bind_addr(),
+            env_conf.client.bind_addr(),
             "5.5.5.5:1234".parse().unwrap(),
         );
     }
