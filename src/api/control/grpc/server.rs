@@ -8,6 +8,7 @@ use std::{collections::HashMap, convert::TryFrom, sync::Arc};
 use actix::{
     Actor, Addr, Arbiter, Context, Handler, MailboxError, ResponseFuture,
 };
+use derive_more::Display;
 use failure::Fail;
 use futures::future::{Either, Future};
 use grpcio::{
@@ -51,24 +52,24 @@ use crate::{
     signalling::room_service::Get,
 };
 
-#[derive(Debug, Fail)]
+#[derive(Debug, Fail, Display)]
 pub enum ControlApiError {
     /// Error when parsing ID of element.
-    #[fail(display = "{:?}", _0)]
+    #[display(fmt = "{:?}", _0)]
     LocalUri(LocalUriParseError),
 
     /// This error is rather abnormal, since what it catches must be caught at
     /// the level of the gRPC.
-    #[fail(display = "{:?}", _0)]
+    #[display(fmt = "{:?}", _0)]
     TryFromProtobuf(TryFromProtobufError),
 
     /// This error is rather abnormal, since what it catches must be caught at
     /// the level of the gRPC.
-    #[fail(display = "{:?}", _0)]
+    #[display(fmt = "{:?}", _0)]
     TryFromElement(TryFromElementError),
 
     /// [`MailboxError`] for [`RoomService`].
-    #[fail(display = "Room service mailbox error: {:?}", _0)]
+    #[display(fmt = "Room service mailbox error: {:?}", _0)]
     RoomServiceMailboxError(MailboxError),
 
     /// [`MailboxError`] which never can happen. This error needed
@@ -77,7 +78,7 @@ pub enum ControlApiError {
     /// it cannot happen.
     ///
     /// __Never use this error.__
-    #[fail(display = "Mailbox error which never can happen.")]
+    #[display(fmt = "Mailbox error which never can happen.")]
     UnknownMailboxErr(MailboxError),
 }
 

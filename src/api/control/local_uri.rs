@@ -5,6 +5,7 @@
 
 use std::{convert::TryFrom, fmt};
 
+use derive_more::Display;
 use failure::Fail;
 use url::Url;
 
@@ -13,24 +14,24 @@ use crate::api::control::endpoints::webrtc_play_endpoint::SrcUri;
 use super::{MemberId, RoomId};
 
 #[allow(clippy::module_name_repetitions)]
-#[derive(Debug, Fail)]
+#[derive(Debug, Fail, Display)]
 pub enum LocalUriParseError {
     /// Protocol of provided URI is not "local://".
-    #[fail(display = "Provided URIs protocol is not 'local://'.")]
+    #[display(fmt = "Provided URIs protocol is not 'local://'.")]
     NotLocal(String),
 
     /// Too many paths in provided URI.
-    #[fail(display = "Too many paths in provided URI ({}).", _0)]
+    #[display(fmt = "Too many paths in provided URI ({}).", _0)]
     TooManyFields(String),
 
-    #[fail(display = "Missing fields. {}", _0)]
+    #[display(fmt = "Missing fields. {}", _0)]
     MissingFields(String),
 
-    #[fail(display = "Error while parsing URL. {:?}", _0)]
+    #[display(fmt = "Error while parsing URL. {:?}", _0)]
     UrlParseErr(String, url::ParseError),
 
     /// Provided empty `&str`.
-    #[fail(display = "You provided empty local uri.")]
+    #[display(fmt = "You provided empty local uri.")]
     Empty,
 }
 

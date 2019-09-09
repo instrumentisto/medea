@@ -4,6 +4,7 @@ use actix::{
     fut::wrap_future, Actor, ActorFuture, Addr, Context, Handler, MailboxError,
     Message,
 };
+use derive_more::Display;
 use failure::Fail;
 use futures::future::{self, Either, Future};
 use medea_grpc_proto::control::Element as ElementProto;
@@ -33,29 +34,28 @@ type ActFuture<I, E> =
     Box<dyn ActorFuture<Actor = RoomService, Item = I, Error = E>>;
 
 #[allow(clippy::module_name_repetitions)]
-#[derive(Debug, Fail)]
+#[derive(Debug, Fail, Display)]
 pub enum RoomServiceError {
-    #[fail(display = "Room [id = {}] not found.", _0)]
+    #[display(fmt = "Room [id = {}] not found.", _0)]
     RoomNotFound(LocalUri<IsRoomId>),
-    #[fail(display = "Room mailbox error: {:?}", _0)]
+    #[display(fmt = "Room mailbox error: {:?}", _0)]
     RoomMailboxErr(MailboxError),
-    #[fail(display = "Room [id = {}] already exists.", _0)]
+    #[display(fmt = "Room [id = {}] already exists.", _0)]
     RoomAlreadyExists(LocalUri<IsRoomId>),
-    #[fail(display = "{}", _0)]
+    #[display(fmt = "{}", _0)]
     RoomError(RoomError),
-    #[fail(display = "Failed to load static specs. {:?}", _0)]
+    #[display(fmt = "Failed to load static specs. {:?}", _0)]
     FailedToLoadStaticSpecs(LoadStaticControlSpecsError),
-    #[fail(display = "Empty URIs list.")]
+    #[display(fmt = "Empty URIs list.")]
     EmptyUrisList,
-    #[fail(display = "Room not found for element [id = {}]", _0)]
+    #[display(fmt = "Room not found for element [id = {}]", _0)]
     RoomNotFoundForElement(LocalUriType),
-    #[fail(
-        display = "Provided not the same Room IDs in elements IDs [ids = \
-                   {:?}].",
+    #[display(
+        fmt = "Provided not the same Room IDs in elements IDs [ids = {:?}].",
         _0
     )]
     NotSameRoomIds(Vec<LocalUriType>, RoomId),
-    #[fail(display = "Provided Room IDs with Room elements IDs.")]
+    #[display(fmt = "Provided Room IDs with Room elements IDs.")]
     DeleteRoomAndFromRoom,
 }
 

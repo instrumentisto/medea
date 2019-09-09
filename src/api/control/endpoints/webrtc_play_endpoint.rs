@@ -38,11 +38,11 @@ impl TryFrom<&WebRtcPlayEndpointProto> for WebRtcPlayEndpoint {
     }
 }
 
-#[derive(Debug, Fail)]
+#[derive(Debug, Fail, Display)]
 pub enum SrcParseError {
-    #[fail(display = "Provided not src uri {}", _0)]
+    #[display(fmt = "Provided not src uri {}", _0)]
     NotSrcUri(String),
-    #[fail(display = "Local URI '{}' parse error: {:?}", _0, _1)]
+    #[display(fmt = "Local URI '{}' parse error: {:?}", _0, _1)]
     LocalUriParseError(String, LocalUriParseError),
 }
 

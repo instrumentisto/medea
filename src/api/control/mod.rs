@@ -30,30 +30,30 @@ pub use self::{
 };
 
 /// Errors which may occur while deserialize protobuf spec.
-#[derive(Debug, Fail)]
+#[derive(Debug, Fail, Display)]
 pub enum TryFromProtobufError {
     /// Error while parsing src uri of [`WebRtcPlayEndpoint`].
-    #[fail(display = "Src uri parse error: {:?}", _0)]
+    #[display(fmt = "Src uri parse error: {:?}", _0)]
     SrcUriError(SrcParseError),
 
     /// Src URI not provided for [`WebRtcPlayEndpoint`].
-    #[fail(display = "Src uri for publish endpoint not provided.")]
+    #[display(fmt = "Src uri for publish endpoint not provided.")]
     SrcUriNotFound,
 
     /// Room element not provided.
-    #[fail(display = "Room element not provided.")]
+    #[display(fmt = "Room element not provided.")]
     RoomElementNotFound,
 
     /// Member element not provided.
-    #[fail(display = "Member element not provided.")]
+    #[display(fmt = "Member element not provided.")]
     MemberElementNotFound,
 
     /// [`P2pMode`] not found.
-    #[fail(display = "P2p mode for play endpoint not provided.")]
+    #[display(fmt = "P2p mode for play endpoint not provided.")]
     P2pModeNotFound,
 
     /// Member credentials not found.
-    #[fail(display = "Credentials for member not provided.")]
+    #[display(fmt = "Credentials for member not provided.")]
     MemberCredentialsNotFound,
 }
 

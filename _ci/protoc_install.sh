@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 if [[ ! $DONT_INSTALL_PROTOC ]] ; then
   echo "Installing protoc"
   PROTOBUF_VERSION=3.3.0

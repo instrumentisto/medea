@@ -62,15 +62,15 @@ pub enum MembersLoadError {
 }
 
 #[allow(clippy::module_name_repetitions, clippy::pub_enum_variant_names)]
-#[derive(Debug, Fail)]
+#[derive(Debug, Fail, Display)]
 pub enum MemberError {
-    #[fail(display = "Publish endpoint [id = {}] not found.", _0)]
+    #[display(fmt = "Publish endpoint [id = {}] not found.", _0)]
     PublishEndpointNotFound(LocalUri<IsEndpointId>),
 
-    #[fail(display = "Play endpoint [id = {}] not found.", _0)]
+    #[display(fmt = "Play endpoint [id = {}] not found.", _0)]
     PlayEndpointNotFound(LocalUri<IsEndpointId>),
 
-    #[fail(display = "Endpoint [id = {}] not found.", _0)]
+    #[display(fmt = "Endpoint [id = {}] not found.", _0)]
     EndpointNotFound(LocalUri<IsEndpointId>),
 }
 
