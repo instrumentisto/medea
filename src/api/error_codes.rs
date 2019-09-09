@@ -35,13 +35,16 @@ pub struct ErrorResponse {
     error_code: ErrorCode,
 
     /// Element ID where some error happened. May be empty.
-    element_id: String,
+    element_id: Option<String>,
 
-    /// If some unexpected error will be throwed then this field will
-    /// store this error converted to [`String`].
+    /// All [`ErrorCode`]s have [`Display`] implementation. And this
+    /// implementation will be used if this field is [`None`]. But
+    /// some time we want to use custom text. Then we set this field
+    /// to [`Some`] and this custom text will be added to
+    /// [`Display`] implementation's text.
     ///
-    /// Normally this field should be [`None`].
-    unknown_error: Option<String>,
+    /// By default this field should be [`None`].
+    additional_text: Option<String>,
 }
 
 impl ErrorResponse {
@@ -49,17 +52,17 @@ impl ErrorResponse {
     pub fn new<T: ToString>(error_code: ErrorCode, element_id: &T) -> Self {
         Self {
             error_code,
-            element_id: element_id.to_string(),
-            unknown_error: None,
+            element_id: Some(element_id.to_string()),
+            additional_text: None,
         }
     }
 
     /// New [`ErrorResponse`] only with [`ErrorCode`].
-    pub fn new_empty(error_code: ErrorCode) -> Self {
+    pub fn empty(error_code: ErrorCode) -> Self {
         Self {
             error_code,
-            element_id: String::new(),
-            unknown_error: None,
+            element_id: None,
+            additional_text: None,
         }
     }
 
@@ -69,8 +72,20 @@ impl ErrorResponse {
     pub fn unknown<B: ToString>(unknown_error: &B) -> Self {
         Self {
             error_code: ErrorCode::UnknownError,
-            unknown_error: Some(unknown_error.to_string()),
-            element_id: String::new(),
+            additional_text: Some(unknown_error.to_string()),
+            element_id: None,
+        }
+    }
+
+    pub fn custom_text(
+        error_code: ErrorCode,
+        text: String,
+        id: Option<Box<dyn ToString>>,
+    ) -> Self {
+        Self {
+            error_code,
+            additional_text: Some(text),
+            element_id: id.map(|s| s.to_string()),
         }
     }
 }
@@ -79,17 +94,19 @@ impl Into<ErrorProto> for ErrorResponse {
     fn into(self) -> ErrorProto {
         let mut error = ErrorProto::new();
 
-        if let Some(unknown_error) = &self.unknown_error {
+        if let Some(additional_text) = &self.additional_text {
             error.set_text(format!(
-                "{} Here is error: '{}'",
+                "{} {}",
                 self.error_code.to_string(),
-                unknown_error
+                additional_text
             ));
         } else {
             error.set_text(self.error_code.to_string());
         }
 
-        error.set_element(self.element_id.to_string());
+        if let Some(id) = self.element_id {
+            error.set_element(id);
+        }
         error.set_code(self.error_code as u32);
 
         error
@@ -216,8 +233,18 @@ pub enum ErrorCode {
     /// Provided empty elements IDs list.
     ///
     /// Code: __1204__.
-    #[display(fmt = "Privded empty elements IDs list.")]
+    #[display(fmt = "Provided empty elements IDs list.")]
     EmptyElementsList = 1204,
+    /// Provided not the same [`RoomId`]s in elements IDs.
+    ///
+    /// Code: __1205__.
+    #[display(fmt = "Provided not the same Room IDs in elements IDs.")]
+    ProvidedNotSameRoomIds = 1205,
+    /// Provided ID for [`Room`] and for [`Room`]'s elements.
+    ///
+    /// Code: __1206__.
+    #[display(fmt = "Provided ID for Room and for Room's elements.")]
+    DeleteRoomAndFromRoom = 1206,
 
     /////////////////////////////
     // Conflict (1300 - 1399) //
@@ -284,9 +311,7 @@ impl From<LocalUriParseError> for ErrorResponse {
             LocalUriParseError::TooManyFields(text) => {
                 Self::new(ErrorCode::ElementIdIsTooLong, &text)
             }
-            LocalUriParseError::Empty => {
-                Self::new_empty(ErrorCode::EmptyElementId)
-            }
+            LocalUriParseError::Empty => Self::empty(ErrorCode::EmptyElementId),
             LocalUriParseError::MissingFields(text) => {
                 Self::new(ErrorCode::MissingFieldsInSrcUri, &text)
             }
@@ -379,10 +404,27 @@ impl From<RoomServiceError> for ErrorResponse {
             }
             RoomServiceError::RoomError(e) => e.into(),
             RoomServiceError::EmptyUrisList => {
-                Self::new_empty(ErrorCode::EmptyElementsList)
+                Self::empty(ErrorCode::EmptyElementsList)
             }
             RoomServiceError::RoomNotFoundForElement(id) => {
                 Self::new(ErrorCode::RoomNotFoundForProvidedElement, &id)
+            }
+            RoomServiceError::NotSameRoomIds(ids, expected_room_id) => {
+                Self::custom_text(
+                    ErrorCode::ProvidedNotSameRoomIds,
+                    format!(
+                        "Expected Room ID: '{}'. IDs with different Room ID: \
+                         {:?}",
+                        expected_room_id,
+                        ids.into_iter()
+                            .map(|id| id.to_string())
+                            .collect::<Vec<_>>()
+                    ),
+                    None,
+                )
+            }
+            RoomServiceError::DeleteRoomAndFromRoom => {
+                Self::empty(ErrorCode::DeleteRoomAndFromRoom)
             }
             RoomServiceError::RoomMailboxErr(_)
             | RoomServiceError::FailedToLoadStaticSpecs(_) => {

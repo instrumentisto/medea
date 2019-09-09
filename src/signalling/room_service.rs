@@ -49,6 +49,14 @@ pub enum RoomServiceError {
     EmptyUrisList,
     #[fail(display = "Room not found for element [id = {}]", _0)]
     RoomNotFoundForElement(LocalUriType),
+    #[fail(
+        display = "Provided not the same Room IDs in elements IDs [ids = \
+                   {:?}].",
+        _0
+    )]
+    NotSameRoomIds(Vec<LocalUriType>, RoomId),
+    #[fail(display = "Provided Room IDs with Room elements IDs.")]
+    DeleteRoomAndFromRoom,
 }
 
 impl From<RoomError> for RoomServiceError {
@@ -237,6 +245,12 @@ impl Handler<DeleteElements> for RoomService {
             })
             .collect();
 
+        if !room_messages_futs.is_empty() && !deletes_from_room.is_empty() {
+            return Box::new(actix::fut::err(
+                RoomServiceError::DeleteRoomAndFromRoom,
+            ));
+        }
+
         if !room_messages_futs.is_empty() {
             Box::new(wrap_future(
                 futures::future::join_all(room_messages_futs)
@@ -264,10 +278,9 @@ impl Handler<DeleteElements> for RoomService {
                 .collect();
 
             if !ignored_ids.is_empty() {
-                warn!(
-                    "Some ids from Get request was ignored: {:?}",
-                    ignored_ids
-                );
+                return Box::new(actix::fut::err(
+                    RoomServiceError::NotSameRoomIds(ignored_ids, room_id),
+                ));
             }
 
             if let Some(room) = self.room_repo.get(&room_id) {

@@ -20,12 +20,12 @@ fn main() {
 
     //    unimplemented_apply(&client);
     create_room(&client);
-    //    delete_room(&client);
+    delete_room(&client);
     //    delete_endpoint(&client);
     //    delete_member(&client);
     //    create_member(&client);
     //    create_endpoint(&client);
-    get_room(&client);
+    //    get_room(&client);
 }
 
 fn unimplemented_apply(client: &ControlApiClient) {
@@ -112,7 +112,8 @@ fn create_endpoint(client: &ControlApiClient) {
 fn delete_room(client: &ControlApiClient) {
     let mut delete_request = IdRequest::new();
     let mut rooms = RepeatedField::new();
-    rooms.push("local://pub-pub-video-call".to_string());
+    rooms.push("local://video-call-1/caller".to_string());
+    rooms.push("local://pub-pub-video-call/caller".to_string());
     delete_request.set_id(rooms);
 
     let reply = client.delete(&delete_request).expect("delete room");
