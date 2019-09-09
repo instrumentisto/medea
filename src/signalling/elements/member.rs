@@ -12,7 +12,8 @@ use std::{
 use failure::Fail;
 use medea_client_api_proto::{IceServer, PeerId};
 use medea_grpc_proto::control::{
-    Member as MemberProto, Room_Element as ElementProto,
+    Element as RootElementProto, Member as MemberProto,
+    Room_Element as ElementProto,
 };
 
 use crate::{
@@ -28,7 +29,10 @@ use crate::{
     media::IceUser,
 };
 
-use super::endpoints::webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint};
+use super::endpoints::{
+    webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
+    Endpoint,
+};
 
 /// Errors which may occur while loading [`Member`]s from [`RoomSpec`].
 #[derive(Debug, Fail)]
@@ -64,6 +68,9 @@ pub enum MemberError {
 
     #[fail(display = "Play endpoint [id = {}] not found.", _0)]
     PlayEndpointNotFound(LocalUri<IsEndpointId>),
+
+    #[fail(display = "Endpoint [id = {}] not found.", _0)]
+    EndpointNotFound(LocalUri<IsEndpointId>),
 }
 
 /// [`Member`] is member of [`Room`].
@@ -417,6 +424,24 @@ impl Member {
         member.insert_sink(sink);
     }
 
+    pub fn get_endpoint_by_id(
+        &self,
+        id: String,
+    ) -> Result<Endpoint, MemberError> {
+        let webrtc_publish_id = WebRtcPublishId(id);
+        if let Some(publish_endpoint) = self.get_src_by_id(&webrtc_publish_id) {
+            return Ok(Endpoint::WebRtcPublishEndpoint(publish_endpoint));
+        }
+        let webrtc_play_id = WebRtcPlayId(webrtc_publish_id.0);
+        if let Some(play_endpoint) = self.get_sink_by_id(&webrtc_play_id) {
+            return Ok(Endpoint::WebRtcPlayEndpoint(play_endpoint));
+        }
+
+        Err(MemberError::EndpointNotFound(
+            self.get_local_uri_to_endpoint(webrtc_play_id.to_string()),
+        ))
+    }
+
     /// Downgrade strong [`Member`]'s pointer to weak [`WeakMember`] pointer.
     pub fn downgrade(&self) -> WeakMember {
         WeakMember(Rc::downgrade(&self.0))
@@ -527,6 +552,18 @@ impl Into<ElementProto> for Member {
 
         member.set_credentials(self.credentials());
 
+        element.set_member(member);
+
+        element
+    }
+}
+
+impl Into<RootElementProto> for Member {
+    fn into(self) -> RootElementProto {
+        let mut member_element: ElementProto = self.into();
+        let member = member_element.take_member();
+
+        let mut element = RootElementProto::new();
         element.set_member(member);
 
         element

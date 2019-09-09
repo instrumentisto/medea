@@ -7,7 +7,7 @@ use std::{
 
 use medea_client_api_proto::PeerId;
 use medea_grpc_proto::control::{
-    Member_Element as ElementProto,
+    Element as RootElementProto, Member_Element as ElementProto,
     WebRtcPlayEndpoint as WebRtcPlayEndpointProto,
 };
 
@@ -22,6 +22,7 @@ use crate::{
 };
 
 use super::publish_endpoint::WebRtcPublishEndpoint;
+use crate::api::control::RootElement;
 
 #[derive(Debug, Clone)]
 struct WebRtcPlayEndpointInner {
@@ -198,6 +199,16 @@ impl Into<ElementProto> for WebRtcPlayEndpoint {
         play.set_src(self.src_uri().to_string());
         element.set_webrtc_play(play);
 
+        element
+    }
+}
+
+impl Into<RootElementProto> for WebRtcPlayEndpoint {
+    fn into(self) -> RootElementProto {
+        let mut element = RootElementProto::new();
+        let mut member_element: ElementProto = self.into();
+        let endpoint = member_element.take_webrtc_play();
+        element.set_webrtc_play(endpoint);
         element
     }
 }

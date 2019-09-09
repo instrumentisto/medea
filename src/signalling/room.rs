@@ -641,47 +641,6 @@ impl Room {
             endpoint_id, member_id, self.id
         );
     }
-
-    fn serialize_member_to_protobuf(
-        &self,
-        member_id: &MemberId,
-    ) -> Result<ElementProto, RoomError> {
-        let member = self.members.get_member(member_id)?;
-
-        let mut member_element: Room_Element = member.into();
-        let member = member_element.take_member();
-
-        let mut element = ElementProto::new();
-        element.set_member(member);
-
-        Ok(element)
-    }
-
-    fn serialize_endpoint_to_proto(
-        &self,
-        member_id: &MemberId,
-        endpoint_id: String,
-    ) -> Result<ElementProto, RoomError> {
-        let member = self.members.get_member(member_id)?;
-
-        let publish_endpoint_id = WebRtcPublishId(endpoint_id);
-        let mut element = ElementProto::new();
-
-        if let Some(endpoint) = member.get_src_by_id(&publish_endpoint_id) {
-            let mut member_element: Member_Element = endpoint.into();
-            let endpoint = member_element.take_webrtc_pub();
-            element.set_webrtc_pub(endpoint);
-        } else {
-            let play_endpoint_id = WebRtcPlayId(publish_endpoint_id.0);
-
-            let endpoint = member.get_sink(&play_endpoint_id)?;
-            let mut member_element: Member_Element = endpoint.into();
-            let endpoint = member_element.take_webrtc_play();
-            element.set_webrtc_play(endpoint);
-        }
-
-        Ok(element)
-    }
 }
 
 /// [`Actor`] implementation that provides an ergonomic way
@@ -721,7 +680,8 @@ impl Handler<SerializeProto> for Room {
         msg: SerializeProto,
         _: &mut Self::Context,
     ) -> Self::Result {
-        let mut serialized = HashMap::new();
+        let mut serialized: HashMap<LocalUriType, ElementProto> =
+            HashMap::new();
         for uri in msg.0 {
             match &uri {
                 LocalUriType::Room(room_uri) => {
@@ -736,17 +696,17 @@ impl Handler<SerializeProto> for Room {
                     }
                 }
                 LocalUriType::Member(member_uri) => {
-                    let member_id = member_uri.member_id();
-                    let member_proto =
-                        self.serialize_member_to_protobuf(member_id)?;
-                    serialized.insert(uri, member_proto);
+                    let member =
+                        self.members.get_member(member_uri.member_id())?;
+                    serialized.insert(uri, member.into());
                 }
                 LocalUriType::Endpoint(endpoint_uri) => {
-                    let endpoint_id = endpoint_uri.endpoint_id().to_string();
-                    let member_id = endpoint_uri.member_id();
-                    let endpoint_proto = self
-                        .serialize_endpoint_to_proto(member_id, endpoint_id)?;
-                    serialized.insert(uri, endpoint_proto);
+                    let member =
+                        self.members.get_member(endpoint_uri.member_id())?;
+                    let endpoint = member.get_endpoint_by_id(
+                        endpoint_uri.endpoint_id().to_string(),
+                    )?;
+                    serialized.insert(uri, endpoint.into());
                 }
             }
         }

@@ -33,7 +33,7 @@ use crate::{
                 WebRtcPublishEndpoint as WebRtcPublishEndpointSpec,
             },
             local_uri::{IsEndpointId, IsMemberId, LocalUri},
-            MemberId, MemberSpec, RoomId, RoomSpec, WebRtcPlayId,
+            Endpoint, MemberId, MemberSpec, RoomId, RoomSpec, WebRtcPlayId,
             WebRtcPublishId,
         },
     },

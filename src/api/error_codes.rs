@@ -338,6 +338,9 @@ impl From<MemberError> for ErrorResponse {
             MemberError::PublishEndpointNotFound(id) => {
                 Self::new(ErrorCode::PublishEndpointNotFound, &id)
             }
+            MemberError::EndpointNotFound(id) => {
+                Self::new(ErrorCode::EndpointNotFound, &id)
+            }
         }
     }
 }
