@@ -57,11 +57,6 @@ use crate::{
 pub enum ParticipantServiceErr {
     #[fail(display = "TurnService Error in ParticipantService: {}", _0)]
     TurnServiceErr(TurnServiceErr),
-    #[fail(
-        display = "Mailbox error when accessing ParticipantService: {}",
-        _0
-    )]
-    MailBoxErr(MailboxError),
     #[fail(display = "Participant [id = {}] not found", _0)]
     ParticipantNotFound(LocalUri<IsMemberId>),
     #[fail(display = "Endpoint [id = {}] not found.", _0)]
@@ -77,12 +72,6 @@ pub enum ParticipantServiceErr {
 impl From<TurnServiceErr> for ParticipantServiceErr {
     fn from(err: TurnServiceErr) -> Self {
         Self::TurnServiceErr(err)
-    }
-}
-
-impl From<MailboxError> for ParticipantServiceErr {
-    fn from(err: MailboxError) -> Self {
-        Self::MailBoxErr(err)
     }
 }
 

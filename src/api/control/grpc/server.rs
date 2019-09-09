@@ -67,9 +67,18 @@ pub enum ControlApiError {
     #[fail(display = "{:?}", _0)]
     TryFromElement(TryFromElementError),
 
-    /// Wrapped [`MailboxError`].
-    #[fail(display = "{:?}", _0)]
-    MailboxError(MailboxError),
+    /// [`MailboxError`] for [`RoomService`].
+    #[fail(display = "Room service mailbox error: {:?}", _0)]
+    RoomServiceMailboxError(MailboxError),
+
+    /// [`MailboxError`] which never can happen. This error needed
+    /// for `fut_try!` macro because they use `From` trait.
+    /// With this error we cover [`MailboxError`] in places where
+    /// it cannot happen.
+    ///
+    /// __Never use this error.__
+    #[fail(display = "Mailbox error which never can happen.")]
+    UnknownMailboxErr(MailboxError),
 }
 
 impl From<LocalUriParseError> for ControlApiError {
@@ -87,12 +96,6 @@ impl From<TryFromProtobufError> for ControlApiError {
 impl From<TryFromElementError> for ControlApiError {
     fn from(from: TryFromElementError) -> Self {
         ControlApiError::TryFromElement(from)
-    }
-}
-
-impl From<MailboxError> for ControlApiError {
-    fn from(from: MailboxError) -> Self {
-        ControlApiError::MailboxError(from)
     }
 }
 
@@ -200,7 +203,7 @@ impl ControlApiService {
         Either::A(
             self.room_service
                 .send(StartRoom(room_id, room))
-                .map_err(ControlApiError::from)
+                .map_err(ControlApiError::RoomServiceMailboxError)
                 .map(move |r| r.map(|_| Ok(sid))),
         )
     }
@@ -227,7 +230,7 @@ impl ControlApiService {
                     member_id,
                     spec,
                 })
-                .map_err(ControlApiError::from)
+                .map_err(ControlApiError::RoomServiceMailboxError)
                 .map(|r| r.map(|r| r.map(|_| sids))),
         )
     }
@@ -252,7 +255,7 @@ impl ControlApiService {
                     endpoint_id,
                     spec: endpoint,
                 })
-                .map_err(ControlApiError::from)
+                .map_err(ControlApiError::RoomServiceMailboxError)
                 .map(|r| r.map(|r| r.map(|_| HashMap::new()))),
         )
     }
@@ -403,24 +406,13 @@ impl ControlApi for ControlApiService {
         req: IdRequest,
         sink: UnarySink<Response>,
     ) {
-        let mut delete_elements = DeleteElements::new();
+        let mut uris = Vec::new();
 
         for id in req.get_id() {
             let uri: LocalUriType = parse_local_uri!(id, ctx, sink, Response);
-            delete_elements.add_uri(uri);
+            uris.push(uri);
         }
-
-        let delete_elements = match delete_elements.validate() {
-            Ok(validated) => validated,
-            Err(err) => {
-                send_error_response!(
-                    ctx,
-                    sink,
-                    ErrorResponse::from(err),
-                    Response
-                );
-            }
-        };
+        let delete_elements = DeleteElements { uris };
 
         ctx.spawn(
             self.room_service

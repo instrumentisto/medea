@@ -38,27 +38,23 @@ type ActFuture<I, E> =
 pub enum RoomServiceError {
     #[fail(display = "Room [id = {}] not found.", _0)]
     RoomNotFound(LocalUri<IsRoomId>),
-    #[fail(display = "Mailbox error: {:?}", _0)]
-    MailboxError(MailboxError),
+    #[fail(display = "Room mailbox error: {:?}", _0)]
+    RoomMailboxErr(MailboxError),
     #[fail(display = "Room [id = {}] already exists.", _0)]
     RoomAlreadyExists(LocalUri<IsRoomId>),
     #[fail(display = "{}", _0)]
     RoomError(RoomError),
     #[fail(display = "Failed to load static specs. {:?}", _0)]
     FailedToLoadStaticSpecs(failure::Error),
-    #[fail(display = "Unknow error.")]
-    Unknown,
+    #[fail(display = "Empty URIs list.")]
+    EmptyUrisList,
+    #[fail(display = "Room not found for element [id = {}]", _0)]
+    RoomNotFoundForElement(LocalUriType),
 }
 
 impl From<RoomError> for RoomServiceError {
     fn from(err: RoomError) -> Self {
         RoomServiceError::RoomError(err)
-    }
-}
-
-impl From<MailboxError> for RoomServiceError {
-    fn from(e: MailboxError) -> Self {
-        RoomServiceError::MailboxError(e)
     }
 }
 
@@ -205,57 +201,25 @@ impl Handler<StartRoom> for RoomService {
 }
 
 /// Signal for delete [`Room`].
+// TODO: maybe use state machine?
 #[derive(Message)]
 #[rtype(result = "Result<(), RoomServiceError>")]
-pub struct DeleteElements<T> {
-    uris: Vec<LocalUriType>,
-    _marker: PhantomData<T>,
+pub struct DeleteElements {
+    pub uris: Vec<LocalUriType>,
 }
 
-pub struct NotValidated;
-pub struct Valid;
-
-impl DeleteElements<NotValidated> {
-    pub fn new() -> DeleteElements<NotValidated> {
-        Self {
-            uris: vec![],
-            _marker: PhantomData,
-        }
-    }
-
-    pub fn add_uri(&mut self, uri: LocalUriType) {
-        self.uris.push(uri);
-    }
-
-    pub fn validate(self) -> Result<DeleteElements<Valid>, RoomServiceError> {
-        // TODO: correct errors
-        if self.uris.is_empty() {
-            return Err(RoomServiceError::Unknown);
-        }
-
-        let first_room = self.uris[0].room_id();
-        let is_same_room =
-            self.uris.iter().all(|item| item.room_id() == first_room);
-
-        if !is_same_room {
-            return Err(RoomServiceError::Unknown);
-        }
-
-        Ok(DeleteElements {
-            uris: self.uris,
-            _marker: PhantomData,
-        })
-    }
-}
-
-impl Handler<DeleteElements<Valid>> for RoomService {
+impl Handler<DeleteElements> for RoomService {
     type Result = ActFuture<(), RoomServiceError>;
 
     fn handle(
         &mut self,
-        msg: DeleteElements<Valid>,
+        msg: DeleteElements,
         _: &mut Context<RoomService>,
     ) -> Self::Result {
+        if msg.uris.is_empty() {
+            return Box::new(actix::fut::err(RoomServiceError::EmptyUrisList));
+        }
+
         let mut deletes_from_room: Vec<LocalUriType> = Vec::new();
         let room_messages_futs: Vec<
             Box<dyn Future<Item = (), Error = MailboxError>>,
@@ -277,7 +241,7 @@ impl Handler<DeleteElements<Valid>> for RoomService {
             Box::new(wrap_future(
                 futures::future::join_all(room_messages_futs)
                     .map(|_| ())
-                    .map_err(|e| RoomServiceError::from(e)),
+                    .map_err(|e| RoomServiceError::RoomMailboxErr(e)),
             ))
         } else if !deletes_from_room.is_empty() {
             let room_id = deletes_from_room[0].room_id().clone();
@@ -302,7 +266,7 @@ impl Handler<DeleteElements<Valid>> for RoomService {
             if let Some(room) = self.room_repo.get(&room_id) {
                 Box::new(wrap_future(
                     room.send(Delete(deletes_from_room))
-                        .map_err(|e| RoomServiceError::from(e)),
+                        .map_err(|e| RoomServiceError::RoomMailboxErr(e)),
                 ))
             } else {
                 Box::new(actix::fut::err(RoomServiceError::RoomNotFound(
@@ -340,7 +304,7 @@ impl Handler<Get> for RoomService {
                     ));
                 } else {
                     return Box::new(actix::fut::err(
-                        RoomServiceError::Unknown,
+                        RoomServiceError::RoomNotFoundForElement(uri),
                     ));
                 }
             }
@@ -352,6 +316,7 @@ impl Handler<Get> for RoomService {
                 futs.push(room.send(SerializeProto(elements)));
             } else {
                 return Box::new(actix::fut::err(
+                    // TODO: better return RoomNotFoundForElement err
                     RoomServiceError::RoomNotFound(get_local_uri_to_room(
                         room_id,
                     )),
@@ -361,7 +326,7 @@ impl Handler<Get> for RoomService {
 
         Box::new(wrap_future(
             futures::future::join_all(futs)
-                .map_err(|e| RoomServiceError::from(e))
+                .map_err(|e| RoomServiceError::RoomMailboxErr(e))
                 .and_then(|results| {
                     let mut all = HashMap::new();
                     for result in results {
@@ -396,7 +361,7 @@ impl Handler<CreateMemberInRoom> for RoomService {
         let fut = if let Some(room) = self.room_repo.get(&msg.room_id) {
             Either::A(
                 room.send(CreateMember(msg.member_id, msg.spec))
-                    .map_err(RoomServiceError::from),
+                    .map_err(RoomServiceError::RoomMailboxErr),
             )
         } else {
             Either::B(future::err(RoomServiceError::RoomNotFound(
@@ -433,7 +398,7 @@ impl Handler<CreateEndpointInRoom> for RoomService {
                     endpoint_id: msg.endpoint_id,
                     spec: msg.spec,
                 })
-                .map_err(RoomServiceError::from),
+                .map_err(RoomServiceError::RoomMailboxErr),
             )
         } else {
             Either::B(future::err(RoomServiceError::RoomNotFound(

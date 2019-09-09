@@ -133,6 +133,11 @@ pub enum ErrorCode {
     /// Code: __1005__.
     #[display(fmt = "Endpoint not found.")]
     EndpointNotFound = 1005,
+    /// Room not found for provided element.
+    ///
+    /// Code: __1006__.
+    #[display(fmt = "Room not found for provided element.")]
+    RoomNotFoundForProvidedElement = 1006,
 
     //////////////////////////////////////
     // Spec errors (1100 - 1199 codes) //
@@ -208,6 +213,11 @@ pub enum ErrorCode {
     /// Code: __1203__.
     #[display(fmt = "Provided empty element ID.")]
     EmptyElementId = 1203,
+    /// Provided empty elements IDs list.
+    ///
+    /// Code: __1204__.
+    #[display(fmt = "Privded empty elements IDs list.")]
+    EmptyElementsList = 1204,
 
     /////////////////////////////
     // Conflict (1300 - 1399) //
@@ -227,17 +237,6 @@ pub enum ErrorCode {
     /// Code: __1302__.
     #[display(fmt = "Room already exists.")]
     RoomAlreadyExists = 1302,
-
-    ///////////////////////////////////////////
-    // Internal server errors (1400 - 1499) //
-    /////////////////////////////////////////
-    // TODO: Maybe print errors to log for this kind of errors??
-    /// [`LocalUriType`] with some [`RoomId`] provided
-    /// to [`Room`] with not this [`Room`]'s [`RoomId`].
-    #[display(
-        fmt = "Local URI provided to 'Room' which have different RoomId."
-    )]
-    UriProvidedToWrongRoom = 1400,
 }
 
 impl From<ParticipantServiceErr> for ErrorResponse {
@@ -255,7 +254,8 @@ impl From<ParticipantServiceErr> for ErrorResponse {
             ParticipantServiceErr::EndpointAlreadyExists(id) => {
                 Self::new(ErrorCode::EndpointAlreadyExists, &id)
             }
-            _ => Self::unknown(&err),
+            ParticipantServiceErr::TurnServiceErr(_)
+            | ParticipantServiceErr::MemberError(_) => Self::unknown(&err),
         }
     }
 }
@@ -264,7 +264,13 @@ impl From<TryFromProtobufError> for ErrorResponse {
     fn from(err: TryFromProtobufError) -> Self {
         match err {
             TryFromProtobufError::SrcUriError(e) => e.into(),
-            _ => Self::unknown(&err),
+            TryFromProtobufError::SrcUriNotFound
+            | TryFromProtobufError::RoomElementNotFound
+            | TryFromProtobufError::MemberElementNotFound
+            | TryFromProtobufError::P2pModeNotFound
+            | TryFromProtobufError::MemberCredentialsNotFound => {
+                Self::unknown(&err)
+            }
         }
     }
 }
@@ -297,10 +303,16 @@ impl From<RoomError> for ErrorResponse {
             RoomError::MemberError(e) => e.into(),
             RoomError::MembersLoadError(e) => e.into(),
             RoomError::ParticipantServiceErr(e) => e.into(),
-            RoomError::WrongRoomId(uri, _) => {
-                Self::new(ErrorCode::UriProvidedToWrongRoom, &uri)
-            }
-            _ => Self::unknown(&err),
+            RoomError::WrongRoomId(_, _)
+            | RoomError::PeerNotFound(_)
+            | RoomError::NoTurnCredentials(_)
+            | RoomError::ConnectionNotExists(_)
+            | RoomError::UnableToSendEvent(_)
+            | RoomError::PeerError(_)
+            | RoomError::TryFromElementError(_)
+            | RoomError::BadRoomSpec(_)
+            | RoomError::TurnServiceError(_)
+            | RoomError::ClientError(_) => Self::unknown(&err),
         }
     }
 }
@@ -366,7 +378,16 @@ impl From<RoomServiceError> for ErrorResponse {
                 Self::new(ErrorCode::RoomAlreadyExists, &id)
             }
             RoomServiceError::RoomError(e) => e.into(),
-            _ => Self::unknown(&err),
+            RoomServiceError::EmptyUrisList => {
+                Self::new_empty(ErrorCode::EmptyElementsList)
+            }
+            RoomServiceError::RoomNotFoundForElement(id) => {
+                Self::new(ErrorCode::RoomNotFoundForProvidedElement, &id)
+            }
+            RoomServiceError::RoomMailboxErr(_)
+            | RoomServiceError::FailedToLoadStaticSpecs(_) => {
+                Self::unknown(&err)
+            }
         }
     }
 }
@@ -376,7 +397,9 @@ impl From<ControlApiError> for ErrorResponse {
         match err {
             ControlApiError::LocalUri(e) => e.into(),
             ControlApiError::TryFromProtobuf(e) => e.into(),
-            _ => Self::unknown(&err),
+            ControlApiError::RoomServiceMailboxError(_)
+            | ControlApiError::TryFromElement(_)
+            | ControlApiError::UnknownMailboxErr(_) => Self::unknown(&err),
         }
     }
 }
