@@ -12,14 +12,13 @@ stages:
     if: (branch = master AND type != pull_request) OR commit_message =~ /.*\[run ci\]/
   - name: build_beta
     if: branch = master
-  - name: test_toolchain
-    if: (branch = master AND type != pull_request) OR commit_message =~ /.*\[run ci\]/
   - name: test
     if: (branch = master AND type != pull_request) OR commit_message =~ /.*\[run ci\]/
 
 jobs:
   allow_failures:
     - rust: nightly
+      stage: check
 
   include:
     - name: Clippy
@@ -59,22 +58,35 @@ jobs:
       rust: nightly
       script: cargo build --bin medea
 
-    - name: test_toolchain
-      stage: test_toolchain
-      rust: nightly
-      script:
-        - cargo +nightly install wasm-bindgen-cli -Z install-upgrade
-        - rustup target add wasm32-unknown-unknown
-
-    - name: unit
+    - name: unit medea-macro
       stage: test
       rust: stable
+      script: make test.unit crate=medea-macro
+
+    - name: unit medea-client-api-proto
+      stage: test
+      rust: stable
+      script: make test.unit crate=medea-client-api-proto
+
+    - name: unit medea
+      stage: test
+      rust: stable
+      script: make test.unit crate=medea
+
+    - name: unit medea-macro
+      stage: test
+      # run on stable when -Z install-upgrade is out
+      # tracking: rust-lang/cargo#6797
+      rust: nightly
       addons:
         chrome: stable
         apt:
           packages:
             - chromium-chromedriver
-      script: make test.unit crate=@all
+      before_script:
+        - cargo +nightly install wasm-bindgen-cli -Z install-upgrade
+        - rustup target add wasm32-unknown-unknown
+      script: make test.unit crate=medea-macro
 
     - name: crates.io
       stage: release
