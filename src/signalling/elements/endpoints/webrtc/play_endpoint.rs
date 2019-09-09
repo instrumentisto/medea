@@ -22,7 +22,6 @@ use crate::{
 };
 
 use super::publish_endpoint::WebRtcPublishEndpoint;
-use crate::api::control::RootElement;
 
 #[derive(Debug, Clone)]
 struct WebRtcPlayEndpointInner {

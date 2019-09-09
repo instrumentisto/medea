@@ -27,7 +27,6 @@ use crate::{
     },
     AppContext,
 };
-use serde::export::PhantomData;
 use std::collections::HashMap;
 
 type ActFuture<I, E> =
@@ -211,10 +210,12 @@ pub struct DeleteElements {
 impl Handler<DeleteElements> for RoomService {
     type Result = ActFuture<(), RoomServiceError>;
 
+    // TODO: delete this allow when drain_filter TODO will be resolved.
+    #[allow(clippy::unnecessary_filter_map)]
     fn handle(
         &mut self,
         msg: DeleteElements,
-        _: &mut Context<RoomService>,
+        _: &mut Self::Context,
     ) -> Self::Result {
         if msg.uris.is_empty() {
             return Box::new(actix::fut::err(RoomServiceError::EmptyUrisList));
@@ -228,23 +229,27 @@ impl Handler<DeleteElements> for RoomService {
             .into_iter()
             .filter_map(|l| {
                 if let LocalUriType::Room(room_id) = l {
-                    Some(room_id)
+                    Some(self.close_room(room_id.take_room_id()))
                 } else {
                     deletes_from_room.push(l);
                     None
                 }
             })
-            .map(|room_id| self.close_room(room_id.take_room_id()))
             .collect();
 
         if !room_messages_futs.is_empty() {
             Box::new(wrap_future(
                 futures::future::join_all(room_messages_futs)
                     .map(|_| ())
-                    .map_err(|e| RoomServiceError::RoomMailboxErr(e)),
+                    .map_err(RoomServiceError::RoomMailboxErr),
             ))
-        } else if !deletes_from_room.is_empty() {
+        } else if deletes_from_room.is_empty() {
+            Box::new(actix::fut::ok(()))
+        } else {
             let room_id = deletes_from_room[0].room_id().clone();
+
+            // TODO: rewrite using drain_filter when this will be in stable
+            //       http://tiny.cc/2osfcz (Vec::drain_filter docs)
             let mut ignored_ids = Vec::new();
             let deletes_from_room: Vec<LocalUriType> = deletes_from_room
                 .into_iter()
@@ -257,24 +262,24 @@ impl Handler<DeleteElements> for RoomService {
                     }
                 })
                 .collect();
+
             if !ignored_ids.is_empty() {
                 warn!(
                     "Some ids from Get request was ignored: {:?}",
                     ignored_ids
                 );
             }
+
             if let Some(room) = self.room_repo.get(&room_id) {
                 Box::new(wrap_future(
                     room.send(Delete(deletes_from_room))
-                        .map_err(|e| RoomServiceError::RoomMailboxErr(e)),
+                        .map_err(RoomServiceError::RoomMailboxErr),
                 ))
             } else {
                 Box::new(actix::fut::err(RoomServiceError::RoomNotFound(
                     get_local_uri_to_room(room_id),
                 )))
             }
-        } else {
-            Box::new(actix::fut::ok(()))
         }
     }
 }
@@ -295,18 +300,16 @@ impl Handler<Get> for RoomService {
             if self.room_repo.is_contains_room_with_id(uri.room_id()) {
                 rooms_elements
                     .entry(uri.room_id().clone())
-                    .or_insert_with(|| Vec::new())
+                    .or_insert_with(Vec::new)
                     .push(uri);
+            } else if let LocalUriType::Room(room_uri) = uri {
+                return Box::new(actix::fut::err(
+                    RoomServiceError::RoomNotFound(room_uri),
+                ));
             } else {
-                if let LocalUriType::Room(room_uri) = uri {
-                    return Box::new(actix::fut::err(
-                        RoomServiceError::RoomNotFound(room_uri),
-                    ));
-                } else {
-                    return Box::new(actix::fut::err(
-                        RoomServiceError::RoomNotFoundForElement(uri),
-                    ));
-                }
+                return Box::new(actix::fut::err(
+                    RoomServiceError::RoomNotFoundForElement(uri),
+                ));
             }
         }
 
@@ -326,7 +329,7 @@ impl Handler<Get> for RoomService {
 
         Box::new(wrap_future(
             futures::future::join_all(futs)
-                .map_err(|e| RoomServiceError::RoomMailboxErr(e))
+                .map_err(RoomServiceError::RoomMailboxErr)
                 .and_then(|results| {
                     let mut all = HashMap::new();
                     for result in results {

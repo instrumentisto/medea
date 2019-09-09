@@ -60,7 +60,7 @@ pub enum MembersLoadError {
     PublishEndpointNotFound(LocalUri<IsEndpointId>),
 }
 
-#[allow(clippy::module_name_repetitions)]
+#[allow(clippy::module_name_repetitions, clippy::pub_enum_variant_names)]
 #[derive(Debug, Fail)]
 pub enum MemberError {
     #[fail(display = "Publish endpoint [id = {}] not found.", _0)]

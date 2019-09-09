@@ -10,8 +10,7 @@
 use std::{collections::HashMap, time::Instant};
 
 use actix::{
-    fut::wrap_future, ActorFuture, AsyncContext, Context, MailboxError,
-    SpawnHandle,
+    fut::wrap_future, ActorFuture, AsyncContext, Context, SpawnHandle,
 };
 use failure::Fail;
 use futures::{
@@ -33,7 +32,7 @@ use crate::{
                 WebRtcPublishEndpoint as WebRtcPublishEndpointSpec,
             },
             local_uri::{IsEndpointId, IsMemberId, LocalUri},
-            Endpoint, MemberId, MemberSpec, RoomId, RoomSpec, WebRtcPlayId,
+            MemberId, MemberSpec, RoomId, RoomSpec, WebRtcPlayId,
             WebRtcPublishId,
         },
     },
