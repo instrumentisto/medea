@@ -116,7 +116,7 @@ pub struct Room {
 impl Room {
     /// Create new instance of [`Room`].
     ///
-    /// Returns [`RoomError::BadRoomSpec`] when error while `Element`
+    /// Returns [`RoomError::BadRoomSpec`] when errs while `Element`
     /// transformation happens.
     pub fn new(
         room_spec: &RoomSpec,
@@ -320,16 +320,17 @@ impl Room {
         )))
     }
 
-    /// Create [`Peer`] for endpoints if [`Peer`] between endpoint's members
-    /// not exist.
+    /// Creates [`Peer`] for endpoints if [`Peer`] between endpoint's members
+    /// doesn't exist.
     ///
-    /// Add `send` track to source member's [`Peer`] and `recv` to
+    /// Adds `send` track to source member's [`Peer`] and `recv` to
     /// sink member's [`Peer`].
     ///
-    /// Returns [`PeerId`]s of newly created [`Peer`] if some created.
+    /// Returns [`PeerId`]s of newly created [`Peer`] if it has been created.
     ///
-    /// __This will panic if provide endpoints with already interconnected
-    /// [`Peer`]s!__
+    /// # Panics
+    ///
+    /// Panics if provided endpoints have interconnected [`Peer`]s already.
     fn connect_endpoints(
         &mut self,
         src: &WebRtcPublishEndpoint,
@@ -380,12 +381,12 @@ impl Room {
         None
     }
 
-    /// Create and interconnect all [`Peer`]s between connected [`Member`]
-    /// and all available at this moment [`Member`].
+    /// Creates and interconnects all [`Peer`]s between connected [`Member`]
+    /// and all available at this moment other [`Member`]s.
     ///
-    /// Availability is determines by checking [`RpcConnection`] of all
+    /// Availability is determined by checking [`RpcConnection`] of all
     /// [`Member`]s from [`WebRtcPlayEndpoint`]s and from receivers of
-    /// connected [`Member`].
+    /// the connected [`Member`].
     fn init_member_connections(
         &mut self,
         member: &Member,
@@ -428,7 +429,7 @@ impl Room {
         }
     }
 
-    /// Check state of interconnected [`Peer`]s and sends [`Event`] about
+    /// Checks state of interconnected [`Peer`]s and sends [`Event`] about
     /// [`Peer`] created to remote [`Member`].
     fn connect_peers(
         &mut self,
@@ -436,30 +437,29 @@ impl Room {
         first_peer: PeerId,
         second_peer: PeerId,
     ) {
-        let fut: ActFuture<(), ()> = match self
-            .send_peer_created(first_peer, second_peer)
-        {
-            Ok(res) => {
-                Box::new(res.then(|res, room, ctx| -> ActFuture<(), ()> {
-                    if res.is_ok() {
-                        return Box::new(future::ok(()).into_actor(room));
-                    }
+        let fut: ActFuture<(), ()> =
+            match self.send_peer_created(first_peer, second_peer) {
+                Ok(res) => {
+                    Box::new(res.then(|res, room, ctx| -> ActFuture<(), ()> {
+                        if res.is_ok() {
+                            return Box::new(future::ok(()).into_actor(room));
+                        }
+                        error!(
+                            "Failed handle command, because {}. Room will be \
+                             stopped.",
+                            res.unwrap_err(),
+                        );
+                        room.close_gracefully(ctx)
+                    }))
+                }
+                Err(err) => {
                     error!(
-                        "Failed handle command, because {}. Room will be \
-                         stopped.",
-                        res.unwrap_err(),
-                    );
-                    room.close_gracefully(ctx)
-                }))
-            }
-            Err(err) => {
-                error!(
                     "Failed handle command, because {}. Room will be stopped.",
                     err
                 );
-                self.close_gracefully(ctx)
-            }
-        };
+                    self.close_gracefully(ctx)
+                }
+            };
 
         ctx.spawn(fut);
     }
@@ -486,7 +486,7 @@ impl Room {
         )
     }
 
-    /// Signal of removing [`Member`]'s [`Peer`]s.
+    /// Signals about removing [`Member`]'s [`Peer`]s.
     fn member_peers_removed(
         &mut self,
         peers_id: Vec<PeerId>,
@@ -607,7 +607,7 @@ impl Handler<RpcConnectionEstablished> for Room {
 
     /// Saves new [`RpcConnection`] in [`ParticipantService`], initiates media
     /// establishment between members.
-    /// Create and interconnect all available [`Member`]'s [`Peer`]s.
+    /// Creates and interconnects all available [`Member`]'s [`Peer`]s.
     ///
     /// [`RpcConnection`]: crate::api::client::rpc_connection::RpcConnection
     fn handle(
@@ -651,12 +651,11 @@ impl Handler<RpcConnectionClosed> for Room {
 
     /// Passes message to [`ParticipantService`] to cleanup stored connections.
     ///
-    /// Remove all related for disconnected [`Member`] [`Peer`]s.
+    /// Removes all related for disconnected [`Member`] [`Peer`]s.
     ///
-    /// Send [`PeersRemoved`] message to [`Member`].
+    /// Sends [`PeersRemoved`] message to [`Member`].
     ///
-    /// Delete all removed [`PeerId`]s from all [`Member`]'s
-    /// endpoints.
+    /// Deletes all removed [`PeerId`]s from all [`Member`]'s endpoints.
     ///
     /// [`PeersRemoved`]: medea-client-api-proto::Event::PeersRemoved
     fn handle(&mut self, msg: RpcConnectionClosed, ctx: &mut Self::Context) {

@@ -44,8 +44,8 @@ use crate::{
     turn::{TurnAuthService, TurnServiceErr, UnreachablePolicy},
 };
 
-#[derive(Fail, Debug, Display)]
 #[allow(clippy::module_name_repetitions)]
+#[derive(Debug, Display, Fail)]
 pub enum ParticipantServiceErr {
     #[display(fmt = "TurnService Error in ParticipantService: {}", _0)]
     TurnServiceErr(TurnServiceErr),
@@ -99,7 +99,7 @@ pub struct ParticipantService {
 }
 
 impl ParticipantService {
-    /// Create new [`ParticipantService`] from [`RoomSpec`].
+    /// Creates new [`ParticipantService`] from [`RoomSpec`].
     pub fn new(
         room_spec: &RoomSpec,
         reconnect_timeout: Duration,
@@ -115,18 +115,18 @@ impl ParticipantService {
         })
     }
 
-    /// Lookup [`Member`] by provided [`MemberId`].
+    /// Lookups [`Member`] by provided [`MemberId`].
     pub fn get_member_by_id(&self, id: &MemberId) -> Option<&Member> {
         self.members.get(id)
     }
 
-    /// Lookup [`Member`] by provided [`MemberId`] and credentials.
+    /// Lookups [`Member`] by provided [`MemberId`] and credentials.
     ///
-    /// Returns [`Err(AuthorizationError::MemberNotExists)`] if lookup by
-    /// [`MemberId`] failed.
+    /// Returns [`AuthorizationError::MemberNotExists`] if lookup by
+    /// [`MemberId`] has failed.
     ///
-    /// Returns [`Err(AuthorizationError::InvalidCredentials)`] if [`Member`]
-    /// was found, but incorrect credentials was provided.
+    /// Returns [`AuthorizationError::InvalidCredentials`] if [`Member`]
+    /// was found, but incorrect credentials were provided.
     pub fn get_member_by_id_and_credentials(
         &self,
         member_id: &MemberId,
@@ -150,7 +150,7 @@ impl ParticipantService {
             && !self.drop_connection_tasks.contains_key(member_id)
     }
 
-    /// Send [`Event`] to specified remote [`Member`].
+    /// Sends [`Event`] to specified remote [`Member`].
     pub fn send_event_to_member(
         &mut self,
         member_id: MemberId,
@@ -218,7 +218,7 @@ impl ParticipantService {
         }
     }
 
-    /// Insert new [`RpcConnection`] into this [`ParticipantService`].
+    /// Inserts new [`RpcConnection`] into this [`ParticipantService`].
     fn insert_connection(
         &mut self,
         member_id: MemberId,

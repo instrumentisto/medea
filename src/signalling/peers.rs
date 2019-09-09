@@ -72,7 +72,7 @@ impl PeerRepository {
             .ok_or_else(|| RoomError::PeerNotFound(peer_id))
     }
 
-    /// Create interconnected [`Peer`]s for provided [`Member`]s.
+    /// Creates interconnected [`Peer`]s for provided [`Member`]s.
     pub fn create_peers(
         &mut self,
         first_member: &Member,
@@ -109,12 +109,11 @@ impl PeerRepository {
         &mut self.tracks_count
     }
 
-    /// Lookup [`Peer`] of [`Member`] with ID `member_id` which
+    /// Lookups [`Peer`] of [`Member`] with ID `member_id` which
     /// connected with `partner_member_id`.
     ///
-    /// Return `Some(peer_id, partner_peer_id)` if that [`Peer`] found.
-    ///
-    /// Return `None` if that [`Peer`] not found.
+    /// Returns `Some(peer_id, partner_peer_id)` if [`Peer`] has been found,
+    /// otherwise returns `None`.
     pub fn get_peer_by_members_ids(
         &self,
         member_id: &MemberId,
@@ -173,8 +172,8 @@ impl PeerRepository {
         }
     }
 
-    /// Remove all related to [`Member`] [`Peer`]s.
-    /// Note that this function will also remove all partners [`Peer`]s.
+    /// Removes all [`Peer`]s related to given [`Member`].
+    /// Note, that this function will also remove all partners [`Peer`]s.
     ///
     /// Returns `HashMap` with all removed [`Peer`]s.
     /// Key - [`Peer`]'s owner [`MemberId`],

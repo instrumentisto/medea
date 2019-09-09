@@ -393,7 +393,7 @@ docker.build.demo:
 # Usage:
 #	make docker.build.medea [TAG=(dev|<tag>)] [debug=(yes|no)]
 #	                        [no-cache=(no|yes)] [minikube=(no|yes)]
-#                           [registry=(dockerhub|<custom-registry>)]
+#	                        [registry=(dockerhub|<custom-registry>)]
 
 docker-build-medea-image-name = $(if $(call eq,$(registry),),,$(registry)/)$(MEDEA_IMAGE_NAME)
 
@@ -683,6 +683,7 @@ build.medea:
 
 build.jason:
 	make cargo.build crate=medea-jason
+
 
 
 

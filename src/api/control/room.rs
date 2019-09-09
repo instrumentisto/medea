@@ -34,9 +34,9 @@ pub enum RoomElement {
     },
 }
 
-/// [Control API]'s `Room` element specification
+/// [Control API]'s `Room` element specification.
 ///
-/// Newtype for [`RootElement::Room`]
+/// Newtype for [`RootElement::Room`].
 ///
 /// [Control API]: http://tiny.cc/380uaz
 #[allow(clippy::module_name_repetitions)]

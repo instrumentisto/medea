@@ -7,13 +7,11 @@ install:
 
 stages:
   - name: check
-    if: (branch = master AND type != pull_request) OR commit_message =~ /.*\[run ci\]/
-  - name: build
-    if: (branch = master AND type != pull_request) OR commit_message =~ /.*\[run ci\]/
-  - name: build_beta
-    if: branch = master
+    if: (branch = master AND type != pull_request)
+        OR commit_message =~ /.*\[run ci\]/
   - name: test
-    if: (branch = master AND type != pull_request) OR commit_message =~ /.*\[run ci\]/
+    if: (branch = master AND type != pull_request)
+        OR commit_message =~ /.*\[run ci\]/
 
 jobs:
   allow_failures:
@@ -44,21 +42,25 @@ jobs:
 
     - name: medea docker (stable)
       stage: build
+      if: (branch = master AND type != pull_request)
+          OR commit_message =~ /.*\[run ci\]/
       rust: stable
-      script: make docker.build.medea debug=no TAG=build-${TRAVIS_BUILD_ID} registry=quay.io
-      services:
-        - docker
+      services: ["docker"]
+      script: make docker.build.medea debug=no
+              TAG=build-${TRAVIS_BUILD_ID} registry=quay.io
       after_script:
         - echo "$QUAYIO_PASS" | docker login quay.io -u "$QUAYIO_USER" --password-stdin
         - docker push quay.io/instrumentisto/medea:build-${TRAVIS_BUILD_ID}
 
     - name: medea (beta)
-      stage: build_beta
+      stage: build
+      if: branch = master
       rust: beta
       script: make cargo.build crate=medea
 
     - name: medea (nightly)
-      stage: build_beta
+      stage: build
+      if: branch = master
       rust: nightly
       script: make cargo.build crate=medea
 
@@ -70,10 +72,9 @@ jobs:
     - name: e2e signalling (stable)
       stage: test
       rust: stable
-      services:
-        - docker
-      script:
-        - make test.e2e dockerized=yes logs=yes TAG=build-${TRAVIS_BUILD_ID} registry=quay.io
+      services: ["docker"]
+      script: make test.e2e dockerized=yes logs=yes
+              TAG=build-${TRAVIS_BUILD_ID} registry=quay.io
 
     - name: crates.io
       stage: release

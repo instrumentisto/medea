@@ -53,7 +53,7 @@ pub enum TryFromElementError {
     NotMember,
 }
 
-/// Load [`RoomSpec`] from file with YAML format.
+/// Loads [`RoomSpec`] from file with YAML format.
 pub fn load_from_yaml_file<P: AsRef<Path>>(path: P) -> Result<RoomSpec, Error> {
     let mut file = File::open(path)?;
     let mut buf = String::new();
@@ -63,7 +63,7 @@ pub fn load_from_yaml_file<P: AsRef<Path>>(path: P) -> Result<RoomSpec, Error> {
     Ok(room)
 }
 
-/// Load all [`RoomSpec`] from YAML files from provided [`ReadDir`].
+/// Loads all [`RoomSpec`] from YAML files from provided [`ReadDir`].
 pub fn load_static_specs_from_dir(
     dir: ReadDir,
 ) -> Result<Vec<RoomSpec>, Error> {
