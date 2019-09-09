@@ -1,8 +1,8 @@
 //! Provides application configuration options.
 
+pub mod client;
 pub mod control;
 pub mod grpc;
-pub mod http_server;
 pub mod log;
 pub mod rpc;
 pub mod shutdown;
@@ -16,9 +16,9 @@ use serde::{Deserialize, Serialize};
 
 #[doc(inline)]
 pub use self::{
+    client::Client,
     control::Control,
     grpc::Grpc,
-    http_server::Client,
     log::Log,
     rpc::Rpc,
     shutdown::Shutdown,

@@ -21,3 +21,24 @@ impl Log {
         slog::Level::from_str(&self.level).ok()
     }
 }
+
+#[cfg(test)]
+mod log_conf_specs {
+    use std::env;
+
+    use serial_test_derive::serial;
+
+    use crate::conf::Conf;
+
+    #[test]
+    #[serial]
+    fn overrides_defaults() {
+        let default_conf = Conf::default();
+
+        env::set_var("MEDEA_LOG.LEVEL", "DEBUG");
+        let env_conf = Conf::parse().unwrap();
+        env::remove_var("MEDEA_LOG.LEVEL");
+
+        assert_ne!(default_conf.log.level, env_conf.log.level);
+    }
+}

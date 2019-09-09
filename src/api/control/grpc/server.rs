@@ -403,13 +403,24 @@ impl ControlApi for ControlApiService {
         req: IdRequest,
         sink: UnarySink<Response>,
     ) {
-        let mut uris = Vec::new();
+        let mut delete_elements = DeleteElements::new();
 
         for id in req.get_id() {
             let uri: LocalUriType = parse_local_uri!(id, ctx, sink, Response);
-            uris.push(uri);
+            delete_elements.add_uri(uri);
         }
-        let delete_elements = DeleteElements { uris };
+
+        let delete_elements = match delete_elements.validate() {
+            Ok(d) => d,
+            Err(e) => {
+                send_error_response!(
+                    ctx,
+                    sink,
+                    ErrorResponse::from(e),
+                    Response
+                );
+            }
+        };
 
         ctx.spawn(
             self.room_service

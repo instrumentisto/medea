@@ -1,5 +1,7 @@
 //! Service which control [`Room`].
 
+use std::collections::HashMap;
+
 use actix::{
     fut::wrap_future, Actor, ActorFuture, Addr, Context, Handler, MailboxError,
     Message,
@@ -28,7 +30,7 @@ use crate::{
     },
     AppContext,
 };
-use std::collections::HashMap;
+use failure::_core::marker::PhantomData;
 
 type ActFuture<I, E> =
     Box<dyn ActorFuture<Actor = RoomService, Item = I, Error = E>>;
@@ -205,22 +207,74 @@ impl Handler<StartRoom> for RoomService {
     }
 }
 
-/// Signal for delete [`Room`].
-// TODO: maybe use state machine?
-#[derive(Message)]
-#[rtype(result = "Result<(), RoomServiceError>")]
-pub struct DeleteElements {
-    pub uris: Vec<LocalUriType>,
+pub struct Validated;
+pub struct Unvalidated;
+
+impl DeleteElements<Unvalidated> {
+    pub fn new() -> DeleteElements<Unvalidated> {
+        Self {
+            uris: Vec::new(),
+            _state: PhantomData,
+        }
+    }
+
+    pub fn add_uri(&mut self, uri: LocalUriType) {
+        self.uris.push(uri)
+    }
+
+    pub fn validate(
+        self,
+    ) -> Result<DeleteElements<Validated>, RoomServiceError> {
+        if self.uris.is_empty() {
+            return Err(RoomServiceError::EmptyUrisList);
+        }
+
+        let mut ignored_uris = Vec::new();
+
+        let first_room = self.uris[0].room_id().clone();
+        let uris: Vec<LocalUriType> = self
+            .uris
+            .into_iter()
+            .filter_map(|uri| {
+                if uri.room_id() == &first_room {
+                    Some(uri)
+                } else {
+                    ignored_uris.push(uri);
+                    None
+                }
+            })
+            .collect();
+
+        if ignored_uris.len() > 0 {
+            return Err(RoomServiceError::NotSameRoomIds(
+                ignored_uris,
+                first_room,
+            ));
+        }
+
+        Ok(DeleteElements {
+            uris,
+            _state: PhantomData,
+        })
+    }
 }
 
-impl Handler<DeleteElements> for RoomService {
+/// Signal for delete [`Room`].
+#[derive(Message)]
+#[rtype(result = "Result<(), RoomServiceError>")]
+pub struct DeleteElements<T> {
+    uris: Vec<LocalUriType>,
+    _state: PhantomData<T>,
+}
+
+impl Handler<DeleteElements<Validated>> for RoomService {
     type Result = ActFuture<(), RoomServiceError>;
 
     // TODO: delete this allow when drain_filter TODO will be resolved.
     #[allow(clippy::unnecessary_filter_map)]
     fn handle(
         &mut self,
-        msg: DeleteElements,
+        msg: DeleteElements<Validated>,
         _: &mut Self::Context,
     ) -> Self::Result {
         if msg.uris.is_empty() {
@@ -243,43 +297,14 @@ impl Handler<DeleteElements> for RoomService {
             })
             .collect();
 
-        if !room_messages_futs.is_empty() && !deletes_from_room.is_empty() {
-            return Box::new(actix::fut::err(
-                RoomServiceError::DeleteRoomAndFromRoom,
-            ));
-        }
-
         if !room_messages_futs.is_empty() {
             Box::new(wrap_future(
                 futures::future::join_all(room_messages_futs)
                     .map(|_| ())
                     .map_err(RoomServiceError::RoomMailboxErr),
             ))
-        } else if deletes_from_room.is_empty() {
-            Box::new(actix::fut::ok(()))
-        } else {
+        } else if !deletes_from_room.is_empty() {
             let room_id = deletes_from_room[0].room_id().clone();
-
-            // TODO: rewrite using drain_filter when this will be in stable
-            //       http://tiny.cc/2osfcz (Vec::drain_filter docs)
-            let mut ignored_ids = Vec::new();
-            let deletes_from_room: Vec<LocalUriType> = deletes_from_room
-                .into_iter()
-                .filter_map(|uri| {
-                    if uri.room_id() == &room_id {
-                        Some(uri)
-                    } else {
-                        ignored_ids.push(uri);
-                        None
-                    }
-                })
-                .collect();
-
-            if !ignored_ids.is_empty() {
-                return Box::new(actix::fut::err(
-                    RoomServiceError::NotSameRoomIds(ignored_ids, room_id),
-                ));
-            }
 
             if let Some(room) = self.room_repo.get(&room_id) {
                 Box::new(wrap_future(
@@ -291,6 +316,8 @@ impl Handler<DeleteElements> for RoomService {
                     get_local_uri_to_room(room_id),
                 )))
             }
+        } else {
+            Box::new(actix::fut::err(RoomServiceError::EmptyUrisList))
         }
     }
 }

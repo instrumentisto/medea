@@ -14,3 +14,24 @@ pub struct Shutdown {
     #[serde(with = "humantime_serde")]
     pub timeout: Duration,
 }
+
+#[cfg(test)]
+mod shutdown_conf_specs {
+    use std::env;
+
+    use serial_test_derive::serial;
+
+    use crate::conf::Conf;
+
+    #[test]
+    #[serial]
+    fn overrides_defaults() {
+        let default_conf = Conf::default();
+
+        env::set_var("MEDEA_SHUTDOWN.TIMEOUT", "20s");
+        let env_conf = Conf::parse().unwrap();
+        env::remove_var("MEDEA_SHUTDOWN.TIMEOUT");
+
+        assert_ne!(default_conf.shutdown.timeout, env_conf.shutdown.timeout);
+    }
+}

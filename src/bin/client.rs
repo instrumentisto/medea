@@ -19,7 +19,7 @@ fn main() {
     let client = ControlApiClient::new(ch);
 
     //    unimplemented_apply(&client);
-    create_room(&client);
+    //    create_room(&client);
     delete_room(&client);
     //    delete_endpoint(&client);
     //    delete_member(&client);
@@ -113,6 +113,7 @@ fn delete_room(client: &ControlApiClient) {
     let mut delete_request = IdRequest::new();
     let mut rooms = RepeatedField::new();
     rooms.push("local://video-call-1/caller".to_string());
+    rooms.push("local://video-call-1".to_string());
     rooms.push("local://pub-pub-video-call/caller".to_string());
     delete_request.set_id(rooms);
 

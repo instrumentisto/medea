@@ -16,3 +16,27 @@ pub struct Control {
 
     pub grpc: Grpc,
 }
+
+#[cfg(test)]
+mod control_conf_specs {
+    use std::env;
+
+    use serial_test_derive::serial;
+
+    use crate::conf::Conf;
+
+    #[test]
+    #[serial]
+    fn overrides_defaults() {
+        let default_conf = Conf::default();
+
+        env::set_var("MEDEA_CONTROL.STATIC_SPECS_DIR", "test/");
+        let env_conf = Conf::parse().unwrap();
+        env::remove_var("MEDEA_CONTROL.STATIC_SPECS_DIR");
+
+        assert_ne!(
+            default_conf.control.static_specs_dir,
+            env_conf.control.static_specs_dir
+        );
+    }
+}

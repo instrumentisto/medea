@@ -68,3 +68,60 @@ pub struct Redis {
     #[serde(with = "humantime_serde")]
     pub connection_timeout: Duration,
 }
+
+#[cfg(test)]
+mod turn_conf_specs {
+    use std::env;
+
+    use serial_test_derive::serial;
+
+    use crate::conf::Conf;
+
+    #[test]
+    #[serial]
+    fn overrides_defaults() {
+        let default_conf = Conf::default();
+
+        env::set_var("MEDEA_TURN.DB.REDIS.IP", "0.0.0.0");
+        env::set_var("MEDEA_TURN.DB.REDIS.PORT", "4444");
+        env::set_var("MEDEA_TURN.DB.REDIS.PASS", "hellofellow");
+        env::set_var("MEDEA_TURN.DB.REDIS.DB_NUMBER", "10");
+        env::set_var("MEDEA_TURN.DB.REDIS.CONNECTION_TIMEOUT", "10s");
+        env::set_var("MEDEA_TURN.HOST", "example.com");
+        env::set_var("MEDEA_TURN.PORT", "4444");
+        env::set_var("MEDEA_TURN.USER", "ferris");
+        env::set_var("MEDEA_TURN.PASS", "qwerty");
+        let env_conf = Conf::parse().unwrap();
+        env::remove_var("MEDEA_TURN.DB.REDIS.IP");
+        env::remove_var("MEDEA_TURN.DB.REDIS.PORT");
+        env::remove_var("MEDEA_TURN.DB.REDIS.PASS");
+        env::remove_var("MEDEA_TURN.DB.REDIS.DB_NUMBER");
+        env::remove_var("MEDEA_TURN.DB.REDIS.CONNECTION_TIMEOUT");
+        env::remove_var("MEDEA_TURN.HOST");
+        env::remove_var("MEDEA_TURN.PORT");
+        env::remove_var("MEDEA_TURN.USER");
+        env::remove_var("MEDEA_TURN.PASS");
+
+        assert_ne!(default_conf.turn.db.redis.ip, env_conf.turn.db.redis.ip);
+        assert_ne!(
+            default_conf.turn.db.redis.port,
+            env_conf.turn.db.redis.port
+        );
+        assert_ne!(
+            default_conf.turn.db.redis.pass,
+            env_conf.turn.db.redis.pass
+        );
+        assert_ne!(
+            default_conf.turn.db.redis.db_number,
+            env_conf.turn.db.redis.db_number
+        );
+        assert_ne!(
+            default_conf.turn.db.redis.connection_timeout,
+            env_conf.turn.db.redis.connection_timeout
+        );
+        assert_ne!(default_conf.turn.host, env_conf.turn.host);
+        assert_ne!(default_conf.turn.port, env_conf.turn.port);
+        assert_ne!(default_conf.turn.user, env_conf.turn.user);
+        assert_ne!(default_conf.turn.pass, env_conf.turn.pass);
+    }
+}

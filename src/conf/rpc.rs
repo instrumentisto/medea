@@ -21,3 +21,30 @@ pub struct Rpc {
     #[serde(with = "humantime_serde")]
     pub reconnect_timeout: Duration,
 }
+
+#[cfg(test)]
+mod log_conf_specs {
+    use std::env;
+
+    use serial_test_derive::serial;
+
+    use crate::conf::Conf;
+
+    #[test]
+    #[serial]
+    fn overrides_defaults() {
+        let default_conf = Conf::default();
+
+        env::set_var("MEDEA_RPC.IDLE_TIMEOUT", "20s");
+        env::set_var("MEDEA_RPC.RECONNECT_TIMEOUT", "30s");
+        let env_conf = Conf::parse().unwrap();
+        env::remove_var("MEDEA_RPC.IDLE_TIMEOUT");
+        env::remove_var("MEDEA_RPC.RECONNECT_TIMEOUT");
+
+        assert_ne!(default_conf.rpc.idle_timeout, env_conf.rpc.idle_timeout);
+        assert_ne!(
+            default_conf.rpc.reconnect_timeout,
+            env_conf.rpc.reconnect_timeout
+        );
+    }
+}
