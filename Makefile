@@ -153,7 +153,7 @@ cargo.fmt:
 #	make cargo.lint
 
 cargo.lint:
-	cargo +nightly clippy --all -- -D clippy::pedantic -D warnings
+	cargo clippy --all -- -D clippy::pedantic -D warnings
 
 
 
@@ -233,7 +233,7 @@ else
 ifeq ($(crate),medea-jason)
 	cd $(crate-dir)/ && \
 	CHROMEDRIVER_CLIENT_ARGS="$(CHROMEDRIVER_CLIENT_ARGS)" \
-    cargo test --target wasm32-unknown-unknown --features mockable
+    cargo test --target wasm32-unknown-unknown
 else
 	cd $(crate-dir)/ && \
 	cargo test

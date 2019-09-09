@@ -5,15 +5,25 @@ install:
   - rustc -vV
   - cargo -vV
 
+stages:
+  - name: check
+    if: (branch = master AND type != pull_request) OR commit_message =~ /.*\[run ci\]/
+  - name: build
+    if: (branch = master AND type != pull_request) OR commit_message =~ /.*\[run ci\]/
+  - name: build_beta
+    if: branch = master
+  - name: test
+    if: (branch = master AND type != pull_request) OR commit_message =~ /.*\[run ci\]/
+
 jobs:
   allow_failures:
     - rust: nightly
-      stage: build
+      stage: check
 
   include:
     - name: Clippy
       stage: check
-      rust: nightly
+      rust: stable
       before_script: rustup component add clippy
       script: make lint
 
@@ -39,19 +49,46 @@ jobs:
       script: cargo build --bin medea
 
     - name: medea (beta)
-      stage: build
+      stage: build_beta
       rust: beta
       script: cargo build --bin medea
 
     - name: medea (nightly)
-      stage: build
+      stage: build_beta
       rust: nightly
       script: cargo build --bin medea
 
-    - name: unit (stable)
+    - name: unit medea-macro
+      stage: test
+      cache: false
+      rust: stable
+      script: make test.unit crate=medea-macro
+
+    - name: unit medea-client-api-proto
+      cache: false
       stage: test
       rust: stable
-      script: make test.unit crate=@all
+      script: make test.unit crate=medea-client-api-proto
+
+    - name: unit medea
+      stage: test
+      rust: stable
+      script: make test.unit crate=medea
+
+    - name: unit medea-jason
+      stage: test
+      # run on stable when -Z install-upgrade is out
+      # tracking: rust-lang/cargo#6797
+      rust: nightly
+      addons:
+        chrome: stable
+        apt:
+          packages:
+            - chromium-chromedriver
+      before_script:
+        - cargo +nightly install wasm-bindgen-cli -Z install-upgrade
+        - rustup target add wasm32-unknown-unknown
+      script: make test.unit crate=medea-jason
 
     - name: crates.io
       stage: release
@@ -59,7 +96,7 @@ jobs:
       cache: false
       before_script:
         - export MEDEA_CRATE_NAME=$(echo $TRAVIS_TAG \
-                        | sed -E "s/^(medea[a-z-]*)-[0-9]+\.[0-9]+\.[0-9]+/\1/")
+          | sed -E "s/^(medea[a-z-]*)-[0-9]+\.[0-9]+\.[0-9]+/\1/")
       script:
         - echo "Releasing $MEDEA_CRATE_NAME to crates.io..."
       deploy:
@@ -75,7 +112,7 @@ jobs:
       cache: false
       before_script:
         - export MEDEA_CRATE_NAME=$(echo $TRAVIS_TAG \
-                        | sed -E "s/^(medea[a-z-]*)-[0-9]+\.[0-9]+\.[0-9]+/\1/")
+          | sed -E "s/^(medea[a-z-]*)-[0-9]+\.[0-9]+\.[0-9]+/\1/")
       script:
         - echo "Releasing $MEDEA_CRATE_NAME to NPM..."
       before_deploy:
@@ -94,7 +131,7 @@ jobs:
       cache: false
       before_script:
         - export MEDEA_CRATE_NAME=$(echo $TRAVIS_TAG \
-                        | sed -E "s/^(medea[a-z-]*)-[0-9]+\.[0-9]+\.[0-9]+/\1/")
+          | sed -E "s/^(medea[a-z-]*)-[0-9]+\.[0-9]+\.[0-9]+/\1/")
       script:
         - echo "Releasing $MEDEA_CRATE_NAME to GitHub..."
       deploy:
