@@ -286,7 +286,6 @@ fn get_response_for_create(
 }
 
 impl ControlApi for ControlApiService {
-    // TODO: just send Vec<LocalUri>, see fn delete()
     /// Implementation for `Create` method of gRPC control API.
     fn create(
         &mut self,
@@ -417,31 +416,24 @@ impl ControlApi for ControlApiService {
         ctx.spawn(
             self.room_service
                 .send(delete_elements)
-                .then(move |result| {
-                    match result {
-                        Ok(result) => match result {
-                            Ok(_) => sink.success(Response::new()),
-                            Err(e) => {
-                                let mut response = Response::new();
-                                response
-                                    .set_error(ErrorResponse::from(e).into());
-                                sink.success(response)
-                            }
-                        },
+                .then(move |result| match result {
+                    Ok(result) => match result {
+                        Ok(_) => sink.success(Response::new()),
                         Err(e) => {
                             let mut response = Response::new();
-
-                            // TODO: dont use unknown, add some special err for
-                            // all       mailbox
-                            // errs, Unavailable("ActorName") or
-                            // something
-                            let error: Error =
-                                ErrorResponse::unknown(&format!("{:?}", e))
-                                    .into();
-                            response.set_error(error);
-
+                            response.set_error(ErrorResponse::from(e).into());
                             sink.success(response)
                         }
+                    },
+                    Err(e) => {
+                        let mut response = Response::new();
+                        response.set_error(
+                            ErrorResponse::from(
+                                ControlApiError::RoomServiceMailboxError(e),
+                            )
+                            .into(),
+                        );
+                        sink.success(response)
                     }
                 })
                 .map_err(|e| {
