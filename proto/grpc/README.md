@@ -17,7 +17,7 @@ __Currently, in early development phase.__
 - CMake >= 3.8.0
 - Rust >= 1.19.0
 - binutils >= 2.22
-- LLVM and Clang >= 3.9 if you need to generate bindings at compile time.
+- LLVM and Clang >= 3.9
 - [protoc](https://github.com/protocolbuffers/protobuf)
 
 

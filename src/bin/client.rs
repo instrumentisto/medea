@@ -19,8 +19,8 @@ fn main() {
     let client = ControlApiClient::new(ch);
 
     //    unimplemented_apply(&client);
-    //    create_room(&client);
-    delete_room(&client);
+    create_room(&client);
+    //    delete_room(&client);
     //    delete_endpoint(&client);
     //    delete_member(&client);
     //    create_member(&client);

@@ -13,13 +13,10 @@ use derive_more::Display;
 use medea_grpc_proto::control::Error as ErrorProto;
 
 use crate::{
-    api::{
-        control::{
-            endpoints::webrtc_play_endpoint::SrcParseError,
-            grpc::server::ControlApiError, local_uri::LocalUriParseError,
-            TryFromElementError, TryFromProtobufError,
-        },
-        error_codes::ErrorCode::ElementIdIsNotLocal,
+    api::control::{
+        endpoints::webrtc_play_endpoint::SrcParseError,
+        grpc::server::ControlApiError, local_uri::LocalUriParseError,
+        TryFromElementError, TryFromProtobufError,
     },
     signalling::{
         elements::{member::MemberError, MembersLoadError},
@@ -39,12 +36,12 @@ pub struct ErrorResponse {
 
     /// All [`ErrorCode`]s have [`Display`] implementation. And this
     /// implementation will be used if this field is [`None`]. But
-    /// some time we want to use custom text. Then we set this field
-    /// to [`Some`] and this custom text will be added to
+    /// some time we want to add some error explanation. Then we set this field
+    /// to [`Some`] and this text will be added to
     /// [`Display`] implementation's text.
     ///
     /// By default this field should be [`None`].
-    additional_text: Option<String>,
+    explanation: Option<String>,
 }
 
 impl ErrorResponse {
@@ -53,7 +50,7 @@ impl ErrorResponse {
         Self {
             error_code,
             element_id: Some(element_id.to_string()),
-            additional_text: None,
+            explanation: None,
         }
     }
 
@@ -62,7 +59,7 @@ impl ErrorResponse {
         Self {
             error_code,
             element_id: None,
-            additional_text: None,
+            explanation: None,
         }
     }
 
@@ -72,7 +69,7 @@ impl ErrorResponse {
     pub fn unknown<B: ToString>(unknown_error: &B) -> Self {
         Self {
             error_code: ErrorCode::UnknownError,
-            additional_text: Some(unknown_error.to_string()),
+            explanation: Some(unknown_error.to_string()),
             element_id: None,
         }
     }
@@ -80,11 +77,11 @@ impl ErrorResponse {
     pub fn custom_text(
         error_code: ErrorCode,
         text: String,
-        id: Option<Box<dyn ToString>>,
+        id: Option<String>,
     ) -> Self {
         Self {
             error_code,
-            additional_text: Some(text),
+            explanation: Some(text),
             element_id: id.map(|s| s.to_string()),
         }
     }
@@ -94,7 +91,7 @@ impl Into<ErrorProto> for ErrorResponse {
     fn into(self) -> ErrorProto {
         let mut error = ErrorProto::new();
 
-        if let Some(additional_text) = &self.additional_text {
+        if let Some(additional_text) = &self.explanation {
             error.set_text(format!(
                 "{} {}",
                 self.error_code.to_string(),
@@ -117,6 +114,10 @@ impl Into<ErrorProto> for ErrorResponse {
 #[derive(Display)]
 pub enum ErrorCode {
     /// Unknown server error.
+    ///
+    /// Use this [`ErrorCode`] only with [`ErrorResponse::unknown`] function.
+    /// In error text with this code should be error message which explain what
+    /// exactly goes wrong ([`ErrorResponse::unknown`] do this).
     ///
     /// Code: __1000__.
     #[display(fmt = "Unexpected error happened.")]
@@ -264,6 +265,19 @@ pub enum ErrorCode {
     /// Code: __1302__.
     #[display(fmt = "Room already exists.")]
     RoomAlreadyExists = 1302,
+
+    ////////////////////////
+    // Misc (1400 - 1499)//
+    //////////////////////
+    /// Unimplemented API call.
+    ///
+    /// This code should be with additional text which explains what
+    /// exactly unimplemented (you can do it with [`ErrorResponse::explain`]
+    /// function).
+    ///
+    /// Code: __1400__.
+    #[display(fmt = "Unimplemented API call.")]
+    UnimplementedCall = 1400,
 }
 
 impl From<ParticipantServiceErr> for ErrorResponse {
@@ -291,12 +305,14 @@ impl From<TryFromProtobufError> for ErrorResponse {
     fn from(err: TryFromProtobufError) -> Self {
         match err {
             TryFromProtobufError::SrcUriError(e) => e.into(),
-            TryFromProtobufError::SrcUriNotFound
-            | TryFromProtobufError::RoomElementNotFound
-            | TryFromProtobufError::MemberElementNotFound
-            | TryFromProtobufError::P2pModeNotFound
-            | TryFromProtobufError::MemberCredentialsNotFound => {
-                Self::unknown(&err)
+            TryFromProtobufError::NotMemberElementInRoomElement(id) => {
+                Self::custom_text(
+                    ErrorCode::UnimplementedCall,
+                    "Not Member elements in Room element currently \
+                     unimplemented."
+                        .to_string(),
+                    Some(id),
+                )
             }
         }
     }
@@ -306,7 +322,7 @@ impl From<LocalUriParseError> for ErrorResponse {
     fn from(err: LocalUriParseError) -> Self {
         match err {
             LocalUriParseError::NotLocal(text) => {
-                Self::new(ElementIdIsNotLocal, &text)
+                Self::new(ErrorCode::ElementIdIsNotLocal, &text)
             }
             LocalUriParseError::TooManyFields(text) => {
                 Self::new(ErrorCode::ElementIdIsTooLong, &text)
@@ -439,6 +455,8 @@ impl From<ControlApiError> for ErrorResponse {
         match err {
             ControlApiError::LocalUri(e) => e.into(),
             ControlApiError::TryFromProtobuf(e) => e.into(),
+            ControlApiError::RoomServiceError(e) => e.into(),
+            ControlApiError::RoomError(e) => e.into(),
             ControlApiError::RoomServiceMailboxError(_)
             | ControlApiError::TryFromElement(_)
             | ControlApiError::UnknownMailboxErr(_) => Self::unknown(&err),

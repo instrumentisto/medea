@@ -8,8 +8,7 @@ server:
     tag: edge
     pullPolicy: Always
   conf:
-    server:
-      http:
+    client:
         public_url: "wss://demo.medea.stg.t11913.org"
         bind_port: 9980
     turn:

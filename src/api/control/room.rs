@@ -58,7 +58,11 @@ impl RoomSpec {
         let mut pipeline = HashMap::new();
         for (id, room_element) in proto.get_pipeline() {
             if !room_element.has_member() {
-                return Err(TryFromProtobufError::MemberElementNotFound);
+                return Err(
+                    TryFromProtobufError::NotMemberElementInRoomElement(
+                        id.to_string(),
+                    ),
+                );
             }
             let member = MemberSpec::try_from(room_element.get_member())?;
             pipeline.insert(id.clone(), member.into());

@@ -17,7 +17,11 @@ pub struct WebRtcPublishId(pub String);
 pub enum P2pMode {
     /// Always connect peer-to-peer.
     Always,
+
+    /// Never connect peer-to-peer.
     Never,
+
+    /// Connect peer-to-peer if it possible.
     IfPossible,
 }
 
@@ -46,7 +50,7 @@ impl Into<WebRtcPublishEndpointP2pProto> for P2pMode {
 #[allow(clippy::module_name_repetitions)]
 #[derive(Clone, Deserialize, Debug)]
 pub struct WebRtcPublishEndpoint {
-    /// Peer-to-peer mode.
+    /// Peer-to-peer mode of this [`WebRtcPublishEndpoint`].
     pub p2p: P2pMode,
 }
 

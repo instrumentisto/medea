@@ -36,25 +36,14 @@ pub enum TryFromProtobufError {
     #[display(fmt = "Src uri parse error: {:?}", _0)]
     SrcUriError(SrcParseError),
 
-    /// Src URI not provided for [`WebRtcPlayEndpoint`].
-    #[display(fmt = "Src uri for publish endpoint not provided.")]
-    SrcUriNotFound,
-
-    /// Room element not provided.
-    #[display(fmt = "Room element not provided.")]
-    RoomElementNotFound,
-
-    /// Member element not provided.
-    #[display(fmt = "Member element not provided.")]
-    MemberElementNotFound,
-
-    /// [`P2pMode`] not found.
-    #[display(fmt = "P2p mode for play endpoint not provided.")]
-    P2pModeNotFound,
-
-    /// Member credentials not found.
-    #[display(fmt = "Credentials for member not provided.")]
-    MemberCredentialsNotFound,
+    /// Room element doesn't have Member element. Currently this is
+    /// unimplemented.
+    #[display(
+        fmt = "Room element [id = {}]doesn't have Member element. Currently \
+               this is unimplemented.",
+        _0
+    )]
+    NotMemberElementInRoomElement(String),
 }
 
 impl From<SrcParseError> for TryFromProtobufError {

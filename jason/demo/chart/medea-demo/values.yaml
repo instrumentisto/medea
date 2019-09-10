@@ -15,10 +15,9 @@ server:
   #       ports and passwords) are auto-wired and specifying them in this
   #       configuration will have no effect.
   conf:
-    server:
-      http:
-        bind_port: 8080
-        public_url: ""
+    client:
+      bind_port: 8080
+      public_url: ""
     turn:
       user: USER
       pass: PASS

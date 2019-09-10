@@ -1,4 +1,4 @@
-use std::{env, fs::File, io::Write as _};
+use std::{env, error::Error, fs::File, io::Write as _};
 
 static CONTROL_API_MOD_RS: &[u8] = b"
 /// Generated from protobuf.
@@ -7,7 +7,7 @@ pub mod control;
 pub mod control_grpc;
 ";
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() -> Result<(), Box<dyn Error>> {
     let out_dir = env::var("OUT_DIR")?;
 
     protoc_grpcio::compile_grpc_protos(
