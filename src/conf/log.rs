@@ -1,4 +1,5 @@
 //! Logging settings.
+
 use std::str::FromStr as _;
 
 use serde::{Deserialize, Serialize};

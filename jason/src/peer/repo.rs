@@ -1,11 +1,12 @@
 use std::{collections::HashMap, rc::Rc};
 
 use futures::sync::mpsc::UnboundedSender;
+use medea_client_api_proto::{IceServer, PeerId};
 
-use super::{PeerConnection, PeerId};
 use crate::{media::MediaManager, peer::PeerEvent, utils::WasmErr};
-use medea_client_api_proto::IceServer;
 
+
+/// [`PeerConnection`] factory and repository.
 #[allow(clippy::module_name_repetitions)]
 #[cfg_attr(feature = "mockable", mockall::automock)]
 pub trait PeerRepository {
@@ -32,7 +33,8 @@ pub trait PeerRepository {
 
 /// [`PeerConnection`] factory and repository.
 pub struct Repository {
-    /// [`MediaManager`] for injecting into new created [`PeerConnection`]s.
+    /// [`MediaManager`] that will be injected into all [`PeerConnection`]s
+    /// created by this repository.
     media_manager: Rc<MediaManager>,
 
     /// Peer id to [`PeerConnection`],
@@ -40,6 +42,7 @@ pub struct Repository {
 }
 
 impl Repository {
+    #[inline]
     pub fn new(media_manager: Rc<MediaManager>) -> Self {
         Self {
             media_manager,

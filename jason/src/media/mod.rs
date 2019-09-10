@@ -14,5 +14,5 @@ pub use self::{
     manager::MediaManager,
     stream::{MediaStream, MediaStreamHandle},
     stream_request::{SimpleStreamRequest, StreamRequest},
-    track::{Id as TrackId, MediaTrack},
+    track::MediaTrack,
 };

@@ -17,7 +17,6 @@ use crate::{
 /// Shared between JS side ([`ConnectionHandle`]) and
 /// Rust side ([`Connection`]).
 struct InnerConnection {
-    remote_member: u64,
     on_remote_stream: Callback<MediaStreamHandle>,
 }
 
@@ -40,11 +39,6 @@ impl ConnectionHandle {
             .borrow_mut()
             .on_remote_stream
             .set_func(f))
-    }
-
-    /// Returns ID of the remote `Member`.
-    pub fn member_id(&self) -> Result<u64, JsValue> {
-        map_weak!(self, |inner| inner.borrow().remote_member)
     }
 }
 

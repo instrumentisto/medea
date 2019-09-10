@@ -63,10 +63,10 @@
 
             var bindJoinButtons = function (roomId) {
                 joinCallerButton.onclick = function () {
-                    window.connect_room(baseUrl + roomId + '/1/caller_credentials')
+                    window.connect_room(baseUrl + roomId + '/caller/test')
                 };
                 joinResponderButton.onclick = function () {
-                    window.connect_room(baseUrl + roomId + '/2/responder_credentials')
+                    window.connect_room(baseUrl + roomId + '/responder/test')
                 };
             };
 

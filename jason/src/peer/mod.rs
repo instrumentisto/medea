@@ -10,7 +10,9 @@ mod repo;
 use std::{collections::HashMap, rc::Rc};
 
 use futures::{future, sync::mpsc::UnboundedSender, Future};
-use medea_client_api_proto::{Direction, IceServer, Track};
+use medea_client_api_proto::{
+    Direction, IceServer, PeerId as Id, Track, TrackId,
+};
 use medea_macro::dispatchable;
 use web_sys::RtcTrackEvent;
 
@@ -27,12 +29,7 @@ use self::{
 #[cfg(feature = "mockable")]
 pub use self::repo::MockPeerRepository;
 #[doc(inline)]
-pub use self::{
-    repo::{PeerRepository, Repository},
-    Id as PeerId,
-};
-
-pub type Id = u64;
+pub use self::repo::PeerRepository;
 
 #[dispatchable]
 #[allow(clippy::module_name_repetitions)]
@@ -49,7 +46,7 @@ pub enum PeerEvent {
     /// [`RtcPeerConnection`] received new stream from remote sender.
     NewRemoteStream {
         peer_id: Id,
-        sender_id: u64,
+        sender_id: Id,
         remote_stream: MediaStream,
     },
 }
@@ -132,10 +129,10 @@ impl PeerConnection {
         let track = track_event.track();
 
         if let Some(sender_id) =
-            inner.media_connections.add_remote_track(transceiver, track)
+        inner.media_connections.add_remote_track(transceiver, track)
         {
             if let Some(tracks) =
-                inner.media_connections.get_tracks_by_sender(sender_id)
+            inner.media_connections.get_tracks_by_sender(sender_id)
             {
                 // got all tracks from this sender, so emit
                 // PeerEvent::NewRemoteStream
@@ -163,7 +160,7 @@ impl PeerConnection {
     ///
     /// [1]: https://tools.ietf.org/html/rfc4566#section-5.14
     /// [2]: https://www.w3.org/TR/webrtc/#rtcrtptransceiver-interface
-    pub fn get_mids(&self) -> Result<HashMap<u64, String>, WasmErr> {
+    pub fn get_mids(&self) -> Result<HashMap<TrackId, String>, WasmErr> {
         self.0.media_connections.get_mids()
     }
 
@@ -196,7 +193,7 @@ impl PeerConnection {
                             )
                         }
                     }
-                    .and_then(move |_| peer.create_and_set_offer()),
+                        .and_then(move |_| peer.create_and_set_offer()),
                 )
             }
         }
