@@ -325,7 +325,7 @@ endif
 
 test-e2e-env = RUST_BACKTRACE=1 \
 	$(if $(call eq,$(logs),yes),,RUST_LOG=warn) \
-	MEDEA_CONTROL_STATIC_SPECS_DIR=tests/specs/
+	MEDEA_CONTROL.STATIC_SPECS_DIR=tests/specs/
 
 test.e2e:
 ifeq ($(up),yes)
