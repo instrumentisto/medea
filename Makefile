@@ -324,8 +324,9 @@ endif
 #	                      [wait=(5|<seconds>)]]
 
 test-e2e-env = RUST_BACKTRACE=1 \
-	$(if $(call eq,$(logs),yes),,RUST_LOG=warn) \
-	MEDEA_CONTROL.STATIC_SPECS_DIR=tests/specs/
+	$(if $(call eq,$(log),yes),,RUST_LOG=warn) \
+	MEDEA_CONTROL.STATIC_SPECS_DIR=tests/specs/ \
+	MEDEA_CONTROL_STATIC_SPECS_DIR=tests/specs/
 
 test.e2e:
 ifeq ($(up),yes)
@@ -585,7 +586,7 @@ ifeq ($(dockerized),yes)
 		$(if $(call eq,$(background),yes),-d,--abort-on-container-exit)
 ifeq ($(background),yes)
 ifeq ($(log),yes)
-	docker-compose -f docker-compose.medea.yml logs -f
+	docker-compose -f docker-compose.medea.yml logs -f &
 endif
 endif
 else

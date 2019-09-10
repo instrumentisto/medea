@@ -6,7 +6,7 @@ use crate::signalling::TestMember;
 #[test]
 fn pub_sub_video_call() {
     System::run(|| {
-        let base_url = "ws://0.0.0.0:8080/ws/pub-sub-video-call";
+        let base_url = "ws://127.0.0.1:8080/ws/pub-sub-video-call";
 
         // Note that events is separated by members.
         // Every member will have different instance of this.

@@ -8,7 +8,7 @@ use crate::signalling::{CloseSocket, TestMember};
 #[test]
 fn three_members_p2p_video_call() {
     System::run(|| {
-        let base_url = "ws://0.0.0.0:8080/ws/three-members-conference";
+        let base_url = "ws://127.0.0.1:8080/ws/three-members-conference";
 
         // Note that events, peer_created_count, ice_candidates
         // is separated by members.

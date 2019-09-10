@@ -82,7 +82,9 @@ jobs:
       stage: test
       rust: stable
       services: ["docker"]
-      script: make test.e2e up=yes dockerized=yes log=yes
+      before_script: make docker.pull TAGS=build-${TRAVIS_BUILD_ID}
+                                      registry=quay.io
+      script: make test.e2e up=yes dockerized=yes log=yes wait=30
                             TAG=build-${TRAVIS_BUILD_ID} registry=quay.io
 
     - name: crates.io
