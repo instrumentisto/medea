@@ -23,7 +23,7 @@ fn main() {
     //    delete_room(&client);
     //    delete_endpoint(&client);
     //    delete_member(&client);
-    //    create_member(&client);
+    create_member(&client);
     //    create_endpoint(&client);
     //    get_room(&client);
 }
@@ -86,7 +86,7 @@ fn create_member(client: &ControlApiClient) {
 
     member.set_credentials("test".to_string());
     member.set_pipeline(member_pipeline);
-    create_member_request.set_id("local://grpc-test/player".to_string());
+    create_member_request.set_id("local://grpc-test/player/asdsad".to_string());
     create_member_request.set_member(member);
 
     let reply = client

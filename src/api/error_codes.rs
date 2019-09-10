@@ -186,16 +186,15 @@ pub enum ErrorCode {
     /// Member.
     ///
     /// Code: __1104__.
-    #[display(
-        fmt = "You provided ID for Member but element's spec is not for Room."
-    )]
+    #[display(fmt = "You provided ID for Member but element's spec is not \
+                     for Member.")]
     ElementIdForMemberButElementIsNot = 1104,
     /// Provided element ID to Endpoint element but element spec is not for
     /// Endpoint.
     ///
     /// Code: __1105__.
     #[display(fmt = "You provided ID for Endpoint but element's spec is not \
-                     for Room.")]
+                     for Endpoint.")]
     ElementIdForEndpointButElementIsNot = 1105,
     /// Invalid ID for element.
     ///
@@ -456,7 +455,6 @@ impl From<ControlApiError> for ErrorResponse {
             ControlApiError::LocalUri(e) => e.into(),
             ControlApiError::TryFromProtobuf(e) => e.into(),
             ControlApiError::RoomServiceError(e) => e.into(),
-            ControlApiError::RoomError(e) => e.into(),
             ControlApiError::RoomServiceMailboxError(_)
             | ControlApiError::TryFromElement(_)
             | ControlApiError::UnknownMailboxErr(_) => Self::unknown(&err),

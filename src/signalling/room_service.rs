@@ -384,7 +384,7 @@ impl Handler<Get> for RoomService {
 
 /// Signal for create new [`Member`] in [`Room`]
 #[derive(Message)]
-#[rtype(result = "Result<Result<(), RoomError>, RoomServiceError>")]
+#[rtype(result = "Result<(), RoomServiceError>")]
 pub struct CreateMemberInRoom {
     pub room_id: RoomId,
     pub member_id: MemberId,
@@ -392,7 +392,7 @@ pub struct CreateMemberInRoom {
 }
 
 impl Handler<CreateMemberInRoom> for RoomService {
-    type Result = ActFuture<Result<(), RoomError>, RoomServiceError>;
+    type Result = ActFuture<(), RoomServiceError>;
 
     fn handle(
         &mut self,
@@ -402,7 +402,8 @@ impl Handler<CreateMemberInRoom> for RoomService {
         let fut = if let Some(room) = self.room_repo.get(&msg.room_id) {
             Either::A(
                 room.send(CreateMember(msg.member_id, msg.spec))
-                    .map_err(RoomServiceError::RoomMailboxErr),
+                    .map_err(RoomServiceError::RoomMailboxErr)
+                    .and_then(|r| r.map_err(RoomServiceError::from)),
             )
         } else {
             Either::B(future::err(RoomServiceError::RoomNotFound(
@@ -416,7 +417,7 @@ impl Handler<CreateMemberInRoom> for RoomService {
 
 /// Signal for create new [`Endpoint`] in [`Room`]
 #[derive(Message)]
-#[rtype(result = "Result<Result<(), RoomError>, RoomServiceError>")]
+#[rtype(result = "Result<(), RoomServiceError>")]
 pub struct CreateEndpointInRoom {
     pub room_id: RoomId,
     pub member_id: MemberId,
@@ -425,7 +426,7 @@ pub struct CreateEndpointInRoom {
 }
 
 impl Handler<CreateEndpointInRoom> for RoomService {
-    type Result = ActFuture<Result<(), RoomError>, RoomServiceError>;
+    type Result = ActFuture<(), RoomServiceError>;
 
     fn handle(
         &mut self,
@@ -439,7 +440,8 @@ impl Handler<CreateEndpointInRoom> for RoomService {
                     endpoint_id: msg.endpoint_id,
                     spec: msg.spec,
                 })
-                .map_err(RoomServiceError::RoomMailboxErr),
+                .map_err(RoomServiceError::RoomMailboxErr)
+                .and_then(|r| r.map_err(RoomServiceError::from)),
             )
         } else {
             Either::B(future::err(RoomServiceError::RoomNotFound(
