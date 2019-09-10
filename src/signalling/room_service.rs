@@ -388,6 +388,8 @@ impl Handler<Get> for RoomService {
 }
 
 /// Signal for create new [`Member`] in [`Room`]
+///
+/// [`Member`]: crate::signalling::elements::member::Member
 #[derive(Message)]
 #[rtype(result = "Result<(), RoomServiceError>")]
 pub struct CreateMemberInRoom {
@@ -423,6 +425,8 @@ impl Handler<CreateMemberInRoom> for RoomService {
 }
 
 /// Signal for create new [`Endpoint`] in [`Room`]
+///
+/// [`Endpoint`]: crate::signalling::elements::endpoints::Endpoint
 #[derive(Message)]
 #[rtype(result = "Result<(), RoomServiceError>")]
 pub struct CreateEndpointInRoom {

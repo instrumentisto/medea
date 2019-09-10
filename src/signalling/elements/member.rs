@@ -336,7 +336,7 @@ impl Member {
 
     /// Lookup [`WebRtcPublishEndpoint`] source endpoint by [`WebRtcPublishId`].
     ///
-    /// Returns [`MeberError::PublishEndpointNotFound`] when
+    /// Returns [`MemberError::PublishEndpointNotFound`] when
     /// [`WebRtcPublishEndpoint`] not found.
     pub fn get_src(
         &self,
@@ -360,7 +360,7 @@ impl Member {
         self.0.borrow().sinks.get(id).cloned()
     }
 
-    /// Lookup [`WebRtcPlayEndpoint`] sink endpoint by [`EndpointId`].
+    /// Lookup [`WebRtcPlayEndpoint`] sink endpoint by [`WebRtcPlayId`].
     ///
     /// Returns [`MemberError::PlayEndpointNotFound`] when
     /// [`WebRtcPlayEndpoint`] not found.

@@ -371,6 +371,8 @@ impl ParticipantService {
     /// Delete [`Member`] from [`ParticipantService`], remove this user from
     /// [`TurnAuthService`], close RPC connection with him and remove drop
     /// connection task.
+    ///
+    /// [`TurnAuthService`]: crate::turn::service::TurnAuthService
     pub fn delete_member(
         &mut self,
         member_id: &MemberId,

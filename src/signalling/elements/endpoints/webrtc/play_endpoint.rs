@@ -89,7 +89,7 @@ impl Drop for WebRtcPlayEndpointInner {
 
 /// Signalling representation of Control API's [`WebRtcPlayEndpoint`].
 ///
-/// [`WebRtcPlayEndpoint`]: crate::api::control::endpoint::WebRtcPlayEndpoint
+/// [`WebRtcPlayEndpoint`]: crate::api::control::endpoints::WebRtcPlayEndpoint
 #[allow(clippy::module_name_repetitions)]
 #[derive(Debug, Clone)]
 pub struct WebRtcPlayEndpoint(Rc<RefCell<WebRtcPlayEndpointInner>>);

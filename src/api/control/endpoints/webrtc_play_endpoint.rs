@@ -48,13 +48,24 @@ pub enum SrcParseError {
 
 /// Special uri with pattern `local://{room_id}/{member_id}/{endpoint_id}`.
 /// This uri can pointing only to [`WebRtcPublishEndpoint`].
+///
+/// [`WebRtcPublishEndpoint`]:
+/// crate::api::control::endpoints::WebRtcPublishEndpoint
 #[derive(Clone, Debug)]
 pub struct SrcUri {
-    /// ID of [`Room`]
+    /// ID of [`Room`].
+    ///
+    /// [`Room`]: crate::signalling::room::Room
     pub room_id: RoomId,
-    /// ID of `Member`
+
+    /// ID of [`MemberSpec`].
+    ///
+    /// [`MemberSpec`]: crate::api::control::member::MemberSpec
     pub member_id: MemberId,
-    /// Control ID of [`Endpoint`]
+
+    /// Control ID of [`Endpoint`].
+    ///
+    /// [`Endpoint`]: crate::api::control::endpoints::Endpoint
     pub endpoint_id: WebRtcPublishId,
 }
 

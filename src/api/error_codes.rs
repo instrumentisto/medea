@@ -41,6 +41,8 @@ pub struct ErrorResponse {
     /// [`Display`] implementation's text.
     ///
     /// By default this field should be [`None`].
+    ///
+    /// [`Display`]: std::fmt::Display
     explanation: Option<String>,
 }
 
@@ -74,14 +76,14 @@ impl ErrorResponse {
         }
     }
 
-    pub fn custom_text(
+    pub fn explain(
         error_code: ErrorCode,
-        text: String,
+        explanation: String,
         id: Option<String>,
     ) -> Self {
         Self {
             error_code,
-            explanation: Some(text),
+            explanation: Some(explanation),
             element_id: id.map(|s| s.to_string()),
         }
     }
@@ -204,6 +206,9 @@ pub enum ErrorCode {
     /// Provided not source URI in [`WebRtcPlayEndpoint`].
     ///
     /// Code: __1107__.
+    ///
+    /// [`WebRtcPlayEndpoint`]:
+    /// crate::signalling::elements::endpoints::webrtc::WebRtcPlayEndpoint
     #[display(fmt = "Provided not source URI.")]
     NotSourceUri = 1107,
 
@@ -238,11 +243,15 @@ pub enum ErrorCode {
     /// Provided not the same [`RoomId`]s in elements IDs.
     ///
     /// Code: __1205__.
+    ///
+    /// [`RoomId`]: crate::api::control::room::Id
     #[display(fmt = "Provided not the same Room IDs in elements IDs.")]
     ProvidedNotSameRoomIds = 1205,
     /// Provided ID for [`Room`] and for [`Room`]'s elements.
     ///
     /// Code: __1206__.
+    ///
+    /// [`Room`]: crate::signalling::room::Room
     #[display(fmt = "Provided ID for Room and for Room's elements.")]
     DeleteRoomAndFromRoom = 1206,
 
@@ -305,7 +314,7 @@ impl From<TryFromProtobufError> for ErrorResponse {
         match err {
             TryFromProtobufError::SrcUriError(e) => e.into(),
             TryFromProtobufError::NotMemberElementInRoomElement(id) => {
-                Self::custom_text(
+                Self::explain(
                     ErrorCode::UnimplementedCall,
                     "Not Member elements in Room element currently \
                      unimplemented."
@@ -323,11 +332,11 @@ impl From<LocalUriParseError> for ErrorResponse {
             LocalUriParseError::NotLocal(text) => {
                 Self::new(ErrorCode::ElementIdIsNotLocal, &text)
             }
-            LocalUriParseError::TooManyFields(text) => {
+            LocalUriParseError::TooManyPaths(text) => {
                 Self::new(ErrorCode::ElementIdIsTooLong, &text)
             }
             LocalUriParseError::Empty => Self::empty(ErrorCode::EmptyElementId),
-            LocalUriParseError::MissingFields(text) => {
+            LocalUriParseError::MissingPaths(text) => {
                 Self::new(ErrorCode::MissingFieldsInSrcUri, &text)
             }
             LocalUriParseError::UrlParseErr(id, _) => {
@@ -425,7 +434,7 @@ impl From<RoomServiceError> for ErrorResponse {
                 Self::new(ErrorCode::RoomNotFoundForProvidedElement, &id)
             }
             RoomServiceError::NotSameRoomIds(ids, expected_room_id) => {
-                Self::custom_text(
+                Self::explain(
                     ErrorCode::ProvidedNotSameRoomIds,
                     format!(
                         "Expected Room ID: '{}'. IDs with different Room ID: \

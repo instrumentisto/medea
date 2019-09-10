@@ -103,7 +103,7 @@ impl WebRtcPublishEndpointInner {
 /// Signalling representation of [`WebRtcPublishEndpoint`].
 ///
 /// [`WebRtcPublishEndpoint`]:
-/// crate::api::control::endpoint::WebRtcPublishEndpoint
+/// crate::api::control::endpoints::WebRtcPublishEndpoint
 #[allow(clippy::module_name_repetitions)]
 #[derive(Debug, Clone)]
 pub struct WebRtcPublishEndpoint(Rc<RefCell<WebRtcPublishEndpointInner>>);

@@ -1,11 +1,8 @@
 //! URI for pointing to some medea element.
 
-// Fix bug in clippy.
-#![allow(clippy::use_self)]
-
 use std::{convert::TryFrom, fmt};
 
-use derive_more::Display;
+use derive_more::{Display, From};
 use failure::Fail;
 use url::Url;
 
@@ -13,6 +10,7 @@ use crate::api::control::endpoints::webrtc_play_endpoint::SrcUri;
 
 use super::{MemberId, RoomId};
 
+/// Error which can happen while [`LocalUri`] parsing.
 #[allow(clippy::module_name_repetitions)]
 #[derive(Debug, Fail, Display)]
 pub enum LocalUriParseError {
@@ -22,25 +20,34 @@ pub enum LocalUriParseError {
 
     /// Too many paths in provided URI.
     #[display(fmt = "Too many paths in provided URI ({}).", _0)]
-    TooManyFields(String),
+    TooManyPaths(String),
 
+    /// Some paths is missing in URI.
+    ///
+    /// `local://room_id//qwerty` for example.
     #[display(fmt = "Missing fields. {}", _0)]
-    MissingFields(String),
+    MissingPaths(String),
 
+    /// Error while parsing URI by [`url::Url`].
     #[display(fmt = "Error while parsing URL. {:?}", _0)]
     UrlParseErr(String, url::ParseError),
 
-    /// Provided empty `&str`.
+    /// Provided empty URI.
     #[display(fmt = "You provided empty local uri.")]
     Empty,
 }
 
 /// Enum for store all kinds of [`LocalUri`]s.
 #[allow(clippy::module_name_repetitions)]
-#[derive(Debug, Hash, PartialEq, Eq, Clone, Display)]
+#[derive(Debug, Hash, PartialEq, Eq, Clone, Display, From)]
 pub enum StatefulLocalUri {
+    /// Stores [`LocalUri`] in [`IsRoomId`] state.
     Room(LocalUri<IsRoomId>),
+
+    /// Stores [`LocalUri`] in [`IsMemberId`] state.
     Member(LocalUri<IsMemberId>),
+
+    /// Stores [`LocalUri`] in [`IsEndpointId`] state.
     Endpoint(LocalUri<IsEndpointId>),
 }
 
@@ -54,22 +61,93 @@ impl StatefulLocalUri {
     }
 }
 
-/// State of [`LocalUri`] which points to `Room`.
+impl TryFrom<&str> for StatefulLocalUri {
+    type Error = LocalUriParseError;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        if value.is_empty() {
+            return Err(LocalUriParseError::Empty);
+        }
+
+        let url = match Url::parse(value) {
+            Ok(url) => url,
+            Err(e) => {
+                return Err(LocalUriParseError::UrlParseErr(
+                    value.to_string(),
+                    e,
+                ));
+            }
+        };
+
+        if url.scheme() != "local" {
+            return Err(LocalUriParseError::NotLocal(value.to_string()));
+        }
+
+        let room_uri = url
+            .host()
+            .map(|id| id.to_string())
+            .filter(|id| !id.is_empty())
+            .map(|id| LocalUri::<IsRoomId>::new(id.into()))
+            .ok_or_else(|| {
+                LocalUriParseError::MissingPaths(value.to_string())
+            })?;
+
+        let mut path = match url.path_segments() {
+            Some(path) => path,
+            None => return Ok(Self::from(room_uri)),
+        };
+
+        let member_id = path
+            .next()
+            .filter(|id| !id.is_empty())
+            .map(|id| MemberId(id.to_string()));
+
+        let endpoint_id = path
+            .next()
+            .filter(|id| !id.is_empty())
+            .map(|id| id.to_string());
+
+        if path.next().is_some() {
+            return Err(LocalUriParseError::TooManyPaths(value.to_string()));
+        }
+
+        if let Some(member_id) = member_id {
+            let member_uri = room_uri.push_member_id(member_id);
+            if let Some(endpoint_id) = endpoint_id {
+                Ok(Self::from(member_uri.push_endpoint_id(endpoint_id)))
+            } else {
+                Ok(Self::from(member_uri))
+            }
+        } else if endpoint_id.is_some() {
+            Err(LocalUriParseError::MissingPaths(value.to_string()))
+        } else {
+            Ok(Self::from(room_uri))
+        }
+    }
+}
+
+/// State of [`LocalUri`] which points to [`Room`].
+///
+/// [`Room`]: crate::signalling::room::Room
 #[derive(Debug, PartialEq, Hash, Eq, Clone)]
 pub struct IsRoomId(RoomId);
 
-/// State of [`LocalUri`] which points to `Member`.
+/// State of [`LocalUri`] which points to [`Member`].
+///
+/// [`Member`]: crate::signalling::elements::member::Member
 #[derive(Debug, PartialEq, Hash, Eq, Clone)]
 pub struct IsMemberId(LocalUri<IsRoomId>, MemberId);
 
-/// State of [`LocalUri`] which points to `Endpoint`.
+/// State of [`LocalUri`] which points to [`Endpoint`].
+///
+/// [`Endpoint`]: crate::signalling::elements::endpoints::Endpoint
 #[derive(Debug, PartialEq, Hash, Eq, Clone)]
 pub struct IsEndpointId(LocalUri<IsMemberId>, String);
 
-#[allow(clippy::doc_markdown)]
-/// Uri in format "local://room_id/member_id/endpoint_id"
-/// This kind of uri used for pointing to some element in spec (`Room`,
-/// `Member`, `WebRtcPlayEndpoint`, `WebRtcPublishEndpoint`, etc) based on his
+/// Uri in format `local://room_id/member_id/endpoint_id`.
+///
+/// This kind of uri used for pointing to some element in spec ([`Room`],
+/// [`Member`], [`WebRtcPlayEndpoint`], [`WebRtcPublishEndpoint`], etc) based on
 /// state.
 ///
 /// [`LocalUri`] can be in three states: [`IsRoomId`], [`IsMemberId`],
@@ -78,8 +156,8 @@ pub struct IsEndpointId(LocalUri<IsMemberId>, String);
 ///
 /// You also can take value from [`LocalUri`] without copy, but you have to do
 /// it consistently. For example, if you wish to get [`RoomId`], [`MemberId`]
-/// and [`EndpointId`] from [`LocalUri<IsEndpointId>`] you should to make this
-/// steps:
+/// and [`Endpoint`] ID from [`LocalUri`] in [`IsEndpointId`] state you should
+/// make this steps:
 ///
 /// ```
 /// # use crate::api::control::local_uri::{LocalUri, IsEndpointId};
@@ -95,8 +173,11 @@ pub struct IsEndpointId(LocalUri<IsMemberId>, String);
 ///     orig_endpoint_id.clone()
 /// );
 ///
-/// // We can get reference to room_id from this LocalUri but can't take room_id
-/// // without this consistency.
+/// // We can get reference to room_id from this LocalUri
+/// // without taking ownership:
+/// assert_eq!(local_uri.room_id(), &orig_member_id);
+///
+/// // If you want to take all IDs ownership, you should do this steps:
 /// let (endpoint_id, member_uri) = local_uri.take_endpoint_id();
 /// assert_eq!(endpoint_id, orig_endpoint_id);
 ///
@@ -108,7 +189,17 @@ pub struct IsEndpointId(LocalUri<IsMemberId>, String);
 /// ```
 ///
 /// This is necessary so that it is not possible to get the address in the
-/// wrong state ("local://room_id//endpoint_id" for example).
+/// wrong state (`local://room_id//endpoint_id` for example).
+///
+/// [`Member`]: crate::signalling::elements::member::Member
+/// [`Room`]: crate::signalling::room::Room
+/// [`WebRtcPlayEndpoint`]:
+/// crate::signalling::elements::endpoints::webrtc::WebRtcPlayEndpoint
+///
+/// [`WebRtcPublishEndpoint`]:
+/// crate::signalling::elements::endpoints::webrtc::WebRtcPublishEndpoint
+///
+/// [`Endpoint`]: crate::signalling::elements::endpoints::Endpoint
 #[derive(Debug, PartialEq, Hash, Eq, Clone)]
 pub struct LocalUri<T> {
     state: T,
@@ -133,7 +224,7 @@ impl LocalUri<IsRoomId> {
     }
 
     /// Push [`MemberId`] to the end of URI and returns
-    /// [`LocalUri<IsMemberId>`].
+    /// [`LocalUri`] in [`IsMemberId`].
     pub fn push_member_id(self, member_id: MemberId) -> LocalUri<IsMemberId> {
         LocalUri::<IsMemberId>::new(self.state.0, member_id)
     }
@@ -163,7 +254,7 @@ impl LocalUri<IsMemberId> {
     }
 
     /// Push endpoint ID to the end of URI and returns
-    /// [`LocalUri<IsEndpointId>`].
+    /// [`LocalUri`] in [`IsEndpointId`] state.
     pub fn push_endpoint_id(
         self,
         endpoint_id: String,
@@ -199,12 +290,14 @@ impl LocalUri<IsEndpointId> {
         &self.state.0.member_id()
     }
 
-    /// Returns reference to endpoint ID.
+    /// Returns reference to [`Endpoint`] ID.
+    ///
+    /// [`Endpoint`]: crate::signalling::elements::endpoints::Endpoint
     pub fn endpoint_id(&self) -> &str {
         &self.state.1
     }
 
-    /// Return endpoint id and [`LocalUri`] in state [`IsMemberId`].
+    /// Return endpoint id and [`LocalUri`] in [`IsMemberId`] state.
     pub fn take_endpoint_id(self) -> (String, LocalUri<IsMemberId>) {
         (self.state.1, self.state.0)
     }
@@ -217,80 +310,6 @@ impl From<SrcUri> for LocalUri<IsEndpointId> {
             uri.member_id,
             uri.endpoint_id.0,
         )
-    }
-}
-
-impl TryFrom<&str> for StatefulLocalUri {
-    type Error = LocalUriParseError;
-
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
-        if value.is_empty() {
-            return Err(LocalUriParseError::Empty);
-        }
-
-        let url = match Url::parse(value) {
-            Ok(url) => url,
-            Err(e) => {
-                return Err(LocalUriParseError::UrlParseErr(
-                    value.to_string(),
-                    e,
-                ));
-            }
-        };
-
-        if url.scheme() != "local" {
-            return Err(LocalUriParseError::NotLocal(value.to_string()));
-        }
-
-        let room_id = url
-            .host()
-            .map(|id| id.to_string())
-            .filter(|id| !id.is_empty())
-            .map(RoomId)
-            .ok_or_else(|| {
-                LocalUriParseError::MissingFields(value.to_string())
-            })?;
-
-        let mut path = match url.path_segments() {
-            Some(path) => path,
-            None => {
-                return Ok(StatefulLocalUri::Room(LocalUri::<IsRoomId>::new(
-                    room_id,
-                )));
-            }
-        };
-
-        let member_id = path
-            .next()
-            .filter(|id| !id.is_empty())
-            .map(|id| MemberId(id.to_string()));
-
-        let endpoint_id = path
-            .next()
-            .filter(|id| !id.is_empty())
-            .map(|id| id.to_string());
-
-        if path.next().is_some() {
-            return Err(LocalUriParseError::TooManyFields(value.to_string()));
-        }
-
-        if let Some(member_id) = member_id {
-            if let Some(endpoint_id) = endpoint_id {
-                Ok(StatefulLocalUri::Endpoint(LocalUri::<IsEndpointId>::new(
-                    room_id,
-                    member_id,
-                    endpoint_id,
-                )))
-            } else {
-                Ok(StatefulLocalUri::Member(LocalUri::<IsMemberId>::new(
-                    room_id, member_id,
-                )))
-            }
-        } else if endpoint_id.is_some() {
-            Err(LocalUriParseError::MissingFields(value.to_string()))
-        } else {
-            Ok(StatefulLocalUri::Room(LocalUri::<IsRoomId>::new(room_id)))
-        }
     }
 }
 
@@ -388,7 +407,7 @@ mod tests {
         ) {
             Ok(_) => unreachable!(),
             Err(e) => match e {
-                LocalUriParseError::TooManyFields(_) => (),
+                LocalUriParseError::TooManyPaths(_) => (),
                 _ => unreachable!(),
             },
         }
@@ -416,7 +435,7 @@ mod tests {
             match StatefulLocalUri::try_from(local_uri_str) {
                 Ok(_) => unreachable!(local_uri_str),
                 Err(e) => match e {
-                    LocalUriParseError::MissingFields(_) => (),
+                    LocalUriParseError::MissingPaths(_) => (),
                     _ => unreachable!(local_uri_str),
                 },
             }

@@ -35,13 +35,13 @@ pub enum MemberElement {
     /// Represent [`WebRtcPublishEndpoint`].
     /// Can transform into [`Endpoint`] enum by `Endpoint::try_from`.
     ///
-    /// [`Endpoint`]: crate::api::control::endpoint::Endpoint
+    /// [`Endpoint`]: crate::api::control::endpoints::Endpoint
     WebRtcPublishEndpoint { spec: WebRtcPublishEndpoint },
 
     /// Represent [`WebRtcPlayEndpoint`].
     /// Can transform into [`Endpoint`] enum by `Endpoint::try_from`.
     ///
-    /// [`Endpoint`]: crate::api::control::endpoint::Endpoint
+    /// [`Endpoint`]: crate::api::control::endpoints::Endpoint
     WebRtcPlayEndpoint { spec: WebRtcPlayEndpoint },
 }
 

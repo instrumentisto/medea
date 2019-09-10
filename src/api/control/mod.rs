@@ -33,6 +33,9 @@ pub use self::{
 #[derive(Debug, Fail, Display)]
 pub enum TryFromProtobufError {
     /// Error while parsing src uri of [`WebRtcPlayEndpoint`].
+    ///
+    /// [`WebRtcPlayEndpoint`]:
+    /// crate::api::control::endpoints::WebRtcPlayEndpoint
     #[display(fmt = "Src uri parse error: {:?}", _0)]
     SrcUriError(SrcParseError),
 
