@@ -201,18 +201,7 @@ impl From<SrcUri> for LocalUri<IsEndpointId> {
     }
 }
 
-#[allow(clippy::doc_markdown)]
-#[derive(Debug, Clone, PartialEq, Hash, Eq)]
-struct LocalUriInner {
-    /// ID of [`Room`]
-    room_id: Option<RoomId>,
-    /// ID of `Member`
-    member_id: Option<MemberId>,
-    /// Control ID of [`Endpoint`]
-    endpoint_id: Option<String>,
-}
-
-impl TryFrom<&str> for LocalUriInner {
+impl TryFrom<&str> for LocalUriType {
     type Error = LocalUriParseError;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
@@ -226,9 +215,10 @@ impl TryFrom<&str> for LocalUriInner {
                 return Err(LocalUriParseError::UrlParseErr(
                     value.to_string(),
                     e,
-                ))
+                ));
             }
         };
+
         if url.scheme() != "local" {
             return Err(LocalUriParseError::NotLocal(value.to_string()));
         }
@@ -237,58 +227,59 @@ impl TryFrom<&str> for LocalUriInner {
             .host()
             .map(|id| id.to_string())
             .filter(|id| !id.is_empty())
-            .map(RoomId);
+            .map(RoomId)
+            .ok_or_else(|| {
+                LocalUriParseError::MissingFields(value.to_string())
+            })?;
+
         let mut path = match url.path_segments() {
             Some(path) => path,
             None => {
-                return Ok(Self {
+                return Ok(LocalUriType::Room(LocalUri::<IsRoomId>::new(
                     room_id,
-                    member_id: None,
-                    endpoint_id: None,
-                })
+                )));
             }
         };
+
         let member_id = path
             .next()
             .filter(|id| !id.is_empty())
             .map(|id| MemberId(id.to_string()));
+
         let endpoint_id = path
             .next()
             .filter(|id| !id.is_empty())
-            .map(std::string::ToString::to_string);
+            .map(|id| id.to_string());
 
         if path.next().is_some() {
             return Err(LocalUriParseError::TooManyFields(value.to_string()));
         }
 
-        Ok(Self {
-            room_id,
-            member_id,
-            endpoint_id,
-        })
-    }
-}
-
-impl LocalUriInner {
-    /// Return true if this [`LocalUri`] pointing to `Room` element.
-    fn is_room_uri(&self) -> bool {
-        self.room_id.is_some()
-            && self.member_id.is_none()
-            && self.endpoint_id.is_none()
-    }
-
-    /// Return true if this [`LocalUri`] pointing to `Member` element.
-    fn is_member_uri(&self) -> bool {
-        self.room_id.is_some()
-            && self.member_id.is_some()
-            && self.endpoint_id.is_none()
-    }
-
-    /// Return true if this [`LocalUri`] pointing to `Endpoint` element.
-    fn is_endpoint_uri(&self) -> bool {
-        self.room_id.is_some()
-            && self.member_id.is_some()
-            && self.endpoint_id.is_some()
+        if let Some(member_id) = member_id {
+            if let Some(endpoint_id) = endpoint_id {
+                return Ok(LocalUriType::Endpoint(
+                    LocalUri::<IsEndpointId>::new(
+                        room_id,
+                        member_id,
+                        endpoint_id,
+                    ),
+                ));
+            } else {
+                return Ok(LocalUriType::Member(LocalUri::<IsMemberId>::new(
+                    room_id, member_id,
+                )));
+            }
+        } else {
+            if endpoint_id.is_some() {
+                return Err(LocalUriParseError::MissingFields(
+                    value.to_string(),
+                ));
+            } else {
+                return Ok(LocalUriType::Room(LocalUri::<IsRoomId>::new(
+                    room_id,
+                )));
+            }
+        }
     }
 }
 
@@ -325,32 +316,6 @@ impl LocalUriType {
             LocalUriType::Room(uri) => uri.room_id(),
             LocalUriType::Member(uri) => uri.room_id(),
             LocalUriType::Endpoint(uri) => uri.room_id(),
-        }
-    }
-}
-
-impl TryFrom<&str> for LocalUriType {
-    type Error = LocalUriParseError;
-
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
-        let inner = LocalUriInner::try_from(value)?;
-        if inner.is_room_uri() {
-            Ok(LocalUriType::Room(LocalUri::<IsRoomId>::new(
-                inner.room_id.unwrap(),
-            )))
-        } else if inner.is_member_uri() {
-            Ok(LocalUriType::Member(LocalUri::<IsMemberId>::new(
-                inner.room_id.unwrap(),
-                inner.member_id.unwrap(),
-            )))
-        } else if inner.is_endpoint_uri() {
-            Ok(LocalUriType::Endpoint(LocalUri::<IsEndpointId>::new(
-                inner.room_id.unwrap(),
-                inner.member_id.unwrap(),
-                inner.endpoint_id.unwrap(),
-            )))
-        } else {
-            Err(LocalUriParseError::MissingFields(value.to_string()))
         }
     }
 }
