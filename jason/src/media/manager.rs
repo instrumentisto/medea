@@ -15,12 +15,12 @@ use futures::{
 use js_sys::Promise;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::{future_to_promise, JsFuture};
-use web_sys::{MediaDeviceKind, MediaStream as SysMediaStream};
+use web_sys::MediaStream as SysMediaStream;
 
 use crate::utils::{window, Callback2, WasmErr};
 
 use super::{
-    MediaDeviceInfo, MediaStream, MediaStreamHandle, SimpleStreamRequest,
+    InputDeviceInfo, MediaStream, MediaStreamHandle, SimpleStreamRequest,
     StreamRequest,
 };
 
@@ -41,7 +41,7 @@ impl InnerMediaManager {
     /// Returns the vector of [`MediaDeviceInfo`] objects.
     fn enumerate_devices(
         &self,
-    ) -> impl Future<Item = Vec<MediaDeviceInfo>, Error = WasmErr> {
+    ) -> impl Future<Item = Vec<InputDeviceInfo>, Error = WasmErr> {
         window()
             .navigator()
             .media_devices()
@@ -52,16 +52,10 @@ impl InnerMediaManager {
                 Ok(js_sys::Array::from(&infos)
                     .values()
                     .into_iter()
-                    .filter_map(|value| {
+                    .filter_map(|info| {
                         let info =
-                            web_sys::MediaDeviceInfo::from(value.unwrap());
-                        match info.kind() {
-                            MediaDeviceKind::Audioinput
-                            | MediaDeviceKind::Videoinput => {
-                                Some(MediaDeviceInfo::from(info))
-                            }
-                            _ => None,
-                        }
+                            web_sys::MediaDeviceInfo::from(info.unwrap());
+                        InputDeviceInfo::try_from(info).ok()
                     })
                     .collect())
             })

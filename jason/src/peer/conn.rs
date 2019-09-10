@@ -169,8 +169,9 @@ impl RtcPeerConnection {
                     Rc::clone(&conn.peer),
                     "icecandidate",
                     move |msg: RtcPeerConnectionIceEvent| {
-                        // TODO: examine None candidates, maybe we should send
-                        //       them (although no one does)
+                        // None candidate means that all ICE transports have
+                        // finished gathering candidates. Does not need to be
+                        // delivered onward to the remote peer.
                         if let Some(c) = msg.candidate() {
                             f(IceCandidate {
                                 candidate: c.candidate(),

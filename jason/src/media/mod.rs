@@ -10,7 +10,7 @@ mod track;
 
 #[doc(inline)]
 pub use self::{
-    device_info::MediaDeviceInfo,
+    device_info::InputDeviceInfo,
     manager::MediaManager,
     stream::{MediaStream, MediaStreamHandle},
     stream_request::{SimpleStreamRequest, StreamRequest},

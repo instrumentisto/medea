@@ -1,14 +1,14 @@
-async function gotDevices(participant, audio_select, video_select) {
+async function getDevices(participant, audio_select, video_select) {
     const device_infos = await participant.media_manager().enumerate_devices();
     console.log('Available input and output devices:', device_infos);
     for (const device_info of device_infos) {
         const option = document.createElement('option');
-        option.value = device_info.deviceId;
-        if (device_info.kind === 'audio') {
-            option.text = device_info.label || `Microphone ${audio_select.length + 1}`;
+        option.value = device_info.device_id();
+        if (device_info.kind() === 'audio') {
+            option.text = device_info.label() || `Microphone ${audio_select.length + 1}`;
             audio_select.append(option);
-        } else if (device_info.kind === 'video') {
-            option.text = device_info.label || `Camera ${video_select.length + 1}`;
+        } else if (device_info.kind() === 'video') {
+            option.text = device_info.label() || `Camera ${video_select.length + 1}`;
             video_select.append(option);
         }
     }
@@ -35,8 +35,8 @@ async function init_participant(wasm, token, frame) {
 
     let participant = new wasm.Jason();
     let room = await participant.init_room();
-    getStream(participant, local_video, audio_select, video_select);
-    gotDevices(participant, audio_select, video_select);
+    await getStream(participant, local_video, audio_select, video_select);
+    getDevices(participant, audio_select, video_select);
 
     audio_select.change(function() {
         getStream(participant, local_video, audio_select, video_select);

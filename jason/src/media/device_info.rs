@@ -2,25 +2,56 @@
 //!
 //! [1]: https://www.w3.org/TR/mediacapture-streams/#device-info
 
+use std::convert::TryFrom;
+
 use wasm_bindgen::prelude::*;
-use web_sys::{MediaDeviceInfo as SysMediaDeviceInfo, MediaDeviceKind};
+use web_sys::{MediaDeviceInfo, MediaDeviceKind};
+
+use crate::utils::WasmErr;
 
 /// Representation of [MediaDeviceInfo][1].
 ///
 /// [1]: https://www.w3.org/TR/mediacapture-streams/#device-info
 #[allow(clippy::module_name_repetitions)]
 #[wasm_bindgen]
-pub struct MediaDeviceInfo {
+pub struct InputDeviceInfo {
+    device_type: InputDeviceKind,
+
     /// Actual underlying [MediaDeviceInfo][1] object.
     ///
     /// [1]: https://www.w3.org/TR/mediacapture-streams/#device-info
-    info: SysMediaDeviceInfo,
+    info: MediaDeviceInfo,
+}
+
+enum InputDeviceKind {
+    Audio,
+    Video,
+}
+
+impl InputDeviceKind {
+    fn to_str(&self) -> &str {
+        match self {
+            InputDeviceKind::Audio => "audio",
+            InputDeviceKind::Video => "video",
+        }
+    }
+}
+
+impl TryFrom<MediaDeviceKind> for InputDeviceKind {
+    type Error = WasmErr;
+
+    fn try_from(value: MediaDeviceKind) -> Result<Self, Self::Error> {
+        match value {
+            MediaDeviceKind::Audioinput => Ok(InputDeviceKind::Audio),
+            MediaDeviceKind::Videoinput => Ok(InputDeviceKind::Video),
+            _ => Err(WasmErr::from("Not input device")),
+        }
+    }
 }
 
 #[wasm_bindgen]
-impl MediaDeviceInfo {
+impl InputDeviceInfo {
     /// A unique identifier for the represented device.
-    #[wasm_bindgen(getter = deviceId)]
     pub fn device_id(&self) -> String {
         self.info.device_id()
     }
@@ -28,18 +59,12 @@ impl MediaDeviceInfo {
     /// Describes the kind of the represented device.
     ///
     /// This representation of [`MediaDeviceInfo`] ONLY for input device.
-    #[wasm_bindgen(getter)]
     pub fn kind(&self) -> String {
-        match self.info.kind() {
-            MediaDeviceKind::Audioinput => "audio".to_string(),
-            MediaDeviceKind::Videoinput => "video".to_string(),
-            _ => unreachable!(),
-        }
+        self.device_type.to_str().to_owned()
     }
 
     /// A label describing this device (for example "External USB Webcam").
     /// If the device has no associated label, then returns the empty string.
-    #[wasm_bindgen(getter)]
     pub fn label(&self) -> String {
         self.info.label()
     }
@@ -48,14 +73,18 @@ impl MediaDeviceInfo {
     /// same group identifier if they belong to the same physical device.
     /// For example, the audio input and output devices representing the speaker
     /// and microphone of the same headset have the same groupId.
-    #[wasm_bindgen(getter = groupId)]
     pub fn group_id(&self) -> String {
         self.info.group_id()
     }
 }
 
-impl From<SysMediaDeviceInfo> for MediaDeviceInfo {
-    fn from(info: SysMediaDeviceInfo) -> Self {
-        Self { info }
+impl TryFrom<MediaDeviceInfo> for InputDeviceInfo {
+    type Error = WasmErr;
+
+    fn try_from(info: MediaDeviceInfo) -> Result<Self, Self::Error> {
+        Ok(Self {
+            device_type: InputDeviceKind::try_from(info.kind())?,
+            info,
+        })
     }
 }
