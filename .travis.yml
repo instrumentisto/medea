@@ -19,6 +19,7 @@ stages:
 jobs:
   allow_failures:
     - rust: nightly
+      stage: build
 
   include:
     - name: Clippy
