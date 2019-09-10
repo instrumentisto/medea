@@ -58,6 +58,8 @@ jobs:
         skip_cleanup: true
         script: make docker.push IMAGE=medea registry=quay.io
                                  TAGS=build-${TRAVIS_BUILD_ID}
+        on:
+          all_branches: true
 
     - name: medea (beta)
       stage: build
