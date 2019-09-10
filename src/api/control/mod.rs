@@ -85,17 +85,34 @@ pub enum TryFromElementError {
     NotMember,
 }
 
+/// Errors which can happen while loading static [Control API] specs.
 #[derive(From, Debug, Fail, Display)]
 pub enum LoadStaticControlSpecsError {
+    /// Default or provided in config static [Control API] specs dir not
+    /// exists.
+    ///
+    /// [Control API]: http://tiny.cc/380uaz
     #[display(fmt = "Directory with specs not found.")]
     SpecDirNotFound,
+
+    /// I/O error while reading static [Control API] specs.
+    ///
+    /// [Control API]: http://tiny.cc/380uaz
     #[display(fmt = "I/O error while reading specs. {:?}", _0)]
     IoError(std::io::Error),
+
+    /// Conflict in static [Control API] specs.
+    ///
+    /// [Control API]: http://tiny.cc/380uaz
     #[display(
         fmt = "Try from element error while loading static specs. {:?}",
         _0
     )]
     TryFromElementError(TryFromElementError),
+
+    /// Error while deserialization static [Control API] specs from YAML file.
+    ///
+    /// [Control API]: http://tiny.cc/380uaz
     #[display(fmt = "Error while deserialization static spec. {:?}", _0)]
     YamlDeserializationError(serde_yaml::Error),
 }

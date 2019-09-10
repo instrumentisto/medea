@@ -19,6 +19,8 @@ pub enum LocalUriParseError {
     NotLocal(String),
 
     /// Too many paths in provided URI.
+    ///
+    /// `local://room_id/member_id/endpoint_id/redundant_path` for example.
     #[display(fmt = "Too many paths in provided URI ({}).", _0)]
     TooManyPaths(String),
 
@@ -52,6 +54,9 @@ pub enum StatefulLocalUri {
 }
 
 impl StatefulLocalUri {
+    /// Returns reference to [`RoomId`].
+    ///
+    /// This is possible in any [`LocalUri`] state.
     pub fn room_id(&self) -> &RoomId {
         match self {
             StatefulLocalUri::Room(uri) => uri.room_id(),

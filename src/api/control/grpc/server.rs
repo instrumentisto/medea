@@ -38,23 +38,30 @@ use crate::{
     log::prelude::*,
     shutdown::ShutdownGracefully,
     signalling::room_service::{
-        CreateEndpointInRoom, CreateMemberInRoom, DeleteElements, Get,
-        RoomService, RoomServiceError, StartRoom,
+        CreateEndpointInRoom, CreateMemberInRoom, CreateRoom, DeleteElements,
+        Get, RoomService, RoomServiceError,
     },
     AppContext,
 };
 
+/// Errors which can happen while processing request to gRPC [Control API].
+///
+/// [Control API]: http://tiny.cc/380uaz
 #[derive(Debug, Fail, Display)]
-pub enum ControlApiError {
+pub enum GrpcControlApiError {
     /// Error while parsing local URI of element.
     LocalUri(LocalUriParseError),
 
-    /// This error is rather abnormal, since what it catches must be caught at
-    /// the level of the gRPC.
+    /// Error which can happen while converting protoc object into interior
+    /// [medea] [Control API] objects.
+    ///
+    /// [Control API]: http://tiny.cc/380uaz
+    /// [medea]: https://github.com/instrumentisto/medea
     TryFromProtobuf(TryFromProtobufError),
 
-    /// This error is rather abnormal, since what it catches must be caught at
-    /// the level of the gRPC.
+    /// Some error in provided [Control API] spec.
+    ///
+    /// [Control API]: http://tiny.cc/380uaz
     TryFromElement(TryFromElementError),
 
     /// [`MailboxError`] for [`RoomService`].
@@ -74,27 +81,27 @@ pub enum ControlApiError {
     RoomServiceError(RoomServiceError),
 }
 
-impl From<LocalUriParseError> for ControlApiError {
+impl From<LocalUriParseError> for GrpcControlApiError {
     fn from(from: LocalUriParseError) -> Self {
-        ControlApiError::LocalUri(from)
+        GrpcControlApiError::LocalUri(from)
     }
 }
 
-impl From<RoomServiceError> for ControlApiError {
+impl From<RoomServiceError> for GrpcControlApiError {
     fn from(from: RoomServiceError) -> Self {
         Self::RoomServiceError(from)
     }
 }
 
-impl From<TryFromProtobufError> for ControlApiError {
+impl From<TryFromProtobufError> for GrpcControlApiError {
     fn from(from: TryFromProtobufError) -> Self {
-        ControlApiError::TryFromProtobuf(from)
+        GrpcControlApiError::TryFromProtobuf(from)
     }
 }
 
-impl From<TryFromElementError> for ControlApiError {
+impl From<TryFromElementError> for GrpcControlApiError {
     fn from(from: TryFromElementError) -> Self {
-        ControlApiError::TryFromElement(from)
+        GrpcControlApiError::TryFromElement(from)
     }
 }
 
@@ -107,9 +114,9 @@ macro_rules! fut_try {
         match $call {
             Ok(o) => o,
             Err(e) => {
-                return Either::B(futures::future::err(ControlApiError::from(
-                    e,
-                )))
+                return Either::B(futures::future::err(
+                    GrpcControlApiError::from(e),
+                ))
             }
         }
     };
@@ -185,7 +192,7 @@ impl ControlApiService {
         &mut self,
         req: &CreateRequest,
         uri: LocalUri<IsRoomId>,
-    ) -> impl Future<Item = Sids, Error = ControlApiError> {
+    ) -> impl Future<Item = Sids, Error = GrpcControlApiError> {
         let room = fut_try!(RoomSpec::try_from_protobuf(
             uri.room_id().clone(),
             req.get_room()
@@ -203,13 +210,13 @@ impl ControlApiService {
 
         Either::A(
             self.room_service
-                .send(StartRoom {
+                .send(CreateRoom {
                     id: uri,
                     spec: room,
                 })
-                .map_err(ControlApiError::RoomServiceMailboxError)
+                .map_err(GrpcControlApiError::RoomServiceMailboxError)
                 .and_then(move |r| {
-                    r.map_err(ControlApiError::from).map(|_| sid)
+                    r.map_err(GrpcControlApiError::from).map(|_| sid)
                 }),
         )
     }
@@ -219,7 +226,7 @@ impl ControlApiService {
         &mut self,
         req: &CreateRequest,
         uri: LocalUri<IsMemberId>,
-    ) -> impl Future<Item = Sids, Error = ControlApiError> {
+    ) -> impl Future<Item = Sids, Error = GrpcControlApiError> {
         let spec = fut_try!(MemberSpec::try_from(req.get_member()));
 
         let sid =
@@ -230,8 +237,10 @@ impl ControlApiService {
         Either::A(
             self.room_service
                 .send(CreateMemberInRoom { uri, spec })
-                .map_err(ControlApiError::RoomServiceMailboxError)
-                .and_then(|r| r.map_err(ControlApiError::from).map(|_| sids)),
+                .map_err(GrpcControlApiError::RoomServiceMailboxError)
+                .and_then(|r| {
+                    r.map_err(GrpcControlApiError::from).map(|_| sids)
+                }),
         )
     }
 
@@ -241,7 +250,7 @@ impl ControlApiService {
         &mut self,
         req: &CreateRequest,
         uri: LocalUri<IsEndpointId>,
-    ) -> impl Future<Item = Sids, Error = ControlApiError> {
+    ) -> impl Future<Item = Sids, Error = GrpcControlApiError> {
         let endpoint = fut_try!(Endpoint::try_from(req));
 
         Either::A(
@@ -250,9 +259,9 @@ impl ControlApiService {
                     uri,
                     spec: endpoint,
                 })
-                .map_err(ControlApiError::RoomServiceMailboxError)
+                .map_err(GrpcControlApiError::RoomServiceMailboxError)
                 .and_then(|r| {
-                    r.map_err(ControlApiError::from).map(|_| HashMap::new())
+                    r.map_err(GrpcControlApiError::from).map(|_| HashMap::new())
                 }),
         )
     }
@@ -278,7 +287,7 @@ impl ControlApi for ControlApiService {
         }
 
         let response_fut: Box<
-            dyn Future<Item = Sids, Error = ControlApiError> + Send,
+            dyn Future<Item = Sids, Error = GrpcControlApiError> + Send,
         > = match parse_local_uri!(req.get_id(), ctx, sink, CreateResponse) {
             StatefulLocalUri::Room(local_uri) => {
                 if req.has_room() {
@@ -376,8 +385,8 @@ impl ControlApi for ControlApiService {
         ctx.spawn(
             self.room_service
                 .send(delete_elements)
-                .map_err(ControlApiError::RoomServiceMailboxError)
-                .and_then(|r| r.map_err(ControlApiError::from))
+                .map_err(GrpcControlApiError::RoomServiceMailboxError)
+                .and_then(|r| r.map_err(GrpcControlApiError::from))
                 .then(move |result| {
                     let mut response = Response::new();
                     if let Err(e) = result {
@@ -410,8 +419,8 @@ impl ControlApi for ControlApiService {
         ctx.spawn(
             self.room_service
                 .send(Get(uris))
-                .map_err(ControlApiError::RoomServiceMailboxError)
-                .and_then(|r| r.map_err(ControlApiError::from))
+                .map_err(GrpcControlApiError::RoomServiceMailboxError)
+                .and_then(|r| r.map_err(GrpcControlApiError::from))
                 .then(|res| {
                     let mut response = GetResponse::new();
                     match res {
@@ -440,7 +449,9 @@ impl ControlApi for ControlApiService {
     }
 }
 
-/// Actor wrapper for `grcio` gRPC server.
+/// Actor wrapper for `grcio` gRPC server which provides dynamic [Control API].
+///
+/// [Control API]: http://tiny.cc/380uaz
 #[allow(clippy::module_name_repetitions)]
 pub struct GrpcServer {
     server: Server,
@@ -476,7 +487,9 @@ impl Handler<ShutdownGracefully> for GrpcServer {
     }
 }
 
-/// Run gRPC server in actix actor.
+/// Run gRPC [Control API] server in actix actor.
+///
+/// [Control API]: http://tiny.cc/380uaz
 pub fn run(room_repo: Addr<RoomService>, app: AppContext) -> Addr<GrpcServer> {
     let bind_ip = app.config.control.grpc.bind_ip.to_string();
     let bind_port = app.config.control.grpc.bind_port;

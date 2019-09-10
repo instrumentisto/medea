@@ -15,7 +15,7 @@ use medea_grpc_proto::control::Error as ErrorProto;
 use crate::{
     api::control::{
         endpoints::webrtc_play_endpoint::SrcParseError,
-        grpc::server::ControlApiError, local_uri::LocalUriParseError,
+        grpc::server::GrpcControlApiError, local_uri::LocalUriParseError,
         TryFromElementError, TryFromProtobufError,
     },
     signalling::{
@@ -447,9 +447,6 @@ impl From<RoomServiceError> for ErrorResponse {
                     None,
                 )
             }
-            RoomServiceError::DeleteRoomAndFromRoom => {
-                Self::empty(ErrorCode::DeleteRoomAndFromRoom)
-            }
             RoomServiceError::RoomMailboxErr(_)
             | RoomServiceError::FailedToLoadStaticSpecs(_) => {
                 Self::unknown(&err)
@@ -458,15 +455,15 @@ impl From<RoomServiceError> for ErrorResponse {
     }
 }
 
-impl From<ControlApiError> for ErrorResponse {
-    fn from(err: ControlApiError) -> Self {
+impl From<GrpcControlApiError> for ErrorResponse {
+    fn from(err: GrpcControlApiError) -> Self {
         match err {
-            ControlApiError::LocalUri(e) => e.into(),
-            ControlApiError::TryFromProtobuf(e) => e.into(),
-            ControlApiError::RoomServiceError(e) => e.into(),
-            ControlApiError::RoomServiceMailboxError(_)
-            | ControlApiError::TryFromElement(_)
-            | ControlApiError::UnknownMailboxErr(_) => Self::unknown(&err),
+            GrpcControlApiError::LocalUri(e) => e.into(),
+            GrpcControlApiError::TryFromProtobuf(e) => e.into(),
+            GrpcControlApiError::RoomServiceError(e) => e.into(),
+            GrpcControlApiError::RoomServiceMailboxError(_)
+            | GrpcControlApiError::TryFromElement(_)
+            | GrpcControlApiError::UnknownMailboxErr(_) => Self::unknown(&err),
         }
     }
 }

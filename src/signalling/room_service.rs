@@ -1,6 +1,6 @@
 //! Service which control [`Room`].
 
-use std::collections::HashMap;
+use std::{collections::HashMap, marker::PhantomData};
 
 use actix::{
     fut::wrap_future, Actor, ActorFuture, Addr, Context, Handler, MailboxError,
@@ -32,35 +32,57 @@ use crate::{
     },
     AppContext,
 };
-use failure::_core::marker::PhantomData;
 
 type ActFuture<I, E> =
     Box<dyn ActorFuture<Actor = RoomService, Item = I, Error = E>>;
 
+/// Errors of [`RoomService`].
 #[allow(clippy::module_name_repetitions)]
 #[derive(Debug, Fail, Display)]
 pub enum RoomServiceError {
+    /// [`Room`] not found in [`RoomRepository`].
     #[display(fmt = "Room [id = {}] not found.", _0)]
     RoomNotFound(LocalUri<IsRoomId>),
+
+    /// Wrapper for [`Room`]'s [`MailboxError`].
     #[display(fmt = "Room mailbox error: {:?}", _0)]
     RoomMailboxErr(MailboxError),
+
+    /// Try to create [`Room`] with [`RoomId`] which already exists in
+    /// [`RoomRepository`].
     #[display(fmt = "Room [id = {}] already exists.", _0)]
     RoomAlreadyExists(LocalUri<IsRoomId>),
+
+    /// Some error happened in [`Room`].
+    ///
+    /// For more info read [`RoomError`] docs.
     #[display(fmt = "{}", _0)]
     RoomError(RoomError),
+
+    /// Error which can happen while loading static [Control API] specs.
+    ///
+    /// [Control API]: http://tiny.cc/380uaz
     #[display(fmt = "Failed to load static specs. {:?}", _0)]
     FailedToLoadStaticSpecs(LoadStaticControlSpecsError),
+
+    /// Provided empty [`LocalUri`] list.
     #[display(fmt = "Empty URIs list.")]
     EmptyUrisList,
+
+    /// Provided [`LocalUri`] to some element from [`Room`] but [`Room`] with
+    /// ID from this [`LocalUri`] not found in [`RoomRepository`].
     #[display(fmt = "Room not found for element [id = {}]", _0)]
     RoomNotFoundForElement(StatefulLocalUri),
+
+    /// Provided not the same [`RoomId`]s in [`LocalUri`] list.
+    ///
+    /// Atm this error can happen in `Delete` method because `Delete` should be
+    /// called only for one [`Room`].
     #[display(
         fmt = "Provided not the same Room IDs in elements IDs [ids = {:?}].",
         _0
     )]
     NotSameRoomIds(Vec<StatefulLocalUri>, RoomId),
-    #[display(fmt = "Provided Room IDs with Room elements IDs.")]
-    DeleteRoomAndFromRoom,
 }
 
 impl From<RoomError> for RoomServiceError {
@@ -87,6 +109,7 @@ pub struct RoomService {
 }
 
 impl RoomService {
+    /// Create new [`RoomService`].
     pub fn new(
         room_repo: RoomRepository,
         app: AppContext,
@@ -99,6 +122,9 @@ impl RoomService {
         }
     }
 
+    /// Closes [`Room`] with provided [`RoomId`].
+    ///
+    /// This is also deletes this [`Room`] from [`RoomRepository`].
     fn close_room(
         &self,
         id: RoomId,
@@ -173,19 +199,22 @@ impl Handler<StartStaticRooms> for RoomService {
     }
 }
 
+/// Implementation of [Control API]'s `Create` method.
+///
+/// [Control API]: http://tiny.cc/380uaz
 #[derive(Message)]
 #[rtype(result = "Result<(), RoomServiceError>")]
-pub struct StartRoom {
+pub struct CreateRoom {
     pub id: LocalUri<IsRoomId>,
     pub spec: RoomSpec,
 }
 
-impl Handler<StartRoom> for RoomService {
+impl Handler<CreateRoom> for RoomService {
     type Result = Result<(), RoomServiceError>;
 
     fn handle(
         &mut self,
-        msg: StartRoom,
+        msg: CreateRoom,
         _ctx: &mut Self::Context,
     ) -> Self::Result {
         let room_id = msg.id.take_room_id();
@@ -212,7 +241,13 @@ impl Handler<StartRoom> for RoomService {
     }
 }
 
+/// State which indicates that [`DeleteElements`] message was validated and can
+/// be send to [`RoomService`].
 pub struct Validated;
+
+/// State which indicates that [`DeleteElements`] message is unvalidated and
+/// should be validated with `validate()` function of [`DeleteElements`] in
+/// [`Unvalidated`] state.
 pub struct Unvalidated;
 
 impl DeleteElements<Unvalidated> {
@@ -264,7 +299,9 @@ impl DeleteElements<Unvalidated> {
     }
 }
 
-/// Signal for delete [`Room`].
+/// Signal for delete [Control API] elements.
+///
+/// [Control API]: http://tiny.cc/380uaz
 #[derive(Message)]
 #[rtype(result = "Result<(), RoomServiceError>")]
 pub struct DeleteElements<T> {
@@ -328,6 +365,9 @@ impl Handler<DeleteElements<Validated>> for RoomService {
     }
 }
 
+/// Implementation of [Control API]'s `Get` method.
+///
+/// [Control API]: http://tiny.cc/380uaz
 #[derive(Message)]
 #[rtype(result = "Result<HashMap<StatefulLocalUri, ElementProto>, \
                   RoomServiceError>")]
