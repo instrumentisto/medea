@@ -37,8 +37,7 @@ jobs:
       before_script:
         - rm -f /home/travis/.cargo/bin/wasm-pack
         - curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
-      script:
-        - make release.npm crate=medea-jason publish=no
+      script: make cargo.build crate=medea-jason dockerized=no
 
     - name: medea docker (stable)
       stage: build
@@ -48,33 +47,38 @@ jobs:
       services: ["docker"]
       script: make docker.build.medea debug=no
               TAG=build-${TRAVIS_BUILD_ID} registry=quay.io
-      after_script:
-        - echo "$QUAYIO_PASS" | docker login quay.io -u "$QUAYIO_USER" --password-stdin
-        - docker push quay.io/instrumentisto/medea:build-${TRAVIS_BUILD_ID}
+      before_deploy: echo "$QUAYIO_PASS"
+                     | make docker.auth registry=quay.io
+                                        user=$QUAYIO_USER pass-stdin=yes
+      deploy:
+        provider: script
+        skip_cleanup: true
+        script: make docker.push IMAGE=medea registry=quay.io
+                                 TAGS=build-${TRAVIS_BUILD_ID}
 
     - name: medea (beta)
       stage: build
       if: branch = master
       rust: beta
-      script: make cargo.build crate=medea
+      script: make cargo.build crate=medea dockerized=no
 
     - name: medea (nightly)
       stage: build
       if: branch = master
       rust: nightly
-      script: make cargo.build crate=medea
+      script: make cargo.build crate=medea dockerized=no
 
     - name: unit (stable)
       stage: test
       rust: stable
       script: make test.unit crate=@all
 
-    - name: e2e signalling (stable)
+    - name: E2E signalling (stable)
       stage: test
       rust: stable
       services: ["docker"]
-      script: make test.e2e dockerized=yes logs=yes
-              TAG=build-${TRAVIS_BUILD_ID} registry=quay.io
+      script: make test.e2e up=yes dockerized=yes log=yes
+                            TAG=build-${TRAVIS_BUILD_ID} registry=quay.io
 
     - name: crates.io
       stage: release

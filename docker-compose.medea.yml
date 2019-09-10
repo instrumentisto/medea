@@ -7,10 +7,9 @@ services:
     environment:
       RUST_LOG: ${RUST_LOG}
       MEDEA_CONF: ${MEDEA_CONF}
-      MEDEA_CONTROL.STATIC_SPECS_DIR: /specs
     ports:
       - "8080:8080"
     volumes:
       - ./${MEDEA_CONF}:/${MEDEA_CONF}:ro
-      - ${MEDEA_CONTROL_STATIC_SPECS_DIR}:/specs:ro
+      - ./${MEDEA_CONTROL_STATIC_SPECS_DIR}:/_dev/specs:ro
     network_mode: host
