@@ -19,6 +19,7 @@ pub struct Pipeline<T> {
 }
 
 impl<T> Pipeline<T> {
+    /// Creates new [`Pipeline`] from provided [`HashMap`].
     pub fn new(pipeline: HashMap<String, T>) -> Self {
         Self { pipeline }
     }

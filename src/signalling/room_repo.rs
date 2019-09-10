@@ -31,14 +31,18 @@ impl RoomRepository {
         rooms.get(id).cloned()
     }
 
+    /// Removes [`Room`] from [`RoomRepository`] by [`RoomId`].
     pub fn remove(&self, id: &RoomId) {
         self.rooms.lock().unwrap().remove(id);
     }
 
+    /// Adds new [`Room`] into [`RoomRepository`].
     pub fn add(&self, id: RoomId, room: Addr<Room>) {
         self.rooms.lock().unwrap().insert(id, room);
     }
 
+    /// Check existence of [`Room`] in [`RoomRepository`] by provided
+    /// [`RoomId`].
     pub fn is_contains_room_with_id(&self, id: &RoomId) -> bool {
         self.rooms.lock().unwrap().contains_key(id)
     }

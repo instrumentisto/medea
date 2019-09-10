@@ -397,7 +397,7 @@ docker.build.demo:
 #   make docker.build.medea-build
 
 docker.build.medea-build:
-	docker build -t medea-build -f build/medea/Dockerfile .
+	docker build -t medea-build -f _build/medea/Dockerfile .
 
 
 # Build medea project Docker image.
@@ -705,6 +705,7 @@ build.jason:
 .PHONY: build build.jason build.medea \
         cargo cargo.build cargo.fmt cargo.lint \
         docker.build.demo docker.build.medea docker.down.demo docker.up.demo \
+        docker.build.medea-build \
         docs docs.rust \
         down down.demo down.coturn down.medea \
         helm helm.down helm.init helm.lint helm.list \

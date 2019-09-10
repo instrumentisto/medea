@@ -180,7 +180,7 @@ pub struct IsEndpointId(LocalUri<IsMemberId>, String);
 ///
 /// // We can get reference to room_id from this LocalUri
 /// // without taking ownership:
-/// assert_eq!(local_uri.room_id(), &orig_member_id);
+/// assert_eq!(local_uri.room_id(), &orig_room_id);
 ///
 /// // If you want to take all IDs ownership, you should do this steps:
 /// let (endpoint_id, member_uri) = local_uri.take_endpoint_id();
@@ -229,7 +229,7 @@ impl LocalUri<IsRoomId> {
     }
 
     /// Push [`MemberId`] to the end of URI and returns
-    /// [`LocalUri`] in [`IsMemberId`].
+    /// [`LocalUri`] in [`IsMemberId`] state.
     pub fn push_member_id(self, member_id: MemberId) -> LocalUri<IsMemberId> {
         LocalUri::<IsMemberId>::new(self.state.0, member_id)
     }
@@ -271,7 +271,7 @@ impl LocalUri<IsMemberId> {
 }
 
 impl LocalUri<IsEndpointId> {
-    /// Create new [`LocalUri`] in [`IsEndpointId`] state.
+    /// Creates new [`LocalUri`] in [`IsEndpointId`] state.
     pub fn new(
         room_id: RoomId,
         member_id: MemberId,
@@ -302,7 +302,9 @@ impl LocalUri<IsEndpointId> {
         &self.state.1
     }
 
-    /// Return endpoint id and [`LocalUri`] in [`IsMemberId`] state.
+    /// Returns [`Endpoint`] id and [`LocalUri`] in [`IsMemberId`] state.
+    ///
+    /// [`Endpoint`]: crate::signalling::elements::endpoints::Endpoint
     pub fn take_endpoint_id(self) -> (String, LocalUri<IsMemberId>) {
         (self.state.1, self.state.0)
     }

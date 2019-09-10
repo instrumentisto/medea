@@ -1,6 +1,11 @@
-use crate::conf::Grpc;
+//! [Control API] settings.
+//!
+//! [Control API]: http://tiny.cc/380uaz
+
 use serde::{Deserialize, Serialize};
 use smart_default::SmartDefault;
+
+use crate::conf::Grpc;
 
 /// [Control API] settings.
 ///

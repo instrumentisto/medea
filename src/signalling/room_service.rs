@@ -105,6 +105,10 @@ pub struct RoomService {
     /// Global app context.
     app: AppContext,
 
+    /// Address to [`GracefulShutdown`].
+    ///
+    /// Use for subscribe newly created [`Room`]s to [`GracefulShutdown`] and
+    /// unsubscribe deleted [`Room`]s from [`GracefulShutdown`].
     graceful_shutdown: Addr<GracefulShutdown>,
 }
 

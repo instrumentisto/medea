@@ -670,6 +670,8 @@ impl Into<ElementProto> for &mut Room {
     }
 }
 
+/// Message for serializing this [`Room`] and [`Room`] elements to protobuf
+/// spec.
 #[derive(Message)]
 #[rtype(result = "Result<HashMap<StatefulLocalUri, ElementProto>, RoomError>")]
 pub struct SerializeProto(pub Vec<StatefulLocalUri>);
@@ -867,6 +869,7 @@ impl Handler<RpcConnectionClosed> for Room {
     }
 }
 
+/// Signal for closing this [`Room`].
 #[derive(Message, Debug)]
 #[rtype(result = "()")]
 pub struct Close;
@@ -900,6 +903,7 @@ impl Handler<Close> for Room {
     }
 }
 
+/// Signal for delete elements from this [`Room`].
 #[derive(Message, Debug)]
 #[rtype(result = "()")]
 pub struct Delete(pub Vec<StatefulLocalUri>);

@@ -1,11 +1,12 @@
 //! All errors which medea can return to control API user.
 //!
 //! # Error codes ranges
-//! * __1000...1000__ Unknow server error
+//! * __1000...1000__ Unexpected server error
 //! * __1001...1099__ Not found errors
 //! * __1100...1199__ Spec errors
 //! * __1200...1299__ Parse errors
 //! * __1300...1399__ Conflicts
+//! * __1400...1499__ Misc errors
 
 use std::string::ToString;
 
@@ -70,12 +71,16 @@ impl ErrorResponse {
     /// Provide unexpected `Error` in this function.
     pub fn unknown<B: ToString>(unknown_error: &B) -> Self {
         Self {
-            error_code: ErrorCode::UnknownError,
+            error_code: ErrorCode::UnexpectedError,
             explanation: Some(unknown_error.to_string()),
             element_id: None,
         }
     }
 
+    /// [`ErrorResponse`] with some additional info.
+    ///
+    /// With this method you can add additional text to error message of
+    /// [`ErrorCode`].
     pub fn explain(
         error_code: ErrorCode,
         explanation: String,
@@ -115,7 +120,7 @@ impl Into<ErrorProto> for ErrorResponse {
 /// Medea control API errors.
 #[derive(Display)]
 pub enum ErrorCode {
-    /// Unknown server error.
+    /// Unexpected server error.
     ///
     /// Use this [`ErrorCode`] only with [`ErrorResponse::unknown`] function.
     /// In error text with this code should be error message which explain what
@@ -123,7 +128,7 @@ pub enum ErrorCode {
     ///
     /// Code: __1000__.
     #[display(fmt = "Unexpected error happened.")]
-    UnknownError = 1000,
+    UnexpectedError = 1000,
 
     ////////////////////////////////////
     // Not found (1001 - 1099 codes) //
@@ -198,19 +203,14 @@ pub enum ErrorCode {
     #[display(fmt = "You provided ID for Endpoint but element's spec is not \
                      for Endpoint.")]
     ElementIdForEndpointButElementIsNot = 1105,
-    /// Invalid ID for element.
-    ///
-    /// Code: __1106__
-    #[display(fmt = "Invalid element's URI.")]
-    InvalidElementUri = 1106,
     /// Provided not source URI in [`WebRtcPlayEndpoint`].
     ///
-    /// Code: __1107__.
+    /// Code: __1106__.
     ///
     /// [`WebRtcPlayEndpoint`]:
     /// crate::signalling::elements::endpoints::webrtc::WebRtcPlayEndpoint
     #[display(fmt = "Provided not source URI.")]
-    NotSourceUri = 1107,
+    NotSourceUri = 1106,
 
     /////////////////////////////////
     // Parse errors (1200 - 1299) //
@@ -247,13 +247,6 @@ pub enum ErrorCode {
     /// [`RoomId`]: crate::api::control::room::Id
     #[display(fmt = "Provided not the same Room IDs in elements IDs.")]
     ProvidedNotSameRoomIds = 1205,
-    /// Provided ID for [`Room`] and for [`Room`]'s elements.
-    ///
-    /// Code: __1206__.
-    ///
-    /// [`Room`]: crate::signalling::room::Room
-    #[display(fmt = "Provided ID for Room and for Room's elements.")]
-    DeleteRoomAndFromRoom = 1206,
 
     /////////////////////////////
     // Conflict (1300 - 1399) //
