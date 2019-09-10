@@ -29,7 +29,7 @@ jobs:
 
     - name: rustfmt
       stage: check
-      rust: nightly
+      rust: nightly-2019-09-05
       cache: false
       env: DONT_INSTALL_PROTOC=1
       before_script: rustup component add rustfmt
