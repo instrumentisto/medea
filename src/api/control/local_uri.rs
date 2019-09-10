@@ -1,6 +1,8 @@
 //! URI for pointing to some medea element.
 
-use std::{convert::TryFrom, fmt};
+#![allow(clippy::use_self)]
+
+use std::{convert::TryFrom, fmt, string::ToString};
 
 use derive_more::{Display, From};
 use failure::Fail;
@@ -110,7 +112,7 @@ impl TryFrom<&str> for StatefulLocalUri {
         let endpoint_id = path
             .next()
             .filter(|id| !id.is_empty())
-            .map(|id| id.to_string());
+            .map(ToString::to_string);
 
         if path.next().is_some() {
             return Err(LocalUriParseError::TooManyPaths(value.to_string()));
@@ -159,7 +161,7 @@ pub struct IsEndpointId(LocalUri<IsMemberId>, String);
 /// [`IsRoomId`]. This is used for compile time guarantees that some
 /// [`LocalUri`] have all mandatory fields.
 ///
-/// You also can take value from [`LocalUri`] without copy, but you have to do
+/// You also can take value from [`LocalUri`] without clone, but you have to do
 /// it consistently. For example, if you wish to get [`RoomId`], [`MemberId`]
 /// and [`Endpoint`] ID from [`LocalUri`] in [`IsEndpointId`] state you should
 /// make this steps:

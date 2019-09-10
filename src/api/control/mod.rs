@@ -86,6 +86,7 @@ pub enum TryFromElementError {
 }
 
 /// Errors which can happen while loading static [Control API] specs.
+#[allow(clippy::pub_enum_variant_names)]
 #[derive(Debug, Fail, Display)]
 pub enum LoadStaticControlSpecsError {
     /// Error while reading default or provided in config static [Control API]

@@ -251,9 +251,10 @@ pub struct Validated;
 
 /// State which indicates that [`DeleteElements`] message is unvalidated and
 /// should be validated with `validate()` function of [`DeleteElements`] in
-/// [`Unvalidated`] state.
+/// [`Unvalidated`] state before sending to [`RoomService`].
 pub struct Unvalidated;
 
+#[allow(clippy::use_self)]
 impl DeleteElements<Unvalidated> {
     pub fn new() -> DeleteElements<Unvalidated> {
         Self {
@@ -266,6 +267,8 @@ impl DeleteElements<Unvalidated> {
         self.uris.push(uri)
     }
 
+    // TODO: delete this allow when drain_filter TODO will be resolved.
+    #[allow(clippy::unnecessary_filter_map)]
     pub fn validate(
         self,
     ) -> Result<DeleteElements<Validated>, RoomServiceError> {
@@ -276,6 +279,7 @@ impl DeleteElements<Unvalidated> {
         let mut ignored_uris = Vec::new();
 
         let first_room = self.uris[0].room_id().clone();
+        // TODO: rewrite using Vec::drain_filter when it will be in stable
         let uris: Vec<StatefulLocalUri> = self
             .uris
             .into_iter()
@@ -289,7 +293,7 @@ impl DeleteElements<Unvalidated> {
             })
             .collect();
 
-        if ignored_uris.len() > 0 {
+        if !ignored_uris.is_empty() {
             return Err(RoomServiceError::NotSameRoomIds(
                 ignored_uris,
                 first_room,
@@ -306,7 +310,7 @@ impl DeleteElements<Unvalidated> {
 /// Signal for delete [Control API] elements.
 ///
 /// [Control API]: http://tiny.cc/380uaz
-#[derive(Message)]
+#[derive(Message, Default)]
 #[rtype(result = "Result<(), RoomServiceError>")]
 pub struct DeleteElements<T> {
     uris: Vec<StatefulLocalUri>,
@@ -318,6 +322,7 @@ impl Handler<DeleteElements<Validated>> for RoomService {
 
     // TODO: delete this allow when drain_filter TODO will be resolved.
     #[allow(clippy::unnecessary_filter_map)]
+    #[allow(clippy::if_not_else)]
     fn handle(
         &mut self,
         msg: DeleteElements<Validated>,
@@ -381,6 +386,7 @@ impl Handler<Get> for RoomService {
     type Result =
         ActFuture<HashMap<StatefulLocalUri, ElementProto>, RoomServiceError>;
 
+    // TODO: use validation state machine same as Delete method
     fn handle(&mut self, msg: Get, _: &mut Self::Context) -> Self::Result {
         let mut rooms_elements = HashMap::new();
         for uri in msg.0 {
