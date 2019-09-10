@@ -200,7 +200,7 @@ cargo.fmt:
 ifeq ($(build),yes)
 	cargo build
 endif
-	cargo +nightly fmt --all $(if $(call eq,$(check),yes),-- --check,)
+	cargo +nightly-2019-09-05 fmt --all $(if $(call eq,$(check),yes),-- --check,)
 
 
 # Lint Rust sources with clippy.
