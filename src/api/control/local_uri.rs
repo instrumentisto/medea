@@ -35,6 +35,25 @@ pub enum LocalUriParseError {
     Empty,
 }
 
+/// Enum for store all kinds of [`LocalUri`]s.
+#[allow(clippy::module_name_repetitions)]
+#[derive(Debug, Hash, PartialEq, Eq, Clone, Display)]
+pub enum StatefulLocalUri {
+    Room(LocalUri<IsRoomId>),
+    Member(LocalUri<IsMemberId>),
+    Endpoint(LocalUri<IsEndpointId>),
+}
+
+impl StatefulLocalUri {
+    pub fn room_id(&self) -> &RoomId {
+        match self {
+            StatefulLocalUri::Room(uri) => uri.room_id(),
+            StatefulLocalUri::Member(uri) => uri.room_id(),
+            StatefulLocalUri::Endpoint(uri) => uri.room_id(),
+        }
+    }
+}
+
 /// State of [`LocalUri`] which points to `Room`.
 #[derive(Debug, PartialEq, Hash, Eq, Clone)]
 pub struct IsRoomId(RoomId);
@@ -201,7 +220,7 @@ impl From<SrcUri> for LocalUri<IsEndpointId> {
     }
 }
 
-impl TryFrom<&str> for LocalUriType {
+impl TryFrom<&str> for StatefulLocalUri {
     type Error = LocalUriParseError;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
@@ -235,7 +254,7 @@ impl TryFrom<&str> for LocalUriType {
         let mut path = match url.path_segments() {
             Some(path) => path,
             None => {
-                return Ok(LocalUriType::Room(LocalUri::<IsRoomId>::new(
+                return Ok(StatefulLocalUri::Room(LocalUri::<IsRoomId>::new(
                     room_id,
                 )));
             }
@@ -257,28 +276,20 @@ impl TryFrom<&str> for LocalUriType {
 
         if let Some(member_id) = member_id {
             if let Some(endpoint_id) = endpoint_id {
-                return Ok(LocalUriType::Endpoint(
-                    LocalUri::<IsEndpointId>::new(
-                        room_id,
-                        member_id,
-                        endpoint_id,
-                    ),
-                ));
-            } else {
-                return Ok(LocalUriType::Member(LocalUri::<IsMemberId>::new(
-                    room_id, member_id,
-                )));
-            }
-        } else {
-            if endpoint_id.is_some() {
-                return Err(LocalUriParseError::MissingFields(
-                    value.to_string(),
-                ));
-            } else {
-                return Ok(LocalUriType::Room(LocalUri::<IsRoomId>::new(
+                Ok(StatefulLocalUri::Endpoint(LocalUri::<IsEndpointId>::new(
                     room_id,
-                )));
+                    member_id,
+                    endpoint_id,
+                )))
+            } else {
+                Ok(StatefulLocalUri::Member(LocalUri::<IsMemberId>::new(
+                    room_id, member_id,
+                )))
             }
+        } else if endpoint_id.is_some() {
+            Err(LocalUriParseError::MissingFields(value.to_string()))
+        } else {
+            Ok(StatefulLocalUri::Room(LocalUri::<IsRoomId>::new(room_id)))
         }
     }
 }
@@ -301,33 +312,14 @@ impl fmt::Display for LocalUri<IsEndpointId> {
     }
 }
 
-/// Enum for store all kinds of [`LocalUri`]s.
-#[allow(clippy::module_name_repetitions)]
-#[derive(Debug, Hash, PartialEq, Eq, Clone, Display)]
-pub enum LocalUriType {
-    Room(LocalUri<IsRoomId>),
-    Member(LocalUri<IsMemberId>),
-    Endpoint(LocalUri<IsEndpointId>),
-}
-
-impl LocalUriType {
-    pub fn room_id(&self) -> &RoomId {
-        match self {
-            LocalUriType::Room(uri) => uri.room_id(),
-            LocalUriType::Member(uri) => uri.room_id(),
-            LocalUriType::Endpoint(uri) => uri.room_id(),
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn parse_local_uri_to_room_element() {
-        let local_uri = LocalUriType::try_from("local://room_id").unwrap();
-        if let LocalUriType::Room(room) = local_uri {
+        let local_uri = StatefulLocalUri::try_from("local://room_id").unwrap();
+        if let StatefulLocalUri::Room(room) = local_uri {
             assert_eq!(room.take_room_id(), RoomId("room_id".to_string()));
         } else {
             unreachable!("{:?}", local_uri);
@@ -337,8 +329,9 @@ mod tests {
     #[test]
     fn parse_local_uri_to_element_of_room() {
         let local_uri =
-            LocalUriType::try_from("local://room_id/room_element_id").unwrap();
-        if let LocalUriType::Member(member) = local_uri {
+            StatefulLocalUri::try_from("local://room_id/room_element_id")
+                .unwrap();
+        if let StatefulLocalUri::Member(member) = local_uri {
             let (element_id, room_uri) = member.take_member_id();
             assert_eq!(element_id, MemberId("room_element_id".to_string()));
             let room_id = room_uri.take_room_id();
@@ -350,11 +343,11 @@ mod tests {
 
     #[test]
     fn parse_local_uri_to_endpoint() {
-        let local_uri = LocalUriType::try_from(
+        let local_uri = StatefulLocalUri::try_from(
             "local://room_id/room_element_id/endpoint_id",
         )
         .unwrap();
-        if let LocalUriType::Endpoint(endpoint) = local_uri {
+        if let StatefulLocalUri::Endpoint(endpoint) = local_uri {
             let (endpoint_id, member_uri) = endpoint.take_endpoint_id();
             assert_eq!(endpoint_id, "endpoint_id".to_string());
             let (member_id, room_uri) = member_uri.take_member_id();
@@ -368,7 +361,7 @@ mod tests {
 
     #[test]
     fn returns_parse_error_if_local_uri_not_local() {
-        match LocalUriType::try_from("not-local://room_id") {
+        match StatefulLocalUri::try_from("not-local://room_id") {
             Ok(_) => unreachable!(),
             Err(e) => match e {
                 LocalUriParseError::NotLocal(_) => (),
@@ -379,7 +372,7 @@ mod tests {
 
     #[test]
     fn returns_parse_error_if_local_uri_empty() {
-        match LocalUriType::try_from("") {
+        match StatefulLocalUri::try_from("") {
             Ok(_) => unreachable!(),
             Err(e) => match e {
                 LocalUriParseError::Empty => (),
@@ -390,7 +383,9 @@ mod tests {
 
     #[test]
     fn returns_error_if_local_uri_have_too_many_paths() {
-        match LocalUriType::try_from("local://room/member/endpoint/too_many") {
+        match StatefulLocalUri::try_from(
+            "local://room/member/endpoint/too_many",
+        ) {
             Ok(_) => unreachable!(),
             Err(e) => match e {
                 LocalUriParseError::TooManyFields(_) => (),
@@ -406,7 +401,7 @@ mod tests {
             "local://room_id/member_id",
             "local://room_id/member_id/endpoint_id",
         ] {
-            let local_uri = LocalUriType::try_from(local_uri_str).unwrap();
+            let local_uri = StatefulLocalUri::try_from(local_uri_str).unwrap();
             assert_eq!(local_uri_str.to_string(), local_uri.to_string());
         }
     }
@@ -418,7 +413,7 @@ mod tests {
             "local:////endpoint_id",
             "local:///member_id/endpoint_id",
         ] {
-            match LocalUriType::try_from(local_uri_str) {
+            match StatefulLocalUri::try_from(local_uri_str) {
                 Ok(_) => unreachable!(local_uri_str),
                 Err(e) => match e {
                     LocalUriParseError::MissingFields(_) => (),

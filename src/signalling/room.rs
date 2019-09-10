@@ -22,7 +22,7 @@ use crate::{
             RpcConnectionClosed, RpcConnectionEstablished,
         },
         control::{
-            local_uri::{IsMemberId, LocalUri, LocalUriType},
+            local_uri::{IsMemberId, LocalUri, StatefulLocalUri},
             room::RoomSpec,
             Endpoint as EndpointSpec, MemberId, MemberSpec, RoomId,
             TryFromElementError, WebRtcPlayId, WebRtcPublishId,
@@ -82,7 +82,7 @@ pub enum RoomError {
         _0,
         _1
     )]
-    WrongRoomId(LocalUriType, RoomId),
+    WrongRoomId(StatefulLocalUri, RoomId),
 }
 
 impl From<PeerError> for RoomError {
@@ -671,22 +671,22 @@ impl Into<ElementProto> for &mut Room {
 }
 
 #[derive(Message)]
-#[rtype(result = "Result<HashMap<LocalUriType, ElementProto>, RoomError>")]
-pub struct SerializeProto(pub Vec<LocalUriType>);
+#[rtype(result = "Result<HashMap<StatefulLocalUri, ElementProto>, RoomError>")]
+pub struct SerializeProto(pub Vec<StatefulLocalUri>);
 
 impl Handler<SerializeProto> for Room {
-    type Result = Result<HashMap<LocalUriType, ElementProto>, RoomError>;
+    type Result = Result<HashMap<StatefulLocalUri, ElementProto>, RoomError>;
 
     fn handle(
         &mut self,
         msg: SerializeProto,
         _: &mut Self::Context,
     ) -> Self::Result {
-        let mut serialized: HashMap<LocalUriType, ElementProto> =
+        let mut serialized: HashMap<StatefulLocalUri, ElementProto> =
             HashMap::new();
         for uri in msg.0 {
             match &uri {
-                LocalUriType::Room(room_uri) => {
+                StatefulLocalUri::Room(room_uri) => {
                     if room_uri.room_id() == &self.id {
                         let current_room: ElementProto = self.into();
                         serialized.insert(uri, current_room);
@@ -697,12 +697,12 @@ impl Handler<SerializeProto> for Room {
                         ));
                     }
                 }
-                LocalUriType::Member(member_uri) => {
+                StatefulLocalUri::Member(member_uri) => {
                     let member =
                         self.members.get_member(member_uri.member_id())?;
                     serialized.insert(uri, member.into());
                 }
-                LocalUriType::Endpoint(endpoint_uri) => {
+                StatefulLocalUri::Endpoint(endpoint_uri) => {
                     let member =
                         self.members.get_member(endpoint_uri.member_id())?;
                     let endpoint = member.get_endpoint_by_id(
@@ -902,7 +902,7 @@ impl Handler<Close> for Room {
 
 #[derive(Message, Debug)]
 #[rtype(result = "()")]
-pub struct Delete(pub Vec<LocalUriType>);
+pub struct Delete(pub Vec<StatefulLocalUri>);
 
 impl Handler<Delete> for Room {
     type Result = ();
@@ -912,10 +912,10 @@ impl Handler<Delete> for Room {
         let mut endpoint_ids = Vec::new();
         for id in msg.0 {
             match id {
-                LocalUriType::Member(member_uri) => {
+                StatefulLocalUri::Member(member_uri) => {
                     member_ids.push(member_uri);
                 }
-                LocalUriType::Endpoint(endpoint_uri) => {
+                StatefulLocalUri::Endpoint(endpoint_uri) => {
                     endpoint_ids.push(endpoint_uri);
                 }
                 // TODO (evdokimovs): better message

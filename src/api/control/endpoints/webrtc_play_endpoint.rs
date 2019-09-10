@@ -12,7 +12,7 @@ use serde::{
 
 use crate::api::control::{
     endpoints::webrtc_publish_endpoint::WebRtcPublishId,
-    local_uri::{IsEndpointId, LocalUri, LocalUriParseError, LocalUriType},
+    local_uri::{IsEndpointId, LocalUri, LocalUriParseError, StatefulLocalUri},
     MemberId, RoomId, TryFromProtobufError,
 };
 
@@ -62,11 +62,11 @@ impl TryFrom<&str> for SrcUri {
     type Error = SrcParseError;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
-        let local_uri = LocalUriType::try_from(value).map_err(|e| {
+        let local_uri = StatefulLocalUri::try_from(value).map_err(|e| {
             SrcParseError::LocalUriParseError(value.to_string(), e)
         })?;
 
-        if let LocalUriType::Endpoint(endpoint_uri) = local_uri {
+        if let StatefulLocalUri::Endpoint(endpoint_uri) = local_uri {
             Ok(endpoint_uri.into())
         } else {
             Err(SrcParseError::NotSrcUri(value.to_string()))

@@ -28,7 +28,7 @@ use crate::{
         control::{
             local_uri::{
                 IsEndpointId, IsMemberId, IsRoomId, LocalUri,
-                LocalUriParseError, LocalUriType,
+                LocalUriParseError, StatefulLocalUri,
             },
             Endpoint, MemberId, MemberSpec, RoomId, RoomSpec,
             TryFromElementError, TryFromProtobufError,
@@ -120,7 +120,7 @@ macro_rules! fut_try {
 /// See `send_error_response` doc for details about arguments for this macro.
 macro_rules! parse_local_uri {
     ($uri:expr, $ctx:expr, $sink:expr, $response:ty) => {
-        match LocalUriType::try_from($uri.as_ref()) {
+        match StatefulLocalUri::try_from($uri.as_ref()) {
             Ok(o) => o,
             Err(e) => {
                 let error: ErrorResponse = e.into();
@@ -229,7 +229,7 @@ impl ControlApiService {
 
         Either::A(
             self.room_service
-                .send(CreateMemberInRoom { uri: uri, spec })
+                .send(CreateMemberInRoom { uri, spec })
                 .map_err(ControlApiError::RoomServiceMailboxError)
                 .and_then(|r| r.map_err(ControlApiError::from).map(|_| sids)),
         )
@@ -247,7 +247,7 @@ impl ControlApiService {
         Either::A(
             self.room_service
                 .send(CreateEndpointInRoom {
-                    uri: uri,
+                    uri,
                     spec: endpoint,
                 })
                 .map_err(ControlApiError::RoomServiceMailboxError)
@@ -280,7 +280,7 @@ impl ControlApi for ControlApiService {
         let response_fut: Box<
             dyn Future<Item = Sids, Error = ControlApiError> + Send,
         > = match parse_local_uri!(req.get_id(), ctx, sink, CreateResponse) {
-            LocalUriType::Room(local_uri) => {
+            StatefulLocalUri::Room(local_uri) => {
                 if req.has_room() {
                     Box::new(self.create_room(&req, local_uri))
                 } else {
@@ -289,7 +289,7 @@ impl ControlApi for ControlApiService {
                     );
                 }
             }
-            LocalUriType::Member(local_uri) => {
+            StatefulLocalUri::Member(local_uri) => {
                 if req.has_member() {
                     Box::new(self.create_member(&req, local_uri))
                 } else {
@@ -298,7 +298,7 @@ impl ControlApi for ControlApiService {
                     );
                 }
             }
-            LocalUriType::Endpoint(local_uri) => {
+            StatefulLocalUri::Endpoint(local_uri) => {
                 if req.has_webrtc_pub() || req.has_webrtc_play() {
                     Box::new(self.create_endpoint(&req, local_uri))
                 } else {
@@ -356,7 +356,8 @@ impl ControlApi for ControlApiService {
         let mut delete_elements = DeleteElements::new();
 
         for id in req.get_id() {
-            let uri: LocalUriType = parse_local_uri!(id, ctx, sink, Response);
+            let uri: StatefulLocalUri =
+                parse_local_uri!(id, ctx, sink, Response);
             delete_elements.add_uri(uri);
         }
 

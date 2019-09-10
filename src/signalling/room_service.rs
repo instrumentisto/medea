@@ -16,7 +16,7 @@ use crate::{
         endpoints::Endpoint as EndpointSpec,
         load_static_specs_from_dir,
         local_uri::{
-            IsEndpointId, IsMemberId, IsRoomId, LocalUri, LocalUriType,
+            IsEndpointId, IsMemberId, IsRoomId, LocalUri, StatefulLocalUri,
         },
         LoadStaticControlSpecsError, MemberSpec, RoomId, RoomSpec,
     },
@@ -53,12 +53,12 @@ pub enum RoomServiceError {
     #[display(fmt = "Empty URIs list.")]
     EmptyUrisList,
     #[display(fmt = "Room not found for element [id = {}]", _0)]
-    RoomNotFoundForElement(LocalUriType),
+    RoomNotFoundForElement(StatefulLocalUri),
     #[display(
         fmt = "Provided not the same Room IDs in elements IDs [ids = {:?}].",
         _0
     )]
-    NotSameRoomIds(Vec<LocalUriType>, RoomId),
+    NotSameRoomIds(Vec<StatefulLocalUri>, RoomId),
     #[display(fmt = "Provided Room IDs with Room elements IDs.")]
     DeleteRoomAndFromRoom,
 }
@@ -223,7 +223,7 @@ impl DeleteElements<Unvalidated> {
         }
     }
 
-    pub fn add_uri(&mut self, uri: LocalUriType) {
+    pub fn add_uri(&mut self, uri: StatefulLocalUri) {
         self.uris.push(uri)
     }
 
@@ -237,7 +237,7 @@ impl DeleteElements<Unvalidated> {
         let mut ignored_uris = Vec::new();
 
         let first_room = self.uris[0].room_id().clone();
-        let uris: Vec<LocalUriType> = self
+        let uris: Vec<StatefulLocalUri> = self
             .uris
             .into_iter()
             .filter_map(|uri| {
@@ -268,7 +268,7 @@ impl DeleteElements<Unvalidated> {
 #[derive(Message)]
 #[rtype(result = "Result<(), RoomServiceError>")]
 pub struct DeleteElements<T> {
-    uris: Vec<LocalUriType>,
+    uris: Vec<StatefulLocalUri>,
     _state: PhantomData<T>,
 }
 
@@ -286,14 +286,15 @@ impl Handler<DeleteElements<Validated>> for RoomService {
             return Box::new(actix::fut::err(RoomServiceError::EmptyUrisList));
         }
 
-        let mut deletes_from_room: Vec<LocalUriType> = Vec::new();
+        let mut deletes_from_room: Vec<StatefulLocalUri> = Vec::new();
+        // TODO: use Vec::drain_filter when it will be in stable
         let room_messages_futs: Vec<
             Box<dyn Future<Item = (), Error = MailboxError>>,
         > = msg
             .uris
             .into_iter()
             .filter_map(|l| {
-                if let LocalUriType::Room(room_id) = l {
+                if let StatefulLocalUri::Room(room_id) = l {
                     Some(self.close_room(room_id.take_room_id()))
                 } else {
                     deletes_from_room.push(l);
@@ -328,14 +329,13 @@ impl Handler<DeleteElements<Validated>> for RoomService {
 }
 
 #[derive(Message)]
-#[rtype(
-    result = "Result<HashMap<LocalUriType, ElementProto>, RoomServiceError>"
-)]
-pub struct Get(pub Vec<LocalUriType>);
+#[rtype(result = "Result<HashMap<StatefulLocalUri, ElementProto>, \
+                  RoomServiceError>")]
+pub struct Get(pub Vec<StatefulLocalUri>);
 
 impl Handler<Get> for RoomService {
     type Result =
-        ActFuture<HashMap<LocalUriType, ElementProto>, RoomServiceError>;
+        ActFuture<HashMap<StatefulLocalUri, ElementProto>, RoomServiceError>;
 
     fn handle(&mut self, msg: Get, _: &mut Self::Context) -> Self::Result {
         let mut rooms_elements = HashMap::new();
@@ -345,7 +345,7 @@ impl Handler<Get> for RoomService {
                     .entry(uri.room_id().clone())
                     .or_insert_with(Vec::new)
                     .push(uri);
-            } else if let LocalUriType::Room(room_uri) = uri {
+            } else if let StatefulLocalUri::Room(room_uri) = uri {
                 return Box::new(actix::fut::err(
                     RoomServiceError::RoomNotFound(room_uri),
                 ));

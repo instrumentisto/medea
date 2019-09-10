@@ -21,7 +21,7 @@ use crate::{
     api::control::{
         endpoints::WebRtcPlayEndpoint as WebRtcPlayEndpointSpec,
         local_uri::{
-            IsEndpointId, IsMemberId, IsRoomId, LocalUri, LocalUriType,
+            IsEndpointId, IsMemberId, IsRoomId, LocalUri, StatefulLocalUri,
         },
         MemberId, MemberSpec, RoomId, RoomSpec, TryFromElementError,
         WebRtcPlayId, WebRtcPublishId,
@@ -40,7 +40,7 @@ use super::endpoints::{
 pub enum MembersLoadError {
     /// Errors that can occur when we try transform some spec from `Element`.
     #[display(fmt = "TryFromElementError: {}", _0)]
-    TryFromError(TryFromElementError, LocalUriType),
+    TryFromError(TryFromElementError, StatefulLocalUri),
 
     /// [`Member`] not found.
     #[display(fmt = "Member [id = {}] not found.", _0)]
@@ -138,7 +138,7 @@ impl Member {
         MemberSpec::try_from(element).map_err(|e| {
             MembersLoadError::TryFromError(
                 e,
-                LocalUriType::Member(LocalUri::<IsMemberId>::new(
+                StatefulLocalUri::Member(LocalUri::<IsMemberId>::new(
                     self.room_id(),
                     member_id.clone(),
                 )),
@@ -490,7 +490,7 @@ pub fn parse_members(
         Err(e) => {
             return Err(MembersLoadError::TryFromError(
                 e,
-                LocalUriType::Room(LocalUri::<IsRoomId>::new(
+                StatefulLocalUri::Room(LocalUri::<IsRoomId>::new(
                     room_spec.id.clone(),
                 )),
             ))
