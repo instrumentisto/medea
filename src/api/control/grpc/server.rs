@@ -184,19 +184,18 @@ impl ControlApiService {
     pub fn create_room(
         &mut self,
         req: &CreateRequest,
-        local_uri: LocalUri<IsRoomId>,
+        uri: LocalUri<IsRoomId>,
     ) -> impl Future<Item = Sids, Error = ControlApiError> {
-        let room_id = local_uri.take_room_id();
-
         let room = fut_try!(RoomSpec::try_from_protobuf(
-            room_id.clone(),
+            uri.room_id().clone(),
             req.get_room()
         ));
 
         let sid: HashMap<String, String> = fut_try!(room.members())
             .iter()
             .map(|(id, member)| {
-                let uri = self.get_sid(&room_id, &id, member.credentials());
+                let uri =
+                    self.get_sid(uri.room_id(), &id, member.credentials());
 
                 (id.clone().to_string(), uri)
             })
@@ -204,7 +203,10 @@ impl ControlApiService {
 
         Either::A(
             self.room_service
-                .send(StartRoom(room_id, room))
+                .send(StartRoom {
+                    id: uri,
+                    spec: room,
+                })
                 .map_err(ControlApiError::RoomServiceMailboxError)
                 .and_then(move |r| {
                     r.map_err(ControlApiError::from).map(|_| sid)
@@ -216,24 +218,18 @@ impl ControlApiService {
     pub fn create_member(
         &mut self,
         req: &CreateRequest,
-        local_uri: LocalUri<IsMemberId>,
+        uri: LocalUri<IsMemberId>,
     ) -> impl Future<Item = Sids, Error = ControlApiError> {
         let spec = fut_try!(MemberSpec::try_from(req.get_member()));
 
-        let (member_id, room_uri) = local_uri.take_member_id();
-        let room_id = room_uri.take_room_id();
-
-        let sid = self.get_sid(&room_id, &member_id, spec.credentials());
+        let sid =
+            self.get_sid(uri.room_id(), uri.member_id(), spec.credentials());
         let mut sids = HashMap::new();
-        sids.insert(member_id.to_string(), sid);
+        sids.insert(uri.member_id().to_string(), sid);
 
         Either::A(
             self.room_service
-                .send(CreateMemberInRoom {
-                    room_id,
-                    member_id,
-                    spec,
-                })
+                .send(CreateMemberInRoom { uri: uri, spec })
                 .map_err(ControlApiError::RoomServiceMailboxError)
                 .and_then(|r| r.map_err(ControlApiError::from).map(|_| sids)),
         )
@@ -244,19 +240,14 @@ impl ControlApiService {
     pub fn create_endpoint(
         &mut self,
         req: &CreateRequest,
-        local_uri: LocalUri<IsEndpointId>,
+        uri: LocalUri<IsEndpointId>,
     ) -> impl Future<Item = Sids, Error = ControlApiError> {
         let endpoint = fut_try!(Endpoint::try_from(req));
-        let (endpoint_id, member_uri) = local_uri.take_endpoint_id();
-        let (member_id, room_uri) = member_uri.take_member_id();
-        let room_id = room_uri.take_room_id();
 
         Either::A(
             self.room_service
                 .send(CreateEndpointInRoom {
-                    room_id,
-                    member_id,
-                    endpoint_id,
+                    uri: uri,
                     spec: endpoint,
                 })
                 .map_err(ControlApiError::RoomServiceMailboxError)

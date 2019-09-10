@@ -112,6 +112,12 @@ impl LocalUri<IsRoomId> {
     pub fn take_room_id(self) -> RoomId {
         self.state.0
     }
+
+    /// Push [`MemberId`] to the end of URI and returns
+    /// [`LocalUri<IsMemberId>`].
+    pub fn push_member_id(self, member_id: MemberId) -> LocalUri<IsMemberId> {
+        LocalUri::<IsMemberId>::new(self.state.0, member_id)
+    }
 }
 
 impl LocalUri<IsMemberId> {
@@ -135,6 +141,17 @@ impl LocalUri<IsMemberId> {
     /// Return [`MemberId`] and [`LocalUri`] in state [`IsRoomId`].
     pub fn take_member_id(self) -> (MemberId, LocalUri<IsRoomId>) {
         (self.state.1, self.state.0)
+    }
+
+    /// Push endpoint ID to the end of URI and returns
+    /// [`LocalUri<IsEndpointId>`].
+    pub fn push_endpoint_id(
+        self,
+        endpoint_id: String,
+    ) -> LocalUri<IsEndpointId> {
+        let (member_id, room_uri) = self.take_member_id();
+        let room_id = room_uri.take_room_id();
+        LocalUri::<IsEndpointId>::new(room_id, member_id, endpoint_id)
     }
 }
 
@@ -295,7 +312,7 @@ impl fmt::Display for LocalUri<IsEndpointId> {
 
 /// Enum for store all kinds of [`LocalUri`]s.
 #[allow(clippy::module_name_repetitions)]
-#[derive(Debug, Hash, PartialEq, Eq, Clone)]
+#[derive(Debug, Hash, PartialEq, Eq, Clone, Display)]
 pub enum LocalUriType {
     Room(LocalUri<IsRoomId>),
     Member(LocalUri<IsMemberId>),
@@ -334,16 +351,6 @@ impl TryFrom<&str> for LocalUriType {
             )))
         } else {
             Err(LocalUriParseError::MissingFields(value.to_string()))
-        }
-    }
-}
-
-impl fmt::Display for LocalUriType {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            LocalUriType::Room(e) => write!(f, "{}", e),
-            LocalUriType::Member(e) => write!(f, "{}", e),
-            LocalUriType::Endpoint(e) => write!(f, "{}", e),
         }
     }
 }

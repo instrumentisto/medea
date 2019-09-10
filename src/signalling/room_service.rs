@@ -15,8 +15,10 @@ use crate::{
     api::control::{
         endpoints::Endpoint as EndpointSpec,
         load_static_specs_from_dir,
-        local_uri::{IsRoomId, LocalUri, LocalUriType},
-        LoadStaticControlSpecsError, MemberId, MemberSpec, RoomId, RoomSpec,
+        local_uri::{
+            IsEndpointId, IsMemberId, IsRoomId, LocalUri, LocalUriType,
+        },
+        LoadStaticControlSpecsError, MemberSpec, RoomId, RoomSpec,
     },
     log::prelude::*,
     shutdown::{self, GracefulShutdown},
@@ -173,7 +175,10 @@ impl Handler<StartStaticRooms> for RoomService {
 
 #[derive(Message)]
 #[rtype(result = "Result<(), RoomServiceError>")]
-pub struct StartRoom(pub RoomId, pub RoomSpec);
+pub struct StartRoom {
+    pub id: LocalUri<IsRoomId>,
+    pub spec: RoomSpec,
+}
 
 impl Handler<StartRoom> for RoomService {
     type Result = Result<(), RoomServiceError>;
@@ -183,7 +188,7 @@ impl Handler<StartRoom> for RoomService {
         msg: StartRoom,
         _ctx: &mut Self::Context,
     ) -> Self::Result {
-        let room_id = msg.0;
+        let room_id = msg.id.take_room_id();
 
         if self.room_repo.get(&room_id).is_some() {
             return Err(RoomServiceError::RoomAlreadyExists(
@@ -191,7 +196,7 @@ impl Handler<StartRoom> for RoomService {
             ));
         }
 
-        let room = Room::new(&msg.1, self.app.clone())?;
+        let room = Room::new(&msg.spec, self.app.clone())?;
         let room_addr = room.start();
 
         shutdown::subscribe(
@@ -386,8 +391,7 @@ impl Handler<Get> for RoomService {
 #[derive(Message)]
 #[rtype(result = "Result<(), RoomServiceError>")]
 pub struct CreateMemberInRoom {
-    pub room_id: RoomId,
-    pub member_id: MemberId,
+    pub uri: LocalUri<IsMemberId>,
     pub spec: MemberSpec,
 }
 
@@ -399,15 +403,18 @@ impl Handler<CreateMemberInRoom> for RoomService {
         msg: CreateMemberInRoom,
         _: &mut Self::Context,
     ) -> Self::Result {
-        let fut = if let Some(room) = self.room_repo.get(&msg.room_id) {
+        let (member_id, room_uri) = msg.uri.take_member_id();
+        let room_id = room_uri.take_room_id();
+
+        let fut = if let Some(room) = self.room_repo.get(&room_id) {
             Either::A(
-                room.send(CreateMember(msg.member_id, msg.spec))
+                room.send(CreateMember(member_id, msg.spec))
                     .map_err(RoomServiceError::RoomMailboxErr)
                     .and_then(|r| r.map_err(RoomServiceError::from)),
             )
         } else {
             Either::B(future::err(RoomServiceError::RoomNotFound(
-                get_local_uri_to_room(msg.room_id),
+                get_local_uri_to_room(room_id),
             )))
         };
 
@@ -419,9 +426,7 @@ impl Handler<CreateMemberInRoom> for RoomService {
 #[derive(Message)]
 #[rtype(result = "Result<(), RoomServiceError>")]
 pub struct CreateEndpointInRoom {
-    pub room_id: RoomId,
-    pub member_id: MemberId,
-    pub endpoint_id: String,
+    pub uri: LocalUri<IsEndpointId>,
     pub spec: EndpointSpec,
 }
 
@@ -433,11 +438,15 @@ impl Handler<CreateEndpointInRoom> for RoomService {
         msg: CreateEndpointInRoom,
         _ctx: &mut Self::Context,
     ) -> Self::Result {
-        let fut = if let Some(room) = self.room_repo.get(&msg.room_id) {
+        let (endpoint_id, member_uri) = msg.uri.take_endpoint_id();
+        let (member_id, room_uri) = member_uri.take_member_id();
+        let room_id = room_uri.take_room_id();
+
+        let fut = if let Some(room) = self.room_repo.get(&room_id) {
             Either::A(
                 room.send(CreateEndpoint {
-                    member_id: msg.member_id,
-                    endpoint_id: msg.endpoint_id,
+                    member_id,
+                    endpoint_id,
                     spec: msg.spec,
                 })
                 .map_err(RoomServiceError::RoomMailboxErr)
@@ -445,7 +454,7 @@ impl Handler<CreateEndpointInRoom> for RoomService {
             )
         } else {
             Either::B(future::err(RoomServiceError::RoomNotFound(
-                get_local_uri_to_room(msg.room_id),
+                get_local_uri_to_room(room_id),
             )))
         };
 
