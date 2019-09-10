@@ -16,8 +16,9 @@ RUN mkdir -p /out/etc/ \
  && echo 'nobody:x:65534:' > /out/etc/group
 
 RUN apt-get update
-RUN apt-get install -y cmake protobuf-compiler golang
+RUN apt-get install -y cmake golang
 ENV GOPATH /usr/lib/go
 
 COPY / /app/
+RUN bash /app/_ci/protoc_install.sh
 WORKDIR "/app"

@@ -18,4 +18,6 @@
 # Medea dependencies cache.
 !.cache/cargo/
 
+!_ci
+
 # !target/{mode} is added and removed dynamically to reduce image build times.
