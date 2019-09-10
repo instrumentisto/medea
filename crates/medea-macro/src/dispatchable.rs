@@ -149,7 +149,7 @@ mod to_handler_fn_name_spec {
 
     #[test]
     fn converts_name_from_camel_case_to_snake_case() {
-        for (name, expected) in vec![
+        for (name, expected) in &[
             ("SomeTestTrait", "on_some_test_trait"),
             ("RPCConnection", "on_rpc_connection"),
             ("RConnection", "on_r_connection"),
@@ -161,7 +161,7 @@ mod to_handler_fn_name_spec {
             ("s", "on_s"),
             ("ASDF", "on_asdf"),
         ] {
-            assert_eq!(to_handler_fn_name(name), expected);
+            assert_eq!(to_handler_fn_name(name), *expected);
         }
     }
 }

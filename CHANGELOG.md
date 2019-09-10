@@ -6,6 +6,26 @@ All user visible changes to this project will be documented in this file. This p
 
 
 
+## TBD [0.2.0] · 2019-??-??
+[0.2.0]: /../../tree/medea-0.2.0
+
+[Milestone](/../../milestone/2) | [Roadmap](/../../issues/27)
+
+### Added
+
+- Control API:
+    - Support for static Сontrol API specs ([#28]).
+- Signalling:
+    - Dynamic `Peer`s creation when client connects ([#28]);
+    - Auto-removing `Peer`s when `Member` disconnects ([#28]).
+- Testing:
+    - E2E tests for signalling ([#28]).
+
+[#28]: /../../pull/28
+
+
+
+
 ## [0.1.0] · 2019-08-22
 [0.1.0]: /../../tree/medea-0.1.0
 

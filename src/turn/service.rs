@@ -10,16 +10,16 @@ use actix::{
     Message, WrapFuture,
 };
 use bb8::RunError;
+use derive_more::Display;
 use failure::Fail;
 use futures::future::{err, ok, Future};
 use rand::{distributions::Alphanumeric, Rng};
 use redis::ConnectionInfo;
 
 use crate::{
-    api::control::MemberId,
+    api::control::{MemberId, RoomId},
     conf,
     media::IceUser,
-    signalling::RoomId,
     turn::repo::{TurnDatabase, TurnDatabaseErr},
 };
 
@@ -27,7 +27,7 @@ static TURN_PASS_LEN: usize = 16;
 
 #[allow(clippy::module_name_repetitions)]
 /// Manages Turn server credentials.
-pub trait TurnAuthService: fmt::Debug + Send {
+pub trait TurnAuthService: fmt::Debug + Send + Sync {
     /// Generates and registers Turn credentials.
     fn create(
         &self,
@@ -47,7 +47,7 @@ impl TurnAuthService for Addr<Service> {
     /// Sends [`CreateIceUser`] to [`Service`].
     fn create(
         &self,
-        member_id: u64,
+        member_id: MemberId,
         room_id: RoomId,
         policy: UnreachablePolicy,
     ) -> Box<dyn Future<Item = IceUser, Error = TurnServiceErr>> {
@@ -97,34 +97,34 @@ type ActFuture<I, E> =
     Box<dyn ActorFuture<Actor = Service, Item = I, Error = E>>;
 
 /// Error which can happen in [`TurnAuthService`].
-#[derive(Debug, Fail)]
+#[derive(Display, Debug, Fail)]
 pub enum TurnServiceErr {
-    #[fail(display = "Error accessing TurnAuthRepo: {}", _0)]
+    #[display(fmt = "Error accessing TurnAuthRepo: {}", _0)]
     TurnAuthRepoErr(TurnDatabaseErr),
-    #[fail(display = "Mailbox error when accessing TurnAuthRepo: {}", _0)]
+    #[display(fmt = "Mailbox error when accessing TurnAuthRepo: {}", _0)]
     MailboxErr(MailboxError),
-    #[fail(display = "Timeout exceeded while trying to insert/delete IceUser")]
+    #[display(fmt = "Timeout exceeded while trying to insert/delete IceUser")]
     TimedOut,
 }
 
 impl From<TurnDatabaseErr> for TurnServiceErr {
     fn from(err: TurnDatabaseErr) -> Self {
-        TurnServiceErr::TurnAuthRepoErr(err)
+        Self::TurnAuthRepoErr(err)
     }
 }
 
 impl From<bb8::RunError<TurnDatabaseErr>> for TurnServiceErr {
     fn from(err: bb8::RunError<TurnDatabaseErr>) -> Self {
         match err {
-            RunError::User(error) => TurnServiceErr::TurnAuthRepoErr(error),
-            RunError::TimedOut => TurnServiceErr::TimedOut,
+            RunError::User(error) => Self::TurnAuthRepoErr(error),
+            RunError::TimedOut => Self::TimedOut,
         }
     }
 }
 
 impl From<MailboxError> for TurnServiceErr {
     fn from(err: MailboxError) -> Self {
-        TurnServiceErr::MailboxErr(err)
+        Self::MailboxErr(err)
     }
 }
 
@@ -240,7 +240,7 @@ impl Handler<CreateIceUser> for Service {
     ) -> Self::Result {
         let ice_user = IceUser::build(
             self.turn_address.clone(),
-            msg.room_id,
+            &msg.room_id,
             &msg.member_id.to_string(),
             self.new_password(TURN_PASS_LEN),
         );
@@ -288,6 +288,8 @@ impl Handler<DeleteIceUsers> for Service {
 
 #[cfg(test)]
 pub mod test {
+    use std::sync::Arc;
+
     use futures::future;
 
     use crate::media::IceUser;
@@ -300,7 +302,7 @@ pub mod test {
     impl TurnAuthService for TurnAuthServiceMock {
         fn create(
             &self,
-            _: u64,
+            _: MemberId,
             _: RoomId,
             _: UnreachablePolicy,
         ) -> Box<dyn Future<Item = IceUser, Error = TurnServiceErr>> {

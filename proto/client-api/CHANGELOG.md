@@ -6,6 +6,19 @@ All user visible changes to this project will be documented in this file. This p
 
 
 
+## TBD [0.1.1] · 2019-??-??
+[0.1.1]: /../../tree/medea-client-api-proto-0.1.1/proto/client-api
+
+### Added
+
+- `TrackId` and `PeerId` types ([#28]);
+- `Incrementable` trait ([#28]).
+
+[#28]: /../../pull/28
+
+
+
+
 ## [0.1.0] · 2019-08-21
 [0.1.0]: /../../tree/medea-client-api-proto-0.1.0/proto/client-api
 

@@ -3,13 +3,11 @@
 //! [WebRTC]: https://webrtcglossary.com/webrtc/
 //! [signalling]: https://webrtcglossary.com/signaling/
 
+pub mod elements;
 pub mod participants;
 pub mod peers;
 pub mod room;
 pub mod room_repo;
 
 #[doc(inline)]
-pub use self::{
-    room::{Id as RoomId, Room},
-    room_repo::RoomsRepository,
-};
+pub use self::room::Room;

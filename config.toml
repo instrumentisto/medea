@@ -12,6 +12,15 @@
 
 
 
+[control]
+# Path to directory with static Сontrol API specs.
+#
+# Default:
+#   static_specs_dir = "specs/"
+
+
+
+
 [rpc]
 # Duration, after which remote RPC client will be considered idle if no
 # heartbeat messages received.
