@@ -1,4 +1,4 @@
-//! Service which control [`Room`].
+//! Service which provide CRUD actions for [`Room`].
 
 use std::{collections::HashMap, marker::PhantomData};
 
@@ -209,7 +209,7 @@ impl Handler<StartStaticRooms> for RoomService {
 #[derive(Message)]
 #[rtype(result = "Result<(), RoomServiceError>")]
 pub struct CreateRoom {
-    pub id: LocalUri<IsRoomId>,
+    pub uri: LocalUri<IsRoomId>,
     pub spec: RoomSpec,
 }
 
@@ -221,7 +221,7 @@ impl Handler<CreateRoom> for RoomService {
         msg: CreateRoom,
         _ctx: &mut Self::Context,
     ) -> Self::Result {
-        let room_id = msg.id.take_room_id();
+        let room_id = msg.uri.take_room_id();
 
         if self.room_repo.get(&room_id).is_some() {
             return Err(RoomServiceError::RoomAlreadyExists(

@@ -1,4 +1,4 @@
-//! `WebRtcPlayEndpoint` implementation.
+//! `WebRtcPlayEndpoint` element implementation.
 
 use std::{convert::TryFrom, fmt};
 
@@ -38,16 +38,29 @@ impl TryFrom<&WebRtcPlayEndpointProto> for WebRtcPlayEndpoint {
     }
 }
 
+/// Errors which can happen while parsing [`SrcUri`] from [Control API] specs.
+///
+/// [Control API]: http://tiny.cc/380uaz
 #[derive(Debug, Fail, Display)]
 pub enum SrcParseError {
+    /// Provided not source URI.
     #[display(fmt = "Provided not src uri {}", _0)]
     NotSrcUri(String),
+
+    /// Error from [`LocalUri`] parser. This is general errors for [`SrcUri`]
+    /// parsing because [`SrcUri`] parses with [`LocalUri`] parser.
     #[display(fmt = "Local URI '{}' parse error: {:?}", _0, _1)]
     LocalUriParseError(String, LocalUriParseError),
 }
 
 /// Special uri with pattern `local://{room_id}/{member_id}/{endpoint_id}`.
 /// This uri can pointing only to [`WebRtcPublishEndpoint`].
+///
+/// Note that [`SrcUri`] parsing with [`LocalUri`] parser.
+/// Actually difference between [`SrcUri`] and [`LocalUri`]
+/// in endpoint ID's type. In [`SrcUri`] it [`WebRtcPublishId`], and in
+/// [`LocalUri`] it [`String`]. Also [`SrcUri`] can be deserialized with
+/// [`serde`].
 ///
 /// [`WebRtcPublishEndpoint`]:
 /// crate::api::control::endpoints::WebRtcPublishEndpoint
@@ -99,8 +112,10 @@ impl From<LocalUri<IsEndpointId>> for SrcUri {
     }
 }
 
-/// Serde deserializer for [`SrcUri`].
+/// [Serde] deserializer for [`SrcUri`].
 /// Deserialize URIs with pattern `local://{room_id}/{member_id}/{endpoint_id}`.
+///
+/// [Serde]: serde
 impl<'de> Deserialize<'de> for SrcUri {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where

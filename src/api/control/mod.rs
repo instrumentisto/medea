@@ -11,7 +11,7 @@ pub mod room;
 
 use std::{convert::TryFrom as _, fs::File, io::Read as _, path::Path};
 
-use derive_more::{Display, From};
+use derive_more::Display;
 use failure::Fail;
 use serde::Deserialize;
 
@@ -86,14 +86,17 @@ pub enum TryFromElementError {
 }
 
 /// Errors which can happen while loading static [Control API] specs.
-#[derive(From, Debug, Fail, Display)]
+#[derive(Debug, Fail, Display)]
 pub enum LoadStaticControlSpecsError {
-    /// Default or provided in config static [Control API] specs dir not
-    /// exists.
+    /// Error while reading default or provided in config static [Control API]
+    /// specs dir.
+    ///
+    /// Atm we only should print `warn!` message to log which prints that
+    /// static specs not loaded.
     ///
     /// [Control API]: http://tiny.cc/380uaz
-    #[display(fmt = "Directory with specs not found.")]
-    SpecDirNotFound,
+    #[display(fmt = "Error while reading static control API specs dir.")]
+    SpecDirReadError(std::io::Error),
 
     /// I/O error while reading static [Control API] specs.
     ///
@@ -117,6 +120,24 @@ pub enum LoadStaticControlSpecsError {
     YamlDeserializationError(serde_yaml::Error),
 }
 
+impl From<std::io::Error> for LoadStaticControlSpecsError {
+    fn from(err: std::io::Error) -> Self {
+        Self::IoError(err)
+    }
+}
+
+impl From<TryFromElementError> for LoadStaticControlSpecsError {
+    fn from(err: TryFromElementError) -> Self {
+        Self::TryFromElementError(err)
+    }
+}
+
+impl From<serde_yaml::Error> for LoadStaticControlSpecsError {
+    fn from(err: serde_yaml::Error) -> Self {
+        Self::YamlDeserializationError(err)
+    }
+}
+
 /// Load [`RoomSpec`] from file with YAML format.
 pub fn load_from_yaml_file<P: AsRef<Path>>(
     path: P,
@@ -135,7 +156,7 @@ pub fn load_static_specs_from_dir<P: AsRef<Path>>(
 ) -> Result<Vec<RoomSpec>, LoadStaticControlSpecsError> {
     let mut specs = Vec::new();
     for entry in std::fs::read_dir(path)
-        .map_err(|_| LoadStaticControlSpecsError::SpecDirNotFound)?
+        .map_err(LoadStaticControlSpecsError::SpecDirReadError)?
     {
         let entry = entry?;
         let spec = load_from_yaml_file(entry.path())?;

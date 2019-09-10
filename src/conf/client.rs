@@ -1,15 +1,19 @@
-//! HTTP server settings.
+//! [Client API] HTTP server settings.
+//!
+//! [Client API]: http://tiny.cc/c80uaz
 
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, ToSocketAddrs as _};
 
 use serde::{Deserialize, Serialize};
 use smart_default::SmartDefault;
 
-/// HTTP server settings.
+/// [Client API] HTTP server settings.
+///
+/// [Client API]: http://tiny.cc/c80uaz
 #[derive(Clone, Debug, Deserialize, Serialize, SmartDefault)]
 #[serde(default)]
 pub struct Client {
-    /// Public URI of server. Address for exposed [Client API].
+    /// Public URL of server. Address for exposed [Client API].
     ///
     /// This address will be returned from [Control API] in `sids` and to
     /// this address will connect [Jason] for start session.
@@ -28,9 +32,6 @@ pub struct Client {
     /// Port to bind HTTP server to. Defaults to `8080`.
     #[default(8080)]
     pub bind_port: u16,
-
-    /// Path to directory with static control API specs.
-    pub static_specs_path: Option<String>,
 }
 
 impl Client {

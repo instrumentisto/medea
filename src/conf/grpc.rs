@@ -1,11 +1,15 @@
-//! gRPC server settings.
+//! [Control API] gRPC server settings.
+//!
+//! [Control API]: http://tiny.cc/380uaz
 
 use std::net::{IpAddr, Ipv4Addr};
 
 use serde::{Deserialize, Serialize};
 use smart_default::SmartDefault;
 
-/// gRPC server settings.
+/// [Control API] gRPC server settings.
+///
+/// [Control API]: http://tiny.cc/380uaz
 #[derive(Clone, Debug, Deserialize, Serialize, SmartDefault)]
 #[serde(default)]
 pub struct Grpc {

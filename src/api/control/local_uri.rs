@@ -39,7 +39,7 @@ pub enum LocalUriParseError {
     Empty,
 }
 
-/// Enum for store all kinds of [`LocalUri`]s.
+/// Enum for store [`LocalUri`]s in all states.
 #[allow(clippy::module_name_repetitions)]
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Display, From)]
 pub enum StatefulLocalUri {
@@ -167,6 +167,7 @@ pub struct IsEndpointId(LocalUri<IsMemberId>, String);
 /// ```
 /// # use crate::api::control::local_uri::{LocalUri, IsEndpointId};
 /// # use crate::api::control::{RoomId, MemberId};
+/// #
 /// let orig_room_id = RoomId("room".to_string());
 /// let orig_member_id = MemberId("member".to_string());
 /// let orig_endpoint_id = "endpoint".to_string();
@@ -200,10 +201,8 @@ pub struct IsEndpointId(LocalUri<IsMemberId>, String);
 /// [`Room`]: crate::signalling::room::Room
 /// [`WebRtcPlayEndpoint`]:
 /// crate::signalling::elements::endpoints::webrtc::WebRtcPlayEndpoint
-///
 /// [`WebRtcPublishEndpoint`]:
 /// crate::signalling::elements::endpoints::webrtc::WebRtcPublishEndpoint
-///
 /// [`Endpoint`]: crate::signalling::elements::endpoints::Endpoint
 #[derive(Debug, PartialEq, Hash, Eq, Clone)]
 pub struct LocalUri<T> {
@@ -357,13 +356,17 @@ mod tests {
         let local_uri =
             StatefulLocalUri::try_from("local://room_id/room_element_id")
                 .unwrap();
-        if let StatefulLocalUri::Member(member) = local_uri {
+        if let StatefulLocalUri::Member(member) = local_uri.clone() {
             let (element_id, room_uri) = member.take_member_id();
             assert_eq!(element_id, MemberId("room_element_id".to_string()));
             let room_id = room_uri.take_room_id();
             assert_eq!(room_id, RoomId("room_id".to_string()));
         } else {
-            unreachable!();
+            unreachable!(
+                "Local URI '{}' parsed to {:?} state but should be in \
+                 IsMemberId state.",
+                local_uri, local_uri
+            );
         }
     }
 
@@ -373,7 +376,7 @@ mod tests {
             "local://room_id/room_element_id/endpoint_id",
         )
         .unwrap();
-        if let StatefulLocalUri::Endpoint(endpoint) = local_uri {
+        if let StatefulLocalUri::Endpoint(endpoint) = local_uri.clone() {
             let (endpoint_id, member_uri) = endpoint.take_endpoint_id();
             assert_eq!(endpoint_id, "endpoint_id".to_string());
             let (member_id, room_uri) = member_uri.take_member_id();
@@ -381,7 +384,11 @@ mod tests {
             let room_id = room_uri.take_room_id();
             assert_eq!(room_id, RoomId("room_id".to_string()));
         } else {
-            unreachable!();
+            unreachable!(
+                "Local URI '{}' parsed to {:?} state but should be in \
+                 IsEndpointId state.",
+                local_uri, local_uri
+            );
         }
     }
 
@@ -402,7 +409,7 @@ mod tests {
             Ok(_) => unreachable!(),
             Err(e) => match e {
                 LocalUriParseError::Empty => (),
-                _ => unreachable!(),
+                _ => unreachable!("Unreachable LocalUriParseError: {:?}", e),
             },
         }
     }
@@ -415,7 +422,7 @@ mod tests {
             Ok(_) => unreachable!(),
             Err(e) => match e {
                 LocalUriParseError::TooManyPaths(_) => (),
-                _ => unreachable!(),
+                _ => unreachable!("Unreachable LocalUriParseError: {:?}", e),
             },
         }
     }
@@ -443,7 +450,10 @@ mod tests {
                 Ok(_) => unreachable!(local_uri_str),
                 Err(e) => match e {
                     LocalUriParseError::MissingPaths(_) => (),
-                    _ => unreachable!(local_uri_str),
+                    _ => unreachable!(
+                        "Unreachable LocalUriParseError {:?} for uri '{}'",
+                        e, local_uri_str
+                    ),
                 },
             }
         }

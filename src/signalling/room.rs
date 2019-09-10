@@ -922,8 +922,9 @@ impl Handler<Delete> for Room {
                 StatefulLocalUri::Endpoint(endpoint_uri) => {
                     endpoint_ids.push(endpoint_uri);
                 }
-                // TODO (evdokimovs): better message
-                _ => warn!("Delete method in Room found LocalUri<Room>."),
+                _ => warn!(
+                    "Found LocalUri<IsRoomId> while deleting __from__ Room."
+                ),
             }
         }
         member_ids.into_iter().for_each(|uri| {

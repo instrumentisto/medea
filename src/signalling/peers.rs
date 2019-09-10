@@ -173,7 +173,7 @@ impl PeerRepository {
         }
     }
 
-    /// Delete [`PeerStateMachine`]s from this [`PeerRepository`] and send
+    /// Deletes [`PeerStateMachine`]s from this [`PeerRepository`] and send
     /// [`Event::PeersRemoved`] to [`Member`]s.
     ///
     /// __Note:__ this also delete partner peers.
@@ -246,7 +246,7 @@ impl PeerRepository {
         peers_to_remove
     }
 
-    /// Delete [`PeerStateMachine`] from this [`PeerRepository`] and send
+    /// Deletes [`PeerStateMachine`] from this [`PeerRepository`] and send
     /// [`Event::PeersRemoved`] to [`Member`]s.
     ///
     /// __Note:__ this also delete partner peer.

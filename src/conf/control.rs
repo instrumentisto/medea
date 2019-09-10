@@ -19,6 +19,9 @@ pub struct Control {
     #[default(String::from("specs/"))]
     pub static_specs_dir: String,
 
+    /// gRPC [Control API] server settings.
+    ///
+    /// [Control API]: http://tiny.cc/380uaz
     pub grpc: Grpc,
 }
 

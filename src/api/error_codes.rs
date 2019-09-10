@@ -37,11 +37,13 @@ pub struct ErrorResponse {
 
     /// All [`ErrorCode`]s have [`Display`] implementation. And this
     /// implementation will be used if this field is [`None`]. But
-    /// some time we want to add some error explanation. Then we set this field
-    /// to [`Some`] and this text will be added to
+    /// some times we want to add some error explanation. Then we set this
+    /// field to [`Some`] and this text will be added to
     /// [`Display`] implementation's text.
     ///
     /// By default this field should be [`None`].
+    ///
+    /// For providing error explanation use [`ErrorResponse::explain`] method.
     ///
     /// [`Display`]: std::fmt::Display
     explanation: Option<String>,
@@ -58,7 +60,7 @@ impl ErrorResponse {
     }
 
     /// New [`ErrorResponse`] only with [`ErrorCode`].
-    pub fn empty(error_code: ErrorCode) -> Self {
+    pub fn without_id(error_code: ErrorCode) -> Self {
         Self {
             error_code,
             element_id: None,
@@ -68,8 +70,10 @@ impl ErrorResponse {
 
     /// [`ErrorResponse`] for all unexpected errors.
     ///
-    /// Provide unexpected `Error` in this function.
-    pub fn unknown<B: ToString>(unknown_error: &B) -> Self {
+    /// Provide unexpected `Error` to this function.
+    /// This error will be printed with [`Display`] implementation
+    /// of provided `Error`.
+    pub fn unexpected<B: ToString>(unknown_error: &B) -> Self {
         Self {
             error_code: ErrorCode::UnexpectedError,
             explanation: Some(unknown_error.to_string()),
@@ -81,7 +85,7 @@ impl ErrorResponse {
     ///
     /// With this method you can add additional text to error message of
     /// [`ErrorCode`].
-    pub fn explain(
+    pub fn with_explanation(
         error_code: ErrorCode,
         explanation: String,
         id: Option<String>,
@@ -175,7 +179,7 @@ pub enum ErrorCode {
     /// Medea expects `Member` element in pipeline but received not him.
     ///
     /// Code: __1101__.
-    #[display(fmt = "Expecting Member element but it's not.")]
+    #[display(fmt = "Expected Member element but it's not.")]
     NotMemberInSpec = 1101,
     /// Invalid source URI in play endpoint.
     ///
@@ -186,21 +190,21 @@ pub enum ErrorCode {
     ///
     /// Code: __1103__.
     #[display(
-        fmt = "You provided ID for Room but element's spec is not for Room."
+        fmt = "You provided URI to Room but element's spec is not for Room."
     )]
     ElementIdForRoomButElementIsNot = 1103,
     /// Provided element ID to Member element but element spec is not for
     /// Member.
     ///
     /// Code: __1104__.
-    #[display(fmt = "You provided ID for Member but element's spec is not \
+    #[display(fmt = "You provided URI to Member but element's spec is not \
                      for Member.")]
     ElementIdForMemberButElementIsNot = 1104,
     /// Provided element ID to Endpoint element but element spec is not for
     /// Endpoint.
     ///
     /// Code: __1105__.
-    #[display(fmt = "You provided ID for Endpoint but element's spec is not \
+    #[display(fmt = "You provided URI to Endpoint but element's spec is not \
                      for Endpoint.")]
     ElementIdForEndpointButElementIsNot = 1105,
     /// Provided not source URI in [`WebRtcPlayEndpoint`].
@@ -220,51 +224,56 @@ pub enum ErrorCode {
     /// Code: __1200__.
     #[display(fmt = "Element's ID's URI not have 'local://' protocol.")]
     ElementIdIsNotLocal = 1200,
-    /// Element's ID have too many paths (slashes).
+    /// Provided element's URI with too many paths.
     ///
     /// Code: __1201__.
-    #[display(fmt = "In provided element's ID too many slashes.")]
+    #[display(fmt = "You provided element's URI with too many paths.")]
     ElementIdIsTooLong = 1201,
-    /// Missing some fields in element's ID.
+    /// Missing some fields in source URI of WebRtcPublishEndpoint.
     ///
     /// Code: __1202__.
-    #[display(fmt = "Missing some fields in element ID.")]
+    #[display(
+        fmt = "Missing some fields in source URI of WebRtcPublishEndpoint."
+    )]
     MissingFieldsInSrcUri = 1202,
     /// Empty element ID.
     ///
     /// Code: __1203__.
-    #[display(fmt = "Provided empty element ID.")]
+    #[display(fmt = "Provided empty element URI.")]
     EmptyElementId = 1203,
-    /// Provided empty elements IDs list.
+    /// Provided empty elements URIs list.
     ///
     /// Code: __1204__.
-    #[display(fmt = "Provided empty elements IDs list.")]
+    #[display(fmt = "Provided empty elements URIs list.")]
     EmptyElementsList = 1204,
-    /// Provided not the same [`RoomId`]s in elements IDs.
+    /// Provided not the same Room IDs in elements IDs. Probably you try use
+    /// Delete method for elements with different Room IDs
     ///
     /// Code: __1205__.
     ///
     /// [`RoomId`]: crate::api::control::room::Id
-    #[display(fmt = "Provided not the same Room IDs in elements IDs.")]
+    #[display(fmt = "Provided not the same Room IDs in elements IDs. \
+                     Probably you try use Delete method for elements with \
+                     different Room IDs")]
     ProvidedNotSameRoomIds = 1205,
 
     /////////////////////////////
     // Conflict (1300 - 1399) //
     ///////////////////////////
-    /// Member already exists.
+    /// Member with provided URI already exists.
     ///
     /// Code: __1300__.
-    #[display(fmt = "Member already exists.")]
+    #[display(fmt = "Member with provided URI already exists.")]
     MemberAlreadyExists = 1300,
-    /// Endpoint already exists.
+    /// Endpoint with provided URI already exists.
     ///
     /// Code: __1301__.
-    #[display(fmt = "Endpoint already exists.")]
+    #[display(fmt = "Endpoint with provided URI already exists.")]
     EndpointAlreadyExists = 1301,
-    /// Room already exists.
+    /// Room with provided URI already exists.
     ///
     /// Code: __1302__.
-    #[display(fmt = "Room already exists.")]
+    #[display(fmt = "Room with provided URI already exists.")]
     RoomAlreadyExists = 1302,
 
     ////////////////////////
@@ -297,7 +306,7 @@ impl From<ParticipantServiceErr> for ErrorResponse {
                 Self::new(ErrorCode::EndpointAlreadyExists, &id)
             }
             ParticipantServiceErr::TurnServiceErr(_)
-            | ParticipantServiceErr::MemberError(_) => Self::unknown(&err),
+            | ParticipantServiceErr::MemberError(_) => Self::unexpected(&err),
         }
     }
 }
@@ -307,9 +316,9 @@ impl From<TryFromProtobufError> for ErrorResponse {
         match err {
             TryFromProtobufError::SrcUriError(e) => e.into(),
             TryFromProtobufError::NotMemberElementInRoomElement(id) => {
-                Self::explain(
+                Self::with_explanation(
                     ErrorCode::UnimplementedCall,
-                    "Not Member elements in Room element currently \
+                    "Not Member elements in Room element currently is \
                      unimplemented."
                         .to_string(),
                     Some(id),
@@ -328,7 +337,9 @@ impl From<LocalUriParseError> for ErrorResponse {
             LocalUriParseError::TooManyPaths(text) => {
                 Self::new(ErrorCode::ElementIdIsTooLong, &text)
             }
-            LocalUriParseError::Empty => Self::empty(ErrorCode::EmptyElementId),
+            LocalUriParseError::Empty => {
+                Self::without_id(ErrorCode::EmptyElementId)
+            }
             LocalUriParseError::MissingPaths(text) => {
                 Self::new(ErrorCode::MissingFieldsInSrcUri, &text)
             }
@@ -354,7 +365,7 @@ impl From<RoomError> for ErrorResponse {
             | RoomError::TryFromElementError(_)
             | RoomError::BadRoomSpec(_)
             | RoomError::TurnServiceError(_)
-            | RoomError::ClientError(_) => Self::unknown(&err),
+            | RoomError::ClientError(_) => Self::unexpected(&err),
         }
     }
 }
@@ -421,13 +432,13 @@ impl From<RoomServiceError> for ErrorResponse {
             }
             RoomServiceError::RoomError(e) => e.into(),
             RoomServiceError::EmptyUrisList => {
-                Self::empty(ErrorCode::EmptyElementsList)
+                Self::without_id(ErrorCode::EmptyElementsList)
             }
             RoomServiceError::RoomNotFoundForElement(id) => {
                 Self::new(ErrorCode::RoomNotFoundForProvidedElement, &id)
             }
             RoomServiceError::NotSameRoomIds(ids, expected_room_id) => {
-                Self::explain(
+                Self::with_explanation(
                     ErrorCode::ProvidedNotSameRoomIds,
                     format!(
                         "Expected Room ID: '{}'. IDs with different Room ID: \
@@ -442,7 +453,7 @@ impl From<RoomServiceError> for ErrorResponse {
             }
             RoomServiceError::RoomMailboxErr(_)
             | RoomServiceError::FailedToLoadStaticSpecs(_) => {
-                Self::unknown(&err)
+                Self::unexpected(&err)
             }
         }
     }
@@ -456,7 +467,9 @@ impl From<GrpcControlApiError> for ErrorResponse {
             GrpcControlApiError::RoomServiceError(e) => e.into(),
             GrpcControlApiError::RoomServiceMailboxError(_)
             | GrpcControlApiError::TryFromElement(_)
-            | GrpcControlApiError::UnknownMailboxErr(_) => Self::unknown(&err),
+            | GrpcControlApiError::UnknownMailboxErr(_) => {
+                Self::unexpected(&err)
+            }
         }
     }
 }

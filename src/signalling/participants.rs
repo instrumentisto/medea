@@ -55,16 +55,27 @@ use crate::{
 #[derive(Fail, Debug, Display)]
 #[allow(clippy::module_name_repetitions)]
 pub enum ParticipantServiceErr {
+    /// Some error happened in [`TurnAuthService`].
     #[display(fmt = "TurnService Error in ParticipantService: {}", _0)]
     TurnServiceErr(TurnServiceErr),
+
+    /// [`Member`] with provided [`LocalUri`] not found.
     #[display(fmt = "Participant [id = {}] not found", _0)]
     ParticipantNotFound(LocalUri<IsMemberId>),
+
+    /// [`Endpoint`] with provided URI not found.
     #[display(fmt = "Endpoint [id = {}] not found.", _0)]
     EndpointNotFound(LocalUri<IsEndpointId>),
+
+    /// Some error happened in [`Member`].
     #[display(fmt = "{}", _0)]
     MemberError(MemberError),
+
+    /// Try to create [`Member`] with ID which already exists.
     #[display(fmt = "Participant [id = {}] already exists.", _0)]
     ParticipantAlreadyExists(LocalUri<IsMemberId>),
+
+    /// Try to create [`Endpoint`] with ID which already exists.
     #[display(fmt = "Endpoint [id = {}] already exists.", _0)]
     EndpointAlreadyExists(LocalUri<IsEndpointId>),
 }
@@ -368,7 +379,7 @@ impl ParticipantService {
         join_all(close_fut).map(|_| ())
     }
 
-    /// Delete [`Member`] from [`ParticipantService`], remove this user from
+    /// Deletes [`Member`] from [`ParticipantService`], remove this user from
     /// [`TurnAuthService`], close RPC connection with him and remove drop
     /// connection task.
     ///
@@ -397,7 +408,7 @@ impl ParticipantService {
         }
     }
 
-    /// Create new [`Member`] in this [`ParticipantService`].
+    /// Creates new [`Member`] in this [`ParticipantService`].
     ///
     /// This function will check that new [`Member`]'s ID is not present in
     /// [`ParticipantService`].

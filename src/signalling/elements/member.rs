@@ -118,7 +118,7 @@ impl Member {
         })))
     }
 
-    /// Lookup [`MemberSpec`] by ID from [`MemberSpec`].
+    /// Lookup [`MemberSpec`] by [`MemberId`] from [`MemberSpec`].
     ///
     /// Returns [`MembersLoadError::MemberNotFound`] when member not found.
     /// Returns [`MembersLoadError::TryFromError`] when found element which is
@@ -388,12 +388,12 @@ impl Member {
         self.0.borrow_mut().srcs.remove(id);
     }
 
-    /// Take sink from [`Member`]'s `sinks`.
+    /// Takes sink from [`Member`]'s `sinks`.
     pub fn take_sink(&self, id: &WebRtcPlayId) -> Option<WebRtcPlayEndpoint> {
         self.0.borrow_mut().sinks.remove(id)
     }
 
-    /// Take src from [`Member`]'s `srsc`.
+    /// Takes src from [`Member`]'s `srsc`.
     pub fn take_src(
         &self,
         id: &WebRtcPublishId,
@@ -401,6 +401,7 @@ impl Member {
         self.0.borrow_mut().srcs.remove(id)
     }
 
+    /// Returns [`RoomId`] of this [`Member`].
     pub fn room_id(&self) -> RoomId {
         self.0.borrow().room_id.clone()
     }
@@ -452,7 +453,7 @@ impl Member {
     }
 
     /// Compares pointers. If both pointers point to the same address, then
-    /// returns true.
+    /// returns `true`.
     #[cfg(test)]
     pub fn ptr_eq(&self, another_member: &Self) -> bool {
         Rc::ptr_eq(&self.0, &another_member.0)
@@ -485,17 +486,12 @@ impl WeakMember {
 pub fn parse_members(
     room_spec: &RoomSpec,
 ) -> Result<HashMap<MemberId, Member>, MembersLoadError> {
-    let members_spec = match room_spec.members() {
-        Ok(o) => o,
-        Err(e) => {
-            return Err(MembersLoadError::TryFromError(
-                e,
-                StatefulLocalUri::Room(LocalUri::<IsRoomId>::new(
-                    room_spec.id.clone(),
-                )),
-            ))
-        }
-    };
+    let members_spec = room_spec.members().map_err(|e| {
+        MembersLoadError::TryFromError(
+            e,
+            LocalUri::<IsRoomId>::new(room_spec.id.clone()).into(),
+        )
+    })?;
 
     let members: HashMap<MemberId, Member> = members_spec
         .iter()

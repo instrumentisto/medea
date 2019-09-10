@@ -44,15 +44,15 @@ use crate::{
     AppContext,
 };
 
-/// Errors which can happen while processing request to gRPC [Control API].
+/// Errors which can happen while processing requests to gRPC [Control API].
 ///
 /// [Control API]: http://tiny.cc/380uaz
 #[derive(Debug, Fail, Display)]
 pub enum GrpcControlApiError {
-    /// Error while parsing local URI of element.
+    /// Error while parsing [`LocalUri`] of element.
     LocalUri(LocalUriParseError),
 
-    /// Error which can happen while converting protoc object into interior
+    /// Error which can happen while converting protobuf objects into interior
     /// [medea] [Control API] objects.
     ///
     /// [Control API]: http://tiny.cc/380uaz
@@ -69,7 +69,7 @@ pub enum GrpcControlApiError {
     RoomServiceMailboxError(MailboxError),
 
     /// [`MailboxError`] which never can happen. This error needed
-    /// for `fut_try!` macro because they use `From` trait.
+    /// for [`fut_try!`] macro because using [`From`] trait.
     /// With this error we cover [`MailboxError`] in places where
     /// it cannot happen.
     ///
@@ -77,7 +77,7 @@ pub enum GrpcControlApiError {
     #[display(fmt = "Mailbox error which never can happen. {:?}", _0)]
     UnknownMailboxErr(MailboxError),
 
-    /// Wrapper aroung [`RoomServiceError`].
+    /// Wrapper around [`RoomServiceError`].
     RoomServiceError(RoomServiceError),
 }
 
@@ -139,10 +139,10 @@ macro_rules! parse_local_uri {
 
 /// Macro for send [`Error`] to client and `return` from current function.
 ///
-/// `$error_code` - some object which can tranform into [`Error`] by `Into`
+/// `$error_code` - some object which can converts into [`Error`] by [`Into`]
 /// trait.
 ///
-/// `$response` - is type of response ([`GetResponse`], [`Response`]
+/// `$response` - type of response ([`GetResponse`], [`Response`]
 /// etc).
 ///
 /// `$ctx` - context where `Future` for send gRPC response will be spawned.
@@ -175,6 +175,8 @@ struct ControlApiService {
 }
 
 impl ControlApiService {
+    /// Returns [Control API] sid based on provided arguments and
+    /// `MEDEA_CLIENT.PUBLIC_URL` config value.
     fn get_sid(
         &self,
         room_id: &RoomId,
@@ -187,18 +189,18 @@ impl ControlApiService {
         )
     }
 
-    /// Implementation of `Create` method for `Room` element.
+    /// Implementation of `Create` method for [`Room`].
     pub fn create_room(
         &mut self,
         req: &CreateRequest,
         uri: LocalUri<IsRoomId>,
     ) -> impl Future<Item = Sids, Error = GrpcControlApiError> {
-        let room = fut_try!(RoomSpec::try_from_protobuf(
+        let spec = fut_try!(RoomSpec::try_from_protobuf(
             uri.room_id().clone(),
             req.get_room()
         ));
 
-        let sid: HashMap<String, String> = fut_try!(room.members())
+        let sid: HashMap<String, String> = fut_try!(spec.members())
             .iter()
             .map(|(id, member)| {
                 let uri =
@@ -210,10 +212,7 @@ impl ControlApiService {
 
         Either::A(
             self.room_service
-                .send(CreateRoom {
-                    id: uri,
-                    spec: room,
-                })
+                .send(CreateRoom { uri, spec })
                 .map_err(GrpcControlApiError::RoomServiceMailboxError)
                 .and_then(move |r| {
                     r.map_err(GrpcControlApiError::from).map(|_| sid)
@@ -221,7 +220,7 @@ impl ControlApiService {
         )
     }
 
-    /// Implementation of `Create` method for `Member` element.
+    /// Implementation of `Create` method for [`Member`] element.
     pub fn create_member(
         &mut self,
         req: &CreateRequest,
@@ -244,21 +243,17 @@ impl ControlApiService {
         )
     }
 
-    /// Implementation of `Create` method for `WebRtcPublishEndpoint` and
-    /// `WebRtcPlayEndpoint` elements.
+    /// Implementation of `Create` method for [`Endpoint`] elements.
     pub fn create_endpoint(
         &mut self,
         req: &CreateRequest,
         uri: LocalUri<IsEndpointId>,
     ) -> impl Future<Item = Sids, Error = GrpcControlApiError> {
-        let endpoint = fut_try!(Endpoint::try_from(req));
+        let spec = fut_try!(Endpoint::try_from(req));
 
         Either::A(
             self.room_service
-                .send(CreateEndpointInRoom {
-                    uri,
-                    spec: endpoint,
-                })
+                .send(CreateEndpointInRoom { uri, spec })
                 .map_err(GrpcControlApiError::RoomServiceMailboxError)
                 .and_then(|r| {
                     r.map_err(GrpcControlApiError::from).map(|_| HashMap::new())
@@ -268,7 +263,9 @@ impl ControlApiService {
 }
 
 impl ControlApi for ControlApiService {
-    /// Implementation for `Create` method of gRPC control API.
+    /// Implementation for `Create` method of gRPC [Control API].
+    ///
+    /// [Control API]: http://tiny.cc/380uaz
     fn create(
         &mut self,
         ctx: RpcContext,
@@ -286,37 +283,40 @@ impl ControlApi for ControlApiService {
             };
         }
 
-        let response_fut: Box<
-            dyn Future<Item = Sids, Error = GrpcControlApiError> + Send,
-        > = match parse_local_uri!(req.get_id(), ctx, sink, CreateResponse) {
-            StatefulLocalUri::Room(local_uri) => {
-                if req.has_room() {
-                    Box::new(self.create_room(&req, local_uri))
-                } else {
-                    send_error_response_code!(
-                        ErrorCode::ElementIdForRoomButElementIsNot
-                    );
+        type CreateFuture =
+            Box<dyn Future<Item = Sids, Error = GrpcControlApiError> + Send>;
+
+        let response_fut: CreateFuture =
+            match parse_local_uri!(req.get_id(), ctx, sink, CreateResponse) {
+                StatefulLocalUri::Room(local_uri) => {
+                    if req.has_room() {
+                        Box::new(self.create_room(&req, local_uri))
+                    } else {
+                        send_error_response_code!(
+                            ErrorCode::ElementIdForRoomButElementIsNot
+                        );
+                    }
                 }
-            }
-            StatefulLocalUri::Member(local_uri) => {
-                if req.has_member() {
-                    Box::new(self.create_member(&req, local_uri))
-                } else {
-                    send_error_response_code!(
-                        ErrorCode::ElementIdForMemberButElementIsNot
-                    );
+                StatefulLocalUri::Member(local_uri) => {
+                    if req.has_member() {
+                        Box::new(self.create_member(&req, local_uri))
+                    } else {
+                        send_error_response_code!(
+                            ErrorCode::ElementIdForMemberButElementIsNot
+                        );
+                    }
                 }
-            }
-            StatefulLocalUri::Endpoint(local_uri) => {
-                if req.has_webrtc_pub() || req.has_webrtc_play() {
-                    Box::new(self.create_endpoint(&req, local_uri))
-                } else {
-                    send_error_response_code!(
-                        ErrorCode::ElementIdForEndpointButElementIsNot
-                    );
+                StatefulLocalUri::Endpoint(local_uri) => {
+                    if req.has_webrtc_pub() || req.has_webrtc_play() {
+                        Box::new(self.create_endpoint(&req, local_uri))
+                    } else {
+                        send_error_response_code!(
+                            ErrorCode::ElementIdForEndpointButElementIsNot
+                        );
+                    }
                 }
-            }
-        };
+            };
+
         ctx.spawn(response_fut.then(move |result| {
             let mut response = CreateResponse::new();
             match result {
@@ -331,11 +331,13 @@ impl ControlApi for ControlApiService {
         }));
     }
 
-    /// Implementation for `Apply` method of gRPC control API.
+    /// Implementation for `Apply` method of gRPC [Control API].
+    ///
+    /// [Control API]: http://tiny.cc/380uaz
     fn apply(
         &mut self,
         ctx: RpcContext,
-        _req: ApplyRequest,
+        _: ApplyRequest,
         sink: UnarySink<Response>,
     ) {
         ctx.spawn(
@@ -355,22 +357,24 @@ impl ControlApi for ControlApiService {
         );
     }
 
-    /// Implementation for `Delete` method of gRPC control API.
+    /// Implementation for `Delete` method of gRPC [Control API].
+    ///
+    /// [Control API]: http://tiny.cc/380uaz
     fn delete(
         &mut self,
         ctx: RpcContext,
         req: IdRequest,
         sink: UnarySink<Response>,
     ) {
-        let mut delete_elements = DeleteElements::new();
+        let mut delete_elements_msg = DeleteElements::new();
 
         for id in req.get_id() {
             let uri: StatefulLocalUri =
                 parse_local_uri!(id, ctx, sink, Response);
-            delete_elements.add_uri(uri);
+            delete_elements_msg.add_uri(uri);
         }
 
-        let delete_elements = match delete_elements.validate() {
+        let delete_elements_msg = match delete_elements_msg.validate() {
             Ok(d) => d,
             Err(e) => {
                 send_error_response!(
@@ -384,7 +388,7 @@ impl ControlApi for ControlApiService {
 
         ctx.spawn(
             self.room_service
-                .send(delete_elements)
+                .send(delete_elements_msg)
                 .map_err(GrpcControlApiError::RoomServiceMailboxError)
                 .and_then(|r| r.map_err(GrpcControlApiError::from))
                 .then(move |result| {
@@ -404,7 +408,9 @@ impl ControlApi for ControlApiService {
         );
     }
 
-    /// Implementation for `Get` method of gRPC control API.
+    /// Implementation for `Get` method of gRPC [Control API].
+    ///
+    /// [Control API]: http://tiny.cc/380uaz
     fn get(
         &mut self,
         ctx: RpcContext,
@@ -416,6 +422,7 @@ impl ControlApi for ControlApiService {
             let local_uri = parse_local_uri!(id, ctx, sink, GetResponse);
             uris.push(local_uri);
         }
+
         ctx.spawn(
             self.room_service
                 .send(Get(uris))
@@ -449,19 +456,18 @@ impl ControlApi for ControlApiService {
     }
 }
 
-/// Actor wrapper for `grcio` gRPC server which provides dynamic [Control API].
+/// Actor wrapper for [`grcio`] gRPC server which provides dynamic [Control
+/// API].
 ///
 /// [Control API]: http://tiny.cc/380uaz
 #[allow(clippy::module_name_repetitions)]
-pub struct GrpcServer {
-    server: Server,
-}
+pub struct GrpcServer(Server);
 
 impl Actor for GrpcServer {
     type Context = Context<Self>;
 
     fn started(&mut self, _ctx: &mut Self::Context) {
-        self.server.start();
+        self.0.start();
         info!("gRPC Control API server started.");
     }
 }
@@ -478,9 +484,10 @@ impl Handler<ShutdownGracefully> for GrpcServer {
             "gRPC Control API server received ShutdownGracefully message so \
              shutting down.",
         );
-        Box::new(self.server.shutdown().map_err(|e| {
+        Box::new(self.0.shutdown().map_err(|e| {
             warn!(
-                "Error while graceful shutdown of gRPC Contro API server: {:?}",
+                "Error while graceful shutdown of gRPC Control API server: \
+                 {:?}",
                 e
             )
         }))
@@ -509,7 +516,5 @@ pub fn run(room_repo: Addr<RoomService>, app: AppContext) -> Addr<GrpcServer> {
         .build()
         .unwrap();
 
-    GrpcServer::start_in_arbiter(&Arbiter::new(), move |_| GrpcServer {
-        server,
-    })
+    GrpcServer::start_in_arbiter(&Arbiter::new(), move |_| GrpcServer(server))
 }

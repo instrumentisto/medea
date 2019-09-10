@@ -14,14 +14,12 @@ use serde::Deserialize;
 
 /// Entity that represents some pipeline of spec.
 #[derive(Clone, Deserialize, Debug)]
-pub struct Pipeline<T> {
-    pipeline: HashMap<String, T>,
-}
+pub struct Pipeline<T>(HashMap<String, T>);
 
 impl<T> Pipeline<T> {
     /// Creates new [`Pipeline`] from provided [`HashMap`].
     pub fn new(pipeline: HashMap<String, T>) -> Self {
-        Self { pipeline }
+        Self(pipeline)
     }
 
     /// Iterate over pipeline by reference.
@@ -33,7 +31,7 @@ impl<T> Pipeline<T> {
     /// Lookup element of [`Pipeline`] by ID.
     #[inline]
     pub fn get(&self, id: &str) -> Option<&T> {
-        self.pipeline.get(id)
+        self.0.get(id)
     }
 }
 
@@ -42,7 +40,7 @@ impl<T> IntoIterator for Pipeline<T> {
     type Item = (String, T);
 
     fn into_iter(self) -> Self::IntoIter {
-        self.pipeline.into_iter()
+        self.0.into_iter()
     }
 }
 
@@ -52,6 +50,6 @@ impl<'a, T> IntoIterator for &'a Pipeline<T> {
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
-        self.pipeline.iter()
+        self.0.iter()
     }
 }

@@ -29,10 +29,11 @@ fn start_static_rooms(
             if let Err(e) = result {
                 match e {
                     RoomServiceError::FailedToLoadStaticSpecs(e) => match e {
-                        LoadStaticControlSpecsError::SpecDirNotFound => {
+                        LoadStaticControlSpecsError::SpecDirReadError(e) => {
                             warn!(
-                                "Specs dir not exists. Control API specs not \
-                                 loaded."
+                                "Error while reading static control API specs \
+                                 dir. Control API specs not loaded. {}",
+                                e
                             );
                         }
                         _ => panic!("{}", e),

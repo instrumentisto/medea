@@ -2,7 +2,7 @@
 //!
 //! [Control API]: http://tiny.cc/380uaz
 
-use std::{collections::HashMap as StdHashMap, convert::TryFrom};
+use std::{collections::HashMap, convert::TryFrom};
 
 use derive_more::{Display, From};
 use medea_grpc_proto::control::Member as MemberProto;
@@ -109,6 +109,12 @@ impl MemberSpec {
     }
 }
 
+/// Generates [`Member`] alphanumeric credentials with
+/// [`MEMBER_CREDENTIALS_LEN`] length.
+///
+/// This credentials will be generated if in dynamic [Control API] spec not
+/// provided credentials for [`Member`]. This logic you can find in [`TryFrom`]
+/// [`MemberProto`] implemented for [`MemberSpec`].
 fn generate_member_credentials() -> String {
     rand::thread_rng()
         .sample_iter(&Alphanumeric)
@@ -121,7 +127,7 @@ impl TryFrom<&MemberProto> for MemberSpec {
 
     /// Serialize [`MemberSpec`] from protobuf object.
     fn try_from(value: &MemberProto) -> Result<Self, Self::Error> {
-        let mut pipeline = StdHashMap::new();
+        let mut pipeline = HashMap::new();
         for (id, member_element) in value.get_pipeline() {
             let endpoint = Endpoint::try_from(member_element)?;
             pipeline.insert(id.clone(), endpoint.into());
@@ -135,7 +141,6 @@ impl TryFrom<&MemberProto> for MemberSpec {
             proto_credentials.to_string()
         };
 
-        // Credentials here maybe absent.
         Ok(Self {
             pipeline,
             credentials,

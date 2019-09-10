@@ -20,7 +20,10 @@ pub use webrtc_publish_endpoint::WebRtcPublishEndpoint;
 /// flow through.
 #[derive(Debug)]
 pub enum Endpoint {
+    /// [`WebRtcPublishEndpoint`] element.
     WebRtcPublish(WebRtcPublishEndpoint),
+
+    /// [`WebRtcPlayEndpoint`] element.
     WebRtcPlay(WebRtcPlayEndpoint),
 }
 

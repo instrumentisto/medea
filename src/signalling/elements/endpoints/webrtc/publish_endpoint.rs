@@ -182,6 +182,7 @@ impl WebRtcPublishEndpoint {
             .retain(|e| e.safe_upgrade().is_some());
     }
 
+    /// Peer-to-peer mode of this [`WebRtcPublishEndpoint`].
     pub fn p2p(&self) -> P2pMode {
         self.0.borrow().p2p.clone()
     }

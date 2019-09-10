@@ -2,14 +2,15 @@
 
 pub mod webrtc;
 
+use derive_more::From;
 use medea_grpc_proto::control::Element as RootElementProto;
 
+#[derive(Clone, Debug, From)]
 pub enum Endpoint {
     WebRtcPublishEndpoint(webrtc::WebRtcPublishEndpoint),
     WebRtcPlayEndpoint(webrtc::WebRtcPlayEndpoint),
 }
 
-// TODO: maybe better?
 impl Into<RootElementProto> for Endpoint {
     fn into(self) -> RootElementProto {
         match self {
