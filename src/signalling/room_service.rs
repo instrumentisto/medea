@@ -294,8 +294,7 @@ impl DeleteElements<Unvalidated> {
             .collect();
 
         if !ignored_uris.is_empty() {
-            return Err(
-                RoomServiceError::NotSameRoomIds(
+            return Err(RoomServiceError::NotSameRoomIds(
                 ignored_uris,
                 first_room,
             ));

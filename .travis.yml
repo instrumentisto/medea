@@ -28,6 +28,7 @@ jobs:
       before_script: rustup component add clippy
       script: make lint
 
+# TODO: write script for check last nightly version with available component
     - name: rustfmt
       stage: check
       rust: nightly-2019-09-05
