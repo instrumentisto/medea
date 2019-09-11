@@ -78,7 +78,7 @@ impl MemberSpec {
         })
     }
 
-    /// Lookup [`WebRtcPublishEndpoint`] by ID.
+    /// Lookups [`WebRtcPublishEndpoint`] by ID.
     pub fn get_publish_endpoint_by_id(
         &self,
         id: &WebRtcPublishId,

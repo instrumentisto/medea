@@ -253,7 +253,7 @@ impl Peer<New> {
         }
     }
 
-    /// Add `send` tracks to `self` and add `recv` for this `send`
+    /// Adds `send` tracks to `self` and add `recv` for this `send`
     /// to `partner_peer`.
     pub fn add_publisher(
         &mut self,
@@ -297,12 +297,12 @@ impl Peer<New> {
         }
     }
 
-    /// Add [`Track`] to [`Peer`] for send.
+    /// Adds [`Track`] to [`Peer`] for send.
     pub fn add_sender(&mut self, track: Rc<MediaTrack>) {
         self.context.senders.insert(track.id, track);
     }
 
-    /// Add [`Track`] to [`Peer`] for receive.
+    /// Adds [`Track`] to [`Peer`] for receive.
     pub fn add_receiver(&mut self, track: Rc<MediaTrack>) {
         self.context.receivers.insert(track.id, track);
     }

@@ -95,7 +95,7 @@ impl Drop for WebRtcPlayEndpointInner {
 pub struct WebRtcPlayEndpoint(Rc<RefCell<WebRtcPlayEndpointInner>>);
 
 impl WebRtcPlayEndpoint {
-    /// Create new [`WebRtcPlayEndpoint`].
+    /// Creates new [`WebRtcPlayEndpoint`].
     pub fn new(
         id: Id,
         src_uri: SrcUri,
@@ -136,7 +136,7 @@ impl WebRtcPlayEndpoint {
         self.0.borrow().src()
     }
 
-    /// Save [`PeerId`] of this [`WebRtcPlayEndpoint`].
+    /// Saves [`PeerId`] of this [`WebRtcPlayEndpoint`].
     pub fn set_peer_id(&self, peer_id: PeerId) {
         self.0.borrow_mut().set_peer_id(peer_id);
     }
@@ -148,7 +148,7 @@ impl WebRtcPlayEndpoint {
         self.0.borrow().peer_id()
     }
 
-    /// Reset state of this [`WebRtcPlayEndpoint`].
+    /// Resets state of this [`WebRtcPlayEndpoint`].
     ///
     /// _Atm this only reset peer_id._
     pub fn reset(&self) {
@@ -160,7 +160,7 @@ impl WebRtcPlayEndpoint {
         self.0.borrow().id.clone()
     }
 
-    /// Downgrade [`WebRtcPlayEndpoint`] to [`WeakWebRtcPlayEndpoint`] weak
+    /// Downgrades [`WebRtcPlayEndpoint`] to [`WeakWebRtcPlayEndpoint`] weak
     /// pointer.
     pub fn downgrade(&self) -> WeakWebRtcPlayEndpoint {
         WeakWebRtcPlayEndpoint(Rc::downgrade(&self.0))
@@ -180,16 +180,18 @@ impl WebRtcPlayEndpoint {
 pub struct WeakWebRtcPlayEndpoint(Weak<RefCell<WebRtcPlayEndpointInner>>);
 
 impl WeakWebRtcPlayEndpoint {
-    /// Upgrade weak pointer to strong pointer.
+    /// Upgrades weak pointer to strong pointer.
     ///
-    /// This function will __panic__ if weak pointer was dropped.
+    /// # Panics
+    ///
+    /// If weak pointer has been dropped.
     pub fn upgrade(&self) -> WebRtcPlayEndpoint {
         WebRtcPlayEndpoint(self.0.upgrade().unwrap())
     }
 
-    /// Safe upgrade to [`WebRtcPlayEndpoint`].
+    /// Upgrades to [`WebRtcPlayEndpoint`] safely.
     ///
-    /// Returns `None` if weak pointer was dropped.
+    /// Returns `None` if weak pointer has been dropped.
     pub fn safe_upgrade(&self) -> Option<WebRtcPlayEndpoint> {
         self.0.upgrade().map(WebRtcPlayEndpoint)
     }

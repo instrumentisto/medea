@@ -2,15 +2,15 @@ version: "2"
 
 services:
   medea:
-    container_name: ${COMPOSE_PROJECT_NAME}
+    container_name: ${COMPOSE_PROJECT_NAME}-backend
     image: ${COMPOSE_IMAGE_NAME}:${COMPOSE_IMAGE_VER}
     environment:
       RUST_LOG: ${RUST_LOG}
       MEDEA_CONF: ${MEDEA_CONF}
-      MEDEA_CONTROL.STATIC_SPECS_DIR: /specs
+      "MEDEA_CONTROL.STATIC_SPECS_DIR": ${MEDEA_CONTROL_STATIC_SPECS_DIR}
     ports:
       - "8080:8080"
     volumes:
       - ./${MEDEA_CONF}:/${MEDEA_CONF}:ro
-      - ${MEDEA_CONTROL_STATIC_SPECS_DIR}:/specs:ro
+      - ./${MEDEA_CONTROL_STATIC_SPECS_DIR}:/${MEDEA_CONTROL_STATIC_SPECS_DIR}:ro
     network_mode: host

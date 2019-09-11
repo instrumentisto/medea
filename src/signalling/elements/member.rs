@@ -146,7 +146,7 @@ impl Member {
         })
     }
 
-    /// Load all srcs and sinks of this [`Member`].
+    /// Loads all sources and sinks of this [`Member`].
     fn load(
         &self,
         room_spec: &RoomSpec,
@@ -248,12 +248,12 @@ impl Member {
         Ok(())
     }
 
-    /// Return [`LocalUri`] to this [`Member`].
+    /// Returns [`LocalUri`] to this [`Member`].
     fn get_local_uri(&self) -> LocalUri<IsMemberId> {
         LocalUri::<IsMemberId>::new(self.room_id(), self.id())
     }
 
-    /// Return [`LocalUri`] to some endpoint from this [`Member`].
+    /// Returns [`LocalUri`] to some endpoint from this [`Member`].
     ///
     /// __Note__ this function don't check presence of `Endpoint` in this
     /// [`Member`].
@@ -264,7 +264,7 @@ impl Member {
         LocalUri::<IsEndpointId>::new(self.room_id(), self.id(), endpoint_id)
     }
 
-    /// Notify [`Member`] that some [`Peer`]s removed.
+    /// Notifies [`Member`] that some [`Peer`]s removed.
     ///
     /// All [`PeerId`]s related to this [`Member`] will be removed.
     ///
@@ -316,17 +316,18 @@ impl Member {
         self.0.borrow().sinks.clone()
     }
 
-    /// Insert sink endpoint into this [`Member`].
+    /// Inserts sink endpoint into this [`Member`].
     pub fn insert_sink(&self, endpoint: WebRtcPlayEndpoint) {
         self.0.borrow_mut().sinks.insert(endpoint.id(), endpoint);
     }
 
-    /// Insert source endpoint into this [`Member`].
+    /// Inserts source endpoint into this [`Member`].
     pub fn insert_src(&self, endpoint: WebRtcPublishEndpoint) {
         self.0.borrow_mut().srcs.insert(endpoint.id(), endpoint);
     }
 
-    /// Lookup [`WebRtcPublishEndpoint`] source endpoint by [`WebRtcPublishId`].
+    /// Lookups [`WebRtcPublishEndpoint`] source endpoint by
+    /// [`WebRtcPublishId`].
     pub fn get_src_by_id(
         &self,
         id: &WebRtcPublishId,
@@ -334,7 +335,8 @@ impl Member {
         self.0.borrow().srcs.get(id).cloned()
     }
 
-    /// Lookup [`WebRtcPublishEndpoint`] source endpoint by [`WebRtcPublishId`].
+    /// Lookups [`WebRtcPublishEndpoint`] source endpoint by
+    /// [`WebRtcPublishId`].
     ///
     /// Returns [`MemberError::PublishEndpointNotFound`] when
     /// [`WebRtcPublishEndpoint`] not found.
@@ -352,7 +354,7 @@ impl Member {
         )
     }
 
-    /// Lookup [`WebRtcPlayEndpoint`] sink endpoint by [`WebRtcPlayId`].
+    /// Lookups [`WebRtcPlayEndpoint`] sink endpoint by [`WebRtcPlayId`].
     pub fn get_sink_by_id(
         &self,
         id: &WebRtcPlayId,
@@ -360,7 +362,7 @@ impl Member {
         self.0.borrow().sinks.get(id).cloned()
     }
 
-    /// Lookup [`WebRtcPlayEndpoint`] sink endpoint by [`WebRtcPlayId`].
+    /// Lookups [`WebRtcPlayEndpoint`] sink endpoint by [`WebRtcPlayId`].
     ///
     /// Returns [`MemberError::PlayEndpointNotFound`] when
     /// [`WebRtcPlayEndpoint`] not found.
@@ -378,12 +380,12 @@ impl Member {
         )
     }
 
-    /// Remove sink [`WebRtcPlayEndpoint`] from this [`Member`].
+    /// Removes sink [`WebRtcPlayEndpoint`] from this [`Member`].
     pub fn remove_sink(&self, id: &WebRtcPlayId) {
         self.0.borrow_mut().sinks.remove(id);
     }
 
-    /// Remove source [`WebRtcPublishEndpoint`] from this [`Member`].
+    /// Removes source [`WebRtcPublishEndpoint`] from this [`Member`].
     pub fn remove_src(&self, id: &WebRtcPublishId) {
         self.0.borrow_mut().srcs.remove(id);
     }
@@ -447,7 +449,7 @@ impl Member {
         ))
     }
 
-    /// Downgrade strong [`Member`]'s pointer to weak [`WeakMember`] pointer.
+    /// Downgrades strong [`Member`]'s pointer to weak [`WeakMember`] pointer.
     pub fn downgrade(&self) -> WeakMember {
         WeakMember(Rc::downgrade(&self.0))
     }
@@ -480,7 +482,7 @@ impl WeakMember {
 }
 
 /// Creates all empty [`Member`]s from [`RoomSpec`] and then
-/// load all related to this [`Member`]s srcs and sinks endpoints.
+/// loads all related to this [`Member`]s sources and sinks endpoints.
 ///
 /// Returns store of all [`Member`]s loaded from [`RoomSpec`].
 pub fn parse_members(

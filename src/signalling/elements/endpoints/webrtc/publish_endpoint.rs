@@ -109,7 +109,7 @@ impl WebRtcPublishEndpointInner {
 pub struct WebRtcPublishEndpoint(Rc<RefCell<WebRtcPublishEndpointInner>>);
 
 impl WebRtcPublishEndpoint {
-    /// Create new [`WebRtcPublishEndpoint`].
+    /// Creates new [`WebRtcPublishEndpoint`].
     pub fn new(id: Id, p2p: P2pMode, owner: WeakMember) -> Self {
         Self(Rc::new(RefCell::new(WebRtcPublishEndpointInner {
             id,
@@ -120,7 +120,7 @@ impl WebRtcPublishEndpoint {
         })))
     }
 
-    /// Add [`WebRtcPlayEndpoint`] (sink) to this [`WebRtcPublishEndpoint`].
+    /// Adds [`WebRtcPlayEndpoint`] (sink) to this [`WebRtcPublishEndpoint`].
     pub fn add_sink(&self, sink: WeakWebRtcPlayEndpoint) {
         self.0.borrow_mut().add_sinks(sink)
     }
@@ -128,19 +128,23 @@ impl WebRtcPublishEndpoint {
     /// Returns all [`WebRtcPlayEndpoint`]s (sinks) of this
     /// [`WebRtcPublishEndpoint`].
     ///
-    /// __This function will panic if meet empty pointer.__
+    /// # Panics
+    ///
+    /// If meets empty pointer.
     pub fn sinks(&self) -> Vec<WebRtcPlayEndpoint> {
         self.0.borrow().sinks()
     }
 
     /// Returns owner [`Member`] of this [`WebRtcPublishEndpoint`].
     ///
-    /// __This function will panic if pointer to [`Member`] was dropped.__
+    /// # Panics
+    ///
+    /// If pointer to [`Member`] has been dropped.
     pub fn owner(&self) -> Member {
         self.0.borrow().owner()
     }
 
-    /// Add [`PeerId`] of this [`WebRtcPublishEndpoint`].
+    /// Adds [`PeerId`] of this [`WebRtcPublishEndpoint`].
     pub fn add_peer_id(&self, peer_id: PeerId) {
         self.0.borrow_mut().add_peer_id(peer_id)
     }
@@ -150,20 +154,20 @@ impl WebRtcPublishEndpoint {
         self.0.borrow().peer_ids()
     }
 
-    /// Reset state of this [`WebRtcPublishEndpoint`].
+    /// Resets state of this [`WebRtcPublishEndpoint`].
     ///
-    /// _Atm this only reset `peer_ids`._
+    /// _Atm this only resets `peer_ids`._
     pub fn reset(&self) {
         self.0.borrow_mut().reset()
     }
 
-    /// Remove [`PeerId`] from this [`WebRtcPublishEndpoint`]'s `peer_ids`.
+    /// Removes [`PeerId`] from this [`WebRtcPublishEndpoint`]'s `peer_ids`.
     #[allow(clippy::trivially_copy_pass_by_ref)]
     pub fn remove_peer_id(&self, peer_id: &PeerId) {
         self.0.borrow_mut().remove_peer_id(peer_id)
     }
 
-    /// Remove all [`PeerId`]s related to this [`WebRtcPublishEndpoint`].
+    /// Removes all [`PeerId`]s related to this [`WebRtcPublishEndpoint`].
     pub fn remove_peer_ids(&self, peer_ids: &[PeerId]) {
         self.0.borrow_mut().remove_peer_ids(peer_ids)
     }
@@ -173,7 +177,7 @@ impl WebRtcPublishEndpoint {
         self.0.borrow().id.clone()
     }
 
-    /// Remove all dropped [`Weak`] pointers from sinks of this
+    /// Removes all dropped [`Weak`] pointers from sinks of this
     /// [`WebRtcPublishEndpoint`].
     pub fn remove_empty_weaks_from_sinks(&self) {
         self.0
@@ -187,7 +191,7 @@ impl WebRtcPublishEndpoint {
         self.0.borrow().p2p.clone()
     }
 
-    /// Downgrade [`WebRtcPublishEndpoint`] to weak pointer
+    /// Downgrades [`WebRtcPublishEndpoint`] to weak pointer
     /// [`WeakWebRtcPublishEndpoint`].
     pub fn downgrade(&self) -> WeakWebRtcPublishEndpoint {
         WeakWebRtcPublishEndpoint(Rc::downgrade(&self.0))
@@ -207,14 +211,16 @@ impl WebRtcPublishEndpoint {
 pub struct WeakWebRtcPublishEndpoint(Weak<RefCell<WebRtcPublishEndpointInner>>);
 
 impl WeakWebRtcPublishEndpoint {
-    /// Upgrade weak pointer to strong pointer.
+    /// Upgrades weak pointer to strong pointer.
     ///
-    /// This function will __panic__ if weak pointer was dropped.
+    /// # Panics
+    ///
+    /// If weak pointer was dropped.
     pub fn upgrade(&self) -> WebRtcPublishEndpoint {
         WebRtcPublishEndpoint(self.0.upgrade().unwrap())
     }
 
-    /// Safe upgrade to [`WebRtcPlayEndpoint`].
+    /// Upgrades to [`WebRtcPlayEndpoint`] safely.
     ///
     /// Returns `None` if weak pointer was dropped.
     pub fn safe_upgrade(&self) -> Option<WebRtcPublishEndpoint> {

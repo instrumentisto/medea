@@ -24,13 +24,13 @@ impl<T> Pipeline<T> {
         Self { pipeline }
     }
 
-    /// Iterate over pipeline by reference.
+    /// Iterates over pipeline by reference.
     #[inline]
     pub fn iter(&self) -> impl Iterator<Item = (&String, &T)> {
         self.into_iter()
     }
 
-    /// Lookup element of [`Pipeline`] by ID.
+    /// Lookups element of [`Pipeline`] by ID.
     #[inline]
     pub fn get(&self, id: &str) -> Option<&T> {
         self.pipeline.get(id)

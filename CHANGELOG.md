@@ -14,12 +14,11 @@ All user visible changes to this project will be documented in this file. This p
 ### Added
 
 - Control API:
-    - Parse static control api specs ([#28]);
-    - Created interior entities for control API specs ([#28]).
-    - Dynamic control API exposed via gRPC (#[33](/../../pull/33)):
-        - `Create` method `Room`, `Member`, `Endpoint`;
+    - Support for static Сontrol API specs ([#28]).
+    - Dynamic Control API exposed via gRPC ([#33](/../../pull/33)):
+        - `Create` method for `Room`, `Member`, `Endpoint`;
         - `Get` method for `Room`, `Member`, `Endpoint`;
-        - `Delete` method for `Room`, `Member`, `Endpoint.
+        - `Delete` method for `Room`, `Member`, `Endpoint`.
 - Signalling:
     - Dynamic `Peer`s creation when client connects ([#28]);
     - Auto-removing `Peer`s when `Member` disconnects ([#28]).

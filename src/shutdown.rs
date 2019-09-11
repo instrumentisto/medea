@@ -195,7 +195,7 @@ impl Handler<Subscribe> for GracefulShutdown {
 }
 
 /// Error which indicates that process is shutting down at this moment.
-#[derive(Clone, Copy, Debug, Fail, Display)]
+#[derive(Clone, Copy, Debug, Display, Fail)]
 #[display(fmt = "Process is shutting down at the moment")]
 pub struct ShuttingDownError;
 

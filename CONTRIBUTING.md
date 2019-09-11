@@ -6,15 +6,14 @@ Contribution Guide
 
 ## Prerequisites
 
-In addition to default stable [Rust] toolchain you will need `rustfmt` and `clippy` 
-components, and also a nightly [Rust] toolchain (for better tooling).
+In addition to default stable [Rust] toolchain you will need [rustfmt] and [Clippy] components, and a nightly [Rust] toolchain (for better tooling).
 ```bash
 rustup toolchain install nightly
 rustup component add rustfmt
 rustup component add clippy
 ```
 
-Also you need install [wasm-pack] for [jason] building and testing:
+Also, you need install [wasm-pack] for [Jason] building and testing:
 ```bash
 $ curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sudo sh
 ```
@@ -29,15 +28,17 @@ Take a look at [`Makefile`] for commands usage details.
 
 ### Development environment
 
-Boot up dockerized environment for [medea] with [jason]:
+Boot up dockerized environment for [Medea] with [Jason]:
 ```bash
 $ make up.dev
 ```
 
-Boot up only [medea] without [jason]:
+Boot up only [Medea] without [Jason]:
 ```bash
 $ make up.medea
 ```
+
+
 
 
 ### Building
@@ -47,25 +48,26 @@ To build/rebuild project and its Docker image use docker-wrapped command from [`
 $ make build dockerized=yes
 ```
 
-To build only [medea]:
+To build only [Medea]:
 ```bash
 $ make build.medea
+
+# or in Docker
+$ make build.medea dockerized=yes
 ```
 
-To build only [jason]:
+To build only [Jason]:
 ```bash
 $ make build.jason
-```
 
-To build [medea] in docker (it works with [jason] too):
-```bash
-$ make build.medea dockerized=yes
+# or in Docker
+$ make build.jason dockerized=yes
 ```
 
 
 ### Formatting
 
-To auto-format Rust sources use command from [`Makefile`]:
+To auto-format [Rust] sources use command from [`Makefile`]:
 ```bash
 $ make fmt
 ```
@@ -73,7 +75,7 @@ $ make fmt
 
 ### Linting
 
-To lint Rust sources use command from [`Makefile`]:
+To lint [Rust] sources use command from [`Makefile`]:
 ```bash
 $ make lint
 ```
@@ -81,13 +83,13 @@ $ make lint
 
 ### Testing
 
-To run unit tests command from [`Makefile`]:
+To run unit tests use command from [`Makefile`]:
 ```bash
-$ make test.unit crate=@all
+$ make test.unit
 
 # or for concrete crate only
 $ make test.unit crate=medea
-$ make test.unit crate=jason
+$ make test.unit crate=medea-jason
 ```
 
 To run E2E tests use docker-wrapped commands from [`Makefile`]:
@@ -98,7 +100,7 @@ $ make test.e2e
 
 ### Documentation
 
-To generate Rust sources project documentation use command from [`Makefile`]:
+To generate [Rust] sources project documentation use command from [`Makefile`]:
 ```bash
 $ make docs.rust
 
@@ -106,21 +108,24 @@ $ make docs.rust
 $ make docs.rust open=no
 
 # or for concrete crate only
-$ make docs.rust crate=jason
+$ make docs.rust crate=medea-jason
 ```
 
 
 
 
-## Running CI
+## CI integration
 
-Add `[run ci]` to your commit message.
-
-
+Add `[run ci]` mark to your commit message for triggering CI build.
 
 
-[`Makefile`]: /Makefile
-[jason]: /jason
-[medea]: https://github.com/instrumentisto/medea
-[Rust]: https://www.rust-lang.org/
+
+
+
+[`Makefile`]: Makefile
+[Clippy]: https://github.com/rust-lang/rust-clippy
+[Jason]: https://github.com/instrumentisto/medea/tree/master/jason
+[Medea]: https://github.com/instrumentisto/medea
+[Rust]: https://www.rust-lang.org
+[rustfmt]: https://github.com/rust-lang/rustfmt
 [wasm-pack]: https://github.com/rustwasm/wasm-pack

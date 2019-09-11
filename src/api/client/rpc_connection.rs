@@ -12,12 +12,12 @@ use medea_client_api_proto::{Command, Event};
 use crate::api::control::MemberId;
 
 /// Newtype for [`Command`] with actix [`Message`] implementation.
-#[derive(Message, Into, From)]
+#[derive(From, Into, Message)]
 #[rtype(result = "Result<(), ()>")]
 pub struct CommandMessage(Command);
 
 /// Newtype for [`Event`] with actix [`Message`] implementation.
-#[derive(Message, Into, From)]
+#[derive(From, Into, Message)]
 pub struct EventMessage(Event);
 
 /// Abstraction over RPC connection with some remote [`Member`].

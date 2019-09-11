@@ -52,8 +52,8 @@ use crate::{
     AppContext,
 };
 
-#[derive(Fail, Debug, Display)]
 #[allow(clippy::module_name_repetitions)]
+#[derive(Debug, Display, Fail)]
 pub enum ParticipantServiceErr {
     /// Some error happened in [`TurnAuthService`].
     #[display(fmt = "TurnService Error in ParticipantService: {}", _0)]
@@ -120,7 +120,7 @@ pub struct ParticipantService {
 }
 
 impl ParticipantService {
-    /// Create new [`ParticipantService`] from [`RoomSpec`].
+    /// Creates new [`ParticipantService`] from [`RoomSpec`].
     pub fn new(
         room_spec: &RoomSpec,
         context: AppContext,
@@ -134,12 +134,12 @@ impl ParticipantService {
         })
     }
 
-    /// Lookup [`Member`] by provided id.
+    /// Lookups [`Member`] by provided [`MemberId`].
     pub fn get_member_by_id(&self, id: &MemberId) -> Option<Member> {
         self.members.get(id).cloned()
     }
 
-    /// Generate [`LocalUri`] which point to some [`Member`] in this `Room`.
+    /// Generates [`LocalUri`] which point to some [`Member`] in this `Room`.
     ///
     /// __Note__ this function don't check presence of [`Member`] in this
     /// `Room`.
@@ -150,7 +150,7 @@ impl ParticipantService {
         LocalUri::<IsMemberId>::new(self.room_id.clone(), member_id)
     }
 
-    /// Lookup [`Member`] by [`MemberId`].
+    /// Lookups [`Member`] by [`MemberId`].
     ///
     /// Returns [`ParticipantServiceErr::ParticipantNotFound`] if member not
     /// found.
@@ -171,7 +171,7 @@ impl ParticipantService {
         self.members.clone()
     }
 
-    /// Lookup [`Member`] by provided [`MemberId`] and credentials.
+    /// Lookups [`Member`] by provided [`MemberId`] and credentials.
     ///
     /// Returns [`Err(AuthorizationError::MemberNotExists)`] if lookup by
     /// [`MemberId`] failed.
@@ -201,7 +201,7 @@ impl ParticipantService {
             && !self.drop_connection_tasks.contains_key(member_id)
     }
 
-    /// Send [`Event`] to specified remote [`Member`].
+    /// Sends [`Event`] to specified remote [`Member`].
     pub fn send_event_to_member(
         &mut self,
         member_id: MemberId,
@@ -271,7 +271,7 @@ impl ParticipantService {
         }
     }
 
-    /// Insert new [`RpcConnection`] into this [`ParticipantService`].
+    /// Inserts new [`RpcConnection`] into this [`ParticipantService`].
     fn insert_connection(
         &mut self,
         member_id: MemberId,
@@ -310,8 +310,8 @@ impl ParticipantService {
                         self.app.config.rpc.reconnect_timeout,
                         move |_, ctx| {
                             info!(
-                                "Member {} connection lost at {:?}. Room will \
-                                 be stopped.",
+                                "Member [id = {}] connection lost at {:?}. \
+                                 Room will be be stopped.",
                                 member_id, closed_at
                             );
                             ctx.notify(RpcConnectionClosed {
