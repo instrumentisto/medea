@@ -584,7 +584,7 @@ impl Room {
     /// Deletes [`Member`] from this [`Room`] by [`MemberId`].
     fn delete_member(&mut self, member_id: &MemberId, ctx: &mut Context<Self>) {
         debug!(
-            "Delete Member [id = {}] in room [id = {}].",
+            "Deleting Member [id = {}] in Room [id = {}].",
             member_id, self.id
         );
         if let Some(member) = self.members.get_member_by_id(member_id) {
@@ -601,14 +601,14 @@ impl Room {
                 .collect();
 
             self.remove_peers(&member.id(), peers, ctx);
+
+            self.members.delete_member(member_id, ctx);
+
+            debug!(
+                "Member [id = {}] deleted from Room [id = {}].",
+                member_id, self.id
+            );
         }
-
-        self.members.delete_member(member_id, ctx);
-
-        debug!(
-            "Member [id = {}] deleted from Room [id = {}].",
-            member_id, self.id
-        );
     }
 
     /// Deletes endpoint from this [`Room`] by ID.
@@ -886,25 +886,8 @@ impl Handler<Close> for Room {
     type Result = ();
 
     fn handle(&mut self, _: Close, ctx: &mut Self::Context) -> Self::Result {
-        for (id, member) in self.members.members() {
-            if self.members.member_has_connection(&id) {
-                let peer_ids_to_remove: HashSet<PeerId> = member
-                    .sinks()
-                    .values()
-                    .filter_map(WebRtcPlayEndpoint::peer_id)
-                    .chain(
-                        member
-                            .srcs()
-                            .values()
-                            .flat_map(|src| src.peer_ids().into_iter()),
-                    )
-                    .collect();
-
-                let member_id = id.clone();
-
-                self.remove_peers(&member_id, peer_ids_to_remove, ctx);
-                self.members.delete_member(&member_id, ctx);
-            }
+        for id in self.members.members().keys() {
+            self.delete_member(id, ctx);
         }
         let drop_fut = self.members.drop_connections(ctx);
         ctx.wait(wrap_future(drop_fut));

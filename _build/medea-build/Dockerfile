@@ -4,7 +4,7 @@
 
 # https://hub.docker.com/_/rust
 ARG rust_ver=latest
-FROM rust:${rust_ver} AS dist
+FROM rust:${rust_ver}
 ARG rustc_mode=release
 ARG rustc_opts=--release
 ARG cargo_home=/usr/local/cargo
