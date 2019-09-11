@@ -295,7 +295,7 @@ endif
 # Run Rust unit tests of project.
 #
 # Usage:
-#	make test.unit [crate=(@all|medea|jason|<crate-name>)]
+#	make test.unit [crate=(@all|medea|medea-jason|<crate-name>)]
 
 test-unit-crate = $(if $(call eq,$(crate),),@all,$(crate))
 

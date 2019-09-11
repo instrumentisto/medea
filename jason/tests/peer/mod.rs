@@ -11,6 +11,7 @@ use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::spawn_local;
 use wasm_bindgen_test::*;
 
+use medea_client_api_proto::PeerId;
 use medea_jason::{
     media::MediaManager,
     peer::{PeerConnection, PeerEvent},
@@ -28,9 +29,11 @@ fn add_candidates_to_answerer_before_offer(
 
     let manager = Rc::new(MediaManager::default());
     let pc1 = Rc::new(
-        PeerConnection::new(1, tx1, vec![], Rc::clone(&manager)).unwrap(),
+        PeerConnection::new(PeerId(1), tx1, vec![], Rc::clone(&manager))
+            .unwrap(),
     );
-    let pc2 = Rc::new(PeerConnection::new(2, tx2, vec![], manager).unwrap());
+    let pc2 =
+        Rc::new(PeerConnection::new(PeerId(2), tx2, vec![], manager).unwrap());
     let (audio_track, video_track) = get_test_tracks();
 
     let pc2_clone = Rc::clone(&pc2);
@@ -47,7 +50,7 @@ fn add_candidates_to_answerer_before_offer(
                 })
                 .map(move |_| {
                     // and assert that buffer was flushed
-                    assert!(pc2_clone2.candidates_buffer_len() == 0);
+                    assert_eq!(pc2_clone2.candidates_buffer_len(), 0);
                 })
         })
         .map(move |_| {
@@ -65,9 +68,11 @@ fn add_candidates_to_offerer_before_answer(
 
     let manager = Rc::new(MediaManager::default());
     let pc1 = Rc::new(
-        PeerConnection::new(1, tx1, vec![], Rc::clone(&manager)).unwrap(),
+        PeerConnection::new(PeerId(1), tx1, vec![], Rc::clone(&manager))
+            .unwrap(),
     );
-    let pc2 = Rc::new(PeerConnection::new(2, tx2, vec![], manager).unwrap());
+    let pc2 =
+        Rc::new(PeerConnection::new(PeerId(2), tx2, vec![], manager).unwrap());
     let (audio_track, video_track) = get_test_tracks();
 
     let pc1_clone = Rc::clone(&pc1);
@@ -89,7 +94,7 @@ fn add_candidates_to_offerer_before_answer(
                     assert!(pc1_clone.candidates_buffer_len() > 0);
                     pc1_clone.set_remote_answer(answer).then(move |_| {
                         // assert that pc1 has buffered candidates got fulshed
-                        assert!(pc1_clone.candidates_buffer_len() == 0);
+                        assert_eq!(pc1_clone.candidates_buffer_len(), 0);
                         Ok(())
                     })
                 },
@@ -108,9 +113,11 @@ fn normal_exchange_of_candidates() -> impl Future<Item = (), Error = JsValue> {
 
     let manager = Rc::new(MediaManager::default());
     let peer1 = Rc::new(
-        PeerConnection::new(1, tx1, vec![], Rc::clone(&manager)).unwrap(),
+        PeerConnection::new(PeerId(1), tx1, vec![], Rc::clone(&manager))
+            .unwrap(),
     );
-    let peer2 = Rc::new(PeerConnection::new(2, tx2, vec![], manager).unwrap());
+    let peer2 =
+        Rc::new(PeerConnection::new(PeerId(2), tx2, vec![], manager).unwrap());
     let (audio_track, video_track) = get_test_tracks();
 
     let peer1_clone = Rc::clone(&peer1);
