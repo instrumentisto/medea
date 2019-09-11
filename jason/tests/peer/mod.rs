@@ -87,7 +87,6 @@ fn add_candidates_to_offerer_before_answer(
         })
         .then(move |answer| {
             let answer = answer.unwrap();
-
             handle_ice_candidates(rx2, Rc::clone(&pc1_clone), 1).then(
                 move |_| {
                     // assert that pc1 has buffered candidates
