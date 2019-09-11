@@ -12,7 +12,7 @@ use smart_default::SmartDefault;
 /// [Client API]: http://tiny.cc/c80uaz
 #[derive(Clone, Debug, Deserialize, Serialize, SmartDefault)]
 #[serde(default)]
-pub struct Client {
+pub struct ClientApiHttpServer {
     /// Public URL of server. Address for exposed [Client API].
     ///
     /// This address will be returned from [Control API] in `sids` and to
@@ -34,7 +34,7 @@ pub struct Client {
     pub bind_port: u16,
 }
 
-impl Client {
+impl ClientApiHttpServer {
     /// Builds [`SocketAddr`] from `bind_ip` and `bind_port`.
     #[inline]
     pub fn bind_addr(&self) -> SocketAddr {

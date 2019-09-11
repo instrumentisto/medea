@@ -1,12 +1,12 @@
 //! All errors which medea can return to control API user.
 //!
 //! # Error codes ranges
-//! * __1000...1000__ Unexpected server error
-//! * __1001...1099__ Not found errors
-//! * __1100...1199__ Spec errors
-//! * __1200...1299__ Parse errors
-//! * __1300...1399__ Conflicts
-//! * __1400...1499__ Misc errors
+//! - __1000...1000__ Unexpected server error
+//! - __1001...1099__ Not found errors
+//! - __1100...1199__ Spec errors
+//! - __1200...1299__ Parse errors
+//! - __1300...1399__ Conflicts
+//! - __1400...1499__ Misc errors
 
 use std::string::ToString;
 
@@ -299,88 +299,87 @@ pub enum ErrorCode {
 
 impl From<ParticipantServiceErr> for ErrorResponse {
     fn from(err: ParticipantServiceErr) -> Self {
+        use ParticipantServiceErr::*;
+
         match err {
-            ParticipantServiceErr::EndpointNotFound(id) => {
-                Self::new(ErrorCode::EndpointNotFound, &id)
-            }
-            ParticipantServiceErr::ParticipantNotFound(id) => {
+            EndpointNotFound(id) => Self::new(ErrorCode::EndpointNotFound, &id),
+            ParticipantNotFound(id) => {
                 Self::new(ErrorCode::MemberNotFound, &id)
             }
-            ParticipantServiceErr::ParticipantAlreadyExists(id) => {
+            ParticipantAlreadyExists(id) => {
                 Self::new(ErrorCode::MemberAlreadyExists, &id)
             }
-            ParticipantServiceErr::EndpointAlreadyExists(id) => {
+            EndpointAlreadyExists(id) => {
                 Self::new(ErrorCode::EndpointAlreadyExists, &id)
             }
-            ParticipantServiceErr::TurnServiceErr(_)
-            | ParticipantServiceErr::MemberError(_) => Self::unexpected(&err),
+            TurnServiceErr(_) | MemberError(_) => Self::unexpected(&err),
         }
     }
 }
 
 impl From<TryFromProtobufError> for ErrorResponse {
     fn from(err: TryFromProtobufError) -> Self {
+        use TryFromProtobufError::*;
+
         match err {
-            TryFromProtobufError::SrcUriError(e) => e.into(),
-            TryFromProtobufError::NotMemberElementInRoomElement(id) => {
-                Self::with_explanation(
-                    ErrorCode::UnimplementedCall,
-                    "Not Member elements in Room element currently is \
-                     unimplemented."
-                        .to_string(),
-                    Some(id),
-                )
-            }
+            SrcUriError(e) => e.into(),
+            NotMemberElementInRoomElement(id) => Self::with_explanation(
+                ErrorCode::UnimplementedCall,
+                "Not Member elements in Room element currently is \
+                 unimplemented."
+                    .to_string(),
+                Some(id),
+            ),
         }
     }
 }
 
 impl From<LocalUriParseError> for ErrorResponse {
     fn from(err: LocalUriParseError) -> Self {
+        use LocalUriParseError::*;
+
         match err {
-            LocalUriParseError::NotLocal(text) => {
-                Self::new(ErrorCode::ElementIdIsNotLocal, &text)
-            }
-            LocalUriParseError::TooManyPaths(text) => {
+            NotLocal(text) => Self::new(ErrorCode::ElementIdIsNotLocal, &text),
+            TooManyPaths(text) => {
                 Self::new(ErrorCode::ElementIdIsTooLong, &text)
             }
-            LocalUriParseError::Empty => {
-                Self::without_id(ErrorCode::EmptyElementId)
-            }
-            LocalUriParseError::MissingPaths(text) => {
+            Empty => Self::without_id(ErrorCode::EmptyElementId),
+            MissingPaths(text) => {
                 Self::new(ErrorCode::MissingFieldsInSrcUri, &text)
             }
-            LocalUriParseError::UrlParseErr(id, _) => {
-                Self::new(ErrorCode::InvalidSrcUri, &id)
-            }
+            UrlParseErr(id, _) => Self::new(ErrorCode::InvalidSrcUri, &id),
         }
     }
 }
 
 impl From<RoomError> for ErrorResponse {
     fn from(err: RoomError) -> Self {
+        use RoomError::*;
+
         match err {
-            RoomError::MemberError(e) => e.into(),
-            RoomError::MembersLoadError(e) => e.into(),
-            RoomError::ParticipantServiceErr(e) => e.into(),
-            RoomError::WrongRoomId(_, _)
-            | RoomError::PeerNotFound(_)
-            | RoomError::NoTurnCredentials(_)
-            | RoomError::ConnectionNotExists(_)
-            | RoomError::UnableToSendEvent(_)
-            | RoomError::PeerError(_)
-            | RoomError::TryFromElementError(_)
-            | RoomError::BadRoomSpec(_)
-            | RoomError::TurnServiceError(_)
-            | RoomError::ClientError(_) => Self::unexpected(&err),
+            MemberError(e) => e.into(),
+            MembersLoadError(e) => e.into(),
+            ParticipantServiceErr(e) => e.into(),
+            WrongRoomId(_, _)
+            | PeerNotFound(_)
+            | NoTurnCredentials(_)
+            | ConnectionNotExists(_)
+            | UnableToSendEvent(_)
+            | PeerError(_)
+            | TryFromElementError(_)
+            | BadRoomSpec(_)
+            | TurnServiceError(_)
+            | ClientError(_) => Self::unexpected(&err),
         }
     }
 }
 
 impl From<MembersLoadError> for ErrorResponse {
     fn from(err: MembersLoadError) -> Self {
+        use MembersLoadError::*;
+
         match err {
-            MembersLoadError::TryFromError(e, id) => match e {
+            TryFromError(e, id) => match e {
                 TryFromElementError::NotMember => {
                     Self::new(ErrorCode::NotMemberInSpec, &id)
                 }
@@ -388,13 +387,11 @@ impl From<MembersLoadError> for ErrorResponse {
                     Self::new(ErrorCode::NotRoomInSpec, &id)
                 }
             },
-            MembersLoadError::MemberNotFound(id) => {
-                Self::new(ErrorCode::MemberNotFound, &id)
-            }
-            MembersLoadError::PublishEndpointNotFound(id) => {
+            MemberNotFound(id) => Self::new(ErrorCode::MemberNotFound, &id),
+            PublishEndpointNotFound(id) => {
                 Self::new(ErrorCode::PublishEndpointNotFound, &id)
             }
-            MembersLoadError::PlayEndpointNotFound(id) => {
+            PlayEndpointNotFound(id) => {
                 Self::new(ErrorCode::PlayEndpointNotFound, &id)
             }
         }
@@ -403,63 +400,57 @@ impl From<MembersLoadError> for ErrorResponse {
 
 impl From<MemberError> for ErrorResponse {
     fn from(err: MemberError) -> Self {
+        use MemberError::*;
+
         match err {
-            MemberError::PlayEndpointNotFound(id) => {
+            PlayEndpointNotFound(id) => {
                 Self::new(ErrorCode::PlayEndpointNotFound, &id)
             }
-            MemberError::PublishEndpointNotFound(id) => {
+            PublishEndpointNotFound(id) => {
                 Self::new(ErrorCode::PublishEndpointNotFound, &id)
             }
-            MemberError::EndpointNotFound(id) => {
-                Self::new(ErrorCode::EndpointNotFound, &id)
-            }
+            EndpointNotFound(id) => Self::new(ErrorCode::EndpointNotFound, &id),
         }
     }
 }
 
 impl From<SrcParseError> for ErrorResponse {
     fn from(err: SrcParseError) -> Self {
+        use SrcParseError::*;
+
         match err {
-            SrcParseError::NotSrcUri(text) => {
-                Self::new(ErrorCode::NotSourceUri, &text)
-            }
-            SrcParseError::LocalUriParseError(_, err) => err.into(),
+            NotSrcUri(text) => Self::new(ErrorCode::NotSourceUri, &text),
+            LocalUriParseError(_, err) => err.into(),
         }
     }
 }
 
 impl From<RoomServiceError> for ErrorResponse {
     fn from(err: RoomServiceError) -> Self {
+        use RoomServiceError::*;
+
         match err {
-            RoomServiceError::RoomNotFound(id) => {
-                Self::new(ErrorCode::RoomNotFound, &id)
-            }
-            RoomServiceError::RoomAlreadyExists(id) => {
+            RoomNotFound(id) => Self::new(ErrorCode::RoomNotFound, &id),
+            RoomAlreadyExists(id) => {
                 Self::new(ErrorCode::RoomAlreadyExists, &id)
             }
-            RoomServiceError::RoomError(e) => e.into(),
-            RoomServiceError::EmptyUrisList => {
-                Self::without_id(ErrorCode::EmptyElementsList)
-            }
-            RoomServiceError::RoomNotFoundForElement(id) => {
+            RoomError(e) => e.into(),
+            EmptyUrisList => Self::without_id(ErrorCode::EmptyElementsList),
+            RoomNotFoundForElement(id) => {
                 Self::new(ErrorCode::RoomNotFoundForProvidedElement, &id)
             }
-            RoomServiceError::NotSameRoomIds(ids, expected_room_id) => {
-                Self::with_explanation(
-                    ErrorCode::ProvidedNotSameRoomIds,
-                    format!(
-                        "Expected Room ID: '{}'. IDs with different Room ID: \
-                         {:?}",
-                        expected_room_id,
-                        ids.into_iter()
-                            .map(|id| id.to_string())
-                            .collect::<Vec<_>>()
-                    ),
-                    None,
-                )
-            }
-            RoomServiceError::RoomMailboxErr(_)
-            | RoomServiceError::FailedToLoadStaticSpecs(_) => {
+            NotSameRoomIds(ids, expected_room_id) => Self::with_explanation(
+                ErrorCode::ProvidedNotSameRoomIds,
+                format!(
+                    "Expected Room ID: '{}'. IDs with different Room ID: {:?}",
+                    expected_room_id,
+                    ids.into_iter()
+                        .map(|id| id.to_string())
+                        .collect::<Vec<_>>()
+                ),
+                None,
+            ),
+            RoomMailboxErr(_) | FailedToLoadStaticSpecs(_) => {
                 Self::unexpected(&err)
             }
         }
@@ -468,15 +459,15 @@ impl From<RoomServiceError> for ErrorResponse {
 
 impl From<GrpcControlApiError> for ErrorResponse {
     fn from(err: GrpcControlApiError) -> Self {
+        use GrpcControlApiError::*;
+
         match err {
-            GrpcControlApiError::LocalUri(e) => e.into(),
-            GrpcControlApiError::TryFromProtobuf(e) => e.into(),
-            GrpcControlApiError::RoomServiceError(e) => e.into(),
-            GrpcControlApiError::RoomServiceMailboxError(_)
-            | GrpcControlApiError::TryFromElement(_)
-            | GrpcControlApiError::UnknownMailboxErr(_) => {
-                Self::unexpected(&err)
-            }
+            LocalUri(e) => e.into(),
+            TryFromProtobuf(e) => e.into(),
+            RoomServiceError(e) => e.into(),
+            RoomServiceMailboxError(_)
+            | TryFromElement(_)
+            | UnknownMailboxErr(_) => Self::unexpected(&err),
         }
     }
 }

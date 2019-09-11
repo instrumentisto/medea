@@ -12,7 +12,7 @@ use smart_default::SmartDefault;
 /// [Control API]: http://tiny.cc/380uaz
 #[derive(Clone, Debug, Deserialize, Serialize, SmartDefault)]
 #[serde(default)]
-pub struct Grpc {
+pub struct ControlApiGrpcServer {
     /// IP address to bind gRPC server to. Defaults to `0.0.0.0`.
     #[default(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)))]
     pub bind_ip: IpAddr,

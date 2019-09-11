@@ -191,7 +191,10 @@ impl ControlApiService {
     ) -> String {
         format!(
             "{}/{}/{}/{}",
-            self.app.config.client.public_url, room_id, member_id, credentials
+            self.app.config.server.client.http.public_url,
+            room_id,
+            member_id,
+            credentials
         )
     }
 
@@ -508,9 +511,9 @@ impl Handler<ShutdownGracefully> for GrpcServer {
 ///
 /// [Control API]: http://tiny.cc/380uaz
 pub fn run(room_repo: Addr<RoomService>, app: AppContext) -> Addr<GrpcServer> {
-    let bind_ip = app.config.control.grpc.bind_ip.to_string();
-    let bind_port = app.config.control.grpc.bind_port;
-    let cq_count = app.config.control.grpc.completion_queue_count;
+    let bind_ip = app.config.server.control.grpc.bind_ip.to_string();
+    let bind_port = app.config.server.control.grpc.bind_port;
+    let cq_count = app.config.server.control.grpc.completion_queue_count;
 
     let service = create_control_api(ControlApiService {
         app,

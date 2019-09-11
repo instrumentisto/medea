@@ -22,7 +22,6 @@ stages:
 jobs:
   allow_failures:
     - rust: nightly
-      stage: build
 
   include:
     - name: Clippy
@@ -36,9 +35,8 @@ jobs:
       rust: nightly
       cache: false
       env: DONT_INSTALL_PROTOC=1
-      before_script:
-        - . ./_ci/rustfmt_install.sh
-      script: make fmt check=yes rustfmt-rust-ver="${RUSTFMT_RUST_VER}"
+      before_script: rustup component add rustfmt
+      script: make fmt check=yes
 
     - name: medea-jason (stable)
       stage: build

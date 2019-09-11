@@ -178,7 +178,7 @@ impl Handler<StartStaticRooms> for RoomService {
         _: &mut Self::Context,
     ) -> Self::Result {
         let room_specs = load_static_specs_from_dir(
-            self.app.config.control.static_specs_dir.clone(),
+            self.app.config.control_api.static_specs_dir.clone(),
         )?;
 
         for spec in room_specs {
@@ -259,7 +259,7 @@ impl DeleteElements<Unvalidated> {
     pub fn new() -> DeleteElements<Unvalidated> {
         Self {
             uris: Vec::new(),
-            _state: PhantomData,
+            _validation_state: PhantomData,
         }
     }
 
@@ -302,19 +302,26 @@ impl DeleteElements<Unvalidated> {
 
         Ok(DeleteElements {
             uris,
-            _state: PhantomData,
+            _validation_state: PhantomData,
         })
     }
 }
 
 /// Signal for delete [Control API] elements.
 ///
+/// This message can be in two states: [`Validated`] and [`Unvalidated`].
+///
+/// For ability to send this message to [`RoomService`] [`DeleteElements`]
+/// should be in [`Validated`] state. You can go to [`Validated`] state
+/// from [`Unvalidated`] with [`DeleteElements::validate`] function
+/// which will validate all [`StatefulLocalUri`]s.
+///
 /// [Control API]: http://tiny.cc/380uaz
 #[derive(Message, Default)]
 #[rtype(result = "Result<(), RoomServiceError>")]
 pub struct DeleteElements<T> {
     uris: Vec<StatefulLocalUri>,
-    _state: PhantomData<T>,
+    _validation_state: PhantomData<T>,
 }
 
 impl Handler<DeleteElements<Validated>> for RoomService {

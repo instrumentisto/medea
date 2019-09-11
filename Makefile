@@ -215,12 +215,10 @@ endif
 # Format Rust sources with rustfmt.
 #
 # Usage:
-#	make cargo.fmt [check=(no|yes)] [build=(no|yes)]
-
-rustfmt-rust-ver=nightly
+#	make cargo.fmt [check=(no|yes)]
 
 cargo.fmt:
-	cargo +${rustfmt-rust-ver} fmt --all $(if $(call eq,$(check),yes),-- --check,)
+	cargo +nightly fmt --all $(if $(call eq,$(check),yes),-- --check,)
 
 
 # Lint Rust sources with clippy.

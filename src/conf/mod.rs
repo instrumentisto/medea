@@ -1,10 +1,11 @@
 //! Provides application configuration options.
 
-pub mod client;
-pub mod control;
-pub mod grpc;
+pub mod client_api_http;
+pub mod control_api;
+pub mod control_api_grpc;
 pub mod log;
 pub mod rpc;
+pub mod server;
 pub mod shutdown;
 pub mod turn;
 
@@ -16,11 +17,10 @@ use serde::{Deserialize, Serialize};
 
 #[doc(inline)]
 pub use self::{
-    client::Client,
-    control::Control,
-    grpc::Grpc,
+    control_api::ControlApi,
     log::Log,
     rpc::Rpc,
+    server::Server,
     shutdown::Shutdown,
     turn::{Redis, Turn},
 };
@@ -39,10 +39,8 @@ pub struct Conf {
     /// RPC connection settings.
     pub rpc: Rpc,
 
-    /// [Client API] server settings.
-    ///
-    /// [Client API]: http://tiny.cc/c80uaz
-    pub client: Client,
+    /// Servers settings.
+    pub server: Server,
 
     /// TURN server settings.
     pub turn: Turn,
@@ -56,7 +54,7 @@ pub struct Conf {
     /// [Control API] settings.
     ///
     /// [Control API]: http://tiny.cc/380uaz
-    pub control: Control,
+    pub control_api: ControlApi,
 }
 
 impl Conf {

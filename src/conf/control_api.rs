@@ -5,24 +5,17 @@
 use serde::{Deserialize, Serialize};
 use smart_default::SmartDefault;
 
-use super::Grpc;
-
 /// [Control API] settings.
 ///
 /// [Control API]: http://tiny.cc/380uaz
 #[derive(Clone, Debug, Deserialize, Serialize, SmartDefault)]
 #[serde(default)]
-pub struct Control {
+pub struct ControlApi {
     /// Path to directory with static [Сontrol API] specs.
     ///
     /// [Control API]: http://tiny.cc/380uaz
     #[default(String::from("specs/"))]
     pub static_specs_dir: String,
-
-    /// gRPC [Control API] server settings.
-    ///
-    /// [Control API]: http://tiny.cc/380uaz
-    pub grpc: Grpc,
 }
 
 #[cfg(test)]

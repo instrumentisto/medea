@@ -19,7 +19,7 @@ use crate::api::control::{
     Endpoint, TryFromElementError, TryFromProtobufError, WebRtcPlayId,
 };
 
-const MEMBER_CREDENTIALS_LEN: usize = 32;
+const CREDENTIALS_LEN: usize = 32;
 
 /// ID of `Member`.
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, From, Display)]
@@ -118,7 +118,7 @@ impl MemberSpec {
 fn generate_member_credentials() -> String {
     rand::thread_rng()
         .sample_iter(&Alphanumeric)
-        .take(MEMBER_CREDENTIALS_LEN)
+        .take(CREDENTIALS_LEN)
         .collect()
 }
 
