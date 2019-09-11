@@ -32,9 +32,7 @@ pub use self::{
 #[cfg(feature = "mockable")]
 pub use self::repo::MockPeerRepository;
 #[doc(inline)]
-pub use self::{
-    repo::{PeerRepository, Repository},
-};
+pub use self::repo::{PeerRepository, Repository};
 
 #[dispatchable]
 #[allow(clippy::module_name_repetitions)]
