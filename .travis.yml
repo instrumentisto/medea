@@ -35,6 +35,7 @@ jobs:
       env: DONT_INSTALL_PROTOC=1
       before_script:
         - export RUSTFMT_RUST_VER=`curl https://rust-lang.github.io/rustup-components-history/x86_64-unknown-linux-gnu/rustfmt`
+        - rustup toolchain install nightly-${RUSTFMT_RUST_VER}
         - rustup component add rustfmt --toolchain nightly-${RUSTFMT_RUST_VER}-x86_64-unknown-linux-gnu
       script: make fmt check=yes rustfmt-rust-ver=nightly-${RUSTFMT_RUST_VER}
 
