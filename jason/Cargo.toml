@@ -1,6 +1,6 @@
 [package]
 name = "medea-jason"
-version = "0.1.0"
+version = "0.1.1-dev"
 edition = "2018"
 description = "Client library for Medea media server"
 authors = ["Instrumentisto Team <developer@instrumentisto.com>"]
@@ -27,7 +27,7 @@ console_error_panic_hook = { version = "0.1", optional = true }
 futures = "0.1"
 js-sys = "0.3"
 macro-attr = "0.2"
-medea-client-api-proto = { version = "0.1", features = ["jason"] }
+medea-client-api-proto = { path = "../proto/client-api", features = ["jason"] }
 medea-macro = "0.1"
 newtype_derive = "0.1"
 serde = { version = "1.0", features = ["derive"] }
