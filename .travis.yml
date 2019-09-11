@@ -65,12 +65,14 @@ jobs:
           all_branches: true
 
     - name: medea (beta)
-      stage: build_beta
+      stage: build
+      if: branch = master
       rust: beta
       script: make cargo.build crate=medea dockerized=no
 
     - name: medea (nightly)
-      stage: build_beta
+      stage: build
+      if: branch = master
       rust: nightly
       script: make cargo.build crate=medea dockerized=no
 
@@ -117,11 +119,11 @@ jobs:
 
     - name: crates.io
       stage: release
-      if: (tag IS present) AND (tag =~ ^medea[a-z-]*-[0-9]+\.[0-9]+\.[0-9]+)
+      if: tag =~ ^medea[a-z-]*-[0-9]+\.[0-9]+\.[0-9]+
       cache: false
       before_script:
         - export MEDEA_CRATE_NAME=$(echo $TRAVIS_TAG \
-          | sed -E "s/^(medea[a-z-]*)-[0-9]+\.[0-9]+\.[0-9]+/\1/")
+                        | sed -E "s/^(medea[a-z-]*)-[0-9]+\.[0-9]+\.[0-9]+/\1/")
       script:
         - echo "Releasing $MEDEA_CRATE_NAME to crates.io..."
       deploy:
@@ -133,11 +135,11 @@ jobs:
 
     - name: NPM
       stage: release
-      if: (tag IS present) AND (tag =~ ^medea-jason-[0-9]+\.[0-9]+\.[0-9]+)
+      if: tag =~ ^medea-jason-[0-9]+\.[0-9]+\.[0-9]+
       cache: false
       before_script:
         - export MEDEA_CRATE_NAME=$(echo $TRAVIS_TAG \
-          | sed -E "s/^(medea[a-z-]*)-[0-9]+\.[0-9]+\.[0-9]+/\1/")
+                        | sed -E "s/^(medea[a-z-]*)-[0-9]+\.[0-9]+\.[0-9]+/\1/")
       script:
         - echo "Releasing $MEDEA_CRATE_NAME to NPM..."
       before_deploy:
@@ -152,11 +154,11 @@ jobs:
 
     - name: GitHub
       stage: release
-      if: (tag IS present) AND (tag =~ ^medea[a-z-]*-[0-9]+\.[0-9]+\.[0-9]+)
+      if: tag =~ ^medea[a-z-]*-[0-9]+\.[0-9]+\.[0-9]+
       cache: false
       before_script:
         - export MEDEA_CRATE_NAME=$(echo $TRAVIS_TAG \
-          | sed -E "s/^(medea[a-z-]*)-[0-9]+\.[0-9]+\.[0-9]+/\1/")
+                        | sed -E "s/^(medea[a-z-]*)-[0-9]+\.[0-9]+\.[0-9]+/\1/")
       script:
         - echo "Releasing $MEDEA_CRATE_NAME to GitHub..."
       deploy:

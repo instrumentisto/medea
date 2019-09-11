@@ -153,7 +153,7 @@ impl MediaConnections {
     /// basing on track IDs.
     ///
     /// Enables or disables tracks in provided stream based on current media
-    /// connections state
+    /// connections state.
     ///
     /// Provided [`MediaStream`] must have all required [`MediaTrack`]s.
     /// [`MediaTrack`]s are inserted into [`Sender`]'s [`RtcRtpTransceiver`]s
