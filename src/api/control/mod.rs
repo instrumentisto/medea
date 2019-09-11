@@ -36,6 +36,8 @@ pub enum TryFromProtobufError {
     ///
     /// [`WebRtcPlayEndpoint`]:
     /// crate::api::control::endpoints::WebRtcPlayEndpoint
+    /// [`SrcUri`]:
+    /// crate::api::control::endpoints::webrtc_play_endpoint::SrcUri
     #[display(fmt = "Src uri parse error: {:?}", _0)]
     SrcUriError(SrcParseError),
 
@@ -76,16 +78,18 @@ pub enum RootElement {
 #[allow(clippy::pub_enum_variant_names)]
 #[derive(Debug, Fail, Clone)]
 pub enum TryFromElementError {
-    /// Element is not Room.
+    /// Element is not `Room`.
     #[fail(display = "Element is not Room")]
     NotRoom,
 
-    /// Element is not Member.
+    /// Element is not `Member`.
     #[fail(display = "Element is not Member")]
     NotMember,
 }
 
 /// Errors which can happen while loading static [Control API] specs.
+///
+/// [Control API]: http://tiny.cc/380uaz
 #[allow(clippy::pub_enum_variant_names)]
 #[derive(Debug, Fail, Display)]
 pub enum LoadStaticControlSpecsError {

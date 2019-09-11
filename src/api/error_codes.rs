@@ -43,7 +43,8 @@ pub struct ErrorResponse {
     ///
     /// By default this field should be [`None`].
     ///
-    /// For providing error explanation use [`ErrorResponse::explain`] method.
+    /// For providing error explanation use [`ErrorResponse::with_explanation`]
+    /// method.
     ///
     /// [`Display`]: std::fmt::Display
     explanation: Option<String>,
@@ -73,6 +74,8 @@ impl ErrorResponse {
     /// Provide unexpected `Error` to this function.
     /// This error will be printed with [`Display`] implementation
     /// of provided `Error` as error explanation.
+    ///
+    /// [`Display`]: std::fmt::Display
     pub fn unexpected<B: ToString>(unknown_error: &B) -> Self {
         Self {
             error_code: ErrorCode::UnexpectedError,
@@ -129,9 +132,10 @@ impl Into<ErrorProto> for ErrorResponse {
 pub enum ErrorCode {
     /// Unexpected server error.
     ///
-    /// Use this [`ErrorCode`] only with [`ErrorResponse::unknown`] function.
-    /// In error text with this code should be error message which explain what
-    /// exactly goes wrong ([`ErrorResponse::unknown`] do this).
+    /// Use this [`ErrorCode`] only with [`ErrorResponse::unexpected`]
+    /// function. In error text with this code should be error message
+    /// which explain what exactly goes wrong
+    /// ([`ErrorResponse::unexpected`] do this).
     ///
     /// Code: __1000__.
     #[display(fmt = "Unexpected error happened.")]
@@ -285,8 +289,8 @@ pub enum ErrorCode {
     /// Unimplemented API call.
     ///
     /// This code should be with additional text which explains what
-    /// exactly unimplemented (you can do it with [`ErrorResponse::explain`]
-    /// function).
+    /// exactly unimplemented (you can do it with
+    /// [`ErrorResponse::with_explanation`] function).
     ///
     /// Code: __1400__.
     #[display(fmt = "Unimplemented API call.")]

@@ -16,19 +16,19 @@ use super::{MemberId, RoomId};
 /// State of [`LocalUri`] which points to [`Room`].
 ///
 /// [`Room`]: crate::signalling::room::Room
-#[derive(Debug, PartialEq, Hash, Eq, Clone)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct IsRoomId(RoomId);
 
 /// State of [`LocalUri`] which points to [`Member`].
 ///
 /// [`Member`]: crate::signalling::elements::member::Member
-#[derive(Debug, PartialEq, Hash, Eq, Clone)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct IsMemberId(LocalUri<IsRoomId>, MemberId);
 
 /// State of [`LocalUri`] which points to [`Endpoint`].
 ///
 /// [`Endpoint`]: crate::signalling::elements::endpoints::Endpoint
-#[derive(Debug, PartialEq, Hash, Eq, Clone)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct IsEndpointId(LocalUri<IsMemberId>, String);
 
 /// URI in format `local://room_id/member_id/endpoint_id`.
@@ -86,7 +86,7 @@ pub struct IsEndpointId(LocalUri<IsMemberId>, String);
 /// [`WebRtcPublishEndpoint`]:
 /// crate::signalling::elements::endpoints::webrtc::WebRtcPublishEndpoint
 /// [`Endpoint`]: crate::signalling::elements::endpoints::Endpoint
-#[derive(Debug, PartialEq, Hash, Eq, Clone)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct LocalUri<T> {
     state: T,
 }

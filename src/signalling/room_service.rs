@@ -364,9 +364,7 @@ impl Handler<DeleteElements<Validated>> for RoomService {
                         .map_err(RoomServiceError::RoomMailboxErr),
                 ))
             } else {
-                Box::new(actix::fut::err(RoomServiceError::RoomNotFound(
-                    get_local_uri_to_room(room_id),
-                )))
+                Box::new(actix::fut::ok(()))
             }
         } else {
             Box::new(actix::fut::err(RoomServiceError::EmptyUrisList))
@@ -385,7 +383,6 @@ impl Handler<Get> for RoomService {
     type Result =
         ActFuture<HashMap<StatefulLocalUri, ElementProto>, RoomServiceError>;
 
-    // TODO: use validation state machine same as Delete method
     fn handle(&mut self, msg: Get, _: &mut Self::Context) -> Self::Result {
         let mut rooms_elements = HashMap::new();
         for uri in msg.0 {
@@ -406,15 +403,14 @@ impl Handler<Get> for RoomService {
         }
 
         let mut futs = Vec::new();
-        for (room_id, elements) in rooms_elements {
+        for (room_id, mut elements) in rooms_elements {
             if let Some(room) = self.room_repo.get(&room_id) {
                 futs.push(room.send(SerializeProto(elements)));
             } else {
                 return Box::new(actix::fut::err(
-                    // TODO: better return RoomNotFoundForElement err
-                    RoomServiceError::RoomNotFound(get_local_uri_to_room(
-                        room_id,
-                    )),
+                    RoomServiceError::RoomNotFoundForElement(
+                        elements.remove(0),
+                    ),
                 ));
             }
         }

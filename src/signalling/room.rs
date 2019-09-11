@@ -352,7 +352,7 @@ impl Room {
     }
 
     /// Creates [`Peer`] for endpoints if [`Peer`] between endpoint's members
-    /// doesn't exist.
+    /// not exist.
     ///
     /// Adds `send` track to source member's [`Peer`] and `recv` to
     /// sink member's [`Peer`].
@@ -655,6 +655,10 @@ impl Room {
 /// to interact with [`Room`].
 impl Actor for Room {
     type Context = Context<Self>;
+
+    fn started(&mut self, _: &mut Self::Context) {
+        debug!("Room [id = {}] started.", self.id);
+    }
 }
 
 impl Into<ElementProto> for &mut Room {
@@ -967,7 +971,7 @@ impl Handler<CreateEndpoint> for Room {
     fn handle(
         &mut self,
         msg: CreateEndpoint,
-        _ctx: &mut Self::Context,
+        _: &mut Self::Context,
     ) -> Self::Result {
         match msg.spec {
             EndpointSpec::WebRtcPlay(endpoint) => {

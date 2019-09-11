@@ -322,11 +322,11 @@ endif
 #	              [up=yes [dockerized=no [debug=(yes|no)]]
 #	                      [dockerized=yes [TAG=(dev|<docker-tag>)]
 #	                                      [registry=<registry-host>]
-#	                                      [logs=(no|yes)]]
+#	                                      [log=(no|yes)]]
 #	                      [wait=(5|<seconds>)]]
 
 test-e2e-env = RUST_BACKTRACE=1 \
-	$(if $(call eq,$(logs),yes),,RUST_LOG=warn) \
+	$(if $(call eq,$(log),yes),,RUST_LOG=warn) \
 	MEDEA_CONTROL.STATIC_SPECS_DIR=tests/specs/ \
 	MEDEA_CONTROL_STATIC_SPECS_DIR=tests/specs/
 
@@ -334,7 +334,7 @@ test.e2e:
 ifeq ($(up),yes)
 	make docker.up.coturn background=yes
 	env $(test-e2e-env) \
-	make docker.up.medea debug=$(debug) background=yes logs=$(logs) \
+	make docker.up.medea debug=$(debug) background=yes log=$(log) \
 	                     dockerized=$(dockerized) \
 	                     TAG=$(TAG) registry=$(registry)
 	sleep $(if $(call eq,$(wait),),5,$(wait))

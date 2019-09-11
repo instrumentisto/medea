@@ -77,7 +77,7 @@ fn main() -> Result<(), Error> {
                         grpc::server::run(room_service, app_context);
                     shutdown::subscribe(
                         &graceful_shutdown,
-                        grpc_addr.clone().recipient(),
+                        grpc_addr.recipient(),
                         shutdown::Priority(1),
                     );
 

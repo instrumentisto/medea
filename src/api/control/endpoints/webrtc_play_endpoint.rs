@@ -55,7 +55,7 @@ pub enum SrcParseError {
     LocalUriParseError(String, LocalUriParseError),
 }
 
-/// Special uri with pattern `local://{room_id}/{member_id}/{endpoint_id}`.
+/// Special URI with pattern `local://{room_id}/{member_id}/{endpoint_id}`.
 /// This uri can pointing only to [`WebRtcPublishEndpoint`].
 ///
 /// Note that [`SrcUri`] is parsing with [`LocalUri`] parser.
@@ -82,6 +82,9 @@ pub struct SrcUri {
     pub member_id: MemberId,
 
     /// ID of [`WebRtcPublishEndpoint`].
+    ///
+    /// [`WebRtcPublishEndpoint`]:
+    /// crate::api::control::endpoints::WebRtcPublishEndpoint
     pub endpoint_id: WebRtcPublishId,
 }
 
@@ -116,6 +119,7 @@ impl From<LocalUri<IsEndpointId>> for SrcUri {
 }
 
 /// [Serde] deserializer for [`SrcUri`].
+///
 /// Deserializes URIs with pattern:
 /// `local://room_id/member_id/publish_endpoint_id`.
 ///

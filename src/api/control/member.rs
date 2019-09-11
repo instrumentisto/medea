@@ -129,6 +129,8 @@ impl TryFrom<&MemberProto> for MemberSpec {
     ///
     /// Additionally generates [`Member`] credentials if
     /// they not provided in protobuf object.
+    ///
+    /// [`Member`]: crate::signalling::elements::member::Member
     fn try_from(value: &MemberProto) -> Result<Self, Self::Error> {
         let mut pipeline = HashMap::new();
         for (id, member_element) in value.get_pipeline() {

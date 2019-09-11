@@ -56,6 +56,8 @@ use crate::{
 #[derive(Debug, Display, Fail)]
 pub enum ParticipantServiceErr {
     /// Some error happened in [`TurnAuthService`].
+    ///
+    /// [`TurnAuthService`]: crate::turn::service::TurnAuthService
     #[display(fmt = "TurnService Error in ParticipantService: {}", _0)]
     TurnServiceErr(TurnServiceErr),
 
@@ -64,6 +66,8 @@ pub enum ParticipantServiceErr {
     ParticipantNotFound(LocalUri<IsMemberId>),
 
     /// [`Endpoint`] with provided URI not found.
+    ///
+    /// [`Endpoint`]: crate::signalling::elements::endpoints::Endpoint
     #[display(fmt = "Endpoint [id = {}] not found.", _0)]
     EndpointNotFound(LocalUri<IsEndpointId>),
 
@@ -76,6 +80,8 @@ pub enum ParticipantServiceErr {
     ParticipantAlreadyExists(LocalUri<IsMemberId>),
 
     /// Try to create [`Endpoint`] with ID which already exists.
+    ///
+    /// [`Endpoint`]: crate::signalling::elements::endpoints::Endpoint
     #[display(fmt = "Endpoint [id = {}] already exists.", _0)]
     EndpointAlreadyExists(LocalUri<IsEndpointId>),
 }

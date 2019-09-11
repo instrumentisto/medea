@@ -39,7 +39,7 @@ pub struct Conf {
     /// RPC connection settings.
     pub rpc: Rpc,
 
-    /// [Client API] connection settings.
+    /// [Client API] server settings.
     ///
     /// [Client API]: http://tiny.cc/c80uaz
     pub client: Client,

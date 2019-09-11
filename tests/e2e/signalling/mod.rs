@@ -92,9 +92,9 @@ impl TestMember {
 impl Actor for TestMember {
     type Context = Context<Self>;
 
-    /// Starts heartbeat and sets a timer that will panic when 5 seconds will
-    /// expire. The timer is needed because some tests may just stuck and listen
-    /// socket forever.
+    /// Start heartbeat and set a timer that will panic when 5 seconds expire.
+    /// The timer is needed because some tests may just stuck
+    /// and listen socket forever.
     fn started(&mut self, ctx: &mut Self::Context) {
         self.start_heartbeat(ctx);
 

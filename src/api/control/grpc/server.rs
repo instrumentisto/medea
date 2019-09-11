@@ -49,7 +49,7 @@ use crate::{
 /// Errors which can happen while processing requests to gRPC [Control API].
 ///
 /// [Control API]: http://tiny.cc/380uaz
-#[derive(Debug, Fail, Display)]
+#[derive(Debug, Display, Fail)]
 pub enum GrpcControlApiError {
     /// Error while parsing [`LocalUri`] of element.
     LocalUri(LocalUriParseError),
@@ -438,9 +438,9 @@ impl ControlApi for ControlApiService {
                 .send(Get(uris))
                 .map_err(GrpcControlApiError::RoomServiceMailboxError)
                 .and_then(|r| r.map_err(GrpcControlApiError::from))
-                .then(|res| {
+                .then(|result| {
                     let mut response = GetResponse::new();
-                    match res {
+                    match result {
                         Ok(elements) => {
                             response.set_elements(
                                 elements
@@ -466,7 +466,7 @@ impl ControlApi for ControlApiService {
     }
 }
 
-/// Actor wrapper for [`grcio`] gRPC server which provides dynamic [Control
+/// Actor wrapper for [`grpcio`] gRPC server which provides dynamic [Control
 /// API].
 ///
 /// [Control API]: http://tiny.cc/380uaz

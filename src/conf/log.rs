@@ -1,10 +1,9 @@
 //! Logging settings.
 
-use std::str::FromStr as _;
+use std::{borrow::Cow, str::FromStr as _};
 
 use serde::{Deserialize, Serialize};
 use smart_default::SmartDefault;
-use std::borrow::Cow;
 
 /// Logging settings.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, SmartDefault)]

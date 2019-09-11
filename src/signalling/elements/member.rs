@@ -138,10 +138,8 @@ impl Member {
         MemberSpec::try_from(element).map_err(|e| {
             MembersLoadError::TryFromError(
                 e,
-                StatefulLocalUri::Member(LocalUri::<IsMemberId>::new(
-                    self.room_id(),
-                    member_id.clone(),
-                )),
+                LocalUri::<IsMemberId>::new(self.room_id(), member_id.clone())
+                    .into(),
             )
         })
     }
@@ -235,14 +233,13 @@ impl Member {
         // to which none [`WebRtcPlayEndpoint`] refers.
         this_member_spec
             .publish_endpoints()
+            .filter(|(endpoint_id, _)| self.srcs().get(endpoint_id).is_none())
             .for_each(|(endpoint_id, e)| {
-                if self.srcs().get(&endpoint_id).is_none() {
-                    self.insert_src(WebRtcPublishEndpoint::new(
-                        endpoint_id,
-                        e.p2p.clone(),
-                        this_member.downgrade(),
-                    ));
-                }
+                self.insert_src(WebRtcPublishEndpoint::new(
+                    endpoint_id,
+                    e.p2p.clone(),
+                    this_member.downgrade(),
+                ));
             });
 
         Ok(())
