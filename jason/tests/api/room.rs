@@ -9,11 +9,11 @@ use futures::{
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_test::*;
 
-use medea_client_api_proto::{Event, IceServer};
+use medea_client_api_proto::{Event, IceServer, PeerId};
 use medea_jason::{
     api::Room,
     media::MediaManager,
-    peer::{MockPeerRepository, PeerConnection, PeerEvent, PeerId},
+    peer::{MockPeerRepository, PeerConnection, PeerEvent},
     rpc::MockRpcClient,
 };
 
@@ -27,7 +27,7 @@ fn get_test_room_and_exist_peer() -> (Room, Rc<PeerConnection>) {
     let (tx, _rx) = unbounded();
     let peer = Rc::new(
         PeerConnection::new(
-            1,
+            PeerId(1),
             tx,
             vec![],
             Rc::new(MediaManager::default()),
@@ -94,7 +94,7 @@ fn get_test_room_and_new_peer(
     let (tx, _rx) = unbounded();
     let peer = Rc::new(
         PeerConnection::new(
-            1,
+            PeerId(1),
             tx,
             vec![],
             Rc::new(MediaManager::default()),
@@ -111,7 +111,7 @@ fn get_test_room_and_new_peer(
                   _peer_events_sender: &UnboundedSender<PeerEvent>,
                   enabled_audio: &bool,
                   enabled_video: &bool| {
-                *id == 1
+                *id == PeerId(1)
                     && *enabled_audio == with_enabled_audio
                     && *enabled_video == with_enabled_video
             },
@@ -134,7 +134,7 @@ fn mute_audio_room_before_init_peer() -> impl Future<Item = (), Error = JsValue>
     room.new_handle().mute_audio().unwrap();
     event_tx
         .unbounded_send(Event::PeerCreated {
-            peer_id: 1,
+            peer_id: PeerId(1),
             sdp_offer: None,
             tracks: vec![audio_track, video_track],
             ice_servers: vec![],
@@ -160,7 +160,7 @@ fn mute_video_room_before_init_peer() -> impl Future<Item = (), Error = JsValue>
     room.new_handle().mute_video().unwrap();
     event_tx
         .unbounded_send(Event::PeerCreated {
-            peer_id: 1,
+            peer_id: PeerId(1),
             sdp_offer: None,
             tracks: vec![audio_track, video_track],
             ice_servers: vec![],

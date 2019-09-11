@@ -5,23 +5,24 @@ use futures::Future;
 use wasm_bindgen::JsValue;
 use wasm_bindgen_test::*;
 
+use medea_client_api_proto::TrackId;
 use medea_jason::{
     media::MediaManager,
-    peer::{MediaConnections, RtcPeerConnection},
+    peer::{
+        MediaConnections, RtcPeerConnection, TransceiverDirection,
+        TransceiverKind,
+    },
+    utils::WasmErr,
 };
 
 use crate::get_test_tracks;
-use medea_jason::{
-    peer::{TransceiverDirection, TransceiverKind},
-    utils::WasmErr,
-};
 
 wasm_bindgen_test_configure!(run_in_browser);
 
 fn get_test_media_connections(
     enabled_audio: bool,
     enabled_video: bool,
-) -> impl Future<Item = (MediaConnections, u64, u64), Error = WasmErr> {
+) -> impl Future<Item = (MediaConnections, TrackId, TrackId), Error = WasmErr> {
     let media_connections = MediaConnections::new(
         Rc::new(RtcPeerConnection::new(vec![]).unwrap()),
         enabled_audio,

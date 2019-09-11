@@ -8,7 +8,7 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen_test::*;
 
 use medea_client_api_proto::{
-    AudioSettings, Direction, MediaType, Track, VideoSettings,
+    AudioSettings, Direction, MediaType, PeerId, Track, TrackId, VideoSettings,
 };
 use medea_jason::utils::{window, WasmErr};
 
@@ -17,17 +17,17 @@ wasm_bindgen_test_configure!(run_in_browser);
 pub fn get_test_tracks() -> (Track, Track) {
     (
         Track {
-            id: 1,
+            id: TrackId(1),
             direction: Direction::Send {
-                receivers: vec![2],
+                receivers: vec![PeerId(2)],
                 mid: None,
             },
             media_type: MediaType::Audio(AudioSettings {}),
         },
         Track {
-            id: 2,
+            id: TrackId(2),
             direction: Direction::Send {
-                receivers: vec![2],
+                receivers: vec![PeerId(2)],
                 mid: None,
             },
             media_type: MediaType::Video(VideoSettings {}),

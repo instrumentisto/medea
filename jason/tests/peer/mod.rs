@@ -5,6 +5,7 @@ use futures::{sync::mpsc::unbounded, Future};
 use wasm_bindgen::JsValue;
 use wasm_bindgen_test::*;
 
+use medea_client_api_proto::PeerId;
 use medea_jason::{media::MediaManager, peer::PeerConnection};
 
 use crate::get_test_tracks;
@@ -38,7 +39,8 @@ fn mute_unmute_audio() -> impl Future<Item = (), Error = JsValue> {
     let (tx, _rx) = unbounded();
     let manager = Rc::new(MediaManager::default());
     let (audio_track, video_track) = get_test_tracks();
-    let peer = PeerConnection::new(1, tx, vec![], manager, true, true).unwrap();
+    let peer = PeerConnection::new(PeerId(1), tx, vec![], manager, true, true)
+        .unwrap();
     peer.get_offer(vec![audio_track, video_track])
         .map(move |_| {
             assert!(peer.is_send_audio_enabled());
@@ -60,7 +62,8 @@ fn mute_unmute_video() -> impl Future<Item = (), Error = JsValue> {
     let (tx, _rx) = unbounded();
     let manager = Rc::new(MediaManager::default());
     let (audio_track, video_track) = get_test_tracks();
-    let peer = PeerConnection::new(1, tx, vec![], manager, true, true).unwrap();
+    let peer = PeerConnection::new(PeerId(1), tx, vec![], manager, true, true)
+        .unwrap();
     peer.get_offer(vec![audio_track, video_track])
         .map(move |_| {
             assert!(peer.is_send_audio_enabled());
@@ -82,8 +85,8 @@ fn new_with_mute_audio() -> impl Future<Item = (), Error = JsValue> {
     let (tx, _rx) = unbounded();
     let manager = Rc::new(MediaManager::default());
     let (audio_track, video_track) = get_test_tracks();
-    let peer =
-        PeerConnection::new(1, tx, vec![], manager, false, true).unwrap();
+    let peer = PeerConnection::new(PeerId(1), tx, vec![], manager, false, true)
+        .unwrap();
     peer.get_offer(vec![audio_track, video_track])
         .map(move |_| {
             assert!(!peer.is_send_audio_enabled());
@@ -97,8 +100,8 @@ fn new_with_mute_video() -> impl Future<Item = (), Error = JsValue> {
     let (tx, _rx) = unbounded();
     let manager = Rc::new(MediaManager::default());
     let (audio_track, video_track) = get_test_tracks();
-    let peer =
-        PeerConnection::new(1, tx, vec![], manager, true, false).unwrap();
+    let peer = PeerConnection::new(PeerId(1), tx, vec![], manager, true, false)
+        .unwrap();
     peer.get_offer(vec![audio_track, video_track])
         .map(move |_| {
             assert!(peer.is_send_audio_enabled());
