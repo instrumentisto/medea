@@ -196,11 +196,13 @@ cargo:
 # Usage:
 #	make cargo.fmt [check=(no|yes)] [build=(no|yes)]
 
+rustfmt-rust-ver=nightly
+
 cargo.fmt:
 ifeq ($(build),yes)
 	cargo build
 endif
-	cargo +nightly-2019-09-05 fmt --all $(if $(call eq,$(check),yes),-- --check,)
+	cargo +${rustfmt-rust-ver} fmt --all $(if $(call eq,$(check),yes),-- --check,)
 
 
 # Lint Rust sources with clippy.

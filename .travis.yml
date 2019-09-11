@@ -3,7 +3,6 @@ cache: cargo
 
 install:
   - bash _ci/protoc_install.sh
-  - export RUSTFMT_NIGHTLY_AVAILABLE_VERSION=`curl https://rust-lang.github.io/rustup-components-history/x86_64-unknown-linux-gnu/rustfmt`
   - rustc -vV
   - cargo -vV
 
@@ -29,14 +28,15 @@ jobs:
       before_script: rustup component add clippy
       script: make lint
 
-# TODO: write script for check last nightly version with available component
     - name: rustfmt
       stage: check
-      rust: nightly-${RUSTFMT_NIGHTLY_AVAILABLE_VERSION}
+      rust: nightly
       cache: false
       env: DONT_INSTALL_PROTOC=1
-      before_script: rustup component add rustfmt
-      script: make fmt check=yes
+      before_script:
+        - export RUSTFMT_RUST_VER=`curl https://rust-lang.github.io/rustup-components-history/x86_64-unknown-linux-gnu/rustfmt`
+        - rustup component add rustfmt --toolchain nightly-${RUSTFMT_RUST_VER}-x86_64-unknown-linux-gnu
+      script: make fmt check=yes rustfmt-rust-ver=nightly-${RUSTFMT_RUST_VER}
 
     - name: medea-jason (stable)
       stage: build
