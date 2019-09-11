@@ -78,7 +78,7 @@ impl WsSession {
             {
                 info!("WsSession of member {} is idle", session.member_id);
                 if let Err(err) = session.room.try_send(RpcConnectionClosed {
-                    member_id: session.member_id,
+                    member_id: session.member_id.clone(),
                     reason: ClosedReason::Lost,
                 }) {
                     error!(
@@ -105,10 +105,9 @@ impl Actor for WsSession {
 
         self.start_watchdog(ctx);
 
-        let member_id = self.member_id;
         ctx.wait(
             wrap_future(self.room.send(RpcConnectionEstablished {
-                member_id: self.member_id,
+                member_id: self.member_id.clone(),
                 connection: Box::new(ctx.address()),
             }))
             .map(
@@ -119,7 +118,7 @@ impl Actor for WsSession {
                         error!(
                             "Room rejected Established for member {}, cause \
                              {:?}",
-                            member_id, e
+                            session.member_id, e
                         );
                         session.close_normal(ctx);
                     }
@@ -132,7 +131,7 @@ impl Actor for WsSession {
                     error!(
                         "WsSession of member {} failed to join Room, because: \
                          {:?}",
-                        member_id, send_err,
+                        session.member_id, send_err,
                     );
                     session.close_normal(ctx);
                 },
@@ -167,7 +166,7 @@ impl RpcConnection for Addr<WsSession> {
     ) -> Box<dyn Future<Item = (), Error = ()>> {
         let fut = self
             .send(msg)
-            .map_err(|err| error!("Failed send event {:?} ", err));
+            .map_err(|err| warn!("Failed send event {:?} ", err));
         Box::new(fut)
     }
 }
@@ -239,7 +238,7 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
             ws::Message::Close(reason) => {
                 if !self.closed_by_server {
                     if let Err(err) = self.room.try_send(RpcConnectionClosed {
-                        member_id: self.member_id,
+                        member_id: self.member_id.clone(),
                         reason: ClosedReason::Closed,
                     }) {
                         error!(

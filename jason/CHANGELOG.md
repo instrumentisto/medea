@@ -6,6 +6,14 @@ All user visible changes to this project will be documented in this file. This p
 
 
 
+## TBD [0.1.1] · 2019-??-??
+[0.1.1]: /../../tree/medea-jason-0.1.1/jason
+
+### Changed
+
+
+
+
 ## [0.1.0] · 2019-08-21
 [0.1.0]: /../../tree/medea-jason-0.1.0/jason
 

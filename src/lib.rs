@@ -1,8 +1,5 @@
 //! Medea media server application.
 
-// TODO: when using enum's Self will be in stable, remove it.
-#![allow(clippy::use_self)]
-
 #[macro_use]
 pub mod utils;
 pub mod api;
@@ -13,113 +10,166 @@ pub mod shutdown;
 pub mod signalling;
 pub mod turn;
 
-use std::{env, io, sync::Arc};
+use std::{collections::HashMap, sync::Arc};
 
 use actix::prelude::*;
-use dotenv::dotenv;
-use futures::IntoFuture as _;
-use log::prelude::*;
+use derive_more::Display;
+use failure::{Error, Fail};
+use futures::future::{Either, Future, IntoFuture as _};
 
 use crate::{
-    api::{client::server::Server, control::Member},
+    api::{
+        client::server::Server,
+        control::{load_static_specs_from_dir, RoomId},
+    },
     conf::Conf,
-    media::create_peers,
+    log::prelude::*,
     shutdown::GracefulShutdown,
-    signalling::{Room, RoomsRepository},
-    turn::new_turn_auth_service,
+    signalling::{room::RoomError, room_repo::RoomRepository, Room},
+    turn::{service, TurnServiceErr},
 };
 
-pub fn run() -> io::Result<()> {
-    dotenv().ok();
-    let config = Conf::parse().unwrap();
+/// Errors which can happen while server starting.
+#[derive(Debug, Fail, Display)]
+pub enum ServerStartError {
+    /// Duplicate [`RoomId`] founded.
+    #[display(fmt = "Duplicate of room ID '{:?}'", _0)]
+    DuplicateRoomId(RoomId),
 
-    if let Some(lvl) = config.log.level() {
-        env::set_var("RUST_LOG", lvl.as_str());
+    /// Some error happened while loading Control API spec.
+    #[display(fmt = "Failed to load specs. {}", _0)]
+    LoadSpec(failure::Error),
+
+    /// Some error happened while creating new [`Room`] from Control API spec.
+    #[display(fmt = "Bad room spec. {}", _0)]
+    BadRoomSpec(String),
+
+    /// Unexpected error returned from [`Room`].
+    #[display(fmt = "Unknown room error.")]
+    UnknownRoomError,
+}
+
+impl From<RoomError> for ServerStartError {
+    fn from(err: RoomError) -> Self {
+        match err {
+            RoomError::BadRoomSpec(m) => Self::BadRoomSpec(m),
+            _ => Self::UnknownRoomError,
+        }
     }
+}
+
+pub fn run() -> Result<(), Error> {
+    dotenv::dotenv().ok();
     let logger = log::new_dual_logger(std::io::stdout(), std::io::stderr());
     let _scope_guard = slog_scope::set_global_logger(logger);
-    slog_stdlog::init().unwrap();
+    slog_stdlog::init()?;
 
+    let config = Conf::parse()?;
     info!("{:?}", config);
 
     actix::run(|| {
-        new_turn_auth_service(&config.turn)
-            .map_err(|err| error!("Error creating TurnAuthService {:?}", err))
-            .and_then(|turn_auth_service| {
-                let members = hashmap! {
-                    1 => Member::new(1, "caller_credentials".to_owned()),
-                    2 => Member::new(2, "responder_credentials".to_owned()),
-                };
-
-                let rooms = (0..1000)
-                    .map(|i: u64| {
-                        (
-                            i,
-                            Room::new(
-                                i,
-                                members.clone(),
-                                create_peers(1, 2),
-                                config.rpc.reconnect_timeout,
-                                Arc::clone(&turn_auth_service),
-                            )
-                            .start(),
-                        )
-                    })
-                    .collect();
-
-                Ok((rooms, config))
+        start_static_rooms(&config)
+            .map_err(|e| error!("Turn: {:?}", e))
+            .map(Result::unwrap)
+            .map(move |(res, graceful_shutdown)| {
+                (res, graceful_shutdown, config)
             })
-            .and_then(|(rooms, config): (Vec<(u64, Addr<Room>)>, _)| {
-                let graceful_shutdown =
-                    GracefulShutdown::new(config.shutdown.timeout).start();
+            .map(|(res, graceful_shutdown, config)| {
+                let rooms = res;
+                info!(
+                    "Loaded rooms: {:?}",
+                    rooms.iter().map(|(id, _)| &id.0).collect::<Vec<&String>>()
+                );
+                let room_repo = RoomRepository::new(rooms);
 
-                let futures: Vec<_> = rooms
-                    .iter()
-                    .map(|(_, room)| {
-                        graceful_shutdown
-                            .send(shutdown::Subscribe(shutdown::Subscriber {
-                                addr: room.clone().recipient(),
-                                priority: shutdown::Priority(2),
-                            }))
-                            .map_err(|e| {
-                                error!(
-                                    "Shutdown subscription failed for Room: {}",
-                                    e
-                                )
-                            })
-                    })
-                    .collect();
-
-                futures::future::join_all(futures)
-                    .map(move |_| (rooms, graceful_shutdown, config))
+                (room_repo, graceful_shutdown, config)
             })
-            .map(|(rooms, graceful_shutdown, config)| {
-                let rooms_repo =
-                    RoomsRepository::new(rooms.into_iter().collect());
-                (rooms_repo, graceful_shutdown, config)
-            })
-            .and_then(|(rooms_repo, graceful_shutdown, config)| {
-                Server::run(rooms_repo, config)
-                    .map_err(|e| {
-                        error!("Error starting Client API HTTP server {:?}", e)
-                    })
+            .and_then(|(room_repo, graceful_shutdown, config)| {
+                Server::run(room_repo, config)
+                    .map_err(|e| error!("Error starting server: {:?}", e))
                     .map(|server| {
                         graceful_shutdown
                             .send(shutdown::Subscribe(shutdown::Subscriber {
                                 addr: server.recipient(),
                                 priority: shutdown::Priority(1),
                             }))
-                            .map_err(|e| {
-                                error!(
-                                    "Shutdown subscription failed for Client \
-                                     API HTTP server: {}",
-                                    e
-                                )
-                            })
+                            .map_err(|e| error!("Shutdown sub: {}", e))
                             .map(|_| ())
                     })
                     .into_future()
                     .flatten()
             })
     })
+    .unwrap();
+
+    Ok(())
+}
+
+/// Parses static [`Room`]s from config and starts them in separate arbiters.
+///
+/// Returns [`ServerStartError::DuplicateRoomId`] if find duplicated room ID.
+///
+/// Returns [`ServerStartError::LoadSpec`] if some error happened
+/// while loading spec.
+///
+/// Returns [`ServerStartError::BadRoomSpec`]
+/// if some error happened while creating room from spec.
+// TODO: temporary solution, changed in 32-grpc-dynamic-control-api branch
+pub fn start_static_rooms(
+    conf: &Conf,
+) -> impl Future<
+    Item = Result<
+        (HashMap<RoomId, Addr<Room>>, Addr<GracefulShutdown>),
+        ServerStartError,
+    >,
+    Error = TurnServiceErr,
+> {
+    let graceful_shutdown =
+        GracefulShutdown::new(conf.shutdown.timeout).start();
+    let config = conf.clone();
+    let static_specs_path = config.control.static_specs_dir.clone();
+    if let Ok(static_specs_dir) = std::fs::read_dir(&static_specs_path) {
+        Either::A(service::new_turn_auth_service(&config.turn).map(
+            move |turn_auth_service| {
+                let room_specs =
+                    match load_static_specs_from_dir(static_specs_dir) {
+                        Ok(r) => r,
+                        Err(e) => return Err(ServerStartError::LoadSpec(e)),
+                    };
+                let mut rooms = HashMap::new();
+                let arbiter = Arbiter::new();
+
+                for spec in room_specs {
+                    if rooms.contains_key(spec.id()) {
+                        return Err(ServerStartError::DuplicateRoomId(
+                            spec.id().clone(),
+                        ));
+                    }
+
+                    let room_id = spec.id().clone();
+                    let rpc_reconnect_timeout = config.rpc.reconnect_timeout;
+                    let turn_cloned = Arc::clone(&turn_auth_service);
+                    let room = Room::start_in_arbiter(&arbiter, move |_| {
+                        Room::new(&spec, rpc_reconnect_timeout, turn_cloned)
+                            .unwrap()
+                    });
+                    graceful_shutdown.do_send(shutdown::Subscribe(
+                        shutdown::Subscriber {
+                            addr: room.clone().recipient(),
+                            priority: shutdown::Priority(2),
+                        },
+                    ));
+                    rooms.insert(room_id, room);
+                }
+
+                Ok((rooms, graceful_shutdown))
+            },
+        ))
+    } else {
+        warn!(
+            "'{}' dir not found. Static Control API specs will not be loaded.",
+            static_specs_path
+        );
+        Either::B(futures::future::ok(Ok((HashMap::new(), graceful_shutdown))))
+    }
 }

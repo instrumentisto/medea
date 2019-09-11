@@ -10,7 +10,9 @@ mod repo;
 use std::{collections::HashMap, rc::Rc};
 
 use futures::{future, sync::mpsc::UnboundedSender, Future};
-use medea_client_api_proto::{Direction, IceServer, Track};
+use medea_client_api_proto::{
+    Direction, IceServer, PeerId as Id, Track, TrackId,
+};
 use medea_macro::dispatchable;
 use web_sys::RtcTrackEvent;
 
@@ -32,10 +34,7 @@ pub use self::repo::MockPeerRepository;
 #[doc(inline)]
 pub use self::{
     repo::{PeerRepository, Repository},
-    Id as PeerId,
 };
-
-pub type Id = u64;
 
 #[dispatchable]
 #[allow(clippy::module_name_repetitions)]
@@ -52,7 +51,7 @@ pub enum PeerEvent {
     /// [`RtcPeerConnection`] received new stream from remote sender.
     NewRemoteStream {
         peer_id: Id,
-        sender_id: u64,
+        sender_id: Id,
         remote_stream: MediaStream,
     },
 }
@@ -200,7 +199,7 @@ impl PeerConnection {
     ///
     /// [1]: https://tools.ietf.org/html/rfc4566#section-5.14
     /// [2]: https://www.w3.org/TR/webrtc/#rtcrtptransceiver-interface
-    pub fn get_mids(&self) -> Result<HashMap<u64, String>, WasmErr> {
+    pub fn get_mids(&self) -> Result<HashMap<TrackId, String>, WasmErr> {
         self.0.media_connections.get_mids()
     }
 

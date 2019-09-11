@@ -1,11 +1,13 @@
 use std::{collections::HashMap, rc::Rc};
 
 use futures::sync::mpsc::UnboundedSender;
+use medea_client_api_proto::{IceServer, PeerId};
 
-use super::{PeerConnection, PeerId};
-use crate::{media::MediaManager, peer::PeerEvent, utils::WasmErr};
-use medea_client_api_proto::IceServer;
+use crate::{media::MediaManager, utils::WasmErr};
 
+use super::{PeerConnection, PeerEvent};
+
+/// [`PeerConnection`] factory and repository.
 #[allow(clippy::module_name_repetitions)]
 #[cfg_attr(feature = "mockable", mockall::automock)]
 pub trait PeerRepository {

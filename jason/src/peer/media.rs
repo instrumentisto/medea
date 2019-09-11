@@ -3,14 +3,14 @@
 use std::{borrow::ToOwned, cell::RefCell, collections::HashMap, rc::Rc};
 
 use futures::{future, Future};
-use medea_client_api_proto::{Direction, MediaType, Track};
+use medea_client_api_proto::{Direction, MediaType, PeerId, Track, TrackId};
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
     MediaStreamTrack, RtcRtpTransceiver, RtcRtpTransceiverDirection,
 };
 
 use crate::{
-    media::{MediaStream, MediaTrack, StreamRequest, TrackId},
+    media::{MediaStream, MediaTrack, StreamRequest},
     utils::WasmErr,
 };
 
@@ -87,7 +87,7 @@ impl MediaConnections {
 
     /// Returns mapping from a [`MediaTrack`] ID to a `mid` of
     /// this track's [`RtcRtpTransceiver`].
-    pub fn get_mids(&self) -> Result<HashMap<u64, String>, WasmErr> {
+    pub fn get_mids(&self) -> Result<HashMap<TrackId, String>, WasmErr> {
         let mut s = self.0.borrow_mut();
         let mut mids =
             HashMap::with_capacity(s.senders.len() + s.receivers.len());
@@ -201,7 +201,7 @@ impl MediaConnections {
         &self,
         transceiver: RtcRtpTransceiver,
         track: MediaStreamTrack,
-    ) -> Option<u64> {
+    ) -> Option<PeerId> {
         let mut s = self.0.borrow_mut();
         if let Some(mid) = transceiver.mid() {
             for receiver in &mut s.receivers.values_mut() {
@@ -226,7 +226,7 @@ impl MediaConnections {
     /// but only if all receiving [`MediaTrack`]s are present already.
     pub fn get_tracks_by_sender(
         &self,
-        sender_id: u64,
+        sender_id: PeerId,
     ) -> Option<Vec<Rc<MediaTrack>>> {
         let s = self.0.borrow();
         let mut tracks: Vec<Rc<MediaTrack>> = Vec::new();
@@ -351,7 +351,7 @@ impl Sender {
 pub struct Receiver {
     track_id: TrackId,
     caps: MediaType,
-    sender_id: u64,
+    sender_id: PeerId,
     transceiver: Option<RtcRtpTransceiver>,
     mid: Option<String>,
     track: Option<Rc<MediaTrack>>,
@@ -369,7 +369,7 @@ impl Receiver {
     fn new(
         track_id: TrackId,
         caps: MediaType,
-        sender_id: u64,
+        sender_id: PeerId,
         peer: &RtcPeerConnection,
         mid: Option<String>,
     ) -> Self {
