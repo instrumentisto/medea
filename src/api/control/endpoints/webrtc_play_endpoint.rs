@@ -1,4 +1,6 @@
-//! `WebRtcPlayEndpoint` element implementation.
+//! `WebRtcPlayEndpoint` [Control API]'s element implementation.
+//!
+//! [Control API]: http://tiny.cc/380uaz
 
 use std::{convert::TryFrom, fmt};
 
@@ -56,14 +58,17 @@ pub enum SrcParseError {
 /// Special uri with pattern `local://{room_id}/{member_id}/{endpoint_id}`.
 /// This uri can pointing only to [`WebRtcPublishEndpoint`].
 ///
-/// Note that [`SrcUri`] parsing with [`LocalUri`] parser.
+/// Note that [`SrcUri`] is parsing with [`LocalUri`] parser.
 /// Actually difference between [`SrcUri`] and [`LocalUri`]
 /// in endpoint ID's type. In [`SrcUri`] it [`WebRtcPublishId`], and in
 /// [`LocalUri`] it [`String`]. Also [`SrcUri`] can be deserialized with
 /// [`serde`].
 ///
+/// Atm used only in [Control API] specs.
+///
 /// [`WebRtcPublishEndpoint`]:
 /// crate::api::control::endpoints::WebRtcPublishEndpoint
+/// [Control API]: http://tiny.cc/380uaz
 #[derive(Clone, Debug)]
 pub struct SrcUri {
     /// ID of [`Room`].
@@ -76,9 +81,7 @@ pub struct SrcUri {
     /// [`MemberSpec`]: crate::api::control::member::MemberSpec
     pub member_id: MemberId,
 
-    /// Control ID of [`Endpoint`].
-    ///
-    /// [`Endpoint`]: crate::api::control::endpoints::Endpoint
+    /// ID of [`WebRtcPublishEndpoint`].
     pub endpoint_id: WebRtcPublishId,
 }
 
@@ -113,7 +116,8 @@ impl From<LocalUri<IsEndpointId>> for SrcUri {
 }
 
 /// [Serde] deserializer for [`SrcUri`].
-/// Deserialize URIs with pattern `local://{room_id}/{member_id}/{endpoint_id}`.
+/// Deserializes URIs with pattern:
+/// `local://room_id/member_id/publish_endpoint_id`.
 ///
 /// [Serde]: serde
 impl<'de> Deserialize<'de> for SrcUri {

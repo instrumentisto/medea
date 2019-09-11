@@ -1,4 +1,6 @@
-//! `WebRtcPublishEndpoint` implementation.
+//! `WebRtcPublishEndpoint` [Control API]'s element implementation.
+//!
+//! [Control API]: http://tiny.cc/380uaz
 
 use derive_more::{Display, From};
 use serde::Deserialize;

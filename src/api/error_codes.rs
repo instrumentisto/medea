@@ -37,7 +37,7 @@ pub struct ErrorResponse {
 
     /// All [`ErrorCode`]s have [`Display`] implementation. And this
     /// implementation will be used if this field is [`None`]. But
-    /// some times we want to add some error explanation. Then we set this
+    /// sometimes we want to add some error explanation. Then we set this
     /// field to [`Some`] and this text will be added to
     /// [`Display`] implementation's text.
     ///
@@ -50,7 +50,7 @@ pub struct ErrorResponse {
 }
 
 impl ErrorResponse {
-    /// New normal [`ErrorResponse`] with [`ErrorCode`] and element ID.
+    /// New [`ErrorResponse`] with [`ErrorCode`] and element ID.
     pub fn new<T: ToString>(error_code: ErrorCode, element_id: &T) -> Self {
         Self {
             error_code,
@@ -72,7 +72,7 @@ impl ErrorResponse {
     ///
     /// Provide unexpected `Error` to this function.
     /// This error will be printed with [`Display`] implementation
-    /// of provided `Error`.
+    /// of provided `Error` as error explanation.
     pub fn unexpected<B: ToString>(unknown_error: &B) -> Self {
         Self {
             error_code: ErrorCode::UnexpectedError,
@@ -121,8 +121,11 @@ impl Into<ErrorProto> for ErrorResponse {
     }
 }
 
-/// Medea control API errors.
-#[derive(Display)]
+/// [Medea]'s [Control API] errors.
+///
+/// [Medea]: https://github.com/instrumentisto/medea
+/// [Control API]: http://tiny.cc/380uaz
+#[derive(Debug, Display)]
 pub enum ErrorCode {
     /// Unexpected server error.
     ///

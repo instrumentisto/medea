@@ -83,7 +83,7 @@ pub struct Member(Rc<RefCell<MemberInner>>);
 #[allow(clippy::module_name_repetitions)]
 #[derive(Debug)]
 struct MemberInner {
-    /// [`RoomId`] of [`Room`] to which this member relates.
+    /// [`RoomId`] of [`Room`] to which this [`Member`] relates.
     room_id: RoomId,
 
     /// ID of this [`Member`].
@@ -118,7 +118,7 @@ impl Member {
         })))
     }
 
-    /// Lookup [`MemberSpec`] by [`MemberId`] from [`MemberSpec`].
+    /// Lookups [`MemberSpec`] by [`MemberId`] from [`MemberSpec`].
     ///
     /// Returns [`MembersLoadError::MemberNotFound`] when member not found.
     /// Returns [`MembersLoadError::TryFromError`] when found element which is
@@ -431,6 +431,8 @@ impl Member {
         member.insert_sink(sink);
     }
 
+    /// Lookups [`WebRtcPublishEndpoint`] and [`WebRtcPlayEndpoint`] at one
+    /// moment by ID.
     pub fn get_endpoint_by_id(
         &self,
         id: String,

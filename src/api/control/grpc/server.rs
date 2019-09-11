@@ -1,6 +1,8 @@
-//! Implementation of gRPC control API.
+//! Implementation of [Control API] gRPC server.
+//!
+//! [Control API]: http://tiny.cc/380uaz
 
-// Fix clippy needless_return in macro.
+// Fix clippy's needless_return bug in try_fut! macro.
 #![allow(clippy::needless_return)]
 
 use std::{collections::HashMap, convert::TryFrom, sync::Arc};
@@ -59,7 +61,9 @@ pub enum GrpcControlApiError {
     /// [medea]: https://github.com/instrumentisto/medea
     TryFromProtobuf(TryFromProtobufError),
 
-    /// Some error in provided [Control API] spec.
+    /// This is __unexpected error__ because this kind of errors
+    /// should be catched by `try_from_protobuf` function which returns
+    /// [`TryFromProtobufError`].
     ///
     /// [Control API]: http://tiny.cc/380uaz
     TryFromElement(TryFromElementError),
@@ -105,8 +109,8 @@ impl From<TryFromElementError> for GrpcControlApiError {
     }
 }
 
-/// Try to unwrap some [`Result`] and if it `Err` then return err future with
-/// [`ControlApiError`].
+/// Tries to unwrap some [`Result`] and if it `Err` then returns err [`Future`]
+/// with [`ControlApiError`].
 ///
 /// __Note:__ this macro returns [`Either::B`].
 macro_rules! fut_try {
@@ -122,7 +126,8 @@ macro_rules! fut_try {
     };
 }
 
-/// Macro for parse [`LocalUri`] and send error to client if some error occurs.
+/// Macro for [`LocalUri`] parsing and sending error to client if some error
+/// occurs.
 ///
 /// See `send_error_response` doc for details about arguments for this macro.
 macro_rules! parse_local_uri {
@@ -145,9 +150,9 @@ macro_rules! parse_local_uri {
 /// `$response` - type of response ([`GetResponse`], [`Response`]
 /// etc).
 ///
-/// `$ctx` - context where `Future` for send gRPC response will be spawned.
+/// `$ctx` - context where [`Future`] for send gRPC response will be spawned.
 ///
-/// `$sink` - `grpcio` sink for response.
+/// `$sink` - [`grpcio`]'s sink for response.
 macro_rules! send_error_response {
     ($ctx:tt, $sink:tt, $error_code:expr, $response:ty) => {
         let mut response = <$response>::new();
@@ -165,6 +170,7 @@ macro_rules! send_error_response {
 /// Type alias for success [`CreateResponse`]'s sids.
 type Sids = HashMap<String, String>;
 
+/// Service which provides gRPC [Control API] implementation.
 #[derive(Clone)]
 struct ControlApiService {
     /// [`Addr`] of [`RoomService`].
@@ -331,7 +337,11 @@ impl ControlApi for ControlApiService {
         }));
     }
 
-    /// Implementation for `Apply` method of gRPC [Control API].
+    /// Implementation for `Apply` method of gRPC [Control API] (__unimplemented
+    /// atm__).
+    ///
+    /// Currently this is stub which returns fail response with
+    /// [`RpcStatusCode::Unimplemented`].
     ///
     /// [Control API]: http://tiny.cc/380uaz
     fn apply(

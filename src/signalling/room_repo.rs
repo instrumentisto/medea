@@ -41,7 +41,7 @@ impl RoomRepository {
         self.rooms.lock().unwrap().insert(id, room);
     }
 
-    /// Check existence of [`Room`] in [`RoomRepository`] by provided
+    /// Checks existence of [`Room`] in [`RoomRepository`] by provided
     /// [`RoomId`].
     pub fn is_contains_room_with_id(&self, id: &RoomId) -> bool {
         self.rooms.lock().unwrap().contains_key(id)

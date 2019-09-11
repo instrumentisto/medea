@@ -322,11 +322,11 @@ endif
 #	              [up=yes [dockerized=no [debug=(yes|no)]]
 #	                      [dockerized=yes [TAG=(dev|<docker-tag>)]
 #	                                      [registry=<registry-host>]
-#	                                      [log=(no|yes)]]
+#	                                      [logs=(no|yes)]]
 #	                      [wait=(5|<seconds>)]]
 
 test-e2e-env = RUST_BACKTRACE=1 \
-	$(if $(call eq,$(log),yes),,RUST_LOG=warn) \
+	$(if $(call eq,$(logs),yes),,RUST_LOG=warn) \
 	MEDEA_CONTROL.STATIC_SPECS_DIR=tests/specs/ \
 	MEDEA_CONTROL_STATIC_SPECS_DIR=tests/specs/
 
@@ -334,7 +334,7 @@ test.e2e:
 ifeq ($(up),yes)
 	make docker.up.coturn background=yes
 	env $(test-e2e-env) \
-	make docker.up.medea debug=$(debug) background=yes log=$(log) \
+	make docker.up.medea debug=$(debug) background=yes logs=$(logs) \
 	                     dockerized=$(dockerized) \
 	                     TAG=$(TAG) registry=$(registry)
 	sleep $(if $(call eq,$(wait),),5,$(wait))
@@ -430,7 +430,7 @@ docker.build.demo:
 #   make docker.build.medea-build
 
 docker.build.medea-build:
-	docker build -t medea-build -f _build/medea/Dockerfile .
+	docker build -t medea-build -f _build/medea-build/Dockerfile .
 
 
 # Build medea project Docker image.
@@ -792,6 +792,7 @@ endef
 .PHONY: build build.jason build.medea \
         cargo cargo.build cargo.fmt cargo.lint \
         docker.auth docker.build.demo docker.build.medea \
+        	docker.build.medea-build \
         	docker.down.coturn docker.down.demo docker.down.medea \
         	docker.pull docker.push \
         	docker.up.coturn docker.up.demo docker.up.medea \

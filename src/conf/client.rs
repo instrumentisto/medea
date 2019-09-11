@@ -1,4 +1,4 @@
-//! [Client API] HTTP server settings.
+//! [Client API]'s HTTP server settings.
 //!
 //! [Client API]: http://tiny.cc/c80uaz
 
@@ -7,7 +7,7 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr, ToSocketAddrs as _};
 use serde::{Deserialize, Serialize};
 use smart_default::SmartDefault;
 
-/// [Client API] HTTP server settings.
+/// [Client API]'s HTTP server settings.
 ///
 /// [Client API]: http://tiny.cc/c80uaz
 #[derive(Clone, Debug, Deserialize, Serialize, SmartDefault)]

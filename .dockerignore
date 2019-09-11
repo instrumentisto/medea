@@ -22,3 +22,4 @@
 !_ci
 
 # !target/{mode} is added and removed dynamically to reduce image build times.
+!target/debug/

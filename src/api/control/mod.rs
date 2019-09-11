@@ -32,17 +32,17 @@ pub use self::{
 /// Errors which may occur while deserialize protobuf spec.
 #[derive(Debug, Fail, Display)]
 pub enum TryFromProtobufError {
-    /// Error while parsing src uri of [`WebRtcPlayEndpoint`].
+    /// Error while parsing [`SrcUri`] of [`WebRtcPlayEndpoint`].
     ///
     /// [`WebRtcPlayEndpoint`]:
     /// crate::api::control::endpoints::WebRtcPlayEndpoint
     #[display(fmt = "Src uri parse error: {:?}", _0)]
     SrcUriError(SrcParseError),
 
-    /// Room element doesn't have Member element. Currently this is
+    /// `Room` element doesn't have `Member` element. Currently this is
     /// unimplemented.
     #[display(
-        fmt = "Room element [id = {}]doesn't have Member element. Currently \
+        fmt = "Room element [id = {}] doesn't have Member element. Currently \
                this is unimplemented.",
         _0
     )]
@@ -61,7 +61,7 @@ impl From<SrcParseError> for TryFromProtobufError {
 #[derive(Clone, Deserialize, Debug)]
 #[serde(tag = "kind")]
 pub enum RootElement {
-    /// Represent [`RoomSpec`].
+    /// Represents [`RoomSpec`].
     /// Can transform into [`RoomSpec`] by `RoomSpec::try_from`.
     Room {
         id: RoomId,
@@ -89,8 +89,9 @@ pub enum TryFromElementError {
 #[allow(clippy::pub_enum_variant_names)]
 #[derive(Debug, Fail, Display)]
 pub enum LoadStaticControlSpecsError {
-    /// Error while reading default or provided in config static [Control API]
-    /// specs dir.
+    /// Error while reading default or provided in config
+    /// (`MEDEA_CONTROL.STATIC_SPECS_DIR` environment variable) static [Control
+    /// API] specs dir.
     ///
     /// Atm we only should print `warn!` message to log which prints that
     /// static specs not loaded.
@@ -139,7 +140,7 @@ impl From<serde_yaml::Error> for LoadStaticControlSpecsError {
     }
 }
 
-/// Load [`RoomSpec`] from file with YAML format.
+/// Loads [`RoomSpec`] from file with YAML format.
 pub fn load_from_yaml_file<P: AsRef<Path>>(
     path: P,
 ) -> Result<RoomSpec, LoadStaticControlSpecsError> {
@@ -151,7 +152,7 @@ pub fn load_from_yaml_file<P: AsRef<Path>>(
     Ok(room)
 }
 
-/// Load all [`RoomSpec`] from YAML files from provided path.
+/// Loads all [`RoomSpec`] from YAML files from provided path.
 pub fn load_static_specs_from_dir<P: AsRef<Path>>(
     path: P,
 ) -> Result<Vec<RoomSpec>, LoadStaticControlSpecsError> {

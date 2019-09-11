@@ -1,9 +1,9 @@
 //! This is temporary binary for testing gRPC Control API implementation
 //! purposes.
 //!
-//! In `control-api-mock-server` this will be deleted. After
-//! `control-api-mock-server` you will be able to test it with Control API mock
-//! server by calling REST API endpoints.
+//! In `control-api-mock-server` branch this will be deleted. After
+//! `control-api-mock-server` branch you will be able to test it with Control
+//! API mock server by calling REST API endpoints.
 
 #![allow(dead_code)]
 

@@ -1,4 +1,6 @@
-//! Endpoint elements of medea spec.
+//! Endpoint elements of [medea] spec.
+//!
+//! [medea]: https://github.com/instrumentisto/medea
 
 pub mod webrtc_play_endpoint;
 pub mod webrtc_publish_endpoint;
@@ -16,8 +18,7 @@ pub use webrtc_play_endpoint::WebRtcPlayEndpoint;
 #[doc(inline)]
 pub use webrtc_publish_endpoint::WebRtcPublishEndpoint;
 
-/// [`Endpoint`] represents a media element that one or more media data streams
-/// flow through.
+/// Media element that one or more media data streams flow through.
 #[derive(Debug)]
 pub enum Endpoint {
     /// [`WebRtcPublishEndpoint`] element.

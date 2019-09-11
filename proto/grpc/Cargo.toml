@@ -8,7 +8,7 @@ license = "MIT/Apache-2.0"
 homepage = "https://github.com/instrumentisto/medea/tree/master/proto/grpc"
 repository = "https://github.com/instrumentisto/medea/tree/master/proto/grpc"
 readme = "README.md"
-keywords = ["medea", "grpc", "control-api"]
+keywords = ["medea", "grpc", "control", "api"]
 categories = ["api-bindings", "web-programming"]
 
 [dependencies]

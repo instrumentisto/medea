@@ -37,9 +37,9 @@ pub enum RoomElement {
     },
 }
 
-/// [Control API]'s `Room` element specification
+/// [Control API]'s `Room` element specification.
 ///
-/// Newtype for [`RootElement::Room`]
+/// Newtype for [`RootElement::Room`].
 ///
 /// [Control API]: http://tiny.cc/380uaz
 #[allow(clippy::module_name_repetitions)]
@@ -50,7 +50,7 @@ pub struct RoomSpec {
 }
 
 impl RoomSpec {
-    /// Deserialize [`RoomSpec`] from protobuf object.
+    /// Deserializes [`RoomSpec`] from protobuf object.
     pub fn try_from_protobuf(
         id: Id,
         proto: &RoomProto,

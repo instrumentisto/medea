@@ -36,7 +36,7 @@ static APP_CONF_PATH_ENV_VAR_NAME: &str = "MEDEA_CONF";
 #[derive(Clone, Debug, Deserialize, Serialize, Default)]
 #[serde(default)]
 pub struct Conf {
-    /// HTTP server settings.
+    /// RPC connection settings.
     pub rpc: Rpc,
 
     /// [Client API] connection settings.

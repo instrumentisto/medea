@@ -109,7 +109,7 @@ impl MemberSpec {
     }
 }
 
-/// Generates [`Member`] alphanumeric credentials with
+/// Generates alphanumeric credentials for [`Member`] with
 /// [`MEMBER_CREDENTIALS_LEN`] length.
 ///
 /// This credentials will be generated if in dynamic [Control API] spec not
@@ -125,7 +125,10 @@ fn generate_member_credentials() -> String {
 impl TryFrom<&MemberProto> for MemberSpec {
     type Error = TryFromProtobufError;
 
-    /// Serialize [`MemberSpec`] from protobuf object.
+    /// Deserializes [`MemberSpec`] from protobuf object.
+    ///
+    /// Additionally generates [`Member`] credentials if
+    /// they not provided in protobuf object.
     fn try_from(value: &MemberProto) -> Result<Self, Self::Error> {
         let mut pipeline = HashMap::new();
         for (id, member_element) in value.get_pipeline() {

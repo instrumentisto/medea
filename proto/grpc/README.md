@@ -6,7 +6,7 @@ Medea Control API gRPC specs
 
 [Changelog](https://github.com/instrumentisto/medea/blob/master/proto/grpc/CHANGELOG.md)
 
-Compiled gRPC specs for [Medea] media server control API.
+Compiled gRPC specs for [Medea] media server [Control API].
 
 __Currently, in early development phase.__
 
@@ -42,3 +42,4 @@ Unless you explicitly state otherwise, any contribution intentionally submitted 
 
 
 [Medea]: https://github.com/instrumentisto/medea
+[Control API]: https://github.com/instrumentisto/medea/blob/master/docs/rfc/0001-control-api.md

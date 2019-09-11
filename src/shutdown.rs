@@ -223,7 +223,7 @@ impl Handler<Unsubscribe> for GracefulShutdown {
     }
 }
 
-/// Subscribe recipient to [`GracefulShutdown`].
+/// Subscribes recipient to [`GracefulShutdown`].
 pub fn subscribe(
     shutdown_addr: &Addr<GracefulShutdown>,
     subscriber: Recipient<ShutdownGracefully>,
@@ -235,7 +235,7 @@ pub fn subscribe(
     }));
 }
 
-/// Unsubscribe recipient from [`GracefulShutdown`].
+/// Unsubscribes recipient from [`GracefulShutdown`].
 pub fn unsubscribe(
     shutdown_addr: &Addr<GracefulShutdown>,
     subscriber: Recipient<ShutdownGracefully>,

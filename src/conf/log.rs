@@ -4,6 +4,7 @@ use std::str::FromStr as _;
 
 use serde::{Deserialize, Serialize};
 use smart_default::SmartDefault;
+use std::borrow::Cow;
 
 /// Logging settings.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, SmartDefault)]
@@ -11,8 +12,8 @@ use smart_default::SmartDefault;
 pub struct Log {
     /// Maximum allowed level of application log entries.
     /// Defaults to `INFO`.
-    #[default(String::from("INFO"))]
-    pub level: String,
+    #[default("INFO")]
+    pub level: Cow<'static, str>,
 }
 
 impl Log {

@@ -5,7 +5,7 @@
 use serde::{Deserialize, Serialize};
 use smart_default::SmartDefault;
 
-use crate::conf::Grpc;
+use super::Grpc;
 
 /// [Control API] settings.
 ///

@@ -175,7 +175,7 @@ impl PeerRepository {
     /// Deletes [`PeerStateMachine`]s from this [`PeerRepository`] and send
     /// [`Event::PeersRemoved`] to [`Member`]s.
     ///
-    /// __Note:__ this also delete partner peers.
+    /// __Note:__ this also deletes partner peers.
     ///
     /// [`Event::PeersRemoved`]: medea_client_api_proto::Event::PeersRemoved
     pub fn remove_peers(
@@ -248,7 +248,7 @@ impl PeerRepository {
     /// Deletes [`PeerStateMachine`] from this [`PeerRepository`] and send
     /// [`Event::PeersRemoved`] to [`Member`]s.
     ///
-    /// __Note:__ this also delete partner peer.
+    /// __Note:__ this also deletes partner peer.
     ///
     /// [`Event::PeersRemoved`]: medea_client_api_proto::Event::PeersRemoved
     pub fn remove_peer(

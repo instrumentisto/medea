@@ -113,7 +113,7 @@ pub struct RoomService {
 }
 
 impl RoomService {
-    /// Create new [`RoomService`].
+    /// Creates new [`RoomService`].
     pub fn new(
         room_repo: RoomRepository,
         app: AppContext,
@@ -203,9 +203,7 @@ impl Handler<StartStaticRooms> for RoomService {
     }
 }
 
-/// Implementation of [Control API]'s `Create` method.
-///
-/// [Control API]: http://tiny.cc/380uaz
+/// Signal for creating new `Room`.
 #[derive(Message)]
 #[rtype(result = "Result<(), RoomServiceError>")]
 pub struct CreateRoom {
@@ -219,7 +217,7 @@ impl Handler<CreateRoom> for RoomService {
     fn handle(
         &mut self,
         msg: CreateRoom,
-        _ctx: &mut Self::Context,
+        _: &mut Self::Context,
     ) -> Self::Result {
         let room_id = msg.uri.take_room_id();
 
@@ -254,6 +252,8 @@ pub struct Validated;
 /// [`Unvalidated`] state before sending to [`RoomService`].
 pub struct Unvalidated;
 
+// Clippy lint show use_self errors for DeleteElements with generic state. This
+// is fix for it.
 #[allow(clippy::use_self)]
 impl DeleteElements<Unvalidated> {
     pub fn new() -> DeleteElements<Unvalidated> {
@@ -374,9 +374,8 @@ impl Handler<DeleteElements<Validated>> for RoomService {
     }
 }
 
-/// Implementation of [Control API]'s `Get` method.
-///
-/// [Control API]: http://tiny.cc/380uaz
+/// Message which returns serialized to protobuf objects by provided
+/// [`LocalUri`].
 #[derive(Message)]
 #[rtype(result = "Result<HashMap<StatefulLocalUri, ElementProto>, \
                   RoomServiceError>")]

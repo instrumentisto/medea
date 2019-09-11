@@ -1,4 +1,7 @@
-//! gRPC generated specs.
+//! Generated [medea]'s [Control API] specs.
+//!
+//! [medea]: https://github.com/instrumentisto/medea
+//! [Control API]: http://tiny.cc/380uaz
 
 #![allow(bare_trait_objects)]
 #![allow(clippy::pedantic)]

@@ -16,6 +16,7 @@ All user visible changes to this project will be documented in this file. This p
 - Methods ([#33](/../../pull/33)):
     - `Create`,
     - `Get`,
+    - `Apply`,
     - `Delete`.
 - Elements ([#33](/../../pull/33)):
     - `Room`,

@@ -166,6 +166,11 @@ impl Room {
         self.id.clone()
     }
 
+    /// Returns reference to [`RoomId`] of this [`Room`].
+    pub fn id(&self) -> &RoomId {
+        &self.id
+    }
+
     /// Sends [`Event::PeerCreated`] to one of specified [`Peer`]s based on
     /// which of them has any outbound tracks. That [`Peer`] state will be
     /// changed to [`WaitLocalSdp`] state. Both provided peers must be in
@@ -557,7 +562,7 @@ impl Room {
         ))
     }
 
-    /// Remove [`Peer`]s and call [`Room::member_peers_removed`] for every
+    /// Removes [`Peer`]s and call [`Room::member_peers_removed`] for every
     /// [`Member`].
     ///
     /// This will delete [`Peer`]s from [`PeerRepository`] and send
@@ -568,32 +573,32 @@ impl Room {
         peer_ids_to_remove: HashSet<PeerId>,
         ctx: &mut Context<Self>,
     ) {
-        let removed_peers =
-            self.peers.remove_peers(&member_id, peer_ids_to_remove);
-        for (member_id, peers_id) in removed_peers {
-            self.member_peers_removed(peers_id, member_id, ctx);
-        }
+        self.peers
+            .remove_peers(&member_id, peer_ids_to_remove)
+            .into_iter()
+            .for_each(|(member_id, peers_id)| {
+                self.member_peers_removed(peers_id, member_id, ctx);
+            });
     }
 
-    /// Signal for delete [`Member`] from this [`Room`]
+    /// Deletes [`Member`] from this [`Room`] by [`MemberId`].
     fn delete_member(&mut self, member_id: &MemberId, ctx: &mut Context<Self>) {
         debug!(
             "Delete Member [id = {}] in room [id = {}].",
             member_id, self.id
         );
         if let Some(member) = self.members.get_member_by_id(member_id) {
-            let mut peers = HashSet::new();
-            for (_, sink) in member.sinks() {
-                if let Some(peer_id) = sink.peer_id() {
-                    peers.insert(peer_id);
-                }
-            }
-
-            for (_, src) in member.srcs() {
-                for peer_id in src.peer_ids() {
-                    peers.insert(peer_id);
-                }
-            }
+            let peers: HashSet<PeerId> = member
+                .sinks()
+                .values()
+                .filter_map(WebRtcPlayEndpoint::peer_id)
+                .chain(
+                    member
+                        .srcs()
+                        .values()
+                        .flat_map(WebRtcPublishEndpoint::peer_ids),
+                )
+                .collect();
 
             self.remove_peers(&member.id(), peers, ctx);
         }
@@ -601,12 +606,12 @@ impl Room {
         self.members.delete_member(member_id, ctx);
 
         debug!(
-            "Member [id = {}] removed from Room [id = {}].",
+            "Member [id = {}] deleted from Room [id = {}].",
             member_id, self.id
         );
     }
 
-    /// Signal for delete endpoint from this [`Room`]
+    /// Deletes endpoint from this [`Room`] by ID.
     fn delete_endpoint(
         &mut self,
         member_id: &MemberId,
@@ -657,21 +662,24 @@ impl Into<ElementProto> for &mut Room {
         let mut element = ElementProto::new();
         let mut room = RoomProto::new();
 
-        let mut pipeline = HashMap::new();
-        for (id, member) in self.members.members() {
-            let local_uri = LocalUri::<IsMemberId>::new(self.get_id(), id);
+        let pipeline = self
+            .members
+            .members()
+            .into_iter()
+            .map(|(id, member)| {
+                let local_uri = LocalUri::<IsMemberId>::new(self.get_id(), id);
+                (local_uri.to_string(), member.into())
+            })
+            .collect();
 
-            pipeline.insert(local_uri.to_string(), member.into());
-        }
         room.set_pipeline(pipeline);
-
         element.set_room(room);
 
         element
     }
 }
 
-/// Message for serializing this [`Room`] and [`Room`] elements to protobuf
+/// Message for serializing this [`Room`] and [`Room`]'s elements to protobuf
 /// spec.
 #[derive(Message)]
 #[rtype(result = "Result<HashMap<StatefulLocalUri, ElementProto>, RoomError>")]
@@ -882,13 +890,13 @@ impl Handler<Close> for Room {
             if self.members.member_has_connection(&id) {
                 let peer_ids_to_remove: HashSet<PeerId> = member
                     .sinks()
-                    .into_iter()
-                    .filter_map(|(_, sink)| sink.peer_id())
+                    .values()
+                    .filter_map(WebRtcPlayEndpoint::peer_id)
                     .chain(
                         member
                             .srcs()
-                            .into_iter()
-                            .flat_map(|(_, src)| src.peer_ids().into_iter()),
+                            .values()
+                            .flat_map(|src| src.peer_ids().into_iter()),
                     )
                     .collect();
 
@@ -939,7 +947,7 @@ impl Handler<Delete> for Room {
     }
 }
 
-/// Create new [`Member`] in this [`Room`].
+/// Signal for create new [`Member`] in this [`Room`].
 #[derive(Message, Debug)]
 #[rtype(result = "Result<(), RoomError>")]
 pub struct CreateMember(pub MemberId, pub MemberSpec);
@@ -950,15 +958,18 @@ impl Handler<CreateMember> for Room {
     fn handle(
         &mut self,
         msg: CreateMember,
-        _ctx: &mut Self::Context,
+        _: &mut Self::Context,
     ) -> Self::Result {
         self.members.create_member(msg.0.clone(), &msg.1)?;
-        debug!("Create Member [id = {}] in Room [id = {}].", msg.0, self.id);
+        debug!(
+            "Member [id = {}] created in Room [id = {}].",
+            msg.0, self.id
+        );
         Ok(())
     }
 }
 
-/// Create new `Endpoint` from [`EndpointSpec`].
+/// Signal for create new `Endpoint` from [`EndpointSpec`].
 #[derive(Message, Debug)]
 #[rtype(result = "Result<(), RoomError>")]
 pub struct CreateEndpoint {
@@ -976,18 +987,18 @@ impl Handler<CreateEndpoint> for Room {
         _ctx: &mut Self::Context,
     ) -> Self::Result {
         match msg.spec {
-            EndpointSpec::WebRtcPlay(e) => {
+            EndpointSpec::WebRtcPlay(endpoint) => {
                 self.members.create_sink_endpoint(
                     &msg.member_id,
                     &WebRtcPlayId(msg.endpoint_id),
-                    e,
+                    endpoint,
                 )?;
             }
-            EndpointSpec::WebRtcPublish(e) => {
+            EndpointSpec::WebRtcPublish(endpoint) => {
                 self.members.create_src_endpoint(
                     &msg.member_id,
                     &WebRtcPublishId(msg.endpoint_id),
-                    e,
+                    endpoint,
                 )?;
             }
         }

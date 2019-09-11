@@ -24,7 +24,7 @@ use crate::{
 
 use super::play_endpoint::WebRtcPlayEndpoint;
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 struct WebRtcPublishEndpointInner {
     /// ID of this [`WebRtcPublishEndpoint`].
     id: Id,
