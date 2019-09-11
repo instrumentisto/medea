@@ -34,10 +34,8 @@ jobs:
       cache: false
       env: DONT_INSTALL_PROTOC=1
       before_script:
-        - export RUSTFMT_RUST_VER=`curl https://rust-lang.github.io/rustup-components-history/x86_64-unknown-linux-gnu/rustfmt`
-        - rustup toolchain install nightly-${RUSTFMT_RUST_VER}
-        - rustup component add rustfmt --toolchain nightly-${RUSTFMT_RUST_VER}-x86_64-unknown-linux-gnu
-      script: make fmt check=yes rustfmt-rust-ver=nightly-${RUSTFMT_RUST_VER}
+        - bash _ci/rustfmt_install.sh
+      script: make fmt check=yes rustfmt-rust-ver="${RUSTFMT_RUST_VER}"
 
     - name: medea-jason (stable)
       stage: build
@@ -77,7 +75,6 @@ jobs:
     - name: e2e signalling (stable)
       stage: test
       rust: stable
-      env: DONT_INSTALL_PROTOC=1
       services:
         - docker
       script:
