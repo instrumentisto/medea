@@ -3,6 +3,7 @@ cache: cargo
 
 install:
   - bash _ci/protoc_install.sh
+  - export RUSTFMT_NIGHTLY_AVAILABLE_VERSION=`curl https://rust-lang.github.io/rustup-components-history/x86_64-unknown-linux-gnu/rustfmt`
   - rustc -vV
   - cargo -vV
 
@@ -31,7 +32,7 @@ jobs:
 # TODO: write script for check last nightly version with available component
     - name: rustfmt
       stage: check
-      rust: nightly-2019-09-05
+      rust: nightly-${RUSTFMT_NIGHTLY_AVAILABLE_VERSION}
       cache: false
       env: DONT_INSTALL_PROTOC=1
       before_script: rustup component add rustfmt
