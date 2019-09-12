@@ -53,7 +53,7 @@ message CreateRequest {
 // Idempotent. If no Element with such ID exists,
 // then it will be created, otherwise it will be reconfigured.
 message ApplyRequest {
-  // ID of Control API element which you want to update.
+  // ID of Control API element which you want update.
   string id = 1;
   // Control API element spec to which this element should be updated.
   oneof el {
@@ -75,14 +75,14 @@ message ApplyRequest {
     APPLY = 0;
     // Elements that exists, but are not
     // specified in provided pipeline
-    // not will be removed.
+    // NOT will be removed.
     APPEND = 1;
   }
 }
 
-// Request with many IDs.
+// Request with many elements IDs.
 message IdRequest {
-  // Vector of IDs.
+  // Vector of elements IDs.
   repeated string id = 1;
 }
 
@@ -135,10 +135,15 @@ message Error {
   uint32 code = 2;
   // Human-readable text description of error.
   string text = 3;
-  // Optional.
   // Link to online documentation of error.
+  //
+  // Optional field.
   string doc = 4;
   // Full ID of Element that error is related to.
+  // Some error doesn't relates to element ID and
+  // in this case element can be empty.
+  //
+  // Optional field.
   string element = 5;
 }
 
@@ -160,7 +165,7 @@ message Room {
   // Pipeline of Room element.
   map<string, Room.Element> pipeline = 1;
 
-  // Elements which can contain Room's pipeline.
+  // Elements which Room's pipeline can contain.
   message Element {
     oneof el {
       Hub hub = 1;
@@ -188,7 +193,7 @@ message Member {
   // Pipeline of Member element.
   map<string, Member.Element> pipeline = 4;
 
-  // Elements which can contain Member's pipeline.
+  // Elements which Member's pipeline can contain.
   message Element {
     oneof el {
       Hub hub = 1;

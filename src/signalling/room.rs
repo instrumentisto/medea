@@ -147,7 +147,7 @@ pub struct Room {
 }
 
 impl Room {
-    /// Create new instance of [`Room`].
+    /// Creates new instance of [`Room`].
     ///
     /// Returns [`RoomError::BadRoomSpec`] when errs while `Element`
     /// transformation happens.
@@ -527,13 +527,16 @@ impl Room {
         member_id: MemberId,
         ctx: &mut Context<Self>,
     ) -> ActFuture<(), ()> {
-        info!("Peers {:?} removed for member '{}'.", peers_id, member_id);
+        info!(
+            "Peers {:?} removed for member [id = {}].",
+            peers_id, member_id
+        );
         if let Some(member) = self.members.get_member_by_id(&member_id) {
             member.peers_removed(&peers_id);
         } else {
             error!(
-                "Participant with id {} for which received \
-                 Event::PeersRemoved not found. Closing room.",
+                "Member [id = {}] for which received Event::PeersRemoved not \
+                 found. Closing room.",
                 member_id
             );
 
@@ -812,7 +815,10 @@ impl Handler<RpcConnectionEstablished> for Room {
         msg: RpcConnectionEstablished,
         ctx: &mut Self::Context,
     ) -> Self::Result {
-        info!("RpcConnectionEstablished for member {}", msg.member_id);
+        info!(
+            "RpcConnectionEstablished for Member [id = {}].",
+            msg.member_id
+        );
 
         let fut = self
             .members

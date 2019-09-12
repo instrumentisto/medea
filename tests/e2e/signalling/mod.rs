@@ -53,14 +53,14 @@ impl TestMember {
         });
     }
 
-    /// Send command to the server.
+    /// Sends command to the server.
     fn send_command(&mut self, msg: Command) {
         let json = serde_json::to_string(&msg).unwrap();
         self.writer.start_send(ws::Message::Text(json)).unwrap();
         self.writer.poll_complete().unwrap();
     }
 
-    /// Start test member in new [`Arbiter`] by given URI.
+    /// Starts test member in new [`Arbiter`] by given URI.
     /// `on_message` - is function which will be called at every [`Event`]
     /// received from server.
     pub fn start(
@@ -92,9 +92,9 @@ impl TestMember {
 impl Actor for TestMember {
     type Context = Context<Self>;
 
-    /// Start heartbeat and set a timer that will panic when 5 seconds expire.
-    /// The timer is needed because some tests may just stuck
-    /// and listen socket forever.
+    /// Starts heartbeat and sets a timer that will panic when 5 seconds will
+    /// expire. The timer is needed because some tests may just stuck and listen
+    /// socket forever.
     fn started(&mut self, ctx: &mut Self::Context) {
         self.start_heartbeat(ctx);
 

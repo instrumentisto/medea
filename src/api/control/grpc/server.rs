@@ -209,7 +209,7 @@ impl ControlApiService {
             req.get_room()
         ));
 
-        let sid: HashMap<String, String> = fut_try!(spec.members())
+        let sid: Sids = fut_try!(spec.members())
             .iter()
             .map(|(id, member)| {
                 let uri =

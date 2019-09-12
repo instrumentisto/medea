@@ -184,7 +184,7 @@ impl ParticipantService {
     /// [`MemberId`] failed.
     ///
     /// Returns [`Err(AuthorizationError::InvalidCredentials)`] if [`Member`]
-    /// was found, but incorrect credentials was provided.
+    /// was found, but incorrect credentials were provided.
     pub fn get_member_by_id_and_credentials(
         &self,
         member_id: &MemberId,

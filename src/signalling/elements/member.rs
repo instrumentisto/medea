@@ -402,7 +402,7 @@ impl Member {
         self.0.borrow().room_id.clone()
     }
 
-    /// Create new [`WebRtcPlayEndpoint`] based on provided
+    /// Creates new [`WebRtcPlayEndpoint`] based on provided
     /// [`WebRtcPlayEndpointSpec`].
     ///
     /// This function will add created [`WebRtcPlayEndpoint`] to src's
@@ -464,14 +464,14 @@ impl Member {
 pub struct WeakMember(Weak<RefCell<MemberInner>>);
 
 impl WeakMember {
-    /// Upgrade weak pointer to strong pointer.
+    /// Upgrades weak pointer to strong pointer.
     ///
     /// This function will __panic__ if weak pointer was dropped.
     pub fn upgrade(&self) -> Member {
         Member(Weak::upgrade(&self.0).unwrap())
     }
 
-    /// Safe upgrade to [`Member`].
+    /// Safe upgrades to [`Member`].
     pub fn safe_upgrade(&self) -> Option<Member> {
         Weak::upgrade(&self.0).map(Member)
     }

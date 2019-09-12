@@ -184,7 +184,7 @@ ifeq ($(dockerized),yes)
 	docker run --rm -v "$(PWD)":/app -w /app \
 		-u $(shell id -u):$(shell id -g) \
 		-v "$(HOME)/.cargo/registry":/usr/local/cargo/registry \
-		medea-build \
+		rust:$(RUST_VER) \
 			make cargo.build crate=$(cargo-build-crate) \
 			                 debug=$(debug) dockerized=no
 else

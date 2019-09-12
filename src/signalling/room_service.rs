@@ -256,10 +256,10 @@ pub struct Validated;
 pub struct Unvalidated;
 
 // Clippy lint show use_self errors for DeleteElements with generic state. This
-// is fix for it.
+// is fix for it. This allow not works on function.
 #[allow(clippy::use_self)]
 impl DeleteElements<Unvalidated> {
-    pub fn new() -> DeleteElements<Unvalidated> {
+    pub fn new() -> Self {
         Self {
             uris: Vec::new(),
             _validation_state: PhantomData,
@@ -319,6 +319,10 @@ impl DeleteElements<Unvalidated> {
 /// from [`Unvalidated`] with [`DeleteElements::validate`] function
 /// which will validate all [`StatefulLocalUri`]s.
 ///
+/// Validation doesn't guarantee that message can't return [`RoomServiceError`].
+/// This is just validation for errors which we can catch before sending
+/// message.
+///
 /// [Control API]: http://tiny.cc/380uaz
 #[derive(Message, Default)]
 #[rtype(result = "Result<(), RoomServiceError>")]
@@ -330,9 +334,9 @@ pub struct DeleteElements<T> {
 impl Handler<DeleteElements<Validated>> for RoomService {
     type Result = ActFuture<(), RoomServiceError>;
 
-    // TODO: delete this allow when drain_filter TODO will be resolved.
-    #[allow(clippy::unnecessary_filter_map)]
-    #[allow(clippy::if_not_else)]
+    // TODO: delete 'clippy::unnecessary_filter_map` when drain_filter TODO will
+    // be resolved.
+    #[allow(clippy::if_not_else, clippy::unnecessary_filter_map)]
     fn handle(
         &mut self,
         msg: DeleteElements<Validated>,
@@ -495,7 +499,7 @@ impl Handler<CreateEndpointInRoom> for RoomService {
     fn handle(
         &mut self,
         msg: CreateEndpointInRoom,
-        _ctx: &mut Self::Context,
+        _: &mut Self::Context,
     ) -> Self::Result {
         let (endpoint_id, member_uri) = msg.uri.take_endpoint_id();
         let (member_id, room_uri) = member_uri.take_member_id();

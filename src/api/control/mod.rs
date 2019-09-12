@@ -76,14 +76,14 @@ pub enum RootElement {
 ///
 /// [`TryFrom`]: std::convert::TryFrom
 #[allow(clippy::pub_enum_variant_names)]
-#[derive(Debug, Fail, Clone)]
+#[derive(Clone, Debug, Display, Fail)]
 pub enum TryFromElementError {
     /// Element is not `Room`.
-    #[fail(display = "Element is not Room")]
+    #[display(fmt = "Element is not Room")]
     NotRoom,
 
     /// Element is not `Member`.
-    #[fail(display = "Element is not Member")]
+    #[display(fmt = "Element is not Member")]
     NotMember,
 }
 
@@ -94,8 +94,8 @@ pub enum TryFromElementError {
 #[derive(Debug, Fail, Display)]
 pub enum LoadStaticControlSpecsError {
     /// Error while reading default or provided in config
-    /// (`MEDEA_CONTROL.STATIC_SPECS_DIR` environment variable) static [Control
-    /// API] specs dir.
+    /// (`MEDEA_CONTROL_API.STATIC_SPECS_DIR` environment variable) static
+    /// [Control API] specs dir.
     ///
     /// Atm we only should print `warn!` message to log which prints that
     /// static specs not loaded.

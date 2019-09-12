@@ -2,7 +2,7 @@ use std::{error::Error, fs::File, io::ErrorKind};
 
 #[cfg(feature = "grpc")]
 fn main() -> Result<(), Box<dyn Error>> {
-    const GRPC_DIR: &str = "src/grpc";
+    const GRPC_DIR: &str = "src/grpc/";
     const GRPC_SPEC_FILE: &str = "src/grpc/control_api.proto";
     const OUT_FILES: [&str; 2] =
         ["src/grpc/control_api.rs", "src/grpc/control_api_grpc.rs"];

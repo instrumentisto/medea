@@ -17,9 +17,4 @@
 # Medea dependencies cache.
 !.cache/cargo/
 
-# Here we have some scripts which install missing toolchains for CI
-# but it usable for Docker images also.
-!_ci
-
 # !target/{mode} is added and removed dynamically to reduce image build times.
-!target/debug/
