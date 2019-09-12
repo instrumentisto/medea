@@ -93,10 +93,13 @@ release: release.crates release.npm
 # Usage:
 #	make test
 
-test: test.unit test.e2e
+test:
+	@make test.unit
+	@make test.e2e up=yes dockerized=no
 
 
 up: up.dev
+
 
 
 
@@ -333,8 +336,7 @@ endif
 
 test-e2e-env = RUST_BACKTRACE=1 \
 	$(if $(call eq,$(log),yes),,RUST_LOG=warn) \
-	MEDEA_CONTROL.STATIC_SPECS_DIR=tests/specs/ \
-	MEDEA_CONTROL_STATIC_SPECS_DIR=tests/specs/
+	MEDEA_CONTROL__STATIC_SPECS_DIR=tests/specs/
 
 test.e2e:
 ifeq ($(up),yes)
