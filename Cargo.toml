@@ -18,7 +18,7 @@ members = [
     "crates/medea-macro",
     "jason",
     "proto/client-api",
-    "proto/grpc",
+    "proto/control-api",
 ]
 
 [profile.release]
@@ -36,11 +36,11 @@ dotenv = "0.14"
 derive_more = "0.15"
 failure = "0.1"
 futures = "0.1"
-grpcio = "0.4"
+grpcio = { version = "0.4", features = ["openssl"] }
 humantime = "1.2"
 humantime-serde = "0.1"
 medea-client-api-proto = { path = "proto/client-api", features = ["medea"] }
-medea-grpc-proto = { path = "proto/grpc" }
+medea-control-api-proto = { path = "proto/control-api" }
 medea-macro = "0.1"
 protobuf = "2.7"
 rand = "0.7"

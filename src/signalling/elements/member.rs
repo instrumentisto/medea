@@ -12,7 +12,7 @@ use std::{
 use derive_more::Display;
 use failure::Fail;
 use medea_client_api_proto::{IceServer, PeerId};
-use medea_grpc_proto::control::{
+use medea_control_api_proto::grpc::control_api::{
     Element as RootElementProto, Member as MemberProto,
     Room_Element as ElementProto,
 };
@@ -20,9 +20,7 @@ use medea_grpc_proto::control::{
 use crate::{
     api::control::{
         endpoints::WebRtcPlayEndpoint as WebRtcPlayEndpointSpec,
-        local_uri::{
-            ToEndpoint, ToMember, ToRoom, LocalUri, StatefulLocalUri,
-        },
+        local_uri::{LocalUri, StatefulLocalUri, ToEndpoint, ToMember, ToRoom},
         MemberId, MemberSpec, RoomId, RoomSpec, TryFromElementError,
         WebRtcPlayId, WebRtcPublishId,
     },
@@ -129,9 +127,10 @@ impl Member {
         member_id: &MemberId,
     ) -> Result<MemberSpec, MembersLoadError> {
         let element = room_spec.pipeline.get(&member_id.0).map_or(
-            Err(MembersLoadError::MemberNotFound(
-                LocalUri::<ToMember>::new(self.room_id(), member_id.clone()),
-            )),
+            Err(MembersLoadError::MemberNotFound(LocalUri::<ToMember>::new(
+                self.room_id(),
+                member_id.clone(),
+            ))),
             Ok,
         )?;
 
@@ -166,12 +165,10 @@ impl Member {
                 MemberId(spec_play_endpoint.src.member_id.to_string());
             let publisher_member =
                 store.get(&publisher_id).ok_or_else(|| {
-                    MembersLoadError::MemberNotFound(
-                        LocalUri::<ToMember>::new(
-                            self.room_id(),
-                            publisher_id,
-                        ),
-                    )
+                    MembersLoadError::MemberNotFound(LocalUri::<ToMember>::new(
+                        self.room_id(),
+                        publisher_id,
+                    ))
                 })?;
             let publisher_spec = self.get_member_from_room_spec(
                 room_spec,

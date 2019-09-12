@@ -10,6 +10,7 @@ use smart_default::SmartDefault;
 /// [Control API] gRPC server settings.
 ///
 /// [Control API]: http://tiny.cc/380uaz
+#[allow(clippy::module_name_repetitions)]
 #[derive(Clone, Debug, Deserialize, Serialize, SmartDefault)]
 #[serde(default)]
 pub struct ControlApiGrpcServer {

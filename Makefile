@@ -325,8 +325,8 @@ endif
 
 test-e2e-env = RUST_BACKTRACE=1 \
 	$(if $(call eq,$(log),yes),,RUST_LOG=warn) \
-	MEDEA_CONTROL.STATIC_SPECS_DIR=tests/specs/ \
-	MEDEA_CONTROL_STATIC_SPECS_DIR=tests/specs/
+	MEDEA_CONTROL_API.STATIC_SPECS_DIR=tests/specs/ \
+	MEDEA_CONTROL_API_STATIC_SPECS_DIR=tests/specs/
 
 test.e2e:
 ifeq ($(up),yes)
@@ -435,12 +435,7 @@ docker-build-medea-image-name = $(strip \
 
 docker.build.medea:
 ifneq ($(no-cache),yes)
-	docker run --rm --network=host -v "$(PWD)":/app -w /app \
-	           -u $(shell id -u):$(shell id -g) \
-	           -e CARGO_HOME=.cache/cargo \
-		medea-build \
-			cargo build --bin=medea \
-				$(if $(call eq,$(debug),no),--release,)
+	cargo build --bin=medea $(if $(call eq,$(debug),no),--release,)
 endif
 	$(call docker.build.clean.ignore)
 	@echo "!target/$(if $(call eq,$(debug),no),release,debug)/" >> .dockerignore
@@ -774,6 +769,21 @@ endef
 
 
 
+###################
+# Protoc commands #
+###################
+
+# Rebuild gRPC protobuf specs for medea-control-api-proto.
+#
+# Usage:
+#  make protoc.rebuild
+
+protoc.rebuild:
+	rm -f proto/control-api/src/grpc/control_api*.rs
+	cargo build -p medea-control-api-proto
+
+
+
 ##################
 # .PHONY section #
 ##################
@@ -781,7 +791,6 @@ endef
 .PHONY: build build.jason build.medea \
         cargo cargo.build cargo.fmt cargo.lint \
         docker.auth docker.build.demo docker.build.medea \
-        	docker.build.medea-build \
         	docker.down.coturn docker.down.demo docker.down.medea \
         	docker.pull docker.push \
         	docker.up.coturn docker.up.demo docker.up.medea \
@@ -790,6 +799,7 @@ endef
         helm helm.down helm.init helm.lint helm.list \
         	helm.package helm.package.release helm.up \
         minikube.boot \
+        protoc.rebuild \
         release release.crates release.helm release.npm \
         test test.e2e test.unit \
         up up.coturn up.demo up.dev up.jason up.medea \

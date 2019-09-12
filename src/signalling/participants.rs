@@ -32,7 +32,7 @@ use crate::{
                 WebRtcPlayEndpoint as WebRtcPlayEndpointSpec,
                 WebRtcPublishEndpoint as WebRtcPublishEndpointSpec,
             },
-            local_uri::{ToEndpoint, ToMember, LocalUri},
+            local_uri::{LocalUri, ToEndpoint, ToMember},
             MemberId, MemberSpec, RoomId, RoomSpec, WebRtcPlayId,
             WebRtcPublishId,
         },

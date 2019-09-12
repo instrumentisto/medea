@@ -13,7 +13,9 @@ use derive_more::Display;
 use failure::Fail;
 use futures::future;
 use medea_client_api_proto::{Command, Event, IceCandidate, PeerId, TrackId};
-use medea_grpc_proto::control::{Element as ElementProto, Room as RoomProto};
+use medea_control_api_proto::grpc::control_api::{
+    Element as ElementProto, Room as RoomProto,
+};
 
 use crate::{
     api::{
@@ -22,7 +24,7 @@ use crate::{
             RpcConnectionClosed, RpcConnectionEstablished,
         },
         control::{
-            local_uri::{ToMember, LocalUri, StatefulLocalUri},
+            local_uri::{LocalUri, StatefulLocalUri, ToMember},
             room::RoomSpec,
             Endpoint as EndpointSpec, MemberId, MemberSpec, RoomId,
             TryFromElementError, WebRtcPlayId, WebRtcPublishId,

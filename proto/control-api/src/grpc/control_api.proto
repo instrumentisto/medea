@@ -1,0 +1,250 @@
+// File which describes Medea's Control API.
+
+syntax = "proto3";
+
+package medea;
+
+// Service for handling Control API requests.
+service ControlApi {
+  // Creates new Element with given ID.
+  //
+  // Not idempotent. Errors if Element with the same ID already exists.
+  rpc Create (CreateRequest) returns (CreateResponse);
+
+  // Applies given spec to Element by its ID.
+  //
+  // Idempotent. If no Element with such ID exists,
+  // then it will be created, otherwise it will be reconfigured.
+  rpc Apply (ApplyRequest) returns (Response);
+
+  // Removes Element by its ID.
+  // Allows referring multiple Elements on the last two levels.
+  //
+  // Idempotent.
+  rpc Delete (IdRequest) returns (Response);
+
+  // Returns Element by its ID. Allows referring multiple Elements.
+  // If no ID specified, returns all Elements declared.
+  rpc Get (IdRequest) returns (GetResponse);
+}
+
+// Creates new Element with given ID.
+//
+// Not idempotent. Errors if Element with the same ID already exists.
+message CreateRequest {
+  // ID with which new Control API element will be created.
+  //
+  // Not idempotent. Errors if Element with the same ID already exists.
+  string id = 1;
+  // Spec of element to create.
+  oneof el {
+    Hub hub = 2;
+    FileRecorder file_recorder = 3;
+    Member member = 4;
+    Relay relay = 5;
+    Room room = 6;
+    WebRtcPlayEndpoint webrtc_play = 7;
+    WebRtcPublishEndpoint webrtc_pub = 8;
+  }
+}
+
+// Applies given spec to Element by its ID.
+//
+// Idempotent. If no Element with such ID exists,
+// then it will be created, otherwise it will be reconfigured.
+message ApplyRequest {
+  // ID of Control API element which you want to update.
+  string id = 1;
+  // Control API element spec to which this element should be updated.
+  oneof el {
+    Hub hub = 2;
+    FileRecorder file_recorder = 3;
+    Member member = 4;
+    Relay relay = 5;
+    Room room = 6;
+    WebRtcPlayEndpoint webrtc_play = 7;
+    WebRtcPublishEndpoint webrtc_pub = 8;
+  }
+  // Updating policy.
+  Policy policy = 9;
+
+  enum Policy {
+    // Elements that exist, but are not
+    // specified in provided pipeline
+    // will be removed.
+    APPLY = 0;
+    // Elements that exists, but are not
+    // specified in provided pipeline
+    // not will be removed.
+    APPEND = 1;
+  }
+}
+
+// Request with many IDs.
+message IdRequest {
+  // Vector of IDs.
+  repeated string id = 1;
+}
+
+// Response for requests which don't
+// return anything on successful
+// result, but can return Error.
+//
+// If request fails, then an error field will be returned.
+// The request should be considered successful only
+// if its response does not contain error.
+message Response {
+  // Error which can be returned if request fails.
+  Error error = 1;
+}
+
+// Response for Create request.
+//
+// If request fails, then an error field will be returned.
+// The request should be considered successful only
+// if its response does not contain error.
+message CreateResponse {
+  // Hashmap with IDs (key) and URIs (value) of elements
+  // with which Jason can connect to the Medea media server.
+  // Returns only if request was fully successful.
+  map<string, string> sid = 1;
+  // Error which can be returned if request fails.
+  Error error = 2;
+}
+
+// Response for Get request.
+//
+// If request fails, then an error field will be returned.
+// The request should be considered successful only
+// if its response does not contain error.
+message GetResponse {
+  // Hashmap with IDs (key) and Control API elements specs (value).
+  //
+  // Returns only if request was fully successful.
+  map<string, Element> elements = 1;
+  // Error which can be returned if request fails.
+  Error error = 2;
+}
+
+// Error which can be returned if request fails.
+//
+// If this Error not returned then request should
+// be considered as successful.
+message Error {
+  // Concrete unique code of error.
+  uint32 code = 2;
+  // Human-readable text description of error.
+  string text = 3;
+  // Optional.
+  // Link to online documentation of error.
+  string doc = 4;
+  // Full ID of Element that error is related to.
+  string element = 5;
+}
+
+// Control API spec element.
+message Element {
+  oneof el {
+    Hub hub = 2;
+    FileRecorder file_recorder = 3;
+    Member member = 4;
+    Relay relay = 5;
+    Room room = 6;
+    WebRtcPlayEndpoint webrtc_play = 7;
+    WebRtcPublishEndpoint webrtc_pub = 8;
+  }
+}
+
+// Control API spec Room element.
+message Room {
+  // Pipeline of Room element.
+  map<string, Room.Element> pipeline = 1;
+
+  // Elements which can contain Room's pipeline.
+  message Element {
+    oneof el {
+      Hub hub = 1;
+      FileRecorder file_recorder = 2;
+      Member member = 3;
+      Relay relay = 4;
+      WebRtcPlayEndpoint webrtc_play = 5;
+      WebRtcPublishEndpoint webrtc_pub = 6;
+    }
+  }
+}
+
+// Member element of Control API spec.
+message Member {
+  // Callback which fires when this Member
+  // connects to media server via WebSocket
+  // for WebRTC negotiation.
+  string on_join = 1;
+  // Callback which fires when this Member
+  // disconnects from media server via WebSocket.
+  string on_leave = 2;
+  // Credentials with which this Member can
+  // connect to media server via WebSocket.
+  string credentials = 3;
+  // Pipeline of Member element.
+  map<string, Member.Element> pipeline = 4;
+
+  // Elements which can contain Member's pipeline.
+  message Element {
+    oneof el {
+      Hub hub = 1;
+      FileRecorder file_recorder = 2;
+      Relay relay = 3;
+      WebRtcPlayEndpoint webrtc_play = 4;
+      WebRtcPublishEndpoint webrtc_pub = 5;
+    }
+  }
+}
+
+// Media element which is able to receive
+// media data from client via WebRTC.
+message WebRtcPublishEndpoint {
+  // P2P mode of WebRtc connection.
+  P2P p2p = 1;
+  // Callback which fires when Member client
+  // starts publishing media data.
+  string on_start = 3;
+  // Callback which fires when Member client
+  // stops publishing media data.
+  string on_stop = 4;
+
+  enum P2P {
+    // Always connect through media server.
+    NEVER = 0;
+    // Connect P2P if it possible.
+    IF_POSSIBLE = 1;
+    // Always connect P2P.
+    ALWAYS = 2;
+  }
+}
+
+// Media element which is able to play
+// media data for client via WebRTC.
+message WebRtcPlayEndpoint {
+  // The source to get media data from.
+  string src = 1;
+  // Callback which fires when Member client
+  // starts playing media data of source client.
+  string on_start = 2;
+  // Callback which fires when Member client
+  // stops playing media data of source client.
+  string on_stop = 3;
+}
+
+message Hub {}
+
+message FileRecorder {
+  string src = 1;
+  string dst = 2;
+  string on_start = 3;
+  string on_stop = 4;
+}
+
+message Relay {
+  string src = 1;
+  string dst = 2;
+}

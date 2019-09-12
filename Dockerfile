@@ -17,11 +17,9 @@ RUN mkdir -p /out/etc/ \
 
 COPY / /app/
 
-RUN bash /app/_ci/protoc_install.sh \
-    && apt-get update \
-    && apt-get install -y cmake golang
-
-ENV GOPATH /usr/lib/go
+# Install dependencies needed for grpcio crate.
+RUN apt-get update \
+    && apt-get install -y cmake
 
 # Build project distribution.
 RUN cd /app \

@@ -9,15 +9,13 @@ use actix::{
 use derive_more::Display;
 use failure::Fail;
 use futures::future::{self, Either, Future};
-use medea_grpc_proto::control::Element as ElementProto;
+use medea_control_api_proto::grpc::control_api::Element as ElementProto;
 
 use crate::{
     api::control::{
         endpoints::Endpoint as EndpointSpec,
         load_static_specs_from_dir,
-        local_uri::{
-            ToEndpoint, ToMember, ToRoom, LocalUri, StatefulLocalUri,
-        },
+        local_uri::{LocalUri, StatefulLocalUri, ToEndpoint, ToMember, ToRoom},
         LoadStaticControlSpecsError, MemberSpec, RoomId, RoomSpec,
     },
     log::prelude::*,

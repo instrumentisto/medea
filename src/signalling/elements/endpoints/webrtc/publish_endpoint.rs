@@ -7,7 +7,7 @@ use std::{
 };
 
 use medea_client_api_proto::PeerId;
-use medea_grpc_proto::control::{
+use medea_control_api_proto::grpc::control_api::{
     Element as RootElementProto, Member_Element as ElementProto,
     WebRtcPublishEndpoint as WebRtcPublishEndpointProto,
 };

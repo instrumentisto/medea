@@ -1,17 +1,17 @@
 //! All errors which medea can return to control API user.
 //!
 //! # Error codes ranges
-//! - __1000...1000__ Unexpected server error
-//! - __1001...1099__ Not found errors
-//! - __1100...1199__ Spec errors
-//! - __1200...1299__ Parse errors
-//! - __1300...1399__ Conflicts
-//! - __1400...1499__ Misc errors
+//! - `1000` ... `1000` Unexpected server error
+//! - `1001` ... `1099` Not found errors
+//! - `1100` ... `1199` Spec errors
+//! - `1200` ... `1299` Parse errors
+//! - `1300` ... `1399` Conflicts
+//! - `1400` ... `1499` Misc errors
 
 use std::string::ToString;
 
 use derive_more::Display;
-use medea_grpc_proto::control::Error as ErrorProto;
+use medea_control_api_proto::grpc::control_api::Error as ErrorProto;
 
 use crate::{
     api::control::{

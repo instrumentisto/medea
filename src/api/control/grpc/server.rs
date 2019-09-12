@@ -17,20 +17,20 @@ use grpcio::{
     Environment, RpcContext, RpcStatus, RpcStatusCode, Server, ServerBuilder,
     UnarySink,
 };
-use medea_grpc_proto::{
-    control::{
+use medea_control_api_proto::grpc::{
+    control_api::{
         ApplyRequest, CreateRequest, CreateResponse, Error, GetResponse,
         IdRequest, Response,
     },
-    control_grpc::{create_control_api, ControlApi},
+    control_api_grpc::{create_control_api, ControlApi},
 };
 
 use crate::{
     api::{
         control::{
             local_uri::{
-                ToEndpoint, ToMember, ToRoom, LocalUri,
-                LocalUriParseError, StatefulLocalUri,
+                LocalUri, LocalUriParseError, StatefulLocalUri, ToEndpoint,
+                ToMember, ToRoom,
             },
             Endpoint, MemberId, MemberSpec, RoomId, RoomSpec,
             TryFromElementError, TryFromProtobufError,

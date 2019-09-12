@@ -141,10 +141,7 @@ impl LocalUri<ToMember> {
 
     /// Push endpoint ID to the end of URI and returns
     /// [`LocalUri`] in [`ToEndpoint`] state.
-    pub fn push_endpoint_id(
-        self,
-        endpoint_id: String,
-    ) -> LocalUri<ToEndpoint> {
+    pub fn push_endpoint_id(self, endpoint_id: String) -> LocalUri<ToEndpoint> {
         let (member_id, room_uri) = self.take_member_id();
         let room_id = room_uri.take_room_id();
         LocalUri::<ToEndpoint>::new(room_id, member_id, endpoint_id)

@@ -5,7 +5,7 @@
 use std::{collections::HashMap, convert::TryFrom};
 
 use derive_more::{Display, From};
-use medea_grpc_proto::control::Room as RoomProto;
+use medea_control_api_proto::grpc::control_api::Room as RoomProto;
 use serde::Deserialize;
 
 use crate::api::control::TryFromProtobufError;

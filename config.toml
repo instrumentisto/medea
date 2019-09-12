@@ -1,58 +1,55 @@
-[server.http]
+[server.client.http]
 # Server host.
 #
-# Environment variable: MEDEA_SERVER.HTTP.HOST
+# Environment variable: MEDEA_SERVER.CLIENT.HTTP.HOST
 #
 # Default:
 #   host = "ws://0.0.0.0:8080"
 
 # IP address to bind HTTP server to.
 #
-# Environment variable: MEDEA_SERVER.HTTP.BIND_IP
+# Environment variable: MEDEA_SERVER.CLIENT.HTTP.BIND_IP
 #
 # Default:
 #   bind_ip = "0.0.0.0"
 
 # Port to bind HTTP server to.
 #
-# Environment variable: MEDEA_SERVER.HTTP.BIND_PORT
+# Environment variable: MEDEA_SERVER.CLIENT.HTTP.BIND_PORT
 #
 # Default:
 #   bind_port = 8080
 
-
-
-
-[control]
-# Path to directory with static Сontrol API specs.
-#
-# Environment variable: MEDEA_CONTROL.STATIC_SPECS_DIR
-#
-# Default:
-#   static_specs_dir = "specs/"
-
-
-[server.grpc]
+[server.control.grpc]
 # IP address to bind gRPC server to.
 #
-# Environment variable: MEDEA_SERVER.GRPC.BIND_IP
+# Environment variable: MEDEA_SERVER.CONTROL.GRPC.BIND_IP
 #
 # Default:
 #   bind_ip = "0.0.0.0"
 
 # Port to bind gRPC server to.
 #
-# Environment variable: MEDEA_SERVER.GRPC.BIND_PORT
+# Environment variable: MEDEA_SERVER.CONTROL.GRPC.BIND_PORT
 #
 # Default:
 #   bind_port = 50051
 
 # Completion queue count of gRPC server.
 #
-# Environment variable: MEDEA_SERVER.GRPC.COMPLETION_QUEUE_COUNT
+# Environment variable: MEDEA_SERVER.CONTROL.GRPC.COMPLETION_QUEUE_COUNT
 #
 # Default:
 #   completion_queue_count = 2
+
+
+[control_api]
+# Path to directory with static Сontrol API specs.
+#
+# Environment variable: MEDEA_CONTROL_API.STATIC_SPECS_DIR
+#
+# Default:
+#   static_specs_dir = "specs/"
 
 
 

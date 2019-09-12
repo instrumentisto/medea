@@ -5,7 +5,7 @@
 use std::{collections::HashMap, convert::TryFrom};
 
 use derive_more::{Display, From};
-use medea_grpc_proto::control::Member as MemberProto;
+use medea_control_api_proto::grpc::control_api::Member as MemberProto;
 use rand::{distributions::Alphanumeric, Rng};
 use serde::Deserialize;
 

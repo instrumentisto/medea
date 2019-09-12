@@ -8,8 +8,11 @@ server:
     tag: dev
     pullPolicy: IfNotPresent
   conf:
-    client:
-        public_url: "wss://medea-demo.test"
+    server:
+      client:
+        http:
+          public_url: "wss://medea-demo.test"
+
     turn:
       host: medea-demo.test
 

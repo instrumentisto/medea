@@ -6,7 +6,8 @@ use std::{convert::TryFrom, fmt};
 
 use derive_more::{Display, From};
 use failure::Fail;
-use medea_grpc_proto::control::WebRtcPlayEndpoint as WebRtcPlayEndpointProto;
+use medea_control_api_proto::grpc as medea_grpc;
+use medea_grpc::control_api::WebRtcPlayEndpoint as WebRtcPlayEndpointProto;
 use serde::{
     de::{self, Deserializer, Error, Visitor},
     Deserialize,
@@ -14,7 +15,7 @@ use serde::{
 
 use crate::api::control::{
     endpoints::webrtc_publish_endpoint::WebRtcPublishId,
-    local_uri::{ToEndpoint, LocalUri, LocalUriParseError, StatefulLocalUri},
+    local_uri::{LocalUri, LocalUriParseError, StatefulLocalUri, ToEndpoint},
     MemberId, RoomId, TryFromProtobufError,
 };
 

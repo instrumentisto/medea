@@ -8,15 +8,17 @@ Contribution Guide
 
 In addition to default stable [Rust] toolchain you will need [rustfmt] and [Clippy] components, and a nightly [Rust] toolchain (for better tooling).
 ```bash
-rustup toolchain install nightly
-rustup component add rustfmt
-rustup component add clippy
+$ rustup toolchain install nightly
+$ rustup component add rustfmt
+$ rustup component add clippy
 ```
 
 Also, you need install [wasm-pack] for [Jason] building and testing:
 ```bash
 $ curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sudo sh
 ```
+
+[Protoc] if you want to rebuild protobuf specs for [Medea]'s gRPC Control API.
 
 
 
@@ -62,6 +64,11 @@ $ make build.jason
 
 # or in Docker
 $ make build.jason dockerized=yes
+```
+
+To rebuild protobuf specs for [Medea]'s gRPC Control API:
+```bash
+$ make protoc.rebuild
 ```
 
 
@@ -129,3 +136,4 @@ Add `[run ci]` mark to your commit message for triggering CI build.
 [Rust]: https://www.rust-lang.org
 [rustfmt]: https://github.com/rust-lang/rustfmt
 [wasm-pack]: https://github.com/rustwasm/wasm-pack
+[Protoc]: https://github.com/protocolbuffers/protobuf

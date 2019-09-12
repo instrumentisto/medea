@@ -10,6 +10,7 @@ use smart_default::SmartDefault;
 /// [Client API]'s HTTP server settings.
 ///
 /// [Client API]: http://tiny.cc/c80uaz
+#[allow(clippy::module_name_repetitions)]
 #[derive(Clone, Debug, Deserialize, Serialize, SmartDefault)]
 #[serde(default)]
 pub struct ClientApiHttpServer {
@@ -69,10 +70,19 @@ mod server_spec {
         env::remove_var("MEDEA_SERVER.CLIENT.HTTP.BIND_IP");
         env::remove_var("MEDEA_SERVER.CLIENT.HTTP.BIND_PORT");
 
-        assert_ne!(default_conf.server.client.http.bind_ip, env_conf.server.client.http.bind_ip);
-        assert_ne!(default_conf.server.client.http.bind_port, env_conf.server.client.http.bind_port);
+        assert_ne!(
+            default_conf.server.client.http.bind_ip,
+            env_conf.server.client.http.bind_ip
+        );
+        assert_ne!(
+            default_conf.server.client.http.bind_port,
+            env_conf.server.client.http.bind_port
+        );
 
-        assert_eq!(env_conf.server.client.http.bind_ip, Ipv4Addr::new(5, 5, 5, 5));
+        assert_eq!(
+            env_conf.server.client.http.bind_ip,
+            Ipv4Addr::new(5, 5, 5, 5)
+        );
         assert_eq!(env_conf.server.client.http.bind_port, 1234);
         assert_eq!(
             env_conf.server.client.http.bind_addr(),
