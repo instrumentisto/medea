@@ -11,11 +11,10 @@ use actix::{
 };
 use derive_more::Display;
 use failure::Fail;
-use futures::future;
-use medea_client_api_proto::{Command, Event, IceCandidate, PeerId, TrackId};
 use futures::future::{self, Future as _};
 use medea_client_api_proto::{
-    Command, Event, IceCandidate, Peer as PeerSnapshot, PeerState, Snapshot,
+    Command, Event, IceCandidate, Peer as PeerSnapshot, PeerId, PeerState,
+    Snapshot, TrackId,
 };
 
 use crate::{
@@ -144,14 +143,10 @@ impl Room {
         self.id.clone()
     }
 
-    pub fn take_snapshot(&self, member_id: MemberId) -> Snapshot {
+    pub fn take_snapshot(&self, member_id: &MemberId) -> Snapshot {
         // TODO: Return MemberNotFound Error.
-        let member = self.participants.get_member(member_id).unwrap();
-        let ice_servers = member
-            .ice_user
-            .as_ref()
-            .map(|ice_user| ice_user.servers_list())
-            .unwrap_or(Vec::new());
+        let member = self.members.get_member(member_id).unwrap();
+        let ice_servers = member.servers_list().unwrap_or(Vec::new());
 
         let peers = self.peers.get_peers_by_member_id(member_id);
         let mut snapshot_peers = HashMap::new();
@@ -160,9 +155,10 @@ impl Room {
             let id = peer.id();
             let sdp_offer = peer.sdp_offer();
             let sdp_answer = peer.sdp_answer();
-            let hashed_ice_candidates = peer.get_hashed_ice_candidates();
+            let ice_candidates = peer.get_ice_candidates();
             let tracks = peer.tracks();
-            let remote_peer = self.peers.get_peer(peer.partner_peer_id()).unwrap(); // TODO (evdokimovs): panic
+            let remote_peer =
+                self.peers.get_peer_by_id(peer.partner_peer_id()).unwrap(); // TODO (evdokimovs): panic
             let remote_sdp_offer = remote_peer.sdp_offer();
             let remote_sdp_answer = remote_peer.sdp_answer();
             let peer_snap = PeerSnapshot {
@@ -172,7 +168,7 @@ impl Room {
                 remote_sdp_offer,
                 remote_sdp_answer,
                 state,
-                hashed_ice_candidates,
+                ice_candidates,
                 tracks,
             };
             snapshot_peers.insert(id, peer_snap);
@@ -484,56 +480,32 @@ impl Room {
         first_peer: PeerId,
         second_peer: PeerId,
     ) {
-        let fut: ActFuture<(), ()> =
-            match self.send_peer_created(first_peer, second_peer) {
-                Ok(res) => {
-                    Box::new(res.then(|res, room, ctx| -> ActFuture<(), ()> {
-                        if res.is_ok() {
-                            return Box::new(future::ok(()).into_actor(room));
-                        }
-                        error!(
-                            "Failed handle command, because {}. Room will be \
-                             stopped.",
-                            res.unwrap_err(),
-                        );
-                        room.close_gracefully(ctx)
-                    }))
-                }
-                Err(err) => {
+        let fut: ActFuture<(), ()> = match self
+            .send_peer_created(first_peer, second_peer)
+        {
+            Ok(res) => {
+                Box::new(res.then(|res, room, ctx| -> ActFuture<(), ()> {
+                    if res.is_ok() {
+                        return Box::new(future::ok(()).into_actor(room));
+                    }
                     error!(
+                        "Failed handle command, because {}. Room will be \
+                         stopped.",
+                        res.unwrap_err(),
+                    );
+                    room.close_gracefully(ctx)
+                }))
+            }
+            Err(err) => {
+                error!(
                     "Failed handle command, because {}. Room will be stopped.",
                     err
                 );
-                    self.close_gracefully(ctx)
-                }
-            };
+                self.close_gracefully(ctx)
+            }
+        };
 
         ctx.spawn(fut);
-    }
-
-    fn handle_get_ice_candidates_by_hash(
-        &mut self,
-        hashed_ice_candidates: HashMap<u64, Vec<String>>,
-    ) -> Result<ActFuture<(), RoomError>, RoomError> {
-        let mut ice_candidates = HashMap::new();
-        // TODO: this is temporary. Need provide MemberId to this function from
-        // EventMessage.
-        let mut member_id = 0;
-        for (peer_id, hashed_ice_candidates) in hashed_ice_candidates {
-            // TODO: make it safe
-            let peer = self.peers.get_peer(peer_id).unwrap();
-            member_id = peer.member_id();
-            let founded_ice_candidates =
-                peer.get_ice_candidates_by_hash(hashed_ice_candidates);
-            ice_candidates.insert(peer_id, founded_ice_candidates);
-        }
-
-        Ok(Box::new(wrap_future(
-            self.participants.send_event_to_member(
-                member_id,
-                Event::AddIceCandidates { ice_candidates },
-            ),
-        )))
     }
 
     /// Closes [`Room`] gracefully, by dropping all the connections and moving
@@ -656,9 +628,6 @@ impl Handler<CommandMessage> for Room {
             Command::SetIceCandidate { peer_id, candidate } => {
                 self.handle_set_ice_candidate(peer_id, candidate)
             }
-            Command::GetIceCandidatesByHash {
-                hashed_ice_candidates,
-            } => self.handle_get_ice_candidates_by_hash(hashed_ice_candidates),
         };
 
         match result {
@@ -702,11 +671,11 @@ impl Handler<RpcConnectionEstablished> for Room {
         info!("RpcConnectionEstablished for member {}", msg.member_id);
 
         // TODO: Maybe better way to detect reconnect of member??
-        let is_reconnect = self.participants.member_has_connection(member_id);
+        let is_reconnect = self.members.member_has_connection(&msg.member_id);
 
         let fut = self
             .members
-            .connection_established(ctx, msg.member_id, msg.connection)
+            .connection_established(ctx, msg.member_id.clone(), msg.connection)
             .map_err(|err, _, _| {
                 error!("RpcConnectionEstablished error {:?}", err)
             })
@@ -716,19 +685,19 @@ impl Handler<RpcConnectionEstablished> for Room {
 
         if is_reconnect {
             ctx.spawn(wrap_future(
-                self.participants
+                self.members
                     .send_event_to_member(
-                        member_id,
+                        msg.member_id.clone(),
                         Event::RestoreState {
-                            snapshot: self.take_snapshot(member_id),
+                            snapshot: self.take_snapshot(&msg.member_id),
                         },
                     )
                     .map_err(move |e| {
                         // TODO: Maybe handle this error??
                         error!(
-                            "Error while sending RestoreState event to member \
-                             [id = {}]. {:?}",
-                            member_id, e
+                            "Error while sending RestoreState event to \
+                             member. {:?}",
+                            e
                         )
                     }),
             ));

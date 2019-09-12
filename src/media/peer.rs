@@ -4,21 +4,13 @@
 
 #![allow(clippy::use_self)]
 
-use std::{
-    collections::{hash_map::DefaultHasher, HashMap},
-    convert::TryFrom,
-    fmt,
-    hash::{Hash, Hasher},
-    sync::Arc,
-};
+use std::{collections::HashMap, convert::TryFrom, fmt, rc::Rc};
 
 use derive_more::Display;
 use failure::Fail;
 use medea_client_api_proto::{
-    AudioSettings, Direction, MediaType, PeerId as Id, Track, TrackId,
-    VideoSettings,
-    AudioSettings, Direction, IceCandidate, MediaType, PeerState, Track,
-    VideoSettings,
+    AudioSettings, Direction, IceCandidate, MediaType, PeerId as Id, PeerState,
+    Track, TrackId, VideoSettings,
 };
 use medea_macro::enum_delegate;
 
@@ -85,15 +77,10 @@ impl PeerError {
         ice_candidate: IceCandidate
     )
 )]
-#[enum_delegate(pub fn get_hashed_ice_candidates(&self) -> Vec<String>)]
 #[enum_delegate(pub fn sdp_offer(&self) -> Option<String>)]
 #[enum_delegate(pub fn sdp_answer(&self) -> Option<String>)]
 #[enum_delegate(pub fn tracks(&self) -> Vec<Track>)]
-#[enum_delegate(pub fn get_ice_candidates_by_hash(
-        &self,
-        hashed_candidates: Vec<String>
-    ) -> Vec<IceCandidate>
-)]
+#[enum_delegate(pub fn get_ice_candidates(&self) -> Vec<IceCandidate>)]
 #[derive(Debug)]
 pub enum PeerStateMachine {
     New(Peer<New>),
@@ -267,16 +254,8 @@ impl<T> Peer<T> {
         self.context.ice_candidates.push(ice_candidate);
     }
 
-    pub fn get_hashed_ice_candidates(&self) -> Vec<String> {
-        self.context
-            .ice_candidates
-            .iter()
-            .map(|ice_candidate| {
-                let mut hasher = DefaultHasher::new();
-                ice_candidate.hash(&mut hasher);
-                format!("{:x}", hasher.finish())
-            })
-            .collect()
+    pub fn get_ice_candidates(&self) -> Vec<IceCandidate> {
+        self.context.ice_candidates.clone()
     }
 
     pub fn sdp_offer(&self) -> Option<String> {
@@ -285,30 +264,6 @@ impl<T> Peer<T> {
 
     pub fn sdp_answer(&self) -> Option<String> {
         self.context.sdp_answer.clone()
-    }
-
-    pub fn get_ice_candidates_by_hash(
-        &self,
-        hashed_candidates: Vec<String>,
-    ) -> Vec<IceCandidate> {
-        let hashed_candidates: Vec<u64> = hashed_candidates
-            .into_iter()
-            .map(|hash| {
-                // TODO: safe it
-                u64::from_str_radix(&hash, 16).unwrap()
-            })
-            .collect();
-        let mut found_candidates = Vec::new();
-        for ice_candidate in &self.context.ice_candidates {
-            let mut hasher = DefaultHasher::new();
-            ice_candidate.hash(&mut hasher);
-            let hash = hasher.finish();
-            if hashed_candidates.contains(&hash) {
-                found_candidates.push(ice_candidate.clone());
-            }
-        }
-
-        found_candidates
     }
 }
 

@@ -13,9 +13,8 @@ use futures::{
     sync::mpsc::{unbounded, UnboundedSender},
 };
 use medea_client_api_proto::{
-    Command, Direction, EventHandler, IceCandidate, IceServer, PeerId, Track,
-    Command, Direction, EventHandler, IceCandidate, IceServer, PeerState,
-    Snapshot, Track,
+    Command, Direction, EventHandler, IceCandidate, IceServer, PeerId,
+    PeerState, Snapshot, Track,
 };
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
@@ -277,7 +276,7 @@ impl EventHandler for InnerRoom {
 
     fn on_restore_state(&mut self, snapshot: Snapshot) {
         {
-            let removed_peers: Vec<u64> = self
+            let removed_peers: Vec<PeerId> = self
                 .peers
                 .iter_peers()
                 .filter(|(id, _)| !snapshot.peers.contains_key(id))
@@ -287,9 +286,6 @@ impl EventHandler for InnerRoom {
                 self.on_peers_removed(removed_peers);
             }
         }
-
-        let mut needed_ice_candidates: HashMap<u64, Vec<String>> =
-            HashMap::new();
 
         for (id, peer) in snapshot.peers {
             let local_peer = if let Some(local_peer) = self.peers.get(id) {
@@ -344,21 +340,12 @@ impl EventHandler for InnerRoom {
                     unreachable!()
                 }
             }
-
-            let missing_ice_candidates = local_peer
-                .get_missing_ice_candidates(peer.hashed_ice_candidates);
-            if !missing_ice_candidates.is_empty() {
-                needed_ice_candidates.insert(peer.id, missing_ice_candidates);
-            }
         }
-        self.rpc.send_command(Command::GetIceCandidatesByHash {
-            hashed_ice_candidates: needed_ice_candidates,
-        });
     }
 
     fn on_add_ice_candidates(
         &mut self,
-        ice_candidates: HashMap<u64, Vec<IceCandidate>>,
+        ice_candidates: HashMap<PeerId, Vec<IceCandidate>>,
     ) {
         for (peer_id, ice_candidates) in ice_candidates {
             for ice_candidate in ice_candidates {

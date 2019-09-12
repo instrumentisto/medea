@@ -67,7 +67,7 @@ impl PeerRepository {
 
     pub fn iter_peers(
         &self,
-    ) -> impl Iterator<Item = (&u64, &Rc<PeerConnection>)> {
+    ) -> impl Iterator<Item = (&PeerId, &Rc<PeerConnection>)> {
         self.peers.iter()
     }
 }

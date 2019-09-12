@@ -47,7 +47,8 @@ impl_incrementable!(PeerId);
 #[cfg(feature = "medea")]
 impl_incrementable!(TrackId);
 
-#[derive(Deserialize, Serialize, Debug, PartialEq)]
+#[cfg_attr(feature = "medea", derive(Serialize, Debug, Clone, PartialEq))]
+#[cfg_attr(feature = "jason", derive(Deserialize))]
 pub enum PeerState {
     New,
     WaitLocalSdp,
@@ -56,11 +57,12 @@ pub enum PeerState {
     Stable,
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[cfg_attr(feature = "medea", derive(Serialize, Debug, Clone, PartialEq))]
+#[cfg_attr(feature = "jason", derive(Deserialize))]
 pub struct Peer {
-    pub id: u64,
+    pub id: PeerId,
     pub state: PeerState,
-    pub hashed_ice_candidates: Vec<String>,
+    pub ice_candidates: Vec<IceCandidate>,
     pub sdp_offer: Option<String>,
     pub sdp_answer: Option<String>,
     pub remote_sdp_offer: Option<String>,
@@ -68,9 +70,10 @@ pub struct Peer {
     pub tracks: Vec<Track>,
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[cfg_attr(feature = "medea", derive(Serialize, Debug, Clone, PartialEq))]
+#[cfg_attr(feature = "jason", derive(Deserialize))]
 pub struct Snapshot {
-    pub peers: HashMap<u64, Peer>,
+    pub peers: HashMap<PeerId, Peer>,
     pub ice_servers: Vec<IceServer>,
 }
 
@@ -125,10 +128,6 @@ pub enum Command {
         peer_id: PeerId,
         candidate: IceCandidate,
     },
-
-    GetIceCandidatesByHash {
-        hashed_ice_candidates: HashMap<u64, Vec<String>>,
-    },
 }
 
 /// WebSocket message from Medea to Jason.
@@ -148,7 +147,10 @@ pub enum Event {
     },
     /// Media Server notifies Web Client about necessity to apply specified SDP
     /// Answer to Web Client's RTCPeerConnection.
-    SdpAnswerMade { peer_id: PeerId, sdp_answer: String },
+    SdpAnswerMade {
+        peer_id: PeerId,
+        sdp_answer: String,
+    },
 
     /// Media Server notifies Web Client about necessity to apply specified
     /// ICE Candidate.
@@ -168,7 +170,7 @@ pub enum Event {
     },
 
     AddIceCandidates {
-        ice_candidates: HashMap<u64, Vec<IceCandidate>>,
+        ice_candidates: HashMap<PeerId, Vec<IceCandidate>>,
     },
 }
 
