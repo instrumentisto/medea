@@ -2,7 +2,6 @@ language: rust
 cache: cargo
 
 install:
-  - bash _ci/protoc_install.sh
   - rustc -vV
   - cargo -vV
 
@@ -34,7 +33,6 @@ jobs:
       stage: check
       rust: nightly
       cache: false
-      env: DONT_INSTALL_PROTOC=1
       before_script: rustup component add rustfmt
       script: make fmt check=yes
 
