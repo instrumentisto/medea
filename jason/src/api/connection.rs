@@ -50,9 +50,8 @@ pub(crate) struct Connection(Rc<RefCell<InnerConnection>>);
 impl Connection {
     /// Instantiates new [`Connection`] for a given [`Member`].
     #[inline]
-    pub(crate) fn new(member_id: u64) -> Self {
+    pub(crate) fn new() -> Self {
         Self(Rc::new(RefCell::new(InnerConnection {
-            remote_member: member_id,
             on_remote_stream: Callback::default(),
         })))
     }

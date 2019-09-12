@@ -22,7 +22,7 @@ use medea_client_api_proto::{
 
 use crate::{
     media::MediaStream,
-    peer::{PeerEvent, PeerEventHandler, PeerId, PeerRepository},
+    peer::{PeerEvent, PeerEventHandler, PeerRepository},
     rpc::RpcClient,
     utils::{Callback2, WasmErr},
 };
@@ -280,7 +280,7 @@ impl EventHandler for InnerRoom {
                     candidate.sdp_m_line_index,
                     &candidate.sdp_mid,
                 )
-                    .map_err(|err| err.log_err()),
+                .map_err(|err| err.log_err()),
             );
         } else {
             // TODO: No peer, whats next?
