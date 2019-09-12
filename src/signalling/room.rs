@@ -145,7 +145,7 @@ impl Room {
 
     pub fn take_snapshot(&self, member_id: &MemberId) -> Snapshot {
         // TODO: Return MemberNotFound Error.
-        let member = self.members.get_member(member_id).unwrap();
+        let member = self.members.get_member_by_id(member_id).unwrap();
         let ice_servers = member.servers_list().unwrap_or(Vec::new());
 
         let peers = self.peers.get_peers_by_member_id(member_id);
@@ -684,13 +684,12 @@ impl Handler<RpcConnectionEstablished> for Room {
             });
 
         if is_reconnect {
+            let snapshot = self.take_snapshot(&msg.member_id);
             ctx.spawn(wrap_future(
                 self.members
                     .send_event_to_member(
-                        msg.member_id.clone(),
-                        Event::RestoreState {
-                            snapshot: self.take_snapshot(&msg.member_id),
-                        },
+                        msg.member_id,
+                        Event::RestoreState { snapshot },
                     )
                     .map_err(move |e| {
                         // TODO: Maybe handle this error??

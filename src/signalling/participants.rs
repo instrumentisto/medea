@@ -115,18 +115,6 @@ impl ParticipantService {
         })
     }
 
-    pub fn get_member(&self, member_id: &MemberId) -> Option<&Member> {
-        self.members.get(member_id)
-    }
-
-    pub fn take_member(&mut self, member_id: &MemberId) -> Option<Member> {
-        self.members.remove(member_id)
-    }
-
-    pub fn insert_member(&mut self, member: Member) {
-        self.members.insert(member.id(), member);
-    }
-
     /// Lookups [`Member`] by provided [`MemberId`].
     pub fn get_member_by_id(&self, id: &MemberId) -> Option<&Member> {
         self.members.get(id)

@@ -168,16 +168,12 @@ pub enum Event {
     RestoreState {
         snapshot: Snapshot,
     },
-
-    AddIceCandidates {
-        ice_candidates: HashMap<PeerId, Vec<IceCandidate>>,
-    },
 }
 
 /// Represents [RTCIceCandidateInit][1] object.
 ///
 /// [1]: https://www.w3.org/TR/webrtc/#dom-rtcicecandidateinit
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize, Hash)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct IceCandidate {
     pub candidate: String,
     pub sdp_m_line_index: Option<u16>,

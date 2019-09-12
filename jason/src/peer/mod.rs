@@ -284,15 +284,6 @@ impl PeerConnection {
     pub fn current_remote_description(&self) -> Option<RtcSessionDescription> {
         self.0.peer.current_remote_description()
     }
-
-    pub fn get_missing_ice_candidates(
-        &self,
-        hashed_ice_candidates: Vec<String>,
-    ) -> Vec<String> {
-        self.0
-            .peer
-            .get_missing_ice_candidates(hashed_ice_candidates)
-    }
 }
 
 impl Drop for PeerConnection {
