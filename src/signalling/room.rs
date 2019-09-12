@@ -41,6 +41,7 @@ use crate::{
     },
     turn::TurnAuthService,
 };
+use futures::IntoFuture;
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
 pub type ActFuture<I, E> =
@@ -143,41 +144,39 @@ impl Room {
         self.id.clone()
     }
 
-    pub fn take_snapshot(&self, member_id: &MemberId) -> Snapshot {
+    pub fn take_snapshot(
+        &self,
+        member_id: &MemberId,
+    ) -> Result<Snapshot, RoomError> {
         // TODO: Return MemberNotFound Error.
-        let member = self.members.get_member_by_id(member_id).unwrap();
+        let member = self
+            .members
+            .get_member_by_id(member_id)
+            .ok_or_else(|| RoomError::MemberNotFound(member_id.clone()))?;
         let ice_servers = member.servers_list().unwrap_or(Vec::new());
 
         let peers = self.peers.get_peers_by_member_id(member_id);
-        let mut snapshot_peers = HashMap::new();
+        let mut peers_snapshots = HashMap::new();
         for peer in peers {
-            let state = PeerState::from(peer);
-            let id = peer.id();
-            let sdp_offer = peer.sdp_offer();
-            let sdp_answer = peer.sdp_answer();
-            let ice_candidates = peer.get_ice_candidates();
-            let tracks = peer.tracks();
             let remote_peer =
                 self.peers.get_peer_by_id(peer.partner_peer_id()).unwrap(); // TODO (evdokimovs): panic
-            let remote_sdp_offer = remote_peer.sdp_offer();
-            let remote_sdp_answer = remote_peer.sdp_answer();
-            let peer_snap = PeerSnapshot {
-                id,
-                sdp_answer,
-                sdp_offer,
-                remote_sdp_offer,
-                remote_sdp_answer,
-                state,
-                ice_candidates,
-                tracks,
+            let peer_snapshot = PeerSnapshot {
+                id: peer.id(),
+                sdp_answer: peer.sdp_answer(),
+                sdp_offer: peer.sdp_offer(),
+                remote_sdp_offer: remote_peer.sdp_offer(),
+                remote_sdp_answer: remote_peer.sdp_answer(),
+                state: PeerState::from(peer),
+                ice_candidates: peer.get_ice_candidates(),
+                tracks: peer.tracks(),
             };
-            snapshot_peers.insert(id, peer_snap);
+            peers_snapshots.insert(peer.id(), peer_snapshot);
         }
 
-        Snapshot {
-            peers: snapshot_peers,
+        Ok(Snapshot {
+            peers: peers_snapshots,
             ice_servers,
-        }
+        })
     }
 
     /// Sends [`Event::PeerCreated`] to one of specified [`Peer`]s based on
@@ -684,7 +683,7 @@ impl Handler<RpcConnectionEstablished> for Room {
             });
 
         if is_reconnect {
-            let snapshot = self.take_snapshot(&msg.member_id);
+            let snapshot = self.take_snapshot(&msg.member_id).unwrap();
             ctx.spawn(wrap_future(
                 self.members
                     .send_event_to_member(
