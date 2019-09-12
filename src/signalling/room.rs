@@ -1,15 +1,18 @@
 //! Room definitions and implementations. Room is responsible for media
 //! connection establishment between concrete [`Member`]s.
 //!
-//! [`Member`]: crate::api::control::member::Member
+//! [`Member`]: crate::signalling::elements::member::Member
 
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use actix::{
     fut::wrap_future, Actor, ActorFuture, AsyncContext, Context, Handler,
-    Message, ResponseActFuture, WrapFuture as _,
+    ResponseActFuture, WrapFuture as _,
 };
+use derive_more::Display;
 use failure::Fail;
+use futures::future;
+use medea_client_api_proto::{Command, Event, IceCandidate, PeerId, TrackId};
 use futures::future::{self, Future as _};
 use medea_client_api_proto::{
     Command, Event, IceCandidate, Peer as PeerSnapshot, PeerState, Snapshot,
@@ -18,54 +21,70 @@ use medea_client_api_proto::{
 use crate::{
     api::{
         client::rpc_connection::{
-            AuthorizationError, Authorize, CommandMessage, RpcConnectionClosed,
-            RpcConnectionEstablished,
+            AuthorizationError, Authorize, ClosedReason, CommandMessage,
+            RpcConnectionClosed, RpcConnectionEstablished,
         },
-        control::{Member, MemberId},
+        control::{MemberId, RoomId, RoomSpec, TryFromElementError},
     },
     log::prelude::*,
     media::{
-        New, Peer, PeerError, PeerId, PeerStateMachine, WaitLocalHaveRemote,
+        New, Peer, PeerError, PeerStateMachine, WaitLocalHaveRemote,
         WaitLocalSdp, WaitRemoteSdp,
     },
     shutdown::ShutdownGracefully,
-    signalling::{participants::ParticipantService, peers::PeerRepository},
+    signalling::{
+        elements::{
+            endpoints::webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
+            Member, MembersLoadError,
+        },
+        participants::ParticipantService,
+        peers::PeerRepository,
+    },
     turn::TurnAuthService,
 };
-
-/// ID of [`Room`].
-pub type Id = u64;
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
 pub type ActFuture<I, E> =
     Box<dyn ActorFuture<Actor = Room, Item = I, Error = E>>;
 
-#[derive(Debug, Fail)]
 #[allow(clippy::module_name_repetitions)]
+#[derive(Debug, Fail, Display)]
 pub enum RoomError {
-    #[fail(display = "Couldn't find Peer with [id = {}]", _0)]
+    #[display(fmt = "Couldn't find Peer with [id = {}]", _0)]
     PeerNotFound(PeerId),
-    #[fail(display = "Couldn't find Member with [id = {}]", _0)]
+    #[display(fmt = "Couldn't find Member with [id = {}]", _0)]
     MemberNotFound(MemberId),
-    #[fail(display = "Member [id = {}] does not have Turn credentials", _0)]
+    #[display(fmt = "Member [id = {}] does not have Turn credentials", _0)]
     NoTurnCredentials(MemberId),
-    #[fail(display = "Couldn't find RpcConnection with Member [id = {}]", _0)]
+    #[display(fmt = "Couldn't find RpcConnection with Member [id = {}]", _0)]
     ConnectionNotExists(MemberId),
-    #[fail(display = "Unable to send event to Member [id = {}]", _0)]
+    #[display(fmt = "Unable to send event to Member [id = {}]", _0)]
     UnableToSendEvent(MemberId),
-    #[fail(display = "PeerError: {}", _0)]
+    #[display(fmt = "PeerError: {}", _0)]
     PeerError(PeerError),
-    #[fail(display = "Generic room error {}", _0)]
+    #[display(fmt = "Generic room error {}", _0)]
     BadRoomSpec(String),
-    #[fail(display = "Turn service error: {}", _0)]
+    #[display(fmt = "Turn service error: {}", _0)]
     TurnServiceError(String),
-    #[fail(display = "Client error:{}", _0)]
+    #[display(fmt = "Client error:{}", _0)]
     ClientError(String),
 }
 
 impl From<PeerError> for RoomError {
     fn from(err: PeerError) -> Self {
-        RoomError::PeerError(err)
+        Self::PeerError(err)
+    }
+}
+
+impl From<TryFromElementError> for RoomError {
+    fn from(err: TryFromElementError) -> Self {
+        Self::BadRoomSpec(format!("Element located in wrong place: {}", err))
+    }
+}
+
+impl From<MembersLoadError> for RoomError {
+    fn from(err: MembersLoadError) -> Self {
+        Self::BadRoomSpec(format!("Error while loading room spec: {}", err))
     }
 }
 
@@ -83,12 +102,13 @@ enum State {
 /// Media server room with its [`Member`]s.
 #[derive(Debug)]
 pub struct Room {
-    id: Id,
+    id: RoomId,
 
-    /// [`RpcConnection`]s of [`Member`]s in this [`Room`].
+    /// [`Member`]s and associated [`RpcConnection`]s of this [`Room`], handles
+    /// [`RpcConnection`] authorization, establishment, message sending.
     ///
     /// [`RpcConnection`]: crate::api::client::rpc_connection::RpcConnection
-    pub participants: ParticipantService,
+    pub members: ParticipantService,
 
     /// [`Peer`]s of [`Member`]s in this [`Room`].
     peers: PeerRepository,
@@ -99,24 +119,29 @@ pub struct Room {
 
 impl Room {
     /// Create new instance of [`Room`].
+    ///
+    /// Returns [`RoomError::BadRoomSpec`] when errs while `Element`
+    /// transformation happens.
     pub fn new(
-        id: Id,
-        members: HashMap<MemberId, Member>,
-        peers: HashMap<PeerId, PeerStateMachine>,
+        room_spec: &RoomSpec,
         reconnect_timeout: Duration,
         turn: Arc<dyn TurnAuthService>,
-    ) -> Self {
-        Self {
-            id,
-            peers: PeerRepository::from(peers),
-            participants: ParticipantService::new(
-                id,
-                members,
-                turn,
+    ) -> Result<Self, RoomError> {
+        Ok(Self {
+            id: room_spec.id().clone(),
+            peers: PeerRepository::from(HashMap::new()),
+            members: ParticipantService::new(
+                room_spec,
                 reconnect_timeout,
-            ),
+                turn,
+            )?,
             state: State::Started,
-        }
+        })
+    }
+
+    /// Returns [`RoomId`] of this [`Room`].
+    pub fn get_id(&self) -> RoomId {
+        self.id.clone()
     }
 
     pub fn take_snapshot(&self, member_id: MemberId) -> Snapshot {
@@ -191,13 +216,11 @@ impl Room {
         let sender = sender.start();
         let member_id = sender.member_id();
         let ice_servers = self
-            .participants
-            .get_member(member_id)
-            .ok_or_else(|| RoomError::MemberNotFound(member_id))?
-            .ice_user
-            .as_ref()
-            .ok_or_else(|| RoomError::NoTurnCredentials(member_id))?
-            .servers_list();
+            .members
+            .get_member_by_id(&member_id)
+            .ok_or_else(|| RoomError::MemberNotFound(member_id.clone()))?
+            .servers_list()
+            .ok_or_else(|| RoomError::NoTurnCredentials(member_id.clone()))?;
         let peer_created = Event::PeerCreated {
             peer_id: sender.id(),
             sdp_offer: None,
@@ -206,8 +229,21 @@ impl Room {
         };
         self.peers.add_peer(sender);
         Ok(Box::new(wrap_future(
-            self.participants
-                .send_event_to_member(member_id, peer_created),
+            self.members.send_event_to_member(member_id, peer_created),
+        )))
+    }
+
+    /// Sends [`Event::PeersRemoved`] to [`Member`].
+    fn send_peers_removed(
+        &mut self,
+        member_id: MemberId,
+        removed_peers_ids: Vec<PeerId>,
+    ) -> ActFuture<(), RoomError> {
+        Box::new(wrap_future(self.members.send_event_to_member(
+            member_id,
+            Event::PeersRemoved {
+                peer_ids: removed_peers_ids,
+            },
         )))
     }
 
@@ -219,7 +255,7 @@ impl Room {
         &mut self,
         from_peer_id: PeerId,
         sdp_offer: String,
-        mids: HashMap<u64, String>,
+        mids: HashMap<TrackId, String>,
     ) -> Result<ActFuture<(), RoomError>, RoomError> {
         let mut from_peer: Peer<WaitLocalSdp> =
             self.peers.take_inner_peer(from_peer_id)?;
@@ -233,16 +269,16 @@ impl Room {
 
         let to_member_id = to_peer.member_id();
         let ice_servers = self
-            .participants
-            .get_member(to_member_id)
-            .ok_or_else(|| RoomError::MemberNotFound(to_member_id))?
-            .ice_user
-            .as_ref()
-            .ok_or_else(|| RoomError::NoTurnCredentials(to_member_id))?
-            .servers_list();
+            .members
+            .get_member_by_id(&to_member_id)
+            .ok_or_else(|| RoomError::MemberNotFound(to_member_id.clone()))?
+            .servers_list()
+            .ok_or_else(|| {
+                RoomError::NoTurnCredentials(to_member_id.clone())
+            })?;
 
         let event = Event::PeerCreated {
-            peer_id: to_peer_id,
+            peer_id: to_peer.id(),
             sdp_offer: Some(sdp_offer),
             tracks: to_peer.tracks(),
             ice_servers,
@@ -252,7 +288,7 @@ impl Room {
         self.peers.add_peer(to_peer);
 
         Ok(Box::new(wrap_future(
-            self.participants.send_event_to_member(to_member_id, event),
+            self.members.send_event_to_member(to_member_id, event),
         )))
     }
 
@@ -285,7 +321,7 @@ impl Room {
         self.peers.add_peer(to_peer);
 
         Ok(Box::new(wrap_future(
-            self.participants.send_event_to_member(to_member_id, event),
+            self.members.send_event_to_member(to_member_id, event),
         )))
     }
 
@@ -296,7 +332,7 @@ impl Room {
         from_peer_id: PeerId,
         candidate: IceCandidate,
     ) -> Result<ActFuture<(), RoomError>, RoomError> {
-        let from_peer = self.peers.get_peer(from_peer_id)?;
+        let from_peer = self.peers.get_peer_by_id(from_peer_id)?;
         if let PeerStateMachine::New(_) = from_peer {
             return Err(PeerError::WrongState(
                 from_peer_id,
@@ -327,8 +363,152 @@ impl Room {
         };
 
         Ok(Box::new(wrap_future(
-            self.participants.send_event_to_member(to_member_id, event),
+            self.members.send_event_to_member(to_member_id, event),
         )))
+    }
+
+    /// Creates [`Peer`] for endpoints if [`Peer`] between endpoint's members
+    /// doesn't exist.
+    ///
+    /// Adds `send` track to source member's [`Peer`] and `recv` to
+    /// sink member's [`Peer`].
+    ///
+    /// Returns [`PeerId`]s of newly created [`Peer`] if it has been created.
+    ///
+    /// # Panics
+    ///
+    /// Panics if provided endpoints have interconnected [`Peer`]s already.
+    fn connect_endpoints(
+        &mut self,
+        src: &WebRtcPublishEndpoint,
+        sink: &WebRtcPlayEndpoint,
+    ) -> Option<(PeerId, PeerId)> {
+        let src_owner = src.owner();
+        let sink_owner = sink.owner();
+
+        if let Some((src_peer_id, sink_peer_id)) = self
+            .peers
+            .get_peer_by_members_ids(&src_owner.id(), &sink_owner.id())
+        {
+            // TODO: when dynamic patching of [`Room`] will be done then we need
+            //       rewrite this code to updating [`Peer`]s in not
+            //       [`Peer<New>`] state.
+            let mut src_peer: Peer<New> =
+                self.peers.take_inner_peer(src_peer_id).unwrap();
+            let mut sink_peer: Peer<New> =
+                self.peers.take_inner_peer(sink_peer_id).unwrap();
+
+            src_peer
+                .add_publisher(&mut sink_peer, self.peers.get_tracks_counter());
+
+            src.add_peer_id(src_peer_id);
+            sink.set_peer_id(sink_peer_id);
+
+            self.peers.add_peer(src_peer);
+            self.peers.add_peer(sink_peer);
+        } else {
+            let (mut src_peer, mut sink_peer) =
+                self.peers.create_peers(&src_owner, &sink_owner);
+
+            src_peer
+                .add_publisher(&mut sink_peer, self.peers.get_tracks_counter());
+
+            src.add_peer_id(src_peer.id());
+            sink.set_peer_id(sink_peer.id());
+
+            let src_peer_id = src_peer.id();
+            let sink_peer_id = sink_peer.id();
+
+            self.peers.add_peer(src_peer);
+            self.peers.add_peer(sink_peer);
+
+            return Some((src_peer_id, sink_peer_id));
+        };
+
+        None
+    }
+
+    /// Creates and interconnects all [`Peer`]s between connected [`Member`]
+    /// and all available at this moment other [`Member`]s.
+    ///
+    /// Availability is determined by checking [`RpcConnection`] of all
+    /// [`Member`]s from [`WebRtcPlayEndpoint`]s and from receivers of
+    /// the connected [`Member`].
+    fn init_member_connections(
+        &mut self,
+        member: &Member,
+        ctx: &mut <Self as Actor>::Context,
+    ) {
+        let mut created_peers: Vec<(PeerId, PeerId)> = Vec::new();
+
+        // Create all connected publish endpoints.
+        for publisher in member.srcs().values() {
+            for receiver in publisher.sinks() {
+                let receiver_owner = receiver.owner();
+
+                if receiver.peer_id().is_none()
+                    && self.members.member_has_connection(&receiver_owner.id())
+                {
+                    if let Some(p) =
+                        self.connect_endpoints(&publisher, &receiver)
+                    {
+                        created_peers.push(p)
+                    }
+                }
+            }
+        }
+
+        // Create all connected play's receivers peers.
+        for receiver in member.sinks().values() {
+            let publisher = receiver.src();
+
+            if receiver.peer_id().is_none()
+                && self.members.member_has_connection(&publisher.owner().id())
+            {
+                if let Some(p) = self.connect_endpoints(&publisher, &receiver) {
+                    created_peers.push(p);
+                }
+            }
+        }
+
+        for (first_peer_id, second_peer_id) in created_peers {
+            self.connect_peers(ctx, first_peer_id, second_peer_id);
+        }
+    }
+
+    /// Checks state of interconnected [`Peer`]s and sends [`Event`] about
+    /// [`Peer`] created to remote [`Member`].
+    fn connect_peers(
+        &mut self,
+        ctx: &mut Context<Self>,
+        first_peer: PeerId,
+        second_peer: PeerId,
+    ) {
+        let fut: ActFuture<(), ()> =
+            match self.send_peer_created(first_peer, second_peer) {
+                Ok(res) => {
+                    Box::new(res.then(|res, room, ctx| -> ActFuture<(), ()> {
+                        if res.is_ok() {
+                            return Box::new(future::ok(()).into_actor(room));
+                        }
+                        error!(
+                            "Failed handle command, because {}. Room will be \
+                             stopped.",
+                            res.unwrap_err(),
+                        );
+                        room.close_gracefully(ctx)
+                    }))
+                }
+                Err(err) => {
+                    error!(
+                    "Failed handle command, because {}. Room will be stopped.",
+                    err
+                );
+                    self.close_gracefully(ctx)
+                }
+            };
+
+        ctx.spawn(fut);
     }
 
     fn handle_get_ice_candidates_by_hash(
@@ -374,18 +554,61 @@ impl Room {
         info!("Closing Room [id = {:?}]", self.id);
         self.state = State::Stopping;
 
-        let room_id = self.id;
         Box::new(
-            self.participants
+            self.members
                 .drop_connections(ctx)
                 .into_actor(self)
-                .map(move |_, room: &mut Self, _| {
+                .map(|_, room: &mut Self, _| {
                     room.state = State::Stopped;
                 })
-                .map_err(move |_, _, _| {
-                    error!("Error closing room {:?}", room_id);
+                .map_err(|_, room, _| {
+                    error!("Error closing room {:?}", room.id);
                 }),
         )
+    }
+
+    /// Signals about removing [`Member`]'s [`Peer`]s.
+    fn member_peers_removed(
+        &mut self,
+        peers_id: Vec<PeerId>,
+        member_id: MemberId,
+        ctx: &mut Context<Self>,
+    ) -> ActFuture<(), ()> {
+        info!("Peers {:?} removed for member '{}'.", peers_id, member_id);
+        if let Some(member) = self.members.get_member_by_id(&member_id) {
+            member.peers_removed(&peers_id);
+        } else {
+            error!(
+                "Participant with id {} for which received \
+                 Event::PeersRemoved not found. Closing room.",
+                member_id
+            );
+
+            return Box::new(self.close_gracefully(ctx));
+        }
+
+        Box::new(self.send_peers_removed(member_id, peers_id).then(
+            |err, room, ctx: &mut Context<Self>| {
+                if let Err(e) = err {
+                    match e {
+                        RoomError::ConnectionNotExists(_)
+                        | RoomError::UnableToSendEvent(_) => {
+                            Box::new(future::ok(()).into_actor(room))
+                        }
+                        _ => {
+                            error!(
+                                "Unexpected failed PeersEvent command, \
+                                 because {}. Room will be stopped.",
+                                e
+                            );
+                            room.close_gracefully(ctx)
+                        }
+                    }
+                } else {
+                    Box::new(future::ok(()).into_actor(room))
+                }
+            },
+        ))
     }
 }
 
@@ -404,49 +627,9 @@ impl Handler<Authorize> for Room {
         msg: Authorize,
         _ctx: &mut Self::Context,
     ) -> Self::Result {
-        self.participants
-            .get_member_by_id_and_credentials(msg.member_id, &msg.credentials)
+        self.members
+            .get_member_by_id_and_credentials(&msg.member_id, &msg.credentials)
             .map(|_| ())
-    }
-}
-
-/// Signal of start signaling between specified [`Peer`]'s.
-#[derive(Debug, Message)]
-#[rtype(result = "Result<(), ()>")]
-pub struct ConnectPeers(PeerId, PeerId);
-
-impl Handler<ConnectPeers> for Room {
-    type Result = ActFuture<(), ()>;
-
-    /// Check state of interconnected [`Peer`]s and sends [`Event`] about
-    /// [`Peer`] created to remote [`Member`].
-    fn handle(
-        &mut self,
-        msg: ConnectPeers,
-        ctx: &mut Self::Context,
-    ) -> Self::Result {
-        match self.send_peer_created(msg.0, msg.1) {
-            Ok(res) => {
-                Box::new(res.then(|res, room, ctx| -> ActFuture<(), ()> {
-                    if res.is_ok() {
-                        return Box::new(future::ok(()).into_actor(room));
-                    }
-                    error!(
-                        "Failed handle command, because {}. Room will be \
-                         stopped.",
-                        res.unwrap_err(),
-                    );
-                    room.close_gracefully(ctx)
-                }))
-            }
-            Err(err) => {
-                error!(
-                    "Failed handle command, because {}. Room will be stopped.",
-                    err
-                );
-                self.close_gracefully(ctx)
-            }
-        }
     }
 }
 
@@ -508,6 +691,7 @@ impl Handler<RpcConnectionEstablished> for Room {
 
     /// Saves new [`RpcConnection`] in [`ParticipantService`], initiates media
     /// establishment between members.
+    /// Creates and interconnects all available [`Member`]'s [`Peer`]s.
     ///
     /// [`RpcConnection`]: crate::api::client::rpc_connection::RpcConnection
     fn handle(
@@ -515,36 +699,20 @@ impl Handler<RpcConnectionEstablished> for Room {
         msg: RpcConnectionEstablished,
         ctx: &mut Self::Context,
     ) -> Self::Result {
-        let member_id = msg.member_id;
         info!("RpcConnectionEstablished for member {}", msg.member_id);
 
         // TODO: Maybe better way to detect reconnect of member??
         let is_reconnect = self.participants.member_has_connection(member_id);
 
-        let fut =
-            self.participants
-                .connection_established(ctx, msg.member_id, msg.connection)
-                .map_err(|err, _, _| {
-                    error!("RpcConnectionEstablished error {:?}", err)
-                })
-                .map(move |_, room, ctx| {
-                    room.peers
-                        .get_peers_by_member_id(member_id)
-                        .into_iter()
-                        .for_each(|peer| {
-                            // Only New peers should be connected.
-                            if let PeerStateMachine::New(peer) = peer {
-                                if room.participants.member_has_connection(
-                                    peer.partner_member_id(),
-                                ) {
-                                    ctx.notify(ConnectPeers(
-                                        peer.id(),
-                                        peer.partner_peer_id(),
-                                    ));
-                                }
-                            }
-                        });
-                });
+        let fut = self
+            .members
+            .connection_established(ctx, msg.member_id, msg.connection)
+            .map_err(|err, _, _| {
+                error!("RpcConnectionEstablished error {:?}", err)
+            })
+            .map(|member, room, ctx| {
+                room.init_member_connections(&member, ctx);
+            });
 
         if is_reconnect {
             ctx.spawn(wrap_future(
@@ -565,7 +733,6 @@ impl Handler<RpcConnectionEstablished> for Room {
                     }),
             ));
         }
-
         Box::new(fut)
     }
 }
@@ -590,205 +757,37 @@ impl Handler<RpcConnectionClosed> for Room {
     type Result = ();
 
     /// Passes message to [`ParticipantService`] to cleanup stored connections.
+    ///
+    /// Removes all related for disconnected [`Member`] [`Peer`]s.
+    ///
+    /// Sends [`PeersRemoved`] message to [`Member`].
+    ///
+    /// Deletes all removed [`PeerId`]s from all [`Member`]'s endpoints.
+    ///
+    /// [`PeersRemoved`]: medea-client-api-proto::Event::PeersRemoved
     fn handle(&mut self, msg: RpcConnectionClosed, ctx: &mut Self::Context) {
         info!(
             "RpcConnectionClosed for member {}, reason {:?}",
             msg.member_id, msg.reason
         );
 
-        self.participants
-            .connection_closed(ctx, msg.member_id, &msg.reason);
-    }
-}
+        self.members
+            .connection_closed(msg.member_id.clone(), &msg.reason, ctx);
 
-#[cfg(test)]
-mod test {
-    use std::sync::{atomic::AtomicUsize, Arc, Mutex};
+        if let ClosedReason::Closed = msg.reason {
+            let removed_peers =
+                self.peers.remove_peers_related_to_member(&msg.member_id);
 
-    use actix::{Addr, System};
-
-    use medea_client_api_proto::{
-        AudioSettings, Direction, IceServer, MediaType, Track, VideoSettings,
-    };
-
-    use crate::{
-        api::client::rpc_connection::test::TestConnection, media::create_peers,
-        turn::new_turn_auth_service_mock,
-    };
-
-    use super::*;
-
-    fn start_room() -> Addr<Room> {
-        let members = hashmap! {
-            1 => Member{
-                id: 1,
-                credentials: "caller_credentials".to_owned(),
-                ice_user: None
-            },
-            2 => Member{
-                id: 2,
-                credentials: "responder_credentials".to_owned(),
-                ice_user: None
-            },
-        };
-        Room::new(
-            1,
-            members,
-            create_peers(1, 2),
-            Duration::from_secs(10),
-            new_turn_auth_service_mock(),
-        )
-        .start()
-    }
-
-    // TODO: This test randomly fails due to random ordering
-    //       in `Event::PeerCreated::tracks`.
-    //       Should be fixed either with order preserving, or with more
-    //       intelligent comparison (no just JSON strings equality).
-    //       The later is preferred.
-    #[ignore]
-    #[test]
-    fn start_signaling() {
-        let stopped = Arc::new(AtomicUsize::new(0));
-        let caller_events = Arc::new(Mutex::new(vec![]));
-        let caller_events_clone = Arc::clone(&caller_events);
-        let responder_events = Arc::new(Mutex::new(vec![]));
-        let responder_events_clone = Arc::clone(&responder_events);
-
-        System::run(move || {
-            let room = start_room();
-            let room_clone = room.clone();
-            let stopped_clone = stopped.clone();
-
-            TestConnection {
-                events: caller_events_clone,
-                member_id: 1,
-                room: room_clone,
-                stopped: stopped_clone,
+            for (peer_member_id, peers_ids) in removed_peers {
+                // Here we may have some problems. If two participants
+                // disconnect at one moment then sending event
+                // to another participant fail,
+                // because connection already closed but we don't know about it
+                // because message in event loop.
+                let fut =
+                    self.member_peers_removed(peers_ids, peer_member_id, ctx);
+                ctx.spawn(fut);
             }
-            .start();
-
-            TestConnection {
-                events: responder_events_clone,
-                member_id: 2,
-                room,
-                stopped,
-            }
-            .start();
-        })
-        .unwrap();
-
-        let caller_events = caller_events.lock().unwrap();
-        let responder_events = responder_events.lock().unwrap();
-        assert_eq!(
-            caller_events.to_vec(),
-            vec![
-                serde_json::to_string(&Event::PeerCreated {
-                    peer_id: 1,
-                    sdp_offer: None,
-                    tracks: vec![
-                        Track {
-                            id: 1,
-                            direction: Direction::Send {
-                                receivers: vec![2],
-                                mid: None
-                            },
-                            media_type: MediaType::Audio(AudioSettings {}),
-                        },
-                        Track {
-                            id: 2,
-                            direction: Direction::Send {
-                                receivers: vec![2],
-                                mid: None
-                            },
-                            media_type: MediaType::Video(VideoSettings {}),
-                        },
-                    ],
-                    ice_servers: vec![
-                        IceServer {
-                            urls: vec!["stun:5.5.5.5:1234".to_string()],
-                            username: None,
-                            credential: None,
-                        },
-                        IceServer {
-                            urls: vec![
-                                "turn:5.5.5.5:1234".to_string(),
-                                "turn:5.5.5.5:1234?transport=tcp".to_string()
-                            ],
-                            username: Some("username".to_string()),
-                            credential: Some("password".to_string()),
-                        },
-                    ],
-                })
-                .unwrap(),
-                serde_json::to_string(&Event::SdpAnswerMade {
-                    peer_id: 1,
-                    sdp_answer: "responder_answer".into(),
-                })
-                .unwrap(),
-                serde_json::to_string(&Event::IceCandidateDiscovered {
-                    peer_id: 1,
-                    candidate: IceCandidate {
-                        candidate: "ice_candidate".to_owned(),
-                        sdp_m_line_index: None,
-                        sdp_mid: None
-                    },
-                })
-                .unwrap(),
-            ]
-        );
-
-        assert_eq!(
-            responder_events.to_vec(),
-            vec![
-                serde_json::to_string(&Event::PeerCreated {
-                    peer_id: 2,
-                    sdp_offer: Some("caller_offer".into()),
-                    tracks: vec![
-                        Track {
-                            id: 1,
-                            direction: Direction::Recv {
-                                sender: 1,
-                                mid: Some(String::from("0"))
-                            },
-                            media_type: MediaType::Audio(AudioSettings {}),
-                        },
-                        Track {
-                            id: 2,
-                            direction: Direction::Recv {
-                                sender: 1,
-                                mid: Some(String::from("1"))
-                            },
-                            media_type: MediaType::Video(VideoSettings {}),
-                        },
-                    ],
-                    ice_servers: vec![
-                        IceServer {
-                            urls: vec!["stun:5.5.5.5:1234".to_string()],
-                            username: None,
-                            credential: None,
-                        },
-                        IceServer {
-                            urls: vec![
-                                "turn:5.5.5.5:1234".to_string(),
-                                "turn:5.5.5.5:1234?transport=tcp".to_string()
-                            ],
-                            username: Some("username".to_string()),
-                            credential: Some("password".to_string()),
-                        },
-                    ],
-                })
-                .unwrap(),
-                serde_json::to_string(&Event::IceCandidateDiscovered {
-                    peer_id: 2,
-                    candidate: IceCandidate {
-                        candidate: "ice_candidate".to_owned(),
-                        sdp_m_line_index: None,
-                        sdp_mid: None
-                    },
-                })
-                .unwrap(),
-            ]
-        );
+        }
     }
 }

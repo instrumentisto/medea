@@ -4,7 +4,7 @@
 
 use medea_client_api_proto::IceServer;
 
-use crate::signalling::RoomId;
+use crate::api::control::RoomId;
 
 /// Credentials on Turn server.
 #[derive(Clone, Debug)]
@@ -25,7 +25,7 @@ impl IceUser {
     /// Build new non static [`IceUser`].
     pub fn build(
         address: String,
-        room_id: RoomId,
+        room_id: &RoomId,
         name: &str,
         pass: String,
     ) -> Self {

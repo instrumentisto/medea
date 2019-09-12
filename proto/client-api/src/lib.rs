@@ -1,12 +1,51 @@
 //! Client API protocol implementation for Medea media server.
 
-// TODO: when using enum's Self will be in stable, remove it.
-#![allow(clippy::use_self)]
-
 use std::collections::HashMap;
 
+use derive_more::Display;
 use medea_macro::dispatchable;
 use serde::{de::Deserializer, ser::Serializer, Deserialize, Serialize};
+
+/// ID of `Peer`.
+#[cfg_attr(
+    feature = "medea",
+    derive(Deserialize, Debug, Hash, Eq, Default, PartialEq)
+)]
+#[cfg_attr(feature = "jason", derive(Serialize))]
+#[derive(Clone, Copy, Display)]
+pub struct PeerId(pub u64);
+
+/// ID of `MediaTrack`.
+#[cfg_attr(
+    feature = "medea",
+    derive(Deserialize, Debug, Hash, Eq, Default, PartialEq)
+)]
+#[cfg_attr(feature = "jason", derive(Serialize))]
+#[derive(Clone, Copy, Display)]
+pub struct TrackId(pub u64);
+
+/// Value that is able to be incremented by `1`.
+#[cfg(feature = "medea")]
+pub trait Incrementable {
+    /// Returns current value + 1.
+    fn incr(&self) -> Self;
+}
+
+/// Implements [`Incrementable`] trait for newtype with any numeric type.
+macro_rules! impl_incrementable {
+    ($name:ty) => {
+        impl Incrementable for $name {
+            fn incr(&self) -> Self {
+                Self(self.0 + 1)
+            }
+        }
+    };
+}
+
+#[cfg(feature = "medea")]
+impl_incrementable!(PeerId);
+#[cfg(feature = "medea")]
+impl_incrementable!(TrackId);
 
 #[derive(Deserialize, Serialize, Debug, PartialEq)]
 pub enum PeerState {
@@ -68,7 +107,7 @@ pub enum ClientMsg {
 pub enum Command {
     /// Web Client sends SDP Offer.
     MakeSdpOffer {
-        peer_id: u64,
+        peer_id: PeerId,
         sdp_offer: String,
         /// Associations between [`Track`] and transceiver's [media
         /// description][1].
@@ -76,15 +115,14 @@ pub enum Command {
         /// `mid` is basically an ID of [`m=<media>` section][1] in SDP.
         ///
         /// [1]: https://tools.ietf.org/html/rfc4566#section-5.14
-        mids: HashMap<u64, String>,
+        mids: HashMap<TrackId, String>,
     },
 
     /// Web Client sends SDP Answer.
-    MakeSdpAnswer { peer_id: u64, sdp_answer: String },
-
+    MakeSdpAnswer { peer_id: PeerId, sdp_answer: String },
     /// Web Client sends Ice Candidate.
     SetIceCandidate {
-        peer_id: u64,
+        peer_id: PeerId,
         candidate: IceCandidate,
     },
 
@@ -96,38 +134,33 @@ pub enum Command {
 /// WebSocket message from Medea to Jason.
 #[allow(dead_code)]
 #[dispatchable]
-#[cfg_attr(feature = "medea", derive(Serialize))]
+#[cfg_attr(feature = "medea", derive(Serialize, Debug, Clone, PartialEq))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
-#[cfg_attr(test, derive(PartialEq))]
 #[serde(tag = "event", content = "data")]
-#[derive(Debug)]
 pub enum Event {
     /// Media Server notifies Web Client about necessity of RTCPeerConnection
     /// creation.
     PeerCreated {
-        peer_id: u64,
+        peer_id: PeerId,
         sdp_offer: Option<String>,
         tracks: Vec<Track>,
         ice_servers: Vec<IceServer>,
     },
     /// Media Server notifies Web Client about necessity to apply specified SDP
     /// Answer to Web Client's RTCPeerConnection.
-    SdpAnswerMade {
-        peer_id: u64,
-        sdp_answer: String,
-    },
+    SdpAnswerMade { peer_id: PeerId, sdp_answer: String },
 
     /// Media Server notifies Web Client about necessity to apply specified
     /// ICE Candidate.
     IceCandidateDiscovered {
-        peer_id: u64,
+        peer_id: PeerId,
         candidate: IceCandidate,
     },
 
     /// Media Server notifies Web Client about necessity of RTCPeerConnection
     /// close.
     PeersRemoved {
-        peer_ids: Vec<u64>,
+        peer_ids: Vec<PeerId>,
     },
 
     RestoreState {
@@ -150,12 +183,10 @@ pub struct IceCandidate {
 }
 
 /// [`Track`] with specified direction.
-#[cfg_attr(feature = "medea", derive(Serialize))]
+#[cfg_attr(feature = "medea", derive(Serialize, Debug, Clone, PartialEq))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
-#[cfg_attr(test, derive(PartialEq))]
-#[derive(Debug)]
 pub struct Track {
-    pub id: u64,
+    pub id: TrackId,
     pub direction: Direction,
     pub media_type: MediaType,
 }
@@ -166,9 +197,8 @@ pub struct Track {
 /// [1]: https://developer.mozilla.org/en-US/docs/Web/API/RTCIceServer
 /// [2]: https://developer.mozilla.org/en-US/docs/Web/API/RTCConfiguration
 #[derive(Clone, Debug)]
-#[cfg_attr(feature = "medea", derive(Serialize))]
+#[cfg_attr(feature = "medea", derive(Serialize, PartialEq))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
-#[cfg_attr(test, derive(PartialEq))]
 pub struct IceServer {
     pub urls: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -178,42 +208,34 @@ pub struct IceServer {
 }
 
 /// Direction of [`Track`].
-#[cfg_attr(feature = "medea", derive(Serialize))]
+#[cfg_attr(feature = "medea", derive(Serialize, Debug, Clone, PartialEq))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
-#[cfg_attr(test, derive(PartialEq))]
-#[derive(Debug)]
 // TODO: Use different struct without mids in TracksApplied event.
 pub enum Direction {
     Send {
-        receivers: Vec<u64>,
+        receivers: Vec<PeerId>,
         mid: Option<String>,
     },
     Recv {
-        sender: u64,
+        sender: PeerId,
         mid: Option<String>,
     },
 }
 
 /// Type of [`Track`].
-#[derive(Clone, Debug)]
-#[cfg_attr(feature = "medea", derive(Serialize))]
+#[cfg_attr(feature = "medea", derive(Serialize, Debug, PartialEq, Clone))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
-#[cfg_attr(test, derive(PartialEq))]
 pub enum MediaType {
     Audio(AudioSettings),
     Video(VideoSettings),
 }
 
-#[derive(Clone, Debug)]
-#[cfg_attr(feature = "medea", derive(Serialize))]
+#[cfg_attr(feature = "medea", derive(Serialize, Clone, Debug, PartialEq))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
-#[cfg_attr(test, derive(PartialEq))]
 pub struct AudioSettings {}
 
-#[derive(Clone, Debug)]
-#[cfg_attr(feature = "medea", derive(Serialize))]
+#[cfg_attr(feature = "medea", derive(Serialize, Clone, Debug, PartialEq))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
-#[cfg_attr(test, derive(PartialEq))]
 pub struct VideoSettings {}
 
 #[cfg(feature = "jason")]
@@ -225,12 +247,12 @@ impl Serialize for ClientMsg {
         use serde::ser::SerializeStruct;
 
         match self {
-            ClientMsg::Ping(n) => {
+            Self::Ping(n) => {
                 let mut ping = serializer.serialize_struct("ping", 1)?;
                 ping.serialize_field("ping", n)?;
                 ping.end()
             }
-            ClientMsg::Command(command) => command.serialize(serializer),
+            Self::Command(command) => command.serialize(serializer),
         }
     }
 }
@@ -256,7 +278,7 @@ impl<'de> Deserialize<'de> for ClientMsg {
                 ))
             })?;
 
-            Ok(ClientMsg::Ping(n))
+            Ok(Self::Ping(n))
         } else {
             let command =
                 serde_json::from_value::<Command>(ev).map_err(|e| {
@@ -265,7 +287,7 @@ impl<'de> Deserialize<'de> for ClientMsg {
                         e
                     ))
                 })?;
-            Ok(ClientMsg::Command(command))
+            Ok(Self::Command(command))
         }
     }
 }
@@ -279,12 +301,12 @@ impl Serialize for ServerMsg {
         use serde::ser::SerializeStruct;
 
         match self {
-            ServerMsg::Pong(n) => {
+            Self::Pong(n) => {
                 let mut ping = serializer.serialize_struct("pong", 1)?;
                 ping.serialize_field("pong", n)?;
                 ping.end()
             }
-            ServerMsg::Event(command) => command.serialize(serializer),
+            Self::Event(command) => command.serialize(serializer),
         }
     }
 }
@@ -310,7 +332,7 @@ impl<'de> Deserialize<'de> for ServerMsg {
                 ))
             })?;
 
-            Ok(ServerMsg::Pong(n))
+            Ok(Self::Pong(n))
         } else {
             let event = serde_json::from_value::<Event>(ev).map_err(|e| {
                 Error::custom(format!(
@@ -318,7 +340,7 @@ impl<'de> Deserialize<'de> for ServerMsg {
                     e
                 ))
             })?;
-            Ok(ServerMsg::Event(event))
+            Ok(Self::Event(event))
         }
     }
 }
@@ -330,10 +352,10 @@ mod test {
     #[test]
     fn command() {
         let mut mids = HashMap::new();
-        mids.insert(0, String::from("1"));
+        mids.insert(TrackId(0), String::from("1"));
 
         let command = ClientMsg::Command(Command::MakeSdpOffer {
-            peer_id: 77,
+            peer_id: PeerId(77),
             sdp_offer: "offer".to_owned(),
             mids,
         });
@@ -372,7 +394,7 @@ mod test {
     #[test]
     fn event() {
         let event = ServerMsg::Event(Event::SdpAnswerMade {
-            peer_id: 45,
+            peer_id: PeerId(45),
             sdp_answer: "answer".to_owned(),
         });
         #[cfg_attr(nightly, rustfmt::skip)]

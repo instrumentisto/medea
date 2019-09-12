@@ -13,6 +13,7 @@ use futures::{
     sync::mpsc::{unbounded, UnboundedSender},
 };
 use medea_client_api_proto::{
+    Command, Direction, EventHandler, IceCandidate, IceServer, PeerId, Track,
     Command, Direction, EventHandler, IceCandidate, IceServer, PeerState,
     Snapshot, Track,
 };
@@ -22,7 +23,7 @@ use web_sys::RtcSignalingState;
 
 use crate::{
     media::{MediaManager, MediaStream},
-    peer::{PeerEvent, PeerEventHandler, PeerId, PeerRepository},
+    peer::{PeerEvent, PeerEventHandler, PeerRepository},
     rpc::RpcClient,
     utils::{Callback2, WasmErr},
 };
@@ -125,7 +126,7 @@ impl Room {
 struct InnerRoom {
     rpc: Rc<RpcClient>,
     peers: PeerRepository,
-    connections: HashMap<u64, Connection>,
+    connections: HashMap<PeerId, Connection>,
     on_new_connection: Rc<Callback2<ConnectionHandle, WasmErr>>,
 }
 
@@ -147,12 +148,14 @@ impl InnerRoom {
 
     /// Creates new [`Connection`]s basing on senders and receivers of provided
     /// [`Track`]s.
+    // TODO: creates connections based on remote peer_ids atm, should create
+    //       connections based on remote member_ids
     fn create_connections_from_tracks(&mut self, tracks: &[Track]) {
-        let create_connection = |room: &mut Self, member_id: &u64| {
-            if !room.connections.contains_key(member_id) {
-                let con = Connection::new(*member_id);
+        let create_connection = |room: &mut Self, peer_id: &PeerId| {
+            if !room.connections.contains_key(peer_id) {
+                let con = Connection::new();
                 room.on_new_connection.call1(con.new_handle());
-                room.connections.insert(*member_id, con);
+                room.connections.insert(*peer_id, con);
             }
         };
 
@@ -392,7 +395,7 @@ impl PeerEventHandler for InnerRoom {
     fn on_new_remote_stream(
         &mut self,
         _: PeerId,
-        sender_id: u64,
+        sender_id: PeerId,
         remote_stream: MediaStream,
     ) {
         match self.connections.get(&sender_id) {

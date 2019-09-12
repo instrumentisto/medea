@@ -1,6 +1,6 @@
 [package]
 name = "medea-jason"
-version = "0.1.0"
+version = "0.1.1-dev"
 edition = "2018"
 description = "Client library for Medea media server"
 authors = ["Instrumentisto Team <developer@instrumentisto.com>"]
