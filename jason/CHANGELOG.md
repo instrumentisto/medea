@@ -11,6 +11,12 @@ All user visible changes to this project will be documented in this file. This p
 
 ### Changed
 
+- Library API ([#40](/../../pull/40)):
+    - `Room.mute_audio()`;
+    - `Room.unmute_audio()`;
+    - `Room.mute_audio()`;
+    - `Room.mute_audio()`.
+
 
 
 
