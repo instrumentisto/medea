@@ -32,7 +32,7 @@ use crate::{
                 WebRtcPlayEndpoint as WebRtcPlayEndpointSpec,
                 WebRtcPublishEndpoint as WebRtcPublishEndpointSpec,
             },
-            local_uri::{IsEndpointId, IsMemberId, LocalUri},
+            local_uri::{ToEndpoint, ToMember, LocalUri},
             MemberId, MemberSpec, RoomId, RoomSpec, WebRtcPlayId,
             WebRtcPublishId,
         },
@@ -63,13 +63,13 @@ pub enum ParticipantServiceErr {
 
     /// [`Member`] with provided [`LocalUri`] not found.
     #[display(fmt = "Participant [id = {}] not found", _0)]
-    ParticipantNotFound(LocalUri<IsMemberId>),
+    ParticipantNotFound(LocalUri<ToMember>),
 
     /// [`Endpoint`] with provided URI not found.
     ///
     /// [`Endpoint`]: crate::signalling::elements::endpoints::Endpoint
     #[display(fmt = "Endpoint [id = {}] not found.", _0)]
-    EndpointNotFound(LocalUri<IsEndpointId>),
+    EndpointNotFound(LocalUri<ToEndpoint>),
 
     /// Some error happened in [`Member`].
     #[display(fmt = "{}", _0)]
@@ -77,13 +77,13 @@ pub enum ParticipantServiceErr {
 
     /// Try to create [`Member`] with ID which already exists.
     #[display(fmt = "Participant [id = {}] already exists.", _0)]
-    ParticipantAlreadyExists(LocalUri<IsMemberId>),
+    ParticipantAlreadyExists(LocalUri<ToMember>),
 
     /// Try to create [`Endpoint`] with ID which already exists.
     ///
     /// [`Endpoint`]: crate::signalling::elements::endpoints::Endpoint
     #[display(fmt = "Endpoint [id = {}] already exists.", _0)]
-    EndpointAlreadyExists(LocalUri<IsEndpointId>),
+    EndpointAlreadyExists(LocalUri<ToEndpoint>),
 }
 
 impl From<TurnServiceErr> for ParticipantServiceErr {
@@ -153,8 +153,8 @@ impl ParticipantService {
     fn get_local_uri_to_member(
         &self,
         member_id: MemberId,
-    ) -> LocalUri<IsMemberId> {
-        LocalUri::<IsMemberId>::new(self.room_id.clone(), member_id)
+    ) -> LocalUri<ToMember> {
+        LocalUri::<ToMember>::new(self.room_id.clone(), member_id)
     }
 
     /// Lookups [`Member`] by [`MemberId`].

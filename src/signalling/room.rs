@@ -22,7 +22,7 @@ use crate::{
             RpcConnectionClosed, RpcConnectionEstablished,
         },
         control::{
-            local_uri::{IsMemberId, LocalUri, StatefulLocalUri},
+            local_uri::{ToMember, LocalUri, StatefulLocalUri},
             room::RoomSpec,
             Endpoint as EndpointSpec, MemberId, MemberSpec, RoomId,
             TryFromElementError, WebRtcPlayId, WebRtcPublishId,
@@ -671,7 +671,7 @@ impl Into<ElementProto> for &mut Room {
             .members()
             .into_iter()
             .map(|(id, member)| {
-                let local_uri = LocalUri::<IsMemberId>::new(self.get_id(), id);
+                let local_uri = LocalUri::<ToMember>::new(self.get_id(), id);
                 (local_uri.to_string(), member.into())
             })
             .collect();

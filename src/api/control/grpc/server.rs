@@ -29,7 +29,7 @@ use crate::{
     api::{
         control::{
             local_uri::{
-                IsEndpointId, IsMemberId, IsRoomId, LocalUri,
+                ToEndpoint, ToMember, ToRoom, LocalUri,
                 LocalUriParseError, StatefulLocalUri,
             },
             Endpoint, MemberId, MemberSpec, RoomId, RoomSpec,
@@ -202,7 +202,7 @@ impl ControlApiService {
     pub fn create_room(
         &mut self,
         req: &CreateRequest,
-        uri: LocalUri<IsRoomId>,
+        uri: LocalUri<ToRoom>,
     ) -> impl Future<Item = Sids, Error = GrpcControlApiError> {
         let spec = fut_try!(RoomSpec::try_from_protobuf(
             uri.room_id().clone(),
@@ -233,7 +233,7 @@ impl ControlApiService {
     pub fn create_member(
         &mut self,
         req: &CreateRequest,
-        uri: LocalUri<IsMemberId>,
+        uri: LocalUri<ToMember>,
     ) -> impl Future<Item = Sids, Error = GrpcControlApiError> {
         let spec = fut_try!(MemberSpec::try_from(req.get_member()));
 
@@ -256,7 +256,7 @@ impl ControlApiService {
     pub fn create_endpoint(
         &mut self,
         req: &CreateRequest,
-        uri: LocalUri<IsEndpointId>,
+        uri: LocalUri<ToEndpoint>,
     ) -> impl Future<Item = Sids, Error = GrpcControlApiError> {
         let spec = fut_try!(Endpoint::try_from(req));
 

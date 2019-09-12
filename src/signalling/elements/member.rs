@@ -21,7 +21,7 @@ use crate::{
     api::control::{
         endpoints::WebRtcPlayEndpoint as WebRtcPlayEndpointSpec,
         local_uri::{
-            IsEndpointId, IsMemberId, IsRoomId, LocalUri, StatefulLocalUri,
+            ToEndpoint, ToMember, ToRoom, LocalUri, StatefulLocalUri,
         },
         MemberId, MemberSpec, RoomId, RoomSpec, TryFromElementError,
         WebRtcPlayId, WebRtcPublishId,
@@ -44,34 +44,34 @@ pub enum MembersLoadError {
 
     /// [`Member`] not found.
     #[display(fmt = "Member [id = {}] not found.", _0)]
-    MemberNotFound(LocalUri<IsMemberId>),
+    MemberNotFound(LocalUri<ToMember>),
 
     /// [`WebRtcPlayEndpoint`] not found.
     #[display(
         fmt = "Play endpoint [id = {}] not found while loading spec,",
         _0
     )]
-    PlayEndpointNotFound(LocalUri<IsEndpointId>),
+    PlayEndpointNotFound(LocalUri<ToEndpoint>),
 
     /// [`WebRtcPublishEndpoint`] not found.
     #[display(
         fmt = "Publish endpoint [id = {}] not found while loading spec.",
         _0
     )]
-    PublishEndpointNotFound(LocalUri<IsEndpointId>),
+    PublishEndpointNotFound(LocalUri<ToEndpoint>),
 }
 
 #[allow(clippy::module_name_repetitions, clippy::pub_enum_variant_names)]
 #[derive(Debug, Fail, Display)]
 pub enum MemberError {
     #[display(fmt = "Publish endpoint [id = {}] not found.", _0)]
-    PublishEndpointNotFound(LocalUri<IsEndpointId>),
+    PublishEndpointNotFound(LocalUri<ToEndpoint>),
 
     #[display(fmt = "Play endpoint [id = {}] not found.", _0)]
-    PlayEndpointNotFound(LocalUri<IsEndpointId>),
+    PlayEndpointNotFound(LocalUri<ToEndpoint>),
 
     #[display(fmt = "Endpoint [id = {}] not found.", _0)]
-    EndpointNotFound(LocalUri<IsEndpointId>),
+    EndpointNotFound(LocalUri<ToEndpoint>),
 }
 
 /// [`Member`] is member of [`Room`].
@@ -130,7 +130,7 @@ impl Member {
     ) -> Result<MemberSpec, MembersLoadError> {
         let element = room_spec.pipeline.get(&member_id.0).map_or(
             Err(MembersLoadError::MemberNotFound(
-                LocalUri::<IsMemberId>::new(self.room_id(), member_id.clone()),
+                LocalUri::<ToMember>::new(self.room_id(), member_id.clone()),
             )),
             Ok,
         )?;
@@ -138,7 +138,7 @@ impl Member {
         MemberSpec::try_from(element).map_err(|e| {
             MembersLoadError::TryFromError(
                 e,
-                LocalUri::<IsMemberId>::new(self.room_id(), member_id.clone())
+                LocalUri::<ToMember>::new(self.room_id(), member_id.clone())
                     .into(),
             )
         })
@@ -167,7 +167,7 @@ impl Member {
             let publisher_member =
                 store.get(&publisher_id).ok_or_else(|| {
                     MembersLoadError::MemberNotFound(
-                        LocalUri::<IsMemberId>::new(
+                        LocalUri::<ToMember>::new(
                             self.room_id(),
                             publisher_id,
                         ),
@@ -246,8 +246,8 @@ impl Member {
     }
 
     /// Returns [`LocalUri`] to this [`Member`].
-    fn get_local_uri(&self) -> LocalUri<IsMemberId> {
-        LocalUri::<IsMemberId>::new(self.room_id(), self.id())
+    fn get_local_uri(&self) -> LocalUri<ToMember> {
+        LocalUri::<ToMember>::new(self.room_id(), self.id())
     }
 
     /// Returns [`LocalUri`] to some endpoint from this [`Member`].
@@ -257,8 +257,8 @@ impl Member {
     pub fn get_local_uri_to_endpoint(
         &self,
         endpoint_id: String,
-    ) -> LocalUri<IsEndpointId> {
-        LocalUri::<IsEndpointId>::new(self.room_id(), self.id(), endpoint_id)
+    ) -> LocalUri<ToEndpoint> {
+        LocalUri::<ToEndpoint>::new(self.room_id(), self.id(), endpoint_id)
     }
 
     /// Notifies [`Member`] that some [`Peer`]s removed.
@@ -490,7 +490,7 @@ pub fn parse_members(
     let members_spec = room_spec.members().map_err(|e| {
         MembersLoadError::TryFromError(
             e,
-            LocalUri::<IsRoomId>::new(room_spec.id.clone()).into(),
+            LocalUri::<ToRoom>::new(room_spec.id.clone()).into(),
         )
     })?;
 

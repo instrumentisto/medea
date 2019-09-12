@@ -16,7 +16,7 @@ use crate::{
         endpoints::Endpoint as EndpointSpec,
         load_static_specs_from_dir,
         local_uri::{
-            IsEndpointId, IsMemberId, IsRoomId, LocalUri, StatefulLocalUri,
+            ToEndpoint, ToMember, ToRoom, LocalUri, StatefulLocalUri,
         },
         LoadStaticControlSpecsError, MemberSpec, RoomId, RoomSpec,
     },
@@ -42,7 +42,7 @@ type ActFuture<I, E> =
 pub enum RoomServiceError {
     /// [`Room`] not found in [`RoomRepository`].
     #[display(fmt = "Room [id = {}] not found.", _0)]
-    RoomNotFound(LocalUri<IsRoomId>),
+    RoomNotFound(LocalUri<ToRoom>),
 
     /// Wrapper for [`Room`]'s [`MailboxError`].
     #[display(fmt = "Room mailbox error: {:?}", _0)]
@@ -51,7 +51,7 @@ pub enum RoomServiceError {
     /// Try to create [`Room`] with [`RoomId`] which already exists in
     /// [`RoomRepository`].
     #[display(fmt = "Room [id = {}] already exists.", _0)]
-    RoomAlreadyExists(LocalUri<IsRoomId>),
+    RoomAlreadyExists(LocalUri<ToRoom>),
 
     /// Some error happened in [`Room`].
     ///
@@ -160,8 +160,8 @@ impl Actor for RoomService {
 ///
 /// __Note__ this function don't check presence of [`Room`] in this
 /// [`RoomService`].
-fn get_local_uri_to_room(room_id: RoomId) -> LocalUri<IsRoomId> {
-    LocalUri::<IsRoomId>::new(room_id)
+fn get_local_uri_to_room(room_id: RoomId) -> LocalUri<ToRoom> {
+    LocalUri::<ToRoom>::new(room_id)
 }
 
 /// Signal for load all static specs and start [`Room`]s.
@@ -203,11 +203,16 @@ impl Handler<StartStaticRooms> for RoomService {
     }
 }
 
-/// Signal for creating new `Room`.
+/// Signal for creating new [`Room`].
 #[derive(Message)]
 #[rtype(result = "Result<(), RoomServiceError>")]
 pub struct CreateRoom {
-    pub uri: LocalUri<IsRoomId>,
+    /// [`LocalUri`] with which will be created new [`Room`].
+    pub uri: LocalUri<ToRoom>,
+
+    /// [Control API] spec for [`Room`].
+    ///
+    /// [Control API]: http://tiny.cc/380uaz
     pub spec: RoomSpec,
 }
 
@@ -445,7 +450,7 @@ impl Handler<Get> for RoomService {
 #[derive(Message)]
 #[rtype(result = "Result<(), RoomServiceError>")]
 pub struct CreateMemberInRoom {
-    pub uri: LocalUri<IsMemberId>,
+    pub uri: LocalUri<ToMember>,
     pub spec: MemberSpec,
 }
 
@@ -482,7 +487,7 @@ impl Handler<CreateMemberInRoom> for RoomService {
 #[derive(Message)]
 #[rtype(result = "Result<(), RoomServiceError>")]
 pub struct CreateEndpointInRoom {
-    pub uri: LocalUri<IsEndpointId>,
+    pub uri: LocalUri<ToEndpoint>,
     pub spec: EndpointSpec,
 }
 

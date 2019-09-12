@@ -14,7 +14,7 @@ use serde::{
 
 use crate::api::control::{
     endpoints::webrtc_publish_endpoint::WebRtcPublishId,
-    local_uri::{IsEndpointId, LocalUri, LocalUriParseError, StatefulLocalUri},
+    local_uri::{ToEndpoint, LocalUri, LocalUriParseError, StatefulLocalUri},
     MemberId, RoomId, TryFromProtobufError,
 };
 
@@ -104,8 +104,8 @@ impl TryFrom<&str> for SrcUri {
     }
 }
 
-impl From<LocalUri<IsEndpointId>> for SrcUri {
-    fn from(uri: LocalUri<IsEndpointId>) -> Self {
+impl From<LocalUri<ToEndpoint>> for SrcUri {
+    fn from(uri: LocalUri<ToEndpoint>) -> Self {
         let (endpoint_id, member_uri) = uri.take_endpoint_id();
         let (member_id, room_uri) = member_uri.take_member_id();
         let room_id = room_uri.take_room_id();

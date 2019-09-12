@@ -422,15 +422,6 @@ docker.build.demo:
 		jason/demo
 
 
-# Build medea's build image.
-#
-# Usage:
-#   make docker.build.medea-build
-
-docker.build.medea-build:
-	docker build -t medea-build -f _build/medea-build/Dockerfile .
-
-
 # Build medea project Docker image.
 #
 # Usage:

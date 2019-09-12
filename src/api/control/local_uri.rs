@@ -17,19 +17,19 @@ use super::{MemberId, RoomId};
 ///
 /// [`Room`]: crate::signalling::room::Room
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct IsRoomId(RoomId);
+pub struct ToRoom(RoomId);
 
 /// State of [`LocalUri`] which points to [`Member`].
 ///
 /// [`Member`]: crate::signalling::elements::member::Member
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct IsMemberId(LocalUri<IsRoomId>, MemberId);
+pub struct ToMember(LocalUri<ToRoom>, MemberId);
 
 /// State of [`LocalUri`] which points to [`Endpoint`].
 ///
 /// [`Endpoint`]: crate::signalling::elements::endpoints::Endpoint
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct IsEndpointId(LocalUri<IsMemberId>, String);
+pub struct ToEndpoint(LocalUri<ToMember>, String);
 
 /// URI in format `local://room_id/member_id/endpoint_id`.
 ///
@@ -37,17 +37,17 @@ pub struct IsEndpointId(LocalUri<IsMemberId>, String);
 /// [`Member`], [`WebRtcPlayEndpoint`], [`WebRtcPublishEndpoint`], etc) based on
 /// state.
 ///
-/// [`LocalUri`] can be in three states: [`IsRoomId`], [`IsMemberId`],
-/// [`IsRoomId`]. This is used for compile time guarantees that some
+/// [`LocalUri`] can be in three states: [`ToRoom`], [`ToMember`],
+/// [`ToRoom`]. This is used for compile time guarantees that some
 /// [`LocalUri`] have all mandatory fields.
 ///
 /// You also can take value from [`LocalUri`] without clone, but you have to do
 /// it consistently. For example, if you wish to get [`RoomId`], [`MemberId`]
-/// and [`Endpoint`] ID from [`LocalUri`] in [`IsEndpointId`] state you should
+/// and [`Endpoint`] ID from [`LocalUri`] in [`ToEndpoint`] state you should
 /// make this steps:
 ///
 /// ```
-/// # use crate::api::control::local_uri::{LocalUri, IsEndpointId};
+/// # use crate::api::control::local_uri::{LocalUri, ToEndpoint};
 /// # use crate::api::control::{RoomId, MemberId};
 /// #
 /// let orig_room_id = RoomId("room".to_string());
@@ -55,7 +55,7 @@ pub struct IsEndpointId(LocalUri<IsMemberId>, String);
 /// let orig_endpoint_id = "endpoint".to_string();
 ///
 /// // Create new LocalUri for endpoint.
-/// let local_uri = LocalUri::<IsEndpointId>::new(
+/// let local_uri = LocalUri::<ToEndpoint>::new(
 ///     orig_room_id.clone(),
 ///     orig_member_id.clone(),
 ///     orig_endpoint_id.clone()
@@ -91,11 +91,11 @@ pub struct LocalUri<T> {
     state: T,
 }
 
-impl LocalUri<IsRoomId> {
-    /// Create new [`LocalUri`] in [`IsRoomId`] state.
+impl LocalUri<ToRoom> {
+    /// Create new [`LocalUri`] in [`ToRoom`] state.
     pub fn new(room_id: RoomId) -> Self {
         Self {
-            state: IsRoomId(room_id),
+            state: ToRoom(room_id),
         }
     }
 
@@ -110,17 +110,17 @@ impl LocalUri<IsRoomId> {
     }
 
     /// Push [`MemberId`] to the end of URI and returns
-    /// [`LocalUri`] in [`IsMemberId`] state.
-    pub fn push_member_id(self, member_id: MemberId) -> LocalUri<IsMemberId> {
-        LocalUri::<IsMemberId>::new(self.state.0, member_id)
+    /// [`LocalUri`] in [`ToMember`] state.
+    pub fn push_member_id(self, member_id: MemberId) -> LocalUri<ToMember> {
+        LocalUri::<ToMember>::new(self.state.0, member_id)
     }
 }
 
-impl LocalUri<IsMemberId> {
-    /// Create new [`LocalUri`] in [`IsMemberId`] state.
+impl LocalUri<ToMember> {
+    /// Create new [`LocalUri`] in [`ToMember`] state.
     pub fn new(room_id: RoomId, member_id: MemberId) -> Self {
         Self {
-            state: IsMemberId(LocalUri::<IsRoomId>::new(room_id), member_id),
+            state: ToMember(LocalUri::<ToRoom>::new(room_id), member_id),
         }
     }
 
@@ -134,33 +134,33 @@ impl LocalUri<IsMemberId> {
         &self.state.1
     }
 
-    /// Return [`MemberId`] and [`LocalUri`] in state [`IsRoomId`].
-    pub fn take_member_id(self) -> (MemberId, LocalUri<IsRoomId>) {
+    /// Return [`MemberId`] and [`LocalUri`] in state [`ToRoom`].
+    pub fn take_member_id(self) -> (MemberId, LocalUri<ToRoom>) {
         (self.state.1, self.state.0)
     }
 
     /// Push endpoint ID to the end of URI and returns
-    /// [`LocalUri`] in [`IsEndpointId`] state.
+    /// [`LocalUri`] in [`ToEndpoint`] state.
     pub fn push_endpoint_id(
         self,
         endpoint_id: String,
-    ) -> LocalUri<IsEndpointId> {
+    ) -> LocalUri<ToEndpoint> {
         let (member_id, room_uri) = self.take_member_id();
         let room_id = room_uri.take_room_id();
-        LocalUri::<IsEndpointId>::new(room_id, member_id, endpoint_id)
+        LocalUri::<ToEndpoint>::new(room_id, member_id, endpoint_id)
     }
 }
 
-impl LocalUri<IsEndpointId> {
-    /// Creates new [`LocalUri`] in [`IsEndpointId`] state.
+impl LocalUri<ToEndpoint> {
+    /// Creates new [`LocalUri`] in [`ToEndpoint`] state.
     pub fn new(
         room_id: RoomId,
         member_id: MemberId,
         endpoint_id: String,
     ) -> Self {
         Self {
-            state: IsEndpointId(
-                LocalUri::<IsMemberId>::new(room_id, member_id),
+            state: ToEndpoint(
+                LocalUri::<ToMember>::new(room_id, member_id),
                 endpoint_id,
             ),
         }
@@ -183,17 +183,17 @@ impl LocalUri<IsEndpointId> {
         &self.state.1
     }
 
-    /// Returns [`Endpoint`] id and [`LocalUri`] in [`IsMemberId`] state.
+    /// Returns [`Endpoint`] id and [`LocalUri`] in [`ToMember`] state.
     ///
     /// [`Endpoint`]: crate::signalling::elements::endpoints::Endpoint
-    pub fn take_endpoint_id(self) -> (String, LocalUri<IsMemberId>) {
+    pub fn take_endpoint_id(self) -> (String, LocalUri<ToMember>) {
         (self.state.1, self.state.0)
     }
 }
 
-impl From<SrcUri> for LocalUri<IsEndpointId> {
+impl From<SrcUri> for LocalUri<ToEndpoint> {
     fn from(uri: SrcUri) -> Self {
-        LocalUri::<IsEndpointId>::new(
+        LocalUri::<ToEndpoint>::new(
             uri.room_id,
             uri.member_id,
             uri.endpoint_id.0,
@@ -201,19 +201,19 @@ impl From<SrcUri> for LocalUri<IsEndpointId> {
     }
 }
 
-impl fmt::Display for LocalUri<IsRoomId> {
+impl fmt::Display for LocalUri<ToRoom> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "local://{}", self.state.0)
     }
 }
 
-impl fmt::Display for LocalUri<IsMemberId> {
+impl fmt::Display for LocalUri<ToMember> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}/{}", self.state.0, self.state.1)
     }
 }
 
-impl fmt::Display for LocalUri<IsEndpointId> {
+impl fmt::Display for LocalUri<ToEndpoint> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}/{}", self.state.0, self.state.1)
     }
@@ -252,14 +252,14 @@ pub enum LocalUriParseError {
 #[allow(clippy::module_name_repetitions)]
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Display, From)]
 pub enum StatefulLocalUri {
-    /// Stores [`LocalUri`] in [`IsRoomId`] state.
-    Room(LocalUri<IsRoomId>),
+    /// Stores [`LocalUri`] in [`ToRoom`] state.
+    Room(LocalUri<ToRoom>),
 
-    /// Stores [`LocalUri`] in [`IsMemberId`] state.
-    Member(LocalUri<IsMemberId>),
+    /// Stores [`LocalUri`] in [`ToMember`] state.
+    Member(LocalUri<ToMember>),
 
-    /// Stores [`LocalUri`] in [`IsEndpointId`] state.
-    Endpoint(LocalUri<IsEndpointId>),
+    /// Stores [`LocalUri`] in [`ToEndpoint`] state.
+    Endpoint(LocalUri<ToEndpoint>),
 }
 
 impl StatefulLocalUri {
@@ -295,7 +295,7 @@ impl TryFrom<&str> for StatefulLocalUri {
             .host()
             .map(|id| id.to_string())
             .filter(|id| !id.is_empty())
-            .map(|id| LocalUri::<IsRoomId>::new(id.into()))
+            .map(|id| LocalUri::<ToRoom>::new(id.into()))
             .ok_or_else(|| {
                 LocalUriParseError::MissingPaths(value.to_string())
             })?;

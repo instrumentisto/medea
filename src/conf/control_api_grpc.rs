@@ -39,25 +39,25 @@ mod control_grpc_conf_specs {
     fn overrides_defaults() {
         let default_conf = Conf::default();
 
-        env::set_var("MEDEA_CONTROL.GRPC.BIND_IP", "127.0.0.1");
-        env::set_var("MEDEA_CONTROL.GRPC.BIND_PORT", "44444");
-        env::set_var("MEDEA_CONTROL.GRPC.COMPLETION_QUEUE_COUNT", "10");
+        env::set_var("MEDEA_SERVER.CONTROL.GRPC.BIND_IP", "127.0.0.1");
+        env::set_var("MEDEA_SERVER.CONTROL.GRPC.BIND_PORT", "44444");
+        env::set_var("MEDEA_SERVER.CONTROL.GRPC.COMPLETION_QUEUE_COUNT", "10");
         let env_conf = Conf::parse().unwrap();
-        env::remove_var("MEDEA_CONTROL.GRPC.BIND_IP");
-        env::remove_var("MEDEA_CONTROL.GRPC.BIND_PORT");
-        env::remove_var("MEDEA_CONTROL.GRPC.COMPLETION_QUEUE_COUNT");
+        env::remove_var("MEDEA_SERVER.CONTROL.GRPC.BIND_IP");
+        env::remove_var("MEDEA_SERVER.CONTROL.GRPC.BIND_PORT");
+        env::remove_var("MEDEA_SERVER.CONTROL.GRPC.COMPLETION_QUEUE_COUNT");
 
         assert_ne!(
-            default_conf.control.grpc.bind_ip,
-            env_conf.control.grpc.bind_ip
+            default_conf.server.control.grpc.bind_ip,
+            env_conf.server.control.grpc.bind_ip
         );
         assert_ne!(
-            default_conf.control.grpc.bind_port,
-            env_conf.control.grpc.bind_port
+            default_conf.server.control.grpc.bind_port,
+            env_conf.server.control.grpc.bind_port
         );
         assert_ne!(
-            default_conf.control.grpc.completion_queue_count,
-            env_conf.control.grpc.completion_queue_count
+            default_conf.server.control.grpc.completion_queue_count,
+            env_conf.server.control.grpc.completion_queue_count
         );
     }
 }

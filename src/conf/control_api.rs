@@ -31,13 +31,13 @@ mod control_conf_specs {
     fn overrides_defaults() {
         let default_conf = Conf::default();
 
-        env::set_var("MEDEA_CONTROL.STATIC_SPECS_DIR", "test/");
+        env::set_var("MEDEA_CONTROL_API.STATIC_SPECS_DIR", "test/");
         let env_conf = Conf::parse().unwrap();
-        env::remove_var("MEDEA_CONTROL.STATIC_SPECS_DIR");
+        env::remove_var("MEDEA_CONTROL_API.STATIC_SPECS_DIR");
 
         assert_ne!(
-            default_conf.control.static_specs_dir,
-            env_conf.control.static_specs_dir
+            default_conf.control_api.static_specs_dir,
+            env_conf.control_api.static_specs_dir
         );
     }
 }
