@@ -1,8 +1,7 @@
 //! Miscellaneous utility structs and functions.
 
-#[macro_use]
-mod errors;
 mod callback;
+mod errors;
 mod event_listener;
 
 use web_sys::Window;
@@ -33,4 +32,19 @@ impl Drop for IntervalHandle {
     fn drop(&mut self) {
         window().clear_interval_with_handle(self.0);
     }
+}
+
+/// Upgrades newtyped [`Weak`] reference, returning [`WasmErr`] if failed,
+/// or mapping [`Rc`]-referenced value with provided `$closure` otherwise.
+///
+/// [`Rc`]: std::rc::Rc
+/// [`Weak`]: std::rc::Weak
+macro_rules! map_weak {
+    ($v:expr, $closure:expr) => {{
+        $v.0.upgrade()
+            .ok_or_else(|| {
+                $crate::utils::WasmErr::from("Detached state").into()
+            })
+            .map($closure)
+    }};
 }

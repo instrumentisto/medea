@@ -11,8 +11,6 @@ use medea_client_api_proto::{MediaType, TrackId};
 use wasm_bindgen::{prelude::*, JsValue};
 use web_sys::MediaStream as SysMediaStream;
 
-use crate::utils::WasmErr;
-
 use super::MediaTrack;
 
 /// Actual data of a [`MediaStream`].
@@ -102,14 +100,14 @@ impl MediaStream {
         MediaStreamHandle(Rc::downgrade(&self.0))
     }
 
-    /// Enables or disables all audio tracks in this stream.
+    /// Enables or disables all audio [`MediaTrack`]s in this stream.
     pub fn toggle_audio_tracks(&self, enabled: bool) {
         for track in self.0.audio_tracks.values() {
             track.set_enabled(enabled);
         }
     }
 
-    /// Enables or disables all video tracks in this stream.
+    /// Enables or disables all video [`MediaTrack`]s in this stream.
     pub fn toggle_video_tracks(&self, enabled: bool) {
         for track in self.0.video_tracks.values() {
             track.set_enabled(enabled);

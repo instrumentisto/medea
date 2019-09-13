@@ -9,7 +9,7 @@ use wasm_bindgen::prelude::*;
 
 use crate::{
     media::{MediaStream, MediaStreamHandle},
-    utils::{Callback, WasmErr},
+    utils::Callback,
 };
 
 /// Actual data of a connection with a specific remote [`Member`].

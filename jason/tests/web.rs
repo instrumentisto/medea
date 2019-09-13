@@ -4,13 +4,12 @@ mod api;
 mod peer;
 
 use futures::{future::IntoFuture, sync::oneshot::channel, Future};
-use wasm_bindgen::prelude::*;
-use wasm_bindgen_test::*;
-
 use medea_client_api_proto::{
     AudioSettings, Direction, MediaType, PeerId, Track, TrackId, VideoSettings,
 };
 use medea_jason::utils::{window, WasmErr};
+use wasm_bindgen::prelude::*;
+use wasm_bindgen_test::*;
 
 wasm_bindgen_test_configure!(run_in_browser);
 
@@ -46,7 +45,6 @@ pub fn resolve_after(delay: i32) -> impl Future<Item = (), Error = JsValue> {
             delay,
         )
         .unwrap();
-
     wait.into_future()
         .map_err(|_| WasmErr::from("canceled").into())
 }

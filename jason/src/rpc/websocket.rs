@@ -16,6 +16,7 @@ use crate::{
 };
 
 /// State of websocket.
+#[derive(Debug)]
 enum State {
     CONNECTING,
     OPEN,

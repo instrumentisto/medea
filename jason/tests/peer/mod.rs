@@ -1,18 +1,18 @@
 #![cfg(target_arch = "wasm32")]
+
+mod media;
+
 use std::rc::Rc;
 
 use futures::{sync::mpsc::unbounded, Future};
-use wasm_bindgen::JsValue;
-use wasm_bindgen_test::*;
-
 use medea_client_api_proto::PeerId;
 use medea_jason::{media::MediaManager, peer::PeerConnection};
+use wasm_bindgen::JsValue;
+use wasm_bindgen_test::*;
 
 use crate::get_test_tracks;
 
 wasm_bindgen_test_configure!(run_in_browser);
-
-mod media;
 
 /// TODO: enable tests in firefox, PR: rustwasm/wasm-bindgen#1744
 // firefoxOptions.prefs:

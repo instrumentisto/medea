@@ -24,11 +24,17 @@ pub enum CloseMsg {
     Disconnect(String),
 }
 
+/// Client to talk with server via Client API RPC.
 #[allow(clippy::module_name_repetitions)]
 #[cfg_attr(feature = "mockable", mockall::automock)]
 pub trait RpcClient {
+    /// Returns [`Stream`] of all [`Event`]s received by this [`RpcClient`].
     fn subscribe(&self) -> Box<dyn Stream<Item = Event, Error = ()>>;
+
+    /// Unsubscribes from this [`RpcClient`]. Drops all subscriptions atm.
     fn unsub(&self);
+
+    /// Sends [`Command`] to server.
     fn send_command(&self, command: Command);
 }
 
@@ -136,26 +142,21 @@ impl WebsocketRpcClient {
 }
 
 impl RpcClient for WebsocketRpcClient {
-    /// Returns Stream of all Events received by this [`RpcClient`].
     // TODO: proper sub registry
     fn subscribe(&self) -> Box<dyn Stream<Item = Event, Error = ()>> {
         let (tx, rx) = unbounded();
         self.0.borrow_mut().subs.push(tx);
-
         Box::new(rx)
     }
 
-    /// Unsubscribe from this [`RpcClient`]. Drops all subscriptions atm.
     // TODO: proper sub registry
     fn unsub(&self) {
         self.0.borrow_mut().subs.clear();
     }
 
-    /// Sends Command to Medea.
     // TODO: proper sub registry
     fn send_command(&self, command: Command) {
         let socket_borrow = &self.0.borrow().sock;
-
         // TODO: no socket? we dont really want this method to return err
         if let Some(socket) = socket_borrow.as_ref() {
             socket.send(&ClientMsg::Command(command)).unwrap();

@@ -28,10 +28,10 @@ struct InnerMediaConnections {
     /// [`MediaTrack`] to its [`Receiver`].
     receivers: HashMap<TrackId, Receiver>,
 
-    /// Are senders audio tracks muted.
+    /// Are senders audio tracks muted or not.
     enabled_audio: bool,
 
-    /// Are senders video tracks muted.
+    /// Are senders video tracks muted or not.
     enabled_video: bool,
 }
 
@@ -71,8 +71,8 @@ impl MediaConnections {
             .for_each(|sender| sender.set_track_enabled(enabled))
     }
 
-    /// Returns true if all [`MediaTrack`]s of all [`Senders`] with given
-    /// [`TransceiverKind`] are enabled or false otherwise.
+    /// Returns `true` if all [`MediaTrack`]s of all [`Senders`] with given
+    /// [`TransceiverKind`] are enabled or `false` otherwise.
     pub fn are_senders_enabled(&self, kind: TransceiverKind) -> bool {
         let conn = self.0.borrow();
         for sender in conn.senders.values().filter(|sender| sender.kind == kind)
@@ -81,7 +81,6 @@ impl MediaConnections {
                 return false;
             }
         }
-
         true
     }
 
@@ -152,8 +151,8 @@ impl MediaConnections {
     /// Inserts tracks from a provided [`MediaStream`] into [`Sender`]s
     /// basing on track IDs.
     ///
-    /// Enables or disables tracks in provided stream based on current media
-    /// connections state.
+    /// Enables or disables tracks in provided [`MediaStream`] basing on current
+    /// media connections state.
     ///
     /// Provided [`MediaStream`] must have all required [`MediaTrack`]s.
     /// [`MediaTrack`]s are inserted into [`Sender`]'s [`RtcRtpTransceiver`]s
@@ -180,13 +179,9 @@ impl MediaConnections {
         stream.toggle_video_tracks(s.enabled_video);
 
         let promises = s.senders.values().filter_map(|sndr| {
-            match stream.get_track_by_id(sndr.track_id) {
-                Some(track) => Some(Sender::insert_and_enable_track(
-                    Rc::clone(sndr),
-                    track,
-                )),
-                None => None,
-            }
+            stream.get_track_by_id(sndr.track_id).map(|track| {
+                Sender::insert_and_enable_track(Rc::clone(sndr), track)
+            })
         });
         let promises: Vec<_> = promises.collect();
         future::Either::B(future::join_all(promises).map(|_| ()))
@@ -241,7 +236,7 @@ impl MediaConnections {
         Some(tracks)
     }
 
-    /// Returns track by its id and direction.
+    /// Returns [`MediaTrack`] by its [`TrackId`] and [`TransceiverDirection`].
     pub fn get_track_by_id(
         &self,
         direction: TransceiverDirection,
@@ -304,7 +299,7 @@ impl Sender {
     }
 
     /// Inserts provided [`MediaTrack`] into provided [`Sender`]s transceiver
-    /// and enables transceivers sender by changing its direction to sendonly;
+    /// and enables transceivers sender by changing its direction to `sendonly`.
     fn insert_and_enable_track(
         sender: Rc<Self>,
         track: Rc<MediaTrack>,
@@ -316,8 +311,7 @@ impl Sender {
                 .replace_track(Some(track.track())),
         )
         .and_then(move |_| {
-            // TODO: also do RTCRtpSender.setStreams when its
-            //       implemented
+            // TODO: also do RTCRtpSender.setStreams when it will be implemented
             sender
                 .transceiver
                 .set_direction(RtcRtpTransceiverDirection::Sendonly);
@@ -327,14 +321,14 @@ impl Sender {
         .map_err(WasmErr::from)
     }
 
-    /// Enable or disable this [`Sender`]s track.
+    /// Enables or disables this [`Sender`]s track.
     fn set_track_enabled(&self, enabled: bool) {
         if let Some(track) = self.track.borrow().as_ref() {
             track.set_enabled(enabled);
         }
     }
 
-    /// Is sender has track and it is enabled.
+    /// Checks is sender has track and it is enabled.
     fn is_track_enabled(&self) -> bool {
         match self.track.borrow().as_ref() {
             None => false,

@@ -1,10 +1,8 @@
 #![cfg(target_arch = "wasm32")]
+
 use std::rc::Rc;
 
 use futures::Future;
-use wasm_bindgen::JsValue;
-use wasm_bindgen_test::*;
-
 use medea_client_api_proto::TrackId;
 use medea_jason::{
     media::MediaManager,
@@ -14,6 +12,8 @@ use medea_jason::{
     },
     utils::WasmErr,
 };
+use wasm_bindgen::JsValue;
+use wasm_bindgen_test::*;
 
 use crate::get_test_tracks;
 

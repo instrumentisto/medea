@@ -39,12 +39,12 @@ impl MediaTrack {
         &self.caps
     }
 
-    /// Is undelying track enabled.
+    /// Checks if underlying [`MediaStreamTrack`] is enabled.
     pub fn is_enabled(&self) -> bool {
-        self.track().enabled()
+        self.track.enabled()
     }
 
-    /// Enabled or disable underlying track.
+    /// Enables or disables underlying [`MediaStreamTrack`].
     pub fn set_enabled(&self, enabled: bool) {
         self.track.set_enabled(enabled)
     }

@@ -21,6 +21,11 @@ use crate::{
     utils::WasmErr,
 };
 
+#[cfg(feature = "mockable")]
+#[doc(inline)]
+pub use self::repo::MockPeerRepository;
+#[doc(inline)]
+pub use self::repo::{PeerRepository, Repository};
 pub use self::{
     conn::{
         IceCandidate, RtcPeerConnection, SdpType, TransceiverDirection,
@@ -28,11 +33,6 @@ pub use self::{
     },
     media::MediaConnections,
 };
-
-#[cfg(feature = "mockable")]
-pub use self::repo::MockPeerRepository;
-#[doc(inline)]
-pub use self::repo::{PeerRepository, Repository};
 
 #[dispatchable]
 #[allow(clippy::module_name_repetitions)]
@@ -160,28 +160,28 @@ impl PeerConnection {
         }
     }
 
-    /// Disable or enable all audio tracks for all [`Sender`]s.
+    /// Disables or enables all audio tracks for all [`Sender`]s.
     pub fn toggle_send_audio(&self, enabled: bool) {
         self.0
             .media_connections
             .toggle_send_media(TransceiverKind::Audio, enabled)
     }
 
-    /// Disable or enable all video tracks for all [`Sender`]s.
+    /// Disables or enables all video tracks for all [`Sender`]s.
     pub fn toggle_send_video(&self, enabled: bool) {
         self.0
             .media_connections
             .toggle_send_media(TransceiverKind::Video, enabled)
     }
 
-    /// Returns true if all [`Sender`]s audio tracks are enabled.
+    /// Returns `true` if all [`Sender`]s audio tracks are enabled.
     pub fn is_send_audio_enabled(&self) -> bool {
         self.0
             .media_connections
             .are_senders_enabled(TransceiverKind::Audio)
     }
 
-    /// Returns true if all [`Sender`]s video tracks are enabled.
+    /// Returns `true` if all [`Sender`]s video tracks are enabled.
     pub fn is_send_video_enabled(&self) -> bool {
         self.0
             .media_connections
