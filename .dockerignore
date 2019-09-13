@@ -13,7 +13,8 @@
 # Cargo should be able to see these files.
 !jason/Cargo.toml
 !jason/src/
-!jason/demo/
+!jason/demo/chart/medea-demo/conf/
+!jason/demo/index.html
 
 # Medea dependencies cache.
 !.cache/cargo/

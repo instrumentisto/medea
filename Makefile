@@ -23,8 +23,6 @@ RUST_VER := 1.37
 
 CURRENT_BRANCH := $(strip $(shell git branch | grep \* | cut -d ' ' -f2))
 
-CHROMEDRIVER_CLIENT_ARGS := $(strip $(shell grep 'CHROMEDRIVER_CLIENT_ARGS=' .env | cut -d '=' -f2))
-
 crate-dir = .
 ifeq ($(crate),medea-jason)
 crate-dir = jason
@@ -103,7 +101,6 @@ up: up.dev
 
 
 
-
 ####################
 # Running commands #
 ####################
@@ -173,9 +170,9 @@ cargo:
 # Build medea's related crates.
 #
 # Usage:
-#	make build [crate=(@all|medea|medea-jason)]
-#	           [debug=(yes|no)]
-#	           [dockerized=(no|yes)]
+#	make cargo.build [crate=(@all|medea|medea-jason)]
+#	                 [debug=(yes|no)]
+#	                 [dockerized=(no|yes)]
 
 cargo-build-crate = $(if $(call eq,$(crate),),@all,$(crate))
 
@@ -299,6 +296,9 @@ endif
 #
 # Usage:
 #	make test.unit [crate=(@all|medea|jason|<crate-name>)]
+
+CHROMEDRIVER_CLIENT_ARGS := $(strip \
+	$(shell grep 'CHROMEDRIVER_CLIENT_ARGS=' .env | cut -d '=' -f2))
 
 test-unit-crate = $(if $(call eq,$(crate),),@all,$(crate))
 
@@ -425,7 +425,7 @@ docker.auth:
 docker-build-demo-image-name = $(DEMO_IMAGE_NAME)
 
 docker.build.demo:
-ifeq ($(TAG), edge)
+ifeq ($(TAG),edge)
 	docker build $(if $(call eq,$(minikube),yes),,--network=host) --force-rm \
 		-t $(docker-build-demo-image-name):$(TAG) \
 		-f jason/Dockerfile .

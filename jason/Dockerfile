@@ -1,4 +1,9 @@
 #
+# Dockerfile of instrumentisto/medea-demo:edge Docker image.
+#
+
+
+#
 # Stage 'dist' creates project distribution.
 #
 
@@ -8,10 +13,10 @@ FROM rust:stretch AS dist
 RUN cargo install wasm-pack \
  && rustup target add wasm32-unknown-unknown
 
-WORKDIR /sources
-COPY / .
+COPY / /src/
 
-RUN cd jason && wasm-pack build -t web
+RUN cd /src/ \
+ && make cargo.build crate=medea-jason debug=no dockerized=no
 
 
 
@@ -27,6 +32,6 @@ COPY jason/demo/chart/medea-demo/conf/nginx.vh.conf \
      /etc/nginx/conf.d/default.conf
 
 COPY jason/demo/index.html /app/
-COPY --from=dist /sources/jason/pkg/ /app/js/
+COPY --from=dist /src/jason/pkg/ /app/js/
 
 WORKDIR /app
