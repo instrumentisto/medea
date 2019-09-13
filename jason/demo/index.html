@@ -1,171 +1,162 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Chat</title>
-    <meta http-equiv='Content-Type' content='text/html; charset=UTF-8'/>
+  <title>Chat</title>
+  <meta http-equiv='Content-Type' content='text/html; charset=UTF-8'/>
 
-    <script type="module">
+  <script type="module">
+    import init, {Jason} from './js/medea_jason.js';
 
-        import init, {Jason} from './js/medea_jason.js';
+    var inited = false;
 
-        var inited = false;
+    export async function run(credentials) {
+      if (!inited) {
+        await init();
+        inited = true;
+      }
 
-        export async function run(credentials) {
-
-            if (!inited) {
-                await init();
-                inited = true;
-            }
-
-            let jason = new Jason();
-
-            jason.on_local_stream(function (stream, error) {
-                if (stream) {
-                    let local_video = document.getElementById("yourvid");
-
-                    local_video.srcObject = stream.get_media_stream();
-                    local_video.play();
-                } else {
-                    console.error(error);
-                }
-            });
-
-            let room = await jason.join_room(credentials);
-
-            room.on_new_connection(function (connection) {
-                connection.on_remote_stream(function (stream) {
-                    let remote_video = document.getElementById("partnervid");
-
-                    remote_video.srcObject = stream.get_media_stream();
-                    remote_video.play();
-                });
-            });
-
-            return room;
+      let jason = new Jason();
+      jason.on_local_stream(function (stream, error) {
+        if (stream) {
+          let local_video = document.getElementById("yourvid");
+          local_video.srcObject = stream.get_media_stream();
+          local_video.play();
+        } else {
+          console.error(error);
         }
+      });
 
-        window.connect_room = async function connect_room(credentials) {
-            window.room = await run(credentials);
+      let room = await jason.join_room(credentials);
+      room.on_new_connection(function (connection) {
+        connection.on_remote_stream(function (stream) {
+          let remote_video = document.getElementById("partnervid");
+          remote_video.srcObject = stream.get_media_stream();
+          remote_video.play();
+        });
+      });
+
+      return room;
+    }
+
+    window.connect_room = async function connect_room(credentials) {
+      window.room = await run(credentials);
+    }
+
+  </script>
+
+  <script type="text/javascript">
+    var baseUrl = (document.location.protocol === "http:" ? "ws" : "wss") +
+                  "://" + document.location.host + "/ws/";
+
+    window.onload = function () {
+      var chooseRoomDiv = document.getElementById('choose-room');
+      var videoCallDiv = document.getElementById('video-call');
+      var chooseRoomButton = document.getElementById('choose-room-btn');
+      var roomIdInput = document.getElementById('room-id-input');
+
+      var joinCallerButton = document.getElementById('join-caller');
+      var joinResponderButton = document.getElementById('join-responder');
+
+      var toggleAudio = document.getElementById('toggle-audio');
+      var toggleVideo = document.getElementById('toggle-video');
+
+      toggleAudio.addEventListener('change', (event) => {
+        if (event.target.checked) {
+          window.room.unmute_audio();
+        } else {
+          window.room.mute_audio();
         }
+      });
 
-    </script>
+      toggleVideo.addEventListener('change', (event) => {
+        if (event.target.checked) {
+          window.room.unmute_video();
+        } else {
+          window.room.mute_video();
+        }
+      });
 
-    <script type="text/javascript">
-        var baseUrl = (document.location.protocol === "http:" ? "ws" : "wss") +
-            "://" + document.location.host + "/ws/";
-
-        window.onload = function () {
-            var chooseRoomDiv = document.getElementById('choose-room');
-            var videoCallDiv = document.getElementById('video-call');
-            var chooseRoomButton = document.getElementById('choose-room-btn');
-            var roomIdInput = document.getElementById('room-id-input');
-
-            var joinCallerButton = document.getElementById('join-caller');
-            var joinResponderButton = document.getElementById('join-responder');
-
-            var toggleAudio = document.getElementById('toggle-audio');
-            var toggleVideo = document.getElementById('toggle-video');
-
-            toggleAudio.addEventListener('change', (event) => {
-                if (event.target.checked) {
-                    window.room.unmute_audio();
-                } else {
-                    window.room.mute_audio();
-                }
-            });
-
-            toggleVideo.addEventListener('change', (event) => {
-                if (event.target.checked) {
-                    window.room.unmute_video();
-                } else {
-                    window.room.mute_video();
-                }
-            });
-
-            var bindJoinButtons = function (roomId) {
-                joinCallerButton.onclick = function () {
-                    window.connect_room(baseUrl + roomId + '/caller/test')
-                };
-                joinResponderButton.onclick = function () {
-                    window.connect_room(baseUrl + roomId + '/responder/test')
-                };
-            };
-
-            let roomId = sessionId = window.location.hash.replace("#", "");
-
-            if (roomId) {
-                bindJoinButtons(roomId);
-                chooseRoomDiv.style.display = "none";
-                videoCallDiv.style.display = "";
-            } else {
-                chooseRoomButton.onclick = function () {
-                    let roomId = roomIdInput.value;
-
-                    window.location.hash = roomId;
-                    bindJoinButtons(roomId);
-
-                    chooseRoomDiv.style.display = "none";
-                    videoCallDiv.style.display = "";
-                };
-            }
+      var bindJoinButtons = function (roomId) {
+        joinCallerButton.onclick = function () {
+          window.connect_room(baseUrl + roomId + '/caller/test')
         };
+        joinResponderButton.onclick = function () {
+          window.connect_room(baseUrl + roomId + '/responder/test')
+        };
+      };
 
-    </script>
+      let roomId = sessionId = window.location.hash.replace("#", "");
+      if (roomId) {
+        bindJoinButtons(roomId);
+        chooseRoomDiv.style.display = "none";
+        videoCallDiv.style.display = "";
+      } else {
+        chooseRoomButton.onclick = function () {
+          let roomId = roomIdInput.value;
+          window.location.hash = roomId;
+          bindJoinButtons(roomId);
 
-    <style>
-        .video-call {
-            display: flex;
-            flex-flow: row nowrap;
-            width: 100%;
-            flex-wrap: nowrap;
-            flex-direction: row;
-        }
+          chooseRoomDiv.style.display = "none";
+          videoCallDiv.style.display = "";
+        };
+      }
+    };
+  </script>
 
-        .video {
-            display: flex;
-            justify-content: center;
-            flex-direction: column;
-            margin-right: 10px;
-            text-align: center;
-        }
+  <style>
+    .video-call {
+      display: flex;
+      flex-flow: row nowrap;
+      width: 100%;
+      flex-wrap: nowrap;
+      flex-direction: row;
+    }
 
-        .video > video {
-            background: dimgrey;
-        }
+    .video {
+      display: flex;
+      justify-content: center;
+      flex-direction: column;
+      margin-right: 10px;
+      text-align: center;
+    }
 
-        .btn-group {
-            margin-top: 10px;
-        }
-    </style>
+    .video > video {
+      background: dimgrey;
+    }
+
+    .btn-group {
+      margin-top: 10px;
+    }
+  </style>
 </head>
 <body>
 
 <div id="choose-room">
-    <input id="room-id-input">
-    <button id="choose-room-btn" type="submit">JOIN</button>
+  <input id="room-id-input">
+  <button id="choose-room-btn" type="submit">JOIN</button>
 </div>
 
 <div id="video-call" style="display: none">
-    <div class="video-call">
-        <div class="video">
-            <video id="yourvid" muted autoplay width="100%" height="100%"></video>
-            <b>You</b>
-        </div>
-        <div class="video">
-            <video id="partnervid" autoplay width="100%" height="100%"></video>
-            <b>Partner</b>
-        </div>
+  <div class="video-call">
+    <div class="video">
+      <video id="yourvid" muted autoplay width="100%" height="100%"></video>
+      <b>You</b>
     </div>
-    <div class="btn-group">
-        <button id="join-caller">Start caller session</button>
-        <button id="join-responder">Start responder session</button>
+    <div class="video">
+      <video id="partnervid" autoplay width="100%" height="100%"></video>
+      <b>Partner</b>
     </div>
-    <div class="btn-group">
-        <input id="toggle-audio" type="checkbox" checked>
-        <label for="toggle-audio">toggle local audio</label>
-        <input id="toggle-video" type="checkbox" checked>
-        <label for="toggle-video">toggle local video</label>
-    </div>
+  </div>
+  <div class="btn-group">
+    <button id="join-caller">Start caller session</button>
+    <button id="join-responder">Start responder session</button>
+  </div>
+  <div class="btn-group">
+    <input id="toggle-audio" type="checkbox" checked>
+    <label for="toggle-audio">toggle local audio</label>
+    <input id="toggle-video" type="checkbox" checked>
+    <label for="toggle-video">toggle local video</label>
+  </div>
 </div>
 
 </body>
