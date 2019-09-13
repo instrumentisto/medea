@@ -10,11 +10,9 @@ mod repo;
 use std::{collections::HashMap, rc::Rc};
 
 use futures::{future, sync::mpsc::UnboundedSender, Future};
-use medea_client_api_proto::{
-    Direction, IceServer, PeerId as Id, Track, TrackId,
-};
+use medea_client_api_proto::{Direction, IceServer, PeerId as Id, Track, TrackId, Event};
 use medea_macro::dispatchable;
-use web_sys::{RtcSessionDescription, RtcSignalingState, RtcTrackEvent};
+use web_sys::{RtcSessionDescription, RtcSignalingState, RtcTrackEvent, Event as SysEvent};
 
 use crate::{
     media::{MediaManager, MediaStream},
@@ -28,6 +26,18 @@ use self::{
 
 #[doc(inline)]
 pub use self::repo::PeerRepository;
+use std::cell::RefCell;
+
+#[derive(Debug)]
+enum SignalingState {
+    New,
+    Stable,
+    HaveLocalOffer,
+    HaveRemoteOffer,
+    HaveLocalPranswer,
+    HaveRemotePranswer,
+    Closed,
+}
 
 #[dispatchable]
 #[allow(clippy::module_name_repetitions)]
@@ -63,6 +73,8 @@ struct InnerPeerConnection {
 
     /// [`PeerEvent`]s tx.
     peer_events_sender: UnboundedSender<PeerEvent>,
+
+    signaling_state: RefCell<SignalingState>,
 }
 
 #[allow(clippy::module_name_repetitions)]
@@ -86,6 +98,7 @@ impl PeerConnection {
             media_connections,
             media_manager,
             peer_events_sender,
+            signaling_state: RefCell::new(SignalingState::New),
         });
 
         // Bind to `icecandidate` event.
@@ -98,6 +111,11 @@ impl PeerConnection {
         let inner_rc = Rc::clone(&inner);
         inner.peer.on_track(Some(move |track_event| {
             Self::on_track(&inner_rc, &track_event);
+        }))?;
+
+        let inner_rc = Rc::clone(&inner);
+        inner.peer.on_signaling_state_changed(Some(move || {
+            Self::on_signaling_state_changed(&inner_rc);
         }))?;
 
         Ok(Self(inner))
@@ -115,6 +133,38 @@ impl PeerConnection {
                 sdp_mid: candidate.sdp_mid,
             },
         );
+    }
+
+    fn on_signaling_state_changed(inner: &InnerPeerConnection) {
+        let signaling_state = inner.peer.signaling_state();
+        match signaling_state {
+            RtcSignalingState::Stable => {
+                if inner.peer.current_remote_description().is_none() && inner.peer.current_local_description().is_none() {
+                    *inner.signaling_state.borrow_mut() = SignalingState::New;
+                } else {
+                    *inner.signaling_state.borrow_mut() = SignalingState::Stable;
+                }
+            }
+            RtcSignalingState::HaveLocalOffer => {
+                *inner.signaling_state.borrow_mut() = SignalingState::HaveLocalOffer;
+            }
+            RtcSignalingState::HaveRemoteOffer => {
+                *inner.signaling_state.borrow_mut() = SignalingState::HaveRemoteOffer;
+            }
+            RtcSignalingState::HaveRemotePranswer => {
+                *inner.signaling_state.borrow_mut() = SignalingState::HaveRemotePranswer;
+            }
+            RtcSignalingState::HaveLocalPranswer => {
+                *inner.signaling_state.borrow_mut() = SignalingState::HaveLocalPranswer;
+            }
+            RtcSignalingState::Closed => {
+                *inner.signaling_state.borrow_mut() = SignalingState::Closed;
+            }
+            _ => {
+                unimplemented!("State: {:?}", signaling_state);
+            }
+        }
+        web_sys::console::log_1(&format!("{:?}", inner.signaling_state).into());
     }
 
     /// Handle `track` event from underlying peer adding new track to

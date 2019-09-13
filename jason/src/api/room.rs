@@ -345,6 +345,9 @@ impl EventHandler for InnerRoom {
                     unreachable!()
                 }
             }
+            for ice_candidate in peer.ice_candidates {
+                (self as &mut dyn EventHandler).on_ice_candidate_discovered(peer.id, ice_candidate)
+            }
         }
     }
 }

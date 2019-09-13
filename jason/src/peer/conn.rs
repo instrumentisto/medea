@@ -13,7 +13,7 @@ use web_sys::{
     RtcPeerConnection as SysRtcPeerConnection, RtcPeerConnectionIceEvent,
     RtcRtpTransceiver, RtcRtpTransceiverDirection, RtcRtpTransceiverInit,
     RtcSdpType, RtcSessionDescription, RtcSessionDescriptionInit,
-    RtcSignalingState, RtcTrackEvent,
+    RtcSignalingState, RtcTrackEvent, Event as SysEvent,
 };
 
 use crate::utils::{EventListener, WasmErr};
@@ -106,6 +106,8 @@ struct InnerPeer {
     /// [3]: https://www.w3.org/TR/webrtc/#event-track
     /// [4]: https://developer.mozilla.org/en-US/docs/Web/API/MediaStreamTrack
     on_track: Option<EventListener<SysRtcPeerConnection, RtcTrackEvent>>,
+
+    on_signaling_state_change: Option<EventListener<SysRtcPeerConnection, SysEvent>>,
 }
 
 /// Representation of [RTCPeerConnection][1].
@@ -129,6 +131,7 @@ impl RtcPeerConnection {
             )?),
             on_ice_candidate: None,
             on_track: None,
+            on_signaling_state_change: None,
         }))))
     }
 
@@ -187,6 +190,27 @@ impl RtcPeerConnection {
                 )?);
             }
         }
+        Ok(())
+    }
+
+    pub fn on_signaling_state_changed<F>(&self, f: Option<F>) -> Result<(), WasmErr>
+    where
+        F: 'static + FnMut(),
+    {
+        let mut conn = self.0.borrow_mut();
+        match f {
+            None => conn.on_signaling_state_change = None,
+            Some(mut f) => {
+                conn.on_signaling_state_change = Some(EventListener::new_mut(
+                    Rc::clone(&conn.peer),
+                    "signalingstatechange",
+                    move |_: SysEvent| {
+                        f();
+                    }
+                )?)
+            }
+        }
+
         Ok(())
     }
 
@@ -366,6 +390,7 @@ impl Drop for RtcPeerConnection {
         let mut inner = self.0.borrow_mut();
         inner.on_track.take();
         inner.on_ice_candidate.take();
+        inner.on_signaling_state_change.take();
         inner.peer.close();
     }
 }
