@@ -275,11 +275,15 @@ impl EventHandler for InnerRoom {
     }
 
     fn on_restore_state(&mut self, snapshot: Snapshot) {
+        use web_sys::console;
+
+        console::log_1(&"OnRestoreState".into());
+
         {
             let removed_peers: Vec<PeerId> = self
                 .peers
                 .iter_peers()
-                .filter(|(id, _)| !snapshot.peers.contains_key(id))
+                .filter(|(id, _)| !snapshot.peers.contains_key(&id.to_string()))
                 .map(|(id, _)| *id)
                 .collect();
             if !removed_peers.is_empty() {
@@ -288,6 +292,7 @@ impl EventHandler for InnerRoom {
         }
 
         for (id, peer) in snapshot.peers {
+            let id = PeerId(id.parse().unwrap());
             let local_peer = if let Some(local_peer) = self.peers.get(id) {
                 local_peer.clone()
             } else {
@@ -339,18 +344,6 @@ impl EventHandler for InnerRoom {
                     // TODO: unreachable??
                     unreachable!()
                 }
-            }
-        }
-    }
-
-    fn on_add_ice_candidates(
-        &mut self,
-        ice_candidates: HashMap<PeerId, Vec<IceCandidate>>,
-    ) {
-        for (peer_id, ice_candidates) in ice_candidates {
-            for ice_candidate in ice_candidates {
-                (self as &mut dyn EventHandler)
-                    .on_ice_candidate_discovered(peer_id, ice_candidate)
             }
         }
     }

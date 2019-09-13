@@ -13,7 +13,7 @@ use serde::{de::Deserializer, ser::Serializer, Deserialize, Serialize};
 )]
 #[cfg_attr(feature = "jason", derive(Serialize))]
 #[derive(Clone, Copy, Display)]
-pub struct PeerId(pub u64);
+pub struct PeerId(pub u32);
 
 /// ID of `MediaTrack`.
 #[cfg_attr(
@@ -73,7 +73,7 @@ pub struct Peer {
 #[cfg_attr(feature = "medea", derive(Serialize, Debug, Clone, PartialEq))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
 pub struct Snapshot {
-    pub peers: HashMap<PeerId, Peer>,
+    pub peers: HashMap<String, Peer>,
     pub ice_servers: Vec<IceServer>,
 }
 
@@ -332,10 +332,10 @@ impl<'de> Deserialize<'de> for ServerMsg {
 
             Ok(Self::Pong(n))
         } else {
-            let event = serde_json::from_value::<Event>(ev).map_err(|e| {
+            let event = serde_json::from_value::<Event>(ev.clone()).map_err(|e| {
                 Error::custom(format!(
-                    "unable to deser ServerMsg::Event [{:?}]",
-                    e
+                    "unable to deser ServerMsg::Event [{:?}]. Event: {:?}",
+                    e, ev,
                 ))
             })?;
             Ok(Self::Event(event))

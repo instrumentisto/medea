@@ -9,6 +9,7 @@ use actix::{
 use actix_web_actors::ws::{self, CloseReason, WebsocketContext};
 use futures::future::Future;
 use medea_client_api_proto::{ClientMsg, ServerMsg};
+use actix_web_actors::ws::CloseCode;
 
 use crate::{
     api::{
@@ -237,9 +238,19 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
             }
             ws::Message::Close(reason) => {
                 if !self.closed_by_server {
+                    let closed_reason = if let Some(reason) = &reason {
+                        if reason.code == CloseCode::Normal {
+                            ClosedReason::Closed
+                        } else {
+                            ClosedReason::Lost
+                        }
+                    } else {
+                        ClosedReason::Lost
+                    };
+
                     if let Err(err) = self.room.try_send(RpcConnectionClosed {
                         member_id: self.member_id.clone(),
-                        reason: ClosedReason::Closed,
+                        reason: closed_reason,
                     }) {
                         error!(
                             "WsSession of member {} failed to remove from \

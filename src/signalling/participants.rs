@@ -115,6 +115,10 @@ impl ParticipantService {
         })
     }
 
+    pub fn is_have_drop_connection_tasks(&self, member_id: &MemberId) -> bool {
+        self.drop_connection_tasks.get(member_id).is_some()
+    }
+
     /// Lookups [`Member`] by provided [`MemberId`].
     pub fn get_member_by_id(&self, id: &MemberId) -> Option<&Member> {
         self.members.get(id)

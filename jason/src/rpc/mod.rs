@@ -15,6 +15,8 @@ use medea_client_api_proto::{ClientMsg, Command, Event, ServerMsg};
 use crate::utils::WasmErr;
 
 use self::{heartbeat::Heartbeat, websocket::WebSocket};
+use wasm_bindgen_futures::spawn_local;
+use futures::task::spawn;
 
 /// Connection with remote was closed.
 pub enum CloseMsg {
@@ -30,6 +32,7 @@ pub enum CloseMsg {
 // 3. Disconnect if no pongs.
 // 4. Buffering if no socket?
 #[allow(clippy::module_name_repetitions)]
+#[derive(Clone)]
 pub struct RpcClient(Rc<RefCell<Inner>>);
 
 /// Inner state of [`RpcClient`].
@@ -58,15 +61,24 @@ impl Inner {
 }
 
 /// Handles close messsage from remote server.
-fn on_close(inner_rc: &RefCell<Inner>, close_msg: CloseMsg) {
-    let mut inner = inner_rc.borrow_mut();
-    inner.sock.take();
-    inner.heartbeat.stop();
+fn on_close(mut inner_rc: RpcClient, close_msg: CloseMsg) {
+    {
+        let mut inner = inner_rc.0.borrow_mut();
+        inner.sock.take();
+        inner.heartbeat.stop();
+    }
 
     // TODO: reconnect on disconnect, propagate error if unable
     //       to reconnect
     match close_msg {
-        CloseMsg::Normal(_msg) | CloseMsg::Disconnect(_msg) => {}
+        CloseMsg::Normal(_msg) |
+        CloseMsg::Disconnect(_msg) => {
+            web_sys::console::log_1(&"WsSession closed.".into());
+            spawn_local(
+                inner_rc.init()
+                    .map_err(|e| web_sys::console::log_1(&e.into()))
+            )
+        }
     }
 }
 
@@ -74,8 +86,9 @@ fn on_close(inner_rc: &RefCell<Inner>, close_msg: CloseMsg) {
 fn on_message(inner_rc: &RefCell<Inner>, msg: Result<ServerMsg, WasmErr>) {
     let inner = inner_rc.borrow();
     match msg {
-        Ok(ServerMsg::Pong(_num)) => {
+        Ok(ServerMsg::Pong(num)) => {
             // TODO: detect no pings
+            web_sys::console::log_1(&format!("Pong {}", num).into());
             inner.heartbeat.set_pong_at(Date::now());
         }
         Ok(ServerMsg::Event(event)) => {
@@ -105,7 +118,9 @@ impl RpcClient {
     /// Starts `Heartbeat` if connection succeeds and binds handlers
     /// on receiving messages from server and closing socket.
     pub fn init(&mut self) -> impl Future<Item = (), Error = WasmErr> {
+        web_sys::console::log_1(&"Init new WsSession.".into());
         let inner = Rc::clone(&self.0);
+        let self_clone = self.clone();
         WebSocket::new(&self.0.borrow().token).and_then(
             move |socket: WebSocket| {
                 let socket = Rc::new(socket);
@@ -117,9 +132,8 @@ impl RpcClient {
                     on_message(&inner_rc, msg)
                 })?;
 
-                let inner_rc = Rc::clone(&inner);
                 socket
-                    .on_close(move |msg: CloseMsg| on_close(&inner_rc, msg))?;
+                    .on_close(move |msg: CloseMsg| on_close(self_clone, msg))?;
 
                 inner.borrow_mut().sock.replace(socket);
                 Ok(())

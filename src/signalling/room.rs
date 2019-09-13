@@ -170,7 +170,7 @@ impl Room {
                 ice_candidates: peer.get_ice_candidates(),
                 tracks: peer.tracks(),
             };
-            peers_snapshots.insert(peer.id(), peer_snapshot);
+            peers_snapshots.insert(peer.id().to_string(), peer_snapshot);
         }
 
         Ok(Snapshot {
@@ -670,11 +670,16 @@ impl Handler<RpcConnectionEstablished> for Room {
         info!("RpcConnectionEstablished for member {}", msg.member_id);
 
         // TODO: Maybe better way to detect reconnect of member??
-        let is_reconnect = self.members.member_has_connection(&msg.member_id);
+//        let is_reconnect = self.members.member_has_connection(&msg.member_id);
+        let RpcConnectionEstablished {
+            member_id,
+            connection
+        } = msg;
+        let is_reconnect = self.members.is_have_drop_connection_tasks(&member_id);
 
         let fut = self
             .members
-            .connection_established(ctx, msg.member_id.clone(), msg.connection)
+            .connection_established(ctx, member_id.clone(), connection)
             .map_err(|err, _, _| {
                 error!("RpcConnectionEstablished error {:?}", err)
             })
@@ -683,11 +688,12 @@ impl Handler<RpcConnectionEstablished> for Room {
             });
 
         if is_reconnect {
-            let snapshot = self.take_snapshot(&msg.member_id).unwrap();
+            debug!("Member [id = {}] reconnecting.", member_id);
+            let snapshot = self.take_snapshot(&member_id).unwrap();
             ctx.spawn(wrap_future(
                 self.members
                     .send_event_to_member(
-                        msg.member_id,
+                        member_id,
                         Event::RestoreState { snapshot },
                     )
                     .map_err(move |e| {
