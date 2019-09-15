@@ -255,7 +255,8 @@ impl Member {
         self.0.borrow_mut().srcs.insert(endpoint.id(), endpoint);
     }
 
-    /// Lookups [`WebRtcPublishEndpoint`] source endpoint by [`WebRtcPublishId`].
+    /// Lookups [`WebRtcPublishEndpoint`] source endpoint by
+    /// [`WebRtcPublishId`].
     pub fn get_src_by_id(
         &self,
         id: &WebRtcPublishId,

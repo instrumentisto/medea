@@ -6,10 +6,17 @@ All user visible changes to this project will be documented in this file. This p
 
 
 
-## TBD [0.1.1] · 2019-??-??
-[0.1.1]: /../../tree/medea-jason-0.1.1/jason
+## TBD [0.2.0] · 2019-??-??
+[0.2.0]: /../../tree/medea-jason-0.2.0/jason
 
-### Changed
+### Added
+
+- Media management:
+    - Library API ([#40](/../../pull/40)):
+        - `Room.mute_audio()`;
+        - `Room.unmute_audio()`;
+        - `Room.mute_video()`;
+        - `Room.unmute_video()`.
 
 
 
