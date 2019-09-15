@@ -1,55 +1,50 @@
-async function f() {
-    const rust = await import("../../pkg");
+async function init_participant(wasm, token, frame) {
+  let toggle_audio = $(frame).find("input[name=toggle-audio]");
+  let toggle_video = $(frame).find("input[name=toggle-video]");
+  let local_video = $(frame).find("video[name=local-video]")[0];
+  let remote_video = $(frame).find("video[name=remote-video]")[0];
 
-    let caller = new rust.Jason();
-    let responder = new rust.Jason();
+  let participant = new wasm.Jason();
+  let room = await participant.join_room(token);
 
-    let caller_room = await caller.join_room("ws://localhost:8080/ws/pub-pub-video-call/caller/test");
-    let responder_room = await responder.join_room("ws://localhost:8080/ws/pub-pub-video-call/responder/test");
+  toggle_audio.change(function() {
+    if($(this).is(":checked")) {
+      room.unmute_audio();
+    } else {
+      room.mute_audio();
+    }
+  });
 
-    caller_room.on_new_connection(function (connection) {
-        connection.on_remote_stream(function (stream) {
-            var video = document.createElement("video");
-            video.srcObject = stream.get_media_stream();
-            document.body.appendChild(video);
-            video.play();
-        });
+  toggle_video.change(function() {
+    if($(this).is(":checked")) {
+      room.unmute_video();
+    } else {
+      room.mute_video();
+    }
+  });
+
+  room.on_new_connection(function (connection) {
+    connection.on_remote_stream(function (stream) {
+      remote_video.srcObject = stream.get_media_stream();
+      remote_video.play();
     });
-    caller.on_local_stream(function (stream, error) {
-        if (stream) {
-            var video = document.createElement("video");
+  });
 
-            video.srcObject = stream.get_media_stream();
-            document.body.appendChild(video);
-            video.play();
-        } else {
-            console.log(error);
-        }
-    });
+  participant.on_local_stream(function (stream, error) {
+    if (stream) {
+      local_video.srcObject = stream.get_media_stream();
+      local_video.play();
+    } else {
+      console.log(error);
+    }
+  });
 
-    responder.on_local_stream(function (stream, error) {
-        if (stream) {
-            var video = document.createElement("video");
-
-            video.srcObject = stream.get_media_stream();
-            document.body.appendChild(video);
-            video.play();
-        } else {
-            console.log(error);
-        }
-    });
-    responder_room.on_new_connection(function (connection) {
-        connection.on_remote_stream(function (stream) {
-            var video = document.createElement("video");
-            video.srcObject = stream.get_media_stream();
-            document.body.appendChild(video);
-            video.play();
-        });
-    });
+  return room;
 }
 
 window.onload = async function () {
-    await f();
+  const wasm = await import("../../pkg");
+
+  await init_participant(wasm, "ws://localhost:8080/ws/pub-pub-video-call/caller/test", "#caller");
+  await init_participant(wasm, "ws://localhost:8080/ws/pub-pub-video-call/responder/test", "#responder");
 };
-
-

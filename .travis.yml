@@ -21,6 +21,9 @@ stages:
 jobs:
   allow_failures:
     - rust: nightly
+      stage: check
+    - rust: nightly
+      stage: build
 
   include:
     - name: Clippy
@@ -73,10 +76,36 @@ jobs:
       rust: nightly
       script: make cargo.build crate=medea dockerized=no
 
-    - name: unit (stable)
+    - name: unit medea-macro (stable)
       stage: test
       rust: stable
-      script: make test.unit crate=@all
+      cache: false
+      script: make test.unit crate=medea-macro
+
+    - name: unit medea-client-api-proto (stable)
+      stage: test
+      rust: stable
+      cache: false
+      script: make test.unit crate=medea-client-api-proto
+
+    - name: unit medea (stable)
+      stage: test
+      rust: stable
+      script: make test.unit crate=medea
+
+    - name: unit medea-jason (nightly)
+      stage: test
+      # Run on stable when -Z install-upgrade is out,
+      # see: https://github.com/rust-lang/cargo/issues/6797
+      rust: nightly
+      addons:
+        chrome: stable
+        apt:
+          packages: ["chromium-chromedriver"]
+      before_script:
+        - cargo +nightly install wasm-bindgen-cli -Z install-upgrade
+        - rustup target add wasm32-unknown-unknown
+      script: make test.unit crate=medea-jason
 
     - name: E2E signalling (stable)
       stage: test

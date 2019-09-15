@@ -71,7 +71,7 @@ impl Conf {
             cfg.merge(File::with_name(&path))?;
         }
 
-        cfg.merge(Environment::with_prefix("MEDEA").separator("."))?;
+        cfg.merge(Environment::with_prefix("MEDEA").separator("__"))?;
 
         Ok(cfg.try_into()?)
     }
@@ -185,9 +185,9 @@ mod tests {
     fn conf_parse_spec_env_overrides_defaults() {
         let defaults = Conf::default();
 
-        env::set_var("MEDEA_RPC.IDLE_TIMEOUT", "46s");
+        env::set_var("MEDEA_RPC__IDLE_TIMEOUT", "46s");
         let new_config = Conf::parse().unwrap();
-        env::remove_var("MEDEA_RPC.IDLE_TIMEOUT");
+        env::remove_var("MEDEA_RPC__IDLE_TIMEOUT");
 
         assert_eq!(new_config.rpc.idle_timeout, Duration::from_secs(46));
         assert_ne!(new_config.rpc.idle_timeout, defaults.rpc.idle_timeout);
@@ -204,12 +204,12 @@ mod tests {
 
         let file_config = Conf::parse().unwrap();
 
-        env::set_var("MEDEA_RPC.IDLE_TIMEOUT", "48s");
+        env::set_var("MEDEA_RPC__IDLE_TIMEOUT", "48s");
         let file_env_config = Conf::parse().unwrap();
 
         env::remove_var(APP_CONF_PATH_ENV_VAR_NAME);
         fs::remove_file(test_config_file_path).unwrap();
-        env::remove_var("MEDEA_RPC.IDLE_TIMEOUT");
+        env::remove_var("MEDEA_RPC__IDLE_TIMEOUT");
 
         assert_eq!(file_config.rpc.idle_timeout, Duration::from_secs(47));
 
@@ -221,9 +221,9 @@ mod tests {
     fn redis_conf() {
         let default_conf = Conf::default();
 
-        env::set_var("MEDEA_TURN.DB.REDIS.IP", "5.5.5.5");
-        env::set_var("MEDEA_TURN.DB.REDIS.PORT", "1234");
-        env::set_var("MEDEA_TURN.DB.REDIS.CONNECTION_TIMEOUT", "10s");
+        env::set_var("MEDEA_TURN__DB__REDIS__IP", "5.5.5.5");
+        env::set_var("MEDEA_TURN__DB__REDIS__PORT", "1234");
+        env::set_var("MEDEA_TURN__DB__REDIS__CONNECTION_TIMEOUT", "10s");
 
         let env_conf = Conf::parse().unwrap();
 
@@ -250,8 +250,8 @@ mod tests {
     fn turn_conf() {
         let default_conf = Conf::default();
 
-        env::set_var("MEDEA_TURN.HOST", "example.com");
-        env::set_var("MEDEA_TURN.PORT", "1234");
+        env::set_var("MEDEA_TURN__HOST", "example.com");
+        env::set_var("MEDEA_TURN__PORT", "1234");
 
         let env_conf = Conf::parse().unwrap();
 
@@ -268,7 +268,7 @@ mod tests {
     fn log_conf() {
         let default_conf = Conf::default();
 
-        env::set_var("MEDEA_LOG.LEVEL", "WARN");
+        env::set_var("MEDEA_LOG__LEVEL", "WARN");
 
         let env_conf = Conf::parse().unwrap();
 
@@ -276,7 +276,7 @@ mod tests {
 
         assert_eq!(env_conf.log.level(), Some(slog::Level::Warning));
 
-        env::set_var("MEDEA_LOG.LEVEL", "OFF");
+        env::set_var("MEDEA_LOG__LEVEL", "OFF");
 
         assert_eq!(Conf::parse().unwrap().log.level(), None);
     }
@@ -286,7 +286,7 @@ mod tests {
     fn shutdown_conf_test() {
         let default_conf = Conf::default();
 
-        env::set_var("MEDEA_SHUTDOWN.TIMEOUT", "700ms");
+        env::set_var("MEDEA_SHUTDOWN__TIMEOUT", "700ms");
 
         let env_conf = Conf::parse().unwrap();
 
