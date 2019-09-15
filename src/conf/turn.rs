@@ -82,25 +82,25 @@ mod turn_conf_specs {
     fn overrides_defaults() {
         let default_conf = Conf::default();
 
-        env::set_var("MEDEA_TURN.DB.REDIS.IP", "0.0.0.0");
-        env::set_var("MEDEA_TURN.DB.REDIS.PORT", "4444");
-        env::set_var("MEDEA_TURN.DB.REDIS.PASS", "hellofellow");
-        env::set_var("MEDEA_TURN.DB.REDIS.DB_NUMBER", "10");
-        env::set_var("MEDEA_TURN.DB.REDIS.CONNECTION_TIMEOUT", "10s");
-        env::set_var("MEDEA_TURN.HOST", "example.com");
-        env::set_var("MEDEA_TURN.PORT", "4444");
-        env::set_var("MEDEA_TURN.USER", "ferris");
-        env::set_var("MEDEA_TURN.PASS", "qwerty");
+        env::set_var("MEDEA_TURN__DB__REDIS__IP", "0.0.0.0");
+        env::set_var("MEDEA_TURN__DB__REDIS__PORT", "4444");
+        env::set_var("MEDEA_TURN__DB__REDIS__PASS", "hellofellow");
+        env::set_var("MEDEA_TURN__DB__REDIS__DB_NUMBER", "10");
+        env::set_var("MEDEA_TURN__DB__REDIS__CONNECTION_TIMEOUT", "10s");
+        env::set_var("MEDEA_TURN__HOST", "example.com");
+        env::set_var("MEDEA_TURN__PORT", "4444");
+        env::set_var("MEDEA_TURN__USER", "ferris");
+        env::set_var("MEDEA_TURN__PASS", "qwerty");
         let env_conf = Conf::parse().unwrap();
-        env::remove_var("MEDEA_TURN.DB.REDIS.IP");
-        env::remove_var("MEDEA_TURN.DB.REDIS.PORT");
-        env::remove_var("MEDEA_TURN.DB.REDIS.PASS");
-        env::remove_var("MEDEA_TURN.DB.REDIS.DB_NUMBER");
-        env::remove_var("MEDEA_TURN.DB.REDIS.CONNECTION_TIMEOUT");
-        env::remove_var("MEDEA_TURN.HOST");
-        env::remove_var("MEDEA_TURN.PORT");
-        env::remove_var("MEDEA_TURN.USER");
-        env::remove_var("MEDEA_TURN.PASS");
+        env::remove_var("MEDEA_TURN__DB__REDIS__IP");
+        env::remove_var("MEDEA_TURN__DB__REDIS__PORT");
+        env::remove_var("MEDEA_TURN__DB__REDIS__PASS");
+        env::remove_var("MEDEA_TURN__DB__REDIS__DB_NUMBER");
+        env::remove_var("MEDEA_TURN__DB__REDIS__CONNECTION_TIMEOUT");
+        env::remove_var("MEDEA_TURN__HOST");
+        env::remove_var("MEDEA_TURN__PORT");
+        env::remove_var("MEDEA_TURN__USER");
+        env::remove_var("MEDEA_TURN__PASS");
 
         assert_ne!(default_conf.turn.db.redis.ip, env_conf.turn.db.redis.ip);
         assert_ne!(

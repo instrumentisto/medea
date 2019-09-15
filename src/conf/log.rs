@@ -35,9 +35,9 @@ mod log_conf_specs {
     fn overrides_defaults() {
         let default_conf = Conf::default();
 
-        env::set_var("MEDEA_LOG.LEVEL", "DEBUG");
+        env::set_var("MEDEA_LOG__LEVEL", "DEBUG");
         let env_conf = Conf::parse().unwrap();
-        env::remove_var("MEDEA_LOG.LEVEL");
+        env::remove_var("MEDEA_LOG__LEVEL");
 
         assert_ne!(default_conf.log.level, env_conf.log.level);
     }

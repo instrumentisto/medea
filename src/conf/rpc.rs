@@ -36,11 +36,11 @@ mod log_conf_specs {
     fn overrides_defaults() {
         let default_conf = Conf::default();
 
-        env::set_var("MEDEA_RPC.IDLE_TIMEOUT", "20s");
-        env::set_var("MEDEA_RPC.RECONNECT_TIMEOUT", "30s");
+        env::set_var("MEDEA_RPC__IDLE_TIMEOUT", "20s");
+        env::set_var("MEDEA_RPC__RECONNECT_TIMEOUT", "30s");
         let env_conf = Conf::parse().unwrap();
-        env::remove_var("MEDEA_RPC.IDLE_TIMEOUT");
-        env::remove_var("MEDEA_RPC.RECONNECT_TIMEOUT");
+        env::remove_var("MEDEA_RPC__IDLE_TIMEOUT");
+        env::remove_var("MEDEA_RPC__RECONNECT_TIMEOUT");
 
         assert_ne!(default_conf.rpc.idle_timeout, env_conf.rpc.idle_timeout);
         assert_ne!(

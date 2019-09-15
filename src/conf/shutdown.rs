@@ -28,9 +28,9 @@ mod shutdown_conf_specs {
     fn overrides_defaults() {
         let default_conf = Conf::default();
 
-        env::set_var("MEDEA_SHUTDOWN.TIMEOUT", "20s");
+        env::set_var("MEDEA_SHUTDOWN__TIMEOUT", "20s");
         let env_conf = Conf::parse().unwrap();
-        env::remove_var("MEDEA_SHUTDOWN.TIMEOUT");
+        env::remove_var("MEDEA_SHUTDOWN__TIMEOUT");
 
         assert_ne!(default_conf.shutdown.timeout, env_conf.shutdown.timeout);
     }
