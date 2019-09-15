@@ -1,9 +1,8 @@
 #![cfg(target_arch = "wasm32")]
-use std::{cell::RefCell, rc::Rc};
 
 mod media;
 
-use std::rc::Rc;
+use std::{cell::RefCell, rc::Rc};
 
 use futures::{
     future::{self, IntoFuture},
@@ -128,11 +127,20 @@ fn add_candidates_to_answerer_before_offer(
 
     let manager = Rc::new(MediaManager::default());
     let pc1 = Rc::new(
-        PeerConnection::new(PeerId(1), tx1, vec![], Rc::clone(&manager))
+        PeerConnection::new(
+            PeerId(1),
+            tx1,
+            vec![],
+            Rc::clone(&manager),
+            true,
+            true,
+        )
+        .unwrap(),
+    );
+    let pc2 = Rc::new(
+        PeerConnection::new(PeerId(2), tx2, vec![], manager, true, true)
             .unwrap(),
     );
-    let pc2 =
-        Rc::new(PeerConnection::new(PeerId(2), tx2, vec![], manager).unwrap());
     let (audio_track, video_track) = get_test_tracks();
 
     let pc2_clone = Rc::clone(&pc2);
@@ -167,11 +175,20 @@ fn add_candidates_to_offerer_before_answer(
 
     let manager = Rc::new(MediaManager::default());
     let pc1 = Rc::new(
-        PeerConnection::new(PeerId(1), tx1, vec![], Rc::clone(&manager))
+        PeerConnection::new(
+            PeerId(1),
+            tx1,
+            vec![],
+            Rc::clone(&manager),
+            true,
+            true,
+        )
+        .unwrap(),
+    );
+    let pc2 = Rc::new(
+        PeerConnection::new(PeerId(2), tx2, vec![], manager, true, true)
             .unwrap(),
     );
-    let pc2 =
-        Rc::new(PeerConnection::new(PeerId(2), tx2, vec![], manager).unwrap());
     let (audio_track, video_track) = get_test_tracks();
 
     let pc1_clone = Rc::clone(&pc1);
@@ -211,11 +228,20 @@ fn normal_exchange_of_candidates() -> impl Future<Item = (), Error = JsValue> {
 
     let manager = Rc::new(MediaManager::default());
     let peer1 = Rc::new(
-        PeerConnection::new(PeerId(1), tx1, vec![], Rc::clone(&manager))
+        PeerConnection::new(
+            PeerId(1),
+            tx1,
+            vec![],
+            Rc::clone(&manager),
+            true,
+            true,
+        )
+        .unwrap(),
+    );
+    let peer2 = Rc::new(
+        PeerConnection::new(PeerId(2), tx2, vec![], manager, true, true)
             .unwrap(),
     );
-    let peer2 =
-        Rc::new(PeerConnection::new(PeerId(2), tx2, vec![], manager).unwrap());
     let (audio_track, video_track) = get_test_tracks();
 
     let peer1_clone = Rc::clone(&peer1);

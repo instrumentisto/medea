@@ -18,6 +18,9 @@ All user visible changes to this project will be documented in this file. This p
         - `Room.mute_video()`;
         - `Room.unmute_video()`.
 
+### Fixed
+- Signalling:
+    - Not adding `IceCandidate`s received before remote SDP description ([#50](/../../pull/50)).
 
 
 
