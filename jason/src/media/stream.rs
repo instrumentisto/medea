@@ -11,7 +11,7 @@ use medea_client_api_proto::{MediaType, TrackId};
 use wasm_bindgen::{prelude::*, JsValue};
 use web_sys::MediaStream as SysMediaStream;
 
-use crate::utils::WasmErr;
+use crate::utils::{copy_js_ref, WasmErr};
 
 use super::MediaTrack;
 
@@ -116,7 +116,7 @@ impl MediaStreamHandle {
     /// Returns the underlying [`MediaStream`][`SysMediaStream`] object.
     pub fn get_media_stream(&self) -> Result<SysMediaStream, JsValue> {
         match self.0.upgrade() {
-            Some(inner) => Ok(inner.stream.clone()),
+            Some(inner) => Ok(copy_js_ref(&inner.stream)),
             None => Err(WasmErr::from("Detached state").into()),
         }
     }

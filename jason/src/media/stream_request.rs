@@ -149,10 +149,10 @@ impl From<&SimpleStreamRequest> for web_sys::MediaStreamConstraints {
         let mut constraints = Self::new();
 
         if let Some((_, _)) = request.video {
-            constraints.video(&JsValue::from_bool(true));
+            constraints.video(&JsValue::TRUE);
         }
         if let Some((_, _)) = request.audio {
-            constraints.audio(&JsValue::from_bool(true));
+            constraints.audio(&JsValue::TRUE);
         }
 
         constraints

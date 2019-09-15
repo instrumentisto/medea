@@ -34,3 +34,12 @@ impl Drop for IntervalHandle {
         window().clear_interval_with_handle(self.0);
     }
 }
+
+/// Copies any JS object. Basically creates new reference to object owned by JS.
+pub fn copy_js_ref<
+    T: AsRef<wasm_bindgen::JsValue> + From<wasm_bindgen::JsValue>,
+>(
+    value: &T,
+) -> T {
+    T::from(value.as_ref().clone())
+}
