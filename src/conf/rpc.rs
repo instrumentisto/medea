@@ -22,6 +22,7 @@ pub struct Rpc {
     pub reconnect_timeout: Duration,
 }
 
+// TODO: are you sure its not failing?
 #[cfg(test)]
 mod log_conf_specs {
     use std::env;

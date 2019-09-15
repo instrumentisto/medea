@@ -427,24 +427,24 @@ mod tests {
 
     #[test]
     fn properly_serialize() {
-        for local_uri_str in vec![
+        for local_uri_str in &[
             "local://room_id",
             "local://room_id/member_id",
             "local://room_id/member_id/endpoint_id",
         ] {
-            let local_uri = StatefulLocalUri::try_from(local_uri_str).unwrap();
+            let local_uri = StatefulLocalUri::try_from(*local_uri_str).unwrap();
             assert_eq!(local_uri_str.to_string(), local_uri.to_string());
         }
     }
 
     #[test]
     fn return_error_when_local_uri_not_full() {
-        for local_uri_str in vec![
+        for local_uri_str in &[
             "local://room_id//endpoint_id",
             "local:////endpoint_id",
             "local:///member_id/endpoint_id",
         ] {
-            match StatefulLocalUri::try_from(local_uri_str) {
+            match StatefulLocalUri::try_from(*local_uri_str) {
                 Ok(_) => unreachable!(local_uri_str),
                 Err(e) => match e {
                     LocalUriParseError::MissingPaths(_) => (),

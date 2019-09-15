@@ -6,7 +6,7 @@ Medea Control API protocol
 
 [Changelog](https://github.com/instrumentisto/medea/blob/master/proto/control-api/CHANGELOG.md)
 
-Client API protocol implementation for [Medea] media server.
+Control API protocol implementation for [Medea] media server.
 
 __Currently, in early development phase.__
 

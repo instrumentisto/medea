@@ -56,8 +56,8 @@ macro_rules! impl_try_from_proto_for_endpoint {
                         WebRtcPublishEndpoint::from(proto.get_webrtc_pub());
                     Ok(Endpoint::WebRtcPublish(publish))
                 } else {
-                    // TODO implement another endpoints when they will be
-                    // implemented
+                    // TODO: implement another endpoints when they will be
+                    //       implemented
                     unimplemented!()
                 }
             }

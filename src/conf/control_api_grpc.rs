@@ -7,6 +7,7 @@ use std::net::{IpAddr, Ipv4Addr};
 use serde::{Deserialize, Serialize};
 use smart_default::SmartDefault;
 
+// TODO: abstract GrpcListener
 /// [Control API] gRPC server settings.
 ///
 /// [Control API]: http://tiny.cc/380uaz

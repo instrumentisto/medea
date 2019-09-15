@@ -7,6 +7,7 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr, ToSocketAddrs as _};
 use serde::{Deserialize, Serialize};
 use smart_default::SmartDefault;
 
+// TODO: abstract HttpListener, move public_url to ClientApiServer
 /// [Client API]'s HTTP server settings.
 ///
 /// [Client API]: http://tiny.cc/c80uaz

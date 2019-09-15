@@ -19,6 +19,7 @@ use medea::{
     AppContext,
 };
 
+// TODO: move somewhere else
 fn start_static_rooms(
     room_service: &Addr<RoomService>,
 ) -> impl Future<Item = (), Error = ()> {
