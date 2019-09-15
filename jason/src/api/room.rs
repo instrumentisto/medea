@@ -19,7 +19,7 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 
 use crate::{
-    media::{MediaManager, MediaStream},
+    media::MediaStream,
     peer::{PeerEvent, PeerEventHandler, PeerRepository},
     rpc::RpcClient,
     utils::{Callback2, WasmErr},
@@ -43,12 +43,30 @@ impl RoomHandle {
         &mut self,
         f: js_sys::Function,
     ) -> Result<(), JsValue> {
-        self.0
-            .upgrade()
-            .map(|room| {
-                room.borrow_mut().on_new_connection.set_func(f);
-            })
-            .ok_or_else(|| WasmErr::from("Detached state").into())
+        map_weak!(self, |inner| inner
+            .borrow_mut()
+            .on_new_connection
+            .set_func(f))
+    }
+
+    /// Mutes outbound audio in this room.
+    pub fn mute_audio(&self) -> Result<(), JsValue> {
+        map_weak!(self, |inner| inner.borrow_mut().toggle_send_audio(false))
+    }
+
+    /// Unmutes outbound audio in this room.
+    pub fn unmute_audio(&self) -> Result<(), JsValue> {
+        map_weak!(self, |inner| inner.borrow_mut().toggle_send_audio(true))
+    }
+
+    /// Mutes outbound video in this room.
+    pub fn mute_video(&self) -> Result<(), JsValue> {
+        map_weak!(self, |inner| inner.borrow_mut().toggle_send_video(false))
+    }
+
+    /// Unmutes outbound video in this room.
+    pub fn unmute_video(&self) -> Result<(), JsValue> {
+        map_weak!(self, |inner| inner.borrow_mut().toggle_send_video(true))
     }
 }
 
@@ -58,21 +76,18 @@ impl RoomHandle {
 /// It's used on Rust side and represents a handle to [`InnerRoom`] data.
 ///
 /// For using [`Room`] on JS side, consider the [`RoomHandle`].
-pub(crate) struct Room(Rc<RefCell<InnerRoom>>);
+pub struct Room(Rc<RefCell<InnerRoom>>);
 
 impl Room {
     /// Creates new [`Room`] and associates it with a provided [`RpcClient`].
-    pub(crate) fn new(rpc: &Rc<RpcClient>, mngr: &Rc<MediaManager>) -> Self {
+    pub fn new(rpc: Rc<dyn RpcClient>, peers: Box<dyn PeerRepository>) -> Self {
         let (tx, rx) = unbounded();
-        let room = Rc::new(RefCell::new(InnerRoom::new(
-            Rc::clone(rpc),
-            tx,
-            Rc::clone(mngr),
-        )));
+        let events_stream = rpc.subscribe();
+
+        let room = Rc::new(RefCell::new(InnerRoom::new(rpc, peers, tx)));
 
         let inner = Rc::downgrade(&room);
-        let handle_medea_event = rpc
-            .subscribe()
+        let handle_medea_event = events_stream
             .for_each(move |event| match inner.upgrade() {
                 Some(inner) => {
                     event.dispatch_with(inner.borrow_mut().deref_mut());
@@ -112,7 +127,7 @@ impl Room {
     /// Creates new [`RoomHandle`] used by JS side. You can create them as many
     /// as you need.
     #[inline]
-    pub(crate) fn new_handle(&self) -> RoomHandle {
+    pub fn new_handle(&self) -> RoomHandle {
         RoomHandle(Rc::downgrade(&self.0))
     }
 }
@@ -121,25 +136,31 @@ impl Room {
 ///
 /// Shared between JS side ([`RoomHandle`]) and Rust side ([`Room`]).
 struct InnerRoom {
-    rpc: Rc<RpcClient>,
-    peers: PeerRepository,
+    rpc: Rc<dyn RpcClient>,
+    peers: Box<dyn PeerRepository>,
+    peer_event_sender: UnboundedSender<PeerEvent>,
     connections: HashMap<PeerId, Connection>,
     on_new_connection: Rc<Callback2<ConnectionHandle, WasmErr>>,
+    enabled_audio: bool,
+    enabled_video: bool,
 }
 
 impl InnerRoom {
     /// Creates new [`InnerRoom`].
     #[inline]
     fn new(
-        rpc: Rc<RpcClient>,
-        peer_events_sender: UnboundedSender<PeerEvent>,
-        media_manager: Rc<MediaManager>,
+        rpc: Rc<dyn RpcClient>,
+        peers: Box<dyn PeerRepository>,
+        peer_event_sender: UnboundedSender<PeerEvent>,
     ) -> Self {
         Self {
             rpc,
-            peers: PeerRepository::new(peer_events_sender, media_manager),
+            peers,
+            peer_event_sender,
             connections: HashMap::new(),
             on_new_connection: Rc::new(Callback2::default()),
+            enabled_audio: true,
+            enabled_video: true,
         }
     }
 
@@ -169,6 +190,24 @@ impl InnerRoom {
             }
         }
     }
+
+    /// Toggles a audio send [`Track`]s of all [`PeerConnection`]s what this
+    /// [`Room`] manage.
+    fn toggle_send_audio(&mut self, enabled: bool) {
+        for peer in self.peers.get_all() {
+            peer.toggle_send_audio(enabled);
+        }
+        self.enabled_audio = enabled;
+    }
+
+    /// Toggles a video send [`Track`]s of all [`PeerConnection`]s what this
+    /// [`Room`] manage.
+    fn toggle_send_video(&mut self, enabled: bool) {
+        for peer in self.peers.get_all() {
+            peer.toggle_send_video(enabled);
+        }
+        self.enabled_video = enabled;
+    }
 }
 
 /// RPC events handling.
@@ -185,8 +224,14 @@ impl EventHandler for InnerRoom {
         tracks: Vec<Track>,
         ice_servers: Vec<IceServer>,
     ) {
-        let peer = match self.peers.create(peer_id, ice_servers) {
-            Ok(peer) => Rc::clone(peer),
+        let peer = match self.peers.create_peer(
+            peer_id,
+            ice_servers,
+            self.peer_event_sender.clone(),
+            self.enabled_audio,
+            self.enabled_video,
+        ) {
+            Ok(peer) => peer,
             Err(err) => {
                 err.log_err();
                 return;

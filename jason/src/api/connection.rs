@@ -9,7 +9,7 @@ use wasm_bindgen::prelude::*;
 
 use crate::{
     media::{MediaStream, MediaStreamHandle},
-    utils::{Callback, WasmErr},
+    utils::Callback,
 };
 
 /// Actual data of a connection with a specific remote [`Member`].
@@ -35,12 +35,10 @@ impl ConnectionHandle {
         &mut self,
         f: js_sys::Function,
     ) -> Result<(), JsValue> {
-        self.0
-            .upgrade()
-            .map(|conn| {
-                conn.borrow_mut().on_remote_stream.set_func(f);
-            })
-            .ok_or_else(|| WasmErr::from("Detached state").into())
+        map_weak!(self, |inner| inner
+            .borrow_mut()
+            .on_remote_stream
+            .set_func(f))
     }
 }
 

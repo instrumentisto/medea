@@ -12,8 +12,6 @@ stages:
   - name: build
     if: (branch = master AND type != pull_request)
         OR commit_message =~ /.*\[run ci\]/
-  - name: build_beta
-    if: branch = master
   - name: test
     if: (branch = master AND type != pull_request)
         OR commit_message =~ /.*\[run ci\]/
@@ -24,6 +22,8 @@ jobs:
   allow_failures:
     - rust: nightly
       stage: check
+    - rust: nightly
+      stage: build
 
   include:
     - name: Clippy
@@ -65,42 +65,43 @@ jobs:
           all_branches: true
 
     - name: medea (beta)
-      stage: build_beta
+      stage: build
+      if: branch = master
       rust: beta
       script: make cargo.build crate=medea dockerized=no
 
     - name: medea (nightly)
-      stage: build_beta
+      stage: build
+      if: branch = master
       rust: nightly
       script: make cargo.build crate=medea dockerized=no
 
-    - name: unit medea-macro
+    - name: unit medea-macro (stable)
       stage: test
-      cache: false
       rust: stable
+      cache: false
       script: make test.unit crate=medea-macro
 
-    - name: unit medea-client-api-proto
-      cache: false
+    - name: unit medea-client-api-proto (stable)
       stage: test
       rust: stable
+      cache: false
       script: make test.unit crate=medea-client-api-proto
 
-    - name: unit medea
+    - name: unit medea (stable)
       stage: test
       rust: stable
       script: make test.unit crate=medea
 
-    - name: unit medea-jason
+    - name: unit medea-jason (nightly)
       stage: test
-      # run on stable when -Z install-upgrade is out
-      # tracking: rust-lang/cargo#6797
+      # Run on stable when -Z install-upgrade is out,
+      # see: https://github.com/rust-lang/cargo/issues/6797
       rust: nightly
       addons:
         chrome: stable
         apt:
-          packages:
-            - chromium-chromedriver
+          packages: ["chromium-chromedriver"]
       before_script:
         - cargo +nightly install wasm-bindgen-cli -Z install-upgrade
         - rustup target add wasm32-unknown-unknown
@@ -121,7 +122,7 @@ jobs:
       cache: false
       before_script:
         - export MEDEA_CRATE_NAME=$(echo $TRAVIS_TAG \
-          | sed -E "s/^(medea[a-z-]*)-[0-9]+\.[0-9]+\.[0-9]+/\1/")
+                        | sed -E "s/^(medea[a-z-]*)-[0-9]+\.[0-9]+\.[0-9]+/\1/")
       script:
         - echo "Releasing $MEDEA_CRATE_NAME to crates.io..."
       deploy:
@@ -137,7 +138,7 @@ jobs:
       cache: false
       before_script:
         - export MEDEA_CRATE_NAME=$(echo $TRAVIS_TAG \
-          | sed -E "s/^(medea[a-z-]*)-[0-9]+\.[0-9]+\.[0-9]+/\1/")
+                        | sed -E "s/^(medea[a-z-]*)-[0-9]+\.[0-9]+\.[0-9]+/\1/")
       script:
         - echo "Releasing $MEDEA_CRATE_NAME to NPM..."
       before_deploy:
@@ -156,7 +157,7 @@ jobs:
       cache: false
       before_script:
         - export MEDEA_CRATE_NAME=$(echo $TRAVIS_TAG \
-          | sed -E "s/^(medea[a-z-]*)-[0-9]+\.[0-9]+\.[0-9]+/\1/")
+                        | sed -E "s/^(medea[a-z-]*)-[0-9]+\.[0-9]+\.[0-9]+/\1/")
       script:
         - echo "Releasing $MEDEA_CRATE_NAME to GitHub..."
       deploy:

@@ -67,7 +67,10 @@ impl Actor for GracefulShutdown {
 
     #[cfg(not(unix))]
     fn started(&mut self, _: &mut Self::Context) {
-        info!("Graceful shutdown is disabled: only UNIX signals are supported");
+        warn!(
+            "Graceful shutdown is disabled: only UNIX signals are supported, \
+             and current playform is not UNIX"
+        );
     }
 
     #[cfg(unix)]
