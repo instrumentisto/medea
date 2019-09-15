@@ -20,7 +20,7 @@ All user visible changes to this project will be documented in this file. This p
 
 ### Fixed
 - Signalling:
-    - Not adding `IceCandidate`s received before remote SDP description ([#50](/../../pull/50)).
+    - Not adding `IceCandidate`s received before remote SDP ([#50](/../../pull/50)).
 
 
 
