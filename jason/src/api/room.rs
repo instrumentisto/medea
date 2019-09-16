@@ -334,6 +334,20 @@ impl EventHandler for InnerRoom {
     fn on_restore_state(&mut self, snapshot: Snapshot) {
         web_sys::console::log_1(&"OnRestoreState".into());
 
+        macro_rules! fatal_err_in_snapshot {
+            ($self:expr) => {
+                web_sys::console::error_1(
+                    &format!(
+                        "Found fatal error in snapshot. Resetting states. {}",
+                        line!()
+                    )
+                    .into(),
+                );
+                $self.reset();
+                return;
+            };
+        }
+
         {
             let removed_peers: Vec<PeerId> = self
                 .peers
@@ -365,8 +379,7 @@ impl EventHandler for InnerRoom {
                     _ => {
                         // TODO: In principle, PeerCreated cannot come in any
                         // state anymore.
-                        self.reset();
-                        return;
+                        fatal_err_in_snapshot!(self);
                     }
                 }
                 continue;
@@ -378,8 +391,7 @@ impl EventHandler for InnerRoom {
                         SignalingState::New => {
                             // TODO: return error because this is not
                             // possible
-                            self.reset();
-                            return;
+                            fatal_err_in_snapshot!(self);
                         }
                         SignalingState::Stable => {}
                         SignalingState::HaveLocalOffer => {
@@ -388,16 +400,39 @@ impl EventHandler for InnerRoom {
                                 snapshot_peer.remote_sdp_answer.unwrap(),
                             );
                         }
+                        SignalingState::HaveRemoteOffer => {}
                         _ => {
-                            // TODO: return error because this is not possible
-                            self.reset();
-                            return;
+                            fatal_err_in_snapshot!(self);
+                        }
+                    }
+                }
+                ServerPeerState::WaitLocalHaveRemoteSdp => {
+                    match local_peer.signaling_state() {
+                        SignalingState::Stable => {
+                            let sdp_answer = local_peer
+                                .current_local_description()
+                                .unwrap()
+                                .sdp();
+                            self.rpc.send_command(Command::MakeSdpAnswer {
+                                peer_id: id,
+                                sdp_answer,
+                            })
+                        }
+                        _ => {
+                            fatal_err_in_snapshot!(self);
                         }
                     }
                 }
                 _ => {
-                    self.reset();
-                    return;
+                    web_sys::console::log_1(
+                        &format!(
+                            "Server State: {:?}; Local state: {:?}",
+                            snapshot_peer.state,
+                            local_peer.signaling_state()
+                        )
+                        .into(),
+                    );
+                    fatal_err_in_snapshot!(self);
                     // TODO: unreachable??
                     //                    unreachable!()
                 }

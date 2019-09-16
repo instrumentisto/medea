@@ -16,6 +16,7 @@ use crate::utils::WasmErr;
 
 use self::{heartbeat::Heartbeat, websocket::WebSocket};
 use futures::{future::Loop, task::spawn};
+use serde_json::Error;
 use wasm_bindgen_futures::spawn_local;
 
 /// Connection with remote was closed.
@@ -80,13 +81,18 @@ fn on_close(inner_rc: WebsocketRpcClient, close_msg: CloseMsg) {
         inner.sock.take();
         inner.heartbeat.stop();
     }
-
     // TODO: reconnect on disconnect, propagate error if unable
     //       to reconnect
     match &close_msg {
         CloseMsg::Normal(_) | CloseMsg::Disconnect(_) => {
             web_sys::console::log_1(&"WsSession closed.".into());
             spawn_local(futures::future::loop_fn(inner_rc, |inner_rc| {
+                {
+                    let mut inner = inner_rc.0.borrow_mut();
+                    inner.sock.take();
+                    inner.heartbeat.stop();
+                }
+
                 web_sys::console::log_1(&"Looped".into());
                 let fut = inner_rc.init();
 
@@ -153,12 +159,8 @@ impl WebsocketRpcClient {
         let inner = Rc::clone(&self.0);
         let self_clone = self.clone();
         web_sys::console::log_1(&"Before WebSocket new".into());
-        WebSocket::new(&self.0.borrow().token)
-            .map_err(|e| {
-                web_sys::console::log_1(&"tetetetete".into());
-                e
-            })
-            .and_then(move |socket: WebSocket| {
+        WebSocket::new(&self.0.borrow().token).and_then(
+            move |socket: WebSocket| {
                 let socket = Rc::new(socket);
 
                 inner.borrow_mut().heartbeat.start(Rc::clone(&socket))?;
@@ -176,7 +178,8 @@ impl WebsocketRpcClient {
 
                 inner.borrow_mut().sock.replace(socket);
                 Ok(())
-            })
+            },
+        )
     }
 }
 
