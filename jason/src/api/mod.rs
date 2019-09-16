@@ -10,12 +10,15 @@ use js_sys::Promise;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::future_to_promise;
 
-use crate::{media::MediaManager, rpc::RpcClient, set_panic_hook};
-
-use self::room::Room;
+use crate::{
+    media::MediaManager,
+    peer,
+    rpc::{RpcClient, WebsocketRpcClient},
+    set_panic_hook,
+};
 
 #[doc(inline)]
-pub use self::{connection::ConnectionHandle, room::RoomHandle};
+pub use self::{connection::ConnectionHandle, room::Room, room::RoomHandle};
 
 #[wasm_bindgen]
 #[derive(Default)]
@@ -24,7 +27,7 @@ pub struct Jason(Rc<RefCell<Inner>>);
 #[derive(Default)]
 struct Inner {
     // TODO: multiple RpcClient's if rooms managed by different servers
-    rpc: Option<Rc<RpcClient>>,
+    rpc: Option<Rc<dyn RpcClient>>,
     media_manager: Rc<MediaManager>,
     rooms: Vec<Room>,
 }
@@ -47,15 +50,17 @@ impl Jason {
     /// Fails if unable to connect to media server.
     /// Effectively returns `Result<RoomHandle, WasmErr>`.
     pub fn join_room(&self, token: String) -> Promise {
-        let mut rpc = RpcClient::new(token, 3000);
-        let media_manager = Rc::clone(&self.0.borrow().media_manager);
+        let mut rpc = WebsocketRpcClient::new(token, 3000);
+        let peer_repository =
+            peer::Repository::new(Rc::clone(&self.0.borrow().media_manager));
 
         let inner = Rc::clone(&self.0);
         let fut = rpc
             .init()
             .and_then(move |()| {
-                let rpc = Rc::new(rpc);
-                let room = Room::new(&rpc, &media_manager);
+                let rpc: Rc<dyn RpcClient> = Rc::new(rpc);
+                let room =
+                    Room::new(Rc::clone(&rpc), Box::new(peer_repository));
 
                 let handle = room.new_handle();
 

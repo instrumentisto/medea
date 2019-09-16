@@ -9,60 +9,88 @@ use super::{PeerConnection, PeerEvent};
 
 /// [`PeerConnection`] factory and repository.
 #[allow(clippy::module_name_repetitions)]
-pub struct PeerRepository {
-    /// Peer id to [`PeerConnection`],
-    peers: HashMap<PeerId, Rc<PeerConnection>>,
-
-    /// Sender that will be injected into all [`PeerConnection`]s
-    /// created by this repository.
-    peer_events_sender: UnboundedSender<PeerEvent>,
-
-    /// [`MediaManager`] that will be injected into all [`PeerConnection`]s
-    /// created by this repository
-    media_manager: Rc<MediaManager>,
-}
-
-impl PeerRepository {
-    /// Creates new [`PeerRepository`].
-    #[inline]
-    pub fn new(
-        peer_events_sender: UnboundedSender<PeerEvent>,
-        media_manager: Rc<MediaManager>,
-    ) -> Self {
-        Self {
-            peers: HashMap::new(),
-            peer_events_sender,
-            media_manager,
-        }
-    }
-
+#[cfg_attr(feature = "mockable", mockall::automock)]
+pub trait PeerRepository {
     /// Creates new [`PeerConnection`] with provided ID and injecting provided
-    /// [`IceServer`]s, stored [`PeerEvent`] sender and [`MediaManager`].
-    pub fn create<I: IntoIterator<Item = IceServer>>(
+    /// [`IceServer`]s, [`PeerEvent`] sender and stored [`MediaManager`].
+    ///
+    /// [`PeerConnection`] can be created with muted audio or video [`Track`]s.
+    fn create_peer(
         &mut self,
         id: PeerId,
-        ice_servers: I,
-    ) -> Result<&Rc<PeerConnection>, WasmErr> {
+        ice_servers: Vec<IceServer>,
+        events_sender: UnboundedSender<PeerEvent>,
+        enabled_audio: bool,
+        enabled_video: bool,
+    ) -> Result<Rc<PeerConnection>, WasmErr>;
+
+    /// Returns [`PeerConnection`] stored in repository by its ID.
+    fn get(&self, id: PeerId) -> Option<Rc<PeerConnection>>;
+
+    /// Removes [`PeerConnection`] stored in repository by its ID.
+    fn remove(&mut self, id: PeerId);
+
+    /// Returns all [`PeerConnection`]s stored in repository.
+    fn get_all(&self) -> Vec<Rc<PeerConnection>>;
+}
+
+/// [`PeerConnection`] factory and repository.
+pub struct Repository {
+    /// [`MediaManager`] for injecting into new created [`PeerConnection`]s.
+    media_manager: Rc<MediaManager>,
+
+    /// Peer id to [`PeerConnection`],
+    peers: HashMap<PeerId, Rc<PeerConnection>>,
+}
+
+impl Repository {
+    pub fn new(media_manager: Rc<MediaManager>) -> Self {
+        Self {
+            media_manager,
+            peers: HashMap::new(),
+        }
+    }
+}
+
+impl PeerRepository for Repository {
+    /// Creates new [`PeerConnection`] with provided ID and injecting provided
+    /// [`IceServer`]s, stored [`PeerEvent`] sender and [`MediaManager`].
+    fn create_peer(
+        &mut self,
+        id: PeerId,
+        ice_servers: Vec<IceServer>,
+        peer_events_sender: UnboundedSender<PeerEvent>,
+        enabled_audio: bool,
+        enabled_video: bool,
+    ) -> Result<Rc<PeerConnection>, WasmErr> {
         let peer = Rc::new(PeerConnection::new(
             id,
-            self.peer_events_sender.clone(),
+            peer_events_sender,
             ice_servers,
             Rc::clone(&self.media_manager),
+            enabled_audio,
+            enabled_video,
         )?);
         self.peers.insert(id, peer);
-        Ok(self.peers.get(&id).unwrap())
+        Ok(self.peers.get(&id).cloned().unwrap())
     }
 
     /// Returns [`PeerConnection`] stored in repository by its ID.
     #[inline]
-    pub fn get(&self, id: PeerId) -> Option<&Rc<PeerConnection>> {
-        self.peers.get(&id)
+    fn get(&self, id: PeerId) -> Option<Rc<PeerConnection>> {
+        self.peers.get(&id).cloned()
     }
 
     /// Removes [`PeerConnection`] stored in repository by its ID.
     #[inline]
-    pub fn remove(&mut self, id: PeerId) {
+    fn remove(&mut self, id: PeerId) {
         self.peers.remove(&id);
+    }
+
+    /// Returns all [`PeerConnection`]s stored in repository.
+    #[inline]
+    fn get_all(&self) -> Vec<Rc<PeerConnection>> {
+        self.peers.values().cloned().collect()
     }
 
     pub fn iter_peers(

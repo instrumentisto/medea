@@ -5,10 +5,11 @@ use std::{
     time::Duration,
 };
 
+#[cfg(unix)]
+use actix::AsyncContext;
 use actix::{
     prelude::{Actor, Context},
-    AsyncContext, Handler, Message, Recipient, ResponseActFuture, System,
-    WrapFuture as _,
+    Handler, Message, Recipient, ResponseActFuture, System, WrapFuture as _,
 };
 use derive_more::Display;
 use failure::Fail;
@@ -64,28 +65,24 @@ impl GracefulShutdown {
 impl Actor for GracefulShutdown {
     type Context = Context<Self>;
 
+    #[cfg(not(unix))]
+    fn started(&mut self, _: &mut Self::Context) {
+        warn!(
+            "Graceful shutdown is disabled: only UNIX signals are supported, \
+             and current playform is not UNIX"
+        );
+    }
+
+    #[cfg(unix)]
     fn started(&mut self, ctx: &mut Self::Context) {
-        #[cfg(not(unix))]
-        {
-            warning!(
-                "Graceful shutdown is disabled: only UNIX signals are \
-                 supported"
+        use tokio_signal::unix::{Signal, SIGHUP, SIGINT, SIGQUIT, SIGTERM};
+        for s in &[SIGHUP, SIGINT, SIGQUIT, SIGTERM] {
+            ctx.add_message_stream(
+                Signal::new(*s)
+                    .flatten_stream()
+                    .map(OsSignal)
+                    .map_err(|_| error!("Error getting shutdown signal")),
             );
-            return;
-        }
-        #[cfg(unix)]
-        {
-            use tokio_signal::unix::{
-                Signal, SIGHUP, SIGINT, SIGQUIT, SIGTERM,
-            };
-            for s in &[SIGHUP, SIGINT, SIGQUIT, SIGTERM] {
-                ctx.add_message_stream(
-                    Signal::new(*s)
-                        .flatten_stream()
-                        .map(OsSignal)
-                        .map_err(|_| error!("Error getting shutdown signal")),
-                );
-            }
         }
     }
 
@@ -98,12 +95,10 @@ impl Actor for GracefulShutdown {
 
 /// Message that is received by [`GracefulShutdown`] shutdown service when
 /// the process receives an OS signal.
-#[cfg(unix)]
 #[derive(Message)]
 #[rtype(result = "Result<(), ()>")]
 struct OsSignal(i32);
 
-#[cfg(unix)]
 impl Handler<OsSignal> for GracefulShutdown {
     type Result = ResponseActFuture<Self, (), ()>;
 

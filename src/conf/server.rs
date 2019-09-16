@@ -45,13 +45,13 @@ mod server_spec {
     fn overrides_defaults_and_gets_bind_addr() {
         let default_conf = Conf::default();
 
-        env::set_var("MEDEA_SERVER.BIND_IP", "5.5.5.5");
-        env::set_var("MEDEA_SERVER.BIND_PORT", "1234");
+        env::set_var("MEDEA_SERVER__BIND_IP", "5.5.5.5");
+        env::set_var("MEDEA_SERVER__BIND_PORT", "1234");
 
         let env_conf = Conf::parse().unwrap();
 
-        env::remove_var("MEDEA_SERVER.BIND_IP");
-        env::remove_var("MEDEA_SERVER.BIND_PORT");
+        env::remove_var("MEDEA_SERVER__BIND_IP");
+        env::remove_var("MEDEA_SERVER__BIND_PORT");
 
         assert_ne!(default_conf.server.bind_ip, env_conf.server.bind_ip);
         assert_ne!(default_conf.server.bind_port, env_conf.server.bind_port);
