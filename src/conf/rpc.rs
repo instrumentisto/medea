@@ -22,25 +22,25 @@ pub struct Rpc {
     pub reconnect_timeout: Duration,
 }
 
-// TODO: are you sure its not failing?
 #[cfg(test)]
 mod rpc_conf_specs {
     use std::{env, fs, time::Duration};
 
     use serial_test_derive::serial;
 
-    use crate::conf::{Conf, APP_CONF_PATH_ENV_VAR_NAME};
+    use crate::{
+        conf::{Conf, APP_CONF_PATH_ENV_VAR_NAME},
+        overrided_by_env_conf,
+    };
 
     #[test]
     #[serial]
     fn overrides_defaults() {
         let default_conf = Conf::default();
-
-        env::set_var("MEDEA_RPC__IDLE_TIMEOUT", "20s");
-        env::set_var("MEDEA_RPC__RECONNECT_TIMEOUT", "30s");
-        let env_conf = Conf::parse().unwrap();
-        env::remove_var("MEDEA_RPC__IDLE_TIMEOUT");
-        env::remove_var("MEDEA_RPC__RECONNECT_TIMEOUT");
+        let env_conf = overrided_by_env_conf!(
+            "MEDEA_RPC__IDLE_TIMEOUT" => "20s",
+            "MEDEA_RPC__RECONNECT_TIMEOUT" => "30s"
+        );
 
         assert_ne!(default_conf.rpc.idle_timeout, env_conf.rpc.idle_timeout);
         assert_ne!(

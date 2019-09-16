@@ -24,23 +24,24 @@ impl Log {
 
 #[cfg(test)]
 mod log_conf_specs {
-    use std::env;
-
     use serial_test_derive::serial;
 
-    use crate::conf::Conf;
+    use crate::{conf::Conf, overrided_by_env_conf};
 
     #[test]
     #[serial]
     fn overrides_defaults() {
         let default_conf = Conf::default();
 
-        env::set_var("MEDEA_LOG__LEVEL", "WARN");
-        let env_conf = Conf::parse().unwrap();
-        env::set_var("MEDEA_LOG__LEVEL", "OFF");
-
+        let env_conf = overrided_by_env_conf!(
+            "MEDEA_LOG__LEVEL" => "WARN"
+        );
         assert_ne!(default_conf.log.level(), env_conf.log.level());
         assert_eq!(env_conf.log.level(), Some(slog::Level::Warning));
-        assert_eq!(Conf::parse().unwrap().log.level(), None);
+
+        let none_lvl = overrided_by_env_conf!(
+            "MEDEA_LOG__LEVEL" => "OFF"
+        );
+        assert_eq!(none_lvl.log.level(), None);
     }
 }

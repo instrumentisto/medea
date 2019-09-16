@@ -98,12 +98,41 @@ where
 }
 
 #[cfg(test)]
-mod tests {
-    use std::{fs, net::Ipv4Addr, time::Duration};
-
+pub mod tests {
     use serial_test_derive::serial;
 
     use super::*;
+
+    /// Macro which overrides environment variables
+    /// with provided values, parses [`Conf`] and
+    /// finally removes all overrided variables.
+    ///
+    /// # Usage
+    ///
+    /// ```rust
+    /// # use crate::conf::Conf;
+    /// #
+    /// let default_conf = Conf::default();
+    /// let env_conf = overrided_by_env_conf!(
+    ///        "MEDEA_TURN__HOST" => "example.com",
+    ///        "MEDEA_TURN__PORT" => "1234",
+    ///        "MEDEA_TURN__USER" => "ferris",
+    ///        "MEDEA_TURN__PASS" => "qwerty"
+    /// );
+    ///
+    /// assert_ne!(default_conf.turn.host, env_conf.turn.host);
+    /// assert_ne!(default_conf.turn.port, env_conf.turn.port);
+    /// // ...
+    /// ```
+    #[macro_export]
+    macro_rules! overrided_by_env_conf {
+        ($($env:expr => $value:expr),+) => {{
+            $(std::env::set_var($env, $value);)+
+            let conf = crate::conf::Conf::parse().unwrap();
+            $(std::env::remove_var($env);)+
+            conf
+        }};
+    }
 
     #[test]
     #[serial]

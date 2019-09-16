@@ -71,29 +71,23 @@ pub struct Redis {
 
 #[cfg(test)]
 mod turn_conf_specs {
-    use std::env;
+    use std::{net::Ipv4Addr, time::Duration};
 
     use serial_test_derive::serial;
 
-    use crate::conf::Conf;
-    use std::{net::Ipv4Addr, time::Duration};
+    use crate::{conf::Conf, overrided_by_env_conf};
 
     #[test]
     #[serial]
     fn redis_db_overrides_defaults() {
         let default_conf = Conf::default();
-
-        env::set_var("MEDEA_TURN__DB__REDIS__IP", "5.5.5.5");
-        env::set_var("MEDEA_TURN__DB__REDIS__PORT", "1234");
-        env::set_var("MEDEA_TURN__DB__REDIS__PASS", "hellofellow");
-        env::set_var("MEDEA_TURN__DB__REDIS__DB_NUMBER", "10");
-        env::set_var("MEDEA_TURN__DB__REDIS__CONNECTION_TIMEOUT", "10s");
-        let env_conf = Conf::parse().unwrap();
-        env::remove_var("MEDEA_TURN__DB__REDIS__IP");
-        env::remove_var("MEDEA_TURN__DB__REDIS__PORT");
-        env::remove_var("MEDEA_TURN__DB__REDIS__PASS");
-        env::remove_var("MEDEA_TURN__DB__REDIS__DB_NUMBER");
-        env::remove_var("MEDEA_TURN__DB__REDIS__CONNECTION_TIMEOUT");
+        let env_conf = overrided_by_env_conf!(
+            "MEDEA_TURN__DB__REDIS__IP" => "5.5.5.5",
+            "MEDEA_TURN__DB__REDIS__PORT" => "1234",
+            "MEDEA_TURN__DB__REDIS__PASS" => "hellofellow",
+            "MEDEA_TURN__DB__REDIS__DB_NUMBER" => "10",
+            "MEDEA_TURN__DB__REDIS__CONNECTION_TIMEOUT" => "10s"
+        );
 
         assert_ne!(default_conf.turn.db.redis.ip, env_conf.turn.db.redis.ip);
         assert_ne!(
@@ -125,16 +119,12 @@ mod turn_conf_specs {
     #[serial]
     fn overrides_defaults() {
         let default_conf = Conf::default();
-
-        env::set_var("MEDEA_TURN__HOST", "example.com");
-        env::set_var("MEDEA_TURN__PORT", "1234");
-        env::set_var("MEDEA_TURN__USER", "ferris");
-        env::set_var("MEDEA_TURN__PASS", "qwerty");
-        let env_conf = Conf::parse().unwrap();
-        env::remove_var("MEDEA_TURN__HOST");
-        env::remove_var("MEDEA_TURN__PORT");
-        env::remove_var("MEDEA_TURN__USER");
-        env::remove_var("MEDEA_TURN__PASS");
+        let env_conf = overrided_by_env_conf!(
+            "MEDEA_TURN__HOST" => "example.com",
+            "MEDEA_TURN__PORT" => "1234",
+            "MEDEA_TURN__USER" => "ferris",
+            "MEDEA_TURN__PASS" => "qwerty"
+        );
 
         assert_ne!(default_conf.turn.host, env_conf.turn.host);
         assert_ne!(default_conf.turn.port, env_conf.turn.port);
@@ -149,11 +139,10 @@ mod turn_conf_specs {
     #[serial]
     fn turn_conf() {
         let default_conf = Conf::default();
-
-        env::set_var("MEDEA_TURN__HOST", "example.com");
-        env::set_var("MEDEA_TURN__PORT", "1234");
-
-        let env_conf = Conf::parse().unwrap();
+        let env_conf = overrided_by_env_conf!(
+            "MEDEA_TURN__HOST" => "example.com",
+            "MEDEA_TURN__PORT" => "1234"
+        );
 
         assert_ne!(default_conf.turn.host, env_conf.turn.host);
         assert_ne!(default_conf.turn.port, env_conf.turn.port);

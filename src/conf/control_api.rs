@@ -21,20 +21,17 @@ pub struct ControlApi {
 
 #[cfg(test)]
 mod control_conf_specs {
-    use std::env;
-
     use serial_test_derive::serial;
 
-    use crate::conf::Conf;
+    use crate::{conf::Conf, overrided_by_env_conf};
 
     #[test]
     #[serial]
     fn overrides_defaults() {
         let default_conf = Conf::default();
-
-        env::set_var("MEDEA_CONTROL_API__STATIC_SPECS_DIR", "test/");
-        let env_conf = Conf::parse().unwrap();
-        env::remove_var("MEDEA_CONTROL_API__STATIC_SPECS_DIR");
+        let env_conf = overrided_by_env_conf!(
+            "MEDEA_CONTROL_API__STATIC_SPECS_DIR" => "test/"
+        );
 
         assert_ne!(
             default_conf.control_api.static_specs_dir,

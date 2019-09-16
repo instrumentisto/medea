@@ -17,20 +17,19 @@ pub struct Shutdown {
 
 #[cfg(test)]
 mod shutdown_conf_specs {
-    use std::{env, time::Duration};
+    use std::time::Duration;
 
     use serial_test_derive::serial;
 
-    use crate::conf::Conf;
+    use crate::{conf::Conf, overrided_by_env_conf};
 
     #[test]
     #[serial]
     fn overrides_defaults() {
         let default_conf = Conf::default();
-
-        env::set_var("MEDEA_SHUTDOWN__TIMEOUT", "20s");
-        let env_conf = Conf::parse().unwrap();
-        env::remove_var("MEDEA_SHUTDOWN__TIMEOUT");
+        let env_conf = overrided_by_env_conf!(
+            "MEDEA_SHUTDOWN__TIMEOUT" => "20s"
+        );
 
         assert_ne!(default_conf.shutdown.timeout, env_conf.shutdown.timeout);
         assert_eq!(env_conf.shutdown.timeout, Duration::from_secs(20));
