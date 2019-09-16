@@ -39,11 +39,11 @@ pub use self::{
 #[derive(Clone, Debug)]
 pub enum SignalingState {
     New,
-    Stable,
     HaveLocalOffer,
     HaveRemoteOffer,
     HaveLocalPranswer,
     HaveRemotePranswer,
+    Stable,
     Closed,
 }
 

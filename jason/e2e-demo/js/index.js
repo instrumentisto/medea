@@ -45,6 +45,7 @@ async function init_participant(wasm, token, frame) {
 window.onload = async function () {
   const wasm = await import("../../pkg");
 
-  await init_participant(wasm, "ws://localhost:8080/ws/pub-pub-video-call/caller/test", "#caller");
+  // TODO: change port. This port is used for debugging.
+  await init_participant(wasm, "ws://localhost:8090/ws/pub-pub-video-call/caller/test", "#caller");
   await init_participant(wasm, "ws://localhost:8080/ws/pub-pub-video-call/responder/test", "#responder");
 };

@@ -115,7 +115,9 @@ impl ParticipantService {
         })
     }
 
-    pub fn is_have_drop_connection_tasks(&self, member_id: &MemberId) -> bool {
+    /// Returns `true` if [`Member`] with provided [`MemberId`] have at least
+    /// one drop connection task.
+    pub fn is_have_drop_connection_task(&self, member_id: &MemberId) -> bool {
         self.drop_connection_tasks.get(member_id).is_some()
     }
 

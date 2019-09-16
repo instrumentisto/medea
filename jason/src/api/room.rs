@@ -22,7 +22,7 @@ use web_sys::RtcSignalingState;
 
 use crate::{
     media::MediaStream,
-    peer::{PeerEvent, PeerEventHandler, PeerRepository},
+    peer::{PeerEvent, PeerEventHandler, PeerRepository, SignalingState},
     rpc::RpcClient,
     utils::{Callback2, WasmErr},
 };
@@ -211,6 +211,9 @@ impl InnerRoom {
         self.enabled_video = enabled;
     }
 
+    /// Resets state of [`InnerRoom`].
+    ///
+    /// Currently removes all [`Peer`]s.
     fn reset(&mut self) {
         let peers_to_remove =
             self.peers.peers().into_iter().map(|(id, _)| id).collect();
@@ -327,10 +330,9 @@ impl EventHandler for InnerRoom {
         })
     }
 
+    /// Synchronize local state with server state ([`Snapshot`]).
     fn on_restore_state(&mut self, snapshot: Snapshot) {
-        use web_sys::console;
-
-        console::log_1(&"OnRestoreState".into());
+        web_sys::console::log_1(&"OnRestoreState".into());
 
         {
             let removed_peers: Vec<PeerId> = self
@@ -345,18 +347,18 @@ impl EventHandler for InnerRoom {
             }
         }
 
-        for (id, peer) in snapshot.peers {
+        for (id, snapshot_peer) in snapshot.peers {
             let id = PeerId(id.parse().unwrap());
             let local_peer = if let Some(local_peer) = self.peers.get(id) {
                 local_peer.clone()
             } else {
-                match peer.state {
+                match snapshot_peer.state {
                     ServerPeerState::WaitLocalHaveRemoteSdp
                     | ServerPeerState::WaitLocalSdp => {
                         self.on_peer_created(
-                            peer.id,
-                            peer.sdp_offer,
-                            peer.tracks,
+                            snapshot_peer.id,
+                            snapshot_peer.sdp_offer,
+                            snapshot_peer.tracks,
                             snapshot.ice_servers.clone(),
                         );
                     }
@@ -370,9 +372,7 @@ impl EventHandler for InnerRoom {
                 continue;
             };
 
-            use crate::peer::SignalingState;
-
-            match peer.state {
+            match snapshot_peer.state {
                 ServerPeerState::Stable => {
                     match local_peer.signaling_state() {
                         SignalingState::New => {
@@ -384,8 +384,8 @@ impl EventHandler for InnerRoom {
                         SignalingState::Stable => {}
                         SignalingState::HaveLocalOffer => {
                             self.on_sdp_answer_made(
-                                peer.id,
-                                peer.remote_sdp_answer.unwrap(),
+                                snapshot_peer.id,
+                                snapshot_peer.remote_sdp_answer.unwrap(),
                             );
                         }
                         _ => {
@@ -402,9 +402,11 @@ impl EventHandler for InnerRoom {
                     //                    unreachable!()
                 }
             }
-            for ice_candidate in peer.ice_candidates {
-                (self as &mut dyn EventHandler)
-                    .on_ice_candidate_discovered(peer.id, ice_candidate)
+            for ice_candidate in snapshot_peer.ice_candidates {
+                (self as &mut dyn EventHandler).on_ice_candidate_discovered(
+                    snapshot_peer.id,
+                    ice_candidate,
+                )
             }
         }
     }

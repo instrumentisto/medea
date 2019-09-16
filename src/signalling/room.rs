@@ -3,7 +3,11 @@
 //!
 //! [`Member`]: crate::signalling::elements::member::Member
 
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+    time::Duration,
+};
 
 use actix::{
     fut::wrap_future, Actor, ActorFuture, AsyncContext, Context, Handler,
@@ -43,7 +47,6 @@ use crate::{
 };
 use futures::IntoFuture;
 use medea_client_api_proto::Event::PeersRemoved;
-use std::collections::HashSet;
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
 pub type ActFuture<I, E> =
@@ -146,11 +149,15 @@ impl Room {
         self.id.clone()
     }
 
+    /// Create snapshot of server state for requested [`Member`].
+    ///
+    /// With this [`Snapshot`] client can synchronize his state with server
+    /// state. If server will send [`Snapshot`] which client considers
+    /// fatally wrong then [`Member`] will send [`Command::ResetMe`].
     pub fn take_snapshot(
         &self,
         member_id: &MemberId,
     ) -> Result<Snapshot, RoomError> {
-        // TODO: Return MemberNotFound Error.
         let member = self
             .members
             .get_member_by_id(member_id)
@@ -706,7 +713,7 @@ impl Handler<RpcConnectionEstablished> for Room {
             connection,
         } = msg;
         let is_reconnect =
-            self.members.is_have_drop_connection_tasks(&member_id);
+            self.members.is_have_drop_connection_task(&member_id);
 
         let fut = self
             .members

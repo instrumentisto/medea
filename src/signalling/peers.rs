@@ -45,7 +45,7 @@ pub struct Counter<T> {
 }
 
 impl<T: Incrementable + Copy> Counter<T> {
-    /// Returns id and increase counter.
+    /// Returns ID and increase counter.
     pub fn next_id(&mut self) -> T {
         let id = self.count;
         self.count = self.count.incr();
@@ -130,6 +130,7 @@ impl PeerRepository {
         None
     }
 
+    /// Returns mutable reference to [`PeerStateMachine`] by [`PeerId`].
     pub fn get_mut_peer(
         &mut self,
         peer_id: PeerId,

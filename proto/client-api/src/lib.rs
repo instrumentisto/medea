@@ -47,33 +47,70 @@ impl_incrementable!(PeerId);
 #[cfg(feature = "medea")]
 impl_incrementable!(TrackId);
 
+/// State of [`Peer`] on server side.
+///
+/// Used in [`Snapshot`].
 #[cfg_attr(feature = "medea", derive(Serialize, Debug, Clone, PartialEq))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
 pub enum ServerPeerState {
+    /// Newly created [`Peer`] without anything.
     New,
+
+    /// [`Peer`] doesnt have remote SDP and is waiting for local SDP.
     WaitLocalSdp,
+
+    /// [`Peer`] has remote SDP and is waiting for local SDP.
     WaitLocalHaveRemoteSdp,
+
+    /// [`Peer`] has local SDP and is waiting for remote SDP.
     WaitRemoteSdp,
+
+    /// SDP exchange ended.
     Stable,
 }
 
 #[cfg_attr(feature = "medea", derive(Serialize, Debug, Clone, PartialEq))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
 pub struct Peer {
+    /// Id of [`Peer`].
     pub id: PeerId,
+
+    /// Current state of [`Peer`] on server.
     pub state: ServerPeerState,
+
+    /// All [`IceCandidate`]s found for this [`Peer`].
     pub ice_candidates: Vec<IceCandidate>,
+
+    /// SDP offer of this [`Peer`].
     pub sdp_offer: Option<String>,
+
+    /// SDP answer of this [`Peer`].
     pub sdp_answer: Option<String>,
+
+    /// SDP offer of partner [`Peer`] of this [`Peer`].
     pub remote_sdp_offer: Option<String>,
+
+    /// SDP answer of partner [`Peer`] of this [`Peer`].
     pub remote_sdp_answer: Option<String>,
+
+    /// All tracks of this [`Peer`].
     pub tracks: Vec<Track>,
 }
 
+/// Snapshot of current server state.
+///
+/// Used for synchronization of reconnecting client with server.
+///
+/// This snapshot will be sended on [`Event::RestoreState`] if [`Member`] lost
+/// his connection and reconnect to the server.
 #[cfg_attr(feature = "medea", derive(Serialize, Debug, Clone, PartialEq))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
 pub struct Snapshot {
+    /// All [`Peer`]s of [`Member`] on server side.
+    // TODO: use PeerId when https://github.com/serde-rs/serde/issues/1183 will be resolved.
     pub peers: HashMap<String, Peer>,
+
+    /// Ice servers for this user.
     pub ice_servers: Vec<IceServer>,
 }
 
@@ -122,16 +159,20 @@ pub enum Command {
     },
 
     /// Web Client sends SDP Answer.
-    MakeSdpAnswer {
-        peer_id: PeerId,
-        sdp_answer: String,
-    },
+    MakeSdpAnswer { peer_id: PeerId, sdp_answer: String },
     /// Web Client sends Ice Candidate.
     SetIceCandidate {
         peer_id: PeerId,
         candidate: IceCandidate,
     },
 
+    /// Client asks server for resetting his state.
+    ///
+    /// This [`Command`] will be sent if while synchronization of client
+    /// with server will be found some fatal conflict.
+    ///
+    /// Currently, on this [`Command`] server should reset signaling state
+    /// of client to initial state.
     ResetMe,
 }
 
@@ -152,10 +193,7 @@ pub enum Event {
     },
     /// Media Server notifies Web Client about necessity to apply specified SDP
     /// Answer to Web Client's RTCPeerConnection.
-    SdpAnswerMade {
-        peer_id: PeerId,
-        sdp_answer: String,
-    },
+    SdpAnswerMade { peer_id: PeerId, sdp_answer: String },
 
     /// Media Server notifies Web Client about necessity to apply specified
     /// ICE Candidate.
@@ -166,13 +204,14 @@ pub enum Event {
 
     /// Media Server notifies Web Client about necessity of RTCPeerConnection
     /// close.
-    PeersRemoved {
-        peer_ids: Vec<PeerId>,
-    },
+    PeersRemoved { peer_ids: Vec<PeerId> },
 
-    RestoreState {
-        snapshot: Snapshot,
-    },
+    /// [`Event`] which server will send if detects that [`Member`] is
+    /// reconnecting.
+    ///
+    /// On this [`Event`] client should upgrade/downgrade local state to state
+    /// of server.
+    RestoreState { snapshot: Snapshot },
 }
 
 /// Represents [RTCIceCandidateInit][1] object.

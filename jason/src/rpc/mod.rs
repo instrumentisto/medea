@@ -15,7 +15,7 @@ use medea_client_api_proto::{ClientMsg, Command, Event, ServerMsg};
 use crate::utils::WasmErr;
 
 use self::{heartbeat::Heartbeat, websocket::WebSocket};
-use futures::task::spawn;
+use futures::{future::Loop, task::spawn};
 use wasm_bindgen_futures::spawn_local;
 
 /// Connection with remote was closed.
@@ -74,7 +74,7 @@ impl Inner {
 }
 
 /// Handles close messsage from remote server.
-fn on_close(mut inner_rc: WebsocketRpcClient, close_msg: CloseMsg) {
+fn on_close(inner_rc: WebsocketRpcClient, close_msg: CloseMsg) {
     {
         let mut inner = inner_rc.0.borrow_mut();
         inner.sock.take();
@@ -83,14 +83,32 @@ fn on_close(mut inner_rc: WebsocketRpcClient, close_msg: CloseMsg) {
 
     // TODO: reconnect on disconnect, propagate error if unable
     //       to reconnect
-    match close_msg {
-        CloseMsg::Normal(_msg) | CloseMsg::Disconnect(_msg) => {
+    match &close_msg {
+        CloseMsg::Normal(_) | CloseMsg::Disconnect(_) => {
             web_sys::console::log_1(&"WsSession closed.".into());
-            spawn_local(
-                inner_rc
-                    .init()
-                    .map_err(|e| web_sys::console::log_1(&e.into())),
-            )
+            spawn_local(futures::future::loop_fn(inner_rc, |inner_rc| {
+                web_sys::console::log_1(&"Looped".into());
+                let fut = inner_rc.init();
+
+                fut.then(move |res| {
+                    web_sys::console::log_1(&"SKAJDLK".into());
+                    match res {
+                        Ok(_) => {
+                            web_sys::console::log_1(&"Ok".into());
+                            Ok(Loop::Break(()))
+                        }
+                        Err(e) => {
+                            web_sys::console::log_1(&"Err".into());
+                            Ok(Loop::Continue(inner_rc))
+                        }
+                    }
+                })
+            }));
+            //            spawn_local(
+            //                inner_rc
+            //                    .init()
+            //                    .map_err(move |e| on_close(inner_rc,
+            // close_msg)),            )
         }
     }
 }
@@ -130,28 +148,35 @@ impl WebsocketRpcClient {
     /// Creates new WebSocket connection to remote media server.
     /// Starts `Heartbeat` if connection succeeds and binds handlers
     /// on receiving messages from server and closing socket.
-    pub fn init(&mut self) -> impl Future<Item = (), Error = WasmErr> {
+    pub fn init(&self) -> impl Future<Item = (), Error = WasmErr> {
         web_sys::console::log_1(&"Init new WsSession.".into());
         let inner = Rc::clone(&self.0);
         let self_clone = self.clone();
-        WebSocket::new(&self.0.borrow().token).and_then(
-            move |socket: WebSocket| {
+        web_sys::console::log_1(&"Before WebSocket new".into());
+        WebSocket::new(&self.0.borrow().token)
+            .map_err(|e| {
+                web_sys::console::log_1(&"tetetetete".into());
+                e
+            })
+            .and_then(move |socket: WebSocket| {
                 let socket = Rc::new(socket);
 
                 inner.borrow_mut().heartbeat.start(Rc::clone(&socket))?;
 
                 let inner_rc = Rc::clone(&inner);
                 socket.on_message(move |msg: Result<ServerMsg, WasmErr>| {
+                    web_sys::console::log_1(&"onMessage".into());
                     on_message(&inner_rc, msg)
                 })?;
 
-                socket
-                    .on_close(move |msg: CloseMsg| on_close(self_clone, msg))?;
+                socket.on_close(move |msg: CloseMsg| {
+                    web_sys::console::log_1(&"onClose".into());
+                    on_close(self_clone, msg)
+                })?;
 
                 inner.borrow_mut().sock.replace(socket);
                 Ok(())
-            },
-        )
+            })
     }
 }
 
@@ -178,10 +203,10 @@ impl RpcClient for WebsocketRpcClient {
     }
 }
 
-impl Drop for WebsocketRpcClient {
+impl Drop for Inner {
     /// Drops related connection and its [`Heartbeat`].
     fn drop(&mut self) {
-        self.0.borrow_mut().sock.take();
-        self.0.borrow_mut().heartbeat.stop();
+        self.sock.take();
+        self.heartbeat.stop();
     }
 }
