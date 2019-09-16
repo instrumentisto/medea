@@ -19,8 +19,6 @@ use wasm_bindgen_futures::{future_to_promise, spawn_local};
 use medea_client_api_proto::{
     Command, Direction, EventHandler, IceCandidate, IceServer, PeerId, Track,
 };
-use wasm_bindgen::prelude::*;
-use wasm_bindgen_futures::spawn_local;
 
 use crate::{
     media::MediaStream,
@@ -73,6 +71,7 @@ impl RoomHandle {
             }
         };
         future_to_promise(fut)
+    }
 
     /// Mutes outbound audio in this room.
     pub fn mute_audio(&self) -> Result<(), JsValue> {
@@ -232,13 +231,6 @@ impl InnerRoom {
             peer.toggle_send_video(enabled);
         }
         self.enabled_video = enabled;
-    }
-
-    /// Creates new [`RoomHandle`] used by JS side. You can create them as many
-    /// as you need.
-    #[inline]
-    pub fn new_handle(&self) -> RoomHandle {
-        RoomHandle(Rc::downgrade(&self.0))
     }
 }
 

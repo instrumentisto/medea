@@ -5,15 +5,15 @@ mod room;
 
 use std::{cell::RefCell, rc::Rc};
 
-use futures::future::Future;
-use js_sys::Promise;
+
+
 use wasm_bindgen::prelude::*;
-use wasm_bindgen_futures::future_to_promise;
+
 
 use crate::{
     media::MediaManager,
     peer,
-    rpc::{RpcClient, WebsocketRpcClient},
+    rpc::{WebsocketRpcClient},
     set_panic_hook,
 };
 
