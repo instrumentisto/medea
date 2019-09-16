@@ -11,9 +11,18 @@ pub mod room;
 
 use std::{convert::TryFrom as _, fs::File, io::Read as _, path::Path};
 
+use actix::Addr;
 use derive_more::Display;
 use failure::Fail;
+use futures::Future;
 use serde::Deserialize;
+
+use crate::{
+    log::prelude::*,
+    signalling::room_service::{
+        RoomService, RoomServiceError, StartStaticRooms,
+    },
+};
 
 use self::{
     endpoints::webrtc_play_endpoint::SrcParseError, pipeline::Pipeline,
@@ -169,4 +178,29 @@ pub fn load_static_specs_from_dir<P: AsRef<Path>>(
         specs.push(spec)
     }
     Ok(specs)
+}
+
+pub fn start_static_rooms(
+    room_service: &Addr<RoomService>,
+) -> impl Future<Item = (), Error = ()> {
+    room_service
+        .send(StartStaticRooms)
+        .map_err(|e| error!("StartStaticRooms mailbox error: {:?}", e))
+        .map(|result| {
+            if let Err(e) = result {
+                match e {
+                    RoomServiceError::FailedToLoadStaticSpecs(e) => match e {
+                        LoadStaticControlSpecsError::SpecDirReadError(e) => {
+                            warn!(
+                                "Error while reading static control API specs \
+                                 dir. Control API specs not loaded. {}",
+                                e
+                            );
+                        }
+                        _ => panic!("{}", e),
+                    },
+                    _ => panic!("{}", e),
+                }
+            }
+        })
 }

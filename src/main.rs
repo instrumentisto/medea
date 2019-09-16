@@ -1,49 +1,17 @@
 use std::collections::HashMap;
 
-use actix::{Actor, Addr};
+use actix::Actor;
 use failure::Error;
 use futures::future::Future;
 use medea::{
-    api::{
-        client::server::Server,
-        control::{grpc, LoadStaticControlSpecsError},
-    },
+    api::{client::server::Server, control::grpc},
     conf::Conf,
     log::{self, prelude::*},
     shutdown::{self, GracefulShutdown},
-    signalling::{
-        room_repo::RoomRepository,
-        room_service::{RoomService, RoomServiceError, StartStaticRooms},
-    },
+    signalling::{room_repo::RoomRepository, room_service::RoomService},
     turn::new_turn_auth_service,
     AppContext,
 };
-
-// TODO: move somewhere else
-fn start_static_rooms(
-    room_service: &Addr<RoomService>,
-) -> impl Future<Item = (), Error = ()> {
-    room_service
-        .send(StartStaticRooms)
-        .map_err(|e| error!("StartStaticRooms mailbox error: {:?}", e))
-        .map(|result| {
-            if let Err(e) = result {
-                match e {
-                    RoomServiceError::FailedToLoadStaticSpecs(e) => match e {
-                        LoadStaticControlSpecsError::SpecDirReadError(e) => {
-                            warn!(
-                                "Error while reading static control API specs \
-                                 dir. Control API specs not loaded. {}",
-                                e
-                            );
-                        }
-                        _ => panic!("{}", e),
-                    },
-                    _ => panic!("{}", e),
-                }
-            }
-        })
-}
 
 fn main() -> Result<(), Error> {
     dotenv::dotenv().ok();
@@ -73,22 +41,24 @@ fn main() -> Result<(), Error> {
                 )
                 .start();
 
-                start_static_rooms(&room_service).map(move |_| {
-                    let grpc_addr =
-                        grpc::server::run(room_service, app_context);
-                    shutdown::subscribe(
-                        &graceful_shutdown,
-                        grpc_addr.recipient(),
-                        shutdown::Priority(1),
-                    );
+                medea::api::control::start_static_rooms(&room_service).map(
+                    move |_| {
+                        let grpc_addr =
+                            grpc::server::run(room_service, app_context);
+                        shutdown::subscribe(
+                            &graceful_shutdown,
+                            grpc_addr.recipient(),
+                            shutdown::Priority(1),
+                        );
 
-                    let server = Server::run(room_repo, config).unwrap();
-                    shutdown::subscribe(
-                        &graceful_shutdown,
-                        server.recipient(),
-                        shutdown::Priority(1),
-                    );
-                })
+                        let server = Server::run(room_repo, config).unwrap();
+                        shutdown::subscribe(
+                            &graceful_shutdown,
+                            server.recipient(),
+                            shutdown::Priority(1),
+                        );
+                    },
+                )
             })
     })
     .unwrap();
