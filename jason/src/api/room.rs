@@ -369,6 +369,13 @@ impl EventHandler for InnerRoom {
                 match snapshot_peer.state {
                     ServerPeerState::WaitLocalHaveRemoteSdp
                     | ServerPeerState::WaitLocalSdp => {
+                        web_sys::console::log_1(
+                            &format!(
+                                "Restored. Serv state: {:?}; Local state: No.",
+                                snapshot_peer.state
+                            )
+                            .into(),
+                        );
                         self.on_peer_created(
                             snapshot_peer.id,
                             snapshot_peer.sdp_offer,
@@ -395,6 +402,15 @@ impl EventHandler for InnerRoom {
                         }
                         SignalingState::Stable => {}
                         SignalingState::HaveLocalOffer => {
+                            web_sys::console::log_1(
+                                &format!(
+                                    "Restored. Serv state: {:?}; Local state: \
+                                     {:?}.",
+                                    snapshot_peer.state,
+                                    local_peer.signaling_state()
+                                )
+                                .into(),
+                            );
                             self.on_sdp_answer_made(
                                 snapshot_peer.id,
                                 snapshot_peer.remote_sdp_answer.unwrap(),
@@ -409,6 +425,15 @@ impl EventHandler for InnerRoom {
                 ServerPeerState::WaitLocalHaveRemoteSdp => {
                     match local_peer.signaling_state() {
                         SignalingState::Stable => {
+                            web_sys::console::log_1(
+                                &format!(
+                                    "Restored. Serv state: {:?}; Local state: \
+                                     {:?}.",
+                                    snapshot_peer.state,
+                                    local_peer.signaling_state()
+                                )
+                                .into(),
+                            );
                             let sdp_answer = local_peer
                                 .current_local_description()
                                 .unwrap()
