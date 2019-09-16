@@ -11,7 +11,7 @@ mod track;
 #[doc(inline)]
 pub use self::{
     device_info::InputDeviceInfo,
-    manager::MediaManager,
+    manager::{MediaManager, MediaManagerHandle},
     stream::{MediaStream, MediaStreamHandle},
     stream_request::{SimpleStreamRequest, StreamRequest},
     track::MediaTrack,

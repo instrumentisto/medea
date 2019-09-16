@@ -28,9 +28,11 @@ pub enum CloseMsg {
 #[allow(clippy::module_name_repetitions)]
 #[cfg_attr(feature = "mockable", mockall::automock)]
 pub trait RpcClient {
-
-    //TODO: docs
-    fn init(&self, token: &str) -> Box<dyn Future<Item = (), Error = WasmErr>>;
+    // Establish connection with Rpc server.
+    fn connect(
+        &self,
+        token: &str,
+    ) -> Box<dyn Future<Item = (), Error = WasmErr>>;
 
     /// Returns [`Stream`] of all [`Event`]s received by this [`RpcClient`].
     fn subscribe(&self) -> Box<dyn Stream<Item = Event, Error = ()>>;
@@ -119,7 +121,10 @@ impl RpcClient for WebsocketRpcClient {
     /// Creates new WebSocket connection to remote media server.
     /// Starts `Heartbeat` if connection succeeds and binds handlers
     /// on receiving messages from server and closing socket.
-    fn init(&self, token: &str) -> Box<dyn Future<Item = (), Error = WasmErr>> {
+    fn connect(
+        &self,
+        token: &str,
+    ) -> Box<dyn Future<Item = (), Error = WasmErr>> {
         let inner = Rc::clone(&self.0);
         Box::new(WebSocket::new(token).and_then(move |socket: WebSocket| {
             let socket = Rc::new(socket);

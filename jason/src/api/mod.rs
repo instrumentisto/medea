@@ -5,15 +5,12 @@ mod room;
 
 use std::{cell::RefCell, rc::Rc};
 
-
-
 use wasm_bindgen::prelude::*;
 
-
 use crate::{
-    media::MediaManager,
+    media::{MediaManager, MediaManagerHandle},
     peer,
-    rpc::{WebsocketRpcClient},
+    rpc::WebsocketRpcClient,
     set_panic_hook,
 };
 
@@ -44,19 +41,16 @@ impl Jason {
 
     /// Returns [`RoomHandle`] for [`Room`] with preconfigured the authorization
     /// `token` for connection with media server.
-    pub fn init_room(&self) -> JsValue {
+    pub fn init_room(&self) -> RoomHandle {
         let rpc = Rc::new(WebsocketRpcClient::new(3000));
         let peer_repository = Box::new(peer::Repository::new(Rc::clone(
             &self.0.borrow().media_manager,
         )));
 
         let room = Room::new(rpc, peer_repository);
-
         let handle = room.new_handle();
-
         self.0.borrow_mut().rooms.push(room);
-
-        JsValue::from(handle)
+        handle
     }
 
     /// Sets `on_local_stream` callback, which will be invoked once media
@@ -67,8 +61,9 @@ impl Jason {
         self.0.borrow_mut().media_manager.set_on_local_stream(f);
     }
 
-    pub fn media_manager(&self) -> JsValue {
-        self.0.borrow().media_manager.new_handle().into()
+    /// Returns handle to [`MediaManager`].
+    pub fn media_manager(&self) -> MediaManagerHandle {
+        self.0.borrow().media_manager.new_handle()
     }
 
     /// Drops [`Jason`] API object, so all related objects (rooms, connections,

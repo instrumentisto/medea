@@ -35,10 +35,10 @@ async function init_participant(wasm, token, frame) {
     let video_select = $(frame).find("select[name=video-source]");
     let join_button = $(frame).find("button[name=join-room]");
 
-    let participant = new wasm.Jason();
-    let room = await participant.init_room();
-    await getStream(participant, local_video, audio_select, video_select);
-    getDevices(participant, audio_select, video_select);
+    let jason = new wasm.Jason();
+    let room = await jason.init_room();
+    await getStream(jason, local_video, audio_select, video_select);
+    getDevices(jason, audio_select, video_select);
 
     toggle_audio.change(function() {
         if($(this).is(":checked")) {
@@ -57,11 +57,11 @@ async function init_participant(wasm, token, frame) {
     });
 
     audio_select.change(function() {
-        getStream(participant, local_video, audio_select, video_select);
+        getStream(jason, local_video, audio_select, video_select);
     });
 
     video_select.change(function() {
-        getStream(participant, local_video, audio_select, video_select);
+        getStream(jason, local_video, audio_select, video_select);
     });
 
     room.on_new_connection(function (connection) {
@@ -71,7 +71,7 @@ async function init_participant(wasm, token, frame) {
         });
     });
 
-    participant.on_local_stream(function (stream, error) {
+    jason.on_local_stream(function (stream, error) {
         if (stream) {
             audio_select.prop( "disabled", true );
             video_select.prop( "disabled", true );

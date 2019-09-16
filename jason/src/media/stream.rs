@@ -11,7 +11,7 @@ use medea_client_api_proto::{MediaType, TrackId};
 use wasm_bindgen::{prelude::*, JsValue};
 use web_sys::MediaStream as SysMediaStream;
 
-use crate::utils::{copy_js_ref};
+use crate::utils::copy_js_ref;
 
 use super::MediaTrack;
 

@@ -138,10 +138,10 @@ impl PeerConnection {
         let track = track_event.track();
 
         if let Some(sender_id) =
-        inner.media_connections.add_remote_track(transceiver, track)
+            inner.media_connections.add_remote_track(transceiver, track)
         {
             if let Some(tracks) =
-            inner.media_connections.get_tracks_by_sender(sender_id)
+                inner.media_connections.get_tracks_by_sender(sender_id)
             {
                 // got all tracks from this sender, so emit
                 // PeerEvent::NewRemoteStream
@@ -230,7 +230,7 @@ impl PeerConnection {
                             )
                         }
                     }
-                        .and_then(move |_| peer.create_and_set_offer()),
+                    .and_then(move |_| peer.create_and_set_offer()),
                 )
             }
         }

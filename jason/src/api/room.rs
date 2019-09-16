@@ -64,7 +64,7 @@ impl RoomHandle {
             Some(inner) => {
                 let rpc = Rc::clone(&inner.borrow().rpc);
                 let fut = rpc
-                    .init(token)
+                    .connect(token)
                     .map(|_| JsValue::NULL)
                     .map_err(JsValue::from);
                 Either::B(fut)
@@ -325,7 +325,7 @@ impl EventHandler for InnerRoom {
                     candidate.sdp_m_line_index,
                     &candidate.sdp_mid,
                 )
-                    .map_err(|err| err.log_err()),
+                .map_err(|err| err.log_err()),
             );
         } else {
             // TODO: No peer, whats next?
