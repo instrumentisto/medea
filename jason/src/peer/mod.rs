@@ -1,4 +1,4 @@
-//! Adapters to [`RTCPeerConnection`][1] and related objects.
+//! Adapters to [RTCPeerConnection][1] and related objects.
 //!
 //! [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
 
@@ -11,7 +11,7 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use futures::{
     future::{self, Either},
-    sync::mpsc::UnboundedSender,
+    sync::mpsc,
     Future,
 };
 use medea_client_api_proto::{
@@ -72,12 +72,12 @@ struct InnerPeerConnection {
     media_manager: Rc<MediaManager>,
 
     /// [`PeerEvent`]s tx.
-    peer_events_sender: UnboundedSender<PeerEvent>,
+    peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
 
-    /// Indicates is underlying [`RtcPeerConnection`] has remote description.
+    /// Indicates if underlying [`RtcPeerConnection`] has remote description.
     has_remote_description: bool,
 
-    /// Stores [ICE Candidate]s received before remote description for
+    /// Stores [`IceCandidate`]s received before remote description for
     /// underlying [`RtcPeerConnection`].
     ice_candidates_buffer: Vec<IceCandidate>,
 }
@@ -87,7 +87,7 @@ impl InnerPeerConnection {
         id: Id,
         ice_servers: I,
         media_manager: Rc<MediaManager>,
-        peer_events_sender: UnboundedSender<PeerEvent>,
+        peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
         enabled_audio: bool,
         enabled_video: bool,
     ) -> Result<Self, WasmErr> {
@@ -97,7 +97,6 @@ impl InnerPeerConnection {
             enabled_audio,
             enabled_video,
         );
-
         Ok(Self {
             id,
             peer,
@@ -114,12 +113,15 @@ impl InnerPeerConnection {
 pub struct PeerConnection(Rc<RefCell<InnerPeerConnection>>);
 
 impl PeerConnection {
-    /// Create new [`RtcPeerConnection`]. Provided `peer_events_sender` will be
-    /// used to emit [`PeerEvent`]s from this peer , provided `ice_servers` will
-    /// be used by created [`RtcPeerConnection`].
+    /// Creates new [`PeerConnection`].
+    ///
+    /// Provided `peer_events_sender` will be used to emit [`PeerEvent`]s from
+    /// this peer.
+    ///
+    /// Provided `ice_servers` will be used by created [`RtcPeerConnection`].
     pub fn new<I: IntoIterator<Item = IceServer>>(
         id: Id,
-        peer_events_sender: UnboundedSender<PeerEvent>,
+        peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
         ice_servers: I,
         media_manager: Rc<MediaManager>,
         enabled_audio: bool,
@@ -152,7 +154,7 @@ impl PeerConnection {
         Ok(Self(inner))
     }
 
-    /// Returns inner IceCandidate's buffer len. Used in tests.
+    /// Returns inner [`IceCandidate`]'s buffer len. Used in tests.
     pub fn candidates_buffer_len(&self) -> usize {
         self.0.borrow().ice_candidates_buffer.len()
     }
@@ -293,7 +295,7 @@ impl PeerConnection {
         self.0.borrow().peer.create_and_set_answer()
     }
 
-    /// Updates underlying [`RTCPeerConnection`][1] remote SDP from answer.
+    /// Updates underlying [RTCPeerConnection][1]'s remote SDP from answer.
     ///
     /// [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
     pub fn set_remote_answer(
@@ -303,7 +305,7 @@ impl PeerConnection {
         self.set_remote_description(SdpType::Answer(answer))
     }
 
-    /// Updates underlying [`RTCPeerConnection`][1] remote SDP from offer.
+    /// Updates underlying [RTCPeerConnection][1]'s remote SDP from offer.
     ///
     /// [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
     fn set_remote_offer(
@@ -313,7 +315,8 @@ impl PeerConnection {
         self.set_remote_description(SdpType::Offer(offer))
     }
 
-    /// Updates underlying [`RTCPeerConnection`][1] remote SDP.
+    /// Updates underlying [RTCPeerConnection][1]'s remote SDP with given
+    /// description.
     ///
     /// [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
     fn set_remote_description(
@@ -421,7 +424,7 @@ impl PeerConnection {
 }
 
 impl Drop for PeerConnection {
-    /// Drop `on_track` and `on_ice_candidate` callbacks to prevent leak.
+    /// Drops `on_track` and `on_ice_candidate` callbacks to prevent leak.
     fn drop(&mut self) {
         let _ = self
             .0

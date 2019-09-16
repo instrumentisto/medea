@@ -6,8 +6,8 @@ use std::{cell::RefCell, rc::Rc};
 
 use futures::{
     future::{self, IntoFuture},
-    sync::mpsc::{unbounded, UnboundedReceiver},
-    Future, Stream,
+    sync::mpsc,
+    Future, Stream as _,
 };
 
 use medea_client_api_proto::PeerId;
@@ -45,7 +45,7 @@ wasm_bindgen_test_configure!(run_in_browser);
 
 #[wasm_bindgen_test(async)]
 fn mute_unmute_audio() -> impl Future<Item = (), Error = JsValue> {
-    let (tx, _rx) = unbounded();
+    let (tx, _rx) = mpsc::unbounded();
     let manager = Rc::new(MediaManager::default());
     let (audio_track, video_track) = get_test_tracks();
     let peer = PeerConnection::new(PeerId(1), tx, vec![], manager, true, true)
@@ -68,7 +68,7 @@ fn mute_unmute_audio() -> impl Future<Item = (), Error = JsValue> {
 
 #[wasm_bindgen_test(async)]
 fn mute_unmute_video() -> impl Future<Item = (), Error = JsValue> {
-    let (tx, _rx) = unbounded();
+    let (tx, _rx) = mpsc::unbounded();
     let manager = Rc::new(MediaManager::default());
     let (audio_track, video_track) = get_test_tracks();
     let peer = PeerConnection::new(PeerId(1), tx, vec![], manager, true, true)
@@ -91,7 +91,7 @@ fn mute_unmute_video() -> impl Future<Item = (), Error = JsValue> {
 
 #[wasm_bindgen_test(async)]
 fn new_with_mute_audio() -> impl Future<Item = (), Error = JsValue> {
-    let (tx, _rx) = unbounded();
+    let (tx, _rx) = mpsc::unbounded();
     let manager = Rc::new(MediaManager::default());
     let (audio_track, video_track) = get_test_tracks();
     let peer = PeerConnection::new(PeerId(1), tx, vec![], manager, false, true)
@@ -106,7 +106,7 @@ fn new_with_mute_audio() -> impl Future<Item = (), Error = JsValue> {
 
 #[wasm_bindgen_test(async)]
 fn new_with_mute_video() -> impl Future<Item = (), Error = JsValue> {
-    let (tx, _rx) = unbounded();
+    let (tx, _rx) = mpsc::unbounded();
     let manager = Rc::new(MediaManager::default());
     let (audio_track, video_track) = get_test_tracks();
     let peer = PeerConnection::new(PeerId(1), tx, vec![], manager, true, false)
@@ -122,8 +122,8 @@ fn new_with_mute_video() -> impl Future<Item = (), Error = JsValue> {
 #[wasm_bindgen_test(async)]
 fn add_candidates_to_answerer_before_offer(
 ) -> impl Future<Item = (), Error = JsValue> {
-    let (tx1, rx1) = unbounded();
-    let (tx2, _) = unbounded();
+    let (tx1, rx1) = mpsc::unbounded();
+    let (tx2, _) = mpsc::unbounded();
 
     let manager = Rc::new(MediaManager::default());
     let pc1 = Rc::new(
@@ -170,8 +170,8 @@ fn add_candidates_to_answerer_before_offer(
 #[wasm_bindgen_test(async)]
 fn add_candidates_to_offerer_before_answer(
 ) -> impl Future<Item = (), Error = JsValue> {
-    let (tx1, _) = unbounded();
-    let (tx2, rx2) = unbounded();
+    let (tx1, _) = mpsc::unbounded();
+    let (tx2, rx2) = mpsc::unbounded();
 
     let manager = Rc::new(MediaManager::default());
     let pc1 = Rc::new(
@@ -223,8 +223,8 @@ fn add_candidates_to_offerer_before_answer(
 
 #[wasm_bindgen_test(async)]
 fn normal_exchange_of_candidates() -> impl Future<Item = (), Error = JsValue> {
-    let (tx1, rx1) = unbounded();
-    let (tx2, rx2) = unbounded();
+    let (tx1, rx1) = mpsc::unbounded();
+    let (tx2, rx2) = mpsc::unbounded();
 
     let manager = Rc::new(MediaManager::default());
     let peer1 = Rc::new(
@@ -274,7 +274,7 @@ fn normal_exchange_of_candidates() -> impl Future<Item = (), Error = JsValue> {
 }
 
 fn handle_ice_candidates(
-    candidates_rx: UnboundedReceiver<PeerEvent>,
+    candidates_rx: mpsc::UnboundedReceiver<PeerEvent>,
     peer: Rc<PeerConnection>,
     count: u8,
 ) -> impl Future<Item = (), Error = JsValue> {
