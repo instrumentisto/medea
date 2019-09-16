@@ -95,7 +95,7 @@ jobs:
 
     - name: unit medea-jason (nightly)
       stage: test
-      # Run on stable when -Z install-upgrade is out,
+      # TODO: Run on stable when -Z install-upgrade is out,
       # see: https://github.com/rust-lang/cargo/issues/6797
       rust: nightly
       addons:
