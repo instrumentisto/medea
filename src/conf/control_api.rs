@@ -40,5 +40,7 @@ mod control_conf_specs {
             default_conf.control_api.static_specs_dir,
             env_conf.control_api.static_specs_dir
         );
+
+        assert_eq!(env_conf.control_api.static_specs_dir, "test/");
     }
 }

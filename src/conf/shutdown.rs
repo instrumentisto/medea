@@ -17,7 +17,7 @@ pub struct Shutdown {
 
 #[cfg(test)]
 mod shutdown_conf_specs {
-    use std::env;
+    use std::{env, time::Duration};
 
     use serial_test_derive::serial;
 
@@ -33,5 +33,6 @@ mod shutdown_conf_specs {
         env::remove_var("MEDEA_SHUTDOWN__TIMEOUT");
 
         assert_ne!(default_conf.shutdown.timeout, env_conf.shutdown.timeout);
+        assert_eq!(env_conf.shutdown.timeout, Duration::from_secs(20));
     }
 }

@@ -102,7 +102,7 @@ mod server_spec {
 
 #[cfg(test)]
 mod control_grpc_conf_specs {
-    use std::env;
+    use std::{env, net::Ipv4Addr};
 
     use serial_test_derive::serial;
 
@@ -113,7 +113,7 @@ mod control_grpc_conf_specs {
     fn overrides_defaults() {
         let default_conf = Conf::default();
 
-        env::set_var("MEDEA_SERVER__CONTROL__GRPC__BIND_IP", "127.0.0.1");
+        env::set_var("MEDEA_SERVER__CONTROL__GRPC__BIND_IP", "182.98.12.48");
         env::set_var("MEDEA_SERVER__CONTROL__GRPC__BIND_PORT", "44444");
         env::set_var(
             "MEDEA_SERVER__CONTROL__GRPC__COMPLETION_QUEUE_COUNT",
@@ -135,6 +135,13 @@ mod control_grpc_conf_specs {
         assert_ne!(
             default_conf.server.control.grpc.completion_queue_count,
             env_conf.server.control.grpc.completion_queue_count
+        );
+
+        assert_eq!(env_conf.server.control.grpc.completion_queue_count, 10);
+        assert_eq!(env_conf.server.control.grpc.bind_port, 44444);
+        assert_eq!(
+            env_conf.server.control.grpc.bind_ip,
+            Ipv4Addr::new(182, 98, 12, 48)
         );
     }
 }
