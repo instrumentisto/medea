@@ -1,11 +1,12 @@
-[server.client.http]
-# Server host.
+[server.client]
+# Server's public URL.
 #
-# Environment variable: MEDEA_SERVER.CLIENT.HTTP.HOST
+# Environment variable: MEDEA_SERVER.CLIENT.PUBLIC_URL
 #
 # Default:
-#   host = "ws://0.0.0.0:8080"
+#   public_url = "ws://0.0.0.0:8080"
 
+[server.client.http]
 # IP address to bind HTTP server to.
 #
 # Environment variable: MEDEA_SERVER.CLIENT.HTTP.BIND_IP

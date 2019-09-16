@@ -191,7 +191,7 @@ impl ControlApiService {
     ) -> String {
         format!(
             "{}/{}/{}/{}",
-            self.app.config.server.client.http.public_url,
+            self.app.config.server.client.public_url,
             room_id,
             member_id,
             credentials

@@ -1,8 +1,8 @@
 //! Provides application configuration options.
 
-pub mod client_api_http;
 pub mod control_api;
-pub mod control_api_grpc;
+pub mod grpc_listener;
+pub mod http_listener;
 pub mod log;
 pub mod rpc;
 pub mod server;
