@@ -9,8 +9,8 @@ use std::{collections::HashMap, convert::TryFrom, fmt, rc::Rc};
 use derive_more::Display;
 use failure::Fail;
 use medea_client_api_proto::{
-    AudioSettings, Direction, IceCandidate, MediaType, PeerId as Id, ServerPeerState,
-    Track, TrackId, VideoSettings,
+    AudioSettings, Direction, IceCandidate, MediaType, PeerId as Id,
+    ServerPeerState, Track, TrackId, VideoSettings,
 };
 use medea_macro::enum_delegate;
 
@@ -98,7 +98,9 @@ impl From<&PeerStateMachine> for ServerPeerState {
             PeerStateMachine::WaitLocalHaveRemote(_) => {
                 ServerPeerState::WaitLocalHaveRemoteSdp
             }
-            PeerStateMachine::WaitRemoteSdp(_) => ServerPeerState::WaitRemoteSdp,
+            PeerStateMachine::WaitRemoteSdp(_) => {
+                ServerPeerState::WaitRemoteSdp
+            }
             PeerStateMachine::Stable(_) => ServerPeerState::Stable,
         }
     }

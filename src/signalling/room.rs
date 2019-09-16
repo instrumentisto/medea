@@ -13,8 +13,8 @@ use derive_more::Display;
 use failure::Fail;
 use futures::future::{self, Future as _};
 use medea_client_api_proto::{
-    Command, Event, IceCandidate, Peer as PeerSnapshot, PeerId, ServerPeerState,
-    Snapshot, TrackId,
+    Command, Event, IceCandidate, Peer as PeerSnapshot, PeerId,
+    ServerPeerState, Snapshot, TrackId,
 };
 
 use crate::{
@@ -42,6 +42,8 @@ use crate::{
     turn::TurnAuthService,
 };
 use futures::IntoFuture;
+use medea_client_api_proto::Event::PeersRemoved;
+use std::collections::HashSet;
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
 pub type ActFuture<I, E> =
@@ -581,6 +583,32 @@ impl Room {
             },
         ))
     }
+
+    fn handle_reset_me(
+        &mut self,
+        resetting_member_id: MemberId,
+        ctx: &mut Context<Self>,
+    ) -> Result<ActFuture<(), RoomError>, RoomError> {
+        let removed_peers = self
+            .peers
+            .remove_peers_related_to_member(&resetting_member_id);
+
+        for (member_id, peers_ids) in removed_peers {
+            if &member_id != &resetting_member_id {
+                self.member_peers_removed(peers_ids, member_id, ctx);
+            } else {
+                let member = self
+                    .members
+                    .get_member_by_id(&member_id)
+                    .ok_or_else(|| {
+                        RoomError::MemberNotFound(resetting_member_id.clone())
+                    })?;
+                member.peers_removed(&peers_ids);
+            }
+        }
+
+        Ok(Box::new(actix::fut::ok(())))
+    }
 }
 
 /// [`Actor`] implementation that provides an ergonomic way
@@ -614,7 +642,7 @@ impl Handler<CommandMessage> for Room {
         msg: CommandMessage,
         ctx: &mut Self::Context,
     ) -> Self::Result {
-        let result = match msg.into() {
+        let result = match msg.cmd {
             Command::MakeSdpOffer {
                 peer_id,
                 sdp_offer,
@@ -627,6 +655,7 @@ impl Handler<CommandMessage> for Room {
             Command::SetIceCandidate { peer_id, candidate } => {
                 self.handle_set_ice_candidate(peer_id, candidate)
             }
+            Command::ResetMe => self.handle_reset_me(msg.member_id, ctx),
         };
 
         match result {
@@ -670,12 +699,14 @@ impl Handler<RpcConnectionEstablished> for Room {
         info!("RpcConnectionEstablished for member {}", msg.member_id);
 
         // TODO: Maybe better way to detect reconnect of member??
-//        let is_reconnect = self.members.member_has_connection(&msg.member_id);
+        //        let is_reconnect =
+        // self.members.member_has_connection(&msg.member_id);
         let RpcConnectionEstablished {
             member_id,
-            connection
+            connection,
         } = msg;
-        let is_reconnect = self.members.is_have_drop_connection_tasks(&member_id);
+        let is_reconnect =
+            self.members.is_have_drop_connection_tasks(&member_id);
 
         let fut = self
             .members

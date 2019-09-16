@@ -33,9 +33,7 @@ pub trait PeerRepository {
     /// Returns all [`PeerConnection`]s stored in repository.
     fn get_all(&self) -> Vec<Rc<PeerConnection>>;
 
-    fn peers(
-        &self,
-    ) -> HashMap<PeerId, Rc<PeerConnection>>;
+    fn peers(&self) -> HashMap<PeerId, Rc<PeerConnection>>;
 }
 
 /// [`PeerConnection`] factory and repository.
@@ -98,9 +96,7 @@ impl PeerRepository for Repository {
     }
 
     #[inline]
-    fn peers(
-        &self,
-    ) -> HashMap<PeerId, Rc<PeerConnection>> {
+    fn peers(&self) -> HashMap<PeerId, Rc<PeerConnection>> {
         self.peers.clone()
     }
 }

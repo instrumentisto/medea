@@ -210,6 +210,13 @@ impl InnerRoom {
         }
         self.enabled_video = enabled;
     }
+
+    fn reset(&mut self) {
+        let peers_to_remove =
+            self.peers.peers().into_iter().map(|(id, _)| id).collect();
+        self.on_peers_removed(peers_to_remove);
+        self.rpc.send_command(Command::ResetMe);
+    }
 }
 
 /// RPC events handling.
@@ -356,7 +363,8 @@ impl EventHandler for InnerRoom {
                     _ => {
                         // TODO: In principle, PeerCreated cannot come in any
                         // state anymore.
-                        unimplemented!()
+                        self.reset();
+                        return;
                     }
                 }
                 continue;
@@ -370,6 +378,8 @@ impl EventHandler for InnerRoom {
                         SignalingState::New => {
                             // TODO: return error because this is not
                             // possible
+                            self.reset();
+                            return;
                         }
                         SignalingState::Stable => {}
                         SignalingState::HaveLocalOffer => {
@@ -380,16 +390,21 @@ impl EventHandler for InnerRoom {
                         }
                         _ => {
                             // TODO: return error because this is not possible
+                            self.reset();
+                            return;
                         }
                     }
                 }
                 _ => {
+                    self.reset();
+                    return;
                     // TODO: unreachable??
-//                    unreachable!()
+                    //                    unreachable!()
                 }
             }
             for ice_candidate in peer.ice_candidates {
-                (self as &mut dyn EventHandler).on_ice_candidate_discovered(peer.id, ice_candidate)
+                (self as &mut dyn EventHandler)
+                    .on_ice_candidate_discovered(peer.id, ice_candidate)
             }
         }
     }

@@ -9,11 +9,11 @@ use futures::Future;
 use medea_client_api_proto::IceServer;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
-    RtcConfiguration, RtcIceCandidateInit,
+    Event as SysEvent, RtcConfiguration, RtcIceCandidateInit,
     RtcPeerConnection as SysRtcPeerConnection, RtcPeerConnectionIceEvent,
     RtcRtpTransceiver, RtcRtpTransceiverDirection, RtcRtpTransceiverInit,
     RtcSdpType, RtcSessionDescription, RtcSessionDescriptionInit,
-    RtcSignalingState, RtcTrackEvent, Event as SysEvent,
+    RtcSignalingState, RtcTrackEvent,
 };
 
 use crate::utils::{EventListener, WasmErr};
@@ -107,7 +107,8 @@ struct InnerPeer {
     /// [4]: https://developer.mozilla.org/en-US/docs/Web/API/MediaStreamTrack
     on_track: Option<EventListener<SysRtcPeerConnection, RtcTrackEvent>>,
 
-    on_signaling_state_change: Option<EventListener<SysRtcPeerConnection, SysEvent>>,
+    on_signaling_state_change:
+        Option<EventListener<SysRtcPeerConnection, SysEvent>>,
 }
 
 /// Representation of [RTCPeerConnection][1].
@@ -193,7 +194,10 @@ impl RtcPeerConnection {
         Ok(())
     }
 
-    pub fn on_signaling_state_changed<F>(&self, f: Option<F>) -> Result<(), WasmErr>
+    pub fn on_signaling_state_changed<F>(
+        &self,
+        f: Option<F>,
+    ) -> Result<(), WasmErr>
     where
         F: 'static + FnMut(),
     {
@@ -206,7 +210,7 @@ impl RtcPeerConnection {
                     "signalingstatechange",
                     move |_: SysEvent| {
                         f();
-                    }
+                    },
                 )?)
             }
         }

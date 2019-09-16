@@ -122,12 +122,17 @@ pub enum Command {
     },
 
     /// Web Client sends SDP Answer.
-    MakeSdpAnswer { peer_id: PeerId, sdp_answer: String },
+    MakeSdpAnswer {
+        peer_id: PeerId,
+        sdp_answer: String,
+    },
     /// Web Client sends Ice Candidate.
     SetIceCandidate {
         peer_id: PeerId,
         candidate: IceCandidate,
     },
+
+    ResetMe,
 }
 
 /// WebSocket message from Medea to Jason.
@@ -332,12 +337,13 @@ impl<'de> Deserialize<'de> for ServerMsg {
 
             Ok(Self::Pong(n))
         } else {
-            let event = serde_json::from_value::<Event>(ev.clone()).map_err(|e| {
-                Error::custom(format!(
-                    "unable to deser ServerMsg::Event [{:?}]. Event: {:?}",
-                    e, ev,
-                ))
-            })?;
+            let event =
+                serde_json::from_value::<Event>(ev.clone()).map_err(|e| {
+                    Error::custom(format!(
+                        "unable to deser ServerMsg::Event [{:?}]. Event: {:?}",
+                        e, ev,
+                    ))
+                })?;
             Ok(Self::Event(event))
         }
     }

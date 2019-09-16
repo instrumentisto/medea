@@ -7,13 +7,16 @@ mod ice_server;
 mod media;
 mod repo;
 
-use std::{collections::HashMap, rc::Rc};
-use std::cell::RefCell;
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use futures::{future, sync::mpsc::UnboundedSender, Future};
-use medea_client_api_proto::{Direction, IceServer, PeerId as Id, Track, TrackId, Event};
+use medea_client_api_proto::{
+    Direction, Event, IceServer, PeerId as Id, Track, TrackId,
+};
 use medea_macro::dispatchable;
-use web_sys::{RtcSessionDescription, RtcSignalingState, RtcTrackEvent, Event as SysEvent};
+use web_sys::{
+    Event as SysEvent, RtcSessionDescription, RtcSignalingState, RtcTrackEvent,
+};
 
 use crate::{
     media::{MediaManager, MediaStream},
@@ -32,7 +35,6 @@ pub use self::{
     },
     media::MediaConnections,
 };
-
 
 #[derive(Clone, Debug)]
 pub enum SignalingState {
@@ -152,23 +154,30 @@ impl PeerConnection {
         let signaling_state = inner.peer.signaling_state();
         match signaling_state {
             RtcSignalingState::Stable => {
-                if inner.peer.current_remote_description().is_none() && inner.peer.current_local_description().is_none() {
+                if inner.peer.current_remote_description().is_none()
+                    && inner.peer.current_local_description().is_none()
+                {
                     *inner.signaling_state.borrow_mut() = SignalingState::New;
                 } else {
-                    *inner.signaling_state.borrow_mut() = SignalingState::Stable;
+                    *inner.signaling_state.borrow_mut() =
+                        SignalingState::Stable;
                 }
             }
             RtcSignalingState::HaveLocalOffer => {
-                *inner.signaling_state.borrow_mut() = SignalingState::HaveLocalOffer;
+                *inner.signaling_state.borrow_mut() =
+                    SignalingState::HaveLocalOffer;
             }
             RtcSignalingState::HaveRemoteOffer => {
-                *inner.signaling_state.borrow_mut() = SignalingState::HaveRemoteOffer;
+                *inner.signaling_state.borrow_mut() =
+                    SignalingState::HaveRemoteOffer;
             }
             RtcSignalingState::HaveRemotePranswer => {
-                *inner.signaling_state.borrow_mut() = SignalingState::HaveRemotePranswer;
+                *inner.signaling_state.borrow_mut() =
+                    SignalingState::HaveRemotePranswer;
             }
             RtcSignalingState::HaveLocalPranswer => {
-                *inner.signaling_state.borrow_mut() = SignalingState::HaveLocalPranswer;
+                *inner.signaling_state.borrow_mut() =
+                    SignalingState::HaveLocalPranswer;
             }
             RtcSignalingState::Closed => {
                 *inner.signaling_state.borrow_mut() = SignalingState::Closed;

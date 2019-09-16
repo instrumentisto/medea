@@ -15,8 +15,8 @@ use medea_client_api_proto::{ClientMsg, Command, Event, ServerMsg};
 use crate::utils::WasmErr;
 
 use self::{heartbeat::Heartbeat, websocket::WebSocket};
-use wasm_bindgen_futures::spawn_local;
 use futures::task::spawn;
+use wasm_bindgen_futures::spawn_local;
 
 /// Connection with remote was closed.
 pub enum CloseMsg {
@@ -84,12 +84,12 @@ fn on_close(mut inner_rc: WebsocketRpcClient, close_msg: CloseMsg) {
     // TODO: reconnect on disconnect, propagate error if unable
     //       to reconnect
     match close_msg {
-        CloseMsg::Normal(_msg) |
-        CloseMsg::Disconnect(_msg) => {
+        CloseMsg::Normal(_msg) | CloseMsg::Disconnect(_msg) => {
             web_sys::console::log_1(&"WsSession closed.".into());
             spawn_local(
-                inner_rc.init()
-                    .map_err(|e| web_sys::console::log_1(&e.into()))
+                inner_rc
+                    .init()
+                    .map_err(|e| web_sys::console::log_1(&e.into())),
             )
         }
     }
