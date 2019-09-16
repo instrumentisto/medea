@@ -74,7 +74,7 @@ impl Inner {
 }
 
 /// Handles close messsage from remote server.
-fn on_close(mut inner_rc: RpcClient, close_msg: CloseMsg) {
+fn on_close(mut inner_rc: WebsocketRpcClient, close_msg: CloseMsg) {
     {
         let mut inner = inner_rc.0.borrow_mut();
         inner.sock.take();

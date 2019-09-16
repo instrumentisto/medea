@@ -328,9 +328,10 @@ impl EventHandler for InnerRoom {
         {
             let removed_peers: Vec<PeerId> = self
                 .peers
-                .iter_peers()
-                .filter(|(id, _)| !snapshot.peers.contains_key(&id.to_string()))
-                .map(|(id, _)| *id)
+                .peers()
+                .keys()
+                .filter(|id| !snapshot.peers.contains_key(&id.to_string()))
+                .map(|id| *id)
                 .collect();
             if !removed_peers.is_empty() {
                 self.on_peers_removed(removed_peers);

@@ -8,6 +8,7 @@ mod media;
 mod repo;
 
 use std::{collections::HashMap, rc::Rc};
+use std::cell::RefCell;
 
 use futures::{future, sync::mpsc::UnboundedSender, Future};
 use medea_client_api_proto::{Direction, IceServer, PeerId as Id, Track, TrackId, Event};
@@ -32,9 +33,6 @@ pub use self::{
     media::MediaConnections,
 };
 
-#[doc(inline)]
-pub use self::repo::PeerRepository;
-use std::cell::RefCell;
 
 #[derive(Debug)]
 enum SignalingState {
