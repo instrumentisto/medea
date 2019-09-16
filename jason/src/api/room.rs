@@ -19,6 +19,8 @@ use wasm_bindgen_futures::{future_to_promise, spawn_local};
 use medea_client_api_proto::{
     Command, Direction, EventHandler, IceCandidate, IceServer, PeerId, Track,
 };
+use wasm_bindgen::prelude::*;
+use wasm_bindgen_futures::spawn_local;
 
 use crate::{
     media::MediaStream,
@@ -71,6 +73,25 @@ impl RoomHandle {
             }
         };
         future_to_promise(fut)
+
+    /// Mutes outbound audio in this room.
+    pub fn mute_audio(&self) -> Result<(), JsValue> {
+        map_weak!(self, |inner| inner.borrow_mut().toggle_send_audio(false))
+    }
+
+    /// Unmutes outbound audio in this room.
+    pub fn unmute_audio(&self) -> Result<(), JsValue> {
+        map_weak!(self, |inner| inner.borrow_mut().toggle_send_audio(true))
+    }
+
+    /// Mutes outbound video in this room.
+    pub fn mute_video(&self) -> Result<(), JsValue> {
+        map_weak!(self, |inner| inner.borrow_mut().toggle_send_video(false))
+    }
+
+    /// Unmutes outbound video in this room.
+    pub fn unmute_video(&self) -> Result<(), JsValue> {
+        map_weak!(self, |inner| inner.borrow_mut().toggle_send_video(true))
     }
 }
 
@@ -145,6 +166,8 @@ struct InnerRoom {
     peer_event_sender: UnboundedSender<PeerEvent>,
     connections: HashMap<PeerId, Connection>,
     on_new_connection: Rc<Callback2<ConnectionHandle, WasmErr>>,
+    enabled_audio: bool,
+    enabled_video: bool,
 }
 
 impl InnerRoom {
@@ -161,6 +184,8 @@ impl InnerRoom {
             peer_event_sender,
             connections: HashMap::new(),
             on_new_connection: Rc::new(Callback2::default()),
+            enabled_audio: true,
+            enabled_video: true,
         }
     }
 
@@ -190,6 +215,31 @@ impl InnerRoom {
             }
         }
     }
+
+    /// Toggles a audio send [`Track`]s of all [`PeerConnection`]s what this
+    /// [`Room`] manage.
+    fn toggle_send_audio(&mut self, enabled: bool) {
+        for peer in self.peers.get_all() {
+            peer.toggle_send_audio(enabled);
+        }
+        self.enabled_audio = enabled;
+    }
+
+    /// Toggles a video send [`Track`]s of all [`PeerConnection`]s what this
+    /// [`Room`] manage.
+    fn toggle_send_video(&mut self, enabled: bool) {
+        for peer in self.peers.get_all() {
+            peer.toggle_send_video(enabled);
+        }
+        self.enabled_video = enabled;
+    }
+
+    /// Creates new [`RoomHandle`] used by JS side. You can create them as many
+    /// as you need.
+    #[inline]
+    pub fn new_handle(&self) -> RoomHandle {
+        RoomHandle(Rc::downgrade(&self.0))
+    }
 }
 
 /// RPC events handling.
@@ -206,10 +256,12 @@ impl EventHandler for InnerRoom {
         tracks: Vec<Track>,
         ice_servers: Vec<IceServer>,
     ) {
-        let peer = match self.peers.create(
+        let peer = match self.peers.create_peer(
             peer_id,
             ice_servers,
             self.peer_event_sender.clone(),
+            self.enabled_audio,
+            self.enabled_video,
         ) {
             Ok(peer) => peer,
             Err(err) => {
@@ -225,12 +277,13 @@ impl EventHandler for InnerRoom {
             // offerer
             None => future::Either::A(
                 peer.get_offer(tracks)
-                    .map(move |sdp_offer| {
-                        rpc.send_command(Command::MakeSdpOffer {
+                    .map(move |sdp_offer| match peer.get_mids() {
+                        Ok(mids) => rpc.send_command(Command::MakeSdpOffer {
                             peer_id,
                             sdp_offer,
-                            mids: peer.get_mids().unwrap(),
-                        })
+                            mids,
+                        }),
+                        Err(err) => err.log_err(),
                     })
                     .map_err(|err| err.log_err()),
             ),
@@ -280,7 +333,7 @@ impl EventHandler for InnerRoom {
                     candidate.sdp_m_line_index,
                     &candidate.sdp_mid,
                 )
-                .map_err(|err| err.log_err()),
+                    .map_err(|err| err.log_err()),
             );
         } else {
             // TODO: No peer, whats next?

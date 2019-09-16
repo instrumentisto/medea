@@ -27,6 +27,8 @@ async function getStream(participant, local_video, audio_select, video_select) {
 }
 
 async function init_participant(wasm, token, frame) {
+    let toggle_audio = $(frame).find("input[name=toggle-audio]");
+    let toggle_video = $(frame).find("input[name=toggle-video]");
     let local_video = $(frame).find("video[name=local-video]")[0];
     let remote_video = $(frame).find("video[name=remote-video]")[0];
     let audio_select = $(frame).find("select[name=audio-source]");
@@ -37,6 +39,22 @@ async function init_participant(wasm, token, frame) {
     let room = await participant.init_room();
     await getStream(participant, local_video, audio_select, video_select);
     getDevices(participant, audio_select, video_select);
+
+    toggle_audio.change(function() {
+        if($(this).is(":checked")) {
+            room.unmute_audio();
+        } else {
+            room.mute_audio();
+        }
+    });
+
+    toggle_video.change(function() {
+        if($(this).is(":checked")) {
+            room.unmute_video();
+        } else {
+            room.mute_video();
+        }
+    });
 
     audio_select.change(function() {
         getStream(participant, local_video, audio_select, video_select);

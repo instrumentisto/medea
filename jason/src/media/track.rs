@@ -38,6 +38,16 @@ impl MediaTrack {
     pub fn caps(&self) -> &MediaType {
         &self.caps
     }
+
+    /// Checks if underlying [`MediaStreamTrack`] is enabled.
+    pub fn is_enabled(&self) -> bool {
+        self.track.enabled()
+    }
+
+    /// Enables or disables underlying [`MediaStreamTrack`].
+    pub fn set_enabled(&self, enabled: bool) {
+        self.track.set_enabled(enabled)
+    }
 }
 
 impl Drop for MediaTrack {

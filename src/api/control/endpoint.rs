@@ -33,7 +33,7 @@ impl FromStr for Scheme {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "local" => Ok(Scheme::Local),
+            "local" => Ok(Self::Local),
             _ => Err(format!("cannot parse \"{}\" to Scheme", s)),
         }
     }

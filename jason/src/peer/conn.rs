@@ -28,7 +28,7 @@ pub struct IceCandidate {
 ///
 /// [1]: https://www.w3.org/TR/webrtc/#dom-rtcrtptransceiver
 /// [2]: https://www.w3.org/TR/webrtc/#dfn-transceiver-kind
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Eq, PartialEq)]
 pub enum TransceiverKind {
     Audio,
     Video,

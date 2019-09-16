@@ -24,12 +24,21 @@ pub enum CloseMsg {
     Disconnect(String),
 }
 
+/// Client to talk with server via Client API RPC.
 #[allow(clippy::module_name_repetitions)]
 #[cfg_attr(feature = "mockable", mockall::automock)]
 pub trait RpcClient {
+
+    //TODO: docs
     fn init(&self, token: &str) -> Box<dyn Future<Item = (), Error = WasmErr>>;
+
+    /// Returns [`Stream`] of all [`Event`]s received by this [`RpcClient`].
     fn subscribe(&self) -> Box<dyn Stream<Item = Event, Error = ()>>;
+
+    /// Unsubscribes from this [`RpcClient`]. Drops all subscriptions atm.
     fn unsub(&self);
+
+    /// Sends [`Command`] to server.
     fn send_command(&self, command: Command);
 }
 

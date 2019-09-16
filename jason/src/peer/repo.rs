@@ -17,11 +17,13 @@ pub trait PeerRepository {
     /// [`IceServer`]s, [`PeerEvent`] sender and stored [`MediaManager`].
     ///
     /// [`PeerConnection`] can be created with muted audio or video [`Track`]s.
-    fn create(
+    fn create_peer(
         &mut self,
         id: PeerId,
         ice_servers: Vec<IceServer>,
         events_sender: UnboundedSender<PeerEvent>,
+        enabled_audio: bool,
+        enabled_video: bool,
     ) -> Result<Rc<PeerConnection>, WasmErr>;
 
     /// Returns [`PeerConnection`] stored in repository by its ID.
@@ -36,8 +38,7 @@ pub trait PeerRepository {
 
 /// [`PeerConnection`] factory and repository.
 pub struct Repository {
-    /// [`MediaManager`] that will be injected into all [`PeerConnection`]s
-    /// created by this repository.
+    /// [`MediaManager`] for injecting into new created [`PeerConnection`]s.
     media_manager: Rc<MediaManager>,
 
     /// Peer id to [`PeerConnection`],
@@ -57,17 +58,21 @@ impl Repository {
 impl PeerRepository for Repository {
     /// Creates new [`PeerConnection`] with provided ID and injecting provided
     /// [`IceServer`]s, stored [`PeerEvent`] sender and [`MediaManager`].
-    fn create(
+    fn create_peer(
         &mut self,
         id: PeerId,
         ice_servers: Vec<IceServer>,
         peer_events_sender: UnboundedSender<PeerEvent>,
+        enabled_audio: bool,
+        enabled_video: bool,
     ) -> Result<Rc<PeerConnection>, WasmErr> {
         let peer = Rc::new(PeerConnection::new(
             id,
             peer_events_sender,
             ice_servers,
             Rc::clone(&self.media_manager),
+            enabled_audio,
+            enabled_video,
         )?);
         self.peers.insert(id, peer);
         Ok(self.peers.get(&id).cloned().unwrap())

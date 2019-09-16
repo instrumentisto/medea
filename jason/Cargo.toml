@@ -1,6 +1,6 @@
 [package]
 name = "medea-jason"
-version = "0.1.1-dev"
+version = "0.2.0-dev"
 edition = "2018"
 description = "Client library for Medea media server"
 authors = ["Instrumentisto Team <developer@instrumentisto.com>"]
@@ -21,17 +21,21 @@ opt-level = "s"  # Tell `rustc` to optimize for small code size.
 
 [features]
 default = ["console_error_panic_hook", "wee_alloc"]
-mockable=[]
+mockable = ["downcast", "fragile", "mockall", "predicates-tree"]
 
 [dependencies]
 console_error_panic_hook = { version = "0.1", optional = true }
+downcast = { version = "0.10", optional = true }
+fragile = { version = "0.3", optional = true }
 futures = "0.1"
 js-sys = "0.3"
 macro-attr = "0.2"
 medea-client-api-proto = { path = "../proto/client-api", features = ["jason"] }
 medea-macro = "0.1"
-mockall = "0.3"
+mockall = { version = "0.2", optional = true }
 newtype_derive = "0.1"
+predicates-tree = { version = "1.0", optional = true }
+version = "0.2.0-dev"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 wasm-bindgen = { version = "0.2", features = ["serde-serialize"] }

@@ -21,6 +21,11 @@ use crate::{
     utils::WasmErr,
 };
 
+#[cfg(feature = "mockable")]
+#[doc(inline)]
+pub use self::repo::MockPeerRepository;
+#[doc(inline)]
+pub use self::repo::{PeerRepository, Repository};
 pub use self::{
     conn::{
         IceCandidate, RtcPeerConnection, SdpType, TransceiverDirection,
@@ -28,11 +33,6 @@ pub use self::{
     },
     media::MediaConnections,
 };
-
-#[cfg(feature = "mockable")]
-pub use self::repo::MockPeerRepository;
-#[doc(inline)]
-pub use self::repo::{PeerRepository, Repository};
 
 #[dispatchable]
 #[allow(clippy::module_name_repetitions)]
@@ -83,9 +83,15 @@ impl PeerConnection {
         peer_events_sender: UnboundedSender<PeerEvent>,
         ice_servers: I,
         media_manager: Rc<MediaManager>,
+        enabled_audio: bool,
+        enabled_video: bool,
     ) -> Result<Self, WasmErr> {
         let peer = Rc::new(RtcPeerConnection::new(ice_servers)?);
-        let media_connections = MediaConnections::new(Rc::clone(&peer));
+        let media_connections = MediaConnections::new(
+            Rc::clone(&peer),
+            enabled_audio,
+            enabled_video,
+        );
         let inner = Rc::new(InnerPeerConnection {
             id,
             peer,
@@ -132,10 +138,10 @@ impl PeerConnection {
         let track = track_event.track();
 
         if let Some(sender_id) =
-            inner.media_connections.add_remote_track(transceiver, track)
+        inner.media_connections.add_remote_track(transceiver, track)
         {
             if let Some(tracks) =
-                inner.media_connections.get_tracks_by_sender(sender_id)
+            inner.media_connections.get_tracks_by_sender(sender_id)
             {
                 // got all tracks from this sender, so emit
                 // PeerEvent::NewRemoteStream
@@ -152,6 +158,34 @@ impl PeerConnection {
             //       handled somehow (propagated to medea to init peer
             //       recreation?)
         }
+    }
+
+    /// Disables or enables all audio tracks for all [`Sender`]s.
+    pub fn toggle_send_audio(&self, enabled: bool) {
+        self.0
+            .media_connections
+            .toggle_send_media(TransceiverKind::Audio, enabled)
+    }
+
+    /// Disables or enables all video tracks for all [`Sender`]s.
+    pub fn toggle_send_video(&self, enabled: bool) {
+        self.0
+            .media_connections
+            .toggle_send_media(TransceiverKind::Video, enabled)
+    }
+
+    /// Returns `true` if all [`Sender`]s audio tracks are enabled.
+    pub fn is_send_audio_enabled(&self) -> bool {
+        self.0
+            .media_connections
+            .are_senders_enabled(TransceiverKind::Audio)
+    }
+
+    /// Returns `true` if all [`Sender`]s video tracks are enabled.
+    pub fn is_send_video_enabled(&self) -> bool {
+        self.0
+            .media_connections
+            .are_senders_enabled(TransceiverKind::Video)
     }
 
     /// Track id to mid relations of all send tracks of this
@@ -196,7 +230,7 @@ impl PeerConnection {
                             )
                         }
                     }
-                    .and_then(move |_| peer.create_and_set_offer()),
+                        .and_then(move |_| peer.create_and_set_offer()),
                 )
             }
         }
@@ -241,28 +275,32 @@ impl PeerConnection {
             });
 
         // update receivers
-        self.0.media_connections.update_tracks(recv).unwrap();
+        if let Err(err) = self.0.media_connections.update_tracks(recv) {
+            return future::Either::A(future::err(err));
+        }
 
         let inner: Rc<InnerPeerConnection> = Rc::clone(&self.0);
-        self.0
-            .peer
-            .set_remote_description(SdpType::Offer(offer))
-            .and_then(move |_| {
-                inner
-                    .media_connections
-                    .update_tracks(send)
-                    .map(|req| (req, inner))
-            })
-            .and_then(move |(request, inner)| match request {
-                None => future::Either::A(future::ok::<_, WasmErr>(())),
-                Some(request) => future::Either::B(
-                    inner.media_manager.get_stream(request).and_then(
-                        move |s| {
-                            inner.media_connections.insert_local_stream(&s)
-                        },
+        future::Either::B(
+            self.0
+                .peer
+                .set_remote_description(SdpType::Offer(offer))
+                .and_then(move |_| {
+                    inner
+                        .media_connections
+                        .update_tracks(send)
+                        .map(|req| (req, inner))
+                })
+                .and_then(move |(request, inner)| match request {
+                    None => future::Either::A(future::ok::<_, WasmErr>(())),
+                    Some(request) => future::Either::B(
+                        inner.media_manager.get_stream(request).and_then(
+                            move |s| {
+                                inner.media_connections.insert_local_stream(&s)
+                            },
+                        ),
                     ),
-                ),
-            })
+                }),
+        )
     }
 
     /// Adds remote peers [ICE Candidate][1] to this peer.

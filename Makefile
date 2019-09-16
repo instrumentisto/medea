@@ -23,8 +23,6 @@ RUST_VER := 1.37
 
 CURRENT_BRANCH := $(strip $(shell git branch | grep \* | cut -d ' ' -f2))
 
-CHROMEDRIVER_CLIENT_ARGS := $(strip $(shell grep 'CHROMEDRIVER_CLIENT_ARGS=' .env | cut -d '=' -f2))
-
 crate-dir = .
 ifeq ($(crate),medea-jason)
 crate-dir = jason
@@ -93,7 +91,9 @@ release: release.crates release.npm
 # Usage:
 #	make test
 
-test: test.unit test.e2e
+test:
+	@make test.unit
+	@make test.e2e up=yes dockerized=no
 
 
 up: up.dev
@@ -170,9 +170,9 @@ cargo:
 # Build medea's related crates.
 #
 # Usage:
-#	make build [crate=(@all|medea|medea-jason)]
-#	           [debug=(yes|no)]
-#	           [dockerized=(no|yes)]
+#	make cargo.build [crate=(@all|medea|medea-jason)]
+#	                 [debug=(yes|no)]
+#	                 [dockerized=(no|yes)]
 
 cargo-build-crate = $(if $(call eq,$(crate),),@all,$(crate))
 
@@ -297,6 +297,11 @@ endif
 # Usage:
 #	make test.unit [crate=(@all|medea|jason|<crate-name>)]
 
+CHROMEDRIVER_CLIENT_ARGS := $(strip \
+	$(shell grep 'CHROMEDRIVER_CLIENT_ARGS=' .env | cut -d '=' -f2))
+
+test-unit-crate = $(if $(call eq,$(crate),),@all,$(crate))
+
 test.unit:
 ifeq ($(test-unit-crate),@all)
 	@make test.unit crate=medea-macro
@@ -304,13 +309,17 @@ ifeq ($(test-unit-crate),@all)
 	@make test.unit crate=medea-jason
 	@make test.unit crate=medea
 else
+ifeq ($(test-unit-crate),medea)
+	cargo test --lib --bin medea
+else
 ifeq ($(crate),medea-jason)
 	cd $(crate-dir)/ && \
 	CHROMEDRIVER_CLIENT_ARGS="$(CHROMEDRIVER_CLIENT_ARGS)" \
-    cargo test --target wasm32-unknown-unknown
+    cargo test --target wasm32-unknown-unknown --features mockable
 else
 	cd $(crate-dir)/ && \
-	cargo test
+	cargo test -p $(test-unit-crate)
+endif
 endif
 endif
 
@@ -327,8 +336,7 @@ endif
 
 test-e2e-env = RUST_BACKTRACE=1 \
 	$(if $(call eq,$(log),yes),,RUST_LOG=warn) \
-	MEDEA_CONTROL.STATIC_SPECS_DIR=tests/specs/ \
-	MEDEA_CONTROL_STATIC_SPECS_DIR=tests/specs/
+	MEDEA_CONTROL__STATIC_SPECS_DIR=tests/specs/
 
 test.e2e:
 ifeq ($(up),yes)
@@ -417,11 +425,17 @@ docker.auth:
 docker-build-demo-image-name = $(DEMO_IMAGE_NAME)
 
 docker.build.demo:
+ifeq ($(TAG),edge)
+	docker build $(if $(call eq,$(minikube),yes),,--network=host) --force-rm \
+		-t $(docker-build-demo-image-name):$(TAG) \
+		-f jason/Dockerfile .
+else
 	@make yarn proj=demo
 	$(docker-env) \
 	docker build $(if $(call eq,$(minikube),yes),,--network=host) --force-rm \
 		-t $(docker-build-demo-image-name):$(if $(call eq,$(TAG),),dev,$(TAG)) \
 		jason/demo
+endif
 
 
 # Build medea project Docker image.
