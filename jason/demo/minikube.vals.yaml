@@ -10,8 +10,7 @@ server:
   conf:
     server:
       client:
-        http:
-          public_url: "wss://medea-demo.test"
+        public_url: "wss://medea-demo.test"
 
     turn:
       host: medea-demo.test

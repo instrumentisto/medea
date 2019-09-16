@@ -1,4 +1,4 @@
-//! Service which provide CRUD actions for [`Room`].
+//! Service which provides CRUD actions for [`Room`].
 
 use std::{collections::HashMap, marker::PhantomData};
 

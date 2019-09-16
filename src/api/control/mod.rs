@@ -180,6 +180,10 @@ pub fn load_static_specs_from_dir<P: AsRef<Path>>(
     Ok(specs)
 }
 
+/// Starts all [`Room`]s from static [Control API] specs.
+///
+/// [Control API]: http://tiny.cc/380uaz
+/// [`Room`]: crate::signalling::room::Room
 pub fn start_static_rooms(
     room_service: &Addr<RoomService>,
 ) -> impl Future<Item = (), Error = ()> {

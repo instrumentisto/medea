@@ -110,7 +110,7 @@ impl MemberSpec {
 }
 
 /// Generates alphanumeric credentials for [`Member`] with
-/// [`MEMBER_CREDENTIALS_LEN`] length.
+/// [`CREDENTIALS_LEN`] length.
 ///
 /// This credentials will be generated if in dynamic [Control API] spec not
 /// provided credentials for [`Member`]. This logic you can find in [`TryFrom`]

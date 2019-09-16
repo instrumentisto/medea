@@ -130,6 +130,7 @@ mod turn_conf_specs {
         assert_ne!(default_conf.turn.port, env_conf.turn.port);
         assert_ne!(default_conf.turn.user, env_conf.turn.user);
         assert_ne!(default_conf.turn.pass, env_conf.turn.pass);
+
         assert_eq!(env_conf.turn.host, "example.com");
         assert_eq!(env_conf.turn.port, 1234);
         assert_eq!(env_conf.turn.addr(), "example.com:1234");

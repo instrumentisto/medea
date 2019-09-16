@@ -17,9 +17,9 @@ server:
   conf:
     server:
       client:
+        public_url: ""
         http:
           bind_port: 8080
-          public_url: ""
     turn:
       user: USER
       pass: PASS
