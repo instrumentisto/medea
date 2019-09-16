@@ -127,9 +127,9 @@ pub mod tests {
     #[macro_export]
     macro_rules! overrided_by_env_conf {
         ($($env:expr => $value:expr),+) => {{
-            $(std::env::set_var($env, $value);)+
+            $(::std::env::set_var($env, $value);)+
             let conf = crate::conf::Conf::parse().unwrap();
-            $(std::env::remove_var($env);)+
+            $(::std::env::remove_var($env);)+
             conf
         }};
     }

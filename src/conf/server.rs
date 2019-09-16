@@ -60,24 +60,21 @@ pub struct Server {
 
 #[cfg(test)]
 mod server_spec {
-    use std::{env, net::Ipv4Addr};
+    use std::net::Ipv4Addr;
 
     use serial_test_derive::serial;
 
-    use crate::conf::Conf;
+    use crate::{conf::Conf, overrided_by_env_conf};
 
     #[test]
     #[serial]
     fn overrides_defaults_and_gets_bind_addr() {
         let default_conf = Conf::default();
 
-        env::set_var("MEDEA_SERVER__CLIENT__HTTP__BIND_IP", "5.5.5.5");
-        env::set_var("MEDEA_SERVER__CLIENT__HTTP__BIND_PORT", "1234");
-
-        let env_conf = Conf::parse().unwrap();
-
-        env::remove_var("MEDEA_SERVER__CLIENT__HTTP__BIND_IP");
-        env::remove_var("MEDEA_SERVER__CLIENT__HTTP__BIND_PORT");
+        let env_conf = overrided_by_env_conf!(
+            "MEDEA_SERVER__CLIENT__HTTP__BIND_IP" => "5.5.5.5",
+            "MEDEA_SERVER__CLIENT__HTTP__BIND_PORT" => "1234"
+        );
 
         assert_ne!(
             default_conf.server.client.http.bind_ip,
