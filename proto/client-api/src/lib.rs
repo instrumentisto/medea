@@ -49,7 +49,7 @@ impl_incrementable!(TrackId);
 
 #[cfg_attr(feature = "medea", derive(Serialize, Debug, Clone, PartialEq))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
-pub enum PeerState {
+pub enum ServerPeerState {
     New,
     WaitLocalSdp,
     WaitLocalHaveRemoteSdp,
@@ -61,7 +61,7 @@ pub enum PeerState {
 #[cfg_attr(feature = "jason", derive(Deserialize))]
 pub struct Peer {
     pub id: PeerId,
-    pub state: PeerState,
+    pub state: ServerPeerState,
     pub ice_candidates: Vec<IceCandidate>,
     pub sdp_offer: Option<String>,
     pub sdp_answer: Option<String>,

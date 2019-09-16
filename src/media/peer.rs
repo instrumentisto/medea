@@ -9,7 +9,7 @@ use std::{collections::HashMap, convert::TryFrom, fmt, rc::Rc};
 use derive_more::Display;
 use failure::Fail;
 use medea_client_api_proto::{
-    AudioSettings, Direction, IceCandidate, MediaType, PeerId as Id, PeerState,
+    AudioSettings, Direction, IceCandidate, MediaType, PeerId as Id, ServerPeerState,
     Track, TrackId, VideoSettings,
 };
 use medea_macro::enum_delegate;
@@ -90,16 +90,16 @@ pub enum PeerStateMachine {
     Stable(Peer<Stable>),
 }
 
-impl From<&PeerStateMachine> for PeerState {
-    fn from(peer: &PeerStateMachine) -> PeerState {
+impl From<&PeerStateMachine> for ServerPeerState {
+    fn from(peer: &PeerStateMachine) -> ServerPeerState {
         match peer {
-            PeerStateMachine::New(_) => PeerState::New,
-            PeerStateMachine::WaitLocalSdp(_) => PeerState::WaitLocalSdp,
+            PeerStateMachine::New(_) => ServerPeerState::New,
+            PeerStateMachine::WaitLocalSdp(_) => ServerPeerState::WaitLocalSdp,
             PeerStateMachine::WaitLocalHaveRemote(_) => {
-                PeerState::WaitLocalHaveRemoteSdp
+                ServerPeerState::WaitLocalHaveRemoteSdp
             }
-            PeerStateMachine::WaitRemoteSdp(_) => PeerState::WaitRemoteSdp,
-            PeerStateMachine::Stable(_) => PeerState::Stable,
+            PeerStateMachine::WaitRemoteSdp(_) => ServerPeerState::WaitRemoteSdp,
+            PeerStateMachine::Stable(_) => ServerPeerState::Stable,
         }
     }
 }

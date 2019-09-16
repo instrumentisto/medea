@@ -13,7 +13,7 @@ use derive_more::Display;
 use failure::Fail;
 use futures::future::{self, Future as _};
 use medea_client_api_proto::{
-    Command, Event, IceCandidate, Peer as PeerSnapshot, PeerId, PeerState,
+    Command, Event, IceCandidate, Peer as PeerSnapshot, PeerId, ServerPeerState,
     Snapshot, TrackId,
 };
 
@@ -166,7 +166,7 @@ impl Room {
                 sdp_offer: peer.sdp_offer(),
                 remote_sdp_offer: remote_peer.sdp_offer(),
                 remote_sdp_answer: remote_peer.sdp_answer(),
-                state: PeerState::from(peer),
+                state: ServerPeerState::from(peer),
                 ice_candidates: peer.get_ice_candidates(),
                 tracks: peer.tracks(),
             };

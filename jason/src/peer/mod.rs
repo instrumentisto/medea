@@ -34,8 +34,8 @@ pub use self::{
 };
 
 
-#[derive(Debug)]
-enum SignalingState {
+#[derive(Clone, Debug)]
+pub enum SignalingState {
     New,
     Stable,
     HaveLocalOffer,
@@ -178,6 +178,10 @@ impl PeerConnection {
             }
         }
         web_sys::console::log_1(&format!("{:?}", inner.signaling_state).into());
+    }
+
+    pub fn signaling_state(&self) -> SignalingState {
+        self.0.signaling_state.borrow().clone()
     }
 
     /// Handle `track` event from underlying peer adding new track to
@@ -366,10 +370,6 @@ impl PeerConnection {
         self.0
             .peer
             .add_ice_candidate(candidate, sdp_m_line_index, sdp_mid)
-    }
-
-    pub fn signaling_state(&self) -> RtcSignalingState {
-        self.0.peer.signaling_state()
     }
 
     pub fn current_local_description(&self) -> Option<RtcSessionDescription> {

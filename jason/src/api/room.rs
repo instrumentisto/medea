@@ -14,7 +14,7 @@ use futures::{
 };
 use medea_client_api_proto::{
     Command, Direction, EventHandler, IceCandidate, IceServer, PeerId,
-    PeerState, Snapshot, Track,
+    ServerPeerState, Snapshot, Track,
 };
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
@@ -344,8 +344,8 @@ impl EventHandler for InnerRoom {
                 local_peer.clone()
             } else {
                 match peer.state {
-                    PeerState::WaitLocalHaveRemoteSdp
-                    | PeerState::WaitLocalSdp => {
+                    ServerPeerState::WaitLocalHaveRemoteSdp
+                    | ServerPeerState::WaitLocalSdp => {
                         self.on_peer_created(
                             peer.id,
                             peer.sdp_offer,
@@ -362,21 +362,17 @@ impl EventHandler for InnerRoom {
                 continue;
             };
 
+            use crate::peer::SignalingState;
+
             match peer.state {
-                PeerState::Stable => {
+                ServerPeerState::Stable => {
                     match local_peer.signaling_state() {
-                        RtcSignalingState::Stable => {
-                            let remote_desc =
-                                local_peer.current_remote_description();
-                            let local_desc =
-                                local_peer.current_local_description();
-                            if !(remote_desc.is_some() && local_desc.is_some())
-                            {
-                                // TODO: return error because this is not
-                                // possible
-                            }
+                        SignalingState::New => {
+                            // TODO: return error because this is not
+                            // possible
                         }
-                        RtcSignalingState::HaveLocalOffer => {
+                        SignalingState::Stable => {}
+                        SignalingState::HaveLocalOffer => {
                             self.on_sdp_answer_made(
                                 peer.id,
                                 peer.remote_sdp_answer.unwrap(),
@@ -389,7 +385,7 @@ impl EventHandler for InnerRoom {
                 }
                 _ => {
                     // TODO: unreachable??
-                    unreachable!()
+//                    unreachable!()
                 }
             }
             for ice_candidate in peer.ice_candidates {
