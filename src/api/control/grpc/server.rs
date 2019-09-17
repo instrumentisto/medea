@@ -199,8 +199,8 @@ impl ControlApiService {
     }
 
     /// Implementation of `Create` method for [`Room`].
-    pub fn create_room(
-        &mut self,
+    fn create_room(
+        &self,
         req: &CreateRequest,
         uri: LocalUri<ToRoom>,
     ) -> impl Future<Item = Sids, Error = GrpcControlApiError> {
@@ -230,8 +230,8 @@ impl ControlApiService {
     }
 
     /// Implementation of `Create` method for [`Member`] element.
-    pub fn create_member(
-        &mut self,
+    fn create_member(
+        &self,
         req: &CreateRequest,
         uri: LocalUri<ToMember>,
     ) -> impl Future<Item = Sids, Error = GrpcControlApiError> {
@@ -253,8 +253,8 @@ impl ControlApiService {
     }
 
     /// Implementation of `Create` method for [`Endpoint`] elements.
-    pub fn create_endpoint(
-        &mut self,
+    fn create_endpoint(
+        &self,
         req: &CreateRequest,
         uri: LocalUri<ToEndpoint>,
     ) -> impl Future<Item = Sids, Error = GrpcControlApiError> {
@@ -269,6 +269,60 @@ impl ControlApiService {
                 }),
         )
     }
+
+    pub fn create_element(
+        &self,
+        req: &CreateRequest,
+    ) -> Box<dyn Future<Item = Sids, Error = ErrorResponse> + Send> {
+        let uri = match StatefulLocalUri::try_from(req.get_id().as_ref()) {
+            Ok(uri) => uri,
+            Err(e) => {
+                return Box::new(futures::future::err(e.into()));
+            }
+        };
+
+        match uri {
+            StatefulLocalUri::Room(local_uri) => {
+                if req.has_room() {
+                    Box::new(
+                        self.create_room(&req, local_uri)
+                            .map_err(|err| err.into()),
+                    )
+                } else {
+                    Box::new(futures::future::err(ErrorResponse::new(
+                        ErrorCode::ElementIdForRoomButElementIsNot,
+                        &req.get_id(),
+                    )))
+                }
+            }
+            StatefulLocalUri::Member(local_uri) => {
+                if req.has_member() {
+                    Box::new(
+                        self.create_member(&req, local_uri)
+                            .map_err(|err| err.into()),
+                    )
+                } else {
+                    Box::new(futures::future::err(ErrorResponse::new(
+                        ErrorCode::ElementIdForMemberButElementIsNot,
+                        &req.get_id(),
+                    )))
+                }
+            }
+            StatefulLocalUri::Endpoint(local_uri) => {
+                if req.has_webrtc_pub() || req.has_webrtc_play() {
+                    Box::new(
+                        self.create_endpoint(&req, local_uri)
+                            .map_err(|err| err.into()),
+                    )
+                } else {
+                    Box::new(futures::future::err(ErrorResponse::new(
+                        ErrorCode::ElementIdForEndpointButElementIsNot,
+                        &req.get_id(),
+                    )))
+                }
+            }
+        }
+    }
 }
 
 impl ControlApi for ControlApiService {
@@ -281,58 +335,13 @@ impl ControlApi for ControlApiService {
         req: CreateRequest,
         sink: UnarySink<CreateResponse>,
     ) {
-        macro_rules! send_error_response_code {
-            ($response_code:expr) => {
-                send_error_response!(
-                    ctx,
-                    sink,
-                    ErrorResponse::new($response_code, &req.get_id()),
-                    CreateResponse
-                )
-            };
-        }
-
-        type CreateFuture =
-            Box<dyn Future<Item = Sids, Error = GrpcControlApiError> + Send>;
-
-        let response_fut: CreateFuture =
-            match parse_local_uri!(req.get_id(), ctx, sink, CreateResponse) {
-                StatefulLocalUri::Room(local_uri) => {
-                    if req.has_room() {
-                        Box::new(self.create_room(&req, local_uri))
-                    } else {
-                        send_error_response_code!(
-                            ErrorCode::ElementIdForRoomButElementIsNot
-                        );
-                    }
-                }
-                StatefulLocalUri::Member(local_uri) => {
-                    if req.has_member() {
-                        Box::new(self.create_member(&req, local_uri))
-                    } else {
-                        send_error_response_code!(
-                            ErrorCode::ElementIdForMemberButElementIsNot
-                        );
-                    }
-                }
-                StatefulLocalUri::Endpoint(local_uri) => {
-                    if req.has_webrtc_pub() || req.has_webrtc_play() {
-                        Box::new(self.create_endpoint(&req, local_uri))
-                    } else {
-                        send_error_response_code!(
-                            ErrorCode::ElementIdForEndpointButElementIsNot
-                        );
-                    }
-                }
-            };
-
-        ctx.spawn(response_fut.then(move |result| {
+        ctx.spawn(self.create_element(&req).then(move |result| {
             let mut response = CreateResponse::new();
             match result {
                 Ok(sid) => {
                     response.set_sid(sid);
                 }
-                Err(e) => response.set_error(ErrorResponse::from(e).into()),
+                Err(e) => response.set_error(e.into()),
             }
             sink.success(response).map_err(|e| {
                 warn!("Error while sending Create response by gRPC. {:?}", e)
