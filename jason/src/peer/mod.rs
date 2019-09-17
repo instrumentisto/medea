@@ -11,11 +11,11 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use futures::{future, sync::mpsc::UnboundedSender, Future};
 use medea_client_api_proto::{
-    Direction, Event, IceServer, PeerId as Id, Track, TrackId,
+    Direction, IceServer, PeerId as Id, Track, TrackId,
 };
 use medea_macro::dispatchable;
 use web_sys::{
-    Event as SysEvent, RtcSessionDescription, RtcSignalingState, RtcTrackEvent,
+    RtcSessionDescription, RtcSignalingState, RtcTrackEvent,
 };
 
 use crate::{
@@ -36,6 +36,7 @@ pub use self::{
     media::MediaConnections,
 };
 
+/// Local signaling state of [`RtcPeerConnection`].
 #[derive(Clone, Debug)]
 pub enum SignalingState {
     New,
@@ -83,6 +84,7 @@ struct InnerPeerConnection {
     /// [`PeerEvent`]s tx.
     peer_events_sender: UnboundedSender<PeerEvent>,
 
+    /// Current signaling state of [`PeerConnection`].
     signaling_state: RefCell<SignalingState>,
 }
 
@@ -128,6 +130,7 @@ impl PeerConnection {
             Self::on_track(&inner_rc, &track_event);
         }))?;
 
+        // Bind to `signalingstatechange` event.
         let inner_rc = Rc::clone(&inner);
         inner.peer.on_signaling_state_changed(Some(move || {
             Self::on_signaling_state_changed(&inner_rc);
@@ -150,6 +153,9 @@ impl PeerConnection {
         );
     }
 
+    /// Handle `signalingstatechange` event from underlying peer.
+    ///
+    /// This function will update signaling state of [`PeerConnection`].
     fn on_signaling_state_changed(inner: &InnerPeerConnection) {
         let signaling_state = inner.peer.signaling_state();
         match signaling_state {
@@ -186,9 +192,10 @@ impl PeerConnection {
                 unimplemented!("State: {:?}", signaling_state);
             }
         }
-        web_sys::console::log_1(&format!("{:?}", inner.signaling_state).into());
+        web_sys::console::error_1(&format!("Not known signaling state: {:?}.", inner.signaling_state).into());
     }
 
+    /// Returns signaling state of this [`PeerConnection`].
     pub fn signaling_state(&self) -> SignalingState {
         self.0.signaling_state.borrow().clone()
     }
@@ -381,12 +388,14 @@ impl PeerConnection {
             .add_ice_candidate(candidate, sdp_m_line_index, sdp_mid)
     }
 
-    pub fn current_local_description(&self) -> Option<RtcSessionDescription> {
-        self.0.peer.current_local_description()
+    /// Returns current local SDP offer of this [`PeerConnection`].
+    pub fn current_local_sdp(&self) -> Option<String> {
+        self.0.peer.current_local_description().map(|s| s.sdp())
     }
 
-    pub fn current_remote_description(&self) -> Option<RtcSessionDescription> {
-        self.0.peer.current_remote_description()
+    /// Returns current remote SDP offer of this [`PeerConnection`].
+    pub fn current_remote_sdp(&self) -> Option<String> {
+        self.0.peer.current_remote_description().map(|s| s.sdp())
     }
 }
 

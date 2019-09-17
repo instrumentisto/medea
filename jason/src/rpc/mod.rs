@@ -11,13 +11,12 @@ use futures::{
 };
 use js_sys::Date;
 use medea_client_api_proto::{ClientMsg, Command, Event, ServerMsg};
+use futures::{future::Loop};
+use wasm_bindgen_futures::spawn_local;
 
 use crate::utils::WasmErr;
 
 use self::{heartbeat::Heartbeat, websocket::WebSocket};
-use futures::{future::Loop, task::spawn};
-use serde_json::Error;
-use wasm_bindgen_futures::spawn_local;
 
 /// Connection with remote was closed.
 pub enum CloseMsg {
@@ -74,7 +73,7 @@ impl Inner {
     }
 }
 
-/// Handles close messsage from remote server.
+/// Handles close message from remote server.
 fn on_close(inner_rc: WebsocketRpcClient, close_msg: CloseMsg) {
     {
         let mut inner = inner_rc.0.borrow_mut();
@@ -103,18 +102,13 @@ fn on_close(inner_rc: WebsocketRpcClient, close_msg: CloseMsg) {
                             web_sys::console::log_1(&"Ok".into());
                             Ok(Loop::Break(()))
                         }
-                        Err(e) => {
+                        Err(_) => {
                             web_sys::console::log_1(&"Err".into());
                             Ok(Loop::Continue(inner_rc))
                         }
                     }
                 })
             }));
-            //            spawn_local(
-            //                inner_rc
-            //                    .init()
-            //                    .map_err(move |e| on_close(inner_rc,
-            // close_msg)),            )
         }
     }
 }
@@ -155,10 +149,8 @@ impl WebsocketRpcClient {
     /// Starts `Heartbeat` if connection succeeds and binds handlers
     /// on receiving messages from server and closing socket.
     pub fn init(&self) -> impl Future<Item = (), Error = WasmErr> {
-        web_sys::console::log_1(&"Init new WsSession.".into());
         let inner = Rc::clone(&self.0);
         let self_clone = self.clone();
-        web_sys::console::log_1(&"Before WebSocket new".into());
         WebSocket::new(&self.0.borrow().token).and_then(
             move |socket: WebSocket| {
                 let socket = Rc::new(socket);
@@ -167,12 +159,10 @@ impl WebsocketRpcClient {
 
                 let inner_rc = Rc::clone(&inner);
                 socket.on_message(move |msg: Result<ServerMsg, WasmErr>| {
-                    web_sys::console::log_1(&"onMessage".into());
                     on_message(&inner_rc, msg)
                 })?;
 
                 socket.on_close(move |msg: CloseMsg| {
-                    web_sys::console::log_1(&"onClose".into());
                     on_close(self_clone, msg)
                 })?;
 

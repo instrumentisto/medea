@@ -50,7 +50,7 @@ impl Jason {
     /// Fails if unable to connect to media server.
     /// Effectively returns `Result<RoomHandle, WasmErr>`.
     pub fn join_room(&self, token: String) -> Promise {
-        let mut rpc = WebsocketRpcClient::new(token, 3000);
+        let rpc = WebsocketRpcClient::new(token, 3000);
         let peer_repository =
             peer::Repository::new(Rc::clone(&self.0.borrow().media_manager));
 

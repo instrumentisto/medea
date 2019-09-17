@@ -4,7 +4,7 @@
 //! [`Member`]: crate::signalling::elements::member::Member
 
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{HashMap},
     sync::Arc,
     time::Duration,
 };
@@ -45,8 +45,6 @@ use crate::{
     },
     turn::TurnAuthService,
 };
-use futures::IntoFuture;
-use medea_client_api_proto::Event::PeersRemoved;
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
 pub type ActFuture<I, E> =

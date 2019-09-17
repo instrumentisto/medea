@@ -1,7 +1,5 @@
 use std::{
     cell::RefCell,
-    collections::hash_map::DefaultHasher,
-    hash::{Hash as _, Hasher as _},
     rc::Rc,
 };
 
@@ -370,14 +368,17 @@ impl RtcPeerConnection {
         transceiver
     }
 
+    /// Returns current JS signaling state of [`RtcPeerConnection`].
     pub fn signaling_state(&self) -> RtcSignalingState {
         self.0.borrow().peer.signaling_state()
     }
 
+    /// Returns current local [`RtcSessionDescription`].
     pub fn current_local_description(&self) -> Option<RtcSessionDescription> {
         self.0.borrow().peer.current_local_description()
     }
 
+    /// Returns current remote [`RtcSessionDescription`].
     pub fn current_remote_description(&self) -> Option<RtcSessionDescription> {
         self.0.borrow().peer.current_remote_description()
     }

@@ -19,7 +19,6 @@ use medea_client_api_proto::{
 };
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
-use web_sys::RtcSignalingState;
 
 use crate::{
     media::MediaStream,
@@ -27,9 +26,9 @@ use crate::{
     rpc::RpcClient,
     utils::{Callback2, WasmErr},
 };
+use crate::peer::PeerConnection;
 
 use super::{connection::Connection, ConnectionHandle};
-use crate::peer::PeerConnection;
 
 /// JS side handle to `Room` where all the media happens.
 ///
@@ -268,9 +267,8 @@ impl InnerRoom {
                 match local_peer.signaling_state() {
                     SignalingState::Stable => {
                         let sdp_answer = local_peer
-                            .current_local_description()
-                            .unwrap()
-                            .sdp();
+                            .current_local_sdp()
+                            .unwrap();
                         self.rpc.send_command(Command::MakeSdpAnswer {
                             peer_id: id,
                             sdp_answer,
@@ -290,9 +288,8 @@ impl InnerRoom {
                 match local_peer.signaling_state() {
                     SignalingState::HaveLocalOffer => {
                         let local_sdp = local_peer
-                            .current_local_description()
-                            .unwrap()
-                            .sdp();
+                            .current_local_sdp()
+                            .unwrap();
                         self.rpc.send_command(Command::MakeSdpOffer {
                             peer_id: id,
                             sdp_offer: local_sdp,
