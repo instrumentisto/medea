@@ -51,6 +51,7 @@ jobs:
       stage: build
       rust: stable
       services: ["docker"]
+      before_script: make docker.build.medea-build
       script: make docker.build.medea debug=no
               TAG=build-${TRAVIS_BUILD_ID} registry=quay.io
       before_deploy: echo "$QUAYIO_PASS"
@@ -111,10 +112,8 @@ jobs:
       stage: test
       rust: stable
       services: ["docker"]
-      before_script:
-        - make docker.pull TAGS=build-${TRAVIS_BUILD_ID}
+      before_script: make docker.pull TAGS=build-${TRAVIS_BUILD_ID}
                                       registry=quay.io
-        - make docker.build.medea-build
       script: make test.e2e up=yes dockerized=yes log=yes wait=30
                             TAG=build-${TRAVIS_BUILD_ID} registry=quay.io
 
