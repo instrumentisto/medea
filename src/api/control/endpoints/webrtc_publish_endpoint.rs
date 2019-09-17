@@ -30,9 +30,9 @@ pub enum P2pMode {
 impl From<WebRtcPublishEndpointP2pProto> for P2pMode {
     fn from(value: WebRtcPublishEndpointP2pProto) -> Self {
         match value {
-            WebRtcPublishEndpointP2pProto::ALWAYS => P2pMode::Always,
-            WebRtcPublishEndpointP2pProto::IF_POSSIBLE => P2pMode::IfPossible,
-            WebRtcPublishEndpointP2pProto::NEVER => P2pMode::Never,
+            WebRtcPublishEndpointP2pProto::ALWAYS => Self::Always,
+            WebRtcPublishEndpointP2pProto::IF_POSSIBLE => Self::IfPossible,
+            WebRtcPublishEndpointP2pProto::NEVER => Self::Never,
         }
     }
 }
@@ -40,9 +40,9 @@ impl From<WebRtcPublishEndpointP2pProto> for P2pMode {
 impl Into<WebRtcPublishEndpointP2pProto> for P2pMode {
     fn into(self) -> WebRtcPublishEndpointP2pProto {
         match self {
-            P2pMode::Always => WebRtcPublishEndpointP2pProto::ALWAYS,
-            P2pMode::IfPossible => WebRtcPublishEndpointP2pProto::IF_POSSIBLE,
-            P2pMode::Never => WebRtcPublishEndpointP2pProto::NEVER,
+            Self::Always => WebRtcPublishEndpointP2pProto::ALWAYS,
+            Self::IfPossible => WebRtcPublishEndpointP2pProto::IF_POSSIBLE,
+            Self::Never => WebRtcPublishEndpointP2pProto::NEVER,
         }
     }
 }

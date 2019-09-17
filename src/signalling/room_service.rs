@@ -85,7 +85,7 @@ pub enum RoomServiceError {
 
 impl From<RoomError> for RoomServiceError {
     fn from(err: RoomError) -> Self {
-        RoomServiceError::RoomError(err)
+        Self::RoomError(err)
     }
 }
 

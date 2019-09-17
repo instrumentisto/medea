@@ -62,7 +62,7 @@ pub enum TryFromProtobufError {
 
 impl From<SrcParseError> for TryFromProtobufError {
     fn from(from: SrcParseError) -> Self {
-        TryFromProtobufError::SrcUriError(from)
+        Self::SrcUriError(from)
     }
 }
 

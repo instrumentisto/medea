@@ -31,10 +31,10 @@ pub enum Endpoint {
 impl Into<MemberElement> for Endpoint {
     fn into(self) -> MemberElement {
         match self {
-            Endpoint::WebRtcPublish(e) => {
+            Self::WebRtcPublish(e) => {
                 MemberElement::WebRtcPublishEndpoint { spec: e }
             }
-            Endpoint::WebRtcPlay(e) => {
+            Self::WebRtcPlay(e) => {
                 MemberElement::WebRtcPlayEndpoint { spec: e }
             }
         }
@@ -50,11 +50,11 @@ macro_rules! impl_try_from_proto_for_endpoint {
                 if proto.has_webrtc_play() {
                     let play =
                         WebRtcPlayEndpoint::try_from(proto.get_webrtc_play())?;
-                    Ok(Endpoint::WebRtcPlay(play))
+                    Ok(Self::WebRtcPlay(play))
                 } else if proto.has_webrtc_pub() {
                     let publish =
                         WebRtcPublishEndpoint::from(proto.get_webrtc_pub());
-                    Ok(Endpoint::WebRtcPublish(publish))
+                    Ok(Self::WebRtcPublish(publish))
                 } else {
                     // TODO: implement another endpoints when they will be
                     //       implemented

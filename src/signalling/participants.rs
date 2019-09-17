@@ -94,7 +94,7 @@ impl From<TurnServiceErr> for ParticipantServiceErr {
 
 impl From<MemberError> for ParticipantServiceErr {
     fn from(err: MemberError) -> Self {
-        ParticipantServiceErr::MemberError(err)
+        Self::MemberError(err)
     }
 }
 

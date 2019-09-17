@@ -12,14 +12,14 @@ use actix::{
 };
 use derive_more::Display;
 use failure::Fail;
-use futures::future::{Either, Future};
+use futures::future::{self, Either, Future, IntoFuture};
 use grpcio::{
     Environment, RpcContext, RpcStatus, RpcStatusCode, Server, ServerBuilder,
     UnarySink,
 };
 use medea_control_api_proto::grpc::{
     control_api::{
-        ApplyRequest, CreateRequest, CreateResponse, Error, GetResponse,
+        ApplyRequest, CreateRequest, CreateResponse, Element, GetResponse,
         IdRequest, Response,
     },
     control_api_grpc::{create_control_api, ControlApi},
@@ -87,7 +87,7 @@ pub enum GrpcControlApiError {
 
 impl From<LocalUriParseError> for GrpcControlApiError {
     fn from(from: LocalUriParseError) -> Self {
-        GrpcControlApiError::LocalUri(from)
+        Self::LocalUri(from)
     }
 }
 
@@ -99,13 +99,13 @@ impl From<RoomServiceError> for GrpcControlApiError {
 
 impl From<TryFromProtobufError> for GrpcControlApiError {
     fn from(from: TryFromProtobufError) -> Self {
-        GrpcControlApiError::TryFromProtobuf(from)
+        Self::TryFromProtobuf(from)
     }
 }
 
 impl From<TryFromElementError> for GrpcControlApiError {
     fn from(from: TryFromElementError) -> Self {
-        GrpcControlApiError::TryFromElement(from)
+        Self::TryFromElement(from)
     }
 }
 
@@ -118,52 +118,9 @@ macro_rules! fut_try {
         match $call {
             Ok(o) => o,
             Err(e) => {
-                return Either::B(futures::future::err(
-                    GrpcControlApiError::from(e),
-                ))
+                return Either::B(future::err(GrpcControlApiError::from(e)))
             }
         }
-    };
-}
-
-/// Macro for [`LocalUri`] parsing and sending error to client if some error
-/// occurs.
-///
-/// See `send_error_response` doc for details about arguments for this macro.
-macro_rules! parse_local_uri {
-    ($uri:expr, $ctx:expr, $sink:expr, $response:ty) => {
-        match StatefulLocalUri::try_from($uri.as_ref()) {
-            Ok(o) => o,
-            Err(e) => {
-                let error: ErrorResponse = e.into();
-                send_error_response!($ctx, $sink, error, $response);
-            }
-        }
-    };
-}
-
-/// Macro for send [`Error`] to client and `return` from current function.
-///
-/// `$error_code` - some object which can converts into [`Error`] by [`Into`]
-/// trait.
-///
-/// `$response` - type of response ([`GetResponse`], [`Response`]
-/// etc).
-///
-/// `$ctx` - context where [`Future`] for send gRPC response will be spawned.
-///
-/// `$sink` - [`grpcio`]'s sink for response.
-macro_rules! send_error_response {
-    ($ctx:tt, $sink:tt, $error_code:expr, $response:ty) => {
-        let mut response = <$response>::new();
-        let error: Error = $error_code.into();
-        response.set_error(error);
-
-        $ctx.spawn($sink.success(response).map_err(|e| {
-            warn!("Error while sending Error response by gRPC. {:?}", e)
-        }));
-
-        return;
     };
 }
 
@@ -277,7 +234,7 @@ impl ControlApiService {
         let uri = match StatefulLocalUri::try_from(req.get_id().as_ref()) {
             Ok(uri) => uri,
             Err(e) => {
-                return Box::new(futures::future::err(e.into()));
+                return Box::new(future::err(e.into()));
             }
         };
 
@@ -289,7 +246,7 @@ impl ControlApiService {
                             .map_err(|err| err.into()),
                     )
                 } else {
-                    Box::new(futures::future::err(ErrorResponse::new(
+                    Box::new(future::err(ErrorResponse::new(
                         ErrorCode::ElementIdForRoomButElementIsNot,
                         &req.get_id(),
                     )))
@@ -302,7 +259,7 @@ impl ControlApiService {
                             .map_err(|err| err.into()),
                     )
                 } else {
-                    Box::new(futures::future::err(ErrorResponse::new(
+                    Box::new(future::err(ErrorResponse::new(
                         ErrorCode::ElementIdForMemberButElementIsNot,
                         &req.get_id(),
                     )))
@@ -315,13 +272,81 @@ impl ControlApiService {
                             .map_err(|err| err.into()),
                     )
                 } else {
-                    Box::new(futures::future::err(ErrorResponse::new(
+                    Box::new(future::err(ErrorResponse::new(
                         ErrorCode::ElementIdForEndpointButElementIsNot,
                         &req.get_id(),
                     )))
                 }
             }
         }
+    }
+
+    pub fn delete_element(
+        &self,
+        req: &IdRequest,
+    ) -> impl Future<Item = (), Error = ErrorResponse> {
+        let mut delete_elements_msg = DeleteElements::new();
+
+        for id in req.get_id() {
+            match StatefulLocalUri::try_from(id.as_str()) {
+                Ok(uri) => {
+                    delete_elements_msg.add_uri(uri);
+                }
+                Err(e) => {
+                    return future::Either::A(future::err(e.into()));
+                }
+            }
+        }
+
+        let room_service = Addr::clone(&self.room_service);
+        future::Either::B(
+            delete_elements_msg
+                .validate()
+                .into_future()
+                .map_err(ErrorResponse::from)
+                .and_then(move |del_msg| {
+                    room_service.send(del_msg).map_err(|err| {
+                        ErrorResponse::from(
+                            GrpcControlApiError::RoomServiceMailboxError(err),
+                        )
+                    })
+                })
+                .and_then(|delete_result| {
+                    delete_result.map_err(ErrorResponse::from)
+                }),
+        )
+    }
+
+    pub fn get_element(
+        &self,
+        req: &IdRequest,
+    ) -> impl Future<Item = HashMap<String, Element>, Error = ErrorResponse>
+    {
+        let mut uris = Vec::new();
+        for id in req.get_id() {
+            match StatefulLocalUri::try_from(id.as_str()) {
+                Ok(uri) => {
+                    uris.push(uri);
+                }
+                Err(e) => {
+                    return future::Either::A(future::err(e.into()));
+                }
+            }
+        }
+
+        future::Either::B(
+            self.room_service
+                .send(Get(uris))
+                .map_err(GrpcControlApiError::RoomServiceMailboxError)
+                .and_then(|r| r.map_err(GrpcControlApiError::from))
+                .map(|elements: HashMap<StatefulLocalUri, Element>| {
+                    elements
+                        .into_iter()
+                        .map(|(id, value)| (id.to_string(), value))
+                        .collect()
+                })
+                .map_err(ErrorResponse::from),
+        )
     }
 }
 
@@ -335,18 +360,25 @@ impl ControlApi for ControlApiService {
         req: CreateRequest,
         sink: UnarySink<CreateResponse>,
     ) {
-        ctx.spawn(self.create_element(&req).then(move |result| {
-            let mut response = CreateResponse::new();
-            match result {
-                Ok(sid) => {
-                    response.set_sid(sid);
-                }
-                Err(e) => response.set_error(e.into()),
-            }
-            sink.success(response).map_err(|e| {
-                warn!("Error while sending Create response by gRPC. {:?}", e)
-            })
-        }));
+        ctx.spawn(
+            self.create_element(&req)
+                .then(move |result| {
+                    let mut response = CreateResponse::new();
+                    match result {
+                        Ok(sid) => {
+                            response.set_sid(sid);
+                        }
+                        Err(e) => response.set_error(e.into()),
+                    }
+                    sink.success(response)
+                })
+                .map_err(|e| {
+                    warn!(
+                        "Error while sending Create response by gRPC. {:?}",
+                        e
+                    )
+                }),
+        );
     }
 
     /// Implementation for `Apply` method of gRPC [Control API] (__unimplemented
@@ -388,35 +420,12 @@ impl ControlApi for ControlApiService {
         req: IdRequest,
         sink: UnarySink<Response>,
     ) {
-        let mut delete_elements_msg = DeleteElements::new();
-
-        for id in req.get_id() {
-            let uri: StatefulLocalUri =
-                parse_local_uri!(id, ctx, sink, Response);
-            delete_elements_msg.add_uri(uri);
-        }
-
-        let delete_elements_msg = match delete_elements_msg.validate() {
-            Ok(d) => d,
-            Err(e) => {
-                send_error_response!(
-                    ctx,
-                    sink,
-                    ErrorResponse::from(e),
-                    Response
-                );
-            }
-        };
-
         ctx.spawn(
-            self.room_service
-                .send(delete_elements_msg)
-                .map_err(GrpcControlApiError::RoomServiceMailboxError)
-                .and_then(|r| r.map_err(GrpcControlApiError::from))
+            self.delete_element(&req)
                 .then(move |result| {
                     let mut response = Response::new();
                     if let Err(e) = result {
-                        response.set_error(ErrorResponse::from(e).into());
+                        response.set_error(e.into());
                     }
                     sink.success(response)
                 })
@@ -439,17 +448,8 @@ impl ControlApi for ControlApiService {
         req: IdRequest,
         sink: UnarySink<GetResponse>,
     ) {
-        let mut uris = Vec::new();
-        for id in req.get_id() {
-            let local_uri = parse_local_uri!(id, ctx, sink, GetResponse);
-            uris.push(local_uri);
-        }
-
         ctx.spawn(
-            self.room_service
-                .send(Get(uris))
-                .map_err(GrpcControlApiError::RoomServiceMailboxError)
-                .and_then(|r| r.map_err(GrpcControlApiError::from))
+            self.get_element(&req)
                 .then(|result| {
                     let mut response = GetResponse::new();
                     match result {
@@ -462,7 +462,7 @@ impl ControlApi for ControlApiService {
                             );
                         }
                         Err(e) => {
-                            response.set_error(ErrorResponse::from(e).into());
+                            response.set_error(e.into());
                         }
                     }
                     sink.success(response)
