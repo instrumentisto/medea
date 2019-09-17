@@ -23,7 +23,7 @@ use serde::{
 )]
 #[cfg_attr(feature = "jason", derive(Serialize))]
 #[derive(Clone, Copy, Display, FromStr)]
-pub struct PeerId(pub u32);
+pub struct PeerId(pub u64);
 
 /// ID of `MediaTrack`.
 #[cfg_attr(

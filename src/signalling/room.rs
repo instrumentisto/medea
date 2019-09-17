@@ -719,6 +719,7 @@ impl Handler<RpcConnectionEstablished> for Room {
 
         if is_reconnect {
             debug!("Member [id = {}] reconnecting.", member_id);
+            // TODO: PANIC
             let snapshot = self.take_snapshot(&member_id).unwrap();
             ctx.spawn(wrap_future(
                 self.members
