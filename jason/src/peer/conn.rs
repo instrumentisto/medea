@@ -102,6 +102,9 @@ struct InnerPeer {
     /// [4]: https://developer.mozilla.org/en-US/docs/Web/API/MediaStreamTrack
     on_track: Option<EventListener<SysRtcPeerConnection, RtcTrackEvent>>,
 
+    /// Event listener for [`signalingstatechange`].
+    ///
+    /// [`signalingstatechange`]: http://tiny.cc/6gbwcz
     on_signaling_state_change:
         Option<EventListener<SysRtcPeerConnection, SysEvent>>,
 }
@@ -189,6 +192,7 @@ impl RtcPeerConnection {
         Ok(())
     }
 
+    /// Sets handler for `signalingstatechange` event.
     pub fn on_signaling_state_changed<F>(
         &self,
         f: Option<F>,

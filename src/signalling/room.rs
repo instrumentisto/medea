@@ -576,6 +576,13 @@ impl Room {
         ))
     }
 
+    /// Handler for [`Command::ResetMe`].
+    ///
+    /// On this command server should reset [`Member`]'s state
+    /// on server side.
+    ///
+    /// Atm this [`Command`] will be sended if some fatal conflict
+    /// found in server snapshot and client's state.
     fn handle_reset_me(
         &mut self,
         resetting_member_id: MemberId,

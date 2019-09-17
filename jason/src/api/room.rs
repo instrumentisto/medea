@@ -137,6 +137,8 @@ impl Room {
     }
 }
 
+/// Errors which can occurs while synchronization of client with server on
+/// reconnecting.
 #[derive(Debug, Display)]
 enum SynchronizationError {
     #[display(
