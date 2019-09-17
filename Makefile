@@ -18,6 +18,7 @@ eq = $(if $(or $(1),$(2)),$(and $(findstring $(1),$(2)),\
 MEDEA_IMAGE_NAME := $(strip \
 	$(shell grep 'COMPOSE_IMAGE_NAME=' .env | cut -d '=' -f2))
 DEMO_IMAGE_NAME := instrumentisto/medea-demo
+MEDEA_BUILD_IMAGE_NAME := instrumentisto/medea-build
 
 RUST_VER := 1.37
 
@@ -175,6 +176,7 @@ cargo:
 #	                 [dockerized=(no|yes)]
 
 cargo-build-crate = $(if $(call eq,$(crate),),@all,$(crate))
+cargo-build-medea-build-image-name = $(MEDEA_BUILD_IMAGE_NAME)
 
 cargo.build:
 ifeq ($(cargo-build-crate),@all)
@@ -186,7 +188,7 @@ ifeq ($(dockerized),yes)
 	docker run --rm -v "$(PWD)":/app -w /app \
 		-u $(shell id -u):$(shell id -g) \
 		-v "$(HOME)/.cargo/registry":/usr/local/cargo/registry \
-		rust:$(RUST_VER) \
+		$(cargo-build-medea-build-image-name):dev \
 			make cargo.build crate=$(cargo-build-crate) \
 			                 debug=$(debug) dockerized=no
 else
@@ -438,6 +440,19 @@ else
 endif
 
 
+# Build Docker image for medea building.
+#
+# Usage:
+#   make docker.build.medea-build [TAG=(dev|<tag>)]
+
+docker-build-medea-build-image-name = $(MEDEA_BUILD_IMAGE_NAME)
+
+docker.build.medea-build:
+	docker build \
+		-t $(docker-build-medea-build-image-name):$(if $(call eq,$(TAG),),dev,$(TAG)) \
+		- < _build/medea-build/Dockerfile
+
+
 # Build medea project Docker image.
 #
 # Usage:
@@ -448,10 +463,16 @@ endif
 
 docker-build-medea-image-name = $(strip \
 	$(if $(call eq,$(registry),),,$(registry)/)$(MEDEA_IMAGE_NAME))
+docker-build-medea-medea-build-image-name = $(MEDEA_BUILD_IMAGE_NAME)
 
 docker.build.medea:
 ifneq ($(no-cache),yes)
-	cargo build --bin=medea $(if $(call eq,$(debug),no),--release,)
+	docker run --rm --network=host -v "$(PWD)":/app -w /app \
+	           -u $(shell id -u):$(shell id -g) \
+	           -e CARGO_HOME=.cache/cargo \
+		$(docker-build-medea-medea-build-image-name):dev \
+			cargo build --bin=medea \
+				$(if $(call eq,$(debug),no),--release,)
 endif
 	$(call docker.build.clean.ignore)
 	@echo "!target/$(if $(call eq,$(debug),no),release,debug)/" >> .dockerignore

@@ -8,8 +8,8 @@
 #
 
 # https://hub.docker.com/_/rust
-ARG rust_ver=latest
-FROM rust:${rust_ver} AS dist
+ARG medea_build_ver=dev
+FROM instrumentisto/medea-build:${medea_build_ver} AS dist
 ARG rustc_mode=release
 ARG rustc_opts=--release
 ARG cargo_home=/usr/local/cargo
@@ -21,10 +21,6 @@ RUN mkdir -p /out/etc/ \
  && echo 'nobody:x:65534:' > /out/etc/group
 
 COPY / /app/
-
-# Install dependencies needed for grpcio crate.
-RUN apt-get update \
-    && apt-get install -y cmake
 
 # Build project distribution.
 RUN cd /app \
