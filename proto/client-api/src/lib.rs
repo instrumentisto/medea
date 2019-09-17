@@ -117,7 +117,8 @@ pub struct Peer {
 #[cfg_attr(feature = "jason", derive(Deserialize))]
 pub struct Snapshot {
     /// All [`Peer`]s of [`Member`] on server side.
-    // TODO: use PeerId when https://github.com/serde-rs/serde/issues/1183 will be resolved.
+    // TODO: remove #[serde(deserialize_with...)] when
+    //       https://github.com/serde-rs/serde/issues/1183 will be resolved.
     #[serde(deserialize_with = "de_int_key")]
     pub peers: HashMap<PeerId, Peer>,
 
@@ -399,6 +400,11 @@ impl<'de> Deserialize<'de> for ServerMsg {
     }
 }
 
+/// Deserializes keys of [`HashMap`] as integer.
+///
+/// This is temporary fix for https://github.com/serde-rs/json/issues/560 issue.
+// TODO: remove it when
+//       https://github.com/serde-rs/serde/issues/1183 will be resolved.
 #[cfg(feature = "jason")]
 fn de_int_key<'de, D, K, V>(deserializer: D) -> Result<HashMap<K, V>, D::Error>
 where

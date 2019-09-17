@@ -3,11 +3,7 @@
 //!
 //! [`Member`]: crate::signalling::elements::member::Member
 
-use std::{
-    collections::{HashMap},
-    sync::Arc,
-    time::Duration,
-};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use actix::{
     fut::wrap_future, Actor, ActorFuture, AsyncContext, Context, Handler,
@@ -166,7 +162,7 @@ impl Room {
         let mut peers_snapshots = HashMap::new();
         for peer in peers {
             let remote_peer =
-                self.peers.get_peer_by_id(peer.partner_peer_id()).unwrap(); // TODO (evdokimovs): panic
+                self.peers.get_peer_by_id(peer.partner_peer_id())?;
             let peer_snapshot = PeerSnapshot {
                 id: peer.id(),
                 sdp_answer: peer.sdp_answer(),
@@ -520,15 +516,6 @@ impl Room {
         &mut self,
         ctx: &mut Context<Self>,
     ) -> ResponseActFuture<Self, (), ()> {
-        // TODO: remove me after debug
-        //        let snapshot = self.take_snapshot(1);
-        //        let second_peer = snapshot.peers.get(&1).unwrap();
-        //        if second_peer.state == PeerState::Stable {
-        //            println!(
-        //                "{}",
-        //                serde_json::to_string(&self.take_snapshot(1)).unwrap()
-        //            );
-        //        }
         info!("Closing Room [id = {:?}]", self.id);
         self.state = State::Stopping;
 

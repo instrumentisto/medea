@@ -14,19 +14,21 @@ use futures::{
     sync::mpsc::{unbounded, UnboundedSender},
 };
 use medea_client_api_proto::{
-    Command, Direction, EventHandler, IceCandidate, IceServer, Peer, PeerId,
-    ServerPeerState, Snapshot, Track,
+    Command, Direction, EventHandler, IceCandidate, IceServer,
+    Peer as SnapshotPeer, PeerId, ServerPeerState, Snapshot, Track,
 };
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 
 use crate::{
     media::MediaStream,
-    peer::{PeerEvent, PeerEventHandler, PeerRepository, SignalingState},
+    peer::{
+        PeerConnection, PeerEvent, PeerEventHandler, PeerRepository,
+        SignalingState,
+    },
     rpc::RpcClient,
     utils::{Callback2, WasmErr},
 };
-use crate::peer::PeerConnection;
 
 use super::{connection::Connection, ConnectionHandle};
 
@@ -242,17 +244,17 @@ impl InnerRoom {
     /// [`Peer`] state.
     fn synchronize_peer_signaling_state(
         &mut self,
-        local_peer: Rc<PeerConnection>,
-        snapshot_peer: Peer,
+        local_peer: &Rc<PeerConnection>,
+        snapshot_peer: SnapshotPeer,
     ) -> Result<(), SynchronizationError> {
-        let id = snapshot_peer.id;
+        let peer_id = snapshot_peer.id;
 
         match snapshot_peer.state {
             ServerPeerState::Stable => match local_peer.signaling_state() {
                 SignalingState::Stable => {}
                 SignalingState::HaveLocalOffer => {
                     self.on_sdp_answer_made(
-                        snapshot_peer.id,
+                        peer_id,
                         snapshot_peer.remote_sdp_answer.unwrap(),
                     );
                 }
@@ -266,11 +268,10 @@ impl InnerRoom {
             ServerPeerState::WaitLocalHaveRemoteSdp => {
                 match local_peer.signaling_state() {
                     SignalingState::Stable => {
-                        let sdp_answer = local_peer
-                            .current_local_sdp()
-                            .unwrap();
+                        let sdp_answer =
+                            local_peer.current_local_sdp().unwrap();
                         self.rpc.send_command(Command::MakeSdpAnswer {
-                            peer_id: id,
+                            peer_id,
                             sdp_answer,
                         })
                     }
@@ -287,11 +288,9 @@ impl InnerRoom {
             ServerPeerState::WaitLocalSdp => {
                 match local_peer.signaling_state() {
                     SignalingState::HaveLocalOffer => {
-                        let local_sdp = local_peer
-                            .current_local_sdp()
-                            .unwrap();
+                        let local_sdp = local_peer.current_local_sdp().unwrap();
                         self.rpc.send_command(Command::MakeSdpOffer {
-                            peer_id: id,
+                            peer_id,
                             sdp_offer: local_sdp,
                             mids: local_peer.get_mids().unwrap(),
                         })
@@ -316,7 +315,7 @@ impl InnerRoom {
 
         for ice_candidate in snapshot_peer.ice_candidates {
             (self as &mut dyn EventHandler)
-                .on_ice_candidate_discovered(snapshot_peer.id, ice_candidate)
+                .on_ice_candidate_discovered(peer_id, ice_candidate)
         }
 
         Ok(())
@@ -326,8 +325,8 @@ impl InnerRoom {
     /// on server side.
     fn create_peer_from_snapshot(
         &mut self,
-        snapshot_peer: Peer,
-        ice_servers: &Vec<IceServer>,
+        snapshot_peer: SnapshotPeer,
+        ice_servers: &[IceServer],
     ) -> Result<(), SynchronizationError> {
         match snapshot_peer.state {
             ServerPeerState::WaitLocalHaveRemoteSdp
@@ -336,12 +335,10 @@ impl InnerRoom {
                     snapshot_peer.id,
                     snapshot_peer.sdp_offer,
                     snapshot_peer.tracks,
-                    ice_servers.clone(),
+                    ice_servers.to_vec(),
                 );
             }
             _ => {
-                // TODO: In principle, PeerCreated cannot come in any
-                // state anymore.
                 return Err(
                     SynchronizationError::CannotCreateNewPeerInThisState(
                         snapshot_peer.state,
@@ -349,13 +346,13 @@ impl InnerRoom {
                 );
             }
         }
-        return Ok(());
+        Ok(())
     }
 
     /// Remove [`PeerConnection`]s which not presented in server snapshot.
     fn remove_peers_not_presented_in_snapshot(
         &mut self,
-        snapshot_peers: &HashMap<PeerId, Peer>,
+        snapshot_peers: &HashMap<PeerId, SnapshotPeer>,
     ) {
         let removed_peers: Vec<PeerId> = self
             .peers
@@ -480,27 +477,24 @@ impl EventHandler for InnerRoom {
 
     /// Synchronize local state with server state ([`Snapshot`]).
     fn on_restore_state(&mut self, snapshot: Snapshot) {
-        web_sys::console::log_1(&"OnRestoreState".into());
         self.remove_peers_not_presented_in_snapshot(&snapshot.peers);
 
         for (id, snapshot_peer) in snapshot.peers {
             if let Some(local_peer) = self.peers.get(id) {
-                if let Err(e) = self
-                    .synchronize_peer_signaling_state(local_peer, snapshot_peer)
-                {
-                    web_sys::console::error_1(&format!("{}", e).into());
-                    self.reset();
-                    return;
-                }
-            } else {
-                if let Err(e) = self.create_peer_from_snapshot(
+                if let Err(e) = self.synchronize_peer_signaling_state(
+                    &local_peer,
                     snapshot_peer,
-                    &snapshot.ice_servers,
                 ) {
                     web_sys::console::error_1(&format!("{}", e).into());
                     self.reset();
                     return;
                 }
+            } else if let Err(e) = self
+                .create_peer_from_snapshot(snapshot_peer, &snapshot.ice_servers)
+            {
+                web_sys::console::error_1(&format!("{}", e).into());
+                self.reset();
+                return;
             }
         }
     }

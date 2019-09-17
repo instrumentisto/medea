@@ -14,9 +14,7 @@ use medea_client_api_proto::{
     Direction, IceServer, PeerId as Id, Track, TrackId,
 };
 use medea_macro::dispatchable;
-use web_sys::{
-    RtcSessionDescription, RtcSignalingState, RtcTrackEvent,
-};
+use web_sys::{RtcSignalingState, RtcTrackEvent};
 
 use crate::{
     media::{MediaManager, MediaStream},
@@ -189,10 +187,15 @@ impl PeerConnection {
                 *inner.signaling_state.borrow_mut() = SignalingState::Closed;
             }
             _ => {
-                unimplemented!("State: {:?}", signaling_state);
+                web_sys::console::error_1(
+                    &format!(
+                        "Not known signaling state: {:?}.",
+                        inner.signaling_state
+                    )
+                    .into(),
+                );
             }
         }
-        web_sys::console::error_1(&format!("Not known signaling state: {:?}.", inner.signaling_state).into());
     }
 
     /// Returns signaling state of this [`PeerConnection`].

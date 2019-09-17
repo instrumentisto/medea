@@ -6,12 +6,12 @@ mod websocket;
 use std::{cell::RefCell, rc::Rc, vec};
 
 use futures::{
+    future::Loop,
     sync::mpsc::{unbounded, UnboundedSender},
     Future, Stream,
 };
 use js_sys::Date;
 use medea_client_api_proto::{ClientMsg, Command, Event, ServerMsg};
-use futures::{future::Loop};
 use wasm_bindgen_futures::spawn_local;
 
 use crate::utils::WasmErr;
@@ -74,7 +74,7 @@ impl Inner {
 }
 
 /// Handles close message from remote server.
-fn on_close(inner_rc: WebsocketRpcClient, close_msg: CloseMsg) {
+fn on_close(inner_rc: WebsocketRpcClient, close_msg: &CloseMsg) {
     {
         let mut inner = inner_rc.0.borrow_mut();
         inner.sock.take();
@@ -84,7 +84,6 @@ fn on_close(inner_rc: WebsocketRpcClient, close_msg: CloseMsg) {
     //       to reconnect
     match &close_msg {
         CloseMsg::Normal(_) | CloseMsg::Disconnect(_) => {
-            web_sys::console::log_1(&"WsSession closed.".into());
             spawn_local(futures::future::loop_fn(inner_rc, |inner_rc| {
                 {
                     let mut inner = inner_rc.0.borrow_mut();
@@ -92,21 +91,11 @@ fn on_close(inner_rc: WebsocketRpcClient, close_msg: CloseMsg) {
                     inner.heartbeat.stop();
                 }
 
-                web_sys::console::log_1(&"Looped".into());
                 let fut = inner_rc.init();
 
-                fut.then(move |res| {
-                    web_sys::console::log_1(&"SKAJDLK".into());
-                    match res {
-                        Ok(_) => {
-                            web_sys::console::log_1(&"Ok".into());
-                            Ok(Loop::Break(()))
-                        }
-                        Err(_) => {
-                            web_sys::console::log_1(&"Err".into());
-                            Ok(Loop::Continue(inner_rc))
-                        }
-                    }
+                fut.then(move |res| match res {
+                    Ok(_) => Ok(Loop::Break(())),
+                    Err(_) => Ok(Loop::Continue(inner_rc)),
                 })
             }));
         }
@@ -117,9 +106,8 @@ fn on_close(inner_rc: WebsocketRpcClient, close_msg: CloseMsg) {
 fn on_message(inner_rc: &RefCell<Inner>, msg: Result<ServerMsg, WasmErr>) {
     let inner = inner_rc.borrow();
     match msg {
-        Ok(ServerMsg::Pong(num)) => {
+        Ok(ServerMsg::Pong(_)) => {
             // TODO: detect no pings
-            web_sys::console::log_1(&format!("Pong {}", num).into());
             inner.heartbeat.set_pong_at(Date::now());
         }
         Ok(ServerMsg::Event(event)) => {
@@ -163,7 +151,7 @@ impl WebsocketRpcClient {
                 })?;
 
                 socket.on_close(move |msg: CloseMsg| {
-                    on_close(self_clone, msg)
+                    on_close(self_clone, &msg)
                 })?;
 
                 inner.borrow_mut().sock.replace(socket);
