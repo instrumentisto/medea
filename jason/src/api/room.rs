@@ -361,7 +361,7 @@ impl InnerRoom {
             .peers()
             .keys()
             .filter(|id| !snapshot_peers.contains_key(&id))
-            .map(|id| *id)
+            .copied()
             .collect();
         if !removed_peers.is_empty() {
             self.on_peers_removed(removed_peers);

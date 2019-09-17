@@ -156,7 +156,7 @@ impl Room {
             .members
             .get_member_by_id(member_id)
             .ok_or_else(|| RoomError::MemberNotFound(member_id.clone()))?;
-        let ice_servers = member.servers_list().unwrap_or(Vec::new());
+        let ice_servers = member.servers_list().unwrap_or_default();
 
         let peers = self.peers.get_peers_by_member_id(member_id);
         let mut peers_snapshots = HashMap::new();
@@ -585,7 +585,7 @@ impl Room {
     /// found in server snapshot and client's state.
     fn handle_reset_me(
         &mut self,
-        resetting_member_id: MemberId,
+        resetting_member_id: &MemberId,
         ctx: &mut Context<Self>,
     ) -> Result<ActFuture<(), RoomError>, RoomError> {
         let removed_peers = self
@@ -593,9 +593,7 @@ impl Room {
             .remove_peers_related_to_member(&resetting_member_id);
 
         for (member_id, peers_ids) in removed_peers {
-            if &member_id != &resetting_member_id {
-                self.member_peers_removed(peers_ids, member_id, ctx);
-            } else {
+            if &member_id == resetting_member_id {
                 let member = self
                     .members
                     .get_member_by_id(&member_id)
@@ -603,6 +601,8 @@ impl Room {
                         RoomError::MemberNotFound(resetting_member_id.clone())
                     })?;
                 member.peers_removed(&peers_ids);
+            } else {
+                self.member_peers_removed(peers_ids, member_id, ctx);
             }
         }
 
@@ -654,7 +654,7 @@ impl Handler<CommandMessage> for Room {
             Command::SetIceCandidate { peer_id, candidate } => {
                 self.handle_set_ice_candidate(peer_id, candidate)
             }
-            Command::ResetMe => self.handle_reset_me(msg.member_id, ctx),
+            Command::ResetMe => self.handle_reset_me(&msg.member_id, ctx),
         };
 
         match result {
