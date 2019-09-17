@@ -773,7 +773,14 @@ impl Handler<CommandMessage> for Room {
                 sdp_answer,
             } => self.handle_make_sdp_answer(peer_id, sdp_answer),
             Command::SetIceCandidate { peer_id, candidate } => {
-                self.handle_set_ice_candidate(peer_id, candidate)
+                // TODO: add E2E test
+                if candidate.candidate.is_empty() {
+                    warn!("Empty candidate from Peer: {}, ignoring", peer_id);
+                    let fut: ActFuture<_, _> = Box::new(actix::fut::ok(()));
+                    Ok(fut)
+                } else {
+                    self.handle_set_ice_candidate(peer_id, candidate)
+                }
             }
         };
 

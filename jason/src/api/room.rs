@@ -297,9 +297,9 @@ impl EventHandler for InnerRoom {
         if let Some(peer) = self.peers.get(peer_id) {
             spawn_local(
                 peer.add_ice_candidate(
-                    &candidate.candidate,
+                    candidate.candidate,
                     candidate.sdp_m_line_index,
-                    &candidate.sdp_mid,
+                    candidate.sdp_mid,
                 )
                 .map_err(|err| err.log_err()),
             );
