@@ -7,13 +7,14 @@ use std::{
     rc::{Rc, Weak},
 };
 
+use derive_more::Display;
 use futures::{
     future::{self, Future as _, IntoFuture},
     stream::Stream as _,
     sync::mpsc::{unbounded, UnboundedSender},
 };
 use medea_client_api_proto::{
-    Command, Direction, EventHandler, IceCandidate, IceServer, PeerId,
+    Command, Direction, EventHandler, IceCandidate, IceServer, Peer, PeerId,
     ServerPeerState, Snapshot, Track,
 };
 use wasm_bindgen::prelude::*;
@@ -28,6 +29,7 @@ use crate::{
 };
 
 use super::{connection::Connection, ConnectionHandle};
+use crate::peer::PeerConnection;
 
 /// JS side handle to `Room` where all the media happens.
 ///
@@ -134,6 +136,22 @@ impl Room {
     }
 }
 
+#[derive(Debug, Display)]
+enum SynchronizationError {
+    #[display(
+        fmt = "Fatal conflict in server snapshot. Local state: {:?}, server \
+               state: {:?}.",
+        _0,
+        _1
+    )]
+    FatalConflictInSnapshot(SignalingState, ServerPeerState),
+    #[display(
+        fmt = "Cannot create Peer in this state. Server state: {:?}.",
+        _0
+    )]
+    CannotCreateNewPeerInThisState(ServerPeerState),
+}
+
 /// Actual data of a [`Room`].
 ///
 /// Shared between JS side ([`RoomHandle`]) and Rust side ([`Room`]).
@@ -219,6 +237,139 @@ impl InnerRoom {
             self.peers.peers().into_iter().map(|(id, _)| id).collect();
         self.on_peers_removed(peers_to_remove);
         self.rpc.send_command(Command::ResetMe);
+    }
+
+    /// Synchronizes local [`PeerConnection`] signaling state with server
+    /// [`Peer`] state.
+    fn synchronize_peer_signaling_state(
+        &mut self,
+        local_peer: Rc<PeerConnection>,
+        snapshot_peer: Peer,
+    ) -> Result<(), SynchronizationError> {
+        let id = snapshot_peer.id;
+
+        match snapshot_peer.state {
+            ServerPeerState::Stable => match local_peer.signaling_state() {
+                SignalingState::Stable => {}
+                SignalingState::HaveLocalOffer => {
+                    self.on_sdp_answer_made(
+                        snapshot_peer.id,
+                        snapshot_peer.remote_sdp_answer.unwrap(),
+                    );
+                }
+                _ => {
+                    return Err(SynchronizationError::FatalConflictInSnapshot(
+                        local_peer.signaling_state(),
+                        snapshot_peer.state,
+                    ));
+                }
+            },
+            ServerPeerState::WaitLocalHaveRemoteSdp => {
+                match local_peer.signaling_state() {
+                    SignalingState::Stable => {
+                        let sdp_answer = local_peer
+                            .current_local_description()
+                            .unwrap()
+                            .sdp();
+                        self.rpc.send_command(Command::MakeSdpAnswer {
+                            peer_id: id,
+                            sdp_answer,
+                        })
+                    }
+                    _ => {
+                        return Err(
+                            SynchronizationError::FatalConflictInSnapshot(
+                                local_peer.signaling_state(),
+                                snapshot_peer.state,
+                            ),
+                        )
+                    }
+                }
+            }
+            ServerPeerState::WaitLocalSdp => {
+                match local_peer.signaling_state() {
+                    SignalingState::HaveLocalOffer => {
+                        let local_sdp = local_peer
+                            .current_local_description()
+                            .unwrap()
+                            .sdp();
+                        self.rpc.send_command(Command::MakeSdpOffer {
+                            peer_id: id,
+                            sdp_offer: local_sdp,
+                            mids: local_peer.get_mids().unwrap(),
+                        })
+                    }
+                    _ => {
+                        return Err(
+                            SynchronizationError::FatalConflictInSnapshot(
+                                local_peer.signaling_state(),
+                                snapshot_peer.state,
+                            ),
+                        )
+                    }
+                }
+            }
+            _ => {
+                return Err(SynchronizationError::FatalConflictInSnapshot(
+                    local_peer.signaling_state(),
+                    snapshot_peer.state,
+                ))
+            }
+        }
+
+        for ice_candidate in snapshot_peer.ice_candidates {
+            (self as &mut dyn EventHandler)
+                .on_ice_candidate_discovered(snapshot_peer.id, ice_candidate)
+        }
+
+        Ok(())
+    }
+
+    /// Creates [`PeerConnection`]s which doesn't presented locally but exists
+    /// on server side.
+    fn create_peer_from_snapshot(
+        &mut self,
+        snapshot_peer: Peer,
+        ice_servers: &Vec<IceServer>,
+    ) -> Result<(), SynchronizationError> {
+        match snapshot_peer.state {
+            ServerPeerState::WaitLocalHaveRemoteSdp
+            | ServerPeerState::WaitLocalSdp => {
+                self.on_peer_created(
+                    snapshot_peer.id,
+                    snapshot_peer.sdp_offer,
+                    snapshot_peer.tracks,
+                    ice_servers.clone(),
+                );
+            }
+            _ => {
+                // TODO: In principle, PeerCreated cannot come in any
+                // state anymore.
+                return Err(
+                    SynchronizationError::CannotCreateNewPeerInThisState(
+                        snapshot_peer.state,
+                    ),
+                );
+            }
+        }
+        return Ok(());
+    }
+
+    /// Remove [`PeerConnection`]s which not presented in server snapshot.
+    fn remove_peers_not_presented_in_snapshot(
+        &mut self,
+        snapshot_peers: &HashMap<PeerId, Peer>,
+    ) {
+        let removed_peers: Vec<PeerId> = self
+            .peers
+            .peers()
+            .keys()
+            .filter(|id| !snapshot_peers.contains_key(&id))
+            .map(|id| *id)
+            .collect();
+        if !removed_peers.is_empty() {
+            self.on_peers_removed(removed_peers);
+        }
     }
 }
 
@@ -333,140 +484,26 @@ impl EventHandler for InnerRoom {
     /// Synchronize local state with server state ([`Snapshot`]).
     fn on_restore_state(&mut self, snapshot: Snapshot) {
         web_sys::console::log_1(&"OnRestoreState".into());
-
-        macro_rules! fatal_err_in_snapshot {
-            ($self:expr) => {
-                web_sys::console::error_1(
-                    &format!(
-                        "Found fatal error in snapshot. Resetting states. {}",
-                        line!()
-                    )
-                    .into(),
-                );
-                $self.reset();
-                return;
-            };
-        }
-
-        {
-            let removed_peers: Vec<PeerId> = self
-                .peers
-                .peers()
-                .keys()
-                .filter(|id| !snapshot.peers.contains_key(&id.to_string()))
-                .map(|id| *id)
-                .collect();
-            if !removed_peers.is_empty() {
-                self.on_peers_removed(removed_peers);
-            }
-        }
+        self.remove_peers_not_presented_in_snapshot(&snapshot.peers);
 
         for (id, snapshot_peer) in snapshot.peers {
-            let id = PeerId(id.parse().unwrap());
-            let local_peer = if let Some(local_peer) = self.peers.get(id) {
-                local_peer.clone()
+            if let Some(local_peer) = self.peers.get(id) {
+                if let Err(e) = self
+                    .synchronize_peer_signaling_state(local_peer, snapshot_peer)
+                {
+                    web_sys::console::error_1(&format!("{}", e).into());
+                    self.reset();
+                    return;
+                }
             } else {
-                match snapshot_peer.state {
-                    ServerPeerState::WaitLocalHaveRemoteSdp
-                    | ServerPeerState::WaitLocalSdp => {
-                        web_sys::console::log_1(
-                            &format!(
-                                "Restored. Serv state: {:?}; Local state: No.",
-                                snapshot_peer.state
-                            )
-                            .into(),
-                        );
-                        self.on_peer_created(
-                            snapshot_peer.id,
-                            snapshot_peer.sdp_offer,
-                            snapshot_peer.tracks,
-                            snapshot.ice_servers.clone(),
-                        );
-                    }
-                    _ => {
-                        // TODO: In principle, PeerCreated cannot come in any
-                        // state anymore.
-                        fatal_err_in_snapshot!(self);
-                    }
+                if let Err(e) = self.create_peer_from_snapshot(
+                    snapshot_peer,
+                    &snapshot.ice_servers,
+                ) {
+                    web_sys::console::error_1(&format!("{}", e).into());
+                    self.reset();
+                    return;
                 }
-                continue;
-            };
-
-            match snapshot_peer.state {
-                ServerPeerState::Stable => {
-                    match local_peer.signaling_state() {
-                        SignalingState::New => {
-                            // TODO: return error because this is not
-                            // possible
-                            fatal_err_in_snapshot!(self);
-                        }
-                        SignalingState::Stable => {}
-                        SignalingState::HaveLocalOffer => {
-                            web_sys::console::log_1(
-                                &format!(
-                                    "Restored. Serv state: {:?}; Local state: \
-                                     {:?}.",
-                                    snapshot_peer.state,
-                                    local_peer.signaling_state()
-                                )
-                                .into(),
-                            );
-                            self.on_sdp_answer_made(
-                                snapshot_peer.id,
-                                snapshot_peer.remote_sdp_answer.unwrap(),
-                            );
-                        }
-                        SignalingState::HaveRemoteOffer => {}
-                        _ => {
-                            fatal_err_in_snapshot!(self);
-                        }
-                    }
-                }
-                ServerPeerState::WaitLocalHaveRemoteSdp => {
-                    match local_peer.signaling_state() {
-                        SignalingState::Stable => {
-                            web_sys::console::log_1(
-                                &format!(
-                                    "Restored. Serv state: {:?}; Local state: \
-                                     {:?}.",
-                                    snapshot_peer.state,
-                                    local_peer.signaling_state()
-                                )
-                                .into(),
-                            );
-                            let sdp_answer = local_peer
-                                .current_local_description()
-                                .unwrap()
-                                .sdp();
-                            self.rpc.send_command(Command::MakeSdpAnswer {
-                                peer_id: id,
-                                sdp_answer,
-                            })
-                        }
-                        _ => {
-                            fatal_err_in_snapshot!(self);
-                        }
-                    }
-                }
-                _ => {
-                    web_sys::console::log_1(
-                        &format!(
-                            "Server State: {:?}; Local state: {:?}",
-                            snapshot_peer.state,
-                            local_peer.signaling_state()
-                        )
-                        .into(),
-                    );
-                    fatal_err_in_snapshot!(self);
-                    // TODO: unreachable??
-                    //                    unreachable!()
-                }
-            }
-            for ice_candidate in snapshot_peer.ice_candidates {
-                (self as &mut dyn EventHandler).on_ice_candidate_discovered(
-                    snapshot_peer.id,
-                    ice_candidate,
-                )
             }
         }
     }

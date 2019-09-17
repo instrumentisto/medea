@@ -1,10 +1,20 @@
 //! Client API protocol implementation for Medea media server.
 
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    fmt::{self, Display},
+    hash::Hash,
+    marker::PhantomData,
+    str::FromStr,
+};
 
-use derive_more::Display;
+use derive_more::{Display, FromStr};
 use medea_macro::dispatchable;
-use serde::{de::Deserializer, ser::Serializer, Deserialize, Serialize};
+use serde::{
+    de::{self, DeserializeSeed, Deserializer, MapAccess, Visitor},
+    ser::Serializer,
+    Deserialize, Serialize,
+};
 
 /// ID of `Peer`.
 #[cfg_attr(
@@ -12,7 +22,7 @@ use serde::{de::Deserializer, ser::Serializer, Deserialize, Serialize};
     derive(Deserialize, Debug, Hash, Eq, Default, PartialEq)
 )]
 #[cfg_attr(feature = "jason", derive(Serialize))]
-#[derive(Clone, Copy, Display)]
+#[derive(Clone, Copy, Display, FromStr)]
 pub struct PeerId(pub u32);
 
 /// ID of `MediaTrack`.
@@ -21,7 +31,7 @@ pub struct PeerId(pub u32);
     derive(Deserialize, Debug, Hash, Eq, Default, PartialEq)
 )]
 #[cfg_attr(feature = "jason", derive(Serialize))]
-#[derive(Clone, Copy, Display)]
+#[derive(Clone, Copy, Display, FromStr)]
 pub struct TrackId(pub u64);
 
 /// Value that is able to be incremented by `1`.
@@ -108,7 +118,8 @@ pub struct Peer {
 pub struct Snapshot {
     /// All [`Peer`]s of [`Member`] on server side.
     // TODO: use PeerId when https://github.com/serde-rs/serde/issues/1183 will be resolved.
-    pub peers: HashMap<String, Peer>,
+    #[serde(deserialize_with = "de_int_key")]
+    pub peers: HashMap<PeerId, Peer>,
 
     /// Ice servers for this user.
     pub ice_servers: Vec<IceServer>,
@@ -386,6 +397,92 @@ impl<'de> Deserialize<'de> for ServerMsg {
             Ok(Self::Event(event))
         }
     }
+}
+
+#[cfg(feature = "jason")]
+fn de_int_key<'de, D, K, V>(deserializer: D) -> Result<HashMap<K, V>, D::Error>
+where
+    D: Deserializer<'de>,
+    K: Eq + Hash + FromStr,
+    K::Err: Display,
+    V: Deserialize<'de>,
+{
+    struct KeySeed<K> {
+        k: PhantomData<K>,
+    }
+
+    impl<'de, K> DeserializeSeed<'de> for KeySeed<K>
+    where
+        K: FromStr,
+        K::Err: Display,
+    {
+        type Value = K;
+
+        fn deserialize<D>(
+            self,
+            deserializer: D,
+        ) -> Result<Self::Value, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            deserializer.deserialize_str(self)
+        }
+    }
+
+    impl<'de, K> Visitor<'de> for KeySeed<K>
+    where
+        K: FromStr,
+        K::Err: Display,
+    {
+        type Value = K;
+
+        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            formatter.write_str("a string")
+        }
+
+        fn visit_str<E>(self, string: &str) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            K::from_str(string).map_err(de::Error::custom)
+        }
+    }
+
+    struct MapVisitor<K, V> {
+        k: PhantomData<K>,
+        v: PhantomData<V>,
+    }
+
+    impl<'de, K, V> Visitor<'de> for MapVisitor<K, V>
+    where
+        K: Eq + Hash + FromStr,
+        K::Err: Display,
+        V: Deserialize<'de>,
+    {
+        type Value = HashMap<K, V>;
+
+        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            formatter.write_str("a map")
+        }
+
+        fn visit_map<A>(self, mut input: A) -> Result<Self::Value, A::Error>
+        where
+            A: MapAccess<'de>,
+        {
+            let mut map = HashMap::new();
+            while let Some((k, v)) = input
+                .next_entry_seed(KeySeed { k: PhantomData }, PhantomData)?
+            {
+                map.insert(k, v);
+            }
+            Ok(map)
+        }
+    }
+
+    deserializer.deserialize_map(MapVisitor {
+        k: PhantomData,
+        v: PhantomData,
+    })
 }
 
 #[cfg(test)]

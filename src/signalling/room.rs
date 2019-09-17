@@ -179,7 +179,7 @@ impl Room {
                 ice_candidates: peer.get_ice_candidates(),
                 tracks: peer.tracks(),
             };
-            peers_snapshots.insert(peer.id().to_string(), peer_snapshot);
+            peers_snapshots.insert(peer.id(), peer_snapshot);
         }
 
         Ok(Snapshot {
