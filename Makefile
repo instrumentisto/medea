@@ -18,8 +18,9 @@ eq = $(if $(or $(1),$(2)),$(and $(findstring $(1),$(2)),\
 MEDEA_IMAGE_NAME := $(strip \
 	$(shell grep 'COMPOSE_IMAGE_NAME=' .env | cut -d '=' -f2))
 DEMO_IMAGE_NAME := instrumentisto/medea-demo
-MEDEA_BUILD_IMAGE_NAME := instrumentisto/medea-build
+MEDEA_BUILD_IMAGE_NAME := alexlapa/medea-build
 
+MEDEA_BUILD_IMAGE_VER := latest
 RUST_VER := 1.37
 
 CURRENT_BRANCH := $(strip $(shell git branch | grep \* | cut -d ' ' -f2))
@@ -176,7 +177,7 @@ cargo:
 #	                 [dockerized=(no|yes)]
 
 cargo-build-crate = $(if $(call eq,$(crate),),@all,$(crate))
-cargo-build-medea-build-image-name = $(MEDEA_BUILD_IMAGE_NAME)
+medea-build-image = $(MEDEA_BUILD_IMAGE_NAME):$(MEDEA_BUILD_IMAGE_VER)
 
 cargo.build:
 ifeq ($(cargo-build-crate),@all)
@@ -188,7 +189,7 @@ ifeq ($(dockerized),yes)
 	docker run --rm -v "$(PWD)":/app -w /app \
 		-u $(shell id -u):$(shell id -g) \
 		-v "$(HOME)/.cargo/registry":/usr/local/cargo/registry \
-		$(cargo-build-medea-build-image-name):dev \
+		$(medea-build-image) \
 			make cargo.build crate=$(cargo-build-crate) \
 			                 debug=$(debug) dockerized=no
 else
@@ -202,14 +203,10 @@ ifeq ($(dockerized),yes)
 		-v "$(HOME)/.cargo/registry":/usr/local/cargo/registry \
 		-v "$(HOME):$(HOME)" \
 		-e XDG_CACHE_HOME=$(HOME) \
-		rust:$(RUST_VER) \
+		$(medea-build-image) \
 			make cargo.build crate=$(cargo-build-crate) \
-			                 debug=$(debug) dockerized=no \
-			                 pre-install=yes
+			                 debug=$(debug) dockerized=no
 else
-ifeq ($(pre-install),yes)
-	curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
-endif
 	@rm -rf $(crate-dir)/pkg/
 	wasm-pack build -t web $(crate-dir)/
 endif
@@ -445,12 +442,12 @@ endif
 # Usage:
 #   make docker.build.medea-build [TAG=(dev|<tag>)]
 
-docker-build-medea-build-image-name = $(MEDEA_BUILD_IMAGE_NAME)
-
 docker.build.medea-build:
 	docker build \
-		-t $(docker-build-medea-build-image-name):$(if $(call eq,$(TAG),),dev,$(TAG)) \
+		--build-arg rust_ver=$(RUST_VER) \
+		-t $(MEDEA_BUILD_IMAGE_NAME):$(if $(call eq,$(TAG),),dev,$(TAG)) \
 		- < _build/medea-build/Dockerfile
+
 
 
 # Build medea project Docker image.
@@ -463,14 +460,14 @@ docker.build.medea-build:
 
 docker-build-medea-image-name = $(strip \
 	$(if $(call eq,$(registry),),,$(registry)/)$(MEDEA_IMAGE_NAME))
-docker-build-medea-medea-build-image-name = $(MEDEA_BUILD_IMAGE_NAME)
+medea-build-image = $(MEDEA_BUILD_IMAGE_NAME):$(MEDEA_BUILD_IMAGE_VER)
 
 docker.build.medea:
 ifneq ($(no-cache),yes)
 	docker run --rm --network=host -v "$(PWD)":/app -w /app \
 	           -u $(shell id -u):$(shell id -g) \
 	           -e CARGO_HOME=.cache/cargo \
-		$(docker-build-medea-medea-build-image-name):dev \
+		$(medea-build-image) \
 			cargo build --bin=medea \
 				$(if $(call eq,$(debug),no),--release,)
 endif
@@ -481,12 +478,10 @@ endif
 		$(if $(call eq,$(no-cache),yes),\
 			--no-cache --pull,) \
 		$(if $(call eq,$(IMAGE),),\
-			--build-arg rust_ver=$(RUST_VER) \
-			--build-arg rustc_mode=$(if \
-				$(call eq,$(debug),no),release,debug) \
-			--build-arg rustc_opts=$(if \
-				$(call eq,$(debug),no),--release,) \
+			--build-arg rustc_mode=$(if $(call eq,$(debug),no),release,debug) \
+			--build-arg rustc_opts=$(if $(call eq,$(debug),no),--release,) \
 			--build-arg cargo_home=.cache/cargo,) \
+			--build-arg medea_build_image=$(medea-build-image) \
 		-t $(docker-build-medea-image-name):$(if $(call eq,$(TAG),),dev,$(TAG)) .
 	$(call docker.build.clean.ignore)
 define docker.build.clean.ignore

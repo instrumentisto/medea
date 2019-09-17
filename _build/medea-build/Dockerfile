@@ -3,5 +3,5 @@ ARG rust_ver=latest
 FROM rust:${rust_ver} AS dist
 
 RUN apt-get update \
-    # Dependencies for grpcio
-    && apt-get install -y cmake
+    && apt-get install -y cmake \
+    && curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
