@@ -3,31 +3,36 @@
 <head>
   <meta http-equiv="Content-type" content="text/html; charset=utf-8"/>
   <title>My awesome Rust, WebAssembly, and Webpack application</title>
-  <script src="https://code.jquery.com/jquery-3.4.1.slim.min.js"
-          integrity="sha256-pasqAKBDmFT4eHoN2ndd6lN370kFiGUFyTiUHWhU7k8="
-          crossorigin="anonymous"></script>
 </head>
 <body>
 
 <div id="caller">
-  <video name="local-video" muted></video>
-  <video name="remote-video"></video>
+  <video class="local-video" muted></video>
+  <video class="remote-video"></video>
   <div>
-    <input type="checkbox" name="toggle-audio" checked>
-    <label>toggle local audio</label>
-    <input type="checkbox" name="toggle-video" checked>
-    <label>toggle local video</label>
+    <label>
+      <input type="checkbox" name="toggle-audio" checked>
+      toggle local audio
+    </label>
+    <label>
+      <input type="checkbox" name="toggle-video" checked>
+      toggle local video
+    </label>
   </div>
 </div>
 
 <div id="responder">
-  <video name="local-video" muted></video>
-  <video name="remote-video"></video>
+  <video class="local-video" muted></video>
+  <video class="remote-video"></video>
   <div>
-    <input type="checkbox" name="toggle-audio" checked>
-    <label>toggle local audio</label>
-    <input type="checkbox" name="toggle-video" checked>
-    <label>toggle local video</label>
+    <label>
+      <input type="checkbox" name="toggle-audio" checked>
+      toggle local audio
+    </label>
+    <label>
+      <input type="checkbox" name="toggle-video" checked>
+      toggle local video
+    </label>
   </div>
 </div>
 
