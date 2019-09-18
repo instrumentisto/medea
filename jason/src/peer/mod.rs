@@ -109,7 +109,7 @@ struct InnerPeerConnection {
     ice_candidates_buffer: Vec<IceCandidate>,
 
     /// Current signaling state of [`PeerConnection`].
-    signaling_state: RefCell<SignalingState>,
+    signaling_state: SignalingState,
 }
 
 impl InnerPeerConnection {
@@ -135,7 +135,7 @@ impl InnerPeerConnection {
             peer_events_sender,
             has_remote_description: false,
             ice_candidates_buffer: vec![],
-            signaling_state: RefCell::new(SignalingState::New),
+            signaling_state: SignalingState::New,
         })
     }
 }
@@ -155,20 +155,14 @@ impl PeerConnection {
         enabled_audio: bool,
         enabled_video: bool,
     ) -> Result<Self, WasmErr> {
-        let peer = Rc::new(RtcPeerConnection::new(ice_servers)?);
-        let media_connections = MediaConnections::new(
-            Rc::clone(&peer),
+        let inner = Rc::new(RefCell::new(InnerPeerConnection::new(
+            id,
+            ice_servers,
+            media_manager,
+            peer_events_sender,
             enabled_audio,
             enabled_video,
-        );
-        let inner = Rc::new(RefCell::new(InnerPeerConnection::new(
-        id,
-        ice_servers,
-        media_manager,
-        peer_events_sender,
-        enabled_audio,
-        enabled_video,
-        )));
+        )?));
 
         // Bind to `icecandidate` event.
         let inner_rc = Rc::clone(&inner);
@@ -187,9 +181,12 @@ impl PeerConnection {
 
         // Bind to `signalingstatechange` event.
         let inner_rc = Rc::clone(&inner);
-        inner.peer.on_signaling_state_changed(Some(move || {
-            Self::on_signaling_state_changed(&inner_rc);
-        }))?;
+        inner
+            .borrow()
+            .peer
+            .on_signaling_state_changed(Some(move || {
+                Self::on_signaling_state_changed(&mut inner_rc.borrow_mut());
+            }))?;
 
         Ok(Self(inner))
     }
@@ -216,7 +213,7 @@ impl PeerConnection {
     /// Handles `signalingstatechange` event from underlying peer.
     ///
     /// This function will update signaling state of [`PeerConnection`].
-    fn on_signaling_state_changed(inner: &InnerPeerConnection) {
+    fn on_signaling_state_changed(inner: &mut InnerPeerConnection) {
         use RtcSignalingState::*;
 
         let signaling_state = inner.peer.signaling_state();
@@ -226,19 +223,16 @@ impl PeerConnection {
                 if inner.peer.current_remote_description().is_some()
                     && inner.peer.current_local_description().is_some()
                 {
-                    *inner.signaling_state.borrow_mut() =
-                        SignalingState::Stable;
+                    inner.signaling_state = SignalingState::Stable;
                 } else {
-                    *inner.signaling_state.borrow_mut() = SignalingState::New;
+                    inner.signaling_state = SignalingState::New;
                 }
             }
             HaveLocalOffer | HaveLocalPranswer => {
-                *inner.signaling_state.borrow_mut() =
-                    SignalingState::HaveLocalOffer;
+                inner.signaling_state = SignalingState::HaveLocalOffer;
             }
             HaveRemoteOffer | HaveRemotePranswer => {
-                *inner.signaling_state.borrow_mut() =
-                    SignalingState::HaveRemoteOffer;
+                inner.signaling_state = SignalingState::HaveRemoteOffer;
             }
             Closed => unimplemented!(
                 "Closed signaling state is deprecated state which does not \
@@ -258,7 +252,7 @@ impl PeerConnection {
 
     /// Returns [`SignalingState`] of this [`PeerConnection`].
     pub fn signaling_state(&self) -> SignalingState {
-        self.0.signaling_state.borrow().clone()
+        self.0.borrow().signaling_state.clone()
     }
 
     /// Handle `track` event from underlying peer adding new track to
@@ -512,12 +506,20 @@ impl PeerConnection {
 
     /// Returns current local SDP offer of this [`PeerConnection`].
     pub fn current_local_sdp(&self) -> Option<String> {
-        self.0.peer.current_local_description().map(|s| s.sdp())
+        self.0
+            .borrow()
+            .peer
+            .current_local_description()
+            .map(|s| s.sdp())
     }
 
     /// Returns current remote SDP offer of this [`PeerConnection`].
     pub fn current_remote_sdp(&self) -> Option<String> {
-        self.0.peer.current_remote_description().map(|s| s.sdp())
+        self.0
+            .borrow()
+            .peer
+            .current_remote_description()
+            .map(|s| s.sdp())
     }
 }
 
