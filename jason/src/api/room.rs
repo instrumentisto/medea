@@ -234,7 +234,7 @@ impl InnerRoom {
 
     /// Resets state of [`InnerRoom`].
     ///
-    /// Currently removes all [`Peer`]s.
+    /// Currently removes all [`Peer`]s and send [`Command::ResetMe`] to the server.
     fn reset(&mut self) {
         let peers_to_remove =
             self.peers.peers().into_iter().map(|(id, _)| id).collect();
@@ -330,7 +330,7 @@ impl InnerRoom {
         Ok(())
     }
 
-    /// Creates [`PeerConnection`]s which doesn't presented locally but exists
+    /// Creates [`PeerConnection`]s which doesn't exists locally but exists
     /// on server side.
     fn create_peer_from_snapshot(
         &mut self,

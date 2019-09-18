@@ -24,6 +24,9 @@ pub struct CommandMessage {
 }
 
 impl CommandMessage {
+    /// Creates new [`CommandMessage`].
+    ///
+    /// `member_id` - ID of [`Member`] from which received [`Command`].
     pub fn new(member_id: MemberId, cmd: Command) -> Self {
         Self { member_id, cmd }
     }

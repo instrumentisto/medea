@@ -144,9 +144,12 @@ impl InnerPeerConnection {
 pub struct PeerConnection(Rc<RefCell<InnerPeerConnection>>);
 
 impl PeerConnection {
-    /// Create new [`RtcPeerConnection`]. Provided `peer_events_sender` will be
-    /// used to emit [`PeerEvent`]s from this peer , provided `ice_servers` will
-    /// be used by created [`RtcPeerConnection`].
+    /// Creates new [`PeerConnection`].
+    ///
+    /// Provided `peer_events_sender` will be used to emit [`PeerEvent`]s from
+    /// this peer.
+    ///
+    /// Provided `ice_servers` will be used by created [`RtcPeerConnection`].
     pub fn new<I: IntoIterator<Item = IceServer>>(
         id: Id,
         peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
