@@ -80,7 +80,7 @@ impl PeerError {
 #[enum_delegate(pub fn sdp_offer(&self) -> Option<String>)]
 #[enum_delegate(pub fn sdp_answer(&self) -> Option<String>)]
 #[enum_delegate(pub fn tracks(&self) -> Vec<Track>)]
-#[enum_delegate(pub fn get_ice_candidates(&self) -> Vec<IceCandidate>)]
+#[enum_delegate(pub fn ice_candidates(&self) -> Vec<IceCandidate>)]
 #[derive(Debug)]
 pub enum PeerStateMachine {
     New(Peer<New>),
@@ -256,7 +256,7 @@ impl<T> Peer<T> {
         self.context.ice_candidates.push(ice_candidate);
     }
 
-    pub fn get_ice_candidates(&self) -> Vec<IceCandidate> {
+    pub fn ice_candidates(&self) -> Vec<IceCandidate> {
         self.context.ice_candidates.clone()
     }
 

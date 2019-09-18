@@ -143,11 +143,12 @@ impl Room {
         self.id.clone()
     }
 
-    /// Create snapshot of server state for requested [`Member`].
+    /// Creates [`Snapshot`] of server state for requested [`Member`].
     ///
-    /// With this [`Snapshot`] client can synchronize his state with server
+    /// With this [`Snapshot`] client will synchronize his state with server
     /// state. If server will send [`Snapshot`] which client considers
-    /// fatally wrong then [`Member`] will send [`Command::ResetMe`].
+    /// fatally wrong then [`Member`] will send [`Command::ResetMe`] on which
+    /// server will delete all [`Member`]'s [`Peer`]s.
     pub fn take_snapshot(
         &self,
         member_id: &MemberId,
@@ -161,16 +162,12 @@ impl Room {
         let peers = self.peers.get_peers_by_member_id(member_id);
         let mut peers_snapshots = HashMap::new();
         for peer in peers {
-            let remote_peer =
-                self.peers.get_peer_by_id(peer.partner_peer_id())?;
             let peer_snapshot = PeerSnapshot {
                 id: peer.id(),
                 sdp_answer: peer.sdp_answer(),
                 sdp_offer: peer.sdp_offer(),
-                remote_sdp_offer: remote_peer.sdp_offer(),
-                remote_sdp_answer: remote_peer.sdp_answer(),
                 state: ServerPeerState::from(peer),
-                ice_candidates: peer.get_ice_candidates(),
+                ice_candidates: peer.ice_candidates(),
                 tracks: peer.tracks(),
             };
             peers_snapshots.insert(peer.id(), peer_snapshot);
@@ -590,7 +587,15 @@ impl Room {
     ) -> Result<ActFuture<(), RoomError>, RoomError> {
         let removed_peers = self
             .peers
-            .remove_peers_related_to_member(&resetting_member_id);
+            .remove_peers_related_to_member(resetting_member_id);
+
+        let resetting_member = self
+            .members
+            .get_member_by_id(resetting_member_id)
+            .cloned()
+            .ok_or_else(|| {
+                RoomError::MemberNotFound(resetting_member_id.clone())
+            })?;
 
         for (member_id, peers_ids) in removed_peers {
             if &member_id == resetting_member_id {
@@ -605,6 +610,8 @@ impl Room {
                 self.member_peers_removed(peers_ids, member_id, ctx);
             }
         }
+
+        self.init_member_connections(&resetting_member, ctx);
 
         Ok(Box::new(actix::fut::ok(())))
     }
@@ -697,9 +704,6 @@ impl Handler<RpcConnectionEstablished> for Room {
     ) -> Self::Result {
         info!("RpcConnectionEstablished for member {}", msg.member_id);
 
-        // TODO: Maybe better way to detect reconnect of member??
-        //        let is_reconnect =
-        // self.members.member_has_connection(&msg.member_id);
         let RpcConnectionEstablished {
             member_id,
             connection,
@@ -719,8 +723,17 @@ impl Handler<RpcConnectionEstablished> for Room {
 
         if is_reconnect {
             debug!("Member [id = {}] reconnecting.", member_id);
-            // TODO: PANIC
-            let snapshot = self.take_snapshot(&member_id).unwrap();
+            let snapshot = match self.take_snapshot(&member_id) {
+                Ok(s) => s,
+                Err(e) => {
+                    error!(
+                        "Error while creating snapshot for Member [id = {}]. \
+                         {:?}",
+                        member_id, e
+                    );
+                    return Box::new(self.close_gracefully(ctx));
+                }
+            };
             ctx.spawn(wrap_future(
                 self.members
                     .send_event_to_member(

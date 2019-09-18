@@ -257,7 +257,7 @@ impl InnerRoom {
                 SignalingState::HaveLocalOffer => {
                     self.on_sdp_answer_made(
                         peer_id,
-                        snapshot_peer.remote_sdp_answer.unwrap(),
+                        snapshot_peer.sdp_answer.unwrap(),
                     );
                 }
                 _ => {
@@ -315,9 +315,16 @@ impl InnerRoom {
             }
         }
 
-        for ice_candidate in snapshot_peer.ice_candidates {
-            (self as &mut dyn EventHandler)
-                .on_ice_candidate_discovered(peer_id, ice_candidate)
+        // We should add `IceCandidates` only if `PeerConnection` have
+        // `remote_description`.
+        match local_peer.signaling_state() {
+            SignalingState::Stable | SignalingState::HaveRemoteOffer => {
+                for ice_candidate in snapshot_peer.ice_candidates {
+                    (self as &mut dyn EventHandler)
+                        .on_ice_candidate_discovered(peer_id, ice_candidate)
+                }
+            }
+            _ => (),
         }
 
         Ok(())
@@ -356,7 +363,7 @@ impl InnerRoom {
         &mut self,
         snapshot_peers: &HashMap<PeerId, SnapshotPeer>,
     ) {
-        let removed_peers: Vec<PeerId> = self
+        let removed_peers: Vec<_> = self
             .peers
             .peers()
             .keys()
@@ -481,22 +488,27 @@ impl EventHandler for InnerRoom {
     fn on_restore_state(&mut self, snapshot: Snapshot) {
         self.remove_peers_not_presented_in_snapshot(&snapshot.peers);
 
-        for (id, snapshot_peer) in snapshot.peers {
-            if let Some(local_peer) = self.peers.get(id) {
-                if let Err(e) = self.synchronize_peer_signaling_state(
-                    &local_peer,
-                    snapshot_peer,
-                ) {
+        macro_rules! unwrap_sync_err {
+            ($call:expr) => {
+                if let Err(e) = $call {
                     web_sys::console::error_1(&format!("{}", e).into());
                     self.reset();
                     return;
                 }
-            } else if let Err(e) = self
-                .create_peer_from_snapshot(snapshot_peer, &snapshot.ice_servers)
-            {
-                web_sys::console::error_1(&format!("{}", e).into());
-                self.reset();
-                return;
+            };
+        }
+
+        for (id, snapshot_peer) in snapshot.peers {
+            if let Some(local_peer) = self.peers.get(id) {
+                unwrap_sync_err!(self.synchronize_peer_signaling_state(
+                    &local_peer,
+                    snapshot_peer,
+                ));
+            } else {
+                unwrap_sync_err!(self.create_peer_from_snapshot(
+                    snapshot_peer,
+                    &snapshot.ice_servers
+                ));
             }
         }
     }

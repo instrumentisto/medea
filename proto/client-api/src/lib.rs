@@ -66,7 +66,7 @@ pub enum ServerPeerState {
     /// Newly created [`Peer`] without anything.
     New,
 
-    /// [`Peer`] doesnt have remote SDP and is waiting for local SDP.
+    /// [`Peer`] doesn't have remote SDP and is waiting for local SDP.
     WaitLocalSdp,
 
     /// [`Peer`] has remote SDP and is waiting for local SDP.
@@ -97,12 +97,6 @@ pub struct Peer {
     /// SDP answer of this [`Peer`].
     pub sdp_answer: Option<String>,
 
-    /// SDP offer of partner [`Peer`] of this [`Peer`].
-    pub remote_sdp_offer: Option<String>,
-
-    /// SDP answer of partner [`Peer`] of this [`Peer`].
-    pub remote_sdp_answer: Option<String>,
-
     /// All tracks of this [`Peer`].
     pub tracks: Vec<Track>,
 }
@@ -111,7 +105,7 @@ pub struct Peer {
 ///
 /// Used for synchronization of reconnecting client with server.
 ///
-/// This snapshot will be sended on [`Event::RestoreState`] if [`Member`] lost
+/// This snapshot will be sent on [`Event::RestoreState`] if [`Member`] lost
 /// his connection and reconnect to the server.
 #[cfg_attr(feature = "medea", derive(Serialize, Debug, Clone, PartialEq))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
@@ -122,7 +116,7 @@ pub struct Snapshot {
     #[serde(deserialize_with = "de_int_key")]
     pub peers: HashMap<PeerId, Peer>,
 
-    /// Ice servers for this user.
+    /// [`IceServer`]s for this [`Member`].
     pub ice_servers: Vec<IceServer>,
 }
 
@@ -178,13 +172,13 @@ pub enum Command {
         candidate: IceCandidate,
     },
 
-    /// Client asks server for resetting his state.
+    /// Client asks server for reset his state.
     ///
     /// This [`Command`] will be sent if while synchronization of client
     /// with server will be found some fatal conflict.
     ///
-    /// Currently, on this [`Command`] server should reset signaling state
-    /// of client to initial state.
+    /// Currently, on this [`Command`] server should remove all [`Member`]'s
+    /// [`Peer`]s.
     ResetMe,
 }
 
@@ -222,7 +216,7 @@ pub enum Event {
     /// reconnecting.
     ///
     /// On this [`Event`] client should upgrade/downgrade local state to state
-    /// of server.
+    /// of the server.
     RestoreState { snapshot: Snapshot },
 }
 
@@ -402,7 +396,7 @@ impl<'de> Deserialize<'de> for ServerMsg {
 
 /// Deserializes keys of [`HashMap`] as integer.
 ///
-/// This is temporary fix for https://github.com/serde-rs/json/issues/560 issue.
+/// This is temporary fix for <https://github.com/serde-rs/json/issues/560>.
 // TODO: remove it when
 //       https://github.com/serde-rs/serde/issues/1183 will be resolved.
 #[cfg(feature = "jason")]

@@ -313,9 +313,9 @@ ifeq ($(test-unit-crate),medea)
 	cargo test --lib --bin medea
 else
 ifeq ($(crate),medea-jason)
-#	cd $(crate-dir)/ && \
-#	CHROMEDRIVER_CLIENT_ARGS="$(CHROMEDRIVER_CLIENT_ARGS)" \
-#    cargo test --target wasm32-unknown-unknown --features mockable
+	cd $(crate-dir)/ && \
+	CHROMEDRIVER_CLIENT_ARGS="$(CHROMEDRIVER_CLIENT_ARGS)" \
+    cargo test --target wasm32-unknown-unknown --features mockable
 else
 	cd $(crate-dir)/ && \
 	cargo test -p $(test-unit-crate)

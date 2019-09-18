@@ -37,13 +37,28 @@ pub use self::{
 /// Local signaling state of [`RtcPeerConnection`].
 #[derive(Clone, Debug)]
 pub enum SignalingState {
+    /// This state represents [`PeerConnection] in `stable` signaling state on
+    /// JS side and without `local_description` and `remote_description`.
+    ///
+    /// On JS side signaling state will be `stable`. but
+    /// we can determine that real signaling state is [`SignalingState::New`]
+    /// by existence of `local_description` and `remote_description`.
     New,
+
+    /// In this state [`PeerConnection`] have `local_description`.
+    ///
+    /// _Note:_ this state is also covers JS side's state
+    /// `have-local-pranswer`.
     HaveLocalOffer,
+
+    /// In this state [`PeerConnection`] have `remote_description`.
+    ///
+    /// _Note:_ this state is also covers JS side's state
+    /// `have-remote-pranswer`.
     HaveRemoteOffer,
-    HaveLocalPranswer,
-    HaveRemotePranswer,
+
+    /// Negotiation is complete and a connection has been established.
     Stable,
-    Closed,
 }
 
 #[dispatchable]
@@ -151,41 +166,37 @@ impl PeerConnection {
         );
     }
 
-    /// Handle `signalingstatechange` event from underlying peer.
+    /// Handles `signalingstatechange` event from underlying peer.
     ///
     /// This function will update signaling state of [`PeerConnection`].
     fn on_signaling_state_changed(inner: &InnerPeerConnection) {
+        use RtcSignalingState::*;
+
         let signaling_state = inner.peer.signaling_state();
+
         match signaling_state {
-            RtcSignalingState::Stable => {
-                if inner.peer.current_remote_description().is_none()
-                    && inner.peer.current_local_description().is_none()
+            Stable => {
+                if inner.peer.current_remote_description().is_some()
+                    && inner.peer.current_local_description().is_some()
                 {
-                    *inner.signaling_state.borrow_mut() = SignalingState::New;
-                } else {
                     *inner.signaling_state.borrow_mut() =
                         SignalingState::Stable;
+                } else {
+                    *inner.signaling_state.borrow_mut() = SignalingState::New;
                 }
             }
-            RtcSignalingState::HaveLocalOffer => {
+            HaveLocalOffer | HaveLocalPranswer => {
                 *inner.signaling_state.borrow_mut() =
                     SignalingState::HaveLocalOffer;
             }
-            RtcSignalingState::HaveRemoteOffer => {
+            HaveRemoteOffer | HaveRemotePranswer => {
                 *inner.signaling_state.borrow_mut() =
                     SignalingState::HaveRemoteOffer;
             }
-            RtcSignalingState::HaveRemotePranswer => {
-                *inner.signaling_state.borrow_mut() =
-                    SignalingState::HaveRemotePranswer;
-            }
-            RtcSignalingState::HaveLocalPranswer => {
-                *inner.signaling_state.borrow_mut() =
-                    SignalingState::HaveLocalPranswer;
-            }
-            RtcSignalingState::Closed => {
-                *inner.signaling_state.borrow_mut() = SignalingState::Closed;
-            }
+            Closed => unimplemented!(
+                "Closed signaling state is deprecated state which does not \
+                 supported."
+            ),
             _ => {
                 web_sys::console::error_1(
                     &format!(
@@ -198,7 +209,7 @@ impl PeerConnection {
         }
     }
 
-    /// Returns signaling state of this [`PeerConnection`].
+    /// Returns [`SignalingState`] of this [`PeerConnection`].
     pub fn signaling_state(&self) -> SignalingState {
         self.0.signaling_state.borrow().clone()
     }

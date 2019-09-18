@@ -74,28 +74,19 @@ impl Inner {
 }
 
 /// Handles close message from remote server.
-fn on_close(inner_rc: WebsocketRpcClient, close_msg: &CloseMsg) {
+fn on_close(ws_client: WebsocketRpcClient, close_msg: &CloseMsg) {
     {
-        let mut inner = inner_rc.0.borrow_mut();
+        let mut inner = ws_client.0.borrow_mut();
         inner.sock.take();
         inner.heartbeat.stop();
     }
-    // TODO: reconnect on disconnect, propagate error if unable
-    //       to reconnect
+
     match &close_msg {
         CloseMsg::Normal(_) | CloseMsg::Disconnect(_) => {
-            spawn_local(futures::future::loop_fn(inner_rc, |inner_rc| {
-                {
-                    let mut inner = inner_rc.0.borrow_mut();
-                    inner.sock.take();
-                    inner.heartbeat.stop();
-                }
-
-                let fut = inner_rc.init();
-
-                fut.then(move |res| match res {
+            spawn_local(futures::future::loop_fn(ws_client, |ws_client| {
+                ws_client.init().then(move |res| match res {
                     Ok(_) => Ok(Loop::Break(())),
-                    Err(_) => Ok(Loop::Continue(inner_rc)),
+                    Err(_) => Ok(Loop::Continue(ws_client)),
                 })
             }));
         }
@@ -139,6 +130,7 @@ impl WebsocketRpcClient {
     pub fn init(&self) -> impl Future<Item = (), Error = WasmErr> {
         let inner = Rc::clone(&self.0);
         let self_clone = self.clone();
+
         WebSocket::new(&self.0.borrow().token).and_then(
             move |socket: WebSocket| {
                 let socket = Rc::new(socket);

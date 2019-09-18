@@ -11,11 +11,15 @@ use medea_client_api_proto::{Command, Event};
 
 use crate::api::control::MemberId;
 
-/// Newtype for [`Command`] with actix [`Message`] implementation.
+/// [`Command`] with actix [`Message`] implementation and [`MemberId`] from
+/// which this [`Command`] was received.
 #[derive(Message)]
 #[rtype(result = "Result<(), ()>")]
 pub struct CommandMessage {
+    /// ID of [`Member`] from which received this [`Command`].
     pub member_id: MemberId,
+
+    /// [`Command`] from [`Member`].
     pub cmd: Command,
 }
 
