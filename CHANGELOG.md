@@ -17,7 +17,8 @@ All user visible changes to this project will be documented in this file. This p
     - Support for static Сontrol API specs ([#28]).
 - Signalling:
     - Dynamic `Peer`s creation when client connects ([#28]);
-    - Auto-removing `Peer`s when `Member` disconnects ([#28]).
+    - Auto-removing `Peer`s when `Member` disconnects ([#28]);
+    - Filter `SetIceCandidate` messages without `candidate` ([#50](/../../pull/50)).
 - Testing:
     - E2E tests for signalling ([#28]).
 
