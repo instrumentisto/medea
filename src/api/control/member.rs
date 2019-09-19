@@ -1,10 +1,11 @@
-//! Member definitions and implementations.
+//! Definitions and implementations of [Control API]'s `Member` element.
+//!
+//! [Control API]: http://tiny.cc/380uaz
 
-use std::{collections::HashMap as StdHashMap, convert::TryFrom};
+use std::{collections::HashMap, convert::TryFrom};
 
-use macro_attr::*;
-use medea_grpc_proto::control::Member as MemberProto;
-use newtype_derive::{newtype_fmt, NewtypeDisplay, NewtypeFrom};
+use derive_more::{Display, From};
+use medea_control_api_proto::grpc::control_api::Member as MemberProto;
 use rand::{distributions::Alphanumeric, Rng};
 use serde::Deserialize;
 
@@ -18,22 +19,11 @@ use crate::api::control::{
     Endpoint, TryFromElementError, TryFromProtobufError, WebRtcPlayId,
 };
 
-const MEMBER_CREDENTIALS_LEN: usize = 32;
+const CREDENTIALS_LEN: usize = 32;
 
-macro_attr! {
-    /// ID of [`Member`].
-    #[derive(
-        Clone,
-        Debug,
-        Deserialize,
-        Eq,
-        Hash,
-        PartialEq,
-        NewtypeFrom!,
-        NewtypeDisplay!,
-    )]
-    pub struct Id(pub String);
-}
+/// ID of `Member`.
+#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, From, Display)]
+pub struct Id(pub String);
 
 /// Element of [`Member`]'s [`Pipeline`].
 ///
@@ -45,13 +35,13 @@ pub enum MemberElement {
     /// Represent [`WebRtcPublishEndpoint`].
     /// Can transform into [`Endpoint`] enum by `Endpoint::try_from`.
     ///
-    /// [`Endpoint`]: crate::api::control::endpoint::Endpoint
+    /// [`Endpoint`]: crate::api::control::endpoints::Endpoint
     WebRtcPublishEndpoint { spec: WebRtcPublishEndpoint },
 
     /// Represent [`WebRtcPlayEndpoint`].
     /// Can transform into [`Endpoint`] enum by `Endpoint::try_from`.
     ///
-    /// [`Endpoint`]: crate::api::control::endpoint::Endpoint
+    /// [`Endpoint`]: crate::api::control::endpoints::Endpoint
     WebRtcPlayEndpoint { spec: WebRtcPlayEndpoint },
 }
 
@@ -88,7 +78,8 @@ impl MemberSpec {
         })
     }
 
-    pub fn get_publish_endpoint(
+    /// Lookups [`WebRtcPublishEndpoint`] by ID.
+    pub fn get_publish_endpoint_by_id(
         &self,
         id: &WebRtcPublishId,
     ) -> Option<&WebRtcPublishEndpoint> {
@@ -112,24 +103,36 @@ impl MemberSpec {
         })
     }
 
+    /// Returns credentials from this [`MemberSpec`].
     pub fn credentials(&self) -> &str {
         &self.credentials
     }
 }
 
+/// Generates alphanumeric credentials for [`Member`] with
+/// [`CREDENTIALS_LEN`] length.
+///
+/// This credentials will be generated if in dynamic [Control API] spec not
+/// provided credentials for [`Member`]. This logic you can find in [`TryFrom`]
+/// [`MemberProto`] implemented for [`MemberSpec`].
 fn generate_member_credentials() -> String {
     rand::thread_rng()
         .sample_iter(&Alphanumeric)
-        .take(MEMBER_CREDENTIALS_LEN)
+        .take(CREDENTIALS_LEN)
         .collect()
 }
 
 impl TryFrom<&MemberProto> for MemberSpec {
     type Error = TryFromProtobufError;
 
-    /// Serialize [`MemberSpec`] from protobuf object.
+    /// Deserializes [`MemberSpec`] from protobuf object.
+    ///
+    /// Additionally generates [`Member`] credentials if
+    /// they not provided in protobuf object.
+    ///
+    /// [`Member`]: crate::signalling::elements::member::Member
     fn try_from(value: &MemberProto) -> Result<Self, Self::Error> {
-        let mut pipeline = StdHashMap::new();
+        let mut pipeline = HashMap::new();
         for (id, member_element) in value.get_pipeline() {
             let endpoint = Endpoint::try_from(member_element)?;
             pipeline.insert(id.clone(), endpoint.into());
@@ -143,7 +146,6 @@ impl TryFrom<&MemberProto> for MemberSpec {
             proto_credentials.to_string()
         };
 
-        // Credentials here maybe absent.
         Ok(Self {
             pipeline,
             credentials,

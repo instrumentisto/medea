@@ -15,7 +15,7 @@
 /// assert_eq!(map.get("c"), None);
 /// ```
 ///
-/// [`HashMap`]: std::hashmap::HashMap
+/// [`HashMap`]: std::collections::HashMap
 #[macro_export]
 macro_rules! hashmap {
     (@single $($x:tt)*) => (());

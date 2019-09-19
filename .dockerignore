@@ -4,18 +4,23 @@
 !Cargo.toml
 !Cargo.lock
 !src/
-!build.rs
 
 # Medea uses this sub-crates.
 !crates/
 !proto/
+!control-api-mock/
 
 # We don't need Jason while building Medea, but since it's in Medea's workspace,
 # Cargo should be able to see these files.
 !jason/Cargo.toml
-!jason/src/lib.rs
+!jason/src/
+!jason/demo/chart/medea-demo/conf/
+!jason/demo/index.html
 
 # Medea dependencies cache.
 !.cache/cargo/
+
+# Makefile may be used in Dockerfile's.
+!Makefile
 
 # !target/{mode} is added and removed dynamically to reduce image build times.

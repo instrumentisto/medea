@@ -14,10 +14,10 @@ use actix_web::{
 };
 use clap::ArgMatches;
 use futures::Future;
-use medea_grpc_proto::control::{
+use medea_control_api_proto::grpc::control_api::{
     Element as ElementProto, Error as ErrorProto,
     GetResponse as GetResponseProto, Response as ResponseProto,
-    Room_Element as RoomElementProto,
+    Room_Element as RoomElementProto, CreateResponse as CreateResponseProto,
 };
 use serde::{Deserialize, Serialize};
 
@@ -46,6 +46,7 @@ pub fn run(args: &ArgMatches) {
                 client: ControlClient::new(&medea_addr),
             })
             .wrap(middleware::Logger::default())
+            .wrap(Cors::new())
             .service(
                 web::resource("/")
                     .route(web::get().to_async(batch_get))
@@ -180,6 +181,22 @@ impl Into<HttpResponse> for Response {
 
 impl From<ResponseProto> for Response {
     fn from(mut resp: ResponseProto) -> Self {
+        if resp.has_error() {
+            Self {
+                sid: None,
+                error: Some(resp.take_error().into()),
+            }
+        } else {
+            Self {
+                sid: None,
+                error: None,
+            }
+        }
+    }
+}
+
+impl From<CreateResponseProto> for Response {
+    fn from(mut resp: CreateResponseProto) -> Self {
         if resp.has_error() {
             Self {
                 sid: None,

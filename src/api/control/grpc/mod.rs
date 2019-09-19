@@ -1,3 +1,5 @@
-//! Implementation of gRPC server and generated gRPC protos.
+//! Implementation of [Control API] gRPC server.
+//!
+//! [Control API]: http://tiny.cc/380uaz
 
 pub mod server;

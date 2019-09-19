@@ -5,7 +5,7 @@ use actix_web::{
     HttpResponse,
 };
 use futures::Future;
-use medea_grpc_proto::control::{
+use medea_control_api_proto::grpc::control_api::{
     Member_Element as MemberElementProto,
     WebRtcPlayEndpoint as WebRtcPlayEndpointProto,
     WebRtcPublishEndpoint as WebRtcPublishEndpointProto,

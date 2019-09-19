@@ -1,44 +1,38 @@
-//! `WebRtcPublishEndpoint` implementation.
+//! `WebRtcPublishEndpoint` [Control API]'s element implementation.
+//!
+//! [Control API]: http://tiny.cc/380uaz
 
-use macro_attr::*;
-use newtype_derive::{newtype_fmt, NewtypeDisplay, NewtypeFrom};
+use derive_more::{Display, From};
 use serde::Deserialize;
 
-use medea_grpc_proto::control::{
+use medea_control_api_proto::grpc::control_api::{
     WebRtcPublishEndpoint as WebRtcPublishEndpointProto,
     WebRtcPublishEndpoint_P2P as WebRtcPublishEndpointP2pProto,
 };
 
-macro_attr! {
-    /// ID of [`WebRtcPublishEndpoint`].
-    #[derive(
-        Clone,
-        Debug,
-        Deserialize,
-        Eq,
-        Hash,
-        PartialEq,
-        NewtypeFrom!,
-        NewtypeDisplay!,
-    )]
-    pub struct WebRtcPublishId(pub String);
-}
+/// ID of [`WebRtcPublishEndpoint`].
+#[derive(Clone, Debug, Deserialize, Display, Eq, Hash, PartialEq, From)]
+pub struct WebRtcPublishId(pub String);
 
 /// Peer-to-peer mode of [`WebRtcPublishEndpoint`].
 #[derive(Clone, Deserialize, Debug)]
 pub enum P2pMode {
     /// Always connect peer-to-peer.
     Always,
+
+    /// Never connect peer-to-peer.
     Never,
+
+    /// Connect peer-to-peer if it possible.
     IfPossible,
 }
 
 impl From<WebRtcPublishEndpointP2pProto> for P2pMode {
     fn from(value: WebRtcPublishEndpointP2pProto) -> Self {
         match value {
-            WebRtcPublishEndpointP2pProto::ALWAYS => P2pMode::Always,
-            WebRtcPublishEndpointP2pProto::IF_POSSIBLE => P2pMode::IfPossible,
-            WebRtcPublishEndpointP2pProto::NEVER => P2pMode::Never,
+            WebRtcPublishEndpointP2pProto::ALWAYS => Self::Always,
+            WebRtcPublishEndpointP2pProto::IF_POSSIBLE => Self::IfPossible,
+            WebRtcPublishEndpointP2pProto::NEVER => Self::Never,
         }
     }
 }
@@ -46,9 +40,9 @@ impl From<WebRtcPublishEndpointP2pProto> for P2pMode {
 impl Into<WebRtcPublishEndpointP2pProto> for P2pMode {
     fn into(self) -> WebRtcPublishEndpointP2pProto {
         match self {
-            P2pMode::Always => WebRtcPublishEndpointP2pProto::ALWAYS,
-            P2pMode::IfPossible => WebRtcPublishEndpointP2pProto::IF_POSSIBLE,
-            P2pMode::Never => WebRtcPublishEndpointP2pProto::NEVER,
+            Self::Always => WebRtcPublishEndpointP2pProto::ALWAYS,
+            Self::IfPossible => WebRtcPublishEndpointP2pProto::IF_POSSIBLE,
+            Self::Never => WebRtcPublishEndpointP2pProto::NEVER,
         }
     }
 }
@@ -58,7 +52,7 @@ impl Into<WebRtcPublishEndpointP2pProto> for P2pMode {
 #[allow(clippy::module_name_repetitions)]
 #[derive(Clone, Deserialize, Debug)]
 pub struct WebRtcPublishEndpoint {
-    /// Peer-to-peer mode.
+    /// Peer-to-peer mode of this [`WebRtcPublishEndpoint`].
     pub p2p: P2pMode,
 }
 

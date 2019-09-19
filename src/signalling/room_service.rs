@@ -1,27 +1,29 @@
-//! Service which control [`Room`].
+//! Service which provides CRUD actions for [`Room`].
+
+use std::{collections::HashMap, marker::PhantomData};
 
 use actix::{
-    fut::wrap_future, Actor, ActorFuture, Addr, AsyncContext as _, Context,
-    Handler, MailboxError, Message,
+    fut::wrap_future, Actor, ActorFuture, Addr, Context, Handler, MailboxError,
+    Message,
 };
+use derive_more::Display;
 use failure::Fail;
-use futures::future::{Either, Future};
-use medea_grpc_proto::control::Element as ElementProto;
+use futures::future::{self, Either, Future};
+use medea_control_api_proto::grpc::control_api::Element as ElementProto;
 
 use crate::{
     api::control::{
         endpoints::Endpoint as EndpointSpec,
         load_static_specs_from_dir,
-        local_uri::{IsEndpointId, IsMemberId, IsRoomId, LocalUri},
-        MemberId, MemberSpec, RoomId, RoomSpec,
+        local_uri::{LocalUri, StatefulLocalUri, ToEndpoint, ToMember, ToRoom},
+        LoadStaticControlSpecsError, MemberSpec, RoomId, RoomSpec,
     },
     log::prelude::*,
     shutdown::{self, GracefulShutdown},
     signalling::{
         room::{
-            Close, CreateEndpoint, CreateMember, DeleteEndpoint, DeleteMember,
-            RoomError, SerializeProtobufEndpoint, SerializeProtobufMember,
-            SerializeProtobufRoom,
+            Close, CreateEndpoint, CreateMember, Delete, RoomError,
+            SerializeProto,
         },
         room_repo::RoomRepository,
         Room,
@@ -32,32 +34,64 @@ use crate::{
 type ActFuture<I, E> =
     Box<dyn ActorFuture<Actor = RoomService, Item = I, Error = E>>;
 
+/// Errors of [`RoomService`].
 #[allow(clippy::module_name_repetitions)]
-#[derive(Debug, Fail)]
+#[derive(Debug, Fail, Display)]
 pub enum RoomServiceError {
-    #[fail(display = "Room [id = {}] not found.", _0)]
-    RoomNotFound(LocalUri<IsRoomId>),
-    #[fail(display = "Mailbox error: {:?}", _0)]
-    MailboxError(MailboxError),
-    #[fail(display = "Room [id = {}] already exists.", _0)]
-    RoomAlreadyExists(LocalUri<IsRoomId>),
-    #[fail(display = "{}", _0)]
+    /// [`Room`] not found in [`RoomRepository`].
+    #[display(fmt = "Room [id = {}] not found.", _0)]
+    RoomNotFound(LocalUri<ToRoom>),
+
+    /// Wrapper for [`Room`]'s [`MailboxError`].
+    #[display(fmt = "Room mailbox error: {:?}", _0)]
+    RoomMailboxErr(MailboxError),
+
+    /// Try to create [`Room`] with [`RoomId`] which already exists in
+    /// [`RoomRepository`].
+    #[display(fmt = "Room [id = {}] already exists.", _0)]
+    RoomAlreadyExists(LocalUri<ToRoom>),
+
+    /// Some error happened in [`Room`].
+    ///
+    /// For more info read [`RoomError`] docs.
+    #[display(fmt = "{}", _0)]
     RoomError(RoomError),
-    #[fail(display = "Failed to load static specs. {:?}", _0)]
-    FailedToLoadStaticSpecs(failure::Error),
-    #[fail(display = "Unknow error.")]
-    Unknow,
+
+    /// Error which can happen while loading static [Control API] specs.
+    ///
+    /// [Control API]: http://tiny.cc/380uaz
+    #[display(fmt = "Failed to load static specs. {:?}", _0)]
+    FailedToLoadStaticSpecs(LoadStaticControlSpecsError),
+
+    /// Provided empty [`LocalUri`] list.
+    #[display(fmt = "Empty URIs list.")]
+    EmptyUrisList,
+
+    /// Provided [`LocalUri`] to some element from [`Room`] but [`Room`] with
+    /// ID from this [`LocalUri`] not found in [`RoomRepository`].
+    #[display(fmt = "Room not found for element [id = {}]", _0)]
+    RoomNotFoundForElement(StatefulLocalUri),
+
+    /// Provided not the same [`RoomId`]s in [`LocalUri`] list.
+    ///
+    /// Atm this error can happen in `Delete` method because `Delete` should be
+    /// called only for one [`Room`].
+    #[display(
+        fmt = "Provided not the same Room IDs in elements IDs [ids = {:?}].",
+        _0
+    )]
+    NotSameRoomIds(Vec<StatefulLocalUri>, RoomId),
 }
 
 impl From<RoomError> for RoomServiceError {
     fn from(err: RoomError) -> Self {
-        RoomServiceError::RoomError(err)
+        Self::RoomError(err)
     }
 }
 
-impl From<MailboxError> for RoomServiceError {
-    fn from(e: MailboxError) -> Self {
-        RoomServiceError::MailboxError(e)
+impl From<LoadStaticControlSpecsError> for RoomServiceError {
+    fn from(err: LoadStaticControlSpecsError) -> Self {
+        Self::FailedToLoadStaticSpecs(err)
     }
 }
 
@@ -69,10 +103,15 @@ pub struct RoomService {
     /// Global app context.
     app: AppContext,
 
+    /// Address to [`GracefulShutdown`].
+    ///
+    /// Use for subscribe newly created [`Room`]s to [`GracefulShutdown`] and
+    /// unsubscribe deleted [`Room`]s from [`GracefulShutdown`].
     graceful_shutdown: Addr<GracefulShutdown>,
 }
 
 impl RoomService {
+    /// Creates new [`RoomService`].
     pub fn new(
         room_repo: RoomRepository,
         app: AppContext,
@@ -82,6 +121,31 @@ impl RoomService {
             room_repo,
             app,
             graceful_shutdown,
+        }
+    }
+
+    /// Closes [`Room`] with provided [`RoomId`].
+    ///
+    /// This is also deletes this [`Room`] from [`RoomRepository`].
+    fn close_room(
+        &self,
+        id: RoomId,
+    ) -> Box<dyn Future<Item = (), Error = MailboxError>> {
+        if let Some(room) = self.room_repo.get(&id) {
+            shutdown::unsubscribe(
+                &self.graceful_shutdown,
+                room.clone().recipient(),
+                shutdown::Priority(2),
+            );
+
+            let room_repo = self.room_repo.clone();
+
+            Box::new(room.send(Close).map(move |_| {
+                debug!("Room [id = {}] removed.", id);
+                room_repo.remove(&id);
+            }))
+        } else {
+            Box::new(futures::future::ok(()))
         }
     }
 }
@@ -94,8 +158,8 @@ impl Actor for RoomService {
 ///
 /// __Note__ this function don't check presence of [`Room`] in this
 /// [`RoomService`].
-fn get_local_uri_to_room(room_id: RoomId) -> LocalUri<IsRoomId> {
-    LocalUri::<IsRoomId>::new(room_id)
+fn get_local_uri_to_room(room_id: RoomId) -> LocalUri<ToRoom> {
+    LocalUri::<ToRoom>::new(room_id)
 }
 
 /// Signal for load all static specs and start [`Room`]s.
@@ -111,53 +175,54 @@ impl Handler<StartStaticRooms> for RoomService {
         _: StartStaticRooms,
         _: &mut Self::Context,
     ) -> Self::Result {
-        if let Some(static_specs_path) =
-            self.app.config.server.http.static_specs_path.clone()
-        {
-            let room_specs = match load_static_specs_from_dir(static_specs_path)
-            {
-                Ok(r) => r,
-                Err(e) => {
-                    return Err(RoomServiceError::FailedToLoadStaticSpecs(e))
-                }
-            };
+        let room_specs = load_static_specs_from_dir(
+            self.app.config.control_api.static_specs_dir.clone(),
+        )?;
 
-            for spec in room_specs {
-                if self.room_repo.is_contains_room_with_id(spec.id()) {
-                    return Err(RoomServiceError::RoomAlreadyExists(
-                        get_local_uri_to_room(spec.id),
-                    ));
-                }
-
-                let room_id = spec.id().clone();
-
-                let room = Room::new(&spec, self.app.clone())?.start();
-                shutdown::subscribe(
-                    &self.graceful_shutdown,
-                    room.clone().recipient(),
-                    shutdown::Priority(2),
-                );
-
-                self.room_repo.add(room_id, room);
+        for spec in room_specs {
+            if self.room_repo.is_contains_room_with_id(spec.id()) {
+                return Err(RoomServiceError::RoomAlreadyExists(
+                    get_local_uri_to_room(spec.id),
+                ));
             }
+
+            let room_id = spec.id().clone();
+
+            let room = Room::new(&spec, self.app.clone())?.start();
+            shutdown::subscribe(
+                &self.graceful_shutdown,
+                room.clone().recipient(),
+                shutdown::Priority(2),
+            );
+
+            self.room_repo.add(room_id, room);
         }
         Ok(())
     }
 }
 
+/// Signal for creating new [`Room`].
 #[derive(Message)]
 #[rtype(result = "Result<(), RoomServiceError>")]
-pub struct StartRoom(pub RoomId, pub RoomSpec);
+pub struct CreateRoom {
+    /// [`LocalUri`] with which will be created new [`Room`].
+    pub uri: LocalUri<ToRoom>,
 
-impl Handler<StartRoom> for RoomService {
+    /// [Control API] spec for [`Room`].
+    ///
+    /// [Control API]: http://tiny.cc/380uaz
+    pub spec: RoomSpec,
+}
+
+impl Handler<CreateRoom> for RoomService {
     type Result = Result<(), RoomServiceError>;
 
     fn handle(
         &mut self,
-        msg: StartRoom,
-        _ctx: &mut Self::Context,
+        msg: CreateRoom,
+        _: &mut Self::Context,
     ) -> Self::Result {
-        let room_id = msg.0;
+        let room_id = msg.uri.take_room_id();
 
         if self.room_repo.get(&room_id).is_some() {
             return Err(RoomServiceError::RoomAlreadyExists(
@@ -165,9 +230,7 @@ impl Handler<StartRoom> for RoomService {
             ));
         }
 
-        let room = msg.1;
-
-        let room = Room::new(&room, self.app.clone())?;
+        let room = Room::new(&msg.spec, self.app.clone())?;
         let room_addr = room.start();
 
         shutdown::subscribe(
@@ -183,255 +246,236 @@ impl Handler<StartRoom> for RoomService {
     }
 }
 
-/// Signal for delete [`Room`].
-#[derive(Message)]
-#[rtype(result = "Result<(), RoomServiceError>")]
-pub struct DeleteRoom(pub RoomId);
+/// State which indicates that [`DeleteElements`] message was validated and can
+/// be send to [`RoomService`].
+pub struct Validated;
 
-impl Handler<DeleteRoom> for RoomService {
-    type Result = Result<(), RoomServiceError>;
+/// State which indicates that [`DeleteElements`] message is unvalidated and
+/// should be validated with `validate()` function of [`DeleteElements`] in
+/// [`Unvalidated`] state before sending to [`RoomService`].
+pub struct Unvalidated;
 
-    fn handle(
-        &mut self,
-        msg: DeleteRoom,
-        ctx: &mut Self::Context,
-    ) -> Self::Result {
-        if let Some(room) = self.room_repo.get(&msg.0) {
-            shutdown::unsubscribe(
-                &self.graceful_shutdown,
-                room.clone().recipient(),
-                shutdown::Priority(2),
-            );
-            let rooms = self.room_repo.clone();
-            ctx.spawn(wrap_future(
-                room.send(Close)
-                    .map(move |_| {
-                        rooms.remove(&msg.0);
-                        debug!("Room [id = {}] removed.", msg.0);
-                    })
-                    .map_err(|e| warn!("Close room mailbox error {:?}.", e)),
+// Clippy lint show use_self errors for DeleteElements with generic state. This
+// is fix for it. This allow not works on function.
+#[allow(clippy::use_self)]
+impl DeleteElements<Unvalidated> {
+    pub fn new() -> Self {
+        Self {
+            uris: Vec::new(),
+            _validation_state: PhantomData,
+        }
+    }
+
+    pub fn add_uri(&mut self, uri: StatefulLocalUri) {
+        self.uris.push(uri)
+    }
+
+    // TODO: delete this allow when drain_filter TODO will be resolved.
+    #[allow(clippy::unnecessary_filter_map)]
+    pub fn validate(
+        self,
+    ) -> Result<DeleteElements<Validated>, RoomServiceError> {
+        if self.uris.is_empty() {
+            return Err(RoomServiceError::EmptyUrisList);
+        }
+
+        let mut ignored_uris = Vec::new();
+
+        let first_room = self.uris[0].room_id().clone();
+        // TODO: rewrite using Vec::drain_filter when it will be in stable
+        let uris: Vec<StatefulLocalUri> = self
+            .uris
+            .into_iter()
+            .filter_map(|uri| {
+                if uri.room_id() == &first_room {
+                    Some(uri)
+                } else {
+                    ignored_uris.push(uri);
+                    None
+                }
+            })
+            .collect();
+
+        if !ignored_uris.is_empty() {
+            return Err(RoomServiceError::NotSameRoomIds(
+                ignored_uris,
+                first_room,
             ));
         }
 
-        Ok(())
+        Ok(DeleteElements {
+            uris,
+            _validation_state: PhantomData,
+        })
     }
 }
 
-/// Signal for delete [`Member`] from [`Room`].
-#[derive(Message)]
+/// Signal for delete [Control API] elements.
+///
+/// This message can be in two states: [`Validated`] and [`Unvalidated`].
+///
+/// For ability to send this message to [`RoomService`] [`DeleteElements`]
+/// should be in [`Validated`] state. You can go to [`Validated`] state
+/// from [`Unvalidated`] with [`DeleteElements::validate`] function
+/// which will validate all [`StatefulLocalUri`]s.
+///
+/// Validation doesn't guarantee that message can't return [`RoomServiceError`].
+/// This is just validation for errors which we can catch before sending
+/// message.
+///
+/// [Control API]: http://tiny.cc/380uaz
+#[derive(Message, Default)]
 #[rtype(result = "Result<(), RoomServiceError>")]
-pub struct DeleteMemberFromRoom {
-    pub member_id: MemberId,
-    pub room_id: RoomId,
+pub struct DeleteElements<T> {
+    uris: Vec<StatefulLocalUri>,
+    _validation_state: PhantomData<T>,
 }
 
-impl Handler<DeleteMemberFromRoom> for RoomService {
-    type Result = Result<(), RoomServiceError>;
+impl Handler<DeleteElements<Validated>> for RoomService {
+    type Result = ActFuture<(), RoomServiceError>;
 
+    // TODO: delete 'clippy::unnecessary_filter_map` when drain_filter TODO will
+    // be resolved.
+    #[allow(clippy::if_not_else, clippy::unnecessary_filter_map)]
     fn handle(
         &mut self,
-        msg: DeleteMemberFromRoom,
-        _ctx: &mut Self::Context,
+        msg: DeleteElements<Validated>,
+        _: &mut Self::Context,
     ) -> Self::Result {
-        if let Some(room) = self.room_repo.get(&msg.room_id) {
-            room.do_send(DeleteMember(msg.member_id));
+        if msg.uris.is_empty() {
+            return Box::new(actix::fut::err(RoomServiceError::EmptyUrisList));
+        }
+
+        let mut deletes_from_room: Vec<StatefulLocalUri> = Vec::new();
+        // TODO: use Vec::drain_filter when it will be in stable
+        let room_messages_futs: Vec<
+            Box<dyn Future<Item = (), Error = MailboxError>>,
+        > = msg
+            .uris
+            .into_iter()
+            .filter_map(|l| {
+                if let StatefulLocalUri::Room(room_id) = l {
+                    Some(self.close_room(room_id.take_room_id()))
+                } else {
+                    deletes_from_room.push(l);
+                    None
+                }
+            })
+            .collect();
+
+        if !room_messages_futs.is_empty() {
+            Box::new(wrap_future(
+                futures::future::join_all(room_messages_futs)
+                    .map(|_| ())
+                    .map_err(RoomServiceError::RoomMailboxErr),
+            ))
+        } else if !deletes_from_room.is_empty() {
+            let room_id = deletes_from_room[0].room_id().clone();
+
+            if let Some(room) = self.room_repo.get(&room_id) {
+                Box::new(wrap_future(
+                    room.send(Delete(deletes_from_room))
+                        .map_err(RoomServiceError::RoomMailboxErr),
+                ))
+            } else {
+                Box::new(actix::fut::ok(()))
+            }
         } else {
-            return Err(RoomServiceError::RoomNotFound(get_local_uri_to_room(
-                msg.room_id,
-            )));
+            Box::new(actix::fut::err(RoomServiceError::EmptyUrisList))
         }
-
-        Ok(())
     }
 }
 
-/// Signal for delete [`Endpoint`] from [`Member`].
+/// Message which returns serialized to protobuf objects by provided
+/// [`LocalUri`].
 #[derive(Message)]
-#[rtype(result = "Result<(), RoomServiceError>")]
-pub struct DeleteEndpointFromMember {
-    pub room_id: RoomId,
-    pub member_id: MemberId,
-    pub endpoint_id: String,
-}
+#[rtype(result = "Result<HashMap<StatefulLocalUri, ElementProto>, \
+                  RoomServiceError>")]
+pub struct Get(pub Vec<StatefulLocalUri>);
 
-impl Handler<DeleteEndpointFromMember> for RoomService {
-    type Result = Result<(), RoomServiceError>;
+impl Handler<Get> for RoomService {
+    type Result =
+        ActFuture<HashMap<StatefulLocalUri, ElementProto>, RoomServiceError>;
 
-    fn handle(
-        &mut self,
-        msg: DeleteEndpointFromMember,
-        _ctx: &mut Self::Context,
-    ) -> Self::Result {
-        if let Some(room) = self.room_repo.get(&msg.room_id) {
-            room.do_send(DeleteEndpoint {
-                endpoint_id: msg.endpoint_id,
-                member_id: msg.member_id,
-            });
-        }
-
-        Ok(())
-    }
-}
-
-/// Type alias for result of Get request.
-type GetResults = Vec<Result<(String, ElementProto), RoomError>>;
-
-/// Signal for get serialized to protobuf object [`Room`].
-#[derive(Message)]
-#[rtype(result = "Result<GetResults, RoomServiceError>")]
-pub struct GetRoom(pub Vec<RoomId>);
-
-impl Handler<GetRoom> for RoomService {
-    type Result = ActFuture<GetResults, RoomServiceError>;
-
-    fn handle(
-        &mut self,
-        msg: GetRoom,
-        _ctx: &mut Self::Context,
-    ) -> Self::Result {
-        let mut futs = Vec::new();
-
-        for room_id in msg.0 {
-            if let Some(room) = self.room_repo.get(&room_id) {
-                futs.push(
-                    room.send(SerializeProtobufRoom)
-                        .map_err(RoomServiceError::from)
-                        .map(move |result| {
-                            result.map(|r| {
-                                let local_uri =
-                                    LocalUri::<IsRoomId>::new(room_id);
-                                (local_uri.to_string(), r)
-                            })
-                        }),
-                )
+    fn handle(&mut self, msg: Get, _: &mut Self::Context) -> Self::Result {
+        let mut rooms_elements = HashMap::new();
+        for uri in msg.0 {
+            if self.room_repo.is_contains_room_with_id(uri.room_id()) {
+                rooms_elements
+                    .entry(uri.room_id().clone())
+                    .or_insert_with(Vec::new)
+                    .push(uri);
+            } else if let StatefulLocalUri::Room(room_uri) = uri {
+                return Box::new(actix::fut::err(
+                    RoomServiceError::RoomNotFound(room_uri),
+                ));
             } else {
-                return Box::new(wrap_future(futures::future::err(
-                    RoomServiceError::RoomNotFound(get_local_uri_to_room(
-                        room_id,
-                    )),
-                )));
+                return Box::new(actix::fut::err(
+                    RoomServiceError::RoomNotFoundForElement(uri),
+                ));
             }
         }
 
-        Box::new(wrap_future(futures::future::join_all(futs)))
-    }
-}
-
-/// Signal for get serialized to protobuf object [`Member`].
-#[derive(Message)]
-#[rtype(result = "Result<GetResults, RoomServiceError>")]
-pub struct GetMember(pub Vec<(RoomId, MemberId)>);
-
-impl Handler<GetMember> for RoomService {
-    type Result = ActFuture<GetResults, RoomServiceError>;
-
-    fn handle(
-        &mut self,
-        msg: GetMember,
-        _ctx: &mut Self::Context,
-    ) -> Self::Result {
         let mut futs = Vec::new();
-
-        for (room_id, member_id) in msg.0 {
+        for (room_id, mut elements) in rooms_elements {
             if let Some(room) = self.room_repo.get(&room_id) {
-                futs.push(
-                    room.send(SerializeProtobufMember(member_id.clone()))
-                        .map_err(RoomServiceError::from)
-                        .map(|result| {
-                            result.map(|r| {
-                                let local_uri = LocalUri::<IsMemberId>::new(
-                                    room_id, member_id,
-                                );
-
-                                (local_uri.to_string(), r)
-                            })
-                        }),
-                )
+                futs.push(room.send(SerializeProto(elements)));
             } else {
-                return Box::new(wrap_future(futures::future::err(
-                    RoomServiceError::RoomNotFound(get_local_uri_to_room(
-                        room_id,
-                    )),
-                )));
+                return Box::new(actix::fut::err(
+                    RoomServiceError::RoomNotFoundForElement(
+                        elements.remove(0),
+                    ),
+                ));
             }
         }
 
-        Box::new(wrap_future(futures::future::join_all(futs)))
-    }
-}
-
-/// Signal for get serialized to protobuf object `Endpoint`.
-#[derive(Message)]
-#[rtype(result = "Result<GetResults, RoomServiceError>")]
-pub struct GetEndpoint(pub Vec<(RoomId, MemberId, String)>);
-
-impl Handler<GetEndpoint> for RoomService {
-    type Result = ActFuture<GetResults, RoomServiceError>;
-
-    fn handle(
-        &mut self,
-        msg: GetEndpoint,
-        _ctx: &mut Self::Context,
-    ) -> Self::Result {
-        let mut futs = Vec::new();
-
-        for (room_id, member_id, endpoint_id) in msg.0 {
-            if let Some(room) = self.room_repo.get(&room_id) {
-                futs.push(
-                    room.send(SerializeProtobufEndpoint(
-                        member_id.clone(),
-                        endpoint_id.clone(),
-                    ))
-                    .map_err(RoomServiceError::from)
-                    .map(|result| {
-                        result.map(|r| {
-                            let local_uri = LocalUri::<IsEndpointId>::new(
-                                room_id,
-                                member_id,
-                                endpoint_id,
-                            );
-                            (local_uri.to_string(), r)
-                        })
-                    }),
-                );
-            } else {
-                return Box::new(wrap_future(futures::future::err(
-                    RoomServiceError::RoomNotFound(get_local_uri_to_room(
-                        room_id,
-                    )),
-                )));
-            }
-        }
-
-        Box::new(wrap_future(futures::future::join_all(futs)))
+        Box::new(wrap_future(
+            futures::future::join_all(futs)
+                .map_err(RoomServiceError::RoomMailboxErr)
+                .and_then(|results| {
+                    let mut all = HashMap::new();
+                    for result in results {
+                        match result {
+                            Ok(res) => all.extend(res),
+                            Err(e) => return Err(RoomServiceError::from(e)),
+                        }
+                    }
+                    Ok(all)
+                }),
+        ))
     }
 }
 
 /// Signal for create new [`Member`] in [`Room`]
+///
+/// [`Member`]: crate::signalling::elements::member::Member
 #[derive(Message)]
-#[rtype(result = "Result<Result<(), RoomError>, RoomServiceError>")]
+#[rtype(result = "Result<(), RoomServiceError>")]
 pub struct CreateMemberInRoom {
-    pub room_id: RoomId,
-    pub member_id: MemberId,
+    pub uri: LocalUri<ToMember>,
     pub spec: MemberSpec,
 }
 
 impl Handler<CreateMemberInRoom> for RoomService {
-    type Result = ActFuture<Result<(), RoomError>, RoomServiceError>;
+    type Result = ActFuture<(), RoomServiceError>;
 
     fn handle(
         &mut self,
         msg: CreateMemberInRoom,
-        _ctx: &mut Self::Context,
+        _: &mut Self::Context,
     ) -> Self::Result {
-        let fut = if let Some(room) = self.room_repo.get(&msg.room_id) {
+        let (member_id, room_uri) = msg.uri.take_member_id();
+        let room_id = room_uri.take_room_id();
+
+        let fut = if let Some(room) = self.room_repo.get(&room_id) {
             Either::A(
-                room.send(CreateMember(msg.member_id, msg.spec))
-                    .map_err(RoomServiceError::from),
+                room.send(CreateMember(member_id, msg.spec))
+                    .map_err(RoomServiceError::RoomMailboxErr)
+                    .and_then(|r| r.map_err(RoomServiceError::from)),
             )
         } else {
-            Either::B(futures::future::err(RoomServiceError::RoomNotFound(
-                get_local_uri_to_room(msg.room_id),
+            Either::B(future::err(RoomServiceError::RoomNotFound(
+                get_local_uri_to_room(room_id),
             )))
         };
 
@@ -440,35 +484,40 @@ impl Handler<CreateMemberInRoom> for RoomService {
 }
 
 /// Signal for create new [`Endpoint`] in [`Room`]
+///
+/// [`Endpoint`]: crate::signalling::elements::endpoints::Endpoint
 #[derive(Message)]
-#[rtype(result = "Result<Result<(), RoomError>, RoomServiceError>")]
+#[rtype(result = "Result<(), RoomServiceError>")]
 pub struct CreateEndpointInRoom {
-    pub room_id: RoomId,
-    pub member_id: MemberId,
-    pub endpoint_id: String,
+    pub uri: LocalUri<ToEndpoint>,
     pub spec: EndpointSpec,
 }
 
 impl Handler<CreateEndpointInRoom> for RoomService {
-    type Result = ActFuture<Result<(), RoomError>, RoomServiceError>;
+    type Result = ActFuture<(), RoomServiceError>;
 
     fn handle(
         &mut self,
         msg: CreateEndpointInRoom,
-        _ctx: &mut Self::Context,
+        _: &mut Self::Context,
     ) -> Self::Result {
-        let fut = if let Some(room) = self.room_repo.get(&msg.room_id) {
+        let (endpoint_id, member_uri) = msg.uri.take_endpoint_id();
+        let (member_id, room_uri) = member_uri.take_member_id();
+        let room_id = room_uri.take_room_id();
+
+        let fut = if let Some(room) = self.room_repo.get(&room_id) {
             Either::A(
                 room.send(CreateEndpoint {
-                    member_id: msg.member_id,
-                    endpoint_id: msg.endpoint_id,
+                    member_id,
+                    endpoint_id,
                     spec: msg.spec,
                 })
-                .map_err(RoomServiceError::from),
+                .map_err(RoomServiceError::RoomMailboxErr)
+                .and_then(|r| r.map_err(RoomServiceError::from)),
             )
         } else {
-            Either::B(futures::future::err(RoomServiceError::RoomNotFound(
-                get_local_uri_to_room(msg.room_id),
+            Either::B(future::err(RoomServiceError::RoomNotFound(
+                get_local_uri_to_room(room_id),
             )))
         };
 

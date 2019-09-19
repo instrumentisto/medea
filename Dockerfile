@@ -1,9 +1,15 @@
 #
+# Dockerfile of instrumentisto/medea Docker image.
+#
+
+
+#
 # Stage 'dist' creates project distribution.
 #
 
 # https://hub.docker.com/_/rust
-FROM medea-build AS dist
+ARG medea_build_image=instrumentisto/medea-build:latest
+FROM ${medea_build_image} AS dist
 ARG rustc_mode=release
 ARG rustc_opts=--release
 ARG cargo_home=/usr/local/cargo

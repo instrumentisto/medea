@@ -5,9 +5,9 @@ use std::{fmt, sync::Arc};
 use actix_web::web::Path;
 use futures::Future;
 use grpcio::{ChannelBuilder, EnvBuilder, Error};
-use medea_grpc_proto::{
-    control::{CreateRequest, GetResponse, IdRequest, Response},
-    control_grpc::ControlApiClient,
+use medea_control_api_proto::grpc::{
+    control_api::{CreateRequest, GetResponse, IdRequest, Response},
+    control_api_grpc::ControlApiClient,
 };
 use protobuf::RepeatedField;
 
@@ -16,6 +16,7 @@ use crate::server::{
     member::{Member, MemberPath},
     room::{Room, RoomPath},
 };
+use medea_control_api_proto::grpc::control_api::CreateResponse;
 
 /// Uri to `Room` element.
 #[derive(Clone, Debug)]
@@ -119,7 +120,7 @@ impl ControlClient {
         &self,
         uri: &RoomUri,
         room: Room,
-    ) -> impl Future<Item = Response, Error = Error> {
+    ) -> impl Future<Item = CreateResponse, Error = Error> {
         let mut req = CreateRequest::new();
         req.set_room(room.into());
         req.set_id(uri.to_string());
@@ -132,7 +133,7 @@ impl ControlClient {
         &self,
         uri: &MemberUri,
         member: Member,
-    ) -> impl Future<Item = Response, Error = Error> {
+    ) -> impl Future<Item = CreateResponse, Error = Error> {
         let mut req = CreateRequest::new();
         req.set_member(member.into());
         req.set_id(uri.to_string());
@@ -144,7 +145,7 @@ impl ControlClient {
         &self,
         uri: &EndpointUri,
         endpoint: Endpoint,
-    ) -> impl Future<Item = Response, Error = Error> {
+    ) -> impl Future<Item = CreateResponse, Error = Error> {
         let mut req = CreateRequest::new();
         req.set_id(uri.to_string());
         match endpoint {

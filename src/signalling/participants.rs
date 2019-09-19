@@ -10,9 +10,9 @@
 use std::{collections::HashMap, time::Instant};
 
 use actix::{
-    fut::wrap_future, ActorFuture, AsyncContext, Context, MailboxError,
-    SpawnHandle,
+    fut::wrap_future, ActorFuture, AsyncContext, Context, SpawnHandle,
 };
+use derive_more::Display;
 use failure::Fail;
 use futures::{
     future::{self, join_all, Either},
@@ -32,7 +32,7 @@ use crate::{
                 WebRtcPlayEndpoint as WebRtcPlayEndpointSpec,
                 WebRtcPublishEndpoint as WebRtcPublishEndpointSpec,
             },
-            local_uri::{IsEndpointId, IsMemberId, LocalUri},
+            local_uri::{LocalUri, ToEndpoint, ToMember},
             MemberId, MemberSpec, RoomId, RoomSpec, WebRtcPlayId,
             WebRtcPublishId,
         },
@@ -52,26 +52,38 @@ use crate::{
     AppContext,
 };
 
-#[derive(Fail, Debug)]
 #[allow(clippy::module_name_repetitions)]
+#[derive(Debug, Display, Fail)]
 pub enum ParticipantServiceErr {
-    #[fail(display = "TurnService Error in ParticipantService: {}", _0)]
+    /// Some error happened in [`TurnAuthService`].
+    ///
+    /// [`TurnAuthService`]: crate::turn::service::TurnAuthService
+    #[display(fmt = "TurnService Error in ParticipantService: {}", _0)]
     TurnServiceErr(TurnServiceErr),
-    #[fail(
-        display = "Mailbox error when accessing ParticipantService: {}",
-        _0
-    )]
-    MailBoxErr(MailboxError),
-    #[fail(display = "Participant [id = {}] not found", _0)]
-    ParticipantNotFound(LocalUri<IsMemberId>),
-    #[fail(display = "Endpoint [id = {}] not found.", _0)]
-    EndpointNotFound(LocalUri<IsEndpointId>),
-    #[fail(display = "{}", _0)]
+
+    /// [`Member`] with provided [`LocalUri`] not found.
+    #[display(fmt = "Participant [id = {}] not found", _0)]
+    ParticipantNotFound(LocalUri<ToMember>),
+
+    /// [`Endpoint`] with provided URI not found.
+    ///
+    /// [`Endpoint`]: crate::signalling::elements::endpoints::Endpoint
+    #[display(fmt = "Endpoint [id = {}] not found.", _0)]
+    EndpointNotFound(LocalUri<ToEndpoint>),
+
+    /// Some error happened in [`Member`].
+    #[display(fmt = "{}", _0)]
     MemberError(MemberError),
-    #[fail(display = "Participant [id = {}] already exists.", _0)]
-    ParticipantAlreadyExists(LocalUri<IsMemberId>),
-    #[fail(display = "Endpoint [id = {}] already exists.", _0)]
-    EndpointAlreadyExists(LocalUri<IsEndpointId>),
+
+    /// Try to create [`Member`] with ID which already exists.
+    #[display(fmt = "Participant [id = {}] already exists.", _0)]
+    ParticipantAlreadyExists(LocalUri<ToMember>),
+
+    /// Try to create [`Endpoint`] with ID which already exists.
+    ///
+    /// [`Endpoint`]: crate::signalling::elements::endpoints::Endpoint
+    #[display(fmt = "Endpoint [id = {}] already exists.", _0)]
+    EndpointAlreadyExists(LocalUri<ToEndpoint>),
 }
 
 impl From<TurnServiceErr> for ParticipantServiceErr {
@@ -80,15 +92,9 @@ impl From<TurnServiceErr> for ParticipantServiceErr {
     }
 }
 
-impl From<MailboxError> for ParticipantServiceErr {
-    fn from(err: MailboxError) -> Self {
-        Self::MailBoxErr(err)
-    }
-}
-
 impl From<MemberError> for ParticipantServiceErr {
     fn from(err: MemberError) -> Self {
-        ParticipantServiceErr::MemberError(err)
+        Self::MemberError(err)
     }
 }
 
@@ -120,7 +126,7 @@ pub struct ParticipantService {
 }
 
 impl ParticipantService {
-    /// Create new [`ParticipantService`] from [`RoomSpec`].
+    /// Creates new [`ParticipantService`] from [`RoomSpec`].
     pub fn new(
         room_spec: &RoomSpec,
         context: AppContext,
@@ -134,25 +140,26 @@ impl ParticipantService {
         })
     }
 
-    /// Lookup [`Member`] by provided id.
+    /// Lookups [`Member`] by provided [`MemberId`].
     pub fn get_member_by_id(&self, id: &MemberId) -> Option<Member> {
         self.members.get(id).cloned()
     }
 
-    /// Generate [`LocalUri`] which point to some [`Member`] in this `Room`.
+    /// Generates [`LocalUri`] which point to some [`Member`] in this
+    /// [`ParticipantService`]'s [`Room`].
     ///
-    /// __Note__ this function don't check presence of [`Member`] in this
-    /// `Room`.
+    /// __Note__ this function don't check presence of [`Member`] in
+    /// [`ParticipantService`].
     fn get_local_uri_to_member(
         &self,
         member_id: MemberId,
-    ) -> LocalUri<IsMemberId> {
-        LocalUri::<IsMemberId>::new(self.room_id.clone(), member_id)
+    ) -> LocalUri<ToMember> {
+        LocalUri::<ToMember>::new(self.room_id.clone(), member_id)
     }
 
-    /// Lookup [`Member`] by [`MemberId`].
+    /// Lookups [`Member`] by [`MemberId`].
     ///
-    /// Returns [`ParticipantServiceErr::ParticipantNotFound`] if member not
+    /// Returns [`ParticipantServiceErr::ParticipantNotFound`] if [`Member`] not
     /// found.
     pub fn get_member(
         &self,
@@ -171,11 +178,13 @@ impl ParticipantService {
         self.members.clone()
     }
 
-    /// Lookup [`Member`] by provided id and credentials. Returns
-    /// [`Err(AuthorizationError::MemberNotExists)`] if lookup by
-    /// [`MemberId`] failed. Returns
-    /// [`Err(AuthorizationError::InvalidCredentials)`] if [`Member`]
-    /// was found, but incorrect credentials was provided.
+    /// Lookups [`Member`] by provided [`MemberId`] and credentials.
+    ///
+    /// Returns [`Err(AuthorizationError::MemberNotExists)`] if lookup by
+    /// [`MemberId`] failed.
+    ///
+    /// Returns [`Err(AuthorizationError::InvalidCredentials)`] if [`Member`]
+    /// was found, but incorrect credentials were provided.
     pub fn get_member_by_id_and_credentials(
         &self,
         member_id: &MemberId,
@@ -184,7 +193,7 @@ impl ParticipantService {
         match self.get_member_by_id(member_id) {
             Some(member) => {
                 if member.credentials().eq(credentials) {
-                    Ok(member.clone())
+                    Ok(member)
                 } else {
                     Err(AuthorizationError::InvalidCredentials)
                 }
@@ -193,13 +202,13 @@ impl ParticipantService {
         }
     }
 
-    /// Checks if [`Member`] has **active** [`RpcConnection`].
+    /// Checks if [`Member`] has __active__ [`RpcConnection`].
     pub fn member_has_connection(&self, member_id: &MemberId) -> bool {
         self.connections.contains_key(member_id)
             && !self.drop_connection_tasks.contains_key(member_id)
     }
 
-    /// Send [`Event`] to specified remote [`Member`].
+    /// Sends [`Event`] to specified remote [`Member`].
     pub fn send_event_to_member(
         &mut self,
         member_id: MemberId,
@@ -223,7 +232,7 @@ impl ParticipantService {
         &mut self,
         ctx: &mut Context<Room>,
         member_id: MemberId,
-        con: Box<dyn RpcConnection>,
+        conn: Box<dyn RpcConnection>,
     ) -> ActFuture<Member, ParticipantServiceErr> {
         let member = match self.get_member_by_id(&member_id) {
             None => {
@@ -233,12 +242,12 @@ impl ParticipantService {
                     ),
                 )));
             }
-            Some(member) => member,
+            Some(member) => member.clone(),
         };
 
         // lookup previous member connection
         if let Some(mut connection) = self.connections.remove(&member_id) {
-            debug!("Closing old RpcConnection for participant {}", member_id);
+            debug!("Closing old RpcConnection for member [id = {}]", member_id);
 
             // cancel RpcConnection close task, since connection is
             // reestablished
@@ -259,7 +268,7 @@ impl ParticipantService {
                 })
                 .and_then(
                     move |ice: IceUser, room: &mut Room, _| {
-                        room.members.insert_connection(member_id.clone(), con);
+                        room.members.insert_connection(member_id, conn);
                         member.replace_ice_user(ice);
 
                         wrap_future(future::ok(member))
@@ -269,7 +278,7 @@ impl ParticipantService {
         }
     }
 
-    /// Insert new [`RpcConnection`] into this [`ParticipantService`].
+    /// Inserts new [`RpcConnection`] into this [`ParticipantService`].
     fn insert_connection(
         &mut self,
         member_id: MemberId,
@@ -293,10 +302,12 @@ impl ParticipantService {
             ClosedReason::Closed => {
                 debug!("Connection for member [id = {}] removed.", member_id);
                 self.connections.remove(&member_id);
-
                 ctx.spawn(wrap_future(
-                    self.delete_ice_user(&member_id).map_err(|err| {
-                        error!("Error deleting IceUser {:?}", err)
+                    self.delete_ice_user(&member_id).map_err(move |err| {
+                        error!(
+                            "Error deleting IceUser of Member [id = {}]. {:?}",
+                            member_id, err
+                        )
                     }),
                 ));
                 // TODO: we have no way to handle absence of RpcConnection right
@@ -307,11 +318,13 @@ impl ParticipantService {
                     member_id.clone(),
                     ctx.run_later(
                         self.app.config.rpc.reconnect_timeout,
-                        move |_, ctx| {
+                        move |room, ctx| {
                             info!(
-                                "Member {} connection lost at {:?}. Room will \
-                                 be stopped.",
-                                &member_id, closed_at
+                                "Member [id = {}] connection lost at {:?}. \
+                                 Room [id = {}] will be be stopped.",
+                                member_id,
+                                closed_at,
+                                room.id()
                             );
                             ctx.notify(RpcConnectionClosed {
                                 member_id,
@@ -329,6 +342,7 @@ impl ParticipantService {
         &mut self,
         member_id: &MemberId,
     ) -> Box<dyn Future<Item = (), Error = TurnServiceErr>> {
+        // TODO: rewrite using `Option::flatten` when it will be in stable rust.
         match self.get_member_by_id(&member_id) {
             Some(member) => match member.take_ice_user() {
                 Some(ice_user) => self.app.turn_service.delete(vec![ice_user]),
@@ -362,7 +376,7 @@ impl ParticipantService {
         let remove_ice_users = Box::new({
             let mut room_users = Vec::with_capacity(self.members.len());
 
-            self.members.iter().for_each(|(_, data)| {
+            self.members.values().for_each(|data| {
                 if let Some(ice_user) = data.take_ice_user() {
                     room_users.push(ice_user);
                 }
@@ -377,9 +391,11 @@ impl ParticipantService {
         join_all(close_fut).map(|_| ())
     }
 
-    /// Delete [`Member`] from [`ParticipantService`], remove this user from
-    /// [`TurnAuthService`], close RPC connection with him and remove drop
+    /// Deletes [`Member`] from [`ParticipantService`], remove this user from
+    /// [`TurnAuthService`], closes RPC connection with him and removes drop
     /// connection task.
+    ///
+    /// [`TurnAuthService`]: crate::turn::service::TurnAuthService
     pub fn delete_member(
         &mut self,
         member_id: &MemberId,
@@ -404,7 +420,7 @@ impl ParticipantService {
         }
     }
 
-    /// Create new [`Member`] in this [`ParticipantService`].
+    /// Creates new [`Member`] in this [`ParticipantService`].
     ///
     /// This function will check that new [`Member`]'s ID is not present in
     /// [`ParticipantService`].
@@ -461,7 +477,7 @@ impl ParticipantService {
         Ok(())
     }
 
-    /// Create new [`WebRtcPlayEndpoint`] in specified [`Member`].
+    /// Creates new [`WebRtcPlayEndpoint`] in specified [`Member`].
     ///
     /// This function will check that new [`WebRtcPlayEndpoint`]'s ID is not
     /// present in [`ParticipantService`].
@@ -475,11 +491,13 @@ impl ParticipantService {
         spec: WebRtcPlayEndpointSpec,
     ) -> Result<(), ParticipantServiceErr> {
         let member = self.get_member(&member_id)?;
-        if member.get_sink_by_id(&endpoint_id).is_some()
-            || member
-                .get_src_by_id(&WebRtcPublishId(endpoint_id.0.clone()))
-                .is_some()
-        {
+
+        let is_member_have_this_sink_id =
+            member.get_sink_by_id(&endpoint_id).is_some();
+        let is_member_have_this_src_id = member
+            .get_src_by_id(&WebRtcPublishId(endpoint_id.0.clone()))
+            .is_some();
+        if is_member_have_this_sink_id || is_member_have_this_src_id {
             return Err(ParticipantServiceErr::EndpointAlreadyExists(
                 member.get_local_uri_to_endpoint(endpoint_id.to_string()),
             ));
@@ -507,7 +525,7 @@ impl ParticipantService {
         Ok(())
     }
 
-    /// Create new [`WebRtcPlayEndpoint`] in specified [`Member`].
+    /// Creates new [`WebRtcPlayEndpoint`] in specified [`Member`].
     ///
     /// This function will check that new [`WebRtcPublishEndpoint`]'s ID is not
     /// present in [`ParticipantService`].
@@ -522,11 +540,12 @@ impl ParticipantService {
     ) -> Result<(), ParticipantServiceErr> {
         let member = self.get_member(&member_id)?;
 
-        if member.get_src_by_id(&endpoint_id).is_some()
-            || member
-                .get_sink_by_id(&WebRtcPlayId(endpoint_id.0.clone()))
-                .is_some()
-        {
+        let is_member_have_this_src_id =
+            member.get_src_by_id(&endpoint_id).is_some();
+        let is_member_have_this_sink_id = member
+            .get_sink_by_id(&WebRtcPlayId(endpoint_id.0.clone()))
+            .is_some();
+        if is_member_have_this_sink_id || is_member_have_this_src_id {
             return Err(ParticipantServiceErr::EndpointAlreadyExists(
                 member.get_local_uri_to_endpoint(endpoint_id.to_string()),
             ));

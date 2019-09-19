@@ -10,6 +10,7 @@ repository = "https://github.com/instrumentisto/medea"
 
 [dependencies]
 actix = "0.8"
+actix-cors = "0.1"
 actix-web = "1.0"
 actix-web-actors = "1.0"
 clap = "2.33"
@@ -23,6 +24,5 @@ slog-async = "2.3"
 slog-stdlog = "3.0"
 slog-envlogger = "2.1"
 dotenv = "0.13"
-medea-grpc-proto = { path = "../../../proto/grpc"}
+medea-control-api-proto = { path = "../../../proto/control-api" }
 protobuf = "2.7"
-actix-cors = "0.1"

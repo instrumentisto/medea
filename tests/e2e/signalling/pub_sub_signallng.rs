@@ -6,14 +6,13 @@ use crate::signalling::TestMember;
 #[test]
 fn pub_sub_video_call() {
     System::run(|| {
-        let base_url = "ws://0.0.0.0:8081/ws/pub-sub-video-call";
+        let base_url = "ws://127.0.0.1:8080/ws/pub-sub-video-call";
 
         // Note that events is separated by members.
         // Every member will have different instance of this.
-        let mut events = Vec::new();
-        let test_fn = move |event: &Event, _: &mut Context<TestMember>| {
-            events.push(event.clone());
-
+        let test_fn = move |event: &Event,
+                            _: &mut Context<TestMember>,
+                            events: Vec<&Event>| {
             // Start checking result of test.
             if let Event::IceCandidateDiscovered { .. } = event {
                 let peers_count = events
@@ -91,13 +90,16 @@ fn pub_sub_video_call() {
             }
         };
 
+        let deadline = Some(std::time::Duration::from_secs(5));
         TestMember::start(
             &format!("{}/caller/test", base_url),
-            Box::new(test_fn.clone()),
+            Box::new(test_fn),
+            deadline,
         );
         TestMember::start(
             &format!("{}/responder/test", base_url),
             Box::new(test_fn),
+            deadline,
         );
     })
     .unwrap();

@@ -14,15 +14,15 @@ All user visible changes to this project will be documented in this file. This p
 ### Added
 
 - Control API:
-    - Parse static control api specs ([#28]);
-    - Created interior entities for control API specs ([#28]).
-    - Dynamic control API exposed via gRPC (#[33](/../../pull/33)):
-        - `Create` method `Room`, `Member`, `Endpoint`;
+    - Support for static Сontrol API specs ([#28]).
+    - Dynamic Control API exposed via gRPC ([#33](/../../pull/33)):
+        - `Create` method for `Room`, `Member`, `Endpoint`;
         - `Get` method for `Room`, `Member`, `Endpoint`;
-        - `Delete` method for `Room`, `Member`, `Endpoint.
+        - `Delete` method for `Room`, `Member`, `Endpoint`.
 - Signalling:
-    - Dynamic `Peer`s creation when client connect ([#28]);
-    - Auto removing `Peer`s when `Member` disconnect ([#28]).
+    - Dynamic `Peer`s creation when client connects ([#28]);
+    - Auto-removing `Peer`s when `Member` disconnects ([#28]);
+    - Filter `SetIceCandidate` messages without `candidate` ([#50](/../../pull/50)).
 - Testing:
     - E2E tests for signalling ([#28]).
 
@@ -48,6 +48,7 @@ All user visible changes to this project will be documented in this file. This p
     - Ability to parse from files and env vars ([#15](/../../pull/15)).
 - Logging:
     - Structured logging to STDOUT/STDERR ([#12](/../../pull/12)).
+
 
 
 

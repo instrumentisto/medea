@@ -1,4 +1,9 @@
 #
+# Dockerfile of instrumentisto/medea-demo:latest Docker image.
+#
+
+
+#
 # Stage 'dist' creates project distribution.
 #
 

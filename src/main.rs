@@ -8,10 +8,7 @@ use medea::{
     conf::Conf,
     log::{self, prelude::*},
     shutdown::{self, GracefulShutdown},
-    signalling::{
-        room_repo::RoomRepository,
-        room_service::{RoomService, StartStaticRooms},
-    },
+    signalling::{room_repo::RoomRepository, room_service::RoomService},
     turn::new_turn_auth_service,
     AppContext,
 };
@@ -44,23 +41,13 @@ fn main() -> Result<(), Error> {
                 )
                 .start();
 
-                room_service
-                    .clone()
-                    .send(StartStaticRooms)
-                    .map_err(|e| {
-                        error!("StartStaticRooms mailbox error: {:?}", e)
-                    })
-                    .map(|result| {
-                        if let Err(e) = result {
-                            panic!("{}", e);
-                        }
-                    })
-                    .map(move |_| {
+                medea::api::control::start_static_rooms(&room_service).map(
+                    move |_| {
                         let grpc_addr =
                             grpc::server::run(room_service, app_context);
                         shutdown::subscribe(
                             &graceful_shutdown,
-                            grpc_addr.clone().recipient(),
+                            grpc_addr.recipient(),
                             shutdown::Priority(1),
                         );
 
@@ -70,7 +57,8 @@ fn main() -> Result<(), Error> {
                             server.recipient(),
                             shutdown::Priority(1),
                         );
-                    })
+                    },
+                )
             })
     })
     .unwrap();
