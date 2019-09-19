@@ -34,6 +34,34 @@
 
             let room = await jason.join_room(credentials);
 
+            let muteAudio = document.getElementsByClassName('mute-audio')[0];
+            let muteVideo = document.getElementsByClassName('mute-video')[0];
+            let isAudioMuted = false;
+            let isVideoMuted = false;
+
+            muteAudio.addEventListener('click', () => {
+                if(isAudioMuted) {
+                    room.unmute_audio();
+                    isAudioMuted = false;
+                    muteAudio.textContent = "Mute audio";
+                } else {
+                    room.mute_audio();
+                    isAudioMuted = true;
+                    muteAudio.textContent = "Unmute audio";
+                }
+            });
+            muteVideo.addEventListener('click', () => {
+                if(isVideoMuted) {
+                    room.unmute_video();
+                    isVideoMuted = false;
+                    muteVideo.textContent = "Mute video";
+                } else {
+                    room.mute_video();
+                    isVideoMuted = true;
+                    muteVideo.textContent = "Unmute video";
+                }
+            });
+
             room.on_new_connection(function (connection) {
                 connection.on_remote_stream(function (stream) {
                     let videoDiv = document.getElementsByClassName("video-call")[0];
@@ -138,6 +166,7 @@
             var videoCallDiv = document.getElementById('video-call');
             var chooseRoomButton = document.getElementById('choose-room-btn');
             var roomIdInput = document.getElementById('room-id-input');
+            let controlBtns = document.getElementsByClassName('control-btns')[0];
 
             var joinCallerButton = document.getElementById('join-caller');
 
@@ -148,6 +177,8 @@
                 joinCallerButton.onclick = async function () {
                     let connectBtnsDiv = document.getElementsByClassName("connect-btns")[0];
                     connectBtnsDiv.style.display = 'none';
+                    controlBtns.style.display = 'block';
+
                     let username = usernameInput.value;
                     try {
                         let room = await axios.get(controlUrl + roomId);
@@ -191,14 +222,16 @@
     <style>
         body {
             font-family: "Source Sans Pro",Helvetica,sans-serif;
+            background: #f5f5f5;
         }
 
         .video-call {
             display: flex;
-            flex-flow: row nowrap;
+            /*flex-flow: row nowrap;*/
             width: 100%;
-            flex-wrap: nowrap;
-            flex-direction: row;
+            justify-content: space-around;
+            /*flex-wrap: nowrap;*/
+            /*flex-direction: row;*/
         }
 
         .video {
@@ -210,7 +243,7 @@
         }
 
         .video > video {
-            background: #A7C6D9;
+            background: #FFFFFF;
             border-radius: 3px;
         }
 
@@ -219,7 +252,7 @@
             bottom: 200px;
             left: 50%;
             transform: translateX(-50%);
-            background: #708A9F;
+            background: #FFFFFF;
             padding: 10px;
             border-radius: 3px;
         }
@@ -247,6 +280,7 @@
             border-radius: 3px;
             border: none;
             padding: 6px;
+            margin-left: 5px;
         }
 
         .connect-text {
@@ -254,6 +288,24 @@
             font-size: 15px;
             text-align: center;
             margin-bottom: 10px;
+        }
+
+        .control-btns {
+            position: fixed;
+            bottom: 150px;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        .control-btn {
+            border-radius: 10px;
+            background: #49668C;
+            color: white;
+            font-size: 13pt;
+            border: none;
+            padding: 10px;
+            cursor: pointer;
+            margin-right: 10px;
         }
     </style>
 </head>
@@ -273,9 +325,14 @@
     </div>
 
     <div class="connect-btns">
-        <span class="connect-text">Enter your username:</span><br>
-        <input id="username">
+<!--        <span class="connect-text">Enter your username:</span><br>-->
+        <input id="username" placeholder="username">
         <button id="join-caller">Join</button>
+    </div>
+
+    <div class="control-btns" style="display: none">
+        <button class="mute-audio control-btn">Mute audio</button>
+        <button class="mute-video control-btn">Mute video</button>
     </div>
 </div>
 
