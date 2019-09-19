@@ -1,6 +1,6 @@
 //! Implementation and definitions of [Control API] specs.
 //!
-//! [Control API]: http://tiny.cc/380uaz
+//! [Control API]: https://tinyurl.com/yxsqplq7
 
 pub mod endpoint;
 pub mod member;
@@ -28,7 +28,7 @@ pub use self::{
 
 /// Root elements of [Control API] spec.
 ///
-/// [Control API]: http://tiny.cc/380uaz
+/// [Control API]: https://tinyurl.com/yxsqplq7
 #[derive(Clone, Deserialize, Debug)]
 #[serde(tag = "kind")]
 pub enum RootElement {

@@ -57,7 +57,7 @@ impl_incrementable!(PeerId);
 #[cfg(feature = "medea")]
 impl_incrementable!(TrackId);
 
-/// State of [`Peer`] on server side.
+/// Signaling state of [`Peer`] on server side.
 ///
 /// Used in [`Snapshot`].
 #[cfg_attr(feature = "medea", derive(Serialize, Debug, Clone, PartialEq))]
@@ -79,6 +79,9 @@ pub enum ServerPeerState {
     Stable,
 }
 
+/// Signaling state of [`Peer`] on server side.
+///
+/// Used in [`Snapshot`].
 #[cfg_attr(feature = "medea", derive(Serialize, Debug, Clone, PartialEq))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
 pub struct Peer {
@@ -105,18 +108,18 @@ pub struct Peer {
 ///
 /// Used for synchronization of reconnecting client with server.
 ///
-/// This snapshot will be sent on [`Event::RestoreState`] if [`Member`] lost
+/// This snapshot will be sent on [`Event::RestoreState`] if `Member` lost
 /// his connection and reconnect to the server.
 #[cfg_attr(feature = "medea", derive(Serialize, Debug, Clone, PartialEq))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
 pub struct Snapshot {
-    /// All [`Peer`]s of [`Member`] on server side.
+    /// All [`Peer`]s of `Member` on server side.
     // TODO: remove #[serde(deserialize_with...)] when
     //       https://github.com/serde-rs/serde/issues/1183 will be resolved.
     #[serde(deserialize_with = "de_int_key")]
     pub peers: HashMap<PeerId, Peer>,
 
-    /// [`IceServer`]s for this [`Member`].
+    /// [`IceServer`]s for this `Member`.
     pub ice_servers: Vec<IceServer>,
 }
 
@@ -166,6 +169,7 @@ pub enum Command {
 
     /// Web Client sends SDP Answer.
     MakeSdpAnswer { peer_id: PeerId, sdp_answer: String },
+
     /// Web Client sends Ice Candidate.
     SetIceCandidate {
         peer_id: PeerId,
@@ -177,7 +181,7 @@ pub enum Command {
     /// This [`Command`] will be sent if while synchronization of client
     /// with server will be found some fatal conflict.
     ///
-    /// Currently, on this [`Command`] server should remove all [`Member`]'s
+    /// Currently, on this [`Command`] server should remove all `Member`'s
     /// [`Peer`]s.
     ResetMe,
 }
@@ -212,7 +216,7 @@ pub enum Event {
     /// close.
     PeersRemoved { peer_ids: Vec<PeerId> },
 
-    /// [`Event`] which server will send if detects that [`Member`] is
+    /// [`Event`] which server will send if detects that `Member` is
     /// reconnecting.
     ///
     /// On this [`Event`] client should upgrade/downgrade local state to state

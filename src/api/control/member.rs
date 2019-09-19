@@ -1,6 +1,6 @@
 //! Definitions and implementations of [Control API]'s `Member` element.
 //!
-//! [Control API]: http://tiny.cc/380uaz
+//! [Control API]: https://tinyurl.com/yxsqplq7
 
 use std::convert::TryFrom;
 

@@ -252,18 +252,22 @@ impl<T> Peer<T> {
         !self.context.senders.is_empty()
     }
 
+    /// Adds [`IceCandidate`] for this [`Peer`].
     pub fn add_ice_candidate(&mut self, ice_candidate: IceCandidate) {
         self.context.ice_candidates.push(ice_candidate);
     }
 
+    /// Returns all [`IceCandidate`]s for this [`Peer`].
     pub fn ice_candidates(&self) -> Vec<IceCandidate> {
         self.context.ice_candidates.clone()
     }
 
+    /// Returns `sdp_offer` of this peer.
     pub fn sdp_offer(&self) -> Option<String> {
         self.context.sdp_offer.clone()
     }
 
+    /// Returns `sdp_answer` of this peer.
     pub fn sdp_answer(&self) -> Option<String> {
         self.context.sdp_answer.clone()
     }

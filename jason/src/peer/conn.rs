@@ -104,7 +104,7 @@ struct InnerPeer {
 
     /// Event listener for [`signalingstatechange`].
     ///
-    /// [`signalingstatechange`]: http://tiny.cc/6gbwcz
+    /// [`signalingstatechange`]: https://tinyurl.com/yxbhuar6
     on_signaling_state_change:
         Option<EventListener<SysRtcPeerConnection, SysEvent>>,
 }

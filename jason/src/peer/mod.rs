@@ -38,15 +38,22 @@ pub use self::{
     media::MediaConnections,
 };
 
-/// Local signaling state of [`RtcPeerConnection`].
+/// Jason's signaling state of [`RtcPeerConnection`].
+///
+/// This signaling state slightly different from the JS's RtcPeerConnection's
+/// signaling state. More info about difference you can find in docs of this
+/// enum's variants.
 #[derive(Clone, Debug)]
 pub enum SignalingState {
     /// This state represents [`PeerConnection] in `stable` signaling state on
     /// JS side and without `local_description` and `remote_description`.
     ///
     /// On JS side signaling state will be `stable`. but
-    /// we can determine that real signaling state is [`SignalingState::New`]
-    /// by existence of `local_description` and `remote_description`.
+    /// we [can determine][1] that real signaling state is
+    /// [`SignalingState::New`] by existence of `local_description` and
+    /// `remote_description`.
+    ///
+    /// [1]: https://tinyurl.com/y2zbnxey
     New,
 
     /// In this state [`PeerConnection`] have `local_description`.
@@ -289,7 +296,7 @@ impl PeerConnection {
         }
     }
 
-    /// Disables or enables all audio tracks for all [`Sender`]s.
+    /// Disables or enables all audio tracks for all `Sender`s.
     pub fn toggle_send_audio(&self, enabled: bool) {
         self.0
             .borrow()
@@ -297,7 +304,7 @@ impl PeerConnection {
             .toggle_send_media(TransceiverKind::Audio, enabled)
     }
 
-    /// Disables or enables all video tracks for all [`Sender`]s.
+    /// Disables or enables all video tracks for all `Sender`s.
     pub fn toggle_send_video(&self, enabled: bool) {
         self.0
             .borrow()
@@ -305,7 +312,7 @@ impl PeerConnection {
             .toggle_send_media(TransceiverKind::Video, enabled)
     }
 
-    /// Returns `true` if all [`Sender`]s audio tracks are enabled.
+    /// Returns `true` if all `Sender`s audio tracks are enabled.
     pub fn is_send_audio_enabled(&self) -> bool {
         self.0
             .borrow()
@@ -313,7 +320,7 @@ impl PeerConnection {
             .are_senders_enabled(TransceiverKind::Audio)
     }
 
-    /// Returns `true` if all [`Sender`]s video tracks are enabled.
+    /// Returns `true` if all `Sender`s video tracks are enabled.
     pub fn is_send_video_enabled(&self) -> bool {
         self.0
             .borrow()

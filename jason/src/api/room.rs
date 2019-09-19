@@ -321,6 +321,13 @@ impl InnerRoom {
         match local_peer.signaling_state() {
             SignalingState::Stable | SignalingState::HaveRemoteOffer => {
                 for ice_candidate in snapshot_peer.ice_candidates {
+                    // TODO: This code can be optimized.
+                    //       We can add not all IceCandidates, but only absent
+                    // ones,       but this will require
+                    // storing of all added IceCandidates
+                    //       or their hashes on the Jason side.
+                    //       Also we can send from the server only IceCandidates
+                    //       hashes in Snapshot
                     (self as &mut dyn EventHandler)
                         .on_ice_candidate_discovered(peer_id, ice_candidate)
                 }
