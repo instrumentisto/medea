@@ -4,10 +4,8 @@
 
 use std::rc::Rc;
 
-use medea_client_api_proto::MediaType;
+use medea_client_api_proto::{MediaType, TrackId as Id};
 use web_sys::MediaStreamTrack;
-
-use medea_client_api_proto::TrackId as Id;
 
 /// Representation of [MediaStreamTrack][1].
 ///
@@ -39,5 +37,15 @@ impl MediaTrack {
     /// Returns [`MediaType`] of this [`MediaTrack`].
     pub fn caps(&self) -> &MediaType {
         &self.caps
+    }
+
+    /// Checks if underlying [`MediaStreamTrack`] is enabled.
+    pub fn is_enabled(&self) -> bool {
+        self.track.enabled()
+    }
+
+    /// Enables or disables underlying [`MediaStreamTrack`].
+    pub fn set_enabled(&self, enabled: bool) {
+        self.track.set_enabled(enabled)
     }
 }

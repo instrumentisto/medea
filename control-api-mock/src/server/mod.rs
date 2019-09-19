@@ -14,7 +14,7 @@ use actix_web::{
 };
 use clap::ArgMatches;
 use futures::Future;
-use medea_grpc_proto::control::{
+use medea_control_api_proto::grpc::control_api::{
     Element as ElementProto, Error as ErrorProto,
     GetResponse as GetResponseProto, Response as ResponseProto,
     Room_Element as RoomElementProto,

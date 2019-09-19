@@ -2,7 +2,7 @@
 
 use std::io;
 
-use actix::{Actor, Addr, Handler, ResponseActFuture, WrapFuture as _};
+use actix::{Actor, Addr, Handler, ResponseFuture};
 use actix_web::{
     dev::Server as ActixServer,
     middleware,
@@ -50,21 +50,22 @@ fn ws_index(
     payload: Payload,
 ) -> impl Future<Item = HttpResponse, Error = actix_web::Error> {
     debug!("Request params: {:?}", info);
+    let RequestParams {
+        room_id,
+        member_id,
+        credentials,
+    } = info.into_inner();
 
-    match state.rooms.get(&info.room_id) {
+    match state.rooms.get(&room_id) {
         Some(room) => Either::A(
             room.send(Authorize {
-                member_id: info.member_id.clone(),
-                credentials: info.credentials.clone(),
+                member_id: member_id.clone(),
+                credentials,
             })
             .from_err()
             .and_then(move |res| match res {
                 Ok(_) => ws::start(
-                    WsSession::new(
-                        info.member_id.clone(),
-                        room,
-                        state.config.idle_timeout,
-                    ),
+                    WsSession::new(member_id, room, state.config.idle_timeout),
                     &request,
                     payload,
                 ),
@@ -97,7 +98,7 @@ pub struct Server(ActixServer);
 impl Server {
     /// Starts Client API HTTP server.
     pub fn run(rooms: RoomRepository, config: Conf) -> io::Result<Addr<Self>> {
-        let server_addr = config.server.http.bind_addr();
+        let server_addr = config.server.client.http.bind_addr();
 
         let server = HttpServer::new(move || {
             App::new()
@@ -126,7 +127,7 @@ impl Actor for Server {
 }
 
 impl Handler<ShutdownGracefully> for Server {
-    type Result = ResponseActFuture<Self, (), ()>;
+    type Result = ResponseFuture<(), ()>;
 
     fn handle(
         &mut self,
@@ -134,7 +135,7 @@ impl Handler<ShutdownGracefully> for Server {
         _: &mut Self::Context,
     ) -> Self::Result {
         info!("Server received ShutdownGracefully message so shutting down");
-        Box::new(self.0.stop(true).into_actor(self))
+        Box::new(self.0.stop(true))
     }
 }
 
@@ -156,7 +157,7 @@ mod test {
     /// Creates [`RoomRepository`] for tests filled with a single [`Room`].
     fn room(conf: Conf) -> RoomRepository {
         let room_spec =
-            control::load_from_yaml_file("tests/specs/pub_sub_video_call.yml")
+            control::load_from_yaml_file("tests/specs/pub-sub-video-call.yml")
                 .unwrap();
 
         let app = AppContext::new(conf, new_turn_auth_service_mock());

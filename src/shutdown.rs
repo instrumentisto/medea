@@ -5,11 +5,13 @@ use std::{
     time::Duration,
 };
 
+#[cfg(unix)]
+use actix::AsyncContext;
 use actix::{
     prelude::{Actor, Context},
-    Addr, AsyncContext, Handler, Message, Recipient, ResponseActFuture, System,
-    WrapFuture as _,
+    Addr, Handler, Message, Recipient, ResponseFuture, System,
 };
+use derive_more::Display;
 use failure::Fail;
 use futures::{future, stream::iter_ok, Future, Stream};
 use tokio::util::FutureExt as _;
@@ -63,28 +65,24 @@ impl GracefulShutdown {
 impl Actor for GracefulShutdown {
     type Context = Context<Self>;
 
+    #[cfg(not(unix))]
+    fn started(&mut self, _: &mut Self::Context) {
+        warn!(
+            "Graceful shutdown is disabled: only UNIX signals are supported, \
+             and current playform is not UNIX"
+        );
+    }
+
+    #[cfg(unix)]
     fn started(&mut self, ctx: &mut Self::Context) {
-        #[cfg(not(unix))]
-        {
-            warning!(
-                "Graceful shutdown is disabled: only UNIX signals are \
-                 supported"
+        use tokio_signal::unix::{Signal, SIGHUP, SIGINT, SIGQUIT, SIGTERM};
+        for s in &[SIGHUP, SIGINT, SIGQUIT, SIGTERM] {
+            ctx.add_message_stream(
+                Signal::new(*s)
+                    .flatten_stream()
+                    .map(OsSignal)
+                    .map_err(|_| error!("Error getting shutdown signal")),
             );
-            return;
-        }
-        #[cfg(unix)]
-        {
-            use tokio_signal::unix::{
-                Signal, SIGHUP, SIGINT, SIGQUIT, SIGTERM,
-            };
-            for s in &[SIGHUP, SIGINT, SIGQUIT, SIGTERM] {
-                ctx.add_message_stream(
-                    Signal::new(*s)
-                        .flatten_stream()
-                        .map(OsSignal)
-                        .map_err(|_| error!("Error getting shutdown signal")),
-                );
-            }
         }
     }
 
@@ -97,25 +95,19 @@ impl Actor for GracefulShutdown {
 
 /// Message that is received by [`GracefulShutdown`] shutdown service when
 /// the process receives an OS signal.
-#[cfg(unix)]
 #[derive(Message)]
 #[rtype(result = "Result<(), ()>")]
 struct OsSignal(i32);
 
-#[cfg(unix)]
 impl Handler<OsSignal> for GracefulShutdown {
-    type Result = ResponseActFuture<Self, (), ()>;
+    type Result = ResponseFuture<(), ()>;
 
-    fn handle(
-        &mut self,
-        sig: OsSignal,
-        _: &mut Context<Self>,
-    ) -> ResponseActFuture<Self, (), ()> {
+    fn handle(&mut self, sig: OsSignal, _: &mut Context<Self>) -> Self::Result {
         info!("OS signal '{}' received", sig.0);
 
         match self.state {
             State::InProgress => {
-                return Box::new(future::ok(()).into_actor(self));
+                return Box::new(future::ok(()));
             }
             State::Listening => {
                 self.state = State::InProgress;
@@ -126,7 +118,7 @@ impl Handler<OsSignal> for GracefulShutdown {
 
         if self.subs.is_empty() {
             System::current().stop();
-            return Box::new(future::ok(()).into_actor(self));
+            return Box::new(future::ok(()));
         }
 
         let by_priority: Vec<_> = self
@@ -158,8 +150,7 @@ impl Handler<OsSignal> for GracefulShutdown {
                 .map(|_| {
                     info!("Graceful shutdown succeeded, stopping system");
                     System::current().stop()
-                })
-                .into_actor(self),
+                }),
         )
     }
 }
@@ -200,8 +191,8 @@ impl Handler<Subscribe> for GracefulShutdown {
 }
 
 /// Error which indicates that process is shutting down at this moment.
-#[derive(Clone, Copy, Debug, Fail)]
-#[fail(display = "Process is shutting down at the moment")]
+#[derive(Clone, Copy, Debug, Display, Fail)]
+#[display(fmt = "Process is shutting down at the moment")]
 pub struct ShuttingDownError;
 
 /// Message that [`Subscriber`] unsubscribes from receiving shutdown
@@ -228,7 +219,7 @@ impl Handler<Unsubscribe> for GracefulShutdown {
     }
 }
 
-/// Subscribe recipient to [`GracefulShutdown`].
+/// Subscribes recipient to [`GracefulShutdown`].
 pub fn subscribe(
     shutdown_addr: &Addr<GracefulShutdown>,
     subscriber: Recipient<ShutdownGracefully>,
@@ -240,7 +231,7 @@ pub fn subscribe(
     }));
 }
 
-/// Unsubscribe recipient from [`GracefulShutdown`].
+/// Unsubscribes recipient from [`GracefulShutdown`].
 pub fn unsubscribe(
     shutdown_addr: &Addr<GracefulShutdown>,
     subscriber: Recipient<ShutdownGracefully>,

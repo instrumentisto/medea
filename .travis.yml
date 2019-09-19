@@ -2,18 +2,26 @@ language: rust
 cache: cargo
 
 install:
-  - PROTOBUF_VERSION=3.3.0
-  - PROTOC_FILENAME=protoc-${PROTOBUF_VERSION}-linux-x86_64.zip
-  - pushd /home/travis
-  - wget https://github.com/google/protobuf/releases/download/v${PROTOBUF_VERSION}/${PROTOC_FILENAME}
-  - unzip ${PROTOC_FILENAME}
-  - bin/protoc --version
-  - popd
   - rustc -vV
   - cargo -vV
 
+stages:
+  - name: check
+    if: (branch = master AND type != pull_request)
+        OR commit_message =~ /.*\[run ci\]/
+  - name: build
+    if: (branch = master AND type != pull_request)
+        OR commit_message =~ /.*\[run ci\]/
+  - name: test
+    if: (branch = master AND type != pull_request)
+        OR commit_message =~ /.*\[run ci\]/
+  - name: release
+    if: tag IS present
+
 jobs:
   allow_failures:
+    - rust: nightly
+      stage: check
     - rust: nightly
       stage: build
 
@@ -37,37 +45,81 @@ jobs:
       before_script:
         - rm -f /home/travis/.cargo/bin/wasm-pack
         - curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
-      script:
-        - make release.npm crate=medea-jason publish=no
+      script: make cargo.build crate=medea-jason dockerized=no
 
-    - name: medea (stable)
+    - name: medea docker (stable)
       stage: build
       rust: stable
-      script: make build.medea
+      services: ["docker"]
+      before_script: make docker.build.medea-build
+      script: make docker.build.medea debug=no
+              TAG=build-${TRAVIS_BUILD_ID} registry=quay.io
+      before_deploy: echo "$QUAYIO_PASS"
+                     | make docker.auth registry=quay.io
+                                        user=$QUAYIO_USER pass-stdin=yes
+      deploy:
+        provider: script
+        skip_cleanup: true
+        script: make docker.push IMAGE=medea registry=quay.io
+                                 TAGS=build-${TRAVIS_BUILD_ID}
+        on:
+          all_branches: true
 
     - name: medea (beta)
       stage: build
+      if: branch = master
       rust: beta
-      script: make build.medea
+      script: make cargo.build crate=medea dockerized=no
 
     - name: medea (nightly)
       stage: build
+      if: branch = master
       rust: nightly
-      script: make build.medea
+      script: make cargo.build crate=medea dockerized=no
 
-    - name: unit (stable)
+    - name: unit medea-macro (stable)
       stage: test
       rust: stable
-      script: make test.unit crate=@all
+      cache: false
+      script: make test.unit crate=medea-macro
 
-    - name: e2e signalling (stable)
+    - name: unit medea-client-api-proto (stable)
       stage: test
       rust: stable
-      script: make test.e2e
+      cache: false
+      script: make test.unit crate=medea-client-api-proto
+
+    - name: unit medea (stable)
+      stage: test
+      rust: stable
+      script: make test.unit crate=medea
+
+    - name: unit medea-jason (nightly)
+      stage: test
+      # TODO: Run on stable when -Z install-upgrade is out,
+      # see: https://github.com/rust-lang/cargo/issues/6797
+      rust: nightly
+      addons:
+        chrome: stable
+        apt:
+          packages: ["chromium-chromedriver"]
+      before_script:
+        - cargo +nightly install wasm-bindgen-cli -Z install-upgrade
+        - rustup target add wasm32-unknown-unknown
+      script: make test.unit crate=medea-jason
+
+    - name: E2E signalling (stable)
+      stage: test
+      rust: stable
+      services: ["docker"]
+      before_script: make docker.pull TAGS=build-${TRAVIS_BUILD_ID}
+                                      registry=quay.io
+      script: make test.e2e up=yes dockerized=yes log=yes wait=30
+                            TAG=build-${TRAVIS_BUILD_ID} registry=quay.io
 
     - name: crates.io
       stage: release
-      if: (tag IS present) AND (tag =~ ^medea[a-z-]*-[0-9]+\.[0-9]+\.[0-9]+)
+      if: tag =~ ^medea[a-z-]*-[0-9]+\.[0-9]+\.[0-9]+
       cache: false
       before_script:
         - export MEDEA_CRATE_NAME=$(echo $TRAVIS_TAG \
@@ -83,7 +135,7 @@ jobs:
 
     - name: NPM
       stage: release
-      if: (tag IS present) AND (tag =~ ^medea-jason-[0-9]+\.[0-9]+\.[0-9]+)
+      if: tag =~ ^medea-jason-[0-9]+\.[0-9]+\.[0-9]+
       cache: false
       before_script:
         - export MEDEA_CRATE_NAME=$(echo $TRAVIS_TAG \
@@ -102,7 +154,7 @@ jobs:
 
     - name: GitHub
       stage: release
-      if: (tag IS present) AND (tag =~ ^medea[a-z-]*-[0-9]+\.[0-9]+\.[0-9]+)
+      if: tag =~ ^medea[a-z-]*-[0-9]+\.[0-9]+\.[0-9]+
       cache: false
       before_script:
         - export MEDEA_CRATE_NAME=$(echo $TRAVIS_TAG \
@@ -116,16 +168,6 @@ jobs:
         name: $TRAVIS_TAG
         on:
           tags: true
-
-stages:
-  - name: check
-    if: (branch = master AND type != pull_request) OR commit_message =~ /.*\[run ci\]/
-  - name: build
-    if: (branch = master AND type != pull_request) OR commit_message =~ /.*\[run ci\]/
-  - name: test
-    if: (branch = master AND type != pull_request) OR commit_message =~ /.*\[run ci\]/
-  - name: tests
-    if: (branch = master AND type != pull_request) OR commit_message =~ /.*\[run ci\]/
 
 notifications:
   email:

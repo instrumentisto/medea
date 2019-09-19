@@ -5,24 +5,20 @@
 use std::fmt;
 
 use actix::Message;
+use derive_more::{From, Into};
 use futures::Future;
-use macro_attr::*;
 use medea_client_api_proto::{Command, Event};
-use newtype_derive::NewtypeFrom;
 
 use crate::api::control::MemberId;
 
-macro_attr! {
-    /// Wrapper [`Command`] for implements actix [`Message`].
-    #[derive(Message, NewtypeFrom!)]
-    #[rtype(result = "Result<(), ()>")]
-    pub struct CommandMessage(Command);
-}
-macro_attr! {
-    /// Wrapper [`Event`] for implements actix [`Message`].
-    #[derive(Message, NewtypeFrom!)]
-    pub struct EventMessage(Event);
-}
+/// Newtype for [`Command`] with actix [`Message`] implementation.
+#[derive(From, Into, Message)]
+#[rtype(result = "Result<(), ()>")]
+pub struct CommandMessage(Command);
+
+/// Newtype for [`Event`] with actix [`Message`] implementation.
+#[derive(From, Into, Message)]
+pub struct EventMessage(Event);
 
 /// Abstraction over RPC connection with some remote [`Member`].
 ///

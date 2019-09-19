@@ -6,6 +6,7 @@
 
 use std::{collections::HashMap, convert::TryFrom, fmt, rc::Rc};
 
+use derive_more::Display;
 use failure::Fail;
 use medea_client_api_proto::{
     AudioSettings, Direction, MediaType, PeerId as Id, Track, TrackId,
@@ -38,17 +39,19 @@ pub struct WaitRemoteSdp {}
 pub struct Stable {}
 
 /// Produced when unwrapping [`PeerStateMachine`] to [`Peer`] with wrong state.
-#[derive(Fail, Debug)]
+#[derive(Debug, Display, Fail)]
 #[allow(clippy::module_name_repetitions)]
 pub enum PeerError {
-    #[fail(
-        display = "Cannot unwrap Peer from PeerStateMachine [id = {}]. \
-                   Expected state {} was {}",
-        _0, _1, _2
+    #[display(
+        fmt = "Cannot unwrap Peer from PeerStateMachine [id = {}]. Expected \
+               state {} was {}",
+        _0,
+        _1,
+        _2
     )]
     WrongState(Id, &'static str, String),
-    #[fail(
-        display = "Peer is sending Track [{}] without providing its mid",
+    #[display(
+        fmt = "Peer is sending Track [{}] without providing its mid",
         _0
     )]
     MidsMismatch(TrackId),
@@ -250,7 +253,7 @@ impl Peer<New> {
         }
     }
 
-    /// Add `send` tracks to self and add `recv` for this `send`
+    /// Adds `send` tracks to `self` and add `recv` for this `send`
     /// to `partner_peer`.
     pub fn add_publisher(
         &mut self,
@@ -266,8 +269,8 @@ impl Peer<New> {
             MediaType::Video(VideoSettings {}),
         ));
 
-        self.add_sender(track_video.clone());
-        self.add_sender(track_audio.clone());
+        self.add_sender(Rc::clone(&track_video));
+        self.add_sender(Rc::clone(&track_audio));
 
         partner_peer.add_receiver(track_video);
         partner_peer.add_receiver(track_audio);
@@ -294,12 +297,12 @@ impl Peer<New> {
         }
     }
 
-    /// Add [`Track`] to [`Peer`] for send.
+    /// Adds [`Track`] to [`Peer`] for send.
     pub fn add_sender(&mut self, track: Rc<MediaTrack>) {
         self.context.senders.insert(track.id, track);
     }
 
-    /// Add [`Track`] to [`Peer`] for receive.
+    /// Adds [`Track`] to [`Peer`] for receive.
     pub fn add_receiver(&mut self, track: Rc<MediaTrack>) {
         self.context.receivers.insert(track.id, track);
     }

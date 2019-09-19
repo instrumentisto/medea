@@ -24,13 +24,26 @@ pub enum CloseMsg {
     Disconnect(String),
 }
 
+/// Client to talk with server via Client API RPC.
+#[allow(clippy::module_name_repetitions)]
+#[cfg_attr(feature = "mockable", mockall::automock)]
+pub trait RpcClient {
+    /// Returns [`Stream`] of all [`Event`]s received by this [`RpcClient`].
+    fn subscribe(&self) -> Box<dyn Stream<Item = Event, Error = ()>>;
+
+    /// Unsubscribes from this [`RpcClient`]. Drops all subscriptions atm.
+    fn unsub(&self);
+
+    /// Sends [`Command`] to server.
+    fn send_command(&self, command: Command);
+}
+
 // TODO:
 // 1. Proper sub registry.
 // 2. Reconnect.
 // 3. Disconnect if no pongs.
 // 4. Buffering if no socket?
-#[allow(clippy::module_name_repetitions)]
-pub struct RpcClient(Rc<RefCell<Inner>>);
+pub struct WebsocketRpcClient(Rc<RefCell<Inner>>);
 
 /// Inner state of [`RpcClient`].
 struct Inner {
@@ -96,7 +109,7 @@ fn on_message(inner_rc: &RefCell<Inner>, msg: Result<ServerMsg, WasmErr>) {
     }
 }
 
-impl RpcClient {
+impl WebsocketRpcClient {
     pub fn new(token: String, ping_interval: i32) -> Self {
         Self(Inner::new(token, ping_interval))
     }
@@ -126,27 +139,24 @@ impl RpcClient {
             },
         )
     }
+}
 
-    /// Returns Stream of all Events received by this [`RpcClient`].
+impl RpcClient for WebsocketRpcClient {
     // TODO: proper sub registry
-    pub fn subscribe(&self) -> impl Stream<Item = Event, Error = ()> {
+    fn subscribe(&self) -> Box<dyn Stream<Item = Event, Error = ()>> {
         let (tx, rx) = unbounded();
         self.0.borrow_mut().subs.push(tx);
-
-        rx
+        Box::new(rx)
     }
 
-    /// Unsubscribe from this [`RpcClient`]. Drops all subscriptions atm.
     // TODO: proper sub registry
-    pub fn unsub(&self) {
+    fn unsub(&self) {
         self.0.borrow_mut().subs.clear();
     }
 
-    /// Sends Command to Medea.
     // TODO: proper sub registry
-    pub fn send_command(&self, command: Command) {
+    fn send_command(&self, command: Command) {
         let socket_borrow = &self.0.borrow().sock;
-
         // TODO: no socket? we dont really want this method to return err
         if let Some(socket) = socket_borrow.as_ref() {
             socket.send(&ClientMsg::Command(command)).unwrap();
@@ -154,7 +164,7 @@ impl RpcClient {
     }
 }
 
-impl Drop for RpcClient {
+impl Drop for WebsocketRpcClient {
     /// Drops related connection and its [`Heartbeat`].
     fn drop(&mut self) {
         self.0.borrow_mut().sock.take();

@@ -5,7 +5,7 @@ use std::{fmt, sync::Arc};
 use actix_web::web::Path;
 use futures::Future;
 use grpcio::{ChannelBuilder, EnvBuilder, Error};
-use medea_grpc_proto::{
+use medea_control_api_proto::grpc::control_api::{
     control::{CreateRequest, GetResponse, IdRequest, Response},
     control_grpc::ControlApiClient,
 };

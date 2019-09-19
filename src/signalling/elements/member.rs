@@ -1,7 +1,6 @@
-//! [`Member`] is member of [`Room`] with [`RpcConnection`].
+//! [`Member`] is member of [`Room`].
 //!
 //! [`Room`]: crate::signalling::room::Room
-//! [`RpcConnection`]: crate::api::client::rpc_connection::RpcConnection
 
 use std::{
     cell::RefCell,
@@ -10,18 +9,18 @@ use std::{
     rc::{Rc, Weak},
 };
 
+use derive_more::Display;
 use failure::Fail;
 use medea_client_api_proto::{IceServer, PeerId};
-use medea_grpc_proto::control::{
-    Member as MemberProto, Room_Element as ElementProto,
+use medea_control_api_proto::grpc::control_api::{
+    Element as RootElementProto, Member as MemberProto,
+    Room_Element as ElementProto,
 };
 
 use crate::{
     api::control::{
         endpoints::WebRtcPlayEndpoint as WebRtcPlayEndpointSpec,
-        local_uri::{
-            IsEndpointId, IsMemberId, IsRoomId, LocalUri, LocalUriType,
-        },
+        local_uri::{LocalUri, StatefulLocalUri, ToEndpoint, ToMember, ToRoom},
         MemberId, MemberSpec, RoomId, RoomSpec, TryFromElementError,
         WebRtcPlayId, WebRtcPublishId,
     },
@@ -29,56 +28,63 @@ use crate::{
     media::IceUser,
 };
 
-use super::endpoints::webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint};
+use super::endpoints::{
+    webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
+    Endpoint,
+};
 
 /// Errors which may occur while loading [`Member`]s from [`RoomSpec`].
-#[derive(Debug, Fail)]
+#[derive(Debug, Display, Fail)]
 pub enum MembersLoadError {
     /// Errors that can occur when we try transform some spec from `Element`.
-    #[fail(display = "TryFromElementError: {}", _0)]
-    TryFromError(TryFromElementError, LocalUriType),
+    #[display(fmt = "TryFromElementError: {}", _0)]
+    TryFromError(TryFromElementError, StatefulLocalUri),
 
     /// [`Member`] not found.
-    #[fail(display = "Member [id = {}] not found.", _0)]
-    MemberNotFound(LocalUri<IsMemberId>),
+    #[display(fmt = "Member [id = {}] not found.", _0)]
+    MemberNotFound(LocalUri<ToMember>),
 
     /// [`WebRtcPlayEndpoint`] not found.
-    #[fail(
-        display = "Play endpoint [id = {}] not found while loading spec,",
+    #[display(
+        fmt = "Play endpoint [id = {}] not found while loading spec,",
         _0
     )]
-    PlayEndpointNotFound(LocalUri<IsEndpointId>),
+    PlayEndpointNotFound(LocalUri<ToEndpoint>),
 
     /// [`WebRtcPublishEndpoint`] not found.
-    #[fail(
-        display = "Publish endpoint [id = {}] not found while loading spec.",
+    #[display(
+        fmt = "Publish endpoint [id = {}] not found while loading spec.",
         _0
     )]
-    PublishEndpointNotFound(LocalUri<IsEndpointId>),
+    PublishEndpointNotFound(LocalUri<ToEndpoint>),
 }
 
-#[allow(clippy::module_name_repetitions)]
-#[derive(Debug, Fail)]
+#[allow(clippy::module_name_repetitions, clippy::pub_enum_variant_names)]
+#[derive(Debug, Fail, Display)]
 pub enum MemberError {
-    #[fail(display = "Publish endpoint [id = {}] not found.", _0)]
-    PublishEndpointNotFound(LocalUri<IsEndpointId>),
+    #[display(fmt = "Publish endpoint [id = {}] not found.", _0)]
+    PublishEndpointNotFound(LocalUri<ToEndpoint>),
 
-    #[fail(display = "Play endpoint [id = {}] not found.", _0)]
-    PlayEndpointNotFound(LocalUri<IsEndpointId>),
+    #[display(fmt = "Play endpoint [id = {}] not found.", _0)]
+    PlayEndpointNotFound(LocalUri<ToEndpoint>),
+
+    #[display(fmt = "Endpoint [id = {}] not found.", _0)]
+    EndpointNotFound(LocalUri<ToEndpoint>),
 }
 
-/// [`Member`] is member of [`Room`] with [`RpcConnection`].
+/// [`Member`] is member of [`Room`].
 ///
 /// [`Room`]: crate::signalling::room::Room
-/// [`RpcConnection`]: crate::api::client::rpc_connection::RpcConnection
 #[derive(Clone, Debug)]
 pub struct Member(Rc<RefCell<MemberInner>>);
 
 #[allow(clippy::module_name_repetitions)]
 #[derive(Debug)]
 struct MemberInner {
+    /// [`RoomId`] of [`Room`] to which this [`Member`] relates.
     room_id: RoomId,
 
+    /// ID of this [`Member`].
     id: MemberId,
 
     /// All [`WebRtcPublishEndpoint`]s of this [`Member`].
@@ -97,7 +103,7 @@ struct MemberInner {
 impl Member {
     /// Create new empty [`Member`].
     ///
-    /// To fill this [`Member`], you need to call the [`Member::load`]
+    /// To fill this [`Member`], you need to call [`Member::load`]
     /// function.
     pub fn new(id: MemberId, credentials: String, room_id: RoomId) -> Self {
         Self(Rc::new(RefCell::new(MemberInner {
@@ -110,7 +116,7 @@ impl Member {
         })))
     }
 
-    /// Lookup [`MemberSpec`] by ID from [`MemberSpec`].
+    /// Lookups [`MemberSpec`] by [`MemberId`] from [`MemberSpec`].
     ///
     /// Returns [`MembersLoadError::MemberNotFound`] when member not found.
     /// Returns [`MembersLoadError::TryFromError`] when found element which is
@@ -121,24 +127,23 @@ impl Member {
         member_id: &MemberId,
     ) -> Result<MemberSpec, MembersLoadError> {
         let element = room_spec.pipeline.get(&member_id.0).map_or(
-            Err(MembersLoadError::MemberNotFound(
-                LocalUri::<IsMemberId>::new(self.room_id(), member_id.clone()),
-            )),
+            Err(MembersLoadError::MemberNotFound(LocalUri::<ToMember>::new(
+                self.room_id(),
+                member_id.clone(),
+            ))),
             Ok,
         )?;
 
         MemberSpec::try_from(element).map_err(|e| {
             MembersLoadError::TryFromError(
                 e,
-                LocalUriType::Member(LocalUri::<IsMemberId>::new(
-                    self.room_id(),
-                    member_id.clone(),
-                )),
+                LocalUri::<ToMember>::new(self.room_id(), member_id.clone())
+                    .into(),
             )
         })
     }
 
-    /// Load all srcs and sinks of this [`Member`].
+    /// Loads all sources and sinks of this [`Member`].
     fn load(
         &self,
         room_spec: &RoomSpec,
@@ -149,37 +154,36 @@ impl Member {
         let this_member_spec =
             self.get_member_from_room_spec(room_spec, &self_id)?;
 
-        let this_member = store.get(&self.id()).map_or(
-            Err(MembersLoadError::MemberNotFound(self.get_local_uri())),
-            Ok,
-        )?;
+        let this_member = store.get(&self.id()).ok_or_else(|| {
+            MembersLoadError::MemberNotFound(self.get_local_uri())
+        })?;
 
         for (spec_play_name, spec_play_endpoint) in
             this_member_spec.play_endpoints()
         {
             let publisher_id =
                 MemberId(spec_play_endpoint.src.member_id.to_string());
-            let publisher_member = store.get(&publisher_id).map_or(
-                Err(MembersLoadError::MemberNotFound(
-                    LocalUri::<IsMemberId>::new(self.room_id(), publisher_id),
-                )),
-                Ok,
-            )?;
+            let publisher_member =
+                store.get(&publisher_id).ok_or_else(|| {
+                    MembersLoadError::MemberNotFound(LocalUri::<ToMember>::new(
+                        self.room_id(),
+                        publisher_id,
+                    ))
+                })?;
             let publisher_spec = self.get_member_from_room_spec(
                 room_spec,
                 &spec_play_endpoint.src.member_id,
             )?;
 
             let publisher_endpoint = publisher_spec
-                .get_publish_endpoint(&spec_play_endpoint.src.endpoint_id)
-                .map_or(
-                    Err(MembersLoadError::PublishEndpointNotFound(
+                .get_publish_endpoint_by_id(&spec_play_endpoint.src.endpoint_id)
+                .ok_or_else(|| {
+                    MembersLoadError::PublishEndpointNotFound(
                         publisher_member.get_local_uri_to_endpoint(
                             spec_play_endpoint.src.endpoint_id.to_string(),
                         ),
-                    )),
-                    Ok,
-                )?;
+                    )
+                })?;
 
             if let Some(publisher) =
                 publisher_member.get_src_by_id(&WebRtcPublishId(
@@ -189,7 +193,7 @@ impl Member {
                 let new_play_endpoint_id =
                     WebRtcPlayId(spec_play_name.to_string());
                 let new_play_endpoint = WebRtcPlayEndpoint::new(
-                    new_play_endpoint_id.clone(),
+                    new_play_endpoint_id,
                     spec_play_endpoint.src.clone(),
                     publisher.downgrade(),
                     this_member.downgrade(),
@@ -199,16 +203,16 @@ impl Member {
 
                 publisher.add_sink(new_play_endpoint.downgrade());
             } else {
-                let new_publish_id = &spec_play_endpoint.src.endpoint_id;
+                let new_publish_id = spec_play_endpoint.src.endpoint_id.clone();
                 let new_publish = WebRtcPublishEndpoint::new(
-                    new_publish_id.clone(),
+                    new_publish_id,
                     publisher_endpoint.p2p.clone(),
                     publisher_member.downgrade(),
                 );
 
                 let new_self_play_id = WebRtcPlayId(spec_play_name.to_string());
                 let new_self_play = WebRtcPlayEndpoint::new(
-                    new_self_play_id.clone(),
+                    new_self_play_id,
                     spec_play_endpoint.src.clone(),
                     new_publish.downgrade(),
                     this_member.downgrade(),
@@ -226,48 +230,47 @@ impl Member {
         // to which none [`WebRtcPlayEndpoint`] refers.
         this_member_spec
             .publish_endpoints()
+            .filter(|(endpoint_id, _)| self.srcs().get(endpoint_id).is_none())
             .for_each(|(endpoint_id, e)| {
-                if self.srcs().get(&endpoint_id).is_none() {
-                    self.insert_src(WebRtcPublishEndpoint::new(
-                        endpoint_id,
-                        e.p2p.clone(),
-                        this_member.downgrade(),
-                    ));
-                }
+                self.insert_src(WebRtcPublishEndpoint::new(
+                    endpoint_id,
+                    e.p2p.clone(),
+                    this_member.downgrade(),
+                ));
             });
 
         Ok(())
     }
 
-    /// Return [`LocalUri`] to this [`Member`].
-    fn get_local_uri(&self) -> LocalUri<IsMemberId> {
-        LocalUri::<IsMemberId>::new(self.room_id(), self.id())
+    /// Returns [`LocalUri`] to this [`Member`].
+    fn get_local_uri(&self) -> LocalUri<ToMember> {
+        LocalUri::<ToMember>::new(self.room_id(), self.id())
     }
 
-    /// Return [`LocalUri`] to some endpoint from this [`Member`].
+    /// Returns [`LocalUri`] to some endpoint from this [`Member`].
     ///
     /// __Note__ this function don't check presence of `Endpoint` in this
     /// [`Member`].
     pub fn get_local_uri_to_endpoint(
         &self,
         endpoint_id: String,
-    ) -> LocalUri<IsEndpointId> {
-        LocalUri::<IsEndpointId>::new(self.room_id(), self.id(), endpoint_id)
+    ) -> LocalUri<ToEndpoint> {
+        LocalUri::<ToEndpoint>::new(self.room_id(), self.id(), endpoint_id)
     }
 
-    /// Notify [`Member`] that some [`Peer`]s removed.
+    /// Notifies [`Member`] that some [`Peer`]s removed.
     ///
     /// All [`PeerId`]s related to this [`Member`] will be removed.
     ///
     /// [`Peer`]: crate::media::peer::Peer
     pub fn peers_removed(&self, peer_ids: &[PeerId]) {
         self.srcs()
-            .into_iter()
-            .for_each(|(_, p)| p.remove_peer_ids(peer_ids));
+            .values()
+            .for_each(|p| p.remove_peer_ids(peer_ids));
 
         self.sinks()
-            .into_iter()
-            .filter_map(|(_, p)| p.peer_id().map(|id| (id, p)))
+            .values()
+            .filter_map(|p| p.peer_id().map(|id| (id, p)))
             .filter(|(id, _)| peer_ids.contains(&id))
             .for_each(|(_, p)| p.reset());
     }
@@ -297,7 +300,7 @@ impl Member {
         self.0.borrow().credentials.clone()
     }
 
-    /// Returns all publishers of this [`Member`].
+    /// Returns all srcs of this [`Member`].
     pub fn srcs(&self) -> HashMap<WebRtcPublishId, WebRtcPublishEndpoint> {
         self.0.borrow().srcs.clone()
     }
@@ -307,17 +310,18 @@ impl Member {
         self.0.borrow().sinks.clone()
     }
 
-    /// Insert sink endpoint into this [`Member`].
+    /// Inserts sink endpoint into this [`Member`].
     pub fn insert_sink(&self, endpoint: WebRtcPlayEndpoint) {
         self.0.borrow_mut().sinks.insert(endpoint.id(), endpoint);
     }
 
-    /// Insert source endpoint into this [`Member`].
+    /// Inserts source endpoint into this [`Member`].
     pub fn insert_src(&self, endpoint: WebRtcPublishEndpoint) {
         self.0.borrow_mut().srcs.insert(endpoint.id(), endpoint);
     }
 
-    /// Lookup [`WebRtcPublishEndpoint`] source endpoint by [`WebRtcPublishId`].
+    /// Lookups [`WebRtcPublishEndpoint`] source endpoint by
+    /// [`WebRtcPublishId`].
     pub fn get_src_by_id(
         &self,
         id: &WebRtcPublishId,
@@ -325,9 +329,10 @@ impl Member {
         self.0.borrow().srcs.get(id).cloned()
     }
 
-    /// Lookup [`WebRtcPublishEndpoint`] source endpoint by [`WebRtcPublishId`].
+    /// Lookups [`WebRtcPublishEndpoint`] source endpoint by
+    /// [`WebRtcPublishId`].
     ///
-    /// Returns [`MeberError::PublishEndpointNotFound`] when
+    /// Returns [`MemberError::PublishEndpointNotFound`] when
     /// [`WebRtcPublishEndpoint`] not found.
     pub fn get_src(
         &self,
@@ -343,7 +348,7 @@ impl Member {
         )
     }
 
-    /// Lookup [`WebRtcPlayEndpoint`] sink endpoint by [`WebRtcPlayId`].
+    /// Lookups [`WebRtcPlayEndpoint`] sink endpoint by [`WebRtcPlayId`].
     pub fn get_sink_by_id(
         &self,
         id: &WebRtcPlayId,
@@ -351,7 +356,7 @@ impl Member {
         self.0.borrow().sinks.get(id).cloned()
     }
 
-    /// Lookup [`WebRtcPlayEndpoint`] sink endpoint by [`EndpointId`].
+    /// Lookups [`WebRtcPlayEndpoint`] sink endpoint by [`WebRtcPlayId`].
     ///
     /// Returns [`MemberError::PlayEndpointNotFound`] when
     /// [`WebRtcPlayEndpoint`] not found.
@@ -369,22 +374,22 @@ impl Member {
         )
     }
 
-    /// Remove sink [`WebRtcPlayEndpoint`] from this [`Member`].
+    /// Removes sink [`WebRtcPlayEndpoint`] from this [`Member`].
     pub fn remove_sink(&self, id: &WebRtcPlayId) {
         self.0.borrow_mut().sinks.remove(id);
     }
 
-    /// Remove source [`WebRtcPublishEndpoint`] from this [`Member`].
+    /// Removes source [`WebRtcPublishEndpoint`] from this [`Member`].
     pub fn remove_src(&self, id: &WebRtcPublishId) {
         self.0.borrow_mut().srcs.remove(id);
     }
 
-    /// Take sink from [`Member`]'s `sinks`.
+    /// Takes sink from [`Member`]'s `sinks`.
     pub fn take_sink(&self, id: &WebRtcPlayId) -> Option<WebRtcPlayEndpoint> {
         self.0.borrow_mut().sinks.remove(id)
     }
 
-    /// Take src from [`Member`]'s `srsc`.
+    /// Takes src from [`Member`]'s `srsc`.
     pub fn take_src(
         &self,
         id: &WebRtcPublishId,
@@ -392,11 +397,12 @@ impl Member {
         self.0.borrow_mut().srcs.remove(id)
     }
 
+    /// Returns [`RoomId`] of this [`Member`].
     pub fn room_id(&self) -> RoomId {
         self.0.borrow().room_id.clone()
     }
 
-    /// Create new [`WebRtcPlayEndpoint`] based on provided
+    /// Creates new [`WebRtcPlayEndpoint`] based on provided
     /// [`WebRtcPlayEndpointSpec`].
     ///
     /// This function will add created [`WebRtcPlayEndpoint`] to src's
@@ -419,13 +425,33 @@ impl Member {
         member.insert_sink(sink);
     }
 
-    /// Downgrade strong [`Member`]'s pointer to weak [`WeakMember`] pointer.
+    /// Lookups [`WebRtcPublishEndpoint`] and [`WebRtcPlayEndpoint`] at one
+    /// moment by ID.
+    pub fn get_endpoint_by_id(
+        &self,
+        id: String,
+    ) -> Result<Endpoint, MemberError> {
+        let webrtc_publish_id = WebRtcPublishId(id);
+        if let Some(publish_endpoint) = self.get_src_by_id(&webrtc_publish_id) {
+            return Ok(Endpoint::WebRtcPublishEndpoint(publish_endpoint));
+        }
+        let webrtc_play_id = WebRtcPlayId(webrtc_publish_id.0);
+        if let Some(play_endpoint) = self.get_sink_by_id(&webrtc_play_id) {
+            return Ok(Endpoint::WebRtcPlayEndpoint(play_endpoint));
+        }
+
+        Err(MemberError::EndpointNotFound(
+            self.get_local_uri_to_endpoint(webrtc_play_id.to_string()),
+        ))
+    }
+
+    /// Downgrades strong [`Member`]'s pointer to weak [`WeakMember`] pointer.
     pub fn downgrade(&self) -> WeakMember {
         WeakMember(Rc::downgrade(&self.0))
     }
 
     /// Compares pointers. If both pointers point to the same address, then
-    /// returns true.
+    /// returns `true`.
     #[cfg(test)]
     pub fn ptr_eq(&self, another_member: &Self) -> bool {
         Rc::ptr_eq(&self.0, &another_member.0)
@@ -438,49 +464,44 @@ impl Member {
 pub struct WeakMember(Weak<RefCell<MemberInner>>);
 
 impl WeakMember {
-    /// Upgrade weak pointer to strong pointer.
+    /// Upgrades weak pointer to strong pointer.
     ///
-    /// This function will __panic__ if weak pointer is `None`.
+    /// This function will __panic__ if weak pointer was dropped.
     pub fn upgrade(&self) -> Member {
         Member(Weak::upgrade(&self.0).unwrap())
     }
 
-    /// Safe upgrade to [`Member`].
+    /// Safe upgrades to [`Member`].
     pub fn safe_upgrade(&self) -> Option<Member> {
         Weak::upgrade(&self.0).map(Member)
     }
 }
 
-/// Creates all empty [`Member`] from [`RoomSpec`] and then
-/// load all related to this [`Member`]s srcs and sinks endpoints.
+/// Creates all empty [`Member`]s from [`RoomSpec`] and then
+/// loads all related to this [`Member`]s sources and sinks endpoints.
 ///
 /// Returns store of all [`Member`]s loaded from [`RoomSpec`].
 pub fn parse_members(
     room_spec: &RoomSpec,
 ) -> Result<HashMap<MemberId, Member>, MembersLoadError> {
-    let members_spec = match room_spec.members() {
-        Ok(o) => o,
-        Err(e) => {
-            return Err(MembersLoadError::TryFromError(
-                e,
-                LocalUriType::Room(LocalUri::<IsRoomId>::new(
-                    room_spec.id.clone(),
-                )),
-            ))
-        }
-    };
-    let mut members = HashMap::new();
+    let members_spec = room_spec.members().map_err(|e| {
+        MembersLoadError::TryFromError(
+            e,
+            LocalUri::<ToRoom>::new(room_spec.id.clone()).into(),
+        )
+    })?;
 
-    for (id, member) in &members_spec {
-        members.insert(
-            id.clone(),
-            Member::new(
+    let members: HashMap<MemberId, Member> = members_spec
+        .iter()
+        .map(|(id, member)| {
+            let new_member = Member::new(
                 id.clone(),
                 member.credentials().to_string(),
                 room_spec.id.clone(),
-            ),
-        );
-    }
+            );
+            (id.clone(), new_member)
+        })
+        .collect();
 
     for member in members.values() {
         member.load(room_spec, &members)?;
@@ -529,6 +550,18 @@ impl Into<ElementProto> for Member {
 
         member.set_credentials(self.credentials());
 
+        element.set_member(member);
+
+        element
+    }
+}
+
+impl Into<RootElementProto> for Member {
+    fn into(self) -> RootElementProto {
+        let mut member_element: ElementProto = self.into();
+        let member = member_element.take_member();
+
+        let mut element = RootElementProto::new();
         element.set_member(member);
 
         element

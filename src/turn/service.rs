@@ -3,13 +3,14 @@
 //! [coturn]: https://github.com/coturn/coturn
 //! [TURN]: https://webrtcglossary.com/turn/
 
-use std::fmt;
+use std::{fmt, sync::Arc};
 
 use actix::{
     fut::wrap_future, Actor, ActorFuture, Addr, Context, Handler, MailboxError,
     Message, WrapFuture,
 };
 use bb8::RunError;
+use derive_more::Display;
 use failure::Fail;
 use futures::future::{err, ok, Future};
 use rand::{distributions::Alphanumeric, Rng};
@@ -22,15 +23,11 @@ use crate::{
     turn::repo::{TurnDatabase, TurnDatabaseErr},
 };
 
-/// Boxed [`TurnAuthService`] which can be [`Sync`] and [`Send`].
-#[allow(clippy::module_name_repetitions)]
-pub type BoxedTurnAuthService = Box<dyn TurnAuthService + Sync + Send>;
-
 static TURN_PASS_LEN: usize = 16;
 
 #[allow(clippy::module_name_repetitions)]
 /// Manages Turn server credentials.
-pub trait TurnAuthService: fmt::Debug + Send {
+pub trait TurnAuthService: fmt::Debug + Send + Sync {
     /// Generates and registers Turn credentials.
     fn create(
         &self,
@@ -100,13 +97,13 @@ type ActFuture<I, E> =
     Box<dyn ActorFuture<Actor = Service, Item = I, Error = E>>;
 
 /// Error which can happen in [`TurnAuthService`].
-#[derive(Debug, Fail)]
+#[derive(Display, Debug, Fail)]
 pub enum TurnServiceErr {
-    #[fail(display = "Error accessing TurnAuthRepo: {}", _0)]
+    #[display(fmt = "Error accessing TurnAuthRepo: {}", _0)]
     TurnAuthRepoErr(TurnDatabaseErr),
-    #[fail(display = "Mailbox error when accessing TurnAuthRepo: {}", _0)]
+    #[display(fmt = "Mailbox error when accessing TurnAuthRepo: {}", _0)]
     MailboxErr(MailboxError),
-    #[fail(display = "Timeout exceeded while trying to insert/delete IceUser")]
+    #[display(fmt = "Timeout exceeded while trying to insert/delete IceUser")]
     TimedOut,
 }
 
@@ -161,9 +158,9 @@ struct Service {
 
 /// Create new instance [`TurnAuthService`].
 #[allow(clippy::module_name_repetitions)]
-pub fn new_turn_auth_service(
+pub fn new_turn_auth_service<'a>(
     cf: &conf::Turn,
-) -> impl Future<Item = BoxedTurnAuthService, Error = TurnServiceErr> {
+) -> impl Future<Item = Arc<dyn TurnAuthService + 'a>, Error = TurnServiceErr> {
     let db_pass = cf.db.redis.pass.clone();
     let turn_address = cf.addr();
     let turn_username = cf.user.clone();
@@ -191,7 +188,7 @@ pub fn new_turn_auth_service(
         turn_password,
         static_user: None,
     })
-    .map::<_, BoxedTurnAuthService>(|service| Box::new(service.start()))
+    .map::<_, Arc<dyn TurnAuthService>>(|service| Arc::new(service.start()))
     .map_err(TurnServiceErr::from)
 }
 
@@ -248,21 +245,19 @@ impl Handler<CreateIceUser> for Service {
             self.new_password(TURN_PASS_LEN),
         );
 
-        Box::new(
-            self.turn_db.insert(&ice_user).into_actor(self).then(
-                move |result, act, _| {
-                    wrap_future(match result {
-                        Ok(_) => ok(ice_user),
-                        Err(e) => match msg.policy {
-                            UnreachablePolicy::ReturnErr => err(e.into()),
-                            UnreachablePolicy::ReturnStatic => {
-                                ok(act.static_user())
-                            }
-                        },
-                    })
-                },
-            ),
-        )
+        Box::new(self.turn_db.insert(&ice_user).into_actor(self).then(
+            move |result, act, _| {
+                wrap_future(match result {
+                    Ok(_) => ok(ice_user),
+                    Err(e) => match msg.policy {
+                        UnreachablePolicy::ReturnErr => err(e.into()),
+                        UnreachablePolicy::ReturnStatic => {
+                            ok(act.static_user())
+                        }
+                    },
+                })
+            },
+        ))
     }
 }
 
@@ -291,6 +286,8 @@ impl Handler<DeleteIceUsers> for Service {
 
 #[cfg(test)]
 pub mod test {
+    use std::sync::Arc;
+
     use futures::future;
 
     use crate::media::IceUser;
@@ -323,7 +320,7 @@ pub mod test {
     }
 
     #[allow(clippy::module_name_repetitions)]
-    pub fn new_turn_auth_service_mock() -> BoxedTurnAuthService {
-        Box::new(TurnAuthServiceMock {})
+    pub fn new_turn_auth_service_mock() -> Arc<dyn TurnAuthService> {
+        Arc::new(TurnAuthServiceMock {})
     }
 }
