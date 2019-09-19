@@ -258,8 +258,8 @@ fn normal_exchange_of_candidates() -> impl Future<Item = (), Error = JsValue> {
                     .and_then(move |_| peer2.create_and_set_answer())
                     .and_then(move |answer| peer1.set_remote_answer(answer))
             })
-            .map_err(|_| ())
-            .and_then(|_| resolve_after(500).map_err(|_| ()))
+            .map_err(|e| panic!("{:?}", e))
+            .and_then(|_| resolve_after(500).map_err(|e| panic!("{:?}", e)))
             .map(move |_| {
                 let _ = peer1_lock;
                 let _ = peer2_lock;
@@ -289,7 +289,7 @@ fn handle_ice_candidates(
             } => {
                 let added = Rc::clone(&added);
                 peer.add_ice_candidate(candidate, sdp_m_line_index, sdp_mid)
-                    .map_err(|_| assert!(false))
+                    .map_err(|e| panic!("{:?}", e))
                     .then(move |_| {
                         *added.borrow_mut() += 1;
                         if *added.borrow() == count {

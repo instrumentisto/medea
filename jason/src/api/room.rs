@@ -234,7 +234,8 @@ impl InnerRoom {
 
     /// Resets state of [`InnerRoom`].
     ///
-    /// Currently removes all [`Peer`]s and send [`Command::ResetMe`] to the server.
+    /// Currently removes all [`Peer`]s and send [`Command::ResetMe`] to the
+    /// server.
     fn reset(&mut self) {
         let peers_to_remove =
             self.peers.peers().into_iter().map(|(id, _)| id).collect();

@@ -539,5 +539,10 @@ impl Drop for PeerConnection {
             .borrow()
             .peer
             .on_ice_candidate::<Box<dyn FnMut(IceCandidate)>>(None);
+        let _ = self
+            .0
+            .borrow()
+            .peer
+            .on_signaling_state_changed::<Box<dyn FnMut()>>(None);
     }
 }
