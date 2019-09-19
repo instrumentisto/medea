@@ -12,9 +12,15 @@ All user visible changes to this project will be documented in this file. This p
 ### Added
 
 - `TrackId` and `PeerId` types ([#28]);
-- `Incrementable` trait ([#28]).
+- `Incrementable` trait ([#28]);
+- RPC messages:
+    - Client commands:
+        - `Event::ResetMe` ([#51]).
+    - Server events:
+        - `RestoreState` ([#51]).
 
 [#28]: /../../pull/28
+[#51]: /../../pull/51
 
 
 

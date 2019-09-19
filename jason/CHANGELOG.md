@@ -21,7 +21,8 @@ All user visible changes to this project will be documented in this file. This p
 ### Fixed
 
 - Signalling:
-    - Skipped `IceCandidate`s received before receiving remote SDP ([#50](/../../pull/50)).
+    - Skipped `IceCandidate`s received before receiving remote SDP ([#50](/../../pull/50));
+    - Synchronization of local state with server state after reconnection ([51](/../../pull/51)).
 
 
 
