@@ -124,6 +124,29 @@ down.dev:
 	@make docker.down.coturn
 
 
+# Stop all services needed for e2e testing of medea in browsers.
+#
+# Usage:
+#   make down.e2e.services [dockerized=(yes|no)] [coturn=(yes|no)]
+
+down.e2e.services:
+ifeq ($(dockerized),no)
+	kill $$(cat /tmp/e2e_medea.pid)
+	kill $$(cat /tmp/e2e_control_api_mock.pid)
+	rm -f /tmp/e2e_medea.pid \
+		/tmp/e2e_control_api_mock.pid
+ifneq ($(coturn),no)
+	@make down.coturn
+endif
+else
+	docker container stop $$(cat /tmp/control-api-mock.docker.uid)
+	docker container stop $$(cat /tmp/medea.docker.uid)
+	rm -f /tmp/control-api-mock.docker.uid /tmp/medea.docker.uid
+
+	@make down.coturn
+endif
+
+
 down.medea: docker.down.medea
 
 
