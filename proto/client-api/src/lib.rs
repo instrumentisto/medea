@@ -219,8 +219,8 @@ pub enum Event {
     /// [`Event`] which server will send if detects that `Member` is
     /// reconnecting.
     ///
-    /// On this [`Event`] client should upgrade/downgrade local state to state
-    /// of the server.
+    /// On this [`Event`] client should upgrade/downgrade local state to the
+    /// state of the server.
     RestoreState { snapshot: Snapshot },
 }
 

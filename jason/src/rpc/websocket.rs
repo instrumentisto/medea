@@ -4,10 +4,9 @@
 
 use std::{cell::RefCell, convert::TryFrom, rc::Rc};
 
+use derive_more::{From, Into};
 use futures::future::{Future, IntoFuture};
-use macro_attr::*;
 use medea_client_api_proto::{ClientMsg, ServerMsg};
-use newtype_derive::NewtypeFrom;
 use web_sys::{CloseEvent, Event, MessageEvent, WebSocket as SysWebSocket};
 
 use crate::{
@@ -218,10 +217,8 @@ impl From<&CloseEvent> for CloseMsg {
     }
 }
 
-macro_attr! {
-    #[derive(NewtypeFrom!)]
-    pub struct ServerMessage(ServerMsg);
-}
+#[derive(From, Into)]
+pub struct ServerMessage(ServerMsg);
 
 impl TryFrom<&MessageEvent> for ServerMessage {
     type Error = WasmErr;

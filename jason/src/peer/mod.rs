@@ -40,7 +40,7 @@ pub use self::{
 
 /// Jason's signaling state of [`RtcPeerConnection`].
 ///
-/// This signaling state slightly different from the JS's RtcPeerConnection's
+/// This signaling state slightly different from the JS's `RTCPeerConnection`'s
 /// signaling state. More info about difference you can find in docs of this
 /// enum's variants.
 #[derive(Clone, Debug)]
@@ -296,7 +296,9 @@ impl PeerConnection {
         }
     }
 
-    /// Disables or enables all audio tracks for all `Sender`s.
+    /// Disables or enables all audio tracks for all [`Sender`]s.
+    ///
+    /// [`Sender`]: crate::peer::media::Sender
     pub fn toggle_send_audio(&self, enabled: bool) {
         self.0
             .borrow()
@@ -304,7 +306,9 @@ impl PeerConnection {
             .toggle_send_media(TransceiverKind::Audio, enabled)
     }
 
-    /// Disables or enables all video tracks for all `Sender`s.
+    /// Disables or enables all video tracks for all [`Sender`]s.
+    ///
+    /// [`Sender`]: crate::peer::media::Sender
     pub fn toggle_send_video(&self, enabled: bool) {
         self.0
             .borrow()
@@ -312,7 +316,9 @@ impl PeerConnection {
             .toggle_send_media(TransceiverKind::Video, enabled)
     }
 
-    /// Returns `true` if all `Sender`s audio tracks are enabled.
+    /// Returns `true` if all [`Sender`]s audio tracks are enabled.
+    ///
+    /// [`Sender`]: crate::peer::media::Sender
     pub fn is_send_audio_enabled(&self) -> bool {
         self.0
             .borrow()
@@ -320,7 +326,9 @@ impl PeerConnection {
             .are_senders_enabled(TransceiverKind::Audio)
     }
 
-    /// Returns `true` if all `Sender`s video tracks are enabled.
+    /// Returns `true` if all [`Sender`]s video tracks are enabled.
+    ///
+    /// [`Sender`]: crate::peer::media::Sender
     pub fn is_send_video_enabled(&self) -> bool {
         self.0
             .borrow()
@@ -341,9 +349,12 @@ impl PeerConnection {
         self.0.borrow().media_connections.get_mids()
     }
 
-    /// Sync provided tracks creating all required `Sender`s and
-    /// `Receiver`s, request local stream if required, get, set and return
+    /// Sync provided tracks creating all required [`Sender`]s and
+    /// [`Receiver`]s, request local stream if required, get, set and return
     /// sdp offer.
+    ///
+    /// [`Sender`]: crate::peer::media::Sender
+    /// [`Receiver`]: crate::peer::media::Receiver
     pub fn get_offer(
         &self,
         tracks: Vec<Track>,
@@ -435,13 +446,15 @@ impl PeerConnection {
         })
     }
 
-    /// Sync provided tracks creating all required `Sender`s and
-    /// `Receiver`s, request local stream if required.
+    /// Sync provided tracks creating all required [`Sender`]s and
+    /// [`Receiver`]s, request local stream if required.
     /// `set_remote_description` will create all transceivers and fire all
-    /// `on_track` events, so it updates `Receiver`s before
-    /// `set_remote_description` and update `Sender`s after.
+    /// `on_track` events, so it updates [`Receiver`]s before
+    /// `set_remote_description` and update [`Sender`]s after.
     ///
     /// [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
+    /// [`Sender`]: crate::peer::media::Sender
+    /// [`Receiver`]: crate::peer::media::Receiver
     pub fn process_offer(
         &self,
         offer: String,

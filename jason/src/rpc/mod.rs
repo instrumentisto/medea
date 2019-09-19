@@ -74,6 +74,9 @@ impl Inner {
 }
 
 /// Handles close message from remote server.
+///
+/// This function will tries to reconnect to the server while WS connection
+/// will not be established.
 fn on_close(ws_client: WebsocketRpcClient, close_msg: &CloseMsg) {
     {
         let mut inner = ws_client.0.borrow_mut();

@@ -748,7 +748,6 @@ impl Handler<RpcConnectionEstablished> for Room {
                         Event::RestoreState { snapshot },
                     )
                     .map_err(move |e| {
-                        // TODO: Maybe handle this error??
                         error!(
                             "Error while sending RestoreState event to \
                              member. {:?}",
