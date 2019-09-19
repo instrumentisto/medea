@@ -14,11 +14,7 @@ doc-valid-idents = [
     "RTCIceCandidate", "RTCIceCandidateInit", "RTCIceServer",
     "RTCPeerConnection", "RTCPeerConnectionIceEvent",
     "RTCRtpTransceiver", "RTCRtpTransceiverDirection",
-<<<<<<< HEAD
     "RTCSdpType", "RTCIceCandidateInit",
     "WebRTC", "RtcPeerConnection",
     "gRPC", "WebDriver",
-=======
-    "RTCSdpType",
->>>>>>> control-api-mock-server
 ]
