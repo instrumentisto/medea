@@ -18,9 +18,9 @@ members = [
     "crates/medea-macro",
     "crates/test/control-api-mock",
     "crates/test/e2e-tests-runner",
+    "crates/test/connection-dropper",
     "jason",
     "proto/client-api",
-    "crates/test/control-api-mock",
     "proto/control-api",
 ]
 
