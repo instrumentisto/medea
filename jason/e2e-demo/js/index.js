@@ -60,5 +60,5 @@ window.onload = async function () {
   const wasm = await import("../../pkg");
 
   await init_participant(wasm, "ws://localhost:8080/ws/pub-pub-video-call/caller/test", "#caller");
-  await init_participant(wasm, "ws://localhost:8080/ws/pub-pub-video-call/responder/test", "#responder");
+  await init_participant(wasm, "ws://localhost:8090/ws/pub-pub-video-call/responder/test", "#responder");
 };

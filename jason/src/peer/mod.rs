@@ -240,6 +240,7 @@ impl PeerConnection {
                 }
             }
             HaveLocalOffer | HaveLocalPranswer => {
+                web_sys::console::log_1(&format!("State: {:?}", signaling_state).into());
                 inner.signaling_state = SignalingState::HaveLocalOffer;
             }
             HaveRemoteOffer | HaveRemotePranswer => {

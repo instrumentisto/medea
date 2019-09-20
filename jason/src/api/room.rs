@@ -292,7 +292,7 @@ impl InnerRoom {
                 SignalingState::HaveLocalOffer => {
                     self.on_sdp_answer_made(
                         peer_id,
-                        snapshot_peer.sdp_answer.unwrap(),
+                        snapshot_peer.sdp_answer.expect("3"),
                     );
                 }
                 _ => {
@@ -306,7 +306,7 @@ impl InnerRoom {
                 match local_peer.signaling_state() {
                     SignalingState::Stable => {
                         let sdp_answer =
-                            local_peer.current_local_sdp().unwrap();
+                            local_peer.current_local_sdp().expect("2");
                         self.rpc.send_command(Command::MakeSdpAnswer {
                             peer_id,
                             sdp_answer,
@@ -325,7 +325,7 @@ impl InnerRoom {
             ServerPeerState::WaitLocalSdp => {
                 match local_peer.signaling_state() {
                     SignalingState::HaveLocalOffer => {
-                        let local_sdp = local_peer.current_local_sdp().unwrap();
+                        let local_sdp = local_peer.current_local_sdp().expect("1");
                         self.rpc.send_command(Command::MakeSdpOffer {
                             peer_id,
                             sdp_offer: local_sdp,

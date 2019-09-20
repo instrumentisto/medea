@@ -7,6 +7,7 @@ use actix_web::{
 use futures::{future, Future};
 use iptables::error::IPTError;
 use serde::Serialize;
+use actix_cors::Cors;
 
 use crate::{
     firewall::Firewall,
@@ -20,6 +21,7 @@ pub fn run(firewall: Firewall, gremlin: Addr<Gremlin>) -> Server {
                 firewall: firewall.clone(),
                 gremlin: gremlin.clone(),
             })
+            .wrap(Cors::new())
             .wrap(middleware::Logger::default())
             .service(
                 web::resource("/connection/up")

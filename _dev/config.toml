@@ -1,2 +1,19 @@
 [control_api]
 static_specs_dir = "_dev/specs/"
+
+[rpc]
+# Duration, after which remote RPC client will be considered idle if no
+# heartbeat messages received.
+#
+# Environment variable: MEDEA_RPC.IDLE_TIMEOUT
+#
+# Default:
+idle_timeout = "4s"
+
+# Duration, after which the server deletes the client session if
+# the remote RPC client does not reconnect after it is idle.
+#
+# Environment variable: MEDEA_RPC.RECONNECT_TIMEOUT
+#
+# Default:
+reconnect_timeout = "60s"

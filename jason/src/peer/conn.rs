@@ -387,12 +387,12 @@ impl RtcPeerConnection {
 
     /// Returns current local [`RtcSessionDescription`].
     pub fn current_local_description(&self) -> Option<RtcSessionDescription> {
-        self.0.borrow().peer.current_local_description()
+        self.0.borrow().peer.local_description()
     }
 
     /// Returns current remote [`RtcSessionDescription`].
     pub fn current_remote_description(&self) -> Option<RtcSessionDescription> {
-        self.0.borrow().peer.current_remote_description()
+        self.0.borrow().peer.remote_description()
     }
 }
 

@@ -67,11 +67,11 @@ impl Handler<Start> for Gremlin {
 
     fn handle(&mut self, _: Start, ctx: &mut Self::Context) -> Self::Result {
         info!("Starting gremlin.");
+        self.firewall.open_port(8090).unwrap();
 
         if let Some(handle) = self.dropper_handle.take() {
             debug!("Old dropper found. Cancelling old dropper's future.");
             ctx.cancel_future(handle);
-            self.step(ctx);
         }
         self.step(ctx);
     }
