@@ -1,3 +1,5 @@
+//! Server which provides API for upping and downing connection for `Member`.
+
 use std::borrow::Cow;
 
 use actix::Addr;
@@ -15,6 +17,8 @@ use crate::{
     prelude::*,
 };
 
+/// Runs [`actix::Server`] which will provide API for upping and downing
+/// connection for `Member`.
 pub fn run(firewall: Firewall, gremlin: Addr<Gremlin>) -> Server {
     HttpServer::new(move || {
         App::new()
@@ -46,17 +50,21 @@ pub fn run(firewall: Firewall, gremlin: Addr<Gremlin>) -> Server {
     .start()
 }
 
+/// Context of [`actix::Server`] which provide API for dropping connections.
 pub struct Context {
     firewall: Firewall,
     gremlin: Addr<Gremlin>,
 }
 
+/// Error response.
 #[derive(Debug, Serialize)]
 struct ErrorResponse<'a> {
+    /// Text of error.
     error_text: Cow<'a, str>,
 }
 
 impl<'a> ErrorResponse<'a> {
+    /// Create new [`ErrorResponse`] with provided text as error text.
     pub fn new<S>(text: S) -> Self
     where
         S: Into<Cow<'a, str>>,
@@ -79,6 +87,9 @@ impl<'a> Into<HttpResponse> for ErrorResponse<'a> {
     }
 }
 
+/// Ups connection for `Member` with `iptables`.
+///
+/// `POST /connection/up`
 #[allow(clippy::needless_pass_by_value)]
 pub fn up_connection(
     state: Data<Context>,
@@ -95,6 +106,9 @@ pub fn up_connection(
     }
 }
 
+/// Drops connection for `Member` with `iptables`.
+///
+/// `POST /connection/down`
 #[allow(clippy::needless_pass_by_value)]
 pub fn down_connection(
     state: Data<Context>,
@@ -106,19 +120,23 @@ pub fn down_connection(
                 warn!("Ignored iptables error: {}", s);
                 future::ok(HttpResponse::Ok().finish())
             }
-            _ => {
-                future::ok(ErrorResponse::from(e).into())
-            },
-        }
+            _ => future::ok(ErrorResponse::from(e).into()),
+        },
     }
 }
 
+/// Starts service which will up/down connection for `Member` at random time.
+///
+/// `POST /gremlin/start`
 #[allow(clippy::needless_pass_by_value)]
 pub fn start_gremlin(state: Data<Context>) -> HttpResponse {
     state.gremlin.do_send(Start);
     HttpResponse::Ok().finish()
 }
 
+/// Stops service which will up/down connection for `Member` at random time.
+///
+/// `POST /gremlin/stop`
 #[allow(clippy::needless_pass_by_value)]
 pub fn stop_gremlin(state: Data<Context>) -> HttpResponse {
     state.gremlin.do_send(Stop);

@@ -1,3 +1,5 @@
+//! Implementation of service which can up/down connection at random time.
+
 use std::time::Duration;
 
 use actix::{
@@ -7,6 +9,7 @@ use rand::{rngs::ThreadRng, Rng};
 
 use crate::{firewall::Firewall, prelude::*};
 
+/// Service which can up/down connection at random time.
 pub struct Gremlin {
     dropper_handle: Option<SpawnHandle>,
     firewall: Firewall,
@@ -14,6 +17,7 @@ pub struct Gremlin {
 }
 
 impl Gremlin {
+    /// Create new service which can up/down connection at random time.
     pub fn new(firewall: Firewall) -> Self {
         Self {
             dropper_handle: None,
@@ -22,6 +26,12 @@ impl Gremlin {
         }
     }
 
+    /// Closes port for `Member`, up it after some random time, run
+    /// `self.step()` after random time.
+    ///
+    /// This is recursive function. If you wish to stop it, you should call
+    /// `ctx.cancel_future` for `self.dropper_handle` ([`Stop`] message will
+    /// do it).
     pub fn step(&mut self, ctx: &mut <Self as Actor>::Context) {
         info!("Gremlin closes port.");
         self.firewall
@@ -58,6 +68,7 @@ impl Actor for Gremlin {
     }
 }
 
+/// Starts gremlin's up/down `Member` connection loop.
 #[derive(Message)]
 #[rtype(result = "()")]
 pub struct Start;
@@ -77,6 +88,7 @@ impl Handler<Start> for Gremlin {
     }
 }
 
+/// Stops gremlin's up/down `Member` connection loop.
 #[derive(Message)]
 #[rtype(result = "()")]
 pub struct Stop;
