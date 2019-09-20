@@ -1,9 +1,11 @@
-use crate::{firewall::Firewall, prelude::*};
+use std::time::Duration;
+
 use actix::{
     Actor, AsyncContext, Context, Handler, Message, Running, SpawnHandle,
 };
 use rand::{rngs::ThreadRng, Rng};
-use std::time::Duration;
+
+use crate::{firewall::Firewall, prelude::*};
 
 pub struct Gremlin {
     dropper_handle: Option<SpawnHandle>,

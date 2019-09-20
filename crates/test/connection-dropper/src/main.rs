@@ -3,11 +3,24 @@ mod gremlin;
 mod prelude;
 mod server;
 
-use crate::{firewall::Firewall, gremlin::Gremlin};
 use actix::Actor;
 use slog::{o, Drain};
 
+use crate::{firewall::Firewall, gremlin::Gremlin};
+
+#[link(name = "c")]
+extern "C" {
+    fn geteuid() -> u32;
+}
+
 fn main() {
+    // We need root permission because we use 'iptables'.
+    unsafe {
+        if geteuid() != 0 {
+            panic!("You cannot run connection-dropper unless you are root.");
+        }
+    }
+
     dotenv::dotenv().ok();
 
     let decorator = slog_term::TermDecorator::new().build();

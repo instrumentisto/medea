@@ -1,5 +1,6 @@
-use iptables::{error::IPTResult, IPTables};
 use std::sync::Arc;
+
+use iptables::{error::IPTResult, IPTables};
 
 #[derive(Clone)]
 pub struct Firewall(Arc<IPTables>);

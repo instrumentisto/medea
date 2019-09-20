@@ -1,7 +1,5 @@
-use crate::{
-    firewall::Firewall,
-    gremlin::{Gremlin, Start, Stop},
-};
+use std::borrow::Cow;
+
 use actix::Addr;
 use actix_web::{
     dev::Server, middleware, web, web::Data, App, HttpResponse, HttpServer,
@@ -9,7 +7,11 @@ use actix_web::{
 use futures::{future, Future};
 use iptables::error::IPTError;
 use serde::Serialize;
-use std::borrow::Cow;
+
+use crate::{
+    firewall::Firewall,
+    gremlin::{Gremlin, Start, Stop},
+};
 
 pub fn run(firewall: Firewall, gremlin: Addr<Gremlin>) -> Server {
     HttpServer::new(move || {
