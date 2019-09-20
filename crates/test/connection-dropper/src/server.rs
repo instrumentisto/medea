@@ -4,11 +4,10 @@ use crate::{
 };
 use actix::Addr;
 use actix_web::{
-    dev::Server, error::PayloadError::Http2Payload, middleware, web, web::Data,
-    App, HttpResponse, HttpServer,
+    dev::Server, middleware, web, web::Data, App, HttpResponse, HttpServer,
 };
 use futures::{future, Future};
-use iptables::{error::IPTError, IPTables};
+use iptables::error::IPTError;
 use serde::Serialize;
 use std::borrow::Cow;
 

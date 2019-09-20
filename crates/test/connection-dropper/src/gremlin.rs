@@ -20,20 +20,24 @@ impl Gremlin {
         }
     }
 
-    pub fn step(&mut self, ctx: &mut Context<Gremlin>) {
+    pub fn step(&mut self, ctx: &mut <Self as Actor>::Context) {
+        info!("Gremlin closes port.");
         self.firewall
             .close_port(8090)
-            .map_err(|e| warn!("Error while closing port: {:?}", e));
+            .map_err(|e| {
+                self.firewall.open_port(8090).ok();
+                e
+            })
+            .unwrap();
+
         self.dropper_handle = Some(ctx.run_later(
             Duration::from_secs(self.rng.gen_range(5, 15)),
             |gremlin, ctx| {
-                gremlin
-                    .firewall
-                    .open_port(8090)
-                    .map_err(|e| warn!("Error while opening port: {:?}", e));
+                info!("Gremlin opens port.");
+                gremlin.firewall.open_port(8090).unwrap();
                 gremlin.dropper_handle = Some(ctx.run_later(
                     Duration::from_secs(gremlin.rng.gen_range(5, 15)),
-                    |mut gremlin, mut ctx| {
+                    |gremlin, ctx| {
                         gremlin.step(ctx);
                     },
                 ));
@@ -45,8 +49,9 @@ impl Gremlin {
 impl Actor for Gremlin {
     type Context = Context<Self>;
 
-    fn stopping(&mut self, ctx: &mut Self::Context) -> Running {
-        self.firewall.open_port(8090);
+    fn stopping(&mut self, _: &mut Self::Context) -> Running {
+        debug!("Shutdown gremlin.");
+        self.firewall.open_port(8090).unwrap();
         Running::Stop
     }
 }
@@ -59,7 +64,10 @@ impl Handler<Start> for Gremlin {
     type Result = ();
 
     fn handle(&mut self, _: Start, ctx: &mut Self::Context) -> Self::Result {
+        info!("Starting gremlin.");
+
         if let Some(handle) = self.dropper_handle.take() {
+            debug!("Old dropper found. Cancelling old dropper's future.");
             ctx.cancel_future(handle);
             self.step(ctx);
         }
@@ -75,9 +83,10 @@ impl Handler<Stop> for Gremlin {
     type Result = ();
 
     fn handle(&mut self, _: Stop, ctx: &mut Self::Context) -> Self::Result {
+        info!("Stopping gremlin.");
         if let Some(handle) = self.dropper_handle.take() {
             ctx.cancel_future(handle);
         }
-        self.firewall.open_port(8090);
+        self.firewall.open_port(8090).unwrap();
     }
 }
