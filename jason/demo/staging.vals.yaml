@@ -9,7 +9,10 @@ server:
     pullPolicy: Always
   conf:
     server:
-      bind_port: 9980
+      client:
+        public_url: "wss://demo.medea.stg.t11913.org"
+        http:
+          bind_port: 9980
     turn:
       host: demo.medea.stg.t11913.org
       pass: changeme

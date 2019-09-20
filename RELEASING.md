@@ -23,7 +23,7 @@ All its user-facing changes should be described explicitly and clear. It should 
 
 
 
-## Realising
+## Releasing
 
 1. Commit all the changes for the prepared release with a commit message:
     ```

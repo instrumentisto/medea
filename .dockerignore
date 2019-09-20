@@ -8,6 +8,7 @@
 # Medea uses this sub-crates.
 !crates/
 !proto/
+!control-api-mock/
 
 # We don't need Jason while building Medea, but since it's in Medea's workspace,
 # Cargo should be able to see these files.

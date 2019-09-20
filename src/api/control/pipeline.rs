@@ -16,6 +16,11 @@ pub struct Pipeline<T> {
 }
 
 impl<T> Pipeline<T> {
+    /// Creates new [`Pipeline`] from provided [`HashMap`].
+    pub fn new(pipeline: HashMap<String, T>) -> Self {
+        Self { pipeline }
+    }
+
     /// Iterates over pipeline by reference.
     #[inline]
     pub fn iter(&self) -> impl Iterator<Item = (&String, &T)> {

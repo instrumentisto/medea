@@ -18,7 +18,9 @@ eq = $(if $(or $(1),$(2)),$(and $(findstring $(1),$(2)),\
 MEDEA_IMAGE_NAME := $(strip \
 	$(shell grep 'COMPOSE_IMAGE_NAME=' .env | cut -d '=' -f2))
 DEMO_IMAGE_NAME := instrumentisto/medea-demo
+MEDEA_BUILD_IMAGE_NAME := alexlapa/medea-build
 
+MEDEA_BUILD_IMAGE_VER := latest
 RUST_VER := 1.37
 
 CURRENT_BRANCH := $(strip $(shell git branch | grep \* | cut -d ' ' -f2))
@@ -122,6 +124,29 @@ down.dev:
 	@make docker.down.coturn
 
 
+# Stop all services needed for e2e testing of medea in browsers.
+#
+# Usage:
+#   make down.e2e.services [dockerized=(yes|no)] [coturn=(yes|no)]
+
+down.e2e.services:
+ifeq ($(dockerized),no)
+	kill $$(cat /tmp/e2e_medea.pid)
+	kill $$(cat /tmp/e2e_control_api_mock.pid)
+	rm -f /tmp/e2e_medea.pid \
+		/tmp/e2e_control_api_mock.pid
+ifneq ($(coturn),no)
+	@make down.coturn
+endif
+else
+	docker container stop $$(cat /tmp/control-api-mock.docker.uid)
+	docker container stop $$(cat /tmp/medea.docker.uid)
+	rm -f /tmp/control-api-mock.docker.uid /tmp/medea.docker.uid
+
+	@make down.coturn
+endif
+
+
 down.medea: docker.down.medea
 
 
@@ -175,6 +200,7 @@ cargo:
 #	                 [dockerized=(no|yes)]
 
 cargo-build-crate = $(if $(call eq,$(crate),),@all,$(crate))
+medea-build-image = $(MEDEA_BUILD_IMAGE_NAME):$(MEDEA_BUILD_IMAGE_VER)
 
 cargo.build:
 ifeq ($(cargo-build-crate),@all)
@@ -186,7 +212,7 @@ ifeq ($(dockerized),yes)
 	docker run --rm -v "$(PWD)":/app -w /app \
 		-u $(shell id -u):$(shell id -g) \
 		-v "$(HOME)/.cargo/registry":/usr/local/cargo/registry \
-		rust:$(RUST_VER) \
+		$(medea-build-image) \
 			make cargo.build crate=$(cargo-build-crate) \
 			                 debug=$(debug) dockerized=no
 else
@@ -200,14 +226,10 @@ ifeq ($(dockerized),yes)
 		-v "$(HOME)/.cargo/registry":/usr/local/cargo/registry \
 		-v "$(HOME):$(HOME)" \
 		-e XDG_CACHE_HOME=$(HOME) \
-		rust:$(RUST_VER) \
+		$(medea-build-image) \
 			make cargo.build crate=$(cargo-build-crate) \
-			                 debug=$(debug) dockerized=no \
-			                 pre-install=yes
+			                 debug=$(debug) dockerized=no
 else
-ifeq ($(pre-install),yes)
-	curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
-endif
 	@rm -rf $(crate-dir)/pkg/
 	wasm-pack build -t web $(crate-dir)/
 endif
@@ -336,7 +358,7 @@ endif
 
 test-e2e-env = RUST_BACKTRACE=1 \
 	$(if $(call eq,$(log),yes),,RUST_LOG=warn) \
-	MEDEA_CONTROL__STATIC_SPECS_DIR=tests/specs/
+	MEDEA_CONTROL_API__STATIC_SPECS_DIR=tests/specs/
 
 test.e2e:
 ifeq ($(up),yes)
@@ -350,6 +372,142 @@ endif
 	RUST_BACKTRACE=1 cargo test --test e2e
 ifeq ($(up),yes)
 	-make down
+endif
+
+
+# Run e2e tests of medea in chrome.
+# If logs set to "yes" then medea print all logs to stdout.
+#
+# Usage:
+# 	make test.e2e.chrome [dockerized=(YES|no)] [logs=(yes|NO)] [coturn=(YES|no)]
+
+test.e2e.chrome:
+ifeq ($(dockerized),no)
+	@make up.e2e.services
+	chromedriver --port=$(chromedriver-port) --log-level=OFF \
+		& echo $$! > /tmp/chromedriver.pid
+
+	$(shell cargo run -p e2e-tests-runner -- \
+		-w http://localhost:$(chromedriver-port) \
+		-f localhost:$(test-runner-port) \
+	 	--headless)
+	kill $$(cat /tmp/chromedriver.pid)
+	rm -f /tmp/chromedriver.pid
+
+	@make down.e2e.services
+
+	@exit $(.SHELLSTATUS)
+else
+	@make up.e2e.services
+
+	docker run --rm -d --network=host selenoid/chrome:latest > /tmp/chromedriver.docker.uid
+	$(run-medea-container) cargo run -p e2e-tests-runner -- \
+		-f 127.0.0.1:$(test-runner-port) \
+		-w http://127.0.0.1:4444 \
+		--headless
+	docker container kill $$(cat /tmp/chromedriver.docker.uid)
+	rm -f /tmp/chromedriver.docker.uid
+
+	@make down.e2e.services
+endif
+
+
+# Start services needed for e2e tests of medea in browsers.
+# If logs set to "yes" then medea print all logs to stdout.
+#
+# Usage:
+# 	make test.e2e [dockerized=(YES|no)] [logs=(yes|NO)] [coturn=(YES|no)]
+
+medea-env = RUST_BACKTRACE=1 \
+	MEDEA_SERVER.HTTP.BIND_PORT=8081 \
+	$(if $(call eq,$(logs),yes),,RUST_LOG=warn) \
+	MEDEA_SERVER.HTTP.STATIC_SPECS_PATH=tests/specs
+
+chromedriver-port = 50000
+geckodriver-port = 50001
+test-runner-port = 51000
+
+run-medea-command = docker run --rm --network=host -v "$(PWD)":/app -w /app \
+                    	--env XDG_CACHE_HOME=$(HOME) \
+                    	--env RUST_BACKTRACE=1 \
+						-u $(shell id -u):$(shell id -g) \
+                    	-v "$(HOME)/.cargo/registry":/usr/local/cargo/registry \
+                    	-v "$(HOME):$(HOME)" \
+                    	-v "$(PWD)/target":/app/target
+run-medea-container-d =  $(run-medea-command) -d alexlapa/medea-build:dev
+run-medea-container = $(run-medea-command) alexlapa/medea-build:dev
+
+up.e2e.services:
+ifneq ($(dockerized),no)
+	mkdir -p .cache target ~/.cargo/registry
+endif
+ifneq ($(coturn),no)
+	@make up.coturn
+endif
+ifeq ($(dockerized),no)
+	cargo build $(if $(call eq,$(release),yes),--release)
+	cargo build -p control-api-mock
+	$(run-medea-container) sh -c "cd jason && wasm-pack build --target web --out-dir ../.cache/jason-pkg"
+
+	env $(if $(call eq,$(logs),yes),,RUST_LOG=warn) cargo run --bin medea \
+		$(if $(call eq,$(release),yes),--release) & \
+		echo $$! > /tmp/e2e_medea.pid
+	env RUST_LOG=warn cargo run -p control-api-mock & \
+		echo $$! > /tmp/e2e_control_api_mock.pid
+	sleep 2
+else
+	@make down.medea dockerized=yes
+	@make down.medea dockerized=no
+	@make up.coturn
+
+	# TODO: publish it to docker hub
+	@make docker.build.medea-build
+
+	$(run-medea-container) sh -c "cd jason && RUST_LOG=info wasm-pack build --target web --out-dir ../.cache/jason-pkg"
+
+	$(run-medea-container) make build.medea optimized=yes
+	$(run-medea-container-d) cargo run --release > /tmp/medea.docker.uid
+
+	$(run-medea-container) cargo build -p control-api-mock
+	$(run-medea-container-d) cargo run -p control-api-mock > /tmp/control-api-mock.docker.uid
+
+	$(run-medea-container) cargo build -p e2e-tests-runner
+endif
+
+
+# Run e2e tests of medea in firefox.
+# If logs set to "yes" then medea print all logs to stdout.
+#
+# Usage:
+# 	make test.e2e.firefox [dockerized=(YES|no)] [logs=(yes|NO)] [coturn=(YES|no)]
+
+test.e2e.firefox:
+ifeq ($(dockerized),no)
+	@make up.e2e.services
+
+	$(shell cargo run -p e2e-tests-runner -- \
+		-w http://127.0.0.1:$(geckodriver-port) \
+		-f 127.0.0.1:$(test-runner-port) \
+		--headless)
+	kill $$(cat /tmp/geckodriver.pid)
+	rm -f /tmp/geckodriver.pid
+
+	@make down.e2e.services
+
+	@exit $(.SHELLSTATUS)
+else
+	docker build -t medea-geckodriver -f _build/geckodriver/Dockerfile .
+	@make up.e2e.services
+
+	docker run --rm -d --network=host medea-geckodriver > /tmp/geckodriver.docker.uid
+	$(run-medea-container) cargo run -p e2e-tests-runner -- \
+		-f localhost:$(test-runner-port) \
+		-w http://localhost:4444 \
+		--headless
+
+	docker container kill $$(cat /tmp/geckodriver.docker.uid)
+	rm -f /tmp/geckodriver.docker.uid
+	@make down.e2e.services
 endif
 
 
@@ -438,6 +596,19 @@ else
 endif
 
 
+# Build Docker image for medea building.
+#
+# Usage:
+#   make docker.build.medea-build [TAG=(dev|<tag>)]
+
+docker.build.medea-build:
+	docker build \
+		--build-arg rust_ver=$(RUST_VER) \
+		-t $(MEDEA_BUILD_IMAGE_NAME):$(if $(call eq,$(TAG),),dev,$(TAG)) \
+		- < _build/medea-build/Dockerfile
+
+
+
 # Build medea project Docker image.
 #
 # Usage:
@@ -448,13 +619,14 @@ endif
 
 docker-build-medea-image-name = $(strip \
 	$(if $(call eq,$(registry),),,$(registry)/)$(MEDEA_IMAGE_NAME))
+medea-build-image = $(MEDEA_BUILD_IMAGE_NAME):$(MEDEA_BUILD_IMAGE_VER)
 
 docker.build.medea:
 ifneq ($(no-cache),yes)
 	docker run --rm --network=host -v "$(PWD)":/app -w /app \
 	           -u $(shell id -u):$(shell id -g) \
 	           -e CARGO_HOME=.cache/cargo \
-		rust:$(RUST_VER) \
+		$(medea-build-image) \
 			cargo build --bin=medea \
 				$(if $(call eq,$(debug),no),--release,)
 endif
@@ -465,12 +637,10 @@ endif
 		$(if $(call eq,$(no-cache),yes),\
 			--no-cache --pull,) \
 		$(if $(call eq,$(IMAGE),),\
-			--build-arg rust_ver=$(RUST_VER) \
-			--build-arg rustc_mode=$(if \
-				$(call eq,$(debug),no),release,debug) \
-			--build-arg rustc_opts=$(if \
-				$(call eq,$(debug),no),--release,) \
+			--build-arg rustc_mode=$(if $(call eq,$(debug),no),release,debug) \
+			--build-arg rustc_opts=$(if $(call eq,$(debug),no),--release,) \
 			--build-arg cargo_home=.cache/cargo,) \
+			--build-arg medea_build_image=$(medea-build-image) \
 		-t $(docker-build-medea-image-name):$(if $(call eq,$(TAG),),dev,$(TAG)) .
 	$(call docker.build.clean.ignore)
 define docker.build.clean.ignore
@@ -790,6 +960,21 @@ endef
 
 
 
+###################
+# Protoc commands #
+###################
+
+# Rebuild gRPC protobuf specs for medea-control-api-proto.
+#
+# Usage:
+#  make protoc.rebuild
+
+protoc.rebuild:
+	rm -f proto/control-api/src/grpc/control_api*.rs
+	cargo build -p medea-control-api-proto
+
+
+
 ##################
 # .PHONY section #
 ##################
@@ -805,6 +990,7 @@ endef
         helm helm.down helm.init helm.lint helm.list \
         	helm.package helm.package.release helm.up \
         minikube.boot \
+        protoc.rebuild \
         release release.crates release.helm release.npm \
         test test.e2e test.unit \
         up up.coturn up.demo up.dev up.jason up.medea \

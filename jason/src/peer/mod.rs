@@ -18,6 +18,7 @@ use medea_client_api_proto::{
     Direction, IceServer, PeerId as Id, Track, TrackId,
 };
 use medea_macro::dispatchable;
+use wasm_bindgen::JsValue;
 use web_sys::{RtcSignalingState, RtcTrackEvent};
 
 use crate::{
@@ -263,6 +264,14 @@ impl PeerConnection {
     /// Returns [`SignalingState`] of this [`PeerConnection`].
     pub fn signaling_state(&self) -> SignalingState {
         self.0.borrow().signaling_state.clone()
+    }
+
+    /// Returns future which resolves into [RTCStatsReport][1]
+    /// for this [`PeerConnection`].
+    ///
+    /// [1]: https://developer.mozilla.org/en-US/docs/Web/API/RTCStatsReport
+    pub fn get_stats(&self) -> impl Future<Item = JsValue, Error = WasmErr> {
+        self.0.borrow().peer.get_stats()
     }
 
     /// Handle `track` event from underlying peer adding new track to

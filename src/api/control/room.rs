@@ -5,7 +5,10 @@
 use std::{collections::HashMap, convert::TryFrom};
 
 use derive_more::{Display, From};
+use medea_control_api_proto::grpc::control_api::Room as RoomProto;
 use serde::Deserialize;
+
+use crate::api::control::TryFromProtobufError;
 
 use super::{
     member::{MemberElement, MemberSpec},
@@ -47,6 +50,29 @@ pub struct RoomSpec {
 }
 
 impl RoomSpec {
+    /// Deserializes [`RoomSpec`] from protobuf object.
+    pub fn try_from_protobuf(
+        id: Id,
+        proto: &RoomProto,
+    ) -> Result<Self, TryFromProtobufError> {
+        let mut pipeline = HashMap::new();
+        for (id, room_element) in proto.get_pipeline() {
+            if !room_element.has_member() {
+                return Err(
+                    TryFromProtobufError::NotMemberElementInRoomElement(
+                        id.to_string(),
+                    ),
+                );
+            }
+            let member = MemberSpec::try_from(room_element.get_member())?;
+            pipeline.insert(id.clone(), member.into());
+        }
+
+        let pipeline = Pipeline::new(pipeline);
+
+        Ok(Self { pipeline, id })
+    }
+
     /// Returns all [`MemberSpec`]s of this [`RoomSpec`].
     pub fn members(
         &self,

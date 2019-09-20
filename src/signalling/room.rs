@@ -3,11 +3,11 @@
 //!
 //! [`Member`]: crate::signalling::elements::member::Member
 
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::collections::{HashMap, HashSet};
 
 use actix::{
     fut::wrap_future, Actor, ActorFuture, AsyncContext, Context, Handler,
-    ResponseActFuture, WrapFuture as _,
+    Message, ResponseActFuture, WrapFuture as _,
 };
 use derive_more::Display;
 use failure::Fail;
@@ -16,6 +16,9 @@ use medea_client_api_proto::{
     Command, Event, IceCandidate, Peer as PeerSnapshot, PeerId,
     ServerPeerState, Snapshot, TrackId,
 };
+use medea_control_api_proto::grpc::control_api::{
+    Element as ElementProto, Room as RoomProto,
+};
 
 use crate::{
     api::{
@@ -23,7 +26,12 @@ use crate::{
             AuthorizationError, Authorize, ClosedReason, CommandMessage,
             RpcConnectionClosed, RpcConnectionEstablished,
         },
-        control::{MemberId, RoomId, RoomSpec, TryFromElementError},
+        control::{
+            local_uri::{LocalUri, StatefulLocalUri, ToMember},
+            room::RoomSpec,
+            Endpoint as EndpointSpec, MemberId, MemberSpec, RoomId,
+            TryFromElementError, WebRtcPlayId, WebRtcPublishId,
+        },
     },
     log::prelude::*,
     media::{
@@ -34,12 +42,13 @@ use crate::{
     signalling::{
         elements::{
             endpoints::webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
+            member::MemberError,
             Member, MembersLoadError,
         },
-        participants::ParticipantService,
+        participants::{ParticipantService, ParticipantServiceErr},
         peers::PeerRepository,
     },
-    turn::TurnAuthService,
+    AppContext,
 };
 
 /// Ergonomic type alias for using [`ActorFuture`] for [`Room`].
@@ -51,8 +60,8 @@ pub type ActFuture<I, E> =
 pub enum RoomError {
     #[display(fmt = "Couldn't find Peer with [id = {}]", _0)]
     PeerNotFound(PeerId),
-    #[display(fmt = "Couldn't find Member with [id = {}]", _0)]
-    MemberNotFound(MemberId),
+    #[display(fmt = "{}", _0)]
+    MemberError(MemberError),
     #[display(fmt = "Member [id = {}] does not have Turn credentials", _0)]
     NoTurnCredentials(MemberId),
     #[display(fmt = "Couldn't find RpcConnection with Member [id = {}]", _0)]
@@ -61,12 +70,24 @@ pub enum RoomError {
     UnableToSendEvent(MemberId),
     #[display(fmt = "PeerError: {}", _0)]
     PeerError(PeerError),
-    #[display(fmt = "Generic room error {}", _0)]
+    #[display(fmt = "{}", _0)]
+    MembersLoadError(MembersLoadError),
+    #[display(fmt = "{}", _0)]
+    TryFromElementError(TryFromElementError),
+    #[display(fmt = "Generic room error: {}", _0)]
     BadRoomSpec(String),
     #[display(fmt = "Turn service error: {}", _0)]
     TurnServiceError(String),
+    #[display(fmt = "{}", _0)]
+    ParticipantServiceErr(ParticipantServiceErr),
     #[display(fmt = "Client error:{}", _0)]
     ClientError(String),
+    #[display(
+        fmt = "Given LocalUri [uri = {}] to wrong room [id = {}]",
+        _0,
+        _1
+    )]
+    WrongRoomId(StatefulLocalUri, RoomId),
 }
 
 impl From<PeerError> for RoomError {
@@ -77,13 +98,25 @@ impl From<PeerError> for RoomError {
 
 impl From<TryFromElementError> for RoomError {
     fn from(err: TryFromElementError) -> Self {
-        Self::BadRoomSpec(format!("Element located in wrong place: {}", err))
+        Self::TryFromElementError(err)
     }
 }
 
 impl From<MembersLoadError> for RoomError {
     fn from(err: MembersLoadError) -> Self {
-        Self::BadRoomSpec(format!("Error while loading room spec: {}", err))
+        Self::MembersLoadError(err)
+    }
+}
+
+impl From<ParticipantServiceErr> for RoomError {
+    fn from(err: ParticipantServiceErr) -> Self {
+        Self::ParticipantServiceErr(err)
+    }
+}
+
+impl From<MemberError> for RoomError {
+    fn from(err: MemberError) -> Self {
+        Self::MemberError(err)
     }
 }
 
@@ -117,23 +150,18 @@ pub struct Room {
 }
 
 impl Room {
-    /// Create new instance of [`Room`].
+    /// Creates new instance of [`Room`].
     ///
     /// Returns [`RoomError::BadRoomSpec`] when errs while `Element`
     /// transformation happens.
     pub fn new(
         room_spec: &RoomSpec,
-        reconnect_timeout: Duration,
-        turn: Arc<dyn TurnAuthService>,
+        context: AppContext,
     ) -> Result<Self, RoomError> {
         Ok(Self {
             id: room_spec.id().clone(),
             peers: PeerRepository::from(HashMap::new()),
-            members: ParticipantService::new(
-                room_spec,
-                reconnect_timeout,
-                turn,
-            )?,
+            members: ParticipantService::new(room_spec, context)?,
             state: State::Started,
         })
     }
@@ -153,10 +181,7 @@ impl Room {
         &self,
         member_id: &MemberId,
     ) -> Result<Snapshot, RoomError> {
-        let member = self
-            .members
-            .get_member_by_id(member_id)
-            .ok_or_else(|| RoomError::MemberNotFound(member_id.clone()))?;
+        let member = self.members.get_member(member_id)?;
         let ice_servers = member.servers_list().unwrap_or_default();
 
         let peers = self.peers.get_peers_by_member_id(member_id);
@@ -177,6 +202,11 @@ impl Room {
             peers: peers_snapshots,
             ice_servers,
         })
+    }
+
+    /// Returns reference to [`RoomId`] of this [`Room`].
+    pub fn id(&self) -> &RoomId {
+        &self.id
     }
 
     /// Sends [`Event::PeerCreated`] to one of specified [`Peer`]s based on
@@ -212,10 +242,11 @@ impl Room {
         let member_id = sender.member_id();
         let ice_servers = self
             .members
-            .get_member_by_id(&member_id)
-            .ok_or_else(|| RoomError::MemberNotFound(member_id.clone()))?
+            .get_member(&member_id)?
             .servers_list()
-            .ok_or_else(|| RoomError::NoTurnCredentials(member_id.clone()))?;
+            .ok_or_else(|| {
+            RoomError::NoTurnCredentials(member_id.clone())
+        })?;
         let peer_created = Event::PeerCreated {
             peer_id: sender.id(),
             sdp_offer: None,
@@ -265,8 +296,7 @@ impl Room {
         let to_member_id = to_peer.member_id();
         let ice_servers = self
             .members
-            .get_member_by_id(&to_member_id)
-            .ok_or_else(|| RoomError::MemberNotFound(to_member_id.clone()))?
+            .get_member(&to_member_id)?
             .servers_list()
             .ok_or_else(|| {
                 RoomError::NoTurnCredentials(to_member_id.clone())
@@ -363,7 +393,7 @@ impl Room {
     }
 
     /// Creates [`Peer`] for endpoints if [`Peer`] between endpoint's members
-    /// doesn't exist.
+    /// not exist.
     ///
     /// Adds `send` track to source member's [`Peer`] and `recv` to
     /// sink member's [`Peer`].
@@ -513,7 +543,7 @@ impl Room {
         &mut self,
         ctx: &mut Context<Self>,
     ) -> ResponseActFuture<Self, (), ()> {
-        info!("Closing Room [id = {:?}]", self.id);
+        info!("Closing Room [id = {}]", self.id);
         self.state = State::Stopping;
 
         Box::new(
@@ -536,13 +566,16 @@ impl Room {
         member_id: MemberId,
         ctx: &mut Context<Self>,
     ) -> ActFuture<(), ()> {
-        info!("Peers {:?} removed for member '{}'.", peers_id, member_id);
+        info!(
+            "Peers {:?} removed for member [id = {}].",
+            peers_id, member_id
+        );
         if let Some(member) = self.members.get_member_by_id(&member_id) {
             member.peers_removed(&peers_id);
         } else {
             error!(
-                "Participant with id {} for which received \
-                 Event::PeersRemoved not found. Closing room.",
+                "Member [id = {}] for which received Event::PeersRemoved not \
+                 found. Closing room.",
                 member_id
             );
 
@@ -589,22 +622,11 @@ impl Room {
             .peers
             .remove_peers_related_to_member(resetting_member_id);
 
-        let resetting_member = self
-            .members
-            .get_member_by_id(resetting_member_id)
-            .cloned()
-            .ok_or_else(|| {
-                RoomError::MemberNotFound(resetting_member_id.clone())
-            })?;
+        let resetting_member = self.members.get_member(resetting_member_id)?;
 
         for (member_id, peers_ids) in removed_peers {
             if &member_id == resetting_member_id {
-                let member = self
-                    .members
-                    .get_member_by_id(&member_id)
-                    .ok_or_else(|| {
-                        RoomError::MemberNotFound(resetting_member_id.clone())
-                    })?;
+                let member = self.members.get_member(&member_id)?;
                 member.peers_removed(&peers_ids);
             } else {
                 self.member_peers_removed(peers_ids, member_id, ctx);
@@ -615,12 +637,175 @@ impl Room {
 
         Ok(Box::new(actix::fut::ok(())))
     }
+
+    /// Removes [`Peer`]s and call [`Room::member_peers_removed`] for every
+    /// [`Member`].
+    ///
+    /// This will delete [`Peer`]s from [`PeerRepository`] and send
+    /// [`Event::PeersRemoved`] event to [`Member`].
+    fn remove_peers(
+        &mut self,
+        member_id: &MemberId,
+        peer_ids_to_remove: HashSet<PeerId>,
+        ctx: &mut Context<Self>,
+    ) {
+        self.peers
+            .remove_peers(&member_id, peer_ids_to_remove)
+            .into_iter()
+            .for_each(|(member_id, peers_id)| {
+                self.member_peers_removed(peers_id, member_id, ctx);
+            });
+    }
+
+    /// Deletes [`Member`] from this [`Room`] by [`MemberId`].
+    fn delete_member(&mut self, member_id: &MemberId, ctx: &mut Context<Self>) {
+        debug!(
+            "Deleting Member [id = {}] in Room [id = {}].",
+            member_id, self.id
+        );
+        if let Some(member) = self.members.get_member_by_id(member_id) {
+            let peers: HashSet<PeerId> = member
+                .sinks()
+                .values()
+                .filter_map(WebRtcPlayEndpoint::peer_id)
+                .chain(
+                    member
+                        .srcs()
+                        .values()
+                        .flat_map(WebRtcPublishEndpoint::peer_ids),
+                )
+                .collect();
+
+            self.remove_peers(&member.id(), peers, ctx);
+
+            self.members.delete_member(member_id, ctx);
+
+            debug!(
+                "Member [id = {}] deleted from Room [id = {}].",
+                member_id, self.id
+            );
+        }
+    }
+
+    /// Deletes endpoint from this [`Room`] by ID.
+    fn delete_endpoint(
+        &mut self,
+        member_id: &MemberId,
+        endpoint_id: String,
+        ctx: &mut Context<Self>,
+    ) {
+        let endpoint_id = if let Some(member) =
+            self.members.get_member_by_id(member_id)
+        {
+            let play_id = WebRtcPlayId(endpoint_id);
+            if let Some(endpoint) = member.take_sink(&play_id) {
+                if let Some(peer_id) = endpoint.peer_id() {
+                    let removed_peers =
+                        self.peers.remove_peer(member_id, peer_id);
+                    for (member_id, peers_ids) in removed_peers {
+                        self.member_peers_removed(peers_ids, member_id, ctx);
+                    }
+                }
+            }
+
+            let publish_id = WebRtcPublishId(play_id.0);
+            if let Some(endpoint) = member.take_src(&publish_id) {
+                let peer_ids = endpoint.peer_ids();
+                self.remove_peers(member_id, peer_ids, ctx);
+            }
+
+            publish_id.0
+        } else {
+            endpoint_id
+        };
+
+        debug!(
+            "Endpoint [id = {}] removed in Member [id = {}] from Room [id = \
+             {}].",
+            endpoint_id, member_id, self.id
+        );
+    }
 }
 
 /// [`Actor`] implementation that provides an ergonomic way
 /// to interact with [`Room`].
 impl Actor for Room {
     type Context = Context<Self>;
+
+    fn started(&mut self, _: &mut Self::Context) {
+        debug!("Room [id = {}] started.", self.id);
+    }
+}
+
+impl Into<ElementProto> for &mut Room {
+    fn into(self) -> ElementProto {
+        let mut element = ElementProto::new();
+        let mut room = RoomProto::new();
+
+        let pipeline = self
+            .members
+            .members()
+            .into_iter()
+            .map(|(id, member)| {
+                let local_uri = LocalUri::<ToMember>::new(self.get_id(), id);
+                (local_uri.to_string(), member.into())
+            })
+            .collect();
+
+        room.set_pipeline(pipeline);
+        element.set_room(room);
+
+        element
+    }
+}
+
+/// Message for serializing this [`Room`] and [`Room`]'s elements to protobuf
+/// spec.
+#[derive(Message)]
+#[rtype(result = "Result<HashMap<StatefulLocalUri, ElementProto>, RoomError>")]
+pub struct SerializeProto(pub Vec<StatefulLocalUri>);
+
+impl Handler<SerializeProto> for Room {
+    type Result = Result<HashMap<StatefulLocalUri, ElementProto>, RoomError>;
+
+    fn handle(
+        &mut self,
+        msg: SerializeProto,
+        _: &mut Self::Context,
+    ) -> Self::Result {
+        let mut serialized: HashMap<StatefulLocalUri, ElementProto> =
+            HashMap::new();
+        for uri in msg.0 {
+            match &uri {
+                StatefulLocalUri::Room(room_uri) => {
+                    if room_uri.room_id() == &self.id {
+                        let current_room: ElementProto = self.into();
+                        serialized.insert(uri, current_room);
+                    } else {
+                        return Err(RoomError::WrongRoomId(
+                            uri,
+                            self.id.clone(),
+                        ));
+                    }
+                }
+                StatefulLocalUri::Member(member_uri) => {
+                    let member =
+                        self.members.get_member(member_uri.member_id())?;
+                    serialized.insert(uri, member.into());
+                }
+                StatefulLocalUri::Endpoint(endpoint_uri) => {
+                    let member =
+                        self.members.get_member(endpoint_uri.member_id())?;
+                    let endpoint = member.get_endpoint_by_id(
+                        endpoint_uri.endpoint_id().to_string(),
+                    )?;
+                    serialized.insert(uri, endpoint.into());
+                }
+            }
+        }
+
+        Ok(serialized)
+    }
 }
 
 impl Handler<Authorize> for Room {
@@ -630,7 +815,7 @@ impl Handler<Authorize> for Room {
     fn handle(
         &mut self,
         msg: Authorize,
-        _ctx: &mut Self::Context,
+        _: &mut Self::Context,
     ) -> Self::Result {
         self.members
             .get_member_by_id_and_credentials(&msg.member_id, &msg.credentials)
@@ -709,7 +894,10 @@ impl Handler<RpcConnectionEstablished> for Room {
         msg: RpcConnectionEstablished,
         ctx: &mut Self::Context,
     ) -> Self::Result {
-        info!("RpcConnectionEstablished for member {}", msg.member_id);
+        info!(
+            "RpcConnectionEstablished for Member [id = {}].",
+            msg.member_id
+        );
 
         let RpcConnectionEstablished {
             member_id,
@@ -769,7 +957,8 @@ impl Handler<ShutdownGracefully> for Room {
         ctx: &mut Self::Context,
     ) -> Self::Result {
         info!(
-            "Room: {:?} received ShutdownGracefully message so shutting down",
+            "Room [id = {}] received ShutdownGracefully message so shutting \
+             down",
             self.id
         );
         self.close_gracefully(ctx)
@@ -812,5 +1001,118 @@ impl Handler<RpcConnectionClosed> for Room {
                 ctx.spawn(fut);
             }
         }
+    }
+}
+
+/// Signal for closing this [`Room`].
+#[derive(Message, Debug)]
+#[rtype(result = "()")]
+pub struct Close;
+
+impl Handler<Close> for Room {
+    type Result = ();
+
+    fn handle(&mut self, _: Close, ctx: &mut Self::Context) -> Self::Result {
+        for id in self.members.members().keys() {
+            self.delete_member(id, ctx);
+        }
+        let drop_fut = self.members.drop_connections(ctx);
+        ctx.wait(wrap_future(drop_fut));
+    }
+}
+
+/// Signal for delete elements from this [`Room`].
+#[derive(Message, Debug)]
+#[rtype(result = "()")]
+pub struct Delete(pub Vec<StatefulLocalUri>);
+
+impl Handler<Delete> for Room {
+    type Result = ();
+
+    fn handle(&mut self, msg: Delete, ctx: &mut Self::Context) {
+        let mut member_ids = Vec::new();
+        let mut endpoint_ids = Vec::new();
+        for id in msg.0 {
+            match id {
+                StatefulLocalUri::Member(member_uri) => {
+                    member_ids.push(member_uri);
+                }
+                StatefulLocalUri::Endpoint(endpoint_uri) => {
+                    endpoint_ids.push(endpoint_uri);
+                }
+                _ => warn!(
+                    "Found LocalUri<IsRoomId> while deleting __from__ Room."
+                ),
+            }
+        }
+        member_ids.into_iter().for_each(|uri| {
+            let (member_id, _) = uri.take_member_id();
+            self.delete_member(&member_id, ctx);
+        });
+        endpoint_ids.into_iter().for_each(|uri| {
+            let (endpoint_id, member_uri) = uri.take_endpoint_id();
+            let (member_id, _) = member_uri.take_member_id();
+            self.delete_endpoint(&member_id, endpoint_id, ctx);
+        });
+    }
+}
+
+/// Signal for create new [`Member`] in this [`Room`].
+#[derive(Message, Debug)]
+#[rtype(result = "Result<(), RoomError>")]
+pub struct CreateMember(pub MemberId, pub MemberSpec);
+
+impl Handler<CreateMember> for Room {
+    type Result = Result<(), RoomError>;
+
+    fn handle(
+        &mut self,
+        msg: CreateMember,
+        _: &mut Self::Context,
+    ) -> Self::Result {
+        self.members.create_member(msg.0.clone(), &msg.1)?;
+        debug!(
+            "Member [id = {}] created in Room [id = {}].",
+            msg.0, self.id
+        );
+        Ok(())
+    }
+}
+
+/// Signal for create new `Endpoint` from [`EndpointSpec`].
+#[derive(Message, Debug)]
+#[rtype(result = "Result<(), RoomError>")]
+pub struct CreateEndpoint {
+    pub member_id: MemberId,
+    pub endpoint_id: String,
+    pub spec: EndpointSpec,
+}
+
+impl Handler<CreateEndpoint> for Room {
+    type Result = Result<(), RoomError>;
+
+    fn handle(
+        &mut self,
+        msg: CreateEndpoint,
+        _: &mut Self::Context,
+    ) -> Self::Result {
+        match msg.spec {
+            EndpointSpec::WebRtcPlay(endpoint) => {
+                self.members.create_sink_endpoint(
+                    &msg.member_id,
+                    &WebRtcPlayId(msg.endpoint_id),
+                    endpoint,
+                )?;
+            }
+            EndpointSpec::WebRtcPublish(endpoint) => {
+                self.members.create_src_endpoint(
+                    &msg.member_id,
+                    &WebRtcPublishId(msg.endpoint_id),
+                    endpoint,
+                )?;
+            }
+        }
+
+        Ok(())
     }
 }

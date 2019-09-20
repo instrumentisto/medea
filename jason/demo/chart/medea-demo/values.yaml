@@ -16,7 +16,10 @@ server:
   #       configuration will have no effect.
   conf:
     server:
-      bind_port: 8080
+      client:
+        public_url: ""
+        http:
+          bind_port: 8080
     turn:
       user: USER
       pass: PASS

@@ -9,7 +9,7 @@ use std::{
 use actix::AsyncContext;
 use actix::{
     prelude::{Actor, Context},
-    Handler, Message, Recipient, ResponseActFuture, System, WrapFuture as _,
+    Addr, Handler, Message, Recipient, ResponseFuture, System,
 };
 use derive_more::Display;
 use failure::Fail;
@@ -26,7 +26,7 @@ pub struct Priority(pub u8);
 /// Message that [`Subscriber`] is informed with to perform its graceful
 /// shutdown.
 #[allow(clippy::module_name_repetitions)]
-#[derive(Debug, Message)]
+#[derive(Message)]
 #[rtype(result = "Result<(), ()>")]
 pub struct ShutdownGracefully;
 
@@ -100,18 +100,14 @@ impl Actor for GracefulShutdown {
 struct OsSignal(i32);
 
 impl Handler<OsSignal> for GracefulShutdown {
-    type Result = ResponseActFuture<Self, (), ()>;
+    type Result = ResponseFuture<(), ()>;
 
-    fn handle(
-        &mut self,
-        sig: OsSignal,
-        _: &mut Context<Self>,
-    ) -> ResponseActFuture<Self, (), ()> {
+    fn handle(&mut self, sig: OsSignal, _: &mut Context<Self>) -> Self::Result {
         info!("OS signal '{}' received", sig.0);
 
         match self.state {
             State::InProgress => {
-                return Box::new(future::ok(()).into_actor(self));
+                return Box::new(future::ok(()));
             }
             State::Listening => {
                 self.state = State::InProgress;
@@ -122,7 +118,7 @@ impl Handler<OsSignal> for GracefulShutdown {
 
         if self.subs.is_empty() {
             System::current().stop();
-            return Box::new(future::ok(()).into_actor(self));
+            return Box::new(future::ok(()));
         }
 
         let by_priority: Vec<_> = self
@@ -154,8 +150,7 @@ impl Handler<OsSignal> for GracefulShutdown {
                 .map(|_| {
                     info!("Graceful shutdown succeeded, stopping system");
                     System::current().stop()
-                })
-                .into_actor(self),
+                }),
         )
     }
 }
@@ -177,7 +172,7 @@ pub struct Subscriber {
 /// Message that [`Subscriber`] subscribes to shutdown messages with.
 #[derive(Message)]
 #[rtype(result = "Result<(), ShuttingDownError>")]
-pub struct Subscribe(pub Subscriber);
+struct Subscribe(pub Subscriber);
 
 impl Handler<Subscribe> for GracefulShutdown {
     type Result = Result<(), ShuttingDownError>;
@@ -204,7 +199,7 @@ pub struct ShuttingDownError;
 /// notifications with.
 #[derive(Message)]
 #[rtype(result = "()")]
-pub struct Unsubscribe(pub Subscriber);
+struct Unsubscribe(pub Subscriber);
 
 impl Handler<Unsubscribe> for GracefulShutdown {
     type Result = ();
@@ -222,4 +217,28 @@ impl Handler<Unsubscribe> for GracefulShutdown {
             self.subs.remove(&m.0.priority);
         }
     }
+}
+
+/// Subscribes recipient to [`GracefulShutdown`].
+pub fn subscribe(
+    shutdown_addr: &Addr<GracefulShutdown>,
+    subscriber: Recipient<ShutdownGracefully>,
+    priority: Priority,
+) {
+    shutdown_addr.do_send(Subscribe(Subscriber {
+        priority,
+        addr: subscriber,
+    }));
+}
+
+/// Unsubscribes recipient from [`GracefulShutdown`].
+pub fn unsubscribe(
+    shutdown_addr: &Addr<GracefulShutdown>,
+    subscriber: Recipient<ShutdownGracefully>,
+    priority: Priority,
+) {
+    shutdown_addr.do_send(Unsubscribe(Subscriber {
+        priority,
+        addr: subscriber,
+    }));
 }

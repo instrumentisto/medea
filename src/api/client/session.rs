@@ -101,7 +101,7 @@ impl Actor for WsSession {
     /// Starts [`Heartbeat`] mechanism and sends [`RpcConnectionEstablished`]
     /// signal to the [`Room`].
     fn started(&mut self, ctx: &mut Self::Context) {
-        debug!("Started WsSession for member {}", self.member_id);
+        debug!("Started WsSession for Member [id = {}]", self.member_id);
 
         self.start_watchdog(ctx);
 

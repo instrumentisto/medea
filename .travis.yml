@@ -51,6 +51,7 @@ jobs:
       stage: build
       rust: stable
       services: ["docker"]
+      before_script: make docker.build.medea-build
       script: make docker.build.medea debug=no
               TAG=build-${TRAVIS_BUILD_ID} registry=quay.io
       before_deploy: echo "$QUAYIO_PASS"
@@ -95,7 +96,7 @@ jobs:
 
     - name: unit medea-jason (nightly)
       stage: test
-      # Run on stable when -Z install-upgrade is out,
+      # TODO: Run on stable when -Z install-upgrade is out,
       # see: https://github.com/rust-lang/cargo/issues/6797
       rust: nightly
       addons:
@@ -115,6 +116,18 @@ jobs:
                                       registry=quay.io
       script: make test.e2e up=yes dockerized=yes log=yes wait=30
                             TAG=build-${TRAVIS_BUILD_ID} registry=quay.io
+
+    - name: e2e (latest Firefox, stable Rust)
+      stage: test
+      rust: stable
+      cache: cargo
+      script: make test.e2e.firefox
+
+    - name: e2e (latest Chrome, stable Rust)
+      stage: test
+      rust: stable
+      cache: cargo
+      script: make test.e2e.chrome
 
     - name: crates.io
       stage: release

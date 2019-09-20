@@ -1,19 +1,53 @@
-[server]
+[server.client]
+# Server's public URL.
+#
+# Environment variable: MEDEA_SERVER.CLIENT.PUBLIC_URL
+#
+# Default:
+#   public_url = "ws://0.0.0.0:8080"
+
+[server.client.http]
 # IP address to bind HTTP server to.
+#
+# Environment variable: MEDEA_SERVER.CLIENT.HTTP.BIND_IP
 #
 # Default:
 #   bind_ip = "0.0.0.0"
 
 # Port to bind HTTP server to.
 #
+# Environment variable: MEDEA_SERVER.CLIENT.HTTP.BIND_PORT
+#
 # Default:
 #   bind_port = 8080
 
+[server.control.grpc]
+# IP address to bind gRPC server to.
+#
+# Environment variable: MEDEA_SERVER.CONTROL.GRPC.BIND_IP
+#
+# Default:
+#   bind_ip = "0.0.0.0"
+
+# Port to bind gRPC server to.
+#
+# Environment variable: MEDEA_SERVER.CONTROL.GRPC.BIND_PORT
+#
+# Default:
+#   bind_port = 50051
+
+# Completion queue count of gRPC server.
+#
+# Environment variable: MEDEA_SERVER.CONTROL.GRPC.COMPLETION_QUEUE_COUNT
+#
+# Default:
+#   completion_queue_count = 2
 
 
-
-[control]
+[control_api]
 # Path to directory with static Сontrol API specs.
+#
+# Environment variable: MEDEA_CONTROL_API.STATIC_SPECS_DIR
 #
 # Default:
 #   static_specs_dir = "specs/"
@@ -25,11 +59,15 @@
 # Duration, after which remote RPC client will be considered idle if no
 # heartbeat messages received.
 #
+# Environment variable: MEDEA_RPC.IDLE_TIMEOUT
+#
 # Default:
 #   idle_timeout = "10s"
 
 # Duration, after which the server deletes the client session if
 # the remote RPC client does not reconnect after it is idle.
+#
+# Environment variable: MEDEA_RPC.RECONNECT_TIMEOUT
 #
 # Default:
 #   reconnect_timeout = "10s"
@@ -40,20 +78,28 @@
 [turn]
 # Turn server host.
 #
+# Environment variable: MEDEA_TURN.HOST
+#
 # Default:
 #   host = "localhost"
 
 # Turn server port.
+#
+# Environment variable: MEDEA_TURN.PORT
 #
 # Default:
 #   port = 3478
 
 # Static user on Turn server.
 #
+# Environment variable: MEDEA_TURN.USER
+#
 # Default:
 #   user = "USER"
 
 # Static user password on Turn server.
+#
+# Environment variable: MEDEA_TURN.PASS
 #
 # Default:
 #   pass = "PASS"
@@ -61,25 +107,35 @@
 [turn.db.redis]
 # Host of Coturn's Redis database.
 #
+# Environment variable: MEDEA_TURN.DB.REDIS.IP
+#
 # Default:
-#   host = "127.0.0.1"
+#   ip = "127.0.0.1"
 
 # Port of Coturn's Redis database for client connections.
+#
+# Environment variable: MEDEA_TURN.DB.REDIS.PORT
 #
 # Default:
 #   port = 6379
 
 # Password to connect to Coturn's Redis database with.
 #
+# Environment variable: MEDEA_TURN.DB.REDIS.PASS
+#
 # Default:
 #   pass = "turn"
 
 # Number of Coturn's database in Redis.
 #
+# Environment variable: MEDEA_TURN.DB.REDIS.DB_NUMBER
+#
 # Default:
 #   db_number = 0
 
 # Timeout for establishing connection with Coturn's Redis database.
+#
+# Environment variable: MEDEA_TURN.DB.REDIS.CONNECTION_TIMEOUT
 #
 # Default:
 #   connection_timeout = "5s"
@@ -89,6 +145,8 @@
 
 [log]
 # Maximum allowed level of application log entries.
+#
+# Environment variable: MEDEA_LOG.LEVEL
 #
 # Possible values:
 #   "OFF", "CRITICAL", "ERROR", "WARN", "INFO", "DEBUG", "TRACE"
@@ -101,6 +159,8 @@
 
 [shutdown]
 # Maximum duration given to shutdown the whole application gracefully.
+#
+# Environment variable: MEDEA_SHUTDOWN.TIMEOUT
 #
 # Default:
 #   timeout = "5s"

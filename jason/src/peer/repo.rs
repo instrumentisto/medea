@@ -1,7 +1,8 @@
 use std::{collections::HashMap, iter::Iterator, rc::Rc};
 
-use futures::sync::mpsc::UnboundedSender;
+use futures::{sync::mpsc::UnboundedSender, Future};
 use medea_client_api_proto::{IceServer, PeerId};
+use wasm_bindgen::JsValue;
 
 use crate::{media::MediaManager, utils::WasmErr};
 
@@ -38,6 +39,15 @@ pub trait PeerRepository {
 
     /// Returns clone of `peers` [`HashMap`] from this repository.
     fn peers(&self) -> HashMap<PeerId, Rc<PeerConnection>>;
+
+    /// Returns future which resolves into [RTCStatsReport][1]
+    /// for all [RtcPeerConnection][2]s from this [`PeerRepository`].
+    ///
+    /// [1]: https://developer.mozilla.org/en-US/docs/Web/API/RTCStatsReport
+    /// [2]: https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection
+    fn get_stats_for_all_peer_connections(
+        &self,
+    ) -> Box<dyn Future<Item = Vec<JsValue>, Error = WasmErr>>;
 }
 
 /// [`PeerConnection`] factory and repository.
@@ -79,6 +89,22 @@ impl PeerRepository for Repository {
         )?);
         self.peers.insert(id, peer);
         Ok(self.peers.get(&id).cloned().unwrap())
+    }
+
+    /// Returns future which resolves into [RTCStatsReport][1]
+    /// for all [RtcPeerConnection][2]s from this [`PeerRepository`].
+    ///
+    /// [1]: https://developer.mozilla.org/en-US/docs/Web/API/RTCStatsReport
+    /// [2]: https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection
+    fn get_stats_for_all_peer_connections(
+        &self,
+    ) -> Box<dyn Future<Item = Vec<JsValue>, Error = WasmErr>> {
+        let mut futs = Vec::new();
+        for peer in self.peers.values() {
+            futs.push(peer.get_stats());
+        }
+
+        Box::new(futures::future::join_all(futs))
     }
 
     /// Returns [`PeerConnection`] stored in repository by its ID.

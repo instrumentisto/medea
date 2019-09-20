@@ -5,11 +5,16 @@ use std::{
     rc::{Rc, Weak},
 };
 
-use derive_more::{Display, From};
 use medea_client_api_proto::PeerId;
+use medea_control_api_proto::grpc::control_api::{
+    Element as RootElementProto, Member_Element as ElementProto,
+    WebRtcPlayEndpoint as WebRtcPlayEndpointProto,
+};
 
 use crate::{
-    api::control::endpoint::SrcUri,
+    api::control::endpoints::webrtc_play_endpoint::{
+        SrcUri, WebRtcPlayId as Id,
+    },
     signalling::elements::{
         endpoints::webrtc::publish_endpoint::WeakWebRtcPublishEndpoint,
         member::WeakMember, Member,
@@ -17,13 +22,6 @@ use crate::{
 };
 
 use super::publish_endpoint::WebRtcPublishEndpoint;
-
-#[doc(inline)]
-pub use Id as WebRtcPlayId;
-
-/// ID of endpoint.
-#[derive(Clone, Debug, Eq, Hash, PartialEq, From, Display)]
-pub struct Id(pub String);
 
 #[derive(Debug, Clone)]
 struct WebRtcPlayEndpointInner {
@@ -91,7 +89,7 @@ impl Drop for WebRtcPlayEndpointInner {
 
 /// Signalling representation of Control API's [`WebRtcPlayEndpoint`].
 ///
-/// [`WebRtcPlayEndpoint`]: crate::api::control::endpoint::WebRtcPlayEndpoint
+/// [`WebRtcPlayEndpoint`]: crate::api::control::endpoints::WebRtcPlayEndpoint
 #[allow(clippy::module_name_repetitions)]
 #[derive(Debug, Clone)]
 pub struct WebRtcPlayEndpoint(Rc<RefCell<WebRtcPlayEndpointInner>>);
@@ -193,8 +191,29 @@ impl WeakWebRtcPlayEndpoint {
 
     /// Upgrades to [`WebRtcPlayEndpoint`] safely.
     ///
-    /// If weak pointer has been dropped.
+    /// Returns `None` if weak pointer has been dropped.
     pub fn safe_upgrade(&self) -> Option<WebRtcPlayEndpoint> {
         self.0.upgrade().map(WebRtcPlayEndpoint)
+    }
+}
+
+impl Into<ElementProto> for WebRtcPlayEndpoint {
+    fn into(self) -> ElementProto {
+        let mut element = ElementProto::new();
+        let mut play = WebRtcPlayEndpointProto::new();
+        play.set_src(self.src_uri().to_string());
+        element.set_webrtc_play(play);
+
+        element
+    }
+}
+
+impl Into<RootElementProto> for WebRtcPlayEndpoint {
+    fn into(self) -> RootElementProto {
+        let mut element = RootElementProto::new();
+        let mut member_element: ElementProto = self.into();
+        let endpoint = member_element.take_webrtc_play();
+        element.set_webrtc_play(endpoint);
+        element
     }
 }

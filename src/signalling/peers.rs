@@ -4,7 +4,7 @@
 //! [`Peer`]: crate::media::peer::Peer
 
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     convert::{TryFrom, TryInto},
 };
 
@@ -182,6 +182,38 @@ impl PeerRepository {
         }
     }
 
+    /// Deletes [`PeerStateMachine`]s from this [`PeerRepository`] and send
+    /// [`Event::PeersRemoved`] to [`Member`]s.
+    ///
+    /// __Note:__ this also deletes partner peers.
+    ///
+    /// [`Event::PeersRemoved`]: medea_client_api_proto::Event::PeersRemoved
+    pub fn remove_peers(
+        &mut self,
+        member_id: &MemberId,
+        peer_ids: HashSet<PeerId>,
+    ) -> HashMap<MemberId, Vec<PeerId>> {
+        let mut removed_peers = HashMap::new();
+        for peer_id in peer_ids {
+            if let Some(peer) = self.peers.remove(&peer_id) {
+                let partner_peer_id = peer.partner_peer_id();
+                let partner_member_id = peer.partner_member_id();
+                if self.peers.remove(&partner_peer_id).is_some() {
+                    removed_peers
+                        .entry(partner_member_id)
+                        .or_insert_with(Vec::new)
+                        .push(partner_peer_id);
+                }
+                removed_peers
+                    .entry(member_id.clone())
+                    .or_insert_with(Vec::new)
+                    .push(peer_id);
+            }
+        }
+
+        removed_peers
+    }
+
     /// Removes all [`Peer`]s related to given [`Member`].
     /// Note, that this function will also remove all partners [`Peer`]s.
     ///
@@ -221,6 +253,22 @@ impl PeerRepository {
             });
 
         peers_to_remove
+    }
+
+    /// Deletes [`PeerStateMachine`] from this [`PeerRepository`] and send
+    /// [`Event::PeersRemoved`] to [`Member`]s.
+    ///
+    /// __Note:__ this also deletes partner peer.
+    ///
+    /// [`Event::PeersRemoved`]: medea_client_api_proto::Event::PeersRemoved
+    pub fn remove_peer(
+        &mut self,
+        member_id: &MemberId,
+        peer_id: PeerId,
+    ) -> HashMap<MemberId, Vec<PeerId>> {
+        let mut peers_id_to_delete = HashSet::new();
+        peers_id_to_delete.insert(peer_id);
+        self.remove_peers(&member_id, peers_id_to_delete)
     }
 }
 

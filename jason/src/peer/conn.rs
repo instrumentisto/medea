@@ -2,6 +2,7 @@ use std::{cell::RefCell, rc::Rc};
 
 use futures::Future;
 use medea_client_api_proto::IceServer;
+use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
     Event as SysEvent, RtcConfiguration, RtcIceCandidateInit,
@@ -132,6 +133,16 @@ impl RtcPeerConnection {
             on_track: None,
             on_signaling_state_change: None,
         }))))
+    }
+
+    /// Returns future which resolves into [RTCStatsReport][1]
+    /// for this [`RtcPeerConnection`].
+    ///
+    /// [1]: https://developer.mozilla.org/en-US/docs/Web/API/RTCStatsReport
+    pub fn get_stats(&self) -> impl Future<Item = JsValue, Error = WasmErr> {
+        let conn = self.0.borrow();
+
+        JsFuture::from(conn.peer.get_stats()).map_err(Into::into)
     }
 
     /// Sets handler for [`RtcTrackEvent`] event (see [RTCTrackEvent][1] and

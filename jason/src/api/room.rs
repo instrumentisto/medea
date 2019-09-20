@@ -13,12 +13,13 @@ use futures::{
     stream::Stream as _,
     sync::mpsc::{unbounded, UnboundedSender},
 };
+use js_sys::Promise;
 use medea_client_api_proto::{
     Command, Direction, EventHandler, IceCandidate, IceServer,
     Peer as SnapshotPeer, PeerId, ServerPeerState, Snapshot, Track,
 };
 use wasm_bindgen::prelude::*;
-use wasm_bindgen_futures::spawn_local;
+use wasm_bindgen_futures::{future_to_promise, spawn_local};
 
 use crate::{
     media::MediaStream,
@@ -72,6 +73,19 @@ impl RoomHandle {
     /// Unmutes outbound video in this room.
     pub fn unmute_video(&self) -> Result<(), JsValue> {
         map_weak!(self, |inner| inner.borrow_mut().toggle_send_video(true))
+    }
+
+    /// Returns promise which resolves into [RTCStatsReport][1]
+    /// for all [RtcPeerConnection][2]s from this room.
+    ///
+    /// [1]: https://developer.mozilla.org/en-US/docs/Web/API/RTCStatsReport
+    /// [2]: https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection
+    pub fn get_stats_for_peer_connections(&self) -> Promise {
+        self.0
+            .upgrade()
+            .unwrap()
+            .borrow()
+            .get_stats_of_peer_connections()
     }
 }
 
@@ -185,6 +199,26 @@ impl InnerRoom {
             enabled_audio: true,
             enabled_video: true,
         }
+    }
+
+    /// Returns promise which resolves into [RTCStatsReport][1]
+    /// for all [RtcPeerConnection][2]s from this room.
+    ///
+    /// [1]: https://developer.mozilla.org/en-US/docs/Web/API/RTCStatsReport
+    /// [2]: https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection
+    pub fn get_stats_of_peer_connections(&self) -> Promise {
+        future_to_promise(
+            self.peers
+                .get_stats_for_all_peer_connections()
+                .map_err(JsValue::from)
+                .map(|e| {
+                    let js_array = js_sys::Array::new();
+                    for id in e {
+                        js_array.push(&id);
+                    }
+                    js_array.into()
+                }),
+        )
     }
 
     /// Creates new [`Connection`]s basing on senders and receivers of provided

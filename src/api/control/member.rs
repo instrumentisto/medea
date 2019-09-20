@@ -2,17 +2,24 @@
 //!
 //! [Control API]: https://tinyurl.com/yxsqplq7
 
-use std::convert::TryFrom;
+use std::{collections::HashMap, convert::TryFrom};
 
 use derive_more::{Display, From};
+use medea_control_api_proto::grpc::control_api::Member as MemberProto;
+use rand::{distributions::Alphanumeric, Rng};
 use serde::Deserialize;
 
-use super::{
-    endpoint::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
+use crate::api::control::{
+    endpoints::{
+        webrtc_play_endpoint::WebRtcPlayEndpoint,
+        webrtc_publish_endpoint::{WebRtcPublishEndpoint, WebRtcPublishId},
+    },
     pipeline::Pipeline,
     room::RoomElement,
-    TryFromElementError,
+    Endpoint, TryFromElementError, TryFromProtobufError, WebRtcPlayId,
 };
+
+const CREDENTIALS_LEN: usize = 32;
 
 /// ID of `Member`.
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, From, Display)]
@@ -28,13 +35,13 @@ pub enum MemberElement {
     /// Represent [`WebRtcPublishEndpoint`].
     /// Can transform into [`Endpoint`] enum by `Endpoint::try_from`.
     ///
-    /// [`Endpoint`]: crate::api::control::endpoint::Endpoint
+    /// [`Endpoint`]: crate::api::control::endpoints::Endpoint
     WebRtcPublishEndpoint { spec: WebRtcPublishEndpoint },
 
     /// Represent [`WebRtcPlayEndpoint`].
     /// Can transform into [`Endpoint`] enum by `Endpoint::try_from`.
     ///
-    /// [`Endpoint`]: crate::api::control::endpoint::Endpoint
+    /// [`Endpoint`]: crate::api::control::endpoints::Endpoint
     WebRtcPlayEndpoint { spec: WebRtcPlayEndpoint },
 }
 
@@ -49,13 +56,24 @@ pub struct MemberSpec {
     credentials: String,
 }
 
+impl Into<RoomElement> for MemberSpec {
+    fn into(self) -> RoomElement {
+        RoomElement::Member {
+            spec: self.pipeline,
+            credentials: self.credentials,
+        }
+    }
+}
+
 impl MemberSpec {
     /// Returns all [`WebRtcPlayEndpoint`]s of this [`MemberSpec`].
     pub fn play_endpoints(
         &self,
-    ) -> impl Iterator<Item = (&String, &WebRtcPlayEndpoint)> {
+    ) -> impl Iterator<Item = (WebRtcPlayId, &WebRtcPlayEndpoint)> {
         self.pipeline.iter().filter_map(|(id, e)| match e {
-            MemberElement::WebRtcPlayEndpoint { spec } => Some((id, spec)),
+            MemberElement::WebRtcPlayEndpoint { spec } => {
+                Some((WebRtcPlayId(id.clone()), spec))
+            }
             _ => None,
         })
     }
@@ -63,9 +81,9 @@ impl MemberSpec {
     /// Lookups [`WebRtcPublishEndpoint`] by ID.
     pub fn get_publish_endpoint_by_id(
         &self,
-        id: &str,
+        id: &WebRtcPublishId,
     ) -> Option<&WebRtcPublishEndpoint> {
-        let e = self.pipeline.get(id)?;
+        let e = self.pipeline.get(&id.0)?;
         if let MemberElement::WebRtcPublishEndpoint { spec } = e {
             Some(spec)
         } else {
@@ -76,9 +94,11 @@ impl MemberSpec {
     /// Returns all [`WebRtcPublishEndpoint`]s of this [`MemberSpec`].
     pub fn publish_endpoints(
         &self,
-    ) -> impl Iterator<Item = (&String, &WebRtcPublishEndpoint)> {
+    ) -> impl Iterator<Item = (WebRtcPublishId, &WebRtcPublishEndpoint)> {
         self.pipeline.iter().filter_map(|(id, e)| match e {
-            MemberElement::WebRtcPublishEndpoint { spec } => Some((id, spec)),
+            MemberElement::WebRtcPublishEndpoint { spec } => {
+                Some((WebRtcPublishId(id.clone()), spec))
+            }
             _ => None,
         })
     }
@@ -86,6 +106,50 @@ impl MemberSpec {
     /// Returns credentials from this [`MemberSpec`].
     pub fn credentials(&self) -> &str {
         &self.credentials
+    }
+}
+
+/// Generates alphanumeric credentials for [`Member`] with
+/// [`CREDENTIALS_LEN`] length.
+///
+/// This credentials will be generated if in dynamic [Control API] spec not
+/// provided credentials for [`Member`]. This logic you can find in [`TryFrom`]
+/// [`MemberProto`] implemented for [`MemberSpec`].
+fn generate_member_credentials() -> String {
+    rand::thread_rng()
+        .sample_iter(&Alphanumeric)
+        .take(CREDENTIALS_LEN)
+        .collect()
+}
+
+impl TryFrom<&MemberProto> for MemberSpec {
+    type Error = TryFromProtobufError;
+
+    /// Deserializes [`MemberSpec`] from protobuf object.
+    ///
+    /// Additionally generates [`Member`] credentials if
+    /// they not provided in protobuf object.
+    ///
+    /// [`Member`]: crate::signalling::elements::member::Member
+    fn try_from(value: &MemberProto) -> Result<Self, Self::Error> {
+        let mut pipeline = HashMap::new();
+        for (id, member_element) in value.get_pipeline() {
+            let endpoint = Endpoint::try_from(member_element)?;
+            pipeline.insert(id.clone(), endpoint.into());
+        }
+        let pipeline = Pipeline::new(pipeline);
+
+        let proto_credentials = value.get_credentials();
+        let credentials = if proto_credentials.is_empty() {
+            generate_member_credentials()
+        } else {
+            proto_credentials.to_string()
+        };
+
+        Ok(Self {
+            pipeline,
+            credentials,
+        })
     }
 }
 

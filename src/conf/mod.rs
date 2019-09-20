@@ -1,6 +1,8 @@
 //! Provides application configuration options.
 
-pub mod control;
+pub mod control_api;
+pub mod grpc_listener;
+pub mod http_listener;
 pub mod log;
 pub mod rpc;
 pub mod server;
@@ -15,7 +17,7 @@ use serde::{Deserialize, Serialize};
 
 #[doc(inline)]
 pub use self::{
-    control::Control,
+    control_api::ControlApi,
     log::Log,
     rpc::Rpc,
     server::Server,
@@ -34,10 +36,10 @@ static APP_CONF_PATH_ENV_VAR_NAME: &str = "MEDEA_CONF";
 #[derive(Clone, Debug, Deserialize, Serialize, Default)]
 #[serde(default)]
 pub struct Conf {
-    /// HTTP server settings.
+    /// RPC connection settings.
     pub rpc: Rpc,
 
-    /// RPC connection settings.
+    /// Servers settings.
     pub server: Server,
 
     /// TURN server settings.
@@ -52,7 +54,7 @@ pub struct Conf {
     /// [Control API] settings.
     ///
     /// [Control API]: https://tinyurl.com/yxsqplq7
-    pub control: Control,
+    pub control_api: ControlApi,
 }
 
 impl Conf {
@@ -96,12 +98,41 @@ where
 }
 
 #[cfg(test)]
-mod tests {
-    use std::{fs, net::Ipv4Addr, time::Duration};
-
+pub mod tests {
     use serial_test_derive::serial;
 
     use super::*;
+
+    /// Macro which overrides environment variables
+    /// with provided values, parses [`Conf`] and
+    /// finally removes all overrided variables.
+    ///
+    /// # Usage
+    ///
+    /// ```rust
+    /// # use crate::conf::Conf;
+    /// #
+    /// let default_conf = Conf::default();
+    /// let env_conf = overrided_by_env_conf!(
+    ///        "MEDEA_TURN__HOST" => "example.com",
+    ///        "MEDEA_TURN__PORT" => "1234",
+    ///        "MEDEA_TURN__USER" => "ferris",
+    ///        "MEDEA_TURN__PASS" => "qwerty"
+    /// );
+    ///
+    /// assert_ne!(default_conf.turn.host, env_conf.turn.host);
+    /// assert_ne!(default_conf.turn.port, env_conf.turn.port);
+    /// // ...
+    /// ```
+    #[macro_export]
+    macro_rules! overrided_by_env_conf {
+        ($($env:expr => $value:expr),+) => {{
+            $(::std::env::set_var($env, $value);)+
+            let conf = crate::conf::Conf::parse().unwrap();
+            $(::std::env::remove_var($env);)+
+            conf
+        }};
+    }
 
     #[test]
     #[serial]
@@ -157,138 +188,5 @@ mod tests {
             Some("arg_path".to_owned()),
         );
         env::remove_var(APP_CONF_PATH_ENV_VAR_NAME);
-    }
-
-    #[test]
-    #[serial]
-    fn conf_parse_spec_file_overrides_defaults() {
-        let defaults = Conf::default();
-        let test_config_file_path = "test_config.toml";
-
-        let data = "[rpc]\nidle_timeout = \"45s\"".to_owned();
-        fs::write(test_config_file_path, data).unwrap();
-        env::set_var(APP_CONF_PATH_ENV_VAR_NAME, test_config_file_path);
-
-        let new_config = Conf::parse().unwrap();
-
-        env::remove_var(APP_CONF_PATH_ENV_VAR_NAME);
-        fs::remove_file(test_config_file_path).unwrap();
-
-        assert_eq!(new_config.rpc.idle_timeout, Duration::from_secs(45));
-        assert_ne!(new_config.rpc.idle_timeout, defaults.rpc.idle_timeout);
-    }
-
-    #[test]
-    #[serial]
-    fn conf_parse_spec_env_overrides_defaults() {
-        let defaults = Conf::default();
-
-        env::set_var("MEDEA_RPC__IDLE_TIMEOUT", "46s");
-        let new_config = Conf::parse().unwrap();
-        env::remove_var("MEDEA_RPC__IDLE_TIMEOUT");
-
-        assert_eq!(new_config.rpc.idle_timeout, Duration::from_secs(46));
-        assert_ne!(new_config.rpc.idle_timeout, defaults.rpc.idle_timeout);
-    }
-
-    #[test]
-    #[serial]
-    fn conf_parse_spec_env_overrides_file() {
-        let test_config_file_path = "test_config.toml";
-
-        let data = "[rpc]\nidle_timeout = \"47s\"".to_owned();
-        fs::write(test_config_file_path, data).unwrap();
-        env::set_var(APP_CONF_PATH_ENV_VAR_NAME, test_config_file_path);
-
-        let file_config = Conf::parse().unwrap();
-
-        env::set_var("MEDEA_RPC__IDLE_TIMEOUT", "48s");
-        let file_env_config = Conf::parse().unwrap();
-
-        env::remove_var(APP_CONF_PATH_ENV_VAR_NAME);
-        fs::remove_file(test_config_file_path).unwrap();
-        env::remove_var("MEDEA_RPC__IDLE_TIMEOUT");
-
-        assert_eq!(file_config.rpc.idle_timeout, Duration::from_secs(47));
-
-        assert_eq!(file_env_config.rpc.idle_timeout, Duration::from_secs(48));
-    }
-
-    #[test]
-    #[serial]
-    fn redis_conf() {
-        let default_conf = Conf::default();
-
-        env::set_var("MEDEA_TURN__DB__REDIS__IP", "5.5.5.5");
-        env::set_var("MEDEA_TURN__DB__REDIS__PORT", "1234");
-        env::set_var("MEDEA_TURN__DB__REDIS__CONNECTION_TIMEOUT", "10s");
-
-        let env_conf = Conf::parse().unwrap();
-
-        assert_ne!(default_conf.turn.db.redis.ip, env_conf.turn.db.redis.ip);
-        assert_ne!(
-            default_conf.turn.db.redis.connection_timeout,
-            env_conf.turn.db.redis.connection_timeout
-        );
-        assert_ne!(
-            default_conf.turn.db.redis.connection_timeout,
-            env_conf.turn.db.redis.connection_timeout
-        );
-
-        assert_eq!(env_conf.turn.db.redis.ip, Ipv4Addr::new(5, 5, 5, 5));
-        assert_eq!(env_conf.turn.db.redis.port, 1234);
-        assert_eq!(
-            env_conf.turn.db.redis.connection_timeout,
-            Duration::from_secs(10)
-        )
-    }
-
-    #[test]
-    #[serial]
-    fn turn_conf() {
-        let default_conf = Conf::default();
-
-        env::set_var("MEDEA_TURN__HOST", "example.com");
-        env::set_var("MEDEA_TURN__PORT", "1234");
-
-        let env_conf = Conf::parse().unwrap();
-
-        assert_ne!(default_conf.turn.host, env_conf.turn.host);
-        assert_ne!(default_conf.turn.port, env_conf.turn.port);
-
-        assert_eq!(env_conf.turn.host, "example.com");
-        assert_eq!(env_conf.turn.port, 1234);
-        assert_eq!(env_conf.turn.addr(), "example.com:1234");
-    }
-
-    #[test]
-    #[serial]
-    fn log_conf() {
-        let default_conf = Conf::default();
-
-        env::set_var("MEDEA_LOG__LEVEL", "WARN");
-
-        let env_conf = Conf::parse().unwrap();
-
-        assert_ne!(default_conf.log.level(), env_conf.log.level());
-
-        assert_eq!(env_conf.log.level(), Some(slog::Level::Warning));
-
-        env::set_var("MEDEA_LOG__LEVEL", "OFF");
-
-        assert_eq!(Conf::parse().unwrap().log.level(), None);
-    }
-
-    #[test]
-    #[serial]
-    fn shutdown_conf_test() {
-        let default_conf = Conf::default();
-
-        env::set_var("MEDEA_SHUTDOWN__TIMEOUT", "700ms");
-
-        let env_conf = Conf::parse().unwrap();
-
-        assert_ne!(default_conf.shutdown.timeout, env_conf.shutdown.timeout);
-        assert_eq!(env_conf.shutdown.timeout, Duration::from_millis(700));
     }
 }

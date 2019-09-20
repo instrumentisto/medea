@@ -19,6 +19,14 @@ services:
     volumes:
       - ../../_dev/specs:/specs:ro
     network_mode: service:web-client
+  control-api-mock:
+    container_name: demo-control-api-mock
+    image: instrumentisto/medea-control-api-mock:dev
+    environment:
+      RUST_LOG: "DEBUG"
+    depends_on:
+      - coturn-db
+    network_mode: service:web-client
   coturn:
     container_name: demo-coturn
     image: instrumentisto/coturn:4.5
