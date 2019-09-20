@@ -1,13 +1,13 @@
 use std::borrow::Cow;
 
 use actix::Addr;
+use actix_cors::Cors;
 use actix_web::{
     dev::Server, middleware, web, web::Data, App, HttpResponse, HttpServer,
 };
 use futures::{future, Future};
 use iptables::error::IPTError;
 use serde::Serialize;
-use actix_cors::Cors;
 
 use crate::{
     firewall::Firewall,

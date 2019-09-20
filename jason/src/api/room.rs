@@ -15,7 +15,7 @@ use futures::{
 };
 use js_sys::Promise;
 use medea_client_api_proto::{
-    Command, Direction, EventHandler, IceCandidate, IceServer,
+    Command, Direction, Event, EventHandler, IceCandidate, IceServer,
     Peer as SnapshotPeer, PeerId, ServerPeerState, Snapshot, Track,
 };
 use wasm_bindgen::prelude::*;
@@ -32,6 +32,7 @@ use crate::{
 };
 
 use super::{connection::Connection, ConnectionHandle};
+use crate::utils::Callback;
 
 /// JS side handle to `Room` where all the media happens.
 ///
@@ -87,6 +88,10 @@ impl RoomHandle {
             .borrow()
             .get_stats_of_peer_connections()
     }
+
+    pub fn on_event(&self, f: js_sys::Function) {
+        self.0.upgrade().unwrap().borrow_mut().on_event.set_func(f);
+    }
 }
 
 /// [`Room`] where all the media happens (manages concrete [`PeerConnection`]s,
@@ -109,6 +114,11 @@ impl Room {
         let handle_medea_event = events_stream
             .for_each(move |event| match inner.upgrade() {
                 Some(inner) => {
+                    let event_json = serde_json::to_string(&event).unwrap();
+                    inner
+                        .borrow()
+                        .on_event
+                        .call(js_sys::JSON::parse(&event_json).unwrap());
                     event.dispatch_with(inner.borrow_mut().deref_mut());
                     Ok(())
                 }
@@ -178,6 +188,7 @@ struct InnerRoom {
     peer_event_sender: UnboundedSender<PeerEvent>,
     connections: HashMap<PeerId, Connection>,
     on_new_connection: Rc<Callback2<ConnectionHandle, WasmErr>>,
+    on_event: Rc<Callback<JsValue>>,
     enabled_audio: bool,
     enabled_video: bool,
 }
@@ -196,6 +207,7 @@ impl InnerRoom {
             peer_event_sender,
             connections: HashMap::new(),
             on_new_connection: Rc::new(Callback2::default()),
+            on_event: Rc::new(Callback::default()),
             enabled_audio: true,
             enabled_video: true,
         }
@@ -325,7 +337,8 @@ impl InnerRoom {
             ServerPeerState::WaitLocalSdp => {
                 match local_peer.signaling_state() {
                     SignalingState::HaveLocalOffer => {
-                        let local_sdp = local_peer.current_local_sdp().expect("1");
+                        let local_sdp =
+                            local_peer.current_local_sdp().expect("1");
                         self.rpc.send_command(Command::MakeSdpOffer {
                             peer_id,
                             sdp_offer: local_sdp,
