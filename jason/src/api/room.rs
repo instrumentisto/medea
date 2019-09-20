@@ -15,7 +15,7 @@ use futures::{
 };
 use js_sys::Promise;
 use medea_client_api_proto::{
-    Command, Direction, Event, EventHandler, IceCandidate, IceServer,
+    Command, Direction, EventHandler, IceCandidate, IceServer,
     Peer as SnapshotPeer, PeerId, ServerPeerState, Snapshot, Track,
 };
 use wasm_bindgen::prelude::*;
@@ -28,11 +28,10 @@ use crate::{
         SignalingState,
     },
     rpc::RpcClient,
-    utils::{Callback2, WasmErr},
+    utils::{Callback, Callback2, WasmErr},
 };
 
 use super::{connection::Connection, ConnectionHandle};
-use crate::utils::Callback;
 
 /// JS side handle to `Room` where all the media happens.
 ///
@@ -89,6 +88,8 @@ impl RoomHandle {
             .get_stats_of_peer_connections()
     }
 
+    /// Sets callback which will be called every time when client received
+    /// [`Event`].
     pub fn on_event(&self, f: js_sys::Function) {
         self.0.upgrade().unwrap().borrow_mut().on_event.set_func(f);
     }

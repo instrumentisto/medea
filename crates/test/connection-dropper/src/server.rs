@@ -7,7 +7,6 @@ use actix_cors::Cors;
 use actix_web::{
     dev::Server, middleware, web, web::Data, App, HttpResponse, HttpServer,
 };
-use futures::{future, Future};
 use iptables::error::IPTError;
 use serde::Serialize;
 
@@ -30,11 +29,11 @@ pub fn run(firewall: Firewall, gremlin: Addr<Gremlin>) -> Server {
             .wrap(middleware::Logger::default())
             .service(
                 web::resource("/connection/up")
-                    .route(web::post().to_async(up_connection)),
+                    .route(web::post().to(up_connection)),
             )
             .service(
                 web::resource("/connection/down")
-                    .route(web::post().to_async(down_connection)),
+                    .route(web::post().to(down_connection)),
             )
             .service(
                 web::resource("/gremlin/start")
@@ -52,7 +51,10 @@ pub fn run(firewall: Firewall, gremlin: Addr<Gremlin>) -> Server {
 
 /// Context of [`actix::Server`] which provide API for dropping connections.
 pub struct Context {
+    /// [`Firewall`] with which we can up/down `Member`'s connection.
     firewall: Firewall,
+
+    /// Service which can randomly up/down connection for `Member`.
     gremlin: Addr<Gremlin>,
 }
 
@@ -77,7 +79,7 @@ impl<'a> ErrorResponse<'a> {
 
 impl<'a> From<IPTError> for ErrorResponse<'a> {
     fn from(err: IPTError) -> Self {
-        ErrorResponse::new(err.to_string())
+        Self::new(err.to_string())
     }
 }
 
@@ -91,18 +93,16 @@ impl<'a> Into<HttpResponse> for ErrorResponse<'a> {
 ///
 /// `POST /connection/up`
 #[allow(clippy::needless_pass_by_value)]
-pub fn up_connection(
-    state: Data<Context>,
-) -> impl Future<Item = HttpResponse, Error = ()> {
+pub fn up_connection(state: Data<Context>) -> HttpResponse {
     match state.firewall.open_port(8090) {
         Ok(is_deleted) => {
             if is_deleted {
-                future::ok(HttpResponse::Ok().finish())
+                HttpResponse::Ok().finish()
             } else {
-                future::ok(ErrorResponse::new("Nothing deleted.").into())
+                ErrorResponse::new("Nothing deleted.").into()
             }
         }
-        Err(e) => future::ok(ErrorResponse::from(e).into()),
+        Err(e) => ErrorResponse::from(e).into(),
     }
 }
 
@@ -110,17 +110,15 @@ pub fn up_connection(
 ///
 /// `POST /connection/down`
 #[allow(clippy::needless_pass_by_value)]
-pub fn down_connection(
-    state: Data<Context>,
-) -> impl Future<Item = HttpResponse, Error = ()> {
+pub fn down_connection(state: Data<Context>) -> HttpResponse {
     match state.firewall.close_port(8090) {
-        Ok(_) => future::ok(HttpResponse::Ok().finish()),
+        Ok(_) => HttpResponse::Ok().finish(),
         Err(e) => match e {
             IPTError::Other(s) => {
                 warn!("Ignored iptables error: {}", s);
-                future::ok(HttpResponse::Ok().finish())
+                HttpResponse::Ok().finish()
             }
-            _ => future::ok(ErrorResponse::from(e).into()),
+            _ => ErrorResponse::from(e).into(),
         },
     }
 }
