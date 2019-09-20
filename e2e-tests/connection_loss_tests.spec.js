@@ -72,11 +72,37 @@ describe('Pub<=>Pub video call', () => {
         let callerRoom = await caller.join_room("ws://127.0.0.1:8080/ws/pub-pub-e2e-call/caller/test");
         let responderRoom = await responder.join_room("ws://127.0.0.1:8090/ws/pub-pub-e2e-call/responder/test");
 
-        setTimeout(async () => {
-            await axios.post("http://localhost:8500/gremlin/start");
-        }, 10);
+        async function down_up() {
+            await axios.post('http://127.0.0.1:8500/connection/down');
+            setTimeout(async () => {
+                await axios.post('http://127.0.0.1:8500/connection/up');
+            }, 5000);
+        }
 
-        callerRoom.on_new_connection((connection) => {
+        async function dropper(e) {
+            if (e.event === 'PeerCreated') {
+                await down_up();
+            } else if (e.event === 'SdpAnswerMade') {
+                await down_up();
+            } else if(e.event === 'PeersRemoved') {
+                await down_up();
+            }
+        }
+
+        // TODO: better?
+        setTimeout(async () => {
+            await down_up();
+        }, 50);
+
+        callerRoom.on_event(async (e) => {
+            await dropper(e);
+        });
+
+        responderRoom.on_event(async (e) => {
+            await dropper(e);
+        });
+
+        callerRoom.on_new_connection(async (connection) => {
             connection.on_remote_stream((stream) => {
                 let video = document.createElement("video");
                 video.id = callerPartnerVideo;
@@ -139,7 +165,7 @@ describe('Pub<=>Pub video call', () => {
 
     after(async () => {
         await deleteRoom();
-        await axios.post("http://localhost:8500/gremlin/stop");
+        await axios.post("http://localhost:8500/connection/up");
     });
 
     it('send rtc packets', async () => {

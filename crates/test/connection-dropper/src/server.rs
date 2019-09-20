@@ -12,6 +12,7 @@ use serde::Serialize;
 use crate::{
     firewall::Firewall,
     gremlin::{Gremlin, Start, Stop},
+    prelude::*,
 };
 
 pub fn run(firewall: Firewall, gremlin: Addr<Gremlin>) -> Server {
@@ -100,7 +101,15 @@ pub fn down_connection(
 ) -> impl Future<Item = HttpResponse, Error = ()> {
     match state.firewall.close_port(8090) {
         Ok(_) => future::ok(HttpResponse::Ok().finish()),
-        Err(e) => future::ok(ErrorResponse::from(e).into()),
+        Err(e) => match e {
+            IPTError::Other(s) => {
+                warn!("Ignored iptables error: {}", s);
+                future::ok(HttpResponse::Ok().finish())
+            }
+            _ => {
+                future::ok(ErrorResponse::from(e).into())
+            },
+        }
     }
 }
 
