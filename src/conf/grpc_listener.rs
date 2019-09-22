@@ -14,8 +14,8 @@ pub struct GrpcListener {
     #[default(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)))]
     pub bind_ip: IpAddr,
 
-    /// Port to bind gRPC server to. Defaults to `50_051`.
-    #[default(50_051)]
+    /// Port to bind gRPC server to. Defaults to `6565`.
+    #[default(6565)]
     pub bind_port: u16,
 
     /// Completion queue count of gRPC server. Defaults to `2`.

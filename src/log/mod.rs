@@ -63,6 +63,9 @@ fn add_default_keys(logger: &Logger) -> Logger {
         "msg" => PushFnValue(move |record : &Record, ser| {
             ser.emit(record.msg())
         }),
+        "fqn" => PushFnValue(move |record : &Record, ser| {
+             ser.emit(format_args!("{}:{}", record.module(), record.line()))
+        }),
         "time" => PushFnValue(move |_ : &Record, ser| {
             ser.emit(Local::now().to_rfc3339())
         }),

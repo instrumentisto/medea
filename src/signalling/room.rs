@@ -26,8 +26,8 @@ use crate::{
         control::{
             local_uri::{LocalUri, StatefulLocalUri, ToMember},
             room::RoomSpec,
-            Endpoint as EndpointSpec, MemberId, MemberSpec, RoomId,
-            TryFromElementError, WebRtcPlayId, WebRtcPublishId,
+            EndpointId, EndpointSpec, MemberId, MemberSpec, RoomId,
+            TryFromElementError,
         },
     },
     log::prelude::*,
@@ -620,13 +620,13 @@ impl Room {
     fn delete_endpoint(
         &mut self,
         member_id: &MemberId,
-        endpoint_id: String,
+        endpoint_id: EndpointId,
         ctx: &mut Context<Self>,
     ) {
         let endpoint_id = if let Some(member) =
             self.members.get_member_by_id(member_id)
         {
-            let play_id = WebRtcPlayId(endpoint_id);
+            let play_id = endpoint_id.into();
             if let Some(endpoint) = member.take_sink(&play_id) {
                 if let Some(peer_id) = endpoint.peer_id() {
                     let removed_peers =
@@ -637,13 +637,13 @@ impl Room {
                 }
             }
 
-            let publish_id = WebRtcPublishId(play_id.0);
+            let publish_id = String::from(play_id).into();
             if let Some(endpoint) = member.take_src(&publish_id) {
                 let peer_ids = endpoint.peer_ids();
                 self.remove_peers(member_id, peer_ids, ctx);
             }
 
-            publish_id.0
+            publish_id.into()
         } else {
             endpoint_id
         };
@@ -938,12 +938,10 @@ impl Handler<Delete> for Room {
             }
         }
         member_ids.into_iter().for_each(|uri| {
-            let (member_id, _) = uri.take_member_id();
-            self.delete_member(&member_id, ctx);
+            self.delete_member(&uri.member_id(), ctx);
         });
         endpoint_ids.into_iter().for_each(|uri| {
-            let (endpoint_id, member_uri) = uri.take_endpoint_id();
-            let (member_id, _) = member_uri.take_member_id();
+            let (_, member_id, endpoint_id) = uri.take_all();
             self.delete_endpoint(&member_id, endpoint_id, ctx);
         });
     }
@@ -976,7 +974,7 @@ impl Handler<CreateMember> for Room {
 #[rtype(result = "Result<(), RoomError>")]
 pub struct CreateEndpoint {
     pub member_id: MemberId,
-    pub endpoint_id: String,
+    pub endpoint_id: EndpointId,
     pub spec: EndpointSpec,
 }
 
@@ -992,14 +990,14 @@ impl Handler<CreateEndpoint> for Room {
             EndpointSpec::WebRtcPlay(endpoint) => {
                 self.members.create_sink_endpoint(
                     &msg.member_id,
-                    &WebRtcPlayId(msg.endpoint_id),
+                    msg.endpoint_id.into(),
                     endpoint,
                 )?;
             }
             EndpointSpec::WebRtcPublish(endpoint) => {
                 self.members.create_src_endpoint(
                     &msg.member_id,
-                    &WebRtcPublishId(msg.endpoint_id),
+                    msg.endpoint_id.into(),
                     endpoint,
                 )?;
             }

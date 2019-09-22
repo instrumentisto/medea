@@ -21,8 +21,8 @@ use crate::{
     api::control::{
         endpoints::WebRtcPlayEndpoint as WebRtcPlayEndpointSpec,
         local_uri::{LocalUri, StatefulLocalUri, ToEndpoint, ToMember, ToRoom},
-        MemberId, MemberSpec, RoomId, RoomSpec, TryFromElementError,
-        WebRtcPlayId, WebRtcPublishId,
+        EndpointId, MemberId, MemberSpec, RoomId, RoomSpec,
+        TryFromElementError, WebRtcPlayId, WebRtcPublishId,
     },
     log::prelude::*,
     media::IceUser,
@@ -44,32 +44,21 @@ pub enum MembersLoadError {
     #[display(fmt = "Member [id = {}] not found.", _0)]
     MemberNotFound(LocalUri<ToMember>),
 
-    /// [`WebRtcPlayEndpoint`] not found.
+    /// [`Endpoint`] not found.
+    ///
+    /// [`Endpoint`]: crate::api::control::endpoint::Endpoint
     #[display(
-        fmt = "Play endpoint [id = {}] not found while loading spec,",
+        fmt = "Endpoint [id = {}] was referenced but not found in spec",
         _0
     )]
-    PlayEndpointNotFound(LocalUri<ToEndpoint>),
-
-    /// [`WebRtcPublishEndpoint`] not found.
-    #[display(
-        fmt = "Publish endpoint [id = {}] not found while loading spec.",
-        _0
-    )]
-    PublishEndpointNotFound(LocalUri<ToEndpoint>),
+    EndpointNotFound(String),
 }
 
 #[allow(clippy::module_name_repetitions, clippy::pub_enum_variant_names)]
 #[derive(Debug, Fail, Display)]
 pub enum MemberError {
-    #[display(fmt = "Publish endpoint [id = {}] not found.", _0)]
-    PublishEndpointNotFound(LocalUri<ToEndpoint>),
-
-    #[display(fmt = "Play endpoint [id = {}] not found.", _0)]
-    PlayEndpointNotFound(LocalUri<ToEndpoint>),
-
     #[display(fmt = "Endpoint [id = {}] not found.", _0)]
-    EndpointNotFound(LocalUri<ToEndpoint>),
+    EndpointNotFound(String),
 }
 
 /// [`Member`] is member of [`Room`].
@@ -126,7 +115,7 @@ impl Member {
         room_spec: &RoomSpec,
         member_id: &MemberId,
     ) -> Result<MemberSpec, MembersLoadError> {
-        let element = room_spec.pipeline.get(&member_id.0).map_or(
+        let element = room_spec.pipeline.get(member_id).map_or(
             Err(MembersLoadError::MemberNotFound(LocalUri::<ToMember>::new(
                 self.room_id(),
                 member_id.clone(),
@@ -176,24 +165,20 @@ impl Member {
             )?;
 
             let publisher_endpoint = publisher_spec
-                .get_publish_endpoint_by_id(&spec_play_endpoint.src.endpoint_id)
+                .get_publish_endpoint_by_id(
+                    spec_play_endpoint.src.endpoint_id.clone(),
+                )
                 .ok_or_else(|| {
-                    MembersLoadError::PublishEndpointNotFound(
-                        publisher_member.get_local_uri_to_endpoint(
-                            spec_play_endpoint.src.endpoint_id.to_string(),
-                        ),
+                    MembersLoadError::EndpointNotFound(
+                        spec_play_endpoint.src.endpoint_id.to_string(),
                     )
                 })?;
 
-            if let Some(publisher) =
-                publisher_member.get_src_by_id(&WebRtcPublishId(
-                    spec_play_endpoint.src.endpoint_id.to_string(),
-                ))
-            {
-                let new_play_endpoint_id =
-                    WebRtcPlayId(spec_play_name.to_string());
+            if let Some(publisher) = publisher_member.get_src_by_id(
+                &spec_play_endpoint.src.endpoint_id.to_string().into(),
+            ) {
                 let new_play_endpoint = WebRtcPlayEndpoint::new(
-                    new_play_endpoint_id,
+                    spec_play_name,
                     spec_play_endpoint.src.clone(),
                     publisher.downgrade(),
                     this_member.downgrade(),
@@ -210,9 +195,8 @@ impl Member {
                     publisher_member.downgrade(),
                 );
 
-                let new_self_play_id = WebRtcPlayId(spec_play_name.to_string());
                 let new_self_play = WebRtcPlayEndpoint::new(
-                    new_self_play_id,
+                    spec_play_name,
                     spec_play_endpoint.src.clone(),
                     new_publish.downgrade(),
                     this_member.downgrade(),
@@ -253,7 +237,7 @@ impl Member {
     /// [`Member`].
     pub fn get_local_uri_to_endpoint(
         &self,
-        endpoint_id: String,
+        endpoint_id: EndpointId,
     ) -> LocalUri<ToEndpoint> {
         LocalUri::<ToEndpoint>::new(self.room_id(), self.id(), endpoint_id)
     }
@@ -329,49 +313,12 @@ impl Member {
         self.0.borrow().srcs.get(id).cloned()
     }
 
-    /// Lookups [`WebRtcPublishEndpoint`] source endpoint by
-    /// [`WebRtcPublishId`].
-    ///
-    /// Returns [`MemberError::PublishEndpointNotFound`] when
-    /// [`WebRtcPublishEndpoint`] not found.
-    pub fn get_src(
-        &self,
-        id: &WebRtcPublishId,
-    ) -> Result<WebRtcPublishEndpoint, MemberError> {
-        self.0.borrow().srcs.get(id).cloned().map_or_else(
-            || {
-                Err(MemberError::PublishEndpointNotFound(
-                    self.get_local_uri_to_endpoint(id.to_string()),
-                ))
-            },
-            Ok,
-        )
-    }
-
     /// Lookups [`WebRtcPlayEndpoint`] sink endpoint by [`WebRtcPlayId`].
     pub fn get_sink_by_id(
         &self,
         id: &WebRtcPlayId,
     ) -> Option<WebRtcPlayEndpoint> {
         self.0.borrow().sinks.get(id).cloned()
-    }
-
-    /// Lookups [`WebRtcPlayEndpoint`] sink endpoint by [`WebRtcPlayId`].
-    ///
-    /// Returns [`MemberError::PlayEndpointNotFound`] when
-    /// [`WebRtcPlayEndpoint`] not found.
-    pub fn get_sink(
-        &self,
-        id: &WebRtcPlayId,
-    ) -> Result<WebRtcPlayEndpoint, MemberError> {
-        self.0.borrow().sinks.get(id).cloned().map_or_else(
-            || {
-                Err(MemberError::PlayEndpointNotFound(
-                    self.get_local_uri_to_endpoint(id.to_string()),
-                ))
-            },
-            Ok,
-        )
     }
 
     /// Removes sink [`WebRtcPlayEndpoint`] from this [`Member`].
@@ -431,18 +378,17 @@ impl Member {
         &self,
         id: String,
     ) -> Result<Endpoint, MemberError> {
-        let webrtc_publish_id = WebRtcPublishId(id);
+        let webrtc_publish_id = id.into();
         if let Some(publish_endpoint) = self.get_src_by_id(&webrtc_publish_id) {
             return Ok(Endpoint::WebRtcPublishEndpoint(publish_endpoint));
         }
-        let webrtc_play_id = WebRtcPlayId(webrtc_publish_id.0);
+
+        let webrtc_play_id = String::from(webrtc_publish_id).into();
         if let Some(play_endpoint) = self.get_sink_by_id(&webrtc_play_id) {
             return Ok(Endpoint::WebRtcPlayEndpoint(play_endpoint));
         }
 
-        Err(MemberError::EndpointNotFound(
-            self.get_local_uri_to_endpoint(webrtc_play_id.to_string()),
-        ))
+        Err(MemberError::EndpointNotFound(webrtc_play_id.into()))
     }
 
     /// Downgrades strong [`Member`]'s pointer to weak [`WeakMember`] pointer.
@@ -538,11 +484,11 @@ impl Into<ElementProto> for Member {
 
         let mut member_pipeline = HashMap::new();
         for (id, play) in self.sinks() {
-            let local_uri = self.get_local_uri_to_endpoint(id.to_string());
+            let local_uri = self.get_local_uri_to_endpoint(id.into());
             member_pipeline.insert(local_uri.to_string(), play.into());
         }
         for (id, publish) in self.srcs() {
-            let local_uri = self.get_local_uri_to_endpoint(id.to_string());
+            let local_uri = self.get_local_uri_to_endpoint(id.into());
 
             member_pipeline.insert(local_uri.to_string(), publish.into());
         }

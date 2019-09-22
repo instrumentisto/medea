@@ -2,9 +2,6 @@
 //!
 //! [Control API]: http://tiny.cc/380uaz
 
-// Fix clippy's needless_return bug in try_fut! macro.
-#![allow(clippy::needless_return)]
-
 use std::{collections::HashMap, convert::TryFrom, sync::Arc};
 
 use actix::{
@@ -30,9 +27,9 @@ use crate::{
         control::{
             local_uri::{
                 LocalUri, LocalUriParseError, StatefulLocalUri, ToEndpoint,
-                ToMember, ToRoom,
+                ToMember,
             },
-            Endpoint, MemberId, MemberSpec, RoomId, RoomSpec,
+            EndpointSpec, MemberId, MemberSpec, RoomId, RoomSpec,
             TryFromElementError, TryFromProtobufError,
         },
         error_codes::{ErrorCode, ErrorResponse},
@@ -158,27 +155,20 @@ impl ControlApiService {
     /// Implementation of `Create` method for [`Room`].
     fn create_room(
         &self,
-        req: &CreateRequest,
-        uri: LocalUri<ToRoom>,
+        spec: RoomSpec,
     ) -> impl Future<Item = Sids, Error = GrpcControlApiError> {
-        let spec = fut_try!(RoomSpec::try_from_protobuf(
-            uri.room_id().clone(),
-            req.get_room()
-        ));
-
         let sid: Sids = fut_try!(spec.members())
             .iter()
-            .map(|(id, member)| {
+            .map(|(member_id, member)| {
                 let uri =
-                    self.get_sid(uri.room_id(), &id, member.credentials());
-
-                (id.clone().to_string(), uri)
+                    self.get_sid(spec.id(), &member_id, member.credentials());
+                (member_id.clone().to_string(), uri)
             })
             .collect();
 
         Either::A(
             self.room_service
-                .send(CreateRoom { uri, spec })
+                .send(CreateRoom { spec })
                 .map_err(GrpcControlApiError::RoomServiceMailboxError)
                 .and_then(move |r| {
                     r.map_err(GrpcControlApiError::from).map(|_| sid)
@@ -189,106 +179,95 @@ impl ControlApiService {
     /// Implementation of `Create` method for [`Member`] element.
     fn create_member(
         &self,
-        req: &CreateRequest,
         uri: LocalUri<ToMember>,
+        spec: MemberSpec,
     ) -> impl Future<Item = Sids, Error = GrpcControlApiError> {
-        let spec = fut_try!(MemberSpec::try_from(req.get_member()));
-
         let sid =
             self.get_sid(uri.room_id(), uri.member_id(), spec.credentials());
         let mut sids = HashMap::new();
         sids.insert(uri.member_id().to_string(), sid);
 
-        Either::A(
-            self.room_service
-                .send(CreateMemberInRoom { uri, spec })
-                .map_err(GrpcControlApiError::RoomServiceMailboxError)
-                .and_then(|r| {
-                    r.map_err(GrpcControlApiError::from).map(|_| sids)
-                }),
-        )
+        self.room_service
+            .send(CreateMemberInRoom { uri, spec })
+            .map_err(GrpcControlApiError::RoomServiceMailboxError)
+            .and_then(|r| r.map_err(GrpcControlApiError::from).map(|_| sids))
     }
 
     /// Implementation of `Create` method for [`Endpoint`] elements.
     fn create_endpoint(
         &self,
-        req: &CreateRequest,
         uri: LocalUri<ToEndpoint>,
+        spec: EndpointSpec,
     ) -> impl Future<Item = Sids, Error = GrpcControlApiError> {
-        let spec = fut_try!(Endpoint::try_from(req));
-
-        Either::A(
-            self.room_service
-                .send(CreateEndpointInRoom { uri, spec })
-                .map_err(GrpcControlApiError::RoomServiceMailboxError)
-                .and_then(|r| {
-                    r.map_err(GrpcControlApiError::from).map(|_| HashMap::new())
-                }),
-        )
+        self.room_service
+            .send(CreateEndpointInRoom { uri, spec })
+            .map_err(GrpcControlApiError::RoomServiceMailboxError)
+            .and_then(|r| {
+                r.map_err(GrpcControlApiError::from).map(|_| HashMap::new())
+            })
     }
 
+    /// Creates element based on provided
     pub fn create_element(
         &self,
-        req: &CreateRequest,
+        mut req: CreateRequest,
     ) -> Box<dyn Future<Item = Sids, Error = ErrorResponse> + Send> {
-        let uri = match StatefulLocalUri::try_from(req.get_id().as_ref()) {
+        let uri = match StatefulLocalUri::try_from(req.take_id()) {
             Ok(uri) => uri,
             Err(e) => {
                 return Box::new(future::err(e.into()));
             }
         };
 
+        let elem = if let Some(elem) = req.el {
+            elem
+        } else {
+            return Box::new(future::err(ErrorResponse::new(
+                ErrorCode::NoElement,
+                &uri,
+            )));
+        };
+
         match uri {
-            StatefulLocalUri::Room(local_uri) => {
-                if req.has_room() {
-                    Box::new(
-                        self.create_room(&req, local_uri)
-                            .map_err(|err| err.into()),
-                    )
-                } else {
-                    Box::new(future::err(ErrorResponse::new(
-                        ErrorCode::ElementIdForRoomButElementIsNot,
-                        &req.get_id(),
-                    )))
-                }
-            }
-            StatefulLocalUri::Member(local_uri) => {
-                if req.has_member() {
-                    Box::new(
-                        self.create_member(&req, local_uri)
-                            .map_err(|err| err.into()),
-                    )
-                } else {
-                    Box::new(future::err(ErrorResponse::new(
-                        ErrorCode::ElementIdForMemberButElementIsNot,
-                        &req.get_id(),
-                    )))
-                }
-            }
-            StatefulLocalUri::Endpoint(local_uri) => {
-                if req.has_webrtc_pub() || req.has_webrtc_play() {
-                    Box::new(
-                        self.create_endpoint(&req, local_uri)
-                            .map_err(|err| err.into()),
-                    )
-                } else {
-                    Box::new(future::err(ErrorResponse::new(
-                        ErrorCode::ElementIdForEndpointButElementIsNot,
-                        &req.get_id(),
-                    )))
-                }
-            }
+            StatefulLocalUri::Room(uri) => Box::new(
+                RoomSpec::try_from((uri.take_room_id(), elem))
+                    .map_err(ErrorResponse::from)
+                    .map(|spec| {
+                        self.create_room(spec).map_err(ErrorResponse::from)
+                    })
+                    .into_future()
+                    .and_then(|create_result| create_result),
+            ),
+            StatefulLocalUri::Member(uri) => Box::new(
+                MemberSpec::try_from((uri.member_id().clone(), elem))
+                    .map_err(ErrorResponse::from)
+                    .map(|spec| {
+                        self.create_member(uri, spec)
+                            .map_err(ErrorResponse::from)
+                    })
+                    .into_future()
+                    .and_then(|create_result| create_result),
+            ),
+            StatefulLocalUri::Endpoint(uri) => Box::new(
+                EndpointSpec::try_from((uri.endpoint_id().clone(), elem))
+                    .map_err(ErrorResponse::from)
+                    .map(|spec| {
+                        self.create_endpoint(uri, spec)
+                            .map_err(ErrorResponse::from)
+                    })
+                    .into_future()
+                    .and_then(|create_result| create_result),
+            ),
         }
     }
 
     pub fn delete_element(
         &self,
-        req: &IdRequest,
+        mut req: IdRequest,
     ) -> impl Future<Item = (), Error = ErrorResponse> {
         let mut delete_elements_msg = DeleteElements::new();
-
-        for id in req.get_id() {
-            match StatefulLocalUri::try_from(id.as_str()) {
+        for id in req.take_id().into_iter() {
+            match StatefulLocalUri::try_from(id) {
                 Ok(uri) => {
                     delete_elements_msg.add_uri(uri);
                 }
@@ -298,33 +277,31 @@ impl ControlApiService {
             }
         }
 
-        let room_service = Addr::clone(&self.room_service);
         future::Either::B(
             delete_elements_msg
                 .validate()
-                .into_future()
                 .map_err(ErrorResponse::from)
-                .and_then(move |del_msg| {
-                    room_service.send(del_msg).map_err(|err| {
+                .map(|msg| self.room_service.send(msg))
+                .into_future()
+                .and_then(move |delete_result| {
+                    delete_result.map_err(|err| {
                         ErrorResponse::from(
                             GrpcControlApiError::RoomServiceMailboxError(err),
                         )
                     })
                 })
-                .and_then(|delete_result| {
-                    delete_result.map_err(ErrorResponse::from)
-                }),
+                .and_then(|result| result.map_err(ErrorResponse::from)),
         )
     }
 
     pub fn get_element(
         &self,
-        req: &IdRequest,
+        mut req: IdRequest,
     ) -> impl Future<Item = HashMap<String, Element>, Error = ErrorResponse>
     {
         let mut uris = Vec::new();
-        for id in req.get_id() {
-            match StatefulLocalUri::try_from(id.as_str()) {
+        for id in req.take_id().into_iter() {
+            match StatefulLocalUri::try_from(id) {
                 Ok(uri) => {
                     uris.push(uri);
                 }
@@ -361,7 +338,7 @@ impl ControlApi for ControlApiService {
         sink: UnarySink<CreateResponse>,
     ) {
         ctx.spawn(
-            self.create_element(&req)
+            self.create_element(req)
                 .then(move |result| {
                     let mut response = CreateResponse::new();
                     match result {
@@ -421,7 +398,7 @@ impl ControlApi for ControlApiService {
         sink: UnarySink<Response>,
     ) {
         ctx.spawn(
-            self.delete_element(&req)
+            self.delete_element(req)
                 .then(move |result| {
                     let mut response = Response::new();
                     if let Err(e) = result {
@@ -449,7 +426,7 @@ impl ControlApi for ControlApiService {
         sink: UnarySink<GetResponse>,
     ) {
         ctx.spawn(
-            self.get_element(&req)
+            self.get_element(req)
                 .then(|result| {
                     let mut response = GetResponse::new();
                     match result {

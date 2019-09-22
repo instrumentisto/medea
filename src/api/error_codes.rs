@@ -1,12 +1,8 @@
 //! All errors which medea can return to control API user.
 //!
 //! # Error codes ranges
-//! - `1000` ... `1000` Unexpected server error
-//! - `1001` ... `1099` Not found errors
-//! - `1100` ... `1199` Spec errors
-//! - `1200` ... `1299` Parse errors
-//! - `1300` ... `1399` Conflicts
-//! - `1400` ... `1499` Misc errors
+//! - `1000` ... `1999` Client errors
+//! - `2000` ... `2999` Server errors
 
 use std::string::ToString;
 
@@ -130,6 +126,133 @@ impl Into<ErrorProto> for ErrorResponse {
 /// [Control API]: http://tiny.cc/380uaz
 #[derive(Debug, Display)]
 pub enum ErrorCode {
+    /// Unimplemented API call.
+    ///
+    /// This code should be with additional text which explains what
+    /// exactly unimplemented (you can do it with
+    /// [`ErrorResponse::with_explanation`] function).
+    ///
+    /// Code: __1000__.
+    #[display(fmt = "Unimplemented API call.")]
+    UnimplementedCall = 1000,
+
+    /// Request does not contain any elements.
+    ///
+    /// Code: __1001__.
+    #[display(fmt = "Request does not contain any elements")]
+    NoElement = 1001,
+
+    /// Provided uri can not point to provided element.
+    ///
+    /// Code: __1002__.
+    #[display(fmt = "Provided uri can not point to provided element")]
+    ElementIdMismatch = 1002,
+
+    /// Room not found.
+    ///
+    /// Code: __1003__.
+    #[display(fmt = "Room not found.")]
+    RoomNotFound = 1003,
+
+    /// Member not found.
+    ///
+    /// Code: __1004__.
+    #[display(fmt = "Member not found.")]
+    MemberNotFound = 1004,
+
+    /// Endpoint not found.
+    ///
+    /// Code: __1005__.
+    #[display(fmt = "Endpoint not found.")]
+    EndpointNotFound = 1005,
+
+    /// Medea expects `Room` element in pipeline but received not him.
+    ///
+    /// Code: __1006__.
+    #[display(fmt = "Expecting Room element but it's not.")]
+    NotRoomInSpec = 1006,
+
+    /// Medea expects `Member` element in pipeline but received not him.
+    ///
+    /// Code: __1007__.
+    #[display(fmt = "Expected Member element but it's not.")]
+    NotMemberInSpec = 1007,
+
+    /// Invalid source URI in play endpoint.
+    ///
+    /// Code: __1008__.
+    #[display(fmt = "Invalid source ID in publish endpoint spec.")]
+    InvalidSrcUri = 1008,
+
+    /// Provided not source URI in [`WebRtcPlayEndpoint`].
+    ///
+    /// Code: __1009__.
+    ///
+    /// [`WebRtcPlayEndpoint`]:
+    /// crate::signalling::elements::endpoints::webrtc::WebRtcPlayEndpoint
+    #[display(fmt = "Provided not source URI.")]
+    NotSourceUri = 1009,
+
+    /// Element's ID don't have "local://" prefix.
+    ///
+    /// Code: __1010__.
+    #[display(fmt = "Element's ID's URI not have 'local://' protocol.")]
+    ElementIdIsNotLocal = 1010,
+
+    /// Provided element's URI with too many paths.
+    ///
+    /// Code: __1011__.
+    #[display(fmt = "You provided element's URI with too many paths.")]
+    ElementIdIsTooLong = 1011,
+
+    /// Missing some fields in source URI of WebRtcPublishEndpoint.
+    ///
+    /// Code: __1012__.
+    #[display(
+        fmt = "Missing some fields in source URI of WebRtcPublishEndpoint."
+    )]
+    MissingFieldsInSrcUri = 1012,
+
+    /// Empty element ID.
+    ///
+    /// Code: __1013__.
+    #[display(fmt = "Provided empty element URI.")]
+    EmptyElementId = 1013,
+
+    /// Provided empty elements URIs list.
+    ///
+    /// Code: __1014__.
+    #[display(fmt = "Provided empty elements URIs list.")]
+    EmptyElementsList = 1014,
+
+    /// Provided not the same Room IDs in elements IDs. Probably you try use
+    /// Delete method for elements with different Room IDs
+    ///
+    /// Code: __1015__.
+    ///
+    /// [`RoomId`]: crate::api::control::room::Id
+    #[display(fmt = "Provided not the same Room IDs in elements IDs. \
+                     Probably you try use Delete method for elements with \
+                     different Room IDs")]
+    ProvidedNotSameRoomIds = 1015,
+
+    /// Room with provided URI already exists.
+    ///
+    /// Code: __1016__.
+    #[display(fmt = "Room with provided URI already exists.")]
+    RoomAlreadyExists = 1016,
+
+    /// Member with provided URI already exists.
+    ///
+    /// Code: __1017__.
+    #[display(fmt = "Member with provided URI already exists.")]
+    MemberAlreadyExists = 1017,
+    /// Endpoint with provided URI already exists.
+    ///
+    /// Code: __1018__.
+    #[display(fmt = "Endpoint with provided URI already exists.")]
+    EndpointAlreadyExists = 1018,
+
     /// Unexpected server error.
     ///
     /// Use this [`ErrorCode`] only with [`ErrorResponse::unexpected`]
@@ -137,164 +260,9 @@ pub enum ErrorCode {
     /// which explain what exactly goes wrong
     /// ([`ErrorResponse::unexpected`] do this).
     ///
-    /// Code: __1000__.
+    /// Code: __2000__.
     #[display(fmt = "Unexpected error happened.")]
-    UnexpectedError = 1000,
-
-    ////////////////////////////////////
-    // Not found (1001 - 1099 codes) //
-    //////////////////////////////////
-    /// Publish endpoint not found.
-    ///
-    /// Code: __1001__.
-    #[display(fmt = "Publish endpoint not found.")]
-    PublishEndpointNotFound = 1001,
-    /// Play endpoint not found.
-    ///
-    /// Code: __1002__.
-    #[display(fmt = "Play endpoint not found.")]
-    PlayEndpointNotFound = 1002,
-    /// Member not found.
-    ///
-    /// Code: __1003__.
-    #[display(fmt = "Member not found.")]
-    MemberNotFound = 1003,
-    /// Room not found.
-    ///
-    /// Code: __1004__.
-    #[display(fmt = "Room not found.")]
-    RoomNotFound = 1004,
-    /// Endpoint not found.
-    ///
-    /// Code: __1005__.
-    #[display(fmt = "Endpoint not found.")]
-    EndpointNotFound = 1005,
-    /// Room not found for provided element.
-    ///
-    /// Code: __1006__.
-    #[display(fmt = "Room not found for provided element.")]
-    RoomNotFoundForProvidedElement = 1006,
-
-    //////////////////////////////////////
-    // Spec errors (1100 - 1199 codes) //
-    ////////////////////////////////////
-    /// Medea expects `Room` element in pipeline but received not him.
-    ///
-    /// Code: __1100__.
-    #[display(fmt = "Expecting Room element but it's not.")]
-    NotRoomInSpec = 1100,
-    /// Medea expects `Member` element in pipeline but received not him.
-    ///
-    /// Code: __1101__.
-    #[display(fmt = "Expected Member element but it's not.")]
-    NotMemberInSpec = 1101,
-    /// Invalid source URI in play endpoint.
-    ///
-    /// Code: __1102__.
-    #[display(fmt = "Invalid source ID in publish endpoint spec.")]
-    InvalidSrcUri = 1102,
-    /// Provided element ID to Room element but element spec is not for Room.
-    ///
-    /// Code: __1103__.
-    #[display(
-        fmt = "You provided URI to Room but element's spec is not for Room."
-    )]
-    ElementIdForRoomButElementIsNot = 1103,
-    /// Provided element ID to Member element but element spec is not for
-    /// Member.
-    ///
-    /// Code: __1104__.
-    #[display(fmt = "You provided URI to Member but element's spec is not \
-                     for Member.")]
-    ElementIdForMemberButElementIsNot = 1104,
-    /// Provided element ID to Endpoint element but element spec is not for
-    /// Endpoint.
-    ///
-    /// Code: __1105__.
-    #[display(fmt = "You provided URI to Endpoint but element's spec is not \
-                     for Endpoint.")]
-    ElementIdForEndpointButElementIsNot = 1105,
-    /// Provided not source URI in [`WebRtcPlayEndpoint`].
-    ///
-    /// Code: __1106__.
-    ///
-    /// [`WebRtcPlayEndpoint`]:
-    /// crate::signalling::elements::endpoints::webrtc::WebRtcPlayEndpoint
-    #[display(fmt = "Provided not source URI.")]
-    NotSourceUri = 1106,
-
-    /////////////////////////////////
-    // Parse errors (1200 - 1299) //
-    ///////////////////////////////
-    /// Element's ID don't have "local://" prefix.
-    ///
-    /// Code: __1200__.
-    #[display(fmt = "Element's ID's URI not have 'local://' protocol.")]
-    ElementIdIsNotLocal = 1200,
-    /// Provided element's URI with too many paths.
-    ///
-    /// Code: __1201__.
-    #[display(fmt = "You provided element's URI with too many paths.")]
-    ElementIdIsTooLong = 1201,
-    /// Missing some fields in source URI of WebRtcPublishEndpoint.
-    ///
-    /// Code: __1202__.
-    #[display(
-        fmt = "Missing some fields in source URI of WebRtcPublishEndpoint."
-    )]
-    MissingFieldsInSrcUri = 1202,
-    /// Empty element ID.
-    ///
-    /// Code: __1203__.
-    #[display(fmt = "Provided empty element URI.")]
-    EmptyElementId = 1203,
-    /// Provided empty elements URIs list.
-    ///
-    /// Code: __1204__.
-    #[display(fmt = "Provided empty elements URIs list.")]
-    EmptyElementsList = 1204,
-    /// Provided not the same Room IDs in elements IDs. Probably you try use
-    /// Delete method for elements with different Room IDs
-    ///
-    /// Code: __1205__.
-    ///
-    /// [`RoomId`]: crate::api::control::room::Id
-    #[display(fmt = "Provided not the same Room IDs in elements IDs. \
-                     Probably you try use Delete method for elements with \
-                     different Room IDs")]
-    ProvidedNotSameRoomIds = 1205,
-
-    /////////////////////////////
-    // Conflict (1300 - 1399) //
-    ///////////////////////////
-    /// Member with provided URI already exists.
-    ///
-    /// Code: __1300__.
-    #[display(fmt = "Member with provided URI already exists.")]
-    MemberAlreadyExists = 1300,
-    /// Endpoint with provided URI already exists.
-    ///
-    /// Code: __1301__.
-    #[display(fmt = "Endpoint with provided URI already exists.")]
-    EndpointAlreadyExists = 1301,
-    /// Room with provided URI already exists.
-    ///
-    /// Code: __1302__.
-    #[display(fmt = "Room with provided URI already exists.")]
-    RoomAlreadyExists = 1302,
-
-    ////////////////////////
-    // Misc (1400 - 1499)//
-    //////////////////////
-    /// Unimplemented API call.
-    ///
-    /// This code should be with additional text which explains what
-    /// exactly unimplemented (you can do it with
-    /// [`ErrorResponse::with_explanation`] function).
-    ///
-    /// Code: __1400__.
-    #[display(fmt = "Unimplemented API call.")]
-    UnimplementedCall = 1400,
+    UnexpectedError = 2000,
 }
 
 impl From<ParticipantServiceErr> for ErrorResponse {
@@ -325,9 +293,28 @@ impl From<TryFromProtobufError> for ErrorResponse {
             SrcUriError(e) => e.into(),
             NotMemberElementInRoomElement(id) => Self::with_explanation(
                 ErrorCode::UnimplementedCall,
-                "Not Member elements in Room element currently is \
-                 unimplemented."
-                    .to_string(),
+                String::from(
+                    "Not Member elements in Room element currently is \
+                     unimplemented.",
+                ),
+                Some(id),
+            ),
+            UnimplementedEndpoint(id) => Self::with_explanation(
+                ErrorCode::UnimplementedCall,
+                String::from("Endpoint is not implemented."),
+                Some(id),
+            ),
+            ExpectedOtherElement(element, id) => Self::with_explanation(
+                ErrorCode::ElementIdMismatch,
+                format!(
+                    "Provided uri can not point to element of type [{}]",
+                    element
+                ),
+                Some(id),
+            ),
+            EmptyElement(id) => Self::with_explanation(
+                ErrorCode::NoElement,
+                String::from("No element was provided"),
                 Some(id),
             ),
         }
@@ -388,28 +375,17 @@ impl From<MembersLoadError> for ErrorResponse {
                 }
             },
             MemberNotFound(id) => Self::new(ErrorCode::MemberNotFound, &id),
-            PublishEndpointNotFound(id) => {
-                Self::new(ErrorCode::PublishEndpointNotFound, &id)
-            }
-            PlayEndpointNotFound(id) => {
-                Self::new(ErrorCode::PlayEndpointNotFound, &id)
-            }
+            EndpointNotFound(id) => Self::new(ErrorCode::EndpointNotFound, &id),
         }
     }
 }
 
 impl From<MemberError> for ErrorResponse {
     fn from(err: MemberError) -> Self {
-        use MemberError::*;
-
         match err {
-            PlayEndpointNotFound(id) => {
-                Self::new(ErrorCode::PlayEndpointNotFound, &id)
+            MemberError::EndpointNotFound(id) => {
+                Self::new(ErrorCode::EndpointNotFound, &id)
             }
-            PublishEndpointNotFound(id) => {
-                Self::new(ErrorCode::PublishEndpointNotFound, &id)
-            }
-            EndpointNotFound(id) => Self::new(ErrorCode::EndpointNotFound, &id),
         }
     }
 }
@@ -420,7 +396,7 @@ impl From<SrcParseError> for ErrorResponse {
 
         match err {
             NotSrcUri(text) => Self::new(ErrorCode::NotSourceUri, &text),
-            LocalUriParseError(_, err) => err.into(),
+            LocalUriParseError(err) => err.into(),
         }
     }
 }
@@ -436,17 +412,12 @@ impl From<RoomServiceError> for ErrorResponse {
             }
             RoomError(e) => e.into(),
             EmptyUrisList => Self::without_id(ErrorCode::EmptyElementsList),
-            RoomNotFoundForElement(id) => {
-                Self::new(ErrorCode::RoomNotFoundForProvidedElement, &id)
-            }
-            NotSameRoomIds(ids, expected_room_id) => Self::with_explanation(
+            NotSameRoomIds(id1, id2) => Self::with_explanation(
                 ErrorCode::ProvidedNotSameRoomIds,
                 format!(
-                    "Expected Room ID: '{}'. IDs with different Room ID: {:?}",
-                    expected_room_id,
-                    ids.into_iter()
-                        .map(|id| id.to_string())
-                        .collect::<Vec<_>>()
+                    "All URI's must have equal room_id. Provided Id's are \
+                     different: [{}] != [{}]",
+                    id1, id2
                 ),
                 None,
             ),

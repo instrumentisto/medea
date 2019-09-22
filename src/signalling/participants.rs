@@ -454,7 +454,13 @@ impl ParticipantService {
 
         for (id, play) in spec.play_endpoints() {
             let partner_member = self.get_member(&play.src.member_id)?;
-            let src = partner_member.get_src(&play.src.endpoint_id)?;
+            let src = partner_member
+                .get_src_by_id(&play.src.endpoint_id)
+                .ok_or_else(|| {
+                    MemberError::EndpointNotFound(
+                        play.src.endpoint_id.to_string(),
+                    )
+                })?;
 
             let sink = WebRtcPlayEndpoint::new(
                 id.clone(),
@@ -487,27 +493,32 @@ impl ParticipantService {
     pub fn create_sink_endpoint(
         &mut self,
         member_id: &MemberId,
-        endpoint_id: &WebRtcPlayId,
+        endpoint_id: WebRtcPlayId,
         spec: WebRtcPlayEndpointSpec,
     ) -> Result<(), ParticipantServiceErr> {
         let member = self.get_member(&member_id)?;
 
         let is_member_have_this_sink_id =
             member.get_sink_by_id(&endpoint_id).is_some();
-        let is_member_have_this_src_id = member
-            .get_src_by_id(&WebRtcPublishId(endpoint_id.0.clone()))
-            .is_some();
+
+        let publish_id = String::from(endpoint_id).into();
+        let is_member_have_this_src_id =
+            member.get_src_by_id(&publish_id).is_some();
         if is_member_have_this_sink_id || is_member_have_this_src_id {
             return Err(ParticipantServiceErr::EndpointAlreadyExists(
-                member.get_local_uri_to_endpoint(endpoint_id.to_string()),
+                member.get_local_uri_to_endpoint(publish_id.into()),
             ));
         }
 
         let partner_member = self.get_member(&spec.src.member_id)?;
-        let src = partner_member.get_src(&spec.src.endpoint_id)?;
+        let src = partner_member
+            .get_src_by_id(&spec.src.endpoint_id)
+            .ok_or_else(|| {
+                MemberError::EndpointNotFound(spec.src.endpoint_id.to_string())
+            })?;
 
         let sink = WebRtcPlayEndpoint::new(
-            endpoint_id.clone(),
+            String::from(publish_id).into(),
             spec.src,
             src.downgrade(),
             member.downgrade(),
@@ -515,12 +526,6 @@ impl ParticipantService {
 
         src.add_sink(sink.downgrade());
         member.insert_sink(sink);
-
-        debug!(
-            "Create WebRtcPlayEndpoint [id = {}] for Member [id = {}] in Room \
-             [id = {}].",
-            endpoint_id, member_id, self.room_id
-        );
 
         Ok(())
     }
@@ -535,35 +540,29 @@ impl ParticipantService {
     pub fn create_src_endpoint(
         &mut self,
         member_id: &MemberId,
-        endpoint_id: &WebRtcPublishId,
+        pubilsh_id: WebRtcPublishId,
         spec: WebRtcPublishEndpointSpec,
     ) -> Result<(), ParticipantServiceErr> {
         let member = self.get_member(&member_id)?;
 
         let is_member_have_this_src_id =
-            member.get_src_by_id(&endpoint_id).is_some();
-        let is_member_have_this_sink_id = member
-            .get_sink_by_id(&WebRtcPlayId(endpoint_id.0.clone()))
-            .is_some();
+            member.get_src_by_id(&pubilsh_id).is_some();
+
+        let play_id = String::from(pubilsh_id).into();
+        let is_member_have_this_sink_id =
+            member.get_sink_by_id(&play_id).is_some();
+
         if is_member_have_this_sink_id || is_member_have_this_src_id {
             return Err(ParticipantServiceErr::EndpointAlreadyExists(
-                member.get_local_uri_to_endpoint(endpoint_id.to_string()),
+                member.get_local_uri_to_endpoint(play_id.into()),
             ));
         }
 
-        let src = WebRtcPublishEndpoint::new(
-            endpoint_id.clone(),
+        member.insert_src(WebRtcPublishEndpoint::new(
+            String::from(play_id).into(),
             spec.p2p,
             member.downgrade(),
-        );
-
-        member.insert_src(src);
-
-        debug!(
-            "Create WebRtcPublishEndpoint [id = {}] for Member [id = {}] in \
-             Room [id = {}]",
-            endpoint_id, member_id, self.room_id
-        );
+        ));
 
         Ok(())
     }

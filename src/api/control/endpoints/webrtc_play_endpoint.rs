@@ -4,7 +4,7 @@
 
 use std::{convert::TryFrom, fmt};
 
-use derive_more::{Display, From};
+use derive_more::{Display, From, Into};
 use failure::Fail;
 use medea_control_api_proto::grpc as medea_grpc;
 use medea_grpc::control_api::WebRtcPlayEndpoint as WebRtcPlayEndpointProto;
@@ -20,8 +20,10 @@ use crate::api::control::{
 };
 
 /// ID of [`WebRtcPlayEndpoint`].
-#[derive(Clone, Debug, Deserialize, Display, Eq, Hash, PartialEq, From)]
-pub struct WebRtcPlayId(pub String);
+#[derive(
+    Clone, Debug, Deserialize, Display, Eq, Hash, PartialEq, From, Into,
+)]
+pub struct WebRtcPlayId(String);
 
 /// Media element which is able to play media data for client via WebRTC.
 #[allow(clippy::module_name_repetitions)]
@@ -36,7 +38,7 @@ impl TryFrom<&WebRtcPlayEndpointProto> for WebRtcPlayEndpoint {
 
     fn try_from(value: &WebRtcPlayEndpointProto) -> Result<Self, Self::Error> {
         Ok(Self {
-            src: SrcUri::try_from(value.get_src())?,
+            src: SrcUri::try_from(value.get_src().to_owned())?,
         })
     }
 }
@@ -52,8 +54,8 @@ pub enum SrcParseError {
 
     /// Error from [`LocalUri`] parser. This is general errors for [`SrcUri`]
     /// parsing because [`SrcUri`] parses with [`LocalUri`] parser.
-    #[display(fmt = "Local URI '{}' parse error: {:?}", _0, _1)]
-    LocalUriParseError(String, LocalUriParseError),
+    #[display(fmt = "Local URI parse error: {:?}", _0)]
+    LocalUriParseError(LocalUriParseError),
 }
 
 /// Special URI with pattern `local://{room_id}/{member_id}/{endpoint_id}`.
@@ -89,32 +91,33 @@ pub struct SrcUri {
     pub endpoint_id: WebRtcPublishId,
 }
 
-impl TryFrom<&str> for SrcUri {
+impl TryFrom<String> for SrcUri {
     type Error = SrcParseError;
 
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
-        let local_uri = StatefulLocalUri::try_from(value).map_err(|e| {
-            SrcParseError::LocalUriParseError(value.to_string(), e)
-        })?;
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        let local_uri = StatefulLocalUri::try_from(value)
+            .map_err(SrcParseError::LocalUriParseError)?;
 
-        if let StatefulLocalUri::Endpoint(endpoint_uri) = local_uri {
-            Ok(endpoint_uri.into())
-        } else {
-            Err(SrcParseError::NotSrcUri(value.to_string()))
+        match local_uri {
+            StatefulLocalUri::Room(uri) => {
+                Err(SrcParseError::NotSrcUri(uri.to_string()))
+            }
+            StatefulLocalUri::Member(uri) => {
+                Err(SrcParseError::NotSrcUri(uri.to_string()))
+            }
+            StatefulLocalUri::Endpoint(uri) => Ok(uri.into()),
         }
     }
 }
 
 impl From<LocalUri<ToEndpoint>> for SrcUri {
     fn from(uri: LocalUri<ToEndpoint>) -> Self {
-        let (endpoint_id, member_uri) = uri.take_endpoint_id();
-        let (member_id, room_uri) = member_uri.take_member_id();
-        let room_id = room_uri.take_room_id();
+        let (room_id, member_id, endpoint_id) = uri.take_all();
 
         Self {
             room_id,
             member_id,
-            endpoint_id: WebRtcPublishId(endpoint_id),
+            endpoint_id: endpoint_id.into(),
         }
     }
 }
@@ -145,7 +148,7 @@ impl<'de> Deserialize<'de> for SrcUri {
             where
                 E: de::Error,
             {
-                match SrcUri::try_from(value) {
+                match SrcUri::try_from(value.to_owned()) {
                     Ok(src_uri) => Ok(src_uri),
                     Err(e) => Err(Error::custom(e)),
                 }

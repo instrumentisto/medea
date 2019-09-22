@@ -7,20 +7,49 @@ pub mod webrtc_publish_endpoint;
 
 use std::convert::TryFrom;
 
+use derive_more::{Display, From, Into};
+use serde::Deserialize;
+
 use medea_control_api_proto::grpc::control_api::{
-    CreateRequest, Member_Element as MemberElementProto,
+    CreateRequest_oneof_el as ElementProto,
+    Member_Element_oneof_el as MemberElementProto,
 };
 
 use super::{member::MemberElement, TryFromProtobufError};
 
 #[doc(inline)]
-pub use webrtc_play_endpoint::WebRtcPlayEndpoint;
+pub use webrtc_play_endpoint::{WebRtcPlayEndpoint, WebRtcPlayId};
 #[doc(inline)]
-pub use webrtc_publish_endpoint::WebRtcPublishEndpoint;
+pub use webrtc_publish_endpoint::{WebRtcPublishEndpoint, WebRtcPublishId};
+
+/// ID of `Endpoint`.
+#[derive(
+    Clone, Debug, Eq, Hash, Deserialize, PartialEq, From, Display, Into,
+)]
+pub struct Id(pub String);
+
+macro_rules! impl_from_into {
+    ($id:ty) => {
+        impl std::convert::From<Id> for $id {
+            fn from(id: Id) -> Self {
+                String::from(id).into()
+            }
+        }
+
+        impl std::convert::From<$id> for Id {
+            fn from(id: $id) -> Self {
+                String::from(id).into()
+            }
+        }
+    };
+}
+
+impl_from_into!(WebRtcPublishId);
+impl_from_into!(WebRtcPlayId);
 
 /// Media element that one or more media data streams flow through.
 #[derive(Debug)]
-pub enum Endpoint {
+pub enum EndpointSpec {
     /// [`WebRtcPublishEndpoint`] element.
     WebRtcPublish(WebRtcPublishEndpoint),
 
@@ -28,7 +57,7 @@ pub enum Endpoint {
     WebRtcPlay(WebRtcPlayEndpoint),
 }
 
-impl Into<MemberElement> for Endpoint {
+impl Into<MemberElement> for EndpointSpec {
     fn into(self) -> MemberElement {
         match self {
             Self::WebRtcPublish(e) => {
@@ -41,29 +70,58 @@ impl Into<MemberElement> for Endpoint {
     }
 }
 
-macro_rules! impl_try_from_proto_for_endpoint {
-    ($proto:ty) => {
-        impl TryFrom<$proto> for Endpoint {
-            type Error = TryFromProtobufError;
+impl TryFrom<(Id, MemberElementProto)> for EndpointSpec {
+    type Error = TryFromProtobufError;
 
-            fn try_from(proto: $proto) -> Result<Self, Self::Error> {
-                if proto.has_webrtc_play() {
-                    let play =
-                        WebRtcPlayEndpoint::try_from(proto.get_webrtc_play())?;
-                    Ok(Self::WebRtcPlay(play))
-                } else if proto.has_webrtc_pub() {
-                    let publish =
-                        WebRtcPublishEndpoint::from(proto.get_webrtc_pub());
-                    Ok(Self::WebRtcPublish(publish))
-                } else {
-                    // TODO: implement another endpoints when they will be
-                    //       implemented
-                    unimplemented!()
-                }
+    fn try_from(value: (Id, MemberElementProto)) -> Result<Self, Self::Error> {
+        use MemberElementProto::*;
+
+        let id = value.0;
+        let proto = value.1;
+
+        match proto {
+            webrtc_play(elem) => {
+                let play = WebRtcPlayEndpoint::try_from(&elem)?;
+                Ok(Self::WebRtcPlay(play))
+            }
+            webrtc_pub(elem) => {
+                let publish = WebRtcPublishEndpoint::from(&elem);
+                Ok(Self::WebRtcPublish(publish))
+            }
+            hub(_) | file_recorder(_) | relay(_) => {
+                Err(TryFromProtobufError::UnimplementedEndpoint(id.0))
             }
         }
-    };
+    }
 }
 
-impl_try_from_proto_for_endpoint!(&MemberElementProto);
-impl_try_from_proto_for_endpoint!(&CreateRequest);
+impl TryFrom<(Id, ElementProto)> for EndpointSpec {
+    type Error = TryFromProtobufError;
+
+    fn try_from(value: (Id, ElementProto)) -> Result<Self, Self::Error> {
+        use ElementProto::*;
+
+        let id = value.0;
+        let proto = value.1;
+
+        match proto {
+            webrtc_play(elem) => {
+                let play = WebRtcPlayEndpoint::try_from(&elem)?;
+                Ok(Self::WebRtcPlay(play))
+            }
+            webrtc_pub(elem) => {
+                let publish = WebRtcPublishEndpoint::from(&elem);
+                Ok(Self::WebRtcPublish(publish))
+            }
+            hub(_) | file_recorder(_) | relay(_) => {
+                Err(TryFromProtobufError::UnimplementedEndpoint(id.0))
+            }
+            member(_) | room(_) => {
+                Err(TryFromProtobufError::ExpectedOtherElement(
+                    String::from("Endpoint"),
+                    id.0,
+                ))
+            }
+        }
+    }
+}

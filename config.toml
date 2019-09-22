@@ -34,7 +34,7 @@
 # Environment variable: MEDEA_SERVER.CONTROL.GRPC.BIND_PORT
 #
 # Default:
-#   bind_port = 50051
+#   bind_port = 6565
 
 # Completion queue count of gRPC server.
 #

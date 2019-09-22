@@ -32,7 +32,8 @@ use self::{
 pub use self::{
     endpoints::{
         webrtc_play_endpoint::WebRtcPlayId,
-        webrtc_publish_endpoint::WebRtcPublishId, Endpoint,
+        webrtc_publish_endpoint::WebRtcPublishId, EndpointSpec,
+        Id as EndpointId,
     },
     member::{Id as MemberId, MemberSpec},
     room::{Id as RoomId, RoomElement, RoomSpec},
@@ -58,6 +59,17 @@ pub enum TryFromProtobufError {
         _0
     )]
     NotMemberElementInRoomElement(String),
+
+    /// `Room` element doesn't have `Member` element. Currently this is
+    /// unimplemented.
+    #[display(fmt = "Expected element of type [{}]. Id [{}]", _0, _1)]
+    ExpectedOtherElement(String, String),
+
+    #[display(fmt = "Element is None, expected Some. Id [{}]", _0)]
+    EmptyElement(String),
+
+    #[display(fmt = "Endpoint is unimplemented. Id [{}]", _0)]
+    UnimplementedEndpoint(String),
 }
 
 impl From<SrcParseError> for TryFromProtobufError {
@@ -76,7 +88,7 @@ pub enum RootElement {
     /// Can transform into [`RoomSpec`] by `RoomSpec::try_from`.
     Room {
         id: RoomId,
-        spec: Pipeline<RoomElement>,
+        spec: Pipeline<MemberId, RoomElement>,
     },
 }
 
