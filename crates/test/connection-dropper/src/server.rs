@@ -1,29 +1,36 @@
 //! Server which provides API for upping and downing connection for `Member`.
 
-use std::borrow::Cow;
-
-use actix::Addr;
+use actix::{Actor as _, Addr, MailboxError};
 use actix_cors::Cors;
 use actix_web::{
     dev::Server, middleware, web, web::Data, App, HttpResponse, HttpServer,
+    ResponseError,
 };
+use clap::ArgMatches;
+use derive_more::{Display, From};
+use futures::Future;
 use iptables::error::IPTError;
 use serde::Serialize;
 
 use crate::{
     firewall::Firewall,
     gremlin::{Gremlin, Start, Stop},
-    prelude::*,
 };
 
 /// Runs [`actix::Server`] which will provide API for upping and downing
 /// connection for `Member`.
-pub fn run(firewall: Firewall, gremlin: Addr<Gremlin>) -> Server {
+pub fn run(opts: ArgMatches) -> Server {
+    let port_to_drop = opts.value_of("port").unwrap().parse().unwrap();
+
+    let firewall = Firewall::new().unwrap();
+    let gremlin = Gremlin::new(port_to_drop, firewall.clone()).start();
+
     HttpServer::new(move || {
         App::new()
             .data(Context {
                 firewall: firewall.clone(),
                 gremlin: gremlin.clone(),
+                port_to_drop,
             })
             .wrap(Cors::new())
             .wrap(middleware::Logger::default())
@@ -37,14 +44,14 @@ pub fn run(firewall: Firewall, gremlin: Addr<Gremlin>) -> Server {
             )
             .service(
                 web::resource("/gremlin/start")
-                    .route(web::post().to(start_gremlin)),
+                    .route(web::post().to_async(start_gremlin)),
             )
             .service(
                 web::resource("/gremlin/stop")
-                    .route(web::post().to(stop_gremlin)),
+                    .route(web::post().to_async(stop_gremlin)),
             )
     })
-    .bind("127.0.0.1:8500")
+    .bind(opts.value_of("addr").unwrap())
     .unwrap()
     .start()
 }
@@ -56,36 +63,30 @@ pub struct Context {
 
     /// Service which can randomly up/down connection for `Member`.
     gremlin: Addr<Gremlin>,
+
+    /// Port which server will close/open on request.
+    port_to_drop: u16,
 }
 
-/// Error response.
-#[derive(Debug, Serialize)]
-struct ErrorResponse<'a> {
-    /// Text of error.
-    error_text: Cow<'a, str>,
+#[derive(Display, Debug, From)]
+pub enum ServerError {
+    #[display(fmt = "Iptables error. {:?}", _0)]
+    IptablesErr(IPTError),
+
+    #[display(fmt = "Gremlin service error. {:?}", _0)]
+    GremlinServiceErr(MailboxError),
 }
 
-impl<'a> ErrorResponse<'a> {
-    /// Create new [`ErrorResponse`] with provided text as error text.
-    pub fn new<S>(text: S) -> Self
-    where
-        S: Into<Cow<'a, str>>,
-    {
-        Self {
-            error_text: text.into(),
+impl ResponseError for ServerError {
+    fn render_response(&self) -> HttpResponse {
+        #[derive(Serialize)]
+        struct ErrorResponse {
+            error_message: String,
         }
-    }
-}
 
-impl<'a> From<IPTError> for ErrorResponse<'a> {
-    fn from(err: IPTError) -> Self {
-        Self::new(err.to_string())
-    }
-}
-
-impl<'a> Into<HttpResponse> for ErrorResponse<'a> {
-    fn into(self) -> HttpResponse {
-        HttpResponse::InternalServerError().json(self)
+        HttpResponse::InternalServerError().json(ErrorResponse {
+            error_message: self.to_string(),
+        })
     }
 }
 
@@ -93,50 +94,46 @@ impl<'a> Into<HttpResponse> for ErrorResponse<'a> {
 ///
 /// `POST /connection/up`
 #[allow(clippy::needless_pass_by_value)]
-pub fn up_connection(state: Data<Context>) -> HttpResponse {
-    match state.firewall.open_port(8090) {
-        Ok(is_deleted) => {
-            if is_deleted {
-                HttpResponse::Ok().finish()
-            } else {
-                ErrorResponse::new("Nothing deleted.").into()
-            }
-        }
-        Err(e) => ErrorResponse::from(e).into(),
-    }
+pub fn up_connection(
+    state: Data<Context>,
+) -> Result<HttpResponse, ServerError> {
+    state.firewall.open_port(state.port_to_drop)?;
+    Ok(HttpResponse::Ok().finish())
 }
 
 /// Drops connection for `Member` with `iptables`.
 ///
 /// `POST /connection/down`
 #[allow(clippy::needless_pass_by_value)]
-pub fn down_connection(state: Data<Context>) -> HttpResponse {
-    match state.firewall.close_port(8090) {
-        Ok(_) => HttpResponse::Ok().finish(),
-        Err(e) => match e {
-            IPTError::Other(s) => {
-                warn!("Ignored iptables error: {}", s);
-                HttpResponse::Ok().finish()
-            }
-            _ => ErrorResponse::from(e).into(),
-        },
-    }
+pub fn down_connection(
+    state: Data<Context>,
+) -> Result<HttpResponse, ServerError> {
+    state.firewall.close_port(state.port_to_drop)?;
+    Ok(HttpResponse::Ok().finish())
 }
 
 /// Starts service which will up/down connection for `Member` at random time.
 ///
 /// `POST /gremlin/start`
 #[allow(clippy::needless_pass_by_value)]
-pub fn start_gremlin(state: Data<Context>) -> HttpResponse {
-    state.gremlin.do_send(Start);
-    HttpResponse::Ok().finish()
+pub fn start_gremlin<'a>(
+    state: Data<Context>,
+) -> impl Future<Item = HttpResponse, Error = ServerError> {
+    state.gremlin.send(Start).from_err().and_then(|res| {
+        res?;
+        Ok(HttpResponse::Ok().finish())
+    })
 }
 
 /// Stops service which will up/down connection for `Member` at random time.
 ///
 /// `POST /gremlin/stop`
 #[allow(clippy::needless_pass_by_value)]
-pub fn stop_gremlin(state: Data<Context>) -> HttpResponse {
-    state.gremlin.do_send(Stop);
-    HttpResponse::Ok().finish()
+pub fn stop_gremlin(
+    state: Data<Context>,
+) -> impl Future<Item = HttpResponse, Error = ServerError> {
+    state.gremlin.send(Stop).from_err().and_then(|res| {
+        res?;
+        Ok(HttpResponse::Ok().finish())
+    })
 }

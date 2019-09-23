@@ -3,10 +3,11 @@ mod gremlin;
 mod prelude;
 mod server;
 
-use actix::Actor;
+use clap::{
+    app_from_crate, crate_authors, crate_description, crate_name,
+    crate_version, Arg,
+};
 use slog::{o, Drain};
-
-use crate::{firewall::Firewall, gremlin::Gremlin};
 
 #[link(name = "c")]
 extern "C" {
@@ -14,6 +15,23 @@ extern "C" {
 }
 
 fn main() {
+    let opts = app_from_crate!()
+        .arg(
+            Arg::with_name("addr")
+                .help("Address where dropper control server will be hosted.")
+                .default_value("127.0.0.1:8500")
+                .long("addr")
+                .short("a"),
+        )
+        .arg(
+            Arg::with_name("port")
+                .help("Port which you want to open/close.")
+                .default_value("8080")
+                .long("port")
+                .short("p"),
+        )
+        .get_matches();
+
     // We need root permission because we use 'iptables'.
     unsafe {
         if geteuid() != 0 {
@@ -32,8 +50,6 @@ fn main() {
     slog_stdlog::init().unwrap();
 
     let sys = actix::System::new("control-api-mock");
-    let firewall = Firewall::new().unwrap();
-    let gremlin = Gremlin::new(firewall.clone()).start();
-    server::run(firewall, gremlin);
+    server::run(opts);
     sys.run().unwrap();
 }
