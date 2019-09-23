@@ -42,10 +42,10 @@ impl ResponseError for ServerError {
 /// Runs [`actix::Server`] which will provide API for upping and downing
 /// connections to `port_to_drop` port.
 pub fn run(opts: ArgMatches) -> Server {
-    let port_to_drop = opts.value_of("port").unwrap().parse().unwrap();
-
     let firewall = Firewall::new().unwrap();
-    let gremlin = Gremlin::new(port_to_drop, firewall.clone()).start();
+    let gremlin = Gremlin::new(&opts, firewall.clone()).start();
+
+    let port_to_drop = opts.value_of("port").unwrap().parse().unwrap();
 
     HttpServer::new(move || {
         App::new()

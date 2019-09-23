@@ -34,6 +34,20 @@ fn main() {
                 .long("port")
                 .short("p"),
         )
+        .arg(
+            Arg::with_name("gremlin-max-wait")
+                .help("Minimum port's loss/availability time.")
+                .default_value("5")
+                .long("min-wait")
+                .short("m"),
+        )
+        .arg(
+            Arg::with_name("gremlin-min-wait")
+                .help("Maximum port's loss/availability time.")
+                .default_value("15")
+                .long("max-wait")
+                .short("x"),
+        )
         .get_matches();
 
     // We need root permission because we use 'iptables'.

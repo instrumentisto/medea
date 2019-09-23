@@ -9,6 +9,7 @@ use iptables::error::IPTResult;
 use rand::{rngs::ThreadRng, Rng};
 
 use crate::{firewall::Firewall, prelude::*};
+use clap::ArgMatches;
 
 /// Service which can up/down connection at random time.
 pub struct Gremlin {
@@ -23,16 +24,30 @@ pub struct Gremlin {
 
     /// Port which will be closed/opened.
     port_to_drop: u16,
+
+    /// Maximum time of downing/availability port.
+    max_wait: u64,
+
+    /// Minimum time of downing/availability port.
+    min_wait: u64,
 }
 
 impl Gremlin {
     /// Create new service which can up/down connection at random time.
-    pub fn new(port_to_drop: u16, firewall: Firewall) -> Self {
+    pub fn new(opts: &ArgMatches, firewall: Firewall) -> Self {
+        let port_to_drop = opts.value_of("port").unwrap().parse().unwrap();
+        let max_wait =
+            opts.value_of("gremlin-max-wait").unwrap().parse().unwrap();
+        let min_wait =
+            opts.value_of("gremlin-min-wait").unwrap().parse().unwrap();
+
         Self {
             dropper_handle: None,
             rng: rand::thread_rng(),
             firewall,
             port_to_drop,
+            max_wait,
+            min_wait,
         }
     }
 
@@ -50,22 +65,28 @@ impl Gremlin {
         // TODO: maybe try to open port if err??
         self.close()?;
 
-        self.dropper_handle = Some(ctx.run_later(
-            Duration::from_secs(self.rng.gen_range(5, 15)),
-            |gremlin, ctx| {
+        self.dropper_handle =
+            Some(ctx.run_later(self.gen_random_duration(), |gremlin, ctx| {
                 info!("Gremlin opens port.");
                 gremlin.open().unwrap();
 
                 gremlin.dropper_handle = Some(ctx.run_later(
-                    Duration::from_secs(gremlin.rng.gen_range(5, 15)),
+                    gremlin.gen_random_duration(),
                     |gremlin, ctx| {
                         gremlin.step(ctx).unwrap();
                     },
                 ));
-            },
-        ));
+            }));
 
         Ok(())
+    }
+
+    /// Generates random [`Duration`] in range between `min_wait` and
+    /// `max_wait`.
+    ///
+    /// Used for generation wait duration in the [`Gremlin`]'s
+    fn gen_random_duration(&mut self) -> Duration {
+        Duration::from_secs(self.rng.gen_range(self.min_wait, self.max_wait))
     }
 
     /// Opens `port_to_drop` of this [`Gremlin`].
