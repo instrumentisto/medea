@@ -84,6 +84,7 @@ fn on_close(ws_client: WebsocketRpcClient, close_msg: &CloseMsg) {
         inner.heartbeat.stop();
     }
 
+    // TODO: why I reconnect on Normal and Disconnect codes????????
     match &close_msg {
         CloseMsg::Normal(_) | CloseMsg::Disconnect(_) => {
             spawn_local(futures::future::loop_fn(ws_client, |ws_client| {
