@@ -555,3 +555,64 @@ mod delete_elements_validation_specs {
         assert!(elements.validate().is_ok());
     }
 }
+
+#[cfg(test)]
+mod room_service_specs {
+    use crate::conf::Conf;
+    use std::convert::TryFrom as _;
+    use crate::api::control;
+
+    use super::*;
+
+    fn get_room_service() -> (Addr<RoomService>, RoomRepository) {
+        let conf = Conf::default();
+        let shutdown_timeout = conf.shutdown.timeout.clone();
+
+        let room_repo = RoomRepository::new(HashMap::new());
+        let turn_service = crate::turn::new_turn_auth_service_mock();
+        let app = AppContext::new(conf, turn_service);
+        let graceful_shutdown = GracefulShutdown::new(shutdown_timeout).start();
+
+        (
+            RoomService::new(room_repo.clone(), app, graceful_shutdown).start(),
+            room_repo,
+        )
+    }
+
+    #[test]
+    fn create_room() {
+        let sys = actix::System::new("room-service-tests");
+
+        let (room_service, room_repo) = get_room_service();
+
+        let spec = control::load_from_yaml_file(
+            "tests/specs/pub-sub-video-call.yml",
+        )
+        .unwrap();
+        let caller_uri = StatefulLocalUri::try_from(
+            "local://pub-sub-video-call/caller".to_string(),
+        )
+        .unwrap();
+        let caller_uri_clone = caller_uri.clone();
+
+        let test = room_service
+            .send(CreateRoom { spec })
+            .and_then(move |_| {
+                let e = room_repo
+                    .get(&"pub-sub-video-call".to_string().into())
+                    .unwrap();
+                e.send(SerializeProto(vec![caller_uri]))
+            })
+            .map(move |r| {
+                let r = r.unwrap();
+                let member = r.get(&caller_uri_clone).unwrap();
+                assert_eq!(member.get_member().get_pipeline().len(), 1);
+            })
+            .map(|_| actix::System::current().stop())
+            .map_err(|e| panic!("{:?}", e));
+
+        actix::spawn(test);
+
+        let _ = sys.run().unwrap();
+    }
+}
