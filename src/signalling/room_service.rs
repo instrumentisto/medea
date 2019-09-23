@@ -558,37 +558,39 @@ mod delete_elements_validation_specs {
 
 #[cfg(test)]
 mod room_service_specs {
-    use crate::conf::Conf;
     use std::convert::TryFrom as _;
-    use crate::api::control;
+
+    use actix_web::web::delete;
+
+    use crate::{api::control, conf::Conf};
 
     use super::*;
 
-    fn get_room_service() -> (Addr<RoomService>, RoomRepository) {
+    fn get_context(conf: Conf) -> AppContext {
+        let turn_service = crate::turn::new_turn_auth_service_mock();
+        AppContext::new(conf, turn_service)
+    }
+
+    fn get_room_service(room_repo: RoomRepository) -> Addr<RoomService> {
         let conf = Conf::default();
         let shutdown_timeout = conf.shutdown.timeout.clone();
 
-        let room_repo = RoomRepository::new(HashMap::new());
-        let turn_service = crate::turn::new_turn_auth_service_mock();
-        let app = AppContext::new(conf, turn_service);
+        let app = get_context(conf);
         let graceful_shutdown = GracefulShutdown::new(shutdown_timeout).start();
 
-        (
-            RoomService::new(room_repo.clone(), app, graceful_shutdown).start(),
-            room_repo,
-        )
+        RoomService::new(room_repo, app, graceful_shutdown).start()
     }
 
     #[test]
     fn create_room() {
         let sys = actix::System::new("room-service-tests");
 
-        let (room_service, room_repo) = get_room_service();
+        let room_repo = RoomRepository::new(HashMap::new());
+        let room_service = get_room_service(room_repo.clone());
 
-        let spec = control::load_from_yaml_file(
-            "tests/specs/pub-sub-video-call.yml",
-        )
-        .unwrap();
+        let spec =
+            control::load_from_yaml_file("tests/specs/pub-sub-video-call.yml")
+                .unwrap();
         let caller_uri = StatefulLocalUri::try_from(
             "local://pub-sub-video-call/caller".to_string(),
         )
@@ -614,5 +616,42 @@ mod room_service_specs {
         actix::spawn(test);
 
         let _ = sys.run().unwrap();
+    }
+
+    #[test]
+    fn delete_room() {
+        let sys = actix::System::new("room-service-tests");
+
+        let spec =
+            control::load_from_yaml_file("tests/specs/pub-sub-video-call.yml")
+                .unwrap();
+        let ctx = get_context(Conf::default());
+        let room = Room::new(&spec, &ctx).unwrap().start();
+        let room_repo = RoomRepository::new(
+            hashmap!("pub-sub-video-call".to_string().into() => room),
+        );
+        let room_service = get_room_service(room_repo.clone());
+
+        let mut delete_elements = DeleteElements::new();
+        let room_uri = StatefulLocalUri::try_from(
+            "local://pub-sub-video-call".to_string(),
+        )
+        .unwrap();
+        delete_elements.add_uri(room_uri);
+        let delete_elements = delete_elements.validate().unwrap();
+        let test = room_service
+            .send(delete_elements)
+            .map(|_| ())
+            .map(move |_| {
+                assert!(room_repo
+                    .get(&"pub-sub-video-call".to_string().into())
+                    .is_none());
+                actix::System::current().stop();
+            })
+            .map_err(|e| panic!("{:?}", e));
+
+        actix::spawn(test);
+
+        sys.run().unwrap();
     }
 }
