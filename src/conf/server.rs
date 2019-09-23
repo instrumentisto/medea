@@ -73,7 +73,7 @@ mod server_spec {
 
         let env_conf = overrided_by_env_conf!(
             "MEDEA_SERVER__CLIENT__HTTP__BIND_IP" => "5.5.5.5",
-            "MEDEA_SERVER__CLIENT__HTTP__BIND_PORT" => "1234"
+            "MEDEA_SERVER__CLIENT__HTTP__BIND_PORT" => "1234",
         );
 
         assert_ne!(
@@ -112,7 +112,7 @@ mod control_grpc_conf_specs {
         let env_conf = overrided_by_env_conf!(
             "MEDEA_SERVER__CONTROL__GRPC__BIND_IP" => "182.98.12.48",
             "MEDEA_SERVER__CONTROL__GRPC__BIND_PORT" => "44444",
-            "MEDEA_SERVER__CONTROL__GRPC__COMPLETION_QUEUE_COUNT" => "10"
+            "MEDEA_SERVER__CONTROL__GRPC__COMPLETION_QUEUE_COUNT" => "10",
         );
 
         assert_ne!(

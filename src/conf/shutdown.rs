@@ -28,7 +28,7 @@ mod shutdown_conf_specs {
     fn overrides_defaults() {
         let default_conf = Conf::default();
         let env_conf = overrided_by_env_conf!(
-            "MEDEA_SHUTDOWN__TIMEOUT" => "20s"
+            "MEDEA_SHUTDOWN__TIMEOUT" => "20s",
         );
 
         assert_ne!(default_conf.shutdown.timeout, env_conf.shutdown.timeout);

@@ -30,7 +30,7 @@ mod control_conf_specs {
     fn overrides_defaults() {
         let default_conf = Conf::default();
         let env_conf = overrided_by_env_conf!(
-            "MEDEA_CONTROL_API__STATIC_SPECS_DIR" => "test/"
+            "MEDEA_CONTROL_API__STATIC_SPECS_DIR" => "test/",
         );
 
         assert_ne!(
