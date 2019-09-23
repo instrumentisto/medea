@@ -163,7 +163,7 @@ mod test {
         let app = AppContext::new(conf, new_turn_auth_service_mock());
 
         let room_id = room_spec.id.clone();
-        let client_room = Room::new(&room_spec, app.clone()).unwrap().start();
+        let client_room = Room::new(&room_spec, &app).unwrap().start();
         let room_hash_map = hashmap! {
             room_id => client_room,
         };

@@ -489,3 +489,69 @@ impl Handler<Get> for RoomService {
         )
     }
 }
+
+#[cfg(test)]
+mod delete_elements_validation_specs {
+    use std::convert::TryFrom as _;
+
+    use super::*;
+
+    #[test]
+    fn empty_uris_list() {
+        let elements = DeleteElements::new();
+        match elements.validate() {
+            Ok(_) => panic!(
+                "Validation should fail with EmptyUrisList but returned Ok."
+            ),
+            Err(e) => match e {
+                RoomServiceError::EmptyUrisList => (),
+                _ => panic!(
+                    "Validation should fail with EmptyList error but errored \
+                     with {:?}.",
+                    e
+                ),
+            },
+        }
+    }
+
+    #[test]
+    fn error_if_not_same_room_ids() {
+        let mut elements = DeleteElements::new();
+        ["local://room_id/member", "local://another_room_id/member"]
+            .into_iter()
+            .map(|uri| StatefulLocalUri::try_from(uri.to_string()).unwrap())
+            .for_each(|uri| elements.add_uri(uri));
+
+        match elements.validate() {
+            Ok(_) => panic!(
+                "Validation should fail with NotSameRoomIds but returned Ok."
+            ),
+            Err(e) => match e {
+                RoomServiceError::NotSameRoomIds(first, another) => {
+                    assert_eq!(&first.to_string(), "room_id");
+                    assert_eq!(&another.to_string(), "another_room_id");
+                }
+                _ => panic!(
+                    "Validation should fail with NotSameRoomIds error but \
+                     errored with {:?}.",
+                    e
+                ),
+            },
+        }
+    }
+
+    #[test]
+    fn success_if_all_ok() {
+        let mut elements = DeleteElements::new();
+        [
+            "local://room_id/member_id",
+            "local://room_id/another_member_id",
+            "local://room_id/member_id/endpoint_id",
+        ]
+        .into_iter()
+        .map(|uri| StatefulLocalUri::try_from(uri.to_string()).unwrap())
+        .for_each(|uri| elements.add_uri(uri));
+
+        assert!(elements.validate().is_ok());
+    }
+}
