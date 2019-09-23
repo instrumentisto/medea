@@ -68,10 +68,12 @@ impl Gremlin {
         Ok(())
     }
 
+    /// Opens `port_to_drop` of this [`Gremlin`].
     pub fn open(&self) -> IPTResult<bool> {
         self.firewall.open_port(self.port_to_drop)
     }
 
+    /// Closes `port_to_drop` of this [`Gremlin`].
     pub fn close(&self) -> IPTResult<bool> {
         self.firewall.close_port(self.port_to_drop)
     }
@@ -88,7 +90,7 @@ impl Actor for Gremlin {
     }
 }
 
-/// Starts gremlin's up/down `Member` connection loop.
+/// Signal for start [`Gremlin`]'s open/close `port_to_drop` loop.
 #[derive(Message)]
 #[rtype(result = "IPTResult<()>")]
 pub struct Start;
@@ -111,7 +113,7 @@ impl Handler<Start> for Gremlin {
     }
 }
 
-/// Stops gremlin's up/down `Member` connection loop.
+/// Signal for stop [`Gremlin`]'s open/close `port_to_drop` loop.
 #[derive(Message)]
 #[rtype(result = "IPTResult<()>")]
 pub struct Stop;

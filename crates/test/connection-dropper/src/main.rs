@@ -1,3 +1,7 @@
+//! Server which provides API for opening and closing some port.
+//!
+//! Used for connection loss E2E tests of Medea/Jason.
+
 mod firewall;
 mod gremlin;
 mod prelude;

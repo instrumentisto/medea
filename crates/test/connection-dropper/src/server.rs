@@ -17,8 +17,30 @@ use crate::{
     gremlin::{Gremlin, Start, Stop},
 };
 
+#[derive(Display, Debug, From)]
+pub enum ServerError {
+    #[display(fmt = "Iptables error. {:?}", _0)]
+    IptablesErr(IPTError),
+
+    #[display(fmt = "Gremlin service error. {:?}", _0)]
+    GremlinServiceErr(MailboxError),
+}
+
+impl ResponseError for ServerError {
+    fn render_response(&self) -> HttpResponse {
+        #[derive(Serialize)]
+        struct ErrorResponse {
+            error_message: String,
+        }
+
+        HttpResponse::InternalServerError().json(ErrorResponse {
+            error_message: self.to_string(),
+        })
+    }
+}
+
 /// Runs [`actix::Server`] which will provide API for upping and downing
-/// connection for `Member`.
+/// connections to `port_to_drop` port.
 pub fn run(opts: ArgMatches) -> Server {
     let port_to_drop = opts.value_of("port").unwrap().parse().unwrap();
 
@@ -66,28 +88,6 @@ pub struct Context {
 
     /// Port which server will close/open on request.
     port_to_drop: u16,
-}
-
-#[derive(Display, Debug, From)]
-pub enum ServerError {
-    #[display(fmt = "Iptables error. {:?}", _0)]
-    IptablesErr(IPTError),
-
-    #[display(fmt = "Gremlin service error. {:?}", _0)]
-    GremlinServiceErr(MailboxError),
-}
-
-impl ResponseError for ServerError {
-    fn render_response(&self) -> HttpResponse {
-        #[derive(Serialize)]
-        struct ErrorResponse {
-            error_message: String,
-        }
-
-        HttpResponse::InternalServerError().json(ErrorResponse {
-            error_message: self.to_string(),
-        })
-    }
 }
 
 /// Ups connection for `Member` with `iptables`.
