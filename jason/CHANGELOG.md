@@ -12,17 +12,28 @@ All user visible changes to this project will be documented in this file. This p
 ### Added
 
 - Media management:
-    - Library API ([#40](/../../pull/40)):
-        - `Room.mute_audio()`;
-        - `Room.unmute_audio()`;
-        - `Room.mute_video()`;
-        - `Room.unmute_video()`.
+    - Library API:
+        - Mute/unmute local video/audio ([#40](/../../pull/40)):
+            - `Room.mute_audio()`;
+            - `Room.unmute_audio()`;
+            - `Room.mute_video()`;
+            - `Room.unmute_video()`.
+        - `InputDeviceInfo` class obtainable via `MediaManager.enumerate_devices()` ([#46](/../../pull/46));
+        - `MediaManager` class obtainable via ` Jason.media_manager()` ([#46](/../../pull/46)):
+            - `MediaManager.enumerate_devices()`;
+            - `MediaManager.init_local_stream()`;
 
 ### Fixed
 
 - Signalling:
     - Skipped `IceCandidate`s received before receiving remote SDP ([#50](/../../pull/50)).
 
+### Changed
+
+- Library API:
+    - Room initialization ([#46](/../../pull/46)):
+        - Remove `Jason.join_room()`;
+        - Add `Jason.init_room()` and `Room.join()`.
 
 
 
