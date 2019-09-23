@@ -130,8 +130,10 @@ struct ControlApiService {
     /// [`Addr`] of [`RoomService`].
     room_service: Addr<RoomService>,
 
-    /// Global app context.
-    app: AppContext,
+    /// Public URL of server. Address for exposed [Client API].
+    ///
+    /// [Client API]: http://tiny.cc/c80uaz
+    public_url: String,
 }
 
 // TODO: tests
@@ -146,10 +148,7 @@ impl ControlApiService {
     ) -> String {
         format!(
             "{}/{}/{}/{}",
-            self.app.config.server.client.public_url,
-            room_id,
-            member_id,
-            credentials
+            self.public_url, room_id, member_id, credentials
         )
     }
 
@@ -497,13 +496,13 @@ impl Handler<ShutdownGracefully> for GrpcServer {
 /// Run gRPC [Control API] server in actix actor.
 ///
 /// [Control API]: http://tiny.cc/380uaz
-pub fn run(room_repo: Addr<RoomService>, app: AppContext) -> Addr<GrpcServer> {
+pub fn run(room_repo: Addr<RoomService>, app: &AppContext) -> Addr<GrpcServer> {
     let bind_ip = app.config.server.control.grpc.bind_ip.to_string();
     let bind_port = app.config.server.control.grpc.bind_port;
     let cq_count = app.config.server.control.grpc.completion_queue_count;
 
     let service = create_control_api(ControlApiService {
-        app,
+        public_url: app.config.server.client.public_url.clone(),
         room_service: room_repo,
     });
     let env = Arc::new(Environment::new(cq_count));
