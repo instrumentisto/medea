@@ -560,9 +560,17 @@ mod delete_elements_validation_specs {
 mod room_service_specs {
     use std::convert::TryFrom as _;
 
-    use crate::{api::control, conf::Conf};
+    use crate::{api::control::RootElement, conf::Conf};
 
     use super::*;
+
+    const ROOM_SPEC: &str =
+        include_str!("../../tests/specs/pub-sub-video-call.yml");
+
+    fn get_room_spec() -> RoomSpec {
+        let parsed: RootElement = serde_yaml::from_str(ROOM_SPEC).unwrap();
+        RoomSpec::try_from(&parsed).unwrap()
+    }
 
     fn get_context(conf: Conf) -> AppContext {
         let turn_service = crate::turn::new_turn_auth_service_mock();
@@ -586,9 +594,7 @@ mod room_service_specs {
         let room_repo = RoomRepository::new(HashMap::new());
         let room_service = get_room_service(room_repo.clone());
 
-        let spec =
-            control::load_from_yaml_file("tests/specs/pub-sub-video-call.yml")
-                .unwrap();
+        let spec = get_room_spec();
         let caller_uri = StatefulLocalUri::try_from(
             "local://pub-sub-video-call/caller".to_string(),
         )
@@ -620,9 +626,7 @@ mod room_service_specs {
     fn delete_room() {
         let sys = actix::System::new("room-service-tests");
 
-        let spec =
-            control::load_from_yaml_file("tests/specs/pub-sub-video-call.yml")
-                .unwrap();
+        let spec = get_room_spec();
         let ctx = get_context(Conf::default());
         let room = Room::new(&spec, &ctx).unwrap().start();
         let room_repo = RoomRepository::new(
@@ -644,6 +648,52 @@ mod room_service_specs {
                 assert!(room_repo
                     .get(&"pub-sub-video-call".to_string().into())
                     .is_none());
+                actix::System::current().stop();
+            })
+            .map_err(|e| panic!("{:?}", e));
+
+        actix::spawn(test);
+
+        sys.run().unwrap();
+    }
+
+    #[test]
+    fn create_member() {
+        let sys = actix::System::new("room-service-tests");
+
+        let spec = get_room_spec();
+        let member_spec = spec
+            .members()
+            .unwrap()
+            .get(&"caller".to_string().into())
+            .unwrap()
+            .clone();
+        let ctx = get_context(Conf::default());
+        let room = Room::new(&spec, &ctx).unwrap().start();
+        let room_repo = RoomRepository::new(
+            hashmap!("pub-sub-video-call".to_string().into() => room),
+        );
+        let room_service = get_room_service(room_repo.clone());
+        let member_uri = LocalUri::<ToMember>::new(
+            "pub-sub-video-call".to_string().into(),
+            "test-member".to_string().into(),
+        );
+        let stateful_member_uri: StatefulLocalUri = member_uri.clone().into();
+        let stateful_member_uri_clone = stateful_member_uri.clone();
+        let msg = CreateMemberInRoom {
+            spec: member_spec,
+            uri: member_uri,
+        };
+
+        let test = room_service
+            .send(msg)
+            .and_then(move |_| {
+                room_service.send(Get(vec![stateful_member_uri_clone]))
+            })
+            .map(move |res| {
+                let elements = res.unwrap();
+                let member_el = elements.get(&stateful_member_uri).unwrap();
+                assert_eq!(member_el.get_member().get_pipeline().len(), 1);
                 actix::System::current().stop();
             })
             .map_err(|e| panic!("{:?}", e));
