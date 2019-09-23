@@ -334,6 +334,7 @@ impl DeleteElements<Unvalidated> {
         self.uris.push(uri)
     }
 
+    // TODO: tests
     /// Validates request. It must have at least one uri, all uris must share
     /// same [`RoomId`].
     pub fn validate(

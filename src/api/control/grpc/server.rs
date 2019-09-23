@@ -134,6 +134,7 @@ struct ControlApiService {
     app: AppContext,
 }
 
+// TODO: tests
 impl ControlApiService {
     /// Returns [Control API] sid based on provided arguments and
     /// `MEDEA_CLIENT.PUBLIC_URL` config value.

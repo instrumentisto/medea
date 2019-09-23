@@ -58,7 +58,7 @@ pub enum MembersLoadError {
 #[derive(Debug, Fail, Display)]
 pub enum MemberError {
     #[display(fmt = "Endpoint [id = {}] not found.", _0)]
-    EndpointNotFound(String),
+    EndpointNotFound(LocalUri<ToEndpoint>),
 }
 
 /// [`Member`] is member of [`Room`].
@@ -388,7 +388,9 @@ impl Member {
             return Ok(Endpoint::WebRtcPlayEndpoint(play_endpoint));
         }
 
-        Err(MemberError::EndpointNotFound(webrtc_play_id.into()))
+        Err(MemberError::EndpointNotFound(
+            self.get_local_uri_to_endpoint(webrtc_play_id.into()),
+        ))
     }
 
     /// Downgrades strong [`Member`]'s pointer to weak [`WeakMember`] pointer.

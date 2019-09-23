@@ -605,6 +605,7 @@ impl Room {
                 )
                 .collect();
 
+            //TODO: dont remove peers, add some meaningfull close frame: CloseRoom, Evicted
             self.remove_peers(&member.id(), peers, ctx);
 
             self.members.delete_member(member_id, ctx);

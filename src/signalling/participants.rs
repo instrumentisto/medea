@@ -109,6 +109,7 @@ pub struct ParticipantService {
     /// [`Member`]s which currently are present in this [`Room`].
     members: HashMap<MemberId, Member>,
 
+    // TODO: dont store context, just grab everything you need in new.
     /// Global app context.
     app: AppContext,
 
@@ -249,7 +250,7 @@ impl ParticipantService {
         if let Some(mut connection) = self.connections.remove(&member_id) {
             debug!("Closing old RpcConnection for member [id = {}]", member_id);
 
-            // cancel RpcConnection close task, since connection is
+            // cancel RpcConnect ion close task, since connection is
             // reestablished
             if let Some(handler) = self.drop_connection_tasks.remove(&member_id)
             {
@@ -458,7 +459,9 @@ impl ParticipantService {
                 .get_src_by_id(&play.src.endpoint_id)
                 .ok_or_else(|| {
                     MemberError::EndpointNotFound(
-                        play.src.endpoint_id.to_string(),
+                        partner_member.get_local_uri_to_endpoint(
+                            play.src.endpoint_id.clone().into(),
+                        ),
                     )
                 })?;
 
@@ -514,7 +517,11 @@ impl ParticipantService {
         let src = partner_member
             .get_src_by_id(&spec.src.endpoint_id)
             .ok_or_else(|| {
-                MemberError::EndpointNotFound(spec.src.endpoint_id.to_string())
+                MemberError::EndpointNotFound(
+                    partner_member.get_local_uri_to_endpoint(
+                        spec.src.endpoint_id.clone().into(),
+                    ),
+                )
             })?;
 
         let sink = WebRtcPlayEndpoint::new(
@@ -525,6 +532,15 @@ impl ParticipantService {
         );
 
         src.add_sink(sink.downgrade());
+
+        debug!(
+            "Created WebRtcPlayEndpoint [id = {}] for Member [id = {}] in \
+             Room [id = {}].",
+            sink.id(),
+            member_id,
+            self.room_id
+        );
+
         member.insert_sink(sink);
 
         Ok(())
@@ -540,15 +556,15 @@ impl ParticipantService {
     pub fn create_src_endpoint(
         &mut self,
         member_id: &MemberId,
-        pubilsh_id: WebRtcPublishId,
+        publish_id: WebRtcPublishId,
         spec: WebRtcPublishEndpointSpec,
     ) -> Result<(), ParticipantServiceErr> {
         let member = self.get_member(&member_id)?;
 
         let is_member_have_this_src_id =
-            member.get_src_by_id(&pubilsh_id).is_some();
+            member.get_src_by_id(&publish_id).is_some();
 
-        let play_id = String::from(pubilsh_id).into();
+        let play_id = String::from(publish_id).into();
         let is_member_have_this_sink_id =
             member.get_sink_by_id(&play_id).is_some();
 
@@ -558,11 +574,21 @@ impl ParticipantService {
             ));
         }
 
-        member.insert_src(WebRtcPublishEndpoint::new(
+        let endpoint = WebRtcPublishEndpoint::new(
             String::from(play_id).into(),
             spec.p2p,
             member.downgrade(),
-        ));
+        );
+
+        debug!(
+            "Create WebRtcPublishEndpoint [id = {}] for Member [id = {}] in \
+             Room [id = {}]",
+            endpoint.id(),
+            member_id,
+            self.room_id
+        );
+
+        member.insert_src(endpoint);
 
         Ok(())
     }
