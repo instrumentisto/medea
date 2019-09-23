@@ -560,8 +560,6 @@ mod delete_elements_validation_specs {
 mod room_service_specs {
     use std::convert::TryFrom as _;
 
-    use actix_web::web::delete;
-
     use crate::{api::control, conf::Conf};
 
     use super::*;
