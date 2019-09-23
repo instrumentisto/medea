@@ -82,12 +82,3 @@ impl_from_error!(std::cell::BorrowError);
 impl_from_error!(serde_json::error::Error);
 // TODO: improve macro to use generics
 impl_from_error!(futures::sync::mpsc::SendError<proto::Event>);
-
-#[macro_export]
-macro_rules! map_weak {
-    ($v:expr, $closure:expr) => {{
-        $v.0.upgrade()
-            .ok_or_else(|| WasmErr::from("Detached state").into())
-            .map($closure)
-    }};
-}
