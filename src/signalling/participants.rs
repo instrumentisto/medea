@@ -48,9 +48,10 @@ use crate::{
         room::{ActFuture, RoomError},
         Room,
     },
-    turn::{TurnServiceErr, UnreachablePolicy},
+    turn::{TurnAuthService, TurnServiceErr, UnreachablePolicy},
     AppContext,
 };
+use std::{sync::Arc, time::Duration};
 
 #[allow(clippy::module_name_repetitions)]
 #[derive(Debug, Display, Fail)]
@@ -109,10 +110,6 @@ pub struct ParticipantService {
     /// [`Member`]s which currently are present in this [`Room`].
     members: HashMap<MemberId, Member>,
 
-    // TODO: dont store context, just grab everything you need in new.
-    /// Global app context.
-    app: AppContext,
-
     /// Established [`RpcConnection`]s of [`Member`]s in this [`Room`].
     ///
     /// [`Member`]: crate::signalling::elements::member::Member
@@ -124,20 +121,28 @@ pub struct ParticipantService {
     /// If [`RpcConnection`] is lost, [`Room`] waits for connection_timeout
     /// before dropping it irrevocably in case it gets reestablished.
     drop_connection_tasks: HashMap<MemberId, SpawnHandle>,
+
+    /// Reference to [`TurnAuthService`].
+    turn_service: Arc<dyn TurnAuthService>,
+
+    /// Duration, after which the server deletes the client session if
+    /// the remote RPC client does not reconnect after it is idle.
+    rpc_reconnect_timeout: Duration,
 }
 
 impl ParticipantService {
     /// Creates new [`ParticipantService`] from [`RoomSpec`].
     pub fn new(
         room_spec: &RoomSpec,
-        context: AppContext,
+        context: &AppContext,
     ) -> Result<Self, MembersLoadError> {
         Ok(Self {
             room_id: room_spec.id().clone(),
             members: parse_members(room_spec)?,
-            app: context,
             connections: HashMap::new(),
             drop_connection_tasks: HashMap::new(),
+            turn_service: context.turn_service.clone(),
+            rpc_reconnect_timeout: context.config.rpc.reconnect_timeout,
         })
     }
 
@@ -259,7 +264,7 @@ impl ParticipantService {
             Box::new(wrap_future(connection.close().then(move |_| Ok(member))))
         } else {
             Box::new(
-                wrap_future(self.app.turn_service.create(
+                wrap_future(self.turn_service.create(
                     member_id.clone(),
                     self.room_id.clone(),
                     UnreachablePolicy::ReturnErr,
@@ -318,7 +323,7 @@ impl ParticipantService {
                 self.drop_connection_tasks.insert(
                     member_id.clone(),
                     ctx.run_later(
-                        self.app.config.rpc.reconnect_timeout,
+                        self.rpc_reconnect_timeout,
                         move |room, ctx| {
                             info!(
                                 "Member [id = {}] connection lost at {:?}. \
@@ -346,7 +351,7 @@ impl ParticipantService {
         // TODO: rewrite using `Option::flatten` when it will be in stable rust.
         match self.get_member_by_id(&member_id) {
             Some(member) => match member.take_ice_user() {
-                Some(ice_user) => self.app.turn_service.delete(vec![ice_user]),
+                Some(ice_user) => self.turn_service.delete(vec![ice_user]),
                 None => Box::new(future::ok(())),
             },
             None => Box::new(future::ok(())),
@@ -382,8 +387,7 @@ impl ParticipantService {
                     room_users.push(ice_user);
                 }
             });
-            self.app
-                .turn_service
+            self.turn_service
                 .delete(room_users)
                 .map_err(|err| error!("Error removing IceUsers {:?}", err))
         });
@@ -412,10 +416,10 @@ impl ParticipantService {
 
         if let Some(member) = self.members.remove(member_id) {
             if let Some(ice_user) = member.take_ice_user() {
-                let delete_ice_user_fut =
-                    self.app.turn_service.delete(vec![ice_user]).map_err(
-                        |err| error!("Error removing IceUser {:?}", err),
-                    );
+                let delete_ice_user_fut = self
+                    .turn_service
+                    .delete(vec![ice_user])
+                    .map_err(|err| error!("Error removing IceUser {:?}", err));
                 ctx.spawn(wrap_future(delete_ice_user_fut));
             }
         }

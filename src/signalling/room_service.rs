@@ -99,6 +99,11 @@ pub struct RoomService {
     /// Use for subscribe newly created [`Room`]s to [`GracefulShutdown`] and
     /// unsubscribe deleted [`Room`]s from [`GracefulShutdown`].
     graceful_shutdown: Addr<GracefulShutdown>,
+
+    /// Path to directory with static [Сontrol API] specs.
+    ///
+    /// [Control API]: http://tiny.cc/380uaz
+    static_specs_dir: String,
 }
 
 impl RoomService {
@@ -109,6 +114,7 @@ impl RoomService {
         graceful_shutdown: Addr<GracefulShutdown>,
     ) -> Self {
         Self {
+            static_specs_dir: app.config.control_api.static_specs_dir.clone(),
             room_repo,
             app,
             graceful_shutdown,
@@ -166,9 +172,7 @@ impl Handler<StartStaticRooms> for RoomService {
         _: StartStaticRooms,
         _: &mut Self::Context,
     ) -> Self::Result {
-        let room_specs = load_static_specs_from_dir(
-            self.app.config.control_api.static_specs_dir.clone(),
-        )?;
+        let room_specs = load_static_specs_from_dir(&self.static_specs_dir)?;
 
         for spec in room_specs {
             if self.room_repo.contains_room_with_id(spec.id()) {
@@ -179,7 +183,7 @@ impl Handler<StartStaticRooms> for RoomService {
 
             let room_id = spec.id().clone();
 
-            let room = Room::new(&spec, self.app.clone())?.start();
+            let room = Room::new(&spec, &self.app)?.start();
             shutdown::subscribe(
                 &self.graceful_shutdown,
                 room.clone().recipient(),
@@ -218,7 +222,7 @@ impl Handler<CreateRoom> for RoomService {
             ));
         }
 
-        let room = Room::new(&room_spec, self.app.clone())?;
+        let room = Room::new(&room_spec, &self.app)?;
         let room_addr = room.start();
 
         shutdown::subscribe(

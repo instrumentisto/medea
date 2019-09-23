@@ -153,7 +153,7 @@ impl Room {
     /// transformation happens.
     pub fn new(
         room_spec: &RoomSpec,
-        context: AppContext,
+        context: &AppContext,
     ) -> Result<Self, RoomError> {
         Ok(Self {
             id: room_spec.id().clone(),
@@ -605,7 +605,8 @@ impl Room {
                 )
                 .collect();
 
-            //TODO: dont remove peers, add some meaningfull close frame: CloseRoom, Evicted
+            // TODO: dont remove peers, add some meaningfull close frame:
+            // CloseRoom, Evicted
             self.remove_peers(&member.id(), peers, ctx);
 
             self.members.delete_member(member_id, ctx);
