@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use derive_more::Display;
+use derive_more::{Constructor, Display};
 use medea_macro::dispatchable;
 use serde::{de::Deserializer, ser::Serializer, Deserialize, Serialize};
 
@@ -128,6 +128,24 @@ pub enum Event {
     /// Media Server notifies Web Client about necessity of RTCPeerConnection
     /// close.
     PeersRemoved { peer_ids: Vec<PeerId> },
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+/// Reason of disconnecting client from the server.
+pub enum RpcConnectionCloseReason {
+    /// `Room` in which client presented was closed.
+    RoomClosed,
+
+    /// Member deleted from `Room`.
+    Evicted,
+
+    /// Member reconnects and old connection was closed.
+    ConnectionSwapped,
+}
+
+#[derive(Constructor, Debug, Deserialize, Serialize)]
+pub struct CloseDescription {
+    pub reason: RpcConnectionCloseReason,
 }
 
 /// Represents [RTCIceCandidateInit][1] object.

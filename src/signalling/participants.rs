@@ -7,7 +7,11 @@
 //! [`RpcConnection`]: crate::api::client::rpc_connection::RpcConnection
 //! [`ParticipantService`]: crate::signalling::participants::ParticipantService
 
-use std::{collections::HashMap, time::Instant};
+use std::{
+    collections::HashMap,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 use actix::{
     fut::wrap_future, ActorFuture, AsyncContext, Context, SpawnHandle,
@@ -19,7 +23,9 @@ use futures::{
     Future,
 };
 
-use medea_client_api_proto::Event;
+use medea_client_api_proto::{
+    CloseDescription, Event, RpcConnectionCloseReason,
+};
 
 use crate::{
     api::{
@@ -51,7 +57,6 @@ use crate::{
     turn::{TurnAuthService, TurnServiceErr, UnreachablePolicy},
     AppContext,
 };
-use std::{sync::Arc, time::Duration};
 
 #[allow(clippy::module_name_repetitions)]
 #[derive(Debug, Display, Fail)]
@@ -255,13 +260,19 @@ impl ParticipantService {
         if let Some(mut connection) = self.connections.remove(&member_id) {
             debug!("Closing old RpcConnection for member [id = {}]", member_id);
 
-            // cancel RpcConnect ion close task, since connection is
+            // cancel RpcConnection close task, since connection is
             // reestablished
             if let Some(handler) = self.drop_connection_tasks.remove(&member_id)
             {
                 ctx.cancel_future(handler);
             }
-            Box::new(wrap_future(connection.close().then(move |_| Ok(member))))
+            Box::new(wrap_future(
+                connection
+                    .close(CloseDescription::new(
+                        RpcConnectionCloseReason::Evicted,
+                    ))
+                    .then(move |_| Ok(member)),
+            ))
         } else {
             Box::new(
                 wrap_future(self.turn_service.create(
@@ -373,7 +384,11 @@ impl ParticipantService {
         let mut close_fut = self.connections.drain().fold(
             vec![],
             |mut futures, (_, mut connection)| {
-                futures.push(connection.close());
+                // TODO: change close reason on 47-rpc-connection-loss branch
+                //       (remove room or resetting room)
+                futures.push(connection.close(CloseDescription::new(
+                    RpcConnectionCloseReason::RoomClosed,
+                )));
                 futures
             },
         );
@@ -411,7 +426,9 @@ impl ParticipantService {
         }
 
         if let Some(mut conn) = self.connections.remove(member_id) {
-            ctx.spawn(wrap_future(conn.close()));
+            ctx.spawn(wrap_future(conn.close(CloseDescription::new(
+                RpcConnectionCloseReason::Evicted,
+            ))));
         }
 
         if let Some(member) = self.members.remove(member_id) {
