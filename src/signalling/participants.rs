@@ -384,8 +384,6 @@ impl ParticipantService {
         let mut close_fut = self.connections.drain().fold(
             vec![],
             |mut futures, (_, mut connection)| {
-                // TODO: change close reason on 47-rpc-connection-loss branch
-                //       (remove room or resetting room)
                 futures.push(connection.close(CloseDescription::new(
                     RpcConnectionCloseReason::RoomClosed,
                 )));

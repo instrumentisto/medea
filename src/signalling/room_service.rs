@@ -92,6 +92,8 @@ pub struct RoomService {
     room_repo: RoomRepository,
 
     /// Global app context.
+    ///
+    /// Used for providing [`AppContext`] to the newly created [`Room`]s.
     app: AppContext,
 
     /// Address to [`GracefulShutdown`].
@@ -338,7 +340,6 @@ impl DeleteElements<Unvalidated> {
         self.uris.push(uri)
     }
 
-    // TODO: tests
     /// Validates request. It must have at least one uri, all uris must share
     /// same [`RoomId`].
     pub fn validate(
@@ -391,7 +392,7 @@ impl Handler<DeleteElements<Validated>> for RoomService {
     type Result = ResponseFuture<(), RoomServiceError>;
 
     // TODO: delete 'clippy::unnecessary_filter_map` when drain_filter TODO will
-    // be resolved.
+    //       be resolved.
     #[allow(clippy::if_not_else, clippy::unnecessary_filter_map)]
     fn handle(
         &mut self,
@@ -572,7 +573,7 @@ mod room_service_specs {
     /// Returns [`RoomSpec`] parsed from
     /// `../../tests/specs/pub-sub-video-call.yml` file.
     ///
-    /// Note that YAML spec is loading on compile time with [`include_str`]
+    /// Note that YAML spec is loads on compile time with [`include_str`]
     /// macro.
     fn room_spec() -> RoomSpec {
         const ROOM_SPEC: &str =
@@ -606,9 +607,13 @@ mod room_service_specs {
     /// This macro automatically stops [`actix::System`] when test completed.
     ///
     /// `$room_service` - [`Addr`] to [`RoomService`],
+    ///
     /// `$create_msg` - [`actix::Message`] which will create `Element`,
+    ///
     /// `$element_uri` - [`StatefulLocalUri`] to `Element` which you try to
-    /// create, `$test` - closure in which will be provided created
+    /// create,
+    ///
+    /// `$test` - closure in which will be provided created
     /// [`Element`].
     macro_rules! test_for_create {
         (

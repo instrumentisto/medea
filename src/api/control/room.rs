@@ -55,10 +55,7 @@ pub struct RoomSpec {
 impl TryFrom<(Id, ElementProto)> for RoomSpec {
     type Error = TryFromProtobufError;
 
-    fn try_from(value: (Id, ElementProto)) -> Result<Self, Self::Error> {
-        let id = value.0;
-        let proto = value.1;
-
+    fn try_from((id, proto): (Id, ElementProto)) -> Result<Self, Self::Error> {
         match proto {
             ElementProto::room(mut room) => {
                 let mut pipeline = HashMap::new();

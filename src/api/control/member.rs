@@ -132,10 +132,9 @@ macro_rules! impl_try_from_proto_for_member {
         impl TryFrom<(Id, $proto)> for MemberSpec {
             type Error = TryFromProtobufError;
 
-            fn try_from(value: (Id, $proto)) -> Result<Self, Self::Error> {
-                let id = value.0;
-                let proto = value.1;
-
+            fn try_from(
+                (id, proto): (Id, $proto),
+            ) -> Result<Self, Self::Error> {
                 match proto {
                     $proto::member(mut member) => {
                         let mut pipeline = HashMap::new();
