@@ -1,6 +1,6 @@
 //! `WebRtcPlayEndpoint` [Control API]'s element implementation.
 //!
-//! [Control API]: http://tiny.cc/380uaz
+//! [Control API]: https://tinyurl.com/yxsqplq7
 
 use std::{convert::TryFrom, fmt};
 
@@ -45,7 +45,7 @@ impl TryFrom<&WebRtcPlayEndpointProto> for WebRtcPlayEndpoint {
 
 /// Errors which can happen while parsing [`SrcUri`] from [Control API] specs.
 ///
-/// [Control API]: http://tiny.cc/380uaz
+/// [Control API]: https://tinyurl.com/yxsqplq7
 #[derive(Debug, Fail, Display)]
 pub enum SrcParseError {
     /// Provided not source URI.
@@ -71,7 +71,7 @@ pub enum SrcParseError {
 ///
 /// [`WebRtcPublishEndpoint`]:
 /// crate::api::control::endpoints::WebRtcPublishEndpoint
-/// [Control API]: http://tiny.cc/380uaz
+/// [Control API]: https://tinyurl.com/yxsqplq7
 #[derive(Clone, Debug)]
 pub struct SrcUri {
     /// ID of [`Room`].

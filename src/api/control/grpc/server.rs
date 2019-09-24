@@ -1,6 +1,6 @@
 //! Implementation of [Control API] gRPC server.
 //!
-//! [Control API]: http://tiny.cc/380uaz
+//! [Control API]: https://tinyurl.com/yxsqplq7
 
 use std::{collections::HashMap, convert::TryFrom, sync::Arc};
 
@@ -45,7 +45,7 @@ use crate::{
 
 /// Errors which can happen while processing requests to gRPC [Control API].
 ///
-/// [Control API]: http://tiny.cc/380uaz
+/// [Control API]: https://tinyurl.com/yxsqplq7
 #[derive(Debug, Display, Fail)]
 pub enum GrpcControlApiError {
     /// Error while parsing [`LocalUri`] of element.
@@ -54,7 +54,7 @@ pub enum GrpcControlApiError {
     /// Error which can happen while converting protobuf objects into interior
     /// [medea] [Control API] objects.
     ///
-    /// [Control API]: http://tiny.cc/380uaz
+    /// [Control API]: https://tinyurl.com/yxsqplq7
     /// [medea]: https://github.com/instrumentisto/medea
     TryFromProtobuf(TryFromProtobufError),
 
@@ -62,7 +62,7 @@ pub enum GrpcControlApiError {
     /// should be catched by `try_from_protobuf` function which returns
     /// [`TryFromProtobufError`].
     ///
-    /// [Control API]: http://tiny.cc/380uaz
+    /// [Control API]: https://tinyurl.com/yxsqplq7
     TryFromElement(TryFromElementError),
 
     /// [`MailboxError`] for [`RoomService`].
@@ -132,7 +132,7 @@ struct ControlApiService {
 
     /// Public URL of server. Address for exposed [Client API].
     ///
-    /// [Client API]: http://tiny.cc/c80uaz
+    /// [Client API]: https://tinyurl.com/yx9thsnr
     public_url: String,
 }
 
@@ -261,6 +261,7 @@ impl ControlApiService {
         }
     }
 
+    /// Deletes element by [`IdRequest`].
     pub fn delete_element(
         &self,
         mut req: IdRequest,
@@ -294,6 +295,7 @@ impl ControlApiService {
         )
     }
 
+    /// Returns requested by [`IdRequest`] [`Element`]s serialized to protobuf.
     pub fn get_element(
         &self,
         mut req: IdRequest,
@@ -330,7 +332,7 @@ impl ControlApiService {
 impl ControlApi for ControlApiService {
     /// Implementation for `Create` method of gRPC [Control API].
     ///
-    /// [Control API]: http://tiny.cc/380uaz
+    /// [Control API]: https://tinyurl.com/yxsqplq7
     fn create(
         &mut self,
         ctx: RpcContext,
@@ -364,7 +366,7 @@ impl ControlApi for ControlApiService {
     /// Currently this is stub which returns fail response with
     /// [`RpcStatusCode::Unimplemented`].
     ///
-    /// [Control API]: http://tiny.cc/380uaz
+    /// [Control API]: https://tinyurl.com/yxsqplq7
     fn apply(
         &mut self,
         ctx: RpcContext,
@@ -390,7 +392,7 @@ impl ControlApi for ControlApiService {
 
     /// Implementation for `Delete` method of gRPC [Control API].
     ///
-    /// [Control API]: http://tiny.cc/380uaz
+    /// [Control API]: https://tinyurl.com/yxsqplq7
     fn delete(
         &mut self,
         ctx: RpcContext,
@@ -418,7 +420,7 @@ impl ControlApi for ControlApiService {
 
     /// Implementation for `Get` method of gRPC [Control API].
     ///
-    /// [Control API]: http://tiny.cc/380uaz
+    /// [Control API]: https://tinyurl.com/yxsqplq7
     fn get(
         &mut self,
         ctx: RpcContext,
@@ -458,7 +460,7 @@ impl ControlApi for ControlApiService {
 /// Actor wrapper for [`grpcio`] gRPC server which provides dynamic [Control
 /// API].
 ///
-/// [Control API]: http://tiny.cc/380uaz
+/// [Control API]: https://tinyurl.com/yxsqplq7
 #[allow(clippy::module_name_repetitions)]
 pub struct GrpcServer(Server);
 
@@ -495,7 +497,7 @@ impl Handler<ShutdownGracefully> for GrpcServer {
 
 /// Run gRPC [Control API] server in actix actor.
 ///
-/// [Control API]: http://tiny.cc/380uaz
+/// [Control API]: https://tinyurl.com/yxsqplq7
 pub fn run(room_repo: Addr<RoomService>, app: &AppContext) -> Addr<GrpcServer> {
     let bind_ip = app.config.server.control.grpc.bind_ip.to_string();
     let bind_port = app.config.server.control.grpc.bind_port;

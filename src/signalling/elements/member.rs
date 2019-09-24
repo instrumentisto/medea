@@ -44,9 +44,9 @@ pub enum MembersLoadError {
     #[display(fmt = "Member [id = {}] not found.", _0)]
     MemberNotFound(LocalUri<ToMember>),
 
-    /// [`Endpoint`] not found.
+    /// [`EndpointSpec`] not found.
     ///
-    /// [`Endpoint`]: crate::api::control::endpoint::Endpoint
+    /// [`EndpointSpec`]: crate::api::control::endpoints::EndpointSpec
     #[display(
         fmt = "Endpoint [id = {}] was referenced but not found in spec",
         _0

@@ -1,6 +1,6 @@
 //! Definitions and implementations of [Control API]'s `Room` element.
 //!
-//! [Control API]: http://tiny.cc/380uaz
+//! [Control API]: https://tinyurl.com/yxsqplq7
 
 use std::{collections::HashMap, convert::TryFrom};
 
@@ -44,7 +44,7 @@ pub enum RoomElement {
 ///
 /// Newtype for [`RootElement::Room`].
 ///
-/// [Control API]: http://tiny.cc/380uaz
+/// [Control API]: https://tinyurl.com/yxsqplq7
 #[allow(clippy::module_name_repetitions)]
 #[derive(Clone, Debug)]
 pub struct RoomSpec {

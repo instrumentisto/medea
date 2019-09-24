@@ -1,6 +1,6 @@
 //! Implementation and definitions of [Control API] specs.
 //!
-//! [Control API]: http://tiny.cc/380uaz
+//! [Control API]: https://tinyurl.com/yxsqplq7
 
 pub mod endpoints;
 pub mod grpc;
@@ -80,7 +80,7 @@ impl From<SrcParseError> for TryFromProtobufError {
 
 /// Root elements of [Control API] spec.
 ///
-/// [Control API]: http://tiny.cc/380uaz
+/// [Control API]: https://tinyurl.com/yxsqplq7
 #[derive(Clone, Deserialize, Debug)]
 #[serde(tag = "kind")]
 pub enum RootElement {
@@ -110,7 +110,7 @@ pub enum TryFromElementError {
 
 /// Errors which can happen while loading static [Control API] specs.
 ///
-/// [Control API]: http://tiny.cc/380uaz
+/// [Control API]: https://tinyurl.com/yxsqplq7
 #[allow(clippy::pub_enum_variant_names)]
 #[derive(Debug, Fail, Display)]
 pub enum LoadStaticControlSpecsError {
@@ -121,19 +121,19 @@ pub enum LoadStaticControlSpecsError {
     /// Atm we only should print `warn!` message to log which prints that
     /// static specs not loaded.
     ///
-    /// [Control API]: http://tiny.cc/380uaz
+    /// [Control API]: https://tinyurl.com/yxsqplq7
     #[display(fmt = "Error while reading static control API specs dir.")]
     SpecDirReadError(std::io::Error),
 
     /// I/O error while reading static [Control API] specs.
     ///
-    /// [Control API]: http://tiny.cc/380uaz
+    /// [Control API]: https://tinyurl.com/yxsqplq7
     #[display(fmt = "I/O error while reading specs. {:?}", _0)]
     IoError(std::io::Error),
 
     /// Conflict in static [Control API] specs.
     ///
-    /// [Control API]: http://tiny.cc/380uaz
+    /// [Control API]: https://tinyurl.com/yxsqplq7
     #[display(
         fmt = "Try from element error while loading static specs. {:?}",
         _0
@@ -142,7 +142,7 @@ pub enum LoadStaticControlSpecsError {
 
     /// Error while deserialization static [Control API] specs from YAML file.
     ///
-    /// [Control API]: http://tiny.cc/380uaz
+    /// [Control API]: https://tinyurl.com/yxsqplq7
     #[display(fmt = "Error while deserialization static spec. {:?}", _0)]
     YamlDeserializationError(serde_yaml::Error),
 }
@@ -194,7 +194,7 @@ pub fn load_static_specs_from_dir<P: AsRef<Path>>(
 
 /// Starts all [`Room`]s from static [Control API] specs.
 ///
-/// [Control API]: http://tiny.cc/380uaz
+/// [Control API]: https://tinyurl.com/yxsqplq7
 /// [`Room`]: crate::signalling::room::Room
 pub fn start_static_rooms(
     room_service: &Addr<RoomService>,

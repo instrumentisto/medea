@@ -1,20 +1,20 @@
 //! [Control API] settings.
 //!
-//! [Control API]: http://tiny.cc/380uaz
+//! [Control API]: https://tinyurl.com/yxsqplq7
 
 use serde::{Deserialize, Serialize};
 use smart_default::SmartDefault;
 
 /// [Control API] settings.
 ///
-/// [Control API]: http://tiny.cc/380uaz
+/// [Control API]: https://tinyurl.com/yxsqplq7
 #[allow(clippy::module_name_repetitions)]
 #[derive(Clone, Debug, Deserialize, Serialize, SmartDefault)]
 #[serde(default)]
 pub struct ControlApi {
     /// Path to directory with static [Сontrol API] specs.
     ///
-    /// [Control API]: http://tiny.cc/380uaz
+    /// [Control API]: https://tinyurl.com/yxsqplq7
     #[default(String::from("specs/"))]
     pub static_specs_dir: String,
 }

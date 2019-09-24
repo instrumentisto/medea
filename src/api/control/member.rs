@@ -1,6 +1,6 @@
 //! Definitions and implementations of [Control API]'s `Member` element.
 //!
-//! [Control API]: http://tiny.cc/380uaz
+//! [Control API]: https://tinyurl.com/yxsqplq7
 
 use std::{collections::HashMap, convert::TryFrom};
 
@@ -37,15 +37,15 @@ pub struct Id(pub String);
 #[serde(tag = "kind")]
 pub enum MemberElement {
     /// Represent [`WebRtcPublishEndpoint`].
-    /// Can transform into [`Endpoint`] enum by `Endpoint::try_from`.
+    /// Can transform into [`EndpointSpec`] enum by `EndpointSpec::try_from`.
     ///
-    /// [`Endpoint`]: crate::api::control::endpoints::Endpoint
+    /// [`EndpointSpec`]: crate::api::control::endpoints::EndpointSpec
     WebRtcPublishEndpoint { spec: WebRtcPublishEndpoint },
 
     /// Represent [`WebRtcPlayEndpoint`].
-    /// Can transform into [`Endpoint`] enum by `Endpoint::try_from`.
+    /// Can transform into [`EndpointSpec`] enum by `EndpointSpec::try_from`.
     ///
-    /// [`Endpoint`]: crate::api::control::endpoints::Endpoint
+    /// [`EndpointSpec`]: crate::api::control::endpoints::EndpointSpec
     WebRtcPlayEndpoint { spec: WebRtcPlayEndpoint },
 }
 

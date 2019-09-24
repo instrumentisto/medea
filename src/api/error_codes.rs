@@ -123,7 +123,7 @@ impl Into<ErrorProto> for ErrorResponse {
 /// [Medea]'s [Control API] errors.
 ///
 /// [Medea]: https://github.com/instrumentisto/medea
-/// [Control API]: http://tiny.cc/380uaz
+/// [Control API]: https://tinyurl.com/yxsqplq7
 #[derive(Debug, Display)]
 pub enum ErrorCode {
     /// Unimplemented API call.

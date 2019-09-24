@@ -55,7 +55,7 @@ pub enum RoomServiceError {
 
     /// Error which can happen while loading static [Control API] specs.
     ///
-    /// [Control API]: http://tiny.cc/380uaz
+    /// [Control API]: https://tinyurl.com/yxsqplq7
     #[display(fmt = "Failed to load static specs. {:?}", _0)]
     FailedToLoadStaticSpecs(LoadStaticControlSpecsError),
 
@@ -102,7 +102,7 @@ pub struct RoomService {
 
     /// Path to directory with static [Сontrol API] specs.
     ///
-    /// [Control API]: http://tiny.cc/380uaz
+    /// [Control API]: https://tinyurl.com/yxsqplq7
     static_specs_dir: String,
 }
 
@@ -202,7 +202,7 @@ impl Handler<StartStaticRooms> for RoomService {
 pub struct CreateRoom {
     /// [Control API] spec for [`Room`].
     ///
-    /// [Control API]: http://tiny.cc/380uaz
+    /// [Control API]: https://tinyurl.com/yxsqplq7
     pub spec: RoomSpec,
 }
 
@@ -379,7 +379,7 @@ impl DeleteElements<Unvalidated> {
 /// This is just validation for errors which we can catch before sending
 /// message.
 ///
-/// [Control API]: http://tiny.cc/380uaz
+/// [Control API]: https://tinyurl.com/yxsqplq7
 #[derive(Message, Default)]
 #[rtype(result = "Result<(), RoomServiceError>")]
 pub struct DeleteElements<T> {
@@ -569,6 +569,11 @@ mod room_service_specs {
 
     use super::*;
 
+    /// Returns [`RoomSpec`] parsed from
+    /// `../../tests/specs/pub-sub-video-call.yml` file.
+    ///
+    /// Note that YAML spec is loading on compile time with [`include_str`]
+    /// macro.
     fn room_spec() -> RoomSpec {
         const ROOM_SPEC: &str =
             include_str!("../../tests/specs/pub-sub-video-call.yml");
@@ -577,11 +582,14 @@ mod room_service_specs {
         RoomSpec::try_from(&parsed).unwrap()
     }
 
+    /// Returns [`AppContext`] with default [`Conf`] and mocked
+    /// [`TurnAuthService`].
     fn app_ctx() -> AppContext {
         let turn_service = crate::turn::new_turn_auth_service_mock();
         AppContext::new(Conf::default(), turn_service)
     }
 
+    /// Returns [`Addr`] to [`RoomService`].
     fn room_service(room_repo: RoomRepository) -> Addr<RoomService> {
         let conf = Conf::default();
         let shutdown_timeout = conf.shutdown.timeout.clone();
@@ -592,14 +600,24 @@ mod room_service_specs {
         RoomService::new(room_repo, app, graceful_shutdown).start()
     }
 
+    /// Returns [`Future`] used for testing of all create methods of
+    /// [`RoomService`].
+    ///
+    /// This macro automatically stops [`actix::System`] when test completed.
+    ///
+    /// `$room_service` - [`Addr`] to [`RoomService`],
+    /// `$create_msg` - [`actix::Message`] which will create `Element`,
+    /// `$element_uri` - [`StatefulLocalUri`] to `Element` which you try to
+    /// create, `$test` - closure in which will be provided created
+    /// [`Element`].
     macro_rules! test_for_create {
         (
             $room_service:expr,
             $create_msg:expr,
-            $caller_uri:expr,
+            $element_uri:expr,
             $test:expr
         ) => {{
-            let get_msg = Get(vec![$caller_uri.clone()]);
+            let get_msg = Get(vec![$element_uri.clone()]);
             $room_service
                 .send($create_msg)
                 .and_then(move |res| {
@@ -608,7 +626,7 @@ mod room_service_specs {
                 })
                 .map(move |r| {
                     let mut resp = r.unwrap();
-                    resp.remove(&$caller_uri).unwrap()
+                    resp.remove(&$element_uri).unwrap()
                 })
                 .map($test)
                 .map(|_| actix::System::current().stop())
@@ -725,6 +743,14 @@ mod room_service_specs {
         sys.run().unwrap();
     }
 
+    /// Returns [`Future`] used for testing of all delete/get methods of
+    /// [`RoomService`].
+    ///
+    /// This test is simply try to delete element with provided
+    /// [`StatefulLocalUri`] and the try to get it. If result of getting
+    /// deleted element is error then test considers successful.
+    ///
+    /// This function automatically stops [`actix::System`] when test completed.
     fn test_for_delete_and_get(
         room_service: Addr<RoomService>,
         element_stateful_uri: StatefulLocalUri,

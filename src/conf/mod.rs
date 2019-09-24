@@ -53,7 +53,7 @@ pub struct Conf {
 
     /// [Control API] settings.
     ///
-    /// [Control API]: http://tiny.cc/380uaz
+    /// [Control API]: https://tinyurl.com/yxsqplq7
     pub control_api: ControlApi,
 }
 

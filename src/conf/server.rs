@@ -7,14 +7,14 @@ use super::{grpc_listener::GrpcListener, http_listener::HttpListener};
 
 /// [Client API] servers settings.
 ///
-/// [Client API]: http://tiny.cc/c80uaz
+/// [Client API]: https://tinyurl.com/yx9thsnr
 #[allow(clippy::module_name_repetitions)]
 #[derive(Clone, Debug, Deserialize, Serialize, SmartDefault)]
 #[serde(default)]
 pub struct ClientApiServer {
     /// [Client API] server settings.
     ///
-    /// [Client API]: http://tiny.cc/c80uaz
+    /// [Client API]: https://tinyurl.com/yx9thsnr
     pub http: HttpListener,
 
     /// Public URL of server. Address for exposed [Client API].
@@ -24,7 +24,7 @@ pub struct ClientApiServer {
     ///
     /// Defaults to `ws://0.0.0.0:8080`.
     ///
-    /// [Client API]: http://tiny.cc/c80uaz
+    /// [Client API]: https://tinyurl.com/yx9thsnr
     /// [Jason]: https://github.com/instrumentisto/medea/tree/master/jason
     #[default("ws://0.0.0.0:8080".to_string())]
     pub public_url: String,
@@ -32,14 +32,14 @@ pub struct ClientApiServer {
 
 /// [Control API] servers settings.
 ///
-/// [Control API]: http://tiny.cc/380uaz
+/// [Control API]: https://tinyurl.com/yxsqplq7
 #[allow(clippy::module_name_repetitions)]
 #[derive(Clone, Debug, Deserialize, Serialize, SmartDefault)]
 #[serde(default)]
 pub struct ControlApiServer {
     /// gRPC [Control API] server settings.
     ///
-    /// [Control API]: http://tiny.cc/380uaz
+    /// [Control API]: https://tinyurl.com/yxsqplq7
     pub grpc: GrpcListener,
 }
 
@@ -49,12 +49,12 @@ pub struct ControlApiServer {
 pub struct Server {
     /// [Client API] servers settings.
     ///
-    /// [Client API]: http://tiny.cc/c80uaz
+    /// [Client API]: https://tinyurl.com/yx9thsnr
     pub client: ClientApiServer,
 
     /// [Control API] servers settings.
     ///
-    /// [Control API]: http://tiny.cc/380uaz
+    /// [Control API]: https://tinyurl.com/yxsqplq7
     pub control: ControlApiServer,
 }
 
