@@ -560,100 +560,81 @@ mod delete_elements_validation_specs {
 mod room_service_specs {
     use std::convert::TryFrom as _;
 
-    use crate::{api::control::RootElement, conf::Conf};
+    use crate::{
+        api::control::{
+            endpoints::webrtc_publish_endpoint::P2pMode, RootElement,
+        },
+        conf::Conf,
+    };
 
     use super::*;
-    use crate::api::control::endpoints::webrtc_publish_endpoint::P2pMode;
 
-    const ROOM_SPEC: &str =
-        include_str!("../../tests/specs/pub-sub-video-call.yml");
+    fn room_spec() -> RoomSpec {
+        const ROOM_SPEC: &str =
+            include_str!("../../tests/specs/pub-sub-video-call.yml");
 
-    fn get_room_spec() -> RoomSpec {
         let parsed: RootElement = serde_yaml::from_str(ROOM_SPEC).unwrap();
         RoomSpec::try_from(&parsed).unwrap()
     }
 
-    fn get_context(conf: Conf) -> AppContext {
+    fn app_ctx() -> AppContext {
         let turn_service = crate::turn::new_turn_auth_service_mock();
-        AppContext::new(conf, turn_service)
+        AppContext::new(Conf::default(), turn_service)
     }
 
-    fn get_room_service(room_repo: RoomRepository) -> Addr<RoomService> {
+    fn room_service(room_repo: RoomRepository) -> Addr<RoomService> {
         let conf = Conf::default();
         let shutdown_timeout = conf.shutdown.timeout.clone();
 
-        let app = get_context(conf);
+        let app = app_ctx();
         let graceful_shutdown = GracefulShutdown::new(shutdown_timeout).start();
 
         RoomService::new(room_repo, app, graceful_shutdown).start()
+    }
+
+    macro_rules! test_for_create {
+        (
+            $room_service:expr,
+            $create_msg:expr,
+            $caller_uri:expr,
+            $test:expr
+        ) => {{
+            let get_msg = Get(vec![$caller_uri.clone()]);
+            $room_service
+                .send($create_msg)
+                .and_then(move |res| {
+                    res.unwrap();
+                    $room_service.send(get_msg)
+                })
+                .map(move |r| {
+                    let mut resp = r.unwrap();
+                    resp.remove(&$caller_uri).unwrap()
+                })
+                .map($test)
+                .map(|_| actix::System::current().stop())
+                .map_err(|e| panic!("{:?}", e))
+        }};
     }
 
     #[test]
     fn create_room() {
         let sys = actix::System::new("room-service-tests");
 
-        let room_repo = RoomRepository::new(HashMap::new());
-        let room_service = get_room_service(room_repo.clone());
-
-        let spec = get_room_spec();
+        let room_service = room_service(RoomRepository::new(HashMap::new()));
+        let spec = room_spec();
         let caller_uri = StatefulLocalUri::try_from(
             "local://pub-sub-video-call/caller".to_string(),
         )
         .unwrap();
-        let caller_uri_clone = caller_uri.clone();
 
-        let test = room_service
-            .send(CreateRoom { spec })
-            .and_then(move |_| {
-                let e = room_repo
-                    .get(&"pub-sub-video-call".to_string().into())
-                    .unwrap();
-                e.send(SerializeProto(vec![caller_uri]))
-            })
-            .map(move |r| {
-                let r = r.unwrap();
-                let member = r.get(&caller_uri_clone).unwrap();
-                assert_eq!(member.get_member().get_pipeline().len(), 1);
-            })
-            .map(|_| actix::System::current().stop())
-            .map_err(|e| panic!("{:?}", e));
-
-        actix::spawn(test);
-
-        let _ = sys.run().unwrap();
-    }
-
-    #[test]
-    fn delete_and_get_room() {
-        let sys = actix::System::new("room-service-tests");
-
-        let spec = get_room_spec();
-        let ctx = get_context(Conf::default());
-        let room = Room::new(&spec, &ctx).unwrap().start();
-        let room_repo = RoomRepository::new(
-            hashmap!("pub-sub-video-call".to_string().into() => room),
-        );
-        let room_service = get_room_service(room_repo.clone());
-
-        let mut delete_elements = DeleteElements::new();
-        let room_uri = StatefulLocalUri::try_from(
-            "local://pub-sub-video-call".to_string(),
-        )
-        .unwrap();
-
-        delete_elements.add_uri(room_uri.clone());
-        let delete_elements = delete_elements.validate().unwrap();
-        let test = room_service
-            .send(delete_elements)
-            .map(|_| ())
-            .and_then(move |_| room_service.send(Get(vec![room_uri])))
-            .map(move |res| {
-                assert!(res.is_err());
-                actix::System::current().stop();
-            })
-            .map_err(|e| panic!("{:?}", e));
-
-        actix::spawn(test);
+        actix::spawn(test_for_create!(
+            room_service,
+            CreateRoom { spec },
+            caller_uri,
+            |member_el| {
+                assert_eq!(member_el.get_member().get_pipeline().len(), 1);
+            }
+        ));
 
         sys.run().unwrap();
     }
@@ -662,122 +643,36 @@ mod room_service_specs {
     fn create_member() {
         let sys = actix::System::new("room-service-tests");
 
-        let spec = get_room_spec();
+        let spec = room_spec();
         let member_spec = spec
             .members()
             .unwrap()
             .get(&"caller".to_string().into())
             .unwrap()
             .clone();
-        let ctx = get_context(Conf::default());
-        let room = Room::new(&spec, &ctx).unwrap().start();
-        let room_repo = RoomRepository::new(
-            hashmap!("pub-sub-video-call".to_string().into() => room),
-        );
-        let room_service = get_room_service(room_repo.clone());
+
+        let room_id: RoomId = "pub-sub-video-call".to_string().into();
+        let room_service = room_service(RoomRepository::new(hashmap!(
+            room_id.clone() => Room::new(&spec, &app_ctx()).unwrap().start(),
+        )));
+
         let member_uri = LocalUri::<ToMember>::new(
-            "pub-sub-video-call".to_string().into(),
+            room_id,
             "test-member".to_string().into(),
         );
         let stateful_member_uri: StatefulLocalUri = member_uri.clone().into();
-        let stateful_member_uri_clone = stateful_member_uri.clone();
-        let msg = CreateMemberInRoom {
-            spec: member_spec,
-            uri: member_uri,
-        };
 
-        let test = room_service
-            .send(msg)
-            .and_then(move |_| {
-                room_service.send(Get(vec![stateful_member_uri_clone]))
-            })
-            .map(move |res| {
-                let elements = res.unwrap();
-                let member_el = elements.get(&stateful_member_uri).unwrap();
+        actix::spawn(test_for_create!(
+            room_service,
+            CreateMemberInRoom {
+                spec: member_spec,
+                uri: member_uri,
+            },
+            stateful_member_uri,
+            |member_el| {
                 assert_eq!(member_el.get_member().get_pipeline().len(), 1);
-                actix::System::current().stop();
-            })
-            .map_err(|e| panic!("{:?}", e));
-
-        actix::spawn(test);
-
-        sys.run().unwrap();
-    }
-
-    #[test]
-    fn delete_and_get_member() {
-        let sys = actix::System::new("room-service-tests");
-
-        let spec = get_room_spec();
-        let ctx = get_context(Conf::default());
-        let room = Room::new(&spec, &ctx).unwrap().start();
-        let room_repo = RoomRepository::new(
-            hashmap!("pub-sub-video-call".to_string().into() => room),
-        );
-        let room_service = get_room_service(room_repo.clone());
-        let member_uri = LocalUri::<ToMember>::new(
-            "pub-sub-video-call".to_string().into(),
-            "caller".to_string().into(),
-        );
-        let stateful_member_uri = StatefulLocalUri::from(member_uri.clone());
-
-        let mut delete_elements = DeleteElements::new();
-        delete_elements.add_uri(stateful_member_uri.clone());
-        let delete_elements = delete_elements.validate().unwrap();
-
-        let test = room_service
-            .send(delete_elements)
-            .and_then(move |res| {
-                res.unwrap();
-                room_service.send(Get(vec![stateful_member_uri]))
-            })
-            .map(move |res| {
-                assert!(res.is_err());
-                actix::System::current().stop();
-            })
-            .map_err(|e| panic!("{:?}", e));
-
-        actix::spawn(test);
-
-        sys.run().unwrap();
-    }
-
-    #[test]
-    fn delete_and_get_endpoint() {
-        let sys = actix::System::new("room-service-tests");
-
-        let spec = get_room_spec();
-        let ctx = get_context(Conf::default());
-        let room = Room::new(&spec, &ctx).unwrap().start();
-        let room_repo = RoomRepository::new(
-            hashmap!("pub-sub-video-call".to_string().into() => room),
-        );
-        let room_service = get_room_service(room_repo.clone());
-        let endpoint_uri = LocalUri::<ToEndpoint>::new(
-            "pub-sub-video-call".to_string().into(),
-            "caller".to_string().into(),
-            "publish".to_string().into(),
-        );
-        let stateful_endpoint_uri =
-            StatefulLocalUri::from(endpoint_uri.clone());
-
-        let mut delete_elements = DeleteElements::new();
-        delete_elements.add_uri(stateful_endpoint_uri.clone());
-        let delete_elements = delete_elements.validate().unwrap();
-
-        let test = room_service
-            .send(delete_elements)
-            .and_then(move |res| {
-                res.unwrap();
-                room_service.send(Get(vec![stateful_endpoint_uri]))
-            })
-            .map(move |res| {
-                assert!(res.is_err());
-                actix::System::current().stop();
-            })
-            .map_err(|e| panic!("{:?}", e));
-
-        actix::spawn(test);
+            }
+        ));
 
         sys.run().unwrap();
     }
@@ -786,8 +681,9 @@ mod room_service_specs {
     fn create_endpoint() {
         let sys = actix::System::new("room-service-tests");
 
-        let spec = get_room_spec();
-        let mut member_spec = spec
+        let spec = room_spec();
+
+        let mut endpoint_spec = spec
             .members()
             .unwrap()
             .get(&"caller".to_string().into())
@@ -795,43 +691,121 @@ mod room_service_specs {
             .get_publish_endpoint_by_id("publish".to_string().into())
             .unwrap()
             .clone();
-        member_spec.p2p = P2pMode::Never;
-        let member_spec = member_spec.into();
-        let ctx = get_context(Conf::default());
-        let room = Room::new(&spec, &ctx).unwrap().start();
-        let room_repo = RoomRepository::new(
-            hashmap!("pub-sub-video-call".to_string().into() => room),
-        );
-        let room_service = get_room_service(room_repo.clone());
-        let member_uri = LocalUri::<ToEndpoint>::new(
-            "pub-sub-video-call".to_string().into(),
+        endpoint_spec.p2p = P2pMode::Never;
+        let endpoint_spec = endpoint_spec.into();
+
+        let room_id: RoomId = "pub-sub-video-call".to_string().into();
+        let room_service = room_service(RoomRepository::new(hashmap!(
+            room_id.clone() => Room::new(&spec, &app_ctx()).unwrap().start(),
+        )));
+
+        let endpoint_uri = LocalUri::<ToEndpoint>::new(
+            room_id,
             "caller".to_string().into(),
             "test-publish".to_string().into(),
         );
-        let stateful_member_uri: StatefulLocalUri = member_uri.clone().into();
-        let stateful_member_uri_clone = stateful_member_uri.clone();
-        let msg = CreateEndpointInRoom {
-            spec: member_spec,
-            uri: member_uri,
-        };
+        let stateful_endpoint_uri: StatefulLocalUri =
+            endpoint_uri.clone().into();
 
-        let test = room_service
-            .send(msg)
-            .and_then(move |_| {
-                room_service.send(Get(vec![stateful_member_uri_clone]))
-            })
-            .map(move |res| {
-                let elements = res.unwrap();
-                let member_el = elements.get(&stateful_member_uri).unwrap();
+        actix::spawn(test_for_create!(
+            room_service,
+            CreateEndpointInRoom {
+                spec: endpoint_spec,
+                uri: endpoint_uri,
+            },
+            stateful_endpoint_uri,
+            |endpoint_el| {
                 assert_eq!(
-                    member_el.get_webrtc_pub().get_p2p(),
+                    endpoint_el.get_webrtc_pub().get_p2p(),
                     P2pMode::Never.into()
                 );
+            }
+        ));
+
+        sys.run().unwrap();
+    }
+
+    fn test_for_delete_and_get(
+        room_service: Addr<RoomService>,
+        element_stateful_uri: StatefulLocalUri,
+    ) -> impl Future<Item = (), Error = ()> {
+        let mut delete_msg = DeleteElements::new();
+        delete_msg.add_uri(element_stateful_uri.clone());
+        let delete_msg = delete_msg.validate().unwrap();
+
+        room_service
+            .send(delete_msg)
+            .and_then(move |res| {
+                res.unwrap();
+                room_service.send(Get(vec![element_stateful_uri]))
+            })
+            .map(move |res| {
+                assert!(res.is_err());
                 actix::System::current().stop();
             })
-            .map_err(|e| panic!("{:?}", e));
+            .map_err(|e| panic!("{:?}", e))
+    }
 
-        actix::spawn(test);
+    #[test]
+    fn delete_and_get_room() {
+        let sys = actix::System::new("room-service-tests");
+
+        let room_id: RoomId = "pub-sub-video-call".to_string().into();
+        let stateful_room_uri =
+            StatefulLocalUri::from(LocalUri::<ToRoom>::new(room_id.clone()));
+
+        let room_service = room_service(RoomRepository::new(hashmap!(
+            room_id => Room::new(&room_spec(), &app_ctx()).unwrap().start(),
+        )));
+
+        actix::spawn(test_for_delete_and_get(room_service, stateful_room_uri));
+
+        sys.run().unwrap();
+    }
+
+    #[test]
+    fn delete_and_get_member() {
+        let sys = actix::System::new("room-service-tests");
+
+        let room_id: RoomId = "pub-sub-video-call".to_string().into();
+        let stateful_member_uri =
+            StatefulLocalUri::from(LocalUri::<ToMember>::new(
+                room_id.clone(),
+                "caller".to_string().into(),
+            ));
+
+        let room_service = room_service(RoomRepository::new(hashmap!(
+            room_id => Room::new(&room_spec(), &app_ctx()).unwrap().start(),
+        )));
+
+        actix::spawn(test_for_delete_and_get(
+            room_service,
+            stateful_member_uri,
+        ));
+
+        sys.run().unwrap();
+    }
+
+    #[test]
+    fn delete_and_get_endpoint() {
+        let sys = actix::System::new("room-service-tests");
+
+        let room_id: RoomId = "pub-sub-video-call".to_string().into();
+        let stateful_endpoint_uri =
+            StatefulLocalUri::from(LocalUri::<ToEndpoint>::new(
+                room_id.clone(),
+                "caller".to_string().into(),
+                "publish".to_string().into(),
+            ));
+
+        let room_service = room_service(RoomRepository::new(hashmap!(
+            room_id => Room::new(&room_spec(), &app_ctx()).unwrap().start(),
+        )));
+
+        actix::spawn(test_for_delete_and_get(
+            room_service,
+            stateful_endpoint_uri,
+        ));
 
         sys.run().unwrap();
     }
