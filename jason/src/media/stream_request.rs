@@ -4,10 +4,17 @@
 
 use std::{collections::HashMap, convert::TryFrom};
 
+use js_sys::Reflect;
 use medea_client_api_proto::{
     AudioSettings, MediaType, TrackId, VideoSettings,
 };
-use wasm_bindgen::JsValue;
+use wasm_bindgen::{prelude::*, JsValue};
+use web_sys::{
+    ConstrainDomStringParameters, MediaStream as SysMediaStream,
+    MediaStreamConstraints as SysMediaStreamConstraints,
+    MediaStreamTrack as SysMediaStreamTrack,
+    MediaTrackConstraints as SysMediaTrackConstraints,
+};
 
 use crate::utils::WasmErr;
 
@@ -52,10 +59,10 @@ pub struct SimpleStreamRequest {
 }
 
 impl SimpleStreamRequest {
-    /// Parses raw [`web_sys::MediaStream`] and returns [`MediaStream`].
+    /// Parses raw [`SysMediaStream`] and returns [`MediaStream`].
     pub fn parse_stream(
         &self,
-        stream: &web_sys::MediaStream,
+        stream: &SysMediaStream,
     ) -> Result<MediaStream, WasmErr> {
         let mut tracks = Vec::new();
 
@@ -64,7 +71,7 @@ impl SimpleStreamRequest {
                 js_sys::try_iter(&stream.get_audio_tracks())
                     .unwrap()
                     .unwrap()
-                    .map(|tr| web_sys::MediaStreamTrack::from(tr.unwrap()))
+                    .map(|tr| SysMediaStreamTrack::from(tr.unwrap()))
                     .collect();
 
             if audio_tracks.len() == 1 {
@@ -87,7 +94,7 @@ impl SimpleStreamRequest {
                 js_sys::try_iter(&stream.get_video_tracks())
                     .unwrap()
                     .unwrap()
-                    .map(|tr| web_sys::MediaStreamTrack::from(tr.unwrap()))
+                    .map(|tr| SysMediaStreamTrack::from(tr.unwrap()))
                     .collect();
 
             if video_tracks.len() == 1 {
@@ -144,17 +151,188 @@ impl TryFrom<StreamRequest> for SimpleStreamRequest {
 
 // TODO: it will be required to map settings to MediaStreamConstraints
 //       when settings will be extended
-impl From<&SimpleStreamRequest> for web_sys::MediaStreamConstraints {
+impl From<&SimpleStreamRequest> for MediaStreamConstraints {
     fn from(request: &SimpleStreamRequest) -> Self {
-        let mut constraints = Self::new();
+        let mut constraints = Self {
+            audio: None,
+            video: None,
+        };
 
         if let Some((_, _)) = request.video {
-            constraints.video(&JsValue::TRUE);
+            constraints.video = Some(VideoTrackConstraints { device_id: None });
         }
         if let Some((_, _)) = request.audio {
-            constraints.audio(&JsValue::TRUE);
+            constraints.audio = Some(AudioTrackConstraints { device_id: None });
         }
 
         constraints
+    }
+}
+
+// TODO: its gonna be a nightmare if we will add all possible constraints,
+//       especially if we will support all that `exact`/`min`/`max`/`ideal`
+//       stuff, will need major refactoring then
+// TODO: using reflection to get fields values is pure evil, but there are no
+//       getters, should be wrapped or improved in wasm-bindgen
+#[derive(Clone, Default)]
+pub struct AudioTrackConstraints {
+    device_id: Option<String>,
+}
+
+#[derive(Clone, Default)]
+pub struct VideoTrackConstraints {
+    device_id: Option<String>,
+}
+
+impl AudioTrackConstraints {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn satisfies(&self, track: &SysMediaStreamTrack) -> bool {
+        if track.kind() != "audio" {
+            return false;
+        }
+
+        if let Some(device_id) = &self.device_id {
+            let track_device_id = if let Ok(val) = Reflect::get(
+                track.get_settings().as_ref(),
+                &JsValue::from_str("deviceId"),
+            ) {
+                if let Some(val) = val.as_string() {
+                    val
+                } else {
+                    return false;
+                }
+            } else {
+                return false;
+            };
+
+            if track_device_id.as_str() != device_id {
+                return false;
+            }
+        }
+
+        true
+    }
+
+    pub fn device_id(&mut self, device_id: String) -> &mut Self {
+        self.device_id = Some(device_id);
+        self
+    }
+}
+
+impl VideoTrackConstraints {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn satisfies(&self, track: &SysMediaStreamTrack) -> bool {
+        if track.kind() != "video" {
+            return false;
+        }
+
+        if let Some(device_id) = &self.device_id {
+            let track_device_id = if let Ok(val) = Reflect::get(
+                track.get_settings().as_ref(),
+                &JsValue::from_str("deviceId"),
+            ) {
+                if let Some(val) = val.as_string() {
+                    val
+                } else {
+                    return false;
+                }
+            } else {
+                return false;
+            };
+
+            if track_device_id.as_str() != device_id {
+                return false;
+            }
+        }
+
+        true
+    }
+
+    pub fn device_id(&mut self, device_id: String) -> &mut Self {
+        self.device_id = Some(device_id);
+        self
+    }
+}
+
+impl Into<SysMediaTrackConstraints> for VideoTrackConstraints {
+    fn into(self) -> SysMediaTrackConstraints {
+        let mut constraints = SysMediaTrackConstraints::new();
+
+        if let Some(device_id) = self.device_id {
+            let mut val = ConstrainDomStringParameters::new();
+            val.exact(&(device_id.into()));
+            constraints.device_id(&(val.into()));
+        }
+
+        constraints
+    }
+}
+
+impl Into<SysMediaTrackConstraints> for AudioTrackConstraints {
+    fn into(self) -> SysMediaTrackConstraints {
+        let mut constraints = SysMediaTrackConstraints::new();
+
+        if let Some(device_id) = self.device_id {
+            let mut val = ConstrainDomStringParameters::new();
+            val.exact(&(device_id.into()));
+            constraints.device_id(&(val.into()));
+        }
+
+        constraints
+    }
+}
+
+/// [MediaStreamConstraints][1] wrapper.
+///
+/// [1]: https://www.w3.org/TR/mediacapture-streams/#dom-mediastreamconstraints
+#[wasm_bindgen]
+#[derive(Clone, Default)]
+pub struct MediaStreamConstraints {
+    audio: Option<AudioTrackConstraints>,
+    video: Option<VideoTrackConstraints>,
+}
+impl MediaStreamConstraints {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn audio(&self) -> &Option<AudioTrackConstraints> {
+        &self.audio
+    }
+
+    pub fn video(&self) -> &Option<VideoTrackConstraints> {
+        &self.video
+    }
+
+    pub fn audio_mut(&mut self) -> &mut Option<AudioTrackConstraints> {
+        &mut self.audio
+    }
+
+    pub fn video_mut(&mut self) -> &mut Option<VideoTrackConstraints> {
+        &mut self.video
+    }
+}
+
+impl From<MediaStreamConstraints> for SysMediaStreamConstraints {
+    fn from(constraints: MediaStreamConstraints) -> Self {
+        let mut sys_constraints = Self::new();
+
+        if let Some(video) = constraints.video {
+            let video: SysMediaTrackConstraints = video.into();
+            sys_constraints.video(&video.into());
+        }
+
+        if let Some(audio) = constraints.audio {
+            let audio: SysMediaTrackConstraints = audio.into();
+            sys_constraints.audio(&audio.into());
+        }
+
+        sys_constraints
     }
 }

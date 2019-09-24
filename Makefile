@@ -271,7 +271,7 @@ endif
 # Generate project documentation of Rust sources.
 #
 # Usage:
-#	make docs.rust [crate=(@all|medea|jason|<crate-name>)]
+#	make docs.rust [crate=(@all|medea|medea-jason|<crate-name>)]
 #	               [open=(yes|no)] [clean=(no|yes)]
 
 docs-rust-crate = $(if $(call eq,$(crate),),@all,$(crate))
@@ -295,7 +295,7 @@ endif
 # Run Rust unit tests of project.
 #
 # Usage:
-#	make test.unit [crate=(@all|medea|jason|<crate-name>)]
+#	make test.unit [crate=(@all|medea|medea-jason|<crate-name>)]
 
 CHROMEDRIVER_CLIENT_ARGS := $(strip \
 	$(shell grep 'CHROMEDRIVER_CLIENT_ARGS=' .env | cut -d '=' -f2))

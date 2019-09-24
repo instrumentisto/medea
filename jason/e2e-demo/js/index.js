@@ -15,8 +15,9 @@ async function getDevices(participant, audio_select, video_select) {
 }
 
 async function getStream(participant, local_video, audio_select, video_select) {
-    const audio_source = audio_select.value ? {deviceId: {exact: audio_select.value}} : true;
-    const video_source = video_select.value ? {deviceId: {exact: video_select.value}} : true;
+
+    const audio_source = audio_select.val() ? {deviceId: {exact: audio_select.val()}} : true;
+    const video_source = video_select.val() ? {deviceId: {exact: video_select.val()}} : true;
     const constraints = {
         audio: audio_source,
         video: video_source

@@ -13,6 +13,9 @@ pub use self::{
     device_info::InputDeviceInfo,
     manager::{MediaManager, MediaManagerHandle},
     stream::{MediaStream, MediaStreamHandle},
-    stream_request::{SimpleStreamRequest, StreamRequest},
+    stream_request::{
+        AudioTrackConstraints, MediaStreamConstraints, SimpleStreamRequest,
+        StreamRequest, VideoTrackConstraints,
+    },
     track::MediaTrack,
 };
