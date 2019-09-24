@@ -48,7 +48,7 @@ impl_from_into!(WebRtcPublishId);
 impl_from_into!(WebRtcPlayId);
 
 /// Media element that one or more media data streams flow through.
-#[derive(Debug)]
+#[derive(Debug, From)]
 pub enum EndpointSpec {
     // TODO: add id in endpoints
     /// [`WebRtcPublishEndpoint`] element.

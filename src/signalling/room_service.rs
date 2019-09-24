@@ -563,6 +563,7 @@ mod room_service_specs {
     use crate::{api::control::RootElement, conf::Conf};
 
     use super::*;
+    use crate::api::control::endpoints::webrtc_publish_endpoint::P2pMode;
 
     const ROOM_SPEC: &str =
         include_str!("../../tests/specs/pub-sub-video-call.yml");
@@ -772,6 +773,60 @@ mod room_service_specs {
             })
             .map(move |res| {
                 assert!(res.is_err());
+                actix::System::current().stop();
+            })
+            .map_err(|e| panic!("{:?}", e));
+
+        actix::spawn(test);
+
+        sys.run().unwrap();
+    }
+
+    #[test]
+    fn create_endpoint() {
+        let sys = actix::System::new("room-service-tests");
+
+        let spec = get_room_spec();
+        let mut member_spec = spec
+            .members()
+            .unwrap()
+            .get(&"caller".to_string().into())
+            .unwrap()
+            .get_publish_endpoint_by_id("publish".to_string().into())
+            .unwrap()
+            .clone();
+        member_spec.p2p = P2pMode::Never;
+        let member_spec = member_spec.into();
+        let ctx = get_context(Conf::default());
+        let room = Room::new(&spec, &ctx).unwrap().start();
+        let room_repo = RoomRepository::new(
+            hashmap!("pub-sub-video-call".to_string().into() => room),
+        );
+        let room_service = get_room_service(room_repo.clone());
+        let member_uri = LocalUri::<ToEndpoint>::new(
+            "pub-sub-video-call".to_string().into(),
+            "caller".to_string().into(),
+            "test-publish".to_string().into(),
+        );
+        let stateful_member_uri: StatefulLocalUri = member_uri.clone().into();
+        let stateful_member_uri_clone = stateful_member_uri.clone();
+        let msg = CreateEndpointInRoom {
+            spec: member_spec,
+            uri: member_uri,
+        };
+
+        let test = room_service
+            .send(msg)
+            .and_then(move |_| {
+                room_service.send(Get(vec![stateful_member_uri_clone]))
+            })
+            .map(move |res| {
+                let elements = res.unwrap();
+                let member_el = elements.get(&stateful_member_uri).unwrap();
+                assert_eq!(
+                    member_el.get_webrtc_pub().get_p2p(),
+                    P2pMode::Never.into()
+                );
                 actix::System::current().stop();
             })
             .map_err(|e| panic!("{:?}", e));
