@@ -623,7 +623,7 @@ mod room_service_specs {
     }
 
     #[test]
-    fn delete_room() {
+    fn delete_and_get_room() {
         let sys = actix::System::new("room-service-tests");
 
         let spec = get_room_spec();
@@ -639,15 +639,15 @@ mod room_service_specs {
             "local://pub-sub-video-call".to_string(),
         )
         .unwrap();
-        delete_elements.add_uri(room_uri);
+
+        delete_elements.add_uri(room_uri.clone());
         let delete_elements = delete_elements.validate().unwrap();
         let test = room_service
             .send(delete_elements)
             .map(|_| ())
-            .map(move |_| {
-                assert!(room_repo
-                    .get(&"pub-sub-video-call".to_string().into())
-                    .is_none());
+            .and_then(move |_| room_service.send(Get(vec![room_uri])))
+            .map(move |res| {
+                assert!(res.is_err());
                 actix::System::current().stop();
             })
             .map_err(|e| panic!("{:?}", e));
@@ -694,6 +694,49 @@ mod room_service_specs {
                 let elements = res.unwrap();
                 let member_el = elements.get(&stateful_member_uri).unwrap();
                 assert_eq!(member_el.get_member().get_pipeline().len(), 1);
+                actix::System::current().stop();
+            })
+            .map_err(|e| panic!("{:?}", e));
+
+        actix::spawn(test);
+
+        sys.run().unwrap();
+    }
+
+    #[test]
+    fn delete_and_get_member() {
+        let sys = actix::System::new("room-service-tests");
+
+        let spec = get_room_spec();
+        let member_spec = spec
+            .members()
+            .unwrap()
+            .get(&"caller".to_string().into())
+            .unwrap()
+            .clone();
+        let ctx = get_context(Conf::default());
+        let room = Room::new(&spec, &ctx).unwrap().start();
+        let room_repo = RoomRepository::new(
+            hashmap!("pub-sub-video-call".to_string().into() => room),
+        );
+        let room_service = get_room_service(room_repo.clone());
+        let member_uri = LocalUri::<ToMember>::new(
+            "pub-sub-video-call".to_string().into(),
+            "test-member".to_string().into(),
+        );
+        let stateful_member_uri = StatefulLocalUri::from(member_uri.clone());
+
+        let mut delete_elements = DeleteElements::new();
+        delete_elements.add_uri(stateful_member_uri.clone());
+        let delete_elements = delete_elements.validate().unwrap();
+
+        let test = room_service
+            .send(delete_elements)
+            .and_then(move |_| {
+                room_service.send(Get(vec![stateful_member_uri]))
+            })
+            .map(move |res| {
+                assert!(res.is_err());
                 actix::System::current().stop();
             })
             .map_err(|e| panic!("{:?}", e));
