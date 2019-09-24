@@ -708,12 +708,6 @@ mod room_service_specs {
         let sys = actix::System::new("room-service-tests");
 
         let spec = get_room_spec();
-        let member_spec = spec
-            .members()
-            .unwrap()
-            .get(&"caller".to_string().into())
-            .unwrap()
-            .clone();
         let ctx = get_context(Conf::default());
         let room = Room::new(&spec, &ctx).unwrap().start();
         let room_repo = RoomRepository::new(
@@ -722,7 +716,7 @@ mod room_service_specs {
         let room_service = get_room_service(room_repo.clone());
         let member_uri = LocalUri::<ToMember>::new(
             "pub-sub-video-call".to_string().into(),
-            "test-member".to_string().into(),
+            "caller".to_string().into(),
         );
         let stateful_member_uri = StatefulLocalUri::from(member_uri.clone());
 
@@ -732,8 +726,49 @@ mod room_service_specs {
 
         let test = room_service
             .send(delete_elements)
-            .and_then(move |_| {
+            .and_then(move |res| {
+                res.unwrap();
                 room_service.send(Get(vec![stateful_member_uri]))
+            })
+            .map(move |res| {
+                assert!(res.is_err());
+                actix::System::current().stop();
+            })
+            .map_err(|e| panic!("{:?}", e));
+
+        actix::spawn(test);
+
+        sys.run().unwrap();
+    }
+
+    #[test]
+    fn delete_and_get_endpoint() {
+        let sys = actix::System::new("room-service-tests");
+
+        let spec = get_room_spec();
+        let ctx = get_context(Conf::default());
+        let room = Room::new(&spec, &ctx).unwrap().start();
+        let room_repo = RoomRepository::new(
+            hashmap!("pub-sub-video-call".to_string().into() => room),
+        );
+        let room_service = get_room_service(room_repo.clone());
+        let endpoint_uri = LocalUri::<ToEndpoint>::new(
+            "pub-sub-video-call".to_string().into(),
+            "caller".to_string().into(),
+            "publish".to_string().into(),
+        );
+        let stateful_endpoint_uri =
+            StatefulLocalUri::from(endpoint_uri.clone());
+
+        let mut delete_elements = DeleteElements::new();
+        delete_elements.add_uri(stateful_endpoint_uri.clone());
+        let delete_elements = delete_elements.validate().unwrap();
+
+        let test = room_service
+            .send(delete_elements)
+            .and_then(move |res| {
+                res.unwrap();
+                room_service.send(Get(vec![stateful_endpoint_uri]))
             })
             .map(move |res| {
                 assert!(res.is_err());
