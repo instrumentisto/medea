@@ -1,3 +1,10 @@
+//! Tests for `Create` method of gRPC [Control API].
+//!
+//! The specificity of these tests is such that the `Get` method is also
+//! being tested at the same time.
+//!
+//! [Control API]: https://tinyurl.com/yxsqplq7
+
 use std::collections::HashMap;
 
 use medea_control_api_proto::grpc::control_api::{

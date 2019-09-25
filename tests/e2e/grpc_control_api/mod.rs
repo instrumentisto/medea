@@ -1,3 +1,7 @@
+/// Tests for gRPC [Medea]'s [Control API].
+///
+/// [Medea]: https://github.com/instrumentisto/medea
+/// [Control API]: https://tinyurl.com/yxsqplq7
 mod create;
 mod delete;
 
@@ -14,15 +18,31 @@ use medea_control_api_proto::grpc::{
 };
 use protobuf::RepeatedField;
 
+/// Client for [Medea]'s gRPC [Control API].
+///
+/// [Medea]: https://github.com/instrumentisto/medea
 struct ControlClient(ControlApiClient);
 
 impl ControlClient {
+    /// Create new [`ControlClient`].
+    ///
+    /// Client will connect to `localhost:6565`.
+    ///
+    /// Note that this function don't connects to the server. This mean that
+    /// when you call [`ControlClient::new`] and server not working you will
+    /// don't know it until try to send something with this client.
     pub fn new() -> Self {
         let env = Arc::new(EnvBuilder::new().build());
         let ch = ChannelBuilder::new(env).connect("localhost:6565");
         ControlClient(ControlApiClient::new(ch))
     }
 
+    /// Gets some [`Element`] by local URI.
+    ///
+    /// # Panics
+    ///
+    /// - if [`GetResponse`] has error
+    /// - if connection with server failed
     pub fn get(&self, uri: &str) -> Element {
         let mut get_room_request = IdRequest::new();
         let mut room = RepeatedField::new();
@@ -36,6 +56,11 @@ impl ControlClient {
         resp.take_elements().remove(&uri.to_string()).unwrap()
     }
 
+    /// Tries to get some [`Element`] by local URI.
+    ///
+    /// # Panics
+    ///
+    /// - if connection with server failed.
     pub fn try_get(&self, uri: &str) -> Result<Element, Error> {
         let mut get_room_request = IdRequest::new();
         let mut room = RepeatedField::new();
@@ -49,6 +74,12 @@ impl ControlClient {
         Ok(resp.take_elements().remove(&uri.to_string()).unwrap())
     }
 
+    /// Creates `Element` and returns it sids.
+    ///
+    /// # Panics
+    ///
+    /// - if [`CreateResponse`] has error.
+    /// - if connection with server failed.
     pub fn create(&self, req: &CreateRequest) -> HashMap<String, String> {
         let resp = self.0.create(&req).expect("create endpoint");
         if resp.has_error() {
@@ -58,6 +89,12 @@ impl ControlClient {
         resp.sid
     }
 
+    /// Deletes `Element`s by local URIs.
+    ///
+    /// # Panics
+    ///
+    /// - if [`Response`] has error
+    /// - if connection with server failed.
     pub fn delete(&self, ids: &[&str]) {
         let mut delete_req = IdRequest::new();
         let mut delete_ids = RepeatedField::new();
@@ -72,6 +109,33 @@ impl ControlClient {
     }
 }
 
+/// Creates [`CreateRequest`] for creating `Room` element with provided room ID.
+///
+/// # Spec of `Room` which will be created with this [`CreateRequest`]
+///
+/// ```yaml
+/// kind: Room
+///   id: {{ PROVIDED_ROOM_ID }}
+///   spec:
+///     pipeline:
+///       caller:
+///         kind: Member
+///         spec:
+///           pipeline:
+///             publish:
+///               kind: WebRtcPublishEndpoint
+///               spec:
+///                 p2p: Always
+///       responder:
+///         kind: Member
+///         credentials: test
+///         spec:
+///           pipeline:
+///             play:
+///               kind: WebRtcPlayEndpoint
+///               spec:
+///                 src: "local://{{ PROVIDED_ROOM_ID }}/caller/publish"
+/// ```
 fn create_room_req(room_id: &str) -> CreateRequest {
     let mut create_req = CreateRequest::new();
     let mut room = Room::new();

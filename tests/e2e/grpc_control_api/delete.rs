@@ -1,7 +1,29 @@
+//! Tests for `Delete` method of gRPC [Control API].
+//!
+//! The specificity of these tests is such that the `Get` method is also
+//! being tested at the same time.
+//!
+//! [Control API]: https://tinyurl.com/yxsqplq7
+
 use medea::api::error_codes::{ErrorCode as MedeaErrorCode, ErrorCode};
 
 use super::{create_room_req, ControlClient};
 
+/// Tests `Delete` method of [Medea]'s [Control API].
+///
+/// # Arguments
+///
+/// `room_id`: `Room` ID which will be created and from will be deleted
+/// `Element`s,
+///
+/// `element_id`: `Element` ID which will be deleted from this `Room`,
+///
+/// `error_code`: [`ErrorCode`] which should be returned from [ControlAPI] when
+/// we tries get deleted `Element`.
+///
+/// [Medea]: https://github.com/instrumentisto/medea
+/// [Control API]: https://tinyurl.com/yxsqplq7
+/// [`ErrorCode`]: medea::api::error_codes::ErrorCode
 fn delete_test(room_id: &str, element_id: &str, error_code: MedeaErrorCode) {
     let client = ControlClient::new();
     client.create(&create_room_req(room_id));
@@ -41,17 +63,35 @@ fn endpoint() {
     );
 }
 
+/// Tests `Delete` method of [Control API] by trying to delete child `Element`
+/// from the also deleting parent `Element`.
+///
+/// # Arguments
+///
+/// `room_id`: `Room` ID which will be created and from will be deleted
+/// `Element`s,
+///
+/// `elements_uris`: `Element`s IDs which will be deleted from this `Element`,
+///
+/// `error_code`: [`ErrorCode`] which should be returned from [ControlAPI] when
+/// we tries get deleted `Element`,
+///
+/// `root_elem_uri`: URI to parent `Element`.
+///
+/// [Medea]: https://github.com/instrumentisto/medea
+/// [Control API]: https://tinyurl.com/yxsqplq7
+/// [`ErrorCode`]: medea::api::error_codes::ErrorCode
 fn delete_elements_at_same_time_test(
     room_id: &str,
-    elements_ids: &[&str],
+    elements_uris: &[&str],
     code: MedeaErrorCode,
-    root_elem_id: &str,
+    root_elem_uri: &str,
 ) {
     let client = ControlClient::new();
     client.create(&create_room_req(room_id));
-    client.delete(elements_ids);
+    client.delete(elements_uris);
 
-    match client.try_get(root_elem_id) {
+    match client.try_get(root_elem_uri) {
         Ok(_) => panic!("Member not deleted!"),
         Err(e) => {
             assert_eq!(e.code, code as u32);
