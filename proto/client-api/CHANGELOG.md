@@ -12,7 +12,8 @@ All user visible changes to this project will be documented in this file. This p
 ### Added
 
 - `TrackId` and `PeerId` types ([#28]);
-- `Incrementable` trait ([#28]).
+- `Incrementable` trait ([#28]);
+- `RpcConnectionClosed` and `CloseDescription` ([#33](/../../pull/28)).
 
 [#28]: /../../pull/28
 

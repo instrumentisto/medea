@@ -240,7 +240,7 @@ impl Handler<CreateRoom> for RoomService {
     }
 }
 
-/// Signal for create new [`Member`] in [`Room`]
+/// Signal for create new [`Member`] in [`Room`].
 ///
 /// [`Member`]: crate::signalling::elements::member::Member
 #[derive(Message)]
@@ -276,7 +276,7 @@ impl Handler<CreateMemberInRoom> for RoomService {
     }
 }
 
-/// Signal for create new [`Endpoint`] in [`Room`]
+/// Signal for create new [`Endpoint`] in [`Room`].
 ///
 /// [`Endpoint`]: crate::signalling::elements::endpoints::Endpoint
 #[derive(Message)]
@@ -329,6 +329,7 @@ pub struct Unvalidated;
 // is fix for it. This allow not works on function.
 #[allow(clippy::use_self)]
 impl DeleteElements<Unvalidated> {
+    /// Creates new [`DeleteElements`] in [`Unvalidated`] state.
     pub fn new() -> Self {
         Self {
             uris: Vec::new(),
@@ -336,6 +337,7 @@ impl DeleteElements<Unvalidated> {
         }
     }
 
+    /// Adds [`StatefulLocalUri`] to request.
     pub fn add_uri(&mut self, uri: StatefulLocalUri) {
         self.uris.push(uri)
     }
@@ -439,18 +441,18 @@ impl Handler<DeleteElements<Validated>> for RoomService {
     }
 }
 
+/// Serialized to protobuf `Element`s which will be returned from [`Get`] on
+/// success result.
+type SerializedElements = HashMap<StatefulLocalUri, ElementProto>;
+
 /// Message which returns serialized to protobuf objects by provided
 /// [`LocalUri`].
 #[derive(Message)]
-#[rtype(result = "Result<HashMap<StatefulLocalUri, ElementProto>, \
-                  RoomServiceError>")]
+#[rtype(result = "Result<SerializedElements, RoomServiceError>")]
 pub struct Get(pub Vec<StatefulLocalUri>);
 
 impl Handler<Get> for RoomService {
-    type Result = ResponseFuture<
-        HashMap<StatefulLocalUri, ElementProto>,
-        RoomServiceError,
-    >;
+    type Result = ResponseFuture<SerializedElements, RoomServiceError>;
 
     fn handle(&mut self, msg: Get, _: &mut Self::Context) -> Self::Result {
         let mut rooms_elements = HashMap::new();

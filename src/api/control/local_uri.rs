@@ -66,7 +66,7 @@ pub struct ToEndpoint(LocalUri<ToMember>, EndpointId);
 /// assert_eq!(local_uri.room_id(), &orig_room_id);
 ///
 /// // If you want to take all IDs ownership, you should do this steps:
-/// let (endpoint_id, member_uri) = local_uri.take_endpoint_id();
+/// let (endpoint_id, member_uri) = local_uri.clone().take_endpoint_id();
 /// assert_eq!(endpoint_id, orig_endpoint_id);
 ///
 /// let (member_id, room_uri) = member_uri.take_member_id();
@@ -74,6 +74,9 @@ pub struct ToEndpoint(LocalUri<ToMember>, EndpointId);
 ///
 /// let room_id = room_uri.take_room_id();
 /// assert_eq!(room_id, orig_room_id);
+///
+/// // Or simply
+/// let (room_id, member_id, endpoint_id) = local_uri.take_all();
 /// ```
 ///
 /// This is necessary so that it is not possible to get the address in the

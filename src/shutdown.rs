@@ -26,7 +26,7 @@ pub struct Priority(pub u8);
 /// Message that [`Subscriber`] is informed with to perform its graceful
 /// shutdown.
 #[allow(clippy::module_name_repetitions)]
-#[derive(Message)]
+#[derive(Debug, Message)]
 #[rtype(result = "Result<(), ()>")]
 pub struct ShutdownGracefully;
 

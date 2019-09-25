@@ -354,7 +354,7 @@ impl Room {
     }
 
     /// Creates [`Peer`] for endpoints if [`Peer`] between endpoint's members
-    /// not exist.
+    /// doesn't exist.
     ///
     /// Adds `send` track to source member's [`Peer`] and `recv` to
     /// sink member's [`Peer`].

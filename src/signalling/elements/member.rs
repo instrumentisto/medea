@@ -108,6 +108,7 @@ impl Member {
     /// Lookups [`MemberSpec`] by [`MemberId`] from [`MemberSpec`].
     ///
     /// Returns [`MembersLoadError::MemberNotFound`] when member not found.
+    ///
     /// Returns [`MembersLoadError::TryFromError`] when found element which is
     /// not [`MemberSpec`].
     fn get_member_from_room_spec(

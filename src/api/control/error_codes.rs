@@ -436,9 +436,9 @@ impl From<GrpcControlApiError> for ErrorResponse {
             LocalUri(e) => e.into(),
             TryFromProtobuf(e) => e.into(),
             RoomServiceError(e) => e.into(),
-            RoomServiceMailboxError(_)
-            | TryFromElement(_)
-            | UnknownMailboxErr(_) => Self::unexpected(&err),
+            RoomServiceMailboxError(_) | TryFromElement(_) => {
+                Self::unexpected(&err)
+            }
         }
     }
 }

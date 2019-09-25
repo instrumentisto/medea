@@ -5,7 +5,9 @@
 //!
 //! [Control API]: https://tinyurl.com/yxsqplq7
 
-use medea::api::error_codes::{ErrorCode as MedeaErrorCode, ErrorCode};
+use medea::api::control::error_codes::{
+    ErrorCode as MedeaErrorCode, ErrorCode,
+};
 
 use super::{create_room_req, ControlClient};
 
@@ -23,8 +25,12 @@ use super::{create_room_req, ControlClient};
 ///
 /// [Medea]: https://github.com/instrumentisto/medea
 /// [Control API]: https://tinyurl.com/yxsqplq7
-/// [`ErrorCode`]: medea::api::error_codes::ErrorCode
-fn delete_test(room_id: &str, element_id: &str, error_code: MedeaErrorCode) {
+/// [`ErrorCode`]: medea::api::control::error_codes::ErrorCode
+fn test_for_delete(
+    room_id: &str,
+    element_id: &str,
+    error_code: MedeaErrorCode,
+) {
     let client = ControlClient::new();
     client.create(&create_room_req(room_id));
     client.delete(&[element_id]);
@@ -38,7 +44,7 @@ fn delete_test(room_id: &str, element_id: &str, error_code: MedeaErrorCode) {
 
 #[test]
 fn room() {
-    delete_test(
+    test_for_delete(
         "delete-room",
         "local://delete-room",
         ErrorCode::RoomNotFound,
@@ -47,7 +53,7 @@ fn room() {
 
 #[test]
 fn member() {
-    delete_test(
+    test_for_delete(
         "delete-member",
         "local://delete-member/publisher",
         ErrorCode::MemberNotFound,
@@ -56,7 +62,7 @@ fn member() {
 
 #[test]
 fn endpoint() {
-    delete_test(
+    test_for_delete(
         "delete-endpoint",
         "local://delete-endpoint/publisher/publish",
         ErrorCode::EndpointNotFound,
@@ -80,8 +86,8 @@ fn endpoint() {
 ///
 /// [Medea]: https://github.com/instrumentisto/medea
 /// [Control API]: https://tinyurl.com/yxsqplq7
-/// [`ErrorCode`]: medea::api::error_codes::ErrorCode
-fn delete_elements_at_same_time_test(
+/// [`ErrorCode`]: medea::api::control::error_codes::ErrorCode
+fn test_for_delete_elements_at_same_time_test(
     room_id: &str,
     elements_uris: &[&str],
     code: MedeaErrorCode,
@@ -101,7 +107,7 @@ fn delete_elements_at_same_time_test(
 
 #[test]
 fn member_and_endpoint_same_time() {
-    delete_elements_at_same_time_test(
+    test_for_delete_elements_at_same_time_test(
         "medea-and-endpoint-same-time",
         &[
             "local://medea-and-endpoint-same-time/publisher",
@@ -114,7 +120,7 @@ fn member_and_endpoint_same_time() {
 
 #[test]
 fn room_and_inner_elements_same_time() {
-    delete_elements_at_same_time_test(
+    test_for_delete_elements_at_same_time_test(
         "room-and-inner-elements-same-time",
         &[
             "local://room-and-inner-elements-same-time",

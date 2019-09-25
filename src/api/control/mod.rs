@@ -3,6 +3,7 @@
 //! [Control API]: https://tinyurl.com/yxsqplq7
 
 pub mod endpoints;
+pub mod error_codes;
 pub mod grpc;
 pub mod local_uri;
 pub mod member;
@@ -39,7 +40,7 @@ pub use self::{
     room::{Id as RoomId, RoomElement, RoomSpec},
 };
 
-/// Errors which may occur while deserialize protobuf spec.
+/// Errors which may occur while deserializing protobuf spec.
 #[derive(Debug, Fail, Display)]
 pub enum TryFromProtobufError {
     /// Error while parsing [`SrcUri`] of [`WebRtcPlayEndpoint`].

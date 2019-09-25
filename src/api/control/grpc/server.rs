@@ -23,16 +23,14 @@ use medea_control_api_proto::grpc::{
 };
 
 use crate::{
-    api::{
-        control::{
-            local_uri::{
-                LocalUri, LocalUriParseError, StatefulLocalUri, ToEndpoint,
-                ToMember,
-            },
-            EndpointSpec, MemberId, MemberSpec, RoomId, RoomSpec,
-            TryFromElementError, TryFromProtobufError,
-        },
+    api::control::{
         error_codes::{ErrorCode, ErrorResponse},
+        local_uri::{
+            LocalUri, LocalUriParseError, StatefulLocalUri, ToEndpoint,
+            ToMember,
+        },
+        EndpointSpec, MemberId, MemberSpec, RoomId, RoomSpec,
+        TryFromElementError, TryFromProtobufError,
     },
     log::prelude::*,
     shutdown::ShutdownGracefully,
@@ -69,15 +67,6 @@ pub enum GrpcControlApiError {
     #[display(fmt = "Room service mailbox error: {:?}", _0)]
     RoomServiceMailboxError(MailboxError),
 
-    /// [`MailboxError`] which never can happen. This error needed
-    /// for [`fut_try!`] macro because using [`From`] trait.
-    /// With this error we cover [`MailboxError`] in places where
-    /// it cannot happen.
-    ///
-    /// __Never use this error.__
-    #[display(fmt = "Mailbox error which never can happen. {:?}", _0)]
-    UnknownMailboxErr(MailboxError),
-
     /// Wrapper around [`RoomServiceError`].
     RoomServiceError(RoomServiceError),
 }
@@ -106,21 +95,6 @@ impl From<TryFromElementError> for GrpcControlApiError {
     }
 }
 
-/// Tries to unwrap some [`Result`] and if it `Err` then returns err [`Future`]
-/// with [`ControlApiError`].
-///
-/// __Note:__ this macro returns [`Either::B`].
-macro_rules! fut_try {
-    ($call:expr) => {
-        match $call {
-            Ok(o) => o,
-            Err(e) => {
-                return Either::B(future::err(GrpcControlApiError::from(e)))
-            }
-        }
-    };
-}
-
 /// Type alias for success [`CreateResponse`]'s sids.
 type Sids = HashMap<String, String>;
 
@@ -136,7 +110,6 @@ struct ControlApiService {
     public_url: String,
 }
 
-// TODO: tests
 impl ControlApiService {
     /// Returns [Control API] sid based on provided arguments and
     /// `MEDEA_CLIENT.PUBLIC_URL` config value.
@@ -157,14 +130,24 @@ impl ControlApiService {
         &self,
         spec: RoomSpec,
     ) -> impl Future<Item = Sids, Error = GrpcControlApiError> {
-        let sid: Sids = fut_try!(spec.members())
-            .iter()
-            .map(|(member_id, member)| {
-                let uri =
-                    self.get_sid(spec.id(), &member_id, member.credentials());
-                (member_id.clone().to_string(), uri)
-            })
-            .collect();
+        let sid = match spec.members() {
+            Ok(members) => members
+                .iter()
+                .map(|(member_id, member)| {
+                    let uri = self.get_sid(
+                        spec.id(),
+                        &member_id,
+                        member.credentials(),
+                    );
+                    (member_id.clone().to_string(), uri)
+                })
+                .collect(),
+            Err(e) => {
+                return Either::B(future::err(
+                    GrpcControlApiError::TryFromElement(e),
+                ))
+            }
+        };
 
         Either::A(
             self.room_service
@@ -207,7 +190,7 @@ impl ControlApiService {
             })
     }
 
-    /// Creates element based on provided
+    /// Creates element based on provided [`CreateRequest`].
     pub fn create_element(
         &self,
         mut req: CreateRequest,

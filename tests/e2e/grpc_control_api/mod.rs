@@ -49,7 +49,7 @@ impl ControlClient {
         room.push(uri.to_string());
         get_room_request.set_id(room);
 
-        let mut resp = self.0.get(&get_room_request).expect("get room");
+        let mut resp = self.0.get(&get_room_request).unwrap();
         if resp.has_error() {
             panic!("{:?}", resp.get_error());
         }
@@ -67,7 +67,7 @@ impl ControlClient {
         room.push(uri.to_string());
         get_room_request.set_id(room);
 
-        let mut resp = self.0.get(&get_room_request).expect("get room");
+        let mut resp = self.0.get(&get_room_request).unwrap();
         if resp.has_error() {
             return Err(resp.take_error());
         }
@@ -81,7 +81,7 @@ impl ControlClient {
     /// - if [`CreateResponse`] has error.
     /// - if connection with server failed.
     pub fn create(&self, req: &CreateRequest) -> HashMap<String, String> {
-        let resp = self.0.create(&req).expect("create endpoint");
+        let resp = self.0.create(&req).unwrap();
         if resp.has_error() {
             panic!("{:?}", resp.get_error());
         }
@@ -115,7 +115,7 @@ impl ControlClient {
 ///
 /// ```yaml
 /// kind: Room
-///   id: {{ PROVIDED_ROOM_ID }}
+///   id: {{ room_id }}
 ///   spec:
 ///     pipeline:
 ///       caller:
@@ -134,7 +134,7 @@ impl ControlClient {
 ///             play:
 ///               kind: WebRtcPlayEndpoint
 ///               spec:
-///                 src: "local://{{ PROVIDED_ROOM_ID }}/caller/publish"
+///                 src: "local://{{ room_id }}/caller/publish"
 /// ```
 fn create_room_req(room_id: &str) -> CreateRequest {
     let mut create_req = CreateRequest::new();
