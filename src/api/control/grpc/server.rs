@@ -7,7 +7,7 @@ use std::{collections::HashMap, convert::TryFrom, sync::Arc};
 use actix::{
     Actor, Addr, Arbiter, Context, Handler, MailboxError, ResponseFuture,
 };
-use derive_more::Display;
+use derive_more::{Display, From};
 use failure::Fail;
 use futures::future::{self, Either, Future, IntoFuture};
 use grpcio::{
@@ -44,7 +44,7 @@ use crate::{
 /// Errors which can happen while processing requests to gRPC [Control API].
 ///
 /// [Control API]: https://tinyurl.com/yxsqplq7
-#[derive(Debug, Display, Fail)]
+#[derive(Debug, Display, Fail, From)]
 pub enum GrpcControlApiError {
     /// Error while parsing [`LocalUri`] of element.
     LocalUri(LocalUriParseError),
@@ -69,30 +69,6 @@ pub enum GrpcControlApiError {
 
     /// Wrapper around [`RoomServiceError`].
     RoomServiceError(RoomServiceError),
-}
-
-impl From<LocalUriParseError> for GrpcControlApiError {
-    fn from(from: LocalUriParseError) -> Self {
-        Self::LocalUri(from)
-    }
-}
-
-impl From<RoomServiceError> for GrpcControlApiError {
-    fn from(from: RoomServiceError) -> Self {
-        Self::RoomServiceError(from)
-    }
-}
-
-impl From<TryFromProtobufError> for GrpcControlApiError {
-    fn from(from: TryFromProtobufError) -> Self {
-        Self::TryFromProtobuf(from)
-    }
-}
-
-impl From<TryFromElementError> for GrpcControlApiError {
-    fn from(from: TryFromElementError) -> Self {
-        Self::TryFromElement(from)
-    }
 }
 
 /// Type alias for success [`CreateResponse`]'s sids.

@@ -90,7 +90,7 @@ struct MemberInner {
 }
 
 impl Member {
-    /// Create new empty [`Member`].
+    /// Creates new empty [`Member`].
     ///
     /// To fill this [`Member`], you need to call [`Member::load`]
     /// function.
@@ -265,12 +265,12 @@ impl Member {
         self.0.borrow().ice_user.as_ref().map(IceUser::servers_list)
     }
 
-    /// Returns and set to `None` [`IceUser`] of this [`Member`].
+    /// Returns and sets to `None` [`IceUser`] of this [`Member`].
     pub fn take_ice_user(&self) -> Option<IceUser> {
         self.0.borrow_mut().ice_user.take()
     }
 
-    /// Replace and return [`IceUser`] of this [`Member`].
+    /// Replaces and returns [`IceUser`] of this [`Member`].
     pub fn replace_ice_user(&self, new_ice_user: IceUser) -> Option<IceUser> {
         self.0.borrow_mut().ice_user.replace(new_ice_user)
     }
