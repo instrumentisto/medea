@@ -62,7 +62,6 @@ impl Gremlin {
         ctx: &mut <Self as Actor>::Context,
     ) -> IPTResult<()> {
         info!("Gremlin closes port.");
-        // TODO: maybe try to open port if err??
         self.close()?;
 
         self.dropper_handle =
