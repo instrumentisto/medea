@@ -53,7 +53,6 @@ pub enum MemberElement {
 #[allow(clippy::module_name_repetitions)]
 #[derive(Clone, Debug)]
 pub struct MemberSpec {
-    // TODO: add id
     /// Spec of this `Member`.
     pipeline: Pipeline<EndpointId, MemberElement>,
 
