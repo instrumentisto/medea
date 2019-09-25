@@ -2,6 +2,7 @@
 //!
 //! [1]: https://www.w3.org/TR/mediacapture-streams
 
+mod constraints;
 mod device_info;
 mod manager;
 mod stream;
@@ -10,12 +11,12 @@ mod track;
 
 #[doc(inline)]
 pub use self::{
+    constraints::{
+        AudioTrackConstraints, MediaStreamConstraints, VideoTrackConstraints,
+    },
     device_info::InputDeviceInfo,
     manager::{MediaManager, MediaManagerHandle},
     stream::{MediaStream, MediaStreamHandle},
-    stream_request::{
-        AudioTrackConstraints, MediaStreamConstraints, SimpleStreamRequest,
-        StreamRequest, VideoTrackConstraints,
-    },
+    stream_request::{SimpleStreamRequest, StreamRequest},
     track::MediaTrack,
 };

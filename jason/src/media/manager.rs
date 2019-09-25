@@ -21,7 +21,7 @@ use web_sys::{
 };
 
 use crate::{
-    media::stream_request::MediaStreamConstraints,
+    media::MediaStreamConstraints,
     utils::{window, Callback2, WasmErr},
 };
 
