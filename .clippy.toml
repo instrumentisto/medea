@@ -10,6 +10,7 @@ doc-valid-idents = [
     "iOS", "macOS", "TeX", "LaTeX", "BibTeX", "BibLaTeX", "MinGW",
     "WebRTC", "WebSocket",
     "MediaStream", "MediaStreamConstraints", "MediaStreamTrack",
+    "MediaDeviceKind",
     "RTCConfiguration", "RTCIceCandidate", "RTCIceServer",
     "RTCPeerConnection", "RTCPeerConnectionIceEvent",
     "RTCRtpTransceiver", "RTCRtpTransceiverDirection",

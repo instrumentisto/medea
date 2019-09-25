@@ -219,6 +219,9 @@ impl MediaManager {
         Either::B(fut)
     }
 
+    /// Obtain [MediaStream][1] basing on a provided [`MediaStreamConstraints`].
+    /// Either builds new stream from already known tracks or initiates new user
+    /// media request saving returned tracks.
     pub fn get_stream_by_constraints(
         &self,
         caps: MediaStreamConstraints,

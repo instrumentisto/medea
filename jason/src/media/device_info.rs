@@ -23,6 +23,9 @@ pub struct InputDeviceInfo {
     info: MediaDeviceInfo,
 }
 
+/// [MediaDeviceKind][1] wrapper, excluding audiooutput.
+///
+/// [1]: https://www.w3.org/TR/mediacapture-streams/#dom-mediadevicekind
 enum InputDeviceKind {
     Audio,
     Video,
