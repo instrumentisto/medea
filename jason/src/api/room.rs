@@ -8,10 +8,13 @@ use std::{
 };
 
 use futures::{
-    future::{self, Future as _, IntoFuture},
+    future::{self, Future as _, IntoFuture, FutureExt},
     stream::Stream as _,
     sync::mpsc::{unbounded, UnboundedSender},
 };
+
+use futures_util::try_future::TryFutureExt;
+
 use medea_client_api_proto::{
     Command, Direction, EventHandler, IceCandidate, IceServer, PeerId, Track,
 };
@@ -296,12 +299,18 @@ impl EventHandler for InnerRoom {
     ) {
         if let Some(peer) = self.peers.get(peer_id) {
             spawn_local(
+                async {
+
+                }
                 peer.add_ice_candidate(
                     candidate.candidate,
                     candidate.sdp_m_line_index,
                     candidate.sdp_mid,
                 )
-                .map_err(|err| err.log_err()),
+                .then(|err| {
+                    err.log_err();
+                    Ok(())
+                }),
             );
         } else {
             // TODO: No peer, whats next?

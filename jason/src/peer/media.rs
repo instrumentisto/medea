@@ -2,7 +2,6 @@
 
 use std::{borrow::ToOwned, cell::RefCell, collections::HashMap, rc::Rc};
 
-use futures::{future, Future};
 use medea_client_api_proto::{Direction, MediaType, PeerId, Track, TrackId};
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
@@ -160,31 +159,31 @@ impl MediaConnections {
     /// direction to `sendonly`.
     ///
     /// [1]: https://www.w3.org/TR/webrtc/#dom-rtcrtpsender-replacetrack
-    pub fn insert_local_stream(
+    pub async fn insert_local_stream(
         &self,
         stream: &MediaStream,
-    ) -> impl Future<Item = (), Error = WasmErr> {
+    ) -> Result<(), WasmErr> {
         let s = self.0.borrow();
 
         // Check that provided stream have all tracks that we need.
         for sender in s.senders.values() {
             if !stream.has_track(sender.track_id) {
-                return future::Either::A(future::err(WasmErr::from(
+                return Err(WasmErr::from(
                     "Stream does not have all necessary tracks",
-                )));
+                ));
             }
         }
 
         stream.toggle_audio_tracks(s.enabled_audio);
         stream.toggle_video_tracks(s.enabled_video);
 
-        let promises = s.senders.values().filter_map(|sndr| {
-            stream.get_track_by_id(sndr.track_id).map(|track| {
-                Sender::insert_and_enable_track(Rc::clone(sndr), track)
-            })
-        });
-        let promises: Vec<_> = promises.collect();
-        future::Either::B(future::join_all(promises).map(|_| ()))
+        for sender in s.senders.values() {
+            if let Some(track) = stream.get_track_by_id(sender.track_id) {
+                Sender::insert_and_enable_track(Rc::clone(sender), track).await?
+            }
+        }
+
+        Ok(())
     }
 
     /// Adds provided [`MediaStreamTrack`] and [`RtcRtpTransceiver`] to the
@@ -300,25 +299,23 @@ impl Sender {
 
     /// Inserts provided [`MediaTrack`] into provided [`Sender`]s transceiver
     /// and enables transceivers sender by changing its direction to `sendonly`.
-    fn insert_and_enable_track(
+    async fn insert_and_enable_track(
         sender: Rc<Self>,
         track: Rc<MediaTrack>,
-    ) -> impl Future<Item = (), Error = WasmErr> {
+    ) -> Result<(), WasmErr> {
         JsFuture::from(
             sender
                 .transceiver
                 .sender()
                 .replace_track(Some(track.track())),
-        )
-        .and_then(move |_| {
-            // TODO: also do RTCRtpSender.setStreams when it will be implemented
-            sender
-                .transceiver
-                .set_direction(RtcRtpTransceiverDirection::Sendonly);
-            sender.track.borrow_mut().replace(track);
-            Ok(())
-        })
-        .map_err(WasmErr::from)
+        ).await?;
+
+        sender
+            .transceiver
+            .set_direction(RtcRtpTransceiverDirection::Sendonly);
+        sender.track.borrow_mut().replace(track);
+
+        Ok(())
     }
 
     /// Enables or disables this [`Sender`]s track.

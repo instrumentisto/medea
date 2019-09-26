@@ -1,6 +1,6 @@
 use std::{collections::HashMap, rc::Rc};
 
-use futures::sync::mpsc::UnboundedSender;
+use futures::channel::mpsc::UnboundedSender;
 use medea_client_api_proto::{IceServer, PeerId};
 
 use crate::{media::MediaManager, utils::WasmErr};

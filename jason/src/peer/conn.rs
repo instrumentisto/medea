@@ -1,6 +1,5 @@
 use std::{cell::RefCell, rc::Rc};
 
-use futures::Future;
 use medea_client_api_proto::IceServer;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
@@ -190,12 +189,12 @@ impl RtcPeerConnection {
     ///
     /// [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
     /// [2]: https://tools.ietf.org/html/rfc5245#section-2
-    pub fn add_ice_candidate(
+    pub async fn add_ice_candidate(
         &self,
         candidate: &str,
         sdp_m_line_index: Option<u16>,
         sdp_mid: &Option<String>,
-    ) -> impl Future<Item = (), Error = WasmErr> {
+    ) -> Result<(), WasmErr> {
         let mut cand_init = RtcIceCandidateInit::new(&candidate);
         cand_init
             .sdp_m_line_index(sdp_m_line_index)
@@ -207,9 +206,8 @@ impl RtcPeerConnection {
                 .add_ice_candidate_with_opt_rtc_ice_candidate_init(
                     Some(cand_init).as_ref(),
                 ),
-        )
-        .map(|_| ())
-        .map_err(Into::into)
+        ).await?;
+        Ok(())
     }
 
     /// Obtains [SDP answer][`SdpType::Answer`] from the underlying
@@ -217,22 +215,22 @@ impl RtcPeerConnection {
     /// description.
     ///
     /// Should be called whenever remote description has been changed.
-    pub fn create_and_set_answer(
+    pub async fn create_and_set_answer(
         &self,
-    ) -> impl Future<Item = String, Error = WasmErr> {
+    ) -> Result<String, WasmErr> {
         let conn = self.0.borrow();
         let peer: Rc<SysRtcPeerConnection> = Rc::clone(&conn.peer);
-        JsFuture::from(conn.peer.create_answer())
-            .map(RtcSessionDescription::from)
-            .and_then(move |answer: RtcSessionDescription| {
-                let answer = answer.sdp();
-                let mut desc =
-                    RtcSessionDescriptionInit::new(RtcSdpType::Answer);
-                desc.sdp(&answer);
-                JsFuture::from(peer.set_local_description(&desc))
-                    .map(move |_| answer)
-            })
-            .map_err(Into::into)
+
+        let answer = JsFuture::from(conn.peer.create_answer()).await?;
+        let answer = RtcSessionDescription::from(answer).sdp();
+
+        let mut desc =
+            RtcSessionDescriptionInit::new(RtcSdpType::Answer);
+        desc.sdp(&answer);
+
+        JsFuture::from(peer.set_local_description(&desc)).await?;
+
+        Ok(answer)
     }
 
     /// Obtains [SDP offer][`SdpType::Offer`] from the underlying
@@ -241,23 +239,21 @@ impl RtcPeerConnection {
     ///
     /// Should be called after local tracks changes, which require
     /// renegotiation.
-    pub fn create_and_set_offer(
+    pub async fn create_and_set_offer(
         &self,
-    ) -> impl Future<Item = String, Error = WasmErr> {
-        let conn = self.0.borrow();
-        let peer: Rc<SysRtcPeerConnection> = Rc::clone(&conn.peer);
-        JsFuture::from(peer.create_offer())
-            .map(RtcSessionDescription::from)
-            .and_then(move |offer: RtcSessionDescription| {
-                let offer = offer.sdp();
-                let mut desc =
-                    RtcSessionDescriptionInit::new(RtcSdpType::Offer);
-                desc.sdp(&offer);
+    ) -> Result<String, WasmErr> {
+        let peer: Rc<SysRtcPeerConnection> = Rc::clone(&self.0.borrow().peer);
 
-                JsFuture::from(peer.set_local_description(&desc))
-                    .map(move |_| offer)
-            })
-            .map_err(Into::into)
+        let create_offer = JsFuture::from(peer.create_offer()).await?;
+        let offer = RtcSessionDescription::from(create_offer).sdp();
+
+        let mut desc =
+            RtcSessionDescriptionInit::new(RtcSdpType::Offer);
+        desc.sdp(&offer);
+
+        JsFuture::from(peer.set_local_description(&desc)).await?;
+
+        Ok(offer)
     }
 
     /// Instructs the underlying [RTCPeerConnection][`SysRtcPeerConnection`]
@@ -265,10 +261,10 @@ impl RtcPeerConnection {
     /// [offer][`SdpType::Offer`] or [answer][`SdpType::Answer`].
     ///
     /// Changes the local media state.
-    pub fn set_remote_description(
+    pub async fn set_remote_description(
         &self,
         sdp: SdpType,
-    ) -> impl Future<Item = (), Error = WasmErr> {
+    ) -> Result<(), WasmErr> {
         let description = match sdp {
             SdpType::Offer(offer) => {
                 let mut desc =
@@ -286,9 +282,9 @@ impl RtcPeerConnection {
 
         JsFuture::from(
             self.0.borrow().peer.set_remote_description(&description),
-        )
-        .map_err(Into::into)
-        .map(|_| ())
+        ).await?;
+
+        Ok(())
     }
 
     /// Creates new [`RtcRtpTransceiver`] (see [RTCRtpTransceiver][1])

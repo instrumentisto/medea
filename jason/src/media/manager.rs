@@ -4,10 +4,6 @@
 
 use std::{cell::RefCell, convert::TryFrom, rc::Rc};
 
-use futures::{
-    future::{self, Either, IntoFuture as _},
-    Future,
-};
 use wasm_bindgen_futures::JsFuture;
 use web_sys::MediaStream as SysMediaStream;
 
@@ -43,46 +39,35 @@ impl MediaManager {
     /// `on_local_stream` callback will be invoked each time this function
     /// succeeds.
     // TODO: lookup stream by caps, and return its copy if found
-    pub fn get_stream(
+    pub async fn get_stream(
         &self,
         caps: StreamRequest,
-    ) -> impl Future<Item = Rc<MediaStream>, Error = WasmErr> {
-        let request = match SimpleStreamRequest::try_from(caps) {
-            Ok(request) => request,
-            Err(err) => return Either::A(future::err(err)),
-        };
+    ) -> Result<Rc<MediaStream>, WasmErr> {
+        let request = SimpleStreamRequest::try_from(caps)?;
 
-        let mngr: Rc<RefCell<InnerMediaManager>> = Rc::clone(&self.0);
         let constraints = web_sys::MediaStreamConstraints::from(&request);
-        let fut = window()
+
+        let media_devices = window()
             .navigator()
             .media_devices()
-            .map_err(WasmErr::from)
-            .into_future()
-            .and_then(move |devices| {
-                devices
-                    .get_user_media_with_constraints(&constraints)
-                    .map_err(WasmErr::from)
-            })
-            .and_then(|promise: js_sys::Promise| {
-                JsFuture::from(promise).map_err(WasmErr::from)
-            })
-            .and_then(move |stream| {
-                request.parse_stream(&SysMediaStream::from(stream))
-            })
-            .then(move |result: Result<MediaStream, WasmErr>| match result {
-                Ok(stream) => {
-                    let stream = Rc::new(stream);
-                    mngr.borrow_mut().streams.push(Rc::clone(&stream));
-                    mngr.borrow().on_local_stream.call1(stream.new_handle());
-                    Ok(stream)
-                }
-                Err(err) => {
-                    mngr.borrow().on_local_stream.call2(err.clone());
-                    Err(err)
-                }
-            });
-        Either::B(fut)
+            .map_err(WasmErr::from)?;
+
+        let get_user_media = media_devices.get_user_media_with_constraints(&constraints)
+            .map_err(WasmErr::from)?;
+        let stream = JsFuture::from(get_user_media).await?;
+
+        match request.parse_stream(&SysMediaStream::from(stream)) {
+            Ok(stream) => {
+                let stream = Rc::new(stream);
+                self.0.borrow_mut().streams.push(Rc::clone(&stream));
+                self.0.borrow().on_local_stream.call1(stream.new_handle());
+                Ok(stream)
+            },
+            Err(err) => {
+                self.0.borrow().on_local_stream.call2(err.clone());
+                Err(err)
+            },
+        }
     }
 
     /// Sets `on_local_stream` callback that will be invoked when

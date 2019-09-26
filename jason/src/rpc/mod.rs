@@ -6,9 +6,10 @@ mod websocket;
 use std::{cell::RefCell, rc::Rc, vec};
 
 use futures::{
-    sync::mpsc::{unbounded, UnboundedSender},
-    Future, Stream,
+    channel::mpsc::{unbounded, UnboundedSender},
+    Stream,
 };
+
 use js_sys::Date;
 use medea_client_api_proto::{ClientMsg, Command, Event, ServerMsg};
 
@@ -29,7 +30,7 @@ pub enum CloseMsg {
 #[cfg_attr(feature = "mockable", mockall::automock)]
 pub trait RpcClient {
     /// Returns [`Stream`] of all [`Event`]s received by this [`RpcClient`].
-    fn subscribe(&self) -> Box<dyn Stream<Item = Event, Error = ()>>;
+    fn subscribe(&self) -> Box<dyn Stream<Item = Event>>;
 
     /// Unsubscribes from this [`RpcClient`]. Drops all subscriptions atm.
     fn unsub(&self);
@@ -117,33 +118,30 @@ impl WebsocketRpcClient {
     /// Creates new WebSocket connection to remote media server.
     /// Starts `Heartbeat` if connection succeeds and binds handlers
     /// on receiving messages from server and closing socket.
-    pub fn init(&mut self) -> impl Future<Item = (), Error = WasmErr> {
+    pub async fn init(&mut self) -> Result<(), WasmErr> {
+
+        let socket = Rc::new(WebSocket::new(&self.0.borrow().token).await?);
+        self.0.borrow_mut().heartbeat.start(Rc::clone(&socket))?;
+
         let inner = Rc::clone(&self.0);
-        WebSocket::new(&self.0.borrow().token).and_then(
-            move |socket: WebSocket| {
-                let socket = Rc::new(socket);
+        socket.on_message(move |msg: Result<ServerMsg, WasmErr>| {
+            on_message(&inner, msg)
+        })?;
 
-                inner.borrow_mut().heartbeat.start(Rc::clone(&socket))?;
+        let inner = Rc::clone(&self.0);
+        socket
+            .on_close(move |msg: CloseMsg| on_close(&inner, msg))?;
 
-                let inner_rc = Rc::clone(&inner);
-                socket.on_message(move |msg: Result<ServerMsg, WasmErr>| {
-                    on_message(&inner_rc, msg)
-                })?;
+        self.0.borrow_mut().sock.replace(socket);
 
-                let inner_rc = Rc::clone(&inner);
-                socket
-                    .on_close(move |msg: CloseMsg| on_close(&inner_rc, msg))?;
+        Ok(())
 
-                inner.borrow_mut().sock.replace(socket);
-                Ok(())
-            },
-        )
     }
 }
 
 impl RpcClient for WebsocketRpcClient {
     // TODO: proper sub registry
-    fn subscribe(&self) -> Box<dyn Stream<Item = Event, Error = ()>> {
+    fn subscribe(&self) -> Box<dyn Stream<Item=Event>> {
         let (tx, rx) = unbounded();
         self.0.borrow_mut().subs.push(tx);
         Box::new(rx)

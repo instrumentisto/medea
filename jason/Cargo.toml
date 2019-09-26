@@ -20,15 +20,15 @@ crate-type = ["cdylib", "rlib"]
 opt-level = "s"  # Tell `rustc` to optimize for small code size.
 
 [features]
-default = ["console_error_panic_hook", "wee_alloc"]
+#default = ["console_error_panic_hook", "wee_alloc"]
+default = ["wee_alloc"]
 mockable = ["downcast", "fragile", "mockall", "predicates-tree"]
 
 [dependencies]
-console_error_panic_hook = { version = "0.1", optional = true }
+#console_error_panic_hook = { version = "0.1", optional = true }
 downcast = { version = "0.10", optional = true }
 fragile = { version = "0.3", optional = true }
-futures = "0.1"
-js-sys = "0.3"
+js-sys = { git = "https://github.com/rustwasm/wasm-bindgen" }
 macro-attr = "0.2"
 medea-client-api-proto = { path = "../proto/client-api", features = ["jason"] }
 medea-macro = "0.1"
@@ -37,11 +37,14 @@ newtype_derive = "0.1"
 predicates-tree = { version = "1.0", optional = true }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-wasm-bindgen = { version = "0.2", features = ["serde-serialize"] }
-wasm-bindgen-futures = "0.3"
+wasm-bindgen = { git = "https://github.com/rustwasm/wasm-bindgen", features = ["serde-serialize"] }
+wasm-bindgen-futures = { git = "https://github.com/rustwasm/wasm-bindgen" }
 wee_alloc = { version = "0.4", optional = true }
+[dependencies.futures-preview]
+    version = "0.3.0-alpha.18"
+    features = ["async-await", "compat", "nightly"]
 [dependencies.web-sys]
-    version = "0.3"
+    git = "https://github.com/rustwasm/wasm-bindgen"
     features = [
         "CloseEvent", "console", "Event", "EventTarget", "MediaDevices",
         "MediaStream", "MediaStreamConstraints", "MediaStreamTrack",
@@ -55,4 +58,7 @@ wee_alloc = { version = "0.4", optional = true }
     ]
 
 [dev-dependencies]
-wasm-bindgen-test = "0.2"
+#wasm-bindgen-test = {git="https://github.com/rustwasm/wasm-bindgen"}
+
+#[patch.crates-io]
+#wasm-bindgen = {git="https://github.com/rustwasm/wasm-bindgen"}
