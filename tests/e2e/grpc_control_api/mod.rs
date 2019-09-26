@@ -118,7 +118,7 @@ impl ControlClient {
 ///   id: {{ room_id }}
 ///   spec:
 ///     pipeline:
-///       caller:
+///       publisher:
 ///         kind: Member
 ///         spec:
 ///           pipeline:
@@ -134,7 +134,7 @@ impl ControlClient {
 ///             play:
 ///               kind: WebRtcPlayEndpoint
 ///               spec:
-///                 src: "local://{{ room_id }}/caller/publish"
+///                 src: "local://{{ room_id }}/publisher/publish"
 /// ```
 fn create_room_req(room_id: &str) -> CreateRequest {
     let mut create_req = CreateRequest::new();

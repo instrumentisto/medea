@@ -143,8 +143,10 @@ pub enum RpcConnectionCloseReason {
     ConnectionSwapped,
 }
 
+/// Description which will be sent in Close WebSocket frame.
 #[derive(Constructor, Debug, Deserialize, Serialize)]
 pub struct CloseDescription {
+    /// Reason of why connection was closed.
     pub reason: RpcConnectionCloseReason,
 }
 

@@ -7,9 +7,9 @@ pub mod webrtc;
 use derive_more::From;
 use medea_control_api_proto::grpc::control_api::Element as RootElementProto;
 
-/// Enum which can store all kinds of [medea] endpoints.
+/// Enum which can store all kinds of [Medea] endpoints.
 ///
-/// [medea]: https://github.com/instrumentisto/medea
+/// [Medea]: https://github.com/instrumentisto/medea
 #[derive(Clone, Debug, From)]
 pub enum Endpoint {
     WebRtcPublishEndpoint(webrtc::WebRtcPublishEndpoint),
