@@ -78,7 +78,7 @@ pub fn run(args: &ArgMatches) {
 
 /// `GET /hb`
 ///
-/// Checks connection with medea's gRPC control API.
+/// Checks connection with medea's gRPC Control API.
 /// This is used for waiting before e2e tests start until all needed services
 /// startup.
 #[allow(clippy::needless_pass_by_value)]
@@ -264,7 +264,7 @@ pub struct GetResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub elements: Option<HashMap<String, Element>>,
 
-    /// Error if something happened on control API's side.
+    /// Error if something happened on Control API's side.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<ErrorResponse>,
 }

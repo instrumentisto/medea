@@ -423,7 +423,9 @@ endif
 # 	make test.e2e [dockerized=(YES|no)] [logs=(yes|NO)] [coturn=(YES|no)]
 
 medea-env = RUST_BACKTRACE=1 \
-	MEDEA_SERVER.HTTP.BIND_PORT=8081 \
+	MEDEA_SERVER__HTTP__BIND_PORT=8081 \
+	MEDEA_RPC__IDLE_TIMEOUT=4s \
+	MEDEA_RPC__RECONNECT_TIMEOUT=60s \
 	$(if $(call eq,$(logs),yes),,RUST_LOG=warn) \
 	MEDEA_SERVER.HTTP.STATIC_SPECS_PATH=tests/specs
 

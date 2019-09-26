@@ -2,7 +2,7 @@
 name = "connection-dropper"
 version = "0.1.0-dev"
 edition = "2018"
-description = "Coonection dropper for Medea E2E tests."
+description = "Conection dropper for Medea's connetcion loss E2E tests."
 authors = ["Instrumentisto Team <developer@instrumentisto.com>"]
 homepage = "https://github.com/instrumentisto/medea"
 readme = "README.md"

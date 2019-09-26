@@ -5,11 +5,11 @@ use std::time::Duration;
 use actix::{
     Actor, AsyncContext, Context, Handler, Message, Running, SpawnHandle,
 };
+use clap::ArgMatches;
 use iptables::error::IPTResult;
 use rand::{rngs::ThreadRng, Rng};
 
 use crate::{firewall::Firewall, prelude::*};
-use clap::ArgMatches;
 
 /// Service which can up/down connection at random time.
 pub struct Gremlin {
@@ -83,7 +83,8 @@ impl Gremlin {
     /// Generates random [`Duration`] in range between `min_wait` and
     /// `max_wait`.
     ///
-    /// Used for generation wait duration in the [`Gremlin`]'s
+    /// Used for generation wait duration between connection up and connection
+    /// down.
     fn gen_random_duration(&mut self) -> Duration {
         Duration::from_secs(self.rng.gen_range(self.min_wait, self.max_wait))
     }

@@ -17,13 +17,19 @@ use crate::{
     gremlin::{Gremlin, Start, Stop},
 };
 
+/// Errors which can happen while request to server.
+///
+/// This errors can be used as returning `Error` from actix-web handlers. On
+/// error result this `Error` will be rendered to json with `500` HTTP code and
+/// `error_message` will be generated from [`Display`] implementation of
+/// [`ServerError`].
 #[derive(Display, Debug, From)]
 pub enum ServerError {
     #[display(fmt = "Iptables error. {:?}", _0)]
     IptablesErr(IPTError),
 
-    #[display(fmt = "Gremlin service error. {:?}", _0)]
-    GremlinServiceErr(MailboxError),
+    #[display(fmt = "Gremlin mailbox error. {:?}", _0)]
+    GremlinMailboxErr(MailboxError),
 }
 
 impl ResponseError for ServerError {

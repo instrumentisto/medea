@@ -1,4 +1,4 @@
-//! `Member` element related methods and entities.
+//! `Member` element's related methods and entities.
 
 use std::collections::HashMap;
 
@@ -43,7 +43,7 @@ pub fn delete(
         .map(|r| Response::from(r).into())
 }
 
-/// Entity that represents control API `Member`.
+/// Entity that represents Control API's `Member` element.
 #[derive(Deserialize, Serialize, Debug)]
 pub struct Member {
     /// Pipeline of control API `Member`.
@@ -95,7 +95,7 @@ impl Into<RoomElementProto> for Member {
 
 /// `POST /{room_id}/{member_id}`
 ///
-/// Create new `Member`.
+/// Creates new `Member`.
 #[allow(clippy::needless_pass_by_value)]
 pub fn create(
     path: Path<MemberPath>,
@@ -111,7 +111,7 @@ pub fn create(
 
 /// `GET /{room_id}/{member_id}`
 ///
-/// Get single `Member`.
+/// Gets single `Member`.
 ///
 /// _For batch get use `GET /`._
 #[allow(clippy::needless_pass_by_value)]

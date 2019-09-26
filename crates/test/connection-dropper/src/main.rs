@@ -1,6 +1,9 @@
 //! Server which provides API for opening and closing some port.
 //!
-//! Used for connection loss E2E tests of Medea/Jason.
+//! Used for connection loss E2E tests of [Medea]/[Jason].
+//!
+//! [Medea]: https://github.com/instrumentisto/medea
+//! [Jason]: https://github.com/instrumentisto/medea/tree/master/jason
 
 mod firewall;
 mod gremlin;
@@ -19,6 +22,13 @@ extern "C" {
 }
 
 fn main() {
+    // We need root permission because we use 'iptables'.
+    unsafe {
+        if geteuid() != 0 {
+            panic!("You cannot run connection-dropper unless you are root.");
+        }
+    }
+
     let opts = app_from_crate!()
         .arg(
             Arg::with_name("addr")
@@ -49,13 +59,6 @@ fn main() {
                 .short("x"),
         )
         .get_matches();
-
-    // We need root permission because we use 'iptables'.
-    unsafe {
-        if geteuid() != 0 {
-            panic!("You cannot run connection-dropper unless you are root.");
-        }
-    }
 
     dotenv::dotenv().ok();
 

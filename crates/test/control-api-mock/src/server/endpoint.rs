@@ -96,7 +96,7 @@ impl From<WebRtcPublishEndpointProto> for WebRtcPublishEndpoint {
     }
 }
 
-/// Control API's `WebRtcPlayEndpoint` representation.
+/// Control API's `WebRtcPlayEndpoint` element representation.
 #[allow(clippy::module_name_repetitions)]
 #[derive(Serialize, Deserialize, Debug)]
 pub struct WebRtcPlayEndpoint {
@@ -121,7 +121,7 @@ impl From<WebRtcPlayEndpointProto> for WebRtcPlayEndpoint {
     }
 }
 
-/// Some `Endpoint` representation.
+/// `Endpoint` element representation.
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "kind")]
 pub enum Endpoint {
@@ -162,7 +162,7 @@ impl From<MemberElementProto> for Endpoint {
 
 /// `POST /{room_id}/{member_id}/{endpoint_id}`
 ///
-/// Create new `Endpoint`.
+/// Creates new `Endpoint` element.
 #[allow(clippy::needless_pass_by_value)]
 pub fn create(
     path: Path<EndpointPath>,
@@ -178,7 +178,7 @@ pub fn create(
 
 /// `GET /{room_id}/{member_id}/{endpoint_id}`
 ///
-/// Get single `Endpoint`.
+/// Gets single `Endpoint` element.
 ///
 /// For batch get use `GET /`.
 #[allow(clippy::needless_pass_by_value)]
