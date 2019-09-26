@@ -618,6 +618,7 @@ impl Room {
         resetting_member_id: &MemberId,
         ctx: &mut Context<Self>,
     ) -> Result<ActFuture<(), RoomError>, RoomError> {
+        debug!("Resetting Member [id = {}].", resetting_member_id);
         let removed_peers = self
             .peers
             .remove_peers_related_to_member(resetting_member_id);

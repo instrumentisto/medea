@@ -45,14 +45,14 @@ fn main() {
                 .short("p"),
         )
         .arg(
-            Arg::with_name("gremlin-max-wait")
+            Arg::with_name("gremlin-min-wait")
                 .help("Minimum port's loss/availability time.")
                 .default_value("5")
                 .long("min-wait")
                 .short("m"),
         )
         .arg(
-            Arg::with_name("gremlin-min-wait")
+            Arg::with_name("gremlin-max-wait")
                 .help("Maximum port's loss/availability time.")
                 .default_value("15")
                 .long("max-wait")

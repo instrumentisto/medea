@@ -1,18 +1,18 @@
 describe('Pub<=>Pub video call', () => {
     let rooms;
 
-    before(async function () {
+    before(async function() {
         this.timeout(60000);
         await deleteRoom();
         await createRoom();
-        rooms = await startPubPubVideoCall(true);
+        rooms = await startPubPubVideoCall();
         let video = await waitForElement(callerPartnerVideo);
         await waitForVideo(video);
     });
 
     after(async () => {
-        await axios.post("http://127.0.0.1:8500/connection/up");
         await deleteRoom();
+        await axios.post("http://127.0.0.1:8500/gremlin/stop");
     });
 
     /**
@@ -27,25 +27,10 @@ describe('Pub<=>Pub video call', () => {
         let callerRoom = await caller.join_room("ws://127.0.0.1:8080/ws/pub-pub-e2e-call/caller/test");
         let responderRoom = await responder.join_room("ws://127.0.0.1:8090/ws/pub-pub-e2e-call/responder/test");
 
-        async function down_up() {
-            await axios.post('http://127.0.0.1:8500/connection/down');
-            setTimeout(async () => {
-                await axios.post('http://127.0.0.1:8500/connection/up');
-            }, 5000);
-        }
-
-        async function dropper(e) {
-            if (e.event === 'PeerCreated') {
-                await down_up();
-            } else if (e.event === 'SdpAnswerMade') {
-                await down_up();
-            } else if(e.event === 'PeersRemoved') {
-                await down_up();
-            }
-        }
-
         responderRoom.on_event(async (e) => {
-            await dropper(e);
+            if (e.event === 'PeerCreated') {
+                await axios.post('http://127.0.0.1:8500/gremlin/start');
+            }
         });
 
         callerRoom.on_new_connection((connection) => {
@@ -104,9 +89,9 @@ describe('Pub<=>Pub video call', () => {
 
     it('video not static', async () => {
         await video_not_static_test()
-    }).retries(5);
+    }).retries(10000);
 
     it('media tracks count valid', async () => {
         await media_track_count_valid_test()
-    })
+    }).retries(10000)
 });

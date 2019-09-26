@@ -455,7 +455,7 @@ ifeq ($(dockerized),no)
 	cargo build -p control-api-mock
 	$(run-medea-container) sh -c "cd jason && wasm-pack build --target web --out-dir ../.cache/jason-pkg"
 
-	env $(if $(call eq,$(logs),yes),,RUST_LOG=warn) cargo run --bin medea \
+	env $(medea-env) $(if $(call eq,$(logs),yes),,RUST_LOG=warn) cargo run --bin medea \
 		$(if $(call eq,$(release),yes),--release) & \
 		echo $$! > /tmp/e2e_medea.pid
 	env RUST_LOG=warn cargo run -p control-api-mock & \
@@ -472,7 +472,7 @@ else
 	$(run-medea-container) sh -c "cd jason && RUST_LOG=info wasm-pack build --target web --out-dir ../.cache/jason-pkg"
 
 	$(run-medea-container) make build.medea optimized=yes
-	$(run-medea-container-d) cargo run --release > /tmp/medea.docker.uid
+	$(run-medea-container-d) env $(medea-env) cargo run --release > /tmp/medea.docker.uid
 
 	$(run-medea-container) cargo build -p control-api-mock
 	$(run-medea-container-d) cargo run -p control-api-mock > /tmp/control-api-mock.docker.uid
