@@ -141,7 +141,10 @@ endif
 else
 	docker container stop $$(cat /tmp/control-api-mock.docker.uid)
 	docker container stop $$(cat /tmp/medea.docker.uid)
-	rm -f /tmp/control-api-mock.docker.uid /tmp/medea.docker.uid
+	docker container stop $$(cat /tmp/nginx.docker.uid)
+	rm -f /tmp/control-api-mock.docker.uid /tmp/medea.docker.uid /tmp/nginx.docker.uid
+
+	sudo kill $(shell pidof connection-dropper)
 
 	@make down.coturn
 endif
@@ -401,6 +404,7 @@ else
 	@make up.e2e.services
 
 	docker run --rm -d --network=host selenoid/chrome:latest > /tmp/chromedriver.docker.uid
+	sleep 3
 	$(run-medea-container) cargo run -p e2e-tests-runner -- \
 		-f 127.0.0.1:$(test-runner-port) \
 		-w http://127.0.0.1:4444 \
@@ -424,7 +428,7 @@ medea-env = RUST_BACKTRACE=1 \
 	MEDEA_SERVER.HTTP.STATIC_SPECS_PATH=tests/specs
 
 chromedriver-port = 50000
-geckodriver-port = 50001
+geckodriver-port = 4444
 test-runner-port = 51000
 
 run-medea-command = docker run --rm --network=host -v "$(PWD)":/app -w /app \
@@ -472,6 +476,10 @@ else
 	$(run-medea-container-d) cargo run -p control-api-mock > /tmp/control-api-mock.docker.uid
 
 	$(run-medea-container) cargo build -p e2e-tests-runner
+
+	docker run --rm -d -v $(PWD)/_dev/connection-loss-e2e-tests-nginx.conf:/etc/nginx/conf.d/default.conf --network=host nginx > /tmp/nginx.docker.uid
+	cargo build -p connection-dropper
+	sudo bash -c '$(PWD)/target/debug/connection-dropper &'
 endif
 
 
@@ -500,9 +508,10 @@ else
 	@make up.e2e.services
 
 	docker run --rm -d --network=host medea-geckodriver > /tmp/geckodriver.docker.uid
+	sleep 3
 	$(run-medea-container) cargo run -p e2e-tests-runner -- \
 		-f localhost:$(test-runner-port) \
-		-w http://localhost:4444 \
+		-w http://127.0.0.1:4444 \
 		--headless
 
 	docker container kill $$(cat /tmp/geckodriver.docker.uid)
@@ -992,6 +1001,7 @@ protoc.rebuild:
         minikube.boot \
         protoc.rebuild \
         release release.crates release.helm release.npm \
-        test test.e2e test.unit \
+        test test.e2e test.e2e.chrome test.e2e.firefox test.unit \
         up up.coturn up.demo up.dev up.jason up.medea \
+        up.e2e.services \
         yarn

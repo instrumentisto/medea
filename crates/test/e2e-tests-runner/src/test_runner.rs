@@ -261,6 +261,7 @@ fn generate_and_save_test_html(test_path: &PathBuf) -> PathBuf {
 fn wait_for_test_end(
     client: Client,
 ) -> impl Future<Item = Client, Error = CmdError> {
+    println!("wait_for_test_end");
     client
         .wait_for_find(Locator::Id("test-end"))
         .map(fantoccini::Element::client)

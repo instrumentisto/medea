@@ -11,8 +11,8 @@ describe('Pub<=>Pub video call', () => {
     });
 
     after(async () => {
+        await axios.post("http://127.0.0.1:8500/connection/up");
         await deleteRoom();
-        await axios.post("http://localhost:8500/connection/up");
     });
 
     /**
@@ -47,7 +47,7 @@ describe('Pub<=>Pub video call', () => {
         // TODO: better?
         setTimeout(async () => {
             await down_up();
-        }, 50);
+        }, 100);
 
         callerRoom.on_event(async (e) => {
             await dropper(e);
@@ -109,7 +109,7 @@ describe('Pub<=>Pub video call', () => {
 
     it('send rtc packets', async () => {
         await send_rtc_packets_test(rooms)
-    }).retries(5);
+    }).retries(10000);
 
     it('video not static', async () => {
         await video_not_static_test()

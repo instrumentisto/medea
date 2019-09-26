@@ -77,7 +77,7 @@ describe('Pub<=>Pub video call', () => {
 
     it('send rtc packets', async () => {
         await send_rtc_packets_test(rooms)
-    }).retries(5);
+    }).retries(10000);
 
     it('video not static', async () => {
         await video_not_static_test()
