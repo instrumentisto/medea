@@ -85,7 +85,11 @@ fn on_close(ws_client: WebsocketRpcClient, close_msg: &CloseMsg) {
     }
 
     match &close_msg {
-        CloseMsg::Normal(_) | CloseMsg::Disconnect(_) => {
+        CloseMsg::Normal(_) => {
+            web_sys::console::log_1(&"Normal".into());
+        }
+       CloseMsg::Disconnect(_) => {
+           web_sys::console::log_1(&"Disconnect".into());
             spawn_local(futures::future::loop_fn(ws_client, |ws_client| {
                 ws_client.init().then(move |res| match res {
                     Ok(_) => Ok(Loop::Break(())),
