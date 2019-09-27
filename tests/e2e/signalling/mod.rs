@@ -56,8 +56,31 @@ impl TestMember {
     /// Sends command to the server.
     fn send_command(&mut self, msg: Command) {
         let json = serde_json::to_string(&msg).unwrap();
-        self.writer.start_send(ws::Message::Text(json)).unwrap();
-        self.writer.poll_complete().unwrap();
+        self.writer.start_send(ws::Message::Text(json)).ok();
+        self.writer.poll_complete().ok();
+    }
+
+    pub fn connect(
+        uri: &str,
+        on_message: MessageHandler,
+        deadline: Option<Duration>,
+    ) -> impl futures::future::Future<Item = (), Error = ()> {
+        awc::Client::new()
+            .ws(uri)
+            .connect()
+            .map_err(|e| panic!("Error: {}", e))
+            .map(move |(_, framed)| {
+                let (sink, stream) = framed.split();
+                TestMember::create(move |ctx| {
+                    TestMember::add_stream(stream, ctx);
+                    TestMember {
+                        writer: sink,
+                        events: Vec::new(),
+                        deadline,
+                        on_message,
+                    }
+                });
+            })
     }
 
     /// Starts test member in new [`Arbiter`] by given URI.

@@ -578,11 +578,13 @@ impl Room {
         peer_ids_to_remove: HashSet<PeerId>,
         ctx: &mut Context<Self>,
     ) {
+        debug!("Remove peers.");
         self.peers
             .remove_peers(&member_id, peer_ids_to_remove)
             .into_iter()
             .for_each(|(member_id, peers_id)| {
-                self.member_peers_removed(peers_id, member_id, ctx);
+                let fut = self.member_peers_removed(peers_id, member_id, ctx);
+                ctx.spawn(fut);
             });
     }
 
@@ -634,7 +636,9 @@ impl Room {
                     let removed_peers =
                         self.peers.remove_peer(member_id, peer_id);
                     for (member_id, peers_ids) in removed_peers {
-                        self.member_peers_removed(peers_ids, member_id, ctx);
+                        let fut = self
+                            .member_peers_removed(peers_ids, member_id, ctx);
+                        ctx.spawn(fut);
                     }
                 }
             }

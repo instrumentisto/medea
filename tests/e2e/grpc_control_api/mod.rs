@@ -21,7 +21,8 @@ use protobuf::RepeatedField;
 /// Client for [Medea]'s gRPC [Control API].
 ///
 /// [Medea]: https://github.com/instrumentisto/medea
-struct ControlClient(ControlApiClient);
+#[derive(Clone)]
+pub struct ControlClient(ControlApiClient);
 
 impl ControlClient {
     /// Create new [`ControlClient`].
@@ -136,7 +137,7 @@ impl ControlClient {
 ///               spec:
 ///                 src: "local://{{ room_id }}/publisher/publish"
 /// ```
-fn create_room_req(room_id: &str) -> CreateRequest {
+pub fn create_room_req(room_id: &str) -> CreateRequest {
     let mut create_req = CreateRequest::new();
     let mut room = Room::new();
     let mut publisher = Member::new();
