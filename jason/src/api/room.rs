@@ -94,8 +94,6 @@ impl Room {
         let events_stream = rpc.subscribe();
         let room = Rc::new(RefCell::new(InnerRoom::new(rpc, peers, tx)));
 
-
-
         let rpc_events_stream = events_stream.map(|event| {
             RoomEvent::RpcEvent(event)
         });
@@ -103,27 +101,14 @@ impl Room {
         let peer_events_stream = peer_events_rx.map(|event|
             RoomEvent::PeerEvent(event));
 
-
         let inner = Rc::downgrade(&room);
-        select(rpc_events_stream, peer_events_stream).then(|event| async {
-            match inner.upgrade() {
-                Some(inner) => {
-                    match event {
-                        RoomEvent::RpcEvent(event) => {},
-                        RoomEvent::PeerEvent(evnet) => {}
-                    }
-//                    event.dispatch_with(inner.borrow_mut().deref_mut());
-//                    Ok(())
-                }
-                None => {
+        select(rpc_events_stream, peer_events_stream).take_while(move |event| {
 
-                    // `InnerSession` is gone, which means that `Room` has been
-                    // dropped. Not supposed to happen, actually, since
-                    // `InnerSession` should drop its `tx` by unsub from
-                    // `RpcClient`.
-//                    Err(())
-                },
-            };
+            inner;
+
+            async {
+                true
+            }
         });
 
         Self(room)
