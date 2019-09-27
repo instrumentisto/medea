@@ -8,7 +8,7 @@ use std::{
     str::FromStr,
 };
 
-use derive_more::{Display, FromStr, Constructor};
+use derive_more::{Constructor, Display, FromStr};
 use medea_macro::dispatchable;
 use serde::{
     de::{self, DeserializeSeed, Deserializer, MapAccess, Visitor},

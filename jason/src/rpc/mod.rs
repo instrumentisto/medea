@@ -11,8 +11,11 @@ use futures::{
     Future, Stream,
 };
 use js_sys::Date;
-use medea_client_api_proto::{ClientMsg, Command, Event, ServerMsg};
+use medea_client_api_proto::{
+    ClientMsg, Command, Event, RpcConnectionCloseReason, ServerMsg,
+};
 use wasm_bindgen_futures::spawn_local;
+use web_sys::CloseEvent;
 
 use crate::utils::WasmErr;
 
@@ -21,9 +24,26 @@ use self::{heartbeat::Heartbeat, websocket::WebSocket};
 /// Connection with remote was closed.
 pub enum CloseMsg {
     /// Transport was gracefully closed by remote.
-    Normal(String),
+    Normal(u16, RpcConnectionCloseReason),
     /// Connection was unexpectedly closed. Consider reconnecting.
-    Disconnect(String),
+    Disconnect(u16),
+}
+
+impl From<&CloseEvent> for CloseMsg {
+    fn from(event: &CloseEvent) -> Self {
+        let code: u16 = event.code();
+        let reason = serde_json::from_str(&event.reason()).ok();
+        match code {
+            1000 => {
+                if let Some(reason) = reason {
+                    Self::Normal(code, reason)
+                } else {
+                    Self::Disconnect(code)
+                }
+            }
+            _ => Self::Disconnect(code),
+        }
+    }
 }
 
 /// Client to talk with server via Client API RPC.
@@ -85,11 +105,8 @@ fn on_close(ws_client: WebsocketRpcClient, close_msg: &CloseMsg) {
     }
 
     match &close_msg {
-        CloseMsg::Normal(_) => {
-            web_sys::console::log_1(&"Normal".into());
-        }
-       CloseMsg::Disconnect(_) => {
-           web_sys::console::log_1(&"Disconnect".into());
+        CloseMsg::Normal(_, _) => {}
+        CloseMsg::Disconnect(_) => {
             spawn_local(futures::future::loop_fn(ws_client, |ws_client| {
                 ws_client.init().then(move |res| match res {
                     Ok(_) => Ok(Loop::Break(())),
