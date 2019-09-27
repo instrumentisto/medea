@@ -8,7 +8,9 @@ use medea_control_api_proto::grpc::control_api::{
     WebRtcPlayEndpoint, WebRtcPublishEndpoint, WebRtcPublishEndpoint_P2P,
 };
 
-use crate::{grpc_control_api::ControlClient, signalling::TestMember};
+use crate::{
+    format_name_macro, grpc_control_api::ControlClient, signalling::TestMember,
+};
 
 fn room_with_one_pub_member_req(room_id: &str) -> CreateRequest {
     let mut create_req = CreateRequest::new();
@@ -94,9 +96,11 @@ fn create_room_req(room_id: &str) -> CreateRequest {
 
 #[test]
 fn create_play_member_after_pub_member() {
-    let sys = System::new("qwerty");
+    format_name_macro!("create-play-member-after-pub-member");
+
+    let sys = System::new(format_name!("{}"));
     let control_client = ControlClient::new();
-    control_client.create(&room_with_one_pub_member_req("asdfg"));
+    control_client.create(&room_with_one_pub_member_req(&format_name!("{}")));
 
     let peers_created = Rc::new(Cell::new(0));
 
@@ -118,14 +122,14 @@ fn create_play_member_after_pub_member() {
     let deadline = Some(std::time::Duration::from_secs(5));
     Arbiter::spawn(
         TestMember::connect(
-            "ws://127.0.0.1:8080/ws/asdfg/publisher/test",
+            &format_name!("ws://127.0.0.1:8080/ws/{}/publisher/test"),
             Box::new(on_event.clone()),
             deadline,
         )
         .and_then(move |_| {
-            control_client.create(&create_play_member_req("asdfg"));
+            control_client.create(&create_play_member_req(&format_name!("{}")));
             TestMember::connect(
-                "ws://127.0.0.1:8080/ws/asdfg/responder/qwerty",
+                &format_name!("ws://127.0.0.1:8080/ws/{}/responder/qwerty"),
                 Box::new(on_event),
                 deadline,
             )
@@ -137,9 +141,11 @@ fn create_play_member_after_pub_member() {
 
 #[test]
 fn delete_member_check_peers_removed() {
-    let sys = System::new("qwerty");
+    format_name_macro!("delete-member-check-peers-removed");
+
+    let sys = System::new(&format_name!("{}"));
     let control_client = ControlClient::new();
-    control_client.create(&create_room_req("zxcv"));
+    control_client.create(&create_room_req(&format_name!("{}")));
 
     let peers_created = Rc::new(Cell::new(0));
 
@@ -149,7 +155,8 @@ fn delete_member_check_peers_removed() {
                 Event::PeerCreated { .. } => {
                     peers_created.set(peers_created.get() + 1);
                     if peers_created.get() == 2 {
-                        control_client.delete(&["local://zxcv/responder"]);
+                        control_client
+                            .delete(&[&format_name!("local://{}/responder")]);
                     }
                 }
                 Event::PeersRemoved { .. } => {
@@ -164,12 +171,12 @@ fn delete_member_check_peers_removed() {
     let deadline = Some(Duration::from_secs(5));
 
     TestMember::start(
-        "ws://127.0.0.1:8080/ws/zxcv/publisher/test",
+        &format_name!("ws://127.0.0.1:8080/ws/{}/publisher/test"),
         Box::new(on_event.clone()),
         deadline,
     );
     TestMember::start(
-        "ws://127.0.0.1:8080/ws/zxcv/responder/test",
+        &format_name!("ws://127.0.0.1:8080/ws/{}/responder/test"),
         Box::new(on_event),
         deadline,
     );
