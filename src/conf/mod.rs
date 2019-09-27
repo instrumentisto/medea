@@ -53,7 +53,7 @@ pub struct Conf {
 
     /// [Control API] settings.
     ///
-    /// [Control API]: http://tiny.cc/380uaz
+    /// [Control API]: https://tinyurl.com/yxsqplq7
     pub control_api: ControlApi,
 }
 
@@ -126,7 +126,7 @@ pub mod tests {
     /// ```
     #[macro_export]
     macro_rules! overrided_by_env_conf {
-        ($($env:expr => $value:expr),+) => {{
+        ($($env:expr => $value:expr),+ $(,)?) => {{
             $(::std::env::set_var($env, $value);)+
             let conf = crate::conf::Conf::parse().unwrap();
             $(::std::env::remove_var($env);)+

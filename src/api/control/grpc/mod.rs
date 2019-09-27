@@ -1,5 +1,5 @@
 //! Implementation of [Control API] gRPC server.
 //!
-//! [Control API]: http://tiny.cc/380uaz
+//! [Control API]: https://tinyurl.com/yxsqplq7
 
 pub mod server;

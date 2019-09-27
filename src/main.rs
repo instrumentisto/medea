@@ -44,7 +44,7 @@ fn main() -> Result<(), Error> {
                 medea::api::control::start_static_rooms(&room_service).map(
                     move |_| {
                         let grpc_addr =
-                            grpc::server::run(room_service, app_context);
+                            grpc::server::run(room_service, &app_context);
                         shutdown::subscribe(
                             &graceful_shutdown,
                             grpc_addr.recipient(),
