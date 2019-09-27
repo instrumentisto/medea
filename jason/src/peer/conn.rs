@@ -206,7 +206,8 @@ impl RtcPeerConnection {
                 .add_ice_candidate_with_opt_rtc_ice_candidate_init(
                     Some(cand_init).as_ref(),
                 ),
-        ).await?;
+        )
+        .await?;
         Ok(())
     }
 
@@ -215,17 +216,14 @@ impl RtcPeerConnection {
     /// description.
     ///
     /// Should be called whenever remote description has been changed.
-    pub async fn create_and_set_answer(
-        &self,
-    ) -> Result<String, WasmErr> {
+    pub async fn create_and_set_answer(&self) -> Result<String, WasmErr> {
         let conn = self.0.borrow();
         let peer: Rc<SysRtcPeerConnection> = Rc::clone(&conn.peer);
 
         let answer = JsFuture::from(conn.peer.create_answer()).await?;
         let answer = RtcSessionDescription::from(answer).sdp();
 
-        let mut desc =
-            RtcSessionDescriptionInit::new(RtcSdpType::Answer);
+        let mut desc = RtcSessionDescriptionInit::new(RtcSdpType::Answer);
         desc.sdp(&answer);
 
         JsFuture::from(peer.set_local_description(&desc)).await?;
@@ -239,16 +237,13 @@ impl RtcPeerConnection {
     ///
     /// Should be called after local tracks changes, which require
     /// renegotiation.
-    pub async fn create_and_set_offer(
-        &self,
-    ) -> Result<String, WasmErr> {
+    pub async fn create_and_set_offer(&self) -> Result<String, WasmErr> {
         let peer: Rc<SysRtcPeerConnection> = Rc::clone(&self.0.borrow().peer);
 
         let create_offer = JsFuture::from(peer.create_offer()).await?;
         let offer = RtcSessionDescription::from(create_offer).sdp();
 
-        let mut desc =
-            RtcSessionDescriptionInit::new(RtcSdpType::Offer);
+        let mut desc = RtcSessionDescriptionInit::new(RtcSdpType::Offer);
         desc.sdp(&offer);
 
         JsFuture::from(peer.set_local_description(&desc)).await?;
@@ -282,7 +277,8 @@ impl RtcPeerConnection {
 
         JsFuture::from(
             self.0.borrow().peer.set_remote_description(&description),
-        ).await?;
+        )
+        .await?;
 
         Ok(())
     }

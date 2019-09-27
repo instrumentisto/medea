@@ -179,7 +179,8 @@ impl MediaConnections {
 
         for sender in s.senders.values() {
             if let Some(track) = stream.get_track_by_id(sender.track_id) {
-                Sender::insert_and_enable_track(Rc::clone(sender), track).await?
+                Sender::insert_and_enable_track(Rc::clone(sender), track)
+                    .await?
             }
         }
 
@@ -308,7 +309,8 @@ impl Sender {
                 .transceiver
                 .sender()
                 .replace_track(Some(track.track())),
-        ).await?;
+        )
+        .await?;
 
         sender
             .transceiver

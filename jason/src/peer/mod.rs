@@ -252,11 +252,17 @@ impl PeerConnection {
         &self,
         tracks: Vec<Track>,
     ) -> Result<String, WasmErr> {
-        let request = self.0.borrow().media_connections.update_tracks(tracks)?;
+        let request =
+            self.0.borrow().media_connections.update_tracks(tracks)?;
 
         if let Some(request) = request {
-            let local_stream = self.0.borrow().media_manager.get_stream(request).await?;
-            self.0.borrow().media_connections.insert_local_stream(&local_stream).await?;
+            let local_stream =
+                self.0.borrow().media_manager.get_stream(request).await?;
+            self.0
+                .borrow()
+                .media_connections
+                .insert_local_stream(&local_stream)
+                .await?;
         }
 
         self.0.borrow().peer.create_and_set_offer().await
@@ -265,9 +271,7 @@ impl PeerConnection {
     /// Creates an SDP answer to an offer received from a remote peer and sets
     /// it as local description. Must be called only if peer already has remote
     /// description.
-    pub async fn create_and_set_answer(
-        &self,
-    ) -> Result<String, WasmErr> {
+    pub async fn create_and_set_answer(&self) -> Result<String, WasmErr> {
         self.0.borrow().peer.create_and_set_answer().await
     }
 
@@ -284,10 +288,7 @@ impl PeerConnection {
     /// Updates underlying [RTCPeerConnection][1]'s remote SDP from offer.
     ///
     /// [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
-    async fn set_remote_offer(
-        &self,
-        offer: String,
-    ) -> Result<(), WasmErr> {
+    async fn set_remote_offer(&self, offer: String) -> Result<(), WasmErr> {
         self.set_remote_description(SdpType::Offer(offer)).await
     }
 
@@ -302,14 +303,18 @@ impl PeerConnection {
         self.0.borrow().peer.set_remote_description(desc).await?;
         self.0.borrow_mut().has_remote_description = true;
 
-        let candidates = std::mem::replace(self.0.borrow_mut().ice_candidates_buffer.as_mut(), Vec::new());
+        let candidates = std::mem::replace(
+            self.0.borrow_mut().ice_candidates_buffer.as_mut(),
+            Vec::new(),
+        );
         let peer = &self.0.borrow().peer;
         for candidate in candidates {
             peer.add_ice_candidate(
                 &candidate.candidate,
                 candidate.sdp_m_line_index,
                 &candidate.sdp_mid,
-            ).await?;
+            )
+            .await?;
         }
 
         Ok(())
@@ -342,8 +347,13 @@ impl PeerConnection {
         let request = self.0.borrow().media_connections.update_tracks(send)?;
 
         if let Some(request) = request {
-            let local_stream = self.0.borrow().media_manager.get_stream(request).await?;
-            self.0.borrow().media_connections.insert_local_stream(&local_stream).await?;
+            let local_stream =
+                self.0.borrow().media_manager.get_stream(request).await?;
+            self.0
+                .borrow()
+                .media_connections
+                .insert_local_stream(&local_stream)
+                .await?;
         }
 
         Ok(())
@@ -360,11 +370,10 @@ impl PeerConnection {
     ) -> Result<(), WasmErr> {
         let mut inner = self.0.borrow_mut();
         if inner.has_remote_description {
-            inner.peer.add_ice_candidate(
-                &candidate,
-                sdp_m_line_index,
-                &sdp_mid,
-            ).await?;
+            inner
+                .peer
+                .add_ice_candidate(&candidate, sdp_m_line_index, &sdp_mid)
+                .await?;
         } else {
             inner.ice_candidates_buffer.push(IceCandidate {
                 candidate,

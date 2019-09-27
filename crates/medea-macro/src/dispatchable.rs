@@ -23,6 +23,7 @@ fn to_handler_fn_name(name: &str) -> String {
 ///    from `camelCase` to `snake_case` and add `on_` prefix.
 /// 3. Generate trait `{enum_name}Handler` with generated methods from step 1.
 /// 4. Generate method `dispatch_with()` with a dispatching generated on step 2.
+#[allow(clippy::too_many_lines)]
 pub fn derive(input: TokenStream) -> Result<TokenStream> {
     let mut output = input.clone();
 

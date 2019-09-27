@@ -8,7 +8,6 @@ use std::{cell::RefCell, rc::Rc, vec};
 use futures::{
     channel::mpsc::{unbounded, UnboundedSender},
     Stream,
-    stream::LocalBoxStream
 };
 
 use js_sys::Date;
@@ -32,7 +31,7 @@ pub enum CloseMsg {
 #[cfg_attr(feature = "mockable", mockall::automock)]
 pub trait RpcClient {
     /// Returns [`Stream`] of all [`Event`]s received by this [`RpcClient`].
-    fn subscribe(&self) -> Pin<Box<dyn Stream<Item=Event>>>;
+    fn subscribe(&self) -> Pin<Box<dyn Stream<Item = Event>>>;
 
     /// Unsubscribes from this [`RpcClient`]. Drops all subscriptions atm.
     fn unsub(&self);
@@ -121,7 +120,6 @@ impl WebsocketRpcClient {
     /// Starts `Heartbeat` if connection succeeds and binds handlers
     /// on receiving messages from server and closing socket.
     pub async fn init(&mut self) -> Result<(), WasmErr> {
-
         let socket = Rc::new(WebSocket::new(&self.0.borrow().token).await?);
         self.0.borrow_mut().heartbeat.start(Rc::clone(&socket))?;
 
@@ -131,19 +129,17 @@ impl WebsocketRpcClient {
         })?;
 
         let inner = Rc::clone(&self.0);
-        socket
-            .on_close(move |msg: CloseMsg| on_close(&inner, msg))?;
+        socket.on_close(move |msg: CloseMsg| on_close(&inner, msg))?;
 
         self.0.borrow_mut().sock.replace(socket);
 
         Ok(())
-
     }
 }
 
 impl RpcClient for WebsocketRpcClient {
     // TODO: proper sub registry
-    fn subscribe(&self) -> Pin<Box<dyn Stream<Item=Event>>> {
+    fn subscribe(&self) -> Pin<Box<dyn Stream<Item = Event>>> {
         let (tx, rx) = unbounded();
         self.0.borrow_mut().subs.push(tx);
         Box::pin(rx)

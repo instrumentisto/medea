@@ -52,7 +52,8 @@ impl MediaManager {
             .media_devices()
             .map_err(WasmErr::from)?;
 
-        let get_user_media = media_devices.get_user_media_with_constraints(&constraints)
+        let get_user_media = media_devices
+            .get_user_media_with_constraints(&constraints)
             .map_err(WasmErr::from)?;
         let stream = JsFuture::from(get_user_media).await?;
 
@@ -62,11 +63,11 @@ impl MediaManager {
                 self.0.borrow_mut().streams.push(Rc::clone(&stream));
                 self.0.borrow().on_local_stream.call1(stream.new_handle());
                 Ok(stream)
-            },
+            }
             Err(err) => {
                 self.0.borrow().on_local_stream.call2(err.clone());
                 Err(err)
-            },
+            }
         }
     }
 

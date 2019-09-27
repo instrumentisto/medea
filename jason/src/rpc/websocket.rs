@@ -6,7 +6,7 @@ use std::{cell::RefCell, convert::TryFrom, rc::Rc};
 
 use futures::{
     channel::oneshot,
-    future::{self, Either}
+    future::{self, Either},
 };
 
 use macro_attr::*;
@@ -127,12 +127,13 @@ impl WebSocket {
         drop(socket_mut);
 
         match state {
-            Either::Left((opened,_)) => match opened {
-                Ok(_)=> Ok(Self(socket)),
-                Err(_) => Err(WasmErr::from("Failed to init WebSocket"))
+            Either::Left((opened, _)) => match opened {
+                Ok(_) => Ok(Self(socket)),
+                Err(_) => Err(WasmErr::from("Failed to init WebSocket")),
+            },
+            Either::Right(_closed) => {
+                Err(WasmErr::from("Failed to init WebSocket"))
             }
-            ,
-            Either::Right(_closed) => Err(WasmErr::from("Failed to init WebSocket")),
         }
     }
 
