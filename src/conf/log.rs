@@ -34,13 +34,13 @@ mod log_conf_specs {
         let default_conf = Conf::default();
 
         let env_conf = overrided_by_env_conf!(
-            "MEDEA_LOG__LEVEL" => "WARN"
+            "MEDEA_LOG__LEVEL" => "WARN",
         );
         assert_ne!(default_conf.log.level(), env_conf.log.level());
         assert_eq!(env_conf.log.level(), Some(slog::Level::Warning));
 
         let none_lvl = overrided_by_env_conf!(
-            "MEDEA_LOG__LEVEL" => "OFF"
+            "MEDEA_LOG__LEVEL" => "OFF",
         );
         assert_eq!(none_lvl.log.level(), None);
     }

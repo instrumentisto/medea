@@ -1,8 +1,8 @@
 //! `WebRtcPublishEndpoint` [Control API]'s element implementation.
 //!
-//! [Control API]: http://tiny.cc/380uaz
+//! [Control API]: https://tinyurl.com/yxsqplq7
 
-use derive_more::{Display, From};
+use derive_more::{Display, From, Into};
 use serde::Deserialize;
 
 use medea_control_api_proto::grpc::control_api::{
@@ -11,8 +11,10 @@ use medea_control_api_proto::grpc::control_api::{
 };
 
 /// ID of [`WebRtcPublishEndpoint`].
-#[derive(Clone, Debug, Deserialize, Display, Eq, Hash, PartialEq, From)]
-pub struct WebRtcPublishId(pub String);
+#[derive(
+    Clone, Debug, Deserialize, Display, Eq, Hash, PartialEq, From, Into,
+)]
+pub struct WebRtcPublishId(String);
 
 /// Peer-to-peer mode of [`WebRtcPublishEndpoint`].
 #[derive(Clone, Deserialize, Debug)]

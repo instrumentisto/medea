@@ -11,7 +11,7 @@ use url::Url;
 
 use crate::api::control::endpoints::webrtc_play_endpoint::SrcUri;
 
-use super::{MemberId, RoomId};
+use super::{EndpointId, MemberId, RoomId};
 
 /// State of [`LocalUri`] which points to [`Room`].
 ///
@@ -29,7 +29,7 @@ pub struct ToMember(LocalUri<ToRoom>, MemberId);
 ///
 /// [`Endpoint`]: crate::signalling::elements::endpoints::Endpoint
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct ToEndpoint(LocalUri<ToMember>, String);
+pub struct ToEndpoint(LocalUri<ToMember>, EndpointId);
 
 /// URI in format `local://room_id/member_id/endpoint_id`.
 ///
@@ -66,7 +66,7 @@ pub struct ToEndpoint(LocalUri<ToMember>, String);
 /// assert_eq!(local_uri.room_id(), &orig_room_id);
 ///
 /// // If you want to take all IDs ownership, you should do this steps:
-/// let (endpoint_id, member_uri) = local_uri.take_endpoint_id();
+/// let (endpoint_id, member_uri) = local_uri.clone().take_endpoint_id();
 /// assert_eq!(endpoint_id, orig_endpoint_id);
 ///
 /// let (member_id, room_uri) = member_uri.take_member_id();
@@ -74,6 +74,9 @@ pub struct ToEndpoint(LocalUri<ToMember>, String);
 ///
 /// let room_id = room_uri.take_room_id();
 /// assert_eq!(room_id, orig_room_id);
+///
+/// // Or simply
+/// let (room_id, member_id, endpoint_id) = local_uri.take_all();
 /// ```
 ///
 /// This is necessary so that it is not possible to get the address in the
@@ -116,6 +119,23 @@ impl LocalUri<ToRoom> {
     }
 }
 
+impl From<StatefulLocalUri> for LocalUri<ToRoom> {
+    fn from(from: StatefulLocalUri) -> Self {
+        match from {
+            StatefulLocalUri::Room(uri) => uri,
+            StatefulLocalUri::Member(uri) => {
+                let (_, uri) = uri.take_member_id();
+                uri
+            }
+            StatefulLocalUri::Endpoint(uri) => {
+                let (_, uri) = uri.take_endpoint_id();
+                let (_, uri) = uri.take_member_id();
+                uri
+            }
+        }
+    }
+}
+
 impl LocalUri<ToMember> {
     /// Create new [`LocalUri`] in [`ToMember`] state.
     pub fn new(room_id: RoomId, member_id: MemberId) -> Self {
@@ -141,10 +161,20 @@ impl LocalUri<ToMember> {
 
     /// Push endpoint ID to the end of URI and returns
     /// [`LocalUri`] in [`ToEndpoint`] state.
-    pub fn push_endpoint_id(self, endpoint_id: String) -> LocalUri<ToEndpoint> {
+    pub fn push_endpoint_id(
+        self,
+        endpoint_id: EndpointId,
+    ) -> LocalUri<ToEndpoint> {
         let (member_id, room_uri) = self.take_member_id();
         let room_id = room_uri.take_room_id();
         LocalUri::<ToEndpoint>::new(room_id, member_id, endpoint_id)
+    }
+
+    /// Returns [`RoomId`] and [`MemberId`].
+    pub fn take_all(self) -> (RoomId, MemberId) {
+        let (member_id, room_url) = self.take_member_id();
+
+        (room_url.take_room_id(), member_id)
     }
 }
 
@@ -153,7 +183,7 @@ impl LocalUri<ToEndpoint> {
     pub fn new(
         room_id: RoomId,
         member_id: MemberId,
-        endpoint_id: String,
+        endpoint_id: EndpointId,
     ) -> Self {
         Self {
             state: ToEndpoint(
@@ -173,18 +203,24 @@ impl LocalUri<ToEndpoint> {
         &self.state.0.member_id()
     }
 
-    /// Returns reference to [`Endpoint`] ID.
-    ///
-    /// [`Endpoint`]: crate::signalling::elements::endpoints::Endpoint
-    pub fn endpoint_id(&self) -> &str {
+    /// Returns reference to [`EndpointId`].
+    pub fn endpoint_id(&self) -> &EndpointId {
         &self.state.1
     }
 
     /// Returns [`Endpoint`] id and [`LocalUri`] in [`ToMember`] state.
     ///
     /// [`Endpoint`]: crate::signalling::elements::endpoints::Endpoint
-    pub fn take_endpoint_id(self) -> (String, LocalUri<ToMember>) {
+    pub fn take_endpoint_id(self) -> (EndpointId, LocalUri<ToMember>) {
         (self.state.1, self.state.0)
+    }
+
+    /// Returns [`EndpointId`], [`RoomId`] and [`MemberId`].
+    pub fn take_all(self) -> (RoomId, MemberId, EndpointId) {
+        let (endpoint_id, member_url) = self.take_endpoint_id();
+        let (member_id, room_url) = member_url.take_member_id();
+
+        (room_url.take_room_id(), member_id, endpoint_id)
     }
 }
 
@@ -193,7 +229,7 @@ impl From<SrcUri> for LocalUri<ToEndpoint> {
         LocalUri::<ToEndpoint>::new(
             uri.room_id,
             uri.member_id,
-            uri.endpoint_id.0,
+            uri.endpoint_id.into(),
         )
     }
 }
@@ -272,30 +308,36 @@ impl StatefulLocalUri {
     }
 }
 
-impl TryFrom<&str> for StatefulLocalUri {
+impl TryFrom<String> for StatefulLocalUri {
     type Error = LocalUriParseError;
 
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
+    fn try_from(value: String) -> Result<Self, Self::Error> {
         if value.is_empty() {
             return Err(LocalUriParseError::Empty);
         }
 
-        let url = Url::parse(value).map_err(|e| {
-            LocalUriParseError::UrlParseErr(value.to_string(), e)
-        })?;
+        let url = match Url::parse(&value) {
+            Ok(url) => url,
+            Err(err) => {
+                return Err(LocalUriParseError::UrlParseErr(value, err))
+            }
+        };
 
         if url.scheme() != "local" {
-            return Err(LocalUriParseError::NotLocal(value.to_string()));
+            return Err(LocalUriParseError::NotLocal(value));
         }
 
-        let room_uri = url
-            .host()
-            .map(|id| id.to_string())
-            .filter(|id| !id.is_empty())
-            .map(|id| LocalUri::<ToRoom>::new(id.into()))
-            .ok_or_else(|| {
-                LocalUriParseError::MissingPaths(value.to_string())
-            })?;
+        let room_uri = match url.host() {
+            Some(host) => {
+                let host = host.to_string();
+                if host.is_empty() {
+                    return Err(LocalUriParseError::MissingPaths(value));
+                } else {
+                    LocalUri::<ToRoom>::new(host.into())
+                }
+            }
+            None => return Err(LocalUriParseError::MissingPaths(value)),
+        };
 
         let mut path = match url.path_segments() {
             Some(path) => path,
@@ -313,18 +355,18 @@ impl TryFrom<&str> for StatefulLocalUri {
             .map(ToString::to_string);
 
         if path.next().is_some() {
-            return Err(LocalUriParseError::TooManyPaths(value.to_string()));
+            return Err(LocalUriParseError::TooManyPaths(value));
         }
 
         if let Some(member_id) = member_id {
             let member_uri = room_uri.push_member_id(member_id);
             if let Some(endpoint_id) = endpoint_id {
-                Ok(member_uri.push_endpoint_id(endpoint_id).into())
+                Ok(member_uri.push_endpoint_id(endpoint_id.into()).into())
             } else {
                 Ok(member_uri.into())
             }
         } else if endpoint_id.is_some() {
-            Err(LocalUriParseError::MissingPaths(value.to_string()))
+            Err(LocalUriParseError::MissingPaths(value))
         } else {
             Ok(room_uri.into())
         }
@@ -337,7 +379,9 @@ mod tests {
 
     #[test]
     fn parse_local_uri_to_room_element() {
-        let local_uri = StatefulLocalUri::try_from("local://room_id").unwrap();
+        let local_uri =
+            StatefulLocalUri::try_from(String::from("local://room_id"))
+                .unwrap();
         if let StatefulLocalUri::Room(room) = local_uri {
             assert_eq!(room.take_room_id(), RoomId("room_id".to_string()));
         } else {
@@ -351,9 +395,10 @@ mod tests {
 
     #[test]
     fn parse_local_uri_to_element_of_room() {
-        let local_uri =
-            StatefulLocalUri::try_from("local://room_id/room_element_id")
-                .unwrap();
+        let local_uri = StatefulLocalUri::try_from(String::from(
+            "local://room_id/room_element_id",
+        ))
+        .unwrap();
         if let StatefulLocalUri::Member(member) = local_uri {
             let (element_id, room_uri) = member.take_member_id();
             assert_eq!(element_id, MemberId("room_element_id".to_string()));
@@ -370,13 +415,13 @@ mod tests {
 
     #[test]
     fn parse_local_uri_to_endpoint() {
-        let local_uri = StatefulLocalUri::try_from(
+        let local_uri = StatefulLocalUri::try_from(String::from(
             "local://room_id/room_element_id/endpoint_id",
-        )
+        ))
         .unwrap();
         if let StatefulLocalUri::Endpoint(endpoint) = local_uri {
             let (endpoint_id, member_uri) = endpoint.take_endpoint_id();
-            assert_eq!(endpoint_id, "endpoint_id".to_string());
+            assert_eq!(endpoint_id, String::from("endpoint_id").into());
             let (member_id, room_uri) = member_uri.take_member_id();
             assert_eq!(member_id, MemberId("room_element_id".to_string()));
             let room_id = room_uri.take_room_id();
@@ -392,7 +437,7 @@ mod tests {
 
     #[test]
     fn returns_parse_error_if_local_uri_not_local() {
-        match StatefulLocalUri::try_from("not-local://room_id") {
+        match StatefulLocalUri::try_from(String::from("not-local://room_id")) {
             Ok(_) => unreachable!(),
             Err(e) => match e {
                 LocalUriParseError::NotLocal(_) => (),
@@ -403,55 +448,53 @@ mod tests {
 
     #[test]
     fn returns_parse_error_if_local_uri_empty() {
-        match StatefulLocalUri::try_from("") {
+        match StatefulLocalUri::try_from(String::from("")) {
             Ok(_) => unreachable!(),
             Err(e) => match e {
                 LocalUriParseError::Empty => (),
-                _ => unreachable!("Unreachable LocalUriParseError: {:?}", e),
+                _ => unreachable!(),
             },
         }
     }
 
     #[test]
     fn returns_error_if_local_uri_have_too_many_paths() {
-        match StatefulLocalUri::try_from(
+        match StatefulLocalUri::try_from(String::from(
             "local://room/member/endpoint/too_many",
-        ) {
+        )) {
             Ok(_) => unreachable!(),
             Err(e) => match e {
                 LocalUriParseError::TooManyPaths(_) => (),
-                _ => unreachable!("Unreachable LocalUriParseError: {:?}", e),
+                _ => unreachable!(),
             },
         }
     }
 
     #[test]
     fn properly_serialize() {
-        for local_uri_str in &[
-            "local://room_id",
-            "local://room_id/member_id",
-            "local://room_id/member_id/endpoint_id",
+        for local_uri_str in vec![
+            String::from("local://room_id"),
+            String::from("local://room_id/member_id"),
+            String::from("local://room_id/member_id/endpoint_id"),
         ] {
-            let local_uri = StatefulLocalUri::try_from(*local_uri_str).unwrap();
+            let local_uri =
+                StatefulLocalUri::try_from(local_uri_str.clone()).unwrap();
             assert_eq!(local_uri_str.to_string(), local_uri.to_string());
         }
     }
 
     #[test]
     fn return_error_when_local_uri_not_full() {
-        for local_uri_str in &[
-            "local://room_id//endpoint_id",
-            "local:////endpoint_id",
-            "local:///member_id/endpoint_id",
+        for local_uri_str in vec![
+            String::from("local://room_id//endpoint_id"),
+            String::from("local:////endpoint_id"),
+            String::from("local:///member_id/endpoint_id"),
         ] {
-            match StatefulLocalUri::try_from(*local_uri_str) {
-                Ok(_) => unreachable!(local_uri_str),
+            match StatefulLocalUri::try_from(local_uri_str) {
+                Ok(_) => unreachable!(),
                 Err(e) => match e {
                     LocalUriParseError::MissingPaths(_) => (),
-                    _ => unreachable!(
-                        "Unreachable LocalUriParseError {:?} for uri '{}'",
-                        e, local_uri_str
-                    ),
+                    _ => unreachable!(),
                 },
             }
         }

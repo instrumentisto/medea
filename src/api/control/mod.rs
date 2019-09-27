@@ -1,8 +1,9 @@
 //! Implementation and definitions of [Control API] specs.
 //!
-//! [Control API]: http://tiny.cc/380uaz
+//! [Control API]: https://tinyurl.com/yxsqplq7
 
 pub mod endpoints;
+pub mod error_codes;
 pub mod grpc;
 pub mod local_uri;
 pub mod member;
@@ -32,13 +33,14 @@ use self::{
 pub use self::{
     endpoints::{
         webrtc_play_endpoint::WebRtcPlayId,
-        webrtc_publish_endpoint::WebRtcPublishId, Endpoint,
+        webrtc_publish_endpoint::WebRtcPublishId, EndpointSpec,
+        Id as EndpointId,
     },
     member::{Id as MemberId, MemberSpec},
     room::{Id as RoomId, RoomElement, RoomSpec},
 };
 
-/// Errors which may occur while deserialize protobuf spec.
+/// Errors which may occur while deserializing protobuf spec.
 #[derive(Debug, Fail, Display)]
 pub enum TryFromProtobufError {
     /// Error while parsing [`SrcUri`] of [`WebRtcPlayEndpoint`].
@@ -58,6 +60,17 @@ pub enum TryFromProtobufError {
         _0
     )]
     NotMemberElementInRoomElement(String),
+
+    /// `Room` element doesn't have `Member` element. Currently this is
+    /// unimplemented.
+    #[display(fmt = "Expected element of type [{}]. Id [{}]", _0, _1)]
+    ExpectedOtherElement(String, String),
+
+    #[display(fmt = "Element is None, expected Some. Id [{}]", _0)]
+    EmptyElement(String),
+
+    #[display(fmt = "Endpoint is unimplemented. Id [{}]", _0)]
+    UnimplementedEndpoint(String),
 }
 
 impl From<SrcParseError> for TryFromProtobufError {
@@ -68,7 +81,7 @@ impl From<SrcParseError> for TryFromProtobufError {
 
 /// Root elements of [Control API] spec.
 ///
-/// [Control API]: http://tiny.cc/380uaz
+/// [Control API]: https://tinyurl.com/yxsqplq7
 #[derive(Clone, Deserialize, Debug)]
 #[serde(tag = "kind")]
 pub enum RootElement {
@@ -76,7 +89,7 @@ pub enum RootElement {
     /// Can transform into [`RoomSpec`] by `RoomSpec::try_from`.
     Room {
         id: RoomId,
-        spec: Pipeline<RoomElement>,
+        spec: Pipeline<MemberId, RoomElement>,
     },
 }
 
@@ -98,7 +111,7 @@ pub enum TryFromElementError {
 
 /// Errors which can happen while loading static [Control API] specs.
 ///
-/// [Control API]: http://tiny.cc/380uaz
+/// [Control API]: https://tinyurl.com/yxsqplq7
 #[allow(clippy::pub_enum_variant_names)]
 #[derive(Debug, Fail, Display)]
 pub enum LoadStaticControlSpecsError {
@@ -109,19 +122,19 @@ pub enum LoadStaticControlSpecsError {
     /// Atm we only should print `warn!` message to log which prints that
     /// static specs not loaded.
     ///
-    /// [Control API]: http://tiny.cc/380uaz
+    /// [Control API]: https://tinyurl.com/yxsqplq7
     #[display(fmt = "Error while reading static control API specs dir.")]
     SpecDirReadError(std::io::Error),
 
     /// I/O error while reading static [Control API] specs.
     ///
-    /// [Control API]: http://tiny.cc/380uaz
+    /// [Control API]: https://tinyurl.com/yxsqplq7
     #[display(fmt = "I/O error while reading specs. {:?}", _0)]
     IoError(std::io::Error),
 
     /// Conflict in static [Control API] specs.
     ///
-    /// [Control API]: http://tiny.cc/380uaz
+    /// [Control API]: https://tinyurl.com/yxsqplq7
     #[display(
         fmt = "Try from element error while loading static specs. {:?}",
         _0
@@ -130,7 +143,7 @@ pub enum LoadStaticControlSpecsError {
 
     /// Error while deserialization static [Control API] specs from YAML file.
     ///
-    /// [Control API]: http://tiny.cc/380uaz
+    /// [Control API]: https://tinyurl.com/yxsqplq7
     #[display(fmt = "Error while deserialization static spec. {:?}", _0)]
     YamlDeserializationError(serde_yaml::Error),
 }
@@ -182,7 +195,7 @@ pub fn load_static_specs_from_dir<P: AsRef<Path>>(
 
 /// Starts all [`Room`]s from static [Control API] specs.
 ///
-/// [Control API]: http://tiny.cc/380uaz
+/// [Control API]: https://tinyurl.com/yxsqplq7
 /// [`Room`]: crate::signalling::room::Room
 pub fn start_static_rooms(
     room_service: &Addr<RoomService>,
