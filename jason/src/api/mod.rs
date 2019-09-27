@@ -11,7 +11,7 @@ use crate::{
     media::MediaManager,
     peer,
     rpc::{RpcClient, WebsocketRpcClient},
-//    set_panic_hook,
+    set_panic_hook,
 };
 
 #[doc(inline)]
@@ -34,36 +34,35 @@ struct Inner {
 /// Responsible for managing shared transports, local media
 /// and room initialization.
 #[wasm_bindgen]
-impl Jason {}
+impl Jason {
     #[wasm_bindgen(constructor)]
-    pub fn new() -> Jason {
-//        set_panic_hook();
+    pub fn new() -> Self {
+        set_panic_hook();
         Jason::default()
     }
 
-//    /// Performs entering to a [`Room`] by the authorization `token`.
-//    ///
-//    /// Establishes connection with media server (if it doesn't already exist).
-//    /// Fails if unable to connect to media server.
-//    pub async fn join_room(&self, token: String) -> Result<RoomHandle, JsValue> {
+    /// Performs entering to a [`Room`] by the authorization `token`.
+    ///
+    /// Establishes connection with media server (if it doesn't already exist).
+    /// Fails if unable to connect to media server.
+    pub async fn join_room(&self, token: String) -> Result<(), JsValue> {
 //        let mut rpc = WebsocketRpcClient::new(token, 3000);
 //        let peer_repository =
 //            peer::Repository::new(Rc::clone(&self.0.borrow().media_manager));
-//
+
 //        rpc.init().await?;
-//
+
 //        let rpc: Rc<dyn RpcClient> = Rc::new(rpc);
-//        let room =
-//            Room::new(Rc::clone(&rpc), Box::new(peer_repository));
+//        let room = Room::new(Rc::clone(&rpc), Box::new(peer_repository));
 //
 //        let handle = room.new_handle();
-//
+
 //        self.0.borrow_mut().rpc.replace(rpc);
 //        self.0.borrow_mut().rooms.push(room);
-//
-//        Ok(handle)
-//
-//    }
+
+//        Ok(room.new_handle())
+        Ok(())
+    }
 
 //    /// Sets `on_local_stream` callback, which will be invoked once media
 //    /// acquisition request will resolve returning
@@ -77,4 +76,4 @@ impl Jason {}
 //    /// streams etc.) respectively. All objects related to this [`Jason`] API
 //    /// object will be detached (you will still hold them, but unable to use).
 //    pub fn dispose(self) {}
-//}
+}
