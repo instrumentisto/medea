@@ -24,18 +24,25 @@ use self::{heartbeat::Heartbeat, websocket::WebSocket};
 /// Connection with remote was closed.
 pub enum CloseMsg {
     /// Transport was gracefully closed by remote.
+    ///
+    /// Determines by close code `1000` and existence of
+    /// [`RpcConnectionCloseReason`].
     Normal(u16, RpcConnectionCloseReason),
     /// Connection was unexpectedly closed. Consider reconnecting.
+    ///
+    /// Unexpected close determines by close code != `1000` and for close code
+    /// 1000 without reason. This is used because if connection lost then
+    /// close code will be `1000` which is wrong.
     Disconnect(u16),
 }
 
 impl From<&CloseEvent> for CloseMsg {
     fn from(event: &CloseEvent) -> Self {
         let code: u16 = event.code();
-        let reason = serde_json::from_str(&event.reason()).ok();
+        let reason = serde_json::from_str(&event.reason());
         match code {
             1000 => {
-                if let Some(reason) = reason {
+                if let Ok(reason) = reason {
                     Self::Normal(code, reason)
                 } else {
                     Self::Disconnect(code)
