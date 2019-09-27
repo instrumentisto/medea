@@ -447,6 +447,7 @@ impl ParticipantService {
     ///
     /// Returns [`ParticipantServiceErr::ParticipantAlreadyExists`] when
     /// [`Member`]'s ID already presented in [`ParticipantService`].
+    // TODO: move to room
     pub fn create_member(
         &mut self,
         id: MemberId,
@@ -512,6 +513,7 @@ impl ParticipantService {
     ///
     /// Returns [`ParticipantServiceErr::EndpointAlreadyExists`] when
     /// [`WebRtcPlayEndpoint`]'s ID already presented in [`Member`].
+    // TODO: move to room
     pub fn create_sink_endpoint(
         &mut self,
         member_id: &MemberId,
@@ -572,6 +574,7 @@ impl ParticipantService {
     ///
     /// Returns [`ParticipantServiceErr::EndpointAlreadyExists`] when
     /// [`WebRtcPublishEndpoint`]'s ID already presented in [`Member`].
+    // TODO: move to room
     pub fn create_src_endpoint(
         &mut self,
         member_id: &MemberId,
