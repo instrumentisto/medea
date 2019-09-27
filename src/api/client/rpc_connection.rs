@@ -7,7 +7,7 @@ use std::fmt;
 use actix::Message;
 use derive_more::{From, Into};
 use futures::Future;
-use medea_client_api_proto::{Command, Event};
+use medea_client_api_proto::{CloseDescription, Command, Event};
 
 use crate::api::control::MemberId;
 
@@ -49,7 +49,10 @@ pub trait RpcConnection: fmt::Debug + Send {
     /// Closes [`RpcConnection`].
     /// No [`RpcConnectionClosed`] signals should be emitted.
     /// Always returns success.
-    fn close(&mut self) -> Box<dyn Future<Item = (), Error = ()>>;
+    fn close(
+        &mut self,
+        close_description: CloseDescription,
+    ) -> Box<dyn Future<Item = (), Error = ()>>;
 
     /// Sends [`Event`] to remote [`Member`].
     ///

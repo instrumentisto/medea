@@ -214,6 +214,7 @@ impl Into<RootElementProto> for WebRtcPlayEndpoint {
         let mut member_element: ElementProto = self.into();
         let endpoint = member_element.take_webrtc_play();
         element.set_webrtc_play(endpoint);
+
         element
     }
 }

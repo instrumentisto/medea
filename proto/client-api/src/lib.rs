@@ -8,7 +8,7 @@ use std::{
     str::FromStr,
 };
 
-use derive_more::{Display, FromStr};
+use derive_more::{Display, FromStr, Constructor};
 use medea_macro::dispatchable;
 use serde::{
     de::{self, DeserializeSeed, Deserializer, MapAccess, Visitor},
@@ -222,6 +222,26 @@ pub enum Event {
     /// On this [`Event`] client should upgrade/downgrade local state to the
     /// state of the server.
     RestoreState { snapshot: Snapshot },
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+/// Reason of disconnecting client from the server.
+pub enum RpcConnectionCloseReason {
+    /// `Room` in which client presented was closed.
+    RoomClosed,
+
+    /// Member deleted from `Room`.
+    Evicted,
+
+    /// Member reconnects and old connection was closed.
+    ConnectionSwapped,
+}
+
+/// Description which will be sent in Close WebSocket frame.
+#[derive(Constructor, Debug, Deserialize, Serialize)]
+pub struct CloseDescription {
+    /// Reason of why connection was closed.
+    pub reason: RpcConnectionCloseReason,
 }
 
 /// Represents [RTCIceCandidateInit][1] object.

@@ -5,10 +5,13 @@
 use std::{collections::HashMap, convert::TryFrom};
 
 use derive_more::{Display, From};
-use medea_control_api_proto::grpc::control_api::Room as RoomProto;
+#[rustfmt::skip]
+use medea_control_api_proto::grpc::control_api::{
+    CreateRequest_oneof_el as ElementProto
+};
 use serde::Deserialize;
 
-use crate::api::control::TryFromProtobufError;
+use crate::api::control::{EndpointId, TryFromProtobufError};
 
 use super::{
     member::{MemberElement, MemberSpec},
@@ -32,7 +35,7 @@ pub enum RoomElement {
     /// Represent [`MemberSpec`].
     /// Can transform into [`MemberSpec`] by `MemberSpec::try_from`.
     Member {
-        spec: Pipeline<MemberElement>,
+        spec: Pipeline<EndpointId, MemberElement>,
         credentials: String,
     },
 }
@@ -46,33 +49,38 @@ pub enum RoomElement {
 #[derive(Clone, Debug)]
 pub struct RoomSpec {
     pub id: Id,
-    pub pipeline: Pipeline<RoomElement>,
+    pub pipeline: Pipeline<MemberId, RoomElement>,
+}
+
+impl TryFrom<(Id, ElementProto)> for RoomSpec {
+    type Error = TryFromProtobufError;
+
+    fn try_from((id, proto): (Id, ElementProto)) -> Result<Self, Self::Error> {
+        match proto {
+            ElementProto::room(mut room) => {
+                let mut pipeline = HashMap::new();
+                for (id, room_element) in room.take_pipeline() {
+                    if let Some(elem) = room_element.el {
+                        let member =
+                            MemberSpec::try_from((MemberId(id.clone()), elem))?;
+                        pipeline.insert(id.into(), member.into());
+                    } else {
+                        return Err(TryFromProtobufError::EmptyElement(id));
+                    }
+                }
+
+                let pipeline = Pipeline::new(pipeline);
+                Ok(Self { id, pipeline })
+            }
+            _ => Err(TryFromProtobufError::ExpectedOtherElement(
+                String::from("Room"),
+                id.to_string(),
+            )),
+        }
+    }
 }
 
 impl RoomSpec {
-    /// Deserializes [`RoomSpec`] from protobuf object.
-    pub fn try_from_protobuf(
-        id: Id,
-        proto: &RoomProto,
-    ) -> Result<Self, TryFromProtobufError> {
-        let mut pipeline = HashMap::new();
-        for (id, room_element) in proto.get_pipeline() {
-            if !room_element.has_member() {
-                return Err(
-                    TryFromProtobufError::NotMemberElementInRoomElement(
-                        id.to_string(),
-                    ),
-                );
-            }
-            let member = MemberSpec::try_from(room_element.get_member())?;
-            pipeline.insert(id.clone(), member.into());
-        }
-
-        let pipeline = Pipeline::new(pipeline);
-
-        Ok(Self { pipeline, id })
-    }
-
     /// Returns all [`MemberSpec`]s of this [`RoomSpec`].
     pub fn members(
         &self,
@@ -80,9 +88,8 @@ impl RoomSpec {
         let mut members: HashMap<MemberId, MemberSpec> = HashMap::new();
         for (control_id, element) in self.pipeline.iter() {
             let member_spec = MemberSpec::try_from(element)?;
-            let member_id = MemberId(control_id.clone());
 
-            members.insert(member_id.clone(), member_spec);
+            members.insert(control_id.clone(), member_spec);
         }
 
         Ok(members)

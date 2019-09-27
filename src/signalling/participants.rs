@@ -7,7 +7,11 @@
 //! [`RpcConnection`]: crate::api::client::rpc_connection::RpcConnection
 //! [`ParticipantService`]: crate::signalling::participants::ParticipantService
 
-use std::{collections::HashMap, time::Instant};
+use std::{
+    collections::HashMap,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 use actix::{
     fut::wrap_future, ActorFuture, AsyncContext, Context, SpawnHandle,
@@ -19,7 +23,9 @@ use futures::{
     Future,
 };
 
-use medea_client_api_proto::Event;
+use medea_client_api_proto::{
+    CloseDescription, Event, RpcConnectionCloseReason,
+};
 
 use crate::{
     api::{
@@ -48,7 +54,7 @@ use crate::{
         room::{ActFuture, RoomError},
         Room,
     },
-    turn::{TurnServiceErr, UnreachablePolicy},
+    turn::{TurnAuthService, TurnServiceErr, UnreachablePolicy},
     AppContext,
 };
 
@@ -109,9 +115,6 @@ pub struct ParticipantService {
     /// [`Member`]s which currently are present in this [`Room`].
     members: HashMap<MemberId, Member>,
 
-    /// Global app context.
-    app: AppContext,
-
     /// Established [`RpcConnection`]s of [`Member`]s in this [`Room`].
     ///
     /// [`Member`]: crate::signalling::elements::member::Member
@@ -123,20 +126,28 @@ pub struct ParticipantService {
     /// If [`RpcConnection`] is lost, [`Room`] waits for connection_timeout
     /// before dropping it irrevocably in case it gets reestablished.
     drop_connection_tasks: HashMap<MemberId, SpawnHandle>,
+
+    /// Reference to [`TurnAuthService`].
+    turn_service: Arc<dyn TurnAuthService>,
+
+    /// Duration, after which the server deletes the client session if
+    /// the remote RPC client does not reconnect after it is idle.
+    rpc_reconnect_timeout: Duration,
 }
 
 impl ParticipantService {
     /// Creates new [`ParticipantService`] from [`RoomSpec`].
     pub fn new(
         room_spec: &RoomSpec,
-        context: AppContext,
+        context: &AppContext,
     ) -> Result<Self, MembersLoadError> {
         Ok(Self {
             room_id: room_spec.id().clone(),
             members: parse_members(room_spec)?,
-            app: context,
             connections: HashMap::new(),
             drop_connection_tasks: HashMap::new(),
+            turn_service: context.turn_service.clone(),
+            rpc_reconnect_timeout: context.config.rpc.reconnect_timeout,
         })
     }
 
@@ -262,10 +273,16 @@ impl ParticipantService {
                 ctx.cancel_future(handler);
             }
             self.connections.insert(member_id, conn);
-            Box::new(wrap_future(connection.close().then(move |_| Ok(member))))
+            Box::new(wrap_future(
+                connection
+                    .close(CloseDescription::new(
+                        RpcConnectionCloseReason::Evicted,
+                    ))
+                    .then(move |_| Ok(member)),
+            ))
         } else {
             Box::new(
-                wrap_future(self.app.turn_service.create(
+                wrap_future(self.turn_service.create(
                     member_id.clone(),
                     self.room_id.clone(),
                     UnreachablePolicy::ReturnErr,
@@ -324,7 +341,7 @@ impl ParticipantService {
                 self.drop_connection_tasks.insert(
                     member_id.clone(),
                     ctx.run_later(
-                        self.app.config.rpc.reconnect_timeout,
+                        self.rpc_reconnect_timeout,
                         move |room, ctx| {
                             info!(
                                 "Member [id = {}] connection lost at {:?}. \
@@ -352,7 +369,7 @@ impl ParticipantService {
         // TODO: rewrite using `Option::flatten` when it will be in stable rust.
         match self.get_member_by_id(&member_id) {
             Some(member) => match member.take_ice_user() {
-                Some(ice_user) => self.app.turn_service.delete(vec![ice_user]),
+                Some(ice_user) => self.turn_service.delete(vec![ice_user]),
                 None => Box::new(future::ok(())),
             },
             None => Box::new(future::ok(())),
@@ -374,7 +391,9 @@ impl ParticipantService {
         let mut close_fut = self.connections.drain().fold(
             vec![],
             |mut futures, (_, mut connection)| {
-                futures.push(connection.close());
+                futures.push(connection.close(CloseDescription::new(
+                    RpcConnectionCloseReason::RoomClosed,
+                )));
                 futures
             },
         );
@@ -388,8 +407,7 @@ impl ParticipantService {
                     room_users.push(ice_user);
                 }
             });
-            self.app
-                .turn_service
+            self.turn_service
                 .delete(room_users)
                 .map_err(|err| error!("Error removing IceUsers {:?}", err))
         });
@@ -413,15 +431,17 @@ impl ParticipantService {
         }
 
         if let Some(mut conn) = self.connections.remove(member_id) {
-            ctx.spawn(wrap_future(conn.close()));
+            ctx.spawn(wrap_future(conn.close(CloseDescription::new(
+                RpcConnectionCloseReason::Evicted,
+            ))));
         }
 
         if let Some(member) = self.members.remove(member_id) {
             if let Some(ice_user) = member.take_ice_user() {
-                let delete_ice_user_fut =
-                    self.app.turn_service.delete(vec![ice_user]).map_err(
-                        |err| error!("Error removing IceUser {:?}", err),
-                    );
+                let delete_ice_user_fut = self
+                    .turn_service
+                    .delete(vec![ice_user])
+                    .map_err(|err| error!("Error removing IceUser {:?}", err));
                 ctx.spawn(wrap_future(delete_ice_user_fut));
             }
         }
@@ -461,7 +481,15 @@ impl ParticipantService {
 
         for (id, play) in spec.play_endpoints() {
             let partner_member = self.get_member(&play.src.member_id)?;
-            let src = partner_member.get_src(&play.src.endpoint_id)?;
+            let src = partner_member
+                .get_src_by_id(&play.src.endpoint_id)
+                .ok_or_else(|| {
+                    MemberError::EndpointNotFound(
+                        partner_member.get_local_uri_to_endpoint(
+                            play.src.endpoint_id.clone().into(),
+                        ),
+                    )
+                })?;
 
             let sink = WebRtcPlayEndpoint::new(
                 id.clone(),
@@ -494,40 +522,52 @@ impl ParticipantService {
     pub fn create_sink_endpoint(
         &mut self,
         member_id: &MemberId,
-        endpoint_id: &WebRtcPlayId,
+        endpoint_id: WebRtcPlayId,
         spec: WebRtcPlayEndpointSpec,
     ) -> Result<(), ParticipantServiceErr> {
         let member = self.get_member(&member_id)?;
 
         let is_member_have_this_sink_id =
             member.get_sink_by_id(&endpoint_id).is_some();
-        let is_member_have_this_src_id = member
-            .get_src_by_id(&WebRtcPublishId(endpoint_id.0.clone()))
-            .is_some();
+
+        let publish_id = String::from(endpoint_id).into();
+        let is_member_have_this_src_id =
+            member.get_src_by_id(&publish_id).is_some();
         if is_member_have_this_sink_id || is_member_have_this_src_id {
             return Err(ParticipantServiceErr::EndpointAlreadyExists(
-                member.get_local_uri_to_endpoint(endpoint_id.to_string()),
+                member.get_local_uri_to_endpoint(publish_id.into()),
             ));
         }
 
         let partner_member = self.get_member(&spec.src.member_id)?;
-        let src = partner_member.get_src(&spec.src.endpoint_id)?;
+        let src = partner_member
+            .get_src_by_id(&spec.src.endpoint_id)
+            .ok_or_else(|| {
+                MemberError::EndpointNotFound(
+                    partner_member.get_local_uri_to_endpoint(
+                        spec.src.endpoint_id.clone().into(),
+                    ),
+                )
+            })?;
 
         let sink = WebRtcPlayEndpoint::new(
-            endpoint_id.clone(),
+            String::from(publish_id).into(),
             spec.src,
             src.downgrade(),
             member.downgrade(),
         );
 
         src.add_sink(sink.downgrade());
-        member.insert_sink(sink);
 
         debug!(
-            "Create WebRtcPlayEndpoint [id = {}] for Member [id = {}] in Room \
-             [id = {}].",
-            endpoint_id, member_id, self.room_id
+            "Created WebRtcPlayEndpoint [id = {}] for Member [id = {}] in \
+             Room [id = {}].",
+            sink.id(),
+            member_id,
+            self.room_id
         );
+
+        member.insert_sink(sink);
 
         Ok(())
     }
@@ -542,35 +582,39 @@ impl ParticipantService {
     pub fn create_src_endpoint(
         &mut self,
         member_id: &MemberId,
-        endpoint_id: &WebRtcPublishId,
+        publish_id: WebRtcPublishId,
         spec: WebRtcPublishEndpointSpec,
     ) -> Result<(), ParticipantServiceErr> {
         let member = self.get_member(&member_id)?;
 
         let is_member_have_this_src_id =
-            member.get_src_by_id(&endpoint_id).is_some();
-        let is_member_have_this_sink_id = member
-            .get_sink_by_id(&WebRtcPlayId(endpoint_id.0.clone()))
-            .is_some();
+            member.get_src_by_id(&publish_id).is_some();
+
+        let play_id = String::from(publish_id).into();
+        let is_member_have_this_sink_id =
+            member.get_sink_by_id(&play_id).is_some();
+
         if is_member_have_this_sink_id || is_member_have_this_src_id {
             return Err(ParticipantServiceErr::EndpointAlreadyExists(
-                member.get_local_uri_to_endpoint(endpoint_id.to_string()),
+                member.get_local_uri_to_endpoint(play_id.into()),
             ));
         }
 
-        let src = WebRtcPublishEndpoint::new(
-            endpoint_id.clone(),
+        let endpoint = WebRtcPublishEndpoint::new(
+            String::from(play_id).into(),
             spec.p2p,
             member.downgrade(),
         );
 
-        member.insert_src(src);
-
         debug!(
             "Create WebRtcPublishEndpoint [id = {}] for Member [id = {}] in \
              Room [id = {}]",
-            endpoint_id, member_id, self.room_id
+            endpoint.id(),
+            member_id,
+            self.room_id
         );
+
+        member.insert_src(endpoint);
 
         Ok(())
     }

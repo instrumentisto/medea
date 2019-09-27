@@ -5,7 +5,10 @@
 use std::{collections::HashMap, convert::TryFrom};
 
 use derive_more::{Display, From};
-use medea_control_api_proto::grpc::control_api::Member as MemberProto;
+use medea_control_api_proto::grpc::control_api::{
+    CreateRequest_oneof_el as ElementProto,
+    Room_Element_oneof_el as RoomElementProto,
+};
 use rand::{distributions::Alphanumeric, Rng};
 use serde::Deserialize;
 
@@ -16,7 +19,8 @@ use crate::api::control::{
     },
     pipeline::Pipeline,
     room::RoomElement,
-    Endpoint, TryFromElementError, TryFromProtobufError, WebRtcPlayId,
+    EndpointId, EndpointSpec, TryFromElementError, TryFromProtobufError,
+    WebRtcPlayId,
 };
 
 const CREDENTIALS_LEN: usize = 32;
@@ -33,15 +37,15 @@ pub struct Id(pub String);
 #[serde(tag = "kind")]
 pub enum MemberElement {
     /// Represent [`WebRtcPublishEndpoint`].
-    /// Can transform into [`Endpoint`] enum by `Endpoint::try_from`.
+    /// Can transform into [`EndpointSpec`] enum by `EndpointSpec::try_from`.
     ///
-    /// [`Endpoint`]: crate::api::control::endpoints::Endpoint
+    /// [`EndpointSpec`]: crate::api::control::endpoints::EndpointSpec
     WebRtcPublishEndpoint { spec: WebRtcPublishEndpoint },
 
     /// Represent [`WebRtcPlayEndpoint`].
-    /// Can transform into [`Endpoint`] enum by `Endpoint::try_from`.
+    /// Can transform into [`EndpointSpec`] enum by `EndpointSpec::try_from`.
     ///
-    /// [`Endpoint`]: crate::api::control::endpoints::Endpoint
+    /// [`EndpointSpec`]: crate::api::control::endpoints::EndpointSpec
     WebRtcPlayEndpoint { spec: WebRtcPlayEndpoint },
 }
 
@@ -50,7 +54,7 @@ pub enum MemberElement {
 #[derive(Clone, Debug)]
 pub struct MemberSpec {
     /// Spec of this `Member`.
-    pipeline: Pipeline<MemberElement>,
+    pipeline: Pipeline<EndpointId, MemberElement>,
 
     /// Credentials to authorize `Member` with.
     credentials: String,
@@ -72,7 +76,7 @@ impl MemberSpec {
     ) -> impl Iterator<Item = (WebRtcPlayId, &WebRtcPlayEndpoint)> {
         self.pipeline.iter().filter_map(|(id, e)| match e {
             MemberElement::WebRtcPlayEndpoint { spec } => {
-                Some((WebRtcPlayId(id.clone()), spec))
+                Some((id.clone().into(), spec))
             }
             _ => None,
         })
@@ -81,9 +85,9 @@ impl MemberSpec {
     /// Lookups [`WebRtcPublishEndpoint`] by ID.
     pub fn get_publish_endpoint_by_id(
         &self,
-        id: &WebRtcPublishId,
+        id: WebRtcPublishId,
     ) -> Option<&WebRtcPublishEndpoint> {
-        let e = self.pipeline.get(&id.0)?;
+        let e = self.pipeline.get(&id.into())?;
         if let MemberElement::WebRtcPublishEndpoint { spec } = e {
             Some(spec)
         } else {
@@ -97,7 +101,7 @@ impl MemberSpec {
     ) -> impl Iterator<Item = (WebRtcPublishId, &WebRtcPublishEndpoint)> {
         self.pipeline.iter().filter_map(|(id, e)| match e {
             MemberElement::WebRtcPublishEndpoint { spec } => {
-                Some((WebRtcPublishId(id.clone()), spec))
+                Some((id.clone().into(), spec))
             }
             _ => None,
         })
@@ -122,36 +126,53 @@ fn generate_member_credentials() -> String {
         .collect()
 }
 
-impl TryFrom<&MemberProto> for MemberSpec {
-    type Error = TryFromProtobufError;
+macro_rules! impl_try_from_proto_for_member {
+    ($proto:tt) => {
+        impl TryFrom<(Id, $proto)> for MemberSpec {
+            type Error = TryFromProtobufError;
 
-    /// Deserializes [`MemberSpec`] from protobuf object.
-    ///
-    /// Additionally generates [`Member`] credentials if
-    /// they not provided in protobuf object.
-    ///
-    /// [`Member`]: crate::signalling::elements::member::Member
-    fn try_from(value: &MemberProto) -> Result<Self, Self::Error> {
-        let mut pipeline = HashMap::new();
-        for (id, member_element) in value.get_pipeline() {
-            let endpoint = Endpoint::try_from(member_element)?;
-            pipeline.insert(id.clone(), endpoint.into());
+            fn try_from(
+                (id, proto): (Id, $proto),
+            ) -> Result<Self, Self::Error> {
+                match proto {
+                    $proto::member(mut member) => {
+                        let mut pipeline = HashMap::new();
+                        for (id, member_element) in member.take_pipeline() {
+                            if let Some(elem) = member_element.el {
+                                let endpoint = EndpointSpec::try_from((
+                                    EndpointId(id.clone()),
+                                    elem,
+                                ))?;
+                                pipeline.insert(id.into(), endpoint.into());
+                            } else {
+                                return Err(
+                                    TryFromProtobufError::EmptyElement(id),
+                                );
+                            }
+                        }
+
+                        let mut credentials = member.take_credentials();
+                        if credentials.is_empty() {
+                            credentials = generate_member_credentials();
+                        }
+
+                        Ok(Self {
+                            pipeline: Pipeline::new(pipeline),
+                            credentials,
+                        })
+                    }
+                    _ => Err(TryFromProtobufError::ExpectedOtherElement(
+                        String::from("Member"),
+                        id.to_string(),
+                    )),
+                }
+            }
         }
-        let pipeline = Pipeline::new(pipeline);
-
-        let proto_credentials = value.get_credentials();
-        let credentials = if proto_credentials.is_empty() {
-            generate_member_credentials()
-        } else {
-            proto_credentials.to_string()
-        };
-
-        Ok(Self {
-            pipeline,
-            credentials,
-        })
-    }
+    };
 }
+
+impl_try_from_proto_for_member!(RoomElementProto);
+impl_try_from_proto_for_member!(ElementProto);
 
 impl TryFrom<&RoomElement> for MemberSpec {
     type Error = TryFromElementError;

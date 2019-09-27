@@ -86,7 +86,7 @@ mod turn_conf_specs {
             "MEDEA_TURN__DB__REDIS__PORT" => "1234",
             "MEDEA_TURN__DB__REDIS__PASS" => "hellofellow",
             "MEDEA_TURN__DB__REDIS__DB_NUMBER" => "10",
-            "MEDEA_TURN__DB__REDIS__CONNECTION_TIMEOUT" => "10s"
+            "MEDEA_TURN__DB__REDIS__CONNECTION_TIMEOUT" => "10s",
         );
 
         assert_ne!(default_conf.turn.db.redis.ip, env_conf.turn.db.redis.ip);
@@ -123,7 +123,7 @@ mod turn_conf_specs {
             "MEDEA_TURN__HOST" => "example.com",
             "MEDEA_TURN__PORT" => "1234",
             "MEDEA_TURN__USER" => "ferris",
-            "MEDEA_TURN__PASS" => "qwerty"
+            "MEDEA_TURN__PASS" => "qwerty",
         );
 
         assert_ne!(default_conf.turn.host, env_conf.turn.host);
@@ -142,7 +142,7 @@ mod turn_conf_specs {
         let default_conf = Conf::default();
         let env_conf = overrided_by_env_conf!(
             "MEDEA_TURN__HOST" => "example.com",
-            "MEDEA_TURN__PORT" => "1234"
+            "MEDEA_TURN__PORT" => "1234",
         );
 
         assert_ne!(default_conf.turn.host, env_conf.turn.host);

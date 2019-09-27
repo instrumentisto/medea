@@ -24,6 +24,7 @@ All user visible changes to this project will be documented in this file. This p
     - Auto-removing `Peer`s when `Member` disconnects ([#28]);
     - Filter `SetIceCandidate` messages without `candidate` ([#50](/../../pull/50));
     - Recover client state after reconnection ([#51](/../../pull/51)).
+    - Send reason of WebSocket close by server as close frame's description.
 - Testing:
     - E2E tests for signalling ([#28]).
 
