@@ -8,15 +8,16 @@ use std::{
 };
 
 use futures::{
-    future::{self, Future as _, IntoFuture, FutureExt},
-    stream::Stream as _,
-    sync::mpsc::{unbounded, UnboundedSender},
+    future::{self, Future as _, IntoFuture},
+    stream::select,
+    channel::mpsc::{unbounded, UnboundedSender},
 };
 
-use futures_util::try_future::TryFutureExt;
+use futures::{StreamExt as _, FutureExt as _};
+use futures::{TryFutureExt};
 
 use medea_client_api_proto::{
-    Command, Direction, EventHandler, IceCandidate, IceServer, PeerId, Track,
+    Command, Direction, EventHandler, IceCandidate, IceServer, PeerId, Track, Event as RpcEvent
 };
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
@@ -29,6 +30,7 @@ use crate::{
 };
 
 use super::{connection::Connection, ConnectionHandle};
+
 
 /// JS side handle to `Room` where all the media happens.
 ///
@@ -84,45 +86,57 @@ pub struct Room(Rc<RefCell<InnerRoom>>);
 impl Room {
     /// Creates new [`Room`] and associates it with a provided [`RpcClient`].
     pub fn new(rpc: Rc<dyn RpcClient>, peers: Box<dyn PeerRepository>) -> Self {
-        let (tx, rx) = unbounded();
+        let (tx, peer_events_rx) = unbounded();
         let events_stream = rpc.subscribe();
-
         let room = Rc::new(RefCell::new(InnerRoom::new(rpc, peers, tx)));
 
-        let inner = Rc::downgrade(&room);
-        let handle_medea_event = events_stream
-            .for_each(move |event| match inner.upgrade() {
-                Some(inner) => {
-                    event.dispatch_with(inner.borrow_mut().deref_mut());
-                    Ok(())
-                }
-                None => {
-                    // `InnerSession` is gone, which means that `Room` has been
-                    // dropped. Not supposed to happen, actually, since
-                    // `InnerSession` should drop its `tx` by unsub from
-                    // `RpcClient`.
-                    Err(())
-                }
-            })
-            .into_future()
-            .then(|_| Ok(()));
+        enum RoomEvent {
+            RpcEvent(RpcEvent),
+            PeerEvent(PeerEvent)
+        }
 
         let inner = Rc::downgrade(&room);
-        let handle_peer_event = rx
-            .for_each(move |event| match inner.upgrade() {
-                Some(inner) => {
-                    event.dispatch_with(inner.borrow_mut().deref_mut());
-                    Ok(())
-                }
-                None => Err(()),
-            })
-            .into_future()
-            .then(|_| Ok(()));
 
-        // Spawns `Promise` in JS, does not provide any handles, so the current
-        // way to stop this stream is to drop all connected `Sender`s.
-        spawn_local(handle_medea_event);
-        spawn_local(handle_peer_event);
+
+        let rpc_events_stream = futures::StreamExt::map(events_stream, |event| RoomEvent::RpcEvent(event));
+//        let peer_events_stream = StreamExt::map() .map(|event| RoomEvent::PeerEvent(event));
+//        select(rpc_events_stream, peer_events_stream);
+//        events_stream.select(rx);
+
+
+//        let handle_medea_event = events_stream
+//            .for_each(move |event| match inner.upgrade() {
+//                Some(inner) => {
+//                    event.dispatch_with(inner.borrow_mut().deref_mut());
+//                    Ok(())
+//                }
+//                None => {
+//                    // `InnerSession` is gone, which means that `Room` has been
+//                    // dropped. Not supposed to happen, since
+//                    // `InnerSession` should drop its `tx` by unsub from
+//                    // `RpcClient`.
+//                    Err(())
+//                }
+//            })
+//            .into_future()
+//            .then(|_| Ok(()));
+//
+//        let inner = Rc::downgrade(&room);
+//        let handle_peer_event = rx
+//            .for_each(move |event| match inner.upgrade() {
+//                Some(inner) => {
+//                    event.dispatch_with(inner.borrow_mut().deref_mut());
+//                    Ok(())
+//                }
+//                None => Err(()),
+//            })
+//            .into_future()
+//            .then(|_| Ok(()));
+//
+//        // Spawns `Promise` in JS, does not provide any handles, so the current
+//        // way to stop this stream is to drop all connected `Sender`s.
+//        spawn_local(handle_medea_event);
+//        spawn_local(handle_peer_event);
 
         Self(room)
     }
@@ -244,46 +258,43 @@ impl EventHandler for InnerRoom {
         self.create_connections_from_tracks(&tracks);
 
         let rpc = Rc::clone(&self.rpc);
-        let fut = match sdp_offer {
-            // offerer
-            None => future::Either::A(
-                peer.get_offer(tracks)
-                    .map(move |sdp_offer| match peer.get_mids() {
-                        Ok(mids) => rpc.send_command(Command::MakeSdpOffer {
-                            peer_id,
-                            sdp_offer,
-                            mids,
-                        }),
-                        Err(err) => err.log_err(),
-                    })
-                    .map_err(|err| err.log_err()),
-            ),
-            Some(offer) => {
-                // answerer
-                future::Either::B(
-                    peer.process_offer(offer, tracks)
-                        .and_then(move |_| peer.create_and_set_answer())
-                        .map(move |sdp_answer| {
-                            rpc.send_command(Command::MakeSdpAnswer {
-                                peer_id,
-                                sdp_answer,
-                            })
-                        })
-                        .map_err(|err| err.log_err()),
-                )
-            }
-        };
-
-        spawn_local(fut);
+        spawn_local(async move {
+            match sdp_offer {
+                None => {
+                    let sdp_offer = peer.get_offer(tracks).await?;
+                    let mids = peer.get_mids()?;
+                    rpc.send_command(Command::MakeSdpOffer {
+                        peer_id,
+                        sdp_offer,
+                        mids,
+                    });
+                },
+                Some(offer) => {
+                    peer.process_offer(offer, tracks).await;
+                    let sdp_answer = peer.create_and_set_answer().await?;
+                    rpc.send_command(Command::MakeSdpAnswer {
+                        peer_id,
+                        sdp_answer,
+                    });
+                },
+            };
+            Result::<_, WasmErr>::Ok(())
+        }.then(|result| {
+            if let Err(err) = result {
+                err.log_err();
+            };
+            future::ready(())
+        }));
     }
 
     /// Applies specified SDP Answer to a specified [`PeerConnection`].
     fn on_sdp_answer_made(&mut self, peer_id: PeerId, sdp_answer: String) {
         if let Some(peer) = self.peers.get(peer_id) {
-            spawn_local(peer.set_remote_answer(sdp_answer).or_else(|err| {
-                err.log_err();
-                Err(())
-            }));
+            spawn_local(async move {
+                if let Err(err) = peer.set_remote_answer(sdp_answer).await {
+                    err.log_err();
+                }
+            });
         } else {
             // TODO: No peer, whats next?
             WasmErr::from(format!("Peer with id {} doesnt exist", peer_id))
@@ -299,18 +310,16 @@ impl EventHandler for InnerRoom {
     ) {
         if let Some(peer) = self.peers.get(peer_id) {
             spawn_local(
-                async {
-
+                async move {
+                    let add = peer.add_ice_candidate(
+                        candidate.candidate,
+                        candidate.sdp_m_line_index,
+                        candidate.sdp_mid,
+                    ).await;
+                    if let Err(err) = add {
+                        err.log_err();
+                    }
                 }
-                peer.add_ice_candidate(
-                    candidate.candidate,
-                    candidate.sdp_m_line_index,
-                    candidate.sdp_mid,
-                )
-                .then(|err| {
-                    err.log_err();
-                    Ok(())
-                }),
             );
         } else {
             // TODO: No peer, whats next?

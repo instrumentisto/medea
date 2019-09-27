@@ -8,6 +8,7 @@ use std::{cell::RefCell, rc::Rc, vec};
 use futures::{
     channel::mpsc::{unbounded, UnboundedSender},
     Stream,
+    stream::LocalBoxStream
 };
 
 use js_sys::Date;
@@ -16,6 +17,7 @@ use medea_client_api_proto::{ClientMsg, Command, Event, ServerMsg};
 use crate::utils::WasmErr;
 
 use self::{heartbeat::Heartbeat, websocket::WebSocket};
+use std::pin::Pin;
 
 /// Connection with remote was closed.
 pub enum CloseMsg {
@@ -30,7 +32,7 @@ pub enum CloseMsg {
 #[cfg_attr(feature = "mockable", mockall::automock)]
 pub trait RpcClient {
     /// Returns [`Stream`] of all [`Event`]s received by this [`RpcClient`].
-    fn subscribe(&self) -> Box<dyn Stream<Item = Event>>;
+    fn subscribe(&self) -> Pin<Box<dyn Stream<Item=Event>>>;
 
     /// Unsubscribes from this [`RpcClient`]. Drops all subscriptions atm.
     fn unsub(&self);
@@ -141,10 +143,10 @@ impl WebsocketRpcClient {
 
 impl RpcClient for WebsocketRpcClient {
     // TODO: proper sub registry
-    fn subscribe(&self) -> Box<dyn Stream<Item=Event>> {
+    fn subscribe(&self) -> Pin<Box<dyn Stream<Item=Event>>> {
         let (tx, rx) = unbounded();
         self.0.borrow_mut().subs.push(tx);
-        Box::new(rx)
+        Box::pin(rx)
     }
 
     // TODO: proper sub registry
