@@ -5,7 +5,10 @@ mod three_pubs;
 
 use std::time::Duration;
 
-use actix::{Actor, Arbiter, AsyncContext, Context, Handler, StreamHandler};
+use actix::{
+    Actor, Addr, Arbiter, AsyncContext, Context, Handler, StreamHandler,
+};
+use futures::Future;
 use actix_codec::Framed;
 use actix_http::ws;
 use awc::{
@@ -60,11 +63,13 @@ impl TestMember {
         self.writer.poll_complete().ok();
     }
 
+    /// Returns [`Future`] which will connect to the WebSocket and starts [`TestMember`]
+    /// actor.
     pub fn connect(
         uri: &str,
         on_message: MessageHandler,
         deadline: Option<Duration>,
-    ) -> impl futures::future::Future<Item = (), Error = ()> {
+    ) -> impl Future<Item = Addr<TestMember>, Error = ()> {
         awc::Client::new()
             .ws(uri)
             .connect()
@@ -79,7 +84,7 @@ impl TestMember {
                         deadline,
                         on_message,
                     }
-                });
+                })
             })
     }
 
@@ -91,24 +96,7 @@ impl TestMember {
         on_message: MessageHandler,
         deadline: Option<Duration>,
     ) {
-        Arbiter::spawn(
-            awc::Client::new()
-                .ws(uri)
-                .connect()
-                .map_err(|e| panic!("Error: {}", e))
-                .map(move |(_, framed)| {
-                    let (sink, stream) = framed.split();
-                    TestMember::create(move |ctx| {
-                        TestMember::add_stream(stream, ctx);
-                        TestMember {
-                            writer: sink,
-                            events: Vec::new(),
-                            deadline,
-                            on_message,
-                        }
-                    });
-                }),
-        )
+        Arbiter::spawn(Self::connect(uri, on_message, deadline).map(|_| ()))
     }
 }
 

@@ -1,3 +1,7 @@
+//! Tests for signaling which should be happen after gRPC [Control API] call.
+//!
+//! [Control API]: https://tinyurl.com/yxsqplq7
+
 use std::{cell::Cell, collections::HashMap, rc::Rc, time::Duration};
 
 use actix::{Arbiter, AsyncContext, Context, System};
@@ -12,6 +16,25 @@ use crate::{
     format_name_macro, grpc_control_api::ControlClient, signalling::TestMember,
 };
 
+/// Creates [`CreateRequest`] for creating `Room` element with provided room ID and `Member` with `WebRtcPublishEndpoint`.
+///
+/// # Spec of `Room` which will be created with this [`CreateRequest`]
+///
+/// ```yaml
+/// kind: Room
+/// id: {{ room_id }}
+/// spec:
+///   pipeline:
+///     publisher:
+///       kind: Member
+///       credentials: test
+///       spec:
+///         pipeline:
+///           publish:
+///             kind: WebRtcPublishEndpoint
+///             spec:
+///               p2p: Always
+/// ```
 fn room_with_one_pub_member_req(room_id: &str) -> CreateRequest {
     let mut create_req = CreateRequest::new();
     let mut room = Room::new();
@@ -37,6 +60,21 @@ fn room_with_one_pub_member_req(room_id: &str) -> CreateRequest {
     create_req
 }
 
+/// Creates [`CreateRequest`] for creating `Member` element in provided Room ID.
+///
+/// # Spec of `Member` which will be created with this [`CreateRequest`]
+///
+/// ```yaml
+/// kind: Member
+/// id: responder
+/// credentials: qwerty
+/// spec:
+///   pipeline:
+///     play:
+///       kind: WebRtcPlayEndpoint
+///       spec:
+///         src: "local://{{ room_id }}/publisher/publish
+/// ```
 fn create_play_member_req(room_id: &str) -> CreateRequest {
     let mut create_member_request = CreateRequest::new();
     let mut member = Member::new();
@@ -56,6 +94,34 @@ fn create_play_member_req(room_id: &str) -> CreateRequest {
     create_member_request
 }
 
+/// Creates [`CreateRequest`] for creating `Room` element with provided room ID.
+///
+/// # Spec of `Room` which will be created with this [`CreateRequest`]
+///
+/// ```yaml
+/// kind: Room
+/// id: {{ room_id }}
+/// spec:
+///   pipeline:
+///     publisher:
+///       kind: Member
+///       credentials: test
+///       spec:
+///         pipeline:
+///           publish:
+///             kind: WebRtcPublishEndpoint
+///             spec:
+///               p2p: Always
+///     responder:
+///       kind: Member
+///       credentials: test
+///       spec:
+///         pipeline:
+///           play:
+///             kind: WebRtcPlayEndpoint
+///             spec:
+///               src: "local://{{ room_id }}/publisher/publish"
+/// ```
 fn create_room_req(room_id: &str) -> CreateRequest {
     let mut create_req = CreateRequest::new();
     let mut room = Room::new();
@@ -97,13 +163,12 @@ fn create_room_req(room_id: &str) -> CreateRequest {
 #[test]
 fn create_play_member_after_pub_member() {
     format_name_macro!("create-play-member-after-pub-member");
-
     let sys = System::new(format_name!("{}"));
+
     let control_client = ControlClient::new();
     control_client.create(&room_with_one_pub_member_req(&format_name!("{}")));
 
     let peers_created = Rc::new(Cell::new(0));
-
     let on_event =
         move |event: &Event, ctx: &mut Context<TestMember>, _: Vec<&Event>| {
             match event {
@@ -133,7 +198,8 @@ fn create_play_member_after_pub_member() {
                 Box::new(on_event),
                 deadline,
             )
-        }),
+        })
+        .map(|_| ()),
     );
 
     sys.run().unwrap();
@@ -142,13 +208,12 @@ fn create_play_member_after_pub_member() {
 #[test]
 fn delete_member_check_peers_removed() {
     format_name_macro!("delete-member-check-peers-removed");
-
     let sys = System::new(&format_name!("{}"));
+
     let control_client = ControlClient::new();
     control_client.create(&create_room_req(&format_name!("{}")));
 
     let peers_created = Rc::new(Cell::new(0));
-
     let on_event =
         move |event: &Event, ctx: &mut Context<TestMember>, _: Vec<&Event>| {
             match event {
@@ -169,7 +234,6 @@ fn delete_member_check_peers_removed() {
         };
 
     let deadline = Some(Duration::from_secs(5));
-
     TestMember::start(
         &format_name!("ws://127.0.0.1:8080/ws/{}/publisher/test"),
         Box::new(on_event.clone()),

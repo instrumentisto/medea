@@ -1,7 +1,8 @@
-/// Tests for gRPC [Medea]'s [Control API].
-///
-/// [Medea]: https://github.com/instrumentisto/medea
-/// [Control API]: https://tinyurl.com/yxsqplq7
+//! Tests for gRPC [Medea]'s [Control API].
+//!
+//! [Medea]: https://github.com/instrumentisto/medea
+//! [Control API]: https://tinyurl.com/yxsqplq7
+
 mod create;
 mod delete;
 
@@ -21,7 +22,7 @@ use protobuf::RepeatedField;
 /// Client for [Medea]'s gRPC [Control API].
 ///
 /// [Medea]: https://github.com/instrumentisto/medea
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct ControlClient(ControlApiClient);
 
 impl ControlClient {
@@ -110,32 +111,32 @@ impl ControlClient {
     }
 }
 
-/// Creates [`CreateRequest`] for creating `Room` element with provided room ID.
+/// Creates [`CreateRequest`] for creating `Room` element with provided `Room` ID.
 ///
 /// # Spec of `Room` which will be created with this [`CreateRequest`]
 ///
 /// ```yaml
 /// kind: Room
-///   id: {{ room_id }}
-///   spec:
-///     pipeline:
-///       publisher:
-///         kind: Member
-///         spec:
-///           pipeline:
-///             publish:
-///               kind: WebRtcPublishEndpoint
-///               spec:
-///                 p2p: Always
-///       responder:
-///         kind: Member
-///         credentials: test
-///         spec:
-///           pipeline:
-///             play:
-///               kind: WebRtcPlayEndpoint
-///               spec:
-///                 src: "local://{{ room_id }}/publisher/publish"
+/// id: {{ room_id }}
+/// spec:
+///   pipeline:
+///     publisher:
+///       kind: Member
+///       spec:
+///         pipeline:
+///           publish:
+///             kind: WebRtcPublishEndpoint
+///             spec:
+///               p2p: Always
+///     responder:
+///       kind: Member
+///       credentials: test
+///       spec:
+///         pipeline:
+///           play:
+///             kind: WebRtcPlayEndpoint
+///             spec:
+///               src: "local://{{ room_id }}/publisher/publish"
 /// ```
 pub fn create_room_req(room_id: &str) -> CreateRequest {
     let mut create_req = CreateRequest::new();
