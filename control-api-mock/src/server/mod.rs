@@ -15,9 +15,9 @@ use actix_web::{
 use clap::ArgMatches;
 use futures::Future;
 use medea_control_api_proto::grpc::control_api::{
-    Element as ElementProto, Error as ErrorProto,
-    GetResponse as GetResponseProto, Response as ResponseProto,
-    Room_Element as RoomElementProto,
+    CreateResponse as CreateResponseProto, Element as ElementProto,
+    Error as ErrorProto, GetResponse as GetResponseProto,
+    Response as ResponseProto, Room_Element as RoomElementProto,
 };
 use serde::{Deserialize, Serialize};
 
@@ -41,16 +41,17 @@ pub fn run(args: &ArgMatches) {
     let medea_addr: String = args.value_of("medea_addr").unwrap().to_string();
     HttpServer::new(move || {
         App::new()
+            .wrap(Cors::new())
             .data(Context {
                 client: ControlClient::new(&medea_addr),
             })
             .wrap(middleware::Logger::default())
-            .wrap(Cors::new())
             .service(
                 web::resource("/")
                     .route(web::get().to_async(batch_get))
                     .route(web::delete().to_async(batch_delete)),
             )
+            .service(web::resource("hb").route(web::get().to_async(heartbeat)))
             .service(
                 web::resource("/{room_id}")
                     .route(web::delete().to_async(room::delete))
@@ -73,6 +74,22 @@ pub fn run(args: &ArgMatches) {
     .bind(args.value_of("addr").unwrap())
     .unwrap()
     .start();
+}
+
+/// `GET /hb`
+///
+/// Checks connection with medea's gRPC Control API.
+/// This is used for waiting before e2e tests start until all needed services
+/// startup.
+#[allow(clippy::needless_pass_by_value)]
+pub fn heartbeat(
+    state: Data<Context>,
+) -> impl Future<Item = HttpResponse, Error = ()> {
+    state
+        .client
+        .get_single("")
+        .map_err(|_| ())
+        .map(|_| HttpResponse::Ok().body("Ok".to_string()))
 }
 
 /// Some batch ID's request. Used for batch delete and get.
@@ -170,6 +187,22 @@ impl From<ResponseProto> for Response {
             }
         } else {
             Self {
+                sid: None,
+                error: None,
+            }
+        }
+    }
+}
+
+impl From<CreateResponseProto> for Response {
+    fn from(mut resp: CreateResponseProto) -> Self {
+        if resp.has_error() {
+            Self {
+                sid: None,
+                error: Some(resp.take_error().into()),
+            }
+        } else {
+            Self {
                 sid: Some(resp.take_sid()),
                 error: None,
             }
@@ -231,7 +264,7 @@ pub struct GetResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub elements: Option<HashMap<String, Element>>,
 
-    /// Error if something happened on control API's side.
+    /// Error if something happened on Control API's side.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<ErrorResponse>,
 }
