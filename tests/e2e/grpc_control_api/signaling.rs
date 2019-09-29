@@ -226,7 +226,7 @@ fn delete_member_check_peers_removed() {
                     }
                 }
                 Event::PeersRemoved { .. } => {
-                    ctx.run_later(Duration::from_secs(1), |_, _| {
+                    ctx.run_later(Duration::from_secs(3), |_, _| {
                         actix::System::current().stop();
                     });
                 }
