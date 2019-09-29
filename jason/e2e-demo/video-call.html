@@ -128,6 +128,32 @@
             background: #49668C;
             color: #ffffff;
         }
+
+        .control-debug-menu__toggle {
+            opacity: 0.5;
+            font-size: 10pt;
+            cursor: pointer;
+            position: absolute;
+            top: 0;
+        }
+
+        .control-debug-menu__item {
+            cursor: pointer;
+            padding: 3px;
+        }
+
+        .control-debug-menu__item:hover {
+            color: #616161;
+        }
+
+        .control-debug-menu {
+            position: absolute;
+            top: 30px;
+            background: #fff;
+            border-radius: 3px;
+            padding: 5px;
+            font-size: 11pt;
+        }
     </style>
 </head>
 
@@ -149,18 +175,13 @@
         <button class="control__mute_video control__btn">Mute video</button>
     </div>
 
-    <div class="control-debug toggle-content">
-        <span>Delete member</span>
-        <span>Delete room</span>
-        <span>Create endpoint</span>
-    </div>
-
     <div class="window control-debug__window_delete-member toggle-content">
         <div class="window__title">
             <span>Delete member</span>
             <span class="window__close">X</span>
         </div>
         <div class="window__content">
+            <input class="control-debug__id_room" placeholder="Room ID">
             <input class="control-debug__id_member" placeholder="Member ID">
             <button class="control-debug__execute">Execute</button>
         </div>
@@ -177,14 +198,15 @@
         </div>
     </div>
 
-    <div class="window control-debug__window_create-endpoint toggle-content is-visible">
+    <div class="window control-debug__window_create-endpoint toggle-content">
         <div class="window__title">
             <span>Create Endpoint</span>
             <span class="window__close">X</span>
         </div>
         <div class="window__content">
-            <input class="control-debug__id_endpoint" placeholder="Endpoint ID">
+            <input class="control-debug__id_room" placeholder="Room ID">
             <input class="control-debug__id_member" placeholder="Member ID">
+            <input class="control-debug__id_endpoint" placeholder="Endpoint ID">
             <br>
             <br>
             <span>Endpoint type:</span>
@@ -196,7 +218,7 @@
             <br>
             <br>
 
-            <div class="webrtc-play-endpoint-spec toggle-content">
+            <div class="webrtc-play-endpoint-spec toggle-content is-visible">
                 <input class="webrtc-play-endpoint-spec__src" placeholder="Source">
             </div>
 
@@ -211,6 +233,64 @@
 
             <button class="control-debug__execute">Execute</button>
         </div>
+    </div>
+
+    <div class="window control-debug__window_delete-endpoint toggle-content">
+        <div class="window__title">
+            <span>Delete Endpoint</span>
+            <span class="window__close">X</span>
+        </div>
+        <div class="window__content">
+            <input class="control-debug__id_room" placeholder="Room ID">
+            <input class="control-debug__id_member" placeholder="Member ID">
+            <input class="control-debug__id_endpoint" placeholder="Endpoint ID">
+
+            <button class="control-debug__execute">Execute</button>
+        </div>
+    </div>
+
+    <div class="window control-debug__window_create-member toggle-content">
+        <div class="window__title">
+            <span>Create member</span>
+            <span class="window__close">X</span>
+        </div>
+        <div class="window__content">
+            <input class="control-debug__id_room" placeholder="Room ID">
+            <input class="control-debug__id_member" placeholder="Member ID">
+            <input class="member-spec__credentials" placeholder="Credentials">
+
+            <button class="control-debug__execute">Execute</button>
+        </div>
+    </div>
+
+    <div class="window control-debug__window_create-room toggle-content">
+        <div class="window__title">
+            <span>Create room</span>
+            <span class="window__close">X</span>
+        </div>
+        <div class="window__content">
+            <input class="control-debug__id_room" placeholder="Room ID">
+
+            <button class="control-debug__execute">Execute</button>
+        </div>
+    </div>
+
+    <div class="control-debug-menu__toggle">
+        Dynamic Control API
+    </div>
+
+    <div class="control-debug-menu toggle-content">
+        <span class="control-debug-menu__item control-debug-menu__item_delete-room">Delete room</span>
+        <br>
+        <span class="control-debug-menu__item control-debug-menu__item_delete-member">Delete member</span>
+        <br>
+        <span class="control-debug-menu__item control-debug-menu__item_delete-endpoint">Delete endpoint</span>
+        <br>
+        <span class="control-debug-menu__item control-debug-menu__item_create-room">Create room</span>
+        <br>
+        <span class="control-debug-menu__item control-debug-menu__item_create-member">Create member</span>
+        <br>
+        <span class="control-debug-menu__item control-debug-menu__item_create-endpoint">Create endpoint</span>
     </div>
 </body>
 </html>
