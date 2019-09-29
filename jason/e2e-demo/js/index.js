@@ -11,7 +11,7 @@ export async function run(credentials) {
 
     jason.on_local_stream(function (stream, error) {
         if (stream) {
-            let local_video = document.getElementById("yourvid");
+            let local_video = document.querySelector('.local-video > video');
 
             local_video.srcObject = stream.get_media_stream();
             local_video.play();
@@ -22,8 +22,8 @@ export async function run(credentials) {
 
     let room = await jason.join_room(credentials);
 
-    let muteAudio = document.getElementsByClassName('mute-audio')[0];
-    let muteVideo = document.getElementsByClassName('mute-video')[0];
+    let muteAudio = document.getElementsByClassName('control__mute_audio')[0];
+    let muteVideo = document.getElementsByClassName('control__mute_video')[0];
     let isAudioMuted = false;
     let isVideoMuted = false;
 
@@ -52,7 +52,7 @@ export async function run(credentials) {
 
     room.on_new_connection(function (connection) {
         connection.on_remote_stream(function (stream) {
-            let videoDiv = document.getElementsByClassName("video-call")[0];
+            let videoDiv = document.getElementsByClassName("remote-videos")[0];
             var video = document.createElement("video");
             video.srcObject = stream.get_media_stream();
             let innerVideoDiv = document.createElement("div");
@@ -146,19 +146,15 @@ async function addNewMember(roomId, memberId) {
 
 window.onload = function () {
     try {
-        var videoCallDiv = document.getElementById('video-call');
-        var chooseRoomButton = document.getElementById('choose-room-btn');
-        var roomIdInput = document.getElementById('room-id-input');
-        let controlBtns = document.getElementsByClassName('control-btns')[0];
+        let controlBtns = document.getElementsByClassName('control')[0];
+        let joinCallerButton = document.getElementsByClassName('connect__join')[0];
+        let usernameInput = document.getElementsByClassName('connect__username')[0];
 
-        var joinCallerButton = document.getElementById('join-caller');
-
-        let usernameInput = document.getElementById('username');
         usernameInput.value = faker.name.firstName();
 
         var bindJoinButtons = function (roomId) {
             joinCallerButton.onclick = async function () {
-                let connectBtnsDiv = document.getElementsByClassName("connect-btns")[0];
+                let connectBtnsDiv = document.getElementsByClassName("connect")[0];
                 connectBtnsDiv.style.display = 'none';
                 controlBtns.style.display = 'block';
 
@@ -184,7 +180,6 @@ window.onload = function () {
         let roomId = window.location.hash.replace("#", "");
 
         bindJoinButtons(roomId);
-        videoCallDiv.style.display = "";
     } catch (e) {
         console.log(e.response)
     }

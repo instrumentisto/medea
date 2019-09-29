@@ -11,13 +11,10 @@
             background: #f5f5f5;
         }
 
-        .video-call {
+        .remote-videos {
             display: flex;
-            /*flex-flow: row nowrap;*/
             width: 100%;
             justify-content: space-around;
-            /*flex-wrap: nowrap;*/
-            /*flex-direction: row;*/
         }
 
         .video {
@@ -33,7 +30,7 @@
             border-radius: 3px;
         }
 
-        .connect-btns {
+        .connect {
             position: fixed;
             bottom: 200px;
             left: 50%;
@@ -43,7 +40,7 @@
             border-radius: 3px;
         }
 
-        .my-video {
+        .local-video {
             position: fixed;
             bottom: 0;
             left: 0;
@@ -53,12 +50,12 @@
             height: 150px;
         }
 
-        #username {
+        .connect__username {
             font-size: 16px;
             padding: 5px;
         }
 
-        #join-caller {
+        .connect__join {
             font-size: 16px;
             background: #49668C;
             color: white;
@@ -69,21 +66,14 @@
             margin-left: 5px;
         }
 
-        .connect-text {
-            color: white;
-            font-size: 15px;
-            text-align: center;
-            margin-bottom: 10px;
-        }
-
-        .control-btns {
+        .control {
             position: fixed;
             bottom: 150px;
             left: 50%;
             transform: translateX(-50%);
         }
 
-        .control-btn {
+        .control__btn {
             border-radius: 10px;
             background: #49668C;
             color: white;
@@ -96,24 +86,21 @@
     </style>
 </head>
 <body>
-<div id="video-call" style="display: none">
-    <div class="video-call">
+    <div class="remote-videos">
     </div>
 
-    <div class="my-video video">
-        <video id="yourvid" muted autoplay width="100%" height="100%"></video>
+    <div class="local-video video">
+        <video muted autoplay width="100%" height="100%"></video>
     </div>
 
-    <div class="connect-btns">
-        <input id="username" placeholder="username">
-        <button id="join-caller">Join</button>
+    <div class="connect">
+        <input class="connect__username" placeholder="username">
+        <button class="connect__join">Join</button>
     </div>
 
-    <div class="control-btns" style="display: none">
-        <button class="mute-audio control-btn">Mute audio</button>
-        <button class="mute-video control-btn">Mute video</button>
+    <div class="control" style="display: none">
+        <button class="control__mute_audio control__btn">Mute audio</button>
+        <button class="control__mute_video control__btn">Mute video</button>
     </div>
-</div>
-
 </body>
 </html>
