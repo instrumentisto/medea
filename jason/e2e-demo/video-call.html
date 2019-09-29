@@ -104,6 +104,61 @@
         <button class="control__mute_audio control__btn">Mute audio</button>
         <button class="control__mute_video control__btn">Mute video</button>
     </div>
-</body>
 
+    <div class="control-debug" style="display: none">
+        <span>Delete member</span>
+        <span>Delete room</span>
+        <span>Create endpoint</span>
+    </div>
+
+    <div class="window control-debug__window_delete-member">
+        <div class="window__title">
+            Delete member
+        </div>
+        <div class="window__content">
+            <input class="control-debug__id_member" placeholder="Member ID">
+            <button class="control-debug__execute">Execute</button>
+        </div>
+    </div>
+
+    <div class="window control-debug__window_delete-room">
+        <div class="window__title">
+            Delete room
+        </div>
+        <div class="window__content">
+            <input class="control-debug__id_room" placeholder="Room ID">
+            <button class="control-debug__execute">Execute</button>
+        </div>
+    </div>
+
+    <div class="window control-debug__window_create-endpoint">
+        <div class="window__title">
+            Create Endpoint
+        </div>
+        <div class="window__content">
+            <input class="control-debug__id_endpoint" placeholder="Endpoint ID">
+            <input class="control-debug__id_member" placeholder="Member ID">
+            <span>Endpoint type:</span>
+            <select class="control-debug__endpoint-type">
+                <option value="WebRtcPlayEndpoint">WebRtcPlayEndpoint</option>
+                <option value="WebRtcPublishEndpoint">WebRtcPublishEndpoint</option>
+            </select>
+
+            <div class="webrtc-play-endpoint-spec">
+                <input class="webrtc-play-endpoint-spec__src" placeholder="Source">
+            </div>
+
+            <div class="webrtc-publish-endpoint-spec">
+                <span>P2P mode:</span>
+                <select class="webrtc-publish-endpoint-spec__p2p">
+                    <option value="Always">Always</option>
+                    <option value="IfPossible">If possible</option>
+                    <option value="Never">Never</option>
+                </select>
+            </div>
+
+            <button class="control-debug__execute">Execute</button>
+        </div>
+    </div>
+</body>
 </html>

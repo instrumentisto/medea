@@ -1,3 +1,5 @@
+let roomId = window.location.hash.replace("#", "");
+
 export async function run(credentials) {
     let wasm = await import("../../pkg");
     let jason = new wasm.Jason();
@@ -138,6 +140,10 @@ async function addNewMember(roomId, memberId) {
 }
 
 window.onload = function() {
+    bindControlDebugDeleteRoom();
+    bindControlDebugDeleteMember();
+    bindControlDebugCreateEndpoint();
+
     try {
         let controlBtns = document.getElementsByClassName('control')[0];
         let joinCallerButton = document.getElementsByClassName('connect__join')[0];
@@ -170,10 +176,82 @@ window.onload = function() {
             };
         };
 
-        let roomId = window.location.hash.replace("#", "");
-
         bindJoinButtons(roomId);
     } catch (e) {
         console.log(e.response)
     }
 };
+
+async function deleteRoom() {
+    try {
+        await axios.delete(controlUrl + roomId);
+    } catch (e) {
+        console.log(e.response);
+    }
+}
+
+async function deleteMember(memberId) {
+    try {
+        await axios.delete(controlUrl + roomId + "/" + memberId);
+    } catch (e) {
+        console.log(e.response);
+    }
+}
+
+async function createEndpoint(memberId, endpointId, spec) {
+    try {
+        await axios({
+            method: 'post',
+            url: controlUrl + roomId + '/' + memberId + '/' + endpointId,
+            data: spec
+        });
+    } catch (e) {
+        console.log(e.response);
+    }
+}
+
+function bindControlDebugDeleteRoom() {
+    let container = document.getElementsByClassName('control-debug__window_delete-room')[0];
+    let execute = container.getElementsByClassName('control-debug__execute')[0];
+    execute.addEventListener('click', async () => {
+        await deleteRoom();
+    });
+}
+
+function bindControlDebugDeleteMember() {
+    let container = document.getElementsByClassName('control-debug__window_delete-member')[0];
+    let execute = container.getElementsByClassName('control-debug__execute')[0];
+    execute.addEventListener('click', async () => {
+        let memberId = container.getElementsByClassName('control-debug__id_member')[0].value;
+        await deleteMember(memberId);
+    });
+}
+
+function bindControlDebugCreateEndpoint() {
+    let container = document.getElementsByClassName('control-debug__window_create-endpoint')[0];
+    let execute = container.getElementsByClassName('control-debug__execute')[0];
+    execute.addEventListener('click', async () => {
+        let memberId = container.getElementsByClassName('control-debug__id_member')[0].value;
+        let endpointId = container.getElementsByClassName('control-debug__id_endpoint')[0].value;
+        let endpointType = container.getElementsByClassName('control-debug__endpoint-type')[0].value;
+        switch (endpointType) {
+            case 'WebRtcPublishEndpoint':
+                let p2pMode = container.getElementsByClassName('webrtc-publish-endpoint-spec__p2p')[0].value;
+                await createEndpoint(memberId, endpointId, {
+                    kind: endpointType,
+                    spec: {
+                        p2p: p2pMode,
+                    }
+                });
+                break;
+            case 'WebRtcPlayEndpoint':
+                let source = container.getElementsByClassName('webrtc-play-endpoint-spec__src')[0].value;
+                await createEndpoint(memberId, endpointId, {
+                    kind: endpointType,
+                    spec: {
+                        src: source,
+                    }
+                });
+        }
+    })
+}
