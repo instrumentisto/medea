@@ -227,6 +227,11 @@ async function createEndpoint(memberId, endpointId, spec) {
 
 function bindControlDebugDeleteRoom() {
     let container = document.getElementsByClassName('control-debug__window_delete-room')[0];
+
+    container.getElementsByClassName('window__close')[0].addEventListener('click', () => {
+        hide(container);
+    });
+
     let execute = container.getElementsByClassName('control-debug__execute')[0];
     execute.addEventListener('click', async () => {
         await deleteRoom();
@@ -235,6 +240,9 @@ function bindControlDebugDeleteRoom() {
 
 function bindControlDebugDeleteMember() {
     let container = document.getElementsByClassName('control-debug__window_delete-member')[0];
+    container.getElementsByClassName('window__close')[0].addEventListener('click', () => {
+        hide(container);
+    });
     let execute = container.getElementsByClassName('control-debug__execute')[0];
     execute.addEventListener('click', async () => {
         let memberId = container.getElementsByClassName('control-debug__id_member')[0].value;
@@ -244,6 +252,10 @@ function bindControlDebugDeleteMember() {
 
 function bindControlDebugCreateEndpoint() {
     let container = document.getElementsByClassName('control-debug__window_create-endpoint')[0];
+
+    container.getElementsByClassName('window__close')[0].addEventListener('click', () => {
+        hide(container);
+    });
 
     let publishEndpointSpecContainer = container.getElementsByClassName('webrtc-publish-endpoint-spec')[0];
     let playEndpointSpecContainer = container.getElementsByClassName('webrtc-play-endpoint-spec')[0];

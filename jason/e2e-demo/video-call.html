@@ -92,6 +92,42 @@
         .toggle-content.is-visible {
             display: block;
         }
+
+        .window {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #FFFFFF;
+            border-radius: 3px;
+        }
+
+        .control-debug__execute {
+            float: right;
+            margin-bottom: 10px;
+            margin-left: 10px;
+        }
+
+        .window__content span {
+            font-size: 10pt;
+        }
+
+        .window__content {
+            padding: 10px;
+        }
+
+        .window__close {
+            float: right;
+            cursor: pointer;
+        }
+
+        .window__title {
+            border-radius: 3px;
+            padding: 10px;
+            display: inherit;
+            background: #49668C;
+            color: #ffffff;
+        }
     </style>
 </head>
 
@@ -121,7 +157,8 @@
 
     <div class="window control-debug__window_delete-member toggle-content">
         <div class="window__title">
-            Delete member
+            <span>Delete member</span>
+            <span class="window__close">X</span>
         </div>
         <div class="window__content">
             <input class="control-debug__id_member" placeholder="Member ID">
@@ -131,7 +168,8 @@
 
     <div class="window control-debug__window_delete-room toggle-content">
         <div class="window__title">
-            Delete room
+            <span>Delete room</span>
+            <span class="window__close">X</span>
         </div>
         <div class="window__content">
             <input class="control-debug__id_room" placeholder="Room ID">
@@ -139,20 +177,26 @@
         </div>
     </div>
 
-    <div class="window control-debug__window_create-endpoint">
+    <div class="window control-debug__window_create-endpoint toggle-content is-visible">
         <div class="window__title">
-            Create Endpoint
+            <span>Create Endpoint</span>
+            <span class="window__close">X</span>
         </div>
         <div class="window__content">
             <input class="control-debug__id_endpoint" placeholder="Endpoint ID">
             <input class="control-debug__id_member" placeholder="Member ID">
+            <br>
+            <br>
             <span>Endpoint type:</span>
-            <select class="control-debug__endpoint-type">
+            <select class="control-debug__endpoint-type is-visible">
                 <option value="WebRtcPlayEndpoint">WebRtcPlayEndpoint</option>
                 <option value="WebRtcPublishEndpoint">WebRtcPublishEndpoint</option>
             </select>
 
-            <div class="webrtc-play-endpoint-spec toggle-content is-visible">
+            <br>
+            <br>
+
+            <div class="webrtc-play-endpoint-spec toggle-content">
                 <input class="webrtc-play-endpoint-spec__src" placeholder="Source">
             </div>
 
