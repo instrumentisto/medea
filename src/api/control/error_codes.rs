@@ -274,12 +274,6 @@ impl From<ParticipantServiceErr> for ErrorResponse {
             ParticipantNotFound(id) => {
                 Self::new(ErrorCode::MemberNotFound, &id)
             }
-            ParticipantAlreadyExists(id) => {
-                Self::new(ErrorCode::MemberAlreadyExists, &id)
-            }
-            EndpointAlreadyExists(id) => {
-                Self::new(ErrorCode::EndpointAlreadyExists, &id)
-            }
             TurnServiceErr(_) | MemberError(_) => Self::unexpected(&err),
         }
     }
@@ -347,6 +341,12 @@ impl From<RoomError> for ErrorResponse {
             MemberError(e) => e.into(),
             MembersLoadError(e) => e.into(),
             ParticipantServiceErr(e) => e.into(),
+            MemberAlreadyExists(id) => {
+                Self::new(ErrorCode::MemberAlreadyExists, &id)
+            }
+            EndpointAlreadyExists(id) => {
+                Self::new(ErrorCode::EndpointAlreadyExists, &id)
+            }
             WrongRoomId(_, _)
             | PeerNotFound(_)
             | NoTurnCredentials(_)

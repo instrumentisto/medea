@@ -34,22 +34,15 @@ use crate::{
             RpcConnectionClosed,
         },
         control::{
-            endpoints::{
-                WebRtcPlayEndpoint as WebRtcPlayEndpointSpec,
-                WebRtcPublishEndpoint as WebRtcPublishEndpointSpec,
-            },
             local_uri::{LocalUri, ToEndpoint, ToMember},
-            MemberId, MemberSpec, RoomId, RoomSpec, WebRtcPlayId,
-            WebRtcPublishId,
+            MemberId, RoomId, RoomSpec,
         },
     },
     log::prelude::*,
     media::IceUser,
     signalling::{
         elements::{
-            endpoints::webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
-            member::MemberError,
-            parse_members, Member, MembersLoadError,
+            member::MemberError, parse_members, Member, MembersLoadError,
         },
         room::{ActFuture, RoomError},
         Room,
@@ -80,16 +73,6 @@ pub enum ParticipantServiceErr {
     /// Some error happened in [`Member`].
     #[display(fmt = "{}", _0)]
     MemberError(MemberError),
-
-    /// Try to create [`Member`] with ID which already exists.
-    #[display(fmt = "Participant [id = {}] already exists.", _0)]
-    ParticipantAlreadyExists(LocalUri<ToMember>),
-
-    /// Try to create [`Endpoint`] with ID which already exists.
-    ///
-    /// [`Endpoint`]: crate::signalling::elements::endpoints::Endpoint
-    #[display(fmt = "Endpoint [id = {}] already exists.", _0)]
-    EndpointAlreadyExists(LocalUri<ToEndpoint>),
 }
 
 impl From<TurnServiceErr> for ParticipantServiceErr {
@@ -161,7 +144,7 @@ impl ParticipantService {
     ///
     /// __Note__ this function don't check presence of [`Member`] in
     /// [`ParticipantService`].
-    fn get_local_uri_to_member(
+    pub fn get_local_uri_to_member(
         &self,
         member_id: MemberId,
     ) -> LocalUri<ToMember> {
@@ -440,178 +423,7 @@ impl ParticipantService {
         }
     }
 
-    /// Creates new [`Member`] in this [`ParticipantService`].
-    ///
-    /// This function will check that new [`Member`]'s ID is not present in
-    /// [`ParticipantService`].
-    ///
-    /// Returns [`ParticipantServiceErr::ParticipantAlreadyExists`] when
-    /// [`Member`]'s ID already presented in [`ParticipantService`].
-    // TODO: move to room
-    pub fn create_member(
-        &mut self,
-        id: MemberId,
-        spec: &MemberSpec,
-    ) -> Result<(), ParticipantServiceErr> {
-        if self.members.get(&id).is_some() {
-            return Err(ParticipantServiceErr::ParticipantAlreadyExists(
-                self.get_local_uri_to_member(id),
-            ));
-        }
-        let signalling_member = Member::new(
-            id.clone(),
-            spec.credentials().to_string(),
-            self.room_id.clone(),
-        );
-
-        for (id, publish) in spec.publish_endpoints() {
-            let signalling_publish = WebRtcPublishEndpoint::new(
-                id.clone(),
-                publish.p2p.clone(),
-                signalling_member.downgrade(),
-            );
-            signalling_member.insert_src(signalling_publish);
-        }
-
-        for (id, play) in spec.play_endpoints() {
-            let partner_member = self.get_member(&play.src.member_id)?;
-            let src = partner_member
-                .get_src_by_id(&play.src.endpoint_id)
-                .ok_or_else(|| {
-                    MemberError::EndpointNotFound(
-                        partner_member.get_local_uri_to_endpoint(
-                            play.src.endpoint_id.clone().into(),
-                        ),
-                    )
-                })?;
-
-            let sink = WebRtcPlayEndpoint::new(
-                id.clone(),
-                play.src.clone(),
-                src.downgrade(),
-                signalling_member.downgrade(),
-            );
-
-            signalling_member.insert_sink(sink);
-        }
-
-        // This is needed for atomicity.
-        for (_, sink) in signalling_member.sinks() {
-            let src = sink.src();
-            src.add_sink(sink.downgrade());
-        }
-
-        self.members.insert(id, signalling_member);
-
-        Ok(())
-    }
-
-    /// Creates new [`WebRtcPlayEndpoint`] in specified [`Member`].
-    ///
-    /// This function will check that new [`WebRtcPlayEndpoint`]'s ID is not
-    /// present in [`ParticipantService`].
-    ///
-    /// Returns [`ParticipantServiceErr::EndpointAlreadyExists`] when
-    /// [`WebRtcPlayEndpoint`]'s ID already presented in [`Member`].
-    // TODO: move to room
-    pub fn create_sink_endpoint(
-        &mut self,
-        member_id: &MemberId,
-        endpoint_id: WebRtcPlayId,
-        spec: WebRtcPlayEndpointSpec,
-    ) -> Result<(), ParticipantServiceErr> {
-        let member = self.get_member(&member_id)?;
-
-        let is_member_have_this_sink_id =
-            member.get_sink_by_id(&endpoint_id).is_some();
-
-        let publish_id = String::from(endpoint_id).into();
-        let is_member_have_this_src_id =
-            member.get_src_by_id(&publish_id).is_some();
-        if is_member_have_this_sink_id || is_member_have_this_src_id {
-            return Err(ParticipantServiceErr::EndpointAlreadyExists(
-                member.get_local_uri_to_endpoint(publish_id.into()),
-            ));
-        }
-
-        let partner_member = self.get_member(&spec.src.member_id)?;
-        let src = partner_member
-            .get_src_by_id(&spec.src.endpoint_id)
-            .ok_or_else(|| {
-                MemberError::EndpointNotFound(
-                    partner_member.get_local_uri_to_endpoint(
-                        spec.src.endpoint_id.clone().into(),
-                    ),
-                )
-            })?;
-
-        let sink = WebRtcPlayEndpoint::new(
-            String::from(publish_id).into(),
-            spec.src,
-            src.downgrade(),
-            member.downgrade(),
-        );
-
-        src.add_sink(sink.downgrade());
-
-        debug!(
-            "Created WebRtcPlayEndpoint [id = {}] for Member [id = {}] in \
-             Room [id = {}].",
-            sink.id(),
-            member_id,
-            self.room_id
-        );
-
-        member.insert_sink(sink);
-
-        Ok(())
-    }
-
-    /// Creates new [`WebRtcPlayEndpoint`] in specified [`Member`].
-    ///
-    /// This function will check that new [`WebRtcPublishEndpoint`]'s ID is not
-    /// present in [`ParticipantService`].
-    ///
-    /// Returns [`ParticipantServiceErr::EndpointAlreadyExists`] when
-    /// [`WebRtcPublishEndpoint`]'s ID already presented in [`Member`].
-    // TODO: move to room
-    pub fn create_src_endpoint(
-        &mut self,
-        member_id: &MemberId,
-        publish_id: WebRtcPublishId,
-        spec: WebRtcPublishEndpointSpec,
-    ) -> Result<(), ParticipantServiceErr> {
-        let member = self.get_member(&member_id)?;
-
-        let is_member_have_this_src_id =
-            member.get_src_by_id(&publish_id).is_some();
-
-        let play_id = String::from(publish_id).into();
-        let is_member_have_this_sink_id =
-            member.get_sink_by_id(&play_id).is_some();
-
-        if is_member_have_this_sink_id || is_member_have_this_src_id {
-            return Err(ParticipantServiceErr::EndpointAlreadyExists(
-                member.get_local_uri_to_endpoint(play_id.into()),
-            ));
-        }
-
-        let endpoint = WebRtcPublishEndpoint::new(
-            String::from(play_id).into(),
-            spec.p2p,
-            member.downgrade(),
-        );
-
-        debug!(
-            "Create WebRtcPublishEndpoint [id = {}] for Member [id = {}] in \
-             Room [id = {}]",
-            endpoint.id(),
-            member_id,
-            self.room_id
-        );
-
-        member.insert_src(endpoint);
-
-        Ok(())
+    pub fn create_membe(&mut self, id: MemberId, member: Member) {
+        self.members.insert(id, member);
     }
 }
