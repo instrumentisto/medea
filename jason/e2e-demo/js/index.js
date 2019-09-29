@@ -182,6 +182,21 @@ window.onload = function() {
     }
 };
 
+// Show an element
+function show(elem) {
+    elem.classList.add('is-visible');
+}
+
+// Hide an element
+function hide(elem) {
+    elem.classList.remove('is-visible');
+}
+
+// Toggle element visibility
+function toggle(elem) {
+    elem.classList.toggle('is-visible');
+}
+
 async function deleteRoom() {
     try {
         await axios.delete(controlUrl + roomId);
@@ -229,6 +244,25 @@ function bindControlDebugDeleteMember() {
 
 function bindControlDebugCreateEndpoint() {
     let container = document.getElementsByClassName('control-debug__window_create-endpoint')[0];
+
+    let publishEndpointSpecContainer = container.getElementsByClassName('webrtc-publish-endpoint-spec')[0];
+    let playEndpointSpecContainer = container.getElementsByClassName('webrtc-play-endpoint-spec')[0];
+
+    let endpointTypeSelect = container.getElementsByClassName('control-debug__endpoint-type')[0];
+    endpointTypeSelect.addEventListener('change', () => {
+        switch (endpointTypeSelect.value) {
+            case 'WebRtcPlayEndpoint':
+                show(playEndpointSpecContainer);
+                hide(publishEndpointSpecContainer);
+                break;
+            case 'WebRtcPublishEndpoint':
+                show(publishEndpointSpecContainer);
+                hide(playEndpointSpecContainer);
+                break;
+        }
+    });
+
+
     let execute = container.getElementsByClassName('control-debug__execute')[0];
     execute.addEventListener('click', async () => {
         let memberId = container.getElementsByClassName('control-debug__id_member')[0].value;

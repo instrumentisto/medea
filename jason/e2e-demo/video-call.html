@@ -84,6 +84,14 @@
             cursor: pointer;
             margin-right: 10px;
         }
+
+        .toggle-content {
+            display: none;
+        }
+
+        .toggle-content.is-visible {
+            display: block;
+        }
     </style>
 </head>
 
@@ -105,13 +113,13 @@
         <button class="control__mute_video control__btn">Mute video</button>
     </div>
 
-    <div class="control-debug" style="display: none">
+    <div class="control-debug toggle-content">
         <span>Delete member</span>
         <span>Delete room</span>
         <span>Create endpoint</span>
     </div>
 
-    <div class="window control-debug__window_delete-member">
+    <div class="window control-debug__window_delete-member toggle-content">
         <div class="window__title">
             Delete member
         </div>
@@ -121,7 +129,7 @@
         </div>
     </div>
 
-    <div class="window control-debug__window_delete-room">
+    <div class="window control-debug__window_delete-room toggle-content">
         <div class="window__title">
             Delete room
         </div>
@@ -144,11 +152,11 @@
                 <option value="WebRtcPublishEndpoint">WebRtcPublishEndpoint</option>
             </select>
 
-            <div class="webrtc-play-endpoint-spec">
+            <div class="webrtc-play-endpoint-spec toggle-content is-visible">
                 <input class="webrtc-play-endpoint-spec__src" placeholder="Source">
             </div>
 
-            <div class="webrtc-publish-endpoint-spec">
+            <div class="webrtc-publish-endpoint-spec toggle-content">
                 <span>P2P mode:</span>
                 <select class="webrtc-publish-endpoint-spec__p2p">
                     <option value="Always">Always</option>
