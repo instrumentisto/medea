@@ -154,6 +154,13 @@
             padding: 5px;
             font-size: 11pt;
         }
+
+        .control-debug__window_get>.window__content>.control-debug__json-result {
+            height: 300px;
+            overflow: scroll;
+            white-space: pre;
+            font-size: 11pt;
+        }
     </style>
 </head>
 
@@ -275,6 +282,24 @@
         </div>
     </div>
 
+    <div class="window control-debug__window_get toggle-content">
+        <div class="window__title">
+            <span>Get</span>
+            <span class="window__close">X</span>
+        </div>
+        <div class="window__content">
+            <input class="control-debug__id_room" placeholder="Room ID">
+            <input class="control-debug__id_member" placeholder="Member ID">
+            <input class="control-debug__id_endpoint" placeholder="Endpoint ID">
+
+            <span>Result: </span>
+            <br>
+            <div class="control-debug__json-result"></div>
+
+            <button class="control-debug__execute">Execute</button>
+        </div>
+    </div>
+
     <div class="control-debug-menu__toggle">
         Dynamic Control API
     </div>
@@ -291,6 +316,8 @@
         <span class="control-debug-menu__item control-debug-menu__item_create-member">Create member</span>
         <br>
         <span class="control-debug-menu__item control-debug-menu__item_create-endpoint">Create endpoint</span>
+        <br>
+        <span class="control-debug-menu__item control-debug-menu__item_get">Get</span>
     </div>
 </body>
 </html>

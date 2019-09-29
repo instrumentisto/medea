@@ -146,6 +146,7 @@ window.onload = function() {
     bindControlDebugDeleteEndpoint();
     bindControlDebugCreateMember();
     bindControlDebugCreateRoom();
+    bindControlDebugGet();
 
     bindControlDebugMenu();
 
@@ -207,7 +208,7 @@ const controlApi = {
         try {
             await axios.delete(controlUrl + roomId);
         } catch (e) {
-            console.log(e.response);
+            alert(JSON.stringify(e.response.data));
         }
     },
 
@@ -215,7 +216,7 @@ const controlApi = {
         try {
             await axios.delete(controlUrl + roomId + "/" + memberId);
         } catch (e) {
-            console.log(e.response);
+            alert(JSON.stringify(e.response.data));
         }
     },
 
@@ -227,7 +228,7 @@ const controlApi = {
                 data: spec
             });
         } catch (e) {
-            console.log(e.response);
+            alert(JSON.stringify(e.response.data));
         }
     },
 
@@ -235,7 +236,7 @@ const controlApi = {
         try {
             await axios.delete(controlUrl + roomId + '/' + memberId + '/' + endpointId);
         } catch (e) {
-            console.log(e.response)
+            alert(JSON.stringify(e.response.data));
         }
     },
 
@@ -250,7 +251,7 @@ const controlApi = {
                 }
             });
         } catch (e) {
-            console.log(e.response);
+            alert(JSON.stringify(e.response.data));
         }
     },
 
@@ -266,10 +267,24 @@ const controlApi = {
                 }
             });
         } catch (e) {
-            console.log(e.response);
+            alert(JSON.stringify(e.response.data));
+        }
+    },
+
+    get: async function(roomId, memberId, endpointId) {
+        try {
+            let url = controlUrl + roomId;
+            if (memberId.length > 0 && endpointId.length > 0) {
+                url = controlUrl + roomId + '/' + memberId + '/' + endpointId;
+            } else if (memberId.length > 0) {
+                url = controlUrl + roomId + '/' + memberId;
+            }
+            let resp = await axios.get(url);
+            return JSON.stringify(resp.data, null, 4);
+        } catch (e) {
+            alert(JSON.stringify(e.response.data));
         }
     }
-
 };
 
 function bindControlDebugDeleteRoom() {
@@ -399,6 +414,26 @@ function bindControlDebugCreateMember() {
     });
 }
 
+function bindControlDebugGet() {
+    let container = document.getElementsByClassName('control-debug__window_get')[0];
+    let resultContainer = container.getElementsByClassName('control-debug__json-result')[0];
+
+    container.getElementsByClassName('window__close')[0].addEventListener('click', () => {
+        hide(container);
+    });
+
+    let execute = container.getElementsByClassName('control-debug__execute')[0];
+    execute.addEventListener('click', async () => {
+        let roomId = container.getElementsByClassName('control-debug__id_room')[0].value;
+        let memberId = container.getElementsByClassName('control-debug__id_member')[0].value;
+        let endpointId = container.getElementsByClassName('control-debug__id_endpoint')[0].value;
+
+        let res = await controlApi.get(roomId, memberId, endpointId);
+        res = res.replace(/(?:\r\n|\r|\n)/g, '<br>');
+        resultContainer.innerHTML = res;
+    })
+}
+
 function bindControlDebugMenu() {
     let menuToggle = document.getElementsByClassName('control-debug-menu__toggle')[0];
     let menuContainer = document.getElementsByClassName('control-debug-menu')[0];
@@ -412,6 +447,7 @@ function bindControlDebugMenu() {
     let deleteEndpointMenuItem = menuContainer.getElementsByClassName('control-debug-menu__item_delete-endpoint')[0];
     let createMemberMenuItem = menuContainer.getElementsByClassName('control-debug-menu__item_create-member')[0];
     let createRoomMenuItem = menuContainer.getElementsByClassName('control-debug-menu__item_create-room')[0];
+    let getMenuItem = menuContainer.getElementsByClassName('control-debug-menu__item_get')[0];
 
     let deleteRoomContainer = document.getElementsByClassName('control-debug__window_delete-room')[0];
     let deleteMemberContainer = document.getElementsByClassName('control-debug__window_delete-member')[0];
@@ -419,6 +455,7 @@ function bindControlDebugMenu() {
     let deleteEndpointContainer = document.getElementsByClassName('control-debug__window_delete-endpoint')[0];
     let createMemberContainer = document.getElementsByClassName('control-debug__window_create-member')[0];
     let createRoomContainer = document.getElementsByClassName('control-debug__window_create-room')[0];
+    let getContainer = document.getElementsByClassName('control-debug__window_get')[0];
 
 
 
@@ -428,6 +465,7 @@ function bindControlDebugMenu() {
         hide(deleteEndpointContainer);
         hide(createMemberContainer);
         hide(createRoomContainer);
+        hide(getContainer);
         show(deleteRoomContainer);
     });
     deleteMemberMenuItem.addEventListener('click', () => {
@@ -436,6 +474,7 @@ function bindControlDebugMenu() {
         hide(deleteEndpointContainer);
         hide(createMemberContainer);
         hide(createRoomContainer);
+        hide(getContainer);
         show(deleteMemberContainer);
     });
     createEndpointMenuItem.addEventListener('click', () => {
@@ -444,6 +483,7 @@ function bindControlDebugMenu() {
         hide(deleteEndpointContainer);
         hide(createMemberContainer);
         hide(createRoomContainer);
+        hide(getContainer);
         show(createEndpointContainer);
     });
     deleteEndpointMenuItem.addEventListener('click', () => {
@@ -452,6 +492,7 @@ function bindControlDebugMenu() {
         hide(createEndpointContainer);
         hide(createMemberContainer);
         hide(createRoomContainer);
+        hide(getContainer);
         show(deleteEndpointContainer);
     });
     createMemberMenuItem.addEventListener('click', () => {
@@ -460,6 +501,7 @@ function bindControlDebugMenu() {
         hide(createEndpointContainer);
         hide(createRoomContainer);
         hide(deleteEndpointContainer);
+        hide(getContainer);
         show(createMemberContainer);
     });
     createRoomMenuItem.addEventListener('click', () => {
@@ -468,6 +510,16 @@ function bindControlDebugMenu() {
         hide(createEndpointContainer);
         hide(deleteEndpointContainer);
         hide(createMemberContainer);
+        hide(getContainer);
         show(createRoomContainer);
     });
+    getMenuItem.addEventListener('click', () => {
+        hide(deleteRoomContainer);
+        hide(deleteMemberContainer);
+        hide(createEndpointContainer);
+        hide(deleteEndpointContainer);
+        hide(createMemberContainer);
+        hide(createRoomContainer);
+        show(getContainer);
+    })
 }
