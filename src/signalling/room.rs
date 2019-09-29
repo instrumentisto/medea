@@ -732,6 +732,7 @@ impl Room {
         member_id: &MemberId,
         endpoint_id: WebRtcPlayId,
         spec: WebRtcPlayEndpointSpec,
+        ctx: &mut Context<Self>,
     ) -> Result<(), RoomError> {
         let member = self.members.get_member(&member_id)?;
 
@@ -776,6 +777,8 @@ impl Room {
         );
 
         member.insert_sink(sink);
+
+        self.init_member_connections(&member, ctx);
 
         Ok(())
     }
@@ -1175,7 +1178,7 @@ impl Handler<CreateEndpoint> for Room {
     fn handle(
         &mut self,
         msg: CreateEndpoint,
-        _: &mut Self::Context,
+        ctx: &mut Self::Context,
     ) -> Self::Result {
         match msg.spec {
             EndpointSpec::WebRtcPlay(endpoint) => {
@@ -1183,6 +1186,7 @@ impl Handler<CreateEndpoint> for Room {
                     &msg.member_id,
                     msg.endpoint_id.into(),
                     endpoint,
+                    ctx,
                 )?;
             }
             EndpointSpec::WebRtcPublish(endpoint) => {
