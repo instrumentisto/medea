@@ -1,35 +1,18 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta http-equiv="Content-type" content="text/html; charset=utf-8"/>
-  <title>My awesome Rust, WebAssembly, and Webpack application</title>
-  <script src="https://code.jquery.com/jquery-3.4.1.slim.min.js"
-          integrity="sha256-pasqAKBDmFT4eHoN2ndd6lN370kFiGUFyTiUHWhU7k8="
-          crossorigin="anonymous"></script>
+    <meta http-equiv="Content-type" content="text/html; charset=utf-8"/>
+    <title>My awesome Rust, WebAssembly, and Webpack application</title>
+    <script>
+        function goToCall() {
+            let roomId = document.getElementById('room-id-input').value;
+            document.location = "/video-call.html#" + roomId;
+        }
+    </script>
 </head>
 <body>
-
-<div id="caller">
-  <video name="local-video" muted></video>
-  <video name="remote-video"></video>
-  <div>
-    <input type="checkbox" name="toggle-audio" checked>
-    <label>toggle local audio</label>
-    <input type="checkbox" name="toggle-video" checked>
-    <label>toggle local video</label>
-  </div>
-</div>
-
-<div id="responder">
-  <video name="local-video" muted></video>
-  <video name="remote-video"></video>
-  <div>
-    <input type="checkbox" name="toggle-audio" checked>
-    <label>toggle local audio</label>
-    <input type="checkbox" name="toggle-video" checked>
-    <label>toggle local video</label>
-  </div>
-</div>
-
+    <div id="choose-room">
+        <input id="room-id-input">
+        <button id="choose-room-btn" type="submit" onclick="goToCall()">JOIN</button>
+    </div>
 </body>
-</html>
