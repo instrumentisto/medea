@@ -8,7 +8,6 @@ use std::time::Duration;
 use actix::{
     Actor, Addr, Arbiter, AsyncContext, Context, Handler, StreamHandler,
 };
-use futures::Future;
 use actix_codec::Framed;
 use actix_http::ws;
 use awc::{
@@ -16,7 +15,7 @@ use awc::{
     ws::{CloseCode, CloseReason, Frame},
     BoxedSocket,
 };
-use futures::{stream::SplitSink, Future as _, Sink as _, Stream as _};
+use futures::{stream::SplitSink, Future, Future as _, Sink as _, Stream as _};
 use medea_client_api_proto::{Command, Event, IceCandidate};
 use serde_json::error::Error as SerdeError;
 
@@ -63,8 +62,8 @@ impl TestMember {
         self.writer.poll_complete().ok();
     }
 
-    /// Returns [`Future`] which will connect to the WebSocket and starts [`TestMember`]
-    /// actor.
+    /// Returns [`Future`] which will connect to the WebSocket and starts
+    /// [`TestMember`] actor.
     pub fn connect(
         uri: &str,
         on_message: MessageHandler,

@@ -16,7 +16,8 @@ use crate::{
     format_name_macro, grpc_control_api::ControlClient, signalling::TestMember,
 };
 
-/// Creates [`CreateRequest`] for creating `Room` element with provided room ID and `Member` with `WebRtcPublishEndpoint`.
+/// Creates [`CreateRequest`] for creating `Room` element with provided room ID
+/// and `Member` with `WebRtcPublishEndpoint`.
 ///
 /// # Spec of `Room` which will be created with this [`CreateRequest`]
 ///

@@ -5,6 +5,7 @@
 
 mod create;
 mod delete;
+mod signaling;
 
 use std::{collections::HashMap, sync::Arc};
 
@@ -22,8 +23,8 @@ use protobuf::RepeatedField;
 /// Client for [Medea]'s gRPC [Control API].
 ///
 /// [Medea]: https://github.com/instrumentisto/medea
-#[derive(Clone, Debug)]
-pub struct ControlClient(ControlApiClient);
+#[derive(Clone)]
+struct ControlClient(ControlApiClient);
 
 impl ControlClient {
     /// Create new [`ControlClient`].
@@ -111,7 +112,8 @@ impl ControlClient {
     }
 }
 
-/// Creates [`CreateRequest`] for creating `Room` element with provided `Room` ID.
+/// Creates [`CreateRequest`] for creating `Room` element with provided `Room`
+/// ID.
 ///
 /// # Spec of `Room` which will be created with this [`CreateRequest`]
 ///
@@ -138,7 +140,7 @@ impl ControlClient {
 ///             spec:
 ///               src: "local://{{ room_id }}/publisher/publish"
 /// ```
-pub fn create_room_req(room_id: &str) -> CreateRequest {
+fn create_room_req(room_id: &str) -> CreateRequest {
     let mut create_req = CreateRequest::new();
     let mut room = Room::new();
     let mut publisher = Member::new();
