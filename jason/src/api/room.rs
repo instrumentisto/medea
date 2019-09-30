@@ -9,7 +9,7 @@ use std::{
 use futures::{
     channel::mpsc::{unbounded, UnboundedSender},
     future::{self, Future as _, IntoFuture},
-    StreamExt as _,
+    StreamExt,
     stream::select,
 };
 
@@ -101,15 +101,22 @@ impl Room {
         let peer_events_stream = peer_events_rx.map(|event|
             RoomEvent::PeerEvent(event));
 
-        let inner = Rc::downgrade(&room);
-        select(rpc_events_stream, peer_events_stream).take_while(move |event| {
-
-            inner;
-
-            async {
-                true
-            }
-        });
+//        let inner = Rc::downgrade(&room);
+//        select(rpc_events_stream, peer_events_stream).take_while(|event: String| async {
+//            match inner.upgrade() {
+//                Some(inner) => {
+//                    true
+//                }
+//                None => {
+//                    // `InnerSession` is gone, which means that `Room` has been
+//                    // dropped. Not supposed to happen, actually, since
+//                    // `InnerSession` should drop its `tx` by unsub from
+//                    // `RpcClient`.
+//                    WasmErr::from("Inner Room dropped unexpectedly").log_err();
+//                    false
+//                }
+//            }
+//        });
 
         Self(room)
     }
