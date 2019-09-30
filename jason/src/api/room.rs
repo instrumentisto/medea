@@ -9,7 +9,7 @@ use std::{
 
 use futures::{
     channel::mpsc::{unbounded, UnboundedSender},
-    future::self,
+    future,
     stream::select,
     FutureExt as _, StreamExt,
 };
@@ -93,10 +93,8 @@ impl Room {
         let events_stream = rpc.subscribe();
         let room = Rc::new(RefCell::new(InnerRoom::new(rpc, peers, tx)));
 
-        let rpc_events_stream =
-            events_stream.map(|event| RoomEvent::RpcEvent(event));
-        let peer_events_stream =
-            peer_events_rx.map(|event| RoomEvent::PeerEvent(event));
+        let rpc_events_stream = events_stream.map(RoomEvent::RpcEvent);
+        let peer_events_stream = peer_events_rx.map(RoomEvent::PeerEvent);
 
         let mut events = select(rpc_events_stream, peer_events_stream);
 

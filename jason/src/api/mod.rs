@@ -40,7 +40,7 @@ impl Jason {
     #[wasm_bindgen(constructor)]
     pub fn new() -> Self {
         set_panic_hook();
-        Jason::default()
+        Self::default()
     }
 
     /// Performs entering to a [`Room`] by the authorization `token`.
@@ -61,8 +61,7 @@ impl Jason {
             };
 
             let rpc: Rc<dyn RpcClient> = Rc::new(rpc);
-            let room =
-                Room::new(Rc::clone(&rpc), Box::new(peer_repository));
+            let room = Room::new(Rc::clone(&rpc), Box::new(peer_repository));
 
             let handle = room.new_handle();
 
