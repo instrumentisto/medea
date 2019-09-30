@@ -106,7 +106,7 @@ jobs:
       before_script:
         - cargo +nightly install wasm-bindgen-cli -Z install-upgrade
         - rustup target add wasm32-unknown-unknown
-      script: make test.unit crate=medea-jason
+      script: make test.unit crate=medea-jason webdriver=geckodriver
 
     - name: E2E signalling (stable)
       stage: test
