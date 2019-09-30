@@ -5,6 +5,7 @@ mod room;
 
 use std::{cell::RefCell, rc::Rc};
 
+use futures::{TryFutureExt};
 use js_sys::Promise;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::future_to_promise;
@@ -48,28 +49,30 @@ impl Jason {
     /// Establishes connection with media server (if it doesn't already exist).
     /// Fails if unable to connect to media server.
     /// Effectively returns `Result<RoomHandle, WasmErr>`.
-//    pub fn join_room(&self, token: String) -> Promise {
-//        let fut = async {
-//            let mut rpc = WebsocketRpcClient::new(token, 3000);
-//            let peer_repository = peer::Repository::new(Rc::clone(
-//                &self.0.borrow().media_manager,
-//            ));
-//
-//            rpc.init().await?;
-//
-//            let rpc: Rc<dyn RpcClient> = Rc::new(rpc);
-//            let room = Room::new(Rc::clone(&rpc), Box::new(peer_repository));
-//
-//            let handle = room.new_handle();
-//
-//            self.0.borrow_mut().rpc.replace(rpc);
-//            self.0.borrow_mut().rooms.push(room);
-//
-//            Ok(handle.into())
-//        };
-//
-//        future_to_promise(fut)
-//    }
+    pub fn join_room(&self, token: String) -> Promise {
+        let mut rpc = WebsocketRpcClient::new(token, 3000);
+        let peer_repository =
+            peer::Repository::new(Rc::clone(&self.0.borrow().media_manager));
+
+        let inner = Rc::clone(&self.0);
+        let fut = rpc
+            .init()
+            .and_then(move |()| {
+                let rpc: Rc<dyn RpcClient> = Rc::new(rpc);
+                let room =
+                    Room::new(Rc::clone(&rpc), Box::new(peer_repository));
+
+                let handle = room.new_handle();
+
+                inner.borrow_mut().rpc.replace(rpc);
+                inner.borrow_mut().rooms.push(room);
+
+                Ok(JsValue::from(handle))
+            })
+            .map_err(JsValue::from);
+
+        future_to_promise(fut)
+    }
 
     /// Sets `on_local_stream` callback, which will be invoked once media
     /// acquisition request will resolve returning

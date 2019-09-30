@@ -3,24 +3,23 @@
 use std::{
     cell::RefCell,
     collections::HashMap,
+    ops::DerefMut as _,
     rc::{Rc, Weak},
 };
 
 use futures::{
     channel::mpsc::{unbounded, UnboundedSender},
     future::{self, Future as _, IntoFuture},
-    StreamExt,
     stream::select,
+    FutureExt as _, StreamExt,
 };
-
-use futures::FutureExt as _;
 
 use medea_client_api_proto::{
     Command, Direction, Event as RpcEvent, EventHandler, IceCandidate,
     IceServer, PeerId, Track,
 };
-use wasm_bindgen::prelude::*;
-use wasm_bindgen_futures::spawn_local;
+use wasm_bindgen::{prelude::*, JsValue};
+use wasm_bindgen_futures::{future_to_promise, spawn_local};
 
 use crate::{
     media::MediaStream,
@@ -94,29 +93,45 @@ impl Room {
         let events_stream = rpc.subscribe();
         let room = Rc::new(RefCell::new(InnerRoom::new(rpc, peers, tx)));
 
-        let rpc_events_stream = events_stream.map(|event| {
-            RoomEvent::RpcEvent(event)
+        let rpc_events_stream =
+            events_stream.map(|event| RoomEvent::RpcEvent(event));
+        let peer_events_stream =
+            peer_events_rx.map(|event| RoomEvent::PeerEvent(event));
+
+        let mut events = select(rpc_events_stream, peer_events_stream);
+
+        let inner = Rc::downgrade(&room);
+        // Spawns `Promise` in JS, does not provide any handles, so the current
+        // way to stop this stream is to drop all connected `Sender`s.
+        spawn_local(async move {
+            while let Some(event) = events.next().await {
+                match inner.upgrade() {
+                    None => {
+                        // `InnerSession` is gone, which means that `Room` has
+                        // been dropped. Not supposed to
+                        // happen, actually, since
+                        // `InnerSession` should drop its `tx` by unsub from
+                        // `RpcClient`.
+                        WasmErr::from("Inner Room dropped unexpectedly")
+                            .log_err();
+                    }
+                    Some(inner) => {
+                        match event {
+                            RoomEvent::RpcEvent(event) => {
+                                event.dispatch_with(
+                                    inner.borrow_mut().deref_mut(),
+                                );
+                            }
+                            RoomEvent::PeerEvent(event) => {
+                                event.dispatch_with(
+                                    inner.borrow_mut().deref_mut(),
+                                );
+                            }
+                        };
+                    }
+                }
+            }
         });
-
-        let peer_events_stream = peer_events_rx.map(|event|
-            RoomEvent::PeerEvent(event));
-
-//        let inner = Rc::downgrade(&room);
-//        select(rpc_events_stream, peer_events_stream).take_while(|event: String| async {
-//            match inner.upgrade() {
-//                Some(inner) => {
-//                    true
-//                }
-//                None => {
-//                    // `InnerSession` is gone, which means that `Room` has been
-//                    // dropped. Not supposed to happen, actually, since
-//                    // `InnerSession` should drop its `tx` by unsub from
-//                    // `RpcClient`.
-//                    WasmErr::from("Inner Room dropped unexpectedly").log_err();
-//                    false
-//                }
-//            }
-//        });
 
         Self(room)
     }
