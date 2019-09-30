@@ -98,33 +98,34 @@ impl WebSocket {
 
         let inner = InnerSocket::new(url)?;
         let socket = Rc::new(RefCell::new(inner));
-        let mut socket_mut = socket.borrow_mut();
 
-        let inner = Rc::clone(&socket);
-        socket_mut.on_close = Some(EventListener::new_once(
-            Rc::clone(&socket_mut.socket),
-            "close",
-            move |_| {
-                inner.borrow_mut().update_state();
-                let _ = tx_close.send(());
-            },
-        )?);
+        {
+            let mut socket_mut = socket.borrow_mut();
+            let inner = Rc::clone(&socket);
+            socket_mut.on_close = Some(EventListener::new_once(
+                Rc::clone(&socket_mut.socket),
+                "close",
+                move |_| {
+                    inner.borrow_mut().update_state();
+                    let _ = tx_close.send(());
+                },
+            )?);
 
-        let inner = Rc::clone(&socket);
-        socket_mut.on_open = Some(EventListener::new_once(
-            Rc::clone(&socket_mut.socket),
-            "open",
-            move |_| {
-                inner.borrow_mut().update_state();
-                let _ = tx_open.send(());
-            },
-        )?);
+            let inner = Rc::clone(&socket);
+            socket_mut.on_open = Some(EventListener::new_once(
+                Rc::clone(&socket_mut.socket),
+                "open",
+                move |_| {
+                    inner.borrow_mut().update_state();
+                    let _ = tx_open.send(());
+                },
+            )?);
+        }
 
         let state = future::select(rx_open, rx_close).await;
 
-        socket_mut.on_open.take();
-        socket_mut.on_close.take();
-        drop(socket_mut);
+        socket.borrow_mut().on_open.take();
+        socket.borrow_mut().on_close.take();
 
         match state {
             Either::Left((opened, _)) => match opened {
