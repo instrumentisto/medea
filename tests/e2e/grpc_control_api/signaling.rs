@@ -216,7 +216,7 @@ fn delete_member_check_peers_removed() {
 
     let peers_created = Rc::new(Cell::new(0));
     let on_event =
-        move |event: &Event, ctx: &mut Context<TestMember>, _: Vec<&Event>| {
+        move |event: &Event, _: &mut Context<TestMember>, _: Vec<&Event>| {
             match event {
                 Event::PeerCreated { .. } => {
                     peers_created.set(peers_created.get() + 1);
@@ -226,9 +226,7 @@ fn delete_member_check_peers_removed() {
                     }
                 }
                 Event::PeersRemoved { .. } => {
-                    ctx.run_later(Duration::from_secs(3), |_, _| {
-                        actix::System::current().stop();
-                    });
+                    actix::System::current().stop();
                 }
                 _ => {}
             }
