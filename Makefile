@@ -294,12 +294,10 @@ endif
 # Run Rust unit tests of project.
 #
 # Usage:
-#	make test.unit [crate=(@all|medea|jason|<crate-name>)]
-
-CHROMEDRIVER_CLIENT_ARGS := $(strip \
-	$(shell grep 'CHROMEDRIVER_CLIENT_ARGS=' .env | cut -d '=' -f2))
+#	make test.unit [crate=(@all|medea|jason|<crate-name>)] webdriver=(chromedriver|geckodriver)
 
 test-unit-crate = $(if $(call eq,$(crate),),@all,$(crate))
+webdriver-env = $(if $(call eq,$(webdriver),geckodriver),GECKODRIVER_REMOTE,CHROMEDRIVER_REMOTE)
 
 test.unit:
 ifeq ($(test-unit-crate),@all)
@@ -312,12 +310,12 @@ ifeq ($(test-unit-crate),medea)
 	cargo test --lib --bin medea
 else
 ifeq ($(crate),medea-jason)
+	@make docker.up.webdriver
+	sleep 10
 	cd $(crate-dir)/ && \
-	CHROMEDRIVER_CLIENT_ARGS="$(CHROMEDRIVER_CLIENT_ARGS)" \
+	$(webdriver-env)="http://127.0.0.1:4444" \
     cargo test --target wasm32-unknown-unknown --features mockable
-else
-	cd $(crate-dir)/ && \
-	cargo test -p $(test-unit-crate)
+	@make docker.down.webdriver
 endif
 endif
 endif
@@ -524,6 +522,16 @@ else
 endif
 
 
+docker.down.webdriver:
+ifeq ($(webdriver),geckodriver)
+	docker container kill $$(cat /tmp/geckodriver.docker.uid)
+	rm -f /tmp/geckodriver.docker.uid
+else
+	docker container kill $$(cat /tmp/chromedriver.docker.uid)
+	rm -f /tmp/chromedriver.docker.uid
+endif
+
+
 # Pull project Docker images from Container Registry.
 #
 # Usage:
@@ -620,6 +628,15 @@ else
 	cargo build --bin medea $(if $(call eq,$(debug),no),--release,)
 	cargo run --bin medea $(if $(call eq,$(debug),no),--release,) \
 		$(if $(call eq,$(background),yes),&,)
+endif
+
+
+docker.up.webdriver:
+ifeq ($(webdriver),geckodriver)
+	docker build -t instrumentisto/medea-geckodriver:dev -f _build/geckodriver/Dockerfile .
+	docker run --rm -d --network=host instrumentisto/medea-geckodriver:dev > /tmp/geckodriver.docker.uid
+else
+	docker run --rm -d --network=host selenoid/chrome:latest > /tmp/chromedriver.docker.uid
 endif
 
 
@@ -824,8 +841,10 @@ protoc.rebuild:
         cargo cargo.build cargo.fmt cargo.lint \
         docker.auth docker.build.demo docker.build.medea \
         	docker.down.coturn docker.down.demo docker.down.medea \
+        	docker.down.webdriver \
         	docker.pull docker.push \
         	docker.up.coturn docker.up.demo docker.up.medea \
+        	docker.up.webdriver \
         docs docs.rust \
         down down.coturn down.demo down.dev down.medea \
         helm helm.down helm.init helm.lint helm.list \
