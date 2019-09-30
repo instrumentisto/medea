@@ -106,7 +106,8 @@ impl InnerPeerConnection {
 }
 
 #[allow(clippy::module_name_repetitions)]
-pub struct PeerConnection(Rc<RefCell<InnerPeerConnection>>);
+pub struct PeerConnection(Rc<LoggingRefCell<InnerPeerConnection>>);
+//pub struct PeerConnection(Rc<RefCell<InnerPeerConnection>>);
 
 impl PeerConnection {
     /// Creates new [`PeerConnection`].
@@ -123,7 +124,7 @@ impl PeerConnection {
         enabled_audio: bool,
         enabled_video: bool,
     ) -> Result<Self, WasmErr> {
-        let inner = Rc::new(RefCell::new(InnerPeerConnection::new(
+        let inner = Rc::new(LoggingRefCell::new(InnerPeerConnection::new(
             id,
             ice_servers,
             media_manager,
@@ -135,16 +136,16 @@ impl PeerConnection {
         // Bind to `icecandidate` event.
         let inner_rc = Rc::clone(&inner);
         inner
-            .borrow()
+            .borrow(1)
             .peer
             .on_ice_candidate(Some(move |candidate| {
-                Self::on_ice_candidate(&inner_rc.borrow(), candidate);
+                Self::on_ice_candidate(&inner_rc.borrow(26), candidate);
             }))?;
 
         // Bind to `track` event.
         let inner_rc = Rc::clone(&inner);
-        inner.borrow().peer.on_track(Some(move |track_event| {
-            Self::on_track(&inner_rc.borrow(), &track_event);
+        inner.borrow(2).peer.on_track(Some(move |track_event| {
+            Self::on_track(&inner_rc.borrow(25), &track_event);
         }))?;
 
         Ok(Self(inner))
@@ -152,7 +153,7 @@ impl PeerConnection {
 
     /// Returns inner [`IceCandidate`]'s buffer len. Used in tests.
     pub fn candidates_buffer_len(&self) -> usize {
-        self.0.borrow().ice_candidates_buffer.len()
+        self.0.borrow(3).ice_candidates_buffer.len()
     }
 
     /// Handle `icecandidate` event from underlying peer emitting
@@ -203,7 +204,7 @@ impl PeerConnection {
     /// Disables or enables all audio tracks for all [`Sender`]s.
     pub fn toggle_send_audio(&self, enabled: bool) {
         self.0
-            .borrow()
+            .borrow(24)
             .media_connections
             .toggle_send_media(TransceiverKind::Audio, enabled)
     }
@@ -211,7 +212,7 @@ impl PeerConnection {
     /// Disables or enables all video tracks for all [`Sender`]s.
     pub fn toggle_send_video(&self, enabled: bool) {
         self.0
-            .borrow()
+            .borrow(4)
             .media_connections
             .toggle_send_media(TransceiverKind::Video, enabled)
     }
@@ -219,7 +220,7 @@ impl PeerConnection {
     /// Returns `true` if all [`Sender`]s audio tracks are enabled.
     pub fn is_send_audio_enabled(&self) -> bool {
         self.0
-            .borrow()
+            .borrow(5)
             .media_connections
             .are_senders_enabled(TransceiverKind::Audio)
     }
@@ -227,7 +228,7 @@ impl PeerConnection {
     /// Returns `true` if all [`Sender`]s video tracks are enabled.
     pub fn is_send_video_enabled(&self) -> bool {
         self.0
-            .borrow()
+            .borrow(6)
             .media_connections
             .are_senders_enabled(TransceiverKind::Video)
     }
@@ -242,7 +243,7 @@ impl PeerConnection {
     /// [1]: https://tools.ietf.org/html/rfc4566#section-5.14
     /// [2]: https://www.w3.org/TR/webrtc/#rtcrtptransceiver-interface
     pub fn get_mids(&self) -> Result<HashMap<TrackId, String>, WasmErr> {
-        self.0.borrow().media_connections.get_mids()
+        self.0.borrow(7).media_connections.get_mids()
     }
 
     /// Sync provided tracks creating all required `Sender`s and
@@ -253,26 +254,26 @@ impl PeerConnection {
         tracks: Vec<Track>,
     ) -> Result<String, WasmErr> {
         let request =
-            self.0.borrow().media_connections.update_tracks(tracks)?;
+            self.0.borrow(8).media_connections.update_tracks(tracks)?;
 
         if let Some(request) = request {
             let local_stream =
-                self.0.borrow().media_manager.get_stream(request).await?;
+                self.0.borrow(9).media_manager.get_stream(request).await?;
             self.0
-                .borrow()
+                .borrow(10)
                 .media_connections
                 .insert_local_stream(&local_stream)
                 .await?;
         }
 
-        self.0.borrow().peer.create_and_set_offer().await
+        self.0.borrow(11).peer.create_and_set_offer().await
     }
 
     /// Creates an SDP answer to an offer received from a remote peer and sets
     /// it as local description. Must be called only if peer already has remote
     /// description.
     pub async fn create_and_set_answer(&self) -> Result<String, WasmErr> {
-        self.0.borrow().peer.create_and_set_answer().await
+        self.0.borrow(12).peer.create_and_set_answer().await
     }
 
     /// Updates underlying [RTCPeerConnection][1]'s remote SDP from answer.
@@ -300,14 +301,14 @@ impl PeerConnection {
         &self,
         desc: SdpType,
     ) -> Result<(), WasmErr> {
-        self.0.borrow().peer.set_remote_description(desc).await?;
-        self.0.borrow_mut().has_remote_description = true;
+        self.0.borrow(13).peer.set_remote_description(desc).await?;
+        self.0.borrow_mut(14).has_remote_description = true;
 
         let candidates = std::mem::replace(
-            self.0.borrow_mut().ice_candidates_buffer.as_mut(),
+            self.0.borrow_mut(15).ice_candidates_buffer.as_mut(),
             Vec::new(),
         );
-        let peer = &self.0.borrow().peer;
+        let peer = &self.0.borrow(16).peer;
         for candidate in candidates {
             peer.add_ice_candidate(
                 &candidate.candidate,
@@ -340,17 +341,17 @@ impl PeerConnection {
             });
 
         // update receivers
-        self.0.borrow().media_connections.update_tracks(recv)?;
+        self.0.borrow(21).media_connections.update_tracks(recv)?;
 
         self.set_remote_offer(offer).await?;
 
-        let request = self.0.borrow().media_connections.update_tracks(send)?;
+        let request = self.0.borrow(17).media_connections.update_tracks(send)?;
 
         if let Some(request) = request {
             let local_stream =
-                self.0.borrow().media_manager.get_stream(request).await?;
+                self.0.borrow(22).media_manager.get_stream(request).await?;
             self.0
-                .borrow()
+                .borrow(23)
                 .media_connections
                 .insert_local_stream(&local_stream)
                 .await?;
@@ -368,7 +369,7 @@ impl PeerConnection {
         sdp_m_line_index: Option<u16>,
         sdp_mid: Option<String>,
     ) -> Result<(), WasmErr> {
-        let mut inner = self.0.borrow_mut();
+        let mut inner = self.0.borrow_mut(18);
         if inner.has_remote_description {
             inner
                 .peer
@@ -391,13 +392,103 @@ impl Drop for PeerConnection {
     fn drop(&mut self) {
         let _ = self
             .0
-            .borrow()
+            .borrow(19)
             .peer
             .on_track::<Box<dyn FnMut(RtcTrackEvent)>>(None);
         let _ = self
             .0
-            .borrow()
+            .borrow(20)
             .peer
             .on_ice_candidate::<Box<dyn FnMut(IceCandidate)>>(None);
+    }
+}
+
+use std::cell::{BorrowMutError, Ref, RefMut, BorrowError};
+
+struct LoggingRefCell<T: ?Sized>(RefCell<T>);
+
+impl<T> LoggingRefCell<T> {
+    pub const fn new(value: T) -> LoggingRefCell<T> {
+        Self(RefCell::new(value))
+    }
+
+    pub fn borrow(&self, n: i32) -> LoggingRef<'_, T> {
+        self.try_borrow(n).expect("already mutably borrowed")
+    }
+
+    pub fn borrow_mut(&self, n: i32) -> LoggingRefMut<'_, T> {
+        self.try_borrow_mut(n).expect("already borrowed")
+    }
+
+    pub fn try_borrow(&self, n: i32) -> Result<LoggingRef<'_, T>, BorrowError> {
+
+        WasmErr::from(format!("CREATED [{}]", n)).log_err();
+
+        self.0.try_borrow().map(|inner| LoggingRef {
+            inner,
+            n,
+        })
+    }
+
+    pub fn try_borrow_mut(&self, n: i32) -> Result<LoggingRefMut<'_, T>, BorrowMutError> {
+
+        WasmErr::from(format!("CREATED [{}]", n)).log_err();
+
+        self.0.try_borrow_mut().map(|inner| LoggingRefMut {
+            inner,
+            n,
+        })
+    }
+}
+
+pub struct LoggingRefMut<'b, T: ?Sized + 'b> {
+    inner: RefMut<'b, T>,
+    n: i32,
+}
+
+impl<T: ?Sized> std::ops::Deref for LoggingRefMut<'_, T> {
+    type Target = T;
+
+    #[inline]
+    fn deref(&self) -> &T {
+        self.inner.deref()
+    }
+}
+
+
+impl<T: ?Sized> std::ops::DerefMut for LoggingRefMut<'_, T> {
+    #[inline]
+    fn deref_mut(&mut self) -> &mut T {
+        self.inner.deref_mut()
+    }
+}
+
+
+pub struct LoggingRef<'b, T: ?Sized + 'b> {
+    inner: Ref<'b, T>,
+    n: i32,
+}
+
+impl<T: ?Sized> std::ops::Deref for LoggingRef<'_, T> {
+    type Target = T;
+
+    #[inline]
+    fn deref(&self) -> &T {
+        self.inner.deref()
+    }
+}
+
+
+impl<T: ?Sized> Drop for LoggingRef<'_, T> {
+    #[inline]
+    fn drop(&mut self) {
+        WasmErr::from(format!("DROPPED [{}]", self.n)).log_err();
+    }
+}
+
+impl<T: ?Sized> Drop for LoggingRefMut<'_, T> {
+    #[inline]
+    fn drop(&mut self) {
+        WasmErr::from(format!("DROPPED [{}]", self.n)).log_err();
     }
 }
