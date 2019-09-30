@@ -1,4 +1,4 @@
-//! Endpoint related methods and entities.
+//! `Endpoint` related methods and entities.
 
 use actix_web::{
     web::{Data, Json, Path},
@@ -19,7 +19,7 @@ use crate::{
     server::{Context, Response, SingleGetResponse},
 };
 
-/// Path to `Endpoint` in REST API.
+/// Path to `Endpoint` element in REST Control API mock.
 #[allow(clippy::module_name_repetitions)]
 #[derive(Debug, Deserialize)]
 pub struct EndpointPath {
@@ -178,7 +178,7 @@ pub fn create(
 
 /// `GET /{room_id}/{member_id}/{endpoint_id}`
 ///
-/// Gets single `Endpoint` element.
+/// Returns requested single `Endpoint` by local URI.
 ///
 /// For batch get use `GET /`.
 #[allow(clippy::needless_pass_by_value)]

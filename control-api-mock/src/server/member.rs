@@ -18,7 +18,7 @@ use crate::{
     server::{endpoint::Endpoint, Context, Response, SingleGetResponse},
 };
 
-/// Path to member in REST API.
+/// Path for `Member` in REST Control API mock.
 #[allow(clippy::module_name_repetitions)]
 #[derive(Debug, Deserialize)]
 pub struct MemberPath {
@@ -28,7 +28,7 @@ pub struct MemberPath {
 
 /// `DELETE /{room_id}/{member_id}`
 ///
-/// Delete single `Member`.
+/// Deletes single `Member`.
 ///
 /// _For batch delete use `DELETE /`._
 #[allow(clippy::needless_pass_by_value)]
@@ -51,7 +51,7 @@ pub struct Member {
 
     /// Optional member credentials.
     ///
-    /// If `None` then credentials will be generated on server side.
+    /// If `None` then random credentials will be generated on Medea side.
     credentials: Option<String>,
 }
 
@@ -95,7 +95,7 @@ impl Into<RoomElementProto> for Member {
 
 /// `POST /{room_id}/{member_id}`
 ///
-/// Create new `Member`.
+/// Creates new `Member`.
 #[allow(clippy::needless_pass_by_value)]
 pub fn create(
     path: Path<MemberPath>,
@@ -111,7 +111,7 @@ pub fn create(
 
 /// `GET /{room_id}/{member_id}`
 ///
-/// Get single `Member`.
+/// Returns single `Member`.
 ///
 /// _For batch get use `GET /`._
 #[allow(clippy::needless_pass_by_value)]

@@ -1,4 +1,4 @@
-//! REST API server implementation.
+//! REST Control API mock server implementation.
 
 pub mod endpoint;
 pub mod member;
@@ -31,12 +31,13 @@ use crate::{
     },
 };
 
-/// Context of actix-web server.
+/// Context of [`actix_web`] server.
 pub struct Context {
+    /// Client for Medea's Control API.
     client: ControlClient,
 }
 
-/// Run actix-web REST API server.
+/// Run REST Control API server mock.
 pub fn run(args: &ArgMatches) {
     let medea_addr: String = args.value_of("medea_addr").unwrap().to_string();
     HttpServer::new(move || {
@@ -78,9 +79,7 @@ pub fn run(args: &ArgMatches) {
 
 /// `GET /hb`
 ///
-/// Checks connection with medea's gRPC Control API.
-/// This is used for waiting before e2e tests start until all needed services
-/// startup.
+/// Checks connection with Medea's gRPC Control API.
 #[allow(clippy::needless_pass_by_value)]
 pub fn heartbeat(
     state: Data<Context>,
@@ -92,7 +91,7 @@ pub fn heartbeat(
         .map(|_| HttpResponse::Ok().body("Ok".to_string()))
 }
 
-/// Some batch ID's request. Used for batch delete and get.
+/// Batch ID's request. Used for batch delete and get.
 #[derive(Deserialize, Debug)]
 pub struct BatchIdsRequest {
     /// Elements ids.
@@ -131,10 +130,10 @@ pub fn batch_delete(
         .map(|r| Response::from(r).into())
 }
 
-/// Error object. Returns when some error happened on control API's side.
+/// Error object. Returns when some error happened on Control API's side.
 #[derive(Debug, Serialize)]
 pub struct ErrorResponse {
-    /// Medea's code of error.
+    /// Medea's Control API error code.
     pub code: u32,
 
     /// Text of error.
@@ -159,11 +158,11 @@ impl Into<ErrorResponse> for ErrorProto {
 /// Used for delete and create methods.
 #[derive(Debug, Serialize)]
 pub struct Response {
-    /// Links for connect.
+    /// URIs with which Jason can connect `Member`s.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sid: Option<HashMap<String, String>>,
 
-    /// Error if something happened on control API's side.
+    /// Error if something happened on Control API's side.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<ErrorResponse>,
 }
@@ -257,10 +256,14 @@ impl Into<RoomElementProto> for Element {
     }
 }
 
-/// Response on batch get requests.
+/// Response on request for batch get `Element`s.
 #[derive(Serialize, Debug)]
 pub struct GetResponse {
-    /// Requested elements. Key - element's ID, value - requested element.
+    /// Requested elements.
+    ///
+    /// Key - element's ID
+    ///
+    /// Value - requested element
     #[serde(skip_serializing_if = "Option::is_none")]
     pub elements: Option<HashMap<String, Element>>,
 
@@ -300,7 +303,7 @@ impl Into<HttpResponse> for GetResponse {
     }
 }
 
-/// Response on single get request.
+/// Response on request for get single `Element`s.
 #[derive(Serialize, Debug)]
 pub struct SingleGetResponse {
     /// Requested element.

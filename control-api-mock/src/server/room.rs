@@ -20,7 +20,7 @@ use crate::{
 
 use super::Context;
 
-/// Path to `Room` in REST API.
+/// Path for `Room` in REST Control API mock.
 #[allow(clippy::module_name_repetitions)]
 #[derive(Debug, Deserialize)]
 pub struct RoomPath {
@@ -29,7 +29,7 @@ pub struct RoomPath {
 
 /// `DELETE /{room_id}`
 ///
-/// Delete room.
+/// Deletes `Room` element.
 ///
 /// _For batch delete use `DELETE /`._
 #[allow(clippy::needless_pass_by_value)]
@@ -105,7 +105,7 @@ impl From<RoomProto> for Room {
 
 /// `POST /{room_id}`
 ///
-/// Create new `Room`.
+/// Creates new `Room`.
 #[allow(clippy::needless_pass_by_value)]
 pub fn create(
     path: Path<RoomPath>,
@@ -121,7 +121,7 @@ pub fn create(
 
 /// `GET /{room_id}`
 ///
-/// Get single `Room`.
+/// Returns requested single `Room` by local URI.
 ///
 /// _For batch get use `GET /`._
 #[allow(clippy::needless_pass_by_value)]

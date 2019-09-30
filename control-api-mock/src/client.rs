@@ -1,4 +1,4 @@
-//! Implementation of client for medea's gRPC control API.
+//! Implementation of client for Medea's gRPC Control API.
 
 use std::{fmt, sync::Arc};
 
@@ -6,7 +6,9 @@ use actix_web::web::Path;
 use futures::Future;
 use grpcio::{ChannelBuilder, EnvBuilder, Error};
 use medea_control_api_proto::grpc::{
-    control_api::{CreateRequest, GetResponse, IdRequest, Response},
+    control_api::{
+        CreateRequest, CreateResponse, GetResponse, IdRequest, Response,
+    },
     control_api_grpc::ControlApiClient,
 };
 use protobuf::RepeatedField;
@@ -16,7 +18,6 @@ use crate::server::{
     member::{Member, MemberPath},
     room::{Room, RoomPath},
 };
-use medea_control_api_proto::grpc::control_api::CreateResponse;
 
 /// Uri to `Room` element.
 #[derive(Clone, Debug)]
@@ -90,7 +91,7 @@ impl fmt::Display for EndpointUri {
     }
 }
 
-/// Create new [`IdRequest`] with provided IDs.
+/// Returns new [`IdRequest`] with provided IDs.
 fn id_request(ids: Vec<String>) -> IdRequest {
     let mut req = IdRequest::new();
     let ids = RepeatedField::from(ids);
@@ -98,24 +99,26 @@ fn id_request(ids: Vec<String>) -> IdRequest {
     req
 }
 
-/// Client for medea's control API.
+/// Client for Medea's Control API.
 #[allow(clippy::module_name_repetitions)]
 pub struct ControlClient {
+    /// [`grpcio`] gRPC client for Medea Control API.
     grpc_client: ControlApiClient,
 }
 
 impl ControlClient {
-    /// Create new client for medea's control API.
+    /// Creates new client for medea's control API.
     ///
-    /// __Note that call of this function is not check availability of control
-    /// API's gRPC server. He's availability check only on some method call.__
+    /// __Note that call of this function don't checks availability of Control
+    /// API gRPC server. Availability checks only on sending request to gRPC
+    /// server.__
     pub fn new(medea_addr: &str) -> Self {
         Self {
             grpc_client: get_grpc_client(medea_addr),
         }
     }
 
-    /// Create `Room` element.
+    /// Creates `Room` element with provided [`RoomUri`] and `Room` spec.
     pub fn create_room(
         &self,
         uri: &RoomUri,
@@ -128,7 +131,7 @@ impl ControlClient {
         self.grpc_client.create_async(&req).unwrap()
     }
 
-    /// Create `Member` element.
+    /// Creates `Member` element with provided [`MemberUri`] and `Member` spec.
     pub fn create_member(
         &self,
         uri: &MemberUri,
@@ -140,7 +143,8 @@ impl ControlClient {
         self.grpc_client.create_async(&req).unwrap()
     }
 
-    /// Create `Endpoint` element.
+    /// Creates `Endpoint` element with provided [`EndpointUri`] and `Endpoint`
+    /// spec.
     pub fn create_endpoint(
         &self,
         uri: &EndpointUri,
@@ -160,7 +164,7 @@ impl ControlClient {
         self.grpc_client.create_async(&req).unwrap()
     }
 
-    /// Single get element.
+    /// Gets single element from Control API by local URI.
     pub fn get_single<T: fmt::Display>(
         &self,
         uri: T,
@@ -170,7 +174,7 @@ impl ControlClient {
         self.grpc_client.get_async(&req).unwrap()
     }
 
-    /// Get batch of elements.
+    /// Gets all elements with provided Local URIs.
     pub fn get_batch(
         &self,
         uris: Vec<String>,
@@ -180,7 +184,7 @@ impl ControlClient {
         self.grpc_client.get_async(&req).unwrap()
     }
 
-    /// Delete single element.
+    /// Deletes single element.
     pub fn delete_single<T: fmt::Display>(
         &self,
         uri: T,
@@ -190,7 +194,7 @@ impl ControlClient {
         self.grpc_client.delete_async(&req).unwrap()
     }
 
-    /// Delete batch of elements.
+    /// Deletes all elements with provided local URIs.
     pub fn delete_batch(
         &self,
         ids: Vec<String>,
@@ -201,7 +205,7 @@ impl ControlClient {
     }
 }
 
-/// Get gRPC client for control API.
+/// Returns gRPC client for Control API.
 fn get_grpc_client(addr: &str) -> ControlApiClient {
     let env = Arc::new(EnvBuilder::new().build());
     let ch = ChannelBuilder::new(env).connect(addr);

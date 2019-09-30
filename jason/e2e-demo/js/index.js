@@ -139,14 +139,138 @@ async function addNewMember(roomId, memberId) {
     }
 }
 
+const controlDebugWindows = {
+    bindControlDebugDeleteRoom: function () {
+        let container = document.getElementsByClassName('control-debug__window_delete-room')[0];
+        bindCloseWindow(container);
+
+        let execute = container.getElementsByClassName('control-debug__execute')[0];
+        execute.addEventListener('click', async () => {
+            await controlApi.deleteRoom();
+        });
+    },
+
+    bindControlDebugDeleteMember: function () {
+        let container = document.getElementsByClassName('control-debug__window_delete-member')[0];
+        bindCloseWindow(container);
+        let execute = container.getElementsByClassName('control-debug__execute')[0];
+        execute.addEventListener('click', async () => {
+            let roomId = container.getElementsByClassName('control-debug__id_room')[0].value;
+            let memberId = container.getElementsByClassName('control-debug__id_member')[0].value;
+            await controlApi.deleteMember(roomId, memberId);
+        });
+    },
+
+    bindControlDebugCreateEndpoint: function () {
+        let container = document.getElementsByClassName('control-debug__window_create-endpoint')[0];
+        bindCloseWindow(container);
+
+        let publishEndpointSpecContainer = container.getElementsByClassName('webrtc-publish-endpoint-spec')[0];
+        let playEndpointSpecContainer = container.getElementsByClassName('webrtc-play-endpoint-spec')[0];
+
+        let endpointTypeSelect = container.getElementsByClassName('control-debug__endpoint-type')[0];
+        endpointTypeSelect.addEventListener('change', () => {
+            switch (endpointTypeSelect.value) {
+                case 'WebRtcPlayEndpoint':
+                    contentVisibility.show(playEndpointSpecContainer);
+                    contentVisibility.hide(publishEndpointSpecContainer);
+                    break;
+                case 'WebRtcPublishEndpoint':
+                    contentVisibility.show(publishEndpointSpecContainer);
+                    contentVisibility.hide(playEndpointSpecContainer);
+                    break;
+            }
+        });
+
+
+        let execute = container.getElementsByClassName('control-debug__execute')[0];
+        execute.addEventListener('click', async () => {
+            let roomId = container.getElementsByClassName('control-debug__id_room')[0].value;
+            let memberId = container.getElementsByClassName('control-debug__id_member')[0].value;
+            let endpointId = container.getElementsByClassName('control-debug__id_endpoint')[0].value;
+            let endpointType = container.getElementsByClassName('control-debug__endpoint-type')[0].value;
+            switch (endpointType) {
+                case 'WebRtcPublishEndpoint':
+                    let p2pMode = container.getElementsByClassName('webrtc-publish-endpoint-spec__p2p')[0].value;
+                    await controlApi.createEndpoint(roomId, memberId, endpointId, {
+                        kind: endpointType,
+                        spec: {
+                            p2p: p2pMode,
+                        }
+                    });
+                    break;
+                case 'WebRtcPlayEndpoint':
+                    let source = container.getElementsByClassName('webrtc-play-endpoint-spec__src')[0].value;
+                    await controlApi.createEndpoint(roomId, memberId, endpointId, {
+                        kind: endpointType,
+                        spec: {
+                            src: source,
+                        }
+                    });
+            }
+        })
+    },
+
+    bindControlDebugDeleteEndpoint: function () {
+        let container = document.getElementsByClassName('control-debug__window_delete-endpoint')[0];
+        bindCloseWindow(container);
+
+        let execute = container.getElementsByClassName('control-debug__execute')[0];
+        execute.addEventListener('click', async () => {
+            let roomId = container.getElementsByClassName('control-debug__id_room')[0].value;
+            let memberId = container.getElementsByClassName('control-debug__id_member')[0].value;
+            let endpointId = container.getElementsByClassName('control-debug__id_endpoint')[0].value;
+            await controlApi.deleteEndpoint(roomId, memberId, endpointId);
+        });
+    },
+
+    bindControlDebugCreateRoom: function () {
+        let container = document.getElementsByClassName('control-debug__window_create-room')[0];
+
+        bindCloseWindow(container);
+
+        let execute = container.getElementsByClassName('control-debug__execute')[0];
+        execute.addEventListener('click', async () => {
+            let roomId = container.getElementsByClassName('control-debug__id_room')[0].value;
+
+            await controlApi.createRoom(roomId);
+        });
+    },
+
+    bindControlDebugCreateMember: function () {
+        let container = document.getElementsByClassName('control-debug__window_create-member')[0];
+        bindCloseWindow(container);
+
+        let execute = container.getElementsByClassName('control-debug__execute')[0];
+        execute.addEventListener('click', async () => {
+            let roomId = container.getElementsByClassName('control-debug__id_room')[0].value;
+            let memberId = container.getElementsByClassName('control-debug__id_member')[0].value;
+            let credentials = container.getElementsByClassName('member-spec__credentials')[0].value;
+
+            await controlApi.createMember(roomId, memberId, credentials);
+        });
+    },
+
+    bindControlDebugGet: function () {
+        let container = document.getElementsByClassName('control-debug__window_get')[0];
+        let resultContainer = container.getElementsByClassName('control-debug__json-result')[0];
+        bindCloseWindow(container);
+
+        let execute = container.getElementsByClassName('control-debug__execute')[0];
+        execute.addEventListener('click', async () => {
+            let roomId = container.getElementsByClassName('control-debug__id_room')[0].value;
+            let memberId = container.getElementsByClassName('control-debug__id_member')[0].value;
+            let endpointId = container.getElementsByClassName('control-debug__id_endpoint')[0].value;
+
+            let res = await controlApi.get(roomId, memberId, endpointId);
+            res = res.replace(/(?:\r\n|\r|\n)/g, '<br>');
+            resultContainer.innerHTML = res;
+        })
+    },
+};
+
 window.onload = function() {
-    bindControlDebugDeleteRoom();
-    bindControlDebugDeleteMember();
-    bindControlDebugCreateEndpoint();
-    bindControlDebugDeleteEndpoint();
-    bindControlDebugCreateMember();
-    bindControlDebugCreateRoom();
-    bindControlDebugGet();
+    Object.values( controlDebugWindows ).forEach( s => s() );
 
     bindControlDebugMenu();
 
@@ -160,8 +284,8 @@ window.onload = function() {
         let bindJoinButtons = function(roomId) {
             joinCallerButton.onclick = async function() {
                 let connectBtnsDiv = document.getElementsByClassName("connect")[0];
-                connectBtnsDiv.style.display = 'none';
-                controlBtns.style.display = 'block';
+                contentVisibility.hide(connectBtnsDiv);
+                contentVisibility.show(controlBtns);
 
                 let username = usernameInput.value;
                 try {
@@ -188,20 +312,19 @@ window.onload = function() {
     }
 };
 
-// Show an element
-function show(elem) {
-    elem.classList.add('is-visible');
-}
+const contentVisibility = {
+    show: function (elem) {
+        elem.classList.add('is-visible');
+    },
 
-// Hide an element
-function hide(elem) {
-    elem.classList.remove('is-visible');
-}
+    hide: function (elem) {
+        elem.classList.remove('is-visible');
+    },
 
-// Toggle element visibility
-function toggle(elem) {
-    elem.classList.toggle('is-visible');
-}
+    toggle: function (elem) {
+        elem.classList.toggle('is-visible');
+    }
+};
 
 const controlApi = {
     deleteRoom: async function () {
@@ -287,239 +410,42 @@ const controlApi = {
     }
 };
 
-function bindControlDebugDeleteRoom() {
-    let container = document.getElementsByClassName('control-debug__window_delete-room')[0];
-
+function bindCloseWindow(container) {
     container.getElementsByClassName('window__close')[0].addEventListener('click', () => {
-        hide(container);
-    });
-
-    let execute = container.getElementsByClassName('control-debug__execute')[0];
-    execute.addEventListener('click', async () => {
-        await controlApi.deleteRoom();
+        contentVisibility.hide(container);
     });
 }
 
-function bindControlDebugDeleteMember() {
-    let container = document.getElementsByClassName('control-debug__window_delete-member')[0];
-    container.getElementsByClassName('window__close')[0].addEventListener('click', () => {
-        hide(container);
-    });
-    let execute = container.getElementsByClassName('control-debug__execute')[0];
-    execute.addEventListener('click', async () => {
-        let roomId = container.getElementsByClassName('control-debug__id_room')[0].value;
-        let memberId = container.getElementsByClassName('control-debug__id_member')[0].value;
-        await controlApi.deleteMember(roomId, memberId);
-    });
-}
-
-function bindControlDebugCreateEndpoint() {
-    let container = document.getElementsByClassName('control-debug__window_create-endpoint')[0];
-
-    container.getElementsByClassName('window__close')[0].addEventListener('click', () => {
-        hide(container);
-    });
-
-    let publishEndpointSpecContainer = container.getElementsByClassName('webrtc-publish-endpoint-spec')[0];
-    let playEndpointSpecContainer = container.getElementsByClassName('webrtc-play-endpoint-spec')[0];
-
-    let endpointTypeSelect = container.getElementsByClassName('control-debug__endpoint-type')[0];
-    endpointTypeSelect.addEventListener('change', () => {
-        switch (endpointTypeSelect.value) {
-            case 'WebRtcPlayEndpoint':
-                show(playEndpointSpecContainer);
-                hide(publishEndpointSpecContainer);
-                break;
-            case 'WebRtcPublishEndpoint':
-                show(publishEndpointSpecContainer);
-                hide(playEndpointSpecContainer);
-                break;
-        }
-    });
-
-
-    let execute = container.getElementsByClassName('control-debug__execute')[0];
-    execute.addEventListener('click', async () => {
-        let roomId = container.getElementsByClassName('control-debug__id_room')[0].value;
-        let memberId = container.getElementsByClassName('control-debug__id_member')[0].value;
-        let endpointId = container.getElementsByClassName('control-debug__id_endpoint')[0].value;
-        let endpointType = container.getElementsByClassName('control-debug__endpoint-type')[0].value;
-        switch (endpointType) {
-            case 'WebRtcPublishEndpoint':
-                let p2pMode = container.getElementsByClassName('webrtc-publish-endpoint-spec__p2p')[0].value;
-                await controlApi.createEndpoint(roomId, memberId, endpointId, {
-                    kind: endpointType,
-                    spec: {
-                        p2p: p2pMode,
-                    }
-                });
-                break;
-            case 'WebRtcPlayEndpoint':
-                let source = container.getElementsByClassName('webrtc-play-endpoint-spec__src')[0].value;
-                await controlApi.createEndpoint(roomId, memberId, endpointId, {
-                    kind: endpointType,
-                    spec: {
-                        src: source,
-                    }
-                });
-        }
-    })
-}
-
-function bindControlDebugDeleteEndpoint() {
-    let container = document.getElementsByClassName('control-debug__window_delete-endpoint')[0];
-
-    container.getElementsByClassName('window__close')[0].addEventListener('click', () => {
-        hide(container);
-    });
-
-    let execute = container.getElementsByClassName('control-debug__execute')[0];
-    execute.addEventListener('click', async () => {
-        let roomId = container.getElementsByClassName('control-debug__id_room')[0].value;
-        let memberId = container.getElementsByClassName('control-debug__id_member')[0].value;
-        let endpointId = container.getElementsByClassName('control-debug__id_endpoint')[0].value;
-        await controlApi.deleteEndpoint(roomId, memberId, endpointId);
-    });
-}
-
-function bindControlDebugCreateRoom() {
-    let container = document.getElementsByClassName('control-debug__window_create-room')[0];
-
-    container.getElementsByClassName('window__close')[0].addEventListener('click', () => {
-        hide(container);
-    });
-
-    let execute = container.getElementsByClassName('control-debug__execute')[0];
-    execute.addEventListener('click', async () => {
-        let roomId = container.getElementsByClassName('control-debug__id_room')[0].value;
-
-        await controlApi.createRoom(roomId);
-    });
-}
-
-function bindControlDebugCreateMember() {
-    let container = document.getElementsByClassName('control-debug__window_create-member')[0];
-
-    container.getElementsByClassName('window__close')[0].addEventListener('click', () => {
-        hide(container);
-    });
-
-    let execute = container.getElementsByClassName('control-debug__execute')[0];
-    execute.addEventListener('click', async () => {
-        let roomId = container.getElementsByClassName('control-debug__id_room')[0].value;
-        let memberId = container.getElementsByClassName('control-debug__id_member')[0].value;
-        let credentials = container.getElementsByClassName('member-spec__credentials')[0].value;
-
-        await controlApi.createMember(roomId, memberId, credentials);
-    });
-}
-
-function bindControlDebugGet() {
-    let container = document.getElementsByClassName('control-debug__window_get')[0];
-    let resultContainer = container.getElementsByClassName('control-debug__json-result')[0];
-
-    container.getElementsByClassName('window__close')[0].addEventListener('click', () => {
-        hide(container);
-    });
-
-    let execute = container.getElementsByClassName('control-debug__execute')[0];
-    execute.addEventListener('click', async () => {
-        let roomId = container.getElementsByClassName('control-debug__id_room')[0].value;
-        let memberId = container.getElementsByClassName('control-debug__id_member')[0].value;
-        let endpointId = container.getElementsByClassName('control-debug__id_endpoint')[0].value;
-
-        let res = await controlApi.get(roomId, memberId, endpointId);
-        res = res.replace(/(?:\r\n|\r|\n)/g, '<br>');
-        resultContainer.innerHTML = res;
-    })
-}
+const debugMenuItems = [
+    'delete-room',
+    'delete-member',
+    'create-endpoint',
+    'delete-endpoint',
+    'create-member',
+    'create-room',
+    'get',
+];
 
 function bindControlDebugMenu() {
     let menuToggle = document.getElementsByClassName('control-debug-menu__toggle')[0];
     let menuContainer = document.getElementsByClassName('control-debug-menu')[0];
     menuToggle.addEventListener('click', () => {
-        toggle(menuContainer);
+        contentVisibility.toggle(menuContainer);
     });
 
-    let deleteRoomMenuItem = menuContainer.getElementsByClassName('control-debug-menu__item_delete-room')[0];
-    let deleteMemberMenuItem = menuContainer.getElementsByClassName('control-debug-menu__item_delete-member')[0];
-    let createEndpointMenuItem = menuContainer.getElementsByClassName('control-debug-menu__item_create-endpoint')[0];
-    let deleteEndpointMenuItem = menuContainer.getElementsByClassName('control-debug-menu__item_delete-endpoint')[0];
-    let createMemberMenuItem = menuContainer.getElementsByClassName('control-debug-menu__item_create-member')[0];
-    let createRoomMenuItem = menuContainer.getElementsByClassName('control-debug-menu__item_create-room')[0];
-    let getMenuItem = menuContainer.getElementsByClassName('control-debug-menu__item_get')[0];
-
-    let deleteRoomContainer = document.getElementsByClassName('control-debug__window_delete-room')[0];
-    let deleteMemberContainer = document.getElementsByClassName('control-debug__window_delete-member')[0];
-    let createEndpointContainer = document.getElementsByClassName('control-debug__window_create-endpoint')[0];
-    let deleteEndpointContainer = document.getElementsByClassName('control-debug__window_delete-endpoint')[0];
-    let createMemberContainer = document.getElementsByClassName('control-debug__window_create-member')[0];
-    let createRoomContainer = document.getElementsByClassName('control-debug__window_create-room')[0];
-    let getContainer = document.getElementsByClassName('control-debug__window_get')[0];
-
-
-
-    deleteRoomMenuItem.addEventListener('click', () => {
-        hide(deleteMemberContainer);
-        hide(createEndpointContainer);
-        hide(deleteEndpointContainer);
-        hide(createMemberContainer);
-        hide(createRoomContainer);
-        hide(getContainer);
-        show(deleteRoomContainer);
-    });
-    deleteMemberMenuItem.addEventListener('click', () => {
-        hide(createEndpointContainer);
-        hide(deleteRoomContainer);
-        hide(deleteEndpointContainer);
-        hide(createMemberContainer);
-        hide(createRoomContainer);
-        hide(getContainer);
-        show(deleteMemberContainer);
-    });
-    createEndpointMenuItem.addEventListener('click', () => {
-        hide(deleteRoomContainer);
-        hide(deleteMemberContainer);
-        hide(deleteEndpointContainer);
-        hide(createMemberContainer);
-        hide(createRoomContainer);
-        hide(getContainer);
-        show(createEndpointContainer);
-    });
-    deleteEndpointMenuItem.addEventListener('click', () => {
-        hide(deleteRoomContainer);
-        hide(deleteMemberContainer);
-        hide(createEndpointContainer);
-        hide(createMemberContainer);
-        hide(createRoomContainer);
-        hide(getContainer);
-        show(deleteEndpointContainer);
-    });
-    createMemberMenuItem.addEventListener('click', () => {
-        hide(deleteRoomContainer);
-        hide(deleteMemberContainer);
-        hide(createEndpointContainer);
-        hide(createRoomContainer);
-        hide(deleteEndpointContainer);
-        hide(getContainer);
-        show(createMemberContainer);
-    });
-    createRoomMenuItem.addEventListener('click', () => {
-        hide(deleteRoomContainer);
-        hide(deleteMemberContainer);
-        hide(createEndpointContainer);
-        hide(deleteEndpointContainer);
-        hide(createMemberContainer);
-        hide(getContainer);
-        show(createRoomContainer);
-    });
-    getMenuItem.addEventListener('click', () => {
-        hide(deleteRoomContainer);
-        hide(deleteMemberContainer);
-        hide(createEndpointContainer);
-        hide(deleteEndpointContainer);
-        hide(createMemberContainer);
-        hide(createRoomContainer);
-        show(getContainer);
-    })
+    for (let i = 0; i < debugMenuItems.length; i++) {
+        let currentItem = debugMenuItems[i];
+        let currentMenuItem = menuContainer.getElementsByClassName('control-debug-menu__item_' + currentItem)[0];
+        currentMenuItem.addEventListener('click', () => {
+            for (let a = 0; a < debugMenuItems.length; a++) {
+                if (a === i) {
+                    continue;
+                }
+                let hideContainer = document.getElementsByClassName('control-debug__window_' + debugMenuItems[a])[0];
+                contentVisibility.hide(hideContainer);
+            }
+            let currentContainer = document.getElementsByClassName('control-debug__window_' + currentItem)[0];
+            contentVisibility.show(currentContainer);
+        });
+    }
 }
