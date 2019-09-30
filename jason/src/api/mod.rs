@@ -5,7 +5,6 @@ mod room;
 
 use std::{cell::RefCell, rc::Rc};
 
-use futures::{TryFutureExt};
 use js_sys::Promise;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::future_to_promise;
@@ -55,23 +54,23 @@ impl Jason {
             peer::Repository::new(Rc::clone(&self.0.borrow().media_manager));
 
         let inner = Rc::clone(&self.0);
-        let fut = rpc
-            .init()
-            .and_then(move |()| {
-                let rpc: Rc<dyn RpcClient> = Rc::new(rpc);
-                let room =
-                    Room::new(Rc::clone(&rpc), Box::new(peer_repository));
 
-                let handle = room.new_handle();
+        future_to_promise(async move {
+            if let Err(err) = rpc.init().await {
+                return Err(err.into());
+            };
 
-                inner.borrow_mut().rpc.replace(rpc);
-                inner.borrow_mut().rooms.push(room);
+            let rpc: Rc<dyn RpcClient> = Rc::new(rpc);
+            let room =
+                Room::new(Rc::clone(&rpc), Box::new(peer_repository));
 
-                Ok(JsValue::from(handle))
-            })
-            .map_err(JsValue::from);
+            let handle = room.new_handle();
 
-        future_to_promise(fut)
+            inner.borrow_mut().rpc.replace(rpc);
+            inner.borrow_mut().rooms.push(room);
+
+            Ok(handle.into())
+        })
     }
 
     /// Sets `on_local_stream` callback, which will be invoked once media

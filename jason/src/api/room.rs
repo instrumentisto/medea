@@ -9,7 +9,7 @@ use std::{
 
 use futures::{
     channel::mpsc::{unbounded, UnboundedSender},
-    future::{self, Future as _, IntoFuture},
+    future::self,
     stream::select,
     FutureExt as _, StreamExt,
 };
@@ -19,7 +19,7 @@ use medea_client_api_proto::{
     IceServer, PeerId, Track,
 };
 use wasm_bindgen::{prelude::*, JsValue};
-use wasm_bindgen_futures::{future_to_promise, spawn_local};
+use wasm_bindgen_futures::spawn_local;
 
 use crate::{
     media::MediaStream,
