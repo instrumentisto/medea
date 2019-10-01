@@ -2,10 +2,7 @@
 
 use std::rc::Rc;
 
-use futures::{
-    channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender},
-    Future,
-};
+use futures::channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
 use medea_client_api_proto::{Event, IceServer, PeerId};
 use medea_jason::{
     api::Room,
@@ -13,7 +10,6 @@ use medea_jason::{
     peer::{MockPeerRepository, PeerConnection, PeerEvent},
     rpc::MockRpcClient,
 };
-use wasm_bindgen::prelude::*;
 use wasm_bindgen_test::*;
 
 use crate::{get_test_tracks, resolve_after};

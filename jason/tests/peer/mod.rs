@@ -164,7 +164,7 @@ async fn add_candidates_to_offerer_before_answer() {
 }
 
 //#[wasm_bindgen_test]
-// async fn normal_exchange_of_candidates() {
+//async fn normal_exchange_of_candidates() {
 //    let (tx1, rx1) = mpsc::unbounded();
 //    let (tx2, rx2) = mpsc::unbounded();
 //
@@ -176,25 +176,30 @@ async fn add_candidates_to_offerer_before_answer() {
 //        Rc::clone(&manager),
 //        true,
 //        true,
-//    ).unwrap();
-//    let peer2 = PeerConnection::new(PeerId(2), tx2, vec![], manager, true,
-// true).unwrap();    let (audio_track, video_track) = get_test_tracks();
+//    )
+//    .unwrap();
+//    let peer2 =
+//        PeerConnection::new(PeerId(2), tx2, vec![], manager, true, true)
+//            .unwrap();
+//    let (audio_track, video_track) = get_test_tracks();
 //
-//    let offer = peer1.get_offer(vec![audio_track.clone(),
-// video_track.clone()]).await.unwrap();    peer2.process_offer(offer,
-// vec![audio_track, video_track]).await.unwrap();    let answer =
-// peer2.create_and_set_answer().await.unwrap();
+//    let offer = peer1
+//        .get_offer(vec![audio_track.clone(), video_track.clone()])
+//        .await
+//        .unwrap();
+//    peer2
+//        .process_offer(offer, vec![audio_track, video_track])
+//        .await
+//        .unwrap();
+//    let answer = peer2.create_and_set_answer().await.unwrap();
 //    peer1.set_remote_answer(answer).await.unwrap();
 //
 //    resolve_after(500).await.unwrap();
 //
 //    handle_ice_candidates(rx1, &peer2, 2).await;
 //    handle_ice_candidates(rx2, &peer1, 2).await;
-//
-//    std::mem::forget(peer1);
-//    std::mem::forget(peer2);
 //}
-//
+
 async fn handle_ice_candidates(
     mut candidates_rx: mpsc::UnboundedReceiver<PeerEvent>,
     peer: &PeerConnection,
