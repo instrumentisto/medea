@@ -526,6 +526,11 @@ else
 endif
 
 
+# Down dockerized webdriver.
+#
+# Usage:
+#   make docker.down.webdriver [webdriver=(chromedriver|geckodriver)]
+
 docker.down.webdriver:
 ifeq ($(webdriver),geckodriver)
 	docker container kill $$(cat /tmp/geckodriver.docker.uid)
@@ -634,6 +639,11 @@ else
 		$(if $(call eq,$(background),yes),&,)
 endif
 
+
+# Up dockerized webdriver.
+#
+# Usage:
+#   make docker.up.webdriver [webdriver=(chromedriver|geckodriver)]
 
 docker.up.webdriver:
 ifeq ($(webdriver),geckodriver)
