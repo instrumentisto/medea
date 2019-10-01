@@ -19,7 +19,10 @@ MEDEA_IMAGE_NAME := $(strip \
 	$(shell grep 'COMPOSE_IMAGE_NAME=' .env | cut -d '=' -f2))
 DEMO_IMAGE_NAME := instrumentisto/medea-demo
 
-RUST_VER := 1.37
+RUST_VER := $(strip \
+            	$(shell grep 'RUST_VER=' .travis.yml | cut -d '=' -f2))
+RUST_NIGHTLY_VER := $(strip \
+                    	$(shell grep 'RUST_NIGHTLY_VER=' .travis.yml | cut -d '=' -f2))
 
 CURRENT_BRANCH := $(strip $(shell git branch | grep \* | cut -d ' ' -f2))
 
@@ -200,7 +203,7 @@ ifeq ($(dockerized),yes)
 		-v "$(HOME)/.cargo/registry":/usr/local/cargo/registry \
 		-v "$(HOME):$(HOME)" \
 		-e XDG_CACHE_HOME=$(HOME) \
-		rust:$(RUST_VER) \
+		instrumentisto/rust:$(RUST_NIGHTLY_VER) \
 			make cargo.build crate=$(cargo-build-crate) \
 			                 debug=$(debug) dockerized=no \
 			                 pre-install=yes
@@ -606,6 +609,45 @@ else
 	cargo run --bin medea $(if $(call eq,$(debug),no),--release,) \
 		$(if $(call eq,$(background),yes),&,)
 endif
+
+
+
+
+###################
+# rustup commands #
+###################
+
+# Install nighly Rust toolchain of concrete date via rustup and link it
+# as a default nightly Rust toolchain.
+#
+# The installer script is updated automatically to the latest version every day.
+# For manual update use 'update-installer=yes' command option.
+#
+# Usage:
+#	make rustup.nightly date=<YYYY-MM-DD>
+#	                    [update-installer=(no|yes)]
+
+rustup.nightly:
+ifeq ($(update-installer),yes)
+	$(call rustup.nightly.download)
+else
+ifeq ($(wildcard $(HOME)/.rustup/instrumentisto-nightly.sh),)
+	$(call rustup.nightly.download)
+else
+ifneq ($(shell find $(HOME)/.rustup/instrumentisto-nightly.sh -mmin +1440),)
+	$(call rustup.nightly.download)
+endif
+endif
+endif
+	@RUSTUP_NIGHTLY_DATE=$(date) $(HOME)/.rustup/instrumentisto-nightly.sh
+define rustup.nightly.download
+	$()
+	@mkdir -p $(HOME)/.rustup/
+	@rm -f $(HOME)/.rustup/instrumentisto-nightly.sh
+	curl -fL -o $(HOME)/.rustup/instrumentisto-nightly.sh \
+		https://raw.githubusercontent.com/instrumentisto/toolchain/master/rustup/nightly.sh
+	@chmod +x $(HOME)/.rustup/instrumentisto-nightly.sh
+endef
 
 
 
