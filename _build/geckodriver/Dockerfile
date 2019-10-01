@@ -1,7 +1,7 @@
 FROM debian:stretch-slim
 
 ARG firefox_ver=latest
-ARG geckodriver_ver=v0.24.0
+ARG geckodriver_ver=v0.25.0
 
 RUN apt-get update \
     && apt-get install -y \
@@ -18,6 +18,6 @@ RUN apt-get update \
     && chmod +x geckodriver \
     && mv geckodriver /usr/bin
 
-EXPOSE 4444
+ENTRYPOINT ["geckodriver", "-b", "/opt/firefox/firefox", "--log", "debug", "--host", "0.0.0.0"]
 
-ENTRYPOINT ["geckodriver", "-b", "/opt/firefox/firefox", "--log", "debug"]
+EXPOSE 4444

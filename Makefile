@@ -294,7 +294,8 @@ endif
 # Run Rust unit tests of project.
 #
 # Usage:
-#	make test.unit [crate=(@all|medea|jason|<crate-name>)] webdriver=(chromedriver|geckodriver)
+#	make test.unit [crate=(@all|medea|jason|<crate-name>)]
+#				   [webdriver=(chromedriver|geckodriver)]
 
 test-unit-crate = $(if $(call eq,$(crate),),@all,$(crate))
 webdriver-env = $(if $(call eq,$(webdriver),geckodriver),GECKODRIVER_REMOTE,CHROMEDRIVER_REMOTE)
@@ -313,7 +314,7 @@ ifeq ($(crate),medea-jason)
 	@make docker.up.webdriver
 	sleep 10
 	cd $(crate-dir)/ && \
-	$(webdriver-env)="http://127.0.0.1:4444" \
+	$(webdriver-env)="http://0.0.0.0:4444" \
     cargo test --target wasm32-unknown-unknown --features mockable
 	@make docker.down.webdriver
 endif
