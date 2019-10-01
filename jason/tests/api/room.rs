@@ -3,7 +3,7 @@
 use std::rc::Rc;
 
 use futures::{
-    sync::mpsc::{unbounded, UnboundedReceiver, UnboundedSender},
+    channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender},
     Future,
 };
 use medea_client_api_proto::{Event, IceServer, PeerId};
@@ -39,7 +39,7 @@ fn get_test_room_and_exist_peer() -> (Room, Rc<PeerConnection>) {
     let (_, event_rx) = unbounded();
     let peer_clone = Rc::clone(&peer);
     rpc.expect_subscribe()
-        .return_once(move || Box::new(event_rx));
+        .return_once(move || Box::pin(event_rx));
     repo.expect_get_all()
         .times(2)
         .returning_st(move || vec![Rc::clone(&peer_clone)]);
@@ -49,34 +49,35 @@ fn get_test_room_and_exist_peer() -> (Room, Rc<PeerConnection>) {
     (room, peer)
 }
 
-#[wasm_bindgen_test(async)]
-fn mute_unmute_audio() -> impl Future<Item = (), Error = JsValue> {
+#[wasm_bindgen_test]
+async fn mute_unmute_audio() {
     let (room, peer) = get_test_room_and_exist_peer();
     let (audio_track, video_track) = get_test_tracks();
+
     peer.get_offer(vec![audio_track, video_track])
-        .map(move |_| {
-            let handle = room.new_handle();
-            assert!(handle.mute_audio().is_ok());
-            assert!(!peer.is_send_audio_enabled());
-            assert!(handle.unmute_audio().is_ok());
-            assert!(peer.is_send_audio_enabled());
-        })
-        .map_err(Into::into)
+        .await
+        .unwrap();
+    let handle = room.new_handle();
+    assert!(handle.mute_audio().is_ok());
+    assert!(!peer.is_send_audio_enabled());
+    assert!(handle.unmute_audio().is_ok());
+    assert!(peer.is_send_audio_enabled());
 }
 
-#[wasm_bindgen_test(async)]
-fn mute_unmute_video() -> impl Future<Item = (), Error = JsValue> {
+#[wasm_bindgen_test]
+async fn mute_unmute_video() {
     let (room, peer) = get_test_room_and_exist_peer();
     let (audio_track, video_track) = get_test_tracks();
+
     peer.get_offer(vec![audio_track, video_track])
-        .map(move |_| {
-            let handle = room.new_handle();
-            assert!(handle.mute_video().is_ok());
-            assert!(!peer.is_send_video_enabled());
-            assert!(handle.unmute_video().is_ok());
-            assert!(peer.is_send_video_enabled());
-        })
-        .map_err(Into::into)
+        .await
+        .unwrap();
+
+    let handle = room.new_handle();
+    assert!(handle.mute_video().is_ok());
+    assert!(!peer.is_send_video_enabled());
+    assert!(handle.unmute_video().is_ok());
+    assert!(peer.is_send_video_enabled());
 }
 
 fn get_test_room_and_new_peer(
@@ -88,7 +89,7 @@ fn get_test_room_and_new_peer(
     let mut repo = Box::new(MockPeerRepository::new());
 
     rpc.expect_subscribe()
-        .return_once(move || Box::new(event_rx));
+        .return_once(move || Box::pin(event_rx));
     repo.expect_get_all().returning(|| vec![]);
     let (tx, _rx) = unbounded();
     let peer = Rc::new(
@@ -123,9 +124,8 @@ fn get_test_room_and_new_peer(
     (room, peer)
 }
 
-#[wasm_bindgen_test(async)]
-fn mute_audio_room_before_init_peer() -> impl Future<Item = (), Error = JsValue>
-{
+#[wasm_bindgen_test]
+async fn mute_audio_room_before_init_peer() {
     let (event_tx, event_rx) = unbounded();
     let (room, peer) = get_test_room_and_new_peer(event_rx, false, true);
     let (audio_track, video_track) = get_test_tracks();
@@ -140,18 +140,14 @@ fn mute_audio_room_before_init_peer() -> impl Future<Item = (), Error = JsValue>
         })
         .unwrap();
 
-    resolve_after(500).and_then(move |_| {
-        // move room so it wont get dropped
-        let _ = room;
-        assert!(peer.is_send_video_enabled());
-        assert!(!peer.is_send_audio_enabled());
-        Ok(())
-    })
+    resolve_after(500).await.unwrap();
+
+    assert!(peer.is_send_video_enabled());
+    assert!(!peer.is_send_audio_enabled());
 }
 
-#[wasm_bindgen_test(async)]
-fn mute_video_room_before_init_peer() -> impl Future<Item = (), Error = JsValue>
-{
+#[wasm_bindgen_test]
+async fn mute_video_room_before_init_peer() {
     let (event_tx, event_rx) = unbounded();
     let (room, peer) = get_test_room_and_new_peer(event_rx, true, false);
     let (audio_track, video_track) = get_test_tracks();
@@ -166,11 +162,8 @@ fn mute_video_room_before_init_peer() -> impl Future<Item = (), Error = JsValue>
         })
         .unwrap();
 
-    resolve_after(500).and_then(move |_| {
-        // move room so it wont get dropped
-        let _ = room;
-        assert!(peer.is_send_audio_enabled());
-        assert!(!peer.is_send_video_enabled());
-        Ok(())
-    })
+    resolve_after(500).await.unwrap();
+
+    assert!(peer.is_send_audio_enabled());
+    assert!(!peer.is_send_video_enabled());
 }
