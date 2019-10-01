@@ -98,7 +98,7 @@ jobs:
       stage: test
       rust: stable
       before_script:
-        - cargo uninstall wasm-bindgen-cli
+        - cargo uninstall wasm-bindgen-cli || echo > /dev/null
         - cargo install wasm-bindgen-cli
         - rustup target add wasm32-unknown-unknown
       script: make test.unit crate=medea-jason webdriver=geckodriver
@@ -107,7 +107,7 @@ jobs:
       stage: test
       rust: stable
       before_script:
-        - cargo uninstall wasm-bindgen-cli
+        - cargo uninstall wasm-bindgen-cli || echo > /dev/null
         - cargo install wasm-bindgen-cli
         - rustup target add wasm32-unknown-unknown
       script: make test.unit crate=medea-jason webdriver=chromedriver
