@@ -139,7 +139,7 @@ up.demo: docker.up.demo
 #	make up.dev
 
 up.dev: up.coturn
-	$(MAKE) -j2 up.jason docker.up.medea
+	$(MAKE) -j3 up.jason docker.up.medea up.control-api-mock
 
 
 up.medea: docker.up.medea
@@ -152,6 +152,14 @@ up.medea: docker.up.medea
 
 up.jason:
 	npm run start --prefix=jason/e2e-demo
+
+
+# Run Control API mock server.
+#
+# Usage:
+#  make up.control-api-mock
+up.control-api-mock:
+	cargo run -p control-api-mock
 
 
 
@@ -839,4 +847,5 @@ protoc.rebuild:
         release release.crates release.helm release.npm \
         test test.e2e test.unit \
         up up.coturn up.demo up.dev up.jason up.medea \
+        up.control-api-mock \
         yarn
