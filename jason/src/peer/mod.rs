@@ -7,7 +7,7 @@ mod ice_server;
 mod media;
 mod repo;
 
-use std::{collections::HashMap, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use futures::channel::mpsc;
 use medea_client_api_proto::{
@@ -62,7 +62,7 @@ struct InnerPeerConnection {
     peer: Rc<RtcPeerConnection>,
 
     /// [`Sender`]s and [`Receivers`] of this [`RtcPeerConnection`].
-    media_connections: MediaConnections,
+    media_connections: Rc<MediaConnections>,
 
     /// [`MediaManager`] that will be used to acquire local [`MediaStream`]s.
     media_manager: Rc<MediaManager>,
@@ -71,11 +71,11 @@ struct InnerPeerConnection {
     peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
 
     /// Indicates if underlying [`RtcPeerConnection`] has remote description.
-    has_remote_description: bool,
+    has_remote_description: RefCell<bool>,
 
     /// Stores [`IceCandidate`]s received before remote description for
     /// underlying [`RtcPeerConnection`].
-    ice_candidates_buffer: Vec<IceCandidate>,
+    ice_candidates_buffer: RefCell<Vec<IceCandidate>>,
 }
 
 impl InnerPeerConnection {
@@ -88,25 +88,25 @@ impl InnerPeerConnection {
         enabled_video: bool,
     ) -> Result<Self, WasmErr> {
         let peer = Rc::new(RtcPeerConnection::new(ice_servers)?);
-        let media_connections = MediaConnections::new(
+        let media_connections = Rc::new(MediaConnections::new(
             Rc::clone(&peer),
             enabled_audio,
             enabled_video,
-        );
+        ));
         Ok(Self {
             id,
             peer,
             media_connections,
             media_manager,
             peer_events_sender,
-            has_remote_description: false,
-            ice_candidates_buffer: vec![],
+            has_remote_description: RefCell::new(false),
+            ice_candidates_buffer: RefCell::new(vec![]),
         })
     }
 }
 
 #[allow(clippy::module_name_repetitions)]
-pub struct PeerConnection(Rc<InnerPeerConnection>);
+pub struct PeerConnection(InnerPeerConnection);
 
 impl PeerConnection {
     /// Creates new [`PeerConnection`].
@@ -123,25 +123,28 @@ impl PeerConnection {
         enabled_audio: bool,
         enabled_video: bool,
     ) -> Result<Self, WasmErr> {
-        let inner = Rc::new(InnerPeerConnection::new(
+        let inner = InnerPeerConnection::new(
             id,
             ice_servers,
             media_manager,
             peer_events_sender,
             enabled_audio,
             enabled_video,
-        )?);
+        )?;
 
         // Bind to `icecandidate` event.
-        let inner_rc = Rc::clone(&inner);
+        let id = inner.id;
+        let sender = inner.peer_events_sender.clone();
         inner.peer.on_ice_candidate(Some(move |candidate| {
-            Self::on_ice_candidate(&inner_rc, candidate);
+            Self::on_ice_candidate(id, &sender, candidate);
         }))?;
 
         // Bind to `track` event.
-        let inner_rc = Rc::clone(&inner);
+        let id = inner.id;
+        let media_connections = Rc::clone(&inner.media_connections);
+        let sender = inner.peer_events_sender.clone();
         inner.peer.on_track(Some(move |track_event| {
-            Self::on_track(&inner_rc, &track_event);
+            Self::on_track(id, &media_connections, &sender, &track_event);
         }))?;
 
         Ok(Self(inner))
@@ -149,46 +152,51 @@ impl PeerConnection {
 
     /// Returns inner [`IceCandidate`]'s buffer len. Used in tests.
     pub fn candidates_buffer_len(&self) -> usize {
-        self.0.ice_candidates_buffer.len()
+        self.0.ice_candidates_buffer.borrow().len()
     }
 
     /// Handle `icecandidate` event from underlying peer emitting
     /// [`PeerEvent::IceCandidateDiscovered`] event into this peers
     /// `peer_events_sender`.
-    fn on_ice_candidate(inner: &InnerPeerConnection, candidate: IceCandidate) {
-        let _ = inner.peer_events_sender.unbounded_send(
-            PeerEvent::IceCandidateDiscovered {
-                peer_id: inner.id,
-                candidate: candidate.candidate,
-                sdp_m_line_index: candidate.sdp_m_line_index,
-                sdp_mid: candidate.sdp_mid,
-            },
-        );
+    fn on_ice_candidate(
+        id: Id,
+        sender: &mpsc::UnboundedSender<PeerEvent>,
+        candidate: IceCandidate,
+    ) {
+        let _ = sender.unbounded_send(PeerEvent::IceCandidateDiscovered {
+            peer_id: id,
+            candidate: candidate.candidate,
+            sdp_m_line_index: candidate.sdp_m_line_index,
+            sdp_mid: candidate.sdp_mid,
+        });
     }
 
     /// Handle `track` event from underlying peer adding new track to
     /// `media_connections` and emitting [`PeerEvent::NewRemoteStream`]
     /// event into this peers `peer_events_sender` if all tracks from this
     /// sender has arrived.
-    fn on_track(inner: &InnerPeerConnection, track_event: &RtcTrackEvent) {
+    fn on_track(
+        id: Id,
+        media_connections: &MediaConnections,
+        sender: &mpsc::UnboundedSender<PeerEvent>,
+        track_event: &RtcTrackEvent,
+    ) {
         let transceiver = track_event.transceiver();
         let track = track_event.track();
 
         if let Some(sender_id) =
-            inner.media_connections.add_remote_track(transceiver, track)
+            media_connections.add_remote_track(transceiver, track)
         {
             if let Some(tracks) =
-                inner.media_connections.get_tracks_by_sender(sender_id)
+                media_connections.get_tracks_by_sender(sender_id)
             {
                 // got all tracks from this sender, so emit
                 // PeerEvent::NewRemoteStream
-                let _ = inner.peer_events_sender.unbounded_send(
-                    PeerEvent::NewRemoteStream {
-                        peer_id: inner.id,
-                        sender_id,
-                        remote_stream: MediaStream::from_tracks(tracks),
-                    },
-                );
+                let _ = sender.unbounded_send(PeerEvent::NewRemoteStream {
+                    peer_id: id,
+                    sender_id,
+                    remote_stream: MediaStream::from_tracks(tracks),
+                });
             };
         } else {
             // TODO: means that this peer is out of sync, should be
@@ -291,20 +299,17 @@ impl PeerConnection {
         desc: SdpType,
     ) -> Result<(), WasmErr> {
         self.0.peer.set_remote_description(desc).await?;
-        self.0.has_remote_description = true;
+        *self.0.has_remote_description.borrow_mut() = true;
 
-        let candidates = std::mem::replace(
-            self.0.ice_candidates_buffer.as_mut(),
-            Vec::new(),
-        );
-        let peer = &self.0.peer;
-        for candidate in candidates {
-            peer.add_ice_candidate(
-                &candidate.candidate,
-                candidate.sdp_m_line_index,
-                &candidate.sdp_mid,
-            )
-            .await?;
+        for candidate in self.0.ice_candidates_buffer.borrow_mut().drain(..) {
+            self.0
+                .peer
+                .add_ice_candidate(
+                    &candidate.candidate,
+                    candidate.sdp_m_line_index,
+                    &candidate.sdp_mid,
+                )
+                .await?;
         }
 
         Ok(())
@@ -356,17 +361,20 @@ impl PeerConnection {
         sdp_m_line_index: Option<u16>,
         sdp_mid: Option<String>,
     ) -> Result<(), WasmErr> {
-        if self.0.has_remote_description {
+        if *self.0.has_remote_description.borrow() {
             self.0
                 .peer
                 .add_ice_candidate(&candidate, sdp_m_line_index, &sdp_mid)
                 .await?;
         } else {
-            self.0.ice_candidates_buffer.push(IceCandidate {
-                candidate,
-                sdp_m_line_index,
-                sdp_mid,
-            });
+            self.0
+                .ice_candidates_buffer
+                .borrow_mut()
+                .push(IceCandidate {
+                    candidate,
+                    sdp_m_line_index,
+                    sdp_mid,
+                });
         }
 
         Ok(())
