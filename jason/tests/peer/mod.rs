@@ -163,42 +163,42 @@ async fn add_candidates_to_offerer_before_answer() {
     assert_eq!(pc1.candidates_buffer_len(), 0);
 }
 
-//#[wasm_bindgen_test]
-// async fn normal_exchange_of_candidates() {
-//    let (tx1, rx1) = mpsc::unbounded();
-//    let (tx2, rx2) = mpsc::unbounded();
-//
-//    let manager = Rc::new(MediaManager::default());
-//    let peer1 = PeerConnection::new(
-//        PeerId(1),
-//        tx1,
-//        vec![],
-//        Rc::clone(&manager),
-//        true,
-//        true,
-//    )
-//    .unwrap();
-//    let peer2 =
-//        PeerConnection::new(PeerId(2), tx2, vec![], manager, true, true)
-//            .unwrap();
-//    let (audio_track, video_track) = get_test_tracks();
-//
-//    let offer = peer1
-//        .get_offer(vec![audio_track.clone(), video_track.clone()])
-//        .await
-//        .unwrap();
-//    peer2
-//        .process_offer(offer, vec![audio_track, video_track])
-//        .await
-//        .unwrap();
-//    let answer = peer2.create_and_set_answer().await.unwrap();
-//    peer1.set_remote_answer(answer).await.unwrap();
-//
-//    resolve_after(500).await.unwrap();
-//
-//    handle_ice_candidates(rx1, &peer2, 2).await;
-//    handle_ice_candidates(rx2, &peer1, 2).await;
-//}
+#[wasm_bindgen_test]
+async fn normal_exchange_of_candidates() {
+    let (tx1, rx1) = mpsc::unbounded();
+    let (tx2, rx2) = mpsc::unbounded();
+
+    let manager = Rc::new(MediaManager::default());
+    let peer1 = PeerConnection::new(
+        PeerId(1),
+        tx1,
+        vec![],
+        Rc::clone(&manager),
+        true,
+        true,
+    )
+    .unwrap();
+    let peer2 =
+        PeerConnection::new(PeerId(2), tx2, vec![], manager, true, true)
+            .unwrap();
+    let (audio_track, video_track) = get_test_tracks();
+
+    let offer = peer1
+        .get_offer(vec![audio_track.clone(), video_track.clone()])
+        .await
+        .unwrap();
+    peer2
+        .process_offer(offer, vec![audio_track, video_track])
+        .await
+        .unwrap();
+    let answer = peer2.create_and_set_answer().await.unwrap();
+    peer1.set_remote_answer(answer).await.unwrap();
+
+    resolve_after(500).await.unwrap();
+
+    handle_ice_candidates(rx1, &peer2, 2).await;
+    handle_ice_candidates(rx2, &peer1, 1).await;
+}
 
 async fn handle_ice_candidates(
     mut candidates_rx: mpsc::UnboundedReceiver<PeerEvent>,
