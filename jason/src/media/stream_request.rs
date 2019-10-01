@@ -152,14 +152,10 @@ impl From<&SimpleStreamRequest> for MediaStreamConstraints {
         let mut constraints = Self::new();
 
         if let Some((_, _)) = request.video {
-            constraints
-                .video_mut()
-                .replace(VideoTrackConstraints::new());
+            constraints.video(VideoTrackConstraints::new());
         }
         if let Some((_, _)) = request.audio {
-            constraints
-                .audio_mut()
-                .replace(AudioTrackConstraints::new());
+            constraints.audio(AudioTrackConstraints::new());
         }
 
         constraints

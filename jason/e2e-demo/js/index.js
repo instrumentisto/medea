@@ -1,33 +1,44 @@
-async function getDevices(participant, audio_select, video_select) {
-    const device_infos = await participant.media_manager().enumerate_devices();
+async function init(){
+  'use strict';
+  const rust = await import('../../pkg');
+
+  const jason = new rust.Jason();
+
+  async function getDevices(audio_select, video_select) {
+    const device_infos = await jason.media_manager().enumerate_devices();
     console.log('Available input and output devices:', device_infos);
     for (const device_info of device_infos) {
-        const option = document.createElement('option');
-        option.value = device_info.device_id();
-        if (device_info.kind() === 'audio') {
-            option.text = device_info.label() || `Microphone ${audio_select.length + 1}`;
-            audio_select.append(option);
-        } else if (device_info.kind() === 'video') {
-            option.text = device_info.label() || `Camera ${video_select.length + 1}`;
-            video_select.append(option);
-        }
+      const option = document.createElement('option');
+      option.value = device_info.device_id();
+      if (device_info.kind() === 'audio') {
+        option.text = device_info.label() || `Microphone ${audio_select.length + 1}`;
+        audio_select.append(option);
+      } else if (device_info.kind() === 'video') {
+        option.text = device_info.label() || `Camera ${video_select.length + 1}`;
+        video_select.append(option);
+      }
     }
-}
+  }
 
-async function getStream(participant, local_video, audio_select, video_select) {
-
-    const audio_source = audio_select.val() ? {deviceId: {exact: audio_select.val()}} : true;
-    const video_source = video_select.val() ? {deviceId: {exact: video_select.val()}} : true;
-    const constraints = {
-        audio: audio_source,
-        video: video_source
-    };
-    let stream = await participant.media_manager().init_local_stream(constraints);
+  async function getStream(local_video, audio_select, video_select) {
+    let constraints = new rust.MediaStreamConstraints();
+    let audio = new rust.AudioTrackConstraints();
+    if (audio_select.val()) {
+      audio.device_id(audio_select.val())
+    }
+    constraints.audio(audio);
+    let video = new rust.VideoTrackConstraints();
+    if (video_select.val()) {
+      video.device_id(video_select.val())
+    }
+    constraints.video(video);
+    let stream = await jason.media_manager().get_local_stream(constraints);
     local_video.srcObject = stream;
     local_video.play();
-}
+    console.log(stream);
+  }
 
-async function init_participant(wasm, token, frame) {
+  async function init_participant(token, frame) {
     let toggle_audio = $(frame).find("input[name=toggle-audio]");
     let toggle_video = $(frame).find("input[name=toggle-video]");
     let local_video = $(frame).find("video[name=local-video]")[0];
@@ -36,67 +47,71 @@ async function init_participant(wasm, token, frame) {
     let video_select = $(frame).find("select[name=video-source]");
     let join_button = $(frame).find("button[name=join-room]");
 
-    let jason = new wasm.Jason();
     let room = await jason.init_room();
-    await getStream(jason, local_video, audio_select, video_select);
-    getDevices(jason, audio_select, video_select);
+    await getStream(local_video, audio_select, video_select);
+    await getDevices(audio_select, video_select);
 
-    toggle_audio.change(function() {
-        if($(this).is(":checked")) {
-            room.unmute_audio();
-        } else {
-            room.mute_audio();
-        }
+    toggle_audio.change(function () {
+      if ($(this).is(":checked")) {
+        room.unmute_audio();
+      } else {
+        room.mute_audio();
+      }
     });
 
-    toggle_video.change(function() {
-        if($(this).is(":checked")) {
-            room.unmute_video();
-        } else {
-            room.mute_video();
-        }
+    toggle_video.change(function () {
+      if ($(this).is(":checked")) {
+        room.unmute_video();
+      } else {
+        room.mute_video();
+      }
     });
 
-    audio_select.change(function() {
-        getStream(jason, local_video, audio_select, video_select);
+    audio_select.change(function () {
+      getStream(local_video, audio_select, video_select);
     });
 
-    video_select.change(function() {
-        getStream(jason, local_video, audio_select, video_select);
+    video_select.change(function () {
+      getStream(local_video, audio_select, video_select);
     });
 
     room.on_new_connection(function (connection) {
-        connection.on_remote_stream(function (stream) {
-            remote_video.srcObject = stream.get_media_stream();
-            remote_video.play();
-        });
+      connection.on_remote_stream(function (stream) {
+        remote_video.srcObject = stream.get_media_stream();
+        remote_video.play();
+      });
     });
 
     jason.on_local_stream(function (stream, error) {
-        if (stream) {
-            audio_select.prop( "disabled", true );
-            video_select.prop( "disabled", true );
-            local_video.srcObject = stream.get_media_stream();
-            local_video.play();
-        } else {
-            console.log(error);
-        }
+      if (stream) {
+        console.log("unreachable!");
+      } else {
+        console.log(error);
+      }
     });
 
-    join_button.click(function() {
-        room.join(token);
-        join_button.prop( "disabled", true );
+    join_button.click(function () {
+      room.join(token);
+      join_button.prop("disabled", true);
+      audio_select.prop("disabled", true);
+      video_select.prop("disabled", true);
     });
 
     return room;
+  }
+
+  return {
+    init_participant: init_participant,
+  };
 }
 
 window.onload = async function () {
-
-    const wasm = await import("../../pkg");
-
-    await init_participant(wasm, "ws://localhost:8080/ws/pub-pub-video-call/caller/test", "#caller");
-    await init_participant(wasm, "ws://localhost:8080/ws/pub-pub-video-call/responder/test", "#responder");
+  init()
+    .then(async medea => {
+      await medea.init_participant("ws://localhost:8080/ws/pub-pub-video-call/caller/test", "#caller");
+      await medea.init_participant("ws://localhost:8080/ws/pub-pub-video-call/responder/test", "#responder");
+    })
+    .catch(console.error);
 
 };
 
