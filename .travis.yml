@@ -96,21 +96,19 @@ jobs:
 
     - name: unit medea-jason (nightly, Firefox)
       stage: test
-      # TODO: Run on stable when -Z install-upgrade is out,
-      # see: https://github.com/rust-lang/cargo/issues/6797
-      rust: nightly
+      rust: stable
       before_script:
-        - cargo +nightly install wasm-bindgen-cli -Z install-upgrade
+        - cargo uninstall wasm-bindgen-cli
+        - cargo install wasm-bindgen-cli
         - rustup target add wasm32-unknown-unknown
       script: make test.unit crate=medea-jason webdriver=geckodriver
 
     - name: unit medea-jason (nightly, Chrome)
       stage: test
-      # TODO: Run on stable when -Z install-upgrade is out,
-      # see: https://github.com/rust-lang/cargo/issues/6797
-      rust: nightly
+      rust: stable
       before_script:
-        - cargo +nightly install wasm-bindgen-cli -Z install-upgrade
+        - cargo uninstall wasm-bindgen-cli
+        - cargo install wasm-bindgen-cli
         - rustup target add wasm32-unknown-unknown
       script: make test.unit crate=medea-jason webdriver=chromedriver
 
