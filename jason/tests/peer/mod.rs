@@ -164,7 +164,7 @@ async fn add_candidates_to_offerer_before_answer() {
 }
 
 //#[wasm_bindgen_test]
-//async fn normal_exchange_of_candidates() {
+// async fn normal_exchange_of_candidates() {
 //    let (tx1, rx1) = mpsc::unbounded();
 //    let (tx2, rx2) = mpsc::unbounded();
 //

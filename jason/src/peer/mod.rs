@@ -54,7 +54,8 @@ pub enum PeerEvent {
     },
 }
 
-struct InnerPeerConnection {
+#[allow(clippy::module_name_repetitions)]
+pub struct PeerConnection {
     /// Unique ID of [`PeerConnection`].
     id: Id,
 
@@ -78,36 +79,6 @@ struct InnerPeerConnection {
     ice_candidates_buffer: RefCell<Vec<IceCandidate>>,
 }
 
-impl InnerPeerConnection {
-    fn new<I: IntoIterator<Item = IceServer>>(
-        id: Id,
-        ice_servers: I,
-        media_manager: Rc<MediaManager>,
-        peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
-        enabled_audio: bool,
-        enabled_video: bool,
-    ) -> Result<Self, WasmErr> {
-        let peer = Rc::new(RtcPeerConnection::new(ice_servers)?);
-        let media_connections = Rc::new(MediaConnections::new(
-            Rc::clone(&peer),
-            enabled_audio,
-            enabled_video,
-        ));
-        Ok(Self {
-            id,
-            peer,
-            media_connections,
-            media_manager,
-            peer_events_sender,
-            has_remote_description: RefCell::new(false),
-            ice_candidates_buffer: RefCell::new(vec![]),
-        })
-    }
-}
-
-#[allow(clippy::module_name_repetitions)]
-pub struct PeerConnection(InnerPeerConnection);
-
 impl PeerConnection {
     /// Creates new [`PeerConnection`].
     ///
@@ -123,36 +94,44 @@ impl PeerConnection {
         enabled_audio: bool,
         enabled_video: bool,
     ) -> Result<Self, WasmErr> {
-        let inner = InnerPeerConnection::new(
-            id,
-            ice_servers,
-            media_manager,
-            peer_events_sender,
+        let peer = Rc::new(RtcPeerConnection::new(ice_servers)?);
+        let media_connections = Rc::new(MediaConnections::new(
+            Rc::clone(&peer),
             enabled_audio,
             enabled_video,
-        )?;
+        ));
+
+        let peer = Self {
+            id,
+            peer,
+            media_connections,
+            media_manager,
+            peer_events_sender,
+            has_remote_description: RefCell::new(false),
+            ice_candidates_buffer: RefCell::new(vec![]),
+        };
 
         // Bind to `icecandidate` event.
-        let id = inner.id;
-        let sender = inner.peer_events_sender.clone();
-        inner.peer.on_ice_candidate(Some(move |candidate| {
+        let id = peer.id;
+        let sender = peer.peer_events_sender.clone();
+        peer.peer.on_ice_candidate(Some(move |candidate| {
             Self::on_ice_candidate(id, &sender, candidate);
         }))?;
 
         // Bind to `track` event.
-        let id = inner.id;
-        let media_connections = Rc::clone(&inner.media_connections);
-        let sender = inner.peer_events_sender.clone();
-        inner.peer.on_track(Some(move |track_event| {
+        let id = peer.id;
+        let media_connections = Rc::clone(&peer.media_connections);
+        let sender = peer.peer_events_sender.clone();
+        peer.peer.on_track(Some(move |track_event| {
             Self::on_track(id, &media_connections, &sender, &track_event);
         }))?;
 
-        Ok(Self(inner))
+        Ok(peer)
     }
 
     /// Returns inner [`IceCandidate`]'s buffer len. Used in tests.
     pub fn candidates_buffer_len(&self) -> usize {
-        self.0.ice_candidates_buffer.borrow().len()
+        self.ice_candidates_buffer.borrow().len()
     }
 
     /// Handle `icecandidate` event from underlying peer emitting
@@ -207,29 +186,25 @@ impl PeerConnection {
 
     /// Disables or enables all audio tracks for all [`Sender`]s.
     pub fn toggle_send_audio(&self, enabled: bool) {
-        self.0
-            .media_connections
+        self.media_connections
             .toggle_send_media(TransceiverKind::Audio, enabled)
     }
 
     /// Disables or enables all video tracks for all [`Sender`]s.
     pub fn toggle_send_video(&self, enabled: bool) {
-        self.0
-            .media_connections
+        self.media_connections
             .toggle_send_media(TransceiverKind::Video, enabled)
     }
 
     /// Returns `true` if all [`Sender`]s audio tracks are enabled.
     pub fn is_send_audio_enabled(&self) -> bool {
-        self.0
-            .media_connections
+        self.media_connections
             .are_senders_enabled(TransceiverKind::Audio)
     }
 
     /// Returns `true` if all [`Sender`]s video tracks are enabled.
     pub fn is_send_video_enabled(&self) -> bool {
-        self.0
-            .media_connections
+        self.media_connections
             .are_senders_enabled(TransceiverKind::Video)
     }
 
@@ -243,7 +218,7 @@ impl PeerConnection {
     /// [1]: https://tools.ietf.org/html/rfc4566#section-5.14
     /// [2]: https://www.w3.org/TR/webrtc/#rtcrtptransceiver-interface
     pub fn get_mids(&self) -> Result<HashMap<TrackId, String>, WasmErr> {
-        self.0.media_connections.get_mids()
+        self.media_connections.get_mids()
     }
 
     /// Sync provided tracks creating all required `Sender`s and
@@ -253,24 +228,23 @@ impl PeerConnection {
         &self,
         tracks: Vec<Track>,
     ) -> Result<String, WasmErr> {
-        let request = self.0.media_connections.update_tracks(tracks)?;
+        let request = self.media_connections.update_tracks(tracks)?;
 
         if let Some(request) = request {
-            let local_stream = self.0.media_manager.get_stream(request).await?;
-            self.0
-                .media_connections
+            let local_stream = self.media_manager.get_stream(request).await?;
+            self.media_connections
                 .insert_local_stream(&local_stream)
                 .await?;
         }
 
-        self.0.peer.create_and_set_offer().await
+        self.peer.create_and_set_offer().await
     }
 
     /// Creates an SDP answer to an offer received from a remote peer and sets
     /// it as local description. Must be called only if peer already has remote
     /// description.
     pub async fn create_and_set_answer(&self) -> Result<String, WasmErr> {
-        self.0.peer.create_and_set_answer().await
+        self.peer.create_and_set_answer().await
     }
 
     /// Updates underlying [RTCPeerConnection][1]'s remote SDP from answer.
@@ -298,12 +272,11 @@ impl PeerConnection {
         &self,
         desc: SdpType,
     ) -> Result<(), WasmErr> {
-        self.0.peer.set_remote_description(desc).await?;
-        *self.0.has_remote_description.borrow_mut() = true;
+        self.peer.set_remote_description(desc).await?;
+        *self.has_remote_description.borrow_mut() = true;
 
-        for candidate in self.0.ice_candidates_buffer.borrow_mut().drain(..) {
-            self.0
-                .peer
+        for candidate in self.ice_candidates_buffer.borrow_mut().drain(..) {
+            self.peer
                 .add_ice_candidate(
                     &candidate.candidate,
                     candidate.sdp_m_line_index,
@@ -335,16 +308,15 @@ impl PeerConnection {
             });
 
         // update receivers
-        self.0.media_connections.update_tracks(recv)?;
+        self.media_connections.update_tracks(recv)?;
 
         self.set_remote_offer(offer).await?;
 
-        let request = self.0.media_connections.update_tracks(send)?;
+        let request = self.media_connections.update_tracks(send)?;
 
         if let Some(request) = request {
-            let local_stream = self.0.media_manager.get_stream(request).await?;
-            self.0
-                .media_connections
+            let local_stream = self.media_manager.get_stream(request).await?;
+            self.media_connections
                 .insert_local_stream(&local_stream)
                 .await?;
         }
@@ -361,20 +333,16 @@ impl PeerConnection {
         sdp_m_line_index: Option<u16>,
         sdp_mid: Option<String>,
     ) -> Result<(), WasmErr> {
-        if *self.0.has_remote_description.borrow() {
-            self.0
-                .peer
+        if *self.has_remote_description.borrow() {
+            self.peer
                 .add_ice_candidate(&candidate, sdp_m_line_index, &sdp_mid)
                 .await?;
         } else {
-            self.0
-                .ice_candidates_buffer
-                .borrow_mut()
-                .push(IceCandidate {
-                    candidate,
-                    sdp_m_line_index,
-                    sdp_mid,
-                });
+            self.ice_candidates_buffer.borrow_mut().push(IceCandidate {
+                candidate,
+                sdp_m_line_index,
+                sdp_mid,
+            });
         }
 
         Ok(())
@@ -384,9 +352,8 @@ impl PeerConnection {
 impl Drop for PeerConnection {
     /// Drops `on_track` and `on_ice_candidate` callbacks to prevent leak.
     fn drop(&mut self) {
-        let _ = self.0.peer.on_track::<Box<dyn FnMut(RtcTrackEvent)>>(None);
+        let _ = self.peer.on_track::<Box<dyn FnMut(RtcTrackEvent)>>(None);
         let _ = self
-            .0
             .peer
             .on_ice_candidate::<Box<dyn FnMut(IceCandidate)>>(None);
     }
