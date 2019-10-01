@@ -140,7 +140,7 @@ async function addNewMember(roomId, memberId) {
 }
 
 const controlDebugWindows = {
-    bindControlDebugDeleteRoom: function () {
+    deleteRoom: function () {
         let container = document.getElementsByClassName('control-debug__window_delete-room')[0];
         bindCloseWindow(container);
 
@@ -150,7 +150,7 @@ const controlDebugWindows = {
         });
     },
 
-    bindControlDebugDeleteMember: function () {
+    deleteMember: function () {
         let container = document.getElementsByClassName('control-debug__window_delete-member')[0];
         bindCloseWindow(container);
         let execute = container.getElementsByClassName('control-debug__execute')[0];
@@ -161,7 +161,7 @@ const controlDebugWindows = {
         });
     },
 
-    bindControlDebugCreateEndpoint: function () {
+    createEndpoint: function () {
         let container = document.getElementsByClassName('control-debug__window_create-endpoint')[0];
         bindCloseWindow(container);
 
@@ -211,7 +211,7 @@ const controlDebugWindows = {
         })
     },
 
-    bindControlDebugDeleteEndpoint: function () {
+    deleteEndpoint: function () {
         let container = document.getElementsByClassName('control-debug__window_delete-endpoint')[0];
         bindCloseWindow(container);
 
@@ -224,7 +224,7 @@ const controlDebugWindows = {
         });
     },
 
-    bindControlDebugCreateRoom: function () {
+    createRoom: function () {
         let container = document.getElementsByClassName('control-debug__window_create-room')[0];
 
         bindCloseWindow(container);
@@ -237,7 +237,7 @@ const controlDebugWindows = {
         });
     },
 
-    bindControlDebugCreateMember: function () {
+    createMember: function () {
         let container = document.getElementsByClassName('control-debug__window_create-member')[0];
         bindCloseWindow(container);
 
@@ -251,7 +251,7 @@ const controlDebugWindows = {
         });
     },
 
-    bindControlDebugGet: function () {
+    get: function () {
         let container = document.getElementsByClassName('control-debug__window_get')[0];
         let resultContainer = container.getElementsByClassName('control-debug__json-result')[0];
         bindCloseWindow(container);
@@ -417,12 +417,12 @@ function bindCloseWindow(container) {
 }
 
 const debugMenuItems = [
-    'delete-room',
-    'delete-member',
     'create-endpoint',
-    'delete-endpoint',
     'create-member',
     'create-room',
+    'delete-room',
+    'delete-member',
+    'delete-endpoint',
     'get',
 ];
 

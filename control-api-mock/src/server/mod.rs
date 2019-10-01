@@ -160,7 +160,7 @@ impl Into<ErrorResponse> for ErrorProto {
 pub struct Response {
     /// URIs with which Jason can connect `Member`s.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub sid: Option<HashMap<String, String>>,
+    pub sids: Option<HashMap<String, String>>,
 
     /// Error if something happened on Control API's side.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -181,12 +181,12 @@ impl From<ResponseProto> for Response {
     fn from(mut resp: ResponseProto) -> Self {
         if resp.has_error() {
             Self {
-                sid: None,
+                sids: None,
                 error: Some(resp.take_error().into()),
             }
         } else {
             Self {
-                sid: None,
+                sids: None,
                 error: None,
             }
         }
@@ -197,12 +197,12 @@ impl From<CreateResponseProto> for Response {
     fn from(mut resp: CreateResponseProto) -> Self {
         if resp.has_error() {
             Self {
-                sid: None,
+                sids: None,
                 error: Some(resp.take_error().into()),
             }
         } else {
             Self {
-                sid: Some(resp.take_sid()),
+                sids: Some(resp.take_sid()),
                 error: None,
             }
         }
