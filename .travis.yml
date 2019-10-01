@@ -94,9 +94,10 @@ jobs:
       rust: stable
       script: make test.unit crate=medea
 
-    - name: unit medea-jason (nightly, Chrome)
+    - name: unit medea-jason (stable, Chrome)
       stage: test
       rust: stable
+      services: ["docker"]
       before_script:
         - cargo uninstall wasm-bindgen-cli || echo > /dev/null
         - cargo install wasm-bindgen-cli
