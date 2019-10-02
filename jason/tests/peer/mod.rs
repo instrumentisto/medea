@@ -23,26 +23,6 @@ use crate::{get_test_tracks, resolve_after};
 
 wasm_bindgen_test_configure!(run_in_browser);
 
-/// TODO: enable tests in firefox, PR: rustwasm/wasm-bindgen#1744
-// firefoxOptions.prefs:
-//    let request = json!({
-//        "capabilities": {
-//            "alwaysMatch": {
-//                "moz:firefoxOptions": {
-//                    "prefs": {
-//                        "media.navigator.streams.fake": true,
-//                        "media.navigator.permission.disabled": true,
-//                        "media.autoplay.enabled": true,
-//                        "media.autoplay.enabled.user-gestures-needed ": false,
-//                        "media.autoplay.ask-permission": false,
-//                        "media.autoplay.default": 0,
-//                    },
-//                    "args": args,
-//                }
-//            }
-//        }
-//    });
-
 #[wasm_bindgen_test(async)]
 fn mute_unmute_audio() -> impl Future<Item = (), Error = JsValue> {
     let (tx, _rx) = mpsc::unbounded();

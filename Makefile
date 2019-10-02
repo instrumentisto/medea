@@ -18,10 +18,10 @@ eq = $(if $(or $(1),$(2)),$(and $(findstring $(1),$(2)),\
 MEDEA_IMAGE_NAME := $(strip \
 	$(shell grep 'COMPOSE_IMAGE_NAME=' .env | cut -d '=' -f2))
 DEMO_IMAGE_NAME := instrumentisto/medea-demo
-MEDEA_BUILD_IMAGE_NAME := alexlapa/medea-build
 
-MEDEA_BUILD_IMAGE_VER := latest
 RUST_VER := 1.37
+CHROME_VERSION := 77.0
+FIREFOX_VERSION := 69.0
 
 CURRENT_BRANCH := $(strip $(shell git branch | grep \* | cut -d ' ' -f2))
 
@@ -177,7 +177,6 @@ cargo:
 #	                 [dockerized=(no|yes)]
 
 cargo-build-crate = $(if $(call eq,$(crate),),@all,$(crate))
-medea-build-image = $(MEDEA_BUILD_IMAGE_NAME):$(MEDEA_BUILD_IMAGE_VER)
 
 cargo.build:
 ifeq ($(cargo-build-crate),@all)
@@ -189,7 +188,7 @@ ifeq ($(dockerized),yes)
 	docker run --rm -v "$(PWD)":/app -w /app \
 		-u $(shell id -u):$(shell id -g) \
 		-v "$(HOME)/.cargo/registry":/usr/local/cargo/registry \
-		$(medea-build-image) \
+		rust:$(RUST_VER) \
 			make cargo.build crate=$(cargo-build-crate) \
 			                 debug=$(debug) dockerized=no
 else
@@ -203,10 +202,14 @@ ifeq ($(dockerized),yes)
 		-v "$(HOME)/.cargo/registry":/usr/local/cargo/registry \
 		-v "$(HOME):$(HOME)" \
 		-e XDG_CACHE_HOME=$(HOME) \
-		$(medea-build-image) \
+		rust:$(RUST_VER) \
 			make cargo.build crate=$(cargo-build-crate) \
-			                 debug=$(debug) dockerized=no
+			                 debug=$(debug) dockerized=no \
+			                 pre-install=yes
 else
+ifeq ($(pre-install),yes)
+	curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+endif
 	@rm -rf $(crate-dir)/pkg/
 	wasm-pack build -t web $(crate-dir)/
 endif
@@ -294,11 +297,11 @@ endif
 # Run Rust unit tests of project.
 #
 # Usage:
-#	make test.unit [crate=(@all|medea|jason|<crate-name>)]
-#				   [webdriver=(chromedriver|geckodriver)]
+#	make test.unit [crate=(@all|medea|medea-jason|<crate-name>)]
+#				   [browser=(chrome|firefox)]
 
 test-unit-crate = $(if $(call eq,$(crate),),@all,$(crate))
-webdriver-env = $(if $(call eq,$(webdriver),geckodriver),GECKODRIVER_REMOTE,CHROMEDRIVER_REMOTE)
+driver-env = $(if $(call eq,$(browser),firefox),GECKODRIVER_REMOTE,CHROMEDRIVER_REMOTE)
 
 test.unit:
 ifeq ($(test-unit-crate),@all)
@@ -314,7 +317,7 @@ ifeq ($(crate),medea-jason)
 	@make docker.up.webdriver
 	sleep 10
 	cd $(crate-dir)/ && \
-	$(webdriver-env)="http://0.0.0.0:4444" \
+	$(driver-env)="http://0.0.0.0:4444" \
     cargo test --target wasm32-unknown-unknown --features mockable
 	@make docker.down.webdriver
 else
@@ -439,19 +442,6 @@ else
 endif
 
 
-# Build Docker image for medea building.
-#
-# Usage:
-#   make docker.build.medea-build [TAG=(dev|<tag>)]
-
-docker.build.medea-build:
-	docker build \
-		--build-arg rust_ver=$(RUST_VER) \
-		-t $(MEDEA_BUILD_IMAGE_NAME):$(if $(call eq,$(TAG),),dev,$(TAG)) \
-		- < _build/medea-build/Dockerfile
-
-
-
 # Build medea project Docker image.
 #
 # Usage:
@@ -462,17 +452,8 @@ docker.build.medea-build:
 
 docker-build-medea-image-name = $(strip \
 	$(if $(call eq,$(registry),),,$(registry)/)$(MEDEA_IMAGE_NAME))
-medea-build-image = $(MEDEA_BUILD_IMAGE_NAME):$(MEDEA_BUILD_IMAGE_VER)
 
 docker.build.medea:
-ifneq ($(no-cache),yes)
-	docker run --rm --network=host -v "$(PWD)":/app -w /app \
-	           -u $(shell id -u):$(shell id -g) \
-	           -e CARGO_HOME=.cache/cargo \
-		$(medea-build-image) \
-			cargo build --bin=medea \
-				$(if $(call eq,$(debug),no),--release,)
-endif
 	$(call docker.build.clean.ignore)
 	@echo "!target/$(if $(call eq,$(debug),no),release,debug)/" >> .dockerignore
 	$(docker-env) \
@@ -480,10 +461,11 @@ endif
 		$(if $(call eq,$(no-cache),yes),\
 			--no-cache --pull,) \
 		$(if $(call eq,$(IMAGE),),\
-			--build-arg rustc_mode=$(if $(call eq,$(debug),no),release,debug) \
-			--build-arg rustc_opts=$(if $(call eq,$(debug),no),--release,) \
-			--build-arg cargo_home=.cache/cargo,) \
-			--build-arg medea_build_image=$(medea-build-image) \
+			--build-arg rust_ver=$(RUST_VER) \
+			--build-arg rustc_mode=$(if \
+				$(call eq,$(debug),no),release,debug) \
+			--build-arg rustc_opts=$(if \
+				$(call eq,$(debug),no),--release,)) \
 		-t $(docker-build-medea-image-name):$(if $(call eq,$(TAG),),dev,$(TAG)) .
 	$(call docker.build.clean.ignore)
 define docker.build.clean.ignore
@@ -529,15 +511,13 @@ endif
 # Down dockerized webdriver.
 #
 # Usage:
-#   make docker.down.webdriver [webdriver=(chromedriver|geckodriver)]
+#   make docker.down.webdriver [browser=(chrome|firefox)]
 
 docker.down.webdriver:
-ifeq ($(webdriver),geckodriver)
-	docker container kill $$(cat /tmp/geckodriver.docker.uid)
-	rm -f /tmp/geckodriver.docker.uid
+ifeq ($(browser),firefox)
+	-docker stop medea-test-ff
 else
-	docker container kill $$(cat /tmp/chromedriver.docker.uid)
-	rm -f /tmp/chromedriver.docker.uid
+	-docker stop medea-test-chrome
 endif
 
 
@@ -643,14 +623,16 @@ endif
 # Up dockerized webdriver.
 #
 # Usage:
-#   make docker.up.webdriver [webdriver=(chromedriver|geckodriver)]
+#   make docker.up.webdriver [browser=(chrome|firefox)]
 
 docker.up.webdriver:
-ifeq ($(webdriver),geckodriver)
-	docker build -t instrumentisto/medea-geckodriver:dev -f _build/geckodriver/Dockerfile .
-	docker run --rm -d --network=host instrumentisto/medea-geckodriver:dev > /tmp/geckodriver.docker.uid
+	@make docker.down.webdriver browser=$(browser)
+ifeq ($(browser),firefox)
+	docker run --rm -d --shm-size 128m --name medea-test-ff \
+		--network=host alexlapa/geckodriver:${FIREFOX_VERSION}
 else
-	docker run --rm -d --network=host selenoid/chrome:latest > /tmp/chromedriver.docker.uid
+	docker run --rm -d --name medea-test-chrome \
+		--network=host selenoid/chrome:$(CHROME_VERSION)
 endif
 
 
