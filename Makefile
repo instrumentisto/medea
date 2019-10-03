@@ -95,7 +95,9 @@ release: release.crates release.npm
 
 test:
 	@make test.unit
-	@make test.e2e up=yes dockerized=no
+	@make test.integration up=yes dockerized=no
+	@make test.e2e browser=chrome
+	@make test.e2e browser=firefox
 
 
 up: up.dev
@@ -131,23 +133,45 @@ down.dev:
 
 down.e2e.services:
 ifeq ($(dockerized),no)
-	kill $$(cat /tmp/e2e_medea.pid)
-	kill $$(cat /tmp/e2e_control_api_mock.pid)
-	rm -f /tmp/e2e_medea.pid \
+	-kill $$(cat /tmp/e2e_medea.pid)
+	-kill $$(cat /tmp/e2e_control_api_mock.pid)
+	-rm -f /tmp/e2e_medea.pid \
 		/tmp/e2e_control_api_mock.pid
 ifneq ($(coturn),no)
-	@make down.coturn
+	-@make down.coturn
 endif
 else
-	docker container stop $$(cat /tmp/control-api-mock.docker.uid)
-	docker container stop $$(cat /tmp/medea.docker.uid)
-	rm -f /tmp/control-api-mock.docker.uid /tmp/medea.docker.uid
+	-docker container stop $$(cat /tmp/control-api-mock.docker.uid)
+	-docker container stop $$(cat /tmp/medea.docker.uid)
+	-rm -f /tmp/control-api-mock.docker.uid /tmp/medea.docker.uid
 
-	@make down.coturn
+	-@make down.coturn
 endif
 
 
 down.medea: docker.down.medea
+
+
+# Down dockerized webdriver.
+#
+# Usage:
+#   make down.webdriver [browser=(chrome|firefox)]
+# 					    [dockerized=(yes|no)]
+
+down.webdriver:
+ifeq ($(browser),firefox)
+ifeq ($(dockerized),no)
+	-kill $$(pidof geckodriver)
+else
+	-docker stop medea-test-ff
+endif
+else
+ifeq ($(dockerized),no)
+	-kill $$(pidof chromedriver)
+else
+	-docker stop medea-test-chrome
+endif
+endif
 
 
 up.coturn: docker.up.coturn
@@ -183,6 +207,30 @@ up.jason:
 #  make up.control-api-mock
 up.control-api-mock:
 	cargo run -p control-api-mock
+
+
+# Start webdriver.
+#
+# Usage:
+#   make up.webdriver [browser=(chrome|firefox)]
+#                     [dockerized=(yes|no)]
+
+up.webdriver: down.webdriver
+ifeq ($(browser),firefox)
+ifeq ($(dockerized),no)
+	geckodriver &
+else
+	docker run --rm -d --shm-size 256m --name medea-test-ff \
+		--network=host alexlapa/geckodriver:${FIREFOX_VERSION}
+endif
+else
+ifeq ($(dockerized),no)
+	chromedriver --port=4444 &
+else
+	docker run --rm -d --name medea-test-chrome \
+		--network=host selenoid/chrome:$(CHROME_VERSION)
+endif
+endif
 
 
 
@@ -362,21 +410,21 @@ endif
 # Run Rust E2E tests of project.
 #
 # Usage:
-# 	make test.e2e [up=no]
+# 	make test.integration [up=no]
 #	              [up=yes [dockerized=no [debug=(yes|no)]]
 #	                      [dockerized=yes [TAG=(dev|<docker-tag>)]
 #	                                      [registry=<registry-host>]
 #	                                      [log=(no|yes)]]
 #	                      [wait=(5|<seconds>)]]
 
-test-e2e-env = RUST_BACKTRACE=1 \
+test-integration-env = RUST_BACKTRACE=1 \
 	$(if $(call eq,$(log),yes),,RUST_LOG=warn) \
 	MEDEA_CONTROL_API__STATIC_SPECS_DIR=tests/specs/
 
-test.e2e:
+test.integration:
 ifeq ($(up),yes)
 	make docker.up.coturn background=yes
-	env $(test-e2e-env) \
+	env $(test-integration-env) \
 	make docker.up.medea debug=$(debug) background=yes log=$(log) \
 	                     dockerized=$(dockerized) \
 	                     TAG=$(TAG) registry=$(registry)
@@ -388,41 +436,21 @@ ifeq ($(up),yes)
 endif
 
 
-# Run e2e tests of medea in chrome.
-# If logs set to "yes" then medea print all logs to stdout.
+# Run E2E project tests.
 #
 # Usage:
-# 	make test.e2e.chrome [dockerized=(YES|no)] [logs=(yes|NO)] [coturn=(YES|no)]
+#   make test.e2e [dockerized=(yes|no)]
+#                 [headless=(yes|no)]
+#                 [browser=(chrome|firefox)]
 
-test.e2e.chrome:
-ifeq ($(dockerized),no)
-	@make up.e2e.services
-	chromedriver --port=$(chromedriver-port) --log-level=OFF \
-		& echo $$! > /tmp/chromedriver.pid
-
-	$(shell cargo run -p e2e-tests-runner -- \
-		-w http://localhost:$(chromedriver-port) \
+test.e2e: up.e2e.services up.webdriver
+	sleep 3
+	$(if $(call eq,$(dockerized),no),,$(run-medea-container)) cargo run -p e2e-tests-runner -- \
+		-w http://localhost:4444 \
 		-f localhost:$(test-runner-port) \
-	 	--headless)
-	kill $$(cat /tmp/chromedriver.pid)
-	rm -f /tmp/chromedriver.pid
-
+		$(if $(call eq,$(headless),no),,--headless)
+	@make down.webdriver
 	@make down.e2e.services
-
-	@exit $(.SHELLSTATUS)
-else
-	@make up.e2e.services
-
-	@make docker.up.webdriver browser=chrome
-	$(run-medea-container) cargo run -p e2e-tests-runner -- \
-		-f 127.0.0.1:$(test-runner-port) \
-		-w http://127.0.0.1:4444 \
-		--headless
-	docker container kill $$(cat /tmp/chromedriver.docker.uid)
-	rm -f /tmp/chromedriver.docker.uid
-
-	@make down.e2e.services
-endif
 
 
 # Start services needed for e2e tests of medea in browsers.
@@ -460,14 +488,15 @@ endif
 ifeq ($(dockerized),no)
 	cargo build $(if $(call eq,$(release),yes),--release)
 	cargo build -p control-api-mock
-	$(run-medea-container) sh -c "cd jason && wasm-pack build --target web --out-dir ../.cache/jason-pkg"
+	pushd jason && wasm-pack build --target web --out-dir ../.cache/jason-pkg && popd
 
 	env $(if $(call eq,$(logs),yes),,RUST_LOG=warn) cargo run --bin medea \
 		$(if $(call eq,$(release),yes),--release) & \
 		echo $$! > /tmp/e2e_medea.pid
 	env RUST_LOG=warn cargo run -p control-api-mock & \
 		echo $$! > /tmp/e2e_control_api_mock.pid
-	sleep 2
+
+	cargo build -p e2e-tests-runner
 else
 	@make down.medea dockerized=yes
 	@make down.medea dockerized=no
@@ -482,41 +511,6 @@ else
 	$(run-medea-container-d) cargo run -p control-api-mock > /tmp/control-api-mock.docker.uid
 
 	$(run-medea-container) cargo build -p e2e-tests-runner
-endif
-
-
-# Run e2e tests of medea in firefox.
-# If logs set to "yes" then medea print all logs to stdout.
-#
-# Usage:
-# 	make test.e2e.firefox [dockerized=(YES|no)] [logs=(yes|NO)] [coturn=(YES|no)]
-
-test.e2e.firefox:
-ifeq ($(dockerized),no)
-	@make up.e2e.services
-
-	$(shell cargo run -p e2e-tests-runner -- \
-		-w http://127.0.0.1:$(geckodriver-port) \
-		-f 127.0.0.1:$(test-runner-port) \
-		--headless)
-	kill $$(cat /tmp/geckodriver.pid)
-	rm -f /tmp/geckodriver.pid
-
-	@make down.e2e.services
-
-	@exit $(.SHELLSTATUS)
-else
-	@make up.e2e.services
-
-	@make docker.up.webdriver browser=firefox
-	$(run-medea-container) cargo run -p e2e-tests-runner -- \
-		-f localhost:$(test-runner-port) \
-		-w http://localhost:4444 \
-		--headless
-
-	docker container kill $$(cat /tmp/geckodriver.docker.uid)
-	rm -f /tmp/geckodriver.docker.uid
-	@make down.e2e.services
 endif
 
 
@@ -675,19 +669,6 @@ else
 endif
 
 
-# Down dockerized webdriver.
-#
-# Usage:
-#   make docker.down.webdriver [browser=(chrome|firefox)]
-
-docker.down.webdriver:
-ifeq ($(browser),firefox)
-	-docker stop medea-test-ff
-else
-	-docker stop medea-test-chrome
-endif
-
-
 # Pull project Docker images from Container Registry.
 #
 # Usage:
@@ -784,22 +765,6 @@ else
 	cargo build --bin medea $(if $(call eq,$(debug),no),--release,)
 	cargo run --bin medea $(if $(call eq,$(debug),no),--release,) \
 		$(if $(call eq,$(background),yes),&,)
-endif
-
-
-# Up dockerized webdriver.
-#
-# Usage:
-#   make docker.up.webdriver [browser=(chrome|firefox)]
-
-docker.up.webdriver:
-	@make docker.down.webdriver browser=$(browser)
-ifeq ($(browser),firefox)
-	docker run --rm -d --shm-size 256m --name medea-test-ff \
-		--network=host alexlapa/geckodriver:${FIREFOX_VERSION}
-else
-	docker run --rm -d --name medea-test-chrome \
-		--network=host selenoid/chrome:$(CHROME_VERSION)
 endif
 
 
@@ -1004,18 +969,17 @@ protoc.rebuild:
         cargo cargo.build cargo.fmt cargo.lint \
         docker.auth docker.build.demo docker.build.medea \
         	docker.down.coturn docker.down.demo docker.down.medea \
-        	docker.down.webdriver \
         	docker.pull docker.push \
         	docker.up.coturn docker.up.demo docker.up.medea \
-        	docker.up.webdriver \
         docs docs.rust \
         down down.coturn down.demo down.dev down.medea \
+		down.webdriver \
         helm helm.down helm.init helm.lint helm.list \
         	helm.package helm.package.release helm.up \
         minikube.boot \
         protoc.rebuild \
         release release.crates release.helm release.npm \
-        test test.e2e test.unit \
+        test test.e2e test.unit test.integration \
         up up.coturn up.demo up.dev up.jason up.medea \
-        up.control-api-mock \
+        up.control-api-mock up.webdriver \
         yarn

@@ -163,19 +163,19 @@ describe('Pub<=>Pub video call', () => {
         checkStats(callerStats);
         let responderStats = await rooms.responder.get_stats_for_peer_connections();
         checkStats(responderStats);
-    }).retries(5);
+    }).retries(20);
 
     it('video not static', async () => {
         let callerVideo = await waitForElement(callerPartnerVideo);
         checkVideoDiff(callerVideo);
         let responderVideo = await waitForElement(responderPartnerVideo);
         checkVideoDiff(responderVideo)
-    }).retries(5);
+    }).retries(20);
 
     it('media tracks count valid', async () => {
         let callerVideo = await waitForElement(callerPartnerVideo);
         assert.lengthOf(callerVideo.srcObject.getTracks(), 2, "Caller video don't have 2 tracks");
         let responderVideo = await waitForElement(responderPartnerVideo);
         assert.lengthOf(responderVideo.srcObject.getTracks(), 2, "Responder video don't have 2 tracks");
-    })
+    }).retries(20)
 });

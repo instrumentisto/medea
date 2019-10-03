@@ -105,26 +105,26 @@ jobs:
         - make test.unit crate=medea-jason browser=chrome
         - make test.unit crate=medea-jason browser=firefox
 
-    - name: E2E signalling (stable)
+    - name: Integration (stable)
       stage: test
       rust: stable
       services: ["docker"]
       before_script: make docker.pull TAGS=build-${TRAVIS_BUILD_ID}
                                       registry=quay.io
-      script: make test.e2e up=yes dockerized=yes log=yes wait=30
+      script: make test.integration up=yes dockerized=yes log=yes wait=30
                             TAG=build-${TRAVIS_BUILD_ID} registry=quay.io
 
-    - name: e2e (latest Firefox, stable Rust)
+    - name: E2E (latest Firefox, stable Rust)
       stage: test
       rust: stable
       cache: cargo
-      script: make test.e2e.firefox
+      script: make test.e2e browser=firefox
 
-    - name: e2e (latest Chrome, stable Rust)
+    - name: E2E (latest Chrome, stable Rust)
       stage: test
       rust: stable
       cache: cargo
-      script: make test.e2e.chrome
+      script: make test.e2e browser=chrome
 
     - name: crates.io
       stage: release
