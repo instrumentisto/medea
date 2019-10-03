@@ -9,6 +9,8 @@ use medea::api::control::error_codes::{
     ErrorCode as MedeaErrorCode, ErrorCode,
 };
 
+use crate::format_name_macro;
+
 use super::{create_room_req, ControlClient};
 
 /// Tests `Delete` method of [Medea]'s [Control API].
@@ -44,27 +46,30 @@ fn test_for_delete(
 
 #[test]
 fn room() {
+    format_name_macro!("delete-room");
     test_for_delete(
-        "delete-room",
-        "local://delete-room",
+        &format_name!("{}"),
+        &format_name!("local://{}"),
         ErrorCode::RoomNotFound,
     );
 }
 
 #[test]
 fn member() {
+    format_name_macro!("delete-member");
     test_for_delete(
-        "delete-member",
-        "local://delete-member/publisher",
+        &format_name!("{}"),
+        &format_name!("local://{}/publisher"),
         ErrorCode::MemberNotFound,
     );
 }
 
 #[test]
 fn endpoint() {
+    format_name_macro!("delete-endpoint");
     test_for_delete(
-        "delete-endpoint",
-        "local://delete-endpoint/publisher/publish",
+        &format_name!("{}"),
+        &format_name!("local://{}/publisher/publish"),
         ErrorCode::EndpointNotFound,
     );
 }
@@ -107,27 +112,31 @@ fn test_for_delete_elements_at_same_time_test(
 
 #[test]
 fn member_and_endpoint_same_time() {
+    format_name_macro!("member-and-endpoint-same-time");
+
     test_for_delete_elements_at_same_time_test(
-        "medea-and-endpoint-same-time",
+        &format_name!("{}"),
         &[
-            "local://medea-and-endpoint-same-time/publisher",
-            "local://medea-and-endpoint-same-time/publisher/publish",
+            &format_name!("local://{}/publisher"),
+            &format_name!("local://{}/publisher/publish"),
         ],
         MedeaErrorCode::MemberNotFound,
-        "local://medea-and-endpoint-same-time/publisher",
+        &format_name!("local://{}/publisher"),
     );
 }
 
 #[test]
 fn room_and_inner_elements_same_time() {
+    format_name_macro!("room-and-inner-elements-same-time");
+
     test_for_delete_elements_at_same_time_test(
-        "room-and-inner-elements-same-time",
+        &format_name!("{}"),
         &[
-            "local://room-and-inner-elements-same-time",
-            "local://room-and-inner-elements-same-time/publisher",
-            "local://room-and-inner-elements-same-time/publisher/publish",
+            &format_name!("local://{}"),
+            &format_name!("local://{}/publisher"),
+            &format_name!("local://{}/publisher/publish"),
         ],
         MedeaErrorCode::RoomNotFound,
-        "local://room-and-inner-elements-same-time",
+        &format_name!("local://{}"),
     );
 }

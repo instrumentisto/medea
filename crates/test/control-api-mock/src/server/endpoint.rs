@@ -1,4 +1,4 @@
-//! Endpoint related methods and entities.
+//! `Endpoint` related methods and entities.
 
 use actix_web::{
     web::{Data, Json, Path},
@@ -19,7 +19,7 @@ use crate::{
     server::{Context, Response, SingleGetResponse},
 };
 
-/// Path to `Endpoint` in REST API.
+/// Path to `Endpoint` element in REST Control API mock.
 #[allow(clippy::module_name_repetitions)]
 #[derive(Debug, Deserialize)]
 pub struct EndpointPath {
@@ -96,7 +96,7 @@ impl From<WebRtcPublishEndpointProto> for WebRtcPublishEndpoint {
     }
 }
 
-/// Control API's `WebRtcPlayEndpoint` representation.
+/// Control API's `WebRtcPlayEndpoint` element representation.
 #[allow(clippy::module_name_repetitions)]
 #[derive(Serialize, Deserialize, Debug)]
 pub struct WebRtcPlayEndpoint {
@@ -121,7 +121,7 @@ impl From<WebRtcPlayEndpointProto> for WebRtcPlayEndpoint {
     }
 }
 
-/// Some `Endpoint` representation.
+/// `Endpoint` element representation.
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "kind")]
 pub enum Endpoint {
@@ -162,7 +162,7 @@ impl From<MemberElementProto> for Endpoint {
 
 /// `POST /{room_id}/{member_id}/{endpoint_id}`
 ///
-/// Create new `Endpoint`.
+/// Creates new `Endpoint` element.
 #[allow(clippy::needless_pass_by_value)]
 pub fn create(
     path: Path<EndpointPath>,
@@ -178,7 +178,7 @@ pub fn create(
 
 /// `GET /{room_id}/{member_id}/{endpoint_id}`
 ///
-/// Get single `Endpoint`.
+/// Returns requested single `Endpoint` by local URI.
 ///
 /// For batch get use `GET /`.
 #[allow(clippy::needless_pass_by_value)]
