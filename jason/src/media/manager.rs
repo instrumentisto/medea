@@ -164,6 +164,14 @@ impl InnerMediaManager {
     }
 }
 
+impl Drop for InnerMediaManager {
+    fn drop(&mut self) {
+        for track in self.tracks.borrow_mut().drain(..) {
+            track.stop();
+        }
+    }
+}
+
 /// Manager that is responsible for [`MediaStream`] acquisition and storing.
 #[allow(clippy::module_name_repetitions)]
 #[derive(Default)]

@@ -106,12 +106,16 @@ async function init(){
 }
 
 window.onload = async function () {
-  init()
-    .then(async medea => {
-      await medea.init_participant("ws://localhost:8080/ws/pub-pub-video-call/caller/test", "#caller");
-      await medea.init_participant("ws://localhost:8080/ws/pub-pub-video-call/responder/test", "#responder");
-    })
-    .catch(console.error);
+  await init()
+      .then(async medea => {
+        await medea.init_participant("ws://localhost:8080/ws/pub-pub-video-call/caller/test", "#caller");
+      })
+      .catch(console.error);
 
+  await init()
+      .then(async medea => {
+        await medea.init_participant("ws://localhost:8080/ws/pub-pub-video-call/responder/test", "#responder");
+      })
+      .catch(console.error);
 };
 
