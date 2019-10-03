@@ -625,8 +625,7 @@ endif
 # Usage:
 #   make docker.up.webdriver [browser=(chrome|firefox)]
 
-docker.up.webdriver:
-	@make docker.down.webdriver browser=$(browser)
+docker.up.webdriver: docker.down.webdriver
 ifeq ($(browser),firefox)
 	docker run --rm -d --shm-size 128m --name medea-test-ff \
 		--network=host instrumentisto/geckodriver:${FIREFOX_VERSION}
