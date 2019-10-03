@@ -5,102 +5,164 @@
   <meta http-equiv='Content-Type' content='text/html; charset=UTF-8'/>
 
   <script type="module">
-    import init, {Jason} from './js/medea_jason.js';
+      import init, {
+          Jason,
+          MediaStreamConstraints, AudioTrackConstraints, VideoTrackConstraints,
+      } from './js/medea_jason.js';
 
-    var inited = false;
+      let inited = false;
 
-    export async function run(credentials) {
-      if (!inited) {
-        await init();
-        inited = true;
+      async function init_jason() {
+          if (inited) {
+              throw Error("Already init");
+          }
+          await init();
+          inited = true;
+          const jason = new Jason();
+
+          async function getDevices(audio_select, video_select) {
+              const device_infos = await jason.media_manager()
+                  .enumerate_devices();
+              console.log('Available input and output devices:', device_infos);
+              for (const device_info of device_infos) {
+                  const option = document.createElement('option');
+                  option.value = device_info.device_id();
+                  if (device_info.kind() === 'audio') {
+                      option.text = device_info.label()
+                          || `Microphone ${audio_select.length + 1}`;
+                      audio_select.append(option);
+                  } else if (device_info.kind() === 'video') {
+                      option.text = device_info.label()
+                          || `Camera ${video_select.length + 1}`;
+                      video_select.append(option);
+                  }
+              }
+          }
+
+          async function getStream(local_video, audio_select, video_select) {
+              let constraints = new MediaStreamConstraints();
+              let audio = new AudioTrackConstraints();
+              if (audio_select.value) {
+                  audio.device_id(audio_select.value)
+              }
+              constraints.audio(audio);
+              let video = new VideoTrackConstraints();
+              if (video_select.value) {
+                  video.device_id(video_select.value)
+              }
+              constraints.video(video);
+              const stream = await jason.media_manager()
+                  .get_local_stream(constraints);
+              local_video.srcObject = stream;
+              local_video.play();
+              console.log(stream);
+          }
+
+          async function init_room(roomId) {
+              const baseUrl = (document.location.protocol === "http:" ? "ws" : "wss") +
+                  "://" + document.location.host + ":8080/ws/";
+
+              let toggleAudio = document.getElementById('toggle-audio');
+              let toggleVideo = document.getElementById('toggle-video');
+              let localVideo = document.getElementById("your-video");
+              let remoteVideo = document.getElementById("partner-video");
+              let audioSelect = document.getElementById("audio-source");
+              let videoSelect = document.getElementById("video-source");
+              let joinCallerButton = document.getElementById('join-caller');
+              let joinResponderButton = document.getElementById('join-responder');
+
+              let room = await jason.init_room();
+              await getStream(localVideo, audioSelect, videoSelect);
+              await getDevices(audioSelect, videoSelect);
+
+              toggleAudio.addEventListener('change', (event) => {
+                  event.target.checked ? room.unmute_audio() : room.mute_audio();
+              });
+
+              toggleVideo.addEventListener('change', (event) => {
+                  event.target.checked ? room.unmute_video() : room.mute_video();
+              });
+
+              audioSelect.addEventListener('change', () => {
+                  getStream(localVideo, audioSelect, videoSelect);
+              });
+
+              videoSelect.addEventListener('change', () => {
+                  getStream(localVideo, audioSelect, videoSelect);
+              });
+
+              room.on_new_connection(function (connection) {
+                  connection.on_remote_stream(function (stream) {
+                      remoteVideo.srcObject = stream.get_media_stream();
+                      remoteVideo.play();
+                  });
+              });
+
+              jason.on_local_stream(function (stream, error) {
+                  if (stream) {
+                      console.log("unreachable!");
+                  } else {
+                      console.log(error);
+                  }
+              });
+
+              joinCallerButton.onclick = function () {
+                  room.join(baseUrl + roomId + '/caller/test');
+                  disableButtons();
+              };
+
+              joinResponderButton.onclick = function () {
+                  room.join(baseUrl + roomId + '/responder/test');
+                  disableButtons();
+              };
+
+              const disableButtons = function () {
+                  joinCallerButton.disabled = true;
+                  joinResponderButton.disabled = true;
+                  audioSelect.disabled = true;
+                  videoSelect.disabled = true;
+              };
+
+              return room;
+          }
+
+          return {
+              init_room: init_room,
+          };
       }
 
-      let jason = new Jason();
-      jason.on_local_stream(function (stream, error) {
-        if (stream) {
-          let local_video = document.getElementById("yourvid");
-          local_video.srcObject = stream.get_media_stream();
-          local_video.play();
-        } else {
-          console.error(error);
-        }
-      });
-
-      let room = await jason.join_room(credentials);
-      room.on_new_connection(function (connection) {
-        connection.on_remote_stream(function (stream) {
-          let remote_video = document.getElementById("partnervid");
-          remote_video.srcObject = stream.get_media_stream();
-          remote_video.play();
-        });
-      });
-
-      return room;
-    }
-
-    window.connect_room = async function connect_room(credentials) {
-      window.room = await run(credentials);
-    }
-
+      window.init_local_room = async function init_local_room(roomId) {
+          window.room = await init_jason()
+              .then(async jason => {
+                  return await jason.init_room(roomId);
+              })
+              .catch(console.error);
+      }
   </script>
 
   <script type="text/javascript">
-    var baseUrl = (document.location.protocol === "http:" ? "ws" : "wss") +
-                  "://" + document.location.host + "/ws/";
+      window.onload = async function () {
+          const chooseRoomDiv = document.getElementById('choose-room');
+          const videoCallDiv = document.getElementById('video-call');
+          const chooseRoomButton = document.getElementById('choose-room-btn');
+          const roomIdSelect = document.getElementById('room-id');
 
-    window.onload = function () {
-      var chooseRoomDiv = document.getElementById('choose-room');
-      var videoCallDiv = document.getElementById('video-call');
-      var chooseRoomButton = document.getElementById('choose-room-btn');
-      var roomIdInput = document.getElementById('room-id-input');
+          let roomId = sessionId = window.location.hash.replace("#", "");
+          if (roomId) {
+              await window.init_local_room(roomId);
+              chooseRoomDiv.style.display = "none";
+              videoCallDiv.style.display = "";
+          } else {
+              chooseRoomButton.onclick = async function () {
+                  roomId = roomIdSelect.value;
+                  window.location.hash = roomId;
+                  await window.init_local_room(roomId);
 
-      var joinCallerButton = document.getElementById('join-caller');
-      var joinResponderButton = document.getElementById('join-responder');
-
-      var toggleAudio = document.getElementById('toggle-audio');
-      var toggleVideo = document.getElementById('toggle-video');
-
-      toggleAudio.addEventListener('change', (event) => {
-        if (event.target.checked) {
-          window.room.unmute_audio();
-        } else {
-          window.room.mute_audio();
-        }
-      });
-
-      toggleVideo.addEventListener('change', (event) => {
-        if (event.target.checked) {
-          window.room.unmute_video();
-        } else {
-          window.room.mute_video();
-        }
-      });
-
-      var bindJoinButtons = function (roomId) {
-        joinCallerButton.onclick = function () {
-          window.connect_room(baseUrl + roomId + '/caller/test')
-        };
-        joinResponderButton.onclick = function () {
-          window.connect_room(baseUrl + roomId + '/responder/test')
-        };
+                  chooseRoomDiv.style.display = "none";
+                  videoCallDiv.style.display = "";
+              };
+          }
       };
-
-      let roomId = sessionId = window.location.hash.replace("#", "");
-      if (roomId) {
-        bindJoinButtons(roomId);
-        chooseRoomDiv.style.display = "none";
-        videoCallDiv.style.display = "";
-      } else {
-        chooseRoomButton.onclick = function () {
-          let roomId = roomIdInput.value;
-          window.location.hash = roomId;
-          bindJoinButtons(roomId);
-
-          chooseRoomDiv.style.display = "none";
-          videoCallDiv.style.display = "";
-        };
-      }
-    };
   </script>
 
   <style>
@@ -132,24 +194,37 @@
 <body>
 
 <div id="choose-room">
-  <input id="room-id-input">
+  <label>Choose room
+    <select id="room-id">
+      <option value="pub-pub-video-call">Pub to Pub</option>
+      <option value="pub-sub-video-call">Pub to Sub</option>
+    </select>
+  </label>
   <button id="choose-room-btn" type="submit">JOIN</button>
 </div>
 
 <div id="video-call" style="display: none">
   <div class="video-call">
     <div class="video">
-      <video id="yourvid" muted autoplay width="100%" height="100%"></video>
+      <video id="your-video" muted autoplay width="100%" height="100%"></video>
       <b>You</b>
     </div>
     <div class="video">
-      <video id="partnervid" autoplay width="100%" height="100%"></video>
+      <video id="partner-video" autoplay width="100%" height="100%"></video>
       <b>Partner</b>
     </div>
   </div>
   <div class="btn-group">
-    <button id="join-caller">Start caller session</button>
-    <button id="join-responder">Start responder session</button>
+    <label>Audio source
+      <select id="audio-source"></select>
+    </label>
+    <label>Video source
+      <select id="video-source"></select>
+    </label>
+  </div>
+  <div class="btn-group">
+    <button id="join-caller">Join as caller</button>
+    <button id="join-responder">Join as responder</button>
   </div>
   <div class="btn-group">
     <input id="toggle-audio" type="checkbox" checked>
