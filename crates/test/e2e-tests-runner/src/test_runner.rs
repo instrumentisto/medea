@@ -179,17 +179,18 @@ impl TestRunner {
                     {
                         println!("{}", test_results);
                         if test_results.is_has_error() {
+                            println!("Console log: ");
+                            for messages in logs {
+                                let messages = messages.as_array().unwrap();
+                                for message in messages {
+                                    let message = message.as_str().unwrap();
+                                    println!("{}", message);
+                                }
+                            }
                             return Err((client, Error::TestsFailed));
                         } else {
                             return Ok((client, self));
                         }
-                    }
-                }
-                for messages in logs {
-                    let messages = messages.as_array().unwrap();
-                    for message in messages {
-                        let message = message.as_str().unwrap();
-                        println!("{}", message);
                     }
                 }
                 Err((client, Error::TestResultsNotFoundInLogs))
