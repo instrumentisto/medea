@@ -38,31 +38,12 @@ impl MediaStreamConstraints {
 }
 
 impl MediaStreamConstraints {
-    /// Searches into the given storage and returns [MediaStreamTrack]
-    /// satisfying these constraints.
-    pub fn satisfies_tracks<'a>(
-        &self,
-        storage: &'a Vec<SysMediaStreamTrack>,
-    ) -> Option<Vec<&'a SysMediaStreamTrack>> {
-        let mut tracks = Vec::new();
+    pub fn get_audio(&self) -> &Option<AudioTrackConstraints> {
+        &self.audio
+    }
 
-        if let Some(audio) = &self.audio {
-            match storage.iter().find(|track| audio.satisfies(track)) {
-                Some(track) => tracks.push(track),
-                None => return None,
-            }
-        }
-
-        if let Some(video) = &self.video {
-            match storage.iter().find(|track| video.satisfies(track)) {
-                Some(track) => tracks.push(track),
-                None => return None,
-            }
-        }
-        if tracks.is_empty() {
-            return None;
-        }
-        Some(tracks)
+    pub fn get_video(&self) -> &Option<VideoTrackConstraints> {
+        &self.video
     }
 }
 

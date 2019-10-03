@@ -34,8 +34,8 @@ enum InputDeviceKind {
 impl InputDeviceKind {
     fn to_str(&self) -> &str {
         match self {
-            InputDeviceKind::Audio => "audio",
-            InputDeviceKind::Video => "video",
+            Self::Audio => "audio",
+            Self::Video => "video",
         }
     }
 }
@@ -45,8 +45,8 @@ impl TryFrom<MediaDeviceKind> for InputDeviceKind {
 
     fn try_from(value: MediaDeviceKind) -> Result<Self, Self::Error> {
         match value {
-            MediaDeviceKind::Audioinput => Ok(InputDeviceKind::Audio),
-            MediaDeviceKind::Videoinput => Ok(InputDeviceKind::Video),
+            MediaDeviceKind::Audioinput => Ok(Self::Audio),
+            MediaDeviceKind::Videoinput => Ok(Self::Video),
             _ => Err(WasmErr::from("Not input device")),
         }
     }

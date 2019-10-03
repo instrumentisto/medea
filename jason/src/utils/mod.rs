@@ -72,6 +72,6 @@ where
     F: Fn(wasm_bindgen::JsValue) -> Option<U>,
 {
     Reflect::get(value.as_ref(), &JsValue::from_str(name))
-        .map(into)
-        .unwrap_or_else(|_| None)
+        .ok()
+        .map_or_else(|| None, into)
 }

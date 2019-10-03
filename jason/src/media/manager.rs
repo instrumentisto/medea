@@ -95,15 +95,35 @@ impl InnerMediaManager {
         &self,
         caps: &MediaStreamConstraints,
     ) -> Option<SysMediaStream> {
+        let mut tracks = Vec::new();
         let storage = self.tracks.borrow();
 
-        caps.satisfies_tracks(&storage).map(|tracks| {
-            let stream = SysMediaStream::new().unwrap();
-            for track in tracks {
-                stream.add_track(track);
+        if let Some(audio) = caps.get_audio() {
+            let track = storage.iter().find(|track| audio.satisfies(track));
+
+            if let Some(track) = track {
+                tracks.push(track);
+            } else {
+                return None;
             }
-            stream
-        })
+        }
+
+        if let Some(video) = caps.get_video() {
+            let track = storage.iter().find(|track| video.satisfies(track));
+
+            if let Some(track) = track {
+                tracks.push(track);
+            } else {
+                return None;
+            }
+        }
+
+        let stream = SysMediaStream::new().unwrap();
+        for track in tracks {
+            stream.add_track(track);
+        }
+
+        Some(stream)
     }
 
     /// Obtain new [MediaStream][1] and save its tracks to storage.
