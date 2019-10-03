@@ -310,7 +310,7 @@ pub struct SingleGetResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub element: Option<Element>,
 
-    /// Error if something happened on control API's side.
+    /// Error if something happened on Control API's side.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<ErrorResponse>,
 }

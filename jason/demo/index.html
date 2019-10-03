@@ -10,7 +10,7 @@
 
         import init, {Jason} from './js/medea_jason.js';
 
-        var inited = false;
+        let inited = false;
 
         export async function run(credentials) {
 
@@ -84,7 +84,7 @@
     </script>
 
     <script type="text/javascript">
-        var baseUrl = (document.location.protocol === "http:" ? "ws" : "wss") +
+        let baseUrl = (document.location.protocol === "http:" ? "ws" : "wss") +
             "://" + document.location.host + "/ws/";
         const controlUrl = "http://" + document.location.host + "/control-api/";
 
@@ -162,18 +162,18 @@
         }
 
         window.onload = function () {
-            var chooseRoomDiv = document.getElementById('choose-room');
-            var videoCallDiv = document.getElementsByClassName('video-call')[0];
-            var chooseRoomButton = document.getElementById('choose-room__join');
-            var roomIdInput = document.getElementById('choose-room__room-id');
+            let chooseRoomDiv = document.getElementById('choose-room');
+            let videoCallDiv = document.getElementsByClassName('video-call')[0];
+            let chooseRoomButton = document.getElementById('choose-room__join');
+            let roomIdInput = document.getElementById('choose-room__room-id');
             let controlBtns = document.getElementsByClassName('control')[0];
 
-            var joinCallerButton = document.getElementsByClassName('join__join')[0];
+            let joinCallerButton = document.getElementsByClassName('join__join')[0];
 
             let usernameInput = document.getElementsByClassName('join__username')[0];
             usernameInput.value = faker.name.firstName();
 
-            var bindJoinButtons = function (roomId) {
+            let bindJoinButtons = function (roomId) {
                 joinCallerButton.onclick = async function () {
                     let connectBtnsDiv = document.getElementsByClassName("join")[0];
                     connectBtnsDiv.style.display = 'none';
@@ -198,7 +198,7 @@
                 };
             };
 
-            let roomId = sessionId = window.location.hash.replace("#", "");
+            let roomId = window.location.hash.replace("#", "");
 
             if (roomId) {
                 bindJoinButtons(roomId);

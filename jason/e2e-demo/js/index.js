@@ -270,7 +270,7 @@ const controlDebugWindows = {
 };
 
 window.onload = function() {
-    Object.values( controlDebugWindows ).forEach( s => s() );
+    Object.values(controlDebugWindows).forEach(s => s());
 
     bindControlDebugMenu();
 

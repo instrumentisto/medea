@@ -451,7 +451,10 @@ endif
 
 
 docker.build.control-api-mock:
-	docker build -t instrumentisto/medea-control-api-mock:dev -f _build/control-api-mock/Dockerfile --build-arg medea_build_image=$(medea-build-image) .
+	docker build -t instrumentisto/medea-control-api-mock:dev \
+		-f crates/control-api-mock/Dockerfile \
+		--build-arg medea_build_image=$(medea-build-image) \
+		.
 
 
 # Build medea project Docker image.
@@ -862,5 +865,4 @@ protoc.rebuild:
         release release.crates release.helm release.npm \
         test test.e2e test.unit \
         up up.coturn up.demo up.dev up.jason up.medea \
-        up.control-api-mock \
         yarn
