@@ -262,22 +262,6 @@ impl MediaManagerHandle {
     }
 
     /// Returns [`MediaStream`] object.
-    pub fn init_local_stream(
-        &self,
-        constraints: SysMediaStreamConstraints,
-    ) -> Promise {
-        let fut = window()
-            .navigator()
-            .media_devices()
-            .into_future()
-            .and_then(move |devices| {
-                devices.get_user_media_with_constraints(&constraints)
-            })
-            .and_then(JsFuture::from);
-        future_to_promise(fut)
-    }
-
-    /// Returns [`MediaStream`] object.
     pub fn get_local_stream(&self, caps: MediaStreamConstraints) -> Promise {
         match map_weak!(self, |inner| { inner.borrow().get_stream(caps) }) {
             Ok(ok) => future_to_promise(
