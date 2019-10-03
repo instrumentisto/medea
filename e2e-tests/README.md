@@ -1,5 +1,5 @@
 E2E testing of medea
-===
+====================
 
 __Run E2E tests:__ `$ make test.e2e`
 

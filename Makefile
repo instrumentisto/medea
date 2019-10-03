@@ -393,12 +393,12 @@ ifeq ($(test-unit-crate),medea)
 	cargo test --lib --bin medea
 else
 ifeq ($(crate),medea-jason)
-	@make docker.up.webdriver
+	@make up.webdriver
 	sleep 10
 	cd $(crate-dir)/ && \
 	$(driver-env)="http://0.0.0.0:4444" \
     cargo test --target wasm32-unknown-unknown --features mockable
-	@make docker.down.webdriver
+	@make down.webdriver
 else
 	cd $(crate-dir)/ && \
 	cargo test -p $(test-unit-crate)
@@ -438,17 +438,25 @@ endif
 
 # Run E2E project tests.
 #
+# You can use 'wait-on-fail=yes' for debug. This flag will
+# don't close browser immediately on test fail but
+# wait for user input and close browser only when
+# you press <Enter>. 'wait-on-fail=yes' usage make sense only
+# with 'dockerized=no' and 'headless=no' flags.
+#
 # Usage:
 #   make test.e2e [dockerized=(yes|no)]
 #                 [headless=(yes|no)]
 #                 [browser=(chrome|firefox)]
+#                 [wait-on-fail=(no|yes)]
 
 test.e2e: up.e2e.services up.webdriver
 	sleep 3
 	$(if $(call eq,$(dockerized),no),,$(run-medea-container)) cargo run -p e2e-tests-runner -- \
 		-w http://localhost:4444 \
 		-f localhost:$(test-runner-port) \
-		$(if $(call eq,$(headless),no),,--headless)
+		$(if $(call eq,$(headless),no),,--headless) \
+		$(if $(call eq,$(wait-on-fail),yes),--wait-on-fail,)
 	@make down.webdriver
 	@make down.e2e.services
 
@@ -600,7 +608,10 @@ endif
 
 
 docker.build.control-api-mock:
-	docker build -t instrumentisto/medea-control-api-mock:dev -f _build/control-api-mock/Dockerfile --build-arg medea_build_image=$(medea-build-image) .
+	docker build -t instrumentisto/medea-control-api-mock:dev \
+		-f _build/control-api-mock/Dockerfile \
+		--build-arg medea_build_image=$(medea-build-image) \
+		.
 
 
 # Build medea project Docker image.

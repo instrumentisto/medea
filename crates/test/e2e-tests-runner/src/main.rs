@@ -51,7 +51,6 @@ fn get_path_to_tests_from_args(opts: &ArgMatches) -> PathBuf {
     if let Some(path_to_test) = opts.value_of("spec_path") {
         test_path.push(path_to_test);
         if !test_path.exists() {
-            // TOOD: maybe print message
             panic!("Test '{}' doesn't exist!", path_to_test);
         }
     }
@@ -83,6 +82,14 @@ fn main() {
                 .default_value("http://127.0.0.1:4444")
                 .long("webdriver-addr")
                 .short("w"),
+        )
+        .arg(
+            Arg::with_name("wait_on_fail")
+                .help(
+                    "If tests fails then runner will don't close browser \
+                     until you press <Enter>.",
+                )
+                .long("wait-on-fail"),
         )
         .get_matches();
 

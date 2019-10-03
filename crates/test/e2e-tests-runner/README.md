@@ -1,5 +1,5 @@
 Medea's e2e tests runner
-=====
+========================
 
 This program is used for running e2e tests jobs in browser
 with [WebDriver].

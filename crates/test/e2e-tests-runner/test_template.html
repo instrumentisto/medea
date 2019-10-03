@@ -25,7 +25,7 @@
     // This is needed for retrieving mocha results from e2e-tests-runner
     console.stdlog = console.log.bind(console);
     console.logs = [];
-    console.log = function(){
+    console.log = function() {
         console.logs.push(Array.from(arguments));
         console.stdlog.apply(console, arguments);
     };
@@ -43,7 +43,7 @@
     });
 </script>
 
-<!--Test file including-->
+<!--Include file with mocha tests-->
 <script src="/e2e-tests/{{{test}}}"></script>
 
 <script>

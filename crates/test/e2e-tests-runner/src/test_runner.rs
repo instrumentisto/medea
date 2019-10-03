@@ -46,13 +46,13 @@ pub enum Error {
 
 impl From<CmdError> for Error {
     fn from(err: CmdError) -> Self {
-        Error::CmdErr(err)
+        Self::CmdErr(err)
     }
 }
 
 impl From<NewSessionError> for Error {
     fn from(err: NewSessionError) -> Self {
-        Error::NewSessionError(err)
+        Self::NewSessionError(err)
     }
 }
 
@@ -74,8 +74,15 @@ fn delete_all_tests_htmls(path_test_dir: &Path) -> Result<(), IoError> {
 ///
 /// Run e2e tests in browser, check results, print results.
 pub struct TestRunner {
+    /// All paths to tests.
     tests: Vec<PathBuf>,
+
+    /// Address where html test files will be hosted.
     test_addr: String,
+
+    /// Don't close browser immediately on test fail. Browser will closed only
+    /// on <Enter> press.
+    is_wait_on_fail_mode: bool,
 }
 
 impl TestRunner {
@@ -85,9 +92,14 @@ impl TestRunner {
         opts: &ArgMatches,
     ) -> impl Future<Item = (), Error = Error> {
         let test_addr = opts.value_of("tests_files_addr").unwrap().to_string();
+        let is_wait_on_fail_mode = opts.is_present("wait_on_fail");
         if path_to_tests.is_dir() {
             let tests = get_all_tests_paths(&path_to_tests);
-            let runner = Self { test_addr, tests };
+            let runner = Self {
+                test_addr,
+                tests,
+                is_wait_on_fail_mode,
+            };
             Either::A(runner.run_tests(&opts).then(move |err| {
                 delete_all_tests_htmls(&path_to_tests).unwrap();
                 err
@@ -96,6 +108,7 @@ impl TestRunner {
             let runner = Self {
                 test_addr,
                 tests: vec![path_to_tests.clone()],
+                is_wait_on_fail_mode,
             };
             Either::B(runner.run_tests(&opts).then(move |err| {
                 let test_dir = path_to_tests.parent().unwrap();
@@ -165,6 +178,7 @@ impl TestRunner {
         self,
         mut client: Client,
     ) -> impl Future<Item = (Client, Self), Error = Error> {
+        let is_wait_on_fail_mode = self.is_wait_on_fail_mode;
         client
             .execute("return console.logs", Vec::new())
             .map_err(|e| panic!("{:?}", e))
@@ -195,7 +209,14 @@ impl TestRunner {
                 }
                 Err((client, Error::TestResultsNotFoundInLogs))
             })
-            .or_else(|(mut client, err)| client.close().then(move |_| Err(err)))
+            .or_else(move |(mut client, err)| {
+                if is_wait_on_fail_mode {
+                    let mut s = String::new();
+                    println!("Press <Enter> for close...");
+                    std::io::stdin().read_line(&mut s).unwrap();
+                }
+                client.close().then(move |_| Err(err))
+            })
     }
 
     /// Returns url which runner will open.
@@ -238,7 +259,7 @@ fn generate_test_html(test_name: &str) -> String {
     let mut helpers_include = String::new();
     for helper_url in get_all_helpers_urls().unwrap() {
         helpers_include
-            .push_str(&format!(r#"<script src="{}"></script>\n"#, helper_url));
+            .push_str(&format!(r#"<script src="{}"></script>"#, helper_url));
     }
     let html_body = html_body.replace("<helpers/>", &helpers_include);
 
