@@ -51,7 +51,6 @@ jobs:
       stage: build
       rust: stable
       services: ["docker"]
-      before_script: make docker.build.medea-build
       script: make docker.build.medea debug=no
               TAG=build-${TRAVIS_BUILD_ID} registry=quay.io
       before_deploy: echo "$QUAYIO_PASS"
@@ -94,19 +93,17 @@ jobs:
       rust: stable
       script: make test.unit crate=medea
 
-    - name: unit medea-jason (nightly)
+    - name: unit medea-jason (stable, Chrome, Firefox)
       stage: test
-      # TODO: Run on stable when -Z install-upgrade is out,
-      # see: https://github.com/rust-lang/cargo/issues/6797
-      rust: nightly
-      addons:
-        chrome: stable
-        apt:
-          packages: ["chromium-chromedriver"]
+      rust: stable
+      services: ["docker"]
       before_script:
-        - cargo +nightly install wasm-bindgen-cli -Z install-upgrade
+        - cargo uninstall wasm-bindgen-cli || echo > /dev/null
+        - cargo install wasm-bindgen-cli
         - rustup target add wasm32-unknown-unknown
-      script: make test.unit crate=medea-jason
+      script:
+        - make test.unit crate=medea-jason browser=chrome
+        - make test.unit crate=medea-jason browser=firefox
 
     - name: E2E signalling (stable)
       stage: test

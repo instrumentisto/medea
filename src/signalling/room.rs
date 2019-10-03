@@ -482,30 +482,31 @@ impl Room {
         first_peer: PeerId,
         second_peer: PeerId,
     ) {
-        let fut: ActFuture<(), ()> = match self
-            .send_peer_created(first_peer, second_peer)
-        {
-            Ok(res) => {
-                Box::new(res.then(|res, room, ctx| -> ActFuture<(), ()> {
-                    if res.is_ok() {
-                        return Box::new(future::ok(()).into_actor(room));
-                    }
+        let fut: ActFuture<(), ()> =
+            match self.send_peer_created(first_peer, second_peer) {
+                Ok(res) => {
+                    Box::new(res.then(|res, room, ctx| -> ActFuture<(), ()> {
+                        if res.is_ok() {
+                            return Box::new(future::ok(()).into_actor(room));
+                        }
+                        error!(
+                            "Failed connect peers, because {}. Room [id = {}] \
+                             will be stopped.",
+                            res.unwrap_err(),
+                            room.id,
+                        );
+                        room.close_gracefully(ctx)
+                    }))
+                }
+                Err(err) => {
                     error!(
-                        "Failed handle command, because {}. Room will be \
-                         stopped.",
-                        res.unwrap_err(),
+                        "Failed connect peers, because {}. Room [id = {}] \
+                         will be stopped.",
+                        err, self.id,
                     );
-                    room.close_gracefully(ctx)
-                }))
-            }
-            Err(err) => {
-                error!(
-                    "Failed handle command, because {}. Room will be stopped.",
-                    err
-                );
-                self.close_gracefully(ctx)
-            }
-        };
+                    self.close_gracefully(ctx)
+                }
+            };
 
         ctx.spawn(fut);
     }
@@ -985,17 +986,19 @@ impl Handler<CommandMessage> for Room {
                         return Box::new(future::ok(()).into_actor(room));
                     }
                     error!(
-                        "Failed handle command, because {}. Room will be \
-                         stopped.",
+                        "Failed handle command, because {}. Room [id = {}] \
+                         will be stopped.",
                         res.unwrap_err(),
+                        room.id,
                     );
                     room.close_gracefully(ctx)
                 }))
             }
             Err(err) => {
                 error!(
-                    "Failed handle command, because {}. Room will be stopped.",
-                    err
+                    "Failed handle command, because {}. Room [id = {}] will \
+                     be stopped.",
+                    err, self.id,
                 );
                 self.close_gracefully(ctx)
             }

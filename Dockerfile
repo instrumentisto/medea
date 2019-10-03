@@ -8,11 +8,10 @@
 #
 
 # https://hub.docker.com/_/rust
-ARG medea_build_image=instrumentisto/medea-build:latest
-FROM ${medea_build_image} AS dist
+ARG rust_ver=latest
+FROM rust:${rust_ver} AS dist
 ARG rustc_mode=release
 ARG rustc_opts=--release
-ARG cargo_home=/usr/local/cargo
 
 # Create user and group files, which will be used in a running container to
 # run the process as an unprivileged user.
@@ -20,15 +19,28 @@ RUN mkdir -p /out/etc/ \
  && echo 'nobody:x:65534:65534:nobody:/:' > /out/etc/passwd \
  && echo 'nobody:x:65534:' > /out/etc/group
 
-COPY / /app/
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+ cmake
 
-# Build project distribution.
+COPY crates /app/crates/
+COPY proto /app/proto/
+COPY jason/Cargo.toml /app/jason/
+COPY Cargo.toml Cargo.lock /app/
+
 RUN cd /app \
- # Compile project.
- && CARGO_HOME="${cargo_home}" \
+ && mkdir -p src && touch src/lib.rs \
+ && mkdir -p jason/src && touch jason/src/lib.rs \
+ && cargo fetch
+
+COPY src app/src
+
+## Build project distribution.
+RUN cd /app \
+    # Compile project.
     # TODO: use --out-dir once stabilized
     # TODO: https://github.com/rust-lang/cargo/issues/6790
-    cargo build --bin=medea ${rustc_opts} \
+    && cargo build --bin=medea ${rustc_opts} \
  # Prepare the binary and all dependent dynamic libraries.
  && cp /app/target/${rustc_mode}/medea /out/medea \
  && ldd /out/medea \

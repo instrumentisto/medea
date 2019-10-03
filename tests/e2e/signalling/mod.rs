@@ -147,10 +147,7 @@ impl StreamHandler<Frame, WsProtocolError> for TestMember {
             let txt = String::from_utf8(txt.unwrap().to_vec()).unwrap();
             let event: Result<Event, SerdeError> = serde_json::from_str(&txt);
             if let Ok(event) = event {
-                let mut events: Vec<&Event> = self.events.iter().collect();
-                events.push(&event);
                 // Test function call
-                (self.on_message)(&event, ctx, events);
 
                 if let Event::PeerCreated {
                     peer_id,
@@ -185,6 +182,9 @@ impl StreamHandler<Frame, WsProtocolError> for TestMember {
                         },
                     });
                 }
+                let mut events: Vec<&Event> = self.events.iter().collect();
+                events.push(&event);
+                (self.on_message)(&event, ctx, events);
                 self.events.push(event);
             }
         }

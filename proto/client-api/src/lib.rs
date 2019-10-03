@@ -140,7 +140,7 @@ pub enum RpcConnectionCloseReason {
     Evicted,
 
     /// Member reconnects and old connection was closed.
-    ConnectionSwapped,
+    NewConnection,
 }
 
 /// Description which will be sent in Close WebSocket frame.
