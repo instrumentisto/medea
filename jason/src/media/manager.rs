@@ -262,7 +262,7 @@ impl MediaManagerHandle {
     }
 
     /// Returns [`MediaStream`] object.
-    pub fn get_local_stream(&self, caps: MediaStreamConstraints) -> Promise {
+    pub fn init_local_stream(&self, caps: MediaStreamConstraints) -> Promise {
         match map_weak!(self, |inner| { inner.borrow().get_stream(caps) }) {
             Ok(ok) => future_to_promise(
                 ok.map(|(stream, _)| stream.into())

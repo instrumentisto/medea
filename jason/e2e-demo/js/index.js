@@ -32,7 +32,7 @@ async function init(){
       video.device_id(video_select.val())
     }
     constraints.video(video);
-    let stream = await jason.media_manager().get_local_stream(constraints);
+    let stream = await jason.media_manager().init_local_stream(constraints);
     local_video.srcObject = stream;
     local_video.play();
     console.log(stream);

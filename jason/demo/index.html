@@ -52,7 +52,7 @@
               }
               constraints.video(video);
               const stream = await jason.media_manager()
-                  .get_local_stream(constraints);
+                  .init_local_stream(constraints);
               local_video.srcObject = stream;
               local_video.play();
               console.log(stream);
