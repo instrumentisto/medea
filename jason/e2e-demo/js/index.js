@@ -4,7 +4,7 @@ async function init(){
 
   const jason = new rust.Jason();
 
-  async function getDevices(audio_select, video_select) {
+  async function fillMediaDevicesInputs(audio_select, video_select) {
     const device_infos = await jason.media_manager().enumerate_devices();
     console.log('Available input and output devices:', device_infos);
     for (const device_info of device_infos) {
@@ -49,7 +49,7 @@ async function init(){
 
     let room = await jason.init_room();
     await getStream(local_video, audio_select, video_select);
-    await getDevices(audio_select, video_select);
+    await fillMediaDevicesInputs(audio_select, video_select);
 
     toggle_audio.change(function () {
       if ($(this).is(":checked")) {

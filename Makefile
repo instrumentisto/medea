@@ -297,9 +297,6 @@ endif
 # Usage:
 #	make test.unit [crate=(@all|medea|medea-jason|<crate-name>)]
 
-CHROMEDRIVER_CLIENT_ARGS := $(strip \
-	$(shell grep 'CHROMEDRIVER_CLIENT_ARGS=' .env | cut -d '=' -f2))
-
 test-unit-crate = $(if $(call eq,$(crate),),@all,$(crate))
 
 test.unit:
@@ -314,7 +311,6 @@ ifeq ($(test-unit-crate),medea)
 else
 ifeq ($(crate),medea-jason)
 	cd $(crate-dir)/ && \
-	CHROMEDRIVER_CLIENT_ARGS="$(CHROMEDRIVER_CLIENT_ARGS)" \
     cargo test --target wasm32-unknown-unknown --features mockable
 else
 	cd $(crate-dir)/ && \

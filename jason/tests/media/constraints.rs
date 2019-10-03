@@ -13,7 +13,7 @@ use medea_jason::{
         AudioTrackConstraints, MediaManager, MediaStreamConstraints,
         VideoTrackConstraints,
     },
-    utils::{window, WasmErr},
+    utils::window,
 };
 
 wasm_bindgen_test_configure!(run_in_browser);
@@ -236,37 +236,5 @@ fn get_another_track_for_other_stream(
                         })
                 })
                 .map_err(|err| err.into())
-        })
-}
-
-#[wasm_bindgen_test(async)]
-fn list_media_devices() -> impl Future<Item = (), Error = JsValue> {
-    window()
-        .navigator()
-        .media_devices()
-        .into_future()
-        .and_then(|devices| devices.enumerate_devices())
-        .and_then(JsFuture::from)
-        .and_then(|infos| Ok((audio_devices(&infos), video_devices(&infos))))
-        .and_then(move |(audio_devices, video_devices)| {
-            for audio in audio_devices {
-                WasmErr::from(format!(
-                    "{:?}: {} - {}",
-                    audio.kind(),
-                    audio.label(),
-                    audio.device_id()
-                ))
-                .log_err()
-            }
-            for video in video_devices {
-                WasmErr::from(format!(
-                    "{:?}: {} - {}",
-                    video.kind(),
-                    video.label(),
-                    video.device_id()
-                ))
-                .log_err()
-            }
-            Ok(())
         })
 }

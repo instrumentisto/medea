@@ -149,7 +149,6 @@ impl InnerMediaManager {
 #[derive(Default)]
 pub struct MediaManager(Rc<RefCell<InnerMediaManager>>);
 
-// TODO: add tests
 impl MediaManager {
     /// Obtain [MediaStream][1] basing on a provided [`StreamRequest`].
     /// Acquired streams are cached and cloning existing stream is preferable
