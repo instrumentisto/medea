@@ -640,7 +640,7 @@ endif
 docker.up.webdriver:
 	@make docker.down.webdriver browser=$(browser)
 ifeq ($(browser),firefox)
-	docker run --rm -d --shm-size 128m --name medea-test-ff \
+	docker run --rm -d --shm-size 256m --name medea-test-ff \
 		--network=host alexlapa/geckodriver:${FIREFOX_VERSION}
 else
 	docker run --rm -d --name medea-test-chrome \
