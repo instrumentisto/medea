@@ -101,12 +101,6 @@ impl InnerMediaManager {
             let stream = SysMediaStream::new().unwrap();
             for track in tracks {
                 stream.add_track(track);
-                WasmErr::from(format!(
-                    "{} track found: {}",
-                    track.kind(),
-                    track.id()
-                ))
-                .log_err();
             }
             stream
         })
