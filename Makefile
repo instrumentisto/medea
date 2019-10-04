@@ -220,12 +220,10 @@ endif
 # Format Rust sources with rustfmt.
 #
 # Usage:
-#	make cargo.fmt [check=(no|yes)] toolchain=(nightly|<toolchain>)
-
-carg-toolchain = $(if $(call eq,$(toolchain),),+nightly,+$(toolchain))
+#	make cargo.fmt [check=(no|yes)]
 
 cargo.fmt:
-	cargo $(carg-toolchain) fmt --all $(if $(call eq,$(check),yes),-- --check,)
+	cargo +nightly fmt --all $(if $(call eq,$(check),yes),-- --check,)
 
 
 # Lint Rust sources with clippy.
@@ -611,45 +609,6 @@ else
 	cargo run --bin medea $(if $(call eq,$(debug),no),--release,) \
 		$(if $(call eq,$(background),yes),&,)
 endif
-
-
-
-
-###################
-# rustup commands #
-###################
-
-# Install nighly Rust toolchain of concrete date via rustup and link it
-# as a default nightly Rust toolchain.
-#
-# The installer script is updated automatically to the latest version every day.
-# For manual update use 'update-installer=yes' command option.
-#
-# Usage:
-#	make rustup.nightly date=<YYYY-MM-DD>
-#	                    [update-installer=(no|yes)]
-
-rustup.nightly:
-ifeq ($(update-installer),yes)
-	$(call rustup.nightly.download)
-else
-ifeq ($(wildcard $(HOME)/.rustup/instrumentisto-nightly.sh),)
-	$(call rustup.nightly.download)
-else
-ifneq ($(shell find $(HOME)/.rustup/instrumentisto-nightly.sh -mmin +1440),)
-	$(call rustup.nightly.download)
-endif
-endif
-endif
-	@RUSTUP_NIGHTLY_DATE=$(date) $(HOME)/.rustup/instrumentisto-nightly.sh
-define rustup.nightly.download
-	$()
-	@mkdir -p $(HOME)/.rustup/
-	@rm -f $(HOME)/.rustup/instrumentisto-nightly.sh
-	curl -fL -o $(HOME)/.rustup/instrumentisto-nightly.sh \
-		https://raw.githubusercontent.com/instrumentisto/toolchain/master/rustup/nightly.sh
-	@chmod +x $(HOME)/.rustup/instrumentisto-nightly.sh
-endef
 
 
 
