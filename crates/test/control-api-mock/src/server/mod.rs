@@ -209,7 +209,7 @@ impl From<CreateResponseProto> for Response {
     }
 }
 
-/// Union of all elements which exists in medea.
+/// All elements which exists in Medea.
 #[derive(Serialize, Debug)]
 #[serde(tag = "kind")]
 pub enum Element {
