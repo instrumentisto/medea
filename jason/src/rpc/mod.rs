@@ -10,7 +10,8 @@ use futures::{
     Future, Stream,
 };
 use js_sys::Date;
-use medea_client_api_proto::{ClientMsg, Command, Event, ServerMsg};
+use medea_client_api_proto::{ClientMsg, Command, Event, ServerMsg, RpcConnectionCloseReason};
+use web_sys::CloseEvent;
 
 use crate::utils::WasmErr;
 
@@ -19,9 +20,33 @@ use self::{heartbeat::Heartbeat, websocket::WebSocket};
 /// Connection with remote was closed.
 pub enum CloseMsg {
     /// Transport was gracefully closed by remote.
-    Normal(String),
+    ///
+    /// Determines by close code `1000` and existence of
+    /// [`RpcConnectionCloseReason`].
+    Normal(u16, RpcConnectionCloseReason),
     /// Connection was unexpectedly closed. Consider reconnecting.
-    Disconnect(String),
+    ///
+    /// Unexpected close determines by close code != `1000` and for close code
+    /// 1000 without reason. This is used because if connection lost then
+    /// close code will be `1000` which is wrong.
+    Disconnect(u16),
+}
+
+impl From<&CloseEvent> for CloseMsg {
+    fn from(event: &CloseEvent) -> Self {
+        let code: u16 = event.code();
+        let reason = serde_json::from_str(&event.reason());
+        match code {
+            1000 => {
+                if let Ok(reason) = reason {
+                    Self::Normal(code, reason)
+                } else {
+                    Self::Disconnect(code)
+                }
+            }
+            _ => Self::Disconnect(code),
+        }
+    }
 }
 
 /// Client to talk with server via Client API RPC.
@@ -36,6 +61,8 @@ pub trait RpcClient {
 
     /// Sends [`Command`] to server.
     fn send_command(&self, command: Command);
+
+    fn on_close(&self, f: Box<dyn Fn(&CloseMsg)>);
 }
 
 // TODO:
@@ -57,12 +84,15 @@ struct Inner {
 
     /// Event's subscribers list.
     subs: Vec<UnboundedSender<Event>>,
+
+    on_close: Box<dyn Fn(&CloseMsg)>,
 }
 
 impl Inner {
     fn new(token: String, heartbeat_interval: i32) -> Rc<RefCell<Self>> {
         Rc::new(RefCell::new(Self {
             sock: None,
+            on_close: Box::new(|_| {}),
             token,
             subs: vec![],
             heartbeat: Heartbeat::new(heartbeat_interval),
@@ -76,10 +106,24 @@ fn on_close(inner_rc: &RefCell<Inner>, close_msg: CloseMsg) {
     inner.sock.take();
     inner.heartbeat.stop();
 
+    match &close_msg {
+        CloseMsg::Normal(code, reason) => {
+            match reason {
+                RpcConnectionCloseReason::Evicted | RpcConnectionCloseReason::RoomClosed => {
+                    (inner_rc.borrow().on_close)(&close_msg);
+                }
+                _ => {}
+            }
+        }
+        _ => {}
+    }
+
+    (inner_rc.borrow().on_close)(&close_msg);
+
     // TODO: reconnect on disconnect, propagate error if unable
     //       to reconnect
     match close_msg {
-        CloseMsg::Normal(_msg) | CloseMsg::Disconnect(_msg) => {}
+        CloseMsg::Normal(_, _) | CloseMsg::Disconnect(_) => {}
     }
 }
 
@@ -161,6 +205,10 @@ impl RpcClient for WebsocketRpcClient {
         if let Some(socket) = socket_borrow.as_ref() {
             socket.send(&ClientMsg::Command(command)).unwrap();
         }
+    }
+
+    fn on_close(&self, f: Box<dyn Fn(&CloseMsg)>) {
+        self.0.borrow_mut().on_close = f;
     }
 }
 

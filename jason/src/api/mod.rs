@@ -59,6 +59,10 @@ impl Jason {
             .init()
             .and_then(move |()| {
                 let rpc: Rc<dyn RpcClient> = Rc::new(rpc);
+                let inner_clone = inner.clone();
+                rpc.on_close(Box::new(move |msg| {
+                    inner_clone.borrow_mut().rooms = Vec::new();
+                }));
                 let room =
                     Room::new(Rc::clone(&rpc), Box::new(peer_repository));
 
