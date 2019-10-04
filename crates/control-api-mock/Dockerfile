@@ -1,5 +1,5 @@
-ARG medea_build_image=instrumentisto/medea-build:latest
-FROM ${medea_build_image} AS dist
+ARG rust_ver=latest
+FROM rust:${rust_ver} AS dist
 ARG rustc_mode=release
 ARG rustc_opts=--release
 ARG cargo_home=/usr/local/cargo
@@ -9,6 +9,10 @@ ARG cargo_home=/usr/local/cargo
 RUN mkdir -p /out/etc/ \
  && echo 'nobody:x:65534:65534:nobody:/:' > /out/etc/passwd \
  && echo 'nobody:x:65534:' > /out/etc/group
+
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+ cmake
 
 COPY / /app/
 

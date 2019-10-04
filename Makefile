@@ -450,6 +450,11 @@ else
 endif
 
 
+# Build REST Control API mock server.
+#
+# Usage:
+#   make docker.build.control-api-mock
+
 docker.build.control-api-mock:
 	docker build -t instrumentisto/medea-control-api-mock:dev \
 		-f crates/control-api-mock/Dockerfile \
