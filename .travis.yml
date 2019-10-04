@@ -1,9 +1,6 @@
 language: rust
 cache: cargo
 
-env:
-  - RUST_VER=1.38.0
-  - RUST_NIGHTLY_VER=nightly-2019-09-24
 
 install:
   - rustc -vV
@@ -24,28 +21,28 @@ stages:
 
 jobs:
   allow_failures:
-    - rust: ${RUST_NIGHTLY_VER}
+    - rust: nightly-2019-09-24
       stage: check
-    - rust: ${RUST_NIGHTLY_VER}
+    - rust: nightly-2019-09-24
       stage: build
 
   include:
     - name: Clippy
       stage: check
-      rust: ${RUST_VER}
+      rust: 1.38.0
       before_script: rustup component add clippy
       script: make lint
 
     - name: rustfmt
       stage: check
-      rust: ${RUST_NIGHTLY_VER}
+      rust: nightly-2019-09-24
       cache: false
       before_script: rustup component add rustfmt
       script: make fmt check=yes
 
     - name: medea-jason (stable)
       stage: build
-      rust: ${RUST_VER}
+      rust: 1.38.0
       before_script:
         - rm -f /home/travis/.cargo/bin/wasm-pack
         - curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
@@ -53,7 +50,7 @@ jobs:
 
     - name: medea docker (stable)
       stage: build
-      rust: ${RUST_VER}
+      rust: 1.38.0
       services: ["docker"]
       script: make docker.build.medea debug=no
               TAG=build-${TRAVIS_BUILD_ID} registry=quay.io
@@ -77,41 +74,41 @@ jobs:
     - name: medea (nightly)
       stage: build
       if: branch = master
-      rust: ${RUST_NIGHTLY_VER}
+      rust: nightly-2019-09-24
       script: make cargo.build crate=medea dockerized=no
 
     - name: unit medea-macro (stable)
       stage: test
-      rust: ${RUST_VER}
+      rust: 1.38.0
       cache: false
       script: make test.unit crate=medea-macro
 
     - name: unit medea-client-api-proto (stable)
       stage: test
-      rust: ${RUST_VER}
+      rust: 1.38.0
       cache: false
       script: make test.unit crate=medea-client-api-proto
 
     - name: unit medea (stable)
       stage: test
-      rust: ${RUST_VER}
+      rust: 1.38.0
       script: make test.unit crate=medea
 
     - name: unit medea-jason (nightly)
       stage: test
-      rust: ${RUST_NIGHTLY_VER}
+      rust: nightly-2019-09-24
       addons:
         chrome: stable
         apt:
           packages: ["chromium-chromedriver"]
       before_script:
-        - cargo +${RUST_NIGHTLY_VER} install wasm-bindgen-cli -Z install-upgrade
+        - cargo +nightly install wasm-bindgen-cli -Z install-upgrade
         - rustup target add wasm32-unknown-unknown
       script: make test.unit crate=medea-jason
 
     - name: E2E signalling (stable)
       stage: test
-      rust: ${RUST_VER}
+      rust: 1.38.0
       services: ["docker"]
       before_script: make docker.pull TAGS=build-${TRAVIS_BUILD_ID}
                                       registry=quay.io
