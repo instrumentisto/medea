@@ -181,7 +181,7 @@
 
                     let username = usernameInput.value;
                     try {
-                        let room = await axios.get(controlUrl + roomId);
+                        await axios.get(controlUrl + roomId);
                     } catch (e) {
                         if(e.response.status === 400) {
                             console.log("Room not found. Creating new room...");
