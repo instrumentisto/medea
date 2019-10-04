@@ -41,7 +41,6 @@ wasm-bindgen-futures = "0.4"
 wee_alloc = { version = "0.4", optional = true }
 [dependencies.futures-preview]
     version = "0.3.0-alpha.18"
-    features = ["async-await", "compat", "nightly"]
 [dependencies.web-sys]
     version = "0.3"
     features = [
