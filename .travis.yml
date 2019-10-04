@@ -29,7 +29,7 @@ jobs:
   include:
     - name: Clippy
       stage: check
-      rust: 1.38.0
+      rust: nightly-2019-09-24
       before_script: rustup component add clippy
       script: make lint
 
@@ -38,7 +38,7 @@ jobs:
       rust: nightly-2019-09-24
       cache: false
       before_script: rustup component add rustfmt
-      script: make fmt check=yes
+      script: make fmt check=yes toolchain=nightly-2019-09-24
 
     - name: medea-jason (stable)
       stage: build

@@ -220,10 +220,12 @@ endif
 # Format Rust sources with rustfmt.
 #
 # Usage:
-#	make cargo.fmt [check=(no|yes)]
+#	make cargo.fmt [check=(no|yes)] toolchain=(nightly|<toolchain>)
+
+carg-toolchain = $(if $(call eq,$(toolchain),),+nightly,+$(toolchain))
 
 cargo.fmt:
-	cargo +nightly fmt --all $(if $(call eq,$(check),yes),-- --check,)
+	cargo $(carg-toolchain) fmt --all $(if $(call eq,$(check),yes),-- --check,)
 
 
 # Lint Rust sources with clippy.
