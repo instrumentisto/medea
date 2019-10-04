@@ -114,7 +114,7 @@ fn on_close(inner_rc: &RefCell<Inner>, close_msg: CloseMsg) {
     inner.heartbeat.stop();
 
     match &close_msg {
-        CloseMsg::Normal(code, reason) => match reason {
+        CloseMsg::Normal(_, reason) => match reason {
             RpcConnectionCloseReason::Evicted
             | RpcConnectionCloseReason::RoomClosed => {
                 (inner_rc.borrow().on_close_room)(&close_msg);
