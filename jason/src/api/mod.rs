@@ -60,7 +60,7 @@ impl Jason {
             .and_then(move |()| {
                 let rpc: Rc<dyn RpcClient> = Rc::new(rpc);
                 let inner_clone = inner.clone();
-                rpc.on_close(Box::new(move |msg| {
+                rpc.on_close_room(Box::new(move |msg| {
                     inner_clone.borrow_mut().rooms = Vec::new();
                 }));
                 let room =

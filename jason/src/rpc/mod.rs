@@ -10,7 +10,9 @@ use futures::{
     Future, Stream,
 };
 use js_sys::Date;
-use medea_client_api_proto::{ClientMsg, Command, Event, ServerMsg, RpcConnectionCloseReason};
+use medea_client_api_proto::{
+    ClientMsg, Command, Event, RpcConnectionCloseReason, ServerMsg,
+};
 use web_sys::CloseEvent;
 
 use crate::utils::WasmErr;
@@ -62,7 +64,8 @@ pub trait RpcClient {
     /// Sends [`Command`] to server.
     fn send_command(&self, command: Command);
 
-    fn on_close(&self, f: Box<dyn Fn(&CloseMsg)>);
+    /// Sets `on_close_room` callback which will be called on [`Room`] close.
+    fn on_close_room(&self, f: Box<dyn Fn(&CloseMsg)>);
 }
 
 // TODO:
@@ -85,14 +88,18 @@ struct Inner {
     /// Event's subscribers list.
     subs: Vec<UnboundedSender<Event>>,
 
-    on_close: Box<dyn Fn(&CloseMsg)>,
+    /// Closure which will be called on [`Room`] close.
+    ///
+    /// Room will be closed on [`RpcConnectionCloseReason::Evicted`] and
+    /// [`RpcConnectionCloseReason::RoomClosed`].
+    on_close_room: Box<dyn Fn(&CloseMsg)>,
 }
 
 impl Inner {
     fn new(token: String, heartbeat_interval: i32) -> Rc<RefCell<Self>> {
         Rc::new(RefCell::new(Self {
             sock: None,
-            on_close: Box::new(|_| {}),
+            on_close_room: Box::new(|_| {}),
             token,
             subs: vec![],
             heartbeat: Heartbeat::new(heartbeat_interval),
@@ -107,18 +114,17 @@ fn on_close(inner_rc: &RefCell<Inner>, close_msg: CloseMsg) {
     inner.heartbeat.stop();
 
     match &close_msg {
-        CloseMsg::Normal(code, reason) => {
-            match reason {
-                RpcConnectionCloseReason::Evicted | RpcConnectionCloseReason::RoomClosed => {
-                    (inner_rc.borrow().on_close)(&close_msg);
-                }
-                _ => {}
+        CloseMsg::Normal(code, reason) => match reason {
+            RpcConnectionCloseReason::Evicted
+            | RpcConnectionCloseReason::RoomClosed => {
+                (inner_rc.borrow().on_close_room)(&close_msg);
             }
-        }
+            _ => {}
+        },
         _ => {}
     }
 
-    (inner_rc.borrow().on_close)(&close_msg);
+    (inner_rc.borrow().on_close_room)(&close_msg);
 
     // TODO: reconnect on disconnect, propagate error if unable
     //       to reconnect
@@ -207,8 +213,8 @@ impl RpcClient for WebsocketRpcClient {
         }
     }
 
-    fn on_close(&self, f: Box<dyn Fn(&CloseMsg)>) {
-        self.0.borrow_mut().on_close = f;
+    fn on_close_room(&self, f: Box<dyn Fn(&CloseMsg)>) {
+        self.0.borrow_mut().on_close_room = f;
     }
 }
 
