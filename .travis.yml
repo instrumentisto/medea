@@ -26,26 +26,26 @@ jobs:
       stage: build
 
   include:
-    - name: Clippy
-      stage: check
-      rust: beta
-      before_script: rustup component add clippy
-      script: make lint
-
-    - name: rustfmt
-      stage: check
-      rust: nightly
-      cache: false
-      before_script: rustup component add rustfmt
-      script: make fmt check=yes
-
-    - name: medea-jason (beta)
-      stage: build
-      rust: beta
-      before_script:
-        - rm -f /home/travis/.cargo/bin/wasm-pack
-        - curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
-      script: make cargo.build crate=medea-jason dockerized=no
+#    - name: Clippy
+#      stage: check
+#      rust: beta
+#      before_script: rustup component add clippy
+#      script: make lint
+#
+#    - name: rustfmt
+#      stage: check
+#      rust: nightly
+#      cache: false
+#      before_script: rustup component add rustfmt
+#      script: make fmt check=yes
+#
+#    - name: medea-jason (beta)
+#      stage: build
+#      rust: beta
+#      before_script:
+#        - rm -f /home/travis/.cargo/bin/wasm-pack
+#        - curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+#      script: make cargo.build crate=medea-jason dockerized=no
 
     - name: medea docker (stable)
       stage: build

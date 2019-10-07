@@ -19,10 +19,8 @@ MEDEA_IMAGE_NAME := $(strip \
 	$(shell grep 'COMPOSE_IMAGE_NAME=' .env | cut -d '=' -f2))
 DEMO_IMAGE_NAME := instrumentisto/medea-demo
 
-RUST_VER := $(strip \
-            	$(shell grep 'RUST_VER=' .travis.yml | cut -d '=' -f2))
-RUST_NIGHTLY_VER := $(strip \
-                    	$(shell grep 'RUST_NIGHTLY_VER=' .travis.yml | cut -d '=' -f2))
+RUST_VER := 1.38
+RUST_BETA_VER := 1.39-beta.5
 
 CURRENT_BRANCH := $(strip $(shell git branch | grep \* | cut -d ' ' -f2))
 
@@ -203,7 +201,7 @@ ifeq ($(dockerized),yes)
 		-v "$(HOME)/.cargo/registry":/usr/local/cargo/registry \
 		-v "$(HOME):$(HOME)" \
 		-e XDG_CACHE_HOME=$(HOME) \
-		instrumentisto/rust:$(RUST_NIGHTLY_VER) \
+		alexlapa/rust-beta:$(RUST_BETA_VER) \
 			make cargo.build crate=$(cargo-build-crate) \
 			                 debug=$(debug) dockerized=no \
 			                 pre-install=yes
