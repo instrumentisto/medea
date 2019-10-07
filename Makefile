@@ -158,6 +158,7 @@ up.jason:
 #
 # Usage:
 #  make up.control-api-mock
+
 up.control-api-mock:
 	cargo run -p control-api-mock
 
@@ -870,4 +871,5 @@ protoc.rebuild:
         release release.crates release.helm release.npm \
         test test.e2e test.unit \
         up up.coturn up.demo up.dev up.jason up.medea \
+        up.control-api-mock \
         yarn

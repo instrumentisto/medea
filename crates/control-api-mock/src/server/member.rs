@@ -12,10 +12,10 @@ use medea_control_api_proto::grpc::control_api::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    client::MemberUri,
-    prelude::*,
-    server::{endpoint::Endpoint, Context, Response, SingleGetResponse},
+use crate::{client::MemberUri, prelude::*};
+
+use super::{
+    endpoint::Endpoint, Context, CreateResponse, Response, SingleGetResponse,
 };
 
 /// Path for `Member` in REST Control API mock.
@@ -46,7 +46,7 @@ pub fn delete(
 /// Entity that represents control API `Member`.
 #[derive(Deserialize, Serialize, Debug)]
 pub struct Member {
-    /// Pipeline of control API `Member`.
+    /// Pipeline of Control API `Member`.
     pipeline: HashMap<String, Endpoint>,
 
     /// Optional member credentials.
@@ -95,7 +95,7 @@ impl Into<RoomElementProto> for Member {
 
 /// `POST /{room_id}/{member_id}`
 ///
-/// Creates new `Member`.
+/// Creates new `Member` element.
 #[allow(clippy::needless_pass_by_value)]
 pub fn create(
     path: Path<MemberPath>,
@@ -106,12 +106,12 @@ pub fn create(
         .client
         .create_member(&path.into(), data.0)
         .map_err(|e| error!("{:?}", e))
-        .map(|r| Response::from(r).into())
+        .map(|r| CreateResponse::from(r).into())
 }
 
 /// `GET /{room_id}/{member_id}`
 ///
-/// Returns single `Member`.
+/// Returns single `Member` element.
 ///
 /// _For batch get use `GET /`._
 #[allow(clippy::needless_pass_by_value)]

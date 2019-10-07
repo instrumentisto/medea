@@ -13,11 +13,9 @@ use medea_control_api_proto::grpc::control_api::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    client::EndpointUri,
-    prelude::*,
-    server::{Context, Response, SingleGetResponse},
-};
+use crate::{client::EndpointUri, prelude::*};
+
+use super::{Context, CreateResponse, Response, SingleGetResponse};
 
 /// Path to `Endpoint` element in REST Control API mock.
 #[allow(clippy::module_name_repetitions)]
@@ -173,12 +171,12 @@ pub fn create(
         .client
         .create_endpoint(&path.into(), data.0)
         .map_err(|e| error!("{:?}", e))
-        .map(|r| Response::from(r).into())
+        .map(|r| CreateResponse::from(r).into())
 }
 
 /// `GET /{room_id}/{member_id}/{endpoint_id}`
 ///
-/// Returns requested single `Endpoint` by local URI.
+/// Returns requested single `Endpoint` element by local URI.
 ///
 /// For batch get use `GET /`.
 #[allow(clippy::needless_pass_by_value)]

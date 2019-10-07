@@ -12,13 +12,11 @@ use medea_control_api_proto::grpc::control_api::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    client::RoomUri,
-    prelude::*,
-    server::{member::Member, Response, SingleGetResponse},
-};
+use crate::{client::RoomUri, prelude::*};
 
-use super::Context;
+use super::{
+    member::Member, Context, CreateResponse, Response, SingleGetResponse,
+};
 
 /// Path for `Room` in REST Control API mock.
 #[allow(clippy::module_name_repetitions)]
@@ -105,7 +103,7 @@ impl From<RoomProto> for Room {
 
 /// `POST /{room_id}`
 ///
-/// Creates new `Room`.
+/// Creates new `Room` element.
 #[allow(clippy::needless_pass_by_value)]
 pub fn create(
     path: Path<RoomPath>,
@@ -116,12 +114,12 @@ pub fn create(
         .client
         .create_room(&path.into(), data.0)
         .map_err(|e| error!("{:?}", e))
-        .map(|r| Response::from(r).into())
+        .map(|r| CreateResponse::from(r).into())
 }
 
 /// `GET /{room_id}`
 ///
-/// Returns requested single `Room` by local URI.
+/// Returns requested single `Room` element by local URI.
 ///
 /// _For batch get use `GET /`._
 #[allow(clippy::needless_pass_by_value)]

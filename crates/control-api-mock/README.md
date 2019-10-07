@@ -1,12 +1,18 @@
 Medea's control API mock server
 ===============================
 
-This app supposed to be used for E2E tests and for debugging purposes of [Medea].
+This app supposed to be used for E2E tests and for debugging purposes of [Medea]'s [Control API].
 
 
 
 
 ## Endpoints
+
+
+### `GET /hb`
+
+Responses with `200 OK` if Control API server available otherwise
+responses `500 Intenal Server Error`.
 
 
 ### `GET /`
@@ -102,3 +108,4 @@ Create `Endpoint` element.
 
 
 [Medea]: https://github.com/instrumentisto/medea
+[Control API]: https://tinyurl.com/yxsqplq7
