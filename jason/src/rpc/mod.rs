@@ -11,7 +11,8 @@ use futures::{
 };
 use js_sys::Date;
 use medea_client_api_proto::{
-    ClientMsg, Command, Event, RpcConnectionCloseReason, ServerMsg,
+    ClientMsg, CloseDescription, Command, Event, RpcConnectionCloseReason,
+    ServerMsg,
 };
 use web_sys::CloseEvent;
 
@@ -20,6 +21,7 @@ use crate::utils::WasmErr;
 use self::{heartbeat::Heartbeat, websocket::WebSocket};
 
 /// Connection with remote was closed.
+#[derive(Debug)]
 pub enum CloseMsg {
     /// Transport was gracefully closed by remote.
     ///
@@ -37,11 +39,12 @@ pub enum CloseMsg {
 impl From<&CloseEvent> for CloseMsg {
     fn from(event: &CloseEvent) -> Self {
         let code: u16 = event.code();
-        let reason = serde_json::from_str(&event.reason());
         match code {
             1000 => {
-                if let Ok(reason) = reason {
-                    Self::Normal(code, reason)
+                if let Ok(description) =
+                    serde_json::from_str::<CloseDescription>(&event.reason())
+                {
+                    Self::Normal(code, description.reason)
                 } else {
                     Self::Disconnect(code)
                 }
@@ -64,6 +67,8 @@ pub trait RpcClient {
     fn send_command(&self, command: Command);
 
     /// Sets `on_close_room` callback which will be called on [`Room`] close.
+    ///
+    /// [`Room`]: crate::api::room::Room
     #[cfg(not(feature = "mockable"))]
     fn on_close_room(&self, f: Box<dyn Fn(&CloseMsg)>);
 }
@@ -117,14 +122,20 @@ struct Inner {
     ///
     /// Room will be closed on [`RpcConnectionCloseReason::Evicted`] and
     /// [`RpcConnectionCloseReason::RoomClosed`].
-    on_close_room: Box<dyn Fn(&CloseMsg)>,
+    ///
+    /// [`Rc`] needed for get around `BorrowMut` error of
+    /// [`WebSocketRpcClient`] when we drop all [`Room`]s in [`Jason`].
+    ///
+    /// [`Room`]: crate::api::room::Room
+    /// [`Jason`]: crate::api::Jason
+    on_close_room: Rc<Box<dyn Fn(&CloseMsg)>>,
 }
 
 impl Inner {
     fn new(token: String, heartbeat_interval: i32) -> Rc<RefCell<Self>> {
         Rc::new(RefCell::new(Self {
             sock: None,
-            on_close_room: Box::new(|_| {}),
+            on_close_room: Rc::new(Box::new(|_| {})),
             token,
             subs: vec![],
             heartbeat: Heartbeat::new(heartbeat_interval),
@@ -134,15 +145,22 @@ impl Inner {
 
 /// Handles close messsage from remote server.
 fn on_close(inner_rc: &RefCell<Inner>, close_msg: &CloseMsg) {
-    let mut inner = inner_rc.borrow_mut();
-    inner.sock.take();
-    inner.heartbeat.stop();
+    {
+        let mut inner = inner_rc.borrow_mut();
+        inner.sock.take();
+        inner.heartbeat.stop();
+    }
+
+    web_sys::console::log_1(
+        &format!("OnClose WebSocket. {:?}", close_msg).into(),
+    );
 
     if let CloseMsg::Normal(_, reason) = &close_msg {
         match reason {
             RpcConnectionCloseReason::Evicted
             | RpcConnectionCloseReason::RoomClosed => {
-                (inner_rc.borrow().on_close_room)(&close_msg);
+                let f = Rc::clone(&inner_rc.borrow().on_close_room);
+                (f)(&close_msg);
             }
             RpcConnectionCloseReason::NewConnection => {}
         }
@@ -239,7 +257,7 @@ impl RpcClient for WebsocketRpcClient {
     // `mockall`.
     #[cfg(not(feature = "mockable"))]
     fn on_close_room(&self, f: Box<dyn Fn(&CloseMsg)>) {
-        self.0.borrow_mut().on_close_room = f;
+        self.0.borrow_mut().on_close_room = Rc::new(f);
     }
 }
 
