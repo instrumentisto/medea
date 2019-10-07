@@ -55,9 +55,9 @@ pub enum P2pMode {
 impl Into<P2pModeProto> for P2pMode {
     fn into(self) -> P2pModeProto {
         match self {
-            P2pMode::Always => P2pModeProto::ALWAYS,
-            P2pMode::IfPossible => P2pModeProto::IF_POSSIBLE,
-            P2pMode::Never => P2pModeProto::NEVER,
+            Self::Always => P2pModeProto::ALWAYS,
+            Self::IfPossible => P2pModeProto::IF_POSSIBLE,
+            Self::Never => P2pModeProto::NEVER,
         }
     }
 }
@@ -65,9 +65,9 @@ impl Into<P2pModeProto> for P2pMode {
 impl From<P2pModeProto> for P2pMode {
     fn from(proto: P2pModeProto) -> Self {
         match proto {
-            P2pModeProto::ALWAYS => P2pMode::Always,
-            P2pModeProto::IF_POSSIBLE => P2pMode::IfPossible,
-            P2pModeProto::NEVER => P2pMode::Never,
+            P2pModeProto::ALWAYS => Self::Always,
+            P2pModeProto::IF_POSSIBLE => Self::IfPossible,
+            P2pModeProto::NEVER => Self::Never,
         }
     }
 }
@@ -133,10 +133,10 @@ impl Into<MemberElementProto> for Endpoint {
     fn into(self) -> MemberElementProto {
         let mut proto = MemberElementProto::new();
         match self {
-            Endpoint::WebRtcPlayEndpoint { spec } => {
+            Self::WebRtcPlayEndpoint { spec } => {
                 proto.set_webrtc_play(spec.into())
             }
-            Endpoint::WebRtcPublishEndpoint { spec } => {
+            Self::WebRtcPublishEndpoint { spec } => {
                 proto.set_webrtc_pub(spec.into())
             }
         }
@@ -147,11 +147,11 @@ impl Into<MemberElementProto> for Endpoint {
 impl From<MemberElementProto> for Endpoint {
     fn from(mut proto: MemberElementProto) -> Self {
         if proto.has_webrtc_play() {
-            Endpoint::WebRtcPlayEndpoint {
+            Self::WebRtcPlayEndpoint {
                 spec: proto.take_webrtc_play().into(),
             }
         } else if proto.has_webrtc_pub() {
-            Endpoint::WebRtcPublishEndpoint {
+            Self::WebRtcPublishEndpoint {
                 spec: proto.take_webrtc_pub().into(),
             }
         } else {

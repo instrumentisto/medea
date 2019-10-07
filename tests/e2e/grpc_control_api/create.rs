@@ -27,7 +27,7 @@ fn room() {
     let responder_sid = sids.get(&"responder".to_string()).unwrap().as_str();
     assert_eq!(
         responder_sid,
-        &format_name!("ws://0.0.0.0:8080/{}/responder/test")
+        &format_name!("ws://0.0.0.0:8080/ws/{}/responder/test")
     );
 
     let mut get_resp = client.get(&format_name!("local://{}"));
@@ -92,7 +92,7 @@ fn member() {
         sids.get(&"test-member".to_string()).unwrap().as_str();
     assert_eq!(
         e2e_test_member_sid,
-        format_name!("ws://0.0.0.0:8080/{}/test-member/qwerty")
+        format_name!("ws://0.0.0.0:8080/ws/{}/test-member/qwerty")
     );
 
     let member = client

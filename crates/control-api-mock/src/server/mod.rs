@@ -222,13 +222,13 @@ pub enum Element {
 impl From<ElementProto> for Element {
     fn from(mut proto: ElementProto) -> Self {
         if proto.has_room() {
-            Element::Room(proto.take_room().into())
+            Self::Room(proto.take_room().into())
         } else if proto.has_member() {
-            Element::Member(proto.take_member().into())
+            Self::Member(proto.take_member().into())
         } else if proto.has_webrtc_pub() {
-            Element::WebRtcPublishEndpoint(proto.take_webrtc_pub().into())
+            Self::WebRtcPublishEndpoint(proto.take_webrtc_pub().into())
         } else if proto.has_webrtc_play() {
-            Element::WebRtcPlayEndpoint(proto.take_webrtc_play().into())
+            Self::WebRtcPlayEndpoint(proto.take_webrtc_play().into())
         } else {
             unimplemented!()
         }
@@ -238,7 +238,7 @@ impl From<ElementProto> for Element {
 impl From<RoomElementProto> for Element {
     fn from(mut proto: RoomElementProto) -> Self {
         if proto.has_member() {
-            Element::Member(proto.take_member().into())
+            Self::Member(proto.take_member().into())
         } else {
             unimplemented!()
         }
@@ -249,7 +249,7 @@ impl Into<RoomElementProto> for Element {
     fn into(self) -> RoomElementProto {
         let mut proto = RoomElementProto::new();
         match self {
-            Element::Member(m) => proto.set_member(m.into()),
+            Self::Member(m) => proto.set_member(m.into()),
             _ => unimplemented!(),
         }
         proto

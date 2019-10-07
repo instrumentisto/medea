@@ -63,7 +63,7 @@ impl Into<RoomElementProto> for RoomElement {
     fn into(self) -> RoomElementProto {
         let mut proto = RoomElementProto::new();
         match self {
-            RoomElement::Member(m) => proto.set_member(m.into()),
+            Self::Member(m) => proto.set_member(m.into()),
         }
 
         proto
@@ -73,7 +73,7 @@ impl Into<RoomElementProto> for RoomElement {
 impl From<RoomElementProto> for RoomElement {
     fn from(mut proto: RoomElementProto) -> Self {
         if proto.has_member() {
-            RoomElement::Member(proto.take_member().into())
+            Self::Member(proto.take_member().into())
         } else {
             unimplemented!()
         }

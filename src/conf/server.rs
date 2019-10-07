@@ -26,7 +26,7 @@ pub struct ClientApiServer {
     ///
     /// [Client API]: https://tinyurl.com/yx9thsnr
     /// [Jason]: https://github.com/instrumentisto/medea/tree/master/jason
-    #[default("ws://0.0.0.0:8080".to_string())]
+    #[default("ws://0.0.0.0:8080/ws".to_string())]
     pub public_url: String,
 }
 

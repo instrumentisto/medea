@@ -4,7 +4,7 @@
 # Environment variable: MEDEA_SERVER__CLIENT__PUBLIC_URL
 #
 # Default:
-#   public_url = "ws://0.0.0.0:8080"
+#   public_url = "ws://0.0.0.0:8080/ws"
 
 [server.client.http]
 # IP address to bind HTTP server to.

@@ -381,8 +381,10 @@ impl Room {
         src: &WebRtcPublishEndpoint,
         sink: &WebRtcPlayEndpoint,
     ) -> Option<(PeerId, PeerId)> {
-        debug!("Connecting endpoints of Member [id = {}] with Member [id = {}]",
-            src.owner().id(), sink.owner().id(),
+        debug!(
+            "Connecting endpoints of Member [id = {}] with Member [id = {}]",
+            src.owner().id(),
+            sink.owner().id(),
         );
         let src_owner = src.owner();
         let sink_owner = sink.owner();

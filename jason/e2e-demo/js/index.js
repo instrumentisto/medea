@@ -67,7 +67,7 @@ let baseUrl = "ws://127.0.0.1:8080/ws/";
 const controlUrl = "http://127.0.0.1:8000/";
 
 async function createRoom(roomId, memberId) {
-    await axios({
+    let resp = await axios({
         method: 'post',
         url: controlUrl + roomId,
         data: {
@@ -87,6 +87,8 @@ async function createRoom(roomId, memberId) {
             }
         }
     });
+
+    return resp.data.sids[memberId]
 }
 
 async function addNewMember(roomId, memberId) {
@@ -115,7 +117,7 @@ async function addNewMember(roomId, memberId) {
         }
     }
 
-    await axios({
+    let resp = await axios({
         method: 'post',
         url: controlUrl + roomId + "/" + memberId,
         data: {
@@ -137,6 +139,8 @@ async function addNewMember(roomId, memberId) {
             }
         })
     }
+
+    return resp.data.sids[memberId]
 }
 
 const controlDebugWindows = {
@@ -288,21 +292,22 @@ window.onload = function() {
                 contentVisibility.show(controlBtns);
 
                 let username = usernameInput.value;
+                let connectUrl = baseUrl + roomId + '/' + username + '/test';
                 try {
                     await axios.get(controlUrl + roomId);
                 } catch (e) {
                     if (e.response.status === 400) {
                         console.log("Room not found. Creating new room...");
-                        await createRoom(roomId, username);
+                        connectUrl = await createRoom(roomId, username);
                     }
                 }
                 try {
                     await axios.get(controlUrl + roomId + '/' + username);
                 } catch (e) {
                     console.log("Member not found. Creating new member...");
-                    await addNewMember(roomId, username);
+                    connectUrl = await addNewMember(roomId, username);
                 }
-                await window.connect_room(baseUrl + roomId + '/' + username + '/test')
+                await window.connect_room(connectUrl)
             };
         };
 
