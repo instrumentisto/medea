@@ -123,8 +123,8 @@ struct Inner {
     /// Room will be closed on [`RpcConnectionCloseReason::Evicted`] and
     /// [`RpcConnectionCloseReason::RoomClosed`].
     ///
-    /// [`Rc`] needed for get around `BorrowMut` error of
-    /// [`WebSocketRpcClient`] when we drop all [`Room`]s in [`Jason`].
+    /// [`Rc`] needed for fix `BorrowMut` error of [`WebSocketRpcClient`] when
+    /// we drop all [`Room`]s from [`Jason`].
     ///
     /// [`Room`]: crate::api::room::Room
     /// [`Jason`]: crate::api::Jason
@@ -150,10 +150,6 @@ fn on_close(inner_rc: &RefCell<Inner>, close_msg: &CloseMsg) {
         inner.sock.take();
         inner.heartbeat.stop();
     }
-
-    web_sys::console::log_1(
-        &format!("OnClose WebSocket. {:?}", close_msg).into(),
-    );
 
     if let CloseMsg::Normal(_, reason) = &close_msg {
         match reason {
