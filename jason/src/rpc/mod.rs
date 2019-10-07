@@ -108,23 +108,20 @@ impl Inner {
 }
 
 /// Handles close messsage from remote server.
-fn on_close(inner_rc: &RefCell<Inner>, close_msg: CloseMsg) {
+fn on_close(inner_rc: &RefCell<Inner>, close_msg: &CloseMsg) {
     let mut inner = inner_rc.borrow_mut();
     inner.sock.take();
     inner.heartbeat.stop();
 
-    match &close_msg {
-        CloseMsg::Normal(_, reason) => match reason {
+    if let CloseMsg::Normal(_, reason) = &close_msg {
+        match reason {
             RpcConnectionCloseReason::Evicted
             | RpcConnectionCloseReason::RoomClosed => {
                 (inner_rc.borrow().on_close_room)(&close_msg);
             }
-            _ => {}
-        },
-        _ => {}
+            RpcConnectionCloseReason::NewConnection => {}
+        }
     }
-
-    (inner_rc.borrow().on_close_room)(&close_msg);
 
     // TODO: reconnect on disconnect, propagate error if unable
     //       to reconnect
@@ -182,7 +179,7 @@ impl WebsocketRpcClient {
 
                 let inner_rc = Rc::clone(&inner);
                 socket
-                    .on_close(move |msg: CloseMsg| on_close(&inner_rc, msg))?;
+                    .on_close(move |msg: CloseMsg| on_close(&inner_rc, &msg))?;
 
                 inner.borrow_mut().sock.replace(socket);
                 Ok(())
