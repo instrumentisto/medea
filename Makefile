@@ -646,9 +646,9 @@ endif
 # Usage:
 #   make docker.up.webdriver [browser=(chrome|firefox)]
 
-docker.up.webdriver:
-	@make docker.down.webdriver browser=$(browser)
+docker.up.webdriver: docker.down.webdriver
 ifeq ($(browser),firefox)
+	# TODO: use instrumentisto/geckodriver when it published
 	docker run --rm -d --shm-size 256m --name medea-test-ff \
 		--network=host alexlapa/geckodriver:${FIREFOX_VERSION}
 else
