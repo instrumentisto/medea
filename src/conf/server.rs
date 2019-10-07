@@ -22,10 +22,22 @@ pub struct ClientApiServer {
     /// This address will be returned from [Control API] in `sids` and to
     /// this address will connect [Jason] for start session.
     ///
-    /// Defaults to `ws://0.0.0.0:8080`.
+    /// This address and address to which [Medea]'s RPC server will be bound
+    /// may be different. Address to which RPC server will be bound always
+    /// `{{ MEDEA_SERVER__CLIENT__HTTP__BIND_IP }}:{{
+    /// MEDEA_SERVER__CLIENT__HTTP__BIND_PORT }}/ws`.
+    ///
+    /// This is needed for flexibility in web proxy configuration. For example,
+    /// if you want to set address to which users will connect you may set
+    /// proxying in nginx config from address `wss://example.com/websocket`
+    /// to `ws://0.0.0.0:8080/ws` ([Medea] RPC server). In this case
+    /// you should set this value to `wss://example.com/websocket`.
+    ///
+    /// Defaults to `ws://0.0.0.0:8080/ws`.
     ///
     /// [Client API]: https://tinyurl.com/yx9thsnr
     /// [Jason]: https://github.com/instrumentisto/medea/tree/master/jason
+    /// [Medea]: https://github.com/instrumentisto/medea
     #[default("ws://0.0.0.0:8080/ws".to_string())]
     pub public_url: String,
 }
