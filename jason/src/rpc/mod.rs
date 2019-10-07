@@ -53,7 +53,6 @@ impl From<&CloseEvent> for CloseMsg {
 
 /// Client to talk with server via Client API RPC.
 #[allow(clippy::module_name_repetitions)]
-#[cfg_attr(feature = "mockable", mockall::automock)]
 pub trait RpcClient {
     /// Returns [`Stream`] of all [`Event`]s received by this [`RpcClient`].
     fn subscribe(&self) -> Box<dyn Stream<Item = Event, Error = ()>>;
@@ -65,7 +64,33 @@ pub trait RpcClient {
     fn send_command(&self, command: Command);
 
     /// Sets `on_close_room` callback which will be called on [`Room`] close.
+    #[cfg(not(feature = "mockable"))]
     fn on_close_room(&self, f: Box<dyn Fn(&CloseMsg)>);
+}
+
+// We mock `RpcClient` manually because `mockall` can't mock `Fn` objects but
+// in spike of `#[cfg(not(feature = "mockable"))]` it still tries mock
+// `on_close_room`.
+//
+// This macro will generate `MockRpcClient` mock for `RpcClient` which you can
+// use in tests with 'mockable' feature.
+//
+// Note that functional of closing 'Room' on WebSocket close will not be
+// available in tests with mocks because limitations of `mockall` crate.
+#[cfg(feature = "mockable")]
+mockall::mock! {
+    pub RpcClient {}
+
+    pub trait RpcClient {
+        /// Returns [`Stream`] of all [`Event`]s received by this [`RpcClient`].
+        fn subscribe(&self) -> Box<dyn Stream<Item = Event, Error = ()>>;
+
+        /// Unsubscribes from this [`RpcClient`]. Drops all subscriptions atm.
+        fn unsub(&self);
+
+        /// Sends [`Command`] to server.
+        fn send_command(&self, command: Command);
+    }
 }
 
 // TODO:
@@ -210,6 +235,9 @@ impl RpcClient for WebsocketRpcClient {
         }
     }
 
+    // Not available in mockable tests because limitations of
+    // `mockall`.
+    #[cfg(not(feature = "mockable"))]
     fn on_close_room(&self, f: Box<dyn Fn(&CloseMsg)>) {
         self.0.borrow_mut().on_close_room = f;
     }

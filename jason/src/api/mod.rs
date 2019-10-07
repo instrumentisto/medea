@@ -59,11 +59,19 @@ impl Jason {
             .init()
             .and_then(move |()| {
                 let rpc: Rc<dyn RpcClient> = Rc::new(rpc);
-                let inner_clone = inner.clone();
-                rpc.on_close_room(Box::new(move |_| {
-                    inner_clone.borrow_mut().rooms = Vec::new();
-                    inner_clone.borrow_mut().media_manager = Rc::default();
-                }));
+
+                // Functional of closing `Room`s on WebSocket close.
+                // Not available in mockable tests because limitations of
+                // `mockall`.
+                #[cfg(not(feature = "mockall"))]
+                {
+                    let inner_clone = inner.clone();
+                    rpc.on_close_room(Box::new(move |_| {
+                        inner_clone.borrow_mut().rooms = Vec::new();
+                        inner_clone.borrow_mut().media_manager = Rc::default();
+                    }));
+                }
+
                 let room =
                     Room::new(Rc::clone(&rpc), Box::new(peer_repository));
 
