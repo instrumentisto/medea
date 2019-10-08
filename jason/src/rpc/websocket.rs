@@ -206,17 +206,6 @@ impl Drop for WebSocket {
     }
 }
 
-impl From<&CloseEvent> for CloseMsg {
-    fn from(event: &CloseEvent) -> Self {
-        let code: u16 = event.code();
-        let body = format!("{}:{}", code, event.reason());
-        match code {
-            1000 => Self::Normal(body),
-            _ => Self::Disconnect(body),
-        }
-    }
-}
-
 #[derive(From, Into)]
 pub struct ServerMessage(ServerMsg);
 

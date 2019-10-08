@@ -11,8 +11,12 @@ use futures::{
     Future, Stream,
 };
 use js_sys::Date;
-use medea_client_api_proto::{ClientMsg, Command, Event, ServerMsg};
+use medea_client_api_proto::{
+    ClientMsg, CloseDescription, Command, Event, RpcConnectionCloseReason,
+    ServerMsg,
+};
 use wasm_bindgen_futures::spawn_local;
+use web_sys::CloseEvent;
 
 use crate::utils::WasmErr;
 
@@ -21,9 +25,35 @@ use self::{heartbeat::Heartbeat, websocket::WebSocket};
 /// Connection with remote was closed.
 pub enum CloseMsg {
     /// Transport was gracefully closed by remote.
-    Normal(String),
+    ///
+    /// Determines by close code `1000` and existence of
+    /// [`RpcConnectionCloseReason`].
+    Normal(u16, RpcConnectionCloseReason),
+
     /// Connection was unexpectedly closed. Consider reconnecting.
-    Disconnect(String),
+    ///
+    /// Unexpected close determines by close code != `1000` and for close code
+    /// 1000 without reason. This is used because if connection lost then
+    /// close code will be `1000` which is wrong.
+    Disconnect(u16),
+}
+
+impl From<&CloseEvent> for CloseMsg {
+    fn from(event: &CloseEvent) -> Self {
+        let code: u16 = event.code();
+        match code {
+            1000 => {
+                if let Ok(description) =
+                    serde_json::from_str::<CloseDescription>(&event.reason())
+                {
+                    Self::Normal(code, description.reason)
+                } else {
+                    Self::Disconnect(code)
+                }
+            }
+            _ => Self::Disconnect(code),
+        }
+    }
 }
 
 /// Client to talk with server via Client API RPC.
@@ -84,9 +114,9 @@ fn on_close(ws_client: WebsocketRpcClient, close_msg: &CloseMsg) {
         inner.heartbeat.stop();
     }
 
-    // TODO: why I reconnect on Normal and Disconnect codes????????
     match &close_msg {
-        CloseMsg::Normal(_) | CloseMsg::Disconnect(_) => {
+        CloseMsg::Normal(_, _) => {}
+        CloseMsg::Disconnect(_) => {
             spawn_local(futures::future::loop_fn(ws_client, |ws_client| {
                 ws_client.init().then(move |res| match res {
                     Ok(_) => Ok(Loop::Break(())),
