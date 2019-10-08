@@ -93,7 +93,7 @@ jobs:
       rust: stable
       script: make test.unit crate=medea
 
-    - name: unit medea-jason (nightly, Chrome, Firefox)
+    - name: unit medea-jason (stable, Chrome, Firefox)
       stage: test
       rust: stable
       services: ["docker"]
