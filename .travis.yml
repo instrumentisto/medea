@@ -95,12 +95,11 @@ jobs:
 
     - name: unit medea-jason (nightly, Chrome, Firefox)
       stage: test
-      # Run on stable when -Z install-upgrade is out,
-      # see: https://github.com/rust-lang/cargo/issues/6797
-      rust: nightly
+      rust: stable
       services: ["docker"]
       before_script:
-        - cargo install wasm-bindgen-cli -Z install-upgrade
+        - cargo uninstall wasm-bindgen-cli || echo > /dev/null
+        - cargo install wasm-bindgen-cli
         - rustup target add wasm32-unknown-unknown
       script:
         - make test.unit crate=medea-jason dockerized=yes browser=chrome
