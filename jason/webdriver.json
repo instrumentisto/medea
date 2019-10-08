@@ -1,0 +1,20 @@
+{
+  "moz:firefoxOptions": {
+    "prefs": {
+      "security.fileuri.strict_origin_policy": false,
+      "security.certerrors.mitm.priming.enabled": false,
+      "media.navigator.permission.disabled": true,
+      "media.autoplay.enabled": true,
+      "media.autoplay.enabled.user-gestures-needed ": false,
+      "media.autoplay.ask-permission": false,
+      "media.autoplay.default": 0,
+      "media.navigator.streams.fake": true
+    }
+  },
+  "goog:chromeOptions": {
+    "args": [
+      "--use-fake-device-for-media-stream",
+      "--use-fake-ui-for-media-stream"
+    ]
+  }
+}

@@ -20,6 +20,8 @@ MEDEA_IMAGE_NAME := $(strip \
 DEMO_IMAGE_NAME := instrumentisto/medea-demo
 
 RUST_VER := 1.37
+CHROME_VERSION := 77.0
+FIREFOX_VERSION := 69.0
 
 CURRENT_BRANCH := $(strip $(shell git branch | grep \* | cut -d ' ' -f2))
 
@@ -295,12 +297,11 @@ endif
 # Run Rust unit tests of project.
 #
 # Usage:
-#	make test.unit [crate=(@all|medea|jason|<crate-name>)]
-
-CHROMEDRIVER_CLIENT_ARGS := $(strip \
-	$(shell grep 'CHROMEDRIVER_CLIENT_ARGS=' .env | cut -d '=' -f2))
+#	make test.unit [crate=(@all|medea|<crate-name>)]
+#	               [crate=medea-jason [browser=(chrome|firefox)]]
 
 test-unit-crate = $(if $(call eq,$(crate),),@all,$(crate))
+webdriver-env = $(if $(call eq,$(browser),firefox),GECKO,CHROME)DRIVER_REMOTE
 
 test.unit:
 ifeq ($(test-unit-crate),@all)
@@ -313,9 +314,12 @@ ifeq ($(test-unit-crate),medea)
 	cargo test --lib --bin medea
 else
 ifeq ($(crate),medea-jason)
+	@make docker.up.webdriver
+	sleep 10
 	cd $(crate-dir)/ && \
-	CHROMEDRIVER_CLIENT_ARGS="$(CHROMEDRIVER_CLIENT_ARGS)" \
-    cargo test --target wasm32-unknown-unknown --features mockable
+	$(webdriver-env)="http://0.0.0.0:4444" \
+	cargo test --target wasm32-unknown-unknown --features mockable
+	@make docker.down.webdriver
 else
 	cd $(crate-dir)/ && \
 	cargo test -p $(test-unit-crate)
@@ -513,6 +517,16 @@ else
 endif
 
 
+# Stop dockerized WebDriver and remove all related containers.
+#
+# Usage:
+#   make docker.down.webdriver [browser=(chrome|firefox)]
+
+docker.down.webdriver:
+	-docker stop medea-webdriver-$(if $(call eq,$(browser),),chrome,$(browser))
+	-docker rm medea-webdriver-$(if $(call eq,$(browser),),chrome,$(browser))
+
+
 # Pull project Docker images from Container Registry.
 #
 # Usage:
@@ -609,6 +623,21 @@ else
 	cargo build --bin medea $(if $(call eq,$(debug),no),--release,)
 	cargo run --bin medea $(if $(call eq,$(debug),no),--release,) \
 		$(if $(call eq,$(background),yes),&,)
+endif
+
+
+# Run dockerized WebDriver.
+#
+# Usage:
+#   make docker.up.webdriver [browser=(chrome|firefox)]
+
+docker.up.webdriver: docker.down.webdriver
+ifeq ($(browser),firefox)
+	docker run --rm -d --shm-size 512m --name medea-webdriver-firefox \
+		--network=host alexlapa/geckodriver:$(FIREFOX_VERSION)
+else
+	docker run --rm -d --name medea-webdriver-chrome \
+		--network=host selenoid/chrome:$(CHROME_VERSION)
 endif
 
 
