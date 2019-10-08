@@ -93,19 +93,18 @@ jobs:
       rust: stable
       script: make test.unit crate=medea
 
-    - name: unit medea-jason (nightly)
+    - name: unit medea-jason (nightly, Chrome, Firefox)
       stage: test
       # Run on stable when -Z install-upgrade is out,
       # see: https://github.com/rust-lang/cargo/issues/6797
       rust: nightly
-      addons:
-        chrome: stable
-        apt:
-          packages: ["chromium-chromedriver"]
+      services: ["docker"]
       before_script:
-        - cargo +nightly install wasm-bindgen-cli -Z install-upgrade
+        - cargo install wasm-bindgen-cli -Z install-upgrade
         - rustup target add wasm32-unknown-unknown
-      script: make test.unit crate=medea-jason
+      script:
+        - make test.unit crate=medea-jason dockerized=yes browser=chrome
+        - make test.unit crate=medea-jason dockerized=yes browser=firefox
 
     - name: E2E signalling (stable)
       stage: test
