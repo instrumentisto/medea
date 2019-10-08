@@ -8,7 +8,7 @@ use actix::{
 };
 use actix_web_actors::ws::{self, CloseCode, CloseReason, WebsocketContext};
 use futures::future::Future;
-use medea_client_api_proto::{ClientMsg, ServerMsg};
+use medea_client_api_proto::{ClientMsg, CloseDescription, ServerMsg};
 
 use crate::{
     api::{
@@ -148,10 +148,19 @@ impl RpcConnection for Addr<WsSession> {
     /// Closes [`WsSession`] by sending itself "normal closure" close message.
     ///
     /// Never returns error.
-    fn close(&mut self) -> Box<dyn Future<Item = (), Error = ()>> {
+    fn close(
+        &mut self,
+        close_description: CloseDescription,
+    ) -> Box<dyn Future<Item = (), Error = ()>> {
+        let reason = CloseReason {
+            code: ws::CloseCode::Normal,
+            description: Some(
+                serde_json::to_string(&close_description).unwrap(),
+            ),
+        };
         let fut = self
             .send(Close {
-                reason: Some(ws::CloseCode::Normal.into()),
+                reason: Some(reason),
             })
             .or_else(|_| Ok(()));
         Box::new(fut)

@@ -8,7 +8,7 @@ use std::{
     str::FromStr,
 };
 
-use derive_more::{Display, FromStr};
+use derive_more::{Constructor, Display};
 use medea_macro::dispatchable;
 use serde::{
     de::{self, DeserializeSeed, Deserializer, MapAccess, Visitor},
@@ -22,7 +22,7 @@ use serde::{
     derive(Deserialize, Debug, Hash, Eq, Default, PartialEq)
 )]
 #[cfg_attr(feature = "jason", derive(Serialize))]
-#[derive(Clone, Copy, Display, FromStr)]
+#[derive(Clone, Copy, Display, derive_more::FromStr)]
 pub struct PeerId(pub u64);
 
 /// ID of `MediaTrack`.
@@ -31,7 +31,7 @@ pub struct PeerId(pub u64);
     derive(Deserialize, Debug, Hash, Eq, Default, PartialEq)
 )]
 #[cfg_attr(feature = "jason", derive(Serialize))]
-#[derive(Clone, Copy, Display, FromStr)]
+#[derive(Clone, Copy, Display, derive_more::FromStr)]
 pub struct TrackId(pub u64);
 
 /// Value that is able to be incremented by `1`.
@@ -184,6 +184,25 @@ pub enum Command {
     /// Currently, on this [`Command`] server should remove all `Member`'s
     /// [`Peer`]s.
     ResetMe,
+}
+
+/// Reason of disconnecting client from the server.
+#[derive(Debug, Deserialize, Serialize)]
+pub enum RpcConnectionCloseReason {
+    /// Client session was finished on the server side.
+    Finished,
+
+    /// Old connection was closed due to client reconnection.
+    NewConnection,
+}
+
+/// Description which will be sent in [Close] WebSocket frame.
+///
+/// [Close]: https://tools.ietf.org/html/rfc6455#section-5.5.1
+#[derive(Constructor, Debug, Deserialize, Serialize)]
+pub struct CloseDescription {
+    /// Reason of why connection was closed.
+    pub reason: RpcConnectionCloseReason,
 }
 
 /// WebSocket message from Medea to Jason.
