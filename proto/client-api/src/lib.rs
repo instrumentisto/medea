@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use derive_more::Display;
+use derive_more::{Constructor, Display};
 use medea_macro::dispatchable;
 use serde::{de::Deserializer, ser::Serializer, Deserialize, Serialize};
 
@@ -97,6 +97,25 @@ pub enum Command {
         peer_id: PeerId,
         candidate: IceCandidate,
     },
+}
+
+/// Reason of disconnecting client from the server.
+#[derive(Debug, Deserialize, Serialize)]
+pub enum RpcConnectionCloseReason {
+    /// Client session was finished on the server side.
+    Finished,
+
+    /// Old connection was closed due to client reconnection.
+    NewConnection,
+}
+
+/// Description which will be sent in [Close] WebSocket frame.
+///
+/// [Close]: https://tools.ietf.org/html/rfc6455#section-5.5.1
+#[derive(Constructor, Debug, Deserialize, Serialize)]
+pub struct CloseDescription {
+    /// Reason of why connection was closed.
+    pub reason: RpcConnectionCloseReason,
 }
 
 /// WebSocket message from Medea to Jason.
