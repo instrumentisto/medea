@@ -1102,11 +1102,8 @@ impl Handler<Close> for Room {
     type Result = ();
 
     fn handle(&mut self, _: Close, ctx: &mut Self::Context) -> Self::Result {
-        for id in self.members.members().keys() {
-            self.delete_member(id, ctx);
-        }
-        let drop_fut = self.members.drop_connections(ctx);
-        ctx.wait(wrap_future(drop_fut));
+        let close_fut = self.close_gracefully(ctx);
+        ctx.wait(close_fut);
     }
 }
 
