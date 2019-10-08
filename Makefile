@@ -824,17 +824,19 @@ endef
 ##################
 
 .PHONY: build build.jason build.medea \
-        cargo cargo.build cargo.fmt cargo.lint \
-        docker.auth docker.build.demo docker.build.medea \
-        	docker.down.coturn docker.down.demo docker.down.medea \
-        	docker.pull docker.push \
-        	docker.up.coturn docker.up.demo docker.up.medea \
-        docs docs.rust \
-        down down.coturn down.demo down.dev down.medea \
-        helm helm.down helm.init helm.lint helm.list \
-        	helm.package helm.package.release helm.up \
-        minikube.boot \
-        release release.crates release.helm release.npm \
-        test test.e2e test.unit \
-        up up.coturn up.demo up.dev up.jason up.medea \
-        yarn
+		cargo cargo.build cargo.fmt cargo.lint \
+		docker.auth docker.build.demo docker.build.medea \
+			docker.down.coturn docker.down.demo docker.down.medea \
+        	docker.down.webdriver \
+			docker.pull docker.push \
+			docker.up.coturn docker.up.demo docker.up.medea \
+        	docker.up.webdriver \
+		docs docs.rust \
+		down down.coturn down.demo down.dev down.medea \
+		helm helm.down helm.init helm.lint helm.list \
+			helm.package helm.package.release helm.up \
+		minikube.boot \
+		release release.crates release.helm release.npm \
+		test test.e2e test.unit \
+		up up.coturn up.demo up.dev up.jason up.medea \
+		yarn
