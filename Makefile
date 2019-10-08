@@ -524,7 +524,6 @@ endif
 
 docker.down.webdriver:
 	-docker stop medea-webdriver-$(if $(call eq,$(browser),),chrome,$(browser))
-	-docker rm medea-webdriver-$(if $(call eq,$(browser),),chrome,$(browser))
 
 
 # Pull project Docker images from Container Registry.
