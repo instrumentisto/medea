@@ -73,12 +73,10 @@ impl Into<MemberElement> for EndpointSpec {
 impl TryFrom<(Id, MemberElementProto)> for EndpointSpec {
     type Error = TryFromProtobufError;
 
-    fn try_from(value: (Id, MemberElementProto)) -> Result<Self, Self::Error> {
+    fn try_from(
+        (_, proto): (Id, MemberElementProto),
+    ) -> Result<Self, Self::Error> {
         use MemberElementProto::*;
-
-        let id = value.0;
-        let proto = value.1;
-
         match proto {
             webrtc_play(elem) => {
                 let play = WebRtcPlayEndpoint::try_from(&elem)?;
@@ -87,9 +85,6 @@ impl TryFrom<(Id, MemberElementProto)> for EndpointSpec {
             webrtc_pub(elem) => {
                 let publish = WebRtcPublishEndpoint::from(&elem);
                 Ok(Self::WebRtcPublish(publish))
-            }
-            hub(_) | file_recorder(_) | relay(_) => {
-                Err(TryFromProtobufError::UnimplementedEndpoint(id.0))
             }
         }
     }
@@ -100,7 +95,6 @@ impl TryFrom<(Id, ElementProto)> for EndpointSpec {
 
     fn try_from((id, proto): (Id, ElementProto)) -> Result<Self, Self::Error> {
         use ElementProto::*;
-
         match proto {
             webrtc_play(elem) => {
                 let play = WebRtcPlayEndpoint::try_from(&elem)?;
@@ -109,9 +103,6 @@ impl TryFrom<(Id, ElementProto)> for EndpointSpec {
             webrtc_pub(elem) => {
                 let publish = WebRtcPublishEndpoint::from(&elem);
                 Ok(Self::WebRtcPublish(publish))
-            }
-            hub(_) | file_recorder(_) | relay(_) => {
-                Err(TryFromProtobufError::UnimplementedEndpoint(id.0))
             }
             member(_) | room(_) => {
                 Err(TryFromProtobufError::ExpectedOtherElement(

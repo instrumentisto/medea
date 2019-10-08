@@ -16,7 +16,7 @@ pub struct Shutdown {
 }
 
 #[cfg(test)]
-mod shutdown_conf_specs {
+mod spec {
     use std::time::Duration;
 
     use serial_test_derive::serial;

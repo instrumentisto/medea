@@ -1,46 +1,98 @@
 //! Settings for application servers.
 
+#![allow(clippy::module_name_repetitions)]
+
+use std::net::{IpAddr, Ipv4Addr, SocketAddr, ToSocketAddrs as _};
+
 use serde::{Deserialize, Serialize};
 use smart_default::SmartDefault;
-
-use super::{grpc_listener::GrpcListener, http_listener::HttpListener};
 
 /// [Client API] servers settings.
 ///
 /// [Client API]: https://tinyurl.com/yx9thsnr
-#[allow(clippy::module_name_repetitions)]
 #[derive(Clone, Debug, Deserialize, Serialize, SmartDefault)]
 #[serde(default)]
 pub struct ClientApiServer {
-    /// [Client API] server settings.
+    /// [Client API] HTTP server settings.
     ///
     /// [Client API]: https://tinyurl.com/yx9thsnr
-    pub http: HttpListener,
+    pub http: ClientApiHttpServer,
+}
 
-    /// Public URL of server. Address for exposed [Client API].
+/// [Client API] HTTP server settings.
+///
+/// [Client API]: https://tinyurl.com/yx9thsnr
+#[derive(Clone, Debug, Deserialize, Serialize, SmartDefault)]
+#[serde(default)]
+pub struct ClientApiHttpServer {
+    /// Public URL of HTTP server. Address for exposed [Client API].
+    /// It's assumed that HTTP server can be reached via this URL externally.
     ///
-    /// This address will be returned from [Control API] in `sids` and to
-    /// this address will connect [Jason] for start session.
+    /// This address is returned from [Control API] in `sids` field
+    /// and [Jason] uses this address to start its session.
     ///
-    /// Defaults to `ws://0.0.0.0:8080`.
+    /// Defaults to `ws://127.0.0.1:8080`.
     ///
     /// [Client API]: https://tinyurl.com/yx9thsnr
+    /// [Control API]: https://tinyurl.com/yxsqplq7
     /// [Jason]: https://github.com/instrumentisto/medea/tree/master/jason
-    #[default("ws://0.0.0.0:8080".to_string())]
+    #[default = "ws://127.0.0.1:8080"]
     pub public_url: String,
+
+    /// IP address to bind HTTP server to.
+    ///
+    /// Defaults to `0.0.0.0`.
+    #[default(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)))]
+    pub bind_ip: IpAddr,
+
+    /// Port to bind HTTP server to.
+    ///
+    /// Defaults to `8080`.
+    #[default = 8080]
+    pub bind_port: u16,
+}
+
+impl ClientApiHttpServer {
+    /// Builds [`SocketAddr`] from `bind_ip` and `bind_port`.
+    #[inline]
+    pub fn bind_addr(&self) -> SocketAddr {
+        (self.bind_ip, self.bind_port)
+            .to_socket_addrs()
+            .unwrap()
+            .next()
+            .unwrap()
+    }
 }
 
 /// [Control API] servers settings.
 ///
 /// [Control API]: https://tinyurl.com/yxsqplq7
-#[allow(clippy::module_name_repetitions)]
 #[derive(Clone, Debug, Deserialize, Serialize, SmartDefault)]
 #[serde(default)]
 pub struct ControlApiServer {
-    /// gRPC [Control API] server settings.
+    /// [Control API] gRPC server settings.
     ///
     /// [Control API]: https://tinyurl.com/yxsqplq7
-    pub grpc: GrpcListener,
+    pub grpc: ControlApiGrpcServer,
+}
+
+/// [Control API] gRPC server settings.
+///
+/// [Control API]: https://tinyurl.com/yxsqplq7
+#[derive(Clone, Debug, Deserialize, Serialize, SmartDefault)]
+#[serde(default)]
+pub struct ControlApiGrpcServer {
+    /// IP address to bind gRPC server to.
+    ///
+    /// Defaults to `0.0.0.0`.
+    #[default(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)))]
+    pub bind_ip: IpAddr,
+
+    /// Port to bind gRPC server to.
+    ///
+    /// Defaults to `6565`.
+    #[default = 6565]
+    pub bind_port: u16,
 }
 
 /// Settings for application servers.
@@ -98,7 +150,7 @@ mod server_spec {
 }
 
 #[cfg(test)]
-mod control_grpc_conf_specs {
+mod control_grpc_spec {
     use std::net::Ipv4Addr;
 
     use serial_test_derive::serial;

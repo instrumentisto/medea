@@ -1,8 +1,6 @@
 //! Provides application configuration options.
 
-pub mod control_api;
-pub mod grpc_listener;
-pub mod http_listener;
+pub mod control;
 pub mod log;
 pub mod rpc;
 pub mod server;
@@ -17,7 +15,7 @@ use serde::{Deserialize, Serialize};
 
 #[doc(inline)]
 pub use self::{
-    control_api::ControlApi,
+    control::ControlApi,
     log::Log,
     rpc::Rpc,
     server::Server,
@@ -54,7 +52,7 @@ pub struct Conf {
     /// [Control API] settings.
     ///
     /// [Control API]: https://tinyurl.com/yxsqplq7
-    pub control_api: ControlApi,
+    pub control: ControlApi,
 }
 
 impl Conf {
@@ -98,14 +96,13 @@ where
 }
 
 #[cfg(test)]
-pub mod tests {
+pub(crate) mod spec {
     use serial_test_derive::serial;
 
     use super::*;
 
-    /// Macro which overrides environment variables
-    /// with provided values, parses [`Conf`] and
-    /// finally removes all overrided variables.
+    /// Macro which overrides environment variables with provided values,
+    /// parses [`Conf`] and finally removes all the overrided variables.
     ///
     /// # Usage
     ///

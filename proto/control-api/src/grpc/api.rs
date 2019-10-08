@@ -45,10 +45,7 @@ impl<'a> ::std::default::Default for &'a CreateRequest {
 
 #[derive(Clone,PartialEq,Debug)]
 pub enum CreateRequest_oneof_el {
-    hub(Hub),
-    file_recorder(FileRecorder),
     member(Member),
-    relay(Relay),
     room(Room),
     webrtc_play(WebRtcPlayEndpoint),
     webrtc_pub(WebRtcPublishEndpoint),
@@ -85,105 +82,7 @@ impl CreateRequest {
         ::std::mem::replace(&mut self.id, ::std::string::String::new())
     }
 
-    // .medea.Hub hub = 2;
-
-
-    pub fn get_hub(&self) -> &Hub {
-        match self.el {
-            ::std::option::Option::Some(CreateRequest_oneof_el::hub(ref v)) => v,
-            _ => Hub::default_instance(),
-        }
-    }
-    pub fn clear_hub(&mut self) {
-        self.el = ::std::option::Option::None;
-    }
-
-    pub fn has_hub(&self) -> bool {
-        match self.el {
-            ::std::option::Option::Some(CreateRequest_oneof_el::hub(..)) => true,
-            _ => false,
-        }
-    }
-
-    // Param is passed by value, moved
-    pub fn set_hub(&mut self, v: Hub) {
-        self.el = ::std::option::Option::Some(CreateRequest_oneof_el::hub(v))
-    }
-
-    // Mutable pointer to the field.
-    pub fn mut_hub(&mut self) -> &mut Hub {
-        if let ::std::option::Option::Some(CreateRequest_oneof_el::hub(_)) = self.el {
-        } else {
-            self.el = ::std::option::Option::Some(CreateRequest_oneof_el::hub(Hub::new()));
-        }
-        match self.el {
-            ::std::option::Option::Some(CreateRequest_oneof_el::hub(ref mut v)) => v,
-            _ => panic!(),
-        }
-    }
-
-    // Take field
-    pub fn take_hub(&mut self) -> Hub {
-        if self.has_hub() {
-            match self.el.take() {
-                ::std::option::Option::Some(CreateRequest_oneof_el::hub(v)) => v,
-                _ => panic!(),
-            }
-        } else {
-            Hub::new()
-        }
-    }
-
-    // .medea.FileRecorder file_recorder = 3;
-
-
-    pub fn get_file_recorder(&self) -> &FileRecorder {
-        match self.el {
-            ::std::option::Option::Some(CreateRequest_oneof_el::file_recorder(ref v)) => v,
-            _ => FileRecorder::default_instance(),
-        }
-    }
-    pub fn clear_file_recorder(&mut self) {
-        self.el = ::std::option::Option::None;
-    }
-
-    pub fn has_file_recorder(&self) -> bool {
-        match self.el {
-            ::std::option::Option::Some(CreateRequest_oneof_el::file_recorder(..)) => true,
-            _ => false,
-        }
-    }
-
-    // Param is passed by value, moved
-    pub fn set_file_recorder(&mut self, v: FileRecorder) {
-        self.el = ::std::option::Option::Some(CreateRequest_oneof_el::file_recorder(v))
-    }
-
-    // Mutable pointer to the field.
-    pub fn mut_file_recorder(&mut self) -> &mut FileRecorder {
-        if let ::std::option::Option::Some(CreateRequest_oneof_el::file_recorder(_)) = self.el {
-        } else {
-            self.el = ::std::option::Option::Some(CreateRequest_oneof_el::file_recorder(FileRecorder::new()));
-        }
-        match self.el {
-            ::std::option::Option::Some(CreateRequest_oneof_el::file_recorder(ref mut v)) => v,
-            _ => panic!(),
-        }
-    }
-
-    // Take field
-    pub fn take_file_recorder(&mut self) -> FileRecorder {
-        if self.has_file_recorder() {
-            match self.el.take() {
-                ::std::option::Option::Some(CreateRequest_oneof_el::file_recorder(v)) => v,
-                _ => panic!(),
-            }
-        } else {
-            FileRecorder::new()
-        }
-    }
-
-    // .medea.Member member = 4;
+    // .medea.Member member = 2;
 
 
     pub fn get_member(&self) -> &Member {
@@ -232,56 +131,7 @@ impl CreateRequest {
         }
     }
 
-    // .medea.Relay relay = 5;
-
-
-    pub fn get_relay(&self) -> &Relay {
-        match self.el {
-            ::std::option::Option::Some(CreateRequest_oneof_el::relay(ref v)) => v,
-            _ => Relay::default_instance(),
-        }
-    }
-    pub fn clear_relay(&mut self) {
-        self.el = ::std::option::Option::None;
-    }
-
-    pub fn has_relay(&self) -> bool {
-        match self.el {
-            ::std::option::Option::Some(CreateRequest_oneof_el::relay(..)) => true,
-            _ => false,
-        }
-    }
-
-    // Param is passed by value, moved
-    pub fn set_relay(&mut self, v: Relay) {
-        self.el = ::std::option::Option::Some(CreateRequest_oneof_el::relay(v))
-    }
-
-    // Mutable pointer to the field.
-    pub fn mut_relay(&mut self) -> &mut Relay {
-        if let ::std::option::Option::Some(CreateRequest_oneof_el::relay(_)) = self.el {
-        } else {
-            self.el = ::std::option::Option::Some(CreateRequest_oneof_el::relay(Relay::new()));
-        }
-        match self.el {
-            ::std::option::Option::Some(CreateRequest_oneof_el::relay(ref mut v)) => v,
-            _ => panic!(),
-        }
-    }
-
-    // Take field
-    pub fn take_relay(&mut self) -> Relay {
-        if self.has_relay() {
-            match self.el.take() {
-                ::std::option::Option::Some(CreateRequest_oneof_el::relay(v)) => v,
-                _ => panic!(),
-            }
-        } else {
-            Relay::new()
-        }
-    }
-
-    // .medea.Room room = 6;
+    // .medea.Room room = 3;
 
 
     pub fn get_room(&self) -> &Room {
@@ -330,7 +180,7 @@ impl CreateRequest {
         }
     }
 
-    // .medea.WebRtcPlayEndpoint webrtc_play = 7;
+    // .medea.WebRtcPlayEndpoint webrtc_play = 4;
 
 
     pub fn get_webrtc_play(&self) -> &WebRtcPlayEndpoint {
@@ -379,7 +229,7 @@ impl CreateRequest {
         }
     }
 
-    // .medea.WebRtcPublishEndpoint webrtc_pub = 8;
+    // .medea.WebRtcPublishEndpoint webrtc_pub = 5;
 
 
     pub fn get_webrtc_pub(&self) -> &WebRtcPublishEndpoint {
@@ -431,22 +281,7 @@ impl CreateRequest {
 
 impl ::protobuf::Message for CreateRequest {
     fn is_initialized(&self) -> bool {
-        if let Some(CreateRequest_oneof_el::hub(ref v)) = self.el {
-            if !v.is_initialized() {
-                return false;
-            }
-        }
-        if let Some(CreateRequest_oneof_el::file_recorder(ref v)) = self.el {
-            if !v.is_initialized() {
-                return false;
-            }
-        }
         if let Some(CreateRequest_oneof_el::member(ref v)) = self.el {
-            if !v.is_initialized() {
-                return false;
-            }
-        }
-        if let Some(CreateRequest_oneof_el::relay(ref v)) = self.el {
             if !v.is_initialized() {
                 return false;
             }
@@ -480,39 +315,21 @@ impl ::protobuf::Message for CreateRequest {
                     if wire_type != ::protobuf::wire_format::WireTypeLengthDelimited {
                         return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
                     }
-                    self.el = ::std::option::Option::Some(CreateRequest_oneof_el::hub(is.read_message()?));
+                    self.el = ::std::option::Option::Some(CreateRequest_oneof_el::member(is.read_message()?));
                 },
                 3 => {
                     if wire_type != ::protobuf::wire_format::WireTypeLengthDelimited {
                         return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
                     }
-                    self.el = ::std::option::Option::Some(CreateRequest_oneof_el::file_recorder(is.read_message()?));
+                    self.el = ::std::option::Option::Some(CreateRequest_oneof_el::room(is.read_message()?));
                 },
                 4 => {
                     if wire_type != ::protobuf::wire_format::WireTypeLengthDelimited {
                         return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
                     }
-                    self.el = ::std::option::Option::Some(CreateRequest_oneof_el::member(is.read_message()?));
-                },
-                5 => {
-                    if wire_type != ::protobuf::wire_format::WireTypeLengthDelimited {
-                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
-                    }
-                    self.el = ::std::option::Option::Some(CreateRequest_oneof_el::relay(is.read_message()?));
-                },
-                6 => {
-                    if wire_type != ::protobuf::wire_format::WireTypeLengthDelimited {
-                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
-                    }
-                    self.el = ::std::option::Option::Some(CreateRequest_oneof_el::room(is.read_message()?));
-                },
-                7 => {
-                    if wire_type != ::protobuf::wire_format::WireTypeLengthDelimited {
-                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
-                    }
                     self.el = ::std::option::Option::Some(CreateRequest_oneof_el::webrtc_play(is.read_message()?));
                 },
-                8 => {
+                5 => {
                     if wire_type != ::protobuf::wire_format::WireTypeLengthDelimited {
                         return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
                     }
@@ -535,19 +352,7 @@ impl ::protobuf::Message for CreateRequest {
         }
         if let ::std::option::Option::Some(ref v) = self.el {
             match v {
-                &CreateRequest_oneof_el::hub(ref v) => {
-                    let len = v.compute_size();
-                    my_size += 1 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
-                },
-                &CreateRequest_oneof_el::file_recorder(ref v) => {
-                    let len = v.compute_size();
-                    my_size += 1 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
-                },
                 &CreateRequest_oneof_el::member(ref v) => {
-                    let len = v.compute_size();
-                    my_size += 1 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
-                },
-                &CreateRequest_oneof_el::relay(ref v) => {
                     let len = v.compute_size();
                     my_size += 1 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
                 },
@@ -576,38 +381,23 @@ impl ::protobuf::Message for CreateRequest {
         }
         if let ::std::option::Option::Some(ref v) = self.el {
             match v {
-                &CreateRequest_oneof_el::hub(ref v) => {
+                &CreateRequest_oneof_el::member(ref v) => {
                     os.write_tag(2, ::protobuf::wire_format::WireTypeLengthDelimited)?;
                     os.write_raw_varint32(v.get_cached_size())?;
                     v.write_to_with_cached_sizes(os)?;
                 },
-                &CreateRequest_oneof_el::file_recorder(ref v) => {
+                &CreateRequest_oneof_el::room(ref v) => {
                     os.write_tag(3, ::protobuf::wire_format::WireTypeLengthDelimited)?;
                     os.write_raw_varint32(v.get_cached_size())?;
                     v.write_to_with_cached_sizes(os)?;
                 },
-                &CreateRequest_oneof_el::member(ref v) => {
+                &CreateRequest_oneof_el::webrtc_play(ref v) => {
                     os.write_tag(4, ::protobuf::wire_format::WireTypeLengthDelimited)?;
                     os.write_raw_varint32(v.get_cached_size())?;
                     v.write_to_with_cached_sizes(os)?;
                 },
-                &CreateRequest_oneof_el::relay(ref v) => {
-                    os.write_tag(5, ::protobuf::wire_format::WireTypeLengthDelimited)?;
-                    os.write_raw_varint32(v.get_cached_size())?;
-                    v.write_to_with_cached_sizes(os)?;
-                },
-                &CreateRequest_oneof_el::room(ref v) => {
-                    os.write_tag(6, ::protobuf::wire_format::WireTypeLengthDelimited)?;
-                    os.write_raw_varint32(v.get_cached_size())?;
-                    v.write_to_with_cached_sizes(os)?;
-                },
-                &CreateRequest_oneof_el::webrtc_play(ref v) => {
-                    os.write_tag(7, ::protobuf::wire_format::WireTypeLengthDelimited)?;
-                    os.write_raw_varint32(v.get_cached_size())?;
-                    v.write_to_with_cached_sizes(os)?;
-                },
                 &CreateRequest_oneof_el::webrtc_pub(ref v) => {
-                    os.write_tag(8, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+                    os.write_tag(5, ::protobuf::wire_format::WireTypeLengthDelimited)?;
                     os.write_raw_varint32(v.get_cached_size())?;
                     v.write_to_with_cached_sizes(os)?;
                 },
@@ -660,25 +450,10 @@ impl ::protobuf::Message for CreateRequest {
                     |m: &CreateRequest| { &m.id },
                     |m: &mut CreateRequest| { &mut m.id },
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_message_accessor::<_, Hub>(
-                    "hub",
-                    CreateRequest::has_hub,
-                    CreateRequest::get_hub,
-                ));
-                fields.push(::protobuf::reflect::accessor::make_singular_message_accessor::<_, FileRecorder>(
-                    "file_recorder",
-                    CreateRequest::has_file_recorder,
-                    CreateRequest::get_file_recorder,
-                ));
                 fields.push(::protobuf::reflect::accessor::make_singular_message_accessor::<_, Member>(
                     "member",
                     CreateRequest::has_member,
                     CreateRequest::get_member,
-                ));
-                fields.push(::protobuf::reflect::accessor::make_singular_message_accessor::<_, Relay>(
-                    "relay",
-                    CreateRequest::has_relay,
-                    CreateRequest::get_relay,
                 ));
                 fields.push(::protobuf::reflect::accessor::make_singular_message_accessor::<_, Room>(
                     "room",
@@ -722,9 +497,6 @@ impl ::protobuf::Clear for CreateRequest {
         self.el = ::std::option::Option::None;
         self.el = ::std::option::Option::None;
         self.el = ::std::option::Option::None;
-        self.el = ::std::option::Option::None;
-        self.el = ::std::option::Option::None;
-        self.el = ::std::option::Option::None;
         self.unknown_fields.clear();
     }
 }
@@ -761,10 +533,7 @@ impl<'a> ::std::default::Default for &'a ApplyRequest {
 
 #[derive(Clone,PartialEq,Debug)]
 pub enum ApplyRequest_oneof_el {
-    hub(Hub),
-    file_recorder(FileRecorder),
     member(Member),
-    relay(Relay),
     room(Room),
     webrtc_play(WebRtcPlayEndpoint),
     webrtc_pub(WebRtcPublishEndpoint),
@@ -801,105 +570,7 @@ impl ApplyRequest {
         ::std::mem::replace(&mut self.id, ::std::string::String::new())
     }
 
-    // .medea.Hub hub = 2;
-
-
-    pub fn get_hub(&self) -> &Hub {
-        match self.el {
-            ::std::option::Option::Some(ApplyRequest_oneof_el::hub(ref v)) => v,
-            _ => Hub::default_instance(),
-        }
-    }
-    pub fn clear_hub(&mut self) {
-        self.el = ::std::option::Option::None;
-    }
-
-    pub fn has_hub(&self) -> bool {
-        match self.el {
-            ::std::option::Option::Some(ApplyRequest_oneof_el::hub(..)) => true,
-            _ => false,
-        }
-    }
-
-    // Param is passed by value, moved
-    pub fn set_hub(&mut self, v: Hub) {
-        self.el = ::std::option::Option::Some(ApplyRequest_oneof_el::hub(v))
-    }
-
-    // Mutable pointer to the field.
-    pub fn mut_hub(&mut self) -> &mut Hub {
-        if let ::std::option::Option::Some(ApplyRequest_oneof_el::hub(_)) = self.el {
-        } else {
-            self.el = ::std::option::Option::Some(ApplyRequest_oneof_el::hub(Hub::new()));
-        }
-        match self.el {
-            ::std::option::Option::Some(ApplyRequest_oneof_el::hub(ref mut v)) => v,
-            _ => panic!(),
-        }
-    }
-
-    // Take field
-    pub fn take_hub(&mut self) -> Hub {
-        if self.has_hub() {
-            match self.el.take() {
-                ::std::option::Option::Some(ApplyRequest_oneof_el::hub(v)) => v,
-                _ => panic!(),
-            }
-        } else {
-            Hub::new()
-        }
-    }
-
-    // .medea.FileRecorder file_recorder = 3;
-
-
-    pub fn get_file_recorder(&self) -> &FileRecorder {
-        match self.el {
-            ::std::option::Option::Some(ApplyRequest_oneof_el::file_recorder(ref v)) => v,
-            _ => FileRecorder::default_instance(),
-        }
-    }
-    pub fn clear_file_recorder(&mut self) {
-        self.el = ::std::option::Option::None;
-    }
-
-    pub fn has_file_recorder(&self) -> bool {
-        match self.el {
-            ::std::option::Option::Some(ApplyRequest_oneof_el::file_recorder(..)) => true,
-            _ => false,
-        }
-    }
-
-    // Param is passed by value, moved
-    pub fn set_file_recorder(&mut self, v: FileRecorder) {
-        self.el = ::std::option::Option::Some(ApplyRequest_oneof_el::file_recorder(v))
-    }
-
-    // Mutable pointer to the field.
-    pub fn mut_file_recorder(&mut self) -> &mut FileRecorder {
-        if let ::std::option::Option::Some(ApplyRequest_oneof_el::file_recorder(_)) = self.el {
-        } else {
-            self.el = ::std::option::Option::Some(ApplyRequest_oneof_el::file_recorder(FileRecorder::new()));
-        }
-        match self.el {
-            ::std::option::Option::Some(ApplyRequest_oneof_el::file_recorder(ref mut v)) => v,
-            _ => panic!(),
-        }
-    }
-
-    // Take field
-    pub fn take_file_recorder(&mut self) -> FileRecorder {
-        if self.has_file_recorder() {
-            match self.el.take() {
-                ::std::option::Option::Some(ApplyRequest_oneof_el::file_recorder(v)) => v,
-                _ => panic!(),
-            }
-        } else {
-            FileRecorder::new()
-        }
-    }
-
-    // .medea.Member member = 4;
+    // .medea.Member member = 2;
 
 
     pub fn get_member(&self) -> &Member {
@@ -948,56 +619,7 @@ impl ApplyRequest {
         }
     }
 
-    // .medea.Relay relay = 5;
-
-
-    pub fn get_relay(&self) -> &Relay {
-        match self.el {
-            ::std::option::Option::Some(ApplyRequest_oneof_el::relay(ref v)) => v,
-            _ => Relay::default_instance(),
-        }
-    }
-    pub fn clear_relay(&mut self) {
-        self.el = ::std::option::Option::None;
-    }
-
-    pub fn has_relay(&self) -> bool {
-        match self.el {
-            ::std::option::Option::Some(ApplyRequest_oneof_el::relay(..)) => true,
-            _ => false,
-        }
-    }
-
-    // Param is passed by value, moved
-    pub fn set_relay(&mut self, v: Relay) {
-        self.el = ::std::option::Option::Some(ApplyRequest_oneof_el::relay(v))
-    }
-
-    // Mutable pointer to the field.
-    pub fn mut_relay(&mut self) -> &mut Relay {
-        if let ::std::option::Option::Some(ApplyRequest_oneof_el::relay(_)) = self.el {
-        } else {
-            self.el = ::std::option::Option::Some(ApplyRequest_oneof_el::relay(Relay::new()));
-        }
-        match self.el {
-            ::std::option::Option::Some(ApplyRequest_oneof_el::relay(ref mut v)) => v,
-            _ => panic!(),
-        }
-    }
-
-    // Take field
-    pub fn take_relay(&mut self) -> Relay {
-        if self.has_relay() {
-            match self.el.take() {
-                ::std::option::Option::Some(ApplyRequest_oneof_el::relay(v)) => v,
-                _ => panic!(),
-            }
-        } else {
-            Relay::new()
-        }
-    }
-
-    // .medea.Room room = 6;
+    // .medea.Room room = 3;
 
 
     pub fn get_room(&self) -> &Room {
@@ -1046,7 +668,7 @@ impl ApplyRequest {
         }
     }
 
-    // .medea.WebRtcPlayEndpoint webrtc_play = 7;
+    // .medea.WebRtcPlayEndpoint webrtc_play = 4;
 
 
     pub fn get_webrtc_play(&self) -> &WebRtcPlayEndpoint {
@@ -1095,7 +717,7 @@ impl ApplyRequest {
         }
     }
 
-    // .medea.WebRtcPublishEndpoint webrtc_pub = 8;
+    // .medea.WebRtcPublishEndpoint webrtc_pub = 5;
 
 
     pub fn get_webrtc_pub(&self) -> &WebRtcPublishEndpoint {
@@ -1144,7 +766,7 @@ impl ApplyRequest {
         }
     }
 
-    // .medea.ApplyRequest.Policy policy = 9;
+    // .medea.ApplyRequest.Policy policy = 6;
 
 
     pub fn get_policy(&self) -> ApplyRequest_Policy {
@@ -1162,22 +784,7 @@ impl ApplyRequest {
 
 impl ::protobuf::Message for ApplyRequest {
     fn is_initialized(&self) -> bool {
-        if let Some(ApplyRequest_oneof_el::hub(ref v)) = self.el {
-            if !v.is_initialized() {
-                return false;
-            }
-        }
-        if let Some(ApplyRequest_oneof_el::file_recorder(ref v)) = self.el {
-            if !v.is_initialized() {
-                return false;
-            }
-        }
         if let Some(ApplyRequest_oneof_el::member(ref v)) = self.el {
-            if !v.is_initialized() {
-                return false;
-            }
-        }
-        if let Some(ApplyRequest_oneof_el::relay(ref v)) = self.el {
             if !v.is_initialized() {
                 return false;
             }
@@ -1211,46 +818,28 @@ impl ::protobuf::Message for ApplyRequest {
                     if wire_type != ::protobuf::wire_format::WireTypeLengthDelimited {
                         return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
                     }
-                    self.el = ::std::option::Option::Some(ApplyRequest_oneof_el::hub(is.read_message()?));
+                    self.el = ::std::option::Option::Some(ApplyRequest_oneof_el::member(is.read_message()?));
                 },
                 3 => {
                     if wire_type != ::protobuf::wire_format::WireTypeLengthDelimited {
                         return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
                     }
-                    self.el = ::std::option::Option::Some(ApplyRequest_oneof_el::file_recorder(is.read_message()?));
+                    self.el = ::std::option::Option::Some(ApplyRequest_oneof_el::room(is.read_message()?));
                 },
                 4 => {
                     if wire_type != ::protobuf::wire_format::WireTypeLengthDelimited {
                         return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
                     }
-                    self.el = ::std::option::Option::Some(ApplyRequest_oneof_el::member(is.read_message()?));
+                    self.el = ::std::option::Option::Some(ApplyRequest_oneof_el::webrtc_play(is.read_message()?));
                 },
                 5 => {
                     if wire_type != ::protobuf::wire_format::WireTypeLengthDelimited {
                         return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
                     }
-                    self.el = ::std::option::Option::Some(ApplyRequest_oneof_el::relay(is.read_message()?));
-                },
-                6 => {
-                    if wire_type != ::protobuf::wire_format::WireTypeLengthDelimited {
-                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
-                    }
-                    self.el = ::std::option::Option::Some(ApplyRequest_oneof_el::room(is.read_message()?));
-                },
-                7 => {
-                    if wire_type != ::protobuf::wire_format::WireTypeLengthDelimited {
-                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
-                    }
-                    self.el = ::std::option::Option::Some(ApplyRequest_oneof_el::webrtc_play(is.read_message()?));
-                },
-                8 => {
-                    if wire_type != ::protobuf::wire_format::WireTypeLengthDelimited {
-                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
-                    }
                     self.el = ::std::option::Option::Some(ApplyRequest_oneof_el::webrtc_pub(is.read_message()?));
                 },
-                9 => {
-                    ::protobuf::rt::read_proto3_enum_with_unknown_fields_into(wire_type, is, &mut self.policy, 9, &mut self.unknown_fields)?
+                6 => {
+                    ::protobuf::rt::read_proto3_enum_with_unknown_fields_into(wire_type, is, &mut self.policy, 6, &mut self.unknown_fields)?
                 },
                 _ => {
                     ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
@@ -1268,23 +857,11 @@ impl ::protobuf::Message for ApplyRequest {
             my_size += ::protobuf::rt::string_size(1, &self.id);
         }
         if self.policy != ApplyRequest_Policy::APPLY {
-            my_size += ::protobuf::rt::enum_size(9, self.policy);
+            my_size += ::protobuf::rt::enum_size(6, self.policy);
         }
         if let ::std::option::Option::Some(ref v) = self.el {
             match v {
-                &ApplyRequest_oneof_el::hub(ref v) => {
-                    let len = v.compute_size();
-                    my_size += 1 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
-                },
-                &ApplyRequest_oneof_el::file_recorder(ref v) => {
-                    let len = v.compute_size();
-                    my_size += 1 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
-                },
                 &ApplyRequest_oneof_el::member(ref v) => {
-                    let len = v.compute_size();
-                    my_size += 1 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
-                },
-                &ApplyRequest_oneof_el::relay(ref v) => {
                     let len = v.compute_size();
                     my_size += 1 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
                 },
@@ -1312,42 +889,27 @@ impl ::protobuf::Message for ApplyRequest {
             os.write_string(1, &self.id)?;
         }
         if self.policy != ApplyRequest_Policy::APPLY {
-            os.write_enum(9, self.policy.value())?;
+            os.write_enum(6, self.policy.value())?;
         }
         if let ::std::option::Option::Some(ref v) = self.el {
             match v {
-                &ApplyRequest_oneof_el::hub(ref v) => {
+                &ApplyRequest_oneof_el::member(ref v) => {
                     os.write_tag(2, ::protobuf::wire_format::WireTypeLengthDelimited)?;
                     os.write_raw_varint32(v.get_cached_size())?;
                     v.write_to_with_cached_sizes(os)?;
                 },
-                &ApplyRequest_oneof_el::file_recorder(ref v) => {
+                &ApplyRequest_oneof_el::room(ref v) => {
                     os.write_tag(3, ::protobuf::wire_format::WireTypeLengthDelimited)?;
                     os.write_raw_varint32(v.get_cached_size())?;
                     v.write_to_with_cached_sizes(os)?;
                 },
-                &ApplyRequest_oneof_el::member(ref v) => {
+                &ApplyRequest_oneof_el::webrtc_play(ref v) => {
                     os.write_tag(4, ::protobuf::wire_format::WireTypeLengthDelimited)?;
                     os.write_raw_varint32(v.get_cached_size())?;
                     v.write_to_with_cached_sizes(os)?;
                 },
-                &ApplyRequest_oneof_el::relay(ref v) => {
-                    os.write_tag(5, ::protobuf::wire_format::WireTypeLengthDelimited)?;
-                    os.write_raw_varint32(v.get_cached_size())?;
-                    v.write_to_with_cached_sizes(os)?;
-                },
-                &ApplyRequest_oneof_el::room(ref v) => {
-                    os.write_tag(6, ::protobuf::wire_format::WireTypeLengthDelimited)?;
-                    os.write_raw_varint32(v.get_cached_size())?;
-                    v.write_to_with_cached_sizes(os)?;
-                },
-                &ApplyRequest_oneof_el::webrtc_play(ref v) => {
-                    os.write_tag(7, ::protobuf::wire_format::WireTypeLengthDelimited)?;
-                    os.write_raw_varint32(v.get_cached_size())?;
-                    v.write_to_with_cached_sizes(os)?;
-                },
                 &ApplyRequest_oneof_el::webrtc_pub(ref v) => {
-                    os.write_tag(8, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+                    os.write_tag(5, ::protobuf::wire_format::WireTypeLengthDelimited)?;
                     os.write_raw_varint32(v.get_cached_size())?;
                     v.write_to_with_cached_sizes(os)?;
                 },
@@ -1400,25 +962,10 @@ impl ::protobuf::Message for ApplyRequest {
                     |m: &ApplyRequest| { &m.id },
                     |m: &mut ApplyRequest| { &mut m.id },
                 ));
-                fields.push(::protobuf::reflect::accessor::make_singular_message_accessor::<_, Hub>(
-                    "hub",
-                    ApplyRequest::has_hub,
-                    ApplyRequest::get_hub,
-                ));
-                fields.push(::protobuf::reflect::accessor::make_singular_message_accessor::<_, FileRecorder>(
-                    "file_recorder",
-                    ApplyRequest::has_file_recorder,
-                    ApplyRequest::get_file_recorder,
-                ));
                 fields.push(::protobuf::reflect::accessor::make_singular_message_accessor::<_, Member>(
                     "member",
                     ApplyRequest::has_member,
                     ApplyRequest::get_member,
-                ));
-                fields.push(::protobuf::reflect::accessor::make_singular_message_accessor::<_, Relay>(
-                    "relay",
-                    ApplyRequest::has_relay,
-                    ApplyRequest::get_relay,
                 ));
                 fields.push(::protobuf::reflect::accessor::make_singular_message_accessor::<_, Room>(
                     "room",
@@ -1463,9 +1010,6 @@ impl ::protobuf::Message for ApplyRequest {
 impl ::protobuf::Clear for ApplyRequest {
     fn clear(&mut self) {
         self.id.clear();
-        self.el = ::std::option::Option::None;
-        self.el = ::std::option::Option::None;
-        self.el = ::std::option::Option::None;
         self.el = ::std::option::Option::None;
         self.el = ::std::option::Option::None;
         self.el = ::std::option::Option::None;
@@ -2359,7 +1903,7 @@ impl Error {
         ::std::default::Default::default()
     }
 
-    // uint32 code = 2;
+    // uint32 code = 1;
 
 
     pub fn get_code(&self) -> u32 {
@@ -2374,7 +1918,7 @@ impl Error {
         self.code = v;
     }
 
-    // string text = 3;
+    // string text = 2;
 
 
     pub fn get_text(&self) -> &str {
@@ -2400,7 +1944,7 @@ impl Error {
         ::std::mem::replace(&mut self.text, ::std::string::String::new())
     }
 
-    // string doc = 4;
+    // string doc = 3;
 
 
     pub fn get_doc(&self) -> &str {
@@ -2426,7 +1970,7 @@ impl Error {
         ::std::mem::replace(&mut self.doc, ::std::string::String::new())
     }
 
-    // string element = 5;
+    // string element = 4;
 
 
     pub fn get_element(&self) -> &str {
@@ -2462,20 +2006,20 @@ impl ::protobuf::Message for Error {
         while !is.eof()? {
             let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
-                2 => {
+                1 => {
                     if wire_type != ::protobuf::wire_format::WireTypeVarint {
                         return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
                     }
                     let tmp = is.read_uint32()?;
                     self.code = tmp;
                 },
-                3 => {
+                2 => {
                     ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.text)?;
                 },
-                4 => {
+                3 => {
                     ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.doc)?;
                 },
-                5 => {
+                4 => {
                     ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.element)?;
                 },
                 _ => {
@@ -2491,16 +2035,16 @@ impl ::protobuf::Message for Error {
     fn compute_size(&self) -> u32 {
         let mut my_size = 0;
         if self.code != 0 {
-            my_size += ::protobuf::rt::value_size(2, self.code, ::protobuf::wire_format::WireTypeVarint);
+            my_size += ::protobuf::rt::value_size(1, self.code, ::protobuf::wire_format::WireTypeVarint);
         }
         if !self.text.is_empty() {
-            my_size += ::protobuf::rt::string_size(3, &self.text);
+            my_size += ::protobuf::rt::string_size(2, &self.text);
         }
         if !self.doc.is_empty() {
-            my_size += ::protobuf::rt::string_size(4, &self.doc);
+            my_size += ::protobuf::rt::string_size(3, &self.doc);
         }
         if !self.element.is_empty() {
-            my_size += ::protobuf::rt::string_size(5, &self.element);
+            my_size += ::protobuf::rt::string_size(4, &self.element);
         }
         my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
         self.cached_size.set(my_size);
@@ -2509,16 +2053,16 @@ impl ::protobuf::Message for Error {
 
     fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::ProtobufResult<()> {
         if self.code != 0 {
-            os.write_uint32(2, self.code)?;
+            os.write_uint32(1, self.code)?;
         }
         if !self.text.is_empty() {
-            os.write_string(3, &self.text)?;
+            os.write_string(2, &self.text)?;
         }
         if !self.doc.is_empty() {
-            os.write_string(4, &self.doc)?;
+            os.write_string(3, &self.doc)?;
         }
         if !self.element.is_empty() {
-            os.write_string(5, &self.element)?;
+            os.write_string(4, &self.element)?;
         }
         os.write_unknown_fields(self.get_unknown_fields())?;
         ::std::result::Result::Ok(())
@@ -2641,10 +2185,7 @@ impl<'a> ::std::default::Default for &'a Element {
 
 #[derive(Clone,PartialEq,Debug)]
 pub enum Element_oneof_el {
-    hub(Hub),
-    file_recorder(FileRecorder),
     member(Member),
-    relay(Relay),
     room(Room),
     webrtc_play(WebRtcPlayEndpoint),
     webrtc_pub(WebRtcPublishEndpoint),
@@ -2655,105 +2196,7 @@ impl Element {
         ::std::default::Default::default()
     }
 
-    // .medea.Hub hub = 2;
-
-
-    pub fn get_hub(&self) -> &Hub {
-        match self.el {
-            ::std::option::Option::Some(Element_oneof_el::hub(ref v)) => v,
-            _ => Hub::default_instance(),
-        }
-    }
-    pub fn clear_hub(&mut self) {
-        self.el = ::std::option::Option::None;
-    }
-
-    pub fn has_hub(&self) -> bool {
-        match self.el {
-            ::std::option::Option::Some(Element_oneof_el::hub(..)) => true,
-            _ => false,
-        }
-    }
-
-    // Param is passed by value, moved
-    pub fn set_hub(&mut self, v: Hub) {
-        self.el = ::std::option::Option::Some(Element_oneof_el::hub(v))
-    }
-
-    // Mutable pointer to the field.
-    pub fn mut_hub(&mut self) -> &mut Hub {
-        if let ::std::option::Option::Some(Element_oneof_el::hub(_)) = self.el {
-        } else {
-            self.el = ::std::option::Option::Some(Element_oneof_el::hub(Hub::new()));
-        }
-        match self.el {
-            ::std::option::Option::Some(Element_oneof_el::hub(ref mut v)) => v,
-            _ => panic!(),
-        }
-    }
-
-    // Take field
-    pub fn take_hub(&mut self) -> Hub {
-        if self.has_hub() {
-            match self.el.take() {
-                ::std::option::Option::Some(Element_oneof_el::hub(v)) => v,
-                _ => panic!(),
-            }
-        } else {
-            Hub::new()
-        }
-    }
-
-    // .medea.FileRecorder file_recorder = 3;
-
-
-    pub fn get_file_recorder(&self) -> &FileRecorder {
-        match self.el {
-            ::std::option::Option::Some(Element_oneof_el::file_recorder(ref v)) => v,
-            _ => FileRecorder::default_instance(),
-        }
-    }
-    pub fn clear_file_recorder(&mut self) {
-        self.el = ::std::option::Option::None;
-    }
-
-    pub fn has_file_recorder(&self) -> bool {
-        match self.el {
-            ::std::option::Option::Some(Element_oneof_el::file_recorder(..)) => true,
-            _ => false,
-        }
-    }
-
-    // Param is passed by value, moved
-    pub fn set_file_recorder(&mut self, v: FileRecorder) {
-        self.el = ::std::option::Option::Some(Element_oneof_el::file_recorder(v))
-    }
-
-    // Mutable pointer to the field.
-    pub fn mut_file_recorder(&mut self) -> &mut FileRecorder {
-        if let ::std::option::Option::Some(Element_oneof_el::file_recorder(_)) = self.el {
-        } else {
-            self.el = ::std::option::Option::Some(Element_oneof_el::file_recorder(FileRecorder::new()));
-        }
-        match self.el {
-            ::std::option::Option::Some(Element_oneof_el::file_recorder(ref mut v)) => v,
-            _ => panic!(),
-        }
-    }
-
-    // Take field
-    pub fn take_file_recorder(&mut self) -> FileRecorder {
-        if self.has_file_recorder() {
-            match self.el.take() {
-                ::std::option::Option::Some(Element_oneof_el::file_recorder(v)) => v,
-                _ => panic!(),
-            }
-        } else {
-            FileRecorder::new()
-        }
-    }
-
-    // .medea.Member member = 4;
+    // .medea.Member member = 1;
 
 
     pub fn get_member(&self) -> &Member {
@@ -2802,56 +2245,7 @@ impl Element {
         }
     }
 
-    // .medea.Relay relay = 5;
-
-
-    pub fn get_relay(&self) -> &Relay {
-        match self.el {
-            ::std::option::Option::Some(Element_oneof_el::relay(ref v)) => v,
-            _ => Relay::default_instance(),
-        }
-    }
-    pub fn clear_relay(&mut self) {
-        self.el = ::std::option::Option::None;
-    }
-
-    pub fn has_relay(&self) -> bool {
-        match self.el {
-            ::std::option::Option::Some(Element_oneof_el::relay(..)) => true,
-            _ => false,
-        }
-    }
-
-    // Param is passed by value, moved
-    pub fn set_relay(&mut self, v: Relay) {
-        self.el = ::std::option::Option::Some(Element_oneof_el::relay(v))
-    }
-
-    // Mutable pointer to the field.
-    pub fn mut_relay(&mut self) -> &mut Relay {
-        if let ::std::option::Option::Some(Element_oneof_el::relay(_)) = self.el {
-        } else {
-            self.el = ::std::option::Option::Some(Element_oneof_el::relay(Relay::new()));
-        }
-        match self.el {
-            ::std::option::Option::Some(Element_oneof_el::relay(ref mut v)) => v,
-            _ => panic!(),
-        }
-    }
-
-    // Take field
-    pub fn take_relay(&mut self) -> Relay {
-        if self.has_relay() {
-            match self.el.take() {
-                ::std::option::Option::Some(Element_oneof_el::relay(v)) => v,
-                _ => panic!(),
-            }
-        } else {
-            Relay::new()
-        }
-    }
-
-    // .medea.Room room = 6;
+    // .medea.Room room = 2;
 
 
     pub fn get_room(&self) -> &Room {
@@ -2900,7 +2294,7 @@ impl Element {
         }
     }
 
-    // .medea.WebRtcPlayEndpoint webrtc_play = 7;
+    // .medea.WebRtcPlayEndpoint webrtc_play = 3;
 
 
     pub fn get_webrtc_play(&self) -> &WebRtcPlayEndpoint {
@@ -2949,7 +2343,7 @@ impl Element {
         }
     }
 
-    // .medea.WebRtcPublishEndpoint webrtc_pub = 8;
+    // .medea.WebRtcPublishEndpoint webrtc_pub = 4;
 
 
     pub fn get_webrtc_pub(&self) -> &WebRtcPublishEndpoint {
@@ -3001,22 +2395,7 @@ impl Element {
 
 impl ::protobuf::Message for Element {
     fn is_initialized(&self) -> bool {
-        if let Some(Element_oneof_el::hub(ref v)) = self.el {
-            if !v.is_initialized() {
-                return false;
-            }
-        }
-        if let Some(Element_oneof_el::file_recorder(ref v)) = self.el {
-            if !v.is_initialized() {
-                return false;
-            }
-        }
         if let Some(Element_oneof_el::member(ref v)) = self.el {
-            if !v.is_initialized() {
-                return false;
-            }
-        }
-        if let Some(Element_oneof_el::relay(ref v)) = self.el {
             if !v.is_initialized() {
                 return false;
             }
@@ -3043,43 +2422,25 @@ impl ::protobuf::Message for Element {
         while !is.eof()? {
             let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
-                2 => {
-                    if wire_type != ::protobuf::wire_format::WireTypeLengthDelimited {
-                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
-                    }
-                    self.el = ::std::option::Option::Some(Element_oneof_el::hub(is.read_message()?));
-                },
-                3 => {
-                    if wire_type != ::protobuf::wire_format::WireTypeLengthDelimited {
-                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
-                    }
-                    self.el = ::std::option::Option::Some(Element_oneof_el::file_recorder(is.read_message()?));
-                },
-                4 => {
+                1 => {
                     if wire_type != ::protobuf::wire_format::WireTypeLengthDelimited {
                         return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
                     }
                     self.el = ::std::option::Option::Some(Element_oneof_el::member(is.read_message()?));
                 },
-                5 => {
-                    if wire_type != ::protobuf::wire_format::WireTypeLengthDelimited {
-                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
-                    }
-                    self.el = ::std::option::Option::Some(Element_oneof_el::relay(is.read_message()?));
-                },
-                6 => {
+                2 => {
                     if wire_type != ::protobuf::wire_format::WireTypeLengthDelimited {
                         return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
                     }
                     self.el = ::std::option::Option::Some(Element_oneof_el::room(is.read_message()?));
                 },
-                7 => {
+                3 => {
                     if wire_type != ::protobuf::wire_format::WireTypeLengthDelimited {
                         return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
                     }
                     self.el = ::std::option::Option::Some(Element_oneof_el::webrtc_play(is.read_message()?));
                 },
-                8 => {
+                4 => {
                     if wire_type != ::protobuf::wire_format::WireTypeLengthDelimited {
                         return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
                     }
@@ -3099,19 +2460,7 @@ impl ::protobuf::Message for Element {
         let mut my_size = 0;
         if let ::std::option::Option::Some(ref v) = self.el {
             match v {
-                &Element_oneof_el::hub(ref v) => {
-                    let len = v.compute_size();
-                    my_size += 1 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
-                },
-                &Element_oneof_el::file_recorder(ref v) => {
-                    let len = v.compute_size();
-                    my_size += 1 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
-                },
                 &Element_oneof_el::member(ref v) => {
-                    let len = v.compute_size();
-                    my_size += 1 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
-                },
-                &Element_oneof_el::relay(ref v) => {
                     let len = v.compute_size();
                     my_size += 1 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
                 },
@@ -3137,38 +2486,23 @@ impl ::protobuf::Message for Element {
     fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::ProtobufResult<()> {
         if let ::std::option::Option::Some(ref v) = self.el {
             match v {
-                &Element_oneof_el::hub(ref v) => {
-                    os.write_tag(2, ::protobuf::wire_format::WireTypeLengthDelimited)?;
-                    os.write_raw_varint32(v.get_cached_size())?;
-                    v.write_to_with_cached_sizes(os)?;
-                },
-                &Element_oneof_el::file_recorder(ref v) => {
-                    os.write_tag(3, ::protobuf::wire_format::WireTypeLengthDelimited)?;
-                    os.write_raw_varint32(v.get_cached_size())?;
-                    v.write_to_with_cached_sizes(os)?;
-                },
                 &Element_oneof_el::member(ref v) => {
-                    os.write_tag(4, ::protobuf::wire_format::WireTypeLengthDelimited)?;
-                    os.write_raw_varint32(v.get_cached_size())?;
-                    v.write_to_with_cached_sizes(os)?;
-                },
-                &Element_oneof_el::relay(ref v) => {
-                    os.write_tag(5, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+                    os.write_tag(1, ::protobuf::wire_format::WireTypeLengthDelimited)?;
                     os.write_raw_varint32(v.get_cached_size())?;
                     v.write_to_with_cached_sizes(os)?;
                 },
                 &Element_oneof_el::room(ref v) => {
-                    os.write_tag(6, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+                    os.write_tag(2, ::protobuf::wire_format::WireTypeLengthDelimited)?;
                     os.write_raw_varint32(v.get_cached_size())?;
                     v.write_to_with_cached_sizes(os)?;
                 },
                 &Element_oneof_el::webrtc_play(ref v) => {
-                    os.write_tag(7, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+                    os.write_tag(3, ::protobuf::wire_format::WireTypeLengthDelimited)?;
                     os.write_raw_varint32(v.get_cached_size())?;
                     v.write_to_with_cached_sizes(os)?;
                 },
                 &Element_oneof_el::webrtc_pub(ref v) => {
-                    os.write_tag(8, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+                    os.write_tag(4, ::protobuf::wire_format::WireTypeLengthDelimited)?;
                     os.write_raw_varint32(v.get_cached_size())?;
                     v.write_to_with_cached_sizes(os)?;
                 },
@@ -3216,25 +2550,10 @@ impl ::protobuf::Message for Element {
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_singular_message_accessor::<_, Hub>(
-                    "hub",
-                    Element::has_hub,
-                    Element::get_hub,
-                ));
-                fields.push(::protobuf::reflect::accessor::make_singular_message_accessor::<_, FileRecorder>(
-                    "file_recorder",
-                    Element::has_file_recorder,
-                    Element::get_file_recorder,
-                ));
                 fields.push(::protobuf::reflect::accessor::make_singular_message_accessor::<_, Member>(
                     "member",
                     Element::has_member,
                     Element::get_member,
-                ));
-                fields.push(::protobuf::reflect::accessor::make_singular_message_accessor::<_, Relay>(
-                    "relay",
-                    Element::has_relay,
-                    Element::get_relay,
                 ));
                 fields.push(::protobuf::reflect::accessor::make_singular_message_accessor::<_, Room>(
                     "room",
@@ -3273,9 +2592,6 @@ impl ::protobuf::Message for Element {
 
 impl ::protobuf::Clear for Element {
     fn clear(&mut self) {
-        self.el = ::std::option::Option::None;
-        self.el = ::std::option::Option::None;
-        self.el = ::std::option::Option::None;
         self.el = ::std::option::Option::None;
         self.el = ::std::option::Option::None;
         self.el = ::std::option::Option::None;
@@ -3477,10 +2793,7 @@ impl<'a> ::std::default::Default for &'a Room_Element {
 
 #[derive(Clone,PartialEq,Debug)]
 pub enum Room_Element_oneof_el {
-    hub(Hub),
-    file_recorder(FileRecorder),
     member(Member),
-    relay(Relay),
     webrtc_play(WebRtcPlayEndpoint),
     webrtc_pub(WebRtcPublishEndpoint),
 }
@@ -3490,105 +2803,7 @@ impl Room_Element {
         ::std::default::Default::default()
     }
 
-    // .medea.Hub hub = 1;
-
-
-    pub fn get_hub(&self) -> &Hub {
-        match self.el {
-            ::std::option::Option::Some(Room_Element_oneof_el::hub(ref v)) => v,
-            _ => Hub::default_instance(),
-        }
-    }
-    pub fn clear_hub(&mut self) {
-        self.el = ::std::option::Option::None;
-    }
-
-    pub fn has_hub(&self) -> bool {
-        match self.el {
-            ::std::option::Option::Some(Room_Element_oneof_el::hub(..)) => true,
-            _ => false,
-        }
-    }
-
-    // Param is passed by value, moved
-    pub fn set_hub(&mut self, v: Hub) {
-        self.el = ::std::option::Option::Some(Room_Element_oneof_el::hub(v))
-    }
-
-    // Mutable pointer to the field.
-    pub fn mut_hub(&mut self) -> &mut Hub {
-        if let ::std::option::Option::Some(Room_Element_oneof_el::hub(_)) = self.el {
-        } else {
-            self.el = ::std::option::Option::Some(Room_Element_oneof_el::hub(Hub::new()));
-        }
-        match self.el {
-            ::std::option::Option::Some(Room_Element_oneof_el::hub(ref mut v)) => v,
-            _ => panic!(),
-        }
-    }
-
-    // Take field
-    pub fn take_hub(&mut self) -> Hub {
-        if self.has_hub() {
-            match self.el.take() {
-                ::std::option::Option::Some(Room_Element_oneof_el::hub(v)) => v,
-                _ => panic!(),
-            }
-        } else {
-            Hub::new()
-        }
-    }
-
-    // .medea.FileRecorder file_recorder = 2;
-
-
-    pub fn get_file_recorder(&self) -> &FileRecorder {
-        match self.el {
-            ::std::option::Option::Some(Room_Element_oneof_el::file_recorder(ref v)) => v,
-            _ => FileRecorder::default_instance(),
-        }
-    }
-    pub fn clear_file_recorder(&mut self) {
-        self.el = ::std::option::Option::None;
-    }
-
-    pub fn has_file_recorder(&self) -> bool {
-        match self.el {
-            ::std::option::Option::Some(Room_Element_oneof_el::file_recorder(..)) => true,
-            _ => false,
-        }
-    }
-
-    // Param is passed by value, moved
-    pub fn set_file_recorder(&mut self, v: FileRecorder) {
-        self.el = ::std::option::Option::Some(Room_Element_oneof_el::file_recorder(v))
-    }
-
-    // Mutable pointer to the field.
-    pub fn mut_file_recorder(&mut self) -> &mut FileRecorder {
-        if let ::std::option::Option::Some(Room_Element_oneof_el::file_recorder(_)) = self.el {
-        } else {
-            self.el = ::std::option::Option::Some(Room_Element_oneof_el::file_recorder(FileRecorder::new()));
-        }
-        match self.el {
-            ::std::option::Option::Some(Room_Element_oneof_el::file_recorder(ref mut v)) => v,
-            _ => panic!(),
-        }
-    }
-
-    // Take field
-    pub fn take_file_recorder(&mut self) -> FileRecorder {
-        if self.has_file_recorder() {
-            match self.el.take() {
-                ::std::option::Option::Some(Room_Element_oneof_el::file_recorder(v)) => v,
-                _ => panic!(),
-            }
-        } else {
-            FileRecorder::new()
-        }
-    }
-
-    // .medea.Member member = 3;
+    // .medea.Member member = 1;
 
 
     pub fn get_member(&self) -> &Member {
@@ -3637,56 +2852,7 @@ impl Room_Element {
         }
     }
 
-    // .medea.Relay relay = 4;
-
-
-    pub fn get_relay(&self) -> &Relay {
-        match self.el {
-            ::std::option::Option::Some(Room_Element_oneof_el::relay(ref v)) => v,
-            _ => Relay::default_instance(),
-        }
-    }
-    pub fn clear_relay(&mut self) {
-        self.el = ::std::option::Option::None;
-    }
-
-    pub fn has_relay(&self) -> bool {
-        match self.el {
-            ::std::option::Option::Some(Room_Element_oneof_el::relay(..)) => true,
-            _ => false,
-        }
-    }
-
-    // Param is passed by value, moved
-    pub fn set_relay(&mut self, v: Relay) {
-        self.el = ::std::option::Option::Some(Room_Element_oneof_el::relay(v))
-    }
-
-    // Mutable pointer to the field.
-    pub fn mut_relay(&mut self) -> &mut Relay {
-        if let ::std::option::Option::Some(Room_Element_oneof_el::relay(_)) = self.el {
-        } else {
-            self.el = ::std::option::Option::Some(Room_Element_oneof_el::relay(Relay::new()));
-        }
-        match self.el {
-            ::std::option::Option::Some(Room_Element_oneof_el::relay(ref mut v)) => v,
-            _ => panic!(),
-        }
-    }
-
-    // Take field
-    pub fn take_relay(&mut self) -> Relay {
-        if self.has_relay() {
-            match self.el.take() {
-                ::std::option::Option::Some(Room_Element_oneof_el::relay(v)) => v,
-                _ => panic!(),
-            }
-        } else {
-            Relay::new()
-        }
-    }
-
-    // .medea.WebRtcPlayEndpoint webrtc_play = 5;
+    // .medea.WebRtcPlayEndpoint webrtc_play = 2;
 
 
     pub fn get_webrtc_play(&self) -> &WebRtcPlayEndpoint {
@@ -3735,7 +2901,7 @@ impl Room_Element {
         }
     }
 
-    // .medea.WebRtcPublishEndpoint webrtc_pub = 6;
+    // .medea.WebRtcPublishEndpoint webrtc_pub = 3;
 
 
     pub fn get_webrtc_pub(&self) -> &WebRtcPublishEndpoint {
@@ -3787,22 +2953,7 @@ impl Room_Element {
 
 impl ::protobuf::Message for Room_Element {
     fn is_initialized(&self) -> bool {
-        if let Some(Room_Element_oneof_el::hub(ref v)) = self.el {
-            if !v.is_initialized() {
-                return false;
-            }
-        }
-        if let Some(Room_Element_oneof_el::file_recorder(ref v)) = self.el {
-            if !v.is_initialized() {
-                return false;
-            }
-        }
         if let Some(Room_Element_oneof_el::member(ref v)) = self.el {
-            if !v.is_initialized() {
-                return false;
-            }
-        }
-        if let Some(Room_Element_oneof_el::relay(ref v)) = self.el {
             if !v.is_initialized() {
                 return false;
             }
@@ -3828,33 +2979,15 @@ impl ::protobuf::Message for Room_Element {
                     if wire_type != ::protobuf::wire_format::WireTypeLengthDelimited {
                         return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
                     }
-                    self.el = ::std::option::Option::Some(Room_Element_oneof_el::hub(is.read_message()?));
+                    self.el = ::std::option::Option::Some(Room_Element_oneof_el::member(is.read_message()?));
                 },
                 2 => {
                     if wire_type != ::protobuf::wire_format::WireTypeLengthDelimited {
                         return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
                     }
-                    self.el = ::std::option::Option::Some(Room_Element_oneof_el::file_recorder(is.read_message()?));
-                },
-                3 => {
-                    if wire_type != ::protobuf::wire_format::WireTypeLengthDelimited {
-                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
-                    }
-                    self.el = ::std::option::Option::Some(Room_Element_oneof_el::member(is.read_message()?));
-                },
-                4 => {
-                    if wire_type != ::protobuf::wire_format::WireTypeLengthDelimited {
-                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
-                    }
-                    self.el = ::std::option::Option::Some(Room_Element_oneof_el::relay(is.read_message()?));
-                },
-                5 => {
-                    if wire_type != ::protobuf::wire_format::WireTypeLengthDelimited {
-                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
-                    }
                     self.el = ::std::option::Option::Some(Room_Element_oneof_el::webrtc_play(is.read_message()?));
                 },
-                6 => {
+                3 => {
                     if wire_type != ::protobuf::wire_format::WireTypeLengthDelimited {
                         return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
                     }
@@ -3874,19 +3007,7 @@ impl ::protobuf::Message for Room_Element {
         let mut my_size = 0;
         if let ::std::option::Option::Some(ref v) = self.el {
             match v {
-                &Room_Element_oneof_el::hub(ref v) => {
-                    let len = v.compute_size();
-                    my_size += 1 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
-                },
-                &Room_Element_oneof_el::file_recorder(ref v) => {
-                    let len = v.compute_size();
-                    my_size += 1 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
-                },
                 &Room_Element_oneof_el::member(ref v) => {
-                    let len = v.compute_size();
-                    my_size += 1 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
-                },
-                &Room_Element_oneof_el::relay(ref v) => {
                     let len = v.compute_size();
                     my_size += 1 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
                 },
@@ -3908,33 +3029,18 @@ impl ::protobuf::Message for Room_Element {
     fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::ProtobufResult<()> {
         if let ::std::option::Option::Some(ref v) = self.el {
             match v {
-                &Room_Element_oneof_el::hub(ref v) => {
+                &Room_Element_oneof_el::member(ref v) => {
                     os.write_tag(1, ::protobuf::wire_format::WireTypeLengthDelimited)?;
                     os.write_raw_varint32(v.get_cached_size())?;
                     v.write_to_with_cached_sizes(os)?;
                 },
-                &Room_Element_oneof_el::file_recorder(ref v) => {
+                &Room_Element_oneof_el::webrtc_play(ref v) => {
                     os.write_tag(2, ::protobuf::wire_format::WireTypeLengthDelimited)?;
                     os.write_raw_varint32(v.get_cached_size())?;
                     v.write_to_with_cached_sizes(os)?;
                 },
-                &Room_Element_oneof_el::member(ref v) => {
-                    os.write_tag(3, ::protobuf::wire_format::WireTypeLengthDelimited)?;
-                    os.write_raw_varint32(v.get_cached_size())?;
-                    v.write_to_with_cached_sizes(os)?;
-                },
-                &Room_Element_oneof_el::relay(ref v) => {
-                    os.write_tag(4, ::protobuf::wire_format::WireTypeLengthDelimited)?;
-                    os.write_raw_varint32(v.get_cached_size())?;
-                    v.write_to_with_cached_sizes(os)?;
-                },
-                &Room_Element_oneof_el::webrtc_play(ref v) => {
-                    os.write_tag(5, ::protobuf::wire_format::WireTypeLengthDelimited)?;
-                    os.write_raw_varint32(v.get_cached_size())?;
-                    v.write_to_with_cached_sizes(os)?;
-                },
                 &Room_Element_oneof_el::webrtc_pub(ref v) => {
-                    os.write_tag(6, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+                    os.write_tag(3, ::protobuf::wire_format::WireTypeLengthDelimited)?;
                     os.write_raw_varint32(v.get_cached_size())?;
                     v.write_to_with_cached_sizes(os)?;
                 },
@@ -3982,25 +3088,10 @@ impl ::protobuf::Message for Room_Element {
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_singular_message_accessor::<_, Hub>(
-                    "hub",
-                    Room_Element::has_hub,
-                    Room_Element::get_hub,
-                ));
-                fields.push(::protobuf::reflect::accessor::make_singular_message_accessor::<_, FileRecorder>(
-                    "file_recorder",
-                    Room_Element::has_file_recorder,
-                    Room_Element::get_file_recorder,
-                ));
                 fields.push(::protobuf::reflect::accessor::make_singular_message_accessor::<_, Member>(
                     "member",
                     Room_Element::has_member,
                     Room_Element::get_member,
-                ));
-                fields.push(::protobuf::reflect::accessor::make_singular_message_accessor::<_, Relay>(
-                    "relay",
-                    Room_Element::has_relay,
-                    Room_Element::get_relay,
                 ));
                 fields.push(::protobuf::reflect::accessor::make_singular_message_accessor::<_, WebRtcPlayEndpoint>(
                     "webrtc_play",
@@ -4034,9 +3125,6 @@ impl ::protobuf::Message for Room_Element {
 
 impl ::protobuf::Clear for Room_Element {
     fn clear(&mut self) {
-        self.el = ::std::option::Option::None;
-        self.el = ::std::option::Option::None;
-        self.el = ::std::option::Option::None;
         self.el = ::std::option::Option::None;
         self.el = ::std::option::Option::None;
         self.el = ::std::option::Option::None;
@@ -4363,9 +3451,6 @@ impl<'a> ::std::default::Default for &'a Member_Element {
 
 #[derive(Clone,PartialEq,Debug)]
 pub enum Member_Element_oneof_el {
-    hub(Hub),
-    file_recorder(FileRecorder),
-    relay(Relay),
     webrtc_play(WebRtcPlayEndpoint),
     webrtc_pub(WebRtcPublishEndpoint),
 }
@@ -4375,154 +3460,7 @@ impl Member_Element {
         ::std::default::Default::default()
     }
 
-    // .medea.Hub hub = 1;
-
-
-    pub fn get_hub(&self) -> &Hub {
-        match self.el {
-            ::std::option::Option::Some(Member_Element_oneof_el::hub(ref v)) => v,
-            _ => Hub::default_instance(),
-        }
-    }
-    pub fn clear_hub(&mut self) {
-        self.el = ::std::option::Option::None;
-    }
-
-    pub fn has_hub(&self) -> bool {
-        match self.el {
-            ::std::option::Option::Some(Member_Element_oneof_el::hub(..)) => true,
-            _ => false,
-        }
-    }
-
-    // Param is passed by value, moved
-    pub fn set_hub(&mut self, v: Hub) {
-        self.el = ::std::option::Option::Some(Member_Element_oneof_el::hub(v))
-    }
-
-    // Mutable pointer to the field.
-    pub fn mut_hub(&mut self) -> &mut Hub {
-        if let ::std::option::Option::Some(Member_Element_oneof_el::hub(_)) = self.el {
-        } else {
-            self.el = ::std::option::Option::Some(Member_Element_oneof_el::hub(Hub::new()));
-        }
-        match self.el {
-            ::std::option::Option::Some(Member_Element_oneof_el::hub(ref mut v)) => v,
-            _ => panic!(),
-        }
-    }
-
-    // Take field
-    pub fn take_hub(&mut self) -> Hub {
-        if self.has_hub() {
-            match self.el.take() {
-                ::std::option::Option::Some(Member_Element_oneof_el::hub(v)) => v,
-                _ => panic!(),
-            }
-        } else {
-            Hub::new()
-        }
-    }
-
-    // .medea.FileRecorder file_recorder = 2;
-
-
-    pub fn get_file_recorder(&self) -> &FileRecorder {
-        match self.el {
-            ::std::option::Option::Some(Member_Element_oneof_el::file_recorder(ref v)) => v,
-            _ => FileRecorder::default_instance(),
-        }
-    }
-    pub fn clear_file_recorder(&mut self) {
-        self.el = ::std::option::Option::None;
-    }
-
-    pub fn has_file_recorder(&self) -> bool {
-        match self.el {
-            ::std::option::Option::Some(Member_Element_oneof_el::file_recorder(..)) => true,
-            _ => false,
-        }
-    }
-
-    // Param is passed by value, moved
-    pub fn set_file_recorder(&mut self, v: FileRecorder) {
-        self.el = ::std::option::Option::Some(Member_Element_oneof_el::file_recorder(v))
-    }
-
-    // Mutable pointer to the field.
-    pub fn mut_file_recorder(&mut self) -> &mut FileRecorder {
-        if let ::std::option::Option::Some(Member_Element_oneof_el::file_recorder(_)) = self.el {
-        } else {
-            self.el = ::std::option::Option::Some(Member_Element_oneof_el::file_recorder(FileRecorder::new()));
-        }
-        match self.el {
-            ::std::option::Option::Some(Member_Element_oneof_el::file_recorder(ref mut v)) => v,
-            _ => panic!(),
-        }
-    }
-
-    // Take field
-    pub fn take_file_recorder(&mut self) -> FileRecorder {
-        if self.has_file_recorder() {
-            match self.el.take() {
-                ::std::option::Option::Some(Member_Element_oneof_el::file_recorder(v)) => v,
-                _ => panic!(),
-            }
-        } else {
-            FileRecorder::new()
-        }
-    }
-
-    // .medea.Relay relay = 3;
-
-
-    pub fn get_relay(&self) -> &Relay {
-        match self.el {
-            ::std::option::Option::Some(Member_Element_oneof_el::relay(ref v)) => v,
-            _ => Relay::default_instance(),
-        }
-    }
-    pub fn clear_relay(&mut self) {
-        self.el = ::std::option::Option::None;
-    }
-
-    pub fn has_relay(&self) -> bool {
-        match self.el {
-            ::std::option::Option::Some(Member_Element_oneof_el::relay(..)) => true,
-            _ => false,
-        }
-    }
-
-    // Param is passed by value, moved
-    pub fn set_relay(&mut self, v: Relay) {
-        self.el = ::std::option::Option::Some(Member_Element_oneof_el::relay(v))
-    }
-
-    // Mutable pointer to the field.
-    pub fn mut_relay(&mut self) -> &mut Relay {
-        if let ::std::option::Option::Some(Member_Element_oneof_el::relay(_)) = self.el {
-        } else {
-            self.el = ::std::option::Option::Some(Member_Element_oneof_el::relay(Relay::new()));
-        }
-        match self.el {
-            ::std::option::Option::Some(Member_Element_oneof_el::relay(ref mut v)) => v,
-            _ => panic!(),
-        }
-    }
-
-    // Take field
-    pub fn take_relay(&mut self) -> Relay {
-        if self.has_relay() {
-            match self.el.take() {
-                ::std::option::Option::Some(Member_Element_oneof_el::relay(v)) => v,
-                _ => panic!(),
-            }
-        } else {
-            Relay::new()
-        }
-    }
-
-    // .medea.WebRtcPlayEndpoint webrtc_play = 4;
+    // .medea.WebRtcPlayEndpoint webrtc_play = 1;
 
 
     pub fn get_webrtc_play(&self) -> &WebRtcPlayEndpoint {
@@ -4571,7 +3509,7 @@ impl Member_Element {
         }
     }
 
-    // .medea.WebRtcPublishEndpoint webrtc_pub = 5;
+    // .medea.WebRtcPublishEndpoint webrtc_pub = 2;
 
 
     pub fn get_webrtc_pub(&self) -> &WebRtcPublishEndpoint {
@@ -4623,21 +3561,6 @@ impl Member_Element {
 
 impl ::protobuf::Message for Member_Element {
     fn is_initialized(&self) -> bool {
-        if let Some(Member_Element_oneof_el::hub(ref v)) = self.el {
-            if !v.is_initialized() {
-                return false;
-            }
-        }
-        if let Some(Member_Element_oneof_el::file_recorder(ref v)) = self.el {
-            if !v.is_initialized() {
-                return false;
-            }
-        }
-        if let Some(Member_Element_oneof_el::relay(ref v)) = self.el {
-            if !v.is_initialized() {
-                return false;
-            }
-        }
         if let Some(Member_Element_oneof_el::webrtc_play(ref v)) = self.el {
             if !v.is_initialized() {
                 return false;
@@ -4659,27 +3582,9 @@ impl ::protobuf::Message for Member_Element {
                     if wire_type != ::protobuf::wire_format::WireTypeLengthDelimited {
                         return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
                     }
-                    self.el = ::std::option::Option::Some(Member_Element_oneof_el::hub(is.read_message()?));
-                },
-                2 => {
-                    if wire_type != ::protobuf::wire_format::WireTypeLengthDelimited {
-                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
-                    }
-                    self.el = ::std::option::Option::Some(Member_Element_oneof_el::file_recorder(is.read_message()?));
-                },
-                3 => {
-                    if wire_type != ::protobuf::wire_format::WireTypeLengthDelimited {
-                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
-                    }
-                    self.el = ::std::option::Option::Some(Member_Element_oneof_el::relay(is.read_message()?));
-                },
-                4 => {
-                    if wire_type != ::protobuf::wire_format::WireTypeLengthDelimited {
-                        return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
-                    }
                     self.el = ::std::option::Option::Some(Member_Element_oneof_el::webrtc_play(is.read_message()?));
                 },
-                5 => {
+                2 => {
                     if wire_type != ::protobuf::wire_format::WireTypeLengthDelimited {
                         return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
                     }
@@ -4699,18 +3604,6 @@ impl ::protobuf::Message for Member_Element {
         let mut my_size = 0;
         if let ::std::option::Option::Some(ref v) = self.el {
             match v {
-                &Member_Element_oneof_el::hub(ref v) => {
-                    let len = v.compute_size();
-                    my_size += 1 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
-                },
-                &Member_Element_oneof_el::file_recorder(ref v) => {
-                    let len = v.compute_size();
-                    my_size += 1 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
-                },
-                &Member_Element_oneof_el::relay(ref v) => {
-                    let len = v.compute_size();
-                    my_size += 1 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
-                },
                 &Member_Element_oneof_el::webrtc_play(ref v) => {
                     let len = v.compute_size();
                     my_size += 1 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
@@ -4729,28 +3622,13 @@ impl ::protobuf::Message for Member_Element {
     fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::ProtobufResult<()> {
         if let ::std::option::Option::Some(ref v) = self.el {
             match v {
-                &Member_Element_oneof_el::hub(ref v) => {
+                &Member_Element_oneof_el::webrtc_play(ref v) => {
                     os.write_tag(1, ::protobuf::wire_format::WireTypeLengthDelimited)?;
                     os.write_raw_varint32(v.get_cached_size())?;
                     v.write_to_with_cached_sizes(os)?;
                 },
-                &Member_Element_oneof_el::file_recorder(ref v) => {
-                    os.write_tag(2, ::protobuf::wire_format::WireTypeLengthDelimited)?;
-                    os.write_raw_varint32(v.get_cached_size())?;
-                    v.write_to_with_cached_sizes(os)?;
-                },
-                &Member_Element_oneof_el::relay(ref v) => {
-                    os.write_tag(3, ::protobuf::wire_format::WireTypeLengthDelimited)?;
-                    os.write_raw_varint32(v.get_cached_size())?;
-                    v.write_to_with_cached_sizes(os)?;
-                },
-                &Member_Element_oneof_el::webrtc_play(ref v) => {
-                    os.write_tag(4, ::protobuf::wire_format::WireTypeLengthDelimited)?;
-                    os.write_raw_varint32(v.get_cached_size())?;
-                    v.write_to_with_cached_sizes(os)?;
-                },
                 &Member_Element_oneof_el::webrtc_pub(ref v) => {
-                    os.write_tag(5, ::protobuf::wire_format::WireTypeLengthDelimited)?;
+                    os.write_tag(2, ::protobuf::wire_format::WireTypeLengthDelimited)?;
                     os.write_raw_varint32(v.get_cached_size())?;
                     v.write_to_with_cached_sizes(os)?;
                 },
@@ -4798,21 +3676,6 @@ impl ::protobuf::Message for Member_Element {
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_singular_message_accessor::<_, Hub>(
-                    "hub",
-                    Member_Element::has_hub,
-                    Member_Element::get_hub,
-                ));
-                fields.push(::protobuf::reflect::accessor::make_singular_message_accessor::<_, FileRecorder>(
-                    "file_recorder",
-                    Member_Element::has_file_recorder,
-                    Member_Element::get_file_recorder,
-                ));
-                fields.push(::protobuf::reflect::accessor::make_singular_message_accessor::<_, Relay>(
-                    "relay",
-                    Member_Element::has_relay,
-                    Member_Element::get_relay,
-                ));
                 fields.push(::protobuf::reflect::accessor::make_singular_message_accessor::<_, WebRtcPlayEndpoint>(
                     "webrtc_play",
                     Member_Element::has_webrtc_play,
@@ -4845,9 +3708,6 @@ impl ::protobuf::Message for Member_Element {
 
 impl ::protobuf::Clear for Member_Element {
     fn clear(&mut self) {
-        self.el = ::std::option::Option::None;
-        self.el = ::std::option::Option::None;
-        self.el = ::std::option::Option::None;
         self.el = ::std::option::Option::None;
         self.el = ::std::option::Option::None;
         self.unknown_fields.clear();
@@ -4903,7 +3763,7 @@ impl WebRtcPublishEndpoint {
         self.p2p = v;
     }
 
-    // string on_start = 3;
+    // string on_start = 2;
 
 
     pub fn get_on_start(&self) -> &str {
@@ -4929,7 +3789,7 @@ impl WebRtcPublishEndpoint {
         ::std::mem::replace(&mut self.on_start, ::std::string::String::new())
     }
 
-    // string on_stop = 4;
+    // string on_stop = 3;
 
 
     pub fn get_on_stop(&self) -> &str {
@@ -4968,10 +3828,10 @@ impl ::protobuf::Message for WebRtcPublishEndpoint {
                 1 => {
                     ::protobuf::rt::read_proto3_enum_with_unknown_fields_into(wire_type, is, &mut self.p2p, 1, &mut self.unknown_fields)?
                 },
-                3 => {
+                2 => {
                     ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.on_start)?;
                 },
-                4 => {
+                3 => {
                     ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.on_stop)?;
                 },
                 _ => {
@@ -4990,10 +3850,10 @@ impl ::protobuf::Message for WebRtcPublishEndpoint {
             my_size += ::protobuf::rt::enum_size(1, self.p2p);
         }
         if !self.on_start.is_empty() {
-            my_size += ::protobuf::rt::string_size(3, &self.on_start);
+            my_size += ::protobuf::rt::string_size(2, &self.on_start);
         }
         if !self.on_stop.is_empty() {
-            my_size += ::protobuf::rt::string_size(4, &self.on_stop);
+            my_size += ::protobuf::rt::string_size(3, &self.on_stop);
         }
         my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
         self.cached_size.set(my_size);
@@ -5005,10 +3865,10 @@ impl ::protobuf::Message for WebRtcPublishEndpoint {
             os.write_enum(1, self.p2p.value())?;
         }
         if !self.on_start.is_empty() {
-            os.write_string(3, &self.on_start)?;
+            os.write_string(2, &self.on_start)?;
         }
         if !self.on_stop.is_empty() {
-            os.write_string(4, &self.on_stop)?;
+            os.write_string(3, &self.on_stop)?;
         }
         os.write_unknown_fields(self.get_unknown_fields())?;
         ::std::result::Result::Ok(())
@@ -5419,718 +4279,67 @@ impl ::protobuf::reflect::ProtobufValue for WebRtcPlayEndpoint {
     }
 }
 
-#[derive(PartialEq,Clone,Default)]
-pub struct Hub {
-    // special fields
-    pub unknown_fields: ::protobuf::UnknownFields,
-    pub cached_size: ::protobuf::CachedSize,
-}
-
-impl<'a> ::std::default::Default for &'a Hub {
-    fn default() -> &'a Hub {
-        <Hub as ::protobuf::Message>::default_instance()
-    }
-}
-
-impl Hub {
-    pub fn new() -> Hub {
-        ::std::default::Default::default()
-    }
-}
-
-impl ::protobuf::Message for Hub {
-    fn is_initialized(&self) -> bool {
-        true
-    }
-
-    fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream<'_>) -> ::protobuf::ProtobufResult<()> {
-        while !is.eof()? {
-            let (field_number, wire_type) = is.read_tag_unpack()?;
-            match field_number {
-                _ => {
-                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
-                },
-            };
-        }
-        ::std::result::Result::Ok(())
-    }
-
-    // Compute sizes of nested messages
-    #[allow(unused_variables)]
-    fn compute_size(&self) -> u32 {
-        let mut my_size = 0;
-        my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
-        self.cached_size.set(my_size);
-        my_size
-    }
-
-    fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::ProtobufResult<()> {
-        os.write_unknown_fields(self.get_unknown_fields())?;
-        ::std::result::Result::Ok(())
-    }
-
-    fn get_cached_size(&self) -> u32 {
-        self.cached_size.get()
-    }
-
-    fn get_unknown_fields(&self) -> &::protobuf::UnknownFields {
-        &self.unknown_fields
-    }
-
-    fn mut_unknown_fields(&mut self) -> &mut ::protobuf::UnknownFields {
-        &mut self.unknown_fields
-    }
-
-    fn as_any(&self) -> &dyn (::std::any::Any) {
-        self as &dyn (::std::any::Any)
-    }
-    fn as_any_mut(&mut self) -> &mut dyn (::std::any::Any) {
-        self as &mut dyn (::std::any::Any)
-    }
-    fn into_any(self: Box<Self>) -> ::std::boxed::Box<dyn (::std::any::Any)> {
-        self
-    }
-
-    fn descriptor(&self) -> &'static ::protobuf::reflect::MessageDescriptor {
-        Self::descriptor_static()
-    }
-
-    fn new() -> Hub {
-        Hub::new()
-    }
-
-    fn descriptor_static() -> &'static ::protobuf::reflect::MessageDescriptor {
-        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::lazy::Lazy {
-            lock: ::protobuf::lazy::ONCE_INIT,
-            ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
-        };
-        unsafe {
-            descriptor.get(|| {
-                let fields = ::std::vec::Vec::new();
-                ::protobuf::reflect::MessageDescriptor::new::<Hub>(
-                    "Hub",
-                    fields,
-                    file_descriptor_proto()
-                )
-            })
-        }
-    }
-
-    fn default_instance() -> &'static Hub {
-        static mut instance: ::protobuf::lazy::Lazy<Hub> = ::protobuf::lazy::Lazy {
-            lock: ::protobuf::lazy::ONCE_INIT,
-            ptr: 0 as *const Hub,
-        };
-        unsafe {
-            instance.get(Hub::new)
-        }
-    }
-}
-
-impl ::protobuf::Clear for Hub {
-    fn clear(&mut self) {
-        self.unknown_fields.clear();
-    }
-}
-
-impl ::std::fmt::Debug for Hub {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        ::protobuf::text_format::fmt(self, f)
-    }
-}
-
-impl ::protobuf::reflect::ProtobufValue for Hub {
-    fn as_ref(&self) -> ::protobuf::reflect::ProtobufValueRef {
-        ::protobuf::reflect::ProtobufValueRef::Message(self)
-    }
-}
-
-#[derive(PartialEq,Clone,Default)]
-pub struct FileRecorder {
-    // message fields
-    pub src: ::std::string::String,
-    pub dst: ::std::string::String,
-    pub on_start: ::std::string::String,
-    pub on_stop: ::std::string::String,
-    // special fields
-    pub unknown_fields: ::protobuf::UnknownFields,
-    pub cached_size: ::protobuf::CachedSize,
-}
-
-impl<'a> ::std::default::Default for &'a FileRecorder {
-    fn default() -> &'a FileRecorder {
-        <FileRecorder as ::protobuf::Message>::default_instance()
-    }
-}
-
-impl FileRecorder {
-    pub fn new() -> FileRecorder {
-        ::std::default::Default::default()
-    }
-
-    // string src = 1;
-
-
-    pub fn get_src(&self) -> &str {
-        &self.src
-    }
-    pub fn clear_src(&mut self) {
-        self.src.clear();
-    }
-
-    // Param is passed by value, moved
-    pub fn set_src(&mut self, v: ::std::string::String) {
-        self.src = v;
-    }
-
-    // Mutable pointer to the field.
-    // If field is not initialized, it is initialized with default value first.
-    pub fn mut_src(&mut self) -> &mut ::std::string::String {
-        &mut self.src
-    }
-
-    // Take field
-    pub fn take_src(&mut self) -> ::std::string::String {
-        ::std::mem::replace(&mut self.src, ::std::string::String::new())
-    }
-
-    // string dst = 2;
-
-
-    pub fn get_dst(&self) -> &str {
-        &self.dst
-    }
-    pub fn clear_dst(&mut self) {
-        self.dst.clear();
-    }
-
-    // Param is passed by value, moved
-    pub fn set_dst(&mut self, v: ::std::string::String) {
-        self.dst = v;
-    }
-
-    // Mutable pointer to the field.
-    // If field is not initialized, it is initialized with default value first.
-    pub fn mut_dst(&mut self) -> &mut ::std::string::String {
-        &mut self.dst
-    }
-
-    // Take field
-    pub fn take_dst(&mut self) -> ::std::string::String {
-        ::std::mem::replace(&mut self.dst, ::std::string::String::new())
-    }
-
-    // string on_start = 3;
-
-
-    pub fn get_on_start(&self) -> &str {
-        &self.on_start
-    }
-    pub fn clear_on_start(&mut self) {
-        self.on_start.clear();
-    }
-
-    // Param is passed by value, moved
-    pub fn set_on_start(&mut self, v: ::std::string::String) {
-        self.on_start = v;
-    }
-
-    // Mutable pointer to the field.
-    // If field is not initialized, it is initialized with default value first.
-    pub fn mut_on_start(&mut self) -> &mut ::std::string::String {
-        &mut self.on_start
-    }
-
-    // Take field
-    pub fn take_on_start(&mut self) -> ::std::string::String {
-        ::std::mem::replace(&mut self.on_start, ::std::string::String::new())
-    }
-
-    // string on_stop = 4;
-
-
-    pub fn get_on_stop(&self) -> &str {
-        &self.on_stop
-    }
-    pub fn clear_on_stop(&mut self) {
-        self.on_stop.clear();
-    }
-
-    // Param is passed by value, moved
-    pub fn set_on_stop(&mut self, v: ::std::string::String) {
-        self.on_stop = v;
-    }
-
-    // Mutable pointer to the field.
-    // If field is not initialized, it is initialized with default value first.
-    pub fn mut_on_stop(&mut self) -> &mut ::std::string::String {
-        &mut self.on_stop
-    }
-
-    // Take field
-    pub fn take_on_stop(&mut self) -> ::std::string::String {
-        ::std::mem::replace(&mut self.on_stop, ::std::string::String::new())
-    }
-}
-
-impl ::protobuf::Message for FileRecorder {
-    fn is_initialized(&self) -> bool {
-        true
-    }
-
-    fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream<'_>) -> ::protobuf::ProtobufResult<()> {
-        while !is.eof()? {
-            let (field_number, wire_type) = is.read_tag_unpack()?;
-            match field_number {
-                1 => {
-                    ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.src)?;
-                },
-                2 => {
-                    ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.dst)?;
-                },
-                3 => {
-                    ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.on_start)?;
-                },
-                4 => {
-                    ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.on_stop)?;
-                },
-                _ => {
-                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
-                },
-            };
-        }
-        ::std::result::Result::Ok(())
-    }
-
-    // Compute sizes of nested messages
-    #[allow(unused_variables)]
-    fn compute_size(&self) -> u32 {
-        let mut my_size = 0;
-        if !self.src.is_empty() {
-            my_size += ::protobuf::rt::string_size(1, &self.src);
-        }
-        if !self.dst.is_empty() {
-            my_size += ::protobuf::rt::string_size(2, &self.dst);
-        }
-        if !self.on_start.is_empty() {
-            my_size += ::protobuf::rt::string_size(3, &self.on_start);
-        }
-        if !self.on_stop.is_empty() {
-            my_size += ::protobuf::rt::string_size(4, &self.on_stop);
-        }
-        my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
-        self.cached_size.set(my_size);
-        my_size
-    }
-
-    fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::ProtobufResult<()> {
-        if !self.src.is_empty() {
-            os.write_string(1, &self.src)?;
-        }
-        if !self.dst.is_empty() {
-            os.write_string(2, &self.dst)?;
-        }
-        if !self.on_start.is_empty() {
-            os.write_string(3, &self.on_start)?;
-        }
-        if !self.on_stop.is_empty() {
-            os.write_string(4, &self.on_stop)?;
-        }
-        os.write_unknown_fields(self.get_unknown_fields())?;
-        ::std::result::Result::Ok(())
-    }
-
-    fn get_cached_size(&self) -> u32 {
-        self.cached_size.get()
-    }
-
-    fn get_unknown_fields(&self) -> &::protobuf::UnknownFields {
-        &self.unknown_fields
-    }
-
-    fn mut_unknown_fields(&mut self) -> &mut ::protobuf::UnknownFields {
-        &mut self.unknown_fields
-    }
-
-    fn as_any(&self) -> &dyn (::std::any::Any) {
-        self as &dyn (::std::any::Any)
-    }
-    fn as_any_mut(&mut self) -> &mut dyn (::std::any::Any) {
-        self as &mut dyn (::std::any::Any)
-    }
-    fn into_any(self: Box<Self>) -> ::std::boxed::Box<dyn (::std::any::Any)> {
-        self
-    }
-
-    fn descriptor(&self) -> &'static ::protobuf::reflect::MessageDescriptor {
-        Self::descriptor_static()
-    }
-
-    fn new() -> FileRecorder {
-        FileRecorder::new()
-    }
-
-    fn descriptor_static() -> &'static ::protobuf::reflect::MessageDescriptor {
-        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::lazy::Lazy {
-            lock: ::protobuf::lazy::ONCE_INIT,
-            ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
-        };
-        unsafe {
-            descriptor.get(|| {
-                let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
-                    "src",
-                    |m: &FileRecorder| { &m.src },
-                    |m: &mut FileRecorder| { &mut m.src },
-                ));
-                fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
-                    "dst",
-                    |m: &FileRecorder| { &m.dst },
-                    |m: &mut FileRecorder| { &mut m.dst },
-                ));
-                fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
-                    "on_start",
-                    |m: &FileRecorder| { &m.on_start },
-                    |m: &mut FileRecorder| { &mut m.on_start },
-                ));
-                fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
-                    "on_stop",
-                    |m: &FileRecorder| { &m.on_stop },
-                    |m: &mut FileRecorder| { &mut m.on_stop },
-                ));
-                ::protobuf::reflect::MessageDescriptor::new::<FileRecorder>(
-                    "FileRecorder",
-                    fields,
-                    file_descriptor_proto()
-                )
-            })
-        }
-    }
-
-    fn default_instance() -> &'static FileRecorder {
-        static mut instance: ::protobuf::lazy::Lazy<FileRecorder> = ::protobuf::lazy::Lazy {
-            lock: ::protobuf::lazy::ONCE_INIT,
-            ptr: 0 as *const FileRecorder,
-        };
-        unsafe {
-            instance.get(FileRecorder::new)
-        }
-    }
-}
-
-impl ::protobuf::Clear for FileRecorder {
-    fn clear(&mut self) {
-        self.src.clear();
-        self.dst.clear();
-        self.on_start.clear();
-        self.on_stop.clear();
-        self.unknown_fields.clear();
-    }
-}
-
-impl ::std::fmt::Debug for FileRecorder {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        ::protobuf::text_format::fmt(self, f)
-    }
-}
-
-impl ::protobuf::reflect::ProtobufValue for FileRecorder {
-    fn as_ref(&self) -> ::protobuf::reflect::ProtobufValueRef {
-        ::protobuf::reflect::ProtobufValueRef::Message(self)
-    }
-}
-
-#[derive(PartialEq,Clone,Default)]
-pub struct Relay {
-    // message fields
-    pub src: ::std::string::String,
-    pub dst: ::std::string::String,
-    // special fields
-    pub unknown_fields: ::protobuf::UnknownFields,
-    pub cached_size: ::protobuf::CachedSize,
-}
-
-impl<'a> ::std::default::Default for &'a Relay {
-    fn default() -> &'a Relay {
-        <Relay as ::protobuf::Message>::default_instance()
-    }
-}
-
-impl Relay {
-    pub fn new() -> Relay {
-        ::std::default::Default::default()
-    }
-
-    // string src = 1;
-
-
-    pub fn get_src(&self) -> &str {
-        &self.src
-    }
-    pub fn clear_src(&mut self) {
-        self.src.clear();
-    }
-
-    // Param is passed by value, moved
-    pub fn set_src(&mut self, v: ::std::string::String) {
-        self.src = v;
-    }
-
-    // Mutable pointer to the field.
-    // If field is not initialized, it is initialized with default value first.
-    pub fn mut_src(&mut self) -> &mut ::std::string::String {
-        &mut self.src
-    }
-
-    // Take field
-    pub fn take_src(&mut self) -> ::std::string::String {
-        ::std::mem::replace(&mut self.src, ::std::string::String::new())
-    }
-
-    // string dst = 2;
-
-
-    pub fn get_dst(&self) -> &str {
-        &self.dst
-    }
-    pub fn clear_dst(&mut self) {
-        self.dst.clear();
-    }
-
-    // Param is passed by value, moved
-    pub fn set_dst(&mut self, v: ::std::string::String) {
-        self.dst = v;
-    }
-
-    // Mutable pointer to the field.
-    // If field is not initialized, it is initialized with default value first.
-    pub fn mut_dst(&mut self) -> &mut ::std::string::String {
-        &mut self.dst
-    }
-
-    // Take field
-    pub fn take_dst(&mut self) -> ::std::string::String {
-        ::std::mem::replace(&mut self.dst, ::std::string::String::new())
-    }
-}
-
-impl ::protobuf::Message for Relay {
-    fn is_initialized(&self) -> bool {
-        true
-    }
-
-    fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream<'_>) -> ::protobuf::ProtobufResult<()> {
-        while !is.eof()? {
-            let (field_number, wire_type) = is.read_tag_unpack()?;
-            match field_number {
-                1 => {
-                    ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.src)?;
-                },
-                2 => {
-                    ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.dst)?;
-                },
-                _ => {
-                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
-                },
-            };
-        }
-        ::std::result::Result::Ok(())
-    }
-
-    // Compute sizes of nested messages
-    #[allow(unused_variables)]
-    fn compute_size(&self) -> u32 {
-        let mut my_size = 0;
-        if !self.src.is_empty() {
-            my_size += ::protobuf::rt::string_size(1, &self.src);
-        }
-        if !self.dst.is_empty() {
-            my_size += ::protobuf::rt::string_size(2, &self.dst);
-        }
-        my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
-        self.cached_size.set(my_size);
-        my_size
-    }
-
-    fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::ProtobufResult<()> {
-        if !self.src.is_empty() {
-            os.write_string(1, &self.src)?;
-        }
-        if !self.dst.is_empty() {
-            os.write_string(2, &self.dst)?;
-        }
-        os.write_unknown_fields(self.get_unknown_fields())?;
-        ::std::result::Result::Ok(())
-    }
-
-    fn get_cached_size(&self) -> u32 {
-        self.cached_size.get()
-    }
-
-    fn get_unknown_fields(&self) -> &::protobuf::UnknownFields {
-        &self.unknown_fields
-    }
-
-    fn mut_unknown_fields(&mut self) -> &mut ::protobuf::UnknownFields {
-        &mut self.unknown_fields
-    }
-
-    fn as_any(&self) -> &dyn (::std::any::Any) {
-        self as &dyn (::std::any::Any)
-    }
-    fn as_any_mut(&mut self) -> &mut dyn (::std::any::Any) {
-        self as &mut dyn (::std::any::Any)
-    }
-    fn into_any(self: Box<Self>) -> ::std::boxed::Box<dyn (::std::any::Any)> {
-        self
-    }
-
-    fn descriptor(&self) -> &'static ::protobuf::reflect::MessageDescriptor {
-        Self::descriptor_static()
-    }
-
-    fn new() -> Relay {
-        Relay::new()
-    }
-
-    fn descriptor_static() -> &'static ::protobuf::reflect::MessageDescriptor {
-        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::lazy::Lazy {
-            lock: ::protobuf::lazy::ONCE_INIT,
-            ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
-        };
-        unsafe {
-            descriptor.get(|| {
-                let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
-                    "src",
-                    |m: &Relay| { &m.src },
-                    |m: &mut Relay| { &mut m.src },
-                ));
-                fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
-                    "dst",
-                    |m: &Relay| { &m.dst },
-                    |m: &mut Relay| { &mut m.dst },
-                ));
-                ::protobuf::reflect::MessageDescriptor::new::<Relay>(
-                    "Relay",
-                    fields,
-                    file_descriptor_proto()
-                )
-            })
-        }
-    }
-
-    fn default_instance() -> &'static Relay {
-        static mut instance: ::protobuf::lazy::Lazy<Relay> = ::protobuf::lazy::Lazy {
-            lock: ::protobuf::lazy::ONCE_INIT,
-            ptr: 0 as *const Relay,
-        };
-        unsafe {
-            instance.get(Relay::new)
-        }
-    }
-}
-
-impl ::protobuf::Clear for Relay {
-    fn clear(&mut self) {
-        self.src.clear();
-        self.dst.clear();
-        self.unknown_fields.clear();
-    }
-}
-
-impl ::std::fmt::Debug for Relay {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        ::protobuf::text_format::fmt(self, f)
-    }
-}
-
-impl ::protobuf::reflect::ProtobufValue for Relay {
-    fn as_ref(&self) -> ::protobuf::reflect::ProtobufValueRef {
-        ::protobuf::reflect::ProtobufValueRef::Message(self)
-    }
-}
-
 static file_descriptor_proto_data: &'static [u8] = b"\
-    \n\tapi.proto\x12\x05medea\"\xf0\x02\n\rCreateRequest\x12\x0e\n\x02id\
-    \x18\x01\x20\x01(\tR\x02id\x12\x1e\n\x03hub\x18\x02\x20\x01(\x0b2\n.mede\
-    a.HubH\0R\x03hub\x12:\n\rfile_recorder\x18\x03\x20\x01(\x0b2\x13.medea.F\
-    ileRecorderH\0R\x0cfileRecorder\x12'\n\x06member\x18\x04\x20\x01(\x0b2\r\
-    .medea.MemberH\0R\x06member\x12$\n\x05relay\x18\x05\x20\x01(\x0b2\x0c.me\
-    dea.RelayH\0R\x05relay\x12!\n\x04room\x18\x06\x20\x01(\x0b2\x0b.medea.Ro\
-    omH\0R\x04room\x12<\n\x0bwebrtc_play\x18\x07\x20\x01(\x0b2\x19.medea.Web\
-    RtcPlayEndpointH\0R\nwebrtcPlay\x12=\n\nwebrtc_pub\x18\x08\x20\x01(\x0b2\
-    \x1c.medea.WebRtcPublishEndpointH\0R\twebrtcPubB\x04\n\x02el\"\xc4\x03\n\
-    \x0cApplyRequest\x12\x0e\n\x02id\x18\x01\x20\x01(\tR\x02id\x12\x1e\n\x03\
-    hub\x18\x02\x20\x01(\x0b2\n.medea.HubH\0R\x03hub\x12:\n\rfile_recorder\
-    \x18\x03\x20\x01(\x0b2\x13.medea.FileRecorderH\0R\x0cfileRecorder\x12'\n\
-    \x06member\x18\x04\x20\x01(\x0b2\r.medea.MemberH\0R\x06member\x12$\n\x05\
-    relay\x18\x05\x20\x01(\x0b2\x0c.medea.RelayH\0R\x05relay\x12!\n\x04room\
-    \x18\x06\x20\x01(\x0b2\x0b.medea.RoomH\0R\x04room\x12<\n\x0bwebrtc_play\
-    \x18\x07\x20\x01(\x0b2\x19.medea.WebRtcPlayEndpointH\0R\nwebrtcPlay\x12=\
-    \n\nwebrtc_pub\x18\x08\x20\x01(\x0b2\x1c.medea.WebRtcPublishEndpointH\0R\
-    \twebrtcPub\x122\n\x06policy\x18\t\x20\x01(\x0e2\x1a.medea.ApplyRequest.\
-    PolicyR\x06policy\"\x1f\n\x06Policy\x12\t\n\x05APPLY\x10\0\x12\n\n\x06AP\
-    PEND\x10\x01B\x04\n\x02el\"\x1b\n\tIdRequest\x12\x0e\n\x02id\x18\x01\x20\
-    \x03(\tR\x02id\".\n\x08Response\x12\"\n\x05error\x18\x01\x20\x01(\x0b2\
-    \x0c.medea.ErrorR\x05error\"\x9e\x01\n\x0eCreateResponse\x120\n\x03sid\
-    \x18\x01\x20\x03(\x0b2\x1e.medea.CreateResponse.SidEntryR\x03sid\x12\"\n\
-    \x05error\x18\x02\x20\x01(\x0b2\x0c.medea.ErrorR\x05error\x1a6\n\x08SidE\
-    ntry\x12\x10\n\x03key\x18\x01\x20\x01(\tR\x03key\x12\x14\n\x05value\x18\
-    \x02\x20\x01(\tR\x05value:\x028\x01\"\xbc\x01\n\x0bGetResponse\x12<\n\
-    \x08elements\x18\x01\x20\x03(\x0b2\x20.medea.GetResponse.ElementsEntryR\
-    \x08elements\x12\"\n\x05error\x18\x02\x20\x01(\x0b2\x0c.medea.ErrorR\x05\
-    error\x1aK\n\rElementsEntry\x12\x10\n\x03key\x18\x01\x20\x01(\tR\x03key\
-    \x12$\n\x05value\x18\x02\x20\x01(\x0b2\x0e.medea.ElementR\x05value:\x028\
-    \x01\"[\n\x05Error\x12\x12\n\x04code\x18\x02\x20\x01(\rR\x04code\x12\x12\
-    \n\x04text\x18\x03\x20\x01(\tR\x04text\x12\x10\n\x03doc\x18\x04\x20\x01(\
-    \tR\x03doc\x12\x18\n\x07element\x18\x05\x20\x01(\tR\x07element\"\xda\x02\
-    \n\x07Element\x12\x1e\n\x03hub\x18\x02\x20\x01(\x0b2\n.medea.HubH\0R\x03\
-    hub\x12:\n\rfile_recorder\x18\x03\x20\x01(\x0b2\x13.medea.FileRecorderH\
-    \0R\x0cfileRecorder\x12'\n\x06member\x18\x04\x20\x01(\x0b2\r.medea.Membe\
-    rH\0R\x06member\x12$\n\x05relay\x18\x05\x20\x01(\x0b2\x0c.medea.RelayH\0\
-    R\x05relay\x12!\n\x04room\x18\x06\x20\x01(\x0b2\x0b.medea.RoomH\0R\x04ro\
-    om\x12<\n\x0bwebrtc_play\x18\x07\x20\x01(\x0b2\x19.medea.WebRtcPlayEndpo\
-    intH\0R\nwebrtcPlay\x12=\n\nwebrtc_pub\x18\x08\x20\x01(\x0b2\x1c.medea.W\
-    ebRtcPublishEndpointH\0R\twebrtcPubB\x04\n\x02el\"\xc9\x03\n\x04Room\x12\
-    5\n\x08pipeline\x18\x01\x20\x03(\x0b2\x19.medea.Room.PipelineEntryR\x08p\
-    ipeline\x1aP\n\rPipelineEntry\x12\x10\n\x03key\x18\x01\x20\x01(\tR\x03ke\
-    y\x12)\n\x05value\x18\x02\x20\x01(\x0b2\x13.medea.Room.ElementR\x05value\
-    :\x028\x01\x1a\xb7\x02\n\x07Element\x12\x1e\n\x03hub\x18\x01\x20\x01(\
-    \x0b2\n.medea.HubH\0R\x03hub\x12:\n\rfile_recorder\x18\x02\x20\x01(\x0b2\
-    \x13.medea.FileRecorderH\0R\x0cfileRecorder\x12'\n\x06member\x18\x03\x20\
-    \x01(\x0b2\r.medea.MemberH\0R\x06member\x12$\n\x05relay\x18\x04\x20\x01(\
-    \x0b2\x0c.medea.RelayH\0R\x05relay\x12<\n\x0bwebrtc_play\x18\x05\x20\x01\
-    (\x0b2\x19.medea.WebRtcPlayEndpointH\0R\nwebrtcPlay\x12=\n\nwebrtc_pub\
-    \x18\x06\x20\x01(\x0b2\x1c.medea.WebRtcPublishEndpointH\0R\twebrtcPubB\
-    \x04\n\x02el\"\xfc\x03\n\x06Member\x12\x17\n\x07on_join\x18\x01\x20\x01(\
-    \tR\x06onJoin\x12\x19\n\x08on_leave\x18\x02\x20\x01(\tR\x07onLeave\x12\
-    \x20\n\x0bcredentials\x18\x03\x20\x01(\tR\x0bcredentials\x127\n\x08pipel\
-    ine\x18\x04\x20\x03(\x0b2\x1b.medea.Member.PipelineEntryR\x08pipeline\
-    \x1aR\n\rPipelineEntry\x12\x10\n\x03key\x18\x01\x20\x01(\tR\x03key\x12+\
-    \n\x05value\x18\x02\x20\x01(\x0b2\x15.medea.Member.ElementR\x05value:\
-    \x028\x01\x1a\x8e\x02\n\x07Element\x12\x1e\n\x03hub\x18\x01\x20\x01(\x0b\
-    2\n.medea.HubH\0R\x03hub\x12:\n\rfile_recorder\x18\x02\x20\x01(\x0b2\x13\
-    .medea.FileRecorderH\0R\x0cfileRecorder\x12$\n\x05relay\x18\x03\x20\x01(\
-    \x0b2\x0c.medea.RelayH\0R\x05relay\x12<\n\x0bwebrtc_play\x18\x04\x20\x01\
-    (\x0b2\x19.medea.WebRtcPlayEndpointH\0R\nwebrtcPlay\x12=\n\nwebrtc_pub\
-    \x18\x05\x20\x01(\x0b2\x1c.medea.WebRtcPublishEndpointH\0R\twebrtcPubB\
+    \n\tapi.proto\x12\x05medea\"\xee\x01\n\rCreateRequest\x12\x0e\n\x02id\
+    \x18\x01\x20\x01(\tR\x02id\x12'\n\x06member\x18\x02\x20\x01(\x0b2\r.mede\
+    a.MemberH\0R\x06member\x12!\n\x04room\x18\x03\x20\x01(\x0b2\x0b.medea.Ro\
+    omH\0R\x04room\x12<\n\x0bwebrtc_play\x18\x04\x20\x01(\x0b2\x19.medea.Web\
+    RtcPlayEndpointH\0R\nwebrtcPlay\x12=\n\nwebrtc_pub\x18\x05\x20\x01(\x0b2\
+    \x1c.medea.WebRtcPublishEndpointH\0R\twebrtcPubB\x04\n\x02el\"\xc2\x02\n\
+    \x0cApplyRequest\x12\x0e\n\x02id\x18\x01\x20\x01(\tR\x02id\x12'\n\x06mem\
+    ber\x18\x02\x20\x01(\x0b2\r.medea.MemberH\0R\x06member\x12!\n\x04room\
+    \x18\x03\x20\x01(\x0b2\x0b.medea.RoomH\0R\x04room\x12<\n\x0bwebrtc_play\
+    \x18\x04\x20\x01(\x0b2\x19.medea.WebRtcPlayEndpointH\0R\nwebrtcPlay\x12=\
+    \n\nwebrtc_pub\x18\x05\x20\x01(\x0b2\x1c.medea.WebRtcPublishEndpointH\0R\
+    \twebrtcPub\x122\n\x06policy\x18\x06\x20\x01(\x0e2\x1a.medea.ApplyReques\
+    t.PolicyR\x06policy\"\x1f\n\x06Policy\x12\t\n\x05APPLY\x10\0\x12\n\n\x06\
+    APPEND\x10\x01B\x04\n\x02el\"\x1b\n\tIdRequest\x12\x0e\n\x02id\x18\x01\
+    \x20\x03(\tR\x02id\".\n\x08Response\x12\"\n\x05error\x18\x01\x20\x01(\
+    \x0b2\x0c.medea.ErrorR\x05error\"\x9e\x01\n\x0eCreateResponse\x120\n\x03\
+    sid\x18\x01\x20\x03(\x0b2\x1e.medea.CreateResponse.SidEntryR\x03sid\x12\
+    \"\n\x05error\x18\x02\x20\x01(\x0b2\x0c.medea.ErrorR\x05error\x1a6\n\x08\
+    SidEntry\x12\x10\n\x03key\x18\x01\x20\x01(\tR\x03key\x12\x14\n\x05value\
+    \x18\x02\x20\x01(\tR\x05value:\x028\x01\"\xbc\x01\n\x0bGetResponse\x12<\
+    \n\x08elements\x18\x01\x20\x03(\x0b2\x20.medea.GetResponse.ElementsEntry\
+    R\x08elements\x12\"\n\x05error\x18\x02\x20\x01(\x0b2\x0c.medea.ErrorR\
+    \x05error\x1aK\n\rElementsEntry\x12\x10\n\x03key\x18\x01\x20\x01(\tR\x03\
+    key\x12$\n\x05value\x18\x02\x20\x01(\x0b2\x0e.medea.ElementR\x05value:\
+    \x028\x01\"[\n\x05Error\x12\x12\n\x04code\x18\x01\x20\x01(\rR\x04code\
+    \x12\x12\n\x04text\x18\x02\x20\x01(\tR\x04text\x12\x10\n\x03doc\x18\x03\
+    \x20\x01(\tR\x03doc\x12\x18\n\x07element\x18\x04\x20\x01(\tR\x07element\
+    \"\xd8\x01\n\x07Element\x12'\n\x06member\x18\x01\x20\x01(\x0b2\r.medea.M\
+    emberH\0R\x06member\x12!\n\x04room\x18\x02\x20\x01(\x0b2\x0b.medea.RoomH\
+    \0R\x04room\x12<\n\x0bwebrtc_play\x18\x03\x20\x01(\x0b2\x19.medea.WebRtc\
+    PlayEndpointH\0R\nwebrtcPlay\x12=\n\nwebrtc_pub\x18\x04\x20\x01(\x0b2\
+    \x1c.medea.WebRtcPublishEndpointH\0R\twebrtcPubB\x04\n\x02el\"\xc7\x02\n\
+    \x04Room\x125\n\x08pipeline\x18\x01\x20\x03(\x0b2\x19.medea.Room.Pipelin\
+    eEntryR\x08pipeline\x1aP\n\rPipelineEntry\x12\x10\n\x03key\x18\x01\x20\
+    \x01(\tR\x03key\x12)\n\x05value\x18\x02\x20\x01(\x0b2\x13.medea.Room.Ele\
+    mentR\x05value:\x028\x01\x1a\xb5\x01\n\x07Element\x12'\n\x06member\x18\
+    \x01\x20\x01(\x0b2\r.medea.MemberH\0R\x06member\x12<\n\x0bwebrtc_play\
+    \x18\x02\x20\x01(\x0b2\x19.medea.WebRtcPlayEndpointH\0R\nwebrtcPlay\x12=\
+    \n\nwebrtc_pub\x18\x03\x20\x01(\x0b2\x1c.medea.WebRtcPublishEndpointH\0R\
+    \twebrtcPubB\x04\n\x02el\"\xfa\x02\n\x06Member\x12\x17\n\x07on_join\x18\
+    \x01\x20\x01(\tR\x06onJoin\x12\x19\n\x08on_leave\x18\x02\x20\x01(\tR\x07\
+    onLeave\x12\x20\n\x0bcredentials\x18\x03\x20\x01(\tR\x0bcredentials\x127\
+    \n\x08pipeline\x18\x04\x20\x03(\x0b2\x1b.medea.Member.PipelineEntryR\x08\
+    pipeline\x1aR\n\rPipelineEntry\x12\x10\n\x03key\x18\x01\x20\x01(\tR\x03k\
+    ey\x12+\n\x05value\x18\x02\x20\x01(\x0b2\x15.medea.Member.ElementR\x05va\
+    lue:\x028\x01\x1a\x8c\x01\n\x07Element\x12<\n\x0bwebrtc_play\x18\x01\x20\
+    \x01(\x0b2\x19.medea.WebRtcPlayEndpointH\0R\nwebrtcPlay\x12=\n\nwebrtc_p\
+    ub\x18\x02\x20\x01(\x0b2\x1c.medea.WebRtcPublishEndpointH\0R\twebrtcPubB\
     \x04\n\x02el\"\xae\x01\n\x15WebRtcPublishEndpoint\x122\n\x03p2p\x18\x01\
     \x20\x01(\x0e2\x20.medea.WebRtcPublishEndpoint.P2PR\x03p2p\x12\x19\n\x08\
-    on_start\x18\x03\x20\x01(\tR\x07onStart\x12\x17\n\x07on_stop\x18\x04\x20\
+    on_start\x18\x02\x20\x01(\tR\x07onStart\x12\x17\n\x07on_stop\x18\x03\x20\
     \x01(\tR\x06onStop\"-\n\x03P2P\x12\t\n\x05NEVER\x10\0\x12\x0f\n\x0bIF_PO\
     SSIBLE\x10\x01\x12\n\n\x06ALWAYS\x10\x02\"Z\n\x12WebRtcPlayEndpoint\x12\
     \x10\n\x03src\x18\x01\x20\x01(\tR\x03src\x12\x19\n\x08on_start\x18\x02\
     \x20\x01(\tR\x07onStart\x12\x17\n\x07on_stop\x18\x03\x20\x01(\tR\x06onSt\
-    op\"\x05\n\x03Hub\"f\n\x0cFileRecorder\x12\x10\n\x03src\x18\x01\x20\x01(\
-    \tR\x03src\x12\x10\n\x03dst\x18\x02\x20\x01(\tR\x03dst\x12\x19\n\x08on_s\
-    tart\x18\x03\x20\x01(\tR\x07onStart\x12\x17\n\x07on_stop\x18\x04\x20\x01\
-    (\tR\x06onStop\"+\n\x05Relay\x12\x10\n\x03src\x18\x01\x20\x01(\tR\x03src\
-    \x12\x10\n\x03dst\x18\x02\x20\x01(\tR\x03dst2\xcc\x01\n\nControlApi\x125\
-    \n\x06Create\x12\x14.medea.CreateRequest\x1a\x15.medea.CreateResponse\
-    \x12-\n\x05Apply\x12\x13.medea.ApplyRequest\x1a\x0f.medea.Response\x12+\
-    \n\x06Delete\x12\x10.medea.IdRequest\x1a\x0f.medea.Response\x12+\n\x03Ge\
-    t\x12\x10.medea.IdRequest\x1a\x12.medea.GetResponseb\x06proto3\
+    op2\xcc\x01\n\nControlApi\x125\n\x06Create\x12\x14.medea.CreateRequest\
+    \x1a\x15.medea.CreateResponse\x12-\n\x05Apply\x12\x13.medea.ApplyRequest\
+    \x1a\x0f.medea.Response\x12+\n\x06Delete\x12\x10.medea.IdRequest\x1a\x0f\
+    .medea.Response\x12+\n\x03Get\x12\x10.medea.IdRequest\x1a\x12.medea.GetR\
+    esponseb\x06proto3\
 ";
 
 static mut file_descriptor_proto_lazy: ::protobuf::lazy::Lazy<::protobuf::descriptor::FileDescriptorProto> = ::protobuf::lazy::Lazy {

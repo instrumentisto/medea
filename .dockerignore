@@ -5,19 +5,15 @@
 !Cargo.lock
 !src/
 
-# Medea uses this sub-crates.
+# Project sub-crates.
 !crates/
 !proto/
 
-# We don't need Jason while building Medea, but since it's in Medea's workspace,
-# Cargo should be able to see these files.
+# Jason sources, assets and manifest.
 !jason/Cargo.toml
 !jason/src/
 !jason/demo/chart/medea-demo/conf/
 !jason/demo/index.html
 
-# Medea dependencies cache.
-!.cache/cargo/
-
-# Makefile may be used in Dockerfile's.
+# Makefile may be used in Dockerfiles.
 !Makefile

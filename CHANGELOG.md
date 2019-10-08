@@ -11,6 +11,11 @@ All user visible changes to this project will be documented in this file. This p
 
 [Milestone](/../../milestone/2) | [Roadmap](/../../issues/27)
 
+### BC Breaks
+
+- Configuration:
+    - Rename `[server]` section of Client API HTTP server as `[server.client.http]` ([#33]).
+
 ### Added
 
 - Control API:
@@ -24,6 +29,9 @@ All user visible changes to this project will be documented in this file. This p
     - Auto-removing `Peer`s when `Member` disconnects ([#28]);
     - Filter `SetIceCandidate` messages without `candidate` ([#50](/../../pull/50));
     - Reason of WebSocket closing by server as `Close` frame's description ([#33]).
+- Configuration:
+    - `[server.control.grpc]` section to configure Control API gRPC server ([#33]);
+    - `server.client.http.public_url` option to configure public URL of Client API HTTP server ([#33]).
 - Testing:
     - E2E tests for signalling ([#28]).
 
