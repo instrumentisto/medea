@@ -10,7 +10,7 @@ use std::convert::TryFrom;
 use derive_more::{Display, From, Into};
 use serde::Deserialize;
 
-use medea_control_api_proto::grpc::control_api::{
+use medea_control_api_proto::grpc::api::{
     CreateRequest_oneof_el as ElementProto,
     Member_Element_oneof_el as MemberElementProto,
 };
@@ -24,7 +24,7 @@ pub use webrtc_publish_endpoint::{WebRtcPublishEndpoint, WebRtcPublishId};
 
 /// ID of `Endpoint`.
 #[derive(
-    Clone, Debug, Eq, Hash, Deserialize, PartialEq, From, Display, Into,
+    Clone, Debug, Deserialize, Display, Eq, From, Hash, Into, PartialEq,
 )]
 pub struct Id(pub String);
 

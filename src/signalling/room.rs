@@ -13,7 +13,7 @@ use derive_more::Display;
 use failure::Fail;
 use futures::future;
 use medea_client_api_proto::{Command, Event, IceCandidate, PeerId, TrackId};
-use medea_control_api_proto::grpc::control_api::{
+use medea_control_api_proto::grpc::api::{
     Element as ElementProto, Room as RoomProto,
 };
 

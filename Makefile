@@ -23,7 +23,7 @@ RUST_VER := 1.37
 CHROME_VERSION := 77.0
 FIREFOX_VERSION := 69.0
 
-CURRENT_BRANCH := $(strip $(shell git branch | grep \* | cut -d ' ' -f2))
+CURRENT_GIT_BRANCH := $(strip $(shell git branch | grep \* | cut -d ' ' -f2))
 
 crate-dir = .
 ifeq ($(crate),medea-jason)
@@ -31,6 +31,9 @@ crate-dir = jason
 endif
 ifeq ($(crate),medea-client-api-proto)
 crate-dir = proto/client-api
+endif
+ifeq ($(crate),medea-control-api-proto)
+crate-dir = proto/control-api
 endif
 ifeq ($(crate),medea-macro)
 crate-dir = crates/medea-macro
@@ -225,6 +228,19 @@ cargo.fmt:
 	cargo +nightly fmt --all $(if $(call eq,$(check),yes),-- --check,)
 
 
+# Generate Rust sources with Cargo's build.rs script.
+#
+# Usage:
+#	make cargo.gen crate=medea-control-api-proto
+
+cargo.gen:
+ifeq ($(crate),medea-control-api-proto)
+	rm -rf $(crate-dir)/src/grpc/api*.rs
+	cd $(crate-dir)/ && \
+	cargo build
+endif
+
+
 # Lint Rust sources with clippy.
 #
 # Usage:
@@ -297,11 +313,11 @@ endif
 # Run Rust unit tests of project.
 #
 # Usage:
-#	make test.unit [crate=(@all|medea|medea-jason|<crate-name>)]
-#				   [browser=(chrome|firefox)]
+#	make test.unit [crate=(@all|medea|<crate-name>)]
+#	               [crate=medea-jason [browser=(chrome|firefox)]]
 
 test-unit-crate = $(if $(call eq,$(crate),),@all,$(crate))
-driver-env = $(if $(call eq,$(browser),firefox),GECKODRIVER_REMOTE,CHROMEDRIVER_REMOTE)
+webdriver-env = $(if $(call eq,$(browser),firefox),GECKO,CHROME)DRIVER_REMOTE
 
 test.unit:
 ifeq ($(test-unit-crate),@all)
@@ -317,8 +333,8 @@ ifeq ($(crate),medea-jason)
 	@make docker.up.webdriver
 	sleep 10
 	cd $(crate-dir)/ && \
-	$(driver-env)="http://0.0.0.0:4444" \
-    cargo test --target wasm32-unknown-unknown --features mockable
+	$(webdriver-env)="http://0.0.0.0:4444" \
+	cargo test --target wasm32-unknown-unknown --features mockable
 	@make docker.down.webdriver
 else
 	cd $(crate-dir)/ && \
@@ -340,7 +356,7 @@ endif
 
 test-e2e-env = RUST_BACKTRACE=1 \
 	$(if $(call eq,$(log),yes),,RUST_LOG=warn) \
-	MEDEA_CONTROL_API__STATIC_SPECS_DIR=tests/specs/
+	MEDEA_CONTROL__STATIC_SPECS_DIR=tests/specs/
 
 test.e2e:
 ifeq ($(up),yes)
@@ -454,8 +470,6 @@ docker-build-medea-image-name = $(strip \
 	$(if $(call eq,$(registry),),,$(registry)/)$(MEDEA_IMAGE_NAME))
 
 docker.build.medea:
-	$(call docker.build.clean.ignore)
-	@echo "!target/$(if $(call eq,$(debug),no),release,debug)/" >> .dockerignore
 	$(docker-env) \
 	docker build $(if $(call eq,$(minikube),yes),,--network=host) --force-rm \
 		$(if $(call eq,$(no-cache),yes),\
@@ -465,13 +479,9 @@ docker.build.medea:
 			--build-arg rustc_mode=$(if \
 				$(call eq,$(debug),no),release,debug) \
 			--build-arg rustc_opts=$(if \
-				$(call eq,$(debug),no),--release,)) \
+				$(call eq,$(debug),no),--release,),) \
 		-t $(docker-build-medea-image-name):$(if $(call eq,$(TAG),),dev,$(TAG)) .
 	$(call docker.build.clean.ignore)
-define docker.build.clean.ignore
-	@sed -i $(if $(call eq,$(shell uname -s),Darwin),'',) \
-		/^!target\/d .dockerignore
-endef
 
 
 # Stop Coturn STUN/TURN server in Docker Compose environment
@@ -508,17 +518,14 @@ else
 endif
 
 
-# Down dockerized webdriver.
+# Stop dockerized WebDriver and remove all related containers.
 #
 # Usage:
 #   make docker.down.webdriver [browser=(chrome|firefox)]
 
 docker.down.webdriver:
-ifeq ($(browser),firefox)
-	-docker stop medea-test-ff
-else
-	-docker stop medea-test-chrome
-endif
+	-docker stop medea-webdriver-$(if $(call eq,$(browser),)chrome,$(browser))
+	-docker rm medea-webdriver-$(if $(call eq,$(browser),)chrome,$(browser))
 
 
 # Pull project Docker images from Container Registry.
@@ -620,17 +627,17 @@ else
 endif
 
 
-# Up dockerized webdriver.
+# Run dockerized WebDriver.
 #
 # Usage:
 #   make docker.up.webdriver [browser=(chrome|firefox)]
 
 docker.up.webdriver: docker.down.webdriver
 ifeq ($(browser),firefox)
-	docker run --rm -d --shm-size 512m --name medea-test-ff \
-		--network=host instrumentisto/geckodriver:${FIREFOX_VERSION}
+	docker run --rm -d --shm-size 512m --name medea-webdriver-firefox \
+		--network=host instrumentisto/geckodriver:$(FIREFOX_VERSION)
 else
-	docker run --rm -d --name medea-test-chrome \
+	docker run --rm -d --name medea-webdriver-chrome \
 		--network=host selenoid/chrome:$(CHROME_VERSION)
 endif
 
@@ -741,7 +748,7 @@ endif
 		git add -v charts/ ; \
 		git commit -m "Release '$(helm-chart)' Helm chart" ; \
 	fi
-	git checkout $(CURRENT_BRANCH)
+	git checkout $(CURRENT_GIT_BRANCH)
 	git push origin gh-pages
 
 
@@ -813,27 +820,12 @@ endef
 
 
 
-###################
-# Protoc commands #
-###################
-
-# Rebuild gRPC protobuf specs for medea-control-api-proto.
-#
-# Usage:
-#  make protoc.rebuild
-
-protoc.rebuild:
-	rm -f proto/control-api/src/grpc/control_api*.rs
-	cargo build -p medea-control-api-proto
-
-
-
 ##################
 # .PHONY section #
 ##################
 
 .PHONY: build build.jason build.medea \
-        cargo cargo.build cargo.fmt cargo.lint \
+        cargo cargo.build cargo.fmt cargo.gen cargo.lint \
         docker.auth docker.build.demo docker.build.medea \
         	docker.down.coturn docker.down.demo docker.down.medea \
         	docker.down.webdriver \
@@ -845,7 +837,6 @@ protoc.rebuild:
         helm helm.down helm.init helm.lint helm.list \
         	helm.package helm.package.release helm.up \
         minikube.boot \
-        protoc.rebuild \
         release release.crates release.helm release.npm \
         test test.e2e test.unit \
         up up.coturn up.demo up.dev up.jason up.medea \

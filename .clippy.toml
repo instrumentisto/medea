@@ -8,11 +8,12 @@ doc-valid-idents = [
     "IPv4", "IPv6", "JavaScript", "NaN", "NaNs",
     "OAuth", "OpenGL", "OpenSSH", "OpenSSL", "OpenStreetMap", "TrueType",
     "iOS", "macOS", "TeX", "LaTeX", "BibTeX", "BibLaTeX", "MinGW",
-    "gRPC", "WebRTC", "WebSocket",
+    "gRPC",
     "MediaStream", "MediaStreamConstraints", "MediaStreamTrack",
     "RTCConfiguration",
     "RTCIceCandidate", "RTCIceCandidateInit", "RTCIceServer",
     "RTCPeerConnection", "RTCPeerConnectionIceEvent",
     "RTCRtpTransceiver", "RTCRtpTransceiverDirection",
     "RTCSdpType",
+    "WebRTC", "WebSocket",
 ]

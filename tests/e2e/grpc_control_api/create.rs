@@ -7,7 +7,7 @@
 
 use std::collections::HashMap;
 
-use medea_control_api_proto::grpc::control_api::{
+use medea_control_api_proto::grpc::api::{
     CreateRequest, Member, Member_Element, WebRtcPlayEndpoint,
     WebRtcPublishEndpoint, WebRtcPublishEndpoint_P2P,
 };

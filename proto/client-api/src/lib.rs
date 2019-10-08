@@ -133,17 +133,19 @@ pub enum Event {
 #[derive(Debug, Deserialize, Serialize)]
 /// Reason of disconnecting client from the server.
 pub enum RpcConnectionCloseReason {
-    /// `Room` in which client presented was closed.
-    RoomClosed,
+    /// Client session was finished on the server side.
+    Finished,
 
-    /// Member deleted from `Room`.
+    /// Client was evicted on the server side.
     Evicted,
 
-    /// Member reconnects and old connection was closed.
+    /// Old connection was closed due to client reconnection.
     NewConnection,
 }
 
-/// Description which will be sent in Close WebSocket frame.
+/// Description which will be sent in [Close] WebSocket frame.
+///
+/// [Close]: https://tools.ietf.org/html/rfc6455#section-5.5.1
 #[derive(Constructor, Debug, Deserialize, Serialize)]
 pub struct CloseDescription {
     /// Reason of why connection was closed.

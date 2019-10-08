@@ -1,54 +1,45 @@
 [server.client]
-# Server's public URL.
+# Client API server's public URL.
+# It's assumed that severs can be reached via this URL externally.
 #
-# Environment variable: MEDEA_SERVER__CLIENT__PUBLIC_URL
-#
+# Env var: MEDEA_SERVER__CLIENT__PUBLIC_URL
 # Default:
-#   public_url = "ws://0.0.0.0:8080"
+#   public_url = "ws://127.0.0.1:8080"
 
 [server.client.http]
-# IP address to bind HTTP server to.
+# IP address to bind Client API HTTP server to.
 #
-# Environment variable: MEDEA_SERVER__CLIENT__HTTP__BIND_IP
-#
+# Env var: MEDEA_SERVER__CLIENT__HTTP__BIND_IP
 # Default:
 #   bind_ip = "0.0.0.0"
 
-# Port to bind HTTP server to.
+# Port to bind Client API HTTP server to.
 #
-# Environment variable: MEDEA_SERVER__CLIENT__HTTP__BIND_PORT
-#
+# Env var: MEDEA_SERVER__CLIENT__HTTP__BIND_PORT
 # Default:
 #   bind_port = 8080
 
+
 [server.control.grpc]
-# IP address to bind gRPC server to.
+# IP address to bind Control API gRPC server to.
 #
-# Environment variable: MEDEA_SERVER__CONTROL__GRPC__BIND_IP
-#
+# Env var: MEDEA_SERVER__CONTROL__GRPC__BIND_IP
 # Default:
 #   bind_ip = "0.0.0.0"
 
-# Port to bind gRPC server to.
+# Port to bind Control API gRPC server to.
 #
-# Environment variable: MEDEA_SERVER__CONTROL__GRPC__BIND_PORT
-#
+# Env var: MEDEA_SERVER__CONTROL__GRPC__BIND_PORT
 # Default:
 #   bind_port = 6565
 
-# Completion queue count of gRPC server.
-#
-# Environment variable: MEDEA_SERVER__CONTROL__GRPC__COMPLETION_QUEUE_COUNT
-#
-# Default:
-#   completion_queue_count = 2
 
 
-[control_api]
+
+[control]
 # Path to directory with static Сontrol API specs.
 #
-# Environment variable: MEDEA_CONTROL_API__STATIC_SPECS_DIR
-#
+# Env var: MEDEA_CONTROL__STATIC_SPECS_DIR
 # Default:
 #   static_specs_dir = "specs/"
 
@@ -59,16 +50,14 @@
 # Duration, after which remote RPC client will be considered idle if no
 # heartbeat messages received.
 #
-# Environment variable: MEDEA_RPC__IDLE_TIMEOUT
-#
+# Env var: MEDEA_RPC__IDLE_TIMEOUT
 # Default:
 #   idle_timeout = "10s"
 
-# Duration, after which the server deletes the client session if
-# the remote RPC client does not reconnect after it is idle.
+# Duration, after which the server deletes client session if remote RPC client
+# does not reconnect after it is idle.
 #
-# Environment variable: MEDEA_RPC__RECONNECT_TIMEOUT
-#
+# Env var: MEDEA_RPC__RECONNECT_TIMEOUT
 # Default:
 #   reconnect_timeout = "10s"
 
@@ -78,65 +67,56 @@
 [turn]
 # Turn server host.
 #
-# Environment variable: MEDEA_TURN__HOST
-#
+# Env var: MEDEA_TURN__HOST
 # Default:
 #   host = "localhost"
 
 # Turn server port.
 #
-# Environment variable: MEDEA_TURN__PORT
-#
+# Env var: MEDEA_TURN__PORT
 # Default:
 #   port = 3478
 
 # Static user on Turn server.
 #
-# Environment variable: MEDEA_TURN__USER
-#
+# Env var: MEDEA_TURN__USER
 # Default:
 #   user = "USER"
 
 # Static user password on Turn server.
 #
-# Environment variable: MEDEA_TURN__PASS
-#
+# Env var: MEDEA_TURN__PASS
 # Default:
 #   pass = "PASS"
 
 [turn.db.redis]
 # Host of Coturn's Redis database.
 #
-# Environment variable: MEDEA_TURN__DB__REDIS__IP
-#
+# Env var: MEDEA_TURN__DB__REDIS__HOST
 # Default:
-#   ip = "127.0.0.1"
+#   host = "127.0.0.1"
 
 # Port of Coturn's Redis database for client connections.
 #
-# Environment variable: MEDEA_TURN__DB__REDIS__PORT
-#
+# Env var: MEDEA_TURN__DB__REDIS__PORT
 # Default:
 #   port = 6379
 
 # Password to connect to Coturn's Redis database with.
 #
-# Environment variable: MEDEA_TURN__DB__REDIS__PASS
-#
+# Env var: MEDEA_TURN__DB__REDIS__PASS
 # Default:
 #   pass = "turn"
 
 # Number of Coturn's database in Redis.
 #
-# Environment variable: MEDEA_TURN__DB__REDIS__DB_NUMBER
-#
+# Env var: MEDEA_TURN__DB__REDIS__DB_NUMBER
 # Default:
 #   db_number = 0
 
 # Timeout for establishing connection with Coturn's Redis database.
 #
-# Environment variable: MEDEA_TURN__DB__REDIS__CONNECTION_TIMEOUT
-#
+# Env var: MEDEA_TURN__DB__REDIS__CONNECTION_TIMEOUT
 # Default:
 #   connection_timeout = "5s"
 
@@ -146,11 +126,9 @@
 [log]
 # Maximum allowed level of application log entries.
 #
-# Environment variable: MEDEA_LOG__LEVEL
-#
+# Env var: MEDEA_LOG__LEVEL
 # Possible values:
 #   "OFF", "CRITICAL", "ERROR", "WARN", "INFO", "DEBUG", "TRACE"
-#
 # Default:
 #   level = "INFO"
 
@@ -160,7 +138,6 @@
 [shutdown]
 # Maximum duration given to shutdown the whole application gracefully.
 #
-# Environment variable: MEDEA_SHUTDOWN__TIMEOUT
-#
+# Env var: MEDEA_SHUTDOWN__TIMEOUT
 # Default:
 #   timeout = "5s"

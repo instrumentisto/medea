@@ -368,7 +368,7 @@ impl ParticipantService {
             vec![],
             |mut futures, (_, mut connection)| {
                 futures.push(connection.close(CloseDescription::new(
-                    RpcConnectionCloseReason::RoomClosed,
+                    RpcConnectionCloseReason::Finished,
                 )));
                 futures
             },

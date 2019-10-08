@@ -21,5 +21,3 @@
 
 # Makefile may be used in Dockerfile's.
 !Makefile
-
-# !target/{mode} is added and removed dynamically to reduce image build times.

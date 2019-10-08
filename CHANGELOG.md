@@ -15,7 +15,7 @@ All user visible changes to this project will be documented in this file. This p
 
 - Control API:
     - Support for static Сontrol API specs ([#28]).
-    - Dynamic Control API exposed via gRPC ([#33](/../../pull/33)):
+    - Dynamic Control API exposed via gRPC ([#33]):
         - `Create` method for `Room`, `Member`, `Endpoint`;
         - `Get` method for `Room`, `Member`, `Endpoint`;
         - `Delete` method for `Room`, `Member`, `Endpoint`.
@@ -23,11 +23,12 @@ All user visible changes to this project will be documented in this file. This p
     - Dynamic `Peer`s creation when client connects ([#28]);
     - Auto-removing `Peer`s when `Member` disconnects ([#28]);
     - Filter `SetIceCandidate` messages without `candidate` ([#50](/../../pull/50));
-    - Send reason of WebSocket close by server as close frame's description.
+    - Reason of WebSocket closing by server as `Close` frame's description ([#33]).
 - Testing:
     - E2E tests for signalling ([#28]).
 
 [#28]: /../../pull/28
+[#33]: /../../pull/33
 
 
 

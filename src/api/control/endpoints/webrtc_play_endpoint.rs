@@ -6,8 +6,8 @@ use std::{convert::TryFrom, fmt};
 
 use derive_more::{Display, From, Into};
 use failure::Fail;
-use medea_control_api_proto::grpc as medea_grpc;
-use medea_grpc::control_api::WebRtcPlayEndpoint as WebRtcPlayEndpointProto;
+use medea_control_api_proto::grpc::api as medea_grpc_control_api;
+use medea_grpc_control_api::WebRtcPlayEndpoint as WebRtcPlayEndpointProto;
 use serde::{
     de::{self, Deserializer, Error, Visitor},
     Deserialize,

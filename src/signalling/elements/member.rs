@@ -12,7 +12,7 @@ use std::{
 use derive_more::Display;
 use failure::Fail;
 use medea_client_api_proto::{IceServer, PeerId};
-use medea_control_api_proto::grpc::control_api::{
+use medea_control_api_proto::grpc::api::{
     Element as RootElementProto, Member as MemberProto,
     Room_Element as ElementProto,
 };

@@ -7,7 +7,7 @@
 use std::string::ToString;
 
 use derive_more::Display;
-use medea_control_api_proto::grpc::control_api::Error as ErrorProto;
+use medea_control_api_proto::grpc::api::Error as ErrorProto;
 
 use crate::{
     api::control::{

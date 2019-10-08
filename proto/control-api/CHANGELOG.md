@@ -1,5 +1,5 @@
 `medea-control-api-proto` changelog
-==================================
+===================================
 
 All user visible changes to this project will be documented in this file. This project uses [Semantic Versioning 2.0.0].
 
@@ -13,19 +13,22 @@ All user visible changes to this project will be documented in this file. This p
 
 ### Added
 
-- Methods ([#33](/../../pull/33)):
-    - `Create`,
-    - `Get`,
-    - `Apply`,
+- Methods ([#33]):
+    - `Create`;
+    - `Get`;
+    - `Apply`;
     - `Delete`.
-- Elements ([#33](/../../pull/33)):
-    - `Room`,
-    - `Member`,
-    - `WebRtcPlayEndpoint`,
-    - `WebRtcPublishEndpoint`
-    - `Hub`,
-    - `FileRecorder`,
+- Elements ([#33]):
+    - `Room`;
+    - `Member`;
+    - `WebRtcPlayEndpoint`;
+    - `WebRtcPublishEndpoint`;
+    - `Hub`;
+    - `FileRecorder`;
     - `Relay`.
+
+[#33]: /../../pull/33
+
 
 
 

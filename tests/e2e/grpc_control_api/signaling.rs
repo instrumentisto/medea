@@ -7,7 +7,7 @@ use std::{cell::Cell, collections::HashMap, rc::Rc, time::Duration};
 use actix::{Arbiter, AsyncContext, Context, System};
 use futures::future::Future as _;
 use medea_client_api_proto::Event;
-use medea_control_api_proto::grpc::control_api::{
+use medea_control_api_proto::grpc::api::{
     CreateRequest, Member, Member_Element, Room, Room_Element,
     WebRtcPlayEndpoint, WebRtcPublishEndpoint, WebRtcPublishEndpoint_P2P,
 };

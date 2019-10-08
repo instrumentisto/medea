@@ -10,7 +10,7 @@ server:
   conf:
     server:
       client:
-        public_url: "wss://demo.medea.stg.t11913.org"
+        public_url: wss://demo.medea.stg.t11913.org
         http:
           bind_port: 9980
     turn:

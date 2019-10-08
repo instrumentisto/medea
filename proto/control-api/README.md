@@ -1,9 +1,10 @@
 Medea Control API protocol
-=========================
+==========================
 
-[![Crates.io](https://img.shields.io/crates/v/medea-control-api-proto)](https://crates.io/crates/medea-grpc-proto)
+[![Crates.io](https://img.shields.io/crates/v/medea-control-api-proto)](https://crates.io/crates/medea-control-api-proto)
 ![Crates.io license](https://img.shields.io/crates/l/medea-control-api-proto)
 
+[API Docs](https://docs.rs/medea-control-api-proto) |
 [Changelog](https://github.com/instrumentisto/medea/blob/master/proto/control-api/CHANGELOG.md)
 
 Control API protocol implementation for [Medea] media server.
@@ -14,14 +15,12 @@ __Currently, in early development phase.__
 
 
 ## Prerequisites
+
 - CMake >= 3.8.0
 - Rust >= 1.19.0
 - binutils >= 2.22
 - LLVM and Clang >= 3.9
-
-### For rebuilding protobuf specs
-
-- [protoc](https://github.com/protocolbuffers/protobuf)>=3.7.0
+- protoc >= 3.7 (for rebuilding [protobuf] specs)
 
 
 
@@ -45,4 +44,4 @@ Unless you explicitly state otherwise, any contribution intentionally submitted 
 
 
 [Medea]: https://github.com/instrumentisto/medea
-[Control API]: https://github.com/instrumentisto/medea/blob/master/docs/rfc/0001-control-api.md
+[protobuf]: https://github.com/protocolbuffers/protobuf

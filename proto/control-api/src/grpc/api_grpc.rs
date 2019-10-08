@@ -18,28 +18,28 @@
 #![allow(unused_imports)]
 #![allow(unused_results)]
 
-const METHOD_CONTROL_API_CREATE: ::grpcio::Method<super::control_api::CreateRequest, super::control_api::CreateResponse> = ::grpcio::Method {
+const METHOD_CONTROL_API_CREATE: ::grpcio::Method<super::api::CreateRequest, super::api::CreateResponse> = ::grpcio::Method {
     ty: ::grpcio::MethodType::Unary,
     name: "/medea.ControlApi/Create",
     req_mar: ::grpcio::Marshaller { ser: ::grpcio::pb_ser, de: ::grpcio::pb_de },
     resp_mar: ::grpcio::Marshaller { ser: ::grpcio::pb_ser, de: ::grpcio::pb_de },
 };
 
-const METHOD_CONTROL_API_APPLY: ::grpcio::Method<super::control_api::ApplyRequest, super::control_api::Response> = ::grpcio::Method {
+const METHOD_CONTROL_API_APPLY: ::grpcio::Method<super::api::ApplyRequest, super::api::Response> = ::grpcio::Method {
     ty: ::grpcio::MethodType::Unary,
     name: "/medea.ControlApi/Apply",
     req_mar: ::grpcio::Marshaller { ser: ::grpcio::pb_ser, de: ::grpcio::pb_de },
     resp_mar: ::grpcio::Marshaller { ser: ::grpcio::pb_ser, de: ::grpcio::pb_de },
 };
 
-const METHOD_CONTROL_API_DELETE: ::grpcio::Method<super::control_api::IdRequest, super::control_api::Response> = ::grpcio::Method {
+const METHOD_CONTROL_API_DELETE: ::grpcio::Method<super::api::IdRequest, super::api::Response> = ::grpcio::Method {
     ty: ::grpcio::MethodType::Unary,
     name: "/medea.ControlApi/Delete",
     req_mar: ::grpcio::Marshaller { ser: ::grpcio::pb_ser, de: ::grpcio::pb_de },
     resp_mar: ::grpcio::Marshaller { ser: ::grpcio::pb_ser, de: ::grpcio::pb_de },
 };
 
-const METHOD_CONTROL_API_GET: ::grpcio::Method<super::control_api::IdRequest, super::control_api::GetResponse> = ::grpcio::Method {
+const METHOD_CONTROL_API_GET: ::grpcio::Method<super::api::IdRequest, super::api::GetResponse> = ::grpcio::Method {
     ty: ::grpcio::MethodType::Unary,
     name: "/medea.ControlApi/Get",
     req_mar: ::grpcio::Marshaller { ser: ::grpcio::pb_ser, de: ::grpcio::pb_de },
@@ -58,67 +58,67 @@ impl ControlApiClient {
         }
     }
 
-    pub fn create_opt(&self, req: &super::control_api::CreateRequest, opt: ::grpcio::CallOption) -> ::grpcio::Result<super::control_api::CreateResponse> {
+    pub fn create_opt(&self, req: &super::api::CreateRequest, opt: ::grpcio::CallOption) -> ::grpcio::Result<super::api::CreateResponse> {
         self.client.unary_call(&METHOD_CONTROL_API_CREATE, req, opt)
     }
 
-    pub fn create(&self, req: &super::control_api::CreateRequest) -> ::grpcio::Result<super::control_api::CreateResponse> {
+    pub fn create(&self, req: &super::api::CreateRequest) -> ::grpcio::Result<super::api::CreateResponse> {
         self.create_opt(req, ::grpcio::CallOption::default())
     }
 
-    pub fn create_async_opt(&self, req: &super::control_api::CreateRequest, opt: ::grpcio::CallOption) -> ::grpcio::Result<::grpcio::ClientUnaryReceiver<super::control_api::CreateResponse>> {
+    pub fn create_async_opt(&self, req: &super::api::CreateRequest, opt: ::grpcio::CallOption) -> ::grpcio::Result<::grpcio::ClientUnaryReceiver<super::api::CreateResponse>> {
         self.client.unary_call_async(&METHOD_CONTROL_API_CREATE, req, opt)
     }
 
-    pub fn create_async(&self, req: &super::control_api::CreateRequest) -> ::grpcio::Result<::grpcio::ClientUnaryReceiver<super::control_api::CreateResponse>> {
+    pub fn create_async(&self, req: &super::api::CreateRequest) -> ::grpcio::Result<::grpcio::ClientUnaryReceiver<super::api::CreateResponse>> {
         self.create_async_opt(req, ::grpcio::CallOption::default())
     }
 
-    pub fn apply_opt(&self, req: &super::control_api::ApplyRequest, opt: ::grpcio::CallOption) -> ::grpcio::Result<super::control_api::Response> {
+    pub fn apply_opt(&self, req: &super::api::ApplyRequest, opt: ::grpcio::CallOption) -> ::grpcio::Result<super::api::Response> {
         self.client.unary_call(&METHOD_CONTROL_API_APPLY, req, opt)
     }
 
-    pub fn apply(&self, req: &super::control_api::ApplyRequest) -> ::grpcio::Result<super::control_api::Response> {
+    pub fn apply(&self, req: &super::api::ApplyRequest) -> ::grpcio::Result<super::api::Response> {
         self.apply_opt(req, ::grpcio::CallOption::default())
     }
 
-    pub fn apply_async_opt(&self, req: &super::control_api::ApplyRequest, opt: ::grpcio::CallOption) -> ::grpcio::Result<::grpcio::ClientUnaryReceiver<super::control_api::Response>> {
+    pub fn apply_async_opt(&self, req: &super::api::ApplyRequest, opt: ::grpcio::CallOption) -> ::grpcio::Result<::grpcio::ClientUnaryReceiver<super::api::Response>> {
         self.client.unary_call_async(&METHOD_CONTROL_API_APPLY, req, opt)
     }
 
-    pub fn apply_async(&self, req: &super::control_api::ApplyRequest) -> ::grpcio::Result<::grpcio::ClientUnaryReceiver<super::control_api::Response>> {
+    pub fn apply_async(&self, req: &super::api::ApplyRequest) -> ::grpcio::Result<::grpcio::ClientUnaryReceiver<super::api::Response>> {
         self.apply_async_opt(req, ::grpcio::CallOption::default())
     }
 
-    pub fn delete_opt(&self, req: &super::control_api::IdRequest, opt: ::grpcio::CallOption) -> ::grpcio::Result<super::control_api::Response> {
+    pub fn delete_opt(&self, req: &super::api::IdRequest, opt: ::grpcio::CallOption) -> ::grpcio::Result<super::api::Response> {
         self.client.unary_call(&METHOD_CONTROL_API_DELETE, req, opt)
     }
 
-    pub fn delete(&self, req: &super::control_api::IdRequest) -> ::grpcio::Result<super::control_api::Response> {
+    pub fn delete(&self, req: &super::api::IdRequest) -> ::grpcio::Result<super::api::Response> {
         self.delete_opt(req, ::grpcio::CallOption::default())
     }
 
-    pub fn delete_async_opt(&self, req: &super::control_api::IdRequest, opt: ::grpcio::CallOption) -> ::grpcio::Result<::grpcio::ClientUnaryReceiver<super::control_api::Response>> {
+    pub fn delete_async_opt(&self, req: &super::api::IdRequest, opt: ::grpcio::CallOption) -> ::grpcio::Result<::grpcio::ClientUnaryReceiver<super::api::Response>> {
         self.client.unary_call_async(&METHOD_CONTROL_API_DELETE, req, opt)
     }
 
-    pub fn delete_async(&self, req: &super::control_api::IdRequest) -> ::grpcio::Result<::grpcio::ClientUnaryReceiver<super::control_api::Response>> {
+    pub fn delete_async(&self, req: &super::api::IdRequest) -> ::grpcio::Result<::grpcio::ClientUnaryReceiver<super::api::Response>> {
         self.delete_async_opt(req, ::grpcio::CallOption::default())
     }
 
-    pub fn get_opt(&self, req: &super::control_api::IdRequest, opt: ::grpcio::CallOption) -> ::grpcio::Result<super::control_api::GetResponse> {
+    pub fn get_opt(&self, req: &super::api::IdRequest, opt: ::grpcio::CallOption) -> ::grpcio::Result<super::api::GetResponse> {
         self.client.unary_call(&METHOD_CONTROL_API_GET, req, opt)
     }
 
-    pub fn get(&self, req: &super::control_api::IdRequest) -> ::grpcio::Result<super::control_api::GetResponse> {
+    pub fn get(&self, req: &super::api::IdRequest) -> ::grpcio::Result<super::api::GetResponse> {
         self.get_opt(req, ::grpcio::CallOption::default())
     }
 
-    pub fn get_async_opt(&self, req: &super::control_api::IdRequest, opt: ::grpcio::CallOption) -> ::grpcio::Result<::grpcio::ClientUnaryReceiver<super::control_api::GetResponse>> {
+    pub fn get_async_opt(&self, req: &super::api::IdRequest, opt: ::grpcio::CallOption) -> ::grpcio::Result<::grpcio::ClientUnaryReceiver<super::api::GetResponse>> {
         self.client.unary_call_async(&METHOD_CONTROL_API_GET, req, opt)
     }
 
-    pub fn get_async(&self, req: &super::control_api::IdRequest) -> ::grpcio::Result<::grpcio::ClientUnaryReceiver<super::control_api::GetResponse>> {
+    pub fn get_async(&self, req: &super::api::IdRequest) -> ::grpcio::Result<::grpcio::ClientUnaryReceiver<super::api::GetResponse>> {
         self.get_async_opt(req, ::grpcio::CallOption::default())
     }
     pub fn spawn<F>(&self, f: F) where F: ::futures::Future<Item = (), Error = ()> + Send + 'static {
@@ -127,10 +127,10 @@ impl ControlApiClient {
 }
 
 pub trait ControlApi {
-    fn create(&mut self, ctx: ::grpcio::RpcContext, req: super::control_api::CreateRequest, sink: ::grpcio::UnarySink<super::control_api::CreateResponse>);
-    fn apply(&mut self, ctx: ::grpcio::RpcContext, req: super::control_api::ApplyRequest, sink: ::grpcio::UnarySink<super::control_api::Response>);
-    fn delete(&mut self, ctx: ::grpcio::RpcContext, req: super::control_api::IdRequest, sink: ::grpcio::UnarySink<super::control_api::Response>);
-    fn get(&mut self, ctx: ::grpcio::RpcContext, req: super::control_api::IdRequest, sink: ::grpcio::UnarySink<super::control_api::GetResponse>);
+    fn create(&mut self, ctx: ::grpcio::RpcContext, req: super::api::CreateRequest, sink: ::grpcio::UnarySink<super::api::CreateResponse>);
+    fn apply(&mut self, ctx: ::grpcio::RpcContext, req: super::api::ApplyRequest, sink: ::grpcio::UnarySink<super::api::Response>);
+    fn delete(&mut self, ctx: ::grpcio::RpcContext, req: super::api::IdRequest, sink: ::grpcio::UnarySink<super::api::Response>);
+    fn get(&mut self, ctx: ::grpcio::RpcContext, req: super::api::IdRequest, sink: ::grpcio::UnarySink<super::api::GetResponse>);
 }
 
 pub fn create_control_api<S: ControlApi + Send + Clone + 'static>(s: S) -> ::grpcio::Service {

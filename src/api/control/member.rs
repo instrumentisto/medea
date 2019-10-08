@@ -5,7 +5,7 @@
 use std::{collections::HashMap, convert::TryFrom};
 
 use derive_more::{Display, From};
-use medea_control_api_proto::grpc::control_api::{
+use medea_control_api_proto::grpc::api::{
     CreateRequest_oneof_el as ElementProto,
     Room_Element_oneof_el as RoomElementProto,
 };

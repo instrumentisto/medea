@@ -15,11 +15,11 @@ use grpcio::{
     UnarySink,
 };
 use medea_control_api_proto::grpc::{
-    control_api::{
+    api::{
         ApplyRequest, CreateRequest, CreateResponse, Element, GetResponse,
         IdRequest, Response,
     },
-    control_api_grpc::{create_control_api, ControlApi},
+    api_grpc::{create_control_api, ControlApi},
 };
 
 use crate::{
