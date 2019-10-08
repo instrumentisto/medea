@@ -3,7 +3,7 @@
 use std::{fmt, sync::Arc};
 
 use actix_web::web::Path;
-use futures::Future;
+use futures::{Future, IntoFuture};
 use grpcio::{ChannelBuilder, EnvBuilder, Error};
 use medea_control_api_proto::grpc::{
     control_api::{
@@ -39,7 +39,7 @@ impl fmt::Display for RoomUri {
     }
 }
 
-/// Uri to `Member` element.
+/// URI to `Member` element.
 #[derive(Clone, Debug)]
 pub struct MemberUri {
     room_id: String,
@@ -62,7 +62,7 @@ impl fmt::Display for MemberUri {
     }
 }
 
-/// Uri to `Endpoint` element.
+/// URI to `Endpoint` element.
 #[derive(Clone, Debug)]
 pub struct EndpointUri {
     room_id: String,
@@ -107,14 +107,14 @@ pub struct ControlClient {
 }
 
 impl ControlClient {
-    /// Creates new client for medea's control API.
+    /// Creates new client for Medea's control API.
     ///
     /// __Note that call of this function don't checks availability of Control
     /// API gRPC server. Availability checks only on sending request to gRPC
     /// server.__
     pub fn new(medea_addr: &str) -> Self {
         Self {
-            grpc_client: get_grpc_client(medea_addr),
+            grpc_client: new_grpcio_control_api_client(medea_addr),
         }
     }
 
@@ -128,7 +128,10 @@ impl ControlClient {
         req.set_room(room.into());
         req.set_id(uri.to_string());
 
-        self.grpc_client.create_async(&req).unwrap()
+        self.grpc_client
+            .create_async(&req)
+            .into_future()
+            .and_then(|r| r)
     }
 
     /// Creates `Member` element with provided [`MemberUri`] and `Member` spec.
@@ -140,7 +143,11 @@ impl ControlClient {
         let mut req = CreateRequest::new();
         req.set_member(member.into());
         req.set_id(uri.to_string());
-        self.grpc_client.create_async(&req).unwrap()
+
+        self.grpc_client
+            .create_async(&req)
+            .into_future()
+            .and_then(|r| r)
     }
 
     /// Creates `Endpoint` element with provided [`EndpointUri`] and `Endpoint`
@@ -161,17 +168,26 @@ impl ControlClient {
             }
         }
 
-        self.grpc_client.create_async(&req).unwrap()
+        self.grpc_client
+            .create_async(&req)
+            .into_future()
+            .and_then(|r| r)
     }
 
     /// Gets single element from Control API by local URI.
-    pub fn get_single<T: fmt::Display>(
+    pub fn get_single<T>(
         &self,
         uri: T,
-    ) -> impl Future<Item = GetResponse, Error = Error> {
+    ) -> impl Future<Item = GetResponse, Error = Error>
+    where
+        T: fmt::Display,
+    {
         let req = id_request(vec![uri.to_string()]);
 
-        self.grpc_client.get_async(&req).unwrap()
+        self.grpc_client
+            .get_async(&req)
+            .into_future()
+            .and_then(|r| r)
     }
 
     /// Gets all elements with provided Local URIs.
@@ -181,17 +197,26 @@ impl ControlClient {
     ) -> impl Future<Item = GetResponse, Error = Error> {
         let req = id_request(uris);
 
-        self.grpc_client.get_async(&req).unwrap()
+        self.grpc_client
+            .get_async(&req)
+            .into_future()
+            .and_then(|r| r)
     }
 
     /// Deletes single element.
-    pub fn delete_single<T: fmt::Display>(
+    pub fn delete_single<T>(
         &self,
         uri: T,
-    ) -> impl Future<Item = Response, Error = Error> {
+    ) -> impl Future<Item = Response, Error = Error>
+    where
+        T: fmt::Display,
+    {
         let req = id_request(vec![uri.to_string()]);
 
-        self.grpc_client.delete_async(&req).unwrap()
+        self.grpc_client
+            .delete_async(&req)
+            .into_future()
+            .and_then(|r| r)
     }
 
     /// Deletes all elements with provided local URIs.
@@ -201,12 +226,15 @@ impl ControlClient {
     ) -> impl Future<Item = Response, Error = Error> {
         let req = id_request(ids);
 
-        self.grpc_client.delete_async(&req).unwrap()
+        self.grpc_client
+            .delete_async(&req)
+            .into_future()
+            .and_then(|r| r)
     }
 }
 
-/// Returns gRPC client for Control API.
-fn get_grpc_client(addr: &str) -> ControlApiClient {
+/// Returns new [`grpcio`] gRPC client for Control API.
+fn new_grpcio_control_api_client(addr: &str) -> ControlApiClient {
     let env = Arc::new(EnvBuilder::new().build());
     let ch = ChannelBuilder::new(env).connect(addr);
     ControlApiClient::new(ch)

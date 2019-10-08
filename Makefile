@@ -205,6 +205,7 @@ up.jason:
 #
 # Usage:
 #  make up.control-api-mock
+
 up.control-api-mock:
 	cargo run -p control-api-mock
 
@@ -607,9 +608,14 @@ else
 endif
 
 
+# Build REST Control API mock server.
+#
+# Usage:
+#   make docker.build.control-api-mock
+
 docker.build.control-api-mock:
 	docker build -t instrumentisto/medea-control-api-mock:dev \
-		-f _build/control-api-mock/Dockerfile \
+		-f crates/control-api-mock/Dockerfile \
 		--build-arg medea_build_image=$(medea-build-image) \
 		.
 
@@ -776,6 +782,22 @@ else
 	cargo build --bin medea $(if $(call eq,$(debug),no),--release,)
 	cargo run --bin medea $(if $(call eq,$(debug),no),--release,) \
 		$(if $(call eq,$(background),yes),&,)
+endif
+
+
+# Up dockerized webdriver.
+#
+# Usage:
+#   make docker.up.webdriver [browser=(chrome|firefox)]
+
+docker.up.webdriver: docker.down.webdriver
+ifeq ($(browser),firefox)
+	# TODO: use instrumentisto/geckodriver when it published
+	docker run --rm -d --shm-size 256m --name medea-test-ff \
+		--network=host alexlapa/geckodriver:${FIREFOX_VERSION}
+else
+	docker run --rm -d --name medea-test-chrome \
+		--network=host selenoid/chrome:$(CHROME_VERSION)
 endif
 
 

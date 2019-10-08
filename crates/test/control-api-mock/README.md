@@ -1,7 +1,7 @@
 Medea's control API mock server
 ===============================
 
-This app supposed to be used for e2e tests and for debugging purposes.
+This app supposed to be used for E2E tests and for debugging purposes of [Medea]'s [Control API].
 
 
 
@@ -18,9 +18,15 @@ startup.
 Returns `200 OK` with body "Ok." when gRPC control API go online.
 
 
+### `GET /hb`
+
+Responses with `200 OK` if Control API server available otherwise
+responses `500 Intenal Server Error`.
+
+
 ### `GET /`
 
-Batch get elements from medea.
+Batch get elements from [Medea].
 _Elements can be heterogeneous._
 
 | name | description                       |
@@ -64,12 +70,12 @@ _Elements can be heterogeneous._
 
 ### `GET /{room_id}`
 
-Single get `Room` element.
+Get single `Room` element.
 
 
 ### `DELETE /{room_id}`
 
-Single delete `Room` element.
+Delete single `Room` element.
 
 
 ### `POST /{room_id}`
@@ -90,19 +96,25 @@ Single delete element from `Room`.
 
 ### `POST /{room_id}/{element_id}`
 
-Create some element.
+Create some element in `Room`.
 
 
 ### `GET /{room_id/{element_id}/{endpoint_id}`
 
-Single get `Endpoint` element.
+Get single `Endpoint` element.
 
 
 ### `DELETE /{room_id}/{element_id}/{endpoint_id}`
 
-Single delete `Endpoint` element.
+Delete single `Endpoint` element.
 
 
 ### `POST /{room_id}/{element_id}/{endpoint_id}`
 
 Create `Endpoint` element.
+
+
+
+
+[Medea]: https://github.com/instrumentisto/medea
+[Control API]: https://tinyurl.com/yxsqplq7

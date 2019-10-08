@@ -5,14 +5,33 @@
     <title>My awesome Rust, WebAssembly, and Webpack application</title>
     <script>
         function goToCall() {
-            let roomId = document.getElementById('room-id-input').value;
-            document.location = "/video-call.html#" + roomId;
+            let roomId = document.getElementsByClassName('choose-room__id')[0].value;
+            document.location = "/video-call#" + roomId;
         }
     </script>
+
+    <style>
+        .choose-room {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        .choose-room__id {
+            height: 30px;
+            width: 300px;
+            font-size: 12pt;
+        }
+
+        .choose-room__join {
+            height: 30px;
+        }
+    </style>
 </head>
 <body>
-    <div id="choose-room">
-        <input id="room-id-input">
-        <button id="choose-room-btn" type="submit" onclick="goToCall()">JOIN</button>
+    <div class="choose-room">
+        <input class="choose-room__id" placeholder="Room ID">
+        <button class="choose-room__join" onclick="goToCall()" type="submit">JOIN</button>
     </div>
 </body>

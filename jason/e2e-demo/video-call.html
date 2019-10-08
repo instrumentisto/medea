@@ -58,13 +58,20 @@
 
         .connect__join {
             font-size: 16px;
+            margin-left: 5px;
+        }
+
+        .btn {
             background: #49668C;
             color: white;
             cursor: pointer;
-            border-radius: 3px;
+            border-radius: 5px;
             border: none;
-            padding: 6px;
-            margin-left: 5px;
+            padding: 7px;
+        }
+
+        .btn:hover {
+            background: #375577;
         }
 
         .control {
@@ -75,13 +82,7 @@
         }
 
         .control__btn {
-            border-radius: 10px;
-            background: #49668C;
-            color: white;
             font-size: 13pt;
-            border: none;
-            padding: 10px;
-            cursor: pointer;
             margin-right: 10px;
         }
 
@@ -137,9 +138,14 @@
             top: 0;
         }
 
+        .control-debug-menu__toggle:hover {
+            opacity: 1;
+        }
+
         .control-debug-menu__item {
             cursor: pointer;
             padding: 3px;
+            color: #242424;
         }
 
         .control-debug-menu__item:hover {
@@ -174,12 +180,12 @@
 
     <div class="connect toggle-content is-visible">
         <input class="connect__username" placeholder="username">
-        <button class="connect__join">Join</button>
+        <button class="connect__join btn">Join</button>
     </div>
 
     <div class="control toggle-content">
-        <button class="control__mute_audio control__btn">Mute audio</button>
-        <button class="control__mute_video control__btn">Mute video</button>
+        <button class="control__mute_audio control__btn btn">Mute audio</button>
+        <button class="control__mute_video control__btn btn">Mute video</button>
     </div>
 
     <div class="window control-debug__window_delete-member toggle-content">

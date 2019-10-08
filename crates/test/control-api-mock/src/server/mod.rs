@@ -1,4 +1,6 @@
-//! REST Control API mock server implementation.
+//! REST [Control API] mock server implementation.
+//!
+//! [Control API]: https://tinyurl.com/yxsqplq7
 
 pub mod endpoint;
 pub mod member;
@@ -21,14 +23,12 @@ use medea_control_api_proto::grpc::control_api::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    client::ControlClient,
-    prelude::*,
-    server::{
-        endpoint::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
-        member::Member,
-        room::Room,
-    },
+use crate::{client::ControlClient, prelude::*};
+
+use self::{
+    endpoint::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
+    member::Member,
+    room::Room,
 };
 
 /// Context of [`actix_web`] server.
@@ -155,9 +155,9 @@ impl Into<ErrorResponse> for ErrorProto {
 
 /// Response which return sids.
 ///
-/// Used for delete and create methods.
+/// Used for create methods.
 #[derive(Debug, Serialize)]
-pub struct Response {
+pub struct CreateResponse {
     /// URIs with which Jason can connect `Member`s.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sids: Option<HashMap<String, String>>,
@@ -167,33 +167,54 @@ pub struct Response {
     pub error: Option<ErrorResponse>,
 }
 
-impl Into<HttpResponse> for Response {
-    fn into(self) -> HttpResponse {
-        if self.error.is_some() {
-            HttpResponse::BadRequest().json(self)
-        } else {
-            HttpResponse::Ok().json(self)
-        }
-    }
+/// Response which can return only error (if any).
+///
+/// Used for delete methods.
+#[derive(Debug, Serialize)]
+pub struct Response {
+    /// Error if something happened on Control API's side.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<ErrorResponse>,
 }
+
+/// Macro which implements [`Into`] [`HttpResponse`] for all
+/// `control-api-mock` responses.
+///
+/// Implementation will check existence of `error` and if it exists then
+/// [`HttpResponse`] will be `BadRequest` with this struct as response in
+/// otherwise `Ok` with this struct as response.
+macro_rules! impl_into_http_response {
+    ($resp:tt) => {
+        impl Into<HttpResponse> for $resp {
+            fn into(self) -> HttpResponse {
+                if self.error.is_some() {
+                    HttpResponse::BadRequest().json(self)
+                } else {
+                    HttpResponse::Ok().json(self)
+                }
+            }
+        }
+    };
+}
+
+impl_into_http_response!(CreateResponse);
+impl_into_http_response!(Response);
+impl_into_http_response!(GetResponse);
+impl_into_http_response!(SingleGetResponse);
 
 impl From<ResponseProto> for Response {
     fn from(mut resp: ResponseProto) -> Self {
         if resp.has_error() {
             Self {
-                sids: None,
                 error: Some(resp.take_error().into()),
             }
         } else {
-            Self {
-                sids: None,
-                error: None,
-            }
+            Self { error: None }
         }
     }
 }
 
-impl From<CreateResponseProto> for Response {
+impl From<CreateResponseProto> for CreateResponse {
     fn from(mut resp: CreateResponseProto) -> Self {
         if resp.has_error() {
             Self {
@@ -222,13 +243,13 @@ pub enum Element {
 impl From<ElementProto> for Element {
     fn from(mut proto: ElementProto) -> Self {
         if proto.has_room() {
-            Element::Room(proto.take_room().into())
+            Self::Room(proto.take_room().into())
         } else if proto.has_member() {
-            Element::Member(proto.take_member().into())
+            Self::Member(proto.take_member().into())
         } else if proto.has_webrtc_pub() {
-            Element::WebRtcPublishEndpoint(proto.take_webrtc_pub().into())
+            Self::WebRtcPublishEndpoint(proto.take_webrtc_pub().into())
         } else if proto.has_webrtc_play() {
-            Element::WebRtcPlayEndpoint(proto.take_webrtc_play().into())
+            Self::WebRtcPlayEndpoint(proto.take_webrtc_play().into())
         } else {
             unimplemented!()
         }
@@ -238,7 +259,7 @@ impl From<ElementProto> for Element {
 impl From<RoomElementProto> for Element {
     fn from(mut proto: RoomElementProto) -> Self {
         if proto.has_member() {
-            Element::Member(proto.take_member().into())
+            Self::Member(proto.take_member().into())
         } else {
             unimplemented!()
         }
@@ -249,7 +270,7 @@ impl Into<RoomElementProto> for Element {
     fn into(self) -> RoomElementProto {
         let mut proto = RoomElementProto::new();
         match self {
-            Element::Member(m) => proto.set_member(m.into()),
+            Self::Member(m) => proto.set_member(m.into()),
             _ => unimplemented!(),
         }
         proto
@@ -293,16 +314,6 @@ impl From<GetResponseProto> for GetResponse {
     }
 }
 
-impl Into<HttpResponse> for GetResponse {
-    fn into(self) -> HttpResponse {
-        if self.error.is_some() {
-            HttpResponse::BadRequest().json(self)
-        } else {
-            HttpResponse::Ok().json(self)
-        }
-    }
-}
-
 /// Response on request for get single `Element`s.
 #[derive(Serialize, Debug)]
 pub struct SingleGetResponse {
@@ -310,7 +321,7 @@ pub struct SingleGetResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub element: Option<Element>,
 
-    /// Error if something happened on control API's side.
+    /// Error if something happened on Control API's side.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<ErrorResponse>,
 }
@@ -331,16 +342,6 @@ impl From<GetResponseProto> for SingleGetResponse {
                     .map(|(_, e)| e.into())
                     .next(),
             }
-        }
-    }
-}
-
-impl Into<HttpResponse> for SingleGetResponse {
-    fn into(self) -> HttpResponse {
-        if self.error.is_some() {
-            HttpResponse::BadRequest().json(self)
-        } else {
-            HttpResponse::Ok().json(self)
         }
     }
 }
