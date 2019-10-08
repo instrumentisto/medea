@@ -12,36 +12,9 @@ use medea_control_api_proto::grpc::control_api::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::{client::MemberUri, prelude::*};
+use crate::{client::Uri, prelude::*};
 
-use super::{
-    endpoint::Endpoint, Context, CreateResponse, Response, SingleGetResponse,
-};
-
-/// Path for `Member` in REST Control API mock.
-#[allow(clippy::module_name_repetitions)]
-#[derive(Debug, Deserialize)]
-pub struct MemberPath {
-    pub room_id: String,
-    pub member_id: String,
-}
-
-/// `DELETE /{room_id}/{member_id}`
-///
-/// Deletes single `Member`.
-///
-/// _For batch delete use `DELETE /`._
-#[allow(clippy::needless_pass_by_value)]
-pub fn delete(
-    path: Path<MemberPath>,
-    state: Data<Context>,
-) -> impl Future<Item = HttpResponse, Error = ()> {
-    state
-        .client
-        .delete_single(MemberUri::from(path))
-        .map_err(|e| error!("{:?}", e))
-        .map(|r| Response::from(r).into())
-}
+use super::{endpoint::Endpoint, Context, CreateResponse};
 
 /// Entity that represents control API `Member`.
 #[derive(Deserialize, Serialize, Debug)]
@@ -98,30 +71,13 @@ impl Into<RoomElementProto> for Member {
 /// Creates new `Member` element.
 #[allow(clippy::needless_pass_by_value)]
 pub fn create(
-    path: Path<MemberPath>,
+    path: Path<(String, String)>,
     state: Data<Context>,
     data: Json<Member>,
 ) -> impl Future<Item = HttpResponse, Error = ()> {
     state
         .client
-        .create_member(&path.into(), data.0)
+        .create_member(Uri::from(path.into_inner()), data.0)
         .map_err(|e| error!("{:?}", e))
         .map(|r| CreateResponse::from(r).into())
-}
-
-/// `GET /{room_id}/{member_id}`
-///
-/// Returns single `Member` element.
-///
-/// _For batch get use `GET /`._
-#[allow(clippy::needless_pass_by_value)]
-pub fn get(
-    path: Path<MemberPath>,
-    state: Data<Context>,
-) -> impl Future<Item = HttpResponse, Error = ()> {
-    state
-        .client
-        .get_single(MemberUri::from(path))
-        .map_err(|e| error!("{:?}", e))
-        .map(|r| SingleGetResponse::from(r).into())
 }

@@ -187,6 +187,11 @@ impl ControlApiService {
             )));
         };
 
+        info!(
+            "Received create_element request with id = [{}], element = [{:?}]",
+            &uri, &elem
+        );
+
         match uri {
             StatefulLocalUri::Room(uri) => Box::new(
                 RoomSpec::try_from((uri.take_room_id(), elem))
@@ -236,6 +241,11 @@ impl ControlApiService {
                 }
             }
         }
+
+        info!(
+            "Received delete_element request with ids = [{:?}]",
+            &delete_elements_msg
+        );
 
         future::Either::B(
             delete_elements_msg

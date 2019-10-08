@@ -1,3 +1,5 @@
+const controlUrl = "http://127.0.0.1:8000/";
+
 let roomId = window.location.hash.replace("#", "");
 
 export async function run(credentials) {
@@ -61,10 +63,9 @@ export async function run(credentials) {
 }
 
 window.connect_room = async function connect_room(credentials) {
+    console.log("Connection room with following credentials: " + credentials);
     run(credentials)
 };
-let baseUrl = "ws://127.0.0.1:8080/ws/";
-const controlUrl = "http://127.0.0.1:8000/";
 
 async function createRoom(roomId, memberId) {
     let resp = await axios({
@@ -91,7 +92,7 @@ async function createRoom(roomId, memberId) {
     return resp.data.sids[memberId]
 }
 
-async function addNewMember(roomId, memberId) {
+async function createMember(roomId, memberId) {
     let controlRoom = await axios.get(controlUrl + roomId);
     let anotherMembers = Object.keys(controlRoom.data.element.pipeline);
     let pipeline = {
@@ -292,22 +293,20 @@ window.onload = function() {
                 contentVisibility.show(controlBtns);
 
                 let username = usernameInput.value;
-                let connectUrl = baseUrl + roomId + '/' + username + '/test';
                 try {
                     await axios.get(controlUrl + roomId);
                 } catch (e) {
                     if (e.response.status === 400) {
                         console.log("Room not found. Creating new room...");
-                        connectUrl = await createRoom(roomId, username);
+                        await window.connect_room(await createRoom(roomId, username))
                     }
                 }
                 try {
                     await axios.get(controlUrl + roomId + '/' + username);
                 } catch (e) {
                     console.log("Member not found. Creating new member...");
-                    connectUrl = await addNewMember(roomId, username);
+                    await window.connect_room(await createMember(roomId, username));
                 }
-                await window.connect_room(connectUrl)
             };
         };
 

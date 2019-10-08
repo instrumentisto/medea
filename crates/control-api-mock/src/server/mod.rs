@@ -23,7 +23,10 @@ use medea_control_api_proto::grpc::control_api::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::{client::ControlClient, prelude::*};
+use crate::{
+    client::{ControlClient, Uri},
+    prelude::*,
+};
 
 use self::{
     endpoint::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
@@ -52,24 +55,23 @@ pub fn run(args: &ArgMatches) {
                     .route(web::get().to_async(batch_get))
                     .route(web::delete().to_async(batch_delete)),
             )
-            .service(web::resource("hb").route(web::get().to_async(heartbeat)))
             .service(
-                web::resource("/{room_id}")
-                    .route(web::delete().to_async(room::delete))
+                web::resource("/{a}")
                     .route(web::post().to_async(room::create))
-                    .route(web::get().to_async(room::get)),
+                    .route(web::get().to_async(get::get1))
+                    .route(web::delete().to_async(delete::delete1)),
             )
             .service(
-                web::resource("/{room_id}/{member_id}")
-                    .route(web::delete().to_async(member::delete))
+                web::resource("/{a}/{b}")
                     .route(web::post().to_async(member::create))
-                    .route(web::get().to_async(member::get)),
+                    .route(web::get().to_async(get::get2))
+                    .route(web::delete().to_async(delete::delete2)),
             )
             .service(
-                web::resource("/{room_id}/{member_id}/{endpoint_id}")
-                    .route(web::delete().to_async(endpoint::delete))
+                web::resource("/{a}/{b}/{c}")
                     .route(web::post().to_async(endpoint::create))
-                    .route(web::get().to_async(endpoint::get)),
+                    .route(web::get().to_async(get::get3))
+                    .route(web::delete().to_async(delete::delete3)),
             )
     })
     .bind(args.value_of("addr").unwrap())
@@ -77,18 +79,83 @@ pub fn run(args: &ArgMatches) {
     .start();
 }
 
-/// `GET /hb`
-///
-/// Checks connection with Medea's gRPC Control API.
 #[allow(clippy::needless_pass_by_value)]
-pub fn heartbeat(
-    state: Data<Context>,
-) -> impl Future<Item = HttpResponse, Error = ()> {
-    state
-        .client
-        .get_single("")
-        .map_err(|_| ())
-        .map(|_| HttpResponse::Ok().body("Ok".to_string()))
+#[allow(clippy::module_name_repetitions)]
+mod delete {
+    use super::*;
+
+    fn delete(
+        uri: Uri,
+        state: Data<Context>,
+    ) -> impl Future<Item = HttpResponse, Error = ()> {
+        state
+            .client
+            .delete_single(uri)
+            .map_err(|e| error!("{:?}", e))
+            .map(|r| Response::from(r).into())
+    }
+
+    pub fn delete1(
+        path: web::Path<(String)>,
+        state: Data<Context>,
+    ) -> impl Future<Item = HttpResponse, Error = ()> {
+        delete(path.into_inner().into(), state)
+    }
+
+    pub fn delete2(
+        path: web::Path<(String, String)>,
+        state: Data<Context>,
+    ) -> impl Future<Item = HttpResponse, Error = ()> {
+        delete(path.into_inner().into(), state)
+    }
+
+    pub fn delete3(
+        path: web::Path<(String, String, String)>,
+        state: Data<Context>,
+    ) -> impl Future<Item = HttpResponse, Error = ()> {
+        delete(path.into_inner().into(), state)
+    }
+}
+
+#[allow(clippy::needless_pass_by_value)]
+#[allow(clippy::module_name_repetitions)]
+mod get {
+    use super::*;
+
+    fn get(
+        uri: Uri,
+        state: Data<Context>,
+    ) -> impl Future<Item = HttpResponse, Error = ()> {
+        state
+            .client
+            .get_single(uri)
+            .map_err(|e| error!("{:?}", e))
+            .map(|r| SingleGetResponse::from(r).into())
+    }
+
+    #[allow(clippy::needless_pass_by_value)]
+    pub fn get1(
+        path: web::Path<(String)>,
+        state: Data<Context>,
+    ) -> impl Future<Item = HttpResponse, Error = ()> {
+        get(path.into_inner().into(), state)
+    }
+
+    #[allow(clippy::needless_pass_by_value)]
+    pub fn get2(
+        path: web::Path<(String, String)>,
+        state: Data<Context>,
+    ) -> impl Future<Item = HttpResponse, Error = ()> {
+        get(path.into_inner().into(), state)
+    }
+
+    #[allow(clippy::needless_pass_by_value)]
+    pub fn get3(
+        path: web::Path<(String, String, String)>,
+        state: Data<Context>,
+    ) -> impl Future<Item = HttpResponse, Error = ()> {
+        get(path.into_inner().into(), state)
+    }
 }
 
 /// Batch ID's request. Used for batch delete and get.

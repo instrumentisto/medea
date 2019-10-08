@@ -1,8 +1,7 @@
 //! Implementation of client for Medea's gRPC Control API.
 
-use std::{fmt, sync::Arc};
+use std::sync::Arc;
 
-use actix_web::web::Path;
 use futures::{Future, IntoFuture};
 use grpcio::{ChannelBuilder, EnvBuilder, Error};
 use medea_control_api_proto::grpc::{
@@ -13,81 +12,33 @@ use medea_control_api_proto::grpc::{
 };
 use protobuf::RepeatedField;
 
-use crate::server::{
-    endpoint::{Endpoint, EndpointPath},
-    member::{Member, MemberPath},
-    room::{Room, RoomPath},
-};
+use crate::server::{endpoint::Endpoint, member::Member, room::Room};
 
 /// Uri to `Room` element.
 #[derive(Clone, Debug)]
-pub struct RoomUri {
-    room_id: String,
-}
+pub struct Uri(String);
 
-impl From<Path<RoomPath>> for RoomUri {
-    fn from(path: Path<RoomPath>) -> Self {
-        Self {
-            room_id: path.into_inner().room_id,
-        }
+impl From<String> for Uri {
+    fn from(path: String) -> Self {
+        Self(format!("local://{}", path))
     }
 }
 
-impl fmt::Display for RoomUri {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "local://{}", self.room_id)
+impl From<(String, String)> for Uri {
+    fn from(path: (String, String)) -> Self {
+        Self(format!("local://{}/{}", path.0, path.1))
     }
 }
 
-/// URI to `Member` element.
-#[derive(Clone, Debug)]
-pub struct MemberUri {
-    room_id: String,
-    member_id: String,
-}
-
-impl From<Path<MemberPath>> for MemberUri {
-    fn from(path: Path<MemberPath>) -> Self {
-        let path = path.into_inner();
-        Self {
-            room_id: path.room_id,
-            member_id: path.member_id,
-        }
+impl From<(String, String, String)> for Uri {
+    fn from(path: (String, String, String)) -> Self {
+        Self(format!("local://{}/{}/{}", path.0, path.1, path.2))
     }
 }
 
-impl fmt::Display for MemberUri {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "local://{}/{}", self.room_id, self.member_id)
-    }
-}
-
-/// URI to `Endpoint` element.
-#[derive(Clone, Debug)]
-pub struct EndpointUri {
-    room_id: String,
-    member_id: String,
-    endpoint_id: String,
-}
-
-impl From<Path<EndpointPath>> for EndpointUri {
-    fn from(path: Path<EndpointPath>) -> Self {
-        let path = path.into_inner();
-        Self {
-            room_id: path.room_id,
-            member_id: path.member_id,
-            endpoint_id: path.endpoint_id,
-        }
-    }
-}
-
-impl fmt::Display for EndpointUri {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "local://{}/{}/{}",
-            self.room_id, self.member_id, self.endpoint_id
-        )
+impl Into<String> for Uri {
+    fn into(self) -> String {
+        self.0
     }
 }
 
@@ -121,12 +72,12 @@ impl ControlClient {
     /// Creates `Room` element with provided [`RoomUri`] and `Room` spec.
     pub fn create_room(
         &self,
-        uri: &RoomUri,
+        uri: Uri,
         room: Room,
     ) -> impl Future<Item = CreateResponse, Error = Error> {
         let mut req = CreateRequest::new();
         req.set_room(room.into());
-        req.set_id(uri.to_string());
+        req.set_id(uri.into());
 
         self.grpc_client
             .create_async(&req)
@@ -137,12 +88,12 @@ impl ControlClient {
     /// Creates `Member` element with provided [`MemberUri`] and `Member` spec.
     pub fn create_member(
         &self,
-        uri: &MemberUri,
+        uri: Uri,
         member: Member,
     ) -> impl Future<Item = CreateResponse, Error = Error> {
         let mut req = CreateRequest::new();
         req.set_member(member.into());
-        req.set_id(uri.to_string());
+        req.set_id(uri.into());
 
         self.grpc_client
             .create_async(&req)
@@ -154,11 +105,11 @@ impl ControlClient {
     /// spec.
     pub fn create_endpoint(
         &self,
-        uri: &EndpointUri,
+        uri: Uri,
         endpoint: Endpoint,
     ) -> impl Future<Item = CreateResponse, Error = Error> {
         let mut req = CreateRequest::new();
-        req.set_id(uri.to_string());
+        req.set_id(uri.into());
         match endpoint {
             Endpoint::WebRtcPlayEndpoint { spec } => {
                 req.set_webrtc_play(spec.into());
@@ -175,14 +126,11 @@ impl ControlClient {
     }
 
     /// Gets single element from Control API by local URI.
-    pub fn get_single<T>(
+    pub fn get_single(
         &self,
-        uri: T,
-    ) -> impl Future<Item = GetResponse, Error = Error>
-    where
-        T: fmt::Display,
-    {
-        let req = id_request(vec![uri.to_string()]);
+        uri: Uri,
+    ) -> impl Future<Item = GetResponse, Error = Error> {
+        let req = id_request(vec![uri.into()]);
 
         self.grpc_client
             .get_async(&req)
@@ -204,14 +152,11 @@ impl ControlClient {
     }
 
     /// Deletes single element.
-    pub fn delete_single<T>(
+    pub fn delete_single(
         &self,
-        uri: T,
-    ) -> impl Future<Item = Response, Error = Error>
-    where
-        T: fmt::Display,
-    {
-        let req = id_request(vec![uri.to_string()]);
+        uri: Uri,
+    ) -> impl Future<Item = Response, Error = Error> {
+        let req = id_request(vec![uri.into()]);
 
         self.grpc_client
             .delete_async(&req)

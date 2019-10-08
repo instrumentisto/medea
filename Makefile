@@ -459,8 +459,7 @@ endif
 docker.build.control-api-mock:
 	docker build -t instrumentisto/medea-control-api-mock:dev \
 		-f crates/control-api-mock/Dockerfile \
-		--build-arg medea_build_image=$(medea-build-image) \
-		.
+		--build-arg medea_build_image=$(medea-build-image) .
 
 
 # Build medea project Docker image.

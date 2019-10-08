@@ -12,35 +12,9 @@ use medea_control_api_proto::grpc::control_api::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::{client::RoomUri, prelude::*};
+use crate::{client::Uri, prelude::*};
 
-use super::{
-    member::Member, Context, CreateResponse, Response, SingleGetResponse,
-};
-
-/// Path for `Room` in REST Control API mock.
-#[allow(clippy::module_name_repetitions)]
-#[derive(Debug, Deserialize)]
-pub struct RoomPath {
-    pub room_id: String,
-}
-
-/// `DELETE /{room_id}`
-///
-/// Deletes `Room` element.
-///
-/// _For batch delete use `DELETE /`._
-#[allow(clippy::needless_pass_by_value)]
-pub fn delete(
-    path: Path<RoomPath>,
-    state: Data<Context>,
-) -> impl Future<Item = HttpResponse, Error = ()> {
-    state
-        .client
-        .delete_single(RoomUri::from(path))
-        .map_err(|e| error!("{:?}", e))
-        .map(|r| Response::from(r).into())
-}
+use super::{member::Member, Context, CreateResponse};
 
 /// Control API's `Room` representation.
 #[derive(Serialize, Deserialize, Debug)]
@@ -106,30 +80,13 @@ impl From<RoomProto> for Room {
 /// Creates new `Room` element.
 #[allow(clippy::needless_pass_by_value)]
 pub fn create(
-    path: Path<RoomPath>,
+    path: Path<String>,
     state: Data<Context>,
     data: Json<Room>,
 ) -> impl Future<Item = HttpResponse, Error = ()> {
     state
         .client
-        .create_room(&path.into(), data.0)
+        .create_room(Uri::from(path.into_inner()), data.0)
         .map_err(|e| error!("{:?}", e))
         .map(|r| CreateResponse::from(r).into())
-}
-
-/// `GET /{room_id}`
-///
-/// Returns requested single `Room` element by local URI.
-///
-/// _For batch get use `GET /`._
-#[allow(clippy::needless_pass_by_value)]
-pub fn get(
-    path: Path<RoomPath>,
-    state: Data<Context>,
-) -> impl Future<Item = HttpResponse, Error = ()> {
-    state
-        .client
-        .get_single(RoomUri::from(path))
-        .map_err(|e| error!("{:?}", e))
-        .map(|r| SingleGetResponse::from(r).into())
 }
