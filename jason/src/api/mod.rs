@@ -66,7 +66,7 @@ impl Jason {
                 #[cfg(not(feature = "mockall"))]
                 {
                     let inner_clone = inner.clone();
-                    rpc.on_close_room(Box::new(move |_| {
+                    rpc.on_close_by_server(Box::new(move |_| {
                         inner_clone.borrow_mut().rooms = Vec::new();
                         inner_clone.borrow_mut().media_manager = Rc::default();
                     }));

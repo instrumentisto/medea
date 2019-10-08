@@ -70,7 +70,7 @@ pub trait RpcClient {
     ///
     /// [`Room`]: crate::api::room::Room
     #[cfg(not(feature = "mockable"))]
-    fn on_close_room(&self, f: Box<dyn Fn(&CloseMsg)>);
+    fn on_close_by_server(&self, f: Box<dyn Fn(&CloseMsg)>);
 }
 
 // We mock `RpcClient` manually because `mockall` can't mock `Fn` objects but
@@ -118,24 +118,25 @@ struct Inner {
     /// Event's subscribers list.
     subs: Vec<UnboundedSender<Event>>,
 
-    /// Closure which will be called on [`Room`] close.
+    /// Closure which will be called when WebSocket connection normally closed
+    /// by server.
     ///
-    /// Room will be closed on [`RpcConnectionCloseReason::Evicted`] and
-    /// [`RpcConnectionCloseReason::RoomClosed`].
+    /// Note that this closure will not be called if WebSocket closed with
+    /// [`RpcConnectionCloseReason::NewConnection`] reason.
     ///
     /// [`Rc`] needed for fix `BorrowMut` error of [`WebSocketRpcClient`] when
     /// we drop all [`Room`]s from [`Jason`].
     ///
     /// [`Room`]: crate::api::room::Room
     /// [`Jason`]: crate::api::Jason
-    on_close_room: Rc<Box<dyn Fn(&CloseMsg)>>,
+    on_close_by_server: Rc<Box<dyn Fn(&CloseMsg)>>,
 }
 
 impl Inner {
     fn new(token: String, heartbeat_interval: i32) -> Rc<RefCell<Self>> {
         Rc::new(RefCell::new(Self {
             sock: None,
-            on_close_room: Rc::new(Box::new(|_| {})),
+            on_close_by_server: Rc::new(Box::new(|_| {})),
             token,
             subs: vec![],
             heartbeat: Heartbeat::new(heartbeat_interval),
@@ -144,6 +145,9 @@ impl Inner {
 }
 
 /// Handles close messsage from remote server.
+///
+/// This function will be called on every WebSocket close (normal and abnormal)
+/// regardless of the close reason.
 fn on_close(inner_rc: &RefCell<Inner>, close_msg: &CloseMsg) {
     {
         let mut inner = inner_rc.borrow_mut();
@@ -155,9 +159,11 @@ fn on_close(inner_rc: &RefCell<Inner>, close_msg: &CloseMsg) {
         match reason {
             RpcConnectionCloseReason::Evicted
             | RpcConnectionCloseReason::RoomClosed => {
-                let f = Rc::clone(&inner_rc.borrow().on_close_room);
+                let f = Rc::clone(&inner_rc.borrow().on_close_by_server);
                 (f)(&close_msg);
             }
+            // This is reconnecting and this is not considered as connection
+            // close.
             RpcConnectionCloseReason::NewConnection => {}
         }
     }
@@ -252,8 +258,8 @@ impl RpcClient for WebsocketRpcClient {
     // Not available in mockable tests because limitations of
     // `mockall`.
     #[cfg(not(feature = "mockable"))]
-    fn on_close_room(&self, f: Box<dyn Fn(&CloseMsg)>) {
-        self.0.borrow_mut().on_close_room = Rc::new(f);
+    fn on_close_by_server(&self, f: Box<dyn Fn(&CloseMsg)>) {
+        self.0.borrow_mut().on_close_by_server = Rc::new(f);
     }
 }
 
