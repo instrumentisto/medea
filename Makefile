@@ -826,10 +826,10 @@ endef
 		cargo cargo.build cargo.fmt cargo.lint \
 		docker.auth docker.build.demo docker.build.medea \
 			docker.down.coturn docker.down.demo docker.down.medea \
-        	docker.down.webdriver \
+			docker.down.webdriver \
 			docker.pull docker.push \
 			docker.up.coturn docker.up.demo docker.up.medea \
-        	docker.up.webdriver \
+			docker.up.webdriver \
 		docs docs.rust \
 		down down.coturn down.demo down.dev down.medea \
 		helm helm.down helm.init helm.lint helm.list \
