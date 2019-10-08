@@ -316,9 +316,9 @@ else
 ifeq ($(crate),medea-jason)
 	@make docker.up.webdriver
 	sleep 10
-	cd $(crate-dir)/ && \
-	$(webdriver-env)="http://0.0.0.0:4444" \
-	cargo test --target wasm32-unknown-unknown --features mockable
+	cd $(crate-dir)/ \
+		&& $(webdriver-env)="http://0.0.0.0:4444" \
+		cargo test --target wasm32-unknown-unknown --features mockable
 	@make docker.down.webdriver
 else
 	cd $(crate-dir)/ && \
