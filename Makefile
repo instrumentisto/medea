@@ -469,8 +469,7 @@ endif
 			--build-arg rustc_mode=$(if \
 				$(call eq,$(debug),no),release,debug) \
 			--build-arg rustc_opts=$(if \
-				$(call eq,$(debug),no),--release,) \
-			--build-arg cargo_home=.cache/cargo,) \
+				$(call eq,$(debug),no),--release,),) \
 		-t $(docker-build-medea-image-name):$(if $(call eq,$(TAG),),dev,$(TAG)) .
 	$(call docker.build.clean.ignore)
 define docker.build.clean.ignore
