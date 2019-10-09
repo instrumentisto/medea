@@ -57,19 +57,19 @@ pub fn run(args: &ArgMatches) {
             )
             .service(
                 web::resource("/{a}")
-                    .route(web::post().to_async(room::create))
+                    .route(web::post().to_async(create::create1))
                     .route(web::get().to_async(get::get1))
                     .route(web::delete().to_async(delete::delete1)),
             )
             .service(
                 web::resource("/{a}/{b}")
-                    .route(web::post().to_async(member::create))
+                    .route(web::post().to_async(create::create2))
                     .route(web::get().to_async(get::get2))
                     .route(web::delete().to_async(delete::delete2)),
             )
             .service(
                 web::resource("/{a}/{b}/{c}")
-                    .route(web::post().to_async(endpoint::create))
+                    .route(web::post().to_async(create::create3))
                     .route(web::get().to_async(get::get3))
                     .route(web::delete().to_async(delete::delete3)),
             )
@@ -79,42 +79,35 @@ pub fn run(args: &ArgMatches) {
     .start();
 }
 
+macro_rules! fn_uri_macro {
+    ($call_fn:tt, $resp:ty) => {
+        macro_rules! fn_uri {
+                ($name:tt, $uri_tuple:ty) => {
+                    pub fn $name(
+                        path: actix_web::web::Path<$uri_tuple>,
+                        state: Data<Context>,
+                    ) -> impl Future<Item = HttpResponse, Error = ()> {
+                        state
+                            .client
+                            .$call_fn(path.into_inner().into())
+                            .map_err(|e| error!("{:?}", e))
+                            .map(|r| <$resp>::from(r).into())
+                    }
+                };
+        }
+    };
+}
+
 #[allow(clippy::needless_pass_by_value)]
 #[allow(clippy::module_name_repetitions)]
 mod delete {
     use super::*;
 
-    fn delete(
-        uri: Uri,
-        state: Data<Context>,
-    ) -> impl Future<Item = HttpResponse, Error = ()> {
-        state
-            .client
-            .delete_single(uri)
-            .map_err(|e| error!("{:?}", e))
-            .map(|r| Response::from(r).into())
-    }
+    fn_uri_macro!(delete_single, Response);
 
-    pub fn delete1(
-        path: web::Path<(String)>,
-        state: Data<Context>,
-    ) -> impl Future<Item = HttpResponse, Error = ()> {
-        delete(path.into_inner().into(), state)
-    }
-
-    pub fn delete2(
-        path: web::Path<(String, String)>,
-        state: Data<Context>,
-    ) -> impl Future<Item = HttpResponse, Error = ()> {
-        delete(path.into_inner().into(), state)
-    }
-
-    pub fn delete3(
-        path: web::Path<(String, String, String)>,
-        state: Data<Context>,
-    ) -> impl Future<Item = HttpResponse, Error = ()> {
-        delete(path.into_inner().into(), state)
-    }
+    fn_uri!(delete1, (String));
+    fn_uri!(delete2, (String, String));
+    fn_uri!(delete3, (String, String, String));
 }
 
 #[allow(clippy::needless_pass_by_value)]
@@ -122,40 +115,35 @@ mod delete {
 mod get {
     use super::*;
 
-    fn get(
-        uri: Uri,
-        state: Data<Context>,
-    ) -> impl Future<Item = HttpResponse, Error = ()> {
-        state
-            .client
-            .get_single(uri)
-            .map_err(|e| error!("{:?}", e))
-            .map(|r| SingleGetResponse::from(r).into())
+    fn_uri_macro!(get_single, SingleGetResponse);
+
+    fn_uri!(get1, (String));
+    fn_uri!(get2, (String, String));
+    fn_uri!(get3, (String, String, String));
+}
+
+mod create {
+    use super::*;
+
+    macro_rules! gen_fn {
+        ($fn_name:tt, $uri_tuple:ty) => {
+            pub fn $fn_name(
+                path: actix_web::web::Path<$uri_tuple>,
+                state: Data<Context>,
+                data: Json<Element>,
+            ) -> impl Future<Item = HttpResponse, Error = ()> {
+                state
+                    .client
+                    .create(Uri::from(path.into_inner()), data.0)
+                    .map_err(|e| error!("{:?}", e))
+                    .map(|r| CreateResponse::from(r).into())
+            }
+        };
     }
 
-    #[allow(clippy::needless_pass_by_value)]
-    pub fn get1(
-        path: web::Path<(String)>,
-        state: Data<Context>,
-    ) -> impl Future<Item = HttpResponse, Error = ()> {
-        get(path.into_inner().into(), state)
-    }
-
-    #[allow(clippy::needless_pass_by_value)]
-    pub fn get2(
-        path: web::Path<(String, String)>,
-        state: Data<Context>,
-    ) -> impl Future<Item = HttpResponse, Error = ()> {
-        get(path.into_inner().into(), state)
-    }
-
-    #[allow(clippy::needless_pass_by_value)]
-    pub fn get3(
-        path: web::Path<(String, String, String)>,
-        state: Data<Context>,
-    ) -> impl Future<Item = HttpResponse, Error = ()> {
-        get(path.into_inner().into(), state)
-    }
+    gen_fn!(create1, (String));
+    gen_fn!(create2, (String, String));
+    gen_fn!(create3, (String, String, String));
 }
 
 /// Batch ID's request. Used for batch delete and get.
@@ -298,7 +286,7 @@ impl From<CreateResponseProto> for CreateResponse {
 }
 
 /// Union of all elements which exists in medea.
-#[derive(Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug)]
 #[serde(tag = "kind")]
 pub enum Element {
     Member(Member),

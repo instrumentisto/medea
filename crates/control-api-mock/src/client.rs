@@ -12,7 +12,7 @@ use medea_control_api_proto::grpc::{
 };
 use protobuf::RepeatedField;
 
-use crate::server::{endpoint::Endpoint, member::Member, room::Room};
+use crate::server::{endpoint::Endpoint, member::Member, room::Room, Element};
 
 /// Uri to `Room` element.
 #[derive(Clone, Debug)]
@@ -67,6 +67,34 @@ impl ControlClient {
         Self {
             grpc_client: new_grpcio_control_api_client(medea_addr),
         }
+    }
+
+    pub fn create(
+        &self,
+        uri: Uri,
+        element: Element,
+    ) -> impl Future<Item = CreateResponse, Error = Error> {
+        let mut req = CreateRequest::new();
+        req.set_id(uri.into());
+        match element {
+            Element::Room(room) => {
+                req.set_room(room.into());
+            }
+            Element::Member(member) => {
+                req.set_member(member.into());
+            }
+            Element::WebRtcPlayEndpoint(webrtc_play) => {
+                req.set_webrtc_play(webrtc_play.into());
+            }
+            Element::WebRtcPublishEndpoint(webrtc_pub) => {
+                req.set_webrtc_pub(webrtc_pub.into());
+            }
+        }
+
+        self.grpc_client
+            .create_async(&req)
+            .into_future()
+            .and_then(|r| r)
     }
 
     /// Creates `Room` element with provided [`RoomUri`] and `Room` spec.
