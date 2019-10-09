@@ -273,7 +273,7 @@ endif
 # Generate project documentation of Rust sources.
 #
 # Usage:
-#	make docs.rust [crate=(@all|medea|jason|<crate-name>)]
+#	make docs.rust [crate=(@all|medea|medea-jason|<crate-name>)]
 #	               [open=(yes|no)] [clean=(no|yes)]
 
 docs-rust-crate = $(if $(call eq,$(crate),),@all,$(crate))
