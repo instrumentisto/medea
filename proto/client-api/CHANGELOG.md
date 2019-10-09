@@ -12,9 +12,17 @@ All user visible changes to this project will be documented in this file. This p
 ### Added
 
 - `TrackId` and `PeerId` types ([#28]);
-- `Incrementable` trait ([#28]).
+- `Incrementable` trait ([#28]);
+- `RpcConnectionCloseReason` and `CloseDescription` types ([#58]);
+- `RpcConnectionCloseReason` variants:
+    - `Finished` ([#58]);
+    - `NewConnection` ([#58]);
+    - `Idle` ([#58]);
+    - `ConnectionRejected` ([#58]);
+    - `ServerError` ([#58]).
 
 [#28]: /../../pull/28
+[#58]: /../../pull/58
 
 
 
