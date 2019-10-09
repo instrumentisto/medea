@@ -230,8 +230,8 @@ impl PeerConnection {
 
         match signaling_state {
             Stable => {
-                if inner.peer.current_remote_description().is_some()
-                    && inner.peer.current_local_description().is_some()
+                if inner.peer.remote_description().is_some()
+                    && inner.peer.local_description().is_some()
                 {
                     inner.signaling_state = SignalingState::Stable;
                 } else {
@@ -528,21 +528,13 @@ impl PeerConnection {
     }
 
     /// Returns current local SDP offer of this [`PeerConnection`].
-    pub fn current_local_sdp(&self) -> Option<String> {
-        self.0
-            .borrow()
-            .peer
-            .current_local_description()
-            .map(|s| s.sdp())
+    pub fn local_sdp(&self) -> Option<String> {
+        self.0.borrow().peer.local_description().map(|s| s.sdp())
     }
 
     /// Returns current remote SDP offer of this [`PeerConnection`].
-    pub fn current_remote_sdp(&self) -> Option<String> {
-        self.0
-            .borrow()
-            .peer
-            .current_remote_description()
-            .map(|s| s.sdp())
+    pub fn remote_sdp(&self) -> Option<String> {
+        self.0.borrow().peer.remote_description().map(|s| s.sdp())
     }
 }
 
