@@ -51,11 +51,6 @@ pub fn run(args: &ArgMatches) {
             })
             .wrap(middleware::Logger::default())
             .service(
-                web::resource("/")
-                    .route(web::get().to_async(batch_get))
-                    .route(web::delete().to_async(batch_delete)),
-            )
-            .service(
                 web::resource("/{a}")
                     .route(web::post().to_async(create::create1))
                     .route(web::get().to_async(get::get1))
@@ -82,18 +77,18 @@ pub fn run(args: &ArgMatches) {
 macro_rules! fn_uri_macro {
     ($call_fn:tt, $resp:ty) => {
         macro_rules! fn_uri {
-                ($name:tt, $uri_tuple:ty) => {
-                    pub fn $name(
-                        path: actix_web::web::Path<$uri_tuple>,
-                        state: Data<Context>,
-                    ) -> impl Future<Item = HttpResponse, Error = ()> {
-                        state
-                            .client
-                            .$call_fn(path.into_inner().into())
-                            .map_err(|e| error!("{:?}", e))
-                            .map(|r| <$resp>::from(r).into())
-                    }
-                };
+            ($name:tt, $uri_tuple:ty) => {
+                pub fn $name(
+                    path: actix_web::web::Path<$uri_tuple>,
+                    state: Data<Context>,
+                ) -> impl Future<Item = HttpResponse, Error = ()> {
+                    state
+                        .client
+                        .$call_fn(path.into_inner().into())
+                        .map_err(|e| error!("{:?}", e))
+                        .map(|r| <$resp>::from(r).into())
+                }
+            };
         }
     };
 }
@@ -144,45 +139,6 @@ mod create {
     gen_fn!(create1, (String));
     gen_fn!(create2, (String, String));
     gen_fn!(create3, (String, String, String));
-}
-
-/// Batch ID's request. Used for batch delete and get.
-#[derive(Deserialize, Debug)]
-pub struct BatchIdsRequest {
-    /// Elements ids.
-    ids: Vec<String>,
-}
-
-/// `GET /`
-///
-/// Batch get elements. With this method you can get getheterogeneous set of
-/// elements.
-#[allow(clippy::needless_pass_by_value)]
-pub fn batch_get(
-    state: Data<Context>,
-    data: Json<BatchIdsRequest>,
-) -> impl Future<Item = HttpResponse, Error = ()> {
-    state
-        .client
-        .get_batch(data.ids.clone())
-        .map_err(|e| error!("{:?}", e))
-        .map(|r| GetResponse::from(r).into())
-}
-
-/// `DELETE /`
-///
-/// Batch delete elements. With this method you can delete getheterogeneous set
-/// of elements.
-#[allow(clippy::needless_pass_by_value)]
-pub fn batch_delete(
-    state: Data<Context>,
-    data: Json<BatchIdsRequest>,
-) -> impl Future<Item = HttpResponse, Error = ()> {
-    state
-        .client
-        .delete_batch(data.0.ids)
-        .map_err(|e| error!("{:?}", e))
-        .map(|r| Response::from(r).into())
 }
 
 /// Error object. Returns when some error happened on Control API's side.
@@ -254,7 +210,6 @@ macro_rules! impl_into_http_response {
 
 impl_into_http_response!(CreateResponse);
 impl_into_http_response!(Response);
-impl_into_http_response!(GetResponse);
 impl_into_http_response!(SingleGetResponse);
 
 impl From<ResponseProto> for Response {
@@ -329,43 +284,6 @@ impl Into<RoomElementProto> for Element {
             _ => unimplemented!(),
         }
         proto
-    }
-}
-
-/// Response on request for batch get `Element`s.
-#[derive(Serialize, Debug)]
-pub struct GetResponse {
-    /// Requested elements.
-    ///
-    /// Key - element's ID
-    ///
-    /// Value - requested element
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub elements: Option<HashMap<String, Element>>,
-
-    /// Error if something happened on Control API's side.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub error: Option<ErrorResponse>,
-}
-
-impl From<GetResponseProto> for GetResponse {
-    fn from(mut proto: GetResponseProto) -> Self {
-        if proto.has_error() {
-            return Self {
-                elements: None,
-                error: Some(proto.take_error().into()),
-            };
-        }
-
-        let mut elements = HashMap::new();
-        for (id, element) in proto.take_elements() {
-            elements.insert(id, element.into());
-        }
-
-        Self {
-            elements: Some(elements),
-            error: None,
-        }
     }
 }
 

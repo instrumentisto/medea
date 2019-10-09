@@ -1,10 +1,5 @@
 //! `Endpoint` related methods and entities.
 
-use actix_web::{
-    web::{Data, Json, Path},
-    HttpResponse,
-};
-use futures::Future;
 use medea_control_api_proto::grpc::control_api::{
     Member_Element as MemberElementProto,
     WebRtcPlayEndpoint as WebRtcPlayEndpointProto,
@@ -12,10 +7,6 @@ use medea_control_api_proto::grpc::control_api::{
     WebRtcPublishEndpoint_P2P as P2pModeProto,
 };
 use serde::{Deserialize, Serialize};
-
-use crate::{client::Uri, prelude::*};
-
-use super::{Context, CreateResponse};
 
 /// P2p mode of [`WebRtcPublishEndpoint`].
 #[derive(Serialize, Deserialize, Debug)]
@@ -131,20 +122,4 @@ impl From<MemberElementProto> for Endpoint {
             unimplemented!()
         }
     }
-}
-
-/// `POST /{room_id}/{member_id}/{endpoint_id}`
-///
-/// Creates new `Endpoint` element.
-#[allow(clippy::needless_pass_by_value)]
-pub fn create(
-    path: Path<(String, String, String)>,
-    state: Data<Context>,
-    data: Json<Endpoint>,
-) -> impl Future<Item = HttpResponse, Error = ()> {
-    state
-        .client
-        .create_endpoint(Uri::from(path.into_inner()), data.0)
-        .map_err(|e| error!("{:?}", e))
-        .map(|r| CreateResponse::from(r).into())
 }

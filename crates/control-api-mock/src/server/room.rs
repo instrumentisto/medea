@@ -2,19 +2,12 @@
 
 use std::collections::HashMap;
 
-use actix_web::{
-    web::{Data, Json, Path},
-    HttpResponse,
-};
-use futures::Future;
 use medea_control_api_proto::grpc::control_api::{
     Room as RoomProto, Room_Element as RoomElementProto,
 };
 use serde::{Deserialize, Serialize};
 
-use crate::{client::Uri, prelude::*};
-
-use super::{member::Member, Context, CreateResponse};
+use super::member::Member;
 
 /// Control API's `Room` representation.
 #[derive(Serialize, Deserialize, Debug)]
@@ -73,20 +66,4 @@ impl From<RoomProto> for Room {
         }
         Self { pipeline }
     }
-}
-
-/// `POST /{room_id}`
-///
-/// Creates new `Room` element.
-#[allow(clippy::needless_pass_by_value)]
-pub fn create(
-    path: Path<String>,
-    state: Data<Context>,
-    data: Json<Room>,
-) -> impl Future<Item = HttpResponse, Error = ()> {
-    state
-        .client
-        .create_room(Uri::from(path.into_inner()), data.0)
-        .map_err(|e| error!("{:?}", e))
-        .map(|r| CreateResponse::from(r).into())
 }

@@ -12,7 +12,7 @@ use medea_control_api_proto::grpc::{
 };
 use protobuf::RepeatedField;
 
-use crate::server::{endpoint::Endpoint, member::Member, room::Room, Element};
+use crate::server::Element;
 
 /// Uri to `Room` element.
 #[derive(Clone, Debug)]
@@ -97,62 +97,6 @@ impl ControlClient {
             .and_then(|r| r)
     }
 
-    /// Creates `Room` element with provided [`RoomUri`] and `Room` spec.
-    pub fn create_room(
-        &self,
-        uri: Uri,
-        room: Room,
-    ) -> impl Future<Item = CreateResponse, Error = Error> {
-        let mut req = CreateRequest::new();
-        req.set_room(room.into());
-        req.set_id(uri.into());
-
-        self.grpc_client
-            .create_async(&req)
-            .into_future()
-            .and_then(|r| r)
-    }
-
-    /// Creates `Member` element with provided [`MemberUri`] and `Member` spec.
-    pub fn create_member(
-        &self,
-        uri: Uri,
-        member: Member,
-    ) -> impl Future<Item = CreateResponse, Error = Error> {
-        let mut req = CreateRequest::new();
-        req.set_member(member.into());
-        req.set_id(uri.into());
-
-        self.grpc_client
-            .create_async(&req)
-            .into_future()
-            .and_then(|r| r)
-    }
-
-    /// Creates `Endpoint` element with provided [`EndpointUri`] and `Endpoint`
-    /// spec.
-    pub fn create_endpoint(
-        &self,
-        uri: Uri,
-        endpoint: Endpoint,
-    ) -> impl Future<Item = CreateResponse, Error = Error> {
-        let mut req = CreateRequest::new();
-        req.set_id(uri.into());
-        match endpoint {
-            Endpoint::WebRtcPlayEndpoint { spec } => {
-                req.set_webrtc_play(spec.into());
-            }
-            Endpoint::WebRtcPublishEndpoint { spec } => {
-                req.set_webrtc_pub(spec.into());
-            }
-        }
-
-        self.grpc_client
-            .create_async(&req)
-            .into_future()
-            .and_then(|r| r)
-    }
-
     /// Gets single element from Control API by local URI.
     pub fn get_single(
         &self,
@@ -166,38 +110,12 @@ impl ControlClient {
             .and_then(|r| r)
     }
 
-    /// Gets all elements with provided Local URIs.
-    pub fn get_batch(
-        &self,
-        uris: Vec<String>,
-    ) -> impl Future<Item = GetResponse, Error = Error> {
-        let req = id_request(uris);
-
-        self.grpc_client
-            .get_async(&req)
-            .into_future()
-            .and_then(|r| r)
-    }
-
     /// Deletes single element.
     pub fn delete_single(
         &self,
         uri: Uri,
     ) -> impl Future<Item = Response, Error = Error> {
         let req = id_request(vec![uri.into()]);
-
-        self.grpc_client
-            .delete_async(&req)
-            .into_future()
-            .and_then(|r| r)
-    }
-
-    /// Deletes all elements with provided local URIs.
-    pub fn delete_batch(
-        &self,
-        ids: Vec<String>,
-    ) -> impl Future<Item = Response, Error = Error> {
-        let req = id_request(ids);
 
         self.grpc_client
             .delete_async(&req)
