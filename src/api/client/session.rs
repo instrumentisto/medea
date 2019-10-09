@@ -6,9 +6,11 @@ use actix::{
     fut::wrap_future, Actor, ActorContext, ActorFuture, Addr, AsyncContext,
     Handler, Message, StreamHandler,
 };
-use actix_web_actors::ws::{self, CloseReason, WebsocketContext};
+use actix_web_actors::ws::{self, CloseReason};
 use futures::future::Future;
-use medea_client_api_proto::{ClientMsg, CloseDescription, ServerMsg};
+use medea_client_api_proto::{
+    ClientMsg, CloseDescription, RpcConnectionCloseReason, ServerMsg,
+};
 
 use crate::{
     api::{
@@ -63,11 +65,7 @@ impl WsSession {
         }
     }
 
-    fn close_normal(&self, ctx: &mut WebsocketContext<Self>) {
-        ctx.notify(Close(ws::CloseCode::Normal.into()));
-    }
-
-    /// Start watchdog which will drop connection if now-last_activity >
+    /// Starts watchdog which will drop connection if now-last_activity >
     /// idle_timeout.
     fn start_watchdog(&mut self, ctx: &mut <Self as Actor>::Context) {
         ctx.run_interval(Duration::new(1, 0), |session, ctx| {
@@ -85,7 +83,9 @@ impl WsSession {
                         session.member_id, err,
                     )
                 }
-                session.close_normal(ctx);
+                ctx.notify(Close::with_normal_code(&CloseDescription::new(
+                    RpcConnectionCloseReason::Idle,
+                )))
             }
         });
     }
@@ -118,7 +118,11 @@ impl Actor for WsSession {
                              {:?}",
                             session.member_id, e
                         );
-                        session.close_normal(ctx);
+                        ctx.notify(Close::with_normal_code(
+                            &CloseDescription::new(
+                                RpcConnectionCloseReason::ConnectionRejected,
+                            ),
+                        ));
                     }
                 },
             )
@@ -131,7 +135,11 @@ impl Actor for WsSession {
                          {:?}",
                         session.member_id, send_err,
                     );
-                    session.close_normal(ctx);
+                    ctx.notify(Close::with_normal_code(
+                        &CloseDescription::new(
+                            RpcConnectionCloseReason::ServerError,
+                        ),
+                    ));
                 },
             ),
         );
@@ -154,13 +162,9 @@ impl RpcConnection for Addr<WsSession> {
         close_description: CloseDescription,
     ) -> Box<dyn Future<Item = (), Error = ()>> {
         let fut = self
-            .send(Close(CloseReason {
-                code: ws::CloseCode::Normal,
-                description: Some(
-                    serde_json::to_string(&close_description).unwrap(),
-                ),
-            }))
+            .send(Close::with_normal_code(&close_description))
             .or_else(|_| Ok(()));
+
         Box::new(fut)
     }
 
@@ -179,12 +183,19 @@ impl RpcConnection for Addr<WsSession> {
 }
 
 /// Message for closing [`WsSession`].
-///
-/// [`CloseReason`] will be sent in WebSocket [Close] frame's description.
-///
-/// [Close]: https://tools.ietf.org/html/rfc6455#section-5.5.1
 #[derive(Message)]
 pub struct Close(CloseReason);
+
+impl Close {
+    /// Creates [`Close`] message with [`ws::CloseCode::Normal`] and provided
+    /// [`CloseDescription`] as serialized description.
+    fn with_normal_code(description: &CloseDescription) -> Self {
+        Self(CloseReason {
+            code: ws::CloseCode::Normal,
+            description: Some(serde_json::to_string(&description).unwrap()),
+        })
+    }
+}
 
 impl Handler<Close> for WsSession {
     type Result = ();

@@ -107,6 +107,21 @@ pub enum RpcConnectionCloseReason {
 
     /// Old connection was closed due to client reconnection.
     NewConnection,
+
+    /// Connection for a while was inactive and server considers that
+    /// connection is idle.
+    Idle,
+
+    /// Establishing of connection with server was rejected on server side.
+    ///
+    /// Most likely because wrong `Member` credentials.
+    ConnectionRejected,
+
+    /// Some server error was occurred while connecting.
+    ///
+    /// This close reason is similar to 500 HTTP code. That is, the client is
+    /// not to blame for this error.
+    ServerError,
 }
 
 /// Description which will be sent in [Close] WebSocket frame.
