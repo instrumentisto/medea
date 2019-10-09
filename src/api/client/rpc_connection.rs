@@ -24,9 +24,14 @@ pub struct EventMessage(Event);
 ///
 /// [`Member`]: crate::signalling::elements::member::Member
 pub trait RpcConnection: fmt::Debug + Send {
-    /// Closes [`RpcConnection`].
+    /// Closes [`RpcConnection`] and send [`CloseDescription`] to the client (in
+    /// WebSocket implementation description will be sent in [Close] frame).
+    ///
     /// No [`RpcConnectionClosed`] signals should be emitted.
+    ///
     /// Always returns success.
+    ///
+    /// [Close]: https://tools.ietf.org/html/rfc6455#section-5.5.1
     fn close(
         &mut self,
         close_description: CloseDescription,

@@ -143,9 +143,12 @@ impl Actor for WsSession {
 }
 
 impl RpcConnection for Addr<WsSession> {
-    /// Closes [`WsSession`] by sending itself "normal closure" close message.
+    /// Closes [`WsSession`] by sending itself "normal closure" close message
+    /// with [`CloseDescription`] as description of [Close] frame.
     ///
     /// Never returns error.
+    ///
+    /// [Close]: https://tools.ietf.org/html/rfc6455#section-5.5.1
     fn close(
         &mut self,
         close_description: CloseDescription,
@@ -176,6 +179,10 @@ impl RpcConnection for Addr<WsSession> {
 }
 
 /// Message for closing [`WsSession`].
+///
+/// [`CloseReason`] will be sent in WebSocket [Close] frame's description.
+///
+/// [Close]: https://tools.ietf.org/html/rfc6455#section-5.5.1
 #[derive(Message)]
 pub struct Close(CloseReason);
 
