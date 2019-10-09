@@ -64,9 +64,7 @@ impl WsSession {
     }
 
     fn close_normal(&self, ctx: &mut WebsocketContext<Self>) {
-        ctx.notify(Close {
-            reason: Some(ws::CloseCode::Normal.into()),
-        });
+        ctx.notify(Close(ws::CloseCode::Normal.into()));
     }
 
     /// Start watchdog which will drop connection if now-last_activity >
@@ -152,16 +150,13 @@ impl RpcConnection for Addr<WsSession> {
         &mut self,
         close_description: CloseDescription,
     ) -> Box<dyn Future<Item = (), Error = ()>> {
-        let reason = CloseReason {
-            code: ws::CloseCode::Normal,
-            description: Some(
-                serde_json::to_string(&close_description).unwrap(),
-            ),
-        };
         let fut = self
-            .send(Close {
-                reason: Some(reason),
-            })
+            .send(Close(CloseReason {
+                code: ws::CloseCode::Normal,
+                description: Some(
+                    serde_json::to_string(&close_description).unwrap(),
+                ),
+            }))
             .or_else(|_| Ok(()));
         Box::new(fut)
     }
@@ -182,9 +177,7 @@ impl RpcConnection for Addr<WsSession> {
 
 /// Message for closing [`WsSession`].
 #[derive(Message)]
-pub struct Close {
-    reason: Option<CloseReason>,
-}
+pub struct Close(CloseReason);
 
 impl Handler<Close> for WsSession {
     type Result = ();
@@ -193,7 +186,7 @@ impl Handler<Close> for WsSession {
     fn handle(&mut self, close: Close, ctx: &mut Self::Context) {
         debug!("Closing WsSession for member {}", self.member_id);
         self.closed_by_server = true;
-        ctx.close(close.reason);
+        ctx.close(Some(close.0));
         ctx.stop();
     }
 }
