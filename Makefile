@@ -23,7 +23,7 @@ RUST_VER := 1.37
 CHROME_VERSION := 77.0
 FIREFOX_VERSION := 69.0
 
-CURRENT_BRANCH := $(strip $(shell git branch | grep \* | cut -d ' ' -f2))
+CURRENT_GIT_BRANCH := $(strip $(shell git branch | grep \* | cut -d ' ' -f2))
 
 crate-dir = .
 ifeq ($(crate),medea-jason)
@@ -314,12 +314,12 @@ ifeq ($(test-unit-crate),medea)
 	cargo test --lib --bin medea
 else
 ifeq ($(crate),medea-jason)
-	@make docker.up.webdriver
+	@make docker.up.webdriver browser=$(browser)
 	sleep 10
-	cd $(crate-dir)/ \
-		&& $(webdriver-env)="http://0.0.0.0:4444" \
-		cargo test --target wasm32-unknown-unknown --features mockable
-	@make docker.down.webdriver
+	cd $(crate-dir)/ && \
+	$(webdriver-env)="http://0.0.0.0:4444" \
+	cargo test --target wasm32-unknown-unknown --features mockable
+	@make docker.down.webdriver browser=$(browser)
 else
 	cd $(crate-dir)/ && \
 	cargo test -p $(test-unit-crate)
@@ -632,11 +632,13 @@ endif
 
 docker.up.webdriver: docker.down.webdriver
 ifeq ($(browser),firefox)
-	docker run --rm -d --shm-size 512m --name medea-webdriver-firefox \
-		--network=host instrumentisto/geckodriver:$(FIREFOX_VERSION)
+	docker run --rm -d --network=host --shm-size 512m \
+		--name medea-webdriver-firefox \
+		instrumentisto/geckodriver:$(FIREFOX_VERSION)
 else
-	docker run --rm -d --name medea-webdriver-chrome \
-		--network=host selenoid/chrome:$(CHROME_VERSION)
+	docker run --rm -d --network=host \
+		--name medea-webdriver-chrome \
+		selenoid/chrome:$(CHROME_VERSION)
 endif
 
 
@@ -746,7 +748,7 @@ endif
 		git add -v charts/ ; \
 		git commit -m "Release '$(helm-chart)' Helm chart" ; \
 	fi
-	git checkout $(CURRENT_BRANCH)
+	git checkout $(CURRENT_GIT_BRANCH)
 	git push origin gh-pages
 
 
@@ -823,19 +825,19 @@ endef
 ##################
 
 .PHONY: build build.jason build.medea \
-		cargo cargo.build cargo.fmt cargo.lint \
-		docker.auth docker.build.demo docker.build.medea \
-			docker.down.coturn docker.down.demo docker.down.medea \
-			docker.down.webdriver \
-			docker.pull docker.push \
-			docker.up.coturn docker.up.demo docker.up.medea \
-			docker.up.webdriver \
-		docs docs.rust \
-		down down.coturn down.demo down.dev down.medea \
-		helm helm.down helm.init helm.lint helm.list \
-			helm.package helm.package.release helm.up \
-		minikube.boot \
-		release release.crates release.helm release.npm \
-		test test.e2e test.unit \
-		up up.coturn up.demo up.dev up.jason up.medea \
-		yarn
+        cargo cargo.build cargo.fmt cargo.lint \
+        docker.auth docker.build.demo docker.build.medea \
+        	docker.down.coturn docker.down.demo docker.down.medea \
+        	docker.down.webdriver \
+        	docker.pull docker.push \
+        	docker.up.coturn docker.up.demo docker.up.medea \
+        	docker.up.webdriver \
+        docs docs.rust \
+        down down.coturn down.demo down.dev down.medea \
+        helm helm.down helm.init helm.lint helm.list \
+        	helm.package helm.package.release helm.up \
+        minikube.boot \
+        release release.crates release.helm release.npm \
+        test test.e2e test.unit \
+        up up.coturn up.demo up.dev up.jason up.medea \
+        yarn
