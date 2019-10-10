@@ -96,15 +96,22 @@ jobs:
     - name: unit medea-jason (beta, Chrome)
       stage: test
       rust: beta
-      addons:
-        chrome: stable
-        apt:
-          packages: ["chromium-chromedriver"]
+      services: ["docker"]
       before_script:
         - cargo uninstall wasm-bindgen-cli || echo > /dev/null
         - cargo install wasm-bindgen-cli
         - rustup target add wasm32-unknown-unknown
-      script: make test.unit crate=medea-jason
+      script: make test.unit crate=medea-jason browser=chrome
+
+    - name: unit medea-jason (beta, Firefox)
+      stage: test
+      rust: beta
+      services: ["docker"]
+      before_script:
+        - cargo uninstall wasm-bindgen-cli || echo > /dev/null
+        - cargo install wasm-bindgen-cli
+        - rustup target add wasm32-unknown-unknown
+      script: make test.unit crate=medea-jason browser=firefox
 
     - name: E2E signalling (stable)
       stage: test
