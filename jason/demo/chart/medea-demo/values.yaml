@@ -152,6 +152,48 @@ web-client:
       #   memory: 128Mi
 
 
+control-api:
+  image:
+    repository: instrumentisto/medea-control-api
+    tag: latest
+    pullPolicy: IfNotPresent
+
+  conf:
+    bind_port: 8000
+
+  deployment:
+    replicas: 1
+    revisionHistoryLimit: 0
+
+    # Optional revision number that may used for fine-grained Deployment rollouts.
+    revision: ""
+
+    annotations: {}
+    # kubernetes.io/change-cause=kubectl set ...
+
+    affinity: {}
+      # nodeAffinity:
+      #   requiredDuringSchedulingIgnoredDuringExecution:
+      #     nodeSelectorTerms:
+      #       - matchExpressions:
+      #         - key: node-label-key
+    #           operator: In
+    #           values: ["node-label-value"]
+
+    tolerations: []
+      # - key: "node.alpha.kubernetes.io/unreachable"
+    #   operator: "Exists"
+    #   effect: "NoExecute"
+
+    resources: {}
+      # limits:
+      #   cpu: 100m
+      #   memory: 128Mi
+      # requests:
+    #   cpu: 100m
+    #   memory: 128Mi
+
+
 ingress:
   enabled: yes
 

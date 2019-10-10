@@ -59,6 +59,22 @@ web-client:
                   values: ["true"]
 
 
+control-api:
+  image:
+    tag: edge
+    pullPolicy: Always
+
+  deployment:
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+            - matchExpressions:
+                - key: "role/application"
+                  operator: In
+                  values: ["true"]
+
+
 ingress:
   hosts:
     - demo.medea.stg.t11913.org
