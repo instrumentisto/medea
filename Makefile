@@ -32,6 +32,9 @@ endif
 ifeq ($(crate),medea-client-api-proto)
 crate-dir = proto/client-api
 endif
+ifeq ($(crate),medea-control-api-proto)
+crate-dir = proto/control-api
+endif
 ifeq ($(crate),medea-macro)
 crate-dir = crates/medea-macro
 endif

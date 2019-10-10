@@ -6,40 +6,40 @@ package medea;
 
 // Media server's Control API service.
 service ControlApi {
-    // Creates new Element with a given ID.
-    //
-    // Not idempotent. Errors if an Element with the same ID already exists.
-    rpc Create (CreateRequest) returns (CreateResponse);
+  // Creates new Element with a given ID.
+  //
+  // Not idempotent. Errors if an Element with the same ID already exists.
+  rpc Create (CreateRequest) returns (CreateResponse);
 
-    // Removes Element by its ID.
-    // Allows referring multiple Elements on the last two levels.
-    //
-    // Idempotent. If no Elements with such IDs exist, then succeeds.
-    rpc Delete (IdRequest) returns (Response);
+  // Removes Element by its ID.
+  // Allows referring multiple Elements on the last two levels.
+  //
+  // Idempotent. If no Elements with such IDs exist, then succeeds.
+  rpc Delete (IdRequest) returns (Response);
 
-    // Returns Element by its ID.
-    // Allows referring multiple Elements.
-    // If no ID specified, returns all Elements declared.
-    rpc Get (IdRequest) returns (GetResponse);
+  // Returns Element by its ID.
+  // Allows referring multiple Elements.
+  // If no ID specified, returns all Elements declared.
+  rpc Get (IdRequest) returns (GetResponse);
 }
 
 // Request of creating new Element with a given ID.
 message CreateRequest {
-    // ID of the Element to be created..
-    string id = 1;
-    // Spec of the created Element.
-    oneof el {
-        Member member = 2;
-        Room room = 3;
-        WebRtcPlayEndpoint webrtc_play = 4;
-        WebRtcPublishEndpoint webrtc_pub = 5;
-    }
+  // ID of the Element to be created..
+  string id = 1;
+  // Spec of the created Element.
+  oneof el {
+    Member member = 2;
+    Room room = 3;
+    WebRtcPlayEndpoint webrtc_play = 4;
+    WebRtcPublishEndpoint webrtc_pub = 5;
+  }
 }
 
 // Request with many Elements IDs.
 message IdRequest {
-    // List of Elements IDs.
-    repeated string id = 1;
+  // List of Elements IDs.
+  repeated string id = 1;
 }
 
 // Response which doesn't return anything on successful result,
@@ -48,8 +48,8 @@ message IdRequest {
 // If operation fails then an Error will be returned.
 // The response is considered successful only if it does not contain Error.
 message Response {
-    // Error of the Response.
-    Error error = 1;
+  // Error of the Response.
+  Error error = 1;
 }
 
 // Response of Create RPC method.
@@ -57,13 +57,13 @@ message Response {
 // If operation fails then an Error will be returned.
 // The response is considered successful only if it does not contain Error.
 message CreateResponse {
-    // Hashmap with IDs (key) and URIs (value) of Elements, which should be used
-    // by clients to connect to a media server via Client API.
-    //
-    // Returned only if CreateResponse is successful.
-    map<string, string> sid = 1;
-    // Error of the CreateResponse.
-    Error error = 2;
+  // Hashmap with IDs (key) and URIs (value) of Elements, which should be used
+  // by clients to connect to a media server via Client API.
+  //
+  // Returned only if CreateResponse is successful.
+  map<string, string> sid = 1;
+  // Error of the CreateResponse.
+  Error error = 2;
 }
 
 // Response of Get RPC method.
@@ -71,113 +71,113 @@ message CreateResponse {
 // If operation fails then an Error will be returned.
 // The response is considered successful only if it does not contain Error.
 message GetResponse {
-    // Hashmap with IDs (key) and specs (value) of the requested Elements.
-    //
-    // Returned only if GetResponse is successful.
-    map<string, Element> elements = 1;
-    // Error of the GetResponse.
-    Error error = 2;
+  // Hashmap with IDs (key) and specs (value) of the requested Elements.
+  //
+  // Returned only if GetResponse is successful.
+  map<string, Element> elements = 1;
+  // Error of the GetResponse.
+  Error error = 2;
 }
 
 // Error of failed request.
 //
 // If the Error is not returned then request is considered as successful.
 message Error {
-    // Concrete unique code of the Error.
-    uint32 code = 1;
-    // Human-readable text description of the Error.
-    string text = 2;
-    // Link to online documentation of the Error.
-    //
-    // Optional field.
-    string doc = 3;
-    // Full ID of Element that the Error is related to.
-    // Some Errors are not related to any Element and in such case
-    // this field is empty.
-    //
-    // Optional field.
-    string element = 4;
+  // Concrete unique code of the Error.
+  uint32 code = 1;
+  // Human-readable text description of the Error.
+  string text = 2;
+  // Link to online documentation of the Error.
+  //
+  // Optional field.
+  string doc = 3;
+  // Full ID of Element that the Error is related to.
+  // Some Errors are not related to any Element and in such case
+  // this field is empty.
+  //
+  // Optional field.
+  string element = 4;
 }
 
 // Media element which can be used in a media pipeline.
 message Element {
-    oneof el {
-        Member member = 1;
-        Room room = 2;
-        WebRtcPlayEndpoint webrtc_play = 3;
-        WebRtcPublishEndpoint webrtc_pub = 4;
-    }
+  oneof el {
+    Member member = 1;
+    Room room = 2;
+    WebRtcPlayEndpoint webrtc_play = 3;
+    WebRtcPublishEndpoint webrtc_pub = 4;
+  }
 }
 
 // Media element which represents a single space where multiple Members can
 // interact with each other.
 message Room {
-    // Pipeline of this Room.
-    map<string, Room.Element> pipeline = 1;
+  // Pipeline of this Room.
+  map<string, Room.Element> pipeline = 1;
 
-    // Elements which Room's pipeline can contain.
-    message Element {
-        oneof el {
-            Member member = 1;
-            WebRtcPlayEndpoint webrtc_play = 2;
-            WebRtcPublishEndpoint webrtc_pub = 3;
-        }
+  // Elements which Room's pipeline can contain.
+  message Element {
+    oneof el {
+      Member member = 1;
+      WebRtcPlayEndpoint webrtc_play = 2;
+      WebRtcPublishEndpoint webrtc_pub = 3;
     }
+  }
 }
 
 // Media element which represents a client authorized to participate
 // in a some bigger media pipeline.
 message Member {
-    // Callback which fires when the Member establishes persistent connection
-    // with a media server via Client API.
-    string on_join = 1;
-    // Callback which fires when the Member finishes persistent connection
-    // with a media server via Client API.
-    string on_leave = 2;
-    // Credentials of the Member to authorize via Client API with.
-    string credentials = 3;
-    // Pipeline of this Member.
-    map<string, Member.Element> pipeline = 4;
+  // Callback which fires when the Member establishes persistent connection
+  // with a media server via Client API.
+  string on_join = 1;
+  // Callback which fires when the Member finishes persistent connection
+  // with a media server via Client API.
+  string on_leave = 2;
+  // Credentials of the Member to authorize via Client API with.
+  string credentials = 3;
+  // Pipeline of this Member.
+  map<string, Member.Element> pipeline = 4;
 
-    // Elements which Member's pipeline can contain.
-    message Element {
-        oneof el {
-            WebRtcPlayEndpoint webrtc_play = 1;
-            WebRtcPublishEndpoint webrtc_pub = 2;
-        }
+  // Elements which Member's pipeline can contain.
+  message Element {
+    oneof el {
+      WebRtcPlayEndpoint webrtc_play = 1;
+      WebRtcPublishEndpoint webrtc_pub = 2;
     }
+  }
 }
 
 // Media element which is able to receive media data from a client via WebRTC
 // (allows to publish media data).
 message WebRtcPublishEndpoint {
-    // P2P mode for this element.
-    P2P p2p = 1;
-    // Callback which fires when a client starts publishing media data.
-    string on_start = 2;
-    // Callback which fires when a client stops publishing media data.
-    string on_stop = 3;
+  // P2P mode for this element.
+  P2P p2p = 1;
+  // Callback which fires when a client starts publishing media data.
+  string on_start = 2;
+  // Callback which fires when a client stops publishing media data.
+  string on_stop = 3;
 
-    // P2P mode of WebRTC interaction.
-    enum P2P {
-        // Always send media data through a media server.
-        NEVER = 0;
-        // Send media data peer-to-peer directly if it's possible,
-        // otherwise through a media server.
-        IF_POSSIBLE = 1;
-        // Send media data peer-to-peer only without a media server.
-        ALWAYS = 2;
-    }
+  // P2P mode of WebRTC interaction.
+  enum P2P {
+    // Always send media data through a media server.
+    NEVER = 0;
+    // Send media data peer-to-peer directly if it's possible,
+    // otherwise through a media server.
+    IF_POSSIBLE = 1;
+    // Send media data peer-to-peer only without a media server.
+    ALWAYS = 2;
+  }
 }
 
 // Media element which is able to play media data for a client via WebRTC.
 message WebRtcPlayEndpoint {
-    // The source to get media data from.
-    string src = 1;
-    // Callback which fires when a client starts playing media data
-    // from the source.
-    string on_start = 2;
-    // Callback which fires when a client stops playing media data
-    // from the source.
-    string on_stop = 3;
+  // The source to get media data from.
+  string src = 1;
+  // Callback which fires when a client starts playing media data
+  // from the source.
+  string on_start = 2;
+  // Callback which fires when a client stops playing media data
+  // from the source.
+  string on_stop = 3;
 }

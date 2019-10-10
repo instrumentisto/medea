@@ -13,17 +13,17 @@ All user visible changes to this project will be documented in this file. This p
 
 ### Added
 
-- Methods ([#33]):
+- Methods ([#57]):
     - `Create`;
     - `Get`;
     - `Delete`.
-- Elements ([#33]):
+- Elements ([#57]):
     - `Room`;
     - `Member`;
     - `WebRtcPlayEndpoint`;
     - `WebRtcPublishEndpoint`.
 
-[#33]: /../../pull/33
+[#57]: /../../pull/57
 
 
 
