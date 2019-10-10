@@ -7,7 +7,7 @@ use std::fmt;
 use actix::Message;
 use derive_more::{From, Into};
 use futures::Future;
-use medea_client_api_proto::{Command, Event};
+use medea_client_api_proto::{CloseDescription, Command, Event};
 
 use crate::api::control::MemberId;
 
@@ -24,10 +24,19 @@ pub struct EventMessage(Event);
 ///
 /// [`Member`]: crate::signalling::elements::member::Member
 pub trait RpcConnection: fmt::Debug + Send {
-    /// Closes [`RpcConnection`].
+    /// Closes [`RpcConnection`] and sends [`CloseDescription`] to the client
+    /// (in WebSocket implementation description will be sent in a [Close]
+    /// frame).
+    ///
     /// No [`RpcConnectionClosed`] signals should be emitted.
-    /// Always returns success.
-    fn close(&mut self) -> Box<dyn Future<Item = (), Error = ()>>;
+    ///
+    /// Always succeeds.
+    ///
+    /// [Close]: https://tools.ietf.org/html/rfc6455#section-5.5.1
+    fn close(
+        &mut self,
+        close_description: CloseDescription,
+    ) -> Box<dyn Future<Item = (), Error = ()>>;
 
     /// Sends [`Event`] to remote [`Member`].
     ///
