@@ -18,6 +18,7 @@ All user visible changes to this project will be documented in this file. This p
         - `Event::ResetMe` ([#51]).
     - Server events:
         - `RestoreState` ([#51]).
+- `CloseReason` and `CloseDescription` types ([#58](/../../pull/58)).
 
 [#28]: /../../pull/28
 [#51]: /../../pull/51

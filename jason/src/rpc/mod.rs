@@ -12,8 +12,7 @@ use futures::{
 };
 use js_sys::Date;
 use medea_client_api_proto::{
-    ClientMsg, CloseDescription, Command, Event, RpcConnectionCloseReason,
-    ServerMsg,
+    ClientMsg, CloseDescription, CloseReason, Command, Event, ServerMsg,
 };
 use wasm_bindgen_futures::spawn_local;
 use web_sys::CloseEvent;
@@ -28,7 +27,7 @@ pub enum CloseMsg {
     ///
     /// Determines by close code `1000` and existence of
     /// [`RpcConnectionCloseReason`].
-    Normal(u16, RpcConnectionCloseReason),
+    Normal(u16, CloseReason),
 
     /// Connection was unexpectedly closed. Consider reconnecting.
     ///

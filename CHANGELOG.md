@@ -19,6 +19,7 @@ All user visible changes to this project will be documented in this file. This p
     - Dynamic `Peer`s creation when client connects ([#28]);
     - Auto-removing `Peer`s when `Member` disconnects ([#28]);
     - Filter `SetIceCandidate` messages without `candidate` ([#50](/../../pull/50));
+    - Send reason of closing WebSocket connection as [Close](https://tools.ietf.org/html/rfc4566#section-5.14) frame's description ([#58](/../../pull/58));
     - Recover client state after reconnection ([#51](/../../pull/51)).
 - Testing:
     - E2E tests for signalling ([#28]).
