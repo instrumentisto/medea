@@ -454,16 +454,6 @@ docker-build-medea-image-name = $(strip \
 	$(if $(call eq,$(registry),),,$(registry)/)$(MEDEA_IMAGE_NAME))
 
 docker.build.medea:
-ifneq ($(no-cache),yes)
-	docker run --rm --network=host -v "$(PWD)":/app -w /app \
-	           -u $(shell id -u):$(shell id -g) \
-	           -e CARGO_HOME=.cache/cargo \
-		rust:$(RUST_VER) \
-			cargo build --bin=medea \
-				$(if $(call eq,$(debug),no),--release,)
-endif
-	$(call docker.build.clean.ignore)
-	@echo "!target/$(if $(call eq,$(debug),no),release,debug)/" >> .dockerignore
 	$(docker-env) \
 	docker build $(if $(call eq,$(minikube),yes),,--network=host) --force-rm \
 		$(if $(call eq,$(no-cache),yes),\
@@ -473,14 +463,8 @@ endif
 			--build-arg rustc_mode=$(if \
 				$(call eq,$(debug),no),release,debug) \
 			--build-arg rustc_opts=$(if \
-				$(call eq,$(debug),no),--release,) \
-			--build-arg cargo_home=.cache/cargo,) \
+				$(call eq,$(debug),no),--release,),) \
 		-t $(docker-build-medea-image-name):$(if $(call eq,$(TAG),),dev,$(TAG)) .
-	$(call docker.build.clean.ignore)
-define docker.build.clean.ignore
-	@sed -i $(if $(call eq,$(shell uname -s),Darwin),'',) \
-		/^!target\/d .dockerignore
-endef
 
 
 # Stop Coturn STUN/TURN server in Docker Compose environment
