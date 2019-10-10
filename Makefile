@@ -18,6 +18,7 @@ eq = $(if $(or $(1),$(2)),$(and $(findstring $(1),$(2)),\
 MEDEA_IMAGE_NAME := $(strip \
 	$(shell grep 'COMPOSE_IMAGE_NAME=' .env | cut -d '=' -f2))
 DEMO_IMAGE_NAME := instrumentisto/medea-demo
+CONTROL_API_MOCK_IMAGE_NAME := instrumentisto/medea-control-api-mock
 
 RUST_VER := 1.37
 CHROME_VERSION := 77.0
@@ -456,8 +457,11 @@ endif
 # Usage:
 #   make docker.build.control-api-mock
 
+docker-build-control-api-mock-image-name = $(CONTROL_API_MOCK_IMAGE_NAME)
+
 docker.build.control-api-mock:
-	docker build -t instrumentisto/medea-control-api-mock:dev \
+	docker build $(if $(call eq,$(minikube),yes),,--network=host) \
+		-t $(CONTROL_API_MOCK_IMAGE_NAME):$(TAG) \
 		-f crates/control-api-mock/Dockerfile \
 		--build-arg medea_build_image=$(medea-build-image) .
 
@@ -783,6 +787,7 @@ ifeq ($(helm-chart),medea-demo)
 ifeq ($(rebuild),yes)
 	@make docker.build.demo minikube=yes TAG=dev
 	@make docker.build.medea no-cache=$(no-cache) minikube=yes TAG=dev
+	@make docker.build.control-api-mock minikube=yes TAG=dev
 endif
 endif
 endif
