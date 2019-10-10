@@ -578,7 +578,7 @@ impl Room {
     /// On this command server should reset [`Member`]'s state
     /// on server side.
     ///
-    /// Atm this [`Command`] will be sended if some fatal conflict
+    /// Atm this [`Command`] will be sent if some fatal conflict
     /// found in server snapshot and client's state.
     fn handle_reset_me(
         &mut self,

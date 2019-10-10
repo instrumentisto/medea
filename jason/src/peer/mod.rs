@@ -45,8 +45,8 @@ pub use self::{
 /// enum's variants.
 #[derive(Clone, Debug)]
 pub enum SignalingState {
-    /// This state represents [`PeerConnection] in `stable` signaling state on
-    /// JS side and without `local_description` and `remote_description`.
+    /// This state represents [`PeerConnection`] in `stable` signaling state on
+    /// JS side without `local_description` and `remote_description`.
     ///
     /// On JS side signaling state will be `stable`. but
     /// we [can determine][1] that real signaling state is
@@ -58,14 +58,14 @@ pub enum SignalingState {
 
     /// In this state [`PeerConnection`] have `local_description`.
     ///
-    /// _Note:_ this state is also covers JS side's state
-    /// `have-local-pranswer`.
+    /// _Note:_ this state is also covers `have-local-pranswer` JS side's
+    /// state.
     HaveLocalOffer,
 
     /// In this state [`PeerConnection`] have `remote_description`.
     ///
-    /// _Note:_ this state is also covers JS side's state
-    /// `have-remote-pranswer`.
+    /// _Note:_ this state is also covers `have-remote-pranswer` JS side's
+    /// state.
     HaveRemoteOffer,
 
     /// Negotiation is complete and a connection has been established.

@@ -26,7 +26,7 @@ pub enum CloseMsg {
     /// Transport was gracefully closed by remote.
     ///
     /// Determines by close code `1000` and existence of
-    /// [`RpcConnectionCloseReason`].
+    /// [`CloseReason`].
     Normal(u16, CloseReason),
 
     /// Connection was unexpectedly closed. Consider reconnecting.
