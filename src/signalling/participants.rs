@@ -24,9 +24,7 @@ use futures::{
     Future,
 };
 
-use medea_client_api_proto::{
-    CloseDescription, Event, RpcConnectionCloseReason,
-};
+use medea_client_api_proto::{CloseDescription, CloseReason, Event};
 
 use crate::{
     api::{
@@ -199,9 +197,7 @@ impl ParticipantService {
             }
             Box::new(wrap_future(
                 connection
-                    .close(CloseDescription::new(
-                        RpcConnectionCloseReason::NewConnection,
-                    ))
+                    .close(CloseDescription::new(CloseReason::Reconnected))
                     .then(move |_| Ok(member)),
             ))
         } else {
@@ -307,9 +303,10 @@ impl ParticipantService {
         let mut close_fut = self.connections.drain().fold(
             vec![],
             |mut futures, (_, mut connection)| {
-                futures.push(connection.close(CloseDescription::new(
-                    RpcConnectionCloseReason::Finished,
-                )));
+                futures.push(
+                    connection
+                        .close(CloseDescription::new(CloseReason::Finished)),
+                );
                 futures
             },
         );

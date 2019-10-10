@@ -145,9 +145,8 @@ mod test {
 
     use actix_http::{ws::Message, HttpService};
     use actix_http_test::{TestServer, TestServerRuntime};
-    use actix_web_actors::ws::CloseReason;
     use futures::{future::IntoFuture as _, sink::Sink as _, Stream as _};
-    use medea_client_api_proto::{CloseDescription, RpcConnectionCloseReason};
+    use medea_client_api_proto::{CloseDescription, CloseReason};
 
     use crate::{
         api::control, conf::Conf, signalling::Room,
@@ -233,9 +232,9 @@ mod test {
                                     .map_err(|(e, _)| panic!("{:?}", e))
                                     .map(|(item, _)| {
                                         let description = CloseDescription::new(
-                                            RpcConnectionCloseReason::Idle,
+                                            CloseReason::Idle,
                                         );
-                                        let close_reason = CloseReason {
+                                        let close_reason = ws::CloseReason {
                                             code: ws::CloseCode::Normal,
                                             description: Some(
                                                 serde_json::to_string(

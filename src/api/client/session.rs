@@ -6,10 +6,10 @@ use actix::{
     fut::wrap_future, Actor, ActorContext, ActorFuture, Addr, AsyncContext,
     Handler, Message, StreamHandler,
 };
-use actix_web_actors::ws::{self, CloseReason};
+use actix_web_actors::ws;
 use futures::future::Future;
 use medea_client_api_proto::{
-    ClientMsg, CloseDescription, RpcConnectionCloseReason, ServerMsg,
+    ClientMsg, CloseDescription, CloseReason, ServerMsg,
 };
 
 use crate::{
@@ -84,7 +84,7 @@ impl WsSession {
                     )
                 }
                 ctx.notify(Close::with_normal_code(&CloseDescription::new(
-                    RpcConnectionCloseReason::Idle,
+                    CloseReason::Idle,
                 )))
             }
         });
@@ -119,9 +119,7 @@ impl Actor for WsSession {
                             session.member_id, e
                         );
                         ctx.notify(Close::with_normal_code(
-                            &CloseDescription::new(
-                                RpcConnectionCloseReason::ConnectionRejected,
-                            ),
+                            &CloseDescription::new(CloseReason::Rejected),
                         ));
                     }
                 },
@@ -136,9 +134,7 @@ impl Actor for WsSession {
                         session.member_id, send_err,
                     );
                     ctx.notify(Close::with_normal_code(
-                        &CloseDescription::new(
-                            RpcConnectionCloseReason::ServerError,
-                        ),
+                        &CloseDescription::new(CloseReason::InternalError),
                     ));
                 },
             ),
@@ -184,13 +180,13 @@ impl RpcConnection for Addr<WsSession> {
 
 /// Message for closing [`WsSession`].
 #[derive(Message)]
-pub struct Close(CloseReason);
+pub struct Close(ws::CloseReason);
 
 impl Close {
     /// Creates [`Close`] message with [`ws::CloseCode::Normal`] and provided
     /// [`CloseDescription`] as serialized description.
     fn with_normal_code(description: &CloseDescription) -> Self {
-        Self(CloseReason {
+        Self(ws::CloseReason {
             code: ws::CloseCode::Normal,
             description: Some(serde_json::to_string(&description).unwrap()),
         })
