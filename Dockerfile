@@ -30,7 +30,9 @@ COPY proto/control-api/src/grpc/api.proto \
      /app/proto/control-api/src/grpc/
 COPY jason/Cargo.toml /app/jason/
 COPY Cargo.toml Cargo.lock /app/
+
 WORKDIR /app/
+
 RUN mkdir -p crates/medea-macro/src/ && touch crates/medea-macro/src/lib.rs \
  && mkdir -p proto/client-api/src/ && touch proto/client-api/src/lib.rs \
  && mkdir -p proto/control-api/src/ && touch proto/control-api/src/lib.rs \

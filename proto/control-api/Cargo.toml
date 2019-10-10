@@ -19,7 +19,7 @@ grpc = ["grpcio", "futures", "protobuf", "protoc-grpcio"]
 [dependencies]
 grpcio = { version = "0.4", optional = true }
 futures = { version = "0.1", optional = true }
-protobuf = { version = "2.7", optional = true }
+protobuf = { version = "2.8", optional = true }
 
 [build-dependencies]
-protoc-grpcio = { version = "1.0", optional = true }
+protoc-grpcio = { version = "1.1", optional = true }
