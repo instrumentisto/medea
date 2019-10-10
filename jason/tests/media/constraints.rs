@@ -1,6 +1,6 @@
 #![cfg(target_arch = "wasm32")]
 
-use futures::prelude::*;
+use futures::{future, prelude::*};
 use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::JsFuture;
 use wasm_bindgen_test::*;
@@ -24,30 +24,26 @@ wasm_bindgen_test_configure!(run_in_browser);
 // 4. Assert constraints.satisfies(stream.track());
 #[wasm_bindgen_test(async)]
 fn video_constraints_satisfies() -> impl Future<Item = (), Error = JsValue> {
-    window()
-        .navigator()
-        .media_devices()
-        .into_future()
-        .and_then(|devices| devices.enumerate_devices())
-        .and_then(JsFuture::from)
-        .and_then(|infos| Ok(video_devices(&infos)))
-        .map(|mut devices| devices.next().unwrap())
-        .and_then(|device: MediaDeviceInfo| {
-            let mut constraints = MediaStreamConstraints::new();
-            let mut track_constraints = VideoTrackConstraints::new();
-            track_constraints.device_id(device.device_id());
-            constraints.video(track_constraints.clone());
+    video_devices().and_then(|devices| {
+        let device = devices.get(0).unwrap();
 
-            MediaManager::default()
-                .get_stream_by_constraints(constraints.clone())
-                .map(move |stream| {
-                    let track =
-                        MediaStreamTrack::from(stream.get_tracks().pop());
+        let mut constraints = MediaStreamConstraints::new();
+        let mut track_constraints = VideoTrackConstraints::new();
+        track_constraints.device_id(device.device_id());
+        constraints.video(track_constraints.clone());
 
-                    assert!(track_constraints.satisfies(&track));
-                })
-                .map_err(|err| err.into())
-        })
+        MediaManager::default()
+            .get_stream_by_constraints(constraints.clone())
+            .map(move |stream| {
+                assert!(stream.get_tracks().length() == 1);
+
+                let track = MediaStreamTrack::from(stream.get_tracks().pop());
+
+                assert!(track.kind() == "video");
+                assert!(track_constraints.satisfies(&track));
+            })
+            .map_err(|err| err.into())
+    })
 }
 
 // 1. Get device id of non default audio device from enumerate_devices();
@@ -56,82 +52,26 @@ fn video_constraints_satisfies() -> impl Future<Item = (), Error = JsValue> {
 // 4. Assert constraints.satisfies(stream.track());
 #[wasm_bindgen_test(async)]
 fn audio_constraints_satisfies() -> impl Future<Item = (), Error = JsValue> {
-    window()
-        .navigator()
-        .media_devices()
-        .into_future()
-        .and_then(|devices| devices.enumerate_devices())
-        .and_then(JsFuture::from)
-        .and_then(|infos| Ok(audio_devices(&infos)))
-        .map(|mut devices| devices.next().unwrap())
-        .and_then(move |device: MediaDeviceInfo| {
-            let mut constraints = MediaStreamConstraints::new();
-            let mut track_constraints = AudioTrackConstraints::new();
-            track_constraints.device_id(device.device_id());
-            constraints.audio(track_constraints.clone());
+    audio_devices().and_then(|devices| {
+        let device = devices.get(0).unwrap();
 
-            MediaManager::default()
-                .get_stream_by_constraints(constraints.clone())
-                .map(move |stream| {
-                    let track =
-                        MediaStreamTrack::from(stream.get_tracks().pop());
-
-                    assert!(track_constraints.satisfies(&track));
-                })
-                .map_err(|err| err.into())
-        })
-}
-
-/// Returns an iterator for non default audio input devices.
-fn audio_devices(infos: &JsValue) -> impl Iterator<Item = MediaDeviceInfo> {
-    js_sys::Array::from(&infos)
-        .values()
-        .into_iter()
-        .map(|info| MediaDeviceInfo::from(info.unwrap()))
-        .filter(|device| {
-            device.kind() == MediaDeviceKind::Audioinput
-                && device.device_id() != "default"
-        })
-}
-
-/// Returns an iterator for non default video input devices.
-fn video_devices(infos: &JsValue) -> impl Iterator<Item = MediaDeviceInfo> {
-    js_sys::Array::from(&infos)
-        .values()
-        .into_iter()
-        .map(|info| MediaDeviceInfo::from(info.unwrap()))
-        .filter(|device| {
-            device.kind() == MediaDeviceKind::Videoinput
-                && device.device_id() != "default"
-        })
-}
-
-/// Build [MediaStreamConstraints] for given device.
-fn build_constraints(
-    audio_device: Option<MediaDeviceInfo>,
-    video_device: Option<MediaDeviceInfo>,
-) -> MediaStreamConstraints {
-    let mut constraints = MediaStreamConstraints::new();
-    if let Some(audio) = audio_device {
+        let mut constraints = MediaStreamConstraints::new();
         let mut track_constraints = AudioTrackConstraints::new();
-        track_constraints.device_id(audio.device_id());
-        constraints.audio(track_constraints);
-    }
-    if let Some(video) = video_device {
-        let mut track_constraints = VideoTrackConstraints::new();
-        track_constraints.device_id(video.device_id());
-        constraints.video(track_constraints);
-    }
-    constraints
-}
+        track_constraints.device_id(device.device_id());
+        constraints.audio(track_constraints.clone());
 
-/// Returns [MediaStreamTrack]s of given [MediaStream].
-fn get_stream_tracks(stream: MediaStream) -> Vec<MediaStreamTrack> {
-    js_sys::try_iter(&stream.get_tracks())
-        .unwrap()
-        .unwrap()
-        .map(|tr| web_sys::MediaStreamTrack::from(tr.unwrap()))
-        .collect()
+        MediaManager::default()
+            .get_stream_by_constraints(constraints.clone())
+            .map(move |stream| {
+                assert!(stream.get_tracks().length() == 1);
+
+                let track = MediaStreamTrack::from(stream.get_tracks().pop());
+
+                assert!(track.kind() == "audio");
+                assert!(track_constraints.satisfies(&track));
+            })
+            .map_err(|err| err.into())
+    })
 }
 
 // 1. Get device id of non default audio and video device from
@@ -139,19 +79,16 @@ fn get_stream_tracks(stream: MediaStream) -> Vec<MediaStreamTrack> {
 // 2. Add it to constraints;
 // 3. Get stream by constraints;
 // 4. Get stream again by this constraints;
-// 4. Assert_eq!(stream1.get_stream_tracks(), stream2.get_stream_tracks());
+// 5. Assert_eq!(stream1.get_stream_tracks(), stream2.get_stream_tracks());
 #[wasm_bindgen_test(async)]
-fn get_some_stream() -> impl Future<Item = (), Error = JsValue> {
-    window()
-        .navigator()
-        .media_devices()
-        .into_future()
-        .and_then(|devices| devices.enumerate_devices())
-        .and_then(JsFuture::from)
-        .and_then(|infos| Ok((audio_devices(&infos), video_devices(&infos))))
-        .and_then(move |(mut audio_devices, mut video_devices)| {
-            let constraints =
-                build_constraints(audio_devices.next(), video_devices.next());
+fn equal_constraints_produce_equal_streams(
+) -> impl Future<Item = (), Error = JsValue> {
+    audio_devices().join(video_devices()).and_then(
+        |(audio_devices, video_devices)| {
+            let constraints = build_constraints(
+                audio_devices.into_iter().next(),
+                video_devices.into_iter().next(),
+            );
 
             let manager = MediaManager::default();
             manager
@@ -185,56 +122,133 @@ fn get_some_stream() -> impl Future<Item = (), Error = JsValue> {
                         })
                 })
                 .map_err(|err| err.into())
-        })
+        },
+    )
 }
 
+// 0. If audio_devices.len() > 1 (otherwise this test makes no sense);
 // 1. Get device id of non default audio device from enumerate_devices();
 // 2. Add it to constraints;
 // 3. Get stream1 by constraints;
 // 4. Get next device id of non default audio device from enumerate_devices();
-// 2. Create new constraints;
-// 3. Get stream2 by constraints;
-// 4. Assert (stream1.track().id() != stream2.track().id());
+// 5. Create new constraints;
+// 6. Get stream2 by constraints;
+// 7. Assert (stream1.track().id() != stream2.track().id());
 #[wasm_bindgen_test(async)]
-fn get_another_track_for_other_stream(
+fn different_constraints_produce_different_streams(
 ) -> impl Future<Item = (), Error = JsValue> {
+    audio_devices().map(IntoIterator::into_iter).and_then(
+        move |mut audio_devices| {
+            if audio_devices.len() > 1 {
+                let constraints = build_constraints(audio_devices.next(), None);
+
+                let manager = MediaManager::default();
+                let fut = manager
+                    .get_stream_by_constraints(constraints)
+                    .map(get_stream_tracks)
+                    .and_then(move |stream_tracks| {
+                        let constraints =
+                            build_constraints(audio_devices.next(), None);
+
+                        manager
+                            .get_stream_by_constraints(constraints)
+                            .map(get_stream_tracks)
+                            .and_then(move |another_stream_tracks| {
+                                let audio_track = stream_tracks
+                                    .iter()
+                                    .find(|track| track.kind() == "audio")
+                                    .unwrap();
+                                let another_audio_track = another_stream_tracks
+                                    .iter()
+                                    .find(|track| track.kind() == "audio")
+                                    .unwrap();
+                                assert_ne!(
+                                    audio_track.id(),
+                                    another_audio_track.id()
+                                );
+                                Ok(())
+                            })
+                    })
+                    .map_err(|err| err.into());
+
+                future::Either::A(fut)
+            } else {
+                future::Either::B(future::ok(()))
+            }
+        },
+    )
+}
+
+/// Returns all registered media devices.
+fn get_media_devices(
+) -> impl Future<Item = Vec<MediaDeviceInfo>, Error = JsValue> {
     window()
         .navigator()
         .media_devices()
         .into_future()
         .and_then(|devices| devices.enumerate_devices())
         .and_then(JsFuture::from)
-        .and_then(|infos| Ok(audio_devices(&infos)))
-        .and_then(move |mut audio_devices| {
-            let constraints = build_constraints(audio_devices.next(), None);
-
-            let manager = MediaManager::default();
-            manager
-                .get_stream_by_constraints(constraints)
-                .map(get_stream_tracks)
-                .and_then(move |stream_tracks| {
-                    let constraints =
-                        build_constraints(audio_devices.next(), None);
-
-                    manager
-                        .get_stream_by_constraints(constraints)
-                        .map(get_stream_tracks)
-                        .and_then(move |another_stream_tracks| {
-                            let audio_track = stream_tracks
-                                .iter()
-                                .find(|track| track.kind() == "audio")
-                                .unwrap();
-                            let another_audio_track = another_stream_tracks
-                                .iter()
-                                .find(|track| track.kind() == "audio")
-                                .unwrap();
-                            assert_ne!(
-                                audio_track.id(),
-                                another_audio_track.id()
-                            );
-                            Ok(())
-                        })
-                })
-                .map_err(|err| err.into())
+        .and_then(|devices| {
+            Ok(js_sys::Array::from(&devices)
+                .values()
+                .into_iter()
+                .map(|item| MediaDeviceInfo::from(item.unwrap()))
+                .collect())
         })
+}
+
+/// Returns an iterator for non default audio input devices.
+fn audio_devices() -> impl Future<Item = Vec<MediaDeviceInfo>, Error = JsValue>
+{
+    get_media_devices().map(|devices| {
+        devices
+            .into_iter()
+            .filter(|device| {
+                device.kind() == MediaDeviceKind::Audioinput
+                    && device.device_id() != "default"
+            })
+            .collect()
+    })
+}
+
+/// Returns an iterator for non default video input devices.
+fn video_devices() -> impl Future<Item = Vec<MediaDeviceInfo>, Error = JsValue>
+{
+    get_media_devices().map(|devices| {
+        devices
+            .into_iter()
+            .filter(|device| {
+                device.kind() == MediaDeviceKind::Videoinput
+                    && device.device_id() != "default"
+            })
+            .collect()
+    })
+}
+
+/// Build [MediaStreamConstraints] for given device.
+fn build_constraints(
+    audio_device: Option<MediaDeviceInfo>,
+    video_device: Option<MediaDeviceInfo>,
+) -> MediaStreamConstraints {
+    let mut constraints = MediaStreamConstraints::new();
+    if let Some(audio) = audio_device {
+        let mut track_constraints = AudioTrackConstraints::new();
+        track_constraints.device_id(audio.device_id());
+        constraints.audio(track_constraints);
+    }
+    if let Some(video) = video_device {
+        let mut track_constraints = VideoTrackConstraints::new();
+        track_constraints.device_id(video.device_id());
+        constraints.video(track_constraints);
+    }
+    constraints
+}
+
+/// Returns [MediaStreamTrack]s of given [MediaStream].
+fn get_stream_tracks(stream: MediaStream) -> Vec<MediaStreamTrack> {
+    js_sys::try_iter(&stream.get_tracks())
+        .unwrap()
+        .unwrap()
+        .map(|tr| web_sys::MediaStreamTrack::from(tr.unwrap()))
+        .collect()
 }
