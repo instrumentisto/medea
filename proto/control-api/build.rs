@@ -1,11 +1,13 @@
 use std::{error::Error, fs::File, io::ErrorKind};
 
-/// Builds gRPC protobuf specs to Rust source codes.
+/// Builds gRPC protobuf specs to Rust source files.
 ///
-/// Specs will be generated only if you delete old
-/// generated specs. For rebuilding you may simply
-/// execute `$ make cargo.gen crate=medea-control-api-proto`
-/// in root of the project.
+/// Specs will be generated only if you've deleted old generated specs.
+/// For rebuilding you may simply execute
+/// ```bash
+/// make cargo.gen crate=medea-control-api-proto
+/// ```
+/// in the root of the project.
 #[cfg(feature = "grpc")]
 fn main() -> Result<(), Box<dyn Error>> {
     const GRPC_DIR: &str = "src/grpc/";

@@ -235,7 +235,7 @@ cargo.fmt:
 
 cargo.gen:
 ifeq ($(crate),medea-control-api-proto)
-	rm -rf $(crate-dir)/src/grpc/api*.rs
+	@rm -rf $(crate-dir)/src/grpc/api*.rs
 	cd $(crate-dir)/ && \
 	cargo build
 endif
