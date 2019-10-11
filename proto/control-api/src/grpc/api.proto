@@ -11,12 +11,6 @@ service ControlApi {
   // Not idempotent. Errors if an Element with the same ID already exists.
   rpc Create (CreateRequest) returns (CreateResponse);
 
-  // Applies given spec to an Element by its ID.
-  //
-  // Idempotent. If no Element with such ID exists, then it will be created,
-  // otherwise it will be reconfigured.
-  rpc Apply (ApplyRequest) returns (Response);
-
   // Removes Element by its ID.
   // Allows referring multiple Elements on the last two levels.
   //
@@ -39,29 +33,6 @@ message CreateRequest {
     Room room = 3;
     WebRtcPlayEndpoint webrtc_play = 4;
     WebRtcPublishEndpoint webrtc_pub = 5;
-  }
-}
-
-// Request of applying given spec to an Element by its ID.
-message ApplyRequest {
-  // ID of an Element to apply changes on.
-  string id = 1;
-  // Element's spec to be applied.
-  oneof el {
-    Member member = 2;
-    Room room = 3;
-    WebRtcPlayEndpoint webrtc_play = 4;
-    WebRtcPublishEndpoint webrtc_pub = 5;
-  }
-  // Policy to apply changes with.
-  Policy policy = 6;
-
-  // Policy of applying Element's spec changes.
-  enum Policy {
-    // Apply provided changes and remove any unspecified Elements.
-    APPLY = 0;
-    // Append provided changes to existing Elements without removing them.
-    APPEND = 1;
   }
 }
 

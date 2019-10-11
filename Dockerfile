@@ -19,11 +19,6 @@ RUN mkdir -p /out/etc/ \
  && echo 'nobody:x:65534:65534:nobody:/:' > /out/etc/passwd \
  && echo 'nobody:x:65534:' > /out/etc/group
 
-# Install required system packages for building.
-RUN apt-get update \
- && apt-get install -y --no-install-recommends \
-            cmake
-
 # Prepare Cargo workspace for building dependencies only.
 COPY crates/medea-macro/Cargo.toml /app/crates/medea-macro/
 COPY proto/client-api/Cargo.toml /app/proto/client-api/

@@ -11,12 +11,11 @@ use std::{collections::HashMap, sync::Arc};
 
 use grpcio::{ChannelBuilder, EnvBuilder};
 use medea_control_api_proto::grpc::{
-    control_api::{
-        ApplyRequest, CreateRequest, IdRequest, Member, Member_Element, Room,
-        Room_Element, WebRtcPlayEndpoint, WebRtcPublishEndpoint,
-        WebRtcPublishEndpoint_P2P,
+    api::{
+        CreateRequest, IdRequest, Member, Member_Element, Room, Room_Element,
+        WebRtcPlayEndpoint, WebRtcPublishEndpoint, WebRtcPublishEndpoint_P2P,
     },
-    control_api_grpc::ControlApiClient,
+    api_grpc::ControlApiClient,
 };
 use protobuf::RepeatedField;
 
@@ -33,12 +32,6 @@ fn main() {
     create_member(&client);
     //    create_endpoint(&client);
     //    get_room(&client);
-}
-
-fn unimplemented_apply(client: &ControlApiClient) {
-    let req = ApplyRequest::new();
-    let reply = client.apply(&req).expect("Apply error");
-    println!("{:?}", reply);
 }
 
 fn create_room(client: &ControlApiClient) {

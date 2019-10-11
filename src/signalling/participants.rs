@@ -22,10 +22,7 @@ use futures::{
     future::{self, join_all, Either},
     Future,
 };
-
-use medea_client_api_proto::{
-    CloseDescription, Event, RpcConnectionCloseReason,
-};
+use medea_client_api_proto::{CloseDescription, CloseReason, Event};
 
 use crate::{
     api::{
@@ -251,9 +248,7 @@ impl ParticipantService {
             }
             Box::new(wrap_future(
                 connection
-                    .close(CloseDescription::new(
-                        RpcConnectionCloseReason::Evicted,
-                    ))
+                    .close(CloseDescription::new(CloseReason::Reconnected))
                     .then(move |_| Ok(member)),
             ))
         } else {
@@ -367,9 +362,10 @@ impl ParticipantService {
         let mut close_fut = self.connections.drain().fold(
             vec![],
             |mut futures, (_, mut connection)| {
-                futures.push(connection.close(CloseDescription::new(
-                    RpcConnectionCloseReason::Finished,
-                )));
+                futures.push(
+                    connection
+                        .close(CloseDescription::new(CloseReason::Finished)),
+                );
                 futures
             },
         );
@@ -407,9 +403,9 @@ impl ParticipantService {
         }
 
         if let Some(mut conn) = self.connections.remove(member_id) {
-            ctx.spawn(wrap_future(conn.close(CloseDescription::new(
-                RpcConnectionCloseReason::Evicted,
-            ))));
+            ctx.spawn(wrap_future(
+                conn.close(CloseDescription::new(CloseReason::Evicted)),
+            ));
         }
 
         if let Some(member) = self.members.remove(member_id) {

@@ -4,22 +4,22 @@ version = "0.1.0-dev"
 edition = "2018"
 description = "Control API protocol implementation for Medea media server"
 authors = ["Instrumentisto Team <developer@instrumentisto.com>"]
-license = "MIT/Apache-2.0"
+license = "BlueOak-1.0.0"
 documentation = "https://docs.rs/medea-control-api-proto"
 homepage = "https://github.com/instrumentisto/medea/tree/master/proto/control-api"
 repository = "https://github.com/instrumentisto/medea/tree/master/proto/control-api"
 readme = "README.md"
 keywords = ["medea", "grpc", "control-api"]
-categories = ["api-bindings", "web-programming"]
+categories = ["api-bindings", "network-programming"]
 
 [features]
 default = ["grpc"]
-grpc = ["grpcio", "futures", "protobuf", "protoc-grpcio"]
+grpc = ["futures", "grpcio", "protobuf", "protoc-grpcio"]
 
 [dependencies]
-grpcio = { version = "0.4", optional = true }
 futures = { version = "0.1", optional = true }
-protobuf = { version = "2.7", optional = true }
+grpcio = { version = "0.4", optional = true }
+protobuf = { version = "2.8", optional = true }
 
 [build-dependencies]
-protoc-grpcio = { version = "1.0", optional = true }
+protoc-grpcio = { version = "1.1", optional = true }

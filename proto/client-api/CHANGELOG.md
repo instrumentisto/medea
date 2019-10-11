@@ -13,7 +13,7 @@ All user visible changes to this project will be documented in this file. This p
 
 - `TrackId` and `PeerId` types ([#28]);
 - `Incrementable` trait ([#28]);
-- `RpcConnectionClosed` and `CloseDescription` types ([#33](/../../pull/33)).
+- `CloseReason` and `CloseDescription` types ([#58](/../../pull/58)).
 
 [#28]: /../../pull/28
 

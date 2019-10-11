@@ -10,14 +10,11 @@ use actix::{
 use derive_more::{Display, From};
 use failure::Fail;
 use futures::future::{self, Either, Future, IntoFuture};
-use grpcio::{
-    Environment, RpcContext, RpcStatus, RpcStatusCode, Server, ServerBuilder,
-    UnarySink,
-};
+use grpcio::{Environment, RpcContext, Server, ServerBuilder, UnarySink};
 use medea_control_api_proto::grpc::{
     api::{
-        ApplyRequest, CreateRequest, CreateResponse, Element, GetResponse,
-        IdRequest, Response,
+        CreateRequest, CreateResponse, Element, GetResponse, IdRequest,
+        Response,
     },
     api_grpc::{create_control_api, ControlApi},
 };
@@ -319,36 +316,6 @@ impl ControlApi for ControlApiService {
         );
     }
 
-    /// Implementation for `Apply` method of gRPC [Control API] (__unimplemented
-    /// atm__).
-    ///
-    /// Currently this is stub which returns fail response with
-    /// [`RpcStatusCode::Unimplemented`].
-    ///
-    /// [Control API]: https://tinyurl.com/yxsqplq7
-    fn apply(
-        &mut self,
-        ctx: RpcContext,
-        _: ApplyRequest,
-        sink: UnarySink<Response>,
-    ) {
-        ctx.spawn(
-            sink.fail(RpcStatus::new(
-                RpcStatusCode::Unimplemented,
-                Some("Apply method currently is unimplemented.".to_string()),
-            ))
-            .map(|_| {
-                info!(
-                    "An unimplemented gRPC Control API method 'Apply' was \
-                     called."
-                );
-            })
-            .map_err(|e| {
-                warn!("Unimplemented method Apply error: {:?}", e);
-            }),
-        );
-    }
-
     /// Implementation for `Delete` method of gRPC [Control API].
     ///
     /// [Control API]: https://tinyurl.com/yxsqplq7
@@ -460,10 +427,10 @@ impl Handler<ShutdownGracefully> for GrpcServer {
 pub fn run(room_repo: Addr<RoomService>, app: &AppContext) -> Addr<GrpcServer> {
     let bind_ip = app.config.server.control.grpc.bind_ip.to_string();
     let bind_port = app.config.server.control.grpc.bind_port;
-    let cq_count = app.config.server.control.grpc.completion_queue_count;
+    let cq_count = 2;
 
     let service = create_control_api(ControlApiService {
-        public_url: app.config.server.client.public_url.clone(),
+        public_url: app.config.server.client.http.public_url.clone(),
         room_service: room_repo,
     });
     let env = Arc::new(Environment::new(cq_count));

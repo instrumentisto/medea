@@ -116,7 +116,7 @@ impl RoomService {
         graceful_shutdown: Addr<GracefulShutdown>,
     ) -> Self {
         Self {
-            static_specs_dir: app.config.control_api.static_specs_dir.clone(),
+            static_specs_dir: app.config.control.static_specs_dir.clone(),
             room_repo,
             app,
             graceful_shutdown,

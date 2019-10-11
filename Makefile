@@ -235,7 +235,7 @@ cargo.fmt:
 
 cargo.gen:
 ifeq ($(crate),medea-control-api-proto)
-	rm -rf $(crate-dir)/src/grpc/api*.rs
+	@rm -rf $(crate-dir)/src/grpc/api*.rs
 	cd $(crate-dir)/ && \
 	cargo build
 endif
@@ -330,12 +330,12 @@ ifeq ($(test-unit-crate),medea)
 	cargo test --lib --bin medea
 else
 ifeq ($(crate),medea-jason)
-	@make docker.up.webdriver
+	@make docker.up.webdriver browser=$(browser)
 	sleep 10
 	cd $(crate-dir)/ && \
 	$(webdriver-env)="http://0.0.0.0:4444" \
 	cargo test --target wasm32-unknown-unknown --features mockable
-	@make docker.down.webdriver
+	@make docker.down.webdriver browser=$(browser)
 else
 	cd $(crate-dir)/ && \
 	cargo test -p $(test-unit-crate)
@@ -481,7 +481,6 @@ docker.build.medea:
 			--build-arg rustc_opts=$(if \
 				$(call eq,$(debug),no),--release,),) \
 		-t $(docker-build-medea-image-name):$(if $(call eq,$(TAG),),dev,$(TAG)) .
-	$(call docker.build.clean.ignore)
 
 
 # Stop Coturn STUN/TURN server in Docker Compose environment
@@ -524,8 +523,7 @@ endif
 #   make docker.down.webdriver [browser=(chrome|firefox)]
 
 docker.down.webdriver:
-	-docker stop medea-webdriver-$(if $(call eq,$(browser),)chrome,$(browser))
-	-docker rm medea-webdriver-$(if $(call eq,$(browser),)chrome,$(browser))
+	-docker stop medea-webdriver-$(if $(call eq,$(browser),),chrome,$(browser))
 
 
 # Pull project Docker images from Container Registry.
@@ -634,11 +632,13 @@ endif
 
 docker.up.webdriver: docker.down.webdriver
 ifeq ($(browser),firefox)
-	docker run --rm -d --shm-size 512m --name medea-webdriver-firefox \
-		--network=host instrumentisto/geckodriver:$(FIREFOX_VERSION)
+	docker run --rm -d --network=host --shm-size 512m \
+		--name medea-webdriver-firefox \
+		instrumentisto/geckodriver:$(FIREFOX_VERSION)
 else
-	docker run --rm -d --name medea-webdriver-chrome \
-		--network=host selenoid/chrome:$(CHROME_VERSION)
+	docker run --rm -d --network=host \
+		--name medea-webdriver-chrome \
+		selenoid/chrome:$(CHROME_VERSION)
 endif
 
 
