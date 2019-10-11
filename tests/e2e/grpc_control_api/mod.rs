@@ -36,7 +36,7 @@ impl ControlClient {
     /// don't know it until try to send something with this client.
     pub fn new() -> Self {
         let env = Arc::new(EnvBuilder::new().build());
-        let ch = ChannelBuilder::new(env).connect("localhost:6565");
+        let ch = ChannelBuilder::new(env).connect("127.0.0.1:6565");
         ControlClient(ControlApiClient::new(ch))
     }
 

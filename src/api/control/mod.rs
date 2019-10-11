@@ -113,7 +113,7 @@ pub enum TryFromElementError {
 ///
 /// [Control API]: https://tinyurl.com/yxsqplq7
 #[allow(clippy::pub_enum_variant_names)]
-#[derive(Debug, Fail, Display)]
+#[derive(Debug, Display, Fail)]
 pub enum LoadStaticControlSpecsError {
     /// Error while reading default or provided in config
     /// (`MEDEA_CONTROL_API.STATIC_SPECS_DIR` environment variable) static

@@ -64,7 +64,7 @@ pub enum SrcParseError {
 /// Note that [`SrcUri`] is parsing with [`LocalUri`] parser.
 /// Actually difference between [`SrcUri`] and [`LocalUri`]
 /// in endpoint ID's type. In [`SrcUri`] it [`WebRtcPublishId`], and in
-/// [`LocalUri`] it [`String`]. Also [`SrcUri`] can be deserialized with
+/// [`LocalUri`] it [`EndpointId`]. Also [`SrcUri`] can be deserialized with
 /// [`serde`].
 ///
 /// Atm used only in [Control API] specs.
@@ -72,6 +72,7 @@ pub enum SrcParseError {
 /// [`WebRtcPublishEndpoint`]:
 /// crate::api::control::endpoints::WebRtcPublishEndpoint
 /// [Control API]: https://tinyurl.com/yxsqplq7
+/// [`EndpointId`]: crate::api::control::EndpointId
 #[derive(Clone, Debug)]
 pub struct SrcUri {
     /// ID of [`Room`].

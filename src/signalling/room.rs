@@ -845,7 +845,7 @@ impl Room {
             src.add_sink(sink.downgrade());
         }
 
-        self.members.create_membe(id, signalling_member);
+        self.members.create_member(id, signalling_member);
 
         Ok(())
     }

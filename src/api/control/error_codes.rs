@@ -1,4 +1,4 @@
-//! All errors which medea can return to control API user.
+//! All errors which Medea can return to Control API user.
 //!
 //! # Error codes ranges
 //! - `1000` ... `1999` Client errors
@@ -23,7 +23,7 @@ use crate::{
     },
 };
 
-/// Medea's control API error response.
+/// Medea's Control API error response.
 pub struct ErrorResponse {
     /// [`ErrorCode`] which will be returned with code and message.
     error_code: ErrorCode,
@@ -136,16 +136,16 @@ pub enum ErrorCode {
     #[display(fmt = "Unimplemented API call.")]
     UnimplementedCall = 1000,
 
-    /// Request does not contain any elements.
+    /// Request doesn't contain any elements.
     ///
     /// Code: __1001__.
-    #[display(fmt = "Request does not contain any elements")]
+    #[display(fmt = "Request doesn't contain any elements")]
     NoElement = 1001,
 
-    /// Provided uri can not point to provided element.
+    /// Provided uri can't point to provided element.
     ///
     /// Code: __1002__.
-    #[display(fmt = "Provided uri can not point to provided element")]
+    #[display(fmt = "Provided uri can't point to provided element")]
     ElementIdMismatch = 1002,
 
     /// Room not found.
@@ -178,10 +178,10 @@ pub enum ErrorCode {
     #[display(fmt = "Expected Member element but it's not.")]
     NotMemberInSpec = 1007,
 
-    /// Invalid source URI in play endpoint.
+    /// Invalid source URI in [`WebRtcPlayEndpoint`].
     ///
     /// Code: __1008__.
-    #[display(fmt = "Invalid source ID in publish endpoint spec.")]
+    #[display(fmt = "Invalid source URI in 'WebRtcPlayEndpoint'.")]
     InvalidSrcUri = 1008,
 
     /// Provided not source URI in [`WebRtcPlayEndpoint`].
@@ -190,13 +190,13 @@ pub enum ErrorCode {
     ///
     /// [`WebRtcPlayEndpoint`]:
     /// crate::signalling::elements::endpoints::webrtc::WebRtcPlayEndpoint
-    #[display(fmt = "Provided not source URI.")]
+    #[display(fmt = "Provided not source URI in 'WebRtcPlayEndpoint'.")]
     NotSourceUri = 1009,
 
-    /// Element's ID don't have "local://" prefix.
+    /// Element's URI don't have `local://` prefix.
     ///
     /// Code: __1010__.
-    #[display(fmt = "Element's ID's URI not have 'local://' protocol.")]
+    #[display(fmt = "Element's URI don't have 'local://' prefix.")]
     ElementIdIsNotLocal = 1010,
 
     /// Provided element's URI with too many paths.
@@ -226,13 +226,13 @@ pub enum ErrorCode {
     EmptyElementsList = 1014,
 
     /// Provided not the same Room IDs in elements IDs. Probably you try use
-    /// Delete method for elements with different Room IDs
+    /// `Delete` method for elements with different Room IDs
     ///
     /// Code: __1015__.
     ///
     /// [`RoomId`]: crate::api::control::room::Id
     #[display(fmt = "Provided not the same Room IDs in elements IDs. \
-                     Probably you try use Delete method for elements with \
+                     Probably you try use 'Delete' method for elements with \
                      different Room IDs")]
     ProvidedNotSameRoomIds = 1015,
 
@@ -247,6 +247,7 @@ pub enum ErrorCode {
     /// Code: __1017__.
     #[display(fmt = "Member with provided URI already exists.")]
     MemberAlreadyExists = 1017,
+
     /// Endpoint with provided URI already exists.
     ///
     /// Code: __1018__.

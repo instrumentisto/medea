@@ -119,6 +119,8 @@ impl MemberSpec {
 /// This credentials will be generated if in dynamic [Control API] spec not
 /// provided credentials for [`Member`]. This logic you can find in [`TryFrom`]
 /// [`MemberProto`] implemented for [`MemberSpec`].
+///
+/// [Control API]: https://tinyurl.com/yxsqplq7
 fn generate_member_credentials() -> String {
     rand::thread_rng()
         .sample_iter(&Alphanumeric)

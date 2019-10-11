@@ -85,7 +85,7 @@ struct ControlApiService {
 
 impl ControlApiService {
     /// Returns [Control API] sid based on provided arguments and
-    /// `MEDEA_CLIENT.PUBLIC_URL` config value.
+    /// `MEDEA_SERVER__CLIENT__HTTP__PUBLIC_URL` config value.
     fn get_sid(
         &self,
         room_id: &RoomId,
@@ -149,7 +149,7 @@ impl ControlApiService {
             .and_then(|r| r.map_err(GrpcControlApiError::from).map(|_| sids))
     }
 
-    /// Implementation of `Create` method for [`Endpoint`] elements.
+    /// Implementation of `Create` method for [`Endpoint`] element.
     fn create_endpoint(
         &self,
         uri: LocalUri<ToEndpoint>,
@@ -336,7 +336,7 @@ impl ControlApi for ControlApiService {
                 })
                 .map_err(|e| {
                     warn!(
-                        "Error while sending response on Delete request by \
+                        "Error while sending response on 'Delete' request by \
                          gRPC: {:?}",
                         e
                     )
@@ -374,8 +374,8 @@ impl ControlApi for ControlApiService {
                 })
                 .map_err(|e| {
                     warn!(
-                        "Error while sending response on Get request by gRPC: \
-                         {:?}",
+                        "Error while sending response on 'Get' request by \
+                         gRPC: {:?}",
                         e
                     )
                 }),

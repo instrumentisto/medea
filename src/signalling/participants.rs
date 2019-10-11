@@ -419,7 +419,7 @@ impl ParticipantService {
         }
     }
 
-    pub fn create_membe(&mut self, id: MemberId, member: Member) {
+    pub fn create_member(&mut self, id: MemberId, member: Member) {
         self.members.insert(id, member);
     }
 }

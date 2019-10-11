@@ -267,11 +267,8 @@ impl Handler<CreateMemberInRoom> for RoomService {
                     .and_then(|r| r.map_err(RoomServiceError::from)),
             )
         } else {
-            Box::new(future::err(RoomServiceError::RoomNotFound(LocalUri::<
-                ToRoom,
-            >::new(
-                room_id
-            ))))
+            let room_uri = LocalUri::<ToRoom>::new(room_id);
+            Box::new(future::err(RoomServiceError::RoomNotFound(room_uri)))
         }
     }
 }
@@ -307,11 +304,8 @@ impl Handler<CreateEndpointInRoom> for RoomService {
                 .and_then(|r| r.map_err(RoomServiceError::from)),
             )
         } else {
-            Box::new(future::err(RoomServiceError::RoomNotFound(LocalUri::<
-                ToRoom,
-            >::new(
-                room_id
-            ))))
+            let room_uri = LocalUri::<ToRoom>::new(room_id);
+            Box::new(future::err(RoomServiceError::RoomNotFound(room_uri)))
         }
     }
 }

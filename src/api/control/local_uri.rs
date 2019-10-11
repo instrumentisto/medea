@@ -1,4 +1,4 @@
-//! URI for pointing to some medea element.
+//! URI for pointing to some Medea element.
 
 // Fix clippy's wrong errors for `Self` in `LocalUri`s with states as generics.
 #![allow(clippy::use_self)]
@@ -48,11 +48,11 @@ pub struct ToEndpoint(LocalUri<ToMember>, EndpointId);
 ///
 /// ```
 /// # use crate::api::control::local_uri::{LocalUri, ToEndpoint};
-/// # use crate::api::control::{RoomId, MemberId};
+/// # use crate::api::control::{RoomId, MemberId, EndpointId};
 /// #
 /// let orig_room_id = RoomId("room".to_string());
 /// let orig_member_id = MemberId("member".to_string());
-/// let orig_endpoint_id = "endpoint".to_string();
+/// let orig_endpoint_id = EndpointId("endpoint".to_string());
 ///
 /// // Create new LocalUri for endpoint.
 /// let local_uri = LocalUri::<ToEndpoint>::new(
@@ -60,13 +60,14 @@ pub struct ToEndpoint(LocalUri<ToMember>, EndpointId);
 ///     orig_member_id.clone(),
 ///     orig_endpoint_id.clone()
 /// );
+/// let local_uri_clone = local_uri.clone();
 ///
 /// // We can get reference to room_id from this LocalUri
 /// // without taking ownership:
 /// assert_eq!(local_uri.room_id(), &orig_room_id);
 ///
 /// // If you want to take all IDs ownership, you should do this steps:
-/// let (endpoint_id, member_uri) = local_uri.clone().take_endpoint_id();
+/// let (endpoint_id, member_uri) = local_uri.take_endpoint_id();
 /// assert_eq!(endpoint_id, orig_endpoint_id);
 ///
 /// let (member_id, room_uri) = member_uri.take_member_id();
@@ -76,7 +77,7 @@ pub struct ToEndpoint(LocalUri<ToMember>, EndpointId);
 /// assert_eq!(room_id, orig_room_id);
 ///
 /// // Or simply
-/// let (room_id, member_id, endpoint_id) = local_uri.take_all();
+/// let (room_id, member_id, endpoint_id) = local_uri_clone.take_all();
 /// ```
 ///
 /// This is necessary so that it is not possible to get the address in the
@@ -95,7 +96,7 @@ pub struct LocalUri<T> {
 }
 
 impl LocalUri<ToRoom> {
-    /// Create new [`LocalUri`] in [`ToRoom`] state.
+    /// Creates new [`LocalUri`] in [`ToRoom`] state.
     pub fn new(room_id: RoomId) -> Self {
         Self {
             state: ToRoom(room_id),
@@ -112,7 +113,7 @@ impl LocalUri<ToRoom> {
         self.state.0
     }
 
-    /// Push [`MemberId`] to the end of URI and returns
+    /// Pushes [`MemberId`] to the end of URI and returns
     /// [`LocalUri`] in [`ToMember`] state.
     pub fn push_member_id(self, member_id: MemberId) -> LocalUri<ToMember> {
         LocalUri::<ToMember>::new(self.state.0, member_id)

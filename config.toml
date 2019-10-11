@@ -128,6 +128,7 @@
 # Env var: MEDEA_LOG__LEVEL
 # Possible values:
 #   "OFF", "CRITICAL", "ERROR", "WARN", "INFO", "DEBUG", "TRACE"
+#
 # Default:
 #   level = "INFO"
 
