@@ -32,6 +32,9 @@ endif
 ifeq ($(crate),medea-client-api-proto)
 crate-dir = proto/client-api
 endif
+ifeq ($(crate),medea-control-api-proto)
+crate-dir = proto/control-api
+endif
 ifeq ($(crate),medea-macro)
 crate-dir = crates/medea-macro
 endif
@@ -223,6 +226,19 @@ endif
 
 cargo.fmt:
 	cargo +nightly fmt --all $(if $(call eq,$(check),yes),-- --check,)
+
+
+# Generate Rust sources with Cargo's build.rs script.
+#
+# Usage:
+#	make cargo.gen crate=medea-control-api-proto
+
+cargo.gen:
+ifeq ($(crate),medea-control-api-proto)
+	@rm -rf $(crate-dir)/src/grpc/api*.rs
+	cd $(crate-dir)/ && \
+	cargo build
+endif
 
 
 # Lint Rust sources with clippy.
@@ -454,16 +470,6 @@ docker-build-medea-image-name = $(strip \
 	$(if $(call eq,$(registry),),,$(registry)/)$(MEDEA_IMAGE_NAME))
 
 docker.build.medea:
-ifneq ($(no-cache),yes)
-	docker run --rm --network=host -v "$(PWD)":/app -w /app \
-	           -u $(shell id -u):$(shell id -g) \
-	           -e CARGO_HOME=.cache/cargo \
-		rust:$(RUST_VER) \
-			cargo build --bin=medea \
-				$(if $(call eq,$(debug),no),--release,)
-endif
-	$(call docker.build.clean.ignore)
-	@echo "!target/$(if $(call eq,$(debug),no),release,debug)/" >> .dockerignore
 	$(docker-env) \
 	docker build $(if $(call eq,$(minikube),yes),,--network=host) --force-rm \
 		$(if $(call eq,$(no-cache),yes),\
@@ -473,14 +479,8 @@ endif
 			--build-arg rustc_mode=$(if \
 				$(call eq,$(debug),no),release,debug) \
 			--build-arg rustc_opts=$(if \
-				$(call eq,$(debug),no),--release,) \
-			--build-arg cargo_home=.cache/cargo,) \
+				$(call eq,$(debug),no),--release,),) \
 		-t $(docker-build-medea-image-name):$(if $(call eq,$(TAG),),dev,$(TAG)) .
-	$(call docker.build.clean.ignore)
-define docker.build.clean.ignore
-	@sed -i $(if $(call eq,$(shell uname -s),Darwin),'',) \
-		/^!target\/d .dockerignore
-endef
 
 
 # Stop Coturn STUN/TURN server in Docker Compose environment
@@ -827,7 +827,7 @@ endef
 ##################
 
 .PHONY: build build.jason build.medea \
-        cargo cargo.build cargo.fmt cargo.lint \
+        cargo cargo.build cargo.fmt cargo.gen cargo.lint \
         docker.auth docker.build.demo docker.build.medea \
         	docker.down.coturn docker.down.demo docker.down.medea \
         	docker.down.webdriver \
