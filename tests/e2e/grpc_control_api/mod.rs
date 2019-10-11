@@ -11,12 +11,12 @@ use std::{collections::HashMap, sync::Arc};
 
 use grpcio::{ChannelBuilder, EnvBuilder};
 use medea_control_api_proto::grpc::{
-    control_api::{
+    api::{
         CreateRequest, Element, Error, IdRequest, Member, Member_Element, Room,
         Room_Element, WebRtcPlayEndpoint, WebRtcPublishEndpoint,
         WebRtcPublishEndpoint_P2P,
     },
-    control_api_grpc::ControlApiClient,
+    api_grpc::ControlApiClient,
 };
 use protobuf::RepeatedField;
 

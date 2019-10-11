@@ -164,7 +164,6 @@ mod control_grpc_spec {
         let env_conf = overrided_by_env_conf!(
             "MEDEA_SERVER__CONTROL__GRPC__BIND_IP" => "182.98.12.48",
             "MEDEA_SERVER__CONTROL__GRPC__BIND_PORT" => "44444",
-            "MEDEA_SERVER__CONTROL__GRPC__COMPLETION_QUEUE_COUNT" => "10",
         );
 
         assert_ne!(
@@ -175,12 +174,6 @@ mod control_grpc_spec {
             default_conf.server.control.grpc.bind_port,
             env_conf.server.control.grpc.bind_port
         );
-        assert_ne!(
-            default_conf.server.control.grpc.completion_queue_count,
-            env_conf.server.control.grpc.completion_queue_count
-        );
-
-        assert_eq!(env_conf.server.control.grpc.completion_queue_count, 10);
         assert_eq!(env_conf.server.control.grpc.bind_port, 44444);
         assert_eq!(
             env_conf.server.control.grpc.bind_ip,
