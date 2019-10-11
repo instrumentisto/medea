@@ -18,6 +18,7 @@ members = [
     "crates/medea-macro",
     "jason",
     "proto/client-api",
+    "proto/control-api",
 ]
 
 [profile.release]
