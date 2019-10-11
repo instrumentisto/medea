@@ -22,7 +22,7 @@ spec:
     matchLabels:
       app.kubernetes.io/name: {{ template "medea-demo.name" . }}
       app.kubernetes.io/instance: {{ .Release.Name | quote }}
-      app.kubernetes.io/component: server
+      app.kubernetes.io/component: control-api
   template:
     metadata:
       labels:
