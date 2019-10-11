@@ -54,6 +54,7 @@ spec:
       containers:
       {{- $coturnDb := index .Values "server" "coturn-db" }}
       {{- $coturn := .Values.server.coturn }}
+      {{- $controlApiMock := index .Values "control-mock" }}
         - name: medea
           image: "{{ .Values.server.image.repository }}:{{ .Values.server.image.tag }}"
           imagePullPolicy: {{ .Values.server.image.pullPolicy }}
@@ -72,6 +73,8 @@ spec:
           ports:
             - name: http
               containerPort: {{ .Values.server.conf.server.client.http.bind_port }}
+            - name: grpc
+              containerPort: 6565
           volumeMounts:
             - name: conf
               subPath: medea.toml
@@ -88,6 +91,13 @@ spec:
             tcpSocket:
               port: {{ .Values.server.conf.server.client.http.bind_port }}
             initialDelaySeconds: 5
+        - name: control--mock
+          image: "{{ $controlApiMock.image.repository }}:{{ $controlApiMock.image.tag }}"
+          imagePullPolicy: "{{ $controlApiMock.image.pullPolicy }}"
+          ports:
+            - name: control-mock
+              containerPort: 8000
+              protocol: TCP
         - name: coturn
           image: "{{ $coturn.image.repository }}:{{ $coturn.image.tag }}"
           imagePullPolicy: {{ $coturn.image.pullPolicy }}

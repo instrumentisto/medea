@@ -460,10 +460,11 @@ endif
 docker-build-control-api-mock-image-name = $(CONTROL_API_MOCK_IMAGE_NAME)
 
 docker.build.control-api-mock:
+	$(docker-env) \
 	docker build $(if $(call eq,$(minikube),yes),,--network=host) \
-		-t $(CONTROL_API_MOCK_IMAGE_NAME):$(TAG) \
+		-t $(docker-build-control-api-mock-image-name):$(TAG) \
 		-f crates/control-api-mock/Dockerfile \
-		--build-arg medea_build_image=$(medea-build-image) .
+		.
 
 
 # Build medea project Docker image.

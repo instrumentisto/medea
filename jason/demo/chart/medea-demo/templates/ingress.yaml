@@ -35,13 +35,13 @@ spec:
             backend:
               serviceName: {{ template "medea-demo.fullname" $ }}-server
               servicePort: http
+          - path: /control-api
+            backend:
+              serviceName: {{ template  "medea-demo.fullname" $ }}-server
+              servicePort: control-mock
           - path: /
             backend:
               serviceName: {{ template "medea-demo.fullname" $ }}-web-client
-              servicePort: http
-          - path: /control-api
-            backend:
-              serviceName: {{ template  "medea-demo.fullname" $ }}-control-api
               servicePort: http
 {{- if $.Values.ingress.tls.enabled }}
   tls:

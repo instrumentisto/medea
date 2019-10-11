@@ -152,7 +152,7 @@ web-client:
       #   memory: 128Mi
 
 
-control-api:
+control-mock:
   image:
     repository: instrumentisto/medea-control-api-mock
     tag: latest

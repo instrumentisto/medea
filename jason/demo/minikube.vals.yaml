@@ -32,7 +32,7 @@ web-client:
     pullPolicy: IfNotPresent
 
 
-control-api:
+control-mock:
   image:
     tag: dev
     pullPolicy: IfNotPresent

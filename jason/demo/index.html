@@ -84,31 +84,35 @@
     </script>
 
     <script type="text/javascript">
-        const controlUrl = "http://" + document.location.host + "/control-api/";
+        const controlUrl = "https://" + document.location.host + "/control-api/";
 
         async function createRoom(roomId, memberId) {
-            let resp = await axios({
-                method: 'post',
-                url: controlUrl + roomId,
-                data: {
-                    pipeline: {
-                        [memberId]: {
-                            kind: 'Member',
-                            credentials: 'test',
-                            pipeline: {
-                                publish: {
-                                    kind: 'WebRtcPublishEndpoint',
-                                    spec: {
-                                        p2p: 'Always'
-                                    }
-                                },
+            try {
+                let resp = await axios({
+                    method: 'post',
+                    url: controlUrl + roomId,
+                    data: {
+                        kind: 'Room',
+                        pipeline: {
+                            [memberId]: {
+                                kind: 'Member',
+                                credentials: 'test',
+                                pipeline: {
+                                    publish: {
+                                        kind: 'WebRtcPublishEndpoint',
+                                        spec: {
+                                            p2p: 'Always'
+                                        }
+                                    },
+                                }
                             }
                         }
                     }
-                }
-            });
-
-            return resp.data.sids[memberId]
+                });
+                return resp.data.sids[memberId]
+            } catch (e) {
+                console.log(e.response);
+            }
         }
 
         async function addNewMember(roomId, memberId) {
@@ -141,6 +145,7 @@
                 method: 'post',
                 url: controlUrl + roomId + "/" + memberId,
                 data: {
+                    kind: 'Member',
                     credentials: 'test',
                     pipeline: pipeline,
                 }

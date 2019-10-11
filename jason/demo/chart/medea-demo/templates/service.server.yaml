@@ -23,3 +23,7 @@ spec:
       port: 80
       targetPort: {{ .Values.server.conf.server.bind_port }}
       protocol: TCP
+    - name: control-mock
+      port: 8000
+      targetPort: 8000
+      protocol: TCP
