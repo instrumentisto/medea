@@ -74,6 +74,55 @@ fn audio_constraints_satisfies() -> impl Future<Item = (), Error = JsValue> {
     })
 }
 
+// 1. Get device id of non default video device from enumerate_devices();
+// 2. Get device id of non default audio device from enumerate_devices();
+// 2. Add both to constraints;
+// 3. Get stream by constraints;
+// 4. Assert that we got stream with 2 tracks;
+// 5. Assert audio_constraint.satisfies(stream.audio_track());
+// 6. Assert video_constraint.satisfies(stream.video_track()).
+#[wasm_bindgen_test(async)]
+fn both_constraints_satisfies() -> impl Future<Item = (), Error = JsValue> {
+    audio_devices().join(video_devices())
+        .map(|(mut audio_devices, mut video_devices)|{
+            (audio_devices.pop().unwrap(), video_devices.pop().unwrap())
+        })
+        .map(|(audio_device, video_device)|{
+            let mut constraints = MediaStreamConstraints::new();
+
+            let mut audio_constraints = AudioTrackConstraints::new();
+            audio_constraints.device_id(audio_device.device_id());
+
+            let mut video_constraints = VideoTrackConstraints::new();
+            video_constraints.device_id(video_device.device_id());
+
+            constraints.audio(audio_constraints);
+            constraints.video(video_constraints);
+
+            constraints
+        })
+        .and_then(|stream_constraints| {
+            MediaManager::default()
+                .get_stream_by_constraints(stream_constraints.clone())
+                .map(move |stream| {
+                    assert!(stream.get_tracks().length() == 2);
+
+                    let video_constraints = stream_constraints.get_video().clone().unwrap();
+                    let audio_constraints = stream_constraints.get_audio().clone().unwrap();
+
+                    let audio_track = MediaStreamTrack::from(stream.get_audio_tracks().pop());
+                    let video_track = MediaStreamTrack::from(stream.get_video_tracks().pop());
+
+                    assert!(audio_track.kind() == "audio");
+                    assert!(audio_constraints.satisfies(&audio_track));
+
+                    assert!(video_track.kind() == "video");
+                    assert!(video_constraints.satisfies(&video_track));
+                })
+                .map_err(|err| err.into())
+        })
+}
+
 // 1. Get device id of non default audio and video device from
 // enumerate_devices();
 // 2. Add it to constraints;
