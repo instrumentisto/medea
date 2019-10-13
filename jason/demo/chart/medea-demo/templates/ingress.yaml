@@ -17,6 +17,9 @@ metadata:
     {{- toYaml . | nindent 4 }}
   {{- end }}
   annotations:
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    kubernetes.io/ingress.class: nginx
   {{- if and $.Values.ingress.tls.enabled $.Values.ingress.tls.auto }}
     kubernetes.io/tls-acme: "true"
   {{- end }}

@@ -67,12 +67,15 @@ spec:
               value: {{ $coturnDb.conf.port | quote }}
             - name: MEDEA_SERVER.CLIENT.PUBLIC_URL
               value: {{ .Values.server.conf.server.client.public_url }}
+            - name: RUST_LOG
+              value: DEBUG
           envFrom:
             - secretRef:
                 name: {{ template "medea-demo.fullname" . }}.server.cred
           ports:
             - name: http
               containerPort: {{ .Values.server.conf.server.client.http.bind_port }}
+              protocol: TCP
             - name: grpc
               containerPort: 6565
           volumeMounts:
@@ -91,7 +94,7 @@ spec:
             tcpSocket:
               port: {{ .Values.server.conf.server.client.http.bind_port }}
             initialDelaySeconds: 5
-        - name: control--mock
+        - name: control-mock
           image: "{{ $controlApiMock.image.repository }}:{{ $controlApiMock.image.tag }}"
           imagePullPolicy: "{{ $controlApiMock.image.pullPolicy }}"
           ports:
@@ -169,6 +172,10 @@ spec:
                 secretKeyRef:
                   name: {{ template "medea-demo.fullname" . }}.server.cred
                   key: MEDEA_TURN__DB__REDIS__PASS
+{{/*          ports:*/}}
+{{/*            - name: redis*/}}
+{{/*              containerPort: 6379*/}}
+{{/*              protocol: TCP*/}}
           volumeMounts:
             - name: conf
               subPath: redis.conf

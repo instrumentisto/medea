@@ -57,7 +57,7 @@ RUN cd /app \
 #
 
 # https://hub.docker.com/_/scratch
-FROM scratch AS runtime
+FROM alpine AS runtime
 
 COPY --from=dist /out/ /
 

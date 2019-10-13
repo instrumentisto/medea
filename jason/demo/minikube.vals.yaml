@@ -10,7 +10,9 @@ server:
   conf:
     server:
       client:
-        public_url: "wss://medea-demo.test"
+        public_url: "wss://medea-demo.test/ws"
+    log:
+      level: "DEBUG"
 
     turn:
       host: medea-demo.test
