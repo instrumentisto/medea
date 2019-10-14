@@ -83,11 +83,12 @@ fn audio_constraints_satisfies() -> impl Future<Item = (), Error = JsValue> {
 // 6. Assert video_constraint.satisfies(stream.video_track()).
 #[wasm_bindgen_test(async)]
 fn both_constraints_satisfies() -> impl Future<Item = (), Error = JsValue> {
-    audio_devices().join(video_devices())
-        .map(|(mut audio_devices, mut video_devices)|{
+    audio_devices()
+        .join(video_devices())
+        .map(|(mut audio_devices, mut video_devices)| {
             (audio_devices.pop().unwrap(), video_devices.pop().unwrap())
         })
-        .map(|(audio_device, video_device)|{
+        .map(|(audio_device, video_device)| {
             let mut constraints = MediaStreamConstraints::new();
 
             let mut audio_constraints = AudioTrackConstraints::new();
@@ -107,11 +108,15 @@ fn both_constraints_satisfies() -> impl Future<Item = (), Error = JsValue> {
                 .map(move |stream| {
                     assert!(stream.get_tracks().length() == 2);
 
-                    let video_constraints = stream_constraints.get_video().clone().unwrap();
-                    let audio_constraints = stream_constraints.get_audio().clone().unwrap();
+                    let video_constraints =
+                        stream_constraints.get_video().clone().unwrap();
+                    let audio_constraints =
+                        stream_constraints.get_audio().clone().unwrap();
 
-                    let audio_track = MediaStreamTrack::from(stream.get_audio_tracks().pop());
-                    let video_track = MediaStreamTrack::from(stream.get_video_tracks().pop());
+                    let audio_track =
+                        MediaStreamTrack::from(stream.get_audio_tracks().pop());
+                    let video_track =
+                        MediaStreamTrack::from(stream.get_video_tracks().pop());
 
                     assert!(audio_track.kind() == "audio");
                     assert!(audio_constraints.satisfies(&audio_track));

@@ -32,7 +32,7 @@ js-sys = "0.3"
 macro-attr = "0.2"
 medea-client-api-proto = { path = "../proto/client-api", features = ["jason"] }
 medea-macro = "0.1"
-mockall = { version = "0.2", optional = true }
+mockall = { version = "0.5", optional = true }
 newtype_derive = "0.1"
 predicates-tree = { version = "1.0", optional = true }
 serde = { version = "1.0", features = ["derive"] }
