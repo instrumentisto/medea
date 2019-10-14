@@ -22,6 +22,7 @@ All user visible changes to this project will be documented in this file. This p
         - `MediaManager` class obtainable via ` Jason.media_manager()` ([#46](/../../pull/46)):
             - `MediaManager.enumerate_devices()`;
             - `MediaManager.init_local_stream()`;
+        - `MediaStreamConstraints`, `AudioTrackConstraints`, `VideoTrackConstraints` classes ([#46](/../../pull/46)).
 
 ### Fixed
 
