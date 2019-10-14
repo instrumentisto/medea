@@ -95,21 +95,41 @@ impl ControlClient {
         resp.sid
     }
 
+    /// Tries to create `Element` and returns it sids.
+    ///
+    /// # Panics
+    ///
+    /// - if connection with server failed.
+    pub fn try_create(
+        &self,
+        req: &CreateRequest,
+    ) -> Result<HashMap<String, String>, Error> {
+        let mut resp = self.0.create(&req).unwrap();
+
+        if resp.has_error() {
+            Err(resp.take_error())
+        } else {
+            Ok(resp.sid)
+        }
+    }
+
     /// Deletes `Element`s by local URIs.
     ///
     /// # Panics
     ///
     /// - if [`Response`] has error
     /// - if connection with server failed.
-    pub fn delete(&self, ids: &[&str]) {
+    pub fn delete(&self, ids: &[&str]) -> Result<(), Error> {
         let mut delete_req = IdRequest::new();
         let mut delete_ids = RepeatedField::new();
         ids.iter().for_each(|id| delete_ids.push(id.to_string()));
         delete_req.set_id(delete_ids);
 
-        let resp = self.0.delete(&delete_req).unwrap();
+        let mut resp = self.0.delete(&delete_req).unwrap();
         if resp.has_error() {
-            panic!("{:?}", resp.get_error());
+            Err(resp.take_error())
+        } else {
+            Ok(())
         }
     }
 }
@@ -251,7 +271,7 @@ pub struct WebRtcPlayEndpoint {
 }
 
 impl WebRtcPlayEndpoint {
-    fn _build_request<T: Into<String>>(self, url: T) -> CreateRequest {
+    fn build_request<T: Into<String>>(self, url: T) -> CreateRequest {
         let mut request = CreateRequest::default();
 
         request.set_id(url.into());

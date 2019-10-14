@@ -35,7 +35,10 @@ fn test_for_delete(
 ) {
     let client = ControlClient::new();
     client.create(&create_room_req(room_id));
-    client.delete(&[element_id]);
+
+    client.try_get(element_id).unwrap();
+
+    client.delete(&[element_id]).unwrap();
 
     let get_room_err = match client.try_get(element_id) {
         Ok(_) => panic!("{} not deleted!", element_id),
@@ -74,8 +77,8 @@ fn endpoint() {
     );
 }
 
-/// Tests `Delete` method of [Control API] by trying to delete child `Element`
-/// from the also deleting parent `Element`.
+/// Tests that `Delete` method on parent element also deletes all nested
+/// elements.
 ///
 /// # Arguments
 ///
@@ -92,7 +95,7 @@ fn endpoint() {
 /// [Medea]: https://github.com/instrumentisto/medea
 /// [Control API]: https://tinyurl.com/yxsqplq7
 /// [`ErrorCode`]: medea::api::control::error_codes::ErrorCode
-fn test_for_delete_elements_at_same_time_test(
+fn test_cascade_delete(
     room_id: &str,
     elements_uris: &[&str],
     code: MedeaErrorCode,
@@ -100,7 +103,7 @@ fn test_for_delete_elements_at_same_time_test(
 ) {
     let client = ControlClient::new();
     client.create(&create_room_req(room_id));
-    client.delete(elements_uris);
+    client.delete(elements_uris).unwrap();
 
     match client.try_get(root_elem_uri) {
         Ok(_) => panic!("Member not deleted!"),
@@ -111,10 +114,10 @@ fn test_for_delete_elements_at_same_time_test(
 }
 
 #[test]
-fn member_and_endpoint_same_time() {
+fn cascade_delete_endpoints_when_deleting_member() {
     gen_insert_str_macro!("member-and-endpoint-same-time");
 
-    test_for_delete_elements_at_same_time_test(
+    test_cascade_delete(
         &insert_str!("{}"),
         &[
             &insert_str!("local://{}/publisher"),
@@ -126,10 +129,10 @@ fn member_and_endpoint_same_time() {
 }
 
 #[test]
-fn room_and_inner_elements_same_time() {
+fn cascade_delete_everything_when_deleting_room() {
     gen_insert_str_macro!("room-and-inner-elements-same-time");
 
-    test_for_delete_elements_at_same_time_test(
+    test_cascade_delete(
         &insert_str!("{}"),
         &[
             &insert_str!("local://{}"),
@@ -139,4 +142,31 @@ fn room_and_inner_elements_same_time() {
         MedeaErrorCode::RoomNotFound,
         &insert_str!("local://{}"),
     );
+}
+
+#[test]
+fn cant_delete_members_from_different_rooms_in_single_request() {
+    let client = ControlClient::new();
+
+    if let Err(err) =
+        client.delete(&["local://room1/member1", "local://room2/member1"])
+    {
+        assert_eq!(err.code, MedeaErrorCode::ProvidedNotSameRoomIds as u32);
+    } else {
+        panic!("should err")
+    }
+}
+
+#[test]
+fn cant_delete_endpoints_from_different_rooms_in_single_request() {
+    let client = ControlClient::new();
+
+    if let Err(err) = client.delete(&[
+        "local://room1/member1/endpoint1",
+        "local://room2/member1/endpoint1",
+    ]) {
+        assert_eq!(err.code, MedeaErrorCode::ProvidedNotSameRoomIds as u32);
+    } else {
+        panic!("should err")
+    }
 }

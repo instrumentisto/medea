@@ -96,6 +96,8 @@ fn signalling_starts_when_create_play_member_after_pub_member() {
     sys.run().unwrap();
 }
 
+// TODO: add signalling_starts_when_create_play_endpoint_after_pub_endpoint
+
 #[test]
 fn peers_removed_on_delete_member() {
     gen_insert_str_macro!("delete-member-check-peers-removed");
@@ -147,7 +149,8 @@ fn peers_removed_on_delete_member() {
                     peers_created.set(peers_created.get() + 1);
                     if peers_created.get() == 2 {
                         control_client
-                            .delete(&[&insert_str!("local://{}/responder")]);
+                            .delete(&[&insert_str!("local://{}/responder")])
+                            .unwrap();
                     }
                 }
                 Event::PeersRemoved { .. } => {
