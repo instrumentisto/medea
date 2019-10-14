@@ -22,8 +22,8 @@ use super::{create_room_req, ControlClient};
 ///
 /// `element_id`: `Element` ID which will be deleted from this `Room`,
 ///
-/// `error_code`: [`ErrorCode`] which should be returned from [ControlAPI] when
-/// we tries get deleted `Element`.
+/// `error_code`: [`ErrorCode`] which should be returned from [`ControlAPI`]
+/// when we tries get deleted `Element`.
 ///
 /// [Medea]: https://github.com/instrumentisto/medea
 /// [Control API]: https://tinyurl.com/yxsqplq7
@@ -84,8 +84,8 @@ fn endpoint() {
 ///
 /// `elements_uris`: `Element`s IDs which will be deleted from this `Element`,
 ///
-/// `error_code`: [`ErrorCode`] which should be returned from [ControlAPI] when
-/// we tries get deleted `Element`,
+/// `error_code`: [`ErrorCode`] which should be returned from [`ControlAPI`]
+/// when we tries get deleted `Element`,
 ///
 /// `root_elem_uri`: URI to parent `Element`.
 ///

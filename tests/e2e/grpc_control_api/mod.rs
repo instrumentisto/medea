@@ -40,7 +40,7 @@ impl ControlClient {
     pub fn new() -> Self {
         let env = Arc::new(EnvBuilder::new().build());
         let ch = ChannelBuilder::new(env).connect("127.0.0.1:6565");
-        ControlClient(ControlApiClient::new(ch))
+        Self(ControlApiClient::new(ch))
     }
 
     /// Gets some [`Element`] by local URI.
@@ -104,8 +104,7 @@ impl ControlClient {
     pub fn delete(&self, ids: &[&str]) {
         let mut delete_req = IdRequest::new();
         let mut delete_ids = RepeatedField::new();
-        ids.into_iter()
-            .for_each(|id| delete_ids.push(id.to_string()));
+        ids.iter().for_each(|id| delete_ids.push(id.to_string()));
         delete_req.set_id(delete_ids);
 
         let resp = self.0.delete(&delete_req).unwrap();
@@ -232,10 +231,10 @@ impl Into<Member_Element> for Endpoint {
         let mut member_elem = Member_Element::new();
 
         match self {
-            Endpoint::WebRtcPlayElement(element) => {
+            Self::WebRtcPlayElement(element) => {
                 member_elem.set_webrtc_play(element.into());
             }
-            Endpoint::WebRtcPublishElement(element) => {
+            Self::WebRtcPublishElement(element) => {
                 member_elem.set_webrtc_pub(element.into())
             }
         }

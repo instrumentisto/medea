@@ -194,9 +194,9 @@ mod test {
         let conf = Conf {
             rpc: Rpc {
                 idle_timeout: Duration::new(2, 0),
-                ..Default::default()
+                ..Rpc::default()
             },
-            ..Default::default()
+            ..Conf::default()
         };
 
         let mut server = ws_server(conf.clone());

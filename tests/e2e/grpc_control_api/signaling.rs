@@ -51,16 +51,13 @@ fn signalling_starts_when_create_play_member_after_pub_member() {
     let peers_created = Rc::new(Cell::new(0));
     let on_event =
         move |event: &Event, ctx: &mut Context<TestMember>, _: Vec<&Event>| {
-            match event {
-                Event::PeerCreated { .. } => {
-                    peers_created.set(peers_created.get() + 1);
-                    if peers_created.get() == 2 {
-                        ctx.run_later(Duration::from_secs(1), |_, _| {
-                            actix::System::current().stop();
-                        });
-                    }
+            if let Event::PeerCreated { .. } = event {
+                peers_created.set(peers_created.get() + 1);
+                if peers_created.get() == 2 {
+                    ctx.run_later(Duration::from_secs(1), |_, _| {
+                        actix::System::current().stop();
+                    });
                 }
-                _ => {}
             }
         };
 

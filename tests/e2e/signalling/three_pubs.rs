@@ -58,12 +58,10 @@ fn three_members_p2p_video_call() {
                                     .iter()
                                     .filter_map(|t| match &t.direction {
                                         Direction::Recv { sender, .. } => {
+                                            assert_ne!(sender, peer_id);
                                             Some(sender)
                                         }
                                         _ => None,
-                                    })
-                                    .map(|sender| {
-                                        assert_ne!(sender, peer_id);
                                     })
                                     .count();
                                 assert_eq!(recv_count, 2);
@@ -73,12 +71,14 @@ fn three_members_p2p_video_call() {
                                     .filter_map(|t| match &t.direction {
                                         Direction::Send {
                                             receivers, ..
-                                        } => Some(receivers),
+                                        } => {
+                                            assert!(
+                                                !receivers.contains(peer_id)
+                                            );
+                                            assert_eq!(receivers.len(), 1);
+                                            Some(receivers)
+                                        }
                                         _ => None,
-                                    })
-                                    .map(|receivers| {
-                                        assert!(!receivers.contains(peer_id));
-                                        assert_eq!(receivers.len(), 1);
                                     })
                                     .count();
                                 assert_eq!(send_count, 2);

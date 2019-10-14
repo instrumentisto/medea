@@ -515,7 +515,7 @@ mod delete_elements_validation_specs {
     fn error_if_not_same_room_ids() {
         let mut elements = DeleteElements::new();
         ["local://room_id/member", "local://another_room_id/member"]
-            .into_iter()
+            .iter()
             .map(|uri| StatefulLocalUri::try_from(uri.to_string()).unwrap())
             .for_each(|uri| elements.add_uri(uri));
 
@@ -545,7 +545,7 @@ mod delete_elements_validation_specs {
             "local://room_id/another_member_id",
             "local://room_id/member_id/endpoint_id",
         ]
-        .into_iter()
+        .iter()
         .map(|uri| StatefulLocalUri::try_from(uri.to_string()).unwrap())
         .for_each(|uri| elements.add_uri(uri));
 
@@ -589,7 +589,7 @@ mod room_service_specs {
     /// Returns [`Addr`] to [`RoomService`].
     fn room_service(room_repo: RoomRepository) -> Addr<RoomService> {
         let conf = Conf::default();
-        let shutdown_timeout = conf.shutdown.timeout.clone();
+        let shutdown_timeout = conf.shutdown.timeout;
 
         let app = app_ctx();
         let graceful_shutdown = GracefulShutdown::new(shutdown_timeout).start();
