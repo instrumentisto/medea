@@ -9,7 +9,7 @@ use medea::api::control::error_codes::{
     ErrorCode as MedeaErrorCode, ErrorCode,
 };
 
-use crate::format_name_macro;
+use crate::gen_insert_str_macro;
 
 use super::{create_room_req, ControlClient};
 
@@ -46,30 +46,30 @@ fn test_for_delete(
 
 #[test]
 fn room() {
-    format_name_macro!("delete-room");
+    gen_insert_str_macro!("delete-room");
     test_for_delete(
-        &format_name!("{}"),
-        &format_name!("local://{}"),
+        &insert_str!("{}"),
+        &insert_str!("local://{}"),
         ErrorCode::RoomNotFound,
     );
 }
 
 #[test]
 fn member() {
-    format_name_macro!("delete-member");
+    gen_insert_str_macro!("delete-member");
     test_for_delete(
-        &format_name!("{}"),
-        &format_name!("local://{}/publisher"),
+        &insert_str!("{}"),
+        &insert_str!("local://{}/publisher"),
         ErrorCode::MemberNotFound,
     );
 }
 
 #[test]
 fn endpoint() {
-    format_name_macro!("delete-endpoint");
+    gen_insert_str_macro!("delete-endpoint");
     test_for_delete(
-        &format_name!("{}"),
-        &format_name!("local://{}/publisher/publish"),
+        &insert_str!("{}"),
+        &insert_str!("local://{}/publisher/publish"),
         ErrorCode::EndpointNotFound,
     );
 }
@@ -112,31 +112,31 @@ fn test_for_delete_elements_at_same_time_test(
 
 #[test]
 fn member_and_endpoint_same_time() {
-    format_name_macro!("member-and-endpoint-same-time");
+    gen_insert_str_macro!("member-and-endpoint-same-time");
 
     test_for_delete_elements_at_same_time_test(
-        &format_name!("{}"),
+        &insert_str!("{}"),
         &[
-            &format_name!("local://{}/publisher"),
-            &format_name!("local://{}/publisher/publish"),
+            &insert_str!("local://{}/publisher"),
+            &insert_str!("local://{}/publisher/publish"),
         ],
         MedeaErrorCode::MemberNotFound,
-        &format_name!("local://{}/publisher"),
+        &insert_str!("local://{}/publisher"),
     );
 }
 
 #[test]
 fn room_and_inner_elements_same_time() {
-    format_name_macro!("room-and-inner-elements-same-time");
+    gen_insert_str_macro!("room-and-inner-elements-same-time");
 
     test_for_delete_elements_at_same_time_test(
-        &format_name!("{}"),
+        &insert_str!("{}"),
         &[
-            &format_name!("local://{}"),
-            &format_name!("local://{}/publisher"),
-            &format_name!("local://{}/publisher/publish"),
+            &insert_str!("local://{}"),
+            &insert_str!("local://{}/publisher"),
+            &insert_str!("local://{}/publisher/publish"),
         ],
         MedeaErrorCode::RoomNotFound,
-        &format_name!("local://{}"),
+        &insert_str!("local://{}"),
     );
 }

@@ -5,54 +5,52 @@
 //!
 //! [Control API]: https://tinyurl.com/yxsqplq7
 
-use std::collections::HashMap;
+use medea_control_api_proto::grpc::api::WebRtcPublishEndpoint_P2P;
 
-use medea_control_api_proto::grpc::api::{
-    CreateRequest, Member, Member_Element, WebRtcPlayEndpoint,
-    WebRtcPublishEndpoint, WebRtcPublishEndpoint_P2P,
+use crate::gen_insert_str_macro;
+
+use super::{
+    create_room_req, ControlClient, MemberBuilder, WebRtcPlayEndpointBuilder,
+    WebRtcPublishEndpointBuilder,
 };
-
-use crate::format_name_macro;
-
-use super::{create_room_req, ControlClient};
 
 #[test]
 fn room() {
-    format_name_macro!("create-room");
+    gen_insert_str_macro!("create-room");
 
     let client = ControlClient::new();
-    let sids = client.create(&create_room_req(&format_name!("{}")));
+    let sids = client.create(&create_room_req(&insert_str!("{}")));
     assert_eq!(sids.len(), 2);
     sids.get(&"publisher".to_string()).unwrap();
     let responder_sid = sids.get(&"responder".to_string()).unwrap().as_str();
     assert_eq!(
         responder_sid,
-        &format_name!("ws://127.0.0.1:8080/{}/responder/test")
+        &insert_str!("ws://127.0.0.1:8080/{}/responder/test")
     );
 
-    let mut get_resp = client.get(&format_name!("local://{}"));
+    let mut get_resp = client.get(&insert_str!("local://{}"));
     let room = get_resp.take_room();
 
     let responder = room
         .get_pipeline()
-        .get(&format_name!("local://{}/responder"))
+        .get(&insert_str!("local://{}/responder"))
         .unwrap()
         .get_member();
     assert_eq!(responder.get_credentials(), "test");
     let responder_pipeline = responder.get_pipeline();
     assert_eq!(responder_pipeline.len(), 1);
     let responder_play = responder_pipeline
-        .get(&format_name!("local://{}/responder/play"))
+        .get(&insert_str!("local://{}/responder/play"))
         .unwrap()
         .get_webrtc_play();
     assert_eq!(
         responder_play.get_src(),
-        format_name!("local://{}/publisher/publish")
+        insert_str!("local://{}/publisher/publish")
     );
 
     let publisher = room
         .get_pipeline()
-        .get(&format_name!("local://{}/publisher"))
+        .get(&insert_str!("local://{}/publisher"))
         .unwrap()
         .get_member();
     assert_ne!(publisher.get_credentials(), "test");
@@ -63,67 +61,69 @@ fn room() {
 
 #[test]
 fn member() {
-    format_name_macro!("create-member");
+    gen_insert_str_macro!("create-member");
 
     let client = ControlClient::new();
-    client.create(&create_room_req(&format_name!("{}")));
+    client.create(&create_room_req(&insert_str!("{}")));
 
-    let create_req = {
-        let mut create_member_request = CreateRequest::new();
-        let mut member = Member::new();
-        let mut member_pipeline = HashMap::new();
+    let add_member = MemberBuilder::default()
+        .id("member")
+        .credentials("qwerty")
+        .add_endpoint(
+            WebRtcPlayEndpointBuilder::default()
+                .id("play")
+                .src(insert_str!("local://{}/publisher/publish"))
+                .build()
+                .unwrap(),
+        )
+        .build()
+        .unwrap()
+        .build_request(insert_str!("local://{}/test-member"));
 
-        let mut play_endpoint = WebRtcPlayEndpoint::new();
-        play_endpoint.set_src(format_name!("local://{}/publisher/publish"));
-        let mut member_element = Member_Element::new();
-        member_element.set_webrtc_play(play_endpoint);
-        member_pipeline.insert("play".to_string(), member_element);
-
-        member.set_credentials("qwerty".to_string());
-        member.set_pipeline(member_pipeline);
-        create_member_request.set_id(format_name!("local://{}/test-member"));
-        create_member_request.set_member(member);
-
-        create_member_request
-    };
-
-    let sids = client.create(&create_req);
+    let sids = client.create(&add_member);
     let e2e_test_member_sid =
         sids.get(&"test-member".to_string()).unwrap().as_str();
     assert_eq!(
         e2e_test_member_sid,
-        format_name!("ws://127.0.0.1:8080/{}/test-member/qwerty")
+        insert_str!("ws://127.0.0.1:8080/{}/test-member/qwerty")
     );
 
     let member = client
-        .get(&format_name!("local://{}/test-member"))
+        .get(&insert_str!("local://{}/test-member"))
         .take_member();
     assert_eq!(member.get_pipeline().len(), 1);
     assert_eq!(member.get_credentials(), "qwerty");
 }
 
 #[test]
+fn asd() {
+    WebRtcPublishEndpointBuilder::default()
+        .id("publish")
+        .p2p_mode(WebRtcPublishEndpoint_P2P::NEVER)
+        .build()
+        .unwrap()
+        .build_request("local://{}/responder/publish");
+}
+
+#[test]
 fn endpoint() {
-    format_name_macro!("create-endpoint");
+    gen_insert_str_macro!("create-endpoint");
 
     let client = ControlClient::new();
-    client.create(&create_room_req(&format_name!("{}")));
+    client.create(&create_room_req(&insert_str!("{}")));
 
-    let create_req = {
-        let mut create_endpoint_request = CreateRequest::new();
-        let mut endpoint = WebRtcPublishEndpoint::new();
-        endpoint.set_p2p(WebRtcPublishEndpoint_P2P::NEVER);
-        create_endpoint_request
-            .set_id(format_name!("local://{}/responder/publish"));
-        create_endpoint_request.set_webrtc_pub(endpoint);
+    let create_req = WebRtcPublishEndpointBuilder::default()
+        .id("publish")
+        .p2p_mode(WebRtcPublishEndpoint_P2P::NEVER)
+        .build()
+        .unwrap()
+        .build_request(insert_str!("local://{}/responder/publish"));
 
-        create_endpoint_request
-    };
     let sids = client.create(&create_req);
     assert_eq!(sids.len(), 0);
 
     let endpoint = client
-        .get(&format_name!("local://{}/responder/publish"))
+        .get(&insert_str!("local://{}/responder/publish"))
         .take_webrtc_pub();
     assert_eq!(endpoint.get_p2p(), WebRtcPublishEndpoint_P2P::NEVER);
 }
