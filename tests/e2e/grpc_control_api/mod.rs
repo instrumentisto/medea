@@ -53,7 +53,7 @@ impl ControlClient {
         let mut get_room_request = IdRequest::new();
         let mut room = RepeatedField::new();
         room.push(uri.to_string());
-        get_room_request.set_id(room);
+        get_room_request.set_fid(room);
 
         let mut resp = self.0.get(&get_room_request).unwrap();
         if resp.has_error() {
@@ -71,7 +71,7 @@ impl ControlClient {
         let mut get_room_request = IdRequest::new();
         let mut room = RepeatedField::new();
         room.push(uri.to_string());
-        get_room_request.set_id(room);
+        get_room_request.set_fid(room);
 
         let mut resp = self.0.get(&get_room_request).unwrap();
         if resp.has_error() {
@@ -123,7 +123,7 @@ impl ControlClient {
         let mut delete_req = IdRequest::new();
         let mut delete_ids = RepeatedField::new();
         ids.iter().for_each(|id| delete_ids.push(id.to_string()));
-        delete_req.set_id(delete_ids);
+        delete_req.set_fid(delete_ids);
 
         let mut resp = self.0.delete(&delete_req).unwrap();
         if resp.has_error() {
@@ -143,6 +143,30 @@ pub struct Room {
     members: HashMap<String, Member>,
 }
 
+impl Room {
+    pub fn build_request<T: Into<String>>(self, uri: T) -> CreateRequest {
+        let mut request = CreateRequest::default();
+
+        let mut grpc_room = GrpcRoom::new();
+        let mut members = HashMap::new();
+
+        for (id, member) in self.members {
+            let mut room_element = Room_Element::new();
+            room_element.set_member(member.into());
+
+            members.insert(id, room_element);
+        }
+
+        grpc_room.set_id(self.id);
+        grpc_room.set_pipeline(members);
+
+        request.set_parent_fid(uri.into());
+        request.set_room(grpc_room);
+
+        request
+    }
+}
+
 impl RoomBuilder {
     fn add_member<T: Into<Member>>(&mut self, member: T) -> &mut Self {
         let member = member.into();
@@ -152,29 +176,6 @@ impl RoomBuilder {
             .insert(member.id.clone(), member);
 
         self
-    }
-}
-
-impl From<Room> for CreateRequest {
-    fn from(room: Room) -> Self {
-        let mut request = Self::default();
-
-        let mut grpc_room = GrpcRoom::new();
-        let mut members = HashMap::new();
-
-        for (id, member) in room.members {
-            let mut room_element = Room_Element::new();
-            room_element.set_member(member.into());
-
-            members.insert(id, room_element);
-        }
-
-        grpc_room.set_pipeline(members);
-
-        request.set_id(room.id);
-        request.set_room(grpc_room);
-
-        request
     }
 }
 
@@ -213,7 +214,7 @@ impl Member {
     fn build_request<T: Into<String>>(self, url: T) -> CreateRequest {
         let mut request = CreateRequest::default();
 
-        request.set_id(url.into());
+        request.set_parent_fid(url.into());
         request.set_member(self.into());
 
         request
@@ -274,7 +275,7 @@ impl WebRtcPlayEndpoint {
     fn build_request<T: Into<String>>(self, url: T) -> CreateRequest {
         let mut request = CreateRequest::default();
 
-        request.set_id(url.into());
+        request.set_parent_fid(url.into());
         request.set_webrtc_play(self.into());
 
         request
@@ -307,7 +308,7 @@ impl WebRtcPublishEndpoint {
     fn build_request<T: Into<String>>(self, url: T) -> CreateRequest {
         let mut request = CreateRequest::default();
 
-        request.set_id(url.into());
+        request.set_parent_fid(url.into());
         request.set_webrtc_pub(self.into());
 
         request
@@ -359,7 +360,7 @@ impl Into<Endpoint> for WebRtcPublishEndpoint {
 /// ```
 fn create_room_req(room_id: &str) -> CreateRequest {
     RoomBuilder::default()
-        .id(format!("{}", room_id))
+        .id(room_id.to_string())
         .add_member(
             MemberBuilder::default()
                 .id("publisher")
@@ -389,5 +390,5 @@ fn create_room_req(room_id: &str) -> CreateRequest {
         )
         .build()
         .unwrap()
-        .into()
+        .build_request(String::new())
 }

@@ -148,9 +148,7 @@ fn cascade_delete_everything_when_deleting_room() {
 fn cant_delete_members_from_different_rooms_in_single_request() {
     let client = ControlClient::new();
 
-    if let Err(err) =
-        client.delete(&["room1/member1", "room2/member1"])
-    {
+    if let Err(err) = client.delete(&["room1/member1", "room2/member1"]) {
         assert_eq!(err.code, MedeaErrorCode::ProvidedNotSameRoomIds as u32);
     } else {
         panic!("should err")
@@ -161,10 +159,9 @@ fn cant_delete_members_from_different_rooms_in_single_request() {
 fn cant_delete_endpoints_from_different_rooms_in_single_request() {
     let client = ControlClient::new();
 
-    if let Err(err) = client.delete(&[
-        "room1/member1/endpoint1",
-        "room2/member1/endpoint1",
-    ]) {
+    if let Err(err) =
+        client.delete(&["room1/member1/endpoint1", "room2/member1/endpoint1"])
+    {
         assert_eq!(err.code, MedeaErrorCode::ProvidedNotSameRoomIds as u32);
     } else {
         panic!("should err")

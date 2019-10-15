@@ -67,7 +67,7 @@ fn create_room(client: &ControlApiClient) {
     room_pipeline.insert("responder".to_string(), responder_member_element);
     room.set_pipeline(room_pipeline);
     req.set_room(room);
-    req.set_id("local://grpc-test".to_string());
+    req.set_parent_fid("grpc-test".to_string());
 
     let reply = client.create(&req).expect("create room");
     println!("{:?}", reply);
@@ -86,7 +86,7 @@ fn create_member(client: &ControlApiClient) {
 
     member.set_credentials("test".to_string());
     member.set_pipeline(member_pipeline);
-    create_member_request.set_id("local://grpc-test/player/asdsad".to_string());
+    create_member_request.set_parent_fid("grpc-test/player/asdsad".to_string());
     create_member_request.set_member(member);
 
     let reply = client
@@ -100,7 +100,7 @@ fn create_endpoint(client: &ControlApiClient) {
     let mut endpoint = WebRtcPublishEndpoint::new();
     endpoint.set_p2p(WebRtcPublishEndpoint_P2P::ALWAYS);
     create_endpoint_request
-        .set_id("local://grpc-test/responder/publish".to_string());
+        .set_parent_fid("grpc-test/responder/publish".to_string());
     create_endpoint_request.set_webrtc_pub(endpoint);
 
     let reply = client
@@ -112,10 +112,10 @@ fn create_endpoint(client: &ControlApiClient) {
 fn delete_room(client: &ControlApiClient) {
     let mut delete_request = IdRequest::new();
     let mut rooms = RepeatedField::new();
-    rooms.push("local://video-call-1/caller".to_string());
-    rooms.push("local://video-call-1".to_string());
-    rooms.push("local://pub-pub-video-call/caller".to_string());
-    delete_request.set_id(rooms);
+    rooms.push("video-call-1/caller".to_string());
+    rooms.push("video-call-1".to_string());
+    rooms.push("pub-pub-video-call/caller".to_string());
+    delete_request.set_fid(rooms);
 
     let reply = client.delete(&delete_request).expect("delete room");
     println!("{:?}", reply);
@@ -124,8 +124,8 @@ fn delete_room(client: &ControlApiClient) {
 fn delete_endpoint(client: &ControlApiClient) {
     let mut delete_endpoint_req = IdRequest::new();
     let mut endpoints = RepeatedField::new();
-    endpoints.push("local://video-call-1/caller/publish".to_string());
-    delete_endpoint_req.set_id(endpoints);
+    endpoints.push("video-call-1/caller/publish".to_string());
+    delete_endpoint_req.set_fid(endpoints);
 
     let reply = client.delete(&delete_endpoint_req).expect("delete member");
     println!("{:?}", reply);
@@ -134,8 +134,8 @@ fn delete_endpoint(client: &ControlApiClient) {
 fn delete_member(client: &ControlApiClient) {
     let mut delete_member_req = IdRequest::new();
     let mut members = RepeatedField::new();
-    members.push("local://video-call-1/caller".to_string());
-    delete_member_req.set_id(members);
+    members.push("video-call-1/caller".to_string());
+    delete_member_req.set_fid(members);
 
     let reply = client.delete(&delete_member_req).expect("delete member");
     println!("{:?}", reply);
@@ -144,11 +144,11 @@ fn delete_member(client: &ControlApiClient) {
 fn get_room(client: &ControlApiClient) {
     let mut get_room_request = IdRequest::new();
     let mut room = RepeatedField::new();
-    room.push("local://grpc-test".to_string());
-    room.push("local://video-call-1/responder".to_string());
-    room.push("local://grpc-test/publisher/publish".to_string());
-    room.push("local://pub-pub-video-call".to_string());
-    get_room_request.set_id(room);
+    room.push("grpc-test".to_string());
+    room.push("video-call-1/responder".to_string());
+    room.push("grpc-test/publisher/publish".to_string());
+    room.push("pub-pub-video-call".to_string());
+    get_room_request.set_fid(room);
 
     let reply = client.get(&get_room_request).expect("get room");
     println!("{:#?}", reply);

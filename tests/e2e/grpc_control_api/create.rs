@@ -75,7 +75,7 @@ mod room {
             .id(insert_str!("{}"))
             .build()
             .unwrap()
-            .into();
+            .build_request("");
 
         client.create(&create_room);
 
@@ -88,15 +88,15 @@ mod room {
 
     #[test]
     fn element_id_mismatch() {
-        gen_insert_str_macro!("cant_create_rooms_with_non_top_level_uri");
+        gen_insert_str_macro!("element_id_mismatch");
 
         let client = ControlClient::new();
 
         let create_room = RoomBuilder::default()
-            .id(insert_str!("qwerty/{}"))
+            .id(insert_str!("{}"))
             .build()
             .unwrap()
-            .into();
+            .build_request(insert_str!("{}"));
 
         if let Err(err) = client.try_create(&create_room) {
             assert_eq!(err.code, ErrorCode::ElementIdMismatch as u32)
@@ -139,9 +139,7 @@ mod member {
             insert_str!("ws://127.0.0.1:8080/{}/test-member/qwerty")
         );
 
-        let member = client
-            .get(&insert_str!("{}/test-member"))
-            .take_member();
+        let member = client.get(&insert_str!("{}/test-member")).take_member();
         assert_eq!(member.get_pipeline().len(), 1);
         assert_eq!(member.get_credentials(), "qwerty");
     }
@@ -175,7 +173,7 @@ mod member {
             .id(insert_str!("{}"))
             .build()
             .unwrap()
-            .into();
+            .build_request("");
 
         client.create(&create_room);
 
@@ -202,7 +200,7 @@ mod member {
             .id("asd")
             .build()
             .unwrap()
-            .build_request("local://qwe");
+            .build_request("qwe");
 
         if let Err(err) = client.try_create(&create_member) {
             assert_eq!(err.code, ErrorCode::ElementIdMismatch as u32)
@@ -249,7 +247,7 @@ mod endpoint {
             .id(insert_str!("{}"))
             .build()
             .unwrap()
-            .into();
+            .build_request("");
 
         client.create(&create_room);
 
@@ -298,7 +296,7 @@ mod endpoint {
             .add_member(MemberBuilder::default().id("member").build().unwrap())
             .build()
             .unwrap()
-            .into();
+            .build_request("");
 
         client.create(&create_room);
 
@@ -331,7 +329,7 @@ mod endpoint {
             .add_member(MemberBuilder::default().id("member").build().unwrap())
             .build()
             .unwrap()
-            .into();
+            .build_request("");
 
         client.create(&create_room);
 

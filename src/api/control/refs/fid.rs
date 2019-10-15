@@ -1,15 +1,13 @@
 use std::{
-    convert::TryFrom,
+    convert::{From, TryFrom},
     fmt::{Display, Error, Formatter},
 };
 
 use derive_more::{Display, From};
 
-use crate::impl_uri;
+use crate::{api::control::RoomId, impl_uri};
 
 use super::{ToEndpoint, ToMember, ToRoom};
-use crate::api::control::RoomId;
-use std::convert::From;
 
 #[derive(Display, Debug)]
 pub enum ParseFidError {
@@ -86,6 +84,10 @@ impl TryFrom<String> for StatefulFid {
     type Error = ParseFidError;
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
+        if value.is_empty() {
+            return Err(ParseFidError::Empty);
+        }
+
         let mut splitted = value.split('/');
         let room_id = if let Some(room_id) = splitted.next() {
             room_id

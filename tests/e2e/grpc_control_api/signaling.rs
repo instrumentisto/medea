@@ -44,7 +44,7 @@ fn signalling_starts_when_create_play_member_after_pub_member() {
         )
         .build()
         .unwrap()
-        .into();
+        .build_request("");
 
     control_client.create(&create_room);
 
@@ -137,7 +137,7 @@ fn peers_removed_on_delete_member() {
         )
         .build()
         .unwrap()
-        .into();
+        .build_request("");
 
     control_client.create(&create_room);
 

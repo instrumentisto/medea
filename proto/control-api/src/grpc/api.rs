@@ -29,7 +29,7 @@ const _PROTOBUF_VERSION_CHECK: () = ::protobuf::VERSION_2_8_1;
 #[derive(PartialEq,Clone,Default)]
 pub struct CreateRequest {
     // message fields
-    pub id: ::std::string::String,
+    pub parent_fid: ::std::string::String,
     // message oneof groups
     pub el: ::std::option::Option<CreateRequest_oneof_el>,
     // special fields
@@ -56,30 +56,30 @@ impl CreateRequest {
         ::std::default::Default::default()
     }
 
-    // string id = 1;
+    // string parent_fid = 1;
 
 
-    pub fn get_id(&self) -> &str {
-        &self.id
+    pub fn get_parent_fid(&self) -> &str {
+        &self.parent_fid
     }
-    pub fn clear_id(&mut self) {
-        self.id.clear();
+    pub fn clear_parent_fid(&mut self) {
+        self.parent_fid.clear();
     }
 
     // Param is passed by value, moved
-    pub fn set_id(&mut self, v: ::std::string::String) {
-        self.id = v;
+    pub fn set_parent_fid(&mut self, v: ::std::string::String) {
+        self.parent_fid = v;
     }
 
     // Mutable pointer to the field.
     // If field is not initialized, it is initialized with default value first.
-    pub fn mut_id(&mut self) -> &mut ::std::string::String {
-        &mut self.id
+    pub fn mut_parent_fid(&mut self) -> &mut ::std::string::String {
+        &mut self.parent_fid
     }
 
     // Take field
-    pub fn take_id(&mut self) -> ::std::string::String {
-        ::std::mem::replace(&mut self.id, ::std::string::String::new())
+    pub fn take_parent_fid(&mut self) -> ::std::string::String {
+        ::std::mem::replace(&mut self.parent_fid, ::std::string::String::new())
     }
 
     // .medea.Member member = 2;
@@ -309,7 +309,7 @@ impl ::protobuf::Message for CreateRequest {
             let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 1 => {
-                    ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.id)?;
+                    ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.parent_fid)?;
                 },
                 2 => {
                     if wire_type != ::protobuf::wire_format::WireTypeLengthDelimited {
@@ -347,8 +347,8 @@ impl ::protobuf::Message for CreateRequest {
     #[allow(unused_variables)]
     fn compute_size(&self) -> u32 {
         let mut my_size = 0;
-        if !self.id.is_empty() {
-            my_size += ::protobuf::rt::string_size(1, &self.id);
+        if !self.parent_fid.is_empty() {
+            my_size += ::protobuf::rt::string_size(1, &self.parent_fid);
         }
         if let ::std::option::Option::Some(ref v) = self.el {
             match v {
@@ -376,8 +376,8 @@ impl ::protobuf::Message for CreateRequest {
     }
 
     fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::ProtobufResult<()> {
-        if !self.id.is_empty() {
-            os.write_string(1, &self.id)?;
+        if !self.parent_fid.is_empty() {
+            os.write_string(1, &self.parent_fid)?;
         }
         if let ::std::option::Option::Some(ref v) = self.el {
             match v {
@@ -446,9 +446,9 @@ impl ::protobuf::Message for CreateRequest {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
                 fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
-                    "id",
-                    |m: &CreateRequest| { &m.id },
-                    |m: &mut CreateRequest| { &mut m.id },
+                    "parent_fid",
+                    |m: &CreateRequest| { &m.parent_fid },
+                    |m: &mut CreateRequest| { &mut m.parent_fid },
                 ));
                 fields.push(::protobuf::reflect::accessor::make_singular_message_accessor::<_, Member>(
                     "member",
@@ -492,7 +492,7 @@ impl ::protobuf::Message for CreateRequest {
 
 impl ::protobuf::Clear for CreateRequest {
     fn clear(&mut self) {
-        self.id.clear();
+        self.parent_fid.clear();
         self.el = ::std::option::Option::None;
         self.el = ::std::option::Option::None;
         self.el = ::std::option::Option::None;
@@ -516,7 +516,7 @@ impl ::protobuf::reflect::ProtobufValue for CreateRequest {
 #[derive(PartialEq,Clone,Default)]
 pub struct IdRequest {
     // message fields
-    pub id: ::protobuf::RepeatedField<::std::string::String>,
+    pub fid: ::protobuf::RepeatedField<::std::string::String>,
     // special fields
     pub unknown_fields: ::protobuf::UnknownFields,
     pub cached_size: ::protobuf::CachedSize,
@@ -533,29 +533,29 @@ impl IdRequest {
         ::std::default::Default::default()
     }
 
-    // repeated string id = 1;
+    // repeated string fid = 1;
 
 
-    pub fn get_id(&self) -> &[::std::string::String] {
-        &self.id
+    pub fn get_fid(&self) -> &[::std::string::String] {
+        &self.fid
     }
-    pub fn clear_id(&mut self) {
-        self.id.clear();
+    pub fn clear_fid(&mut self) {
+        self.fid.clear();
     }
 
     // Param is passed by value, moved
-    pub fn set_id(&mut self, v: ::protobuf::RepeatedField<::std::string::String>) {
-        self.id = v;
+    pub fn set_fid(&mut self, v: ::protobuf::RepeatedField<::std::string::String>) {
+        self.fid = v;
     }
 
     // Mutable pointer to the field.
-    pub fn mut_id(&mut self) -> &mut ::protobuf::RepeatedField<::std::string::String> {
-        &mut self.id
+    pub fn mut_fid(&mut self) -> &mut ::protobuf::RepeatedField<::std::string::String> {
+        &mut self.fid
     }
 
     // Take field
-    pub fn take_id(&mut self) -> ::protobuf::RepeatedField<::std::string::String> {
-        ::std::mem::replace(&mut self.id, ::protobuf::RepeatedField::new())
+    pub fn take_fid(&mut self) -> ::protobuf::RepeatedField<::std::string::String> {
+        ::std::mem::replace(&mut self.fid, ::protobuf::RepeatedField::new())
     }
 }
 
@@ -569,7 +569,7 @@ impl ::protobuf::Message for IdRequest {
             let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 1 => {
-                    ::protobuf::rt::read_repeated_string_into(wire_type, is, &mut self.id)?;
+                    ::protobuf::rt::read_repeated_string_into(wire_type, is, &mut self.fid)?;
                 },
                 _ => {
                     ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
@@ -583,7 +583,7 @@ impl ::protobuf::Message for IdRequest {
     #[allow(unused_variables)]
     fn compute_size(&self) -> u32 {
         let mut my_size = 0;
-        for value in &self.id {
+        for value in &self.fid {
             my_size += ::protobuf::rt::string_size(1, &value);
         };
         my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
@@ -592,7 +592,7 @@ impl ::protobuf::Message for IdRequest {
     }
 
     fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::ProtobufResult<()> {
-        for v in &self.id {
+        for v in &self.fid {
             os.write_string(1, &v)?;
         };
         os.write_unknown_fields(self.get_unknown_fields())?;
@@ -638,9 +638,9 @@ impl ::protobuf::Message for IdRequest {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
                 fields.push(::protobuf::reflect::accessor::make_repeated_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
-                    "id",
-                    |m: &IdRequest| { &m.id },
-                    |m: &mut IdRequest| { &mut m.id },
+                    "fid",
+                    |m: &IdRequest| { &m.fid },
+                    |m: &mut IdRequest| { &mut m.fid },
                 ));
                 ::protobuf::reflect::MessageDescriptor::new::<IdRequest>(
                     "IdRequest",
@@ -664,7 +664,7 @@ impl ::protobuf::Message for IdRequest {
 
 impl ::protobuf::Clear for IdRequest {
     fn clear(&mut self) {
-        self.id.clear();
+        self.fid.clear();
         self.unknown_fields.clear();
     }
 }
@@ -2042,6 +2042,7 @@ impl ::protobuf::reflect::ProtobufValue for Element {
 #[derive(PartialEq,Clone,Default)]
 pub struct Room {
     // message fields
+    pub id: ::std::string::String,
     pub pipeline: ::std::collections::HashMap<::std::string::String, Room_Element>,
     // special fields
     pub unknown_fields: ::protobuf::UnknownFields,
@@ -2059,7 +2060,33 @@ impl Room {
         ::std::default::Default::default()
     }
 
-    // repeated .medea.Room.PipelineEntry pipeline = 1;
+    // string id = 1;
+
+
+    pub fn get_id(&self) -> &str {
+        &self.id
+    }
+    pub fn clear_id(&mut self) {
+        self.id.clear();
+    }
+
+    // Param is passed by value, moved
+    pub fn set_id(&mut self, v: ::std::string::String) {
+        self.id = v;
+    }
+
+    // Mutable pointer to the field.
+    // If field is not initialized, it is initialized with default value first.
+    pub fn mut_id(&mut self) -> &mut ::std::string::String {
+        &mut self.id
+    }
+
+    // Take field
+    pub fn take_id(&mut self) -> ::std::string::String {
+        ::std::mem::replace(&mut self.id, ::std::string::String::new())
+    }
+
+    // repeated .medea.Room.PipelineEntry pipeline = 2;
 
 
     pub fn get_pipeline(&self) -> &::std::collections::HashMap<::std::string::String, Room_Element> {
@@ -2095,6 +2122,9 @@ impl ::protobuf::Message for Room {
             let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 1 => {
+                    ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.id)?;
+                },
+                2 => {
                     ::protobuf::rt::read_map_into::<::protobuf::types::ProtobufTypeString, ::protobuf::types::ProtobufTypeMessage<Room_Element>>(wire_type, is, &mut self.pipeline)?;
                 },
                 _ => {
@@ -2109,14 +2139,20 @@ impl ::protobuf::Message for Room {
     #[allow(unused_variables)]
     fn compute_size(&self) -> u32 {
         let mut my_size = 0;
-        my_size += ::protobuf::rt::compute_map_size::<::protobuf::types::ProtobufTypeString, ::protobuf::types::ProtobufTypeMessage<Room_Element>>(1, &self.pipeline);
+        if !self.id.is_empty() {
+            my_size += ::protobuf::rt::string_size(1, &self.id);
+        }
+        my_size += ::protobuf::rt::compute_map_size::<::protobuf::types::ProtobufTypeString, ::protobuf::types::ProtobufTypeMessage<Room_Element>>(2, &self.pipeline);
         my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
         self.cached_size.set(my_size);
         my_size
     }
 
     fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::ProtobufResult<()> {
-        ::protobuf::rt::write_map_with_cached_sizes::<::protobuf::types::ProtobufTypeString, ::protobuf::types::ProtobufTypeMessage<Room_Element>>(1, &self.pipeline, os)?;
+        if !self.id.is_empty() {
+            os.write_string(1, &self.id)?;
+        }
+        ::protobuf::rt::write_map_with_cached_sizes::<::protobuf::types::ProtobufTypeString, ::protobuf::types::ProtobufTypeMessage<Room_Element>>(2, &self.pipeline, os)?;
         os.write_unknown_fields(self.get_unknown_fields())?;
         ::std::result::Result::Ok(())
     }
@@ -2159,6 +2195,11 @@ impl ::protobuf::Message for Room {
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
+                fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
+                    "id",
+                    |m: &Room| { &m.id },
+                    |m: &mut Room| { &mut m.id },
+                ));
                 fields.push(::protobuf::reflect::accessor::make_map_accessor::<_, ::protobuf::types::ProtobufTypeString, ::protobuf::types::ProtobufTypeMessage<Room_Element>>(
                     "pipeline",
                     |m: &Room| { &m.pipeline },
@@ -2186,6 +2227,7 @@ impl ::protobuf::Message for Room {
 
 impl ::protobuf::Clear for Room {
     fn clear(&mut self) {
+        self.id.clear();
         self.pipeline.clear();
         self.unknown_fields.clear();
     }
@@ -2574,6 +2616,7 @@ impl ::protobuf::reflect::ProtobufValue for Room_Element {
 #[derive(PartialEq,Clone,Default)]
 pub struct Member {
     // message fields
+    pub id: ::std::string::String,
     pub on_join: ::std::string::String,
     pub on_leave: ::std::string::String,
     pub credentials: ::std::string::String,
@@ -2594,7 +2637,33 @@ impl Member {
         ::std::default::Default::default()
     }
 
-    // string on_join = 1;
+    // string id = 1;
+
+
+    pub fn get_id(&self) -> &str {
+        &self.id
+    }
+    pub fn clear_id(&mut self) {
+        self.id.clear();
+    }
+
+    // Param is passed by value, moved
+    pub fn set_id(&mut self, v: ::std::string::String) {
+        self.id = v;
+    }
+
+    // Mutable pointer to the field.
+    // If field is not initialized, it is initialized with default value first.
+    pub fn mut_id(&mut self) -> &mut ::std::string::String {
+        &mut self.id
+    }
+
+    // Take field
+    pub fn take_id(&mut self) -> ::std::string::String {
+        ::std::mem::replace(&mut self.id, ::std::string::String::new())
+    }
+
+    // string on_join = 2;
 
 
     pub fn get_on_join(&self) -> &str {
@@ -2620,7 +2689,7 @@ impl Member {
         ::std::mem::replace(&mut self.on_join, ::std::string::String::new())
     }
 
-    // string on_leave = 2;
+    // string on_leave = 3;
 
 
     pub fn get_on_leave(&self) -> &str {
@@ -2646,7 +2715,7 @@ impl Member {
         ::std::mem::replace(&mut self.on_leave, ::std::string::String::new())
     }
 
-    // string credentials = 3;
+    // string credentials = 4;
 
 
     pub fn get_credentials(&self) -> &str {
@@ -2672,7 +2741,7 @@ impl Member {
         ::std::mem::replace(&mut self.credentials, ::std::string::String::new())
     }
 
-    // repeated .medea.Member.PipelineEntry pipeline = 4;
+    // repeated .medea.Member.PipelineEntry pipeline = 5;
 
 
     pub fn get_pipeline(&self) -> &::std::collections::HashMap<::std::string::String, Member_Element> {
@@ -2708,15 +2777,18 @@ impl ::protobuf::Message for Member {
             let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 1 => {
-                    ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.on_join)?;
+                    ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.id)?;
                 },
                 2 => {
-                    ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.on_leave)?;
+                    ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.on_join)?;
                 },
                 3 => {
-                    ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.credentials)?;
+                    ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.on_leave)?;
                 },
                 4 => {
+                    ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.credentials)?;
+                },
+                5 => {
                     ::protobuf::rt::read_map_into::<::protobuf::types::ProtobufTypeString, ::protobuf::types::ProtobufTypeMessage<Member_Element>>(wire_type, is, &mut self.pipeline)?;
                 },
                 _ => {
@@ -2731,32 +2803,38 @@ impl ::protobuf::Message for Member {
     #[allow(unused_variables)]
     fn compute_size(&self) -> u32 {
         let mut my_size = 0;
+        if !self.id.is_empty() {
+            my_size += ::protobuf::rt::string_size(1, &self.id);
+        }
         if !self.on_join.is_empty() {
-            my_size += ::protobuf::rt::string_size(1, &self.on_join);
+            my_size += ::protobuf::rt::string_size(2, &self.on_join);
         }
         if !self.on_leave.is_empty() {
-            my_size += ::protobuf::rt::string_size(2, &self.on_leave);
+            my_size += ::protobuf::rt::string_size(3, &self.on_leave);
         }
         if !self.credentials.is_empty() {
-            my_size += ::protobuf::rt::string_size(3, &self.credentials);
+            my_size += ::protobuf::rt::string_size(4, &self.credentials);
         }
-        my_size += ::protobuf::rt::compute_map_size::<::protobuf::types::ProtobufTypeString, ::protobuf::types::ProtobufTypeMessage<Member_Element>>(4, &self.pipeline);
+        my_size += ::protobuf::rt::compute_map_size::<::protobuf::types::ProtobufTypeString, ::protobuf::types::ProtobufTypeMessage<Member_Element>>(5, &self.pipeline);
         my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
         self.cached_size.set(my_size);
         my_size
     }
 
     fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+        if !self.id.is_empty() {
+            os.write_string(1, &self.id)?;
+        }
         if !self.on_join.is_empty() {
-            os.write_string(1, &self.on_join)?;
+            os.write_string(2, &self.on_join)?;
         }
         if !self.on_leave.is_empty() {
-            os.write_string(2, &self.on_leave)?;
+            os.write_string(3, &self.on_leave)?;
         }
         if !self.credentials.is_empty() {
-            os.write_string(3, &self.credentials)?;
+            os.write_string(4, &self.credentials)?;
         }
-        ::protobuf::rt::write_map_with_cached_sizes::<::protobuf::types::ProtobufTypeString, ::protobuf::types::ProtobufTypeMessage<Member_Element>>(4, &self.pipeline, os)?;
+        ::protobuf::rt::write_map_with_cached_sizes::<::protobuf::types::ProtobufTypeString, ::protobuf::types::ProtobufTypeMessage<Member_Element>>(5, &self.pipeline, os)?;
         os.write_unknown_fields(self.get_unknown_fields())?;
         ::std::result::Result::Ok(())
     }
@@ -2800,6 +2878,11 @@ impl ::protobuf::Message for Member {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
                 fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
+                    "id",
+                    |m: &Member| { &m.id },
+                    |m: &mut Member| { &mut m.id },
+                ));
+                fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
                     "on_join",
                     |m: &Member| { &m.on_join },
                     |m: &mut Member| { &mut m.on_join },
@@ -2841,6 +2924,7 @@ impl ::protobuf::Message for Member {
 
 impl ::protobuf::Clear for Member {
     fn clear(&mut self) {
+        self.id.clear();
         self.on_join.clear();
         self.on_leave.clear();
         self.credentials.clear();
@@ -3156,6 +3240,7 @@ impl ::protobuf::reflect::ProtobufValue for Member_Element {
 #[derive(PartialEq,Clone,Default)]
 pub struct WebRtcPublishEndpoint {
     // message fields
+    pub id: ::std::string::String,
     pub p2p: WebRtcPublishEndpoint_P2P,
     pub on_start: ::std::string::String,
     pub on_stop: ::std::string::String,
@@ -3175,7 +3260,33 @@ impl WebRtcPublishEndpoint {
         ::std::default::Default::default()
     }
 
-    // .medea.WebRtcPublishEndpoint.P2P p2p = 1;
+    // string id = 1;
+
+
+    pub fn get_id(&self) -> &str {
+        &self.id
+    }
+    pub fn clear_id(&mut self) {
+        self.id.clear();
+    }
+
+    // Param is passed by value, moved
+    pub fn set_id(&mut self, v: ::std::string::String) {
+        self.id = v;
+    }
+
+    // Mutable pointer to the field.
+    // If field is not initialized, it is initialized with default value first.
+    pub fn mut_id(&mut self) -> &mut ::std::string::String {
+        &mut self.id
+    }
+
+    // Take field
+    pub fn take_id(&mut self) -> ::std::string::String {
+        ::std::mem::replace(&mut self.id, ::std::string::String::new())
+    }
+
+    // .medea.WebRtcPublishEndpoint.P2P p2p = 2;
 
 
     pub fn get_p2p(&self) -> WebRtcPublishEndpoint_P2P {
@@ -3190,7 +3301,7 @@ impl WebRtcPublishEndpoint {
         self.p2p = v;
     }
 
-    // string on_start = 2;
+    // string on_start = 3;
 
 
     pub fn get_on_start(&self) -> &str {
@@ -3216,7 +3327,7 @@ impl WebRtcPublishEndpoint {
         ::std::mem::replace(&mut self.on_start, ::std::string::String::new())
     }
 
-    // string on_stop = 3;
+    // string on_stop = 4;
 
 
     pub fn get_on_stop(&self) -> &str {
@@ -3253,12 +3364,15 @@ impl ::protobuf::Message for WebRtcPublishEndpoint {
             let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 1 => {
-                    ::protobuf::rt::read_proto3_enum_with_unknown_fields_into(wire_type, is, &mut self.p2p, 1, &mut self.unknown_fields)?
+                    ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.id)?;
                 },
                 2 => {
-                    ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.on_start)?;
+                    ::protobuf::rt::read_proto3_enum_with_unknown_fields_into(wire_type, is, &mut self.p2p, 2, &mut self.unknown_fields)?
                 },
                 3 => {
+                    ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.on_start)?;
+                },
+                4 => {
                     ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.on_stop)?;
                 },
                 _ => {
@@ -3273,14 +3387,17 @@ impl ::protobuf::Message for WebRtcPublishEndpoint {
     #[allow(unused_variables)]
     fn compute_size(&self) -> u32 {
         let mut my_size = 0;
+        if !self.id.is_empty() {
+            my_size += ::protobuf::rt::string_size(1, &self.id);
+        }
         if self.p2p != WebRtcPublishEndpoint_P2P::NEVER {
-            my_size += ::protobuf::rt::enum_size(1, self.p2p);
+            my_size += ::protobuf::rt::enum_size(2, self.p2p);
         }
         if !self.on_start.is_empty() {
-            my_size += ::protobuf::rt::string_size(2, &self.on_start);
+            my_size += ::protobuf::rt::string_size(3, &self.on_start);
         }
         if !self.on_stop.is_empty() {
-            my_size += ::protobuf::rt::string_size(3, &self.on_stop);
+            my_size += ::protobuf::rt::string_size(4, &self.on_stop);
         }
         my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
         self.cached_size.set(my_size);
@@ -3288,14 +3405,17 @@ impl ::protobuf::Message for WebRtcPublishEndpoint {
     }
 
     fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+        if !self.id.is_empty() {
+            os.write_string(1, &self.id)?;
+        }
         if self.p2p != WebRtcPublishEndpoint_P2P::NEVER {
-            os.write_enum(1, self.p2p.value())?;
+            os.write_enum(2, self.p2p.value())?;
         }
         if !self.on_start.is_empty() {
-            os.write_string(2, &self.on_start)?;
+            os.write_string(3, &self.on_start)?;
         }
         if !self.on_stop.is_empty() {
-            os.write_string(3, &self.on_stop)?;
+            os.write_string(4, &self.on_stop)?;
         }
         os.write_unknown_fields(self.get_unknown_fields())?;
         ::std::result::Result::Ok(())
@@ -3339,6 +3459,11 @@ impl ::protobuf::Message for WebRtcPublishEndpoint {
         unsafe {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
+                fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
+                    "id",
+                    |m: &WebRtcPublishEndpoint| { &m.id },
+                    |m: &mut WebRtcPublishEndpoint| { &mut m.id },
+                ));
                 fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeEnum<WebRtcPublishEndpoint_P2P>>(
                     "p2p",
                     |m: &WebRtcPublishEndpoint| { &m.p2p },
@@ -3376,6 +3501,7 @@ impl ::protobuf::Message for WebRtcPublishEndpoint {
 
 impl ::protobuf::Clear for WebRtcPublishEndpoint {
     fn clear(&mut self) {
+        self.id.clear();
         self.p2p = WebRtcPublishEndpoint_P2P::NEVER;
         self.on_start.clear();
         self.on_stop.clear();
@@ -3456,6 +3582,7 @@ impl ::protobuf::reflect::ProtobufValue for WebRtcPublishEndpoint_P2P {
 #[derive(PartialEq,Clone,Default)]
 pub struct WebRtcPlayEndpoint {
     // message fields
+    pub id: ::std::string::String,
     pub src: ::std::string::String,
     pub on_start: ::std::string::String,
     pub on_stop: ::std::string::String,
@@ -3475,7 +3602,33 @@ impl WebRtcPlayEndpoint {
         ::std::default::Default::default()
     }
 
-    // string src = 1;
+    // string id = 1;
+
+
+    pub fn get_id(&self) -> &str {
+        &self.id
+    }
+    pub fn clear_id(&mut self) {
+        self.id.clear();
+    }
+
+    // Param is passed by value, moved
+    pub fn set_id(&mut self, v: ::std::string::String) {
+        self.id = v;
+    }
+
+    // Mutable pointer to the field.
+    // If field is not initialized, it is initialized with default value first.
+    pub fn mut_id(&mut self) -> &mut ::std::string::String {
+        &mut self.id
+    }
+
+    // Take field
+    pub fn take_id(&mut self) -> ::std::string::String {
+        ::std::mem::replace(&mut self.id, ::std::string::String::new())
+    }
+
+    // string src = 2;
 
 
     pub fn get_src(&self) -> &str {
@@ -3501,7 +3654,7 @@ impl WebRtcPlayEndpoint {
         ::std::mem::replace(&mut self.src, ::std::string::String::new())
     }
 
-    // string on_start = 2;
+    // string on_start = 3;
 
 
     pub fn get_on_start(&self) -> &str {
@@ -3527,7 +3680,7 @@ impl WebRtcPlayEndpoint {
         ::std::mem::replace(&mut self.on_start, ::std::string::String::new())
     }
 
-    // string on_stop = 3;
+    // string on_stop = 4;
 
 
     pub fn get_on_stop(&self) -> &str {
@@ -3564,12 +3717,15 @@ impl ::protobuf::Message for WebRtcPlayEndpoint {
             let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 1 => {
-                    ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.src)?;
+                    ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.id)?;
                 },
                 2 => {
-                    ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.on_start)?;
+                    ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.src)?;
                 },
                 3 => {
+                    ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.on_start)?;
+                },
+                4 => {
                     ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.on_stop)?;
                 },
                 _ => {
@@ -3584,14 +3740,17 @@ impl ::protobuf::Message for WebRtcPlayEndpoint {
     #[allow(unused_variables)]
     fn compute_size(&self) -> u32 {
         let mut my_size = 0;
+        if !self.id.is_empty() {
+            my_size += ::protobuf::rt::string_size(1, &self.id);
+        }
         if !self.src.is_empty() {
-            my_size += ::protobuf::rt::string_size(1, &self.src);
+            my_size += ::protobuf::rt::string_size(2, &self.src);
         }
         if !self.on_start.is_empty() {
-            my_size += ::protobuf::rt::string_size(2, &self.on_start);
+            my_size += ::protobuf::rt::string_size(3, &self.on_start);
         }
         if !self.on_stop.is_empty() {
-            my_size += ::protobuf::rt::string_size(3, &self.on_stop);
+            my_size += ::protobuf::rt::string_size(4, &self.on_stop);
         }
         my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
         self.cached_size.set(my_size);
@@ -3599,14 +3758,17 @@ impl ::protobuf::Message for WebRtcPlayEndpoint {
     }
 
     fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::ProtobufResult<()> {
+        if !self.id.is_empty() {
+            os.write_string(1, &self.id)?;
+        }
         if !self.src.is_empty() {
-            os.write_string(1, &self.src)?;
+            os.write_string(2, &self.src)?;
         }
         if !self.on_start.is_empty() {
-            os.write_string(2, &self.on_start)?;
+            os.write_string(3, &self.on_start)?;
         }
         if !self.on_stop.is_empty() {
-            os.write_string(3, &self.on_stop)?;
+            os.write_string(4, &self.on_stop)?;
         }
         os.write_unknown_fields(self.get_unknown_fields())?;
         ::std::result::Result::Ok(())
@@ -3651,6 +3813,11 @@ impl ::protobuf::Message for WebRtcPlayEndpoint {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
                 fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
+                    "id",
+                    |m: &WebRtcPlayEndpoint| { &m.id },
+                    |m: &mut WebRtcPlayEndpoint| { &mut m.id },
+                ));
+                fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
                     "src",
                     |m: &WebRtcPlayEndpoint| { &m.src },
                     |m: &mut WebRtcPlayEndpoint| { &mut m.src },
@@ -3687,6 +3854,7 @@ impl ::protobuf::Message for WebRtcPlayEndpoint {
 
 impl ::protobuf::Clear for WebRtcPlayEndpoint {
     fn clear(&mut self) {
+        self.id.clear();
         self.src.clear();
         self.on_start.clear();
         self.on_stop.clear();
@@ -3707,57 +3875,60 @@ impl ::protobuf::reflect::ProtobufValue for WebRtcPlayEndpoint {
 }
 
 static file_descriptor_proto_data: &'static [u8] = b"\
-    \n\tapi.proto\x12\x05medea\"\xee\x01\n\rCreateRequest\x12\x0e\n\x02id\
-    \x18\x01\x20\x01(\tR\x02id\x12'\n\x06member\x18\x02\x20\x01(\x0b2\r.mede\
-    a.MemberH\0R\x06member\x12!\n\x04room\x18\x03\x20\x01(\x0b2\x0b.medea.Ro\
-    omH\0R\x04room\x12<\n\x0bwebrtc_play\x18\x04\x20\x01(\x0b2\x19.medea.Web\
-    RtcPlayEndpointH\0R\nwebrtcPlay\x12=\n\nwebrtc_pub\x18\x05\x20\x01(\x0b2\
-    \x1c.medea.WebRtcPublishEndpointH\0R\twebrtcPubB\x04\n\x02el\"\x1b\n\tId\
-    Request\x12\x0e\n\x02id\x18\x01\x20\x03(\tR\x02id\".\n\x08Response\x12\"\
-    \n\x05error\x18\x01\x20\x01(\x0b2\x0c.medea.ErrorR\x05error\"\x9e\x01\n\
-    \x0eCreateResponse\x120\n\x03sid\x18\x01\x20\x03(\x0b2\x1e.medea.CreateR\
-    esponse.SidEntryR\x03sid\x12\"\n\x05error\x18\x02\x20\x01(\x0b2\x0c.mede\
-    a.ErrorR\x05error\x1a6\n\x08SidEntry\x12\x10\n\x03key\x18\x01\x20\x01(\t\
-    R\x03key\x12\x14\n\x05value\x18\x02\x20\x01(\tR\x05value:\x028\x01\"\xbc\
-    \x01\n\x0bGetResponse\x12<\n\x08elements\x18\x01\x20\x03(\x0b2\x20.medea\
-    .GetResponse.ElementsEntryR\x08elements\x12\"\n\x05error\x18\x02\x20\x01\
-    (\x0b2\x0c.medea.ErrorR\x05error\x1aK\n\rElementsEntry\x12\x10\n\x03key\
-    \x18\x01\x20\x01(\tR\x03key\x12$\n\x05value\x18\x02\x20\x01(\x0b2\x0e.me\
-    dea.ElementR\x05value:\x028\x01\"[\n\x05Error\x12\x12\n\x04code\x18\x01\
-    \x20\x01(\rR\x04code\x12\x12\n\x04text\x18\x02\x20\x01(\tR\x04text\x12\
-    \x10\n\x03doc\x18\x03\x20\x01(\tR\x03doc\x12\x18\n\x07element\x18\x04\
-    \x20\x01(\tR\x07element\"\xd8\x01\n\x07Element\x12'\n\x06member\x18\x01\
-    \x20\x01(\x0b2\r.medea.MemberH\0R\x06member\x12!\n\x04room\x18\x02\x20\
-    \x01(\x0b2\x0b.medea.RoomH\0R\x04room\x12<\n\x0bwebrtc_play\x18\x03\x20\
-    \x01(\x0b2\x19.medea.WebRtcPlayEndpointH\0R\nwebrtcPlay\x12=\n\nwebrtc_p\
-    ub\x18\x04\x20\x01(\x0b2\x1c.medea.WebRtcPublishEndpointH\0R\twebrtcPubB\
-    \x04\n\x02el\"\xc7\x02\n\x04Room\x125\n\x08pipeline\x18\x01\x20\x03(\x0b\
-    2\x19.medea.Room.PipelineEntryR\x08pipeline\x1aP\n\rPipelineEntry\x12\
-    \x10\n\x03key\x18\x01\x20\x01(\tR\x03key\x12)\n\x05value\x18\x02\x20\x01\
-    (\x0b2\x13.medea.Room.ElementR\x05value:\x028\x01\x1a\xb5\x01\n\x07Eleme\
-    nt\x12'\n\x06member\x18\x01\x20\x01(\x0b2\r.medea.MemberH\0R\x06member\
-    \x12<\n\x0bwebrtc_play\x18\x02\x20\x01(\x0b2\x19.medea.WebRtcPlayEndpoin\
-    tH\0R\nwebrtcPlay\x12=\n\nwebrtc_pub\x18\x03\x20\x01(\x0b2\x1c.medea.Web\
-    RtcPublishEndpointH\0R\twebrtcPubB\x04\n\x02el\"\xfa\x02\n\x06Member\x12\
-    \x17\n\x07on_join\x18\x01\x20\x01(\tR\x06onJoin\x12\x19\n\x08on_leave\
-    \x18\x02\x20\x01(\tR\x07onLeave\x12\x20\n\x0bcredentials\x18\x03\x20\x01\
-    (\tR\x0bcredentials\x127\n\x08pipeline\x18\x04\x20\x03(\x0b2\x1b.medea.M\
-    ember.PipelineEntryR\x08pipeline\x1aR\n\rPipelineEntry\x12\x10\n\x03key\
-    \x18\x01\x20\x01(\tR\x03key\x12+\n\x05value\x18\x02\x20\x01(\x0b2\x15.me\
-    dea.Member.ElementR\x05value:\x028\x01\x1a\x8c\x01\n\x07Element\x12<\n\
-    \x0bwebrtc_play\x18\x01\x20\x01(\x0b2\x19.medea.WebRtcPlayEndpointH\0R\n\
-    webrtcPlay\x12=\n\nwebrtc_pub\x18\x02\x20\x01(\x0b2\x1c.medea.WebRtcPubl\
-    ishEndpointH\0R\twebrtcPubB\x04\n\x02el\"\xae\x01\n\x15WebRtcPublishEndp\
-    oint\x122\n\x03p2p\x18\x01\x20\x01(\x0e2\x20.medea.WebRtcPublishEndpoint\
-    .P2PR\x03p2p\x12\x19\n\x08on_start\x18\x02\x20\x01(\tR\x07onStart\x12\
-    \x17\n\x07on_stop\x18\x03\x20\x01(\tR\x06onStop\"-\n\x03P2P\x12\t\n\x05N\
-    EVER\x10\0\x12\x0f\n\x0bIF_POSSIBLE\x10\x01\x12\n\n\x06ALWAYS\x10\x02\"Z\
-    \n\x12WebRtcPlayEndpoint\x12\x10\n\x03src\x18\x01\x20\x01(\tR\x03src\x12\
-    \x19\n\x08on_start\x18\x02\x20\x01(\tR\x07onStart\x12\x17\n\x07on_stop\
-    \x18\x03\x20\x01(\tR\x06onStop2\x9d\x01\n\nControlApi\x125\n\x06Create\
-    \x12\x14.medea.CreateRequest\x1a\x15.medea.CreateResponse\x12+\n\x06Dele\
-    te\x12\x10.medea.IdRequest\x1a\x0f.medea.Response\x12+\n\x03Get\x12\x10.\
-    medea.IdRequest\x1a\x12.medea.GetResponseb\x06proto3\
+    \n\tapi.proto\x12\x05medea\"\xfd\x01\n\rCreateRequest\x12\x1d\n\nparent_\
+    fid\x18\x01\x20\x01(\tR\tparentFid\x12'\n\x06member\x18\x02\x20\x01(\x0b\
+    2\r.medea.MemberH\0R\x06member\x12!\n\x04room\x18\x03\x20\x01(\x0b2\x0b.\
+    medea.RoomH\0R\x04room\x12<\n\x0bwebrtc_play\x18\x04\x20\x01(\x0b2\x19.m\
+    edea.WebRtcPlayEndpointH\0R\nwebrtcPlay\x12=\n\nwebrtc_pub\x18\x05\x20\
+    \x01(\x0b2\x1c.medea.WebRtcPublishEndpointH\0R\twebrtcPubB\x04\n\x02el\"\
+    \x1d\n\tIdRequest\x12\x10\n\x03fid\x18\x01\x20\x03(\tR\x03fid\".\n\x08Re\
+    sponse\x12\"\n\x05error\x18\x01\x20\x01(\x0b2\x0c.medea.ErrorR\x05error\
+    \"\x9e\x01\n\x0eCreateResponse\x120\n\x03sid\x18\x01\x20\x03(\x0b2\x1e.m\
+    edea.CreateResponse.SidEntryR\x03sid\x12\"\n\x05error\x18\x02\x20\x01(\
+    \x0b2\x0c.medea.ErrorR\x05error\x1a6\n\x08SidEntry\x12\x10\n\x03key\x18\
+    \x01\x20\x01(\tR\x03key\x12\x14\n\x05value\x18\x02\x20\x01(\tR\x05value:\
+    \x028\x01\"\xbc\x01\n\x0bGetResponse\x12<\n\x08elements\x18\x01\x20\x03(\
+    \x0b2\x20.medea.GetResponse.ElementsEntryR\x08elements\x12\"\n\x05error\
+    \x18\x02\x20\x01(\x0b2\x0c.medea.ErrorR\x05error\x1aK\n\rElementsEntry\
+    \x12\x10\n\x03key\x18\x01\x20\x01(\tR\x03key\x12$\n\x05value\x18\x02\x20\
+    \x01(\x0b2\x0e.medea.ElementR\x05value:\x028\x01\"[\n\x05Error\x12\x12\n\
+    \x04code\x18\x01\x20\x01(\rR\x04code\x12\x12\n\x04text\x18\x02\x20\x01(\
+    \tR\x04text\x12\x10\n\x03doc\x18\x03\x20\x01(\tR\x03doc\x12\x18\n\x07ele\
+    ment\x18\x04\x20\x01(\tR\x07element\"\xd8\x01\n\x07Element\x12'\n\x06mem\
+    ber\x18\x01\x20\x01(\x0b2\r.medea.MemberH\0R\x06member\x12!\n\x04room\
+    \x18\x02\x20\x01(\x0b2\x0b.medea.RoomH\0R\x04room\x12<\n\x0bwebrtc_play\
+    \x18\x03\x20\x01(\x0b2\x19.medea.WebRtcPlayEndpointH\0R\nwebrtcPlay\x12=\
+    \n\nwebrtc_pub\x18\x04\x20\x01(\x0b2\x1c.medea.WebRtcPublishEndpointH\0R\
+    \twebrtcPubB\x04\n\x02el\"\xd7\x02\n\x04Room\x12\x0e\n\x02id\x18\x01\x20\
+    \x01(\tR\x02id\x125\n\x08pipeline\x18\x02\x20\x03(\x0b2\x19.medea.Room.P\
+    ipelineEntryR\x08pipeline\x1aP\n\rPipelineEntry\x12\x10\n\x03key\x18\x01\
+    \x20\x01(\tR\x03key\x12)\n\x05value\x18\x02\x20\x01(\x0b2\x13.medea.Room\
+    .ElementR\x05value:\x028\x01\x1a\xb5\x01\n\x07Element\x12'\n\x06member\
+    \x18\x01\x20\x01(\x0b2\r.medea.MemberH\0R\x06member\x12<\n\x0bwebrtc_pla\
+    y\x18\x02\x20\x01(\x0b2\x19.medea.WebRtcPlayEndpointH\0R\nwebrtcPlay\x12\
+    =\n\nwebrtc_pub\x18\x03\x20\x01(\x0b2\x1c.medea.WebRtcPublishEndpointH\0\
+    R\twebrtcPubB\x04\n\x02el\"\x8a\x03\n\x06Member\x12\x0e\n\x02id\x18\x01\
+    \x20\x01(\tR\x02id\x12\x17\n\x07on_join\x18\x02\x20\x01(\tR\x06onJoin\
+    \x12\x19\n\x08on_leave\x18\x03\x20\x01(\tR\x07onLeave\x12\x20\n\x0bcrede\
+    ntials\x18\x04\x20\x01(\tR\x0bcredentials\x127\n\x08pipeline\x18\x05\x20\
+    \x03(\x0b2\x1b.medea.Member.PipelineEntryR\x08pipeline\x1aR\n\rPipelineE\
+    ntry\x12\x10\n\x03key\x18\x01\x20\x01(\tR\x03key\x12+\n\x05value\x18\x02\
+    \x20\x01(\x0b2\x15.medea.Member.ElementR\x05value:\x028\x01\x1a\x8c\x01\
+    \n\x07Element\x12<\n\x0bwebrtc_play\x18\x01\x20\x01(\x0b2\x19.medea.WebR\
+    tcPlayEndpointH\0R\nwebrtcPlay\x12=\n\nwebrtc_pub\x18\x02\x20\x01(\x0b2\
+    \x1c.medea.WebRtcPublishEndpointH\0R\twebrtcPubB\x04\n\x02el\"\xbe\x01\n\
+    \x15WebRtcPublishEndpoint\x12\x0e\n\x02id\x18\x01\x20\x01(\tR\x02id\x122\
+    \n\x03p2p\x18\x02\x20\x01(\x0e2\x20.medea.WebRtcPublishEndpoint.P2PR\x03\
+    p2p\x12\x19\n\x08on_start\x18\x03\x20\x01(\tR\x07onStart\x12\x17\n\x07on\
+    _stop\x18\x04\x20\x01(\tR\x06onStop\"-\n\x03P2P\x12\t\n\x05NEVER\x10\0\
+    \x12\x0f\n\x0bIF_POSSIBLE\x10\x01\x12\n\n\x06ALWAYS\x10\x02\"j\n\x12WebR\
+    tcPlayEndpoint\x12\x0e\n\x02id\x18\x01\x20\x01(\tR\x02id\x12\x10\n\x03sr\
+    c\x18\x02\x20\x01(\tR\x03src\x12\x19\n\x08on_start\x18\x03\x20\x01(\tR\
+    \x07onStart\x12\x17\n\x07on_stop\x18\x04\x20\x01(\tR\x06onStop2\x9d\x01\
+    \n\nControlApi\x125\n\x06Create\x12\x14.medea.CreateRequest\x1a\x15.mede\
+    a.CreateResponse\x12+\n\x06Delete\x12\x10.medea.IdRequest\x1a\x0f.medea.\
+    Response\x12+\n\x03Get\x12\x10.medea.IdRequest\x1a\x12.medea.GetResponse\
+    b\x06proto3\
 ";
 
 static mut file_descriptor_proto_lazy: ::protobuf::lazy::Lazy<::protobuf::descriptor::FileDescriptorProto> = ::protobuf::lazy::Lazy {

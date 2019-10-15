@@ -21,7 +21,7 @@ use medea_control_api_proto::grpc::{
 
 use crate::{
     api::control::{
-        error_codes::{ErrorCode, ErrorResponse},
+        error_codes::{ErrorCode, ErrorCode::ElementIdMismatch, ErrorResponse},
         refs::{fid::ParseFidError, Fid, StatefulFid, ToEndpoint, ToMember},
         EndpointSpec, MemberId, MemberSpec, RoomId, RoomSpec,
         TryFromElementError, TryFromProtobufError,
@@ -165,32 +165,53 @@ impl ControlApiService {
         &self,
         mut req: CreateRequest,
     ) -> Box<dyn Future<Item = Sids, Error = ErrorResponse> + Send> {
-        let uri = match StatefulFid::try_from(req.take_id()) {
-            Ok(uri) => uri,
-            Err(e) => {
-                return Box::new(future::err(e.into()));
-            }
-        };
+        //        let elem = if let Some(elem) = req.el {
+        //            elem
+        //        } else {
+        //            return Box::new(future::err(ErrorResponse::new(
+        //                ErrorCode::NoElement,
+        //                &uri,
+        //            )));
+        //        };
 
-        let elem = if let Some(elem) = req.el {
-            elem
-        } else {
-            return Box::new(future::err(ErrorResponse::new(
-                ErrorCode::NoElement,
-                &uri,
-            )));
+        let (uri, elem) = match StatefulFid::try_from(req.take_parent_fid()) {
+            Ok(uri) => {
+                if let Some(elem) = req.el {
+                    (uri, elem)
+                } else {
+                    return Box::new(future::err(ErrorResponse::new(
+                        ErrorCode::NoElement,
+                        &uri,
+                    )));
+                }
+            }
+            Err(e) => match e {
+                ParseFidError::Empty => {
+                    let elem = if let Some(elem) = req.el {
+                        elem
+                    } else {
+                        return Box::new(future::err(
+                            ErrorResponse::without_id(ErrorCode::NoElement),
+                        ));
+                    };
+                    return Box::new(
+                        RoomSpec::try_from(elem)
+                            .map_err(ErrorResponse::from)
+                            .map(|spec| {
+                                self.create_room(spec)
+                                    .map_err(ErrorResponse::from)
+                            })
+                            .into_future()
+                            .and_then(|create_result| create_result),
+                    );
+                }
+                _ => {
+                    return Box::new(future::err(e.into()));
+                }
+            },
         };
 
         match uri {
-            StatefulFid::Room(uri) => Box::new(
-                RoomSpec::try_from((uri.take_room_id(), elem))
-                    .map_err(ErrorResponse::from)
-                    .map(|spec| {
-                        self.create_room(spec).map_err(ErrorResponse::from)
-                    })
-                    .into_future()
-                    .and_then(|create_result| create_result),
-            ),
             StatefulFid::Member(uri) => Box::new(
                 MemberSpec::try_from((uri.member_id().clone(), elem))
                     .map_err(ErrorResponse::from)
@@ -211,6 +232,9 @@ impl ControlApiService {
                     .into_future()
                     .and_then(|create_result| create_result),
             ),
+            StatefulFid::Room(uri) => Box::new(future::err(
+                ErrorResponse::without_id(ElementIdMismatch),
+            )),
         }
     }
 
@@ -220,7 +244,7 @@ impl ControlApiService {
         mut req: IdRequest,
     ) -> impl Future<Item = (), Error = ErrorResponse> {
         let mut delete_elements_msg = DeleteElements::new();
-        for id in req.take_id().into_iter() {
+        for id in req.take_fid().into_iter() {
             match StatefulFid::try_from(id) {
                 Ok(uri) => {
                     delete_elements_msg.add_uri(uri);
@@ -255,7 +279,7 @@ impl ControlApiService {
     ) -> impl Future<Item = HashMap<String, Element>, Error = ErrorResponse>
     {
         let mut uris = Vec::new();
-        for id in req.take_id().into_iter() {
+        for id in req.take_fid().into_iter() {
             match StatefulFid::try_from(id) {
                 Ok(uri) => {
                     uris.push(uri);
