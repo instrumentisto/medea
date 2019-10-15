@@ -556,6 +556,7 @@ mod room_service_specs {
     use crate::{
         api::control::{
             endpoints::webrtc_publish_endpoint::P2pMode, RootElement,
+            refs::{ToEndpoint, Fid},
         },
         conf::Conf,
     };
@@ -638,7 +639,7 @@ mod room_service_specs {
         let room_service = room_service(RoomRepository::new(HashMap::new()));
         let spec = room_spec();
         let caller_uri = StatefulFid::try_from(
-            "local://pub-sub-video-call/caller".to_string(),
+            "pub-sub-video-call/caller".to_string(),
         )
         .unwrap();
 
@@ -672,12 +673,14 @@ mod room_service_specs {
         )));
 
         let member_uri =
-            Fid::<ToMember>::new(room_id, "test-member".to_string().into());
-        let stateful_member_uri: Fid = member_uri.clone().into();
+            Fid::<ToRoom>::new(room_id);
+        let member_id: MemberId = "test-member".to_string().into();
+        let stateful_member_uri: StatefulFid = member_uri.clone().push_member_id(member_id.clone()).into();
 
         actix::spawn(test_for_create!(
             room_service,
             CreateMemberInRoom {
+                id: member_id,
                 spec: member_spec,
                 uri: member_uri,
             },
@@ -712,16 +715,16 @@ mod room_service_specs {
             room_id.clone() => Room::new(&spec, &app_ctx()).unwrap().start(),
         )));
 
-        let endpoint_uri = Fid::<ToEndpoint>::new(
+        let endpoint_uri = Fid::<ToMember>::new(
             room_id,
             "caller".to_string().into(),
-            "test-publish".to_string().into(),
         );
-        let stateful_endpoint_uri: Fid = endpoint_uri.clone().into();
+        let stateful_endpoint_uri: StatefulFid = endpoint_uri.clone().into();
 
         actix::spawn(test_for_create!(
             room_service,
             CreateEndpointInRoom {
+                id: "test-publish".to_string().into(),
                 spec: endpoint_spec,
                 uri: endpoint_uri,
             },
