@@ -60,6 +60,7 @@ impl Display for Fid<ToEndpoint> {
     }
 }
 
+#[allow(clippy::module_name_repetitions)]
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Display, From)]
 pub enum StatefulFid {
     Room(Fid<ToRoom>),
@@ -111,7 +112,7 @@ impl TryFrom<String> for StatefulFid {
             .into());
         };
 
-        if let Some(_) = splitted.next() {
+        if splitted.next().is_some() {
             Err(ParseFidError::TooManyPaths(value))
         } else {
             Ok(Fid::<ToEndpoint>::new(

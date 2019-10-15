@@ -128,12 +128,10 @@ fn generate_member_credentials() -> String {
         .collect()
 }
 
-impl TryFrom<(Id, MemberProto)> for MemberSpec {
+impl TryFrom<MemberProto> for MemberSpec {
     type Error = TryFromProtobufError;
 
-    fn try_from(
-        (id, mut member): (Id, MemberProto),
-    ) -> Result<Self, Self::Error> {
+    fn try_from(mut member: MemberProto) -> Result<Self, Self::Error> {
         let mut pipeline = HashMap::new();
         for (id, member_element) in member.take_pipeline() {
             if let Some(elem) = member_element.el {
@@ -166,9 +164,7 @@ macro_rules! impl_try_from_proto_for_member {
                 (id, proto): (Id, $proto),
             ) -> Result<Self, Self::Error> {
                 match proto {
-                    $proto::member(mut member) => {
-                        MemberSpec::try_from((id, member))
-                    }
+                    $proto::member(member) => Self::try_from(member),
                     _ => Err(TryFromProtobufError::ExpectedOtherElement(
                         String::from("Member"),
                         id.to_string(),

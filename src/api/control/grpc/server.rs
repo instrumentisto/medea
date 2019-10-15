@@ -22,10 +22,12 @@ use medea_control_api_proto::grpc::{
 use crate::{
     api::control::{
         endpoints::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
-        error_codes::{ErrorCode, ErrorCode::ElementIdMismatch, ErrorResponse},
-        refs::{
-            fid::ParseFidError, Fid, StatefulFid, ToEndpoint, ToMember, ToRoom,
+        error_codes::{
+            ErrorCode,
+            ErrorCode::{ElementIdIsTooLong, ElementIdMismatch},
+            ErrorResponse,
         },
+        refs::{fid::ParseFidError, Fid, StatefulFid, ToMember, ToRoom},
         EndpointId, EndpointSpec, MemberId, MemberSpec, RoomId, RoomSpec,
         TryFromElementError, TryFromProtobufError,
     },
@@ -38,7 +40,6 @@ use crate::{
     AppContext,
 };
 use std::convert::From;
-use crate::api::control::error_codes::ErrorCode::ElementIdIsTooLong;
 
 /// Errors which can happen while processing requests to gRPC [Control API].
 ///
@@ -183,8 +184,8 @@ impl ControlApiService {
                     )));
                 }
             }
-            Err(e) => match e {
-                ParseFidError::Empty => {
+            Err(e) => {
+                if let ParseFidError::Empty = e {
                     let elem = if let Some(elem) = req.el {
                         elem
                     } else {
@@ -202,11 +203,10 @@ impl ControlApiService {
                             .into_future()
                             .and_then(|create_result| create_result),
                     );
-                }
-                _ => {
+                } else {
                     return Box::new(future::err(e.into()));
                 }
-            },
+            }
         };
 
         match uri {
@@ -214,7 +214,7 @@ impl ControlApiService {
                 CreateRequestOneof::member(mut member) => {
                     let id: MemberId = member.take_id().into();
                     Box::new(
-                        MemberSpec::try_from((id.clone(), member))
+                        MemberSpec::try_from(member)
                             .map_err(ErrorResponse::from)
                             .map(|spec| {
                                 self.create_member(id, uri, spec)
@@ -232,12 +232,12 @@ impl ControlApiService {
                 let (endpoint, id) = match elem {
                     CreateRequestOneof::webrtc_play(mut play) => (
                         WebRtcPlayEndpoint::try_from(&play)
-                            .map(|r| EndpointSpec::WebRtcPlay(r)),
+                            .map(EndpointSpec::WebRtcPlay),
                         play.take_id().into(),
                     ),
                     CreateRequestOneof::webrtc_pub(mut publish) => (
                         Ok(WebRtcPublishEndpoint::from(&publish))
-                            .map(|r| EndpointSpec::WebRtcPublish(r)),
+                            .map(EndpointSpec::WebRtcPublish),
                         publish.take_id().into(),
                     ),
                     _ => {
@@ -257,7 +257,7 @@ impl ControlApiService {
                         .and_then(|create_res| create_res),
                 )
             }
-            StatefulFid::Endpoint(uri) => Box::new(future::err(
+            StatefulFid::Endpoint(_) => Box::new(future::err(
                 // TODO: changeme
                 ErrorResponse::without_id(ElementIdIsTooLong),
             )),

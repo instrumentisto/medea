@@ -1,3 +1,5 @@
+#![allow(clippy::use_self)]
+
 pub mod fid;
 pub mod local_uri;
 

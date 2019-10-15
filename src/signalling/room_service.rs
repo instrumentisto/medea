@@ -14,7 +14,7 @@ use crate::{
     api::control::{
         endpoints::EndpointSpec,
         load_static_specs_from_dir,
-        refs::{Fid, StatefulFid, ToEndpoint, ToMember, ToRoom},
+        refs::{Fid, StatefulFid, ToMember, ToRoom},
         EndpointId, LoadStaticControlSpecsError, MemberId, MemberSpec, RoomId,
         RoomSpec,
     },

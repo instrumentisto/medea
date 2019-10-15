@@ -66,8 +66,8 @@ fn create_room(client: &ControlApiClient) {
     room_pipeline.insert("publisher".to_string(), publisher_member_element);
     room_pipeline.insert("responder".to_string(), responder_member_element);
     room.set_pipeline(room_pipeline);
+    room.set_id("grpc-test".to_string());
     req.set_room(room);
-    req.set_parent_fid("grpc-test".to_string());
 
     let reply = client.create(&req).expect("create room");
     println!("{:?}", reply);
@@ -86,7 +86,8 @@ fn create_member(client: &ControlApiClient) {
 
     member.set_credentials("test".to_string());
     member.set_pipeline(member_pipeline);
-    create_member_request.set_parent_fid("grpc-test/player/asdsad".to_string());
+    member.set_id("player".to_string());
+    create_member_request.set_parent_fid("grpc-test".to_string());
     create_member_request.set_member(member);
 
     let reply = client
@@ -99,8 +100,8 @@ fn create_endpoint(client: &ControlApiClient) {
     let mut create_endpoint_request = CreateRequest::new();
     let mut endpoint = WebRtcPublishEndpoint::new();
     endpoint.set_p2p(WebRtcPublishEndpoint_P2P::ALWAYS);
-    create_endpoint_request
-        .set_parent_fid("grpc-test/responder/publish".to_string());
+    endpoint.set_id("publish".to_string());
+    create_endpoint_request.set_parent_fid("grpc-test/responder".to_string());
     create_endpoint_request.set_webrtc_pub(endpoint);
 
     let reply = client
