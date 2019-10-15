@@ -70,7 +70,7 @@ fn signalling_starts_when_create_play_member_after_pub_member() {
         )
         .and_then(move |_| {
             let create_play_member = MemberBuilder::default()
-                .id("play")
+                .id("responder")
                 .credentials("qwerty")
                 .add_endpoint(
                     WebRtcPlayEndpointBuilder::default()
@@ -81,7 +81,7 @@ fn signalling_starts_when_create_play_member_after_pub_member() {
                 )
                 .build()
                 .unwrap()
-                .build_request(insert_str!("{}/responder"));
+                .build_request(insert_str!("{}"));
 
             control_client.create(&create_play_member);
             TestMember::connect(

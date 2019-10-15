@@ -6,7 +6,7 @@ use std::{collections::HashMap, convert::TryFrom};
 
 use derive_more::{Display, From};
 use medea_control_api_proto::grpc::api::{
-    CreateRequest_oneof_el as ElementProto,
+    CreateRequest_oneof_el as ElementProto, Member as MemberProto,
     Room_Element_oneof_el as RoomElementProto,
 };
 use rand::{distributions::Alphanumeric, Rng};
@@ -128,6 +128,35 @@ fn generate_member_credentials() -> String {
         .collect()
 }
 
+impl TryFrom<(Id, MemberProto)> for MemberSpec {
+    type Error = TryFromProtobufError;
+
+    fn try_from(
+        (id, mut member): (Id, MemberProto),
+    ) -> Result<Self, Self::Error> {
+        let mut pipeline = HashMap::new();
+        for (id, member_element) in member.take_pipeline() {
+            if let Some(elem) = member_element.el {
+                let endpoint =
+                    EndpointSpec::try_from((EndpointId(id.clone()), elem))?;
+                pipeline.insert(id.into(), endpoint.into());
+            } else {
+                return Err(TryFromProtobufError::EmptyElement(id));
+            }
+        }
+
+        let mut credentials = member.take_credentials();
+        if credentials.is_empty() {
+            credentials = generate_member_credentials();
+        }
+
+        Ok(Self {
+            pipeline: Pipeline::new(pipeline),
+            credentials,
+        })
+    }
+}
+
 macro_rules! impl_try_from_proto_for_member {
     ($proto:tt) => {
         impl TryFrom<(Id, $proto)> for MemberSpec {
@@ -138,30 +167,7 @@ macro_rules! impl_try_from_proto_for_member {
             ) -> Result<Self, Self::Error> {
                 match proto {
                     $proto::member(mut member) => {
-                        let mut pipeline = HashMap::new();
-                        for (id, member_element) in member.take_pipeline() {
-                            if let Some(elem) = member_element.el {
-                                let endpoint = EndpointSpec::try_from((
-                                    EndpointId(id.clone()),
-                                    elem,
-                                ))?;
-                                pipeline.insert(id.into(), endpoint.into());
-                            } else {
-                                return Err(
-                                    TryFromProtobufError::EmptyElement(id),
-                                );
-                            }
-                        }
-
-                        let mut credentials = member.take_credentials();
-                        if credentials.is_empty() {
-                            credentials = generate_member_credentials();
-                        }
-
-                        Ok(Self {
-                            pipeline: Pipeline::new(pipeline),
-                            credentials,
-                        })
+                        MemberSpec::try_from((id, member))
                     }
                     _ => Err(TryFromProtobufError::ExpectedOtherElement(
                         String::from("Member"),

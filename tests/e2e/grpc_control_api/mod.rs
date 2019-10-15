@@ -205,6 +205,7 @@ impl Into<GrpcMember> for Member {
         }
 
         grpc_member.set_pipeline(pipeline);
+        grpc_member.set_id(self.id);
 
         grpc_member
     }
@@ -286,6 +287,7 @@ impl Into<GrpcWebRtcPlayEndpoint> for WebRtcPlayEndpoint {
     fn into(self) -> GrpcWebRtcPlayEndpoint {
         let mut endpoint = GrpcWebRtcPlayEndpoint::new();
         endpoint.set_src(self.src);
+        endpoint.set_id(self.id);
 
         endpoint
     }
@@ -319,6 +321,7 @@ impl Into<GrpcWebRtcPublishEndpoint> for WebRtcPublishEndpoint {
     fn into(self) -> GrpcWebRtcPublishEndpoint {
         let mut endpoint = GrpcWebRtcPublishEndpoint::new();
         endpoint.set_p2p(self.p2p_mode);
+        endpoint.set_id(self.id);
 
         endpoint
     }

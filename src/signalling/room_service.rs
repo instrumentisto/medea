@@ -15,7 +15,8 @@ use crate::{
         endpoints::EndpointSpec,
         load_static_specs_from_dir,
         refs::{Fid, StatefulFid, ToEndpoint, ToMember, ToRoom},
-        LoadStaticControlSpecsError, MemberSpec, RoomId, RoomSpec,
+        EndpointId, LoadStaticControlSpecsError, MemberId, MemberSpec, RoomId,
+        RoomSpec,
     },
     log::prelude::*,
     shutdown::{self, GracefulShutdown},
@@ -248,7 +249,8 @@ impl Handler<CreateRoom> for RoomService {
 #[derive(Message)]
 #[rtype(result = "Result<(), RoomServiceError>")]
 pub struct CreateMemberInRoom {
-    pub uri: Fid<ToMember>,
+    pub id: MemberId,
+    pub uri: Fid<ToRoom>,
     pub spec: MemberSpec,
 }
 
@@ -260,11 +262,11 @@ impl Handler<CreateMemberInRoom> for RoomService {
         msg: CreateMemberInRoom,
         _: &mut Self::Context,
     ) -> Self::Result {
-        let (room_id, member_id) = msg.uri.take_all();
+        let room_id = msg.uri.take_room_id();
 
         if let Some(room) = self.room_repo.get(&room_id) {
             Box::new(
-                room.send(CreateMember(member_id, msg.spec))
+                room.send(CreateMember(msg.id, msg.spec))
                     .map_err(RoomServiceError::RoomMailboxErr)
                     .and_then(|r| r.map_err(RoomServiceError::from)),
             )
@@ -281,7 +283,8 @@ impl Handler<CreateMemberInRoom> for RoomService {
 #[derive(Message)]
 #[rtype(result = "Result<(), RoomServiceError>")]
 pub struct CreateEndpointInRoom {
-    pub uri: Fid<ToEndpoint>,
+    pub id: EndpointId,
+    pub uri: Fid<ToMember>,
     pub spec: EndpointSpec,
 }
 
@@ -293,7 +296,8 @@ impl Handler<CreateEndpointInRoom> for RoomService {
         msg: CreateEndpointInRoom,
         _: &mut Self::Context,
     ) -> Self::Result {
-        let (room_id, member_id, endpoint_id) = msg.uri.take_all();
+        let (room_id, member_id) = msg.uri.take_all();
+        let endpoint_id = msg.id;
 
         if let Some(room) = self.room_repo.get(&room_id) {
             Box::new(

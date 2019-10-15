@@ -118,7 +118,7 @@ mod member {
         client.create(&create_room_req(&insert_str!("{}")));
 
         let add_member = MemberBuilder::default()
-            .id("member")
+            .id("test-member")
             .credentials("qwerty")
             .add_endpoint(
                 WebRtcPlayEndpointBuilder::default()
@@ -129,7 +129,7 @@ mod member {
             )
             .build()
             .unwrap()
-            .build_request(insert_str!("{}/test-member"));
+            .build_request(insert_str!("{}"));
 
         let sids = client.create(&add_member);
         let e2e_test_member_sid =
@@ -154,7 +154,7 @@ mod member {
             .id("caller")
             .build()
             .unwrap()
-            .build_request(insert_str!("{}/member"));
+            .build_request(insert_str!("{}"));
 
         if let Err(err) = client.try_create(&create_member) {
             assert_eq!(err.code, ErrorCode::RoomNotFound as u32)
@@ -181,7 +181,7 @@ mod member {
             .id("caller")
             .build()
             .unwrap()
-            .build_request(insert_str!("{}/member"));
+            .build_request(insert_str!("{}"));
 
         client.create(&create_member);
 
@@ -200,7 +200,7 @@ mod member {
             .id("asd")
             .build()
             .unwrap()
-            .build_request("qwe");
+            .build_request("qwe/qwe");
 
         if let Err(err) = client.try_create(&create_member) {
             assert_eq!(err.code, ErrorCode::ElementIdMismatch as u32)
@@ -226,7 +226,7 @@ mod endpoint {
             .p2p_mode(WebRtcPublishEndpoint_P2P::NEVER)
             .build()
             .unwrap()
-            .build_request(insert_str!("{}/responder/publish"));
+            .build_request(insert_str!("{}/responder"));
 
         let sids = client.create(&create_req);
         assert_eq!(sids.len(), 0);
@@ -256,7 +256,7 @@ mod endpoint {
             .p2p_mode(WebRtcPublishEndpoint_P2P::ALWAYS)
             .build()
             .unwrap()
-            .build_request(insert_str!("{}/member/publish"));
+            .build_request(insert_str!("{}/member"));
 
         if let Err(err) = client.try_create(&create_play) {
             assert_eq!(err.code, ErrorCode::MemberNotFound as u32)
@@ -276,7 +276,7 @@ mod endpoint {
             .p2p_mode(WebRtcPublishEndpoint_P2P::ALWAYS)
             .build()
             .unwrap()
-            .build_request(insert_str!("{}/member/publish"));
+            .build_request(insert_str!("{}/member"));
 
         if let Err(err) = client.try_create(&create_publish) {
             assert_eq!(err.code, ErrorCode::RoomNotFound as u32)
@@ -305,7 +305,7 @@ mod endpoint {
             .p2p_mode(WebRtcPublishEndpoint_P2P::ALWAYS)
             .build()
             .unwrap()
-            .build_request(insert_str!("{}/member/publish"));
+            .build_request(insert_str!("{}/member"));
 
         client.create(&create_endpoint);
 
@@ -338,7 +338,7 @@ mod endpoint {
             .src(insert_str!("local://{}/member/publish"))
             .build()
             .unwrap()
-            .build_request(insert_str!("{}/member/play"));
+            .build_request(insert_str!("{}/member"));
 
         if let Err(err) = client.try_create(&create_endpoint) {
             assert_eq!(err.code, ErrorCode::EndpointNotFound as u32)

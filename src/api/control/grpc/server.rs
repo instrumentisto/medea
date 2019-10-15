@@ -13,17 +13,20 @@ use futures::future::{self, Either, Future, IntoFuture};
 use grpcio::{Environment, RpcContext, Server, ServerBuilder, UnarySink};
 use medea_control_api_proto::grpc::{
     api::{
-        CreateRequest, CreateResponse, Element, GetResponse, IdRequest,
-        Response,
+        CreateRequest, CreateRequest_oneof_el as CreateRequestOneof,
+        CreateResponse, Element, GetResponse, IdRequest, Response,
     },
     api_grpc::{create_control_api, ControlApi},
 };
 
 use crate::{
     api::control::{
+        endpoints::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
         error_codes::{ErrorCode, ErrorCode::ElementIdMismatch, ErrorResponse},
-        refs::{fid::ParseFidError, Fid, StatefulFid, ToEndpoint, ToMember},
-        EndpointSpec, MemberId, MemberSpec, RoomId, RoomSpec,
+        refs::{
+            fid::ParseFidError, Fid, StatefulFid, ToEndpoint, ToMember, ToRoom,
+        },
+        EndpointId, EndpointSpec, MemberId, MemberSpec, RoomId, RoomSpec,
         TryFromElementError, TryFromProtobufError,
     },
     log::prelude::*,
@@ -34,6 +37,8 @@ use crate::{
     },
     AppContext,
 };
+use std::convert::From;
+use crate::api::control::error_codes::ErrorCode::ElementIdIsTooLong;
 
 /// Errors which can happen while processing requests to gRPC [Control API].
 ///
@@ -132,16 +137,16 @@ impl ControlApiService {
     /// Implementation of `Create` method for [`Member`] element.
     fn create_member(
         &self,
-        uri: Fid<ToMember>,
+        id: MemberId,
+        uri: Fid<ToRoom>,
         spec: MemberSpec,
     ) -> impl Future<Item = Sids, Error = GrpcControlApiError> {
-        let sid =
-            self.get_sid(uri.room_id(), uri.member_id(), spec.credentials());
+        let sid = self.get_sid(uri.room_id(), &id, spec.credentials());
         let mut sids = HashMap::new();
-        sids.insert(uri.member_id().to_string(), sid);
+        sids.insert(id.to_string(), sid);
 
         self.room_service
-            .send(CreateMemberInRoom { uri, spec })
+            .send(CreateMemberInRoom { id, uri, spec })
             .map_err(GrpcControlApiError::RoomServiceMailboxError)
             .and_then(|r| r.map_err(GrpcControlApiError::from).map(|_| sids))
     }
@@ -149,11 +154,12 @@ impl ControlApiService {
     /// Implementation of `Create` method for [`Endpoint`] element.
     fn create_endpoint(
         &self,
-        uri: Fid<ToEndpoint>,
+        id: EndpointId,
+        uri: Fid<ToMember>,
         spec: EndpointSpec,
     ) -> impl Future<Item = Sids, Error = GrpcControlApiError> {
         self.room_service
-            .send(CreateEndpointInRoom { uri, spec })
+            .send(CreateEndpointInRoom { id, uri, spec })
             .map_err(GrpcControlApiError::RoomServiceMailboxError)
             .and_then(|r| {
                 r.map_err(GrpcControlApiError::from).map(|_| HashMap::new())
@@ -161,19 +167,11 @@ impl ControlApiService {
     }
 
     /// Creates element based on provided [`CreateRequest`].
+    // TODO: REFACTOR ME PLEASE
     pub fn create_element(
         &self,
         mut req: CreateRequest,
     ) -> Box<dyn Future<Item = Sids, Error = ErrorResponse> + Send> {
-        //        let elem = if let Some(elem) = req.el {
-        //            elem
-        //        } else {
-        //            return Box::new(future::err(ErrorResponse::new(
-        //                ErrorCode::NoElement,
-        //                &uri,
-        //            )));
-        //        };
-
         let (uri, elem) = match StatefulFid::try_from(req.take_parent_fid()) {
             Ok(uri) => {
                 if let Some(elem) = req.el {
@@ -212,28 +210,56 @@ impl ControlApiService {
         };
 
         match uri {
-            StatefulFid::Member(uri) => Box::new(
-                MemberSpec::try_from((uri.member_id().clone(), elem))
-                    .map_err(ErrorResponse::from)
-                    .map(|spec| {
-                        self.create_member(uri, spec)
+            StatefulFid::Room(uri) => match elem {
+                CreateRequestOneof::member(mut member) => {
+                    let id: MemberId = member.take_id().into();
+                    Box::new(
+                        MemberSpec::try_from((id.clone(), member))
                             .map_err(ErrorResponse::from)
-                    })
-                    .into_future()
-                    .and_then(|create_result| create_result),
-            ),
-            StatefulFid::Endpoint(uri) => Box::new(
-                EndpointSpec::try_from((uri.endpoint_id().clone(), elem))
-                    .map_err(ErrorResponse::from)
-                    .map(|spec| {
-                        self.create_endpoint(uri, spec)
-                            .map_err(ErrorResponse::from)
-                    })
-                    .into_future()
-                    .and_then(|create_result| create_result),
-            ),
-            StatefulFid::Room(uri) => Box::new(future::err(
-                ErrorResponse::without_id(ElementIdMismatch),
+                            .map(|spec| {
+                                self.create_member(id, uri, spec)
+                                    .map_err(ErrorResponse::from)
+                            })
+                            .into_future()
+                            .and_then(|create_result| create_result),
+                    )
+                }
+                _ => Box::new(future::err(ErrorResponse::without_id(
+                    ElementIdMismatch,
+                ))),
+            },
+            StatefulFid::Member(uri) => {
+                let (endpoint, id) = match elem {
+                    CreateRequestOneof::webrtc_play(mut play) => (
+                        WebRtcPlayEndpoint::try_from(&play)
+                            .map(|r| EndpointSpec::WebRtcPlay(r)),
+                        play.take_id().into(),
+                    ),
+                    CreateRequestOneof::webrtc_pub(mut publish) => (
+                        Ok(WebRtcPublishEndpoint::from(&publish))
+                            .map(|r| EndpointSpec::WebRtcPublish(r)),
+                        publish.take_id().into(),
+                    ),
+                    _ => {
+                        return Box::new(future::err(
+                            ErrorResponse::without_id(ElementIdMismatch),
+                        ))
+                    }
+                };
+                Box::new(
+                    endpoint
+                        .map_err(ErrorResponse::from)
+                        .map(move |spec| {
+                            self.create_endpoint(id, uri, spec)
+                                .map_err(ErrorResponse::from)
+                        })
+                        .into_future()
+                        .and_then(|create_res| create_res),
+                )
+            }
+            StatefulFid::Endpoint(uri) => Box::new(future::err(
+                // TODO: changeme
+                ErrorResponse::without_id(ElementIdIsTooLong),
             )),
         }
     }
