@@ -31,7 +31,7 @@ use crate::{
             RpcConnectionClosed,
         },
         control::{
-            local_uri::{LocalUri, ToEndpoint, ToMember},
+            refs::{LocalUri, ToEndpoint, ToMember},
             MemberId, RoomId, RoomSpec,
         },
     },

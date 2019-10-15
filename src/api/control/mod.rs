@@ -5,9 +5,9 @@
 pub mod endpoints;
 pub mod error_codes;
 pub mod grpc;
-pub mod local_uri;
 pub mod member;
 pub mod pipeline;
+pub mod refs;
 pub mod room;
 
 use std::{convert::TryFrom as _, fs::File, io::Read as _, path::Path};

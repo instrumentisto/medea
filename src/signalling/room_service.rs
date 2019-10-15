@@ -14,7 +14,7 @@ use crate::{
     api::control::{
         endpoints::EndpointSpec,
         load_static_specs_from_dir,
-        local_uri::{LocalUri, StatefulLocalUri, ToEndpoint, ToMember, ToRoom},
+        refs::{LocalUri, StatefulLocalUri, ToEndpoint, ToMember, ToRoom},
         LoadStaticControlSpecsError, MemberSpec, RoomId, RoomSpec,
     },
     log::prelude::*,

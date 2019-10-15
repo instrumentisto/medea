@@ -15,7 +15,10 @@ use serde::{
 
 use crate::api::control::{
     endpoints::webrtc_publish_endpoint::WebRtcPublishId,
-    local_uri::{LocalUri, LocalUriParseError, StatefulLocalUri, ToEndpoint},
+    refs::{
+        local_uri::{LocalUriParseError, StatefulLocalUri},
+        LocalUri, ToEndpoint,
+    },
     MemberId, RoomId, TryFromProtobufError,
 };
 

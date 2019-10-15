@@ -22,9 +22,9 @@ use medea_control_api_proto::grpc::{
 use crate::{
     api::control::{
         error_codes::{ErrorCode, ErrorResponse},
-        local_uri::{
-            LocalUri, LocalUriParseError, StatefulLocalUri, ToEndpoint,
-            ToMember,
+        refs::{
+            local_uri::LocalUriParseError, LocalUri, StatefulLocalUri,
+            ToEndpoint, ToMember,
         },
         EndpointSpec, MemberId, MemberSpec, RoomId, RoomSpec,
         TryFromElementError, TryFromProtobufError,

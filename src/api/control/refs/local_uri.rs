@@ -9,9 +9,9 @@ use derive_more::{Display, From};
 use failure::Fail;
 use url::Url;
 
-use crate::api::control::endpoints::webrtc_play_endpoint::SrcUri;
-
-use super::{EndpointId, MemberId, RoomId};
+use crate::api::control::{
+    endpoints::webrtc_play_endpoint::SrcUri, EndpointId, MemberId, RoomId,
+};
 
 /// State of [`LocalUri`] which points to [`Room`].
 ///

@@ -12,7 +12,7 @@ use medea_control_api_proto::grpc::api::Error as ErrorProto;
 use crate::{
     api::control::{
         endpoints::webrtc_play_endpoint::SrcParseError,
-        grpc::server::GrpcControlApiError, local_uri::LocalUriParseError,
+        grpc::server::GrpcControlApiError, refs::local_uri::LocalUriParseError,
         TryFromElementError, TryFromProtobufError,
     },
     signalling::{

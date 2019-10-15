@@ -20,7 +20,7 @@ use medea_control_api_proto::grpc::api::{
 use crate::{
     api::control::{
         endpoints::WebRtcPlayEndpoint as WebRtcPlayEndpointSpec,
-        local_uri::{LocalUri, StatefulLocalUri, ToEndpoint, ToMember, ToRoom},
+        refs::{LocalUri, StatefulLocalUri, ToEndpoint, ToMember, ToRoom},
         EndpointId, MemberId, MemberSpec, RoomId, RoomSpec,
         TryFromElementError, WebRtcPlayId, WebRtcPublishId,
     },

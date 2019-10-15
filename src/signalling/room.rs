@@ -28,7 +28,7 @@ use crate::{
                 WebRtcPlayEndpoint as WebRtcPlayEndpointSpec,
                 WebRtcPublishEndpoint as WebRtcPublishEndpointSpec,
             },
-            local_uri::{LocalUri, StatefulLocalUri, ToEndpoint, ToMember},
+            refs::{LocalUri, StatefulLocalUri, ToEndpoint, ToMember},
             room::RoomSpec,
             EndpointId, EndpointSpec, MemberId, MemberSpec, RoomId,
             TryFromElementError, WebRtcPlayId, WebRtcPublishId,
