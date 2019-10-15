@@ -1,6 +1,6 @@
 //! [`MediaDeviceInfo`][1] related objects.
 //!
-//! [1]: https://www.w3.org/TR/mediacapture-streams/#device-info
+//! [1]: https://w3.org/TR/mediacapture-streams/#device-info
 
 use std::convert::TryFrom;
 
@@ -11,7 +11,7 @@ use crate::utils::WasmErr;
 
 /// Representation of [MediaDeviceInfo][1].
 ///
-/// [1]: https://www.w3.org/TR/mediacapture-streams/#device-info
+/// [1]: https://w3.org/TR/mediacapture-streams/#device-info
 #[allow(clippy::module_name_repetitions)]
 #[wasm_bindgen]
 pub struct InputDeviceInfo {
@@ -19,20 +19,23 @@ pub struct InputDeviceInfo {
 
     /// Actual underlying [MediaDeviceInfo][1] object.
     ///
-    /// [1]: https://www.w3.org/TR/mediacapture-streams/#device-info
+    /// [1]: https://w3.org/TR/mediacapture-streams/#device-info
     info: MediaDeviceInfo,
 }
 
-/// [MediaDeviceKind][1] wrapper, excluding audiooutput.
+/// [MediaDeviceKind][1] wrapper, excluding `audiooutput`.
 ///
-/// [1]: https://www.w3.org/TR/mediacapture-streams/#dom-mediadevicekind
+/// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediadevicekind
 enum InputDeviceKind {
+    /// `audioinput` device (for example a microphone).
     Audio,
+    /// `videoinput` device ( for example a webcam).
     Video,
 }
 
 impl InputDeviceKind {
-    fn to_str(&self) -> &str {
+    #[inline]
+    fn as_str(&self) -> &str {
         match self {
             Self::Audio => "audio",
             Self::Video => "video",
@@ -54,28 +57,35 @@ impl TryFrom<MediaDeviceKind> for InputDeviceKind {
 
 #[wasm_bindgen]
 impl InputDeviceInfo {
-    /// A unique identifier for the represented device.
+    /// Returns unique identifier for the represented device.
     pub fn device_id(&self) -> String {
         self.info.device_id()
     }
 
-    /// Describes the kind of the represented device.
+    /// Returns kind of the represented device.
     ///
-    /// This representation of [`MediaDeviceInfo`] ONLY for input device.
+    /// This representation of [MediaDeviceInfo][1] ONLY for input device.
+    ///
+    /// [1]: https://w3.org/TR/mediacapture-streams/#device-info
     pub fn kind(&self) -> String {
-        self.device_type.to_str().to_owned()
+        self.device_type.as_str().to_owned()
     }
 
-    /// A label describing this device (for example "External USB Webcam").
-    /// If the device has no associated label, then returns the empty string.
+    /// Returns label describing the represented device (for example
+    /// "External USB Webcam").
+    /// If the device has no associated label, then returns an empty string.
     pub fn label(&self) -> String {
         self.info.label()
     }
 
-    /// The group identifier of the represented device. Two devices have the
-    /// same group identifier if they belong to the same physical device.
-    /// For example, the audio input and output devices representing the speaker
-    /// and microphone of the same headset have the same groupId.
+    /// Returns group identifier of the represented device.
+    ///
+    /// Two devices have the same group identifier if they belong to the same
+    /// physical device. For example, the audio input and output devices
+    /// representing the speaker and microphone of the same headset have the
+    /// same [groupId][1].
+    ///
+    /// [1]: https://w3.org/TR/mediacapture-streams/#dom-mediadeviceinfo-groupid
     pub fn group_id(&self) -> String {
         self.info.group_id()
     }

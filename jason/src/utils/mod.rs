@@ -51,7 +51,8 @@ macro_rules! map_weak {
     }};
 }
 
-/// Copies any JS object. Basically creates new reference to object owned by JS.
+/// Copies any JS object.
+/// Basically, creates new reference to an object owned by JS.
 pub fn copy_js_ref<
     T: AsRef<wasm_bindgen::JsValue> + From<wasm_bindgen::JsValue>,
 >(
@@ -60,8 +61,8 @@ pub fn copy_js_ref<
     T::from(value.as_ref().clone())
 }
 
-/// Returns property of JS object by name if its defined. Converts the value by
-/// given predicate.
+/// Returns property of JS object by name if its defined.
+/// Converts the value with a given predicate.
 pub fn get_property_by_name<T, F, U>(
     value: &T,
     name: &str,

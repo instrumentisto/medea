@@ -1,6 +1,6 @@
 //! Acquiring and storing [MediaStream][1]s.
 //!
-//! [1]: https://www.w3.org/TR/mediacapture-streams/#mediastream
+//! [1]: https://w3.org/TR/mediacapture-streams/#mediastream
 
 use std::{
     cell::RefCell,
@@ -69,11 +69,12 @@ impl InnerMediaManager {
             .map_err(WasmErr::from)
     }
 
-    /// Returns [MediaStream][1] and is this stream new, meaning that it was
-    /// obtained via new [`getUserMediaCall`] call or was build from already
-    /// owned tracks.
+    /// Returns [MediaStream][1] and information if this stream is new one,
+    /// meaning that it was obtained via new [getUserMedia()][2] call or was
+    /// build from already owned tracks.
     ///
-    /// [1]: https://www.w3.org/TR/mediacapture-streams/#mediastream
+    /// [1]: https://w3.org/TR/mediacapture-streams/#mediastream
+    /// [2]: https://bit.ly/2MHnEj5
     fn get_stream(
         &self,
         caps: MediaStreamConstraints,
@@ -88,9 +89,10 @@ impl InnerMediaManager {
     }
 
     /// Tries to build new [MediaStream][1] from already owned tracks to avoid
-    /// useless getUserMedia requests.
+    /// redudant [getUserMedia()][2] requests.
     ///
-    /// [1]: https://www.w3.org/TR/mediacapture-streams/#mediastream
+    /// [1]: https://w3.org/TR/mediacapture-streams/#mediastream
+    /// [2]: https://bit.ly/2MHnEj5
     fn get_from_storage(
         &self,
         caps: &MediaStreamConstraints,
@@ -126,9 +128,9 @@ impl InnerMediaManager {
         Some(stream)
     }
 
-    /// Obtain new [MediaStream][1] and save its tracks to storage.
+    /// Obtains new [MediaStream][1] and save its tracks to storage.
     ///
-    /// [1]: https://www.w3.org/TR/mediacapture-streams/#mediastream
+    /// [1]: https://w3.org/TR/mediacapture-streams/#mediastream
     fn get_user_media(
         &self,
         caps: MediaStreamConstraints,
@@ -141,7 +143,6 @@ impl InnerMediaManager {
             .into_future()
             .and_then(move |devices| {
                 let caps: SysMediaStreamConstraints = caps.into();
-
                 devices
                     .get_user_media_with_constraints(&caps)
                     .map_err(WasmErr::from)
@@ -172,20 +173,22 @@ impl Drop for InnerMediaManager {
     }
 }
 
-/// Manager that is responsible for [`MediaStream`] acquisition and storing.
+/// Manager that is responsible for [MediaStream][1] acquisition and storing.
+///
+/// [1]: https://w3.org/TR/mediacapture-streams/#mediastream
 #[allow(clippy::module_name_repetitions)]
 #[derive(Default)]
 pub struct MediaManager(Rc<RefCell<InnerMediaManager>>);
 
 impl MediaManager {
-    /// Obtain [MediaStream][1] basing on a provided [`StreamRequest`].
+    /// Obtains [MediaStream][1] basing on a provided [`StreamRequest`].
     /// Acquired streams are cached and cloning existing stream is preferable
     /// over obtaining new ones.
     ///
     /// `on_local_stream` callback will be invoked each time new stream was
     /// obtained.
     ///
-    /// [1]: https://www.w3.org/TR/mediacapture-streams/#mediastream
+    /// [1]: https://w3.org/TR/mediacapture-streams/#mediastream
     pub fn get_stream_by_request(
         &self,
         caps: StreamRequest,
@@ -226,9 +229,11 @@ impl MediaManager {
         Either::B(fut)
     }
 
-    /// Obtain [MediaStream][1] basing on a provided [`MediaStreamConstraints`].
+    /// Obtains [MediaStream][1] basing on provided [`MediaStreamConstraints`].
     /// Either builds new stream from already known tracks or initiates new user
     /// media request saving returned tracks.
+    ///
+    /// [1]: https://w3.org/TR/mediacapture-streams/#mediastream
     pub fn get_stream_by_constraints(
         &self,
         caps: MediaStreamConstraints,

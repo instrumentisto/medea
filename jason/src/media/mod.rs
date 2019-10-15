@@ -1,6 +1,6 @@
-//! Adapters to [`Media Capture and Streams API`][1].
+//! Adapters to [Media Capture and Streams API][1].
 //!
-//! [1]: https://www.w3.org/TR/mediacapture-streams
+//! [1]: https://w3.org/TR/mediacapture-streams
 
 mod constraints;
 mod device_info;

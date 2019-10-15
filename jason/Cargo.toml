@@ -43,16 +43,18 @@ wee_alloc = { version = "0.4", optional = true }
 [dependencies.web-sys]
     version = "0.3"
     features = [
-        "CloseEvent", "console", "ConstrainDomStringParameters", "Event",
-        "EventTarget", "MediaDevices", "MediaTrackConstraints",
-        "MediaTrackSettings", "MediaDeviceInfo", "MediaDeviceKind",
+        "CloseEvent", "console", "ConstrainDomStringParameters",
+        "Event", "EventTarget",
+        "MediaDevices","MediaDeviceInfo", "MediaDeviceKind",
+        "MediaTrackConstraints", "MediaTrackSettings",
         "MediaStream", "MediaStreamConstraints", "MediaStreamTrack",
         "MessageEvent", "Navigator", "RtcConfiguration", "RtcIceCandidate",
-        "RtcIceServer", "RtcIceCandidateInit",  "RtcPeerConnection",
+        "RtcIceServer", "RtcIceCandidateInit", "RtcPeerConnection",
         "RtcPeerConnectionIceEvent", "RtcRtpReceiver", "RtcRtpSender",
         "RtcRtpTransceiver", "RtcRtpTransceiverDirection",
         "RtcRtpTransceiverInit", "RtcSdpType", "RtcSessionDescription",
-        "RtcSessionDescriptionInit", "RtcTrackEvent", "WebSocket", "Window",
+        "RtcSessionDescriptionInit", "RtcTrackEvent",
+        "WebSocket", "Window",
     ]
 
 [dev-dependencies]

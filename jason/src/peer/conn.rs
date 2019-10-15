@@ -170,8 +170,9 @@ impl RtcPeerConnection {
                     "icecandidate",
                     move |msg: RtcPeerConnectionIceEvent| {
                         // None candidate means that all ICE transports have
-                        // finished gathering candidates. Does not need to be
-                        // delivered onward to the remote peer.
+                        // finished gathering candidates.
+                        // Doesn't need to be delivered onward to the remote
+                        // peer.
                         if let Some(c) = msg.candidate() {
                             f(IceCandidate {
                                 candidate: c.candidate(),

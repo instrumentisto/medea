@@ -1,4 +1,5 @@
 #![cfg(target_arch = "wasm32")]
+
 use futures::Future;
 use js_sys::Array;
 use wasm_bindgen::JsValue;

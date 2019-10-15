@@ -1,3 +1,5 @@
+#![allow(clippy::module_name_repetitions)]
+
 use wasm_bindgen::prelude::*;
 use web_sys::{
     ConstrainDomStringParameters,
@@ -11,7 +13,6 @@ use crate::utils::get_property_by_name;
 /// [MediaStreamConstraints][1] wrapper.
 ///
 /// [1]: https://www.w3.org/TR/mediacapture-streams/#dom-mediastreamconstraints
-#[allow(clippy::module_name_repetitions)]
 #[wasm_bindgen]
 #[derive(Clone, Default)]
 pub struct MediaStreamConstraints {
@@ -21,17 +22,22 @@ pub struct MediaStreamConstraints {
 
 #[wasm_bindgen]
 impl MediaStreamConstraints {
+    /// Creates new [`MediaStreamConstraints`] with none constraints configured.
     #[wasm_bindgen(constructor)]
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Specifies the nature and settings of the audio [MediaStreamTrack].
+    /// Specifies the nature and settings of the audio [MediaStreamTrack][1].
+    ///
+    /// [1]: https://www.w3.org/TR/mediacapture-streams/#mediastreamtrack
     pub fn audio(&mut self, constraints: AudioTrackConstraints) {
         self.audio.replace(constraints);
     }
 
-    /// Specifies the nature and settings of the video [MediaStreamTrack].
+    /// Specifies the nature and settings of the video [MediaStreamTrack][1].
+    ///
+    /// [1]: https://www.w3.org/TR/mediacapture-streams/#mediastreamtrack
     pub fn video(&mut self, constraints: VideoTrackConstraints) {
         self.video.replace(constraints);
     }
@@ -65,10 +71,11 @@ impl From<MediaStreamConstraints> for SysMediaStreamConstraints {
     }
 }
 
-/// Checks that the [MediaStreamTrack] is taken from a device
-/// with given [deviceId][1].
+/// Checks that the [MediaStreamTrack][1] is taken from a device
+/// with given [deviceId][2].
 ///
-/// [1]: https://www.w3.org/TR/mediacapture-streams/#def-constraint-deviceId
+/// [1]: https://www.w3.org/TR/mediacapture-streams/#mediastreamtrack
+/// [2]: https://www.w3.org/TR/mediacapture-streams/#def-constraint-deviceId
 macro_rules! satisfies_by_device_id {
     ($v:expr, $track:ident) => {{
         match &$v.device_id {
@@ -83,30 +90,32 @@ macro_rules! satisfies_by_device_id {
     }};
 }
 
-// TODO: its gonna be a nightmare if we will add all possible constraints,
+// TODO: Its gonna be a nightmare if we will add all possible constraints,
 //       especially if we will support all that `exact`/`min`/`max`/`ideal`
-//       stuff, will need major refactoring then
-// TODO: using reflection to get fields values is pure evil, but there are no
+//       stuff, will need major refactoring then.
+// TODO: Using reflection to get fields values is pure evil, but there are no
 //       getters for WebIDL's dictionaries, should be wrapped or improved in
-//       wasm-bindgen
+//       wasm-bindgen.
 
-/// Represents constraints applicable to audio tracks.
-#[allow(clippy::module_name_repetitions)]
+/// Constraints applicable to audio tracks.
 #[wasm_bindgen]
 #[derive(Clone, Default)]
 pub struct AudioTrackConstraints {
-    /// The identifier of the device generating the content of the media track.
+    /// The identifier of the device generating the content for the media
+    /// track.
     device_id: Option<String>,
 }
 
 #[wasm_bindgen]
 impl AudioTrackConstraints {
+    /// Creates new [`AudioTrackConstraints`] with none constraints configured.
     #[wasm_bindgen(constructor)]
     pub fn new() -> Self {
         Self::default()
     }
 
     /// Sets [deviceId][1] constraint.
+    ///
     /// [1]: https://www.w3.org/TR/mediacapture-streams/#def-constraint-deviceId
     pub fn device_id(&mut self, device_id: String) {
         self.device_id = Some(device_id);
@@ -114,7 +123,7 @@ impl AudioTrackConstraints {
 }
 
 impl AudioTrackConstraints {
-    /// Checks if provided [`MediaStreamTrack`][1] satisfies constraints
+    /// Checks if provided [MediaStreamTrack][1] satisfies constraints
     /// contained.
     ///
     /// [1]: https://www.w3.org/TR/mediacapture-streams/#mediastreamtrack
@@ -141,23 +150,25 @@ impl From<AudioTrackConstraints> for SysMediaTrackConstraints {
     }
 }
 
-/// Represents constraints applicable to video tracks.
-#[allow(clippy::module_name_repetitions)]
+/// Constraints applicable to video tracks.
 #[wasm_bindgen]
 #[derive(Clone, Default)]
 pub struct VideoTrackConstraints {
-    /// The identifier of the device generating the content of the media track.
+    /// The identifier of the device generating the content for the media
+    /// track.
     device_id: Option<String>,
 }
 
 #[wasm_bindgen]
 impl VideoTrackConstraints {
+    /// Creates new [`VideoTrackConstraints`] with none constraints configured.
     #[wasm_bindgen(constructor)]
     pub fn new() -> Self {
         Self::default()
     }
 
     /// Sets [deviceId][1] constraint.
+    ///
     /// [1]: https://www.w3.org/TR/mediacapture-streams/#def-constraint-deviceId
     pub fn device_id(&mut self, device_id: String) {
         self.device_id = Some(device_id);
@@ -165,7 +176,7 @@ impl VideoTrackConstraints {
 }
 
 impl VideoTrackConstraints {
-    /// Checks if provided [`MediaStreamTrack`][1] satisfies constraints
+    /// Checks if provided [MediaStreamTrack][1] satisfies constraints
     /// contained.
     ///
     /// [1]: https://www.w3.org/TR/mediacapture-streams/#mediastreamtrack

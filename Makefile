@@ -631,8 +631,8 @@ endif
 #   make docker.up.webdriver [browser=(chrome|firefox)]
 
 docker.up.webdriver:
-	- @make docker.down.webdriver browser=chrome
-	- @make docker.down.webdriver browser=firefox
+	-@make docker.down.webdriver browser=chrome
+	-@make docker.down.webdriver browser=firefox
 ifeq ($(browser),firefox)
 	docker run --rm -d --network=host --shm-size 512m \
 		--name medea-webdriver-firefox \

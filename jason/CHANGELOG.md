@@ -9,6 +9,12 @@ All user visible changes to this project will be documented in this file. This p
 ## TBD [0.2.0] · 2019-??-??
 [0.2.0]: /../../tree/medea-jason-0.2.0/jason
 
+### BC Breaks
+
+- Library API:
+    - Room initialization ([#46]):
+        - Remove `Jason.join_room()`.
+
 ### Added
 
 - Media management:
@@ -18,23 +24,22 @@ All user visible changes to this project will be documented in this file. This p
             - `Room.unmute_audio()`;
             - `Room.mute_video()`;
             - `Room.unmute_video()`.
-        - `InputDeviceInfo` class obtainable via `MediaManager.enumerate_devices()` ([#46](/../../pull/46));
-        - `MediaManager` class obtainable via ` Jason.media_manager()` ([#46](/../../pull/46)):
+        - `InputDeviceInfo` class obtainable via `MediaManager.enumerate_devices()` ([#46]);
+        - `MediaManager` class obtainable via `Jason.media_manager()` ([#46]):
             - `MediaManager.enumerate_devices()`;
-            - `MediaManager.init_local_stream()`;
-        - `MediaStreamConstraints`, `AudioTrackConstraints`, `VideoTrackConstraints` classes ([#46](/../../pull/46)).
+            - `MediaManager.init_local_stream()`.
+        - `MediaStreamConstraints`, `AudioTrackConstraints`, `VideoTrackConstraints` classes ([#46]);
+        - Room initialization ([#46]):
+            - `Jason.init_room()`;
+            - `Room.join()`.
 
 ### Fixed
 
 - Signalling:
     - Skipped `IceCandidate`s received before receiving remote SDP ([#50](/../../pull/50)).
 
-### Changed
+[#46]: /../../pull/46
 
-- Library API:
-    - Room initialization ([#46](/../../pull/46)):
-        - Remove `Jason.join_room()`;
-        - Add `Jason.init_room()` and `Room.join()`.
 
 
 

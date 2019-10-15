@@ -28,7 +28,7 @@ pub enum CloseMsg {
 #[allow(clippy::module_name_repetitions)]
 #[cfg_attr(feature = "mockable", mockall::automock)]
 pub trait RpcClient {
-    // Establish connection with Rpc server.
+    // Establish connection with RPC server.
     fn connect(
         &self,
         token: &str,
@@ -144,7 +144,7 @@ impl RpcClient for WebsocketRpcClient {
         }))
     }
 
-    /// Returns Stream of all Events received by this [`RpcClient`].
+    /// Returns [`Stream`] of all [`Event`]s received by this [`RpcClient`].
     // TODO: proper sub registry
     fn subscribe(&self) -> Box<dyn Stream<Item = Event, Error = ()>> {
         let (tx, rx) = unbounded();
@@ -153,13 +153,13 @@ impl RpcClient for WebsocketRpcClient {
         Box::new(rx)
     }
 
-    /// Unsubscribe from this [`RpcClient`]. Drops all subscriptions atm.
+    /// Unsubscribes from this [`RpcClient`]. Drops all subscriptions atm.
     // TODO: proper sub registry
     fn unsub(&self) {
         self.0.borrow_mut().subs.clear();
     }
 
-    /// Sends Command to Medea.
+    /// Sends [`Command`] to RPC server.
     // TODO: proper sub registry
     fn send_command(&self, command: Command) {
         let socket_borrow = &self.0.borrow().sock;
