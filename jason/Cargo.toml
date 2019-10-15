@@ -31,7 +31,7 @@ js-sys = "0.3"
 macro-attr = "0.2"
 medea-client-api-proto = { path = "../proto/client-api", features = ["jason"] }
 medea-macro = "0.1"
-mockall = { version = "0.2", optional = true }
+mockall = { version = "0.5", optional = true }
 newtype_derive = "0.1"
 predicates-tree = { version = "1.0", optional = true }
 serde = { version = "1.0", features = ["derive"] }
@@ -43,15 +43,18 @@ futures-preview = "0.3.0-alpha.18"
 [dependencies.web-sys]
     version = "0.3"
     features = [
-        "CloseEvent", "console", "Event", "EventTarget", "MediaDevices",
+        "CloseEvent", "console", "ConstrainDomStringParameters",
+        "Event", "EventTarget",
+        "MediaDevices","MediaDeviceInfo", "MediaDeviceKind",
+        "MediaTrackConstraints", "MediaTrackSettings",
         "MediaStream", "MediaStreamConstraints", "MediaStreamTrack",
         "MessageEvent", "Navigator", "RtcConfiguration", "RtcIceCandidate",
         "RtcIceServer", "RtcIceCandidateInit", "RtcPeerConnection",
         "RtcPeerConnectionIceEvent", "RtcRtpReceiver", "RtcRtpSender",
         "RtcRtpTransceiver", "RtcRtpTransceiverDirection",
         "RtcRtpTransceiverInit", "RtcSdpType", "RtcSessionDescription",
-        "RtcSessionDescriptionInit", "RtcTrackEvent", "WebSocket",
-        "Window",
+        "RtcSessionDescriptionInit", "RtcTrackEvent",
+        "WebSocket", "Window",
     ]
 
 [dev-dependencies]

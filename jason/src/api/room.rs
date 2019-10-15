@@ -8,18 +8,17 @@ use std::{
 };
 
 use futures::{
-    channel::mpsc::{unbounded, UnboundedSender},
-    future,
-    stream::select,
-    FutureExt as _, StreamExt,
+    future::{self, Either, Future, IntoFuture},
+    stream::Stream as _,
+    sync::mpsc::{unbounded, UnboundedSender},
 };
+use js_sys::Promise;
+use wasm_bindgen::prelude::*;
+use wasm_bindgen_futures::{future_to_promise, spawn_local};
 
 use medea_client_api_proto::{
-    Command, Direction, Event as RpcEvent, EventHandler, IceCandidate,
-    IceServer, PeerId, Track,
+    Command, Direction, EventHandler, IceCandidate, IceServer, PeerId, Track,
 };
-use wasm_bindgen::{prelude::*, JsValue};
-use wasm_bindgen_futures::spawn_local;
 
 use crate::{
     media::MediaStream,
@@ -43,13 +42,35 @@ pub struct RoomHandle(Weak<RefCell<InnerRoom>>);
 impl RoomHandle {
     /// Sets callback, which will be invoked on new `Connection` establishing.
     pub fn on_new_connection(
-        &mut self,
+        &self,
         f: js_sys::Function,
     ) -> Result<(), JsValue> {
         map_weak!(self, |inner| inner
             .borrow_mut()
             .on_new_connection
             .set_func(f))
+    }
+
+    /// Performs entering to a [`Room`].
+    ///
+    /// Establishes connection with media server (if it doesn't already exist).
+    /// Fails if unable to connect to media server.
+    /// Effectively returns `Result<(), WasmErr>`.
+    pub fn join(&self, token: &str) -> Promise {
+        let fut = match self.0.upgrade() {
+            None => Either::A(future::err::<JsValue, _>(
+                WasmErr::from("Detached state").into(),
+            )),
+            Some(inner) => {
+                let rpc = Rc::clone(&inner.borrow().rpc);
+                let fut = rpc
+                    .connect(token)
+                    .map(|_| JsValue::NULL)
+                    .map_err(JsValue::from);
+                Either::B(fut)
+            }
+        };
+        future_to_promise(fut)
     }
 
     /// Mutes outbound audio in this room.
@@ -84,52 +105,45 @@ pub struct Room(Rc<RefCell<InnerRoom>>);
 impl Room {
     /// Creates new [`Room`] and associates it with a provided [`RpcClient`].
     pub fn new(rpc: Rc<dyn RpcClient>, peers: Box<dyn PeerRepository>) -> Self {
-        enum RoomEvent {
-            RpcEvent(RpcEvent),
-            PeerEvent(PeerEvent),
-        }
-
-        let (tx, peer_events_rx) = unbounded();
+        let (tx, rx) = unbounded();
         let events_stream = rpc.subscribe();
+
         let room = Rc::new(RefCell::new(InnerRoom::new(rpc, peers, tx)));
 
-        let rpc_events_stream = events_stream.map(RoomEvent::RpcEvent);
-        let peer_events_stream = peer_events_rx.map(RoomEvent::PeerEvent);
-
-        let mut events = select(rpc_events_stream, peer_events_stream);
+        let inner = Rc::downgrade(&room);
+        let handle_medea_event = events_stream
+            .for_each(move |event| match inner.upgrade() {
+                Some(inner) => {
+                    event.dispatch_with(inner.borrow_mut().deref_mut());
+                    Ok(())
+                }
+                None => {
+                    // `InnerSession` is gone, which means that `Room` has been
+                    // dropped. Not supposed to happen, actually, since
+                    // `InnerSession` should drop its `tx` by unsub from
+                    // `RpcClient`.
+                    Err(())
+                }
+            })
+            .into_future()
+            .then(|_| Ok(()));
 
         let inner = Rc::downgrade(&room);
+        let handle_peer_event = rx
+            .for_each(move |event| match inner.upgrade() {
+                Some(inner) => {
+                    event.dispatch_with(inner.borrow_mut().deref_mut());
+                    Ok(())
+                }
+                None => Err(()),
+            })
+            .into_future()
+            .then(|_| Ok(()));
+
         // Spawns `Promise` in JS, does not provide any handles, so the current
         // way to stop this stream is to drop all connected `Sender`s.
-        spawn_local(async move {
-            while let Some(event) = events.next().await {
-                match inner.upgrade() {
-                    None => {
-                        // `InnerSession` is gone, which means that `Room` has
-                        // been dropped. Not supposed to
-                        // happen, actually, since
-                        // `InnerSession` should drop its `tx` by unsub from
-                        // `RpcClient`.
-                        WasmErr::from("Inner Room dropped unexpectedly")
-                            .log_err();
-                    }
-                    Some(inner) => {
-                        match event {
-                            RoomEvent::RpcEvent(event) => {
-                                event.dispatch_with(
-                                    inner.borrow_mut().deref_mut(),
-                                );
-                            }
-                            RoomEvent::PeerEvent(event) => {
-                                event.dispatch_with(
-                                    inner.borrow_mut().deref_mut(),
-                                );
-                            }
-                        };
-                    }
-                }
-            }
-        });
+        spawn_local(handle_medea_event);
+        spawn_local(handle_peer_event);
 
         Self(room)
     }
@@ -251,46 +265,46 @@ impl EventHandler for InnerRoom {
         self.create_connections_from_tracks(&tracks);
 
         let rpc = Rc::clone(&self.rpc);
-        spawn_local(
-            async move {
-                match sdp_offer {
-                    None => {
-                        let sdp_offer = peer.get_offer(tracks).await?;
-                        let mids = peer.get_mids()?;
-                        rpc.send_command(Command::MakeSdpOffer {
+        let fut = match sdp_offer {
+            // offerer
+            None => future::Either::A(
+                peer.get_offer(tracks)
+                    .map(move |sdp_offer| match peer.get_mids() {
+                        Ok(mids) => rpc.send_command(Command::MakeSdpOffer {
                             peer_id,
                             sdp_offer,
                             mids,
-                        });
-                    }
-                    Some(offer) => {
-                        peer.process_offer(offer, tracks).await?;
-                        let sdp_answer = peer.create_and_set_answer().await?;
-                        rpc.send_command(Command::MakeSdpAnswer {
-                            peer_id,
-                            sdp_answer,
-                        });
-                    }
-                };
-                Result::<_, WasmErr>::Ok(())
+                        }),
+                        Err(err) => err.log_err(),
+                    })
+                    .map_err(|err| err.log_err()),
+            ),
+            Some(offer) => {
+                // answerer
+                future::Either::B(
+                    peer.process_offer(offer, tracks)
+                        .and_then(move |_| peer.create_and_set_answer())
+                        .map(move |sdp_answer| {
+                            rpc.send_command(Command::MakeSdpAnswer {
+                                peer_id,
+                                sdp_answer,
+                            })
+                        })
+                        .map_err(|err| err.log_err()),
+                )
             }
-                .then(|result| {
-                    if let Err(err) = result {
-                        err.log_err();
-                    };
-                    future::ready(())
-                }),
-        );
+        };
+
+        spawn_local(fut);
     }
 
     /// Applies specified SDP Answer to a specified [`PeerConnection`].
     fn on_sdp_answer_made(&mut self, peer_id: PeerId, sdp_answer: String) {
         if let Some(peer) = self.peers.get(peer_id) {
-            spawn_local(async move {
-                if let Err(err) = peer.set_remote_answer(sdp_answer).await {
-                    err.log_err();
-                }
-            });
+            spawn_local(peer.set_remote_answer(sdp_answer).or_else(|err| {
+                err.log_err();
+                Err(())
+            }));
         } else {
             // TODO: No peer, whats next?
             WasmErr::from(format!("Peer with id {} doesnt exist", peer_id))
@@ -305,18 +319,14 @@ impl EventHandler for InnerRoom {
         candidate: IceCandidate,
     ) {
         if let Some(peer) = self.peers.get(peer_id) {
-            spawn_local(async move {
-                let add = peer
-                    .add_ice_candidate(
-                        candidate.candidate,
-                        candidate.sdp_m_line_index,
-                        candidate.sdp_mid,
-                    )
-                    .await;
-                if let Err(err) = add {
-                    err.log_err();
-                }
-            });
+            spawn_local(
+                peer.add_ice_candidate(
+                    candidate.candidate,
+                    candidate.sdp_m_line_index,
+                    candidate.sdp_mid,
+                )
+                .map_err(|err| err.log_err()),
+            );
         } else {
             // TODO: No peer, whats next?
             WasmErr::from(format!("Peer with id {} doesnt exist", peer_id))
