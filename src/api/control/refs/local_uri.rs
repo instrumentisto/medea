@@ -9,27 +9,12 @@ use derive_more::{Display, From};
 use failure::Fail;
 use url::Url;
 
-use crate::api::control::{
-    endpoints::webrtc_play_endpoint::SrcUri, EndpointId, MemberId, RoomId,
+use crate::{
+    api::control::{endpoints::webrtc_play_endpoint::SrcUri, MemberId, RoomId},
+    impl_uri,
 };
 
-/// State of [`LocalUri`] which points to [`Room`].
-///
-/// [`Room`]: crate::signalling::room::Room
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct ToRoom(RoomId);
-
-/// State of [`LocalUri`] which points to [`Member`].
-///
-/// [`Member`]: crate::signalling::elements::member::Member
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct ToMember(LocalUri<ToRoom>, MemberId);
-
-/// State of [`LocalUri`] which points to [`Endpoint`].
-///
-/// [`Endpoint`]: crate::signalling::elements::endpoints::Endpoint
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct ToEndpoint(LocalUri<ToMember>, EndpointId);
+use super::{ToEndpoint, ToMember, ToRoom};
 
 /// URI in format `local://room_id/member_id/endpoint_id`.
 ///
@@ -95,30 +80,7 @@ pub struct LocalUri<T> {
     state: T,
 }
 
-impl LocalUri<ToRoom> {
-    /// Creates new [`LocalUri`] in [`ToRoom`] state.
-    pub fn new(room_id: RoomId) -> Self {
-        Self {
-            state: ToRoom(room_id),
-        }
-    }
-
-    /// Returns reference to [`RoomId`].
-    pub fn room_id(&self) -> &RoomId {
-        &self.state.0
-    }
-
-    /// Returns [`RoomId`].
-    pub fn take_room_id(self) -> RoomId {
-        self.state.0
-    }
-
-    /// Pushes [`MemberId`] to the end of URI and returns
-    /// [`LocalUri`] in [`ToMember`] state.
-    pub fn push_member_id(self, member_id: MemberId) -> LocalUri<ToMember> {
-        LocalUri::<ToMember>::new(self.state.0, member_id)
-    }
-}
+impl_uri!(LocalUri);
 
 impl From<StatefulLocalUri> for LocalUri<ToRoom> {
     fn from(from: StatefulLocalUri) -> Self {
@@ -134,94 +96,6 @@ impl From<StatefulLocalUri> for LocalUri<ToRoom> {
                 uri
             }
         }
-    }
-}
-
-impl LocalUri<ToMember> {
-    /// Create new [`LocalUri`] in [`ToMember`] state.
-    pub fn new(room_id: RoomId, member_id: MemberId) -> Self {
-        Self {
-            state: ToMember(LocalUri::<ToRoom>::new(room_id), member_id),
-        }
-    }
-
-    /// Returns reference to [`RoomId`].
-    pub fn room_id(&self) -> &RoomId {
-        &self.state.0.room_id()
-    }
-
-    /// Returns reference to [`MemberId`].
-    pub fn member_id(&self) -> &MemberId {
-        &self.state.1
-    }
-
-    /// Return [`MemberId`] and [`LocalUri`] in state [`ToRoom`].
-    pub fn take_member_id(self) -> (MemberId, LocalUri<ToRoom>) {
-        (self.state.1, self.state.0)
-    }
-
-    /// Push endpoint ID to the end of URI and returns
-    /// [`LocalUri`] in [`ToEndpoint`] state.
-    pub fn push_endpoint_id(
-        self,
-        endpoint_id: EndpointId,
-    ) -> LocalUri<ToEndpoint> {
-        let (member_id, room_uri) = self.take_member_id();
-        let room_id = room_uri.take_room_id();
-        LocalUri::<ToEndpoint>::new(room_id, member_id, endpoint_id)
-    }
-
-    /// Returns [`RoomId`] and [`MemberId`].
-    pub fn take_all(self) -> (RoomId, MemberId) {
-        let (member_id, room_url) = self.take_member_id();
-
-        (room_url.take_room_id(), member_id)
-    }
-}
-
-impl LocalUri<ToEndpoint> {
-    /// Creates new [`LocalUri`] in [`ToEndpoint`] state.
-    pub fn new(
-        room_id: RoomId,
-        member_id: MemberId,
-        endpoint_id: EndpointId,
-    ) -> Self {
-        Self {
-            state: ToEndpoint(
-                LocalUri::<ToMember>::new(room_id, member_id),
-                endpoint_id,
-            ),
-        }
-    }
-
-    /// Returns reference to [`RoomId`].
-    pub fn room_id(&self) -> &RoomId {
-        &self.state.0.room_id()
-    }
-
-    /// Returns reference to [`MemberId`].
-    pub fn member_id(&self) -> &MemberId {
-        &self.state.0.member_id()
-    }
-
-    /// Returns reference to [`EndpointId`].
-    pub fn endpoint_id(&self) -> &EndpointId {
-        &self.state.1
-    }
-
-    /// Returns [`Endpoint`] id and [`LocalUri`] in [`ToMember`] state.
-    ///
-    /// [`Endpoint`]: crate::signalling::elements::endpoints::Endpoint
-    pub fn take_endpoint_id(self) -> (EndpointId, LocalUri<ToMember>) {
-        (self.state.1, self.state.0)
-    }
-
-    /// Returns [`EndpointId`], [`RoomId`] and [`MemberId`].
-    pub fn take_all(self) -> (RoomId, MemberId, EndpointId) {
-        let (endpoint_id, member_url) = self.take_endpoint_id();
-        let (member_id, room_url) = member_url.take_member_id();
-
-        (room_url.take_room_id(), member_id, endpoint_id)
     }
 }
 
