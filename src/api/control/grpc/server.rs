@@ -22,10 +22,7 @@ use medea_control_api_proto::grpc::{
 use crate::{
     api::control::{
         error_codes::{ErrorCode, ErrorResponse},
-        refs::{
-            local_uri::LocalUriParseError, LocalUri, StatefulLocalUri,
-            ToEndpoint, ToMember,
-        },
+        refs::{fid::ParseFidError, Fid, StatefulFid, ToEndpoint, ToMember},
         EndpointSpec, MemberId, MemberSpec, RoomId, RoomSpec,
         TryFromElementError, TryFromProtobufError,
     },
@@ -43,8 +40,8 @@ use crate::{
 /// [Control API]: https://tinyurl.com/yxsqplq7
 #[derive(Debug, Display, Fail, From)]
 pub enum GrpcControlApiError {
-    /// Error while parsing [`LocalUri`] of element.
-    LocalUri(LocalUriParseError),
+    /// Error while parsing [`Fid`] of element.
+    Fid(ParseFidError),
 
     /// Error which can happen while converting protobuf objects into interior
     /// [medea] [Control API] objects.
@@ -135,7 +132,7 @@ impl ControlApiService {
     /// Implementation of `Create` method for [`Member`] element.
     fn create_member(
         &self,
-        uri: LocalUri<ToMember>,
+        uri: Fid<ToMember>,
         spec: MemberSpec,
     ) -> impl Future<Item = Sids, Error = GrpcControlApiError> {
         let sid =
@@ -152,7 +149,7 @@ impl ControlApiService {
     /// Implementation of `Create` method for [`Endpoint`] element.
     fn create_endpoint(
         &self,
-        uri: LocalUri<ToEndpoint>,
+        uri: Fid<ToEndpoint>,
         spec: EndpointSpec,
     ) -> impl Future<Item = Sids, Error = GrpcControlApiError> {
         self.room_service
@@ -168,7 +165,7 @@ impl ControlApiService {
         &self,
         mut req: CreateRequest,
     ) -> Box<dyn Future<Item = Sids, Error = ErrorResponse> + Send> {
-        let uri = match StatefulLocalUri::try_from(req.take_id()) {
+        let uri = match StatefulFid::try_from(req.take_id()) {
             Ok(uri) => uri,
             Err(e) => {
                 return Box::new(future::err(e.into()));
@@ -185,7 +182,7 @@ impl ControlApiService {
         };
 
         match uri {
-            StatefulLocalUri::Room(uri) => Box::new(
+            StatefulFid::Room(uri) => Box::new(
                 RoomSpec::try_from((uri.take_room_id(), elem))
                     .map_err(ErrorResponse::from)
                     .map(|spec| {
@@ -194,7 +191,7 @@ impl ControlApiService {
                     .into_future()
                     .and_then(|create_result| create_result),
             ),
-            StatefulLocalUri::Member(uri) => Box::new(
+            StatefulFid::Member(uri) => Box::new(
                 MemberSpec::try_from((uri.member_id().clone(), elem))
                     .map_err(ErrorResponse::from)
                     .map(|spec| {
@@ -204,7 +201,7 @@ impl ControlApiService {
                     .into_future()
                     .and_then(|create_result| create_result),
             ),
-            StatefulLocalUri::Endpoint(uri) => Box::new(
+            StatefulFid::Endpoint(uri) => Box::new(
                 EndpointSpec::try_from((uri.endpoint_id().clone(), elem))
                     .map_err(ErrorResponse::from)
                     .map(|spec| {
@@ -224,7 +221,7 @@ impl ControlApiService {
     ) -> impl Future<Item = (), Error = ErrorResponse> {
         let mut delete_elements_msg = DeleteElements::new();
         for id in req.take_id().into_iter() {
-            match StatefulLocalUri::try_from(id) {
+            match StatefulFid::try_from(id) {
                 Ok(uri) => {
                     delete_elements_msg.add_uri(uri);
                 }
@@ -259,7 +256,7 @@ impl ControlApiService {
     {
         let mut uris = Vec::new();
         for id in req.take_id().into_iter() {
-            match StatefulLocalUri::try_from(id) {
+            match StatefulFid::try_from(id) {
                 Ok(uri) => {
                     uris.push(uri);
                 }
@@ -274,7 +271,7 @@ impl ControlApiService {
                 .send(Get(uris))
                 .map_err(GrpcControlApiError::RoomServiceMailboxError)
                 .and_then(|r| r.map_err(GrpcControlApiError::from))
-                .map(|elements: HashMap<StatefulLocalUri, Element>| {
+                .map(|elements: HashMap<StatefulFid, Element>| {
                     elements
                         .into_iter()
                         .map(|(id, value)| (id.to_string(), value))

@@ -20,7 +20,7 @@ use medea_control_api_proto::grpc::api::{
 use crate::{
     api::control::{
         endpoints::WebRtcPlayEndpoint as WebRtcPlayEndpointSpec,
-        refs::{LocalUri, StatefulLocalUri, ToEndpoint, ToMember, ToRoom},
+        refs::{Fid, StatefulFid, ToEndpoint, ToMember, ToRoom},
         EndpointId, MemberId, MemberSpec, RoomId, RoomSpec,
         TryFromElementError, WebRtcPlayId, WebRtcPublishId,
     },
@@ -38,11 +38,11 @@ use super::endpoints::{
 pub enum MembersLoadError {
     /// Errors that can occur when we try transform some spec from `Element`.
     #[display(fmt = "TryFromElementError: {}", _0)]
-    TryFromError(TryFromElementError, StatefulLocalUri),
+    TryFromError(TryFromElementError, StatefulFid),
 
     /// [`Member`] not found.
     #[display(fmt = "Member [id = {}] not found.", _0)]
-    MemberNotFound(LocalUri<ToMember>),
+    MemberNotFound(Fid<ToMember>),
 
     /// [`EndpointSpec`] not found.
     ///
@@ -58,7 +58,7 @@ pub enum MembersLoadError {
 #[derive(Debug, Fail, Display)]
 pub enum MemberError {
     #[display(fmt = "Endpoint [id = {}] not found.", _0)]
-    EndpointNotFound(LocalUri<ToEndpoint>),
+    EndpointNotFound(Fid<ToEndpoint>),
 }
 
 /// [`Member`] is member of [`Room`].
@@ -117,7 +117,7 @@ impl Member {
         member_id: &MemberId,
     ) -> Result<MemberSpec, MembersLoadError> {
         let element = room_spec.pipeline.get(member_id).map_or(
-            Err(MembersLoadError::MemberNotFound(LocalUri::<ToMember>::new(
+            Err(MembersLoadError::MemberNotFound(Fid::<ToMember>::new(
                 self.room_id(),
                 member_id.clone(),
             ))),
@@ -127,8 +127,7 @@ impl Member {
         MemberSpec::try_from(element).map_err(|e| {
             MembersLoadError::TryFromError(
                 e,
-                LocalUri::<ToMember>::new(self.room_id(), member_id.clone())
-                    .into(),
+                Fid::<ToMember>::new(self.room_id(), member_id.clone()).into(),
             )
         })
     }
@@ -144,9 +143,9 @@ impl Member {
         let this_member_spec =
             self.get_member_from_room_spec(room_spec, &self_id)?;
 
-        let this_member = store.get(&self.id()).ok_or_else(|| {
-            MembersLoadError::MemberNotFound(self.get_local_uri())
-        })?;
+        let this_member = store
+            .get(&self.id())
+            .ok_or_else(|| MembersLoadError::MemberNotFound(self.get_fid()))?;
 
         for (spec_play_name, spec_play_endpoint) in
             this_member_spec.play_endpoints()
@@ -155,7 +154,7 @@ impl Member {
                 MemberId(spec_play_endpoint.src.member_id.to_string());
             let publisher_member =
                 store.get(&publisher_id).ok_or_else(|| {
-                    MembersLoadError::MemberNotFound(LocalUri::<ToMember>::new(
+                    MembersLoadError::MemberNotFound(Fid::<ToMember>::new(
                         self.room_id(),
                         publisher_id,
                     ))
@@ -227,20 +226,20 @@ impl Member {
         Ok(())
     }
 
-    /// Returns [`LocalUri`] to this [`Member`].
-    fn get_local_uri(&self) -> LocalUri<ToMember> {
-        LocalUri::<ToMember>::new(self.room_id(), self.id())
+    /// Returns [`Fid`] to this [`Member`].
+    fn get_fid(&self) -> Fid<ToMember> {
+        Fid::<ToMember>::new(self.room_id(), self.id())
     }
 
-    /// Returns [`LocalUri`] to some endpoint from this [`Member`].
+    /// Returns [`Fid`] to some endpoint from this [`Member`].
     ///
     /// __Note__ this function don't check presence of `Endpoint` in this
     /// [`Member`].
     pub fn get_local_uri_to_endpoint(
         &self,
         endpoint_id: EndpointId,
-    ) -> LocalUri<ToEndpoint> {
-        LocalUri::<ToEndpoint>::new(self.room_id(), self.id(), endpoint_id)
+    ) -> Fid<ToEndpoint> {
+        Fid::<ToEndpoint>::new(self.room_id(), self.id(), endpoint_id)
     }
 
     /// Notifies [`Member`] that some [`Peer`]s removed.
@@ -436,7 +435,7 @@ pub fn parse_members(
     let members_spec = room_spec.members().map_err(|e| {
         MembersLoadError::TryFromError(
             e,
-            LocalUri::<ToRoom>::new(room_spec.id.clone()).into(),
+            Fid::<ToRoom>::new(room_spec.id.clone()).into(),
         )
     })?;
 

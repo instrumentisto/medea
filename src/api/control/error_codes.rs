@@ -12,7 +12,8 @@ use medea_control_api_proto::grpc::api::Error as ErrorProto;
 use crate::{
     api::control::{
         endpoints::webrtc_play_endpoint::SrcParseError,
-        grpc::server::GrpcControlApiError, refs::local_uri::LocalUriParseError,
+        grpc::server::GrpcControlApiError,
+        refs::{fid::ParseFidError, local_uri::LocalUriParseError},
         TryFromElementError, TryFromProtobufError,
     },
     signalling::{
@@ -334,6 +335,19 @@ impl From<LocalUriParseError> for ErrorResponse {
     }
 }
 
+impl From<ParseFidError> for ErrorResponse {
+    fn from(err: ParseFidError) -> Self {
+        use ParseFidError::*;
+
+        match err {
+            TooManyPaths(text) => {
+                Self::new(ErrorCode::ElementIdIsTooLong, &text)
+            }
+            Empty => Self::without_id(ErrorCode::EmptyElementId),
+        }
+    }
+}
+
 impl From<RoomError> for ErrorResponse {
     fn from(err: RoomError) -> Self {
         use RoomError::*;
@@ -434,7 +448,7 @@ impl From<GrpcControlApiError> for ErrorResponse {
         use GrpcControlApiError::*;
 
         match err {
-            LocalUri(e) => e.into(),
+            Fid(e) => e.into(),
             TryFromProtobuf(e) => e.into(),
             RoomServiceError(e) => e.into(),
             RoomServiceMailboxError(_) | TryFromElement(_) => {

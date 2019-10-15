@@ -1,9 +1,12 @@
 pub mod fid;
 pub mod local_uri;
 
-pub use self::local_uri::{LocalUri, StatefulLocalUri};
-
 use super::{EndpointId, MemberId, RoomId};
+
+pub use self::{
+    fid::{Fid, StatefulFid},
+    local_uri::{LocalUri, StatefulLocalUri},
+};
 
 /// State of [`LocalUri`] which points to [`Room`].
 ///

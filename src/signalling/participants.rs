@@ -31,7 +31,7 @@ use crate::{
             RpcConnectionClosed,
         },
         control::{
-            refs::{LocalUri, ToEndpoint, ToMember},
+            refs::{Fid, ToEndpoint, ToMember},
             MemberId, RoomId, RoomSpec,
         },
     },
@@ -57,15 +57,15 @@ pub enum ParticipantServiceErr {
     #[display(fmt = "TurnService Error in ParticipantService: {}", _0)]
     TurnServiceErr(TurnServiceErr),
 
-    /// [`Member`] with provided [`LocalUri`] not found.
+    /// [`Member`] with provided [`Fid`] not found.
     #[display(fmt = "Participant [id = {}] not found", _0)]
-    ParticipantNotFound(LocalUri<ToMember>),
+    ParticipantNotFound(Fid<ToMember>),
 
     /// [`Endpoint`] with provided URI not found.
     ///
     /// [`Endpoint`]: crate::signalling::elements::endpoints::Endpoint
     #[display(fmt = "Endpoint [id = {}] not found.", _0)]
-    EndpointNotFound(LocalUri<ToEndpoint>),
+    EndpointNotFound(Fid<ToEndpoint>),
 
     /// Some error happened in [`Member`].
     #[display(fmt = "{}", _0)]
@@ -136,16 +136,13 @@ impl ParticipantService {
         self.members.get(id).cloned()
     }
 
-    /// Generates [`LocalUri`] which point to some [`Member`] in this
+    /// Generates [`Fid`] which point to some [`Member`] in this
     /// [`ParticipantService`]'s [`Room`].
     ///
     /// __Note__ this function don't check presence of [`Member`] in
     /// [`ParticipantService`].
-    pub fn get_local_uri_to_member(
-        &self,
-        member_id: MemberId,
-    ) -> LocalUri<ToMember> {
-        LocalUri::<ToMember>::new(self.room_id.clone(), member_id)
+    pub fn get_fid_to_member(&self, member_id: MemberId) -> Fid<ToMember> {
+        Fid::<ToMember>::new(self.room_id.clone(), member_id)
     }
 
     /// Lookups [`Member`] by [`MemberId`].
@@ -158,7 +155,7 @@ impl ParticipantService {
     ) -> Result<Member, ParticipantServiceErr> {
         self.members.get(id).cloned().map_or(
             Err(ParticipantServiceErr::ParticipantNotFound(
-                self.get_local_uri_to_member(id.clone()),
+                self.get_fid_to_member(id.clone()),
             )),
             Ok,
         )
@@ -229,7 +226,7 @@ impl ParticipantService {
             None => {
                 return Box::new(wrap_future(future::err(
                     ParticipantServiceErr::ParticipantNotFound(
-                        self.get_local_uri_to_member(member_id),
+                        self.get_fid_to_member(member_id),
                     ),
                 )));
             }

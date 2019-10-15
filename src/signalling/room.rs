@@ -28,7 +28,7 @@ use crate::{
                 WebRtcPlayEndpoint as WebRtcPlayEndpointSpec,
                 WebRtcPublishEndpoint as WebRtcPublishEndpointSpec,
             },
-            refs::{LocalUri, StatefulLocalUri, ToEndpoint, ToMember},
+            refs::{Fid, StatefulFid, ToEndpoint, ToMember},
             room::RoomSpec,
             EndpointId, EndpointSpec, MemberId, MemberSpec, RoomId,
             TryFromElementError, WebRtcPlayId, WebRtcPublishId,
@@ -83,20 +83,16 @@ pub enum RoomError {
     ParticipantServiceErr(ParticipantServiceErr),
     #[display(fmt = "Client error:{}", _0)]
     ClientError(String),
-    #[display(
-        fmt = "Given LocalUri [uri = {}] to wrong room [id = {}]",
-        _0,
-        _1
-    )]
-    WrongRoomId(StatefulLocalUri, RoomId),
+    #[display(fmt = "Given Fid [uri = {}] to wrong room [id = {}]", _0, _1)]
+    WrongRoomId(StatefulFid, RoomId),
     /// Try to create [`Member`] with ID which already exists.
     #[display(fmt = "Member [id = {}] already exists.", _0)]
-    MemberAlreadyExists(LocalUri<ToMember>),
+    MemberAlreadyExists(Fid<ToMember>),
     /// Try to create [`Endpoint`] with ID which already exists.
     ///
     /// [`Endpoint`]: crate::signalling::elements::endpoints::Endpoint
     #[display(fmt = "Endpoint [id = {}] already exists.", _0)]
-    EndpointAlreadyExists(LocalUri<ToEndpoint>),
+    EndpointAlreadyExists(Fid<ToEndpoint>),
 }
 
 impl From<PeerError> for RoomError {
@@ -798,7 +794,7 @@ impl Room {
     ) -> Result<(), RoomError> {
         if self.members.get_member_by_id(&id).is_some() {
             return Err(RoomError::MemberAlreadyExists(
-                self.members.get_local_uri_to_member(id),
+                self.members.get_fid_to_member(id),
             ));
         }
         let signalling_member = Member::new(
@@ -871,7 +867,7 @@ impl Into<ElementProto> for &mut Room {
             .members()
             .into_iter()
             .map(|(id, member)| {
-                let local_uri = LocalUri::<ToMember>::new(self.get_id(), id);
+                let local_uri = Fid::<ToMember>::new(self.get_id(), id);
                 (local_uri.to_string(), member.into())
             })
             .collect();
@@ -886,22 +882,21 @@ impl Into<ElementProto> for &mut Room {
 /// Message for serializing this [`Room`] and [`Room`]'s elements to protobuf
 /// spec.
 #[derive(Message)]
-#[rtype(result = "Result<HashMap<StatefulLocalUri, ElementProto>, RoomError>")]
-pub struct SerializeProto(pub Vec<StatefulLocalUri>);
+#[rtype(result = "Result<HashMap<StatefulFid, ElementProto>, RoomError>")]
+pub struct SerializeProto(pub Vec<StatefulFid>);
 
 impl Handler<SerializeProto> for Room {
-    type Result = Result<HashMap<StatefulLocalUri, ElementProto>, RoomError>;
+    type Result = Result<HashMap<StatefulFid, ElementProto>, RoomError>;
 
     fn handle(
         &mut self,
         msg: SerializeProto,
         _: &mut Self::Context,
     ) -> Self::Result {
-        let mut serialized: HashMap<StatefulLocalUri, ElementProto> =
-            HashMap::new();
+        let mut serialized: HashMap<StatefulFid, ElementProto> = HashMap::new();
         for uri in msg.0 {
             match &uri {
-                StatefulLocalUri::Room(room_uri) => {
+                StatefulFid::Room(room_uri) => {
                     if room_uri.room_id() == &self.id {
                         let current_room: ElementProto = self.into();
                         serialized.insert(uri, current_room);
@@ -912,12 +907,12 @@ impl Handler<SerializeProto> for Room {
                         ));
                     }
                 }
-                StatefulLocalUri::Member(member_uri) => {
+                StatefulFid::Member(member_uri) => {
                     let member =
                         self.members.get_member(member_uri.member_id())?;
                     serialized.insert(uri, member.into());
                 }
-                StatefulLocalUri::Endpoint(endpoint_uri) => {
+                StatefulFid::Endpoint(endpoint_uri) => {
                     let member =
                         self.members.get_member(endpoint_uri.member_id())?;
                     let endpoint = member.get_endpoint_by_id(
@@ -1113,7 +1108,7 @@ impl Handler<Close> for Room {
 /// Signal for delete elements from this [`Room`].
 #[derive(Message, Debug)]
 #[rtype(result = "()")]
-pub struct Delete(pub Vec<StatefulLocalUri>);
+pub struct Delete(pub Vec<StatefulFid>);
 
 impl Handler<Delete> for Room {
     type Result = ();
@@ -1123,15 +1118,13 @@ impl Handler<Delete> for Room {
         let mut endpoint_ids = Vec::new();
         for id in msg.0 {
             match id {
-                StatefulLocalUri::Member(member_uri) => {
+                StatefulFid::Member(member_uri) => {
                     member_ids.push(member_uri);
                 }
-                StatefulLocalUri::Endpoint(endpoint_uri) => {
+                StatefulFid::Endpoint(endpoint_uri) => {
                     endpoint_ids.push(endpoint_uri);
                 }
-                _ => warn!(
-                    "Found LocalUri<IsRoomId> while deleting __from__ Room."
-                ),
+                _ => warn!("Found Fid<IsRoomId> while deleting __from__ Room."),
             }
         }
         member_ids.into_iter().for_each(|uri| {
