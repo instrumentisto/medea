@@ -359,7 +359,7 @@ impl Into<Endpoint> for WebRtcPublishEndpoint {
 /// ```
 fn create_room_req(room_id: &str) -> CreateRequest {
     RoomBuilder::default()
-        .id(format!("local://{}", room_id))
+        .id(format!("{}", room_id))
         .add_member(
             MemberBuilder::default()
                 .id("publisher")

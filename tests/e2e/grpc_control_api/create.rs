@@ -34,19 +34,19 @@ mod room {
             &insert_str!("ws://127.0.0.1:8080/{}/responder/test")
         );
 
-        let mut get_resp = client.get(&insert_str!("local://{}"));
+        let mut get_resp = client.get(&insert_str!("{}"));
         let room = get_resp.take_room();
 
         let responder = room
             .get_pipeline()
-            .get(&insert_str!("local://{}/responder"))
+            .get(&insert_str!("{}/responder"))
             .unwrap()
             .get_member();
         assert_eq!(responder.get_credentials(), "test");
         let responder_pipeline = responder.get_pipeline();
         assert_eq!(responder_pipeline.len(), 1);
         let responder_play = responder_pipeline
-            .get(&insert_str!("local://{}/responder/play"))
+            .get(&insert_str!("{}/responder/play"))
             .unwrap()
             .get_webrtc_play();
         assert_eq!(
@@ -56,7 +56,7 @@ mod room {
 
         let publisher = room
             .get_pipeline()
-            .get(&insert_str!("local://{}/publisher"))
+            .get(&insert_str!("{}/publisher"))
             .unwrap()
             .get_member();
         assert_ne!(publisher.get_credentials(), "test");
@@ -72,7 +72,7 @@ mod room {
         let client = ControlClient::new();
 
         let create_room = RoomBuilder::default()
-            .id(insert_str!("local://{}"))
+            .id(insert_str!("{}"))
             .build()
             .unwrap()
             .into();
@@ -93,7 +93,7 @@ mod room {
         let client = ControlClient::new();
 
         let create_room = RoomBuilder::default()
-            .id(insert_str!("local://qwerty/{}"))
+            .id(insert_str!("qwerty/{}"))
             .build()
             .unwrap()
             .into();
@@ -129,7 +129,7 @@ mod member {
             )
             .build()
             .unwrap()
-            .build_request(insert_str!("local://{}/test-member"));
+            .build_request(insert_str!("{}/test-member"));
 
         let sids = client.create(&add_member);
         let e2e_test_member_sid =
@@ -140,7 +140,7 @@ mod member {
         );
 
         let member = client
-            .get(&insert_str!("local://{}/test-member"))
+            .get(&insert_str!("{}/test-member"))
             .take_member();
         assert_eq!(member.get_pipeline().len(), 1);
         assert_eq!(member.get_credentials(), "qwerty");
@@ -156,7 +156,7 @@ mod member {
             .id("caller")
             .build()
             .unwrap()
-            .build_request(insert_str!("local://{}/member"));
+            .build_request(insert_str!("{}/member"));
 
         if let Err(err) = client.try_create(&create_member) {
             assert_eq!(err.code, ErrorCode::RoomNotFound as u32)
@@ -172,7 +172,7 @@ mod member {
         let client = ControlClient::new();
 
         let create_room = RoomBuilder::default()
-            .id(insert_str!("local://{}"))
+            .id(insert_str!("{}"))
             .build()
             .unwrap()
             .into();
@@ -183,7 +183,7 @@ mod member {
             .id("caller")
             .build()
             .unwrap()
-            .build_request(insert_str!("local://{}/member"));
+            .build_request(insert_str!("{}/member"));
 
         client.create(&create_member);
 
@@ -228,13 +228,13 @@ mod endpoint {
             .p2p_mode(WebRtcPublishEndpoint_P2P::NEVER)
             .build()
             .unwrap()
-            .build_request(insert_str!("local://{}/responder/publish"));
+            .build_request(insert_str!("{}/responder/publish"));
 
         let sids = client.create(&create_req);
         assert_eq!(sids.len(), 0);
 
         let endpoint = client
-            .get(&insert_str!("local://{}/responder/publish"))
+            .get(&insert_str!("{}/responder/publish"))
             .take_webrtc_pub();
         assert_eq!(endpoint.get_p2p(), WebRtcPublishEndpoint_P2P::NEVER);
     }
@@ -246,7 +246,7 @@ mod endpoint {
         let client = ControlClient::new();
 
         let create_room = RoomBuilder::default()
-            .id(insert_str!("local://{}"))
+            .id(insert_str!("{}"))
             .build()
             .unwrap()
             .into();
@@ -258,7 +258,7 @@ mod endpoint {
             .p2p_mode(WebRtcPublishEndpoint_P2P::ALWAYS)
             .build()
             .unwrap()
-            .build_request(insert_str!("local://{}/member/publish"));
+            .build_request(insert_str!("{}/member/publish"));
 
         if let Err(err) = client.try_create(&create_play) {
             assert_eq!(err.code, ErrorCode::MemberNotFound as u32)
@@ -278,7 +278,7 @@ mod endpoint {
             .p2p_mode(WebRtcPublishEndpoint_P2P::ALWAYS)
             .build()
             .unwrap()
-            .build_request(insert_str!("local://{}/member/publish"));
+            .build_request(insert_str!("{}/member/publish"));
 
         if let Err(err) = client.try_create(&create_publish) {
             assert_eq!(err.code, ErrorCode::RoomNotFound as u32)
@@ -294,7 +294,7 @@ mod endpoint {
         let client = ControlClient::new();
 
         let create_room = RoomBuilder::default()
-            .id(insert_str!("local://{}"))
+            .id(insert_str!("{}"))
             .add_member(MemberBuilder::default().id("member").build().unwrap())
             .build()
             .unwrap()
@@ -307,7 +307,7 @@ mod endpoint {
             .p2p_mode(WebRtcPublishEndpoint_P2P::ALWAYS)
             .build()
             .unwrap()
-            .build_request(insert_str!("local://{}/member/publish"));
+            .build_request(insert_str!("{}/member/publish"));
 
         client.create(&create_endpoint);
 
@@ -327,7 +327,7 @@ mod endpoint {
         let client = ControlClient::new();
 
         let create_room = RoomBuilder::default()
-            .id(insert_str!("local://{}"))
+            .id(insert_str!("{}"))
             .add_member(MemberBuilder::default().id("member").build().unwrap())
             .build()
             .unwrap()
@@ -340,7 +340,7 @@ mod endpoint {
             .src(insert_str!("local://{}/member/publish"))
             .build()
             .unwrap()
-            .build_request(insert_str!("local://{}/member/play"));
+            .build_request(insert_str!("{}/member/play"));
 
         if let Err(err) = client.try_create(&create_endpoint) {
             assert_eq!(err.code, ErrorCode::EndpointNotFound as u32)
@@ -358,7 +358,7 @@ mod endpoint {
             .p2p_mode(WebRtcPublishEndpoint_P2P::ALWAYS)
             .build()
             .unwrap()
-            .build_request("local://qwe");
+            .build_request("qwe");
 
         if let Err(err) = client.try_create(&create_endpoint) {
             assert_eq!(err.code, ErrorCode::ElementIdMismatch as u32)

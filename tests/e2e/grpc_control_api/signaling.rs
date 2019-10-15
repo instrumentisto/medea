@@ -27,7 +27,7 @@ fn signalling_starts_when_create_play_member_after_pub_member() {
     let control_client = ControlClient::new();
 
     let create_room = RoomBuilder::default()
-        .id(insert_str!("local://{}"))
+        .id(insert_str!("{}"))
         .add_member(
             MemberBuilder::default()
                 .id("publisher")
@@ -81,7 +81,7 @@ fn signalling_starts_when_create_play_member_after_pub_member() {
                 )
                 .build()
                 .unwrap()
-                .build_request(insert_str!("local://{}/responder"));
+                .build_request(insert_str!("{}/responder"));
 
             control_client.create(&create_play_member);
             TestMember::connect(
@@ -106,7 +106,7 @@ fn peers_removed_on_delete_member() {
     let control_client = ControlClient::new();
 
     let create_room = RoomBuilder::default()
-        .id(insert_str!("local://{}"))
+        .id(insert_str!("{}"))
         .add_member(
             MemberBuilder::default()
                 .id("publisher")
@@ -149,7 +149,7 @@ fn peers_removed_on_delete_member() {
                     peers_created.set(peers_created.get() + 1);
                     if peers_created.get() == 2 {
                         control_client
-                            .delete(&[&insert_str!("local://{}/responder")])
+                            .delete(&[&insert_str!("{}/responder")])
                             .unwrap();
                     }
                 }

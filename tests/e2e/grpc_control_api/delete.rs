@@ -52,7 +52,7 @@ fn room() {
     gen_insert_str_macro!("delete-room");
     test_for_delete(
         &insert_str!("{}"),
-        &insert_str!("local://{}"),
+        &insert_str!("{}"),
         ErrorCode::RoomNotFound,
     );
 }
@@ -62,7 +62,7 @@ fn member() {
     gen_insert_str_macro!("delete-member");
     test_for_delete(
         &insert_str!("{}"),
-        &insert_str!("local://{}/publisher"),
+        &insert_str!("{}/publisher"),
         ErrorCode::MemberNotFound,
     );
 }
@@ -72,7 +72,7 @@ fn endpoint() {
     gen_insert_str_macro!("delete-endpoint");
     test_for_delete(
         &insert_str!("{}"),
-        &insert_str!("local://{}/publisher/publish"),
+        &insert_str!("{}/publisher/publish"),
         ErrorCode::EndpointNotFound,
     );
 }
@@ -120,11 +120,11 @@ fn cascade_delete_endpoints_when_deleting_member() {
     test_cascade_delete(
         &insert_str!("{}"),
         &[
-            &insert_str!("local://{}/publisher"),
-            &insert_str!("local://{}/publisher/publish"),
+            &insert_str!("{}/publisher"),
+            &insert_str!("{}/publisher/publish"),
         ],
         MedeaErrorCode::MemberNotFound,
-        &insert_str!("local://{}/publisher"),
+        &insert_str!("{}/publisher"),
     );
 }
 
@@ -135,12 +135,12 @@ fn cascade_delete_everything_when_deleting_room() {
     test_cascade_delete(
         &insert_str!("{}"),
         &[
-            &insert_str!("local://{}"),
-            &insert_str!("local://{}/publisher"),
-            &insert_str!("local://{}/publisher/publish"),
+            &insert_str!("{}"),
+            &insert_str!("{}/publisher"),
+            &insert_str!("{}/publisher/publish"),
         ],
         MedeaErrorCode::RoomNotFound,
-        &insert_str!("local://{}"),
+        &insert_str!("{}"),
     );
 }
 
@@ -149,7 +149,7 @@ fn cant_delete_members_from_different_rooms_in_single_request() {
     let client = ControlClient::new();
 
     if let Err(err) =
-        client.delete(&["local://room1/member1", "local://room2/member1"])
+        client.delete(&["room1/member1", "room2/member1"])
     {
         assert_eq!(err.code, MedeaErrorCode::ProvidedNotSameRoomIds as u32);
     } else {
@@ -162,8 +162,8 @@ fn cant_delete_endpoints_from_different_rooms_in_single_request() {
     let client = ControlClient::new();
 
     if let Err(err) = client.delete(&[
-        "local://room1/member1/endpoint1",
-        "local://room2/member1/endpoint1",
+        "room1/member1/endpoint1",
+        "room2/member1/endpoint1",
     ]) {
         assert_eq!(err.code, MedeaErrorCode::ProvidedNotSameRoomIds as u32);
     } else {
