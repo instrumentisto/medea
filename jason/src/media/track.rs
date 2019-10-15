@@ -49,3 +49,9 @@ impl MediaTrack {
         self.track.set_enabled(enabled)
     }
 }
+
+impl Drop for MediaTrack {
+    fn drop(&mut self) {
+        self.track.stop()
+    }
+}

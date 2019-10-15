@@ -7,11 +7,16 @@ use std::{collections::HashMap, convert::TryFrom};
 use medea_client_api_proto::{
     AudioSettings, MediaType, TrackId, VideoSettings,
 };
-use wasm_bindgen::JsValue;
+use web_sys::{
+    MediaStream as SysMediaStream, MediaStreamTrack as SysMediaStreamTrack,
+};
 
 use crate::utils::WasmErr;
 
-use super::{MediaStream, MediaTrack};
+use super::{
+    AudioTrackConstraints, MediaStream, MediaStreamConstraints, MediaTrack,
+    VideoTrackConstraints,
+};
 
 /// Representation of [MediaStreamConstraints][1] object.
 ///
@@ -52,10 +57,10 @@ pub struct SimpleStreamRequest {
 }
 
 impl SimpleStreamRequest {
-    /// Parses raw [`web_sys::MediaStream`] and returns [`MediaStream`].
+    /// Parses raw [`SysMediaStream`] and returns [`MediaStream`].
     pub fn parse_stream(
         &self,
-        stream: &web_sys::MediaStream,
+        stream: &SysMediaStream,
     ) -> Result<MediaStream, WasmErr> {
         let mut tracks = Vec::new();
 
@@ -64,7 +69,7 @@ impl SimpleStreamRequest {
                 js_sys::try_iter(&stream.get_audio_tracks())
                     .unwrap()
                     .unwrap()
-                    .map(|tr| web_sys::MediaStreamTrack::from(tr.unwrap()))
+                    .map(|tr| SysMediaStreamTrack::from(tr.unwrap()))
                     .collect();
 
             if audio_tracks.len() == 1 {
@@ -87,7 +92,7 @@ impl SimpleStreamRequest {
                 js_sys::try_iter(&stream.get_video_tracks())
                     .unwrap()
                     .unwrap()
-                    .map(|tr| web_sys::MediaStreamTrack::from(tr.unwrap()))
+                    .map(|tr| SysMediaStreamTrack::from(tr.unwrap()))
                     .collect();
 
             if video_tracks.len() == 1 {
@@ -142,17 +147,15 @@ impl TryFrom<StreamRequest> for SimpleStreamRequest {
     }
 }
 
-// TODO: it will be required to map settings to MediaStreamConstraints
-//       when settings will be extended
-impl From<&SimpleStreamRequest> for web_sys::MediaStreamConstraints {
+impl From<&SimpleStreamRequest> for MediaStreamConstraints {
     fn from(request: &SimpleStreamRequest) -> Self {
         let mut constraints = Self::new();
 
         if let Some((_, _)) = request.video {
-            constraints.video(&JsValue::from_bool(true));
+            constraints.video(VideoTrackConstraints::new());
         }
         if let Some((_, _)) = request.audio {
-            constraints.audio(&JsValue::from_bool(true));
+            constraints.audio(AudioTrackConstraints::new());
         }
 
         constraints
