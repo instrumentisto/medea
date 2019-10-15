@@ -1,3 +1,5 @@
+/// Implementation of Full ID (`fid` in dynamic Control API specs).
+
 use std::{
     convert::{From, TryFrom},
     fmt::{Display, Error, Formatter},
@@ -9,6 +11,7 @@ use crate::{api::control::RoomId, impl_uri};
 
 use super::{ToEndpoint, ToMember, ToRoom};
 
+/// Errors which can happen while parsing [`Fid`].
 #[derive(Display, Debug)]
 pub enum ParseFidError {
     #[display(fmt = "Fid is empty.")]
@@ -18,6 +21,7 @@ pub enum ParseFidError {
     TooManyPaths(String),
 }
 
+/// Full ID (`fid` in dynamic Control API specs).
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Fid<T> {
     state: T,
@@ -60,6 +64,7 @@ impl Display for Fid<ToEndpoint> {
     }
 }
 
+/// Enum for storing [`Fid`]s in all states.
 #[allow(clippy::module_name_repetitions)]
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Display, From)]
 pub enum StatefulFid {

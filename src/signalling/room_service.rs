@@ -154,16 +154,6 @@ impl Actor for RoomService {
     type Context = Context<Self>;
 }
 
-// TODO: is this needed??
-//       maybe Fid::<ToRoom>::new()??
-/// Returns [`Fid`] pointing to [`Room`].
-///
-/// __Note__ this function don't check presence of [`Room`] in this
-/// [`RoomService`].
-fn get_fid_to_room(room_id: RoomId) -> Fid<ToRoom> {
-    Fid::<ToRoom>::new(room_id)
-}
-
 /// Signal for load all static specs and start [`Room`]s.
 #[derive(Message)]
 #[rtype(result = "Result<(), RoomServiceError>")]
@@ -182,7 +172,7 @@ impl Handler<StartStaticRooms> for RoomService {
         for spec in room_specs {
             if self.room_repo.contains_room_with_id(spec.id()) {
                 return Err(RoomServiceError::RoomAlreadyExists(
-                    get_fid_to_room(spec.id),
+                    Fid::<ToRoom>::new(spec.id),
                 ));
             }
 
@@ -222,7 +212,7 @@ impl Handler<CreateRoom> for RoomService {
         let room_spec = msg.spec;
 
         if self.room_repo.get(&room_spec.id).is_some() {
-            return Err(RoomServiceError::RoomAlreadyExists(get_fid_to_room(
+            return Err(RoomServiceError::RoomAlreadyExists(Fid::<ToRoom>::new(
                 room_spec.id,
             )));
         }

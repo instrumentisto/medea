@@ -1,3 +1,5 @@
+//! Implementation of all kinds of references to some resource used in Medea's Control API specs.
+
 #![allow(clippy::use_self)]
 
 pub mod fid;
@@ -5,6 +7,7 @@ pub mod local_uri;
 
 use super::{EndpointId, MemberId, RoomId};
 
+#[doc(inline)]
 pub use self::{
     fid::{Fid, StatefulFid},
     local_uri::{LocalUri, StatefulLocalUri},
