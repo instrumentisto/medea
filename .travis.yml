@@ -29,14 +29,12 @@ jobs:
     - name: Clippy
       stage: check
       rust: stable
-      before_script: rustup component add clippy
       script: make lint
 
     - name: rustfmt
       stage: check
       rust: nightly
       cache: false
-      before_script: rustup component add rustfmt
       script: make fmt check=yes
 
     - name: medea-jason (stable)

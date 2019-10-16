@@ -6,10 +6,9 @@
 //! [Control API]: https://tinyurl.com/yxsqplq7
 
 use medea_control_api_proto::grpc::api::WebRtcPublishEndpoint_P2P;
+use medea::api::control::error_codes::ErrorCode;
 
 use crate::gen_insert_str_macro;
-
-use medea::api::control::error_codes::ErrorCode;
 
 use super::{
     create_room_req, ControlClient, MemberBuilder, RoomBuilder,
