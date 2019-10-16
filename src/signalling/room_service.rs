@@ -240,7 +240,7 @@ impl Handler<CreateRoom> for RoomService {
 #[rtype(result = "Result<(), RoomServiceError>")]
 pub struct CreateMemberInRoom {
     pub id: MemberId,
-    pub uri: Fid<ToRoom>,
+    pub parent_fid: Fid<ToRoom>,
     pub spec: MemberSpec,
 }
 
@@ -252,7 +252,7 @@ impl Handler<CreateMemberInRoom> for RoomService {
         msg: CreateMemberInRoom,
         _: &mut Self::Context,
     ) -> Self::Result {
-        let room_id = msg.uri.take_room_id();
+        let room_id = msg.parent_fid.take_room_id();
 
         if let Some(room) = self.room_repo.get(&room_id) {
             Box::new(
@@ -261,8 +261,8 @@ impl Handler<CreateMemberInRoom> for RoomService {
                     .and_then(|r| r.map_err(RoomServiceError::from)),
             )
         } else {
-            let room_uri = Fid::<ToRoom>::new(room_id);
-            Box::new(future::err(RoomServiceError::RoomNotFound(room_uri)))
+            let room_fid = Fid::<ToRoom>::new(room_id);
+            Box::new(future::err(RoomServiceError::RoomNotFound(room_fid)))
         }
     }
 }
@@ -274,7 +274,7 @@ impl Handler<CreateMemberInRoom> for RoomService {
 #[rtype(result = "Result<(), RoomServiceError>")]
 pub struct CreateEndpointInRoom {
     pub id: EndpointId,
-    pub uri: Fid<ToMember>,
+    pub parent_fid: Fid<ToMember>,
     pub spec: EndpointSpec,
 }
 
@@ -286,7 +286,7 @@ impl Handler<CreateEndpointInRoom> for RoomService {
         msg: CreateEndpointInRoom,
         _: &mut Self::Context,
     ) -> Self::Result {
-        let (room_id, member_id) = msg.uri.take_all();
+        let (room_id, member_id) = msg.parent_fid.take_all();
         let endpoint_id = msg.id;
 
         if let Some(room) = self.room_repo.get(&room_id) {
@@ -300,8 +300,8 @@ impl Handler<CreateEndpointInRoom> for RoomService {
                 .and_then(|r| r.map_err(RoomServiceError::from)),
             )
         } else {
-            let room_uri = Fid::<ToRoom>::new(room_id);
-            Box::new(future::err(RoomServiceError::RoomNotFound(room_uri)))
+            let room_fid = Fid::<ToRoom>::new(room_id);
+            Box::new(future::err(RoomServiceError::RoomNotFound(room_fid)))
         }
     }
 }
@@ -322,28 +322,28 @@ impl DeleteElements<Unvalidated> {
     /// Creates new [`DeleteElements`] in [`Unvalidated`] state.
     pub fn new() -> Self {
         Self {
-            uris: Vec::new(),
+            fids: Vec::new(),
             _validation_state: PhantomData,
         }
     }
 
     /// Adds [`StatefulFid`] to request.
-    pub fn add_uri(&mut self, uri: StatefulFid) {
-        self.uris.push(uri)
+    pub fn add_fid(&mut self, fid: StatefulFid) {
+        self.fids.push(fid)
     }
 
-    /// Validates request. It must have at least one uri, all uris must share
+    /// Validates request. It must have at least one fid, all fids must share
     /// same [`RoomId`].
     pub fn validate(
         self,
     ) -> Result<DeleteElements<Validated>, RoomServiceError> {
-        if self.uris.is_empty() {
+        if self.fids.is_empty() {
             return Err(RoomServiceError::EmptyUrisList);
         }
 
-        let first_room_id = self.uris[0].room_id();
+        let first_room_id = self.fids[0].room_id();
 
-        for id in &self.uris {
+        for id in &self.fids {
             if first_room_id != id.room_id() {
                 return Err(RoomServiceError::NotSameRoomIds(
                     first_room_id.clone(),
@@ -353,7 +353,7 @@ impl DeleteElements<Unvalidated> {
         }
 
         Ok(DeleteElements {
-            uris: self.uris,
+            fids: self.fids,
             _validation_state: PhantomData,
         })
     }
@@ -376,7 +376,7 @@ impl DeleteElements<Unvalidated> {
 #[derive(Message, Default)]
 #[rtype(result = "Result<(), RoomServiceError>")]
 pub struct DeleteElements<T> {
-    uris: Vec<StatefulFid>,
+    fids: Vec<StatefulFid>,
     _validation_state: PhantomData<T>,
 }
 
@@ -396,7 +396,7 @@ impl Handler<DeleteElements<Validated>> for RoomService {
         let room_messages_futs: Vec<
             Box<dyn Future<Item = (), Error = MailboxError>>,
         > = msg
-            .uris
+            .fids
             .into_iter()
             .filter_map(|l| {
                 if let StatefulFid::Room(room_id) = l {
@@ -446,17 +446,17 @@ impl Handler<Get> for RoomService {
 
     fn handle(&mut self, msg: Get, _: &mut Self::Context) -> Self::Result {
         let mut rooms_elements = HashMap::new();
-        for uri in msg.0 {
-            let room_id = uri.room_id();
+        for fid in msg.0 {
+            let room_id = fid.room_id();
 
             if let Some(room) = self.room_repo.get(room_id) {
                 rooms_elements
                     .entry(room)
                     .or_insert_with(Vec::new)
-                    .push(uri);
+                    .push(fid);
             } else {
                 return Box::new(future::err(RoomServiceError::RoomNotFound(
-                    uri.into(),
+                    fid.into(),
                 )));
             }
         }
@@ -490,7 +490,7 @@ mod delete_elements_validation_specs {
     use super::*;
 
     #[test]
-    fn empty_uris_list() {
+    fn empty_fids_list() {
         let elements = DeleteElements::new();
         match elements.validate() {
             Ok(_) => panic!(
@@ -512,8 +512,8 @@ mod delete_elements_validation_specs {
         let mut elements = DeleteElements::new();
         ["room_id/member", "another_room_id/member"]
             .iter()
-            .map(|uri| StatefulFid::try_from(uri.to_string()).unwrap())
-            .for_each(|uri| elements.add_uri(uri));
+            .map(|fid| StatefulFid::try_from(fid.to_string()).unwrap())
+            .for_each(|fid| elements.add_fid(fid));
 
         match elements.validate() {
             Ok(_) => panic!(
@@ -542,8 +542,8 @@ mod delete_elements_validation_specs {
             "room_id/member_id/endpoint_id",
         ]
         .iter()
-        .map(|uri| StatefulFid::try_from(uri.to_string()).unwrap())
-        .for_each(|uri| elements.add_uri(uri));
+        .map(|fid| StatefulFid::try_from(fid.to_string()).unwrap())
+        .for_each(|fid| elements.add_fid(fid));
 
         assert!(elements.validate().is_ok());
     }
@@ -604,7 +604,7 @@ mod room_service_specs {
     ///
     /// `$create_msg` - [`actix::Message`] which will create `Element`,
     ///
-    /// `$element_uri` - [`StatefulFid`] to `Element` which you try to
+    /// `$element_fid` - [`StatefulFid`] to `Element` which you try to
     /// create,
     ///
     /// `$test` - closure in which will be provided created
@@ -613,10 +613,10 @@ mod room_service_specs {
         (
             $room_service:expr,
             $create_msg:expr,
-            $element_uri:expr,
+            $element_fid:expr,
             $test:expr
         ) => {{
-            let get_msg = Get(vec![$element_uri.clone()]);
+            let get_msg = Get(vec![$element_fid.clone()]);
             $room_service
                 .send($create_msg)
                 .and_then(move |res| {
@@ -625,7 +625,7 @@ mod room_service_specs {
                 })
                 .map(move |r| {
                     let mut resp = r.unwrap();
-                    resp.remove(&$element_uri).unwrap()
+                    resp.remove(&$element_fid).unwrap()
                 })
                 .map($test)
                 .map(|_| actix::System::current().stop())
@@ -639,14 +639,14 @@ mod room_service_specs {
 
         let room_service = room_service(RoomRepository::new(HashMap::new()));
         let spec = room_spec();
-        let caller_uri =
+        let caller_fid =
             StatefulFid::try_from("pub-sub-video-call/caller".to_string())
                 .unwrap();
 
         actix::spawn(test_for_create!(
             room_service,
             CreateRoom { spec },
-            caller_uri,
+            caller_fid,
             |member_el| {
                 assert_eq!(member_el.get_member().get_pipeline().len(), 1);
             }
@@ -672,19 +672,21 @@ mod room_service_specs {
             room_id.clone() => Room::new(&spec, &app_ctx()).unwrap().start(),
         )));
 
-        let member_uri = Fid::<ToRoom>::new(room_id);
+        let member_parent_fid = Fid::<ToRoom>::new(room_id);
         let member_id: MemberId = "test-member".to_string().into();
-        let stateful_member_uri: StatefulFid =
-            member_uri.clone().push_member_id(member_id.clone()).into();
+        let member_fid: StatefulFid = member_parent_fid
+            .clone()
+            .push_member_id(member_id.clone())
+            .into();
 
         actix::spawn(test_for_create!(
             room_service,
             CreateMemberInRoom {
                 id: member_id,
                 spec: member_spec,
-                uri: member_uri,
+                parent_fid: member_parent_fid,
             },
-            stateful_member_uri,
+            member_fid,
             |member_el| {
                 assert_eq!(member_el.get_member().get_pipeline().len(), 1);
             }
@@ -715,18 +717,22 @@ mod room_service_specs {
             room_id.clone() => Room::new(&spec, &app_ctx()).unwrap().start(),
         )));
 
-        let endpoint_uri =
+        let endpoint_parent_fid =
             Fid::<ToMember>::new(room_id, "caller".to_string().into());
-        let stateful_endpoint_uri: StatefulFid = endpoint_uri.clone().into();
+        let endpoint_id: EndpointId = "test-publish".to_string().into();
+        let endpoint_fid: StatefulFid = endpoint_parent_fid
+            .clone()
+            .push_endpoint_id(endpoint_id.clone())
+            .into();
 
         actix::spawn(test_for_create!(
             room_service,
             CreateEndpointInRoom {
-                id: "test-publish".to_string().into(),
+                id: endpoint_id,
                 spec: endpoint_spec,
-                uri: endpoint_uri,
+                parent_fid: endpoint_parent_fid,
             },
-            stateful_endpoint_uri,
+            endpoint_fid,
             |endpoint_el| {
                 assert_eq!(
                     endpoint_el.get_webrtc_pub().get_p2p(),
@@ -748,17 +754,17 @@ mod room_service_specs {
     /// This function automatically stops [`actix::System`] when test completed.
     fn test_for_delete_and_get(
         room_service: Addr<RoomService>,
-        element_stateful_uri: StatefulFid,
+        element_fid: StatefulFid,
     ) -> impl Future<Item = (), Error = ()> {
         let mut delete_msg = DeleteElements::new();
-        delete_msg.add_uri(element_stateful_uri.clone());
+        delete_msg.add_fid(element_fid.clone());
         let delete_msg = delete_msg.validate().unwrap();
 
         room_service
             .send(delete_msg)
             .and_then(move |res| {
                 res.unwrap();
-                room_service.send(Get(vec![element_stateful_uri]))
+                room_service.send(Get(vec![element_fid]))
             })
             .map(move |res| {
                 assert!(res.is_err());
@@ -772,14 +778,13 @@ mod room_service_specs {
         let sys = actix::System::new("room-service-tests");
 
         let room_id: RoomId = "pub-sub-video-call".to_string().into();
-        let stateful_room_uri =
-            StatefulFid::from(Fid::<ToRoom>::new(room_id.clone()));
+        let room_fid = StatefulFid::from(Fid::<ToRoom>::new(room_id.clone()));
 
         let room_service = room_service(RoomRepository::new(hashmap!(
             room_id => Room::new(&room_spec(), &app_ctx()).unwrap().start(),
         )));
 
-        actix::spawn(test_for_delete_and_get(room_service, stateful_room_uri));
+        actix::spawn(test_for_delete_and_get(room_service, room_fid));
 
         sys.run().unwrap();
     }
@@ -789,7 +794,7 @@ mod room_service_specs {
         let sys = actix::System::new("room-service-tests");
 
         let room_id: RoomId = "pub-sub-video-call".to_string().into();
-        let stateful_member_uri = StatefulFid::from(Fid::<ToMember>::new(
+        let member_fid = StatefulFid::from(Fid::<ToMember>::new(
             room_id.clone(),
             "caller".to_string().into(),
         ));
@@ -798,10 +803,7 @@ mod room_service_specs {
             room_id => Room::new(&room_spec(), &app_ctx()).unwrap().start(),
         )));
 
-        actix::spawn(test_for_delete_and_get(
-            room_service,
-            stateful_member_uri,
-        ));
+        actix::spawn(test_for_delete_and_get(room_service, member_fid));
 
         sys.run().unwrap();
     }
@@ -811,7 +813,7 @@ mod room_service_specs {
         let sys = actix::System::new("room-service-tests");
 
         let room_id: RoomId = "pub-sub-video-call".to_string().into();
-        let stateful_endpoint_uri = StatefulFid::from(Fid::<ToEndpoint>::new(
+        let endpoint_fid = StatefulFid::from(Fid::<ToEndpoint>::new(
             room_id.clone(),
             "caller".to_string().into(),
             "publish".to_string().into(),
@@ -821,10 +823,7 @@ mod room_service_specs {
             room_id => Room::new(&room_spec(), &app_ctx()).unwrap().start(),
         )));
 
-        actix::spawn(test_for_delete_and_get(
-            room_service,
-            stateful_endpoint_uri,
-        ));
+        actix::spawn(test_for_delete_and_get(room_service, endpoint_fid));
 
         sys.run().unwrap();
     }

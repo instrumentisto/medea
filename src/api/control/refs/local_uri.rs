@@ -1,4 +1,4 @@
-//! URI for pointing to some Medea element.
+//! URI for pointing to some Medea element in spec.
 
 // Fix clippy's wrong errors for `Self` in `LocalUri`s with states as generics.
 #![allow(clippy::use_self)]
@@ -253,7 +253,7 @@ impl TryFrom<String> for StatefulLocalUri {
 }
 
 #[cfg(test)]
-mod tests {
+mod specs {
     use super::*;
 
     #[test]
@@ -352,12 +352,12 @@ mod tests {
     #[test]
     fn properly_serialize() {
         for local_uri_str in vec![
-            String::from("local://room_id"),
-            String::from("local://room_id/member_id"),
-            String::from("local://room_id/member_id/endpoint_id"),
+            "local://room_id",
+            "local://room_id/member_id",
+            "local://room_id/member_id/endpoint_id",
         ] {
             let local_uri =
-                StatefulLocalUri::try_from(local_uri_str.clone()).unwrap();
+                StatefulLocalUri::try_from(local_uri_str.to_string()).unwrap();
             assert_eq!(local_uri_str.to_string(), local_uri.to_string());
         }
     }
@@ -365,11 +365,11 @@ mod tests {
     #[test]
     fn return_error_when_local_uri_not_full() {
         for local_uri_str in vec![
-            String::from("local://room_id//endpoint_id"),
-            String::from("local:////endpoint_id"),
-            String::from("local:///member_id/endpoint_id"),
+            "local://room_id//endpoint_id",
+            "local:////endpoint_id",
+            "local:///member_id/endpoint_id",
         ] {
-            match StatefulLocalUri::try_from(local_uri_str) {
+            match StatefulLocalUri::try_from(local_uri_str.to_string()) {
                 Ok(_) => unreachable!(),
                 Err(e) => match e {
                     LocalUriParseError::MissingPaths(_) => (),

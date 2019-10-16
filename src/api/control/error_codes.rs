@@ -143,10 +143,10 @@ pub enum ErrorCode {
     #[display(fmt = "Request doesn't contain any elements")]
     NoElement = 1001,
 
-    /// Provided uri can't point to provided element.
+    /// Provided fid can't point to provided element.
     ///
     /// Code: __1002__.
-    #[display(fmt = "Provided uri can't point to provided element")]
+    #[display(fmt = "Provided fid can't point to provided element")]
     ElementIdMismatch = 1002,
 
     /// Room not found.
@@ -200,10 +200,10 @@ pub enum ErrorCode {
     #[display(fmt = "Element's URI don't have 'local://' prefix.")]
     ElementIdIsNotLocal = 1010,
 
-    /// Provided element's URI with too many paths.
+    /// Provided element's FID/URI with too many paths.
     ///
     /// Code: __1011__.
-    #[display(fmt = "You provided element's URI with too many paths.")]
+    #[display(fmt = "You provided element's FID/URI with too many paths.")]
     ElementIdIsTooLong = 1011,
 
     /// Missing some fields in source URI of WebRtcPublishEndpoint.
@@ -217,13 +217,13 @@ pub enum ErrorCode {
     /// Empty element ID.
     ///
     /// Code: __1013__.
-    #[display(fmt = "Provided empty element URI.")]
+    #[display(fmt = "Provided empty element ID.")]
     EmptyElementId = 1013,
 
-    /// Provided empty elements URIs list.
+    /// Provided empty elements FIDs list.
     ///
     /// Code: __1014__.
-    #[display(fmt = "Provided empty elements URIs list.")]
+    #[display(fmt = "Provided empty elements FIDs list.")]
     EmptyElementsList = 1014,
 
     /// Provided not the same Room IDs in elements IDs. Probably you try use
@@ -237,23 +237,29 @@ pub enum ErrorCode {
                      different Room IDs")]
     ProvidedNotSameRoomIds = 1015,
 
-    /// Room with provided URI already exists.
+    /// Room with provided fid already exists.
     ///
     /// Code: __1016__.
-    #[display(fmt = "Room with provided URI already exists.")]
+    #[display(fmt = "Room with provided FID already exists.")]
     RoomAlreadyExists = 1016,
 
-    /// Member with provided URI already exists.
+    /// Member with provided FID already exists.
     ///
     /// Code: __1017__.
-    #[display(fmt = "Member with provided URI already exists.")]
+    #[display(fmt = "Member with provided FID already exists.")]
     MemberAlreadyExists = 1017,
 
-    /// Endpoint with provided URI already exists.
+    /// Endpoint with provided FID already exists.
     ///
     /// Code: __1018__.
-    #[display(fmt = "Endpoint with provided URI already exists.")]
+    #[display(fmt = "Endpoint with provided FID already exists.")]
     EndpointAlreadyExists = 1018,
+
+    /// Missing path in some pointer to the Medea element.
+    ///
+    /// Code: __1019__.
+    #[display(fmt = "Missing path in some pointer to the Medea element.")]
+    MissingPath = 1019,
 
     /// Unexpected server error.
     ///
@@ -303,7 +309,7 @@ impl From<TryFromProtobufError> for ErrorResponse {
             ExpectedOtherElement(element, id) => Self::with_explanation(
                 ErrorCode::ElementIdMismatch,
                 format!(
-                    "Provided uri can not point to element of type [{}]",
+                    "Provided fid can not point to element of type [{}]",
                     element
                 ),
                 Some(id),
@@ -344,6 +350,7 @@ impl From<ParseFidError> for ErrorResponse {
                 Self::new(ErrorCode::ElementIdIsTooLong, &text)
             }
             Empty => Self::without_id(ErrorCode::EmptyElementId),
+            MissingPath(text) => Self::new(ErrorCode::MissingPath, &text),
         }
     }
 }
@@ -430,7 +437,7 @@ impl From<RoomServiceError> for ErrorResponse {
             NotSameRoomIds(id1, id2) => Self::with_explanation(
                 ErrorCode::ProvidedNotSameRoomIds,
                 format!(
-                    "All URI's must have equal room_id. Provided Id's are \
+                    "All FID's must have equal room_id. Provided Id's are \
                      different: [{}] != [{}]",
                     id1, id2
                 ),

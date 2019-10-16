@@ -235,7 +235,7 @@ impl Member {
     ///
     /// __Note__ this function don't check presence of `Endpoint` in this
     /// [`Member`].
-    pub fn get_local_uri_to_endpoint(
+    pub fn get_fid_to_endpoint(
         &self,
         endpoint_id: EndpointId,
     ) -> Fid<ToEndpoint> {
@@ -389,7 +389,7 @@ impl Member {
         }
 
         Err(MemberError::EndpointNotFound(
-            self.get_local_uri_to_endpoint(webrtc_play_id.into()),
+            self.get_fid_to_endpoint(webrtc_play_id.into()),
         ))
     }
 
@@ -486,13 +486,13 @@ impl Into<ElementProto> for Member {
 
         let mut member_pipeline = HashMap::new();
         for (id, play) in self.sinks() {
-            let local_uri = self.get_local_uri_to_endpoint(id.into());
-            member_pipeline.insert(local_uri.to_string(), play.into());
+            let endpoint_fid = self.get_fid_to_endpoint(id.into());
+            member_pipeline.insert(endpoint_fid.to_string(), play.into());
         }
         for (id, publish) in self.srcs() {
-            let local_uri = self.get_local_uri_to_endpoint(id.into());
+            let endpoint_fid = self.get_fid_to_endpoint(id.into());
 
-            member_pipeline.insert(local_uri.to_string(), publish.into());
+            member_pipeline.insert(endpoint_fid.to_string(), publish.into());
         }
         member.set_pipeline(member_pipeline);
 

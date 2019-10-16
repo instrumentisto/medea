@@ -147,7 +147,11 @@ impl ControlApiService {
         sids.insert(id.to_string(), sid);
 
         self.room_service
-            .send(CreateMemberInRoom { id, uri, spec })
+            .send(CreateMemberInRoom {
+                id,
+                parent_fid: uri,
+                spec,
+            })
             .map_err(GrpcControlApiError::RoomServiceMailboxError)
             .and_then(|r| r.map_err(GrpcControlApiError::from).map(|_| sids))
     }
@@ -160,7 +164,11 @@ impl ControlApiService {
         spec: EndpointSpec,
     ) -> impl Future<Item = Sids, Error = GrpcControlApiError> {
         self.room_service
-            .send(CreateEndpointInRoom { id, uri, spec })
+            .send(CreateEndpointInRoom {
+                id,
+                parent_fid: uri,
+                spec,
+            })
             .map_err(GrpcControlApiError::RoomServiceMailboxError)
             .and_then(|r| {
                 r.map_err(GrpcControlApiError::from).map(|_| HashMap::new())
@@ -183,9 +191,7 @@ impl ControlApiService {
         };
 
         let parent_fid = match StatefulFid::try_from(unparsed_parent_fid) {
-            Ok(parent_fid) => {
-                parent_fid
-            }
+            Ok(parent_fid) => parent_fid,
             Err(e) => {
                 if let ParseFidError::Empty = e {
                     return Box::new(
@@ -267,7 +273,7 @@ impl ControlApiService {
         for id in req.take_fid().into_iter() {
             match StatefulFid::try_from(id) {
                 Ok(uri) => {
-                    delete_elements_msg.add_uri(uri);
+                    delete_elements_msg.add_fid(uri);
                 }
                 Err(e) => {
                     return future::Either::A(future::err(e.into()));

@@ -83,7 +83,7 @@ pub enum RoomError {
     ParticipantServiceErr(ParticipantServiceErr),
     #[display(fmt = "Client error:{}", _0)]
     ClientError(String),
-    #[display(fmt = "Given Fid [uri = {}] to wrong room [id = {}]", _0, _1)]
+    #[display(fmt = "Given Fid [fid = {}] to wrong Room [id = {}]", _0, _1)]
     WrongRoomId(StatefulFid, RoomId),
     /// Try to create [`Member`] with ID which already exists.
     #[display(fmt = "Member [id = {}] already exists.", _0)]
@@ -694,7 +694,7 @@ impl Room {
 
         if is_member_have_this_sink_id || is_member_have_this_src_id {
             return Err(RoomError::EndpointAlreadyExists(
-                member.get_local_uri_to_endpoint(play_id.into()),
+                member.get_fid_to_endpoint(play_id.into()),
             ));
         }
 
@@ -741,7 +741,7 @@ impl Room {
             member.get_src_by_id(&publish_id).is_some();
         if is_member_have_this_sink_id || is_member_have_this_src_id {
             return Err(RoomError::EndpointAlreadyExists(
-                member.get_local_uri_to_endpoint(publish_id.into()),
+                member.get_fid_to_endpoint(publish_id.into()),
             ));
         }
 
@@ -750,7 +750,7 @@ impl Room {
             .get_src_by_id(&spec.src.endpoint_id)
             .ok_or_else(|| {
                 MemberError::EndpointNotFound(
-                    partner_member.get_local_uri_to_endpoint(
+                    partner_member.get_fid_to_endpoint(
                         spec.src.endpoint_id.clone().into(),
                     ),
                 )
@@ -819,7 +819,7 @@ impl Room {
                 .get_src_by_id(&play.src.endpoint_id)
                 .ok_or_else(|| {
                     MemberError::EndpointNotFound(
-                        partner_member.get_local_uri_to_endpoint(
+                        partner_member.get_fid_to_endpoint(
                             play.src.endpoint_id.clone().into(),
                         ),
                     )
@@ -867,8 +867,8 @@ impl Into<ElementProto> for &mut Room {
             .members()
             .into_iter()
             .map(|(id, member)| {
-                let local_uri = Fid::<ToMember>::new(self.get_id(), id);
-                (local_uri.to_string(), member.into())
+                let member_fid = Fid::<ToMember>::new(self.get_id(), id);
+                (member_fid.to_string(), member.into())
             })
             .collect();
 
@@ -894,31 +894,31 @@ impl Handler<SerializeProto> for Room {
         _: &mut Self::Context,
     ) -> Self::Result {
         let mut serialized: HashMap<StatefulFid, ElementProto> = HashMap::new();
-        for uri in msg.0 {
-            match &uri {
-                StatefulFid::Room(room_uri) => {
-                    if room_uri.room_id() == &self.id {
+        for fid in msg.0 {
+            match &fid {
+                StatefulFid::Room(room_fid) => {
+                    if room_fid.room_id() == &self.id {
                         let current_room: ElementProto = self.into();
-                        serialized.insert(uri, current_room);
+                        serialized.insert(fid, current_room);
                     } else {
                         return Err(RoomError::WrongRoomId(
-                            uri,
+                            fid,
                             self.id.clone(),
                         ));
                     }
                 }
-                StatefulFid::Member(member_uri) => {
+                StatefulFid::Member(member_fid) => {
                     let member =
-                        self.members.get_member(member_uri.member_id())?;
-                    serialized.insert(uri, member.into());
+                        self.members.get_member(member_fid.member_id())?;
+                    serialized.insert(fid, member.into());
                 }
-                StatefulFid::Endpoint(endpoint_uri) => {
+                StatefulFid::Endpoint(endpoint_fid) => {
                     let member =
-                        self.members.get_member(endpoint_uri.member_id())?;
+                        self.members.get_member(endpoint_fid.member_id())?;
                     let endpoint = member.get_endpoint_by_id(
-                        endpoint_uri.endpoint_id().to_string(),
+                        endpoint_fid.endpoint_id().to_string(),
                     )?;
-                    serialized.insert(uri, endpoint.into());
+                    serialized.insert(fid, endpoint.into());
                 }
             }
         }
@@ -1118,20 +1118,20 @@ impl Handler<Delete> for Room {
         let mut endpoint_ids = Vec::new();
         for id in msg.0 {
             match id {
-                StatefulFid::Member(member_uri) => {
-                    member_ids.push(member_uri);
+                StatefulFid::Member(member_fid) => {
+                    member_ids.push(member_fid);
                 }
-                StatefulFid::Endpoint(endpoint_uri) => {
-                    endpoint_ids.push(endpoint_uri);
+                StatefulFid::Endpoint(endpoint_fid) => {
+                    endpoint_ids.push(endpoint_fid);
                 }
                 _ => warn!("Found Fid<IsRoomId> while deleting __from__ Room."),
             }
         }
-        member_ids.into_iter().for_each(|uri| {
-            self.delete_member(&uri.member_id(), ctx);
+        member_ids.into_iter().for_each(|fid| {
+            self.delete_member(&fid.member_id(), ctx);
         });
-        endpoint_ids.into_iter().for_each(|uri| {
-            let (_, member_id, endpoint_id) = uri.take_all();
+        endpoint_ids.into_iter().for_each(|fid| {
+            let (_, member_id, endpoint_id) = fid.take_all();
             self.delete_endpoint(&member_id, endpoint_id, ctx);
         });
     }
