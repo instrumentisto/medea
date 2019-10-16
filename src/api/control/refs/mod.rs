@@ -16,19 +16,19 @@ pub use self::{
     src_uri::SrcUri,
 };
 
-/// State of [`LocalUri`] which points to [`Room`].
+/// State of reference which points to [`Room`].
 ///
 /// [`Room`]: crate::signalling::room::Room
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct ToRoom(RoomId);
 
-/// State of [`LocalUri`] which points to [`Member`].
+/// State of reference which points to [`Member`].
 ///
 /// [`Member`]: crate::signalling::elements::member::Member
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct ToMember(RoomId, MemberId);
 
-/// State of [`LocalUri`] which points to [`Endpoint`].
+/// State of reference which points to [`Endpoint`].
 ///
 /// [`Endpoint`]: crate::signalling::elements::endpoints::Endpoint
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -50,29 +50,40 @@ pub struct ToEndpoint(RoomId, MemberId, EndpointId);
 /// This is necessary so that you can write different implementations of
 /// serializing and deserializing for references, but at the same time have some
 /// standard API for working with them.
+///
+/// [`ToRoom`]: crate::api::control::refs::ToRoom
+/// [`ToMember`]: crate::api::control::refs::ToMember
+/// [`ToEndpoint`]: crate::api::control::refs::ToEndpoint
 #[macro_export]
 macro_rules! impls_for_stateful_refs {
     ($container:tt) => {
         impl $container<ToRoom> {
-            /// Creates new [`LocalUri`] in [`ToRoom`] state.
+            #[doc = "Create new reference in [`ToRoom`] state."]
             pub fn new(room_id: $crate::api::control::RoomId) -> Self {
                 Self {
                     state: ToRoom(room_id),
                 }
             }
 
-            /// Returns reference to [`RoomId`].
+            /// Returns borrowed [`RoomId`].
+            ///
+            /// [`RoomId`]: crate::api::control::RoomId
             pub fn room_id(&self) -> &$crate::api::control::RoomId {
                 &self.state.0
             }
 
             /// Returns [`RoomId`].
+            ///
+            /// [`RoomId`]: crate::api::control::RoomId
             pub fn take_room_id(self) -> $crate::api::control::RoomId {
                 self.state.0
             }
 
             /// Pushes [`MemberId`] to the end of URI and returns
-            /// [`LocalUri`] in [`ToMember`] state.
+            /// reference in [`ToMember`] state.
+            ///
+            /// [`MemberId`]: crate::api::control::MemberId
+            /// [`ToMember`]: crate::api::control::refs::ToMember
             pub fn push_member_id(
                 self,
                 member_id: $crate::api::control::MemberId,
@@ -85,7 +96,9 @@ macro_rules! impls_for_stateful_refs {
         }
 
         impl $container<$crate::api::control::refs::ToMember> {
-            /// Create new [`LocalUri`] in [`ToMember`] state.
+            /// Create new reference in [`ToMember`] state.
+            ///
+            /// [`ToMember`]: crate::api::control::refs::ToMember
             pub fn new(
                 room_id: $crate::api::control::RoomId,
                 member_id: $crate::api::control::MemberId,
@@ -97,17 +110,24 @@ macro_rules! impls_for_stateful_refs {
                 }
             }
 
-            /// Returns reference to [`RoomId`].
+            /// Returns borrowed [`RoomId`].
+            ///
+            /// [`RoomId`]: crate::api::control::RoomId
             pub fn room_id(&self) -> &$crate::api::control::RoomId {
                 &self.state.0
             }
 
-            /// Returns reference to [`MemberId`].
+            /// Returns borrowed [`MemberId`].
+            ///
+            /// [`MemberId`]: crate::api::control::MemberId
             pub fn member_id(&self) -> &$crate::api::control::MemberId {
                 &self.state.1
             }
 
-            /// Return [`MemberId`] and [`LocalUri`] in state [`ToRoom`].
+            /// Return [`MemberId`] and reference in state [`ToRoom`].
+            ///
+            /// [`MemberId`]: crate::api::control::MemberId
+            /// [`ToRoom`]: crate::api::control::refs::ToRoom
             pub fn take_member_id(
                 self,
             ) -> (
@@ -123,7 +143,9 @@ macro_rules! impls_for_stateful_refs {
             }
 
             /// Push endpoint ID to the end of URI and returns
-            /// [`LocalUri`] in [`ToEndpoint`] state.
+            /// reference in [`ToEndpoint`] state.
+            ///
+            /// [`ToEndpoint`]: crate::api::control::refs::ToEndpoint
             pub fn push_endpoint_id(
                 self,
                 endpoint_id: $crate::api::control::EndpointId,
@@ -138,6 +160,9 @@ macro_rules! impls_for_stateful_refs {
             }
 
             /// Returns [`RoomId`] and [`MemberId`].
+            ///
+            /// [`RoomId`]: crate::api::control::RoomId
+            /// [`MemberId`]: crate::api::control::MemberId
             pub fn take_all(
                 self,
             ) -> ($crate::api::control::RoomId, $crate::api::control::MemberId)
@@ -149,7 +174,9 @@ macro_rules! impls_for_stateful_refs {
         }
 
         impl $container<$crate::api::control::refs::ToEndpoint> {
-            /// Creates new [`LocalUri`] in [`ToEndpoint`] state.
+            /// Creates new reference in [`ToEndpoint`] state.
+            ///
+            /// [`ToEndpoint`]: crate::api::control::refs::ToEndpoint
             pub fn new(
                 room_id: $crate::api::control::RoomId,
                 member_id: $crate::api::control::MemberId,
@@ -164,24 +191,31 @@ macro_rules! impls_for_stateful_refs {
                 }
             }
 
-            /// Returns reference to [`RoomId`].
+            /// Returns borrowed [`RoomId`].
+            ///
+            /// [`RoomId`]: crate::api::control::RoomId
             pub fn room_id(&self) -> &$crate::api::control::RoomId {
                 &self.state.0
             }
 
-            /// Returns reference to [`MemberId`].
+            /// Returns borrowed [`MemberId`].
+            ///
+            /// [`MemberId`]: crate::api::control::MemberId
             pub fn member_id(&self) -> &$crate::api::control::MemberId {
                 &self.state.1
             }
 
-            /// Returns reference to [`EndpointId`].
+            /// Returns borrowed [`EndpointId`].
+            ///
+            /// [`EndpointId`]: crate::api::control::EndpointId
             pub fn endpoint_id(&self) -> &$crate::api::control::EndpointId {
                 &self.state.2
             }
 
-            /// Returns [`Endpoint`] id and [`LocalUri`] in [`ToMember`] state.
+            /// Returns [`Endpoint`] id and reference in [`ToMember`] state.
             ///
             /// [`Endpoint`]: crate::signalling::elements::endpoints::Endpoint
+            /// [`ToMember`]: crate::api::control::refs::ToMember
             pub fn take_endpoint_id(
                 self,
             ) -> (
@@ -198,6 +232,10 @@ macro_rules! impls_for_stateful_refs {
             }
 
             /// Returns [`EndpointId`], [`RoomId`] and [`MemberId`].
+            ///
+            /// [`EndpointId`]: crate::api::control::EndpointId
+            /// [`RoomId`]: crate::api::control::RoomId
+            /// [`MemberId`]: crate::api::control::MemberId
             pub fn take_all(
                 self,
             ) -> (

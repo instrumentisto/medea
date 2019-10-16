@@ -80,7 +80,7 @@ pub enum StatefulFid {
 impl StatefulFid {
     /// Returns reference to [`RoomId`].
     ///
-    /// This is possible in any [`LocalUri`] state.
+    /// This is possible in any [`StatefulFid`] state.
     pub fn room_id(&self) -> &RoomId {
         match self {
             StatefulFid::Room(uri) => uri.room_id(),

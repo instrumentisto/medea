@@ -1,6 +1,9 @@
 //! Implementation of special URI with pattern
 //! `local://{room_id}/{member_id}/{endpoint_id}`. This URI can point only to
 //! [`WebRtcPublishEndpoint`].
+//!
+//! [`WebRtcPublishEndpoint`]:
+//! crate::signalling::elements::endpoints::webrtc::WebRtcPublishEndpoint
 
 use std::{convert::TryFrom, fmt};
 

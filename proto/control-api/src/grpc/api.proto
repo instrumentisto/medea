@@ -23,9 +23,9 @@ service ControlApi {
   rpc Get (IdRequest) returns (GetResponse);
 }
 
-// Request of creating new Element with a given ID.
+// Request of creating new Element with in element with given Full ID (FID).
 message CreateRequest {
-  // ID of the Element in which will be created provided element.
+  // Full ID (FID) of the Element in which will be created provided element.
   string parent_fid = 1;
   // Spec of the created Element.
   oneof el {
@@ -36,9 +36,9 @@ message CreateRequest {
   }
 }
 
-// Request with many Elements IDs.
+// Request with many Elements Full IDs (FIDs) elements.
 message IdRequest {
-  // List of Elements FIDs.
+  // List of elements Full IDs (FIDs).
   repeated string fid = 1;
 }
 

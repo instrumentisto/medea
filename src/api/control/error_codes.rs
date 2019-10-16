@@ -184,6 +184,9 @@ pub enum ErrorCode {
     /// Invalid source URI in [`WebRtcPlayEndpoint`].
     ///
     /// Code: __1008__.
+    ///
+    /// [`WebRtcPlayEndpoint`]:
+    /// crate::signalling::elements::endpoints::webrtc::WebRtcPlayEndpoint
     #[display(fmt = "Invalid source URI in 'WebRtcPlayEndpoint'.")]
     InvalidSrcUri = 1008,
 

@@ -675,7 +675,7 @@ impl Room {
     /// This function will check that new [`WebRtcPublishEndpoint`]'s ID is not
     /// present in [`ParticipantService`].
     ///
-    /// Returns [`ParticipantServiceErr::EndpointAlreadyExists`] when
+    /// Returns [`RoomError::EndpointAlreadyExists`] when
     /// [`WebRtcPublishEndpoint`]'s ID already presented in [`Member`].
     pub fn create_src_endpoint(
         &mut self,
@@ -722,7 +722,7 @@ impl Room {
     /// This function will check that new [`WebRtcPlayEndpoint`]'s ID is not
     /// present in [`ParticipantService`].
     ///
-    /// Returns [`ParticipantServiceErr::EndpointAlreadyExists`] when
+    /// Returns [`RoomError::EndpointAlreadyExists`] when
     /// [`WebRtcPlayEndpoint`]'s ID already presented in [`Member`].
     pub fn create_sink_endpoint(
         &mut self,
@@ -785,7 +785,7 @@ impl Room {
     /// This function will check that new [`Member`]'s ID is not present in
     /// [`ParticipantService`].
     ///
-    /// Returns [`ParticipantServiceErr::ParticipantAlreadyExists`] when
+    /// Returns [`RoomError::MemberAlreadyExists`] when
     /// [`Member`]'s ID already presented in [`ParticipantService`].
     pub fn create_member(
         &mut self,
