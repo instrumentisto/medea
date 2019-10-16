@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use medea_control_api_proto::grpc::control_api::{
+use medea_control_api_proto::grpc::api::{
     Room as RoomProto, Room_Element as RoomElementProto,
 };
 use serde::{Deserialize, Serialize};
@@ -12,6 +12,8 @@ use super::member::Member;
 /// Control API's `Room` representation.
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Room {
+    /// ID of `Room`.
+    id: String,
     /// Pipeline of `Room`.
     pipeline: HashMap<String, RoomElement>,
 }
@@ -52,6 +54,7 @@ impl Into<RoomProto> for Room {
         for (id, member) in self.pipeline {
             room_elements.insert(id, member.into());
         }
+        proto.set_id(self.id);
         proto.set_pipeline(room_elements);
 
         proto
@@ -64,6 +67,7 @@ impl From<RoomProto> for Room {
         for (id, member) in proto.take_pipeline() {
             pipeline.insert(id, member.into());
         }
-        Self { pipeline }
+        let id = proto.take_id();
+        Self { id, pipeline }
     }
 }

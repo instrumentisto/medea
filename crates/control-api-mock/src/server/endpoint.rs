@@ -1,6 +1,6 @@
 //! `Endpoint` related methods and entities.
 
-use medea_control_api_proto::grpc::control_api::{
+use medea_control_api_proto::grpc::api::{
     Member_Element as MemberElementProto,
     WebRtcPlayEndpoint as WebRtcPlayEndpointProto,
     WebRtcPublishEndpoint as WebRtcPublishEndpointProto,
@@ -40,6 +40,9 @@ impl From<P2pModeProto> for P2pMode {
 #[allow(clippy::module_name_repetitions)]
 #[derive(Serialize, Deserialize, Debug)]
 pub struct WebRtcPublishEndpoint {
+    /// ID of `WebRtcPublishEndpoint`.
+    id: String,
+
     /// Mode of connection for this [`WebRtcPublishEndpoint`].
     p2p: P2pMode,
 }
@@ -47,14 +50,16 @@ pub struct WebRtcPublishEndpoint {
 impl Into<WebRtcPublishEndpointProto> for WebRtcPublishEndpoint {
     fn into(self) -> WebRtcPublishEndpointProto {
         let mut proto = WebRtcPublishEndpointProto::new();
+        proto.set_id(self.id);
         proto.set_p2p(self.p2p.into());
         proto
     }
 }
 
 impl From<WebRtcPublishEndpointProto> for WebRtcPublishEndpoint {
-    fn from(proto: WebRtcPublishEndpointProto) -> Self {
+    fn from(mut proto: WebRtcPublishEndpointProto) -> Self {
         Self {
+            id: proto.take_id(),
             p2p: proto.get_p2p().into(),
         }
     }
@@ -64,6 +69,9 @@ impl From<WebRtcPublishEndpointProto> for WebRtcPublishEndpoint {
 #[allow(clippy::module_name_repetitions)]
 #[derive(Serialize, Deserialize, Debug)]
 pub struct WebRtcPlayEndpoint {
+    /// ID of `WebRtcPlayEndpoint`.
+    id: String,
+
     /// URI in format `local://{room_id}/{member_id}/{endpoint_id}` pointing to
     /// [`WebRtcPublishEndpoint`] which this [`WebRtcPlayEndpoint`] plays.
     src: String,
@@ -72,6 +80,7 @@ pub struct WebRtcPlayEndpoint {
 impl Into<WebRtcPlayEndpointProto> for WebRtcPlayEndpoint {
     fn into(self) -> WebRtcPlayEndpointProto {
         let mut proto = WebRtcPlayEndpointProto::new();
+        proto.set_id(self.id);
         proto.set_src(self.src);
         proto
     }
@@ -80,6 +89,7 @@ impl Into<WebRtcPlayEndpointProto> for WebRtcPlayEndpoint {
 impl From<WebRtcPlayEndpointProto> for WebRtcPlayEndpoint {
     fn from(mut proto: WebRtcPlayEndpointProto) -> Self {
         Self {
+            id: proto.take_id(),
             src: proto.take_src(),
         }
     }

@@ -5,10 +5,10 @@ use std::sync::Arc;
 use futures::{Future, IntoFuture};
 use grpcio::{ChannelBuilder, EnvBuilder, Error};
 use medea_control_api_proto::grpc::{
-    control_api::{
+    api::{
         CreateRequest, CreateResponse, GetResponse, IdRequest, Response,
     },
-    control_api_grpc::ControlApiClient,
+    api_grpc::ControlApiClient,
 };
 use protobuf::RepeatedField;
 
@@ -46,7 +46,7 @@ impl Into<String> for Uri {
 fn id_request(ids: Vec<String>) -> IdRequest {
     let mut req = IdRequest::new();
     let ids = RepeatedField::from(ids);
-    req.set_id(ids);
+    req.set_fid(ids);
     req
 }
 
@@ -75,7 +75,7 @@ impl ControlClient {
         element: Element,
     ) -> impl Future<Item = CreateResponse, Error = Error> {
         let mut req = CreateRequest::new();
-        req.set_id(uri.into());
+        req.set_parent_fid(uri.into());
         match element {
             Element::Room(room) => {
                 req.set_room(room.into());

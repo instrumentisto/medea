@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use medea_control_api_proto::grpc::control_api::{
+use medea_control_api_proto::grpc::api::{
     Member as MemberProto, Room_Element as RoomElementProto,
 };
 use serde::{Deserialize, Serialize};
@@ -12,6 +12,9 @@ use super::endpoint::Endpoint;
 /// Entity that represents control API `Member`.
 #[derive(Deserialize, Serialize, Debug)]
 pub struct Member {
+    /// ID of `Member`.
+    id: String,
+
     /// Pipeline of Control API `Member`.
     pipeline: HashMap<String, Endpoint>,
 
@@ -28,6 +31,7 @@ impl Into<MemberProto> for Member {
         for (id, endpoint) in self.pipeline {
             memebers_elements.insert(id, endpoint.into());
         }
+        proto.set_id(self.id);
         proto.set_pipeline(memebers_elements);
 
         if let Some(credentials) = self.credentials {
@@ -45,6 +49,7 @@ impl From<MemberProto> for Member {
             member_pipeline.insert(id, endpoint.into());
         }
         Self {
+            id: proto.take_id(),
             pipeline: member_pipeline,
             credentials: Some(proto.take_credentials()),
         }
