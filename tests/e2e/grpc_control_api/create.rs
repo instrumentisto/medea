@@ -5,8 +5,8 @@
 //!
 //! [Control API]: https://tinyurl.com/yxsqplq7
 
-use medea_control_api_proto::grpc::api::WebRtcPublishEndpoint_P2P;
 use medea::api::control::error_codes::ErrorCode;
+use medea_control_api_proto::grpc::api::WebRtcPublishEndpoint_P2P;
 
 use crate::gen_insert_str_macro;
 

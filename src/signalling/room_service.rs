@@ -261,8 +261,9 @@ impl Handler<CreateMemberInRoom> for RoomService {
                     .and_then(|r| r.map_err(RoomServiceError::from)),
             )
         } else {
-            let room_fid = Fid::<ToRoom>::new(room_id);
-            Box::new(future::err(RoomServiceError::RoomNotFound(room_fid)))
+            Box::new(future::err(RoomServiceError::RoomNotFound(
+                Fid::<ToRoom>::new(room_id),
+            )))
         }
     }
 }
@@ -300,8 +301,9 @@ impl Handler<CreateEndpointInRoom> for RoomService {
                 .and_then(|r| r.map_err(RoomServiceError::from)),
             )
         } else {
-            let room_fid = Fid::<ToRoom>::new(room_id);
-            Box::new(future::err(RoomServiceError::RoomNotFound(room_fid)))
+            Box::new(future::err(RoomServiceError::RoomNotFound(
+                Fid::<ToRoom>::new(room_id),
+            )))
         }
     }
 }
