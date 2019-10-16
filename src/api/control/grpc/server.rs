@@ -168,31 +168,26 @@ impl ControlApiService {
     }
 
     /// Creates element based on provided [`CreateRequest`].
-    // TODO: REFACTOR ME PLEASE
     pub fn create_element(
         &self,
         mut req: CreateRequest,
     ) -> Box<dyn Future<Item = Sids, Error = ErrorResponse> + Send> {
-        let (uri, elem) = match StatefulFid::try_from(req.take_parent_fid()) {
-            Ok(uri) => {
-                if let Some(elem) = req.el {
-                    (uri, elem)
-                } else {
-                    return Box::new(future::err(ErrorResponse::new(
-                        ErrorCode::NoElement,
-                        &uri,
-                    )));
-                }
+        let unparsed_parent_fid = req.take_parent_fid();
+        let elem = if let Some(elem) = req.el {
+            elem
+        } else {
+            return Box::new(future::err(ErrorResponse::new(
+                ErrorCode::NoElement,
+                &unparsed_parent_fid,
+            )));
+        };
+
+        let parent_fid = match StatefulFid::try_from(unparsed_parent_fid) {
+            Ok(parent_fid) => {
+                parent_fid
             }
             Err(e) => {
                 if let ParseFidError::Empty = e {
-                    let elem = if let Some(elem) = req.el {
-                        elem
-                    } else {
-                        return Box::new(future::err(
-                            ErrorResponse::without_id(ErrorCode::NoElement),
-                        ));
-                    };
                     return Box::new(
                         RoomSpec::try_from(elem)
                             .map_err(ErrorResponse::from)
@@ -209,7 +204,7 @@ impl ControlApiService {
             }
         };
 
-        match uri {
+        match parent_fid {
             StatefulFid::Room(uri) => match elem {
                 CreateRequestOneof::member(mut member) => {
                     let id: MemberId = member.take_id().into();
@@ -232,12 +227,12 @@ impl ControlApiService {
                 let (endpoint, id) = match elem {
                     CreateRequestOneof::webrtc_play(mut play) => (
                         WebRtcPlayEndpoint::try_from(&play)
-                            .map(EndpointSpec::WebRtcPlay),
+                            .map(EndpointSpec::from),
                         play.take_id().into(),
                     ),
                     CreateRequestOneof::webrtc_pub(mut publish) => (
                         Ok(WebRtcPublishEndpoint::from(&publish))
-                            .map(EndpointSpec::WebRtcPublish),
+                            .map(EndpointSpec::from),
                         publish.take_id().into(),
                     ),
                     _ => {
@@ -258,7 +253,6 @@ impl ControlApiService {
                 )
             }
             StatefulFid::Endpoint(_) => Box::new(future::err(
-                // TODO: changeme
                 ErrorResponse::without_id(ElementIdIsTooLong),
             )),
         }
