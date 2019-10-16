@@ -212,9 +212,9 @@ impl Handler<CreateRoom> for RoomService {
         let room_spec = msg.spec;
 
         if self.room_repo.get(&room_spec.id).is_some() {
-            return Err(RoomServiceError::RoomAlreadyExists(Fid::<ToRoom>::new(
-                room_spec.id,
-            )));
+            return Err(RoomServiceError::RoomAlreadyExists(
+                Fid::<ToRoom>::new(room_spec.id),
+            ));
         }
 
         let room = Room::new(&room_spec, &self.app)?;
@@ -510,7 +510,7 @@ mod delete_elements_validation_specs {
     #[test]
     fn error_if_not_same_room_ids() {
         let mut elements = DeleteElements::new();
-        ["local://room_id/member", "local://another_room_id/member"]
+        ["room_id/member", "another_room_id/member"]
             .iter()
             .map(|uri| StatefulFid::try_from(uri.to_string()).unwrap())
             .for_each(|uri| elements.add_uri(uri));
@@ -537,9 +537,9 @@ mod delete_elements_validation_specs {
     fn success_if_all_ok() {
         let mut elements = DeleteElements::new();
         [
-            "local://room_id/member_id",
-            "local://room_id/another_member_id",
-            "local://room_id/member_id/endpoint_id",
+            "room_id/member_id",
+            "room_id/another_member_id",
+            "room_id/member_id/endpoint_id",
         ]
         .iter()
         .map(|uri| StatefulFid::try_from(uri.to_string()).unwrap())
@@ -555,8 +555,9 @@ mod room_service_specs {
 
     use crate::{
         api::control::{
-            endpoints::webrtc_publish_endpoint::P2pMode, RootElement,
-            refs::{ToEndpoint, Fid},
+            endpoints::webrtc_publish_endpoint::P2pMode,
+            refs::{Fid, ToEndpoint},
+            RootElement,
         },
         conf::Conf,
     };
@@ -638,10 +639,9 @@ mod room_service_specs {
 
         let room_service = room_service(RoomRepository::new(HashMap::new()));
         let spec = room_spec();
-        let caller_uri = StatefulFid::try_from(
-            "pub-sub-video-call/caller".to_string(),
-        )
-        .unwrap();
+        let caller_uri =
+            StatefulFid::try_from("pub-sub-video-call/caller".to_string())
+                .unwrap();
 
         actix::spawn(test_for_create!(
             room_service,
@@ -672,10 +672,10 @@ mod room_service_specs {
             room_id.clone() => Room::new(&spec, &app_ctx()).unwrap().start(),
         )));
 
-        let member_uri =
-            Fid::<ToRoom>::new(room_id);
+        let member_uri = Fid::<ToRoom>::new(room_id);
         let member_id: MemberId = "test-member".to_string().into();
-        let stateful_member_uri: StatefulFid = member_uri.clone().push_member_id(member_id.clone()).into();
+        let stateful_member_uri: StatefulFid =
+            member_uri.clone().push_member_id(member_id.clone()).into();
 
         actix::spawn(test_for_create!(
             room_service,
@@ -715,10 +715,8 @@ mod room_service_specs {
             room_id.clone() => Room::new(&spec, &app_ctx()).unwrap().start(),
         )));
 
-        let endpoint_uri = Fid::<ToMember>::new(
-            room_id,
-            "caller".to_string().into(),
-        );
+        let endpoint_uri =
+            Fid::<ToMember>::new(room_id, "caller".to_string().into());
         let stateful_endpoint_uri: StatefulFid = endpoint_uri.clone().into();
 
         actix::spawn(test_for_create!(

@@ -117,13 +117,17 @@ impl fmt::Display for LocalUri<ToRoom> {
 
 impl fmt::Display for LocalUri<ToMember> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}/{}", self.state.0, self.state.1)
+        write!(f, "local://{}/{}", self.state.0, self.state.1)
     }
 }
 
 impl fmt::Display for LocalUri<ToEndpoint> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}/{}", self.state.0, self.state.1)
+        write!(
+            f,
+            "local://{}/{}/{}",
+            self.state.0, self.state.1, self.state.2
+        )
     }
 }
 

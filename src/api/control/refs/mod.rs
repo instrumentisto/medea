@@ -1,4 +1,5 @@
-//! Implementation of all kinds of references to some resource used in Medea's Control API specs.
+//! Implementation of all kinds of references to some resource used in Medea's
+//! Control API specs.
 
 #![allow(clippy::use_self)]
 

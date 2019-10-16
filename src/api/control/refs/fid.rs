@@ -1,5 +1,4 @@
 /// Implementation of Full ID (`fid` in dynamic Control API specs).
-
 use std::{
     convert::{From, TryFrom},
     fmt::{Display, Error, Formatter},
