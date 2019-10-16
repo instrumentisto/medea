@@ -25,7 +25,7 @@ service ControlApi {
 
 // Request of creating new Element with a given ID.
 message CreateRequest {
-  // ID of the Element to be created..
+  // ID of the Element in which will be created provided element.
   string parent_fid = 1;
   // Spec of the created Element.
   oneof el {
@@ -38,7 +38,7 @@ message CreateRequest {
 
 // Request with many Elements IDs.
 message IdRequest {
-  // List of Elements IDs.
+  // List of Elements FIDs.
   repeated string fid = 1;
 }
 
@@ -112,6 +112,7 @@ message Element {
 // Media element which represents a single space where multiple Members can
 // interact with each other.
 message Room {
+  // ID of this Room.
   string id  = 1;
   // Pipeline of this Room.
   map<string, Room.Element> pipeline = 2;
@@ -129,6 +130,7 @@ message Room {
 // Media element which represents a client authorized to participate
 // in a some bigger media pipeline.
 message Member {
+  // ID of this Member.
   string id = 1;
   // Callback which fires when the Member establishes persistent connection
   // with a media server via Client API.
@@ -153,6 +155,7 @@ message Member {
 // Media element which is able to receive media data from a client via WebRTC
 // (allows to publish media data).
 message WebRtcPublishEndpoint {
+  // ID of this WebRtcPublishEndpoint.
   string id = 1;
   // P2P mode for this element.
   P2P p2p = 2;
@@ -175,6 +178,7 @@ message WebRtcPublishEndpoint {
 
 // Media element which is able to play media data for a client via WebRTC.
 message WebRtcPlayEndpoint {
+  // ID of this WebRtcPlayEndpoint.
   string id = 1;
   // The source to get media data from.
   string src = 2;

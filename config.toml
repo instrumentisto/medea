@@ -4,7 +4,7 @@
 #
 # Env var: MEDEA_SERVER__CLIENT__HTTP__PUBLIC_URL
 # Default:
-#   public_url = "ws://127.0.0.1:8080"
+#   public_url = "ws://127.0.0.1:8080/ws"
 
 # IP address to bind Client API HTTP server to.
 #

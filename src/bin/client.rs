@@ -21,7 +21,7 @@ use protobuf::RepeatedField;
 
 fn main() {
     let env = Arc::new(EnvBuilder::new().build());
-    let ch = ChannelBuilder::new(env).connect("localhost:50051");
+    let ch = ChannelBuilder::new(env).connect("127.0.0.1:6565");
     let client = ControlApiClient::new(ch);
 
     //    unimplemented_apply(&client);
@@ -31,7 +31,7 @@ fn main() {
     //    delete_member(&client);
     create_member(&client);
     //    create_endpoint(&client);
-    //    get_room(&client);
+    get_room(&client);
 }
 
 fn create_room(client: &ControlApiClient) {

@@ -25,9 +25,7 @@ use crate::{
     },
 };
 
-use self::{
-    endpoints::webrtc_play_endpoint::SrcParseError, pipeline::Pipeline,
-};
+use self::{pipeline::Pipeline, refs::src_uri::SrcParseError};
 
 #[doc(inline)]
 pub use self::{

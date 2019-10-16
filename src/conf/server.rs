@@ -36,7 +36,7 @@ pub struct ClientApiHttpServer {
     /// [Client API]: https://tinyurl.com/yx9thsnr
     /// [Control API]: https://tinyurl.com/yxsqplq7
     /// [Jason]: https://github.com/instrumentisto/medea/tree/master/jason
-    #[default = "ws://127.0.0.1:8080"]
+    #[default = "ws://127.0.0.1:8080/ws"]
     pub public_url: String,
 
     /// IP address to bind HTTP server to.

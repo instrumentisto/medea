@@ -18,7 +18,7 @@ server:
     server:
       client:
         http:
-          public_url: ws://127.0.0.1:8080
+          public_url: ws://127.0.0.1:8080/ws
           bind_port: 8080
     turn:
       user: USER

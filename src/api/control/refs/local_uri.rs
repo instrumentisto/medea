@@ -10,11 +10,11 @@ use failure::Fail;
 use url::Url;
 
 use crate::{
-    api::control::{endpoints::webrtc_play_endpoint::SrcUri, MemberId, RoomId},
-    impl_uri,
+    api::control::{MemberId, RoomId},
+    impls_for_stateful_refs,
 };
 
-use super::{ToEndpoint, ToMember, ToRoom};
+use super::{SrcUri, ToEndpoint, ToMember, ToRoom};
 
 /// URI in format `local://room_id/member_id/endpoint_id`.
 ///
@@ -80,7 +80,7 @@ pub struct LocalUri<T> {
     state: T,
 }
 
-impl_uri!(LocalUri);
+impls_for_stateful_refs!(LocalUri);
 
 impl From<StatefulLocalUri> for LocalUri<ToRoom> {
     fn from(from: StatefulLocalUri) -> Self {

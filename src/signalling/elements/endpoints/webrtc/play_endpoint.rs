@@ -12,8 +12,8 @@ use medea_control_api_proto::grpc::api::{
 };
 
 use crate::{
-    api::control::endpoints::webrtc_play_endpoint::{
-        SrcUri, WebRtcPlayId as Id,
+    api::control::{
+        endpoints::webrtc_play_endpoint::WebRtcPlayId as Id, refs::SrcUri,
     },
     signalling::elements::{
         endpoints::webrtc::publish_endpoint::WeakWebRtcPublishEndpoint,
@@ -202,6 +202,7 @@ impl Into<ElementProto> for WebRtcPlayEndpoint {
         let mut element = ElementProto::new();
         let mut play = WebRtcPlayEndpointProto::new();
         play.set_src(self.src_uri().to_string());
+        play.set_id(self.id().to_string());
         element.set_webrtc_play(play);
 
         element

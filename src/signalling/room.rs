@@ -841,7 +841,7 @@ impl Room {
             src.add_sink(sink.downgrade());
         }
 
-        self.members.create_member(id, signalling_member);
+        self.members.insert_member(id, signalling_member);
 
         Ok(())
     }
@@ -866,13 +866,11 @@ impl Into<ElementProto> for &mut Room {
             .members
             .members()
             .into_iter()
-            .map(|(id, member)| {
-                let member_fid = Fid::<ToMember>::new(self.get_id(), id);
-                (member_fid.to_string(), member.into())
-            })
+            .map(|(id, member)| (id.to_string(), member.into()))
             .collect();
 
         room.set_pipeline(pipeline);
+        room.set_id(self.id().to_string());
         element.set_room(room);
 
         element

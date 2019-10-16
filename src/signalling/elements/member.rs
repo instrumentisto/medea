@@ -486,16 +486,14 @@ impl Into<ElementProto> for Member {
 
         let mut member_pipeline = HashMap::new();
         for (id, play) in self.sinks() {
-            let endpoint_fid = self.get_fid_to_endpoint(id.into());
-            member_pipeline.insert(endpoint_fid.to_string(), play.into());
+            member_pipeline.insert(id.to_string(), play.into());
         }
         for (id, publish) in self.srcs() {
-            let endpoint_fid = self.get_fid_to_endpoint(id.into());
-
-            member_pipeline.insert(endpoint_fid.to_string(), publish.into());
+            member_pipeline.insert(id.to_string(), publish.into());
         }
         member.set_pipeline(member_pipeline);
 
+        member.set_id(self.id().to_string());
         member.set_credentials(self.credentials());
 
         element.set_member(member);

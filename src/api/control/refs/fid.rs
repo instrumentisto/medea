@@ -6,13 +6,14 @@ use std::{
 };
 
 use derive_more::{Display, From};
+use failure::Fail;
 
-use crate::{api::control::RoomId, impl_uri};
+use crate::{api::control::RoomId, impls_for_stateful_refs};
 
 use super::{ToEndpoint, ToMember, ToRoom};
 
 /// Errors which can happen while parsing [`Fid`].
-#[derive(Display, Debug)]
+#[derive(Display, Debug, Fail)]
 pub enum ParseFidError {
     #[display(fmt = "Fid is empty.")]
     Empty,
@@ -30,7 +31,7 @@ pub struct Fid<T> {
     state: T,
 }
 
-impl_uri!(Fid);
+impls_for_stateful_refs!(Fid);
 
 impl From<StatefulFid> for Fid<ToRoom> {
     fn from(from: StatefulFid) -> Self {
@@ -157,6 +158,7 @@ mod specs {
             "room_id//endpoint_id",
             "//endpoint_id",
             "//member_id/endpoint_id",
+            "/member_id",
         ] {
             match StatefulFid::try_from(fid_str.to_string()) {
                 Ok(f) => unreachable!("Unexpected successful parse: {}", f),
@@ -171,7 +173,7 @@ mod specs {
     #[test]
     fn returns_error_on_too_many_paths() {
         for fid_str in vec![
-            "room_id/member_id/endpoint_id/somethis_else",
+            "room_id/member_id/endpoint_id/something_else",
             "room_id/member_id/endpoint_id/",
             "room_id/member_id/endpoint_id////",
         ] {
@@ -235,7 +237,7 @@ mod specs {
     }
 
     #[test]
-    fn serializes_into_origin_fid() {
+    fn serializes_into_original_fid() {
         for fid_str in vec![
             "room_id",
             "room_id/member_id",

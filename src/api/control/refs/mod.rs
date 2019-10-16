@@ -1,10 +1,11 @@
 //! Implementation of all kinds of references to some resource used in Medea's
-//! Control API specs.
+//! Control API.
 
 #![allow(clippy::use_self)]
 
 pub mod fid;
 pub mod local_uri;
+pub mod src_uri;
 
 use super::{EndpointId, MemberId, RoomId};
 
@@ -12,6 +13,7 @@ use super::{EndpointId, MemberId, RoomId};
 pub use self::{
     fid::{Fid, StatefulFid},
     local_uri::{LocalUri, StatefulLocalUri},
+    src_uri::SrcUri,
 };
 
 /// State of [`LocalUri`] which points to [`Room`].
@@ -32,9 +34,24 @@ pub struct ToMember(RoomId, MemberId);
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct ToEndpoint(RoomId, MemberId, EndpointId);
 
-// TODO: rename
+/// Generates functions for transition between [`ToRoom`],
+/// [`ToMember`] and [`ToEndpoint`] states of Medea references and handy getters
+/// for data of this references.
+///
+/// Supposed that container for which you want to implement all this methods
+/// is something like:
+///
+/// ```rust
+/// pub struct SomeReference<T> {
+///     state: T
+/// }
+/// ```
+///
+/// This is necessary so that you can write different implementations of
+/// serializing and deserializing for references, but at the same time have some
+/// standard API for working with them.
 #[macro_export]
-macro_rules! impl_uri {
+macro_rules! impls_for_stateful_refs {
     ($container:tt) => {
         impl $container<ToRoom> {
             /// Creates new [`LocalUri`] in [`ToRoom`] state.

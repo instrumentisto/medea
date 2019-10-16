@@ -11,9 +11,11 @@ use medea_control_api_proto::grpc::api::Error as ErrorProto;
 
 use crate::{
     api::control::{
-        endpoints::webrtc_play_endpoint::SrcParseError,
         grpc::server::GrpcControlApiError,
-        refs::{fid::ParseFidError, local_uri::LocalUriParseError},
+        refs::{
+            fid::ParseFidError, local_uri::LocalUriParseError,
+            src_uri::SrcParseError,
+        },
         TryFromElementError, TryFromProtobufError,
     },
     signalling::{
@@ -255,10 +257,10 @@ pub enum ErrorCode {
     #[display(fmt = "Endpoint with provided FID already exists.")]
     EndpointAlreadyExists = 1018,
 
-    /// Missing path in some pointer to the Medea element.
+    /// Missing path in some reference to the Medea element.
     ///
     /// Code: __1019__.
-    #[display(fmt = "Missing path in some pointer to the Medea element.")]
+    #[display(fmt = "Missing path in some reference to the Medea element.")]
     MissingPath = 1019,
 
     /// Unexpected server error.

@@ -233,6 +233,7 @@ impl Into<ElementProto> for WebRtcPublishEndpoint {
         let mut element = ElementProto::new();
         let mut publish = WebRtcPublishEndpointProto::new();
         publish.set_p2p(self.p2p().into());
+        publish.set_id(self.id().to_string());
         element.set_webrtc_pub(publish);
 
         element

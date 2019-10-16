@@ -31,34 +31,26 @@ mod room {
             sids.get(&"responder".to_string()).unwrap().as_str();
         assert_eq!(
             responder_sid,
-            &insert_str!("ws://127.0.0.1:8080/{}/responder/test")
+            &insert_str!("ws://127.0.0.1:8080/ws/{}/responder/test")
         );
 
         let mut get_resp = client.get(&insert_str!("{}"));
         let room = get_resp.take_room();
 
-        let responder = room
-            .get_pipeline()
-            .get(&insert_str!("{}/responder"))
-            .unwrap()
-            .get_member();
+        let responder =
+            room.get_pipeline().get("responder").unwrap().get_member();
         assert_eq!(responder.get_credentials(), "test");
         let responder_pipeline = responder.get_pipeline();
         assert_eq!(responder_pipeline.len(), 1);
-        let responder_play = responder_pipeline
-            .get(&insert_str!("{}/responder/play"))
-            .unwrap()
-            .get_webrtc_play();
+        let responder_play =
+            responder_pipeline.get("play").unwrap().get_webrtc_play();
         assert_eq!(
             responder_play.get_src(),
             insert_str!("local://{}/publisher/publish")
         );
 
-        let publisher = room
-            .get_pipeline()
-            .get(&insert_str!("{}/publisher"))
-            .unwrap()
-            .get_member();
+        let publisher =
+            room.get_pipeline().get("publisher").unwrap().get_member();
         assert_ne!(publisher.get_credentials(), "test");
         assert_ne!(publisher.get_credentials(), "");
         let publisher_pipeline = responder.get_pipeline();
@@ -136,7 +128,7 @@ mod member {
             sids.get(&"test-member".to_string()).unwrap().as_str();
         assert_eq!(
             e2e_test_member_sid,
-            insert_str!("ws://127.0.0.1:8080/{}/test-member/qwerty")
+            insert_str!("ws://127.0.0.1:8080/ws/{}/test-member/qwerty")
         );
 
         let member = client.get(&insert_str!("{}/test-member")).take_member();
