@@ -225,8 +225,9 @@ impl ControlApiService {
                             .and_then(|create_result| create_result),
                     )
                 }
-                _ => Box::new(future::err(ErrorResponse::without_id(
+                _ => Box::new(future::err(ErrorResponse::new(
                     ElementIdMismatch,
+                    &uri,
                 ))),
             },
             StatefulFid::Member(uri) => {
@@ -242,9 +243,10 @@ impl ControlApiService {
                         publish.take_id().into(),
                     ),
                     _ => {
-                        return Box::new(future::err(
-                            ErrorResponse::without_id(ElementIdMismatch),
-                        ))
+                        return Box::new(future::err(ErrorResponse::new(
+                            ElementIdMismatch,
+                            &uri,
+                        )))
                     }
                 };
                 Box::new(
@@ -259,7 +261,7 @@ impl ControlApiService {
                 )
             }
             StatefulFid::Endpoint(_) => Box::new(future::err(
-                ErrorResponse::without_id(ElementIdIsTooLong),
+                ErrorResponse::new(ElementIdIsTooLong, &parent_fid),
             )),
         }
     }
