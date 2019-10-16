@@ -65,8 +65,7 @@ spec:
               value: {{ $coturn.conf.listening_port | quote }}
             - name: MEDEA_TURN__DB__REDIS__PORT
               value: {{ $coturnDb.conf.port | quote }}
-            - name: MEDEA_SERVER.CLIENT.PUBLIC_URL
-              value: {{ .Values.server.conf.server.client.public_url }}
+            {{/* TODO BEFORE REVIEW: delete RUST_LOG env */}}
             - name: RUST_LOG
               value: DEBUG
           envFrom:

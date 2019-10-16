@@ -19,30 +19,47 @@ RUN mkdir -p /out/etc/ \
  && echo 'nobody:x:65534:65534:nobody:/:' > /out/etc/passwd \
  && echo 'nobody:x:65534:' > /out/etc/group
 
+# Install required system packages for building.
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
- cmake
+            cmake
 
-COPY crates /app/crates/
-COPY proto /app/proto/
+# Prepare Cargo workspace for building dependencies only.
+COPY crates/medea-macro/Cargo.toml /app/crates/medea-macro/
+COPY proto/client-api/Cargo.toml /app/proto/client-api/
+COPY proto/control-api/Cargo.toml /app/proto/control-api/
+# Required to omit triggering re-compilation for build.rs.
+COPY proto/control-api/build.rs /app/proto/control-api/
+COPY proto/control-api/src/grpc/api.proto \
+     proto/control-api/src/grpc/api*.rs \
+     /app/proto/control-api/src/grpc/
 COPY jason/Cargo.toml /app/jason/
 COPY Cargo.toml Cargo.lock /app/
+WORKDIR /app/
+RUN mkdir -p crates/medea-macro/src/ && touch crates/medea-macro/src/lib.rs \
+ && mkdir -p proto/client-api/src/ && touch proto/client-api/src/lib.rs \
+ && mkdir -p proto/control-api/src/ && touch proto/control-api/src/lib.rs \
+ && mkdir -p jason/src/ && touch jason/src/lib.rs \
+ && mkdir -p src/ && touch src/lib.rs
 
-RUN cd /app \
- && mkdir -p src && touch src/lib.rs \
- && mkdir -p jason/src && touch jason/src/lib.rs \
- && cargo fetch
+# Build dependencies only.
+RUN cargo build --lib ${rustc_opts}
+# Remove fingreprints of pre-built empty project sub-crates
+# to rebuild them correctly later.
+RUN rm -rf /app/target/${rustc_mode}/.fingerprint/medea*
 
-COPY src app/src
+# Prepare project sources for building.
+COPY crates/ /app/crates/
+COPY proto/ /app/proto/
+COPY src/ /app/src/
 
-## Build project distribution.
-RUN cd /app \
-    # Compile project.
-    # TODO: use --out-dir once stabilized
-    # TODO: https://github.com/rust-lang/cargo/issues/6790
-    && cargo build --bin=medea ${rustc_opts} \
- # Prepare the binary and all dependent dynamic libraries.
- && cp /app/target/${rustc_mode}/medea /out/medea \
+# Build project distribution binary.
+# TODO: use --out-dir once stabilized
+# TODO: https://github.com/rust-lang/cargo/issues/6790
+RUN cargo build --bin=medea ${rustc_opts}
+
+# Prepare project distribution binary and all dependent dynamic libraries.
+RUN cp /app/target/${rustc_mode}/medea /out/medea \
  && ldd /out/medea \
     | awk 'BEGIN{ORS=" "}$1~/^\//{print $1}$3~/^\//{print $3}' \
     | sed 's/,$/\n/' \

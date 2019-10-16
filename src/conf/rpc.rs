@@ -23,7 +23,7 @@ pub struct Rpc {
 }
 
 #[cfg(test)]
-mod rpc_conf_specs {
+mod spec {
     use std::{fs, time::Duration};
 
     use serial_test_derive::serial;

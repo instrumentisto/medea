@@ -11,7 +11,7 @@ use smart_default::SmartDefault;
 pub struct Log {
     /// Maximum allowed level of application log entries.
     /// Defaults to `INFO`.
-    #[default("INFO")]
+    #[default = "INFO"]
     pub level: Cow<'static, str>,
 }
 

@@ -1,23 +1,23 @@
 mod grpc_control_api;
 pub mod signalling;
 
-/// Macro which generates `format_name!` macro which will replaces `{}` with
-/// provided to `format_name_macro!` name.
+/// Generates `insert_str!` macro, that can be used as `format!` macro with one
+/// predefined argument.
 ///
 /// # Example usage
 ///
 /// ```
 /// fn first_test() {
-///     format_name_macro!("first-test");
+///     gen_insert_str_macro!("first-test");
 ///
-///     let addr = format_name!("ws://127.0.0.1:8080/{}/publisher/test");
+///     let addr = insert_str!("ws://127.0.0.1:8080/{}/publisher/test");
 ///     assert_eq!(addr, "ws://127.0.0.1:8080/first-test/publisher/test");
 /// }
 ///
 /// fn second_test() {
-///     format_name_macro!("second-test");
+///     gen_insert_str_macro!("second-test");
 ///
-///     let addr = format_name!("local://{}/publisher");
+///     let addr = insert_str!("local://{}/publisher");
 ///     assert_eq!(addr, "local://second-test/publisher");
 /// }
 ///
@@ -25,9 +25,9 @@ pub mod signalling;
 /// # second_test();
 /// ```
 #[macro_export]
-macro_rules! format_name_macro {
+macro_rules! gen_insert_str_macro {
     ($name:expr) => {
-        macro_rules! format_name {
+        macro_rules! insert_str {
             ($fmt:expr) => {
                 format!($fmt, $name)
             };

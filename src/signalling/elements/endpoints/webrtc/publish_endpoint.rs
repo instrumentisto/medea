@@ -7,7 +7,7 @@ use std::{
 };
 
 use medea_client_api_proto::PeerId;
-use medea_control_api_proto::grpc::control_api::{
+use medea_control_api_proto::grpc::api::{
     Element as RootElementProto, Member_Element as ElementProto,
     WebRtcPublishEndpoint as WebRtcPublishEndpointProto,
 };
@@ -233,6 +233,7 @@ impl Into<ElementProto> for WebRtcPublishEndpoint {
         let mut element = ElementProto::new();
         let mut publish = WebRtcPublishEndpointProto::new();
         publish.set_p2p(self.p2p().into());
+        publish.set_id(self.id().to_string());
         element.set_webrtc_pub(publish);
 
         element

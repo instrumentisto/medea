@@ -18,7 +18,7 @@ Also, you need install [wasm-pack] for [Jason] building and testing:
 $ curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sudo sh
 ```
 
-[Protoc] if you want to rebuild protobuf specs for [Medea]'s gRPC Control API.
+Also, you need install `protoc` if you want to rebuild [protobuf] specs for [Medea] gRPC Control API.
 
 
 
@@ -66,9 +66,9 @@ $ make build.jason
 $ make build.jason dockerized=yes
 ```
 
-To rebuild protobuf specs for [Medea]'s gRPC Control API:
+To rebuild [protobuf] specs for [Medea] gRPC Control API:
 ```bash
-$ make protoc.rebuild
+$ make cargo.gen crate=medea-control-api-proto
 ```
 
 
@@ -133,7 +133,7 @@ Add `[run ci]` mark to your commit message for triggering CI build.
 [Clippy]: https://github.com/rust-lang/rust-clippy
 [Jason]: https://github.com/instrumentisto/medea/tree/master/jason
 [Medea]: https://github.com/instrumentisto/medea
+[protobuf]: https://github.com/protocolbuffers/protobuf
 [Rust]: https://www.rust-lang.org
 [rustfmt]: https://github.com/rust-lang/rustfmt
 [wasm-pack]: https://github.com/rustwasm/wasm-pack
-[Protoc]: https://github.com/protocolbuffers/protobuf

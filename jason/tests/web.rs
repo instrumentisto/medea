@@ -1,7 +1,9 @@
 #![cfg(target_arch = "wasm32")]
 
 mod api;
+mod media;
 mod peer;
+mod utils;
 
 use futures::{future::IntoFuture, sync::oneshot::channel, Future};
 use medea_client_api_proto::{

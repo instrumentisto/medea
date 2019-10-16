@@ -1,4 +1,4 @@
-//! All errors which medea can return to control API user.
+//! All errors which Medea can return to Control API user.
 //!
 //! # Error codes ranges
 //! - `1000` ... `1999` Client errors
@@ -7,12 +7,15 @@
 use std::string::ToString;
 
 use derive_more::Display;
-use medea_control_api_proto::grpc::control_api::Error as ErrorProto;
+use medea_control_api_proto::grpc::api::Error as ErrorProto;
 
 use crate::{
     api::control::{
-        endpoints::webrtc_play_endpoint::SrcParseError,
-        grpc::server::GrpcControlApiError, local_uri::LocalUriParseError,
+        grpc::server::GrpcControlApiError,
+        refs::{
+            fid::ParseFidError, local_uri::LocalUriParseError,
+            src_uri::SrcParseError,
+        },
         TryFromElementError, TryFromProtobufError,
     },
     signalling::{
@@ -23,7 +26,7 @@ use crate::{
     },
 };
 
-/// Medea's control API error response.
+/// Medea's Control API error response.
 pub struct ErrorResponse {
     /// [`ErrorCode`] which will be returned with code and message.
     error_code: ErrorCode,
@@ -136,16 +139,16 @@ pub enum ErrorCode {
     #[display(fmt = "Unimplemented API call.")]
     UnimplementedCall = 1000,
 
-    /// Request does not contain any elements.
+    /// Request doesn't contain any elements.
     ///
     /// Code: __1001__.
-    #[display(fmt = "Request does not contain any elements")]
+    #[display(fmt = "Request doesn't contain any elements")]
     NoElement = 1001,
 
-    /// Provided uri can not point to provided element.
+    /// Provided fid can't point to provided element.
     ///
     /// Code: __1002__.
-    #[display(fmt = "Provided uri can not point to provided element")]
+    #[display(fmt = "Provided fid can't point to provided element")]
     ElementIdMismatch = 1002,
 
     /// Room not found.
@@ -178,10 +181,13 @@ pub enum ErrorCode {
     #[display(fmt = "Expected Member element but it's not.")]
     NotMemberInSpec = 1007,
 
-    /// Invalid source URI in play endpoint.
+    /// Invalid source URI in [`WebRtcPlayEndpoint`].
     ///
     /// Code: __1008__.
-    #[display(fmt = "Invalid source ID in publish endpoint spec.")]
+    ///
+    /// [`WebRtcPlayEndpoint`]:
+    /// crate::signalling::elements::endpoints::webrtc::WebRtcPlayEndpoint
+    #[display(fmt = "Invalid source URI in 'WebRtcPlayEndpoint'.")]
     InvalidSrcUri = 1008,
 
     /// Provided not source URI in [`WebRtcPlayEndpoint`].
@@ -190,19 +196,19 @@ pub enum ErrorCode {
     ///
     /// [`WebRtcPlayEndpoint`]:
     /// crate::signalling::elements::endpoints::webrtc::WebRtcPlayEndpoint
-    #[display(fmt = "Provided not source URI.")]
+    #[display(fmt = "Provided not source URI in 'WebRtcPlayEndpoint'.")]
     NotSourceUri = 1009,
 
-    /// Element's ID don't have "local://" prefix.
+    /// Element's URI don't have `local://` prefix.
     ///
     /// Code: __1010__.
-    #[display(fmt = "Element's ID's URI not have 'local://' protocol.")]
+    #[display(fmt = "Element's URI don't have 'local://' prefix.")]
     ElementIdIsNotLocal = 1010,
 
-    /// Provided element's URI with too many paths.
+    /// Provided element's FID/URI with too many paths.
     ///
     /// Code: __1011__.
-    #[display(fmt = "You provided element's URI with too many paths.")]
+    #[display(fmt = "You provided element's FID/URI with too many paths.")]
     ElementIdIsTooLong = 1011,
 
     /// Missing some fields in source URI of WebRtcPublishEndpoint.
@@ -216,42 +222,49 @@ pub enum ErrorCode {
     /// Empty element ID.
     ///
     /// Code: __1013__.
-    #[display(fmt = "Provided empty element URI.")]
+    #[display(fmt = "Provided empty element ID.")]
     EmptyElementId = 1013,
 
-    /// Provided empty elements URIs list.
+    /// Provided empty elements FIDs list.
     ///
     /// Code: __1014__.
-    #[display(fmt = "Provided empty elements URIs list.")]
+    #[display(fmt = "Provided empty elements FIDs list.")]
     EmptyElementsList = 1014,
 
     /// Provided not the same Room IDs in elements IDs. Probably you try use
-    /// Delete method for elements with different Room IDs
+    /// `Delete` method for elements with different Room IDs
     ///
     /// Code: __1015__.
     ///
     /// [`RoomId`]: crate::api::control::room::Id
     #[display(fmt = "Provided not the same Room IDs in elements IDs. \
-                     Probably you try use Delete method for elements with \
+                     Probably you try use 'Delete' method for elements with \
                      different Room IDs")]
     ProvidedNotSameRoomIds = 1015,
 
-    /// Room with provided URI already exists.
+    /// Room with provided fid already exists.
     ///
     /// Code: __1016__.
-    #[display(fmt = "Room with provided URI already exists.")]
+    #[display(fmt = "Room with provided FID already exists.")]
     RoomAlreadyExists = 1016,
 
-    /// Member with provided URI already exists.
+    /// Member with provided FID already exists.
     ///
     /// Code: __1017__.
-    #[display(fmt = "Member with provided URI already exists.")]
+    #[display(fmt = "Member with provided FID already exists.")]
     MemberAlreadyExists = 1017,
-    /// Endpoint with provided URI already exists.
+
+    /// Endpoint with provided FID already exists.
     ///
     /// Code: __1018__.
-    #[display(fmt = "Endpoint with provided URI already exists.")]
+    #[display(fmt = "Endpoint with provided FID already exists.")]
     EndpointAlreadyExists = 1018,
+
+    /// Missing path in some reference to the Medea element.
+    ///
+    /// Code: __1019__.
+    #[display(fmt = "Missing path in some reference to the Medea element.")]
+    MissingPath = 1019,
 
     /// Unexpected server error.
     ///
@@ -301,7 +314,7 @@ impl From<TryFromProtobufError> for ErrorResponse {
             ExpectedOtherElement(element, id) => Self::with_explanation(
                 ErrorCode::ElementIdMismatch,
                 format!(
-                    "Provided uri can not point to element of type [{}]",
+                    "Provided fid can not point to element of type [{}]",
                     element
                 ),
                 Some(id),
@@ -329,6 +342,20 @@ impl From<LocalUriParseError> for ErrorResponse {
                 Self::new(ErrorCode::MissingFieldsInSrcUri, &text)
             }
             UrlParseErr(id, _) => Self::new(ErrorCode::InvalidSrcUri, &id),
+        }
+    }
+}
+
+impl From<ParseFidError> for ErrorResponse {
+    fn from(err: ParseFidError) -> Self {
+        use ParseFidError::*;
+
+        match err {
+            TooManyPaths(text) => {
+                Self::new(ErrorCode::ElementIdIsTooLong, &text)
+            }
+            Empty => Self::without_id(ErrorCode::EmptyElementId),
+            MissingPath(text) => Self::new(ErrorCode::MissingPath, &text),
         }
     }
 }
@@ -415,7 +442,7 @@ impl From<RoomServiceError> for ErrorResponse {
             NotSameRoomIds(id1, id2) => Self::with_explanation(
                 ErrorCode::ProvidedNotSameRoomIds,
                 format!(
-                    "All URI's must have equal room_id. Provided Id's are \
+                    "All FID's must have equal room_id. Provided Id's are \
                      different: [{}] != [{}]",
                     id1, id2
                 ),
@@ -433,7 +460,7 @@ impl From<GrpcControlApiError> for ErrorResponse {
         use GrpcControlApiError::*;
 
         match err {
-            LocalUri(e) => e.into(),
+            Fid(e) => e.into(),
             TryFromProtobuf(e) => e.into(),
             RoomServiceError(e) => e.into(),
             RoomServiceMailboxError(_) | TryFromElement(_) => {

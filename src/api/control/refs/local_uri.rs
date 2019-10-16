@@ -1,4 +1,4 @@
-//! URI for pointing to some medea element.
+//! URI for pointing to some Medea element in spec.
 
 // Fix clippy's wrong errors for `Self` in `LocalUri`s with states as generics.
 #![allow(clippy::use_self)]
@@ -9,27 +9,12 @@ use derive_more::{Display, From};
 use failure::Fail;
 use url::Url;
 
-use crate::api::control::endpoints::webrtc_play_endpoint::SrcUri;
+use crate::{
+    api::control::{MemberId, RoomId},
+    impls_for_stateful_refs,
+};
 
-use super::{EndpointId, MemberId, RoomId};
-
-/// State of [`LocalUri`] which points to [`Room`].
-///
-/// [`Room`]: crate::signalling::room::Room
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct ToRoom(RoomId);
-
-/// State of [`LocalUri`] which points to [`Member`].
-///
-/// [`Member`]: crate::signalling::elements::member::Member
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct ToMember(LocalUri<ToRoom>, MemberId);
-
-/// State of [`LocalUri`] which points to [`Endpoint`].
-///
-/// [`Endpoint`]: crate::signalling::elements::endpoints::Endpoint
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct ToEndpoint(LocalUri<ToMember>, EndpointId);
+use super::{SrcUri, ToEndpoint, ToMember, ToRoom};
 
 /// URI in format `local://room_id/member_id/endpoint_id`.
 ///
@@ -48,11 +33,11 @@ pub struct ToEndpoint(LocalUri<ToMember>, EndpointId);
 ///
 /// ```
 /// # use crate::api::control::local_uri::{LocalUri, ToEndpoint};
-/// # use crate::api::control::{RoomId, MemberId};
+/// # use crate::api::control::{RoomId, MemberId, EndpointId};
 /// #
 /// let orig_room_id = RoomId("room".to_string());
 /// let orig_member_id = MemberId("member".to_string());
-/// let orig_endpoint_id = "endpoint".to_string();
+/// let orig_endpoint_id = EndpointId("endpoint".to_string());
 ///
 /// // Create new LocalUri for endpoint.
 /// let local_uri = LocalUri::<ToEndpoint>::new(
@@ -60,13 +45,14 @@ pub struct ToEndpoint(LocalUri<ToMember>, EndpointId);
 ///     orig_member_id.clone(),
 ///     orig_endpoint_id.clone()
 /// );
+/// let local_uri_clone = local_uri.clone();
 ///
 /// // We can get reference to room_id from this LocalUri
 /// // without taking ownership:
 /// assert_eq!(local_uri.room_id(), &orig_room_id);
 ///
 /// // If you want to take all IDs ownership, you should do this steps:
-/// let (endpoint_id, member_uri) = local_uri.clone().take_endpoint_id();
+/// let (endpoint_id, member_uri) = local_uri.take_endpoint_id();
 /// assert_eq!(endpoint_id, orig_endpoint_id);
 ///
 /// let (member_id, room_uri) = member_uri.take_member_id();
@@ -76,7 +62,7 @@ pub struct ToEndpoint(LocalUri<ToMember>, EndpointId);
 /// assert_eq!(room_id, orig_room_id);
 ///
 /// // Or simply
-/// let (room_id, member_id, endpoint_id) = local_uri.take_all();
+/// let (room_id, member_id, endpoint_id) = local_uri_clone.take_all();
 /// ```
 ///
 /// This is necessary so that it is not possible to get the address in the
@@ -94,30 +80,7 @@ pub struct LocalUri<T> {
     state: T,
 }
 
-impl LocalUri<ToRoom> {
-    /// Create new [`LocalUri`] in [`ToRoom`] state.
-    pub fn new(room_id: RoomId) -> Self {
-        Self {
-            state: ToRoom(room_id),
-        }
-    }
-
-    /// Returns reference to [`RoomId`].
-    pub fn room_id(&self) -> &RoomId {
-        &self.state.0
-    }
-
-    /// Returns [`RoomId`].
-    pub fn take_room_id(self) -> RoomId {
-        self.state.0
-    }
-
-    /// Push [`MemberId`] to the end of URI and returns
-    /// [`LocalUri`] in [`ToMember`] state.
-    pub fn push_member_id(self, member_id: MemberId) -> LocalUri<ToMember> {
-        LocalUri::<ToMember>::new(self.state.0, member_id)
-    }
-}
+impls_for_stateful_refs!(LocalUri);
 
 impl From<StatefulLocalUri> for LocalUri<ToRoom> {
     fn from(from: StatefulLocalUri) -> Self {
@@ -133,94 +96,6 @@ impl From<StatefulLocalUri> for LocalUri<ToRoom> {
                 uri
             }
         }
-    }
-}
-
-impl LocalUri<ToMember> {
-    /// Create new [`LocalUri`] in [`ToMember`] state.
-    pub fn new(room_id: RoomId, member_id: MemberId) -> Self {
-        Self {
-            state: ToMember(LocalUri::<ToRoom>::new(room_id), member_id),
-        }
-    }
-
-    /// Returns reference to [`RoomId`].
-    pub fn room_id(&self) -> &RoomId {
-        &self.state.0.room_id()
-    }
-
-    /// Returns reference to [`MemberId`].
-    pub fn member_id(&self) -> &MemberId {
-        &self.state.1
-    }
-
-    /// Return [`MemberId`] and [`LocalUri`] in state [`ToRoom`].
-    pub fn take_member_id(self) -> (MemberId, LocalUri<ToRoom>) {
-        (self.state.1, self.state.0)
-    }
-
-    /// Push endpoint ID to the end of URI and returns
-    /// [`LocalUri`] in [`ToEndpoint`] state.
-    pub fn push_endpoint_id(
-        self,
-        endpoint_id: EndpointId,
-    ) -> LocalUri<ToEndpoint> {
-        let (member_id, room_uri) = self.take_member_id();
-        let room_id = room_uri.take_room_id();
-        LocalUri::<ToEndpoint>::new(room_id, member_id, endpoint_id)
-    }
-
-    /// Returns [`RoomId`] and [`MemberId`].
-    pub fn take_all(self) -> (RoomId, MemberId) {
-        let (member_id, room_url) = self.take_member_id();
-
-        (room_url.take_room_id(), member_id)
-    }
-}
-
-impl LocalUri<ToEndpoint> {
-    /// Creates new [`LocalUri`] in [`ToEndpoint`] state.
-    pub fn new(
-        room_id: RoomId,
-        member_id: MemberId,
-        endpoint_id: EndpointId,
-    ) -> Self {
-        Self {
-            state: ToEndpoint(
-                LocalUri::<ToMember>::new(room_id, member_id),
-                endpoint_id,
-            ),
-        }
-    }
-
-    /// Returns reference to [`RoomId`].
-    pub fn room_id(&self) -> &RoomId {
-        &self.state.0.room_id()
-    }
-
-    /// Returns reference to [`MemberId`].
-    pub fn member_id(&self) -> &MemberId {
-        &self.state.0.member_id()
-    }
-
-    /// Returns reference to [`EndpointId`].
-    pub fn endpoint_id(&self) -> &EndpointId {
-        &self.state.1
-    }
-
-    /// Returns [`Endpoint`] id and [`LocalUri`] in [`ToMember`] state.
-    ///
-    /// [`Endpoint`]: crate::signalling::elements::endpoints::Endpoint
-    pub fn take_endpoint_id(self) -> (EndpointId, LocalUri<ToMember>) {
-        (self.state.1, self.state.0)
-    }
-
-    /// Returns [`EndpointId`], [`RoomId`] and [`MemberId`].
-    pub fn take_all(self) -> (RoomId, MemberId, EndpointId) {
-        let (endpoint_id, member_url) = self.take_endpoint_id();
-        let (member_id, room_url) = member_url.take_member_id();
-
-        (room_url.take_room_id(), member_id, endpoint_id)
     }
 }
 
@@ -242,13 +117,17 @@ impl fmt::Display for LocalUri<ToRoom> {
 
 impl fmt::Display for LocalUri<ToMember> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}/{}", self.state.0, self.state.1)
+        write!(f, "local://{}/{}", self.state.0, self.state.1)
     }
 }
 
 impl fmt::Display for LocalUri<ToEndpoint> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}/{}", self.state.0, self.state.1)
+        write!(
+            f,
+            "local://{}/{}/{}",
+            self.state.0, self.state.1, self.state.2
+        )
     }
 }
 
@@ -374,7 +253,7 @@ impl TryFrom<String> for StatefulLocalUri {
 }
 
 #[cfg(test)]
-mod tests {
+mod specs {
     use super::*;
 
     #[test]
@@ -473,12 +352,12 @@ mod tests {
     #[test]
     fn properly_serialize() {
         for local_uri_str in vec![
-            String::from("local://room_id"),
-            String::from("local://room_id/member_id"),
-            String::from("local://room_id/member_id/endpoint_id"),
+            "local://room_id",
+            "local://room_id/member_id",
+            "local://room_id/member_id/endpoint_id",
         ] {
             let local_uri =
-                StatefulLocalUri::try_from(local_uri_str.clone()).unwrap();
+                StatefulLocalUri::try_from(local_uri_str.to_string()).unwrap();
             assert_eq!(local_uri_str.to_string(), local_uri.to_string());
         }
     }
@@ -486,11 +365,11 @@ mod tests {
     #[test]
     fn return_error_when_local_uri_not_full() {
         for local_uri_str in vec![
-            String::from("local://room_id//endpoint_id"),
-            String::from("local:////endpoint_id"),
-            String::from("local:///member_id/endpoint_id"),
+            "local://room_id//endpoint_id",
+            "local:////endpoint_id",
+            "local:///member_id/endpoint_id",
         ] {
-            match StatefulLocalUri::try_from(local_uri_str) {
+            match StatefulLocalUri::try_from(local_uri_str.to_string()) {
                 Ok(_) => unreachable!(),
                 Err(e) => match e {
                     LocalUriParseError::MissingPaths(_) => (),
