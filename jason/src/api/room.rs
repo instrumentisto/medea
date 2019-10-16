@@ -8,15 +8,17 @@ use std::{
 };
 
 use futures::{
-    future::{self, Future as _, IntoFuture},
+    future::{self, Either, Future, IntoFuture},
     stream::Stream as _,
     sync::mpsc::{unbounded, UnboundedSender},
 };
+use js_sys::Promise;
+use wasm_bindgen::prelude::*;
+use wasm_bindgen_futures::{future_to_promise, spawn_local};
+
 use medea_client_api_proto::{
     Command, Direction, EventHandler, IceCandidate, IceServer, PeerId, Track,
 };
-use wasm_bindgen::prelude::*;
-use wasm_bindgen_futures::spawn_local;
 
 use crate::{
     media::MediaStream,
@@ -40,13 +42,35 @@ pub struct RoomHandle(Weak<RefCell<InnerRoom>>);
 impl RoomHandle {
     /// Sets callback, which will be invoked on new `Connection` establishing.
     pub fn on_new_connection(
-        &mut self,
+        &self,
         f: js_sys::Function,
     ) -> Result<(), JsValue> {
         map_weak!(self, |inner| inner
             .borrow_mut()
             .on_new_connection
             .set_func(f))
+    }
+
+    /// Performs entering to a [`Room`].
+    ///
+    /// Establishes connection with media server (if it doesn't already exist).
+    /// Fails if unable to connect to media server.
+    /// Effectively returns `Result<(), WasmErr>`.
+    pub fn join(&self, token: &str) -> Promise {
+        let fut = match self.0.upgrade() {
+            None => Either::A(future::err::<JsValue, _>(
+                WasmErr::from("Detached state").into(),
+            )),
+            Some(inner) => {
+                let rpc = Rc::clone(&inner.borrow().rpc);
+                let fut = rpc
+                    .connect(token)
+                    .map(|_| JsValue::NULL)
+                    .map_err(JsValue::from);
+                Either::B(fut)
+            }
+        };
+        future_to_promise(fut)
     }
 
     /// Mutes outbound audio in this room.

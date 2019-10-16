@@ -36,13 +36,15 @@ fn get_test_media_connections(
         .unwrap()
         .unwrap();
     let manager = Rc::new(MediaManager::default());
-    manager.get_stream(request).and_then(move |stream| {
-        media_connections
-            .insert_local_stream(&stream)
-            .and_then(move |_| {
-                Ok((media_connections, audio_track_id, video_track_id))
-            })
-    })
+    manager
+        .get_stream_by_request(request)
+        .and_then(move |stream| {
+            media_connections
+                .insert_local_stream(&stream)
+                .and_then(move |_| {
+                    Ok((media_connections, audio_track_id, video_track_id))
+                })
+        })
 }
 
 // Tests MediaConnections::toggle_send_media function.

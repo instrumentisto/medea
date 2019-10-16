@@ -270,7 +270,7 @@ impl PeerConnection {
                                 self.0
                                     .borrow()
                                     .media_manager
-                                    .get_stream(request)
+                                    .get_stream_by_request(request)
                                     .and_then(move |stream| {
                                         inner
                                             .borrow()
@@ -382,14 +382,14 @@ impl PeerConnection {
                         let media_manager =
                             Rc::clone(&inner.borrow().media_manager);
                         future::Either::B(
-                            media_manager.get_stream(request).and_then(
-                                move |s| {
+                            media_manager
+                                .get_stream_by_request(request)
+                                .and_then(move |s| {
                                     inner
                                         .borrow()
                                         .media_connections
                                         .insert_local_stream(&s)
-                                },
-                            ),
+                                }),
                         )
                     }
                 }),

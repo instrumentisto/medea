@@ -5,7 +5,7 @@
       "security.certerrors.mitm.priming.enabled": false,
       "media.navigator.permission.disabled": true,
       "media.autoplay.enabled": true,
-      "media.autoplay.enabled.user-gestures-needed ": false,
+      "media.autoplay.enabled.user-gestures-needed": false,
       "media.autoplay.ask-permission": false,
       "media.autoplay.default": 0,
       "media.navigator.streams.fake": true
