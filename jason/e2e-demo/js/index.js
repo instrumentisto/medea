@@ -1,85 +1,24 @@
-const controlUrl = "http://127.0.0.1:8000/";
+const controlUrl = "http://127.0.0.1:8000/control-api/";
 
 let roomId = window.location.hash.replace("#", "");
-
-export async function run(credentials) {
-    let wasm = await import("../../pkg");
-    let jason = new wasm.Jason();
-
-    jason.on_local_stream(function(stream, error) {
-        if (stream) {
-            let local_video = document.querySelector('.local-video > video');
-
-            local_video.srcObject = stream.get_media_stream();
-            local_video.play();
-        } else {
-            console.error(error);
-        }
-    });
-
-    let room = await jason.join_room(credentials);
-
-    let muteAudio = document.getElementsByClassName('control__mute_audio')[0];
-    let muteVideo = document.getElementsByClassName('control__mute_video')[0];
-    let isAudioMuted = false;
-    let isVideoMuted = false;
-
-    muteAudio.addEventListener('click', () => {
-        if (isAudioMuted) {
-            room.unmute_audio();
-            isAudioMuted = false;
-            muteAudio.textContent = "Mute audio";
-        } else {
-            room.mute_audio();
-            isAudioMuted = true;
-            muteAudio.textContent = "Unmute audio";
-        }
-    });
-    muteVideo.addEventListener('click', () => {
-        if (isVideoMuted) {
-            room.unmute_video();
-            isVideoMuted = false;
-            muteVideo.textContent = "Mute video";
-        } else {
-            room.mute_video();
-            isVideoMuted = true;
-            muteVideo.textContent = "Unmute video";
-        }
-    });
-
-    room.on_new_connection(function(connection) {
-        connection.on_remote_stream(function(stream) {
-            let videoDiv = document.getElementsByClassName("remote-videos")[0];
-            let video = document.createElement("video");
-            video.srcObject = stream.get_media_stream();
-            let innerVideoDiv = document.createElement("div");
-            innerVideoDiv.className = "video";
-            innerVideoDiv.appendChild(video);
-            videoDiv.appendChild(innerVideoDiv);
-
-            video.play();
-        });
-    });
-}
-
-window.connect_room = async function connect_room(credentials) {
-    console.log("Connection room with following credentials: " + credentials);
-    run(credentials)
-};
 
 async function createRoom(roomId, memberId) {
     let resp = await axios({
         method: 'post',
-        url: controlUrl + roomId,
+        url: controlUrl,
         data: {
+            id: roomId,
+            kind: 'Room',
             pipeline: {
                 [memberId]: {
                     kind: 'Member',
+                    id: memberId,
                     credentials: 'test',
                     pipeline: {
                         publish: {
                             kind: 'WebRtcPublishEndpoint',
                             spec: {
+                                id: 'publish',
                                 p2p: 'Always'
                             }
                         },
@@ -99,6 +38,7 @@ async function createMember(roomId, memberId) {
         publish: {
             kind: 'WebRtcPublishEndpoint',
             spec: {
+                id: 'publish',
                 p2p: 'Always'
             }
         }
@@ -107,38 +47,46 @@ async function createMember(roomId, memberId) {
     let memberIds = [];
 
     for (let i = 0; i < anotherMembers.length; i++) {
-        let localUri = anotherMembers[i];
-        let memberId = localUri.replace(/local:\/\/.*\//, "");
+        // let localUri = anotherMembers[i];
+        // let memberId = localUri.replace(/local:\/\/.*\//, "");
+        let memberId = anotherMembers[i];
         memberIds.push(memberId);
         pipeline["play-" + memberId] = {
             kind: 'WebRtcPlayEndpoint',
             spec: {
-                src: localUri + "/publish"
+                id: "play-" + memberId,
+                src: 'local://' + roomId + '/' + memberId + "/publish"
             }
         }
     }
 
     let resp = await axios({
         method: 'post',
-        url: controlUrl + roomId + "/" + memberId,
+        url: controlUrl + roomId,
         data: {
+            kind: 'Member',
+            id: memberId,
             credentials: 'test',
             pipeline: pipeline,
         }
     });
 
-    for (let i = 0; i < memberIds.length; i++) {
-        let id = memberIds[i];
-        await axios({
-            method: 'post',
-            url: controlUrl + roomId + "/" + id + "/play-" + memberId,
-            data: {
-                kind: 'WebRtcPlayEndpoint',
-                spec: {
+    try {
+        for (let i = 0; i < memberIds.length; i++) {
+            let id = memberIds[i];
+            await axios({
+                method: 'post',
+                url: controlUrl + roomId + "/" + id,
+                data: {
+                    kind: 'WebRtcPlayEndpoint',
+                    id: "play-" + memberId,
                     src: 'local://' + roomId + '/' + memberId + '/publish'
                 }
-            }
-        })
+            })
+        }
+
+    } catch (e) {
+        console.log(e.response);
     }
 
     return resp.data.sids[memberId]
@@ -274,15 +222,111 @@ const controlDebugWindows = {
     },
 };
 
-window.onload = function() {
+window.onload = async function() {
+    let rust = await import("../../pkg");
+    let jason = new rust.Jason();
+
     Object.values(controlDebugWindows).forEach(s => s());
 
     bindControlDebugMenu();
+
+    async function fillMediaDevicesInputs(audio_select, video_select) {
+        const device_infos = await jason.media_manager().enumerate_devices();
+        console.log('Available input and output devices:', device_infos);
+        for (const device_info of device_infos) {
+            const option = document.createElement('option');
+            option.value = device_info.device_id();
+            if (device_info.kind() === 'audio') {
+                option.text = device_info.label() || `Microphone ${audio_select.length + 1}`;
+                audio_select.append(option);
+            } else if (device_info.kind() === 'video') {
+                option.text = device_info.label() || `Camera ${video_select.length + 1}`;
+                video_select.append(option);
+            }
+        }
+    }
+
+    async function getStream(local_video, audio_select, video_select) {
+        let constraints = new rust.MediaStreamConstraints();
+        let audio = new rust.AudioTrackConstraints();
+        let audioValue = audio_select.options[audio_select.selectedIndex].value;
+        let videoValue = video_select.options[video_select.selectedIndex].value;
+        if (audioValue) {
+            audio.device_id(audioValue)
+        }
+        constraints.audio(audio);
+        let video = new rust.VideoTrackConstraints();
+        if (videoValue) {
+            video.device_id(videoValue)
+        }
+        constraints.video(video);
+        let stream = await jason.media_manager().init_local_stream(constraints);
+        local_video.srcObject = stream;
+        local_video.play();
+        console.log(stream);
+    }
 
     try {
         let controlBtns = document.getElementsByClassName('control')[0];
         let joinCallerButton = document.getElementsByClassName('connect__join')[0];
         let usernameInput = document.getElementsByClassName('connect__username')[0];
+        let audioSelect = document.getElementsByClassName('connect__select-device_audio')[0];
+        let videoSelect = document.getElementsByClassName('connect__select-device_video')[0];
+        let localVideo = document.querySelector('.local-video > video');
+
+        let room = await jason.init_room();
+        await fillMediaDevicesInputs(audioSelect, videoSelect);
+        await getStream(localVideo, audioSelect, videoSelect);
+
+        audioSelect.addEventListener('change', () => {
+            getStream(localVideo, audioSelect, videoSelect);
+        });
+
+        videoSelect.addEventListener('change', () => {
+            getStream(localVideo, audioSelect, videoSelect);
+        });
+
+        room.on_new_connection((connection) => {
+            connection.on_remote_stream((stream) => {
+                let videoDiv = document.getElementsByClassName("remote-videos")[0];
+                let video = document.createElement("video");
+                video.srcObject = stream.get_media_stream();
+                let innerVideoDiv = document.createElement("div");
+                innerVideoDiv.className = "video";
+                innerVideoDiv.appendChild(video);
+                videoDiv.appendChild(innerVideoDiv);
+
+                video.play();
+            });
+        });
+
+        let muteAudio = document.getElementsByClassName('control__mute_audio')[0];
+        let muteVideo = document.getElementsByClassName('control__mute_video')[0];
+        let isAudioMuted = false;
+        let isVideoMuted = false;
+
+        muteAudio.addEventListener('click', () => {
+            if (isAudioMuted) {
+                room.unmute_audio();
+                isAudioMuted = false;
+                muteAudio.textContent = "Mute audio";
+            } else {
+                room.mute_audio();
+                isAudioMuted = true;
+                muteAudio.textContent = "Unmute audio";
+            }
+        });
+        muteVideo.addEventListener('click', () => {
+            if (isVideoMuted) {
+                room.unmute_video();
+                isVideoMuted = false;
+                muteVideo.textContent = "Mute video";
+            } else {
+                room.mute_video();
+                isVideoMuted = true;
+                muteVideo.textContent = "Unmute video";
+            }
+        })
 
         usernameInput.value = faker.name.firstName();
 
@@ -298,21 +342,23 @@ window.onload = function() {
                 } catch (e) {
                     if (e.response.status === 400) {
                         console.log("Room not found. Creating new room...");
-                        await window.connect_room(await createRoom(roomId, username))
+                        room.join(await createRoom(roomId, username));
+                        // await window.connect_room(await createRoom(roomId, username))
                     }
                 }
                 try {
                     await axios.get(controlUrl + roomId + '/' + username);
                 } catch (e) {
                     console.log("Member not found. Creating new member...");
-                    await window.connect_room(await createMember(roomId, username));
+                    room.join(await createMember(roomId, username));
+                    // await window.connect_room(await createMember(roomId, username));
                 }
             };
         };
 
         bindJoinButtons(roomId);
     } catch (e) {
-        console.log(e.response)
+        console.log(e)
     }
 };
 
@@ -371,8 +417,9 @@ const controlApi = {
         try {
             await axios({
                 method: 'post',
-                url: controlUrl + roomId,
+                url: controlUrl,
                 data: {
+                    id: roomId,
                     kind: 'Room',
                     pipeline: {}
                 }

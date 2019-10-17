@@ -20,19 +20,25 @@ pub struct Uri(String);
 
 impl From<String> for Uri {
     fn from(path: String) -> Self {
-        Self(format!("local://{}", path))
+        Self(format!("{}", path))
     }
 }
 
 impl From<(String, String)> for Uri {
     fn from(path: (String, String)) -> Self {
-        Self(format!("local://{}/{}", path.0, path.1))
+        Self(format!("{}/{}", path.0, path.1))
     }
 }
 
 impl From<(String, String, String)> for Uri {
     fn from(path: (String, String, String)) -> Self {
-        Self(format!("local://{}/{}/{}", path.0, path.1, path.2))
+        Self(format!("{}/{}/{}", path.0, path.1, path.2))
+    }
+}
+
+impl From<()> for Uri {
+    fn from(_: ()) -> Self {
+        Self(String::new())
     }
 }
 

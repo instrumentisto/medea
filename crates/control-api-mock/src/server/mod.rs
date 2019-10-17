@@ -50,6 +50,11 @@ pub fn run(args: &ArgMatches) {
                 client: ControlClient::new(&medea_addr),
             })
             .wrap(middleware::Logger::default())
+            .service(web::resource("/control-api/")
+                .route(web::post().to_async(create::create0))
+                .route(web::get().to_async(get::get0))
+                .route(web::delete().to_async(delete::delete0))
+            )
             .service(
                 web::resource("/control-api/{a}")
                     .route(web::post().to_async(create::create1))
@@ -100,6 +105,7 @@ mod delete {
 
     fn_uri_macro!(delete_single, Response);
 
+    fn_uri!(delete0, ());
     fn_uri!(delete1, String);
     fn_uri!(delete2, (String, String));
     fn_uri!(delete3, (String, String, String));
@@ -112,6 +118,7 @@ mod get {
 
     fn_uri_macro!(get_single, SingleGetResponse);
 
+    fn_uri!(get0, ());
     fn_uri!(get1, String);
     fn_uri!(get2, (String, String));
     fn_uri!(get3, (String, String, String));
@@ -136,6 +143,7 @@ mod create {
         };
     }
 
+    gen_fn!(create0, ());
     gen_fn!(create1, (String));
     gen_fn!(create2, (String, String));
     gen_fn!(create3, (String, String, String));
