@@ -55,8 +55,7 @@ impl InnerMediaManager {
     /// Returns the vector of [`MediaDeviceInfo`] objects.
     fn enumerate_devices(
         &self,
-    ) -> impl Future<Output = Result<Vec<InputDeviceInfo>, WasmErr>> + 'static
-    {
+    ) -> impl Future<Output = Result<Vec<InputDeviceInfo>, WasmErr>> {
         async {
             let devices = window().navigator().media_devices()?;
             let devices = JsFuture::from(devices.enumerate_devices()?).await?;
