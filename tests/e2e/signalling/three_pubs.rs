@@ -6,6 +6,7 @@ use medea_client_api_proto::{Direction, Event, PeerId};
 use crate::signalling::{CloseSocket, TestMember};
 
 #[test]
+#[allow(clippy::too_many_lines)]
 fn three_members_p2p_video_call() {
     System::run(|| {
         let base_url = "ws://127.0.0.1:8080/ws/three-members-conference";

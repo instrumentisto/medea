@@ -2,7 +2,11 @@
 //!
 //! [Control API]: https://tinyurl.com/yxsqplq7
 
-use std::{collections::HashMap, convert::TryFrom, sync::Arc};
+use std::{
+    collections::HashMap,
+    convert::{From, TryFrom},
+    sync::Arc,
+};
 
 use actix::{
     Actor, Addr, Arbiter, Context, Handler, MailboxError, ResponseFuture,
@@ -39,7 +43,6 @@ use crate::{
     },
     AppContext,
 };
-use std::convert::From;
 
 /// Errors which can happen while processing requests to gRPC [Control API].
 ///
@@ -87,6 +90,8 @@ struct ControlApiService {
 }
 
 impl ControlApiService {
+    // TODO: move to room_service, grpc might not be the only ControlApi
+    // protocol, and this logic will should be shared
     /// Returns [Control API] sid based on provided arguments and
     /// `MEDEA_SERVER__CLIENT__HTTP__PUBLIC_URL` config value.
     fn get_sid(

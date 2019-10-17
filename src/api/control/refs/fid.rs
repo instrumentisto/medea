@@ -95,6 +95,7 @@ impl TryFrom<String> for StatefulFid {
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
         if value.is_empty() {
+            // TODO: not an error but rather Fid<Root>
             return Err(ParseFidError::Empty);
         }
 
@@ -154,7 +155,7 @@ mod specs {
 
     #[test]
     fn returns_error_on_missing_path() {
-        for fid_str in vec![
+        for fid_str in &[
             "room_id//endpoint_id",
             "//endpoint_id",
             "//member_id/endpoint_id",
@@ -172,7 +173,7 @@ mod specs {
 
     #[test]
     fn returns_error_on_too_many_paths() {
-        for fid_str in vec![
+        for fid_str in &[
             "room_id/member_id/endpoint_id/something_else",
             "room_id/member_id/endpoint_id/",
             "room_id/member_id/endpoint_id////",
@@ -238,7 +239,7 @@ mod specs {
 
     #[test]
     fn serializes_into_original_fid() {
-        for fid_str in vec![
+        for fid_str in &[
             "room_id",
             "room_id/member_id",
             "room_id/member_id/endpoint_id",

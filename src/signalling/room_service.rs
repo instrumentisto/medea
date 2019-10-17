@@ -400,11 +400,11 @@ impl Handler<DeleteElements<Validated>> for RoomService {
         > = msg
             .fids
             .into_iter()
-            .filter_map(|l| {
-                if let StatefulFid::Room(room_id) = l {
+            .filter_map(|fid| {
+                if let StatefulFid::Room(room_id) = fid {
                     Some(self.close_room(room_id.take_room_id()))
                 } else {
-                    deletes_from_room.push(l);
+                    deletes_from_room.push(fid);
                     None
                 }
             })
