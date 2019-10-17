@@ -99,18 +99,18 @@ impl From<WebRtcPlayEndpointProto> for WebRtcPlayEndpoint {
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "kind")]
 pub enum Endpoint {
-    WebRtcPublishEndpoint { spec: WebRtcPublishEndpoint },
-    WebRtcPlayEndpoint { spec: WebRtcPlayEndpoint },
+    WebRtcPublishEndpoint(WebRtcPublishEndpoint),
+    WebRtcPlayEndpoint(WebRtcPlayEndpoint),
 }
 
 impl Into<MemberElementProto> for Endpoint {
     fn into(self) -> MemberElementProto {
         let mut proto = MemberElementProto::new();
         match self {
-            Self::WebRtcPlayEndpoint { spec } => {
+            Self::WebRtcPlayEndpoint(spec) => {
                 proto.set_webrtc_play(spec.into())
             }
-            Self::WebRtcPublishEndpoint { spec } => {
+            Self::WebRtcPublishEndpoint(spec) => {
                 proto.set_webrtc_pub(spec.into())
             }
         }
@@ -121,13 +121,13 @@ impl Into<MemberElementProto> for Endpoint {
 impl From<MemberElementProto> for Endpoint {
     fn from(mut proto: MemberElementProto) -> Self {
         if proto.has_webrtc_play() {
-            Self::WebRtcPlayEndpoint {
-                spec: proto.take_webrtc_play().into(),
-            }
+            Self::WebRtcPlayEndpoint(
+                proto.take_webrtc_play().into(),
+            )
         } else if proto.has_webrtc_pub() {
-            Self::WebRtcPublishEndpoint {
-                spec: proto.take_webrtc_pub().into(),
-            }
+            Self::WebRtcPublishEndpoint(
+                proto.take_webrtc_pub().into(),
+            )
         } else {
             unimplemented!()
         }
