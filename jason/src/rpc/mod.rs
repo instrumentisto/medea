@@ -3,10 +3,10 @@
 mod heartbeat;
 mod websocket;
 
-use std::{cell::RefCell, rc::Rc, vec};
+use std::{cell::RefCell, pin::Pin, rc::Rc, vec};
 
 use futures::{
-    sync::mpsc::{unbounded, UnboundedSender},
+    channel::mpsc::{unbounded, UnboundedSender},
     Future, Stream,
 };
 use js_sys::Date;
@@ -24,18 +24,19 @@ pub enum CloseMsg {
     Disconnect(String),
 }
 
+// TODO: consider using async-trait crate, it doesnt work with mockall atm
 /// Client to talk with server via Client API RPC.
 #[allow(clippy::module_name_repetitions)]
 #[cfg_attr(feature = "mockable", mockall::automock)]
 pub trait RpcClient {
-    // Establish connection with RPC server.
+    // atm Establish connection with RPC server.
     fn connect(
         &self,
-        token: &str,
-    ) -> Box<dyn Future<Item = (), Error = WasmErr>>;
+        token: String,
+    ) -> Pin<Box<dyn Future<Output = Result<(), WasmErr>>>>;
 
     /// Returns [`Stream`] of all [`Event`]s received by this [`RpcClient`].
-    fn subscribe(&self) -> Box<dyn Stream<Item = Event, Error = ()>>;
+    fn subscribe(&self) -> Pin<Box<dyn Stream<Item = Event>>>;
 
     /// Unsubscribes from this [`RpcClient`]. Drops all subscriptions atm.
     fn unsub(&self);
@@ -123,12 +124,11 @@ impl RpcClient for WebsocketRpcClient {
     /// on receiving messages from server and closing socket.
     fn connect(
         &self,
-        token: &str,
-    ) -> Box<dyn Future<Item = (), Error = WasmErr>> {
+        token: String,
+    ) -> Pin<Box<dyn Future<Output = Result<(), WasmErr>>>> {
         let inner = Rc::clone(&self.0);
-        Box::new(WebSocket::new(token).and_then(move |socket: WebSocket| {
-            let socket = Rc::new(socket);
-
+        Box::pin(async move {
+            let socket = Rc::new(WebSocket::new(&token).await?);
             inner.borrow_mut().heartbeat.start(Rc::clone(&socket))?;
 
             let inner_rc = Rc::clone(&inner);
@@ -141,16 +141,16 @@ impl RpcClient for WebsocketRpcClient {
 
             inner.borrow_mut().sock.replace(socket);
             Ok(())
-        }))
+        })
     }
 
     /// Returns [`Stream`] of all [`Event`]s received by this [`RpcClient`].
     // TODO: proper sub registry
-    fn subscribe(&self) -> Box<dyn Stream<Item = Event, Error = ()>> {
+    fn subscribe(&self) -> Pin<Box<dyn Stream<Item = Event>>> {
         let (tx, rx) = unbounded();
         self.0.borrow_mut().subs.push(tx);
 
-        Box::new(rx)
+        Box::pin(rx)
     }
 
     /// Unsubscribes from this [`RpcClient`]. Drops all subscriptions atm.
