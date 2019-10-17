@@ -145,20 +145,18 @@ const controlDebugWindows = {
             switch (endpointType) {
                 case 'WebRtcPublishEndpoint':
                     let p2pMode = container.getElementsByClassName('webrtc-publish-endpoint-spec__p2p')[0].value;
-                    await controlApi.createEndpoint(roomId, memberId, endpointId, {
+                    await controlApi.createEndpoint(roomId, memberId, {
                         kind: endpointType,
-                        spec: {
-                            p2p: p2pMode,
-                        }
+                        id: endpointId,
+                        p2p: p2pMode,
                     });
                     break;
                 case 'WebRtcPlayEndpoint':
                     let source = container.getElementsByClassName('webrtc-play-endpoint-spec__src')[0].value;
-                    await controlApi.createEndpoint(roomId, memberId, endpointId, {
+                    await controlApi.createEndpoint(roomId, memberId, {
                         kind: endpointType,
-                        spec: {
-                            src: source,
-                        }
+                        id: endpointId,
+                        src: source,
                     });
             }
         })
@@ -393,11 +391,11 @@ const controlApi = {
         }
     },
 
-    createEndpoint: async function (roomId, memberId, endpointId, spec) {
+    createEndpoint: async function (roomId, memberId, spec) {
         try {
             await axios({
                 method: 'post',
-                url: controlUrl + roomId + '/' + memberId + '/' + endpointId,
+                url: controlUrl + roomId + '/' + memberId,
                 data: spec
             });
         } catch (e) {
@@ -433,10 +431,11 @@ const controlApi = {
         try {
             await axios({
                 method: 'post',
-                url: controlUrl + roomId + '/' + memberId,
+                url: controlUrl + roomId,
                 data: {
                     kind: 'Member',
                     credentials: credentials,
+                    id: memberId,
                     pipeline: {}
                 }
             });
