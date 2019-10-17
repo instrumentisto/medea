@@ -49,6 +49,7 @@
             margin-bottom: 20px;
             width: auto;
             height: 150px;
+            max-width: 225px;
         }
 
         .connect__username {
@@ -59,6 +60,18 @@
         .connect__join {
             font-size: 16px;
             margin-left: 5px;
+        }
+
+        .connect__device {
+            margin-top: 5px;
+        }
+
+        .connect__device > label {
+            font-size: 10pt;
+        }
+
+        .connect__device > label > select {
+            margin-top: 5px;
         }
 
         .btn {
@@ -180,18 +193,18 @@
 
     <div class="connect toggle-content is-visible">
         <div>
-            <label>Audio device
+            <input class="connect__username" placeholder="username">
+            <button class="connect__join btn">Join</button>
+        </div>
+        <div class="connect__device">
+            <label>Audio:
                 <select class="connect__select-device_audio">
                 </select>
-            </label>
-            <label>Video device
+            </label><br>
+            <label>Video:
                 <select class="connect__select-device_video">
                 </select>
             </label>
-        </div>
-        <div>
-            <input class="connect__username" placeholder="username">
-            <button class="connect__join btn">Join</button>
         </div>
     </div>
 

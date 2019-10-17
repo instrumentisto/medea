@@ -326,7 +326,7 @@ window.onload = async function() {
                 isVideoMuted = true;
                 muteVideo.textContent = "Unmute video";
             }
-        })
+        });
 
         usernameInput.value = faker.name.firstName();
 
