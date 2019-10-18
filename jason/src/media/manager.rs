@@ -194,12 +194,12 @@ impl MediaManager {
 
             Ok(stream)
         }
-            .await
-            .map(Rc::new)
-            .map_err(move |err: WasmErr| {
-                inner.on_local_stream.call2(err.clone());
-                err
-            })
+        .await
+        .map(Rc::new)
+        .map_err(move |err: WasmErr| {
+            inner.on_local_stream.call2(err.clone());
+            err
+        })
     }
 
     /// Obtains [MediaStream][1] basing on provided [`MediaStreamConstraints`].
