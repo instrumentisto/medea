@@ -9,10 +9,7 @@ use std::{
     rc::{Rc, Weak},
 };
 
-use futures::{
-    future::{self},
-    TryFutureExt as _,
-};
+use futures::{future, FutureExt as _, TryFutureExt as _};
 use js_sys::Promise;
 use wasm_bindgen::{prelude::*, JsValue};
 use wasm_bindgen_futures::{future_to_promise, JsFuture};
@@ -82,12 +79,11 @@ impl InnerMediaManager {
         caps: MediaStreamConstraints,
     ) -> impl Future<Output = Result<(SysMediaStream, bool), WasmErr>> {
         if let Some(stream) = self.get_from_storage(&caps) {
-            future::Either::Left(future::ok((stream, false)))
+            future::ok((stream, false)).left_future()
         } else {
-            future::Either::Right(
-                self.get_user_media(caps)
-                    .and_then(|stream| future::ok((stream, true))),
-            )
+            self.get_user_media(caps)
+                .and_then(|stream| future::ok((stream, true)))
+                .right_future()
         }
     }
 
@@ -198,12 +194,12 @@ impl MediaManager {
 
             Ok(stream)
         }
-        .await
-        .map(Rc::new)
-        .map_err(move |err: WasmErr| {
-            inner.on_local_stream.call2(err.clone());
-            err
-        })
+            .await
+            .map(Rc::new)
+            .map_err(move |err: WasmErr| {
+                inner.on_local_stream.call2(err.clone());
+                err
+            })
     }
 
     /// Obtains [MediaStream][1] basing on provided [`MediaStreamConstraints`].
@@ -215,7 +211,7 @@ impl MediaManager {
         &self,
         caps: MediaStreamConstraints,
     ) -> Result<SysMediaStream, WasmErr> {
-        self.0.get_stream(caps).await.map(|(stream, _)| stream)
+        self.0.get_stream(caps).await.map(|(s, _)| s)
     }
 
     /// Sets `on_local_stream` callback that will be invoked when

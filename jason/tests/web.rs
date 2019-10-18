@@ -5,7 +5,7 @@ mod media;
 mod peer;
 mod utils;
 
-use futures::channel::oneshot::channel;
+use futures::channel::oneshot;
 use medea_client_api_proto::{
     AudioSettings, Direction, MediaType, PeerId, Track, TrackId, VideoSettings,
 };
@@ -37,7 +37,7 @@ pub fn get_test_tracks() -> (Track, Track) {
 }
 
 pub async fn resolve_after(delay: i32) -> Result<(), JsValue> {
-    let (done, wait) = channel();
+    let (done, wait) = oneshot::channel();
     let cb = Closure::once_into_js(move || {
         done.send(()).unwrap();
     });

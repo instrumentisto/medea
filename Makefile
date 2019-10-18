@@ -248,7 +248,7 @@ endif
 #	make cargo.lint
 
 cargo.lint:
-	cargo clippy --all -- -D clippy::pedantic -D warnings
+	cargo +beta clippy --all -- -D clippy::pedantic -D warnings
 
 
 
@@ -335,7 +335,7 @@ ifeq ($(crate),medea-jason)
 	sleep 10
 	cd $(crate-dir)/ && \
 	$(webdriver-env)="http://127.0.0.1:4444" \
-	cargo test --target wasm32-unknown-unknown --features mockable
+	cargo +beta test --target wasm32-unknown-unknown --features mockable
 	@make docker.down.webdriver browser=$(browser)
 else
 	cd $(crate-dir)/ && \

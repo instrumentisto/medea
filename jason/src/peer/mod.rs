@@ -276,6 +276,7 @@ impl PeerConnection {
         self.peer.set_remote_description(desc).await?;
         *self.has_remote_description.borrow_mut() = true;
 
+        // TODO: do it concurrently?
         for candidate in self.ice_candidates_buffer.borrow_mut().drain(..) {
             self.peer
                 .add_ice_candidate(

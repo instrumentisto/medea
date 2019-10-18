@@ -2,7 +2,7 @@
 
 use std::rc::Rc;
 
-use futures::channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
+use futures::channel::mpsc;
 use medea_client_api_proto::{Event, IceServer, PeerId};
 use medea_jason::{
     api::Room,
@@ -19,7 +19,7 @@ wasm_bindgen_test_configure!(run_in_browser);
 fn get_test_room_and_exist_peer() -> (Room, Rc<PeerConnection>) {
     let mut rpc = MockRpcClient::new();
     let mut repo = Box::new(MockPeerRepository::new());
-    let (tx, _rx) = unbounded();
+    let (tx, _rx) = mpsc::unbounded();
     let peer = Rc::new(
         PeerConnection::new(
             PeerId(1),
@@ -32,7 +32,7 @@ fn get_test_room_and_exist_peer() -> (Room, Rc<PeerConnection>) {
         .unwrap(),
     );
 
-    let (_, event_rx) = unbounded();
+    let (_, event_rx) = mpsc::unbounded();
     let peer_clone = Rc::clone(&peer);
     rpc.expect_subscribe()
         .return_once(move || Box::pin(event_rx));
@@ -77,7 +77,7 @@ async fn mute_unmute_video() {
 }
 
 fn get_test_room_and_new_peer(
-    event_rx: UnboundedReceiver<Event>,
+    event_rx: mpsc::UnboundedReceiver<Event>,
     with_enabled_audio: bool,
     with_enabled_video: bool,
 ) -> (Room, Rc<PeerConnection>) {
@@ -87,7 +87,7 @@ fn get_test_room_and_new_peer(
     rpc.expect_subscribe()
         .return_once(move || Box::pin(event_rx));
     repo.expect_get_all().returning(|| vec![]);
-    let (tx, _rx) = unbounded();
+    let (tx, _rx) = mpsc::unbounded();
     let peer = Rc::new(
         PeerConnection::new(
             PeerId(1),
@@ -104,7 +104,7 @@ fn get_test_room_and_new_peer(
         .withf(
             move |id: &PeerId,
                   _ice_servers: &Vec<IceServer>,
-                  _peer_events_sender: &UnboundedSender<PeerEvent>,
+                  _peer_events_sender: &mpsc::UnboundedSender<PeerEvent>,
                   enabled_audio: &bool,
                   enabled_video: &bool| {
                 *id == PeerId(1)
@@ -122,7 +122,7 @@ fn get_test_room_and_new_peer(
 
 #[wasm_bindgen_test]
 async fn mute_audio_room_before_init_peer() {
-    let (event_tx, event_rx) = unbounded();
+    let (event_tx, event_rx) = mpsc::unbounded();
     let (room, peer) = get_test_room_and_new_peer(event_rx, false, true);
     let (audio_track, video_track) = get_test_tracks();
 
@@ -144,7 +144,7 @@ async fn mute_audio_room_before_init_peer() {
 
 #[wasm_bindgen_test]
 async fn mute_video_room_before_init_peer() {
-    let (event_tx, event_rx) = unbounded();
+    let (event_tx, event_rx) = mpsc::unbounded();
     let (room, peer) = get_test_room_and_new_peer(event_rx, true, false);
     let (audio_track, video_track) = get_test_tracks();
 

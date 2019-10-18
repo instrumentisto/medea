@@ -5,13 +5,11 @@ mod media;
 use std::rc::Rc;
 
 use futures::{channel::mpsc, StreamExt as _};
-
 use medea_client_api_proto::PeerId;
 use medea_jason::{
     media::MediaManager,
     peer::{PeerConnection, PeerEvent},
 };
-// use wasm_bindgen_futures::spawn_local;
 use wasm_bindgen_test::*;
 
 use crate::{get_test_tracks, resolve_after};

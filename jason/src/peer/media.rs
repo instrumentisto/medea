@@ -177,6 +177,7 @@ impl MediaConnections {
         stream.toggle_audio_tracks(s.enabled_audio);
         stream.toggle_video_tracks(s.enabled_video);
 
+        // TODO: do it concurrently?
         for sender in s.senders.values() {
             if let Some(track) = stream.get_track_by_id(sender.track_id) {
                 Sender::insert_and_enable_track(Rc::clone(sender), track)

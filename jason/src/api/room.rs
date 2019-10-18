@@ -7,12 +7,7 @@ use std::{
     rc::{Rc, Weak},
 };
 
-use futures::{
-    channel::mpsc::{unbounded, UnboundedSender},
-    future,
-    stream::select,
-    FutureExt as _, StreamExt,
-};
+use futures::{channel::mpsc, future, stream, FutureExt as _, StreamExt as _};
 use js_sys::Promise;
 use medea_client_api_proto::{
     Command, Direction, Event as RpcEvent, EventHandler, IceCandidate,
@@ -106,14 +101,14 @@ impl Room {
             PeerEvent(PeerEvent),
         }
 
-        let (tx, peer_events_rx) = unbounded();
+        let (tx, peer_events_rx) = mpsc::unbounded();
         let events_stream = rpc.subscribe();
         let room = Rc::new(RefCell::new(InnerRoom::new(rpc, peers, tx)));
 
         let rpc_events_stream = events_stream.map(RoomEvent::RpcEvent);
         let peer_events_stream = peer_events_rx.map(RoomEvent::PeerEvent);
 
-        let mut events = select(rpc_events_stream, peer_events_stream);
+        let mut events = stream::select(rpc_events_stream, peer_events_stream);
 
         let inner = Rc::downgrade(&room);
         // Spawns `Promise` in JS, does not provide any handles, so the current
@@ -165,7 +160,7 @@ impl Room {
 struct InnerRoom {
     rpc: Rc<dyn RpcClient>,
     peers: Box<dyn PeerRepository>,
-    peer_event_sender: UnboundedSender<PeerEvent>,
+    peer_event_sender: mpsc::UnboundedSender<PeerEvent>,
     connections: HashMap<PeerId, Connection>,
     on_new_connection: Rc<Callback2<ConnectionHandle, WasmErr>>,
     enabled_audio: bool,
@@ -178,7 +173,7 @@ impl InnerRoom {
     fn new(
         rpc: Rc<dyn RpcClient>,
         peers: Box<dyn PeerRepository>,
-        peer_event_sender: UnboundedSender<PeerEvent>,
+        peer_event_sender: mpsc::UnboundedSender<PeerEvent>,
     ) -> Self {
         Self {
             rpc,
@@ -291,12 +286,12 @@ impl EventHandler for InnerRoom {
                 };
                 Result::<_, WasmErr>::Ok(())
             }
-            .then(|result| {
-                if let Err(err) = result {
-                    err.log_err();
-                };
-                future::ready(())
-            }),
+                .then(|result| {
+                    if let Err(err) = result {
+                        err.log_err();
+                    };
+                    future::ready(())
+                }),
         );
     }
 

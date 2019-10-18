@@ -4,11 +4,7 @@
 
 use std::{cell::RefCell, convert::TryFrom, rc::Rc};
 
-use futures::{
-    channel::oneshot,
-    future::{self, Either},
-};
-
+use futures::{channel::oneshot, future};
 use macro_attr::*;
 use medea_client_api_proto::{ClientMsg, ServerMsg};
 use newtype_derive::NewtypeFrom;
@@ -128,11 +124,11 @@ impl WebSocket {
         socket.borrow_mut().on_close.take();
 
         match state {
-            Either::Left((opened, _)) => match opened {
+            future::Either::Left((opened, _)) => match opened {
                 Ok(_) => Ok(Self(socket)),
                 Err(_) => Err(WasmErr::from("Failed to init WebSocket")),
             },
-            Either::Right(_closed) => {
+            future::Either::Right(_closed) => {
                 Err(WasmErr::from("Failed to init WebSocket"))
             }
         }
