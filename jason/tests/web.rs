@@ -5,7 +5,7 @@ mod media;
 mod peer;
 mod utils;
 
-use futures::{future::IntoFuture, sync::oneshot::channel, Future};
+use futures::channel::oneshot;
 use medea_client_api_proto::{
     AudioSettings, Direction, MediaType, PeerId, Track, TrackId, VideoSettings,
 };
@@ -36,8 +36,8 @@ pub fn get_test_tracks() -> (Track, Track) {
     )
 }
 
-pub fn resolve_after(delay: i32) -> impl Future<Item = (), Error = JsValue> {
-    let (done, wait) = channel();
+pub async fn resolve_after(delay: i32) -> Result<(), JsValue> {
+    let (done, wait) = oneshot::channel();
     let cb = Closure::once_into_js(move || {
         done.send(()).unwrap();
     });
@@ -47,6 +47,6 @@ pub fn resolve_after(delay: i32) -> impl Future<Item = (), Error = JsValue> {
             delay,
         )
         .unwrap();
-    wait.into_future()
-        .map_err(|_| WasmErr::from("canceled").into())
+
+    wait.await.map_err(|_| WasmErr::from("canceled").into())
 }

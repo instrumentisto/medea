@@ -1,6 +1,5 @@
 use std::{cell::RefCell, rc::Rc};
 
-use futures::Future;
 use medea_client_api_proto::IceServer;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
@@ -72,10 +71,10 @@ pub enum SdpType {
     Answer(String),
 }
 
-/// Helper wrapper for [RTCPeerConnection][1].
+/// Representation of [RTCPeerConnection][1].
 ///
 /// [1]: https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection
-struct InnerPeer {
+pub struct RtcPeerConnection {
     /// Underlying [RTCPeerConnection][1].
     ///
     /// [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
@@ -89,8 +88,9 @@ struct InnerPeer {
     /// [2]: https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-onicecandidate
     /// [3]: https://www.w3.org/TR/webrtc/#event-icecandidate
     /// [4]: https://www.w3.org/TR/webrtc/#dom-rtcicecandidate
-    on_ice_candidate:
+    on_ice_candidate: RefCell<
         Option<EventListener<SysRtcPeerConnection, RtcPeerConnectionIceEvent>>,
+    >,
 
     /// [`ontrack`][2] callback of [RTCPeerConnection][1] to handle
     /// [`track`][3] event. It fires when [RTCPeerConnection][1] receives
@@ -100,13 +100,9 @@ struct InnerPeer {
     /// [2]: https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-ontrack
     /// [3]: https://www.w3.org/TR/webrtc/#event-track
     /// [4]: https://developer.mozilla.org/en-US/docs/Web/API/MediaStreamTrack
-    on_track: Option<EventListener<SysRtcPeerConnection, RtcTrackEvent>>,
+    on_track:
+        RefCell<Option<EventListener<SysRtcPeerConnection, RtcTrackEvent>>>,
 }
-
-/// Representation of [RTCPeerConnection][1].
-///
-/// [1]: https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection
-pub struct RtcPeerConnection(Rc<RefCell<InnerPeer>>);
 
 impl RtcPeerConnection {
     /// Instantiates new [`RtcPeerConnection`].
@@ -118,13 +114,13 @@ impl RtcPeerConnection {
         let mut peer_conf = RtcConfiguration::new();
         peer_conf.ice_servers(&RtcIceServers::from(ice_servers));
 
-        Ok(Self(Rc::new(RefCell::new(InnerPeer {
+        Ok(Self {
             peer: Rc::new(SysRtcPeerConnection::new_with_configuration(
                 &peer_conf,
             )?),
-            on_ice_candidate: None,
-            on_track: None,
-        }))))
+            on_ice_candidate: RefCell::new(None),
+            on_track: RefCell::new(None),
+        })
     }
 
     /// Sets handler for [`RtcTrackEvent`] event (see [RTCTrackEvent][1] and
@@ -136,12 +132,14 @@ impl RtcPeerConnection {
     where
         F: 'static + FnMut(RtcTrackEvent),
     {
-        let mut conn = self.0.borrow_mut();
+        let mut on_track = self.on_track.borrow_mut();
         match f {
-            None => conn.on_track = None,
+            None => {
+                on_track.take();
+            }
             Some(mut f) => {
-                conn.on_track = Some(EventListener::new_mut(
-                    Rc::clone(&conn.peer),
+                on_track.replace(EventListener::new_mut(
+                    Rc::clone(&self.peer),
                     "track",
                     move |msg: RtcTrackEvent| {
                         f(msg);
@@ -161,12 +159,14 @@ impl RtcPeerConnection {
     where
         F: 'static + FnMut(IceCandidate),
     {
-        let mut conn = self.0.borrow_mut();
+        let mut on_ice_candidate = self.on_ice_candidate.borrow_mut();
         match f {
-            None => conn.on_ice_candidate = None,
+            None => {
+                on_ice_candidate.take();
+            }
             Some(mut f) => {
-                conn.on_ice_candidate = Some(EventListener::new_mut(
-                    Rc::clone(&conn.peer),
+                on_ice_candidate.replace(EventListener::new_mut(
+                    Rc::clone(&self.peer),
                     "icecandidate",
                     move |msg: RtcPeerConnectionIceEvent| {
                         // None candidate means that all ICE transports have
@@ -192,26 +192,23 @@ impl RtcPeerConnection {
     ///
     /// [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
     /// [2]: https://tools.ietf.org/html/rfc5245#section-2
-    pub fn add_ice_candidate(
+    pub async fn add_ice_candidate(
         &self,
         candidate: &str,
         sdp_m_line_index: Option<u16>,
         sdp_mid: &Option<String>,
-    ) -> impl Future<Item = (), Error = WasmErr> {
+    ) -> Result<(), WasmErr> {
         let mut cand_init = RtcIceCandidateInit::new(&candidate);
         cand_init
             .sdp_m_line_index(sdp_m_line_index)
             .sdp_mid(sdp_mid.as_ref().map(String::as_ref));
         JsFuture::from(
-            self.0
-                .borrow()
-                .peer
-                .add_ice_candidate_with_opt_rtc_ice_candidate_init(
-                    Some(cand_init).as_ref(),
-                ),
+            self.peer.add_ice_candidate_with_opt_rtc_ice_candidate_init(
+                Some(cand_init).as_ref(),
+            ),
         )
-        .map(|_| ())
-        .map_err(Into::into)
+        .await?;
+        Ok(())
     }
 
     /// Obtains [SDP answer][`SdpType::Answer`] from the underlying
@@ -219,22 +216,18 @@ impl RtcPeerConnection {
     /// description.
     ///
     /// Should be called whenever remote description has been changed.
-    pub fn create_and_set_answer(
-        &self,
-    ) -> impl Future<Item = String, Error = WasmErr> {
-        let conn = self.0.borrow();
-        let peer: Rc<SysRtcPeerConnection> = Rc::clone(&conn.peer);
-        JsFuture::from(conn.peer.create_answer())
-            .map(RtcSessionDescription::from)
-            .and_then(move |answer: RtcSessionDescription| {
-                let answer = answer.sdp();
-                let mut desc =
-                    RtcSessionDescriptionInit::new(RtcSdpType::Answer);
-                desc.sdp(&answer);
-                JsFuture::from(peer.set_local_description(&desc))
-                    .map(move |_| answer)
-            })
-            .map_err(Into::into)
+    pub async fn create_and_set_answer(&self) -> Result<String, WasmErr> {
+        let peer: Rc<SysRtcPeerConnection> = Rc::clone(&self.peer);
+
+        let answer = JsFuture::from(self.peer.create_answer()).await?;
+        let answer = RtcSessionDescription::from(answer).sdp();
+
+        let mut desc = RtcSessionDescriptionInit::new(RtcSdpType::Answer);
+        desc.sdp(&answer);
+
+        JsFuture::from(peer.set_local_description(&desc)).await?;
+
+        Ok(answer)
     }
 
     /// Obtains [SDP offer][`SdpType::Offer`] from the underlying
@@ -243,23 +236,18 @@ impl RtcPeerConnection {
     ///
     /// Should be called after local tracks changes, which require
     /// renegotiation.
-    pub fn create_and_set_offer(
-        &self,
-    ) -> impl Future<Item = String, Error = WasmErr> {
-        let conn = self.0.borrow();
-        let peer: Rc<SysRtcPeerConnection> = Rc::clone(&conn.peer);
-        JsFuture::from(peer.create_offer())
-            .map(RtcSessionDescription::from)
-            .and_then(move |offer: RtcSessionDescription| {
-                let offer = offer.sdp();
-                let mut desc =
-                    RtcSessionDescriptionInit::new(RtcSdpType::Offer);
-                desc.sdp(&offer);
+    pub async fn create_and_set_offer(&self) -> Result<String, WasmErr> {
+        let peer: Rc<SysRtcPeerConnection> = Rc::clone(&self.peer);
 
-                JsFuture::from(peer.set_local_description(&desc))
-                    .map(move |_| offer)
-            })
-            .map_err(Into::into)
+        let create_offer = JsFuture::from(peer.create_offer()).await?;
+        let offer = RtcSessionDescription::from(create_offer).sdp();
+
+        let mut desc = RtcSessionDescriptionInit::new(RtcSdpType::Offer);
+        desc.sdp(&offer);
+
+        JsFuture::from(peer.set_local_description(&desc)).await?;
+
+        Ok(offer)
     }
 
     /// Instructs the underlying [RTCPeerConnection][`SysRtcPeerConnection`]
@@ -267,10 +255,10 @@ impl RtcPeerConnection {
     /// [offer][`SdpType::Offer`] or [answer][`SdpType::Answer`].
     ///
     /// Changes the local media state.
-    pub fn set_remote_description(
+    pub async fn set_remote_description(
         &self,
         sdp: SdpType,
-    ) -> impl Future<Item = (), Error = WasmErr> {
+    ) -> Result<(), WasmErr> {
         let description = match sdp {
             SdpType::Offer(offer) => {
                 let mut desc =
@@ -286,11 +274,9 @@ impl RtcPeerConnection {
             }
         };
 
-        JsFuture::from(
-            self.0.borrow().peer.set_remote_description(&description),
-        )
-        .map_err(Into::into)
-        .map(|_| ())
+        JsFuture::from(self.peer.set_remote_description(&description)).await?;
+
+        Ok(())
     }
 
     /// Creates new [`RtcRtpTransceiver`] (see [RTCRtpTransceiver][1])
@@ -305,9 +291,7 @@ impl RtcPeerConnection {
     ) -> RtcRtpTransceiver {
         let mut init = RtcRtpTransceiverInit::new();
         init.direction(direction.into());
-        self.0
-            .borrow()
-            .peer
+        self.peer
             .add_transceiver_with_str_and_init(kind.as_str(), &init)
     }
 
@@ -322,10 +306,9 @@ impl RtcPeerConnection {
     ) -> Option<RtcRtpTransceiver> {
         let mut transceiver = None;
 
-        let transceivers =
-            js_sys::try_iter(&self.0.borrow().peer.get_transceivers())
-                .unwrap()
-                .unwrap();
+        let transceivers = js_sys::try_iter(&self.peer.get_transceivers())
+            .unwrap()
+            .unwrap();
         for tr in transceivers {
             let tr = RtcRtpTransceiver::from(tr.unwrap());
             if let Some(tr_mid) = tr.mid() {
@@ -348,9 +331,8 @@ impl Drop for RtcPeerConnection {
     ///
     /// [1]: https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-close
     fn drop(&mut self) {
-        let mut inner = self.0.borrow_mut();
-        inner.on_track.take();
-        inner.on_ice_candidate.take();
-        inner.peer.close();
+        self.on_track.borrow_mut().take();
+        self.on_ice_candidate.borrow_mut().take();
+        self.peer.close();
     }
 }

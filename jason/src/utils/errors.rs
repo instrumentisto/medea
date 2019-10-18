@@ -81,4 +81,4 @@ macro_rules! impl_from_error {
 impl_from_error!(std::cell::BorrowError);
 impl_from_error!(serde_json::error::Error);
 // TODO: improve macro to use generics
-impl_from_error!(futures::sync::mpsc::SendError<proto::Event>);
+impl_from_error!(futures::channel::mpsc::TrySendError<proto::Event>);
