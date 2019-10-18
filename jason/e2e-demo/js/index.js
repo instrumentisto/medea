@@ -43,8 +43,6 @@ async function createMember(roomId, memberId) {
     let memberIds = [];
 
     for (let i = 0; i < anotherMembers.length; i++) {
-        // let localUri = anotherMembers[i];
-        // let memberId = localUri.replace(/local:\/\/.*\//, "");
         let memberId = anotherMembers[i];
         memberIds.push(memberId);
         pipeline["play-" + memberId] = {
