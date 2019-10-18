@@ -87,27 +87,6 @@ async function createMember(roomId, memberId) {
 }
 
 const controlDebugWindows = {
-    deleteRoom: function () {
-        let container = document.getElementsByClassName('control-debug__window_delete-room')[0];
-        bindCloseWindow(container);
-
-        let execute = container.getElementsByClassName('control-debug__execute')[0];
-        execute.addEventListener('click', async () => {
-            await controlApi.deleteRoom();
-        });
-    },
-
-    deleteMember: function () {
-        let container = document.getElementsByClassName('control-debug__window_delete-member')[0];
-        bindCloseWindow(container);
-        let execute = container.getElementsByClassName('control-debug__execute')[0];
-        execute.addEventListener('click', async () => {
-            let roomId = container.getElementsByClassName('control-debug__id_room')[0].value;
-            let memberId = container.getElementsByClassName('control-debug__id_member')[0].value;
-            await controlApi.deleteMember(roomId, memberId);
-        });
-    },
-
     createEndpoint: function () {
         let container = document.getElementsByClassName('control-debug__window_create-endpoint')[0];
         bindCloseWindow(container);
@@ -156,8 +135,8 @@ const controlDebugWindows = {
         })
     },
 
-    deleteEndpoint: function () {
-        let container = document.getElementsByClassName('control-debug__window_delete-endpoint')[0];
+    delete: function () {
+        let container = document.getElementsByClassName('control-debug__window_delete')[0];
         bindCloseWindow(container);
 
         let execute = container.getElementsByClassName('control-debug__execute')[0];
@@ -165,7 +144,7 @@ const controlDebugWindows = {
             let roomId = container.getElementsByClassName('control-debug__id_room')[0].value;
             let memberId = container.getElementsByClassName('control-debug__id_member')[0].value;
             let endpointId = container.getElementsByClassName('control-debug__id_endpoint')[0].value;
-            await controlApi.deleteEndpoint(roomId, memberId, endpointId);
+            await controlApi.delete(roomId, memberId, endpointId);
         });
     },
 
@@ -335,7 +314,6 @@ window.onload = async function() {
                     if (e.response.status === 400) {
                         console.log("Room not found. Creating new room...");
                         room.join(await createRoom(roomId, username));
-                        // await window.connect_room(await createRoom(roomId, username))
                     }
                 }
                 try {
@@ -343,7 +321,6 @@ window.onload = async function() {
                 } catch (e) {
                     console.log("Member not found. Creating new member...");
                     room.join(await createMember(roomId, username));
-                    // await window.connect_room(await createMember(roomId, username));
                 }
             };
         };
@@ -369,22 +346,6 @@ const contentVisibility = {
 };
 
 const controlApi = {
-    deleteRoom: async function () {
-        try {
-            await axios.delete(controlUrl + roomId);
-        } catch (e) {
-            alert(JSON.stringify(e.response.data));
-        }
-    },
-
-    deleteMember: async function (roomId, memberId) {
-        try {
-            await axios.delete(controlUrl + roomId + "/" + memberId);
-        } catch (e) {
-            alert(JSON.stringify(e.response.data));
-        }
-    },
-
     createEndpoint: async function (roomId, memberId, spec) {
         try {
             await axios({
@@ -392,14 +353,6 @@ const controlApi = {
                 url: controlUrl + roomId + '/' + memberId,
                 data: spec
             });
-        } catch (e) {
-            alert(JSON.stringify(e.response.data));
-        }
-    },
-
-    deleteEndpoint: async function (roomId, memberId, endpointId) {
-        try {
-            await axios.delete(controlUrl + roomId + '/' + memberId + '/' + endpointId);
         } catch (e) {
             alert(JSON.stringify(e.response.data));
         }
@@ -438,14 +391,30 @@ const controlApi = {
         }
     },
 
+    getUrlForElement: function(roomId, memberId, endpointId) {
+        let url = controlUrl + roomId;
+        if (memberId.length > 0 && endpointId.length > 0) {
+            url = controlUrl + roomId + '/' + memberId + '/' + endpointId;
+        } else if (memberId.length > 0) {
+            url = controlUrl + roomId + '/' + memberId;
+        }
+
+        return url;
+    },
+
+    delete: async function(roomId, memberId, endpointId) {
+        try {
+            let url = controlApi.getUrlForElement(roomId, memberId, endpointId);
+            let resp = await axios.delete(url);
+            return JSON.stringify(resp.data, null, 4);
+        } catch (e) {
+            alert(JSON.stringify(e.response.data));
+        }
+    },
+
     get: async function(roomId, memberId, endpointId) {
         try {
-            let url = controlUrl + roomId;
-            if (memberId.length > 0 && endpointId.length > 0) {
-                url = controlUrl + roomId + '/' + memberId + '/' + endpointId;
-            } else if (memberId.length > 0) {
-                url = controlUrl + roomId + '/' + memberId;
-            }
+            let url = controlApi.getUrlForElement(roomId, memberId, endpointId);
             let resp = await axios.get(url);
             return JSON.stringify(resp.data, null, 4);
         } catch (e) {
@@ -464,9 +433,7 @@ const debugMenuItems = [
     'create-endpoint',
     'create-member',
     'create-room',
-    'delete-room',
-    'delete-member',
-    'delete-endpoint',
+    'delete',
     'get',
 ];
 
