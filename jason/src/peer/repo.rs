@@ -1,6 +1,6 @@
 use std::{collections::HashMap, rc::Rc};
 
-use futures::sync::mpsc::UnboundedSender;
+use futures::channel::mpsc;
 use medea_client_api_proto::{IceServer, PeerId};
 
 use crate::{
@@ -21,7 +21,7 @@ pub trait PeerRepository {
         &mut self,
         id: PeerId,
         ice_servers: Vec<IceServer>,
-        events_sender: UnboundedSender<PeerEvent>,
+        events_sender: mpsc::UnboundedSender<PeerEvent>,
         enabled_audio: bool,
         enabled_video: bool,
     ) -> Result<Rc<PeerConnection>, WasmErr>;
@@ -62,7 +62,7 @@ impl PeerRepository for Repository {
         &mut self,
         id: PeerId,
         ice_servers: Vec<IceServer>,
-        peer_events_sender: UnboundedSender<PeerEvent>,
+        peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
         enabled_audio: bool,
         enabled_video: bool,
     ) -> Result<Rc<PeerConnection>, WasmErr> {

@@ -5,9 +5,7 @@ use std::sync::Arc;
 use futures::{Future, IntoFuture};
 use grpcio::{ChannelBuilder, EnvBuilder, Error};
 use medea_control_api_proto::grpc::{
-    api::{
-        CreateRequest, CreateResponse, GetResponse, IdRequest, Response,
-    },
+    api::{CreateRequest, CreateResponse, GetResponse, IdRequest, Response},
     api_grpc::ControlApiClient,
 };
 use protobuf::RepeatedField;

@@ -121,13 +121,9 @@ impl Into<MemberElementProto> for Endpoint {
 impl From<MemberElementProto> for Endpoint {
     fn from(mut proto: MemberElementProto) -> Self {
         if proto.has_webrtc_play() {
-            Self::WebRtcPlayEndpoint(
-                proto.take_webrtc_play().into(),
-            )
+            Self::WebRtcPlayEndpoint(proto.take_webrtc_play().into())
         } else if proto.has_webrtc_pub() {
-            Self::WebRtcPublishEndpoint(
-                proto.take_webrtc_pub().into(),
-            )
+            Self::WebRtcPublishEndpoint(proto.take_webrtc_pub().into())
         } else {
             unimplemented!()
         }

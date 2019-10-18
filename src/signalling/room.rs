@@ -483,31 +483,30 @@ impl Room {
         first_peer: PeerId,
         second_peer: PeerId,
     ) {
-        let fut: ActFuture<(), ()> =
-            match self.send_peer_created(first_peer, second_peer) {
-                Ok(res) => {
-                    Box::new(res.then(|res, room, ctx| -> ActFuture<(), ()> {
-                        if res.is_ok() {
-                            return Box::new(future::ok(()).into_actor(room));
-                        }
-                        error!(
-                            "Failed connect peers, because {}. Room [id = {}] \
-                             will be stopped.",
-                            res.unwrap_err(),
-                            room.id,
-                        );
-                        room.close_gracefully(ctx)
-                    }))
-                }
-                Err(err) => {
+        let fut = match self.send_peer_created(first_peer, second_peer) {
+            Ok(res) => {
+                Box::new(res.then(|res, room, ctx| -> ActFuture<(), ()> {
+                    if res.is_ok() {
+                        return Box::new(future::ok(()).into_actor(room));
+                    }
                     error!(
                         "Failed connect peers, because {}. Room [id = {}] \
                          will be stopped.",
-                        err, self.id,
+                        res.unwrap_err(),
+                        room.id,
                     );
-                    self.close_gracefully(ctx)
-                }
-            };
+                    room.close_gracefully(ctx)
+                }))
+            }
+            Err(err) => {
+                error!(
+                    "Failed connect peers, because {}. Room [id = {}] will be \
+                     stopped.",
+                    err, self.id,
+                );
+                self.close_gracefully(ctx)
+            }
+        };
 
         ctx.spawn(fut);
     }
@@ -881,6 +880,11 @@ impl Into<ElementProto> for &mut Room {
         element
     }
 }
+
+// TODO: Tightly coupled with protobuf.
+//      We should name this method GetElements, that will return some
+//      intermediate DTO, that will be serialized at the caller side.
+//      But lets leave it as it is for now.
 
 /// Message for serializing this [`Room`] and [`Room`]'s elements to protobuf
 /// spec.

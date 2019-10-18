@@ -16,7 +16,7 @@ use crate::{
         load_static_specs_from_dir,
         refs::{Fid, StatefulFid, ToMember, ToRoom},
         EndpointId, LoadStaticControlSpecsError, MemberId, MemberSpec, RoomId,
-        RoomSpec,
+        RoomSpec, TryFromElementError,
     },
     log::prelude::*,
     shutdown::{self, GracefulShutdown},
@@ -53,6 +53,13 @@ pub enum RoomServiceError {
     /// For more info read [`RoomError`] docs.
     #[display(fmt = "{}", _0)]
     RoomError(RoomError),
+
+    /// Error which can happen while converting protobuf objects into interior
+    /// [medea] [Control API] objects.
+    ///
+    /// [Control API]: https://tinyurl.com/yxsqplq7
+    /// [medea]: https://github.com/instrumentisto/medea
+    TryFromElement(TryFromElementError),
 
     /// Error which can happen while loading static [Control API] specs.
     ///
@@ -107,6 +114,11 @@ pub struct RoomService {
     ///
     /// [Control API]: https://tinyurl.com/yxsqplq7
     static_specs_dir: String,
+
+    /// Public URL of server. Address for exposed [Client API].
+    ///
+    /// [Client API]: https://tinyurl.com/yx9thsnr
+    public_url: String,
 }
 
 impl RoomService {
@@ -118,6 +130,7 @@ impl RoomService {
     ) -> Self {
         Self {
             static_specs_dir: app.config.control.static_specs_dir.clone(),
+            public_url: app.config.server.client.http.public_url.clone(),
             room_repo,
             app,
             graceful_shutdown,
@@ -147,6 +160,20 @@ impl RoomService {
         } else {
             Box::new(futures::future::ok(()))
         }
+    }
+
+    /// Returns [Control API] sid based on provided arguments and
+    /// `MEDEA_SERVER__CLIENT__HTTP__PUBLIC_URL` config value.
+    fn get_sid(
+        &self,
+        room_id: &RoomId,
+        member_id: &MemberId,
+        credentials: &str,
+    ) -> String {
+        format!(
+            "{}/{}/{}/{}",
+            self.public_url, room_id, member_id, credentials
+        )
     }
 }
 
@@ -191,9 +218,12 @@ impl Handler<StartStaticRooms> for RoomService {
     }
 }
 
+/// Type alias for success [`CreateResponse`]'s sids.
+pub type Sids = HashMap<String, String>;
+
 /// Signal for creating new [`Room`].
 #[derive(Message)]
-#[rtype(result = "Result<(), RoomServiceError>")]
+#[rtype(result = "Result<Sids, RoomServiceError>")]
 pub struct CreateRoom {
     /// [Control API] spec for [`Room`].
     ///
@@ -202,7 +232,7 @@ pub struct CreateRoom {
 }
 
 impl Handler<CreateRoom> for RoomService {
-    type Result = Result<(), RoomServiceError>;
+    type Result = Result<Sids, RoomServiceError>;
 
     fn handle(
         &mut self,
@@ -210,6 +240,20 @@ impl Handler<CreateRoom> for RoomService {
         _: &mut Self::Context,
     ) -> Self::Result {
         let room_spec = msg.spec;
+        let sid = match room_spec.members() {
+            Ok(members) => members
+                .iter()
+                .map(|(member_id, member)| {
+                    let uri = self.get_sid(
+                        room_spec.id(),
+                        &member_id,
+                        member.credentials(),
+                    );
+                    (member_id.clone().to_string(), uri)
+                })
+                .collect(),
+            Err(e) => return Err(RoomServiceError::TryFromElement(e)),
+        };
 
         if self.room_repo.get(&room_spec.id).is_some() {
             return Err(RoomServiceError::RoomAlreadyExists(
@@ -229,7 +273,7 @@ impl Handler<CreateRoom> for RoomService {
         debug!("New Room [id = {}] started.", room_spec.id);
         self.room_repo.add(room_spec.id, room_addr);
 
-        Ok(())
+        Ok(sid)
     }
 }
 
@@ -237,7 +281,7 @@ impl Handler<CreateRoom> for RoomService {
 ///
 /// [`Member`]: crate::signalling::elements::member::Member
 #[derive(Message)]
-#[rtype(result = "Result<(), RoomServiceError>")]
+#[rtype(result = "Result<Sids, RoomServiceError>")]
 pub struct CreateMemberInRoom {
     pub id: MemberId,
     pub parent_fid: Fid<ToRoom>,
@@ -245,7 +289,7 @@ pub struct CreateMemberInRoom {
 }
 
 impl Handler<CreateMemberInRoom> for RoomService {
-    type Result = ResponseFuture<(), RoomServiceError>;
+    type Result = ResponseFuture<Sids, RoomServiceError>;
 
     fn handle(
         &mut self,
@@ -253,12 +297,17 @@ impl Handler<CreateMemberInRoom> for RoomService {
         _: &mut Self::Context,
     ) -> Self::Result {
         let room_id = msg.parent_fid.take_room_id();
+        let sid = self.get_sid(&room_id, &msg.id, msg.spec.credentials());
+        let mut sids = HashMap::new();
+        sids.insert(msg.id.to_string(), sid);
 
         if let Some(room) = self.room_repo.get(&room_id) {
             Box::new(
                 room.send(CreateMember(msg.id, msg.spec))
                     .map_err(RoomServiceError::RoomMailboxErr)
-                    .and_then(|r| r.map_err(RoomServiceError::from)),
+                    .and_then(move |r| {
+                        r.map_err(RoomServiceError::from).map(move |_| sids)
+                    }),
             )
         } else {
             Box::new(future::err(RoomServiceError::RoomNotFound(
@@ -272,7 +321,7 @@ impl Handler<CreateMemberInRoom> for RoomService {
 ///
 /// [`Endpoint`]: crate::signalling::elements::endpoints::Endpoint
 #[derive(Message)]
-#[rtype(result = "Result<(), RoomServiceError>")]
+#[rtype(result = "Result<Sids, RoomServiceError>")]
 pub struct CreateEndpointInRoom {
     pub id: EndpointId,
     pub parent_fid: Fid<ToMember>,
@@ -280,7 +329,7 @@ pub struct CreateEndpointInRoom {
 }
 
 impl Handler<CreateEndpointInRoom> for RoomService {
-    type Result = ResponseFuture<(), RoomServiceError>;
+    type Result = ResponseFuture<Sids, RoomServiceError>;
 
     fn handle(
         &mut self,
@@ -298,7 +347,9 @@ impl Handler<CreateEndpointInRoom> for RoomService {
                     spec: msg.spec,
                 })
                 .map_err(RoomServiceError::RoomMailboxErr)
-                .and_then(|r| r.map_err(RoomServiceError::from)),
+                .and_then(|r| {
+                    r.map_err(RoomServiceError::from).map(|_| HashMap::new())
+                }),
             )
         } else {
             Box::new(future::err(RoomServiceError::RoomNotFound(
@@ -401,11 +452,11 @@ impl Handler<DeleteElements<Validated>> for RoomService {
         > = msg
             .fids
             .into_iter()
-            .filter_map(|l| {
-                if let StatefulFid::Room(room_id) = l {
+            .filter_map(|fid| {
+                if let StatefulFid::Room(room_id) = fid {
                     Some(self.close_room(room_id.take_room_id()))
                 } else {
-                    deletes_from_room.push(l);
+                    deletes_from_room.push(fid);
                     None
                 }
             })

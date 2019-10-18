@@ -2,14 +2,18 @@
 //!
 //! [Control API]: https://tinyurl.com/yxsqplq7
 
-use std::{collections::HashMap, convert::TryFrom, sync::Arc};
+use std::{
+    collections::HashMap,
+    convert::{From, TryFrom},
+    sync::Arc,
+};
 
 use actix::{
     Actor, Addr, Arbiter, Context, Handler, MailboxError, ResponseFuture,
 };
 use derive_more::{Display, From};
 use failure::Fail;
-use futures::future::{self, Either, Future, IntoFuture};
+use futures::future::{self, Future, IntoFuture};
 use grpcio::{Environment, RpcContext, Server, ServerBuilder, UnarySink};
 use medea_control_api_proto::grpc::{
     api::{
@@ -28,18 +32,17 @@ use crate::{
             ErrorResponse,
         },
         refs::{fid::ParseFidError, Fid, StatefulFid, ToMember, ToRoom},
-        EndpointId, EndpointSpec, MemberId, MemberSpec, RoomId, RoomSpec,
-        TryFromElementError, TryFromProtobufError,
+        EndpointId, EndpointSpec, MemberId, MemberSpec, RoomSpec,
+        TryFromProtobufError,
     },
     log::prelude::*,
     shutdown::ShutdownGracefully,
     signalling::room_service::{
         CreateEndpointInRoom, CreateMemberInRoom, CreateRoom, DeleteElements,
-        Get, RoomService, RoomServiceError,
+        Get, RoomService, RoomServiceError, Sids,
     },
     AppContext,
 };
-use std::convert::From;
 
 /// Errors which can happen while processing requests to gRPC [Control API].
 ///
@@ -56,13 +59,6 @@ pub enum GrpcControlApiError {
     /// [medea]: https://github.com/instrumentisto/medea
     TryFromProtobuf(TryFromProtobufError),
 
-    /// This is __unexpected error__ because this kind of errors
-    /// should be catched by `try_from_protobuf` function which returns
-    /// [`TryFromProtobufError`].
-    ///
-    /// [Control API]: https://tinyurl.com/yxsqplq7
-    TryFromElement(TryFromElementError),
-
     /// [`MailboxError`] for [`RoomService`].
     #[display(fmt = "Room service mailbox error: {:?}", _0)]
     RoomServiceMailboxError(MailboxError),
@@ -70,9 +66,6 @@ pub enum GrpcControlApiError {
     /// Wrapper around [`RoomServiceError`].
     RoomServiceError(RoomServiceError),
 }
-
-/// Type alias for success [`CreateResponse`]'s sids.
-type Sids = HashMap<String, String>;
 
 /// Service which provides gRPC [Control API] implementation.
 #[derive(Clone)]
@@ -87,92 +80,49 @@ struct ControlApiService {
 }
 
 impl ControlApiService {
-    /// Returns [Control API] sid based on provided arguments and
-    /// `MEDEA_SERVER__CLIENT__HTTP__PUBLIC_URL` config value.
-    fn get_sid(
-        &self,
-        room_id: &RoomId,
-        member_id: &MemberId,
-        credentials: &str,
-    ) -> String {
-        format!(
-            "{}/{}/{}/{}",
-            self.public_url, room_id, member_id, credentials
-        )
-    }
-
     /// Implementation of `Create` method for [`Room`].
     fn create_room(
         &self,
         spec: RoomSpec,
     ) -> impl Future<Item = Sids, Error = GrpcControlApiError> {
-        let sid = match spec.members() {
-            Ok(members) => members
-                .iter()
-                .map(|(member_id, member)| {
-                    let uri = self.get_sid(
-                        spec.id(),
-                        &member_id,
-                        member.credentials(),
-                    );
-                    (member_id.clone().to_string(), uri)
-                })
-                .collect(),
-            Err(e) => {
-                return Either::B(future::err(
-                    GrpcControlApiError::TryFromElement(e),
-                ))
-            }
-        };
-
-        Either::A(
-            self.room_service
-                .send(CreateRoom { spec })
-                .map_err(GrpcControlApiError::RoomServiceMailboxError)
-                .and_then(move |r| {
-                    r.map_err(GrpcControlApiError::from).map(|_| sid)
-                }),
-        )
+        self.room_service
+            .send(CreateRoom { spec })
+            .map_err(GrpcControlApiError::RoomServiceMailboxError)
+            .and_then(move |r| r.map_err(GrpcControlApiError::from))
     }
 
     /// Implementation of `Create` method for [`Member`] element.
     fn create_member(
         &self,
         id: MemberId,
-        uri: Fid<ToRoom>,
+        parent_fid: Fid<ToRoom>,
         spec: MemberSpec,
     ) -> impl Future<Item = Sids, Error = GrpcControlApiError> {
-        let sid = self.get_sid(uri.room_id(), &id, spec.credentials());
-        let mut sids = HashMap::new();
-        sids.insert(id.to_string(), sid);
-
         self.room_service
             .send(CreateMemberInRoom {
                 id,
-                parent_fid: uri,
+                parent_fid,
                 spec,
             })
             .map_err(GrpcControlApiError::RoomServiceMailboxError)
-            .and_then(|r| r.map_err(GrpcControlApiError::from).map(|_| sids))
+            .and_then(|r| r.map_err(GrpcControlApiError::from))
     }
 
     /// Implementation of `Create` method for [`Endpoint`] element.
     fn create_endpoint(
         &self,
         id: EndpointId,
-        uri: Fid<ToMember>,
+        parent_fid: Fid<ToMember>,
         spec: EndpointSpec,
     ) -> impl Future<Item = Sids, Error = GrpcControlApiError> {
         self.room_service
             .send(CreateEndpointInRoom {
                 id,
-                parent_fid: uri,
+                parent_fid,
                 spec,
             })
             .map_err(GrpcControlApiError::RoomServiceMailboxError)
-            .and_then(|r| {
-                r.map_err(GrpcControlApiError::from).map(|_| HashMap::new())
-            })
+            .and_then(|r| r.map_err(GrpcControlApiError::from))
     }
 
     /// Creates element based on provided [`CreateRequest`].
@@ -190,35 +140,34 @@ impl ControlApiService {
             )));
         };
 
+        if unparsed_parent_fid.is_empty() {
+            return Box::new(
+                RoomSpec::try_from(elem)
+                    .map_err(ErrorResponse::from)
+                    .map(|spec| {
+                        self.create_room(spec).map_err(ErrorResponse::from)
+                    })
+                    .into_future()
+                    .and_then(|create_result| create_result),
+            );
+        }
+
         let parent_fid = match StatefulFid::try_from(unparsed_parent_fid) {
             Ok(parent_fid) => parent_fid,
             Err(e) => {
-                if let ParseFidError::Empty = e {
-                    return Box::new(
-                        RoomSpec::try_from(elem)
-                            .map_err(ErrorResponse::from)
-                            .map(|spec| {
-                                self.create_room(spec)
-                                    .map_err(ErrorResponse::from)
-                            })
-                            .into_future()
-                            .and_then(|create_result| create_result),
-                    );
-                } else {
-                    return Box::new(future::err(e.into()));
-                }
+                return Box::new(future::err(e.into()));
             }
         };
 
         match parent_fid {
-            StatefulFid::Room(uri) => match elem {
+            StatefulFid::Room(parent_fid) => match elem {
                 CreateRequestOneof::member(mut member) => {
                     let id: MemberId = member.take_id().into();
                     Box::new(
                         MemberSpec::try_from(member)
                             .map_err(ErrorResponse::from)
                             .map(|spec| {
-                                self.create_member(id, uri, spec)
+                                self.create_member(id, parent_fid, spec)
                                     .map_err(ErrorResponse::from)
                             })
                             .into_future()
@@ -227,10 +176,10 @@ impl ControlApiService {
                 }
                 _ => Box::new(future::err(ErrorResponse::new(
                     ElementIdMismatch,
-                    &uri,
+                    &parent_fid,
                 ))),
             },
-            StatefulFid::Member(uri) => {
+            StatefulFid::Member(parent_fid) => {
                 let (endpoint, id) = match elem {
                     CreateRequestOneof::webrtc_play(mut play) => (
                         WebRtcPlayEndpoint::try_from(&play)
@@ -245,7 +194,7 @@ impl ControlApiService {
                     _ => {
                         return Box::new(future::err(ErrorResponse::new(
                             ElementIdMismatch,
-                            &uri,
+                            &parent_fid,
                         )))
                     }
                 };
@@ -253,7 +202,7 @@ impl ControlApiService {
                     endpoint
                         .map_err(ErrorResponse::from)
                         .map(move |spec| {
-                            self.create_endpoint(id, uri, spec)
+                            self.create_endpoint(id, parent_fid, spec)
                                 .map_err(ErrorResponse::from)
                         })
                         .into_future()
@@ -274,8 +223,8 @@ impl ControlApiService {
         let mut delete_elements_msg = DeleteElements::new();
         for id in req.take_fid().into_iter() {
             match StatefulFid::try_from(id) {
-                Ok(uri) => {
-                    delete_elements_msg.add_fid(uri);
+                Ok(fid) => {
+                    delete_elements_msg.add_fid(fid);
                 }
                 Err(e) => {
                     return future::Either::A(future::err(e.into()));
@@ -306,11 +255,11 @@ impl ControlApiService {
         mut req: IdRequest,
     ) -> impl Future<Item = HashMap<String, Element>, Error = ErrorResponse>
     {
-        let mut uris = Vec::new();
+        let mut fids = Vec::new();
         for id in req.take_fid().into_iter() {
             match StatefulFid::try_from(id) {
-                Ok(uri) => {
-                    uris.push(uri);
+                Ok(fid) => {
+                    fids.push(fid);
                 }
                 Err(e) => {
                     return future::Either::A(future::err(e.into()));
@@ -320,7 +269,7 @@ impl ControlApiService {
 
         future::Either::B(
             self.room_service
-                .send(Get(uris))
+                .send(Get(fids))
                 .map_err(GrpcControlApiError::RoomServiceMailboxError)
                 .and_then(|r| r.map_err(GrpcControlApiError::from))
                 .map(|elements: HashMap<StatefulFid, Element>| {

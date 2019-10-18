@@ -50,10 +50,11 @@ pub fn run(args: &ArgMatches) {
                 client: ControlClient::new(&medea_addr),
             })
             .wrap(middleware::Logger::default())
-            .service(web::resource("/control-api/")
-                .route(web::post().to_async(create::create0))
-                .route(web::get().to_async(get::get0))
-                .route(web::delete().to_async(delete::delete0))
+            .service(
+                web::resource("/control-api/")
+                    .route(web::post().to_async(create::create0))
+                    .route(web::get().to_async(get::get0))
+                    .route(web::delete().to_async(delete::delete0)),
             )
             .service(
                 web::resource("/control-api/{a}")
