@@ -86,6 +86,28 @@ async function createMember(roomId, memberId) {
     return resp.data.sids[memberId]
 }
 
+const colorizedJson = {
+    replacer: function(match, pIndent, pKey, pVal, pEnd) {
+        let key = '<span class=json__key>';
+        let val = '<span class=json__value>';
+        let str = '<span class=json__string>';
+        let r = pIndent || '';
+        if (pKey)
+            r = r + key + pKey.replace(/[": ]/g, '') + '</span>: ';
+        if (pVal)
+            r = r + (pVal[0] === '"' ? str : val) + pVal + '</span>';
+        return r + (pEnd || '');
+    },
+
+    prettyPrint: function(obj) {
+        let jsonLine = /^( *)("[\w\-]+": )?("[^"]*"|[\w.+-]*)?([,[{])?$/mg;
+        return JSON.stringify(obj, null, 3)
+            .replace(/&/g, '&amp;').replace(/\\"/g, '&quot;')
+            .replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(jsonLine, colorizedJson.replacer);
+    }
+};
+
 const controlDebugWindows = {
     createEndpoint: function () {
         let container = document.getElementsByClassName('control-debug__window_create-endpoint')[0];
@@ -187,8 +209,7 @@ const controlDebugWindows = {
             let endpointId = container.getElementsByClassName('control-debug__id_endpoint')[0].value;
 
             let res = await controlApi.get(roomId, memberId, endpointId);
-            res = res.replace(/(?:\r\n|\r|\n)/g, '<br>');
-            resultContainer.innerHTML = res;
+            resultContainer.innerHTML = colorizedJson.prettyPrint(res);
         })
     },
 };
@@ -416,7 +437,7 @@ const controlApi = {
         try {
             let url = controlApi.getUrlForElement(roomId, memberId, endpointId);
             let resp = await axios.get(url);
-            return JSON.stringify(resp.data, null, 4);
+            return resp.data;
         } catch (e) {
             alert(JSON.stringify(e.response.data));
         }
