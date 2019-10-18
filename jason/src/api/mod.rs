@@ -39,8 +39,7 @@ impl Jason {
         Self::default()
     }
 
-    /// Returns [`RoomHandle`] for [`Room`] with the preconfigured authorization
-    /// `token` for connection with media server.
+    /// Returns [`RoomHandle`] for [`Room`].
     pub fn init_room(&self) -> RoomHandle {
         let rpc = Rc::new(WebsocketRpcClient::new(3000));
         let peer_repository = Box::new(peer::Repository::new(Rc::clone(

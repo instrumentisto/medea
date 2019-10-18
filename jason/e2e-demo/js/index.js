@@ -36,6 +36,7 @@ async function init(){
     local_video.srcObject = stream;
     local_video.play();
     console.log(stream);
+    return stream;
   }
 
   async function init_participant(token, frame) {
@@ -68,16 +69,18 @@ async function init(){
     });
 
     audio_select.change(function () {
-      getStream(local_video, audio_select, video_select);
+      const stream = getStream(local_video, audio_select, video_select);
+      room.inject_local_stream(stream);
     });
 
     video_select.change(function () {
-      getStream(local_video, audio_select, video_select);
+      const stream = getStream(local_video, audio_select, video_select);
+      room.inject_local_stream(stream);
     });
 
     room.on_new_connection(function (connection) {
       connection.on_remote_stream(function (stream) {
-        remote_video.srcObject = stream.get_media_stream();
+        remote_video.srcObject = stream;
         remote_video.play();
       });
     });
@@ -118,4 +121,3 @@ window.onload = async function () {
       })
       .catch(console.error);
 };
-

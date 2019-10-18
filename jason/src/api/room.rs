@@ -15,10 +15,10 @@ use medea_client_api_proto::{
 };
 use wasm_bindgen::{prelude::*, JsValue};
 use wasm_bindgen_futures::{future_to_promise, spawn_local};
+use web_sys::MediaStream as SysMediaStream;
 
 use crate::{
-    media::MediaStream,
-    peer::{PeerEvent, PeerEventHandler, PeerRepository},
+    peer::{MediaStream, PeerEvent, PeerEventHandler, PeerRepository},
     rpc::RpcClient,
     utils::{Callback2, WasmErr},
 };
@@ -38,7 +38,7 @@ pub struct RoomHandle(Weak<RefCell<InnerRoom>>);
 impl RoomHandle {
     /// Sets callback, which will be invoked on new `Connection` establishing.
     pub fn on_new_connection(
-        &mut self,
+        &self,
         f: js_sys::Function,
     ) -> Result<(), JsValue> {
         map_weak!(self, |inner| inner
@@ -47,7 +47,8 @@ impl RoomHandle {
             .set_func(f))
     }
 
-    /// Performs entering to a [`Room`].
+    /// Performs entering to a [`Room`]  with the preconfigured authorization
+    /// `token` for connection with media server.
     ///
     /// Establishes connection with media server (if it doesn't already exist).
     /// Fails if unable to connect to media server.
@@ -62,6 +63,15 @@ impl RoomHandle {
             }),
             Err(err) => future_to_promise(future::err(err)),
         }
+    }
+
+    /// Performs injecting local media stream for all created and new
+    /// [`PeerConnection`]s into thiis [`Room`].
+    pub fn inject_local_stream(
+        &self,
+        stream: SysMediaStream,
+    ) -> Result<(), JsValue> {
+        map_weak!(self, |inner| inner.borrow_mut().inject_local_stream(stream))
     }
 
     /// Mutes outbound audio in this room.
@@ -158,12 +168,29 @@ impl Room {
 ///
 /// Shared between JS side ([`RoomHandle`]) and Rust side ([`Room`]).
 struct InnerRoom {
+    /// Client to talk with server via Client API RPC.
     rpc: Rc<dyn RpcClient>,
+
+    /// Local media stream for injecting into new created [`PeerConnection`]s.
+    local_stream: Option<SysMediaStream>,
+
+    /// [`PeerConnection`] repository.
     peers: Box<dyn PeerRepository>,
+
+    /// Channel for send events produced [`PeerConnection`] to [`Room`].
     peer_event_sender: mpsc::UnboundedSender<PeerEvent>,
+
+    /// Collection of [`Connection`]s with a remote [`Member`]s.
     connections: HashMap<PeerId, Connection>,
+
+    /// Callback from JS side which will be invoked on remote `Member` media
+    /// stream arrival.
     on_new_connection: Rc<Callback2<ConnectionHandle, WasmErr>>,
+
+    /// Indicates if outgoing audio is enabled in this [`Room`].
     enabled_audio: bool,
+
+    /// Indicates if outgoing video is enabled in this [`Room`].
     enabled_video: bool,
 }
 
@@ -177,6 +204,7 @@ impl InnerRoom {
     ) -> Self {
         Self {
             rpc,
+            local_stream: None,
             peers,
             peer_event_sender,
             connections: HashMap::new(),
@@ -230,6 +258,23 @@ impl InnerRoom {
         }
         self.enabled_video = enabled;
     }
+
+    /// Inject given local stream into all [`PeerConnection`]s this [`Room`] and
+    /// store its for inject into new [`PeerConnection`].
+    fn inject_local_stream(&mut self, stream: SysMediaStream) {
+        let peers = self.peers.get_all();
+        let injected_stream = Rc::new(stream.clone());
+        spawn_local(async move {
+            for peer in peers {
+                if let Err(err) =
+                    peer.inject_local_stream(&injected_stream).await
+                {
+                    err.log_err()
+                }
+            }
+        });
+        self.local_stream.replace(stream);
+    }
 }
 
 /// RPC events handling.
@@ -262,12 +307,14 @@ impl EventHandler for InnerRoom {
 
         self.create_connections_from_tracks(&tracks);
 
+        let local_stream = self.local_stream.clone();
         let rpc = Rc::clone(&self.rpc);
         spawn_local(
             async move {
                 match sdp_offer {
                     None => {
-                        let sdp_offer = peer.get_offer(tracks).await?;
+                        let sdp_offer =
+                            peer.get_offer(tracks, local_stream).await?;
                         let mids = peer.get_mids()?;
                         rpc.send_command(Command::MakeSdpOffer {
                             peer_id,
@@ -276,8 +323,9 @@ impl EventHandler for InnerRoom {
                         });
                     }
                     Some(offer) => {
-                        peer.process_offer(offer, tracks).await?;
-                        let sdp_answer = peer.create_and_set_answer().await?;
+                        let sdp_answer = peer
+                            .process_offer(offer, tracks, local_stream)
+                            .await?;
                         rpc.send_command(Command::MakeSdpAnswer {
                             peer_id,
                             sdp_answer,
@@ -375,7 +423,7 @@ impl PeerEventHandler for InnerRoom {
         remote_stream: MediaStream,
     ) {
         match self.connections.get(&sender_id) {
-            Some(conn) => conn.on_remote_stream(&remote_stream),
+            Some(conn) => conn.on_remote_stream(remote_stream.stream()),
             None => {
                 WasmErr::from("NewRemoteStream from sender without connection")
                     .log_err()

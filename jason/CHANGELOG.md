@@ -31,7 +31,8 @@ All user visible changes to this project will be documented in this file. This p
         - `MediaStreamConstraints`, `AudioTrackConstraints`, `VideoTrackConstraints` classes ([#46]);
         - Room initialization ([#46]):
             - `Jason.init_room()`;
-            - `Room.join()`.
+            - `Room.join()`;
+        - Inject local video/audio into `Room` via `Room.inject_local_stream()` ([#46](/../../pull/46)). 
 
 ### Fixed
 

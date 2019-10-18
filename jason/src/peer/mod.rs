@@ -6,20 +6,20 @@ mod conn;
 mod ice_server;
 mod media;
 mod repo;
+mod stream;
+mod stream_request;
+mod track;
 
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, convert::TryFrom, rc::Rc};
 
 use futures::channel::mpsc;
 use medea_client_api_proto::{
     Direction, IceServer, PeerId as Id, Track, TrackId,
 };
 use medea_macro::dispatchable;
-use web_sys::RtcTrackEvent;
+use web_sys::{MediaStream as SysMediaStream, RtcTrackEvent};
 
-use crate::{
-    media::{MediaManager, MediaStream},
-    utils::WasmErr,
-};
+use crate::{media::MediaManager, utils::WasmErr};
 
 #[cfg(feature = "mockable")]
 #[doc(inline)]
@@ -32,6 +32,9 @@ pub use self::{
         TransceiverKind,
     },
     media::MediaConnections,
+    stream::MediaStream,
+    stream_request::{SimpleStreamRequest, StreamRequest},
+    track::MediaTrack,
 };
 
 #[dispatchable]
@@ -227,25 +230,54 @@ impl PeerConnection {
     pub async fn get_offer(
         &self,
         tracks: Vec<Track>,
+        local_stream: Option<SysMediaStream>,
     ) -> Result<String, WasmErr> {
-        let request = self.media_connections.update_tracks(tracks)?;
+        self.media_connections.update_tracks(tracks)?;
 
-        if let Some(request) = request {
-            let local_stream =
-                self.media_manager.get_stream_by_request(request).await?;
-            self.media_connections
-                .insert_local_stream(&local_stream)
-                .await?;
-        }
+        self.insert_local_stream(local_stream).await?;
 
         self.peer.create_and_set_offer().await
     }
 
-    /// Creates an SDP answer to an offer received from a remote peer and sets
-    /// it as local description. Must be called only if peer already has remote
-    /// description.
-    pub async fn create_and_set_answer(&self) -> Result<String, WasmErr> {
-        self.peer.create_and_set_answer().await
+    /// Replace local stream into underlying [RTCPeerConnection][1] on provided
+    /// [MediaStream][2] if its have all required tracks.
+    ///
+    /// [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
+    /// [2]: https://www.w3.org/TR/mediacapture-streams/#mediastream
+    pub async fn inject_local_stream(
+        &self,
+        local_stream: &SysMediaStream,
+    ) -> Result<(), WasmErr> {
+        if let Some(request) = self.media_connections.get_stream_request() {
+            let caps = SimpleStreamRequest::try_from(request)?;
+            self.media_connections
+                .insert_local_stream(&caps.parse_stream(local_stream)?)
+                .await?;
+        }
+        Ok(())
+    }
+
+    /// Insert provided [MediaStream][1] into underlying [RTCPeerConnection][2]
+    /// if it has all required tracks.
+    /// Request local stream from [`MediaManager`] if local stream not provided.
+    ///
+    /// [1]: https://www.w3.org/TR/mediacapture-streams/#mediastream
+    /// [2]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
+    async fn insert_local_stream(
+        &self,
+        local_stream: Option<SysMediaStream>,
+    ) -> Result<(), WasmErr> {
+        if let Some(request) = self.media_connections.get_stream_request() {
+            let caps = SimpleStreamRequest::try_from(request)?;
+            let stream = match local_stream {
+                Some(stream) => stream,
+                None => self.media_manager.get_stream(&caps).await?,
+            };
+            self.media_connections
+                .insert_local_stream(&caps.parse_stream(&stream)?)
+                .await?;
+        }
+        Ok(())
     }
 
     /// Updates underlying [RTCPeerConnection][1]'s remote SDP from answer.
@@ -291,7 +323,8 @@ impl PeerConnection {
     }
 
     /// Sync provided tracks creating all required `Sender`s and
-    /// `Receiver`s, request local stream if required.
+    /// `Receiver`s, request local stream if required, get, set and return
+    /// sdp answer.
     /// `set_remote_description` will create all transceivers and fire all
     /// `on_track` events, so it updates `Receiver`s before
     /// `set_remote_description` and update `Sender`s after.
@@ -301,7 +334,8 @@ impl PeerConnection {
         &self,
         offer: String,
         tracks: Vec<Track>,
-    ) -> Result<(), WasmErr> {
+        local_stream: Option<SysMediaStream>,
+    ) -> Result<String, WasmErr> {
         // TODO: use drain_filter when its stable
         let (recv, send): (Vec<_>, Vec<_>) =
             tracks.into_iter().partition(|track| match track.direction {
@@ -314,17 +348,11 @@ impl PeerConnection {
 
         self.set_remote_offer(offer).await?;
 
-        let request = self.media_connections.update_tracks(send)?;
+        self.media_connections.update_tracks(send)?;
 
-        if let Some(request) = request {
-            let local_stream =
-                self.media_manager.get_stream_by_request(request).await?;
-            self.media_connections
-                .insert_local_stream(&local_stream)
-                .await?;
-        }
+        self.insert_local_stream(local_stream).await?;
 
-        Ok(())
+        self.peer.create_and_set_answer().await
     }
 
     /// Adds remote peers [ICE Candidate][1] to this peer.

@@ -8,12 +8,14 @@ use web_sys::{
     MediaStreamTrack, RtcRtpTransceiver, RtcRtpTransceiverDirection,
 };
 
-use crate::{
-    media::{MediaStream, MediaTrack, StreamRequest},
-    utils::WasmErr,
-};
+use crate::utils::WasmErr;
 
-use super::conn::{RtcPeerConnection, TransceiverDirection, TransceiverKind};
+use super::{
+    conn::{RtcPeerConnection, TransceiverDirection, TransceiverKind},
+    stream::MediaStream,
+    stream_request::StreamRequest,
+    track::MediaTrack,
+};
 
 /// Actual data of [`MediaConnections`] storage.
 struct InnerMediaConnections {
@@ -66,7 +68,7 @@ impl MediaConnections {
         };
         s.senders
             .values()
-            .filter(|sender| sender.kind == kind)
+            .filter(|sender| sender.kind() == kind)
             .for_each(|sender| sender.set_track_enabled(enabled))
     }
 
@@ -74,7 +76,8 @@ impl MediaConnections {
     /// [`TransceiverKind`] are enabled or `false` otherwise.
     pub fn are_senders_enabled(&self, kind: TransceiverKind) -> bool {
         let conn = self.0.borrow();
-        for sender in conn.senders.values().filter(|sender| sender.kind == kind)
+        for sender in
+            conn.senders.values().filter(|sender| sender.kind() == kind)
         {
             if !sender.is_track_enabled() {
                 return false;
@@ -119,17 +122,13 @@ impl MediaConnections {
     pub fn update_tracks<I: IntoIterator<Item = Track>>(
         &self,
         tracks: I,
-    ) -> Result<Option<StreamRequest>, WasmErr> {
+    ) -> Result<(), WasmErr> {
         let mut s = self.0.borrow_mut();
-        let mut stream_request = None;
         for track in tracks {
             match track.direction {
                 Direction::Send { mid, .. } => {
-                    stream_request
-                        .get_or_insert_with(StreamRequest::default)
-                        .add_track_request(track.id, track.media_type.clone());
                     let sndr =
-                        Sender::new(track.id, &track.media_type, &s.peer, mid)?;
+                        Sender::new(track.id, track.media_type, &s.peer, mid)?;
                     s.senders.insert(track.id, sndr);
                 }
                 Direction::Recv { sender, mid } => {
@@ -144,7 +143,18 @@ impl MediaConnections {
                 }
             }
         }
-        Ok(stream_request)
+        Ok(())
+    }
+
+    /// Returns [`StreamRequest`] if this [`MediaConnections`] has [`Sender`]s.
+    pub fn get_stream_request(&self) -> Option<StreamRequest> {
+        let mut stream_request = None;
+        for sender in self.0.borrow().senders.values() {
+            stream_request
+                .get_or_insert_with(StreamRequest::default)
+                .add_track_request(sender.track_id, sender.caps.clone());
+        }
+        stream_request
     }
 
     /// Inserts tracks from a provided [`MediaStream`] into [`Sender`]s
@@ -260,9 +270,9 @@ impl MediaConnections {
 /// peer.
 pub struct Sender {
     track_id: TrackId,
+    caps: MediaType,
     track: RefCell<Option<Rc<MediaTrack>>>,
     transceiver: RtcRtpTransceiver,
-    kind: TransceiverKind,
 }
 
 impl Sender {
@@ -272,7 +282,7 @@ impl Sender {
     /// lookup fails.
     fn new(
         track_id: TrackId,
-        caps: &MediaType,
+        caps: MediaType,
         peer: &RtcPeerConnection,
         mid: Option<String>,
     ) -> Result<Rc<Self>, WasmErr> {
@@ -293,10 +303,18 @@ impl Sender {
         };
         Ok(Rc::new(Self {
             track_id,
+            caps,
             track: RefCell::new(None),
             transceiver,
-            kind,
         }))
+    }
+
+    /// Returns kind of [`RtcRtpTransceiver`] this [`Sender`].
+    fn kind(&self) -> TransceiverKind {
+        match self.caps {
+            MediaType::Audio(_) => TransceiverKind::Audio,
+            MediaType::Video(_) => TransceiverKind::Video,
+        }
     }
 
     /// Inserts provided [`MediaTrack`] into provided [`Sender`]s transceiver
@@ -367,17 +385,14 @@ impl Receiver {
         peer: &RtcPeerConnection,
         mid: Option<String>,
     ) -> Self {
+        let kind = match caps {
+            MediaType::Audio(_) => TransceiverKind::Audio,
+            MediaType::Video(_) => TransceiverKind::Video,
+        };
         let transceiver = match mid {
-            None => match caps {
-                MediaType::Audio(_) => Some(peer.add_transceiver(
-                    TransceiverKind::Audio,
-                    TransceiverDirection::Recvonly,
-                )),
-                MediaType::Video(_) => Some(peer.add_transceiver(
-                    TransceiverKind::Video,
-                    TransceiverDirection::Recvonly,
-                )),
-            },
+            None => {
+                Some(peer.add_transceiver(kind, TransceiverDirection::Recvonly))
+            }
             Some(_) => None,
         };
         Self {

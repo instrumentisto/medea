@@ -20,13 +20,10 @@ use web_sys::{
 
 use crate::{
     media::MediaStreamConstraints,
-    utils::{window, Callback2, WasmErr},
+    utils::{copy_js_ref, window, Callback2, WasmErr},
 };
 
-use super::{
-    InputDeviceInfo, MediaStream, MediaStreamHandle, SimpleStreamRequest,
-    StreamRequest,
-};
+use super::InputDeviceInfo;
 
 /// Manager that is responsible for [MediaStream][1] acquisition and storing.
 ///
@@ -45,7 +42,7 @@ struct InnerMediaManager {
     /// its handle.
     // TODO: will be extended with some metadata that would allow client to
     //       understand purpose of obtaining this stream.
-    on_local_stream: Callback2<MediaStreamHandle, WasmErr>,
+    on_local_stream: Callback2<SysMediaStream, WasmErr>,
 }
 
 impl InnerMediaManager {
@@ -167,7 +164,8 @@ impl Drop for InnerMediaManager {
 }
 
 impl MediaManager {
-    /// Obtains [MediaStream][1] basing on a provided [`StreamRequest`].
+    /// Obtains [MediaStream][1] basing on a provided
+    /// [MediaStreamConstraints][2].
     /// Acquired streams are cached and cloning existing stream is preferable
     /// over obtaining new ones.
     ///
@@ -175,47 +173,32 @@ impl MediaManager {
     /// obtained.
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#mediastream
-    pub async fn get_stream_by_request(
+    /// [2]: https://w3.org/TR/mediacapture-streams/#dom-mediastreamconstraints
+    pub async fn get_stream<I: Into<MediaStreamConstraints>>(
         &self,
-        caps: StreamRequest,
-    ) -> Result<Rc<MediaStream>, WasmErr> {
-        let caps = SimpleStreamRequest::try_from(caps)?;
+        caps: I,
+    ) -> Result<SysMediaStream, WasmErr> {
         let inner = Rc::clone(&self.0);
 
         async {
             let (stream, is_new_stream) =
-                self.0.get_stream((&caps).into()).await?;
-
-            let stream = caps.parse_stream(&stream)?;
+                self.0.get_stream(caps.into()).await?;
 
             if is_new_stream {
-                inner.on_local_stream.call1(stream.new_handle());
+                inner.on_local_stream.call1(copy_js_ref(&stream));
             }
 
             Ok(stream)
         }
             .await
-            .map(Rc::new)
             .map_err(move |err: WasmErr| {
                 inner.on_local_stream.call2(err.clone());
                 err
             })
     }
 
-    /// Obtains [MediaStream][1] basing on provided [`MediaStreamConstraints`].
-    /// Either builds new stream from already known tracks or initiates new user
-    /// media request saving returned tracks.
-    ///
-    /// [1]: https://w3.org/TR/mediacapture-streams/#mediastream
-    pub async fn get_stream_by_constraints(
-        &self,
-        caps: MediaStreamConstraints,
-    ) -> Result<SysMediaStream, WasmErr> {
-        self.0.get_stream(caps).await.map(|(s, _)| s)
-    }
-
     /// Sets `on_local_stream` callback that will be invoked when
-    /// [`MediaManager`] obtains new [`MediaStream`].
+    /// [`MediaManager`] obtains new [MediaStream].
     #[inline]
     pub fn set_on_local_stream(&self, f: js_sys::Function) {
         self.0.on_local_stream.set_func(f);

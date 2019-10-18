@@ -6,18 +6,16 @@ use std::{
 };
 
 use wasm_bindgen::prelude::*;
+use web_sys::MediaStream as SysMediaStream;
 
-use crate::{
-    media::{MediaStream, MediaStreamHandle},
-    utils::Callback,
-};
+use crate::utils::Callback;
 
 /// Actual data of a connection with a specific remote [`Member`].
 ///
 /// Shared between JS side ([`ConnectionHandle`]) and
 /// Rust side ([`Connection`]).
 struct InnerConnection {
-    on_remote_stream: Callback<MediaStreamHandle>,
+    on_remote_stream: Callback<SysMediaStream>,
 }
 
 /// Connection with a specific remote `Member`, that is used on JS side.
@@ -63,9 +61,9 @@ impl Connection {
     }
 
     /// Invoke `on_remote_stream` [`Connection`]'s callback
-    /// for a given [`MediaStream`] received from a related remote [`Member`].
+    /// for a given [MediaStream] received from a related remote [`Member`].
     #[inline]
-    pub(crate) fn on_remote_stream(&self, stream: &MediaStream) {
-        self.0.borrow().on_remote_stream.call(stream.new_handle());
+    pub(crate) fn on_remote_stream(&self, stream: SysMediaStream) {
+        self.0.borrow().on_remote_stream.call(stream);
     }
 }

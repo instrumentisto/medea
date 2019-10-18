@@ -11,12 +11,14 @@ use web_sys::{
     MediaStream as SysMediaStream, MediaStreamTrack as SysMediaStreamTrack,
 };
 
-use crate::utils::WasmErr;
-
-use super::{
-    AudioTrackConstraints, MediaStream, MediaStreamConstraints, MediaTrack,
-    VideoTrackConstraints,
+use crate::{
+    media::{
+        AudioTrackConstraints, MediaStreamConstraints, VideoTrackConstraints,
+    },
+    utils::WasmErr,
 };
+
+use super::{MediaStream, MediaTrack};
 
 /// Representation of [MediaStreamConstraints][1] object.
 ///

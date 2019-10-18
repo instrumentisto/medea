@@ -50,7 +50,7 @@ async fn mute_unmute_audio() {
     let (room, peer) = get_test_room_and_exist_peer();
     let (audio_track, video_track) = get_test_tracks();
 
-    peer.get_offer(vec![audio_track, video_track])
+    peer.get_offer(vec![audio_track, video_track], None)
         .await
         .unwrap();
     let handle = room.new_handle();
@@ -65,7 +65,7 @@ async fn mute_unmute_video() {
     let (room, peer) = get_test_room_and_exist_peer();
     let (audio_track, video_track) = get_test_tracks();
 
-    peer.get_offer(vec![audio_track, video_track])
+    peer.get_offer(vec![audio_track, video_track], None)
         .await
         .unwrap();
 
