@@ -448,9 +448,9 @@ impl From<RoomServiceError> for ErrorResponse {
                 ),
                 None,
             ),
-            RoomMailboxErr(_) | FailedToLoadStaticSpecs(_) => {
-                Self::unexpected(&err)
-            }
+            RoomMailboxErr(_)
+            | FailedToLoadStaticSpecs(_)
+            | TryFromElement(_) => Self::unexpected(&err),
         }
     }
 }
@@ -463,9 +463,7 @@ impl From<GrpcControlApiError> for ErrorResponse {
             Fid(e) => e.into(),
             TryFromProtobuf(e) => e.into(),
             RoomServiceError(e) => e.into(),
-            RoomServiceMailboxError(_) | TryFromElement(_) => {
-                Self::unexpected(&err)
-            }
+            RoomServiceMailboxError(_) => Self::unexpected(&err),
         }
     }
 }

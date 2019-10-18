@@ -13,7 +13,7 @@ use actix::{
 };
 use derive_more::{Display, From};
 use failure::Fail;
-use futures::future::{self, Either, Future, IntoFuture};
+use futures::future::{self, Future, IntoFuture};
 use grpcio::{Environment, RpcContext, Server, ServerBuilder, UnarySink};
 use medea_control_api_proto::grpc::{
     api::{
@@ -32,14 +32,14 @@ use crate::{
             ErrorResponse,
         },
         refs::{fid::ParseFidError, Fid, StatefulFid, ToMember, ToRoom},
-        EndpointId, EndpointSpec, MemberId, MemberSpec, RoomId, RoomSpec,
-        TryFromElementError, TryFromProtobufError,
+        EndpointId, EndpointSpec, MemberId, MemberSpec, RoomSpec,
+        TryFromProtobufError,
     },
     log::prelude::*,
     shutdown::ShutdownGracefully,
     signalling::room_service::{
         CreateEndpointInRoom, CreateMemberInRoom, CreateRoom, DeleteElements,
-        Get, RoomService, RoomServiceError,
+        Get, RoomService, RoomServiceError, Sids,
     },
     AppContext,
 };
@@ -59,13 +59,6 @@ pub enum GrpcControlApiError {
     /// [medea]: https://github.com/instrumentisto/medea
     TryFromProtobuf(TryFromProtobufError),
 
-    /// This is __unexpected error__ because this kind of errors
-    /// should be catched by `try_from_protobuf` function which returns
-    /// [`TryFromProtobufError`].
-    ///
-    /// [Control API]: https://tinyurl.com/yxsqplq7
-    TryFromElement(TryFromElementError),
-
     /// [`MailboxError`] for [`RoomService`].
     #[display(fmt = "Room service mailbox error: {:?}", _0)]
     RoomServiceMailboxError(MailboxError),
@@ -73,9 +66,6 @@ pub enum GrpcControlApiError {
     /// Wrapper around [`RoomServiceError`].
     RoomServiceError(RoomServiceError),
 }
-
-/// Type alias for success [`CreateResponse`]'s sids.
-type Sids = HashMap<String, String>;
 
 /// Service which provides gRPC [Control API] implementation.
 #[derive(Clone)]
@@ -90,54 +80,15 @@ struct ControlApiService {
 }
 
 impl ControlApiService {
-    // TODO: move to room_service, grpc might not be the only ControlApi
-    // protocol, and this logic will should be shared
-    /// Returns [Control API] sid based on provided arguments and
-    /// `MEDEA_SERVER__CLIENT__HTTP__PUBLIC_URL` config value.
-    fn get_sid(
-        &self,
-        room_id: &RoomId,
-        member_id: &MemberId,
-        credentials: &str,
-    ) -> String {
-        format!(
-            "{}/{}/{}/{}",
-            self.public_url, room_id, member_id, credentials
-        )
-    }
-
     /// Implementation of `Create` method for [`Room`].
     fn create_room(
         &self,
         spec: RoomSpec,
     ) -> impl Future<Item = Sids, Error = GrpcControlApiError> {
-        let sid = match spec.members() {
-            Ok(members) => members
-                .iter()
-                .map(|(member_id, member)| {
-                    let uri = self.get_sid(
-                        spec.id(),
-                        &member_id,
-                        member.credentials(),
-                    );
-                    (member_id.clone().to_string(), uri)
-                })
-                .collect(),
-            Err(e) => {
-                return Either::B(future::err(
-                    GrpcControlApiError::TryFromElement(e),
-                ))
-            }
-        };
-
-        Either::A(
-            self.room_service
-                .send(CreateRoom { spec })
-                .map_err(GrpcControlApiError::RoomServiceMailboxError)
-                .and_then(move |r| {
-                    r.map_err(GrpcControlApiError::from).map(|_| sid)
-                }),
-        )
+        self.room_service
+            .send(CreateRoom { spec })
+            .map_err(GrpcControlApiError::RoomServiceMailboxError)
+            .and_then(move |r| r.map_err(GrpcControlApiError::from))
     }
 
     /// Implementation of `Create` method for [`Member`] element.
@@ -147,10 +98,6 @@ impl ControlApiService {
         uri: Fid<ToRoom>,
         spec: MemberSpec,
     ) -> impl Future<Item = Sids, Error = GrpcControlApiError> {
-        let sid = self.get_sid(uri.room_id(), &id, spec.credentials());
-        let mut sids = HashMap::new();
-        sids.insert(id.to_string(), sid);
-
         self.room_service
             .send(CreateMemberInRoom {
                 id,
@@ -158,7 +105,7 @@ impl ControlApiService {
                 spec,
             })
             .map_err(GrpcControlApiError::RoomServiceMailboxError)
-            .and_then(|r| r.map_err(GrpcControlApiError::from).map(|_| sids))
+            .and_then(|r| r.map_err(GrpcControlApiError::from))
     }
 
     /// Implementation of `Create` method for [`Endpoint`] element.
@@ -175,9 +122,7 @@ impl ControlApiService {
                 spec,
             })
             .map_err(GrpcControlApiError::RoomServiceMailboxError)
-            .and_then(|r| {
-                r.map_err(GrpcControlApiError::from).map(|_| HashMap::new())
-            })
+            .and_then(|r| r.map_err(GrpcControlApiError::from))
     }
 
     /// Creates element based on provided [`CreateRequest`].

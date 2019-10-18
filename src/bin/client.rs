@@ -26,12 +26,12 @@ fn main() {
 
     //    unimplemented_apply(&client);
     create_room(&client);
+    create_member(&client);
+    create_endpoint(&client);
     //    delete_room(&client);
     //    delete_endpoint(&client);
     //    delete_member(&client);
-    create_member(&client);
-    //    create_endpoint(&client);
-    get_room(&client);
+    //    get_room(&client);
 }
 
 fn create_room(client: &ControlApiClient) {
