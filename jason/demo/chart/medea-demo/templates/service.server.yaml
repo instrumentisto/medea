@@ -23,7 +23,8 @@ spec:
       port: 80
       targetPort: {{ .Values.server.conf.server.client.http.bind_port }}
       protocol: TCP
+    {{- $controlApiMock := index .Values "control-mock" }}
     - name: control-mock
-      port: 8000
-      targetPort: 8000
+      port: {{ $controlApiMock.conf.bind_port }}
+      targetPort: {{ $controlApiMock.conf.bind_port }}
       protocol: TCP

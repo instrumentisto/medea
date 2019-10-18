@@ -54,7 +54,6 @@ spec:
       containers:
       {{- $coturnDb := index .Values "server" "coturn-db" }}
       {{- $coturn := .Values.server.coturn }}
-      {{- $controlApiMock := index .Values "control-mock" }}
         - name: medea
           image: "{{ .Values.server.image.repository }}:{{ .Values.server.image.tag }}"
           imagePullPolicy: {{ .Values.server.image.pullPolicy }}
@@ -65,9 +64,6 @@ spec:
               value: {{ $coturn.conf.listening_port | quote }}
             - name: MEDEA_TURN__DB__REDIS__PORT
               value: {{ $coturnDb.conf.port | quote }}
-            {{/* TODO BEFORE REVIEW: delete RUST_LOG env */}}
-            - name: RUST_LOG
-              value: DEBUG
           envFrom:
             - secretRef:
                 name: {{ template "medea-demo.fullname" . }}.server.cred
@@ -76,7 +72,7 @@ spec:
               containerPort: {{ .Values.server.conf.server.client.http.bind_port }}
               protocol: TCP
             - name: grpc
-              containerPort: 6565
+              containerPort: {{ .Values.server.conf.server.control.grpc.bind_port }}
           volumeMounts:
             - name: conf
               subPath: medea.toml
@@ -93,12 +89,20 @@ spec:
             tcpSocket:
               port: {{ .Values.server.conf.server.client.http.bind_port }}
             initialDelaySeconds: 5
+        {{- $controlApiMock := index .Values "control-mock" }}
         - name: control-mock
           image: "{{ $controlApiMock.image.repository }}:{{ $controlApiMock.image.tag }}"
           imagePullPolicy: "{{ $controlApiMock.image.pullPolicy }}"
+          command: ["/control-api-mock"]
+          args:
+            - --addr=0.0.0.0:{{ $controlApiMock.conf.bind_port }}
+            - --medea-addr=127.0.0.1:{{ .Values.server.conf.server.control.grpc.bind_port }}
+          env:
+            - name: RUST_LOG
+              value: {{ $controlApiMock.conf.log.level | quote }}
           ports:
             - name: control-mock
-              containerPort: 8000
+              containerPort: {{ $controlApiMock.conf.bind_port }}
               protocol: TCP
         - name: coturn
           image: "{{ $coturn.image.repository }}:{{ $coturn.image.tag }}"
@@ -171,10 +175,6 @@ spec:
                 secretKeyRef:
                   name: {{ template "medea-demo.fullname" . }}.server.cred
                   key: MEDEA_TURN__DB__REDIS__PASS
-{{/*          ports:*/}}
-{{/*            - name: redis*/}}
-{{/*              containerPort: 6379*/}}
-{{/*              protocol: TCP*/}}
           volumeMounts:
             - name: conf
               subPath: redis.conf

@@ -20,6 +20,10 @@ server:
         http:
           public_url: ws://127.0.0.1:8080/ws
           bind_port: 8080
+      control:
+        grpc:
+          bind_ip: 0.0.0.0
+          bind_port: 6565
     turn:
       user: USER
       pass: PASS
@@ -160,6 +164,8 @@ control-mock:
 
   conf:
     bind_port: 8000
+    log:
+      level: DEBUG
 
   deployment:
     replicas: 1

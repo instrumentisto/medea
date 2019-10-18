@@ -76,7 +76,7 @@ RUN cp /app/target/${rustc_mode}/medea /out/medea \
 #
 
 # https://hub.docker.com/_/scratch
-FROM alpine AS runtime
+FROM scratch AS runtime
 
 COPY --from=dist /out/ /
 
