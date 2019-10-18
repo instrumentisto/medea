@@ -17,30 +17,6 @@ use crate::{get_test_tracks, resolve_after};
 wasm_bindgen_test_configure!(run_in_browser);
 
 #[wasm_bindgen_test]
-async fn inject_local_stream() {
-    let (tx, _rx) = mpsc::unbounded();
-    let manager = Rc::new(MediaManager::default());
-    let (audio_track, video_track) = get_test_tracks();
-    let peer = PeerConnection::new(PeerId(1), tx, vec![], manager, true, true)
-        .unwrap();
-
-    peer.get_offer(vec![audio_track, video_track], None)
-        .await
-        .unwrap();
-
-    assert!(peer.is_send_audio_enabled());
-    assert!(peer.is_send_video_enabled());
-
-    peer.toggle_send_audio(false);
-    assert!(!peer.is_send_audio_enabled());
-    assert!(peer.is_send_video_enabled());
-
-    peer.toggle_send_audio(true);
-    assert!(peer.is_send_audio_enabled());
-    assert!(peer.is_send_video_enabled());
-}
-
-#[wasm_bindgen_test]
 async fn mute_unmute_audio() {
     let (tx, _rx) = mpsc::unbounded();
     let manager = Rc::new(MediaManager::default());

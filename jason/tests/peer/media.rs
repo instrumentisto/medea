@@ -7,14 +7,13 @@ use medea_jason::{
     media::MediaManager,
     peer::{
         MediaConnections, RtcPeerConnection, TransceiverDirection,
-        TransceiverKind,
+        TransceiverKind, SimpleStreamRequest,
     },
     utils::WasmErr,
 };
 use wasm_bindgen_test::*;
 
 use crate::get_test_tracks;
-use medea_jason::peer::SimpleStreamRequest;
 
 wasm_bindgen_test_configure!(run_in_browser);
 
