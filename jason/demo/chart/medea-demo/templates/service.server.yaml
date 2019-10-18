@@ -21,7 +21,7 @@ spec:
   ports:
     - name: http
       port: 80
-      targetPort: {{ .Values.server.conf.server.bind_port }}
+      targetPort: {{ .Values.server.conf.server.client.http.bind_port }}
       protocol: TCP
     - name: control-mock
       port: 8000
