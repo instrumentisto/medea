@@ -95,7 +95,6 @@ impl TryFrom<String> for StatefulFid {
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
         if value.is_empty() {
-            // TODO: not an error but rather Fid<Root>
             return Err(ParseFidError::Empty);
         }
 

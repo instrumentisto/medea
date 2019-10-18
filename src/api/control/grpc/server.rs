@@ -140,23 +140,22 @@ impl ControlApiService {
             )));
         };
 
+        if unparsed_parent_fid.is_empty() {
+            return Box::new(
+                RoomSpec::try_from(elem)
+                    .map_err(ErrorResponse::from)
+                    .map(|spec| {
+                        self.create_room(spec).map_err(ErrorResponse::from)
+                    })
+                    .into_future()
+                    .and_then(|create_result| create_result),
+            );
+        }
+
         let parent_fid = match StatefulFid::try_from(unparsed_parent_fid) {
             Ok(parent_fid) => parent_fid,
             Err(e) => {
-                if let ParseFidError::Empty = e {
-                    return Box::new(
-                        RoomSpec::try_from(elem)
-                            .map_err(ErrorResponse::from)
-                            .map(|spec| {
-                                self.create_room(spec)
-                                    .map_err(ErrorResponse::from)
-                            })
-                            .into_future()
-                            .and_then(|create_result| create_result),
-                    );
-                } else {
-                    return Box::new(future::err(e.into()));
-                }
+                return Box::new(future::err(e.into()));
             }
         };
 
