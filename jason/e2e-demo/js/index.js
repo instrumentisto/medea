@@ -17,10 +17,8 @@ async function createRoom(roomId, memberId) {
                     pipeline: {
                         publish: {
                             kind: 'WebRtcPublishEndpoint',
-                            spec: {
-                                id: 'publish',
-                                p2p: 'Always'
-                            }
+                            id: 'publish',
+                            p2p: 'Always'
                         },
                     }
                 }
@@ -37,10 +35,8 @@ async function createMember(roomId, memberId) {
     let pipeline = {
         publish: {
             kind: 'WebRtcPublishEndpoint',
-            spec: {
-                id: 'publish',
-                p2p: 'Always'
-            }
+            id: 'publish',
+            p2p: 'Always'
         }
     };
 
@@ -53,10 +49,8 @@ async function createMember(roomId, memberId) {
         memberIds.push(memberId);
         pipeline["play-" + memberId] = {
             kind: 'WebRtcPlayEndpoint',
-            spec: {
-                id: "play-" + memberId,
-                src: 'local://' + roomId + '/' + memberId + "/publish"
-            }
+            id: "play-" + memberId,
+            src: 'local://' + roomId + '/' + memberId + "/publish"
         }
     }
 

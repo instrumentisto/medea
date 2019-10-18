@@ -104,7 +104,7 @@ macro_rules! fn_uri_macro {
 mod delete {
     use super::*;
 
-    fn_uri_macro!(delete_single, Response);
+    fn_uri_macro!(delete, Response);
 
     fn_uri!(delete0, ());
     fn_uri!(delete1, String);
@@ -117,7 +117,7 @@ mod delete {
 mod get {
     use super::*;
 
-    fn_uri_macro!(get_single, SingleGetResponse);
+    fn_uri_macro!(get, SingleGetResponse);
 
     fn_uri!(get0, ());
     fn_uri!(get1, String);

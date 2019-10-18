@@ -102,7 +102,7 @@ impl ControlClient {
     }
 
     /// Gets single element from Control API by local URI.
-    pub fn get_single(
+    pub fn get(
         &self,
         uri: Uri,
     ) -> impl Future<Item = GetResponse, Error = Error> {
@@ -115,7 +115,7 @@ impl ControlClient {
     }
 
     /// Deletes single element.
-    pub fn delete_single(
+    pub fn delete(
         &self,
         uri: Uri,
     ) -> impl Future<Item = Response, Error = Error> {
