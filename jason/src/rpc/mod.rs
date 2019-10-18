@@ -5,10 +5,7 @@ mod websocket;
 
 use std::{cell::RefCell, rc::Rc, vec};
 
-use futures::{
-    sync::mpsc::{unbounded, UnboundedSender},
-    Future, Stream,
-};
+use futures::{channel::mpsc, future::LocalBoxFuture, stream::LocalBoxStream};
 use js_sys::Date;
 use medea_client_api_proto::{ClientMsg, Command, Event, ServerMsg};
 
@@ -24,18 +21,21 @@ pub enum CloseMsg {
     Disconnect(String),
 }
 
+// TODO: consider using async-trait crate, it doesnt work with mockall atm
 /// Client to talk with server via Client API RPC.
 #[allow(clippy::module_name_repetitions)]
 #[cfg_attr(feature = "mockable", mockall::automock)]
 pub trait RpcClient {
-    // Establish connection with RPC server.
+    // atm Establish connection with RPC server.
     fn connect(
         &self,
-        token: &str,
-    ) -> Box<dyn Future<Item = (), Error = WasmErr>>;
+        token: String,
+    ) -> LocalBoxFuture<'static, Result<(), WasmErr>>;
 
     /// Returns [`Stream`] of all [`Event`]s received by this [`RpcClient`].
-    fn subscribe(&self) -> Box<dyn Stream<Item = Event, Error = ()>>;
+    ///
+    /// [`Stream`]: futures::Stream
+    fn subscribe(&self) -> LocalBoxStream<'static, Event>;
 
     /// Unsubscribes from this [`RpcClient`]. Drops all subscriptions atm.
     fn unsub(&self);
@@ -59,7 +59,7 @@ struct Inner {
     heartbeat: Heartbeat,
 
     /// Event's subscribers list.
-    subs: Vec<UnboundedSender<Event>>,
+    subs: Vec<mpsc::UnboundedSender<Event>>,
 }
 
 impl Inner {
@@ -123,12 +123,11 @@ impl RpcClient for WebsocketRpcClient {
     /// on receiving messages from server and closing socket.
     fn connect(
         &self,
-        token: &str,
-    ) -> Box<dyn Future<Item = (), Error = WasmErr>> {
+        token: String,
+    ) -> LocalBoxFuture<'static, Result<(), WasmErr>> {
         let inner = Rc::clone(&self.0);
-        Box::new(WebSocket::new(token).and_then(move |socket: WebSocket| {
-            let socket = Rc::new(socket);
-
+        Box::pin(async move {
+            let socket = Rc::new(WebSocket::new(&token).await?);
             inner.borrow_mut().heartbeat.start(Rc::clone(&socket))?;
 
             let inner_rc = Rc::clone(&inner);
@@ -141,16 +140,18 @@ impl RpcClient for WebsocketRpcClient {
 
             inner.borrow_mut().sock.replace(socket);
             Ok(())
-        }))
+        })
     }
 
     /// Returns [`Stream`] of all [`Event`]s received by this [`RpcClient`].
+    ///
+    /// [`Stream`]: futures::Stream
     // TODO: proper sub registry
-    fn subscribe(&self) -> Box<dyn Stream<Item = Event, Error = ()>> {
-        let (tx, rx) = unbounded();
+    fn subscribe(&self) -> LocalBoxStream<'static, Event> {
+        let (tx, rx) = mpsc::unbounded();
         self.0.borrow_mut().subs.push(tx);
 
-        Box::new(rx)
+        Box::pin(rx)
     }
 
     /// Unsubscribes from this [`RpcClient`]. Drops all subscriptions atm.
