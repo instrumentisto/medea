@@ -19,6 +19,21 @@ use super::{
     WebRtcPublishEndpointBuilder,
 };
 
+fn stop_on_peer_created(
+) -> impl Fn(&Event, &mut Context<TestMember>, Vec<&Event>) + Clone {
+    let peers_created = Rc::new(Cell::new(0));
+    move |event: &Event, ctx: &mut Context<TestMember>, _: Vec<&Event>| {
+        if let Event::PeerCreated { .. } = event {
+            peers_created.set(peers_created.get() + 1);
+            if peers_created.get() == 2 {
+                ctx.run_later(Duration::from_secs(1), |_, _| {
+                    actix::System::current().stop();
+                });
+            }
+        }
+    }
+}
+
 #[test]
 fn signalling_starts_when_create_play_member_after_pub_member() {
     gen_insert_str_macro!("create-play-member-after-pub-member");
@@ -48,20 +63,9 @@ fn signalling_starts_when_create_play_member_after_pub_member() {
 
     control_client.create(&create_room);
 
-    let peers_created = Rc::new(Cell::new(0));
-    let on_event =
-        move |event: &Event, ctx: &mut Context<TestMember>, _: Vec<&Event>| {
-            if let Event::PeerCreated { .. } = event {
-                peers_created.set(peers_created.get() + 1);
-                if peers_created.get() == 2 {
-                    ctx.run_later(Duration::from_secs(1), |_, _| {
-                        actix::System::current().stop();
-                    });
-                }
-            }
-        };
+    let on_event = stop_on_peer_created();
 
-    let deadline = Some(std::time::Duration::from_secs(5));
+    let deadline = Some(Duration::from_secs(5));
     Arbiter::spawn(
         TestMember::connect(
             &insert_str!("ws://127.0.0.1:8080/ws/{}/publisher/test"),
@@ -96,7 +100,130 @@ fn signalling_starts_when_create_play_member_after_pub_member() {
     sys.run().unwrap();
 }
 
-// TODO: add signalling_starts_when_create_play_endpoint_after_pub_endpoint
+#[test]
+fn signalling_starts_when_create_play_endpoint_after_pub_member() {
+    gen_insert_str_macro!(
+        "signalling_starts_when_create_play_endpoint_after_pub_member"
+    );
+    let sys = System::new(insert_str!("{}"));
+
+    let control_client = ControlClient::new();
+
+    let create_room = RoomBuilder::default()
+        .id(insert_str!("{}"))
+        .add_member(
+            MemberBuilder::default()
+                .id("publisher")
+                .credentials("test")
+                .add_endpoint(
+                    WebRtcPublishEndpointBuilder::default()
+                        .id("publish")
+                        .p2p_mode(WebRtcPublishEndpoint_P2P::ALWAYS)
+                        .build()
+                        .unwrap(),
+                )
+                .build()
+                .unwrap(),
+        )
+        .build()
+        .unwrap()
+        .build_request("");
+
+    control_client.create(&create_room);
+
+    let on_event = stop_on_peer_created();
+
+    let deadline = Some(Duration::from_secs(5));
+    Arbiter::spawn(
+        TestMember::connect(
+            &insert_str!("ws://127.0.0.1:8080/ws/{}/publisher/test"),
+            Box::new(on_event.clone()),
+            deadline,
+        )
+        .and_then(move |_| {
+            let create_second_member = MemberBuilder::default()
+                .id("responder")
+                .credentials("qwerty")
+                .build()
+                .unwrap()
+                .build_request(insert_str!("{}"));
+            control_client.create(&create_second_member);
+
+            let create_play = WebRtcPlayEndpointBuilder::default()
+                .id("play")
+                .src(insert_str!("local://{}/publisher/publish"))
+                .build()
+                .unwrap()
+                .build_request(insert_str!("{}/responder"));
+
+            control_client.create(&create_play);
+
+            TestMember::connect(
+                &insert_str!("ws://127.0.0.1:8080/ws/{}/responder/qwerty"),
+                Box::new(on_event),
+                deadline,
+            )
+        })
+        .map(|_| ()),
+    );
+
+    sys.run().unwrap();
+}
+
+#[test]
+fn signalling_starts_in_loopback_scenario() {
+    gen_insert_str_macro!("signalling_starts_in_loopback_scenario");
+    let sys = System::new(insert_str!("{}"));
+
+    let control_client = ControlClient::new();
+
+    let create_room = RoomBuilder::default()
+        .id(insert_str!("{}"))
+        .add_member(
+            MemberBuilder::default()
+                .id("publisher")
+                .credentials("test")
+                .add_endpoint(
+                    WebRtcPublishEndpointBuilder::default()
+                        .id("publish")
+                        .p2p_mode(WebRtcPublishEndpoint_P2P::ALWAYS)
+                        .build()
+                        .unwrap(),
+                )
+                .build()
+                .unwrap(),
+        )
+        .build()
+        .unwrap()
+        .build_request("");
+
+    control_client.create(&create_room);
+
+    let on_event = stop_on_peer_created();
+
+    let deadline = Some(Duration::from_secs(5));
+    Arbiter::spawn(
+        TestMember::connect(
+            &insert_str!("ws://127.0.0.1:8080/ws/{}/publisher/test"),
+            Box::new(on_event.clone()),
+            deadline,
+        )
+        .and_then(move |_| {
+            let create_play = WebRtcPlayEndpointBuilder::default()
+                .id("play")
+                .src(insert_str!("local://{}/publisher/publish"))
+                .build()
+                .unwrap()
+                .build_request(insert_str!("{}/publisher"));
+
+            control_client.create(&create_play);
+            Ok(())
+        })
+        .map(|_| ()),
+    );
+
+    sys.run().unwrap();
+}
 
 #[test]
 fn peers_removed_on_delete_member() {
