@@ -12,6 +12,8 @@ All user visible changes to this project will be documented in this file. This p
 ### BC Breaks
 
 - Library API:
+    - Callback `on_local_stream` ([#54]):
+        - move from `MediaManager` to `Room`;  
     - Room initialization ([#46]):
         - Remove `Jason.join_room()`.
 
