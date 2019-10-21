@@ -85,12 +85,8 @@ async function init(){
       });
     });
 
-    jason.on_local_stream(function (stream, error) {
-      if (stream) {
+    room.on_local_stream(function () {
         console.log("unreachable!");
-      } else {
-        console.log(error);
-      }
     });
 
     join_button.click(function () {

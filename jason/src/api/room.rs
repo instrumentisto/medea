@@ -20,7 +20,7 @@ use web_sys::MediaStream as SysMediaStream;
 use crate::{
     peer::{MediaStream, PeerEvent, PeerEventHandler, PeerRepository},
     rpc::RpcClient,
-    utils::{Callback2, WasmErr},
+    utils::{Callback, WasmErr},
 };
 
 use super::{connection::Connection, ConnectionHandle};
@@ -45,6 +45,12 @@ impl RoomHandle {
             .borrow_mut()
             .on_new_connection
             .set_func(f))
+    }
+
+    /// Sets callback, which will be invoked on any `Connection` send new local
+    /// stream to remote member.
+    pub fn on_local_stream(&self, f: js_sys::Function) -> Result<(), JsValue> {
+        map_weak!(self, |inner| inner.borrow_mut().on_local_stream.set_func(f))
     }
 
     /// Performs entering to a [`Room`]  with the preconfigured authorization
@@ -185,7 +191,13 @@ struct InnerRoom {
 
     /// Callback from JS side which will be invoked on remote `Member` media
     /// stream arrival.
-    on_new_connection: Rc<Callback2<ConnectionHandle, WasmErr>>,
+    on_new_connection: Callback<ConnectionHandle>,
+
+    /// Callback to be invoked when new [`MediaStream`] is acquired providing
+    /// its handle.
+    // TODO: will be extended with some metadata that would allow client to
+    //       understand purpose of obtaining this stream.
+    on_local_stream: Callback<SysMediaStream>,
 
     /// Indicates if outgoing audio is enabled in this [`Room`].
     enabled_audio: bool,
@@ -208,7 +220,8 @@ impl InnerRoom {
             peers,
             peer_event_sender,
             connections: HashMap::new(),
-            on_new_connection: Rc::new(Callback2::default()),
+            on_new_connection: Callback::default(),
+            on_local_stream: Callback::default(),
             enabled_audio: true,
             enabled_video: true,
         }
@@ -222,7 +235,7 @@ impl InnerRoom {
         let create_connection = |room: &mut Self, peer_id: &PeerId| {
             if !room.connections.contains_key(peer_id) {
                 let con = Connection::new();
-                room.on_new_connection.call1(con.new_handle());
+                room.on_new_connection.call(con.new_handle());
                 room.connections.insert(*peer_id, con);
             }
         };
@@ -429,6 +442,11 @@ impl PeerEventHandler for InnerRoom {
                     .log_err()
             }
         }
+    }
+
+    /// Invoke `on_local_stream` [`Room`]'s callback.
+    fn on_new_local_stream(&mut self, _: PeerId, local_stream: MediaStream) {
+        self.on_local_stream.call(local_stream.stream());
     }
 }
 

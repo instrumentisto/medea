@@ -52,14 +52,6 @@ impl Jason {
         handle
     }
 
-    /// Sets `on_local_stream` callback, which will be invoked once media
-    /// acquisition request will resolve returning
-    /// [`MediaStreamHandle`](crate::media::MediaStreamHandle) or
-    /// [`WasmErr`](crate::utils::errors::WasmErr).
-    pub fn on_local_stream(&self, f: js_sys::Function) {
-        self.0.borrow_mut().media_manager.set_on_local_stream(f);
-    }
-
     /// Returns handle to [`MediaManager`].
     pub fn media_manager(&self) -> MediaManagerHandle {
         self.0.borrow().media_manager.new_handle()

@@ -6,8 +6,8 @@ use medea_client_api_proto::TrackId;
 use medea_jason::{
     media::MediaManager,
     peer::{
-        MediaConnections, RtcPeerConnection, TransceiverDirection,
-        TransceiverKind, SimpleStreamRequest,
+        MediaConnections, RtcPeerConnection, SimpleStreamRequest,
+        TransceiverDirection, TransceiverKind,
     },
     utils::WasmErr,
 };
@@ -35,7 +35,7 @@ async fn get_test_media_connections(
     let request = media_connections.get_stream_request().unwrap();
     let caps = SimpleStreamRequest::try_from(request).unwrap();
     let manager = Rc::new(MediaManager::default());
-    let stream = manager.get_stream(&caps).await?;
+    let (stream, _) = manager.get_stream(&caps).await?;
 
     media_connections
         .insert_local_stream(&caps.parse_stream(&stream)?)

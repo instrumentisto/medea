@@ -226,6 +226,7 @@ async fn handle_ice_candidates(
                     break;
                 }
             }
+            PeerEvent::NewLocalStream { .. } => {}
             _ => unreachable!(),
         }
     }

@@ -45,6 +45,24 @@ fn get_test_room_and_exist_peer() -> (Room, Rc<PeerConnection>) {
     (room, peer)
 }
 
+// #[wasm_bindgen_test]
+// async fn error_inject_local_stream() {
+// let (room, peer) = get_test_room_and_exist_peer();
+// let (audio_track, video_track) = get_test_tracks();
+//
+// peer.get_offer(vec![audio_track, video_track], None)
+// .await
+// .unwrap();
+//
+// let media_manager = MediaManager::default();
+// let local_stream = media_manager.get_stream()
+// let handle = room.new_handle();
+// assert!(handle.mute_audio().is_ok());
+// assert!(!peer.is_send_audio_enabled());
+// assert!(handle.unmute_audio().is_ok());
+// assert!(peer.is_send_audio_enabled());
+// }
+
 #[wasm_bindgen_test]
 async fn mute_unmute_audio() {
     let (room, peer) = get_test_room_and_exist_peer();

@@ -20,7 +20,7 @@ use web_sys::{
 
 use crate::{
     media::MediaStreamConstraints,
-    utils::{copy_js_ref, window, Callback2, WasmErr},
+    utils::{window, WasmErr},
 };
 
 use super::InputDeviceInfo;
@@ -37,12 +37,6 @@ pub struct MediaManager(Rc<InnerMediaManager>);
 struct InnerMediaManager {
     /// Obtained tracks storage
     tracks: Rc<RefCell<Vec<MediaStreamTrack>>>,
-
-    /// Callback to be invoked when new [`MediaStream`] is acquired providing
-    /// its handle.
-    // TODO: will be extended with some metadata that would allow client to
-    //       understand purpose of obtaining this stream.
-    on_local_stream: Callback2<SysMediaStream, WasmErr>,
 }
 
 impl InnerMediaManager {
@@ -177,31 +171,8 @@ impl MediaManager {
     pub async fn get_stream<I: Into<MediaStreamConstraints>>(
         &self,
         caps: I,
-    ) -> Result<SysMediaStream, WasmErr> {
-        let inner = Rc::clone(&self.0);
-
-        async {
-            let (stream, is_new_stream) =
-                self.0.get_stream(caps.into()).await?;
-
-            if is_new_stream {
-                inner.on_local_stream.call1(copy_js_ref(&stream));
-            }
-
-            Ok(stream)
-        }
-            .await
-            .map_err(move |err: WasmErr| {
-                inner.on_local_stream.call2(err.clone());
-                err
-            })
-    }
-
-    /// Sets `on_local_stream` callback that will be invoked when
-    /// [`MediaManager`] obtains new [MediaStream].
-    #[inline]
-    pub fn set_on_local_stream(&self, f: js_sys::Function) {
-        self.0.on_local_stream.set_func(f);
+    ) -> Result<(SysMediaStream, bool), WasmErr> {
+        self.0.get_stream(caps.into()).await
     }
 
     /// Instantiates new [`MediaManagerHandle`] for use on JS side.

@@ -55,6 +55,12 @@ pub enum PeerEvent {
         sender_id: Id,
         remote_stream: MediaStream,
     },
+
+    /// [`RtcPeerConnection`] send new local stream to remote members.
+    NewLocalStream {
+        peer_id: Id,
+        local_stream: MediaStream,
+    },
 }
 
 #[allow(clippy::module_name_repetitions)]
@@ -269,13 +275,20 @@ impl PeerConnection {
     ) -> Result<(), WasmErr> {
         if let Some(request) = self.media_connections.get_stream_request() {
             let caps = SimpleStreamRequest::try_from(request)?;
-            let stream = match local_stream {
-                Some(stream) => stream,
+            let (stream, is_new_stream) = match local_stream {
+                Some(stream) => (stream, false),
                 None => self.media_manager.get_stream(&caps).await?,
             };
-            self.media_connections
-                .insert_local_stream(&caps.parse_stream(&stream)?)
-                .await?;
+            let stream = caps.parse_stream(&stream)?;
+            self.media_connections.insert_local_stream(&stream).await?;
+            if is_new_stream {
+                let _ = self.peer_events_sender.unbounded_send(
+                    PeerEvent::NewLocalStream {
+                        peer_id: self.id,
+                        local_stream: stream,
+                    },
+                );
+            }
         }
         Ok(())
     }
