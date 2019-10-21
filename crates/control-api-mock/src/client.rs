@@ -73,6 +73,7 @@ impl ControlClient {
         }
     }
 
+    /// Creates provided element with gRPC Control API.
     pub fn create(
         &self,
         uri: Uri,
@@ -101,7 +102,7 @@ impl ControlClient {
             .and_then(|r| r)
     }
 
-    /// Gets single element from Control API by local URI.
+    /// Gets element from Control API by local URI.
     pub fn get(
         &self,
         uri: Uri,
@@ -114,7 +115,7 @@ impl ControlClient {
             .and_then(|r| r)
     }
 
-    /// Deletes single element.
+    /// Deletes element.
     pub fn delete(
         &self,
         uri: Uri,

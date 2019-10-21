@@ -80,9 +80,9 @@ pub fn run(args: &ArgMatches) {
     .start();
 }
 
-macro_rules! fn_uri_macro {
+macro_rules! gen_request_macro {
     ($call_fn:tt, $resp:ty) => {
-        macro_rules! fn_uri {
+        macro_rules! request {
             ($name:tt, $uri_tuple:ty) => {
                 pub fn $name(
                     path: actix_web::web::Path<$uri_tuple>,
@@ -104,12 +104,12 @@ macro_rules! fn_uri_macro {
 mod delete {
     use super::*;
 
-    fn_uri_macro!(delete, Response);
+    gen_request_macro!(delete, Response);
 
-    fn_uri!(delete0, ());
-    fn_uri!(delete1, String);
-    fn_uri!(delete2, (String, String));
-    fn_uri!(delete3, (String, String, String));
+    request!(delete0, ());
+    request!(delete1, String);
+    request!(delete2, (String, String));
+    request!(delete3, (String, String, String));
 }
 
 #[allow(clippy::needless_pass_by_value)]
@@ -117,18 +117,18 @@ mod delete {
 mod get {
     use super::*;
 
-    fn_uri_macro!(get, SingleGetResponse);
+    gen_request_macro!(get, SingleGetResponse);
 
-    fn_uri!(get0, ());
-    fn_uri!(get1, String);
-    fn_uri!(get2, (String, String));
-    fn_uri!(get3, (String, String, String));
+    request!(get0, ());
+    request!(get1, String);
+    request!(get2, (String, String));
+    request!(get3, (String, String, String));
 }
 
 mod create {
     use super::*;
 
-    macro_rules! gen_fn {
+    macro_rules! create_request {
         ($fn_name:tt, $uri_tuple:ty) => {
             pub fn $fn_name(
                 path: actix_web::web::Path<$uri_tuple>,
@@ -144,10 +144,10 @@ mod create {
         };
     }
 
-    gen_fn!(create0, ());
-    gen_fn!(create1, (String));
-    gen_fn!(create2, (String, String));
-    gen_fn!(create3, (String, String, String));
+    create_request!(create0, ());
+    create_request!(create1, (String));
+    create_request!(create2, (String, String));
+    create_request!(create3, (String, String, String));
 }
 
 /// Error object. Returns when some error happened on Control API's side.

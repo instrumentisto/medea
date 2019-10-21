@@ -2,6 +2,7 @@
 
 use medea_control_api_proto::grpc::api::{
     Member_Element as MemberElementProto,
+    Member_Element_oneof_el as MemberElementOneOfEl,
     WebRtcPlayEndpoint as WebRtcPlayEndpointProto,
     WebRtcPublishEndpoint as WebRtcPublishEndpointProto,
     WebRtcPublishEndpoint_P2P as P2pModeProto,
@@ -119,13 +120,14 @@ impl Into<MemberElementProto> for Endpoint {
 }
 
 impl From<MemberElementProto> for Endpoint {
-    fn from(mut proto: MemberElementProto) -> Self {
-        if proto.has_webrtc_play() {
-            Self::WebRtcPlayEndpoint(proto.take_webrtc_play().into())
-        } else if proto.has_webrtc_pub() {
-            Self::WebRtcPublishEndpoint(proto.take_webrtc_pub().into())
-        } else {
-            unimplemented!()
+    fn from(proto: MemberElementProto) -> Self {
+        match proto.el.unwrap() {
+            MemberElementOneOfEl::webrtc_pub(webrtc_pub) => {
+                Self::WebRtcPublishEndpoint(webrtc_pub.into())
+            }
+            MemberElementOneOfEl::webrtc_play(webrtc_play) => {
+                Self::WebRtcPlayEndpoint(webrtc_play.into())
+            }
         }
     }
 }

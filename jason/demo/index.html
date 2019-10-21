@@ -1,13 +1,14 @@
 <!DOCTYPE html>
 <html>
-<head>
-    <title>Chat</title>
-    <meta http-equiv='Content-Type' content='text/html; charset=UTF-8'/>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/0.19.0/axios.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/Faker/3.1.0/faker.min.js"></script>
 
-    <script type="module">
-        import init, {
+<head>
+  <title>Chat</title>
+  <meta http-equiv='Content-Type' content='text/html; charset=UTF-8' />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/0.19.0/axios.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Faker/3.1.0/faker.min.js"></script>
+
+  <script type="module">
+    import init, {
             Jason,
             MediaStreamConstraints, AudioTrackConstraints, VideoTrackConstraints,
         } from './js/medea_jason.js';
@@ -253,125 +254,127 @@
         }
     </script>
 
-    <script type="text/javascript">
+  <script type="text/javascript">
 
-    </script>
+  </script>
 
-    <style>
-        body {
-            font-family: "Source Sans Pro",Helvetica,sans-serif;
-            background: #f5f5f5;
-        }
+  <style>
+    body {
+      font-family: "Source Sans Pro", Helvetica, sans-serif;
+      background: #f5f5f5;
+    }
 
-        .remote-videos {
-            display: flex;
-            width: 100%;
-            justify-content: space-around;
-        }
+    .remote-videos {
+      display: flex;
+      width: 100%;
+      justify-content: space-around;
+    }
 
-        .video {
-            display: flex;
-            justify-content: center;
-            flex-direction: column;
-            margin-right: 10px;
-            text-align: center;
-        }
+    .video {
+      display: flex;
+      justify-content: center;
+      flex-direction: column;
+      margin-right: 10px;
+      text-align: center;
+    }
 
-        .video > video {
-            background: #FFFFFF;
-            border-radius: 3px;
-        }
+    .video>video {
+      background: #FFFFFF;
+      border-radius: 3px;
+    }
 
-        .join {
-            position: fixed;
-            bottom: 200px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: #FFFFFF;
-            padding: 10px;
-            border-radius: 3px;
-        }
+    .join {
+      position: fixed;
+      bottom: 200px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #FFFFFF;
+      padding: 10px;
+      border-radius: 3px;
+    }
 
-        .local-video {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            margin-left: 20px;
-            margin-bottom: 20px;
-            width: auto;
-            height: 150px;
-        }
+    .local-video {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      margin-left: 20px;
+      margin-bottom: 20px;
+      width: auto;
+      height: 150px;
+    }
 
-        .join__username {
-            font-size: 16px;
-            padding: 5px;
-        }
+    .join__username {
+      font-size: 16px;
+      padding: 5px;
+    }
 
-        .join__join {
-            font-size: 16px;
-            background: #49668C;
-            color: white;
-            cursor: pointer;
-            border-radius: 3px;
-            border: none;
-            padding: 6px;
-            margin-left: 5px;
-        }
+    .join__join {
+      font-size: 16px;
+      background: #49668C;
+      color: white;
+      cursor: pointer;
+      border-radius: 3px;
+      border: none;
+      padding: 6px;
+      margin-left: 5px;
+    }
 
-        .control {
-            position: fixed;
-            bottom: 150px;
-            left: 50%;
-            transform: translateX(-50%);
-        }
+    .control {
+      position: fixed;
+      bottom: 150px;
+      left: 50%;
+      transform: translateX(-50%);
+    }
 
-        .control__mute {
-            border-radius: 10px;
-            background: #49668C;
-            color: white;
-            font-size: 13pt;
-            border: none;
-            padding: 10px;
-            cursor: pointer;
-            margin-right: 10px;
-        }
-    </style>
+    .control__mute {
+      border-radius: 10px;
+      background: #49668C;
+      color: white;
+      font-size: 13pt;
+      border: none;
+      padding: 10px;
+      cursor: pointer;
+      margin-right: 10px;
+    }
+  </style>
 </head>
+
 <body>
 
-<div id="choose-room">
+  <div id="choose-room">
     <input id="choose-room__room-id">
     <button id="choose-room__join" type="submit">JOIN</button>
-</div>
+  </div>
 
-<div class="video-call" style="display: none">
+  <div class="video-call" style="display: none">
     <div class="remote-videos">
     </div>
 
     <div class="local-video video">
-        <video class="local-video__video" muted autoplay width="100%" height="100%"></video>
+      <video class="local-video__video" muted autoplay width="100%" height="100%"></video>
     </div>
 
     <div class="join">
-        <input class="join__username" placeholder="username">
-        <button class="join__join">Join</button>
-        <div class="connect__device">
-            <label>Audio:
-                <select class="connect__select-device_audio">
-                </select>
-            </label><br>
-            <label>Video:
-                <select class="connect__select-device_video">
-                </select>
-            </label>
-        </div>
+      <input class="join__username" placeholder="username">
+      <button class="join__join">Join</button>
+      <div class="connect__device">
+        <label>Audio:
+          <select class="connect__select-device_audio">
+          </select>
+        </label><br>
+        <label>Video:
+          <select class="connect__select-device_video">
+          </select>
+        </label>
+      </div>
     </div>
 
     <div class="control" style="display: none">
-        <button class="control__mute_audio control__mute">Mute audio</button>
-        <button class="control__mute_video control__mute">Mute video</button>
+      <button class="control__mute_audio control__mute">Mute audio</button>
+      <button class="control__mute_video control__mute">Mute video</button>
     </div>
-</div>
+  </div>
 
 </body>
+
 </html>

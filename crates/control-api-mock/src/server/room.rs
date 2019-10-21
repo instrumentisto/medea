@@ -4,6 +4,7 @@ use std::collections::HashMap;
 
 use medea_control_api_proto::grpc::api::{
     Room as RoomProto, Room_Element as RoomElementProto,
+    Room_Element_oneof_el as RoomElementOneOfEl,
 };
 use serde::{Deserialize, Serialize};
 
@@ -14,6 +15,7 @@ use super::member::Member;
 pub struct Room {
     /// ID of `Room`.
     id: String,
+
     /// Pipeline of `Room`.
     pipeline: HashMap<String, RoomElement>,
 }
@@ -38,11 +40,10 @@ impl Into<RoomElementProto> for RoomElement {
 }
 
 impl From<RoomElementProto> for RoomElement {
-    fn from(mut proto: RoomElementProto) -> Self {
-        if proto.has_member() {
-            Self::Member(proto.take_member().into())
-        } else {
-            unimplemented!()
+    fn from(proto: RoomElementProto) -> Self {
+        match proto.el.unwrap() {
+            RoomElementOneOfEl::member(member) => Self::Member(member.into()),
+            _ => unimplemented!(),
         }
     }
 }
