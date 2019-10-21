@@ -133,7 +133,7 @@ fn signalling_starts_when_create_play_endpoint_after_pub_member() {
 
     let on_event = stop_on_peer_created();
 
-    let deadline = Some(Duration::from_secs(10));
+    let deadline = Some(Duration::from_secs(5));
     Arbiter::spawn(
         TestMember::connect(
             &insert_str!("ws://127.0.0.1:8080/ws/{}/publisher/test"),
