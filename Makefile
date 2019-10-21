@@ -134,6 +134,15 @@ down.dev:
 down.medea: docker.down.medea
 
 
+# Stop not dockerized Control API mock server.
+#
+# Usage:
+#   make down.control-api-mock
+
+down.control-api-mock:
+	kill -9 $(pidof control-api-mock)
+
+
 up.coturn: docker.up.coturn
 
 
@@ -885,6 +894,7 @@ endef
         	docker.up.webdriver docker.up.control-api-mock \
         docs docs.rust \
         down down.coturn down.demo down.dev down.medea \
+        down.control-api-mock \
         helm helm.down helm.init helm.lint helm.list \
         	helm.package helm.package.release helm.up \
         minikube.boot \

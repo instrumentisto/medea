@@ -1,4 +1,4 @@
-Medea's control API mock server
+Medea's Control API mock server
 ===============================
 
 This app supposed to be used for E2E tests and for debugging purposes of [Medea]'s [Control API].
