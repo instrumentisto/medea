@@ -218,7 +218,7 @@ impl Handler<StartStaticRooms> for RoomService {
     }
 }
 
-/// Type alias for `sids` field in dynamic Control API create response.
+/// Type alias for success [`CreateResponse`]'s sids.
 pub type Sids = HashMap<String, String>;
 
 /// Signal for creating new [`Room`].
