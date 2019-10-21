@@ -25,8 +25,6 @@ RUST_BETA_VER := 1.39-beta.5
 CHROME_VERSION := 77.0
 FIREFOX_VERSION := 69.0
 
-TAG := dev
-
 CURRENT_GIT_BRANCH := $(strip $(shell git branch | grep \* | cut -d ' ' -f2))
 
 crate-dir = .
