@@ -231,3 +231,26 @@ async fn handle_ice_candidates(
         }
     }
 }
+
+#[wasm_bindgen_test]
+async fn send_event_on_new_local_stream() {
+    let (tx, mut rx) = mpsc::unbounded();
+    let manager = Rc::new(MediaManager::default());
+    let (audio_track, video_track) = get_test_tracks();
+    let id = PeerId(1);
+    let peer =
+        PeerConnection::new(id, tx, vec![], manager, true, false).unwrap();
+    peer.get_offer(vec![audio_track, video_track], None)
+        .await
+        .unwrap();
+
+    while let Some(event) = rx.next().await {
+        match event {
+            PeerEvent::NewLocalStream { peer_id, .. } => {
+                assert_eq!(peer_id, id);
+                break;
+            }
+            _ => {}
+        }
+    }
+}

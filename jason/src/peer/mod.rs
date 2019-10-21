@@ -336,7 +336,7 @@ impl PeerConnection {
         }
         let results = future::join_all(futures).await;
         for res in results {
-            let _ = res?;
+            res?;
         }
         Ok(())
     }
