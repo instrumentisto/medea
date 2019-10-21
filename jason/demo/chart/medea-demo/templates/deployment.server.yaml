@@ -93,7 +93,6 @@ spec:
         - name: control-mock
           image: "{{ $controlApiMock.image.repository }}:{{ $controlApiMock.image.tag }}"
           imagePullPolicy: "{{ $controlApiMock.image.pullPolicy }}"
-          command: ["/control-api-mock"]
           args:
             - --addr=0.0.0.0:{{ $controlApiMock.conf.bind_port }}
             - --medea-addr=127.0.0.1:{{ .Values.server.conf.server.control.grpc.bind_port }}

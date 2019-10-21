@@ -175,7 +175,7 @@ control-mock:
     revision: ""
 
     annotations: {}
-    # kubernetes.io/change-cause=kubectl set ...
+      # kubernetes.io/change-cause=kubectl set ...
 
     affinity: {}
       # nodeAffinity:
@@ -183,21 +183,21 @@ control-mock:
       #     nodeSelectorTerms:
       #       - matchExpressions:
       #         - key: node-label-key
-    #           operator: In
-    #           values: ["node-label-value"]
+      #           operator: In
+      #           values: ["node-label-value"]
 
     tolerations: []
       # - key: "node.alpha.kubernetes.io/unreachable"
-    #   operator: "Exists"
-    #   effect: "NoExecute"
+      #   operator: "Exists"
+      #   effect: "NoExecute"
 
     resources: {}
       # limits:
       #   cpu: 100m
       #   memory: 128Mi
       # requests:
-    #   cpu: 100m
-    #   memory: 128Mi
+      #   cpu: 100m
+      #   memory: 128Mi
 
 
 ingress:

@@ -25,6 +25,8 @@ RUST_BETA_VER := 1.39-beta.5
 CHROME_VERSION := 77.0
 FIREFOX_VERSION := 69.0
 
+TAG := dev
+
 CURRENT_GIT_BRANCH := $(strip $(shell git branch | grep \* | cut -d ' ' -f2))
 
 crate-dir = .
@@ -682,12 +684,12 @@ endif
 # Run dockerized Medea Control API mock server.
 #
 # Usage:
-#   make docker.up.control-api-mock
+#   make docker.up.control-api-mock [TAG=(dev|<docker-tag>)]
 
 docker.up.control-api-mock:
 	docker run --rm -d --network=host \
 		--name medea-control-api-mock \
-		instrumentisto/medea-control-api-mock:dev
+		$(CONTROL_API_MOCK_IMAGE_NAME):$(TAG)
 
 
 
@@ -875,7 +877,7 @@ endef
 
 .PHONY: build build.jason build.medea \
         cargo cargo.build cargo.fmt cargo.gen cargo.lint \
-        docker.auth docker.build.demo docker.build.medea \
+        docker.auth docker.build.demo docker.build.medea docker.build.control-api-mock \
         	docker.down.coturn docker.down.demo docker.down.medea \
         	docker.down.webdriver docker.down.control-api-mock \
         	docker.pull docker.push \

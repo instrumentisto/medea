@@ -366,7 +366,6 @@ pub struct Validated;
 /// State which indicates that [`DeleteElements`] message is unvalidated and
 /// should be validated with `validate()` function of [`DeleteElements`] in
 /// [`Unvalidated`] state before sending to [`RoomService`].
-#[derive(Debug)]
 pub struct Unvalidated;
 
 // Clippy lint show use_self errors for DeleteElements with generic state. This
@@ -427,7 +426,7 @@ impl DeleteElements<Unvalidated> {
 /// message.
 ///
 /// [Control API]: https://tinyurl.com/yxsqplq7
-#[derive(Message, Default, Debug)]
+#[derive(Message, Default)]
 #[rtype(result = "Result<(), RoomServiceError>")]
 pub struct DeleteElements<T> {
     fids: Vec<StatefulFid>,

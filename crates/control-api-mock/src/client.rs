@@ -18,7 +18,7 @@ pub struct Uri(String);
 
 impl From<String> for Uri {
     fn from(path: String) -> Self {
-        Self(format!("{}", path))
+        Self(path)
     }
 }
 
