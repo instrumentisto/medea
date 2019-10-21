@@ -12,7 +12,7 @@ mod track;
 
 use std::{cell::RefCell, collections::HashMap, convert::TryFrom, rc::Rc};
 
-use futures::channel::mpsc;
+use futures::{channel::mpsc, future};
 use medea_client_api_proto::{
     Direction, IceServer, PeerId as Id, Track, TrackId,
 };
@@ -321,17 +321,23 @@ impl PeerConnection {
         self.peer.set_remote_description(desc).await?;
         *self.has_remote_description.borrow_mut() = true;
 
-        // TODO: do it concurrently?
-        for candidate in self.ice_candidates_buffer.borrow_mut().drain(..) {
-            self.peer
-                .add_ice_candidate(
+        let mut futures = Vec::new();
+        let mut candidates = self.ice_candidates_buffer.borrow_mut();
+        while let Some(candidate) = candidates.pop() {
+            let peer = Rc::clone(&self.peer);
+            futures.push(async move {
+                peer.add_ice_candidate(
                     &candidate.candidate,
                     candidate.sdp_m_line_index,
                     &candidate.sdp_mid,
                 )
-                .await?;
+                .await
+            });
         }
-
+        let results = future::join_all(futures).await;
+        for res in results {
+            let _ = res?;
+        }
         Ok(())
     }
 
