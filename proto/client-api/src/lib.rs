@@ -99,6 +99,43 @@ pub enum Command {
     },
 }
 
+/// Reason of disconnecting Web Client from Media Server.
+#[derive(Debug, Deserialize, Serialize)]
+pub enum CloseReason {
+    /// Client session was finished on a server side.
+    Finished,
+
+    /// Old connection was closed due to a client reconnection.
+    Reconnected,
+
+    /// Connection has been inactive for a while and thus considered idle
+    /// by a server.
+    Idle,
+
+    /// Establishing of connection with a server was rejected on server side.
+    ///
+    /// Most likely because of incorrect Member credentials.
+    Rejected,
+
+    /// Server internal error has occurred while connecting.
+    ///
+    /// This close reason is similar to 500 HTTP status code.
+    InternalError,
+
+    /// Client was evicted on the server side.
+    Evicted,
+}
+
+/// Description which is sent in [Close] WebSocket frame from Media Server
+/// to Web Client.
+///
+/// [Close]: https://tools.ietf.org/html/rfc6455#section-5.5.1
+#[derive(Constructor, Debug, Deserialize, Serialize)]
+pub struct CloseDescription {
+    /// Reason of why WebSocket connection has been closed.
+    pub reason: CloseReason,
+}
+
 /// WebSocket message from Medea to Jason.
 #[allow(dead_code)]
 #[dispatchable]
@@ -128,26 +165,6 @@ pub enum Event {
     /// Media Server notifies Web Client about necessity of RTCPeerConnection
     /// close.
     PeersRemoved { peer_ids: Vec<PeerId> },
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-/// Reason of disconnecting client from the server.
-pub enum RpcConnectionCloseReason {
-    /// `Room` in which client presented was closed.
-    RoomClosed,
-
-    /// Member deleted from `Room`.
-    Evicted,
-
-    /// Member reconnects and old connection was closed.
-    NewConnection,
-}
-
-/// Description which will be sent in Close WebSocket frame.
-#[derive(Constructor, Debug, Deserialize, Serialize)]
-pub struct CloseDescription {
-    /// Reason of why connection was closed.
-    pub reason: RpcConnectionCloseReason,
 }
 
 /// Represents [RTCIceCandidateInit][1] object.
@@ -343,8 +360,8 @@ mod test {
                 \"command\":\"MakeSdpOffer\",\
                 \"data\":{\
                     \"peer_id\":77,\
-	                \"sdp_offer\":\"offer\",\
-	                \"mids\":{\"0\":\"1\"}\
+                    \"sdp_offer\":\"offer\",\
+                    \"mids\":{\"0\":\"1\"}\
                 }\
             }";
 

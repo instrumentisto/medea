@@ -5,15 +5,14 @@ mod room;
 
 use std::{cell::RefCell, rc::Rc};
 
-use futures::future::Future;
-use js_sys::Promise;
 use wasm_bindgen::prelude::*;
-use wasm_bindgen_futures::future_to_promise;
 
+#[cfg(not(feature = "mockall"))]
+use crate::rpc::RpcClient as _;
 use crate::{
-    media::MediaManager,
+    media::{MediaManager, MediaManagerHandle},
     peer,
-    rpc::{RpcClient, WebsocketRpcClient},
+    rpc::WebsocketRpcClient,
     set_panic_hook,
 };
 
@@ -26,8 +25,6 @@ pub struct Jason(Rc<RefCell<Inner>>);
 
 #[derive(Default)]
 struct Inner {
-    // TODO: multiple RpcClient's if rooms managed by different servers
-    rpc: Option<Rc<dyn RpcClient>>,
     media_manager: Rc<MediaManager>,
     rooms: Vec<Room>,
 }
@@ -44,47 +41,30 @@ impl Jason {
         Self::default()
     }
 
-    /// Performs entering to a [`Room`] by the authorization `token`.
-    ///
-    /// Establishes connection with media server (if it doesn't already exist).
-    /// Fails if unable to connect to media server.
-    /// Effectively returns `Result<RoomHandle, WasmErr>`.
-    pub fn join_room(&self, token: String) -> Promise {
-        let mut rpc = WebsocketRpcClient::new(token, 3000);
-        let peer_repository =
-            peer::Repository::new(Rc::clone(&self.0.borrow().media_manager));
+    /// Returns [`RoomHandle`] for [`Room`] with the preconfigured authorization
+    /// `token` for connection with media server.
+    pub fn init_room(&self) -> RoomHandle {
+        let rpc = Rc::new(WebsocketRpcClient::new(3000));
+        let peer_repository = Box::new(peer::Repository::new(Rc::clone(
+            &self.0.borrow().media_manager,
+        )));
 
-        let inner = Rc::clone(&self.0);
-        let fut = rpc
-            .init()
-            .and_then(move |()| {
-                let rpc: Rc<dyn RpcClient> = Rc::new(rpc);
+        // Functional of closing `Room`s on WebSocket close.
+        // Not available in mockable tests because limitations of
+        // `mockall`.
+        #[cfg(not(feature = "mockall"))]
+        {
+            let inner_clone = self.0.clone();
+            rpc.on_close_by_server(Box::new(move |_| {
+                inner_clone.borrow_mut().rooms = Vec::new();
+                inner_clone.borrow_mut().media_manager = Rc::default();
+            }));
+        }
 
-                // Functional of closing `Room`s on WebSocket close.
-                // Not available in mockable tests because limitations of
-                // `mockall`.
-                #[cfg(not(feature = "mockall"))]
-                {
-                    let inner_clone = inner.clone();
-                    rpc.on_close_by_server(Box::new(move |_| {
-                        inner_clone.borrow_mut().rooms = Vec::new();
-                        inner_clone.borrow_mut().media_manager = Rc::default();
-                    }));
-                }
-
-                let room =
-                    Room::new(Rc::clone(&rpc), Box::new(peer_repository));
-
-                let handle = room.new_handle();
-
-                inner.borrow_mut().rpc.replace(rpc);
-                inner.borrow_mut().rooms.push(room);
-
-                Ok(JsValue::from(handle))
-            })
-            .map_err(JsValue::from);
-
-        future_to_promise(fut)
+        let room = Room::new(rpc, peer_repository);
+        let handle = room.new_handle();
+        self.0.borrow_mut().rooms.push(room);
+        handle
     }
 
     /// Sets `on_local_stream` callback, which will be invoked once media
@@ -93,6 +73,11 @@ impl Jason {
     /// [`WasmErr`](crate::utils::errors::WasmErr).
     pub fn on_local_stream(&self, f: js_sys::Function) {
         self.0.borrow_mut().media_manager.set_on_local_stream(f);
+    }
+
+    /// Returns handle to [`MediaManager`].
+    pub fn media_manager(&self) -> MediaManagerHandle {
+        self.0.borrow().media_manager.new_handle()
     }
 
     /// Drops [`Jason`] API object, so all related objects (rooms, connections,

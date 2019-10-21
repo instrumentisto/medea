@@ -4,7 +4,7 @@
 
 use std::{cell::RefCell, convert::TryFrom, rc::Rc};
 
-use futures::future::{Future, IntoFuture};
+use futures::{channel::oneshot, future};
 use macro_attr::*;
 use medea_client_api_proto::{ClientMsg, ServerMsg};
 use newtype_derive::NewtypeFrom;
@@ -88,54 +88,50 @@ impl InnerSocket {
 impl WebSocket {
     /// Initiates new WebSocket connection. Resolves only when underlying
     /// connection becomes active.
-    pub fn new(url: &str) -> impl Future<Item = Self, Error = WasmErr> {
-        let (tx_close, rx_close) = futures::oneshot();
-        let (tx_open, rx_open) = futures::oneshot();
+    pub async fn new(url: &str) -> Result<Self, WasmErr> {
+        let (tx_close, rx_close) = oneshot::channel();
+        let (tx_open, rx_open) = oneshot::channel();
 
-        InnerSocket::new(url)
-            .into_future()
-            .and_then(move |socket| {
-                let socket = Rc::new(RefCell::new(socket));
-                let mut socket_mut = socket.borrow_mut();
+        let inner = InnerSocket::new(url)?;
+        let socket = Rc::new(RefCell::new(inner));
 
-                let inner = Rc::clone(&socket);
-                socket_mut.on_close = Some(EventListener::new_once(
-                    Rc::clone(&socket_mut.socket),
-                    "close",
-                    move |_| {
-                        inner.borrow_mut().update_state();
-                        let _ = tx_close.send(());
-                    },
-                )?);
+        {
+            let mut socket_mut = socket.borrow_mut();
+            let inner = Rc::clone(&socket);
+            socket_mut.on_close = Some(EventListener::new_once(
+                Rc::clone(&socket_mut.socket),
+                "close",
+                move |_| {
+                    inner.borrow_mut().update_state();
+                    let _ = tx_close.send(());
+                },
+            )?);
 
-                let inner = Rc::clone(&socket);
-                socket_mut.on_open = Some(EventListener::new_once(
-                    Rc::clone(&socket_mut.socket),
-                    "open",
-                    move |_| {
-                        inner.borrow_mut().update_state();
-                        let _ = tx_open.send(());
-                    },
-                )?);
+            let inner = Rc::clone(&socket);
+            socket_mut.on_open = Some(EventListener::new_once(
+                Rc::clone(&socket_mut.socket),
+                "open",
+                move |_| {
+                    inner.borrow_mut().update_state();
+                    let _ = tx_open.send(());
+                },
+            )?);
+        }
 
-                drop(socket_mut);
-                Ok(Self(socket))
-            })
-            .and_then(move |socket| {
-                rx_open
-                    .then(move |_| {
-                        let mut socket_mut = socket.0.borrow_mut();
-                        socket_mut.on_open.take();
-                        socket_mut.on_close.take();
-                        drop(socket_mut);
-                        Ok(socket)
-                    })
-                    .select(rx_close.then(|_| {
-                        Err(WasmErr::from("Failed to init WebSocket"))
-                    }))
-                    .map(|(socket, _)| socket)
-                    .map_err(|(err, _)| err)
-            })
+        let state = future::select(rx_open, rx_close).await;
+
+        socket.borrow_mut().on_open.take();
+        socket.borrow_mut().on_close.take();
+
+        match state {
+            future::Either::Left((opened, _)) => match opened {
+                Ok(_) => Ok(Self(socket)),
+                Err(_) => Err(WasmErr::from("Failed to init WebSocket")),
+            },
+            future::Either::Right(_closed) => {
+                Err(WasmErr::from("Failed to init WebSocket"))
+            }
+        }
     }
 
     /// Set handler on receive message from server.

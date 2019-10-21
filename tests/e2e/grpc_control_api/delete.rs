@@ -9,7 +9,7 @@ use medea::api::control::error_codes::{
     ErrorCode as MedeaErrorCode, ErrorCode,
 };
 
-use crate::format_name_macro;
+use crate::gen_insert_str_macro;
 
 use super::{create_room_req, ControlClient};
 
@@ -22,8 +22,8 @@ use super::{create_room_req, ControlClient};
 ///
 /// `element_id`: `Element` ID which will be deleted from this `Room`,
 ///
-/// `error_code`: [`ErrorCode`] which should be returned from [ControlAPI] when
-/// we tries get deleted `Element`.
+/// `error_code`: [`ErrorCode`] which should be returned from [`ControlAPI`]
+/// when we tries get deleted `Element`.
 ///
 /// [Medea]: https://github.com/instrumentisto/medea
 /// [Control API]: https://tinyurl.com/yxsqplq7
@@ -35,7 +35,10 @@ fn test_for_delete(
 ) {
     let client = ControlClient::new();
     client.create(&create_room_req(room_id));
-    client.delete(&[element_id]);
+
+    client.try_get(element_id).unwrap();
+
+    client.delete(&[element_id]).unwrap();
 
     let get_room_err = match client.try_get(element_id) {
         Ok(_) => panic!("{} not deleted!", element_id),
@@ -46,36 +49,36 @@ fn test_for_delete(
 
 #[test]
 fn room() {
-    format_name_macro!("delete-room");
+    gen_insert_str_macro!("delete-room");
     test_for_delete(
-        &format_name!("{}"),
-        &format_name!("local://{}"),
+        &insert_str!("{}"),
+        &insert_str!("{}"),
         ErrorCode::RoomNotFound,
     );
 }
 
 #[test]
 fn member() {
-    format_name_macro!("delete-member");
+    gen_insert_str_macro!("delete-member");
     test_for_delete(
-        &format_name!("{}"),
-        &format_name!("local://{}/publisher"),
+        &insert_str!("{}"),
+        &insert_str!("{}/publisher"),
         ErrorCode::MemberNotFound,
     );
 }
 
 #[test]
 fn endpoint() {
-    format_name_macro!("delete-endpoint");
+    gen_insert_str_macro!("delete-endpoint");
     test_for_delete(
-        &format_name!("{}"),
-        &format_name!("local://{}/publisher/publish"),
+        &insert_str!("{}"),
+        &insert_str!("{}/publisher/publish"),
         ErrorCode::EndpointNotFound,
     );
 }
 
-/// Tests `Delete` method of [Control API] by trying to delete child `Element`
-/// from the also deleting parent `Element`.
+/// Tests that `Delete` method on parent element also deletes all nested
+/// elements.
 ///
 /// # Arguments
 ///
@@ -84,15 +87,15 @@ fn endpoint() {
 ///
 /// `elements_uris`: `Element`s IDs which will be deleted from this `Element`,
 ///
-/// `error_code`: [`ErrorCode`] which should be returned from [ControlAPI] when
-/// we tries get deleted `Element`,
+/// `error_code`: [`ErrorCode`] which should be returned from [`ControlAPI`]
+/// when we tries get deleted `Element`,
 ///
 /// `root_elem_uri`: URI to parent `Element`.
 ///
 /// [Medea]: https://github.com/instrumentisto/medea
 /// [Control API]: https://tinyurl.com/yxsqplq7
 /// [`ErrorCode`]: medea::api::control::error_codes::ErrorCode
-fn test_for_delete_elements_at_same_time_test(
+fn test_cascade_delete(
     room_id: &str,
     elements_uris: &[&str],
     code: MedeaErrorCode,
@@ -100,7 +103,7 @@ fn test_for_delete_elements_at_same_time_test(
 ) {
     let client = ControlClient::new();
     client.create(&create_room_req(room_id));
-    client.delete(elements_uris);
+    client.delete(elements_uris).unwrap();
 
     match client.try_get(root_elem_uri) {
         Ok(_) => panic!("Member not deleted!"),
@@ -111,32 +114,56 @@ fn test_for_delete_elements_at_same_time_test(
 }
 
 #[test]
-fn member_and_endpoint_same_time() {
-    format_name_macro!("member-and-endpoint-same-time");
+fn cascade_delete_endpoints_when_deleting_member() {
+    gen_insert_str_macro!("member-and-endpoint-same-time");
 
-    test_for_delete_elements_at_same_time_test(
-        &format_name!("{}"),
+    test_cascade_delete(
+        &insert_str!("{}"),
         &[
-            &format_name!("local://{}/publisher"),
-            &format_name!("local://{}/publisher/publish"),
+            &insert_str!("{}/publisher"),
+            &insert_str!("{}/publisher/publish"),
         ],
         MedeaErrorCode::MemberNotFound,
-        &format_name!("local://{}/publisher"),
+        &insert_str!("{}/publisher"),
     );
 }
 
 #[test]
-fn room_and_inner_elements_same_time() {
-    format_name_macro!("room-and-inner-elements-same-time");
+fn cascade_delete_everything_when_deleting_room() {
+    gen_insert_str_macro!("room-and-inner-elements-same-time");
 
-    test_for_delete_elements_at_same_time_test(
-        &format_name!("{}"),
+    test_cascade_delete(
+        &insert_str!("{}"),
         &[
-            &format_name!("local://{}"),
-            &format_name!("local://{}/publisher"),
-            &format_name!("local://{}/publisher/publish"),
+            &insert_str!("{}"),
+            &insert_str!("{}/publisher"),
+            &insert_str!("{}/publisher/publish"),
         ],
         MedeaErrorCode::RoomNotFound,
-        &format_name!("local://{}"),
+        &insert_str!("{}"),
     );
+}
+
+#[test]
+fn cant_delete_members_from_different_rooms_in_single_request() {
+    let client = ControlClient::new();
+
+    if let Err(err) = client.delete(&["room1/member1", "room2/member1"]) {
+        assert_eq!(err.code, MedeaErrorCode::ProvidedNotSameRoomIds as u32);
+    } else {
+        panic!("should err")
+    }
+}
+
+#[test]
+fn cant_delete_endpoints_from_different_rooms_in_single_request() {
+    let client = ControlClient::new();
+
+    if let Err(err) =
+        client.delete(&["room1/member1/endpoint1", "room2/member1/endpoint1"])
+    {
+        assert_eq!(err.code, MedeaErrorCode::ProvidedNotSameRoomIds as u32);
+    } else {
+        panic!("should err")
+    }
 }

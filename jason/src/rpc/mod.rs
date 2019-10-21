@@ -5,14 +5,10 @@ mod websocket;
 
 use std::{cell::RefCell, rc::Rc, vec};
 
-use futures::{
-    sync::mpsc::{unbounded, UnboundedSender},
-    Future, Stream,
-};
+use futures::{channel::mpsc, future::LocalBoxFuture, stream::LocalBoxStream};
 use js_sys::Date;
 use medea_client_api_proto::{
-    ClientMsg, CloseDescription, Command, Event, RpcConnectionCloseReason,
-    ServerMsg,
+    ClientMsg, CloseDescription, CloseReason, Command, Event, ServerMsg,
 };
 use web_sys::CloseEvent;
 
@@ -27,7 +23,7 @@ pub enum CloseMsg {
     ///
     /// Determines by close code `1000` and existence of
     /// [`RpcConnectionCloseReason`].
-    Normal(u16, RpcConnectionCloseReason),
+    Normal(u16, CloseReason),
     /// Connection was unexpectedly closed. Consider reconnecting.
     ///
     /// Unexpected close determines by close code != `1000` and for close code
@@ -54,11 +50,20 @@ impl From<&CloseEvent> for CloseMsg {
     }
 }
 
+// TODO: consider using async-trait crate, it doesnt work with mockall atm
 /// Client to talk with server via Client API RPC.
 #[allow(clippy::module_name_repetitions)]
 pub trait RpcClient {
+    // atm Establish connection with RPC server.
+    fn connect(
+        &self,
+        token: String,
+    ) -> LocalBoxFuture<'static, Result<(), WasmErr>>;
+
     /// Returns [`Stream`] of all [`Event`]s received by this [`RpcClient`].
-    fn subscribe(&self) -> Box<dyn Stream<Item = Event, Error = ()>>;
+    ///
+    /// [`Stream`]: futures::Stream
+    fn subscribe(&self) -> LocalBoxStream<'static, Event>;
 
     /// Unsubscribes from this [`RpcClient`]. Drops all subscriptions atm.
     fn unsub(&self);
@@ -87,8 +92,13 @@ mockall::mock! {
     pub RpcClient {}
 
     pub trait RpcClient {
+        fn connect(
+        &self,
+        token: String,
+        ) -> LocalBoxFuture<'static, Result<(), WasmErr>>;
+
         /// Returns [`Stream`] of all [`Event`]s received by this [`RpcClient`].
-        fn subscribe(&self) -> Box<dyn Stream<Item = Event, Error = ()>>;
+        fn subscribe(&self) -> LocalBoxStream<'static, Event>;
 
         /// Unsubscribes from this [`RpcClient`]. Drops all subscriptions atm.
         fn unsub(&self);
@@ -110,13 +120,10 @@ struct Inner {
     /// WebSocket connection to remote media server.
     sock: Option<Rc<WebSocket>>,
 
-    /// Credentials used to authorize connection.
-    token: String,
-
     heartbeat: Heartbeat,
 
     /// Event's subscribers list.
-    subs: Vec<UnboundedSender<Event>>,
+    subs: Vec<mpsc::UnboundedSender<Event>>,
 
     /// Closure which will be called when WebSocket connection normally closed
     /// by server.
@@ -133,11 +140,10 @@ struct Inner {
 }
 
 impl Inner {
-    fn new(token: String, heartbeat_interval: i32) -> Rc<RefCell<Self>> {
+    fn new(heartbeat_interval: i32) -> Rc<RefCell<Self>> {
         Rc::new(RefCell::new(Self {
             sock: None,
             on_close_by_server: Rc::new(Box::new(|_| {})),
-            token,
             subs: vec![],
             heartbeat: Heartbeat::new(heartbeat_interval),
         }))
@@ -157,14 +163,13 @@ fn on_close(inner_rc: &RefCell<Inner>, close_msg: &CloseMsg) {
 
     if let CloseMsg::Normal(_, reason) = &close_msg {
         match reason {
-            RpcConnectionCloseReason::Evicted
-            | RpcConnectionCloseReason::RoomClosed => {
+            // This is reconnecting and this is not considered as connection
+            // close.
+            CloseReason::Reconnected => {}
+            _ => {
                 let f = Rc::clone(&inner_rc.borrow().on_close_by_server);
                 (f)(&close_msg);
             }
-            // This is reconnecting and this is not considered as connection
-            // close.
-            RpcConnectionCloseReason::NewConnection => {}
         }
     }
 
@@ -202,53 +207,59 @@ fn on_message(inner_rc: &RefCell<Inner>, msg: Result<ServerMsg, WasmErr>) {
 }
 
 impl WebsocketRpcClient {
-    pub fn new(token: String, ping_interval: i32) -> Self {
-        Self(Inner::new(token, ping_interval))
-    }
-
-    /// Creates new WebSocket connection to remote media server.
-    /// Starts `Heartbeat` if connection succeeds and binds handlers
-    /// on receiving messages from server and closing socket.
-    pub fn init(&mut self) -> impl Future<Item = (), Error = WasmErr> {
-        let inner = Rc::clone(&self.0);
-        WebSocket::new(&self.0.borrow().token).and_then(
-            move |socket: WebSocket| {
-                let socket = Rc::new(socket);
-
-                inner.borrow_mut().heartbeat.start(Rc::clone(&socket))?;
-
-                let inner_rc = Rc::clone(&inner);
-                socket.on_message(move |msg: Result<ServerMsg, WasmErr>| {
-                    on_message(&inner_rc, msg)
-                })?;
-
-                let inner_rc = Rc::clone(&inner);
-                socket
-                    .on_close(move |msg: CloseMsg| on_close(&inner_rc, &msg))?;
-
-                inner.borrow_mut().sock.replace(socket);
-                Ok(())
-            },
-        )
+    pub fn new(ping_interval: i32) -> Self {
+        Self(Inner::new(ping_interval))
     }
 }
 
 impl RpcClient for WebsocketRpcClient {
-    // TODO: proper sub registry
-    fn subscribe(&self) -> Box<dyn Stream<Item = Event, Error = ()>> {
-        let (tx, rx) = unbounded();
-        self.0.borrow_mut().subs.push(tx);
-        Box::new(rx)
+    /// Creates new WebSocket connection to remote media server.
+    /// Starts `Heartbeat` if connection succeeds and binds handlers
+    /// on receiving messages from server and closing socket.
+    fn connect(
+        &self,
+        token: String,
+    ) -> LocalBoxFuture<'static, Result<(), WasmErr>> {
+        let inner = Rc::clone(&self.0);
+        Box::pin(async move {
+            let socket = Rc::new(WebSocket::new(&token).await?);
+            inner.borrow_mut().heartbeat.start(Rc::clone(&socket))?;
+
+            let inner_rc = Rc::clone(&inner);
+            socket.on_message(move |msg: Result<ServerMsg, WasmErr>| {
+                on_message(&inner_rc, msg)
+            })?;
+
+            let inner_rc = Rc::clone(&inner);
+            socket.on_close(move |msg: CloseMsg| on_close(&inner_rc, &msg))?;
+
+            inner.borrow_mut().sock.replace(socket);
+            Ok(())
+        })
     }
 
+    /// Returns [`Stream`] of all [`Event`]s received by this [`RpcClient`].
+    ///
+    /// [`Stream`]: futures::Stream
+    // TODO: proper sub registry
+    fn subscribe(&self) -> LocalBoxStream<'static, Event> {
+        let (tx, rx) = mpsc::unbounded();
+        self.0.borrow_mut().subs.push(tx);
+
+        Box::pin(rx)
+    }
+
+    /// Unsubscribes from this [`RpcClient`]. Drops all subscriptions atm.
     // TODO: proper sub registry
     fn unsub(&self) {
         self.0.borrow_mut().subs.clear();
     }
 
+    /// Sends [`Command`] to RPC server.
     // TODO: proper sub registry
     fn send_command(&self, command: Command) {
         let socket_borrow = &self.0.borrow().sock;
+
         // TODO: no socket? we dont really want this method to return err
         if let Some(socket) = socket_borrow.as_ref() {
             socket.send(&ClientMsg::Command(command)).unwrap();

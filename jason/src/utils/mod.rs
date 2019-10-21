@@ -4,6 +4,8 @@ mod callback;
 mod errors;
 mod event_listener;
 
+use js_sys::Reflect;
+use wasm_bindgen::prelude::*;
 use web_sys::Window;
 
 #[doc(inline)]
@@ -47,4 +49,30 @@ macro_rules! map_weak {
             })
             .map($closure)
     }};
+}
+
+/// Copies any JS object.
+/// Basically, creates new reference to an object owned by JS.
+pub fn copy_js_ref<
+    T: AsRef<wasm_bindgen::JsValue> + From<wasm_bindgen::JsValue>,
+>(
+    value: &T,
+) -> T {
+    T::from(value.as_ref().clone())
+}
+
+/// Returns property of JS object by name if its defined.
+/// Converts the value with a given predicate.
+pub fn get_property_by_name<T, F, U>(
+    value: &T,
+    name: &str,
+    into: F,
+) -> Option<U>
+where
+    T: AsRef<wasm_bindgen::JsValue>,
+    F: Fn(wasm_bindgen::JsValue) -> Option<U>,
+{
+    Reflect::get(value.as_ref(), &JsValue::from_str(name))
+        .ok()
+        .map_or_else(|| None, into)
 }

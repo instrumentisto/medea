@@ -1,11 +1,13 @@
 use std::{collections::HashMap, rc::Rc};
 
-use futures::sync::mpsc::UnboundedSender;
+use futures::channel::mpsc;
 use medea_client_api_proto::{IceServer, PeerId};
 
-use crate::{media::MediaManager, utils::WasmErr};
-
-use super::{PeerConnection, PeerEvent};
+use crate::{
+    media::MediaManager,
+    peer::{PeerConnection, PeerEvent},
+    utils::WasmErr,
+};
 
 /// [`PeerConnection`] factory and repository.
 #[allow(clippy::module_name_repetitions)]
@@ -19,7 +21,7 @@ pub trait PeerRepository {
         &mut self,
         id: PeerId,
         ice_servers: Vec<IceServer>,
-        events_sender: UnboundedSender<PeerEvent>,
+        events_sender: mpsc::UnboundedSender<PeerEvent>,
         enabled_audio: bool,
         enabled_video: bool,
     ) -> Result<Rc<PeerConnection>, WasmErr>;
@@ -44,6 +46,7 @@ pub struct Repository {
 }
 
 impl Repository {
+    #[inline]
     pub fn new(media_manager: Rc<MediaManager>) -> Self {
         Self {
             media_manager,
@@ -59,7 +62,7 @@ impl PeerRepository for Repository {
         &mut self,
         id: PeerId,
         ice_servers: Vec<IceServer>,
-        peer_events_sender: UnboundedSender<PeerEvent>,
+        peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
         enabled_audio: bool,
         enabled_video: bool,
     ) -> Result<Rc<PeerConnection>, WasmErr> {
