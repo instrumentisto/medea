@@ -2,6 +2,7 @@
 
 use std::{borrow::ToOwned, cell::RefCell, collections::HashMap, rc::Rc};
 
+use futures::future;
 use medea_client_api_proto::{Direction, MediaType, PeerId, Track, TrackId};
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
@@ -187,12 +188,18 @@ impl MediaConnections {
         stream.toggle_audio_tracks(s.enabled_audio);
         stream.toggle_video_tracks(s.enabled_video);
 
-        // TODO: do it concurrently?
+        let mut futures = Vec::new();
         for sender in s.senders.values() {
             if let Some(track) = stream.get_track_by_id(sender.track_id) {
-                Sender::insert_and_enable_track(Rc::clone(sender), track)
-                    .await?
+                futures.push(async move {
+                    Sender::insert_and_enable_track(Rc::clone(sender), track)
+                        .await
+                })
             }
+        }
+        let results = future::join_all(futures).await;
+        for res in results {
+            let _ = res?;
         }
 
         Ok(())
