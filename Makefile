@@ -144,7 +144,7 @@ up.demo: docker.up.demo
 #	make up.dev
 
 up.dev: up.coturn
-	$(MAKE) -j3 up.jason docker.up.medea up.control-api-mock
+	$(MAKE) -j3 up.jason docker.up.medea docker.up.control-api-mock
 
 
 up.medea: docker.up.medea
@@ -552,6 +552,15 @@ docker.down.webdriver:
 	-docker stop medea-webdriver-$(if $(call eq,$(browser),),chrome,$(browser))
 
 
+# Stop dockerized Control API mock server and remove all related containers.
+#
+# Usage:
+#   make docker.down.control-api-mock
+
+docker.down.control-api-mock:
+	-docker stop medea-control-api-mock
+
+
 # Pull project Docker images from Container Registry.
 #
 # Usage:
@@ -668,6 +677,17 @@ else
 		--name medea-webdriver-chrome \
 		selenoid/chrome:$(CHROME_VERSION)
 endif
+
+
+# Run dockerized Medea Control API mock server.
+#
+# Usage:
+#   make docker.up.control-api-mock
+
+docker.up.control-api-mock:
+	docker run --rm -d --network=host \
+		--name medea-control-api-mock \
+		instrumentisto/medea-control-api-mock:dev
 
 
 
@@ -857,10 +877,10 @@ endef
         cargo cargo.build cargo.fmt cargo.gen cargo.lint \
         docker.auth docker.build.demo docker.build.medea \
         	docker.down.coturn docker.down.demo docker.down.medea \
-        	docker.down.webdriver \
+        	docker.down.webdriver docker.down.control-api-mock \
         	docker.pull docker.push \
         	docker.up.coturn docker.up.demo docker.up.medea \
-        	docker.up.webdriver \
+        	docker.up.webdriver docker.up.control-api-mock \
         docs docs.rust \
         down down.coturn down.demo down.dev down.medea \
         helm helm.down helm.init helm.lint helm.list \
