@@ -3,7 +3,6 @@
 mod api;
 mod media;
 mod peer;
-mod utils;
 
 use futures::channel::oneshot;
 use medea_client_api_proto::{

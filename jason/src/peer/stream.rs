@@ -7,8 +7,6 @@ use std::{collections::HashMap, rc::Rc};
 use medea_client_api_proto::{MediaType, TrackId};
 use web_sys::MediaStream as SysMediaStream;
 
-use crate::utils::copy_js_ref;
-
 use super::MediaTrack;
 
 /// Actual data of a [`MediaStream`].
@@ -111,6 +109,6 @@ impl MediaStream {
     ///
     /// [1]: https://www.w3.org/TR/mediacapture-streams/#mediastream
     pub fn stream(&self) -> SysMediaStream {
-        copy_js_ref(&self.0.stream)
+        Clone::clone(&self.0.stream)
     }
 }

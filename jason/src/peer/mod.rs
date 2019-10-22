@@ -265,7 +265,9 @@ impl PeerConnection {
 
     /// Insert provided [MediaStream][1] into underlying [RTCPeerConnection][2]
     /// if it has all required tracks.
-    /// Request local stream from [`MediaManager`] if local stream not provided.
+    /// Requests local stream from [`MediaManager`] if no stream was provided.
+    /// Will produce [`PeerEvent::NewLocalStream`] if new stream was received
+    /// from [`MediaManager`].
     ///
     /// [1]: https://www.w3.org/TR/mediacapture-streams/#mediastream
     /// [2]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface

@@ -1,6 +1,6 @@
 use std::{cell::RefCell, rc::Rc};
 
-use medea_client_api_proto::IceServer;
+use medea_client_api_proto::{IceServer, MediaType};
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
     RtcConfiguration, RtcIceCandidateInit,
@@ -31,6 +31,15 @@ pub struct IceCandidate {
 pub enum TransceiverKind {
     Audio,
     Video,
+}
+
+impl From<&MediaType> for TransceiverKind {
+    fn from(media_type: &MediaType) -> Self {
+        match media_type {
+            MediaType::Audio(_) => Self::Audio,
+            MediaType::Video(_) => Self::Video,
+        }
+    }
 }
 
 impl TransceiverKind {

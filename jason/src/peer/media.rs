@@ -176,12 +176,19 @@ impl MediaConnections {
     ) -> Result<(), WasmErr> {
         let s = self.0.borrow();
 
-        // Check that provided stream have all tracks that we need.
+        // Build sender to track pairs to catch errors before inserting.
+        let mut sender_and_track = Vec::new();
         for sender in s.senders.values() {
-            if !stream.has_track(sender.track_id) {
-                return Err(WasmErr::from(
-                    "Stream does not have all necessary tracks",
-                ));
+            match stream.get_track_by_id(sender.track_id) {
+                Some(track) => {
+                    //                    sender.caps.
+                    sender_and_track.push((sender, track));
+                }
+                None => {
+                    return Err(WasmErr::from(
+                        "Stream does not have all necessary tracks",
+                    ))
+                }
             }
         }
 
@@ -189,13 +196,9 @@ impl MediaConnections {
         stream.toggle_video_tracks(s.enabled_video);
 
         let mut futures = Vec::new();
-        for sender in s.senders.values() {
-            if let Some(track) = stream.get_track_by_id(sender.track_id) {
-                futures.push(Sender::insert_and_enable_track(
-                    Rc::clone(sender),
-                    track,
-                ))
-            }
+        for (sender, track) in sender_and_track {
+            futures
+                .push(Sender::insert_and_enable_track(Rc::clone(sender), track))
         }
         for res in future::join_all(futures).await {
             res?;
@@ -292,10 +295,7 @@ impl Sender {
         peer: &RtcPeerConnection,
         mid: Option<String>,
     ) -> Result<Rc<Self>, WasmErr> {
-        let kind = match caps {
-            MediaType::Audio(_) => TransceiverKind::Audio,
-            MediaType::Video(_) => TransceiverKind::Video,
-        };
+        let kind = TransceiverKind::from(&caps);
         let transceiver = match mid {
             None => peer.add_transceiver(kind, TransceiverDirection::Sendonly),
             Some(mid) => {
@@ -317,14 +317,13 @@ impl Sender {
 
     /// Returns kind of [`RtcRtpTransceiver`] this [`Sender`].
     fn kind(&self) -> TransceiverKind {
-        match self.caps {
-            MediaType::Audio(_) => TransceiverKind::Audio,
-            MediaType::Video(_) => TransceiverKind::Video,
-        }
+        TransceiverKind::from(&self.caps)
     }
 
     /// Inserts provided [`MediaTrack`] into provided [`Sender`]s transceiver
     /// and enables transceivers sender by changing its direction to `sendonly`.
+    ///
+    /// [1]: https://www.w3.org/TR/webrtc/#dom-rtcrtpsender-replacetrack
     async fn insert_and_enable_track(
         sender: Rc<Self>,
         track: Rc<MediaTrack>,
@@ -391,10 +390,7 @@ impl Receiver {
         peer: &RtcPeerConnection,
         mid: Option<String>,
     ) -> Self {
-        let kind = match caps {
-            MediaType::Audio(_) => TransceiverKind::Audio,
-            MediaType::Video(_) => TransceiverKind::Video,
-        };
+        let kind = TransceiverKind::from(&caps);
         let transceiver = match mid {
             None => {
                 Some(peer.add_transceiver(kind, TransceiverDirection::Recvonly))

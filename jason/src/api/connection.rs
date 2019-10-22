@@ -61,7 +61,7 @@ impl Connection {
     }
 
     /// Invoke `on_remote_stream` [`Connection`]'s callback
-    /// for a given [MediaStream] received from a related remote [`Member`].
+    /// for a given [`MediaStream`] received from a related remote [`Member`].
     #[inline]
     pub(crate) fn on_remote_stream(&self, stream: SysMediaStream) {
         self.0.borrow().on_remote_stream.call(stream);
