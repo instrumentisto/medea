@@ -20,7 +20,7 @@ use web_sys::MediaStream as SysMediaStream;
 use crate::{
     peer::{MediaStream, PeerEvent, PeerEventHandler, PeerRepository},
     rpc::RpcClient,
-    utils::{Callback, WasmErr},
+    utils::{copy_js_ref, Callback, WasmErr},
 };
 
 use super::{connection::Connection, ConnectionHandle};
@@ -276,7 +276,7 @@ impl InnerRoom {
     /// store its for inject into new [`PeerConnection`].
     fn inject_local_stream(&mut self, stream: SysMediaStream) {
         let peers = self.peers.get_all();
-        let injected_stream = Rc::new(stream.clone());
+        let injected_stream = copy_js_ref(&stream);
         spawn_local(async move {
             for peer in peers {
                 if let Err(err) =
@@ -445,8 +445,8 @@ impl PeerEventHandler for InnerRoom {
     }
 
     /// Invoke `on_local_stream` [`Room`]'s callback.
-    fn on_new_local_stream(&mut self, _: PeerId, local_stream: MediaStream) {
-        self.on_local_stream.call(local_stream.stream());
+    fn on_new_local_stream(&mut self, _: PeerId, stream: MediaStream) {
+        self.on_local_stream.call(stream.stream());
     }
 }
 
