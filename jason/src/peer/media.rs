@@ -191,14 +191,13 @@ impl MediaConnections {
         let mut futures = Vec::new();
         for sender in s.senders.values() {
             if let Some(track) = stream.get_track_by_id(sender.track_id) {
-                futures.push(async move {
-                    Sender::insert_and_enable_track(Rc::clone(sender), track)
-                        .await
-                })
+                futures.push(Sender::insert_and_enable_track(
+                    Rc::clone(sender),
+                    track,
+                ))
             }
         }
-        let results = future::join_all(futures).await;
-        for res in results {
+        for res in future::join_all(futures).await {
             res?;
         }
 

@@ -34,7 +34,7 @@ All user visible changes to this project will be documented in this file. This p
         - Room initialization ([#46]):
             - `Jason.init_room()`;
             - `Room.join()`;
-        - Inject local video/audio into `Room` via `Room.inject_local_stream()` ([#46](/../../pull/46)). 
+        - Inject local video/audio into `Room` via `Room.inject_local_stream()` ([#54](/../../pull/54)). 
 
 ### Fixed
 

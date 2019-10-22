@@ -68,13 +68,13 @@ async function init(){
       }
     });
 
-    audio_select.change(function () {
-      const stream = getStream(local_video, audio_select, video_select);
+    audio_select.change(async function () {
+      const stream = await getStream(local_video, audio_select, video_select);
       room.inject_local_stream(stream);
     });
 
-    video_select.change(function () {
-      const stream = getStream(local_video, audio_select, video_select);
+    video_select.change(async function () {
+      const stream = await getStream(local_video, audio_select, video_select);
       room.inject_local_stream(stream);
     });
 
