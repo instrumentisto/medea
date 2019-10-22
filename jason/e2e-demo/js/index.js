@@ -1,4 +1,5 @@
 const controlUrl = "http://127.0.0.1:8000/control-api/";
+const baseUrl = 'ws://127.0.0.1:8080/ws/';
 
 let roomId = window.location.hash.replace("#", "");
 
@@ -215,6 +216,7 @@ const controlDebugWindows = {
 window.onload = async function() {
   let rust = await import("../../pkg");
   let jason = new rust.Jason();
+  console.log(baseUrl);
 
   Object.values(controlDebugWindows).forEach(s => s());
 
@@ -341,6 +343,7 @@ window.onload = async function() {
           console.log("Member not found. Creating new member...");
           room.join(await createMember(roomId, username));
         }
+        room.join(baseUrl + roomId + '/' + username + '/test')
       };
     };
 
