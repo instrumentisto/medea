@@ -384,7 +384,7 @@ ifeq ($(up),yes)
 	env $(test-e2e-env) \
 	make docker.up.medea debug=$(debug) background=yes log=$(log) \
 	                     dockerized=$(dockerized) \
-	                     TAG=$(TAG) registry=$(registry)
+	                     TAG=$(if $(call eq,$(TAG),),dev,$(TAG)) registry=$(registry)
 	sleep $(if $(call eq,$(wait),),5,$(wait))
 endif
 	RUST_BACKTRACE=1 cargo test --test e2e
@@ -696,7 +696,7 @@ endif
 docker.up.control-api-mock:
 	docker run --rm -d --network=host \
 		--name medea-control-api-mock \
-		$(CONTROL_API_MOCK_IMAGE_NAME):$(TAG)
+		$(CONTROL_API_MOCK_IMAGE_NAME):$(if $(call eq,$(TAG),),dev,$(TAG))
 
 
 
