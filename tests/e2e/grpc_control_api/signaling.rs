@@ -134,6 +134,8 @@ fn signalling_starts_when_create_play_endpoint_after_pub_member() {
     let on_event = stop_on_peer_created();
 
     let deadline = Some(Duration::from_secs(5));
+    use medea::hashmap;
+
     Arbiter::spawn(
         TestMember::connect(
             &insert_str!("ws://127.0.0.1:8080/ws/{}/publisher/test"),
@@ -141,22 +143,24 @@ fn signalling_starts_when_create_play_endpoint_after_pub_member() {
             deadline,
         )
         .and_then(move |_| {
+            let create_play = super::Endpoint::WebRtcPlayElement(
+                WebRtcPlayEndpointBuilder::default()
+                    .id("play")
+                    .src(insert_str!("local://{}/publisher/publish"))
+                    .build()
+                    .unwrap(),
+            );
+
             let create_second_member = MemberBuilder::default()
                 .id("responder")
                 .credentials("qwerty")
+                .endpoints(hashmap! {
+                    "play".to_string() => create_play,
+                })
                 .build()
                 .unwrap()
                 .build_request(insert_str!("{}"));
             control_client.create(&create_second_member);
-
-            let create_play = WebRtcPlayEndpointBuilder::default()
-                .id("play")
-                .src(insert_str!("local://{}/publisher/publish"))
-                .build()
-                .unwrap()
-                .build_request(insert_str!("{}/responder"));
-
-            control_client.create(&create_play);
 
             TestMember::connect(
                 &insert_str!("ws://127.0.0.1:8080/ws/{}/responder/qwerty"),
