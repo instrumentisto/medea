@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use super::member::Member;
 
 /// Control API's `Room` representation.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct Room {
     /// ID of `Room`.
     id: String,
@@ -22,7 +22,7 @@ pub struct Room {
 
 /// Element of [`Room`]'s pipeline.
 #[allow(clippy::module_name_repetitions)]
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(tag = "kind")]
 pub enum RoomElement {
     Member(Member),

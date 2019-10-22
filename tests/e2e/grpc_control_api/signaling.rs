@@ -6,6 +6,7 @@ use std::{cell::Cell, rc::Rc, time::Duration};
 
 use actix::{Arbiter, AsyncContext, Context, System};
 use futures::future::Future as _;
+use medea::hashmap;
 use medea_client_api_proto::Event;
 use medea_control_api_proto::grpc::api::WebRtcPublishEndpoint_P2P;
 
@@ -134,7 +135,6 @@ fn signalling_starts_when_create_play_endpoint_after_pub_member() {
     let on_event = stop_on_peer_created();
 
     let deadline = Some(Duration::from_secs(5));
-    use medea::hashmap;
 
     Arbiter::spawn(
         TestMember::connect(
@@ -143,19 +143,20 @@ fn signalling_starts_when_create_play_endpoint_after_pub_member() {
             deadline,
         )
         .and_then(move |_| {
-            let create_play = super::Endpoint::WebRtcPlayElement(
-                WebRtcPlayEndpointBuilder::default()
-                    .id("play")
-                    .src(insert_str!("local://{}/publisher/publish"))
-                    .build()
-                    .unwrap(),
-            );
+            let second_member_play_endpoint =
+                super::Endpoint::WebRtcPlayElement(
+                    WebRtcPlayEndpointBuilder::default()
+                        .id("play")
+                        .src(insert_str!("local://{}/publisher/publish"))
+                        .build()
+                        .unwrap(),
+                );
 
             let create_second_member = MemberBuilder::default()
                 .id("responder")
                 .credentials("qwerty")
                 .endpoints(hashmap! {
-                    "play".to_string() => create_play,
+                    "play".to_string() => second_member_play_endpoint,
                 })
                 .build()
                 .unwrap()

@@ -10,7 +10,7 @@ use medea_control_api_proto::grpc::api::{
 use serde::{Deserialize, Serialize};
 
 /// P2p mode of [`WebRtcPublishEndpoint`].
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Debug, Deserialize, Serialize)]
 pub enum P2pMode {
     Always,
     Never,
@@ -39,7 +39,7 @@ impl From<P2pModeProto> for P2pMode {
 
 /// Control API's `WebRtcPublishEndpoint` representation.
 #[allow(clippy::module_name_repetitions)]
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct WebRtcPublishEndpoint {
     /// ID of `WebRtcPublishEndpoint`.
     id: String,
@@ -68,7 +68,7 @@ impl From<WebRtcPublishEndpointProto> for WebRtcPublishEndpoint {
 
 /// Control API's `WebRtcPlayEndpoint` element representation.
 #[allow(clippy::module_name_repetitions)]
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct WebRtcPlayEndpoint {
     /// ID of `WebRtcPlayEndpoint`.
     id: String,
@@ -97,7 +97,7 @@ impl From<WebRtcPlayEndpointProto> for WebRtcPlayEndpoint {
 }
 
 /// `Endpoint` element representation.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(tag = "kind")]
 pub enum Endpoint {
     WebRtcPublishEndpoint(WebRtcPublishEndpoint),

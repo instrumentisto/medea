@@ -173,7 +173,7 @@ impl Into<ErrorResponse> for ErrorProto {
     }
 }
 
-/// Response which return sids.
+/// Response which returns sids.
 ///
 /// Used for create methods.
 #[derive(Debug, Serialize)]
@@ -296,8 +296,8 @@ impl Into<RoomElementProto> for Element {
     }
 }
 
-/// Response on request for get single `Element`s.
-#[derive(Serialize, Debug)]
+/// Response on request for get `Element` request.
+#[derive(Debug, Serialize)]
 pub struct SingleGetResponse {
     /// Requested element.
     #[serde(skip_serializing_if = "Option::is_none")]
