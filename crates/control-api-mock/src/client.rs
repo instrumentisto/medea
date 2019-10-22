@@ -12,35 +12,35 @@ use protobuf::RepeatedField;
 
 use crate::server::Element;
 
-/// Uri to `Room` element.
+/// Fid to `Room` element.
 #[derive(Clone, Debug)]
-pub struct Uri(String);
+pub struct Fid(String);
 
-impl From<String> for Uri {
+impl From<String> for Fid {
     fn from(path: String) -> Self {
         Self(path)
     }
 }
 
-impl From<(String, String)> for Uri {
+impl From<(String, String)> for Fid {
     fn from(path: (String, String)) -> Self {
         Self(format!("{}/{}", path.0, path.1))
     }
 }
 
-impl From<(String, String, String)> for Uri {
+impl From<(String, String, String)> for Fid {
     fn from(path: (String, String, String)) -> Self {
         Self(format!("{}/{}/{}", path.0, path.1, path.2))
     }
 }
 
-impl From<()> for Uri {
+impl From<()> for Fid {
     fn from(_: ()) -> Self {
         Self(String::new())
     }
 }
 
-impl Into<String> for Uri {
+impl Into<String> for Fid {
     fn into(self) -> String {
         self.0
     }
@@ -76,11 +76,11 @@ impl ControlClient {
     /// Creates provided element with gRPC Control API.
     pub fn create(
         &self,
-        uri: Uri,
+        fid: Fid,
         element: Element,
     ) -> impl Future<Item = CreateResponse, Error = Error> {
         let mut req = CreateRequest::new();
-        req.set_parent_fid(uri.into());
+        req.set_parent_fid(fid.into());
         match element {
             Element::Room(room) => {
                 req.set_room(room.into());
@@ -102,12 +102,12 @@ impl ControlClient {
             .and_then(|r| r)
     }
 
-    /// Gets element from Control API by local URI.
+    /// Gets element from Control API by Fid.
     pub fn get(
         &self,
-        uri: Uri,
+        fid: Fid,
     ) -> impl Future<Item = GetResponse, Error = Error> {
-        let req = id_request(vec![uri.into()]);
+        let req = id_request(vec![fid.into()]);
 
         self.grpc_client
             .get_async(&req)
@@ -118,9 +118,9 @@ impl ControlClient {
     /// Deletes element.
     pub fn delete(
         &self,
-        uri: Uri,
+        fid: Fid,
     ) -> impl Future<Item = Response, Error = Error> {
-        let req = id_request(vec![uri.into()]);
+        let req = id_request(vec![fid.into()]);
 
         self.grpc_client
             .delete_async(&req)

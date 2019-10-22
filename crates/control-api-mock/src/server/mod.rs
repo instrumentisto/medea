@@ -24,7 +24,7 @@ use medea_control_api_proto::grpc::api::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    client::{ControlClient, Uri},
+    client::{ControlClient, Fid},
     prelude::*,
 };
 
@@ -137,7 +137,7 @@ mod create {
             ) -> impl Future<Item = HttpResponse, Error = ()> {
                 state
                     .client
-                    .create(Uri::from(path.into_inner()), data.0)
+                    .create(Fid::from(path.into_inner()), data.0)
                     .map_err(|e| error!("{:?}", e))
                     .map(|r| CreateResponse::from(r).into())
             }
