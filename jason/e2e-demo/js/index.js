@@ -335,6 +335,7 @@ window.onload = async function() {
           if (e.response.status === 400) {
             console.log("Room not found. Creating new room...");
             room.join(await createRoom(roomId, username));
+            return;
           }
         }
         try {
@@ -342,6 +343,7 @@ window.onload = async function() {
         } catch (e) {
           console.log("Member not found. Creating new member...");
           room.join(await createMember(roomId, username));
+          return;
         }
         room.join(baseUrl + roomId + '/' + username + '/test')
       };
