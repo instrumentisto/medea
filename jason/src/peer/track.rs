@@ -4,8 +4,10 @@
 
 use std::rc::Rc;
 
-use medea_client_api_proto::{MediaType, TrackId as Id};
+use medea_client_api_proto::TrackId as Id;
 use web_sys::MediaStreamTrack;
+
+use crate::media::TrackConstraints;
 
 /// Representation of [MediaStreamTrack][1].
 ///
@@ -14,12 +16,16 @@ use web_sys::MediaStreamTrack;
 pub struct MediaTrack {
     id: Id,
     track: MediaStreamTrack,
-    caps: MediaType,
+    caps: TrackConstraints,
 }
 
 impl MediaTrack {
     /// Instantiates new [`MediaTrack`].
-    pub fn new(id: Id, track: MediaStreamTrack, caps: MediaType) -> Rc<Self> {
+    pub fn new(
+        id: Id,
+        track: MediaStreamTrack,
+        caps: TrackConstraints,
+    ) -> Rc<Self> {
         Rc::new(Self { id, track, caps })
     }
 
@@ -35,7 +41,7 @@ impl MediaTrack {
     }
 
     /// Returns [`MediaType`] of this [`MediaTrack`].
-    pub fn caps(&self) -> &MediaType {
+    pub fn caps(&self) -> &TrackConstraints {
         &self.caps
     }
 

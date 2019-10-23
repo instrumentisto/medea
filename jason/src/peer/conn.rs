@@ -1,6 +1,6 @@
 use std::{cell::RefCell, rc::Rc};
 
-use medea_client_api_proto::{IceServer, MediaType};
+use medea_client_api_proto::IceServer;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
     RtcConfiguration, RtcIceCandidateInit,
@@ -10,7 +10,10 @@ use web_sys::{
     RtcTrackEvent,
 };
 
-use crate::utils::{EventListener, WasmErr};
+use crate::{
+    media::TrackConstraints,
+    utils::{EventListener, WasmErr},
+};
 
 use super::ice_server::RtcIceServers;
 
@@ -33,11 +36,11 @@ pub enum TransceiverKind {
     Video,
 }
 
-impl From<&MediaType> for TransceiverKind {
-    fn from(media_type: &MediaType) -> Self {
+impl From<&TrackConstraints> for TransceiverKind {
+    fn from(media_type: &TrackConstraints) -> Self {
         match media_type {
-            MediaType::Audio(_) => Self::Audio,
-            MediaType::Video(_) => Self::Video,
+            TrackConstraints::Audio(_) => Self::Audio,
+            TrackConstraints::Video(_) => Self::Video,
         }
     }
 }

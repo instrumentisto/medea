@@ -3,13 +3,13 @@
 use std::{borrow::ToOwned, cell::RefCell, collections::HashMap, rc::Rc};
 
 use futures::future;
-use medea_client_api_proto::{Direction, MediaType, PeerId, Track, TrackId};
+use medea_client_api_proto::{Direction, PeerId, Track, TrackId};
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
     MediaStreamTrack, RtcRtpTransceiver, RtcRtpTransceiverDirection,
 };
 
-use crate::utils::WasmErr;
+use crate::{media::TrackConstraints, utils::WasmErr};
 
 use super::{
     conn::{RtcPeerConnection, TransceiverDirection, TransceiverKind},
@@ -128,14 +128,18 @@ impl MediaConnections {
         for track in tracks {
             match track.direction {
                 Direction::Send { mid, .. } => {
-                    let sndr =
-                        Sender::new(track.id, track.media_type, &s.peer, mid)?;
+                    let sndr = Sender::new(
+                        track.id,
+                        track.media_type.into(),
+                        &s.peer,
+                        mid,
+                    )?;
                     s.senders.insert(track.id, sndr);
                 }
                 Direction::Recv { sender, mid } => {
                     let recv = Receiver::new(
                         track.id,
-                        track.media_type,
+                        track.media_type.into(),
                         sender,
                         &s.peer,
                         mid,
@@ -179,16 +183,18 @@ impl MediaConnections {
         // Build sender to track pairs to catch errors before inserting.
         let mut sender_and_track = Vec::new();
         for sender in s.senders.values() {
-            match stream.get_track_by_id(sender.track_id) {
-                Some(track) => {
-                    //                    sender.caps.
+            if let Some(track) = stream.get_track_by_id(sender.track_id) {
+                if sender.caps.satisfies(&track.track()) {
                     sender_and_track.push((sender, track));
-                }
-                None => {
+                } else {
                     return Err(WasmErr::from(
-                        "Stream does not have all necessary tracks",
-                    ))
+                        "Provided track does not satisfy senders constraints",
+                    ));
                 }
+            } else {
+                return Err(WasmErr::from(
+                    "Stream does not have all necessary tracks",
+                ));
             }
         }
 
@@ -279,7 +285,7 @@ impl MediaConnections {
 /// peer.
 pub struct Sender {
     track_id: TrackId,
-    caps: MediaType,
+    caps: TrackConstraints,
     track: RefCell<Option<Rc<MediaTrack>>>,
     transceiver: RtcRtpTransceiver,
 }
@@ -291,7 +297,7 @@ impl Sender {
     /// lookup fails.
     fn new(
         track_id: TrackId,
-        caps: MediaType,
+        caps: TrackConstraints,
         peer: &RtcPeerConnection,
         mid: Option<String>,
     ) -> Result<Rc<Self>, WasmErr> {
@@ -367,7 +373,7 @@ impl Sender {
 /// only when [`MediaTrack`] data arrives.
 pub struct Receiver {
     track_id: TrackId,
-    caps: MediaType,
+    caps: TrackConstraints,
     sender_id: PeerId,
     transceiver: Option<RtcRtpTransceiver>,
     mid: Option<String>,
@@ -385,7 +391,7 @@ impl Receiver {
     #[inline]
     fn new(
         track_id: TrackId,
-        caps: MediaType,
+        caps: TrackConstraints,
         sender_id: PeerId,
         peer: &RtcPeerConnection,
         mid: Option<String>,

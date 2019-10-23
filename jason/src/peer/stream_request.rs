@@ -4,16 +4,15 @@
 
 use std::{collections::HashMap, convert::TryFrom};
 
-use medea_client_api_proto::{
-    AudioSettings, MediaType, TrackId, VideoSettings,
-};
+use medea_client_api_proto::TrackId;
 use web_sys::{
     MediaStream as SysMediaStream, MediaStreamTrack as SysMediaStreamTrack,
 };
 
 use crate::{
     media::{
-        AudioTrackConstraints, MediaStreamConstraints, VideoTrackConstraints,
+        AudioTrackConstraints, MediaStreamConstraints, TrackConstraints,
+        VideoTrackConstraints,
     },
     utils::WasmErr,
 };
@@ -32,18 +31,22 @@ use super::{MediaStream, MediaTrack};
 /// [3]: https://www.w3.org/TR/mediacapture-streams/#mediastream
 #[derive(Default)]
 pub struct StreamRequest {
-    audio: HashMap<TrackId, AudioSettings>,
-    video: HashMap<TrackId, VideoSettings>,
+    audio: HashMap<TrackId, AudioTrackConstraints>,
+    video: HashMap<TrackId, VideoTrackConstraints>,
 }
 
 impl StreamRequest {
     /// Adds track request to this [`StreamRequest`].
-    pub fn add_track_request(&mut self, track_id: TrackId, caps: MediaType) {
-        match caps {
-            MediaType::Audio(audio) => {
+    pub fn add_track_request<T: Into<TrackConstraints>>(
+        &mut self,
+        track_id: TrackId,
+        caps: T,
+    ) {
+        match caps.into() {
+            TrackConstraints::Audio(audio) => {
                 self.audio.insert(track_id, audio);
             }
-            MediaType::Video(video) => {
+            TrackConstraints::Video(video) => {
                 self.video.insert(track_id, video);
             }
         }
@@ -54,8 +57,8 @@ impl StreamRequest {
 /// and must have at least one track of any kind.
 #[allow(clippy::module_name_repetitions)]
 pub struct SimpleStreamRequest {
-    audio: Option<(TrackId, AudioSettings)>,
-    video: Option<(TrackId, VideoSettings)>,
+    audio: Option<(TrackId, AudioTrackConstraints)>,
+    video: Option<(TrackId, VideoTrackConstraints)>,
 }
 
 impl SimpleStreamRequest {
@@ -76,11 +79,18 @@ impl SimpleStreamRequest {
 
             if audio_tracks.len() == 1 {
                 let track = audio_tracks.into_iter().next().unwrap();
-                tracks.push(MediaTrack::new(
-                    *id,
-                    track,
-                    MediaType::Audio(audio.clone()),
-                ))
+                if audio.satisfies(&track) {
+                    tracks.push(MediaTrack::new(
+                        *id,
+                        track,
+                        TrackConstraints::Audio(audio.clone()),
+                    ))
+                } else {
+                    return Err(WasmErr::from(
+                        "Provided audio track does not satisfy previously \
+                         specified constraints",
+                    ));
+                }
             } else {
                 return Err(WasmErr::from(
                     "Provided MediaStream was expected to have single audio \
@@ -99,11 +109,18 @@ impl SimpleStreamRequest {
 
             if video_tracks.len() == 1 {
                 let track = video_tracks.into_iter().next().unwrap();
-                tracks.push(MediaTrack::new(
-                    *id,
-                    track,
-                    MediaType::Video(video.clone()),
-                ))
+                if video.satisfies(&track) {
+                    tracks.push(MediaTrack::new(
+                        *id,
+                        track,
+                        TrackConstraints::Video(video.clone()),
+                    ))
+                } else {
+                    return Err(WasmErr::from(
+                        "Provided video track does not satisfy previously \
+                         specified constraints",
+                    ));
+                }
             } else {
                 return Err(WasmErr::from(
                     "Provided MediaStream was expected to have single video \
@@ -153,11 +170,11 @@ impl From<&SimpleStreamRequest> for MediaStreamConstraints {
     fn from(request: &SimpleStreamRequest) -> Self {
         let mut constraints = Self::new();
 
-        if let Some((_, _)) = request.video {
-            constraints.video(VideoTrackConstraints::new());
+        if let Some((_, audio)) = &request.audio {
+            constraints.audio(audio.clone());
         }
-        if let Some((_, _)) = request.audio {
-            constraints.audio(AudioTrackConstraints::new());
+        if let Some((_, video)) = &request.video {
+            constraints.video(video.clone());
         }
 
         constraints
