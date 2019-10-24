@@ -34,8 +34,6 @@ jobs:
       stage: check
       rust: nightly
       cache: false
-      # TODO: why add again?
-      before_script: rustup component add rustfmt --toolchain nightly-x86_64-unknown-linux-gnu
       script: make fmt check=yes
 
     - name: medea-jason (beta)
