@@ -73,6 +73,7 @@ spec:
               protocol: TCP
             - name: grpc
               containerPort: {{ .Values.server.conf.server.control.grpc.bind_port }}
+              protocol: TCP
           volumeMounts:
             - name: conf
               subPath: medea.toml

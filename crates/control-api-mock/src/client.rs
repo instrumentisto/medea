@@ -16,6 +16,12 @@ use crate::server::Element;
 #[derive(Clone, Debug)]
 pub struct Fid(String);
 
+impl From<()> for Fid {
+    fn from(_: ()) -> Self {
+        Self(String::new())
+    }
+}
+
 impl From<String> for Fid {
     fn from(path: String) -> Self {
         Self(path)
@@ -31,12 +37,6 @@ impl From<(String, String)> for Fid {
 impl From<(String, String, String)> for Fid {
     fn from(path: (String, String, String)) -> Self {
         Self(format!("{}/{}/{}", path.0, path.1, path.2))
-    }
-}
-
-impl From<()> for Fid {
-    fn from(_: ()) -> Self {
-        Self(String::new())
     }
 }
 

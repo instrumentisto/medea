@@ -41,9 +41,8 @@ RUN cargo build --lib ${rustc_opts}
 RUN rm -rf /app/target/${rustc_mode}/.fingerprint/medea*
 
 # Prepare project sources for building.
-COPY crates/ /app/crates/
-COPY proto/ /app/proto/
-COPY src/ /app/src/
+COPY crates/control-api-mock /app/crates/control-api-mock
+COPY proto/control-api /app/proto/control-api
 
 # Build project distribution binary.
 # TODO: use --out-dir once stabilized

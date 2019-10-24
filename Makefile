@@ -465,13 +465,13 @@ docker.auth:
 docker-build-demo-image-name = $(DEMO_IMAGE_NAME)
 
 docker.build.demo:
+	$(docker-env)
 ifeq ($(TAG),edge)
 	docker build $(if $(call eq,$(minikube),yes),,--network=host) --force-rm \
 		-t $(docker-build-demo-image-name):$(TAG) \
 		-f jason/Dockerfile .
 else
 	@make yarn proj=demo
-	$(docker-env) \
 	docker build $(if $(call eq,$(minikube),yes),,--network=host) --force-rm \
 		-t $(docker-build-demo-image-name):$(if $(call eq,$(TAG),),dev,$(TAG)) \
 		jason/demo
@@ -481,14 +481,18 @@ endif
 # Build REST Control API mock server.
 #
 # Usage:
-#   make docker.build.control-api-mock
-
-docker-build-control-api-mock-image-name = $(CONTROL_API_MOCK_IMAGE_NAME)
+#   make docker.build.control-api-mock [TAG=(dev|<tag>)] [minikube=(no|yes)]
+#									   [debug=(yes|no)]
 
 docker.build.control-api-mock:
 	$(docker-env) \
 	docker build $(if $(call eq,$(minikube),yes),,--network=host) \
-		-t $(docker-build-control-api-mock-image-name):$(TAG) \
+				--build-arg rust_ver=$(RUST_VER) \
+				--build-arg rustc_mode=$(if \
+					$(call eq,$(debug),no),release,debug) \
+				--build-arg rustc_opts=$(if \
+					$(call eq,$(debug),no),--release,) \
+		-t  $(CONTROL_API_MOCK_IMAGE_NAME):$(if $(call eq,$(TAG),),dev,$(TAG)) \
 		-f crates/control-api-mock/Dockerfile \
 		.
 

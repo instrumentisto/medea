@@ -157,12 +157,12 @@
             await getDevices(audioSelect, videoSelect);
             await getStream(localVideo, audioSelect, videoSelect);
 
-            audioSelect.addEventListener('change', () => {
-                getStream(localVideo, audioSelect, videoSelect);
+            audioSelect.addEventListener('change', async () => {
+                await getStream(localVideo, audioSelect, videoSelect);
             });
 
-            videoSelect.addEventListener('change', () => {
-                getStream(localVideo, audioSelect, videoSelect);
+            videoSelect.addEventListener('change', async () => {
+                await getStream(localVideo, audioSelect, videoSelect);
             });
 
             room.on_new_connection((connection) => {
