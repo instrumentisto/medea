@@ -786,7 +786,9 @@ impl Room {
 
         member.insert_sink(sink);
 
-        self.init_member_connections(&member, ctx);
+        if self.members.member_has_connection(member_id) {
+            self.init_member_connections(&member, ctx);
+        }
 
         Ok(())
     }
