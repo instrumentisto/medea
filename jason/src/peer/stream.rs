@@ -4,10 +4,10 @@
 
 use std::{collections::HashMap, rc::Rc};
 
-use medea_client_api_proto::{MediaType, TrackId};
+use medea_client_api_proto::TrackId;
 use web_sys::MediaStream as SysMediaStream;
 
-use crate::utils::copy_js_ref;
+use crate::media::TrackConstraints;
 
 use super::MediaTrack;
 
@@ -43,10 +43,10 @@ impl InnerStream {
         self.stream.add_track(track.track());
         let caps = track.caps();
         match caps {
-            MediaType::Audio(_) => {
+            TrackConstraints::Audio(_) => {
                 self.audio_tracks.insert(track.id(), track);
             }
-            MediaType::Video(_) => {
+            TrackConstraints::Video(_) => {
                 self.video_tracks.insert(track.id(), track);
             }
         }
@@ -111,6 +111,6 @@ impl MediaStream {
     ///
     /// [1]: https://www.w3.org/TR/mediacapture-streams/#mediastream
     pub fn stream(&self) -> SysMediaStream {
-        copy_js_ref(&self.0.stream)
+        Clone::clone(&self.0.stream)
     }
 }

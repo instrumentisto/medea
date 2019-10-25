@@ -10,7 +10,10 @@ use web_sys::{
     RtcTrackEvent,
 };
 
-use crate::utils::{EventListener, WasmErr};
+use crate::{
+    media::TrackConstraints,
+    utils::{EventListener, WasmErr},
+};
 
 use super::ice_server::RtcIceServers;
 
@@ -31,6 +34,15 @@ pub struct IceCandidate {
 pub enum TransceiverKind {
     Audio,
     Video,
+}
+
+impl From<&TrackConstraints> for TransceiverKind {
+    fn from(media_type: &TrackConstraints) -> Self {
+        match media_type {
+            TrackConstraints::Audio(_) => Self::Audio,
+            TrackConstraints::Video(_) => Self::Video,
+        }
+    }
 }
 
 impl TransceiverKind {

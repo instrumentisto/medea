@@ -1,5 +1,9 @@
 #![allow(clippy::module_name_repetitions)]
 
+use medea_client_api_proto::{
+    AudioSettings as ProtoAudioConstraints, MediaType as ProtoTrackConstraints,
+    VideoSettings as ProtoVideoConstraints,
+};
 use wasm_bindgen::prelude::*;
 use web_sys::{
     ConstrainDomStringParameters,
@@ -90,6 +94,30 @@ macro_rules! satisfies_by_device_id {
     }};
 }
 
+#[derive(Clone)]
+pub enum TrackConstraints {
+    Audio(AudioTrackConstraints),
+    Video(VideoTrackConstraints),
+}
+
+impl TrackConstraints {
+    pub fn satisfies(&self, track: &SysMediaStreamTrack) -> bool {
+        match self {
+            Self::Audio(audio) => audio.satisfies(&track),
+            Self::Video(video) => video.satisfies(&track),
+        }
+    }
+}
+
+impl From<ProtoTrackConstraints> for TrackConstraints {
+    fn from(caps: ProtoTrackConstraints) -> Self {
+        match caps {
+            ProtoTrackConstraints::Audio(audio) => Self::Audio(audio.into()),
+            ProtoTrackConstraints::Video(video) => Self::Video(video.into()),
+        }
+    }
+}
+
 // TODO: Its gonna be a nightmare if we will add all possible constraints,
 //       especially if we will support all that `exact`/`min`/`max`/`ideal`
 //       stuff, will need major refactoring then.
@@ -133,6 +161,12 @@ impl AudioTrackConstraints {
         }
 
         satisfies_by_device_id!(self, track)
+    }
+}
+
+impl From<ProtoAudioConstraints> for AudioTrackConstraints {
+    fn from(_caps: ProtoAudioConstraints) -> Self {
+        Self::new()
     }
 }
 
@@ -186,6 +220,12 @@ impl VideoTrackConstraints {
         }
 
         satisfies_by_device_id!(self, track)
+    }
+}
+
+impl From<ProtoVideoConstraints> for VideoTrackConstraints {
+    fn from(_caps: ProtoVideoConstraints) -> Self {
+        Self::new()
     }
 }
 
