@@ -80,8 +80,20 @@ pub fn run(args: &ArgMatches) {
     .start();
 }
 
+/// Generates `request` macro which will generate [`actix_web`] request handler which will
+/// call some function with `Path` extracted from `Request`.
+///
+/// `$call_fn` - function which will be called on request;
+///
+/// `$resp` - type of response on this requst.
 macro_rules! gen_request_macro {
     ($call_fn:tt, $resp:ty) => {
+        /// Generates handler with provided name and `Path` which will be
+        /// passed to `$call_fn` function.
+        ///
+        /// `$name` - name of generated function;
+        ///
+        /// `$uri_tuple` - type of path which will be provided by [`actix_web`].
         macro_rules! request {
             ($name:tt, $uri_tuple:ty) => {
                 pub fn $name(
@@ -99,6 +111,7 @@ macro_rules! gen_request_macro {
     };
 }
 
+/// Implementation of `Delete` requests to Control API mock.
 #[allow(clippy::needless_pass_by_value)]
 #[allow(clippy::module_name_repetitions)]
 mod delete {
@@ -112,6 +125,7 @@ mod delete {
     request!(delete3, (String, String, String));
 }
 
+/// Implementation of `Get` requests to Control API mock.
 #[allow(clippy::needless_pass_by_value)]
 #[allow(clippy::module_name_repetitions)]
 mod get {
@@ -125,6 +139,7 @@ mod get {
     request!(get3, (String, String, String));
 }
 
+/// Implementation of `Post` requests to Control API mock.
 mod create {
     use super::*;
 
