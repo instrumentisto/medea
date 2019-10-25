@@ -2,6 +2,7 @@
 
 use std::{convert::TryFrom, rc::Rc};
 
+use anyhow::Result;
 use medea_client_api_proto::TrackId;
 use medea_jason::{
     media::MediaManager,
@@ -9,7 +10,6 @@ use medea_jason::{
         MediaConnections, RtcPeerConnection, SimpleStreamRequest,
         TransceiverDirection, TransceiverKind,
     },
-    utils::WasmErr,
 };
 use wasm_bindgen_test::*;
 
@@ -20,7 +20,7 @@ wasm_bindgen_test_configure!(run_in_browser);
 async fn get_test_media_connections(
     enabled_audio: bool,
     enabled_video: bool,
-) -> Result<(MediaConnections, TrackId, TrackId), WasmErr> {
+) -> Result<(MediaConnections, TrackId, TrackId)> {
     let media_connections = MediaConnections::new(
         Rc::new(RtcPeerConnection::new(vec![]).unwrap()),
         enabled_audio,

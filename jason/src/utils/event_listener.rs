@@ -1,7 +1,7 @@
 use std::{ops::Deref, rc::Rc};
 
-use wasm_bindgen::{closure::Closure, convert::FromWasmAbi, JsCast};
-use web_sys::EventTarget;
+use wasm_bindgen::{closure::Closure, convert::FromWasmAbi, JsCast, JsValue};
+use web_sys::{console, EventTarget};
 
 use crate::utils::WasmErr;
 
@@ -78,7 +78,10 @@ where
                 self.closure.as_ref().unchecked_ref(),
             )
         {
-            WasmErr::from(err).log_err();
+            console::error_1(&JsValue::from_str(&format!(
+                "{}",
+                WasmErr::from(err)
+            )))
         }
     }
 }

@@ -1,6 +1,7 @@
 use std::{cell::RefCell, rc::Rc};
 
 use medea_client_api_proto::IceServer;
+use thiserror::*;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
     RtcConfiguration, RtcIceCandidateInit,
@@ -83,6 +84,30 @@ pub enum SdpType {
     Answer(String),
 }
 
+/// Describes errors that may occur during signaling between this and remote
+/// [RTCPeerConnection][1] and event handlers setting errors.
+///
+/// [1]: https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection.
+#[derive(Error, Debug)]
+pub enum Error {
+    #[error("failed add ice candidate {0}")]
+    AddIceCandidate(WasmErr),
+    #[error("failed create answer {0}")]
+    CreateAnswer(WasmErr),
+    #[error("failed create peer connection {0}")]
+    CreatePeer(WasmErr),
+    #[error("failed create offer {0}")]
+    CreateOffer(WasmErr),
+    #[error("failed set handler for RtcPeerConnectionIceEvent {0}")]
+    SetHandlerIceEvent(WasmErr),
+    #[error("failed set handler for RtcTrackEvent {0}")]
+    SetHandlerTrackEvent(WasmErr),
+    #[error("failed set local description {0}")]
+    SetLocalDescription(WasmErr),
+    #[error("failed set remote description {0}")]
+    SetRemoteDescription(WasmErr),
+}
+
 /// Representation of [RTCPeerConnection][1].
 ///
 /// [1]: https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection
@@ -118,18 +143,19 @@ pub struct RtcPeerConnection {
 
 impl RtcPeerConnection {
     /// Instantiates new [`RtcPeerConnection`].
-    pub fn new<I>(ice_servers: I) -> Result<Self, WasmErr>
+    pub fn new<I>(ice_servers: I) -> Result<Self, Error>
     where
         I: IntoIterator<Item = IceServer>,
     {
         // TODO: RTCBundlePolicy = "max-bundle"?
         let mut peer_conf = RtcConfiguration::new();
         peer_conf.ice_servers(&RtcIceServers::from(ice_servers));
+        let peer = SysRtcPeerConnection::new_with_configuration(&peer_conf)
+            .map_err(Into::into)
+            .map_err(Error::CreatePeer)?;
 
         Ok(Self {
-            peer: Rc::new(SysRtcPeerConnection::new_with_configuration(
-                &peer_conf,
-            )?),
+            peer: Rc::new(peer),
             on_ice_candidate: RefCell::new(None),
             on_track: RefCell::new(None),
         })
@@ -140,7 +166,7 @@ impl RtcPeerConnection {
     ///
     /// [1]: https://www.w3.org/TR/webrtc/#rtctrackevent
     /// [2]: https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-ontrack
-    pub fn on_track<F>(&self, f: Option<F>) -> Result<(), WasmErr>
+    pub fn on_track<F>(&self, f: Option<F>) -> Result<(), Error>
     where
         F: 'static + FnMut(RtcTrackEvent),
     {
@@ -150,13 +176,16 @@ impl RtcPeerConnection {
                 on_track.take();
             }
             Some(mut f) => {
-                on_track.replace(EventListener::new_mut(
-                    Rc::clone(&self.peer),
-                    "track",
-                    move |msg: RtcTrackEvent| {
-                        f(msg);
-                    },
-                )?);
+                on_track.replace(
+                    EventListener::new_mut(
+                        Rc::clone(&self.peer),
+                        "track",
+                        move |msg: RtcTrackEvent| {
+                            f(msg);
+                        },
+                    )
+                    .map_err(Error::SetHandlerIceEvent)?,
+                );
             }
         }
         Ok(())
@@ -167,7 +196,7 @@ impl RtcPeerConnection {
     ///
     /// [1]: https://www.w3.org/TR/webrtc/#dom-rtcpeerconnectioniceevent
     /// [2]: https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection-onicecandidate
-    pub fn on_ice_candidate<F>(&self, f: Option<F>) -> Result<(), WasmErr>
+    pub fn on_ice_candidate<F>(&self, f: Option<F>) -> Result<(), Error>
     where
         F: 'static + FnMut(IceCandidate),
     {
@@ -177,23 +206,26 @@ impl RtcPeerConnection {
                 on_ice_candidate.take();
             }
             Some(mut f) => {
-                on_ice_candidate.replace(EventListener::new_mut(
-                    Rc::clone(&self.peer),
-                    "icecandidate",
-                    move |msg: RtcPeerConnectionIceEvent| {
-                        // None candidate means that all ICE transports have
-                        // finished gathering candidates.
-                        // Doesn't need to be delivered onward to the remote
-                        // peer.
-                        if let Some(c) = msg.candidate() {
-                            f(IceCandidate {
-                                candidate: c.candidate(),
-                                sdp_m_line_index: c.sdp_m_line_index(),
-                                sdp_mid: c.sdp_mid(),
-                            });
-                        }
-                    },
-                )?);
+                on_ice_candidate.replace(
+                    EventListener::new_mut(
+                        Rc::clone(&self.peer),
+                        "icecandidate",
+                        move |msg: RtcPeerConnectionIceEvent| {
+                            // None candidate means that all ICE transports have
+                            // finished gathering candidates.
+                            // Doesn't need to be delivered onward to the remote
+                            // peer.
+                            if let Some(c) = msg.candidate() {
+                                f(IceCandidate {
+                                    candidate: c.candidate(),
+                                    sdp_m_line_index: c.sdp_m_line_index(),
+                                    sdp_mid: c.sdp_mid(),
+                                });
+                            }
+                        },
+                    )
+                    .map_err(Error::SetHandlerIceEvent)?,
+                );
             }
         }
         Ok(())
@@ -209,7 +241,7 @@ impl RtcPeerConnection {
         candidate: &str,
         sdp_m_line_index: Option<u16>,
         sdp_mid: &Option<String>,
-    ) -> Result<(), WasmErr> {
+    ) -> Result<(), Error> {
         let mut cand_init = RtcIceCandidateInit::new(&candidate);
         cand_init
             .sdp_m_line_index(sdp_m_line_index)
@@ -219,7 +251,9 @@ impl RtcPeerConnection {
                 Some(cand_init).as_ref(),
             ),
         )
-        .await?;
+        .await
+        .map_err(Into::into)
+        .map_err(Error::AddIceCandidate)?;
         Ok(())
     }
 
@@ -228,16 +262,22 @@ impl RtcPeerConnection {
     /// description.
     ///
     /// Should be called whenever remote description has been changed.
-    pub async fn create_and_set_answer(&self) -> Result<String, WasmErr> {
+    pub async fn create_and_set_answer(&self) -> Result<String, Error> {
         let peer: Rc<SysRtcPeerConnection> = Rc::clone(&self.peer);
 
-        let answer = JsFuture::from(self.peer.create_answer()).await?;
+        let answer = JsFuture::from(self.peer.create_answer())
+            .await
+            .map_err(Into::into)
+            .map_err(Error::CreateAnswer)?;
         let answer = RtcSessionDescription::from(answer).sdp();
 
         let mut desc = RtcSessionDescriptionInit::new(RtcSdpType::Answer);
         desc.sdp(&answer);
 
-        JsFuture::from(peer.set_local_description(&desc)).await?;
+        JsFuture::from(peer.set_local_description(&desc))
+            .await
+            .map_err(Into::into)
+            .map_err(Error::SetLocalDescription)?;
 
         Ok(answer)
     }
@@ -248,16 +288,22 @@ impl RtcPeerConnection {
     ///
     /// Should be called after local tracks changes, which require
     /// renegotiation.
-    pub async fn create_and_set_offer(&self) -> Result<String, WasmErr> {
+    pub async fn create_and_set_offer(&self) -> Result<String, Error> {
         let peer: Rc<SysRtcPeerConnection> = Rc::clone(&self.peer);
 
-        let create_offer = JsFuture::from(peer.create_offer()).await?;
+        let create_offer = JsFuture::from(peer.create_offer())
+            .await
+            .map_err(Into::into)
+            .map_err(Error::CreateOffer)?;
         let offer = RtcSessionDescription::from(create_offer).sdp();
 
         let mut desc = RtcSessionDescriptionInit::new(RtcSdpType::Offer);
         desc.sdp(&offer);
 
-        JsFuture::from(peer.set_local_description(&desc)).await?;
+        JsFuture::from(peer.set_local_description(&desc))
+            .await
+            .map_err(Into::into)
+            .map_err(Error::SetLocalDescription)?;
 
         Ok(offer)
     }
@@ -270,7 +316,7 @@ impl RtcPeerConnection {
     pub async fn set_remote_description(
         &self,
         sdp: SdpType,
-    ) -> Result<(), WasmErr> {
+    ) -> Result<(), Error> {
         let description = match sdp {
             SdpType::Offer(offer) => {
                 let mut desc =
@@ -286,7 +332,10 @@ impl RtcPeerConnection {
             }
         };
 
-        JsFuture::from(self.peer.set_remote_description(&description)).await?;
+        JsFuture::from(self.peer.set_remote_description(&description))
+            .await
+            .map_err(Into::into)
+            .map_err(Error::SetRemoteDescription)?;
 
         Ok(())
     }

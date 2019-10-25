@@ -44,11 +44,18 @@ impl Drop for IntervalHandle {
 macro_rules! map_weak {
     ($v:expr, $closure:expr) => {{
         $v.0.upgrade()
-            .ok_or_else(|| {
-                $crate::utils::WasmErr::from("Detached state").into()
-            })
+            .ok_or_else(|| js_sys::Error::new("Detached state").into())
             .map($closure)
     }};
+}
+
+macro_rules! console_log {
+    ($e:expr) => {
+        web_sys::console::error_1(&wasm_bindgen::JsValue::from_str(&format!(
+            "{}",
+            $e
+        )))
+    };
 }
 
 /// Returns property of JS object by name if its defined.

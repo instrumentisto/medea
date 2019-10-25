@@ -1,9 +1,10 @@
 use std::{collections::HashMap, rc::Rc};
 
+use anyhow::Result;
 use futures::channel::mpsc;
 use medea_client_api_proto::{IceServer, PeerId};
 
-use crate::{media::MediaManager, utils::WasmErr};
+use crate::media::MediaManager;
 
 use super::{PeerConnection, PeerEvent};
 
@@ -22,7 +23,7 @@ pub trait PeerRepository {
         events_sender: mpsc::UnboundedSender<PeerEvent>,
         enabled_audio: bool,
         enabled_video: bool,
-    ) -> Result<Rc<PeerConnection>, WasmErr>;
+    ) -> Result<Rc<PeerConnection>>;
 
     /// Returns [`PeerConnection`] stored in repository by its ID.
     fn get(&self, id: PeerId) -> Option<Rc<PeerConnection>>;
@@ -63,7 +64,7 @@ impl PeerRepository for Repository {
         peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
         enabled_audio: bool,
         enabled_video: bool,
-    ) -> Result<Rc<PeerConnection>, WasmErr> {
+    ) -> Result<Rc<PeerConnection>> {
         let peer = Rc::new(PeerConnection::new(
             id,
             peer_events_sender,

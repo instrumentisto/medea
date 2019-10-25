@@ -7,6 +7,7 @@ use std::{
     rc::{Rc, Weak},
 };
 
+use anyhow::Error;
 use futures::{channel::mpsc, future, stream, FutureExt as _, StreamExt as _};
 use js_sys::Promise;
 use medea_client_api_proto::{
@@ -20,7 +21,7 @@ use web_sys::MediaStream as SysMediaStream;
 use crate::{
     peer::{MediaStream, PeerEvent, PeerEventHandler, PeerRepository},
     rpc::RpcClient,
-    utils::{Callback, WasmErr},
+    utils::Callback,
 };
 
 use super::{connection::Connection, ConnectionHandle};
@@ -53,6 +54,18 @@ impl RoomHandle {
         map_weak!(self, |inner| inner.borrow_mut().on_local_stream.set_func(f))
     }
 
+    /// Sets callback, which will be invoked when any `Connection` cannot obtain
+    /// local stream or inject local stream failed.
+    pub fn on_failed_local_stream(
+        &self,
+        f: js_sys::Function,
+    ) -> Result<(), JsValue> {
+        map_weak!(self, |inner| inner
+            .borrow_mut()
+            .on_failed_local_stream
+            .set_func(f))
+    }
+
     /// Performs entering to a [`Room`]  with the preconfigured authorization
     /// `token` for connection with media server.
     ///
@@ -61,12 +74,13 @@ impl RoomHandle {
     /// Effectively returns `Result<(), WasmErr>`.
     pub fn join(&self, token: String) -> Promise {
         match map_weak!(self, |inner| Rc::clone(&inner.borrow().rpc)) {
-            Ok(rpc) => future_to_promise(async move {
-                rpc.connect(token)
-                    .await
-                    .map(|_| JsValue::NULL)
-                    .map_err(JsValue::from)
-            }),
+            Ok(rpc) => {
+                future_to_promise(async move {
+                    rpc.connect(token).await.map(|_| JsValue::NULL).map_err(
+                        |err| js_sys::Error::new(&format!("{}", err)).into(),
+                    )
+                })
+            }
             Err(err) => future_to_promise(future::err(err)),
         }
     }
@@ -138,8 +152,7 @@ impl Room {
                         // happen, actually, since
                         // `InnerSession` should drop its `tx` by unsub from
                         // `RpcClient`.
-                        WasmErr::from("Inner Room dropped unexpectedly")
-                            .log_err();
+                        console_log!("Inner Room dropped unexpectedly")
                     }
                     Some(inner) => {
                         match event {
@@ -194,10 +207,16 @@ struct InnerRoom {
     on_new_connection: Callback<ConnectionHandle>,
 
     /// Callback to be invoked when new [`MediaStream`] is acquired providing
-    /// its handle.
+    /// its actual underlying [MediaStream][1] object.
+    ///
+    /// [1]: https://www.w3.org/TR/mediacapture-streams/#mediastream
     // TODO: will be extended with some metadata that would allow client to
     //       understand purpose of obtaining this stream.
     on_local_stream: Callback<SysMediaStream>,
+
+    /// Callback to be invoked when failed obtain [`MediaStream`] from
+    /// [`MediaManager`] or failed inject stream into [`PeerConnection`].
+    on_failed_local_stream: Rc<Callback<js_sys::Error>>,
 
     /// Indicates if outgoing audio is enabled in this [`Room`].
     enabled_audio: bool,
@@ -222,6 +241,7 @@ impl InnerRoom {
             connections: HashMap::new(),
             on_new_connection: Callback::default(),
             on_local_stream: Callback::default(),
+            on_failed_local_stream: Rc::new(Callback::default()),
             enabled_audio: true,
             enabled_video: true,
         }
@@ -274,15 +294,21 @@ impl InnerRoom {
 
     /// Inject given local stream into all [`PeerConnection`]s this [`Room`] and
     /// store its for inject into new [`PeerConnection`].
+    ///
+    /// If inject local stream into existing [`PeerConnection`] failed, invoke
+    /// `on_failed_local_stream` callback with failure error.
     fn inject_local_stream(&mut self, stream: SysMediaStream) {
         let peers = self.peers.get_all();
         let injected_stream = Clone::clone(&stream);
+        let error_callback = Rc::clone(&self.on_failed_local_stream);
         spawn_local(async move {
             for peer in peers {
                 if let Err(err) =
                     peer.inject_local_stream(&injected_stream).await
                 {
-                    err.log_err()
+                    console_log!(err);
+                    error_callback
+                        .call(js_sys::Error::new(&format!("{}", err)));
                 }
             }
         });
@@ -313,7 +339,7 @@ impl EventHandler for InnerRoom {
         ) {
             Ok(peer) => peer,
             Err(err) => {
-                err.log_err();
+                console_log!(err);
                 return;
             }
         };
@@ -322,12 +348,14 @@ impl EventHandler for InnerRoom {
 
         let local_stream = self.local_stream.clone();
         let rpc = Rc::clone(&self.rpc);
+        let error_callback = Rc::clone(&self.on_failed_local_stream);
         spawn_local(
             async move {
                 match sdp_offer {
                     None => {
-                        let sdp_offer =
-                            peer.get_offer(tracks, local_stream).await?;
+                        let sdp_offer = peer
+                            .get_offer(tracks, local_stream.as_ref())
+                            .await?;
                         let mids = peer.get_mids()?;
                         rpc.send_command(Command::MakeSdpOffer {
                             peer_id,
@@ -337,7 +365,7 @@ impl EventHandler for InnerRoom {
                     }
                     Some(offer) => {
                         let sdp_answer = peer
-                            .process_offer(offer, tracks, local_stream)
+                            .process_offer(offer, tracks, local_stream.as_ref())
                             .await?;
                         rpc.send_command(Command::MakeSdpAnswer {
                             peer_id,
@@ -345,12 +373,14 @@ impl EventHandler for InnerRoom {
                         });
                     }
                 };
-                Result::<_, WasmErr>::Ok(())
+                Result::<_, Error>::Ok(())
             }
             .then(|result| {
-                async {
+                async move {
                     if let Err(err) = result {
-                        err.log_err();
+                        console_log!(err);
+                        error_callback
+                            .call(js_sys::Error::new(&format!("{}", err)));
                     };
                 }
             }),
@@ -362,13 +392,12 @@ impl EventHandler for InnerRoom {
         if let Some(peer) = self.peers.get(peer_id) {
             spawn_local(async move {
                 if let Err(err) = peer.set_remote_answer(sdp_answer).await {
-                    err.log_err();
+                    console_log!(err);
                 }
             });
         } else {
             // TODO: No peer, whats next?
-            WasmErr::from(format!("Peer with id {} doesnt exist", peer_id))
-                .log_err()
+            console_log!(format!("Peer with id {} doesnt exist", peer_id))
         }
     }
 
@@ -388,13 +417,12 @@ impl EventHandler for InnerRoom {
                     )
                     .await;
                 if let Err(err) = add {
-                    err.log_err();
+                    console_log!(err);
                 }
             });
         } else {
             // TODO: No peer, whats next?
-            WasmErr::from(format!("Peer with id {} doesnt exist", peer_id))
-                .log_err()
+            console_log!(format!("Peer with id {} doesnt exist", peer_id))
         }
     }
 
@@ -439,8 +467,7 @@ impl PeerEventHandler for InnerRoom {
         match self.connections.get(&sender_id) {
             Some(conn) => conn.on_remote_stream(remote_stream.stream()),
             None => {
-                WasmErr::from("NewRemoteStream from sender without connection")
-                    .log_err()
+                console_log!("NewRemoteStream from sender without connection")
             }
         }
     }

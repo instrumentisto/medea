@@ -5,19 +5,39 @@
 use std::{collections::HashMap, convert::TryFrom};
 
 use medea_client_api_proto::TrackId;
+use thiserror::*;
 use web_sys::{
     MediaStream as SysMediaStream, MediaStreamTrack as SysMediaStreamTrack,
 };
 
-use crate::{
-    media::{
-        AudioTrackConstraints, MediaStreamConstraints, TrackConstraints,
-        VideoTrackConstraints,
-    },
-    utils::WasmErr,
+use crate::media::{
+    AudioTrackConstraints, MediaStreamConstraints, TrackConstraints,
+    VideoTrackConstraints,
 };
 
 use super::{MediaStream, MediaTrack};
+
+/// Describes errors that may occur when validating [`StreamRequest`] or
+/// parsing [MediaStream][1].
+///
+/// [1]: https://w3.org/TR/mediacapture-streams/#mediastream
+#[derive(Error, Debug)]
+pub enum Error {
+    #[error("only one video track allowed in SimpleStreamRequest")]
+    TooManyVideoTracks,
+    #[error("only one audio track allowed in SimpleStreamRequest")]
+    TooManyAudioTracks,
+    #[error("SimpleStreamRequest should have at least one track")]
+    NotFoundTracks,
+    #[error("provided MediaStream was expected to have single video track")]
+    ExpectedVideoTracks,
+    #[error("provided MediaStream was expected to have single audio track")]
+    ExpectedAudioTracks,
+    #[error("provided audio track does not satisfy specified constraints")]
+    InvalidAudioTrack,
+    #[error("provided video track does not satisfy specified constraints")]
+    InvalidVideoTrack,
+}
 
 /// Representation of [MediaStreamConstraints][1] object.
 ///
@@ -66,7 +86,7 @@ impl SimpleStreamRequest {
     pub fn parse_stream(
         &self,
         stream: &SysMediaStream,
-    ) -> Result<MediaStream, WasmErr> {
+    ) -> Result<MediaStream, Error> {
         let mut tracks = Vec::new();
 
         if let Some((id, audio)) = &self.audio {
@@ -86,16 +106,10 @@ impl SimpleStreamRequest {
                         TrackConstraints::Audio(audio.clone()),
                     ))
                 } else {
-                    return Err(WasmErr::from(
-                        "Provided audio track does not satisfy previously \
-                         specified constraints",
-                    ));
+                    return Err(Error::InvalidAudioTrack);
                 }
             } else {
-                return Err(WasmErr::from(
-                    "Provided MediaStream was expected to have single audio \
-                     track",
-                ));
+                return Err(Error::ExpectedAudioTracks);
             }
         }
 
@@ -116,16 +130,10 @@ impl SimpleStreamRequest {
                         TrackConstraints::Video(video.clone()),
                     ))
                 } else {
-                    return Err(WasmErr::from(
-                        "Provided video track does not satisfy previously \
-                         specified constraints",
-                    ));
+                    return Err(Error::InvalidVideoTrack);
                 }
             } else {
-                return Err(WasmErr::from(
-                    "Provided MediaStream was expected to have single video \
-                     track",
-                ));
+                return Err(Error::ExpectedVideoTracks);
             }
         }
 
@@ -134,21 +142,15 @@ impl SimpleStreamRequest {
 }
 
 impl TryFrom<StreamRequest> for SimpleStreamRequest {
-    type Error = WasmErr;
+    type Error = Error;
 
     fn try_from(value: StreamRequest) -> Result<Self, Self::Error> {
         if value.video.len() > 1 {
-            Err(WasmErr::from(
-                "Only one video track allowed in SimpleStreamRequest",
-            ))
+            Err(Error::TooManyVideoTracks)
         } else if value.audio.len() > 1 {
-            Err(WasmErr::from(
-                "Only one audio track allowed in SimpleStreamRequest",
-            ))
+            Err(Error::TooManyAudioTracks)
         } else if value.video.len() + value.audio.len() < 1 {
-            Err(WasmErr::from(
-                "SimpleStreamRequest should have at least on track",
-            ))
+            Err(Error::NotFoundTracks)
         } else {
             let mut request = Self {
                 audio: None,

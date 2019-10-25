@@ -4,11 +4,12 @@ mod api;
 mod media;
 mod peer;
 
+use anyhow::Result;
 use futures::channel::oneshot;
 use medea_client_api_proto::{
     AudioSettings, Direction, MediaType, PeerId, Track, TrackId, VideoSettings,
 };
-use medea_jason::utils::{window, WasmErr};
+use medea_jason::utils::window;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_test::*;
 
@@ -35,7 +36,7 @@ pub fn get_test_tracks() -> (Track, Track) {
     )
 }
 
-pub async fn resolve_after(delay: i32) -> Result<(), JsValue> {
+pub async fn resolve_after(delay: i32) -> Result<()> {
     let (done, wait) = oneshot::channel();
     let cb = Closure::once_into_js(move || {
         done.send(()).unwrap();
@@ -47,5 +48,5 @@ pub async fn resolve_after(delay: i32) -> Result<(), JsValue> {
         )
         .unwrap();
 
-    wait.await.map_err(|_| WasmErr::from("canceled").into())
+    Ok(wait.await?)
 }

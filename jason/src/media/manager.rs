@@ -11,6 +11,7 @@ use std::{
 
 use futures::{future, FutureExt as _, TryFutureExt as _};
 use js_sys::Promise;
+use thiserror::*;
 use wasm_bindgen::{prelude::*, JsValue};
 use wasm_bindgen_futures::{future_to_promise, JsFuture};
 use web_sys::{
@@ -24,6 +25,17 @@ use crate::{
 };
 
 use super::InputDeviceInfo;
+
+/// Describes errors that may occur in the [`MediaManager`].
+#[derive(Error, Debug)]
+pub enum Error {
+    #[error("media devices failed: {0}")]
+    MediaDevices(WasmErr),
+    #[error("get user media failed: {0}")]
+    GetUserMedia(WasmErr),
+    #[error("get enumerate devices failed: {0}")]
+    GetEnumerateDevices(WasmErr),
+}
 
 /// Manager that is responsible for [MediaStream][1] acquisition and storing.
 ///
@@ -43,10 +55,22 @@ impl InnerMediaManager {
     /// Returns the vector of [`MediaDeviceInfo`] objects.
     fn enumerate_devices(
         &self,
-    ) -> impl Future<Output = Result<Vec<InputDeviceInfo>, WasmErr>> {
+    ) -> impl Future<Output = Result<Vec<InputDeviceInfo>, Error>> {
         async {
-            let devices = window().navigator().media_devices()?;
-            let devices = JsFuture::from(devices.enumerate_devices()?).await?;
+            let devices = window()
+                .navigator()
+                .media_devices()
+                .map_err(Into::into)
+                .map_err(Error::MediaDevices)?;
+            let devices = JsFuture::from(
+                devices
+                    .enumerate_devices()
+                    .map_err(Into::into)
+                    .map_err(Error::GetEnumerateDevices)?,
+            )
+            .await
+            .map_err(Into::into)
+            .map_err(Error::GetEnumerateDevices)?;
 
             Ok(js_sys::Array::from(&devices)
                 .values()
@@ -68,7 +92,7 @@ impl InnerMediaManager {
     fn get_stream(
         &self,
         caps: MediaStreamConstraints,
-    ) -> impl Future<Output = Result<(SysMediaStream, bool), WasmErr>> {
+    ) -> impl Future<Output = Result<(SysMediaStream, bool), Error>> {
         if let Some(stream) = self.get_from_storage(&caps) {
             future::ok((stream, false)).left_future()
         } else {
@@ -124,17 +148,26 @@ impl InnerMediaManager {
     fn get_user_media(
         &self,
         caps: MediaStreamConstraints,
-    ) -> impl Future<Output = Result<SysMediaStream, WasmErr>> {
+    ) -> impl Future<Output = Result<SysMediaStream, Error>> {
         let storage = Rc::clone(&self.tracks);
 
         async move {
-            let media_devices = window().navigator().media_devices()?;
+            let media_devices = window()
+                .navigator()
+                .media_devices()
+                .map_err(Into::into)
+                .map_err(Error::MediaDevices)?;
 
             let caps: SysMediaStreamConstraints = caps.into();
             let stream = JsFuture::from(
-                media_devices.get_user_media_with_constraints(&caps)?,
+                media_devices
+                    .get_user_media_with_constraints(&caps)
+                    .map_err(Into::into)
+                    .map_err(Error::GetUserMedia)?,
             )
-            .await?;
+            .await
+            .map_err(Into::into)
+            .map_err(Error::GetUserMedia)?;
 
             let stream = SysMediaStream::from(stream);
 
@@ -171,7 +204,7 @@ impl MediaManager {
     pub async fn get_stream<I: Into<MediaStreamConstraints>>(
         &self,
         caps: I,
-    ) -> Result<(SysMediaStream, bool), WasmErr> {
+    ) -> Result<(SysMediaStream, bool), Error> {
         self.0.get_stream(caps.into()).await
     }
 
@@ -208,21 +241,26 @@ impl MediaManagerHandle {
                             })
                             .into()
                     })
-                    .map_err(Into::into)
+                    .map_err(|err| {
+                        js_sys::Error::new(&format!("{}", err)).into()
+                    })
             }),
             Err(e) => future_to_promise(future::err(e)),
         }
     }
 
-    /// Returns [`MediaStream`] object.
+    /// Returns [MediaStream][1] object.
+    ///
+    /// [1]: https://w3.org/TR/mediacapture-streams/#mediastream
     pub fn init_local_stream(&self, caps: MediaStreamConstraints) -> Promise {
         match map_weak!(self, |inner| { inner.get_stream(caps) }) {
-            Ok(stream) => future_to_promise(async {
-                stream
-                    .await
-                    .map(|(stream, _)| stream.into())
-                    .map_err(|err| err.into())
-            }),
+            Ok(stream) => {
+                future_to_promise(async {
+                    stream.await.map(|(stream, _)| stream.into()).map_err(
+                        |err| js_sys::Error::new(&format!("{}", err)).into(),
+                    )
+                })
+            }
             Err(err) => future_to_promise(future::err(err)),
         }
     }
