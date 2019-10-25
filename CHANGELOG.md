@@ -19,7 +19,7 @@ All user visible changes to this project will be documented in this file. This p
 ### Added
 
 - Control API:
-    - Support for static Сontrol API specs ([#28]).
+    - Support for static Сontrol API specs ([#28]);
     - Dynamic Control API exposed via gRPC ([#33]):
         - `Create` method for `Room`, `Member`, `Endpoint`;
         - `Get` method for `Room`, `Member`, `Endpoint`;

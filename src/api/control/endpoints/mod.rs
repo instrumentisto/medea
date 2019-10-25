@@ -1,6 +1,6 @@
-//! Endpoint elements of [medea] spec.
+//! Endpoint elements of [Medea] spec.
 //!
-//! [medea]: https://github.com/instrumentisto/medea
+//! [Medea]: https://github.com/instrumentisto/medea
 
 pub mod webrtc_play_endpoint;
 pub mod webrtc_publish_endpoint;

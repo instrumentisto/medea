@@ -12,8 +12,6 @@ server:
       client:
         http:
           public_url: wss://medea-demo.test/ws
-    log:
-      level: DEBUG
 
     turn:
       host: medea-demo.test

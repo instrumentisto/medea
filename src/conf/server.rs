@@ -111,7 +111,7 @@ pub struct Server {
 }
 
 #[cfg(test)]
-mod server_spec {
+mod client_http_spec {
     use std::net::Ipv4Addr;
 
     use serial_test_derive::serial;

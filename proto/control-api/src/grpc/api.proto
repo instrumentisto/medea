@@ -23,9 +23,9 @@ service ControlApi {
   rpc Get (IdRequest) returns (GetResponse);
 }
 
-// Request of creating new Element with in element with given Full ID (FID).
+// Request of creating new Element with in element with a given FID (full ID).
 message CreateRequest {
-  // Full ID (FID) of the Element in which will be created provided element.
+  // FID (full ID) of the Element in which the provided Element will be created.
   string parent_fid = 1;
   // Spec of the created Element.
   oneof el {
@@ -36,9 +36,9 @@ message CreateRequest {
   }
 }
 
-// Request with many Elements Full IDs (FIDs) elements.
+// Request with many FIDs (full IDs) of Elements.
 message IdRequest {
-  // List of elements Full IDs (FIDs).
+  // List of Elements FIDs.
   repeated string fid = 1;
 }
 
@@ -113,7 +113,7 @@ message Element {
 // interact with each other.
 message Room {
   // ID of this Room.
-  string id  = 1;
+  string id = 1;
   // Pipeline of this Room.
   map<string, Room.Element> pipeline = 2;
 
