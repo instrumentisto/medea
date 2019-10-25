@@ -1,3 +1,5 @@
+//! Medea media server application.
+
 use std::collections::HashMap;
 
 use actix::Actor;

@@ -41,7 +41,7 @@ pub enum MembersLoadError {
     TryFromError(TryFromElementError, StatefulFid),
 
     /// [`Member`] not found.
-    #[display(fmt = "Member [id = {}] not found.", _0)]
+    #[display(fmt = "Member [id = {}] not found", _0)]
     MemberNotFound(Fid<ToMember>),
 
     /// [`EndpointSpec`] not found.
@@ -352,7 +352,7 @@ impl Member {
     /// Creates new [`WebRtcPlayEndpoint`] based on provided
     /// [`WebRtcPlayEndpointSpec`].
     ///
-    /// This function will add created [`WebRtcPlayEndpoint`] to src's
+    /// This function will add created [`WebRtcPlayEndpoint`] to `src`s of
     /// [`WebRtcPublishEndpoint`] and to provided [`Member`].
     pub fn create_sink(
         member: &Rc<Self>,
@@ -419,7 +419,7 @@ impl WeakMember {
         Member(Weak::upgrade(&self.0).unwrap())
     }
 
-    /// Safe upgrades to [`Member`].
+    /// Safely upgrades to [`Member`].
     pub fn safe_upgrade(&self) -> Option<Member> {
         Weak::upgrade(&self.0).map(Member)
     }

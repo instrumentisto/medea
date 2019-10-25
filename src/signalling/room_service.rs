@@ -43,7 +43,7 @@ pub enum RoomServiceError {
     #[display(fmt = "Room mailbox error: {:?}", _0)]
     RoomMailboxErr(MailboxError),
 
-    /// Try to create [`Room`] with [`RoomId`] which already exists in
+    /// Attempt to create [`Room`] with [`RoomId`] which already exists in
     /// [`RoomRepository`].
     #[display(fmt = "Room [id = {}] already exists.", _0)]
     RoomAlreadyExists(Fid<ToRoom>),
@@ -51,7 +51,6 @@ pub enum RoomServiceError {
     /// Some error happened in [`Room`].
     ///
     /// For more info read [`RoomError`] docs.
-    #[display(fmt = "{}", _0)]
     RoomError(RoomError),
 
     /// Error which can happen while converting protobuf objects into interior
