@@ -61,33 +61,45 @@ pub type ActFuture<I, E> =
 pub enum RoomError {
     #[display(fmt = "Couldn't find Peer with [id = {}]", _0)]
     PeerNotFound(PeerId),
-    #[display(fmt = "{}", _0)]
+
     MemberError(MemberError),
+
     #[display(fmt = "Member [id = {}] does not have Turn credentials", _0)]
     NoTurnCredentials(MemberId),
+
     #[display(fmt = "Couldn't find RpcConnection with Member [id = {}]", _0)]
     ConnectionNotExists(MemberId),
+
     #[display(fmt = "Unable to send event to Member [id = {}]", _0)]
     UnableToSendEvent(MemberId),
+
     #[display(fmt = "PeerError: {}", _0)]
     PeerError(PeerError),
+
     #[display(fmt = "{}", _0)]
     MembersLoadError(MembersLoadError),
+
     #[display(fmt = "{}", _0)]
     TryFromElementError(TryFromElementError),
+
     #[display(fmt = "Generic room error: {}", _0)]
     BadRoomSpec(String),
+
     #[display(fmt = "Turn service error: {}", _0)]
     TurnServiceError(String),
-    #[display(fmt = "{}", _0)]
+
     ParticipantServiceErr(ParticipantServiceErr),
+
     #[display(fmt = "Client error:{}", _0)]
     ClientError(String),
+
     #[display(fmt = "Given Fid [fid = {}] to wrong Room [id = {}]", _0, _1)]
     WrongRoomId(StatefulFid, RoomId),
+
     /// Try to create [`Member`] with ID which already exists.
     #[display(fmt = "Member [id = {}] already exists.", _0)]
     MemberAlreadyExists(Fid<ToMember>),
+
     /// Try to create [`Endpoint`] with ID which already exists.
     ///
     /// [`Endpoint`]: crate::signalling::elements::endpoints::Endpoint
@@ -774,7 +786,9 @@ impl Room {
 
         member.insert_sink(sink);
 
-        self.init_member_connections(&member, ctx);
+        if self.members.member_has_connection(member_id) {
+            self.init_member_connections(&member, ctx);
+        }
 
         Ok(())
     }
@@ -877,9 +891,9 @@ impl Into<ElementProto> for &mut Room {
 }
 
 // TODO: Tightly coupled with protobuf.
-//      We should name this method GetElements, that will return some
-//      intermediate DTO, that will be serialized at the caller side.
-//      But lets leave it as it is for now.
+//       We should name this method GetElements, that will return some
+//       intermediate DTO, that will be serialized at the caller side.
+//       But lets leave it as it is for now.
 
 /// Message for serializing this [`Room`] and [`Room`]'s elements to protobuf
 /// spec.
@@ -1099,12 +1113,15 @@ impl Handler<Close> for Room {
     type Result = ();
 
     fn handle(&mut self, _: Close, ctx: &mut Self::Context) -> Self::Result {
-        let close_fut = self.close_gracefully(ctx);
-        ctx.wait(close_fut);
+        for id in self.members.members().keys() {
+            self.delete_member(id, ctx);
+        }
+        let drop_fut = self.members.drop_connections(ctx);
+        ctx.wait(wrap_future(drop_fut));
     }
 }
 
-/// Signal for delete elements from this [`Room`].
+/// Signal for deleting elements from this [`Room`].
 #[derive(Message, Debug)]
 #[rtype(result = "()")]
 pub struct Delete(pub Vec<StatefulFid>);
@@ -1136,7 +1153,7 @@ impl Handler<Delete> for Room {
     }
 }
 
-/// Signal for create new [`Member`] in this [`Room`].
+/// Signal for creating new [`Member`] in this [`Room`].
 #[derive(Message, Debug)]
 #[rtype(result = "Result<(), RoomError>")]
 pub struct CreateMember(pub MemberId, pub MemberSpec);
@@ -1158,7 +1175,7 @@ impl Handler<CreateMember> for Room {
     }
 }
 
-/// Signal for create new `Endpoint` from [`EndpointSpec`].
+/// Signal for creating new `Endpoint` from [`EndpointSpec`].
 #[derive(Message, Debug)]
 #[rtype(result = "Result<(), RoomError>")]
 pub struct CreateEndpoint {

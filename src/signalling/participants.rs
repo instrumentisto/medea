@@ -68,7 +68,6 @@ pub enum ParticipantServiceErr {
     EndpointNotFound(Fid<ToEndpoint>),
 
     /// Some error happened in [`Member`].
-    #[display(fmt = "{}", _0)]
     MemberError(MemberError),
 }
 
@@ -168,7 +167,7 @@ impl ParticipantService {
 
     /// Lookups [`Member`] by provided [`MemberId`] and credentials.
     ///
-    /// Returns [`Err(AuthorizationError::MemberNotExists)`] if lookup by
+    /// Returns [`AuthorizationError::MemberNotExists`] if lookup by
     /// [`MemberId`] failed.
     ///
     /// Returns [`Err(AuthorizationError::InvalidCredentials)`] if [`Member`]
@@ -385,7 +384,7 @@ impl ParticipantService {
         join_all(close_fut).map(|_| ())
     }
 
-    /// Deletes [`Member`] from [`ParticipantService`], remove this user from
+    /// Deletes [`Member`] from [`ParticipantService`], removes this user from
     /// [`TurnAuthService`], closes RPC connection with him and removes drop
     /// connection task.
     ///
@@ -416,6 +415,7 @@ impl ParticipantService {
         }
     }
 
+    /// Inserts given [`Member`] into [`ParticipantService`].
     pub fn insert_member(&mut self, id: MemberId, member: Member) {
         self.members.insert(id, member);
     }

@@ -25,7 +25,9 @@ pub enum ParseFidError {
     MissingPath(String),
 }
 
-/// Full ID (`fid` in dynamic Control API specs).
+/// FID (full ID, or `fid` in Control API specs) is a composition of
+/// media elements IDs, which refers to some media element on a whole server
+/// uniquely.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Fid<T> {
     state: T,

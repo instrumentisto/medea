@@ -1,4 +1,4 @@
-//! Medea media server application.
+//! Medea media server.
 
 #[macro_use]
 pub mod utils;
@@ -14,8 +14,8 @@ use std::sync::Arc;
 
 use crate::{conf::Conf, turn::TurnAuthService};
 
-/// Global app context.
-#[derive(Debug, Clone)]
+/// Global application context.
+#[derive(Clone, Debug)]
 pub struct AppContext {
     /// [Medea] configuration.
     ///
@@ -28,6 +28,7 @@ pub struct AppContext {
 
 impl AppContext {
     /// Creates new [`AppContext`].
+    #[inline]
     pub fn new(config: Conf, turn: Arc<dyn TurnAuthService>) -> Self {
         Self {
             config: Arc::new(config),
