@@ -86,14 +86,16 @@ async function init(){
     });
 
     room.on_local_stream(function () {
-        console.log("unreachable!");
+      console.log("unreachable!");
+    });
+
+    room.on_failed_local_stream(function (error) {
+      console.log(error);
     });
 
     join_button.click(function () {
       room.join(token);
       join_button.prop("disabled", true);
-      audio_select.prop("disabled", true);
-      video_select.prop("disabled", true);
     });
 
     return room;
