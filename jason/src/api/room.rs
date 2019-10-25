@@ -286,12 +286,12 @@ impl EventHandler for InnerRoom {
                 };
                 Result::<_, WasmErr>::Ok(())
             }
-                .then(|result| {
-                    if let Err(err) = result {
-                        err.log_err();
-                    };
-                    future::ready(())
-                }),
+            .then(|result| {
+                if let Err(err) = result {
+                    err.log_err();
+                };
+                future::ready(())
+            }),
         );
     }
 

@@ -5,7 +5,9 @@ mod three_pubs;
 
 use std::time::Duration;
 
-use actix::{Actor, Arbiter, AsyncContext, Context, Handler, StreamHandler};
+use actix::{
+    Actor, Addr, Arbiter, AsyncContext, Context, Handler, StreamHandler,
+};
 use actix_codec::Framed;
 use actix_http::ws;
 use awc::{
@@ -13,7 +15,7 @@ use awc::{
     ws::{CloseCode, CloseReason, Frame},
     BoxedSocket,
 };
-use futures::{stream::SplitSink, Future as _, Sink as _, Stream as _};
+use futures::{stream::SplitSink, Future, Future as _, Sink as _, Stream as _};
 use medea_client_api_proto::{Command, Event, IceCandidate};
 use serde_json::error::Error as SerdeError;
 
@@ -54,10 +56,35 @@ impl TestMember {
     }
 
     /// Sends command to the server.
-    fn send_command(&mut self, msg: Command) {
-        let json = serde_json::to_string(&msg).unwrap();
-        self.writer.start_send(ws::Message::Text(json)).unwrap();
-        self.writer.poll_complete().unwrap();
+    fn send_command(&mut self, msg: &Command) {
+        let json = serde_json::to_string(msg).unwrap();
+        self.writer.start_send(ws::Message::Text(json)).ok();
+        self.writer.poll_complete().ok();
+    }
+
+    /// Returns [`Future`] which will connect to the WebSocket and starts
+    /// [`TestMember`] actor.
+    pub fn connect(
+        uri: &str,
+        on_message: MessageHandler,
+        deadline: Option<Duration>,
+    ) -> impl Future<Item = Addr<Self>, Error = ()> {
+        awc::Client::new()
+            .ws(uri)
+            .connect()
+            .map_err(|e| panic!("Error: {}", e))
+            .map(move |(_, framed)| {
+                let (sink, stream) = framed.split();
+                Self::create(move |ctx| {
+                    Self::add_stream(stream, ctx);
+                    Self {
+                        writer: sink,
+                        events: Vec::new(),
+                        deadline,
+                        on_message,
+                    }
+                })
+            })
     }
 
     /// Starts test member in new [`Arbiter`] by given URI.
@@ -68,24 +95,7 @@ impl TestMember {
         on_message: MessageHandler,
         deadline: Option<Duration>,
     ) {
-        Arbiter::spawn(
-            awc::Client::new()
-                .ws(uri)
-                .connect()
-                .map_err(|e| panic!("Error: {}", e))
-                .map(move |(_, framed)| {
-                    let (sink, stream) = framed.split();
-                    TestMember::create(move |ctx| {
-                        TestMember::add_stream(stream, ctx);
-                        TestMember {
-                            writer: sink,
-                            events: Vec::new(),
-                            deadline,
-                            on_message,
-                        }
-                    });
-                }),
-        )
+        Arbiter::spawn(Self::connect(uri, on_message, deadline).map(|_| ()))
     }
 }
 
@@ -137,10 +147,7 @@ impl StreamHandler<Frame, WsProtocolError> for TestMember {
             let txt = String::from_utf8(txt.unwrap().to_vec()).unwrap();
             let event: Result<Event, SerdeError> = serde_json::from_str(&txt);
             if let Ok(event) = event {
-                let mut events: Vec<&Event> = self.events.iter().collect();
-                events.push(&event);
                 // Test function call
-                (self.on_message)(&event, ctx, events);
 
                 if let Event::PeerCreated {
                     peer_id,
@@ -150,11 +157,11 @@ impl StreamHandler<Frame, WsProtocolError> for TestMember {
                 } = &event
                 {
                     match sdp_offer {
-                        Some(_) => self.send_command(Command::MakeSdpAnswer {
+                        Some(_) => self.send_command(&Command::MakeSdpAnswer {
                             peer_id: *peer_id,
                             sdp_answer: "responder_answer".into(),
                         }),
-                        None => self.send_command(Command::MakeSdpOffer {
+                        None => self.send_command(&Command::MakeSdpOffer {
                             peer_id: *peer_id,
                             sdp_offer: "caller_offer".into(),
                             mids: tracks
@@ -166,7 +173,7 @@ impl StreamHandler<Frame, WsProtocolError> for TestMember {
                         }),
                     }
 
-                    self.send_command(Command::SetIceCandidate {
+                    self.send_command(&Command::SetIceCandidate {
                         peer_id: *peer_id,
                         candidate: IceCandidate {
                             candidate: "ice_candidate".to_string(),
@@ -175,6 +182,9 @@ impl StreamHandler<Frame, WsProtocolError> for TestMember {
                         },
                     });
                 }
+                let mut events: Vec<&Event> = self.events.iter().collect();
+                events.push(&event);
+                (self.on_message)(&event, ctx, events);
                 self.events.push(event);
             }
         }

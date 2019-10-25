@@ -1,6 +1,6 @@
 //! Implementation of [Client API].
 //!
-//! [Client API]: http://tiny.cc/c80uaz
+//! [Client API]: https://tinyurl.com/yx9thsnr
 
 mod session;
 

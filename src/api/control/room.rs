@@ -1,11 +1,17 @@
 //! Definitions and implementations of [Control API]'s `Room` element.
 //!
-//! [Control API]: http://tiny.cc/380uaz
+//! [Control API]: https://tinyurl.com/yxsqplq7
 
 use std::{collections::HashMap, convert::TryFrom};
 
 use derive_more::{Display, From};
+#[rustfmt::skip]
+use medea_control_api_proto::grpc::api::{
+    CreateRequest_oneof_el as ElementProto,
+};
 use serde::Deserialize;
+
+use crate::api::control::{EndpointId, TryFromProtobufError};
 
 use super::{
     member::{MemberElement, MemberSpec},
@@ -29,7 +35,7 @@ pub enum RoomElement {
     /// Represent [`MemberSpec`].
     /// Can transform into [`MemberSpec`] by `MemberSpec::try_from`.
     Member {
-        spec: Pipeline<MemberElement>,
+        spec: Pipeline<EndpointId, MemberElement>,
         credentials: String,
     },
 }
@@ -38,12 +44,47 @@ pub enum RoomElement {
 ///
 /// Newtype for [`RootElement::Room`].
 ///
-/// [Control API]: http://tiny.cc/380uaz
+/// [Control API]: https://tinyurl.com/yxsqplq7
 #[allow(clippy::module_name_repetitions)]
 #[derive(Clone, Debug)]
 pub struct RoomSpec {
     pub id: Id,
-    pub pipeline: Pipeline<RoomElement>,
+    pub pipeline: Pipeline<MemberId, RoomElement>,
+}
+
+impl TryFrom<ElementProto> for RoomSpec {
+    type Error = TryFromProtobufError;
+
+    fn try_from(proto: ElementProto) -> Result<Self, Self::Error> {
+        let id = match proto {
+            ElementProto::room(mut room) => {
+                let mut pipeline = HashMap::new();
+                for (id, room_element) in room.take_pipeline() {
+                    if let Some(elem) = room_element.el {
+                        let member =
+                            MemberSpec::try_from((MemberId(id.clone()), elem))?;
+                        pipeline.insert(id.into(), member.into());
+                    } else {
+                        return Err(TryFromProtobufError::EmptyElement(id));
+                    }
+                }
+
+                let pipeline = Pipeline::new(pipeline);
+                return Ok(Self {
+                    id: room.take_id().into(),
+                    pipeline,
+                });
+            }
+            ElementProto::member(mut member) => member.take_id(),
+            ElementProto::webrtc_pub(mut webrtc_pub) => webrtc_pub.take_id(),
+            ElementProto::webrtc_play(mut webrtc_play) => webrtc_play.take_id(),
+        };
+
+        Err(TryFromProtobufError::ExpectedOtherElement(
+            String::from("Room"),
+            id,
+        ))
+    }
 }
 
 impl RoomSpec {
@@ -54,9 +95,8 @@ impl RoomSpec {
         let mut members: HashMap<MemberId, MemberSpec> = HashMap::new();
         for (control_id, element) in self.pipeline.iter() {
             let member_spec = MemberSpec::try_from(element)?;
-            let member_id = MemberId(control_id.clone());
 
-            members.insert(member_id.clone(), member_spec);
+            members.insert(control_id.clone(), member_spec);
         }
 
         Ok(members)

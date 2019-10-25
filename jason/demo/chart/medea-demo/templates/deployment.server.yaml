@@ -69,7 +69,7 @@ spec:
                 name: {{ template "medea-demo.fullname" . }}.server.cred
           ports:
             - name: http
-              containerPort: {{ .Values.server.conf.server.bind_port }}
+              containerPort: {{ .Values.server.conf.server.client.http.bind_port }}
           volumeMounts:
             - name: conf
               subPath: medea.toml
@@ -80,11 +80,11 @@ spec:
         {{- end }}
           livenessProbe:
             tcpSocket:
-              port: {{ .Values.server.conf.server.bind_port }}
+              port: {{ .Values.server.conf.server.client.http.bind_port }}
             initialDelaySeconds: 3
           readinessProbe:
             tcpSocket:
-              port: {{ .Values.server.conf.server.bind_port }}
+              port: {{ .Values.server.conf.server.client.http.bind_port }}
             initialDelaySeconds: 5
         - name: coturn
           image: "{{ $coturn.image.repository }}:{{ $coturn.image.tag }}"

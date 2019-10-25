@@ -23,10 +23,10 @@ service ControlApi {
   rpc Get (IdRequest) returns (GetResponse);
 }
 
-// Request of creating new Element with a given ID.
+// Request of creating new Element with in element with a given FID (full ID).
 message CreateRequest {
-  // ID of the Element to be created..
-  string id = 1;
+  // FID (full ID) of the Element in which the provided Element will be created.
+  string parent_fid = 1;
   // Spec of the created Element.
   oneof el {
     Member member = 2;
@@ -36,10 +36,10 @@ message CreateRequest {
   }
 }
 
-// Request with many Elements IDs.
+// Request with many FIDs (full IDs) of Elements.
 message IdRequest {
-  // List of Elements IDs.
-  repeated string id = 1;
+  // List of Elements FIDs.
+  repeated string fid = 1;
 }
 
 // Response which doesn't return anything on successful result,
@@ -112,8 +112,10 @@ message Element {
 // Media element which represents a single space where multiple Members can
 // interact with each other.
 message Room {
+  // ID of this Room.
+  string id = 1;
   // Pipeline of this Room.
-  map<string, Room.Element> pipeline = 1;
+  map<string, Room.Element> pipeline = 2;
 
   // Elements which Room's pipeline can contain.
   message Element {
@@ -128,16 +130,18 @@ message Room {
 // Media element which represents a client authorized to participate
 // in a some bigger media pipeline.
 message Member {
+  // ID of this Member.
+  string id = 1;
   // Callback which fires when the Member establishes persistent connection
   // with a media server via Client API.
-  string on_join = 1;
+  string on_join = 2;
   // Callback which fires when the Member finishes persistent connection
   // with a media server via Client API.
-  string on_leave = 2;
+  string on_leave = 3;
   // Credentials of the Member to authorize via Client API with.
-  string credentials = 3;
+  string credentials = 4;
   // Pipeline of this Member.
-  map<string, Member.Element> pipeline = 4;
+  map<string, Member.Element> pipeline = 5;
 
   // Elements which Member's pipeline can contain.
   message Element {
@@ -151,12 +155,14 @@ message Member {
 // Media element which is able to receive media data from a client via WebRTC
 // (allows to publish media data).
 message WebRtcPublishEndpoint {
+  // ID of this WebRtcPublishEndpoint.
+  string id = 1;
   // P2P mode for this element.
-  P2P p2p = 1;
+  P2P p2p = 2;
   // Callback which fires when a client starts publishing media data.
-  string on_start = 2;
+  string on_start = 3;
   // Callback which fires when a client stops publishing media data.
-  string on_stop = 3;
+  string on_stop = 4;
 
   // P2P mode of WebRTC interaction.
   enum P2P {
@@ -172,12 +178,14 @@ message WebRtcPublishEndpoint {
 
 // Media element which is able to play media data for a client via WebRTC.
 message WebRtcPlayEndpoint {
+  // ID of this WebRtcPlayEndpoint.
+  string id = 1;
   // The source to get media data from.
-  string src = 1;
+  string src = 2;
   // Callback which fires when a client starts playing media data
   // from the source.
-  string on_start = 2;
+  string on_start = 3;
   // Callback which fires when a client stops playing media data
   // from the source.
-  string on_stop = 3;
+  string on_stop = 4;
 }
