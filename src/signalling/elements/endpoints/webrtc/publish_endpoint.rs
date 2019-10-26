@@ -6,11 +6,16 @@ use std::{
     rc::{Rc, Weak},
 };
 
-use derive_more::{Display, From};
 use medea_client_api_proto::PeerId;
+use medea_control_api_proto::grpc::api::{
+    Element as RootElementProto, Member_Element as ElementProto,
+    WebRtcPublishEndpoint as WebRtcPublishEndpointProto,
+};
 
 use crate::{
-    api::control::endpoint::P2pMode,
+    api::control::endpoints::webrtc_publish_endpoint::{
+        P2pMode, WebRtcPublishId as Id,
+    },
     signalling::elements::{
         endpoints::webrtc::play_endpoint::WeakWebRtcPlayEndpoint,
         member::WeakMember, Member,
@@ -18,13 +23,6 @@ use crate::{
 };
 
 use super::play_endpoint::WebRtcPlayEndpoint;
-
-#[doc(inline)]
-pub use Id as WebRtcPublishId;
-
-/// ID of [`WebRtcPublishEndpoint`].
-#[derive(Clone, Debug, Eq, Hash, PartialEq, From, Display)]
-pub struct Id(pub String);
 
 #[derive(Clone, Debug)]
 struct WebRtcPublishEndpointInner {
@@ -105,23 +103,18 @@ impl WebRtcPublishEndpointInner {
 /// Signalling representation of [`WebRtcPublishEndpoint`].
 ///
 /// [`WebRtcPublishEndpoint`]:
-/// crate::api::control::endpoint::WebRtcPublishEndpoint
+/// crate::api::control::endpoints::WebRtcPublishEndpoint
 #[allow(clippy::module_name_repetitions)]
 #[derive(Debug, Clone)]
 pub struct WebRtcPublishEndpoint(Rc<RefCell<WebRtcPublishEndpointInner>>);
 
 impl WebRtcPublishEndpoint {
     /// Creates new [`WebRtcPublishEndpoint`].
-    pub fn new(
-        id: Id,
-        p2p: P2pMode,
-        sinks: Vec<WeakWebRtcPlayEndpoint>,
-        owner: WeakMember,
-    ) -> Self {
+    pub fn new(id: Id, p2p: P2pMode, owner: WeakMember) -> Self {
         Self(Rc::new(RefCell::new(WebRtcPublishEndpointInner {
             id,
             p2p,
-            sinks,
+            sinks: Vec::new(),
             owner,
             peer_ids: HashSet::new(),
         })))
@@ -193,6 +186,11 @@ impl WebRtcPublishEndpoint {
             .retain(|e| e.safe_upgrade().is_some());
     }
 
+    /// Peer-to-peer mode of this [`WebRtcPublishEndpoint`].
+    pub fn p2p(&self) -> P2pMode {
+        self.0.borrow().p2p.clone()
+    }
+
     /// Downgrades [`WebRtcPublishEndpoint`] to weak pointer
     /// [`WeakWebRtcPublishEndpoint`].
     pub fn downgrade(&self) -> WeakWebRtcPublishEndpoint {
@@ -227,5 +225,27 @@ impl WeakWebRtcPublishEndpoint {
     /// Returns `None` if weak pointer was dropped.
     pub fn safe_upgrade(&self) -> Option<WebRtcPublishEndpoint> {
         self.0.upgrade().map(WebRtcPublishEndpoint)
+    }
+}
+
+impl Into<ElementProto> for WebRtcPublishEndpoint {
+    fn into(self) -> ElementProto {
+        let mut element = ElementProto::new();
+        let mut publish = WebRtcPublishEndpointProto::new();
+        publish.set_p2p(self.p2p().into());
+        publish.set_id(self.id().to_string());
+        element.set_webrtc_pub(publish);
+
+        element
+    }
+}
+
+impl Into<RootElementProto> for WebRtcPublishEndpoint {
+    fn into(self) -> RootElementProto {
+        let mut element = RootElementProto::new();
+        let mut member_element: ElementProto = self.into();
+        let endpoint = member_element.take_webrtc_pub();
+        element.set_webrtc_pub(endpoint);
+        element
     }
 }

@@ -121,6 +121,9 @@ pub enum CloseReason {
     ///
     /// This close reason is similar to 500 HTTP status code.
     InternalError,
+
+    /// Client was evicted on the server side.
+    Evicted,
 }
 
 /// Description which is sent in [Close] WebSocket frame from Media Server

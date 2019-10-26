@@ -1,6 +1,6 @@
 //! Logging settings.
 
-use std::str::FromStr as _;
+use std::{borrow::Cow, str::FromStr as _};
 
 use serde::{Deserialize, Serialize};
 use smart_default::SmartDefault;
@@ -11,13 +11,37 @@ use smart_default::SmartDefault;
 pub struct Log {
     /// Maximum allowed level of application log entries.
     /// Defaults to `INFO`.
-    #[default(String::from("INFO"))]
-    pub level: String,
+    #[default = "INFO"]
+    pub level: Cow<'static, str>,
 }
 
 impl Log {
     /// Returns configured application logging level. `None` if disabled.
     pub fn level(&self) -> Option<slog::Level> {
         slog::Level::from_str(&self.level).ok()
+    }
+}
+
+#[cfg(test)]
+mod log_conf_specs {
+    use serial_test_derive::serial;
+
+    use crate::{conf::Conf, overrided_by_env_conf};
+
+    #[test]
+    #[serial]
+    fn overrides_defaults() {
+        let default_conf = Conf::default();
+
+        let env_conf = overrided_by_env_conf!(
+            "MEDEA_LOG__LEVEL" => "WARN",
+        );
+        assert_ne!(default_conf.log.level(), env_conf.log.level());
+        assert_eq!(env_conf.log.level(), Some(slog::Level::Warning));
+
+        let none_lvl = overrided_by_env_conf!(
+            "MEDEA_LOG__LEVEL" => "OFF",
+        );
+        assert_eq!(none_lvl.log.level(), None);
     }
 }

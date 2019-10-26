@@ -1,9 +1,10 @@
 //! Definitions and implementations of [Control API]'s `Pipeline`.
 //!
-//! [Control API]: http://tiny.cc/380uaz
+//! [Control API]: https://tinyurl.com/yxsqplq7
 
 use std::{
     collections::{hash_map::Iter, HashMap},
+    hash::Hash,
     iter::IntoIterator,
 };
 
@@ -11,27 +12,32 @@ use serde::Deserialize;
 
 /// Entity that represents some pipeline of spec.
 #[derive(Clone, Deserialize, Debug)]
-pub struct Pipeline<T> {
-    pipeline: HashMap<String, T>,
+pub struct Pipeline<K: Hash + Eq, V> {
+    pipeline: HashMap<K, V>,
 }
 
-impl<T> Pipeline<T> {
+impl<K: Hash + Eq, V> Pipeline<K, V> {
+    /// Creates new [`Pipeline`] from provided [`HashMap`].
+    pub fn new(pipeline: HashMap<K, V>) -> Self {
+        Self { pipeline }
+    }
+
     /// Iterates over pipeline by reference.
     #[inline]
-    pub fn iter(&self) -> impl Iterator<Item = (&String, &T)> {
+    pub fn iter(&self) -> impl Iterator<Item = (&K, &V)> {
         self.into_iter()
     }
 
     /// Lookups element of [`Pipeline`] by ID.
     #[inline]
-    pub fn get(&self, id: &str) -> Option<&T> {
+    pub fn get(&self, id: &K) -> Option<&V> {
         self.pipeline.get(id)
     }
 }
 
-impl<'a, T> IntoIterator for &'a Pipeline<T> {
-    type IntoIter = Iter<'a, String, T>;
-    type Item = (&'a String, &'a T);
+impl<'a, K: Eq + Hash, V> IntoIterator for &'a Pipeline<K, V> {
+    type IntoIter = Iter<'a, K, V>;
+    type Item = (&'a K, &'a V);
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
