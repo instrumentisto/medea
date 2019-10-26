@@ -12,7 +12,7 @@
 
     let inited = false;
 
-    async function init_jason() {
+    export async function init_jason() {
       if (inited) {
         throw Error("Already init");
       }
@@ -20,7 +20,11 @@
       inited = true;
       const jason = new Jason();
 
-      async function getDevices(audio_select, video_select) {
+      async function getDevices(audio_select, video_select, current_stream) {
+        const current_audio = current_stream.getAudioTracks().pop().label
+          || "disable";
+        const current_video = current_stream.getVideoTracks().pop().label
+          || "disable";
         const device_infos = await jason.media_manager()
           .enumerate_devices();
         console.log('Available input and output devices:', device_infos);
@@ -30,16 +34,18 @@
           if (device_info.kind() === 'audio') {
             option.text = device_info.label()
               || `Microphone ${audio_select.length + 1}`;
+            option.selected = option.text === current_audio;
             audio_select.append(option);
           } else if (device_info.kind() === 'video') {
             option.text = device_info.label()
               || `Camera ${video_select.length + 1}`;
+            option.selected = option.text === current_video;
             video_select.append(option);
           }
         }
       }
 
-      async function getStream(local_video, audio_select, video_select) {
+      async function getStream(audio_select, video_select) {
         let constraints = new MediaStreamConstraints();
         let audio = new AudioTrackConstraints();
         if (audio_select.value) {
@@ -51,11 +57,7 @@
           video.device_id(video_select.value)
         }
         constraints.video(video);
-        const stream = await jason.media_manager()
-          .init_local_stream(constraints);
-        local_video.srcObject = stream;
-        local_video.play();
-        console.log(stream);
+        return await jason.media_manager().init_local_stream(constraints);
       }
 
       async function init_room(roomId) {
@@ -72,8 +74,12 @@
         let joinResponderButton = document.getElementById('join-responder');
 
         let room = await jason.init_room();
-        await getStream(localVideo, audioSelect, videoSelect);
-        await getDevices(audioSelect, videoSelect);
+
+        const updateLocalStream = function (stream) {
+          localVideo.srcObject = stream;
+          localVideo.play();
+          room.inject_local_stream(stream);
+        };
 
         toggleAudio.addEventListener('change', (event) => {
           event.target.checked ? room.unmute_audio() : room.mute_audio();
@@ -83,52 +89,59 @@
           event.target.checked ? room.unmute_video() : room.mute_video();
         });
 
-        audioSelect.addEventListener('change', () => {
-          getStream(localVideo, audioSelect, videoSelect);
+        audioSelect.addEventListener('change', async () => {
+          try {
+            const stream = await getStream(audioSelect, videoSelect);
+            updateLocalStream(stream);
+          } catch (err) {
+            console.log('Init local stream failed: ' + err);
+          }
         });
 
-        videoSelect.addEventListener('change', () => {
-          getStream(localVideo, audioSelect, videoSelect);
+        videoSelect.addEventListener('change', async () => {
+          try {
+            const stream = await getStream(audioSelect, videoSelect);
+            updateLocalStream(stream);
+          } catch (err) {
+            console.log('Init local stream failed: ' + err);
+          }
         });
 
         room.on_new_connection(function (connection) {
           connection.on_remote_stream(function (stream) {
-            remoteVideo.srcObject = stream.get_media_stream();
-              remoteVideo.play();
-            });
+            remoteVideo.srcObject = stream;
+            remoteVideo.play();
           });
+        });
 
-          jason.on_local_stream(function (stream, error) {
-            if (stream) {
-              console.log("unreachable!");
-            } else {
-              console.log(error);
-            }
-          });
+        room.on_local_stream(function () {
+          console.log("unreachable!");
+        });
 
-          joinCallerButton.onclick = function () {
-            room.join(baseUrl + roomId + '/caller/test');
-            disableButtons();
-          };
+        room.on_failed_local_stream(function (error) {
+          console.log(error);
+        });
 
-          joinResponderButton.onclick = function () {
-            room.join(baseUrl + roomId + '/responder/test');
-            disableButtons();
-          };
+        joinCallerButton.addEventListener('click', (event) => {
+          room.join(baseUrl + roomId + '/caller/test');
+          event.target.disabled = true;
+        });
 
-          const disableButtons = function () {
-            joinCallerButton.disabled = true;
-            joinResponderButton.disabled = true;
-            audioSelect.disabled = true;
-            videoSelect.disabled = true;
-          };
+        joinResponderButton.addEventListener('click', (event) => {
+          room.join(baseUrl + roomId + '/responder/test');
+          event.target.disabled = true;
+        });
 
-          return room;
-        }
+        let stream = await getStream(audioSelect, videoSelect);
+        updateLocalStream(stream);
+        await getDevices(audioSelect, videoSelect, stream);
 
-        return {
-          init_room: init_room,
-        };
+        return room;
+      }
+
+      return {
+        init_room: init_room,
+      };
     }
 
     window.init_local_room = async function init_local_room(roomId) {

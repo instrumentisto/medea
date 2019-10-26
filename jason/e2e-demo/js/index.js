@@ -24,7 +24,7 @@ async function init(){
     }
   }
 
-  async function getStream(local_video, audio_select, video_select) {
+  async function getStream(audio_select, video_select) {
     let constraints = new rust.MediaStreamConstraints();
     let audio = new rust.AudioTrackConstraints();
     if (audio_select.val()) {
@@ -37,8 +37,6 @@ async function init(){
     }
     constraints.video(video);
     let stream = await jason.media_manager().init_local_stream(constraints);
-    local_video.srcObject = stream;
-    local_video.play();
     console.log(stream);
     return stream;
   }
@@ -53,8 +51,12 @@ async function init(){
     let join_button = $(frame).find("button[name=join-room]");
 
     const room = await jason.init_room();
-    const stream = await getStream(local_video, audio_select, video_select);
-    await fillMediaDevicesInputs(audio_select, video_select, stream);
+
+    const updateLocalStream = function (stream) {
+      local_video.srcObject = stream;
+      local_video.play();
+      room.inject_local_stream(stream);
+    };
 
     toggle_audio.change(function () {
       if ($(this).is(":checked")) {
@@ -73,13 +75,13 @@ async function init(){
     });
 
     audio_select.change(async function () {
-      const stream = await getStream(local_video, audio_select, video_select);
-      room.inject_local_stream(stream);
+      const stream = await getStream(audio_select, video_select);
+      updateLocalStream(stream);
     });
 
     video_select.change(async function () {
-      const stream = await getStream(local_video, audio_select, video_select);
-      room.inject_local_stream(stream);
+      const stream = await getStream(audio_select, video_select);
+      updateLocalStream(stream);
     });
 
     room.on_new_connection(function (connection) {
@@ -101,6 +103,10 @@ async function init(){
       room.join(token);
       join_button.prop("disabled", true);
     });
+
+    const stream = await getStream(audio_select, video_select);
+    updateLocalStream(stream);
+    await fillMediaDevicesInputs(audio_select, video_select, stream);
 
     return room;
   }
