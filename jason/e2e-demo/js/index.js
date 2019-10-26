@@ -4,7 +4,9 @@ async function init(){
 
   const jason = new rust.Jason();
 
-  async function fillMediaDevicesInputs(audio_select, video_select) {
+  async function fillMediaDevicesInputs(audio_select, video_select, current_stream) {
+    const current_audio = current_stream.getAudioTracks().pop().label || "disable";
+    const current_video = current_stream.getVideoTracks().pop().label || "disable";
     const device_infos = await jason.media_manager().enumerate_devices();
     console.log('Available input and output devices:', device_infos);
     for (const device_info of device_infos) {
@@ -12,9 +14,11 @@ async function init(){
       option.value = device_info.device_id();
       if (device_info.kind() === 'audio') {
         option.text = device_info.label() || `Microphone ${audio_select.length + 1}`;
+        option.selected = option.text === current_audio;
         audio_select.append(option);
       } else if (device_info.kind() === 'video') {
         option.text = device_info.label() || `Camera ${video_select.length + 1}`;
+        option.selected = option.text === current_video;
         video_select.append(option);
       }
     }
@@ -48,9 +52,9 @@ async function init(){
     let video_select = $(frame).find("select[name=video-source]");
     let join_button = $(frame).find("button[name=join-room]");
 
-    let room = await jason.init_room();
-    await getStream(local_video, audio_select, video_select);
-    await fillMediaDevicesInputs(audio_select, video_select);
+    const room = await jason.init_room();
+    const stream = await getStream(local_video, audio_select, video_select);
+    await fillMediaDevicesInputs(audio_select, video_select, stream);
 
     toggle_audio.change(function () {
       if ($(this).is(":checked")) {
