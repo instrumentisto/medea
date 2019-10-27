@@ -9,16 +9,20 @@ use serde::{Deserialize, Serialize};
 
 use super::endpoint::Endpoint;
 
-/// Entity that represents control API `Member`.
+/// Entity that represents [Control API] `Member`.
+///
+/// [Control API]: https://tinyurl.com/yxsqplq7
 #[derive(Deserialize, Serialize, Debug)]
 pub struct Member {
     /// ID of `Member`.
     id: String,
 
-    /// Pipeline of Control API `Member`.
+    /// Pipeline of [Control API] `Member`.
+    ///
+    /// [Control API]: https://tinyurl.com/yxsqplq7
     pipeline: HashMap<String, Endpoint>,
 
-    /// Optional member credentials.
+    /// Optional `Member` credentials.
     ///
     /// If `None` then random credentials will be generated on Medea side.
     credentials: Option<String>,

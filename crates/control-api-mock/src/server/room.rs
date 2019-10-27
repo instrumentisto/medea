@@ -10,7 +10,9 @@ use serde::{Deserialize, Serialize};
 
 use super::member::Member;
 
-/// Control API's `Room` representation.
+/// [Control API]'s `Room` representation.
+///
+/// [Control API]: https://tinyurl.com/yxsqplq7
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Room {
     /// ID of `Room`.

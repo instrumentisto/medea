@@ -1,4 +1,7 @@
-//! Implementation of client for Medea's gRPC Control API.
+//! Implementation of client for [Medea]'s gRPC [Control API].
+//!
+//! [Medea]: https://github.com/instrumentisto/medea
+//! [Control API]: https://tinyurl.com/yxsqplq7
 
 use std::sync::Arc;
 
@@ -46,7 +49,7 @@ impl Into<String> for Fid {
     }
 }
 
-/// Returns new [`IdRequest`] with provided IDs.
+/// Returns new [`IdRequest`] with provided FIDs.
 fn id_request(ids: Vec<String>) -> IdRequest {
     let mut req = IdRequest::new();
     let ids = RepeatedField::from(ids);
@@ -54,7 +57,10 @@ fn id_request(ids: Vec<String>) -> IdRequest {
     req
 }
 
-/// Client for Medea's Control API.
+/// Client for [Medea]'s [Control API].
+///
+/// [Medea]: https://github.com/instrumentisto/medea
+/// [Control API]: https://tinyurl.com/yxsqplq7
 #[allow(clippy::module_name_repetitions)]
 pub struct ControlClient {
     /// [`grpcio`] gRPC client for Medea Control API.
@@ -62,11 +68,11 @@ pub struct ControlClient {
 }
 
 impl ControlClient {
-    /// Creates new client for Medea's control API.
+    /// Creates new client for Medea's Control API.
     ///
-    /// __Note that call of this function don't checks availability of Control
-    /// API gRPC server. Availability checks only on sending request to gRPC
-    /// server.__
+    /// __Note that call of this function doesn't checks availability of Control
+    /// API gRPC server. Availability will be checked only on sending request to
+    /// gRPC server.__
     pub fn new(medea_addr: &str) -> Self {
         Self {
             grpc_client: new_grpcio_control_api_client(medea_addr),
@@ -102,7 +108,7 @@ impl ControlClient {
             .and_then(|r| r)
     }
 
-    /// Gets element from Control API by Fid.
+    /// Gets element from Control API by FID.
     pub fn get(
         &self,
         fid: Fid,
@@ -115,7 +121,7 @@ impl ControlClient {
             .and_then(|r| r)
     }
 
-    /// Deletes element.
+    /// Deletes element from Control API by FID.
     pub fn delete(
         &self,
         fid: Fid,

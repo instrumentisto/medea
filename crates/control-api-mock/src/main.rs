@@ -1,4 +1,7 @@
-//! REST mock server for gRPC Medea's Control API.
+//! REST mock server for gRPC [Medea]'s [Control API].
+//!
+//! [Medea]: https://github.com/instrumentisto/medea
+//! [Control API]: https://tinyurl.com/yxsqplq7
 
 pub mod client;
 pub mod prelude;
@@ -38,6 +41,8 @@ fn main() {
     sys.run().unwrap();
 }
 
+/// Initializes [`slog`] logger which will output logs with [`slog_term`]'s
+/// decorator.
 fn init_logger() -> GlobalLoggerGuard {
     let decorator = slog_term::TermDecorator::new().build();
     let drain = slog_term::FullFormat::new(decorator).build().fuse();

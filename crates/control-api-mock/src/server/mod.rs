@@ -18,8 +18,10 @@ use clap::ArgMatches;
 use futures::Future;
 use medea_control_api_proto::grpc::api::{
     CreateResponse as CreateResponseProto, Element as ElementProto,
-    Error as ErrorProto, GetResponse as GetResponseProto,
-    Response as ResponseProto, Room_Element as RoomElementProto,
+    Element_oneof_el as ElementOneOf, Error as ErrorProto,
+    GetResponse as GetResponseProto, Response as ResponseProto,
+    Room_Element as RoomElementProto,
+    Room_Element_oneof_el as RoomElementOneOf,
 };
 use serde::{Deserialize, Serialize};
 
@@ -36,11 +38,16 @@ use self::{
 
 /// Context of [`actix_web`] server.
 pub struct Context {
-    /// Client for Medea's Control API.
+    /// Client for [Medea]'s [Control API].
+    ///
+    /// [Control API]: https://tinyurl.com/yxsqplq7
+    /// [Medea]: https://github.com/instrumentisto/medea
     client: ControlClient,
 }
 
-/// Run REST Control API server mock.
+/// Run REST [Control API] server mock.
+///
+/// [Control API]: https://tinyurl.com/yxsqplq7
 pub fn run(args: &ArgMatches) {
     let medea_addr: String = args.value_of("medea_addr").unwrap().to_string();
     HttpServer::new(move || {
@@ -80,12 +87,12 @@ pub fn run(args: &ArgMatches) {
     .start();
 }
 
-/// Generates `request` macro which will generate [`actix_web`] request handler which will
-/// call some function with `Path` extracted from `Request`.
+/// Generates `request` macro which will generate [`actix_web`] request handler
+/// which will call some function with `Path` extracted from `Request`.
 ///
 /// `$call_fn` - function which will be called on request;
 ///
-/// `$resp` - type of response on this requst.
+/// `$resp` - type of response on this request.
 macro_rules! gen_request_macro {
     ($call_fn:tt, $resp:ty) => {
         /// Generates handler with provided name and `Path` which will be
@@ -111,7 +118,9 @@ macro_rules! gen_request_macro {
     };
 }
 
-/// Implementation of `Delete` requests to Control API mock.
+/// Implementation of `Delete` requests to [Control API] mock.
+///
+/// [Control API]: https://tinyurl.com/yxsqplq7
 #[allow(clippy::needless_pass_by_value)]
 #[allow(clippy::module_name_repetitions)]
 mod delete {
@@ -125,7 +134,9 @@ mod delete {
     request!(delete3, (String, String, String));
 }
 
-/// Implementation of `Get` requests to Control API mock.
+/// Implementation of `Get` requests to [Control API] mock.
+///
+/// [Control API]: https://tinyurl.com/yxsqplq7
 #[allow(clippy::needless_pass_by_value)]
 #[allow(clippy::module_name_repetitions)]
 mod get {
@@ -139,7 +150,9 @@ mod get {
     request!(get3, (String, String, String));
 }
 
-/// Implementation of `Post` requests to Control API mock.
+/// Implementation of `Post` requests to [Control API] mock.
+///
+/// [Control API]: https://tinyurl.com/yxsqplq7
 mod create {
     use super::*;
 
@@ -165,7 +178,9 @@ mod create {
     create_request!(create3, (String, String, String));
 }
 
-/// Error object. Returns when some error happened on Control API's side.
+/// Error object. Returns when some error happened on [Control API]'s side.
+///
+/// [Control API]: https://tinyurl.com/yxsqplq7
 #[derive(Debug, Serialize)]
 pub struct ErrorResponse {
     /// Medea's Control API error code.
@@ -193,11 +208,15 @@ impl Into<ErrorResponse> for ErrorProto {
 /// Used for create methods.
 #[derive(Debug, Serialize)]
 pub struct CreateResponse {
-    /// URIs with which Jason can connect `Member`s.
+    /// URIs with which [Jason] can connect `Member`s.
+    ///
+    /// [Jason]: https://github.com/instrumentisto/medea/tree/master/jason
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sids: Option<HashMap<String, String>>,
 
-    /// Error if something happened on Control API's side.
+    /// Error if something happened on [Control API]'s side.
+    ///
+    /// [Control API]: https://tinyurl.com/yxsqplq7
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<ErrorResponse>,
 }
@@ -207,7 +226,9 @@ pub struct CreateResponse {
 /// Used for delete methods.
 #[derive(Debug, Serialize)]
 pub struct Response {
-    /// Error if something happened on Control API's side.
+    /// Error if something happened on [Control API]'s side.
+    ///
+    /// [Control API]: https://tinyurl.com/yxsqplq7
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<ErrorResponse>,
 }
@@ -264,7 +285,9 @@ impl From<CreateResponseProto> for CreateResponse {
     }
 }
 
-/// Union of all elements which exists in medea.
+/// Union of all elements which exists in [Medea].
+///
+/// [Medea]: https://github.com/instrumentisto/medea
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(tag = "kind")]
 pub enum Element {
@@ -275,27 +298,28 @@ pub enum Element {
 }
 
 impl From<ElementProto> for Element {
-    fn from(mut proto: ElementProto) -> Self {
-        if proto.has_room() {
-            Self::Room(proto.take_room().into())
-        } else if proto.has_member() {
-            Self::Member(proto.take_member().into())
-        } else if proto.has_webrtc_pub() {
-            Self::WebRtcPublishEndpoint(proto.take_webrtc_pub().into())
-        } else if proto.has_webrtc_play() {
-            Self::WebRtcPlayEndpoint(proto.take_webrtc_play().into())
-        } else {
-            unimplemented!()
+    fn from(proto: ElementProto) -> Self {
+        match proto.el.unwrap() {
+            ElementOneOf::room(room) => Self::Room(room.into()),
+            ElementOneOf::member(member) => Self::Member(member.into()),
+            ElementOneOf::webrtc_pub(webrtc_pub) => {
+                Self::WebRtcPublishEndpoint(webrtc_pub.into())
+            }
+            ElementOneOf::webrtc_play(webrtc_play) => {
+                Self::WebRtcPlayEndpoint(webrtc_play.into())
+            }
         }
     }
 }
 
 impl From<RoomElementProto> for Element {
     fn from(mut proto: RoomElementProto) -> Self {
-        if proto.has_member() {
-            Self::Member(proto.take_member().into())
-        } else {
-            unimplemented!()
+        match proto.el {
+            RoomElementOneOf::member(member) => Self::Member(member.into()),
+            _ => unimplemented!(
+                "Currently Control API mock server supports only Member \
+                 element in Room pipeline."
+            ),
         }
     }
 }
@@ -318,8 +342,10 @@ pub struct SingleGetResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub element: Option<Element>,
 
-    /// `Some(ErrorResponse)` if some error happened on Control API's side.
+    /// [`ErrorResponse`] if some error happened on [Control API]'s side.
     /// Otherwise `None`.
+    ///
+    /// [Control API]: https://tinyurl.com/yxsqplq7
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<ErrorResponse>,
 }
