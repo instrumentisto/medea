@@ -314,7 +314,7 @@ impl From<ElementProto> for Element {
 
 impl From<RoomElementProto> for Element {
     fn from(mut proto: RoomElementProto) -> Self {
-        match proto.el {
+        match proto.el.unwrap() {
             RoomElementOneOf::member(member) => Self::Member(member.into()),
             _ => unimplemented!(
                 "Currently Control API mock server supports only Member \
