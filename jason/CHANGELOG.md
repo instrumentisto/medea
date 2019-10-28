@@ -32,6 +32,8 @@ All user visible changes to this project will be documented in this file. This p
         - Room initialization ([#46]):
             - `Jason.init_room()`;
             - `Room.join()`.
+- Signalling:
+    - Cleanup Jason state on normal WebSocket close ([#55](/../../pull/55)).
 
 ### Fixed
 
