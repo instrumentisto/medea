@@ -21,6 +21,8 @@ stages:
 jobs:
   allow_failures:
     - rust: nightly
+      stage: check
+    - rust: nightly
       stage: build
 
   include:

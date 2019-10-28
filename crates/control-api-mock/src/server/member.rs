@@ -31,12 +31,12 @@ pub struct Member {
 impl Into<MemberProto> for Member {
     fn into(self) -> MemberProto {
         let mut proto = MemberProto::new();
-        let mut memebers_elements = HashMap::new();
+        let mut members_elements = HashMap::new();
         for (id, endpoint) in self.pipeline {
-            memebers_elements.insert(id, endpoint.into());
+            members_elements.insert(id, endpoint.into());
         }
         proto.set_id(self.id);
-        proto.set_pipeline(memebers_elements);
+        proto.set_pipeline(members_elements);
 
         if let Some(credentials) = self.credentials {
             proto.set_credentials(credentials);
