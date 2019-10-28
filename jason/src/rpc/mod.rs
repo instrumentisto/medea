@@ -162,14 +162,12 @@ fn on_close(inner_rc: &RefCell<Inner>, close_msg: &CloseMsg) {
     }
 
     if let CloseMsg::Normal(_, reason) = &close_msg {
-        match reason {
-            // This is reconnecting and this is not considered as connection
-            // close.
-            CloseReason::Reconnected => {}
-            _ => {
-                let f = Rc::clone(&inner_rc.borrow().on_close_by_server);
-                (f)(&close_msg);
-            }
+        // This is reconnecting and this is not considered as connection
+        // close.
+        if let CloseReason::Reconnected = reason {
+        } else {
+            let f = Rc::clone(&inner_rc.borrow().on_close_by_server);
+            (f)(&close_msg);
         }
     }
 
