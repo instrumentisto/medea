@@ -93,8 +93,8 @@ mockall::mock! {
 
     pub trait RpcClient {
         fn connect(
-        &self,
-        token: String,
+            &self,
+            token: String,
         ) -> LocalBoxFuture<'static, Result<(), WasmErr>>;
 
         /// Returns [`Stream`] of all [`Event`]s received by this [`RpcClient`].
@@ -150,7 +150,7 @@ impl Inner {
     }
 }
 
-/// Handles close messsage from remote server.
+/// Handles close message from remote server.
 ///
 /// This function will be called on every WebSocket close (normal and abnormal)
 /// regardless of the close reason.
