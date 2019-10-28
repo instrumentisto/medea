@@ -313,7 +313,7 @@ impl From<ElementProto> for Element {
 }
 
 impl From<RoomElementProto> for Element {
-    fn from(mut proto: RoomElementProto) -> Self {
+    fn from(proto: RoomElementProto) -> Self {
         match proto.el.unwrap() {
             RoomElementOneOf::member(member) => Self::Member(member.into()),
             _ => unimplemented!(
