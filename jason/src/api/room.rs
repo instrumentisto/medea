@@ -379,10 +379,8 @@ impl EventHandler for InnerRoom {
                 async move {
                     if let Err(err) = result {
                         console_log!(err);
-                        error_callback.call(js_sys::Error::new(&format!(
-                            "Local stream failed: {}",
-                            err
-                        )));
+                        error_callback
+                            .call(js_sys::Error::new(&format!("{}", err)));
                     };
                 }
             }),
