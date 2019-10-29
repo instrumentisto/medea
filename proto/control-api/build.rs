@@ -11,7 +11,18 @@ use std::{error::Error, fs::File, io::ErrorKind};
 #[cfg(feature = "grpc")]
 fn main() -> Result<(), Box<dyn Error>> {
     const GRPC_DIR: &str = "src/grpc";
-    let proto_names = vec!["api", "callback"];
+
+    let proto_names: Vec<String> = std::fs::read_dir(GRPC_DIR)
+        .unwrap()
+        .into_iter()
+        .map(|entry| entry.unwrap().path())
+        .filter(|path| {
+            path.is_file()
+                && path.extension().unwrap().to_str().unwrap() == "proto"
+        })
+        .map(|path| path.file_stem().unwrap().to_str().unwrap().to_string())
+        .collect();
+
     let grpc_spec_files: Vec<String> = proto_names
         .iter()
         .map(|name| format!("{}/{}.proto", GRPC_DIR, name))
