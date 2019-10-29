@@ -49,12 +49,9 @@ macro_rules! map_weak {
     }};
 }
 
-macro_rules! console_log {
+macro_rules! error {
     ($e:expr) => {
-        web_sys::console::error_1(&wasm_bindgen::JsValue::from_str(&format!(
-            "{}",
-            $e
-        )))
+        web_sys::console::error_1(&$e.into())
     };
 }
 
