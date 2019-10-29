@@ -71,6 +71,9 @@ pub trait RpcClient {
     /// Sends [`Command`] to server.
     fn send_command(&self, command: Command);
 
+    // TODO: change to on_close_by_server-> Future<Item = CloseMsg> to
+    //       workaround mockall not being able to mock fn arg.
+
     /// Sets `on_close_room` callback which will be called on [`Room`] close.
     ///
     /// [`Room`]: crate::api::room::Room

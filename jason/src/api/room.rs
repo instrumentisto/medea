@@ -83,6 +83,8 @@ impl RoomHandle {
     pub fn unmute_video(&self) -> Result<(), JsValue> {
         map_weak!(self, |inner| inner.borrow_mut().toggle_send_video(true))
     }
+
+    // TODO: add on_close callback, on_close tests
 }
 
 /// [`Room`] where all the media happens (manages concrete [`PeerConnection`]s,
