@@ -3,12 +3,9 @@
 //! [Control API]: https://tinyurl.com/yxsqplq7
 
 pub mod callback;
-pub mod callback_repo;
-pub mod callback_url;
 pub mod endpoints;
 pub mod error_codes;
 pub mod grpc;
-pub mod grpc_callback_service;
 pub mod member;
 pub mod pipeline;
 pub mod refs;

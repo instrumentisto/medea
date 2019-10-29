@@ -4,7 +4,7 @@ use actix::{Actor, Context};
 use grpcio::{ChannelBuilder, EnvBuilder};
 use medea_control_api_proto::grpc::callback_grpc::CallbackClient as GrpcioCallbackClient;
 
-use crate::api::control::callback_url::GrpcCallbackUrl;
+use super::callback_url::GrpcCallbackUrl;
 
 pub struct GrpcCallbackService {
     client: GrpcioCallbackClient,

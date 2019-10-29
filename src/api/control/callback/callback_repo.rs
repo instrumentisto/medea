@@ -5,7 +5,7 @@ use std::{
 
 use actix::{Actor as _, Addr};
 
-use crate::api::control::{
+use super::{
     callback_url::GrpcCallbackUrl, grpc_callback_service::GrpcCallbackService,
 };
 
