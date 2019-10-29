@@ -31,14 +31,14 @@ spec:
     - host: {{ $host | quote }}
       http:
         paths:
+          - path: /control-api
+            backend:
+              serviceName: {{ template  "medea-demo.fullname" $ }}-server
+              servicePort: control-http
           - path: /ws
             backend:
               serviceName: {{ template "medea-demo.fullname" $ }}-server
               servicePort: http
-          - path: /control-api
-            backend:
-              serviceName: {{ template  "medea-demo.fullname" $ }}-server
-              servicePort: control-mock
           - path: /
             backend:
               serviceName: {{ template "medea-demo.fullname" $ }}-web-client

@@ -15,9 +15,9 @@ include = ["/src/", "/Cargo.*", "/CHANGELOG.md", "/LICENSE.md", "/README.md"]
 
 [workspace]
 members = [
-    "crates/control-api-mock",
     "crates/medea-macro",
     "jason",
+    "mock/control-api",
     "proto/client-api",
     "proto/control-api",
 ]

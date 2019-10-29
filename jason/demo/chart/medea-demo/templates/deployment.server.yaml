@@ -90,19 +90,19 @@ spec:
             tcpSocket:
               port: {{ .Values.server.conf.server.client.http.bind_port }}
             initialDelaySeconds: 5
-        {{- $controlApiMock := index .Values "control-mock" }}
+      {{- $controlMock := index .Values "server" "control-mock" }}
         - name: control-mock
-          image: "{{ $controlApiMock.image.repository }}:{{ $controlApiMock.image.tag }}"
-          imagePullPolicy: "{{ $controlApiMock.image.pullPolicy }}"
+          image: "{{ $controlMock.image.repository }}:{{ $controlMock.image.tag }}"
+          imagePullPolicy: {{ $controlMock.image.pullPolicy }}
           args:
-            - --addr=0.0.0.0:{{ $controlApiMock.conf.bind_port }}
+            - --addr=0.0.0.0:{{ $controlMock.conf.bind_port }}
             - --medea-addr=127.0.0.1:{{ .Values.server.conf.server.control.grpc.bind_port }}
           env:
             - name: RUST_LOG
-              value: {{ $controlApiMock.conf.log.level | quote }}
+              value: {{ $controlMock.conf.log.level | quote }}
           ports:
-            - name: control-mock
-              containerPort: {{ $controlApiMock.conf.bind_port }}
+            - name: control-http
+              containerPort: {{ $controlMock.conf.bind_port }}
               protocol: TCP
         - name: coturn
           image: "{{ $coturn.image.repository }}:{{ $coturn.image.tag }}"

@@ -16,6 +16,11 @@ server:
     turn:
       host: medea-demo.test
 
+  control-mock:
+    image:
+      tag: dev
+      pullPolicy: IfNotPresent
+
   coturn:
     image:
       tag: 4.5
@@ -28,12 +33,6 @@ server:
 
 
 web-client:
-  image:
-    tag: dev
-    pullPolicy: IfNotPresent
-
-
-control-mock:
   image:
     tag: dev
     pullPolicy: IfNotPresent

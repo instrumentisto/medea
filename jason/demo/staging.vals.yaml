@@ -17,6 +17,11 @@ server:
       host: demo.medea.stg.t11913.org
       pass: changeme
 
+  control-api:
+    image:
+      tag: edge
+      pullPolicy: Always
+
   coturn:
     image:
       tag: 4.5
@@ -44,22 +49,6 @@ server:
 
 
 web-client:
-  image:
-    tag: edge
-    pullPolicy: Always
-
-  deployment:
-    affinity:
-      nodeAffinity:
-        requiredDuringSchedulingIgnoredDuringExecution:
-          nodeSelectorTerms:
-            - matchExpressions:
-                - key: "role/application"
-                  operator: In
-                  values: ["true"]
-
-
-control-api:
   image:
     tag: edge
     pullPolicy: Always

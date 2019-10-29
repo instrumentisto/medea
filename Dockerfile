@@ -26,7 +26,7 @@ RUN apt-get update \
 
 # Prepare Cargo workspace for building dependencies only.
 COPY crates/medea-macro/Cargo.toml /app/crates/medea-macro/
-COPY crates/control-api-mock/Cargo.toml /app/crates/control-api-mock/
+COPY mock/control-api/Cargo.toml /app/mock/control-api/
 COPY proto/client-api/Cargo.toml /app/proto/client-api/
 COPY proto/control-api/Cargo.toml /app/proto/control-api/
 # Required to omit triggering re-compilation for build.rs.
@@ -38,7 +38,7 @@ COPY jason/Cargo.toml /app/jason/
 COPY Cargo.toml Cargo.lock /app/
 WORKDIR /app/
 RUN mkdir -p crates/medea-macro/src/ && touch crates/medea-macro/src/lib.rs \
- && mkdir -p crates/control-api-mock/src/ && touch crates/control-api-mock/src/lib.rs \
+ && mkdir -p mock/control-api/src/ && touch mock/control-api/src/lib.rs \
  && mkdir -p proto/client-api/src/ && touch proto/client-api/src/lib.rs \
  && mkdir -p proto/control-api/src/ && touch proto/control-api/src/lib.rs \
  && mkdir -p jason/src/ && touch jason/src/lib.rs \

@@ -1,8 +1,8 @@
 [package]
-name = "control-api-mock"
+name = "medea-control-api-mock"
 version = "0.1.0-dev"
 edition = "2018"
-description = "Mock server for medea's control API."
+description = "Mock server for Medea's control API."
 authors = ["Instrumentisto Team <developer@instrumentisto.com>"]
 homepage = "https://github.com/instrumentisto/medea"
 readme = "README.md"

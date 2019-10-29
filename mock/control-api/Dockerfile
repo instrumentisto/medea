@@ -12,7 +12,7 @@ RUN mkdir -p /out/etc/ \
 
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
- cmake
+            cmake
 
 # Prepare Cargo workspace for building dependencies only.
 COPY crates/medea-macro/Cargo.toml /app/crates/medea-macro/

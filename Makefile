@@ -18,7 +18,7 @@ eq = $(if $(or $(1),$(2)),$(and $(findstring $(1),$(2)),\
 MEDEA_IMAGE_NAME := $(strip \
 	$(shell grep 'COMPOSE_IMAGE_NAME=' .env | cut -d '=' -f2))
 DEMO_IMAGE_NAME := instrumentisto/medea-demo
-CONTROL_API_MOCK_IMAGE_NAME := instrumentisto/medea-control-api-mock
+CONTROL_MOCK_IMAGE_NAME := instrumentisto/medea-control-api-mock
 
 RUST_VER := 1.38
 RUST_BETA_VER := 1.39-beta.5
@@ -36,6 +36,9 @@ crate-dir = proto/client-api
 endif
 ifeq ($(crate),medea-control-api-proto)
 crate-dir = proto/control-api
+endif
+ifeq ($(crate),medea-control-api-mock)
+crate-dir = mock/control-api
 endif
 ifeq ($(crate),medea-macro)
 crate-dir = crates/medea-macro
@@ -112,6 +115,15 @@ up: up.dev
 # Running commands #
 ####################
 
+# Stop non-dockerized Control API mock server.
+#
+# Usage:
+#   make down.control
+
+down.control:
+	kill -9 $(pidof medea-control-api-mock)
+
+
 down.coturn: docker.down.coturn
 
 
@@ -132,13 +144,13 @@ down.dev:
 down.medea: docker.down.medea
 
 
-# Stop not dockerized Control API mock server.
+# Run Control API mock server.
 #
 # Usage:
-#   make down.control-api-mock
+#  make up.control
 
-down.control-api-mock:
-	kill -9 $(pidof control-api-mock)
+up.control:
+	cargo run -p medea-control-api-mock
 
 
 up.coturn: docker.up.coturn
@@ -153,7 +165,7 @@ up.demo: docker.up.demo
 #	make up.dev
 
 up.dev: up.coturn
-	$(MAKE) -j3 up.jason docker.up.medea docker.up.control-api-mock
+	$(MAKE) -j3 up.jason docker.up.medea up.control
 
 
 up.medea: docker.up.medea
@@ -166,15 +178,6 @@ up.medea: docker.up.medea
 
 up.jason:
 	npm run start --prefix=jason/e2e-demo
-
-
-# Run Control API mock server.
-#
-# Usage:
-#  make up.control-api-mock
-
-up.control-api-mock:
-	cargo run -p control-api-mock
 
 
 
@@ -384,7 +387,7 @@ ifeq ($(up),yes)
 	env $(test-e2e-env) \
 	make docker.up.medea debug=$(debug) background=yes log=$(log) \
 	                     dockerized=$(dockerized) \
-	                     TAG=$(if $(call eq,$(TAG),),dev,$(TAG)) registry=$(registry)
+	                     TAG=$(TAG) registry=$(registry)
 	sleep $(if $(call eq,$(wait),),5,$(wait))
 endif
 	RUST_BACKTRACE=1 cargo test --test e2e
@@ -456,6 +459,22 @@ docker.auth:
 		$(if $(call eq,$(pass-stdin),yes),--password-stdin,)
 
 
+# Build Docker image for Control API mock server.
+#
+# Usage:
+#	make docker.build.control [TAG=(dev|<tag>)] [debug=(yes|no)]
+#	                          [minikube=(no|yes)]
+
+docker.build.control:
+	$(docker-env) \
+	docker build $(if $(call eq,$(minikube),yes),,--network=host) \
+		--build-arg rust_ver=$(RUST_VER) \
+		--build-arg rustc_mode=$(if $(call eq,$(debug),no),release,debug) \
+		--build-arg rustc_opts=$(if $(call eq,$(debug),no),--release,) \
+		-t $(CONTROL_MOCK_IMAGE_NAME):$(if $(call eq,$(TAG),),dev,$(TAG)) \
+		-f crates/control-api-mock/Dockerfile .
+
+
 # Build Docker image for demo application.
 #
 # Usage:
@@ -465,36 +484,18 @@ docker.auth:
 docker-build-demo-image-name = $(DEMO_IMAGE_NAME)
 
 docker.build.demo:
-	$(docker-env)
 ifeq ($(TAG),edge)
+	$(docker-env) \
 	docker build $(if $(call eq,$(minikube),yes),,--network=host) --force-rm \
 		-t $(docker-build-demo-image-name):$(TAG) \
 		-f jason/Dockerfile .
 else
 	@make yarn proj=demo
+	$(docker-env) \
 	docker build $(if $(call eq,$(minikube),yes),,--network=host) --force-rm \
 		-t $(docker-build-demo-image-name):$(if $(call eq,$(TAG),),dev,$(TAG)) \
 		jason/demo
 endif
-
-
-# Build REST Control API mock server.
-#
-# Usage:
-#   make docker.build.control-api-mock [TAG=(dev|<tag>)] [minikube=(no|yes)]
-#									   [debug=(yes|no)]
-
-docker.build.control-api-mock:
-	$(docker-env) \
-	docker build $(if $(call eq,$(minikube),yes),,--network=host) \
-				--build-arg rust_ver=$(RUST_VER) \
-				--build-arg rustc_mode=$(if \
-					$(call eq,$(debug),no),release,debug) \
-				--build-arg rustc_opts=$(if \
-					$(call eq,$(debug),no),--release,) \
-		-t  $(CONTROL_API_MOCK_IMAGE_NAME):$(if $(call eq,$(TAG),),dev,$(TAG)) \
-		-f crates/control-api-mock/Dockerfile \
-		.
 
 
 # Build medea project Docker image.
@@ -520,6 +521,15 @@ docker.build.medea:
 			--build-arg rustc_opts=$(if \
 				$(call eq,$(debug),no),--release,),) \
 		-t $(docker-build-medea-image-name):$(if $(call eq,$(TAG),),dev,$(TAG)) .
+
+
+# Stop dockerized Control API mock server and remove all related containers.
+#
+# Usage:
+#   make docker.down.control
+
+docker.down.control:
+	-docker stop medea-control-api-mock
 
 
 # Stop Coturn STUN/TURN server in Docker Compose environment
@@ -563,15 +573,6 @@ endif
 
 docker.down.webdriver:
 	-docker stop medea-webdriver-$(if $(call eq,$(browser),),chrome,$(browser))
-
-
-# Stop dockerized Control API mock server and remove all related containers.
-#
-# Usage:
-#   make docker.down.control-api-mock
-
-docker.down.control-api-mock:
-	-docker stop medea-control-api-mock
 
 
 # Pull project Docker images from Container Registry.
@@ -621,6 +622,17 @@ define docker.push.do
 	$(docker-env) \
 	docker push $(docker-push-image-name):$(tag)
 endef
+
+
+# Run dockerized Medea Control API mock server.
+#
+# Usage:
+#   make docker.up.control [TAG=(dev|<docker-tag>)]
+
+docker.up.control:
+	docker run --rm -d --network=host \
+		--name medea-control-api-mock \
+		$(CONTROL_MOCK_IMAGE_NAME):$(if $(call eq,$(TAG),),dev,$(TAG))
 
 
 # Run Coturn STUN/TURN server in Docker Compose environment.
@@ -690,17 +702,6 @@ else
 		--name medea-webdriver-chrome \
 		selenoid/chrome:$(CHROME_VERSION)
 endif
-
-
-# Run dockerized Medea Control API mock server.
-#
-# Usage:
-#   make docker.up.control-api-mock [TAG=(dev|<docker-tag>)]
-
-docker.up.control-api-mock:
-	docker run --rm -d --network=host \
-		--name medea-control-api-mock \
-		$(CONTROL_API_MOCK_IMAGE_NAME):$(if $(call eq,$(TAG),),dev,$(TAG))
 
 
 
@@ -830,7 +831,7 @@ ifeq ($(helm-chart),medea-demo)
 ifeq ($(rebuild),yes)
 	@make docker.build.demo minikube=yes TAG=dev
 	@make docker.build.medea no-cache=$(no-cache) minikube=yes TAG=dev
-	@make docker.build.control-api-mock minikube=yes TAG=dev
+	@make docker.build.control minikube=yes TAG=dev
 endif
 endif
 endif
@@ -888,20 +889,18 @@ endef
 
 .PHONY: build build.jason build.medea \
         cargo cargo.build cargo.fmt cargo.gen cargo.lint \
-        docker.auth docker.build.demo docker.build.medea docker.build.control-api-mock \
-        	docker.down.coturn docker.down.demo docker.down.medea \
-        	docker.down.webdriver docker.down.control-api-mock \
+        docker.auth  docker.build.control docker.build.demo docker.build.medea \
+        	docker.down.control docker.down.coturn docker.down.demo \
+        	docker.down.medea docker.down.webdriver  \
         	docker.pull docker.push \
-        	docker.up.coturn docker.up.demo docker.up.medea \
-        	docker.up.webdriver docker.up.control-api-mock \
+        	docker.up.control docker.up.coturn docker.up.demo docker.up.medea \
+        	docker.up.webdriver \
         docs docs.rust \
-        down down.coturn down.demo down.dev down.medea \
-        down.control-api-mock \
+        down down.control down.coturn down.demo down.dev down.medea \
         helm helm.down helm.init helm.lint helm.list \
         	helm.package helm.package.release helm.up \
         minikube.boot \
         release release.crates release.helm release.npm \
         test test.e2e test.unit \
-        up up.coturn up.demo up.dev up.jason up.medea \
-        up.control-api-mock \
+        up up.control up.coturn up.demo up.dev up.jason up.medea \
         yarn
