@@ -20,19 +20,16 @@
       try {
         let resp = await axios({
           method: 'post',
-          url: controlUrl,
+          url: controlUrl + roomId,
           data: {
             kind: 'Room',
-            id: roomId,
             pipeline: {
               [memberId]: {
                 kind: 'Member',
-                id: memberId,
                 credentials: 'test',
                 pipeline: {
                   publish: {
                     kind: 'WebRtcPublishEndpoint',
-                    id: 'publish',
                     p2p: 'Always'
                   },
                 },
@@ -52,7 +49,6 @@
       let pipeline = {
         publish: {
           kind: 'WebRtcPublishEndpoint',
-          id: 'publish',
           p2p: 'Always',
         },
       };
@@ -64,17 +60,15 @@
         memberIds.push(memberId);
         pipeline["play-" + memberId] = {
           kind: 'WebRtcPlayEndpoint',
-          id: "play-" + memberId,
           src: 'local://' + roomId + '/' + memberId + "/publish",
         };
       }
 
       let resp = await axios({
         method: 'post',
-        url: controlUrl + roomId,
+        url: controlUrl + roomId + '/' + memberId,
         data: {
           kind: 'Member',
-          id: memberId,
           credentials: 'test',
           pipeline: pipeline,
         },
@@ -84,10 +78,9 @@
         let id = memberIds[i];
         await axios({
           method: 'post',
-          url: controlUrl + roomId + "/" + id,
+          url: controlUrl + roomId + "/" + id + '/play-' + memberId,
           data: {
             kind: 'WebRtcPlayEndpoint',
-            id: 'play-' + memberId,
             src: 'local://' + roomId + '/' + memberId + '/publish',
           }
         })

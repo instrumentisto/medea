@@ -6,19 +6,16 @@ let roomId = window.location.hash.replace("#", "");
 async function createRoom(roomId, memberId) {
   let resp = await axios({
     method: 'post',
-    url: controlUrl,
+    url: controlUrl + roomId,
     data: {
-      id: roomId,
       kind: 'Room',
       pipeline: {
         [memberId]: {
           kind: 'Member',
-          id: memberId,
           credentials: 'test',
           pipeline: {
             publish: {
               kind: 'WebRtcPublishEndpoint',
-              id: 'publish',
               p2p: 'Always'
             },
           }
@@ -36,7 +33,6 @@ async function createMember(roomId, memberId) {
   let pipeline = {
     publish: {
       kind: 'WebRtcPublishEndpoint',
-      id: 'publish',
       p2p: 'Always'
     }
   };
@@ -48,17 +44,15 @@ async function createMember(roomId, memberId) {
     memberIds.push(memberId);
     pipeline["play-" + memberId] = {
       kind: 'WebRtcPlayEndpoint',
-      id: "play-" + memberId,
       src: 'local://' + roomId + '/' + memberId + "/publish"
     }
   }
 
   let resp = await axios({
     method: 'post',
-    url: controlUrl + roomId,
+    url: controlUrl + roomId + '/' + memberId,
     data: {
       kind: 'Member',
-      id: memberId,
       credentials: 'test',
       pipeline: pipeline,
     }
@@ -69,10 +63,9 @@ async function createMember(roomId, memberId) {
       let id = memberIds[i];
       await axios({
         method: 'post',
-        url: controlUrl + roomId + "/" + id,
+        url: controlUrl + roomId + "/" + id + '/' + 'play-' + memberId,
         data: {
           kind: 'WebRtcPlayEndpoint',
-          id: "play-" + memberId,
           src: 'local://' + roomId + '/' + memberId + '/publish'
         }
       })
@@ -139,17 +132,15 @@ const controlDebugWindows = {
       switch (endpointType) {
         case 'WebRtcPublishEndpoint':
           let p2pMode = container.getElementsByClassName('webrtc-publish-endpoint-spec__p2p')[0].value;
-          await controlApi.createEndpoint(roomId, memberId, {
+          await controlApi.createEndpoint(roomId, memberId, endpointId, {
             kind: endpointType,
-            id: endpointId,
             p2p: p2pMode,
           });
           break;
         case 'WebRtcPlayEndpoint':
           let source = container.getElementsByClassName('webrtc-play-endpoint-spec__src')[0].value;
-          await controlApi.createEndpoint(roomId, memberId, {
+          await controlApi.createEndpoint(roomId, memberId, endpointId, {
             kind: endpointType,
-            id: endpointId,
             src: source,
           });
       }
@@ -370,25 +361,12 @@ const contentVisibility = {
 };
 
 const controlApi = {
-  createEndpoint: async function(roomId, memberId, spec) {
-    try {
-      await axios({
-        method: 'post',
-        url: controlUrl + roomId + '/' + memberId,
-        data: spec
-      });
-    } catch (e) {
-      alert(JSON.stringify(e.response.data));
-    }
-  },
-
   createRoom: async function(roomId) {
     try {
       await axios({
         method: 'post',
-        url: controlUrl,
+        url: controlUrl + roomId,
         data: {
-          id: roomId,
           kind: 'Room',
           pipeline: {}
         }
@@ -402,13 +380,24 @@ const controlApi = {
     try {
       await axios({
         method: 'post',
-        url: controlUrl + roomId,
+        url: controlUrl + roomId + '/' + memberId,
         data: {
           kind: 'Member',
           credentials: credentials,
-          id: memberId,
           pipeline: {}
         }
+      });
+    } catch (e) {
+      alert(JSON.stringify(e.response.data));
+    }
+  },
+
+  createEndpoint: async function(roomId, memberId, endpointId, spec) {
+    try {
+      await axios({
+        method: 'post',
+        url: controlUrl + roomId + '/' + memberId + '/' + endpointId,
+        data: spec
       });
     } catch (e) {
       alert(JSON.stringify(e.response.data));
