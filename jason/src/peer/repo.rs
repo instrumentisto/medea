@@ -1,12 +1,15 @@
 use std::{collections::HashMap, rc::Rc};
 
-use anyhow::Result;
+use anyhow::Error;
 use futures::channel::mpsc;
 use medea_client_api_proto::{IceServer, PeerId};
+use tracerr::Traced;
 
 use crate::media::MediaManager;
 
 use super::{PeerConnection, PeerEvent};
+
+type Result<T, E = Error> = std::result::Result<T, Traced<E>>;
 
 /// [`PeerConnection`] factory and repository.
 #[allow(clippy::module_name_repetitions)]
@@ -65,14 +68,17 @@ impl PeerRepository for Repository {
         enabled_audio: bool,
         enabled_video: bool,
     ) -> Result<Rc<PeerConnection>> {
-        let peer = Rc::new(PeerConnection::new(
-            id,
-            peer_events_sender,
-            ice_servers,
-            Rc::clone(&self.media_manager),
-            enabled_audio,
-            enabled_video,
-        )?);
+        let peer = Rc::new(
+            PeerConnection::new(
+                id,
+                peer_events_sender,
+                ice_servers,
+                Rc::clone(&self.media_manager),
+                enabled_audio,
+                enabled_video,
+            )
+            .map_err(tracerr::wrap!())?,
+        );
         self.peers.insert(id, peer);
         Ok(self.peers.get(&id).cloned().unwrap())
     }

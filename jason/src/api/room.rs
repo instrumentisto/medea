@@ -25,6 +25,7 @@ use crate::{
 };
 
 use super::{connection::Connection, ConnectionHandle};
+use tracerr::Traced;
 
 /// JS side handle to `Room` where all the media happens.
 ///
@@ -373,7 +374,7 @@ impl EventHandler for InnerRoom {
                         });
                     }
                 };
-                Result::<_, Error>::Ok(())
+                Result::<_, Traced<Error>>::Ok(())
             }
             .then(|result| {
                 async move {

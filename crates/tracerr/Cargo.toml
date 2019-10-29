@@ -1,0 +1,15 @@
+[package]
+name = "tracerr"
+version = "0.1.0"
+edition = "2018"
+description = "Custom error tracing."
+authors = ["Instrumentisto Team <developer@instrumentisto.com>"]
+repository = "https://git.instrumentisto.com/social/backend"
+publish = false
+
+[features]
+"with-failure" = ["failure"]
+
+[dependencies]
+derive_more = "0.15"
+failure = { version = "0.1", optional = true }
