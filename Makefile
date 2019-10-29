@@ -472,7 +472,7 @@ docker.build.control:
 		--build-arg rustc_mode=$(if $(call eq,$(debug),no),release,debug) \
 		--build-arg rustc_opts=$(if $(call eq,$(debug),no),--release,) \
 		-t $(CONTROL_MOCK_IMAGE_NAME):$(if $(call eq,$(TAG),),dev,$(TAG)) \
-		-f crates/control-api-mock/Dockerfile .
+		-f mock/control-api/Dockerfile .
 
 
 # Build Docker image for demo application.
