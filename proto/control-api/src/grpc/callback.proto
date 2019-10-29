@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package medea_callback;
+
+service Callback {
+  rpc OnEvent (Request) returns (Response);
+}
+
+message Request {
+  // FID (Full ID) of element with which was occured event.
+  string element = 1;
+  // What event occured.
+  Event event = 2;
+  // Time on which event occured.
+  string at = 3;
+
+  // All events which can happen.
+  enum Event {
+    ON_JOIN = 0;
+    ON_LEAVE = 1;
+  }
+}
+
+message Response {}

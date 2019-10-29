@@ -10,20 +10,32 @@ use std::{error::Error, fs::File, io::ErrorKind};
 /// in the root of the project.
 #[cfg(feature = "grpc")]
 fn main() -> Result<(), Box<dyn Error>> {
-    const GRPC_DIR: &str = "src/grpc/";
-    const GRPC_SPEC_FILE: &str = "src/grpc/api.proto";
-    const OUT_FILES: [&str; 2] = ["src/grpc/api.rs", "src/grpc/api_grpc.rs"];
+    const GRPC_DIR: &str = "src/grpc";
+    let proto_names = vec!["api", "callback"];
+    let grpc_spec_files: Vec<String> = proto_names
+        .iter()
+        .map(|name| format!("{}/{}.proto", GRPC_DIR, name))
+        .collect();
+    let out_files: Vec<String> = proto_names
+        .iter()
+        .map(|filename| format!("{}/{}.rs", GRPC_DIR, filename))
+        .chain(
+            proto_names
+                .iter()
+                .map(|filename| format!("{}/{}_grpc.rs", GRPC_DIR, filename)),
+        )
+        .collect();
 
-    println!("cargo:rerun-if-changed={}", GRPC_SPEC_FILE);
-    for filename in &OUT_FILES {
-        println!("cargo:rerun-if-changed={}", filename);
-    }
+    grpc_spec_files
+        .iter()
+        .chain(out_files.iter())
+        .for_each(|filename| println!("cargo:rerun-if-changed={}", filename));
 
-    for filename in &OUT_FILES {
+    for filename in &out_files {
         if let Err(e) = File::open(filename) {
             if let ErrorKind::NotFound = e.kind() {
                 protoc_grpcio::compile_grpc_protos(
-                    &[GRPC_SPEC_FILE],
+                    &grpc_spec_files,
                     &[GRPC_DIR],
                     &GRPC_DIR,
                     None,
