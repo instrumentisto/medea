@@ -1,11 +1,14 @@
-use std::{fmt, sync::Arc};
+use std::{
+    fmt,
+    fmt::{Error, Formatter},
+    sync::Arc,
+};
 
 use actix::{Actor, Context};
 use grpcio::{ChannelBuilder, EnvBuilder};
 use medea_control_api_proto::grpc::callback_grpc::CallbackClient as GrpcioCallbackClient;
 
 use super::callback_url::GrpcCallbackUrl;
-use failure::_core::fmt::{Error, Formatter};
 
 pub struct GrpcCallbackService {
     client: GrpcioCallbackClient,

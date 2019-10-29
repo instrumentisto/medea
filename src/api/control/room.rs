@@ -18,6 +18,7 @@ use super::{
     pipeline::Pipeline,
     MemberId, RootElement, TryFromElementError,
 };
+use crate::api::control::callback::callback_url::CallbackUrl;
 
 /// ID of [`Room`].
 ///
@@ -37,6 +38,8 @@ pub enum RoomElement {
     Member {
         spec: Pipeline<EndpointId, MemberElement>,
         credentials: String,
+        on_leave: Option<CallbackUrl>,
+        on_join: Option<CallbackUrl>,
     },
 }
 

@@ -32,6 +32,7 @@ use super::endpoints::{
     webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
     Endpoint,
 };
+use crate::api::control::callback::callback_url::CallbackUrl;
 
 /// Errors which may occur while loading [`Member`]s from [`RoomSpec`].
 #[derive(Debug, Display, Fail)]
@@ -87,6 +88,10 @@ struct MemberInner {
 
     /// [`IceUser`] of this [`Member`].
     ice_user: Option<IceUser>,
+
+    on_join: Option<CallbackUrl>,
+
+    on_leave: Option<CallbackUrl>,
 }
 
 impl Member {
@@ -102,6 +107,8 @@ impl Member {
             credentials,
             ice_user: None,
             room_id,
+            on_leave: None,
+            on_join: None,
         })))
     }
 
@@ -146,6 +153,9 @@ impl Member {
         let this_member = store
             .get(&self.id())
             .ok_or_else(|| MembersLoadError::MemberNotFound(self.get_fid()))?;
+
+        this_member.set_on_join(this_member_spec.on_join().clone());
+        this_member.set_on_leave(this_member_spec.on_leave().clone());
 
         for (spec_play_name, spec_play_endpoint) in
             this_member_spec.play_endpoints()
@@ -403,6 +413,22 @@ impl Member {
     #[cfg(test)]
     pub fn ptr_eq(&self, another_member: &Self) -> bool {
         Rc::ptr_eq(&self.0, &another_member.0)
+    }
+
+    pub fn get_on_join(&self) -> Option<CallbackUrl> {
+        self.0.borrow().on_join.clone()
+    }
+
+    pub fn get_on_leave(&self) -> Option<CallbackUrl> {
+        self.0.borrow().on_leave.clone()
+    }
+
+    pub fn set_on_leave(&self, on_leave: Option<CallbackUrl>) {
+        self.0.borrow_mut().on_leave = on_leave;
+    }
+
+    pub fn set_on_join(&self, on_join: Option<CallbackUrl>) {
+        self.0.borrow_mut().on_join = on_join;
     }
 }
 

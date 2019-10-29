@@ -11,6 +11,7 @@ use medea_control_api_proto::grpc::api::Error as ErrorProto;
 
 use crate::{
     api::control::{
+        callback::callback_url::CallbackUrlParseError,
         grpc::server::GrpcControlApiError,
         refs::{
             fid::ParseFidError, local_uri::LocalUriParseError,
@@ -266,6 +267,18 @@ pub enum ErrorCode {
     #[display(fmt = "Missing path in some reference to the Medea element.")]
     MissingPath = 1019,
 
+    /// Missing host in callback URL.
+    #[display(fmt = "Missing host in callback URL.")]
+    MissingHostInCallbackUrl = 1020,
+
+    /// Unsupported callback URL protocol.
+    #[display(fmt = "Unsupported callback URL protocol.")]
+    UnsupportedCallbackUrlProtocol = 1021,
+
+    /// Invalid callback URL.
+    #[display(fmt = "Invalid callback URL.")]
+    InvalidCallbackUrl = 1022,
+
     /// Unexpected server error.
     ///
     /// Use this [`ErrorCode`] only with [`ErrorResponse::unexpected`]
@@ -298,6 +311,7 @@ impl From<TryFromProtobufError> for ErrorResponse {
 
         match err {
             SrcUriError(e) => e.into(),
+            CallbackUrlParseErr(e) => e.into(),
             NotMemberElementInRoomElement(id) => Self::with_explanation(
                 ErrorCode::UnimplementedCall,
                 String::from(
@@ -342,6 +356,22 @@ impl From<LocalUriParseError> for ErrorResponse {
                 Self::new(ErrorCode::MissingFieldsInSrcUri, &text)
             }
             UrlParseErr(id, _) => Self::new(ErrorCode::InvalidSrcUri, &id),
+        }
+    }
+}
+
+impl From<CallbackUrlParseError> for ErrorResponse {
+    fn from(err: CallbackUrlParseError) -> Self {
+        use CallbackUrlParseError::*;
+
+        match err {
+            MissingHost => {
+                Self::without_id(ErrorCode::MissingHostInCallbackUrl)
+            }
+            UnsupportedScheme => {
+                Self::without_id(ErrorCode::UnsupportedCallbackUrlProtocol)
+            }
+            UrlParseErr(_) => Self::without_id(ErrorCode::InvalidCallbackUrl),
         }
     }
 }

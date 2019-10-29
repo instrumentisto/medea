@@ -13,6 +13,7 @@ use rand::{distributions::Alphanumeric, Rng};
 use serde::Deserialize;
 
 use crate::api::control::{
+    callback::callback_url::CallbackUrl,
     endpoints::{
         webrtc_play_endpoint::WebRtcPlayEndpoint,
         webrtc_publish_endpoint::{WebRtcPublishEndpoint, WebRtcPublishId},
@@ -58,6 +59,10 @@ pub struct MemberSpec {
 
     /// Credentials to authorize `Member` with.
     credentials: String,
+
+    on_join: Option<CallbackUrl>,
+
+    on_leave: Option<CallbackUrl>,
 }
 
 impl Into<RoomElement> for MemberSpec {
@@ -65,6 +70,8 @@ impl Into<RoomElement> for MemberSpec {
         RoomElement::Member {
             spec: self.pipeline,
             credentials: self.credentials,
+            on_join: self.on_join,
+            on_leave: self.on_leave,
         }
     }
 }
@@ -111,6 +118,14 @@ impl MemberSpec {
     pub fn credentials(&self) -> &str {
         &self.credentials
     }
+
+    pub fn on_join(&self) -> &Option<CallbackUrl> {
+        &self.on_join
+    }
+
+    pub fn on_leave(&self) -> &Option<CallbackUrl> {
+        &self.on_leave
+    }
 }
 
 /// Generates alphanumeric credentials for [`Member`] with
@@ -148,9 +163,28 @@ impl TryFrom<MemberProto> for MemberSpec {
             credentials = generate_member_credentials();
         }
 
+        let on_leave = {
+            let on_leave = member.take_on_leave();
+            if on_leave.is_empty() {
+                None
+            } else {
+                Some(CallbackUrl::try_from(on_leave)?)
+            }
+        };
+        let on_join = {
+            let on_join = member.take_on_join();
+            if on_join.is_empty() {
+                None
+            } else {
+                Some(CallbackUrl::try_from(on_join)?)
+            }
+        };
+
         Ok(Self {
             pipeline: Pipeline::new(pipeline),
             credentials,
+            on_join,
+            on_leave,
         })
     }
 }
@@ -185,9 +219,16 @@ impl TryFrom<&RoomElement> for MemberSpec {
     #[allow(unreachable_patterns)]
     fn try_from(from: &RoomElement) -> Result<Self, Self::Error> {
         match from {
-            RoomElement::Member { spec, credentials } => Ok(Self {
+            RoomElement::Member {
+                spec,
+                credentials,
+                on_leave,
+                on_join,
+            } => Ok(Self {
                 pipeline: spec.clone(),
                 credentials: credentials.clone(),
+                on_leave: on_leave.clone(),
+                on_join: on_join.clone(),
             }),
             _ => Err(TryFromElementError::NotMember),
         }

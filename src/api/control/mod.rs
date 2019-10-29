@@ -38,6 +38,7 @@ pub use self::{
     member::{Id as MemberId, MemberSpec},
     room::{Id as RoomId, RoomElement, RoomSpec},
 };
+use crate::api::control::callback::callback_url::CallbackUrlParseError;
 
 /// Errors which may occur while deserializing protobuf spec.
 #[derive(Debug, Fail, Display)]
@@ -70,11 +71,20 @@ pub enum TryFromProtobufError {
 
     #[display(fmt = "Endpoint is unimplemented. Id [{}]", _0)]
     UnimplementedEndpoint(String),
+
+    #[display(fmt = "Error while parsing callback URL. {:?}", _0)]
+    CallbackUrlParseErr(CallbackUrlParseError),
 }
 
 impl From<SrcParseError> for TryFromProtobufError {
     fn from(from: SrcParseError) -> Self {
         Self::SrcUriError(from)
+    }
+}
+
+impl From<CallbackUrlParseError> for TryFromProtobufError {
+    fn from(from: CallbackUrlParseError) -> Self {
+        Self::CallbackUrlParseErr(from)
     }
 }
 

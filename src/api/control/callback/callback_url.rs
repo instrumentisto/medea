@@ -1,5 +1,6 @@
 use derive_more::Display;
-use std::convert::TryFrom;
+use serde::{de::Visitor, Deserialize, Deserializer};
+use std::{convert::TryFrom, fmt};
 use url::{ParseError, Url};
 
 #[derive(Clone, Display, Debug, Eq, PartialEq, Hash)]
@@ -47,6 +48,40 @@ impl TryFrom<String> for CallbackUrl {
             "grpc" => Ok(CallbackUrl::Grpc(GrpcCallbackUrl(host))),
             _ => Err(CallbackUrlParseError::UnsupportedScheme),
         }
+    }
+}
+
+/// [Serde] deserializer for [`CallbackUrl`].
+///
+/// [Serde]: serde
+impl<'de> Deserialize<'de> for CallbackUrl {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct SrcUriVisitor;
+
+        impl<'de> Visitor<'de> for SrcUriVisitor {
+            type Value = CallbackUrl;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str(
+                    "Uri in format local://room_id/member_id/endpoint_id",
+                )
+            }
+
+            fn visit_str<E>(self, value: &str) -> Result<CallbackUrl, E>
+            where
+                E: serde::de::Error,
+            {
+                match CallbackUrl::try_from(value.to_owned()) {
+                    Ok(src_uri) => Ok(src_uri),
+                    Err(e) => Err(serde::de::Error::custom(e)),
+                }
+            }
+        }
+
+        deserializer.deserialize_identifier(SrcUriVisitor)
     }
 }
 
