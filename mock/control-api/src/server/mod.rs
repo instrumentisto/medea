@@ -122,7 +122,6 @@ mod delete {
 
     gen_request_macro!(delete, Response);
 
-    request!(delete0, ());
     request!(delete1, String);
     request!(delete2, (String, String));
     request!(delete3, (String, String, String));
@@ -138,7 +137,6 @@ mod get {
 
     gen_request_macro!(get, SingleGetResponse);
 
-    request!(get0, ());
     request!(get1, String);
     request!(get2, (String, String));
     request!(get3, (String, String, String));
@@ -147,24 +145,10 @@ mod get {
 /// Implementation of `Post` requests to [Control API] mock.
 ///
 /// [Control API]: https://tinyurl.com/yxsqplq7
+#[allow(clippy::needless_pass_by_value)]
+#[allow(clippy::module_name_repetitions)]
 mod create {
     use super::*;
-
-    macro_rules! create_request {
-        ($fn_name:tt, $uri_tuple:ty) => {
-            pub fn $fn_name(
-                path: actix_web::web::Path<$uri_tuple>,
-                state: Data<Context>,
-                data: Json<Element>,
-            ) -> impl Future<Item = HttpResponse, Error = ()> {
-                state
-                    .client
-                    .create(Fid::from(path.into_inner()), data.0)
-                    .map_err(|e| error!("{:?}", e))
-                    .map(|r| CreateResponse::from(r).into())
-            }
-        };
-    }
 
     pub fn create1(
         path: actix_web::web::Path<String>,

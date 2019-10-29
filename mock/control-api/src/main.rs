@@ -27,7 +27,7 @@ fn main() {
         )
         .arg(
             Arg::with_name("medea_addr")
-                .help("Address to medea's gRPC control API.")
+                .help("Address to Medea's gRPC control API.")
                 .default_value("0.0.0.0:6565")
                 .long("medea-addr")
                 .short("m"),

@@ -52,6 +52,8 @@ pub struct WebRtcPublishEndpoint {
 }
 
 impl WebRtcPublishEndpoint {
+    /// Converts [`WebRtcPublishEndpoint`] into protobuf
+    /// [`WebRtcPublishEndpointProto`].
     pub fn into_proto(self, id: String) -> WebRtcPublishEndpointProto {
         let mut proto = WebRtcPublishEndpointProto::new();
         proto.set_id(id);
@@ -85,6 +87,8 @@ pub struct WebRtcPlayEndpoint {
 }
 
 impl WebRtcPlayEndpoint {
+    /// Converts [`WebRtcPlayEndpoint`] into protobuf
+    /// [`WebRtcPlayEndpointProto`].
     pub fn into_proto(self, id: String) -> WebRtcPlayEndpointProto {
         let mut proto = WebRtcPlayEndpointProto::new();
         proto.set_id(id);
@@ -111,6 +115,7 @@ pub enum Endpoint {
 }
 
 impl Endpoint {
+    /// Converts [`Endpoint`] into protobuf [`MemberElementProto`].
     pub fn into_proto(self, id: String) -> MemberElementProto {
         let mut proto = MemberElementProto::new();
         match self {

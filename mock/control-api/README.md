@@ -25,17 +25,17 @@ Atm this endpoint can only get `Member` element.
 Get single `Endpoint` element.
 
 
-### `POST /`
+### `POST /{room_id}`
 
 Create `Room` element.
 
 
-### `POST /{room_id}`
+### `POST /{room_id}/{element_id}`
 
 Create element in `Room`.
 
 
-### `POST /{room_id}/{element_id}`
+### `POST /{room_id}/{element_id}/{endpoint_id}`
 
 Create `Endpoint` element.
 
