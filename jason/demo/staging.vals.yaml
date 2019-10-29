@@ -19,7 +19,6 @@ server:
 
   control-api:
     image:
-      tag: edge
       pullPolicy: Always
 
   coturn:

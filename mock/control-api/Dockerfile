@@ -45,7 +45,7 @@ RUN mkdir -p crates/medea-macro/src/ && touch crates/medea-macro/src/lib.rs \
  && mkdir -p src/ && touch src/lib.rs
 
 # Build dependencies only.
-RUN cargo build --lib ${rustc_opts}
+RUN cargo build -p medea-control-api-mock ${rustc_opts}
 # Remove fingreprints of pre-built empty project sub-crates
 # to rebuild them correctly later.
 RUN rm -rf /app/target/${rustc_mode}/.fingerprint/medea*
