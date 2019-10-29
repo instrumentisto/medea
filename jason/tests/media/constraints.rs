@@ -17,6 +17,50 @@ use medea_jason::{
 
 wasm_bindgen_test_configure!(run_in_browser);
 
+#[wasm_bindgen_test]
+async fn not_satisfies_stopped_video_track() {
+    let video_device = video_devices().await.unwrap().pop().unwrap();
+
+    let mut constraints = MediaStreamConstraints::new();
+    let mut track_constraints = VideoTrackConstraints::new();
+    track_constraints.device_id(video_device.device_id());
+    constraints.video(track_constraints.clone());
+
+    let media_manager = MediaManager::default();
+    let (stream, _) =
+        media_manager.get_stream(constraints.clone()).await.unwrap();
+
+    assert!(stream.get_tracks().length() == 1);
+
+    let track = MediaStreamTrack::from(stream.get_tracks().pop());
+    track.stop();
+
+    assert!(track.kind() == "video");
+    assert!(!track_constraints.satisfies(&track));
+}
+
+#[wasm_bindgen_test]
+async fn not_satisfies_stopped_audio_track() {
+    let audio_device = audio_devices().await.unwrap().pop().unwrap();
+
+    let mut constraints = MediaStreamConstraints::new();
+    let mut track_constraints = AudioTrackConstraints::new();
+    track_constraints.device_id(audio_device.device_id());
+    constraints.audio(track_constraints.clone());
+
+    let media_manager = MediaManager::default();
+    let (stream, _) =
+        media_manager.get_stream(constraints.clone()).await.unwrap();
+
+    assert!(stream.get_tracks().length() == 1);
+
+    let track = MediaStreamTrack::from(stream.get_tracks().pop());
+    track.stop();
+
+    assert!(track.kind() == "audio");
+    assert!(!track_constraints.satisfies(&track));
+}
+
 // 1. Get device id of non default video device from enumerate_devices();
 // 2. Add it to constraints;
 // 3. Get stream by constraints;
