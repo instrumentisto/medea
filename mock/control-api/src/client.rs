@@ -82,6 +82,7 @@ impl ControlClient {
     /// Creates provided element with gRPC Control API.
     pub fn create(
         &self,
+        id: String,
         fid: Fid,
         element: Element,
     ) -> impl Future<Item = CreateResponse, Error = Error> {
@@ -89,16 +90,16 @@ impl ControlClient {
         req.set_parent_fid(fid.into());
         match element {
             Element::Room(room) => {
-                req.set_room(room.into());
+                req.set_room(room.into_proto(id));
             }
             Element::Member(member) => {
-                req.set_member(member.into());
+                req.set_member(member.into_proto(id));
             }
             Element::WebRtcPlayEndpoint(webrtc_play) => {
-                req.set_webrtc_play(webrtc_play.into());
+                req.set_webrtc_play(webrtc_play.into_proto(id));
             }
             Element::WebRtcPublishEndpoint(webrtc_pub) => {
-                req.set_webrtc_pub(webrtc_pub.into());
+                req.set_webrtc_pub(webrtc_pub.into_proto(id));
             }
         }
 

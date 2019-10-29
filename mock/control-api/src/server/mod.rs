@@ -58,12 +58,6 @@ pub fn run(args: &ArgMatches) {
             })
             .wrap(middleware::Logger::default())
             .service(
-                web::resource("/control-api/")
-                    .route(web::post().to_async(create::create0))
-                    .route(web::get().to_async(get::get0))
-                    .route(web::delete().to_async(delete::delete0)),
-            )
-            .service(
                 web::resource("/control-api/{a}")
                     .route(web::post().to_async(create::create1))
                     .route(web::get().to_async(get::get1))
@@ -172,10 +166,43 @@ mod create {
         };
     }
 
-    create_request!(create0, ());
-    create_request!(create1, (String));
-    create_request!(create2, (String, String));
-    create_request!(create3, (String, String, String));
+    pub fn create1(
+        path: actix_web::web::Path<String>,
+        state: Data<Context>,
+        data: Json<Element>,
+    ) -> impl Future<Item = HttpResponse, Error = ()> {
+        state
+            .client
+            .create(path.into_inner(), Fid::from(()), data.0)
+            .map_err(|e| error!("{:?}", e))
+            .map(|r| CreateResponse::from(r).into())
+    }
+
+    pub fn create2(
+        path: actix_web::web::Path<(String, String)>,
+        state: Data<Context>,
+        data: Json<Element>,
+    ) -> impl Future<Item = HttpResponse, Error = ()> {
+        let uri = path.into_inner();
+        state
+            .client
+            .create(uri.1, Fid::from(uri.0), data.0)
+            .map_err(|e| error!("{:?}", e))
+            .map(|r| CreateResponse::from(r).into())
+    }
+
+    pub fn create3(
+        path: actix_web::web::Path<(String, String, String)>,
+        state: Data<Context>,
+        data: Json<Element>,
+    ) -> impl Future<Item = HttpResponse, Error = ()> {
+        let uri = path.into_inner();
+        state
+            .client
+            .create(uri.2, Fid::from((uri.0, uri.1)), data.0)
+            .map_err(|e| error!("{:?}", e))
+            .map(|r| CreateResponse::from(r).into())
+    }
 }
 
 /// Error object. Returns when some error happened on [Control API]'s side.
@@ -297,6 +324,17 @@ pub enum Element {
     Room(Room),
 }
 
+impl Element {
+    pub fn into_proto(self, id: String) -> RoomElementProto {
+        let mut proto = RoomElementProto::new();
+        match self {
+            Self::Member(m) => proto.set_member(m.into_proto(id)),
+            _ => unimplemented!(),
+        }
+        proto
+    }
+}
+
 impl From<ElementProto> for Element {
     fn from(proto: ElementProto) -> Self {
         match proto.el.unwrap() {
@@ -321,17 +359,6 @@ impl From<RoomElementProto> for Element {
                  element in Room pipeline."
             ),
         }
-    }
-}
-
-impl Into<RoomElementProto> for Element {
-    fn into(self) -> RoomElementProto {
-        let mut proto = RoomElementProto::new();
-        match self {
-            Self::Member(m) => proto.set_member(m.into()),
-            _ => unimplemented!(),
-        }
-        proto
     }
 }
 

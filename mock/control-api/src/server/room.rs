@@ -16,10 +16,25 @@ use super::member::Member;
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Room {
     /// ID of `Room`.
+    #[serde(skip_deserializing)]
     id: String,
 
     /// Pipeline of `Room`.
     pipeline: HashMap<String, RoomElement>,
+}
+
+impl Room {
+    pub fn into_proto(self, id: String) -> RoomProto {
+        let mut proto = RoomProto::new();
+        let mut room_elements = HashMap::new();
+        for (id, member) in self.pipeline {
+            room_elements.insert(id.clone(), member.into_proto(id));
+        }
+        proto.set_id(id);
+        proto.set_pipeline(room_elements);
+
+        proto
+    }
 }
 
 /// Element of [`Room`]'s pipeline.
@@ -30,11 +45,11 @@ pub enum RoomElement {
     Member(Member),
 }
 
-impl Into<RoomElementProto> for RoomElement {
-    fn into(self) -> RoomElementProto {
+impl RoomElement {
+    pub fn into_proto(self, id: String) -> RoomElementProto {
         let mut proto = RoomElementProto::new();
         match self {
-            Self::Member(m) => proto.set_member(m.into()),
+            Self::Member(m) => proto.set_member(m.into_proto(id)),
         }
 
         proto
@@ -47,20 +62,6 @@ impl From<RoomElementProto> for RoomElement {
             RoomElementOneOfEl::member(member) => Self::Member(member.into()),
             _ => unimplemented!(),
         }
-    }
-}
-
-impl Into<RoomProto> for Room {
-    fn into(self) -> RoomProto {
-        let mut proto = RoomProto::new();
-        let mut room_elements = HashMap::new();
-        for (id, member) in self.pipeline {
-            room_elements.insert(id, member.into());
-        }
-        proto.set_id(self.id);
-        proto.set_pipeline(room_elements);
-
-        proto
     }
 }
 

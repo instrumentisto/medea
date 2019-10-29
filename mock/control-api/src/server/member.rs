@@ -15,6 +15,7 @@ use super::endpoint::Endpoint;
 #[derive(Deserialize, Serialize, Debug)]
 pub struct Member {
     /// ID of `Member`.
+    #[serde(skip_deserializing)]
     id: String,
 
     /// Pipeline of [Control API] `Member`.
@@ -28,20 +29,26 @@ pub struct Member {
     credentials: Option<String>,
 }
 
-impl Into<MemberProto> for Member {
-    fn into(self) -> MemberProto {
+impl Member {
+    pub fn into_proto(self, id: String) -> MemberProto {
         let mut proto = MemberProto::new();
         let mut members_elements = HashMap::new();
         for (id, endpoint) in self.pipeline {
-            members_elements.insert(id, endpoint.into());
+            members_elements.insert(id.clone(), endpoint.into_proto(id));
         }
-        proto.set_id(self.id);
+        proto.set_id(id);
         proto.set_pipeline(members_elements);
 
         if let Some(credentials) = self.credentials {
             proto.set_credentials(credentials);
         }
 
+        proto
+    }
+
+    pub fn into_room_el_proto(self, id: String) -> RoomElementProto {
+        let mut proto = RoomElementProto::new();
+        proto.set_member(self.into_proto(id));
         proto
     }
 }
@@ -57,13 +64,5 @@ impl From<MemberProto> for Member {
             pipeline: member_pipeline,
             credentials: Some(proto.take_credentials()),
         }
-    }
-}
-
-impl Into<RoomElementProto> for Member {
-    fn into(self) -> RoomElementProto {
-        let mut proto = RoomElementProto::new();
-        proto.set_member(self.into());
-        proto
     }
 }

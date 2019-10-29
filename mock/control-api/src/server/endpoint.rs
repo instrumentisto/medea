@@ -44,16 +44,17 @@ impl From<P2pModeProto> for P2pMode {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct WebRtcPublishEndpoint {
     /// ID of [`WebRtcPublishEndpoint`].
+    #[serde(skip_deserializing)]
     id: String,
 
     /// Mode of connection for this [`WebRtcPublishEndpoint`].
     p2p: P2pMode,
 }
 
-impl Into<WebRtcPublishEndpointProto> for WebRtcPublishEndpoint {
-    fn into(self) -> WebRtcPublishEndpointProto {
+impl WebRtcPublishEndpoint {
+    pub fn into_proto(self, id: String) -> WebRtcPublishEndpointProto {
         let mut proto = WebRtcPublishEndpointProto::new();
-        proto.set_id(self.id);
+        proto.set_id(id);
         proto.set_p2p(self.p2p.into());
         proto
     }
@@ -75,6 +76,7 @@ impl From<WebRtcPublishEndpointProto> for WebRtcPublishEndpoint {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct WebRtcPlayEndpoint {
     /// ID of `WebRtcPlayEndpoint`.
+    #[serde(skip_deserializing)]
     id: String,
 
     /// URI in format `local://{room_id}/{member_id}/{endpoint_id}` pointing to
@@ -82,10 +84,10 @@ pub struct WebRtcPlayEndpoint {
     src: String,
 }
 
-impl Into<WebRtcPlayEndpointProto> for WebRtcPlayEndpoint {
-    fn into(self) -> WebRtcPlayEndpointProto {
+impl WebRtcPlayEndpoint {
+    pub fn into_proto(self, id: String) -> WebRtcPlayEndpointProto {
         let mut proto = WebRtcPlayEndpointProto::new();
-        proto.set_id(self.id);
+        proto.set_id(id);
         proto.set_src(self.src);
         proto
     }
@@ -108,15 +110,15 @@ pub enum Endpoint {
     WebRtcPlayEndpoint(WebRtcPlayEndpoint),
 }
 
-impl Into<MemberElementProto> for Endpoint {
-    fn into(self) -> MemberElementProto {
+impl Endpoint {
+    pub fn into_proto(self, id: String) -> MemberElementProto {
         let mut proto = MemberElementProto::new();
         match self {
             Self::WebRtcPlayEndpoint(spec) => {
-                proto.set_webrtc_play(spec.into())
+                proto.set_webrtc_play(spec.into_proto(id))
             }
             Self::WebRtcPublishEndpoint(spec) => {
-                proto.set_webrtc_pub(spec.into())
+                proto.set_webrtc_pub(spec.into_proto(id))
             }
         }
         proto
