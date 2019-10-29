@@ -9,13 +9,21 @@ use super::{
     callback_url::GrpcCallbackUrl, grpc_callback_service::GrpcCallbackService,
 };
 
+#[derive(Debug)]
 struct Inner {
     grpc: HashMap<GrpcCallbackUrl, Addr<GrpcCallbackService>>,
 }
 
+#[derive(Debug, Clone)]
 pub struct CallbackRepository(Arc<Mutex<Inner>>);
 
 impl CallbackRepository {
+    pub fn new() -> Self {
+        Self(Arc::new(Mutex::new(Inner {
+            grpc: HashMap::new(),
+        })))
+    }
+
     pub fn get_grpc(
         &self,
         addr: &GrpcCallbackUrl,

@@ -24,6 +24,7 @@ use crate::{
             RpcConnectionClosed, RpcConnectionEstablished,
         },
         control::{
+            callback::callback_repo::CallbackRepository,
             endpoints::{
                 WebRtcPlayEndpoint as WebRtcPlayEndpointSpec,
                 WebRtcPublishEndpoint as WebRtcPublishEndpointSpec,
@@ -153,6 +154,8 @@ enum State {
 pub struct Room {
     id: RoomId,
 
+    callbacks: CallbackRepository,
+
     /// [`Member`]s and associated [`RpcConnection`]s of this [`Room`], handles
     /// [`RpcConnection`] authorization, establishment, message sending.
     ///
@@ -180,6 +183,7 @@ impl Room {
             peers: PeerRepository::from(HashMap::new()),
             members: ParticipantService::new(room_spec, context)?,
             state: State::Started,
+            callbacks: context.callbacks.clone(),
         })
     }
 

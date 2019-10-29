@@ -12,7 +12,10 @@ pub mod turn;
 
 use std::sync::Arc;
 
-use crate::{conf::Conf, turn::TurnAuthService};
+use crate::{
+    api::control::callback::callback_repo::CallbackRepository, conf::Conf,
+    turn::TurnAuthService,
+};
 
 /// Global application context.
 #[derive(Clone, Debug)]
@@ -24,6 +27,8 @@ pub struct AppContext {
 
     /// Reference to [`TurnAuthService`].
     pub turn_service: Arc<dyn TurnAuthService>,
+
+    pub callbacks: CallbackRepository,
 }
 
 impl AppContext {
@@ -33,6 +38,7 @@ impl AppContext {
         Self {
             config: Arc::new(config),
             turn_service: turn,
+            callbacks: CallbackRepository::new(),
         }
     }
 }
