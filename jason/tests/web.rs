@@ -15,6 +15,23 @@ use wasm_bindgen_test::*;
 
 wasm_bindgen_test_configure!(run_in_browser);
 
+#[wasm_bindgen(module = "/tests/mock_navigator.js")]
+extern "C" {
+    pub type MockNavigator;
+
+    #[wasm_bindgen(constructor)]
+    pub fn new() -> MockNavigator;
+
+    #[wasm_bindgen(method, setter = errorGetUserMedia)]
+    fn error_get_user_media(this: &MockNavigator, err: JsValue);
+
+    #[wasm_bindgen(method, setter = errorEnumerateDevices)]
+    fn error_enumerate_devices(this: &MockNavigator, err: JsValue);
+
+    #[wasm_bindgen(method)]
+    fn stop(this: &MockNavigator);
+}
+
 pub fn get_test_tracks() -> (Track, Track) {
     (
         Track {

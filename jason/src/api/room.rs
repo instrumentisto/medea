@@ -48,7 +48,6 @@ impl RoomHandle {
             .set_func(f))
     }
 
-    // TODO: add tests
     /// Sets `on_local_stream` callback, which will be invoked once media
     /// acquisition request will resolve successfully. Only invoked if media
     /// request was initiated by rpc server.
@@ -56,7 +55,6 @@ impl RoomHandle {
         map_weak!(self, |inner| inner.borrow_mut().on_local_stream.set_func(f))
     }
 
-    // TODO: add tests
     /// Sets `on_failed_local_stream` callback, which will be invoked on local
     /// media acquisition or media injection failures.
     pub fn on_failed_local_stream(

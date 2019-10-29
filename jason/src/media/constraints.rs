@@ -224,7 +224,6 @@ impl VideoTrackConstraints {
             return false;
         }
 
-        // TODO: add test
         if track.ready_state() != MediaStreamTrackState::Live {
             return false;
         }
