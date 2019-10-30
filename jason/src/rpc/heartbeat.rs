@@ -2,6 +2,7 @@ use std::{cell::RefCell, rc::Rc};
 
 use medea_client_api_proto::ClientMsg;
 use thiserror::Error;
+use tracerr::Traced;
 use wasm_bindgen::{prelude::*, JsCast};
 
 use crate::{
@@ -19,6 +20,8 @@ pub enum Error {
     #[error("failed send ping: {0}")]
     SendPing(#[from] SocketError),
 }
+
+type Result<T, E = Error> = std::result::Result<T, Traced<E>>;
 
 /// Responsible for sending/handling keep-alive requests, detecting connection
 /// loss.
@@ -40,12 +43,14 @@ struct InnerHeartbeat {
 impl InnerHeartbeat {
     /// Send ping message into socket.
     /// Returns error no open socket.
-    fn send_now(&mut self) -> Result<(), Error> {
+    fn send_now(&mut self) -> Result<()> {
         match self.socket.as_ref() {
-            None => Err(Error::NoSocket),
+            None => Err(tracerr::new!(Error::NoSocket)),
             Some(socket) => {
                 self.num += 1;
-                Ok(socket.send(&ClientMsg::Ping(self.num))?)
+                Ok(socket
+                    .send(&ClientMsg::Ping(self.num))
+                    .map_err(tracerr::map_from_and_wrap!())?)
             }
         }
     }
@@ -74,12 +79,12 @@ impl Heartbeat {
     ///
     /// Sends first `ping` immediately, so provided [`WebSocket`] must be
     /// active.
-    pub fn start(&self, socket: Rc<WebSocket>) -> Result<(), Error> {
+    pub fn start(&self, socket: Rc<WebSocket>) -> Result<()> {
         let mut inner = self.0.borrow_mut();
         inner.num = 0;
         inner.pong_at = None;
         inner.socket = Some(socket);
-        inner.send_now()?;
+        inner.send_now().map_err(tracerr::wrap!())?;
 
         let inner_rc = Rc::clone(&self.0);
         let do_ping = Closure::wrap(Box::new(move || {
@@ -92,7 +97,8 @@ impl Heartbeat {
                 do_ping.as_ref().unchecked_ref(),
                 inner.interval,
             )
-            .map_err(WasmErr::from)?;
+            .map_err(WasmErr::from)
+            .map_err(tracerr::from_and_wrap!())?;
 
         inner.ping_task = Some(PingTaskHandler {
             _closure: do_ping,

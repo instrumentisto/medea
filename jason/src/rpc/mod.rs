@@ -5,14 +5,15 @@ mod websocket;
 
 use std::{cell::RefCell, rc::Rc, vec};
 
-use anyhow::Result;
+use anyhow::Error;
 use futures::{channel::mpsc, future::LocalBoxFuture, stream::LocalBoxStream};
 use js_sys::Date;
 use medea_client_api_proto::{ClientMsg, Command, Event, ServerMsg};
+use tracerr::Traced;
 
 use self::{
     heartbeat::Heartbeat,
-    websocket::{Error, WebSocket},
+    websocket::{Error as SocketError, WebSocket},
 };
 
 /// Connection with remote was closed.
@@ -29,7 +30,10 @@ pub enum CloseMsg {
 #[cfg_attr(feature = "mockable", mockall::automock)]
 pub trait RpcClient {
     // atm Establish connection with RPC server.
-    fn connect(&self, token: String) -> LocalBoxFuture<'static, Result<()>>;
+    fn connect(
+        &self,
+        token: String,
+    ) -> LocalBoxFuture<'static, Result<(), Traced<Error>>>;
 
     /// Returns [`Stream`] of all [`Event`]s received by this [`RpcClient`].
     ///
@@ -85,7 +89,7 @@ fn on_close(inner_rc: &RefCell<Inner>, close_msg: CloseMsg) {
 }
 
 /// Handles messages from remote server.
-fn on_message(inner_rc: &RefCell<Inner>, msg: Result<ServerMsg, Error>) {
+fn on_message(inner_rc: &RefCell<Inner>, msg: Result<ServerMsg, SocketError>) {
     let inner = inner_rc.borrow();
     match msg {
         Ok(ServerMsg::Pong(_num)) => {
@@ -120,19 +124,34 @@ impl RpcClient for WebsocketRpcClient {
     /// Creates new WebSocket connection to remote media server.
     /// Starts `Heartbeat` if connection succeeds and binds handlers
     /// on receiving messages from server and closing socket.
-    fn connect(&self, token: String) -> LocalBoxFuture<'static, Result<()>> {
+    fn connect(
+        &self,
+        token: String,
+    ) -> LocalBoxFuture<'static, Result<(), Traced<Error>>> {
         let inner = Rc::clone(&self.0);
         Box::pin(async move {
-            let socket = Rc::new(WebSocket::new(&token).await?);
-            inner.borrow_mut().heartbeat.start(Rc::clone(&socket))?;
+            let socket = Rc::new(
+                WebSocket::new(&token)
+                    .await
+                    .map_err(tracerr::map_from_and_wrap!())?,
+            );
+            inner
+                .borrow_mut()
+                .heartbeat
+                .start(Rc::clone(&socket))
+                .map_err(tracerr::map_from_and_wrap!())?;
 
             let inner_rc = Rc::clone(&inner);
-            socket.on_message(move |msg: Result<ServerMsg, Error>| {
-                on_message(&inner_rc, msg)
-            })?;
+            socket
+                .on_message(move |msg: Result<ServerMsg, SocketError>| {
+                    on_message(&inner_rc, msg)
+                })
+                .map_err(tracerr::map_from_and_wrap!())?;
 
             let inner_rc = Rc::clone(&inner);
-            socket.on_close(move |msg: CloseMsg| on_close(&inner_rc, msg))?;
+            socket
+                .on_close(move |msg: CloseMsg| on_close(&inner_rc, msg))
+                .map_err(tracerr::map_from_and_wrap!())?;
 
             inner.borrow_mut().sock.replace(socket);
             Ok(())

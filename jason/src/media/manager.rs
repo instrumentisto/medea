@@ -250,10 +250,7 @@ impl MediaManagerHandle {
                             })
                             .into()
                     })
-                    .map_err(|err| {
-                        js_sys::Error::new(&format!("{}\n{}", err, err.trace()))
-                            .into()
-                    })
+                    .map_err(|err| format!("{}\n{}", err, err.trace()).into())
             }),
             Err(e) => future_to_promise(future::err(e)),
         }
@@ -268,10 +265,7 @@ impl MediaManagerHandle {
                 stream
                     .await
                     .map(|(stream, _)| stream.into())
-                    .map_err(|err| {
-                        js_sys::Error::new(&format!("{}\n{}", err, err.trace()))
-                            .into()
-                    })
+                    .map_err(|err| format!("{}\n{}", err, err.trace()).into())
             }),
             Err(err) => future_to_promise(future::err(err)),
         }

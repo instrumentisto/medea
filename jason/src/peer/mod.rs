@@ -241,7 +241,7 @@ impl PeerConnection {
         let mids = self
             .media_connections
             .get_mids()
-            .map_err(tracerr::from_and_wrap!())?;
+            .map_err(tracerr::map_from_and_wrap!())?;
 
         Ok(mids)
     }
@@ -256,7 +256,7 @@ impl PeerConnection {
     ) -> Result<String> {
         self.media_connections
             .update_tracks(tracks)
-            .map_err(tracerr::from_and_wrap!())?;
+            .map_err(tracerr::map_from_and_wrap!())?;
 
         self.insert_local_stream(local_stream)
             .await
@@ -321,7 +321,7 @@ impl PeerConnection {
             self.media_connections
                 .insert_local_stream(&stream)
                 .await
-                .map_err(tracerr::from_and_wrap!())?;
+                .map_err(tracerr::map_from_and_wrap!())?;
             if is_new_stream {
                 let _ = self.peer_events_sender.unbounded_send(
                     PeerEvent::NewLocalStream {
@@ -406,7 +406,7 @@ impl PeerConnection {
         // update receivers
         self.media_connections
             .update_tracks(recv)
-            .map_err(tracerr::from_and_wrap!())?;
+            .map_err(tracerr::map_from_and_wrap!())?;
 
         self.set_remote_offer(offer)
             .await
@@ -414,7 +414,7 @@ impl PeerConnection {
 
         self.media_connections
             .update_tracks(send)
-            .map_err(tracerr::from_and_wrap!())?;
+            .map_err(tracerr::map_from_and_wrap!())?;
 
         self.insert_local_stream(local_stream)
             .await

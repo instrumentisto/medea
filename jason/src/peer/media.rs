@@ -5,6 +5,7 @@ use std::{borrow::ToOwned, cell::RefCell, collections::HashMap, rc::Rc};
 use futures::future;
 use medea_client_api_proto::{Direction, PeerId, Track, TrackId};
 use thiserror::*;
+use tracerr::Traced;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
     MediaStreamTrack, RtcRtpTransceiver, RtcRtpTransceiverDirection,
@@ -35,6 +36,8 @@ pub enum Error {
     #[error("provided track does not satisfy senders constraints")]
     InvalidMediaTrack,
 }
+
+type Result<T, E = Error> = std::result::Result<T, Traced<E>>;
 
 /// Actual data of [`MediaConnections`] storage.
 struct InnerMediaConnections {
@@ -107,14 +110,18 @@ impl MediaConnections {
 
     /// Returns mapping from a [`MediaTrack`] ID to a `mid` of
     /// this track's [`RtcRtpTransceiver`].
-    pub fn get_mids(&self) -> Result<HashMap<TrackId, String>, Error> {
+    pub fn get_mids(&self) -> Result<HashMap<TrackId, String>> {
         let mut s = self.0.borrow_mut();
         let mut mids =
             HashMap::with_capacity(s.senders.len() + s.receivers.len());
         for (track_id, sender) in &s.senders {
             mids.insert(
                 *track_id,
-                sender.transceiver.mid().ok_or(Error::SendersWithoutMid)?,
+                sender
+                    .transceiver
+                    .mid()
+                    .ok_or(Error::SendersWithoutMid)
+                    .map_err(tracerr::wrap!())?,
             );
         }
         for (track_id, receiver) in &mut s.receivers {
@@ -123,7 +130,8 @@ impl MediaConnections {
                 receiver
                     .mid()
                     .map(ToOwned::to_owned)
-                    .ok_or(Error::ReceiversWithoutMid)?,
+                    .ok_or(Error::ReceiversWithoutMid)
+                    .map_err(tracerr::wrap!())?,
             );
         }
         Ok(mids)
@@ -140,7 +148,7 @@ impl MediaConnections {
     pub fn update_tracks<I: IntoIterator<Item = Track>>(
         &self,
         tracks: I,
-    ) -> Result<(), Error> {
+    ) -> Result<()> {
         let mut s = self.0.borrow_mut();
         for track in tracks {
             match track.direction {
@@ -150,7 +158,8 @@ impl MediaConnections {
                         track.media_type.into(),
                         &s.peer,
                         mid,
-                    )?;
+                    )
+                    .map_err(tracerr::wrap!())?;
                     s.senders.insert(track.id, sndr);
                 }
                 Direction::Recv { sender, mid } => {
@@ -194,7 +203,7 @@ impl MediaConnections {
     pub async fn insert_local_stream(
         &self,
         stream: &MediaStream,
-    ) -> Result<(), Error> {
+    ) -> Result<()> {
         let s = self.0.borrow();
 
         // Build sender to track pairs to catch errors before inserting.
@@ -204,10 +213,10 @@ impl MediaConnections {
                 if sender.caps.satisfies(&track.track()) {
                     sender_and_track.push((sender, track));
                 } else {
-                    return Err(Error::InvalidMediaTrack);
+                    return Err(tracerr::new!(Error::InvalidMediaTrack));
                 }
             } else {
-                return Err(Error::InvalidMediaStream);
+                return Err(tracerr::new!(Error::InvalidMediaStream));
             }
         }
 
@@ -220,7 +229,7 @@ impl MediaConnections {
                 .push(Sender::insert_and_enable_track(Rc::clone(sender), track))
         }
         for res in future::join_all(futures).await {
-            res?;
+            res.map_err(tracerr::wrap!())?;
         }
 
         Ok(())
@@ -313,13 +322,14 @@ impl Sender {
         caps: TrackConstraints,
         peer: &RtcPeerConnection,
         mid: Option<String>,
-    ) -> Result<Rc<Self>, Error> {
+    ) -> Result<Rc<Self>> {
         let kind = TransceiverKind::from(&caps);
         let transceiver = match mid {
             None => peer.add_transceiver(kind, TransceiverDirection::Sendonly),
             Some(mid) => peer
                 .get_transceiver_by_mid(&mid)
-                .ok_or(Error::NotFoundTransceiver(mid))?,
+                .ok_or(Error::NotFoundTransceiver(mid))
+                .map_err(tracerr::wrap!())?,
         };
         Ok(Rc::new(Self {
             track_id,
@@ -341,7 +351,7 @@ impl Sender {
     async fn insert_and_enable_track(
         sender: Rc<Self>,
         track: Rc<MediaTrack>,
-    ) -> Result<(), Error> {
+    ) -> Result<()> {
         JsFuture::from(
             sender
                 .transceiver
@@ -350,7 +360,8 @@ impl Sender {
         )
         .await
         .map_err(Into::into)
-        .map_err(Error::InsertTrack)?;
+        .map_err(Error::InsertTrack)
+        .map_err(tracerr::wrap!())?;
 
         sender
             .transceiver

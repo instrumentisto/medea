@@ -9,8 +9,6 @@ use crate::media::MediaManager;
 
 use super::{PeerConnection, PeerEvent};
 
-type Result<T, E = Error> = std::result::Result<T, Traced<E>>;
-
 /// [`PeerConnection`] factory and repository.
 #[allow(clippy::module_name_repetitions)]
 #[cfg_attr(feature = "mockable", mockall::automock)]
@@ -26,7 +24,7 @@ pub trait PeerRepository {
         events_sender: mpsc::UnboundedSender<PeerEvent>,
         enabled_audio: bool,
         enabled_video: bool,
-    ) -> Result<Rc<PeerConnection>>;
+    ) -> Result<Rc<PeerConnection>, Traced<Error>>;
 
     /// Returns [`PeerConnection`] stored in repository by its ID.
     fn get(&self, id: PeerId) -> Option<Rc<PeerConnection>>;
@@ -67,7 +65,7 @@ impl PeerRepository for Repository {
         peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
         enabled_audio: bool,
         enabled_video: bool,
-    ) -> Result<Rc<PeerConnection>> {
+    ) -> Result<Rc<PeerConnection>, Traced<Error>> {
         let peer = Rc::new(
             PeerConnection::new(
                 id,

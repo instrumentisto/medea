@@ -15,6 +15,7 @@ use crate::{
     rpc::CloseMsg,
     utils::{EventListener, WasmErr},
 };
+use tracerr::Traced;
 
 /// Describes errors that may occur when working with [`WebSocket`].
 #[derive(Error, Debug)]
@@ -43,6 +44,8 @@ pub enum Error {
     ClosedSocket,
 }
 
+type Result<T, E = Error> = std::result::Result<T, Traced<E>>;
+
 /// State of websocket.
 #[derive(Debug)]
 enum State {
@@ -65,7 +68,7 @@ impl State {
 impl TryFrom<u16> for State {
     type Error = Error;
 
-    fn try_from(value: u16) -> Result<Self, Self::Error> {
+    fn try_from(value: u16) -> std::result::Result<Self, Self::Error> {
         match value {
             0 => Ok(Self::CONNECTING),
             1 => Ok(Self::OPEN),
@@ -88,10 +91,9 @@ struct InnerSocket {
 pub struct WebSocket(Rc<RefCell<InnerSocket>>);
 
 impl InnerSocket {
-    fn new(url: &str) -> Result<Self, Error> {
+    fn new(url: &str) -> Result<Self> {
         let socket = SysWebSocket::new(url)
-            .map_err(Into::into)
-            .map_err(Error::CreateSocket)?;
+            .map_err(|err| tracerr::new!(Error::CreateSocket(err.into())))?;
         Ok(Self {
             socket_state: State::CONNECTING,
             socket: Rc::new(socket),
@@ -117,7 +119,7 @@ impl InnerSocket {
 impl WebSocket {
     /// Initiates new WebSocket connection. Resolves only when underlying
     /// connection becomes active.
-    pub async fn new(url: &str) -> Result<Self, Error> {
+    pub async fn new(url: &str) -> Result<Self> {
         let (tx_close, rx_close) = oneshot::channel();
         let (tx_open, rx_open) = oneshot::channel();
 
@@ -136,7 +138,9 @@ impl WebSocket {
                         let _ = tx_close.send(());
                     },
                 )
-                .map_err(Error::SetHandlerOnClose)?,
+                .map_err(|err| {
+                    tracerr::new!(Error::SetHandlerOnClose(err.into()))
+                })?,
             );
 
             let inner = Rc::clone(&socket);
@@ -149,7 +153,9 @@ impl WebSocket {
                         let _ = tx_open.send(());
                     },
                 )
-                .map_err(Error::SetHandlerOnOpen)?,
+                .map_err(|err| {
+                    tracerr::new!(Error::SetHandlerOnOpen(err.into()))
+                })?,
             );
         }
 
@@ -161,16 +167,18 @@ impl WebSocket {
         match state {
             future::Either::Left((opened, _)) => match opened {
                 Ok(_) => Ok(Self(socket)),
-                Err(_) => Err(Error::InitSocket),
+                Err(_) => Err(tracerr::new!(Error::InitSocket)),
             },
-            future::Either::Right(_closed) => Err(Error::InitSocket),
+            future::Either::Right(_closed) => {
+                Err(tracerr::new!(Error::InitSocket))
+            }
         }
     }
 
     /// Set handler on receive message from server.
-    pub fn on_message<F>(&self, mut f: F) -> Result<(), Error>
+    pub fn on_message<F>(&self, mut f: F) -> Result<()>
     where
-        F: (FnMut(Result<ServerMsg, Error>)) + 'static,
+        F: (FnMut(std::result::Result<ServerMsg, Error>)) + 'static,
     {
         let mut inner_mut = self.0.borrow_mut();
         inner_mut.on_message = Some(
@@ -183,8 +191,9 @@ impl WebSocket {
                     f(parsed);
                 },
             )
-            .map_err(Into::into)
-            .map_err(Error::SetHandlerOnMessage)?,
+            .map_err(|err| {
+                tracerr::new!(Error::SetHandlerOnMessage(err.into()))
+            })?,
         );
         Ok(())
     }
@@ -205,24 +214,25 @@ impl WebSocket {
                     f(CloseMsg::from(&msg));
                 },
             )
-            .map_err(Error::SetHandlerOnClose)?,
+            .map_err(|err| {
+                tracerr::new!(Error::SetHandlerOnClose(err.into()))
+            })?,
         );
         Ok(())
     }
 
     /// Send message to server.
-    pub fn send(&self, msg: &ClientMsg) -> Result<(), Error> {
+    pub fn send(&self, msg: &ClientMsg) -> Result<()> {
         let inner = self.0.borrow();
-        let message =
-            serde_json::to_string(msg).map_err(Error::ParseClientMessage)?;
+        let message = serde_json::to_string(msg)
+            .map_err(|err| tracerr::new!(Error::ParseClientMessage(err)))?;
 
         match inner.socket_state {
             State::OPEN => inner
                 .socket
                 .send_with_str(&message)
-                .map_err(Into::into)
-                .map_err(Error::SendMessage),
-            _ => Err(Error::ClosedSocket),
+                .map_err(|err| tracerr::new!(Error::SendMessage(err.into()))),
+            _ => Err(tracerr::new!(Error::ClosedSocket)),
         }
     }
 }
