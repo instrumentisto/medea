@@ -14,7 +14,7 @@ use medea_jason::{
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_test::*;
 
-use crate::{get_test_tracks, resolve_after};
+use crate::{get_test_tracks, resolve_after, MockNavigator};
 
 wasm_bindgen_test_configure!(run_in_browser);
 
@@ -186,12 +186,12 @@ async fn error_inject_invalid_local_stream_into_new_peer() {
     let room_handle = room.new_handle();
     let (done, wait) = oneshot::channel();
     let cb = Closure::once_into_js(move |err: js_sys::Error| {
+        done.send(()).unwrap();
         assert_eq!(
             err.to_string(),
             "Error: provided MediaStream was expected to have single video \
              track"
         );
-        done.send(()).unwrap();
     });
     room_handle.on_failed_local_stream(cb.into()).unwrap();
 
@@ -230,12 +230,12 @@ async fn error_inject_invalid_local_stream_into_new_peer() {
 async fn error_inject_invalid_local_stream_into_room_on_exists_peer() {
     let (done, wait) = oneshot::channel();
     let cb = Closure::once_into_js(move |err: js_sys::Error| {
+        done.send(()).unwrap();
         assert_eq!(
             err.to_string(),
             "Error: provided MediaStream was expected to have single video \
              track"
         );
-        done.send(()).unwrap();
     });
     let (room, peer) = get_test_room_and_exist_peer(1);
     let (audio_track, video_track) = get_test_tracks();
@@ -253,4 +253,34 @@ async fn error_inject_invalid_local_stream_into_room_on_exists_peer() {
     room_handle.inject_local_stream(stream).unwrap();
 
     wait.await.unwrap();
+}
+
+#[wasm_bindgen_test]
+async fn error_get_local_stream_on_new_peer() {
+    let (event_tx, event_rx) = mpsc::unbounded();
+    let (room, _peer) = get_test_room_and_new_peer(event_rx, true, true);
+
+    let room_handle = room.new_handle();
+    let (done, wait) = oneshot::channel();
+    let cb = Closure::once_into_js(move |err: js_sys::Error| {
+        done.send(()).unwrap();
+        assert_eq!(err.to_string(), "Error: get user media failed: some error");
+    });
+    room_handle.on_failed_local_stream(cb.into()).unwrap();
+
+    let mock_navigator = MockNavigator::new();
+    mock_navigator.error_get_user_media("some error".into());
+
+    let (audio_track, video_track) = get_test_tracks();
+    event_tx
+        .unbounded_send(Event::PeerCreated {
+            peer_id: PeerId(1),
+            sdp_offer: None,
+            tracks: vec![audio_track, video_track],
+            ice_servers: vec![],
+        })
+        .unwrap();
+
+    wait.await.unwrap();
+    mock_navigator.stop();
 }

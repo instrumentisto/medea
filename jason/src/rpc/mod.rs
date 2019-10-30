@@ -102,14 +102,14 @@ fn on_message(inner_rc: &RefCell<Inner>, msg: Result<ServerMsg, SocketError>) {
                 if let Err(err) = sub.unbounded_send(event) {
                     // TODO: receiver is gone, should delete
                     //       this subs tx
-                    console_log!(err);
+                    error!(err.to_string());
                 }
             }
         }
         Err(err) => {
             // TODO: protocol versions mismatch? should drop
             //       connection if so
-            console_log!(err);
+            error!(err.to_string());
         }
     }
 }

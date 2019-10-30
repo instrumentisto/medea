@@ -8,7 +8,7 @@ use wasm_bindgen::prelude::*;
 use web_sys::{
     ConstrainDomStringParameters,
     MediaStreamConstraints as SysMediaStreamConstraints,
-    MediaStreamTrack as SysMediaStreamTrack,
+    MediaStreamTrack as SysMediaStreamTrack, MediaStreamTrackState,
     MediaTrackConstraints as SysMediaTrackConstraints,
 };
 
@@ -160,6 +160,10 @@ impl AudioTrackConstraints {
             return false;
         }
 
+        if track.ready_state() != MediaStreamTrackState::Live {
+            return false;
+        }
+
         satisfies_by_device_id!(self, track)
         // TODO returns Result<bool, Error>
     }
@@ -217,6 +221,10 @@ impl VideoTrackConstraints {
     /// [1]: https://www.w3.org/TR/mediacapture-streams/#mediastreamtrack
     pub fn satisfies(&self, track: &SysMediaStreamTrack) -> bool {
         if track.kind() != "video" {
+            return false;
+        }
+
+        if track.ready_state() != MediaStreamTrackState::Live {
             return false;
         }
 

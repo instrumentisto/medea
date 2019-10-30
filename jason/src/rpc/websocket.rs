@@ -110,7 +110,7 @@ impl InnerSocket {
             Ok(new_state) => self.socket_state = new_state,
             Err(err) => {
                 // unreachable, unless some vendor will break enum
-                console_log!(err)
+                error!(err.to_string())
             }
         };
     }
@@ -250,7 +250,7 @@ impl Drop for WebSocket {
                 .socket
                 .close_with_code_and_reason(1000, "Dropped unexpectedly")
             {
-                console_log!(WasmErr::from(err));
+                error!(err);
             }
         }
     }

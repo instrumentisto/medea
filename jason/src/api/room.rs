@@ -49,14 +49,15 @@ impl RoomHandle {
             .set_func(f))
     }
 
-    /// Sets callback, which will be invoked on any `Connection` send new local
-    /// stream to remote member.
+    /// Sets `on_local_stream` callback, which will be invoked once media
+    /// acquisition request will resolve successfully. Only invoked if media
+    /// request was initiated by rpc server.
     pub fn on_local_stream(&self, f: js_sys::Function) -> Result<(), JsValue> {
         map_weak!(self, |inner| inner.borrow_mut().on_local_stream.set_func(f))
     }
 
-    /// Sets callback, which will be invoked when any `Connection` cannot obtain
-    /// local stream or inject local stream failed.
+    /// Sets `on_failed_local_stream` callback, which will be invoked on local
+    /// media acquisition or media injection failures.
     pub fn on_failed_local_stream(
         &self,
         f: js_sys::Function,
@@ -87,7 +88,7 @@ impl RoomHandle {
     }
 
     /// Performs injecting local media stream for all created and new
-    /// [`PeerConnection`]s into thiis [`Room`].
+    /// [`PeerConnection`]s into this [`Room`].
     pub fn inject_local_stream(
         &self,
         stream: SysMediaStream,
@@ -153,7 +154,7 @@ impl Room {
                         // happen, actually, since
                         // `InnerSession` should drop its `tx` by unsub from
                         // `RpcClient`.
-                        console_log!("Inner Room dropped unexpectedly")
+                        error!("Inner Room dropped unexpectedly")
                     }
                     Some(inner) => {
                         match event {
@@ -307,7 +308,7 @@ impl InnerRoom {
                 if let Err(err) =
                     peer.inject_local_stream(&injected_stream).await
                 {
-                    console_log!(err);
+                    error!(err.to_string());
                     error_callback
                         .call(js_sys::Error::new(&format!("{}", err)));
                 }
@@ -340,7 +341,7 @@ impl EventHandler for InnerRoom {
         ) {
             Ok(peer) => peer,
             Err(err) => {
-                console_log!(err);
+                error!(err.to_string());
                 return;
             }
         };
@@ -379,7 +380,7 @@ impl EventHandler for InnerRoom {
             .then(|result| {
                 async move {
                     if let Err(err) = result {
-                        console_log!(err);
+                        error!(err.to_string());
                         error_callback
                             .call(js_sys::Error::new(&format!("{}", err)));
                     };
@@ -393,12 +394,12 @@ impl EventHandler for InnerRoom {
         if let Some(peer) = self.peers.get(peer_id) {
             spawn_local(async move {
                 if let Err(err) = peer.set_remote_answer(sdp_answer).await {
-                    console_log!(err);
+                    error!(err.to_string());
                 }
             });
         } else {
             // TODO: No peer, whats next?
-            console_log!(format!("Peer with id {} doesnt exist", peer_id))
+            error!(format!("Peer with id {} doesnt exist", peer_id))
         }
     }
 
@@ -418,12 +419,12 @@ impl EventHandler for InnerRoom {
                     )
                     .await;
                 if let Err(err) = add {
-                    console_log!(err);
+                    error!(err.to_string());
                 }
             });
         } else {
             // TODO: No peer, whats next?
-            console_log!(format!("Peer with id {} doesnt exist", peer_id))
+            error!(format!("Peer with id {} doesnt exist", peer_id))
         }
     }
 
@@ -467,9 +468,7 @@ impl PeerEventHandler for InnerRoom {
     ) {
         match self.connections.get(&sender_id) {
             Some(conn) => conn.on_remote_stream(remote_stream.stream()),
-            None => {
-                console_log!("NewRemoteStream from sender without connection")
-            }
+            None => error!("NewRemoteStream from sender without connection"),
         }
     }
 
