@@ -100,7 +100,7 @@ pub enum Command {
 }
 
 /// Reason of disconnecting Web Client from Media Server.
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum CloseReason {
     /// Client session was finished on a server side.
     Finished,
