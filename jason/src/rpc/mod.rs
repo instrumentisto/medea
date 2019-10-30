@@ -82,7 +82,7 @@ pub trait RpcClient {
     /// [`Room`]: crate::api::room::Room
     fn on_close_by_server(
         &self,
-    ) -> LocalBoxFuture<'static, Result<CloseMsg, oneshot::Canceled>>;
+    ) -> LocalBoxFuture<'static, Result<CloseReason, oneshot::Canceled>>;
 }
 
 // TODO:
@@ -113,14 +113,14 @@ struct Inner {
     ///
     /// [`Room`]: crate::api::room::Room
     /// [`Jason`]: crate::api::Jason
-    on_close_by_server: Option<oneshot::Sender<CloseMsg>>,
+    on_close_by_server_subscribers: Vec<oneshot::Sender<CloseReason>>,
 }
 
 impl Inner {
     fn new(heartbeat_interval: i32) -> Rc<RefCell<Self>> {
         Rc::new(RefCell::new(Self {
             sock: None,
-            on_close_by_server: None,
+            on_close_by_server_subscribers: Vec::new(),
             subs: vec![],
             heartbeat: Heartbeat::new(heartbeat_interval),
         }))
@@ -143,8 +143,11 @@ fn on_close(inner_rc: &RefCell<Inner>, close_msg: &CloseMsg) {
         // close.
         if let CloseReason::Reconnected = reason {
         } else {
-            if let Some(q) = inner_rc.borrow_mut().on_close_by_server.take() {
-                q.send(close_msg.clone());
+            let mut on_close_by_server_subcribers = Vec::new();
+            std::mem::swap(&mut on_close_by_server_subcribers, &mut inner_rc.borrow_mut().on_close_by_server_subscribers);
+
+            for sub in on_close_by_server_subcribers {
+                sub.send(reason.clone());
             }
         }
     }
@@ -244,9 +247,9 @@ impl RpcClient for WebsocketRpcClient {
 
     fn on_close_by_server(
         &self,
-    ) -> LocalBoxFuture<'static, Result<CloseMsg, oneshot::Canceled>> {
+    ) -> LocalBoxFuture<'static, Result<CloseReason, oneshot::Canceled>> {
         let (tx, rx) = oneshot::channel();
-        self.0.borrow_mut().on_close_by_server = Some(tx);
+        self.0.borrow_mut().on_close_by_server_subscribers.push(tx);
         Box::pin(rx)
     }
 }

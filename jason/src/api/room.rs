@@ -22,6 +22,7 @@ use crate::{
     rpc::RpcClient,
     utils::{Callback2, WasmErr},
 };
+use crate::utils::Callback;
 
 use super::{connection::Connection, ConnectionHandle};
 
@@ -45,6 +46,17 @@ impl RoomHandle {
             .borrow_mut()
             .on_new_connection
             .set_func(f))
+    }
+
+    pub fn on_close_by_server(
+        &mut self,
+        f: js_sys::Function,
+    ) -> Result<(), JsValue> {
+        map_weak!(self, |inner| inner
+            .borrow_mut()
+            .on_close_by_server
+            .set_func(f)
+        )
     }
 
     /// Performs entering to a [`Room`].
@@ -167,6 +179,7 @@ struct InnerRoom {
     on_new_connection: Rc<Callback2<ConnectionHandle, WasmErr>>,
     enabled_audio: bool,
     enabled_video: bool,
+    on_close_by_server: Rc<Callback<JsValue>>,
 }
 
 impl InnerRoom {
@@ -177,6 +190,16 @@ impl InnerRoom {
         peers: Box<dyn PeerRepository>,
         peer_event_sender: mpsc::UnboundedSender<PeerEvent>,
     ) -> Self {
+        let on_close_by_server = Rc::new(Callback::default());
+        let on_close_by_server_clone = Rc::clone(&on_close_by_server);
+        spawn_local(
+            rpc.on_close_by_server()
+                .map(move |msg| {
+                    if let Ok(msg) = msg {
+                        on_close_by_server_clone.call(JsValue::from_str(&msg.to_string()));
+                    }
+                })
+        );
         Self {
             rpc,
             peers,
@@ -185,6 +208,7 @@ impl InnerRoom {
             on_new_connection: Rc::new(Callback2::default()),
             enabled_audio: true,
             enabled_video: true,
+            on_close_by_server,
         }
     }
 
