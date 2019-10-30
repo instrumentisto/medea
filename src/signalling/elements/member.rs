@@ -237,7 +237,7 @@ impl Member {
     }
 
     /// Returns [`Fid`] to this [`Member`].
-    fn get_fid(&self) -> Fid<ToMember> {
+    pub fn get_fid(&self) -> Fid<ToMember> {
         Fid::<ToMember>::new(self.room_id(), self.id())
     }
 

@@ -7,7 +7,7 @@ use std::collections::{HashMap, HashSet};
 
 use actix::{
     fut::wrap_future, Actor, ActorFuture, AsyncContext, Context, Handler,
-    Message, ResponseActFuture, WrapFuture as _,
+    Message, ResponseActFuture, ResponseFuture, WrapFuture as _,
 };
 use derive_more::Display;
 use failure::Fail;
@@ -24,7 +24,10 @@ use crate::{
             RpcConnectionClosed, RpcConnectionEstablished,
         },
         control::{
-            callback::callback_repo::CallbackRepository,
+            callback::{
+                callback_repo::CallbackRepository, callback_url::CallbackUrl,
+                Callback, CallbackEvent, MemberCallbackEvent,
+            },
             endpoints::{
                 WebRtcPlayEndpoint as WebRtcPlayEndpointSpec,
                 WebRtcPublishEndpoint as WebRtcPublishEndpointSpec,
@@ -1047,6 +1050,21 @@ impl Handler<RpcConnectionEstablished> for Room {
             })
             .map(|member, room, ctx| {
                 room.init_member_connections(&member, ctx);
+                let callback_url = member.get_on_join();
+                if let Some(callback_url) = callback_url {
+                    match callback_url {
+                        CallbackUrl::Grpc(grpc_callback_url) => {
+                            let callback_service =
+                                room.callbacks.get_grpc(&grpc_callback_url);
+                            callback_service.do_send(Callback::new(
+                                member.get_fid().into(),
+                                CallbackEvent::Member(
+                                    MemberCallbackEvent::OnJoin,
+                                ),
+                            ));
+                        }
+                    }
+                }
             });
         Box::new(fut)
     }
