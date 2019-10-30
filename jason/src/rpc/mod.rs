@@ -144,7 +144,10 @@ fn on_close(inner_rc: &RefCell<Inner>, close_msg: &CloseMsg) {
         if let CloseReason::Reconnected = reason {
         } else {
             let mut on_close_by_server_subcribers = Vec::new();
-            std::mem::swap(&mut on_close_by_server_subcribers, &mut inner_rc.borrow_mut().on_close_by_server_subscribers);
+            std::mem::swap(
+                &mut on_close_by_server_subcribers,
+                &mut inner_rc.borrow_mut().on_close_by_server_subscribers,
+            );
 
             for sub in on_close_by_server_subcribers {
                 sub.send(reason.clone());

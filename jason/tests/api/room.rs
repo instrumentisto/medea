@@ -3,7 +3,7 @@
 use std::rc::Rc;
 
 use futures::channel::mpsc;
-use medea_client_api_proto::{Event, IceServer, PeerId};
+use medea_client_api_proto::{Event, IceServer, PeerId, CloseReason};
 use medea_jason::{
     api::Room,
     media::MediaManager,
@@ -13,6 +13,8 @@ use medea_jason::{
 use wasm_bindgen_test::*;
 
 use crate::{get_test_tracks, resolve_after};
+use std::cell::RefCell;
+use wasm_bindgen_futures::spawn_local;
 
 wasm_bindgen_test_configure!(run_in_browser);
 
@@ -163,3 +165,54 @@ async fn mute_video_room_before_init_peer() {
     assert!(peer.is_send_audio_enabled());
     assert!(!peer.is_send_video_enabled());
 }
+
+/*
+#[wasm_bindgen_test]
+async fn close_room() {
+    let mut rpc = MockRpcClient::new();
+    let mut repo = Box::new(MockPeerRepository::new());
+
+    use futures::channel::oneshot;
+
+    use std::sync::{Arc, Mutex};
+
+    let senders = Arc::new(Mutex::new(Vec::new()));
+    let senders_clone = Arc::clone(&senders);
+    let (event_tx, event_rx) = mpsc::unbounded();
+    rpc.expect_subscribe()
+        .return_once(move || Box::pin(event_rx));
+    rpc.expect_on_close_by_server().returning(move || {
+        let (tx, rx) = oneshot::channel();
+        senders_clone.lock().unwrap().push(tx);
+        Box::pin(rx)
+    });
+    rpc.expect_send_command().return_const(());
+    rpc.expect_unsub().return_const(());
+
+    use medea_jason::rpc::RpcClient;
+    use futures::FutureExt;
+
+    let room = Room::new(Rc::new(rpc), repo);
+    let mut room_handle = room.new_handle();
+    use wasm_bindgen::closure::Closure;
+
+    use wasm_bindgen::JsCast;
+
+    room_handle.on_close_by_server(Closure::once_into_js(|| {
+        panic!("sadf");
+    }).into()).unwrap();
+
+    let mut sqwe = Vec::new();
+    std::mem::swap(&mut sqwe, &mut senders.lock().unwrap());
+
+    resolve_after(500).await.unwrap();
+
+    for sub in sqwe {
+        sub.send(CloseReason::Finished);
+    }
+
+    resolve_after(1000).await.unwrap();
+
+}
+
+*/

@@ -20,9 +20,8 @@ use crate::{
     media::MediaStream,
     peer::{PeerEvent, PeerEventHandler, PeerRepository},
     rpc::RpcClient,
-    utils::{Callback2, WasmErr},
+    utils::{Callback, Callback2, WasmErr},
 };
-use crate::utils::Callback;
 
 use super::{connection::Connection, ConnectionHandle};
 
@@ -55,8 +54,7 @@ impl RoomHandle {
         map_weak!(self, |inner| inner
             .borrow_mut()
             .on_close_by_server
-            .set_func(f)
-        )
+            .set_func(f))
     }
 
     /// Performs entering to a [`Room`].
@@ -192,14 +190,13 @@ impl InnerRoom {
     ) -> Self {
         let on_close_by_server = Rc::new(Callback::default());
         let on_close_by_server_clone = Rc::clone(&on_close_by_server);
-        spawn_local(
-            rpc.on_close_by_server()
-                .map(move |msg| {
-                    if let Ok(msg) = msg {
-                        on_close_by_server_clone.call(JsValue::from_str(&msg.to_string()));
-                    }
-                })
-        );
+        spawn_local(rpc.on_close_by_server().map(move |msg| {
+            if let Ok(msg) = msg {
+                on_close_by_server_clone
+                    .call(JsValue::from_str(&msg.to_string()))
+                    .unwrap();
+            }
+        }));
         Self {
             rpc,
             peers,
