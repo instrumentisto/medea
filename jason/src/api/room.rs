@@ -24,6 +24,7 @@ use crate::{
 };
 
 use super::{connection::Connection, ConnectionHandle};
+use crate::rpc::JsCloseReason;
 
 /// JS side handle to `Room` where all the media happens.
 ///
@@ -177,7 +178,7 @@ struct InnerRoom {
     on_new_connection: Rc<Callback2<ConnectionHandle, WasmErr>>,
     enabled_audio: bool,
     enabled_video: bool,
-    on_close_by_server: Rc<Callback<JsValue>>,
+    on_close_by_server: Rc<Callback<JsCloseReason>>,
 }
 
 impl InnerRoom {
@@ -193,7 +194,7 @@ impl InnerRoom {
         spawn_local(rpc.on_close_by_server().map(move |msg| {
             if let Ok(msg) = msg {
                 on_close_by_server_clone
-                    .call(JsValue::from_str(&msg.to_string()))
+                    .call(JsCloseReason::new(msg))
                     .unwrap();
             }
         }));

@@ -55,6 +55,29 @@ impl From<&CloseEvent> for CloseMsg {
     }
 }
 
+use wasm_bindgen::prelude::*;
+
+#[wasm_bindgen]
+pub struct JsCloseReason {
+    reason: String,
+}
+
+impl JsCloseReason {
+    pub fn new(reason: CloseReason) -> Self {
+        Self {
+            reason: reason.to_string(),
+        }
+    }
+}
+
+#[wasm_bindgen]
+impl JsCloseReason {
+    #[wasm_bindgen(getter)]
+    pub fn reason(&self) -> String {
+        self.reason.clone()
+    }
+}
+
 // TODO: consider using async-trait crate, it doesnt work with mockall atm
 /// Client to talk with server via Client API RPC.
 #[allow(clippy::module_name_repetitions)]
