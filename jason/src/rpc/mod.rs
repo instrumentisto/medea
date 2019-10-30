@@ -5,7 +5,10 @@ mod websocket;
 
 use std::{cell::RefCell, rc::Rc, vec};
 
-use futures::{channel::mpsc, future::LocalBoxFuture, stream::LocalBoxStream};
+use futures::{
+    channel::mpsc, future::LocalBoxFuture, stream::LocalBoxStream, SinkExt,
+    TryFutureExt,
+};
 use js_sys::Date;
 use medea_client_api_proto::{
     ClientMsg, CloseDescription, CloseReason, Command, Event, ServerMsg,
@@ -78,7 +81,9 @@ pub trait RpcClient {
     ///
     /// [`Room`]: crate::api::room::Room
     #[cfg(not(feature = "mockable"))]
-    fn on_close_by_server(&self, f: Box<dyn Fn(&CloseMsg)>);
+    fn on_close_by_server(
+        &self,
+    ) -> LocalBoxFuture<'static, Result<(), futures::channel::oneshot::Canceled>>;
 }
 
 // We mock `RpcClient` manually because `mockall` can't mock `Fn` objects but
@@ -139,14 +144,14 @@ struct Inner {
     ///
     /// [`Room`]: crate::api::room::Room
     /// [`Jason`]: crate::api::Jason
-    on_close_by_server: Rc<Box<dyn Fn(&CloseMsg)>>,
+    on_close_by_server: Option<futures::channel::oneshot::Sender<()>>,
 }
 
 impl Inner {
     fn new(heartbeat_interval: i32) -> Rc<RefCell<Self>> {
         Rc::new(RefCell::new(Self {
             sock: None,
-            on_close_by_server: Rc::new(Box::new(|_| {})),
+            on_close_by_server: None,
             subs: vec![],
             heartbeat: Heartbeat::new(heartbeat_interval),
         }))
@@ -169,8 +174,9 @@ fn on_close(inner_rc: &RefCell<Inner>, close_msg: &CloseMsg) {
         // close.
         if let CloseReason::Reconnected = reason {
         } else {
-            let f = Rc::clone(&inner_rc.borrow().on_close_by_server);
-            (f)(&close_msg);
+            if let Some(q) = inner_rc.borrow_mut().on_close_by_server.take() {
+                q.send(());
+            }
         }
     }
 
@@ -270,8 +276,13 @@ impl RpcClient for WebsocketRpcClient {
     // Not available in mockable tests because limitations of
     // `mockall`.
     #[cfg(not(feature = "mockable"))]
-    fn on_close_by_server(&self, f: Box<dyn Fn(&CloseMsg)>) {
-        self.0.borrow_mut().on_close_by_server = Rc::new(f);
+    fn on_close_by_server(
+        &self,
+    ) -> LocalBoxFuture<'static, Result<(), futures::channel::oneshot::Canceled>>
+    {
+        let (tx, rx) = futures::channel::oneshot::channel();
+        self.0.borrow_mut().on_close_by_server = Some(tx);
+        Box::pin(rx)
     }
 }
 

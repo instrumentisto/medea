@@ -18,6 +18,8 @@ use crate::{
 
 #[doc(inline)]
 pub use self::{connection::ConnectionHandle, room::Room, room::RoomHandle};
+use futures::{FutureExt, TryFutureExt};
+use wasm_bindgen_futures::spawn_local;
 
 #[wasm_bindgen]
 #[derive(Default)]
@@ -55,10 +57,13 @@ impl Jason {
         #[cfg(not(feature = "mockall"))]
         {
             let inner_clone = self.0.clone();
-            rpc.on_close_by_server(Box::new(move |_| {
+            spawn_local(rpc.on_close_by_server().map(move |_| {
+                web_sys::console::log_1(&"ADSAD".into());
                 inner_clone.borrow_mut().rooms = Vec::new();
                 inner_clone.borrow_mut().media_manager = Rc::default();
             }));
+            //            rpc.on_close_by_server(Box::new(move |_| {
+            //            }));
         }
 
         let room = Room::new(rpc, peer_repository);
