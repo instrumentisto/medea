@@ -49,8 +49,7 @@ async function init(){
 
     let room = await jason.init_room();
     room.on_close_by_server(function (q) {
-      console.log('HOORAY JS SIDE WORKS');
-      console.log(q.reason);
+      console.log('Reason of Jason close: ' + q.reason);
     });
     await getStream(local_video, audio_select, video_select);
     await fillMediaDevicesInputs(audio_select, video_select);

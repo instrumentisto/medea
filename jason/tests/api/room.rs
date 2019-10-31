@@ -1,6 +1,6 @@
 #![cfg(target_arch = "wasm32")]
 
-use std::rc::Rc;
+use std::{cell::RefCell, rc::Rc};
 
 use futures::channel::mpsc;
 use medea_client_api_proto::{CloseReason, Event, IceServer, PeerId};
@@ -10,11 +10,10 @@ use medea_jason::{
     peer::{MockPeerRepository, PeerConnection, PeerEvent},
     rpc::MockRpcClient,
 };
+use wasm_bindgen_futures::spawn_local;
 use wasm_bindgen_test::*;
 
 use crate::{get_test_tracks, resolve_after};
-use std::cell::RefCell;
-use wasm_bindgen_futures::spawn_local;
 
 wasm_bindgen_test_configure!(run_in_browser);
 
@@ -42,6 +41,10 @@ fn get_test_room_and_exist_peer() -> (Room, Rc<PeerConnection>) {
         .times(2)
         .returning_st(move || vec![Rc::clone(&peer_clone)]);
     rpc.expect_unsub().return_const(());
+    rpc.expect_on_close_by_server().returning(move || {
+        let (tx, rx) = futures::channel::oneshot::channel();
+        Box::pin(rx)
+    });
 
     let room = Room::new(Rc::new(rpc), repo);
     (room, peer)
@@ -117,6 +120,10 @@ fn get_test_room_and_new_peer(
         .return_once_st(move |_, _, _, _, _| Ok(peer_clone));
     rpc.expect_send_command().return_const(());
     rpc.expect_unsub().return_const(());
+    rpc.expect_on_close_by_server().returning(move || {
+        let (tx, rx) = futures::channel::oneshot::channel();
+        Box::pin(rx)
+    });
 
     let room = Room::new(Rc::new(rpc), repo);
     (room, peer)
@@ -188,18 +195,23 @@ async fn mute_video_room_before_init_peer() {
 // rpc.expect_send_command().return_const(());
 // rpc.expect_unsub().return_const(());
 //
-// use medea_jason::rpc::RpcClient;
 // use futures::FutureExt;
+// use medea_jason::rpc::RpcClient;
 //
 // let room = Room::new(Rc::new(rpc), repo);
 // let mut room_handle = room.new_handle();
-// use wasm_bindgen::closure::Closure;
+// use wasm_bindgen::{closure::Closure, JsCast};
+// console_error_panic_hook::set_once();
 //
-// use wasm_bindgen::JsCast;
-//
-// room_handle.on_close_by_server(Closure::once_into_js(|| {
+// room_handle
+// .on_close_by_server(
+// Closure::once_into_js(|| {
 // panic!("sadf");
-// }).into()).unwrap();
+// assert!(false);
+// })
+// .into(),
+// )
+// .unwrap();
 //
 // let mut sqwe = Vec::new();
 // std::mem::swap(&mut sqwe, &mut senders.lock().unwrap());
@@ -210,7 +222,5 @@ async fn mute_video_room_before_init_peer() {
 // sub.send(CloseReason::Finished);
 // }
 //
-// resolve_after(1000).await.unwrap();
-//
+// resolve_after(2000).await.unwrap();
 // }
-//

@@ -9,12 +9,12 @@ use futures::{
     channel::{mpsc, oneshot},
     future::LocalBoxFuture,
     stream::LocalBoxStream,
-    SinkExt,
 };
 use js_sys::Date;
 use medea_client_api_proto::{
     ClientMsg, CloseDescription, CloseReason, Command, Event, ServerMsg,
 };
+use wasm_bindgen::prelude::*;
 use web_sys::CloseEvent;
 
 use crate::utils::WasmErr;
@@ -22,7 +22,7 @@ use crate::utils::WasmErr;
 use self::{heartbeat::Heartbeat, websocket::WebSocket};
 
 /// Connection with remote was closed.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum CloseMsg {
     /// Transport was gracefully closed by remote.
     ///
@@ -55,15 +55,18 @@ impl From<&CloseEvent> for CloseMsg {
     }
 }
 
-use wasm_bindgen::prelude::*;
-
+/// Reason of why Jason was closed.
+///
+/// This struct will be provided into `on_close_by_server` JS side callback.
 #[wasm_bindgen]
-pub struct JsCloseReason {
+pub struct ClosedByServerReason {
     reason: String,
 }
 
-impl JsCloseReason {
-    pub fn new(reason: CloseReason) -> Self {
+impl ClosedByServerReason {
+    /// Creates new [`ClosedByServerReason`] with provided [`CloseReason`]
+    /// converted into [`String`].
+    pub fn new(reason: &CloseReason) -> Self {
         Self {
             reason: reason.to_string(),
         }
@@ -71,7 +74,7 @@ impl JsCloseReason {
 }
 
 #[wasm_bindgen]
-impl JsCloseReason {
+impl ClosedByServerReason {
     #[wasm_bindgen(getter)]
     pub fn reason(&self) -> String {
         self.reason.clone()
@@ -125,17 +128,11 @@ struct Inner {
     /// Event's subscribers list.
     subs: Vec<mpsc::UnboundedSender<Event>>,
 
-    /// Closure which will be called when WebSocket connection normally closed
-    /// by server.
+    /// [`oneshot::Sender`] with which [`CloseReason`] will be sent when
+    /// WebSocket connection normally closed by server.
     ///
-    /// Note that this closure will not be called if WebSocket closed with
+    /// Note that [`CloseReason`] will not be sent if WebSocket closed with
     /// [`RpcConnectionCloseReason::NewConnection`] reason.
-    ///
-    /// [`Rc`] needed for fix `BorrowMut` error of [`WebSocketRpcClient`] when
-    /// we drop all [`Room`]s from [`Jason`].
-    ///
-    /// [`Room`]: crate::api::room::Room
-    /// [`Jason`]: crate::api::Jason
     on_close_by_server_subscribers: Vec<oneshot::Sender<CloseReason>>,
 }
 
@@ -153,7 +150,7 @@ impl Inner {
 /// Handles close message from remote server.
 ///
 /// This function will be called on every WebSocket close (normal and abnormal)
-/// regardless of the close reason.
+/// regardless of the [`CloseReason`].
 fn on_close(inner_rc: &RefCell<Inner>, close_msg: &CloseMsg) {
     {
         let mut inner = inner_rc.borrow_mut();
@@ -166,14 +163,23 @@ fn on_close(inner_rc: &RefCell<Inner>, close_msg: &CloseMsg) {
         // close.
         if let CloseReason::Reconnected = reason {
         } else {
-            let mut on_close_by_server_subcribers = Vec::new();
+            let mut on_close_by_server_subscribers = Vec::new();
             std::mem::swap(
-                &mut on_close_by_server_subcribers,
+                &mut on_close_by_server_subscribers,
                 &mut inner_rc.borrow_mut().on_close_by_server_subscribers,
             );
 
-            for sub in on_close_by_server_subcribers {
-                sub.send(reason.clone());
+            for sub in on_close_by_server_subscribers {
+                if let Err(reason) = sub.send(reason.clone()) {
+                    web_sys::console::error_1(
+                        &format!(
+                            "Failed to send reason of Jason close to \
+                             subscriber: {:?}",
+                            reason
+                        )
+                        .into(),
+                    )
+                }
             }
         }
     }
@@ -271,6 +277,8 @@ impl RpcClient for WebsocketRpcClient {
         }
     }
 
+    /// Returns [`Future`] which will be resolved with [`CloseReason`] on
+    /// RPC connection closing initiated by server.
     fn on_close_by_server(
         &self,
     ) -> LocalBoxFuture<'static, Result<CloseReason, oneshot::Canceled>> {

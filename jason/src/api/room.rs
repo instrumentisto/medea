@@ -19,12 +19,11 @@ use wasm_bindgen_futures::{future_to_promise, spawn_local};
 use crate::{
     media::MediaStream,
     peer::{PeerEvent, PeerEventHandler, PeerRepository},
-    rpc::RpcClient,
+    rpc::{ClosedByServerReason, RpcClient},
     utils::{Callback, Callback2, WasmErr},
 };
 
 use super::{connection::Connection, ConnectionHandle};
-use crate::rpc::JsCloseReason;
 
 /// JS side handle to `Room` where all the media happens.
 ///
@@ -48,6 +47,7 @@ impl RoomHandle {
             .set_func(f))
     }
 
+    /// Sets callback, which will be invoked on closing Jason by server.
     pub fn on_close_by_server(
         &mut self,
         f: js_sys::Function,
@@ -94,8 +94,6 @@ impl RoomHandle {
     pub fn unmute_video(&self) -> Result<(), JsValue> {
         map_weak!(self, |inner| inner.borrow_mut().toggle_send_video(true))
     }
-
-    // TODO: add on_close callback, on_close tests
 }
 
 /// [`Room`] where all the media happens (manages concrete [`PeerConnection`]s,
@@ -178,7 +176,7 @@ struct InnerRoom {
     on_new_connection: Rc<Callback2<ConnectionHandle, WasmErr>>,
     enabled_audio: bool,
     enabled_video: bool,
-    on_close_by_server: Rc<Callback<JsCloseReason>>,
+    on_close_by_server: Rc<Callback<ClosedByServerReason>>,
 }
 
 impl InnerRoom {
@@ -191,13 +189,18 @@ impl InnerRoom {
     ) -> Self {
         let on_close_by_server = Rc::new(Callback::default());
         let on_close_by_server_clone = Rc::clone(&on_close_by_server);
-        spawn_local(rpc.on_close_by_server().map(move |msg| {
-            if let Ok(msg) = msg {
-                on_close_by_server_clone
-                    .call(JsCloseReason::new(msg))
-                    .unwrap();
+        spawn_local(rpc.on_close_by_server().map(move |reason| {
+            if let Ok(reason) = reason {
+                if let Some(call_result) = on_close_by_server_clone
+                    .call(ClosedByServerReason::new(&reason))
+                {
+                    if let Err(err) = call_result {
+                        WasmErr::from(err).log_err();
+                    }
+                }
             }
         }));
+
         Self {
             rpc,
             peers,
