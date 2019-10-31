@@ -1,8 +1,14 @@
 #![cfg(target_arch = "wasm32")]
 
-use std::{cell::RefCell, rc::Rc};
+use std::{
+    rc::Rc,
+    sync::{Arc, Mutex},
+};
 
-use futures::channel::mpsc;
+use futures::{
+    channel::{mpsc, oneshot},
+    future::{self, Either},
+};
 use medea_client_api_proto::{CloseReason, Event, IceServer, PeerId};
 use medea_jason::{
     api::Room,
@@ -10,11 +16,10 @@ use medea_jason::{
     peer::{MockPeerRepository, PeerConnection, PeerEvent},
     rpc::MockRpcClient,
 };
-use wasm_bindgen_futures::spawn_local;
+use wasm_bindgen::{prelude::*, JsValue};
 use wasm_bindgen_test::*;
 
 use crate::{get_test_tracks, resolve_after};
-use wasm_bindgen::JsValue;
 
 wasm_bindgen_test_configure!(run_in_browser);
 
@@ -43,7 +48,7 @@ fn get_test_room_and_exist_peer() -> (Room, Rc<PeerConnection>) {
         .returning_st(move || vec![Rc::clone(&peer_clone)]);
     rpc.expect_unsub().return_const(());
     rpc.expect_on_close_by_server().returning(move || {
-        let (tx, rx) = futures::channel::oneshot::channel();
+        let (_tx, rx) = futures::channel::oneshot::channel();
         Box::pin(rx)
     });
 
@@ -122,7 +127,7 @@ fn get_test_room_and_new_peer(
     rpc.expect_send_command().return_const(());
     rpc.expect_unsub().return_const(());
     rpc.expect_on_close_by_server().returning(move || {
-        let (tx, rx) = futures::channel::oneshot::channel();
+        let (_tx, rx) = futures::channel::oneshot::channel();
         Box::pin(rx)
     });
 
@@ -174,27 +179,20 @@ async fn mute_video_room_before_init_peer() {
     assert!(!peer.is_send_video_enabled());
 }
 
-use wasm_bindgen::prelude::*;
-
-#[wasm_bindgen(
-    inline_js = "export function get_reason(closed) { return closed.reason; }"
-)]
-extern "C" {
-    fn get_reason(closed: &JsValue) -> JsValue;
-}
-
 #[wasm_bindgen_test]
 async fn close_room() {
+    #[wasm_bindgen(inline_js = "export function get_reason(closed) { return \
+                                closed.reason; }")]
+    extern "C" {
+        fn get_reason(closed: &JsValue) -> JsValue;
+    }
+
     let mut rpc = MockRpcClient::new();
-    let mut repo = Box::new(MockPeerRepository::new());
-
-    use futures::channel::oneshot;
-
-    use std::sync::{Arc, Mutex};
+    let repo = Box::new(MockPeerRepository::new());
 
     let senders = Arc::new(Mutex::new(Vec::new()));
     let senders_clone = Arc::clone(&senders);
-    let (event_tx, event_rx) = mpsc::unbounded();
+    let (_event_tx, event_rx) = mpsc::unbounded();
     rpc.expect_subscribe()
         .return_once(move || Box::pin(event_rx));
     rpc.expect_on_close_by_server().returning(move || {
@@ -205,45 +203,38 @@ async fn close_room() {
     rpc.expect_send_command().return_const(());
     rpc.expect_unsub().return_const(());
 
-    use futures::FutureExt;
-    use medea_jason::rpc::RpcClient;
-
     let room = Room::new(Rc::new(rpc), repo);
     let mut room_handle = room.new_handle();
-    use wasm_bindgen::{closure::Closure, JsCast};
-    console_error_panic_hook::set_once();
 
-    let (tx, rx) = futures::channel::oneshot::channel();
+    let (tx, rx) = oneshot::channel();
     room_handle
         .on_close_by_server(
             Closure::once_into_js(move |close: wasm_bindgen::JsValue| {
                 let q = get_reason(&close).as_string().unwrap();
                 if &q == "Finished" {
-                    tx.send(());
+                    tx.send(()).unwrap();
                 }
             })
             .into(),
         )
         .unwrap();
 
-    let mut sqwe = Vec::new();
-    std::mem::swap(&mut sqwe, &mut senders.lock().unwrap());
+    let mut on_close_subscribers = Vec::new();
+    std::mem::swap(&mut on_close_subscribers, &mut senders.lock().unwrap());
 
-    for sub in sqwe {
-        sub.send(CloseReason::Finished);
+    for sender in on_close_subscribers {
+        sender.send(CloseReason::Finished).unwrap();
     }
 
     let result =
-        futures::future::select(Box::pin(rx), Box::pin(resolve_after(500)))
-            .await;
-
+        future::select(Box::pin(rx), Box::pin(resolve_after(500))).await;
     match result {
-        futures::future::Either::Left((assert_result, _)) => {
+        Either::Left((assert_result, _)) => {
             if let Err(_) = assert_result {
                 panic!("cancelled");
             }
         }
-        futures::future::Either::Right(_) => {
+        Either::Right(_) => {
             panic!("on_close_by_server did not fired");
         }
     };

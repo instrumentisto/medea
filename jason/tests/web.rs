@@ -5,12 +5,13 @@ mod media;
 mod peer;
 mod utils;
 
-use futures::channel::oneshot;
+use js_sys::Promise;
 use medea_client_api_proto::{
     AudioSettings, Direction, MediaType, PeerId, Track, TrackId, VideoSettings,
 };
-use medea_jason::utils::{window, WasmErr};
+use medea_jason::utils::window;
 use wasm_bindgen::prelude::*;
+use wasm_bindgen_futures::JsFuture;
 use wasm_bindgen_test::*;
 
 wasm_bindgen_test_configure!(run_in_browser);
@@ -37,15 +38,12 @@ pub fn get_test_tracks() -> (Track, Track) {
 }
 
 pub async fn resolve_after(ms: i32) -> Result<(), JsValue> {
-    use js_sys::Promise;
-    use wasm_bindgen_futures::JsFuture;
-
-    let promise = Promise::new(&mut |yes, _| {
-        let win = window();
-        win.set_timeout_with_callback_and_timeout_and_arguments_0(&yes, ms)
+    JsFuture::from(Promise::new(&mut |yes, _| {
+        window()
+            .set_timeout_with_callback_and_timeout_and_arguments_0(&yes, ms)
             .unwrap();
-    });
-    let js_fut = JsFuture::from(promise);
-    js_fut.await?;
+    }))
+    .await?;
+
     Ok(())
 }
