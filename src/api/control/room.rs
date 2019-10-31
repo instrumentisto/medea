@@ -11,14 +11,15 @@ use medea_control_api_proto::grpc::api::{
 };
 use serde::Deserialize;
 
-use crate::api::control::{EndpointId, TryFromProtobufError};
+use crate::api::control::{
+    callback::callback_url::CallbackUrl, EndpointId, TryFromProtobufError,
+};
 
 use super::{
     member::{MemberElement, MemberSpec},
     pipeline::Pipeline,
     MemberId, RootElement, TryFromElementError,
 };
-use crate::api::control::callback::callback_url::CallbackUrl;
 
 /// ID of [`Room`].
 ///

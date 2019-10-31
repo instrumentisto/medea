@@ -3,6 +3,7 @@
 //! [Medea]: https://github.com/instrumentisto/medea
 //! [Control API]: https://tinyurl.com/yxsqplq7
 
+pub mod callback_server;
 pub mod client;
 pub mod prelude;
 pub mod server;
@@ -38,6 +39,7 @@ fn main() {
 
     let sys = actix::System::new("control-api-mock");
     server::run(&opts);
+    let addr = callback_server::run();
     sys.run().unwrap();
 }
 
