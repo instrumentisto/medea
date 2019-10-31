@@ -865,6 +865,21 @@ impl Room {
 
         Ok(())
     }
+
+    pub fn send_callback(
+        &mut self,
+        callback_url: CallbackUrl,
+        fid: StatefulFid,
+        event: CallbackEvent,
+    ) {
+        match callback_url {
+            CallbackUrl::Grpc(grpc_callback_url) => {
+                let callback_service =
+                    self.callbacks.get_grpc(&grpc_callback_url);
+                callback_service.do_send(Callback::new(fid, event));
+            }
+        }
+    }
 }
 
 /// [`Actor`] implementation that provides an ergonomic way
@@ -1051,19 +1066,12 @@ impl Handler<RpcConnectionEstablished> for Room {
             .map(|member, room, ctx| {
                 room.init_member_connections(&member, ctx);
                 let callback_url = member.get_on_join();
-                if let Some(callback_url) = callback_url {
-                    match callback_url {
-                        CallbackUrl::Grpc(grpc_callback_url) => {
-                            let callback_service =
-                                room.callbacks.get_grpc(&grpc_callback_url);
-                            callback_service.do_send(Callback::new(
-                                member.get_fid().into(),
-                                CallbackEvent::Member(
-                                    MemberCallbackEvent::OnJoin,
-                                ),
-                            ));
-                        }
-                    }
+                if let Some(callback_url) = member.get_on_join() {
+                    room.send_callback(
+                        callback_url,
+                        member.get_fid().into(),
+                        CallbackEvent::Member(MemberCallbackEvent::OnJoin),
+                    );
                 }
             });
         Box::new(fut)
@@ -1107,8 +1115,18 @@ impl Handler<RpcConnectionClosed> for Room {
 
         self.members
             .connection_closed(msg.member_id.clone(), &msg.reason, ctx);
+        // TODO: UNWRAP
+        let member = self.members.get_member_by_id(&msg.member_id).unwrap();
 
         if let ClosedReason::Closed = msg.reason {
+            if let Some(callback_url) = member.get_on_leave() {
+                self.send_callback(
+                    callback_url,
+                    member.get_fid().into(),
+                    CallbackEvent::Member(MemberCallbackEvent::OnLeave),
+                );
+            }
+
             let removed_peers =
                 self.peers.remove_peers_related_to_member(&msg.member_id);
 

@@ -33,9 +33,7 @@ impl CallbackRepository {
             grpc_service.clone()
         } else {
             let grpc_service = GrpcCallbackService::new(addr).start();
-            locked_self
-                .grpc
-                .insert(addr.clone(), grpc_service.clone());
+            locked_self.grpc.insert(addr.clone(), grpc_service.clone());
             grpc_service
         }
     }

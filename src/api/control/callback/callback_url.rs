@@ -66,7 +66,8 @@ impl<'de> Deserialize<'de> for CallbackUrl {
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
                 formatter.write_str(
-                    "Uri in format local://room_id/member_id/endpoint_id",
+                    "URI to callback service in format like \
+                     'grpc://127.0.0.1:9090'.",
                 )
             }
 
