@@ -7,6 +7,7 @@
 
 # Project sub-crates.
 !crates/
+!mock/
 !proto/
 
 # Jason sources, assets and manifest.

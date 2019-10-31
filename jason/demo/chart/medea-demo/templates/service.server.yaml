@@ -21,5 +21,9 @@ spec:
   ports:
     - name: http
       port: 80
-      targetPort: {{ .Values.server.conf.server.bind_port }}
+      targetPort: http
+      protocol: TCP
+    - name: control-http
+      port: 8000
+      targetPort: control-http
       protocol: TCP

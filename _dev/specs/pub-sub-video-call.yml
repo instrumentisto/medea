@@ -17,7 +17,7 @@ spec:
             spec:
               # Actually, it receives not media data, but ICE candidates only.
               p2p: Always
-    subcriber:
+    subscriber:
       kind: Member
       credentials: test
       spec:
