@@ -174,12 +174,13 @@ async fn mute_video_room_before_init_peer() {
     assert!(!peer.is_send_video_enabled());
 }
 
-#[wasm_bindgen(
-inline_js = "export function get_reason(closed) { return closed.reason; }"
-)]
+use wasm_bindgen::prelude::*;
 
+#[wasm_bindgen(
+    inline_js = "export function get_reason(closed) { return closed.reason; }"
+)]
 extern "C" {
-    fn get_reason(&JsValue) -> JsValue;
+    fn get_reason(closed: &JsValue) -> JsValue;
 }
 
 #[wasm_bindgen_test]
@@ -212,12 +213,16 @@ async fn close_room() {
     use wasm_bindgen::{closure::Closure, JsCast};
     console_error_panic_hook::set_once();
 
-    let (mut tx, rx) = futures::channel::oneshot::channel();
+    let (tx, rx) = futures::channel::oneshot::channel();
     room_handle
         .on_close_by_server(
-            Closure::once_into_js(move |close:wasm_bindgen::JsValue| {
-                tx.send(());
-            }).into(),
+            Closure::once_into_js(move |close: wasm_bindgen::JsValue| {
+                let q = get_reason(&close).as_string().unwrap();
+                if &q == "Finished" {
+                    tx.send(());
+                }
+            })
+            .into(),
         )
         .unwrap();
 
@@ -228,15 +233,16 @@ async fn close_room() {
         sub.send(CloseReason::Finished);
     }
 
-    resolve_after(500).await.unwrap();
-    let result = futures::future::select(Box::pin(rx), Box::pin(resolve_after(500))).await;
+    let result =
+        futures::future::select(Box::pin(rx), Box::pin(resolve_after(500)))
+            .await;
 
     match result {
         futures::future::Either::Left((assert_result, _)) => {
             if let Err(_) = assert_result {
                 panic!("cancelled");
             }
-        },
+        }
         futures::future::Either::Right(_) => {
             panic!("on_close_by_server did not fired");
         }

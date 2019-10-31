@@ -36,17 +36,16 @@ pub fn get_test_tracks() -> (Track, Track) {
     )
 }
 
-pub async fn resolve_after(delay: i32) -> Result<(), JsValue> {
-    let (done, wait) = oneshot::channel();
-    let cb = Closure::once_into_js(move || {
-        done.send(()).unwrap();
-    });
-    window()
-        .set_timeout_with_callback_and_timeout_and_arguments_0(
-            &cb.into(),
-            delay,
-        )
-        .unwrap();
+pub async fn resolve_after(ms: i32) -> Result<(), JsValue> {
+    use js_sys::Promise;
+    use wasm_bindgen_futures::JsFuture;
 
-    wait.await.map_err(|_| WasmErr::from("canceled").into())
+    let promise = Promise::new(&mut |yes, _| {
+        let win = window();
+        win.set_timeout_with_callback_and_timeout_and_arguments_0(&yes, ms)
+            .unwrap();
+    });
+    let js_fut = JsFuture::from(promise);
+    js_fut.await?;
+    Ok(())
 }
