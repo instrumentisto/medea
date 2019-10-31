@@ -17,6 +17,7 @@ include = ["/src/", "/Cargo.*", "/CHANGELOG.md", "/LICENSE.md", "/README.md"]
 members = [
     "crates/medea-macro",
     "jason",
+    "mock/control-api",
     "proto/client-api",
     "proto/control-api",
 ]
@@ -33,7 +34,7 @@ bb8-redis = "0.3"
 chrono = "0.4"
 config = "0.9"
 derive_more = "0.15"
-dotenv = "0.14"
+dotenv = "0.15"
 failure = "0.1"
 futures = "0.1"
 grpcio = { version = "0.4", features = ["openssl"] }

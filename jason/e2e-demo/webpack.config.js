@@ -9,14 +9,18 @@ module.exports = {
   entry: "./js/index.js",
   output: {
     path: dist,
-    filename: "bundle.js"
+    filename: "bundle.js",
   },
   devServer: {
     contentBase: dist,
   },
   plugins: [
     new HtmlWebpackPlugin({
-      template: 'index.html'
+      template: 'index.html',
+    }),
+    new HtmlWebpackPlugin({
+      filename: 'video-call',
+      template: 'video-call.html',
     }),
     new WasmPackPlugin({
       crateDirectory: path.resolve(__dirname, '../'),
