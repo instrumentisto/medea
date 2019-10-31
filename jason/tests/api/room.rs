@@ -14,6 +14,7 @@ use wasm_bindgen_futures::spawn_local;
 use wasm_bindgen_test::*;
 
 use crate::{get_test_tracks, resolve_after};
+use wasm_bindgen::JsValue;
 
 wasm_bindgen_test_configure!(run_in_browser);
 
@@ -173,54 +174,71 @@ async fn mute_video_room_before_init_peer() {
     assert!(!peer.is_send_video_enabled());
 }
 
-// #[wasm_bindgen_test]
-// async fn close_room() {
-// let mut rpc = MockRpcClient::new();
-// let mut repo = Box::new(MockPeerRepository::new());
-//
-// use futures::channel::oneshot;
-//
-// use std::sync::{Arc, Mutex};
-//
-// let senders = Arc::new(Mutex::new(Vec::new()));
-// let senders_clone = Arc::clone(&senders);
-// let (event_tx, event_rx) = mpsc::unbounded();
-// rpc.expect_subscribe()
-// .return_once(move || Box::pin(event_rx));
-// rpc.expect_on_close_by_server().returning(move || {
-// let (tx, rx) = oneshot::channel();
-// senders_clone.lock().unwrap().push(tx);
-// Box::pin(rx)
-// });
-// rpc.expect_send_command().return_const(());
-// rpc.expect_unsub().return_const(());
-//
-// use futures::FutureExt;
-// use medea_jason::rpc::RpcClient;
-//
-// let room = Room::new(Rc::new(rpc), repo);
-// let mut room_handle = room.new_handle();
-// use wasm_bindgen::{closure::Closure, JsCast};
-// console_error_panic_hook::set_once();
-//
-// room_handle
-// .on_close_by_server(
-// Closure::once_into_js(|| {
-// panic!("sadf");
-// assert!(false);
-// })
-// .into(),
-// )
-// .unwrap();
-//
-// let mut sqwe = Vec::new();
-// std::mem::swap(&mut sqwe, &mut senders.lock().unwrap());
-//
-// resolve_after(500).await.unwrap();
-//
-// for sub in sqwe {
-// sub.send(CloseReason::Finished);
-// }
-//
-// resolve_after(2000).await.unwrap();
-// }
+#[wasm_bindgen(
+inline_js = "export function get_reason(closed) { return closed.reason; }"
+)]
+
+extern "C" {
+    fn get_reason(&JsValue) -> JsValue;
+}
+
+#[wasm_bindgen_test]
+async fn close_room() {
+    let mut rpc = MockRpcClient::new();
+    let mut repo = Box::new(MockPeerRepository::new());
+
+    use futures::channel::oneshot;
+
+    use std::sync::{Arc, Mutex};
+
+    let senders = Arc::new(Mutex::new(Vec::new()));
+    let senders_clone = Arc::clone(&senders);
+    let (event_tx, event_rx) = mpsc::unbounded();
+    rpc.expect_subscribe()
+        .return_once(move || Box::pin(event_rx));
+    rpc.expect_on_close_by_server().returning(move || {
+        let (tx, rx) = oneshot::channel();
+        senders_clone.lock().unwrap().push(tx);
+        Box::pin(rx)
+    });
+    rpc.expect_send_command().return_const(());
+    rpc.expect_unsub().return_const(());
+
+    use futures::FutureExt;
+    use medea_jason::rpc::RpcClient;
+
+    let room = Room::new(Rc::new(rpc), repo);
+    let mut room_handle = room.new_handle();
+    use wasm_bindgen::{closure::Closure, JsCast};
+    console_error_panic_hook::set_once();
+
+    let (mut tx, rx) = futures::channel::oneshot::channel();
+    room_handle
+        .on_close_by_server(
+            Closure::once_into_js(move |close:wasm_bindgen::JsValue| {
+                tx.send(());
+            }).into(),
+        )
+        .unwrap();
+
+    let mut sqwe = Vec::new();
+    std::mem::swap(&mut sqwe, &mut senders.lock().unwrap());
+
+    for sub in sqwe {
+        sub.send(CloseReason::Finished);
+    }
+
+    resolve_after(500).await.unwrap();
+    let result = futures::future::select(Box::pin(rx), Box::pin(resolve_after(500))).await;
+
+    match result {
+        futures::future::Either::Left((assert_result, _)) => {
+            if let Err(_) = assert_result {
+                panic!("cancelled");
+            }
+        },
+        futures::future::Either::Right(_) => {
+            panic!("on_close_by_server did not fired");
+        }
+    };
+}
