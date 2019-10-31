@@ -16,7 +16,8 @@ impl Callback for CallbackService {
         req: Request,
         sink: UnarySink<Response>,
     ) {
-        panic!("{:?}", req);
+        println!("{:?}", req);
+        println!("{:?}", req.get_event());
 
         ctx.spawn(sink.success(Response::new()).map_err(|_| ()))
     }

@@ -28,13 +28,12 @@ impl CallbackRepository {
         &self,
         addr: &GrpcCallbackUrl,
     ) -> Addr<GrpcCallbackService> {
-        if let Some(grpc_service) = self.0.lock().unwrap().grpc.get(addr) {
+        let mut locked_self = self.0.lock().unwrap();
+        if let Some(grpc_service) = locked_self.grpc.get(addr) {
             grpc_service.clone()
         } else {
             let grpc_service = GrpcCallbackService::new(addr).start();
-            self.0
-                .lock()
-                .unwrap()
+            locked_self
                 .grpc
                 .insert(addr.clone(), grpc_service.clone());
             grpc_service
