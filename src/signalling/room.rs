@@ -637,6 +637,13 @@ impl Room {
             // Send PeersRemoved to `Member`s which have related to this
             // `Member` `Peer`s.
             self.remove_peers(&member.id(), peers, ctx);
+            if let Some(callback_url) = member.get_on_leave() {
+                self.send_callback(
+                    callback_url,
+                    member.get_fid().into(),
+                    CallbackEvent::Member(MemberCallbackEvent::OnLeave),
+                );
+            }
 
             self.members.delete_member(member_id, ctx);
 
