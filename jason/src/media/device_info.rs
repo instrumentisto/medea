@@ -4,10 +4,9 @@
 
 use std::convert::TryFrom;
 
+use anyhow::{anyhow, Error};
 use wasm_bindgen::prelude::*;
 use web_sys::{MediaDeviceInfo, MediaDeviceKind};
-
-use crate::utils::WasmErr;
 
 /// Representation of [MediaDeviceInfo][1].
 ///
@@ -44,13 +43,13 @@ impl InputDeviceKind {
 }
 
 impl TryFrom<MediaDeviceKind> for InputDeviceKind {
-    type Error = WasmErr;
+    type Error = Error;
 
     fn try_from(value: MediaDeviceKind) -> Result<Self, Self::Error> {
         match value {
             MediaDeviceKind::Audioinput => Ok(Self::Audio),
             MediaDeviceKind::Videoinput => Ok(Self::Video),
-            _ => Err(WasmErr::from("Not input device")),
+            _ => Err(anyhow!("Not input device")),
         }
     }
 }
@@ -92,7 +91,7 @@ impl InputDeviceInfo {
 }
 
 impl TryFrom<MediaDeviceInfo> for InputDeviceInfo {
-    type Error = WasmErr;
+    type Error = Error;
 
     fn try_from(info: MediaDeviceInfo) -> Result<Self, Self::Error> {
         Ok(Self {

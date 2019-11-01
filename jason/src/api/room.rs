@@ -309,8 +309,7 @@ impl InnerRoom {
                     peer.inject_local_stream(&injected_stream).await
                 {
                     error!(err.to_string());
-                    error_callback
-                        .call(js_sys::Error::new(&format!("{}", err)));
+                    error_callback.call(js_sys::Error::new(&err.to_string()));
                 }
             }
         });
@@ -382,7 +381,7 @@ impl EventHandler for InnerRoom {
                     if let Err(err) = result {
                         error!(err.to_string());
                         error_callback
-                            .call(js_sys::Error::new(&format!("{}", err)));
+                            .call(js_sys::Error::new(&err.to_string()));
                     };
                 }
             }),

@@ -121,7 +121,15 @@ window.onload = async function () {
       .then(async medea => {
         await medea.init_participant("ws://localhost:8080/ws/pub-pub-video-call/caller/test", "#caller");
       })
-      .catch(console.error);
+      .catch(function(e) {
+        console.log("Name:" + e.name());
+        console.log("Message:" + e.message());
+        console.log("Trace:" + e.trace());
+        if (e.name() === "Js error") {
+          const source = e.source();
+          console.log("Source:" + source.name + ":" + source.message);
+        }
+      });
 
   await init()
       .then(async medea => {
