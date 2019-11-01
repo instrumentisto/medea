@@ -15,7 +15,7 @@ use awc::{
     ws::{CloseCode, CloseReason, Frame},
     BoxedSocket,
 };
-use futures::{stream::SplitSink, Future, Future as _, Sink as _, Stream as _};
+use futures::{stream::SplitSink, Future, Sink as _, Stream as _};
 use medea_client_api_proto::{Command, Event, IceCandidate};
 use serde_json::error::Error as SerdeError;
 

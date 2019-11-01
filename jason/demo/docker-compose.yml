@@ -19,6 +19,13 @@ services:
     volumes:
       - ../../_dev/specs:/specs:ro
     network_mode: service:web-client
+  control-mock:
+    container_name: demo-control-api-mock
+    image: instrumentisto/medea-control-api-mock:dev
+    depends_on: ["medea"]
+    environment:
+      RUST_LOG: INFO
+    network_mode: service:web-client
   coturn:
     container_name: demo-coturn
     image: instrumentisto/coturn:4.5
