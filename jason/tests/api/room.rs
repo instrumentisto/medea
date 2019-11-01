@@ -213,7 +213,9 @@ async fn close_room() {
                 let close_reason =
                     get_reason(&close_reason).as_string().unwrap();
                 if &close_reason == "Finished" {
-                    test_tx.send(()).unwrap();
+                    test_tx.send(Ok(())).unwrap();
+                } else {
+                    test_tx.send(Err(close_reason)).unwrap();
                 }
             })
             .into(),
@@ -229,8 +231,9 @@ async fn close_room() {
     let result =
         future::select(Box::pin(test_rx), Box::pin(resolve_after(500))).await;
     match result {
-        Either::Left((assert_result, _)) => {
-            assert_result.expect("Cancelled.");
+        Either::Left((oneshot_fut_result, _)) => {
+            let assert_result = oneshot_fut_result.expect("Cancelled.");
+            assert_result.expect("Assertion failed. Received CloseReason was");
         }
         Either::Right(_) => {
             panic!("on_close_by_server did not fired");
