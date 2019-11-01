@@ -171,14 +171,12 @@ fn on_close(inner_rc: &RefCell<Inner>, close_msg: &CloseMsg) {
 
             for sub in on_close_by_server_subscribers {
                 if let Err(reason) = sub.send(reason.clone()) {
-                    web_sys::console::error_1(
-                        &format!(
-                            "Failed to send reason of Jason close to \
-                             subscriber: {:?}",
-                            reason
-                        )
-                        .into(),
-                    )
+                    WasmErr::from(format!(
+                        "Failed to send reason of Jason close to subscriber: \
+                         {:?}",
+                        reason
+                    ))
+                    .log_err();
                 }
             }
         }

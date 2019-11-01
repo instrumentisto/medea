@@ -37,10 +37,13 @@ pub fn get_test_tracks() -> (Track, Track) {
     )
 }
 
-pub async fn resolve_after(ms: i32) -> Result<(), JsValue> {
+/// Async function which resolves after provided number of ms.
+pub async fn resolve_after(delay_ms: i32) -> Result<(), JsValue> {
     JsFuture::from(Promise::new(&mut |yes, _| {
         window()
-            .set_timeout_with_callback_and_timeout_and_arguments_0(&yes, ms)
+            .set_timeout_with_callback_and_timeout_and_arguments_0(
+                &yes, delay_ms,
+            )
             .unwrap();
     }))
     .await?;

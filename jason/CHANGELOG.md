@@ -32,8 +32,9 @@ All user visible changes to this project will be documented in this file. This p
         - Room initialization ([#46]):
             - `Jason.init_room()`;
             - `Room.join()`.
+        - `Room.on_close_by_server` callback for WebSocket close initiated by server ([#55]).
 - Signalling:
-    - Cleanup Jason state on normal WebSocket close ([#55](/../../pull/55)).
+    - Cleanup Jason state on normal WebSocket close ([#55]).
 
 ### Fixed
 
@@ -41,6 +42,7 @@ All user visible changes to this project will be documented in this file. This p
     - Skipped `IceCandidate`s received before receiving remote SDP ([#50](/../../pull/50)).
 
 [#46]: /../../pull/46
+[#55]: /../../pull/55
 
 
 

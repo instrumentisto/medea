@@ -48,7 +48,7 @@ fn get_test_room_and_exist_peer() -> (Room, Rc<PeerConnection>) {
         .returning_st(move || vec![Rc::clone(&peer_clone)]);
     rpc.expect_unsub().return_const(());
     rpc.expect_on_close_by_server().returning(move || {
-        let (_, rx) = futures::channel::oneshot::channel();
+        let (_, rx) = oneshot::channel();
         Box::pin(rx)
     });
 
@@ -180,7 +180,7 @@ async fn mute_video_room_before_init_peer() {
 }
 
 #[wasm_bindgen_test]
-async fn close_room() {
+async fn on_close_by_server_js_side_callback() {
     #[wasm_bindgen(inline_js = "export function get_reason(closed) { return \
                                 closed.reason; }")]
     extern "C" {
@@ -233,10 +233,10 @@ async fn close_room() {
     match result {
         Either::Left((oneshot_fut_result, _)) => {
             let assert_result = oneshot_fut_result.expect("Cancelled.");
-            assert_result.expect("Assertion failed. Received CloseReason was");
+            assert_result.expect("Assertion failed. Received CloseReason");
         }
         Either::Right(_) => {
-            panic!("on_close_by_server did not fired");
+            panic!("on_close_by_server callback didn't fired");
         }
     };
 }

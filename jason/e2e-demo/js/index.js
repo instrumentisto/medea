@@ -269,7 +269,7 @@ window.onload = async function() {
       });
     });
 
-    room.on_close_by_server(function (q) {
+    room.on_close_by_server(function (on_closed) {
       let videos = document.getElementsByClassName('video');
       for (let el of videos) {
         el.parentNode.removeChild(el);
@@ -277,7 +277,7 @@ window.onload = async function() {
       room = newRoom();
       contentVisibility.show(connectBtnsDiv);
       contentVisibility.hide(controlBtns);
-      alert("Call was ended.\nReason: " + q.reason);
+      alert("Call was ended.\nReason: " + on_closed.reason);
     });
   }
 
