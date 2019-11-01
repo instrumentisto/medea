@@ -47,7 +47,7 @@ impl RoomHandle {
             .set_func(f))
     }
 
-    /// Sets callback, which will be invoked on closing Jason by server.
+    /// Sets callback, which will be invoked on Jason close by server.
     pub fn on_close_by_server(
         &mut self,
         f: js_sys::Function,
@@ -189,8 +189,8 @@ impl InnerRoom {
     ) -> Self {
         let on_close_by_server = Rc::new(Callback::default());
         let on_close_by_server_clone = Rc::clone(&on_close_by_server);
-        spawn_local(rpc.on_close_by_server().map(move |reason| {
-            if let Ok(reason) = reason {
+        spawn_local(rpc.on_close_by_server().map(move |res| {
+            if let Ok(reason) = res {
                 if let Some(call_result) = on_close_by_server_clone
                     .call(ClosedByServerReason::new(&reason))
                 {

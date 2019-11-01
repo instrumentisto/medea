@@ -206,13 +206,14 @@ async fn close_room() {
     let room = Room::new(Rc::new(rpc), repo);
     let mut room_handle = room.new_handle();
 
-    let (tx, rx) = oneshot::channel();
+    let (test_tx, test_rx) = oneshot::channel();
     room_handle
         .on_close_by_server(
-            Closure::once_into_js(move |close: wasm_bindgen::JsValue| {
-                let q = get_reason(&close).as_string().unwrap();
-                if &q == "Finished" {
-                    tx.send(()).unwrap();
+            Closure::once_into_js(move |close_reason: JsValue| {
+                let close_reason =
+                    get_reason(&close_reason).as_string().unwrap();
+                if &close_reason == "Finished" {
+                    test_tx.send(()).unwrap();
                 }
             })
             .into(),
@@ -221,18 +222,15 @@ async fn close_room() {
 
     let mut on_close_subscribers = Vec::new();
     std::mem::swap(&mut on_close_subscribers, &mut senders.lock().unwrap());
-
     for sender in on_close_subscribers {
         sender.send(CloseReason::Finished).unwrap();
     }
 
     let result =
-        future::select(Box::pin(rx), Box::pin(resolve_after(500))).await;
+        future::select(Box::pin(test_rx), Box::pin(resolve_after(500))).await;
     match result {
         Either::Left((assert_result, _)) => {
-            if let Err(_) = assert_result {
-                panic!("cancelled");
-            }
+            assert_result.expect("Cancelled.");
         }
         Either::Right(_) => {
             panic!("on_close_by_server did not fired");
