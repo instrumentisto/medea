@@ -236,15 +236,15 @@ window.onload = async function() {
   async function getStream(audio_select, video_select) {
     let constraints = new rust.MediaStreamConstraints();
     let audio = new rust.AudioTrackConstraints();
-    let audioValue = audio_select.options[audio_select.selectedIndex].value;
-    let videoValue = video_select.options[video_select.selectedIndex].value;
-    if (audioValue) {
-      audio.device_id(audioValue)
+    let audioSource = audio_select.options[audio_select.selectedIndex];
+    if (audioSource) {
+      audio.device_id(audioSource.value);
     }
     constraints.audio(audio);
     let video = new rust.VideoTrackConstraints();
-    if (videoValue) {
-      video.device_id(videoValue)
+    let videoSource = video_select.options[video_select.selectedIndex];
+    if (videoSource) {
+      video.device_id(videoSource.value);
     }
     constraints.video(video);
     return await jason.media_manager().init_local_stream(constraints);
@@ -258,9 +258,9 @@ window.onload = async function() {
     let videoSelect = document.getElementsByClassName('connect__select-device_video')[0];
     let localVideo = document.querySelector('.local-video > video');
 
-    const updateLocalVideo = function (stream) {
-      local_video.srcObject = stream;
-      local_video.play();
+    const updateLocalVideo = (stream) => {
+      localVideo.srcObject = stream;
+      localVideo.play();
     };
 
     const room = await jason.init_room();
@@ -273,9 +273,9 @@ window.onload = async function() {
       console.log("Init local video failed:" + e);
     }
 
-    audioSelect.addEventListener('change', () => {
+    audioSelect.addEventListener('change', async () => {
       try {
-        const stream = getStream(audioSelect, videoSelect);
+        const stream = await getStream(audioSelect, videoSelect);
         updateLocalVideo(stream);
         room.inject_local_stream(stream);
       } catch (e) {
@@ -283,9 +283,9 @@ window.onload = async function() {
       }
     });
 
-    videoSelect.addEventListener('change', () => {
+    videoSelect.addEventListener('change', async () => {
       try {
-        const stream = getStream(audioSelect, videoSelect);
+        const stream = await getStream(audioSelect, videoSelect);
         updateLocalVideo(stream);
         room.inject_local_stream(stream);
       } catch (e) {
@@ -297,7 +297,7 @@ window.onload = async function() {
       connection.on_remote_stream((stream) => {
         let videoDiv = document.getElementsByClassName("remote-videos")[0];
         let video = document.createElement("video");
-        video.srcObject = stream.get_media_stream();
+        video.srcObject = stream;
         let innerVideoDiv = document.createElement("div");
         innerVideoDiv.className = "video";
         innerVideoDiv.appendChild(video);
@@ -307,7 +307,7 @@ window.onload = async function() {
       });
     });
 
-    room.on_failed_local_stream(function (error) {
+    room.on_failed_local_stream((error) => {
       console.log(error);
     });
 

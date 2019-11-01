@@ -124,15 +124,15 @@
       async function getStream(audio_select, video_select) {
         let constraints = new MediaStreamConstraints();
         let audio = new AudioTrackConstraints();
-        let audioValue = audio_select.options[audio_select.selectedIndex].value;
-        let videoValue = video_select.options[video_select.selectedIndex].value;
-        if (audioValue) {
-          audio.device_id(audioValue)
+        let audioSource = audio_select.options[audio_select.selectedIndex];
+        if (audioSource) {
+          audio.device_id(audioSource.value);
         }
         constraints.audio(audio);
         let video = new VideoTrackConstraints();
-        if (videoValue) {
-          video.device_id(videoValue)
+        let videoSource = video_select.options[video_select.selectedIndex];
+        if (videoSource) {
+          video.device_id(videoSource.value);
         }
         constraints.video(video);
         return await jason.media_manager().init_local_stream(constraints);
@@ -153,24 +153,38 @@
 
       let room = await jason.init_room();
 
-      const updateLocalStream = async () => {
-        try {
-          var stream = await getStream(audioSelect, videoSelect);
-          localVideo.srcObject = stream;
-          localVideo.play();
-          room.inject_local_stream(stream);
-        } catch (err) {
-          console.log('Init local stream failed: ' + err);
-        };
-        return stream;
+      const updateLocalVideo = function (stream) {
+        localVideo.srcObject = stream;
+        localVideo.play();
       };
 
+      try {
+        const stream = await getStream(audioSelect, videoSelect);
+        updateLocalVideo(stream);
+        await getDevices(audioSelect, videoSelect, stream);
+        room.inject_local_stream(stream);
+      } catch (e) {
+        console.log("Init local video failed:" + e);
+      }
+
       audioSelect.addEventListener('change', async () => {
-        updateLocalStream();
+        try {
+          const stream = await getStream(audioSelect, videoSelect);
+          updateLocalVideo(stream);
+          room.inject_local_stream(stream);
+        } catch (e) {
+          console.log("Changing audio source failed:" + e);
+        }
       });
 
       videoSelect.addEventListener('change', async () => {
-        updateLocalStream();
+        try {
+          const stream = await getStream(audioSelect, videoSelect);
+          updateLocalVideo(stream);
+          room.inject_local_stream(stream);
+        } catch (e) {
+          console.log("Changing video source failed:" + e);
+        }
       });
 
       room.on_failed_local_stream(function (error) {
@@ -260,9 +274,6 @@
           videoCallDiv.style.display = "";
         };
       }
-
-      const stream = updateLocalStream(stream);
-      await getDevices(audioSelect, videoSelect, stream);
     }
 
     window.onload = async function () {
