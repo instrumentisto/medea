@@ -26,7 +26,8 @@ use crate::{
         control::{
             callback::{
                 callback_repo::CallbackRepository, callback_url::CallbackUrl,
-                Callback, CallbackEvent, MemberCallbackEvent,
+                Callback, CallbackEvent, OnJoinEvent, OnLeaveEvent,
+                OnLeaveReason,
             },
             endpoints::{
                 WebRtcPlayEndpoint as WebRtcPlayEndpointSpec,
@@ -643,10 +644,11 @@ impl Room {
             // `Member` `Peer`s.
             self.remove_peers(&member.id(), peers, ctx);
             if let Some(callback_url) = member.get_on_leave() {
+                // TODO: Maybe don't send callback on member delete??
                 self.send_callback(
                     callback_url,
                     member.get_fid().into(),
-                    CallbackEvent::Member(MemberCallbackEvent::OnLeave),
+                    OnLeaveEvent::new(OnLeaveReason::LostConnection).into(),
                 );
             }
 
@@ -1082,7 +1084,7 @@ impl Handler<RpcConnectionEstablished> for Room {
                     room.send_callback(
                         callback_url,
                         member.get_fid().into(),
-                        CallbackEvent::Member(MemberCallbackEvent::OnJoin),
+                        OnJoinEvent.into(),
                     );
                 }
             });
@@ -1135,7 +1137,7 @@ impl Handler<RpcConnectionClosed> for Room {
                 self.send_callback(
                     callback_url,
                     member.get_fid().into(),
-                    CallbackEvent::Member(MemberCallbackEvent::OnLeave),
+                    OnLeaveEvent::new(OnLeaveReason::LostConnection).into(),
                 );
             }
 

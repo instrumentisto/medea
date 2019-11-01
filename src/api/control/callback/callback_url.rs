@@ -1,6 +1,7 @@
+use std::{convert::TryFrom, fmt};
+
 use derive_more::Display;
 use serde::{de::Visitor, Deserialize, Deserializer};
-use std::{convert::TryFrom, fmt};
 use url::{ParseError, Url};
 
 #[derive(Clone, Display, Debug, Eq, PartialEq, Hash)]

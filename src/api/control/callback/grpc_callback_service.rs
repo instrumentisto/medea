@@ -50,14 +50,9 @@ impl Handler<Callback> for GrpcCallbackService {
         msg: Callback,
         ctx: &mut Self::Context,
     ) -> Self::Result {
-        let mut req = Request::new();
-        req.set_event(msg.event.into());
-        req.set_element(msg.element.to_string());
-        req.set_at(msg.at.to_rfc3339());
-
         Box::new(
             self.client
-                .on_event_async(&req)
+                .on_event_async(&msg.into())
                 .into_future()
                 .and_then(|q| q)
                 .map(|_| ())

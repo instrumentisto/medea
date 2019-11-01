@@ -21,7 +21,7 @@ fn main() {
     let opts = app_from_crate!()
         .arg(
             Arg::with_name("addr")
-                .help("Address where host control-api-mock-server.")
+                .help("Address where host medea-control-api-mock-server.")
                 .default_value("0.0.0.0:8000")
                 .long("addr")
                 .short("a"),
