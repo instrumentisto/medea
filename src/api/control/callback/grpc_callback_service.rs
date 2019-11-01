@@ -7,16 +7,14 @@ use std::{
 use actix::{Actor, Context, Handler, ResponseFuture};
 use futures::future::{Future as _, IntoFuture as _};
 use grpcio::{ChannelBuilder, EnvBuilder};
-use medea_control_api_proto::grpc::{
-    callback::Request, callback_grpc::CallbackClient as GrpcioCallbackClient,
-};
+use medea_control_api_proto::grpc::callback_grpc::CallbackClient;
 
 use crate::api::control::callback::Callback;
 
 use super::callback_url::GrpcCallbackUrl;
 
 pub struct GrpcCallbackService {
-    client: GrpcioCallbackClient,
+    client: CallbackClient,
 }
 
 impl fmt::Debug for GrpcCallbackService {
@@ -32,7 +30,7 @@ impl GrpcCallbackService {
     pub fn new(addr: &GrpcCallbackUrl) -> Self {
         let env = Arc::new(EnvBuilder::new().build());
         let ch = ChannelBuilder::new(env).connect(&addr.to_string());
-        let client = GrpcioCallbackClient::new(ch);
+        let client = CallbackClient::new(ch);
 
         Self { client }
     }
@@ -45,11 +43,7 @@ impl Actor for GrpcCallbackService {
 impl Handler<Callback> for GrpcCallbackService {
     type Result = ResponseFuture<(), ()>;
 
-    fn handle(
-        &mut self,
-        msg: Callback,
-        ctx: &mut Self::Context,
-    ) -> Self::Result {
+    fn handle(&mut self, msg: Callback, _: &mut Self::Context) -> Self::Result {
         Box::new(
             self.client
                 .on_event_async(&msg.into())

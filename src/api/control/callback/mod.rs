@@ -6,8 +6,8 @@ use actix::Message;
 use chrono::{DateTime, Utc};
 use derive_more::From;
 use medea_control_api_proto::grpc::callback::{
-    OnJoin as OnJoinProto, OnJoin, OnLeave as OnLeaveProto, OnLeave,
-    OnLeave_Reason as OnLeaveReasonProto, OnLeave_Reason, Request,
+    OnJoin as OnJoinProto, OnJoin, OnLeave as OnLeaveProto,
+    OnLeave_Reason as OnLeaveReasonProto, Request,
     Request_oneof_event as RequestOneofEventProto,
 };
 

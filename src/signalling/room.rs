@@ -7,7 +7,7 @@ use std::collections::{HashMap, HashSet};
 
 use actix::{
     fut::wrap_future, Actor, ActorFuture, AsyncContext, Context, Handler,
-    Message, ResponseActFuture, ResponseFuture, WrapFuture as _,
+    Message, ResponseActFuture, WrapFuture as _,
 };
 use derive_more::Display;
 use failure::Fail;
@@ -648,7 +648,7 @@ impl Room {
                 self.send_callback(
                     callback_url,
                     member.get_fid().into(),
-                    OnLeaveEvent::new(OnLeaveReason::LostConnection).into(),
+                    OnLeaveEvent::new(OnLeaveReason::LostConnection),
                 );
             }
 
@@ -880,17 +880,17 @@ impl Room {
         Ok(())
     }
 
-    pub fn send_callback(
+    pub fn send_callback<T: Into<CallbackEvent>>(
         &mut self,
         callback_url: CallbackUrl,
         fid: StatefulFid,
-        event: CallbackEvent,
+        event: T,
     ) {
         match callback_url {
             CallbackUrl::Grpc(grpc_callback_url) => {
                 let callback_service =
                     self.callbacks.get_grpc(&grpc_callback_url);
-                callback_service.do_send(Callback::new(fid, event));
+                callback_service.do_send(Callback::new(fid, event.into()));
             }
         }
     }
@@ -1079,12 +1079,11 @@ impl Handler<RpcConnectionEstablished> for Room {
             })
             .map(|member, room, ctx| {
                 room.init_member_connections(&member, ctx);
-                let callback_url = member.get_on_join();
                 if let Some(callback_url) = member.get_on_join() {
                     room.send_callback(
                         callback_url,
                         member.get_fid().into(),
-                        OnJoinEvent.into(),
+                        OnJoinEvent,
                     );
                 }
             });
@@ -1137,7 +1136,7 @@ impl Handler<RpcConnectionClosed> for Room {
                 self.send_callback(
                     callback_url,
                     member.get_fid().into(),
-                    OnLeaveEvent::new(OnLeaveReason::LostConnection).into(),
+                    OnLeaveEvent::new(OnLeaveReason::LostConnection),
                 );
             }
 
