@@ -48,7 +48,7 @@ fn get_test_room_and_exist_peer() -> (Room, Rc<PeerConnection>) {
         .returning_st(move || vec![Rc::clone(&peer_clone)]);
     rpc.expect_unsub().return_const(());
     rpc.expect_on_close_by_server().returning(move || {
-        let (_tx, rx) = futures::channel::oneshot::channel();
+        let (_, rx) = futures::channel::oneshot::channel();
         Box::pin(rx)
     });
 
@@ -127,7 +127,7 @@ fn get_test_room_and_new_peer(
     rpc.expect_send_command().return_const(());
     rpc.expect_unsub().return_const(());
     rpc.expect_on_close_by_server().returning(move || {
-        let (_tx, rx) = futures::channel::oneshot::channel();
+        let (_, rx) = oneshot::channel();
         Box::pin(rx)
     });
 

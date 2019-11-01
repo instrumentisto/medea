@@ -70,7 +70,6 @@ async function createMember(roomId, memberId) {
         }
       })
     }
-
   } catch (e) {
     console.log(e.response);
   }
@@ -249,28 +248,12 @@ window.onload = async function() {
     console.log(stream);
   }
 
-  try {
-    let controlBtns = document.getElementsByClassName('control')[0];
-    let joinCallerButton = document.getElementsByClassName('connect__join')[0];
-    let usernameInput = document.getElementsByClassName('connect__username')[0];
-    let audioSelect = document.getElementsByClassName('connect__select-device_audio')[0];
-    let videoSelect = document.getElementsByClassName('connect__select-device_video')[0];
-    let localVideo = document.querySelector('.local-video > video');
+  let room = newRoom();
+  let connectBtnsDiv = document.getElementsByClassName("connect")[0];
+  let controlBtns = document.getElementsByClassName('control')[0];
 
-    let room = await jason.init_room();
-    room.on_close_by_server(function (q) {
-      console.log('Reason of Jason close: ' + q.reason);
-    });
-    await fillMediaDevicesInputs(audioSelect, videoSelect);
-    await getStream(localVideo, audioSelect, videoSelect);
-
-    audioSelect.addEventListener('change', () => {
-      getStream(localVideo, audioSelect, videoSelect);
-    });
-
-    videoSelect.addEventListener('change', () => {
-      getStream(localVideo, audioSelect, videoSelect);
-    });
+  async function newRoom() {
+    room = await jason.init_room();
 
     room.on_new_connection((connection) => {
       connection.on_remote_stream((stream) => {
@@ -284,6 +267,36 @@ window.onload = async function() {
 
         video.play();
       });
+    });
+
+    room.on_close_by_server(function (q) {
+      let videos = document.getElementsByClassName('video');
+      for (let el of videos) {
+        el.parentNode.removeChild(el);
+      }
+      room = newRoom();
+      contentVisibility.show(connectBtnsDiv);
+      contentVisibility.hide(controlBtns);
+      alert("Call was ended.\nReason: " + q.reason);
+    });
+  }
+
+  try {
+    let joinCallerButton = document.getElementsByClassName('connect__join')[0];
+    let usernameInput = document.getElementsByClassName('connect__username')[0];
+    let audioSelect = document.getElementsByClassName('connect__select-device_audio')[0];
+    let videoSelect = document.getElementsByClassName('connect__select-device_video')[0];
+    let localVideo = document.querySelector('.local-video > video');
+
+    await fillMediaDevicesInputs(audioSelect, videoSelect);
+    await getStream(localVideo, audioSelect, videoSelect);
+
+    audioSelect.addEventListener('change', () => {
+      getStream(localVideo, audioSelect, videoSelect);
+    });
+
+    videoSelect.addEventListener('change', () => {
+      getStream(localVideo, audioSelect, videoSelect);
     });
 
     let muteAudio = document.getElementsByClassName('control__mute_audio')[0];
@@ -318,7 +331,6 @@ window.onload = async function() {
 
     let bindJoinButtons = function(roomId) {
       joinCallerButton.onclick = async function() {
-        let connectBtnsDiv = document.getElementsByClassName("connect")[0];
         contentVisibility.hide(connectBtnsDiv);
         contentVisibility.show(controlBtns);
 
