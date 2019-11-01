@@ -1,7 +1,9 @@
+pub mod server;
+
 use medea_control_api_proto::grpc::callback::{
     OnJoin as OnJoinProto, OnLeave as OnLeaveProto,
     OnLeave_Reason as OnLeaveReasonProto, Request as CallbackProto,
-    Request_oneof_event as CallbackEventProto, Request_oneof_event,
+    Request_oneof_event as CallbackEventProto,
 };
 use serde::Serialize;
 
@@ -41,7 +43,7 @@ impl From<OnLeaveReasonProto> for OnLeaveReason {
 pub struct OnJoin;
 
 impl From<OnJoinProto> for OnJoin {
-    fn from(proto: OnJoinProto) -> Self {
+    fn from(_: OnJoinProto) -> Self {
         Self
     }
 }

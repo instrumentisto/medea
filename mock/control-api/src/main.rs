@@ -4,7 +4,6 @@
 //! [Control API]: https://tinyurl.com/yxsqplq7
 
 pub mod callback;
-pub mod callback_server;
 pub mod client;
 pub mod prelude;
 pub mod server;
@@ -39,7 +38,7 @@ fn main() {
     let _log_guard = init_logger();
 
     let sys = actix::System::new("control-api-mock");
-    let callback_server_addr = callback_server::run();
+    let callback_server_addr = callback::server::run();
     server::run(&opts, callback_server_addr);
     sys.run().unwrap();
 }

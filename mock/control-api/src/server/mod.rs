@@ -8,6 +8,7 @@ pub mod room;
 
 use std::collections::HashMap;
 
+use actix::Addr;
 use actix_cors::Cors;
 use actix_web::{
     middleware,
@@ -26,6 +27,7 @@ use medea_control_api_proto::grpc::api::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    callback::server::{GetCallbacks, GrpcCallbackServer},
     client::{ControlClient, Fid},
     prelude::*,
 };
@@ -35,8 +37,6 @@ use self::{
     member::Member,
     room::Room,
 };
-use crate::callback_server::{GetCallbacks, GrpcCallbackServer};
-use actix::Addr;
 
 /// Context of [`actix_web`] server.
 pub struct Context {

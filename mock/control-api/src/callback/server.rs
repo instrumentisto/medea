@@ -7,9 +7,8 @@ use medea_control_api_proto::grpc::{
     callback::{Request, Response},
     callback_grpc::{create_callback, Callback as CallbackProto},
 };
-use serde::Serialize;
 
-use super::callback::Callback;
+use super::Callback;
 
 type Callbacks = Arc<Mutex<Vec<Callback>>>;
 
