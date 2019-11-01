@@ -3,6 +3,7 @@
 //! [Medea]: https://github.com/instrumentisto/medea
 //! [Control API]: https://tinyurl.com/yxsqplq7
 
+pub mod callback;
 pub mod callback_server;
 pub mod client;
 pub mod prelude;

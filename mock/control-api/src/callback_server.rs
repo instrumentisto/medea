@@ -4,42 +4,12 @@ use actix::{Actor, Addr, Arbiter, Context, Handler, Message};
 use futures::future::Future as _;
 use grpcio::{Environment, RpcContext, Server, ServerBuilder, UnarySink};
 use medea_control_api_proto::grpc::{
-    callback::{Request, Request_Event as RequestEventProto, Response},
+    callback::{Request, Response},
     callback_grpc::{create_callback, Callback as CallbackProto},
 };
 use serde::Serialize;
 
-#[derive(Serialize, Clone)]
-pub struct Callback {
-    element: String,
-    event: CallbackEvent,
-    at: String,
-}
-
-#[derive(Serialize, Clone)]
-pub enum CallbackEvent {
-    OnJoin,
-    OnLeave,
-}
-
-impl From<RequestEventProto> for CallbackEvent {
-    fn from(req: RequestEventProto) -> Self {
-        match req {
-            RequestEventProto::ON_JOIN => Self::OnJoin,
-            RequestEventProto::ON_LEAVE => Self::OnLeave,
-        }
-    }
-}
-
-impl From<Request> for Callback {
-    fn from(mut req: Request) -> Self {
-        Self {
-            element: req.take_element(),
-            event: req.get_event().into(),
-            at: req.take_at(),
-        }
-    }
-}
+use super::callback::Callback;
 
 type Callbacks = Arc<Mutex<Vec<Callback>>>;
 
