@@ -117,7 +117,7 @@ mod tests {
             match callback_url {
                 CallbackUrl::Grpc(grpc_callback_url) => {
                     assert_eq!(
-                        grpc_callback_url.to_string(),
+                        grpc_callback_url.addr(),
                         expected_callback_url.to_string()
                     );
                 }

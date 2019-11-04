@@ -17,24 +17,18 @@ use crate::{
 #[test]
 fn on_join() {
     gen_insert_str_macro!("member_callback_on_join");
+    const CALLBACK_SERVER_PORT: u16 = 9099;
 
     let sys = System::new(insert_str!("{}"));
 
-    let callback_server = super::run(9099);
+    let callback_server = super::run(CALLBACK_SERVER_PORT);
     let control_client = ControlClient::new();
     let member = RoomBuilder::default()
         .id(insert_str!("{}"))
         .add_member(
             MemberBuilder::default()
                 .id("publisher")
-                .add_endpoint(
-                    WebRtcPublishEndpointBuilder::default()
-                        .id("publish")
-                        .p2p_mode(WebRtcPublishEndpoint_P2P::ALWAYS)
-                        .build()
-                        .unwrap(),
-                )
-                .on_join("grpc://127.0.0.1:9099".to_string())
+                .on_join(format!("grpc://127.0.0.1:{}", CALLBACK_SERVER_PORT))
                 .build()
                 .unwrap(),
         )
@@ -73,25 +67,18 @@ fn on_join() {
 #[test]
 fn on_leave() {
     gen_insert_str_macro!("member_callback_on_leave");
+    const CALLBACK_SERVER_PORT: u16 = 9098;
 
     let sys = System::new(insert_str!("{}"));
 
-    let callback_server = super::run(9098);
+    let callback_server = super::run(CALLBACK_SERVER_PORT);
     let control_client = ControlClient::new();
     let member = RoomBuilder::default()
         .id(insert_str!("{}"))
         .add_member(
             MemberBuilder::default()
                 .id("publisher")
-                .add_endpoint(
-                    WebRtcPublishEndpointBuilder::default()
-                        .id("publish")
-                        .p2p_mode(WebRtcPublishEndpoint_P2P::ALWAYS)
-                        .build()
-                        .unwrap(),
-                )
-                .on_join("grpc://127.0.0.1:9098".to_string())
-                .on_leave("grpc://127.0.0.1:9098".to_string())
+                .on_leave(format!("grpc://127.0.0.1:{}", CALLBACK_SERVER_PORT))
                 .build()
                 .unwrap(),
         )
@@ -113,7 +100,7 @@ fn on_leave() {
             client.send(CloseSocket).map_err(|e| panic!("{:?}", e))
         })
         .and_then(move |_| {
-            std::thread::sleep(Duration::from_secs(1));
+            std::thread::sleep(Duration::from_millis(50));
             callback_server.send(GetCallbacks).map_err(|_| ())
         })
         .map(|callbacks| {
