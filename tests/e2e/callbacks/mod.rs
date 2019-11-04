@@ -20,7 +20,7 @@ pub struct GrpcCallbackServer {
 impl Actor for GrpcCallbackServer {
     type Context = Context<Self>;
 
-    fn started(&mut self, ctx: &mut Self::Context) {
+    fn started(&mut self, _: &mut Self::Context) {
         self.server.start();
     }
 }
@@ -64,7 +64,7 @@ impl Callback for CallbackService {
     }
 }
 
-pub fn run() -> Addr<GrpcCallbackServer> {
+pub fn run(port: u16) -> Addr<GrpcCallbackServer> {
     let cq_count = 2;
     let callbacks = Arc::new(Mutex::new(Vec::new()));
 
@@ -73,7 +73,7 @@ pub fn run() -> Addr<GrpcCallbackServer> {
 
     let server = ServerBuilder::new(env)
         .register_service(service)
-        .bind("127.0.0.1", 9099)
+        .bind("127.0.0.1", port)
         .build()
         .unwrap();
 
