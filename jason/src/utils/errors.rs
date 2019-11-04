@@ -31,3 +31,10 @@ impl From<String> for WasmErr {
         Self(Cow::Owned(msg))
     }
 }
+
+/// Prints to console.error.
+macro_rules! error {
+    ($e:expr) => {
+        web_sys::console::error_1(&$e.into())
+    };
+}

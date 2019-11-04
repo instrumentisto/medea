@@ -1,7 +1,9 @@
 //! Miscellaneous utility structs and functions.
 
-mod callback;
+#[macro_use]
 mod errors;
+
+mod callback;
 mod event_listener;
 
 use js_sys::Reflect;
@@ -47,12 +49,6 @@ macro_rules! map_weak {
             .ok_or_else(|| js_sys::Error::new("Detached state").into())
             .map($closure)
     }};
-}
-
-macro_rules! error {
-    ($e:expr) => {
-        web_sys::console::error_1(&$e.into())
-    };
 }
 
 /// Returns property of JS object by name if its defined.

@@ -153,15 +153,15 @@
 
       let room = await jason.init_room();
 
-      const updateLocalVideo = function (stream) {
+      const updateLocalVideo = async function (stream) {
         localVideo.srcObject = stream;
-        localVideo.play();
+        await localVideo.play();
       };
 
       audioSelect.addEventListener('change', async () => {
         try {
           const stream = await getStream(audioSelect, videoSelect);
-          updateLocalVideo(stream);
+          await updateLocalVideo(stream);
           room.inject_local_stream(stream);
         } catch (e) {
           console.log("Changing audio source failed:" + e);
@@ -171,7 +171,7 @@
       videoSelect.addEventListener('change', async () => {
         try {
           const stream = await getStream(audioSelect, videoSelect);
-          updateLocalVideo(stream);
+          await updateLocalVideo(stream);
           room.inject_local_stream(stream);
         } catch (e) {
           console.log("Changing video source failed:" + e);
@@ -179,11 +179,11 @@
       });
 
       room.on_failed_local_stream(function (error) {
-        console.log(error);
+        console.error(error);
       });
 
       room.on_new_connection((connection) => {
-        connection.on_remote_stream((stream) => {
+        connection.on_remote_stream(async (stream) => {
           let videoDiv = document.getElementsByClassName("remote-videos")[0];
           let video = document.createElement("video");
           video.srcObject = stream;
@@ -192,7 +192,7 @@
           innerVideoDiv.appendChild(video);
           videoDiv.appendChild(innerVideoDiv);
 
-          video.play();
+          await video.play();
         });
       });
 
@@ -257,7 +257,7 @@
 
         try {
           const stream = await getStream(audioSelect, videoSelect);
-          updateLocalVideo(stream);
+          await updateLocalVideo(stream);
           await getDevices(audioSelect, videoSelect, stream);
           room.inject_local_stream(stream);
         } catch (e) {
@@ -273,7 +273,7 @@
 
           try {
             const stream = await getStream(audioSelect, videoSelect);
-            updateLocalVideo(stream);
+            await updateLocalVideo(stream);
             await getDevices(audioSelect, videoSelect, stream);
             room.inject_local_stream(stream);
           } catch (e) {

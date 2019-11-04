@@ -258,15 +258,15 @@ window.onload = async function() {
     let videoSelect = document.getElementsByClassName('connect__select-device_video')[0];
     let localVideo = document.querySelector('.local-video > video');
 
-    const updateLocalVideo = (stream) => {
+    const updateLocalVideo = async (stream) => {
       localVideo.srcObject = stream;
-      localVideo.play();
+      await localVideo.play();
     };
 
     const room = await jason.init_room();
     try {
       const stream = await getStream(audioSelect, videoSelect);
-      updateLocalVideo(stream);
+      await updateLocalVideo(stream);
       await fillMediaDevicesInputs(audioSelect, videoSelect, stream);
       room.inject_local_stream(stream);
     } catch (e) {
@@ -276,7 +276,7 @@ window.onload = async function() {
     audioSelect.addEventListener('change', async () => {
       try {
         const stream = await getStream(audioSelect, videoSelect);
-        updateLocalVideo(stream);
+        await updateLocalVideo(stream);
         room.inject_local_stream(stream);
       } catch (e) {
         console.log("Changing audio source failed:" + e);
@@ -286,15 +286,15 @@ window.onload = async function() {
     videoSelect.addEventListener('change', async () => {
       try {
         const stream = await getStream(audioSelect, videoSelect);
-        updateLocalVideo(stream);
+        await updateLocalVideo(stream);
         room.inject_local_stream(stream);
       } catch (e) {
         console.log("Changing video source failed:" + e);
       }
     });
 
-    room.on_new_connection((connection) => {
-      connection.on_remote_stream((stream) => {
+    room.on_new_connection( (connection) => {
+      connection.on_remote_stream( async (stream) => {
         let videoDiv = document.getElementsByClassName("remote-videos")[0];
         let video = document.createElement("video");
         video.srcObject = stream;
@@ -303,12 +303,12 @@ window.onload = async function() {
         innerVideoDiv.appendChild(video);
         videoDiv.appendChild(innerVideoDiv);
 
-        video.play();
+        await video.play();
       });
     });
 
     room.on_failed_local_stream((error) => {
-      console.log(error);
+      console.error(error);
     });
 
     let muteAudio = document.getElementsByClassName('control__mute_audio')[0];

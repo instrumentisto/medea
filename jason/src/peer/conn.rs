@@ -184,7 +184,7 @@ impl RtcPeerConnection {
                             f(msg);
                         },
                     )
-                    .map_err(Error::SetHandlerIceEvent)?,
+                    .map_err(Error::SetHandlerTrackEvent)?,
                 );
             }
         }
