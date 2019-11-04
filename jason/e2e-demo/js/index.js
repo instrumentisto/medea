@@ -246,8 +246,6 @@ const controlDebugWindows = {
       }
 
       resultContainer.appendChild(table);
-
-      // resultContainer.innerHTML = colorizedJson.prettyPrint(res);
     })
   }
 };

@@ -27,7 +27,7 @@ use protobuf::RepeatedField;
 ///
 /// [Medea]: https://github.com/instrumentisto/medea
 #[derive(Clone)]
-struct ControlClient(ControlApiClient);
+pub struct ControlClient(ControlApiClient);
 
 impl ControlClient {
     /// Create new [`ControlClient`].
@@ -168,7 +168,7 @@ impl Room {
 }
 
 impl RoomBuilder {
-    fn add_member<T: Into<Member>>(&mut self, member: T) -> &mut Self {
+    pub fn add_member<T: Into<Member>>(&mut self, member: T) -> &mut Self {
         let member = member.into();
 
         self.members
@@ -188,6 +188,12 @@ pub struct Member {
     credentials: Option<String>,
     #[builder(default = "HashMap::new()")]
     endpoints: HashMap<String, Endpoint>,
+    #[builder(default = "None")]
+    #[builder(setter(strip_option))]
+    on_join: Option<String>,
+    #[builder(default = "None")]
+    #[builder(setter(strip_option))]
+    on_leave: Option<String>,
 }
 
 impl Into<GrpcMember> for Member {
@@ -206,6 +212,9 @@ impl Into<GrpcMember> for Member {
 
         grpc_member.set_pipeline(pipeline);
         grpc_member.set_id(self.id);
+        self.on_join.map(|on_join| grpc_member.set_on_join(on_join));
+        self.on_leave
+            .map(|on_leave| grpc_member.set_on_leave(on_leave));
 
         grpc_member
     }
@@ -223,7 +232,7 @@ impl Member {
 }
 
 impl MemberBuilder {
-    fn add_endpoint<T: Into<Endpoint>>(&mut self, element: T) -> &mut Self {
+    pub fn add_endpoint<T: Into<Endpoint>>(&mut self, element: T) -> &mut Self {
         let element = element.into();
 
         self.endpoints
@@ -273,7 +282,7 @@ pub struct WebRtcPlayEndpoint {
 }
 
 impl WebRtcPlayEndpoint {
-    fn build_request<T: Into<String>>(self, url: T) -> CreateRequest {
+    pub fn build_request<T: Into<String>>(self, url: T) -> CreateRequest {
         let mut request = CreateRequest::default();
 
         request.set_parent_fid(url.into());
@@ -307,7 +316,7 @@ pub struct WebRtcPublishEndpoint {
 }
 
 impl WebRtcPublishEndpoint {
-    fn build_request<T: Into<String>>(self, url: T) -> CreateRequest {
+    pub fn build_request<T: Into<String>>(self, url: T) -> CreateRequest {
         let mut request = CreateRequest::default();
 
         request.set_parent_fid(url.into());

@@ -1,10 +1,10 @@
 use std::{convert::TryFrom, fmt};
 
 use derive_more::Display;
+use failure::_core::fmt::{Error, Formatter};
 use serde::{de::Visitor, Deserialize, Deserializer};
-use url::{ParseError, Url};
 use std::fmt::Display;
-use failure::_core::fmt::{Formatter, Error};
+use url::{ParseError, Url};
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct GrpcCallbackUrl(String);

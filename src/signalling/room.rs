@@ -837,6 +837,9 @@ impl Room {
             self.id.clone(),
         );
 
+        signalling_member.set_on_join(spec.on_join().clone());
+        signalling_member.set_on_leave(spec.on_leave().clone());
+
         for (id, publish) in spec.publish_endpoints() {
             let signalling_publish = WebRtcPublishEndpoint::new(
                 id.clone(),
