@@ -3,11 +3,25 @@ use std::{convert::TryFrom, fmt};
 use derive_more::Display;
 use serde::{de::Visitor, Deserialize, Deserializer};
 use url::{ParseError, Url};
+use std::fmt::Display;
+use failure::_core::fmt::{Formatter, Error};
 
-#[derive(Clone, Display, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct GrpcCallbackUrl(String);
 
-#[derive(Clone, Display, Debug, Eq, PartialEq, Hash)]
+impl GrpcCallbackUrl {
+    pub fn addr(&self) -> &str {
+        &self.0
+    }
+}
+
+impl Display for GrpcCallbackUrl {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+        write!(f, "grpc://{}", self.0)
+    }
+}
+
+#[derive(Clone, derive_more::Display, Debug, Eq, PartialEq, Hash)]
 pub enum CallbackUrl {
     Grpc(GrpcCallbackUrl),
 }

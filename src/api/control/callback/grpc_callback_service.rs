@@ -29,7 +29,7 @@ impl fmt::Debug for GrpcCallbackService {
 impl GrpcCallbackService {
     pub fn new(addr: &GrpcCallbackUrl) -> Self {
         let env = Arc::new(EnvBuilder::new().build());
-        let ch = ChannelBuilder::new(env).connect(&addr.to_string());
+        let ch = ChannelBuilder::new(env).connect(addr.addr());
         let client = CallbackClient::new(ch);
 
         Self { client }

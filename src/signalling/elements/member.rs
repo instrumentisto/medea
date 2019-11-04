@@ -521,6 +521,8 @@ impl Into<ElementProto> for Member {
 
         member.set_id(self.id().to_string());
         member.set_credentials(self.credentials());
+        self.get_on_leave().map(|on_leave| member.set_on_leave(on_leave.to_string()));
+        self.get_on_join().map(|on_join| member.set_on_join(on_join.to_string()));
 
         element.set_member(member);
 
