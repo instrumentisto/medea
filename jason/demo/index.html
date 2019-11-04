@@ -158,15 +158,6 @@
         localVideo.play();
       };
 
-      try {
-        const stream = await getStream(audioSelect, videoSelect);
-        updateLocalVideo(stream);
-        await getDevices(audioSelect, videoSelect, stream);
-        room.inject_local_stream(stream);
-      } catch (e) {
-        console.log("Init local video failed:" + e);
-      }
-
       audioSelect.addEventListener('change', async () => {
         try {
           const stream = await getStream(audioSelect, videoSelect);
@@ -235,7 +226,7 @@
 
       let bindJoinButtons = function (roomId) {
         joinCallerButton.onclick = async function () {
-          let connectBtnsDiv = document.getElementsByClassName("join")[0];
+          let connectBtnsDiv = document.getElementsByClassName("join__join")[0];
           connectBtnsDiv.style.display = 'none';
           controlBtns.style.display = 'block';
 
@@ -263,12 +254,31 @@
         bindJoinButtons(roomId);
         chooseRoomDiv.style.display = "none";
         videoCallDiv.style.display = "";
+
+        try {
+          const stream = await getStream(audioSelect, videoSelect);
+          updateLocalVideo(stream);
+          await getDevices(audioSelect, videoSelect, stream);
+          room.inject_local_stream(stream);
+        } catch (e) {
+          console.log("Init local video failed:" + e);
+        }
+
       } else {
-        chooseRoomButton.onclick = function () {
+        chooseRoomButton.onclick = async function () {
           let roomId = roomIdInput.value;
 
           window.location.hash = roomId;
           bindJoinButtons(roomId);
+
+          try {
+            const stream = await getStream(audioSelect, videoSelect);
+            updateLocalVideo(stream);
+            await getDevices(audioSelect, videoSelect, stream);
+            room.inject_local_stream(stream);
+          } catch (e) {
+            console.log("Init local video failed:" + e);
+          }
 
           chooseRoomDiv.style.display = "none";
           videoCallDiv.style.display = "";
