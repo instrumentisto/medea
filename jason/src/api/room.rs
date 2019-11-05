@@ -76,6 +76,9 @@ impl RoomHandle {
     /// Establishes connection with media server (if it doesn't already exist).
     /// Fails if unable to connect to media server.
     /// Effectively returns `Result<(), WasmErr>`.
+
+    // TODO: https://github.com/instrumentisto/medea/issues/45#issuecomment-519976830
+    //       fails if on_failed_local_stream callback is not set
     pub fn join(&self, token: String) -> Promise {
         match map_weak!(self, |inner| Rc::clone(&inner.borrow().rpc)) {
             Ok(rpc) => {
@@ -383,6 +386,7 @@ impl EventHandler for InnerRoom {
                 async move {
                     if let Err(err) = result {
                         error!(err.to_string());
+                        // TODO: only media errors should go here
                         error_callback
                             .call(js_sys::Error::new(&format!("{}", err)));
                     };
