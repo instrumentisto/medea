@@ -20,6 +20,7 @@ use futures::Future;
 use serde::Deserialize;
 
 use crate::{
+    api::control::callback::callback_url::CallbackUrlParseError,
     log::prelude::*,
     signalling::room_service::{
         RoomService, RoomServiceError, StartStaticRooms,
@@ -38,7 +39,6 @@ pub use self::{
     member::{Id as MemberId, MemberSpec},
     room::{Id as RoomId, RoomElement, RoomSpec},
 };
-use crate::api::control::callback::callback_url::CallbackUrlParseError;
 
 /// Errors which may occur while deserializing protobuf spec.
 #[derive(Debug, Fail, Display)]

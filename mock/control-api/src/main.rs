@@ -38,8 +38,8 @@ fn main() {
     let _log_guard = init_logger();
 
     let sys = actix::System::new("control-api-mock");
-    let callback_server_addr = callback::server::run();
-    server::run(&opts, callback_server_addr);
+    let callback_server = callback::server::run();
+    server::run(&opts, callback_server);
     sys.run().unwrap();
 }
 

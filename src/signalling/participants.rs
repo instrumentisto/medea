@@ -420,6 +420,8 @@ impl ParticipantService {
         self.members.insert(id, member);
     }
 
+    /// Returns [`Iterator`] over [`MemberId`] and [`Member`] which this
+    /// [`ParticipantRepository`] stores.
     pub fn iter_members(&self) -> impl Iterator<Item = (&MemberId, &Member)> {
         self.members.iter()
     }

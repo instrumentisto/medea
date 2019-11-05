@@ -28,9 +28,11 @@ pub struct Member {
     /// If `None` then random credentials will be generated on Medea side.
     credentials: Option<String>,
 
+    /// URL to which `OnJoin` Control API callback will be sent.
     #[serde(skip_serializing_if = "Option::is_none")]
     on_join: Option<String>,
 
+    /// URL to which `OnLeave` Control API callback will be sent.
     #[serde(skip_serializing_if = "Option::is_none")]
     on_leave: Option<String>,
 }

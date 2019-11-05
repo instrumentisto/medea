@@ -268,14 +268,20 @@ pub enum ErrorCode {
     MissingPath = 1019,
 
     /// Missing host in callback URL.
+    ///
+    /// Code: __1020__.
     #[display(fmt = "Missing host in callback URL.")]
     MissingHostInCallbackUrl = 1020,
 
     /// Unsupported callback URL protocol.
+    ///
+    /// Code: __1021__.
     #[display(fmt = "Unsupported callback URL protocol.")]
     UnsupportedCallbackUrlProtocol = 1021,
 
     /// Invalid callback URL.
+    ///
+    /// Code: __1022__.
     #[display(fmt = "Invalid callback URL.")]
     InvalidCallbackUrl = 1022,
 

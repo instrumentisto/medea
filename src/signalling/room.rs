@@ -158,6 +158,7 @@ enum State {
 pub struct Room {
     id: RoomId,
 
+    /// Repository which stores all callback services.
     callbacks: CallbackRepository,
 
     /// [`Member`]s and associated [`RpcConnection`]s of this [`Room`], handles
@@ -893,6 +894,10 @@ impl Room {
         Ok(())
     }
 
+    /// Sends [`CallbackEvent`] for provided [`StatefulFid`] to
+    /// callback service.
+    ///
+    /// Note that this function doesn't reacts on [`CallbackEvent`] send error.
     pub fn send_callback<T: Into<CallbackEvent>>(
         &self,
         callback_url: CallbackUrl,

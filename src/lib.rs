@@ -28,6 +28,7 @@ pub struct AppContext {
     /// Reference to [`TurnAuthService`].
     pub turn_service: Arc<dyn TurnAuthService>,
 
+    /// Repository which stores all callback services.
     pub callbacks: CallbackRepository,
 }
 

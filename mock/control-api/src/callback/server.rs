@@ -1,3 +1,7 @@
+//! Implementation of Control API gRPC [callback service].
+//!
+//! [callback service]: https://tinyurl.com/y5fajesq
+
 use std::sync::{Arc, Mutex};
 
 use actix::{Actor, Addr, Arbiter, Context, Handler, Message};
@@ -12,8 +16,15 @@ use super::Callback;
 
 type Callbacks = Arc<Mutex<Vec<Callback>>>;
 
+/// [`Actor`] wrapper for [`grpcio`] server.
+///
+/// Also this [`Actor`] can return all received callbacks
+/// with [`GetCallbacks`] [`Message`].
 pub struct GrpcCallbackServer {
+    /// [`grpcio`] gRPC server.
     server: Server,
+
+    /// All [`Callback`]s which this server received.
     events: Callbacks,
 }
 
@@ -25,8 +36,10 @@ impl Actor for GrpcCallbackServer {
     }
 }
 
+/// Implementation for [`CallbackProto`] gRPC service.
 #[derive(Clone)]
 pub struct CallbackService {
+    /// All [`Callback`]s which this server received.
     events: Callbacks,
 }
 
@@ -43,7 +56,6 @@ impl CallbackProto for CallbackService {
         req: Request,
         sink: UnarySink<Response>,
     ) {
-        println!("Received event: {:#?}", req);
         self.events.lock().unwrap().push(req.into());
         ctx.spawn(
             sink.success(Response::new())
@@ -52,6 +64,8 @@ impl CallbackProto for CallbackService {
     }
 }
 
+/// [`Message`] which returns all [`Callback`]s received by this
+/// [`GrpcCallbackServer`].
 #[derive(Message)]
 #[rtype(result = "Result<Vec<Callback>, ()>")]
 pub struct GetCallbacks;
@@ -68,6 +82,7 @@ impl Handler<GetCallbacks> for GrpcCallbackServer {
     }
 }
 
+/// Run [`GrpcCallbackServer`].
 pub fn run() -> Addr<GrpcCallbackServer> {
     let cq_count = 2;
 

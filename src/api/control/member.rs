@@ -60,8 +60,10 @@ pub struct MemberSpec {
     /// Credentials to authorize `Member` with.
     credentials: String,
 
+    /// URL to which `OnJoin` Control API callback will be sent.
     on_join: Option<CallbackUrl>,
 
+    /// URL to which `OnLeave` Control API callback will be sent.
     on_leave: Option<CallbackUrl>,
 }
 
@@ -119,10 +121,12 @@ impl MemberSpec {
         &self.credentials
     }
 
+    /// Returns reference to `OnJoin` [`CallbackUrl`].
     pub fn on_join(&self) -> &Option<CallbackUrl> {
         &self.on_join
     }
 
+    /// Returns reference to `OnLeave` [`CallbackUrl`].
     pub fn on_leave(&self) -> &Option<CallbackUrl> {
         &self.on_leave
     }

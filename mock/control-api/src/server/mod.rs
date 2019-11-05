@@ -46,7 +46,8 @@ pub struct Context {
     /// [Medea]: https://github.com/instrumentisto/medea
     client: ControlClient,
 
-    callback_server_addr: Addr<GrpcCallbackServer>,
+    /// gRPC server which receives Control API callbacks.
+    callback_server: Addr<GrpcCallbackServer>,
 }
 
 /// Run REST [Control API] server mock.
@@ -59,7 +60,7 @@ pub fn run(args: &ArgMatches, callback_server_addr: Addr<GrpcCallbackServer>) {
             .wrap(Cors::new())
             .data(Context {
                 client: ControlClient::new(&medea_addr),
-                callback_server_addr: callback_server_addr.clone(),
+                callback_server: callback_server_addr.clone(),
             })
             .wrap(middleware::Logger::default())
             .service(
@@ -121,11 +122,13 @@ macro_rules! gen_request_macro {
     };
 }
 
+/// [`actix_web`] REST API endpoint which returns all
+/// [`Callback`]s received by this mock server.
 pub fn get_callbacks(
     state: Data<Context>,
 ) -> impl Future<Item = HttpResponse, Error = ()> {
     state
-        .callback_server_addr
+        .callback_server
         .send(GetCallbacks)
         .map_err(|e| warn!("GrpcCallbackServer mailbox error. {:?}", e))
         .map(|callbacks| HttpResponse::Ok().json(&callbacks.unwrap()))

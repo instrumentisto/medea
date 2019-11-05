@@ -1,3 +1,5 @@
+//! Control API callback implementation.
+
 pub mod server;
 
 use medea_control_api_proto::grpc::callback::{
@@ -7,8 +9,10 @@ use medea_control_api_proto::grpc::callback::{
 };
 use serde::Serialize;
 
+/// `OnLeave` callback of Control API.
 #[derive(Clone, Serialize)]
 pub struct OnLeave {
+    /// Reason of why `Member` leaves.
     reason: OnLeaveReason,
 }
 
@@ -20,10 +24,16 @@ impl From<OnLeaveProto> for OnLeave {
     }
 }
 
+/// Reason of why `Member` leaves.
 #[derive(Clone, Serialize)]
 pub enum OnLeaveReason {
+    /// Server is shutting down.
     ServerShutdown,
+
+    /// Connection with `Member` was lost.
     LostConnection,
+
+    /// Room was closed.
     RoomClose,
 }
 
@@ -41,6 +51,7 @@ impl From<OnLeaveReasonProto> for OnLeaveReason {
     }
 }
 
+/// `OnJoin` callback for Control API.
 #[derive(Clone, Serialize)]
 pub struct OnJoin;
 
@@ -50,6 +61,7 @@ impl From<OnJoinProto> for OnJoin {
     }
 }
 
+/// All callbacks which can happen.
 #[derive(Clone, Serialize)]
 #[serde(tag = "type")]
 pub enum CallbackEvent {
@@ -70,10 +82,16 @@ impl From<CallbackEventProto> for CallbackEvent {
     }
 }
 
+/// Control API callback.
 #[derive(Clone, Serialize)]
 pub struct Callback {
+    /// FID (Full ID) of element with which this event was occurred.
     element: String,
+
+    /// Event which occurred.
     event: CallbackEvent,
+
+    /// Time on which callback was occurred.
     at: String,
 }
 

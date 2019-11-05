@@ -19,6 +19,7 @@ use medea_control_api_proto::grpc::api::{
 
 use crate::{
     api::control::{
+        callback::callback_url::CallbackUrl,
         endpoints::WebRtcPlayEndpoint as WebRtcPlayEndpointSpec,
         refs::{Fid, StatefulFid, ToEndpoint, ToMember, ToRoom},
         EndpointId, MemberId, MemberSpec, RoomId, RoomSpec,
@@ -32,7 +33,6 @@ use super::endpoints::{
     webrtc::{WebRtcPlayEndpoint, WebRtcPublishEndpoint},
     Endpoint,
 };
-use crate::api::control::callback::callback_url::CallbackUrl;
 
 /// Errors which may occur while loading [`Member`]s from [`RoomSpec`].
 #[derive(Debug, Display, Fail)]
@@ -89,8 +89,10 @@ struct MemberInner {
     /// [`IceUser`] of this [`Member`].
     ice_user: Option<IceUser>,
 
+    /// URL to which `OnJoin` Control API callback will be sent.
     on_join: Option<CallbackUrl>,
 
+    /// URL to which `OnLeave` Control API callback will be sent.
     on_leave: Option<CallbackUrl>,
 }
 
@@ -415,18 +417,22 @@ impl Member {
         Rc::ptr_eq(&self.0, &another_member.0)
     }
 
+    /// Returns [`CallbackUrl`] to which Medea should send `OnJoin` callback.
     pub fn get_on_join(&self) -> Option<CallbackUrl> {
         self.0.borrow().on_join.clone()
     }
 
+    /// Returns [`CallbackUrl`] to which Medea should send `OnLeave` callback.
     pub fn get_on_leave(&self) -> Option<CallbackUrl> {
         self.0.borrow().on_leave.clone()
     }
 
+    /// Sets [`CallbackUrl`] to which Medea should send `OnLeave` callback.
     pub fn set_on_leave(&self, on_leave: Option<CallbackUrl>) {
         self.0.borrow_mut().on_leave = on_leave;
     }
 
+    /// Sets [`CallbackUrl`] to which Medea should send `OnJoin` callback.
     pub fn set_on_join(&self, on_join: Option<CallbackUrl>) {
         self.0.borrow_mut().on_join = on_join;
     }
