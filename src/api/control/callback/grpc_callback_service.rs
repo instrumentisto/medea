@@ -9,7 +9,7 @@ use futures::future::{Future as _, IntoFuture as _};
 use grpcio::{ChannelBuilder, EnvBuilder};
 use medea_control_api_proto::grpc::callback_grpc::CallbackClient;
 
-use crate::api::control::callback::Callback;
+use crate::{api::control::callback::Callback, log::prelude::*};
 
 use super::callback_url::GrpcCallbackUrl;
 
@@ -50,7 +50,7 @@ impl Handler<Callback> for GrpcCallbackService {
                 .into_future()
                 .and_then(|q| q)
                 .map(|_| ())
-                .map_err(|e| println!("{:?}", e)),
+                .map_err(|e| warn!("{:?}", e)),
         )
     }
 }

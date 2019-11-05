@@ -6,23 +6,31 @@ service Callback {
   rpc OnEvent (Request) returns (Response);
 }
 
+// 'on_join' callback in Control API spec.
 message OnJoin {}
 
+// 'on_leave' callback in Control API spec.
 message OnLeave {
+  // Reason of why `Member` leaves server.
   Reason reason = 1;
 
   enum Reason {
+    // Connection with 'Member' was lost.
     LOST_CONNECTION = 0;
+
+    // Server is shutting down.
     SERVER_SHUTDOWN = 1;
-    ROOM_CLOSE = 2;
   }
 }
 
 message Request {
-  // FID (Full ID) of element with which was occured event.
+  // FID (Full ID) of element with which was occurred event.
   string element = 1;
-  // Time on which event occured.
+
+  // Time on which event was occurred.
   string at = 2;
+
+  // Name of callback in spec.
   oneof event {
     OnJoin on_join = 3;
     OnLeave on_leave = 4;

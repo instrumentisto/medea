@@ -4,14 +4,11 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use actix::{Actor as _, Addr, Recipient};
+use actix::{Actor as _, Recipient};
 
 use crate::api::control::callback::callback_url::CallbackUrl;
 
-use super::{
-    callback_url::GrpcCallbackUrl, grpc_callback_service::GrpcCallbackService,
-    Callback,
-};
+use super::{grpc_callback_service::GrpcCallbackService, Callback};
 
 struct Inner(HashMap<CallbackUrl, Recipient<Callback>>);
 
@@ -39,7 +36,7 @@ impl Inner {
 
 impl Debug for Inner {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        write!(f, "BLAH-BLAH-BLAH")
+        write!(f, "Inner {{ /* Cannot be printed */ }}")
     }
 }
 

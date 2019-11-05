@@ -1146,14 +1146,6 @@ impl Handler<RpcConnectionClosed> for Room {
         let member = self.members.get_member_by_id(&msg.member_id).unwrap();
 
         if let ClosedReason::Closed = msg.reason {
-            if let Some(callback_url) = member.get_on_leave() {
-                self.send_callback(
-                    callback_url,
-                    member.get_fid().into(),
-                    OnLeaveEvent::new(OnLeaveReason::LostConnection),
-                );
-            }
-
             let removed_peers =
                 self.peers.remove_peers_related_to_member(&msg.member_id);
 

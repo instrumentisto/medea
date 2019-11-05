@@ -34,7 +34,6 @@ impl Into<OnLeaveProto> for OnLeaveEvent {
 pub enum OnLeaveReason {
     ServerShutdown,
     LostConnection,
-    RoomClose,
 }
 
 impl Into<OnLeaveReasonProto> for OnLeaveReason {

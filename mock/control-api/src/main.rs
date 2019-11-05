@@ -3,10 +3,10 @@
 //! [Medea]: https://github.com/instrumentisto/medea
 //! [Control API]: https://tinyurl.com/yxsqplq7
 
+pub mod api;
 pub mod callback;
 pub mod client;
 pub mod prelude;
-pub mod server;
 
 use clap::{
     app_from_crate, crate_authors, crate_description, crate_name,
@@ -59,7 +59,7 @@ fn main() {
 
     let sys = actix::System::new("control-api-mock");
     let callback_server = callback::server::run(&opts);
-    server::run(&opts, callback_server);
+    api::run(&opts, callback_server);
     sys.run().unwrap();
 }
 

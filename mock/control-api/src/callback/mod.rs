@@ -32,9 +32,6 @@ pub enum OnLeaveReason {
 
     /// Connection with `Member` was lost.
     LostConnection,
-
-    /// Room was closed.
-    RoomClose,
 }
 
 impl From<OnLeaveReasonProto> for OnLeaveReason {
@@ -46,7 +43,6 @@ impl From<OnLeaveReasonProto> for OnLeaveReason {
             OnLeaveReasonProto::LOST_CONNECTION => {
                 OnLeaveReason::LostConnection
             }
-            OnLeaveReasonProto::ROOM_CLOSE => OnLeaveReason::RoomClose,
         }
     }
 }
