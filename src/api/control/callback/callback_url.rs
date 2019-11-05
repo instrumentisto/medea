@@ -19,7 +19,8 @@ pub struct GrpcCallbackUrl(String);
 impl GrpcCallbackUrl {
     /// Returns address for gRPC callback service.
     ///
-    /// If you wish to get address with protocol - use [`Display`] implementation.
+    /// If you wish to get address with protocol - use [`Display`]
+    /// implementation.
     pub fn addr(&self) -> &str {
         &self.0
     }

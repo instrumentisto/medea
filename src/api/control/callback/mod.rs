@@ -53,7 +53,6 @@ impl Into<OnLeaveReasonProto> for OnLeaveReason {
             OnLeaveReason::ServerShutdown => {
                 OnLeaveReasonProto::SERVER_SHUTDOWN
             }
-            OnLeaveReason::RoomClose => OnLeaveReasonProto::ROOM_CLOSE,
         }
     }
 }

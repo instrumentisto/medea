@@ -33,8 +33,8 @@ impl fmt::Debug for GrpcCallbackService {
 impl GrpcCallbackService {
     /// Returns gRPC client for provided [`GrpcCallbackUrl`].
     ///
-    /// Note that this function doesn't check availability of gRPC server on provided
-    /// [`GrpcCallbackUrl`].
+    /// Note that this function doesn't check availability of gRPC server on
+    /// provided [`GrpcCallbackUrl`].
     pub fn new(addr: &GrpcCallbackUrl) -> Self {
         let env = Arc::new(EnvBuilder::new().build());
         let ch = ChannelBuilder::new(env).connect(addr.addr());

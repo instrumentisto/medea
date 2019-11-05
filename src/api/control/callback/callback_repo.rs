@@ -11,6 +11,7 @@ use actix::{Actor as _, Recipient};
 use crate::api::control::callback::callback_url::CallbackUrl;
 
 use super::{grpc_callback_service::GrpcCallbackService, Callback};
+use crate::api::control::{callback::CallbackEvent, refs::StatefulFid};
 
 struct Inner(HashMap<CallbackUrl, Recipient<Callback>>);
 
@@ -62,7 +63,24 @@ impl CallbackRepository {
     ///
     /// If some service not presented in repository then new service
     /// automatically will be created.
-    pub fn get(&self, url: &CallbackUrl) -> Recipient<Callback> {
+    fn get(&self, url: &CallbackUrl) -> Recipient<Callback> {
         self.0.lock().unwrap().get(url)
+    }
+
+    /// Sends [`CallbackEvent`] for provided [`StatefulFid`] to
+    /// callback service.
+    // TODO: Add buffering and resending for failed 'Callback' sends.
+    //       https://github.com/instrumentisto/medea/issues/61
+    pub fn send_callback<T: Into<CallbackEvent>>(
+        &self,
+        callback_url: CallbackUrl,
+        fid: StatefulFid,
+        event: T,
+    ) {
+        // TODO: Remove Result suppression ('.ok()') after buffering
+        //       implementation.
+        self.get(&callback_url)
+            .do_send(Callback::new(fid, event.into()))
+            .ok();
     }
 }

@@ -543,7 +543,7 @@ impl Room {
 
         for (_, member) in self.members.iter_members() {
             if let Some(on_leave) = member.get_on_leave() {
-                self.send_callback(
+                self.callbacks.send_callback(
                     on_leave,
                     member.get_fid().into(),
                     OnLeaveEvent::new(OnLeaveReason::ServerShutdown),
@@ -656,7 +656,7 @@ impl Room {
             self.remove_peers(&member.id(), peers, ctx);
             if let Some(callback_url) = member.get_on_leave() {
                 // TODO: Maybe don't send callback on member delete??
-                self.send_callback(
+                self.callbacks.send_callback(
                     callback_url,
                     member.get_fid().into(),
                     OnLeaveEvent::new(OnLeaveReason::LostConnection),
@@ -893,21 +893,6 @@ impl Room {
 
         Ok(())
     }
-
-    /// Sends [`CallbackEvent`] for provided [`StatefulFid`] to
-    /// callback service.
-    ///
-    /// Note that this function doesn't reacts on [`CallbackEvent`] send error.
-    pub fn send_callback<T: Into<CallbackEvent>>(
-        &self,
-        callback_url: CallbackUrl,
-        fid: StatefulFid,
-        event: T,
-    ) {
-        self.callbacks
-            .get(&callback_url)
-            .do_send(Callback::new(fid, event.into()));
-    }
 }
 
 /// [`Actor`] implementation that provides an ergonomic way
@@ -1094,7 +1079,7 @@ impl Handler<RpcConnectionEstablished> for Room {
             .map(|member, room, ctx| {
                 room.init_member_connections(&member, ctx);
                 if let Some(callback_url) = member.get_on_join() {
-                    room.send_callback(
+                    room.callbacks.send_callback(
                         callback_url,
                         member.get_fid().into(),
                         OnJoinEvent,
@@ -1173,13 +1158,6 @@ impl Handler<Close> for Room {
 
     fn handle(&mut self, _: Close, ctx: &mut Self::Context) -> Self::Result {
         for (id, member) in self.members.members() {
-            if let Some(on_leave) = member.get_on_leave() {
-                self.send_callback(
-                    on_leave,
-                    member.get_fid().into(),
-                    OnLeaveEvent::new(OnLeaveReason::RoomClose),
-                );
-            }
             self.delete_member(&id, ctx);
         }
         let drop_fut = self.members.drop_connections(ctx);
