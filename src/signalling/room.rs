@@ -904,7 +904,8 @@ impl Room {
         fid: StatefulFid,
         event: T,
     ) {
-        self.callbacks.get(&callback_url)
+        self.callbacks
+            .get(&callback_url)
             .do_send(Callback::new(fid, event.into()));
     }
 }
