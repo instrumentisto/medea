@@ -13,7 +13,7 @@ pub mod turn;
 use std::sync::Arc;
 
 use crate::{
-    api::control::callback::callback_repo::CallbackRepository, conf::Conf,
+    api::control::callback::repo::CallbackRepository, conf::Conf,
     turn::TurnAuthService,
 };
 

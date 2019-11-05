@@ -2,16 +2,18 @@
 
 use std::{
     collections::HashMap,
-    fmt::{Debug, Error, Formatter},
+    fmt::{self, Debug},
     sync::{Arc, Mutex},
 };
 
 use actix::{Actor as _, Recipient};
 
-use crate::api::control::callback::callback_url::CallbackUrl;
+use crate::api::control::{
+    callback::{url::CallbackUrl, CallbackEvent},
+    refs::StatefulFid,
+};
 
-use super::{grpc_callback_service::GrpcCallbackService, Callback};
-use crate::api::control::{callback::CallbackEvent, refs::StatefulFid};
+use super::{services::grpc::GrpcCallbackService, Callback};
 
 struct Inner(HashMap<CallbackUrl, Recipient<Callback>>);
 
@@ -20,20 +22,20 @@ impl Inner {
     ///
     /// Note that this function will overwrite service if it already presented
     /// in storage.
-    fn create_service(&mut self, url: &CallbackUrl) -> Recipient<Callback> {
-        let callback_service = match url {
+    fn create_service(&mut self, url: CallbackUrl) -> Recipient<Callback> {
+        let callback_service = match &url {
             CallbackUrl::Grpc(grpc_url) => {
                 let grpc_service = GrpcCallbackService::new(grpc_url).start();
                 grpc_service.recipient()
             }
         };
-        self.0.insert(url.clone(), callback_service.clone());
+        self.0.insert(url, callback_service.clone());
 
         callback_service
     }
 
-    fn get(&mut self, url: &CallbackUrl) -> Recipient<Callback> {
-        if let Some(callback_service) = self.0.get(url).clone() {
+    fn get(&mut self, url: CallbackUrl) -> Recipient<Callback> {
+        if let Some(callback_service) = self.0.get(&url) {
             callback_service.clone()
         } else {
             self.create_service(url)
@@ -42,7 +44,7 @@ impl Inner {
 }
 
 impl Debug for Inner {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         write!(f, "Inner {{ /* Cannot be printed */ }}")
     }
 }
@@ -63,7 +65,7 @@ impl CallbackRepository {
     ///
     /// If some service not presented in repository then new service
     /// automatically will be created.
-    fn get(&self, url: &CallbackUrl) -> Recipient<Callback> {
+    fn get(&self, url: CallbackUrl) -> Recipient<Callback> {
         self.0.lock().unwrap().get(url)
     }
 
@@ -79,8 +81,14 @@ impl CallbackRepository {
     ) {
         // TODO: Remove Result suppression ('.ok()') after buffering
         //       implementation.
-        self.get(&callback_url)
+        self.get(callback_url)
             .do_send(Callback::new(fid, event.into()))
             .ok();
+    }
+}
+
+impl Default for CallbackRepository {
+    fn default() -> Self {
+        Self::new()
     }
 }

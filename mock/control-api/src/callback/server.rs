@@ -21,6 +21,7 @@ type Callbacks = Arc<Mutex<Vec<Callback>>>;
 ///
 /// Also this [`Actor`] can return all received callbacks
 /// with [`GetCallbacks`] [`Message`].
+#[allow(clippy::module_name_repetitions)]
 pub struct GrpcCallbackServer {
     /// [`grpcio`] gRPC server.
     server: Server,

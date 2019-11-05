@@ -11,11 +11,13 @@ use futures::future::{Future as _, IntoFuture as _};
 use grpcio::{ChannelBuilder, EnvBuilder};
 use medea_control_api_proto::grpc::callback_grpc::CallbackClient;
 
-use crate::{api::control::callback::Callback, log::prelude::*};
-
-use super::callback_url::GrpcCallbackUrl;
+use crate::{
+    api::control::callback::{url::GrpcCallbackUrl, Callback},
+    log::prelude::*,
+};
 
 /// gRPC client for sending [`Callback`]s.
+#[allow(clippy::module_name_repetitions)]
 pub struct GrpcCallbackService {
     /// [`grpcio`] gRPC client for Control API callback.
     client: CallbackClient,

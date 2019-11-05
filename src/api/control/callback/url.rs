@@ -2,7 +2,6 @@
 use std::{convert::TryFrom, fmt};
 
 use derive_more::Display;
-use failure::_core::fmt::{Error, Formatter};
 use serde::{de::Visitor, Deserialize, Deserializer};
 use std::fmt::Display;
 use url::{ParseError, Url};
@@ -13,6 +12,7 @@ use url::{ParseError, Url};
 /// without anything else (protocol e.g.).
 ///
 /// In [`Display`] implementation protocol will be added to this address.
+#[allow(clippy::module_name_repetitions)]
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct GrpcCallbackUrl(String);
 
@@ -27,12 +27,13 @@ impl GrpcCallbackUrl {
 }
 
 impl Display for GrpcCallbackUrl {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         write!(f, "grpc://{}", self.0)
     }
 }
 
 /// All callback URLs which supported by Medea.
+#[allow(clippy::module_name_repetitions)]
 #[derive(Clone, derive_more::Display, Debug, Eq, PartialEq, Hash)]
 pub enum CallbackUrl {
     Grpc(GrpcCallbackUrl),
@@ -73,7 +74,7 @@ impl TryFrom<String> for CallbackUrl {
         };
 
         match url_scheme {
-            "grpc" => Ok(CallbackUrl::Grpc(GrpcCallbackUrl(host))),
+            "grpc" => Ok(Self::Grpc(GrpcCallbackUrl(host))),
             _ => Err(CallbackUrlParseError::UnsupportedScheme),
         }
     }

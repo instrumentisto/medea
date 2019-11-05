@@ -1,8 +1,8 @@
 //! Control API callbacks implementation.
 
-pub mod callback_repo;
-pub mod callback_url;
-pub mod grpc_callback_service;
+pub mod repo;
+pub mod services;
+pub mod url;
 
 use actix::Message;
 use chrono::{DateTime, Utc};
@@ -47,12 +47,8 @@ pub enum OnLeaveReason {
 impl Into<OnLeaveReasonProto> for OnLeaveReason {
     fn into(self) -> OnLeaveReasonProto {
         match self {
-            OnLeaveReason::LostConnection => {
-                OnLeaveReasonProto::LOST_CONNECTION
-            }
-            OnLeaveReason::ServerShutdown => {
-                OnLeaveReasonProto::SERVER_SHUTDOWN
-            }
+            Self::LostConnection => OnLeaveReasonProto::LOST_CONNECTION,
+            Self::ServerShutdown => OnLeaveReasonProto::SERVER_SHUTDOWN,
         }
     }
 }
@@ -67,6 +63,7 @@ impl Into<OnJoinProto> for OnJoinEvent {
 }
 
 /// All callbacks which can happen.
+#[allow(clippy::module_name_repetitions)]
 #[derive(From)]
 pub enum CallbackEvent {
     OnJoin(OnJoinEvent),
@@ -76,10 +73,10 @@ pub enum CallbackEvent {
 impl Into<RequestOneofEventProto> for CallbackEvent {
     fn into(self) -> RequestOneofEventProto {
         match self {
-            CallbackEvent::OnJoin(on_join) => {
+            Self::OnJoin(on_join) => {
                 RequestOneofEventProto::on_join(on_join.into())
             }
-            CallbackEvent::OnLeave(on_leave) => {
+            Self::OnLeave(on_leave) => {
                 RequestOneofEventProto::on_leave(on_leave.into())
             }
         }

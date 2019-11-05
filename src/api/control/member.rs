@@ -13,7 +13,7 @@ use rand::{distributions::Alphanumeric, Rng};
 use serde::Deserialize;
 
 use crate::api::control::{
-    callback::callback_url::CallbackUrl,
+    callback::url::CallbackUrl,
     endpoints::{
         webrtc_play_endpoint::WebRtcPlayEndpoint,
         webrtc_publish_endpoint::{WebRtcPublishEndpoint, WebRtcPublishId},

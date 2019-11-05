@@ -11,7 +11,7 @@ use medea_control_api_proto::grpc::api::Error as ErrorProto;
 
 use crate::{
     api::control::{
-        callback::callback_url::CallbackUrlParseError,
+        callback::url::CallbackUrlParseError,
         grpc::server::GrpcControlApiError,
         refs::{
             fid::ParseFidError, local_uri::LocalUriParseError,

@@ -25,8 +25,7 @@ use crate::{
         },
         control::{
             callback::{
-                callback_repo::CallbackRepository, callback_url::CallbackUrl,
-                Callback, CallbackEvent, OnJoinEvent, OnLeaveEvent,
+                repo::CallbackRepository, OnJoinEvent, OnLeaveEvent,
                 OnLeaveReason,
             },
             endpoints::{
@@ -1131,6 +1130,14 @@ impl Handler<RpcConnectionClosed> for Room {
         let member = self.members.get_member_by_id(&msg.member_id).unwrap();
 
         if let ClosedReason::Closed = msg.reason {
+            if let Some(callback_url) = member.get_on_leave() {
+                self.callbacks.send_callback(
+                    callback_url,
+                    member.get_fid().into(),
+                    OnLeaveEvent::new(OnLeaveReason::LostConnection),
+                );
+            }
+
             let removed_peers =
                 self.peers.remove_peers_related_to_member(&msg.member_id);
 
@@ -1157,8 +1164,8 @@ impl Handler<Close> for Room {
     type Result = ();
 
     fn handle(&mut self, _: Close, ctx: &mut Self::Context) -> Self::Result {
-        for (id, member) in self.members.members() {
-            self.delete_member(&id, ctx);
+        for id in self.members.members().keys() {
+            self.delete_member(id, ctx);
         }
         let drop_fut = self.members.drop_connections(ctx);
         ctx.wait(wrap_future(drop_fut));

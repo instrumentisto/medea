@@ -37,12 +37,8 @@ pub enum OnLeaveReason {
 impl From<OnLeaveReasonProto> for OnLeaveReason {
     fn from(proto: OnLeaveReasonProto) -> Self {
         match proto {
-            OnLeaveReasonProto::SERVER_SHUTDOWN => {
-                OnLeaveReason::ServerShutdown
-            }
-            OnLeaveReasonProto::LOST_CONNECTION => {
-                OnLeaveReason::LostConnection
-            }
+            OnLeaveReasonProto::SERVER_SHUTDOWN => Self::ServerShutdown,
+            OnLeaveReasonProto::LOST_CONNECTION => Self::LostConnection,
         }
     }
 }
@@ -58,6 +54,7 @@ impl From<OnJoinProto> for OnJoin {
 }
 
 /// All callbacks which can happen.
+#[allow(clippy::module_name_repetitions)]
 #[derive(Clone, Serialize)]
 #[serde(tag = "type")]
 pub enum CallbackEvent {

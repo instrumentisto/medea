@@ -124,6 +124,7 @@ macro_rules! gen_request_macro {
 
 /// [`actix_web`] REST API endpoint which returns all
 /// [`Callback`]s received by this mock server.
+#[allow(clippy::needless_pass_by_value)]
 pub fn get_callbacks(
     state: Data<Context>,
 ) -> impl Future<Item = HttpResponse, Error = ()> {

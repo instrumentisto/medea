@@ -47,8 +47,12 @@ impl Member {
         }
         proto.set_id(id);
         proto.set_pipeline(members_elements);
-        self.on_leave.map(|on_leave| proto.set_on_leave(on_leave));
-        self.on_join.map(|on_join| proto.set_on_join(on_join));
+        if let Some(on_leave) = self.on_leave {
+            proto.set_on_leave(on_leave);
+        }
+        if let Some(on_join) = self.on_join {
+            proto.set_on_join(on_join);
+        }
 
         if let Some(credentials) = self.credentials {
             proto.set_credentials(credentials);

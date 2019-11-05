@@ -12,7 +12,7 @@ use medea_control_api_proto::grpc::api::{
 use serde::Deserialize;
 
 use crate::api::control::{
-    callback::callback_url::CallbackUrl, EndpointId, TryFromProtobufError,
+    callback::url::CallbackUrl, EndpointId, TryFromProtobufError,
 };
 
 use super::{

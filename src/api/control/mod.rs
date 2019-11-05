@@ -20,7 +20,7 @@ use futures::Future;
 use serde::Deserialize;
 
 use crate::{
-    api::control::callback::callback_url::CallbackUrlParseError,
+    api::control::callback::url::CallbackUrlParseError,
     log::prelude::*,
     signalling::room_service::{
         RoomService, RoomServiceError, StartStaticRooms,
