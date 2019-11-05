@@ -53,7 +53,7 @@ impl RoomHandle {
 
     /// Sets `on_local_stream` callback, which will be invoked once media
     /// acquisition request will resolve successfully. Only invoked if media
-    /// request was initiated by rpc server. wtf
+    /// request was initiated by rpc server.
     pub fn on_local_stream(&self, f: js_sys::Function) -> Result<(), JsValue> {
         map_weak!(self, |inner| inner.borrow_mut().on_local_stream.set_func(f))
     }
