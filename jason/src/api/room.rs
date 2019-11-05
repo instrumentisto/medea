@@ -19,7 +19,10 @@ use wasm_bindgen_futures::{future_to_promise, spawn_local};
 use web_sys::MediaStream as SysMediaStream;
 
 use crate::{
-    peer::{MediaStream, PeerEvent, PeerEventHandler, PeerRepository},
+    peer::{
+        MediaStream, MediaStreamHandle, PeerEvent, PeerEventHandler,
+        PeerRepository,
+    },
     rpc::RpcClient,
     utils::Callback,
 };
@@ -213,7 +216,7 @@ struct InnerRoom {
     /// [1]: https://www.w3.org/TR/mediacapture-streams/#mediastream
     // TODO: will be extended with some metadata that would allow client to
     //       understand purpose of obtaining this stream.
-    on_local_stream: Callback<SysMediaStream>,
+    on_local_stream: Callback<MediaStreamHandle>,
 
     /// Callback to be invoked when failed obtain [`MediaStream`] from
     /// [`MediaManager`] or failed inject stream into [`PeerConnection`].
@@ -466,14 +469,14 @@ impl PeerEventHandler for InnerRoom {
         remote_stream: MediaStream,
     ) {
         match self.connections.get(&sender_id) {
-            Some(conn) => conn.on_remote_stream(remote_stream.stream()),
+            Some(conn) => conn.on_remote_stream(remote_stream.new_handle()),
             None => error!("NewRemoteStream from sender without connection"),
         }
     }
 
     /// Invoke `on_local_stream` [`Room`]'s callback.
     fn on_new_local_stream(&mut self, _: PeerId, stream: MediaStream) {
-        self.on_local_stream.call(stream.stream());
+        self.on_local_stream.call(stream.new_handle());
     }
 }
 

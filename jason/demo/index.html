@@ -186,7 +186,7 @@
         connection.on_remote_stream(async (stream) => {
           let videoDiv = document.getElementsByClassName("remote-videos")[0];
           let video = document.createElement("video");
-          video.srcObject = stream;
+          video.srcObject = stream.get_media_stream();
           let innerVideoDiv = document.createElement("div");
           innerVideoDiv.className = "video";
           innerVideoDiv.appendChild(video);

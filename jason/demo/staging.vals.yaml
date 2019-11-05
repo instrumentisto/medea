@@ -19,6 +19,7 @@ server:
 
   control-mock:
     image:
+      tag: edge
       pullPolicy: Always
 
   coturn:

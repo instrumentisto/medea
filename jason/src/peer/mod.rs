@@ -33,7 +33,7 @@ pub use self::{
         TransceiverKind,
     },
     media::MediaConnections,
-    stream::MediaStream,
+    stream::{MediaStream, MediaStreamHandle},
     stream_request::{Error, SimpleStreamRequest, StreamRequest},
     track::MediaTrack,
 };

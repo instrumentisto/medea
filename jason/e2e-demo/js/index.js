@@ -297,7 +297,7 @@ window.onload = async function() {
       connection.on_remote_stream( async (stream) => {
         let videoDiv = document.getElementsByClassName("remote-videos")[0];
         let video = document.createElement("video");
-        video.srcObject = stream;
+        video.srcObject = stream.get_media_stream();
         let innerVideoDiv = document.createElement("div");
         innerVideoDiv.className = "video";
         innerVideoDiv.appendChild(video);
@@ -343,8 +343,6 @@ window.onload = async function() {
 
     let bindJoinButtons = function(roomId) {
       joinCallerButton.onclick = async function() {
-        let connectBtnsDiv = document.getElementsByClassName("connect")[0];
-        contentVisibility.hide(connectBtnsDiv);
         contentVisibility.show(controlBtns);
 
         let username = usernameInput.value;
