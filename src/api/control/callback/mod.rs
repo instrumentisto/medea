@@ -1,3 +1,5 @@
+//! Control API callbacks implementation.
+
 pub mod callback_repo;
 pub mod callback_url;
 pub mod grpc_callback_service;
@@ -13,7 +15,9 @@ use medea_control_api_proto::grpc::callback::{
 
 use crate::api::control::refs::StatefulFid;
 
+/// Event for `on_leave` `Member` callback.
 pub struct OnLeaveEvent {
+    /// Reason of why `Member` was lost.
     reason: OnLeaveReason,
 }
 
@@ -31,8 +35,12 @@ impl Into<OnLeaveProto> for OnLeaveEvent {
     }
 }
 
+/// Reason of why `Member` was lost.
 pub enum OnLeaveReason {
+    /// Server is shutting down.
     ServerShutdown,
+
+    /// Connection with `Member` was lost.
     LostConnection,
 }
 
@@ -50,6 +58,7 @@ impl Into<OnLeaveReasonProto> for OnLeaveReason {
     }
 }
 
+/// `on_join` `Member` callback for Control API.
 pub struct OnJoinEvent;
 
 impl Into<OnJoinProto> for OnJoinEvent {
@@ -58,6 +67,7 @@ impl Into<OnJoinProto> for OnJoinEvent {
     }
 }
 
+/// All callbacks which can happen.
 #[derive(From)]
 pub enum CallbackEvent {
     OnJoin(OnJoinEvent),
@@ -77,6 +87,10 @@ impl Into<RequestOneofEventProto> for CallbackEvent {
     }
 }
 
+/// Control API callback.
+///
+/// This struct is used as [`Message`] for sending callback in all callback
+/// services.
 #[derive(Message)]
 #[rtype(result = "Result<(), ()>")]
 pub struct Callback {
@@ -86,6 +100,7 @@ pub struct Callback {
 }
 
 impl Callback {
+    /// Returns [`Callback`] with provided fields and current time as `at`.
     pub fn new(element: StatefulFid, event: CallbackEvent) -> Self {
         Self {
             element,

@@ -1,3 +1,4 @@
+/// URLs for callbacks implementation.
 use std::{convert::TryFrom, fmt};
 
 use derive_more::Display;
@@ -6,10 +7,19 @@ use serde::{de::Visitor, Deserialize, Deserializer};
 use std::fmt::Display;
 use url::{ParseError, Url};
 
+/// Callback URL for gRPC service.
+///
+/// Note that this newtype stores only host and port of gRPC callback service
+/// without anything else (protocol e.g.).
+///
+/// In [`Display`] implementation protocol will be added to this address.
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct GrpcCallbackUrl(String);
 
 impl GrpcCallbackUrl {
+    /// Returns address for gRPC callback service.
+    ///
+    /// If you wish to get address with protocol - use [`Display`] implementation.
     pub fn addr(&self) -> &str {
         &self.0
     }
@@ -21,11 +31,13 @@ impl Display for GrpcCallbackUrl {
     }
 }
 
+/// All callback URLs which supported by Medea.
 #[derive(Clone, derive_more::Display, Debug, Eq, PartialEq, Hash)]
 pub enum CallbackUrl {
     Grpc(GrpcCallbackUrl),
 }
 
+/// Error which can happen while callback URL parsing.
 #[derive(Debug, Display)]
 pub enum CallbackUrlParseError {
     #[display(fmt = "{:?}", _0)]

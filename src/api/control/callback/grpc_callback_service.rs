@@ -1,3 +1,5 @@
+//! Implementation of gRPC client for sending [`Callback`]s.
+
 use std::{
     fmt,
     fmt::{Error, Formatter},
@@ -13,7 +15,9 @@ use crate::{api::control::callback::Callback, log::prelude::*};
 
 use super::callback_url::GrpcCallbackUrl;
 
+/// gRPC client for sending [`Callback`]s.
 pub struct GrpcCallbackService {
+    /// [`grpcio`] gRPC client for Control API callback.
     client: CallbackClient,
 }
 
@@ -27,6 +31,10 @@ impl fmt::Debug for GrpcCallbackService {
 }
 
 impl GrpcCallbackService {
+    /// Returns gRPC client for provided [`GrpcCallbackUrl`].
+    ///
+    /// Note that this function doesn't check availability of gRPC server on provided
+    /// [`GrpcCallbackUrl`].
     pub fn new(addr: &GrpcCallbackUrl) -> Self {
         let env = Arc::new(EnvBuilder::new().build());
         let ch = ChannelBuilder::new(env).connect(addr.addr());
