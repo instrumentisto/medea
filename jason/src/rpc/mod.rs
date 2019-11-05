@@ -5,7 +5,7 @@ mod websocket;
 
 use std::{cell::RefCell, rc::Rc, vec};
 
-use anyhow::Error;
+use failure::Error;
 use futures::{channel::mpsc, future::LocalBoxFuture, stream::LocalBoxStream};
 use js_sys::Date;
 use medea_client_api_proto::{ClientMsg, Command, Event, ServerMsg};

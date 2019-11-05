@@ -1,6 +1,6 @@
 use std::{collections::HashMap, rc::Rc};
 
-use anyhow::Error;
+use failure::Error;
 use futures::channel::mpsc;
 use medea_client_api_proto::{IceServer, PeerId};
 use tracerr::Traced;

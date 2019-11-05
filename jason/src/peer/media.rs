@@ -2,9 +2,9 @@
 
 use std::{borrow::ToOwned, cell::RefCell, collections::HashMap, rc::Rc};
 
+use failure::Fail;
 use futures::future;
 use medea_client_api_proto::{Direction, PeerId, Track, TrackId};
-use thiserror::*;
 use tracerr::Traced;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
@@ -21,19 +21,19 @@ use super::{
 };
 
 /// Describes errors that may occur in [`MediaConnections`] storage.
-#[derive(Error, Debug)]
+#[derive(Debug, Fail)]
 pub enum Error {
-    #[error("failed insert track to sender {0}")]
+    #[fail(display = "failed insert track to sender {}", 0)]
     InsertTrack(WasmErr),
-    #[error("unable to find transceiver with provided mid {0}")]
+    #[fail(display = "unable to find transceiver with provided mid {}", 0)]
     NotFoundTransceiver(String),
-    #[error("peer has senders without mid")]
+    #[fail(display = "peer has senders without mid")]
     SendersWithoutMid,
-    #[error("peer has receivers without mid")]
+    #[fail(display = "peer has receivers without mid")]
     ReceiversWithoutMid,
-    #[error("provided stream does not have all necessary tracks")]
+    #[fail(display = "provided stream does not have all necessary tracks")]
     InvalidMediaStream,
-    #[error("provided track does not satisfy senders constraints")]
+    #[fail(display = "provided track does not satisfy senders constraints")]
     InvalidMediaTrack,
 }
 

@@ -12,7 +12,7 @@ mod track;
 
 use std::{cell::RefCell, collections::HashMap, convert::TryFrom, rc::Rc};
 
-use anyhow::Error;
+use failure::Error;
 use futures::{channel::mpsc, future};
 use medea_client_api_proto::{
     Direction, IceServer, PeerId as Id, Track, TrackId,
@@ -23,7 +23,7 @@ use web_sys::{MediaStream as SysMediaStream, RtcTrackEvent};
 
 use crate::media::MediaManager;
 
-type Result<T, E = Error> = std::result::Result<T, Traced<E>>;
+type Result<T, E = Traced<Error>> = std::result::Result<T, E>;
 
 #[cfg(feature = "mockable")]
 #[doc(inline)]
@@ -303,7 +303,7 @@ impl PeerConnection {
             let (stream, is_new_stream) = if let Some(stream) = local_stream {
                 (
                     caps.parse_stream(stream)
-                        .map_err(tracerr::from_and_wrap!())?,
+                        .map_err(tracerr::map_from_and_wrap!())?,
                     false,
                 )
             } else {
@@ -314,7 +314,7 @@ impl PeerConnection {
                     .map_err(tracerr::map_from_and_wrap!())?;
                 (
                     caps.parse_stream(&stream)
-                        .map_err(tracerr::from_and_wrap!())?,
+                        .map_err(tracerr::map_from_and_wrap!())?,
                     is_new,
                 )
             };

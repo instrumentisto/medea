@@ -2,7 +2,7 @@
 
 use std::{convert::TryFrom, rc::Rc};
 
-use anyhow::Result;
+use failure::Fail;
 use medea_client_api_proto::TrackId;
 use medea_jason::{
     media::MediaManager,
@@ -11,11 +11,14 @@ use medea_jason::{
         TransceiverDirection, TransceiverKind,
     },
 };
+use tracerr::Traced;
 use wasm_bindgen_test::*;
 
 use crate::get_test_tracks;
 
 wasm_bindgen_test_configure!(run_in_browser);
+
+type Result<T, E = Box<dyn Fail>> = std::result::Result<T, E>;
 
 async fn get_test_media_connections(
     enabled_audio: bool,

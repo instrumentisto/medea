@@ -11,6 +11,8 @@ use medea_jason::{
 };
 
 use crate::MockNavigator;
+use medea_jason::utils::JasonError;
+use wasm_bindgen::{JsCast, JsValue};
 
 wasm_bindgen_test_configure!(run_in_browser);
 

@@ -1,7 +1,8 @@
 use std::{cell::RefCell, rc::Rc};
 
+use derive_more::From;
+use failure::Fail;
 use medea_client_api_proto::ClientMsg;
-use thiserror::Error;
 use tracerr::Traced;
 use wasm_bindgen::{prelude::*, JsCast};
 
@@ -11,17 +12,17 @@ use crate::{
 };
 
 /// Describes errors that may occur into [`Heartbeat`].
-#[derive(Error, Debug)]
+#[derive(Debug, Fail, From)]
 pub enum Error {
-    #[error("unable to ping: no socket")]
+    #[fail(display = "unable to ping: no socket")]
     NoSocket,
-    #[error("cannot set callback for ping send: {0}")]
-    SetIntervalHandler(#[from] WasmErr),
-    #[error("failed send ping: {0}")]
-    SendPing(#[from] SocketError),
+    #[fail(display = "cannot set callback for ping send: {}", 0)]
+    SetIntervalHandler(#[fail(cause)] WasmErr),
+    #[fail(display = "failed send ping: {}", 0)]
+    SendPing(#[fail(cause)] SocketError),
 }
 
-type Result<T, E = Error> = std::result::Result<T, Traced<E>>;
+type Result<T, E = Traced<Error>> = std::result::Result<T, E>;
 
 /// Responsible for sending/handling keep-alive requests, detecting connection
 /// loss.

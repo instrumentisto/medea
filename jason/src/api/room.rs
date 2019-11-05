@@ -7,7 +7,7 @@ use std::{
     rc::{Rc, Weak},
 };
 
-use anyhow::Error;
+use failure::Error;
 use futures::{channel::mpsc, future, stream, FutureExt as _, StreamExt as _};
 use js_sys::Promise;
 use medea_client_api_proto::{

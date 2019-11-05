@@ -1,9 +1,16 @@
 use std::borrow::Cow;
+// use std::fmt::{Debug, Display};
 
-use anyhow::Error;
-use thiserror::*;
+use failure::{AsFail, Error, Fail};
 use tracerr::{Trace, Traced};
 use wasm_bindgen::{prelude::*, JsCast};
+
+// pub trait AppError: Display + Debug + Send + Sync + 'static {
+//
+// fn name(&self) -> &str;
+//
+// fn js_cause(&self) -> Option<&WasmErr>
+// }
 
 // Wrapper for JS value which returned from JS side as error.
 // #[derive(Error, Debug)]
@@ -34,8 +41,8 @@ use wasm_bindgen::{prelude::*, JsCast};
 // }
 // }
 
-#[derive(Error, Debug)]
-#[error("{name}: {message}")]
+#[derive(Debug, Fail)]
+#[fail(display = "{}: {}", name, message)]
 pub struct WasmErr {
     name: Cow<'static, str>,
     message: Cow<'static, str>,
@@ -62,11 +69,11 @@ impl From<JsValue> for WasmErr {
     }
 }
 
-impl From<&WasmErr> for JsValue {
+impl From<&WasmErr> for js_sys::Error {
     fn from(err: &WasmErr) -> Self {
-        let error = js_sys::Error::new(&err.message);
+        let error = Self::new(&err.message);
         error.set_name(&err.name);
-        error.into()
+        error
     }
 }
 
@@ -75,7 +82,7 @@ pub struct JasonError {
     name: &'static str,
     message: String,
     trace: Trace,
-    source: Option<WasmErr>,
+    source: Option<js_sys::Error>,
 }
 
 #[wasm_bindgen]
@@ -99,18 +106,18 @@ impl JasonError {
     }
 }
 
-impl From<Traced<Error>> for JasonError {
-    fn from(error: Traced<Error>) -> Self {
+impl<E: Fail> From<Traced<E>> for JasonError {
+    fn from(error: Traced<E>) -> Self {
         let (err, trace) = error.unwrap();
         let message = err.to_string();
-        match err.downcast::<WasmErr>() {
-            Ok(e) => Self {
+        match err.as_fail().find_root_cause().downcast_ref::<WasmErr>() {
+            Some(e) => Self {
                 name: "Js error",
                 message,
                 trace,
-                source: Some(e),
+                source: Some(e.into()),
             },
-            Err(_) => Self {
+            None => Self {
                 name: "Internal error",
                 message,
                 trace,
