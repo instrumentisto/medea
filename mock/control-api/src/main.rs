@@ -33,12 +33,32 @@ fn main() {
                 .long("medea-addr")
                 .short("m"),
         )
+        .arg(
+            Arg::with_name("callback_port")
+                .help(
+                    "Port on which gRPC Control API callback service will \
+                     listen.",
+                )
+                .default_value("9099")
+                .long("callback-port")
+                .short("p"),
+        )
+        .arg(
+            Arg::with_name("callback_host")
+                .help(
+                    "Address on which gRPC Control API callback service will \
+                     be hosted.",
+                )
+                .default_value("0.0.0.0")
+                .long("callback-host")
+                .short("c"),
+        )
         .get_matches();
 
     let _log_guard = init_logger();
 
     let sys = actix::System::new("control-api-mock");
-    let callback_server = callback::server::run();
+    let callback_server = callback::server::run(&opts);
     server::run(&opts, callback_server);
     sys.run().unwrap();
 }

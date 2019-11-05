@@ -13,6 +13,7 @@ use medea_control_api_proto::grpc::{
 };
 
 use super::Callback;
+use clap::ArgMatches;
 
 type Callbacks = Arc<Mutex<Vec<Callback>>>;
 
@@ -83,7 +84,9 @@ impl Handler<GetCallbacks> for GrpcCallbackServer {
 }
 
 /// Run [`GrpcCallbackServer`].
-pub fn run() -> Addr<GrpcCallbackServer> {
+pub fn run(args: &ArgMatches) -> Addr<GrpcCallbackServer> {
+    let host = args.value_of("callback_host").unwrap();
+    let port = args.value_of("callback_port").unwrap().parse().unwrap();
     let cq_count = 2;
 
     let events = Arc::new(Mutex::new(Vec::new()));
@@ -93,7 +96,7 @@ pub fn run() -> Addr<GrpcCallbackServer> {
 
     let server = ServerBuilder::new(env)
         .register_service(service)
-        .bind("127.0.0.1", 9099)
+        .bind(host, port)
         .build()
         .unwrap();
 
