@@ -5,6 +5,7 @@
 use std::sync::{Arc, Mutex};
 
 use actix::{Actor, Addr, Arbiter, Context, Handler, Message};
+use clap::ArgMatches;
 use futures::future::Future as _;
 use grpcio::{Environment, RpcContext, Server, ServerBuilder, UnarySink};
 use medea_control_api_proto::grpc::{
@@ -13,7 +14,6 @@ use medea_control_api_proto::grpc::{
 };
 
 use super::Callback;
-use clap::ArgMatches;
 
 type Callbacks = Arc<Mutex<Vec<Callback>>>;
 

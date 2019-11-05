@@ -1,4 +1,5 @@
-/// URLs for callbacks implementation.
+//! URLs for callbacks implementation.
+
 use std::{convert::TryFrom, fmt};
 
 use derive_more::Display;

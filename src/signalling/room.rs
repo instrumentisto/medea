@@ -1126,16 +1126,25 @@ impl Handler<RpcConnectionClosed> for Room {
 
         self.members
             .connection_closed(msg.member_id.clone(), &msg.reason, ctx);
-        // TODO: UNWRAP
-        let member = self.members.get_member_by_id(&msg.member_id).unwrap();
 
         if let ClosedReason::Closed = msg.reason {
-            if let Some(callback_url) = member.get_on_leave() {
-                self.callbacks.send_callback(
-                    callback_url,
-                    member.get_fid().into(),
-                    OnLeaveEvent::new(OnLeaveReason::LostConnection),
+            if let Some(member) = self.members.get_member_by_id(&msg.member_id)
+            {
+                if let Some(callback_url) = member.get_on_leave() {
+                    self.callbacks.send_callback(
+                        callback_url,
+                        member.get_fid().into(),
+                        OnLeaveEvent::new(OnLeaveReason::LostConnection),
+                    );
+                }
+            } else {
+                error!(
+                    "Member [id = {}] with ID from RpcConnectionClosed not \
+                     found.",
+                    msg.member_id,
                 );
+                let close_fut = self.close_gracefully(ctx);
+                ctx.spawn(close_fut);
             }
 
             let removed_peers =

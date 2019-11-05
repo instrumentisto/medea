@@ -121,12 +121,12 @@ impl MemberSpec {
         &self.credentials
     }
 
-    /// Returns reference to `OnJoin` [`CallbackUrl`].
+    /// Returns reference to `on_join` [`CallbackUrl`].
     pub fn on_join(&self) -> &Option<CallbackUrl> {
         &self.on_join
     }
 
-    /// Returns reference to `OnLeave` [`CallbackUrl`].
+    /// Returns reference to `on_leave` [`CallbackUrl`].
     pub fn on_leave(&self) -> &Option<CallbackUrl> {
         &self.on_leave
     }
