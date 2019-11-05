@@ -419,4 +419,8 @@ impl ParticipantService {
     pub fn insert_member(&mut self, id: MemberId, member: Member) {
         self.members.insert(id, member);
     }
+
+    pub fn iter_members(&self) -> impl Iterator<Item = (&MemberId, &Member)> {
+        self.members.iter()
+    }
 }

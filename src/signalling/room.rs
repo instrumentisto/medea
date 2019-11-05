@@ -540,6 +540,16 @@ impl Room {
         info!("Closing Room [id = {}]", self.id);
         self.state = State::Stopping;
 
+        for (_, member) in self.members.iter_members() {
+            if let Some(on_leave) = member.get_on_leave() {
+                self.send_callback(
+                    on_leave,
+                    member.get_fid().into(),
+                    OnLeaveEvent::new(OnLeaveReason::ServerShutdown),
+                );
+            }
+        }
+
         Box::new(
             self.members
                 .drop_connections(ctx)
@@ -884,7 +894,7 @@ impl Room {
     }
 
     pub fn send_callback<T: Into<CallbackEvent>>(
-        &mut self,
+        &self,
         callback_url: CallbackUrl,
         fid: StatefulFid,
         event: T,
@@ -1169,8 +1179,15 @@ impl Handler<Close> for Room {
     type Result = ();
 
     fn handle(&mut self, _: Close, ctx: &mut Self::Context) -> Self::Result {
-        for id in self.members.members().keys() {
-            self.delete_member(id, ctx);
+        for (id, member) in self.members.members() {
+            if let Some(on_leave) = member.get_on_leave() {
+                self.send_callback(
+                    on_leave,
+                    member.get_fid().into(),
+                    OnLeaveEvent::new(OnLeaveReason::RoomClose),
+                );
+            }
+            self.delete_member(&id, ctx);
         }
         let drop_fut = self.members.drop_connections(ctx);
         ctx.wait(wrap_future(drop_fut));

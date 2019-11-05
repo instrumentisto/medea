@@ -234,7 +234,7 @@ const controlDebugWindows = {
       for (item of res) {
         let row = document.createElement('tr');
         let event = document.createElement('th');
-        event.innerHTML = item.event.type;
+        event.innerHTML = JSON.stringify(item.event);
         row.appendChild(event);
         let time = document.createElement('th');
         time.innerHTML = item.at;

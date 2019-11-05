@@ -24,6 +24,7 @@ impl From<OnLeaveProto> for OnLeave {
 pub enum OnLeaveReason {
     ServerShutdown,
     LostConnection,
+    RoomClose,
 }
 
 impl From<OnLeaveReasonProto> for OnLeaveReason {
@@ -35,6 +36,7 @@ impl From<OnLeaveReasonProto> for OnLeaveReason {
             OnLeaveReasonProto::LOST_CONNECTION => {
                 OnLeaveReason::LostConnection
             }
+            OnLeaveReasonProto::ROOM_CLOSE => OnLeaveReason::RoomClose,
         }
     }
 }
