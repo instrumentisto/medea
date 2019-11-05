@@ -74,14 +74,24 @@ impl RoomHandle {
     /// `token` for connection with media server.
     ///
     /// Establishes connection with media server (if it doesn't already exist).
-    /// Fails if unable to connect to media server.
-    /// Effectively returns `Result<(), WasmErr>`.
-
-    // TODO: https://github.com/instrumentisto/medea/issues/45#issuecomment-519976830
-    //       fails if on_failed_local_stream callback is not set
+    /// Fails if:
+    ///   - `on_failed_local_stream` callback is not set
+    ///   - unable to connect to media server.
+    /// Effectively returns `Result<(), js_sys::Error>`.
     pub fn join(&self, token: String) -> Promise {
-        match map_weak!(self, |inner| Rc::clone(&inner.borrow().rpc)) {
-            Ok(rpc) => {
+        match map_weak!(self, |inner| (
+            Rc::clone(&inner.borrow().rpc),
+            inner.borrow().on_failed_local_stream.is_set()
+        )) {
+            Ok((rpc, failed_callback_is_set)) => {
+                if !failed_callback_is_set {
+                    return future_to_promise(future::err(
+                        js_sys::Error::new(
+                            "`on_failed_local_stream` callback is not set",
+                        )
+                        .into(),
+                    ));
+                }
                 future_to_promise(async move {
                     rpc.connect(token).await.map(|_| JsValue::NULL).map_err(
                         |err| js_sys::Error::new(&format!("{}", err)).into(),

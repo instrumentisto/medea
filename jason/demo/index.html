@@ -230,20 +230,24 @@
           connectBtnsDiv.style.display = 'none';
           controlBtns.style.display = 'block';
 
-          let username = usernameInput.value;
           try {
-            await axios.get(controlUrl + roomId);
-          } catch (e) {
-            if (e.response.status === 400) {
-              console.log("Room not found. Creating new room...");
-              room.join(await createRoom(roomId, username));
+            let username = usernameInput.value;
+            try {
+              await axios.get(controlUrl + roomId);
+            } catch (e) {
+              if (e.response.status === 400) {
+                console.log("Room not found. Creating new room...");
+                room.join(await createRoom(roomId, username));
+              }
             }
-          }
-          try {
-            await axios.get(controlUrl + roomId + '/' + username);
+            try {
+              await axios.get(controlUrl + roomId + '/' + username);
+            } catch (e) {
+              console.log("Member not found. Creating new member...");
+              room.join(await addNewMember(roomId, username));
+            }
           } catch (e) {
-            console.log("Member not found. Creating new member...");
-            room.join(await addNewMember(roomId, username));
+            console.error("Join to room failed: " + e);
           }
         };
       };

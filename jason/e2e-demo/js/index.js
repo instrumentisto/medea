@@ -270,7 +270,7 @@ window.onload = async function() {
       await fillMediaDevicesInputs(audioSelect, videoSelect, stream);
       room.inject_local_stream(stream);
     } catch (e) {
-      console.log("Init local video failed:" + e);
+      console.error("Init local video failed: " + e);
     }
 
     audioSelect.addEventListener('change', async () => {
@@ -279,7 +279,7 @@ window.onload = async function() {
         await updateLocalVideo(stream);
         room.inject_local_stream(stream);
       } catch (e) {
-        console.log("Changing audio source failed:" + e);
+        console.error("Changing audio source failed: " + e);
       }
     });
 
@@ -289,7 +289,7 @@ window.onload = async function() {
         await updateLocalVideo(stream);
         room.inject_local_stream(stream);
       } catch (e) {
-        console.log("Changing video source failed:" + e);
+        console.error("Changing video source failed: " + e);
       }
     });
 
@@ -345,24 +345,28 @@ window.onload = async function() {
       joinCallerButton.onclick = async function() {
         contentVisibility.show(controlBtns);
 
-        let username = usernameInput.value;
         try {
-          await axios.get(controlUrl + roomId);
-        } catch (e) {
-          if (e.response.status === 400) {
-            console.log("Room not found. Creating new room...");
-            room.join(await createRoom(roomId, username));
+          let username = usernameInput.value;
+          try {
+            await axios.get(controlUrl + roomId);
+          } catch (e) {
+            if (e.response.status === 400) {
+              console.log("Room not found. Creating new room...");
+              room.join(await createRoom(roomId, username));
+              return;
+            }
+          }
+          try {
+            await axios.get(controlUrl + roomId + '/' + username);
+          } catch (e) {
+            console.log("Member not found. Creating new member...");
+            room.join(await createMember(roomId, username));
             return;
           }
-        }
-        try {
-          await axios.get(controlUrl + roomId + '/' + username);
+          room.join(baseUrl + roomId + '/' + username + '/test')
         } catch (e) {
-          console.log("Member not found. Creating new member...");
-          room.join(await createMember(roomId, username));
-          return;
+          console.error("Join to room failed: " + e);
         }
-        room.join(baseUrl + roomId + '/' + username + '/test')
       };
     };
 

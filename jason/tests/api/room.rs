@@ -12,6 +12,7 @@ use medea_jason::{
     AudioTrackConstraints, MediaStreamConstraints,
 };
 use wasm_bindgen::prelude::*;
+use wasm_bindgen_futures::JsFuture;
 use wasm_bindgen_test::*;
 
 use crate::{get_test_tracks, resolve_after, MockNavigator};
@@ -283,4 +284,31 @@ async fn error_get_local_stream_on_new_peer() {
 
     wait.await.unwrap();
     mock_navigator.stop();
+}
+
+// Tests Room::join without set `on_failed_local_stream` callback.
+// Setup:
+//     1. Create Room.
+//     2. DO NOT set `on_failed_local_stream` callback.
+//     3. Try join to Room.
+// Assertions:
+//     1. Room::join returns error.
+#[wasm_bindgen_test]
+async fn error_join_room_without_failed_stream_callback() {
+    let (_, event_rx) = mpsc::unbounded();
+    let mut rpc = MockRpcClient::new();
+    rpc.expect_subscribe()
+        .return_once(move || Box::pin(event_rx));
+    rpc.expect_unsub().return_const(());
+    let repo = Box::new(MockPeerRepository::new());
+    let room = Room::new(Rc::new(rpc), repo);
+
+    let room_handle = room.new_handle();
+    match JsFuture::from(room_handle.join("token".to_string())).await {
+        Ok(_) => assert!(
+            false,
+            "Not allowed join if `on_failed_local_stream` callback is not set"
+        ),
+        Err(_) => assert!(true),
+    }
 }
