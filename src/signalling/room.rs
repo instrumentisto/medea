@@ -904,13 +904,8 @@ impl Room {
         fid: StatefulFid,
         event: T,
     ) {
-        match callback_url {
-            CallbackUrl::Grpc(grpc_callback_url) => {
-                let callback_service =
-                    self.callbacks.get_grpc(&grpc_callback_url);
-                callback_service.do_send(Callback::new(fid, event.into()));
-            }
-        }
+        self.callbacks.get(&callback_url)
+            .do_send(Callback::new(fid, event.into()));
     }
 }
 
