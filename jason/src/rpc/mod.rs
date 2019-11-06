@@ -5,6 +5,7 @@ mod websocket;
 
 use std::{cell::RefCell, rc::Rc, vec};
 
+use derive_more::Display;
 use futures::{
     channel::{mpsc, oneshot},
     future::LocalBoxFuture,
@@ -20,6 +21,17 @@ use web_sys::CloseEvent;
 use crate::utils::WasmErr;
 
 use self::{heartbeat::Heartbeat, websocket::WebSocket};
+
+#[derive(Clone, Display, Debug)]
+pub enum CloseByClientReason {
+    ReconnectionFailed,
+}
+
+#[derive(Clone, Display, Debug)]
+pub enum ClientAndServerCloseReason {
+    ByServer(CloseReason),
+    ByClient(CloseByClientReason),
+}
 
 /// Connection with remote was closed.
 #[derive(Debug)]
@@ -60,15 +72,23 @@ impl From<&CloseEvent> for CloseMsg {
 /// This struct will be provided into `on_close_by_server` JS side callback.
 #[wasm_bindgen]
 pub struct ClosedByServerReason {
+    is_closed_by_server: bool,
     reason: String,
 }
 
 impl ClosedByServerReason {
     /// Creates new [`ClosedByServerReason`] with provided [`CloseReason`]
     /// converted into [`String`].
-    pub fn new(reason: &CloseReason) -> Self {
-        Self {
-            reason: reason.to_string(),
+    pub fn new(reason: &ClientAndServerCloseReason) -> Self {
+        match reason {
+            ClientAndServerCloseReason::ByServer(reason) => Self {
+                reason: reason.to_string(),
+                is_closed_by_server: true,
+            },
+            ClientAndServerCloseReason::ByClient(reason) => Self {
+                reason: reason.to_string(),
+                is_closed_by_server: false,
+            },
         }
     }
 }
@@ -78,6 +98,11 @@ impl ClosedByServerReason {
     #[wasm_bindgen(getter)]
     pub fn reason(&self) -> String {
         self.reason.clone()
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn is_closed_by_server(&self) -> bool {
+        self.is_closed_by_server
     }
 }
 
@@ -108,7 +133,10 @@ pub trait RpcClient {
     /// [`Room`]: crate::api::room::Room
     fn on_close_by_server(
         &self,
-    ) -> LocalBoxFuture<'static, Result<CloseReason, oneshot::Canceled>>;
+    ) -> LocalBoxFuture<
+        'static,
+        Result<ClientAndServerCloseReason, oneshot::Canceled>,
+    >;
 }
 
 // TODO:
@@ -133,7 +161,8 @@ struct Inner {
     ///
     /// Note that [`CloseReason`] will not be sent if WebSocket closed with
     /// [`RpcConnectionCloseReason::NewConnection`] reason.
-    on_close_by_server_subscribers: Vec<oneshot::Sender<CloseReason>>,
+    on_close_by_server_subscribers:
+        Vec<oneshot::Sender<ClientAndServerCloseReason>>,
 }
 
 impl Inner {
@@ -170,7 +199,9 @@ fn on_close(inner_rc: &RefCell<Inner>, close_msg: &CloseMsg) {
             );
 
             for sub in on_close_by_server_subscribers {
-                if let Err(reason) = sub.send(reason.clone()) {
+                if let Err(reason) = sub
+                    .send(ClientAndServerCloseReason::ByServer(reason.clone()))
+                {
                     WasmErr::from(format!(
                         "Failed to send reason of Jason close to subscriber: \
                          {:?}",
@@ -279,7 +310,10 @@ impl RpcClient for WebsocketRpcClient {
     /// RPC connection closing initiated by server.
     fn on_close_by_server(
         &self,
-    ) -> LocalBoxFuture<'static, Result<CloseReason, oneshot::Canceled>> {
+    ) -> LocalBoxFuture<
+        'static,
+        Result<ClientAndServerCloseReason, oneshot::Canceled>,
+    > {
         let (tx, rx) = oneshot::channel();
         self.0.borrow_mut().on_close_by_server_subscribers.push(tx);
         Box::pin(rx)

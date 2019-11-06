@@ -19,7 +19,7 @@ use wasm_bindgen_futures::{future_to_promise, spawn_local};
 use crate::{
     media::MediaStream,
     peer::{PeerEvent, PeerEventHandler, PeerRepository},
-    rpc::{ClosedByServerReason, RpcClient},
+    rpc::{ClientAndServerCloseReason, ClosedByServerReason, RpcClient},
     utils::{Callback, Callback2, WasmErr},
 };
 
@@ -158,6 +158,10 @@ impl Room {
         Self(room)
     }
 
+    pub fn close(self, reason: ClientAndServerCloseReason) {
+        self.0.borrow_mut().close(reason);
+    }
+
     /// Creates new [`RoomHandle`] used by JS side. You can create them as many
     /// as you need.
     #[inline]
@@ -178,6 +182,7 @@ struct InnerRoom {
     enabled_audio: bool,
     enabled_video: bool,
     on_close_by_server: Rc<Callback<ClosedByServerReason>>,
+    close_reason: Option<ClientAndServerCloseReason>,
 }
 
 impl InnerRoom {
@@ -188,21 +193,7 @@ impl InnerRoom {
         peers: Box<dyn PeerRepository>,
         peer_event_sender: mpsc::UnboundedSender<PeerEvent>,
     ) -> Self {
-
-        // TODO: dont subscribe, invoke on_close in drop/close()
         let on_close_by_server = Rc::new(Callback::default());
-        let on_close_by_server_clone = Rc::clone(&on_close_by_server);
-        spawn_local(rpc.on_close_by_server().map(move |res| {
-            if let Ok(reason) = res {
-                if let Some(call_result) = on_close_by_server_clone
-                    .call(ClosedByServerReason::new(&reason))
-                {
-                    if let Err(err) = call_result {
-                        WasmErr::from(err).log_err();
-                    }
-                }
-            }
-        }));
 
         Self {
             rpc,
@@ -213,7 +204,12 @@ impl InnerRoom {
             enabled_audio: true,
             enabled_video: true,
             on_close_by_server,
+            close_reason: None,
         }
+    }
+
+    fn close(&mut self, reason: ClientAndServerCloseReason) {
+        self.close_reason = Some(reason);
     }
 
     /// Creates new [`Connection`]s basing on senders and receivers of provided
@@ -417,6 +413,16 @@ impl PeerEventHandler for InnerRoom {
 impl Drop for InnerRoom {
     /// Unsubscribes [`InnerRoom`] from all its subscriptions.
     fn drop(&mut self) {
+        if let Some(reason) = &self.close_reason {
+            if let Some(call_result) = self
+                .on_close_by_server
+                .call(ClosedByServerReason::new(&reason))
+            {
+                if let Err(err) = call_result {
+                    WasmErr::from(err).log_err();
+                }
+            }
+        }
         self.rpc.unsub();
     }
 }

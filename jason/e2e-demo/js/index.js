@@ -277,7 +277,7 @@ window.onload = async function() {
       room = newRoom();
       contentVisibility.show(connectBtnsDiv);
       contentVisibility.hide(controlBtns);
-      alert("Call was ended.\nReason: " + on_closed.reason);
+      alert(`Call was ended.\nReason: ${on_closed.reason}\nIs closed by server: ${on_closed.is_closed_by_server}`);
     });
   }
 

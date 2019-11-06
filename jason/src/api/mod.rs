@@ -3,7 +3,7 @@
 mod connection;
 mod room;
 
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, mem, rc::Rc};
 
 use futures::FutureExt;
 use wasm_bindgen::prelude::*;
@@ -50,12 +50,15 @@ impl Jason {
         )));
 
         let inner_clone = self.0.clone();
-        spawn_local(rpc.on_close_by_server().map(move |_| {
+        spawn_local(rpc.on_close_by_server().map(move |res| {
             // TODO: dont close all rooms when multiple rpc connections
             //       will be supported
-
-            // TODO: room.close(reason)
-            inner_clone.borrow_mut().rooms = Vec::new();
+            let mut rooms = Vec::new();
+            mem::swap(&mut inner_clone.borrow_mut().rooms, &mut rooms);
+            let reason = res.unwrap();
+            for room in rooms {
+                room.close(reason.clone());
+            }
             inner_clone.borrow_mut().media_manager = Rc::default();
         }));
 
