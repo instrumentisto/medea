@@ -22,6 +22,12 @@ message OnLeave {
 
     // Server is shutting down.
     SERVER_SHUTDOWN = 1;
+
+    // Member was normally disconnected.
+    DISCONNECTED = 2;
+
+    // Member was evicted from the Medea media server by Control API.
+    EVICTED = 3;
   }
 }
 

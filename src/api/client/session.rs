@@ -252,10 +252,13 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
                 }
             }
             ws::Message::Close(reason) => {
+                // TODO (evdokimovs): normal check close code
                 if !self.closed_by_server {
                     if let Err(err) = self.room.try_send(RpcConnectionClosed {
                         member_id: self.member_id.clone(),
-                        reason: ClosedReason::Closed,
+                        reason: ClosedReason::Closed {
+                            is_normally: true,
+                        },
                     }) {
                         error!(
                             "WsSession of member {} failed to remove from \

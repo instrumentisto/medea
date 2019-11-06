@@ -42,6 +42,10 @@ pub enum OnLeaveReason {
 
     /// Connection with `Member` was lost.
     LostConnection,
+
+    Evicted,
+
+    Disconnected,
 }
 
 impl Into<OnLeaveReasonProto> for OnLeaveReason {
@@ -49,6 +53,8 @@ impl Into<OnLeaveReasonProto> for OnLeaveReason {
         match self {
             Self::LostConnection => OnLeaveReasonProto::LOST_CONNECTION,
             Self::ServerShutdown => OnLeaveReasonProto::SERVER_SHUTDOWN,
+            Self::Disconnected => OnLeaveReasonProto::DISCONNECTED,
+            Self::Evicted => OnLeaveReasonProto::EVICTED,
         }
     }
 }

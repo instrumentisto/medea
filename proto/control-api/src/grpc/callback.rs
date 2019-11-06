@@ -314,6 +314,8 @@ impl ::protobuf::reflect::ProtobufValue for OnLeave {
 pub enum OnLeave_Reason {
     LOST_CONNECTION = 0,
     SERVER_SHUTDOWN = 1,
+    DISCONNECTED = 2,
+    EVICTED = 3,
 }
 
 impl ::protobuf::ProtobufEnum for OnLeave_Reason {
@@ -325,6 +327,8 @@ impl ::protobuf::ProtobufEnum for OnLeave_Reason {
         match value {
             0 => ::std::option::Option::Some(OnLeave_Reason::LOST_CONNECTION),
             1 => ::std::option::Option::Some(OnLeave_Reason::SERVER_SHUTDOWN),
+            2 => ::std::option::Option::Some(OnLeave_Reason::DISCONNECTED),
+            3 => ::std::option::Option::Some(OnLeave_Reason::EVICTED),
             _ => ::std::option::Option::None
         }
     }
@@ -333,6 +337,8 @@ impl ::protobuf::ProtobufEnum for OnLeave_Reason {
         static values: &'static [OnLeave_Reason] = &[
             OnLeave_Reason::LOST_CONNECTION,
             OnLeave_Reason::SERVER_SHUTDOWN,
+            OnLeave_Reason::DISCONNECTED,
+            OnLeave_Reason::EVICTED,
         ];
         values
     }
@@ -744,9 +750,10 @@ impl ::protobuf::reflect::ProtobufValue for Request {
 
 static file_descriptor_proto_data: &'static [u8] = b"\
     \n\x0ecallback.proto\x12\x0emedea_callback\x1a\x1bgoogle/protobuf/empty.\
-    proto\"\x08\n\x06OnJoin\"u\n\x07OnLeave\x126\n\x06reason\x18\x01\x20\x01\
-    (\x0e2\x1e.medea_callback.OnLeave.ReasonR\x06reason\"2\n\x06Reason\x12\
-    \x13\n\x0fLOST_CONNECTION\x10\0\x12\x13\n\x0fSERVER_SHUTDOWN\x10\x01\"\
+    proto\"\x08\n\x06OnJoin\"\x94\x01\n\x07OnLeave\x126\n\x06reason\x18\x01\
+    \x20\x01(\x0e2\x1e.medea_callback.OnLeave.ReasonR\x06reason\"Q\n\x06Reas\
+    on\x12\x13\n\x0fLOST_CONNECTION\x10\0\x12\x13\n\x0fSERVER_SHUTDOWN\x10\
+    \x01\x12\x10\n\x0cDISCONNECTED\x10\x02\x12\x0b\n\x07EVICTED\x10\x03\"\
     \xa5\x01\n\x07Request\x12\x18\n\x07element\x18\x01\x20\x01(\tR\x07elemen\
     t\x12\x0e\n\x02at\x18\x02\x20\x01(\tR\x02at\x121\n\x07on_join\x18\x03\
     \x20\x01(\x0b2\x16.medea_callback.OnJoinH\0R\x06onJoin\x124\n\x08on_leav\

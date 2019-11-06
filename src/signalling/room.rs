@@ -654,11 +654,10 @@ impl Room {
             // `Member` `Peer`s.
             self.remove_peers(&member.id(), peers, ctx);
             if let Some(callback_url) = member.get_on_leave() {
-                // TODO: Maybe don't send callback on member delete??
                 self.callbacks.send_callback(
                     callback_url,
                     member.get_fid().into(),
-                    OnLeaveEvent::new(OnLeaveReason::LostConnection),
+                    OnLeaveEvent::new(OnLeaveReason::Evicted),
                 );
             }
 
@@ -1127,14 +1126,19 @@ impl Handler<RpcConnectionClosed> for Room {
         self.members
             .connection_closed(msg.member_id.clone(), &msg.reason, ctx);
 
-        if let ClosedReason::Closed = msg.reason {
+        if let ClosedReason::Closed { is_normally } = msg.reason {
             if let Some(member) = self.members.get_member_by_id(&msg.member_id)
             {
                 if let Some(callback_url) = member.get_on_leave() {
+                    let reason = if is_normally {
+                        OnLeaveReason::Disconnected
+                    } else {
+                        OnLeaveReason::LostConnection
+                    };
                     self.callbacks.send_callback(
                         callback_url,
                         member.get_fid().into(),
-                        OnLeaveEvent::new(OnLeaveReason::LostConnection),
+                        OnLeaveEvent::new(reason),
                     );
                 }
             } else {

@@ -290,7 +290,7 @@ impl ParticipantService {
     ) {
         let closed_at = Instant::now();
         match reason {
-            ClosedReason::Closed => {
+            ClosedReason::Closed { is_normally: _ } => {
                 debug!("Connection for member [id = {}] removed.", member_id);
                 self.connections.remove(&member_id);
                 ctx.spawn(wrap_future(
@@ -319,7 +319,9 @@ impl ParticipantService {
                             );
                             ctx.notify(RpcConnectionClosed {
                                 member_id,
-                                reason: ClosedReason::Closed,
+                                reason: ClosedReason::Closed {
+                                    is_normally: false,
+                                },
                             })
                         },
                     ),
