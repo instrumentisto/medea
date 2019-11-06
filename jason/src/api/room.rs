@@ -48,14 +48,13 @@ impl RoomHandle {
     }
 
     /// Sets callback, which will be invoked on Jason close by server.
-    // TODO: on_close_by_server => on_close
-    pub fn on_close_by_server(
+    pub fn on_close(
         &mut self,
         f: js_sys::Function,
     ) -> Result<(), JsValue> {
         map_weak!(self, |inner| inner
             .borrow_mut()
-            .on_close_by_server
+            .on_close
             .set_func(f))
     }
 
@@ -181,7 +180,7 @@ struct InnerRoom {
     on_new_connection: Rc<Callback2<ConnectionHandle, WasmErr>>,
     enabled_audio: bool,
     enabled_video: bool,
-    on_close_by_server: Rc<Callback<ClosedByServerReason>>,
+    on_close: Rc<Callback<ClosedByServerReason>>,
     close_reason: Option<ClientAndServerCloseReason>,
 }
 
@@ -193,8 +192,6 @@ impl InnerRoom {
         peers: Box<dyn PeerRepository>,
         peer_event_sender: mpsc::UnboundedSender<PeerEvent>,
     ) -> Self {
-        let on_close_by_server = Rc::new(Callback::default());
-
         Self {
             rpc,
             peers,
@@ -203,7 +200,7 @@ impl InnerRoom {
             on_new_connection: Rc::new(Callback2::default()),
             enabled_audio: true,
             enabled_video: true,
-            on_close_by_server,
+            on_close: Rc::new(Callback::default()),
             close_reason: None,
         }
     }
@@ -415,7 +412,7 @@ impl Drop for InnerRoom {
     fn drop(&mut self) {
         if let Some(reason) = &self.close_reason {
             if let Some(call_result) = self
-                .on_close_by_server
+                .on_close
                 .call(ClosedByServerReason::new(&reason))
             {
                 if let Err(err) = call_result {

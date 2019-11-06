@@ -208,7 +208,7 @@ async fn on_close_by_server_js_side_callback() {
 
     let (test_tx, test_rx) = oneshot::channel();
     room_handle
-        .on_close_by_server(
+        .on_close(
             Closure::once_into_js(move |close_reason: JsValue| {
                 let close_reason =
                     get_reason(&close_reason).as_string().unwrap();

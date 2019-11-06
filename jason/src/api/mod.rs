@@ -50,8 +50,8 @@ impl Jason {
         )));
 
         let inner_clone = self.0.clone();
-        spawn_local(rpc.on_close_by_server().map(move |res| {
-            // TODO: dont close all rooms when multiple rpc connections
+        spawn_local(rpc.on_close().map(move |res| {
+            // TODO: don't close all rooms when multiple rpc connections
             //       will be supported
             let mut rooms = Vec::new();
             mem::swap(&mut inner_clone.borrow_mut().rooms, &mut rooms);

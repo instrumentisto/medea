@@ -131,7 +131,7 @@ pub trait RpcClient {
     /// Sets `on_close_room` callback which will be called on [`Room`] close.
     ///
     /// [`Room`]: crate::api::room::Room
-    fn on_close_by_server(
+    fn on_close(
         &self,
     ) -> LocalBoxFuture<
         'static,
@@ -161,7 +161,7 @@ struct Inner {
     ///
     /// Note that [`CloseReason`] will not be sent if WebSocket closed with
     /// [`RpcConnectionCloseReason::NewConnection`] reason.
-    on_close_by_server_subscribers:
+    on_close_subscribers:
         Vec<oneshot::Sender<ClientAndServerCloseReason>>,
 }
 
@@ -169,7 +169,7 @@ impl Inner {
     fn new(heartbeat_interval: i32) -> Rc<RefCell<Self>> {
         Rc::new(RefCell::new(Self {
             sock: None,
-            on_close_by_server_subscribers: Vec::new(),
+            on_close_subscribers: Vec::new(),
             subs: vec![],
             heartbeat: Heartbeat::new(heartbeat_interval),
         }))
@@ -192,13 +192,13 @@ fn on_close(inner_rc: &RefCell<Inner>, close_msg: &CloseMsg) {
         // close.
         if let CloseReason::Reconnected = reason {
         } else {
-            let mut on_close_by_server_subscribers = Vec::new();
+            let mut on_close_subscribers = Vec::new();
             std::mem::swap(
-                &mut on_close_by_server_subscribers,
-                &mut inner_rc.borrow_mut().on_close_by_server_subscribers,
+                &mut on_close_subscribers,
+                &mut inner_rc.borrow_mut().on_close_subscribers,
             );
 
-            for sub in on_close_by_server_subscribers {
+            for sub in on_close_subscribers {
                 if let Err(reason) = sub
                     .send(ClientAndServerCloseReason::ByServer(reason.clone()))
                 {
@@ -308,14 +308,14 @@ impl RpcClient for WebsocketRpcClient {
 
     /// Returns [`Future`] which will be resolved with [`CloseReason`] on
     /// RPC connection closing initiated by server.
-    fn on_close_by_server(
+    fn on_close(
         &self,
     ) -> LocalBoxFuture<
         'static,
         Result<ClientAndServerCloseReason, oneshot::Canceled>,
     > {
         let (tx, rx) = oneshot::channel();
-        self.0.borrow_mut().on_close_by_server_subscribers.push(tx);
+        self.0.borrow_mut().on_close_subscribers.push(tx);
         Box::pin(rx)
     }
 }
