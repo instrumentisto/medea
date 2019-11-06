@@ -6,7 +6,7 @@ use actix::{Actor, Addr, Arbiter, Context, Handler, Message};
 use futures::Future as _;
 use grpcio::{Environment, RpcContext, Server, ServerBuilder, UnarySink};
 use medea_control_api_proto::grpc::{
-    callback::{Request},
+    callback::Request,
     callback_grpc::{create_callback, Callback},
 };
 use protobuf::well_known_types::Empty;
