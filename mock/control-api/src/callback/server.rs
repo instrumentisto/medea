@@ -9,10 +9,9 @@ use clap::ArgMatches;
 use futures::future::Future as _;
 use grpcio::{Environment, RpcContext, Server, ServerBuilder, UnarySink};
 use medea_control_api_proto::grpc::{
-    callback::Request,
+    callback::{Request, Response},
     callback_grpc::{create_callback, Callback as CallbackProto},
 };
-use protobuf::well_known_types::Empty;
 
 use super::Callback;
 
@@ -57,11 +56,11 @@ impl CallbackProto for CallbackService {
         &mut self,
         ctx: RpcContext,
         req: Request,
-        sink: UnarySink<Empty>,
+        sink: UnarySink<Response>,
     ) {
         self.events.lock().unwrap().push(req.into());
         ctx.spawn(
-            sink.success(Empty::new())
+            sink.success(Response::new())
                 .map_err(|e| println!("Err: {:?}", e)),
         )
     }

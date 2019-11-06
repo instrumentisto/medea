@@ -4,7 +4,6 @@ use actix::{Arbiter, Context, System};
 use futures::future::Future as _;
 use medea_client_api_proto::Event;
 use medea_control_api_proto::grpc::{
-    api::WebRtcPublishEndpoint_P2P,
     callback::OnLeave_Reason as OnLeaveReasonProto,
 };
 
@@ -12,7 +11,7 @@ use crate::{
     callbacks::GetCallbacks,
     gen_insert_str_macro,
     grpc_control_api::{
-        ControlClient, MemberBuilder, RoomBuilder, WebRtcPublishEndpointBuilder,
+        ControlClient, MemberBuilder, RoomBuilder,
     },
     signalling::{CloseSocket, TestMember},
 };
