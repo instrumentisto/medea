@@ -1,0 +1,3 @@
+[rpc]
+idle_timeout = "1s"
+reconnect_timeout = "0ms"

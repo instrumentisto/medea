@@ -4,6 +4,7 @@ use actix::{AsyncContext as _, Context, System};
 use medea_client_api_proto::{Direction, Event, PeerId};
 
 use crate::signalling::{CloseSocket, TestMember};
+use actix_http::ws::CloseCode;
 
 #[test]
 #[allow(clippy::too_many_lines)]
@@ -93,7 +94,7 @@ fn three_members_p2p_video_call() {
                         // Close should happen when last TestMember pass
                         // tests.
                         if members_tested.get() == 2 {
-                            ctx.notify(CloseSocket);
+                            ctx.notify(CloseSocket(CloseCode::Normal));
                         }
                         members_tested.set(members_tested.get() + 1);
                     }
