@@ -48,6 +48,7 @@ impl RoomHandle {
     }
 
     /// Sets callback, which will be invoked on Jason close by server.
+    // TODO: on_close_by_server => on_close
     pub fn on_close_by_server(
         &mut self,
         f: js_sys::Function,
@@ -187,6 +188,8 @@ impl InnerRoom {
         peers: Box<dyn PeerRepository>,
         peer_event_sender: mpsc::UnboundedSender<PeerEvent>,
     ) -> Self {
+
+        // TODO: dont subscribe, invoke on_close in drop/close()
         let on_close_by_server = Rc::new(Callback::default());
         let on_close_by_server_clone = Rc::clone(&on_close_by_server);
         spawn_local(rpc.on_close_by_server().map(move |res| {

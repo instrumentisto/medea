@@ -51,6 +51,10 @@ impl Jason {
 
         let inner_clone = self.0.clone();
         spawn_local(rpc.on_close_by_server().map(move |_| {
+            // TODO: dont close all rooms when multiple rpc connections
+            //       will be supported
+
+            // TODO: room.close(reason)
             inner_clone.borrow_mut().rooms = Vec::new();
             inner_clone.borrow_mut().media_manager = Rc::default();
         }));
