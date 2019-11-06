@@ -742,143 +742,17 @@ impl ::protobuf::reflect::ProtobufValue for Request {
     }
 }
 
-#[derive(PartialEq,Clone,Default)]
-pub struct Response {
-    // special fields
-    pub unknown_fields: ::protobuf::UnknownFields,
-    pub cached_size: ::protobuf::CachedSize,
-}
-
-impl<'a> ::std::default::Default for &'a Response {
-    fn default() -> &'a Response {
-        <Response as ::protobuf::Message>::default_instance()
-    }
-}
-
-impl Response {
-    pub fn new() -> Response {
-        ::std::default::Default::default()
-    }
-}
-
-impl ::protobuf::Message for Response {
-    fn is_initialized(&self) -> bool {
-        true
-    }
-
-    fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream<'_>) -> ::protobuf::ProtobufResult<()> {
-        while !is.eof()? {
-            let (field_number, wire_type) = is.read_tag_unpack()?;
-            match field_number {
-                _ => {
-                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
-                },
-            };
-        }
-        ::std::result::Result::Ok(())
-    }
-
-    // Compute sizes of nested messages
-    #[allow(unused_variables)]
-    fn compute_size(&self) -> u32 {
-        let mut my_size = 0;
-        my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
-        self.cached_size.set(my_size);
-        my_size
-    }
-
-    fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::ProtobufResult<()> {
-        os.write_unknown_fields(self.get_unknown_fields())?;
-        ::std::result::Result::Ok(())
-    }
-
-    fn get_cached_size(&self) -> u32 {
-        self.cached_size.get()
-    }
-
-    fn get_unknown_fields(&self) -> &::protobuf::UnknownFields {
-        &self.unknown_fields
-    }
-
-    fn mut_unknown_fields(&mut self) -> &mut ::protobuf::UnknownFields {
-        &mut self.unknown_fields
-    }
-
-    fn as_any(&self) -> &dyn (::std::any::Any) {
-        self as &dyn (::std::any::Any)
-    }
-    fn as_any_mut(&mut self) -> &mut dyn (::std::any::Any) {
-        self as &mut dyn (::std::any::Any)
-    }
-    fn into_any(self: Box<Self>) -> ::std::boxed::Box<dyn (::std::any::Any)> {
-        self
-    }
-
-    fn descriptor(&self) -> &'static ::protobuf::reflect::MessageDescriptor {
-        Self::descriptor_static()
-    }
-
-    fn new() -> Response {
-        Response::new()
-    }
-
-    fn descriptor_static() -> &'static ::protobuf::reflect::MessageDescriptor {
-        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::lazy::Lazy {
-            lock: ::protobuf::lazy::ONCE_INIT,
-            ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
-        };
-        unsafe {
-            descriptor.get(|| {
-                let fields = ::std::vec::Vec::new();
-                ::protobuf::reflect::MessageDescriptor::new::<Response>(
-                    "Response",
-                    fields,
-                    file_descriptor_proto()
-                )
-            })
-        }
-    }
-
-    fn default_instance() -> &'static Response {
-        static mut instance: ::protobuf::lazy::Lazy<Response> = ::protobuf::lazy::Lazy {
-            lock: ::protobuf::lazy::ONCE_INIT,
-            ptr: 0 as *const Response,
-        };
-        unsafe {
-            instance.get(Response::new)
-        }
-    }
-}
-
-impl ::protobuf::Clear for Response {
-    fn clear(&mut self) {
-        self.unknown_fields.clear();
-    }
-}
-
-impl ::std::fmt::Debug for Response {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        ::protobuf::text_format::fmt(self, f)
-    }
-}
-
-impl ::protobuf::reflect::ProtobufValue for Response {
-    fn as_ref(&self) -> ::protobuf::reflect::ProtobufValueRef {
-        ::protobuf::reflect::ProtobufValueRef::Message(self)
-    }
-}
-
 static file_descriptor_proto_data: &'static [u8] = b"\
-    \n\x0ecallback.proto\x12\x0emedea_callback\"\x08\n\x06OnJoin\"u\n\x07OnL\
-    eave\x126\n\x06reason\x18\x01\x20\x01(\x0e2\x1e.medea_callback.OnLeave.R\
-    easonR\x06reason\"2\n\x06Reason\x12\x13\n\x0fLOST_CONNECTION\x10\0\x12\
-    \x13\n\x0fSERVER_SHUTDOWN\x10\x01\"\xa5\x01\n\x07Request\x12\x18\n\x07el\
-    ement\x18\x01\x20\x01(\tR\x07element\x12\x0e\n\x02at\x18\x02\x20\x01(\tR\
-    \x02at\x121\n\x07on_join\x18\x03\x20\x01(\x0b2\x16.medea_callback.OnJoin\
-    H\0R\x06onJoin\x124\n\x08on_leave\x18\x04\x20\x01(\x0b2\x17.medea_callba\
-    ck.OnLeaveH\0R\x07onLeaveB\x07\n\x05event\"\n\n\x08Response2H\n\x08Callb\
-    ack\x12<\n\x07OnEvent\x12\x17.medea_callback.Request\x1a\x18.medea_callb\
-    ack.Responseb\x06proto3\
+    \n\x0ecallback.proto\x12\x0emedea_callback\x1a\x1bgoogle/protobuf/empty.\
+    proto\"\x08\n\x06OnJoin\"u\n\x07OnLeave\x126\n\x06reason\x18\x01\x20\x01\
+    (\x0e2\x1e.medea_callback.OnLeave.ReasonR\x06reason\"2\n\x06Reason\x12\
+    \x13\n\x0fLOST_CONNECTION\x10\0\x12\x13\n\x0fSERVER_SHUTDOWN\x10\x01\"\
+    \xa5\x01\n\x07Request\x12\x18\n\x07element\x18\x01\x20\x01(\tR\x07elemen\
+    t\x12\x0e\n\x02at\x18\x02\x20\x01(\tR\x02at\x121\n\x07on_join\x18\x03\
+    \x20\x01(\x0b2\x16.medea_callback.OnJoinH\0R\x06onJoin\x124\n\x08on_leav\
+    e\x18\x04\x20\x01(\x0b2\x17.medea_callback.OnLeaveH\0R\x07onLeaveB\x07\n\
+    \x05event2F\n\x08Callback\x12:\n\x07OnEvent\x12\x17.medea_callback.Reque\
+    st\x1a\x16.google.protobuf.Emptyb\x06proto3\
 ";
 
 static mut file_descriptor_proto_lazy: ::protobuf::lazy::Lazy<::protobuf::descriptor::FileDescriptorProto> = ::protobuf::lazy::Lazy {

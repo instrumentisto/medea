@@ -1,9 +1,11 @@
 syntax = "proto3";
 
+import "google/protobuf/empty.proto";
+
 package medea_callback;
 
 service Callback {
-  rpc OnEvent (Request) returns (Response);
+  rpc OnEvent (Request) returns (google.protobuf.Empty);
 }
 
 // 'on_join' callback in Control API spec.
@@ -36,5 +38,3 @@ message Request {
     OnLeave on_leave = 4;
   }
 }
-
-message Response {}

@@ -3,7 +3,7 @@
 
 // https://github.com/Manishearth/rust-clippy/issues/702
 #![allow(unknown_lints)]
-#![allow(clippy::all)]
+#![allow(clippy)]
 
 #![cfg_attr(rustfmt, rustfmt_skip)]
 
@@ -18,7 +18,7 @@
 #![allow(unused_imports)]
 #![allow(unused_results)]
 
-const METHOD_CALLBACK_ON_EVENT: ::grpcio::Method<super::callback::Request, super::callback::Response> = ::grpcio::Method {
+const METHOD_CALLBACK_ON_EVENT: ::grpcio::Method<super::callback::Request, super::empty::Empty> = ::grpcio::Method {
     ty: ::grpcio::MethodType::Unary,
     name: "/medea_callback.Callback/OnEvent",
     req_mar: ::grpcio::Marshaller { ser: ::grpcio::pb_ser, de: ::grpcio::pb_de },
@@ -37,19 +37,19 @@ impl CallbackClient {
         }
     }
 
-    pub fn on_event_opt(&self, req: &super::callback::Request, opt: ::grpcio::CallOption) -> ::grpcio::Result<super::callback::Response> {
+    pub fn on_event_opt(&self, req: &super::callback::Request, opt: ::grpcio::CallOption) -> ::grpcio::Result<super::empty::Empty> {
         self.client.unary_call(&METHOD_CALLBACK_ON_EVENT, req, opt)
     }
 
-    pub fn on_event(&self, req: &super::callback::Request) -> ::grpcio::Result<super::callback::Response> {
+    pub fn on_event(&self, req: &super::callback::Request) -> ::grpcio::Result<super::empty::Empty> {
         self.on_event_opt(req, ::grpcio::CallOption::default())
     }
 
-    pub fn on_event_async_opt(&self, req: &super::callback::Request, opt: ::grpcio::CallOption) -> ::grpcio::Result<::grpcio::ClientUnaryReceiver<super::callback::Response>> {
+    pub fn on_event_async_opt(&self, req: &super::callback::Request, opt: ::grpcio::CallOption) -> ::grpcio::Result<::grpcio::ClientUnaryReceiver<super::empty::Empty>> {
         self.client.unary_call_async(&METHOD_CALLBACK_ON_EVENT, req, opt)
     }
 
-    pub fn on_event_async(&self, req: &super::callback::Request) -> ::grpcio::Result<::grpcio::ClientUnaryReceiver<super::callback::Response>> {
+    pub fn on_event_async(&self, req: &super::callback::Request) -> ::grpcio::Result<::grpcio::ClientUnaryReceiver<super::empty::Empty>> {
         self.on_event_async_opt(req, ::grpcio::CallOption::default())
     }
     pub fn spawn<F>(&self, f: F) where F: ::futures::Future<Item = (), Error = ()> + Send + 'static {
@@ -58,7 +58,7 @@ impl CallbackClient {
 }
 
 pub trait Callback {
-    fn on_event(&mut self, ctx: ::grpcio::RpcContext, req: super::callback::Request, sink: ::grpcio::UnarySink<super::callback::Response>);
+    fn on_event(&mut self, ctx: ::grpcio::RpcContext, req: super::callback::Request, sink: ::grpcio::UnarySink<super::empty::Empty>);
 }
 
 pub fn create_callback<S: Callback + Send + Clone + 'static>(s: S) -> ::grpcio::Service {

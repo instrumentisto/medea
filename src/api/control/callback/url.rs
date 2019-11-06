@@ -1,7 +1,6 @@
 //! URLs for callbacks implementation.
 
-use std::{convert::TryFrom, fmt};
-use std::fmt::Display;
+use std::{convert::TryFrom, fmt, fmt::Display};
 
 use derive_more::Display;
 use serde::{de::Visitor, Deserialize, Deserializer};

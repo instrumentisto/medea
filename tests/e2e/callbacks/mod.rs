@@ -6,9 +6,10 @@ use actix::{Actor, Addr, Arbiter, Context, Handler, Message};
 use futures::Future as _;
 use grpcio::{Environment, RpcContext, Server, ServerBuilder, UnarySink};
 use medea_control_api_proto::grpc::{
-    callback::{Request, Response},
+    callback::{Request},
     callback_grpc::{create_callback, Callback},
 };
+use protobuf::well_known_types::Empty;
 
 type Callbacks = Arc<Mutex<Vec<Request>>>;
 
@@ -57,10 +58,10 @@ impl Callback for CallbackService {
         &mut self,
         ctx: RpcContext,
         req: Request,
-        sink: UnarySink<Response>,
+        sink: UnarySink<Empty>,
     ) {
         self.callbacks.lock().unwrap().push(req);
-        ctx.spawn(sink.success(Response::new()).map_err(|e| panic!("{:?}", e)))
+        ctx.spawn(sink.success(Empty::new()).map_err(|e| panic!("{:?}", e)))
     }
 }
 
