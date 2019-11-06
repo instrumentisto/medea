@@ -32,6 +32,12 @@ pub enum OnLeaveReason {
 
     /// Connection with `Member` was lost.
     LostConnection,
+
+    /// Member was normally disconnected.
+    Disconnected,
+
+    /// Member was evicted from the Medea media server by Control API.
+    Evicted,
 }
 
 impl From<OnLeaveReasonProto> for OnLeaveReason {
@@ -39,6 +45,8 @@ impl From<OnLeaveReasonProto> for OnLeaveReason {
         match proto {
             OnLeaveReasonProto::SERVER_SHUTDOWN => Self::ServerShutdown,
             OnLeaveReasonProto::LOST_CONNECTION => Self::LostConnection,
+            OnLeaveReasonProto::EVICTED => Self::Evicted,
+            OnLeaveReasonProto::DISCONNECTED => Self::Disconnected,
         }
     }
 }

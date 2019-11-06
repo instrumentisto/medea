@@ -43,9 +43,11 @@ pub enum OnLeaveReason {
     /// Connection with `Member` was lost.
     LostConnection,
 
-    Evicted,
-
+    /// Member was normally disconnected.
     Disconnected,
+
+    /// Member was evicted from the Medea media server by Control API.
+    Evicted,
 }
 
 impl Into<OnLeaveReasonProto> for OnLeaveReason {
