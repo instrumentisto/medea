@@ -357,8 +357,7 @@ impl ControlApi for ControlApiService {
                     let mut response = GetResponse::new();
                     match result {
                         Ok(elements) => {
-                            response
-                                .set_elements(elements.into_iter().collect());
+                            response.set_elements(elements);
                         }
                         Err(e) => {
                             response.set_error(e.into());
