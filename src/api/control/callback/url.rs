@@ -1,10 +1,10 @@
 //! URLs for callbacks implementation.
 
 use std::{convert::TryFrom, fmt};
+use std::fmt::Display;
 
 use derive_more::Display;
 use serde::{de::Visitor, Deserialize, Deserializer};
-use std::fmt::Display;
 use url::{ParseError, Url};
 
 /// Callback URL for gRPC service.
