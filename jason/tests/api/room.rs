@@ -20,6 +20,7 @@ use wasm_bindgen::{prelude::*, JsValue};
 use wasm_bindgen_test::*;
 
 use crate::{get_test_tracks, resolve_after};
+use medea_jason::rpc::ClientAndServerCloseReason;
 
 wasm_bindgen_test_configure!(run_in_browser);
 
@@ -47,7 +48,7 @@ fn get_test_room_and_exist_peer() -> (Room, Rc<PeerConnection>) {
         .times(2)
         .returning_st(move || vec![Rc::clone(&peer_clone)]);
     rpc.expect_unsub().return_const(());
-    rpc.expect_on_close_by_server().returning(move || {
+    rpc.expect_on_close().returning(move || {
         let (_, rx) = oneshot::channel();
         Box::pin(rx)
     });
@@ -126,7 +127,7 @@ fn get_test_room_and_new_peer(
         .return_once_st(move |_, _, _, _, _| Ok(peer_clone));
     rpc.expect_send_command().return_const(());
     rpc.expect_unsub().return_const(());
-    rpc.expect_on_close_by_server().returning(move || {
+    rpc.expect_on_close().returning(move || {
         let (_, rx) = oneshot::channel();
         Box::pin(rx)
     });
@@ -195,7 +196,7 @@ async fn on_close_by_server_js_side_callback() {
     let (_event_tx, event_rx) = mpsc::unbounded();
     rpc.expect_subscribe()
         .return_once(move || Box::pin(event_rx));
-    rpc.expect_on_close_by_server().returning(move || {
+    rpc.expect_on_close().returning(move || {
         let (tx, rx) = oneshot::channel();
         senders_clone.lock().unwrap().push(tx);
         Box::pin(rx)
@@ -225,7 +226,7 @@ async fn on_close_by_server_js_side_callback() {
     let mut on_close_subscribers = Vec::new();
     std::mem::swap(&mut on_close_subscribers, &mut senders.lock().unwrap());
     for sender in on_close_subscribers {
-        sender.send(CloseReason::Finished).unwrap();
+        sender.send(ClientAndServerCloseReason::ByServer(CloseReason::Finished)).unwrap();
     }
 
     let result =
