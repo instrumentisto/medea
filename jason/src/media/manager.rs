@@ -54,7 +54,6 @@ struct InnerMediaManager {
 impl InnerMediaManager {
     /// Returns the vector of [`MediaDeviceInfo`] objects.
     fn enumerate_devices(
-        &self,
     ) -> impl Future<Output = Result<Vec<InputDeviceInfo>, Error>> {
         async {
             let devices = window()
@@ -228,7 +227,7 @@ pub struct MediaManagerHandle(Weak<InnerMediaManager>);
 impl MediaManagerHandle {
     /// Returns the JS array of [`MediaDeviceInfo`] objects.
     pub fn enumerate_devices(&self) -> Promise {
-        match map_weak!(self, |inner| inner.enumerate_devices()) {
+        match map_weak!(self, |_| InnerMediaManager::enumerate_devices()) {
             Ok(devices) => future_to_promise(async {
                 devices
                     .await

@@ -66,8 +66,8 @@ impl WsSession {
     }
 
     /// Starts watchdog which will drop connection if now-last_activity >
-    /// idle_timeout.
-    fn start_watchdog(&mut self, ctx: &mut <Self as Actor>::Context) {
+    /// `idle_timeout`.
+    fn start_watchdog(ctx: &mut <Self as Actor>::Context) {
         ctx.run_interval(Duration::new(1, 0), |session, ctx| {
             if Instant::now().duration_since(session.last_activity)
                 > session.idle_timeout
@@ -101,7 +101,7 @@ impl Actor for WsSession {
     fn started(&mut self, ctx: &mut Self::Context) {
         debug!("Started WsSession for Member [id = {}]", self.member_id);
 
-        self.start_watchdog(ctx);
+        Self::start_watchdog(ctx);
 
         ctx.wait(
             wrap_future(self.room.send(RpcConnectionEstablished {
