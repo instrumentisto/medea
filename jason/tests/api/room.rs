@@ -1,9 +1,6 @@
 #![cfg(target_arch = "wasm32")]
 
-use std::{
-    rc::Rc,
-    sync::{Arc, Mutex},
-};
+use std::rc::Rc;
 
 use futures::{
     channel::{mpsc, oneshot},
@@ -180,25 +177,37 @@ async fn mute_video_room_before_init_peer() {
     assert!(!peer.is_send_video_enabled());
 }
 
+macro_rules! my_assert_eq {
+    ($test_tx:tt, $a:expr, $b:expr) => {
+        if $a != $b {
+            $test_tx.send(Err(format!("'{}' != '{}'", $a, $b)));
+            return;
+        }
+    };
+}
+
 #[wasm_bindgen_test]
 async fn on_close_by_server_js_side_callback() {
     #[wasm_bindgen(inline_js = "export function get_reason(closed) { return \
                                 closed.reason; }")]
     extern "C" {
-        fn get_reason(closed: &JsValue) -> JsValue;
+        fn get_reason(closed: &JsValue) -> String;
+    }
+    #[wasm_bindgen(inline_js = "export function \
+                                get_is_closed_by_server(reason) { return \
+                                reason.is_closed_by_server; }")]
+    extern "C" {
+        fn get_is_closed_by_server(reason: &JsValue) -> bool;
     }
 
     let mut rpc = MockRpcClient::new();
     let repo = Box::new(MockPeerRepository::new());
 
-    let senders = Arc::new(Mutex::new(Vec::new()));
-    let senders_clone = Arc::clone(&senders);
     let (_event_tx, event_rx) = mpsc::unbounded();
     rpc.expect_subscribe()
         .return_once(move || Box::pin(event_rx));
     rpc.expect_on_close().returning(move || {
-        let (tx, rx) = oneshot::channel();
-        senders_clone.lock().unwrap().push(tx);
+        let (_, rx) = oneshot::channel();
         Box::pin(rx)
     });
     rpc.expect_send_command().return_const(());
@@ -210,31 +219,25 @@ async fn on_close_by_server_js_side_callback() {
     let (test_tx, test_rx) = oneshot::channel();
     room_handle
         .on_close(
-            Closure::once_into_js(move |close_reason: JsValue| {
-                let close_reason =
-                    get_reason(&close_reason).as_string().unwrap();
-                if &close_reason == "Finished" {
-                    test_tx.send(Ok(())).unwrap();
-                } else {
-                    test_tx.send(Err(close_reason)).unwrap();
-                }
+            Closure::once_into_js(move |closed: JsValue| {
+                let close_reason = get_reason(&closed);
+                my_assert_eq!(test_tx, close_reason, "Finished");
+                my_assert_eq!(test_tx, get_is_closed_by_server(&closed), true);
+
+                test_tx.send(Ok(()));
             })
             .into(),
         )
         .unwrap();
 
-    let mut on_close_subscribers = Vec::new();
-    std::mem::swap(&mut on_close_subscribers, &mut senders.lock().unwrap());
-    for sender in on_close_subscribers {
-        sender.send(ClientAndServerCloseReason::ByServer(CloseReason::Finished)).unwrap();
-    }
+    room.close(ClientAndServerCloseReason::ByServer(CloseReason::Finished));
 
     let result =
         future::select(Box::pin(test_rx), Box::pin(resolve_after(500))).await;
     match result {
         Either::Left((oneshot_fut_result, _)) => {
             let assert_result = oneshot_fut_result.expect("Cancelled.");
-            assert_result.expect("Assertion failed. Received CloseReason");
+            assert_result.expect("Assertion failed");
         }
         Either::Right(_) => {
             panic!("on_close_by_server callback didn't fired");

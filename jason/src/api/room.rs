@@ -48,14 +48,8 @@ impl RoomHandle {
     }
 
     /// Sets callback, which will be invoked on Jason close by server.
-    pub fn on_close(
-        &mut self,
-        f: js_sys::Function,
-    ) -> Result<(), JsValue> {
-        map_weak!(self, |inner| inner
-            .borrow_mut()
-            .on_close
-            .set_func(f))
+    pub fn on_close(&mut self, f: js_sys::Function) -> Result<(), JsValue> {
+        map_weak!(self, |inner| inner.borrow_mut().on_close.set_func(f))
     }
 
     /// Performs entering to a [`Room`].
@@ -411,9 +405,8 @@ impl Drop for InnerRoom {
     /// Unsubscribes [`InnerRoom`] from all its subscriptions.
     fn drop(&mut self) {
         if let Some(reason) = &self.close_reason {
-            if let Some(call_result) = self
-                .on_close
-                .call(ClosedByServerReason::new(&reason))
+            if let Some(call_result) =
+                self.on_close.call(ClosedByServerReason::new(&reason))
             {
                 if let Err(err) = call_result {
                     WasmErr::from(err).log_err();

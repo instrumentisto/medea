@@ -161,8 +161,7 @@ struct Inner {
     ///
     /// Note that [`CloseReason`] will not be sent if WebSocket closed with
     /// [`RpcConnectionCloseReason::NewConnection`] reason.
-    on_close_subscribers:
-        Vec<oneshot::Sender<ClientAndServerCloseReason>>,
+    on_close_subscribers: Vec<oneshot::Sender<ClientAndServerCloseReason>>,
 }
 
 impl Inner {
