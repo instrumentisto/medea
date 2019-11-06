@@ -43,10 +43,7 @@ impl<A: Into<JsValue>> Callback<A> {
     ///
     /// Returns `false` if no callback is set.
     pub fn is_set(&self) -> bool {
-        match self.f.borrow().as_ref() {
-            Some(_) => true,
-            None => false,
-        }
+        self.f.borrow().as_ref().is_some()
     }
 }
 
