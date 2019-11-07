@@ -24,7 +24,7 @@ async fn mute_unmute_audio() {
     let peer = PeerConnection::new(PeerId(1), tx, vec![], manager, true, true)
         .unwrap();
 
-    peer.get_offer(vec![audio_track, video_track])
+    peer.get_offer(vec![audio_track, video_track], None)
         .await
         .unwrap();
 
@@ -47,7 +47,7 @@ async fn mute_unmute_video() {
     let (audio_track, video_track) = get_test_tracks();
     let peer = PeerConnection::new(PeerId(1), tx, vec![], manager, true, true)
         .unwrap();
-    peer.get_offer(vec![audio_track, video_track])
+    peer.get_offer(vec![audio_track, video_track], None)
         .await
         .unwrap();
 
@@ -71,7 +71,7 @@ async fn new_with_mute_audio() {
     let peer = PeerConnection::new(PeerId(1), tx, vec![], manager, false, true)
         .unwrap();
 
-    peer.get_offer(vec![audio_track, video_track])
+    peer.get_offer(vec![audio_track, video_track], None)
         .await
         .unwrap();
     assert!(!peer.is_send_audio_enabled());
@@ -86,7 +86,7 @@ async fn new_with_mute_video() {
     let (audio_track, video_track) = get_test_tracks();
     let peer = PeerConnection::new(PeerId(1), tx, vec![], manager, true, false)
         .unwrap();
-    peer.get_offer(vec![audio_track, video_track])
+    peer.get_offer(vec![audio_track, video_track], None)
         .await
         .unwrap();
 
@@ -113,13 +113,16 @@ async fn add_candidates_to_answerer_before_offer() {
     let pc2 = PeerConnection::new(PeerId(2), tx2, vec![], manager, true, true)
         .unwrap();
     let (audio_track, video_track) = get_test_tracks();
-    let offer = pc1.get_offer(vec![audio_track, video_track]).await.unwrap();
+    let offer = pc1
+        .get_offer(vec![audio_track, video_track], None)
+        .await
+        .unwrap();
 
     handle_ice_candidates(rx1, &pc2, 1).await;
     // assert that pc2 has buffered candidates
     assert!(pc2.candidates_buffer_len() > 0);
     // then set its remote description
-    pc2.process_offer(offer, vec![]).await.unwrap();
+    pc2.process_offer(offer, vec![], None).await.unwrap();
 
     // and assert that buffer was flushed
     assert_eq!(pc2.candidates_buffer_len(), 0);
@@ -148,9 +151,11 @@ async fn add_candidates_to_offerer_before_answer() {
     );
 
     let (audio_track, video_track) = get_test_tracks();
-    let offer = pc1.get_offer(vec![audio_track, video_track]).await.unwrap();
-    pc2.process_offer(offer, vec![]).await.unwrap();
-    let answer = pc2.create_and_set_answer().await.unwrap();
+    let offer = pc1
+        .get_offer(vec![audio_track, video_track], None)
+        .await
+        .unwrap();
+    let answer = pc2.process_offer(offer, vec![], None).await.unwrap();
 
     handle_ice_candidates(rx2, &pc1, 1).await;
 
@@ -182,14 +187,13 @@ async fn normal_exchange_of_candidates() {
     let (audio_track, video_track) = get_test_tracks();
 
     let offer = peer1
-        .get_offer(vec![audio_track.clone(), video_track.clone()])
+        .get_offer(vec![audio_track.clone(), video_track.clone()], None)
         .await
         .unwrap();
-    peer2
-        .process_offer(offer, vec![audio_track, video_track])
+    let answer = peer2
+        .process_offer(offer, vec![audio_track, video_track], None)
         .await
         .unwrap();
-    let answer = peer2.create_and_set_answer().await.unwrap();
     peer1.set_remote_answer(answer).await.unwrap();
 
     resolve_after(500).await.unwrap();
@@ -222,7 +226,31 @@ async fn handle_ice_candidates(
                     break;
                 }
             }
+            PeerEvent::NewLocalStream { .. } => {}
             _ => unreachable!(),
+        }
+    }
+}
+
+#[wasm_bindgen_test]
+async fn send_event_on_new_local_stream() {
+    let (tx, mut rx) = mpsc::unbounded();
+    let manager = Rc::new(MediaManager::default());
+    let (audio_track, video_track) = get_test_tracks();
+    let id = PeerId(1);
+    let peer =
+        PeerConnection::new(id, tx, vec![], manager, true, false).unwrap();
+    peer.get_offer(vec![audio_track, video_track], None)
+        .await
+        .unwrap();
+
+    while let Some(event) = rx.next().await {
+        match event {
+            PeerEvent::NewLocalStream { peer_id, .. } => {
+                assert_eq!(peer_id, id);
+                break;
+            }
+            _ => {}
         }
     }
 }

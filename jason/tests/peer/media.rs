@@ -1,15 +1,15 @@
 #![cfg(target_arch = "wasm32")]
 
-use std::rc::Rc;
+use std::{convert::TryFrom, rc::Rc};
 
+use anyhow::Result;
 use medea_client_api_proto::TrackId;
 use medea_jason::{
     media::MediaManager,
     peer::{
-        MediaConnections, RtcPeerConnection, TransceiverDirection,
-        TransceiverKind,
+        MediaConnections, RtcPeerConnection, SimpleStreamRequest,
+        TransceiverDirection, TransceiverKind,
     },
-    utils::WasmErr,
 };
 use wasm_bindgen_test::*;
 
@@ -20,7 +20,7 @@ wasm_bindgen_test_configure!(run_in_browser);
 async fn get_test_media_connections(
     enabled_audio: bool,
     enabled_video: bool,
-) -> Result<(MediaConnections, TrackId, TrackId), WasmErr> {
+) -> Result<(MediaConnections, TrackId, TrackId)> {
     let media_connections = MediaConnections::new(
         Rc::new(RtcPeerConnection::new(vec![]).unwrap()),
         enabled_audio,
@@ -29,16 +29,43 @@ async fn get_test_media_connections(
     let (audio_track, video_track) = get_test_tracks();
     let audio_track_id = audio_track.id;
     let video_track_id = video_track.id;
-    let request = media_connections
+    media_connections
         .update_tracks(vec![audio_track, video_track])
-        .unwrap()
         .unwrap();
+    let request = media_connections.get_stream_request().unwrap();
+    let caps = SimpleStreamRequest::try_from(request).unwrap();
     let manager = Rc::new(MediaManager::default());
-    let stream = manager.get_stream_by_request(request).await?;
+    let (stream, _) = manager.get_stream(&caps).await?;
 
-    media_connections.insert_local_stream(&stream).await?;
+    media_connections
+        .insert_local_stream(&caps.parse_stream(&stream)?)
+        .await?;
 
     Ok((media_connections, audio_track_id, video_track_id))
+}
+
+#[wasm_bindgen_test]
+fn get_stream_request() {
+    let media_connections = MediaConnections::new(
+        Rc::new(RtcPeerConnection::new(vec![]).unwrap()),
+        true,
+        true,
+    );
+    let (audio_track, video_track) = get_test_tracks();
+    media_connections
+        .update_tracks(vec![audio_track, video_track])
+        .unwrap();
+    let request = media_connections.get_stream_request();
+    assert!(request.is_some());
+
+    let media_connections = MediaConnections::new(
+        Rc::new(RtcPeerConnection::new(vec![]).unwrap()),
+        true,
+        true,
+    );
+    media_connections.update_tracks(vec![]).unwrap();
+    let request = media_connections.get_stream_request();
+    assert!(request.is_none());
 }
 
 // Tests MediaConnections::toggle_send_media function.

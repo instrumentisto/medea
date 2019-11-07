@@ -9,9 +9,13 @@ All user visible changes to this project will be documented in this file. This p
 ## TBD [0.2.0] · 2019-??-??
 [0.2.0]: /../../tree/medea-jason-0.2.0/jason
 
+[Milestone](/../../milestone/2) | [Roadmap](/../../issues/27)
+
 ### BC Breaks
 
 - Library API:
+    - Expose `on_local_stream` callback in `Room` instead of `Jason` ([#54]);
+    - Remove error argument from `on_local_stream` callback ([#54]);
     - Room initialization ([#46]):
         - Remove `Jason.join_room()`.
 
@@ -31,7 +35,9 @@ All user visible changes to this project will be documented in this file. This p
         - `MediaStreamConstraints`, `AudioTrackConstraints`, `VideoTrackConstraints` classes ([#46]);
         - Room initialization ([#46]):
             - `Jason.init_room()`;
-            - `Room.join()`.
+            - `Room.join()`;
+        - Ability to inject local video/audio stream into `Room` via `Room.inject_local_stream()` ([#54]);
+        - `Room.on_failed_local_stream` callback ([#54]).
 
 ### Fixed
 
@@ -39,6 +45,7 @@ All user visible changes to this project will be documented in this file. This p
     - Skipped `IceCandidate`s received before receiving remote SDP ([#50](/../../pull/50)).
 
 [#46]: /../../pull/46
+[#54]: /../../pull/54
 
 
 

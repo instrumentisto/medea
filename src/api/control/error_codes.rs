@@ -96,7 +96,7 @@ impl ErrorResponse {
         Self {
             error_code,
             explanation: Some(explanation),
-            element_id: id.map(|s| s.to_string()),
+            element_id: id,
         }
     }
 }

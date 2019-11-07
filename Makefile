@@ -337,7 +337,7 @@ endif
 #
 # Usage:
 #	make test.unit [crate=(@all|medea|<crate-name>)]
-#	               [crate=medea-jason [browser=(chrome|firefox)]]
+#	               [crate=medea-jason [browser=(chrome|firefox|default)]]
 
 test-unit-crate = $(if $(call eq,$(crate),),@all,$(crate))
 webdriver-env = $(if $(call eq,$(browser),firefox),GECKO,CHROME)DRIVER_REMOTE
@@ -353,12 +353,17 @@ ifeq ($(test-unit-crate),medea)
 	cargo test --lib --bin medea
 else
 ifeq ($(crate),medea-jason)
+ifeq ($(browser),default)
+	cd $(crate-dir)/ && \
+	cargo +beta test --target wasm32-unknown-unknown --features mockable
+else
 	@make docker.up.webdriver browser=$(browser)
 	sleep 10
 	cd $(crate-dir)/ && \
 	$(webdriver-env)="http://127.0.0.1:4444" \
 	cargo +beta test --target wasm32-unknown-unknown --features mockable
 	@make docker.down.webdriver browser=$(browser)
+endif
 else
 	cd $(crate-dir)/ && \
 	cargo test -p $(test-unit-crate)

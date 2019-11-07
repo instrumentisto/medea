@@ -1,12 +1,24 @@
 use std::{cell::RefCell, rc::Rc};
 
 use medea_client_api_proto::ClientMsg;
+use thiserror::Error;
 use wasm_bindgen::{prelude::*, JsCast};
 
 use crate::{
-    rpc::websocket::WebSocket,
+    rpc::websocket::{Error as SocketError, WebSocket},
     utils::{window, IntervalHandle, WasmErr},
 };
+
+/// Errors that may occur in [`Heartbeat`].
+#[derive(Debug, Error)]
+pub enum Error {
+    #[error("unable to ping: no socket")]
+    NoSocket,
+    #[error("cannot set callback for ping send: {0}")]
+    SetIntervalHandler(#[from] WasmErr),
+    #[error("failed to send ping: {0}")]
+    SendPing(#[from] SocketError),
+}
 
 /// Responsible for sending/handling keep-alive requests, detecting connection
 /// loss.
@@ -28,12 +40,12 @@ struct InnerHeartbeat {
 impl InnerHeartbeat {
     /// Send ping message into socket.
     /// Returns error no open socket.
-    fn send_now(&mut self) -> Result<(), WasmErr> {
+    fn send_now(&mut self) -> Result<(), Error> {
         match self.socket.as_ref() {
-            None => Err(WasmErr::from("Unable to ping: no socket")),
+            None => Err(Error::NoSocket),
             Some(socket) => {
                 self.num += 1;
-                socket.send(&ClientMsg::Ping(self.num))
+                Ok(socket.send(&ClientMsg::Ping(self.num))?)
             }
         }
     }
@@ -62,7 +74,7 @@ impl Heartbeat {
     ///
     /// Sends first `ping` immediately, so provided [`WebSocket`] must be
     /// active.
-    pub fn start(&self, socket: Rc<WebSocket>) -> Result<(), WasmErr> {
+    pub fn start(&self, socket: Rc<WebSocket>) -> Result<(), Error> {
         let mut inner = self.0.borrow_mut();
         inner.num = 0;
         inner.pong_at = None;
@@ -79,7 +91,8 @@ impl Heartbeat {
             .set_interval_with_callback_and_timeout_and_arguments_0(
                 do_ping.as_ref().unchecked_ref(),
                 inner.interval,
-            )?;
+            )
+            .map_err(WasmErr::from)?;
 
         inner.ping_task = Some(PingTaskHandler {
             _closure: do_ping,

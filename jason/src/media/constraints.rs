@@ -1,10 +1,14 @@
 #![allow(clippy::module_name_repetitions)]
 
+use medea_client_api_proto::{
+    AudioSettings as ProtoAudioConstraints, MediaType as ProtoTrackConstraints,
+    VideoSettings as ProtoVideoConstraints,
+};
 use wasm_bindgen::prelude::*;
 use web_sys::{
     ConstrainDomStringParameters,
     MediaStreamConstraints as SysMediaStreamConstraints,
-    MediaStreamTrack as SysMediaStreamTrack,
+    MediaStreamTrack as SysMediaStreamTrack, MediaStreamTrackState,
     MediaTrackConstraints as SysMediaTrackConstraints,
 };
 
@@ -44,10 +48,12 @@ impl MediaStreamConstraints {
 }
 
 impl MediaStreamConstraints {
+    /// Returns only audio constraints.
     pub fn get_audio(&self) -> &Option<AudioTrackConstraints> {
         &self.audio
     }
 
+    /// Returns only video constraints.
     pub fn get_video(&self) -> &Option<VideoTrackConstraints> {
         &self.video
     }
@@ -88,6 +94,39 @@ macro_rules! satisfies_by_device_id {
             .map_or(false, |id| id.as_str() == device_id),
         }
     }};
+}
+
+/// Wrapper around [MediaTrackConstraints][1].
+///
+/// [1]: https://w3.org/TR/mediacapture-streams/#media-track-constraints
+#[derive(Clone)]
+pub enum TrackConstraints {
+    /// Audio constraints.
+    Audio(AudioTrackConstraints),
+    /// Video constraints.
+    Video(VideoTrackConstraints),
+}
+
+impl TrackConstraints {
+    /// Checks if provided [MediaStreamTrack][1] satisfies this
+    /// [`TrackConstraints`].
+    ///
+    /// [1]: https://w3.org/TR/mediacapture-streams/#mediastreamtrack
+    pub fn satisfies(&self, track: &SysMediaStreamTrack) -> bool {
+        match self {
+            Self::Audio(audio) => audio.satisfies(&track),
+            Self::Video(video) => video.satisfies(&track),
+        }
+    }
+}
+
+impl From<ProtoTrackConstraints> for TrackConstraints {
+    fn from(caps: ProtoTrackConstraints) -> Self {
+        match caps {
+            ProtoTrackConstraints::Audio(audio) => Self::Audio(audio.into()),
+            ProtoTrackConstraints::Video(video) => Self::Video(video.into()),
+        }
+    }
 }
 
 // TODO: Its gonna be a nightmare if we will add all possible constraints,
@@ -132,7 +171,19 @@ impl AudioTrackConstraints {
             return false;
         }
 
+        if track.ready_state() != MediaStreamTrackState::Live {
+            return false;
+        }
+
         satisfies_by_device_id!(self, track)
+        // TODO returns Result<bool, Error>
+    }
+}
+
+impl From<ProtoAudioConstraints> for AudioTrackConstraints {
+    #[inline]
+    fn from(_: ProtoAudioConstraints) -> Self {
+        Self::new()
     }
 }
 
@@ -185,7 +236,17 @@ impl VideoTrackConstraints {
             return false;
         }
 
+        if track.ready_state() != MediaStreamTrackState::Live {
+            return false;
+        }
+
         satisfies_by_device_id!(self, track)
+    }
+}
+
+impl From<ProtoVideoConstraints> for VideoTrackConstraints {
+    fn from(_caps: ProtoVideoConstraints) -> Self {
+        Self::new()
     }
 }
 

@@ -185,11 +185,11 @@ spec:
         {{- end }}
           livenessProbe:
             exec:
-              command: ['redis-cli', 'ping']
+              command: ['redis-cli', '-p', '{{ $coturnDb.conf.port }}', 'ping']
             initialDelaySeconds: 3
           readinessProbe:
             exec:
-              command: ['redis-cli', 'ping']
+              command: ['redis-cli', '-p', '{{ $coturnDb.conf.port }}', 'ping']
             initialDelaySeconds: 5
       volumes:
         - name: conf

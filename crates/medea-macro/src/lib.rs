@@ -26,11 +26,9 @@ use proc_macro::TokenStream;
 ///     Bar(String),
 /// }
 ///
-/// fn main() {
-///     let mut foo = MyEnum::Foo(String::from("foo"));
-///     foo.push_str("_bar");
-///     assert_eq!(foo.as_str(), "foo_bar")
-/// }
+/// let mut foo = MyEnum::Foo(String::from("foo"));
+/// foo.push_str("_bar");
+/// assert_eq!(foo.as_str(), "foo_bar")
 /// ```
 ///
 /// # Extended example
@@ -76,19 +74,17 @@ use proc_macro::TokenStream;
 ///     AnotherState(Peer<AnotherState>),
 /// }
 ///
-/// fn main() {
-///     let mut peer = PeerStateMachine::SomeState(Peer {
-///         context: Context { some_value: 10 },
-///         state: SomeState,
-///     });
+/// let mut peer = PeerStateMachine::SomeState(Peer {
+///     context: Context { some_value: 10 },
+///     state: SomeState,
+/// });
 ///
-///     assert_eq!(peer.some_value(), 10);
+/// assert_eq!(peer.some_value(), 10);
 ///
-///     assert_eq!(peer.function_with_additional_args(100), 100);
+/// assert_eq!(peer.function_with_additional_args(100), 100);
 ///
-///     assert_eq!(peer.mutable_function(), 10);
-///     assert_eq!(peer.some_value(), 1000);
-/// }
+/// assert_eq!(peer.mutable_function(), 10);
+/// assert_eq!(peer.some_value(), 1000);
 /// ```
 #[allow(clippy::needless_pass_by_value)]
 #[proc_macro_attribute]
@@ -191,19 +187,18 @@ pub fn enum_delegate(args: TokenStream, input: TokenStream) -> TokenStream {
 /// #    }
 /// # }
 /// #
-/// fn main() {
-///     let mut foo = Foo { bar: 0, baz: 0 };
 ///
-///     Event::Some { new_bar: 1 }.dispatch_with(&mut foo);
-///     assert_eq!(foo.bar, 1);
+/// let mut foo = Foo { bar: 0, baz: 0 };
 ///
-///     Event::Another.dispatch_with(&mut foo);
-///     assert_eq!(foo.bar, 2);
+/// Event::Some { new_bar: 1 }.dispatch_with(&mut foo);
+/// assert_eq!(foo.bar, 1);
 ///
-///     Event::UnnamedVariant(3, 3).dispatch_with(&mut foo);
-///     assert_eq!(foo.bar, 3);
-///     assert_eq!(foo.baz, 3);
-/// }
+/// Event::Another.dispatch_with(&mut foo);
+/// assert_eq!(foo.bar, 2);
+///
+/// Event::UnnamedVariant(3, 3).dispatch_with(&mut foo);
+/// assert_eq!(foo.bar, 3);
+/// assert_eq!(foo.baz, 3);
 /// ```
 #[proc_macro_attribute]
 pub fn dispatchable(_: TokenStream, input: TokenStream) -> TokenStream {

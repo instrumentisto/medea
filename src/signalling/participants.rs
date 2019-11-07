@@ -229,7 +229,7 @@ impl ParticipantService {
                     ),
                 )));
             }
-            Some(member) => member.clone(),
+            Some(member) => member,
         };
 
         // lookup previous member connection
