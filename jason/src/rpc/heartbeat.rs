@@ -17,7 +17,7 @@ pub enum Error {
     #[fail(display = "unable to ping: no socket")]
     NoSocket,
     #[fail(display = "cannot set callback for ping send: {}", 0)]
-    SetIntervalHandler(#[fail(cause)] WasmErr),
+    SetIntervalHandler(WasmErr),
     #[fail(display = "failed send ping: {}", 0)]
     SendPing(#[fail(cause)] SocketError),
 }
@@ -99,6 +99,7 @@ impl Heartbeat {
                 inner.interval,
             )
             .map_err(WasmErr::from)
+            .map_err(Error::SetIntervalHandler)
             .map_err(tracerr::from_and_wrap!())?;
 
         inner.ping_task = Some(PingTaskHandler {

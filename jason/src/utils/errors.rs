@@ -1,16 +1,17 @@
-use std::borrow::Cow;
-// use std::fmt::{Debug, Display};
+use std::{
+    borrow::Cow,
+    fmt::{Debug, Display},
+};
 
-use failure::{AsFail, Error, Fail};
+use derive_more::Display;
 use tracerr::{Trace, Traced};
 use wasm_bindgen::{prelude::*, JsCast};
 
-// pub trait AppError: Display + Debug + Send + Sync + 'static {
-//
-// fn name(&self) -> &str;
-//
-// fn js_cause(&self) -> Option<&WasmErr>
-// }
+pub trait JsCaused: Display + Debug + Send + Sync + 'static {
+    fn name(&self) -> &'static str;
+
+    fn js_cause(&self) -> Option<js_sys::Error>;
+}
 
 // Wrapper for JS value which returned from JS side as error.
 // #[derive(Error, Debug)]
@@ -41,8 +42,8 @@ use wasm_bindgen::{prelude::*, JsCast};
 // }
 // }
 
-#[derive(Debug, Fail)]
-#[fail(display = "{}: {}", name, message)]
+#[derive(Debug, Display)]
+#[display(fmt = "{}: {}", name, message)]
 pub struct WasmErr {
     name: Cow<'static, str>,
     message: Cow<'static, str>,
@@ -106,19 +107,19 @@ impl JasonError {
     }
 }
 
-impl<E: Fail> From<Traced<E>> for JasonError {
+impl<E: JsCaused> From<Traced<E>> for JasonError {
     fn from(error: Traced<E>) -> Self {
         let (err, trace) = error.unwrap();
         let message = err.to_string();
-        match err.as_fail().find_root_cause().downcast_ref::<WasmErr>() {
+        match err.js_cause() {
             Some(e) => Self {
-                name: "Js error",
+                name: err.name(),
                 message,
                 trace,
-                source: Some(e.into()),
+                source: Some(e),
             },
             None => Self {
-                name: "Internal error",
+                name: err.name(),
                 message,
                 trace,
                 source: None,

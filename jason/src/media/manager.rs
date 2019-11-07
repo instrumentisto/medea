@@ -5,11 +5,12 @@
 use std::{
     cell::RefCell,
     convert::TryFrom,
+    error::Error as StdError,
     future::Future,
     rc::{Rc, Weak},
 };
 
-use failure::Fail;
+use derive_more::Display;
 use futures::{future, FutureExt as _, TryFutureExt as _};
 use js_sys::Promise;
 use tracerr::Traced;
@@ -26,20 +27,40 @@ use crate::{
 };
 
 use super::InputDeviceInfo;
-use crate::utils::JasonError;
+use crate::utils::{JasonError, JsCaused};
 
 /// Describes errors that may occur in the [`MediaManager`].
-#[derive(Debug, Fail)]
+#[derive(Debug, Display)]
 pub enum Error {
-    #[fail(display = "media devices failed: {}", 0)]
-    MediaDevices(#[fail(cause)] WasmErr),
-    #[fail(display = "get user media failed: {}", 0)]
-    GetUserMedia(#[fail(cause)] WasmErr),
-    #[fail(display = "get enumerate devices failed: {}", 0)]
-    GetEnumerateDevices(#[fail(cause)] WasmErr),
+    #[display(fmt = "media devices failed: {}", _0)]
+    MediaDevices(WasmErr),
+    #[display(fmt = "get user media failed: {}", _0)]
+    GetUserMedia(WasmErr),
+    #[display(fmt = "get enumerate devices failed: {}", _0)]
+    GetEnumerateDevices(WasmErr),
 }
 
 type Result<T, E = Traced<Error>> = std::result::Result<T, E>;
+
+impl StdError for Error {}
+
+impl JsCaused for Error {
+    fn name(&self) -> &'static str {
+        match self {
+            Error::MediaDevices(_) => "MediaDevices",
+            Error::GetUserMedia(_) => "GetUserMedia",
+            Error::GetEnumerateDevices(_) => "GetEnumerateDevices",
+        }
+    }
+
+    fn js_cause(&self) -> Option<js_sys::Error> {
+        match self {
+            Error::MediaDevices(err)
+            | Error::GetUserMedia(err)
+            | Error::GetEnumerateDevices(err) => Some(err.into()),
+        }
+    }
+}
 
 /// Manager that is responsible for [MediaStream][1] acquisition and storing.
 ///
@@ -266,7 +287,9 @@ impl MediaManagerHandle {
                 stream
                     .await
                     .map(|(stream, _)| stream.into())
-                    .map_err(|err| JasonError::from(err).into())
+                    .map_err(tracerr::wrap!(=> Error))
+                    .map_err(JasonError::from)
+                    .map_err(Into::into)
             }),
             Err(err) => future_to_promise(future::err(err)),
         }

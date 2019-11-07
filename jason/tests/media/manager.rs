@@ -10,9 +10,9 @@ use medea_jason::{
     MediaStreamConstraints, VideoTrackConstraints,
 };
 
-use crate::MockNavigator;
+use crate::{unwrap_error, MockNavigator};
 use medea_jason::utils::JasonError;
-use wasm_bindgen::{JsCast, JsValue};
+use wasm_bindgen::prelude::*;
 
 wasm_bindgen_test_configure!(run_in_browser);
 
@@ -64,14 +64,17 @@ async fn failed_get_user_media() {
     let result = JsFuture::from(
         media_manager.new_handle().init_local_stream(constraints),
     )
-    .map_err(WasmErr::from)
     .await;
     mock_navigator.stop();
     match result {
         Ok(_) => assert!(false),
-        Err(err) => assert_eq!(
-            err.to_string(),
-            "Error: get user media failed: some error".to_string()
-        ),
+        Err(err) => {
+            let e = unwrap_error(err);
+            assert_eq!(e.name(), "GetUserMedia");
+            assert_eq!(
+                e.message(),
+                "get user media failed: Unknown error: some error"
+            );
+        }
     }
 }

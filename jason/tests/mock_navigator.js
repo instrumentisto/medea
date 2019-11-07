@@ -18,3 +18,7 @@ export class MockNavigator {
     }
   }
 }
+
+export const unwrap_error = (err) => {
+  return err;
+};
