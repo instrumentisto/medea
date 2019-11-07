@@ -6,20 +6,21 @@ mod conn;
 mod ice_server;
 mod media;
 mod repo;
+mod stream;
+mod stream_request;
+mod track;
 
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, convert::TryFrom, rc::Rc};
 
-use futures::channel::mpsc;
+use anyhow::Result;
+use futures::{channel::mpsc, future};
 use medea_client_api_proto::{
     Direction, IceServer, PeerId as Id, Track, TrackId,
 };
 use medea_macro::dispatchable;
-use web_sys::RtcTrackEvent;
+use web_sys::{MediaStream as SysMediaStream, RtcTrackEvent};
 
-use crate::{
-    media::{MediaManager, MediaStream},
-    utils::WasmErr,
-};
+use crate::media::MediaManager;
 
 #[cfg(feature = "mockable")]
 #[doc(inline)]
@@ -32,28 +33,68 @@ pub use self::{
         TransceiverKind,
     },
     media::MediaConnections,
+    stream::{MediaStream, MediaStreamHandle},
+    stream_request::{Error, SimpleStreamRequest, StreamRequest},
+    track::MediaTrack,
 };
 
 #[dispatchable]
 #[allow(clippy::module_name_repetitions)]
 /// Events emitted from [`RtcPeerConnection`].
 pub enum PeerEvent {
-    /// [`RtcPeerConnection`] discovered new ice candidate.
+    /// [`RtcPeerConnection`] discovered new ICE candidate.
+    ///
+    /// Wrapper around [RTCPeerConnectionIceEvent][1].
+    ///
+    /// [1]: https://w3.org/TR/webrtc/#rtcpeerconnectioniceevent
     IceCandidateDiscovered {
+        /// ID of the [`PeerConnection`] that discovered new ICE candidate.
         peer_id: Id,
+
+        /// [`candidate` field][2] of the discovered [RTCIceCandidate][1].
+        ///
+        /// [1]: https://w3.org/TR/webrtc/#dom-rtcicecandidate
+        /// [2]: https://w3.org/TR/webrtc/#dom-rtcicecandidate-candidate
         candidate: String,
+
+        /// [`sdpMLineIndex` field][2] of the discovered [RTCIceCandidate][1].
+        ///
+        /// [1]: https://w3.org/TR/webrtc/#dom-rtcicecandidate
+        /// [2]: https://w3.org/TR/webrtc/#dom-rtcicecandidate-sdpmlineindex
         sdp_m_line_index: Option<u16>,
+
+        /// [`sdpMid` field][2] of the discovered [RTCIceCandidate][1].
+        ///
+        /// [1]: https://w3.org/TR/webrtc/#dom-rtcicecandidate
+        /// [2]: https://w3.org/TR/webrtc/#dom-rtcicecandidate-sdpmid
         sdp_mid: Option<String>,
     },
 
     /// [`RtcPeerConnection`] received new stream from remote sender.
     NewRemoteStream {
+        /// ID of the [`PeerConnection`] that received new stream from remote
+        /// sender.
         peer_id: Id,
+
+        /// ID of the remote sender's [`PeerConnection`].
         sender_id: Id,
+
+        /// Received [`MediaStream`].
         remote_stream: MediaStream,
+    },
+
+    /// [`RtcPeerConnection`] sent new local stream to remote members.
+    NewLocalStream {
+        /// ID of the [`PeerConnection`] that sent new local stream to remote
+        /// members.
+        peer_id: Id,
+
+        /// Local [`MediaStream`] that is sent to remote members.
+        local_stream: MediaStream,
     },
 }
 
+/// High-level wrapper around [`RtcPeerConnection`].
 #[allow(clippy::module_name_repetitions)]
 pub struct PeerConnection {
     /// Unique ID of [`PeerConnection`].
@@ -93,7 +134,7 @@ impl PeerConnection {
         media_manager: Rc<MediaManager>,
         enabled_audio: bool,
         enabled_video: bool,
-    ) -> Result<Self, WasmErr> {
+    ) -> Result<Self> {
         let peer = Rc::new(RtcPeerConnection::new(ice_servers)?);
         let media_connections = Rc::new(MediaConnections::new(
             Rc::clone(&peer),
@@ -217,8 +258,9 @@ impl PeerConnection {
     ///
     /// [1]: https://tools.ietf.org/html/rfc4566#section-5.14
     /// [2]: https://www.w3.org/TR/webrtc/#rtcrtptransceiver-interface
-    pub fn get_mids(&self) -> Result<HashMap<TrackId, String>, WasmErr> {
-        self.media_connections.get_mids()
+    #[inline]
+    pub fn get_mids(&self) -> Result<HashMap<TrackId, String>> {
+        Ok(self.media_connections.get_mids()?)
     }
 
     /// Sync provided tracks creating all required `Sender`s and
@@ -227,41 +269,75 @@ impl PeerConnection {
     pub async fn get_offer(
         &self,
         tracks: Vec<Track>,
-    ) -> Result<String, WasmErr> {
-        let request = self.media_connections.update_tracks(tracks)?;
+        local_stream: Option<&SysMediaStream>,
+    ) -> Result<String> {
+        self.media_connections.update_tracks(tracks)?;
 
-        if let Some(request) = request {
-            let local_stream =
-                self.media_manager.get_stream_by_request(request).await?;
-            self.media_connections
-                .insert_local_stream(&local_stream)
-                .await?;
-        }
+        self.insert_local_stream(local_stream).await?;
 
-        self.peer.create_and_set_offer().await
+        let offer = self.peer.create_and_set_offer().await?;
+
+        Ok(offer)
     }
 
-    /// Creates an SDP answer to an offer received from a remote peer and sets
-    /// it as local description. Must be called only if peer already has remote
-    /// description.
-    pub async fn create_and_set_answer(&self) -> Result<String, WasmErr> {
-        self.peer.create_and_set_answer().await
+    /// Replaces local stream in the underlying [RTCPeerConnection][1]
+    /// with a provided [MediaStream][2] if its have all required tracks.
+    ///
+    /// [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
+    /// [2]: https://www.w3.org/TR/mediacapture-streams/#mediastream
+    #[inline]
+    pub async fn inject_local_stream(
+        &self,
+        local_stream: &SysMediaStream,
+    ) -> Result<()> {
+        self.insert_local_stream(Some(local_stream)).await
+    }
+
+    /// Inserts provided [MediaStream][1] into underlying [RTCPeerConnection][2]
+    /// if it has all required tracks.
+    /// Requests local stream from [`MediaManager`] if no stream was provided.
+    /// Will produce [`PeerEvent::NewLocalStream`] if new stream was received
+    /// from [`MediaManager`].
+    ///
+    /// [1]: https://www.w3.org/TR/mediacapture-streams/#mediastream
+    /// [2]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
+    async fn insert_local_stream(
+        &self,
+        local_stream: Option<&SysMediaStream>,
+    ) -> Result<()> {
+        if let Some(request) = self.media_connections.get_stream_request() {
+            let caps = SimpleStreamRequest::try_from(request)?;
+            let (stream, is_new_stream) = if let Some(stream) = local_stream {
+                (caps.parse_stream(stream)?, false)
+            } else {
+                let (stream, is_new) =
+                    self.media_manager.get_stream(&caps).await?;
+                (caps.parse_stream(&stream)?, is_new)
+            };
+            self.media_connections.insert_local_stream(&stream).await?;
+            if is_new_stream {
+                let _ = self.peer_events_sender.unbounded_send(
+                    PeerEvent::NewLocalStream {
+                        peer_id: self.id,
+                        local_stream: stream,
+                    },
+                );
+            }
+        }
+        Ok(())
     }
 
     /// Updates underlying [RTCPeerConnection][1]'s remote SDP from answer.
     ///
     /// [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
-    pub async fn set_remote_answer(
-        &self,
-        answer: String,
-    ) -> Result<(), WasmErr> {
+    pub async fn set_remote_answer(&self, answer: String) -> Result<()> {
         self.set_remote_description(SdpType::Answer(answer)).await
     }
 
     /// Updates underlying [RTCPeerConnection][1]'s remote SDP from offer.
     ///
     /// [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
-    async fn set_remote_offer(&self, offer: String) -> Result<(), WasmErr> {
+    async fn set_remote_offer(&self, offer: String) -> Result<()> {
         self.set_remote_description(SdpType::Offer(offer)).await
     }
 
@@ -269,29 +345,30 @@ impl PeerConnection {
     /// description.
     ///
     /// [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
-    async fn set_remote_description(
-        &self,
-        desc: SdpType,
-    ) -> Result<(), WasmErr> {
+    async fn set_remote_description(&self, desc: SdpType) -> Result<()> {
         self.peer.set_remote_description(desc).await?;
         *self.has_remote_description.borrow_mut() = true;
 
-        // TODO: do it concurrently?
-        for candidate in self.ice_candidates_buffer.borrow_mut().drain(..) {
-            self.peer
-                .add_ice_candidate(
+        let mut candidates = self.ice_candidates_buffer.borrow_mut();
+        let mut futures = Vec::with_capacity(candidates.len());
+        while let Some(candidate) = candidates.pop() {
+            let peer = Rc::clone(&self.peer);
+            futures.push(async move {
+                peer.add_ice_candidate(
                     &candidate.candidate,
                     candidate.sdp_m_line_index,
                     &candidate.sdp_mid,
                 )
-                .await?;
+                .await
+            });
         }
-
+        future::try_join_all(futures).await?;
         Ok(())
     }
 
     /// Sync provided tracks creating all required `Sender`s and
-    /// `Receiver`s, request local stream if required.
+    /// `Receiver`s, request local stream if required, get, set and return
+    /// SDP answer.
     /// `set_remote_description` will create all transceivers and fire all
     /// `on_track` events, so it updates `Receiver`s before
     /// `set_remote_description` and update `Sender`s after.
@@ -301,7 +378,8 @@ impl PeerConnection {
         &self,
         offer: String,
         tracks: Vec<Track>,
-    ) -> Result<(), WasmErr> {
+        local_stream: Option<&SysMediaStream>,
+    ) -> Result<String> {
         // TODO: use drain_filter when its stable
         let (recv, send): (Vec<_>, Vec<_>) =
             tracks.into_iter().partition(|track| match track.direction {
@@ -314,17 +392,11 @@ impl PeerConnection {
 
         self.set_remote_offer(offer).await?;
 
-        let request = self.media_connections.update_tracks(send)?;
+        self.media_connections.update_tracks(send)?;
 
-        if let Some(request) = request {
-            let local_stream =
-                self.media_manager.get_stream_by_request(request).await?;
-            self.media_connections
-                .insert_local_stream(&local_stream)
-                .await?;
-        }
+        self.insert_local_stream(local_stream).await?;
 
-        Ok(())
+        Ok(self.peer.create_and_set_answer().await?)
     }
 
     /// Adds remote peers [ICE Candidate][1] to this peer.
@@ -335,7 +407,7 @@ impl PeerConnection {
         candidate: String,
         sdp_m_line_index: Option<u16>,
         sdp_mid: Option<String>,
-    ) -> Result<(), WasmErr> {
+    ) -> Result<()> {
         if *self.has_remote_description.borrow() {
             self.peer
                 .add_ice_candidate(&candidate, sdp_m_line_index, &sdp_mid)
@@ -347,7 +419,6 @@ impl PeerConnection {
                 sdp_mid,
             });
         }
-
         Ok(())
     }
 }
