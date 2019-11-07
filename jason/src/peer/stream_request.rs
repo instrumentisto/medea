@@ -17,18 +17,16 @@ use crate::media::{
 
 use super::{MediaStream, MediaTrack};
 
-/// Describes errors that may occur when validating [`StreamRequest`] or
-/// parsing [MediaStream][1].
-///
-/// [1]: https://w3.org/TR/mediacapture-streams/#mediastream
-#[derive(Error, Debug)]
+/// Errors that may occur when validating [`StreamRequest`] or
+/// parsing [`MediaStream`].
+#[derive(Debug, Error)]
 pub enum Error {
-    #[error("only one video track allowed in SimpleStreamRequest")]
+    #[error("only one video track is allowed in SimpleStreamRequest")]
     TooManyVideoTracks,
-    #[error("only one audio track allowed in SimpleStreamRequest")]
+    #[error("only one audio track is  allowed in SimpleStreamRequest")]
     TooManyAudioTracks,
     #[error("SimpleStreamRequest should have at least one track")]
-    NotFoundTracks,
+    NoTracks,
     #[error("provided MediaStream was expected to have single video track")]
     ExpectedVideoTracks,
     #[error("provided MediaStream was expected to have single audio track")]
@@ -41,7 +39,7 @@ pub enum Error {
 
 /// Representation of [MediaStreamConstraints][1] object.
 ///
-/// It's used for invoking [`getUserMedia()`][2] to specify what kinds of tracks
+/// It's used for invoking [getUserMedia()][2] to specify what kinds of tracks
 /// should be included into returned [`MediaStream`], and, optionally,
 /// to establish constraints for those [`MediaTrack`]'s settings.
 ///
@@ -87,6 +85,8 @@ impl SimpleStreamRequest {
         &self,
         stream: &SysMediaStream,
     ) -> Result<MediaStream, Error> {
+        use Error::*;
+
         let mut tracks = Vec::new();
 
         if let Some((id, audio)) = &self.audio {
@@ -106,10 +106,10 @@ impl SimpleStreamRequest {
                         TrackConstraints::Audio(audio.clone()),
                     ))
                 } else {
-                    return Err(Error::InvalidAudioTrack);
+                    return Err(InvalidAudioTrack);
                 }
             } else {
-                return Err(Error::ExpectedAudioTracks);
+                return Err(ExpectedAudioTracks);
             }
         }
 
@@ -130,10 +130,10 @@ impl SimpleStreamRequest {
                         TrackConstraints::Video(video.clone()),
                     ))
                 } else {
-                    return Err(Error::InvalidVideoTrack);
+                    return Err(InvalidVideoTrack);
                 }
             } else {
-                return Err(Error::ExpectedVideoTracks);
+                return Err(ExpectedVideoTracks);
             }
         }
 
@@ -145,26 +145,27 @@ impl TryFrom<StreamRequest> for SimpleStreamRequest {
     type Error = Error;
 
     fn try_from(value: StreamRequest) -> Result<Self, Self::Error> {
-        if value.video.len() > 1 {
-            Err(Error::TooManyVideoTracks)
-        } else if value.audio.len() > 1 {
-            Err(Error::TooManyAudioTracks)
-        } else if value.video.len() + value.audio.len() < 1 {
-            Err(Error::NotFoundTracks)
-        } else {
-            let mut request = Self {
-                audio: None,
-                video: None,
-            };
-            for (id, audio) in value.audio {
-                request.audio.replace((id, audio));
-            }
-            for (id, video) in value.video {
-                request.video.replace((id, video));
-            }
+        use Error::*;
 
-            Ok(request)
+        if value.video.len() > 1 {
+            return Err(TooManyVideoTracks);
+        } else if value.audio.len() > 1 {
+            return Err(TooManyAudioTracks);
+        } else if value.video.is_empty() && value.audio.is_empty() {
+            return Err(NoTracks);
         }
+
+        let mut req = Self {
+            audio: None,
+            video: None,
+        };
+        for (id, audio) in value.audio {
+            req.audio.replace((id, audio));
+        }
+        for (id, video) in value.video {
+            req.video.replace((id, video));
+        }
+        Ok(req)
     }
 }
 

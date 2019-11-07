@@ -4,7 +4,7 @@ use thiserror::*;
 use wasm_bindgen::{JsCast, JsValue};
 
 /// Wrapper for JS value which returned from JS side as error.
-#[derive(Error, Debug)]
+#[derive(Debug, Error)]
 #[error("{0}")]
 pub struct WasmErr(Cow<'static, str>);
 
@@ -32,8 +32,8 @@ impl From<String> for WasmErr {
     }
 }
 
-/// Prints to console.error.
-macro_rules! error {
+/// Prints `$e` as `console.error()`.
+macro_rules! console_error {
     ($e:expr) => {
         web_sys::console::error_1(&$e.into())
     };

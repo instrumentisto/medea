@@ -84,27 +84,27 @@ pub enum SdpType {
     Answer(String),
 }
 
-/// Describes errors that may occur during signaling between this and remote
+/// Errors that may occur during signaling between this and remote
 /// [RTCPeerConnection][1] and event handlers setting errors.
 ///
 /// [1]: https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection.
-#[derive(Error, Debug)]
+#[derive(Debug, Error)]
 pub enum Error {
-    #[error("failed add ice candidate {0}")]
+    #[error("failed to add ICE candidate: {0}")]
     AddIceCandidate(WasmErr),
-    #[error("failed create answer {0}")]
+    #[error("failed to create SDP answer: {0}")]
     CreateAnswer(WasmErr),
-    #[error("failed create peer connection {0}")]
+    #[error("failed to create PeerConnection: {0}")]
     CreatePeer(WasmErr),
-    #[error("failed create offer {0}")]
+    #[error("failed to create SDP offer: {0}")]
     CreateOffer(WasmErr),
-    #[error("failed set handler for RtcPeerConnectionIceEvent {0}")]
+    #[error("failed to set handler for RtcPeerConnectionIceEvent: {0}")]
     SetHandlerIceEvent(WasmErr),
-    #[error("failed set handler for RtcTrackEvent {0}")]
+    #[error("failed to set handler for RtcTrackEvent: {0}")]
     SetHandlerTrackEvent(WasmErr),
-    #[error("failed set local description {0}")]
+    #[error("failed to set local SDP description: {0}")]
     SetLocalDescription(WasmErr),
-    #[error("failed set remote description {0}")]
+    #[error("failed to set remote SDP description: {0}")]
     SetRemoteDescription(WasmErr),
 }
 

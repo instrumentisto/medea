@@ -34,6 +34,7 @@ pub struct TurnDatabase {
 }
 
 impl TurnDatabase {
+    /// Creates new [`TurnDatabase`].
     pub fn new<S: Into<ConnectionInfo> + Clone>(
         conn_timeout: Duration,
         conn_info: S,

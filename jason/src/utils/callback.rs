@@ -39,9 +39,8 @@ impl<A: Into<JsValue>> Callback<A> {
             .map(|f| f.call1(&JsValue::NULL, &arg.into()))
     }
 
-    /// Indicates that callback is set.
-    ///
-    /// Returns `false` if no callback is set.
+    /// Indicates if callback is set.
+    #[inline]
     pub fn is_set(&self) -> bool {
         self.f.borrow().as_ref().is_some()
     }

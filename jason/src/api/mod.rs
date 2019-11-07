@@ -31,6 +31,7 @@ struct Inner {
 ///
 /// Responsible for managing shared transports, local media
 /// and room initialization.
+#[allow(clippy::unused_self)]
 #[wasm_bindgen]
 impl Jason {
     #[wasm_bindgen(constructor)]
@@ -60,7 +61,5 @@ impl Jason {
     /// Drops [`Jason`] API object, so all related objects (rooms, connections,
     /// streams etc.) respectively. All objects related to this [`Jason`] API
     /// object will be detached (you will still hold them, but unable to use).
-    pub fn dispose(self) {
-        drop(self) // unused_self
-    }
+    pub fn dispose(self) {}
 }

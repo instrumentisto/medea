@@ -9,14 +9,14 @@ use crate::{
     utils::{window, IntervalHandle, WasmErr},
 };
 
-/// Describes errors that may occur into [`Heartbeat`].
-#[derive(Error, Debug)]
+/// Errors that may occur in [`Heartbeat`].
+#[derive(Debug, Error)]
 pub enum Error {
     #[error("unable to ping: no socket")]
     NoSocket,
     #[error("cannot set callback for ping send: {0}")]
     SetIntervalHandler(#[from] WasmErr),
-    #[error("failed send ping: {0}")]
+    #[error("failed to send ping: {0}")]
     SendPing(#[from] SocketError),
 }
 

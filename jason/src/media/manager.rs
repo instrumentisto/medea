@@ -26,14 +26,14 @@ use crate::{
 
 use super::InputDeviceInfo;
 
-/// Describes errors that may occur in the [`MediaManager`].
-#[derive(Error, Debug)]
+/// Errors that may occur in a [`MediaManager`].
+#[derive(Debug, Error)]
 pub enum Error {
-    #[error("media devices failed: {0}")]
+    #[error("Navigator.mediaDevices() failed: {0}")]
     MediaDevices(WasmErr),
-    #[error("get user media failed: {0}")]
+    #[error("MediaDevices.getUserMedia() failed: {0}")]
     GetUserMedia(WasmErr),
-    #[error("get enumerate devices failed: {0}")]
+    #[error("MediaDevices.enumerateDevices() failed: {0}")]
     GetEnumerateDevices(WasmErr),
 }
 

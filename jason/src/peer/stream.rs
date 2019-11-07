@@ -97,16 +97,16 @@ impl MediaStream {
         }
     }
 
+    /// Instantiates new [`MediaStreamHandle`] for use on JS side.
+    pub fn new_handle(&self) -> MediaStreamHandle {
+        MediaStreamHandle(Rc::downgrade(&self.0))
+    }
+
     /// Enables or disables all audio [`MediaTrack`]s in this stream.
     pub fn toggle_audio_tracks(&self, enabled: bool) {
         for track in self.0.audio_tracks.values() {
             track.set_enabled(enabled);
         }
-    }
-
-    /// Instantiates new [`MediaStreamHandle`] for use on JS side.
-    pub fn new_handle(&self) -> MediaStreamHandle {
-        MediaStreamHandle(Rc::downgrade(&self.0))
     }
 
     /// Enables or disables all video [`MediaTrack`]s in this stream.
@@ -136,6 +136,6 @@ pub struct MediaStreamHandle(Weak<InnerStream>);
 impl MediaStreamHandle {
     /// Returns the underlying [`MediaStream`][`SysMediaStream`] object.
     pub fn get_media_stream(&self) -> Result<SysMediaStream, JsValue> {
-        map_weak!(self, |inner| Clone::clone(&inner.stream))
+        map_weak!(self, |inner| inner.stream.clone())
     }
 }

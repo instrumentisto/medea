@@ -16,30 +16,30 @@ use crate::{
     utils::{EventListener, WasmErr},
 };
 
-/// Describes errors that may occur when working with [`WebSocket`].
-#[derive(Error, Debug)]
+/// Errors that may occur when working with [`WebSocket`].
+#[derive(Debug, Error)]
 pub enum Error {
-    #[error("failed create websocket: {0}")]
+    #[error("failed to create WebSocket: {0}")]
     CreateSocket(WasmErr),
-    #[error("failed init websocket")]
+    #[error("failed to init WebSocket")]
     InitSocket,
-    #[error("failed parse client message: {0}")]
+    #[error("failed to parse client message: {0}")]
     ParseClientMessage(serde_json::error::Error),
-    #[error("failed parse server message: {0}")]
+    #[error("failed to parse server message: {0}")]
     ParseServerMessage(serde_json::error::Error),
-    #[error("message is not string")]
+    #[error("message is not a string")]
     MessageNotString,
-    #[error("failed send message: {0}")]
+    #[error("failed to send message: {0}")]
     SendMessage(WasmErr),
-    #[error("failed set handler for CloseEvent: {0}")]
+    #[error("failed to set handler for CloseEvent: {0}")]
     SetHandlerOnClose(WasmErr),
-    #[error("failed set handler for OpenEvent: {0}")]
+    #[error("failed to set handler for OpenEvent: {0}")]
     SetHandlerOnOpen(WasmErr),
-    #[error("failed set handler for MessageEvent: {0}")]
+    #[error("failed to set handler for MessageEvent: {0}")]
     SetHandlerOnMessage(WasmErr),
-    #[error("Could not cast {0} to State variant")]
+    #[error("could not cast {0} to State variant")]
     CastState(u16),
-    #[error("Underlying socket is closed")]
+    #[error("underlying socket is closed")]
     ClosedSocket,
 }
 
@@ -108,7 +108,7 @@ impl InnerSocket {
             Ok(new_state) => self.socket_state = new_state,
             Err(err) => {
                 // unreachable, unless some vendor will break enum
-                error!(err.to_string())
+                console_error!(err.to_string())
             }
         };
     }
@@ -240,7 +240,7 @@ impl Drop for WebSocket {
                 .socket
                 .close_with_code_and_reason(1000, "Dropped unexpectedly")
             {
-                error!(err);
+                console_error!(err);
             }
         }
     }

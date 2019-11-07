@@ -78,7 +78,7 @@ where
                 self.closure.as_ref().unchecked_ref(),
             )
         {
-            error!(err);
+            console_error!(err);
         }
     }
 }

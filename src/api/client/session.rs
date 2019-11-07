@@ -65,7 +65,7 @@ impl WsSession {
         }
     }
 
-    /// Starts watchdog which will drop connection if now-last_activity >
+    /// Starts watchdog which will drop connection if `now`-`last_activity` >
     /// `idle_timeout`.
     fn start_watchdog(ctx: &mut <Self as Actor>::Context) {
         ctx.run_interval(Duration::new(1, 0), |session, ctx| {

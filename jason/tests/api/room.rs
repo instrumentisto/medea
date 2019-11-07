@@ -265,7 +265,10 @@ async fn error_get_local_stream_on_new_peer() {
     let (done, wait) = oneshot::channel();
     let cb = Closure::once_into_js(move |err: js_sys::Error| {
         done.send(()).unwrap();
-        assert_eq!(err.to_string(), "Error: get user media failed: some error");
+        assert_eq!(
+            err.to_string(),
+            "Error: MediaDevices.getUserMedia() failed: some error"
+        );
     });
     room_handle.on_failed_local_stream(cb.into()).unwrap();
 

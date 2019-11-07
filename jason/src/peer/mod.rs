@@ -57,7 +57,7 @@ pub enum PeerEvent {
         remote_stream: MediaStream,
     },
 
-    /// [`RtcPeerConnection`] send new local stream to remote members.
+    /// [`RtcPeerConnection`] sent new local stream to remote members.
     NewLocalStream {
         peer_id: Id,
         local_stream: MediaStream,
@@ -227,10 +227,9 @@ impl PeerConnection {
     ///
     /// [1]: https://tools.ietf.org/html/rfc4566#section-5.14
     /// [2]: https://www.w3.org/TR/webrtc/#rtcrtptransceiver-interface
+    #[inline]
     pub fn get_mids(&self) -> Result<HashMap<TrackId, String>> {
-        let mids = self.media_connections.get_mids()?;
-
-        Ok(mids)
+        Ok(self.media_connections.get_mids()?)
     }
 
     /// Sync provided tracks creating all required `Sender`s and
@@ -250,11 +249,12 @@ impl PeerConnection {
         Ok(offer)
     }
 
-    /// Replace local stream into underlying [RTCPeerConnection][1] on provided
-    /// [MediaStream][2] if its have all required tracks.
+    /// Replaces local stream in the underlying [RTCPeerConnection][1]
+    /// with a provided [MediaStream][2] if its have all required tracks.
     ///
     /// [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
     /// [2]: https://www.w3.org/TR/mediacapture-streams/#mediastream
+    #[inline]
     pub async fn inject_local_stream(
         &self,
         local_stream: &SysMediaStream,
@@ -262,7 +262,7 @@ impl PeerConnection {
         self.insert_local_stream(Some(local_stream)).await
     }
 
-    /// Insert provided [MediaStream][1] into underlying [RTCPeerConnection][2]
+    /// Inserts provided [MediaStream][1] into underlying [RTCPeerConnection][2]
     /// if it has all required tracks.
     /// Requests local stream from [`MediaManager`] if no stream was provided.
     /// Will produce [`PeerEvent::NewLocalStream`] if new stream was received
@@ -318,8 +318,8 @@ impl PeerConnection {
         self.peer.set_remote_description(desc).await?;
         *self.has_remote_description.borrow_mut() = true;
 
-        let mut futures = Vec::new();
         let mut candidates = self.ice_candidates_buffer.borrow_mut();
+        let mut futures = Vec::with_capacity(candidates.len());
         while let Some(candidate) = candidates.pop() {
             let peer = Rc::clone(&self.peer);
             futures.push(async move {
@@ -331,15 +331,13 @@ impl PeerConnection {
                 .await
             });
         }
-        for res in future::join_all(futures).await {
-            res?;
-        }
+        future::try_join_all(futures).await?;
         Ok(())
     }
 
     /// Sync provided tracks creating all required `Sender`s and
     /// `Receiver`s, request local stream if required, get, set and return
-    /// sdp answer.
+    /// SDP answer.
     /// `set_remote_description` will create all transceivers and fire all
     /// `on_track` events, so it updates `Receiver`s before
     /// `set_remote_description` and update `Sender`s after.
@@ -367,9 +365,7 @@ impl PeerConnection {
 
         self.insert_local_stream(local_stream).await?;
 
-        let answer = self.peer.create_and_set_answer().await?;
-
-        Ok(answer)
+        Ok(self.peer.create_and_set_answer().await?)
     }
 
     /// Adds remote peers [ICE Candidate][1] to this peer.
@@ -392,7 +388,6 @@ impl PeerConnection {
                 sdp_mid,
             });
         }
-
         Ok(())
     }
 }

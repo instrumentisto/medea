@@ -39,7 +39,8 @@ async fn failed_get_media_devices_info() {
         Ok(_) => assert!(false),
         Err(err) => assert_eq!(
             err.to_string(),
-            "Error: get enumerate devices failed: some error".to_string()
+            "Error: MediaDevices.enumerateDevices() failed: some error"
+                .to_string()
         ),
     }
 }
@@ -69,7 +70,7 @@ async fn failed_get_user_media() {
         Ok(_) => assert!(false),
         Err(err) => assert_eq!(
             err.to_string(),
-            "Error: get user media failed: some error".to_string()
+            "Error: MediaDevices.getUserMedia() failed: some error".to_string()
         ),
     }
 }
