@@ -8,12 +8,40 @@ use futures::{channel::oneshot, future};
 use macro_attr::*;
 use medea_client_api_proto::{ClientMsg, ServerMsg};
 use newtype_derive::NewtypeFrom;
+use thiserror::*;
 use web_sys::{CloseEvent, Event, MessageEvent, WebSocket as SysWebSocket};
 
 use crate::{
     rpc::CloseMsg,
     utils::{EventListener, WasmErr},
 };
+
+/// Errors that may occur when working with [`WebSocket`].
+#[derive(Debug, Error)]
+pub enum Error {
+    #[error("failed to create WebSocket: {0}")]
+    CreateSocket(WasmErr),
+    #[error("failed to init WebSocket")]
+    InitSocket,
+    #[error("failed to parse client message: {0}")]
+    ParseClientMessage(serde_json::error::Error),
+    #[error("failed to parse server message: {0}")]
+    ParseServerMessage(serde_json::error::Error),
+    #[error("message is not a string")]
+    MessageNotString,
+    #[error("failed to send message: {0}")]
+    SendMessage(WasmErr),
+    #[error("failed to set handler for CloseEvent: {0}")]
+    SetHandlerOnClose(WasmErr),
+    #[error("failed to set handler for OpenEvent: {0}")]
+    SetHandlerOnOpen(WasmErr),
+    #[error("failed to set handler for MessageEvent: {0}")]
+    SetHandlerOnMessage(WasmErr),
+    #[error("could not cast {0} to State variant")]
+    CastState(u16),
+    #[error("underlying socket is closed")]
+    ClosedSocket,
+}
 
 /// State of websocket.
 #[derive(Debug)]
@@ -35,7 +63,7 @@ impl State {
 }
 
 impl TryFrom<u16> for State {
-    type Error = WasmErr;
+    type Error = Error;
 
     fn try_from(value: u16) -> Result<Self, Self::Error> {
         match value {
@@ -43,9 +71,7 @@ impl TryFrom<u16> for State {
             1 => Ok(Self::OPEN),
             2 => Ok(Self::CLOSING),
             3 => Ok(Self::CLOSED),
-            _ => Err(WasmErr::Custom(
-                format!("Could not cast {} to State variant", value).into(),
-            )),
+            _ => Err(Error::CastState(value)),
         }
     }
 }
@@ -62,10 +88,13 @@ struct InnerSocket {
 pub struct WebSocket(Rc<RefCell<InnerSocket>>);
 
 impl InnerSocket {
-    fn new(url: &str) -> Result<Self, WasmErr> {
+    fn new(url: &str) -> Result<Self, Error> {
+        let socket = SysWebSocket::new(url)
+            .map_err(Into::into)
+            .map_err(Error::CreateSocket)?;
         Ok(Self {
             socket_state: State::CONNECTING,
-            socket: Rc::new(SysWebSocket::new(url)?),
+            socket: Rc::new(socket),
             on_open: None,
             on_message: None,
             on_close: None,
@@ -73,13 +102,13 @@ impl InnerSocket {
         })
     }
 
-    /// Checks underlying WebSocket state and updates socket_state.
+    /// Checks underlying WebSocket state and updates `socket_state`.
     fn update_state(&mut self) {
         match State::try_from(self.socket.ready_state()) {
             Ok(new_state) => self.socket_state = new_state,
             Err(err) => {
                 // unreachable, unless some vendor will break enum
-                err.log_err()
+                console_error!(err.to_string())
             }
         };
     }
@@ -88,7 +117,7 @@ impl InnerSocket {
 impl WebSocket {
     /// Initiates new WebSocket connection. Resolves only when underlying
     /// connection becomes active.
-    pub async fn new(url: &str) -> Result<Self, WasmErr> {
+    pub async fn new(url: &str) -> Result<Self, Error> {
         let (tx_close, rx_close) = oneshot::channel();
         let (tx_open, rx_open) = oneshot::channel();
 
@@ -98,24 +127,30 @@ impl WebSocket {
         {
             let mut socket_mut = socket.borrow_mut();
             let inner = Rc::clone(&socket);
-            socket_mut.on_close = Some(EventListener::new_once(
-                Rc::clone(&socket_mut.socket),
-                "close",
-                move |_| {
-                    inner.borrow_mut().update_state();
-                    let _ = tx_close.send(());
-                },
-            )?);
+            socket_mut.on_close = Some(
+                EventListener::new_once(
+                    Rc::clone(&socket_mut.socket),
+                    "close",
+                    move |_| {
+                        inner.borrow_mut().update_state();
+                        let _ = tx_close.send(());
+                    },
+                )
+                .map_err(Error::SetHandlerOnClose)?,
+            );
 
             let inner = Rc::clone(&socket);
-            socket_mut.on_open = Some(EventListener::new_once(
-                Rc::clone(&socket_mut.socket),
-                "open",
-                move |_| {
-                    inner.borrow_mut().update_state();
-                    let _ = tx_open.send(());
-                },
-            )?);
+            socket_mut.on_open = Some(
+                EventListener::new_once(
+                    Rc::clone(&socket_mut.socket),
+                    "open",
+                    move |_| {
+                        inner.borrow_mut().update_state();
+                        let _ = tx_open.send(());
+                    },
+                )
+                .map_err(Error::SetHandlerOnOpen)?,
+            );
         }
 
         let state = future::select(rx_open, rx_close).await;
@@ -126,60 +161,68 @@ impl WebSocket {
         match state {
             future::Either::Left((opened, _)) => match opened {
                 Ok(_) => Ok(Self(socket)),
-                Err(_) => Err(WasmErr::from("Failed to init WebSocket")),
+                Err(_) => Err(Error::InitSocket),
             },
-            future::Either::Right(_closed) => {
-                Err(WasmErr::from("Failed to init WebSocket"))
-            }
+            future::Either::Right(_closed) => Err(Error::InitSocket),
         }
     }
 
     /// Set handler on receive message from server.
-    pub fn on_message<F>(&self, mut f: F) -> Result<(), WasmErr>
+    pub fn on_message<F>(&self, mut f: F) -> Result<(), Error>
     where
-        F: (FnMut(Result<ServerMsg, WasmErr>)) + 'static,
+        F: (FnMut(Result<ServerMsg, Error>)) + 'static,
     {
         let mut inner_mut = self.0.borrow_mut();
-        inner_mut.on_message = Some(EventListener::new_mut(
-            Rc::clone(&inner_mut.socket),
-            "message",
-            move |msg| {
-                let parsed =
-                    ServerMessage::try_from(&msg).map(std::convert::Into::into);
-                f(parsed);
-            },
-        )?);
+        inner_mut.on_message = Some(
+            EventListener::new_mut(
+                Rc::clone(&inner_mut.socket),
+                "message",
+                move |msg| {
+                    let parsed = ServerMessage::try_from(&msg)
+                        .map(std::convert::Into::into);
+                    f(parsed);
+                },
+            )
+            .map_err(Into::into)
+            .map_err(Error::SetHandlerOnMessage)?,
+        );
         Ok(())
     }
 
     /// Set handler on close socket.
-    pub fn on_close<F>(&self, f: F) -> Result<(), WasmErr>
+    pub fn on_close<F>(&self, f: F) -> Result<(), Error>
     where
         F: (FnOnce(CloseMsg)) + 'static,
     {
         let mut inner_mut = self.0.borrow_mut();
         let inner = Rc::clone(&self.0);
-        inner_mut.on_close = Some(EventListener::new_once(
-            Rc::clone(&inner_mut.socket),
-            "close",
-            move |msg: CloseEvent| {
-                inner.borrow_mut().update_state();
-                f(CloseMsg::from(&msg));
-            },
-        )?);
+        inner_mut.on_close = Some(
+            EventListener::new_once(
+                Rc::clone(&inner_mut.socket),
+                "close",
+                move |msg: CloseEvent| {
+                    inner.borrow_mut().update_state();
+                    f(CloseMsg::from(&msg));
+                },
+            )
+            .map_err(Error::SetHandlerOnClose)?,
+        );
         Ok(())
     }
 
     /// Send message to server.
-    pub fn send(&self, msg: &ClientMsg) -> Result<(), WasmErr> {
+    pub fn send(&self, msg: &ClientMsg) -> Result<(), Error> {
         let inner = self.0.borrow();
+        let message =
+            serde_json::to_string(msg).map_err(Error::ParseClientMessage)?;
 
         match inner.socket_state {
             State::OPEN => inner
                 .socket
-                .send_with_str(&serde_json::to_string(msg)?)
-                .map_err(WasmErr::from),
-            _ => Err(WasmErr::from("Underlying socket is closed")),
+                .send_with_str(&message)
+                .map_err(Into::into)
+                .map_err(Error::SendMessage),
+            _ => Err(Error::ClosedSocket),
         }
     }
 }
@@ -197,7 +240,7 @@ impl Drop for WebSocket {
                 .socket
                 .close_with_code_and_reason(1000, "Dropped unexpectedly")
             {
-                WasmErr::from(err).log_err();
+                console_error!(err);
             }
         }
     }
@@ -209,16 +252,13 @@ macro_attr! {
 }
 
 impl TryFrom<&MessageEvent> for ServerMessage {
-    type Error = WasmErr;
+    type Error = Error;
 
-    fn try_from(msg: &MessageEvent) -> Result<Self, Self::Error> {
-        let payload = msg
-            .data()
-            .as_string()
-            .ok_or_else(|| WasmErr::from("Payload is not string"))?;
+    fn try_from(msg: &MessageEvent) -> std::result::Result<Self, Self::Error> {
+        let payload = msg.data().as_string().ok_or(Error::MessageNotString)?;
 
         serde_json::from_str::<ServerMsg>(&payload)
-            .map_err(WasmErr::from)
+            .map_err(Error::ParseServerMessage)
             .map(Self::from)
     }
 }

@@ -18,8 +18,11 @@ use crate::{
 
 #[doc(inline)]
 pub use self::{connection::ConnectionHandle, room::Room, room::RoomHandle};
-use crate::utils::WasmErr;
 
+/// General library interface.
+///
+/// Responsible for managing shared transports, local media
+/// and room initialization.
 #[wasm_bindgen]
 #[derive(Default)]
 pub struct Jason(Rc<RefCell<Inner>>);
@@ -30,20 +33,17 @@ struct Inner {
     rooms: Vec<Room>,
 }
 
-/// Main library handler.
-///
-/// Responsible for managing shared transports, local media
-/// and room initialization.
+#[allow(clippy::unused_self)]
 #[wasm_bindgen]
 impl Jason {
+    /// Instantiates new [`Jason`] interface to interact with this library.
     #[wasm_bindgen(constructor)]
     pub fn new() -> Self {
         set_panic_hook();
         Self::default()
     }
 
-    /// Returns [`RoomHandle`] for [`Room`] with the preconfigured authorization
-    /// `token` for connection with media server.
+    /// Returns [`RoomHandle`] for [`Room`].
     pub fn init_room(&self) -> RoomHandle {
         let rpc = Rc::new(WebsocketRpcClient::new(3000));
         let peer_repository = Box::new(peer::Repository::new(Rc::clone(
@@ -64,11 +64,10 @@ impl Jason {
                 }
                 Err(_) => {
                     // Note that in this case clean up will still happen.
-                    WasmErr::from(
+                    console_error!(
                         "'on_close' callback's 'Sender' was unexpectedly \
-                         cancelled.",
-                    )
-                    .log_err();
+                         cancelled."
+                    );
                 }
             }
             inner_clone.borrow_mut().media_manager = Rc::default();
@@ -78,14 +77,6 @@ impl Jason {
         let handle = room.new_handle();
         self.0.borrow_mut().rooms.push(room);
         handle
-    }
-
-    /// Sets `on_local_stream` callback, which will be invoked once media
-    /// acquisition request will resolve returning
-    /// [`MediaStreamHandle`](crate::media::MediaStreamHandle) or
-    /// [`WasmErr`](crate::utils::errors::WasmErr).
-    pub fn on_local_stream(&self, f: js_sys::Function) {
-        self.0.borrow_mut().media_manager.set_on_local_stream(f);
     }
 
     /// Returns handle to [`MediaManager`].

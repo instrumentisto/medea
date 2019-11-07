@@ -150,7 +150,7 @@ impl WebRtcPlayEndpoint {
 
     /// Resets state of this [`WebRtcPlayEndpoint`].
     ///
-    /// _Atm this only reset peer_id._
+    /// _Atm this only resets [`PeerId`]._
     pub fn reset(&self) {
         self.0.borrow_mut().reset()
     }

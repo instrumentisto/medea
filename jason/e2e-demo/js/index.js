@@ -212,7 +212,9 @@ window.onload = async function() {
 
   bindControlDebugMenu();
 
-  async function fillMediaDevicesInputs(audio_select, video_select) {
+  async function fillMediaDevicesInputs(audio_select, video_select, current_stream) {
+    const current_audio = current_stream.getAudioTracks().pop().label || "disable";
+    const current_video = current_stream.getVideoTracks().pop().label || "disable";
     const device_infos = await jason.media_manager().enumerate_devices();
     console.log('Available input and output devices:', device_infos);
     for (const device_info of device_infos) {
@@ -220,32 +222,31 @@ window.onload = async function() {
       option.value = device_info.device_id();
       if (device_info.kind() === 'audio') {
         option.text = device_info.label() || `Microphone ${audio_select.length + 1}`;
+        option.selected = option.text === current_audio;
         audio_select.append(option);
       } else if (device_info.kind() === 'video') {
         option.text = device_info.label() || `Camera ${video_select.length + 1}`;
+        option.selected = option.text === current_video;
         video_select.append(option);
       }
     }
   }
 
-  async function getStream(local_video, audio_select, video_select) {
+  async function getStream(audio_select, video_select) {
     let constraints = new rust.MediaStreamConstraints();
     let audio = new rust.AudioTrackConstraints();
-    let audioValue = audio_select.options[audio_select.selectedIndex].value;
-    let videoValue = video_select.options[video_select.selectedIndex].value;
-    if (audioValue) {
-      audio.device_id(audioValue)
+    let audioSource = audio_select.options[audio_select.selectedIndex];
+    if (audioSource) {
+      audio.device_id(audioSource.value);
     }
     constraints.audio(audio);
     let video = new rust.VideoTrackConstraints();
-    if (videoValue) {
-      video.device_id(videoValue)
+    let videoSource = video_select.options[video_select.selectedIndex];
+    if (videoSource) {
+      video.device_id(videoSource.value);
     }
     constraints.video(video);
-    let stream = await jason.media_manager().init_local_stream(constraints);
-    local_video.srcObject = stream;
-    local_video.play();
-    console.log(stream);
+    return await jason.media_manager().init_local_stream(constraints);
   }
 
   let room = newRoom();
@@ -293,17 +294,67 @@ window.onload = async function() {
     let videoSelect = document.getElementsByClassName('connect__select-device_video')[0];
     let localVideo = document.querySelector('.local-video > video');
 
+<<<<<<< HEAD
     await fillMediaDevicesInputs(audioSelect, videoSelect);
     await getStream(localVideo, audioSelect, videoSelect);
+=======
+    const updateLocalVideo = async (stream) => {
+      localVideo.srcObject = stream;
+      await localVideo.play();
+    };
+>>>>>>> master
 
-    audioSelect.addEventListener('change', () => {
-      getStream(localVideo, audioSelect, videoSelect);
+    const room = await jason.init_room();
+    try {
+      const stream = await getStream(audioSelect, videoSelect);
+      await updateLocalVideo(stream);
+      await fillMediaDevicesInputs(audioSelect, videoSelect, stream);
+      room.inject_local_stream(stream);
+    } catch (e) {
+      console.error("Init local video failed: " + e);
+    }
+
+    audioSelect.addEventListener('change', async () => {
+      try {
+        const stream = await getStream(audioSelect, videoSelect);
+        await updateLocalVideo(stream);
+        room.inject_local_stream(stream);
+      } catch (e) {
+        console.error("Changing audio source failed: " + e);
+      }
     });
 
-    videoSelect.addEventListener('change', () => {
-      getStream(localVideo, audioSelect, videoSelect);
+    videoSelect.addEventListener('change', async () => {
+      try {
+        const stream = await getStream(audioSelect, videoSelect);
+        await updateLocalVideo(stream);
+        room.inject_local_stream(stream);
+      } catch (e) {
+        console.error("Changing video source failed: " + e);
+      }
     });
 
+<<<<<<< HEAD
+=======
+    room.on_new_connection( (connection) => {
+      connection.on_remote_stream( async (stream) => {
+        let videoDiv = document.getElementsByClassName("remote-videos")[0];
+        let video = document.createElement("video");
+        video.srcObject = stream.get_media_stream();
+        let innerVideoDiv = document.createElement("div");
+        innerVideoDiv.className = "video";
+        innerVideoDiv.appendChild(video);
+        videoDiv.appendChild(innerVideoDiv);
+
+        await video.play();
+      });
+    });
+
+    room.on_failed_local_stream((error) => {
+      console.error(error);
+    });
+
+>>>>>>> master
     let muteAudio = document.getElementsByClassName('control__mute_audio')[0];
     let muteVideo = document.getElementsByClassName('control__mute_video')[0];
     let isAudioMuted = false;
@@ -336,27 +387,34 @@ window.onload = async function() {
 
     let bindJoinButtons = function(roomId) {
       joinCallerButton.onclick = async function() {
+<<<<<<< HEAD
         contentVisibility.hide(connectBtnsDiv);
+=======
+>>>>>>> master
         contentVisibility.show(controlBtns);
 
-        let username = usernameInput.value;
         try {
-          await axios.get(controlUrl + roomId);
-        } catch (e) {
-          if (e.response.status === 400) {
-            console.log("Room not found. Creating new room...");
-            room.join(await createRoom(roomId, username));
+          let username = usernameInput.value;
+          try {
+            await axios.get(controlUrl + roomId);
+          } catch (e) {
+            if (e.response.status === 400) {
+              console.log("Room not found. Creating new room...");
+              room.join(await createRoom(roomId, username));
+              return;
+            }
+          }
+          try {
+            await axios.get(controlUrl + roomId + '/' + username);
+          } catch (e) {
+            console.log("Member not found. Creating new member...");
+            room.join(await createMember(roomId, username));
             return;
           }
-        }
-        try {
-          await axios.get(controlUrl + roomId + '/' + username);
+          room.join(baseUrl + roomId + '/' + username + '/test')
         } catch (e) {
-          console.log("Member not found. Creating new member...");
-          room.join(await createMember(roomId, username));
-          return;
+          console.error("Join to room failed: " + e);
         }
-        room.join(baseUrl + roomId + '/' + username + '/test')
       };
     };
 

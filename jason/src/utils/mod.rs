@@ -1,7 +1,9 @@
 //! Miscellaneous utility structs and functions.
 
-mod callback;
+#[macro_use]
 mod errors;
+
+mod callback;
 mod event_listener;
 
 use js_sys::Reflect;
@@ -44,21 +46,9 @@ impl Drop for IntervalHandle {
 macro_rules! map_weak {
     ($v:expr, $closure:expr) => {{
         $v.0.upgrade()
-            .ok_or_else(|| {
-                $crate::utils::WasmErr::from("Detached state").into()
-            })
+            .ok_or_else(|| js_sys::Error::new("Detached state").into())
             .map($closure)
     }};
-}
-
-/// Copies any JS object.
-/// Basically, creates new reference to an object owned by JS.
-pub fn copy_js_ref<
-    T: AsRef<wasm_bindgen::JsValue> + From<wasm_bindgen::JsValue>,
->(
-    value: &T,
-) -> T {
-    T::from(value.as_ref().clone())
 }
 
 /// Returns property of JS object by name if its defined.

@@ -7,10 +7,7 @@ use std::{
 
 use wasm_bindgen::prelude::*;
 
-use crate::{
-    media::{MediaStream, MediaStreamHandle},
-    utils::Callback,
-};
+use crate::{peer::MediaStreamHandle, utils::Callback};
 
 /// Actual data of a connection with a specific remote [`Member`].
 ///
@@ -65,7 +62,7 @@ impl Connection {
     /// Invoke `on_remote_stream` [`Connection`]'s callback
     /// for a given [`MediaStream`] received from a related remote [`Member`].
     #[inline]
-    pub(crate) fn on_remote_stream(&self, stream: &MediaStream) {
-        self.0.borrow().on_remote_stream.call(stream.new_handle());
+    pub(crate) fn on_remote_stream(&self, stream: MediaStreamHandle) {
+        self.0.borrow().on_remote_stream.call(stream);
     }
 }

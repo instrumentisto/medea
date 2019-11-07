@@ -2,18 +2,39 @@
 
 use std::{borrow::ToOwned, cell::RefCell, collections::HashMap, rc::Rc};
 
-use medea_client_api_proto::{Direction, MediaType, PeerId, Track, TrackId};
+use futures::future;
+use medea_client_api_proto::{Direction, PeerId, Track, TrackId};
+use thiserror::*;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
     MediaStreamTrack, RtcRtpTransceiver, RtcRtpTransceiverDirection,
 };
 
-use crate::{
-    media::{MediaStream, MediaTrack, StreamRequest},
-    utils::WasmErr,
+use crate::{media::TrackConstraints, utils::WasmErr};
+
+use super::{
+    conn::{RtcPeerConnection, TransceiverDirection, TransceiverKind},
+    stream::MediaStream,
+    stream_request::StreamRequest,
+    track::MediaTrack,
 };
 
-use super::conn::{RtcPeerConnection, TransceiverDirection, TransceiverKind};
+/// Errors that may occur in [`MediaConnections`] storage.
+#[derive(Debug, Error)]
+pub enum Error {
+    #[error("failed to insert Track to a sender: {0}")]
+    InsertTrack(WasmErr),
+    #[error("unable to find Transceiver with provided mid: {0}")]
+    NotFoundTransceiver(String),
+    #[error("Peer has senders without mid")]
+    SendersWithoutMid,
+    #[error("Peer has receivers without mid")]
+    ReceiversWithoutMid,
+    #[error("provided stream does not have all necessary Tracks")]
+    InvalidMediaStream,
+    #[error("provided Track does not satisfy senders constraints")]
+    InvalidMediaTrack,
+}
 
 /// Actual data of [`MediaConnections`] storage.
 struct InnerMediaConnections {
@@ -66,17 +87,16 @@ impl MediaConnections {
         };
         s.senders
             .values()
-            .filter(|sender| sender.kind == kind)
-            .for_each(|sender| sender.set_track_enabled(enabled))
+            .filter(|s| s.kind() == kind)
+            .for_each(|s| s.set_track_enabled(enabled))
     }
 
     /// Returns `true` if all [`MediaTrack`]s of all [`Senders`] with given
     /// [`TransceiverKind`] are enabled or `false` otherwise.
     pub fn are_senders_enabled(&self, kind: TransceiverKind) -> bool {
         let conn = self.0.borrow();
-        for sender in conn.senders.values().filter(|sender| sender.kind == kind)
-        {
-            if !sender.is_track_enabled() {
+        for s in conn.senders.values().filter(|s| s.kind() == kind) {
+            if !s.is_track_enabled() {
                 return false;
             }
         }
@@ -85,24 +105,23 @@ impl MediaConnections {
 
     /// Returns mapping from a [`MediaTrack`] ID to a `mid` of
     /// this track's [`RtcRtpTransceiver`].
-    pub fn get_mids(&self) -> Result<HashMap<TrackId, String>, WasmErr> {
+    pub fn get_mids(&self) -> Result<HashMap<TrackId, String>, Error> {
         let mut s = self.0.borrow_mut();
         let mut mids =
             HashMap::with_capacity(s.senders.len() + s.receivers.len());
         for (track_id, sender) in &s.senders {
             mids.insert(
                 *track_id,
-                sender.transceiver.mid().ok_or_else(|| {
-                    WasmErr::from("Peer has senders without mid")
-                })?,
+                sender.transceiver.mid().ok_or(Error::SendersWithoutMid)?,
             );
         }
         for (track_id, receiver) in &mut s.receivers {
             mids.insert(
                 *track_id,
-                receiver.mid().map(ToOwned::to_owned).ok_or_else(|| {
-                    WasmErr::from("Peer has receivers without mid")
-                })?,
+                receiver
+                    .mid()
+                    .map(ToOwned::to_owned)
+                    .ok_or(Error::ReceiversWithoutMid)?,
             );
         }
         Ok(mids)
@@ -119,23 +138,23 @@ impl MediaConnections {
     pub fn update_tracks<I: IntoIterator<Item = Track>>(
         &self,
         tracks: I,
-    ) -> Result<Option<StreamRequest>, WasmErr> {
+    ) -> Result<(), Error> {
         let mut s = self.0.borrow_mut();
-        let mut stream_request = None;
         for track in tracks {
             match track.direction {
                 Direction::Send { mid, .. } => {
-                    stream_request
-                        .get_or_insert_with(StreamRequest::default)
-                        .add_track_request(track.id, track.media_type.clone());
-                    let sndr =
-                        Sender::new(track.id, &track.media_type, &s.peer, mid)?;
+                    let sndr = Sender::new(
+                        track.id,
+                        track.media_type.into(),
+                        &s.peer,
+                        mid,
+                    )?;
                     s.senders.insert(track.id, sndr);
                 }
                 Direction::Recv { sender, mid } => {
                     let recv = Receiver::new(
                         track.id,
-                        track.media_type,
+                        track.media_type.into(),
                         sender,
                         &s.peer,
                         mid,
@@ -144,7 +163,18 @@ impl MediaConnections {
                 }
             }
         }
-        Ok(stream_request)
+        Ok(())
+    }
+
+    /// Returns [`StreamRequest`] if this [`MediaConnections`] has [`Sender`]s.
+    pub fn get_stream_request(&self) -> Option<StreamRequest> {
+        let mut stream_request = None;
+        for sender in self.0.borrow().senders.values() {
+            stream_request
+                .get_or_insert_with(StreamRequest::default)
+                .add_track_request(sender.track_id, sender.caps.clone());
+        }
+        stream_request
     }
 
     /// Inserts tracks from a provided [`MediaStream`] into [`Sender`]s
@@ -162,28 +192,34 @@ impl MediaConnections {
     pub async fn insert_local_stream(
         &self,
         stream: &MediaStream,
-    ) -> Result<(), WasmErr> {
+    ) -> Result<(), Error> {
+        use Error::*;
+
         let s = self.0.borrow();
 
-        // Check that provided stream have all tracks that we need.
+        // Build sender to track pairs to catch errors before inserting.
+        let mut sender_and_track = Vec::with_capacity(s.senders.len());
         for sender in s.senders.values() {
-            if !stream.has_track(sender.track_id) {
-                return Err(WasmErr::from(
-                    "Stream does not have all necessary tracks",
-                ));
+            if let Some(track) = stream.get_track_by_id(sender.track_id) {
+                if sender.caps.satisfies(&track.track()) {
+                    sender_and_track.push((sender, track));
+                } else {
+                    return Err(InvalidMediaTrack);
+                }
+            } else {
+                return Err(InvalidMediaStream);
             }
         }
 
         stream.toggle_audio_tracks(s.enabled_audio);
         stream.toggle_video_tracks(s.enabled_video);
 
-        // TODO: do it concurrently?
-        for sender in s.senders.values() {
-            if let Some(track) = stream.get_track_by_id(sender.track_id) {
-                Sender::insert_and_enable_track(Rc::clone(sender), track)
-                    .await?
-            }
-        }
+        future::try_join_all(
+            sender_and_track
+                .into_iter()
+                .map(|(s, t)| Sender::insert_and_enable_track(Rc::clone(s), t)),
+        )
+        .await?;
 
         Ok(())
     }
@@ -260,9 +296,9 @@ impl MediaConnections {
 /// peer.
 pub struct Sender {
     track_id: TrackId,
+    caps: TrackConstraints,
     track: RefCell<Option<Rc<MediaTrack>>>,
     transceiver: RtcRtpTransceiver,
-    kind: TransceiverKind,
 }
 
 impl Sender {
@@ -272,46 +308,47 @@ impl Sender {
     /// lookup fails.
     fn new(
         track_id: TrackId,
-        caps: &MediaType,
+        caps: TrackConstraints,
         peer: &RtcPeerConnection,
         mid: Option<String>,
-    ) -> Result<Rc<Self>, WasmErr> {
-        let kind = match caps {
-            MediaType::Audio(_) => TransceiverKind::Audio,
-            MediaType::Video(_) => TransceiverKind::Video,
-        };
+    ) -> Result<Rc<Self>, Error> {
+        let kind = TransceiverKind::from(&caps);
         let transceiver = match mid {
             None => peer.add_transceiver(kind, TransceiverDirection::Sendonly),
-            Some(mid) => {
-                peer.get_transceiver_by_mid(&mid).ok_or_else(|| {
-                    WasmErr::from(format!(
-                        "Unable to find transceiver with provided mid {}",
-                        mid
-                    ))
-                })?
-            }
+            Some(mid) => peer
+                .get_transceiver_by_mid(&mid)
+                .ok_or(Error::NotFoundTransceiver(mid))?,
         };
         Ok(Rc::new(Self {
             track_id,
+            caps,
             track: RefCell::new(None),
             transceiver,
-            kind,
         }))
+    }
+
+    /// Returns kind of [`RtcRtpTransceiver`] this [`Sender`].
+    fn kind(&self) -> TransceiverKind {
+        TransceiverKind::from(&self.caps)
     }
 
     /// Inserts provided [`MediaTrack`] into provided [`Sender`]s transceiver
     /// and enables transceivers sender by changing its direction to `sendonly`.
+    ///
+    /// [1]: https://www.w3.org/TR/webrtc/#dom-rtcrtpsender-replacetrack
     async fn insert_and_enable_track(
         sender: Rc<Self>,
         track: Rc<MediaTrack>,
-    ) -> Result<(), WasmErr> {
+    ) -> Result<(), Error> {
         JsFuture::from(
             sender
                 .transceiver
                 .sender()
                 .replace_track(Some(track.track())),
         )
-        .await?;
+        .await
+        .map_err(Into::into)
+        .map_err(Error::InsertTrack)?;
 
         sender
             .transceiver
@@ -344,7 +381,7 @@ impl Sender {
 /// only when [`MediaTrack`] data arrives.
 pub struct Receiver {
     track_id: TrackId,
-    caps: MediaType,
+    caps: TrackConstraints,
     sender_id: PeerId,
     transceiver: Option<RtcRtpTransceiver>,
     mid: Option<String>,
@@ -362,22 +399,16 @@ impl Receiver {
     #[inline]
     fn new(
         track_id: TrackId,
-        caps: MediaType,
+        caps: TrackConstraints,
         sender_id: PeerId,
         peer: &RtcPeerConnection,
         mid: Option<String>,
     ) -> Self {
+        let kind = TransceiverKind::from(&caps);
         let transceiver = match mid {
-            None => match caps {
-                MediaType::Audio(_) => Some(peer.add_transceiver(
-                    TransceiverKind::Audio,
-                    TransceiverDirection::Recvonly,
-                )),
-                MediaType::Video(_) => Some(peer.add_transceiver(
-                    TransceiverKind::Video,
-                    TransceiverDirection::Recvonly,
-                )),
-            },
+            None => {
+                Some(peer.add_transceiver(kind, TransceiverDirection::Recvonly))
+            }
             Some(_) => None,
         };
         Self {

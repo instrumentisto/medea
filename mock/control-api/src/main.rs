@@ -3,6 +3,8 @@
 //! [Medea]: https://github.com/instrumentisto/medea
 //! [Control API]: https://tinyurl.com/yxsqplq7
 
+#![allow(clippy::must_use_candidate)]
+
 pub mod client;
 pub mod prelude;
 pub mod server;

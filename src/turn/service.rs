@@ -194,7 +194,7 @@ pub fn new_turn_auth_service<'a>(
 
 impl Service {
     /// Generates random alphanumeric string of specified length.
-    fn new_password(&self, n: usize) -> String {
+    fn generate_pass(n: usize) -> String {
         rand::thread_rng()
             .sample_iter(&Alphanumeric)
             .take(n)
@@ -242,7 +242,7 @@ impl Handler<CreateIceUser> for Service {
             self.turn_address.clone(),
             &msg.room_id,
             &msg.member_id.to_string(),
-            self.new_password(TURN_PASS_LEN),
+            Self::generate_pass(TURN_PASS_LEN),
         );
 
         Box::new(self.turn_db.insert(&ice_user).into_actor(self).then(

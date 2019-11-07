@@ -5,6 +5,7 @@ mod websocket;
 
 use std::{cell::RefCell, rc::Rc, vec};
 
+use anyhow::Result;
 use derive_more::Display;
 use futures::{
     channel::{mpsc, oneshot},
@@ -19,9 +20,10 @@ use medea_client_api_proto::{
 use wasm_bindgen::prelude::*;
 use web_sys::CloseEvent;
 
-use crate::utils::WasmErr;
-
-use self::{heartbeat::Heartbeat, websocket::WebSocket};
+use self::{
+    heartbeat::Heartbeat,
+    websocket::{Error, WebSocket},
+};
 
 /// Reasons of closing by client side.
 #[derive(Clone, Display, Debug)]
@@ -91,16 +93,19 @@ impl JsCloseReason {
 
 #[wasm_bindgen]
 impl JsCloseReason {
+    /// `wasm_bindgen` getter for `reason` field.
     #[wasm_bindgen(getter)]
     pub fn reason(&self) -> String {
         self.reason.clone()
     }
 
+    /// `wasm_bindgen` getter for `is_closed_by_server` field.
     #[wasm_bindgen(getter)]
     pub fn is_closed_by_server(&self) -> bool {
         self.is_closed_by_server
     }
 
+    /// `wasm_bindgen` getter for `is_err` field.
     #[wasm_bindgen(getter)]
     pub fn is_err(&self) -> bool {
         self.is_err
@@ -147,11 +152,8 @@ impl From<&CloseEvent> for CloseMsg {
 #[allow(clippy::module_name_repetitions)]
 #[cfg_attr(feature = "mockable", mockall::automock)]
 pub trait RpcClient {
-    // atm Establish connection with RPC server.
-    fn connect(
-        &self,
-        token: String,
-    ) -> LocalBoxFuture<'static, Result<(), WasmErr>>;
+    /// Establishes connection with RPC server.
+    fn connect(&self, token: String) -> LocalBoxFuture<'static, Result<()>>;
 
     /// Returns [`Stream`] of all [`Event`]s received by this [`RpcClient`].
     ///
@@ -177,11 +179,12 @@ pub trait RpcClient {
 // 2. Reconnect.
 // 3. Disconnect if no pongs.
 // 4. Buffering if no socket?
+/// Client API RPC client to talk with server via [`WebSocket`].
 pub struct WebsocketRpcClient(Rc<RefCell<Inner>>);
 
-/// Inner state of [`RpcClient`].
+/// Inner state of [`WebsocketRpcClient`].
 struct Inner {
-    /// WebSocket connection to remote media server.
+    /// [`WebSocket`] connection to remote media server.
     sock: Option<Rc<WebSocket>>,
 
     heartbeat: Heartbeat,
@@ -234,12 +237,11 @@ fn on_close(inner_rc: &RefCell<Inner>, close_msg: &CloseMsg) {
                 if let Err(reason) =
                     sub.send(CloseReason::ByServer(reason.clone()))
                 {
-                    WasmErr::from(format!(
+                    console_error!(format!(
                         "Failed to send reason of Jason close to subscriber: \
                          {:?}",
                         reason
                     ))
-                    .log_err();
                 }
             }
         }
@@ -253,7 +255,7 @@ fn on_close(inner_rc: &RefCell<Inner>, close_msg: &CloseMsg) {
 }
 
 /// Handles messages from remote server.
-fn on_message(inner_rc: &RefCell<Inner>, msg: Result<ServerMsg, WasmErr>) {
+fn on_message(inner_rc: &RefCell<Inner>, msg: Result<ServerMsg, Error>) {
     let inner = inner_rc.borrow();
     match msg {
         Ok(ServerMsg::Pong(_num)) => {
@@ -266,19 +268,20 @@ fn on_message(inner_rc: &RefCell<Inner>, msg: Result<ServerMsg, WasmErr>) {
                 if let Err(err) = sub.unbounded_send(event) {
                     // TODO: receiver is gone, should delete
                     //       this subs tx
-                    WasmErr::from(err).log_err();
+                    console_error!(err.to_string());
                 }
             }
         }
         Err(err) => {
             // TODO: protocol versions mismatch? should drop
             //       connection if so
-            err.log_err();
+            console_error!(err.to_string());
         }
     }
 }
 
 impl WebsocketRpcClient {
+    /// Creates new [`WebsocketRpcClient`] with a given `ping_interval`.
     pub fn new(ping_interval: i32) -> Self {
         Self(Inner::new(ping_interval))
     }
@@ -288,17 +291,14 @@ impl RpcClient for WebsocketRpcClient {
     /// Creates new WebSocket connection to remote media server.
     /// Starts `Heartbeat` if connection succeeds and binds handlers
     /// on receiving messages from server and closing socket.
-    fn connect(
-        &self,
-        token: String,
-    ) -> LocalBoxFuture<'static, Result<(), WasmErr>> {
+    fn connect(&self, token: String) -> LocalBoxFuture<'static, Result<()>> {
         let inner = Rc::clone(&self.0);
         Box::pin(async move {
             let socket = Rc::new(WebSocket::new(&token).await?);
             inner.borrow_mut().heartbeat.start(Rc::clone(&socket))?;
 
             let inner_rc = Rc::clone(&inner);
-            socket.on_message(move |msg: Result<ServerMsg, WasmErr>| {
+            socket.on_message(move |msg: Result<ServerMsg, Error>| {
                 on_message(&inner_rc, msg)
             })?;
 

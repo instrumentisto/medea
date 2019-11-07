@@ -17,6 +17,50 @@ use medea_jason::{
 
 wasm_bindgen_test_configure!(run_in_browser);
 
+#[wasm_bindgen_test]
+async fn not_satisfies_stopped_video_track() {
+    let video_device = video_devices().await.unwrap().pop().unwrap();
+
+    let mut constraints = MediaStreamConstraints::new();
+    let mut track_constraints = VideoTrackConstraints::new();
+    track_constraints.device_id(video_device.device_id());
+    constraints.video(track_constraints.clone());
+
+    let media_manager = MediaManager::default();
+    let (stream, _) =
+        media_manager.get_stream(constraints.clone()).await.unwrap();
+
+    assert!(stream.get_tracks().length() == 1);
+
+    let track = MediaStreamTrack::from(stream.get_tracks().pop());
+    track.stop();
+
+    assert!(track.kind() == "video");
+    assert!(!track_constraints.satisfies(&track));
+}
+
+#[wasm_bindgen_test]
+async fn not_satisfies_stopped_audio_track() {
+    let audio_device = audio_devices().await.unwrap().pop().unwrap();
+
+    let mut constraints = MediaStreamConstraints::new();
+    let mut track_constraints = AudioTrackConstraints::new();
+    track_constraints.device_id(audio_device.device_id());
+    constraints.audio(track_constraints.clone());
+
+    let media_manager = MediaManager::default();
+    let (stream, _) =
+        media_manager.get_stream(constraints.clone()).await.unwrap();
+
+    assert!(stream.get_tracks().length() == 1);
+
+    let track = MediaStreamTrack::from(stream.get_tracks().pop());
+    track.stop();
+
+    assert!(track.kind() == "audio");
+    assert!(!track_constraints.satisfies(&track));
+}
+
 // 1. Get device id of non default video device from enumerate_devices();
 // 2. Add it to constraints;
 // 3. Get stream by constraints;
@@ -31,10 +75,8 @@ async fn video_constraints_satisfies() {
     constraints.video(track_constraints.clone());
 
     let media_manager = MediaManager::default();
-    let stream = media_manager
-        .get_stream_by_constraints(constraints.clone())
-        .await
-        .unwrap();
+    let (stream, _) =
+        media_manager.get_stream(constraints.clone()).await.unwrap();
 
     assert!(stream.get_tracks().length() == 1);
 
@@ -58,10 +100,8 @@ async fn audio_constraints_satisfies() {
     constraints.audio(track_constraints.clone());
 
     let media_manager = MediaManager::default();
-    let stream = media_manager
-        .get_stream_by_constraints(constraints.clone())
-        .await
-        .unwrap();
+    let (stream, _) =
+        media_manager.get_stream(constraints.clone()).await.unwrap();
 
     assert!(stream.get_tracks().length() == 1);
 
@@ -99,10 +139,8 @@ async fn both_constraints_satisfies() {
     };
     let media_manager = MediaManager::default();
 
-    let stream = media_manager
-        .get_stream_by_constraints(constraints.clone())
-        .await
-        .unwrap();
+    let (stream, _) =
+        media_manager.get_stream(constraints.clone()).await.unwrap();
 
     assert!(stream.get_tracks().length() == 2);
 
@@ -137,16 +175,10 @@ async fn equal_constraints_produce_equal_streams() {
 
     let manager = MediaManager::default();
 
-    let stream = manager
-        .get_stream_by_constraints(constraints.clone())
-        .await
-        .unwrap();
+    let (stream, _) = manager.get_stream(constraints.clone()).await.unwrap();
     let stream_tracks = get_stream_tracks(stream);
 
-    let stream = manager
-        .get_stream_by_constraints(constraints.clone())
-        .await
-        .unwrap();
+    let (stream, _) = manager.get_stream(constraints.clone()).await.unwrap();
     let another_stream_tracks = get_stream_tracks(stream);
 
     let audio_track = stream_tracks
@@ -187,17 +219,12 @@ async fn different_constraints_produce_different_streams() {
 
         let manager = MediaManager::default();
 
-        let stream = manager
-            .get_stream_by_constraints(constraints)
-            .await
-            .unwrap();
+        let (stream, _) = manager.get_stream(constraints).await.unwrap();
         let stream_tracks = get_stream_tracks(stream);
 
         let constraints = build_constraints(audio_devices.next(), None);
-        let another_stream = manager
-            .get_stream_by_constraints(constraints)
-            .await
-            .unwrap();
+        let (another_stream, _) =
+            manager.get_stream(constraints).await.unwrap();
         let another_stream_tracks = get_stream_tracks(another_stream);
 
         let audio_track = stream_tracks
