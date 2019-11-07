@@ -87,7 +87,7 @@ impl From<CallbackEventProto> for CallbackEvent {
 #[derive(Clone, Serialize)]
 pub struct Callback {
     /// FID (Full ID) of element with which this event was occurred.
-    element: String,
+    fid: String,
 
     /// Event which occurred.
     event: CallbackEvent,
@@ -99,7 +99,7 @@ pub struct Callback {
 impl From<CallbackProto> for Callback {
     fn from(mut proto: CallbackProto) -> Self {
         Self {
-            element: proto.take_element(),
+            fid: proto.take_fid(),
             at: proto.take_at(),
             event: proto.event.unwrap().into(),
         }

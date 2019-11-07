@@ -98,7 +98,7 @@ impl Into<RequestOneofEventProto> for CallbackEvent {
 #[derive(Message)]
 #[rtype(result = "Result<(), ()>")]
 pub struct Callback {
-    element: StatefulFid,
+    fid: StatefulFid,
     event: CallbackEvent,
     at: DateTime<Utc>,
 }
@@ -107,7 +107,7 @@ impl Callback {
     /// Returns [`Callback`] with provided fields and current time as `at`.
     pub fn new(element: StatefulFid, event: CallbackEvent) -> Self {
         Self {
-            element,
+            fid: element,
             event,
             at: chrono::Utc::now(),
         }
@@ -118,7 +118,7 @@ impl Into<Request> for Callback {
     fn into(self) -> Request {
         let mut proto = Request::new();
         proto.event = Some(self.event.into());
-        proto.set_element(self.element.to_string());
+        proto.set_fid(self.fid.to_string());
         proto.set_at(self.at.to_rfc3339());
         proto
     }

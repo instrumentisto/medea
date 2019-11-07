@@ -374,7 +374,7 @@ impl ::protobuf::reflect::ProtobufValue for OnLeave_Reason {
 #[derive(PartialEq,Clone,Default)]
 pub struct Request {
     // message fields
-    pub element: ::std::string::String,
+    pub fid: ::std::string::String,
     pub at: ::std::string::String,
     // message oneof groups
     pub event: ::std::option::Option<Request_oneof_event>,
@@ -400,30 +400,30 @@ impl Request {
         ::std::default::Default::default()
     }
 
-    // string element = 1;
+    // string fid = 1;
 
 
-    pub fn get_element(&self) -> &str {
-        &self.element
+    pub fn get_fid(&self) -> &str {
+        &self.fid
     }
-    pub fn clear_element(&mut self) {
-        self.element.clear();
+    pub fn clear_fid(&mut self) {
+        self.fid.clear();
     }
 
     // Param is passed by value, moved
-    pub fn set_element(&mut self, v: ::std::string::String) {
-        self.element = v;
+    pub fn set_fid(&mut self, v: ::std::string::String) {
+        self.fid = v;
     }
 
     // Mutable pointer to the field.
     // If field is not initialized, it is initialized with default value first.
-    pub fn mut_element(&mut self) -> &mut ::std::string::String {
-        &mut self.element
+    pub fn mut_fid(&mut self) -> &mut ::std::string::String {
+        &mut self.fid
     }
 
     // Take field
-    pub fn take_element(&mut self) -> ::std::string::String {
-        ::std::mem::replace(&mut self.element, ::std::string::String::new())
+    pub fn take_fid(&mut self) -> ::std::string::String {
+        ::std::mem::replace(&mut self.fid, ::std::string::String::new())
     }
 
     // string at = 2;
@@ -571,7 +571,7 @@ impl ::protobuf::Message for Request {
             let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
                 1 => {
-                    ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.element)?;
+                    ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.fid)?;
                 },
                 2 => {
                     ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.at)?;
@@ -600,8 +600,8 @@ impl ::protobuf::Message for Request {
     #[allow(unused_variables)]
     fn compute_size(&self) -> u32 {
         let mut my_size = 0;
-        if !self.element.is_empty() {
-            my_size += ::protobuf::rt::string_size(1, &self.element);
+        if !self.fid.is_empty() {
+            my_size += ::protobuf::rt::string_size(1, &self.fid);
         }
         if !self.at.is_empty() {
             my_size += ::protobuf::rt::string_size(2, &self.at);
@@ -624,8 +624,8 @@ impl ::protobuf::Message for Request {
     }
 
     fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::ProtobufResult<()> {
-        if !self.element.is_empty() {
-            os.write_string(1, &self.element)?;
+        if !self.fid.is_empty() {
+            os.write_string(1, &self.fid)?;
         }
         if !self.at.is_empty() {
             os.write_string(2, &self.at)?;
@@ -687,9 +687,9 @@ impl ::protobuf::Message for Request {
             descriptor.get(|| {
                 let mut fields = ::std::vec::Vec::new();
                 fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
-                    "element",
-                    |m: &Request| { &m.element },
-                    |m: &mut Request| { &mut m.element },
+                    "fid",
+                    |m: &Request| { &m.fid },
+                    |m: &mut Request| { &mut m.fid },
                 ));
                 fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
                     "at",
@@ -728,7 +728,7 @@ impl ::protobuf::Message for Request {
 
 impl ::protobuf::Clear for Request {
     fn clear(&mut self) {
-        self.element.clear();
+        self.fid.clear();
         self.at.clear();
         self.event = ::std::option::Option::None;
         self.event = ::std::option::Option::None;
@@ -879,13 +879,13 @@ static file_descriptor_proto_data: &'static [u8] = b"\
     \x07OnLeave\x126\n\x06reason\x18\x01\x20\x01(\x0e2\x1e.medea_callback.On\
     Leave.ReasonR\x06reason\"Q\n\x06Reason\x12\x13\n\x0fLOST_CONNECTION\x10\
     \0\x12\x13\n\x0fSERVER_SHUTDOWN\x10\x01\x12\x10\n\x0cDISCONNECTED\x10\
-    \x02\x12\x0b\n\x07EVICTED\x10\x03\"\xa5\x01\n\x07Request\x12\x18\n\x07el\
-    ement\x18\x01\x20\x01(\tR\x07element\x12\x0e\n\x02at\x18\x02\x20\x01(\tR\
-    \x02at\x121\n\x07on_join\x18\x03\x20\x01(\x0b2\x16.medea_callback.OnJoin\
-    H\0R\x06onJoin\x124\n\x08on_leave\x18\x04\x20\x01(\x0b2\x17.medea_callba\
-    ck.OnLeaveH\0R\x07onLeaveB\x07\n\x05event\"\n\n\x08Response2H\n\x08Callb\
-    ack\x12<\n\x07OnEvent\x12\x17.medea_callback.Request\x1a\x18.medea_callb\
-    ack.Responseb\x06proto3\
+    \x02\x12\x0b\n\x07EVICTED\x10\x03\"\x9d\x01\n\x07Request\x12\x10\n\x03fi\
+    d\x18\x01\x20\x01(\tR\x03fid\x12\x0e\n\x02at\x18\x02\x20\x01(\tR\x02at\
+    \x121\n\x07on_join\x18\x03\x20\x01(\x0b2\x16.medea_callback.OnJoinH\0R\
+    \x06onJoin\x124\n\x08on_leave\x18\x04\x20\x01(\x0b2\x17.medea_callback.O\
+    nLeaveH\0R\x07onLeaveB\x07\n\x05event\"\n\n\x08Response2H\n\x08Callback\
+    \x12<\n\x07OnEvent\x12\x17.medea_callback.Request\x1a\x18.medea_callback\
+    .Responseb\x06proto3\
 ";
 
 static mut file_descriptor_proto_lazy: ::protobuf::lazy::Lazy<::protobuf::descriptor::FileDescriptorProto> = ::protobuf::lazy::Lazy {

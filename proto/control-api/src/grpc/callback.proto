@@ -31,7 +31,7 @@ message OnLeave {
 
 message Request {
   // FID (Full ID) of element with which was occurred event.
-  string element = 1;
+  string fid = 1;
 
   // Time on which event was occurred.
   string at = 2;

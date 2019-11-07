@@ -25,8 +25,7 @@ impl Inner {
     fn create_service(&mut self, url: CallbackUrl) -> Recipient<Callback> {
         let callback_service = match &url {
             CallbackUrl::Grpc(grpc_url) => {
-                let grpc_service = GrpcCallbackService::new(grpc_url).start();
-                grpc_service.recipient()
+                GrpcCallbackService::new(grpc_url).start().recipient()
             }
         };
         self.0.insert(url, callback_service.clone());
