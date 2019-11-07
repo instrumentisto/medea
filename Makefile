@@ -25,8 +25,6 @@ RUST_BETA_VER := 1.39-beta.5
 CHROME_VERSION := 77.0
 FIREFOX_VERSION := 69.0
 
-CURRENT_GIT_BRANCH := $(strip $(shell git branch | grep \* | cut -d ' ' -f2))
-
 crate-dir = .
 ifeq ($(crate),medea-jason)
 crate-dir = jason
@@ -819,7 +817,7 @@ endif
 		git commit -m \
 			"Release $(helm-chart)-$(helm-package-release-ver) Helm chart" ; \
 	fi
-	git checkout $(CURRENT_GIT_BRANCH)
+	git checkout -
 	git push origin gh-pages
 
 
