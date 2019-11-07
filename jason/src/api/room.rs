@@ -19,11 +19,12 @@ use wasm_bindgen_futures::{future_to_promise, spawn_local};
 use crate::{
     media::MediaStream,
     peer::{PeerEvent, PeerEventHandler, PeerRepository},
-    rpc::{ClientAndServerCloseReason, ClosedByServerReason, RpcClient},
+    rpc::{CloseReason, JsCloseReason, RpcClient},
     utils::{Callback, Callback2, WasmErr},
 };
 
 use super::{connection::Connection, ConnectionHandle};
+use crate::rpc::CloseByClientReason;
 
 /// JS side handle to `Room` where all the media happens.
 ///
@@ -151,7 +152,12 @@ impl Room {
         Self(room)
     }
 
-    pub fn close(self, reason: ClientAndServerCloseReason) {
+    /// Sets `close_reason` of [`InnerRoom`] and consumes [`Room`] pointer.
+    ///
+    /// Supposed that this function will trigger [`Drop`] implementation of
+    /// [`InnerRoom`] and call JS side `on_close` callback with provided
+    /// [`ClientAndServerCloseReason`].
+    pub fn close(self, reason: CloseReason) {
         self.0.borrow_mut().close(reason);
     }
 
@@ -174,8 +180,8 @@ struct InnerRoom {
     on_new_connection: Rc<Callback2<ConnectionHandle, WasmErr>>,
     enabled_audio: bool,
     enabled_video: bool,
-    on_close: Rc<Callback<ClosedByServerReason>>,
-    close_reason: Option<ClientAndServerCloseReason>,
+    on_close: Rc<Callback<JsCloseReason>>,
+    close_reason: Option<CloseReason>,
 }
 
 impl InnerRoom {
@@ -199,7 +205,11 @@ impl InnerRoom {
         }
     }
 
-    fn close(&mut self, reason: ClientAndServerCloseReason) {
+    /// Sets `close_reason` of [`InnerRoom`].
+    ///
+    /// Supposed that after this function call, [`Drop`] implementation of
+    /// [`InnerRoom`] will be triggered.
+    fn close(&mut self, reason: CloseReason) {
         self.close_reason = Some(reason);
     }
 
@@ -404,13 +414,19 @@ impl PeerEventHandler for InnerRoom {
 impl Drop for InnerRoom {
     /// Unsubscribes [`InnerRoom`] from all its subscriptions.
     fn drop(&mut self) {
-        if let Some(reason) = &self.close_reason {
-            if let Some(call_result) =
-                self.on_close.call(ClosedByServerReason::new(&reason))
-            {
-                if let Err(err) = call_result {
-                    WasmErr::from(err).log_err();
-                }
+        let close_reason = if let Some(reason) = &self.close_reason {
+            reason
+        } else {
+            &CloseReason::ByClient {
+                reason: CloseByClientReason::RoomUnexpectedlyDropped,
+                is_err: true,
+            }
+        };
+        if let Some(call_result) =
+            self.on_close.call(JsCloseReason::new(close_reason))
+        {
+            if let Err(err) = call_result {
+                WasmErr::from(err).log_err();
             }
         }
         self.rpc.unsub();

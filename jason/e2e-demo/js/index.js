@@ -269,7 +269,7 @@ window.onload = async function() {
       });
     });
 
-    room.on_close_by_server(function (on_closed) {
+    room.on_close(function (on_closed) {
       let videos = document.getElementsByClassName('video');
       for (let el of videos) {
         el.parentNode.removeChild(el);
@@ -277,7 +277,12 @@ window.onload = async function() {
       room = newRoom();
       contentVisibility.show(connectBtnsDiv);
       contentVisibility.hide(controlBtns);
-      alert(`Call was ended.\nReason: ${on_closed.reason}\nIs closed by server: ${on_closed.is_closed_by_server}`);
+      alert(`
+        Call was ended.
+        Reason: ${on_closed.reason};
+        Is closed by server: ${on_closed.is_closed_by_server};
+        Is error: ${on_closed.is_err}.
+      `);
     });
   }
 

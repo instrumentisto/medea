@@ -18,6 +18,7 @@ use crate::{
 
 #[doc(inline)]
 pub use self::{connection::ConnectionHandle, room::Room, room::RoomHandle};
+use crate::utils::WasmErr;
 
 #[wasm_bindgen]
 #[derive(Default)]
@@ -55,9 +56,20 @@ impl Jason {
             //       will be supported
             let mut rooms = Vec::new();
             mem::swap(&mut inner_clone.borrow_mut().rooms, &mut rooms);
-            let reason = res.unwrap();
-            for room in rooms {
-                room.close(reason.clone());
+            match res {
+                Ok(reason) => {
+                    for room in rooms {
+                        room.close(reason.clone());
+                    }
+                }
+                Err(_) => {
+                    // Note that in this case clean up will still happen.
+                    WasmErr::from(
+                        "'on_close' callback's 'Sender' was unexpectedly \
+                         cancelled.",
+                    )
+                    .log_err();
+                }
             }
             inner_clone.borrow_mut().media_manager = Rc::default();
         }));

@@ -13,7 +13,8 @@ use futures::{
 };
 use js_sys::Date;
 use medea_client_api_proto::{
-    ClientMsg, CloseDescription, CloseReason, Command, Event, ServerMsg,
+    ClientMsg, CloseDescription, CloseReason as CloseByServerReason, Command,
+    Event, ServerMsg,
 };
 use wasm_bindgen::prelude::*;
 use web_sys::CloseEvent;
@@ -22,15 +23,88 @@ use crate::utils::WasmErr;
 
 use self::{heartbeat::Heartbeat, websocket::WebSocket};
 
+/// Reasons of closing by client side.
 #[derive(Clone, Display, Debug)]
 pub enum CloseByClientReason {
-    ReconnectionFailed,
+    /// [`Room`] was dropped without `close_reason`.
+    RoomUnexpectedlyDropped,
 }
 
+/// Reasons of closing by client side and server side.
 #[derive(Clone, Display, Debug)]
-pub enum ClientAndServerCloseReason {
-    ByServer(CloseReason),
-    ByClient(CloseByClientReason),
+pub enum CloseReason {
+    /// Closed by server.
+    ByServer(CloseByServerReason),
+
+    /// Closed by client.
+    #[display(fmt = "{}", reason)]
+    ByClient {
+        /// Reason of closing.
+        reason: CloseByClientReason,
+
+        /// Is closing considered as error?
+        is_err: bool,
+    },
+}
+
+/// Reason of why Jason was closed.
+///
+/// This struct will be provided into `on_close_by_server` JS side callback.
+#[wasm_bindgen]
+pub struct JsCloseReason {
+    /// Is closed by server?
+    ///
+    /// `true` if [`CloseReason::ByServer`].
+    is_closed_by_server: bool,
+
+    /// Reason of closing.
+    reason: String,
+
+    /// Is closing considered as error?
+    ///
+    /// This field may be `true` only on closing by client.
+    is_err: bool,
+}
+
+impl JsCloseReason {
+    /// Creates new [`ClosedByServerReason`] with provided [`CloseReason`]
+    /// converted into [`String`].
+    ///
+    /// `is_err` may be `true` only on closing by client.
+    ///
+    /// `is_closed_by_server` is `true` on [`CloseReason::ByServer`].
+    pub fn new(reason: &CloseReason) -> Self {
+        match reason {
+            CloseReason::ByServer(reason) => Self {
+                reason: reason.to_string(),
+                is_closed_by_server: true,
+                is_err: false,
+            },
+            CloseReason::ByClient { reason, is_err } => Self {
+                reason: reason.to_string(),
+                is_closed_by_server: false,
+                is_err: *is_err,
+            },
+        }
+    }
+}
+
+#[wasm_bindgen]
+impl JsCloseReason {
+    #[wasm_bindgen(getter)]
+    pub fn reason(&self) -> String {
+        self.reason.clone()
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn is_closed_by_server(&self) -> bool {
+        self.is_closed_by_server
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn is_err(&self) -> bool {
+        self.is_err
+    }
 }
 
 /// Connection with remote was closed.
@@ -40,7 +114,8 @@ pub enum CloseMsg {
     ///
     /// Determines by close code `1000` and existence of
     /// [`RpcConnectionCloseReason`].
-    Normal(u16, CloseReason),
+    Normal(u16, CloseByServerReason),
+
     /// Connection was unexpectedly closed. Consider reconnecting.
     ///
     /// Unexpected close determines by close code != `1000` and for close code
@@ -64,45 +139,6 @@ impl From<&CloseEvent> for CloseMsg {
             }
             _ => Self::Disconnect(code),
         }
-    }
-}
-
-/// Reason of why Jason was closed.
-///
-/// This struct will be provided into `on_close_by_server` JS side callback.
-#[wasm_bindgen]
-pub struct ClosedByServerReason {
-    is_closed_by_server: bool,
-    reason: String,
-}
-
-impl ClosedByServerReason {
-    /// Creates new [`ClosedByServerReason`] with provided [`CloseReason`]
-    /// converted into [`String`].
-    pub fn new(reason: &ClientAndServerCloseReason) -> Self {
-        match reason {
-            ClientAndServerCloseReason::ByServer(reason) => Self {
-                reason: reason.to_string(),
-                is_closed_by_server: true,
-            },
-            ClientAndServerCloseReason::ByClient(reason) => Self {
-                reason: reason.to_string(),
-                is_closed_by_server: false,
-            },
-        }
-    }
-}
-
-#[wasm_bindgen]
-impl ClosedByServerReason {
-    #[wasm_bindgen(getter)]
-    pub fn reason(&self) -> String {
-        self.reason.clone()
-    }
-
-    #[wasm_bindgen(getter)]
-    pub fn is_closed_by_server(&self) -> bool {
-        self.is_closed_by_server
     }
 }
 
@@ -133,10 +169,7 @@ pub trait RpcClient {
     /// [`Room`]: crate::api::room::Room
     fn on_close(
         &self,
-    ) -> LocalBoxFuture<
-        'static,
-        Result<ClientAndServerCloseReason, oneshot::Canceled>,
-    >;
+    ) -> LocalBoxFuture<'static, Result<CloseReason, oneshot::Canceled>>;
 }
 
 // TODO:
@@ -161,7 +194,7 @@ struct Inner {
     ///
     /// Note that [`CloseReason`] will not be sent if WebSocket closed with
     /// [`RpcConnectionCloseReason::NewConnection`] reason.
-    on_close_subscribers: Vec<oneshot::Sender<ClientAndServerCloseReason>>,
+    on_close_subscribers: Vec<oneshot::Sender<CloseReason>>,
 }
 
 impl Inner {
@@ -189,7 +222,7 @@ fn on_close(inner_rc: &RefCell<Inner>, close_msg: &CloseMsg) {
     if let CloseMsg::Normal(_, reason) = &close_msg {
         // This is reconnecting and this is not considered as connection
         // close.
-        if let CloseReason::Reconnected = reason {
+        if let CloseByServerReason::Reconnected = reason {
         } else {
             let mut on_close_subscribers = Vec::new();
             std::mem::swap(
@@ -198,8 +231,8 @@ fn on_close(inner_rc: &RefCell<Inner>, close_msg: &CloseMsg) {
             );
 
             for sub in on_close_subscribers {
-                if let Err(reason) = sub
-                    .send(ClientAndServerCloseReason::ByServer(reason.clone()))
+                if let Err(reason) =
+                    sub.send(CloseReason::ByServer(reason.clone()))
                 {
                     WasmErr::from(format!(
                         "Failed to send reason of Jason close to subscriber: \
@@ -309,10 +342,7 @@ impl RpcClient for WebsocketRpcClient {
     /// RPC connection closing initiated by server.
     fn on_close(
         &self,
-    ) -> LocalBoxFuture<
-        'static,
-        Result<ClientAndServerCloseReason, oneshot::Canceled>,
-    > {
+    ) -> LocalBoxFuture<'static, Result<CloseReason, oneshot::Canceled>> {
         let (tx, rx) = oneshot::channel();
         self.0.borrow_mut().on_close_subscribers.push(tx);
         Box::pin(rx)

@@ -6,18 +6,19 @@ use futures::{
     channel::{mpsc, oneshot},
     future::{self, Either},
 };
-use medea_client_api_proto::{CloseReason, Event, IceServer, PeerId};
+use medea_client_api_proto::{
+    CloseReason as CloseByServerReason, Event, IceServer, PeerId,
+};
 use medea_jason::{
     api::Room,
     media::MediaManager,
     peer::{MockPeerRepository, PeerConnection, PeerEvent},
-    rpc::MockRpcClient,
+    rpc::{CloseReason, MockRpcClient},
 };
 use wasm_bindgen::{prelude::*, JsValue};
 use wasm_bindgen_test::*;
 
 use crate::{get_test_tracks, resolve_after};
-use medea_jason::rpc::ClientAndServerCloseReason;
 
 wasm_bindgen_test_configure!(run_in_browser);
 
@@ -177,7 +178,18 @@ async fn mute_video_room_before_init_peer() {
     assert!(!peer.is_send_video_enabled());
 }
 
-macro_rules! my_assert_eq {
+/// `assert_eq` analog but on failed comparison error will be sent with
+/// [`oneshot::Sender`].
+///
+/// This macro will be used in JS callback tests because this is the only option
+/// to trigger test fail.
+///
+/// `$test_tx` - [`oneshot::Sender`] to which comparison error will be sent
+///
+/// `$a` - left item of comparision
+///
+/// `$b` - right item of comparision
+macro_rules! callback_assert_eq {
     ($test_tx:tt, $a:expr, $b:expr) => {
         if $a != $b {
             $test_tx.send(Err(format!("'{}' != '{}'", $a, $b)));
@@ -221,8 +233,12 @@ async fn on_close_by_server_js_side_callback() {
         .on_close(
             Closure::once_into_js(move |closed: JsValue| {
                 let close_reason = get_reason(&closed);
-                my_assert_eq!(test_tx, close_reason, "Finished");
-                my_assert_eq!(test_tx, get_is_closed_by_server(&closed), true);
+                callback_assert_eq!(test_tx, close_reason, "Finished");
+                callback_assert_eq!(
+                    test_tx,
+                    get_is_closed_by_server(&closed),
+                    true
+                );
 
                 test_tx.send(Ok(()));
             })
@@ -230,7 +246,7 @@ async fn on_close_by_server_js_side_callback() {
         )
         .unwrap();
 
-    room.close(ClientAndServerCloseReason::ByServer(CloseReason::Finished));
+    room.close(CloseReason::ByServer(CloseByServerReason::Finished));
 
     let result =
         future::select(Box::pin(test_rx), Box::pin(resolve_after(500))).await;
