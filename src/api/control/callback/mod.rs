@@ -15,6 +15,8 @@ use medea_control_api_proto::grpc::callback::{
 
 use crate::api::control::refs::StatefulFid;
 
+use self::services::CallbackServiceError;
+
 /// Event for `on_leave` `Member` callback.
 pub struct OnLeaveEvent {
     /// Reason of why `Member` was lost.
@@ -45,9 +47,6 @@ pub enum OnLeaveReason {
 
     /// Member was normally disconnected.
     Disconnected,
-
-    /// Member was evicted from the Medea media server by Control API.
-    Evicted,
 }
 
 impl Into<OnLeaveReasonProto> for OnLeaveReason {
@@ -56,7 +55,6 @@ impl Into<OnLeaveReasonProto> for OnLeaveReason {
             Self::LostConnection => OnLeaveReasonProto::LOST_CONNECTION,
             Self::ServerShutdown => OnLeaveReasonProto::SERVER_SHUTDOWN,
             Self::Disconnected => OnLeaveReasonProto::DISCONNECTED,
-            Self::Evicted => OnLeaveReasonProto::EVICTED,
         }
     }
 }
@@ -96,7 +94,7 @@ impl Into<RequestOneofEventProto> for CallbackEvent {
 /// This struct is used as [`Message`] for sending callback in all callback
 /// services.
 #[derive(Message)]
-#[rtype(result = "Result<(), ()>")]
+#[rtype(result = "Result<(), CallbackServiceError>")]
 pub struct Callback {
     fid: StatefulFid,
     event: CallbackEvent,

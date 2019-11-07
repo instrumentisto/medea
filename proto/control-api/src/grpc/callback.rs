@@ -315,7 +315,6 @@ pub enum OnLeave_Reason {
     LOST_CONNECTION = 0,
     SERVER_SHUTDOWN = 1,
     DISCONNECTED = 2,
-    EVICTED = 3,
 }
 
 impl ::protobuf::ProtobufEnum for OnLeave_Reason {
@@ -328,7 +327,6 @@ impl ::protobuf::ProtobufEnum for OnLeave_Reason {
             0 => ::std::option::Option::Some(OnLeave_Reason::LOST_CONNECTION),
             1 => ::std::option::Option::Some(OnLeave_Reason::SERVER_SHUTDOWN),
             2 => ::std::option::Option::Some(OnLeave_Reason::DISCONNECTED),
-            3 => ::std::option::Option::Some(OnLeave_Reason::EVICTED),
             _ => ::std::option::Option::None
         }
     }
@@ -338,7 +336,6 @@ impl ::protobuf::ProtobufEnum for OnLeave_Reason {
             OnLeave_Reason::LOST_CONNECTION,
             OnLeave_Reason::SERVER_SHUTDOWN,
             OnLeave_Reason::DISCONNECTED,
-            OnLeave_Reason::EVICTED,
         ];
         values
     }
@@ -875,17 +872,16 @@ impl ::protobuf::reflect::ProtobufValue for Response {
 }
 
 static file_descriptor_proto_data: &'static [u8] = b"\
-    \n\x0ecallback.proto\x12\x0emedea_callback\"\x08\n\x06OnJoin\"\x94\x01\n\
+    \n\x0ecallback.proto\x12\x0emedea_callback\"\x08\n\x06OnJoin\"\x87\x01\n\
     \x07OnLeave\x126\n\x06reason\x18\x01\x20\x01(\x0e2\x1e.medea_callback.On\
-    Leave.ReasonR\x06reason\"Q\n\x06Reason\x12\x13\n\x0fLOST_CONNECTION\x10\
+    Leave.ReasonR\x06reason\"D\n\x06Reason\x12\x13\n\x0fLOST_CONNECTION\x10\
     \0\x12\x13\n\x0fSERVER_SHUTDOWN\x10\x01\x12\x10\n\x0cDISCONNECTED\x10\
-    \x02\x12\x0b\n\x07EVICTED\x10\x03\"\x9d\x01\n\x07Request\x12\x10\n\x03fi\
-    d\x18\x01\x20\x01(\tR\x03fid\x12\x0e\n\x02at\x18\x02\x20\x01(\tR\x02at\
-    \x121\n\x07on_join\x18\x03\x20\x01(\x0b2\x16.medea_callback.OnJoinH\0R\
-    \x06onJoin\x124\n\x08on_leave\x18\x04\x20\x01(\x0b2\x17.medea_callback.O\
-    nLeaveH\0R\x07onLeaveB\x07\n\x05event\"\n\n\x08Response2H\n\x08Callback\
-    \x12<\n\x07OnEvent\x12\x17.medea_callback.Request\x1a\x18.medea_callback\
-    .Responseb\x06proto3\
+    \x02\"\x9d\x01\n\x07Request\x12\x10\n\x03fid\x18\x01\x20\x01(\tR\x03fid\
+    \x12\x0e\n\x02at\x18\x02\x20\x01(\tR\x02at\x121\n\x07on_join\x18\x03\x20\
+    \x01(\x0b2\x16.medea_callback.OnJoinH\0R\x06onJoin\x124\n\x08on_leave\
+    \x18\x04\x20\x01(\x0b2\x17.medea_callback.OnLeaveH\0R\x07onLeaveB\x07\n\
+    \x05event\"\n\n\x08Response2H\n\x08Callback\x12<\n\x07OnEvent\x12\x17.me\
+    dea_callback.Request\x1a\x18.medea_callback.Responseb\x06proto3\
 ";
 
 static mut file_descriptor_proto_lazy: ::protobuf::lazy::Lazy<::protobuf::descriptor::FileDescriptorProto> = ::protobuf::lazy::Lazy {

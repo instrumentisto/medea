@@ -23,9 +23,6 @@ message OnLeave {
 
     // Member was normally disconnected.
     DISCONNECTED = 2;
-
-    // Member was evicted from the Medea media server by Control API.
-    EVICTED = 3;
   }
 }
 

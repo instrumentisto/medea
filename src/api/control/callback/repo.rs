@@ -6,11 +6,15 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use actix::{Actor as _, Recipient};
+use actix::{Actor as _, Arbiter, Recipient};
+use futures::future::Future as _;
 
-use crate::api::control::{
-    callback::{url::CallbackUrl, CallbackEvent},
-    refs::StatefulFid,
+use crate::{
+    api::control::{
+        callback::{url::CallbackUrl, CallbackEvent},
+        refs::StatefulFid,
+    },
+    log::prelude::*,
 };
 
 use super::{services::grpc::GrpcCallbackService, Callback};
@@ -78,11 +82,16 @@ impl CallbackRepository {
         fid: StatefulFid,
         event: T,
     ) {
-        // TODO: Remove Result suppression ('.ok()') after buffering
-        //       implementation.
-        self.get(callback_url)
-            .do_send(Callback::new(fid, event.into()))
-            .ok();
+        Arbiter::spawn(
+            self.get(callback_url)
+                .send(Callback::new(fid, event.into()))
+                .map_err(|e| error!("Failed to send callback because {:?}.", e))
+                .map(|res| {
+                    if let Err(err) = res {
+                        warn!("Failed to send callback because {:?}.", err);
+                    }
+                }),
+        );
     }
 }
 

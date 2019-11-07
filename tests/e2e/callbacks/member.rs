@@ -1,191 +1,123 @@
+//! E2E tests for `Member` Control API callbacks.
+
 use std::time::Duration;
 
-use actix::{Arbiter, Context, System};
-use futures::future::Future as _;
+use actix::{Addr, Arbiter, Context, System};
+use actix_http::ws::CloseCode;
+use futures::Future;
 use medea_client_api_proto::Event;
-use medea_control_api_proto::grpc::{
-    callback::OnLeave_Reason as OnLeaveReasonProto,
-};
+use medea_control_api_proto::grpc::callback::OnLeave_Reason as OnLeaveReason;
 
 use crate::{
-    callbacks::GetCallbacks,
-    gen_insert_str_macro,
-    grpc_control_api::{
-        ControlClient, MemberBuilder, RoomBuilder,
-    },
+    callbacks::{GetCallbacks, GrpcCallbackServer},
+    grpc_control_api::{ControlClient, MemberBuilder, RoomBuilder},
     signalling::{CloseSocket, TestMember},
 };
-use actix_http::ws::CloseCode;
+
+/// Type for [`Future`] item in `callback_test` function.
+type CallbackTestItem = (Addr<TestMember>, Addr<GrpcCallbackServer>);
+
+/// Creates `Room` with this spec:
+///
+/// ```yaml
+/// kind: Room
+/// id: {{ PROVIDED NAME }}
+/// spec:
+///    pipeline:
+///      test-member:
+///        kind: Member
+///        on_join: "grpc://127.0.0.1:{{ PROVIDED PORT }}"
+///        on_leave: "grpc://127.0.0.1:{{ PROVIDED PORT }}"
+/// ```
+///
+/// Then, returns [`Future`] which resolves with [`TestMember`]
+/// connected to created `Room` and [`GrpcCallbackServer`] which
+/// will receive all callbacks from Medea.
+fn callback_test(
+    name: &str,
+    port: u16,
+) -> impl Future<Item = CallbackTestItem, Error = ()> {
+    let callback_server = super::run(port);
+    let control_client = ControlClient::new();
+    let member = RoomBuilder::default()
+        .id(name)
+        .add_member(
+            MemberBuilder::default()
+                .id("test-member")
+                .on_leave(format!("grpc://127.0.0.1:{}", port))
+                .on_join(format!("grpc://127.0.0.1:{}", port))
+                .build()
+                .unwrap(),
+        )
+        .build()
+        .unwrap()
+        .build_request(String::new());
+    let create_response = control_client.create(&member);
+
+    let on_event =
+        move |_: &Event, _: &mut Context<TestMember>, _: Vec<&Event>| {};
+    let deadline = Some(Duration::from_secs(5));
+    TestMember::connect(
+        create_response.get("test-member").unwrap(),
+        Box::new(on_event),
+        deadline,
+    )
+    .map(move |client| (client, callback_server))
+}
 
 #[test]
 fn on_join() {
-    gen_insert_str_macro!("member_callback_on_join");
-    const CALLBACK_SERVER_PORT: u16 = 9099;
+    const TEST_NAME: &str = "member_callback_on_join";
+    let sys = System::new(TEST_NAME);
 
-    let sys = System::new(insert_str!("{}"));
-
-    let callback_server = super::run(CALLBACK_SERVER_PORT);
-    let control_client = ControlClient::new();
-    let member = RoomBuilder::default()
-        .id(insert_str!("{}"))
-        .add_member(
-            MemberBuilder::default()
-                .id("publisher")
-                .on_join(format!("grpc://127.0.0.1:{}", CALLBACK_SERVER_PORT))
-                .build()
-                .unwrap(),
-        )
-        .build()
-        .unwrap()
-        .build_request(String::new());
-    let create_res = control_client.create(&member);
-
-    let on_event =
-        move |_: &Event, _: &mut Context<TestMember>, _: Vec<&Event>| {};
-    let deadline = Some(Duration::from_secs(5));
     Arbiter::spawn(
-        TestMember::connect(
-            create_res.get("publisher").unwrap(),
-            Box::new(on_event.clone()),
-            deadline,
-        )
-        .and_then(move |_| {
-            std::thread::sleep(Duration::from_millis(50));
-            callback_server.send(GetCallbacks).map_err(|_| ())
-        })
-        .map(|callbacks| {
-            let callbacks = callbacks.unwrap();
-            let on_joins_count = callbacks
-                .into_iter()
-                .filter(|req| req.has_on_join())
-                .count();
-            assert_eq!(on_joins_count, 1);
-            System::current().stop();
-        }),
+        callback_test(TEST_NAME, 9099)
+            .and_then(move |(_, callback_server)| {
+                std::thread::sleep(Duration::from_millis(50));
+                callback_server.send(GetCallbacks).map_err(|_| ())
+            })
+            .map(|callbacks_result| {
+                let on_joins_count = callbacks_result
+                    .unwrap()
+                    .into_iter()
+                    .filter(|req| req.has_on_join())
+                    .count();
+                assert_eq!(on_joins_count, 1);
+                System::current().stop();
+            }),
     );
 
     sys.run().unwrap()
 }
 
 #[test]
-fn on_leave() {
-    gen_insert_str_macro!("member_callback_on_leave");
-    const CALLBACK_SERVER_PORT: u16 = 9098;
+fn on_leave_normally_disconnected() {
+    const TEST_NAME: &str = "member_callback_on_leave";
+    let sys = System::new(TEST_NAME);
 
-    let sys = System::new(insert_str!("{}"));
-
-    let callback_server = super::run(CALLBACK_SERVER_PORT);
-    let control_client = ControlClient::new();
-    let member = RoomBuilder::default()
-        .id(insert_str!("{}"))
-        .add_member(
-            MemberBuilder::default()
-                .id("publisher")
-                .on_leave(format!("grpc://127.0.0.1:{}", CALLBACK_SERVER_PORT))
-                .build()
-                .unwrap(),
-        )
-        .build()
-        .unwrap()
-        .build_request(String::new());
-    let create_res = control_client.create(&member);
-
-    let on_event =
-        move |_: &Event, _: &mut Context<TestMember>, _: Vec<&Event>| {};
-    let deadline = Some(Duration::from_secs(5));
     Arbiter::spawn(
-        TestMember::connect(
-            create_res.get("publisher").unwrap(),
-            Box::new(on_event.clone()),
-            deadline,
-        )
-        .and_then(|client| {
-            client
-                .send(CloseSocket(CloseCode::Normal))
-                .map_err(|e| panic!("{:?}", e))
-        })
-        .and_then(move |_| {
-            std::thread::sleep(Duration::from_millis(50));
-            callback_server.send(GetCallbacks).map_err(|_| ())
-        })
-        .map(|callbacks| {
-            let callbacks = callbacks.unwrap();
-            let on_leaves_count = callbacks
-                .into_iter()
-                .filter(|req| req.has_on_leave())
-                .map(|mut req| req.take_on_leave().reason)
-                .filter(|reason| {
-                    if let OnLeaveReasonProto::DISCONNECTED = reason {
-                        true
-                    } else {
-                        false
-                    }
-                })
-                .count();
-            assert_eq!(on_leaves_count, 1);
-            System::current().stop();
-        }),
-    );
-
-    sys.run().unwrap()
-}
-
-#[test]
-fn on_leave_on_evicted() {
-    gen_insert_str_macro!("member_callback_on_leave_on_evicted");
-    const CALLBACK_SERVER_PORT: u16 = 9097;
-
-    let sys = System::new(insert_str!("{}"));
-
-    let callback_server = super::run(CALLBACK_SERVER_PORT);
-    let control_client = ControlClient::new();
-    let member = RoomBuilder::default()
-        .id(insert_str!("{}"))
-        .add_member(
-            MemberBuilder::default()
-                .id("publisher")
-                .on_leave(format!("grpc://127.0.0.1:{}", CALLBACK_SERVER_PORT))
-                .build()
-                .unwrap(),
-        )
-        .build()
-        .unwrap()
-        .build_request(String::new());
-    let create_res = control_client.create(&member);
-
-    let on_event =
-        move |_: &Event, _: &mut Context<TestMember>, _: Vec<&Event>| {};
-    let deadline = Some(Duration::from_secs(5));
-    Arbiter::spawn(
-        TestMember::connect(
-            create_res.get("publisher").unwrap(),
-            Box::new(on_event.clone()),
-            deadline,
-        )
-        .and_then(move |_| {
-            control_client
-                .delete(&[&insert_str!("{}/publisher")])
-                .unwrap();
-            std::thread::sleep(Duration::from_millis(50));
-            callback_server.send(GetCallbacks).map_err(|_| ())
-        })
-        .map(|callbacks| {
-            let callbacks = callbacks.unwrap();
-            let on_leaves_count = callbacks
-                .into_iter()
-                .filter(|req| req.has_on_leave())
-                .map(|mut req| req.take_on_leave().reason)
-                .filter(|reason| {
-                    if let OnLeaveReasonProto::EVICTED = reason {
-                        true
-                    } else {
-                        false
-                    }
-                })
-                .count();
-            assert_eq!(on_leaves_count, 1);
-            System::current().stop();
-        }),
+        callback_test(TEST_NAME, 9098)
+            .and_then(|(client, callback_server)| {
+                client
+                    .send(CloseSocket(CloseCode::Normal))
+                    .map_err(|e| panic!("{:?}", e))
+                    .map(move |_| callback_server)
+            })
+            .and_then(move |callback_server| {
+                std::thread::sleep(Duration::from_millis(50));
+                callback_server.send(GetCallbacks).map_err(|_| ())
+            })
+            .map(|callbacks_result| {
+                let on_leaves_count = callbacks_result
+                    .unwrap()
+                    .into_iter()
+                    .filter(|req| req.has_on_leave())
+                    .map(|mut req| req.take_on_leave().reason)
+                    .filter(|reason| reason == &OnLeaveReason::DISCONNECTED)
+                    .count();
+                assert_eq!(on_leaves_count, 1);
+                System::current().stop();
+            }),
     );
 
     sys.run().unwrap()
@@ -193,62 +125,33 @@ fn on_leave_on_evicted() {
 
 #[test]
 fn on_leave_on_connection_loss() {
-    gen_insert_str_macro!("member_callback_on_leave_on_connection_loss");
-    const CALLBACK_SERVER_PORT: u16 = 9096;
+    const TEST_NAME: &str = "member_callback_on_leave_on_connection_loss";
+    let sys = System::new(TEST_NAME);
 
-    let sys = System::new(insert_str!("{}"));
-
-    let callback_server = super::run(CALLBACK_SERVER_PORT);
-    let control_client = ControlClient::new();
-    let member = RoomBuilder::default()
-        .id(insert_str!("{}"))
-        .add_member(
-            MemberBuilder::default()
-                .id("publisher")
-                .on_leave(format!("grpc://127.0.0.1:{}", CALLBACK_SERVER_PORT))
-                .build()
-                .unwrap(),
-        )
-        .build()
-        .unwrap()
-        .build_request(String::new());
-    let create_res = control_client.create(&member);
-
-    let on_event =
-        move |_: &Event, _: &mut Context<TestMember>, _: Vec<&Event>| {};
-    let deadline = Some(Duration::from_secs(5));
     Arbiter::spawn(
-        TestMember::connect(
-            create_res.get("publisher").unwrap(),
-            Box::new(on_event.clone()),
-            deadline,
-        )
-        .and_then(|client| {
-            client
-                .send(CloseSocket(CloseCode::Abnormal))
-                .map_err(|e| panic!("{:?}", e))
-        })
-        .and_then(move |_| {
-            std::thread::sleep(Duration::from_millis(1100));
-            callback_server.send(GetCallbacks).map_err(|_| ())
-        })
-        .map(|callbacks| {
-            let callbacks = callbacks.unwrap();
-            let on_leaves_count = callbacks
-                .into_iter()
-                .filter(|req| req.has_on_leave())
-                .map(|mut req| req.take_on_leave().reason)
-                .filter(|reason| {
-                    if let OnLeaveReasonProto::LOST_CONNECTION = reason {
-                        true
-                    } else {
-                        false
-                    }
-                })
-                .count();
-            assert_eq!(on_leaves_count, 1);
-            System::current().stop();
-        }),
+        callback_test(TEST_NAME, 9096)
+            .and_then(|(client, callback_server)| {
+                client
+                    .send(CloseSocket(CloseCode::Abnormal))
+                    .map_err(|e| panic!("{:?}", e))
+                    .map(move |_| callback_server)
+            })
+            .and_then(move |callback_server| {
+                // Wait for 'idle_timeout'.
+                std::thread::sleep(Duration::from_millis(1100));
+                callback_server.send(GetCallbacks).map_err(|_| ())
+            })
+            .map(|callbacks_result| {
+                let on_leaves_count = callbacks_result
+                    .unwrap()
+                    .into_iter()
+                    .filter(|req| req.has_on_leave())
+                    .map(|mut req| req.take_on_leave().reason)
+                    .filter(|reason| reason == &OnLeaveReason::LOST_CONNECTION)
+                    .count();
+                assert_eq!(on_leaves_count, 1);
+                System::current().stop();
+            }),
     );
 
     sys.run().unwrap()

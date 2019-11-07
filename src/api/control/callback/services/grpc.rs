@@ -11,9 +11,8 @@ use futures::future::{Future as _, IntoFuture as _};
 use grpcio::{ChannelBuilder, EnvBuilder};
 use medea_control_api_proto::grpc::callback_grpc::CallbackClient;
 
-use crate::{
-    api::control::callback::{url::GrpcCallbackUrl, Callback},
-    log::prelude::*,
+use crate::api::control::callback::{
+    services::CallbackServiceError, url::GrpcCallbackUrl, Callback,
 };
 
 /// gRPC client for sending [`Callback`]s.
@@ -51,7 +50,7 @@ impl Actor for GrpcCallbackService {
 }
 
 impl Handler<Callback> for GrpcCallbackService {
-    type Result = ResponseFuture<(), ()>;
+    type Result = ResponseFuture<(), CallbackServiceError>;
 
     fn handle(&mut self, msg: Callback, _: &mut Self::Context) -> Self::Result {
         Box::new(
@@ -60,7 +59,7 @@ impl Handler<Callback> for GrpcCallbackService {
                 .into_future()
                 .and_then(|q| q)
                 .map(|_| ())
-                .map_err(|e| warn!("{:?}", e)),
+                .map_err(|e| CallbackServiceError::from(e)),
         )
     }
 }
