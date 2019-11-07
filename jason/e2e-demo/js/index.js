@@ -252,12 +252,29 @@ window.onload = async function() {
   let room = newRoom();
   let connectBtnsDiv = document.getElementsByClassName("connect")[0];
   let controlBtns = document.getElementsByClassName('control')[0];
+  let audioSelect = document.getElementsByClassName('connect__select-device_audio')[0];
+  let videoSelect = document.getElementsByClassName('connect__select-device_video')[0];
+  let localVideo = document.querySelector('.local-video > video');
+
+  const updateLocalVideo = async (stream) => {
+    localVideo.srcObject = stream;
+    await localVideo.play();
+  };
 
   async function newRoom() {
     room = await jason.init_room();
 
-    room.on_new_connection((connection) => {
-      connection.on_remote_stream((stream) => {
+    try {
+      const stream = await getStream(audioSelect, videoSelect);
+      await updateLocalVideo(stream);
+      await fillMediaDevicesInputs(audioSelect, videoSelect, stream);
+      room.inject_local_stream(stream);
+    } catch (e) {
+      console.error("Init local video failed: " + e);
+    }
+
+    room.on_new_connection( (connection) => {
+      connection.on_remote_stream( async (stream) => {
         let videoDiv = document.getElementsByClassName("remote-videos")[0];
         let video = document.createElement("video");
         video.srcObject = stream.get_media_stream();
@@ -266,8 +283,12 @@ window.onload = async function() {
         innerVideoDiv.appendChild(video);
         videoDiv.appendChild(innerVideoDiv);
 
-        video.play();
+        await video.play();
       });
+    });
+
+    room.on_failed_local_stream((error) => {
+      console.error(error);
     });
 
     room.on_close(function (on_closed) {
@@ -290,29 +311,6 @@ window.onload = async function() {
   try {
     let joinCallerButton = document.getElementsByClassName('connect__join')[0];
     let usernameInput = document.getElementsByClassName('connect__username')[0];
-    let audioSelect = document.getElementsByClassName('connect__select-device_audio')[0];
-    let videoSelect = document.getElementsByClassName('connect__select-device_video')[0];
-    let localVideo = document.querySelector('.local-video > video');
-
-<<<<<<< HEAD
-    await fillMediaDevicesInputs(audioSelect, videoSelect);
-    await getStream(localVideo, audioSelect, videoSelect);
-=======
-    const updateLocalVideo = async (stream) => {
-      localVideo.srcObject = stream;
-      await localVideo.play();
-    };
->>>>>>> master
-
-    const room = await jason.init_room();
-    try {
-      const stream = await getStream(audioSelect, videoSelect);
-      await updateLocalVideo(stream);
-      await fillMediaDevicesInputs(audioSelect, videoSelect, stream);
-      room.inject_local_stream(stream);
-    } catch (e) {
-      console.error("Init local video failed: " + e);
-    }
 
     audioSelect.addEventListener('change', async () => {
       try {
@@ -334,27 +332,6 @@ window.onload = async function() {
       }
     });
 
-<<<<<<< HEAD
-=======
-    room.on_new_connection( (connection) => {
-      connection.on_remote_stream( async (stream) => {
-        let videoDiv = document.getElementsByClassName("remote-videos")[0];
-        let video = document.createElement("video");
-        video.srcObject = stream.get_media_stream();
-        let innerVideoDiv = document.createElement("div");
-        innerVideoDiv.className = "video";
-        innerVideoDiv.appendChild(video);
-        videoDiv.appendChild(innerVideoDiv);
-
-        await video.play();
-      });
-    });
-
-    room.on_failed_local_stream((error) => {
-      console.error(error);
-    });
-
->>>>>>> master
     let muteAudio = document.getElementsByClassName('control__mute_audio')[0];
     let muteVideo = document.getElementsByClassName('control__mute_video')[0];
     let isAudioMuted = false;
@@ -387,10 +364,7 @@ window.onload = async function() {
 
     let bindJoinButtons = function(roomId) {
       joinCallerButton.onclick = async function() {
-<<<<<<< HEAD
         contentVisibility.hide(connectBtnsDiv);
-=======
->>>>>>> master
         contentVisibility.show(controlBtns);
 
         try {

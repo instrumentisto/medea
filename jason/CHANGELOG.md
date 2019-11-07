@@ -35,16 +35,12 @@ All user visible changes to this project will be documented in this file. This p
         - `MediaStreamConstraints`, `AudioTrackConstraints`, `VideoTrackConstraints` classes ([#46]);
         - Room initialization ([#46]):
             - `Jason.init_room()`;
-<<<<<<< HEAD
-            - `Room.join()`.
+            - `Room.join()`;
+        - Ability to inject local video/audio stream into `Room` via `Room.inject_local_stream()` ([#54]);
+        - `Room.on_failed_local_stream` callback ([#54]);
         - `Room.on_close_by_server` callback for WebSocket close initiated by server ([#55]).
 - Signalling:
     - Cleanup Jason state on normal WebSocket close ([#55]).
-=======
-            - `Room.join()`;
-        - Ability to inject local video/audio stream into `Room` via `Room.inject_local_stream()` ([#54]);
-        - `Room.on_failed_local_stream` callback ([#54]).
->>>>>>> master
 
 ### Fixed
 
@@ -52,11 +48,8 @@ All user visible changes to this project will be documented in this file. This p
     - Skipped `IceCandidate`s received before receiving remote SDP ([#50](/../../pull/50)).
 
 [#46]: /../../pull/46
-<<<<<<< HEAD
 [#55]: /../../pull/55
-=======
 [#54]: /../../pull/54
->>>>>>> master
 
 
 

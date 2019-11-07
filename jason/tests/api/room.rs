@@ -196,7 +196,7 @@ async fn mute_video_room_before_init_peer() {
 macro_rules! callback_assert_eq {
     ($test_tx:tt, $a:expr, $b:expr) => {
         if $a != $b {
-            $test_tx.send(Err(format!("'{}' != '{}'", $a, $b)));
+            $test_tx.send(Err(format!("'{}' != '{}'", $a, $b))).unwrap();
             return;
         }
     };
@@ -214,6 +214,11 @@ async fn on_close_by_server_js_side_callback() {
                                 reason.is_closed_by_server; }")]
     extern "C" {
         fn get_is_closed_by_server(reason: &JsValue) -> bool;
+    }
+    #[wasm_bindgen(inline_js = "export function get_is_err(reason) { return \
+                                reason.is_err; }")]
+    extern "C" {
+        fn get_is_err(reason: &JsValue) -> bool;
     }
 
     let mut rpc = MockRpcClient::new();
@@ -236,15 +241,15 @@ async fn on_close_by_server_js_side_callback() {
     room_handle
         .on_close(
             Closure::once_into_js(move |closed: JsValue| {
-                let close_reason = get_reason(&closed);
-                callback_assert_eq!(test_tx, close_reason, "Finished");
+                callback_assert_eq!(test_tx, get_reason(&closed), "Finished");
                 callback_assert_eq!(
                     test_tx,
                     get_is_closed_by_server(&closed),
                     true
                 );
+                callback_assert_eq!(test_tx, get_is_err(&closed), false);
 
-                test_tx.send(Ok(()));
+                test_tx.send(Ok(())).unwrap();
             })
             .into(),
         )
