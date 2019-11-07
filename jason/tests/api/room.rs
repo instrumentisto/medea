@@ -2,21 +2,16 @@
 
 use std::rc::Rc;
 
-use futures::{
-    channel::{mpsc, oneshot},
-    future::{self, Either},
-};
-use medea_client_api_proto::{
-    CloseReason as CloseByServerReason, Event, IceServer, PeerId,
-};
+use futures::channel::{mpsc, oneshot};
+use medea_client_api_proto::{Event, IceServer, PeerId};
 use medea_jason::{
     api::Room,
     media::MediaManager,
     peer::{MockPeerRepository, PeerConnection, PeerEvent},
-    rpc::{CloseReason, MockRpcClient},
+    rpc::MockRpcClient,
     AudioTrackConstraints, MediaStreamConstraints,
 };
-use wasm_bindgen::{prelude::*, JsValue};
+use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
 use wasm_bindgen_test::*;
 
@@ -182,28 +177,45 @@ async fn mute_video_room_before_init_peer() {
     assert!(!peer.is_send_video_enabled());
 }
 
-/// `assert_eq` analog but on failed comparison error will be sent with
-/// [`oneshot::Sender`].
-///
-/// This macro will be used in JS callback tests because this is the only option
-/// to trigger test fail.
-///
-/// `$test_tx` - [`oneshot::Sender`] to which comparison error will be sent
-///
-/// `$a` - left item of comparision
-///
-/// `$b` - right item of comparision
-macro_rules! callback_assert_eq {
-    ($test_tx:tt, $a:expr, $b:expr) => {
-        if $a != $b {
-            $test_tx.send(Err(format!("'{}' != '{}'", $a, $b))).unwrap();
-            return;
-        }
-    };
-}
+/// Tests for `on_close` JS side callback.
+mod on_close_callback {
+    use std::rc::Rc;
 
-#[wasm_bindgen_test]
-async fn on_close_by_server_js_side_callback() {
+    use futures::{
+        channel::{mpsc, oneshot},
+        future::{self, Either},
+    };
+    use medea_client_api_proto::CloseReason as CloseByServerReason;
+    use medea_jason::{
+        api::Room,
+        peer::MockPeerRepository,
+        rpc::{CloseByClientReason, CloseReason, MockRpcClient},
+    };
+    use wasm_bindgen::{prelude::*, JsValue};
+    use wasm_bindgen_test::*;
+
+    use crate::resolve_after;
+
+    /// `assert_eq` analog but on failed comparison error will be sent with
+    /// [`oneshot::Sender`].
+    ///
+    /// This macro will be used in JS callback tests because this is the only
+    /// option to trigger test fail.
+    ///
+    /// `$test_tx` - [`oneshot::Sender`] to which comparison error will be sent
+    ///
+    /// `$a` - left item of comparision
+    ///
+    /// `$b` - right item of comparision
+    macro_rules! callback_assert_eq {
+        ($test_tx:tt, $a:expr, $b:expr) => {
+            if $a != $b {
+                $test_tx.send(Err(format!("'{}' != '{}'", $a, $b))).unwrap();
+                return;
+            }
+        };
+    }
+
     #[wasm_bindgen(inline_js = "export function get_reason(closed) { return \
                                 closed.reason; }")]
     extern "C" {
@@ -221,53 +233,134 @@ async fn on_close_by_server_js_side_callback() {
         fn get_is_err(reason: &JsValue) -> bool;
     }
 
-    let mut rpc = MockRpcClient::new();
-    let repo = Box::new(MockPeerRepository::new());
+    /// Returns empty [`Room`] with mocks inside.
+    fn get_room() -> Room {
+        let mut rpc = MockRpcClient::new();
+        let repo = Box::new(MockPeerRepository::new());
 
-    let (_event_tx, event_rx) = mpsc::unbounded();
-    rpc.expect_subscribe()
-        .return_once(move || Box::pin(event_rx));
-    rpc.expect_on_close().returning(move || {
-        let (_, rx) = oneshot::channel();
-        Box::pin(rx)
-    });
-    rpc.expect_send_command().return_const(());
-    rpc.expect_unsub().return_const(());
+        let (_event_tx, event_rx) = mpsc::unbounded();
+        rpc.expect_subscribe()
+            .return_once(move || Box::pin(event_rx));
+        rpc.expect_on_close().returning(move || {
+            let (_, rx) = oneshot::channel();
+            Box::pin(rx)
+        });
+        rpc.expect_send_command().return_const(());
+        rpc.expect_unsub().return_const(());
 
-    let room = Room::new(Rc::new(rpc), repo);
-    let mut room_handle = room.new_handle();
+        Room::new(Rc::new(rpc), repo)
+    }
 
-    let (test_tx, test_rx) = oneshot::channel();
-    room_handle
-        .on_close(
-            Closure::once_into_js(move |closed: JsValue| {
-                callback_assert_eq!(test_tx, get_reason(&closed), "Finished");
-                callback_assert_eq!(
-                    test_tx,
-                    get_is_closed_by_server(&closed),
-                    true
-                );
-                callback_assert_eq!(test_tx, get_is_err(&closed), false);
+    /// Waits for [`Result`] from [`oneshot::Receiver`] with tests result.
+    ///
+    /// Also it will check result of test and will panic if some error will be found.
+    async fn wait_and_check_test_result(rx: oneshot::Receiver<Result<(), String>>) {
+        let result =
+            future::select(Box::pin(rx), Box::pin(resolve_after(500))).await;
+        match result {
+            Either::Left((oneshot_fut_result, _)) => {
+                let assert_result = oneshot_fut_result.expect("Cancelled.");
+                assert_result.expect("Assertion failed");
+            }
+            Either::Right(_) => {
+                panic!("on_close callback didn't fired");
+            }
+        };
+    }
 
-                test_tx.send(Ok(())).unwrap();
-            })
-            .into(),
-        )
-        .unwrap();
+    #[wasm_bindgen_test]
+    async fn closed_by_server() {
+        let room = get_room();
+        let mut room_handle = room.new_handle();
 
-    room.close(CloseReason::ByServer(CloseByServerReason::Finished));
+        let (test_tx, test_rx) = oneshot::channel();
+        room_handle
+            .on_close(
+                Closure::once_into_js(move |closed: JsValue| {
+                    callback_assert_eq!(
+                        test_tx,
+                        get_reason(&closed),
+                        "Finished"
+                    );
+                    callback_assert_eq!(
+                        test_tx,
+                        get_is_closed_by_server(&closed),
+                        true
+                    );
+                    callback_assert_eq!(test_tx, get_is_err(&closed), false);
 
-    let result =
-        future::select(Box::pin(test_rx), Box::pin(resolve_after(500))).await;
-    match result {
-        Either::Left((oneshot_fut_result, _)) => {
-            let assert_result = oneshot_fut_result.expect("Cancelled.");
-            assert_result.expect("Assertion failed");
-        }
-        Either::Right(_) => {
-            panic!("on_close_by_server callback didn't fired");
-        }
-    };
+                    test_tx.send(Ok(())).unwrap();
+                })
+                .into(),
+            )
+            .unwrap();
+
+        room.close(CloseReason::ByServer(CloseByServerReason::Finished));
+        wait_and_check_test_result(test_rx).await;
+    }
+
+    #[wasm_bindgen_test]
+    async fn unexpected_room_drop() {
+        let room = get_room();
+        let mut room_handle = room.new_handle();
+
+        let (test_tx, test_rx) = oneshot::channel();
+        room_handle
+            .on_close(
+                Closure::once_into_js(move |closed: JsValue| {
+                    callback_assert_eq!(
+                        test_tx,
+                        get_reason(&closed),
+                        "RoomUnexpectedlyDropped"
+                    );
+                    callback_assert_eq!(test_tx, get_is_err(&closed), true);
+                    callback_assert_eq!(
+                        test_tx,
+                        get_is_closed_by_server(&closed),
+                        false
+                    );
+                    test_tx.send(Ok(())).unwrap();
+                })
+                .into(),
+            )
+            .unwrap();
+
+        std::mem::drop(room);
+        wait_and_check_test_result(test_rx).await;
+    }
+
+    #[wasm_bindgen_test]
+    async fn normal_close_by_client() {
+        let room = get_room();
+        let mut room_handle = room.new_handle();
+
+        let (test_tx, test_rx) = oneshot::channel();
+        room_handle
+            .on_close(
+                Closure::once_into_js(move |closed: JsValue| {
+                    callback_assert_eq!(
+                        test_tx,
+                        get_reason(&closed),
+                        "RoomUnexpectedlyDropped"
+                    );
+                    callback_assert_eq!(test_tx, get_is_err(&closed), false);
+                    callback_assert_eq!(
+                        test_tx,
+                        get_is_closed_by_server(&closed),
+                        false
+                    );
+                    test_tx.send(Ok(())).unwrap();
+                })
+                .into(),
+            )
+            .unwrap();
+
+        room.close(CloseReason::ByClient {
+            reason: CloseByClientReason::RoomUnexpectedlyDropped,
+            is_err: false,
+        });
+        wait_and_check_test_result(test_rx).await;
+    }
 }
 
 // Tests Room::inject_local_stream for create new PeerConnection.
