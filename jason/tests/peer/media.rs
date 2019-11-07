@@ -18,7 +18,7 @@ use crate::get_test_tracks;
 
 wasm_bindgen_test_configure!(run_in_browser);
 
-type Result<T, E = Box<dyn Fail>> = std::result::Result<T, E>;
+type Result<T> = std::result::Result<T, Box<dyn Fail>>;
 
 async fn get_test_media_connections(
     enabled_audio: bool,

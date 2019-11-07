@@ -1,3 +1,11 @@
+//! Client library for Medea media server.
+//!
+//! [Medea]: https://github.com/instrumentisto/medea
+
+#![allow(clippy::must_use_candidate)]
+#![cfg_attr(not(feature = "mockable"), warn(missing_docs))]
+#![cfg_attr(feature = "mockable", allow(missing_docs))]
+
 #[macro_use]
 pub mod utils;
 

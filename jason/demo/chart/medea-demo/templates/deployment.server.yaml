@@ -70,6 +70,10 @@ spec:
           ports:
             - name: http
               containerPort: {{ .Values.server.conf.server.client.http.bind_port }}
+              protocol: TCP
+            - name: grpc
+              containerPort: {{ .Values.server.conf.server.control.grpc.bind_port }}
+              protocol: TCP
           volumeMounts:
             - name: conf
               subPath: medea.toml
@@ -86,6 +90,20 @@ spec:
             tcpSocket:
               port: {{ .Values.server.conf.server.client.http.bind_port }}
             initialDelaySeconds: 5
+      {{- $controlMock := index .Values "server" "control-mock" }}
+        - name: control-mock
+          image: "{{ $controlMock.image.repository }}:{{ $controlMock.image.tag }}"
+          imagePullPolicy: {{ $controlMock.image.pullPolicy }}
+          args:
+            - --addr=0.0.0.0:{{ $controlMock.conf.bind_port }}
+            - --medea-addr=127.0.0.1:{{ .Values.server.conf.server.control.grpc.bind_port }}
+          env:
+            - name: RUST_LOG
+              value: {{ $controlMock.conf.log.level | quote }}
+          ports:
+            - name: control-http
+              containerPort: {{ $controlMock.conf.bind_port }}
+              protocol: TCP
         - name: coturn
           image: "{{ $coturn.image.repository }}:{{ $coturn.image.tag }}"
           imagePullPolicy: {{ $coturn.image.pullPolicy }}
@@ -167,11 +185,11 @@ spec:
         {{- end }}
           livenessProbe:
             exec:
-              command: ['redis-cli', 'ping']
+              command: ['redis-cli', '-p', '{{ $coturnDb.conf.port }}', 'ping']
             initialDelaySeconds: 3
           readinessProbe:
             exec:
-              command: ['redis-cli', 'ping']
+              command: ['redis-cli', '-p', '{{ $coturnDb.conf.port }}', 'ping']
             initialDelaySeconds: 5
       volumes:
         - name: conf

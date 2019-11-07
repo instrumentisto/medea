@@ -23,24 +23,23 @@ use web_sys::{
 
 use crate::{
     media::MediaStreamConstraints,
-    utils::{window, WasmErr},
+    utils::{JasonError, JsCaused, window, WasmErr},
 };
 
 use super::InputDeviceInfo;
-use crate::utils::{JasonError, JsCaused};
 
-/// Describes errors that may occur in the [`MediaManager`].
+/// Errors that may occur in a [`MediaManager`].
 #[derive(Debug, Display)]
 pub enum Error {
-    #[display(fmt = "media devices failed: {}", _0)]
+    #[display(fmt = "Navigator.mediaDevices() failed: {}", _0)]
     MediaDevices(WasmErr),
-    #[display(fmt = "get user media failed: {}", _0)]
+    #[display(fmt = "MediaDevices.getUserMedia() failed: {}", _0)]
     GetUserMedia(WasmErr),
-    #[display(fmt = "get enumerate devices failed: {}", _0)]
+    #[display(fmt = "MediaDevices.enumerateDevices() failed: {}", _0)]
     GetEnumerateDevices(WasmErr),
 }
 
-type Result<T, E = Traced<Error>> = std::result::Result<T, E>;
+type Result<T> = std::result::Result<T, Traced<Error>>;
 
 impl StdError for Error {}
 
@@ -79,7 +78,6 @@ struct InnerMediaManager {
 impl InnerMediaManager {
     /// Returns the vector of [`MediaDeviceInfo`] objects.
     fn enumerate_devices(
-        &self,
     ) -> impl Future<Output = Result<Vec<InputDeviceInfo>>> {
         async {
             let devices = window()
@@ -259,7 +257,7 @@ pub struct MediaManagerHandle(Weak<InnerMediaManager>);
 impl MediaManagerHandle {
     /// Returns the JS array of [`MediaDeviceInfo`] objects.
     pub fn enumerate_devices(&self) -> Promise {
-        match map_weak!(self, |inner| inner.enumerate_devices()) {
+        match map_weak!(self, |_| InnerMediaManager::enumerate_devices()) {
             Ok(devices) => future_to_promise(async {
                 devices
                     .await
@@ -272,7 +270,9 @@ impl MediaManagerHandle {
                             })
                             .into()
                     })
-                    .map_err(|err| js_sys::Error::new(&err.to_string()).into())
+                    .map_err(|err| {
+                        js_sys::Error::new(&format!("{}", err)).into()
+                    })
             }),
             Err(e) => future_to_promise(future::err(e)),
         }

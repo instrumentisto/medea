@@ -127,3 +127,10 @@ impl<E: JsCaused> From<Traced<E>> for JasonError {
         }
     }
 }
+
+/// Prints `$e` as `console.error()`.
+macro_rules! console_error {
+    ($e:expr) => {
+        web_sys::console::error_1(&$e.into())
+    };
+}

@@ -9,42 +9,42 @@ use macro_attr::*;
 use medea_client_api_proto::{ClientMsg, ServerMsg};
 use newtype_derive::NewtypeFrom;
 use thiserror::*;
+use tracerr::Traced;
 use web_sys::{CloseEvent, Event, MessageEvent, WebSocket as SysWebSocket};
 
 use crate::{
     rpc::CloseMsg,
     utils::{EventListener, WasmErr},
 };
-use tracerr::Traced;
 
-/// Describes errors that may occur when working with [`WebSocket`].
-#[derive(Error, Debug)]
+/// Errors that may occur when working with [`WebSocket`].
+#[derive(Debug, Error)]
 pub enum Error {
-    #[error("failed create websocket: {0}")]
+    #[error("failed to create WebSocket: {0}")]
     CreateSocket(WasmErr),
-    #[error("failed init websocket")]
+    #[error("failed to init WebSocket")]
     InitSocket,
-    #[error("failed parse client message: {0}")]
+    #[error("failed to parse client message: {0}")]
     ParseClientMessage(serde_json::error::Error),
-    #[error("failed parse server message: {0}")]
+    #[error("failed to parse server message: {0}")]
     ParseServerMessage(serde_json::error::Error),
-    #[error("message is not string")]
+    #[error("message is not a string")]
     MessageNotString,
-    #[error("failed send message: {0}")]
+    #[error("failed to send message: {0}")]
     SendMessage(WasmErr),
-    #[error("failed set handler for CloseEvent: {0}")]
+    #[error("failed to set handler for CloseEvent: {0}")]
     SetHandlerOnClose(WasmErr),
-    #[error("failed set handler for OpenEvent: {0}")]
+    #[error("failed to set handler for OpenEvent: {0}")]
     SetHandlerOnOpen(WasmErr),
-    #[error("failed set handler for MessageEvent: {0}")]
+    #[error("failed to set handler for MessageEvent: {0}")]
     SetHandlerOnMessage(WasmErr),
-    #[error("Could not cast {0} to State variant")]
+    #[error("could not cast {0} to State variant")]
     CastState(u16),
-    #[error("Underlying socket is closed")]
+    #[error("underlying socket is closed")]
     ClosedSocket,
 }
 
-type Result<T, E = Error> = std::result::Result<T, Traced<E>>;
+type Result<T> = std::result::Result<T, Traced<Error>>;
 
 /// State of websocket.
 #[derive(Debug)]
@@ -93,7 +93,9 @@ pub struct WebSocket(Rc<RefCell<InnerSocket>>);
 impl InnerSocket {
     fn new(url: &str) -> Result<Self> {
         let socket = SysWebSocket::new(url)
-            .map_err(|err| tracerr::new!(Error::CreateSocket(err.into())))?;
+            .map_err(Into::into)
+            .map_err(Error::CreateSocket)
+            .map_err(tracerr::wrap!())?;
         Ok(Self {
             socket_state: State::CONNECTING,
             socket: Rc::new(socket),
@@ -104,13 +106,13 @@ impl InnerSocket {
         })
     }
 
-    /// Checks underlying WebSocket state and updates socket_state.
+    /// Checks underlying WebSocket state and updates `socket_state`.
     fn update_state(&mut self) {
         match State::try_from(self.socket.ready_state()) {
             Ok(new_state) => self.socket_state = new_state,
             Err(err) => {
                 // unreachable, unless some vendor will break enum
-                error!(err.to_string())
+                console_error!(err.to_string())
             }
         };
     }
@@ -138,9 +140,8 @@ impl WebSocket {
                         let _ = tx_close.send(());
                     },
                 )
-                .map_err(|err| {
-                    tracerr::new!(Error::SetHandlerOnClose(err.into()))
-                })?,
+                .map_err(Error::SetHandlerOnClose)
+                .map_err(tracerr::wrap!())?,
             );
 
             let inner = Rc::clone(&socket);
@@ -153,9 +154,8 @@ impl WebSocket {
                         let _ = tx_open.send(());
                     },
                 )
-                .map_err(|err| {
-                    tracerr::new!(Error::SetHandlerOnOpen(err.into()))
-                })?,
+                .map_err(Error::SetHandlerOnOpen)
+                .map_err(tracerr::wrap!())?,
             );
         }
 
@@ -191,15 +191,15 @@ impl WebSocket {
                     f(parsed);
                 },
             )
-            .map_err(|err| {
-                tracerr::new!(Error::SetHandlerOnMessage(err.into()))
-            })?,
+            .map_err(Into::into)
+            .map_err(Error::SetHandlerOnMessage)
+            .map_err(tracerr::wrap!())?,
         );
         Ok(())
     }
 
     /// Set handler on close socket.
-    pub fn on_close<F>(&self, f: F) -> Result<(), Error>
+    pub fn on_close<F>(&self, f: F) -> Result<()>
     where
         F: (FnOnce(CloseMsg)) + 'static,
     {
@@ -214,9 +214,8 @@ impl WebSocket {
                     f(CloseMsg::from(&msg));
                 },
             )
-            .map_err(|err| {
-                tracerr::new!(Error::SetHandlerOnClose(err.into()))
-            })?,
+            .map_err(Error::SetHandlerOnClose)
+            .map_err(tracerr::wrap!())?,
         );
         Ok(())
     }
@@ -225,13 +224,16 @@ impl WebSocket {
     pub fn send(&self, msg: &ClientMsg) -> Result<()> {
         let inner = self.0.borrow();
         let message = serde_json::to_string(msg)
-            .map_err(|err| tracerr::new!(Error::ParseClientMessage(err)))?;
+            .map_err(Error::ParseClientMessage)
+            .map_err(tracerr::wrap!())?;
 
         match inner.socket_state {
             State::OPEN => inner
                 .socket
                 .send_with_str(&message)
-                .map_err(|err| tracerr::new!(Error::SendMessage(err.into()))),
+                .map_err(Into::into)
+                .map_err(Error::SendMessage)
+                .map_err(tracerr::wrap!()),
             _ => Err(tracerr::new!(Error::ClosedSocket)),
         }
     }
@@ -250,7 +252,7 @@ impl Drop for WebSocket {
                 .socket
                 .close_with_code_and_reason(1000, "Dropped unexpectedly")
             {
-                error!(err);
+                console_error!(err);
             }
         }
     }

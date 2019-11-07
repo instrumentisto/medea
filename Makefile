@@ -18,6 +18,7 @@ eq = $(if $(or $(1),$(2)),$(and $(findstring $(1),$(2)),\
 MEDEA_IMAGE_NAME := $(strip \
 	$(shell grep 'COMPOSE_IMAGE_NAME=' .env | cut -d '=' -f2))
 DEMO_IMAGE_NAME := instrumentisto/medea-demo
+CONTROL_MOCK_IMAGE_NAME := instrumentisto/medea-control-api-mock
 
 RUST_VER := 1.38
 RUST_BETA_VER := 1.39-beta.5
@@ -35,6 +36,9 @@ crate-dir = proto/client-api
 endif
 ifeq ($(crate),medea-control-api-proto)
 crate-dir = proto/control-api
+endif
+ifeq ($(crate),medea-control-api-mock)
+crate-dir = mock/control-api
 endif
 ifeq ($(crate),medea-macro)
 crate-dir = crates/medea-macro
@@ -111,6 +115,15 @@ up: up.dev
 # Running commands #
 ####################
 
+# Stop non-dockerized Control API mock server.
+#
+# Usage:
+#   make down.control
+
+down.control:
+	kill -9 $(pidof medea-control-api-mock)
+
+
 down.coturn: docker.down.coturn
 
 
@@ -131,6 +144,15 @@ down.dev:
 down.medea: docker.down.medea
 
 
+# Run Control API mock server.
+#
+# Usage:
+#  make up.control
+
+up.control:
+	cargo run -p medea-control-api-mock
+
+
 up.coturn: docker.up.coturn
 
 
@@ -143,7 +165,7 @@ up.demo: docker.up.demo
 #	make up.dev
 
 up.dev: up.coturn
-	$(MAKE) -j2 up.jason docker.up.medea
+	$(MAKE) -j3 up.jason docker.up.medea up.control
 
 
 up.medea: docker.up.medea
@@ -315,8 +337,7 @@ endif
 #
 # Usage:
 #	make test.unit [crate=(@all|medea|<crate-name>)]
-#	               [crate=medea-jason [browser=(chrome|firefox)]]
-#                  [remote=(yes|no)]
+#	               [crate=medea-jason [browser=(chrome|firefox|default)]]
 
 test-unit-crate = $(if $(call eq,$(crate),),@all,$(crate))
 webdriver-env = $(if $(call eq,$(browser),firefox),GECKO,CHROME)DRIVER_REMOTE
@@ -332,9 +353,9 @@ ifeq ($(test-unit-crate),medea)
 	cargo test --lib --bin medea
 else
 ifeq ($(crate),medea-jason)
-ifeq ($(remote),no)
+ifeq ($(browser),default)
 	cd $(crate-dir)/ && \
-	cargo test --target wasm32-unknown-unknown --features mockable
+	cargo +beta test --target wasm32-unknown-unknown --features mockable
 else
 	@make docker.up.webdriver browser=$(browser)
 	sleep 10
@@ -443,6 +464,22 @@ docker.auth:
 		$(if $(call eq,$(pass-stdin),yes),--password-stdin,)
 
 
+# Build Docker image for Control API mock server.
+#
+# Usage:
+#	make docker.build.control [TAG=(dev|<tag>)] [debug=(yes|no)]
+#	                          [minikube=(no|yes)]
+
+docker.build.control:
+	$(docker-env) \
+	docker build $(if $(call eq,$(minikube),yes),,--network=host) \
+		--build-arg rust_ver=$(RUST_VER) \
+		--build-arg rustc_mode=$(if $(call eq,$(debug),no),release,debug) \
+		--build-arg rustc_opts=$(if $(call eq,$(debug),no),--release,) \
+		-t $(CONTROL_MOCK_IMAGE_NAME):$(if $(call eq,$(TAG),),dev,$(TAG)) \
+		-f mock/control-api/Dockerfile .
+
+
 # Build Docker image for demo application.
 #
 # Usage:
@@ -453,6 +490,7 @@ docker-build-demo-image-name = $(DEMO_IMAGE_NAME)
 
 docker.build.demo:
 ifeq ($(TAG),edge)
+	$(docker-env) \
 	docker build $(if $(call eq,$(minikube),yes),,--network=host) --force-rm \
 		-t $(docker-build-demo-image-name):$(TAG) \
 		-f jason/Dockerfile .
@@ -488,6 +526,15 @@ docker.build.medea:
 			--build-arg rustc_opts=$(if \
 				$(call eq,$(debug),no),--release,),) \
 		-t $(docker-build-medea-image-name):$(if $(call eq,$(TAG),),dev,$(TAG)) .
+
+
+# Stop dockerized Control API mock server and remove all related containers.
+#
+# Usage:
+#   make docker.down.control
+
+docker.down.control:
+	-docker stop medea-control-api-mock
 
 
 # Stop Coturn STUN/TURN server in Docker Compose environment
@@ -580,6 +627,17 @@ define docker.push.do
 	$(docker-env) \
 	docker push $(docker-push-image-name):$(tag)
 endef
+
+
+# Run dockerized Medea Control API mock server.
+#
+# Usage:
+#   make docker.up.control [TAG=(dev|<docker-tag>)]
+
+docker.up.control:
+	docker run --rm -d --network=host \
+		--name medea-control-api-mock \
+		$(CONTROL_MOCK_IMAGE_NAME):$(if $(call eq,$(TAG),),dev,$(TAG))
 
 
 # Run Coturn STUN/TURN server in Docker Compose environment.
@@ -778,6 +836,7 @@ ifeq ($(helm-chart),medea-demo)
 ifeq ($(rebuild),yes)
 	@make docker.build.demo minikube=yes TAG=dev
 	@make docker.build.medea no-cache=$(no-cache) minikube=yes TAG=dev
+	@make docker.build.control minikube=yes TAG=dev
 endif
 endif
 endif
@@ -835,18 +894,18 @@ endef
 
 .PHONY: build build.jason build.medea \
         cargo cargo.build cargo.fmt cargo.gen cargo.lint \
-        docker.auth docker.build.demo docker.build.medea \
-        	docker.down.coturn docker.down.demo docker.down.medea \
-        	docker.down.webdriver \
+        docker.auth  docker.build.control docker.build.demo docker.build.medea \
+        	docker.down.control docker.down.coturn docker.down.demo \
+        	docker.down.medea docker.down.webdriver  \
         	docker.pull docker.push \
-        	docker.up.coturn docker.up.demo docker.up.medea \
+        	docker.up.control docker.up.coturn docker.up.demo docker.up.medea \
         	docker.up.webdriver \
         docs docs.rust \
-        down down.coturn down.demo down.dev down.medea \
+        down down.control down.coturn down.demo down.dev down.medea \
         helm helm.down helm.init helm.lint helm.list \
         	helm.package helm.package.release helm.up \
         minikube.boot \
         release release.crates release.helm release.npm \
         test test.e2e test.unit \
-        up up.coturn up.demo up.dev up.jason up.medea \
+        up up.control up.coturn up.demo up.dev up.jason up.medea \
         yarn

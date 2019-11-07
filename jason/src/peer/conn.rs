@@ -21,20 +21,37 @@ use super::ice_server::RtcIceServers;
 
 /// [RTCIceCandidate][1] representation.
 ///
-/// [1]: https://www.w3.org/TR/webrtc/#rtcicecandidate-interface
+/// [1]: https://w3.org/TR/webrtc/#rtcicecandidate-interface
 pub struct IceCandidate {
+    /// [`candidate` field][2] of the discovered [RTCIceCandidate][1].
+    ///
+    /// [1]: https://w3.org/TR/webrtc/#dom-rtcicecandidate
+    /// [2]: https://w3.org/TR/webrtc/#dom-rtcicecandidate-candidate
     pub candidate: String,
+
+    /// [`sdpMLineIndex` field][2] of the discovered [RTCIceCandidate][1].
+    ///
+    /// [1]: https://w3.org/TR/webrtc/#dom-rtcicecandidate
+    /// [2]: https://w3.org/TR/webrtc/#dom-rtcicecandidate-sdpmlineindex
     pub sdp_m_line_index: Option<u16>,
+
+    /// [`sdpMid` field][2] of the discovered [RTCIceCandidate][1].
+    ///
+    /// [1]: https://w3.org/TR/webrtc/#dom-rtcicecandidate
+    /// [2]: https://w3.org/TR/webrtc/#dom-rtcicecandidate-sdpmid
     pub sdp_mid: Option<String>,
 }
 
 /// Representation of [RTCRtpTransceiver][1]'s [kind][2].
 ///
-/// [1]: https://www.w3.org/TR/webrtc/#dom-rtcrtptransceiver
-/// [2]: https://www.w3.org/TR/webrtc/#dfn-transceiver-kind
+/// [1]: https://w3.org/TR/webrtc/#dom-rtcrtptransceiver
+/// [2]: https://w3.org/TR/webrtc/#dfn-transceiver-kind
 #[derive(Clone, Copy, Eq, PartialEq)]
 pub enum TransceiverKind {
+    /// Audio transceiver.
     Audio,
+
+    /// Video transceiver.
     Video,
 }
 
@@ -59,11 +76,18 @@ impl TransceiverKind {
 
 /// Representation of [RTCRtpTransceiverDirection][1].
 ///
-/// [1]:https://www.w3.org/TR/webrtc/#dom-rtcrtptransceiverdirection
+/// [1]:https://w3.org/TR/webrtc/#dom-rtcrtptransceiverdirection
 #[derive(Clone, Copy)]
 // TODO: sendrecv optimization
 pub enum TransceiverDirection {
+    /// [`sendonly` direction][1] of transceiver.
+    ///
+    /// [1]: https://w3.org/TR/webrtc/#dom-rtcrtptransceiverdirection-sendonly
     Sendonly,
+
+    /// [`recvonly` direction][1] of transceiver.
+    ///
+    /// [1]: https://w3.org/TR/webrtc/#dom-rtcrtptransceiverdirection-recvonly
     Recvonly,
 }
 
@@ -79,41 +103,48 @@ impl From<TransceiverDirection> for RtcRtpTransceiverDirection {
 
 /// Representation of [RTCSdpType].
 ///
-/// [RTCSdpType]: https://www.w3.org/TR/webrtc/#dom-rtcsdptype
+/// [RTCSdpType]: https://w3.org/TR/webrtc/#dom-rtcsdptype
 pub enum SdpType {
+    /// [`offer` type][1] of SDP.
+    ///
+    /// [1]: https://w3.org/TR/webrtc/#dom-rtcsdptype-offer
     Offer(String),
+
+    /// [`answer` type][1] of SDP.
+    ///
+    /// [1]: https://w3.org/TR/webrtc/#dom-rtcsdptype-answer
     Answer(String),
 }
 
-/// Describes errors that may occur during signaling between this and remote
+/// Errors that may occur during signaling between this and remote
 /// [RTCPeerConnection][1] and event handlers setting errors.
 ///
 /// [1]: https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection.
-#[derive(Error, Debug)]
+#[derive(Debug, Error)]
 pub enum Error {
-    #[error("failed add ice candidate {0}")]
+    #[error("failed to add ICE candidate: {0}")]
     AddIceCandidate(WasmErr),
-    #[error("failed create answer {0}")]
+    #[error("failed to create SDP answer: {0}")]
     CreateAnswer(WasmErr),
-    #[error("failed create peer connection {0}")]
+    #[error("failed to create PeerConnection: {0}")]
     CreatePeer(WasmErr),
-    #[error("failed create offer {0}")]
+    #[error("failed to create SDP offer: {0}")]
     CreateOffer(WasmErr),
-    #[error("failed set handler for RtcPeerConnectionIceEvent {0}")]
+    #[error("failed to set handler for RtcPeerConnectionIceEvent: {0}")]
     SetHandlerIceEvent(WasmErr),
-    #[error("failed set handler for RtcTrackEvent {0}")]
+    #[error("failed to set handler for RtcTrackEvent: {0}")]
     SetHandlerTrackEvent(WasmErr),
-    #[error("failed set local description {0}")]
+    #[error("failed to set local SDP description: {0}")]
     SetLocalDescription(WasmErr),
-    #[error("failed set remote description {0}")]
+    #[error("failed to set remote SDP description: {0}")]
     SetRemoteDescription(WasmErr),
 }
 
-type Result<T, E = Error> = std::result::Result<T, Traced<E>>;
+type Result<T> = std::result::Result<T, Traced<Error>>;
 
 /// Representation of [RTCPeerConnection][1].
 ///
-/// [1]: https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection
+/// [1]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection
 pub struct RtcPeerConnection {
     /// Underlying [RTCPeerConnection][1].
     ///
@@ -327,7 +358,7 @@ impl RtcPeerConnection {
     pub async fn set_remote_description(
         &self,
         sdp: SdpType,
-    ) -> Result<(), Error> {
+    ) -> Result<()> {
         let description = match sdp {
             SdpType::Offer(offer) => {
                 let mut desc =

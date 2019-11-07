@@ -11,18 +11,18 @@ use crate::{
     utils::{window, IntervalHandle, WasmErr},
 };
 
-/// Describes errors that may occur into [`Heartbeat`].
+/// Errors that may occur in [`Heartbeat`].
 #[derive(Debug, Fail, From)]
 pub enum Error {
-    #[fail(display = "unable to ping: no socket")]
+    #[error("unable to ping: no socket")]
     NoSocket,
-    #[fail(display = "cannot set callback for ping send: {}", 0)]
+    #[error("cannot set callback for ping send: {0}")]
     SetIntervalHandler(WasmErr),
-    #[fail(display = "failed send ping: {}", 0)]
-    SendPing(#[fail(cause)] SocketError),
+    #[error("failed to send ping: {0}")]
+    SendPing(#[fail(cause)]  SocketError),
 }
 
-type Result<T, E = Traced<Error>> = std::result::Result<T, E>;
+type Result<T> = std::result::Result<T, Traced<Error>>;
 
 /// Responsible for sending/handling keep-alive requests, detecting connection
 /// loss.
@@ -99,8 +99,7 @@ impl Heartbeat {
                 inner.interval,
             )
             .map_err(WasmErr::from)
-            .map_err(Error::SetIntervalHandler)
-            .map_err(tracerr::from_and_wrap!())?;
+            .map_err(tracerr::map_from_and_wrap!())?;
 
         inner.ping_task = Some(PingTaskHandler {
             _closure: do_ping,

@@ -1,7 +1,7 @@
 use std::{ops::Deref, rc::Rc};
 
-use wasm_bindgen::{closure::Closure, convert::FromWasmAbi, JsCast, JsValue};
-use web_sys::{console, EventTarget};
+use wasm_bindgen::{closure::Closure, convert::FromWasmAbi, JsCast};
+use web_sys::EventTarget;
 
 use crate::utils::WasmErr;
 
@@ -20,6 +20,7 @@ where
     T: Deref<Target = EventTarget>,
     A: FromWasmAbi + 'static,
 {
+    /// Creates new [`EventListener`] from a given [`FnMut`] `closure`.
     pub fn new_mut<F>(
         target: Rc<T>,
         event_name: &'static str,
@@ -42,6 +43,7 @@ where
         })
     }
 
+    /// Creates new [`EventListener`] from a given [`FnOnce`] `closure`.
     pub fn new_once<F>(
         target: Rc<T>,
         event_name: &'static str,
@@ -78,10 +80,7 @@ where
                 self.closure.as_ref().unchecked_ref(),
             )
         {
-            console::error_1(&JsValue::from_str(&format!(
-                "{}",
-                WasmErr::from(err)
-            )))
+            console_error!(err);
         }
     }
 }

@@ -46,6 +46,7 @@ pub struct Repository {
 }
 
 impl Repository {
+    /// Instantiates new [`Repository`] with a given [`MediaManager`].
     #[inline]
     pub fn new(media_manager: Rc<MediaManager>) -> Self {
         Self {

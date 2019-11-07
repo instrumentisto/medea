@@ -17,6 +17,11 @@ server:
       host: demo.medea.stg.t11913.org
       pass: changeme
 
+  control-mock:
+    image:
+      tag: edge
+      pullPolicy: Always
+
   coturn:
     image:
       tag: 4.5

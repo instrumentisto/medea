@@ -12,7 +12,6 @@ use medea_jason::{
 
 use crate::{unwrap_error, MockNavigator};
 use medea_jason::utils::JasonError;
-use wasm_bindgen::prelude::*;
 
 wasm_bindgen_test_configure!(run_in_browser);
 
@@ -41,7 +40,8 @@ async fn failed_get_media_devices_info() {
         Ok(_) => assert!(false),
         Err(err) => assert_eq!(
             err.to_string(),
-            "Error: get enumerate devices failed: some error".to_string()
+            "Error: MediaDevices.enumerateDevices() failed: some error"
+                .to_string()
         ),
     }
 }
@@ -73,7 +73,7 @@ async fn failed_get_user_media() {
             assert_eq!(e.name(), "GetUserMedia");
             assert_eq!(
                 e.message(),
-                "get user media failed: Unknown error: some error"
+                "MediaDevices.getUserMedia() failed: Unknown error: some error"
             );
         }
     }

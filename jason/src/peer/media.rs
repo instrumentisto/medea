@@ -20,20 +20,20 @@ use super::{
     track::MediaTrack,
 };
 
-/// Describes errors that may occur in [`MediaConnections`] storage.
+/// Errors that may occur in [`MediaConnections`] storage.
 #[derive(Debug, Fail)]
 pub enum Error {
-    #[fail(display = "failed insert track to sender {}", 0)]
+    #[fail(display = "failed to insert Track to a sender: {}", 0)]
     InsertTrack(WasmErr),
-    #[fail(display = "unable to find transceiver with provided mid {}", 0)]
+    #[fail(display = "unable to find Transceiver with provided mid: {}", 0)]
     NotFoundTransceiver(String),
-    #[fail(display = "peer has senders without mid")]
+    #[fail(display = "Peer has senders without mid")]
     SendersWithoutMid,
-    #[fail(display = "peer has receivers without mid")]
+    #[fail(display = "Peer has receivers without mid")]
     ReceiversWithoutMid,
-    #[fail(display = "provided stream does not have all necessary tracks")]
+    #[fail(display = "provided stream does not have all necessary Tracks")]
     InvalidMediaStream,
-    #[fail(display = "provided track does not satisfy senders constraints")]
+    #[fail(display = "provided Track does not satisfy senders constraints")]
     InvalidMediaTrack,
 }
 
@@ -90,18 +90,16 @@ impl MediaConnections {
         };
         s.senders
             .values()
-            .filter(|sender| sender.kind() == kind)
-            .for_each(|sender| sender.set_track_enabled(enabled))
+            .filter(|s| s.kind() == kind)
+            .for_each(|s| s.set_track_enabled(enabled))
     }
 
     /// Returns `true` if all [`MediaTrack`]s of all [`Senders`] with given
     /// [`TransceiverKind`] are enabled or `false` otherwise.
     pub fn are_senders_enabled(&self, kind: TransceiverKind) -> bool {
         let conn = self.0.borrow();
-        for sender in
-            conn.senders.values().filter(|sender| sender.kind() == kind)
-        {
-            if !sender.is_track_enabled() {
+        for s in conn.senders.values().filter(|s| s.kind() == kind) {
+            if !s.is_track_enabled() {
                 return false;
             }
         }
@@ -204,33 +202,33 @@ impl MediaConnections {
         &self,
         stream: &MediaStream,
     ) -> Result<()> {
+        use Error::*;
+
         let s = self.0.borrow();
 
         // Build sender to track pairs to catch errors before inserting.
-        let mut sender_and_track = Vec::new();
+        let mut sender_and_track = Vec::with_capacity(s.senders.len());
         for sender in s.senders.values() {
             if let Some(track) = stream.get_track_by_id(sender.track_id) {
                 if sender.caps.satisfies(&track.track()) {
                     sender_and_track.push((sender, track));
                 } else {
-                    return Err(tracerr::new!(Error::InvalidMediaTrack));
+                    return Err(tracerr::new!(InvalidMediaTrack));
                 }
             } else {
-                return Err(tracerr::new!(Error::InvalidMediaStream));
+                return Err(tracerr::new!(InvalidMediaStream));
             }
         }
 
         stream.toggle_audio_tracks(s.enabled_audio);
         stream.toggle_video_tracks(s.enabled_video);
 
-        let mut futures = Vec::new();
-        for (sender, track) in sender_and_track {
-            futures
-                .push(Sender::insert_and_enable_track(Rc::clone(sender), track))
-        }
-        for res in future::join_all(futures).await {
-            res.map_err(tracerr::wrap!())?;
-        }
+        future::try_join_all(
+            sender_and_track
+                .into_iter()
+                .map(|(s, t)| Sender::insert_and_enable_track(Rc::clone(s), t)),
+        )
+        .await?;
 
         Ok(())
     }

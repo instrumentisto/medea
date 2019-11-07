@@ -2,9 +2,13 @@
 //!
 //! [1]: https://www.w3.org/TR/mediacapture-streams/#mediastream
 
-use std::{collections::HashMap, rc::Rc};
+use std::{
+    collections::HashMap,
+    rc::{Rc, Weak},
+};
 
 use medea_client_api_proto::TrackId;
+use wasm_bindgen::{prelude::*, JsValue};
 use web_sys::MediaStream as SysMediaStream;
 
 use crate::media::TrackConstraints;
@@ -93,6 +97,11 @@ impl MediaStream {
         }
     }
 
+    /// Instantiates new [`MediaStreamHandle`] for use on JS side.
+    pub fn new_handle(&self) -> MediaStreamHandle {
+        MediaStreamHandle(Rc::downgrade(&self.0))
+    }
+
     /// Enables or disables all audio [`MediaTrack`]s in this stream.
     pub fn toggle_audio_tracks(&self, enabled: bool) {
         for track in self.0.audio_tracks.values() {
@@ -112,5 +121,21 @@ impl MediaStream {
     /// [1]: https://www.w3.org/TR/mediacapture-streams/#mediastream
     pub fn stream(&self) -> SysMediaStream {
         Clone::clone(&self.0.stream)
+    }
+}
+
+/// JS side handle to [`MediaStream`].
+///
+/// Actually, represents a [`Weak`]-based handle to `InnerStream`.
+///
+/// For using [`MediaStreamHandle`] on Rust side, consider the [`MediaStream`].
+#[wasm_bindgen]
+pub struct MediaStreamHandle(Weak<InnerStream>);
+
+#[wasm_bindgen]
+impl MediaStreamHandle {
+    /// Returns the underlying [`MediaStream`][`SysMediaStream`] object.
+    pub fn get_media_stream(&self) -> Result<SysMediaStream, JsValue> {
+        map_weak!(self, |inner| inner.stream.clone())
     }
 }

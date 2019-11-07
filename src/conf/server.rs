@@ -31,7 +31,7 @@ pub struct ClientApiHttpServer {
     /// This address is returned from [Control API] in `sids` field
     /// and [Jason] uses this address to start its session.
     ///
-    /// Defaults to `ws://127.0.0.1:8080`.
+    /// Defaults to `ws://127.0.0.1:8080/ws`.
     ///
     /// [Client API]: https://tinyurl.com/yx9thsnr
     /// [Control API]: https://tinyurl.com/yxsqplq7
