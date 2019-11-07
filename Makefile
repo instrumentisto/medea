@@ -337,8 +337,8 @@ endif
 #
 # Usage:
 #	make test.unit [crate=(@all|medea|<crate-name>)]
-#	               [crate=medea-jason [browser=(chrome|firefox)]]
-#                  [remote=(yes|no)]
+#	               [crate=medea-jason [browser=(chrome|firefox)]
+#	                                  [mocked=(no|yes)]]
 
 test-unit-crate = $(if $(call eq,$(crate),),@all,$(crate))
 webdriver-env = $(if $(call eq,$(browser),firefox),GECKO,CHROME)DRIVER_REMOTE
@@ -354,7 +354,7 @@ ifeq ($(test-unit-crate),medea)
 	cargo test --lib --bin medea
 else
 ifeq ($(crate),medea-jason)
-ifeq ($(remote),no)
+ifeq ($(mocked),yes)
 	cd $(crate-dir)/ && \
 	cargo test --target wasm32-unknown-unknown --features mockable
 else
