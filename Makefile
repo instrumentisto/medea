@@ -22,7 +22,7 @@ CONTROL_MOCK_IMAGE_NAME := instrumentisto/medea-control-api-mock
 
 RUST_VER := 1.38
 RUST_BETA_VER := 1.39-beta.5
-CHROME_VERSION := 77.0
+CHROME_VERSION := 78.0
 FIREFOX_VERSION := 69.0
 
 CURRENT_GIT_BRANCH := $(strip $(shell git branch | grep \* | cut -d ' ' -f2))

@@ -256,7 +256,16 @@ struct InnerRoom {
 
     /// Indicates if outgoing video is enabled in this [`Room`].
     enabled_video: bool,
+
+    /// JS callback which will be called when this [`Room`] will be closed.
     on_close: Rc<Callback<JsCloseReason>>,
+
+    /// Reason of [`Room`] closing.
+    ///
+    /// This [`CloseReason`] will be provided into `on_close` JS callback.
+    ///
+    /// Note that `None` will be considered as error and `is_err` will be
+    /// `true` in [`JsCloseReason`] provided to JS callback.
     close_reason: Option<CloseReason>,
 }
 
