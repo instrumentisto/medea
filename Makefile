@@ -800,6 +800,9 @@ helm.package:
 # Usage:
 #	make helm.package.release [chart=medea-demo] [build=(yes|no)]
 
+helm-package-release-ver := $(strip $(shell \
+	grep 'version: ' jason/demo/chart/medea-demo/Chart.yaml | cut -d ':' -f2))
+
 helm.package.release:
 ifneq ($(build),no)
 	@make helm.package chart=$(helm-chart)
@@ -813,7 +816,8 @@ endif
 		helm repo index charts/ \
 			--url=https://instrumentisto.github.io/medea/charts ; \
 		git add -v charts/ ; \
-		git commit -m "Release '$(helm-chart)' Helm chart" ; \
+		git commit -m \
+			"Release $(helm-chart)-$(helm-package-release-ver) Helm chart" ; \
 	fi
 	git checkout $(CURRENT_GIT_BRANCH)
 	git push origin gh-pages
