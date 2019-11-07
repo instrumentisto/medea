@@ -21,18 +21,31 @@ use super::{MediaStream, MediaTrack};
 /// parsing [`MediaStream`].
 #[derive(Debug, Error)]
 pub enum Error {
-    #[error("only one video track is allowed in SimpleStreamRequest")]
-    TooManyVideoTracks,
+    /// [`StreamRequest`] contains multiple [`AudioTrackConstraints`].
     #[error("only one audio track is  allowed in SimpleStreamRequest")]
     TooManyAudioTracks,
+
+    /// [`StreamRequest`] contains multiple [`VideoTrackConstraints`].
+    #[error("only one video track is allowed in SimpleStreamRequest")]
+    TooManyVideoTracks,
+
+    /// [`StreamRequest`] contains no track constraints at all.
     #[error("SimpleStreamRequest should have at least one track")]
     NoTracks,
-    #[error("provided MediaStream was expected to have single video track")]
-    ExpectedVideoTracks,
+
+    /// Provided [`MediaStream`] has multiple audio [`MediaTrack`]s.
     #[error("provided MediaStream was expected to have single audio track")]
     ExpectedAudioTracks,
+
+    /// Provided [`MediaStream`] has multiple video [`MediaTrack`]s.
+    #[error("provided MediaStream was expected to have single video track")]
+    ExpectedVideoTracks,
+
+    /// Audio [`MediaTrack`] fails to satisfy specified constraints.
     #[error("provided audio track does not satisfy specified constraints")]
     InvalidAudioTrack,
+
+    /// Video [`MediaTrack`] fails to satisfy specified constraints.
     #[error("provided video track does not satisfy specified constraints")]
     InvalidVideoTrack,
 }

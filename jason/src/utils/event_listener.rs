@@ -20,6 +20,7 @@ where
     T: Deref<Target = EventTarget>,
     A: FromWasmAbi + 'static,
 {
+    /// Creates new [`EventListener`] from a given [`FnMut`] `closure`.
     pub fn new_mut<F>(
         target: Rc<T>,
         event_name: &'static str,
@@ -42,6 +43,7 @@ where
         })
     }
 
+    /// Creates new [`EventListener`] from a given [`FnOnce`] `closure`.
     pub fn new_once<F>(
         target: Rc<T>,
         event_name: &'static str,

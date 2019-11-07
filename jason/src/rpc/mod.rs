@@ -28,7 +28,7 @@ pub enum CloseMsg {
 #[allow(clippy::module_name_repetitions)]
 #[cfg_attr(feature = "mockable", mockall::automock)]
 pub trait RpcClient {
-    // atm Establish connection with RPC server.
+    /// Establishes connection with RPC server.
     fn connect(&self, token: String) -> LocalBoxFuture<'static, Result<()>>;
 
     /// Returns [`Stream`] of all [`Event`]s received by this [`RpcClient`].
@@ -48,11 +48,12 @@ pub trait RpcClient {
 // 2. Reconnect.
 // 3. Disconnect if no pongs.
 // 4. Buffering if no socket?
+/// Client API RPC client to talk with server via [`WebSocket`].
 pub struct WebsocketRpcClient(Rc<RefCell<Inner>>);
 
-/// Inner state of [`RpcClient`].
+/// Inner state of [`WebsocketRpcClient`].
 struct Inner {
-    /// WebSocket connection to remote media server.
+    /// [`WebSocket`] connection to remote media server.
     sock: Option<Rc<WebSocket>>,
 
     heartbeat: Heartbeat,
@@ -111,6 +112,7 @@ fn on_message(inner_rc: &RefCell<Inner>, msg: Result<ServerMsg, Error>) {
 }
 
 impl WebsocketRpcClient {
+    /// Creates new [`WebsocketRpcClient`] with a given `ping_interval`.
     pub fn new(ping_interval: i32) -> Self {
         Self(Inner::new(ping_interval))
     }

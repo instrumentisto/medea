@@ -48,10 +48,12 @@ impl MediaStreamConstraints {
 }
 
 impl MediaStreamConstraints {
+    /// Returns only audio constraints.
     pub fn get_audio(&self) -> &Option<AudioTrackConstraints> {
         &self.audio
     }
 
+    /// Returns only video constraints.
     pub fn get_video(&self) -> &Option<VideoTrackConstraints> {
         &self.video
     }
@@ -94,13 +96,22 @@ macro_rules! satisfies_by_device_id {
     }};
 }
 
+/// Wrapper around [MediaTrackConstraints][1].
+///
+/// [1]: https://w3.org/TR/mediacapture-streams/#media-track-constraints
 #[derive(Clone)]
 pub enum TrackConstraints {
+    /// Audio constraints.
     Audio(AudioTrackConstraints),
+    /// Video constraints.
     Video(VideoTrackConstraints),
 }
 
 impl TrackConstraints {
+    /// Checks if provided [MediaStreamTrack][1] satisfies this
+    /// [`TrackConstraints`].
+    ///
+    /// [1]: https://w3.org/TR/mediacapture-streams/#mediastreamtrack
     pub fn satisfies(&self, track: &SysMediaStreamTrack) -> bool {
         match self {
             Self::Audio(audio) => audio.satisfies(&track),
@@ -170,7 +181,8 @@ impl AudioTrackConstraints {
 }
 
 impl From<ProtoAudioConstraints> for AudioTrackConstraints {
-    fn from(_caps: ProtoAudioConstraints) -> Self {
+    #[inline]
+    fn from(_: ProtoAudioConstraints) -> Self {
         Self::new()
     }
 }

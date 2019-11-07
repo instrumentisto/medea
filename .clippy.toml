@@ -11,6 +11,7 @@ doc-valid-idents = [
     "getUserMedia", "gRPC",
     "MediaDeviceKind",
     "MediaStream", "MediaStreamConstraints", "MediaStreamTrack",
+    "MediaTrackConstraints",
     "RTCConfiguration",
     "RTCIceCandidate", "RTCIceCandidateInit", "RTCIceServer",
     "RTCPeerConnection", "RTCPeerConnectionIceEvent",

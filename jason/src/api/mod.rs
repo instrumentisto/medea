@@ -17,6 +17,10 @@ use crate::{
 #[doc(inline)]
 pub use self::{connection::ConnectionHandle, room::Room, room::RoomHandle};
 
+/// General library interface.
+///
+/// Responsible for managing shared transports, local media
+/// and room initialization.
 #[wasm_bindgen]
 #[derive(Default)]
 pub struct Jason(Rc<RefCell<Inner>>);
@@ -27,13 +31,10 @@ struct Inner {
     rooms: Vec<Room>,
 }
 
-/// Main library handler.
-///
-/// Responsible for managing shared transports, local media
-/// and room initialization.
 #[allow(clippy::unused_self)]
 #[wasm_bindgen]
 impl Jason {
+    /// Instantiates new [`Jason`] interface to interact with this library.
     #[wasm_bindgen(constructor)]
     pub fn new() -> Self {
         set_panic_hook();

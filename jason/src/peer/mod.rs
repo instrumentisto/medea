@@ -42,28 +42,59 @@ pub use self::{
 #[allow(clippy::module_name_repetitions)]
 /// Events emitted from [`RtcPeerConnection`].
 pub enum PeerEvent {
-    /// [`RtcPeerConnection`] discovered new ice candidate.
+    /// [`RtcPeerConnection`] discovered new ICE candidate.
+    ///
+    /// Wrapper around [RTCPeerConnectionIceEvent][1].
+    ///
+    /// [1]: https://w3.org/TR/webrtc/#rtcpeerconnectioniceevent
     IceCandidateDiscovered {
+        /// ID of the [`PeerConnection`] that discovered new ICE candidate.
         peer_id: Id,
+
+        /// [`candidate` field][2] of the discovered [RTCIceCandidate][1].
+        ///
+        /// [1]: https://w3.org/TR/webrtc/#dom-rtcicecandidate
+        /// [2]: https://w3.org/TR/webrtc/#dom-rtcicecandidate-candidate
         candidate: String,
+
+        /// [`sdpMLineIndex` field][2] of the discovered [RTCIceCandidate][1].
+        ///
+        /// [1]: https://w3.org/TR/webrtc/#dom-rtcicecandidate
+        /// [2]: https://w3.org/TR/webrtc/#dom-rtcicecandidate-sdpmlineindex
         sdp_m_line_index: Option<u16>,
+
+        /// [`sdpMid` field][2] of the discovered [RTCIceCandidate][1].
+        ///
+        /// [1]: https://w3.org/TR/webrtc/#dom-rtcicecandidate
+        /// [2]: https://w3.org/TR/webrtc/#dom-rtcicecandidate-sdpmid
         sdp_mid: Option<String>,
     },
 
     /// [`RtcPeerConnection`] received new stream from remote sender.
     NewRemoteStream {
+        /// ID of the [`PeerConnection`] that received new stream from remote
+        /// sender.
         peer_id: Id,
+
+        /// ID of the remote sender's [`PeerConnection`].
         sender_id: Id,
+
+        /// Received [`MediaStream`].
         remote_stream: MediaStream,
     },
 
     /// [`RtcPeerConnection`] sent new local stream to remote members.
     NewLocalStream {
+        /// ID of the [`PeerConnection`] that sent new local stream to remote
+        /// members.
         peer_id: Id,
+
+        /// Local [`MediaStream`] that is sent to remote members.
         local_stream: MediaStream,
     },
 }
 
+/// High-level wrapper around [`RtcPeerConnection`].
 #[allow(clippy::module_name_repetitions)]
 pub struct PeerConnection {
     /// Unique ID of [`PeerConnection`].
