@@ -41,7 +41,7 @@ grpcio = { version = "0.4", features = ["openssl"] }
 humantime-serde = "0.1"
 medea-client-api-proto = { path = "proto/client-api", features = ["medea"] }
 medea-control-api-proto = { path = "proto/control-api" }
-medea-macro = "0.1"
+medea-macro = { path = "crates/medea-macro" }
 protobuf = "2.7"
 rand = "0.7"
 redis = "0.11"
