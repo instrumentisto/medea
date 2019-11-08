@@ -20,8 +20,7 @@ MEDEA_IMAGE_NAME := $(strip \
 DEMO_IMAGE_NAME := instrumentisto/medea-demo
 CONTROL_MOCK_IMAGE_NAME := instrumentisto/medea-control-api-mock
 
-RUST_VER := 1.38
-RUST_BETA_VER := 1.39-beta.5
+RUST_VER := 1.39
 CHROME_VERSION := 78.0
 FIREFOX_VERSION := 69.0
 
@@ -228,7 +227,7 @@ ifeq ($(dockerized),yes)
 		-v "$(HOME)/.cargo/registry":/usr/local/cargo/registry \
 		-v "$(HOME):$(HOME)" \
 		-e XDG_CACHE_HOME=$(HOME) \
-		alexlapa/rust-beta:$(RUST_BETA_VER) \
+		rust:$(RUST_VER) \
 			make cargo.build crate=$(cargo-build-crate) \
 			                 debug=$(debug) dockerized=no \
 			                 pre-install=yes
@@ -270,7 +269,7 @@ endif
 #	make cargo.lint
 
 cargo.lint:
-	cargo +beta clippy --all -- -D clippy::pedantic -D warnings
+	cargo clippy --all -- -D clippy::pedantic -D warnings
 
 
 
@@ -355,13 +354,13 @@ else
 ifeq ($(crate),medea-jason)
 ifeq ($(browser),default)
 	cd $(crate-dir)/ && \
-	cargo +beta test --target wasm32-unknown-unknown --features mockable
+	cargo test --target wasm32-unknown-unknown --features mockable
 else
 	@make docker.up.webdriver browser=$(browser)
 	sleep 10
 	cd $(crate-dir)/ && \
 	$(webdriver-env)="http://127.0.0.1:4444" \
-	cargo +beta test --target wasm32-unknown-unknown --features mockable
+	cargo test --target wasm32-unknown-unknown --features mockable
 	@make docker.down.webdriver browser=$(browser)
 endif
 else
