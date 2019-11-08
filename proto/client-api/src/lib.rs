@@ -75,6 +75,7 @@ pub enum ClientMsg {
 
 /// WebSocket message from Web Client to Media Server.
 #[allow(dead_code)]
+#[dispatchable]
 #[cfg_attr(feature = "medea", derive(Deserialize))]
 #[cfg_attr(feature = "jason", derive(Serialize))]
 #[cfg_attr(test, derive(Debug, PartialEq))]
