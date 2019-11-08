@@ -321,6 +321,7 @@ mod on_close_callback {
                         get_is_closed_by_server(&closed),
                         false
                     );
+
                     test_tx.send(Ok(())).unwrap();
                 })
                 .into(),
@@ -351,6 +352,7 @@ mod on_close_callback {
                         get_is_closed_by_server(&closed),
                         false
                     );
+
                     test_tx.send(Ok(())).unwrap();
                 })
                 .into(),
