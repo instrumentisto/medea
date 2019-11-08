@@ -87,10 +87,6 @@ fn get_test_room_and_exist_peer(
         .times(count_gets_peer)
         .returning_st(move || vec![Rc::clone(&peer_clone)]);
     rpc.expect_unsub().return_const(());
-    rpc.expect_on_close().returning(move || {
-        let (_, rx) = oneshot::channel();
-        Box::pin(rx)
-    });
 
     let room = Room::new(Rc::new(rpc), repo);
     (room, peer)
@@ -166,10 +162,6 @@ fn get_test_room_and_new_peer(
         .return_once_st(move |_, _, _, _, _| Ok(peer_clone));
     rpc.expect_send_command().return_const(());
     rpc.expect_unsub().return_const(());
-    rpc.expect_on_close().returning(move || {
-        let (_, rx) = oneshot::channel();
-        Box::pin(rx)
-    });
 
     let room = Room::new(Rc::new(rpc), repo);
     (room, peer)
@@ -219,8 +211,9 @@ async fn mute_video_room_before_init_peer() {
     assert!(!peer.is_send_video_enabled());
 }
 
-/// Tests for `on_close` JS side callback.
 mod on_close_callback {
+    //! Tests for `on_close` JS side callback.
+
     use std::rc::Rc;
 
     use futures::channel::{mpsc, oneshot};
@@ -260,10 +253,6 @@ mod on_close_callback {
         let (_event_tx, event_rx) = mpsc::unbounded();
         rpc.expect_subscribe()
             .return_once(move || Box::pin(event_rx));
-        rpc.expect_on_close().returning(move || {
-            let (_, rx) = oneshot::channel();
-            Box::pin(rx)
-        });
         rpc.expect_send_command().return_const(());
         rpc.expect_unsub().return_const(());
 

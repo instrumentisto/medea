@@ -339,7 +339,7 @@ impl RpcClient for WebsocketRpcClient {
     }
 
     /// Returns [`Future`] which will be resolved with [`CloseReason`] on
-    /// RPC connection closing initiated by server.
+    /// RPC connection closing.
     fn on_close(
         &self,
     ) -> LocalBoxFuture<'static, Result<CloseReason, oneshot::Canceled>> {

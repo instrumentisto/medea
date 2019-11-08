@@ -203,7 +203,7 @@ impl Room {
     ///
     /// Supposed that this function will trigger [`Drop`] implementation of
     /// [`InnerRoom`] and call JS side `on_close` callback with provided
-    /// [`ClientAndServerCloseReason`].
+    /// [`CloseReason`].
     pub fn close(self, reason: CloseReason) {
         self.0.borrow_mut().close(reason);
     }
