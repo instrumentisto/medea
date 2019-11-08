@@ -56,19 +56,16 @@ impl Jason {
             //       will be supported
             let mut rooms = Vec::new();
             mem::swap(&mut inner_clone.borrow_mut().rooms, &mut rooms);
-            match res {
-                Ok(reason) => {
-                    for room in rooms {
-                        room.close(reason.clone());
-                    }
+            if let Ok(reason) = res {
+                for room in rooms {
+                    room.close(reason.clone());
                 }
-                Err(_) => {
-                    // Note that in this case clean up will still happen.
-                    console_error!(
-                        "'on_close' callback's 'Sender' was unexpectedly \
-                         cancelled."
-                    );
-                }
+            } else {
+                // Note that in this case clean up will still happen.
+                console_error!(
+                    "'on_close' callback's 'Sender' was unexpectedly \
+                     cancelled."
+                );
             }
             inner_clone.borrow_mut().media_manager = Rc::default();
         }));

@@ -2,7 +2,10 @@
 
 use std::rc::Rc;
 
-use futures::channel::{mpsc, oneshot};
+use futures::{
+    channel::{mpsc, oneshot},
+    future::Either,
+};
 use medea_client_api_proto::{Event, IceServer, PeerId};
 use medea_jason::{
     api::Room,
@@ -14,7 +17,6 @@ use medea_jason::{
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
 use wasm_bindgen_test::*;
-use futures::future::Either;
 
 use crate::{get_test_tracks, resolve_after, MockNavigator};
 
