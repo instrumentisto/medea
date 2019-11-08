@@ -215,7 +215,7 @@ const controlDebugWindows = {
         resultContainer.firstChild.remove();
       }
 
-      let res = await controlApi.getCallbacks();
+      let callbacks = await controlApi.getCallbacks();
 
       let table = document.createElement("table");
 
@@ -227,20 +227,20 @@ const controlDebugWindows = {
       timeHeader.innerHTML = 'Time';
       header.appendChild(timeHeader);
       let elementHeader = document.createElement('th');
-      elementHeader.innerHTML = 'Element';
+      elementHeader.innerHTML = 'FID';
       header.appendChild(elementHeader);
       table.appendChild(header);
 
-      for (item of res) {
+      for (callback of callbacks) {
         let row = document.createElement('tr');
         let event = document.createElement('th');
-        event.innerHTML = JSON.stringify(item.event);
+        event.innerHTML = JSON.stringify(callback.event);
         row.appendChild(event);
         let time = document.createElement('th');
-        time.innerHTML = item.at;
+        time.innerHTML = callback.at;
         row.appendChild(time);
         let element = document.createElement('th');
-        element.innerHTML = item.element;
+        element.innerHTML = callback.fid;
         row.appendChild(element);
         table.appendChild(row);
       }
@@ -298,6 +298,7 @@ window.onload = async function() {
 
   try {
     let controlBtns = document.getElementsByClassName('control')[0];
+    let connectDiv = document.getElementsByClassName('connect')[0];
     let joinCallerButton = document.getElementsByClassName('connect__join')[0];
     let usernameInput = document.getElementsByClassName('connect__username')[0];
     let audioSelect = document.getElementsByClassName('connect__select-device_audio')[0];
@@ -390,6 +391,7 @@ window.onload = async function() {
     let bindJoinButtons = function(roomId) {
       joinCallerButton.onclick = async function() {
         contentVisibility.show(controlBtns);
+        contentVisibility.hide(connectDiv);
 
         try {
           let username = usernameInput.value;
