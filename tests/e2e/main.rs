@@ -1,6 +1,6 @@
+pub mod signalling;
 mod callbacks;
 mod grpc_control_api;
-pub mod signalling;
 
 /// Generates `insert_str!` macro, that can be used as `format!` macro with one
 /// predefined argument.

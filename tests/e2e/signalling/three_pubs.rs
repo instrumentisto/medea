@@ -2,9 +2,9 @@ use std::{cell::Cell, rc::Rc};
 
 use actix::{AsyncContext as _, Context, System};
 use medea_client_api_proto::{Direction, Event, PeerId};
+use actix_http::ws::CloseCode;
 
 use crate::signalling::{CloseSocket, TestMember};
-use actix_http::ws::CloseCode;
 
 #[test]
 #[allow(clippy::too_many_lines)]
