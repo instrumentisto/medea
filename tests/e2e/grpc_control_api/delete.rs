@@ -9,8 +9,6 @@ use medea::api::control::error_codes::{
     ErrorCode as MedeaErrorCode, ErrorCode,
 };
 
-use crate::gen_insert_str_macro;
-
 use super::{create_room_req, ControlClient};
 
 /// Tests `Delete` method of [Medea]'s [Control API].
@@ -49,30 +47,26 @@ fn test_for_delete(
 
 #[test]
 fn room() {
-    gen_insert_str_macro!("delete-room");
-    test_for_delete(
-        &insert_str!("{}"),
-        &insert_str!("{}"),
-        ErrorCode::RoomNotFound,
-    );
+    const TEST_NAME: &str = "delete-room";
+    test_for_delete(TEST_NAME, TEST_NAME, ErrorCode::RoomNotFound);
 }
 
 #[test]
 fn member() {
-    gen_insert_str_macro!("delete-member");
+    const TEST_NAME: &str = "delete-member";
     test_for_delete(
-        &insert_str!("{}"),
-        &insert_str!("{}/publisher"),
+        TEST_NAME,
+        &format!("{}/publisher", TEST_NAME),
         ErrorCode::MemberNotFound,
     );
 }
 
 #[test]
 fn endpoint() {
-    gen_insert_str_macro!("delete-endpoint");
+    const TEST_NAME: &str = "delete-endpoint";
     test_for_delete(
-        &insert_str!("{}"),
-        &insert_str!("{}/publisher/publish"),
+        &TEST_NAME,
+        &format!("{}/publisher/publish", TEST_NAME),
         ErrorCode::EndpointNotFound,
     );
 }
@@ -115,32 +109,32 @@ fn test_cascade_delete(
 
 #[test]
 fn cascade_delete_endpoints_when_deleting_member() {
-    gen_insert_str_macro!("member-and-endpoint-same-time");
+    const TEST_NAME: &str = "member-and-endpoint-same-time";
 
     test_cascade_delete(
-        &insert_str!("{}"),
+        TEST_NAME,
         &[
-            &insert_str!("{}/publisher"),
-            &insert_str!("{}/publisher/publish"),
+            &format!("{}/publisher", TEST_NAME),
+            &format!("{}/publisher/publish", TEST_NAME),
         ],
         MedeaErrorCode::MemberNotFound,
-        &insert_str!("{}/publisher"),
+        &format!("{}/publisher", TEST_NAME),
     );
 }
 
 #[test]
 fn cascade_delete_everything_when_deleting_room() {
-    gen_insert_str_macro!("room-and-inner-elements-same-time");
+    const TEST_NAME: &str = "room-and-inner-elements-same-time";
 
     test_cascade_delete(
-        &insert_str!("{}"),
+        TEST_NAME,
         &[
-            &insert_str!("{}"),
-            &insert_str!("{}/publisher"),
-            &insert_str!("{}/publisher/publish"),
+            &TEST_NAME,
+            &format!("{}/publisher", TEST_NAME),
+            &format!("{}/publisher/publish", TEST_NAME),
         ],
         MedeaErrorCode::RoomNotFound,
-        &insert_str!("{}"),
+        TEST_NAME,
     );
 }
 

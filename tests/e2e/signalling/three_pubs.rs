@@ -1,8 +1,8 @@
 use std::{cell::Cell, rc::Rc};
 
 use actix::{AsyncContext as _, Context, System};
-use medea_client_api_proto::{Direction, Event, PeerId};
 use actix_http::ws::CloseCode;
+use medea_client_api_proto::{Direction, Event, PeerId};
 
 use crate::signalling::{CloseSocket, TestMember};
 
