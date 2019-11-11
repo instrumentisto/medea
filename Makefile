@@ -270,7 +270,7 @@ endif
 #	make cargo.lint
 
 cargo.lint:
-	cargo +beta clippy --all -- -D clippy::pedantic -D warnings --release
+	cargo +beta clippy --all -- -D clippy::pedantic -D warnings
 
 
 
