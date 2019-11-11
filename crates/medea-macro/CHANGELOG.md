@@ -6,6 +6,21 @@ All user visible changes to this project will be documented in this file. This p
 
 
 
+## TBD [0.2.0] · 2019-??-??
+[0.2.0]: /../../tree/medea-macro-0.2.0/crates/medea-macro
+
+### BC Breaks
+
+- Handler traits of `#[dispatchable]` macro now have `type Output`.
+
+### Changed
+
+- `#[dispatchable]` macro generates `type Output` in handler traits with
+   which we can specify output type for all functions of handler trait.
+
+
+
+
 ## [0.1.0] · 2019-08-21
 [0.1.0]: /../../tree/medea-macro-0.1.0/crates/medea-macro
 

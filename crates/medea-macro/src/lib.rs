@@ -121,6 +121,9 @@ pub fn enum_delegate(args: TokenStream, input: TokenStream) -> TokenStream {
 /// to the end of its name. Each method of trait is created by `snake_case`'ing
 /// `enum` variants and adding `on_` prefix.
 ///
+/// `type Output` is type which will be returned from all functions of
+/// `EventHandler` trait.
+///
 /// ```
 /// # use medea_macro::dispatchable;
 /// #
@@ -137,17 +140,22 @@ pub fn enum_delegate(args: TokenStream, input: TokenStream) -> TokenStream {
 /// # }
 /// #
 /// impl EventHandler for Foo {
-///     fn on_some(&mut self, new_bar: i32) {
+///     type Output = i32;
+///
+///     fn on_some(&mut self, new_bar: i32) -> Self::Output {
 ///         self.bar = new_bar;
+///         self.bar
 ///     }
 ///
-///     fn on_another(&mut self) {
+///     fn on_another(&mut self) -> Self::Output {
 ///         self.bar = 2;
+///         self.bar
 ///     }
 ///
-///     fn on_unnamed_variant(&mut self, data: (i32, i32)) {
+///     fn on_unnamed_variant(&mut self, data: (i32, i32)) -> Self::Output {
 ///         self.bar = data.0;
 ///         self.baz = data.1;
+///         self.bar
 ///     }
 /// }
 /// ```
@@ -173,32 +181,40 @@ pub fn enum_delegate(args: TokenStream, input: TokenStream) -> TokenStream {
 /// # }
 /// #
 /// # impl EventHandler for Foo {
-/// #    fn on_some(&mut self, new_bar: i32) {
+/// #    type Output = i32;
+/// #
+/// #    fn on_some(&mut self, new_bar: i32) -> Self::Output {
 /// #        self.bar = new_bar;
+/// #        self.bar
 /// #    }
 /// #
-/// #    fn on_another(&mut self) {
+/// #    fn on_another(&mut self) -> Self::Output {
 /// #        self.bar = 2;
+/// #        self.bar
 /// #    }
 /// #
-/// #    fn on_unnamed_variant(&mut self, data: (i32, i32)) {
+/// #    fn on_unnamed_variant(&mut self, data: (i32, i32)) -> Self::Output {
 /// #        self.bar = data.0;
 /// #        self.baz = data.1;
+/// #        self.bar
 /// #    }
 /// # }
 /// #
 ///
 /// let mut foo = Foo { bar: 0, baz: 0 };
 ///
-/// Event::Some { new_bar: 1 }.dispatch_with(&mut foo);
+/// let bar = Event::Some { new_bar: 1 }.dispatch_with(&mut foo);
 /// assert_eq!(foo.bar, 1);
+/// assert_eq!(bar, 1);
 ///
-/// Event::Another.dispatch_with(&mut foo);
+/// let bar = Event::Another.dispatch_with(&mut foo);
 /// assert_eq!(foo.bar, 2);
+/// assert_eq!(bar, 2);
 ///
-/// Event::UnnamedVariant(3, 3).dispatch_with(&mut foo);
+/// let bar = Event::UnnamedVariant(3, 3).dispatch_with(&mut foo);
 /// assert_eq!(foo.bar, 3);
 /// assert_eq!(foo.baz, 3);
+/// assert_eq!(bar, 3);
 /// ```
 #[proc_macro_attribute]
 pub fn dispatchable(_: TokenStream, input: TokenStream) -> TokenStream {
