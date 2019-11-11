@@ -367,15 +367,23 @@ impl Room {
         info!("Closing Room [id = {}]", self.id);
         self.state = State::Stopping;
 
-        for (_, member) in self.members.iter_members() {
-            if let Some(on_leave) = member.get_on_leave() {
+        self.members
+            .iter_members()
+            .filter_map(|(_, member)| {
+                member
+                    .get_on_leave()
+                    .map(move |on_leave| (member, on_leave))
+            })
+            .filter(|(member, _)| {
+                self.members.member_has_connection(&member.id())
+            })
+            .for_each(|(member, on_leave)| {
                 self.callbacks.send_callback(
                     on_leave,
                     member.get_fid().into(),
                     OnLeaveEvent::new(OnLeaveReason::ServerShutdown),
                 );
-            }
-        }
+            });
 
         Box::new(
             self.members
