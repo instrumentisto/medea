@@ -270,7 +270,7 @@ endif
 #	make cargo.lint
 
 cargo.lint:
-	cargo +beta clippy --all -- -D clippy::pedantic -D warnings
+	cargo +beta clippy --all -- -D clippy::pedantic -D warnings --release
 
 
 
@@ -350,23 +350,23 @@ ifeq ($(test-unit-crate),@all)
 	@make test.unit crate=medea
 else
 ifeq ($(test-unit-crate),medea)
-	cargo test --lib --bin medea
+	cargo test --lib --bin medea --release
 else
 ifeq ($(crate),medea-jason)
 ifeq ($(browser),default)
 	cd $(crate-dir)/ && \
-	cargo +beta test --target wasm32-unknown-unknown --features mockable
+	cargo +beta test --target wasm32-unknown-unknown --features mockable --release
 else
 	@make docker.up.webdriver browser=$(browser)
 	sleep 10
 	cd $(crate-dir)/ && \
 	$(webdriver-env)="http://127.0.0.1:4444" \
-	cargo +beta test --target wasm32-unknown-unknown --features mockable
+	cargo +beta test --target wasm32-unknown-unknown --features mockable --release
 	@make docker.down.webdriver browser=$(browser)
 endif
 else
 	cd $(crate-dir)/ && \
-	cargo test -p $(test-unit-crate)
+	cargo test -p $(test-unit-crate) --release
 endif
 endif
 endif
@@ -395,7 +395,7 @@ ifeq ($(up),yes)
 	                     TAG=$(TAG) registry=$(registry)
 	sleep $(if $(call eq,$(wait),),5,$(wait))
 endif
-	RUST_BACKTRACE=1 cargo test --test e2e
+	RUST_BACKTRACE=1 cargo test --test e2e --release
 ifeq ($(up),yes)
 	-make down
 endif
