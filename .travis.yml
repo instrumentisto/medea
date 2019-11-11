@@ -98,7 +98,6 @@ jobs:
       rust: beta
       services: ["docker"]
       before_script:
-#        - cargo uninstall wasm-bindgen-cli || echo > /dev/null
         - cargo install -f --path crates/crate-version-grep
         - cargo install -f wasm-bindgen-cli --version `crate-version-grep wasm-bindgen`
         - rustup target add wasm32-unknown-unknown
@@ -109,7 +108,6 @@ jobs:
       rust: beta
       services: ["docker"]
       before_script:
-#        - cargo uninstall wasm-bindgen-cli || echo > /dev/null
         - cargo install -f --path crates/crate-version-grep
         - cargo install -f wasm-bindgen-cli --version `crate-version-grep wasm-bindgen`
         - rustup target add wasm32-unknown-unknown

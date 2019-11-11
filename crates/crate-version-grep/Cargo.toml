@@ -2,16 +2,16 @@
 name = "crate-version-grep"
 version = "0.1.0-dev"
 edition = "2018"
-description = "TODO"
+description = "CLI application for getting current locked version of crate from 'Cargo.lock' file."
 authors = ["Instrumentisto Team <developer@instrumentisto.com>"]
 license = "MIT/Apache-2.0"
-documentation = "https://docs.rs/medea-macro"
-homepage = "https://github.com/instrumentisto/medea/tree/master/crates/cargo-lock-parser"
-repository = "https://github.com/instrumentisto/medea/tree/master/crates/cargo-lock-parser"
+documentation = "https://docs.rs/crate-version-grep"
+homepage = "https://github.com/instrumentisto/medea/tree/master/crates/crate-version-grep"
+repository = "https://github.com/instrumentisto/medea/tree/master/crates/crate-version-grep"
 readme = "README.md"
-# TODO
-keywords = ["medea", "macro", "derive"]
-categories = ["development-tools::build-utils"]
+keywords = ["crate", "version", "Cargo.lock"]
+categories = ["command-line-utilities"]
+publish = false
 
 [dependencies]
-cargo-lock = "3.0.0"
+cargo-lock = "3.0"
