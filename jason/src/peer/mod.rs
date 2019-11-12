@@ -42,15 +42,29 @@ pub use self::{
     track::MediaTrack,
 };
 
+/// Errors that may occur in [RTCPeerConnection][1].
+///
+/// [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
 #[derive(Debug, Display, From)]
 #[allow(clippy::module_name_repetitions)]
 pub enum PeerError {
+    /// Errors that may occur in [`MediaConnections`] storage.
     #[display(fmt = "{}", _0)]
     MediaConnections(MediaConnectionsError),
+
+    /// Errors that may occur in a [`MediaManager`].
     #[display(fmt = "{}", _0)]
     MediaManager(MediaManagerError),
+
+    /// Errors that may occur during signaling between this and remote
+    /// [RTCPeerConnection][1] and event handlers setting errors.
+    ///
+    /// [1]: https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection.
     #[display(fmt = "{}", _0)]
     RtcPeerConnection(RTCPeerConnectionError),
+
+    /// Errors that may occur when validating [`StreamRequest`] or
+    /// parsing [`MediaStream`].
     #[display(fmt = "{}", _0)]
     StreamRequest(StreamRequestError),
 }

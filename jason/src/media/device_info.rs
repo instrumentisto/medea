@@ -8,9 +8,7 @@ use derive_more::Display;
 use wasm_bindgen::prelude::*;
 use web_sys::{MediaDeviceInfo, MediaDeviceKind};
 
-// use crate::utils::JsCaused;
-
-/// Errors that may occur when parsing [MediaDeviceInfo][1].
+/// Errors that may occur when parsing [`MediaDeviceInfo`][1].
 ///
 /// [1]: https://w3.org/TR/mediacapture-streams/#device-info
 #[derive(Debug, Display)]
@@ -19,19 +17,6 @@ pub enum Error {
     #[display(fmt = "Not input device")]
     NotInputDevice,
 }
-
-// impl JsCaused for Error {
-// fn name(&self) -> &'static str {
-// use Error::*;
-// match self {
-// NotInputDevice => "NotInputDevice",
-// }
-// }
-//
-// fn js_cause(&self) -> Option<js_sys::Error> {
-// None
-// }
-// }
 
 /// Representation of [MediaDeviceInfo][1].
 ///

@@ -27,16 +27,31 @@ use super::{
 #[derive(Debug, Display)]
 #[allow(clippy::module_name_repetitions)]
 pub enum MediaConnectionsError {
+    /// Occurs when the provided [`MediaTrack`] cannot be inserted into
+    /// provided [`Sender`]s transceiver.
     #[display(fmt = "failed to insert Track to a sender: {}", _0)]
     InsertTrack(JsError),
+
+    /// Occurs when creates new [`Sender`] on not existed into a
+    /// [`RtcPeerConnection`] the [`RtcRtpTransceiver`].
     #[display(fmt = "unable to find Transceiver with provided mid: {}", _0)]
     NotFoundTransceiver(String),
+
+    /// Occurs when cannot get the "mid" from the [`Sender`].
     #[display(fmt = "Peer has senders without mid")]
     SendersWithoutMid,
+
+    /// Occurs when cannot get the "mid" from the [`Receiver`].
     #[display(fmt = "Peer has receivers without mid")]
     ReceiversWithoutMid,
+
+    /// Occurs when inserted [`MediaStream`] dont have all necessary
+    /// [`MediaTrack`]s.
     #[display(fmt = "provided stream does not have all necessary Tracks")]
     InvalidMediaStream,
+
+    /// Occurs when [`MediaTrack`] of inserted [`MediaStream`] does not satisfy
+    /// [`Sender`] constraints.
     #[display(fmt = "provided Track does not satisfy senders constraints")]
     InvalidMediaTrack,
 }

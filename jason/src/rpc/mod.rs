@@ -30,9 +30,13 @@ pub enum CloseMsg {
 #[derive(Debug, Display, From)]
 #[allow(clippy::module_name_repetitions)]
 pub enum RpcClientError {
-    #[display(fmt = "connect to socket failed: {}", _0)]
-    ConnectSocket(SocketError),
-    #[display(fmt = "cannot start heartbeat: {}", _0)]
+    /// Occurs if new WebSocket connection to remote media server cannot
+    /// be established.
+    #[display(fmt = "establishment connection failed: {}", _0)]
+    EstablishmentConnection(SocketError),
+
+    /// Occurs if the heartbeat cannot be started.
+    #[display(fmt = "start heartbeat failed: {}", _0)]
     StartHeartbeat(HeartbeatError),
 }
 
@@ -40,7 +44,7 @@ impl JsCaused for RpcClientError {
     fn name(&self) -> &'static str {
         use RpcClientError::*;
         match self {
-            ConnectSocket(_) => "ConnectSocket",
+            EstablishmentConnection(_) => "EstablishmentConnection",
             StartHeartbeat(_) => "StartHeartbeat",
         }
     }
@@ -48,7 +52,7 @@ impl JsCaused for RpcClientError {
     fn js_cause(&self) -> Option<js_sys::Error> {
         use RpcClientError::*;
         match self {
-            ConnectSocket(err) => err.js_cause(),
+            EstablishmentConnection(err) => err.js_cause(),
             StartHeartbeat(err) => err.js_cause(),
         }
     }

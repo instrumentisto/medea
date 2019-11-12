@@ -39,8 +39,9 @@ impl Drop for IntervalHandle {
     }
 }
 
+///
 #[derive(Debug, Display)]
-#[display(fmt = "Detached state")]
+#[display(fmt = "detached state")]
 pub struct HandlerError;
 
 impl JsCaused for HandlerError {
@@ -53,7 +54,7 @@ impl JsCaused for HandlerError {
     }
 }
 
-/// Upgrades newtyped [`Weak`] reference, returning [`WasmErr`] if failed,
+/// Upgrades newtyped [`Weak`] reference, returning [`HandlerError`] if failed,
 /// or mapping [`Rc`]-referenced value with provided `$closure` otherwise.
 ///
 /// [`Rc`]: std::rc::Rc

@@ -14,10 +14,15 @@ use crate::{
 #[derive(Debug, Display, From)]
 #[allow(clippy::module_name_repetitions)]
 pub enum HeartbeatError {
+    /// Occurs when `ping` cannot be send because no socket.
     #[display(fmt = "unable to ping: no socket")]
     NoSocket,
+
+    /// Occurs when a handler cannot be set to send `ping`.
     #[display(fmt = "cannot set callback for ping send: {}", _0)]
     SetIntervalHandler(JsError),
+
+    /// Occurs when socket failed to send `ping`.
     #[display(fmt = "failed to send ping: {}", _0)]
     SendPing(SocketError),
 }

@@ -20,26 +20,48 @@ use crate::{
 /// Errors that may occur when working with [`WebSocket`].
 #[derive(Debug, Display)]
 pub enum SocketError {
+    /// Occurs when the port to which the connection is being attempted
+    /// is being blocked.
     #[display(fmt = "failed to create WebSocket: {}", _0)]
     CreateSocket(JsError),
+
+    /// Occurs when the connection close before becomes state active.
     #[display(fmt = "failed to init WebSocket")]
     InitSocket,
+
+    /// Occurs when [`ClientMessage`] cannot be parsed.
     #[display(fmt = "failed to parse client message: {}", _0)]
     ParseClientMessage(serde_json::error::Error),
+
+    /// Occurs when [`ServerMessage`] cannot be parsed.
     #[display(fmt = "failed to parse server message: {}", _0)]
     ParseServerMessage(serde_json::error::Error),
+
+    /// Occurs if the parsed message is not string.
     #[display(fmt = "message is not a string")]
     MessageNotString,
+
+    /// Occurs when a message cannot be send to server.
     #[display(fmt = "failed to send message: {}", _0)]
     SendMessage(JsError),
+
+    /// Occurs when handler cannot be set for the event [`CloseEvent`].
     #[display(fmt = "failed to set handler for CloseEvent: {}", _0)]
     SetHandlerOnClose(JsError),
+
+    /// Occurs when handler cannot be set for the event [`OpenEvent`].
     #[display(fmt = "failed to set handler for OpenEvent: {}", _0)]
     SetHandlerOnOpen(JsError),
+
+    /// Occurs when handler cannot be set for the event [`MessageEvent`].
     #[display(fmt = "failed to set handler for MessageEvent: {}", _0)]
     SetHandlerOnMessage(JsError),
+
+    /// Occurs when underlying WebSocket state cannot be checked.
     #[display(fmt = "could not cast {} to State variant", _0)]
     CastState(u16),
+
+    /// Occurs when message is sent to closed socket.
     #[display(fmt = "underlying socket is closed")]
     ClosedSocket,
 }

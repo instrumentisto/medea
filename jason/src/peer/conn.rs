@@ -128,21 +128,40 @@ pub enum RTCPeerConnectionError {
     /// [1]: https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection.
     #[display(fmt = "failed to add ICE candidate: {}", _0)]
     AddIceCandidate(JsError),
+
+    /// Occurs when cannot obtains [SDP answer][`SdpType::Answer`] from
+    /// the underlying [RTCPeerConnection][`SysRtcPeerConnection`].
     #[display(fmt = "failed to create SDP answer: {}", _0)]
     CreateAnswer(JsError),
+
+    /// Occurs when a new [`RtcPeerConnection`] cannot be created.
     #[display(fmt = "failed to create PeerConnection: {}", _0)]
     CreatePeer(JsError),
+
+    /// Occurs when cannot obtains [SDP offer][`SdpType::Offer`] from
+    /// the underlying [RTCPeerConnection][`SysRtcPeerConnection`]
     #[display(fmt = "failed to create SDP offer: {}", _0)]
     CreateOffer(JsError),
+
+    /// Occurs when handler cannot be set for the event
+    /// [`RtcPeerConnectionIceEvent`].
     #[display(
         fmt = "failed to set handler for RtcPeerConnectionIceEvent: {}",
         _0
     )]
     SetHandlerIceEvent(JsError),
+
+    /// Occurs when handler cannot be set for the event [`RtcTrackEvent`].
     #[display(fmt = "failed to set handler for RtcTrackEvent: {}", _0)]
     SetHandlerTrackEvent(JsError),
+
+    /// Occurs if the local description associated with the
+    /// [`RTCPeerConnection`] cannot be changed.
     #[display(fmt = "failed to set local SDP description: {}", _0)]
     SetLocalDescription(JsError),
+
+    /// Occurs if the description of the remote end of the
+    /// [`RTCPeerConnection`] cannot be changed.
     #[display(fmt = "failed to set remote SDP description: {}", _0)]
     SetRemoteDescription(JsError),
 }
@@ -256,7 +275,7 @@ impl RtcPeerConnection {
                             f(msg);
                         },
                     )
-                    .map_err(RTCPeerConnectionError::SetHandlerIceEvent)
+                    .map_err(RTCPeerConnectionError::SetHandlerTrackEvent)
                     .map_err(tracerr::wrap!())?,
                 );
             }
