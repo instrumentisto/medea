@@ -4,7 +4,10 @@
 
 use std::{cell::RefCell, convert::TryFrom, rc::Rc};
 
-use futures::{channel::oneshot, future};
+use futures::{
+    channel::{mpsc, oneshot},
+    future, SinkExt,
+};
 use macro_attr::*;
 use medea_client_api_proto::{ClientMsg, ServerMsg};
 use newtype_derive::NewtypeFrom;
@@ -21,11 +24,10 @@ pub trait RpcTransport {
     /// Set handler on receive message from server.
     fn on_message(
         &self,
-        f: Box<dyn FnMut(Result<ServerMsg, Error>)>,
-    ) -> Result<(), Error>;
+    ) -> Result<mpsc::UnboundedReceiver<Result<ServerMsg, Error>>, Error>;
 
     /// Set handler on close socket.
-    fn on_close(&self, f: Box<dyn (FnOnce(CloseMsg))>) -> Result<(), Error>;
+    fn on_close(&self) -> Result<oneshot::Receiver<CloseMsg>, Error>;
 
     /// Send message to server.
     fn send(&self, msg: &ClientMsg) -> Result<(), Error>;
@@ -133,8 +135,8 @@ impl RpcTransport for WebSocket {
     /// Set handler on receive message from server.
     fn on_message(
         &self,
-        mut f: Box<dyn FnMut(Result<ServerMsg, Error>)>,
-    ) -> Result<(), Error> {
+    ) -> Result<mpsc::UnboundedReceiver<Result<ServerMsg, Error>>, Error> {
+        let (mut tx, rx) = mpsc::unbounded();
         let mut inner_mut = self.0.borrow_mut();
         inner_mut.on_message = Some(
             EventListener::new_mut(
@@ -143,17 +145,18 @@ impl RpcTransport for WebSocket {
                 move |msg| {
                     let parsed = ServerMessage::try_from(&msg)
                         .map(std::convert::Into::into);
-                    f(parsed);
+                    tx.unbounded_send(parsed);
                 },
             )
             .map_err(Into::into)
             .map_err(Error::SetHandlerOnMessage)?,
         );
-        Ok(())
+        Ok(rx)
     }
 
     /// Set handler on close socket.
-    fn on_close(&self, f: Box<dyn (FnOnce(CloseMsg))>) -> Result<(), Error> {
+    fn on_close(&self) -> Result<oneshot::Receiver<CloseMsg>, Error> {
+        let (tx, rx) = oneshot::channel();
         let mut inner_mut = self.0.borrow_mut();
         let inner = Rc::clone(&self.0);
         inner_mut.on_close = Some(
@@ -162,12 +165,12 @@ impl RpcTransport for WebSocket {
                 "close",
                 move |msg: CloseEvent| {
                     inner.borrow_mut().update_state();
-                    f(CloseMsg::from(&msg));
+                    tx.send(CloseMsg::from(&msg));
                 },
             )
             .map_err(Error::SetHandlerOnClose)?,
         );
-        Ok(())
+        Ok(rx)
     }
 
     /// Send message to server.

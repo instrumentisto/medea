@@ -6,7 +6,9 @@ pub mod websocket;
 use std::{cell::RefCell, rc::Rc, vec};
 
 use anyhow::Result;
-use futures::{channel::mpsc, future::LocalBoxFuture, stream::LocalBoxStream};
+use futures::{
+    channel::mpsc, future::LocalBoxFuture, stream::LocalBoxStream, StreamExt,
+};
 use js_sys::Date;
 use medea_client_api_proto::{ClientMsg, Command, Event, ServerMsg};
 
@@ -15,6 +17,8 @@ use self::{
     websocket::{Error, WebSocket},
 };
 use crate::rpc::websocket::RpcTransport;
+use wasm_bindgen::__rt::std::thread::spawn;
+use wasm_bindgen_futures::spawn_local;
 
 /// Connection with remote was closed.
 pub enum CloseMsg {
@@ -137,14 +141,19 @@ impl RpcClient for WebsocketRpcClient {
             inner.borrow_mut().heartbeat.start(Rc::clone(&socket))?;
 
             let inner_rc = Rc::clone(&inner);
-            socket.on_message(Box::new(
-                move |msg: Result<ServerMsg, Error>| on_message(&inner_rc, msg),
-            ))?;
-
+            let mut on_socket_message = socket.on_message()?;
+            spawn_local(async move {
+                while let Some(msg) = on_socket_message.next().await {
+                    on_message(&inner_rc, msg)
+                }
+            });
             let inner_rc = Rc::clone(&inner);
-            socket.on_close(Box::new(move |msg: CloseMsg| {
-                on_close(&inner_rc, msg)
-            }))?;
+            let on_socket_close = socket.on_close()?;
+            spawn_local(async move {
+                let msg = on_socket_close.await;
+                // TODO: unwrap??
+                on_close(&inner_rc, msg.unwrap())
+            });
 
             inner.borrow_mut().sock.replace(socket);
             Ok(())
