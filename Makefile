@@ -489,6 +489,7 @@ docker.build.demo:
 ifeq ($(TAG),edge)
 	$(docker-env) \
 	docker build $(if $(call eq,$(minikube),yes),,--network=host) --force-rm \
+		--build-arg rust_ver=$(RUST_VER) \
 		-t $(docker-build-demo-image-name):$(TAG) \
 		-f jason/Dockerfile .
 else
