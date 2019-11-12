@@ -63,6 +63,7 @@ pub enum ServerMsg {
 
 #[allow(dead_code)]
 #[cfg_attr(test, derive(Debug, PartialEq))]
+#[derive(Clone)]
 /// Message from 'Client' to 'Media Server'.
 pub enum ClientMsg {
     /// `ping` message that WebSocket client is expected to send to the server
@@ -78,6 +79,7 @@ pub enum ClientMsg {
 #[cfg_attr(feature = "jason", derive(Serialize))]
 #[cfg_attr(test, derive(Debug, PartialEq))]
 #[serde(tag = "command", content = "data")]
+#[derive(Clone)]
 pub enum Command {
     /// Web Client sends SDP Offer.
     MakeSdpOffer {
