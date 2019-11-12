@@ -33,6 +33,19 @@ pub enum CloseByClientReason {
     // TODO: RoomClosed after calling room.dispose or jason.dispose.
 }
 
+impl Into<CloseReason> for CloseByClientReason {
+    fn into(self) -> CloseReason {
+        match &self {
+            CloseByClientReason::RoomUnexpectedlyDropped => {
+                CloseReason::ByClient {
+                    reason: self,
+                    is_err: true,
+                }
+            }
+        }
+    }
+}
+
 /// Reasons of closing by client side and server side.
 #[derive(Clone, Display, Debug)]
 pub enum CloseReason {
@@ -188,7 +201,8 @@ pub struct WebsocketRpcClient(Rc<RefCell<Inner>>);
 /// Inner state of [`WebsocketRpcClient`].
 struct Inner {
     /// [`WebSocket`] connection to remote media server.
-    // TODO: Rc<dyn RpcTransport>, impl RpcTransport for WebSocket, RpcConnection tests
+    // TODO: Rc<dyn RpcTransport>, impl RpcTransport for WebSocket,
+    // RpcConnection tests
     sock: Option<Rc<WebSocket>>,
 
     heartbeat: Heartbeat,
