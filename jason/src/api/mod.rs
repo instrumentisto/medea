@@ -31,7 +31,6 @@ struct Inner {
     rooms: Vec<Room>,
 }
 
-#[allow(clippy::unused_self)]
 #[wasm_bindgen]
 impl Jason {
     /// Instantiates new [`Jason`] interface to interact with this library.
