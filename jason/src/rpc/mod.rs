@@ -152,7 +152,9 @@ impl RpcClient for WebsocketRpcClient {
             spawn_local(async move {
                 let msg = on_socket_close.await;
                 // TODO: unwrap??
-                on_close(&inner_rc, msg.unwrap())
+                if let Ok(msg) = msg {
+                    on_close(&inner_rc, msg)
+                }
             });
 
             inner.borrow_mut().sock.replace(socket);

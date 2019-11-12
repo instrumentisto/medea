@@ -50,6 +50,7 @@ impl_incrementable!(TrackId);
 // TODO: should be properly shared between medea and jason
 #[allow(dead_code)]
 #[cfg_attr(test, derive(Debug, PartialEq))]
+#[derive(Clone)]
 /// Message sent by `Media Server` to `Client`.
 pub enum ServerMsg {
     /// `pong` message that server answers with to WebSocket client in response
