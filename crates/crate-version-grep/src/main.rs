@@ -19,13 +19,9 @@ use cargo_lock::lockfile::Lockfile;
 
 fn main() {
     let crate_name = env::args().nth(1).expect("Crate name not provided!");
-    let lockfile = Lockfile::load("Cargo.lock").unwrap();
-
-    for package in lockfile.packages {
-        if package.name.as_str() == crate_name {
-            println!("{}", package.version);
-            return;
-        }
-    }
-    panic!("Crate not found in Cargo.lock!");
+    Lockfile::load("Cargo.lock").unwrap().packages.into_iter()
+        .skip_while(|package| package.name.as_str() != crate_name)
+        .next()
+        .map(|package| println!("{}", package.version))
+        .or_else(|| panic!("Crate not found in Cargo.lock!"));
 }
