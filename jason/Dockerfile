@@ -8,7 +8,8 @@
 #
 
 # https://hub.docker.com/_/rust
-FROM alexlapa/rust-beta:1.39-beta.5 AS dist
+ARG rust_ver=latest
+FROM rust:${rust_ver} AS dist
 
 RUN cargo install wasm-pack \
  && rustup target add wasm32-unknown-unknown

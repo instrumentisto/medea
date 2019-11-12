@@ -29,7 +29,7 @@ console_error_panic_hook = { version = "0.1", optional = true }
 derive_more = "0.15"
 downcast = { version = "0.10", optional = true }
 fragile = { version = "0.3", optional = true }
-futures-preview = "=0.3.0-alpha.19"
+futures = "0.3"
 js-sys = "0.3"
 macro-attr = "0.2"
 medea-client-api-proto = { path = "../proto/client-api", features = ["jason"] }

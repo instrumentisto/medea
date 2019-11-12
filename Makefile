@@ -22,7 +22,7 @@ CONTROL_MOCK_IMAGE_NAME := instrumentisto/medea-control-api-mock
 
 RUST_VER := 1.39
 CHROME_VERSION := 78.0
-FIREFOX_VERSION := 69.0
+FIREFOX_VERSION := 70.0
 
 crate-dir = .
 ifeq ($(crate),medea-jason)
@@ -489,6 +489,7 @@ docker.build.demo:
 ifeq ($(TAG),edge)
 	$(docker-env) \
 	docker build $(if $(call eq,$(minikube),yes),,--network=host) --force-rm \
+		--build-arg rust_ver=$(RUST_VER) \
 		-t $(docker-build-demo-image-name):$(TAG) \
 		-f jason/Dockerfile .
 else
