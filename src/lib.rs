@@ -1,7 +1,5 @@
 //! Medea media server.
 
-#![allow(clippy::must_use_candidate)]
-
 #[macro_use]
 pub mod utils;
 pub mod api;
