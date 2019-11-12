@@ -19,6 +19,6 @@ export class MockNavigator {
   }
 }
 
-export const unwrap_error = (err) => {
+export const get_jason_error = (err) => {
   return err;
 };

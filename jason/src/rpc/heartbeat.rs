@@ -1,28 +1,48 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, convert::From, rc::Rc};
 
-use derive_more::From;
-use failure::Fail;
+use derive_more::{Display, From};
 use medea_client_api_proto::ClientMsg;
 use tracerr::Traced;
 use wasm_bindgen::{prelude::*, JsCast};
 
 use crate::{
-    rpc::websocket::{Error as SocketError, WebSocket},
-    utils::{window, IntervalHandle, WasmErr},
+    rpc::websocket::{SocketError, WebSocket},
+    utils::{window, IntervalHandle, JsCaused, JsError},
 };
 
 /// Errors that may occur in [`Heartbeat`].
-#[derive(Debug, Fail, From)]
-pub enum Error {
-    #[error("unable to ping: no socket")]
+#[derive(Debug, Display, From)]
+#[allow(clippy::module_name_repetitions)]
+pub enum HeartbeatError {
+    #[display(fmt = "unable to ping: no socket")]
     NoSocket,
-    #[error("cannot set callback for ping send: {0}")]
-    SetIntervalHandler(WasmErr),
-    #[error("failed to send ping: {0}")]
-    SendPing(#[fail(cause)]  SocketError),
+    #[display(fmt = "cannot set callback for ping send: {}", _0)]
+    SetIntervalHandler(JsError),
+    #[display(fmt = "failed to send ping: {}", _0)]
+    SendPing(SocketError),
 }
 
-type Result<T> = std::result::Result<T, Traced<Error>>;
+impl JsCaused for HeartbeatError {
+    fn name(&self) -> &'static str {
+        use HeartbeatError::*;
+        match self {
+            NoSocket => "NoSocket",
+            SetIntervalHandler(_) => "SetIntervalHandler",
+            SendPing(_) => "SendPing",
+        }
+    }
+
+    fn js_cause(&self) -> Option<js_sys::Error> {
+        use HeartbeatError::*;
+        match self {
+            NoSocket => None,
+            SetIntervalHandler(err) => err.js_cause(),
+            SendPing(err) => err.js_cause(),
+        }
+    }
+}
+
+type Result<T> = std::result::Result<T, Traced<HeartbeatError>>;
 
 /// Responsible for sending/handling keep-alive requests, detecting connection
 /// loss.
@@ -46,7 +66,7 @@ impl InnerHeartbeat {
     /// Returns error no open socket.
     fn send_now(&mut self) -> Result<()> {
         match self.socket.as_ref() {
-            None => Err(tracerr::new!(Error::NoSocket)),
+            None => Err(tracerr::new!(HeartbeatError::NoSocket)),
             Some(socket) => {
                 self.num += 1;
                 Ok(socket
@@ -98,8 +118,8 @@ impl Heartbeat {
                 do_ping.as_ref().unchecked_ref(),
                 inner.interval,
             )
-            .map_err(WasmErr::from)
-            .map_err(tracerr::map_from_and_wrap!())?;
+            .map_err(JsError::from)
+            .map_err(tracerr::from_and_wrap!())?;
 
         inner.ping_task = Some(PingTaskHandler {
             _closure: do_ping,

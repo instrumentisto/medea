@@ -5,15 +5,17 @@ mod websocket;
 
 use std::{cell::RefCell, rc::Rc, vec};
 
-use failure::Error;
+use derive_more::{Display, From};
 use futures::{channel::mpsc, future::LocalBoxFuture, stream::LocalBoxStream};
 use js_sys::Date;
 use medea_client_api_proto::{ClientMsg, Command, Event, ServerMsg};
 use tracerr::Traced;
 
+use crate::utils::{JasonError, JsCaused};
+
 use self::{
-    heartbeat::Heartbeat,
-    websocket::{Error as SocketError, WebSocket},
+    heartbeat::{Heartbeat, HeartbeatError},
+    websocket::{SocketError, WebSocket},
 };
 
 /// Connection with remote was closed.
@@ -24,13 +26,44 @@ pub enum CloseMsg {
     Disconnect(String),
 }
 
+/// Errors that may occur in [`RpcClient`].
+#[derive(Debug, Display, From)]
+#[allow(clippy::module_name_repetitions)]
+pub enum RpcClientError {
+    #[display(fmt = "connect to socket failed: {}", _0)]
+    ConnectSocket(SocketError),
+    #[display(fmt = "cannot start heartbeat: {}", _0)]
+    StartHeartbeat(HeartbeatError),
+}
+
+impl JsCaused for RpcClientError {
+    fn name(&self) -> &'static str {
+        use RpcClientError::*;
+        match self {
+            ConnectSocket(_) => "ConnectSocket",
+            StartHeartbeat(_) => "StartHeartbeat",
+        }
+    }
+
+    fn js_cause(&self) -> Option<js_sys::Error> {
+        use RpcClientError::*;
+        match self {
+            ConnectSocket(err) => err.js_cause(),
+            StartHeartbeat(err) => err.js_cause(),
+        }
+    }
+}
+
 // TODO: consider using async-trait crate, it doesnt work with mockall atm
 /// Client to talk with server via Client API RPC.
 #[allow(clippy::module_name_repetitions)]
 #[cfg_attr(feature = "mockable", mockall::automock)]
 pub trait RpcClient {
     /// Establishes connection with RPC server.
-    fn connect(&self, token: String) -> LocalBoxFuture<'static, Result<(), Traced<Error>>>;
+    fn connect(
+        &self,
+        token: String,
+    ) -> LocalBoxFuture<'static, Result<(), Traced<RpcClientError>>>;
 
     /// Returns [`Stream`] of all [`Event`]s received by this [`RpcClient`].
     ///
@@ -87,7 +120,10 @@ fn on_close(inner_rc: &RefCell<Inner>, close_msg: CloseMsg) {
 }
 
 /// Handles messages from remote server.
-fn on_message(inner_rc: &RefCell<Inner>, msg: Result<ServerMsg, SocketError>) {
+fn on_message(
+    inner_rc: &RefCell<Inner>,
+    msg: Result<ServerMsg, Traced<SocketError>>,
+) {
     let inner = inner_rc.borrow();
     match msg {
         Ok(ServerMsg::Pong(_num)) => {
@@ -107,7 +143,7 @@ fn on_message(inner_rc: &RefCell<Inner>, msg: Result<ServerMsg, SocketError>) {
         Err(err) => {
             // TODO: protocol versions mismatch? should drop
             //       connection if so
-            console_error!(err.to_string());
+            console_error!(JasonError::from(err.unwrap()).to_string());
         }
     }
 }
@@ -126,7 +162,7 @@ impl RpcClient for WebsocketRpcClient {
     fn connect(
         &self,
         token: String,
-    ) -> LocalBoxFuture<'static, Result<(), Traced<Error>>> {
+    ) -> LocalBoxFuture<'static, Result<(), Traced<RpcClientError>>> {
         let inner = Rc::clone(&self.0);
         Box::pin(async move {
             let socket = Rc::new(
@@ -142,9 +178,11 @@ impl RpcClient for WebsocketRpcClient {
 
             let inner_rc = Rc::clone(&inner);
             socket
-                .on_message(move |msg: Result<ServerMsg, SocketError>| {
-                    on_message(&inner_rc, msg)
-                })
+                .on_message(
+                    move |msg: Result<ServerMsg, Traced<SocketError>>| {
+                        on_message(&inner_rc, msg)
+                    },
+                )
                 .map_err(tracerr::map_from_and_wrap!())?;
 
             let inner_rc = Rc::clone(&inner);

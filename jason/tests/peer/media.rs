@@ -2,7 +2,6 @@
 
 use std::{convert::TryFrom, rc::Rc};
 
-use failure::Fail;
 use medea_client_api_proto::TrackId;
 use medea_jason::{
     media::MediaManager,
@@ -11,19 +10,16 @@ use medea_jason::{
         TransceiverDirection, TransceiverKind,
     },
 };
-use tracerr::Traced;
 use wasm_bindgen_test::*;
 
 use crate::get_test_tracks;
 
 wasm_bindgen_test_configure!(run_in_browser);
 
-type Result<T> = std::result::Result<T, Box<dyn Fail>>;
-
 async fn get_test_media_connections(
     enabled_audio: bool,
     enabled_video: bool,
-) -> Result<(MediaConnections, TrackId, TrackId)> {
+) -> (MediaConnections, TrackId, TrackId) {
     let media_connections = MediaConnections::new(
         Rc::new(RtcPeerConnection::new(vec![]).unwrap()),
         enabled_audio,
@@ -38,13 +34,14 @@ async fn get_test_media_connections(
     let request = media_connections.get_stream_request().unwrap();
     let caps = SimpleStreamRequest::try_from(request).unwrap();
     let manager = Rc::new(MediaManager::default());
-    let (stream, _) = manager.get_stream(&caps).await?;
+    let (stream, _) = manager.get_stream(&caps).await.unwrap();
 
     media_connections
-        .insert_local_stream(&caps.parse_stream(&stream)?)
-        .await?;
+        .insert_local_stream(&caps.parse_stream(&stream).unwrap())
+        .await
+        .unwrap();
 
-    Ok((media_connections, audio_track_id, video_track_id))
+    (media_connections, audio_track_id, video_track_id)
 }
 
 #[wasm_bindgen_test]
@@ -83,7 +80,7 @@ fn get_stream_request() {
 #[wasm_bindgen_test]
 async fn disable_and_enable_all_tracks_in_media_manager() {
     let (media_connections, audio_track_id, video_track_id) =
-        get_test_media_connections(true, true).await.unwrap();
+        get_test_media_connections(true, true).await;
 
     let audio_track = media_connections
         .get_track_by_id(TransceiverDirection::Sendonly, audio_track_id)
@@ -115,7 +112,7 @@ async fn disable_and_enable_all_tracks_in_media_manager() {
 #[wasm_bindgen_test]
 async fn new_media_connections_with_disabled_audio_tracks() {
     let (media_connections, audio_track_id, video_track_id) =
-        get_test_media_connections(false, true).await.unwrap();
+        get_test_media_connections(false, true).await;
 
     let audio_track = media_connections
         .get_track_by_id(TransceiverDirection::Sendonly, audio_track_id)
@@ -131,7 +128,7 @@ async fn new_media_connections_with_disabled_audio_tracks() {
 #[wasm_bindgen_test]
 async fn new_media_connections_with_disabled_video_tracks() {
     let (media_connections, audio_track_id, video_track_id) =
-        get_test_media_connections(true, false).await.unwrap();
+        get_test_media_connections(true, false).await;
 
     let audio_track = media_connections
         .get_track_by_id(TransceiverDirection::Sendonly, audio_track_id)

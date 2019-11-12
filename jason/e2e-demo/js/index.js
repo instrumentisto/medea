@@ -270,7 +270,7 @@ window.onload = async function() {
       await fillMediaDevicesInputs(audioSelect, videoSelect, stream);
       room.inject_local_stream(stream);
     } catch (e) {
-      console.error("Init local video failed: " + e);
+      console.error("Init local video failed: " + e.message());
     }
 
     audioSelect.addEventListener('change', async () => {

@@ -3,7 +3,7 @@ use std::{ops::Deref, rc::Rc};
 use wasm_bindgen::{closure::Closure, convert::FromWasmAbi, JsCast};
 use web_sys::EventTarget;
 
-use crate::utils::WasmErr;
+use crate::utils::JsError;
 
 /// Wrapper for closure that handles some [`EventTarget`] event.
 pub struct EventListener<T, A>
@@ -25,7 +25,7 @@ where
         target: Rc<T>,
         event_name: &'static str,
         closure: F,
-    ) -> Result<Self, WasmErr>
+    ) -> Result<Self, JsError>
     where
         F: FnMut(A) + 'static,
     {
@@ -48,7 +48,7 @@ where
         target: Rc<T>,
         event_name: &'static str,
         closure: F,
-    ) -> Result<Self, WasmErr>
+    ) -> Result<Self, JsError>
     where
         F: FnOnce(A) + 'static,
     {

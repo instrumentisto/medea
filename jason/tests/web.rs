@@ -4,7 +4,6 @@ mod api;
 mod media;
 mod peer;
 
-use anyhow::Result;
 use futures::channel::oneshot;
 use medea_client_api_proto::{
     AudioSettings, Direction, MediaType, PeerId, Track, TrackId, VideoSettings,
@@ -32,7 +31,7 @@ extern "C" {
     fn stop(this: &MockNavigator);
 
     #[wasm_bindgen]
-    fn unwrap_error(err: JsValue) -> JasonError;
+    fn get_jason_error(err: JsValue) -> JasonError;
 }
 
 pub fn get_test_tracks() -> (Track, Track) {
@@ -56,7 +55,7 @@ pub fn get_test_tracks() -> (Track, Track) {
     )
 }
 
-pub async fn resolve_after(delay: i32) -> Result<()> {
+pub async fn resolve_after(delay: i32) -> Result<(), oneshot::Canceled> {
     let (done, wait) = oneshot::channel();
     let cb = Closure::once_into_js(move || {
         done.send(()).unwrap();

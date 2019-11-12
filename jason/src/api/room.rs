@@ -3,11 +3,12 @@
 use std::{
     cell::RefCell,
     collections::HashMap,
+    convert::From,
     ops::DerefMut as _,
     rc::{Rc, Weak},
 };
 
-use failure::Error;
+use derive_more::Display;
 use futures::{channel::mpsc, future, stream, FutureExt as _, StreamExt as _};
 use js_sys::Promise;
 use medea_client_api_proto::{
@@ -21,14 +22,79 @@ use web_sys::MediaStream as SysMediaStream;
 
 use crate::{
     peer::{
-        MediaStream, MediaStreamHandle, PeerEvent, PeerEventHandler,
+        MediaStream, MediaStreamHandle, PeerError, PeerEvent, PeerEventHandler,
         PeerRepository,
     },
-    rpc::RpcClient,
-    utils::Callback,
+    rpc::{RpcClient, RpcClientError},
+    utils::{Callback, JasonError, JsCaused},
 };
 
 use super::{connection::Connection, ConnectionHandle};
+
+/// Errors that may occur in a [`Room`].
+#[derive(Debug, Display)]
+enum RoomError {
+    #[display(fmt = "`on_failed_local_stream` callback is not set")]
+    CallbackNotSet,
+    #[display(fmt = "unable to connect with media server: {}", _0)]
+    ConnectToServer(RpcClientError),
+    #[display(fmt = "invalid local stream: {}", _0)]
+    InvalidLocalStream(PeerError),
+    #[display(fmt = "failed to get local stream: {}", _0)]
+    GetLocalStream(PeerError),
+    #[display(fmt = "peer with id {} doesnt exist", _0)]
+    NotFoundPeer(PeerId),
+    #[display(fmt = "webrtc signaling process failed: {}", _0)]
+    WebRTCSignaling(PeerError),
+    #[display(fmt = "`NewRemoteStream` from sender without connection")]
+    RemoteStreamWithoutConnection,
+}
+
+impl From<RpcClientError> for RoomError {
+    fn from(err: RpcClientError) -> Self {
+        Self::ConnectToServer(err)
+    }
+}
+
+impl From<PeerError> for RoomError {
+    fn from(err: PeerError) -> Self {
+        use PeerError::*;
+        use RoomError::*;
+        match err {
+            MediaConnections(_) | StreamRequest(_) => InvalidLocalStream(err),
+            MediaManager(_) => GetLocalStream(err),
+            RtcPeerConnection(_) => WebRTCSignaling(err),
+        }
+    }
+}
+
+impl JsCaused for RoomError {
+    fn name(&self) -> &'static str {
+        use RoomError::*;
+        match self {
+            CallbackNotSet => "CallbackNotSet",
+            ConnectToServer(_) => "ConnectToServer",
+            InvalidLocalStream(_) => "InvalidLocalStream",
+            GetLocalStream(_) => "GetLocalStream",
+            NotFoundPeer(_) => "NotFoundPeer",
+            WebRTCSignaling(_) => "WebRTCSignaling",
+            RemoteStreamWithoutConnection => "RemoteStreamWithoutConnection",
+        }
+    }
+
+    fn js_cause(&self) -> Option<js_sys::Error> {
+        use RoomError::*;
+        match self {
+            CallbackNotSet
+            | NotFoundPeer(_)
+            | RemoteStreamWithoutConnection => None,
+            InvalidLocalStream(err)
+            | GetLocalStream(err)
+            | WebRTCSignaling(err) => err.js_cause(),
+            ConnectToServer(err) => err.js_cause(),
+        }
+    }
+}
 
 /// JS side handle to `Room` where all the media happens.
 ///
@@ -81,6 +147,7 @@ impl RoomHandle {
     ///
     /// Effectively returns `Result<(), js_sys::Error>`.
     pub fn join(&self, token: String) -> Promise {
+        use RoomError::*;
         match map_weak!(self, |inner| (
             Rc::clone(&inner.borrow().rpc),
             inner.borrow().on_failed_local_stream.is_set()
@@ -88,16 +155,18 @@ impl RoomHandle {
             Ok((rpc, failed_callback_is_set)) => {
                 if !failed_callback_is_set {
                     return future_to_promise(future::err(
-                        js_sys::Error::new(
-                            "`on_failed_local_stream` callback is not set",
+                        JasonError::from(
+                            tracerr::new!(CallbackNotSet).unwrap(),
                         )
                         .into(),
                     ));
                 }
                 future_to_promise(async move {
-                    rpc.connect(token).await.map(|_| JsValue::NULL).map_err(
-                        |err| js_sys::Error::new(&format!("{}", err)).into(),
-                    )
+                    rpc.connect(token)
+                        .await
+                        .map(|_| JsValue::NULL)
+                        .map_err(tracerr::map_from_and_wrap!(=> RoomError))
+                        .map_err(|err| JasonError::from(err.unwrap()).into())
                 })
             }
             Err(err) => future_to_promise(future::err(err)),
@@ -235,7 +304,7 @@ struct InnerRoom {
 
     /// Callback to be invoked when failed obtain [`MediaStream`] from
     /// [`MediaManager`] or failed inject stream into [`PeerConnection`].
-    on_failed_local_stream: Rc<Callback<js_sys::Error>>,
+    on_failed_local_stream: Rc<Callback<JasonError>>,
 
     /// Indicates if outgoing audio is enabled in this [`Room`].
     enabled_audio: bool,
@@ -322,12 +391,12 @@ impl InnerRoom {
         let error_callback = Rc::clone(&self.on_failed_local_stream);
         spawn_local(async move {
             for peer in peers {
-                if let Err(err) =
-                    peer.inject_local_stream(&injected_stream).await
+                if let Err(err) = peer
+                    .inject_local_stream(&injected_stream)
+                    .await
+                    .map_err(tracerr::map_from_and_wrap!(=> RoomError))
                 {
-                    console_error!(err.to_string());
-                    error_callback
-                        .call(js_sys::Error::new(&format!("{}", err)));
+                    error_callback.call(JasonError::from(err.unwrap()));
                 }
             }
         });
@@ -349,16 +418,20 @@ impl EventHandler for InnerRoom {
         tracks: Vec<Track>,
         ice_servers: Vec<IceServer>,
     ) {
-        let peer = match self.peers.create_peer(
-            peer_id,
-            ice_servers,
-            self.peer_event_sender.clone(),
-            self.enabled_audio,
-            self.enabled_video,
-        ) {
+        let peer = match self
+            .peers
+            .create_peer(
+                peer_id,
+                ice_servers,
+                self.peer_event_sender.clone(),
+                self.enabled_audio,
+                self.enabled_video,
+            )
+            .map_err(tracerr::map_from_and_wrap!(=> RoomError))
+        {
             Ok(peer) => peer,
             Err(err) => {
-                console_error!(err.to_string());
+                console_error!(JasonError::from(err.unwrap()).to_string());
                 return;
             }
         };
@@ -374,8 +447,11 @@ impl EventHandler for InnerRoom {
                     None => {
                         let sdp_offer = peer
                             .get_offer(tracks, local_stream.as_ref())
-                            .await?;
-                        let mids = peer.get_mids()?;
+                            .await
+                            .map_err(tracerr::map_from_and_wrap!())?;
+                        let mids = peer
+                            .get_mids()
+                            .map_err(tracerr::map_from_and_wrap!())?;
                         rpc.send_command(Command::MakeSdpOffer {
                             peer_id,
                             sdp_offer,
@@ -385,22 +461,33 @@ impl EventHandler for InnerRoom {
                     Some(offer) => {
                         let sdp_answer = peer
                             .process_offer(offer, tracks, local_stream.as_ref())
-                            .await?;
+                            .await
+                            .map_err(tracerr::map_from_and_wrap!())?;
                         rpc.send_command(Command::MakeSdpAnswer {
                             peer_id,
                             sdp_answer,
                         });
                     }
                 };
-                Result::<_, Traced<Error>>::Ok(())
+                Result::<_, Traced<RoomError>>::Ok(())
             }
             .then(|result| {
                 async move {
                     if let Err(err) = result {
-                        console_error!(err.to_string());
-                        // TODO: only media errors should go here
-                        error_callback
-                            .call(js_sys::Error::new(&format!("{}", err)));
+                        let (err, trace) = err.unwrap();
+                        match err {
+                            RoomError::InvalidLocalStream(_)
+                            | RoomError::GetLocalStream(_) => {
+                                let e = JasonError::from((err, trace));
+                                console_error!(e.to_string());
+                                error_callback.call(e);
+                            }
+                            _ => {
+                                console_error!(
+                                    JasonError::from((err, trace)).to_string()
+                                );
+                            }
+                        };
                     };
                 }
             }),
@@ -411,13 +498,20 @@ impl EventHandler for InnerRoom {
     fn on_sdp_answer_made(&mut self, peer_id: PeerId, sdp_answer: String) {
         if let Some(peer) = self.peers.get(peer_id) {
             spawn_local(async move {
-                if let Err(err) = peer.set_remote_answer(sdp_answer).await {
-                    console_error!(err.to_string());
+                if let Err(err) = peer
+                    .set_remote_answer(sdp_answer)
+                    .await
+                    .map_err(tracerr::map_from_and_wrap!(=> RoomError))
+                {
+                    console_error!(JasonError::from(err.unwrap()).to_string());
                 }
             });
         } else {
             // TODO: No peer, whats next?
-            console_error!(format!("Peer with id {} doesnt exist", peer_id))
+            let err = JasonError::from(
+                tracerr::new!(RoomError::NotFoundPeer(peer_id)).unwrap(),
+            );
+            console_error!(err.to_string());
         }
     }
 
@@ -435,14 +529,18 @@ impl EventHandler for InnerRoom {
                         candidate.sdp_m_line_index,
                         candidate.sdp_mid,
                     )
-                    .await;
+                    .await
+                    .map_err(tracerr::map_from_and_wrap!(=> RoomError));
                 if let Err(err) = add {
-                    console_error!(err.to_string());
+                    console_error!(JasonError::from(err.unwrap()).to_string());
                 }
             });
         } else {
             // TODO: No peer, whats next?
-            console_error!(format!("Peer with id {} doesnt exist", peer_id))
+            let err = JasonError::from(
+                tracerr::new!(RoomError::NotFoundPeer(peer_id)).unwrap(),
+            );
+            console_error!(err.to_string());
         }
     }
 
@@ -486,9 +584,11 @@ impl PeerEventHandler for InnerRoom {
     ) {
         match self.connections.get(&sender_id) {
             Some(conn) => conn.on_remote_stream(remote_stream.new_handle()),
-            None => {
-                console_error!("NewRemoteStream from sender without connection")
-            }
+            None => console_error!(JasonError::from(
+                tracerr::new!(RoomError::RemoteStreamWithoutConnection)
+                    .unwrap()
+            )
+            .to_string()),
         }
     }
 

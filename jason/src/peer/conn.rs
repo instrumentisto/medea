@@ -1,7 +1,7 @@
 use std::{cell::RefCell, rc::Rc};
 
+use derive_more::Display;
 use medea_client_api_proto::IceServer;
-use thiserror::*;
 use tracerr::Traced;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
@@ -14,7 +14,7 @@ use web_sys::{
 
 use crate::{
     media::TrackConstraints,
-    utils::{EventListener, WasmErr},
+    utils::{EventListener, JsCaused, JsError},
 };
 
 use super::ice_server::RtcIceServers;
@@ -120,27 +120,64 @@ pub enum SdpType {
 /// [RTCPeerConnection][1] and event handlers setting errors.
 ///
 /// [1]: https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection.
-#[derive(Debug, Error)]
-pub enum Error {
-    #[error("failed to add ICE candidate: {0}")]
-    AddIceCandidate(WasmErr),
-    #[error("failed to create SDP answer: {0}")]
-    CreateAnswer(WasmErr),
-    #[error("failed to create PeerConnection: {0}")]
-    CreatePeer(WasmErr),
-    #[error("failed to create SDP offer: {0}")]
-    CreateOffer(WasmErr),
-    #[error("failed to set handler for RtcPeerConnectionIceEvent: {0}")]
-    SetHandlerIceEvent(WasmErr),
-    #[error("failed to set handler for RtcTrackEvent: {0}")]
-    SetHandlerTrackEvent(WasmErr),
-    #[error("failed to set local SDP description: {0}")]
-    SetLocalDescription(WasmErr),
-    #[error("failed to set remote SDP description: {0}")]
-    SetRemoteDescription(WasmErr),
+#[derive(Debug, Display)]
+pub enum RTCPeerConnectionError {
+    /// Occurs when cannot adds new remote candidate to the
+    /// [RTCPeerConnection][1]'s remote description.
+    ///
+    /// [1]: https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection.
+    #[display(fmt = "failed to add ICE candidate: {}", _0)]
+    AddIceCandidate(JsError),
+    #[display(fmt = "failed to create SDP answer: {}", _0)]
+    CreateAnswer(JsError),
+    #[display(fmt = "failed to create PeerConnection: {}", _0)]
+    CreatePeer(JsError),
+    #[display(fmt = "failed to create SDP offer: {}", _0)]
+    CreateOffer(JsError),
+    #[display(
+        fmt = "failed to set handler for RtcPeerConnectionIceEvent: {}",
+        _0
+    )]
+    SetHandlerIceEvent(JsError),
+    #[display(fmt = "failed to set handler for RtcTrackEvent: {}", _0)]
+    SetHandlerTrackEvent(JsError),
+    #[display(fmt = "failed to set local SDP description: {}", _0)]
+    SetLocalDescription(JsError),
+    #[display(fmt = "failed to set remote SDP description: {}", _0)]
+    SetRemoteDescription(JsError),
 }
 
-type Result<T> = std::result::Result<T, Traced<Error>>;
+impl JsCaused for RTCPeerConnectionError {
+    fn name(&self) -> &'static str {
+        use RTCPeerConnectionError::*;
+        match self {
+            AddIceCandidate(_) => "AddIceCandidate",
+            CreateAnswer(_) => "CreateAnswer",
+            CreatePeer(_) => "CreatePeer",
+            CreateOffer(_) => "CreateOffer",
+            SetHandlerIceEvent(_) => "SetHandlerIceEvent",
+            SetHandlerTrackEvent(_) => "SetHandlerTrackEvent",
+            SetLocalDescription(_) => "SetLocalDescription",
+            SetRemoteDescription(_) => "SetRemoteDescription",
+        }
+    }
+
+    fn js_cause(&self) -> Option<js_sys::Error> {
+        use RTCPeerConnectionError::*;
+        match self {
+            AddIceCandidate(err)
+            | CreateAnswer(err)
+            | CreatePeer(err)
+            | CreateOffer(err)
+            | SetHandlerIceEvent(err)
+            | SetHandlerTrackEvent(err)
+            | SetLocalDescription(err)
+            | SetRemoteDescription(err) => err.js_cause(),
+        }
+    }
+}
+
+type Result<T> = std::result::Result<T, Traced<RTCPeerConnectionError>>;
 
 /// Representation of [RTCPeerConnection][1].
 ///
@@ -186,7 +223,7 @@ impl RtcPeerConnection {
         peer_conf.ice_servers(&RtcIceServers::from(ice_servers));
         let peer = SysRtcPeerConnection::new_with_configuration(&peer_conf)
             .map_err(Into::into)
-            .map_err(Error::CreatePeer)
+            .map_err(RTCPeerConnectionError::CreatePeer)
             .map_err(tracerr::wrap!())?;
 
         Ok(Self {
@@ -219,7 +256,7 @@ impl RtcPeerConnection {
                             f(msg);
                         },
                     )
-                    .map_err(Error::SetHandlerIceEvent)
+                    .map_err(RTCPeerConnectionError::SetHandlerIceEvent)
                     .map_err(tracerr::wrap!())?,
                 );
             }
@@ -260,7 +297,7 @@ impl RtcPeerConnection {
                             }
                         },
                     )
-                    .map_err(Error::SetHandlerIceEvent)
+                    .map_err(RTCPeerConnectionError::SetHandlerIceEvent)
                     .map_err(tracerr::wrap!())?,
                 );
             }
@@ -290,7 +327,7 @@ impl RtcPeerConnection {
         )
         .await
         .map_err(Into::into)
-        .map_err(Error::AddIceCandidate)
+        .map_err(RTCPeerConnectionError::AddIceCandidate)
         .map_err(tracerr::wrap!())?;
         Ok(())
     }
@@ -306,7 +343,7 @@ impl RtcPeerConnection {
         let answer = JsFuture::from(self.peer.create_answer())
             .await
             .map_err(Into::into)
-            .map_err(Error::CreateAnswer)
+            .map_err(RTCPeerConnectionError::CreateAnswer)
             .map_err(tracerr::wrap!())?;
         let answer = RtcSessionDescription::from(answer).sdp();
 
@@ -316,7 +353,7 @@ impl RtcPeerConnection {
         JsFuture::from(peer.set_local_description(&desc))
             .await
             .map_err(Into::into)
-            .map_err(Error::SetLocalDescription)
+            .map_err(RTCPeerConnectionError::SetLocalDescription)
             .map_err(tracerr::wrap!())?;
 
         Ok(answer)
@@ -334,7 +371,7 @@ impl RtcPeerConnection {
         let create_offer = JsFuture::from(peer.create_offer())
             .await
             .map_err(Into::into)
-            .map_err(Error::CreateOffer)
+            .map_err(RTCPeerConnectionError::CreateOffer)
             .map_err(tracerr::wrap!())?;
         let offer = RtcSessionDescription::from(create_offer).sdp();
 
@@ -344,7 +381,7 @@ impl RtcPeerConnection {
         JsFuture::from(peer.set_local_description(&desc))
             .await
             .map_err(Into::into)
-            .map_err(Error::SetLocalDescription)
+            .map_err(RTCPeerConnectionError::SetLocalDescription)
             .map_err(tracerr::wrap!())?;
 
         Ok(offer)
@@ -355,10 +392,7 @@ impl RtcPeerConnection {
     /// [offer][`SdpType::Offer`] or [answer][`SdpType::Answer`].
     ///
     /// Changes the local media state.
-    pub async fn set_remote_description(
-        &self,
-        sdp: SdpType,
-    ) -> Result<()> {
+    pub async fn set_remote_description(&self, sdp: SdpType) -> Result<()> {
         let description = match sdp {
             SdpType::Offer(offer) => {
                 let mut desc =
@@ -377,7 +411,7 @@ impl RtcPeerConnection {
         JsFuture::from(self.peer.set_remote_description(&description))
             .await
             .map_err(Into::into)
-            .map_err(Error::SetRemoteDescription)
+            .map_err(RTCPeerConnectionError::SetRemoteDescription)
             .map_err(tracerr::wrap!())?;
 
         Ok(())

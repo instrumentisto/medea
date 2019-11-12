@@ -4,52 +4,31 @@ use std::{
 };
 
 use derive_more::Display;
-use tracerr::{Trace, Traced};
+use tracerr::Trace;
 use wasm_bindgen::{prelude::*, JsCast};
 
+/// Representation of an error which can caused by error returned from the
+/// JS side.
 pub trait JsCaused: Display + Debug + Send + Sync + 'static {
+    /// Returns name of error.
     fn name(&self) -> &'static str;
 
+    /// Returns JS error if it is the cause.
     fn js_cause(&self) -> Option<js_sys::Error>;
 }
 
-// Wrapper for JS value which returned from JS side as error.
-// #[derive(Error, Debug)]
-// #[error("{0}")]
-// pub struct WasmErr(Cow<'static, str>);
-//
-// impl From<JsValue> for WasmErr {
-// fn from(val: JsValue) -> Self {
-// match val.dyn_into::<js_sys::Error>() {
-// Ok(err) => String::from(err.to_string()).into(),
-// Err(val) => match val.as_string() {
-// Some(reason) => reason.into(),
-// None => "no str representation for JsError".into(),
-// },
-// }
-// }
-// }
-//
-// impl From<&'static str> for WasmErr {
-// fn from(msg: &'static str) -> Self {
-// Self(Cow::Borrowed(msg))
-// }
-// }
-//
-// impl From<String> for WasmErr {
-// fn from(msg: String) -> Self {
-// Self(Cow::Owned(msg))
-// }
-// }
-
+/// Wrapper for JS value which returned from JS side as error.
 #[derive(Debug, Display)]
 #[display(fmt = "{}: {}", name, message)]
-pub struct WasmErr {
+pub struct JsError {
+    /// Name of JS error.
     name: Cow<'static, str>,
+
+    /// Message of JS error.
     message: Cow<'static, str>,
 }
 
-impl From<JsValue> for WasmErr {
+impl From<JsValue> for JsError {
     fn from(val: JsValue) -> Self {
         match val.dyn_into::<js_sys::Error>() {
             Ok(err) => Self {
@@ -70,15 +49,30 @@ impl From<JsValue> for WasmErr {
     }
 }
 
-impl From<&WasmErr> for js_sys::Error {
-    fn from(err: &WasmErr) -> Self {
+impl From<&JsError> for js_sys::Error {
+    fn from(err: &JsError) -> Self {
         let error = Self::new(&err.message);
         error.set_name(&err.name);
         error
     }
 }
 
+impl JsCaused for JsError {
+    fn name(&self) -> &'static str {
+        "JsError"
+    }
+
+    fn js_cause(&self) -> Option<js_sys::Error> {
+        Some(self.into())
+    }
+}
+
+/// Representation of app error exported to JS side.
+///
+/// Contains JS side error if it the cause and trace information.
 #[wasm_bindgen]
+#[derive(Debug, Display)]
+#[display(fmt = "{}: {}\n{}", name, message, trace)]
 pub struct JasonError {
     name: &'static str,
     message: String,
@@ -88,18 +82,22 @@ pub struct JasonError {
 
 #[wasm_bindgen]
 impl JasonError {
+    /// REturns name of error.
     pub fn name(&self) -> String {
         String::from(self.name)
     }
 
+    /// Returns message of errors.
     pub fn message(&self) -> String {
         self.message.clone()
     }
 
+    /// Returns trace information of error.
     pub fn trace(&self) -> String {
         self.trace.to_string()
     }
 
+    /// Returns JS side error if it the cause.
     pub fn source(&self) -> JsValue {
         self.source
             .as_ref()
@@ -107,9 +105,8 @@ impl JasonError {
     }
 }
 
-impl<E: JsCaused> From<Traced<E>> for JasonError {
-    fn from(error: Traced<E>) -> Self {
-        let (err, trace) = error.unwrap();
+impl<E: JsCaused> From<(E, Trace)> for JasonError {
+    fn from((err, trace): (E, Trace)) -> Self {
         let message = err.to_string();
         match err.js_cause() {
             Some(e) => Self {

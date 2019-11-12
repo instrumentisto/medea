@@ -2,7 +2,7 @@
 
 use std::{borrow::ToOwned, cell::RefCell, collections::HashMap, rc::Rc};
 
-use failure::Fail;
+use derive_more::Display;
 use futures::future;
 use medea_client_api_proto::{Direction, PeerId, Track, TrackId};
 use tracerr::Traced;
@@ -11,7 +11,10 @@ use web_sys::{
     MediaStreamTrack, RtcRtpTransceiver, RtcRtpTransceiverDirection,
 };
 
-use crate::{media::TrackConstraints, utils::WasmErr};
+use crate::{
+    media::TrackConstraints,
+    utils::{JsCaused, JsError},
+};
 
 use super::{
     conn::{RtcPeerConnection, TransceiverDirection, TransceiverKind},
@@ -21,23 +24,46 @@ use super::{
 };
 
 /// Errors that may occur in [`MediaConnections`] storage.
-#[derive(Debug, Fail)]
-pub enum Error {
-    #[fail(display = "failed to insert Track to a sender: {}", 0)]
-    InsertTrack(WasmErr),
-    #[fail(display = "unable to find Transceiver with provided mid: {}", 0)]
+#[derive(Debug, Display)]
+#[allow(clippy::module_name_repetitions)]
+pub enum MediaConnectionsError {
+    #[display(fmt = "failed to insert Track to a sender: {}", _0)]
+    InsertTrack(JsError),
+    #[display(fmt = "unable to find Transceiver with provided mid: {}", _0)]
     NotFoundTransceiver(String),
-    #[fail(display = "Peer has senders without mid")]
+    #[display(fmt = "Peer has senders without mid")]
     SendersWithoutMid,
-    #[fail(display = "Peer has receivers without mid")]
+    #[display(fmt = "Peer has receivers without mid")]
     ReceiversWithoutMid,
-    #[fail(display = "provided stream does not have all necessary Tracks")]
+    #[display(fmt = "provided stream does not have all necessary Tracks")]
     InvalidMediaStream,
-    #[fail(display = "provided Track does not satisfy senders constraints")]
+    #[display(fmt = "provided Track does not satisfy senders constraints")]
     InvalidMediaTrack,
 }
 
-type Result<T, E = Error> = std::result::Result<T, Traced<E>>;
+impl JsCaused for MediaConnectionsError {
+    fn name(&self) -> &'static str {
+        use MediaConnectionsError::*;
+        match self {
+            InsertTrack(_) => "InsertTrack",
+            NotFoundTransceiver(_) => "NotFoundTransceiver",
+            SendersWithoutMid => "SendersWithoutMid",
+            ReceiversWithoutMid => "ReceiversWithoutMid",
+            InvalidMediaStream => "InvalidMediaStream",
+            InvalidMediaTrack => "InvalidMediaTrack",
+        }
+    }
+
+    fn js_cause(&self) -> Option<js_sys::Error> {
+        use MediaConnectionsError::*;
+        match self {
+            InsertTrack(err) => err.js_cause(),
+            _ => None,
+        }
+    }
+}
+
+type Result<T> = std::result::Result<T, Traced<MediaConnectionsError>>;
 
 /// Actual data of [`MediaConnections`] storage.
 struct InnerMediaConnections {
@@ -118,7 +144,7 @@ impl MediaConnections {
                 sender
                     .transceiver
                     .mid()
-                    .ok_or(Error::SendersWithoutMid)
+                    .ok_or(MediaConnectionsError::SendersWithoutMid)
                     .map_err(tracerr::wrap!())?,
             );
         }
@@ -128,7 +154,7 @@ impl MediaConnections {
                 receiver
                     .mid()
                     .map(ToOwned::to_owned)
-                    .ok_or(Error::ReceiversWithoutMid)
+                    .ok_or(MediaConnectionsError::ReceiversWithoutMid)
                     .map_err(tracerr::wrap!())?,
             );
         }
@@ -202,7 +228,7 @@ impl MediaConnections {
         &self,
         stream: &MediaStream,
     ) -> Result<()> {
-        use Error::*;
+        use MediaConnectionsError::*;
 
         let s = self.0.borrow();
 
@@ -326,7 +352,7 @@ impl Sender {
             None => peer.add_transceiver(kind, TransceiverDirection::Sendonly),
             Some(mid) => peer
                 .get_transceiver_by_mid(&mid)
-                .ok_or(Error::NotFoundTransceiver(mid))
+                .ok_or(MediaConnectionsError::NotFoundTransceiver(mid))
                 .map_err(tracerr::wrap!())?,
         };
         Ok(Rc::new(Self {
@@ -358,7 +384,7 @@ impl Sender {
         )
         .await
         .map_err(Into::into)
-        .map_err(Error::InsertTrack)
+        .map_err(MediaConnectionsError::InsertTrack)
         .map_err(tracerr::wrap!())?;
 
         sender

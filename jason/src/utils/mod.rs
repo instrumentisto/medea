@@ -6,6 +6,7 @@ mod errors;
 mod callback;
 mod event_listener;
 
+use derive_more::Display;
 use js_sys::Reflect;
 use wasm_bindgen::prelude::*;
 use web_sys::Window;
@@ -13,7 +14,7 @@ use web_sys::Window;
 #[doc(inline)]
 pub use self::{
     callback::{Callback, Callback2},
-    errors::{JasonError, JsCaused, WasmErr},
+    errors::{JasonError, JsCaused, JsError},
     event_listener::EventListener,
 };
 
@@ -38,6 +39,20 @@ impl Drop for IntervalHandle {
     }
 }
 
+#[derive(Debug, Display)]
+#[display(fmt = "Detached state")]
+pub struct HandlerError;
+
+impl JsCaused for HandlerError {
+    fn name(&self) -> &'static str {
+        "HandlerError"
+    }
+
+    fn js_cause(&self) -> Option<js_sys::Error> {
+        None
+    }
+}
+
 /// Upgrades newtyped [`Weak`] reference, returning [`WasmErr`] if failed,
 /// or mapping [`Rc`]-referenced value with provided `$closure` otherwise.
 ///
@@ -46,7 +61,12 @@ impl Drop for IntervalHandle {
 macro_rules! map_weak {
     ($v:expr, $closure:expr) => {{
         $v.0.upgrade()
-            .ok_or_else(|| js_sys::Error::new("Detached state").into())
+            .ok_or(
+                $crate::utils::JasonError::from(
+                    tracerr::new!($crate::utils::HandlerError).unwrap(),
+                )
+                .into(),
+            )
             .map($closure)
     }};
 }

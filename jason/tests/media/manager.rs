@@ -1,17 +1,15 @@
 #![cfg(target_arch = "wasm32")]
 
-use futures::TryFutureExt;
 use js_sys::Array;
 use wasm_bindgen_futures::JsFuture;
 use wasm_bindgen_test::*;
 
 use medea_jason::{
-    media::MediaManager, utils::WasmErr, AudioTrackConstraints,
-    MediaStreamConstraints, VideoTrackConstraints,
+    media::MediaManager, AudioTrackConstraints, MediaStreamConstraints,
+    VideoTrackConstraints,
 };
 
-use crate::{unwrap_error, MockNavigator};
-use medea_jason::utils::JasonError;
+use crate::{get_jason_error, MockNavigator};
 
 wasm_bindgen_test_configure!(run_in_browser);
 
@@ -32,17 +30,20 @@ async fn failed_get_media_devices_info() {
     let mock_navigator = MockNavigator::new();
     mock_navigator.error_enumerate_devices("some error".into());
     let media_manager = MediaManager::default();
-    let result = JsFuture::from(media_manager.new_handle().enumerate_devices())
-        .map_err(WasmErr::from)
-        .await;
+    let result =
+        JsFuture::from(media_manager.new_handle().enumerate_devices()).await;
     mock_navigator.stop();
     match result {
         Ok(_) => assert!(false),
-        Err(err) => assert_eq!(
-            err.to_string(),
-            "Error: MediaDevices.enumerateDevices() failed: some error"
-                .to_string()
-        ),
+        Err(err) => {
+            let e = get_jason_error(err);
+            assert_eq!(e.name(), "GetEnumerateDevices");
+            assert_eq!(
+                e.message(),
+                "MediaDevices.enumerateDevices() failed: Unknown error: some \
+                 error"
+            );
+        }
     }
 }
 
@@ -69,10 +70,10 @@ async fn failed_get_user_media() {
     match result {
         Ok(_) => assert!(false),
         Err(err) => {
-            let e = unwrap_error(err);
-            assert_eq!(e.name(), "GetUserMedia");
+            let err = get_jason_error(err);
+            assert_eq!(err.name(), "GetUserMedia");
             assert_eq!(
-                e.message(),
+                err.message(),
                 "MediaDevices.getUserMedia() failed: Unknown error: some error"
             );
         }

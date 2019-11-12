@@ -4,47 +4,83 @@
 
 use std::{cell::RefCell, convert::TryFrom, rc::Rc};
 
+use derive_more::Display;
 use futures::{channel::oneshot, future};
 use macro_attr::*;
 use medea_client_api_proto::{ClientMsg, ServerMsg};
 use newtype_derive::NewtypeFrom;
-use thiserror::*;
 use tracerr::Traced;
 use web_sys::{CloseEvent, Event, MessageEvent, WebSocket as SysWebSocket};
 
 use crate::{
     rpc::CloseMsg,
-    utils::{EventListener, WasmErr},
+    utils::{EventListener, JasonError, JsCaused, JsError},
 };
 
 /// Errors that may occur when working with [`WebSocket`].
-#[derive(Debug, Error)]
-pub enum Error {
-    #[error("failed to create WebSocket: {0}")]
-    CreateSocket(WasmErr),
-    #[error("failed to init WebSocket")]
+#[derive(Debug, Display)]
+pub enum SocketError {
+    #[display(fmt = "failed to create WebSocket: {}", _0)]
+    CreateSocket(JsError),
+    #[display(fmt = "failed to init WebSocket")]
     InitSocket,
-    #[error("failed to parse client message: {0}")]
+    #[display(fmt = "failed to parse client message: {}", _0)]
     ParseClientMessage(serde_json::error::Error),
-    #[error("failed to parse server message: {0}")]
+    #[display(fmt = "failed to parse server message: {}", _0)]
     ParseServerMessage(serde_json::error::Error),
-    #[error("message is not a string")]
+    #[display(fmt = "message is not a string")]
     MessageNotString,
-    #[error("failed to send message: {0}")]
-    SendMessage(WasmErr),
-    #[error("failed to set handler for CloseEvent: {0}")]
-    SetHandlerOnClose(WasmErr),
-    #[error("failed to set handler for OpenEvent: {0}")]
-    SetHandlerOnOpen(WasmErr),
-    #[error("failed to set handler for MessageEvent: {0}")]
-    SetHandlerOnMessage(WasmErr),
-    #[error("could not cast {0} to State variant")]
+    #[display(fmt = "failed to send message: {}", _0)]
+    SendMessage(JsError),
+    #[display(fmt = "failed to set handler for CloseEvent: {}", _0)]
+    SetHandlerOnClose(JsError),
+    #[display(fmt = "failed to set handler for OpenEvent: {}", _0)]
+    SetHandlerOnOpen(JsError),
+    #[display(fmt = "failed to set handler for MessageEvent: {}", _0)]
+    SetHandlerOnMessage(JsError),
+    #[display(fmt = "could not cast {} to State variant", _0)]
     CastState(u16),
-    #[error("underlying socket is closed")]
+    #[display(fmt = "underlying socket is closed")]
     ClosedSocket,
 }
 
-type Result<T> = std::result::Result<T, Traced<Error>>;
+impl JsCaused for SocketError {
+    fn name(&self) -> &'static str {
+        use SocketError::*;
+        match self {
+            CreateSocket(_) => "CreateSocket",
+            InitSocket => "InitSocket",
+            ParseClientMessage(_) => "ParseClientMessage",
+            ParseServerMessage(_) => "ParseServerMessage",
+            MessageNotString => "MessageNotString",
+            SendMessage(_) => "SendMessage",
+            SetHandlerOnClose(_) => "SetHandlerOnClose",
+            SetHandlerOnOpen(_) => "SetHandlerOnOpen",
+            SetHandlerOnMessage(_) => "SetHandlerOnMessage",
+            CastState(_) => "CastState",
+            ClosedSocket => "ClosedSocket",
+        }
+    }
+
+    fn js_cause(&self) -> Option<js_sys::Error> {
+        use SocketError::*;
+        match self {
+            InitSocket
+            | ClosedSocket
+            | MessageNotString
+            | ParseClientMessage(_)
+            | ParseServerMessage(_)
+            | CastState(_) => None,
+            CreateSocket(err)
+            | SendMessage(err)
+            | SetHandlerOnClose(err)
+            | SetHandlerOnOpen(err)
+            | SetHandlerOnMessage(err) => err.js_cause(),
+        }
+    }
+}
+
+type Result<T> = std::result::Result<T, Traced<SocketError>>;
 
 /// State of websocket.
 #[derive(Debug)]
@@ -66,7 +102,7 @@ impl State {
 }
 
 impl TryFrom<u16> for State {
-    type Error = Error;
+    type Error = SocketError;
 
     fn try_from(value: u16) -> std::result::Result<Self, Self::Error> {
         match value {
@@ -74,7 +110,7 @@ impl TryFrom<u16> for State {
             1 => Ok(Self::OPEN),
             2 => Ok(Self::CLOSING),
             3 => Ok(Self::CLOSED),
-            _ => Err(Error::CastState(value)),
+            _ => Err(SocketError::CastState(value)),
         }
     }
 }
@@ -94,7 +130,7 @@ impl InnerSocket {
     fn new(url: &str) -> Result<Self> {
         let socket = SysWebSocket::new(url)
             .map_err(Into::into)
-            .map_err(Error::CreateSocket)
+            .map_err(SocketError::CreateSocket)
             .map_err(tracerr::wrap!())?;
         Ok(Self {
             socket_state: State::CONNECTING,
@@ -112,7 +148,9 @@ impl InnerSocket {
             Ok(new_state) => self.socket_state = new_state,
             Err(err) => {
                 // unreachable, unless some vendor will break enum
-                console_error!(err.to_string())
+                console_error!(
+                    JasonError::from(tracerr::new!(err).unwrap()).to_string()
+                )
             }
         };
     }
@@ -122,6 +160,7 @@ impl WebSocket {
     /// Initiates new WebSocket connection. Resolves only when underlying
     /// connection becomes active.
     pub async fn new(url: &str) -> Result<Self> {
+        use SocketError::*;
         let (tx_close, rx_close) = oneshot::channel();
         let (tx_open, rx_open) = oneshot::channel();
 
@@ -140,7 +179,7 @@ impl WebSocket {
                         let _ = tx_close.send(());
                     },
                 )
-                .map_err(Error::SetHandlerOnClose)
+                .map_err(SetHandlerOnClose)
                 .map_err(tracerr::wrap!())?,
             );
 
@@ -154,7 +193,7 @@ impl WebSocket {
                         let _ = tx_open.send(());
                     },
                 )
-                .map_err(Error::SetHandlerOnOpen)
+                .map_err(SetHandlerOnOpen)
                 .map_err(tracerr::wrap!())?,
             );
         }
@@ -167,18 +206,16 @@ impl WebSocket {
         match state {
             future::Either::Left((opened, _)) => match opened {
                 Ok(_) => Ok(Self(socket)),
-                Err(_) => Err(tracerr::new!(Error::InitSocket)),
+                Err(_) => Err(tracerr::new!(InitSocket)),
             },
-            future::Either::Right(_closed) => {
-                Err(tracerr::new!(Error::InitSocket))
-            }
+            future::Either::Right(_closed) => Err(tracerr::new!(InitSocket)),
         }
     }
 
     /// Set handler on receive message from server.
     pub fn on_message<F>(&self, mut f: F) -> Result<()>
     where
-        F: (FnMut(std::result::Result<ServerMsg, Error>)) + 'static,
+        F: (FnMut(Result<ServerMsg>)) + 'static,
     {
         let mut inner_mut = self.0.borrow_mut();
         inner_mut.on_message = Some(
@@ -187,12 +224,13 @@ impl WebSocket {
                 "message",
                 move |msg| {
                     let parsed = ServerMessage::try_from(&msg)
-                        .map(std::convert::Into::into);
+                        .map(std::convert::Into::into)
+                        .map_err(tracerr::wrap!());
                     f(parsed);
                 },
             )
             .map_err(Into::into)
-            .map_err(Error::SetHandlerOnMessage)
+            .map_err(SocketError::SetHandlerOnMessage)
             .map_err(tracerr::wrap!())?,
         );
         Ok(())
@@ -214,7 +252,7 @@ impl WebSocket {
                     f(CloseMsg::from(&msg));
                 },
             )
-            .map_err(Error::SetHandlerOnClose)
+            .map_err(SocketError::SetHandlerOnClose)
             .map_err(tracerr::wrap!())?,
         );
         Ok(())
@@ -222,9 +260,10 @@ impl WebSocket {
 
     /// Send message to server.
     pub fn send(&self, msg: &ClientMsg) -> Result<()> {
+        use SocketError::*;
         let inner = self.0.borrow();
         let message = serde_json::to_string(msg)
-            .map_err(Error::ParseClientMessage)
+            .map_err(ParseClientMessage)
             .map_err(tracerr::wrap!())?;
 
         match inner.socket_state {
@@ -232,9 +271,9 @@ impl WebSocket {
                 .socket
                 .send_with_str(&message)
                 .map_err(Into::into)
-                .map_err(Error::SendMessage)
+                .map_err(SendMessage)
                 .map_err(tracerr::wrap!()),
-            _ => Err(tracerr::new!(Error::ClosedSocket)),
+            _ => Err(tracerr::new!(ClosedSocket)),
         }
     }
 }
@@ -269,19 +308,21 @@ impl From<&CloseEvent> for CloseMsg {
     }
 }
 
+// TODO use derive_more::From
 macro_attr! {
     #[derive(NewtypeFrom!)]
     pub struct ServerMessage(ServerMsg);
 }
 
 impl TryFrom<&MessageEvent> for ServerMessage {
-    type Error = Error;
+    type Error = SocketError;
 
     fn try_from(msg: &MessageEvent) -> std::result::Result<Self, Self::Error> {
-        let payload = msg.data().as_string().ok_or(Error::MessageNotString)?;
+        use SocketError::*;
+        let payload = msg.data().as_string().ok_or(MessageNotString)?;
 
         serde_json::from_str::<ServerMsg>(&payload)
-            .map_err(Error::ParseServerMessage)
+            .map_err(ParseServerMessage)
             .map(Self::from)
     }
 }

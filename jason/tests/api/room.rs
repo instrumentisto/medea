@@ -6,10 +6,10 @@ use futures::channel::{mpsc, oneshot};
 use medea_client_api_proto::{Event, IceServer, PeerId};
 use medea_jason::{
     api::Room,
-    media::MediaManager,
+    media::{AudioTrackConstraints, MediaManager, MediaStreamConstraints},
     peer::{MockPeerRepository, PeerConnection, PeerEvent},
     rpc::MockRpcClient,
-    AudioTrackConstraints, MediaStreamConstraints,
+    utils::JasonError,
 };
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
@@ -186,12 +186,13 @@ async fn error_inject_invalid_local_stream_into_new_peer() {
 
     let room_handle = room.new_handle();
     let (done, wait) = oneshot::channel();
-    let cb = Closure::once_into_js(move |err: js_sys::Error| {
+    let cb = Closure::once_into_js(move |err: JasonError| {
         done.send(()).unwrap();
+        assert_eq!(&err.name(), "InvalidLocalStream");
         assert_eq!(
-            err.to_string(),
-            "Error: provided MediaStream was expected to have single video \
-             track"
+            err.message(),
+            "invalid local stream: provided MediaStream was expected to have \
+             single video track"
         );
     });
     room_handle.on_failed_local_stream(cb.into()).unwrap();
@@ -230,12 +231,13 @@ async fn error_inject_invalid_local_stream_into_new_peer() {
 #[wasm_bindgen_test]
 async fn error_inject_invalid_local_stream_into_room_on_exists_peer() {
     let (done, wait) = oneshot::channel();
-    let cb = Closure::once_into_js(move |err: js_sys::Error| {
+    let cb = Closure::once_into_js(move |err: JasonError| {
         done.send(()).unwrap();
+        assert_eq!(&err.name(), "InvalidLocalStream");
         assert_eq!(
-            err.to_string(),
-            "Error: provided MediaStream was expected to have single video \
-             track"
+            &err.message(),
+            "invalid local stream: provided MediaStream was expected to have \
+             single video track"
         );
     });
     let (room, peer) = get_test_room_and_exist_peer(1);
@@ -263,11 +265,13 @@ async fn error_get_local_stream_on_new_peer() {
 
     let room_handle = room.new_handle();
     let (done, wait) = oneshot::channel();
-    let cb = Closure::once_into_js(move |err: js_sys::Error| {
+    let cb = Closure::once_into_js(move |err: JasonError| {
         done.send(()).unwrap();
+        assert_eq!(&err.name(), "GetLocalStream");
         assert_eq!(
-            err.to_string(),
-            "Error: MediaDevices.getUserMedia() failed: some error"
+            &err.message(),
+            "failed to get local stream: MediaDevices.getUserMedia() failed: \
+             Unknown error: some error"
         );
     });
     room_handle.on_failed_local_stream(cb.into()).unwrap();

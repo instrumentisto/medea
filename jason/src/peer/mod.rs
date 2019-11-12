@@ -12,7 +12,7 @@ mod track;
 
 use std::{cell::RefCell, collections::HashMap, convert::TryFrom, rc::Rc};
 
-use failure::Error;
+use derive_more::{Display, From};
 use futures::{channel::mpsc, future};
 use medea_client_api_proto::{
     Direction, IceServer, PeerId as Id, Track, TrackId,
@@ -21,9 +21,10 @@ use medea_macro::dispatchable;
 use tracerr::Traced;
 use web_sys::{MediaStream as SysMediaStream, RtcTrackEvent};
 
-use crate::media::MediaManager;
-
-type Result<T> = std::result::Result<T, Traced<Error>>;
+use crate::{
+    media::{MediaManager, MediaManagerError},
+    utils::JsCaused,
+};
 
 #[cfg(feature = "mockable")]
 #[doc(inline)]
@@ -32,14 +33,51 @@ pub use self::repo::MockPeerRepository;
 pub use self::repo::{PeerRepository, Repository};
 pub use self::{
     conn::{
-        IceCandidate, RtcPeerConnection, SdpType, TransceiverDirection,
-        TransceiverKind,
+        IceCandidate, RTCPeerConnectionError, RtcPeerConnection, SdpType,
+        TransceiverDirection, TransceiverKind,
     },
-    media::MediaConnections,
+    media::{MediaConnections, MediaConnectionsError},
     stream::{MediaStream, MediaStreamHandle},
-    stream_request::{Error, SimpleStreamRequest, StreamRequest},
+    stream_request::{SimpleStreamRequest, StreamRequest, StreamRequestError},
     track::MediaTrack,
 };
+
+#[derive(Debug, Display, From)]
+#[allow(clippy::module_name_repetitions)]
+pub enum PeerError {
+    #[display(fmt = "{}", _0)]
+    MediaConnections(MediaConnectionsError),
+    #[display(fmt = "{}", _0)]
+    MediaManager(MediaManagerError),
+    #[display(fmt = "{}", _0)]
+    RtcPeerConnection(RTCPeerConnectionError),
+    #[display(fmt = "{}", _0)]
+    StreamRequest(StreamRequestError),
+}
+
+impl JsCaused for PeerError {
+    fn name(&self) -> &'static str {
+        use PeerError::*;
+        match self {
+            MediaConnections(_) => "MediaConnections",
+            MediaManager(_) => "MediaManager",
+            RtcPeerConnection(_) => "RtcPeerConnection",
+            StreamRequest(_) => "StreamRequest",
+        }
+    }
+
+    fn js_cause(&self) -> Option<js_sys::Error> {
+        use PeerError::*;
+        match self {
+            MediaConnections(err) => err.js_cause(),
+            MediaManager(err) => err.js_cause(),
+            RtcPeerConnection(err) => err.js_cause(),
+            StreamRequest(err) => err.js_cause(),
+        }
+    }
+}
+
+type Result<T> = std::result::Result<T, Traced<PeerError>>;
 
 #[dispatchable]
 #[allow(clippy::module_name_repetitions)]
@@ -409,7 +447,8 @@ impl PeerConnection {
                 .await
             });
         }
-        future::try_join_all(futures).await
+        future::try_join_all(futures)
+            .await
             .map_err(tracerr::map_from_and_wrap!())?;
         Ok(())
     }
