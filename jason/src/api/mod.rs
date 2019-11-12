@@ -3,7 +3,7 @@
 mod connection;
 mod room;
 
-use std::{cell::RefCell, mem, rc::Rc};
+use std::{cell::RefCell, rc::Rc};
 
 use futures::FutureExt;
 use wasm_bindgen::prelude::*;
@@ -52,14 +52,13 @@ impl Jason {
         let inner_clone = self.0.clone();
         spawn_local(rpc.on_close().map(move |res| {
             // TODO: don't close all rooms when multiple rpc connections
-            //       will be supported
-            let mut rooms = Vec::new();
-            mem::swap(&mut inner_clone.borrow_mut().rooms, &mut rooms);
+            //       will be supported.
             if let Ok(reason) = res {
-                for room in rooms {
+                for room in inner_clone.borrow_mut().rooms.drain(..) {
                     room.close(reason.clone());
                 }
             } else {
+                // TODO: why not call room.close with some specific reason?
                 // Note that in this case clean up will still happen.
                 console_error!(
                     "'on_close' callback's 'Sender' was unexpectedly \

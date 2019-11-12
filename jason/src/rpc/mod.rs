@@ -30,6 +30,7 @@ use self::{
 pub enum CloseByClientReason {
     /// [`Room`] was dropped without `close_reason`.
     RoomUnexpectedlyDropped,
+    // TODO: RoomClosed after calling room.dispose or jason.dispose.
 }
 
 /// Reasons of closing by client side and server side.
@@ -44,10 +45,12 @@ pub enum CloseReason {
         /// Reason of closing.
         reason: CloseByClientReason,
 
-        /// Is closing considered as error?
+        /// Is closing considered as error.
         is_err: bool,
     },
 }
+
+// TODO: why in rpc mod? move to api::room.
 
 /// Reason of why Jason was closed.
 ///
@@ -62,7 +65,7 @@ pub struct JsCloseReason {
     /// Reason of closing.
     reason: String,
 
-    /// Is closing considered as error?
+    /// Is closing considered as error.
     ///
     /// This field may be `true` only on closing by client.
     is_err: bool,
@@ -126,7 +129,7 @@ pub enum CloseMsg {
     /// Unexpected close determines by close code != `1000` and for close code
     /// 1000 without reason. This is used because if connection lost then
     /// close code will be `1000` which is wrong.
-    Disconnect(u16),
+    Abnormal(u16),
 }
 
 impl From<&CloseEvent> for CloseMsg {
@@ -139,10 +142,10 @@ impl From<&CloseEvent> for CloseMsg {
                 {
                     Self::Normal(code, description.reason)
                 } else {
-                    Self::Disconnect(code)
+                    Self::Abnormal(code)
                 }
             }
-            _ => Self::Disconnect(code),
+            _ => Self::Abnormal(code),
         }
     }
 }
@@ -185,6 +188,7 @@ pub struct WebsocketRpcClient(Rc<RefCell<Inner>>);
 /// Inner state of [`WebsocketRpcClient`].
 struct Inner {
     /// [`WebSocket`] connection to remote media server.
+    // TODO: Rc<dyn RpcTransport>, impl RpcTransport for WebSocket, RpcConnection tests
     sock: Option<Rc<WebSocket>>,
 
     heartbeat: Heartbeat,
@@ -216,24 +220,16 @@ impl Inner {
 /// This function will be called on every WebSocket close (normal and abnormal)
 /// regardless of the [`CloseReason`].
 fn on_close(inner_rc: &RefCell<Inner>, close_msg: &CloseMsg) {
-    {
-        let mut inner = inner_rc.borrow_mut();
-        inner.sock.take();
-        inner.heartbeat.stop();
-    }
+    let mut inner = inner_rc.borrow_mut();
+    inner.sock.take();
+    inner.heartbeat.stop();
 
     if let CloseMsg::Normal(_, reason) = &close_msg {
         // This is reconnecting and this is not considered as connection
         // close.
         if let CloseByServerReason::Reconnected = reason {
         } else {
-            let mut on_close_subscribers = Vec::new();
-            std::mem::swap(
-                &mut on_close_subscribers,
-                &mut inner_rc.borrow_mut().on_close_subscribers,
-            );
-
-            for sub in on_close_subscribers {
+            for sub in inner.on_close_subscribers.drain(..) {
                 if let Err(reason) =
                     sub.send(CloseReason::ByServer(reason.clone()))
                 {
@@ -250,7 +246,7 @@ fn on_close(inner_rc: &RefCell<Inner>, close_msg: &CloseMsg) {
     // TODO: reconnect on disconnect, propagate error if unable
     //       to reconnect
     match close_msg {
-        CloseMsg::Normal(_, _) | CloseMsg::Disconnect(_) => {}
+        CloseMsg::Normal(_, _) | CloseMsg::Abnormal(_) => {}
     }
 }
 

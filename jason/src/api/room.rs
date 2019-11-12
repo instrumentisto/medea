@@ -205,7 +205,7 @@ impl Room {
     /// [`InnerRoom`] and call JS side `on_close` callback with provided
     /// [`CloseReason`].
     pub fn close(self, reason: CloseReason) {
-        self.0.borrow_mut().close(reason);
+        self.0.borrow_mut().set_close_reason(reason);
     }
 
     /// Creates new [`RoomHandle`] used by JS side. You can create them as many
@@ -297,7 +297,7 @@ impl InnerRoom {
     ///
     /// Supposed that after this function call, [`Drop`] implementation of
     /// [`InnerRoom`] will be triggered.
-    fn close(&mut self, reason: CloseReason) {
+    fn set_close_reason(&mut self, reason: CloseReason) {
         self.close_reason = Some(reason);
     }
 
@@ -536,6 +536,7 @@ impl PeerEventHandler for InnerRoom {
 impl Drop for InnerRoom {
     /// Unsubscribes [`InnerRoom`] from all its subscriptions.
     fn drop(&mut self) {
+        self.rpc.unsub();
         let close_reason = if let Some(reason) = &self.close_reason {
             reason
         } else {
@@ -551,6 +552,5 @@ impl Drop for InnerRoom {
                 console_error!(err.as_string());
             }
         }
-        self.rpc.unsub();
     }
 }
