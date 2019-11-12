@@ -28,7 +28,7 @@ jobs:
   include:
     - name: Clippy
       stage: check
-      rust: beta
+      rust: stable
       before_script: rustup component add clippy
       script: make lint
 
@@ -39,9 +39,9 @@ jobs:
       before_script: rustup component add rustfmt --toolchain nightly-x86_64-unknown-linux-gnu
       script: make fmt check=yes
 
-    - name: medea-jason (beta)
+    - name: medea-jason (stable)
       stage: build
-      rust: beta
+      rust: stable
       before_script:
         - rm -f /home/travis/.cargo/bin/wasm-pack
         - curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
@@ -93,9 +93,9 @@ jobs:
       rust: stable
       script: make test.unit crate=medea
 
-    - name: unit medea-jason (beta, Chrome)
+    - name: unit medea-jason (stable, Chrome)
       stage: test
-      rust: beta
+      rust: stable
       services: ["docker"]
       before_script:
         - cargo uninstall wasm-bindgen-cli || echo > /dev/null
@@ -103,9 +103,9 @@ jobs:
         - rustup target add wasm32-unknown-unknown
       script: make test.unit crate=medea-jason browser=chrome
 
-    - name: unit medea-jason (beta, Firefox)
+    - name: unit medea-jason (stable, Firefox)
       stage: test
-      rust: beta
+      rust: stable
       services: ["docker"]
       before_script:
         - cargo uninstall wasm-bindgen-cli || echo > /dev/null

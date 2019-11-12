@@ -20,12 +20,9 @@ MEDEA_IMAGE_NAME := $(strip \
 DEMO_IMAGE_NAME := instrumentisto/medea-demo
 CONTROL_MOCK_IMAGE_NAME := instrumentisto/medea-control-api-mock
 
-RUST_VER := 1.38
-RUST_BETA_VER := 1.39-beta.5
-CHROME_VERSION := 77.0
-FIREFOX_VERSION := 69.0
-
-CURRENT_GIT_BRANCH := $(strip $(shell git branch | grep \* | cut -d ' ' -f2))
+RUST_VER := 1.39
+CHROME_VERSION := 78.0
+FIREFOX_VERSION := 70.0
 
 crate-dir = .
 ifeq ($(crate),medea-jason)
@@ -228,7 +225,7 @@ ifeq ($(dockerized),yes)
 		-v "$(HOME)/.cargo/registry":/usr/local/cargo/registry \
 		-v "$(HOME):$(HOME)" \
 		-e XDG_CACHE_HOME=$(HOME) \
-		alexlapa/rust-beta:$(RUST_BETA_VER) \
+		rust:$(RUST_VER) \
 			make cargo.build crate=$(cargo-build-crate) \
 			                 debug=$(debug) dockerized=no \
 			                 pre-install=yes
@@ -270,7 +267,7 @@ endif
 #	make cargo.lint
 
 cargo.lint:
-	cargo +beta clippy --all -- -D clippy::pedantic -D warnings
+	cargo clippy --all -- -D clippy::pedantic -D warnings
 
 
 
@@ -355,13 +352,13 @@ else
 ifeq ($(crate),medea-jason)
 ifeq ($(browser),default)
 	cd $(crate-dir)/ && \
-	cargo +beta test --target wasm32-unknown-unknown --features mockable
+	cargo test --target wasm32-unknown-unknown --features mockable
 else
 	@make docker.up.webdriver browser=$(browser)
 	sleep 10
 	cd $(crate-dir)/ && \
 	$(webdriver-env)="http://127.0.0.1:4444" \
-	cargo +beta test --target wasm32-unknown-unknown --features mockable
+	cargo test --target wasm32-unknown-unknown --features mockable
 	@make docker.down.webdriver browser=$(browser)
 endif
 else
@@ -493,6 +490,7 @@ docker.build.demo:
 ifeq ($(TAG),edge)
 	$(docker-env) \
 	docker build $(if $(call eq,$(minikube),yes),,--network=host) --force-rm \
+		--build-arg rust_ver=$(RUST_VER) \
 		-t $(docker-build-demo-image-name):$(TAG) \
 		-f jason/Dockerfile .
 else
@@ -801,6 +799,9 @@ helm.package:
 # Usage:
 #	make helm.package.release [chart=medea-demo] [build=(yes|no)]
 
+helm-package-release-ver := $(strip $(shell \
+	grep 'version: ' jason/demo/chart/medea-demo/Chart.yaml | cut -d ':' -f2))
+
 helm.package.release:
 ifneq ($(build),no)
 	@make helm.package chart=$(helm-chart)
@@ -814,9 +815,10 @@ endif
 		helm repo index charts/ \
 			--url=https://instrumentisto.github.io/medea/charts ; \
 		git add -v charts/ ; \
-		git commit -m "Release '$(helm-chart)' Helm chart" ; \
+		git commit -m \
+			"Release $(helm-chart)-$(helm-package-release-ver) Helm chart" ; \
 	fi
-	git checkout $(CURRENT_GIT_BRANCH)
+	git checkout -
 	git push origin gh-pages
 
 
