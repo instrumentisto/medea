@@ -3,6 +3,7 @@
 mod api;
 mod media;
 mod peer;
+mod rpc;
 
 use anyhow::Result;
 use futures::channel::oneshot;

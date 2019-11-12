@@ -1,7 +1,7 @@
 //! Abstraction over RPC transport.
 
 mod heartbeat;
-mod websocket;
+pub mod websocket;
 
 use std::{cell::RefCell, rc::Rc, vec};
 
@@ -30,7 +30,10 @@ pub enum CloseMsg {
 #[cfg_attr(feature = "mockable", mockall::automock)]
 pub trait RpcClient {
     /// Establishes connection with RPC server.
-    fn connect(&self, token: String) -> LocalBoxFuture<'static, Result<()>>;
+    fn connect(
+        &self,
+        token: Box<dyn RpcTransport>,
+    ) -> LocalBoxFuture<'static, Result<()>>;
 
     /// Returns [`Stream`] of all [`Event`]s received by this [`RpcClient`].
     ///
@@ -123,11 +126,14 @@ impl RpcClient for WebsocketRpcClient {
     /// Creates new WebSocket connection to remote media server.
     /// Starts `Heartbeat` if connection succeeds and binds handlers
     /// on receiving messages from server and closing socket.
-    fn connect(&self, token: String) -> LocalBoxFuture<'static, Result<()>> {
+    fn connect(
+        &self,
+        rpc_transport: Box<dyn RpcTransport>,
+    ) -> LocalBoxFuture<'static, Result<()>> {
         let inner = Rc::clone(&self.0);
         Box::pin(async move {
-            let websocket = WebSocket::new(&token).await?;
-            let socket = Rc::new(Box::new(websocket) as Box<dyn RpcTransport>);
+            //            let websocket = WebSocket::new(&token).await?;
+            let socket = Rc::new(rpc_transport);
             inner.borrow_mut().heartbeat.start(Rc::clone(&socket))?;
 
             let inner_rc = Rc::clone(&inner);
