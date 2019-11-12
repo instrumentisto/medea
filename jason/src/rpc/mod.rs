@@ -17,7 +17,6 @@ use medea_client_api_proto::{
     ClientMsg, CloseDescription, CloseReason as CloseByServerReason, Command,
     Event, ServerMsg,
 };
-use wasm_bindgen::prelude::*;
 use web_sys::CloseEvent;
 
 use self::{
@@ -45,12 +44,10 @@ impl Into<CloseReason> for CloseByClientReason {
                     is_err: true,
                 }
             }
-            CloseByClientReason::RoomClosed => {
-                CloseReason::ByClient {
-                    reason: self,
-                    is_err: false,
-                }
-            }
+            CloseByClientReason::RoomClosed => CloseReason::ByClient {
+                reason: self,
+                is_err: false,
+            },
         }
     }
 }
@@ -70,71 +67,6 @@ pub enum CloseReason {
         /// Is closing considered as error.
         is_err: bool,
     },
-}
-
-// TODO: why in rpc mod? move to api::room.
-
-/// Reason of why Jason was closed.
-///
-/// This struct will be provided into `on_close_by_server` JS side callback.
-#[wasm_bindgen]
-pub struct JsCloseReason {
-    /// Is closed by server?
-    ///
-    /// `true` if [`CloseReason::ByServer`].
-    is_closed_by_server: bool,
-
-    /// Reason of closing.
-    reason: String,
-
-    /// Is closing considered as error.
-    ///
-    /// This field may be `true` only on closing by client.
-    is_err: bool,
-}
-
-impl JsCloseReason {
-    /// Creates new [`ClosedByServerReason`] with provided [`CloseReason`]
-    /// converted into [`String`].
-    ///
-    /// `is_err` may be `true` only on closing by client.
-    ///
-    /// `is_closed_by_server` is `true` on [`CloseReason::ByServer`].
-    pub fn new(reason: &CloseReason) -> Self {
-        match reason {
-            CloseReason::ByServer(reason) => Self {
-                reason: reason.to_string(),
-                is_closed_by_server: true,
-                is_err: false,
-            },
-            CloseReason::ByClient { reason, is_err } => Self {
-                reason: reason.to_string(),
-                is_closed_by_server: false,
-                is_err: *is_err,
-            },
-        }
-    }
-}
-
-#[wasm_bindgen]
-impl JsCloseReason {
-    /// `wasm_bindgen` getter for `reason` field.
-    #[wasm_bindgen(getter)]
-    pub fn reason(&self) -> String {
-        self.reason.clone()
-    }
-
-    /// `wasm_bindgen` getter for `is_closed_by_server` field.
-    #[wasm_bindgen(getter)]
-    pub fn is_closed_by_server(&self) -> bool {
-        self.is_closed_by_server
-    }
-
-    /// `wasm_bindgen` getter for `is_err` field.
-    #[wasm_bindgen(getter)]
-    pub fn is_err(&self) -> bool {
-        self.is_err
-    }
 }
 
 /// Connection with remote was closed.
