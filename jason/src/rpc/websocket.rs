@@ -16,6 +16,21 @@ use crate::{
     utils::{EventListener, WasmErr},
 };
 
+#[cfg_attr(feature = "mockable", mockall::automock)]
+pub trait RpcTransport {
+    /// Set handler on receive message from server.
+    fn on_message(
+        &self,
+        f: Box<dyn FnMut(Result<ServerMsg, Error>)>,
+    ) -> Result<(), Error>;
+
+    /// Set handler on close socket.
+    fn on_close(&self, f: Box<dyn (FnOnce(CloseMsg))>) -> Result<(), Error>;
+
+    /// Send message to server.
+    fn send(&self, msg: &ClientMsg) -> Result<(), Error>;
+}
+
 /// Errors that may occur when working with [`WebSocket`].
 #[derive(Debug, Error)]
 pub enum Error {
@@ -114,6 +129,64 @@ impl InnerSocket {
     }
 }
 
+impl RpcTransport for WebSocket {
+    /// Set handler on receive message from server.
+    fn on_message(
+        &self,
+        mut f: Box<dyn FnMut(Result<ServerMsg, Error>)>,
+    ) -> Result<(), Error> {
+        let mut inner_mut = self.0.borrow_mut();
+        inner_mut.on_message = Some(
+            EventListener::new_mut(
+                Rc::clone(&inner_mut.socket),
+                "message",
+                move |msg| {
+                    let parsed = ServerMessage::try_from(&msg)
+                        .map(std::convert::Into::into);
+                    f(parsed);
+                },
+            )
+            .map_err(Into::into)
+            .map_err(Error::SetHandlerOnMessage)?,
+        );
+        Ok(())
+    }
+
+    /// Set handler on close socket.
+    fn on_close(&self, f: Box<dyn (FnOnce(CloseMsg))>) -> Result<(), Error> {
+        let mut inner_mut = self.0.borrow_mut();
+        let inner = Rc::clone(&self.0);
+        inner_mut.on_close = Some(
+            EventListener::new_once(
+                Rc::clone(&inner_mut.socket),
+                "close",
+                move |msg: CloseEvent| {
+                    inner.borrow_mut().update_state();
+                    f(CloseMsg::from(&msg));
+                },
+            )
+            .map_err(Error::SetHandlerOnClose)?,
+        );
+        Ok(())
+    }
+
+    /// Send message to server.
+    fn send(&self, msg: &ClientMsg) -> Result<(), Error> {
+        let inner = self.0.borrow();
+        let message =
+            serde_json::to_string(msg).map_err(Error::ParseClientMessage)?;
+
+        match inner.socket_state {
+            State::OPEN => inner
+                .socket
+                .send_with_str(&message)
+                .map_err(Into::into)
+                .map_err(Error::SendMessage),
+            _ => Err(Error::ClosedSocket),
+        }
+    }
+}
+
 impl WebSocket {
     /// Initiates new WebSocket connection. Resolves only when underlying
     /// connection becomes active.
@@ -164,65 +237,6 @@ impl WebSocket {
                 Err(_) => Err(Error::InitSocket),
             },
             future::Either::Right(_closed) => Err(Error::InitSocket),
-        }
-    }
-
-    /// Set handler on receive message from server.
-    pub fn on_message<F>(&self, mut f: F) -> Result<(), Error>
-    where
-        F: (FnMut(Result<ServerMsg, Error>)) + 'static,
-    {
-        let mut inner_mut = self.0.borrow_mut();
-        inner_mut.on_message = Some(
-            EventListener::new_mut(
-                Rc::clone(&inner_mut.socket),
-                "message",
-                move |msg| {
-                    let parsed = ServerMessage::try_from(&msg)
-                        .map(std::convert::Into::into);
-                    f(parsed);
-                },
-            )
-            .map_err(Into::into)
-            .map_err(Error::SetHandlerOnMessage)?,
-        );
-        Ok(())
-    }
-
-    /// Set handler on close socket.
-    pub fn on_close<F>(&self, f: F) -> Result<(), Error>
-    where
-        F: (FnOnce(CloseMsg)) + 'static,
-    {
-        let mut inner_mut = self.0.borrow_mut();
-        let inner = Rc::clone(&self.0);
-        inner_mut.on_close = Some(
-            EventListener::new_once(
-                Rc::clone(&inner_mut.socket),
-                "close",
-                move |msg: CloseEvent| {
-                    inner.borrow_mut().update_state();
-                    f(CloseMsg::from(&msg));
-                },
-            )
-            .map_err(Error::SetHandlerOnClose)?,
-        );
-        Ok(())
-    }
-
-    /// Send message to server.
-    pub fn send(&self, msg: &ClientMsg) -> Result<(), Error> {
-        let inner = self.0.borrow();
-        let message =
-            serde_json::to_string(msg).map_err(Error::ParseClientMessage)?;
-
-        match inner.socket_state {
-            State::OPEN => inner
-                .socket
-                .send_with_str(&message)
-                .map_err(Into::into)
-                .map_err(Error::SendMessage),
-            _ => Err(Error::ClosedSocket),
         }
     }
 }

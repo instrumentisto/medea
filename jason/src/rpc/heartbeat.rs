@@ -5,7 +5,7 @@ use thiserror::Error;
 use wasm_bindgen::{prelude::*, JsCast};
 
 use crate::{
-    rpc::websocket::{Error as SocketError, WebSocket},
+    rpc::websocket::{Error as SocketError, RpcTransport, WebSocket},
     utils::{window, IntervalHandle, WasmErr},
 };
 
@@ -32,7 +32,7 @@ struct InnerHeartbeat {
     /// Timestamp of last pong received.
     pong_at: Option<f64>,
     /// WebSocket connection with remote server.
-    socket: Option<Rc<WebSocket>>,
+    socket: Option<Rc<Box<dyn RpcTransport>>>,
     /// Handler of sending `ping` task. Task is dropped if you drop handler.
     ping_task: Option<PingTaskHandler>,
 }
@@ -74,7 +74,10 @@ impl Heartbeat {
     ///
     /// Sends first `ping` immediately, so provided [`WebSocket`] must be
     /// active.
-    pub fn start(&self, socket: Rc<WebSocket>) -> Result<(), Error> {
+    pub fn start(
+        &self,
+        socket: Rc<Box<dyn RpcTransport>>,
+    ) -> Result<(), Error> {
         let mut inner = self.0.borrow_mut();
         inner.num = 0;
         inner.pong_at = None;

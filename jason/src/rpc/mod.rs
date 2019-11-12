@@ -14,6 +14,7 @@ use self::{
     heartbeat::Heartbeat,
     websocket::{Error, WebSocket},
 };
+use crate::rpc::websocket::RpcTransport;
 
 /// Connection with remote was closed.
 pub enum CloseMsg {
@@ -54,7 +55,7 @@ pub struct WebsocketRpcClient(Rc<RefCell<Inner>>);
 /// Inner state of [`WebsocketRpcClient`].
 struct Inner {
     /// [`WebSocket`] connection to remote media server.
-    sock: Option<Rc<WebSocket>>,
+    sock: Option<Rc<Box<dyn RpcTransport>>>,
 
     heartbeat: Heartbeat,
 
@@ -125,16 +126,19 @@ impl RpcClient for WebsocketRpcClient {
     fn connect(&self, token: String) -> LocalBoxFuture<'static, Result<()>> {
         let inner = Rc::clone(&self.0);
         Box::pin(async move {
-            let socket = Rc::new(WebSocket::new(&token).await?);
+            let websocket = WebSocket::new(&token).await?;
+            let socket = Rc::new(Box::new(websocket) as Box<dyn RpcTransport>);
             inner.borrow_mut().heartbeat.start(Rc::clone(&socket))?;
 
             let inner_rc = Rc::clone(&inner);
-            socket.on_message(move |msg: Result<ServerMsg, Error>| {
-                on_message(&inner_rc, msg)
-            })?;
+            socket.on_message(Box::new(
+                move |msg: Result<ServerMsg, Error>| on_message(&inner_rc, msg),
+            ))?;
 
             let inner_rc = Rc::clone(&inner);
-            socket.on_close(move |msg: CloseMsg| on_close(&inner_rc, msg))?;
+            socket.on_close(Box::new(move |msg: CloseMsg| {
+                on_close(&inner_rc, msg)
+            }))?;
 
             inner.borrow_mut().sock.replace(socket);
             Ok(())
