@@ -30,7 +30,10 @@ use self::{
 pub enum CloseByClientReason {
     /// [`Room`] was dropped without `close_reason`.
     RoomUnexpectedlyDropped,
+
+    /// Room was normally closed by JS side.
     // TODO: RoomClosed after calling room.dispose or jason.dispose.
+    RoomClosed,
 }
 
 impl Into<CloseReason> for CloseByClientReason {
@@ -40,6 +43,12 @@ impl Into<CloseReason> for CloseByClientReason {
                 CloseReason::ByClient {
                     reason: self,
                     is_err: true,
+                }
+            }
+            CloseByClientReason::RoomClosed => {
+                CloseReason::ByClient {
+                    reason: self,
+                    is_err: false,
                 }
             }
         }
