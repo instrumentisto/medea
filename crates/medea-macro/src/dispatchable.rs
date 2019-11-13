@@ -108,7 +108,7 @@ pub fn derive(input: TokenStream) -> Result<TokenStream> {
             );
             quote! {
                 #[doc = #doc]
-                fn #fn_name_ident(&mut self, #args);
+                fn #fn_name_ident(&mut self, #args) -> Self::Output;
             }
         })
         .collect();
@@ -124,6 +124,9 @@ pub fn derive(input: TokenStream) -> Result<TokenStream> {
         #[automatically_derived]
         #[doc = #trait_doc]
         pub trait #handler_trait_ident {
+            /// Output type of all functions from this trait.
+            type Output;
+
             #(#handler_trait_methods)*
         }
 
@@ -132,7 +135,7 @@ pub fn derive(input: TokenStream) -> Result<TokenStream> {
             #[doc = #method_doc]
             pub fn dispatch_with<T: #handler_trait_ident>(
                 self, handler: &mut T,
-            ) {
+            ) -> <T as #handler_trait_ident>::Output {
                 match self {
                     #(#dispatch_variants)*
                 }
