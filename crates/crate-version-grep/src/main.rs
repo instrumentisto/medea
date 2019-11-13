@@ -19,7 +19,10 @@ use cargo_lock::lockfile::Lockfile;
 
 fn main() {
     let crate_name = env::args().nth(1).expect("Crate name not provided!");
-    Lockfile::load("Cargo.lock").unwrap().packages.into_iter()
+    Lockfile::load("Cargo.lock")
+        .unwrap()
+        .packages
+        .into_iter()
         .skip_while(|package| package.name.as_str() != crate_name)
         .next()
         .map(|package| println!("{}", package.version))
