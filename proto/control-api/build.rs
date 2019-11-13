@@ -9,7 +9,7 @@ use std::{error::Error, fs::File, io::ErrorKind};
 /// ```
 /// in the root of the project.
 #[cfg(feature = "grpc")]
-fn main() -> Result<(), Box<dyn Error>> {
+fn compile_grpc_specs() -> Result<(), Box<dyn Error>> {
     const GRPC_DIR: &str = "src/grpc";
 
     let proto_names: Vec<String> = std::fs::read_dir(GRPC_DIR)
@@ -62,5 +62,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-#[cfg(not(feature = "grpc"))]
-fn main() {}
+fn main() -> Result<(), Box<dyn Error>> {
+    #[cfg(feature = "grpc")]
+    compile_grpc_specs()?;
+
+    Ok(())
+}
