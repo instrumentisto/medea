@@ -11,14 +11,8 @@ All user visible changes to this project will be documented in this file. This p
 
 ### BC Breaks
 
-- Handler traits of `#[dispatchable]` macro now have `type Output` ([#66]).
-
-### Changed
-
-- `#[dispatchable]` macro generates `type Output` in handler traits with
-   which we can specify output type for all functions of handler trait ([#66]).
-
-[#66]: /../../pull/66
+- `#[dispatchable]` macro:
+    - Handler traits now require specifying `Output` associative type, which is the return type of all handler trait methods ([#66](/../../pull/66)).
 
 
 

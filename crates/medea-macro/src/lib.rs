@@ -121,7 +121,7 @@ pub fn enum_delegate(args: TokenStream, input: TokenStream) -> TokenStream {
 /// to the end of its name. Each method of trait is created by `snake_case`'ing
 /// `enum` variants and adding `on_` prefix.
 ///
-/// `type Output` is type which will be returned from all functions of
+/// `type Output` is a type which will be returned from all functions of
 /// `EventHandler` trait.
 ///
 /// ```
