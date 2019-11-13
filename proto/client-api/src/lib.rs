@@ -48,7 +48,6 @@ impl_incrementable!(PeerId);
 impl_incrementable!(TrackId);
 
 // TODO: should be properly shared between medea and jason
-#[allow(dead_code)]
 #[cfg_attr(test, derive(Debug, PartialEq))]
 #[derive(Clone)]
 /// Message sent by `Media Server` to `Client`.
@@ -61,7 +60,6 @@ pub enum ServerMsg {
     Event(Event),
 }
 
-#[allow(dead_code)]
 #[cfg_attr(test, derive(Debug, PartialEq))]
 #[derive(Clone)]
 /// Message from 'Client' to 'Media Server'.
@@ -74,7 +72,7 @@ pub enum ClientMsg {
 }
 
 /// WebSocket message from Web Client to Media Server.
-#[allow(dead_code)]
+#[dispatchable]
 #[cfg_attr(feature = "medea", derive(Deserialize))]
 #[cfg_attr(feature = "jason", derive(Serialize))]
 #[cfg_attr(test, derive(Debug, PartialEq))]
@@ -140,7 +138,6 @@ pub struct CloseDescription {
 }
 
 /// WebSocket message from Medea to Jason.
-#[allow(dead_code)]
 #[dispatchable]
 #[cfg_attr(feature = "medea", derive(Serialize, Debug, Clone, PartialEq))]
 #[cfg_attr(feature = "jason", derive(Deserialize))]
