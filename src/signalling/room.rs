@@ -12,7 +12,9 @@ use actix::{
 use derive_more::Display;
 use failure::Fail;
 use futures::future;
-use medea_client_api_proto::{Command, Event, IceCandidate, PeerId, TrackId};
+use medea_client_api_proto::{
+    Command, CommandHandler, Event, IceCandidate, PeerId, TrackId,
+};
 use medea_control_api_proto::grpc::api::{
     Element as ElementProto, Room as RoomProto,
 };
@@ -254,122 +256,6 @@ impl Room {
             Event::PeersRemoved {
                 peer_ids: removed_peers_ids,
             },
-        )))
-    }
-
-    /// Sends [`Event::PeerCreated`] to provided [`Peer`] partner. Provided
-    /// [`Peer`] state must be [`WaitLocalSdp`] and will be changed to
-    /// [`WaitRemoteSdp`], partners [`Peer`] state must be [`New`] and will be
-    /// changed to [`WaitLocalHaveRemote`].
-    fn handle_make_sdp_offer(
-        &mut self,
-        from_peer_id: PeerId,
-        sdp_offer: String,
-        mids: HashMap<TrackId, String>,
-    ) -> Result<ActFuture<(), RoomError>, RoomError> {
-        let mut from_peer: Peer<WaitLocalSdp> =
-            self.peers.take_inner_peer(from_peer_id)?;
-        from_peer.set_mids(mids)?;
-
-        let to_peer_id = from_peer.partner_peer_id();
-        let to_peer: Peer<New> = self.peers.take_inner_peer(to_peer_id)?;
-
-        let from_peer = from_peer.set_local_sdp(sdp_offer.clone());
-        let to_peer = to_peer.set_remote_sdp(sdp_offer.clone());
-
-        let to_member_id = to_peer.member_id();
-        let ice_servers = self
-            .members
-            .get_member(&to_member_id)?
-            .servers_list()
-            .ok_or_else(|| {
-                RoomError::NoTurnCredentials(to_member_id.clone())
-            })?;
-
-        let event = Event::PeerCreated {
-            peer_id: to_peer.id(),
-            sdp_offer: Some(sdp_offer),
-            tracks: to_peer.tracks(),
-            ice_servers,
-        };
-
-        self.peers.add_peer(from_peer);
-        self.peers.add_peer(to_peer);
-
-        Ok(Box::new(wrap_future(
-            self.members.send_event_to_member(to_member_id, event),
-        )))
-    }
-
-    /// Sends [`Event::SdpAnswerMade`] to provided [`Peer`] partner. Provided
-    /// [`Peer`] state must be [`WaitLocalHaveRemote`] and will be changed to
-    /// [`Stable`], partners [`Peer`] state must be [`WaitRemoteSdp`] and will
-    /// be changed to [`Stable`].
-    fn handle_make_sdp_answer(
-        &mut self,
-        from_peer_id: PeerId,
-        sdp_answer: String,
-    ) -> Result<ActFuture<(), RoomError>, RoomError> {
-        let from_peer: Peer<WaitLocalHaveRemote> =
-            self.peers.take_inner_peer(from_peer_id)?;
-
-        let to_peer_id = from_peer.partner_peer_id();
-        let to_peer: Peer<WaitRemoteSdp> =
-            self.peers.take_inner_peer(to_peer_id)?;
-
-        let from_peer = from_peer.set_local_sdp(sdp_answer.clone());
-        let to_peer = to_peer.set_remote_sdp(&sdp_answer);
-
-        let to_member_id = to_peer.member_id();
-        let event = Event::SdpAnswerMade {
-            peer_id: to_peer_id,
-            sdp_answer,
-        };
-
-        self.peers.add_peer(from_peer);
-        self.peers.add_peer(to_peer);
-
-        Ok(Box::new(wrap_future(
-            self.members.send_event_to_member(to_member_id, event),
-        )))
-    }
-
-    /// Sends [`Event::IceCandidateDiscovered`] to provided [`Peer`] partner.
-    /// Both [`Peer`]s may have any state except [`New`].
-    fn handle_set_ice_candidate(
-        &mut self,
-        from_peer_id: PeerId,
-        candidate: IceCandidate,
-    ) -> Result<ActFuture<(), RoomError>, RoomError> {
-        let from_peer = self.peers.get_peer_by_id(from_peer_id)?;
-        if let PeerStateMachine::New(_) = from_peer {
-            return Err(PeerError::WrongState(
-                from_peer_id,
-                "Not New",
-                format!("{}", from_peer),
-            )
-            .into());
-        }
-
-        let to_peer_id = from_peer.partner_peer_id();
-        let to_peer = self.peers.get_peer_by_id(to_peer_id)?;
-        if let PeerStateMachine::New(_) = to_peer {
-            return Err(PeerError::WrongState(
-                to_peer_id,
-                "Not New",
-                format!("{}", to_peer),
-            )
-            .into());
-        }
-
-        let to_member_id = to_peer.member_id();
-        let event = Event::IceCandidateDiscovered {
-            peer_id: to_peer_id,
-            candidate,
-        };
-
-        Ok(Box::new(wrap_future(
-            self.members.send_event_to_member(to_member_id, event),
         )))
     }
 
@@ -865,6 +751,133 @@ impl Room {
     }
 }
 
+impl CommandHandler for Room {
+    type Output = Result<ActFuture<(), RoomError>, RoomError>;
+
+    /// Sends [`Event::PeerCreated`] to provided [`Peer`] partner. Provided
+    /// [`Peer`] state must be [`WaitLocalSdp`] and will be changed to
+    /// [`WaitRemoteSdp`], partners [`Peer`] state must be [`New`] and will be
+    /// changed to [`WaitLocalHaveRemote`].
+    fn on_make_sdp_offer(
+        &mut self,
+        from_peer_id: PeerId,
+        sdp_offer: String,
+        mids: HashMap<TrackId, String>,
+    ) -> Self::Output {
+        let mut from_peer: Peer<WaitLocalSdp> =
+            self.peers.take_inner_peer(from_peer_id)?;
+        from_peer.set_mids(mids)?;
+
+        let to_peer_id = from_peer.partner_peer_id();
+        let to_peer: Peer<New> = self.peers.take_inner_peer(to_peer_id)?;
+
+        let from_peer = from_peer.set_local_sdp(sdp_offer.clone());
+        let to_peer = to_peer.set_remote_sdp(sdp_offer.clone());
+
+        let to_member_id = to_peer.member_id();
+        let ice_servers = self
+            .members
+            .get_member(&to_member_id)?
+            .servers_list()
+            .ok_or_else(|| {
+                RoomError::NoTurnCredentials(to_member_id.clone())
+            })?;
+
+        let event = Event::PeerCreated {
+            peer_id: to_peer.id(),
+            sdp_offer: Some(sdp_offer),
+            tracks: to_peer.tracks(),
+            ice_servers,
+        };
+
+        self.peers.add_peer(from_peer);
+        self.peers.add_peer(to_peer);
+
+        Ok(Box::new(wrap_future(
+            self.members.send_event_to_member(to_member_id, event),
+        )))
+    }
+
+    /// Sends [`Event::SdpAnswerMade`] to provided [`Peer`] partner. Provided
+    /// [`Peer`] state must be [`WaitLocalHaveRemote`] and will be changed to
+    /// [`Stable`], partners [`Peer`] state must be [`WaitRemoteSdp`] and will
+    /// be changed to [`Stable`].
+    fn on_make_sdp_answer(
+        &mut self,
+        from_peer_id: PeerId,
+        sdp_answer: String,
+    ) -> Self::Output {
+        let from_peer: Peer<WaitLocalHaveRemote> =
+            self.peers.take_inner_peer(from_peer_id)?;
+
+        let to_peer_id = from_peer.partner_peer_id();
+        let to_peer: Peer<WaitRemoteSdp> =
+            self.peers.take_inner_peer(to_peer_id)?;
+
+        let from_peer = from_peer.set_local_sdp(sdp_answer.clone());
+        let to_peer = to_peer.set_remote_sdp(&sdp_answer);
+
+        let to_member_id = to_peer.member_id();
+        let event = Event::SdpAnswerMade {
+            peer_id: to_peer_id,
+            sdp_answer,
+        };
+
+        self.peers.add_peer(from_peer);
+        self.peers.add_peer(to_peer);
+
+        Ok(Box::new(wrap_future(
+            self.members.send_event_to_member(to_member_id, event),
+        )))
+    }
+
+    /// Sends [`Event::IceCandidateDiscovered`] to provided [`Peer`] partner.
+    /// Both [`Peer`]s may have any state except [`New`].
+    fn on_set_ice_candidate(
+        &mut self,
+        from_peer_id: PeerId,
+        candidate: IceCandidate,
+    ) -> Self::Output {
+        // TODO: add E2E test
+        if candidate.candidate.is_empty() {
+            warn!("Empty candidate from Peer: {}, ignoring", from_peer_id);
+            let fut: ActFuture<_, _> = Box::new(actix::fut::ok(()));
+            return Ok(fut);
+        }
+
+        let from_peer = self.peers.get_peer_by_id(from_peer_id)?;
+        if let PeerStateMachine::New(_) = from_peer {
+            return Err(PeerError::WrongState(
+                from_peer_id,
+                "Not New",
+                format!("{}", from_peer),
+            )
+            .into());
+        }
+
+        let to_peer_id = from_peer.partner_peer_id();
+        let to_peer = self.peers.get_peer_by_id(to_peer_id)?;
+        if let PeerStateMachine::New(_) = to_peer {
+            return Err(PeerError::WrongState(
+                to_peer_id,
+                "Not New",
+                format!("{}", to_peer),
+            )
+            .into());
+        }
+
+        let to_member_id = to_peer.member_id();
+        let event = Event::IceCandidateDiscovered {
+            peer_id: to_peer_id,
+            candidate,
+        };
+
+        Ok(Box::new(wrap_future(
+            self.members.send_event_to_member(to_member_id, event),
+        )))
+    }
+}
+
 /// [`Actor`] implementation that provides an ergonomic way
 /// to interact with [`Room`].
 impl Actor for Room {
@@ -973,29 +986,7 @@ impl Handler<CommandMessage> for Room {
         msg: CommandMessage,
         ctx: &mut Self::Context,
     ) -> Self::Result {
-        let result = match msg.into() {
-            Command::MakeSdpOffer {
-                peer_id,
-                sdp_offer,
-                mids,
-            } => self.handle_make_sdp_offer(peer_id, sdp_offer, mids),
-            Command::MakeSdpAnswer {
-                peer_id,
-                sdp_answer,
-            } => self.handle_make_sdp_answer(peer_id, sdp_answer),
-            Command::SetIceCandidate { peer_id, candidate } => {
-                // TODO: add E2E test
-                if candidate.candidate.is_empty() {
-                    warn!("Empty candidate from Peer: {}, ignoring", peer_id);
-                    let fut: ActFuture<_, _> = Box::new(actix::fut::ok(()));
-                    Ok(fut)
-                } else {
-                    self.handle_set_ice_candidate(peer_id, candidate)
-                }
-            }
-        };
-
-        match result {
+        match Command::from(msg).dispatch_with(self) {
             Ok(res) => {
                 Box::new(res.then(|res, room, ctx| -> ActFuture<(), ()> {
                     if res.is_ok() {
