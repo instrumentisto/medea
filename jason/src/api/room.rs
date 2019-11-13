@@ -28,7 +28,6 @@ use crate::{
 };
 
 use super::{connection::Connection, ConnectionHandle};
-use crate::rpc::{websocket::RpcTransport, WebsocketRpcClient};
 
 /// JS side handle to `Room` where all the media happens.
 ///

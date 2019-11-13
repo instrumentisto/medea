@@ -5,7 +5,7 @@ use thiserror::Error;
 use wasm_bindgen::{prelude::*, JsCast};
 
 use crate::{
-    rpc::websocket::{Error as SocketError, RpcTransport, WebSocket},
+    rpc::websocket::{Error as SocketError, RpcTransport},
     utils::{window, IntervalHandle, WasmErr},
 };
 

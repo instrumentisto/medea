@@ -12,12 +12,8 @@ use futures::{
 use js_sys::Date;
 use medea_client_api_proto::{ClientMsg, Command, Event, ServerMsg};
 
-use self::{
-    heartbeat::Heartbeat,
-    websocket::{Error, WebSocket},
-};
+use self::{heartbeat::Heartbeat, websocket::Error};
 use crate::rpc::websocket::RpcTransport;
-use wasm_bindgen::__rt::std::thread::spawn;
 use wasm_bindgen_futures::spawn_local;
 
 /// Connection with remote was closed.

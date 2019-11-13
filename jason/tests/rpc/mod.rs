@@ -18,8 +18,15 @@ use crate::resolve_after;
 wasm_bindgen_test_configure!(run_in_browser);
 
 struct Inner {
+    /// [`mpsc::UnboundedSender`]s for `on_message` callback of
+    /// [`RpcTransportMock`].
     on_message: Vec<mpsc::UnboundedSender<Result<ServerMsg, Error>>>,
+
+    /// [`oneshot::Sender`] for `on_close` callback of [`RpcTransportMock`].
     on_close: Option<oneshot::Sender<CloseMsg>>,
+
+    /// [`oneshot::Sender`] with which all [`ClientMsg`]s from
+    /// [`RpcTransport::send`] will be sent.
     on_send: Option<mpsc::UnboundedSender<ClientMsg>>,
 }
 
@@ -52,6 +59,7 @@ impl RpcTransport for RpcTransportMock {
 }
 
 impl RpcTransportMock {
+    /// Returns [`RpcTransportMock`] without callbacks.
     pub fn new() -> Self {
         Self(Rc::new(RefCell::new(Inner {
             on_message: Vec::new(),
@@ -60,6 +68,7 @@ impl RpcTransportMock {
         })))
     }
 
+    /// Emulates receiving of [`ServerMsg`] by [`RpcTransport`] from server.
     pub fn send_on_message(&self, msg: ServerMsg) {
         self.0
             .borrow()
@@ -68,6 +77,8 @@ impl RpcTransportMock {
             .for_each(|q| q.unbounded_send(Ok(msg.clone())));
     }
 
+    /// Returns [`mpsc::UnboundedReceiver`] which will receive all
+    /// [`ClientMessage`]s which will be sent with [`RpcTransport::send`].
     fn on_send(&self) -> mpsc::UnboundedReceiver<ClientMsg> {
         let (tx, rx) = mpsc::unbounded();
         self.0.borrow_mut().on_send = Some(tx);
@@ -122,6 +133,6 @@ async fn heartbeat() {
     .await;
     match res {
         Either::Left(_) => (),
-        Either::Right(_) => panic!("Ping not sent after ping interval."),
+        Either::Right(_) => panic!("Ping doesn't sended after ping interval."),
     }
 }

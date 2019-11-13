@@ -4,13 +4,12 @@
 
 use std::{cell::RefCell, convert::TryFrom, rc::Rc};
 
+use derive_more::{From, Into};
 use futures::{
     channel::{mpsc, oneshot},
-    future, SinkExt,
+    future,
 };
-use macro_attr::*;
 use medea_client_api_proto::{ClientMsg, ServerMsg};
-use newtype_derive::NewtypeFrom;
 use thiserror::*;
 use web_sys::{CloseEvent, Event, MessageEvent, WebSocket as SysWebSocket};
 
@@ -19,6 +18,7 @@ use crate::{
     utils::{EventListener, WasmErr},
 };
 
+/// RPC transport between client and server.
 #[cfg_attr(feature = "mockable", mockall::automock)]
 pub trait RpcTransport {
     /// Set handler on receive message from server.
@@ -36,26 +36,47 @@ pub trait RpcTransport {
 /// Errors that may occur when working with [`WebSocket`].
 #[derive(Debug, Error)]
 pub enum Error {
+    /// Failed to create WebSocket.
     #[error("failed to create WebSocket: {0}")]
     CreateSocket(WasmErr),
+
+    /// Failed to init WebSocket.
     #[error("failed to init WebSocket")]
     InitSocket,
+
+    /// Failed to parse client message.
     #[error("failed to parse client message: {0}")]
     ParseClientMessage(serde_json::error::Error),
+
+    /// Failed to parse server message.
     #[error("failed to parse server message: {0}")]
     ParseServerMessage(serde_json::error::Error),
+
+    /// Message is not string.
     #[error("message is not a string")]
     MessageNotString,
+
+    /// Failed to send message.
     #[error("failed to send message: {0}")]
     SendMessage(WasmErr),
+
+    /// Failed to set handler for CloseEvent.
     #[error("failed to set handler for CloseEvent: {0}")]
     SetHandlerOnClose(WasmErr),
+
+    /// Failed to set handler for OpenEvent.
     #[error("failed to set handler for OpenEvent: {0}")]
     SetHandlerOnOpen(WasmErr),
+
+    /// Failed to set handler for MessageEvent.
     #[error("failed to set handler for MessageEvent: {0}")]
     SetHandlerOnMessage(WasmErr),
+
+    /// Couldn't cast provided [`u16`] to `State` variant.
     #[error("could not cast {0} to State variant")]
     CastState(u16),
+
+    /// Underlying socket is closed.
     #[error("underlying socket is closed")]
     ClosedSocket,
 }
@@ -102,6 +123,7 @@ struct InnerSocket {
     on_error: Option<EventListener<SysWebSocket, Event>>,
 }
 
+/// WebSocket [`RpcTransport`] between client and server.
 pub struct WebSocket(Rc<RefCell<InnerSocket>>);
 
 impl InnerSocket {
@@ -136,16 +158,16 @@ impl RpcTransport for WebSocket {
     fn on_message(
         &self,
     ) -> Result<mpsc::UnboundedReceiver<Result<ServerMsg, Error>>, Error> {
-        let (mut tx, rx) = mpsc::unbounded();
+        let (tx, rx) = mpsc::unbounded();
         let mut inner_mut = self.0.borrow_mut();
         inner_mut.on_message = Some(
             EventListener::new_mut(
                 Rc::clone(&inner_mut.socket),
                 "message",
                 move |msg| {
-                    let parsed = ServerMessage::try_from(&msg)
-                        .map(std::convert::Into::into);
-                    tx.unbounded_send(parsed);
+                    let parsed = ServerMessage::try_from(&msg).map(Into::into);
+                    // TODO: maybe log it?
+                    tx.unbounded_send(parsed).ok();
                 },
             )
             .map_err(Into::into)
@@ -165,7 +187,8 @@ impl RpcTransport for WebSocket {
                 "close",
                 move |msg: CloseEvent| {
                     inner.borrow_mut().update_state();
-                    tx.send(CloseMsg::from(&msg));
+                    // TODO: maybe log it?
+                    tx.send(CloseMsg::from(&msg)).ok();
                 },
             )
             .map_err(Error::SetHandlerOnClose)?,
@@ -183,7 +206,7 @@ impl RpcTransport for WebSocket {
             State::OPEN => inner
                 .socket
                 .send_with_str(&message)
-                .map_err(Into::into)
+                .map_err(std::convert::Into::into)
                 .map_err(Error::SendMessage),
             _ => Err(Error::ClosedSocket),
         }
@@ -274,10 +297,9 @@ impl From<&CloseEvent> for CloseMsg {
     }
 }
 
-macro_attr! {
-    #[derive(NewtypeFrom!)]
-    pub struct ServerMessage(ServerMsg);
-}
+/// Message received from server.
+#[derive(From, Into)]
+pub struct ServerMessage(ServerMsg);
 
 impl TryFrom<&MessageEvent> for ServerMessage {
     type Error = Error;
