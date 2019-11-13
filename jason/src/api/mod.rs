@@ -12,7 +12,7 @@ use wasm_bindgen_futures::spawn_local;
 use crate::{
     media::{MediaManager, MediaManagerHandle},
     peer,
-    rpc::{CloseByClientReason, RpcClient as _, WebsocketRpcClient},
+    rpc::{CloseByClientReason, RpcClient as _, WebSocketRpcClient},
     set_panic_hook,
 };
 
@@ -44,7 +44,7 @@ impl Jason {
 
     /// Returns [`RoomHandle`] for [`Room`].
     pub fn init_room(&self) -> RoomHandle {
-        let rpc = Rc::new(WebsocketRpcClient::new(3000));
+        let rpc = Rc::new(WebSocketRpcClient::new(3000));
         let peer_repository = Box::new(peer::Repository::new(Rc::clone(
             &self.0.borrow().media_manager,
         )));
@@ -60,16 +60,12 @@ impl Jason {
                     .drain(..)
                     .for_each(|room| room.close(reason.clone()));
             } else {
-                // Note that in this case clean up will still happen.
                 inner_clone.borrow_mut().rooms.drain(..).for_each(|room| {
                     room.close(
-                        CloseByClientReason::RoomUnexpectedlyDropped.into(),
+                        CloseByClientReason::RpcConnectionUnexpectedlyDropped
+                            .into(),
                     );
                 });
-                console_error!(
-                    "'on_close' callback's 'Sender' was unexpectedly \
-                     cancelled."
-                );
             }
             inner_clone.borrow_mut().media_manager = Rc::default();
         }));

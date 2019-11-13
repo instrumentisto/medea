@@ -59,7 +59,7 @@ struct PingTaskHandler {
 
 impl Heartbeat {
     /// Returns new instance of [`interval`] with given interval for ping in
-    /// seconds.
+    /// milliseconds.
     pub fn new(interval: i32) -> Self {
         Self(Rc::new(RefCell::new(InnerHeartbeat {
             interval,

@@ -31,23 +31,28 @@ pub enum CloseByClientReason {
     RoomUnexpectedlyDropped,
 
     /// Room was normally closed by JS side.
-    // TODO: RoomClosed after calling room.dispose or jason.dispose.
     RoomClosed,
+
+    /// [`WebSocketRpcClient`] was unexpectedly dropped.
+    RpcConnectionUnexpectedlyDropped,
+}
+
+impl CloseByClientReason {
+    /// Returns `true` if [`CloseByClientReason`] is considered as error.
+    pub fn is_err(&self) -> bool {
+        match &self {
+            Self::RoomUnexpectedlyDropped
+            | Self::RpcConnectionUnexpectedlyDropped => true,
+            Self::RoomClosed => false,
+        }
+    }
 }
 
 impl Into<CloseReason> for CloseByClientReason {
     fn into(self) -> CloseReason {
-        match &self {
-            CloseByClientReason::RoomUnexpectedlyDropped => {
-                CloseReason::ByClient {
-                    reason: self,
-                    is_err: true,
-                }
-            }
-            CloseByClientReason::RoomClosed => CloseReason::ByClient {
-                reason: self,
-                is_err: false,
-            },
+        CloseReason::ByClient {
+            is_err: self.is_err(),
+            reason: self,
         }
     }
 }
@@ -137,13 +142,11 @@ pub trait RpcClient {
 // 3. Disconnect if no pongs.
 // 4. Buffering if no socket?
 /// Client API RPC client to talk with server via [`WebSocket`].
-pub struct WebsocketRpcClient(Rc<RefCell<Inner>>);
+pub struct WebSocketRpcClient(Rc<RefCell<Inner>>);
 
 /// Inner state of [`WebsocketRpcClient`].
 struct Inner {
     /// [`WebSocket`] connection to remote media server.
-    // TODO: Rc<dyn RpcTransport>, impl RpcTransport for WebSocket,
-    // RpcConnection tests
     sock: Option<Rc<WebSocket>>,
 
     heartbeat: Heartbeat,
@@ -231,14 +234,15 @@ fn on_message(inner_rc: &RefCell<Inner>, msg: Result<ServerMsg, Error>) {
     }
 }
 
-impl WebsocketRpcClient {
-    /// Creates new [`WebsocketRpcClient`] with a given `ping_interval`.
+impl WebSocketRpcClient {
+    /// Creates new [`WebsocketRpcClient`] with a given `ping_interval` in
+    /// milliseconds.
     pub fn new(ping_interval: i32) -> Self {
         Self(Inner::new(ping_interval))
     }
 }
 
-impl RpcClient for WebsocketRpcClient {
+impl RpcClient for WebSocketRpcClient {
     /// Creates new WebSocket connection to remote media server.
     /// Starts `Heartbeat` if connection succeeds and binds handlers
     /// on receiving messages from server and closing socket.
@@ -300,7 +304,7 @@ impl RpcClient for WebsocketRpcClient {
     }
 }
 
-impl Drop for WebsocketRpcClient {
+impl Drop for WebSocketRpcClient {
     /// Drops related connection and its [`Heartbeat`].
     fn drop(&mut self) {
         self.0.borrow_mut().sock.take();

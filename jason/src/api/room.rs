@@ -114,7 +114,7 @@ impl RoomHandle {
             .set_func(f))
     }
 
-    /// Sets callback, which will be invoked on Jason close by server.
+    /// Sets callback, which will be invoked on Jason close.
     pub fn on_close(&mut self, f: js_sys::Function) -> Result<(), JsValue> {
         map_weak!(self, |inner| inner.borrow_mut().on_close.set_func(f))
     }
@@ -267,6 +267,12 @@ impl Room {
     /// Supposed that this function will trigger [`Drop`] implementation of
     /// [`InnerRoom`] and call JS side `on_close` callback with provided
     /// [`CloseReason`].
+    ///
+    /// Note that this function __doesn't guarantee__ that [`InnerRoom`] will be
+    /// dropped because theoretically other pointers to the [`InnerRoom`]
+    /// can exist. If you need guarantee of [`InnerRoom`] dropping then you
+    /// may check count of pointers to [`InnerRoom`] with
+    /// [`Rc::strong_count`].
     pub fn close(self, reason: CloseReason) {
         self.0.borrow_mut().set_close_reason(reason);
     }
@@ -604,20 +610,16 @@ impl Drop for InnerRoom {
     /// Unsubscribes [`InnerRoom`] from all its subscriptions.
     fn drop(&mut self) {
         self.rpc.unsub();
-        let close_reason = if let Some(reason) = &self.close_reason {
-            reason
-        } else {
+        let close_reason = self.close_reason.as_ref().unwrap_or_else(|| {
             &CloseReason::ByClient {
                 reason: CloseByClientReason::RoomUnexpectedlyDropped,
                 is_err: true,
             }
-        };
-        if let Some(call_result) =
-            self.on_close.call(JsCloseReason::new(close_reason))
-        {
-            if let Err(err) = call_result {
-                console_error!(err.as_string());
-            }
-        }
+        });
+        self.on_close
+            .call(JsCloseReason::new(close_reason))
+            .map(|result| {
+                result.map_err(|err| console_error!(err.as_string()))
+            });
     }
 }
