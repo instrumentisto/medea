@@ -133,7 +133,6 @@ impl RpcClient for WebsocketRpcClient {
     ) -> LocalBoxFuture<'static, Result<()>> {
         let inner = Rc::clone(&self.0);
         Box::pin(async move {
-            //            let websocket = WebSocket::new(&token).await?;
             let socket = Rc::new(rpc_transport);
             inner.borrow_mut().heartbeat.start(Rc::clone(&socket))?;
 
