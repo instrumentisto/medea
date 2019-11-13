@@ -120,7 +120,8 @@ fn on_message(inner_rc: &RefCell<Inner>, msg: Result<ServerMsg, Error>) {
 }
 
 impl WebsocketRpcClient {
-    /// Creates new [`WebsocketRpcClient`] with a given `ping_interval` in milliseconds.
+    /// Creates new [`WebsocketRpcClient`] with a given `ping_interval` in
+    /// milliseconds.
     pub fn new(ping_interval: i32) -> Self {
         Self(Inner::new(ping_interval))
     }

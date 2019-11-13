@@ -1,4 +1,5 @@
-use crate::resolve_after;
+use std::{cell::RefCell, rc::Rc};
+
 use futures::{
     channel::{mpsc, oneshot},
     future::Either,
@@ -9,9 +10,10 @@ use medea_jason::rpc::{
     websocket::{Error, MockRpcTransport, RpcTransport},
     CloseMsg, RpcClient, WebsocketRpcClient,
 };
-use std::{cell::RefCell, rc::Rc};
 use wasm_bindgen_futures::spawn_local;
 use wasm_bindgen_test::*;
+
+use crate::resolve_after;
 
 wasm_bindgen_test_configure!(run_in_browser);
 
@@ -63,7 +65,7 @@ impl RpcTransportMock {
             .borrow()
             .on_message
             .iter()
-            .for_each(|q| q.unbounded_send(Ok(msg.clone())).expect("asdf"));
+            .for_each(|q| q.unbounded_send(Ok(msg.clone())));
     }
 
     fn on_send(&self) -> mpsc::UnboundedReceiver<ClientMsg> {
@@ -86,7 +88,7 @@ async fn on_message() {
     };
     let server_event_clone = server_event.clone();
     spawn_local(async move {
-        stream.next().await;
+        assert_eq!(stream.next().await.unwrap(), server_event_clone);
     });
     ws.connect(Box::new(rpc_transport.clone())).await;
     rpc_transport.send_on_message(ServerMsg::Event(server_event));
@@ -106,10 +108,9 @@ async fn heartbeat() {
             while let Some(event) = on_send_stream.next().await {
                 match event {
                     ClientMsg::Ping(_) => {
-                        if ping_count > 0 {
+                        ping_count += 1;
+                        if ping_count > 1 {
                             break;
-                        } else {
-                            ping_count += 1;
                         }
                     }
                     _ => {}
@@ -121,6 +122,6 @@ async fn heartbeat() {
     .await;
     match res {
         Either::Left(_) => (),
-        Either::Right(_) => panic!(),
+        Either::Right(_) => panic!("Ping not sent after ping interval."),
     }
 }
