@@ -113,7 +113,7 @@ async fn heartbeat() {
     let mut on_send_stream = rpc_transport.on_send();
     ws.connect(Box::new(rpc_transport)).await;
 
-    let res = futures::future::select(
+    let test_result = futures::future::select(
         Box::pin(async move {
             let mut ping_count = 0;
             while let Some(event) = on_send_stream.next().await {
@@ -131,8 +131,8 @@ async fn heartbeat() {
         Box::pin(resolve_after(600)),
     )
     .await;
-    match res {
+    match test_result {
         Either::Left(_) => (),
-        Either::Right(_) => panic!("Ping doesn't sended after ping interval."),
+        Either::Right(_) => panic!("Ping doesn't sent after ping interval."),
     }
 }

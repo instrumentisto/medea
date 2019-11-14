@@ -11,10 +11,11 @@ use futures::{
 };
 use js_sys::Date;
 use medea_client_api_proto::{ClientMsg, Command, Event, ServerMsg};
+use wasm_bindgen_futures::spawn_local;
+
+use crate::rpc::websocket::RpcTransport;
 
 use self::{heartbeat::Heartbeat, websocket::Error};
-use crate::rpc::websocket::RpcTransport;
-use wasm_bindgen_futures::spawn_local;
 
 /// Connection with remote was closed.
 pub enum CloseMsg {
@@ -32,7 +33,7 @@ pub trait RpcClient {
     /// Establishes connection with RPC server.
     fn connect(
         &self,
-        token: Box<dyn RpcTransport>,
+        rpc_transport: Box<dyn RpcTransport>,
     ) -> LocalBoxFuture<'static, Result<()>>;
 
     /// Returns [`Stream`] of all [`Event`]s received by this [`RpcClient`].
