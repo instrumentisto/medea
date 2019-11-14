@@ -16,6 +16,9 @@ include = ["/src/", "/Cargo.*", "/CHANGELOG.md", "/LICENSE.md", "/README.md"]
 [workspace]
 members = [
     "crates/medea-macro",
+    "crates/js_caused",
+    "crates/js_caused_derive",
+    "crates/tracerr",
     "jason",
     "mock/control-api",
     "proto/client-api",
