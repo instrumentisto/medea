@@ -956,9 +956,7 @@ impl Handler<CommandMessage> for Room {
         msg: CommandMessage,
         ctx: &mut Self::Context,
     ) -> Self::Result {
-        let result = Command::from(msg).dispatch_with(self);
-
-        match result {
+        match Command::from(msg).dispatch_with(self) {
             Ok(res) => {
                 Box::new(res.then(|res, room, ctx| -> ActFuture<(), ()> {
                     if res.is_ok() {
