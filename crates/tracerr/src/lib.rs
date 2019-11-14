@@ -28,7 +28,7 @@
 //!   at src/lib.rs:9",
 //! );
 //!
-//! let (val, trace) = err.unwrap();
+//! let (val, trace) = err.into_parts();
 //! assert_eq!(
 //!     format!("{}\n{}", val, trace),
 //!     r"my error
@@ -92,10 +92,10 @@ pub struct Traced<E> {
 }
 
 impl<E> Traced<E> {
-    /// Unwraps [`Traced`] wrapper by returning contained original error
-    /// and captured [`Trace`] separately.
+    /// Consumes [`Traced`], returning its original error and captured
+    /// [`Trace`].
     #[inline]
-    pub fn unwrap(self) -> (E, Trace) {
+    pub fn into_parts(self) -> (E, Trace) {
         (self.err, self.trace)
     }
 

@@ -41,7 +41,7 @@ impl JsCaused for HeartbeatError {
         use HeartbeatError::*;
         match self {
             NoSocket => None,
-            SetIntervalHandler(err) => err.js_cause(),
+            SetIntervalHandler(err) => Some(err.into()),
             SendPing(err) => err.js_cause(),
         }
     }

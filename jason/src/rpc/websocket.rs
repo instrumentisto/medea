@@ -97,7 +97,7 @@ impl JsCaused for SocketError {
             | SendMessage(err)
             | SetHandlerOnClose(err)
             | SetHandlerOnOpen(err)
-            | SetHandlerOnMessage(err) => err.js_cause(),
+            | SetHandlerOnMessage(err) => Some(err.into()),
         }
     }
 }
@@ -170,9 +170,10 @@ impl InnerSocket {
             Ok(new_state) => self.socket_state = new_state,
             Err(err) => {
                 // unreachable, unless some vendor will break enum
-                console_error!(
-                    JasonError::from(tracerr::new!(err).unwrap()).to_string()
+                console_error!(JasonError::from(
+                    tracerr::new!(err).into_parts()
                 )
+                .to_string())
             }
         };
     }

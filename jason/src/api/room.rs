@@ -3,7 +3,6 @@
 use std::{
     cell::RefCell,
     collections::HashMap,
-    convert::From,
     ops::DerefMut as _,
     rc::{Rc, Weak},
 };
@@ -147,7 +146,6 @@ impl RoomHandle {
     ///
     /// Effectively returns `Result<(), js_sys::Error>`.
     pub fn join(&self, token: String) -> Promise {
-        use RoomError::*;
         match map_weak!(self, |inner| (
             Rc::clone(&inner.borrow().rpc),
             inner.borrow().on_failed_local_stream.is_set()
@@ -156,7 +154,8 @@ impl RoomHandle {
                 if !failed_callback_is_set {
                     return future_to_promise(future::err(
                         JasonError::from(
-                            tracerr::new!(CallbackNotSet).unwrap(),
+                            tracerr::new!(RoomError::CallbackNotSet)
+                                .into_parts(),
                         )
                         .into(),
                     ));
@@ -166,7 +165,9 @@ impl RoomHandle {
                         .await
                         .map(|_| JsValue::NULL)
                         .map_err(tracerr::map_from_and_wrap!(=> RoomError))
-                        .map_err(|err| JasonError::from(err.unwrap()).into())
+                        .map_err(|err| {
+                            JasonError::from(err.into_parts()).into()
+                        })
                 })
             }
             Err(err) => future_to_promise(future::err(err)),
@@ -396,7 +397,7 @@ impl InnerRoom {
                     .await
                     .map_err(tracerr::map_from_and_wrap!(=> RoomError))
                 {
-                    error_callback.call(JasonError::from(err.unwrap()));
+                    error_callback.call(JasonError::from(err.into_parts()));
                 }
             }
         });
@@ -431,7 +432,7 @@ impl EventHandler for InnerRoom {
         {
             Ok(peer) => peer,
             Err(err) => {
-                console_error!(JasonError::from(err.unwrap()).to_string());
+                console_error!(JasonError::from(err.into_parts()).to_string());
                 return;
             }
         };
@@ -474,7 +475,7 @@ impl EventHandler for InnerRoom {
             .then(|result| {
                 async move {
                     if let Err(err) = result {
-                        let (err, trace) = err.unwrap();
+                        let (err, trace) = err.into_parts();
                         match err {
                             RoomError::InvalidLocalStream(_)
                             | RoomError::GetLocalStream(_) => {
@@ -503,13 +504,15 @@ impl EventHandler for InnerRoom {
                     .await
                     .map_err(tracerr::map_from_and_wrap!(=> RoomError))
                 {
-                    console_error!(JasonError::from(err.unwrap()).to_string());
+                    console_error!(
+                        JasonError::from(err.into_parts()).to_string()
+                    );
                 }
             });
         } else {
             // TODO: No peer, whats next?
             let err = JasonError::from(
-                tracerr::new!(RoomError::NotFoundPeer(peer_id)).unwrap(),
+                tracerr::new!(RoomError::NotFoundPeer(peer_id)).into_parts(),
             );
             console_error!(err.to_string());
         }
@@ -532,13 +535,15 @@ impl EventHandler for InnerRoom {
                     .await
                     .map_err(tracerr::map_from_and_wrap!(=> RoomError));
                 if let Err(err) = add {
-                    console_error!(JasonError::from(err.unwrap()).to_string());
+                    console_error!(
+                        JasonError::from(err.into_parts()).to_string()
+                    );
                 }
             });
         } else {
             // TODO: No peer, whats next?
             let err = JasonError::from(
-                tracerr::new!(RoomError::NotFoundPeer(peer_id)).unwrap(),
+                tracerr::new!(RoomError::NotFoundPeer(peer_id)).into_parts(),
             );
             console_error!(err.to_string());
         }
@@ -586,7 +591,7 @@ impl PeerEventHandler for InnerRoom {
             Some(conn) => conn.on_remote_stream(remote_stream.new_handle()),
             None => console_error!(JasonError::from(
                 tracerr::new!(RoomError::RemoteStreamWithoutConnection)
-                    .unwrap()
+                    .into_parts()
             )
             .to_string()),
         }

@@ -267,17 +267,19 @@ async fn error_get_local_stream_on_new_peer() {
     let (done, wait) = oneshot::channel();
     let cb = Closure::once_into_js(move |err: JasonError| {
         done.send(()).unwrap();
+        // TODO: this asserts not gonna work
         assert_eq!(&err.name(), "GetLocalStream");
         assert_eq!(
             &err.message(),
             "failed to get local stream: MediaDevices.getUserMedia() failed: \
-             Unknown error: some error"
+             Unknown JS error: error_get_local_stream_on_new_peer"
         );
     });
     room_handle.on_failed_local_stream(cb.into()).unwrap();
 
     let mock_navigator = MockNavigator::new();
-    mock_navigator.error_get_user_media("some error".into());
+    mock_navigator
+        .error_get_user_media("error_get_local_stream_on_new_peer".into());
 
     let (audio_track, video_track) = get_test_tracks();
     event_tx

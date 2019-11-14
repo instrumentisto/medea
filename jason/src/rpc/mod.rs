@@ -147,7 +147,7 @@ fn on_message(
         Err(err) => {
             // TODO: protocol versions mismatch? should drop
             //       connection if so
-            console_error!(JasonError::from(err.unwrap()).to_string());
+            console_error!(JasonError::from(err.into_parts()).to_string());
         }
     }
 }

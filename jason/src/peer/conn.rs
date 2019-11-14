@@ -191,7 +191,7 @@ impl JsCaused for RTCPeerConnectionError {
             | SetHandlerIceEvent(err)
             | SetHandlerTrackEvent(err)
             | SetLocalDescription(err)
-            | SetRemoteDescription(err) => err.js_cause(),
+            | SetRemoteDescription(err) => Some(err.into()),
         }
     }
 }

@@ -64,7 +64,7 @@ macro_rules! map_weak {
         $v.0.upgrade()
             .ok_or(
                 $crate::utils::JasonError::from(
-                    tracerr::new!($crate::utils::HandlerError).unwrap(),
+                    tracerr::new!($crate::utils::HandlerError).into_parts(),
                 )
                 .into(),
             )

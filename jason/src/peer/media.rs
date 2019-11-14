@@ -72,7 +72,7 @@ impl JsCaused for MediaConnectionsError {
     fn js_cause(&self) -> Option<js_sys::Error> {
         use MediaConnectionsError::*;
         match self {
-            InsertTrack(err) => err.js_cause(),
+            InsertTrack(err) => Some(err.into()),
             _ => None,
         }
     }
