@@ -5,25 +5,23 @@
 use std::{collections::HashMap, convert::TryFrom};
 
 use derive_more::Display;
+use js_caused::JsCaused;
 use medea_client_api_proto::TrackId;
 use tracerr::Traced;
 use web_sys::{
     MediaStream as SysMediaStream, MediaStreamTrack as SysMediaStreamTrack,
 };
 
-use crate::{
-    media::{
-        AudioTrackConstraints, MediaStreamConstraints, TrackConstraints,
-        VideoTrackConstraints,
-    },
-    utils::JsCaused,
+use crate::media::{
+    AudioTrackConstraints, MediaStreamConstraints, TrackConstraints,
+    VideoTrackConstraints,
 };
 
 use super::{MediaStream, MediaTrack};
 
 /// Errors that may occur when validating [`StreamRequest`] or
 /// parsing [`MediaStream`].
-#[derive(Debug, Display)]
+#[derive(Debug, Display, JsCaused)]
 #[allow(clippy::module_name_repetitions)]
 pub enum StreamRequestError {
     /// [`StreamRequest`] contains multiple [`AudioTrackConstraints`].
@@ -61,25 +59,6 @@ pub enum StreamRequestError {
         fmt = "provided video track does not satisfy specified constraints"
     )]
     InvalidVideoTrack,
-}
-
-impl JsCaused for StreamRequestError {
-    fn name(&self) -> &'static str {
-        use StreamRequestError::*;
-        match self {
-            TooManyAudioTracks => "TooManyAudioTracks",
-            TooManyVideoTracks => "TooManyVideoTracks",
-            NoTracks => "NoTracks",
-            ExpectedAudioTracks => "ExpectedAudioTracks",
-            ExpectedVideoTracks => "ExpectedVideoTracks",
-            InvalidAudioTrack => "InvalidAudioTrack",
-            InvalidVideoTrack => "InvalidVideoTrack",
-        }
-    }
-
-    fn js_cause(&self) -> Option<js_sys::Error> {
-        None
-    }
 }
 
 type Result<T> = std::result::Result<T, Traced<StreamRequestError>>;

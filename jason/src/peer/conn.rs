@@ -1,6 +1,7 @@
 use std::{cell::RefCell, rc::Rc};
 
 use derive_more::Display;
+use js_caused::JsCaused;
 use medea_client_api_proto::IceServer;
 use tracerr::Traced;
 use wasm_bindgen_futures::JsFuture;
@@ -14,7 +15,7 @@ use web_sys::{
 
 use crate::{
     media::TrackConstraints,
-    utils::{EventListener, JsCaused, JsError},
+    utils::{EventListener, JsError},
 };
 
 use super::ice_server::RtcIceServers;
@@ -120,7 +121,7 @@ pub enum SdpType {
 /// [RTCPeerConnection][1] and event handlers setting errors.
 ///
 /// [1]: https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection.
-#[derive(Debug, Display)]
+#[derive(Debug, Display, JsCaused)]
 pub enum RTCPeerConnectionError {
     /// Occurs when cannot adds new remote candidate to the
     /// [RTCPeerConnection][1]'s remote description.
@@ -164,36 +165,6 @@ pub enum RTCPeerConnectionError {
     /// [`RTCPeerConnection`] cannot be changed.
     #[display(fmt = "failed to set remote SDP description: {}", _0)]
     SetRemoteDescription(JsError),
-}
-
-impl JsCaused for RTCPeerConnectionError {
-    fn name(&self) -> &'static str {
-        use RTCPeerConnectionError::*;
-        match self {
-            AddIceCandidate(_) => "AddIceCandidate",
-            CreateAnswer(_) => "CreateAnswer",
-            CreatePeer(_) => "CreatePeer",
-            CreateOffer(_) => "CreateOffer",
-            SetHandlerIceEvent(_) => "SetHandlerIceEvent",
-            SetHandlerTrackEvent(_) => "SetHandlerTrackEvent",
-            SetLocalDescription(_) => "SetLocalDescription",
-            SetRemoteDescription(_) => "SetRemoteDescription",
-        }
-    }
-
-    fn js_cause(&self) -> Option<js_sys::Error> {
-        use RTCPeerConnectionError::*;
-        match self {
-            AddIceCandidate(err)
-            | CreateAnswer(err)
-            | CreatePeer(err)
-            | CreateOffer(err)
-            | SetHandlerIceEvent(err)
-            | SetHandlerTrackEvent(err)
-            | SetLocalDescription(err)
-            | SetRemoteDescription(err) => err.js_cause(),
-        }
-    }
 }
 
 type Result<T> = std::result::Result<T, Traced<RTCPeerConnectionError>>;

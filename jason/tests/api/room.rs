@@ -2,7 +2,10 @@
 
 use std::rc::Rc;
 
-use futures::channel::{mpsc, oneshot};
+use futures::{
+    channel::{mpsc, oneshot},
+    future::Either,
+};
 use medea_client_api_proto::{Event, IceServer, PeerId};
 use medea_jason::{
     api::Room,
@@ -18,6 +21,49 @@ use wasm_bindgen_test::*;
 use crate::{get_test_tracks, resolve_after, MockNavigator};
 
 wasm_bindgen_test_configure!(run_in_browser);
+
+/// `assert_eq` analog but on failed comparison error will be sent with
+/// [`oneshot::Sender`].
+///
+/// This macro will be used in JS callback tests because this is the only
+/// option to trigger test fail.
+///
+/// `$test_tx` - [`oneshot::Sender`] to which comparison error will be sent
+///
+/// `$a` - left item of comparision
+///
+/// `$b` - right item of comparision
+macro_rules! callback_assert_eq {
+    ($test_tx:tt, $a:expr, $b:expr) => {
+        if $a != $b {
+            $test_tx.send(Err(format!("{} != {}", $a, $b))).unwrap();
+            return;
+        }
+    };
+}
+
+/// Waits for [`Result`] from [`oneshot::Receiver`] with tests result.
+///
+/// Also it will check result of test and will panic if some error will be
+/// found.
+async fn wait_and_check_test_result(
+    rx: oneshot::Receiver<Result<(), String>>,
+    finally: impl FnOnce(),
+) {
+    let result =
+        futures::future::select(Box::pin(rx), Box::pin(resolve_after(500)))
+            .await;
+    finally();
+    match result {
+        Either::Left((oneshot_fut_result, _)) => {
+            let assert_result = oneshot_fut_result.expect("Cancelled.");
+            assert_result.expect("Assertion failed");
+        }
+        Either::Right(_) => {
+            panic!("callback didn't fired");
+        }
+    };
+}
 
 fn get_test_room_and_exist_peer(
     count_gets_peer: usize,
@@ -185,15 +231,16 @@ async fn error_inject_invalid_local_stream_into_new_peer() {
     let (room, _peer) = get_test_room_and_new_peer(event_rx, true, true);
 
     let room_handle = room.new_handle();
-    let (done, wait) = oneshot::channel();
+    let (test_tx, test_rx) = oneshot::channel();
     let cb = Closure::once_into_js(move |err: JasonError| {
-        done.send(()).unwrap();
-        assert_eq!(&err.name(), "InvalidLocalStream");
-        assert_eq!(
+        callback_assert_eq!(test_tx, &err.name(), "InvalidLocalStream");
+        callback_assert_eq!(
+            test_tx,
             err.message(),
             "invalid local stream: provided MediaStream was expected to have \
              single video track"
         );
+        test_tx.send(Ok(())).unwrap();
     });
     room_handle.on_failed_local_stream(cb.into()).unwrap();
 
@@ -216,7 +263,7 @@ async fn error_inject_invalid_local_stream_into_new_peer() {
         })
         .unwrap();
 
-    wait.await.unwrap();
+    wait_and_check_test_result(test_rx, || {}).await;
 }
 
 // Tests Room::inject_local_stream for existing PeerConnection.
@@ -230,15 +277,16 @@ async fn error_inject_invalid_local_stream_into_new_peer() {
 //     1. Invoking `on_failed_local_stream` callback.
 #[wasm_bindgen_test]
 async fn error_inject_invalid_local_stream_into_room_on_exists_peer() {
-    let (done, wait) = oneshot::channel();
+    let (test_tx, test_rx) = oneshot::channel();
     let cb = Closure::once_into_js(move |err: JasonError| {
-        done.send(()).unwrap();
-        assert_eq!(&err.name(), "InvalidLocalStream");
-        assert_eq!(
+        callback_assert_eq!(test_tx, &err.name(), "InvalidLocalStream");
+        callback_assert_eq!(
+            test_tx,
             &err.message(),
             "invalid local stream: provided MediaStream was expected to have \
              single video track"
         );
+        test_tx.send(Ok(())).unwrap();
     });
     let (room, peer) = get_test_room_and_exist_peer(1);
     let (audio_track, video_track) = get_test_tracks();
@@ -255,7 +303,7 @@ async fn error_inject_invalid_local_stream_into_room_on_exists_peer() {
     room_handle.on_failed_local_stream(cb.into()).unwrap();
     room_handle.inject_local_stream(stream).unwrap();
 
-    wait.await.unwrap();
+    wait_and_check_test_result(test_rx, || {}).await;
 }
 
 #[wasm_bindgen_test]
@@ -264,15 +312,16 @@ async fn error_get_local_stream_on_new_peer() {
     let (room, _peer) = get_test_room_and_new_peer(event_rx, true, true);
 
     let room_handle = room.new_handle();
-    let (done, wait) = oneshot::channel();
+    let (test_tx, test_rx) = oneshot::channel();
     let cb = Closure::once_into_js(move |err: JasonError| {
-        done.send(()).unwrap();
-        assert_eq!(&err.name(), "GetLocalStream");
-        assert_eq!(
+        callback_assert_eq!(test_tx, &err.name(), "GetLocalStream");
+        callback_assert_eq!(
+            test_tx,
             &err.message(),
             "failed to get local stream: MediaDevices.getUserMedia() failed: \
              Unknown error: some error"
         );
+        test_tx.send(Ok(())).unwrap();
     });
     room_handle.on_failed_local_stream(cb.into()).unwrap();
 
@@ -289,8 +338,7 @@ async fn error_get_local_stream_on_new_peer() {
         })
         .unwrap();
 
-    wait.await.unwrap();
-    mock_navigator.stop();
+    wait_and_check_test_result(test_rx, move || mock_navigator.stop()).await;
 }
 
 // Tests Room::join without set `on_failed_local_stream` callback.

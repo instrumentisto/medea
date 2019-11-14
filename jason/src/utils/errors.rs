@@ -1,21 +1,9 @@
-use std::{
-    borrow::Cow,
-    fmt::{Debug, Display},
-};
+use std::borrow::Cow;
 
 use derive_more::Display;
+use js_caused::JsCaused;
 use tracerr::Trace;
 use wasm_bindgen::{prelude::*, JsCast};
-
-/// Representation of an error which can caused by error returned from the
-/// JS side.
-pub trait JsCaused: Display + Debug + Send + Sync + 'static {
-    /// Returns name of error.
-    fn name(&self) -> &'static str;
-
-    /// Returns JS error if it is the cause.
-    fn js_cause(&self) -> Option<js_sys::Error>;
-}
 
 /// Wrapper for JS value which returned from JS side as error.
 #[derive(Debug, Display)]
@@ -54,16 +42,6 @@ impl From<&JsError> for js_sys::Error {
         let error = Self::new(&err.message);
         error.set_name(&err.name);
         error
-    }
-}
-
-impl JsCaused for JsError {
-    fn name(&self) -> &'static str {
-        "JsError"
-    }
-
-    fn js_cause(&self) -> Option<js_sys::Error> {
-        Some(self.into())
     }
 }
 

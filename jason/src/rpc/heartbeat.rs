@@ -1,17 +1,18 @@
 use std::{cell::RefCell, convert::From, rc::Rc};
 
 use derive_more::{Display, From};
+use js_caused::JsCaused;
 use medea_client_api_proto::ClientMsg;
 use tracerr::Traced;
 use wasm_bindgen::{prelude::*, JsCast};
 
 use crate::{
     rpc::websocket::{SocketError, WebSocket},
-    utils::{window, IntervalHandle, JsCaused, JsError},
+    utils::{window, IntervalHandle, JsError},
 };
 
 /// Errors that may occur in [`Heartbeat`].
-#[derive(Debug, Display, From)]
+#[derive(Debug, Display, From, JsCaused)]
 #[allow(clippy::module_name_repetitions)]
 pub enum HeartbeatError {
     /// Occurs when `ping` cannot be send because no socket.
@@ -24,27 +25,7 @@ pub enum HeartbeatError {
 
     /// Occurs when socket failed to send `ping`.
     #[display(fmt = "failed to send ping: {}", _0)]
-    SendPing(SocketError),
-}
-
-impl JsCaused for HeartbeatError {
-    fn name(&self) -> &'static str {
-        use HeartbeatError::*;
-        match self {
-            NoSocket => "NoSocket",
-            SetIntervalHandler(_) => "SetIntervalHandler",
-            SendPing(_) => "SendPing",
-        }
-    }
-
-    fn js_cause(&self) -> Option<js_sys::Error> {
-        use HeartbeatError::*;
-        match self {
-            NoSocket => None,
-            SetIntervalHandler(err) => err.js_cause(),
-            SendPing(err) => err.js_cause(),
-        }
-    }
+    SendPing(#[js_cause] SocketError),
 }
 
 type Result<T> = std::result::Result<T, Traced<HeartbeatError>>;

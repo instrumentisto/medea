@@ -11,6 +11,7 @@ use std::{
 
 use derive_more::Display;
 use futures::{future, FutureExt as _, TryFutureExt as _};
+use js_caused::JsCaused;
 use js_sys::Promise;
 use tracerr::Traced;
 use wasm_bindgen::{prelude::*, JsValue};
@@ -22,13 +23,13 @@ use web_sys::{
 
 use crate::{
     media::MediaStreamConstraints,
-    utils::{window, JasonError, JsCaused, JsError},
+    utils::{window, JasonError, JsError},
 };
 
 use super::InputDeviceInfo;
 
 /// Errors that may occur in a [`MediaManager`].
-#[derive(Debug, Display)]
+#[derive(Debug, Display, JsCaused)]
 pub enum MediaManagerError {
     /// Occurs when cannot get access to [MediaDevices][1] object.
     ///
@@ -50,26 +51,6 @@ pub enum MediaManagerError {
 }
 
 type Result<T> = std::result::Result<T, Traced<MediaManagerError>>;
-
-impl JsCaused for MediaManagerError {
-    fn name(&self) -> &'static str {
-        use MediaManagerError::*;
-        match self {
-            MediaDevices(_) => "MediaDevices",
-            GetUserMedia(_) => "GetUserMedia",
-            GetEnumerateDevices(_) => "GetEnumerateDevices",
-        }
-    }
-
-    fn js_cause(&self) -> Option<js_sys::Error> {
-        use MediaManagerError::*;
-        match self {
-            MediaDevices(err)
-            | GetUserMedia(err)
-            | GetEnumerateDevices(err) => err.js_cause(),
-        }
-    }
-}
 
 /// Manager that is responsible for [MediaStream][1] acquisition and storing.
 ///

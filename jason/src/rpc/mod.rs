@@ -7,11 +7,12 @@ use std::{cell::RefCell, rc::Rc, vec};
 
 use derive_more::{Display, From};
 use futures::{channel::mpsc, future::LocalBoxFuture, stream::LocalBoxStream};
+use js_caused::JsCaused;
 use js_sys::Date;
 use medea_client_api_proto::{ClientMsg, Command, Event, ServerMsg};
 use tracerr::Traced;
 
-use crate::utils::{JasonError, JsCaused};
+use crate::utils::JasonError;
 
 use self::{
     heartbeat::{Heartbeat, HeartbeatError},
@@ -27,35 +28,17 @@ pub enum CloseMsg {
 }
 
 /// Errors that may occur in [`RpcClient`].
-#[derive(Debug, Display, From)]
+#[derive(Debug, Display, From, JsCaused)]
 #[allow(clippy::module_name_repetitions)]
 pub enum RpcClientError {
     /// Occurs if new WebSocket connection to remote media server cannot
     /// be established.
     #[display(fmt = "establishment connection failed: {}", _0)]
-    EstablishmentConnection(SocketError),
+    EstablishmentConnection(#[js_cause] SocketError),
 
     /// Occurs if the heartbeat cannot be started.
     #[display(fmt = "start heartbeat failed: {}", _0)]
-    StartHeartbeat(HeartbeatError),
-}
-
-impl JsCaused for RpcClientError {
-    fn name(&self) -> &'static str {
-        use RpcClientError::*;
-        match self {
-            EstablishmentConnection(_) => "EstablishmentConnection",
-            StartHeartbeat(_) => "StartHeartbeat",
-        }
-    }
-
-    fn js_cause(&self) -> Option<js_sys::Error> {
-        use RpcClientError::*;
-        match self {
-            EstablishmentConnection(err) => err.js_cause(),
-            StartHeartbeat(err) => err.js_cause(),
-        }
-    }
+    StartHeartbeat(#[js_cause] HeartbeatError),
 }
 
 // TODO: consider using async-trait crate, it doesnt work with mockall atm
