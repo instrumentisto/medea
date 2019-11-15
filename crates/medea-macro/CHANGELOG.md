@@ -6,6 +6,16 @@ All user visible changes to this project will be documented in this file. This p
 
 
 
+## TBD  [0.1.1] · 2019-11-??
+[0.1.1]: /../../tree/medea-macro-0.1.1/crates/medea-macro
+
+### Added
+
+- `#[derive(JsCaused)]` macro for derive `JsCaused` trait for `medea-jason` crate errors ([#68](/../../pull/68));
+
+
+
+
 ## [0.1.0] · 2019-08-21
 [0.1.0]: /../../tree/medea-macro-0.1.0/crates/medea-macro
 
