@@ -85,20 +85,11 @@ impl JasonError {
 
 impl<E: JsCaused> From<(E, Trace)> for JasonError {
     fn from((err, trace): (E, Trace)) -> Self {
-        let message = err.to_string();
-        match err.js_cause() {
-            Some(e) => Self {
-                name: err.name(),
-                message,
-                trace,
-                source: Some(e),
-            },
-            None => Self {
-                name: err.name(),
-                message,
-                trace,
-                source: None,
-            },
+        Self {
+            name: err.name(),
+            message: err.to_string(),
+            trace,
+            source: err.js_cause(),
         }
     }
 }

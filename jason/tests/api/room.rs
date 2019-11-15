@@ -326,7 +326,8 @@ async fn error_get_local_stream_on_new_peer() {
     room_handle.on_failed_local_stream(cb.into()).unwrap();
 
     let mock_navigator = MockNavigator::new();
-    mock_navigator.error_get_user_media("error_get_local_stream_on_new_peer".into());
+    mock_navigator
+        .error_get_user_media("error_get_local_stream_on_new_peer".into());
 
     let (audio_track, video_track) = get_test_tracks();
     event_tx

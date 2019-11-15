@@ -133,9 +133,10 @@ impl InnerSocket {
             Ok(new_state) => self.socket_state = new_state,
             Err(err) => {
                 // unreachable, unless some vendor will break enum
-                console_error!(
-                    JasonError::from(tracerr::new!(err).into_parts()).to_string()
+                console_error!(JasonError::from(
+                    tracerr::new!(err).into_parts()
                 )
+                .to_string())
             }
         };
     }

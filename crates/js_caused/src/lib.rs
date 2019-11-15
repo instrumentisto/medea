@@ -6,7 +6,7 @@ pub use js_caused_derive::*;
 
 /// Representation of an error which can caused by error returned from the
 /// JS side.
-pub trait JsCaused: Display + Debug + Send + Sync + 'static {
+pub trait JsCaused: Display + Debug + 'static {
     /// Returns name of error.
     fn name(&self) -> &'static str;
 
