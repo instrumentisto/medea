@@ -22,15 +22,15 @@ use self::{heartbeat::Heartbeat, websocket::Error};
 #[cfg_attr(feature = "mockable", mockall::automock)]
 #[allow(clippy::module_name_repetitions)]
 pub trait RpcTransport {
-    /// Set handler on receive message from server.
+    /// Sets handler on receive message from server.
     fn on_message(
         &self,
     ) -> Result<mpsc::UnboundedReceiver<Result<ServerMsg, Error>>, Error>;
 
-    /// Set handler on close socket.
+    /// Sets handler on close socket.
     fn on_close(&self) -> Result<oneshot::Receiver<CloseMsg>, Error>;
 
-    /// Send message to server.
+    /// Sends message to a server.
     fn send(&self, msg: &ClientMsg) -> Result<(), Error>;
 }
 

@@ -27,6 +27,12 @@ struct Inner {
     /// [`oneshot::Sender`] with which all [`ClientMsg`]s from
     /// [`RpcTransport::send`] will be sent.
     on_send: Option<mpsc::UnboundedSender<ClientMsg>>,
+
+    /// [`CloseMsg`] which will be returned in `on_close` callback when
+    /// [`RpcTransportMock`] will be dropped.
+    ///
+    /// If `None` then `CloseMsg::Normal(String::new())` will be sent.
+    on_close_reason: Option<CloseMsg>,
 }
 
 #[derive(Clone)]
@@ -64,6 +70,7 @@ impl RpcTransportMock {
             on_message: Vec::new(),
             on_close: None,
             on_send: None,
+            on_close_reason: None,
         })))
     }
 
@@ -84,16 +91,25 @@ impl RpcTransportMock {
         rx
     }
 
-    fn close(&self, close_msg: CloseMsg) {
-        self.0.borrow_mut().on_close.take().map(|on_close| {
-            on_close.send(close_msg).unwrap();
-        });
+    /// Sets [`CloseMsg`] which will be returned in `on_close` callback when
+    /// [`RpcTransportMock`] will be dropped.
+    #[allow(dead_code)]
+    fn set_on_close_reason(&self, close_msg: CloseMsg) {
+        self.0.borrow_mut().on_close_reason = Some(close_msg);
     }
 }
 
 impl Drop for RpcTransportMock {
     fn drop(&mut self) {
-        self.close(CloseMsg::Normal(String::new()));
+        let close_msg = self
+            .0
+            .borrow_mut()
+            .on_close_reason
+            .take()
+            .unwrap_or_else(|| CloseMsg::Normal(String::new()));
+        self.0.borrow_mut().on_close.take().map(|on_close| {
+            on_close.send(close_msg).unwrap();
+        });
     }
 }
 
@@ -146,6 +162,6 @@ async fn heartbeat() {
     .await;
     match test_result {
         Either::Left(_) => (),
-        Either::Right(_) => panic!("Ping doesn't sent after ping interval."),
+        Either::Right(_) => panic!("Ping doesn't sent during ping interval."),
     }
 }
