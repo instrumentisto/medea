@@ -7,54 +7,41 @@ use std::{cell::RefCell, rc::Rc, vec};
 
 use anyhow::Result;
 use futures::{
-    channel::mpsc, future::LocalBoxFuture, stream::LocalBoxStream, StreamExt,
+    channel::{mpsc, oneshot},
+    future::LocalBoxFuture,
+    stream::LocalBoxStream,
+    StreamExt,
 };
 use js_sys::Date;
 use medea_client_api_proto::{ClientMsg, Command, Event, ServerMsg};
 use wasm_bindgen_futures::spawn_local;
 
-use crate::rpc::websocket::RpcTransport;
-
 use self::{heartbeat::Heartbeat, websocket::Error};
 
+/// RPC transport between client and server.
+#[cfg_attr(feature = "mockable", mockall::automock)]
+#[allow(clippy::module_name_repetitions)]
+pub trait RpcTransport {
+    /// Set handler on receive message from server.
+    fn on_message(
+        &self,
+    ) -> Result<mpsc::UnboundedReceiver<Result<ServerMsg, Error>>, Error>;
+
+    /// Set handler on close socket.
+    fn on_close(&self) -> Result<oneshot::Receiver<CloseMsg>, Error>;
+
+    /// Send message to server.
+    fn send(&self, msg: &ClientMsg) -> Result<(), Error>;
+}
+
 /// Connection with remote was closed.
+#[derive(Debug)]
 pub enum CloseMsg {
     /// Transport was gracefully closed by remote.
     Normal(String),
     /// Connection was unexpectedly closed. Consider reconnecting.
     Disconnect(String),
 }
-
-// TODO: consider using async-trait crate, it doesnt work with mockall atm
-/// Client to talk with server via Client API RPC.
-#[allow(clippy::module_name_repetitions)]
-#[cfg_attr(feature = "mockable", mockall::automock)]
-pub trait RpcClient {
-    /// Establishes connection with RPC server.
-    fn connect(
-        &self,
-        rpc_transport: Box<dyn RpcTransport>,
-    ) -> LocalBoxFuture<'static, Result<()>>;
-
-    /// Returns [`Stream`] of all [`Event`]s received by this [`RpcClient`].
-    ///
-    /// [`Stream`]: futures::Stream
-    fn subscribe(&self) -> LocalBoxStream<'static, Event>;
-
-    /// Unsubscribes from this [`RpcClient`]. Drops all subscriptions atm.
-    fn unsub(&self);
-
-    /// Sends [`Command`] to server.
-    fn send_command(&self, command: Command);
-}
-
-// TODO:
-// 1. Proper sub registry.
-// 2. Reconnect.
-// 3. Disconnect if no pongs.
-// 4. Buffering if no socket?
-/// Client API RPC client to talk with server via [`WebSocket`].
-pub struct WebsocketRpcClient(Rc<RefCell<Inner>>);
 
 /// Inner state of [`WebsocketRpcClient`].
 struct Inner {
@@ -116,7 +103,39 @@ fn on_message(inner_rc: &RefCell<Inner>, msg: Result<ServerMsg, Error>) {
     }
 }
 
-impl WebsocketRpcClient {
+// TODO: consider using async-trait crate, it doesnt work with mockall atm
+/// Client to talk with server via Client API RPC.
+#[allow(clippy::module_name_repetitions)]
+#[cfg_attr(feature = "mockable", mockall::automock)]
+pub trait RpcClient {
+    /// Establishes connection with RPC server.
+    fn connect(
+        &self,
+        rpc_transport: Box<dyn RpcTransport>,
+    ) -> LocalBoxFuture<'static, Result<()>>;
+
+    /// Returns [`Stream`] of all [`Event`]s received by this [`RpcClient`].
+    ///
+    /// [`Stream`]: futures::Stream
+    fn subscribe(&self) -> LocalBoxStream<'static, Event>;
+
+    /// Unsubscribes from this [`RpcClient`]. Drops all subscriptions atm.
+    fn unsub(&self);
+
+    /// Sends [`Command`] to server.
+    fn send_command(&self, command: Command);
+}
+
+// TODO:
+// 1. Proper sub registry.
+// 2. Reconnect.
+// 3. Disconnect if no pongs.
+// 4. Buffering if no socket?
+/// Client API RPC client to talk with server via [`WebSocket`].
+#[allow(clippy::module_name_repetitions)]
+pub struct RpcClientImpl(Rc<RefCell<Inner>>);
+
+impl RpcClientImpl {
     /// Creates new [`WebsocketRpcClient`] with a given `ping_interval` in
     /// milliseconds.
     pub fn new(ping_interval: i32) -> Self {
@@ -124,7 +143,7 @@ impl WebsocketRpcClient {
     }
 }
 
-impl RpcClient for WebsocketRpcClient {
+impl RpcClient for RpcClientImpl {
     /// Creates new WebSocket connection to remote media server.
     /// Starts `Heartbeat` if connection succeeds and binds handlers
     /// on receiving messages from server and closing socket.
@@ -147,10 +166,14 @@ impl RpcClient for WebsocketRpcClient {
             let inner_rc = Rc::clone(&inner);
             let on_socket_close = socket.on_close()?;
             spawn_local(async move {
-                let msg = on_socket_close.await;
-                // TODO: unwrap??
-                if let Ok(msg) = msg {
-                    on_close(&inner_rc, msg)
+                match on_socket_close.await {
+                    Ok(msg) => on_close(&inner_rc, msg),
+                    Err(e) => {
+                        console_error!(format!(
+                            "RPC socket was unexpectedly dropped. {:?}",
+                            e
+                        ));
+                    }
                 }
             });
 
@@ -188,7 +211,7 @@ impl RpcClient for WebsocketRpcClient {
     }
 }
 
-impl Drop for WebsocketRpcClient {
+impl Drop for RpcClientImpl {
     /// Drops related connection and its [`Heartbeat`].
     fn drop(&mut self) {
         self.0.borrow_mut().sock.take();

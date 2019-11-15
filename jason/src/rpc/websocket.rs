@@ -14,24 +14,9 @@ use thiserror::*;
 use web_sys::{CloseEvent, Event, MessageEvent, WebSocket as SysWebSocket};
 
 use crate::{
-    rpc::CloseMsg,
+    rpc::{CloseMsg, RpcTransport},
     utils::{EventListener, WasmErr},
 };
-
-/// RPC transport between client and server.
-#[cfg_attr(feature = "mockable", mockall::automock)]
-pub trait RpcTransport {
-    /// Set handler on receive message from server.
-    fn on_message(
-        &self,
-    ) -> Result<mpsc::UnboundedReceiver<Result<ServerMsg, Error>>, Error>;
-
-    /// Set handler on close socket.
-    fn on_close(&self) -> Result<oneshot::Receiver<CloseMsg>, Error>;
-
-    /// Send message to server.
-    fn send(&self, msg: &ClientMsg) -> Result<(), Error>;
-}
 
 /// Errors that may occur when working with [`WebSocket`].
 #[derive(Debug, Error)]
@@ -154,7 +139,7 @@ impl InnerSocket {
 }
 
 impl RpcTransport for WebSocket {
-    /// Set handler on receive message from server.
+    /// Sets handler for receiving server messages.
     fn on_message(
         &self,
     ) -> Result<mpsc::UnboundedReceiver<Result<ServerMsg, Error>>, Error> {
@@ -166,8 +151,13 @@ impl RpcTransport for WebSocket {
                 "message",
                 move |msg| {
                     let parsed = ServerMessage::try_from(&msg).map(Into::into);
-                    // TODO: maybe log it?
-                    tx.unbounded_send(parsed).ok();
+                    tx.unbounded_send(parsed).unwrap_or_else(|e| {
+                        console_error!(format!(
+                            "WebSocket's 'on_message' callback receiver \
+                             unexpectedly gone. {:?}",
+                            e
+                        ))
+                    });
                 },
             )
             .map_err(Into::into)
@@ -176,7 +166,7 @@ impl RpcTransport for WebSocket {
         Ok(rx)
     }
 
-    /// Set handler on close socket.
+    /// Sets handler for socket closing.
     fn on_close(&self) -> Result<oneshot::Receiver<CloseMsg>, Error> {
         let (tx, rx) = oneshot::channel();
         let mut inner_mut = self.0.borrow_mut();
@@ -187,8 +177,13 @@ impl RpcTransport for WebSocket {
                 "close",
                 move |msg: CloseEvent| {
                     inner.borrow_mut().update_state();
-                    // TODO: maybe log it?
-                    tx.send(CloseMsg::from(&msg)).ok();
+                    tx.send(CloseMsg::from(&msg)).unwrap_or_else(|e| {
+                        console_error!(format!(
+                            "WebSocket's 'on_close' callback receiver \
+                             unexpectedly gone. {:?}",
+                            e
+                        ))
+                    });
                 },
             )
             .map_err(Error::SetHandlerOnClose)?,
@@ -196,7 +191,7 @@ impl RpcTransport for WebSocket {
         Ok(rx)
     }
 
-    /// Send message to server.
+    /// Sends message to the server.
     fn send(&self, msg: &ClientMsg) -> Result<(), Error> {
         let inner = self.0.borrow();
         let message =
@@ -297,7 +292,7 @@ impl From<&CloseEvent> for CloseMsg {
     }
 }
 
-/// Message received from server.
+/// Newtype for received server message.
 #[derive(From, Into)]
 pub struct ServerMessage(ServerMsg);
 

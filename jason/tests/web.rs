@@ -6,7 +6,6 @@ mod peer;
 mod rpc;
 
 use anyhow::Result;
-use futures::channel::oneshot;
 use js_sys::Promise;
 use medea_client_api_proto::{
     AudioSettings, Direction, MediaType, PeerId, Track, TrackId, VideoSettings,

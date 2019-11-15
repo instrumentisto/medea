@@ -3,12 +3,11 @@ use std::{cell::RefCell, rc::Rc};
 use futures::{
     channel::{mpsc, oneshot},
     future::Either,
-    SinkExt, StreamExt, TryFutureExt,
+    StreamExt,
 };
 use medea_client_api_proto::{ClientMsg, Event, PeerId, ServerMsg};
 use medea_jason::rpc::{
-    websocket::{Error, MockRpcTransport, RpcTransport},
-    CloseMsg, RpcClient, WebsocketRpcClient,
+    websocket::Error, CloseMsg, RpcClient, RpcClientImpl, RpcTransport,
 };
 use wasm_bindgen_futures::spawn_local;
 use wasm_bindgen_test::*;
@@ -59,7 +58,7 @@ impl RpcTransport for RpcTransportMock {
 }
 
 impl RpcTransportMock {
-    /// Returns [`RpcTransportMock`] without callbacks.
+    /// Returns [`RpcTransportMock`] without any callbacks.
     pub fn new() -> Self {
         Self(Rc::new(RefCell::new(Inner {
             on_message: Vec::new(),
@@ -68,13 +67,13 @@ impl RpcTransportMock {
         })))
     }
 
-    /// Emulates receiving of [`ServerMsg`] by [`RpcTransport`] from server.
+    /// Emulates receiving of [`ServerMsg`] by [`RpcTransport`] from a server.
     pub fn send_on_message(&self, msg: ServerMsg) {
         self.0
             .borrow()
             .on_message
             .iter()
-            .for_each(|q| q.unbounded_send(Ok(msg.clone())));
+            .for_each(|q| q.unbounded_send(Ok(msg.clone())).unwrap());
     }
 
     /// Returns [`mpsc::UnboundedReceiver`] which will receive all
@@ -84,13 +83,26 @@ impl RpcTransportMock {
         self.0.borrow_mut().on_send = Some(tx);
         rx
     }
+
+    fn close(&self, close_msg: CloseMsg) {
+        self.0.borrow_mut().on_close.take().map(|on_close| {
+            on_close.send(close_msg).unwrap();
+        });
+    }
+}
+
+impl Drop for RpcTransportMock {
+    fn drop(&mut self) {
+        self.close(CloseMsg::Normal(String::new()));
+    }
 }
 
 #[wasm_bindgen_test]
 async fn on_message() {
     let rpc_transport = RpcTransportMock::new();
-    let ws = WebsocketRpcClient::new(10);
+    let ws = RpcClientImpl::new(10);
     let mut stream = ws.subscribe();
+
     let server_event = Event::PeerCreated {
         peer_id: PeerId(0),
         tracks: vec![],
@@ -98,20 +110,21 @@ async fn on_message() {
         sdp_offer: None,
     };
     let server_event_clone = server_event.clone();
+
     spawn_local(async move {
         assert_eq!(stream.next().await.unwrap(), server_event_clone);
     });
-    ws.connect(Box::new(rpc_transport.clone())).await;
+    ws.connect(Box::new(rpc_transport.clone())).await.unwrap();
     rpc_transport.send_on_message(ServerMsg::Event(server_event));
 }
 
 #[wasm_bindgen_test]
 async fn heartbeat() {
     let rpc_transport = RpcTransportMock::new();
-    let ws = WebsocketRpcClient::new(500);
+    let ws = RpcClientImpl::new(500);
 
     let mut on_send_stream = rpc_transport.on_send();
-    ws.connect(Box::new(rpc_transport)).await;
+    ws.connect(Box::new(rpc_transport)).await.unwrap();
 
     let test_result = futures::future::select(
         Box::pin(async move {

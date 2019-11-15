@@ -96,10 +96,7 @@ impl RoomHandle {
                 future_to_promise(async move {
                     let websocket =
                         WebSocket::new(&token).await.map_err(|err| {
-                            JsValue::from(js_sys::Error::new(&format!(
-                                "{}",
-                                err
-                            )))
+                            JsValue::from(js_sys::Error::new(&err.to_string()))
                         })?;
                     rpc.connect(Box::new(websocket))
                         .await
