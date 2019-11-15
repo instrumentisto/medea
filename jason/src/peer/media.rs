@@ -4,7 +4,6 @@ use std::{borrow::ToOwned, cell::RefCell, collections::HashMap, rc::Rc};
 
 use derive_more::Display;
 use futures::future;
-use js_caused::JsCaused;
 use medea_client_api_proto::{Direction, PeerId, Track, TrackId};
 use tracerr::Traced;
 use wasm_bindgen_futures::JsFuture;
@@ -12,7 +11,10 @@ use web_sys::{
     MediaStreamTrack, RtcRtpTransceiver, RtcRtpTransceiverDirection,
 };
 
-use crate::{media::TrackConstraints, utils::JsError};
+use crate::{
+    media::TrackConstraints,
+    utils::{JsCaused, JsError},
+};
 
 use super::{
     conn::{RtcPeerConnection, TransceiverDirection, TransceiverKind},

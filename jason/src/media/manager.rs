@@ -11,7 +11,6 @@ use std::{
 
 use derive_more::Display;
 use futures::{future, FutureExt as _, TryFutureExt as _};
-use js_caused::JsCaused;
 use js_sys::Promise;
 use tracerr::Traced;
 use wasm_bindgen::{prelude::*, JsValue};
@@ -23,7 +22,7 @@ use web_sys::{
 
 use crate::{
     media::MediaStreamConstraints,
-    utils::{window, JasonError, JsError},
+    utils::{window, JasonError, JsCaused, JsError},
 };
 
 use super::InputDeviceInfo;

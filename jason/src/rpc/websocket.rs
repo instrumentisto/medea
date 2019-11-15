@@ -6,14 +6,13 @@ use std::{cell::RefCell, convert::TryFrom, rc::Rc};
 
 use derive_more::*;
 use futures::{channel::oneshot, future};
-use js_caused::JsCaused;
 use medea_client_api_proto::{ClientMsg, ServerMsg};
 use tracerr::Traced;
 use web_sys::{CloseEvent, Event, MessageEvent, WebSocket as SysWebSocket};
 
 use crate::{
     rpc::CloseMsg,
-    utils::{EventListener, JasonError, JsError},
+    utils::{EventListener, JasonError, JsCaused, JsError},
 };
 
 /// Errors that may occur when working with [`WebSocket`].

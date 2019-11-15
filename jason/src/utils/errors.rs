@@ -1,9 +1,23 @@
-use std::borrow::Cow;
+use std::{
+    borrow::Cow,
+    fmt::{Debug, Display},
+};
 
 use derive_more::Display;
-use js_caused::JsCaused;
 use tracerr::Trace;
 use wasm_bindgen::{prelude::*, JsCast};
+
+pub use medea_macro::JsCaused;
+
+/// Representation of an error which can caused by error returned from the
+/// JS side.
+pub trait JsCaused {
+    /// Returns name of error.
+    fn name(&self) -> &'static str;
+
+    /// Returns JS error if it is the cause.
+    fn js_cause(&self) -> Option<js_sys::Error>;
+}
 
 /// Wrapper for JS value which returned from JS side as error.
 #[derive(Debug, Display)]
@@ -60,7 +74,7 @@ pub struct JasonError {
 
 #[wasm_bindgen]
 impl JasonError {
-    /// REturns name of error.
+    /// Returns name of error.
     pub fn name(&self) -> String {
         String::from(self.name)
     }
@@ -83,7 +97,7 @@ impl JasonError {
     }
 }
 
-impl<E: JsCaused> From<(E, Trace)> for JasonError {
+impl<E: JsCaused + Display> From<(E, Trace)> for JasonError {
     fn from((err, trace): (E, Trace)) -> Self {
         Self {
             name: err.name(),

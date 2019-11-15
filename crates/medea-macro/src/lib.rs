@@ -8,8 +8,10 @@ extern crate proc_macro;
 
 mod dispatchable;
 mod enum_delegate;
+mod js_caused;
 
 use proc_macro::TokenStream;
+use synstructure::decl_derive;
 
 /// Delegates function calls to enum variants field.
 /// Variants are expected to have only one field.
@@ -204,3 +206,62 @@ pub fn enum_delegate(args: TokenStream, input: TokenStream) -> TokenStream {
 pub fn dispatchable(_: TokenStream, input: TokenStream) -> TokenStream {
     dispatchable::derive(input).unwrap_or_else(|e| e.to_compile_error().into())
 }
+
+decl_derive!([JsCaused, attributes(js_caused, js_cause)] =>
+/// Generate implementation `JsCaused` trait for errors represented as `enum`.
+///
+/// # How to use
+///
+/// ### 1. Declare wrapper for JS error.
+///
+/// ```
+/// use crate::utils::JsCaused;
+///
+/// struct JsError;
+///
+/// impl From<&JsError> for js_sys::Error {
+///     fn from(_: &JsError) -> Self {
+///         unimplemented!()
+///     }
+/// }
+/// ```
+///
+/// ### 2. Declare `enum` for error variants.
+///
+/// The `js_cause()` method returns a nested error if type of error is named
+/// `JsError` or if there are the `#[js_error]` attribute.
+///
+/// ```
+/// #[derive(JsCaused)]
+/// enum FooError {
+///     Internal,
+///     Js(#[js_error] JsError),
+/// }
+///
+/// let err = FooError::Internal;
+/// assert_eq!(err.name(), "Internal");
+/// assert!(err.js_cause().is_none());
+///
+/// let err = FooError::Js(JsError {});
+/// assert_eq!(err.name(), "Js");
+/// assert!(err.js_cause().is_some());
+/// ```
+///
+/// If error has attribute `#[js_caused]` it will be called `js_cause()`
+/// on nested error.
+///
+/// ```
+/// #[derive(JsCaused)]
+/// enum BarError {
+///     Foo(#[js_cause] FooError),
+/// }
+///
+/// let err = BarError::Foo(FooError::Internal);
+/// assert_eq!(err.name(), "Foo");
+/// assert!(err.js_cause().is_none());
+///
+/// let err = BarError::Foo(FooError::Js(JsError {}));
+/// assert_eq!(err.name(), "Foo");
+/// assert!(err.js_cause().is_some());
+/// ```
+js_caused::derive);

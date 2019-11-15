@@ -5,16 +5,18 @@
 use std::{collections::HashMap, convert::TryFrom};
 
 use derive_more::Display;
-use js_caused::JsCaused;
 use medea_client_api_proto::TrackId;
 use tracerr::Traced;
 use web_sys::{
     MediaStream as SysMediaStream, MediaStreamTrack as SysMediaStreamTrack,
 };
 
-use crate::media::{
-    AudioTrackConstraints, MediaStreamConstraints, TrackConstraints,
-    VideoTrackConstraints,
+use crate::{
+    media::{
+        AudioTrackConstraints, MediaStreamConstraints, TrackConstraints,
+        VideoTrackConstraints,
+    },
+    utils::JsCaused,
 };
 
 use super::{MediaStream, MediaTrack};

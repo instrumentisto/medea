@@ -7,12 +7,11 @@ use std::{cell::RefCell, rc::Rc, vec};
 
 use derive_more::{Display, From};
 use futures::{channel::mpsc, future::LocalBoxFuture, stream::LocalBoxStream};
-use js_caused::JsCaused;
 use js_sys::Date;
 use medea_client_api_proto::{ClientMsg, Command, Event, ServerMsg};
 use tracerr::Traced;
 
-use crate::utils::JasonError;
+use crate::utils::{JasonError, JsCaused};
 
 use self::{
     heartbeat::{Heartbeat, HeartbeatError},

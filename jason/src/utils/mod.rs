@@ -7,7 +7,6 @@ mod callback;
 mod event_listener;
 
 use derive_more::Display;
-use js_caused::JsCaused;
 use js_sys::Reflect;
 use wasm_bindgen::prelude::*;
 use web_sys::Window;
@@ -15,7 +14,7 @@ use web_sys::Window;
 #[doc(inline)]
 pub use self::{
     callback::{Callback, Callback2},
-    errors::{JasonError, JsError},
+    errors::{JasonError, JsCaused, JsError},
     event_listener::EventListener,
 };
 
@@ -44,6 +43,15 @@ impl Drop for IntervalHandle {
 #[derive(Debug, Display, JsCaused)]
 #[display(fmt = "detached state")]
 pub struct HandlerError;
+// impl JsCaused for HandlerError {
+// fn name(&self) -> &'static str {
+// "HandlerError"
+// }
+//
+// fn js_cause(&self) -> Option<js_sys::Error> {
+// None
+// }
+// }
 
 /// Upgrades newtyped [`Weak`] reference, returning [`HandlerError`] if failed,
 /// or mapping [`Rc`]-referenced value with provided `$closure` otherwise.

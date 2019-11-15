@@ -319,7 +319,7 @@ async fn error_get_local_stream_on_new_peer() {
             test_tx,
             &err.message(),
             "failed to get local stream: MediaDevices.getUserMedia() failed: \
-             Unknown error: error_get_local_stream_on_new_peer"
+             Unknown JS error: error_get_local_stream_on_new_peer"
         );
         test_tx.send(Ok(())).unwrap();
     });

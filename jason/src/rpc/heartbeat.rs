@@ -1,14 +1,13 @@
 use std::{cell::RefCell, convert::From, rc::Rc};
 
 use derive_more::{Display, From};
-use js_caused::JsCaused;
 use medea_client_api_proto::ClientMsg;
 use tracerr::Traced;
 use wasm_bindgen::{prelude::*, JsCast};
 
 use crate::{
     rpc::websocket::{SocketError, WebSocket},
-    utils::{window, IntervalHandle, JsError},
+    utils::{window, IntervalHandle, JsCaused, JsError},
 };
 
 /// Errors that may occur in [`Heartbeat`].

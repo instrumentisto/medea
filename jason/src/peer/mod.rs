@@ -14,7 +14,6 @@ use std::{cell::RefCell, collections::HashMap, convert::TryFrom, rc::Rc};
 
 use derive_more::{Display, From};
 use futures::{channel::mpsc, future};
-use js_caused::JsCaused;
 use medea_client_api_proto::{
     Direction, IceServer, PeerId as Id, Track, TrackId,
 };
@@ -22,7 +21,10 @@ use medea_macro::dispatchable;
 use tracerr::Traced;
 use web_sys::{MediaStream as SysMediaStream, RtcTrackEvent};
 
-use crate::media::{MediaManager, MediaManagerError};
+use crate::{
+    media::{MediaManager, MediaManagerError},
+    utils::JsCaused,
+};
 
 #[cfg(feature = "mockable")]
 #[doc(inline)]

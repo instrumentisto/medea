@@ -1,7 +1,6 @@
 use std::{cell::RefCell, rc::Rc};
 
 use derive_more::Display;
-use js_caused::JsCaused;
 use medea_client_api_proto::IceServer;
 use tracerr::Traced;
 use wasm_bindgen_futures::JsFuture;
@@ -15,7 +14,7 @@ use web_sys::{
 
 use crate::{
     media::TrackConstraints,
-    utils::{EventListener, JsError},
+    utils::{EventListener, JsCaused, JsError},
 };
 
 use super::ice_server::RtcIceServers;

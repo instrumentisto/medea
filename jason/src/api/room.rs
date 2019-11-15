@@ -9,7 +9,6 @@ use std::{
 
 use derive_more::Display;
 use futures::{channel::mpsc, future, stream, FutureExt as _, StreamExt as _};
-use js_caused::JsCaused;
 use js_sys::Promise;
 use medea_client_api_proto::{
     Command, Direction, Event as RpcEvent, EventHandler, IceCandidate,
@@ -26,7 +25,7 @@ use crate::{
         PeerRepository,
     },
     rpc::{RpcClient, RpcClientError},
-    utils::{Callback, JasonError},
+    utils::{Callback, JasonError, JsCaused},
 };
 
 use super::{connection::Connection, ConnectionHandle};
