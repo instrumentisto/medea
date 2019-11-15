@@ -53,20 +53,14 @@ impl Jason {
         spawn_local(rpc.on_close().map(move |res| {
             // TODO: don't close all rooms when multiple rpc connections
             //       will be supported.
-            if let Ok(reason) = res {
-                inner_clone
-                    .borrow_mut()
-                    .rooms
-                    .drain(..)
-                    .for_each(|room| room.close(reason.clone()));
-            } else {
-                inner_clone.borrow_mut().rooms.drain(..).for_each(|room| {
-                    room.close(
-                        CloseByClientReason::RpcConnectionUnexpectedlyDropped
-                            .into(),
-                    );
-                });
-            }
+            let reason = res.unwrap_or_else(|_| {
+                CloseByClientReason::RpcConnectionUnexpectedlyDropped.into()
+            });
+            inner_clone
+                .borrow_mut()
+                .rooms
+                .drain(..)
+                .for_each(|room| room.close(reason.clone()));
             inner_clone.borrow_mut().media_manager = Rc::default();
         }));
 

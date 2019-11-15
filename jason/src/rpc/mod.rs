@@ -187,17 +187,19 @@ fn on_close(inner_rc: &RefCell<Inner>, close_msg: &CloseMsg) {
         // close.
         if let CloseByServerReason::Reconnected = reason {
         } else {
-            for sub in inner.on_close_subscribers.drain(..) {
-                if let Err(reason) =
-                    sub.send(CloseReason::ByServer(reason.clone()))
-                {
+            inner
+                .on_close_subscribers
+                .drain(..)
+                .filter_map(|sub| {
+                    sub.send(CloseReason::ByServer(reason.clone())).err()
+                })
+                .for_each(|reason| {
                     console_error!(format!(
                         "Failed to send reason of Jason close to subscriber: \
                          {:?}",
                         reason
                     ))
-                }
-            }
+                });
         }
     }
 
