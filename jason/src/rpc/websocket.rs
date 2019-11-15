@@ -146,7 +146,6 @@ impl WebSocket {
     /// Initiates new WebSocket connection. Resolves only when underlying
     /// connection becomes active.
     pub async fn new(url: &str) -> Result<Self> {
-        use SocketError::*;
         let (tx_close, rx_close) = oneshot::channel();
         let (tx_open, rx_open) = oneshot::channel();
 
@@ -165,7 +164,7 @@ impl WebSocket {
                         let _ = tx_close.send(());
                     },
                 )
-                .map_err(SetHandlerOnClose)
+                .map_err(SocketError::SetHandlerOnClose)
                 .map_err(tracerr::wrap!())?,
             );
 
@@ -179,7 +178,7 @@ impl WebSocket {
                         let _ = tx_open.send(());
                     },
                 )
-                .map_err(SetHandlerOnOpen)
+                .map_err(SocketError::SetHandlerOnOpen)
                 .map_err(tracerr::wrap!())?,
             );
         }
@@ -192,9 +191,11 @@ impl WebSocket {
         match state {
             future::Either::Left((opened, _)) => match opened {
                 Ok(_) => Ok(Self(socket)),
-                Err(_) => Err(tracerr::new!(InitSocket)),
+                Err(_) => Err(tracerr::new!(SocketError::InitSocket)),
             },
-            future::Either::Right(_closed) => Err(tracerr::new!(InitSocket)),
+            future::Either::Right(_closed) => {
+                Err(tracerr::new!(SocketError::InitSocket))
+            }
         }
     }
 
@@ -246,10 +247,9 @@ impl WebSocket {
 
     /// Send message to server.
     pub fn send(&self, msg: &ClientMsg) -> Result<()> {
-        use SocketError::*;
         let inner = self.0.borrow();
         let message = serde_json::to_string(msg)
-            .map_err(ParseClientMessage)
+            .map_err(SocketError::ParseClientMessage)
             .map_err(tracerr::wrap!())?;
 
         match inner.socket_state {
@@ -257,9 +257,9 @@ impl WebSocket {
                 .socket
                 .send_with_str(&message)
                 .map_err(Into::into)
-                .map_err(SendMessage)
+                .map_err(SocketError::SendMessage)
                 .map_err(tracerr::wrap!()),
-            _ => Err(tracerr::new!(ClosedSocket)),
+            _ => Err(tracerr::new!(SocketError::ClosedSocket)),
         }
     }
 }

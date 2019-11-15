@@ -41,7 +41,6 @@ fn js_caused_derive(s: Structure) -> TokenStream {
                 match *self { #name_body }
             }
 
-            #[allow(unreachable_code)]
             fn js_cause(&self) -> Option<js_sys::Error> {
                 match *self { #cause_body }
             }

@@ -25,7 +25,10 @@ RUN apt-get update \
             cmake
 
 # Prepare Cargo workspace for building dependencies only.
+COPY crates/js_caused/Cargo.toml /app/crates/js_caused/
+COPY crates/js_caused_derive/Cargo.toml /app/crates/js_caused_derive/
 COPY crates/medea-macro/Cargo.toml /app/crates/medea-macro/
+COPY crates/tracerr/Cargo.toml /app/crates/tracerr/
 COPY mock/control-api/Cargo.toml /app/mock/control-api/
 COPY proto/client-api/Cargo.toml /app/proto/client-api/
 COPY proto/control-api/Cargo.toml /app/proto/control-api/
@@ -37,7 +40,10 @@ COPY proto/control-api/src/grpc/api.proto \
 COPY jason/Cargo.toml /app/jason/
 COPY Cargo.toml Cargo.lock /app/
 WORKDIR /app/
-RUN mkdir -p crates/medea-macro/src/ && touch crates/medea-macro/src/lib.rs \
+RUN mkdir -p crates/js_caused/src/ && touch crates/js_caused/src/lib.rs \
+ && mkdir -p crates/js_caused_derive/src/ && touch crates/js_caused_derive/src/lib.rs \
+ && mkdir -p crates/medea-macro/src/ && touch crates/medea-macro/src/lib.rs \
+ && mkdir -p crates/tracerr/src/ && touch crates/tracerr/src/lib.rs \
  && mkdir -p mock/control-api/src/ && touch mock/control-api/src/lib.rs \
  && mkdir -p proto/client-api/src/ && touch proto/client-api/src/lib.rs \
  && mkdir -p proto/control-api/src/ && touch proto/control-api/src/lib.rs \

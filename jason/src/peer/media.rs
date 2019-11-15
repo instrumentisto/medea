@@ -219,8 +219,6 @@ impl MediaConnections {
         &self,
         stream: &MediaStream,
     ) -> Result<()> {
-        use MediaConnectionsError::*;
-
         let s = self.0.borrow();
 
         // Build sender to track pairs to catch errors before inserting.
@@ -230,10 +228,14 @@ impl MediaConnections {
                 if sender.caps.satisfies(&track.track()) {
                     sender_and_track.push((sender, track));
                 } else {
-                    return Err(tracerr::new!(InvalidMediaTrack));
+                    return Err(tracerr::new!(
+                        MediaConnectionsError::InvalidMediaTrack
+                    ));
                 }
             } else {
-                return Err(tracerr::new!(InvalidMediaStream));
+                return Err(tracerr::new!(
+                    MediaConnectionsError::InvalidMediaStream
+                ));
             }
         }
 
