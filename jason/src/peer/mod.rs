@@ -14,6 +14,7 @@ use std::{cell::RefCell, collections::HashMap, convert::TryFrom, rc::Rc};
 
 use derive_more::{Display, From};
 use futures::{channel::mpsc, future};
+use js_caused::JsCaused;
 use medea_client_api_proto::{
     Direction, IceServer, PeerId as Id, Track, TrackId,
 };
@@ -21,10 +22,7 @@ use medea_macro::dispatchable;
 use tracerr::Traced;
 use web_sys::{MediaStream as SysMediaStream, RtcTrackEvent};
 
-use crate::{
-    media::{MediaManager, MediaManagerError},
-    utils::JsCaused,
-};
+use crate::media::{MediaManager, MediaManagerError};
 
 #[cfg(feature = "mockable")]
 #[doc(inline)]
@@ -45,50 +43,28 @@ pub use self::{
 /// Errors that may occur in [RTCPeerConnection][1].
 ///
 /// [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
-#[derive(Debug, Display, From)]
+#[derive(Debug, Display, From, JsCaused)]
 #[allow(clippy::module_name_repetitions)]
 pub enum PeerError {
     /// Errors that may occur in [`MediaConnections`] storage.
     #[display(fmt = "{}", _0)]
-    MediaConnections(MediaConnectionsError),
+    MediaConnections(#[js_cause] MediaConnectionsError),
 
     /// Errors that may occur in a [`MediaManager`].
     #[display(fmt = "{}", _0)]
-    MediaManager(MediaManagerError),
+    MediaManager(#[js_cause] MediaManagerError),
 
     /// Errors that may occur during signaling between this and remote
     /// [RTCPeerConnection][1] and event handlers setting errors.
     ///
     /// [1]: https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection.
     #[display(fmt = "{}", _0)]
-    RtcPeerConnection(RTCPeerConnectionError),
+    RtcPeerConnection(#[js_cause] RTCPeerConnectionError),
 
     /// Errors that may occur when validating [`StreamRequest`] or
     /// parsing [`MediaStream`].
     #[display(fmt = "{}", _0)]
-    StreamRequest(StreamRequestError),
-}
-
-impl JsCaused for PeerError {
-    fn name(&self) -> &'static str {
-        use PeerError::*;
-        match self {
-            MediaConnections(_) => "MediaConnections",
-            MediaManager(_) => "MediaManager",
-            RtcPeerConnection(_) => "RtcPeerConnection",
-            StreamRequest(_) => "StreamRequest",
-        }
-    }
-
-    fn js_cause(&self) -> Option<js_sys::Error> {
-        use PeerError::*;
-        match self {
-            MediaConnections(err) => err.js_cause(),
-            MediaManager(err) => err.js_cause(),
-            RtcPeerConnection(err) => err.js_cause(),
-            StreamRequest(err) => err.js_cause(),
-        }
-    }
+    StreamRequest(#[js_cause] StreamRequestError),
 }
 
 type Result<T> = std::result::Result<T, Traced<PeerError>>;

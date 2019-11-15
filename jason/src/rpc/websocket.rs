@@ -4,21 +4,20 @@
 
 use std::{cell::RefCell, convert::TryFrom, rc::Rc};
 
-use derive_more::Display;
+use derive_more::*;
 use futures::{channel::oneshot, future};
-use macro_attr::*;
+use js_caused::JsCaused;
 use medea_client_api_proto::{ClientMsg, ServerMsg};
-use newtype_derive::NewtypeFrom;
 use tracerr::Traced;
 use web_sys::{CloseEvent, Event, MessageEvent, WebSocket as SysWebSocket};
 
 use crate::{
     rpc::CloseMsg,
-    utils::{EventListener, JasonError, JsCaused, JsError},
+    utils::{EventListener, JasonError, JsError},
 };
 
 /// Errors that may occur when working with [`WebSocket`].
-#[derive(Debug, Display)]
+#[derive(Debug, Display, JsCaused)]
 pub enum SocketError {
     /// Occurs when the port to which the connection is being attempted
     /// is being blocked.
@@ -64,42 +63,6 @@ pub enum SocketError {
     /// Occurs when message is sent to closed socket.
     #[display(fmt = "underlying socket is closed")]
     ClosedSocket,
-}
-
-impl JsCaused for SocketError {
-    fn name(&self) -> &'static str {
-        use SocketError::*;
-        match self {
-            CreateSocket(_) => "CreateSocket",
-            InitSocket => "InitSocket",
-            ParseClientMessage(_) => "ParseClientMessage",
-            ParseServerMessage(_) => "ParseServerMessage",
-            MessageNotString => "MessageNotString",
-            SendMessage(_) => "SendMessage",
-            SetHandlerOnClose(_) => "SetHandlerOnClose",
-            SetHandlerOnOpen(_) => "SetHandlerOnOpen",
-            SetHandlerOnMessage(_) => "SetHandlerOnMessage",
-            CastState(_) => "CastState",
-            ClosedSocket => "ClosedSocket",
-        }
-    }
-
-    fn js_cause(&self) -> Option<js_sys::Error> {
-        use SocketError::*;
-        match self {
-            InitSocket
-            | ClosedSocket
-            | MessageNotString
-            | ParseClientMessage(_)
-            | ParseServerMessage(_)
-            | CastState(_) => None,
-            CreateSocket(err)
-            | SendMessage(err)
-            | SetHandlerOnClose(err)
-            | SetHandlerOnOpen(err)
-            | SetHandlerOnMessage(err) => Some(err.into()),
-        }
-    }
 }
 
 type Result<T> = std::result::Result<T, Traced<SocketError>>;
@@ -170,10 +133,9 @@ impl InnerSocket {
             Ok(new_state) => self.socket_state = new_state,
             Err(err) => {
                 // unreachable, unless some vendor will break enum
-                console_error!(JasonError::from(
-                    tracerr::new!(err).into_parts()
+                console_error!(
+                    JasonError::from(tracerr::new!(err).into_parts()).to_string()
                 )
-                .to_string())
             }
         };
     }
@@ -331,11 +293,11 @@ impl From<&CloseEvent> for CloseMsg {
     }
 }
 
-// TODO use derive_more::From
-macro_attr! {
-    #[derive(NewtypeFrom!)]
-    pub struct ServerMessage(ServerMsg);
-}
+/// Wrapper for help to get [`ServerMsg`] from Websocket [`MessageEvent`][1].
+///
+/// [1]: https://developer.mozilla.org/en-US/docs/Web/API/MessageEvent
+#[derive(From, Into)]
+pub struct ServerMessage(ServerMsg);
 
 impl TryFrom<&MessageEvent> for ServerMessage {
     type Error = SocketError;

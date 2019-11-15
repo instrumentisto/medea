@@ -9,6 +9,7 @@ use std::{
 
 use derive_more::Display;
 use futures::{channel::mpsc, future, stream, FutureExt as _, StreamExt as _};
+use js_caused::JsCaused;
 use js_sys::Promise;
 use medea_client_api_proto::{
     Command, Direction, Event as RpcEvent, EventHandler, IceCandidate,
@@ -25,26 +26,26 @@ use crate::{
         PeerRepository,
     },
     rpc::{RpcClient, RpcClientError},
-    utils::{Callback, JasonError, JsCaused},
+    utils::{Callback, JasonError},
 };
 
 use super::{connection::Connection, ConnectionHandle};
 
 /// Errors that may occur in a [`Room`].
-#[derive(Debug, Display)]
+#[derive(Debug, Display, JsCaused)]
 enum RoomError {
     #[display(fmt = "`on_failed_local_stream` callback is not set")]
     CallbackNotSet,
     #[display(fmt = "unable to connect with media server: {}", _0)]
-    ConnectToServer(RpcClientError),
+    ConnectToServer(#[js_cause] RpcClientError),
     #[display(fmt = "invalid local stream: {}", _0)]
-    InvalidLocalStream(PeerError),
+    InvalidLocalStream(#[js_cause] PeerError),
     #[display(fmt = "failed to get local stream: {}", _0)]
-    GetLocalStream(PeerError),
+    GetLocalStream(#[js_cause] PeerError),
     #[display(fmt = "peer with id {} doesnt exist", _0)]
     NotFoundPeer(PeerId),
     #[display(fmt = "webrtc signaling process failed: {}", _0)]
-    WebRTCSignaling(PeerError),
+    WebRTCSignaling(#[js_cause] PeerError),
     #[display(fmt = "`NewRemoteStream` from sender without connection")]
     RemoteStreamWithoutConnection,
 }
@@ -63,34 +64,6 @@ impl From<PeerError> for RoomError {
             MediaConnections(_) | StreamRequest(_) => InvalidLocalStream(err),
             MediaManager(_) => GetLocalStream(err),
             RtcPeerConnection(_) => WebRTCSignaling(err),
-        }
-    }
-}
-
-impl JsCaused for RoomError {
-    fn name(&self) -> &'static str {
-        use RoomError::*;
-        match self {
-            CallbackNotSet => "CallbackNotSet",
-            ConnectToServer(_) => "ConnectToServer",
-            InvalidLocalStream(_) => "InvalidLocalStream",
-            GetLocalStream(_) => "GetLocalStream",
-            NotFoundPeer(_) => "NotFoundPeer",
-            WebRTCSignaling(_) => "WebRTCSignaling",
-            RemoteStreamWithoutConnection => "RemoteStreamWithoutConnection",
-        }
-    }
-
-    fn js_cause(&self) -> Option<js_sys::Error> {
-        use RoomError::*;
-        match self {
-            CallbackNotSet
-            | NotFoundPeer(_)
-            | RemoteStreamWithoutConnection => None,
-            InvalidLocalStream(err)
-            | GetLocalStream(err)
-            | WebRTCSignaling(err) => err.js_cause(),
-            ConnectToServer(err) => err.js_cause(),
         }
     }
 }

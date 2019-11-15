@@ -18,7 +18,3 @@ export class MockNavigator {
     }
   }
 }
-
-export const get_jason_error = (err) => {
-  return err;
-};

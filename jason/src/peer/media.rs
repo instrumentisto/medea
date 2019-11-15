@@ -4,6 +4,7 @@ use std::{borrow::ToOwned, cell::RefCell, collections::HashMap, rc::Rc};
 
 use derive_more::Display;
 use futures::future;
+use js_caused::JsCaused;
 use medea_client_api_proto::{Direction, PeerId, Track, TrackId};
 use tracerr::Traced;
 use wasm_bindgen_futures::JsFuture;
@@ -11,10 +12,7 @@ use web_sys::{
     MediaStreamTrack, RtcRtpTransceiver, RtcRtpTransceiverDirection,
 };
 
-use crate::{
-    media::TrackConstraints,
-    utils::{JsCaused, JsError},
-};
+use crate::{media::TrackConstraints, utils::JsError};
 
 use super::{
     conn::{RtcPeerConnection, TransceiverDirection, TransceiverKind},
@@ -24,7 +22,7 @@ use super::{
 };
 
 /// Errors that may occur in [`MediaConnections`] storage.
-#[derive(Debug, Display)]
+#[derive(Debug, Display, JsCaused)]
 #[allow(clippy::module_name_repetitions)]
 pub enum MediaConnectionsError {
     /// Occurs when the provided [`MediaTrack`] cannot be inserted into
@@ -54,28 +52,6 @@ pub enum MediaConnectionsError {
     /// [`Sender`] constraints.
     #[display(fmt = "provided Track does not satisfy senders constraints")]
     InvalidMediaTrack,
-}
-
-impl JsCaused for MediaConnectionsError {
-    fn name(&self) -> &'static str {
-        use MediaConnectionsError::*;
-        match self {
-            InsertTrack(_) => "InsertTrack",
-            NotFoundTransceiver(_) => "NotFoundTransceiver",
-            SendersWithoutMid => "SendersWithoutMid",
-            ReceiversWithoutMid => "ReceiversWithoutMid",
-            InvalidMediaStream => "InvalidMediaStream",
-            InvalidMediaTrack => "InvalidMediaTrack",
-        }
-    }
-
-    fn js_cause(&self) -> Option<js_sys::Error> {
-        use MediaConnectionsError::*;
-        match self {
-            InsertTrack(err) => Some(err.into()),
-            _ => None,
-        }
-    }
 }
 
 type Result<T> = std::result::Result<T, Traced<MediaConnectionsError>>;
