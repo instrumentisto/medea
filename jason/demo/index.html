@@ -189,11 +189,14 @@
           let videoDiv = document.getElementById("remote-videos");
           let video = document.createElement("video");
           video.srcObject = stream.get_media_stream();
-          video.setAttribute("style", "max-width:25%;");
+          video.style.maxWidth = "100%";
+
+          let innerVideoDiv = document.createElement("div");
+          innerVideoDiv.className = "col-md-3";
+          innerVideoDiv.appendChild(video);
+          videoDiv.appendChild(innerVideoDiv);
 
           await video.play();
-
-          videoDiv.appendChild(video);
         });
       });
 
