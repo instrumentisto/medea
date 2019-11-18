@@ -1,3 +1,5 @@
+//! Tests for [`medea_jason::rpc::RpcClient`].
+
 use std::{cell::RefCell, rc::Rc};
 
 use futures::{
@@ -35,6 +37,7 @@ struct Inner {
     on_close_reason: Option<CloseMsg>,
 }
 
+/// Test mock for [`RpcTrasport`].
 #[derive(Clone)]
 struct RpcTransportMock(Rc<RefCell<Inner>>);
 

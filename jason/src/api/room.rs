@@ -102,7 +102,7 @@ impl RoomHandle {
                         .await
                         .map(|_| JsValue::NULL)
                         .map_err(|err| {
-                            js_sys::Error::new(&format!("{}", err)).into()
+                            js_sys::Error::new(&err.to_string()).into()
                         })
                 })
             }
