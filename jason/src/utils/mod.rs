@@ -39,19 +39,10 @@ impl Drop for IntervalHandle {
     }
 }
 
-///
+/// Occurs if referenced value was dropped.
 #[derive(Debug, Display, JsCaused)]
 #[display(fmt = "detached state")]
 pub struct HandlerError;
-// impl JsCaused for HandlerError {
-// fn name(&self) -> &'static str {
-// "HandlerError"
-// }
-//
-// fn js_cause(&self) -> Option<js_sys::Error> {
-// None
-// }
-// }
 
 /// Upgrades newtyped [`Weak`] reference, returning [`HandlerError`] if failed,
 /// or mapping [`Rc`]-referenced value with provided `$closure` otherwise.
