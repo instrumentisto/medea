@@ -94,8 +94,10 @@ jobs:
       rust: stable
       services: ["docker"]
       before_script:
-        - cargo uninstall wasm-bindgen-cli || echo > /dev/null
-        - cargo install wasm-bindgen-cli
+        # With `cargo pkgid` we get version of `wasm-bindgen` from Cargo.lock.
+        - cargo install -f wasm-bindgen-cli
+                --version `cargo pkgid wasm-bindgen | grep -o '#.*'
+                                                    | grep -o '[0-9\.]*'`
         - rustup target add wasm32-unknown-unknown
       script: make test.unit crate=medea-jason browser=chrome
 
@@ -104,8 +106,10 @@ jobs:
       rust: stable
       services: ["docker"]
       before_script:
-        - cargo uninstall wasm-bindgen-cli || echo > /dev/null
-        - cargo install wasm-bindgen-cli
+        # With `cargo pkgid` we get version of `wasm-bindgen` from Cargo.lock.
+        - cargo install -f wasm-bindgen-cli
+                --version `cargo pkgid wasm-bindgen | grep -o '#.*'
+                                                    | grep -o '[0-9\.]*'`
         - rustup target add wasm32-unknown-unknown
       script: make test.unit crate=medea-jason browser=firefox
 
