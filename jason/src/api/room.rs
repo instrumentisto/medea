@@ -33,18 +33,36 @@ use super::{connection::Connection, ConnectionHandle};
 /// Errors that may occur in a [`Room`].
 #[derive(Debug, Display, JsCaused)]
 enum RoomError {
+    /// Returned if the `on_failed_local_stream` callback was not set before
+    /// joining the room.
     #[display(fmt = "`on_failed_local_stream` callback is not set")]
     CallbackNotSet,
+
+    /// Returned if [`RpcClientError`] cannoot connect with media server.
     #[display(fmt = "unable to connect with media server: {}", _0)]
     ConnectToServer(#[js_cause] RpcClientError),
+
+    /// Returned if the previously added local media stream does not satisfy
+    /// the tracks sent from the media server.
     #[display(fmt = "invalid local stream: {}", _0)]
     InvalidLocalStream(#[js_cause] PeerError),
+
+    /// Returned if [`PeerConnection`] cannot receive the local stream from
+    /// [`MediaManager`].
     #[display(fmt = "failed to get local stream: {}", _0)]
     GetLocalStream(#[js_cause] PeerError),
+
+    /// Returned if the requested [`PeerConnection`] is not found.
     #[display(fmt = "peer with id {} doesnt exist", _0)]
     NotFoundPeer(PeerId),
+
+    /// Returned if an error occurred during the webrtc signaling process
+    /// with remote peer.
     #[display(fmt = "webrtc signaling process failed: {}", _0)]
     WebRTCSignaling(#[js_cause] PeerError),
+
+    /// Returned if was received event [`PeerEvent::NewRemoteStream`] without
+    /// [`Connection`] with remote [`Member`].
     #[display(fmt = "`NewRemoteStream` from sender without connection")]
     RemoteStreamWithoutConnection,
 }
