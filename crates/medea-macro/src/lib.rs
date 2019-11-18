@@ -214,7 +214,7 @@ decl_derive!([JsCaused, attributes(js_caused, js_cause)] =>
 ///
 /// ### 1. Declare wrapper for JS error.
 ///
-/// ```
+/// ```rust,ignore
 /// use crate::utils::JsCaused;
 ///
 /// struct JsError;
@@ -231,7 +231,7 @@ decl_derive!([JsCaused, attributes(js_caused, js_cause)] =>
 /// The `js_cause()` method returns a nested error if type of error is named
 /// `JsError` or if there are the `#[js_error]` attribute.
 ///
-/// ```
+/// ```rust,ignore
 /// #[derive(JsCaused)]
 /// enum FooError {
 ///     Internal,
@@ -250,7 +250,7 @@ decl_derive!([JsCaused, attributes(js_caused, js_cause)] =>
 /// If error has attribute `#[js_caused]` it will be called `js_cause()`
 /// on nested error.
 ///
-/// ```
+/// ```rust,ignore
 /// #[derive(JsCaused)]
 /// enum BarError {
 ///     Foo(#[js_cause] FooError),
