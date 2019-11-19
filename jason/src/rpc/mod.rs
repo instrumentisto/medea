@@ -35,8 +35,6 @@ pub enum CloseMsg {
 }
 
 // TODO: consider using async-trait crate, it doesnt work with mockall atm
-// TODO: LocalBoxFuture<'static, Result<()>> => LocalBoxFuture<Result<()>>
-
 /// Client to talk with server via Client API RPC.
 #[allow(clippy::module_name_repetitions)]
 #[cfg_attr(feature = "mockable", mockall::automock)]
@@ -57,12 +55,8 @@ pub trait RpcClient {
     fn send_command(&self, command: Command);
 }
 
-// TODO: MockRpcTransport is not used anywhere right now
-// TODO: consider returning using streams and futures
-
 /// RPC transport between client and server.
 #[allow(clippy::module_name_repetitions)]
-#[cfg_attr(feature = "mockable", mockall::automock)]
 pub trait RpcTransport {
     /// Sets handler on receive message from server.
     fn on_message(
