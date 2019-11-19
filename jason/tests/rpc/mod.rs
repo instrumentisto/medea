@@ -1,6 +1,6 @@
 //! Tests for [`medea_jason::rpc::RpcClient`].
 
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use futures::{
     channel::{mpsc, oneshot},
@@ -16,7 +16,6 @@ use wasm_bindgen_futures::spawn_local;
 use wasm_bindgen_test::*;
 
 use crate::resolve_after;
-use wasm_bindgen::__rt::std::collections::HashMap;
 
 wasm_bindgen_test_configure!(run_in_browser);
 
@@ -122,7 +121,14 @@ impl Drop for RpcTransportMock {
     }
 }
 
-// TODO: small explanation of whats going on
+/// Tests [`WebSocketRpcClient::subscribe`] function.
+///
+/// # Algorithm:
+///
+/// 1. Connect [`WebSocketRpcClient`] with [`RpcTransportMock`]
+/// 2. Subscribe to [`Event`]s with [`WebSocketRpcClient::subscribe`]
+/// 3. Send [`Event`] with [`RpcTransportMock::send_on_message`]
+/// 4. Check that subscriber from step 2 receives this [`Event`]
 #[wasm_bindgen_test]
 async fn message_received_from_transport_is_transmitted_to_sub() {
     let rpc_transport = RpcTransportMock::new();
@@ -144,7 +150,13 @@ async fn message_received_from_transport_is_transmitted_to_sub() {
     rpc_transport.send_on_message(ServerMsg::Event(server_event));
 }
 
-// TODO: small explanation of whats going on
+/// Tests that [`WebSocketRpcClient`] sends [`Event::Ping`] to a server.
+///
+/// # Algorithm
+///
+/// 1. Connect [`WebSocketRpcClient`] with [`RpcTransportMock`]
+/// 2. Subscribe to [`ClientMsg`]s which [`WebSocketRpcClient`] will send with
+/// [`RpcTransportMock::on_send`] 3. Wait 600ms for [`ClientMsg::Ping`]
 #[wasm_bindgen_test]
 async fn heartbeat() {
     let rpc_transport = Rc::new(RpcTransportMock::new());
@@ -177,6 +189,14 @@ async fn heartbeat() {
     }
 }
 
+/// Tests [`WebSocketRpcClient::unsub`] function.
+///
+/// # Algorithm
+///
+/// 1. Subscribe to [`Event`]s with [`WebSocketRpcClient::subscribe`]
+/// 2. Call [`WebSocketRpcClient::unsub`]
+/// 3. Wait for `None` received from [`WebSocketRpcClient::subscribe`]'s
+/// `Stream`
 #[wasm_bindgen_test]
 async fn unsub_drops_subs() {
     let ws = WebSocketRpcClient::new(500);
@@ -205,6 +225,15 @@ async fn unsub_drops_subs() {
     }
 }
 
+/// Tests that [`RpcTransport`] will be dropped when [`WebSocketRpcClient`] was
+/// dropped.
+///
+/// # Algorithm
+///
+/// 1. Create [`WebSocketRpcClient`] with [`RpcTransportMock`] [`Rc`]
+/// 2. Drop [`WebSocketRpcClient`]
+/// 3. Check that [`RpcTransportMock`]'s [`Rc`] now have only 1
+/// [`Rc::strong_count`]
 #[wasm_bindgen_test]
 async fn transport_is_dropped_when_client_is() {
     let rpc_transport = Rc::new(RpcTransportMock::new());
@@ -214,6 +243,15 @@ async fn transport_is_dropped_when_client_is() {
     assert_eq!(Rc::strong_count(&rpc_transport), 1);
 }
 
+/// Tests [`WebSocketRpcClient::send_command`] function.
+///
+/// # Algorithm
+///
+/// 1. Connect [`WebSocketRpcClient`] with [`RpcTransportMock`]
+/// 2. Subscribe to [`ClientMsg`]s with [`RpcTransportMock::on_send`]
+/// 3. Send [`ClientMsg`] with [`WebSocketRpcClient::send_command`]
+/// 4. Check that this message received by [`RpcTransportMock`] with
+/// [`RpcTransportMock::on_send`] from step 2
 #[wasm_bindgen_test]
 async fn send_goes_to_transport() {
     let rpc_transport = Rc::new(RpcTransportMock::new());
