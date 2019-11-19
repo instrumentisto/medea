@@ -7,7 +7,7 @@ use futures::{
     future::{self, Either},
     StreamExt,
 };
-use medea_client_api_proto::{ClientMsg, Event, PeerId, ServerMsg};
+use medea_client_api_proto::{ClientMsg, Command, Event, PeerId, ServerMsg};
 use medea_jason::rpc::{
     CloseMsg, PinFuture, PinStream, RpcClient, RpcTransport, TransportError,
     WebSocketRpcClient,
@@ -16,10 +16,10 @@ use wasm_bindgen_futures::spawn_local;
 use wasm_bindgen_test::*;
 
 use crate::resolve_after;
+use wasm_bindgen::__rt::std::collections::HashMap;
 
 wasm_bindgen_test_configure!(run_in_browser);
 
-// TODO: you sure that we need to implement this manually?
 struct Inner {
     /// [`mpsc::UnboundedSender`]s for `on_message` callback of
     /// [`RpcTransportMock`].
@@ -178,7 +178,7 @@ async fn heartbeat() {
 }
 
 #[wasm_bindgen_test]
-async fn unsub_drops_sub() {
+async fn unsub_drops_subs() {
     let ws = WebSocketRpcClient::new(500);
     let (test_tx, test_rx) = oneshot::channel();
     let mut subscriber_stream = ws.subscribe();
@@ -205,5 +205,58 @@ async fn unsub_drops_sub() {
     }
 }
 
-// TODO: make sure that send goes to transport
-// TODO: make sure that transport is dropped when client is
+#[wasm_bindgen_test]
+async fn transport_is_dropped_when_client_is() {
+    let rpc_transport = Rc::new(RpcTransportMock::new());
+    let ws = WebSocketRpcClient::new(500);
+    ws.connect(rpc_transport.clone()).await.unwrap();
+    std::mem::drop(ws);
+    assert_eq!(Rc::strong_count(&rpc_transport), 1);
+}
+
+#[wasm_bindgen_test]
+async fn send_goes_to_transport() {
+    let rpc_transport = Rc::new(RpcTransportMock::new());
+    let ws = WebSocketRpcClient::new(500);
+    ws.connect(rpc_transport.clone()).await.unwrap();
+    let (test_tx, test_rx) = oneshot::channel();
+    let test_peer_id = PeerId(9999);
+    let test_sdp_offer = "Hello world!".to_string();
+    let test_cmd = Command::MakeSdpOffer {
+        peer_id: test_peer_id.clone(),
+        sdp_offer: test_sdp_offer.clone(),
+        mids: HashMap::new(),
+    };
+
+    let mut on_send_receiver = rpc_transport.on_send();
+    spawn_local(async move {
+        while let Some(msg) = on_send_receiver.next().await {
+            match msg {
+                ClientMsg::Command(cmd) => match cmd {
+                    Command::MakeSdpOffer {
+                        peer_id,
+                        sdp_offer,
+                        mids: _,
+                    } => {
+                        assert_eq!(&peer_id, &test_peer_id);
+                        assert_eq!(&sdp_offer, &test_sdp_offer);
+                        test_tx.send(()).unwrap();
+                        break;
+                    }
+                    _ => (),
+                },
+                _ => (),
+            }
+        }
+    });
+
+    ws.send_command(test_cmd);
+
+    match future::select(Box::pin(test_rx), Box::pin(resolve_after(1000))).await
+    {
+        Either::Left(_) => (),
+        Either::Right(_) => {
+            panic!("Command doesn't reach 'RpcTransport' within a 1s.")
+        }
+    }
+}
