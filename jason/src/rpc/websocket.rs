@@ -14,7 +14,7 @@ use thiserror::*;
 use web_sys::{CloseEvent, Event, MessageEvent, WebSocket as SysWebSocket};
 
 use crate::{
-    rpc::{CloseMsg, RpcTransport},
+    rpc::{CloseMsg, PinFuture, PinStream, RpcTransport},
     utils::{EventListener, WasmErr},
 };
 
@@ -140,9 +140,7 @@ impl InnerSocket {
 
 impl RpcTransport for WebSocketRpcTransport {
     /// Sets handler for receiving server messages.
-    fn on_message(
-        &self,
-    ) -> Result<mpsc::UnboundedReceiver<Result<ServerMsg, Error>>, Error> {
+    fn on_message(&self) -> Result<PinStream<Result<ServerMsg, Error>>, Error> {
         let (tx, rx) = mpsc::unbounded();
         let mut inner_mut = self.0.borrow_mut();
         inner_mut.on_message = Some(
@@ -163,11 +161,13 @@ impl RpcTransport for WebSocketRpcTransport {
             .map_err(Into::into)
             .map_err(Error::SetHandlerOnMessage)?,
         );
-        Ok(rx)
+        Ok(Box::pin(rx))
     }
 
     /// Sets handler for socket closing.
-    fn on_close(&self) -> Result<oneshot::Receiver<CloseMsg>, Error> {
+    fn on_close(
+        &self,
+    ) -> Result<PinFuture<Result<CloseMsg, oneshot::Canceled>>, Error> {
         let (tx, rx) = oneshot::channel();
         let mut inner_mut = self.0.borrow_mut();
         let inner = Rc::clone(&self.0);
@@ -188,7 +188,7 @@ impl RpcTransport for WebSocketRpcTransport {
             )
             .map_err(Error::SetHandlerOnClose)?,
         );
-        Ok(rx)
+        Ok(Box::pin(rx))
     }
 
     /// Sends message to the server.

@@ -16,10 +16,14 @@ use wasm_bindgen_futures::spawn_local;
 
 use self::heartbeat::Heartbeat;
 
+#[doc(inline)]
 pub use self::websocket::{Error as TransportError, WebSocketRpcTransport};
 
-type PinFuture<T> = Pin<Box<dyn Future<Output = T>>>;
-type PinStream<T> = Pin<Box<dyn Stream<Item = T>>>;
+/// [`Future`] wrapped into [`Pin`] and [`Box`] without lifetime.
+pub type PinFuture<T> = Pin<Box<dyn Future<Output = T>>>;
+
+/// [`Stream`] wrapped into [`Pin`] and [`Box`] without lifetime.
+pub type PinStream<T> = Pin<Box<dyn Stream<Item = T>>>;
 
 /// Connection with remote was closed.
 #[derive(Debug)]
@@ -63,13 +67,12 @@ pub trait RpcTransport {
     /// Sets handler on receive message from server.
     fn on_message(
         &self,
-    ) -> Result<
-        mpsc::UnboundedReceiver<Result<ServerMsg, TransportError>>,
-        TransportError,
-    >;
+    ) -> Result<PinStream<Result<ServerMsg, TransportError>>, TransportError>;
 
     /// Sets handler on close socket.
-    fn on_close(&self) -> Result<oneshot::Receiver<CloseMsg>, TransportError>;
+    fn on_close(
+        &self,
+    ) -> Result<PinFuture<Result<CloseMsg, oneshot::Canceled>>, TransportError>;
 
     /// Sends message to a server.
     fn send(&self, msg: &ClientMsg) -> Result<(), TransportError>;
@@ -162,7 +165,7 @@ impl RpcClient for WebSocketRpcClient {
     fn connect(
         &self,
         transport: Rc<dyn RpcTransport>,
-    ) -> Pin<Box<dyn Future<Output = Result<()>>>> {
+    ) -> PinFuture<Result<()>> {
         let inner = Rc::clone(&self.0);
         Box::pin(async move {
             inner.borrow_mut().heartbeat.start(Rc::clone(&transport))?;
@@ -198,7 +201,7 @@ impl RpcClient for WebSocketRpcClient {
     ///
     /// [`Stream`]: futures::Stream
     // TODO: proper sub registry
-    fn subscribe(&self) -> Pin<Box<dyn Stream<Item = Event>>> {
+    fn subscribe(&self) -> PinStream<Event> {
         let (tx, rx) = mpsc::unbounded();
         self.0.borrow_mut().subs.push(tx);
 

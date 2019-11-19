@@ -9,7 +9,8 @@ use futures::{
 };
 use medea_client_api_proto::{ClientMsg, Event, PeerId, ServerMsg};
 use medea_jason::rpc::{
-    CloseMsg, RpcClient, RpcTransport, TransportError, WebSocketRpcClient,
+    CloseMsg, PinFuture, PinStream, RpcClient, RpcTransport, TransportError,
+    WebSocketRpcClient,
 };
 use wasm_bindgen_futures::spawn_local;
 use wasm_bindgen_test::*;
@@ -45,19 +46,20 @@ struct RpcTransportMock(Rc<RefCell<Inner>>);
 impl RpcTransport for RpcTransportMock {
     fn on_message(
         &self,
-    ) -> Result<
-        mpsc::UnboundedReceiver<Result<ServerMsg, TransportError>>,
-        TransportError,
-    > {
+    ) -> Result<PinStream<Result<ServerMsg, TransportError>>, TransportError>
+    {
         let (tx, rx) = mpsc::unbounded();
         self.0.borrow_mut().on_message.push(tx);
-        Ok(rx)
+        Ok(Box::pin(rx))
     }
 
-    fn on_close(&self) -> Result<oneshot::Receiver<CloseMsg>, TransportError> {
+    fn on_close(
+        &self,
+    ) -> Result<PinFuture<Result<CloseMsg, oneshot::Canceled>>, TransportError>
+    {
         let (tx, rx) = oneshot::channel();
         self.0.borrow_mut().on_close = Some(tx);
-        Ok(rx)
+        Ok(Box::pin(rx))
     }
 
     fn send(&self, msg: &ClientMsg) -> Result<(), TransportError> {
