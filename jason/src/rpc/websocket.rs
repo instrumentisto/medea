@@ -17,6 +17,7 @@ use crate::{
 
 /// Errors that may occur when working with [`WebSocket`].
 #[derive(Debug, Display, JsCaused)]
+#[js_error(JsError)]
 pub enum SocketError {
     /// Occurs when the port to which the connection is being attempted
     /// is being blocked.

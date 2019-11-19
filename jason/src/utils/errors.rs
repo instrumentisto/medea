@@ -12,11 +12,14 @@ pub use medea_macro::JsCaused;
 /// Representation of an error which can caused by error returned from the
 /// JS side.
 pub trait JsCaused {
+    /// Type of wrapper for JS error.
+    type Error;
+
     /// Returns name of error.
     fn name(&self) -> &'static str;
 
     /// Returns JS error if it is the cause.
-    fn js_cause(&self) -> Option<js_sys::Error>;
+    fn js_cause(self) -> Option<Self::Error>;
 }
 
 /// Wrapper for JS value which returned from JS side as error.
@@ -51,8 +54,8 @@ impl From<JsValue> for JsError {
     }
 }
 
-impl From<&JsError> for js_sys::Error {
-    fn from(err: &JsError) -> Self {
+impl From<JsError> for js_sys::Error {
+    fn from(err: JsError) -> Self {
         let error = Self::new(&err.message);
         error.set_name(&err.name);
         error
@@ -97,13 +100,16 @@ impl JasonError {
     }
 }
 
-impl<E: JsCaused + Display> From<(E, Trace)> for JasonError {
+impl<E: JsCaused + Display> From<(E, Trace)> for JasonError
+where
+    E::Error: Into<js_sys::Error>,
+{
     fn from((err, trace): (E, Trace)) -> Self {
         Self {
             name: err.name(),
             message: err.to_string(),
             trace,
-            source: err.js_cause(),
+            source: err.js_cause().map(Into::into),
         }
     }
 }

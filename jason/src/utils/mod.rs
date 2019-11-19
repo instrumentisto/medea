@@ -42,6 +42,7 @@ impl Drop for IntervalHandle {
 /// Occurs if referenced value was dropped.
 #[derive(Debug, Display, JsCaused)]
 #[display(fmt = "detached state")]
+#[js_error(JsError)]
 pub struct HandlerError;
 
 /// Upgrades newtyped [`Weak`] reference, returning [`HandlerError`] if failed,

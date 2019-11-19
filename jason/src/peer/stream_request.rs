@@ -25,6 +25,7 @@ use super::{MediaStream, MediaTrack};
 /// parsing [`MediaStream`].
 #[derive(Debug, Display, JsCaused)]
 #[allow(clippy::module_name_repetitions)]
+#[js_error(crate::utils::JsError)]
 pub enum StreamRequestError {
     /// [`StreamRequest`] contains multiple [`AudioTrackConstraints`].
     #[display(fmt = "only one audio track is allowed in SimpleStreamRequest")]

@@ -32,6 +32,7 @@ use super::{connection::Connection, ConnectionHandle};
 
 /// Errors that may occur in a [`Room`].
 #[derive(Debug, Display, JsCaused)]
+#[js_error(crate::utils::JsError)]
 enum RoomError {
     /// Returned if the `on_failed_local_stream` callback was not set before
     /// joining the room.

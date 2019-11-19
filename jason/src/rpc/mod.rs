@@ -29,6 +29,7 @@ pub enum CloseMsg {
 /// Errors that may occur in [`RpcClient`].
 #[derive(Debug, Display, From, JsCaused)]
 #[allow(clippy::module_name_repetitions)]
+#[js_error(crate::utils::JsError)]
 pub enum RpcClientError {
     /// Occurs if new WebSocket connection to remote media server cannot
     /// be established.

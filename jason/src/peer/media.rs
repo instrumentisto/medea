@@ -26,6 +26,7 @@ use super::{
 /// Errors that may occur in [`MediaConnections`] storage.
 #[derive(Debug, Display, JsCaused)]
 #[allow(clippy::module_name_repetitions)]
+#[js_error(JsError)]
 pub enum MediaConnectionsError {
     /// Occurs when the provided [`MediaTrack`] cannot be inserted into
     /// provided [`Sender`]s transceiver.

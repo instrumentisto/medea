@@ -207,35 +207,26 @@ pub fn dispatchable(_: TokenStream, input: TokenStream) -> TokenStream {
     dispatchable::derive(input).unwrap_or_else(|e| e.to_compile_error().into())
 }
 
-decl_derive!([JsCaused, attributes(js_caused, js_cause)] =>
+decl_derive!([JsCaused, attributes(js_cause, js_error)] =>
 /// Generate implementation `JsCaused` trait for errors represented as `enum`.
 ///
 /// # How to use
 ///
-/// ### 1. Declare wrapper for JS error.
+/// ### 1. Declare wrapper for JS error and `enum` for error variants.
 ///
-/// ```rust,ignore
-/// use crate::utils::JsCaused;
+/// The `js_cause()` method returns error if nested error has type declare as
+/// argument of `js_error` attribute like `#[js_error(path::to::Error)]`.
+///
+/// ```
+/// use medea_jason::utils::JsCaused;
 ///
 /// struct JsError;
 ///
-/// impl From<&JsError> for js_sys::Error {
-///     fn from(_: &JsError) -> Self {
-///         unimplemented!()
-///     }
-/// }
-/// ```
-///
-/// ### 2. Declare `enum` for error variants.
-///
-/// The `js_cause()` method returns a nested error if type of error is named
-/// `JsError` or if there are the `#[js_error]` attribute.
-///
-/// ```rust,ignore
 /// #[derive(JsCaused)]
+/// #[js_error(JsError)]
 /// enum FooError {
 ///     Internal,
-///     Js(#[js_error] JsError),
+///     Js(JsError),
 /// }
 ///
 /// let err = FooError::Internal;
@@ -247,11 +238,23 @@ decl_derive!([JsCaused, attributes(js_caused, js_cause)] =>
 /// assert!(err.js_cause().is_some());
 /// ```
 ///
-/// If error has attribute `#[js_caused]` it will be called `js_cause()`
+/// If enum variant has attribute `#[js_caused]` it will be called `js_cause()`
 /// on nested error.
 ///
-/// ```rust,ignore
+/// ```
+/// # use medea_jason::utils::JsCaused;
+/// #
+/// # struct JsError;
+/// #
+/// # #[derive(JsCaused)]
+/// # #[js_error(JsError)]
+/// # enum FooError {
+/// #     Internal,
+/// #     Js(JsError),
+/// # }
+///
 /// #[derive(JsCaused)]
+/// #[js_error(JsError)]
 /// enum BarError {
 ///     Foo(#[js_cause] FooError),
 /// }

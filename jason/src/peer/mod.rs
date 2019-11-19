@@ -47,6 +47,7 @@ pub use self::{
 /// [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
 #[derive(Debug, Display, From, JsCaused)]
 #[allow(clippy::module_name_repetitions)]
+#[js_error(crate::utils::JsError)]
 pub enum PeerError {
     /// Errors that may occur in [`MediaConnections`] storage.
     #[display(fmt = "{}", _0)]
