@@ -6,8 +6,13 @@ All user visible changes to this project will be documented in this file. This p
 
 
 
-## TBD  [0.1.1] · 2019-11-??
-[0.1.1]: /../../tree/medea-macro-0.1.1/crates/medea-macro
+## TBD [0.2.0] · 2019-??-??
+[0.2.0]: /../../tree/medea-macro-0.2.0/crates/medea-macro
+
+### BC Breaks
+
+- `#[dispatchable]` macro:
+    - Handler traits now require specifying `Output` associative type, which is the return type of all handler trait methods ([#66](/../../pull/66)).
 
 ### Added
 

@@ -398,6 +398,8 @@ impl InnerRoom {
 
 /// RPC events handling.
 impl EventHandler for InnerRoom {
+    type Output = ();
+
     /// Creates [`PeerConnection`] with a provided ID and all the
     /// [`Connection`]s basing on provided [`Track`]s.
     ///
@@ -551,6 +553,8 @@ impl EventHandler for InnerRoom {
 
 /// [`PeerEvent`]s handling.
 impl PeerEventHandler for InnerRoom {
+    type Output = ();
+
     /// Handles [`PeerEvent::IceCandidateDiscovered`] event and sends received
     /// candidate to RPC server.
     fn on_ice_candidate_discovered(

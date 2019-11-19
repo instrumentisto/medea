@@ -1381,7 +1381,7 @@ dependencies = [
  "humantime-serde 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "medea-client-api-proto 0.1.1-dev",
  "medea-control-api-proto 0.1.0-dev",
- "medea-macro 0.1.0",
+ "medea-macro 0.2.0-dev",
  "protobuf 2.8.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "rand 0.7.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "redis 0.11.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1410,7 +1410,7 @@ name = "medea-client-api-proto"
 version = "0.1.1-dev"
 dependencies = [
  "derive_more 0.15.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "medea-macro 0.1.0",
+ "medea-macro 0.2.0-dev",
  "serde 1.0.102 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_json 1.0.41 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -1458,7 +1458,7 @@ dependencies = [
  "futures 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "js-sys 0.3.31 (registry+https://github.com/rust-lang/crates.io-index)",
  "medea-client-api-proto 0.1.1-dev",
- "medea-macro 0.1.0",
+ "medea-macro 0.2.0-dev",
  "mockall 0.5.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "predicates-tree 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.102 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1473,7 +1473,7 @@ dependencies = [
 
 [[package]]
 name = "medea-macro"
-version = "0.1.0"
+version = "0.2.0-dev"
 dependencies = [
  "Inflector 0.11.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "medea-jason 0.2.0-dev",
