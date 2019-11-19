@@ -109,7 +109,7 @@ struct InnerSocket {
 }
 
 /// WebSocket [`RpcTransport`] between client and server.
-pub struct WebSocket(Rc<RefCell<InnerSocket>>);
+pub struct WebSocketRpcTransport(Rc<RefCell<InnerSocket>>);
 
 impl InnerSocket {
     fn new(url: &str) -> Result<Self, Error> {
@@ -138,7 +138,7 @@ impl InnerSocket {
     }
 }
 
-impl RpcTransport for WebSocket {
+impl RpcTransport for WebSocketRpcTransport {
     /// Sets handler for receiving server messages.
     fn on_message(
         &self,
@@ -208,7 +208,7 @@ impl RpcTransport for WebSocket {
     }
 }
 
-impl WebSocket {
+impl WebSocketRpcTransport {
     /// Initiates new WebSocket connection. Resolves only when underlying
     /// connection becomes active.
     pub async fn new(url: &str) -> Result<Self, Error> {
@@ -262,7 +262,7 @@ impl WebSocket {
     }
 }
 
-impl Drop for WebSocket {
+impl Drop for WebSocketRpcTransport {
     fn drop(&mut self) {
         let mut inner = self.0.borrow_mut();
         if inner.socket_state.can_close() {

@@ -9,7 +9,7 @@ use futures::{
 };
 use medea_client_api_proto::{ClientMsg, Event, PeerId, ServerMsg};
 use medea_jason::rpc::{
-    websocket::Error, CloseMsg, RpcClient, RpcClientImpl, RpcTransport,
+    CloseMsg, RpcClient, RpcTransport, TransportError, WebSocketRpcClient,
 };
 use wasm_bindgen_futures::spawn_local;
 use wasm_bindgen_test::*;
@@ -18,10 +18,11 @@ use crate::resolve_after;
 
 wasm_bindgen_test_configure!(run_in_browser);
 
+// TODO: you sure that we need to implement this manually?
 struct Inner {
     /// [`mpsc::UnboundedSender`]s for `on_message` callback of
     /// [`RpcTransportMock`].
-    on_message: Vec<mpsc::UnboundedSender<Result<ServerMsg, Error>>>,
+    on_message: Vec<mpsc::UnboundedSender<Result<ServerMsg, TransportError>>>,
 
     /// [`oneshot::Sender`] for `on_close` callback of [`RpcTransportMock`].
     on_close: Option<oneshot::Sender<CloseMsg>>,
@@ -44,19 +45,22 @@ struct RpcTransportMock(Rc<RefCell<Inner>>);
 impl RpcTransport for RpcTransportMock {
     fn on_message(
         &self,
-    ) -> Result<mpsc::UnboundedReceiver<Result<ServerMsg, Error>>, Error> {
+    ) -> Result<
+        mpsc::UnboundedReceiver<Result<ServerMsg, TransportError>>,
+        TransportError,
+    > {
         let (tx, rx) = mpsc::unbounded();
         self.0.borrow_mut().on_message.push(tx);
         Ok(rx)
     }
 
-    fn on_close(&self) -> Result<oneshot::Receiver<CloseMsg>, Error> {
+    fn on_close(&self) -> Result<oneshot::Receiver<CloseMsg>, TransportError> {
         let (tx, rx) = oneshot::channel();
         self.0.borrow_mut().on_close = Some(tx);
         Ok(rx)
     }
 
-    fn send(&self, msg: &ClientMsg) -> Result<(), Error> {
+    fn send(&self, msg: &ClientMsg) -> Result<(), TransportError> {
         self.0
             .borrow()
             .on_send
@@ -116,10 +120,11 @@ impl Drop for RpcTransportMock {
     }
 }
 
+// TODO: small explanation of whats going on
 #[wasm_bindgen_test]
-async fn on_message() {
+async fn message_received_from_transport_is_transmitted_to_sub() {
     let rpc_transport = RpcTransportMock::new();
-    let ws = RpcClientImpl::new(10);
+    let ws = WebSocketRpcClient::new(10);
     let mut stream = ws.subscribe();
 
     let server_event = Event::PeerCreated {
@@ -133,17 +138,18 @@ async fn on_message() {
     spawn_local(async move {
         assert_eq!(stream.next().await.unwrap(), server_event_clone);
     });
-    ws.connect(Box::new(rpc_transport.clone())).await.unwrap();
+    ws.connect(Rc::new(rpc_transport.clone())).await.unwrap();
     rpc_transport.send_on_message(ServerMsg::Event(server_event));
 }
 
+// TODO: small explanation of whats going on
 #[wasm_bindgen_test]
 async fn heartbeat() {
-    let rpc_transport = RpcTransportMock::new();
-    let ws = RpcClientImpl::new(500);
+    let rpc_transport = Rc::new(RpcTransportMock::new());
+    let ws = WebSocketRpcClient::new(500);
 
     let mut on_send_stream = rpc_transport.on_send();
-    ws.connect(Box::new(rpc_transport)).await.unwrap();
+    ws.connect(rpc_transport).await.unwrap();
 
     let test_result = futures::future::select(
         Box::pin(async move {
@@ -168,3 +174,7 @@ async fn heartbeat() {
         Either::Right(_) => panic!("Ping doesn't sent during ping interval."),
     }
 }
+
+// TODO: make sure that unsub drops sub
+// TODO: make sure that send goes to transport
+// TODO: make sure that transport is dropped when client is
