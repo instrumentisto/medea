@@ -3,14 +3,12 @@
 mod heartbeat;
 mod websocket;
 
-use std::{cell::RefCell, rc::Rc, vec};
+use std::{cell::RefCell, pin::Pin, rc::Rc, vec};
 
 use anyhow::Result;
 use futures::{
     channel::{mpsc, oneshot},
-    future::LocalBoxFuture,
-    stream::LocalBoxStream,
-    StreamExt,
+    Future, Stream, StreamExt,
 };
 use js_sys::Date;
 use medea_client_api_proto::{ClientMsg, Command, Event, ServerMsg};
@@ -19,6 +17,9 @@ use wasm_bindgen_futures::spawn_local;
 use self::heartbeat::Heartbeat;
 
 pub use self::websocket::{Error as TransportError, WebSocketRpcTransport};
+
+type PinFuture<T> = Pin<Box<dyn Future<Output = T>>>;
+type PinStream<T> = Pin<Box<dyn Stream<Item = T>>>;
 
 /// Connection with remote was closed.
 #[derive(Debug)]
@@ -37,15 +38,13 @@ pub enum CloseMsg {
 #[cfg_attr(feature = "mockable", mockall::automock)]
 pub trait RpcClient {
     /// Establishes connection with RPC server.
-    fn connect(
-        &self,
-        rpc_transport: Rc<dyn RpcTransport>,
-    ) -> LocalBoxFuture<'static, Result<()>>;
+    fn connect(&self, transport: Rc<dyn RpcTransport>)
+        -> PinFuture<Result<()>>;
 
     /// Returns [`Stream`] of all [`Event`]s received by this [`RpcClient`].
     ///
     /// [`Stream`]: futures::Stream
-    fn subscribe(&self) -> LocalBoxStream<'static, Event>;
+    fn subscribe(&self) -> PinStream<Event>;
 
     /// Unsubscribes from this [`RpcClient`]. Drops all subscriptions atm.
     fn unsub(&self);
@@ -163,7 +162,7 @@ impl RpcClient for WebSocketRpcClient {
     fn connect(
         &self,
         transport: Rc<dyn RpcTransport>,
-    ) -> LocalBoxFuture<'static, Result<()>> {
+    ) -> Pin<Box<dyn Future<Output = Result<()>>>> {
         let inner = Rc::clone(&self.0);
         Box::pin(async move {
             inner.borrow_mut().heartbeat.start(Rc::clone(&transport))?;
@@ -199,7 +198,7 @@ impl RpcClient for WebSocketRpcClient {
     ///
     /// [`Stream`]: futures::Stream
     // TODO: proper sub registry
-    fn subscribe(&self) -> LocalBoxStream<'static, Event> {
+    fn subscribe(&self) -> Pin<Box<dyn Stream<Item = Event>>> {
         let (tx, rx) = mpsc::unbounded();
         self.0.borrow_mut().subs.push(tx);
 
