@@ -4,7 +4,7 @@ use std::{cell::RefCell, rc::Rc};
 
 use futures::{
     channel::{mpsc, oneshot},
-    future::Either,
+    future::{self, Either},
     StreamExt,
 };
 use medea_client_api_proto::{ClientMsg, Event, PeerId, ServerMsg};
@@ -153,7 +153,7 @@ async fn heartbeat() {
     let mut on_send_stream = rpc_transport.on_send();
     ws.connect(rpc_transport).await.unwrap();
 
-    let test_result = futures::future::select(
+    let test_result = future::select(
         Box::pin(async move {
             let mut ping_count = 0;
             while let Some(event) = on_send_stream.next().await {
@@ -177,6 +177,33 @@ async fn heartbeat() {
     }
 }
 
-// TODO: make sure that unsub drops sub
+#[wasm_bindgen_test]
+async fn unsub_drops_sub() {
+    let ws = WebSocketRpcClient::new(500);
+    let (test_tx, test_rx) = oneshot::channel();
+    let mut subscriber_stream = ws.subscribe();
+    spawn_local(async move {
+        loop {
+            match subscriber_stream.next().await {
+                Some(_) => (),
+                None => {
+                    test_tx.send(()).unwrap();
+                    break;
+                }
+            }
+        }
+    });
+    ws.unsub();
+
+    match future::select(Box::pin(test_rx), Box::pin(resolve_after(1000))).await
+    {
+        Either::Left(_) => (),
+        Either::Right(_) => panic!(
+            "'unsub_drops_sub' lasts more that 1s. Most likely 'unsub' is \
+             broken."
+        ),
+    }
+}
+
 // TODO: make sure that send goes to transport
 // TODO: make sure that transport is dropped when client is
