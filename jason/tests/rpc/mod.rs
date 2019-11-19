@@ -126,8 +126,11 @@ impl Drop for RpcTransportMock {
 /// # Algorithm:
 ///
 /// 1. Connect [`WebSocketRpcClient`] with [`RpcTransportMock`]
+///
 /// 2. Subscribe to [`Event`]s with [`WebSocketRpcClient::subscribe`]
+///
 /// 3. Send [`Event`] with [`RpcTransportMock::send_on_message`]
+///
 /// 4. Check that subscriber from step 2 receives this [`Event`]
 #[wasm_bindgen_test]
 async fn message_received_from_transport_is_transmitted_to_sub() {
@@ -155,8 +158,11 @@ async fn message_received_from_transport_is_transmitted_to_sub() {
 /// # Algorithm
 ///
 /// 1. Connect [`WebSocketRpcClient`] with [`RpcTransportMock`]
+///
 /// 2. Subscribe to [`ClientMsg`]s which [`WebSocketRpcClient`] will send with
-/// [`RpcTransportMock::on_send`] 3. Wait 600ms for [`ClientMsg::Ping`]
+/// [`RpcTransportMock::on_send`]
+///
+/// 3. Wait 600ms for [`ClientMsg::Ping`]
 #[wasm_bindgen_test]
 async fn heartbeat() {
     let rpc_transport = Rc::new(RpcTransportMock::new());
@@ -194,7 +200,9 @@ async fn heartbeat() {
 /// # Algorithm
 ///
 /// 1. Subscribe to [`Event`]s with [`WebSocketRpcClient::subscribe`]
+///
 /// 2. Call [`WebSocketRpcClient::unsub`]
+///
 /// 3. Wait for `None` received from [`WebSocketRpcClient::subscribe`]'s
 /// `Stream`
 #[wasm_bindgen_test]
@@ -231,11 +239,13 @@ async fn unsub_drops_subs() {
 /// # Algorithm
 ///
 /// 1. Create [`WebSocketRpcClient`] with [`RpcTransportMock`] [`Rc`]
+///
 /// 2. Drop [`WebSocketRpcClient`]
+///
 /// 3. Check that [`RpcTransportMock`]'s [`Rc`] now have only 1
 /// [`Rc::strong_count`]
 #[wasm_bindgen_test]
-async fn transport_is_dropped_when_client_is() {
+async fn transport_is_dropped_when_client_is_dropped() {
     let rpc_transport = Rc::new(RpcTransportMock::new());
     let ws = WebSocketRpcClient::new(500);
     ws.connect(rpc_transport.clone()).await.unwrap();
@@ -248,8 +258,11 @@ async fn transport_is_dropped_when_client_is() {
 /// # Algorithm
 ///
 /// 1. Connect [`WebSocketRpcClient`] with [`RpcTransportMock`]
+///
 /// 2. Subscribe to [`ClientMsg`]s with [`RpcTransportMock::on_send`]
+///
 /// 3. Send [`ClientMsg`] with [`WebSocketRpcClient::send_command`]
+///
 /// 4. Check that this message received by [`RpcTransportMock`] with
 /// [`RpcTransportMock::on_send`] from step 2
 #[wasm_bindgen_test]
@@ -276,8 +289,8 @@ async fn send_goes_to_transport() {
                         sdp_offer,
                         mids: _,
                     } => {
-                        assert_eq!(&peer_id, &test_peer_id);
-                        assert_eq!(&sdp_offer, &test_sdp_offer);
+                        assert_eq!(peer_id, test_peer_id);
+                        assert_eq!(sdp_offer, test_sdp_offer);
                         test_tx.send(()).unwrap();
                         break;
                     }

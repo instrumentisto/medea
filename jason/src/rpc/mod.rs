@@ -68,7 +68,7 @@ pub trait RpcTransport {
         &self,
     ) -> Result<PinFuture<Result<CloseMsg, oneshot::Canceled>>, TransportError>;
 
-    /// Sends message to a server.
+    /// Sends message to server.
     fn send(&self, msg: &ClientMsg) -> Result<(), TransportError>;
 }
 
