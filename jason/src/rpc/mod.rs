@@ -57,6 +57,7 @@ pub trait RpcClient {
 
 /// RPC transport between client and server.
 #[allow(clippy::module_name_repetitions)]
+#[cfg_attr(feature = "mockable", mockall::automock)]
 pub trait RpcTransport {
     /// Sets handler on receive message from server.
     fn on_message(

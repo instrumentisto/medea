@@ -1,16 +1,22 @@
 //! Tests for [`medea_jason::rpc::RpcClient`].
 
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::{
+    cell::RefCell,
+    collections::HashMap,
+    rc::Rc,
+    sync::atomic::{AtomicU64, Ordering},
+};
 
 use futures::{
     channel::{mpsc, oneshot},
-    future::{self, Either},
-    StreamExt,
+    future::{self, pending, Either},
+    stream::once,
+    FutureExt, StreamExt,
 };
 use medea_client_api_proto::{ClientMsg, Command, Event, PeerId, ServerMsg};
 use medea_jason::rpc::{
-    CloseMsg, PinFuture, PinStream, RpcClient, RpcTransport, TransportError,
-    WebSocketRpcClient,
+    CloseMsg, MockRpcTransport, PinFuture, PinStream, RpcClient, RpcTransport,
+    TransportError, WebSocketRpcClient,
 };
 use wasm_bindgen_futures::spawn_local;
 use wasm_bindgen_test::*;
@@ -133,24 +139,29 @@ impl Drop for RpcTransportMock {
 ///
 /// 4. Check that subscriber from step 2 receives this [`Event`]
 #[wasm_bindgen_test]
-async fn message_received_from_transport_is_transmitted_to_sub() {
-    let rpc_transport = RpcTransportMock::new();
-    let ws = WebSocketRpcClient::new(10);
-    let mut stream = ws.subscribe();
-
-    let server_event = Event::PeerCreated {
-        peer_id: PeerId(0),
-        tracks: vec![],
-        ice_servers: vec![],
-        sdp_offer: None,
+ async fn message_received_from_transport_is_transmitted_to_sub() {
+    let server_event = Event::PeersRemoved {
+        peer_ids: vec![]
     };
     let server_event_clone = server_event.clone();
 
-    spawn_local(async move {
-        assert_eq!(stream.next().await.unwrap(), server_event_clone);
-    });
-    ws.connect(Rc::new(rpc_transport.clone())).await.unwrap();
-    rpc_transport.send_on_message(ServerMsg::Event(server_event));
+    let mut transport = MockRpcTransport::new();
+    transport.expect_on_message()
+        .return_once(move || Ok(
+            once(async move {
+                Ok(ServerMsg::Event(server_event_clone))
+            }).boxed()
+        ));
+    transport.expect_send()
+        .return_once(|_| Ok(()));
+    transport.expect_on_close()
+        .return_once(|| Ok(pending().boxed()));
+
+    let ws = WebSocketRpcClient::new(10);
+
+    let mut stream = ws.subscribe();
+    ws.connect(Rc::new(transport)).await.unwrap();
+    assert_eq!(stream.next().await.unwrap(), server_event);
 }
 
 /// Tests that [`WebSocketRpcClient`] sends [`Event::Ping`] to a server.
@@ -165,34 +176,30 @@ async fn message_received_from_transport_is_transmitted_to_sub() {
 /// 3. Wait 600ms for [`ClientMsg::Ping`]
 #[wasm_bindgen_test]
 async fn heartbeat() {
-    let rpc_transport = Rc::new(RpcTransportMock::new());
-    let ws = WebSocketRpcClient::new(500);
+    let mut transport = MockRpcTransport::new();
+    transport
+        .expect_on_message()
+        .return_once(move || Ok(once(pending()).boxed()));
+    transport
+        .expect_on_close()
+        .return_once(move || Ok(pending().boxed()));
 
-    let mut on_send_stream = rpc_transport.on_send();
-    ws.connect(rpc_transport).await.unwrap();
+    let counter = AtomicU64::new(1);
+    transport
+        .expect_send()
+        .times(3)
+        .withf(move |msg: &ClientMsg| {
+            if let ClientMsg::Ping(id) = msg {
+                assert_eq!(*id, counter.fetch_add(1, Ordering::Relaxed));
+            };
+            true
+        })
+        .returning(|_| Ok(()));
 
-    let test_result = future::select(
-        Box::pin(async move {
-            let mut ping_count = 0;
-            while let Some(event) = on_send_stream.next().await {
-                match event {
-                    ClientMsg::Ping(_) => {
-                        ping_count += 1;
-                        if ping_count > 1 {
-                            break;
-                        }
-                    }
-                    _ => {}
-                }
-            }
-        }),
-        Box::pin(resolve_after(600)),
-    )
-    .await;
-    match test_result {
-        Either::Left(_) => (),
-        Either::Right(_) => panic!("Ping doesn't sent during ping interval."),
-    }
+    let ws = WebSocketRpcClient::new(50);
+    ws.connect(Rc::new(transport)).await.unwrap();
+
+    resolve_after(120).await.unwrap();
 }
 
 /// Tests [`WebSocketRpcClient::unsub`] function.
@@ -224,13 +231,13 @@ async fn unsub_drops_subs() {
     ws.unsub();
 
     match future::select(Box::pin(test_rx), Box::pin(resolve_after(1000))).await
-    {
-        Either::Left(_) => (),
-        Either::Right(_) => panic!(
-            "'unsub_drops_sub' lasts more that 1s. Most likely 'unsub' is \
+        {
+            Either::Left(_) => (),
+            Either::Right(_) => panic!(
+                "'unsub_drops_sub' lasts more that 1s. Most likely 'unsub' is \
              broken."
-        ),
-    }
+            ),
+        }
 }
 
 /// Tests that [`RpcTransport`] will be dropped when [`WebSocketRpcClient`] was
@@ -304,10 +311,10 @@ async fn send_goes_to_transport() {
     ws.send_command(test_cmd);
 
     match future::select(Box::pin(test_rx), Box::pin(resolve_after(1000))).await
-    {
-        Either::Left(_) => (),
-        Either::Right(_) => {
-            panic!("Command doesn't reach 'RpcTransport' within a 1s.")
+        {
+            Either::Left(_) => (),
+            Either::Right(_) => {
+                panic!("Command doesn't reach 'RpcTransport' within a 1s.")
+            }
         }
-    }
 }
