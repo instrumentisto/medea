@@ -1,7 +1,6 @@
 //! Tests for [`medea_jason::rpc::RpcClient`].
 
 use std::{
-    cell::RefCell,
     collections::HashMap,
     rc::Rc,
     sync::atomic::{AtomicU64, Ordering},
@@ -14,118 +13,13 @@ use futures::{
     FutureExt, StreamExt,
 };
 use medea_client_api_proto::{ClientMsg, Command, Event, PeerId, ServerMsg};
-use medea_jason::rpc::{
-    CloseMsg, MockRpcTransport, PinFuture, PinStream, RpcClient, RpcTransport,
-    TransportError, WebSocketRpcClient,
-};
+use medea_jason::rpc::{MockRpcTransport, RpcClient, WebSocketRpcClient};
 use wasm_bindgen_futures::spawn_local;
 use wasm_bindgen_test::*;
 
 use crate::resolve_after;
 
 wasm_bindgen_test_configure!(run_in_browser);
-
-struct Inner {
-    /// [`mpsc::UnboundedSender`]s for `on_message` callback of
-    /// [`RpcTransportMock`].
-    on_message: Vec<mpsc::UnboundedSender<Result<ServerMsg, TransportError>>>,
-
-    /// [`oneshot::Sender`] for `on_close` callback of [`RpcTransportMock`].
-    on_close: Option<oneshot::Sender<CloseMsg>>,
-
-    /// [`oneshot::Sender`] with which all [`ClientMsg`]s from
-    /// [`RpcTransport::send`] will be sent.
-    on_send: Option<mpsc::UnboundedSender<ClientMsg>>,
-
-    /// [`CloseMsg`] which will be returned in `on_close` callback when
-    /// [`RpcTransportMock`] will be dropped.
-    ///
-    /// If `None` then `CloseMsg::Normal(String::new())` will be sent.
-    on_close_reason: Option<CloseMsg>,
-}
-
-/// Test mock for [`RpcTrasport`].
-#[derive(Clone)]
-struct RpcTransportMock(Rc<RefCell<Inner>>);
-
-impl RpcTransport for RpcTransportMock {
-    fn on_message(
-        &self,
-    ) -> Result<PinStream<Result<ServerMsg, TransportError>>, TransportError>
-    {
-        let (tx, rx) = mpsc::unbounded();
-        self.0.borrow_mut().on_message.push(tx);
-        Ok(Box::pin(rx))
-    }
-
-    fn on_close(
-        &self,
-    ) -> Result<PinFuture<Result<CloseMsg, oneshot::Canceled>>, TransportError>
-    {
-        let (tx, rx) = oneshot::channel();
-        self.0.borrow_mut().on_close = Some(tx);
-        Ok(Box::pin(rx))
-    }
-
-    fn send(&self, msg: &ClientMsg) -> Result<(), TransportError> {
-        self.0
-            .borrow()
-            .on_send
-            .as_ref()
-            .map(|q| q.unbounded_send(msg.clone()));
-        Ok(())
-    }
-}
-
-impl RpcTransportMock {
-    /// Returns [`RpcTransportMock`] without any callbacks.
-    pub fn new() -> Self {
-        Self(Rc::new(RefCell::new(Inner {
-            on_message: Vec::new(),
-            on_close: None,
-            on_send: None,
-            on_close_reason: None,
-        })))
-    }
-
-    /// Emulates receiving of [`ServerMsg`] by [`RpcTransport`] from a server.
-    pub fn send_on_message(&self, msg: ServerMsg) {
-        self.0
-            .borrow()
-            .on_message
-            .iter()
-            .for_each(|q| q.unbounded_send(Ok(msg.clone())).unwrap());
-    }
-
-    /// Returns [`mpsc::UnboundedReceiver`] which will receive all
-    /// [`ClientMessage`]s which will be sent with [`RpcTransport::send`].
-    fn on_send(&self) -> mpsc::UnboundedReceiver<ClientMsg> {
-        let (tx, rx) = mpsc::unbounded();
-        self.0.borrow_mut().on_send = Some(tx);
-        rx
-    }
-
-    /// Sets [`CloseMsg`] which will be returned in `on_close` callback when
-    /// [`RpcTransportMock`] will be dropped.
-    #[allow(dead_code)]
-    fn set_on_close_reason(&self, close_msg: CloseMsg) {
-        self.0.borrow_mut().on_close_reason = Some(close_msg);
-    }
-}
-
-impl Drop for RpcTransportMock {
-    fn drop(&mut self) {
-        let close_msg = self
-            .0
-            .borrow_mut()
-            .on_close_reason
-            .take()
-            .unwrap_or_else(|| CloseMsg::Normal(String::new()));
-        self.0.borrow_mut().on_close.take().map(|on_close| {
-            on_close.send(close_msg).unwrap();
-        });
-    }
-}
 
 /// Tests [`WebSocketRpcClient::subscribe`] function.
 ///
@@ -139,22 +33,20 @@ impl Drop for RpcTransportMock {
 ///
 /// 4. Check that subscriber from step 2 receives this [`Event`]
 #[wasm_bindgen_test]
- async fn message_received_from_transport_is_transmitted_to_sub() {
-    let server_event = Event::PeersRemoved {
-        peer_ids: vec![]
-    };
+async fn message_received_from_transport_is_transmitted_to_sub() {
+    let server_event = Event::PeersRemoved { peer_ids: vec![] };
     let server_event_clone = server_event.clone();
 
     let mut transport = MockRpcTransport::new();
-    transport.expect_on_message()
-        .return_once(move || Ok(
-            once(async move {
-                Ok(ServerMsg::Event(server_event_clone))
-            }).boxed()
-        ));
-    transport.expect_send()
-        .return_once(|_| Ok(()));
-    transport.expect_on_close()
+    transport.expect_on_message().return_once(move || {
+        Ok(
+            once(async move { Ok(ServerMsg::Event(server_event_clone)) })
+                .boxed(),
+        )
+    });
+    transport.expect_send().return_once(|_| Ok(()));
+    transport
+        .expect_on_close()
         .return_once(|| Ok(pending().boxed()));
 
     let ws = WebSocketRpcClient::new(10);
@@ -231,13 +123,13 @@ async fn unsub_drops_subs() {
     ws.unsub();
 
     match future::select(Box::pin(test_rx), Box::pin(resolve_after(1000))).await
-        {
-            Either::Left(_) => (),
-            Either::Right(_) => panic!(
-                "'unsub_drops_sub' lasts more that 1s. Most likely 'unsub' is \
+    {
+        Either::Left(_) => (),
+        Either::Right(_) => panic!(
+            "'unsub_drops_sub' lasts more that 1s. Most likely 'unsub' is \
              broken."
-            ),
-        }
+        ),
+    }
 }
 
 /// Tests that [`RpcTransport`] will be dropped when [`WebSocketRpcClient`] was
@@ -253,7 +145,16 @@ async fn unsub_drops_subs() {
 /// [`Rc::strong_count`]
 #[wasm_bindgen_test]
 async fn transport_is_dropped_when_client_is_dropped() {
-    let rpc_transport = Rc::new(RpcTransportMock::new());
+    let mut transport = MockRpcTransport::new();
+    transport
+        .expect_on_message()
+        .return_once(move || Ok(once(pending()).boxed()));
+    transport
+        .expect_on_close()
+        .return_once(move || Ok(pending().boxed()));
+    transport.expect_send().return_once(|_| Ok(()));
+    let rpc_transport = Rc::new(transport);
+
     let ws = WebSocketRpcClient::new(500);
     ws.connect(rpc_transport.clone()).await.unwrap();
     std::mem::drop(ws);
@@ -274,9 +175,21 @@ async fn transport_is_dropped_when_client_is_dropped() {
 /// [`RpcTransportMock::on_send`] from step 2
 #[wasm_bindgen_test]
 async fn send_goes_to_transport() {
-    let rpc_transport = Rc::new(RpcTransportMock::new());
+    let mut transport = MockRpcTransport::new();
+    let (on_send_tx, mut on_send_rx) = mpsc::unbounded();
+    transport
+        .expect_on_message()
+        .return_once(move || Ok(once(pending()).boxed()));
+    transport
+        .expect_on_close()
+        .return_once(move || Ok(pending().boxed()));
+    transport.expect_send().returning(move |e| {
+        on_send_tx.unbounded_send(e.clone()).unwrap();
+        Ok(())
+    });
+
     let ws = WebSocketRpcClient::new(500);
-    ws.connect(rpc_transport.clone()).await.unwrap();
+    ws.connect(Rc::new(transport)).await.unwrap();
     let (test_tx, test_rx) = oneshot::channel();
     let test_peer_id = PeerId(9999);
     let test_sdp_offer = "Hello world!".to_string();
@@ -286,9 +199,8 @@ async fn send_goes_to_transport() {
         mids: HashMap::new(),
     };
 
-    let mut on_send_receiver = rpc_transport.on_send();
     spawn_local(async move {
-        while let Some(msg) = on_send_receiver.next().await {
+        while let Some(msg) = on_send_rx.next().await {
             match msg {
                 ClientMsg::Command(cmd) => match cmd {
                     Command::MakeSdpOffer {
@@ -311,10 +223,10 @@ async fn send_goes_to_transport() {
     ws.send_command(test_cmd);
 
     match future::select(Box::pin(test_rx), Box::pin(resolve_after(1000))).await
-        {
-            Either::Left(_) => (),
-            Either::Right(_) => {
-                panic!("Command doesn't reach 'RpcTransport' within a 1s.")
-            }
+    {
+        Either::Left(_) => (),
+        Either::Right(_) => {
+            panic!("Command doesn't reach 'RpcTransport' within a 1s.")
         }
+    }
 }
