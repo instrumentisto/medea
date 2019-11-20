@@ -7,8 +7,9 @@ describe('Pub<=>Pub video call', () => {
     async function createRoom() {
         await axios({
             method: 'post',
-            url: 'http://127.0.0.1:8000/pub-pub-e2e-call',
+            url: 'http://127.0.0.1:8000/control-api/pub-pub-e2e-call',
             data: {
+            kind: 'Room',
             pipeline: {
                 caller: {
                     kind: 'Member',
@@ -16,15 +17,11 @@ describe('Pub<=>Pub video call', () => {
                     pipeline: {
                         publish: {
                             kind: 'WebRtcPublishEndpoint',
-                            spec: {
-                                p2p: 'Always'
-                            }
+                            p2p: 'Always'
                         },
                         play: {
                             kind: 'WebRtcPlayEndpoint',
-                            spec: {
-                                src: 'local://pub-pub-e2e-call/responder/publish',
-                            }
+                            src: 'local://pub-pub-e2e-call/responder/publish',
                         }
                     }
                 },
@@ -34,15 +31,11 @@ describe('Pub<=>Pub video call', () => {
                     pipeline: {
                         publish: {
                             kind: 'WebRtcPublishEndpoint',
-                            spec: {
-                                p2p: 'Always',
-                            }
+                            p2p: 'Always',
                         },
                         play: {
                             kind: 'WebRtcPlayEndpoint',
-                            spec: {
-                                src: 'local://pub-pub-e2e-call/caller/publish',
-                            }
+                            src: 'local://pub-pub-e2e-call/caller/publish',
                         }
                     }
                 }
@@ -54,7 +47,7 @@ describe('Pub<=>Pub video call', () => {
      * Send DELETE pub-pub-e2e-call request to control-api-room.
      */
     async function deleteRoom() {
-        await axios.delete('http://127.0.0.1:8000/pub-pub-e2e-call')
+        await axios.delete('http://127.0.0.1:8000/control-api/pub-pub-e2e-call')
     }
 
     const callerPartnerVideo = 'callers-partner-video';
@@ -69,8 +62,8 @@ describe('Pub<=>Pub video call', () => {
         let caller = await window.getJason();
         let responder = await window.getJason();
 
-        let callerRoom = await caller.join_room("ws://127.0.0.1:8080/ws/pub-pub-e2e-call/caller/test");
-        let responderRoom = await responder.join_room("ws://127.0.0.1:8080/ws/pub-pub-e2e-call/responder/test");
+        let callerRoom = caller.init_room();
+        let responderRoom = responder.init_room();
 
         callerRoom.on_new_connection((connection) => {
             connection.on_remote_stream((stream) => {
@@ -82,29 +75,29 @@ describe('Pub<=>Pub video call', () => {
                 video.play();
             });
         });
-        caller.on_local_stream((stream, error) => {
-            if (stream) {
-                let video = document.createElement("video");
+        // caller.on_local_stream((stream, error) => {
+        //     if (stream) {
+        //         let video = document.createElement("video");
+        //
+        //         video.srcObject = stream.get_media_stream();
+        //         document.body.appendChild(video);
+        //         video.play();
+        //     } else {
+        //         console.log(error);
+        //     }
+        // });
 
-                video.srcObject = stream.get_media_stream();
-                document.body.appendChild(video);
-                video.play();
-            } else {
-                console.log(error);
-            }
-        });
-
-        responder.on_local_stream((stream, error) => {
-            if (stream) {
-                let video = document.createElement("video");
-
-                video.srcObject = stream.get_media_stream();
-                document.body.appendChild(video);
-                video.play();
-            } else {
-                console.log(error);
-            }
-        });
+        // responder.on_local_stream((stream, error) => {
+        //     if (stream) {
+        //         let video = document.createElement("video");
+        //
+        //         video.srcObject = stream.get_media_stream();
+        //         document.body.appendChild(video);
+        //         video.play();
+        //     } else {
+        //         console.log(error);
+        //     }
+        // });
         responderRoom.on_new_connection((connection) => {
             connection.on_remote_stream(function(stream) {
                 let video = document.createElement("video");
@@ -115,6 +108,9 @@ describe('Pub<=>Pub video call', () => {
                 video.play();
             });
         });
+
+        await callerRoom.join("ws://127.0.0.1:8080/ws/pub-pub-e2e-call/caller/test");
+        await responderRoom.join("ws://127.0.0.1:8080/ws/pub-pub-e2e-call/responder/test");
 
         return {
             caller: callerRoom,

@@ -208,31 +208,7 @@ up.jason:
 #  make up.control-api-mock
 
 up.control-api-mock:
-	cargo run -p control-api-mock
-
-
-# Start webdriver.
-#
-# Usage:
-#   make up.webdriver [browser=(chrome|firefox)]
-#                     [dockerized=(yes|no)]
-
-up.webdriver: down.webdriver
-ifeq ($(browser),firefox)
-ifeq ($(dockerized),no)
-	geckodriver &
-else
-	docker run --rm -d --shm-size 256m --name medea-test-ff \
-		--network=host alexlapa/geckodriver:${FIREFOX_VERSION}
-endif
-else
-ifeq ($(dockerized),no)
-	chromedriver --port=4444 &
-else
-	docker run --rm -d --name medea-test-chrome \
-		--network=host selenoid/chrome:$(CHROME_VERSION)
-endif
-endif
+	cargo run -p medea-control-api-mock
 
 
 
@@ -470,7 +446,7 @@ endif
 #                 [browser=(chrome|firefox)]
 #                 [wait-on-fail=(no|yes)]
 
-test.e2e: up.e2e.services up.webdriver
+test.e2e: up.e2e.services docker.up.webdriver
 	sleep 3
 	$(if $(call eq,$(dockerized),no),,$(run-medea-container)) cargo run -p e2e-tests-runner -- \
 		-w http://localhost:4444 \
@@ -503,8 +479,8 @@ run-medea-command = docker run --rm --network=host -v "$(PWD)":/app -w /app \
                     	-v "$(HOME)/.cargo/registry":/usr/local/cargo/registry \
                     	-v "$(HOME):$(HOME)" \
                     	-v "$(PWD)/target":/app/target
-run-medea-container-d =  $(run-medea-command) -d alexlapa/medea-build:dev
-run-medea-container = $(run-medea-command) alexlapa/medea-build:dev
+run-medea-container-d =  $(run-medea-command) -d rust:latest
+run-medea-container = $(run-medea-command) rust:latest
 
 up.e2e.services:
 ifneq ($(dockerized),no)
@@ -515,13 +491,13 @@ ifneq ($(coturn),no)
 endif
 ifeq ($(dockerized),no)
 	cargo build $(if $(call eq,$(release),yes),--release)
-	cargo build -p control-api-mock
+	cargo build -p medea-control-api-mock
 	pushd jason && wasm-pack build --target web --out-dir ../.cache/jason-pkg && popd
 
 	env $(if $(call eq,$(logs),yes),,RUST_LOG=warn) cargo run --bin medea \
 		$(if $(call eq,$(release),yes),--release) & \
 		echo $$! > /tmp/e2e_medea.pid
-	env RUST_LOG=warn cargo run -p control-api-mock & \
+	env RUST_LOG=warn cargo run -p medea-control-api-mock & \
 		echo $$! > /tmp/e2e_control_api_mock.pid
 
 	cargo build -p e2e-tests-runner
@@ -535,8 +511,8 @@ else
 	$(run-medea-container) make build.medea optimized=yes
 	$(run-medea-container-d) cargo run --release > /tmp/medea.docker.uid
 
-	$(run-medea-container) cargo build -p control-api-mock
-	$(run-medea-container-d) cargo run -p control-api-mock > /tmp/control-api-mock.docker.uid
+	$(run-medea-container) cargo build -p medea-control-api-mock
+	$(run-medea-container-d) cargo run -p medea-control-api-mock > /tmp/control-api-mock.docker.uid
 
 	$(run-medea-container) cargo build -p e2e-tests-runner
 endif
