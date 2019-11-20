@@ -12,8 +12,10 @@ use actix::{
 use derive_more::Display;
 use failure::Fail;
 use futures::future;
-use medea_client_api_proto::{Command, Event, IceCandidate, PeerId, TrackId};
-use medea_control_api_proto::grpc::control_api::{
+use medea_client_api_proto::{
+    Command, CommandHandler, Event, IceCandidate, PeerId, TrackId,
+};
+use medea_control_api_proto::grpc::api::{
     Element as ElementProto, Room as RoomProto,
 };
 
@@ -28,7 +30,7 @@ use crate::{
                 WebRtcPlayEndpoint as WebRtcPlayEndpointSpec,
                 WebRtcPublishEndpoint as WebRtcPublishEndpointSpec,
             },
-            local_uri::{LocalUri, StatefulLocalUri, ToEndpoint, ToMember},
+            refs::{Fid, StatefulFid, ToEndpoint, ToMember},
             room::RoomSpec,
             EndpointId, EndpointSpec, MemberId, MemberSpec, RoomId,
             TryFromElementError, WebRtcPlayId, WebRtcPublishId,
@@ -61,42 +63,48 @@ pub type ActFuture<I, E> =
 pub enum RoomError {
     #[display(fmt = "Couldn't find Peer with [id = {}]", _0)]
     PeerNotFound(PeerId),
-    #[display(fmt = "{}", _0)]
+
     MemberError(MemberError),
+
     #[display(fmt = "Member [id = {}] does not have Turn credentials", _0)]
     NoTurnCredentials(MemberId),
+
     #[display(fmt = "Couldn't find RpcConnection with Member [id = {}]", _0)]
     ConnectionNotExists(MemberId),
+
     #[display(fmt = "Unable to send event to Member [id = {}]", _0)]
     UnableToSendEvent(MemberId),
+
     #[display(fmt = "PeerError: {}", _0)]
     PeerError(PeerError),
-    #[display(fmt = "{}", _0)]
+
     MembersLoadError(MembersLoadError),
-    #[display(fmt = "{}", _0)]
+
     TryFromElementError(TryFromElementError),
+
     #[display(fmt = "Generic room error: {}", _0)]
     BadRoomSpec(String),
+
     #[display(fmt = "Turn service error: {}", _0)]
     TurnServiceError(String),
-    #[display(fmt = "{}", _0)]
+
     ParticipantServiceErr(ParticipantServiceErr),
-    #[display(fmt = "Client error:{}", _0)]
+
+    #[display(fmt = "Client error: {}", _0)]
     ClientError(String),
-    #[display(
-        fmt = "Given LocalUri [uri = {}] to wrong room [id = {}]",
-        _0,
-        _1
-    )]
-    WrongRoomId(StatefulLocalUri, RoomId),
+
+    #[display(fmt = "Given Fid [fid = {}] to wrong Room [id = {}]", _0, _1)]
+    WrongRoomId(StatefulFid, RoomId),
+
     /// Try to create [`Member`] with ID which already exists.
     #[display(fmt = "Member [id = {}] already exists.", _0)]
-    MemberAlreadyExists(LocalUri<ToMember>),
+    MemberAlreadyExists(Fid<ToMember>),
+
     /// Try to create [`Endpoint`] with ID which already exists.
     ///
     /// [`Endpoint`]: crate::signalling::elements::endpoints::Endpoint
     #[display(fmt = "Endpoint [id = {}] already exists.", _0)]
-    EndpointAlreadyExists(LocalUri<ToEndpoint>),
+    EndpointAlreadyExists(Fid<ToEndpoint>),
 }
 
 impl From<PeerError> for RoomError {
@@ -249,122 +257,6 @@ impl Room {
         )))
     }
 
-    /// Sends [`Event::PeerCreated`] to provided [`Peer`] partner. Provided
-    /// [`Peer`] state must be [`WaitLocalSdp`] and will be changed to
-    /// [`WaitRemoteSdp`], partners [`Peer`] state must be [`New`] and will be
-    /// changed to [`WaitLocalHaveRemote`].
-    fn handle_make_sdp_offer(
-        &mut self,
-        from_peer_id: PeerId,
-        sdp_offer: String,
-        mids: HashMap<TrackId, String>,
-    ) -> Result<ActFuture<(), RoomError>, RoomError> {
-        let mut from_peer: Peer<WaitLocalSdp> =
-            self.peers.take_inner_peer(from_peer_id)?;
-        from_peer.set_mids(mids)?;
-
-        let to_peer_id = from_peer.partner_peer_id();
-        let to_peer: Peer<New> = self.peers.take_inner_peer(to_peer_id)?;
-
-        let from_peer = from_peer.set_local_sdp(sdp_offer.clone());
-        let to_peer = to_peer.set_remote_sdp(sdp_offer.clone());
-
-        let to_member_id = to_peer.member_id();
-        let ice_servers = self
-            .members
-            .get_member(&to_member_id)?
-            .servers_list()
-            .ok_or_else(|| {
-                RoomError::NoTurnCredentials(to_member_id.clone())
-            })?;
-
-        let event = Event::PeerCreated {
-            peer_id: to_peer.id(),
-            sdp_offer: Some(sdp_offer),
-            tracks: to_peer.tracks(),
-            ice_servers,
-        };
-
-        self.peers.add_peer(from_peer);
-        self.peers.add_peer(to_peer);
-
-        Ok(Box::new(wrap_future(
-            self.members.send_event_to_member(to_member_id, event),
-        )))
-    }
-
-    /// Sends [`Event::SdpAnswerMade`] to provided [`Peer`] partner. Provided
-    /// [`Peer`] state must be [`WaitLocalHaveRemote`] and will be changed to
-    /// [`Stable`], partners [`Peer`] state must be [`WaitRemoteSdp`] and will
-    /// be changed to [`Stable`].
-    fn handle_make_sdp_answer(
-        &mut self,
-        from_peer_id: PeerId,
-        sdp_answer: String,
-    ) -> Result<ActFuture<(), RoomError>, RoomError> {
-        let from_peer: Peer<WaitLocalHaveRemote> =
-            self.peers.take_inner_peer(from_peer_id)?;
-
-        let to_peer_id = from_peer.partner_peer_id();
-        let to_peer: Peer<WaitRemoteSdp> =
-            self.peers.take_inner_peer(to_peer_id)?;
-
-        let from_peer = from_peer.set_local_sdp(sdp_answer.clone());
-        let to_peer = to_peer.set_remote_sdp(&sdp_answer);
-
-        let to_member_id = to_peer.member_id();
-        let event = Event::SdpAnswerMade {
-            peer_id: to_peer_id,
-            sdp_answer,
-        };
-
-        self.peers.add_peer(from_peer);
-        self.peers.add_peer(to_peer);
-
-        Ok(Box::new(wrap_future(
-            self.members.send_event_to_member(to_member_id, event),
-        )))
-    }
-
-    /// Sends [`Event::IceCandidateDiscovered`] to provided [`Peer`] partner.
-    /// Both [`Peer`]s may have any state except [`New`].
-    fn handle_set_ice_candidate(
-        &mut self,
-        from_peer_id: PeerId,
-        candidate: IceCandidate,
-    ) -> Result<ActFuture<(), RoomError>, RoomError> {
-        let from_peer = self.peers.get_peer_by_id(from_peer_id)?;
-        if let PeerStateMachine::New(_) = from_peer {
-            return Err(PeerError::WrongState(
-                from_peer_id,
-                "Not New",
-                format!("{}", from_peer),
-            )
-            .into());
-        }
-
-        let to_peer_id = from_peer.partner_peer_id();
-        let to_peer = self.peers.get_peer_by_id(to_peer_id)?;
-        if let PeerStateMachine::New(_) = to_peer {
-            return Err(PeerError::WrongState(
-                to_peer_id,
-                "Not New",
-                format!("{}", to_peer),
-            )
-            .into());
-        }
-
-        let to_member_id = to_peer.member_id();
-        let event = Event::IceCandidateDiscovered {
-            peer_id: to_peer_id,
-            candidate,
-        };
-
-        Ok(Box::new(wrap_future(
-            self.members.send_event_to_member(to_member_id, event),
-        )))
-    }
-
     /// Creates [`Peer`] for endpoints if [`Peer`] between endpoint's members
     /// doesn't exist.
     ///
@@ -487,31 +379,30 @@ impl Room {
         first_peer: PeerId,
         second_peer: PeerId,
     ) {
-        let fut: ActFuture<(), ()> =
-            match self.send_peer_created(first_peer, second_peer) {
-                Ok(res) => {
-                    Box::new(res.then(|res, room, ctx| -> ActFuture<(), ()> {
-                        if res.is_ok() {
-                            return Box::new(future::ok(()).into_actor(room));
-                        }
-                        error!(
-                            "Failed connect peers, because {}. Room [id = {}] \
-                             will be stopped.",
-                            res.unwrap_err(),
-                            room.id,
-                        );
-                        room.close_gracefully(ctx)
-                    }))
-                }
-                Err(err) => {
+        let fut = match self.send_peer_created(first_peer, second_peer) {
+            Ok(res) => {
+                Box::new(res.then(|res, room, ctx| -> ActFuture<(), ()> {
+                    if res.is_ok() {
+                        return Box::new(future::ok(()).into_actor(room));
+                    }
                     error!(
                         "Failed connect peers, because {}. Room [id = {}] \
                          will be stopped.",
-                        err, self.id,
+                        res.unwrap_err(),
+                        room.id,
                     );
-                    self.close_gracefully(ctx)
-                }
-            };
+                    room.close_gracefully(ctx)
+                }))
+            }
+            Err(err) => {
+                error!(
+                    "Failed connect peers, because {}. Room [id = {}] will be \
+                     stopped.",
+                    err, self.id,
+                );
+                self.close_gracefully(ctx)
+            }
+        };
 
         ctx.spawn(fut);
     }
@@ -684,7 +575,7 @@ impl Room {
     /// This function will check that new [`WebRtcPublishEndpoint`]'s ID is not
     /// present in [`ParticipantService`].
     ///
-    /// Returns [`ParticipantServiceErr::EndpointAlreadyExists`] when
+    /// Returns [`RoomError::EndpointAlreadyExists`] when
     /// [`WebRtcPublishEndpoint`]'s ID already presented in [`Member`].
     pub fn create_src_endpoint(
         &mut self,
@@ -703,7 +594,7 @@ impl Room {
 
         if is_member_have_this_sink_id || is_member_have_this_src_id {
             return Err(RoomError::EndpointAlreadyExists(
-                member.get_local_uri_to_endpoint(play_id.into()),
+                member.get_fid_to_endpoint(play_id.into()),
             ));
         }
 
@@ -731,7 +622,7 @@ impl Room {
     /// This function will check that new [`WebRtcPlayEndpoint`]'s ID is not
     /// present in [`ParticipantService`].
     ///
-    /// Returns [`ParticipantServiceErr::EndpointAlreadyExists`] when
+    /// Returns [`RoomError::EndpointAlreadyExists`] when
     /// [`WebRtcPlayEndpoint`]'s ID already presented in [`Member`].
     pub fn create_sink_endpoint(
         &mut self,
@@ -750,7 +641,7 @@ impl Room {
             member.get_src_by_id(&publish_id).is_some();
         if is_member_have_this_sink_id || is_member_have_this_src_id {
             return Err(RoomError::EndpointAlreadyExists(
-                member.get_local_uri_to_endpoint(publish_id.into()),
+                member.get_fid_to_endpoint(publish_id.into()),
             ));
         }
 
@@ -759,7 +650,7 @@ impl Room {
             .get_src_by_id(&spec.src.endpoint_id)
             .ok_or_else(|| {
                 MemberError::EndpointNotFound(
-                    partner_member.get_local_uri_to_endpoint(
+                    partner_member.get_fid_to_endpoint(
                         spec.src.endpoint_id.clone().into(),
                     ),
                 )
@@ -784,7 +675,9 @@ impl Room {
 
         member.insert_sink(sink);
 
-        self.init_member_connections(&member, ctx);
+        if self.members.member_has_connection(member_id) {
+            self.init_member_connections(&member, ctx);
+        }
 
         Ok(())
     }
@@ -794,7 +687,7 @@ impl Room {
     /// This function will check that new [`Member`]'s ID is not present in
     /// [`ParticipantService`].
     ///
-    /// Returns [`ParticipantServiceErr::ParticipantAlreadyExists`] when
+    /// Returns [`RoomError::MemberAlreadyExists`] when
     /// [`Member`]'s ID already presented in [`ParticipantService`].
     pub fn create_member(
         &mut self,
@@ -803,7 +696,7 @@ impl Room {
     ) -> Result<(), RoomError> {
         if self.members.get_member_by_id(&id).is_some() {
             return Err(RoomError::MemberAlreadyExists(
-                self.members.get_local_uri_to_member(id),
+                self.members.get_fid_to_member(id),
             ));
         }
         let signalling_member = Member::new(
@@ -828,7 +721,7 @@ impl Room {
                 .get_src_by_id(&play.src.endpoint_id)
                 .ok_or_else(|| {
                     MemberError::EndpointNotFound(
-                        partner_member.get_local_uri_to_endpoint(
+                        partner_member.get_fid_to_endpoint(
                             play.src.endpoint_id.clone().into(),
                         ),
                     )
@@ -850,9 +743,136 @@ impl Room {
             src.add_sink(sink.downgrade());
         }
 
-        self.members.create_membe(id, signalling_member);
+        self.members.insert_member(id, signalling_member);
 
         Ok(())
+    }
+}
+
+impl CommandHandler for Room {
+    type Output = Result<ActFuture<(), RoomError>, RoomError>;
+
+    /// Sends [`Event::PeerCreated`] to provided [`Peer`] partner. Provided
+    /// [`Peer`] state must be [`WaitLocalSdp`] and will be changed to
+    /// [`WaitRemoteSdp`], partners [`Peer`] state must be [`New`] and will be
+    /// changed to [`WaitLocalHaveRemote`].
+    fn on_make_sdp_offer(
+        &mut self,
+        from_peer_id: PeerId,
+        sdp_offer: String,
+        mids: HashMap<TrackId, String>,
+    ) -> Self::Output {
+        let mut from_peer: Peer<WaitLocalSdp> =
+            self.peers.take_inner_peer(from_peer_id)?;
+        from_peer.set_mids(mids)?;
+
+        let to_peer_id = from_peer.partner_peer_id();
+        let to_peer: Peer<New> = self.peers.take_inner_peer(to_peer_id)?;
+
+        let from_peer = from_peer.set_local_sdp(sdp_offer.clone());
+        let to_peer = to_peer.set_remote_sdp(sdp_offer.clone());
+
+        let to_member_id = to_peer.member_id();
+        let ice_servers = self
+            .members
+            .get_member(&to_member_id)?
+            .servers_list()
+            .ok_or_else(|| {
+                RoomError::NoTurnCredentials(to_member_id.clone())
+            })?;
+
+        let event = Event::PeerCreated {
+            peer_id: to_peer.id(),
+            sdp_offer: Some(sdp_offer),
+            tracks: to_peer.tracks(),
+            ice_servers,
+        };
+
+        self.peers.add_peer(from_peer);
+        self.peers.add_peer(to_peer);
+
+        Ok(Box::new(wrap_future(
+            self.members.send_event_to_member(to_member_id, event),
+        )))
+    }
+
+    /// Sends [`Event::SdpAnswerMade`] to provided [`Peer`] partner. Provided
+    /// [`Peer`] state must be [`WaitLocalHaveRemote`] and will be changed to
+    /// [`Stable`], partners [`Peer`] state must be [`WaitRemoteSdp`] and will
+    /// be changed to [`Stable`].
+    fn on_make_sdp_answer(
+        &mut self,
+        from_peer_id: PeerId,
+        sdp_answer: String,
+    ) -> Self::Output {
+        let from_peer: Peer<WaitLocalHaveRemote> =
+            self.peers.take_inner_peer(from_peer_id)?;
+
+        let to_peer_id = from_peer.partner_peer_id();
+        let to_peer: Peer<WaitRemoteSdp> =
+            self.peers.take_inner_peer(to_peer_id)?;
+
+        let from_peer = from_peer.set_local_sdp(sdp_answer.clone());
+        let to_peer = to_peer.set_remote_sdp(&sdp_answer);
+
+        let to_member_id = to_peer.member_id();
+        let event = Event::SdpAnswerMade {
+            peer_id: to_peer_id,
+            sdp_answer,
+        };
+
+        self.peers.add_peer(from_peer);
+        self.peers.add_peer(to_peer);
+
+        Ok(Box::new(wrap_future(
+            self.members.send_event_to_member(to_member_id, event),
+        )))
+    }
+
+    /// Sends [`Event::IceCandidateDiscovered`] to provided [`Peer`] partner.
+    /// Both [`Peer`]s may have any state except [`New`].
+    fn on_set_ice_candidate(
+        &mut self,
+        from_peer_id: PeerId,
+        candidate: IceCandidate,
+    ) -> Self::Output {
+        // TODO: add E2E test
+        if candidate.candidate.is_empty() {
+            warn!("Empty candidate from Peer: {}, ignoring", from_peer_id);
+            let fut: ActFuture<_, _> = Box::new(actix::fut::ok(()));
+            return Ok(fut);
+        }
+
+        let from_peer = self.peers.get_peer_by_id(from_peer_id)?;
+        if let PeerStateMachine::New(_) = from_peer {
+            return Err(PeerError::WrongState(
+                from_peer_id,
+                "Not New",
+                format!("{}", from_peer),
+            )
+            .into());
+        }
+
+        let to_peer_id = from_peer.partner_peer_id();
+        let to_peer = self.peers.get_peer_by_id(to_peer_id)?;
+        if let PeerStateMachine::New(_) = to_peer {
+            return Err(PeerError::WrongState(
+                to_peer_id,
+                "Not New",
+                format!("{}", to_peer),
+            )
+            .into());
+        }
+
+        let to_member_id = to_peer.member_id();
+        let event = Event::IceCandidateDiscovered {
+            peer_id: to_peer_id,
+            candidate,
+        };
+
+        Ok(Box::new(wrap_future(
+            self.members.send_event_to_member(to_member_id, event),
+        )))
     }
 }
 
@@ -875,60 +895,62 @@ impl Into<ElementProto> for &mut Room {
             .members
             .members()
             .into_iter()
-            .map(|(id, member)| {
-                let local_uri = LocalUri::<ToMember>::new(self.get_id(), id);
-                (local_uri.to_string(), member.into())
-            })
+            .map(|(id, member)| (id.to_string(), member.into()))
             .collect();
 
         room.set_pipeline(pipeline);
+        room.set_id(self.id().to_string());
         element.set_room(room);
 
         element
     }
 }
 
+// TODO: Tightly coupled with protobuf.
+//       We should name this method GetElements, that will return some
+//       intermediate DTO, that will be serialized at the caller side.
+//       But lets leave it as it is for now.
+
 /// Message for serializing this [`Room`] and [`Room`]'s elements to protobuf
 /// spec.
 #[derive(Message)]
-#[rtype(result = "Result<HashMap<StatefulLocalUri, ElementProto>, RoomError>")]
-pub struct SerializeProto(pub Vec<StatefulLocalUri>);
+#[rtype(result = "Result<HashMap<StatefulFid, ElementProto>, RoomError>")]
+pub struct SerializeProto(pub Vec<StatefulFid>);
 
 impl Handler<SerializeProto> for Room {
-    type Result = Result<HashMap<StatefulLocalUri, ElementProto>, RoomError>;
+    type Result = Result<HashMap<StatefulFid, ElementProto>, RoomError>;
 
     fn handle(
         &mut self,
         msg: SerializeProto,
         _: &mut Self::Context,
     ) -> Self::Result {
-        let mut serialized: HashMap<StatefulLocalUri, ElementProto> =
-            HashMap::new();
-        for uri in msg.0 {
-            match &uri {
-                StatefulLocalUri::Room(room_uri) => {
-                    if room_uri.room_id() == &self.id {
+        let mut serialized: HashMap<StatefulFid, ElementProto> = HashMap::new();
+        for fid in msg.0 {
+            match &fid {
+                StatefulFid::Room(room_fid) => {
+                    if room_fid.room_id() == &self.id {
                         let current_room: ElementProto = self.into();
-                        serialized.insert(uri, current_room);
+                        serialized.insert(fid, current_room);
                     } else {
                         return Err(RoomError::WrongRoomId(
-                            uri,
+                            fid,
                             self.id.clone(),
                         ));
                     }
                 }
-                StatefulLocalUri::Member(member_uri) => {
+                StatefulFid::Member(member_fid) => {
                     let member =
-                        self.members.get_member(member_uri.member_id())?;
-                    serialized.insert(uri, member.into());
+                        self.members.get_member(member_fid.member_id())?;
+                    serialized.insert(fid, member.into());
                 }
-                StatefulLocalUri::Endpoint(endpoint_uri) => {
+                StatefulFid::Endpoint(endpoint_fid) => {
                     let member =
-                        self.members.get_member(endpoint_uri.member_id())?;
+                        self.members.get_member(endpoint_fid.member_id())?;
                     let endpoint = member.get_endpoint_by_id(
-                        endpoint_uri.endpoint_id().to_string(),
+                        endpoint_fid.endpoint_id().to_string(),
                     )?;
-                    serialized.insert(uri, endpoint.into());
+                    serialized.insert(fid, endpoint.into());
                 }
             }
         }
@@ -962,29 +984,7 @@ impl Handler<CommandMessage> for Room {
         msg: CommandMessage,
         ctx: &mut Self::Context,
     ) -> Self::Result {
-        let result = match msg.into() {
-            Command::MakeSdpOffer {
-                peer_id,
-                sdp_offer,
-                mids,
-            } => self.handle_make_sdp_offer(peer_id, sdp_offer, mids),
-            Command::MakeSdpAnswer {
-                peer_id,
-                sdp_answer,
-            } => self.handle_make_sdp_answer(peer_id, sdp_answer),
-            Command::SetIceCandidate { peer_id, candidate } => {
-                // TODO: add E2E test
-                if candidate.candidate.is_empty() {
-                    warn!("Empty candidate from Peer: {}, ignoring", peer_id);
-                    let fut: ActFuture<_, _> = Box::new(actix::fut::ok(()));
-                    Ok(fut)
-                } else {
-                    self.handle_set_ice_candidate(peer_id, candidate)
-                }
-            }
-        };
-
-        match result {
+        match Command::from(msg).dispatch_with(self) {
             Ok(res) => {
                 Box::new(res.then(|res, room, ctx| -> ActFuture<(), ()> {
                     if res.is_ok() {
@@ -1115,10 +1115,10 @@ impl Handler<Close> for Room {
     }
 }
 
-/// Signal for delete elements from this [`Room`].
+/// Signal for deleting elements from this [`Room`].
 #[derive(Message, Debug)]
 #[rtype(result = "()")]
-pub struct Delete(pub Vec<StatefulLocalUri>);
+pub struct Delete(pub Vec<StatefulFid>);
 
 impl Handler<Delete> for Room {
     type Result = ();
@@ -1128,28 +1128,26 @@ impl Handler<Delete> for Room {
         let mut endpoint_ids = Vec::new();
         for id in msg.0 {
             match id {
-                StatefulLocalUri::Member(member_uri) => {
-                    member_ids.push(member_uri);
+                StatefulFid::Member(member_fid) => {
+                    member_ids.push(member_fid);
                 }
-                StatefulLocalUri::Endpoint(endpoint_uri) => {
-                    endpoint_ids.push(endpoint_uri);
+                StatefulFid::Endpoint(endpoint_fid) => {
+                    endpoint_ids.push(endpoint_fid);
                 }
-                _ => warn!(
-                    "Found LocalUri<IsRoomId> while deleting __from__ Room."
-                ),
+                _ => warn!("Found Fid<IsRoomId> while deleting __from__ Room."),
             }
         }
-        member_ids.into_iter().for_each(|uri| {
-            self.delete_member(&uri.member_id(), ctx);
+        member_ids.into_iter().for_each(|fid| {
+            self.delete_member(&fid.member_id(), ctx);
         });
-        endpoint_ids.into_iter().for_each(|uri| {
-            let (_, member_id, endpoint_id) = uri.take_all();
+        endpoint_ids.into_iter().for_each(|fid| {
+            let (_, member_id, endpoint_id) = fid.take_all();
             self.delete_endpoint(&member_id, endpoint_id, ctx);
         });
     }
 }
 
-/// Signal for create new [`Member`] in this [`Room`].
+/// Signal for creating new [`Member`] in this [`Room`].
 #[derive(Message, Debug)]
 #[rtype(result = "Result<(), RoomError>")]
 pub struct CreateMember(pub MemberId, pub MemberSpec);
@@ -1171,7 +1169,7 @@ impl Handler<CreateMember> for Room {
     }
 }
 
-/// Signal for create new `Endpoint` from [`EndpointSpec`].
+/// Signal for creating new `Endpoint` from [`EndpointSpec`].
 #[derive(Message, Debug)]
 #[rtype(result = "Result<(), RoomError>")]
 pub struct CreateEndpoint {

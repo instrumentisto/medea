@@ -70,7 +70,7 @@ pub struct Redis {
 }
 
 #[cfg(test)]
-mod turn_conf_specs {
+mod spec {
     use std::{net::Ipv4Addr, time::Duration};
 
     use serial_test_derive::serial;

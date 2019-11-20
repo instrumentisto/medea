@@ -23,9 +23,7 @@ use futures::{
     Future,
 };
 
-use medea_client_api_proto::{
-    CloseDescription, Event, RpcConnectionCloseReason,
-};
+use medea_client_api_proto::{CloseDescription, CloseReason, Event};
 
 use crate::{
     api::{
@@ -34,7 +32,7 @@ use crate::{
             RpcConnectionClosed,
         },
         control::{
-            local_uri::{LocalUri, ToEndpoint, ToMember},
+            refs::{Fid, ToEndpoint, ToMember},
             MemberId, RoomId, RoomSpec,
         },
     },
@@ -60,18 +58,17 @@ pub enum ParticipantServiceErr {
     #[display(fmt = "TurnService Error in ParticipantService: {}", _0)]
     TurnServiceErr(TurnServiceErr),
 
-    /// [`Member`] with provided [`LocalUri`] not found.
+    /// [`Member`] with provided [`Fid`] not found.
     #[display(fmt = "Participant [id = {}] not found", _0)]
-    ParticipantNotFound(LocalUri<ToMember>),
+    ParticipantNotFound(Fid<ToMember>),
 
     /// [`Endpoint`] with provided URI not found.
     ///
     /// [`Endpoint`]: crate::signalling::elements::endpoints::Endpoint
     #[display(fmt = "Endpoint [id = {}] not found.", _0)]
-    EndpointNotFound(LocalUri<ToEndpoint>),
+    EndpointNotFound(Fid<ToEndpoint>),
 
     /// Some error happened in [`Member`].
-    #[display(fmt = "{}", _0)]
     MemberError(MemberError),
 }
 
@@ -139,16 +136,13 @@ impl ParticipantService {
         self.members.get(id).cloned()
     }
 
-    /// Generates [`LocalUri`] which point to some [`Member`] in this
+    /// Generates [`Fid`] which point to some [`Member`] in this
     /// [`ParticipantService`]'s [`Room`].
     ///
     /// __Note__ this function don't check presence of [`Member`] in
     /// [`ParticipantService`].
-    pub fn get_local_uri_to_member(
-        &self,
-        member_id: MemberId,
-    ) -> LocalUri<ToMember> {
-        LocalUri::<ToMember>::new(self.room_id.clone(), member_id)
+    pub fn get_fid_to_member(&self, member_id: MemberId) -> Fid<ToMember> {
+        Fid::<ToMember>::new(self.room_id.clone(), member_id)
     }
 
     /// Lookups [`Member`] by [`MemberId`].
@@ -161,7 +155,7 @@ impl ParticipantService {
     ) -> Result<Member, ParticipantServiceErr> {
         self.members.get(id).cloned().map_or(
             Err(ParticipantServiceErr::ParticipantNotFound(
-                self.get_local_uri_to_member(id.clone()),
+                self.get_fid_to_member(id.clone()),
             )),
             Ok,
         )
@@ -174,7 +168,7 @@ impl ParticipantService {
 
     /// Lookups [`Member`] by provided [`MemberId`] and credentials.
     ///
-    /// Returns [`Err(AuthorizationError::MemberNotExists)`] if lookup by
+    /// Returns [`AuthorizationError::MemberNotExists`] if lookup by
     /// [`MemberId`] failed.
     ///
     /// Returns [`Err(AuthorizationError::InvalidCredentials)`] if [`Member`]
@@ -232,11 +226,11 @@ impl ParticipantService {
             None => {
                 return Box::new(wrap_future(future::err(
                     ParticipantServiceErr::ParticipantNotFound(
-                        self.get_local_uri_to_member(member_id),
+                        self.get_fid_to_member(member_id),
                     ),
                 )));
             }
-            Some(member) => member.clone(),
+            Some(member) => member,
         };
 
         // lookup previous member connection
@@ -251,9 +245,7 @@ impl ParticipantService {
             }
             Box::new(wrap_future(
                 connection
-                    .close(CloseDescription::new(
-                        RpcConnectionCloseReason::Evicted,
-                    ))
+                    .close(CloseDescription::new(CloseReason::Reconnected))
                     .then(move |_| Ok(member)),
             ))
         } else {
@@ -367,9 +359,10 @@ impl ParticipantService {
         let mut close_fut = self.connections.drain().fold(
             vec![],
             |mut futures, (_, mut connection)| {
-                futures.push(connection.close(CloseDescription::new(
-                    RpcConnectionCloseReason::RoomClosed,
-                )));
+                futures.push(
+                    connection
+                        .close(CloseDescription::new(CloseReason::Finished)),
+                );
                 futures
             },
         );
@@ -392,7 +385,7 @@ impl ParticipantService {
         join_all(close_fut).map(|_| ())
     }
 
-    /// Deletes [`Member`] from [`ParticipantService`], remove this user from
+    /// Deletes [`Member`] from [`ParticipantService`], removes this user from
     /// [`TurnAuthService`], closes RPC connection with him and removes drop
     /// connection task.
     ///
@@ -407,9 +400,9 @@ impl ParticipantService {
         }
 
         if let Some(mut conn) = self.connections.remove(member_id) {
-            ctx.spawn(wrap_future(conn.close(CloseDescription::new(
-                RpcConnectionCloseReason::Evicted,
-            ))));
+            ctx.spawn(wrap_future(
+                conn.close(CloseDescription::new(CloseReason::Evicted)),
+            ));
         }
 
         if let Some(member) = self.members.remove(member_id) {
@@ -423,7 +416,8 @@ impl ParticipantService {
         }
     }
 
-    pub fn create_membe(&mut self, id: MemberId, member: Member) {
+    /// Inserts given [`Member`] into [`ParticipantService`].
+    pub fn insert_member(&mut self, id: MemberId, member: Member) {
         self.members.insert(id, member);
     }
 }

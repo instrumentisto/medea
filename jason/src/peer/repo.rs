@@ -1,12 +1,16 @@
 use std::{collections::HashMap, rc::Rc};
 
-use futures::{sync::mpsc::UnboundedSender, Future};
+use anyhow::Result;
+use futures::channel::mpsc;
 use medea_client_api_proto::{IceServer, PeerId};
 use wasm_bindgen::JsValue;
 
-use crate::{media::MediaManager, utils::WasmErr};
+use crate::media::MediaManager;
 
 use super::{PeerConnection, PeerEvent};
+use crate::utils::WasmErr;
+use futures::Future;
+use std::pin::Pin;
 
 /// [`PeerConnection`] factory and repository.
 #[allow(clippy::module_name_repetitions)]
@@ -20,10 +24,10 @@ pub trait PeerRepository {
         &mut self,
         id: PeerId,
         ice_servers: Vec<IceServer>,
-        events_sender: UnboundedSender<PeerEvent>,
+        events_sender: mpsc::UnboundedSender<PeerEvent>,
         enabled_audio: bool,
         enabled_video: bool,
-    ) -> Result<Rc<PeerConnection>, WasmErr>;
+    ) -> Result<Rc<PeerConnection>>;
 
     /// Returns [`PeerConnection`] stored in repository by its ID.
     fn get(&self, id: PeerId) -> Option<Rc<PeerConnection>>;
@@ -41,7 +45,7 @@ pub trait PeerRepository {
     /// [2]: https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection
     fn get_stats_for_all_peer_connections(
         &self,
-    ) -> Box<dyn Future<Item = Vec<JsValue>, Error = WasmErr>>;
+    ) -> Pin<Box<dyn Future<Output = Vec<Result<JsValue, WasmErr>>>>>;
 }
 
 /// [`PeerConnection`] factory and repository.
@@ -54,6 +58,8 @@ pub struct Repository {
 }
 
 impl Repository {
+    /// Instantiates new [`Repository`] with a given [`MediaManager`].
+    #[inline]
     pub fn new(media_manager: Rc<MediaManager>) -> Self {
         Self {
             media_manager,
@@ -69,10 +75,10 @@ impl PeerRepository for Repository {
         &mut self,
         id: PeerId,
         ice_servers: Vec<IceServer>,
-        peer_events_sender: UnboundedSender<PeerEvent>,
+        peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
         enabled_audio: bool,
         enabled_video: bool,
-    ) -> Result<Rc<PeerConnection>, WasmErr> {
+    ) -> Result<Rc<PeerConnection>> {
         let peer = Rc::new(PeerConnection::new(
             id,
             peer_events_sender,
@@ -92,13 +98,13 @@ impl PeerRepository for Repository {
     /// [2]: https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection
     fn get_stats_for_all_peer_connections(
         &self,
-    ) -> Box<dyn Future<Item = Vec<JsValue>, Error = WasmErr>> {
+    ) -> Pin<Box<dyn Future<Output = Vec<Result<JsValue, WasmErr>>>>> {
         let mut futs = Vec::new();
         for peer in self.peers.values() {
             futs.push(peer.get_stats());
         }
 
-        Box::new(futures::future::join_all(futs))
+        Box::pin(futures::future::join_all(futs))
     }
 
     /// Returns [`PeerConnection`] stored in repository by its ID.

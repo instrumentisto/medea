@@ -1,3 +1,10 @@
+//! Client library for Medea media server.
+//!
+//! [Medea]: https://github.com/instrumentisto/medea
+
+#![cfg_attr(not(feature = "mockable"), warn(missing_docs))]
+#![cfg_attr(feature = "mockable", allow(missing_docs))]
+
 #[macro_use]
 pub mod utils;
 
@@ -18,7 +25,9 @@ pub use console_error_panic_hook::set_once as set_panic_hook;
 #[doc(inline)]
 pub use self::{
     api::{ConnectionHandle, Jason, RoomHandle},
-    media::MediaStreamHandle,
+    media::{
+        AudioTrackConstraints, MediaStreamConstraints, VideoTrackConstraints,
+    },
 };
 
 // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global

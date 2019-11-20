@@ -6,14 +6,14 @@ use std::{
 };
 
 use medea_client_api_proto::PeerId;
-use medea_control_api_proto::grpc::control_api::{
+use medea_control_api_proto::grpc::api::{
     Element as RootElementProto, Member_Element as ElementProto,
     WebRtcPlayEndpoint as WebRtcPlayEndpointProto,
 };
 
 use crate::{
-    api::control::endpoints::webrtc_play_endpoint::{
-        SrcUri, WebRtcPlayId as Id,
+    api::control::{
+        endpoints::webrtc_play_endpoint::WebRtcPlayId as Id, refs::SrcUri,
     },
     signalling::elements::{
         endpoints::webrtc::publish_endpoint::WeakWebRtcPublishEndpoint,
@@ -150,7 +150,7 @@ impl WebRtcPlayEndpoint {
 
     /// Resets state of this [`WebRtcPlayEndpoint`].
     ///
-    /// _Atm this only reset peer_id._
+    /// _Atm this only resets [`PeerId`]._
     pub fn reset(&self) {
         self.0.borrow_mut().reset()
     }
@@ -202,6 +202,7 @@ impl Into<ElementProto> for WebRtcPlayEndpoint {
         let mut element = ElementProto::new();
         let mut play = WebRtcPlayEndpointProto::new();
         play.set_src(self.src_uri().to_string());
+        play.set_id(self.id().to_string());
         element.set_webrtc_play(play);
 
         element

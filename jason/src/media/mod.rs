@@ -1,16 +1,17 @@
-//! Adapters to [`Media Capture and Streams API`][1].
+//! Adapters to [Media Capture and Streams API][1].
 //!
-//! [1]: https://www.w3.org/TR/mediacapture-streams
+//! [1]: https://w3.org/TR/mediacapture-streams
 
+mod constraints;
+mod device_info;
 mod manager;
-mod stream;
-mod stream_request;
-mod track;
 
 #[doc(inline)]
 pub use self::{
-    manager::MediaManager,
-    stream::{MediaStream, MediaStreamHandle},
-    stream_request::{SimpleStreamRequest, StreamRequest},
-    track::MediaTrack,
+    constraints::{
+        AudioTrackConstraints, MediaStreamConstraints, TrackConstraints,
+        VideoTrackConstraints,
+    },
+    device_info::InputDeviceInfo,
+    manager::{MediaManager, MediaManagerHandle},
 };

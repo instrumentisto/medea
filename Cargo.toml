@@ -16,11 +16,10 @@ include = ["/src/", "/Cargo.*", "/CHANGELOG.md", "/LICENSE.md", "/README.md"]
 [workspace]
 members = [
     "crates/medea-macro",
-    "crates/test/control-api-mock",
     "crates/test/e2e-tests-runner",
     "jason",
+    "mock/control-api",
     "proto/client-api",
-    "crates/test/control-api-mock",
     "proto/control-api",
 ]
 
@@ -35,16 +34,15 @@ bb8 = "0.3"
 bb8-redis = "0.3"
 chrono = "0.4"
 config = "0.9"
-dotenv = "0.14"
 derive_more = "0.15"
+dotenv = "0.15"
 failure = "0.1"
 futures = "0.1"
 grpcio = { version = "0.4", features = ["openssl"] }
-humantime = "1.3"
 humantime-serde = "0.1"
 medea-client-api-proto = { path = "proto/client-api", features = ["medea"] }
 medea-control-api-proto = { path = "proto/control-api" }
-medea-macro = "0.1"
+medea-macro = { path = "crates/medea-macro" }
 protobuf = "2.7"
 rand = "0.7"
 redis = "0.11"
@@ -69,6 +67,7 @@ actix-codec = "0.1"
 actix-http = "0.2"
 actix-http-test = "0.2"
 awc = "0.2"
+derive_builder = "0.9"
 serial_test = "0.2"
 serial_test_derive = "0.2"
 tempfile = "3.1"

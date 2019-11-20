@@ -5,9 +5,9 @@
 pub mod endpoints;
 pub mod error_codes;
 pub mod grpc;
-pub mod local_uri;
 pub mod member;
 pub mod pipeline;
+pub mod refs;
 pub mod room;
 
 use std::{convert::TryFrom as _, fs::File, io::Read as _, path::Path};
@@ -25,9 +25,7 @@ use crate::{
     },
 };
 
-use self::{
-    endpoints::webrtc_play_endpoint::SrcParseError, pipeline::Pipeline,
-};
+use self::{pipeline::Pipeline, refs::src_uri::SrcParseError};
 
 #[doc(inline)]
 pub use self::{
@@ -113,7 +111,7 @@ pub enum TryFromElementError {
 ///
 /// [Control API]: https://tinyurl.com/yxsqplq7
 #[allow(clippy::pub_enum_variant_names)]
-#[derive(Debug, Fail, Display)]
+#[derive(Debug, Display, Fail)]
 pub enum LoadStaticControlSpecsError {
     /// Error while reading default or provided in config
     /// (`MEDEA_CONTROL_API.STATIC_SPECS_DIR` environment variable) static

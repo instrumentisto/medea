@@ -1,5 +1,4 @@
 language: rust
-cache: cargo
 
 install:
   - rustc -vV
@@ -35,8 +34,7 @@ jobs:
     - name: rustfmt
       stage: check
       rust: nightly
-      cache: false
-      before_script: rustup component add rustfmt
+      before_script: rustup component add rustfmt --toolchain nightly-x86_64-unknown-linux-gnu
       script: make fmt check=yes
 
     - name: medea-jason (stable)
@@ -79,13 +77,11 @@ jobs:
     - name: unit medea-macro (stable)
       stage: test
       rust: stable
-      cache: false
       script: make test.unit crate=medea-macro
 
     - name: unit medea-client-api-proto (stable)
       stage: test
       rust: stable
-      cache: false
       script: make test.unit crate=medea-client-api-proto
 
     - name: unit medea (stable)
@@ -93,17 +89,29 @@ jobs:
       rust: stable
       script: make test.unit crate=medea
 
-    - name: unit medea-jason (stable, Chrome, Firefox)
+    - name: unit medea-jason (stable, Chrome)
       stage: test
       rust: stable
       services: ["docker"]
       before_script:
-        - cargo uninstall wasm-bindgen-cli || echo > /dev/null
-        - cargo install wasm-bindgen-cli
+        # With `cargo pkgid` we get version of `wasm-bindgen` from Cargo.lock.
+        - cargo install -f wasm-bindgen-cli
+                --version `cargo pkgid wasm-bindgen | grep -o '#.*'
+                                                    | grep -o '[0-9\.]*'`
         - rustup target add wasm32-unknown-unknown
-      script:
-        - make test.unit crate=medea-jason browser=chrome
-        - make test.unit crate=medea-jason browser=firefox
+      script: make test.unit crate=medea-jason browser=chrome
+
+    - name: unit medea-jason (stable, Firefox)
+      stage: test
+      rust: stable
+      services: ["docker"]
+      before_script:
+        # With `cargo pkgid` we get version of `wasm-bindgen` from Cargo.lock.
+        - cargo install -f wasm-bindgen-cli
+                --version `cargo pkgid wasm-bindgen | grep -o '#.*'
+                                                    | grep -o '[0-9\.]*'`
+        - rustup target add wasm32-unknown-unknown
+      script: make test.unit crate=medea-jason browser=firefox
 
     - name: Integration (stable)
       stage: test
@@ -129,7 +137,6 @@ jobs:
     - name: crates.io
       stage: release
       if: tag =~ ^medea[a-z-]*-[0-9]+\.[0-9]+\.[0-9]+
-      cache: false
       before_script:
         - export MEDEA_CRATE_NAME=$(echo $TRAVIS_TAG \
                         | sed -E "s/^(medea[a-z-]*)-[0-9]+\.[0-9]+\.[0-9]+/\1/")
@@ -145,7 +152,6 @@ jobs:
     - name: NPM
       stage: release
       if: tag =~ ^medea-jason-[0-9]+\.[0-9]+\.[0-9]+
-      cache: false
       before_script:
         - export MEDEA_CRATE_NAME=$(echo $TRAVIS_TAG \
                         | sed -E "s/^(medea[a-z-]*)-[0-9]+\.[0-9]+\.[0-9]+/\1/")
@@ -164,7 +170,6 @@ jobs:
     - name: GitHub
       stage: release
       if: tag =~ ^medea[a-z-]*-[0-9]+\.[0-9]+\.[0-9]+
-      cache: false
       before_script:
         - export MEDEA_CRATE_NAME=$(echo $TRAVIS_TAG \
                         | sed -E "s/^(medea[a-z-]*)-[0-9]+\.[0-9]+\.[0-9]+/\1/")

@@ -1,334 +1,413 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Chat</title>
-    <meta http-equiv='Content-Type' content='text/html; charset=UTF-8'/>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/0.19.0/axios.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/Faker/3.1.0/faker.min.js"></script>
+  <title>Chat</title>
+  <meta http-equiv='Content-Type' content='text/html; charset=UTF-8' />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/0.19.0/axios.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Faker/3.1.0/faker.min.js"></script>
 
-    <script type="module">
+  <script type="module">
+    import init, {
+      Jason,
+      MediaStreamConstraints, AudioTrackConstraints, VideoTrackConstraints,
+    } from './js/medea_jason.js';
 
-        import init, {Jason} from './js/medea_jason.js';
+    let inited = false;
+    const controlUrl = document.location.protocol + "//" +
+                       document.location.host + "/control-api/";
 
-        let inited = false;
-
-        export async function run(credentials) {
-
-            if (!inited) {
-                await init();
-                inited = true;
-            }
-
-            let jason = new Jason();
-
-            jason.on_local_stream(function (stream, error) {
-                if (stream) {
-                    let localVideo = document.getElementsByClassName('local-video__video')[0];
-
-                    localVideo.srcObject = stream.get_media_stream();
-                    localVideo.play();
-                } else {
-                    console.error(error);
-                }
-            });
-
-            let room = await jason.join_room(credentials);
-
-            let muteAudio = document.getElementsByClassName('control__mute_audio')[0];
-            let muteVideo = document.getElementsByClassName('control__mute_video')[0];
-            let isAudioMuted = false;
-            let isVideoMuted = false;
-
-            muteAudio.addEventListener('click', () => {
-                if(isAudioMuted) {
-                    room.unmute_audio();
-                    isAudioMuted = false;
-                    muteAudio.textContent = "Mute audio";
-                } else {
-                    room.mute_audio();
-                    isAudioMuted = true;
-                    muteAudio.textContent = "Unmute audio";
-                }
-            });
-            muteVideo.addEventListener('click', () => {
-                if(isVideoMuted) {
-                    room.unmute_video();
-                    isVideoMuted = false;
-                    muteVideo.textContent = "Mute video";
-                } else {
-                    room.mute_video();
-                    isVideoMuted = true;
-                    muteVideo.textContent = "Unmute video";
-                }
-            });
-
-            room.on_new_connection(function (connection) {
-                connection.on_remote_stream(function (stream) {
-                    let videoDiv = document.getElementsByClassName("remote-videos")[0];
-                    var video = document.createElement("video");
-                    video.srcObject = stream.get_media_stream();
-                    let innerVideoDiv = document.createElement("div");
-                    innerVideoDiv.className = "video";
-                    innerVideoDiv.appendChild(video);
-                    videoDiv.appendChild(innerVideoDiv);
-
-                    video.play();
-                });
-            });
-        }
-
-        window.connect_room = async function connect_room(credentials) {
-            run(credentials)
-        }
-
-    </script>
-
-    <script type="text/javascript">
-        let baseUrl = (document.location.protocol === "http:" ? "ws" : "wss") +
-            "://" + document.location.host + "/ws/";
-        const controlUrl = "http://" + document.location.host + "/control-api/";
-
-        async function createRoom(roomId, memberId) {
-            let resp = await axios({
-                method: 'post',
-                url: controlUrl + roomId,
-                data: {
-                    pipeline: {
-                        [memberId]: {
-                            kind: 'Member',
-                            credentials: 'test',
-                            pipeline: {
-                                publish: {
-                                    kind: 'WebRtcPublishEndpoint',
-                                    spec: {
-                                        p2p: 'Always'
-                                    }
-                                },
-                            }
-                        }
-                    }
-                }
-            });
-
-            return resp.data.sids[memberId]
-        }
-
-        async function addNewMember(roomId, memberId) {
-            let controlRoom = await axios.get(controlUrl + roomId);
-            let anotherMembers = Object.keys(controlRoom.data.element.pipeline);
-            let pipeline = {
-                publish: {
+    async function createRoom(roomId, memberId) {
+      try {
+        let resp = await axios({
+          method: 'post',
+          url: controlUrl + roomId,
+          data: {
+            kind: 'Room',
+            pipeline: {
+              [memberId]: {
+                kind: 'Member',
+                credentials: 'test',
+                pipeline: {
+                  publish: {
                     kind: 'WebRtcPublishEndpoint',
-                    spec: {
-                        p2p: 'Always'
-                    }
-                }
-            };
+                    p2p: 'Always'
+                  },
+                },
+              },
+            },
+          },
+        });
+        return resp.data.sids[memberId]
+      } catch (e) {
+        console.log(e.response);
+      }
+    }
 
-            let memberIds = [];
+    async function addNewMember(roomId, memberId) {
+      let controlRoom = await axios.get(controlUrl + roomId);
+      let anotherMembers = Object.keys(controlRoom.data.element.pipeline);
+      let pipeline = {
+        publish: {
+          kind: 'WebRtcPublishEndpoint',
+          p2p: 'Always',
+        },
+      };
 
-            for(let i = 0; i < anotherMembers.length; i++) {
-                let localUri = anotherMembers[i];
-                let memberId = localUri.replace(/local:\/\/.*\//, "");
-                memberIds.push(memberId);
-                pipeline["play-" + memberId] = {
-                    kind: 'WebRtcPlayEndpoint',
-                    spec: {
-                        src: localUri + "/publish"
-                    }
-                }
-            }
+      let memberIds = [];
 
-            let resp = await axios({
-                method: 'post',
-                url: controlUrl + roomId + "/" + memberId,
-                data: {
-                    credentials: 'test',
-                    pipeline: pipeline,
-                }
-            });
-
-            for(let i = 0; i < memberIds.length; i++) {
-                let id = memberIds[i];
-                await axios({
-                    method: 'post',
-                    url: controlUrl + roomId + "/" + id + "/play-" + memberId,
-                    data: {
-                        kind: 'WebRtcPlayEndpoint',
-                        spec: {
-                            src: 'local://' + roomId + '/' + memberId + '/publish'
-                        }
-                    }
-                })
-            }
-
-            return resp.data.sids[memberId]
-        }
-
-        window.onload = function () {
-            let chooseRoomDiv = document.getElementById('choose-room');
-            let videoCallDiv = document.getElementsByClassName('video-call')[0];
-            let chooseRoomButton = document.getElementById('choose-room__join');
-            let roomIdInput = document.getElementById('choose-room__room-id');
-            let controlBtns = document.getElementsByClassName('control')[0];
-
-            let joinCallerButton = document.getElementsByClassName('join__join')[0];
-
-            let usernameInput = document.getElementsByClassName('join__username')[0];
-            usernameInput.value = faker.name.firstName();
-
-            let bindJoinButtons = function (roomId) {
-                joinCallerButton.onclick = async function () {
-                    let connectBtnsDiv = document.getElementsByClassName("join")[0];
-                    connectBtnsDiv.style.display = 'none';
-                    controlBtns.style.display = 'block';
-
-                    let username = usernameInput.value;
-                    let connectUrl = baseUrl + roomId + '/' + username + '/test';
-                    try {
-                        await axios.get(controlUrl + roomId);
-                    } catch (e) {
-                        if(e.response.status === 400) {
-                            console.log("Room not found. Creating new room...");
-                            connectUrl = await createRoom(roomId, username);
-                        }
-                    }
-                    try {
-                        await axios.get(controlUrl + roomId + '/' + username);
-                    } catch (e) {
-                        console.log("Member not found. Creating new member...");
-                        connectUrl = await addNewMember(roomId, username);
-                    }
-                    await window.connect_room(connectUrl)
-                };
-            };
-
-            let roomId = window.location.hash.replace("#", "");
-
-            if (roomId) {
-                bindJoinButtons(roomId);
-                chooseRoomDiv.style.display = "none";
-                videoCallDiv.style.display = "";
-            } else {
-                chooseRoomButton.onclick = function () {
-                    let roomId = roomIdInput.value;
-
-                    window.location.hash = roomId;
-                    bindJoinButtons(roomId);
-
-                    chooseRoomDiv.style.display = "none";
-                    videoCallDiv.style.display = "";
-                };
-            }
+      for (let i = 0; i < anotherMembers.length; i++) {
+        let memberId = anotherMembers[i];
+        memberIds.push(memberId);
+        pipeline["play-" + memberId] = {
+          kind: 'WebRtcPlayEndpoint',
+          src: 'local://' + roomId + '/' + memberId + "/publish",
         };
+      }
 
-    </script>
+      let resp = await axios({
+        method: 'post',
+        url: controlUrl + roomId + '/' + memberId,
+        data: {
+          kind: 'Member',
+          credentials: 'test',
+          pipeline: pipeline,
+        },
+      });
 
-    <style>
-        body {
-            font-family: "Source Sans Pro",Helvetica,sans-serif;
-            background: #f5f5f5;
+      for (let i = 0; i < memberIds.length; i++) {
+        let id = memberIds[i];
+        await axios({
+          method: 'post',
+          url: controlUrl + roomId + "/" + id + '/play-' + memberId,
+          data: {
+            kind: 'WebRtcPlayEndpoint',
+            src: 'local://' + roomId + '/' + memberId + '/publish',
+          }
+        })
+      }
+
+      return resp.data.sids[memberId]
+    }
+
+    async function init_jason() {
+      if (inited) {
+        throw Error("Already init");
+      }
+      await init();
+      inited = true;
+      const jason = new Jason();
+
+      async function getDevices(audio_select, video_select, current_stream) {
+        const current_audio = current_stream.getAudioTracks().pop().label
+          || "disable";
+        const current_video = current_stream.getVideoTracks().pop().label
+          || "disable";
+        const device_infos = await jason.media_manager().enumerate_devices();
+        console.log('Available input and output devices:', device_infos);
+        for (const device_info of device_infos) {
+          const option = document.createElement('option');
+          option.value = device_info.device_id();
+          if (device_info.kind() === 'audio') {
+            option.text = device_info.label()
+              || `Microphone ${audio_select.length + 1}`;
+            option.selected = option.text === current_audio;
+            audio_select.append(option);
+          } else if (device_info.kind() === 'video') {
+            option.text = device_info.label()
+              || `Camera ${video_select.length + 1}`;
+            option.selected = option.text === current_video;
+            video_select.append(option);
+          }
+        }
+      }
+
+      async function getStream(audio_select, video_select) {
+        let constraints = new MediaStreamConstraints();
+        let audio = new AudioTrackConstraints();
+        let audioSource = audio_select.options[audio_select.selectedIndex];
+        if (audioSource) {
+          audio.device_id(audioSource.value);
+        }
+        constraints.audio(audio);
+        let video = new VideoTrackConstraints();
+        let videoSource = video_select.options[video_select.selectedIndex];
+        if (videoSource) {
+          video.device_id(videoSource.value);
+        }
+        constraints.video(video);
+        return await jason.media_manager().init_local_stream(constraints);
+      }
+
+      let chooseRoomDiv = document.getElementById('choose-room');
+      let videoCallDiv = document.getElementsByClassName('video-call')[0];
+      let chooseRoomButton = document.getElementById('choose-room__join');
+      let roomIdInput = document.getElementById('choose-room__room-id');
+      let controlBtns = document.getElementsByClassName('control')[0];
+      let audioSelect = document.getElementsByClassName('connect__select-device_audio')[0];
+      let videoSelect = document.getElementsByClassName('connect__select-device_video')[0];
+      let localVideo = document.getElementsByClassName('local-video__video')[0];
+
+      let joinCallerButton = document.getElementsByClassName('join__join')[0];
+      let usernameInput = document.getElementsByClassName('join__username')[0];
+      usernameInput.value = faker.name.firstName();
+
+      let room = await jason.init_room();
+
+      const updateLocalVideo = async function (stream) {
+        localVideo.srcObject = stream;
+        await localVideo.play();
+      };
+
+      audioSelect.addEventListener('change', async () => {
+        try {
+          const stream = await getStream(audioSelect, videoSelect);
+          await updateLocalVideo(stream);
+          room.inject_local_stream(stream);
+        } catch (e) {
+          console.log("Changing audio source failed:" + e);
+        }
+      });
+
+      videoSelect.addEventListener('change', async () => {
+        try {
+          const stream = await getStream(audioSelect, videoSelect);
+          await updateLocalVideo(stream);
+          room.inject_local_stream(stream);
+        } catch (e) {
+          console.log("Changing video source failed:" + e);
+        }
+      });
+
+      room.on_failed_local_stream(function (error) {
+        console.error(error);
+      });
+
+      room.on_new_connection((connection) => {
+        connection.on_remote_stream(async (stream) => {
+          let videoDiv = document.getElementsByClassName("remote-videos")[0];
+          let video = document.createElement("video");
+          video.srcObject = stream.get_media_stream();
+          let innerVideoDiv = document.createElement("div");
+          innerVideoDiv.className = "video";
+          innerVideoDiv.appendChild(video);
+          videoDiv.appendChild(innerVideoDiv);
+
+          await video.play();
+        });
+      });
+
+      let muteAudio = document.getElementsByClassName('control__mute_audio')[0];
+      let muteVideo = document.getElementsByClassName('control__mute_video')[0];
+      let isAudioMuted = false;
+      let isVideoMuted = false;
+
+      muteAudio.addEventListener('click', () => {
+        if(isAudioMuted) {
+          room.unmute_audio();
+          isAudioMuted = false;
+          muteAudio.textContent = "Mute audio";
+        } else {
+          room.mute_audio();
+          isAudioMuted = true;
+          muteAudio.textContent = "Unmute audio";
+        }
+      });
+      muteVideo.addEventListener('click', () => {
+        if(isVideoMuted) {
+          room.unmute_video();
+          isVideoMuted = false;
+          muteVideo.textContent = "Mute video";
+        } else {
+          room.mute_video();
+          isVideoMuted = true;
+          muteVideo.textContent = "Unmute video";
+        }
+      });
+
+      let bindJoinButtons = function (roomId) {
+        joinCallerButton.onclick = async function () {
+          let connectBtnsDiv = document.getElementsByClassName("join__join")[0];
+          connectBtnsDiv.style.display = 'none';
+          controlBtns.style.display = 'block';
+
+          try {
+            let username = usernameInput.value;
+            try {
+              await axios.get(controlUrl + roomId);
+            } catch (e) {
+              if (e.response.status === 400) {
+                console.log("Room not found. Creating new room...");
+                room.join(await createRoom(roomId, username));
+              }
+            }
+            try {
+              await axios.get(controlUrl + roomId + '/' + username);
+            } catch (e) {
+              console.log("Member not found. Creating new member...");
+              room.join(await addNewMember(roomId, username));
+            }
+          } catch (e) {
+            console.error("Join to room failed: " + e);
+          }
+        };
+      };
+
+      let roomId = window.location.hash.replace("#", "");
+
+      if (roomId) {
+        bindJoinButtons(roomId);
+        chooseRoomDiv.style.display = "none";
+        videoCallDiv.style.display = "";
+
+        try {
+          const stream = await getStream(audioSelect, videoSelect);
+          await updateLocalVideo(stream);
+          await getDevices(audioSelect, videoSelect, stream);
+          room.inject_local_stream(stream);
+        } catch (e) {
+          console.log("Init local video failed:" + e);
         }
 
-        .remote-videos {
-            display: flex;
-            width: 100%;
-            justify-content: space-around;
-        }
+      } else {
+        chooseRoomButton.onclick = async function () {
+          let roomId = roomIdInput.value;
 
-        .video {
-            display: flex;
-            justify-content: center;
-            flex-direction: column;
-            margin-right: 10px;
-            text-align: center;
-        }
+          window.location.hash = roomId;
+          bindJoinButtons(roomId);
 
-        .video > video {
-            background: #FFFFFF;
-            border-radius: 3px;
-        }
+          try {
+            const stream = await getStream(audioSelect, videoSelect);
+            await updateLocalVideo(stream);
+            await getDevices(audioSelect, videoSelect, stream);
+            room.inject_local_stream(stream);
+          } catch (e) {
+            console.log("Init local video failed:" + e);
+          }
 
-        .join {
-            position: fixed;
-            bottom: 200px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: #FFFFFF;
-            padding: 10px;
-            border-radius: 3px;
-        }
+          chooseRoomDiv.style.display = "none";
+          videoCallDiv.style.display = "";
+        };
+      }
+    }
 
-        .local-video {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            margin-left: 20px;
-            margin-bottom: 20px;
-            width: auto;
-            height: 150px;
-        }
+    window.onload = async function () {
+      await init_jason();
+    }
+  </script>
 
-        .join__username {
-            font-size: 16px;
-            padding: 5px;
-        }
+  <style>
+    body {
+      font-family: "Source Sans Pro", Helvetica, sans-serif;
+      background: #f5f5f5;
+    }
 
-        .join__join {
-            font-size: 16px;
-            background: #49668C;
-            color: white;
-            cursor: pointer;
-            border-radius: 3px;
-            border: none;
-            padding: 6px;
-            margin-left: 5px;
-        }
+    .remote-videos {
+      display: flex;
+      width: 100%;
+      justify-content: space-around;
+    }
 
-        .control {
-            position: fixed;
-            bottom: 150px;
-            left: 50%;
-            transform: translateX(-50%);
-        }
+    .video {
+      display: flex;
+      justify-content: center;
+      flex-direction: column;
+      margin-right: 10px;
+      text-align: center;
+    }
 
-        .control__mute {
-            border-radius: 10px;
-            background: #49668C;
-            color: white;
-            font-size: 13pt;
-            border: none;
-            padding: 10px;
-            cursor: pointer;
-            margin-right: 10px;
-        }
-    </style>
+    .video>video {
+      background: #FFFFFF;
+      border-radius: 3px;
+    }
+
+    .join {
+      position: fixed;
+      bottom: 200px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #FFFFFF;
+      padding: 10px;
+      border-radius: 3px;
+    }
+
+    .local-video {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      margin-left: 20px;
+      margin-bottom: 20px;
+      width: auto;
+      height: 150px;
+    }
+
+    .join__username {
+      font-size: 16px;
+      padding: 5px;
+    }
+
+    .join__join {
+      font-size: 16px;
+      background: #49668C;
+      color: white;
+      cursor: pointer;
+      border-radius: 3px;
+      border: none;
+      padding: 6px;
+      margin-left: 5px;
+    }
+
+    .control {
+      position: fixed;
+      bottom: 150px;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+
+    .control__mute {
+      border-radius: 10px;
+      background: #49668C;
+      color: white;
+      font-size: 13pt;
+      border: none;
+      padding: 10px;
+      cursor: pointer;
+      margin-right: 10px;
+    }
+  </style>
 </head>
 <body>
-
-<div id="choose-room">
+  <div id="choose-room">
     <input id="choose-room__room-id">
     <button id="choose-room__join" type="submit">JOIN</button>
-</div>
+  </div>
 
-<div class="video-call" style="display: none">
+  <div class="video-call" style="display: none">
     <div class="remote-videos">
     </div>
 
     <div class="local-video video">
-        <video class="local-video__video" muted autoplay width="100%" height="100%"></video>
+      <video class="local-video__video" muted autoplay width="100%" height="100%"></video>
     </div>
 
     <div class="join">
-        <input class="join__username" placeholder="username">
-        <button class="join__join">Join</button>
+      <input class="join__username" placeholder="username">
+      <button class="join__join">Join</button>
+      <div class="connect__device">
+        <label>Audio:
+          <select class="connect__select-device_audio">
+          </select>
+        </label><br>
+        <label>Video:
+          <select class="connect__select-device_video">
+          </select>
+        </label>
+      </div>
     </div>
 
     <div class="control" style="display: none">
-        <button class="control__mute_audio control__mute">Mute audio</button>
-        <button class="control__mute_video control__mute">Mute video</button>
+      <button class="control__mute_audio control__mute">Mute audio</button>
+      <button class="control__mute_video control__mute">Mute video</button>
     </div>
-</div>
-
+  </div>
 </body>
 </html>

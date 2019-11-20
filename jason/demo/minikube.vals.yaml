@@ -10,10 +10,16 @@ server:
   conf:
     server:
       client:
-        public_url: "wss://medea-demo.test"
+        http:
+          public_url: wss://medea-demo.test/ws
 
     turn:
       host: medea-demo.test
+
+  control-mock:
+    image:
+      tag: dev
+      pullPolicy: IfNotPresent
 
   coturn:
     image:

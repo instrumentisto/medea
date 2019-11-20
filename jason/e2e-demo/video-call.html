@@ -1,327 +1,335 @@
 <!DOCTYPE html>
 <html>
-
 <head>
-    <title>Chat</title>
-    <meta http-equiv='Content-Type' content='text/html; charset=UTF-8' />
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/0.19.0/axios.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/Faker/3.1.0/faker.min.js"></script>
-    <style>
-        body {
-            font-family: "Source Sans Pro", Helvetica, sans-serif;
-            background: #f5f5f5;
-        }
+  <title>Chat</title>
+  <meta http-equiv='Content-Type' content='text/html; charset=UTF-8' />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/0.19.0/axios.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Faker/3.1.0/faker.min.js"></script>
+  <style>
+    body {
+      font-family: "Source Sans Pro", Helvetica, sans-serif;
+      background: #f5f5f5;
+    }
 
-        .remote-videos {
-            display: flex;
-            width: 100%;
-            justify-content: space-around;
-        }
+    .remote-videos {
+      display: flex;
+      width: 100%;
+      justify-content: space-around;
+    }
 
-        .video {
-            display: flex;
-            justify-content: center;
-            flex-direction: column;
-            margin-right: 10px;
-            text-align: center;
-        }
+    .video {
+      display: flex;
+      justify-content: center;
+      flex-direction: column;
+      margin-right: 10px;
+      text-align: center;
+    }
 
-        .video>video {
-            background: #FFFFFF;
-            border-radius: 3px;
-        }
+    .video>video {
+      background: #FFFFFF;
+      border-radius: 3px;
+    }
 
-        .connect {
-            position: fixed;
-            bottom: 200px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: #FFFFFF;
-            padding: 10px;
-            border-radius: 3px;
-        }
+    .connect {
+      position: fixed;
+      bottom: 200px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #FFFFFF;
+      padding: 10px;
+      border-radius: 3px;
+    }
 
-        .local-video {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            margin-left: 20px;
-            margin-bottom: 20px;
-            width: auto;
-            height: 150px;
-        }
+    .local-video {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      margin-left: 20px;
+      margin-bottom: 20px;
+      width: auto;
+      height: 150px;
+      max-width: 225px;
+    }
 
-        .connect__username {
-            font-size: 16px;
-            padding: 5px;
-        }
+    .connect__username {
+      font-size: 16px;
+      padding: 5px;
+    }
 
-        .connect__join {
-            font-size: 16px;
-            margin-left: 5px;
-        }
+    .connect__join {
+      font-size: 16px;
+      margin-left: 5px;
+    }
 
-        .btn {
-            background: #49668C;
-            color: white;
-            cursor: pointer;
-            border-radius: 5px;
-            border: none;
-            padding: 7px;
-        }
+    .connect__device {
+      margin-top: 5px;
+    }
 
-        .btn:hover {
-            background: #375577;
-        }
+    .connect__device>label {
+      font-size: 10pt;
+    }
 
-        .control {
-            position: fixed;
-            bottom: 150px;
-            left: 50%;
-            transform: translateX(-50%);
-        }
+    .connect__device>label>select {
+      margin-top: 5px;
+    }
 
-        .control__btn {
-            font-size: 13pt;
-            margin-right: 10px;
-        }
+    .btn {
+      background: #49668C;
+      color: white;
+      cursor: pointer;
+      border-radius: 5px;
+      border: none;
+      padding: 7px;
+    }
 
-        .toggle-content {
-            display: none;
-        }
+    .btn:hover {
+      background: #375577;
+    }
 
-        .toggle-content.is-visible {
-            display: block;
-        }
+    .control {
+      position: fixed;
+      bottom: 150px;
+      left: 50%;
+      transform: translateX(-50%);
+    }
 
-        .window {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: #FFFFFF;
-            border-radius: 3px;
-        }
+    .control__btn {
+      font-size: 13pt;
+      margin-right: 10px;
+    }
 
-        .control-debug__execute {
-            float: right;
-            margin-bottom: 10px;
-            margin-left: 10px;
-        }
+    .toggle-content {
+      display: none;
+    }
 
-        .window__content span {
-            font-size: 10pt;
-        }
+    .toggle-content.is-visible {
+      display: block;
+    }
 
-        .window__content {
-            padding: 10px;
-        }
+    .window {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: #FFFFFF;
+      border-radius: 3px;
+    }
 
-        .window__close {
-            float: right;
-            cursor: pointer;
-        }
+    .control-debug__execute {
+      float: right;
+      margin-bottom: 10px;
+      margin-left: 10px;
+    }
 
-        .window__title {
-            border-radius: 3px;
-            padding: 10px;
-            display: inherit;
-            background: #49668C;
-            color: #ffffff;
-        }
+    .window__content span {
+      font-size: 10pt;
+    }
 
-        .control-debug-menu__toggle {
-            opacity: 0.5;
-            font-size: 10pt;
-            cursor: pointer;
-            position: absolute;
-            top: 0;
-        }
+    .window__content {
+      padding: 10px;
+    }
 
-        .control-debug-menu__toggle:hover {
-            opacity: 1;
-        }
+    .window__close {
+      float: right;
+      cursor: pointer;
+    }
 
-        .control-debug-menu__item {
-            cursor: pointer;
-            padding: 3px;
-            color: #242424;
-        }
+    .window__title {
+      border-radius: 3px;
+      padding: 10px;
+      display: inherit;
+      background: #49668C;
+      color: #ffffff;
+    }
 
-        .control-debug-menu__item:hover {
-            color: #616161;
-        }
+    .control-debug-menu__toggle {
+      opacity: 0.5;
+      font-size: 10pt;
+      cursor: pointer;
+      position: absolute;
+      top: 0;
+    }
 
-        .control-debug-menu {
-            position: absolute;
-            top: 30px;
-            background: #fff;
-            border-radius: 3px;
-            padding: 5px;
-            font-size: 11pt;
-        }
+    .control-debug-menu__toggle:hover {
+      opacity: 1;
+    }
 
-        .control-debug__window_get>.window__content>.control-debug__json-result {
-            height: 300px;
-            overflow: scroll;
-            white-space: pre;
-            font-size: 11pt;
-        }
-    </style>
+    .control-debug-menu__item {
+      cursor: pointer;
+      padding: 3px;
+      color: #242424;
+    }
+
+    .control-debug-menu__item:hover {
+      color: #616161;
+    }
+
+    .control-debug-menu {
+      position: absolute;
+      top: 30px;
+      background: #fff;
+      border-radius: 3px;
+      padding: 5px;
+      font-size: 11pt;
+    }
+
+    .control-debug__window_get>.window__content>.control-debug__json-result {
+      height: 300px;
+      overflow: scroll;
+      white-space: pre;
+      font-size: 11pt;
+    }
+
+    .json__key {
+      color: brown;
+    }
+
+    .json__value {
+      color: navy;
+    }
+
+    .json__string {
+      color: olive;
+    }
+  </style>
 </head>
-
 <body>
-    <div class="remote-videos">
+  <div class="remote-videos">
+  </div>
+
+  <div class="local-video video">
+    <video muted autoplay width="100%" height="100%"></video>
+  </div>
+
+  <div class="connect toggle-content is-visible">
+    <div>
+      <input class="connect__username" placeholder="username">
+      <button class="connect__join btn">Join</button>
     </div>
-
-    <div class="local-video video">
-        <video muted autoplay width="100%" height="100%"></video>
+    <div class="connect__device">
+      <label>Audio:
+        <select class="connect__select-device_audio">
+        </select>
+      </label><br>
+      <label>Video:
+        <select class="connect__select-device_video">
+        </select>
+      </label>
     </div>
+  </div>
 
-    <div class="connect toggle-content is-visible">
-        <input class="connect__username" placeholder="username">
-        <button class="connect__join btn">Join</button>
+  <div class="control toggle-content">
+    <button class="control__mute_audio control__btn btn">Mute audio</button>
+    <button class="control__mute_video control__btn btn">Mute video</button>
+  </div>
+
+  <div class="window control-debug__window_create-endpoint toggle-content">
+    <div class="window__title">
+      <span>Create Endpoint</span>
+      <span class="window__close">X</span>
     </div>
+    <div class="window__content">
+      <input class="control-debug__id_room" placeholder="Room ID">
+      <input class="control-debug__id_member" placeholder="Member ID">
+      <input class="control-debug__id_endpoint" placeholder="Endpoint ID">
+      <br>
+      <br>
+      <span>Endpoint type:</span>
+      <select class="control-debug__endpoint-type is-visible">
+        <option value="WebRtcPlayEndpoint">WebRtcPlayEndpoint</option>
+        <option value="WebRtcPublishEndpoint">WebRtcPublishEndpoint</option>
+      </select>
 
-    <div class="control toggle-content">
-        <button class="control__mute_audio control__btn btn">Mute audio</button>
-        <button class="control__mute_video control__btn btn">Mute video</button>
+      <br>
+      <br>
+
+      <div class="webrtc-play-endpoint-spec toggle-content is-visible">
+        <input class="webrtc-play-endpoint-spec__src" placeholder="Source">
+      </div>
+
+      <div class="webrtc-publish-endpoint-spec toggle-content">
+        <span>P2P mode:</span>
+        <select class="webrtc-publish-endpoint-spec__p2p">
+          <option value="Always">Always</option>
+          <option value="IfPossible">If possible</option>
+          <option value="Never">Never</option>
+        </select>
+      </div>
+
+      <button class="control-debug__execute">Execute</button>
     </div>
+  </div>
 
-    <div class="window control-debug__window_delete-member toggle-content">
-        <div class="window__title">
-            <span>Delete member</span>
-            <span class="window__close">X</span>
-        </div>
-        <div class="window__content">
-            <input class="control-debug__id_room" placeholder="Room ID">
-            <input class="control-debug__id_member" placeholder="Member ID">
-            <button class="control-debug__execute">Execute</button>
-        </div>
+  <div class="window control-debug__window_delete toggle-content">
+    <div class="window__title">
+      <span>Delete</span>
+      <span class="window__close">X</span>
     </div>
+    <div class="window__content">
+      <input class="control-debug__id_room" placeholder="Room ID">
+      <input class="control-debug__id_member" placeholder="Member ID">
+      <input class="control-debug__id_endpoint" placeholder="Endpoint ID">
 
-    <div class="window control-debug__window_delete-room toggle-content">
-        <div class="window__title">
-            <span>Delete room</span>
-            <span class="window__close">X</span>
-        </div>
-        <div class="window__content">
-            <input class="control-debug__id_room" placeholder="Room ID">
-            <button class="control-debug__execute">Execute</button>
-        </div>
+      <button class="control-debug__execute">Execute</button>
     </div>
+  </div>
 
-    <div class="window control-debug__window_create-endpoint toggle-content">
-        <div class="window__title">
-            <span>Create Endpoint</span>
-            <span class="window__close">X</span>
-        </div>
-        <div class="window__content">
-            <input class="control-debug__id_room" placeholder="Room ID">
-            <input class="control-debug__id_member" placeholder="Member ID">
-            <input class="control-debug__id_endpoint" placeholder="Endpoint ID">
-            <br>
-            <br>
-            <span>Endpoint type:</span>
-            <select class="control-debug__endpoint-type is-visible">
-                <option value="WebRtcPlayEndpoint">WebRtcPlayEndpoint</option>
-                <option value="WebRtcPublishEndpoint">WebRtcPublishEndpoint</option>
-            </select>
-
-            <br>
-            <br>
-
-            <div class="webrtc-play-endpoint-spec toggle-content is-visible">
-                <input class="webrtc-play-endpoint-spec__src" placeholder="Source">
-            </div>
-
-            <div class="webrtc-publish-endpoint-spec toggle-content">
-                <span>P2P mode:</span>
-                <select class="webrtc-publish-endpoint-spec__p2p">
-                    <option value="Always">Always</option>
-                    <option value="IfPossible">If possible</option>
-                    <option value="Never">Never</option>
-                </select>
-            </div>
-
-            <button class="control-debug__execute">Execute</button>
-        </div>
+  <div class="window control-debug__window_create-member toggle-content">
+    <div class="window__title">
+      <span>Create member</span>
+      <span class="window__close">X</span>
     </div>
+    <div class="window__content">
+      <input class="control-debug__id_room" placeholder="Room ID">
+      <input class="control-debug__id_member" placeholder="Member ID">
+      <input class="member-spec__credentials" placeholder="Credentials">
 
-    <div class="window control-debug__window_delete-endpoint toggle-content">
-        <div class="window__title">
-            <span>Delete Endpoint</span>
-            <span class="window__close">X</span>
-        </div>
-        <div class="window__content">
-            <input class="control-debug__id_room" placeholder="Room ID">
-            <input class="control-debug__id_member" placeholder="Member ID">
-            <input class="control-debug__id_endpoint" placeholder="Endpoint ID">
-
-            <button class="control-debug__execute">Execute</button>
-        </div>
+      <button class="control-debug__execute">Execute</button>
     </div>
+  </div>
 
-    <div class="window control-debug__window_create-member toggle-content">
-        <div class="window__title">
-            <span>Create member</span>
-            <span class="window__close">X</span>
-        </div>
-        <div class="window__content">
-            <input class="control-debug__id_room" placeholder="Room ID">
-            <input class="control-debug__id_member" placeholder="Member ID">
-            <input class="member-spec__credentials" placeholder="Credentials">
-
-            <button class="control-debug__execute">Execute</button>
-        </div>
+  <div class="window control-debug__window_create-room toggle-content">
+    <div class="window__title">
+      <span>Create room</span>
+      <span class="window__close">X</span>
     </div>
+    <div class="window__content">
+      <input class="control-debug__id_room" placeholder="Room ID">
 
-    <div class="window control-debug__window_create-room toggle-content">
-        <div class="window__title">
-            <span>Create room</span>
-            <span class="window__close">X</span>
-        </div>
-        <div class="window__content">
-            <input class="control-debug__id_room" placeholder="Room ID">
-
-            <button class="control-debug__execute">Execute</button>
-        </div>
+      <button class="control-debug__execute">Execute</button>
     </div>
+  </div>
 
-    <div class="window control-debug__window_get toggle-content">
-        <div class="window__title">
-            <span>Get</span>
-            <span class="window__close">X</span>
-        </div>
-        <div class="window__content">
-            <input class="control-debug__id_room" placeholder="Room ID">
-            <input class="control-debug__id_member" placeholder="Member ID">
-            <input class="control-debug__id_endpoint" placeholder="Endpoint ID">
-
-            <div class="control-debug__json-result"></div>
-
-            <button class="control-debug__execute">Execute</button>
-        </div>
+  <div class="window control-debug__window_get toggle-content">
+    <div class="window__title">
+      <span>Get</span>
+      <span class="window__close">X</span>
     </div>
+    <div class="window__content">
+      <input class="control-debug__id_room" placeholder="Room ID">
+      <input class="control-debug__id_member" placeholder="Member ID">
+      <input class="control-debug__id_endpoint" placeholder="Endpoint ID">
 
-    <div class="control-debug-menu__toggle">
-        Dynamic Control API
-    </div>
+      <div class="control-debug__json-result"></div>
 
-    <div class="control-debug-menu toggle-content">
-        <span class="control-debug-menu__item control-debug-menu__item_create-room">Create room</span>
-        <br>
-        <span class="control-debug-menu__item control-debug-menu__item_create-member">Create member</span>
-        <br>
-        <span class="control-debug-menu__item control-debug-menu__item_create-endpoint">Create endpoint</span>
-        <br>
-        <span class="control-debug-menu__item control-debug-menu__item_delete-room">Delete room</span>
-        <br>
-        <span class="control-debug-menu__item control-debug-menu__item_delete-member">Delete member</span>
-        <br>
-        <span class="control-debug-menu__item control-debug-menu__item_delete-endpoint">Delete endpoint</span>
-        <br>
-        <span class="control-debug-menu__item control-debug-menu__item_get">Get</span>
+      <button class="control-debug__execute">Execute</button>
     </div>
+  </div>
+
+  <div class="control-debug-menu__toggle">
+    Dynamic Control API
+  </div>
+
+  <div class="control-debug-menu toggle-content">
+    <span class="control-debug-menu__item control-debug-menu__item_create-room">Create room</span>
+    <br>
+    <span class="control-debug-menu__item control-debug-menu__item_create-member">Create member</span>
+    <br>
+    <span class="control-debug-menu__item control-debug-menu__item_create-endpoint">Create endpoint</span>
+    <br>
+    <span class="control-debug-menu__item control-debug-menu__item_get">Get</span>
+    <br>
+    <span class="control-debug-menu__item control-debug-menu__item_delete">Delete</span>
+  </div>
 </body>
 </html>

@@ -6,9 +6,11 @@ use actix::{
     fut::wrap_future, Actor, ActorContext, ActorFuture, Addr, AsyncContext,
     Handler, Message, StreamHandler,
 };
-use actix_web_actors::ws::{self, CloseReason, WebsocketContext};
+use actix_web_actors::ws;
 use futures::future::Future;
-use medea_client_api_proto::{ClientMsg, CloseDescription, ServerMsg};
+use medea_client_api_proto::{
+    ClientMsg, CloseDescription, CloseReason, ServerMsg,
+};
 
 use crate::{
     api::{
@@ -63,15 +65,9 @@ impl WsSession {
         }
     }
 
-    fn close_normal(&self, ctx: &mut WebsocketContext<Self>) {
-        ctx.notify(Close {
-            reason: Some(ws::CloseCode::Normal.into()),
-        });
-    }
-
-    /// Start watchdog which will drop connection if now-last_activity >
-    /// idle_timeout.
-    fn start_watchdog(&mut self, ctx: &mut <Self as Actor>::Context) {
+    /// Starts watchdog which will drop connection if `now`-`last_activity` >
+    /// `idle_timeout`.
+    fn start_watchdog(ctx: &mut <Self as Actor>::Context) {
         ctx.run_interval(Duration::new(1, 0), |session, ctx| {
             if Instant::now().duration_since(session.last_activity)
                 > session.idle_timeout
@@ -87,7 +83,9 @@ impl WsSession {
                         session.member_id, err,
                     )
                 }
-                session.close_normal(ctx);
+                ctx.notify(Close::with_normal_code(&CloseDescription::new(
+                    CloseReason::Idle,
+                )))
             }
         });
     }
@@ -103,7 +101,7 @@ impl Actor for WsSession {
     fn started(&mut self, ctx: &mut Self::Context) {
         debug!("Started WsSession for Member [id = {}]", self.member_id);
 
-        self.start_watchdog(ctx);
+        Self::start_watchdog(ctx);
 
         ctx.wait(
             wrap_future(self.room.send(RpcConnectionEstablished {
@@ -120,7 +118,9 @@ impl Actor for WsSession {
                              {:?}",
                             session.member_id, e
                         );
-                        session.close_normal(ctx);
+                        ctx.notify(Close::with_normal_code(
+                            &CloseDescription::new(CloseReason::Rejected),
+                        ));
                     }
                 },
             )
@@ -133,7 +133,9 @@ impl Actor for WsSession {
                          {:?}",
                         session.member_id, send_err,
                     );
-                    session.close_normal(ctx);
+                    ctx.notify(Close::with_normal_code(
+                        &CloseDescription::new(CloseReason::InternalError),
+                    ));
                 },
             ),
         );
@@ -145,24 +147,20 @@ impl Actor for WsSession {
 }
 
 impl RpcConnection for Addr<WsSession> {
-    /// Closes [`WsSession`] by sending itself "normal closure" close message.
+    /// Closes [`WsSession`] by sending itself "normal closure" close message
+    /// with [`CloseDescription`] as description of [Close] frame.
     ///
     /// Never returns error.
+    ///
+    /// [Close]: https://tools.ietf.org/html/rfc6455#section-5.5.1
     fn close(
         &mut self,
         close_description: CloseDescription,
     ) -> Box<dyn Future<Item = (), Error = ()>> {
-        let reason = CloseReason {
-            code: ws::CloseCode::Normal,
-            description: Some(
-                serde_json::to_string(&close_description).unwrap(),
-            ),
-        };
         let fut = self
-            .send(Close {
-                reason: Some(reason),
-            })
+            .send(Close::with_normal_code(&close_description))
             .or_else(|_| Ok(()));
+
         Box::new(fut)
     }
 
@@ -182,8 +180,17 @@ impl RpcConnection for Addr<WsSession> {
 
 /// Message for closing [`WsSession`].
 #[derive(Message)]
-pub struct Close {
-    reason: Option<CloseReason>,
+pub struct Close(ws::CloseReason);
+
+impl Close {
+    /// Creates [`Close`] message with [`ws::CloseCode::Normal`] and provided
+    /// [`CloseDescription`] as serialized description.
+    fn with_normal_code(description: &CloseDescription) -> Self {
+        Self(ws::CloseReason {
+            code: ws::CloseCode::Normal,
+            description: Some(serde_json::to_string(&description).unwrap()),
+        })
+    }
 }
 
 impl Handler<Close> for WsSession {
@@ -193,7 +200,7 @@ impl Handler<Close> for WsSession {
     fn handle(&mut self, close: Close, ctx: &mut Self::Context) {
         debug!("Closing WsSession for member {}", self.member_id);
         self.closed_by_server = true;
-        ctx.close(close.reason);
+        ctx.close(Some(close.0));
         ctx.stop();
     }
 }

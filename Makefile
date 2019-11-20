@@ -18,12 +18,11 @@ eq = $(if $(or $(1),$(2)),$(and $(findstring $(1),$(2)),\
 MEDEA_IMAGE_NAME := $(strip \
 	$(shell grep 'COMPOSE_IMAGE_NAME=' .env | cut -d '=' -f2))
 DEMO_IMAGE_NAME := instrumentisto/medea-demo
+CONTROL_MOCK_IMAGE_NAME := instrumentisto/medea-control-api-mock
 
-RUST_VER := 1.37
-CHROME_VERSION := 77.0
-FIREFOX_VERSION := 69.0
-
-CURRENT_BRANCH := $(strip $(shell git branch | grep \* | cut -d ' ' -f2))
+RUST_VER := 1.39
+CHROME_VERSION := 78.0
+FIREFOX_VERSION := 70.0
 
 crate-dir = .
 ifeq ($(crate),medea-jason)
@@ -31,6 +30,12 @@ crate-dir = jason
 endif
 ifeq ($(crate),medea-client-api-proto)
 crate-dir = proto/client-api
+endif
+ifeq ($(crate),medea-control-api-proto)
+crate-dir = proto/control-api
+endif
+ifeq ($(crate),medea-control-api-mock)
+crate-dir = mock/control-api
 endif
 ifeq ($(crate),medea-macro)
 crate-dir = crates/medea-macro
@@ -109,6 +114,15 @@ up: up.dev
 # Running commands #
 ####################
 
+# Stop non-dockerized Control API mock server.
+#
+# Usage:
+#   make down.control
+
+down.control:
+	kill -9 $(pidof medea-control-api-mock)
+
+
 down.coturn: docker.down.coturn
 
 
@@ -152,26 +166,13 @@ endif
 down.medea: docker.down.medea
 
 
-# Down dockerized webdriver.
+# Run Control API mock server.
 #
 # Usage:
-#   make down.webdriver [browser=(chrome|firefox)]
-# 					    [dockerized=(yes|no)]
+#  make up.control
 
-down.webdriver:
-ifeq ($(browser),firefox)
-ifeq ($(dockerized),no)
-	-kill $$(pidof geckodriver)
-else
-	-docker stop medea-test-ff
-endif
-else
-ifeq ($(dockerized),no)
-	-kill $$(pidof chromedriver)
-else
-	-docker stop medea-test-chrome
-endif
-endif
+up.control:
+	cargo run -p medea-control-api-mock
 
 
 up.coturn: docker.up.coturn
@@ -186,7 +187,7 @@ up.demo: docker.up.demo
 #	make up.dev
 
 up.dev: up.coturn
-	$(MAKE) -j3 up.jason docker.up.medea up.control-api-mock
+	$(MAKE) -j3 up.jason docker.up.medea up.control
 
 
 up.medea: docker.up.medea
@@ -305,6 +306,19 @@ cargo.fmt:
 	cargo +nightly fmt --all $(if $(call eq,$(check),yes),-- --check,)
 
 
+# Generate Rust sources with Cargo's build.rs script.
+#
+# Usage:
+#	make cargo.gen crate=medea-control-api-proto
+
+cargo.gen:
+ifeq ($(crate),medea-control-api-proto)
+	@rm -rf $(crate-dir)/src/grpc/api*.rs
+	cd $(crate-dir)/ && \
+	cargo build
+endif
+
+
 # Lint Rust sources with clippy.
 #
 # Usage:
@@ -353,7 +367,7 @@ endif
 # Generate project documentation of Rust sources.
 #
 # Usage:
-#	make docs.rust [crate=(@all|medea|jason|<crate-name>)]
+#	make docs.rust [crate=(@all|medea|medea-jason|<crate-name>)]
 #	               [open=(yes|no)] [clean=(no|yes)]
 
 docs-rust-crate = $(if $(call eq,$(crate),),@all,$(crate))
@@ -377,11 +391,11 @@ endif
 # Run Rust unit tests of project.
 #
 # Usage:
-#	make test.unit [crate=(@all|medea|medea-jason|<crate-name>)]
-#				   [browser=(chrome|firefox)]
+#	make test.unit [crate=(@all|medea|<crate-name>)]
+#	               [crate=medea-jason [browser=(chrome|firefox|default)]]
 
 test-unit-crate = $(if $(call eq,$(crate),),@all,$(crate))
-driver-env = $(if $(call eq,$(browser),firefox),GECKODRIVER_REMOTE,CHROMEDRIVER_REMOTE)
+webdriver-env = $(if $(call eq,$(browser),firefox),GECKO,CHROME)DRIVER_REMOTE
 
 test.unit:
 ifeq ($(test-unit-crate),@all)
@@ -394,12 +408,17 @@ ifeq ($(test-unit-crate),medea)
 	cargo test --lib --bin medea
 else
 ifeq ($(crate),medea-jason)
-	@make up.webdriver
+ifeq ($(browser),default)
+	cd $(crate-dir)/ && \
+	cargo test --target wasm32-unknown-unknown --features mockable
+else
+	@make docker.up.webdriver browser=$(browser)
 	sleep 10
 	cd $(crate-dir)/ && \
-	$(driver-env)="http://0.0.0.0:4444" \
-    cargo test --target wasm32-unknown-unknown --features mockable
-	@make down.webdriver
+	$(webdriver-env)="http://127.0.0.1:4444" \
+	cargo test --target wasm32-unknown-unknown --features mockable
+	@make docker.down.webdriver browser=$(browser)
+endif
 else
 	cd $(crate-dir)/ && \
 	cargo test -p $(test-unit-crate)
@@ -586,6 +605,22 @@ docker.auth:
 		$(if $(call eq,$(pass-stdin),yes),--password-stdin,)
 
 
+# Build Docker image for Control API mock server.
+#
+# Usage:
+#	make docker.build.control [TAG=(dev|<tag>)] [debug=(yes|no)]
+#	                          [minikube=(no|yes)]
+
+docker.build.control:
+	$(docker-env) \
+	docker build $(if $(call eq,$(minikube),yes),,--network=host) \
+		--build-arg rust_ver=$(RUST_VER) \
+		--build-arg rustc_mode=$(if $(call eq,$(debug),no),release,debug) \
+		--build-arg rustc_opts=$(if $(call eq,$(debug),no),--release,) \
+		-t $(CONTROL_MOCK_IMAGE_NAME):$(if $(call eq,$(TAG),),dev,$(TAG)) \
+		-f mock/control-api/Dockerfile .
+
+
 # Build Docker image for demo application.
 #
 # Usage:
@@ -596,7 +631,9 @@ docker-build-demo-image-name = $(DEMO_IMAGE_NAME)
 
 docker.build.demo:
 ifeq ($(TAG),edge)
+	$(docker-env) \
 	docker build $(if $(call eq,$(minikube),yes),,--network=host) --force-rm \
+		--build-arg rust_ver=$(RUST_VER) \
 		-t $(docker-build-demo-image-name):$(TAG) \
 		-f jason/Dockerfile .
 else
@@ -632,8 +669,6 @@ docker-build-medea-image-name = $(strip \
 	$(if $(call eq,$(registry),),,$(registry)/)$(MEDEA_IMAGE_NAME))
 
 docker.build.medea:
-	$(call docker.build.clean.ignore)
-	@echo "!target/$(if $(call eq,$(debug),no),release,debug)/" >> .dockerignore
 	$(docker-env) \
 	docker build $(if $(call eq,$(minikube),yes),,--network=host) --force-rm \
 		$(if $(call eq,$(no-cache),yes),\
@@ -643,13 +678,17 @@ docker.build.medea:
 			--build-arg rustc_mode=$(if \
 				$(call eq,$(debug),no),release,debug) \
 			--build-arg rustc_opts=$(if \
-				$(call eq,$(debug),no),--release,)) \
+				$(call eq,$(debug),no),--release,),) \
 		-t $(docker-build-medea-image-name):$(if $(call eq,$(TAG),),dev,$(TAG)) .
-	$(call docker.build.clean.ignore)
-define docker.build.clean.ignore
-	@sed -i $(if $(call eq,$(shell uname -s),Darwin),'',) \
-		/^!target\/d .dockerignore
-endef
+
+
+# Stop dockerized Control API mock server and remove all related containers.
+#
+# Usage:
+#   make docker.down.control
+
+docker.down.control:
+	-docker stop medea-control-api-mock
 
 
 # Stop Coturn STUN/TURN server in Docker Compose environment
@@ -684,6 +723,15 @@ ifeq ($(dockerized),yes)
 else
 	-killall medea
 endif
+
+
+# Stop dockerized WebDriver and remove all related containers.
+#
+# Usage:
+#   make docker.down.webdriver [browser=(chrome|firefox)]
+
+docker.down.webdriver:
+	-docker stop medea-webdriver-$(if $(call eq,$(browser),),chrome,$(browser))
 
 
 # Pull project Docker images from Container Registry.
@@ -733,6 +781,17 @@ define docker.push.do
 	$(docker-env) \
 	docker push $(docker-push-image-name):$(tag)
 endef
+
+
+# Run dockerized Medea Control API mock server.
+#
+# Usage:
+#   make docker.up.control [TAG=(dev|<docker-tag>)]
+
+docker.up.control:
+	docker run --rm -d --network=host \
+		--name medea-control-api-mock \
+		$(CONTROL_MOCK_IMAGE_NAME):$(if $(call eq,$(TAG),),dev,$(TAG))
 
 
 # Run Coturn STUN/TURN server in Docker Compose environment.
@@ -785,19 +844,22 @@ else
 endif
 
 
-# Up dockerized webdriver.
+# Run dockerized WebDriver.
 #
 # Usage:
 #   make docker.up.webdriver [browser=(chrome|firefox)]
 
-docker.up.webdriver: docker.down.webdriver
+docker.up.webdriver:
+	-@make docker.down.webdriver browser=chrome
+	-@make docker.down.webdriver browser=firefox
 ifeq ($(browser),firefox)
-	# TODO: use instrumentisto/geckodriver when it published
-	docker run --rm -d --shm-size 256m --name medea-test-ff \
-		--network=host alexlapa/geckodriver:${FIREFOX_VERSION}
+	docker run --rm -d --network=host --shm-size 512m \
+		--name medea-webdriver-firefox \
+		instrumentisto/geckodriver:$(FIREFOX_VERSION)
 else
-	docker run --rm -d --name medea-test-chrome \
-		--network=host selenoid/chrome:$(CHROME_VERSION)
+	docker run --rm -d --network=host \
+		--name medea-webdriver-chrome \
+		selenoid/chrome:$(CHROME_VERSION)
 endif
 
 
@@ -892,6 +954,9 @@ helm.package:
 # Usage:
 #	make helm.package.release [chart=medea-demo] [build=(yes|no)]
 
+helm-package-release-ver := $(strip $(shell \
+	grep 'version: ' jason/demo/chart/medea-demo/Chart.yaml | cut -d ':' -f2))
+
 helm.package.release:
 ifneq ($(build),no)
 	@make helm.package chart=$(helm-chart)
@@ -905,9 +970,10 @@ endif
 		helm repo index charts/ \
 			--url=https://instrumentisto.github.io/medea/charts ; \
 		git add -v charts/ ; \
-		git commit -m "Release '$(helm-chart)' Helm chart" ; \
+		git commit -m \
+			"Release $(helm-chart)-$(helm-package-release-ver) Helm chart" ; \
 	fi
-	git checkout $(CURRENT_BRANCH)
+	git checkout -
 	git push origin gh-pages
 
 
@@ -928,6 +994,7 @@ ifeq ($(helm-chart),medea-demo)
 ifeq ($(rebuild),yes)
 	@make docker.build.demo minikube=yes TAG=dev
 	@make docker.build.medea no-cache=$(no-cache) minikube=yes TAG=dev
+	@make docker.build.control minikube=yes TAG=dev
 endif
 endif
 endif
@@ -999,20 +1066,20 @@ protoc.rebuild:
 ##################
 
 .PHONY: build build.jason build.medea \
-        cargo cargo.build cargo.fmt cargo.lint \
-        docker.auth docker.build.demo docker.build.medea \
-        	docker.down.coturn docker.down.demo docker.down.medea \
+        cargo cargo.build cargo.fmt cargo.gen cargo.lint \
+        docker.auth  docker.build.control docker.build.demo docker.build.medea \
+        	docker.down.control docker.down.coturn docker.down.demo \
+        	docker.down.medea docker.down.webdriver  \
         	docker.pull docker.push \
-        	docker.up.coturn docker.up.demo docker.up.medea \
+        	docker.up.control docker.up.coturn docker.up.demo docker.up.medea \
+        	docker.up.webdriver \
         docs docs.rust \
-        down down.coturn down.demo down.dev down.medea \
-		down.webdriver \
+        down down.control down.coturn down.demo down.dev down.medea \
         helm helm.down helm.init helm.lint helm.list \
         	helm.package helm.package.release helm.up \
         minikube.boot \
         protoc.rebuild \
         release release.crates release.helm release.npm \
         test test.e2e test.unit test.integration \
-        up up.coturn up.demo up.dev up.jason up.medea \
-        up.control-api-mock up.webdriver \
+        up up.control up.coturn up.demo up.dev up.jason up.medea \
         yarn

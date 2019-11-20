@@ -9,7 +9,8 @@
       "media.autoplay.ask-permission": false,
       "media.autoplay.default": 0,
       "media.navigator.streams.fake": true
-    }
+    },
+    "args": []
   },
   "goog:chromeOptions": {
     "args": [
