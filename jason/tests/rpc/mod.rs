@@ -3,7 +3,10 @@
 use std::{
     collections::HashMap,
     rc::Rc,
-    sync::atomic::{AtomicU64, Ordering},
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc,
+    },
 };
 
 use futures::{
@@ -25,11 +28,11 @@ wasm_bindgen_test_configure!(run_in_browser);
 ///
 /// # Algorithm:
 ///
-/// 1. Connect [`WebSocketRpcClient`] with [`RpcTransportMock`]
+/// 1. Connect [`WebSocketRpcClient`] with [`MockRpcTransport`]
 ///
 /// 2. Subscribe to [`Event`]s with [`WebSocketRpcClient::subscribe`]
 ///
-/// 3. Send [`Event`] with [`RpcTransportMock::send_on_message`]
+/// 3. Send [`Event`] with [`MockRpcTransport`]
 ///
 /// 4. Check that subscriber from step 2 receives this [`Event`]
 #[wasm_bindgen_test]
@@ -60,10 +63,9 @@ async fn message_received_from_transport_is_transmitted_to_sub() {
 ///
 /// # Algorithm
 ///
-/// 1. Connect [`WebSocketRpcClient`] with [`RpcTransportMock`]
+/// 1. Connect [`WebSocketRpcClient`] with [`MockRpcTransport`]
 ///
-/// 2. Subscribe to [`ClientMsg`]s which [`WebSocketRpcClient`] will send with
-/// [`RpcTransportMock::on_send`]
+/// 2. Subscribe to [`ClientMsg`]s which [`WebSocketRpcClient`] will send
 ///
 /// 3. Wait 600ms for [`ClientMsg::Ping`]
 #[wasm_bindgen_test]
@@ -76,7 +78,8 @@ async fn heartbeat() {
         .expect_on_close()
         .return_once(move || Ok(pending().boxed()));
 
-    let counter = AtomicU64::new(1);
+    let counter = Arc::new(AtomicU64::new(1));
+    let counter_clone = counter.clone();
     transport
         .expect_send()
         .times(3)
@@ -92,6 +95,7 @@ async fn heartbeat() {
     ws.connect(Rc::new(transport)).await.unwrap();
 
     resolve_after(120).await.unwrap();
+    assert!(counter_clone.load(Ordering::Relaxed) > 2);
 }
 
 /// Tests [`WebSocketRpcClient::unsub`] function.
@@ -137,11 +141,11 @@ async fn unsub_drops_subs() {
 ///
 /// # Algorithm
 ///
-/// 1. Create [`WebSocketRpcClient`] with [`RpcTransportMock`] [`Rc`]
+/// 1. Create [`WebSocketRpcClient`] with [`MockRpcTransport`] [`Rc`]
 ///
 /// 2. Drop [`WebSocketRpcClient`]
 ///
-/// 3. Check that [`RpcTransportMock`]'s [`Rc`] now have only 1
+/// 3. Check that [`MockRpcTransport`]'s [`Rc`] now have only 1
 /// [`Rc::strong_count`]
 #[wasm_bindgen_test]
 async fn transport_is_dropped_when_client_is_dropped() {
@@ -165,17 +169,19 @@ async fn transport_is_dropped_when_client_is_dropped() {
 ///
 /// # Algorithm
 ///
-/// 1. Connect [`WebSocketRpcClient`] with [`RpcTransportMock`]
+/// 1. Connect [`WebSocketRpcClient`] with [`MockRpcTransport`]
 ///
-/// 2. Subscribe to [`ClientMsg`]s with [`RpcTransportMock::on_send`]
+/// 2. Subscribe to [`ClientMsg`]s which [`WebSocketRpcClient`] will send
 ///
 /// 3. Send [`ClientMsg`] with [`WebSocketRpcClient::send_command`]
 ///
-/// 4. Check that this message received by [`RpcTransportMock`] with
-/// [`RpcTransportMock::on_send`] from step 2
+/// 4. Check that this message received by [`MockRpcTransport`]
 #[wasm_bindgen_test]
 async fn send_goes_to_transport() {
     let mut transport = MockRpcTransport::new();
+    // We don't use mockall's '.withf' instead of channel because in case
+    // of '.withf' usage we should move 'test_tx' to all '.withf' closures
+    // (but we can't do this).
     let (on_send_tx, mut on_send_rx) = mpsc::unbounded();
     transport
         .expect_on_message()
