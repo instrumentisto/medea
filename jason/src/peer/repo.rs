@@ -4,8 +4,6 @@ use anyhow::Result;
 use futures::channel::mpsc;
 use medea_client_api_proto::{IceServer, PeerId};
 
-use crate::media::MediaManager;
-
 use super::{PeerConnection, PeerEvent};
 
 /// [`PeerConnection`] factory and repository.
@@ -36,23 +34,10 @@ pub trait PeerRepository {
 }
 
 /// [`PeerConnection`] factory and repository.
+#[derive(Default)]
 pub struct Repository {
-    /// [`MediaManager`] for injecting into new created [`PeerConnection`]s.
-    media_manager: Rc<MediaManager>,
-
     /// Peer id to [`PeerConnection`],
     peers: HashMap<PeerId, Rc<PeerConnection>>,
-}
-
-impl Repository {
-    /// Instantiates new [`Repository`] with a given [`MediaManager`].
-    #[inline]
-    pub fn new(media_manager: Rc<MediaManager>) -> Self {
-        Self {
-            media_manager,
-            peers: HashMap::new(),
-        }
-    }
 }
 
 impl PeerRepository for Repository {
@@ -70,7 +55,6 @@ impl PeerRepository for Repository {
             id,
             peer_events_sender,
             ice_servers,
-            Rc::clone(&self.media_manager),
             enabled_audio,
             enabled_video,
         )?);

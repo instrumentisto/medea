@@ -6,6 +6,9 @@ mod errors;
 mod callback;
 mod event_listener;
 
+use std::pin::Pin;
+
+use futures::future::Future;
 use js_sys::Reflect;
 use wasm_bindgen::prelude::*;
 use web_sys::Window;
@@ -16,6 +19,9 @@ pub use self::{
     errors::WasmErr,
     event_listener::EventListener,
 };
+
+/// [`Future`] wrapped into [`Pin`] and [`Box`] without lifetime.
+pub type PinFuture<T> = Pin<Box<dyn Future<Output = T>>>;
 
 /// Returns [`Window`] object.
 ///
