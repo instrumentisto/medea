@@ -4,7 +4,7 @@
 
 use std::{cell::RefCell, convert::TryFrom, rc::Rc};
 
-use derive_more::*;
+use derive_more::{Display, From, Into};
 use futures::{channel::oneshot, future};
 use medea_client_api_proto::{ClientMsg, ServerMsg};
 use tracerr::Traced;
@@ -12,7 +12,9 @@ use web_sys::{CloseEvent, Event, MessageEvent, WebSocket as SysWebSocket};
 
 use crate::{
     rpc::CloseMsg,
-    utils::{EventListener, JasonError, JsCaused, JsError},
+    utils::{
+        EventListener, EventListenerBindError, JasonError, JsCaused, JsError,
+    },
 };
 
 /// Errors that may occur when working with [`WebSocket`].
@@ -21,48 +23,43 @@ use crate::{
 pub enum SocketError {
     /// Occurs when the port to which the connection is being attempted
     /// is being blocked.
-    #[display(fmt = "failed to create WebSocket: {}", _0)]
+    #[display(fmt = "Failed to create WebSocket: {}", _0)]
     CreateSocket(JsError),
 
     /// Occurs when the connection close before becomes state active.
-    #[display(fmt = "failed to init WebSocket")]
+    #[display(fmt = "Failed to init WebSocket")]
     InitSocket,
 
     /// Occurs when [`ClientMessage`] cannot be parsed.
-    #[display(fmt = "failed to parse client message: {}", _0)]
+    #[display(fmt = "Failed to parse client message: {}", _0)]
     ParseClientMessage(serde_json::error::Error),
 
     /// Occurs when [`ServerMessage`] cannot be parsed.
-    #[display(fmt = "failed to parse server message: {}", _0)]
+    #[display(fmt = "Failed to parse server message: {}", _0)]
     ParseServerMessage(serde_json::error::Error),
 
     /// Occurs if the parsed message is not string.
-    #[display(fmt = "message is not a string")]
+    #[display(fmt = "Message is not a string")]
     MessageNotString,
 
     /// Occurs when a message cannot be send to server.
-    #[display(fmt = "failed to send message: {}", _0)]
+    #[display(fmt = "Failed to send message: {}", _0)]
     SendMessage(JsError),
 
-    /// Occurs when handler cannot be set for the event [`CloseEvent`].
-    #[display(fmt = "failed to set handler for CloseEvent: {}", _0)]
-    SetHandlerOnClose(JsError),
-
-    /// Occurs when handler cannot be set for the event [`OpenEvent`].
-    #[display(fmt = "failed to set handler for OpenEvent: {}", _0)]
-    SetHandlerOnOpen(JsError),
-
-    /// Occurs when handler cannot be set for the event [`MessageEvent`].
-    #[display(fmt = "failed to set handler for MessageEvent: {}", _0)]
-    SetHandlerOnMessage(JsError),
-
-    /// Occurs when underlying WebSocket state cannot be checked.
-    #[display(fmt = "could not cast {} to State variant", _0)]
-    CastState(u16),
+    /// Occurs when handler failed to bind to some [`WebSocket`] event. Not
+    /// really supposed to ever happen.
+    #[display(fmt = "Failed to bind to WebSocket event: {}", _0)]
+    WebSocketEventBindError(EventListenerBindError),
 
     /// Occurs when message is sent to closed socket.
-    #[display(fmt = "underlying socket is closed")]
+    #[display(fmt = "Underlying socket is closed")]
     ClosedSocket,
+}
+
+impl From<EventListenerBindError> for SocketError {
+    fn from(err: EventListenerBindError) -> Self {
+        Self::WebSocketEventBindError(err)
+    }
 }
 
 type Result<T> = std::result::Result<T, Traced<SocketError>>;
@@ -95,7 +92,7 @@ impl TryFrom<u16> for State {
             1 => Ok(Self::OPEN),
             2 => Ok(Self::CLOSING),
             3 => Ok(Self::CLOSED),
-            _ => Err(SocketError::CastState(value)),
+            _ => unreachable!(),
         }
     }
 }
@@ -109,6 +106,8 @@ struct InnerSocket {
     on_error: Option<EventListener<SysWebSocket, Event>>,
 }
 
+/// Convenience wrapper around [WebSocket][1]
+/// [1]:https://developer.mozilla.org/en-US/docs/Web/API/WebSocket
 pub struct WebSocket(Rc<RefCell<InnerSocket>>);
 
 impl InnerSocket {
@@ -133,10 +132,7 @@ impl InnerSocket {
             Ok(new_state) => self.socket_state = new_state,
             Err(err) => {
                 // unreachable, unless some vendor will break enum
-                console_error!(JasonError::from(
-                    tracerr::new!(err).into_parts()
-                )
-                .to_string())
+                JasonError::from(tracerr::new!(err).into_parts()).print()
             }
         };
     }
@@ -164,8 +160,7 @@ impl WebSocket {
                         let _ = tx_close.send(());
                     },
                 )
-                .map_err(SocketError::SetHandlerOnClose)
-                .map_err(tracerr::wrap!())?,
+                .map_err(tracerr::map_from_and_wrap!(=> SocketError))?,
             );
 
             let inner = Rc::clone(&socket);
@@ -178,8 +173,7 @@ impl WebSocket {
                         let _ = tx_open.send(());
                     },
                 )
-                .map_err(SocketError::SetHandlerOnOpen)
-                .map_err(tracerr::wrap!())?,
+                .map_err(tracerr::map_from_and_wrap!(=> SocketError))?,
             );
         }
 
@@ -216,9 +210,7 @@ impl WebSocket {
                     f(parsed);
                 },
             )
-            .map_err(Into::into)
-            .map_err(SocketError::SetHandlerOnMessage)
-            .map_err(tracerr::wrap!())?,
+            .map_err(tracerr::map_from_and_wrap!(=> SocketError))?,
         );
         Ok(())
     }
@@ -239,8 +231,7 @@ impl WebSocket {
                     f(CloseMsg::from(&msg));
                 },
             )
-            .map_err(SocketError::SetHandlerOnClose)
-            .map_err(tracerr::wrap!())?,
+            .map_err(tracerr::map_from_and_wrap!(=> SocketError))?,
         );
         Ok(())
     }

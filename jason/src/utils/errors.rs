@@ -9,6 +9,13 @@ use wasm_bindgen::{prelude::*, JsCast};
 
 pub use medea_macro::JsCaused;
 
+/// Prints `$e` as `console.error()`.
+macro_rules! console_error {
+    ($e:expr) => {
+        web_sys::console::error_1(&$e.into())
+    };
+}
+
 /// Representation of an error which can caused by error returned from the
 /// JS side.
 pub trait JsCaused {
@@ -27,10 +34,10 @@ pub trait JsCaused {
 #[display(fmt = "{}: {}", name, message)]
 pub struct JsError {
     /// Name of JS error.
-    name: Cow<'static, str>,
+    pub name: Cow<'static, str>,
 
     /// Message of JS error.
-    message: Cow<'static, str>,
+    pub message: Cow<'static, str>,
 }
 
 impl From<JsValue> for JsError {
@@ -75,6 +82,13 @@ pub struct JasonError {
     source: Option<js_sys::Error>,
 }
 
+impl JasonError {
+    /// Prints error information to `console.error()`.
+    pub fn print(&self) {
+        console_error!(self.to_string());
+    }
+}
+
 #[wasm_bindgen]
 impl JasonError {
     /// Returns name of error.
@@ -114,9 +128,8 @@ where
     }
 }
 
-/// Prints `$e` as `console.error()`.
-macro_rules! console_error {
-    ($e:expr) => {
-        web_sys::console::error_1(&$e.into())
-    };
-}
+/// Occurs if referenced value was dropped.
+#[derive(Debug, Display, JsCaused)]
+#[display(fmt = "Handler is in detached state.")]
+#[js_error(JsError)]
+pub struct HandlerDetachedError;

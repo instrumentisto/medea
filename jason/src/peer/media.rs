@@ -30,13 +30,13 @@ use super::{
 pub enum MediaConnectionsError {
     /// Occurs when the provided [`MediaTrack`] cannot be inserted into
     /// provided [`Sender`]s transceiver.
-    #[display(fmt = "failed to insert Track to a sender: {}", _0)]
-    InsertTrack(JsError),
+    #[display(fmt = "Failed to insert Track to a sender: {}", _0)]
+    CouldNotInsertTrack(JsError),
 
     /// Occurs when creates new [`Sender`] on not existed into a
     /// [`RtcPeerConnection`] the [`RtcRtpTransceiver`].
-    #[display(fmt = "unable to find Transceiver with provided mid: {}", _0)]
-    NotFoundTransceiver(String),
+    #[display(fmt = "Unable to find Transceiver with provided mid: {}", _0)]
+    TransceiverNotFound(String),
 
     /// Occurs when cannot get the "mid" from the [`Sender`].
     #[display(fmt = "Peer has senders without mid")]
@@ -48,12 +48,12 @@ pub enum MediaConnectionsError {
 
     /// Occurs when inserted [`MediaStream`] dont have all necessary
     /// [`MediaTrack`]s.
-    #[display(fmt = "provided stream does not have all necessary Tracks")]
+    #[display(fmt = "Provided stream does not have all necessary Tracks")]
     InvalidMediaStream,
 
     /// Occurs when [`MediaTrack`] of inserted [`MediaStream`] does not satisfy
     /// [`Sender`] constraints.
-    #[display(fmt = "provided Track does not satisfy senders constraints")]
+    #[display(fmt = "Provided Track does not satisfy senders constraints")]
     InvalidMediaTrack,
 }
 
@@ -348,7 +348,7 @@ impl Sender {
             None => peer.add_transceiver(kind, TransceiverDirection::Sendonly),
             Some(mid) => peer
                 .get_transceiver_by_mid(&mid)
-                .ok_or(MediaConnectionsError::NotFoundTransceiver(mid))
+                .ok_or(MediaConnectionsError::TransceiverNotFound(mid))
                 .map_err(tracerr::wrap!())?,
         };
         Ok(Rc::new(Self {
@@ -380,7 +380,7 @@ impl Sender {
         )
         .await
         .map_err(Into::into)
-        .map_err(MediaConnectionsError::InsertTrack)
+        .map_err(MediaConnectionsError::CouldNotInsertTrack)
         .map_err(tracerr::wrap!())?;
 
         sender

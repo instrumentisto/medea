@@ -35,19 +35,19 @@ pub enum MediaManagerError {
     ///
     /// [1]: https://www.w3.org/TR/mediacapture-streams/#mediadevices
     #[display(fmt = "Navigator.mediaDevices() failed: {}", _0)]
-    MediaDevices(JsError),
+    CouldNotGetMediaDevices(JsError),
 
     /// Occurs if the requested [MediaStream][1] could not be received.
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#mediastream
     #[display(fmt = "MediaDevices.getUserMedia() failed: {}", _0)]
-    GetUserMedia(JsError),
+    GetUserMediaFailed(JsError),
 
     /// Occurs when cannot get info about connected [MediaDevices][1].
     ///
     /// [1]: https://www.w3.org/TR/mediacapture-streams/#mediadevices
     #[display(fmt = "MediaDevices.enumerateDevices() failed: {}", _0)]
-    GetEnumerateDevices(JsError),
+    EnumerateDevicesFailed(JsError),
 }
 
 type Result<T> = std::result::Result<T, Traced<MediaManagerError>>;
@@ -76,18 +76,18 @@ impl InnerMediaManager {
                 .navigator()
                 .media_devices()
                 .map_err(JsError::from)
-                .map_err(MediaDevices)
+                .map_err(CouldNotGetMediaDevices)
                 .map_err(tracerr::from_and_wrap!())?;
             let devices = JsFuture::from(
                 devices
                     .enumerate_devices()
                     .map_err(JsError::from)
-                    .map_err(GetEnumerateDevices)
+                    .map_err(EnumerateDevicesFailed)
                     .map_err(tracerr::from_and_wrap!())?,
             )
             .await
             .map_err(JsError::from)
-            .map_err(GetEnumerateDevices)
+            .map_err(EnumerateDevicesFailed)
             .map_err(tracerr::from_and_wrap!())?;
 
             Ok(js_sys::Array::from(&devices)
@@ -175,7 +175,7 @@ impl InnerMediaManager {
                 .navigator()
                 .media_devices()
                 .map_err(JsError::from)
-                .map_err(MediaDevices)
+                .map_err(CouldNotGetMediaDevices)
                 .map_err(tracerr::from_and_wrap!())?;
 
             let caps: SysMediaStreamConstraints = caps.into();
@@ -183,12 +183,12 @@ impl InnerMediaManager {
                 media_devices
                     .get_user_media_with_constraints(&caps)
                     .map_err(JsError::from)
-                    .map_err(GetUserMedia)
+                    .map_err(GetUserMediaFailed)
                     .map_err(tracerr::from_and_wrap!())?,
             )
             .await
             .map_err(JsError::from)
-            .map_err(GetUserMedia)
+            .map_err(GetUserMediaFailed)
             .map_err(tracerr::from_and_wrap!())?;
 
             let stream = SysMediaStream::from(stream);

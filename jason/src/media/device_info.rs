@@ -14,7 +14,7 @@ use web_sys::{MediaDeviceInfo, MediaDeviceKind};
 #[derive(Debug, Display)]
 pub enum Error {
     /// Occurs when kind of media device not input device.
-    #[display(fmt = "Not input device")]
+    #[display(fmt = "Not an input device")]
     NotInputDevice,
 }
 

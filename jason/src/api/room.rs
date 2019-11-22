@@ -8,7 +8,7 @@ use std::{
 };
 
 use derive_more::Display;
-use futures::{channel::mpsc, future, stream, FutureExt as _, StreamExt as _};
+use futures::{channel::mpsc, stream, Future, FutureExt as _, StreamExt as _};
 use js_sys::Promise;
 use medea_client_api_proto::{
     Command, Direction, Event as RpcEvent, EventHandler, IceCandidate,
@@ -39,38 +39,38 @@ enum RoomError {
     #[display(fmt = "`on_failed_local_stream` callback is not set")]
     CallbackNotSet,
 
-    /// Returned if [`RpcClientError`] cannoot connect with media server.
-    #[display(fmt = "unable to connect with media server: {}", _0)]
-    ConnectToServer(#[js_cause] RpcClientError),
+    /// Returned if [`RpcClient`] was unable to connect to RPC server.
+    #[display(fmt = "Unable to connect RPC server: {}", _0)]
+    CouldNotConnectToServer(#[js_cause] RpcClientError),
 
     /// Returned if the previously added local media stream does not satisfy
     /// the tracks sent from the media server.
-    #[display(fmt = "invalid local stream: {}", _0)]
+    #[display(fmt = "Invalid local stream: {}", _0)]
     InvalidLocalStream(#[js_cause] PeerError),
 
     /// Returned if [`PeerConnection`] cannot receive the local stream from
     /// [`MediaManager`].
-    #[display(fmt = "failed to get local stream: {}", _0)]
-    GetLocalStream(#[js_cause] PeerError),
+    #[display(fmt = "Failed to get local stream: {}", _0)]
+    CouldNotGetLocalMedia(#[js_cause] PeerError),
 
     /// Returned if the requested [`PeerConnection`] is not found.
-    #[display(fmt = "peer with id {} doesnt exist", _0)]
-    NotFoundPeer(PeerId),
+    #[display(fmt = "Peer with id {} doesnt exist", _0)]
+    NoSuchPeer(PeerId),
 
     /// Returned if an error occurred during the webrtc signaling process
     /// with remote peer.
-    #[display(fmt = "webrtc signaling process failed: {}", _0)]
-    WebRTCSignaling(#[js_cause] PeerError),
+    #[display(fmt = "Some PeerConnection error: {}", _0)]
+    PeerConnectionError(#[js_cause] PeerError),
 
     /// Returned if was received event [`PeerEvent::NewRemoteStream`] without
     /// [`Connection`] with remote [`Member`].
-    #[display(fmt = "`NewRemoteStream` from sender without connection")]
-    RemoteStreamWithoutConnection,
+    #[display(fmt = "Remote stream from unknown peer")]
+    UnknownRemotePeer,
 }
 
 impl From<RpcClientError> for RoomError {
     fn from(err: RpcClientError) -> Self {
-        Self::ConnectToServer(err)
+        Self::CouldNotConnectToServer(err)
     }
 }
 
@@ -80,8 +80,8 @@ impl From<PeerError> for RoomError {
         use RoomError::*;
         match err {
             MediaConnections(_) | StreamRequest(_) => InvalidLocalStream(err),
-            MediaManager(_) => GetLocalStream(err),
-            RtcPeerConnection(_) => WebRTCSignaling(err),
+            MediaManager(_) => CouldNotGetLocalMedia(err),
+            RtcPeerConnection(_) => PeerConnectionError(err),
         }
     }
 }
@@ -94,6 +94,36 @@ impl From<PeerError> for RoomError {
 #[allow(clippy::module_name_repetitions)]
 #[wasm_bindgen]
 pub struct RoomHandle(Weak<RefCell<InnerRoom>>);
+
+impl RoomHandle {
+    /// Implements externally visible `RoomHandle::join`.
+    pub fn inner_join(
+        &self,
+        token: String,
+    ) -> impl Future<Output = Result<(), JasonError>> + 'static {
+        let inner: Result<_, JasonError> = map_weak!(self, |inner| inner);
+
+        async move {
+            let inner = inner?;
+
+            if !inner.borrow().on_failed_local_stream.is_set() {
+                return Err(JasonError::from(
+                    tracerr::new!(RoomError::CallbackNotSet).into_parts(),
+                ));
+            }
+
+            inner
+                .borrow()
+                .rpc
+                .connect(token)
+                .await
+                .map_err(tracerr::map_from_and_wrap!(=> RoomError))
+                .map_err(|err| JasonError::from(err.into_parts()))?;
+
+            Ok(())
+        }
+    }
+}
 
 #[wasm_bindgen]
 impl RoomHandle {
@@ -137,32 +167,9 @@ impl RoomHandle {
     ///
     /// Effectively returns `Result<(), js_sys::Error>`.
     pub fn join(&self, token: String) -> Promise {
-        match map_weak!(self, |inner| (
-            Rc::clone(&inner.borrow().rpc),
-            inner.borrow().on_failed_local_stream.is_set()
-        )) {
-            Ok((rpc, failed_callback_is_set)) => {
-                if !failed_callback_is_set {
-                    return future_to_promise(future::err(
-                        JasonError::from(
-                            tracerr::new!(RoomError::CallbackNotSet)
-                                .into_parts(),
-                        )
-                        .into(),
-                    ));
-                }
-                future_to_promise(async move {
-                    rpc.connect(token)
-                        .await
-                        .map(|_| JsValue::NULL)
-                        .map_err(tracerr::map_from_and_wrap!(=> RoomError))
-                        .map_err(|err| {
-                            JasonError::from(err.into_parts()).into()
-                        })
-                })
-            }
-            Err(err) => future_to_promise(future::err(err)),
-        }
+        future_to_promise(self.inner_join(token).map(|result| {
+            result.map(|_| JsValue::null()).map_err(|err| err.into())
+        }))
     }
 
     /// Injects local media stream for all created and new [`PeerConnection`]s
@@ -425,7 +432,7 @@ impl EventHandler for InnerRoom {
         {
             Ok(peer) => peer,
             Err(err) => {
-                console_error!(JasonError::from(err.into_parts()).to_string());
+                JasonError::from(err.into_parts()).print();
                 return;
             }
         };
@@ -471,16 +478,12 @@ impl EventHandler for InnerRoom {
                         let (err, trace) = err.into_parts();
                         match err {
                             RoomError::InvalidLocalStream(_)
-                            | RoomError::GetLocalStream(_) => {
+                            | RoomError::CouldNotGetLocalMedia(_) => {
                                 let e = JasonError::from((err, trace));
-                                console_error!(e.to_string());
+                                e.print();
                                 error_callback.call(e);
                             }
-                            _ => {
-                                console_error!(
-                                    JasonError::from((err, trace)).to_string()
-                                );
-                            }
+                            _ => JasonError::from((err, trace)).print(),
                         };
                     };
                 }
@@ -497,17 +500,15 @@ impl EventHandler for InnerRoom {
                     .await
                     .map_err(tracerr::map_from_and_wrap!(=> RoomError))
                 {
-                    console_error!(
-                        JasonError::from(err.into_parts()).to_string()
-                    );
+                    JasonError::from(err.into_parts()).print()
                 }
             });
         } else {
             // TODO: No peer, whats next?
-            let err = JasonError::from(
-                tracerr::new!(RoomError::NotFoundPeer(peer_id)).into_parts(),
-            );
-            console_error!(err.to_string());
+            JasonError::from(
+                tracerr::new!(RoomError::NoSuchPeer(peer_id)).into_parts(),
+            )
+            .print();
         }
     }
 
@@ -528,17 +529,15 @@ impl EventHandler for InnerRoom {
                     .await
                     .map_err(tracerr::map_from_and_wrap!(=> RoomError));
                 if let Err(err) = add {
-                    console_error!(
-                        JasonError::from(err.into_parts()).to_string()
-                    );
+                    JasonError::from(err.into_parts()).print();
                 }
             });
         } else {
             // TODO: No peer, whats next?
-            let err = JasonError::from(
-                tracerr::new!(RoomError::NotFoundPeer(peer_id)).into_parts(),
-            );
-            console_error!(err.to_string());
+            JasonError::from(
+                tracerr::new!(RoomError::NoSuchPeer(peer_id)).into_parts(),
+            )
+            .print()
         }
     }
 
@@ -584,11 +583,10 @@ impl PeerEventHandler for InnerRoom {
     ) {
         match self.connections.get(&sender_id) {
             Some(conn) => conn.on_remote_stream(remote_stream.new_handle()),
-            None => console_error!(JasonError::from(
-                tracerr::new!(RoomError::RemoteStreamWithoutConnection)
-                    .into_parts()
+            None => JasonError::from(
+                tracerr::new!(RoomError::UnknownRemotePeer).into_parts(),
             )
-            .to_string()),
+            .print(),
         }
     }
 

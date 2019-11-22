@@ -38,7 +38,7 @@ async fn failed_get_media_devices_info() {
         Ok(_) => assert!(false),
         Err(err) => {
             let e = get_jason_error(err);
-            assert_eq!(e.name(), "GetEnumerateDevices");
+            assert_eq!(e.name(), "EnumerateDevicesFailed");
             assert_eq!(
                 e.message(),
                 "MediaDevices.enumerateDevices() failed: Unknown JS error: \
@@ -72,7 +72,7 @@ async fn failed_get_user_media() {
         Ok(_) => assert!(false),
         Err(err) => {
             let err = get_jason_error(err);
-            assert_eq!(err.name(), "GetUserMedia");
+            assert_eq!(err.name(), "GetUserMediaFailed");
             assert_eq!(
                 err.message(),
                 "MediaDevices.getUserMedia() failed: Unknown JS error: \
@@ -110,7 +110,7 @@ async fn failed_get_user_media2() {
         Ok(_) => assert!(false),
         Err(err) => {
             let err = get_jason_error(err);
-            assert_eq!(err.name(), "GetUserMedia");
+            assert_eq!(err.name(), "GetUserMediaFailed");
             assert_eq!(
                 err.message(),
                 "MediaDevices.getUserMedia() failed: \

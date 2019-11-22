@@ -3,6 +3,7 @@
 mod api;
 mod media;
 mod peer;
+mod rpc;
 
 use js_sys::Promise;
 use medea_client_api_proto::{

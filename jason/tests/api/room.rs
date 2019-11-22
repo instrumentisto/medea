@@ -4,7 +4,8 @@ use std::rc::Rc;
 
 use futures::{
     channel::{mpsc, oneshot},
-    future::Either,
+    future::{pending, ready, Either, FutureExt as _},
+    stream::{once, StreamExt},
 };
 use medea_client_api_proto::{Event, IceServer, PeerId};
 use medea_jason::{
@@ -14,8 +15,8 @@ use medea_jason::{
     rpc::MockRpcClient,
     utils::JasonError,
 };
+use mockall::predicate::*;
 use wasm_bindgen::prelude::*;
-use wasm_bindgen_futures::JsFuture;
 use wasm_bindgen_test::*;
 
 use crate::{get_test_tracks, resolve_after, MockNavigator};
@@ -237,7 +238,7 @@ async fn error_inject_invalid_local_stream_into_new_peer() {
         callback_assert_eq!(
             test_tx,
             err.message(),
-            "invalid local stream: provided MediaStream was expected to have \
+            "Invalid local stream: provided MediaStream was expected to have \
              single video track"
         );
         test_tx.send(Ok(())).unwrap();
@@ -283,7 +284,7 @@ async fn error_inject_invalid_local_stream_into_room_on_exists_peer() {
         callback_assert_eq!(
             test_tx,
             &err.message(),
-            "invalid local stream: provided MediaStream was expected to have \
+            "Invalid local stream: provided MediaStream was expected to have \
              single video track"
         );
         test_tx.send(Ok(())).unwrap();
@@ -314,11 +315,11 @@ async fn error_get_local_stream_on_new_peer() {
     let room_handle = room.new_handle();
     let (test_tx, test_rx) = oneshot::channel();
     let cb = Closure::once_into_js(move |err: JasonError| {
-        callback_assert_eq!(test_tx, &err.name(), "GetLocalStream");
+        callback_assert_eq!(test_tx, &err.name(), "CouldNotGetLocalMedia");
         callback_assert_eq!(
             test_tx,
             &err.message(),
-            "failed to get local stream: MediaDevices.getUserMedia() failed: \
+            "Failed to get local stream: MediaDevices.getUserMedia() failed: \
              Unknown JS error: error_get_local_stream_on_new_peer"
         );
         test_tx.send(Ok(())).unwrap();
@@ -360,11 +361,43 @@ async fn error_join_room_without_failed_stream_callback() {
     let room = Room::new(Rc::new(rpc), repo);
 
     let room_handle = room.new_handle();
-    match JsFuture::from(room_handle.join("token".to_string())).await {
-        Ok(_) => assert!(
-            false,
-            "Not allowed join if `on_failed_local_stream` callback is not set"
-        ),
-        Err(_) => assert!(true),
+
+    let join_room = room_handle.inner_join(String::from("token")).await;
+
+    match join_room {
+        Ok(_) => unreachable!(),
+        Err(e) => {
+            assert_eq!(e.name(), "CallbackNotSet");
+            assert_eq!(
+                e.message(),
+                "`on_failed_local_stream` callback is not set"
+            );
+            assert!(!e.trace().is_empty());
+        }
     }
+}
+
+// Invoke RoomHandle::inner_join and make sure that it tried to connect
+// RpcClient with provided token if `on_failed_local_stream` is set.
+#[wasm_bindgen_test]
+async fn join_room_connects_rpc_client() {
+    let mut rpc = MockRpcClient::new();
+
+    rpc.expect_connect()
+        .with(eq(String::from("token")))
+        .return_once(|_| ready(Ok(())).boxed_local());
+    rpc.expect_subscribe()
+        .return_once(|| once(pending()).boxed());
+    rpc.expect_unsub().return_const(());
+
+    let room = Room::new(Rc::new(rpc), Box::new(MockPeerRepository::new()));
+    let room_handle = room.new_handle();
+
+    room_handle
+        .on_failed_local_stream(
+            Closure::once_into_js(|_: JasonError| {}).into(),
+        )
+        .unwrap();
+
+    room_handle.inner_join(String::from("token")).await.unwrap();
 }

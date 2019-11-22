@@ -1,7 +1,7 @@
 //! Abstraction over RPC transport.
 
 mod heartbeat;
-mod websocket;
+pub mod websocket;
 
 use std::{cell::RefCell, rc::Rc, vec};
 
@@ -33,12 +33,12 @@ pub enum CloseMsg {
 pub enum RpcClientError {
     /// Occurs if new WebSocket connection to remote media server cannot
     /// be established.
-    #[display(fmt = "establishment connection failed: {}", _0)]
-    EstablishmentConnection(#[js_cause] SocketError),
+    #[display(fmt = "Connection establishment failed: {}", _0)]
+    RpcTransportError(#[js_cause] SocketError),
 
     /// Occurs if the heartbeat cannot be started.
-    #[display(fmt = "start heartbeat failed: {}", _0)]
-    StartHeartbeat(#[js_cause] HeartbeatError),
+    #[display(fmt = "Start heartbeat failed: {}", _0)]
+    CouldNotStartHeartbeat(#[js_cause] HeartbeatError),
 }
 
 // TODO: consider using async-trait crate, it doesnt work with mockall atm
@@ -130,7 +130,7 @@ fn on_message(
         Err(err) => {
             // TODO: protocol versions mismatch? should drop
             //       connection if so
-            console_error!(JasonError::from(err.into_parts()).to_string());
+            JasonError::from(err.into_parts()).print();
         }
     }
 }
