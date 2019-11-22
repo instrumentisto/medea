@@ -40,7 +40,7 @@ All user visible changes to this project will be documented in this file. This p
         - `Room.on_failed_local_stream` callback ([#54]).
 - Error handling:
     - Library API:
-        - `JasonError` as library error with trace information and underlie JS error if it is cause ([#55])
+        - `JasonError` as library error with trace information and underlying JS error if it is the cause ([#55])
 
 ### Fixed
 
