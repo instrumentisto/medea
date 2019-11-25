@@ -365,7 +365,10 @@ window.onload = async function() {
           }
           await room.join(baseUrl + roomId + '/' + username + '/test')
         } catch (e) {
-          console.error("Join to room failed: Error[name:[", e.name(), "], [msg:", e.message(), "], [source", e.source(), "]]");
+          console.error(
+            "Join to room failed: Error[name:[", e.name(), "], ",
+            "[msg:", e.message(), "], [source", e.source(), "]]",
+          );
           console.error(e.trace());
         }
       };

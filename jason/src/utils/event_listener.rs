@@ -1,15 +1,15 @@
 use std::{ops::Deref, rc::Rc};
 
 use derive_more::{Display, From};
+use tracerr::Traced;
 use wasm_bindgen::{closure::Closure, convert::FromWasmAbi, JsCast};
 use web_sys::EventTarget;
 
 use crate::utils::{errors::JsCaused, JsError};
-use tracerr::Traced;
 
 /// Failed to bind to [`EventTarget`][1] event.
 ///
-/// [1]:https://developer.mozilla.org/en-US/docs/Web/API/EventTarget
+/// [1]: https://developer.mozilla.org/en-US/docs/Web/API/EventTarget
 #[allow(clippy::module_name_repetitions)]
 #[derive(Debug, Display, From, JsCaused)]
 #[js_error(JsError)]

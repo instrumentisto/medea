@@ -39,7 +39,7 @@ impl Drop for IntervalHandle {
 }
 
 /// Upgrades newtyped [`Weak`] reference, returning [`HandlerDetachedError`] if
-/// failed, or mapping [`Rc`]-referenced value with provided `$closure`
+/// failed, or maps the [`Rc`]-referenced value with provided `$closure`
 /// otherwise.
 ///
 /// [`Rc`]: std::rc::Rc

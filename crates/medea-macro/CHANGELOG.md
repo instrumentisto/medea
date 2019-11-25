@@ -16,7 +16,7 @@ All user visible changes to this project will be documented in this file. This p
 
 ### Added
 
-- `#[derive(JsCaused)]` macro for derive `JsCaused` trait for `medea-jason` crate errors ([#68](/../../pull/68));
+- `#[derive(JsCaused)]` macro for deriving `JsCaused` trait from `medea-jason` crate ([#68](/../../pull/68)).
 
 
 

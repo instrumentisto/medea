@@ -29,15 +29,13 @@ wasm_bindgen_test_configure!(run_in_browser);
 /// This macro will be used in JS callback tests because this is the only
 /// option to trigger test fail.
 ///
-/// `$test_tx` - [`oneshot::Sender`] to which comparison error will be sent
-///
-/// `$a` - left item of comparision
-///
-/// `$b` - right item of comparision
+/// `$test_tx` - [`oneshot::Sender`] to which comparison error will be sent.
 macro_rules! callback_assert_eq {
-    ($test_tx:tt, $a:expr, $b:expr) => {
-        if $a != $b {
-            $test_tx.send(Err(format!("{} != {}", $a, $b))).unwrap();
+    ($test_tx:tt, $actual:expr, $expected:expr) => {
+        if $actual != $expected {
+            $test_tx
+                .send(Err(format!("{} != {}", $actual, $expected)))
+                .unwrap();
             return;
         }
     };
@@ -370,7 +368,7 @@ async fn error_join_room_without_failed_stream_callback() {
             assert_eq!(e.name(), "CallbackNotSet");
             assert_eq!(
                 e.message(),
-                "`on_failed_local_stream` callback is not set"
+                "`on_failed_local_stream` callback is not set",
             );
             assert!(!e.trace().is_empty());
         }

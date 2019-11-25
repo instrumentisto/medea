@@ -23,4 +23,4 @@ syn = { version = "1.0", features = ["full"] }
 synstructure = "0.12"
 
 [dev-dependencies]
-medea-jason = {path = "../../jason"}
+medea-jason = { path = "../../jason" }

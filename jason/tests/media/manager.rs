@@ -42,7 +42,7 @@ async fn failed_get_media_devices_info() {
             assert_eq!(
                 e.message(),
                 "MediaDevices.enumerateDevices() failed: Unknown JS error: \
-                 failed_get_media_devices_info"
+                 failed_get_media_devices_info",
             );
         }
     }
@@ -76,7 +76,7 @@ async fn failed_get_user_media() {
             assert_eq!(
                 err.message(),
                 "MediaDevices.getUserMedia() failed: Unknown JS error: \
-                 failed_get_user_media"
+                 failed_get_user_media",
             );
         }
     }
@@ -114,7 +114,7 @@ async fn failed_get_user_media2() {
             assert_eq!(
                 err.message(),
                 "MediaDevices.getUserMedia() failed: \
-                 get_user_media_error_name: get_user_media_error_message"
+                 get_user_media_error_name: get_user_media_error_message",
             );
         }
     }

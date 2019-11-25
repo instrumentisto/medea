@@ -33,9 +33,7 @@ extern "C" {
     fn stop(this: &MockNavigator);
 }
 
-#[wasm_bindgen(inline_js = "export const get_jason_error = (err) => {
-                                return err;
-                            }")]
+#[wasm_bindgen(inline_js = "export const get_jason_error = (err) => err;")]
 extern "C" {
     fn get_jason_error(err: JsValue) -> JasonError;
 }
@@ -61,7 +59,7 @@ pub fn get_test_tracks() -> (Track, Track) {
     )
 }
 
-/// Async function which resolves after provided number of ms.
+/// Async function which resolves after provided number of milliseconds.
 pub async fn resolve_after(delay_ms: i32) -> Result<(), JsValue> {
     JsFuture::from(Promise::new(&mut |yes, _| {
         window()
@@ -71,6 +69,5 @@ pub async fn resolve_after(delay_ms: i32) -> Result<(), JsValue> {
             .unwrap();
     }))
     .await?;
-
     Ok(())
 }
