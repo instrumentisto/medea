@@ -12,8 +12,8 @@ use crate::{
 /// Errors that may occur in [`Heartbeat`].
 #[derive(Debug, Error)]
 pub enum Error {
-    #[error("unable to ping: no socket")]
-    NoSocket,
+    #[error("unable to ping: no transport")]
+    NoTransport,
     #[error("cannot set callback for ping send: {0}")]
     SetIntervalHandler(#[from] WasmErr),
     #[error("failed to send ping: {0}")]
@@ -31,21 +31,21 @@ struct InnerHeartbeat {
     num: u64,
     /// Timestamp of last pong received.
     pong_at: Option<f64>,
-    /// WebSocket connection with remote server.
-    socket: Option<Rc<dyn RpcTransport>>,
+    /// Connection with remote RPC server.
+    transport: Option<Rc<dyn RpcTransport>>,
     /// Handler of sending `ping` task. Task is dropped if you drop handler.
     ping_task: Option<PingTaskHandler>,
 }
 
 impl InnerHeartbeat {
-    /// Send ping message into socket.
-    /// Returns error no open socket.
+    /// Send ping message to RPC server.
+    /// Returns errors if no open transport found.
     fn send_now(&mut self) -> Result<(), Error> {
-        match self.socket.as_ref() {
-            None => Err(Error::NoSocket),
-            Some(socket) => {
+        match self.transport.as_ref() {
+            None => Err(Error::NoTransport),
+            Some(transport) => {
                 self.num += 1;
-                Ok(socket.send(&ClientMsg::Ping(self.num))?)
+                Ok(transport.send(&ClientMsg::Ping(self.num))?)
             }
         }
     }
@@ -65,20 +65,20 @@ impl Heartbeat {
             interval,
             num: 0,
             pong_at: None,
-            socket: None,
+            transport: None,
             ping_task: None,
         })))
     }
 
-    /// Starts [`Heartbeat`] for given [`WebSocket`].
+    /// Starts [`Heartbeat`] for given [`RpcTransport`].
     ///
-    /// Sends first `ping` immediately, so provided [`WebSocket`] must be
+    /// Sends first `ping` immediately, so provided [`RpcTransport`] must be
     /// active.
-    pub fn start(&self, socket: Rc<dyn RpcTransport>) -> Result<(), Error> {
+    pub fn start(&self, transport: Rc<dyn RpcTransport>) -> Result<(), Error> {
         let mut inner = self.0.borrow_mut();
         inner.num = 0;
         inner.pong_at = None;
-        inner.socket = Some(socket);
+        inner.transport = Some(transport);
         inner.send_now()?;
 
         let inner_rc = Rc::clone(&self.0);
@@ -105,7 +105,7 @@ impl Heartbeat {
     /// Stops [`Heartbeat`].
     pub fn stop(&self) {
         self.0.borrow_mut().ping_task.take();
-        self.0.borrow_mut().socket.take();
+        self.0.borrow_mut().transport.take();
     }
 
     /// Timestamp of last pong received.

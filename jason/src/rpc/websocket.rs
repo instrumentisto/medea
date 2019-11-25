@@ -7,14 +7,15 @@ use std::{cell::RefCell, convert::TryFrom, rc::Rc};
 use derive_more::{From, Into};
 use futures::{
     channel::{mpsc, oneshot},
-    future,
+    future::{self, LocalBoxFuture},
+    stream::LocalBoxStream,
 };
 use medea_client_api_proto::{ClientMsg, ServerMsg};
 use thiserror::*;
 use web_sys::{CloseEvent, Event, MessageEvent, WebSocket as SysWebSocket};
 
 use crate::{
-    rpc::{CloseMsg, PinFuture, PinStream, RpcTransport},
+    rpc::{CloseMsg, RpcTransport},
     utils::{EventListener, WasmErr},
 };
 
@@ -140,7 +141,9 @@ impl InnerSocket {
 
 impl RpcTransport for WebSocketRpcTransport {
     /// Sets handler for receiving server messages.
-    fn on_message(&self) -> Result<PinStream<Result<ServerMsg, Error>>, Error> {
+    fn on_message(
+        &self,
+    ) -> Result<LocalBoxStream<'static, Result<ServerMsg, Error>>, Error> {
         let (tx, rx) = mpsc::unbounded();
         let mut inner_mut = self.0.borrow_mut();
         inner_mut.on_message = Some(
@@ -167,7 +170,10 @@ impl RpcTransport for WebSocketRpcTransport {
     /// Sets handler for socket closing.
     fn on_close(
         &self,
-    ) -> Result<PinFuture<Result<CloseMsg, oneshot::Canceled>>, Error> {
+    ) -> Result<
+        LocalBoxFuture<'static, Result<CloseMsg, oneshot::Canceled>>,
+        Error,
+    > {
         let (tx, rx) = oneshot::channel();
         let mut inner_mut = self.0.borrow_mut();
         let inner = Rc::clone(&self.0);
