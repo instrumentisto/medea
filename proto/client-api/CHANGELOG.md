@@ -11,6 +11,7 @@ All user visible changes to this project will be documented in this file. This p
 
 ### Added
 
+- `AddPeerConnectionMetrics` client command with `IceConnectionState` metric (ADD_PR_REF_HERE);
 - `TrackId` and `PeerId` types ([#28]);
 - `Incrementable` trait ([#28]);
 - `CloseReason` and `CloseDescription` types ([#58](/../../pull/58)).

@@ -1038,6 +1038,35 @@ struct GetMembers {
 ```
 </details>
 
+#### 9. AddPeerConnectionMetrics
+
+Web Client sends [RTCPeerConnection] metrics.
+
+```rust
+struct AddPeerConnectionMetrics {
+    peer_id: u64,
+    metrics: PeerMetrics,
+}
+```
+
+Related objects:
+```rust
+pub enum PeerMetrics {
+    IceConnectionStateChanged(IceConnectionState),
+}
+
+pub enum IceConnectionState {
+    New,
+    Checking,
+    Connected,
+    Completed,
+    Failed,
+    Disconnected,
+    Closed,
+}
+```
+
+Metrics list will be extended as needed.
 
 ### Extended examples
 

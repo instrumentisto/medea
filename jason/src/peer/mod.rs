@@ -15,10 +15,12 @@ use std::{cell::RefCell, collections::HashMap, convert::TryFrom, rc::Rc};
 use anyhow::Result;
 use futures::{channel::mpsc, future};
 use medea_client_api_proto::{
-    Direction, IceServer, PeerId as Id, Track, TrackId,
+    Direction, IceConnectionState, IceServer, PeerId as Id, Track, TrackId,
 };
 use medea_macro::dispatchable;
-use web_sys::{MediaStream as SysMediaStream, RtcTrackEvent};
+use web_sys::{
+    MediaStream as SysMediaStream, RtcIceConnectionState, RtcTrackEvent,
+};
 
 use crate::media::MediaManager;
 
@@ -92,6 +94,19 @@ pub enum PeerEvent {
         /// Local [`MediaStream`] that is sent to remote members.
         local_stream: MediaStream,
     },
+
+    /// [`RtcPeerConnection`]'s [`ICE connection`][1] state changed.
+    ///
+    /// [1]: https://www.w3.org/TR/webrtc/#dfn-ice-connection-state
+    IceConnectionStateChanged {
+        /// ID of the [`PeerConnection`] that sends
+        /// [`iceconnectionstatechange`][1] event.
+        ///
+        /// [1]: https://www.w3.org/TR/webrtc/#event-iceconnectionstatechange
+        peer_id: Id,
+        /// New [`IceConnectionState`].
+        ice_connection_state: IceConnectionState,
+    },
 }
 
 /// High-level wrapper around [`RtcPeerConnection`].
@@ -159,6 +174,19 @@ impl PeerConnection {
             Self::on_ice_candidate(id, &sender, candidate);
         }))?;
 
+        // Bind to `iceconnectionstatechange` event.
+        let id = peer.id;
+        let sender = peer.peer_events_sender.clone();
+        peer.peer.on_ice_connection_state_change(Some(
+            move |ice_connection_state| {
+                Self::on_ice_connection_state_changed(
+                    id,
+                    &sender,
+                    ice_connection_state,
+                );
+            },
+        ))?;
+
         // Bind to `track` event.
         let id = peer.id;
         let media_connections = Rc::clone(&peer.media_connections);
@@ -188,6 +216,36 @@ impl PeerConnection {
             candidate: candidate.candidate,
             sdp_m_line_index: candidate.sdp_m_line_index,
             sdp_mid: candidate.sdp_mid,
+        });
+    }
+
+    /// Handle `icecandidate` event from underlying peer emitting
+    /// [`PeerEvent::IceCandidateDiscovered`] event into this peers
+    /// `peer_events_sender`.
+    fn on_ice_connection_state_changed(
+        peer_id: Id,
+        sender: &mpsc::UnboundedSender<PeerEvent>,
+        ice_connection_state: RtcIceConnectionState,
+    ) {
+        use RtcIceConnectionState::*;
+
+        let ice_connection_state = match ice_connection_state {
+            New => IceConnectionState::New,
+            Checking => IceConnectionState::Checking,
+            Connected => IceConnectionState::Connected,
+            Completed => IceConnectionState::Completed,
+            Failed => IceConnectionState::Failed,
+            Disconnected => IceConnectionState::Disconnected,
+            Closed => IceConnectionState::Closed,
+            _ => {
+                console_error!("Unknown ICE connection state");
+                return;
+            }
+        };
+
+        let _ = sender.unbounded_send(PeerEvent::IceConnectionStateChanged {
+            peer_id,
+            ice_connection_state,
         });
     }
 

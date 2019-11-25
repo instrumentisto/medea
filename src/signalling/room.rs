@@ -13,7 +13,7 @@ use derive_more::Display;
 use failure::Fail;
 use futures::future;
 use medea_client_api_proto::{
-    Command, CommandHandler, Event, IceCandidate, PeerId, TrackId,
+    Command, CommandHandler, Event, IceCandidate, PeerId, PeerMetrics, TrackId,
 };
 use medea_control_api_proto::grpc::api::{
     Element as ElementProto, Room as RoomProto,
@@ -875,6 +875,16 @@ impl CommandHandler for Room {
         Ok(Box::new(wrap_future(
             self.members.send_event_to_member(to_member_id, event),
         )))
+    }
+
+    /// Logs received metric.
+    fn on_add_peer_connection_metrics(
+        &mut self,
+        _peer_id: PeerId,
+        _candidate: PeerMetrics,
+    ) -> Self::Output {
+        debug!("");
+        Ok(Box::new(wrap_future(future::ok(()))))
     }
 }
 

@@ -39,6 +39,10 @@ All user visible changes to this project will be documented in this file. This p
         - Ability to inject local video/audio stream into `Room` via `Room.inject_local_stream()` ([#54]);
         - `Room.on_failed_local_stream` callback ([#54]).
 
+- Messaging (ADD_PR_REF_HERE):
+    - Emitting of RPC commands:
+        - `AddPeerConnectionMetrics` with `IceConnectionState`.
+
 ### Fixed
 
 - Signalling:
