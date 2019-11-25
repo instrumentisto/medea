@@ -9,9 +9,9 @@ use std::{
     rc::{Rc, Weak},
 };
 
+use derive_more::Display;
 use futures::{future, FutureExt as _, TryFutureExt as _};
 use js_sys::Promise;
-use thiserror::*;
 use wasm_bindgen::{prelude::*, JsValue};
 use wasm_bindgen_futures::{future_to_promise, JsFuture};
 use web_sys::{
@@ -27,15 +27,22 @@ use crate::{
 use super::InputDeviceInfo;
 
 /// Errors that may occur in a [`MediaManager`].
-#[derive(Debug, Error)]
-pub enum Error {
-    #[error("Navigator.mediaDevices() failed: {0}")]
+#[derive(Debug, Display)]
+pub enum MediaManagerError {
+    /// Failed to get media devices
+    #[display(fmt = "Navigator.mediaDevices() failed: {}", _0)]
     MediaDevices(WasmErr),
-    #[error("MediaDevices.getUserMedia() failed: {0}")]
+
+    /// Failed to get user media
+    #[display(fmt = "MediaDevices.getUserMedia() failed: {}", _0)]
     GetUserMedia(WasmErr),
-    #[error("MediaDevices.enumerateDevices() failed: {0}")]
+
+    /// Failed to get enumerate devices
+    #[display(fmt = "MediaDevices.enumerateDevices() failed: {}", _0)]
     GetEnumerateDevices(WasmErr),
 }
+
+type Result<T> = std::result::Result<T, MediaManagerError>;
 
 /// Manager that is responsible for [MediaStream][1] acquisition and storing.
 ///
@@ -53,23 +60,23 @@ struct InnerMediaManager {
 
 impl InnerMediaManager {
     /// Returns the vector of [`MediaDeviceInfo`] objects.
-    fn enumerate_devices(
-    ) -> impl Future<Output = Result<Vec<InputDeviceInfo>, Error>> {
+    fn enumerate_devices() -> impl Future<Output = Result<Vec<InputDeviceInfo>>>
+    {
         async {
             let devices = window()
                 .navigator()
                 .media_devices()
                 .map_err(Into::into)
-                .map_err(Error::MediaDevices)?;
+                .map_err(MediaManagerError::MediaDevices)?;
             let devices = JsFuture::from(
                 devices
                     .enumerate_devices()
                     .map_err(Into::into)
-                    .map_err(Error::GetEnumerateDevices)?,
+                    .map_err(MediaManagerError::GetEnumerateDevices)?,
             )
             .await
             .map_err(Into::into)
-            .map_err(Error::GetEnumerateDevices)?;
+            .map_err(MediaManagerError::GetEnumerateDevices)?;
 
             Ok(js_sys::Array::from(&devices)
                 .values()
@@ -91,7 +98,7 @@ impl InnerMediaManager {
     fn get_stream(
         &self,
         caps: MediaStreamConstraints,
-    ) -> impl Future<Output = Result<(SysMediaStream, bool), Error>> {
+    ) -> impl Future<Output = Result<(SysMediaStream, bool)>> {
         if let Some(stream) = self.get_from_storage(&caps) {
             future::ok((stream, false)).left_future()
         } else {
@@ -147,7 +154,7 @@ impl InnerMediaManager {
     fn get_user_media(
         &self,
         caps: MediaStreamConstraints,
-    ) -> impl Future<Output = Result<SysMediaStream, Error>> {
+    ) -> impl Future<Output = Result<SysMediaStream>> {
         let storage = Rc::clone(&self.tracks);
 
         async move {
@@ -155,18 +162,18 @@ impl InnerMediaManager {
                 .navigator()
                 .media_devices()
                 .map_err(Into::into)
-                .map_err(Error::MediaDevices)?;
+                .map_err(MediaManagerError::MediaDevices)?;
 
             let caps: SysMediaStreamConstraints = caps.into();
             let stream = JsFuture::from(
                 media_devices
                     .get_user_media_with_constraints(&caps)
                     .map_err(Into::into)
-                    .map_err(Error::GetUserMedia)?,
+                    .map_err(MediaManagerError::GetUserMedia)?,
             )
             .await
             .map_err(Into::into)
-            .map_err(Error::GetUserMedia)?;
+            .map_err(MediaManagerError::GetUserMedia)?;
 
             let stream = SysMediaStream::from(stream);
 
@@ -203,7 +210,7 @@ impl MediaManager {
     pub async fn get_stream<I: Into<MediaStreamConstraints>>(
         &self,
         caps: I,
-    ) -> Result<(SysMediaStream, bool), Error> {
+    ) -> Result<(SysMediaStream, bool)> {
         self.0.get_stream(caps.into()).await
     }
 

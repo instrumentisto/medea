@@ -1,22 +1,38 @@
 use std::{cell::RefCell, convert::TryFrom, rc::Rc};
 
-use anyhow::Result;
+use derive_more::{Display, From};
+use futures::future::LocalBoxFuture;
 use web_sys::MediaStream as SysMediaStream;
 
 use crate::{
-    media::MediaManager,
+    media::{MediaManager, MediaManagerError},
     peer::{
         MediaSource, MediaStream, MediaStreamHandle, SimpleStreamRequest,
-        StreamRequest,
+        StreamRequest, StreamRequestError,
     },
-    utils::{Callback, PinFuture},
+    utils::Callback,
 };
 
+/// Errors that may occur in process of receiving [`MediaStream`].
+#[derive(Debug, Display, From)]
+pub enum Error {
+    /// Failed to get local stream from [`MediaManager`].
+    #[display(fmt = "failed to get local stream: {}", _0)]
+    MediaManager(MediaManagerError),
+
+    /// Errors that may occur when validating [`StreamRequest`] or
+    /// parsing [`MediaStream`][1].
+    ///
+    /// [1]: https://www.w3.org/TR/mediacapture-streams/#mediastream
+    #[display(fmt = "local stream not satisfy request: {}", _0)]
+    ParseStream(StreamRequestError),
+}
+
 /// Storage the local [MediaStream][1] for [`Room`] and callbacks for success
-/// and fail get local [`MediaStream`][1] from [`MediaManager`].
+/// and fail get [`MediaStream`].
 ///
 /// [1]: https://www.w3.org/TR/mediacapture-streams/#mediastream
-pub struct RoomStorage {
+pub struct RoomStream {
     /// Local [`MediaStream`][1] injected into this [`Room`].
     ///
     /// [1]: https://www.w3.org/TR/mediacapture-streams/#mediastream
@@ -42,7 +58,7 @@ pub struct RoomStorage {
     on_fail: Rc<Callback<js_sys::Error>>,
 }
 
-impl RoomStorage {
+impl RoomStream {
     /// Creates new [`RoomStorage`].
     pub fn new(media_manager: Rc<MediaManager>) -> Self {
         Self {
@@ -81,7 +97,9 @@ impl RoomStorage {
     }
 }
 
-impl MediaSource for RoomStorage {
+impl MediaSource for RoomStream {
+    type Error = Error;
+
     /// Returns the stored local media stream if exists or retrieve new from
     /// [`MediaManager`].
     ///
@@ -92,7 +110,7 @@ impl MediaSource for RoomStorage {
     fn get_media_stream(
         &self,
         request: StreamRequest,
-    ) -> PinFuture<Result<MediaStream>> {
+    ) -> LocalBoxFuture<Result<MediaStream, Self::Error>> {
         let local_stream = Rc::clone(&self.local_stream);
         let media_manager = Rc::clone(&self.media_manager);
         let success = Rc::clone(&self.on_success);

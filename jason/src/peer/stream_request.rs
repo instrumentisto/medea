@@ -4,8 +4,8 @@
 
 use std::{collections::HashMap, convert::TryFrom};
 
+use derive_more::Display;
 use medea_client_api_proto::TrackId;
-use thiserror::*;
 use web_sys::{
     MediaStream as SysMediaStream, MediaStreamTrack as SysMediaStreamTrack,
 };
@@ -19,34 +19,53 @@ use super::{MediaStream, MediaTrack};
 
 /// Errors that may occur when validating [`StreamRequest`] or
 /// parsing [`MediaStream`].
-#[derive(Debug, Error)]
-pub enum Error {
+#[derive(Debug, Display)]
+#[allow(clippy::module_name_repetitions)]
+pub enum StreamRequestError {
     /// [`StreamRequest`] contains multiple [`AudioTrackConstraints`].
-    #[error("only one audio track is  allowed in SimpleStreamRequest")]
+    #[display(fmt = "only one audio track is  allowed in SimpleStreamRequest")]
     TooManyAudioTracks,
 
     /// [`StreamRequest`] contains multiple [`VideoTrackConstraints`].
-    #[error("only one video track is allowed in SimpleStreamRequest")]
+    #[display(fmt = "only one video track is allowed in SimpleStreamRequest")]
     TooManyVideoTracks,
 
     /// [`StreamRequest`] contains no track constraints at all.
-    #[error("SimpleStreamRequest should have at least one track")]
+    #[display(fmt = "SimpleStreamRequest should have at least one track")]
     NoTracks,
 
-    /// Provided [`MediaStream`] has multiple audio [`MediaTrack`]s.
-    #[error("provided MediaStream was expected to have single audio track")]
+    /// Provided [MediaStream][1] has multiple audio [MediaStreamTrack][2]s.
+    ///
+    /// [1]: https://www.w3.org/TR/mediacapture-streams/#mediastream
+    /// [2]: https://www.w3.org/TR/mediacapture-streams/#mediastreamtrack
+    #[display(
+        fmt = "provided local stream was expected to have single audio track"
+    )]
     ExpectedAudioTracks,
 
-    /// Provided [`MediaStream`] has multiple video [`MediaTrack`]s.
-    #[error("provided MediaStream was expected to have single video track")]
+    /// Provided [MediaStream][1] has multiple video [MediaStreamTrack][2]s.
+    ///
+    /// [1]: https://www.w3.org/TR/mediacapture-streams/#mediastream
+    /// [2]: https://www.w3.org/TR/mediacapture-streams/#mediastreamtrack
+    #[display(
+        fmt = "provided local stream was expected to have single video track"
+    )]
     ExpectedVideoTracks,
 
-    /// Audio [`MediaTrack`] fails to satisfy specified constraints.
-    #[error("provided audio track does not satisfy specified constraints")]
+    /// Audio [MediaStreamTrack][1] fails to satisfy specified constraints.
+    ///
+    /// [1]: https://www.w3.org/TR/mediacapture-streams/#mediastreamtrack
+    #[display(
+        fmt = "provided audio track does not satisfy specified constraints"
+    )]
     InvalidAudioTrack,
 
-    /// Video [`MediaTrack`] fails to satisfy specified constraints.
-    #[error("provided video track does not satisfy specified constraints")]
+    /// Video [MediaStreamTrack][1] fails to satisfy specified constraints.
+    ///
+    /// [1]: https://www.w3.org/TR/mediacapture-streams/#mediastreamtrack
+    #[display(
+        fmt = "provided video track does not satisfy specified constraints"
+    )]
     InvalidVideoTrack,
 }
 
@@ -97,8 +116,8 @@ impl SimpleStreamRequest {
     pub fn parse_stream(
         &self,
         stream: &SysMediaStream,
-    ) -> Result<MediaStream, Error> {
-        use Error::*;
+    ) -> Result<MediaStream, StreamRequestError> {
+        use StreamRequestError::*;
 
         let mut tracks = Vec::new();
 
@@ -155,10 +174,10 @@ impl SimpleStreamRequest {
 }
 
 impl TryFrom<StreamRequest> for SimpleStreamRequest {
-    type Error = Error;
+    type Error = StreamRequestError;
 
     fn try_from(value: StreamRequest) -> Result<Self, Self::Error> {
-        use Error::*;
+        use StreamRequestError::*;
 
         if value.video.len() > 1 {
             return Err(TooManyVideoTracks);

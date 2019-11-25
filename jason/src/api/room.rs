@@ -7,7 +7,6 @@ use std::{
     rc::{Rc, Weak},
 };
 
-use anyhow::{Error, Result};
 use futures::{channel::mpsc, future, stream, StreamExt as _};
 use js_sys::Promise;
 use medea_client_api_proto::{
@@ -19,13 +18,15 @@ use wasm_bindgen_futures::{future_to_promise, spawn_local};
 use web_sys::MediaStream as SysMediaStream;
 
 use crate::{
-    peer::{MediaStream, PeerEvent, PeerEventHandler, PeerRepository},
+    peer::{
+        MediaStream, PeerError, PeerEvent, PeerEventHandler, PeerRepository,
+    },
     rpc::RpcClient,
     utils::Callback,
 };
 
 use super::{
-    connection::Connection, room_storage::RoomStorage, ConnectionHandle,
+    connection::Connection, room_stream::RoomStream, ConnectionHandle,
 };
 
 /// JS side handle to `Room` where all the media happens.
@@ -142,7 +143,7 @@ impl Room {
     pub fn new(
         rpc: Rc<dyn RpcClient>,
         peers: Box<dyn PeerRepository>,
-        stream_storage: Rc<RoomStorage>,
+        stream_source: Rc<RoomStream>,
     ) -> Self {
         enum RoomEvent {
             RpcEvent(RpcEvent),
@@ -153,7 +154,7 @@ impl Room {
         let events_stream = rpc.subscribe();
         let room = Rc::new(RefCell::new(InnerRoom::new(
             rpc,
-            stream_storage,
+            stream_source,
             peers,
             tx,
         )));
@@ -227,7 +228,7 @@ struct InnerRoom {
     rpc: Rc<dyn RpcClient>,
 
     /// Stores the injected local media stream for this [`Room`].
-    stream_storage: Rc<RoomStorage>,
+    stream_storage: Rc<RoomStream>,
 
     /// Indicates if outgoing audio is enabled in this [`Room`].
     enabled_audio: bool,
@@ -241,7 +242,7 @@ impl InnerRoom {
     #[inline]
     fn new(
         rpc: Rc<dyn RpcClient>,
-        stream_storage: Rc<RoomStorage>,
+        stream_storage: Rc<RoomStream>,
         peers: Box<dyn PeerRepository>,
         peer_event_sender: mpsc::UnboundedSender<PeerEvent>,
     ) -> Self {
@@ -382,7 +383,7 @@ impl EventHandler for InnerRoom {
                         });
                     }
                 };
-                Ok::<_, Error>(())
+                Ok::<_, PeerError>(())
             }
             .await
             {

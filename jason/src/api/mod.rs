@@ -2,7 +2,7 @@
 
 mod connection;
 mod room;
-mod room_storage;
+mod room_stream;
 
 use std::{cell::RefCell, rc::Rc};
 
@@ -19,7 +19,7 @@ use crate::{
 pub use self::{
     connection::ConnectionHandle,
     room::{Room, RoomHandle},
-    room_storage::RoomStorage,
+    room_stream::RoomStream,
 };
 
 /// General library interface.
@@ -49,10 +49,9 @@ impl Jason {
     pub fn init_room(&self) -> RoomHandle {
         let rpc = Rc::new(WebsocketRpcClient::new(3000));
         let peer_repository = Box::new(peer::Repository::default());
-        let store = Rc::new(RoomStorage::new(Rc::clone(
-            &self.0.borrow().media_manager,
-        )));
-        let room = Room::new(rpc, peer_repository, store);
+        let stream_source =
+            Rc::new(RoomStream::new(Rc::clone(&self.0.borrow().media_manager)));
+        let room = Room::new(rpc, peer_repository, stream_source);
         let handle = room.new_handle();
         self.0.borrow_mut().rooms.push(room);
         handle

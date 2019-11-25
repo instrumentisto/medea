@@ -7,24 +7,70 @@ use std::rc::Rc;
 use futures::{channel::mpsc, StreamExt as _};
 use medea_client_api_proto::PeerId;
 use medea_jason::{
-    api::RoomStorage,
+    api::RoomStream,
     media::MediaManager,
     peer::{PeerConnection, PeerEvent},
 };
 use wasm_bindgen_test::*;
 
-use crate::{get_test_tracks, resolve_after};
+use crate::{get_test_tracks, resolve_after, MockNavigator};
 
 wasm_bindgen_test_configure!(run_in_browser);
 
 #[wasm_bindgen_test]
-async fn mute_unmute_audio() {
+async fn error_get_offer_if_media_source_failed() {
     let (tx, _rx) = mpsc::unbounded();
-    let store = Rc::new(RoomStorage::new(Rc::new(MediaManager::default())));
+    let media_source =
+        Rc::new(RoomStream::new(Rc::new(MediaManager::default())));
     let (audio_track, video_track) = get_test_tracks();
     let peer = PeerConnection::new(PeerId(1), tx, vec![], true, true).unwrap();
 
-    peer.get_offer(vec![audio_track, video_track], store.as_ref())
+    let mock_navigator = MockNavigator::new();
+    mock_navigator.error_get_user_media("some error".into());
+
+    match peer
+        .get_offer(vec![audio_track, video_track], media_source.as_ref())
+        .await
+    {
+        Ok(_) => assert!(false, "Not must to get offer without media stream"),
+        Err(err) => assert_eq!(
+            err.to_string(),
+            "failed to get local stream: MediaDevices.getUserMedia() failed: \
+             some error"
+        ),
+    };
+
+    mock_navigator.stop();
+}
+
+#[wasm_bindgen_test]
+async fn send_audio_video_without_senders_is_disabled() {
+    let (tx, _rx) = mpsc::unbounded();
+    let media_source =
+        Rc::new(RoomStream::new(Rc::new(MediaManager::default())));
+    let (audio_track, video_track) = get_test_tracks();
+    let peer = PeerConnection::new(PeerId(1), tx, vec![], true, true).unwrap();
+
+    assert!(!peer.is_send_audio_enabled());
+    assert!(!peer.is_send_video_enabled());
+
+    peer.get_offer(vec![audio_track, video_track], media_source.as_ref())
+        .await
+        .unwrap();
+
+    assert!(peer.is_send_audio_enabled());
+    assert!(peer.is_send_video_enabled());
+}
+
+#[wasm_bindgen_test]
+async fn mute_unmute_audio() {
+    let (tx, _rx) = mpsc::unbounded();
+    let media_source =
+        Rc::new(RoomStream::new(Rc::new(MediaManager::default())));
+    let (audio_track, video_track) = get_test_tracks();
+    let peer = PeerConnection::new(PeerId(1), tx, vec![], true, true).unwrap();
+
+    peer.get_offer(vec![audio_track, video_track], media_source.as_ref())
         .await
         .unwrap();
 
@@ -43,10 +89,11 @@ async fn mute_unmute_audio() {
 #[wasm_bindgen_test]
 async fn mute_unmute_video() {
     let (tx, _rx) = mpsc::unbounded();
-    let store = Rc::new(RoomStorage::new(Rc::new(MediaManager::default())));
+    let media_source =
+        Rc::new(RoomStream::new(Rc::new(MediaManager::default())));
     let (audio_track, video_track) = get_test_tracks();
     let peer = PeerConnection::new(PeerId(1), tx, vec![], true, true).unwrap();
-    peer.get_offer(vec![audio_track, video_track], store.as_ref())
+    peer.get_offer(vec![audio_track, video_track], media_source.as_ref())
         .await
         .unwrap();
 
@@ -65,11 +112,12 @@ async fn mute_unmute_video() {
 #[wasm_bindgen_test]
 async fn new_with_mute_audio() {
     let (tx, _rx) = mpsc::unbounded();
-    let store = Rc::new(RoomStorage::new(Rc::new(MediaManager::default())));
+    let media_source =
+        Rc::new(RoomStream::new(Rc::new(MediaManager::default())));
     let (audio_track, video_track) = get_test_tracks();
     let peer = PeerConnection::new(PeerId(1), tx, vec![], false, true).unwrap();
 
-    peer.get_offer(vec![audio_track, video_track], store.as_ref())
+    peer.get_offer(vec![audio_track, video_track], media_source.as_ref())
         .await
         .unwrap();
     assert!(!peer.is_send_audio_enabled());
@@ -80,10 +128,11 @@ async fn new_with_mute_audio() {
 #[wasm_bindgen_test]
 async fn new_with_mute_video() {
     let (tx, _rx) = mpsc::unbounded();
-    let store = Rc::new(RoomStorage::new(Rc::new(MediaManager::default())));
+    let media_source =
+        Rc::new(RoomStream::new(Rc::new(MediaManager::default())));
     let (audio_track, video_track) = get_test_tracks();
     let peer = PeerConnection::new(PeerId(1), tx, vec![], true, false).unwrap();
-    peer.get_offer(vec![audio_track, video_track], store.as_ref())
+    peer.get_offer(vec![audio_track, video_track], media_source.as_ref())
         .await
         .unwrap();
 
@@ -96,13 +145,14 @@ async fn add_candidates_to_answerer_before_offer() {
     let (tx1, rx1) = mpsc::unbounded();
     let (tx2, _) = mpsc::unbounded();
 
-    let store = Rc::new(RoomStorage::new(Rc::new(MediaManager::default())));
+    let media_source =
+        Rc::new(RoomStream::new(Rc::new(MediaManager::default())));
     let pc1 = PeerConnection::new(PeerId(1), tx1, vec![], true, true).unwrap();
 
     let pc2 = PeerConnection::new(PeerId(2), tx2, vec![], true, true).unwrap();
     let (audio_track, video_track) = get_test_tracks();
     let offer = pc1
-        .get_offer(vec![audio_track, video_track], store.as_ref())
+        .get_offer(vec![audio_track, video_track], media_source.as_ref())
         .await
         .unwrap();
 
@@ -110,7 +160,7 @@ async fn add_candidates_to_answerer_before_offer() {
     // assert that pc2 has buffered candidates
     assert!(pc2.candidates_buffer_len() > 0);
     // then set its remote description
-    pc2.process_offer(offer, vec![], store.as_ref())
+    pc2.process_offer(offer, vec![], media_source.as_ref())
         .await
         .unwrap();
 
@@ -123,7 +173,8 @@ async fn add_candidates_to_offerer_before_answer() {
     let (tx1, _) = mpsc::unbounded();
     let (tx2, rx2) = mpsc::unbounded();
 
-    let store = Rc::new(RoomStorage::new(Rc::new(MediaManager::default())));
+    let media_source =
+        Rc::new(RoomStream::new(Rc::new(MediaManager::default())));
     let pc1 = Rc::new(
         PeerConnection::new(PeerId(1), tx1, vec![], true, true).unwrap(),
     );
@@ -133,11 +184,11 @@ async fn add_candidates_to_offerer_before_answer() {
 
     let (audio_track, video_track) = get_test_tracks();
     let offer = pc1
-        .get_offer(vec![audio_track, video_track], store.as_ref())
+        .get_offer(vec![audio_track, video_track], media_source.as_ref())
         .await
         .unwrap();
     let answer = pc2
-        .process_offer(offer, vec![], store.as_ref())
+        .process_offer(offer, vec![], media_source.as_ref())
         .await
         .unwrap();
 
@@ -155,7 +206,8 @@ async fn normal_exchange_of_candidates() {
     let (tx1, rx1) = mpsc::unbounded();
     let (tx2, rx2) = mpsc::unbounded();
 
-    let store = Rc::new(RoomStorage::new(Rc::new(MediaManager::default())));
+    let media_source =
+        Rc::new(RoomStream::new(Rc::new(MediaManager::default())));
     let peer1 =
         PeerConnection::new(PeerId(1), tx1, vec![], true, true).unwrap();
     let peer2 =
@@ -165,12 +217,16 @@ async fn normal_exchange_of_candidates() {
     let offer = peer1
         .get_offer(
             vec![audio_track.clone(), video_track.clone()],
-            store.as_ref(),
+            media_source.as_ref(),
         )
         .await
         .unwrap();
     let answer = peer2
-        .process_offer(offer, vec![audio_track, video_track], store.as_ref())
+        .process_offer(
+            offer,
+            vec![audio_track, video_track],
+            media_source.as_ref(),
+        )
         .await
         .unwrap();
     peer1.set_remote_answer(answer).await.unwrap();

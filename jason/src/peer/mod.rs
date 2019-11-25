@@ -10,17 +10,20 @@ mod stream;
 mod stream_request;
 mod track;
 
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, convert::From, rc::Rc};
 
-use anyhow::Result;
-use futures::{channel::mpsc, future};
+use derive_more::{Display, From};
+use futures::{
+    channel::mpsc,
+    future::{try_join_all, LocalBoxFuture},
+};
 use medea_client_api_proto::{
     Direction, IceServer, PeerId as Id, Track, TrackId,
 };
 use medea_macro::dispatchable;
 use web_sys::RtcTrackEvent;
 
-use crate::utils::PinFuture;
+use crate::api::RoomStream as StreamSource;
 
 #[cfg(feature = "mockable")]
 #[doc(inline)]
@@ -29,12 +32,12 @@ pub use self::repo::MockPeerRepository;
 pub use self::repo::{PeerRepository, Repository};
 pub use self::{
     conn::{
-        IceCandidate, RtcPeerConnection, SdpType, TransceiverDirection,
-        TransceiverKind,
+        IceCandidate, RTCPeerConnectionError, RtcPeerConnection, SdpType,
+        TransceiverDirection, TransceiverKind,
     },
-    media::MediaConnections,
+    media::{MediaConnections, MediaConnectionsError},
     stream::{MediaStream, MediaStreamHandle},
-    stream_request::{Error, SimpleStreamRequest, StreamRequest},
+    stream_request::{SimpleStreamRequest, StreamRequest, StreamRequestError},
     track::MediaTrack,
 };
 
@@ -84,13 +87,40 @@ pub enum PeerEvent {
     },
 }
 
+/// Errors that may occur in [RTCPeerConnection][1].
+///
+/// [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
+#[derive(Debug, Display, From)]
+#[allow(clippy::module_name_repetitions)]
+pub enum PeerError {
+    /// Errors that may occur in [`MediaConnections`] storage.
+    #[display(fmt = "{}", _0)]
+    MediaConnections(MediaConnectionsError),
+
+    /// Errors that may occur when getting [`MediaStream`].
+    #[display(fmt = "{}", _0)]
+    MediaSource(<StreamSource as MediaSource>::Error),
+
+    /// Errors that may occur during signaling between this and remote
+    /// [RTCPeerConnection][1] and event handlers setting errors.
+    ///
+    /// [1]: https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection.
+    #[display(fmt = "{}", _0)]
+    RtcPeerConnection(RTCPeerConnectionError),
+}
+
+type Result<T, E = PeerError> = std::result::Result<T, E>;
+
 /// Source for acquire [`MediaStream`] by [`StreamRequest`].
 pub trait MediaSource {
+    /// Error that is returned if cannot receive the [`MediaStream`].
+    type Error;
+
     /// Returns [`MediaStream`] by [`StreamRequest`].
     fn get_media_stream(
         &self,
         request: StreamRequest,
-    ) -> PinFuture<Result<MediaStream>>;
+    ) -> LocalBoxFuture<Result<MediaStream, Self::Error>>;
 }
 
 /// High-level wrapper around [`RtcPeerConnection`].
@@ -263,7 +293,10 @@ impl PeerConnection {
     pub async fn update_stream<S: MediaSource>(
         &self,
         media_source: &S,
-    ) -> Result<()> {
+    ) -> Result<()>
+    where
+        PeerError: From<<S as MediaSource>::Error>,
+    {
         if let Some(request) = self.media_connections.get_stream_request() {
             let media_stream = media_source.get_media_stream(request).await?;
             self.media_connections
@@ -280,7 +313,10 @@ impl PeerConnection {
         &self,
         tracks: Vec<Track>,
         media_source: &S,
-    ) -> Result<String> {
+    ) -> Result<String>
+    where
+        PeerError: From<<S as MediaSource>::Error>,
+    {
         self.media_connections.update_tracks(tracks)?;
 
         self.update_stream(media_source).await?;
@@ -325,7 +361,7 @@ impl PeerConnection {
                 .await
             });
         }
-        future::try_join_all(futures).await?;
+        try_join_all(futures).await?;
         Ok(())
     }
 
@@ -342,7 +378,10 @@ impl PeerConnection {
         offer: String,
         tracks: Vec<Track>,
         media_source: &S,
-    ) -> Result<String> {
+    ) -> Result<String>
+    where
+        PeerError: From<<S as MediaSource>::Error>,
+    {
         // TODO: use drain_filter when its stable
         let (recv, send): (Vec<_>, Vec<_>) =
             tracks.into_iter().partition(|track| match track.direction {

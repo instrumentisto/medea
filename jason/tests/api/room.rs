@@ -16,16 +16,17 @@ use wasm_bindgen_futures::JsFuture;
 use wasm_bindgen_test::*;
 
 use crate::{get_test_tracks, resolve_after, MockNavigator};
-use medea_jason::api::RoomStorage;
+use medea_jason::api::RoomStream;
 
 wasm_bindgen_test_configure!(run_in_browser);
 
 fn get_test_room_and_exist_peer(
     count_gets_peer: usize,
-) -> (Room, Rc<PeerConnection>, Rc<RoomStorage>) {
+) -> (Room, Rc<PeerConnection>, Rc<RoomStream>) {
     let mut rpc = MockRpcClient::new();
     let mut repo = Box::new(MockPeerRepository::new());
-    let store = Rc::new(RoomStorage::new(Rc::new(MediaManager::default())));
+    let stream_source =
+        Rc::new(RoomStream::new(Rc::new(MediaManager::default())));
     let (tx, _rx) = mpsc::unbounded();
     let peer = Rc::new(
         PeerConnection::new(PeerId(1), tx, vec![], true, true).unwrap(),
@@ -40,16 +41,16 @@ fn get_test_room_and_exist_peer(
         .returning_st(move || vec![Rc::clone(&peer_clone)]);
     rpc.expect_unsub().return_const(());
 
-    let room = Room::new(Rc::new(rpc), repo, Rc::clone(&store));
-    (room, peer, store)
+    let room = Room::new(Rc::new(rpc), repo, Rc::clone(&stream_source));
+    (room, peer, stream_source)
 }
 
 #[wasm_bindgen_test]
 async fn mute_unmute_audio() {
-    let (room, peer, store) = get_test_room_and_exist_peer(2);
+    let (room, peer, media_source) = get_test_room_and_exist_peer(2);
     let (audio_track, video_track) = get_test_tracks();
 
-    peer.get_offer(vec![audio_track, video_track], store.as_ref())
+    peer.get_offer(vec![audio_track, video_track], media_source.as_ref())
         .await
         .unwrap();
     let handle = room.new_handle();
@@ -61,10 +62,10 @@ async fn mute_unmute_audio() {
 
 #[wasm_bindgen_test]
 async fn mute_unmute_video() {
-    let (room, peer, store) = get_test_room_and_exist_peer(2);
+    let (room, peer, media_source) = get_test_room_and_exist_peer(2);
     let (audio_track, video_track) = get_test_tracks();
 
-    peer.get_offer(vec![audio_track, video_track], store.as_ref())
+    peer.get_offer(vec![audio_track, video_track], media_source.as_ref())
         .await
         .unwrap();
 
@@ -82,7 +83,8 @@ fn get_test_room_and_new_peer(
 ) -> (Room, Rc<PeerConnection>) {
     let mut rpc = MockRpcClient::new();
     let mut repo = Box::new(MockPeerRepository::new());
-    let store = Rc::new(RoomStorage::new(Rc::new(MediaManager::default())));
+    let media_source =
+        Rc::new(RoomStream::new(Rc::new(MediaManager::default())));
 
     rpc.expect_subscribe()
         .return_once(move || Box::pin(event_rx));
@@ -115,7 +117,7 @@ fn get_test_room_and_new_peer(
     rpc.expect_send_command().return_const(());
     rpc.expect_unsub().return_const(());
 
-    let room = Room::new(Rc::new(rpc), repo, store);
+    let room = Room::new(Rc::new(rpc), repo, media_source);
     (room, peer)
 }
 
@@ -184,8 +186,8 @@ async fn error_inject_invalid_local_stream_into_new_peer() {
         done.send(()).unwrap();
         assert_eq!(
             err.to_string(),
-            "Error: provided MediaStream was expected to have single video \
-             track"
+            "Error: local stream not satisfy request: provided local stream \
+             was expected to have single video track"
         );
     });
     room_handle.on_failed_local_stream(cb.into()).unwrap();
@@ -228,8 +230,8 @@ async fn error_inject_invalid_local_stream_into_room_on_exists_peer() {
         done.send(()).unwrap();
         assert_eq!(
             err.to_string(),
-            "Error: provided MediaStream was expected to have single video \
-             track"
+            "Error: local stream not satisfy request: provided local stream \
+             was expected to have single video track"
         );
     });
     let (room, peer, store) = get_test_room_and_exist_peer(1);
@@ -261,7 +263,8 @@ async fn error_get_local_stream_on_new_peer() {
         done.send(()).unwrap();
         assert_eq!(
             err.to_string(),
-            "Error: MediaDevices.getUserMedia() failed: some error"
+            "Error: failed to get local stream: MediaDevices.getUserMedia() \
+             failed: some error"
         );
     });
     room_handle.on_failed_local_stream(cb.into()).unwrap();
@@ -298,7 +301,7 @@ async fn error_join_room_without_failed_stream_callback() {
         .return_once(move || Box::pin(event_rx));
     rpc.expect_unsub().return_const(());
     let repo = Box::new(MockPeerRepository::new());
-    let store = Rc::new(RoomStorage::new(Rc::new(MediaManager::default())));
+    let store = Rc::new(RoomStream::new(Rc::new(MediaManager::default())));
     let room = Room::new(Rc::new(rpc), repo, store);
 
     let room_handle = room.new_handle();
