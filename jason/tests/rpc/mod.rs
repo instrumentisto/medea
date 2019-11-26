@@ -18,8 +18,7 @@ use medea_client_api_proto::{
     ClientMsg, CloseReason, Command, Event, PeerId, ServerMsg,
 };
 use medea_jason::rpc::{
-    CloseByClientReason, CloseMsg, MockRpcTransport, RpcClient,
-    WebSocketRpcClient,
+    CloseMsg, MockRpcTransport, RpcClient, WebSocketRpcClient,
 };
 use wasm_bindgen_futures::spawn_local;
 use wasm_bindgen_test::*;
@@ -271,7 +270,7 @@ mod on_close {
     /// # Algorithm
     ///
     /// 1. Mock [`WebSocketRpcTransport::on_close`] to return
-    /// [`CloseReason::Finished`] with `1000` code.
+    ///    [`CloseReason::Finished`] with `1000` code.
     ///
     /// 2. Wait for [`WebSocketRpcTransport::on_close`] resolving.
     ///
@@ -295,7 +294,7 @@ mod on_close {
     /// # Algorithm
     ///
     /// 1. Mock [`WebSocketRpcTransport::on_close`] to return
-    /// [`CloseReason::Reconnected`] with `1000` code.
+    ///    [`CloseReason::Reconnected`] with `1000` code.
     ///
     /// 2. Wait `500ms` for [`WebSocketRpcTransport::on_close`] [`Future`]. If
     ///    in this time interval this [`Future`] wasn't resolved then test
@@ -312,7 +311,10 @@ mod on_close {
         .await
         {
             Either::Left((msg, _)) => {
-                unreachable!("Some close msg thrown: {:?}!", msg);
+                unreachable!(
+                    "Some CloseMsg was unexpectedly thrown: {:?}.",
+                    msg
+                );
             }
             Either::Right(_) => (),
         }
@@ -324,7 +326,7 @@ mod on_close {
     /// # Algorithm
     ///
     /// 1. Mock [`WebSocketRpcTransport::on_close`] to return
-    /// [`CloseMsg::Abnormal`] with `1500` code.
+    ///    [`CloseMsg::Abnormal`] with `1500` code.
     ///
     /// 2. Wait `500ms` for [`WebSocketRpcTransport::on_close`] [`Future`]. If
     ///    in this time interval this [`Future`] wasn't resolved then test
@@ -340,7 +342,10 @@ mod on_close {
         .await
         {
             Either::Left((msg, _)) => {
-                unreachable!("Some close msg thrown: {:?}!", msg);
+                unreachable!(
+                    "Some CloseMsg was unexpectedly thrown: {:?}.",
+                    msg
+                );
             }
             Either::Right(_) => (),
         }

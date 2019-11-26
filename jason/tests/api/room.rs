@@ -44,7 +44,7 @@ macro_rules! callback_assert_eq {
 
 /// Waits for [`Result`] from [`oneshot::Receiver`] with tests result.
 ///
-/// Also it will check result of test and will panic if some error will be
+/// Also it will check result of test and will `panic` if some error will be
 /// found.
 async fn wait_and_check_test_result(rx: oneshot::Receiver<Result<(), String>>) {
     let result =
@@ -212,7 +212,7 @@ async fn mute_video_room_before_init_peer() {
 }
 
 mod on_close_callback {
-    //! Tests for `on_close` JS side callback.
+    //! Tests for `RoomHandle.on_close` JS side callback.
 
     use std::rc::Rc;
 
@@ -259,6 +259,15 @@ mod on_close_callback {
         Room::new(Rc::new(rpc), repo)
     }
 
+    /// Tests that JS side [`RoomHandle::on_close`] works.
+    ///
+    /// # Algorithm
+    ///
+    /// 1. Subscribe to [`RoomHandle::on_close`].
+    ///
+    /// 2. Call [`Room::close`] with [`CloseByServerReason::Finished`] reason.
+    ///
+    /// 3. Check that JS callback was called with this reason.
     #[wasm_bindgen_test]
     async fn closed_by_server() {
         let room = get_room();
@@ -290,6 +299,18 @@ mod on_close_callback {
         wait_and_check_test_result(test_rx).await;
     }
 
+    /// Tests that [`RoomHandle::on_close`] will be called on unexpected
+    /// [`Room`] drop.
+    ///
+    /// # Algorithm
+    ///
+    /// 1. Subscribe to [`RoomHandle::on_close`].
+    ///
+    /// 2. Drop [`Room`].
+    ///
+    /// 3. Check that JS callback was called with
+    ///    `CloseReason::ByClient(ClosedByClientReason::
+    /// RoomUnexpectedlyDropped`.
     #[wasm_bindgen_test]
     async fn unexpected_room_drop() {
         let room = get_room();
@@ -321,6 +342,15 @@ mod on_close_callback {
         wait_and_check_test_result(test_rx).await;
     }
 
+    /// Tests that [`RoomHandle::on_close`] will be called on closing by Jason.
+    ///
+    /// # Algorithm
+    ///
+    /// 1. Subscribe to [`RoomHandle::on_close`].
+    ///
+    /// 2. Call [`Room::close`] with [`CloseReason::ByClient`]
+    ///
+    /// 3. Check that JS callback was called with this [`CloseReason`].
     #[wasm_bindgen_test]
     async fn normal_close_by_client() {
         let room = get_room();
