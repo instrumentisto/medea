@@ -1,11 +1,29 @@
 #![cfg(target_arch = "wasm32")]
 
+/// Makes eq assertion and if it fails, sends error to provided tx.
+///
+/// Panics if send operation fails.
+/// `$test_tx` - [`oneshot::Sender`] to which comparison error will be sent
+///
+/// `$a` - left item of comparision
+///
+/// `$b` - right item of comparision
+macro_rules! callback_assert_eq {
+    ($tx:tt, $a:expr, $b:expr) => {
+        if $a != $b {
+            $tx.send(Err(format!("{} != {}", $a, $b))).unwrap();
+            return;
+        }
+    };
+}
+
 mod api;
 mod media;
 mod peer;
 mod rpc;
 
 use anyhow::Result;
+use futures::{channel::oneshot, future::Either};
 use js_sys::Promise;
 use medea_client_api_proto::{
     AudioSettings, Direction, MediaType, PeerId, Track, TrackId, VideoSettings,
@@ -66,4 +84,24 @@ pub async fn resolve_after(delay_ms: i32) -> Result<(), JsValue> {
     }))
     .await?;
     Ok(())
+}
+
+/// Waits for [`Result`] from [`oneshot::Receiver`] with tests result with 1
+/// second deadline.
+///
+/// Panics if deadline is exceeded or provided rx resolves to `Err`.
+pub async fn wait_and_check_test_result(
+    rx: oneshot::Receiver<Result<(), String>>,
+) {
+    let result =
+        futures::future::select(Box::pin(rx), Box::pin(resolve_after(500)))
+            .await;
+    match result {
+        Either::Left((rx_result, _)) => {
+            rx_result.unwrap().unwrap();
+        }
+        Either::Right(_) => {
+            panic!("on_close callback didn't fired");
+        }
+    };
 }

@@ -5,14 +5,14 @@ mod room;
 
 use std::{cell::RefCell, rc::Rc};
 
-use futures::FutureExt;
+use futures::FutureExt as _;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 
 use crate::{
     media::{MediaManager, MediaManagerHandle},
     peer,
-    rpc::{CloseByClientReason, RpcClient as _, WebSocketRpcClient},
+    rpc::{ClientDisconnect, RpcClient as _, WebSocketRpcClient},
     set_panic_hook,
 };
 
@@ -49,19 +49,19 @@ impl Jason {
             &self.0.borrow().media_manager,
         )));
 
-        let inner_clone = self.0.clone();
+        let inner = self.0.clone();
         spawn_local(rpc.on_close().map(move |res| {
             // TODO: don't close all rooms when multiple rpc connections
             //       will be supported.
             let reason = res.unwrap_or_else(|_| {
-                CloseByClientReason::RpcConnectionUnexpectedlyDropped.into()
+                ClientDisconnect::RpcClientUnexpectedlyDropped.into()
             });
-            inner_clone
+            inner
                 .borrow_mut()
                 .rooms
                 .drain(..)
                 .for_each(|room| room.close(reason.clone()));
-            inner_clone.borrow_mut().media_manager = Rc::default();
+            inner.borrow_mut().media_manager = Rc::default();
         }));
 
         let room = Room::new(rpc, peer_repository);
@@ -80,7 +80,7 @@ impl Jason {
     /// object will be detached (you will still hold them, but unable to use).
     pub fn dispose(self) {
         self.0.borrow_mut().rooms.drain(..).for_each(|room| {
-            room.close(CloseByClientReason::RoomClosed.into());
+            room.close(ClientDisconnect::RoomClosed.into());
         });
     }
 }

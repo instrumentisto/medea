@@ -2,7 +2,7 @@
 //!
 //! [WebSocket]: https://developer.mozilla.org/ru/docs/WebSockets
 
-use std::{cell::RefCell, convert::TryFrom, rc::Rc};
+use std::{borrow::Cow, cell::RefCell, convert::TryFrom, rc::Rc};
 
 use derive_more::{From, Into};
 use futures::{
@@ -15,7 +15,7 @@ use thiserror::*;
 use web_sys::{CloseEvent, Event, MessageEvent, WebSocket as SysWebSocket};
 
 use crate::{
-    rpc::{CloseMsg, RpcTransport},
+    rpc::{ClientDisconnect, CloseMsg, RpcTransport},
     utils::{EventListener, WasmErr},
 };
 
@@ -69,6 +69,22 @@ pub enum Error {
     ClosedSocket,
 }
 
+/// Newtype for received [`ServerMsg`].
+#[derive(From, Into)]
+pub struct ServerMessage(ServerMsg);
+
+impl TryFrom<&MessageEvent> for ServerMessage {
+    type Error = Error;
+
+    fn try_from(msg: &MessageEvent) -> std::result::Result<Self, Self::Error> {
+        let payload = msg.data().as_string().ok_or(Error::MessageNotString)?;
+
+        serde_json::from_str::<ServerMsg>(&payload)
+            .map_err(Error::ParseServerMessage)
+            .map(Self::from)
+    }
+}
+
 /// State of websocket.
 #[derive(Debug)]
 enum State {
@@ -109,6 +125,7 @@ struct InnerSocket {
     on_message: Option<EventListener<SysWebSocket, MessageEvent>>,
     on_close: Option<EventListener<SysWebSocket, CloseEvent>>,
     on_error: Option<EventListener<SysWebSocket, Event>>,
+    close_reason: ClientDisconnect,
 }
 
 /// WebSocket [`RpcTransport`] between client and server.
@@ -126,6 +143,7 @@ impl InnerSocket {
             on_message: None,
             on_close: None,
             on_error: None,
+            close_reason: ClientDisconnect::RpcTransportUnexpectedlyDropped,
         })
     }
 
@@ -211,6 +229,10 @@ impl RpcTransport for WebSocketRpcTransport {
             _ => Err(Error::ClosedSocket),
         }
     }
+
+    fn set_close_reason(&self, close_reason: ClientDisconnect) {
+        self.0.borrow_mut().close_reason = close_reason;
+    }
 }
 
 impl WebSocketRpcTransport {
@@ -276,28 +298,18 @@ impl Drop for WebSocketRpcTransport {
             inner.on_message.take();
             inner.on_close.take();
 
-            if let Err(err) = inner
-                .socket
-                .close_with_code_and_reason(1000, "Dropped unexpectedly")
+            let close_reason: Cow<'static, str> =
+                serde_json::to_string(&inner.close_reason)
+                    .unwrap_or_else(|_| {
+                        "Could not serialize close message".into()
+                    })
+                    .into();
+
+            if let Err(err) =
+                inner.socket.close_with_code_and_reason(1000, &close_reason)
             {
                 console_error!(err);
             }
         }
-    }
-}
-
-/// Newtype for received [`ServerMsg`].
-#[derive(From, Into)]
-pub struct ServerMessage(ServerMsg);
-
-impl TryFrom<&MessageEvent> for ServerMessage {
-    type Error = Error;
-
-    fn try_from(msg: &MessageEvent) -> std::result::Result<Self, Self::Error> {
-        let payload = msg.data().as_string().ok_or(Error::MessageNotString)?;
-
-        serde_json::from_str::<ServerMsg>(&payload)
-            .map_err(Error::ParseServerMessage)
-            .map(Self::from)
     }
 }

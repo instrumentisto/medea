@@ -334,6 +334,7 @@ window.onload = async function() {
 
     let muteAudio = document.getElementsByClassName('control__mute_audio')[0];
     let muteVideo = document.getElementsByClassName('control__mute_video')[0];
+    let closeApp = document.getElementsByClassName('control__close_app')[0];
     let isAudioMuted = false;
     let isVideoMuted = false;
 
@@ -358,6 +359,9 @@ window.onload = async function() {
         isVideoMuted = true;
         muteVideo.textContent = "Unmute video";
       }
+    });
+    closeApp.addEventListener('click', () => {
+      jason.dispose();
     });
 
     usernameInput.value = faker.name.firstName();

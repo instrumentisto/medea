@@ -39,8 +39,8 @@ All user visible changes to this project will be documented in this file. This p
         - Ability to inject local video/audio stream into `Room` via `Room.inject_local_stream()` ([#54]);
         - `Room.on_failed_local_stream` callback ([#54]);
         - `Room.on_close` callback for WebSocket close initiated by server ([#55]).
-- Signalling:
-    - Cleanup Jason state on normal WebSocket close ([#55]).
+- RPC messaging:
+    - Cleanup Jason state on Normal Closure (code = 1000) WebSocket close ([#55]).
 
 ### Fixed
 

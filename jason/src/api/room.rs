@@ -23,7 +23,7 @@ use crate::{
         MediaStream, MediaStreamHandle, PeerEvent, PeerEventHandler,
         PeerRepository,
     },
-    rpc::{CloseByClientReason, CloseReason, RpcClient, WebSocketRpcTransport},
+    rpc::{ClientDisconnect, CloseReason, RpcClient, WebSocketRpcTransport},
     utils::Callback,
 };
 
@@ -32,8 +32,9 @@ use super::{connection::Connection, ConnectionHandle};
 /// Reason of why Jason was closed.
 ///
 /// This struct will be provided into `on_close_by_server` JS side callback.
+#[allow(clippy::module_name_repetitions)]
 #[wasm_bindgen]
-pub struct JsCloseReason {
+pub struct RoomCloseReason {
     /// Is closed by server?
     ///
     /// `true` if [`CloseReason::ByServer`].
@@ -48,7 +49,7 @@ pub struct JsCloseReason {
     is_err: bool,
 }
 
-impl JsCloseReason {
+impl RoomCloseReason {
     /// Creates new [`ClosedByServerReason`] with provided [`CloseReason`]
     /// converted into [`String`].
     ///
@@ -72,7 +73,7 @@ impl JsCloseReason {
 }
 
 #[wasm_bindgen]
-impl JsCloseReason {
+impl RoomCloseReason {
     /// `wasm_bindgen` getter for `reason` field.
     #[wasm_bindgen(getter)]
     pub fn reason(&self) -> String {
@@ -114,12 +115,11 @@ impl RoomHandle {
             .set_func(f))
     }
 
-    /// Sets callback, which will be invoked on Jason close.
+    /// Sets `on_close` callback, which will be invoked on Jason close.
     pub fn on_close(&mut self, f: js_sys::Function) -> Result<(), JsValue> {
         map_weak!(self, |inner| inner.borrow_mut().on_close.set_func(f))
     }
 
-    /// Performs entering to a [`Room`].
     /// Sets `on_local_stream` callback, which will be invoked once media
     /// acquisition request will resolve successfully. Only invoked if media
     /// request was initiated by media server.
@@ -333,7 +333,7 @@ struct InnerRoom {
     enabled_video: bool,
 
     /// JS callback which will be called when this [`Room`] will be closed.
-    on_close: Rc<Callback<JsCloseReason>>,
+    on_close: Rc<Callback<RoomCloseReason>>,
 
     /// Reason of [`Room`] closing.
     ///
@@ -341,7 +341,7 @@ struct InnerRoom {
     ///
     /// Note that `None` will be considered as error and `is_err` will be
     /// `true` in [`JsCloseReason`] provided to JS callback.
-    close_reason: Option<CloseReason>,
+    close_reason: CloseReason,
 }
 
 impl InnerRoom {
@@ -364,16 +364,19 @@ impl InnerRoom {
             enabled_audio: true,
             enabled_video: true,
             on_close: Rc::new(Callback::default()),
-            close_reason: None,
+            close_reason: CloseReason::ByClient {
+                reason: ClientDisconnect::RoomUnexpectedlyDropped,
+                is_err: true,
+            },
         }
     }
 
     /// Sets `close_reason` of [`InnerRoom`].
     ///
-    /// Supposed that after this function call, [`Drop`] implementation of
-    /// [`InnerRoom`] will be triggered.
+    /// [`Drop`] implementation of
+    /// [`InnerRoom`] is supposed to be triggered after this function call.
     fn set_close_reason(&mut self, reason: CloseReason) {
-        self.close_reason = Some(reason);
+        self.close_reason = reason;
     }
 
     /// Creates new [`Connection`]s basing on senders and receivers of provided
@@ -616,14 +619,14 @@ impl Drop for InnerRoom {
     /// Unsubscribes [`InnerRoom`] from all its subscriptions.
     fn drop(&mut self) {
         self.rpc.unsub();
-        let close_reason = self.close_reason.as_ref().unwrap_or_else(|| {
-            &CloseReason::ByClient {
-                reason: CloseByClientReason::RoomUnexpectedlyDropped,
-                is_err: true,
-            }
-        });
+
+        if let CloseReason::ByClient { reason, .. } = self.close_reason.clone()
+        {
+            self.rpc.set_close_reason(reason);
+        };
+
         self.on_close
-            .call(JsCloseReason::new(close_reason))
+            .call(RoomCloseReason::new(&self.close_reason))
             .map(|result| {
                 result.map_err(|err| console_error!(err.as_string()))
             });

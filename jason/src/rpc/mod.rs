@@ -17,6 +17,7 @@ use medea_client_api_proto::{
     ClientMsg, CloseDescription, CloseReason as CloseByServerReason, Command,
     Event, ServerMsg,
 };
+use serde::Serialize;
 use wasm_bindgen_futures::spawn_local;
 use web_sys::CloseEvent;
 
@@ -24,39 +25,6 @@ use self::heartbeat::Heartbeat;
 
 #[doc(inline)]
 pub use self::websocket::{Error as TransportError, WebSocketRpcTransport};
-
-/// Reasons of closing by client side.
-#[derive(Clone, Display, Debug, PartialEq, Eq)]
-pub enum CloseByClientReason {
-    /// [`Room`] was dropped without `close_reason`.
-    RoomUnexpectedlyDropped,
-
-    /// Room was normally closed by JS side.
-    RoomClosed,
-
-    /// [`WebSocketRpcClient`] was unexpectedly dropped.
-    RpcConnectionUnexpectedlyDropped,
-}
-
-impl CloseByClientReason {
-    /// Returns `true` if [`CloseByClientReason`] is considered as error.
-    pub fn is_err(&self) -> bool {
-        match &self {
-            Self::RoomUnexpectedlyDropped
-            | Self::RpcConnectionUnexpectedlyDropped => true,
-            Self::RoomClosed => false,
-        }
-    }
-}
-
-impl Into<CloseReason> for CloseByClientReason {
-    fn into(self) -> CloseReason {
-        CloseReason::ByClient {
-            is_err: self.is_err(),
-            reason: self,
-        }
-    }
-}
 
 /// Reasons of closing by client side and server side.
 #[derive(Clone, Display, Debug, Eq, PartialEq)]
@@ -68,11 +36,48 @@ pub enum CloseReason {
     #[display(fmt = "{}", reason)]
     ByClient {
         /// Reason of closing.
-        reason: CloseByClientReason,
+        reason: ClientDisconnect,
 
         /// Is closing considered as error.
         is_err: bool,
     },
+}
+
+/// Reasons of closing by client side.
+#[derive(Clone, Display, Debug, Eq, PartialEq, Serialize)]
+pub enum ClientDisconnect {
+    /// [`Room`] was dropped without `close_reason`.
+    RoomUnexpectedlyDropped,
+
+    /// Room was normally closed by JS side.
+    RoomClosed,
+
+    /// [`RpcClient`] was unexpectedly dropped.
+    RpcClientUnexpectedlyDropped,
+
+    /// [`RpcTransport`] was unexpectedly dropped.
+    RpcTransportUnexpectedlyDropped,
+}
+
+impl ClientDisconnect {
+    /// Returns `true` if [`CloseByClientReason`] is considered as error.
+    pub fn is_err(&self) -> bool {
+        match &self {
+            Self::RoomUnexpectedlyDropped
+            | Self::RpcClientUnexpectedlyDropped
+            | Self::RpcTransportUnexpectedlyDropped => true,
+            Self::RoomClosed => false,
+        }
+    }
+}
+
+impl Into<CloseReason> for ClientDisconnect {
+    fn into(self) -> CloseReason {
+        CloseReason::ByClient {
+            is_err: self.is_err(),
+            reason: self,
+        }
+    }
 }
 
 /// Connection with remote was closed.
@@ -87,8 +92,7 @@ pub enum CloseMsg {
     /// Connection was unexpectedly closed. Consider reconnecting.
     ///
     /// Unexpected close determines by close code != `1000` and for close code
-    /// 1000 without reason. This is used because if connection lost then
-    /// close code will be `1000` which is wrong.
+    /// 1000 without reason.
     Abnormal(u16),
 }
 
@@ -132,19 +136,23 @@ pub trait RpcClient {
     /// Sends [`Command`] to server.
     fn send_command(&self, command: Command);
 
-    /// Sets `on_close_room` callback which will be called on [`Room`] close.
-    ///
-    /// [`Room`]: crate::api::room::Room
+    /// Returns [`Future`] which will be resolved with [`CloseReason`] on
+    /// RPC connection close, caused by underlying transport close. Will not be
+    /// invoked on [`RpcClient`] drop.
     fn on_close(
         &self,
     ) -> LocalBoxFuture<'static, Result<CloseReason, oneshot::Canceled>>;
+
+    /// Sets reason, that will be passed to underlying transport when this
+    /// client will be dropped.
+    fn set_close_reason(&self, close_reason: ClientDisconnect);
 }
 
 /// RPC transport between client and server.
 #[allow(clippy::module_name_repetitions)]
 #[cfg_attr(feature = "mockable", mockall::automock)]
 pub trait RpcTransport {
-    /// Sets handler on receiving message from server.
+    /// Returns stream of all messages received by this transport.
     fn on_message(
         &self,
     ) -> Result<
@@ -152,7 +160,8 @@ pub trait RpcTransport {
         TransportError,
     >;
 
-    /// Sets handler on closing RPC connection.
+    /// Returns future, that will be resolved when this transport will be
+    /// closed.
     fn on_close(
         &self,
     ) -> Result<
@@ -160,8 +169,12 @@ pub trait RpcTransport {
         TransportError,
     >;
 
-    /// Sends message to server.
+    /// Sends message to remote server.
     fn send(&self, msg: &ClientMsg) -> Result<(), TransportError>;
+
+    /// Sets reason, that will be sent to remote server when this transport will
+    /// be dropped.
+    fn set_close_reason(&self, reason: ClientDisconnect);
 }
 
 /// Inner state of [`WebsocketRpcClient`].
@@ -180,6 +193,11 @@ struct Inner {
     /// Note that [`CloseReason`] will not be sent if WebSocket closed with
     /// [`RpcConnectionCloseReason::NewConnection`] reason.
     on_close_subscribers: Vec<oneshot::Sender<CloseReason>>,
+
+    /// Reason of [`WebsocketRpcClient`] closing.
+    ///
+    /// This reason will be provided to underlying [`RpcTransport`].
+    close_reason: ClientDisconnect,
 }
 
 impl Inner {
@@ -189,6 +207,7 @@ impl Inner {
             on_close_subscribers: Vec::new(),
             subs: vec![],
             heartbeat: Heartbeat::new(heartbeat_interval),
+            close_reason: ClientDisconnect::RpcClientUnexpectedlyDropped,
         }))
     }
 }
@@ -202,11 +221,11 @@ fn on_close(inner_rc: &RefCell<Inner>, close_msg: &CloseMsg) {
     inner.sock.take();
     inner.heartbeat.stop();
 
+    // TODO: reconnect on disconnect, propagate error if unable
+    //       to reconnect
+
     if let CloseMsg::Normal(_, reason) = &close_msg {
-        // This is reconnecting and this is not considered as connection
-        // close.
-        if let CloseByServerReason::Reconnected = reason {
-        } else {
+        if *reason != CloseByServerReason::Reconnected {
             inner
                 .on_close_subscribers
                 .drain(..)
@@ -221,12 +240,6 @@ fn on_close(inner_rc: &RefCell<Inner>, close_msg: &CloseMsg) {
                     ))
                 });
         }
-    }
-
-    // TODO: reconnect on disconnect, propagate error if unable
-    //       to reconnect
-    match close_msg {
-        CloseMsg::Normal(_, _) | CloseMsg::Abnormal(_) => {}
     }
 }
 
@@ -344,7 +357,8 @@ impl RpcClient for WebSocketRpcClient {
     }
 
     /// Returns [`Future`] which will be resolved with [`CloseReason`] on
-    /// RPC connection closing.
+    /// RPC connection close, caused by underlying transport close. Will not be
+    /// invoked on [`RpcClient`] drop.
     fn on_close(
         &self,
     ) -> LocalBoxFuture<'static, Result<CloseReason, oneshot::Canceled>> {
@@ -352,12 +366,21 @@ impl RpcClient for WebSocketRpcClient {
         self.0.borrow_mut().on_close_subscribers.push(tx);
         Box::pin(rx)
     }
+
+    /// Sets reason, that will be passed to underlying transport when this
+    /// client will be dropped.
+    fn set_close_reason(&self, close_reason: ClientDisconnect) {
+        self.0.borrow_mut().close_reason = close_reason
+    }
 }
 
 impl Drop for WebSocketRpcClient {
     /// Drops related connection and its [`Heartbeat`].
     fn drop(&mut self) {
-        self.0.borrow_mut().sock.take();
-        self.0.borrow_mut().heartbeat.stop();
+        let mut inner = self.0.borrow_mut();
+        if let Some(socket) = inner.sock.take() {
+            socket.set_close_reason(inner.close_reason.clone());
+        }
+        inner.heartbeat.stop();
     }
 }
