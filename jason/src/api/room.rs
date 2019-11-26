@@ -23,7 +23,7 @@ use crate::{
         MediaStream, MediaStreamHandle, PeerEvent, PeerEventHandler,
         PeerRepository,
     },
-    rpc::{CloseByClientReason, CloseReason, RpcClient},
+    rpc::{CloseByClientReason, CloseReason, RpcClient, WebSocketRpcTransport},
     utils::Callback,
 };
 
@@ -163,9 +163,15 @@ impl RoomHandle {
                     ));
                 }
                 future_to_promise(async move {
-                    rpc.connect(token).await.map(|_| JsValue::NULL).map_err(
-                        |err| js_sys::Error::new(&format!("{}", err)).into(),
-                    )
+                    let websocket = WebSocketRpcTransport::new(&token)
+                        .await
+                        .map_err(|e| {
+                            JsValue::from(js_sys::Error::new(&e.to_string()))
+                        })?;
+                    rpc.connect(Rc::new(websocket))
+                        .await
+                        .map(|_| JsValue::NULL)
+                        .map_err(|e| js_sys::Error::new(&e.to_string()).into())
                 })
             }
             Err(err) => future_to_promise(future::err(err)),

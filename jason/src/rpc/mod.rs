@@ -10,19 +10,20 @@ use derive_more::Display;
 use futures::{
     channel::{mpsc, oneshot},
     future::LocalBoxFuture,
-    stream::LocalBoxStream,
+    stream::{LocalBoxStream, StreamExt as _},
 };
 use js_sys::Date;
 use medea_client_api_proto::{
     ClientMsg, CloseDescription, CloseReason as CloseByServerReason, Command,
     Event, ServerMsg,
 };
+use wasm_bindgen_futures::spawn_local;
 use web_sys::CloseEvent;
 
-use self::{
-    heartbeat::Heartbeat,
-    websocket::{Error, WebSocket},
-};
+use self::heartbeat::Heartbeat;
+
+#[doc(inline)]
+pub use self::websocket::{Error as TransportError, WebSocketRpcTransport};
 
 /// Reasons of closing by client side.
 #[derive(Clone, Display, Debug)]
@@ -115,7 +116,10 @@ impl From<&CloseEvent> for CloseMsg {
 #[cfg_attr(feature = "mockable", mockall::automock)]
 pub trait RpcClient {
     /// Establishes connection with RPC server.
-    fn connect(&self, token: String) -> LocalBoxFuture<'static, Result<()>>;
+    fn connect(
+        &self,
+        transport: Rc<dyn RpcTransport>,
+    ) -> LocalBoxFuture<'static, Result<()>>;
 
     /// Returns [`Stream`] of all [`Event`]s received by this [`RpcClient`].
     ///
@@ -136,18 +140,34 @@ pub trait RpcClient {
     ) -> LocalBoxFuture<'static, Result<CloseReason, oneshot::Canceled>>;
 }
 
-// TODO:
-// 1. Proper sub registry.
-// 2. Reconnect.
-// 3. Disconnect if no pongs.
-// 4. Buffering if no socket?
-/// Client API RPC client to talk with server via [`WebSocket`].
-pub struct WebSocketRpcClient(Rc<RefCell<Inner>>);
+/// RPC transport between client and server.
+#[allow(clippy::module_name_repetitions)]
+#[cfg_attr(feature = "mockable", mockall::automock)]
+pub trait RpcTransport {
+    /// Sets handler on receiving message from server.
+    fn on_message(
+        &self,
+    ) -> Result<
+        LocalBoxStream<'static, Result<ServerMsg, TransportError>>,
+        TransportError,
+    >;
+
+    /// Sets handler on closing RPC connection.
+    fn on_close(
+        &self,
+    ) -> Result<
+        LocalBoxFuture<'static, Result<CloseMsg, oneshot::Canceled>>,
+        TransportError,
+    >;
+
+    /// Sends message to server.
+    fn send(&self, msg: &ClientMsg) -> Result<(), TransportError>;
+}
 
 /// Inner state of [`WebsocketRpcClient`].
 struct Inner {
     /// [`WebSocket`] connection to remote media server.
-    sock: Option<Rc<WebSocket>>,
+    sock: Option<Rc<dyn RpcTransport>>,
 
     heartbeat: Heartbeat,
 
@@ -211,7 +231,10 @@ fn on_close(inner_rc: &RefCell<Inner>, close_msg: &CloseMsg) {
 }
 
 /// Handles messages from remote server.
-fn on_message(inner_rc: &RefCell<Inner>, msg: Result<ServerMsg, Error>) {
+fn on_message(
+    inner_rc: &RefCell<Inner>,
+    msg: Result<ServerMsg, TransportError>,
+) {
     let inner = inner_rc.borrow();
     match msg {
         Ok(ServerMsg::Pong(_num)) => {
@@ -236,6 +259,15 @@ fn on_message(inner_rc: &RefCell<Inner>, msg: Result<ServerMsg, Error>) {
     }
 }
 
+// TODO:
+// 1. Proper sub registry.
+// 2. Reconnect.
+// 3. Disconnect if no pongs.
+// 4. Buffering if no socket?
+/// Client API RPC client to talk with server via [`WebSocket`].
+#[allow(clippy::module_name_repetitions)]
+pub struct WebSocketRpcClient(Rc<RefCell<Inner>>);
+
 impl WebSocketRpcClient {
     /// Creates new [`WebsocketRpcClient`] with a given `ping_interval` in
     /// milliseconds.
@@ -248,21 +280,37 @@ impl RpcClient for WebSocketRpcClient {
     /// Creates new WebSocket connection to remote media server.
     /// Starts `Heartbeat` if connection succeeds and binds handlers
     /// on receiving messages from server and closing socket.
-    fn connect(&self, token: String) -> LocalBoxFuture<'static, Result<()>> {
+    fn connect(
+        &self,
+        transport: Rc<dyn RpcTransport>,
+    ) -> LocalBoxFuture<'static, Result<()>> {
         let inner = Rc::clone(&self.0);
         Box::pin(async move {
-            let socket = Rc::new(WebSocket::new(&token).await?);
-            inner.borrow_mut().heartbeat.start(Rc::clone(&socket))?;
+            inner.borrow_mut().heartbeat.start(Rc::clone(&transport))?;
 
             let inner_rc = Rc::clone(&inner);
-            socket.on_message(move |msg: Result<ServerMsg, Error>| {
-                on_message(&inner_rc, msg)
-            })?;
+            let mut on_socket_message = transport.on_message()?;
+            spawn_local(async move {
+                while let Some(msg) = on_socket_message.next().await {
+                    on_message(&inner_rc, msg)
+                }
+            });
 
             let inner_rc = Rc::clone(&inner);
-            socket.on_close(move |msg: CloseMsg| on_close(&inner_rc, &msg))?;
+            let on_socket_close = transport.on_close()?;
+            spawn_local(async move {
+                match on_socket_close.await {
+                    Ok(msg) => on_close(&inner_rc, &msg),
+                    Err(e) => {
+                        console_error!(format!(
+                            "RPC socket was unexpectedly dropped. {:?}",
+                            e
+                        ));
+                    }
+                }
+            });
 
-            inner.borrow_mut().sock.replace(socket);
+            inner.borrow_mut().sock.replace(transport);
             Ok(())
         })
     }
