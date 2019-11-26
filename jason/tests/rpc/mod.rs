@@ -14,8 +14,13 @@ use futures::{
     future::{self, Either},
     stream, FutureExt as _, StreamExt as _,
 };
-use medea_client_api_proto::{ClientMsg, Command, Event, PeerId, ServerMsg};
-use medea_jason::rpc::{MockRpcTransport, RpcClient, WebSocketRpcClient};
+use medea_client_api_proto::{
+    ClientMsg, CloseReason, Command, Event, PeerId, ServerMsg,
+};
+use medea_jason::rpc::{
+    CloseByClientReason, CloseMsg, MockRpcTransport, RpcClient,
+    WebSocketRpcClient,
+};
 use wasm_bindgen_futures::spawn_local;
 use wasm_bindgen_test::*;
 
@@ -232,6 +237,72 @@ async fn send_goes_to_transport() {
         Either::Left(_) => (),
         Either::Right(_) => {
             panic!("Command doesn't reach 'RpcTransport' within a 1s.")
+        }
+    }
+}
+
+mod on_close {
+    use super::*;
+
+    async fn get_client(close_msg: CloseMsg) -> WebSocketRpcClient {
+        let mut transport = MockRpcTransport::new();
+        transport
+            .expect_on_message()
+            .return_once(move || Ok(stream::once(future::pending()).boxed()));
+        transport.expect_send().return_once(|_| Ok(()));
+        transport
+            .expect_on_close()
+            .return_once(move || Ok(Box::pin(async { Ok(close_msg) })));
+
+        let ws = WebSocketRpcClient::new(500);
+        ws.connect(Rc::new(transport)).await.unwrap();
+
+        ws
+    }
+
+    #[wasm_bindgen_test]
+    async fn it_works() {
+        let ws =
+            get_client(CloseMsg::Normal(1000, CloseReason::Finished)).await;
+
+        assert_eq!(
+            ws.on_close().await.unwrap(),
+            medea_jason::rpc::CloseReason::ByServer(CloseReason::Finished)
+        );
+    }
+
+    #[wasm_bindgen_test]
+    async fn dont_call_on_reconnected_reason() {
+        let ws =
+            get_client(CloseMsg::Normal(1000, CloseReason::Reconnected)).await;
+
+        match future::select(
+            Box::pin(ws.on_close()),
+            Box::pin(resolve_after(500)),
+        )
+        .await
+        {
+            Either::Left((msg, _)) => {
+                unreachable!("Some close msg thrown: {:?}!", msg);
+            }
+            Either::Right(_) => (),
+        }
+    }
+
+    #[wasm_bindgen_test]
+    async fn dont_call_on_abnormal_close() {
+        let ws = get_client(CloseMsg::Abnormal(1500)).await;
+
+        match future::select(
+            Box::pin(ws.on_close()),
+            Box::pin(resolve_after(500)),
+        )
+        .await
+        {
+            Either::Left((msg, _)) => {
+                unreachable!("Some close msg thrown: {:?}!", msg);
+            }
+            Either::Right(_) => (),
         }
     }
 }

@@ -26,7 +26,7 @@ use self::heartbeat::Heartbeat;
 pub use self::websocket::{Error as TransportError, WebSocketRpcTransport};
 
 /// Reasons of closing by client side.
-#[derive(Clone, Display, Debug)]
+#[derive(Clone, Display, Debug, PartialEq, Eq)]
 pub enum CloseByClientReason {
     /// [`Room`] was dropped without `close_reason`.
     RoomUnexpectedlyDropped,
@@ -59,7 +59,7 @@ impl Into<CloseReason> for CloseByClientReason {
 }
 
 /// Reasons of closing by client side and server side.
-#[derive(Clone, Display, Debug)]
+#[derive(Clone, Display, Debug, Eq, PartialEq)]
 pub enum CloseReason {
     /// Closed by server.
     ByServer(CloseByServerReason),
