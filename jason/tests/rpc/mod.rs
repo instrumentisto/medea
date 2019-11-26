@@ -11,9 +11,8 @@ use std::{
 
 use futures::{
     channel::{mpsc, oneshot},
-    future::{self, pending, Either},
-    stream::once,
-    FutureExt, StreamExt,
+    future::{self, Either},
+    stream, FutureExt as _, StreamExt as _,
 };
 use medea_client_api_proto::{ClientMsg, Command, Event, PeerId, ServerMsg};
 use medea_jason::rpc::{MockRpcTransport, RpcClient, WebSocketRpcClient};
@@ -26,57 +25,57 @@ wasm_bindgen_test_configure!(run_in_browser);
 
 /// Tests [`WebSocketRpcClient::subscribe`] function.
 ///
-/// # Algorithm:
+/// # Algorithm
 ///
-/// 1. Connect [`WebSocketRpcClient`] with [`MockRpcTransport`]
+/// 1. Connect [`WebSocketRpcClient`] with [`MockRpcTransport`].
 ///
-/// 2. Subscribe to [`Event`]s with [`WebSocketRpcClient::subscribe`]
+/// 2. Subscribe to [`Event`]s with [`WebSocketRpcClient::subscribe`].
 ///
-/// 3. Send [`Event`] with [`MockRpcTransport`]
+/// 3. Send [`Event`] with [`MockRpcTransport`].
 ///
-/// 4. Check that subscriber from step 2 receives this [`Event`]
+/// 4. Check that subscriber from step 2 receives this [`Event`].
 #[wasm_bindgen_test]
 async fn message_received_from_transport_is_transmitted_to_sub() {
-    let server_event = Event::PeersRemoved { peer_ids: vec![] };
-    let server_event_clone = server_event.clone();
+    let srv_event = Event::PeersRemoved { peer_ids: vec![] };
+    let srv_event_cloned = srv_event.clone();
 
     let mut transport = MockRpcTransport::new();
     transport.expect_on_message().return_once(move || {
         Ok(
-            once(async move { Ok(ServerMsg::Event(server_event_clone)) })
+            stream::once(async move { Ok(ServerMsg::Event(srv_event_cloned)) })
                 .boxed(),
         )
     });
     transport.expect_send().return_once(|_| Ok(()));
     transport
         .expect_on_close()
-        .return_once(|| Ok(pending().boxed()));
+        .return_once(|| Ok(future::pending().boxed()));
 
     let ws = WebSocketRpcClient::new(10);
 
     let mut stream = ws.subscribe();
     ws.connect(Rc::new(transport)).await.unwrap();
-    assert_eq!(stream.next().await.unwrap(), server_event);
+    assert_eq!(stream.next().await.unwrap(), srv_event);
 }
 
 /// Tests that [`WebSocketRpcClient`] sends [`Event::Ping`] to a server.
 ///
 /// # Algorithm
 ///
-/// 1. Connect [`WebSocketRpcClient`] with [`MockRpcTransport`]
+/// 1. Connect [`WebSocketRpcClient`] with [`MockRpcTransport`].
 ///
-/// 2. Subscribe to [`ClientMsg`]s which [`WebSocketRpcClient`] will send
+/// 2. Subscribe to [`ClientMsg`]s which [`WebSocketRpcClient`] will send.
 ///
-/// 3. Wait 600ms for [`ClientMsg::Ping`]
+/// 3. Wait `600ms` for [`ClientMsg::Ping`].
 #[wasm_bindgen_test]
 async fn heartbeat() {
     let mut transport = MockRpcTransport::new();
     transport
         .expect_on_message()
-        .return_once(move || Ok(once(pending()).boxed()));
+        .return_once(move || Ok(stream::once(future::pending()).boxed()));
     transport
         .expect_on_close()
-        .return_once(move || Ok(pending().boxed()));
+        .return_once(move || Ok(future::pending().boxed()));
 
     let counter = Arc::new(AtomicU64::new(1));
     let counter_clone = counter.clone();
@@ -102,12 +101,12 @@ async fn heartbeat() {
 ///
 /// # Algorithm
 ///
-/// 1. Subscribe to [`Event`]s with [`WebSocketRpcClient::subscribe`]
+/// 1. Subscribe to [`Event`]s with [`WebSocketRpcClient::subscribe`].
 ///
-/// 2. Call [`WebSocketRpcClient::unsub`]
+/// 2. Call [`WebSocketRpcClient::unsub`].
 ///
 /// 3. Wait for `None` received from [`WebSocketRpcClient::subscribe`]'s
-/// `Stream`
+/// `Stream`.
 #[wasm_bindgen_test]
 async fn unsub_drops_subs() {
     let ws = WebSocketRpcClient::new(500);
@@ -141,21 +140,21 @@ async fn unsub_drops_subs() {
 ///
 /// # Algorithm
 ///
-/// 1. Create [`WebSocketRpcClient`] with [`MockRpcTransport`] [`Rc`]
+/// 1. Create [`WebSocketRpcClient`] with [`MockRpcTransport`] [`Rc`].
 ///
-/// 2. Drop [`WebSocketRpcClient`]
+/// 2. Drop [`WebSocketRpcClient`].
 ///
 /// 3. Check that [`MockRpcTransport`]'s [`Rc`] now have only 1
-/// [`Rc::strong_count`]
+/// [`Rc::strong_count`].
 #[wasm_bindgen_test]
 async fn transport_is_dropped_when_client_is_dropped() {
     let mut transport = MockRpcTransport::new();
     transport
         .expect_on_message()
-        .return_once(move || Ok(once(pending()).boxed()));
+        .return_once(move || Ok(stream::once(future::pending()).boxed()));
     transport
         .expect_on_close()
-        .return_once(move || Ok(pending().boxed()));
+        .return_once(move || Ok(future::pending().boxed()));
     transport.expect_send().return_once(|_| Ok(()));
     let rpc_transport = Rc::new(transport);
 
@@ -169,13 +168,13 @@ async fn transport_is_dropped_when_client_is_dropped() {
 ///
 /// # Algorithm
 ///
-/// 1. Connect [`WebSocketRpcClient`] with [`MockRpcTransport`]
+/// 1. Connect [`WebSocketRpcClient`] with [`MockRpcTransport`].
 ///
-/// 2. Subscribe to [`ClientMsg`]s which [`WebSocketRpcClient`] will send
+/// 2. Subscribe to [`ClientMsg`]s which [`WebSocketRpcClient`] will send.
 ///
-/// 3. Send [`ClientMsg`] with [`WebSocketRpcClient::send_command`]
+/// 3. Send [`ClientMsg`] with [`WebSocketRpcClient::send_command`].
 ///
-/// 4. Check that this message received by [`MockRpcTransport`]
+/// 4. Check that this message received by [`MockRpcTransport`].
 #[wasm_bindgen_test]
 async fn send_goes_to_transport() {
     let mut transport = MockRpcTransport::new();
@@ -185,10 +184,10 @@ async fn send_goes_to_transport() {
     let (on_send_tx, mut on_send_rx) = mpsc::unbounded();
     transport
         .expect_on_message()
-        .return_once(move || Ok(once(pending()).boxed()));
+        .return_once(move || Ok(stream::once(future::pending()).boxed()));
     transport
         .expect_on_close()
-        .return_once(move || Ok(pending().boxed()));
+        .return_once(move || Ok(future::pending().boxed()));
     transport.expect_send().returning(move |e| {
         on_send_tx.unbounded_send(e.clone()).unwrap();
         Ok(())

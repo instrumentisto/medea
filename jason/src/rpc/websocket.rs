@@ -22,47 +22,49 @@ use crate::{
 /// Errors that may occur when working with [`WebSocket`].
 #[derive(Debug, Error)]
 pub enum Error {
-    /// Failed to create WebSocket.
+    /// Failed to create [`SysWebSocket`].
     #[error("failed to create WebSocket: {0}")]
     CreateSocket(WasmErr),
 
-    /// Failed to init WebSocket.
+    /// Failed to init [`SysWebSocket`].
     #[error("failed to init WebSocket")]
     InitSocket,
 
-    /// Failed to parse client message.
+    /// Failed to parse [`ClientMsg`].
     #[error("failed to parse client message: {0}")]
     ParseClientMessage(serde_json::error::Error),
 
-    /// Failed to parse server message.
+    /// Failed to parse [`ServerMessage`].
     #[error("failed to parse server message: {0}")]
     ParseServerMessage(serde_json::error::Error),
 
-    /// Message is not string.
+    /// [`ServerMessage`] is not a string.
     #[error("message is not a string")]
     MessageNotString,
 
-    /// Failed to send message.
+    /// Failed to send [`ClientMsg`].
     #[error("failed to send message: {0}")]
     SendMessage(WasmErr),
 
-    /// Failed to set handler for CloseEvent.
+    /// Failed to set handler for [`CloseEvent`].
     #[error("failed to set handler for CloseEvent: {0}")]
     SetHandlerOnClose(WasmErr),
 
-    /// Failed to set handler for OpenEvent.
+    /// Failed to set handler for [`OpenEvent`].
+    ///
+    /// [`OpenEvent`]: web_sys::OpenEvent
     #[error("failed to set handler for OpenEvent: {0}")]
     SetHandlerOnOpen(WasmErr),
 
-    /// Failed to set handler for MessageEvent.
+    /// Failed to set handler for [`MessageEvent`].
     #[error("failed to set handler for MessageEvent: {0}")]
     SetHandlerOnMessage(WasmErr),
 
-    /// Couldn't cast provided [`u16`] to `State` variant.
+    /// Couldn't cast provided [`u16`] to [`State`] variant.
     #[error("could not cast {0} to State variant")]
     CastState(u16),
 
-    /// Underlying socket is closed.
+    /// Underlying [`SysWebSocket`] is closed.
     #[error("underlying socket is closed")]
     ClosedSocket,
 }
@@ -140,7 +142,6 @@ impl InnerSocket {
 }
 
 impl RpcTransport for WebSocketRpcTransport {
-    /// Sets handler for receiving server messages.
     fn on_message(
         &self,
     ) -> Result<LocalBoxStream<'static, Result<ServerMsg, Error>>, Error> {
@@ -167,7 +168,6 @@ impl RpcTransport for WebSocketRpcTransport {
         Ok(Box::pin(rx))
     }
 
-    /// Sets handler for socket closing.
     fn on_close(
         &self,
     ) -> Result<
@@ -197,7 +197,6 @@ impl RpcTransport for WebSocketRpcTransport {
         Ok(Box::pin(rx))
     }
 
-    /// Sends message to the server.
     fn send(&self, msg: &ClientMsg) -> Result<(), Error> {
         let inner = self.0.borrow();
         let message =
@@ -207,7 +206,7 @@ impl RpcTransport for WebSocketRpcTransport {
             State::OPEN => inner
                 .socket
                 .send_with_str(&message)
-                .map_err(std::convert::Into::into)
+                .map_err(Into::into)
                 .map_err(Error::SendMessage),
             _ => Err(Error::ClosedSocket),
         }
@@ -298,7 +297,7 @@ impl From<&CloseEvent> for CloseMsg {
     }
 }
 
-/// Newtype for received server message.
+/// Newtype for received [`ServerMsg`].
 #[derive(From, Into)]
 pub struct ServerMessage(ServerMsg);
 

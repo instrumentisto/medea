@@ -9,7 +9,7 @@ use anyhow::Result;
 use futures::{
     channel::{mpsc, oneshot},
     future::LocalBoxFuture,
-    stream::{LocalBoxStream, StreamExt},
+    stream::{LocalBoxStream, StreamExt as _},
 };
 use js_sys::Date;
 use medea_client_api_proto::{ClientMsg, Command, Event, ServerMsg};
@@ -56,7 +56,7 @@ pub trait RpcClient {
 #[allow(clippy::module_name_repetitions)]
 #[cfg_attr(feature = "mockable", mockall::automock)]
 pub trait RpcTransport {
-    /// Sets handler on receive message from server.
+    /// Sets handler on receiving message from server.
     fn on_message(
         &self,
     ) -> Result<
@@ -64,7 +64,7 @@ pub trait RpcTransport {
         TransportError,
     >;
 
-    /// Sets handler on close socket.
+    /// Sets handler on closing RPC connection.
     fn on_close(
         &self,
     ) -> Result<

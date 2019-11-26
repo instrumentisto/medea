@@ -55,7 +55,7 @@ pub fn get_test_tracks() -> (Track, Track) {
     )
 }
 
-/// Async function which resolves after provided number of milliseconds.
+/// Resolves after provided number of milliseconds.
 pub async fn resolve_after(delay_ms: i32) -> Result<(), JsValue> {
     JsFuture::from(Promise::new(&mut |yes, _| {
         window()
@@ -65,6 +65,5 @@ pub async fn resolve_after(delay_ms: i32) -> Result<(), JsValue> {
             .unwrap();
     }))
     .await?;
-
     Ok(())
 }
