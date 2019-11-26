@@ -242,8 +242,13 @@ async fn send_goes_to_transport() {
 }
 
 mod on_close {
+    //! Tests for [`WebSocketRpcClient::on_close`].
+
     use super::*;
 
+    /// Returns [`WebSocketRpcClient`] which will be resolved
+    /// [`WebSocketRpcClient::on_close`] [`Future`] with provided
+    /// [`CloseMsg`].
     async fn get_client(close_msg: CloseMsg) -> WebSocketRpcClient {
         let mut transport = MockRpcTransport::new();
         transport
@@ -260,8 +265,21 @@ mod on_close {
         ws
     }
 
+    /// Tests that [`WebSocketRpcClient::on_close`]'s [`Future`] resolves on
+    /// normal closing.
+    ///
+    /// # Algorithm
+    ///
+    /// 1. Mock [`WebSocketRpcTransport::on_close`] to return
+    /// [`CloseReason::Finished`] with `1000` code.
+    ///
+    /// 2. Wait for [`WebSocketRpcTransport::on_close`] resolving.
+    ///
+    /// 3. Check that [`medea_jason::rpc::CloseReason`] returned from this
+    ///    [`Future`] is [`rpc::CloseReason::ByServer`] with
+    ///    [`CloseReason::Finished`] as reason.
     #[wasm_bindgen_test]
-    async fn it_works() {
+    async fn resolve_on_normal_closing() {
         let ws =
             get_client(CloseMsg::Normal(1000, CloseReason::Finished)).await;
 
@@ -271,8 +289,19 @@ mod on_close {
         );
     }
 
+    /// Tests that [`WebSocketRpcClient::on_close`]'s [`Future`] don't resolves
+    /// on [`CloseReason::Reconnected`].
+    ///
+    /// # Algorithm
+    ///
+    /// 1. Mock [`WebSocketRpcTransport::on_close`] to return
+    /// [`CloseReason::Reconnected`] with `1000` code.
+    ///
+    /// 2. Wait `500ms` for [`WebSocketRpcTransport::on_close`] [`Future`]. If
+    ///    in this time interval this [`Future`] wasn't resolved then test
+    ///    considered passed.
     #[wasm_bindgen_test]
-    async fn dont_call_on_reconnected_reason() {
+    async fn dont_resolve_on_reconnected_reason() {
         let ws =
             get_client(CloseMsg::Normal(1000, CloseReason::Reconnected)).await;
 
@@ -289,8 +318,19 @@ mod on_close {
         }
     }
 
+    /// Tests that [`WebSocketRpcClient::on_close`]'s [`Future`] don't resolves
+    /// on [`CloseMsg::Abnormal`].
+    ///
+    /// # Algorithm
+    ///
+    /// 1. Mock [`WebSocketRpcTransport::on_close`] to return
+    /// [`CloseMsg::Abnormal`] with `1500` code.
+    ///
+    /// 2. Wait `500ms` for [`WebSocketRpcTransport::on_close`] [`Future`]. If
+    ///    in this time interval this [`Future`] wasn't resolved then test
+    ///    considered passed.
     #[wasm_bindgen_test]
-    async fn dont_call_on_abnormal_close() {
+    async fn dont_resolve_on_abnormal_close() {
         let ws = get_client(CloseMsg::Abnormal(1500)).await;
 
         match future::select(
