@@ -109,6 +109,7 @@ pub enum Command {
 #[cfg_attr(feature = "medea", derive(Deserialize))]
 #[cfg_attr(feature = "jason", derive(Serialize))]
 #[cfg_attr(test, derive(Debug, PartialEq))]
+#[derive(Clone)]
 pub enum PeerMetrics {
     /// Peer Connection's ICE connection state.
     IceConnectionStateChanged(IceConnectionState),
@@ -118,6 +119,7 @@ pub enum PeerMetrics {
 #[cfg_attr(feature = "medea", derive(Deserialize))]
 #[cfg_attr(feature = "jason", derive(Serialize))]
 #[cfg_attr(test, derive(Debug, PartialEq))]
+#[derive(Clone)]
 pub enum IceConnectionState {
     New,
     Checking,
