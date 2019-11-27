@@ -163,11 +163,11 @@ pub struct RtcPeerConnection {
     >,
 
     /// [`iceconnectionstatechange`][2] callback of [RTCPeerConnection][1],
-    /// fires whenever [`ICE connection state`][3] changes.
+    /// fires whenever [ICE connection state][3] changes.
     ///
-    /// [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
-    /// [2]: https://www.w3.org/TR/webrtc/#event-iceconnectionstatechange
-    /// [3]: https://www.w3.org/TR/webrtc/#dfn-ice-connection-state
+    /// [1]: https://w3.org/TR/webrtc/#rtcpeerconnection-interface
+    /// [2]: https://w3.org/TR/webrtc/#event-iceconnectionstatechange
+    /// [3]: https://w3.org/TR/webrtc/#dfn-ice-connection-state
     on_ice_connection_state_changed:
         RefCell<Option<EventListener<SysRtcPeerConnection, Event>>>,
 

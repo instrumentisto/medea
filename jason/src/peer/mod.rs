@@ -95,15 +95,16 @@ pub enum PeerEvent {
         local_stream: MediaStream,
     },
 
-    /// [`RtcPeerConnection`]'s [`ICE connection`][1] state changed.
+    /// [`RtcPeerConnection`]'s [ICE connection][1] state changed.
     ///
-    /// [1]: https://www.w3.org/TR/webrtc/#dfn-ice-connection-state
+    /// [1]: https://w3.org/TR/webrtc/#dfn-ice-connection-state
     IceConnectionStateChanged {
         /// ID of the [`PeerConnection`] that sends
         /// [`iceconnectionstatechange`][1] event.
         ///
-        /// [1]: https://www.w3.org/TR/webrtc/#event-iceconnectionstatechange
+        /// [1]: https://w3.org/TR/webrtc/#event-iceconnectionstatechange
         peer_id: Id,
+
         /// New [`IceConnectionState`].
         ice_connection_state: IceConnectionState,
     },

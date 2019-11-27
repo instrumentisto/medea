@@ -256,8 +256,8 @@ async fn send_event_on_new_local_stream() {
 }
 
 /// Setup signalling between two peers and wait for:
-/// 1. `IceConnectionState::Checking` from both peers
-/// 2. `IceConnectionState::Connected` from both peers
+/// 1. `IceConnectionState::Checking` from both peers.
+/// 2. `IceConnectionState::Connected` from both peers.
 #[wasm_bindgen_test]
 async fn ice_connection_state_changed_is_emitted() {
     let (tx1, rx1) = mpsc::unbounded();

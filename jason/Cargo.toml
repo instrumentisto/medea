@@ -44,7 +44,8 @@ wee_alloc = { version = "0.4", optional = true }
 [dependencies.web-sys]
     version = "0.3"
     features = [
-        "CloseEvent", "console", "ConstrainDomStringParameters",
+        "console", "ConstrainDomStringParameters",
+        "CloseEvent",
         "Event", "EventTarget",
         "MediaDevices","MediaDeviceInfo", "MediaDeviceKind",
         "MediaTrackConstraints", "MediaTrackSettings",
@@ -53,12 +54,16 @@ wee_alloc = { version = "0.4", optional = true }
         "MessageEvent",
         "Navigator",
         "RtcConfiguration",
-        "RtcIceCandidate", "RtcIceServer", "RtcIceCandidateInit",
+        "RtcIceCandidate", "RtcIceCandidateInit",
         "RtcIceConnectionState",
-        "RtcPeerConnection", "RtcPeerConnectionIceEvent", "RtcRtpReceiver",
-        "RtcRtpSender", "RtcRtpTransceiver", "RtcRtpTransceiverDirection",
-        "RtcRtpTransceiverInit", "RtcSdpType", "RtcSessionDescription",
-        "RtcSessionDescriptionInit", "RtcTrackEvent",
+        "RtcIceServer",
+        "RtcPeerConnection", "RtcPeerConnectionIceEvent",
+        "RtcRtpReceiver", "RtcRtpSender",
+        "RtcRtpTransceiver", "RtcRtpTransceiverDirection",
+        "RtcRtpTransceiverInit",
+        "RtcSdpType",
+        "RtcSessionDescription", "RtcSessionDescriptionInit",
+        "RtcTrackEvent",
         "WebSocket", "Window",
     ]
 

@@ -98,7 +98,7 @@ pub enum Command {
         peer_id: PeerId,
         candidate: IceCandidate,
     },
-    /// Web Client sends Peer Connection metric.
+    /// Web Client sends Peer Connection metrics.
     AddPeerConnectionMetrics {
         peer_id: PeerId,
         metrics: PeerMetrics,
