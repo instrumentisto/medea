@@ -12,7 +12,7 @@ use futures::{channel::mpsc, stream, Future, FutureExt as _, StreamExt as _};
 use js_sys::Promise;
 use medea_client_api_proto::{
     Command, Direction, Event as RpcEvent, EventHandler, IceCandidate,
-    IceServer, PeerId, Track,
+    IceConnectionState, IceServer, PeerId, PeerMetrics, Track,
 };
 use tracerr::Traced;
 use wasm_bindgen::{prelude::*, JsValue};
@@ -24,7 +24,7 @@ use crate::{
         MediaStream, MediaStreamHandle, PeerError, PeerEvent, PeerEventHandler,
         PeerRepository,
     },
-    rpc::{RpcClient, RpcClientError},
+    rpc::{RpcClient, RpcClientError, WebSocketRpcTransport},
     utils::{Callback, JasonError, JsCaused, JsError},
 };
 
@@ -111,10 +111,14 @@ impl RoomHandle {
                 ));
             }
 
+            let websocket = WebSocketRpcTransport::new(&token)
+                .await
+                .map_err(tracerr::map_from_and_wrap!(=> RoomError))
+                .map_err(|err| JasonError::from(err.into_parts()))?;
             inner
                 .borrow()
                 .rpc
-                .connect(token)
+                .connect(Rc::new(websocket))
                 .await
                 .map_err(tracerr::map_from_and_wrap!(=> RoomError))
                 .map_err(|err| JasonError::from(err.into_parts()))?;
@@ -592,6 +596,21 @@ impl PeerEventHandler for InnerRoom {
     /// Invokes `on_local_stream` [`Room`]'s callback.
     fn on_new_local_stream(&mut self, _: PeerId, stream: MediaStream) {
         self.on_local_stream.call(stream.new_handle());
+    }
+
+    /// Handles [`PeerEvent::IceConnectionStateChanged`] event and sends new
+    /// state to RPC server.
+    fn on_ice_connection_state_changed(
+        &mut self,
+        peer_id: PeerId,
+        ice_connection_state: IceConnectionState,
+    ) {
+        self.rpc.send_command(Command::AddPeerConnectionMetrics {
+            peer_id,
+            metrics: PeerMetrics::IceConnectionStateChanged(
+                ice_connection_state,
+            ),
+        });
     }
 }
 

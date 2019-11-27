@@ -5,13 +5,17 @@
 use std::{cell::RefCell, convert::TryFrom, rc::Rc};
 
 use derive_more::{Display, From, Into};
-use futures::{channel::oneshot, future};
+use futures::{
+    channel::{mpsc, oneshot},
+    future::{self, LocalBoxFuture},
+    stream::LocalBoxStream,
+};
 use medea_client_api_proto::{ClientMsg, ServerMsg};
 use tracerr::Traced;
 use web_sys::{CloseEvent, Event, MessageEvent, WebSocket as SysWebSocket};
 
 use crate::{
-    rpc::CloseMsg,
+    rpc::{CloseMsg, RpcTransport},
     utils::{
         EventListener, EventListenerBindError, JasonError, JsCaused, JsError,
     },
@@ -105,9 +109,8 @@ struct InnerSocket {
     on_error: Option<EventListener<SysWebSocket, Event>>,
 }
 
-/// Convenience wrapper around [WebSocket][1]
-/// [1]:https://developer.mozilla.org/en-US/docs/Web/API/WebSocket
-pub struct WebSocket(Rc<RefCell<InnerSocket>>);
+/// WebSocket [`RpcTransport`] between client and server.
+pub struct WebSocketRpcTransport(Rc<RefCell<InnerSocket>>);
 
 impl InnerSocket {
     fn new(url: &str) -> Result<Self> {
@@ -137,7 +140,79 @@ impl InnerSocket {
     }
 }
 
-impl WebSocket {
+impl RpcTransport for WebSocketRpcTransport {
+    fn on_message(
+        &self,
+    ) -> Result<LocalBoxStream<'static, Result<ServerMsg, Error>>, Error> {
+        let (tx, rx) = mpsc::unbounded();
+        let mut inner_mut = self.0.borrow_mut();
+        inner_mut.on_message = Some(
+            EventListener::new_mut(
+                Rc::clone(&inner_mut.socket),
+                "message",
+                move |msg| {
+                    let parsed = ServerMessage::try_from(&msg).map(Into::into);
+                    tx.unbounded_send(parsed).unwrap_or_else(|e| {
+                        console_error!(format!(
+                            "WebSocket's 'on_message' callback receiver \
+                             unexpectedly gone. {:?}",
+                            e
+                        ))
+                    });
+                },
+            )
+            .map_err(tracerr::map_from_and_wrap!(=> SocketError))?,
+        );
+        Ok(Box::pin(rx))
+    }
+
+    fn on_close(
+        &self,
+    ) -> Result<
+        LocalBoxFuture<'static, Result<CloseMsg, oneshot::Canceled>>,
+        Error,
+    > {
+        let (tx, rx) = oneshot::channel();
+        let mut inner_mut = self.0.borrow_mut();
+        let inner = Rc::clone(&self.0);
+        inner_mut.on_close = Some(
+            EventListener::new_once(
+                Rc::clone(&inner_mut.socket),
+                "close",
+                move |msg: CloseEvent| {
+                    inner.borrow_mut().update_state();
+                    tx.send(CloseMsg::from(&msg)).unwrap_or_else(|e| {
+                        console_error!(format!(
+                            "WebSocket's 'on_close' callback receiver \
+                             unexpectedly gone. {:?}",
+                            e
+                        ))
+                    });
+                },
+            )
+            .map_err(tracerr::map_from_and_wrap!(=> SocketError))?,
+        );
+        Ok(Box::pin(rx))
+    }
+
+    fn send(&self, msg: &ClientMsg) -> Result<(), Error> {
+        let inner = self.0.borrow();
+        let message = serde_json::to_string(msg)
+            .map_err(SocketError::ParseClientMessage)
+            .map_err(tracerr::wrap!())?;
+
+        match inner.socket_state {
+            State::OPEN => inner
+                .socket
+                .send_with_str(&message)
+                .map_err(Into::into)
+                .map_err(Error::SendMessage),
+            _ => Err(tracerr::new!(SocketError::ClosedSocket)),
+        }
+    }
+}
+
+impl WebSocketRpcTransport {
     /// Initiates new WebSocket connection. Resolves only when underlying
     /// connection becomes active.
     pub async fn new(url: &str) -> Result<Self> {
@@ -191,70 +266,9 @@ impl WebSocket {
             }
         }
     }
-
-    /// Set handler on receive message from server.
-    pub fn on_message<F>(&self, mut f: F) -> Result<()>
-    where
-        F: (FnMut(Result<ServerMsg>)) + 'static,
-    {
-        let mut inner_mut = self.0.borrow_mut();
-        inner_mut.on_message = Some(
-            EventListener::new_mut(
-                Rc::clone(&inner_mut.socket),
-                "message",
-                move |msg| {
-                    let parsed = ServerMessage::try_from(&msg)
-                        .map(std::convert::Into::into)
-                        .map_err(tracerr::wrap!());
-                    f(parsed);
-                },
-            )
-            .map_err(tracerr::map_from_and_wrap!(=> SocketError))?,
-        );
-        Ok(())
-    }
-
-    /// Set handler on close socket.
-    pub fn on_close<F>(&self, f: F) -> Result<()>
-    where
-        F: (FnOnce(CloseMsg)) + 'static,
-    {
-        let mut inner_mut = self.0.borrow_mut();
-        let inner = Rc::clone(&self.0);
-        inner_mut.on_close = Some(
-            EventListener::new_once(
-                Rc::clone(&inner_mut.socket),
-                "close",
-                move |msg: CloseEvent| {
-                    inner.borrow_mut().update_state();
-                    f(CloseMsg::from(&msg));
-                },
-            )
-            .map_err(tracerr::map_from_and_wrap!(=> SocketError))?,
-        );
-        Ok(())
-    }
-
-    /// Send message to server.
-    pub fn send(&self, msg: &ClientMsg) -> Result<()> {
-        let inner = self.0.borrow();
-        let message = serde_json::to_string(msg)
-            .map_err(SocketError::ParseClientMessage)
-            .map_err(tracerr::wrap!())?;
-
-        match inner.socket_state {
-            State::OPEN => inner
-                .socket
-                .send_with_str(&message)
-                .map_err(Into::into)
-                .map_err(SocketError::SendMessage)
-                .map_err(tracerr::wrap!()),
-            _ => Err(tracerr::new!(SocketError::ClosedSocket)),
-        }
-    }
 }
 
-impl Drop for WebSocket {
+impl Drop for WebSocketRpcTransport {
     fn drop(&mut self) {
         let mut inner = self.0.borrow_mut();
         if inner.socket_state.can_close() {

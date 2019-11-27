@@ -49,6 +49,7 @@ impl_incrementable!(TrackId);
 
 // TODO: should be properly shared between medea and jason
 #[cfg_attr(test, derive(Debug, PartialEq))]
+#[derive(Clone)]
 /// Message sent by `Media Server` to `Client`.
 pub enum ServerMsg {
     /// `pong` message that server answers with to WebSocket client in response
@@ -60,6 +61,7 @@ pub enum ServerMsg {
 }
 
 #[cfg_attr(test, derive(Debug, PartialEq))]
+#[derive(Clone)]
 /// Message from 'Client' to 'Media Server'.
 pub enum ClientMsg {
     /// `ping` message that WebSocket client is expected to send to the server
@@ -75,6 +77,7 @@ pub enum ClientMsg {
 #[cfg_attr(feature = "jason", derive(Serialize))]
 #[cfg_attr(test, derive(Debug, PartialEq))]
 #[serde(tag = "command", content = "data")]
+#[derive(Clone)]
 pub enum Command {
     /// Web Client sends SDP Offer.
     MakeSdpOffer {
@@ -95,6 +98,36 @@ pub enum Command {
         peer_id: PeerId,
         candidate: IceCandidate,
     },
+    /// Web Client sends Peer Connection metrics.
+    AddPeerConnectionMetrics {
+        peer_id: PeerId,
+        metrics: PeerMetrics,
+    },
+}
+
+/// Web Client's Peer Connection metrics.
+#[cfg_attr(feature = "medea", derive(Deserialize))]
+#[cfg_attr(feature = "jason", derive(Serialize))]
+#[cfg_attr(test, derive(Debug, PartialEq))]
+#[derive(Clone)]
+pub enum PeerMetrics {
+    /// Peer Connection's ICE connection state.
+    IceConnectionStateChanged(IceConnectionState),
+}
+
+/// Peer Connection's ICE connection state.
+#[cfg_attr(feature = "medea", derive(Deserialize))]
+#[cfg_attr(feature = "jason", derive(Serialize))]
+#[cfg_attr(test, derive(Debug, PartialEq))]
+#[derive(Clone)]
+pub enum IceConnectionState {
+    New,
+    Checking,
+    Connected,
+    Completed,
+    Failed,
+    Disconnected,
+    Closed,
 }
 
 /// Reason of disconnecting Web Client from Media Server.
