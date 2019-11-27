@@ -1,5 +1,6 @@
-use proc_macro2::TokenStream;
+use proc_macro2::{Span, TokenStream};
 use quote::quote;
+use syn::parse::{Error, Result};
 use synstructure::{BindStyle, Structure};
 
 /// Generates the actual code for `#[derive(JsCaused)]` macro.
@@ -14,8 +15,8 @@ use synstructure::{BindStyle, Structure};
 /// 3. Generate implementation `JsCaused` trait for this `enum` with generated
 /// methods from step 1 and 2.
 #[allow(clippy::needless_pass_by_value)]
-pub fn derive(mut s: Structure) -> TokenStream {
-    let error_type = error_type(&s).expect("not found js_error attribute");
+pub fn derive(mut s: Structure) -> Result<TokenStream> {
+    let error_type = error_type(&s)?;
 
     let name_body = s.each_variant(|v| {
         let name = &v.ast().ident;
@@ -50,65 +51,102 @@ pub fn derive(mut s: Structure) -> TokenStream {
         }
     });
 
-    quote! { #js_caused }
+    Ok(quote! { #js_caused })
 }
 
-/// Parse and returns argument of `js_error` attribute.
-fn error_type(s: &synstructure::Structure) -> Option<syn::Path> {
+/// Parse and returns argument of `js(error = "path::to::Error)` attribute.
+fn error_type(s: &synstructure::Structure) -> Result<syn::Path> {
     let mut error_type = None;
     for attr in &s.ast().attrs {
         if let Ok(meta) = attr.parse_meta() {
-            if meta.path().is_ident("js_error") {
+            if meta.path().is_ident("js") {
                 if error_type.is_some() {
-                    panic!("Cannot have two `js_error` attributes");
+                    return Err(Error::new_spanned(
+                        meta,
+                        "Cannot have two js attributes",
+                    ));
                 }
-                match meta {
-                    syn::Meta::List(types) => {
-                        if types.nested.len() != 1 {
-                            panic!(
-                                "Expected at only one argument to js_error \
-                                 attribute"
-                            );
-                        }
-                        error_type = match &types.nested[0] {
-                            syn::NestedMeta::Meta(syn::Meta::Path(path)) => {
-                                Some(path.clone())
-                            }
-                            _ => panic!(
-                                "Invalid argument for js_error attribute"
-                            ),
-                        };
+                if let syn::Meta::List(list) = meta {
+                    if list.nested.is_empty() {
+                        return Err(Error::new_spanned(
+                            list,
+                            "Expected at least one argument to js attribute",
+                        ));
                     }
-                    _ => panic!(
-                        "Expected attribute like `#[js_error(path::to::Error)]"
-                    ),
+                    error_type =
+                        match &list.nested[0] {
+                            syn::NestedMeta::Meta(syn::Meta::NameValue(nv))
+                                if nv.path.is_ident("error") =>
+                            {
+                                if let syn::MetaNameValue {
+                                    lit: syn::Lit::Str(lit_str),
+                                    ..
+                                } = nv
+                                {
+                                    Some(lit_str.parse_with(
+                                        syn::Path::parse_mod_style,
+                                    )?)
+                                } else {
+                                    return Err(Error::new_spanned(
+                                        nv,
+                                        "Expected `path::to::error`",
+                                    ));
+                                }
+                            }
+                            _ => {
+                                return Err(Error::new_spanned(
+                                    list,
+                                    "Expected attribute like #[js(error = \
+                                     \"path::to::error\")]",
+                                ));
+                            }
+                        };
+                } else {
+                    return Err(Error::new_spanned(
+                        meta,
+                        "js attribute must take a list in parentheses",
+                    ));
+                };
+            }
+        }
+    }
+    match error_type {
+        Some(path) => Ok(path),
+        None => syn::LitStr::new("JsError", Span::call_site()).parse(),
+    }
+}
+
+/// Checks what enum variant has attribute `js(cause)`.
+fn is_caused(bi: &synstructure::BindingInfo) -> bool {
+    let mut found_cause = false;
+    for attr in &bi.ast().attrs {
+        if let Ok(meta) = attr.parse_meta() {
+            if meta.path().is_ident("js") {
+                if let syn::Meta::List(ref list) = meta {
+                    if let Some(pair) = list.nested.first() {
+                        if let syn::NestedMeta::Meta(syn::Meta::Path(
+                            ref path,
+                        )) = pair
+                        {
+                            if path.is_ident("cause") {
+                                if found_cause {
+                                    panic!("Cannot have two cause attributes");
+                                }
+                                found_cause = true;
+                            }
+                        }
+                    }
                 }
             }
         }
     }
-    error_type
+    found_cause
 }
 
-/// Checks what enum variant contains type error from `js_error` attribute.
+/// Checks what enum variant contains js error.
 fn is_error(bi: &synstructure::BindingInfo, err: &syn::Path) -> bool {
     match &bi.ast().ty {
         syn::Type::Path(syn::TypePath { qself: None, path }) => path == err,
         _ => false,
     }
-}
-
-/// Checks what enum variant has attribute `js_cause`.
-fn is_caused(bi: &synstructure::BindingInfo) -> bool {
-    let mut found_cause = false;
-    for attr in &bi.ast().attrs {
-        if let Ok(meta) = attr.parse_meta() {
-            if meta.path().is_ident("js_cause") {
-                if found_cause {
-                    panic!("Cannot have two `js_cause` attributes");
-                }
-                found_cause = true;
-            }
-        }
-    }
-    found_cause
 }

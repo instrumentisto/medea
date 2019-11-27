@@ -131,5 +131,4 @@ where
 /// Occurs if referenced value was dropped.
 #[derive(Debug, Display, JsCaused)]
 #[display(fmt = "Handler is in detached state.")]
-#[js_error(JsError)]
 pub struct HandlerDetachedError;

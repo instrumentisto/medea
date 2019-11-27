@@ -29,7 +29,6 @@ use super::InputDeviceInfo;
 
 /// Errors that may occur in a [`MediaManager`].
 #[derive(Debug, Display, JsCaused)]
-#[js_error(JsError)]
 pub enum MediaManagerError {
     /// Occurs when cannot get access to [MediaDevices][1] object.
     ///

@@ -23,7 +23,7 @@ use web_sys::{MediaStream as SysMediaStream, RtcTrackEvent};
 
 use crate::{
     media::{MediaManager, MediaManagerError},
-    utils::JsCaused,
+    utils::{JsCaused, JsError},
 };
 
 #[cfg(feature = "mockable")]
@@ -47,27 +47,26 @@ pub use self::{
 /// [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
 #[derive(Debug, Display, From, JsCaused)]
 #[allow(clippy::module_name_repetitions)]
-#[js_error(crate::utils::JsError)]
 pub enum PeerError {
     /// Errors that may occur in [`MediaConnections`] storage.
     #[display(fmt = "{}", _0)]
-    MediaConnections(#[js_cause] MediaConnectionsError),
+    MediaConnections(#[js(cause)] MediaConnectionsError),
 
     /// Errors that may occur in a [`MediaManager`].
     #[display(fmt = "{}", _0)]
-    MediaManager(#[js_cause] MediaManagerError),
+    MediaManager(#[js(cause)] MediaManagerError),
 
     /// Errors that may occur during signaling between this and remote
     /// [RTCPeerConnection][1] and event handlers setting errors.
     ///
     /// [1]: https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection.
     #[display(fmt = "{}", _0)]
-    RtcPeerConnection(#[js_cause] RTCPeerConnectionError),
+    RtcPeerConnection(#[js(cause)] RTCPeerConnectionError),
 
     /// Errors that may occur when validating [`StreamRequest`] or
     /// parsing [`MediaStream`].
     #[display(fmt = "{}", _0)]
-    StreamRequest(#[js_cause] StreamRequestError),
+    StreamRequest(#[js(cause)] StreamRequestError),
 }
 
 type Result<T> = std::result::Result<T, Traced<PeerError>>;

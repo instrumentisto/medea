@@ -13,7 +13,6 @@ use crate::{
 /// Errors that may occur in [`Heartbeat`].
 #[derive(Debug, Display, From, JsCaused)]
 #[allow(clippy::module_name_repetitions)]
-#[js_error(JsError)]
 pub enum HeartbeatError {
     /// Occurs when `ping` cannot be send because no socket.
     #[display(fmt = "unable to ping: no socket")]
@@ -25,7 +24,7 @@ pub enum HeartbeatError {
 
     /// Occurs when socket failed to send `ping`.
     #[display(fmt = "failed to send ping: {}", _0)]
-    SendPing(#[js_cause] SocketError),
+    SendPing(#[js(cause)] SocketError),
 }
 
 type Result<T> = std::result::Result<T, Traced<HeartbeatError>>;

@@ -121,7 +121,6 @@ pub enum SdpType {
 ///
 /// [1]: https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection.
 #[derive(Debug, Display, JsCaused)]
-#[js_error(JsError)]
 pub enum RTCPeerConnectionError {
     /// Occurs when cannot adds new remote candidate to the
     /// [RTCPeerConnection][1]'s remote description.

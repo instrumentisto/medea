@@ -25,14 +25,13 @@ use crate::{
         PeerRepository,
     },
     rpc::{RpcClient, RpcClientError},
-    utils::{Callback, JasonError, JsCaused},
+    utils::{Callback, JasonError, JsCaused, JsError},
 };
 
 use super::{connection::Connection, ConnectionHandle};
 
 /// Errors that may occur in a [`Room`].
 #[derive(Debug, Display, JsCaused)]
-#[js_error(crate::utils::JsError)]
 enum RoomError {
     /// Returned if the `on_failed_local_stream` callback was not set before
     /// joining the room.
@@ -41,17 +40,17 @@ enum RoomError {
 
     /// Returned if [`RpcClient`] was unable to connect to RPC server.
     #[display(fmt = "Unable to connect RPC server: {}", _0)]
-    CouldNotConnectToServer(#[js_cause] RpcClientError),
+    CouldNotConnectToServer(#[js(cause)] RpcClientError),
 
     /// Returned if the previously added local media stream does not satisfy
     /// the tracks sent from the media server.
     #[display(fmt = "Invalid local stream: {}", _0)]
-    InvalidLocalStream(#[js_cause] PeerError),
+    InvalidLocalStream(#[js(cause)] PeerError),
 
     /// Returned if [`PeerConnection`] cannot receive the local stream from
     /// [`MediaManager`].
     #[display(fmt = "Failed to get local stream: {}", _0)]
-    CouldNotGetLocalMedia(#[js_cause] PeerError),
+    CouldNotGetLocalMedia(#[js(cause)] PeerError),
 
     /// Returned if the requested [`PeerConnection`] is not found.
     #[display(fmt = "Peer with id {} doesnt exist", _0)]
@@ -60,7 +59,7 @@ enum RoomError {
     /// Returned if an error occurred during the webrtc signaling process
     /// with remote peer.
     #[display(fmt = "Some PeerConnection error: {}", _0)]
-    PeerConnectionError(#[js_cause] PeerError),
+    PeerConnectionError(#[js(cause)] PeerError),
 
     /// Returned if was received event [`PeerEvent::NewRemoteStream`] without
     /// [`Connection`] with remote [`Member`].
@@ -165,10 +164,10 @@ impl RoomHandle {
     ///   - `on_failed_local_stream` callback is not set
     ///   - unable to connect to media server.
     ///
-    /// Effectively returns `Result<(), js_sys::Error>`.
+    /// Effectively returns `Result<(), JasonError>`.
     pub fn join(&self, token: String) -> Promise {
         future_to_promise(self.inner_join(token).map(|result| {
-            result.map(|_| JsValue::null()).map_err(|err| err.into())
+            result.map(|_| JsValue::null()).map_err(Into::into)
         }))
     }
 

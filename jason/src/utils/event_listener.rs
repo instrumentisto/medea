@@ -12,7 +12,6 @@ use crate::utils::{errors::JsCaused, JsError};
 /// [1]: https://developer.mozilla.org/en-US/docs/Web/API/EventTarget
 #[allow(clippy::module_name_repetitions)]
 #[derive(Debug, Display, From, JsCaused)]
-#[js_error(JsError)]
 pub struct EventListenerBindError(JsError);
 
 /// Wrapper for closure that handles some [`EventTarget`] event.

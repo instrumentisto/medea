@@ -11,7 +11,7 @@ use js_sys::Date;
 use medea_client_api_proto::{ClientMsg, Command, Event, ServerMsg};
 use tracerr::Traced;
 
-use crate::utils::{JasonError, JsCaused};
+use crate::utils::{JasonError, JsCaused, JsError};
 
 use self::{
     heartbeat::{Heartbeat, HeartbeatError},
@@ -29,16 +29,15 @@ pub enum CloseMsg {
 /// Errors that may occur in [`RpcClient`].
 #[derive(Debug, Display, From, JsCaused)]
 #[allow(clippy::module_name_repetitions)]
-#[js_error(crate::utils::JsError)]
 pub enum RpcClientError {
     /// Occurs if new WebSocket connection to remote media server cannot
     /// be established.
     #[display(fmt = "Connection establishment failed: {}", _0)]
-    RpcTransportError(#[js_cause] SocketError),
+    RpcTransportError(#[js(cause)] SocketError),
 
     /// Occurs if the heartbeat cannot be started.
     #[display(fmt = "Start heartbeat failed: {}", _0)]
-    CouldNotStartHeartbeat(#[js_cause] HeartbeatError),
+    CouldNotStartHeartbeat(#[js(cause)] HeartbeatError),
 }
 
 // TODO: consider using async-trait crate, it doesnt work with mockall atm
