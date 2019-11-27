@@ -1,20 +1,28 @@
 #![cfg(target_arch = "wasm32")]
 
-/// Makes eq assertion and if it fails, sends error to provided tx.
-///
-/// Panics if send operation fails.
-/// `$test_tx` - [`oneshot::Sender`] to which comparison error will be sent
-///
-/// `$a` - left item of comparision
-///
-/// `$b` - right item of comparision
 macro_rules! callback_assert_eq {
-    ($tx:tt, $a:expr, $b:expr) => {
+    ($a:expr, $b:expr) => {
         if $a != $b {
-            $tx.send(Err(format!("{} != {}", $a, $b))).unwrap();
-            return;
+            return Err(format!("{} != {}", $a, $b));
         }
     };
+}
+
+macro_rules! callback_test {
+    (|$($arg_name:ident: $arg_type:ty),*| $body:block) => {{
+        let (test_tx, test_rx) = futures::channel::oneshot::channel();
+        let closure = wasm_bindgen::closure::Closure::once_into_js(
+            move |$($arg_name: $arg_type),*| {
+                let test_fn = || {
+                    $body;
+                    Ok(())
+                };
+                test_tx.send((test_fn)()).unwrap();
+            }
+        );
+
+        (closure, test_rx)
+    }}
 }
 
 mod api;

@@ -54,6 +54,7 @@ async fn message_received_from_transport_is_transmitted_to_sub() {
     transport
         .expect_on_close()
         .return_once(|| Ok(future::pending().boxed()));
+    transport.expect_set_close_reason().return_const(());
 
     let ws = WebSocketRpcClient::new(10);
 
@@ -80,6 +81,7 @@ async fn heartbeat() {
     transport
         .expect_on_close()
         .return_once(move || Ok(future::pending().boxed()));
+    transport.expect_set_close_reason().return_const(());
 
     let counter = Arc::new(AtomicU64::new(1));
     let counter_clone = counter.clone();
@@ -160,6 +162,7 @@ async fn transport_is_dropped_when_client_is_dropped() {
         .expect_on_close()
         .return_once(move || Ok(future::pending().boxed()));
     transport.expect_send().return_once(|_| Ok(()));
+    transport.expect_set_close_reason().return_const(());
     let rpc_transport = Rc::new(transport);
 
     let ws = WebSocketRpcClient::new(500);
@@ -196,6 +199,7 @@ async fn send_goes_to_transport() {
         on_send_tx.unbounded_send(e.clone()).unwrap();
         Ok(())
     });
+    transport.expect_set_close_reason().return_const(());
 
     let ws = WebSocketRpcClient::new(500);
     ws.connect(Rc::new(transport)).await.unwrap();

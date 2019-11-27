@@ -47,6 +47,7 @@ fn get_test_room_and_exist_peer(
         .times(count_gets_peer)
         .returning_st(move || vec![Rc::clone(&peer_clone)]);
     rpc.expect_unsub().return_const(());
+    rpc.expect_set_close_reason().return_const(());
 
     let room = Room::new(Rc::new(rpc), repo);
     (room, peer)
@@ -122,6 +123,7 @@ fn get_test_room_and_new_peer(
         .return_once_st(move |_, _, _, _, _| Ok(peer_clone));
     rpc.expect_send_command().return_const(());
     rpc.expect_unsub().return_const(());
+    rpc.expect_set_close_reason().return_const(());
 
     let room = Room::new(Rc::new(rpc), repo);
     (room, peer)
@@ -187,15 +189,12 @@ async fn error_inject_invalid_local_stream_into_new_peer() {
     let (room, _peer) = get_test_room_and_new_peer(event_rx, true, true);
 
     let room_handle = room.new_handle();
-    let (test_tx, test_rx) = oneshot::channel();
-    let cb = Closure::once_into_js(move |err: js_sys::Error| {
+    let (cb, test_rx) = callback_test!(|err: js_sys::Error| {
         callback_assert_eq!(
-            test_tx,
             err.to_string().as_string().unwrap(),
             "Error: provided MediaStream was expected to have single video \
-             tracks"
+             track"
         );
-        test_tx.send(Ok(())).unwrap();
     });
     room_handle.on_failed_local_stream(cb.into()).unwrap();
 
@@ -232,15 +231,12 @@ async fn error_inject_invalid_local_stream_into_new_peer() {
 //     1. Invoking `on_failed_local_stream` callback.
 #[wasm_bindgen_test]
 async fn error_inject_invalid_local_stream_into_room_on_exists_peer() {
-    let (test_tx, test_rx) = oneshot::channel();
-    let cb = Closure::once_into_js(move |err: js_sys::Error| {
+    let (cb, test_rx) = callback_test!(|err: js_sys::Error| {
         callback_assert_eq!(
-            test_tx,
             err.to_string().as_string().unwrap(),
             "Error: provided MediaStream was expected to have single video \
              track"
         );
-        test_tx.send(Ok(())).unwrap();
     });
     let (room, peer) = get_test_room_and_exist_peer(1);
     let (audio_track, video_track) = get_test_tracks();
@@ -266,15 +262,14 @@ async fn error_get_local_stream_on_new_peer() {
     let (room, _peer) = get_test_room_and_new_peer(event_rx, true, true);
 
     let room_handle = room.new_handle();
-    let (test_tx, test_rx) = oneshot::channel();
-    let cb = Closure::once_into_js(move |err: js_sys::Error| {
+
+    let (cb, test_rx) = callback_test!(|err: js_sys::Error| {
         callback_assert_eq!(
-            test_tx,
             err.to_string().as_string().unwrap(),
             "Error: MediaDevices.getUserMedia() failed: some error"
         );
-        test_tx.send(Ok(())).unwrap();
     });
+
     room_handle.on_failed_local_stream(cb.into()).unwrap();
 
     let mock_navigator = MockNavigator::new();
@@ -308,6 +303,7 @@ async fn error_join_room_without_failed_stream_callback() {
     rpc.expect_subscribe()
         .return_once(move || Box::pin(event_rx));
     rpc.expect_unsub().return_const(());
+    rpc.expect_set_close_reason().return_const(());
     let repo = Box::new(MockPeerRepository::new());
     let room = Room::new(Rc::new(rpc), repo);
 
@@ -365,6 +361,7 @@ mod on_close_callback {
             .return_once(move || Box::pin(event_rx));
         rpc.expect_send_command().return_const(());
         rpc.expect_unsub().return_const(());
+        rpc.expect_set_close_reason().return_const(());
 
         Room::new(Rc::new(rpc), repo)
     }
@@ -383,27 +380,12 @@ mod on_close_callback {
         let room = get_room();
         let mut room_handle = room.new_handle();
 
-        let (test_tx, test_rx) = oneshot::channel();
-        room_handle
-            .on_close(
-                Closure::once_into_js(move |closed: JsValue| {
-                    callback_assert_eq!(
-                        test_tx,
-                        get_reason(&closed),
-                        "Finished"
-                    );
-                    callback_assert_eq!(
-                        test_tx,
-                        get_is_closed_by_server(&closed),
-                        true
-                    );
-                    callback_assert_eq!(test_tx, get_is_err(&closed), false);
-
-                    test_tx.send(Ok(())).unwrap();
-                })
-                .into(),
-            )
-            .unwrap();
+        let (cb, test_rx) = callback_test!(|closed: JsValue| {
+            callback_assert_eq!(get_reason(&closed), "Finished");
+            callback_assert_eq!(get_is_closed_by_server(&closed), true);
+            callback_assert_eq!(get_is_err(&closed), false);
+        });
+        room_handle.on_close(cb.into()).unwrap();
 
         room.close(CloseReason::ByServer(CloseByServerReason::Finished));
         wait_and_check_test_result(test_rx).await;
@@ -426,27 +408,12 @@ mod on_close_callback {
         let room = get_room();
         let mut room_handle = room.new_handle();
 
-        let (test_tx, test_rx) = oneshot::channel();
-        room_handle
-            .on_close(
-                Closure::once_into_js(move |closed: JsValue| {
-                    callback_assert_eq!(
-                        test_tx,
-                        get_reason(&closed),
-                        "RoomUnexpectedlyDropped"
-                    );
-                    callback_assert_eq!(test_tx, get_is_err(&closed), true);
-                    callback_assert_eq!(
-                        test_tx,
-                        get_is_closed_by_server(&closed),
-                        false
-                    );
-
-                    test_tx.send(Ok(())).unwrap();
-                })
-                .into(),
-            )
-            .unwrap();
+        let (cb, test_rx) = callback_test!(|closed: JsValue| {
+            callback_assert_eq!(get_reason(&closed), "RoomUnexpectedlyDropped");
+            callback_assert_eq!(get_is_err(&closed), true);
+            callback_assert_eq!(get_is_closed_by_server(&closed), false);
+        });
+        room_handle.on_close(cb.into()).unwrap();
 
         std::mem::drop(room);
         wait_and_check_test_result(test_rx).await;
@@ -466,27 +433,12 @@ mod on_close_callback {
         let room = get_room();
         let mut room_handle = room.new_handle();
 
-        let (test_tx, test_rx) = oneshot::channel();
-        room_handle
-            .on_close(
-                Closure::once_into_js(move |closed: JsValue| {
-                    callback_assert_eq!(
-                        test_tx,
-                        get_reason(&closed),
-                        "RoomUnexpectedlyDropped"
-                    );
-                    callback_assert_eq!(test_tx, get_is_err(&closed), false);
-                    callback_assert_eq!(
-                        test_tx,
-                        get_is_closed_by_server(&closed),
-                        false
-                    );
-
-                    test_tx.send(Ok(())).unwrap();
-                })
-                .into(),
-            )
-            .unwrap();
+        let (cb, test_rx) = callback_test!(|closed: JsValue| {
+            callback_assert_eq!(get_reason(&closed), "RoomUnexpectedlyDropped");
+            callback_assert_eq!(get_is_err(&closed), false);
+            callback_assert_eq!(get_is_closed_by_server(&closed), false);
+        });
+        room_handle.on_close(cb.into()).unwrap();
 
         room.close(CloseReason::ByClient {
             reason: ClientDisconnect::RoomUnexpectedlyDropped,
