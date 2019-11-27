@@ -2,6 +2,8 @@
 
 #[macro_use]
 mod errors;
+#[macro_use]
+mod log;
 
 mod callback;
 mod event_listener;

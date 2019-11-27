@@ -15,7 +15,7 @@ use thiserror::*;
 use web_sys::{CloseEvent, Event, MessageEvent, WebSocket as SysWebSocket};
 
 use crate::{
-    rpc::{ClientDisconnect, CloseMsg, RpcTransport},
+    rpc::{on_close, ClientDisconnect, CloseMsg, RpcTransport},
     utils::{EventListener, WasmErr},
 };
 
@@ -291,6 +291,7 @@ impl WebSocketRpcTransport {
 
 impl Drop for WebSocketRpcTransport {
     fn drop(&mut self) {
+        debug!("Dropping WebSocketRpcTransport.");
         let mut inner = self.0.borrow_mut();
         if inner.socket_state.can_close() {
             inner.on_open.take();

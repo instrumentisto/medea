@@ -198,6 +198,8 @@ struct Inner {
     ///
     /// This reason will be provided to underlying [`RpcTransport`].
     close_reason: ClientDisconnect,
+
+    is_closed: bool,
 }
 
 impl Inner {
@@ -208,6 +210,7 @@ impl Inner {
             subs: vec![],
             heartbeat: Heartbeat::new(heartbeat_interval),
             close_reason: ClientDisconnect::RpcClientUnexpectedlyDropped,
+            is_closed: false,
         }))
     }
 }
@@ -315,10 +318,12 @@ impl RpcClient for WebSocketRpcClient {
                 match on_socket_close.await {
                     Ok(msg) => on_close(&inner_rc, &msg),
                     Err(e) => {
-                        console_error!(format!(
-                            "RPC socket was unexpectedly dropped. {:?}",
-                            e
-                        ));
+                        if !inner_rc.borrow().is_closed {
+                            console_error!(format!(
+                                "RPC socket was unexpectedly dropped. {:?}",
+                                e
+                            ));
+                        }
                     }
                 }
             });
@@ -362,6 +367,7 @@ impl RpcClient for WebSocketRpcClient {
     fn on_close(
         &self,
     ) -> LocalBoxFuture<'static, Result<CloseReason, oneshot::Canceled>> {
+        debug!("Set on_close for RpcClient.");
         let (tx, rx) = oneshot::channel();
         self.0.borrow_mut().on_close_subscribers.push(tx);
         Box::pin(rx)
@@ -377,8 +383,11 @@ impl RpcClient for WebSocketRpcClient {
 impl Drop for WebSocketRpcClient {
     /// Drops related connection and its [`Heartbeat`].
     fn drop(&mut self) {
+        debug!("Closing WebSocketRpcClient.");
+        self.0.borrow_mut().is_closed = true;
         let mut inner = self.0.borrow_mut();
         if let Some(socket) = inner.sock.take() {
+            debug!("Set close reason for RpcTransport.");
             socket.set_close_reason(inner.close_reason.clone());
         }
         inner.heartbeat.stop();
