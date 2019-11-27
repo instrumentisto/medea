@@ -262,6 +262,7 @@ window.onload = async function() {
   };
 
   async function newRoom() {
+    jason = new rust.Jason();
     room = await jason.init_room();
 
     try {
@@ -292,9 +293,9 @@ window.onload = async function() {
     });
 
     room.on_close(function (on_closed) {
-      let videos = document.getElementsByClassName('video');
-      for (let el of videos) {
-        el.parentNode.removeChild(el);
+      let videos = document.getElementsByClassName('remote-videos')[0];
+      while (videos.firstChild) {
+        videos.firstChild.remove();
       }
       room = newRoom();
       contentVisibility.show(connectBtnsDiv);
