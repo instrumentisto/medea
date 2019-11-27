@@ -4,7 +4,7 @@ use medea_client_api_proto::IceServer;
 use thiserror::*;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
-    RtcConfiguration, RtcIceCandidateInit,
+    Event, RtcConfiguration, RtcIceCandidateInit, RtcIceConnectionState,
     RtcPeerConnection as SysRtcPeerConnection, RtcPeerConnectionIceEvent,
     RtcRtpTransceiver, RtcRtpTransceiverDirection, RtcRtpTransceiverInit,
     RtcSdpType, RtcSessionDescription, RtcSessionDescriptionInit,
@@ -133,6 +133,8 @@ pub enum Error {
     SetHandlerIceEvent(WasmErr),
     #[error("failed to set handler for RtcTrackEvent: {0}")]
     SetHandlerTrackEvent(WasmErr),
+    #[error("failed to set handler for IceConnectionStateChange event: {0}")]
+    SetHandlerIceConnectionStateChangeEvent(WasmErr),
     #[error("failed to set local SDP description: {0}")]
     SetLocalDescription(WasmErr),
     #[error("failed to set remote SDP description: {0}")]
@@ -159,6 +161,15 @@ pub struct RtcPeerConnection {
     on_ice_candidate: RefCell<
         Option<EventListener<SysRtcPeerConnection, RtcPeerConnectionIceEvent>>,
     >,
+
+    /// [`iceconnectionstatechange`][2] callback of [RTCPeerConnection][1],
+    /// fires whenever [ICE connection state][3] changes.
+    ///
+    /// [1]: https://w3.org/TR/webrtc/#rtcpeerconnection-interface
+    /// [2]: https://w3.org/TR/webrtc/#event-iceconnectionstatechange
+    /// [3]: https://w3.org/TR/webrtc/#dfn-ice-connection-state
+    on_ice_connection_state_changed:
+        RefCell<Option<EventListener<SysRtcPeerConnection, Event>>>,
 
     /// [`ontrack`][2] callback of [RTCPeerConnection][1] to handle
     /// [`track`][3] event. It fires when [RTCPeerConnection][1] receives
@@ -188,6 +199,7 @@ impl RtcPeerConnection {
         Ok(Self {
             peer: Rc::new(peer),
             on_ice_candidate: RefCell::new(None),
+            on_ice_connection_state_changed: RefCell::new(None),
             on_track: RefCell::new(None),
         })
     }
@@ -256,6 +268,39 @@ impl RtcPeerConnection {
                         },
                     )
                     .map_err(Error::SetHandlerIceEvent)?,
+                );
+            }
+        }
+        Ok(())
+    }
+
+    /// Sets handler for [`iceconnectionstatechange`][1] event.
+    ///
+    /// [1]: https://www.w3.org/TR/webrtc/#event-iceconnectionstatechange
+    pub fn on_ice_connection_state_change<F>(
+        &self,
+        f: Option<F>,
+    ) -> Result<(), Error>
+    where
+        F: 'static + FnMut(RtcIceConnectionState),
+    {
+        let mut on_ice_connection_state_changed =
+            self.on_ice_connection_state_changed.borrow_mut();
+        match f {
+            None => {
+                on_ice_connection_state_changed.take();
+            }
+            Some(mut f) => {
+                let peer = Rc::clone(&self.peer);
+                on_ice_connection_state_changed.replace(
+                    EventListener::new_mut(
+                        Rc::clone(&self.peer),
+                        "iceconnectionstatechange",
+                        move |_| {
+                            f(peer.ice_connection_state());
+                        },
+                    )
+                    .map_err(Error::SetHandlerIceConnectionStateChangeEvent)?,
                 );
             }
         }
@@ -425,6 +470,7 @@ impl Drop for RtcPeerConnection {
     fn drop(&mut self) {
         self.on_track.borrow_mut().take();
         self.on_ice_candidate.borrow_mut().take();
+        self.on_ice_connection_state_changed.borrow_mut().take();
         self.peer.close();
     }
 }
