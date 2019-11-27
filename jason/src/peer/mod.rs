@@ -219,8 +219,8 @@ impl PeerConnection {
         });
     }
 
-    /// Handle `icecandidate` event from underlying peer emitting
-    /// [`PeerEvent::IceCandidateDiscovered`] event into this peers
+    /// Handle `iceconnectionstatechange` event from underlying peer emitting
+    /// [`PeerEvent::IceConnectionStateChanged`] event into this peers
     /// `peer_events_sender`.
     fn on_ice_connection_state_changed(
         peer_id: Id,

@@ -133,6 +133,8 @@ pub enum Error {
     SetHandlerIceEvent(WasmErr),
     #[error("failed to set handler for RtcTrackEvent: {0}")]
     SetHandlerTrackEvent(WasmErr),
+    #[error("failed to set handler for IceConnectionStateChange event: {0}")]
+    SetHandlerIceConnectionStateChangeEvent(WasmErr),
     #[error("failed to set local SDP description: {0}")]
     SetLocalDescription(WasmErr),
     #[error("failed to set remote SDP description: {0}")]
@@ -298,7 +300,7 @@ impl RtcPeerConnection {
                             f(peer.ice_connection_state());
                         },
                     )
-                    .map_err(Error::SetHandlerIceEvent)?,
+                    .map_err(Error::SetHandlerIceConnectionStateChangeEvent)?,
                 );
             }
         }

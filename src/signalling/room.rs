@@ -877,13 +877,12 @@ impl CommandHandler for Room {
         )))
     }
 
-    /// Logs received metric.
+    /// Does nothing atm.
     fn on_add_peer_connection_metrics(
         &mut self,
         _peer_id: PeerId,
         _candidate: PeerMetrics,
     ) -> Self::Output {
-        debug!("");
         Ok(Box::new(wrap_future(future::ok(()))))
     }
 }
