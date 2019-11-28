@@ -24,7 +24,7 @@ use crate::{
         MediaStream, MediaStreamHandle, PeerError, PeerEvent, PeerEventHandler,
         PeerRepository,
     },
-    rpc::{RpcClient, RpcClientError, WebSocketRpcTransport},
+    rpc::{RpcClient, RpcClientError, TransportError, WebSocketRpcTransport},
     utils::{Callback, JasonError, JsCaused, JsError},
 };
 
@@ -37,6 +37,10 @@ enum RoomError {
     /// joining the room.
     #[display(fmt = "`on_failed_local_stream` callback is not set")]
     CallbackNotSet,
+
+    /// Returned if unable to init [`RpcTransport`].
+    #[display(fmt = "Unable to init RPC transport: {}", _0)]
+    InitRpcTransportFailed(#[js(cause)] TransportError),
 
     /// Returned if [`RpcClient`] was unable to connect to RPC server.
     #[display(fmt = "Unable to connect RPC server: {}", _0)]
@@ -70,6 +74,12 @@ enum RoomError {
 impl From<RpcClientError> for RoomError {
     fn from(err: RpcClientError) -> Self {
         Self::CouldNotConnectToServer(err)
+    }
+}
+
+impl From<TransportError> for RoomError {
+    fn from(err: TransportError) -> Self {
+        Self::InitRpcTransportFailed(err)
     }
 }
 
@@ -170,9 +180,11 @@ impl RoomHandle {
     ///
     /// Effectively returns `Result<(), JasonError>`.
     pub fn join(&self, token: String) -> Promise {
-        future_to_promise(self.inner_join(token).map(|result| {
-            result.map(|_| JsValue::null()).map_err(Into::into)
-        }))
+        future_to_promise(
+            self.inner_join(token).map(|result| {
+                result.map(|_| JsValue::null()).map_err(Into::into)
+            }),
+        )
     }
 
     /// Injects local media stream for all created and new [`PeerConnection`]s

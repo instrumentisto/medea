@@ -216,15 +216,15 @@ impl PeerConnection {
         // Bind to `iceconnectionstatechange` event.
         let id = peer.id;
         let sender = peer.peer_events_sender.clone();
-        peer.peer.on_ice_connection_state_change(Some(
-            move |ice_connection_state| {
+        peer.peer
+            .on_ice_connection_state_change(Some(move |ice_connection_state| {
                 Self::on_ice_connection_state_changed(
                     id,
                     &sender,
                     ice_connection_state,
                 );
-            },
-        ))?;
+            }))
+            .map_err(tracerr::map_from_and_wrap!())?;
 
         // Bind to `track` event.
         let id = peer.id;

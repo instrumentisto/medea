@@ -23,7 +23,7 @@ use crate::{
 
 /// Errors that may occur when working with [`WebSocket`].
 #[derive(Debug, Display, JsCaused)]
-pub enum SocketError {
+pub enum TransportError {
     /// Occurs when the port to which the connection is being attempted
     /// is being blocked.
     #[display(fmt = "Failed to create WebSocket: {}", _0)]
@@ -59,13 +59,13 @@ pub enum SocketError {
     ClosedSocket,
 }
 
-impl From<EventListenerBindError> for SocketError {
+impl From<EventListenerBindError> for TransportError {
     fn from(err: EventListenerBindError) -> Self {
         Self::WebSocketEventBindError(err)
     }
 }
 
-type Result<T> = std::result::Result<T, Traced<SocketError>>;
+type Result<T, E = Traced<TransportError>> = std::result::Result<T, E>;
 
 /// State of websocket.
 #[derive(Debug)]
@@ -87,7 +87,7 @@ impl State {
 }
 
 impl TryFrom<u16> for State {
-    type Error = SocketError;
+    type Error = TransportError;
 
     fn try_from(value: u16) -> std::result::Result<Self, Self::Error> {
         match value {
@@ -116,7 +116,7 @@ impl InnerSocket {
     fn new(url: &str) -> Result<Self> {
         let socket = SysWebSocket::new(url)
             .map_err(Into::into)
-            .map_err(SocketError::CreateSocket)
+            .map_err(TransportError::CreateSocket)
             .map_err(tracerr::wrap!())?;
         Ok(Self {
             socket_state: State::CONNECTING,
@@ -141,9 +141,7 @@ impl InnerSocket {
 }
 
 impl RpcTransport for WebSocketRpcTransport {
-    fn on_message(
-        &self,
-    ) -> Result<LocalBoxStream<'static, Result<ServerMsg, Error>>, Error> {
+    fn on_message(&self) -> Result<LocalBoxStream<'static, Result<ServerMsg>>> {
         let (tx, rx) = mpsc::unbounded();
         let mut inner_mut = self.0.borrow_mut();
         inner_mut.on_message = Some(
@@ -151,7 +149,9 @@ impl RpcTransport for WebSocketRpcTransport {
                 Rc::clone(&inner_mut.socket),
                 "message",
                 move |msg| {
-                    let parsed = ServerMessage::try_from(&msg).map(Into::into);
+                    let parsed = ServerMessage::try_from(&msg)
+                        .map(Into::into)
+                        .map_err(tracerr::wrap!());
                     tx.unbounded_send(parsed).unwrap_or_else(|e| {
                         console_error!(format!(
                             "WebSocket's 'on_message' callback receiver \
@@ -161,17 +161,15 @@ impl RpcTransport for WebSocketRpcTransport {
                     });
                 },
             )
-            .map_err(tracerr::map_from_and_wrap!(=> SocketError))?,
+            .map_err(tracerr::map_from_and_wrap!(=> TransportError))?,
         );
         Ok(Box::pin(rx))
     }
 
     fn on_close(
         &self,
-    ) -> Result<
-        LocalBoxFuture<'static, Result<CloseMsg, oneshot::Canceled>>,
-        Error,
-    > {
+    ) -> Result<LocalBoxFuture<'static, Result<CloseMsg, oneshot::Canceled>>>
+    {
         let (tx, rx) = oneshot::channel();
         let mut inner_mut = self.0.borrow_mut();
         let inner = Rc::clone(&self.0);
@@ -190,15 +188,15 @@ impl RpcTransport for WebSocketRpcTransport {
                     });
                 },
             )
-            .map_err(tracerr::map_from_and_wrap!(=> SocketError))?,
+            .map_err(tracerr::map_from_and_wrap!(=> TransportError))?,
         );
         Ok(Box::pin(rx))
     }
 
-    fn send(&self, msg: &ClientMsg) -> Result<(), Error> {
+    fn send(&self, msg: &ClientMsg) -> Result<()> {
         let inner = self.0.borrow();
         let message = serde_json::to_string(msg)
-            .map_err(SocketError::ParseClientMessage)
+            .map_err(TransportError::ParseClientMessage)
             .map_err(tracerr::wrap!())?;
 
         match inner.socket_state {
@@ -206,8 +204,9 @@ impl RpcTransport for WebSocketRpcTransport {
                 .socket
                 .send_with_str(&message)
                 .map_err(Into::into)
-                .map_err(Error::SendMessage),
-            _ => Err(tracerr::new!(SocketError::ClosedSocket)),
+                .map_err(TransportError::SendMessage)
+                .map_err(tracerr::wrap!()),
+            _ => Err(tracerr::new!(TransportError::ClosedSocket)),
         }
     }
 }
@@ -234,7 +233,7 @@ impl WebSocketRpcTransport {
                         let _ = tx_close.send(());
                     },
                 )
-                .map_err(tracerr::map_from_and_wrap!(=> SocketError))?,
+                .map_err(tracerr::map_from_and_wrap!())?,
             );
 
             let inner = Rc::clone(&socket);
@@ -247,7 +246,7 @@ impl WebSocketRpcTransport {
                         let _ = tx_open.send(());
                     },
                 )
-                .map_err(tracerr::map_from_and_wrap!(=> SocketError))?,
+                .map_err(tracerr::map_from_and_wrap!(=> TransportError))?,
             );
         }
 
@@ -259,10 +258,10 @@ impl WebSocketRpcTransport {
         match state {
             future::Either::Left((opened, _)) => match opened {
                 Ok(_) => Ok(Self(socket)),
-                Err(_) => Err(tracerr::new!(SocketError::InitSocket)),
+                Err(_) => Err(tracerr::new!(TransportError::InitSocket)),
             },
             future::Either::Right(_closed) => {
-                Err(tracerr::new!(SocketError::InitSocket))
+                Err(tracerr::new!(TransportError::InitSocket))
             }
         }
     }
@@ -305,10 +304,10 @@ impl From<&CloseEvent> for CloseMsg {
 pub struct ServerMessage(ServerMsg);
 
 impl TryFrom<&MessageEvent> for ServerMessage {
-    type Error = SocketError;
+    type Error = TransportError;
 
     fn try_from(msg: &MessageEvent) -> std::result::Result<Self, Self::Error> {
-        use SocketError::*;
+        use TransportError::*;
         let payload = msg.data().as_string().ok_or(MessageNotString)?;
 
         serde_json::from_str::<ServerMsg>(&payload)

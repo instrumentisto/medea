@@ -304,10 +304,7 @@ impl RtcPeerConnection {
     /// Sets handler for [`iceconnectionstatechange`][1] event.
     ///
     /// [1]: https://www.w3.org/TR/webrtc/#event-iceconnectionstatechange
-    pub fn on_ice_connection_state_change<F>(
-        &self,
-        f: Option<F>,
-    ) -> Result<()>
+    pub fn on_ice_connection_state_change<F>(&self, f: Option<F>) -> Result<()>
     where
         F: 'static + FnMut(RtcIceConnectionState),
     {
