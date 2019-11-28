@@ -150,7 +150,7 @@ fn on_message(
         Err(err) => {
             // TODO: protocol versions mismatch? should drop
             //       connection if so
-            JasonError::from(err.into_parts()).print();
+            JasonError::from(err).print();
         }
     }
 }

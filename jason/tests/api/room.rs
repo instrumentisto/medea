@@ -4,8 +4,7 @@ use std::rc::Rc;
 
 use futures::{
     channel::{mpsc, oneshot},
-    future::{pending, ready, Either, FutureExt as _},
-    stream::{once, StreamExt},
+    future::Either,
 };
 use medea_client_api_proto::{Event, IceServer, PeerId};
 use medea_jason::{
@@ -15,7 +14,6 @@ use medea_jason::{
     rpc::MockRpcClient,
     utils::JasonError,
 };
-use mockall::predicate::*;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_test::*;
 
@@ -374,30 +372,3 @@ async fn error_join_room_without_failed_stream_callback() {
         }
     }
 }
-
-// Unable mock [`RpcTransport`].
-//
-//// Invoke RoomHandle::inner_join and make sure that it tried to connect
-//// RpcClient with provided token if `on_failed_local_stream` is set.
-//#[wasm_bindgen_test]
-// async fn join_room_connects_rpc_client() {
-//    let mut rpc = MockRpcClient::new();
-//
-//    rpc.expect_connect()
-//        .with(eq(String::from("token")))
-//        .return_once(|_| ready(Ok(())).boxed_local());
-//    rpc.expect_subscribe()
-//        .return_once(|| once(pending()).boxed());
-//    rpc.expect_unsub().return_const(());
-//
-//    let room = Room::new(Rc::new(rpc), Box::new(MockPeerRepository::new()));
-//    let room_handle = room.new_handle();
-//
-//    room_handle
-//        .on_failed_local_stream(
-//            Closure::once_into_js(|_: JasonError| {}).into(),
-//        )
-//        .unwrap();
-//
-//    room_handle.inner_join(String::from("token")).await.unwrap();
-//}

@@ -116,22 +116,20 @@ impl RoomHandle {
             let inner = inner?;
 
             if !inner.borrow().on_failed_local_stream.is_set() {
-                return Err(JasonError::from(
-                    tracerr::new!(RoomError::CallbackNotSet).into_parts(),
-                ));
+                return Err(JasonError::from(tracerr::new!(
+                    RoomError::CallbackNotSet
+                )));
             }
 
             let websocket = WebSocketRpcTransport::new(&token)
                 .await
-                .map_err(tracerr::map_from_and_wrap!(=> RoomError))
-                .map_err(|err| JasonError::from(err.into_parts()))?;
+                .map_err(tracerr::map_from_and_wrap!(=> RoomError))?;
             inner
                 .borrow()
                 .rpc
                 .connect(Rc::new(websocket))
                 .await
-                .map_err(tracerr::map_from_and_wrap!(=> RoomError))
-                .map_err(|err| JasonError::from(err.into_parts()))?;
+                .map_err(tracerr::map_from_and_wrap!(=> RoomError))?;
 
             Ok(())
         }
@@ -410,7 +408,7 @@ impl InnerRoom {
                     .await
                     .map_err(tracerr::map_from_and_wrap!(=> RoomError))
                 {
-                    error_callback.call(JasonError::from(err.into_parts()));
+                    error_callback.call(JasonError::from(err));
                 }
             }
         });
@@ -447,7 +445,7 @@ impl EventHandler for InnerRoom {
         {
             Ok(peer) => peer,
             Err(err) => {
-                JasonError::from(err.into_parts()).print();
+                JasonError::from(err).print();
                 return;
             }
         };
@@ -515,15 +513,13 @@ impl EventHandler for InnerRoom {
                     .await
                     .map_err(tracerr::map_from_and_wrap!(=> RoomError))
                 {
-                    JasonError::from(err.into_parts()).print()
+                    JasonError::from(err).print()
                 }
             });
         } else {
             // TODO: No peer, whats next?
-            JasonError::from(
-                tracerr::new!(RoomError::NoSuchPeer(peer_id)).into_parts(),
-            )
-            .print();
+            JasonError::from(tracerr::new!(RoomError::NoSuchPeer(peer_id)))
+                .print();
         }
     }
 
@@ -544,15 +540,13 @@ impl EventHandler for InnerRoom {
                     .await
                     .map_err(tracerr::map_from_and_wrap!(=> RoomError));
                 if let Err(err) = add {
-                    JasonError::from(err.into_parts()).print();
+                    JasonError::from(err).print();
                 }
             });
         } else {
             // TODO: No peer, whats next?
-            JasonError::from(
-                tracerr::new!(RoomError::NoSuchPeer(peer_id)).into_parts(),
-            )
-            .print()
+            JasonError::from(tracerr::new!(RoomError::NoSuchPeer(peer_id)))
+                .print()
         }
     }
 
@@ -598,10 +592,10 @@ impl PeerEventHandler for InnerRoom {
     ) {
         match self.connections.get(&sender_id) {
             Some(conn) => conn.on_remote_stream(remote_stream.new_handle()),
-            None => JasonError::from(
-                tracerr::new!(RoomError::UnknownRemotePeer).into_parts(),
-            )
-            .print(),
+            None => {
+                JasonError::from(tracerr::new!(RoomError::UnknownRemotePeer))
+                    .print()
+            }
         }
     }
 

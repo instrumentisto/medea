@@ -4,7 +4,7 @@ use std::{
 };
 
 use derive_more::Display;
-use tracerr::Trace;
+use tracerr::{Trace, Traced};
 use wasm_bindgen::{prelude::*, JsCast};
 
 pub use medea_macro::JsCaused;
@@ -125,6 +125,15 @@ where
             trace,
             source: err.js_cause().map(Into::into),
         }
+    }
+}
+
+impl<E: JsCaused + Display> From<Traced<E>> for JasonError
+where
+    E::Error: Into<js_sys::Error>,
+{
+    fn from(traced: Traced<E>) -> Self {
+        Self::from(traced.into_parts())
     }
 }
 

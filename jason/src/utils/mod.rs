@@ -48,10 +48,9 @@ macro_rules! map_weak {
     ($v:ident, $closure:expr) => {{
         $v.0.upgrade()
             .ok_or(
-                $crate::utils::JasonError::from(
-                    tracerr::new!($crate::utils::HandlerDetachedError)
-                        .into_parts(),
-                )
+                $crate::utils::JasonError::from(tracerr::new!(
+                    $crate::utils::HandlerDetachedError
+                ))
                 .into(),
             )
             .map($closure)

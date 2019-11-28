@@ -16,9 +16,7 @@ use web_sys::{CloseEvent, Event, MessageEvent, WebSocket as SysWebSocket};
 
 use crate::{
     rpc::{CloseMsg, RpcTransport},
-    utils::{
-        EventListener, EventListenerBindError, JasonError, JsCaused, JsError,
-    },
+    utils::{EventListener, EventListenerBindError, JsCaused, JsError},
 };
 
 /// Errors that may occur when working with [`WebSocket`].
@@ -86,15 +84,13 @@ impl State {
     }
 }
 
-impl TryFrom<u16> for State {
-    type Error = TransportError;
-
-    fn try_from(value: u16) -> std::result::Result<Self, Self::Error> {
+impl From<u16> for State {
+    fn from(value: u16) -> Self {
         match value {
-            0 => Ok(Self::CONNECTING),
-            1 => Ok(Self::OPEN),
-            2 => Ok(Self::CLOSING),
-            3 => Ok(Self::CLOSED),
+            0 => Self::CONNECTING,
+            1 => Self::OPEN,
+            2 => Self::CLOSING,
+            3 => Self::CLOSED,
             _ => unreachable!(),
         }
     }
@@ -130,13 +126,7 @@ impl InnerSocket {
 
     /// Checks underlying WebSocket state and updates `socket_state`.
     fn update_state(&mut self) {
-        match State::try_from(self.socket.ready_state()) {
-            Ok(new_state) => self.socket_state = new_state,
-            Err(err) => {
-                // unreachable, unless some vendor will break enum
-                JasonError::from(tracerr::new!(err).into_parts()).print()
-            }
-        };
+        self.socket_state = self.socket.ready_state().into();
     }
 }
 

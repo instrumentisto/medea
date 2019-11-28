@@ -263,7 +263,7 @@ impl MediaManagerHandle {
                             .into()
                     })
                     .map_err(tracerr::wrap!(=> MediaManagerError))
-                    .map_err(|err| JasonError::from(err.into_parts()).into())
+                    .map_err(|err| JasonError::from(err).into())
             }),
             Err(e) => future_to_promise(future::err(e)),
         }
@@ -279,7 +279,7 @@ impl MediaManagerHandle {
                     .await
                     .map(|(stream, _)| stream.into())
                     .map_err(tracerr::wrap!(=> MediaManagerError))
-                    .map_err(|err| JasonError::from(err.into_parts()).into())
+                    .map_err(|err| JasonError::from(err).into())
             }),
             Err(err) => future_to_promise(future::err(err)),
         }
