@@ -446,3 +446,88 @@ mod on_close_callback {
         wait_and_check_test_result(test_result).await;
     }
 }
+
+mod rpc_close_reason_on_room_drop {
+    //! Tests which checks that when [`Room`] is dropped the right close reason
+    //! is provided to [`RpcClient`].
+
+    use futures::channel::oneshot;
+    use medea_jason::rpc::{ClientDisconnect, CloseReason};
+
+    use super::*;
+
+    /// Returns [`Room`] and [`oneshot::Receiver`] which will be resolved
+    /// with [`RpcClient`]'s close reason ([`ClientDisconnect`]).
+    async fn get_client() -> (Room, oneshot::Receiver<ClientDisconnect>) {
+        let mut rpc = MockRpcClient::new();
+        let repo = Box::new(MockPeerRepository::new());
+
+        let (_event_tx, event_rx) = mpsc::unbounded();
+        rpc.expect_subscribe()
+            .return_once(move || Box::pin(event_rx));
+        rpc.expect_send_command().return_const(());
+        rpc.expect_unsub().return_const(());
+        let (test_tx, test_rx) = oneshot::channel();
+        rpc.expect_set_close_reason().return_once(move |reason| {
+            test_tx.send(reason).unwrap();
+        });
+        let room = Room::new(Rc::new(rpc), repo);
+        (room, test_rx)
+    }
+
+    /// Tests that [`Room`] sets right [`ClientDisconnect`] close reason on
+    /// UNexpected drop.
+    ///
+    /// # Algorithm
+    ///
+    /// 1. Mock [`RpcClient::set_close_reason`].
+    ///
+    /// 2. Drop [`Room`].
+    ///
+    /// 3. Check that close reason provided into [`RpcClient::set_close_reason`]
+    ///    is [`ClientDisconnect::RoomUnexpectedlyDropped`].
+    #[wasm_bindgen_test]
+    async fn set_default_close_reason_on_drop() {
+        let (room, test_rx) = get_client().await;
+
+        std::mem::drop(room);
+
+        let close_reason = test_rx.await.unwrap();
+        assert_eq!(
+            &close_reason,
+            &ClientDisconnect::RoomUnexpectedlyDropped,
+            "Room sets RPC close reason '{:?} instead of \
+             'RoomUnxpectedlyDropped'.",
+            close_reason,
+        )
+    }
+
+    /// Tests that [`Room`] sets right [`ClientDisconnect`] close reason on
+    /// expected drop.
+    ///
+    /// # Algorithm
+    ///
+    /// 1. Mock [`RpcClient::set_close_reason`].
+    ///
+    /// 2. Close [`Room`] with [`Room::close`] with
+    ///    [`ClientDisconnect::RoomClosed`] as close reason.
+    ///
+    /// 3. Check that close reason provided into [`RpcClient::set_close_reason`]
+    ///    is [`ClientDisconnect::RoomClosed`].
+    #[wasm_bindgen_test]
+    async fn sets_provided_close_reason_on_drop() {
+        let (room, test_rx) = get_client().await;
+        room.close(CloseReason::ByClient {
+            reason: ClientDisconnect::RoomClosed,
+            is_err: false,
+        });
+
+        let close_reason = test_rx.await.unwrap();
+        assert_eq!(
+            &close_reason,
+            &ClientDisconnect::RoomClosed,
+            "Room sets RPC close reason '{:?}' instead of 'RoomClosed.",
+            close_reason,
+        );
+    }
+}
