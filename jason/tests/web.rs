@@ -1,6 +1,11 @@
 #![cfg(target_arch = "wasm32")]
 
-macro_rules! callback_assert_eq {
+/// Analog for [`assert_eq`] but for [`js_callback`] macro.
+/// Simply use it as [`assert_eq`]. For use cases and reasons
+/// just read [`js_callback`]'s docs.
+///
+/// __Use it only in [`js_callback`]'s closures.__
+macro_rules! cb_assert_eq {
     ($a:expr, $b:expr) => {
         if $a != $b {
             return Err(format!("{} != {}", $a, $b));
@@ -8,7 +13,51 @@ macro_rules! callback_assert_eq {
     };
 }
 
-macro_rules! callback_test {
+/// Macro which generates [`wasm_bindgen::closure::Closure`] with provided
+/// [`FnOnce`] and [`futures::channel::oneshot::Receiver`] which will receive
+/// result of assertions from provided [`FnOnce`]. In provided [`FnOnce`] you
+/// may use [`cb_assert_eq`] macro in same way as a vanilla [`assert_eq`].
+/// Result of this assertions will be returned with
+/// [`futures::channel::oneshot::Receiver`]. You may simply use
+/// [`wait_and_check_test_result`] which will `panic` if some assertion failed.
+///
+/// # Use cases
+///
+/// This macro is useful in tests which should check that JS callback provided
+/// in some function was called and some assertions was passed. We can't use
+/// habitual `assert_eq` because panics from [`wasm_bindgen::closure::Closure`]
+/// will not fails `wasm_bindgen_test`'s tests.
+///
+/// # Example
+///
+/// ```ignore
+/// let room: Room = get_room();
+/// let mut room_handle: RoomHandle = room.new_handle();
+///
+/// // Create 'Closure' which we can provide as JS closure and
+/// // 'Future' which will be resolved with assertions result.
+/// let (cb, test_result) = js_callback!(|closed: JsValue| {
+///     // You can write here any Rust code which you need.
+///     // The only difference is that within this macro
+///     // you can use 'cb_assert_eq!'.
+///     let closed_reason = get_reason(&closed);
+///     cb_assert_eq!(closed_reason, "RoomUnexpectedlyDropped");
+///
+///     cb_assert_eq!(get_is_err(&closed), false);
+///     cb_assert_eq!(get_is_closed_by_server(&closed), false);
+/// });
+/// room_handle.on_close(cb.into()).unwrap();
+///
+/// room.close(CloseReason::ByClient {
+///     reason: ClientDisconnect::RoomUnexpectedlyDropped,
+///     is_err: false,
+/// });
+///
+/// // Wait for assertions results and check it ('wait_and_check_test_result'
+/// // will panic if assertion errored).
+/// wait_and_check_test_result(test_result).await;
+/// ```
+macro_rules! js_callback {
     (|$($arg_name:ident: $arg_type:ty),*| $body:block) => {{
         let (test_tx, test_rx) = futures::channel::oneshot::channel();
         let closure = wasm_bindgen::closure::Closure::once_into_js(

@@ -199,6 +199,7 @@ struct Inner {
     /// This reason will be provided to underlying [`RpcTransport`].
     close_reason: ClientDisconnect,
 
+    /// Indicates that [`WebSocketRpcClient`] is closed.
     is_closed: bool,
 }
 

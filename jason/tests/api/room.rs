@@ -2,7 +2,7 @@
 
 use std::rc::Rc;
 
-use futures::channel::{mpsc, oneshot};
+use futures::channel::mpsc;
 use medea_client_api_proto::{Event, IceServer, PeerId};
 use medea_jason::{
     api::Room,
@@ -11,7 +11,6 @@ use medea_jason::{
     rpc::MockRpcClient,
     AudioTrackConstraints, MediaStreamConstraints,
 };
-use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
 use wasm_bindgen_test::*;
 
@@ -189,8 +188,8 @@ async fn error_inject_invalid_local_stream_into_new_peer() {
     let (room, _peer) = get_test_room_and_new_peer(event_rx, true, true);
 
     let room_handle = room.new_handle();
-    let (cb, test_rx) = callback_test!(|err: js_sys::Error| {
-        callback_assert_eq!(
+    let (cb, test_rx) = js_callback!(|err: js_sys::Error| {
+        cb_assert_eq!(
             err.to_string().as_string().unwrap(),
             "Error: provided MediaStream was expected to have single video \
              track"
@@ -231,8 +230,8 @@ async fn error_inject_invalid_local_stream_into_new_peer() {
 //     1. Invoking `on_failed_local_stream` callback.
 #[wasm_bindgen_test]
 async fn error_inject_invalid_local_stream_into_room_on_exists_peer() {
-    let (cb, test_rx) = callback_test!(|err: js_sys::Error| {
-        callback_assert_eq!(
+    let (cb, test_result) = js_callback!(|err: js_sys::Error| {
+        cb_assert_eq!(
             err.to_string().as_string().unwrap(),
             "Error: provided MediaStream was expected to have single video \
              track"
@@ -253,7 +252,7 @@ async fn error_inject_invalid_local_stream_into_room_on_exists_peer() {
     room_handle.on_failed_local_stream(cb.into()).unwrap();
     room_handle.inject_local_stream(stream).unwrap();
 
-    wait_and_check_test_result(test_rx).await;
+    wait_and_check_test_result(test_result).await;
 }
 
 #[wasm_bindgen_test]
@@ -263,8 +262,8 @@ async fn error_get_local_stream_on_new_peer() {
 
     let room_handle = room.new_handle();
 
-    let (cb, test_rx) = callback_test!(|err: js_sys::Error| {
-        callback_assert_eq!(
+    let (cb, test_result) = js_callback!(|err: js_sys::Error| {
+        cb_assert_eq!(
             err.to_string().as_string().unwrap(),
             "Error: MediaDevices.getUserMedia() failed: some error"
         );
@@ -285,7 +284,7 @@ async fn error_get_local_stream_on_new_peer() {
         })
         .unwrap();
 
-    wait_and_check_test_result(test_rx).await;
+    wait_and_check_test_result(test_result).await;
     mock_navigator.stop();
 }
 
@@ -322,7 +321,7 @@ mod on_close_callback {
 
     use std::rc::Rc;
 
-    use futures::channel::{mpsc, oneshot};
+    use futures::channel::mpsc;
     use medea_client_api_proto::CloseReason as CloseByServerReason;
     use medea_jason::{
         api::Room,
@@ -380,15 +379,15 @@ mod on_close_callback {
         let room = get_room();
         let mut room_handle = room.new_handle();
 
-        let (cb, test_rx) = callback_test!(|closed: JsValue| {
-            callback_assert_eq!(get_reason(&closed), "Finished");
-            callback_assert_eq!(get_is_closed_by_server(&closed), true);
-            callback_assert_eq!(get_is_err(&closed), false);
+        let (cb, test_result) = js_callback!(|closed: JsValue| {
+            cb_assert_eq!(get_reason(&closed), "Finished");
+            cb_assert_eq!(get_is_closed_by_server(&closed), true);
+            cb_assert_eq!(get_is_err(&closed), false);
         });
         room_handle.on_close(cb.into()).unwrap();
 
         room.close(CloseReason::ByServer(CloseByServerReason::Finished));
-        wait_and_check_test_result(test_rx).await;
+        wait_and_check_test_result(test_result).await;
     }
 
     /// Tests that [`RoomHandle::on_close`] will be called on unexpected
@@ -408,15 +407,15 @@ mod on_close_callback {
         let room = get_room();
         let mut room_handle = room.new_handle();
 
-        let (cb, test_rx) = callback_test!(|closed: JsValue| {
-            callback_assert_eq!(get_reason(&closed), "RoomUnexpectedlyDropped");
-            callback_assert_eq!(get_is_err(&closed), true);
-            callback_assert_eq!(get_is_closed_by_server(&closed), false);
+        let (cb, test_result) = js_callback!(|closed: JsValue| {
+            cb_assert_eq!(get_reason(&closed), "RoomUnexpectedlyDropped");
+            cb_assert_eq!(get_is_err(&closed), true);
+            cb_assert_eq!(get_is_closed_by_server(&closed), false);
         });
         room_handle.on_close(cb.into()).unwrap();
 
         std::mem::drop(room);
-        wait_and_check_test_result(test_rx).await;
+        wait_and_check_test_result(test_result).await;
     }
 
     /// Tests that [`RoomHandle::on_close`] will be called on closing by Jason.
@@ -433,10 +432,10 @@ mod on_close_callback {
         let room = get_room();
         let mut room_handle = room.new_handle();
 
-        let (cb, test_rx) = callback_test!(|closed: JsValue| {
-            callback_assert_eq!(get_reason(&closed), "RoomUnexpectedlyDropped");
-            callback_assert_eq!(get_is_err(&closed), false);
-            callback_assert_eq!(get_is_closed_by_server(&closed), false);
+        let (cb, test_result) = js_callback!(|closed: JsValue| {
+            cb_assert_eq!(get_reason(&closed), "RoomUnexpectedlyDropped");
+            cb_assert_eq!(get_is_err(&closed), false);
+            cb_assert_eq!(get_is_closed_by_server(&closed), false);
         });
         room_handle.on_close(cb.into()).unwrap();
 
@@ -444,6 +443,6 @@ mod on_close_callback {
             reason: ClientDisconnect::RoomUnexpectedlyDropped,
             is_err: false,
         });
-        wait_and_check_test_result(test_rx).await;
+        wait_and_check_test_result(test_result).await;
     }
 }

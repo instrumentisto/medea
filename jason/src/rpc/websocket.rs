@@ -15,7 +15,7 @@ use thiserror::*;
 use web_sys::{CloseEvent, Event, MessageEvent, WebSocket as SysWebSocket};
 
 use crate::{
-    rpc::{on_close, ClientDisconnect, CloseMsg, RpcTransport},
+    rpc::{ClientDisconnect, CloseMsg, RpcTransport},
     utils::{EventListener, WasmErr},
 };
 
