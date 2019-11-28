@@ -368,7 +368,6 @@ impl RpcClient for WebSocketRpcClient {
     fn on_close(
         &self,
     ) -> LocalBoxFuture<'static, Result<CloseReason, oneshot::Canceled>> {
-        debug!("Set on_close for RpcClient.");
         let (tx, rx) = oneshot::channel();
         self.0.borrow_mut().on_close_subscribers.push(tx);
         Box::pin(rx)
@@ -384,11 +383,9 @@ impl RpcClient for WebSocketRpcClient {
 impl Drop for WebSocketRpcClient {
     /// Drops related connection and its [`Heartbeat`].
     fn drop(&mut self) {
-        debug!("Closing WebSocketRpcClient.");
         self.0.borrow_mut().is_closed = true;
         let mut inner = self.0.borrow_mut();
         if let Some(socket) = inner.sock.take() {
-            debug!("Set close reason for RpcTransport.");
             socket.set_close_reason(inner.close_reason.clone());
         }
         inner.heartbeat.stop();

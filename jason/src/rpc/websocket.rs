@@ -291,7 +291,6 @@ impl WebSocketRpcTransport {
 
 impl Drop for WebSocketRpcTransport {
     fn drop(&mut self) {
-        debug!("Dropping WebSocketRpcTransport.");
         let mut inner = self.0.borrow_mut();
         if inner.socket_state.can_close() {
             inner.on_open.take();

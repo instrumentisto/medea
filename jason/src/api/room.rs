@@ -280,7 +280,6 @@ impl Room {
     /// may check count of pointers to [`InnerRoom`] with
     /// [`Rc::strong_count`].
     pub fn close(self, reason: CloseReason) {
-        debug!("Try to close Room.");
         self.0.borrow_mut().set_close_reason(reason);
     }
 
@@ -634,23 +633,16 @@ impl PeerEventHandler for InnerRoom {
 impl Drop for InnerRoom {
     /// Unsubscribes [`InnerRoom`] from all its subscriptions.
     fn drop(&mut self) {
-        debug!("Dropping InnerRoom.");
         self.rpc.unsub();
 
         if let CloseReason::ByClient { reason, .. } = self.close_reason.clone()
         {
-            debug!("Set close reason of RpcClient.");
             self.rpc.set_close_reason(reason);
         };
 
         self.on_close
             .call(RoomCloseReason::new(&self.close_reason))
             .map(|result| {
-                debug!(
-                    "'Room.on_close' JS callback execution was finished with \
-                     {:?}.",
-                    result
-                );
                 result.map_err(|err| console_error!(err.as_string()))
             });
     }
