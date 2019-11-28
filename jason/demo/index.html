@@ -5,6 +5,8 @@
   <meta http-equiv='Content-Type' content='text/html; charset=UTF-8' />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/0.19.0/axios.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Faker/3.1.0/faker.min.js"></script>
+  <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
+  <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
 
   <script type="module">
     import init, {
@@ -139,16 +141,16 @@
       }
 
       let chooseRoomDiv = document.getElementById('choose-room');
-      let videoCallDiv = document.getElementsByClassName('video-call')[0];
+      let videoCallDiv = document.getElementById('video-call');
       let chooseRoomButton = document.getElementById('choose-room__join');
       let roomIdInput = document.getElementById('choose-room__room-id');
-      let controlBtns = document.getElementsByClassName('control')[0];
-      let audioSelect = document.getElementsByClassName('connect__select-device_audio')[0];
-      let videoSelect = document.getElementsByClassName('connect__select-device_video')[0];
-      let localVideo = document.getElementsByClassName('local-video__video')[0];
+      let controlBtns = document.getElementById('control');
+      let audioSelect = document.getElementById('connect__select-device_audio');
+      let videoSelect = document.getElementById('connect__select-device_video');
+      let localVideo = document.getElementById('local-video__video');
 
-      let joinCallerButton = document.getElementsByClassName('join__join')[0];
-      let usernameInput = document.getElementsByClassName('join__username')[0];
+      let joinCallerButton = document.getElementById('join__join');
+      let usernameInput = document.getElementById('join__username');
       usernameInput.value = faker.name.firstName();
 
       let room = await jason.init_room();
@@ -184,11 +186,13 @@
 
       room.on_new_connection((connection) => {
         connection.on_remote_stream(async (stream) => {
-          let videoDiv = document.getElementsByClassName("remote-videos")[0];
+          let videoDiv = document.getElementById("remote-videos");
           let video = document.createElement("video");
           video.srcObject = stream.get_media_stream();
+          video.style.maxWidth = "100%";
+
           let innerVideoDiv = document.createElement("div");
-          innerVideoDiv.className = "video";
+          innerVideoDiv.className = "col-md-3";
           innerVideoDiv.appendChild(video);
           videoDiv.appendChild(innerVideoDiv);
 
@@ -196,8 +200,8 @@
         });
       });
 
-      let muteAudio = document.getElementsByClassName('control__mute_audio')[0];
-      let muteVideo = document.getElementsByClassName('control__mute_video')[0];
+      let muteAudio = document.getElementById('control__mute_audio');
+      let muteVideo = document.getElementById('control__mute_video');
       let isAudioMuted = false;
       let isVideoMuted = false;
 
@@ -226,7 +230,7 @@
 
       let bindJoinButtons = function (roomId) {
         joinCallerButton.onclick = async function () {
-          let connectBtnsDiv = document.getElementsByClassName("join__join")[0];
+          let connectBtnsDiv = document.getElementById("join__join");
           connectBtnsDiv.style.display = 'none';
           controlBtns.style.display = 'block';
 
@@ -237,15 +241,14 @@
             } catch (e) {
               if (e.response.status === 400) {
                 console.log("Room not found. Creating new room...");
-                room.join(await createRoom(roomId, username));
+                await room.join(await createRoom(roomId, username));
               }
             }
-            try {
-              await axios.get(controlUrl + roomId + '/' + username);
-            } catch (e) {
-              console.log("Member not found. Creating new member...");
-              room.join(await addNewMember(roomId, username));
-            }
+
+            await axios.delete(controlUrl + roomId + '/' + username);
+            console.log("Creating new member.");
+            await room.join(await addNewMember(roomId, username));
+
           } catch (e) {
             console.error("Join to room failed: " + e);
           }
@@ -295,118 +298,52 @@
     }
   </script>
 
-  <style>
-    body {
-      font-family: "Source Sans Pro", Helvetica, sans-serif;
-      background: #f5f5f5;
-    }
-
-    .remote-videos {
-      display: flex;
-      width: 100%;
-      justify-content: space-around;
-    }
-
-    .video {
-      display: flex;
-      justify-content: center;
-      flex-direction: column;
-      margin-right: 10px;
-      text-align: center;
-    }
-
-    .video>video {
-      background: #FFFFFF;
-      border-radius: 3px;
-    }
-
-    .join {
-      position: fixed;
-      bottom: 200px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: #FFFFFF;
-      padding: 10px;
-      border-radius: 3px;
-    }
-
-    .local-video {
-      position: fixed;
-      bottom: 0;
-      left: 0;
-      margin-left: 20px;
-      margin-bottom: 20px;
-      width: auto;
-      height: 150px;
-    }
-
-    .join__username {
-      font-size: 16px;
-      padding: 5px;
-    }
-
-    .join__join {
-      font-size: 16px;
-      background: #49668C;
-      color: white;
-      cursor: pointer;
-      border-radius: 3px;
-      border: none;
-      padding: 6px;
-      margin-left: 5px;
-    }
-
-    .control {
-      position: fixed;
-      bottom: 150px;
-      left: 50%;
-      transform: translateX(-50%);
-    }
-
-    .control__mute {
-      border-radius: 10px;
-      background: #49668C;
-      color: white;
-      font-size: 13pt;
-      border: none;
-      padding: 10px;
-      cursor: pointer;
-      margin-right: 10px;
-    }
-  </style>
 </head>
 <body>
-  <div id="choose-room">
-    <input id="choose-room__room-id">
-    <button id="choose-room__join" type="submit">JOIN</button>
+  <div id="choose-room" class="input-group col-md-3">
+    <input id="choose-room__room-id" type="text" class="form-control" placeholder="Room name" aria-label="Room name" aria-describedby="basic-addon2">
+    <div class="input-group-append">
+      <button id="choose-room__join" class="btn btn-outline-secondary" type="submit">Join Room</button>
+    </div>
   </div>
 
-  <div class="video-call" style="display: none">
-    <div class="remote-videos">
+  <div id="video-call" style="display: none">
+    <div id="remote-videos" class="row">
     </div>
 
-    <div class="local-video video">
-      <video class="local-video__video" muted autoplay width="100%" height="100%"></video>
-    </div>
-
-    <div class="join">
-      <input class="join__username" placeholder="username">
-      <button class="join__join">Join</button>
-      <div class="connect__device">
-        <label>Audio:
-          <select class="connect__select-device_audio">
-          </select>
-        </label><br>
-        <label>Video:
-          <select class="connect__select-device_video">
-          </select>
-        </label>
+    <div class="row">
+      <div class="col-md-3">
+        <video id="local-video__video" muted autoplay width="100%" height="100%"></video>
       </div>
-    </div>
+      <div class="col-md-3">
 
-    <div class="control" style="display: none">
-      <button class="control__mute_audio control__mute">Mute audio</button>
-      <button class="control__mute_video control__mute">Mute video</button>
+        <div class="input-group mb-3">
+          <input id="join__username" type="text" class="form-control" placeholder="Username" aria-label="Username" aria-describedby="basic-addon2">
+          <div class="input-group-append">
+            <button id="join__join" class="btn btn-outline-secondary" type="button">Connect</button>
+          </div>
+        </div>
+
+        <div class="input-group mb-3">
+          <div class="input-group-prepend">
+            <label class="input-group-text" for="connect__select-device_audio">Audio</label>
+          </div>
+          <select class="custom-select" id="connect__select-device_audio"></select>
+        </div>
+
+        <div class="input-group mb-3">
+          <div class="input-group-prepend">
+            <label class="input-group-text" for="connect__select-device_video">Video</label>
+          </div>
+          <select class="custom-select" id="connect__select-device_video"></select>
+        </div>
+
+        <div id="control" class="input-group mb-3" style="display: none">
+            <button class="btn btn-info" id="control__mute_audio">Mute audio</button>
+            <button class="btn btn-info" id="control__mute_video">Mute video</button>
+        </div>
+
+      </div>
     </div>
   </div>
 </body>

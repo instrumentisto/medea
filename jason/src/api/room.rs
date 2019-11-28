@@ -12,7 +12,7 @@ use futures::{channel::mpsc, future, stream, FutureExt as _, StreamExt as _};
 use js_sys::Promise;
 use medea_client_api_proto::{
     Command, Direction, Event as RpcEvent, EventHandler, IceCandidate,
-    IceServer, PeerId, Track,
+    IceConnectionState, IceServer, PeerId, PeerMetrics, Track,
 };
 use wasm_bindgen::{prelude::*, JsValue};
 use wasm_bindgen_futures::{future_to_promise, spawn_local};
@@ -613,6 +613,21 @@ impl PeerEventHandler for InnerRoom {
     /// Invokes `on_local_stream` [`Room`]'s callback.
     fn on_new_local_stream(&mut self, _: PeerId, stream: MediaStream) {
         self.on_local_stream.call(stream.new_handle());
+    }
+
+    /// Handles [`PeerEvent::IceConnectionStateChanged`] event and sends new
+    /// state to RPC server.
+    fn on_ice_connection_state_changed(
+        &mut self,
+        peer_id: PeerId,
+        ice_connection_state: IceConnectionState,
+    ) {
+        self.rpc.send_command(Command::AddPeerConnectionMetrics {
+            peer_id,
+            metrics: PeerMetrics::IceConnectionStateChanged(
+                ice_connection_state,
+            ),
+        });
     }
 }
 
