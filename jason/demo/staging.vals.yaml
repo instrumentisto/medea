@@ -16,6 +16,8 @@ server:
     turn:
       host: demo.medea.stg.t11913.org
       pass: changeme
+    log:
+      level: DEBUG
 
   control-mock:
     image:

@@ -241,15 +241,14 @@
             } catch (e) {
               if (e.response.status === 400) {
                 console.log("Room not found. Creating new room...");
-                room.join(await createRoom(roomId, username));
+                await room.join(await createRoom(roomId, username));
               }
             }
-            try {
-              await axios.get(controlUrl + roomId + '/' + username);
-            } catch (e) {
-              console.log("Member not found. Creating new member...");
-              room.join(await addNewMember(roomId, username));
-            }
+
+            await axios.delete(controlUrl + roomId + '/' + username);
+            console.log("Creating new member.");
+            await room.join(await addNewMember(roomId, username));
+
           } catch (e) {
             console.error("Join to room failed: " + e);
           }
