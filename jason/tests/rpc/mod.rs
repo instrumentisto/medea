@@ -1,5 +1,7 @@
 //! Tests for [`medea_jason::rpc::RpcClient`].
 
+mod websocket;
+
 use std::{
     collections::HashMap,
     rc::Rc,
