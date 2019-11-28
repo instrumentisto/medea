@@ -53,8 +53,8 @@ macro_rules! cb_assert_eq {
 ///     is_err: false,
 /// });
 ///
-/// // Wait for assertions results and check it ('wait_and_check_test_result'
-/// // will panic if assertion errored).
+/// // Wait for closure execution, get assertions result and check it.
+/// // 'wait_and_check_test_result' will panic if assertion errored.
 /// wait_and_check_test_result(test_result).await;
 /// ```
 macro_rules! js_callback {
@@ -143,8 +143,8 @@ pub async fn resolve_after(delay_ms: i32) -> Result<(), JsValue> {
     Ok(())
 }
 
-/// Waits for [`Result`] from [`oneshot::Receiver`] with tests result with 1
-/// second deadline.
+/// Waits for [`Result`] from [`oneshot::Receiver`] with tests result with 500
+/// milliseconds deadline.
 ///
 /// Panics if deadline is exceeded or provided rx resolves to `Err`.
 pub async fn wait_and_check_test_result(

@@ -448,7 +448,7 @@ mod on_close_callback {
 }
 
 mod rpc_close_reason_on_room_drop {
-    //! Tests which checks that when [`Room`] is dropped the right close reason
+    //! Tests which checks that when [`Room`] is dropped, the right close reason
     //! is provided to [`RpcClient`].
 
     use futures::channel::oneshot;
@@ -494,10 +494,10 @@ mod rpc_close_reason_on_room_drop {
 
         let close_reason = test_rx.await.unwrap();
         assert_eq!(
-            &close_reason,
-            &ClientDisconnect::RoomUnexpectedlyDropped,
+            close_reason,
+            ClientDisconnect::RoomUnexpectedlyDropped,
             "Room sets RPC close reason '{:?} instead of \
-             'RoomUnxpectedlyDropped'.",
+             'RoomUnexpectedlyDropped'.",
             close_reason,
         )
     }
@@ -524,8 +524,8 @@ mod rpc_close_reason_on_room_drop {
 
         let close_reason = test_rx.await.unwrap();
         assert_eq!(
-            &close_reason,
-            &ClientDisconnect::RoomClosed,
+            close_reason,
+            ClientDisconnect::RoomClosed,
             "Room sets RPC close reason '{:?}' instead of 'RoomClosed.",
             close_reason,
         );

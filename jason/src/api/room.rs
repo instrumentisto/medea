@@ -56,7 +56,7 @@ impl RoomCloseReason {
     /// `is_err` may be `true` only on closing by client.
     ///
     /// `is_closed_by_server` is `true` on [`CloseReason::ByServer`].
-    pub fn new(reason: &CloseReason) -> Self {
+    pub fn new(reason: CloseReason) -> Self {
         match reason {
             CloseReason::ByServer(reason) => Self {
                 reason: reason.to_string(),
@@ -66,7 +66,7 @@ impl RoomCloseReason {
             CloseReason::ByClient { reason, is_err } => Self {
                 reason: reason.to_string(),
                 is_closed_by_server: false,
-                is_err: *is_err,
+                is_err,
             },
         }
     }
@@ -373,8 +373,8 @@ impl InnerRoom {
 
     /// Sets `close_reason` of [`InnerRoom`].
     ///
-    /// [`Drop`] implementation of
-    /// [`InnerRoom`] is supposed to be triggered after this function call.
+    /// [`Drop`] implementation of [`InnerRoom`] is supposed
+    /// to be triggered after this function call.
     fn set_close_reason(&mut self, reason: CloseReason) {
         self.close_reason = reason;
     }
@@ -635,13 +635,12 @@ impl Drop for InnerRoom {
     fn drop(&mut self) {
         self.rpc.unsub();
 
-        if let CloseReason::ByClient { reason, .. } = self.close_reason.clone()
-        {
-            self.rpc.set_close_reason(reason);
+        if let CloseReason::ByClient { reason, .. } = &self.close_reason {
+            self.rpc.set_close_reason(*reason);
         };
 
         self.on_close
-            .call(RoomCloseReason::new(&self.close_reason))
+            .call(RoomCloseReason::new(self.close_reason))
             .map(|result| {
                 result.map_err(|err| console_error!(err.as_string()))
             });

@@ -76,7 +76,7 @@ pub struct ServerMessage(ServerMsg);
 impl TryFrom<&MessageEvent> for ServerMessage {
     type Error = Error;
 
-    fn try_from(msg: &MessageEvent) -> std::result::Result<Self, Self::Error> {
+    fn try_from(msg: &MessageEvent) -> Result<Self, Self::Error> {
         let payload = msg.data().as_string().ok_or(Error::MessageNotString)?;
 
         serde_json::from_str::<ServerMsg>(&payload)

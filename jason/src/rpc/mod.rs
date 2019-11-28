@@ -27,7 +27,7 @@ use self::heartbeat::Heartbeat;
 pub use self::websocket::{Error as TransportError, WebSocketRpcTransport};
 
 /// Reasons of closing by client side and server side.
-#[derive(Clone, Display, Debug, Eq, PartialEq)]
+#[derive(Copy, Clone, Display, Debug, Eq, PartialEq)]
 pub enum CloseReason {
     /// Closed by server.
     ByServer(CloseByServerReason),
@@ -44,7 +44,7 @@ pub enum CloseReason {
 }
 
 /// Reasons of closing by client side.
-#[derive(Clone, Display, Debug, Eq, PartialEq, Serialize)]
+#[derive(Copy, Clone, Display, Debug, Eq, PartialEq, Serialize)]
 pub enum ClientDisconnect {
     /// [`Room`] was dropped without `close_reason`.
     RoomUnexpectedlyDropped,
@@ -61,8 +61,8 @@ pub enum ClientDisconnect {
 
 impl ClientDisconnect {
     /// Returns `true` if [`CloseByClientReason`] is considered as error.
-    pub fn is_err(&self) -> bool {
-        match &self {
+    pub fn is_err(self) -> bool {
+        match self {
             Self::RoomUnexpectedlyDropped
             | Self::RpcClientUnexpectedlyDropped
             | Self::RpcTransportUnexpectedlyDropped => true,
@@ -152,7 +152,7 @@ pub trait RpcClient {
 #[allow(clippy::module_name_repetitions)]
 #[cfg_attr(feature = "mockable", mockall::automock)]
 pub trait RpcTransport {
-    /// Returns stream of all messages received by this transport.
+    /// Returns [`LocalBoxStream`] of all messages received by this transport.
     fn on_message(
         &self,
     ) -> Result<
@@ -160,8 +160,8 @@ pub trait RpcTransport {
         TransportError,
     >;
 
-    /// Returns future, that will be resolved when this transport will be
-    /// closed.
+    /// Returns [`LocalBoxFuture`], that will be resolved when this transport
+    /// will be closed.
     fn on_close(
         &self,
     ) -> Result<
@@ -199,7 +199,7 @@ struct Inner {
     /// This reason will be provided to underlying [`RpcTransport`].
     close_reason: ClientDisconnect,
 
-    /// Indicates that [`WebSocketRpcClient`] is closed.
+    /// Indicates that this [`WebSocketRpcClient`] is closed.
     is_closed: bool,
 }
 
@@ -234,7 +234,7 @@ fn on_close(inner_rc: &RefCell<Inner>, close_msg: &CloseMsg) {
                 .on_close_subscribers
                 .drain(..)
                 .filter_map(|sub| {
-                    sub.send(CloseReason::ByServer(reason.clone())).err()
+                    sub.send(CloseReason::ByServer(*reason)).err()
                 })
                 .for_each(|reason| {
                     console_error!(format!(

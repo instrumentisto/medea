@@ -407,13 +407,13 @@ mod transport_close_reason_on_drop {
         std::mem::drop(ws);
 
         let close_reason = test_rx.await.unwrap();
-        if &close_reason != &ClientDisconnect::RpcClientUnexpectedlyDropped {
-            panic!(
-                "RpcClient sets RpcTransport close reason '{:?}' instead of \
-                 'RpcClientUnexpectedlyDropped'.",
-                close_reason
-            );
-        }
+        assert_eq!(
+            close_reason,
+            ClientDisconnect::RpcClientUnexpectedlyDropped,
+            "RpcClient sets RpcTransport close reason '{:?}' instead of \
+             'RpcClientUnexpectedlyDropped'.",
+            close_reason,
+        );
     }
 
     /// Tests that [`RpcClient`] sets right [`ClientDisconnect`] close reason on
@@ -437,12 +437,12 @@ mod transport_close_reason_on_drop {
         std::mem::drop(ws);
 
         let close_reason = test_rx.await.unwrap();
-        if &close_reason != &ClientDisconnect::RoomClosed {
-            panic!(
-                "RpcClient sets RpcTransport close reason '{:?}' instead of \
-                 'RoomClosed'.",
-                close_reason
-            );
-        }
+        assert_eq!(
+            close_reason,
+            ClientDisconnect::RoomClosed,
+            "RpcClient sets RpcTransport close reason '{:?}' instead of \
+             'RoomClosed'.",
+            close_reason,
+        );
     }
 }
