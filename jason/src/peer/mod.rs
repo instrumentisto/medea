@@ -46,7 +46,7 @@ pub use self::{
 
 /// Errors that may occur in [RTCPeerConnection][1].
 ///
-/// [1]: https://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
+/// [1]: https://w3.org/TR/webrtc/#rtcpeerconnection-interface
 #[derive(Debug, Display, From, JsCaused)]
 #[allow(clippy::module_name_repetitions)]
 pub enum PeerError {
@@ -61,7 +61,7 @@ pub enum PeerError {
     /// Errors that may occur during signaling between this and remote
     /// [RTCPeerConnection][1] and event handlers setting errors.
     ///
-    /// [1]: https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection.
+    /// [1]: https://w3.org/TR/webrtc/#dom-rtcpeerconnection.
     #[display(fmt = "{}", _0)]
     RtcPeerConnection(#[js(cause)] RTCPeerConnectionError),
 

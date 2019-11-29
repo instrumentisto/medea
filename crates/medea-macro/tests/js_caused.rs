@@ -3,17 +3,17 @@ use medea_jason::utils::JsCaused;
 struct JsError {}
 
 #[test]
-fn derive_for_structure() {
+fn derives_for_structure() {
     #[derive(JsCaused)]
-    struct TestError {}
+    struct TestError;
 
-    let err = TestError {};
+    let err = TestError;
     assert_eq!(err.name(), "TestError");
     assert!(err.js_cause().is_none());
 }
 
 #[test]
-fn derive_for_enum_with_js_error() {
+fn derives_for_enum_with_js_error() {
     #[derive(JsCaused)]
     enum TestError {
         Foo,
@@ -30,7 +30,7 @@ fn derive_for_enum_with_js_error() {
 }
 
 #[test]
-fn derive_for_enum_with_nested_js_error() {
+fn derives_for_enum_with_nested_js_error() {
     #[derive(JsCaused)]
     enum CausedError {
         Baz(JsError),
@@ -54,8 +54,8 @@ fn derive_for_enum_with_nested_js_error() {
 }
 
 #[test]
-fn derive_for_non_default_name_js_error() {
-    struct SomeError {}
+fn derives_for_non_default_name_js_error() {
+    struct SomeError;
 
     #[derive(JsCaused)]
     #[js(error = "SomeError")]

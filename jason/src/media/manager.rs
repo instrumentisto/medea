@@ -32,7 +32,7 @@ use super::InputDeviceInfo;
 pub enum MediaManagerError {
     /// Occurs when cannot get access to [MediaDevices][1] object.
     ///
-    /// [1]: https://www.w3.org/TR/mediacapture-streams/#mediadevices
+    /// [1]: https://w3.org/TR/mediacapture-streams/#mediadevices
     #[display(fmt = "Navigator.mediaDevices() failed: {}", _0)]
     CouldNotGetMediaDevices(JsError),
 
@@ -44,7 +44,7 @@ pub enum MediaManagerError {
 
     /// Occurs when cannot get info about connected [MediaDevices][1].
     ///
-    /// [1]: https://www.w3.org/TR/mediacapture-streams/#mediadevices
+    /// [1]: https://w3.org/TR/mediacapture-streams/#mediadevices
     #[display(fmt = "MediaDevices.enumerateDevices() failed: {}", _0)]
     EnumerateDevicesFailed(JsError),
 }
@@ -263,7 +263,7 @@ impl MediaManagerHandle {
                             .into()
                     })
                     .map_err(tracerr::wrap!(=> MediaManagerError))
-                    .map_err(|err| JasonError::from(err).into())
+                    .map_err(|e| JasonError::from(e).into())
             }),
             Err(e) => future_to_promise(future::err(e)),
         }
@@ -279,7 +279,7 @@ impl MediaManagerHandle {
                     .await
                     .map(|(stream, _)| stream.into())
                     .map_err(tracerr::wrap!(=> MediaManagerError))
-                    .map_err(|err| JasonError::from(err).into())
+                    .map_err(|e| JasonError::from(e).into())
             }),
             Err(err) => future_to_promise(future::err(err)),
         }

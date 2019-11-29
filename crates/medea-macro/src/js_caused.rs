@@ -7,13 +7,13 @@ use synstructure::{BindStyle, Structure};
 ///
 /// # Algorithm
 ///
-/// 1. Generate body for trait method `name()` as `enum` variant name as is.
+/// 1. Generate body for trait method `name()` as enum variant name "as is".
 /// 2. Generate body for trait method `js_cause()`:
 ///     - if `enum` variant contains associated error, returns this error;
-///     - if `enum` variant contains `JsCaused`, invoke trait method;
+///     - if `enum` variant contains `JsCaused`, invoke its trait method;
 ///     - otherwise returns `None`.
-/// 3. Generate implementation `JsCaused` trait for this `enum` with generated
-/// methods from step 1 and 2.
+/// 3. Generate implementation of `JsCaused` trait for this enum with generated
+///    methods from step 1 and 2.
 #[allow(clippy::needless_pass_by_value)]
 pub fn derive(mut s: Structure) -> Result<TokenStream> {
     let error_type = error_type(&s)?;
@@ -38,6 +38,7 @@ pub fn derive(mut s: Structure) -> Result<TokenStream> {
     });
 
     let js_caused = s.gen_impl(quote! {
+        #[automatically_derived]
         gen impl JsCaused for @Self {
             type Error = #error_type;
 
@@ -51,10 +52,11 @@ pub fn derive(mut s: Structure) -> Result<TokenStream> {
         }
     });
 
-    Ok(quote! { #js_caused })
+    Ok(quote!(#js_caused))
 }
 
-/// Parse and returns argument of `js(error = "path::to::Error)` attribute.
+/// Parse and returns argument of `#[js(error = "path::to::Error"))]` attribute.
+/// If no such attribute exists the defaults to `JsError`.
 fn error_type(s: &synstructure::Structure) -> Result<syn::Path> {
     let mut error_type = None;
     for attr in &s.ast().attrs {
@@ -63,14 +65,15 @@ fn error_type(s: &synstructure::Structure) -> Result<syn::Path> {
                 if error_type.is_some() {
                     return Err(Error::new_spanned(
                         meta,
-                        "Cannot have two js attributes",
+                        "Cannot have two #[js(...)] attributes",
                     ));
                 }
                 if let syn::Meta::List(list) = meta {
                     if list.nested.is_empty() {
                         return Err(Error::new_spanned(
                             list,
-                            "Expected at least one argument to js attribute",
+                            "Expected at least one argument to #[js(...)] \
+                             attribute",
                         ));
                     }
                     error_type =
@@ -104,7 +107,7 @@ fn error_type(s: &synstructure::Structure) -> Result<syn::Path> {
                 } else {
                     return Err(Error::new_spanned(
                         meta,
-                        "js attribute must take a list in parentheses",
+                        "#[js] attribute must take a list in parentheses",
                     ));
                 };
             }
@@ -116,7 +119,7 @@ fn error_type(s: &synstructure::Structure) -> Result<syn::Path> {
     }
 }
 
-/// Checks what enum variant has attribute `js(cause)`.
+/// Checks that enum variant has `#[js(cause)]` attribute.
 fn is_caused(bi: &synstructure::BindingInfo) -> bool {
     let mut found_cause = false;
     for attr in &bi.ast().attrs {
@@ -143,7 +146,7 @@ fn is_caused(bi: &synstructure::BindingInfo) -> bool {
     found_cause
 }
 
-/// Checks what enum variant contains js error.
+/// Checks that enum variant contains JS error.
 fn is_error(bi: &synstructure::BindingInfo, err: &syn::Path) -> bool {
     match &bi.ast().ty {
         syn::Type::Path(syn::TypePath { qself: None, path }) => path == err,

@@ -224,15 +224,15 @@ pub fn dispatchable(_: TokenStream, input: TokenStream) -> TokenStream {
 }
 
 decl_derive!([JsCaused, attributes(js)] =>
-/// Generate implementation `JsCaused` trait for errors represented as `enum`.
+/// Generate implementation of `JsCaused` trait for errors represented as enum.
 ///
 /// # How to use
 ///
-/// ### 1. Declare wrapper for JS error and `enum` for error variants.
+/// ### 1. Declare wrapper for JS error and enum for error variants.
 ///
-/// The `js_cause()` method returns error if nested error has type declare as
-/// argument of `js(error)` attribute like `#[js(error = "path::to::Error")]` or
-/// type of error is imported as `JsError`.
+/// The `js_cause()` method returns error if nested error has its type declared
+/// as an argument of the attribute `#[js(error = "path::to::Error")]` or
+/// the error type is assumed to be imported as `JsError`.
 ///
 /// ```
 /// use medea_jason::utils::JsCaused;
@@ -254,8 +254,8 @@ decl_derive!([JsCaused, attributes(js)] =>
 /// assert!(err.js_cause().is_some());
 /// ```
 ///
-/// If enum variant has attribute `#[js(cause)]` it will be called `js_cause()`
-/// on nested error.
+/// If enum variant has attribute `#[js(cause)]` it will call the `js_cause()`
+/// method on nested error.
 ///
 /// ```
 /// # use medea_jason::utils::JsCaused;
@@ -267,7 +267,7 @@ decl_derive!([JsCaused, attributes(js)] =>
 /// #     Internal,
 /// #     Js(JsError),
 /// # }
-///
+/// #
 /// #[derive(JsCaused)]
 /// enum BarError {
 ///     Foo(#[js(cause)] FooError),

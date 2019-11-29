@@ -357,10 +357,7 @@ async fn error_join_room_without_failed_stream_callback() {
     let room = Room::new(Rc::new(rpc), repo);
 
     let room_handle = room.new_handle();
-
-    let join_room = room_handle.inner_join(String::from("token")).await;
-
-    match join_room {
+    match room_handle.inner_join(String::from("token")).await {
         Ok(_) => unreachable!(),
         Err(e) => {
             assert_eq!(e.name(), "CallbackNotSet");

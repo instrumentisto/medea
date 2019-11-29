@@ -52,7 +52,7 @@ pub enum TransportError {
     #[display(fmt = "Failed to bind to WebSocket event: {}", _0)]
     WebSocketEventBindError(EventListenerBindError),
 
-    /// Occurs when message is sent to closed socket.
+    /// Occurs when message is sent to a closed socket.
     #[display(fmt = "Underlying socket is closed")]
     ClosedSocket,
 }
@@ -287,7 +287,7 @@ impl From<&CloseEvent> for CloseMsg {
     }
 }
 
-/// Wrapper for help to get [`ServerMsg`] from Websocket [`MessageEvent`][1].
+/// Wrapper for help to get [`ServerMsg`] from Websocket [MessageEvent][1].
 ///
 /// [1]: https://developer.mozilla.org/en-US/docs/Web/API/MessageEvent
 #[derive(From, Into)]

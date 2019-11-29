@@ -8,12 +8,12 @@ use derive_more::Display;
 use wasm_bindgen::prelude::*;
 use web_sys::{MediaDeviceInfo, MediaDeviceKind};
 
-/// Errors that may occur when parsing [`MediaDeviceInfo`][1].
+/// Errors that may occur when parsing [MediaDeviceInfo][1].
 ///
 /// [1]: https://w3.org/TR/mediacapture-streams/#device-info
 #[derive(Debug, Display)]
 pub enum Error {
-    /// Occurs when kind of media device not input device.
+    /// Occurs when kind of media device is not an input device.
     #[display(fmt = "Not an input device")]
     NotInputDevice,
 }
