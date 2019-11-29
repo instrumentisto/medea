@@ -744,10 +744,10 @@ helm:
 helm.down:
 ifneq ($(check),no)
 	$(if $(shell helm $(helm-cluster-args) list | grep '$(helm-release)'),\
-		helm $(helm-cluster-args) delete $(helm-release) ,\
+		helm $(helm-cluster-args) uninstall $(helm-release) ,\
 		@echo "--> No $(helm-release) release found in $(helm-cluster) cluster")
 else
-	helm $(helm-cluster-args) delete $(helm-release)
+	helm $(helm-cluster-args) uninstall $(helm-release)
 endif
 
 
