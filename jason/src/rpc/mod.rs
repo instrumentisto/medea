@@ -5,8 +5,7 @@ mod websocket;
 
 use std::{cell::RefCell, rc::Rc, vec};
 
-use anyhow::Result;
-use derive_more::Display;
+use derive_more::{Display, From};
 use futures::{
     channel::{mpsc, oneshot},
     future::LocalBoxFuture,
@@ -18,13 +17,16 @@ use medea_client_api_proto::{
     Event, ServerMsg,
 };
 use serde::Serialize;
+use tracerr::Traced;
 use wasm_bindgen_futures::spawn_local;
 use web_sys::CloseEvent;
 
-use self::heartbeat::Heartbeat;
+use crate::utils::{JasonError, JsCaused, JsError};
+
+use self::heartbeat::{Heartbeat, HeartbeatError};
 
 #[doc(inline)]
-pub use self::websocket::{Error as TransportError, WebSocketRpcTransport};
+pub use self::websocket::{TransportError, WebSocketRpcTransport};
 
 /// Reasons of closing by client side and server side.
 #[derive(Copy, Clone, Display, Debug, Eq, PartialEq)]
@@ -114,6 +116,19 @@ impl From<&CloseEvent> for CloseMsg {
     }
 }
 
+/// Errors that may occur in [`RpcClient`].
+#[derive(Debug, Display, From, JsCaused)]
+#[allow(clippy::module_name_repetitions)]
+pub enum RpcClientError {
+    /// Occurs if WebSocket connection to remote media server failed.
+    #[display(fmt = "Connection failed: {}", _0)]
+    RpcTransportError(#[js(cause)] TransportError),
+
+    /// Occurs if the heartbeat cannot be started.
+    #[display(fmt = "Start heartbeat failed: {}", _0)]
+    CouldNotStartHeartbeat(#[js(cause)] HeartbeatError),
+}
+
 // TODO: consider using async-trait crate, it doesnt work with mockall atm
 /// Client to talk with server via Client API RPC.
 #[allow(clippy::module_name_repetitions)]
@@ -123,7 +138,7 @@ pub trait RpcClient {
     fn connect(
         &self,
         transport: Rc<dyn RpcTransport>,
-    ) -> LocalBoxFuture<'static, Result<()>>;
+    ) -> LocalBoxFuture<'static, Result<(), Traced<RpcClientError>>>;
 
     /// Returns [`Stream`] of all [`Event`]s received by this [`RpcClient`].
     ///
@@ -156,8 +171,8 @@ pub trait RpcTransport {
     fn on_message(
         &self,
     ) -> Result<
-        LocalBoxStream<'static, Result<ServerMsg, TransportError>>,
-        TransportError,
+        LocalBoxStream<'static, Result<ServerMsg, Traced<TransportError>>>,
+        Traced<TransportError>,
     >;
 
     /// Returns [`LocalBoxFuture`], that will be resolved when this transport
@@ -166,15 +181,15 @@ pub trait RpcTransport {
         &self,
     ) -> Result<
         LocalBoxFuture<'static, Result<CloseMsg, oneshot::Canceled>>,
-        TransportError,
+        Traced<TransportError>,
     >;
-
-    /// Sends message to remote server.
-    fn send(&self, msg: &ClientMsg) -> Result<(), TransportError>;
 
     /// Sets reason, that will be sent to remote server when this transport will
     /// be dropped.
     fn set_close_reason(&self, reason: ClientDisconnect);
+
+    /// Sends message to server.
+    fn send(&self, msg: &ClientMsg) -> Result<(), Traced<TransportError>>;
 }
 
 /// Inner state of [`WebsocketRpcClient`].
@@ -250,7 +265,7 @@ fn on_close(inner_rc: &RefCell<Inner>, close_msg: &CloseMsg) {
 /// Handles messages from remote server.
 fn on_message(
     inner_rc: &RefCell<Inner>,
-    msg: Result<ServerMsg, TransportError>,
+    msg: Result<ServerMsg, Traced<TransportError>>,
 ) {
     let inner = inner_rc.borrow();
     match msg {
@@ -271,7 +286,7 @@ fn on_message(
         Err(err) => {
             // TODO: protocol versions mismatch? should drop
             //       connection if so
-            console_error!(err.to_string());
+            JasonError::from(err).print();
         }
     }
 }
@@ -300,13 +315,19 @@ impl RpcClient for WebSocketRpcClient {
     fn connect(
         &self,
         transport: Rc<dyn RpcTransport>,
-    ) -> LocalBoxFuture<'static, Result<()>> {
+    ) -> LocalBoxFuture<'static, Result<(), Traced<RpcClientError>>> {
         let inner = Rc::clone(&self.0);
         Box::pin(async move {
-            inner.borrow_mut().heartbeat.start(Rc::clone(&transport))?;
+            inner
+                .borrow_mut()
+                .heartbeat
+                .start(Rc::clone(&transport))
+                .map_err(tracerr::map_from_and_wrap!())?;
 
             let inner_rc = Rc::clone(&inner);
-            let mut on_socket_message = transport.on_message()?;
+            let mut on_socket_message = transport
+                .on_message()
+                .map_err(tracerr::map_from_and_wrap!())?;
             spawn_local(async move {
                 while let Some(msg) = on_socket_message.next().await {
                     on_message(&inner_rc, msg)
@@ -314,7 +335,9 @@ impl RpcClient for WebSocketRpcClient {
             });
 
             let inner_rc = Rc::clone(&inner);
-            let on_socket_close = transport.on_close()?;
+            let on_socket_close = transport
+                .on_close()
+                .map_err(tracerr::map_from_and_wrap!())?;
             spawn_local(async move {
                 match on_socket_close.await {
                     Ok(msg) => on_close(&inner_rc, &msg),

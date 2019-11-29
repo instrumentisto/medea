@@ -2,15 +2,19 @@
 
 use std::rc::Rc;
 
-use futures::channel::mpsc;
+use futures::{
+    channel::{mpsc, oneshot},
+    future::Either,
+};
 use medea_client_api_proto::{Event, IceServer, PeerId};
 use medea_jason::{
     api::Room,
-    media::MediaManager,
+    media::{AudioTrackConstraints, MediaManager, MediaStreamConstraints},
     peer::{MockPeerRepository, PeerConnection, PeerEvent},
     rpc::MockRpcClient,
-    AudioTrackConstraints, MediaStreamConstraints,
+    utils::JasonError,
 };
+use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
 use wasm_bindgen_test::*;
 
@@ -188,11 +192,12 @@ async fn error_inject_invalid_local_stream_into_new_peer() {
     let (room, _peer) = get_test_room_and_new_peer(event_rx, true, true);
 
     let room_handle = room.new_handle();
-    let (cb, test_rx) = js_callback!(|err: js_sys::Error| {
+    let (cb, test_result) = js_callback!(|err: JasonError| {
+        cb_assert_eq!(&err.name(), "InvalidLocalStream");
         cb_assert_eq!(
-            err.to_string().as_string().unwrap(),
-            "Error: provided MediaStream was expected to have single video \
-             track"
+            err.message(),
+            "Invalid local stream: provided MediaStream was expected to have \
+             single video track"
         );
     });
     room_handle.on_failed_local_stream(cb.into()).unwrap();
@@ -216,7 +221,7 @@ async fn error_inject_invalid_local_stream_into_new_peer() {
         })
         .unwrap();
 
-    wait_and_check_test_result(test_rx).await;
+    wait_and_check_test_result(test_result, || {}).await;
 }
 
 // Tests Room::inject_local_stream for existing PeerConnection.
@@ -230,11 +235,12 @@ async fn error_inject_invalid_local_stream_into_new_peer() {
 //     1. Invoking `on_failed_local_stream` callback.
 #[wasm_bindgen_test]
 async fn error_inject_invalid_local_stream_into_room_on_exists_peer() {
-    let (cb, test_result) = js_callback!(|err: js_sys::Error| {
+    let (cb, test_result) = js_callback!(|err: JasonError| {
+        cb_assert_eq!(&err.name(), "InvalidLocalStream");
         cb_assert_eq!(
-            err.to_string().as_string().unwrap(),
-            "Error: provided MediaStream was expected to have single video \
-             track"
+            &err.message(),
+            "Invalid local stream: provided MediaStream was expected to have \
+             single video track"
         );
     });
     let (room, peer) = get_test_room_and_exist_peer(1);
@@ -252,7 +258,7 @@ async fn error_inject_invalid_local_stream_into_room_on_exists_peer() {
     room_handle.on_failed_local_stream(cb.into()).unwrap();
     room_handle.inject_local_stream(stream).unwrap();
 
-    wait_and_check_test_result(test_result).await;
+    wait_and_check_test_result(test_result, || {}).await;
 }
 
 #[wasm_bindgen_test]
@@ -262,17 +268,20 @@ async fn error_get_local_stream_on_new_peer() {
 
     let room_handle = room.new_handle();
 
-    let (cb, test_result) = js_callback!(|err: js_sys::Error| {
+    let (cb, test_result) = js_callback!(|err: JasonError| {
+        cb_assert_eq!(&err.name(), "CouldNotGetLocalMedia");
         cb_assert_eq!(
-            err.to_string().as_string().unwrap(),
-            "Error: MediaDevices.getUserMedia() failed: some error"
+            &err.message(),
+            "Failed to get local stream: MediaDevices.getUserMedia() failed: \
+             Unknown JS error: error_get_local_stream_on_new_peer"
         );
     });
 
     room_handle.on_failed_local_stream(cb.into()).unwrap();
 
     let mock_navigator = MockNavigator::new();
-    mock_navigator.error_get_user_media("some error".into());
+    mock_navigator
+        .error_get_user_media("error_get_local_stream_on_new_peer".into());
 
     let (audio_track, video_track) = get_test_tracks();
     event_tx
@@ -284,8 +293,8 @@ async fn error_get_local_stream_on_new_peer() {
         })
         .unwrap();
 
-    wait_and_check_test_result(test_result).await;
-    mock_navigator.stop();
+    wait_and_check_test_result(test_result, move || mock_navigator.stop())
+        .await;
 }
 
 // Tests Room::join without set `on_failed_local_stream` callback.
@@ -307,12 +316,16 @@ async fn error_join_room_without_failed_stream_callback() {
     let room = Room::new(Rc::new(rpc), repo);
 
     let room_handle = room.new_handle();
-    match JsFuture::from(room_handle.join("token".to_string())).await {
-        Ok(_) => assert!(
-            false,
-            "Not allowed join if `on_failed_local_stream` callback is not set"
-        ),
-        Err(_) => assert!(true),
+    match room_handle.inner_join(String::from("token")).await {
+        Ok(_) => unreachable!(),
+        Err(e) => {
+            assert_eq!(e.name(), "CallbackNotSet");
+            assert_eq!(
+                e.message(),
+                "`on_failed_local_stream` callback is not set",
+            );
+            assert!(!e.trace().is_empty());
+        }
     }
 }
 
@@ -387,7 +400,7 @@ mod on_close_callback {
         room_handle.on_close(cb.into()).unwrap();
 
         room.close(CloseReason::ByServer(CloseByServerReason::Finished));
-        wait_and_check_test_result(test_result).await;
+        wait_and_check_test_result(test_result, || {}).await;
     }
 
     /// Tests that [`RoomHandle::on_close`] will be called on unexpected
@@ -415,7 +428,7 @@ mod on_close_callback {
         room_handle.on_close(cb.into()).unwrap();
 
         std::mem::drop(room);
-        wait_and_check_test_result(test_result).await;
+        wait_and_check_test_result(test_result, || {}).await;
     }
 
     /// Tests that [`RoomHandle::on_close`] will be called on closing by Jason.
@@ -443,7 +456,7 @@ mod on_close_callback {
             reason: ClientDisconnect::RoomUnexpectedlyDropped,
             is_err: false,
         });
-        wait_and_check_test_result(test_result).await;
+        wait_and_check_test_result(test_result, || {}).await;
     }
 }
 

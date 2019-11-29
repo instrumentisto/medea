@@ -166,7 +166,7 @@
           await updateLocalVideo(stream);
           room.inject_local_stream(stream);
         } catch (e) {
-          console.log("Changing audio source failed:" + e);
+          logError("Changing audio source failed", e);
         }
       });
 
@@ -176,7 +176,7 @@
           await updateLocalVideo(stream);
           room.inject_local_stream(stream);
         } catch (e) {
-          console.log("Changing video source failed:" + e);
+          logError("Changing video source failed", e);
         }
       });
 
@@ -250,7 +250,7 @@
             await room.join(await addNewMember(roomId, username));
 
           } catch (e) {
-            console.error("Join to room failed: " + e);
+            logError("Join to room failed", e);
           }
         };
       };
@@ -268,7 +268,7 @@
           await getDevices(audioSelect, videoSelect, stream);
           room.inject_local_stream(stream);
         } catch (e) {
-          console.log("Init local video failed:" + e);
+          logError("Init local video failed", e);
         }
 
       } else {
@@ -284,7 +284,7 @@
             await getDevices(audioSelect, videoSelect, stream);
             room.inject_local_stream(stream);
           } catch (e) {
-            console.log("Init local video failed:" + e);
+            logError("Init local video failed", e);
           }
 
           chooseRoomDiv.style.display = "none";
@@ -295,6 +295,14 @@
 
     window.onload = async function () {
       await init_jason();
+    };
+
+    function logError(msg, e) {
+      console.error(
+        msg + ": Error[name:[", e.name(), "], ",
+        "[msg:", e.message(), "], [source", e.source(), "]]",
+      );
+      console.error(e.trace());
     }
   </script>
 

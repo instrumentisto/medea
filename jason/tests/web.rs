@@ -79,13 +79,12 @@ mod media;
 mod peer;
 mod rpc;
 
-use anyhow::Result;
 use futures::{channel::oneshot, future::Either};
 use js_sys::Promise;
 use medea_client_api_proto::{
     AudioSettings, Direction, MediaType, PeerId, Track, TrackId, VideoSettings,
 };
-use medea_jason::utils::window;
+use medea_jason::utils::{window, JasonError};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
 use wasm_bindgen_test::*;
@@ -107,6 +106,11 @@ extern "C" {
 
     #[wasm_bindgen(method)]
     fn stop(this: &MockNavigator);
+}
+
+#[wasm_bindgen(inline_js = "export const get_jason_error = (err) => err;")]
+extern "C" {
+    fn get_jason_error(err: JsValue) -> JasonError;
 }
 
 pub fn get_test_tracks() -> (Track, Track) {
@@ -143,22 +147,25 @@ pub async fn resolve_after(delay_ms: i32) -> Result<(), JsValue> {
     Ok(())
 }
 
-/// Waits for [`Result`] from [`oneshot::Receiver`] with tests result with 500
-/// milliseconds deadline.
+/// Waits for [`Result`] from [`oneshot::Receiver`] with tests result.
 ///
-/// Panics if deadline is exceeded or provided rx resolves to `Err`.
-pub async fn wait_and_check_test_result(
+/// Also it will check result of test and will panic if some error will be
+/// found.
+async fn wait_and_check_test_result(
     rx: oneshot::Receiver<Result<(), String>>,
+    finally: impl FnOnce(),
 ) {
     let result =
         futures::future::select(Box::pin(rx), Box::pin(resolve_after(500)))
             .await;
+    finally();
     match result {
-        Either::Left((rx_result, _)) => {
-            rx_result.unwrap().unwrap();
+        Either::Left((oneshot_fut_result, _)) => {
+            let assert_result = oneshot_fut_result.expect("Cancelled.");
+            assert_result.expect("Assertion failed");
         }
         Either::Right(_) => {
-            panic!("on_close callback didn't fired");
+            panic!("callback didn't fired");
         }
     };
 }
