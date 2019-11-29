@@ -153,11 +153,12 @@ impl From<TransportError> for RoomError {
 impl From<PeerError> for RoomError {
     fn from(err: PeerError) -> Self {
         use PeerError::*;
-        use RoomError::*;
         match err {
-            MediaConnections(_) | StreamRequest(_) => InvalidLocalStream(err),
-            MediaManager(_) => CouldNotGetLocalMedia(err),
-            RtcPeerConnection(_) => PeerConnectionError(err),
+            MediaConnections(_) | StreamRequest(_) => {
+                Self::InvalidLocalStream(err)
+            }
+            MediaManager(_) => Self::CouldNotGetLocalMedia(err),
+            RtcPeerConnection(_) => Self::PeerConnectionError(err),
         }
     }
 }
