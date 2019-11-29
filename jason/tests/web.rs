@@ -5,12 +5,11 @@ mod media;
 mod peer;
 mod rpc;
 
-use anyhow::Result;
 use js_sys::Promise;
 use medea_client_api_proto::{
     AudioSettings, Direction, MediaType, PeerId, Track, TrackId, VideoSettings,
 };
-use medea_jason::utils::window;
+use medea_jason::utils::{window, JasonError};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
 use wasm_bindgen_test::*;
@@ -32,6 +31,11 @@ extern "C" {
 
     #[wasm_bindgen(method)]
     fn stop(this: &MockNavigator);
+}
+
+#[wasm_bindgen(inline_js = "export const get_jason_error = (err) => err;")]
+extern "C" {
+    fn get_jason_error(err: JsValue) -> JasonError;
 }
 
 pub fn get_test_tracks() -> (Track, Track) {

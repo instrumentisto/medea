@@ -1,24 +1,33 @@
 use std::{cell::RefCell, rc::Rc};
 
+use derive_more::{Display, From};
 use medea_client_api_proto::ClientMsg;
-use thiserror::Error;
+use tracerr::Traced;
 use wasm_bindgen::{prelude::*, JsCast};
 
 use crate::{
     rpc::{RpcTransport, TransportError},
-    utils::{window, IntervalHandle, WasmErr},
+    utils::{window, IntervalHandle, JsCaused, JsError},
 };
 
 /// Errors that may occur in [`Heartbeat`].
-#[derive(Debug, Error)]
-pub enum Error {
-    #[error("unable to ping: no transport")]
-    NoTransport,
-    #[error("cannot set callback for ping send: {0}")]
-    SetIntervalHandler(#[from] WasmErr),
-    #[error("failed to send ping: {0}")]
-    SendPing(#[from] TransportError),
+#[derive(Debug, Display, From, JsCaused)]
+#[allow(clippy::module_name_repetitions)]
+pub enum HeartbeatError {
+    /// Occurs when `ping` cannot be send because no transport.
+    #[display(fmt = "unable to ping: no transport")]
+    NoSocket,
+
+    /// Occurs when a handler cannot be set to send `ping`.
+    #[display(fmt = "cannot set callback for ping send: {}", _0)]
+    SetIntervalHandler(JsError),
+
+    /// Occurs when socket failed to send `ping`.
+    #[display(fmt = "failed to send ping: {}", _0)]
+    SendPing(#[js(cause)] TransportError),
 }
+
+type Result<T> = std::result::Result<T, Traced<HeartbeatError>>;
 
 /// Responsible for sending/handling keep-alive requests, detecting connection
 /// loss.
@@ -40,12 +49,14 @@ struct InnerHeartbeat {
 impl InnerHeartbeat {
     /// Send ping message to RPC server.
     /// Returns errors if no open transport found.
-    fn send_now(&mut self) -> Result<(), Error> {
+    fn send_now(&mut self) -> Result<()> {
         match self.transport.as_ref() {
-            None => Err(Error::NoTransport),
+            None => Err(tracerr::new!(HeartbeatError::NoSocket)),
             Some(transport) => {
                 self.num += 1;
-                Ok(transport.send(&ClientMsg::Ping(self.num))?)
+                Ok(transport
+                    .send(&ClientMsg::Ping(self.num))
+                    .map_err(tracerr::map_from_and_wrap!())?)
             }
         }
     }
@@ -74,12 +85,12 @@ impl Heartbeat {
     ///
     /// Sends first `ping` immediately, so provided [`RpcTransport`] must be
     /// active.
-    pub fn start(&self, transport: Rc<dyn RpcTransport>) -> Result<(), Error> {
+    pub fn start(&self, transport: Rc<dyn RpcTransport>) -> Result<()> {
         let mut inner = self.0.borrow_mut();
         inner.num = 0;
         inner.pong_at = None;
         inner.transport = Some(transport);
-        inner.send_now()?;
+        inner.send_now().map_err(tracerr::wrap!())?;
 
         let inner_rc = Rc::clone(&self.0);
         let do_ping = Closure::wrap(Box::new(move || {
@@ -92,7 +103,8 @@ impl Heartbeat {
                 do_ping.as_ref().unchecked_ref(),
                 inner.interval,
             )
-            .map_err(WasmErr::from)?;
+            .map_err(JsError::from)
+            .map_err(tracerr::from_and_wrap!())?;
 
         inner.ping_task = Some(PingTaskHandler {
             _closure: do_ping,
