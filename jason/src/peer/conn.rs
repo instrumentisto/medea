@@ -2,9 +2,10 @@ use std::{cell::RefCell, rc::Rc};
 
 use derive_more::Display;
 use medea_client_api_proto::IceServer;
+use tracerr::Traced;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
-    RtcConfiguration, RtcIceCandidateInit,
+    Event, RtcConfiguration, RtcIceCandidateInit, RtcIceConnectionState,
     RtcPeerConnection as SysRtcPeerConnection, RtcPeerConnectionIceEvent,
     RtcRtpTransceiver, RtcRtpTransceiverDirection, RtcRtpTransceiverInit,
     RtcSdpType, RtcSessionDescription, RtcSessionDescriptionInit,
@@ -13,7 +14,7 @@ use web_sys::{
 
 use crate::{
     media::TrackConstraints,
-    utils::{EventListener, WasmErr},
+    utils::{EventListener, EventListenerBindError, JsCaused, JsError},
 };
 
 use super::ice_server::RtcIceServers;
@@ -115,49 +116,56 @@ pub enum SdpType {
     Answer(String),
 }
 
+/// Errors that may occur during signaling between this and remote
 /// [RTCPeerConnection][1] and event handlers setting errors.
 ///
 /// [1]: https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection.
-#[derive(Debug, Display)]
+#[derive(Debug, Display, JsCaused)]
 pub enum RTCPeerConnectionError {
     /// Occurs when cannot adds new remote candidate to the
     /// [RTCPeerConnection][1]'s remote description.
     ///
     /// [1]: https://www.w3.org/TR/webrtc/#dom-rtcpeerconnection.
     #[display(fmt = "Failed to add ICE candidate: {}", _0)]
-    AddIceCandidateFailed(WasmErr),
+    AddIceCandidateFailed(JsError),
 
     /// Occurs when cannot obtains [SDP answer][`SdpType::Answer`] from
     /// the underlying [RTCPeerConnection][`SysRtcPeerConnection`].
     #[display(fmt = "Failed to create SDP answer: {}", _0)]
-    CreateAnswerFailed(WasmErr),
+    CreateAnswerFailed(JsError),
 
     /// Occurs when a new [`RtcPeerConnection`] cannot be created.
     #[display(fmt = "Failed to create PeerConnection: {}", _0)]
-    PeerCreationError(WasmErr),
+    PeerCreationError(JsError),
 
     /// Occurs when cannot obtains [SDP offer][`SdpType::Offer`] from
     /// the underlying [RTCPeerConnection][`SysRtcPeerConnection`]
     #[display(fmt = "Failed to create SDP offer: {}", _0)]
-    CreateOfferFailed(WasmErr),
+    CreateOfferFailed(JsError),
 
     /// Occurs when handler failed to bind to some [`RTCPeerConnection`] event.
     /// Not really supposed to ever happen.
     #[display(fmt = "Failed to bind to RTCPeerConnection event: {}", _0)]
-    PeerConnectionEventBindFailed(WasmErr),
+    PeerConnectionEventBindFailed(EventListenerBindError),
 
     /// Occurs if the local description associated with the
     /// [`RTCPeerConnection`] cannot be changed.
     #[display(fmt = "Failed to set local SDP description: {}", _0)]
-    SetLocalDescriptionFailed(WasmErr),
+    SetLocalDescriptionFailed(JsError),
 
     /// Occurs if the description of the remote end of the
     /// [`RTCPeerConnection`] cannot be changed.
     #[display(fmt = "Failed to set remote SDP description: {}", _0)]
-    SetRemoteDescriptionFailed(WasmErr),
+    SetRemoteDescriptionFailed(JsError),
 }
 
-type Result<T> = std::result::Result<T, RTCPeerConnectionError>;
+type Result<T> = std::result::Result<T, Traced<RTCPeerConnectionError>>;
+
+impl From<EventListenerBindError> for RTCPeerConnectionError {
+    fn from(err: EventListenerBindError) -> Self {
+        Self::PeerConnectionEventBindFailed(err)
+    }
+}
 
 /// Representation of [RTCPeerConnection][1].
 ///
@@ -179,6 +187,15 @@ pub struct RtcPeerConnection {
     on_ice_candidate: RefCell<
         Option<EventListener<SysRtcPeerConnection, RtcPeerConnectionIceEvent>>,
     >,
+
+    /// [`iceconnectionstatechange`][2] callback of [RTCPeerConnection][1],
+    /// fires whenever [ICE connection state][3] changes.
+    ///
+    /// [1]: https://w3.org/TR/webrtc/#rtcpeerconnection-interface
+    /// [2]: https://w3.org/TR/webrtc/#event-iceconnectionstatechange
+    /// [3]: https://w3.org/TR/webrtc/#dfn-ice-connection-state
+    on_ice_connection_state_changed:
+        RefCell<Option<EventListener<SysRtcPeerConnection, Event>>>,
 
     /// [`ontrack`][2] callback of [RTCPeerConnection][1] to handle
     /// [`track`][3] event. It fires when [RTCPeerConnection][1] receives
@@ -203,11 +220,13 @@ impl RtcPeerConnection {
         peer_conf.ice_servers(&RtcIceServers::from(ice_servers));
         let peer = SysRtcPeerConnection::new_with_configuration(&peer_conf)
             .map_err(Into::into)
-            .map_err(RTCPeerConnectionError::PeerCreationError)?;
+            .map_err(RTCPeerConnectionError::PeerCreationError)
+            .map_err(tracerr::wrap!())?;
 
         Ok(Self {
             peer: Rc::new(peer),
             on_ice_candidate: RefCell::new(None),
+            on_ice_connection_state_changed: RefCell::new(None),
             on_track: RefCell::new(None),
         })
     }
@@ -235,10 +254,7 @@ impl RtcPeerConnection {
                             f(msg);
                         },
                     )
-                    .map_err(Into::into)
-                    .map_err(
-                        RTCPeerConnectionError::PeerConnectionEventBindFailed,
-                    )?,
+                    .map_err(tracerr::map_from_and_wrap!())?,
                 );
             }
         }
@@ -278,10 +294,37 @@ impl RtcPeerConnection {
                             }
                         },
                     )
-                    .map_err(Into::into)
-                    .map_err(
-                        RTCPeerConnectionError::PeerConnectionEventBindFailed,
-                    )?,
+                    .map_err(tracerr::map_from_and_wrap!())?,
+                );
+            }
+        }
+        Ok(())
+    }
+
+    /// Sets handler for [`iceconnectionstatechange`][1] event.
+    ///
+    /// [1]: https://www.w3.org/TR/webrtc/#event-iceconnectionstatechange
+    pub fn on_ice_connection_state_change<F>(&self, f: Option<F>) -> Result<()>
+    where
+        F: 'static + FnMut(RtcIceConnectionState),
+    {
+        let mut on_ice_connection_state_changed =
+            self.on_ice_connection_state_changed.borrow_mut();
+        match f {
+            None => {
+                on_ice_connection_state_changed.take();
+            }
+            Some(mut f) => {
+                let peer = Rc::clone(&self.peer);
+                on_ice_connection_state_changed.replace(
+                    EventListener::new_mut(
+                        Rc::clone(&self.peer),
+                        "iceconnectionstatechange",
+                        move |_| {
+                            f(peer.ice_connection_state());
+                        },
+                    )
+                    .map_err(tracerr::map_from_and_wrap!())?,
                 );
             }
         }
@@ -310,7 +353,8 @@ impl RtcPeerConnection {
         )
         .await
         .map_err(Into::into)
-        .map_err(RTCPeerConnectionError::AddIceCandidateFailed)?;
+        .map_err(RTCPeerConnectionError::AddIceCandidateFailed)
+        .map_err(tracerr::wrap!())?;
         Ok(())
     }
 
@@ -325,7 +369,8 @@ impl RtcPeerConnection {
         let answer = JsFuture::from(self.peer.create_answer())
             .await
             .map_err(Into::into)
-            .map_err(RTCPeerConnectionError::CreateAnswerFailed)?;
+            .map_err(RTCPeerConnectionError::CreateAnswerFailed)
+            .map_err(tracerr::wrap!())?;
         let answer = RtcSessionDescription::from(answer).sdp();
 
         let mut desc = RtcSessionDescriptionInit::new(RtcSdpType::Answer);
@@ -334,7 +379,8 @@ impl RtcPeerConnection {
         JsFuture::from(peer.set_local_description(&desc))
             .await
             .map_err(Into::into)
-            .map_err(RTCPeerConnectionError::SetLocalDescriptionFailed)?;
+            .map_err(RTCPeerConnectionError::SetLocalDescriptionFailed)
+            .map_err(tracerr::wrap!())?;
 
         Ok(answer)
     }
@@ -351,7 +397,8 @@ impl RtcPeerConnection {
         let create_offer = JsFuture::from(peer.create_offer())
             .await
             .map_err(Into::into)
-            .map_err(RTCPeerConnectionError::CreateOfferFailed)?;
+            .map_err(RTCPeerConnectionError::CreateOfferFailed)
+            .map_err(tracerr::wrap!())?;
         let offer = RtcSessionDescription::from(create_offer).sdp();
 
         let mut desc = RtcSessionDescriptionInit::new(RtcSdpType::Offer);
@@ -360,7 +407,8 @@ impl RtcPeerConnection {
         JsFuture::from(peer.set_local_description(&desc))
             .await
             .map_err(Into::into)
-            .map_err(RTCPeerConnectionError::SetLocalDescriptionFailed)?;
+            .map_err(RTCPeerConnectionError::SetLocalDescriptionFailed)
+            .map_err(tracerr::wrap!())?;
 
         Ok(offer)
     }
@@ -389,7 +437,8 @@ impl RtcPeerConnection {
         JsFuture::from(self.peer.set_remote_description(&description))
             .await
             .map_err(Into::into)
-            .map_err(RTCPeerConnectionError::SetLocalDescriptionFailed)?;
+            .map_err(RTCPeerConnectionError::SetRemoteDescriptionFailed)
+            .map_err(tracerr::wrap!())?;
 
         Ok(())
     }
@@ -448,6 +497,7 @@ impl Drop for RtcPeerConnection {
     fn drop(&mut self) {
         self.on_track.borrow_mut().take();
         self.on_ice_candidate.borrow_mut().take();
+        self.on_ice_connection_state_changed.borrow_mut().take();
         self.peer.close();
     }
 }

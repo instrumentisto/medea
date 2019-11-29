@@ -38,6 +38,12 @@ All user visible changes to this project will be documented in this file. This p
             - `Room.join()`;
         - Ability to inject local video/audio stream into `Room` via `Room.inject_local_stream()` ([#54]);
         - `Room.on_failed_local_stream` callback ([#54]).
+- Signalling:
+    - Emitting of RPC commands:
+        - `AddPeerConnectionMetrics` with `IceConnectionState` ([#71](/../../pull/71)).
+- Error handling:
+    - Library API:
+        - `JasonError` as library error with trace information and underlying JS error if it is the cause ([#55])
 
 ### Fixed
 

@@ -270,7 +270,7 @@ window.onload = async function() {
       await fillMediaDevicesInputs(audioSelect, videoSelect, stream);
       room.inject_local_stream(stream);
     } catch (e) {
-      console.error("Init local video failed: " + e);
+      console.error("Init local video failed: " + e.message());
     }
 
     audioSelect.addEventListener('change', async () => {
@@ -352,7 +352,7 @@ window.onload = async function() {
           } catch (e) {
             if (e.response.status === 400) {
               console.log("Room not found. Creating new room...");
-              room.join(await createRoom(roomId, username));
+              await room.join(await createRoom(roomId, username));
               return;
             }
           }
@@ -360,12 +360,16 @@ window.onload = async function() {
             await axios.get(controlUrl + roomId + '/' + username);
           } catch (e) {
             console.log("Member not found. Creating new member...");
-            room.join(await createMember(roomId, username));
+            await room.join(await createMember(roomId, username));
             return;
           }
-          room.join(baseUrl + roomId + '/' + username + '/test')
+          await room.join(baseUrl + roomId + '/' + username + '/test')
         } catch (e) {
-          console.error("Join to room failed: " + e);
+          console.error(
+            "Join to room failed: Error[name:[", e.name(), "], ",
+            "[msg:", e.message(), "], [source", e.source(), "]]",
+          );
+          console.error(e.trace());
         }
       };
     };

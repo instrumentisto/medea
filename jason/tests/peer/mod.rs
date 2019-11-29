@@ -5,7 +5,7 @@ mod media;
 use std::rc::Rc;
 
 use futures::{channel::mpsc, StreamExt as _};
-use medea_client_api_proto::PeerId;
+use medea_client_api_proto::{IceConnectionState, PeerId};
 use medea_jason::{
     api::RoomStream,
     media::MediaManager,
@@ -262,6 +262,97 @@ async fn handle_ice_candidates(
                 }
             }
             _ => unreachable!(),
+        }
+    }
+}
+
+/// Setup signalling between two peers and wait for:
+/// 1. `IceConnectionState::Checking` from both peers.
+/// 2. `IceConnectionState::Connected` from both peers.
+#[wasm_bindgen_test]
+async fn ice_connection_state_changed_is_emitted() {
+    let (tx1, rx1) = mpsc::unbounded();
+    let (tx2, rx2) = mpsc::unbounded();
+
+    let manager = Rc::new(MediaManager::default());
+    let peer1 = PeerConnection::new(
+        PeerId(1),
+        tx1,
+        vec![],
+        Rc::clone(&manager),
+        true,
+        true,
+    )
+    .unwrap();
+    let peer2 =
+        PeerConnection::new(PeerId(2), tx2, vec![], manager, true, true)
+            .unwrap();
+    let (audio_track, video_track) = get_test_tracks();
+
+    let offer = peer1
+        .get_offer(vec![audio_track.clone(), video_track.clone()], None)
+        .await
+        .unwrap();
+    let answer = peer2
+        .process_offer(offer, vec![audio_track, video_track], None)
+        .await
+        .unwrap();
+    peer1.set_remote_answer(answer).await.unwrap();
+
+    resolve_after(500).await.unwrap();
+
+    let mut events = futures::stream::select(rx1, rx2);
+
+    let mut checking1 = false;
+    let mut checking2 = false;
+    let mut connected1 = false;
+    let mut connected2 = false;
+    while let Some(event) = events.next().await {
+        let event: PeerEvent = event;
+        match event {
+            PeerEvent::IceCandidateDiscovered {
+                peer_id,
+                candidate,
+                sdp_m_line_index,
+                sdp_mid,
+            } => {
+                if peer_id.0 == 1 {
+                    peer2
+                        .add_ice_candidate(candidate, sdp_m_line_index, sdp_mid)
+                        .await
+                        .unwrap();
+                } else {
+                    peer1
+                        .add_ice_candidate(candidate, sdp_m_line_index, sdp_mid)
+                        .await
+                        .unwrap();
+                }
+            }
+            PeerEvent::IceConnectionStateChanged {
+                peer_id,
+                ice_connection_state,
+            } => match ice_connection_state {
+                IceConnectionState::Checking => {
+                    if peer_id.0 == 1 {
+                        checking1 = true;
+                    } else {
+                        checking2 = true;
+                    }
+                }
+                IceConnectionState::Connected => {
+                    if peer_id.0 == 1 {
+                        connected1 = true;
+                    } else {
+                        connected2 = true;
+                    }
+                }
+                _ => {}
+            },
+            _ => {}
+        };
+
+        if checking1 && checking2 && connected1 && connected2 {
+            break;
         }
     }
 }

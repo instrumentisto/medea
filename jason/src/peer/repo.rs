@@ -2,6 +2,7 @@ use std::{collections::HashMap, rc::Rc};
 
 use futures::channel::mpsc;
 use medea_client_api_proto::{IceServer, PeerId};
+use tracerr::Traced;
 
 use super::{PeerConnection, PeerError, PeerEvent};
 
@@ -20,7 +21,7 @@ pub trait PeerRepository {
         events_sender: mpsc::UnboundedSender<PeerEvent>,
         enabled_audio: bool,
         enabled_video: bool,
-    ) -> Result<Rc<PeerConnection>, PeerError>;
+    ) -> Result<Rc<PeerConnection>, Traced<PeerError>>;
 
     /// Returns [`PeerConnection`] stored in repository by its ID.
     fn get(&self, id: PeerId) -> Option<Rc<PeerConnection>>;
@@ -49,14 +50,17 @@ impl PeerRepository for Repository {
         peer_events_sender: mpsc::UnboundedSender<PeerEvent>,
         enabled_audio: bool,
         enabled_video: bool,
-    ) -> Result<Rc<PeerConnection>, PeerError> {
-        let peer = Rc::new(PeerConnection::new(
-            id,
-            peer_events_sender,
-            ice_servers,
-            enabled_audio,
-            enabled_video,
-        )?);
+    ) -> Result<Rc<PeerConnection>, Traced<PeerError>> {
+        let peer = Rc::new(
+            PeerConnection::new(
+                id,
+                peer_events_sender,
+                ice_servers,
+                enabled_audio,
+                enabled_video,
+            )
+            .map_err(tracerr::map_from_and_wrap!())?,
+        );
         self.peers.insert(id, peer);
         Ok(self.peers.get(&id).cloned().unwrap())
     }

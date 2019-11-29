@@ -5,12 +5,16 @@ use std::{borrow::ToOwned, cell::RefCell, collections::HashMap, rc::Rc};
 use derive_more::Display;
 use futures::future;
 use medea_client_api_proto::{Direction, PeerId, Track, TrackId};
+use tracerr::Traced;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
     MediaStreamTrack, RtcRtpTransceiver, RtcRtpTransceiverDirection,
 };
 
-use crate::{media::TrackConstraints, utils::WasmErr};
+use crate::{
+    media::TrackConstraints,
+    utils::{JsCaused, JsError},
+};
 
 use super::{
     conn::{RtcPeerConnection, TransceiverDirection, TransceiverKind},
@@ -20,13 +24,13 @@ use super::{
 };
 
 /// Errors that may occur in [`MediaConnections`] storage.
-#[derive(Debug, Display)]
+#[derive(Debug, Display, JsCaused)]
 #[allow(clippy::module_name_repetitions)]
 pub enum MediaConnectionsError {
     /// Occurs when the provided [`MediaTrack`] cannot be inserted into
     /// provided [`Sender`]s transceiver.
     #[display(fmt = "Failed to insert Track to a sender: {}", _0)]
-    CouldNotInsertTrack(WasmErr),
+    CouldNotInsertTrack(JsError),
 
     /// Occurs when creates new [`Sender`] on not existed into a
     /// [`RtcPeerConnection`] the [`RtcRtpTransceiver`].
@@ -52,7 +56,7 @@ pub enum MediaConnectionsError {
     InvalidMediaTrack,
 }
 
-type Result<T> = std::result::Result<T, MediaConnectionsError>;
+type Result<T> = std::result::Result<T, Traced<MediaConnectionsError>>;
 
 /// Actual data of [`MediaConnections`] storage.
 struct InnerMediaConnections {
@@ -125,14 +129,17 @@ impl MediaConnections {
     /// Returns mapping from a [`MediaTrack`] ID to a `mid` of
     /// this track's [`RtcRtpTransceiver`].
     pub fn get_mids(&self) -> Result<HashMap<TrackId, String>> {
-        use MediaConnectionsError::*;
         let mut s = self.0.borrow_mut();
         let mut mids =
             HashMap::with_capacity(s.senders.len() + s.receivers.len());
         for (track_id, sender) in &s.senders {
             mids.insert(
                 *track_id,
-                sender.transceiver.mid().ok_or(SendersWithoutMid)?,
+                sender
+                    .transceiver
+                    .mid()
+                    .ok_or(MediaConnectionsError::SendersWithoutMid)
+                    .map_err(tracerr::wrap!())?,
             );
         }
         for (track_id, receiver) in &mut s.receivers {
@@ -141,7 +148,8 @@ impl MediaConnections {
                 receiver
                     .mid()
                     .map(ToOwned::to_owned)
-                    .ok_or(ReceiversWithoutMid)?,
+                    .ok_or(MediaConnectionsError::ReceiversWithoutMid)
+                    .map_err(tracerr::wrap!())?,
             );
         }
         Ok(mids)
@@ -168,7 +176,8 @@ impl MediaConnections {
                         track.media_type.into(),
                         &s.peer,
                         mid,
-                    )?;
+                    )
+                    .map_err(tracerr::wrap!())?;
                     s.senders.insert(track.id, sndr);
                 }
                 Direction::Recv { sender, mid } => {
@@ -213,8 +222,6 @@ impl MediaConnections {
         &self,
         stream: &MediaStream,
     ) -> Result<()> {
-        use MediaConnectionsError::*;
-
         let s = self.0.borrow();
 
         // Build sender to track pairs to catch errors before inserting.
@@ -224,10 +231,14 @@ impl MediaConnections {
                 if sender.caps.satisfies(&track.track()) {
                     sender_and_track.push((sender, track));
                 } else {
-                    return Err(InvalidMediaTrack);
+                    return Err(tracerr::new!(
+                        MediaConnectionsError::InvalidMediaTrack
+                    ));
                 }
             } else {
-                return Err(InvalidMediaStream);
+                return Err(tracerr::new!(
+                    MediaConnectionsError::InvalidMediaStream
+                ));
             }
         }
 
@@ -337,7 +348,8 @@ impl Sender {
             None => peer.add_transceiver(kind, TransceiverDirection::Sendonly),
             Some(mid) => peer
                 .get_transceiver_by_mid(&mid)
-                .ok_or(MediaConnectionsError::TransceiverNotFound(mid))?,
+                .ok_or(MediaConnectionsError::TransceiverNotFound(mid))
+                .map_err(tracerr::wrap!())?,
         };
         Ok(Rc::new(Self {
             track_id,
@@ -368,7 +380,8 @@ impl Sender {
         )
         .await
         .map_err(Into::into)
-        .map_err(MediaConnectionsError::CouldNotInsertTrack)?;
+        .map_err(MediaConnectionsError::CouldNotInsertTrack)
+        .map_err(tracerr::wrap!())?;
 
         sender
             .transceiver

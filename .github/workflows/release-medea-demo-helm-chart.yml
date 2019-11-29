@@ -23,6 +23,7 @@ jobs:
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Actions"
 
-          make helm.init client-only=yes
+          curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 \
+          | bash
 
       - run: make helm.package.release chart=medea-demo build=yes

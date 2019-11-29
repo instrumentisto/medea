@@ -11,7 +11,7 @@ use wasm_bindgen::prelude::*;
 use crate::{
     media::{MediaManager, MediaManagerHandle},
     peer,
-    rpc::WebsocketRpcClient,
+    rpc::WebSocketRpcClient,
     set_panic_hook,
 };
 
@@ -47,7 +47,7 @@ impl Jason {
 
     /// Returns [`RoomHandle`] for [`Room`].
     pub fn init_room(&self) -> RoomHandle {
-        let rpc = Rc::new(WebsocketRpcClient::new(3000));
+        let rpc = Rc::new(WebSocketRpcClient::new(3000));
         let peer_repository = Box::new(peer::Repository::default());
         let stream_source =
             Rc::new(RoomStream::new(Rc::clone(&self.0.borrow().media_manager)));

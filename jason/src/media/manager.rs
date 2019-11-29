@@ -12,6 +12,7 @@ use std::{
 use derive_more::Display;
 use futures::{future, FutureExt as _, TryFutureExt as _};
 use js_sys::Promise;
+use tracerr::Traced;
 use wasm_bindgen::{prelude::*, JsValue};
 use wasm_bindgen_futures::{future_to_promise, JsFuture};
 use web_sys::{
@@ -21,28 +22,34 @@ use web_sys::{
 
 use crate::{
     media::MediaStreamConstraints,
-    utils::{window, WasmErr},
+    utils::{window, JasonError, JsCaused, JsError},
 };
 
 use super::InputDeviceInfo;
 
 /// Errors that may occur in a [`MediaManager`].
-#[derive(Debug, Display)]
+#[derive(Debug, Display, JsCaused)]
 pub enum MediaManagerError {
-    /// Failed to get media devices
+    /// Occurs when cannot get access to [MediaDevices][1] object.
+    ///
+    /// [1]: https://w3.org/TR/mediacapture-streams/#mediadevices
     #[display(fmt = "Navigator.mediaDevices() failed: {}", _0)]
-    MediaDevices(WasmErr),
+    CouldNotGetMediaDevices(JsError),
 
-    /// Failed to get user media
+    /// Occurs if the requested [MediaStream][1] could not be received.
+    ///
+    /// [1]: https://w3.org/TR/mediacapture-streams/#mediastream
     #[display(fmt = "MediaDevices.getUserMedia() failed: {}", _0)]
-    GetUserMedia(WasmErr),
+    GetUserMediaFailed(JsError),
 
-    /// Failed to get enumerate devices
+    /// Occurs when cannot get info about connected [MediaDevices][1].
+    ///
+    /// [1]: https://w3.org/TR/mediacapture-streams/#mediadevices
     #[display(fmt = "MediaDevices.enumerateDevices() failed: {}", _0)]
-    GetEnumerateDevices(WasmErr),
+    EnumerateDevicesFailed(JsError),
 }
 
-type Result<T> = std::result::Result<T, MediaManagerError>;
+type Result<T> = std::result::Result<T, Traced<MediaManagerError>>;
 
 /// Manager that is responsible for [MediaStream][1] acquisition and storing.
 ///
@@ -62,21 +69,25 @@ impl InnerMediaManager {
     /// Returns the vector of [`MediaDeviceInfo`] objects.
     fn enumerate_devices() -> impl Future<Output = Result<Vec<InputDeviceInfo>>>
     {
+        use MediaManagerError::*;
         async {
             let devices = window()
                 .navigator()
                 .media_devices()
-                .map_err(Into::into)
-                .map_err(MediaManagerError::MediaDevices)?;
+                .map_err(JsError::from)
+                .map_err(CouldNotGetMediaDevices)
+                .map_err(tracerr::from_and_wrap!())?;
             let devices = JsFuture::from(
                 devices
                     .enumerate_devices()
-                    .map_err(Into::into)
-                    .map_err(MediaManagerError::GetEnumerateDevices)?,
+                    .map_err(JsError::from)
+                    .map_err(EnumerateDevicesFailed)
+                    .map_err(tracerr::from_and_wrap!())?,
             )
             .await
-            .map_err(Into::into)
-            .map_err(MediaManagerError::GetEnumerateDevices)?;
+            .map_err(JsError::from)
+            .map_err(EnumerateDevicesFailed)
+            .map_err(tracerr::from_and_wrap!())?;
 
             Ok(js_sys::Array::from(&devices)
                 .values()
@@ -109,7 +120,7 @@ impl InnerMediaManager {
     }
 
     /// Tries to build new [MediaStream][1] from already owned tracks to avoid
-    /// redudant [getUserMedia()][2] requests.
+    /// redundant [getUserMedia()][2] requests.
     ///
     /// [1]: https://w3.org/TR/mediacapture-streams/#mediastream
     /// [2]: https://bit.ly/2MHnEj5
@@ -155,25 +166,29 @@ impl InnerMediaManager {
         &self,
         caps: MediaStreamConstraints,
     ) -> impl Future<Output = Result<SysMediaStream>> {
+        use MediaManagerError::*;
         let storage = Rc::clone(&self.tracks);
 
         async move {
             let media_devices = window()
                 .navigator()
                 .media_devices()
-                .map_err(Into::into)
-                .map_err(MediaManagerError::MediaDevices)?;
+                .map_err(JsError::from)
+                .map_err(CouldNotGetMediaDevices)
+                .map_err(tracerr::from_and_wrap!())?;
 
             let caps: SysMediaStreamConstraints = caps.into();
             let stream = JsFuture::from(
                 media_devices
                     .get_user_media_with_constraints(&caps)
-                    .map_err(Into::into)
-                    .map_err(MediaManagerError::GetUserMedia)?,
+                    .map_err(JsError::from)
+                    .map_err(GetUserMediaFailed)
+                    .map_err(tracerr::from_and_wrap!())?,
             )
             .await
-            .map_err(Into::into)
-            .map_err(MediaManagerError::GetUserMedia)?;
+            .map_err(JsError::from)
+            .map_err(GetUserMediaFailed)
+            .map_err(tracerr::from_and_wrap!())?;
 
             let stream = SysMediaStream::from(stream);
 
@@ -247,9 +262,8 @@ impl MediaManagerHandle {
                             })
                             .into()
                     })
-                    .map_err(|err| {
-                        js_sys::Error::new(&format!("{}", err)).into()
-                    })
+                    .map_err(tracerr::wrap!(=> MediaManagerError))
+                    .map_err(|e| JasonError::from(e).into())
             }),
             Err(e) => future_to_promise(future::err(e)),
         }
@@ -260,13 +274,13 @@ impl MediaManagerHandle {
     /// [1]: https://w3.org/TR/mediacapture-streams/#mediastream
     pub fn init_local_stream(&self, caps: MediaStreamConstraints) -> Promise {
         match map_weak!(self, |inner| { inner.get_stream(caps) }) {
-            Ok(stream) => {
-                future_to_promise(async {
-                    stream.await.map(|(stream, _)| stream.into()).map_err(
-                        |err| js_sys::Error::new(&format!("{}", err)).into(),
-                    )
-                })
-            }
+            Ok(stream) => future_to_promise(async {
+                stream
+                    .await
+                    .map(|(stream, _)| stream.into())
+                    .map_err(tracerr::wrap!(=> MediaManagerError))
+                    .map_err(|e| JasonError::from(e).into())
+            }),
             Err(err) => future_to_promise(future::err(err)),
         }
     }
