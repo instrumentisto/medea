@@ -1,7 +1,7 @@
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
 use syn::parse::{Error, Result};
-use synstructure::{BindStyle, Structure};
+use synstructure::Structure;
 
 /// Generates the actual code for `#[derive(JsCaused)]` macro.
 ///
@@ -15,7 +15,7 @@ use synstructure::{BindStyle, Structure};
 /// 3. Generate implementation of `JsCaused` trait for this enum with generated
 ///    methods from step 1 and 2.
 #[allow(clippy::needless_pass_by_value)]
-pub fn derive(mut s: Structure) -> Result<TokenStream> {
+pub fn derive(s: Structure) -> Result<TokenStream> {
     let error_type = error_type(&s)?;
 
     let name_body = s.each_variant(|v| {
@@ -23,7 +23,7 @@ pub fn derive(mut s: Structure) -> Result<TokenStream> {
         quote!(stringify!(#name))
     });
 
-    let cause_body = s.bind_with(|_| BindStyle::Move).each_variant(|v| {
+    let cause_body = s.each_variant(|v| {
         if let Some(js_error) =
             v.bindings().iter().find(|&bi| is_error(bi, &error_type))
         {
@@ -46,7 +46,7 @@ pub fn derive(mut s: Structure) -> Result<TokenStream> {
                 match self { #name_body }
             }
 
-            fn js_cause(self) -> Option<Self::Error> {
+            fn js_cause(&self) -> Option<&Self::Error> {
                 match self { #cause_body }
             }
         }

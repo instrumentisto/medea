@@ -26,7 +26,7 @@ pub trait JsCaused {
     fn name(&self) -> &'static str;
 
     /// Returns JS error if it is the cause.
-    fn js_cause(self) -> Option<Self::Error>;
+    fn js_cause(&self) -> Option<&Self::Error>;
 }
 
 /// Wrapper for JS value which returned from JS side as error.
@@ -61,8 +61,8 @@ impl From<JsValue> for JsError {
     }
 }
 
-impl From<JsError> for js_sys::Error {
-    fn from(err: JsError) -> Self {
+impl From<&JsError> for js_sys::Error {
+    fn from(err: &JsError) -> Self {
         let error = Self::new(&err.message);
         error.set_name(&err.name);
         error
@@ -76,13 +76,28 @@ impl From<JsError> for js_sys::Error {
 #[derive(Debug, Display)]
 #[display(fmt = "{}: {}\n{}", name, message, trace)]
 pub struct JasonError {
-    name: &'static str,
+    name: String,
     message: String,
     trace: Trace,
     source: Option<js_sys::Error>,
 }
 
 impl JasonError {
+    /// Returns new instance of [`JasonError`].
+    pub fn new<D: Display>(
+        name: &str,
+        message: &D,
+        trace: Trace,
+        source: Option<&JsError>,
+    ) -> Self {
+        Self {
+            name: name.to_owned(),
+            message: message.to_string(),
+            trace,
+            source: source.map(Into::into),
+        }
+    }
+
     /// Prints error information to `console.error()`.
     pub fn print(&self) {
         console_error!(self.to_string());
@@ -93,7 +108,7 @@ impl JasonError {
 impl JasonError {
     /// Returns name of error.
     pub fn name(&self) -> String {
-        String::from(self.name)
+        self.name.clone()
     }
 
     /// Returns message of errors.
@@ -114,26 +129,10 @@ impl JasonError {
     }
 }
 
-impl<E: JsCaused + Display> From<(E, Trace)> for JasonError
-where
-    E::Error: Into<js_sys::Error>,
-{
-    fn from((err, trace): (E, Trace)) -> Self {
-        Self {
-            name: err.name(),
-            message: err.to_string(),
-            trace,
-            source: err.js_cause().map(Into::into),
-        }
-    }
-}
-
-impl<E: JsCaused + Display> From<Traced<E>> for JasonError
-where
-    E::Error: Into<js_sys::Error>,
-{
+impl<E: JsCaused<Error = JsError> + Display> From<Traced<E>> for JasonError {
     fn from(traced: Traced<E>) -> Self {
-        Self::from(traced.into_parts())
+        let (err, trace) = traced.into_parts();
+        Self::new(err.name(), &err, trace, err.js_cause())
     }
 }
 

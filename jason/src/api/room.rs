@@ -7,7 +7,7 @@ use std::{
     rc::{Rc, Weak},
 };
 
-use derive_more::Display;
+use derive_more as dm;
 use futures::{channel::mpsc, stream, Future, FutureExt as _, StreamExt as _};
 use js_sys::Promise;
 use medea_client_api_proto::{
@@ -21,8 +21,7 @@ use web_sys::MediaStream as SysMediaStream;
 
 use crate::{
     peer::{
-        MediaStream, PeerError, PeerEvent, PeerEventHandler,
-        PeerRepository,
+        MediaStream, PeerError, PeerEvent, PeerEventHandler, PeerRepository,
     },
     rpc::{RpcClient, RpcClientError, TransportError, WebSocketRpcTransport},
     utils::{Callback, JasonError, JsCaused, JsError},
@@ -33,7 +32,7 @@ use super::{
 };
 
 /// Errors that may occur in a [`Room`].
-#[derive(Debug, Display, JsCaused)]
+#[derive(Debug, dm::Display, dm::From, JsCaused)]
 enum RoomError {
     /// Returned if the `on_failed_local_stream` callback was not set before
     /// joining the room.
@@ -48,16 +47,6 @@ enum RoomError {
     #[display(fmt = "Unable to connect RPC server: {}", _0)]
     CouldNotConnectToServer(#[js(cause)] RpcClientError),
 
-    /// Returned if the previously added local media stream does not satisfy
-    /// the tracks sent from the media server.
-    #[display(fmt = "Invalid local stream: {}", _0)]
-    InvalidLocalStream(#[js(cause)] PeerError),
-
-    /// Returned if [`PeerConnection`] cannot receive the local stream from
-    /// [`MediaManager`].
-    #[display(fmt = "Failed to get local stream: {}", _0)]
-    CouldNotGetLocalMedia(#[js(cause)] PeerError),
-
     /// Returned if the requested [`PeerConnection`] is not found.
     #[display(fmt = "Peer with id {} doesnt exist", _0)]
     NoSuchPeer(PeerId),
@@ -71,30 +60,6 @@ enum RoomError {
     /// [`Connection`] with remote [`Member`].
     #[display(fmt = "Remote stream from unknown peer")]
     UnknownRemotePeer,
-}
-
-impl From<RpcClientError> for RoomError {
-    fn from(err: RpcClientError) -> Self {
-        Self::CouldNotConnectToServer(err)
-    }
-}
-
-impl From<TransportError> for RoomError {
-    fn from(err: TransportError) -> Self {
-        Self::InitRpcTransportFailed(err)
-    }
-}
-
-impl From<PeerError> for RoomError {
-    fn from(err: PeerError) -> Self {
-        use PeerError::*;
-        use RoomError::*;
-        match err {
-            MediaConnections(_) | StreamRequest(_) => InvalidLocalStream(err),
-            MediaManager(_) => CouldNotGetLocalMedia(err),
-            RtcPeerConnection(_) => PeerConnectionError(err),
-        }
-    }
 }
 
 /// JS side handle to `Room` where all the media happens.
@@ -118,9 +83,7 @@ impl RoomHandle {
             let inner = inner?;
 
             if !inner.borrow().stream_storage.is_set_on_fail() {
-                return Err(JasonError::from(tracerr::new!(
-                    RoomError::CallbackNotSet
-                )));
+                return Err(tracerr::new!(RoomError::CallbackNotSet).into());
             }
 
             let websocket = WebSocketRpcTransport::new(&token)
@@ -399,8 +362,10 @@ impl InnerRoom {
 
         spawn_local(async move {
             for peer in peers {
-                if let Err(err) =
-                    peer.update_stream(media_source.as_ref()).await
+                if let Err(err) = peer
+                    .update_stream(media_source.as_ref())
+                    .await
+                    .map_err(tracerr::map_from_and_wrap!(=> RoomError))
                 {
                     JasonError::from(err).print();
                 }
@@ -455,7 +420,8 @@ impl EventHandler for InnerRoom {
                             .get_offer(tracks, media_source.as_ref())
                             .await
                             .map_err(tracerr::map_from_and_wrap!())?;
-                        let mids = peer.get_mids()
+                        let mids = peer
+                            .get_mids()
                             .map_err(tracerr::map_from_and_wrap!())?;
                         rpc.send_command(Command::MakeSdpOffer {
                             peer_id,
@@ -474,11 +440,11 @@ impl EventHandler for InnerRoom {
                         });
                     }
                 };
-                Result::<_, Traced<RoomError>>::Ok(())
+                Ok::<_, Traced<RoomError>>(())
             }
             .await
             {
-                JasonError::from((err, trace)).print();
+                JasonError::from(err).print();
             }
         });
     }

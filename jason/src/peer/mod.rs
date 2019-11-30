@@ -12,7 +12,7 @@ mod track;
 
 use std::{cell::RefCell, collections::HashMap, convert::From, rc::Rc};
 
-use derive_more::{Display, From};
+use derive_more as dm;
 use futures::{
     channel::mpsc,
     future::{try_join_all, LocalBoxFuture},
@@ -48,7 +48,7 @@ pub use self::{
 /// Errors that may occur in [RTCPeerConnection][1].
 ///
 /// [1]: https://w3.org/TR/webrtc/#rtcpeerconnection-interface
-#[derive(Debug, Display, From, JsCaused)]
+#[derive(Debug, dm::Display, dm::From, JsCaused)]
 #[allow(clippy::module_name_repetitions)]
 pub enum PeerError {
     /// Errors that may occur in [`MediaConnections`] storage.
@@ -62,10 +62,10 @@ pub enum PeerError {
     #[display(fmt = "{}", _0)]
     RtcPeerConnection(#[js(cause)] RTCPeerConnectionError),
 
-    /// Errors that may occur when validating [`StreamRequest`] or
-    /// parsing [`MediaStream`].
+    /// Errors that may occur during receiving the media stream from
+    /// [`MediaSource`].
     #[display(fmt = "{}", _0)]
-    StreamRequest(#[js(cause)] StreamRequestError),
+    CouldNotGetMediaStream(#[js(cause)] <StreamSource as MediaSource>::Error),
 }
 
 type Result<T, E = Traced<PeerError>> = std::result::Result<T, E>;
@@ -139,7 +139,7 @@ pub trait MediaSource {
     fn get_media_stream(
         &self,
         request: StreamRequest,
-    ) -> LocalBoxFuture<Result<MediaStream, Self::Error>>;
+    ) -> LocalBoxFuture<Result<MediaStream, Traced<Self::Error>>>;
 }
 
 /// High-level wrapper around [`RtcPeerConnection`].
@@ -372,7 +372,10 @@ impl PeerConnection {
         PeerError: From<<S as MediaSource>::Error>,
     {
         if let Some(request) = self.media_connections.get_stream_request() {
-            let media_stream = media_source.get_media_stream(request).await?;
+            let media_stream = media_source
+                .get_media_stream(request)
+                .await
+                .map_err(tracerr::map_from_and_wrap!())?;
             self.media_connections
                 .insert_local_stream(&media_stream)
                 .await
@@ -392,13 +395,18 @@ impl PeerConnection {
     where
         PeerError: From<<S as MediaSource>::Error>,
     {
-        self.media_connections.update_tracks(tracks)
+        self.media_connections
+            .update_tracks(tracks)
             .map_err(tracerr::map_from_and_wrap!())?;
 
-        self.update_stream(media_source).await
-            .map_err(tracerr::map_from_and_wrap!())?;
+        self.update_stream(media_source)
+            .await
+            .map_err(tracerr::wrap!())?;
 
-        let offer = self.peer.create_and_set_offer().await
+        let offer = self
+            .peer
+            .create_and_set_offer()
+            .await
             .map_err(tracerr::map_from_and_wrap!())?;
 
         Ok(offer)
@@ -446,7 +454,8 @@ impl PeerConnection {
                 .await
             });
         }
-        try_join_all(futures).await
+        try_join_all(futures)
+            .await
             .map_err(tracerr::map_from_and_wrap!())?;
         Ok(())
     }

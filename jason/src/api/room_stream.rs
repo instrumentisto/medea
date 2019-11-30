@@ -2,6 +2,7 @@ use std::{cell::RefCell, convert::TryFrom, rc::Rc};
 
 use derive_more::{Display, From};
 use futures::future::LocalBoxFuture;
+use tracerr::Traced;
 use web_sys::MediaStream as SysMediaStream;
 
 use crate::{
@@ -10,22 +11,22 @@ use crate::{
         MediaSource, MediaStream, MediaStreamHandle, SimpleStreamRequest,
         StreamRequest, StreamRequestError,
     },
-    utils::Callback,
+    utils::{Callback, JasonError, JsCaused, JsError},
 };
 
 /// Errors that may occur in process of receiving [`MediaStream`].
-#[derive(Debug, Display, From)]
+#[derive(Debug, Display, From, JsCaused)]
 pub enum Error {
     /// Failed to get local stream from [`MediaManager`].
-    #[display(fmt = "failed to get local stream: {}", _0)]
-    MediaManager(MediaManagerError),
+    #[display(fmt = "Failed to get local stream: {}", _0)]
+    CouldNotGetLocalMedia(#[js(cause)] MediaManagerError),
 
     /// Errors that may occur when validating [`StreamRequest`] or
     /// parsing [`MediaStream`][1].
     ///
     /// [1]: https://www.w3.org/TR/mediacapture-streams/#mediastream
-    #[display(fmt = "local stream not satisfy request: {}", _0)]
-    ParseStream(StreamRequestError),
+    #[display(fmt = "Invalid local stream: {}", _0)]
+    InvalidLocalStream(#[js(cause)] StreamRequestError),
 }
 
 /// Storage the local [MediaStream][1] for [`Room`] and callbacks for success
@@ -55,7 +56,7 @@ pub struct RoomStream {
     /// [`MediaManager`] or cannot parse its into [`MediaStream`].
     ///
     /// [1]: https://www.w3.org/TR/mediacapture-streams/#mediastream
-    on_fail: Rc<Callback<js_sys::Error>>,
+    on_fail: Rc<Callback<JasonError>>,
 }
 
 impl RoomStream {
@@ -110,35 +111,49 @@ impl MediaSource for RoomStream {
     fn get_media_stream(
         &self,
         request: StreamRequest,
-    ) -> LocalBoxFuture<Result<MediaStream, Self::Error>> {
+    ) -> LocalBoxFuture<Result<MediaStream, Traced<Self::Error>>> {
         let local_stream = Rc::clone(&self.local_stream);
         let media_manager = Rc::clone(&self.media_manager);
         let success = Rc::clone(&self.on_success);
         let fail = Rc::clone(&self.on_fail);
         Box::pin(async move {
-            match async move {
-                let caps = SimpleStreamRequest::try_from(request)?;
+            async move {
+                let caps = SimpleStreamRequest::try_from(request)
+                    .map_err(tracerr::from_and_wrap!())?;
                 if let Some(stream) = local_stream.borrow().as_ref() {
-                    Ok((caps.parse_stream(stream)?, false))
+                    Ok((
+                        caps.parse_stream(stream)
+                            .map_err(tracerr::map_from_and_wrap!())?,
+                        false,
+                    ))
                 } else {
-                    let (stream, is_new) =
-                        media_manager.get_stream(&caps).await?;
-                    Ok((caps.parse_stream(&stream)?, is_new))
+                    let (stream, is_new) = media_manager
+                        .get_stream(&caps)
+                        .await
+                        .map_err(tracerr::map_from_and_wrap!())?;
+                    Ok((
+                        caps.parse_stream(&stream)
+                            .map_err(tracerr::map_from_and_wrap!())?,
+                        is_new,
+                    ))
                 }
             }
             .await
-            {
-                Ok((stream, is_new)) => {
-                    if is_new {
-                        success.call(stream.new_handle());
-                    }
-                    Ok(stream)
+            .map(|(stream, is_new)| {
+                if is_new {
+                    success.call(stream.new_handle());
                 }
-                Err(err) => {
-                    fail.call(js_sys::Error::new(&format!("{}", err)));
-                    Err(err)
-                }
-            }
+                stream
+            })
+            .map_err(|e: Traced<Error>| {
+                fail.call(JasonError::new(
+                    e.as_ref().name(),
+                    e.as_ref(),
+                    e.trace().clone(),
+                    e.as_ref().js_cause(),
+                ));
+                e
+            })
         })
     }
 }

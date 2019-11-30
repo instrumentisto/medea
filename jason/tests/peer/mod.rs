@@ -35,8 +35,8 @@ async fn error_get_offer_if_media_source_failed() {
         Ok(_) => assert!(false, "Not must to get offer without media stream"),
         Err(err) => assert_eq!(
             err.to_string(),
-            "failed to get local stream: MediaDevices.getUserMedia() failed: \
-             some error"
+            "Failed to get local stream: MediaDevices.getUserMedia() failed: \
+             Unknown JS error: some error"
         ),
     };
 
@@ -274,27 +274,27 @@ async fn ice_connection_state_changed_is_emitted() {
     let (tx1, rx1) = mpsc::unbounded();
     let (tx2, rx2) = mpsc::unbounded();
 
-    let manager = Rc::new(MediaManager::default());
-    let peer1 = PeerConnection::new(
-        PeerId(1),
-        tx1,
-        vec![],
-        Rc::clone(&manager),
-        true,
-        true,
-    )
-    .unwrap();
+    let media_source =
+        Rc::new(RoomStream::new(Rc::new(MediaManager::default())));
+    let peer1 =
+        PeerConnection::new(PeerId(1), tx1, vec![], true, true).unwrap();
     let peer2 =
-        PeerConnection::new(PeerId(2), tx2, vec![], manager, true, true)
-            .unwrap();
+        PeerConnection::new(PeerId(2), tx2, vec![], true, true).unwrap();
     let (audio_track, video_track) = get_test_tracks();
 
     let offer = peer1
-        .get_offer(vec![audio_track.clone(), video_track.clone()], None)
+        .get_offer(
+            vec![audio_track.clone(), video_track.clone()],
+            media_source.as_ref(),
+        )
         .await
         .unwrap();
     let answer = peer2
-        .process_offer(offer, vec![audio_track, video_track], None)
+        .process_offer(
+            offer,
+            vec![audio_track, video_track],
+            media_source.as_ref(),
+        )
         .await
         .unwrap();
     peer1.set_remote_answer(answer).await.unwrap();
