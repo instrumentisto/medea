@@ -84,15 +84,15 @@ pub struct JasonError {
 
 impl JasonError {
     /// Returns new instance of [`JasonError`].
-    pub fn new<D: Display>(
+    pub fn new<E: Into<js_sys::Error>>(
         name: &str,
-        message: &D,
+        message: String,
         trace: Trace,
-        source: Option<&JsError>,
+        source: Option<E>,
     ) -> Self {
         Self {
             name: name.to_owned(),
-            message: message.to_string(),
+            message,
             trace,
             source: source.map(Into::into),
         }
@@ -132,7 +132,7 @@ impl JasonError {
 impl<E: JsCaused<Error = JsError> + Display> From<Traced<E>> for JasonError {
     fn from(traced: Traced<E>) -> Self {
         let (err, trace) = traced.into_parts();
-        Self::new(err.name(), &err, trace, err.js_cause())
+        Self::new(err.name(), err.to_string(), trace, err.js_cause())
     }
 }
 

@@ -19,7 +19,7 @@ use crate::{
 pub use self::{
     connection::ConnectionHandle,
     room::{Room, RoomHandle},
-    room_stream::RoomStream,
+    room_stream::{Error as StreamSourceError, RoomStream},
 };
 
 /// General library interface.

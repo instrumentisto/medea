@@ -44,7 +44,7 @@ macro_rules! callback_assert_eq {
 ///
 /// Also it will check result of test and will panic if some error will be
 /// found.
-async fn wait_and_check_test_result(
+pub async fn wait_and_check_test_result(
     rx: oneshot::Receiver<Result<(), String>>,
     finally: impl FnOnce(),
 ) {
