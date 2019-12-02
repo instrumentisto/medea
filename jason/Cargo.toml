@@ -24,28 +24,27 @@ default = ["console_error_panic_hook", "wee_alloc"]
 mockable = ["downcast", "fragile", "mockall", "predicates-tree"]
 
 [dependencies]
-anyhow = "1.0"
 console_error_panic_hook = { version = "0.1", optional = true }
+derive_more = "0.99"
 downcast = { version = "0.10", optional = true }
 fragile = { version = "0.3", optional = true }
 futures = "0.3"
 js-sys = "0.3"
-macro-attr = "0.2"
 medea-client-api-proto = { path = "../proto/client-api", features = ["jason"] }
 medea-macro = { path = "../crates/medea-macro" }
 mockall = { version = "0.5", optional = true }
-newtype_derive = "0.1"
 predicates-tree = { version = "1.0", optional = true }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-thiserror = "1.0"
+tracerr = "0.1"
 wasm-bindgen = { version = "0.2", features = ["serde-serialize"] }
 wasm-bindgen-futures = "0.4"
 wee_alloc = { version = "0.4", optional = true }
 [dependencies.web-sys]
     version = "0.3"
     features = [
-        "CloseEvent", "console", "ConstrainDomStringParameters",
+        "console", "ConstrainDomStringParameters",
+        "CloseEvent",
         "Event", "EventTarget",
         "MediaDevices","MediaDeviceInfo", "MediaDeviceKind",
         "MediaTrackConstraints", "MediaTrackSettings",
@@ -54,11 +53,16 @@ wee_alloc = { version = "0.4", optional = true }
         "MessageEvent",
         "Navigator",
         "RtcConfiguration",
-        "RtcIceCandidate", "RtcIceServer", "RtcIceCandidateInit",
-        "RtcPeerConnection", "RtcPeerConnectionIceEvent", "RtcRtpReceiver",
-        "RtcRtpSender", "RtcRtpTransceiver", "RtcRtpTransceiverDirection",
-        "RtcRtpTransceiverInit", "RtcSdpType", "RtcSessionDescription",
-        "RtcSessionDescriptionInit", "RtcTrackEvent",
+        "RtcIceCandidate", "RtcIceCandidateInit",
+        "RtcIceConnectionState",
+        "RtcIceServer",
+        "RtcPeerConnection", "RtcPeerConnectionIceEvent",
+        "RtcRtpReceiver", "RtcRtpSender",
+        "RtcRtpTransceiver", "RtcRtpTransceiverDirection",
+        "RtcRtpTransceiverInit",
+        "RtcSdpType",
+        "RtcSessionDescription", "RtcSessionDescriptionInit",
+        "RtcTrackEvent",
         "WebSocket", "Window",
     ]
 

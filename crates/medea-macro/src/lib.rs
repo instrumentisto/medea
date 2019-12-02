@@ -8,8 +8,10 @@ extern crate proc_macro;
 
 mod dispatchable;
 mod enum_delegate;
+mod js_caused;
 
 use proc_macro::TokenStream;
+use synstructure::decl_derive;
 
 /// Delegates function calls to enum variants field.
 /// Variants are expected to have only one field.
@@ -220,3 +222,63 @@ pub fn enum_delegate(args: TokenStream, input: TokenStream) -> TokenStream {
 pub fn dispatchable(_: TokenStream, input: TokenStream) -> TokenStream {
     dispatchable::derive(input).unwrap_or_else(|e| e.to_compile_error().into())
 }
+
+decl_derive!([JsCaused, attributes(js)] =>
+/// Generate implementation of `JsCaused` trait for errors represented as enum.
+///
+/// # How to use
+///
+/// ### 1. Declare wrapper for JS error and enum for error variants.
+///
+/// The `js_cause()` method returns error if nested error has its type declared
+/// as an argument of the attribute `#[js(error = "path::to::Error")]` or
+/// the error type is assumed to be imported as `JsError`.
+///
+/// ```
+/// use medea_jason::utils::JsCaused;
+///
+/// struct JsError;
+///
+/// #[derive(JsCaused)]
+/// enum FooError {
+///     Internal,
+///     Js(JsError),
+/// }
+///
+/// let err = FooError::Internal;
+/// assert_eq!(err.name(), "Internal");
+/// assert!(err.js_cause().is_none());
+///
+/// let err = FooError::Js(JsError {});
+/// assert_eq!(err.name(), "Js");
+/// assert!(err.js_cause().is_some());
+/// ```
+///
+/// If enum variant has attribute `#[js(cause)]` it will call the `js_cause()`
+/// method on nested error.
+///
+/// ```
+/// # use medea_jason::utils::JsCaused;
+/// #
+/// # struct JsError;
+/// #
+/// # #[derive(JsCaused)]
+/// # enum FooError {
+/// #     Internal,
+/// #     Js(JsError),
+/// # }
+/// #
+/// #[derive(JsCaused)]
+/// enum BarError {
+///     Foo(#[js(cause)] FooError),
+/// }
+///
+/// let err = BarError::Foo(FooError::Internal);
+/// assert_eq!(err.name(), "Foo");
+/// assert!(err.js_cause().is_none());
+///
+/// let err = BarError::Foo(FooError::Js(JsError {}));
+/// assert_eq!(err.name(), "Foo");
+/// assert!(err.js_cause().is_some());
+/// ```
+js_caused::derive);

@@ -13,5 +13,5 @@ pub use self::{
         VideoTrackConstraints,
     },
     device_info::InputDeviceInfo,
-    manager::{MediaManager, MediaManagerHandle},
+    manager::{MediaManager, MediaManagerError, MediaManagerHandle},
 };

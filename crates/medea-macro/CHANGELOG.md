@@ -14,6 +14,10 @@ All user visible changes to this project will be documented in this file. This p
 - `#[dispatchable]` macro:
     - Handler traits now require specifying `Output` associative type, which is the return type of all handler trait methods ([#66](/../../pull/66)).
 
+### Added
+
+- `#[derive(JsCaused)]` macro for deriving `JsCaused` trait from `medea-jason` crate ([#68](/../../pull/68)).
+
 
 
 

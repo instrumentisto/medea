@@ -229,7 +229,7 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
                 self.last_activity = Instant::now();
                 match serde_json::from_str::<ClientMsg>(&text) {
                     Ok(ClientMsg::Ping(n)) => {
-                        trace!("Received ping: {}", n);
+                        debug!("Received ping: {}", n);
                         // Answer with Heartbeat::Pong.
                         ctx.text(
                             serde_json::to_string(&ServerMsg::Pong(n)).unwrap(),
