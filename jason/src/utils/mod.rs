@@ -5,8 +5,10 @@ mod errors;
 
 mod callback;
 mod event_listener;
+mod logs_sender;
 
 use js_sys::Reflect;
+use medea_client_api_proto::PeerId;
 use wasm_bindgen::prelude::*;
 use web_sys::Window;
 
@@ -15,6 +17,7 @@ pub use self::{
     callback::{Callback, Callback2},
     errors::{HandlerDetachedError, JasonError, JsCaused, JsError},
     event_listener::{EventListener, EventListenerBindError},
+    logs_sender::LogSender,
 };
 
 /// Returns [`Window`] object.
@@ -26,6 +29,34 @@ pub fn window() -> Window {
     // Cannot use `lazy_static` since `window` is `!Sync`.
     // Safe to unwrap.
     web_sys::window().unwrap()
+}
+
+pub fn store_error(err: JasonError, peer_id: Option<PeerId>) -> JasonError {
+    match peer_id {
+        Some(id) => push_to_store(
+            &format!("{{\"peer_id\":{},\"error\":\"{}\"}}", id, err),
+            true,
+        ),
+        None => push_to_store(&format!("{{\"error\":\"{}\"}}", err), true),
+    }
+    err
+}
+
+pub fn push_to_store(value: &str, as_json: bool) {
+    if let Ok(Some(store)) = window().local_storage() {
+        let mut log = store
+            .get("jason_log")
+            .unwrap()
+            .map_or("[".to_string(), |s: String| {
+                format!("{},", s.trim_end_matches(']'))
+            });
+        if as_json {
+            log = format!("{}{}]", log, value);
+        } else {
+            log = format!("{}\"{}\"]", log, value);
+        }
+        store.set("jason_log", &log).unwrap();
+    }
 }
 
 /// Wrapper around interval timer ID.

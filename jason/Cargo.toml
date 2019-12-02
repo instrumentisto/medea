@@ -46,12 +46,14 @@ wee_alloc = { version = "0.4", optional = true }
         "console", "ConstrainDomStringParameters",
         "CloseEvent",
         "Event", "EventTarget",
+        "Headers",
         "MediaDevices","MediaDeviceInfo", "MediaDeviceKind",
         "MediaTrackConstraints", "MediaTrackSettings",
         "MediaStream", "MediaStreamConstraints",
         "MediaStreamTrack", "MediaStreamTrackState",
         "MessageEvent",
         "Navigator",
+        "Request", "RequestInit", "RequestMode", "Response",
         "RtcConfiguration",
         "RtcIceCandidate", "RtcIceCandidateInit",
         "RtcIceConnectionState",
@@ -63,6 +65,7 @@ wee_alloc = { version = "0.4", optional = true }
         "RtcSdpType",
         "RtcSessionDescription", "RtcSessionDescriptionInit",
         "RtcTrackEvent",
+        "Storage",
         "WebSocket", "Window",
     ]
 

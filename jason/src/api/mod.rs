@@ -14,6 +14,7 @@ use crate::{
     peer,
     rpc::{ClientDisconnect, RpcClient as _, WebSocketRpcClient},
     set_panic_hook,
+    utils::{JasonError, LogSender},
 };
 
 #[doc(inline)]
@@ -31,6 +32,7 @@ pub struct Jason(Rc<RefCell<Inner>>);
 struct Inner {
     media_manager: Rc<MediaManager>,
     rooms: Vec<Room>,
+    logs_sender: Option<LogSender>,
 }
 
 #[wasm_bindgen]
@@ -40,6 +42,13 @@ impl Jason {
     pub fn new() -> Self {
         set_panic_hook();
         Self::default()
+    }
+
+    pub fn init_log_sender(&self) -> Result<(), JsValue> {
+        let sender = LogSender::new("http://localhost:8080/logs", 5000)
+            .map_err(JasonError::from)?;
+        self.0.borrow_mut().logs_sender = Some(sender);
+        Ok(())
     }
 
     /// Returns [`RoomHandle`] for [`Room`].
@@ -62,6 +71,7 @@ impl Jason {
                 .drain(..)
                 .for_each(|room| room.close(reason.clone()));
             inner.borrow_mut().media_manager = Rc::default();
+            inner.logs_sender.take();
         }));
 
         let room = Room::new(rpc, peer_repository);
@@ -79,8 +89,10 @@ impl Jason {
     /// streams etc.) respectively. All objects related to this [`Jason`] API
     /// object will be detached (you will still hold them, but unable to use).
     pub fn dispose(self) {
-        self.0.borrow_mut().rooms.drain(..).for_each(|room| {
+        let inner = self.0.borrow_mut();
+        inner.rooms.drain(..).for_each(|room| {
             room.close(ClientDisconnect::RoomClosed.into());
         });
+        inner.logs_sender.take();
     }
 }

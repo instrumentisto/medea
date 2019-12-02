@@ -22,7 +22,7 @@ use web_sys::{
 
 use crate::{
     media::MediaStreamConstraints,
-    utils::{window, JasonError, JsCaused, JsError},
+    utils::{store_error, window, JasonError, JsCaused, JsError},
 };
 
 use super::InputDeviceInfo;
@@ -263,7 +263,9 @@ impl MediaManagerHandle {
                             .into()
                     })
                     .map_err(tracerr::wrap!(=> MediaManagerError))
-                    .map_err(|e| JasonError::from(e).into())
+                    .map_err(|err| {
+                        store_error(JasonError::from(err), None).into()
+                    })
             }),
             Err(e) => future_to_promise(future::err(e)),
         }
@@ -279,7 +281,9 @@ impl MediaManagerHandle {
                     .await
                     .map(|(stream, _)| stream.into())
                     .map_err(tracerr::wrap!(=> MediaManagerError))
-                    .map_err(|e| JasonError::from(e).into())
+                    .map_err(|err| {
+                        store_error(JasonError::from(err), None).into()
+                    })
             }),
             Err(err) => future_to_promise(future::err(err)),
         }
