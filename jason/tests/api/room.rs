@@ -225,8 +225,8 @@ async fn error_inject_invalid_local_stream_into_new_peer() {
 //     2. Set `on_failed_local_stream` callback.
 //     3. Acquire audio track.
 //     4. Acquire local media stream without video track.
-//     5. Inject local stream to Room and try change stream into existing
-// peer. Assertions:
+//     5. Inject local stream to Room and try change stream into existing peer.
+// Assertions:
 //     1. Invoking `on_failed_local_stream` callback.
 #[wasm_bindgen_test]
 async fn error_inject_invalid_local_stream_into_room_on_exists_peer() {
@@ -342,18 +342,18 @@ mod on_close_callback {
     use super::wait_and_check_test_result;
 
     #[wasm_bindgen(inline_js = "export function get_reason(closed) { return \
-                                closed.reason; }")]
+                                closed.reason(); }")]
     extern "C" {
         fn get_reason(closed: &JsValue) -> String;
     }
     #[wasm_bindgen(inline_js = "export function \
                                 get_is_closed_by_server(reason) { return \
-                                reason.is_closed_by_server; }")]
+                                reason.is_closed_by_server(); }")]
     extern "C" {
         fn get_is_closed_by_server(reason: &JsValue) -> bool;
     }
     #[wasm_bindgen(inline_js = "export function get_is_err(reason) { return \
-                                reason.is_err; }")]
+                                reason.is_err(); }")]
     extern "C" {
         fn get_is_err(reason: &JsValue) -> bool;
     }

@@ -79,19 +79,16 @@ impl RoomCloseReason {
 #[wasm_bindgen]
 impl RoomCloseReason {
     /// `wasm_bindgen` getter for `reason` field.
-    #[wasm_bindgen(getter)]
     pub fn reason(&self) -> String {
         self.reason.clone()
     }
 
     /// `wasm_bindgen` getter for `is_closed_by_server` field.
-    #[wasm_bindgen(getter)]
     pub fn is_closed_by_server(&self) -> bool {
         self.is_closed_by_server
     }
 
     /// `wasm_bindgen` getter for `is_err` field.
-    #[wasm_bindgen(getter)]
     pub fn is_err(&self) -> bool {
         self.is_err
     }
@@ -217,7 +214,8 @@ impl RoomHandle {
             .set_func(f))
     }
 
-    /// Sets `on_close` callback, which will be invoked on Jason close.
+    /// Sets `on_close` callback, which will be invoked on [`Room`] close,
+    /// providing [`RoomCloseReason`].
     pub fn on_close(&mut self, f: js_sys::Function) -> Result<(), JsValue> {
         map_weak!(self, |inner| inner.borrow_mut().on_close.set_func(f))
     }

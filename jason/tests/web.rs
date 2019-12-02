@@ -26,7 +26,7 @@ macro_rules! cb_assert_eq {
 /// This macro is useful in tests which should check that JS callback provided
 /// in some function was called and some assertions was passed. We can't use
 /// habitual `assert_eq` because panics from [`wasm_bindgen::closure::Closure`]
-/// will not fails `wasm_bindgen_test`'s tests.
+/// will not fail `wasm_bindgen_test`'s tests.
 ///
 /// # Example
 ///

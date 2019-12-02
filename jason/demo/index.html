@@ -18,28 +18,16 @@
     const controlUrl = document.location.protocol + "//" +
                        document.location.host + "/control-api/";
 
-    async function createRoom(roomId, memberId) {
+    async function createRoom(roomId) {
       try {
         let resp = await axios({
           method: 'post',
           url: controlUrl + roomId,
           data: {
             kind: 'Room',
-            pipeline: {
-              [memberId]: {
-                kind: 'Member',
-                credentials: 'test',
-                pipeline: {
-                  publish: {
-                    kind: 'WebRtcPublishEndpoint',
-                    p2p: 'Always'
-                  },
-                },
-              },
-            },
+            pipeline: {},
           },
         });
-        return resp.data.sids[memberId]
       } catch (e) {
         console.log(e.response);
       }
@@ -200,6 +188,15 @@
         });
       });
 
+      room.on_close(function (on_closed) {
+        alert(
+          `Call was ended.
+          Reason: ${on_closed.reason()};
+          Is closed by server: ${on_closed.is_closed_by_server()};
+          Is error: ${on_closed.is_err()}.`
+        );
+      });
+
       let muteAudio = document.getElementById('control__mute_audio');
       let muteVideo = document.getElementById('control__mute_video');
       let isAudioMuted = false;
@@ -241,7 +238,7 @@
             } catch (e) {
               if (e.response.status === 400) {
                 console.log("Room not found. Creating new room...");
-                await room.join(await createRoom(roomId, username));
+                await createRoom(roomId)
               }
             }
 
