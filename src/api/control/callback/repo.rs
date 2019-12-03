@@ -1,4 +1,4 @@
-//! Repository which stores and lazily creates callback services.
+//! Repository which stores and lazily creates [`Callback`] services.
 
 use std::{
     collections::HashMap,
@@ -37,6 +37,10 @@ impl Inner {
         callback_service
     }
 
+    /// Returns [`Callback`]'s [`Recipient`].
+    ///
+    /// If some service not presented in repository then new service
+    /// automatically will be created.
     fn get(&mut self, url: CallbackUrl) -> Recipient<Callback> {
         if let Some(callback_service) = self.0.get(&url) {
             callback_service.clone()
@@ -52,10 +56,12 @@ impl Debug for Inner {
     }
 }
 
+/// Repository which stores and lazily creates [`Callback`] services.
 #[derive(Debug, Clone)]
 pub struct CallbackRepository(Arc<Mutex<Inner>>);
 
 impl CallbackRepository {
+    /// Returns new empty [`CallbackRepository`].
     pub fn new() -> Self {
         Self(Arc::new(Mutex::new(Inner(HashMap::new()))))
     }

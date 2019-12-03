@@ -107,7 +107,7 @@ impl Callback {
         Self {
             fid: element,
             event,
-            at: chrono::Utc::now(),
+            at: Utc::now(),
         }
     }
 }

@@ -1,3 +1,5 @@
+//! Implementation of Control API callback server for tests.
+
 mod member;
 
 use std::sync::{Arc, Mutex};
@@ -10,8 +12,10 @@ use medea_control_api_proto::grpc::{
     callback_grpc::{create_callback, Callback},
 };
 
+/// Requests which [`GrpcCallbackServer`] will receive.
 type Callbacks = Arc<Mutex<Vec<Request>>>;
 
+/// gRPC Control API callback server for tests.
 pub struct GrpcCallbackServer {
     server: Server,
     callbacks: Callbacks,
@@ -25,6 +29,7 @@ impl Actor for GrpcCallbackServer {
     }
 }
 
+/// Returns all [`Request`]s which this [`GrpcCallbackServer`] received.
 #[derive(Message)]
 #[rtype(result = "Result<Vec<Request>, ()>")]
 pub struct GetCallbacks;
@@ -64,6 +69,7 @@ impl Callback for CallbackService {
     }
 }
 
+/// Runs [`GrpcCallbackServer`] on `localhost` and provided port.
 pub fn run(port: u16) -> Addr<GrpcCallbackServer> {
     let cq_count = 2;
     let callbacks = Arc::new(Mutex::new(Vec::new()));

@@ -65,6 +65,15 @@ fn callback_test(
     .map(move |client| (client, callback_server))
 }
 
+/// Checks that `on_join` callback works.
+///
+/// # Algorithm
+///
+/// 1. Start test callback server and connect [`TestMember`] to it.
+///
+/// 2. Wait `50ms`.
+///
+/// 3. Check that test callback server receives `on_join` callback.
 #[test]
 fn on_join() {
     const TEST_NAME: &str = "member_callback_on_join";
@@ -90,6 +99,18 @@ fn on_join() {
     sys.run().unwrap()
 }
 
+/// Checks that `on_leave` callback works on normal client disconnect.
+///
+/// # Algorithm
+///
+/// 1. Start test callback server and connect [`TestMember`] to it.
+///
+/// 2. Close [`TestMember`]'s socket with [`CloseCode::Normal`].
+///
+/// 3. Wait `50ms`.
+///
+/// 4. Check that test callback server receives `on_leave` callback with
+/// [`OnLeaveReason::DISONNECTED`].
 #[test]
 fn on_leave_normally_disconnected() {
     const TEST_NAME: &str = "member_callback_on_leave";
@@ -123,6 +144,18 @@ fn on_leave_normally_disconnected() {
     sys.run().unwrap()
 }
 
+/// Checks that `on_leave` callback works when connection with client was lost.
+///
+/// # Algorithm
+///
+/// 1. Start test callback server and connect [`TestMember`] to it.
+///
+/// 2. Close [`TestMember`]'s socket with [`CloseCode::Abnormal`].
+///
+/// 3. Wait `50ms`.
+///
+/// 4. Check that test callback server receives `on_leave` callback with
+/// [`OnLeaveReason::LOST_CONNECTION`].
 #[test]
 fn on_leave_on_connection_loss() {
     const TEST_NAME: &str = "member_callback_on_leave_on_connection_loss";

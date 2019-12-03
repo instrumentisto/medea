@@ -59,7 +59,7 @@ impl Handler<Callback> for GrpcCallbackService {
                 .into_future()
                 .and_then(|q| q)
                 .map(|_| ())
-                .map_err(|e| CallbackServiceError::from(e)),
+                .map_err(CallbackServiceError::from),
         )
     }
 }
