@@ -37,7 +37,10 @@ All user visible changes to this project will be documented in this file. This p
             - `Jason.init_room()`;
             - `Room.join()`;
         - Ability to inject local video/audio stream into `Room` via `Room.inject_local_stream()` ([#54]);
-        - `Room.on_failed_local_stream` callback ([#54]).
+        - `Room.on_failed_local_stream` callback ([#54]);
+        - `Room.on_close` callback for WebSocket close initiated by server ([#55]).
+- RPC messaging:
+    - Cleanup Jason state on normal (`code = 1000`) WebSocket close ([#55]).
 - Signalling:
     - Emitting of RPC commands:
         - `AddPeerConnectionMetrics` with `IceConnectionState` ([#71](/../../pull/71)).
@@ -52,6 +55,7 @@ All user visible changes to this project will be documented in this file. This p
 
 [#46]: /../../pull/46
 [#54]: /../../pull/54
+[#55]: /../../pull/55
 
 
 
