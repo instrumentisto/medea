@@ -22,8 +22,12 @@ All user visible changes to this project will be documented in this file. This p
     - `Member`;
     - `WebRtcPlayEndpoint`;
     - `WebRtcPublishEndpoint`.
+- Callbacks:
+    - `OnJoin` ([#63]);
+    - `OnLeave` ([#63]).
 
 [#57]: /../../pull/57
+[#63]: /../../pull/63
 
 
 
