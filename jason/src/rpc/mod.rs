@@ -190,6 +190,10 @@ pub trait RpcTransport {
 
     /// Sends message to server.
     fn send(&self, msg: &ClientMsg) -> Result<(), Traced<TransportError>>;
+
+    fn reconnect(
+        &self,
+    ) -> LocalBoxFuture<'static, Result<(), Traced<TransportError>>>;
 }
 
 /// Inner state of [`WebsocketRpcClient`].

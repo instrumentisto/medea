@@ -123,9 +123,11 @@ struct InnerSocket {
     on_close: Option<EventListener<SysWebSocket, CloseEvent>>,
     on_error: Option<EventListener<SysWebSocket, Event>>,
     close_reason: ClientDisconnect,
+    token: String,
 }
 
 /// WebSocket [`RpcTransport`] between client and server.
+#[derive(Clone)]
 pub struct WebSocketRpcTransport(Rc<RefCell<InnerSocket>>);
 
 impl InnerSocket {
@@ -142,6 +144,7 @@ impl InnerSocket {
             on_close: None,
             on_error: None,
             close_reason: ClientDisconnect::RpcTransportUnexpectedlyDropped,
+            token: url.to_string(),
         })
     }
 
@@ -223,6 +226,16 @@ impl RpcTransport for WebSocketRpcTransport {
 
     fn set_close_reason(&self, close_reason: ClientDisconnect) {
         self.0.borrow_mut().close_reason = close_reason;
+    }
+
+    fn reconnect(&self) -> LocalBoxFuture<'static, Result<()>> {
+        let self_clone = self.clone();
+        Box::pin(async move {
+            let url = self_clone.0.borrow().token.clone();
+            let ws = Self::new(&url).await?;
+            self_clone.0.swap(&ws.0);
+            Ok(())
+        })
     }
 }
 
