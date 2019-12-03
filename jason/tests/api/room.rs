@@ -324,9 +324,8 @@ async fn error_join_room_without_failed_stream_callback() {
     }
 }
 
+/// Tests for `RoomHandle.on_close` JS side callback.
 mod on_close_callback {
-    //! Tests for `RoomHandle.on_close` JS side callback.
-
     use std::rc::Rc;
 
     use futures::channel::mpsc;

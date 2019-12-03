@@ -33,13 +33,13 @@ use crate::{
 
 use super::{connection::Connection, ConnectionHandle};
 
-/// Reason of why Jason was closed.
+/// Reason of why [`Room`] has been closed.
 ///
-/// This struct will be provided into `on_close_by_server` JS side callback.
+/// This struct is passed into `on_close_by_server` JS side callback.
 #[allow(clippy::module_name_repetitions)]
 #[wasm_bindgen]
 pub struct RoomCloseReason {
-    /// Is closed by server?
+    /// Indicator if [`Room`] is closed by server.
     ///
     /// `true` if [`CloseReason::ByServer`].
     is_closed_by_server: bool,
@@ -47,7 +47,7 @@ pub struct RoomCloseReason {
     /// Reason of closing.
     reason: String,
 
-    /// Is closing considered as error.
+    /// Indicator if closing is considered as error.
     ///
     /// This field may be `true` only on closing by client.
     is_err: bool,
@@ -78,17 +78,18 @@ impl RoomCloseReason {
 
 #[wasm_bindgen]
 impl RoomCloseReason {
-    /// `wasm_bindgen` getter for `reason` field.
+    /// `wasm_bindgen` getter for [`RoomCloseReason::reason`] field.
     pub fn reason(&self) -> String {
         self.reason.clone()
     }
 
-    /// `wasm_bindgen` getter for `is_closed_by_server` field.
+    /// `wasm_bindgen` getter for [`RoomCloseReason::is_closed_by_server`]
+    /// field.
     pub fn is_closed_by_server(&self) -> bool {
         self.is_closed_by_server
     }
 
-    /// `wasm_bindgen` getter for `is_err` field.
+    /// `wasm_bindgen` getter for [`RoomCloseReason::is_err`] field.
     pub fn is_err(&self) -> bool {
         self.is_err
     }

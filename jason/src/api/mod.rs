@@ -51,7 +51,7 @@ impl Jason {
 
         let inner = self.0.clone();
         spawn_local(rpc.on_close().map(move |res| {
-            // TODO: don't close all rooms when multiple rpc connections
+            // TODO: Don't close all rooms when multiple rpc connections
             //       will be supported.
             let reason = res.unwrap_or_else(|_| {
                 ClientDisconnect::RpcClientUnexpectedlyDropped.into()

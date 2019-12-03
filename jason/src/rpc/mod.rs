@@ -51,7 +51,7 @@ pub enum ClientDisconnect {
     /// [`Room`] was dropped without `close_reason`.
     RoomUnexpectedlyDropped,
 
-    /// Room was normally closed by JS side.
+    /// [`Room`] was normally closed by JS side.
     RoomClosed,
 
     /// [`RpcClient`] was unexpectedly dropped.
@@ -93,8 +93,8 @@ pub enum CloseMsg {
 
     /// Connection was unexpectedly closed. Consider reconnecting.
     ///
-    /// Unexpected close determines by close code != `1000` and for close code
-    /// 1000 without reason.
+    /// Unexpected close determines by non-`1000` close code and for close code
+    /// `1000` without reason.
     Abnormal(u16),
 }
 
