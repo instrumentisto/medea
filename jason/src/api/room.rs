@@ -250,11 +250,12 @@ impl RoomHandle {
     ///
     /// Effectively returns `Result<(), JasonError>`.
     pub fn join(&self, token: String) -> Promise {
-        future_to_promise(
-            self.inner_join(token).map(|result| {
-                result.map(|_| JsValue::null()).map_err(Into::into)
-            }),
-        )
+        future_to_promise(self.inner_join(token).map(|result| {
+            result
+                .map(|_| JsValue::null())
+                .map_err(store_jason_error!(None))
+                .map_err(Into::into)
+        }))
     }
 
     /// Injects local media stream for all created and new [`PeerConnection`]s
@@ -518,8 +519,10 @@ impl InnerRoom {
                     .inject_local_stream(&injected_stream)
                     .await
                     .map_err(tracerr::map_from_and_wrap!(=> RoomError))
+                    .map_err(JasonError::from)
                 {
-                    error_callback.call(JasonError::from(err));
+                    store_jason_error!(&err, Some(peer.id()));
+                    error_callback.call(err);
                 }
             }
         });
@@ -553,10 +556,12 @@ impl EventHandler for InnerRoom {
                 self.enabled_video,
             )
             .map_err(tracerr::map_from_and_wrap!(=> RoomError))
+            .map_err(JasonError::from)
         {
             Ok(peer) => peer,
             Err(err) => {
-                JasonError::from(err).print();
+                store_jason_error!(&err, None);
+                err.print();
                 return;
             }
         };
@@ -596,7 +601,7 @@ impl EventHandler for InnerRoom {
                 };
                 Result::<_, Traced<RoomError>>::Ok(())
             }
-            .then(|result| {
+            .then(move |result| {
                 async move {
                     if let Err(err) = result {
                         let (err, trace) = err.into_parts();
@@ -604,6 +609,7 @@ impl EventHandler for InnerRoom {
                             RoomError::InvalidLocalStream(_)
                             | RoomError::CouldNotGetLocalMedia(_) => {
                                 let e = JasonError::from((err, trace));
+                                store_jason_error!(&e, Some(peer_id));
                                 e.print();
                                 error_callback.call(e);
                             }
@@ -623,8 +629,10 @@ impl EventHandler for InnerRoom {
                     .set_remote_answer(sdp_answer)
                     .await
                     .map_err(tracerr::map_from_and_wrap!(=> RoomError))
+                    .map_err(JasonError::from)
                 {
-                    JasonError::from(err).print()
+                    store_jason_error!(&err, Some(peer_id));
+                    err.print();
                 }
             });
         } else {
@@ -649,9 +657,11 @@ impl EventHandler for InnerRoom {
                         candidate.sdp_mid,
                     )
                     .await
-                    .map_err(tracerr::map_from_and_wrap!(=> RoomError));
+                    .map_err(tracerr::map_from_and_wrap!(=> RoomError))
+                    .map_err(JasonError::from);
                 if let Err(err) = add {
-                    JasonError::from(err).print();
+                    store_jason_error!(&err, Some(peer_id));
+                    err.print();
                 }
             });
         } else {
@@ -701,12 +711,13 @@ impl PeerEventHandler for InnerRoom {
         sender_id: PeerId,
         remote_stream: MediaStream,
     ) {
-        match self.connections.get(&sender_id) {
-            Some(conn) => conn.on_remote_stream(remote_stream.new_handle()),
-            None => {
-                JasonError::from(tracerr::new!(RoomError::UnknownRemotePeer))
-                    .print()
-            }
+        if let Some(conn) = self.connections.get(&sender_id) {
+            conn.on_remote_stream(remote_stream.new_handle());
+        } else {
+            let err =
+                JasonError::from(tracerr::new!(RoomError::UnknownRemotePeer));
+            store_jason_error!(&err, Some(sender_id));
+            err.print();
         }
     }
 

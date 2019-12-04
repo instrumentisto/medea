@@ -44,9 +44,14 @@ impl Jason {
         Self::default()
     }
 
-    pub fn init_log_sender(&self) -> Result<(), JsValue> {
-        let sender = LogSender::new("http://localhost:8080/logs", 5000)
-            .map_err(JasonError::from)?;
+    /// Instantiates new [`LogSender`] to send saved logs to the specified URL
+    /// at the specified interval.
+    pub fn init_log_sender(
+        &self,
+        url: &str,
+        interval: i32,
+    ) -> Result<(), JsValue> {
+        let sender = LogSender::new(url, interval).map_err(JasonError::from)?;
         self.0.borrow_mut().logs_sender = Some(sender);
         Ok(())
     }

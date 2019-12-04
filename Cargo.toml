@@ -27,6 +27,7 @@ lto = "thin"
 
 [dependencies]
 actix = "0.8"
+actix-cors = "0.1"
 actix-web = "1.0"
 actix-web-actors = "1.0"
 bb8 = "0.3"

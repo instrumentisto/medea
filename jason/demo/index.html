@@ -17,6 +17,8 @@
     let inited = false;
     const controlUrl = document.location.protocol + "//" +
                        document.location.host + "/control-api/";
+    const logsUrl = document.location.protocol + "//" +
+            document.location.host + "/logs";
 
     async function createRoom(roomId) {
       try {
@@ -86,6 +88,7 @@
       await init();
       inited = true;
       const jason = new Jason();
+      jason.init_log_sender(logsUrl, 5000);
 
       async function getDevices(audio_select, video_select, current_stream) {
         const current_audio = current_stream.getAudioTracks().pop().label
@@ -168,8 +171,8 @@
         }
       });
 
-      room.on_failed_local_stream(function (error) {
-        console.error(error);
+      room.on_failed_local_stream((e) => {
+        logError("Get local stream failed", e);
       });
 
       room.on_new_connection((connection) => {

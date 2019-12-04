@@ -3,6 +3,7 @@
 use std::io;
 
 use actix::{Actor, Addr, Handler, ResponseFuture};
+use actix_cors::Cors;
 use actix_web::{
     dev::Server as ActixServer,
     middleware,
@@ -81,6 +82,14 @@ fn ws_index(
     }
 }
 
+/// Handles POST `/logs` HTTP requests and logs body.
+#[allow(clippy::needless_pass_by_value)]
+fn log_index(body: String) -> HttpResponse {
+    info!("client logs: {}", body);
+
+    HttpResponse::Ok().body("Ok")
+}
+
 /// Context for [`App`] which holds all the necessary dependencies.
 pub struct Context {
     /// Repository of all currently existing [`Room`]s in application.
@@ -107,9 +116,19 @@ impl Server {
                     config: config.rpc.clone(),
                 })
                 .wrap(middleware::Logger::default())
+                .wrap(
+                    Cors::new()
+                        .send_wildcard()
+                        .allowed_methods(vec!["POST"])
+                        .max_age(3600),
+                )
                 .service(
                     resource("/ws/{room_id}/{member_id}/{credentials}")
                         .route(actix_web::web::get().to_async(ws_index)),
+                )
+                .service(
+                    resource("/logs")
+                        .route(actix_web::web::post().to(log_index)),
                 )
         })
         .disable_signals()

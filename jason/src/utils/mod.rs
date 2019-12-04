@@ -31,32 +31,26 @@ pub fn window() -> Window {
     web_sys::window().unwrap()
 }
 
-pub fn store_error(err: JasonError, peer_id: Option<PeerId>) -> JasonError {
-    match peer_id {
-        Some(id) => push_to_store(
-            &format!("{{\"peer_id\":{},\"error\":\"{}\"}}", id, err),
-            true,
-        ),
-        None => push_to_store(&format!("{{\"error\":\"{}\"}}", err), true),
-    }
-    err
+macro_rules! store_jason_error {
+    ($peer:expr) => {
+        |e| {
+            $crate::utils::store_error(&e, $peer);
+            e
+        }
+    };
+    ($e:expr, $peer:expr) => {
+        $crate::utils::store_error($e, $peer);
+    };
 }
 
-pub fn push_to_store(value: &str, as_json: bool) {
-    if let Ok(Some(store)) = window().local_storage() {
-        let mut log = store
-            .get("jason_log")
-            .unwrap()
-            .map_or("[".to_string(), |s: String| {
-                format!("{},", s.trim_end_matches(']'))
-            });
-        if as_json {
-            log = format!("{}{}]", log, value);
-        } else {
-            log = format!("{}\"{}\"]", log, value);
+/// Stores [`JasonError`] into local storage for further sending to the server.
+pub fn store_error(err: &JasonError, peer_id: Option<PeerId>) {
+    match peer_id {
+        Some(id) => {
+            LogSender::push_to_store(&format!("peer_id={} error={}", id, err))
         }
-        store.set("jason_log", &log).unwrap();
-    }
+        None => LogSender::push_to_store(&format!("error={}", err)),
+    };
 }
 
 /// Wrapper around interval timer ID.

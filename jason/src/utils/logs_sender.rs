@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::{cell::RefCell, rc::Rc};
 
 use derive_more as dm;
 use tracerr::Traced;
@@ -7,7 +7,12 @@ use wasm_bindgen_futures::{spawn_local, JsFuture};
 use web_sys::{Request, RequestInit, RequestMode, Response};
 
 use super::{window, IntervalHandle, JasonError, JsCaused, JsError};
-use wasm_bindgen::__rt::core::cell::RefCell;
+
+/// Key in a local storage for storing logs.
+const JASON_LOG_KEY: &str = "jason_log";
+
+/// The key in local storage for logs that could not be sent on the first try.
+const SEND_LOG_KEY: &str = "jason_send";
 
 /// Errors that may occur in [`LogSender`].
 #[derive(Debug, dm::Display, JsCaused)]
@@ -16,13 +21,15 @@ pub enum Error {
     #[display(fmt = "local storage unavailable: {}", _0)]
     NotAccessLocalStorage(JsError),
 
-    /// Occurs when a handler cannot be set to send `logs`.
+    /// Occurs when a recurring task for sending logs cannot be created.
     #[display(fmt = "cannot set callback for logs send: {}", _0)]
     SetIntervalHandler(JsError),
 
+    /// Occurs when a log request cannot be sent to the server.
     #[display(fmt = "cannot send logs")]
     CannotSendLogs(JsError),
 
+    /// Occurs when a remote server returns an error.
     #[display(
         fmt = "response error: [code = {}, message = {}]",
         code,
@@ -32,11 +39,14 @@ pub enum Error {
 }
 
 struct Inner {
-    url: String,
+    /// Url of remote server for sending logs.
+    url: Rc<String>,
     /// Handler of sending `logs` task. Task is dropped if you drop handler.
     logs_task: Option<LogsTaskHandler>,
 }
 
+/// Responsible for storing logs in local storage and sending it
+/// to the server.
 pub struct LogSender(Rc<RefCell<Inner>>);
 
 impl LogSender {
@@ -44,13 +54,13 @@ impl LogSender {
     /// milliseconds for send logs to specified url.
     pub fn new(url: &str, interval: i32) -> Result<Self, Traced<Error>> {
         let inner = Rc::new(RefCell::new(Inner {
-            url: url.to_string(),
+            url: Rc::new(url.to_string()),
             logs_task: None,
         }));
         let inner_rc = Rc::clone(&inner);
         let do_send = Closure::wrap(Box::new(move || {
             inner_rc.borrow().send_now();
-        }) as Box<dyn FnMut()>);
+        }) as Box<dyn Fn()>);
 
         let interval_id = window()
             .set_interval_with_callback_and_timeout_and_arguments_0(
@@ -68,6 +78,20 @@ impl LogSender {
 
         Ok(Self(inner))
     }
+
+    /// Stores given string value in local storage.
+    pub fn push_to_store(value: &str) {
+        if let Ok(Some(store)) = window().local_storage() {
+            let mut log = store
+                .get("jason_log")
+                .unwrap()
+                .map_or("[".to_string(), |s: String| {
+                    format!("{},", s.trim_end_matches(']'))
+                });
+            log = format!("{}{}]", log, value);
+            store.set("jason_log", &log).unwrap();
+        }
+    }
 }
 
 impl Drop for LogSender {
@@ -80,13 +104,14 @@ impl Drop for LogSender {
 /// Handler for binding closure that repeatedly calls a closure with a fixed
 /// time delay between each call.
 struct LogsTaskHandler {
-    _closure: Closure<dyn FnMut()>,
+    _closure: Closure<dyn Fn()>,
     _interval_handler: IntervalHandle,
 }
 
 impl Inner {
+    /// Runs async task for send logs from local storage to server.
     fn send_now(&self) {
-        let url = self.url.clone();
+        let url = Rc::clone(&self.url);
         spawn_local(async move {
             if let Err(e) = async move {
                 if let Some(store) = window()
@@ -95,19 +120,18 @@ impl Inner {
                     .map_err(Error::NotAccessLocalStorage)
                     .map_err(tracerr::wrap!())?
                 {
-                    if let Ok(Some(logs)) = store.get("send_log") {
+                    if let Ok(Some(logs)) = store.get(SEND_LOG_KEY) {
                         send(&url, &logs)
                             .await
-                            .map(|_| store.delete("send_log").unwrap())
+                            .map(|_| store.delete(SEND_LOG_KEY).unwrap())
                             .map_err(tracerr::wrap!())?;
                     }
-                    if let Ok(Some(logs)) = store.get("jason_log") {
-                        store.delete("jason_log").unwrap();
-                        let json = format!("{{\"errors\":{}}}", logs);
-                        send(&url, &json)
+                    if let Ok(Some(logs)) = store.get(JASON_LOG_KEY) {
+                        store.delete(JASON_LOG_KEY).unwrap();
+                        send(&url, &logs)
                             .await
                             .map_err(|e| {
-                                store.set("send_log", &json).unwrap();
+                                store.set(SEND_LOG_KEY, &logs).unwrap();
                                 e
                             })
                             .map_err(tracerr::wrap!())?;
@@ -116,13 +140,15 @@ impl Inner {
                 Ok::<_, Traced<Error>>(())
             }
             .await
+            .map_err(JasonError::from)
             {
-                JasonError::from(e).print();
+                e.print();
             }
         })
     }
 }
 
+/// Sends given body as a `text/plain` POST request to the specified URL.
 pub async fn send(url: &str, body: &str) -> Result<(), Traced<Error>> {
     let mut opts = RequestInit::new();
     opts.method("POST");
@@ -131,11 +157,6 @@ pub async fn send(url: &str, body: &str) -> Result<(), Traced<Error>> {
     opts.body(Some(&js_value));
 
     let request = Request::new_with_str_and_init(url, &opts).unwrap();
-
-    request
-        .headers()
-        .set("Content-Type", "application/json")
-        .unwrap();
 
     JsFuture::from(window().fetch_with_request(&request))
         .await
