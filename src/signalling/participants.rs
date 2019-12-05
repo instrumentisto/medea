@@ -242,6 +242,7 @@ impl ParticipantService {
             {
                 ctx.cancel_future(handler);
             }
+            self.connections.insert(member_id, conn);
             Box::new(wrap_future(
                 connection
                     .close(CloseDescription::new(CloseReason::Reconnected))

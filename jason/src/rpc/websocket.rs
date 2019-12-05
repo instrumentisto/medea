@@ -9,6 +9,7 @@ use futures::{
     channel::{mpsc, oneshot},
     future::{self, LocalBoxFuture},
     stream::LocalBoxStream,
+    SinkExt,
 };
 use medea_client_api_proto::{ClientMsg, ServerMsg};
 use tracerr::Traced;
@@ -118,10 +119,14 @@ impl From<u16> for State {
 struct InnerSocket {
     socket: Rc<SysWebSocket>,
     socket_state: State,
-    on_open: Option<EventListener<SysWebSocket, Event>>,
-    on_message: Option<EventListener<SysWebSocket, MessageEvent>>,
-    on_close: Option<EventListener<SysWebSocket, CloseEvent>>,
-    on_error: Option<EventListener<SysWebSocket, Event>>,
+    on_open_listener: Option<EventListener<SysWebSocket, Event>>,
+    on_message_listener: Option<EventListener<SysWebSocket, MessageEvent>>,
+    on_close_listener: Option<EventListener<SysWebSocket, CloseEvent>>,
+    on_error_listener: Option<EventListener<SysWebSocket, Event>>,
+    on_open: Option<mpsc::UnboundedSender<Event>>,
+    on_message: Option<mpsc::UnboundedSender<Result<ServerMsg>>>,
+    on_close: Option<mpsc::UnboundedSender<CloseMsg>>,
+    on_error: Option<mpsc::UnboundedSender<Event>>,
     close_reason: ClientDisconnect,
     token: String,
 }
@@ -139,10 +144,14 @@ impl InnerSocket {
         Ok(Self {
             socket_state: State::CONNECTING,
             socket: Rc::new(socket),
+            on_open_listener: None,
+            on_message_listener: None,
+            on_close_listener: None,
+            on_error_listener: None,
             on_open: None,
-            on_message: None,
-            on_close: None,
             on_error: None,
+            on_close: None,
+            on_message: None,
             close_reason: ClientDisconnect::RpcTransportUnexpectedlyDropped,
             token: url.to_string(),
         })
@@ -157,53 +166,15 @@ impl InnerSocket {
 impl RpcTransport for WebSocketRpcTransport {
     fn on_message(&self) -> Result<LocalBoxStream<'static, Result<ServerMsg>>> {
         let (tx, rx) = mpsc::unbounded();
-        let mut inner_mut = self.0.borrow_mut();
-        inner_mut.on_message = Some(
-            EventListener::new_mut(
-                Rc::clone(&inner_mut.socket),
-                "message",
-                move |msg| {
-                    let parsed = ServerMessage::try_from(&msg)
-                        .map(Into::into)
-                        .map_err(tracerr::wrap!());
-                    tx.unbounded_send(parsed).unwrap_or_else(|e| {
-                        console_error!(format!(
-                            "WebSocket's 'on_message' callback receiver \
-                             unexpectedly gone. {:?}",
-                            e
-                        ))
-                    });
-                },
-            )
-            .map_err(tracerr::map_from_and_wrap!(=> TransportError))?,
-        );
+        self.0.borrow_mut().on_message = Some(tx);
+
         Ok(Box::pin(rx))
     }
 
-    fn on_close(
-        &self,
-    ) -> Result<LocalBoxFuture<'static, Result<CloseMsg, oneshot::Canceled>>>
-    {
-        let (tx, rx) = oneshot::channel();
-        let mut inner_mut = self.0.borrow_mut();
-        let inner = Rc::clone(&self.0);
-        inner_mut.on_close = Some(
-            EventListener::new_once(
-                Rc::clone(&inner_mut.socket),
-                "close",
-                move |msg: CloseEvent| {
-                    inner.borrow_mut().update_state();
-                    tx.send(CloseMsg::from(&msg)).unwrap_or_else(|e| {
-                        console_error!(format!(
-                            "WebSocket's 'on_close' callback receiver \
-                             unexpectedly gone. {:?}",
-                            e
-                        ))
-                    });
-                },
-            )
-            .map_err(tracerr::map_from_and_wrap!(=> TransportError))?,
-        );
+    fn on_close(&self) -> Result<LocalBoxStream<'static, CloseMsg>> {
+        let (tx, rx) = mpsc::unbounded();
+        self.0.borrow_mut().on_close = Some(tx);
+
         Ok(Box::pin(rx))
     }
 
@@ -229,11 +200,30 @@ impl RpcTransport for WebSocketRpcTransport {
     }
 
     fn reconnect(&self) -> LocalBoxFuture<'static, Result<()>> {
+        console_error!("Trying to reconnect WebSocket...");
         let self_clone = self.clone();
+        let on_message = self.0.borrow_mut().on_message.take();
+        let on_close = self.0.borrow_mut().on_close.take();
         Box::pin(async move {
             let url = self_clone.0.borrow().token.clone();
-            let ws = Self::new(&url).await?;
-            self_clone.0.swap(&ws.0);
+            console_error!("Creating new socket...");
+            let mut ws = Self::new(&url).await.unwrap();
+            console_error!("Socket successfully created!");
+            ws.0.borrow_mut().on_message = on_message;
+            ws.0.borrow_mut().on_close = on_close;
+            console_error!(format!("asdsad {}", Rc::strong_count(&ws.0)));
+            RefCell::swap(&self_clone.0, &ws.0);
+            ws.0.borrow_mut().on_open_listener.take();
+            ws.0.borrow_mut().on_error_listener.take();
+            ws.0.borrow_mut().on_message_listener.take();
+            ws.0.borrow_mut().on_close_listener.take();
+            console_error!(format!(" asdasd {}", Rc::strong_count(&ws.0)));
+            console_error!(format!(
+                "on_close: {:?}",
+                self_clone.0.borrow().on_close
+            ));
+            console_error!("Swapped old socket with new!");
+            self_clone.0.borrow_mut().update_state();
             Ok(())
         })
     }
@@ -252,7 +242,7 @@ impl WebSocketRpcTransport {
         {
             let mut socket_mut = socket.borrow_mut();
             let inner = Rc::clone(&socket);
-            socket_mut.on_close = Some(
+            socket_mut.on_close_listener = Some(
                 EventListener::new_once(
                     Rc::clone(&socket_mut.socket),
                     "close",
@@ -265,7 +255,7 @@ impl WebSocketRpcTransport {
             );
 
             let inner = Rc::clone(&socket);
-            socket_mut.on_open = Some(
+            socket_mut.on_open_listener = Some(
                 EventListener::new_once(
                     Rc::clone(&socket_mut.socket),
                     "open",
@@ -280,8 +270,66 @@ impl WebSocketRpcTransport {
 
         let state = future::select(rx_open, rx_close).await;
 
-        socket.borrow_mut().on_open.take();
-        socket.borrow_mut().on_close.take();
+        socket.borrow_mut().on_open_listener.take();
+        socket.borrow_mut().on_close_listener.take();
+
+        let socket_clone = socket.clone();
+        let on_close = EventListener::new_once(
+            Rc::clone(&socket.borrow().socket),
+            "close",
+            move |msg: CloseEvent| {
+                let close_msg = CloseMsg::from(&msg);
+                console_error!(format!("OnClose {:?}", close_msg));
+                console_error!(format!(
+                    "OnMessage {:?}",
+                    socket_clone.borrow().on_message
+                ));
+                socket_clone.borrow_mut().update_state();
+                if let Some(on_close) = socket_clone.borrow().on_close.as_ref()
+                {
+                    on_close.unbounded_send(close_msg).unwrap_or_else(|e| {
+                        console_error!(format!(
+                            "WebSocket's 'on_close' callback receiver \
+                             unexpectedly gone. {:?}",
+                            e
+                        ))
+                    });
+                } else {
+                    console_error!("No future for on_close");
+                }
+            },
+        )
+        .map_err(tracerr::map_from_and_wrap!(=> TransportError))?;
+        socket.borrow_mut().on_close_listener = Some(on_close);
+
+        let socket_clone = socket.clone();
+        let on_message = EventListener::new_mut(
+            Rc::clone(&socket.borrow().socket),
+            "message",
+            move |msg| {
+                let parsed = ServerMessage::try_from(&msg)
+                    .map(Into::into)
+                    .map_err(tracerr::wrap!());
+                console_error!(format!(
+                    "on_close: {:?}",
+                    socket_clone.borrow().on_close
+                ));
+                if let Some(on_message) =
+                    socket_clone.borrow().on_message.as_ref()
+                {
+                    on_message.unbounded_send(parsed).unwrap_or_else(|e| {
+                        console_error!(format!(
+                            "WebSocket's 'on_message' callback receiver \
+                             unexpectedly gone. {:?}",
+                            e
+                        ))
+                    });
+                }
+            },
+        )
+        .map_err(tracerr::map_from_and_wrap!(=> TransportError))?;
+
+        socket.borrow_mut().on_message_listener = Some(on_message);
 
         match state {
             future::Either::Left((opened, _)) => match opened {
@@ -295,24 +343,24 @@ impl WebSocketRpcTransport {
     }
 }
 
-impl Drop for WebSocketRpcTransport {
+impl Drop for InnerSocket {
     fn drop(&mut self) {
-        let mut inner = self.0.borrow_mut();
-        if inner.socket_state.can_close() {
-            inner.on_open.take();
-            inner.on_error.take();
-            inner.on_message.take();
-            inner.on_close.take();
+        console_error!("Drop WebSocketRpcTransport.");
+        if self.socket_state.can_close() {
+            self.on_open_listener.take();
+            self.on_error_listener.take();
+            self.on_message_listener.take();
+            self.on_close_listener.take();
 
             let close_reason: Cow<'static, str> =
-                serde_json::to_string(&inner.close_reason)
+                serde_json::to_string(&self.close_reason)
                     .unwrap_or_else(|_| {
                         "Could not serialize close message".into()
                     })
                     .into();
 
             if let Err(err) =
-                inner.socket.close_with_code_and_reason(1000, &close_reason)
+                self.socket.close_with_code_and_reason(1000, &close_reason)
             {
                 console_error!(err);
             }

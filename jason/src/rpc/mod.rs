@@ -179,10 +179,7 @@ pub trait RpcTransport {
     /// will be closed.
     fn on_close(
         &self,
-    ) -> Result<
-        LocalBoxFuture<'static, Result<CloseMsg, oneshot::Canceled>>,
-        Traced<TransportError>,
-    >;
+    ) -> Result<LocalBoxStream<'static, CloseMsg>, Traced<TransportError>>;
 
     /// Sets reason, that will be sent to remote server when this transport will
     /// be dropped.
@@ -239,33 +236,47 @@ impl Inner {
 ///
 /// This function will be called on every WebSocket close (normal and abnormal)
 /// regardless of the [`CloseReason`].
-fn on_close(inner_rc: Rc<RefCell<Inner>>, close_msg: &CloseMsg) {
-    console_error!("OnClose");
+async fn on_close(inner_rc: Rc<RefCell<Inner>>, close_msg: &CloseMsg) {
+    console_error!("On Close future RPC");
     inner_rc.borrow_mut().heartbeat.stop();
 
     // TODO: reconnect on disconnect, propagate error if unable
     //       to reconnect
 
     match &close_msg {
-        CloseMsg::Normal(_, reason) => {
-            inner_rc.borrow_mut().sock.take();
-            if *reason != CloseByServerReason::Reconnected {
-                inner_rc
-                    .borrow_mut()
-                    .on_close_subscribers
-                    .drain(..)
-                    .filter_map(|sub| {
-                        sub.send(CloseReason::ByServer(*reason)).err()
-                    })
-                    .for_each(|reason| {
-                        console_error!(format!(
-                            "Failed to send reason of Jason close to \
-                             subscriber: {:?}",
-                            reason
-                        ))
-                    });
+        CloseMsg::Normal(_, reason) => match reason {
+            CloseByServerReason::Reconnected => (),
+            CloseByServerReason::Idle => {
+                while let Err(_) =
+                    inner_rc.borrow().sock.as_ref().unwrap().reconnect().await
+                {
+                    console_error!("Trying to reconnect....");
+                    crate::utils::resolve_after(100).await;
+                }
+                if let Some(sock) = inner_rc.borrow().sock.clone() {
+                    inner_rc.borrow_mut().heartbeat.start(sock).unwrap();
+                }
             }
-        }
+            _ => {
+                inner_rc.borrow_mut().sock.take();
+                if *reason != CloseByServerReason::Reconnected {
+                    inner_rc
+                        .borrow_mut()
+                        .on_close_subscribers
+                        .drain(..)
+                        .filter_map(|sub| {
+                            sub.send(CloseReason::ByServer(*reason)).err()
+                        })
+                        .for_each(|reason| {
+                            console_error!(format!(
+                                "Failed to send reason of Jason close to \
+                                 subscriber: {:?}",
+                                reason
+                            ))
+                        });
+                }
+            }
+        },
         CloseMsg::Abnormal(_) => spawn_local(async move {
             while let Err(_) =
                 inner_rc.borrow().sock.as_ref().unwrap().reconnect().await
@@ -350,21 +361,15 @@ impl RpcClient for WebSocketRpcClient {
             });
 
             let inner_rc = Rc::clone(&inner);
-            let on_socket_close = transport
+            let mut on_socket_close = transport
                 .on_close()
                 .map_err(tracerr::map_from_and_wrap!())?;
             spawn_local(async move {
-                match on_socket_close.await {
-                    Ok(msg) => on_close(inner_rc.clone(), &msg),
-                    Err(e) => {
-                        if !inner_rc.borrow().is_closed {
-                            console_error!(format!(
-                                "RPC socket was unexpectedly dropped. {:?}",
-                                e
-                            ));
-                        }
-                    }
+                while let Some(msg) = on_socket_close.next().await {
+                    console_error!("asdlkfjkldsajfldsf");
+                    on_close(inner_rc.clone(), &msg).await;
                 }
+                console_error!("123456789");
             });
 
             inner.borrow_mut().sock.replace(transport);
@@ -418,14 +423,13 @@ impl RpcClient for WebSocketRpcClient {
     }
 }
 
-impl Drop for WebSocketRpcClient {
+impl Drop for Inner {
     /// Drops related connection and its [`Heartbeat`].
     fn drop(&mut self) {
-        self.0.borrow_mut().is_closed = true;
-        let mut inner = self.0.borrow_mut();
-        if let Some(socket) = inner.sock.take() {
-            socket.set_close_reason(inner.close_reason.clone());
+        self.is_closed = true;
+        if let Some(socket) = self.sock.take() {
+            socket.set_close_reason(self.close_reason.clone());
         }
-        inner.heartbeat.stop();
+        self.heartbeat.stop();
     }
 }

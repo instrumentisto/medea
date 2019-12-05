@@ -6,7 +6,7 @@ use actix::{
     fut::wrap_future, Actor, ActorContext, ActorFuture, Addr, AsyncContext,
     Handler, Message, StreamHandler,
 };
-use actix_web_actors::ws;
+use actix_web_actors::ws::{self, CloseCode};
 use futures::future::Future;
 use medea_client_api_proto::{
     ClientMsg, CloseDescription, CloseReason, ServerMsg,
@@ -99,7 +99,7 @@ impl Actor for WsSession {
     /// Starts [`Heartbeat`] mechanism and sends [`RpcConnectionEstablished`]
     /// signal to the [`Room`].
     fn started(&mut self, ctx: &mut Self::Context) {
-        debug!("Started WsSession for Member [id = {}]", self.member_id);
+        debug!("Started WsSession for member {}", self.member_id);
 
         Self::start_watchdog(ctx);
 
@@ -171,6 +171,7 @@ impl RpcConnection for Addr<WsSession> {
         &self,
         msg: EventMessage,
     ) -> Box<dyn Future<Item = (), Error = ()>> {
+        debug!("Send event {:?}", msg);
         let fut = self
             .send(msg)
             .map_err(|err| warn!("Failed send event {:?} ", err));
@@ -229,7 +230,7 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
                 self.last_activity = Instant::now();
                 match serde_json::from_str::<ClientMsg>(&text) {
                     Ok(ClientMsg::Ping(n)) => {
-                        debug!("Received ping: {}", n);
+                        trace!("Received ping: {}", n);
                         // Answer with Heartbeat::Pong.
                         ctx.text(
                             serde_json::to_string(&ServerMsg::Pong(n)).unwrap(),
@@ -253,9 +254,21 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
             }
             ws::Message::Close(reason) => {
                 if !self.closed_by_server {
+                    let closed_reason = if let Some(reason) = &reason {
+                        if reason.code == CloseCode::Normal
+                            || reason.code == CloseCode::Away
+                        {
+                            ClosedReason::Closed
+                        } else {
+                            ClosedReason::Lost
+                        }
+                    } else {
+                        ClosedReason::Lost
+                    };
+
                     if let Err(err) = self.room.try_send(RpcConnectionClosed {
                         member_id: self.member_id.clone(),
-                        reason: ClosedReason::Closed,
+                        reason: closed_reason,
                     }) {
                         error!(
                             "WsSession of member {} failed to remove from \
