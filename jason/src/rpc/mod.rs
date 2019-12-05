@@ -237,7 +237,7 @@ impl Inner {
 /// This function will be called on every WebSocket close (normal and abnormal)
 /// regardless of the [`CloseReason`].
 async fn on_close(inner_rc: Rc<RefCell<Inner>>, close_msg: &CloseMsg) {
-    console_error!("On Close future RPC");
+    console_error!(format!("On Close future RPC {:?}", close_msg));
     inner_rc.borrow_mut().heartbeat.stop();
 
     // TODO: reconnect on disconnect, propagate error if unable
@@ -250,10 +250,10 @@ async fn on_close(inner_rc: Rc<RefCell<Inner>>, close_msg: &CloseMsg) {
                 while let Err(_) =
                     inner_rc.borrow().sock.as_ref().unwrap().reconnect().await
                 {
-                    console_error!("Trying to reconnect....");
                     crate::utils::resolve_after(100).await;
                 }
-                if let Some(sock) = inner_rc.borrow().sock.clone() {
+                let sock = inner_rc.borrow().sock.clone();
+                if let Some(sock) = sock {
                     inner_rc.borrow_mut().heartbeat.start(sock).unwrap();
                 }
             }
