@@ -38,7 +38,6 @@ where
     where
         F: FnMut(A) + 'static,
     {
-        console_error!("New mut call");
         let closure = Closure::wrap(Box::new(closure) as Box<dyn FnMut(A)>);
 
         target
@@ -49,7 +48,6 @@ where
             .map_err(JsError::from)
             .map_err(EventListenerBindError::from)
             .map_err(tracerr::wrap!())?;
-        console_error!("Event listener was added.");
 
         Ok(Self {
             event_name,
@@ -93,7 +91,6 @@ where
     /// Drops [`EventListener`]'s closure and unregisters appropriate event
     /// handler.
     fn drop(&mut self) {
-        console_error!("Drop event listener");
         if let Err(err) = (self.target.as_ref() as &web_sys::EventTarget)
             .remove_event_listener_with_callback(
                 self.event_name,

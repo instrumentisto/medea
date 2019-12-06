@@ -188,6 +188,7 @@ pub trait RpcTransport {
     /// Sends message to server.
     fn send(&self, msg: &ClientMsg) -> Result<(), Traced<TransportError>>;
 
+    /// Try to reconnect [`RpcTransport`].
     fn reconnect(
         &self,
     ) -> LocalBoxFuture<'static, Result<(), Traced<TransportError>>>;
@@ -237,7 +238,6 @@ impl Inner {
 /// This function will be called on every WebSocket close (normal and abnormal)
 /// regardless of the [`CloseReason`].
 async fn on_close(inner_rc: Rc<RefCell<Inner>>, close_msg: &CloseMsg) {
-    console_error!(format!("On Close future RPC {:?}", close_msg));
     inner_rc.borrow_mut().heartbeat.stop();
 
     // TODO: reconnect on disconnect, propagate error if unable
@@ -250,7 +250,13 @@ async fn on_close(inner_rc: Rc<RefCell<Inner>>, close_msg: &CloseMsg) {
                 while let Err(_) =
                     inner_rc.borrow().sock.as_ref().unwrap().reconnect().await
                 {
-                    crate::utils::resolve_after(100).await;
+                    if let Err(e) = crate::utils::resolve_after(100).await {
+                        console_error!(format!(
+                            "Error while trying to set interval between \
+                             reconnects: {:?}",
+                            e
+                        ));
+                    };
                 }
                 let sock = inner_rc.borrow().sock.clone();
                 if let Some(sock) = sock {
@@ -281,8 +287,13 @@ async fn on_close(inner_rc: Rc<RefCell<Inner>>, close_msg: &CloseMsg) {
             while let Err(_) =
                 inner_rc.borrow().sock.as_ref().unwrap().reconnect().await
             {
-                console_error!("Trying to reconnect....");
-                crate::utils::resolve_after(100).await;
+                if let Err(e) = crate::utils::resolve_after(100).await {
+                    console_error!(format!(
+                        "Error while trying to set interval between \
+                         reconnects: {:?}",
+                        e
+                    ));
+                };
             }
         }),
     }
@@ -366,10 +377,8 @@ impl RpcClient for WebSocketRpcClient {
                 .map_err(tracerr::map_from_and_wrap!())?;
             spawn_local(async move {
                 while let Some(msg) = on_socket_close.next().await {
-                    console_error!("asdlkfjkldsajfldsf");
                     on_close(inner_rc.clone(), &msg).await;
                 }
-                console_error!("123456789");
             });
 
             inner.borrow_mut().sock.replace(transport);

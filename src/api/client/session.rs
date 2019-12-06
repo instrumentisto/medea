@@ -99,7 +99,7 @@ impl Actor for WsSession {
     /// Starts [`Heartbeat`] mechanism and sends [`RpcConnectionEstablished`]
     /// signal to the [`Room`].
     fn started(&mut self, ctx: &mut Self::Context) {
-        debug!("Started WsSession for member {}", self.member_id);
+        debug!("Started WsSession for Member [id = {}]", self.member_id);
 
         Self::start_watchdog(ctx);
 
@@ -171,7 +171,6 @@ impl RpcConnection for Addr<WsSession> {
         &self,
         msg: EventMessage,
     ) -> Box<dyn Future<Item = (), Error = ()>> {
-        debug!("Send event {:?}", msg);
         let fut = self
             .send(msg)
             .map_err(|err| warn!("Failed send event {:?} ", err));
@@ -230,7 +229,7 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
                 self.last_activity = Instant::now();
                 match serde_json::from_str::<ClientMsg>(&text) {
                     Ok(ClientMsg::Ping(n)) => {
-                        trace!("Received ping: {}", n);
+                        debug!("Received ping: {}", n);
                         // Answer with Heartbeat::Pong.
                         ctx.text(
                             serde_json::to_string(&ServerMsg::Pong(n)).unwrap(),
