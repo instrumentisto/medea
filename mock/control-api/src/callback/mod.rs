@@ -70,7 +70,6 @@ mod join {
     }
 }
 
-
 mod leave {
 
     use medea_control_api_proto::grpc::callback::{

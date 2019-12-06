@@ -4,7 +4,10 @@ use std::fmt::Debug;
 use futures::Future;
 use grpcio::Error;
 
-use crate::api::control::callback::{url::CallbackUrl, CallbackRequest};
+use crate::{
+    api::control::callback::{url::CallbackUrl, CallbackRequest},
+    log::prelude::*,
+};
 
 pub mod grpc;
 
@@ -29,6 +32,7 @@ impl From<grpcio::Error> for CallbackClientError {
 
 /// Creates [`CallbackClient`] based on provided [`CallbackUrl`].
 pub fn build_client(url: &CallbackUrl) -> impl CallbackClient {
+    info!("Creating CallbackClient for url: {:?}", url);
     match &url {
         CallbackUrl::Grpc(grpc_url) => grpc::GrpcCallbackClient::new(grpc_url),
     }
