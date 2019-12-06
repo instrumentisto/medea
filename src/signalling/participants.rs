@@ -319,9 +319,7 @@ impl ParticipantService {
                             );
                             ctx.notify(RpcConnectionClosed {
                                 member_id,
-                                reason: ClosedReason::Closed {
-                                    is_normally: false,
-                                },
+                                reason: ClosedReason::Closed { normal: false },
                             })
                         },
                     ),

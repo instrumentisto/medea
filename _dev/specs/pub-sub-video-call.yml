@@ -20,6 +20,8 @@ spec:
     subscriber:
       kind: Member
       credentials: test
+      on_join: "grpc://127.0.0.1:9099"
+      on_leave: "grpc://127.0.0.1:9099"
       spec:
         pipeline:
           play-publisher:

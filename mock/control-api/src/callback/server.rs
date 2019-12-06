@@ -10,12 +10,12 @@ use futures::future::Future as _;
 use grpcio::{Environment, RpcContext, Server, ServerBuilder, UnarySink};
 use medea_control_api_proto::grpc::{
     callback::{Request, Response},
-    callback_grpc::{create_callback, Callback as CallbackProto},
+    callback_grpc::{create_callback, Callback as CallbackService},
 };
 
-use super::Callback;
+use crate::{callback::CallbackItem, prelude::*};
 
-type Callbacks = Arc<Mutex<Vec<Callback>>>;
+type CallbackItems = Arc<Mutex<Vec<CallbackItem>>>;
 
 /// [`Actor`] wrapper for [`grpcio`] server.
 ///
@@ -27,7 +27,7 @@ pub struct GrpcCallbackServer {
     server: Server,
 
     /// All [`Callback`]s which this server received.
-    events: Callbacks,
+    events: CallbackItems,
 }
 
 impl Actor for GrpcCallbackServer {
@@ -38,30 +38,31 @@ impl Actor for GrpcCallbackServer {
     }
 }
 
-/// Implementation for [`CallbackProto`] gRPC service.
+/// Implementation for [`CallbackService`] gRPC service.
 #[derive(Clone)]
-pub struct CallbackService {
+pub struct GrpcCallbackService {
     /// All [`Callback`]s which this server received.
-    events: Callbacks,
+    events: CallbackItems,
 }
 
-impl CallbackService {
-    pub fn new(events: Callbacks) -> Self {
+impl GrpcCallbackService {
+    pub fn new(events: CallbackItems) -> Self {
         Self { events }
     }
 }
 
-impl CallbackProto for CallbackService {
+impl CallbackService for GrpcCallbackService {
     fn on_event(
         &mut self,
         ctx: RpcContext,
         req: Request,
         sink: UnarySink<Response>,
     ) {
+        info!("Callback request received: [{:?}]", req);
         self.events.lock().unwrap().push(req.into());
         ctx.spawn(
             sink.success(Response::new())
-                .map_err(|e| println!("Err: {:?}", e)),
+                .map_err(|e| error!("Err: {:?}", e)),
         )
     }
 }
@@ -69,15 +70,15 @@ impl CallbackProto for CallbackService {
 /// [`Message`] which returns all [`Callback`]s received by this
 /// [`GrpcCallbackServer`].
 #[derive(Message)]
-#[rtype(result = "Result<Vec<Callback>, ()>")]
-pub struct GetCallbacks;
+#[rtype(result = "Result<Vec<CallbackItem>, ()>")]
+pub struct GetCallbackItems;
 
-impl Handler<GetCallbacks> for GrpcCallbackServer {
-    type Result = Result<Vec<Callback>, ()>;
+impl Handler<GetCallbackItems> for GrpcCallbackServer {
+    type Result = Result<Vec<CallbackItem>, ()>;
 
     fn handle(
         &mut self,
-        _: GetCallbacks,
+        _: GetCallbackItems,
         _: &mut Self::Context,
     ) -> Self::Result {
         Ok(self.events.lock().unwrap().clone())
@@ -92,7 +93,8 @@ pub fn run(args: &ArgMatches) -> Addr<GrpcCallbackServer> {
 
     let events = Arc::new(Mutex::new(Vec::new()));
 
-    let service = create_callback(CallbackService::new(Arc::clone(&events)));
+    let service =
+        create_callback(GrpcCallbackService::new(Arc::clone(&events)));
     let env = Arc::new(Environment::new(cq_count));
 
     let server = ServerBuilder::new(env)

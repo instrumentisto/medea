@@ -27,7 +27,7 @@ use medea_control_api_proto::grpc::api::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    callback::server::{GetCallbacks, GrpcCallbackServer},
+    callback::server::{GetCallbackItems, GrpcCallbackServer},
     client::{ControlClient, Fid},
     prelude::*,
 };
@@ -130,7 +130,7 @@ pub fn get_callbacks(
 ) -> impl Future<Item = HttpResponse, Error = ()> {
     state
         .callback_server
-        .send(GetCallbacks)
+        .send(GetCallbackItems)
         .map_err(|e| warn!("GrpcCallbackServer mailbox error. {:?}", e))
         .map(|callbacks| HttpResponse::Ok().json(&callbacks.unwrap()))
 }

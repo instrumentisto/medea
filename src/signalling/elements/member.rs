@@ -156,8 +156,7 @@ impl Member {
             .get(&self.id())
             .ok_or_else(|| MembersLoadError::MemberNotFound(self.get_fid()))?;
 
-        this_member.set_on_join(this_member_spec.on_join().clone());
-        this_member.set_on_leave(this_member_spec.on_leave().clone());
+        this_member.set_callback_urls(&this_member_spec);
 
         for (spec_play_name, spec_play_endpoint) in
             this_member_spec.play_endpoints()
@@ -427,14 +426,10 @@ impl Member {
         self.0.borrow().on_leave.clone()
     }
 
-    /// Sets [`CallbackUrl`] to which Medea should send `OnLeave` callback.
-    pub fn set_on_leave(&self, on_leave: Option<CallbackUrl>) {
-        self.0.borrow_mut().on_leave = on_leave;
-    }
-
-    /// Sets [`CallbackUrl`] to which Medea should send `OnJoin` callback.
-    pub fn set_on_join(&self, on_join: Option<CallbackUrl>) {
-        self.0.borrow_mut().on_join = on_join;
+    /// Sets all [`CallbackUrl`]'s from [`MemberSpec`].
+    pub fn set_callback_urls(&self, spec: &MemberSpec) {
+        self.0.borrow_mut().on_leave = spec.on_leave().clone();
+        self.0.borrow_mut().on_join = spec.on_join().clone();
     }
 }
 

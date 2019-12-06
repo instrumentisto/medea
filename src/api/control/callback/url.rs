@@ -6,9 +6,9 @@ use derive_more::Display;
 use serde::{de::Visitor, Deserialize, Deserializer};
 use url::{ParseError, Url};
 
-/// Callback URL for gRPC service.
+/// Callback URL for gRPC client.
 ///
-/// Note that this newtype stores only host and port of gRPC callback service
+/// Note that this newtype stores only host and port of gRPC callback client
 /// without anything else (protocol e.g.).
 ///
 /// In [`Display`] implementation protocol will be added to this address.
@@ -17,7 +17,7 @@ use url::{ParseError, Url};
 pub struct GrpcCallbackUrl(String);
 
 impl GrpcCallbackUrl {
-    /// Returns address for gRPC callback service.
+    /// Returns address for gRPC callback client.
     ///
     /// If you wish to get address with protocol - use [`Display`]
     /// implementation.
@@ -95,7 +95,7 @@ impl<'de> Deserialize<'de> for CallbackUrl {
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
                 formatter.write_str(
-                    "URI to callback service in format like \
+                    "URI to callback client in format like \
                      'grpc://127.0.0.1:9090'.",
                 )
             }

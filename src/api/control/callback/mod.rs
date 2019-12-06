@@ -1,7 +1,7 @@
 //! Control API callbacks implementation.
 
-pub mod repo;
-pub mod services;
+pub mod clients;
+pub mod service;
 pub mod url;
 
 use actix::Message;
@@ -9,15 +9,16 @@ use chrono::{DateTime, Utc};
 use derive_more::From;
 use medea_control_api_proto::grpc::callback::{
     OnJoin as OnJoinProto, OnJoin, OnLeave as OnLeaveProto,
-    OnLeave_Reason as OnLeaveReasonProto, Request,
+    OnLeave_Reason as OnLeaveReasonProto, Request as CallbackRequestProto,
     Request_oneof_event as RequestOneofEventProto,
 };
 
 use crate::api::control::refs::StatefulFid;
 
-use self::services::CallbackServiceError;
+use self::clients::CallbackClientError;
 
 /// Event for `on_leave` `Member` callback.
+#[derive(Debug)]
 pub struct OnLeaveEvent {
     /// Reason of why `Member` was lost.
     reason: OnLeaveReason,
@@ -38,6 +39,7 @@ impl Into<OnLeaveProto> for OnLeaveEvent {
 }
 
 /// Reason of why `Member` was lost.
+#[derive(Debug)]
 pub enum OnLeaveReason {
     /// Server is shutting down.
     ServerShutdown,
@@ -60,6 +62,7 @@ impl Into<OnLeaveReasonProto> for OnLeaveReason {
 }
 
 /// `on_join` `Member` callback for Control API.
+#[derive(Debug)]
 pub struct OnJoinEvent;
 
 impl Into<OnJoinProto> for OnJoinEvent {
@@ -70,7 +73,7 @@ impl Into<OnJoinProto> for OnJoinEvent {
 
 /// All callbacks which can happen.
 #[allow(clippy::module_name_repetitions)]
-#[derive(From)]
+#[derive(Debug, From)]
 pub enum CallbackEvent {
     OnJoin(OnJoinEvent),
     OnLeave(OnLeaveEvent),
@@ -92,17 +95,19 @@ impl Into<RequestOneofEventProto> for CallbackEvent {
 /// Control API callback.
 ///
 /// This struct is used as [`Message`] for sending callback in all callback
-/// services.
-#[derive(Message)]
-#[rtype(result = "Result<(), CallbackServiceError>")]
-pub struct Callback {
+/// clients.
+#[allow(clippy::module_name_repetitions)]
+#[derive(Debug, Message)]
+#[rtype(result = "Result<(), CallbackClientError>")]
+pub struct CallbackRequest {
     fid: StatefulFid,
     event: CallbackEvent,
     at: DateTime<Utc>,
 }
 
-impl Callback {
-    /// Returns [`Callback`] with provided fields and current time as `at`.
+impl CallbackRequest {
+    /// Returns [`CallbackRequest`] with provided fields and current time as
+    /// `at`.
     pub fn new(element: StatefulFid, event: CallbackEvent) -> Self {
         Self {
             fid: element,
@@ -112,9 +117,9 @@ impl Callback {
     }
 }
 
-impl Into<Request> for Callback {
-    fn into(self) -> Request {
-        let mut proto = Request::new();
+impl Into<CallbackRequestProto> for CallbackRequest {
+    fn into(self) -> CallbackRequestProto {
+        let mut proto = CallbackRequestProto::new();
         proto.event = Some(self.event.into());
         proto.set_fid(self.fid.to_string());
         proto.set_at(self.at.to_rfc3339());

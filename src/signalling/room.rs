@@ -27,7 +27,7 @@ use crate::{
         },
         control::{
             callback::{
-                repo::CallbackRepository, OnJoinEvent, OnLeaveEvent,
+                service::CallbackService, OnJoinEvent, OnLeaveEvent,
                 OnLeaveReason,
             },
             endpoints::{
@@ -159,8 +159,8 @@ enum State {
 pub struct Room {
     id: RoomId,
 
-    /// Repository which stores all callback services.
-    callbacks: CallbackRepository,
+    /// Repository which stores all callback clients.
+    callbacks: CallbackService,
 
     /// [`Member`]s and associated [`RpcConnection`]s of this [`Room`], handles
     /// [`RpcConnection`] authorization, establishment, message sending.
@@ -674,8 +674,7 @@ impl Room {
             self.id.clone(),
         );
 
-        signalling_member.set_on_join(spec.on_join().clone());
-        signalling_member.set_on_leave(spec.on_leave().clone());
+        signalling_member.set_callback_urls(spec);
 
         for (id, publish) in spec.publish_endpoints() {
             let signalling_publish = WebRtcPublishEndpoint::new(
@@ -1068,17 +1067,17 @@ impl Handler<RpcConnectionClosed> for Room {
         self.members
             .connection_closed(msg.member_id.clone(), &msg.reason, ctx);
 
-        if let ClosedReason::Closed { is_normally } = msg.reason {
+        if let ClosedReason::Closed { normal } = msg.reason {
             if let Some(member) = self.members.get_member_by_id(&msg.member_id)
             {
-                if let Some(callback_url) = member.get_on_leave() {
-                    let reason = if is_normally {
+                if let Some(on_leave_url) = member.get_on_leave() {
+                    let reason = if normal {
                         OnLeaveReason::Disconnected
                     } else {
                         OnLeaveReason::LostConnection
                     };
                     self.callbacks.send_callback(
-                        callback_url,
+                        on_leave_url,
                         member.get_fid().into(),
                         OnLeaveEvent::new(reason),
                     );

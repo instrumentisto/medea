@@ -13,12 +13,12 @@ use medea_control_api_proto::grpc::{
 };
 
 /// Requests which [`GrpcCallbackServer`] will receive.
-type Callbacks = Arc<Mutex<Vec<Request>>>;
+type CallbackItems = Arc<Mutex<Vec<Request>>>;
 
 /// gRPC Control API callback server for tests.
 pub struct GrpcCallbackServer {
     server: Server,
-    callbacks: Callbacks,
+    callbacks: CallbackItems,
 }
 
 impl Actor for GrpcCallbackServer {
@@ -47,17 +47,17 @@ impl Handler<GetCallbacks> for GrpcCallbackServer {
 }
 
 #[derive(Clone)]
-pub struct CallbackService {
-    callbacks: Callbacks,
+pub struct CallbackServer {
+    callbacks: CallbackItems,
 }
 
-impl CallbackService {
-    pub fn new(callbacks: Callbacks) -> Self {
+impl CallbackServer {
+    pub fn new(callbacks: CallbackItems) -> Self {
         Self { callbacks }
     }
 }
 
-impl Callback for CallbackService {
+impl Callback for CallbackServer {
     fn on_event(
         &mut self,
         ctx: RpcContext,
@@ -74,7 +74,7 @@ pub fn run(port: u16) -> Addr<GrpcCallbackServer> {
     let cq_count = 2;
     let callbacks = Arc::new(Mutex::new(Vec::new()));
 
-    let service = create_callback(CallbackService::new(Arc::clone(&callbacks)));
+    let service = create_callback(CallbackServer::new(Arc::clone(&callbacks)));
     let env = Arc::new(Environment::new(cq_count));
 
     let server = ServerBuilder::new(env)

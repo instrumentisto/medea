@@ -19,7 +19,9 @@ async function createRoom(roomId, memberId) {
               kind: 'WebRtcPublishEndpoint',
               p2p: 'Always'
             },
-          }
+          },
+          on_join: "grpc://127.0.0.1:9099",
+          on_leave: "grpc://127.0.0.1:9099"
         }
       }
     }
@@ -56,6 +58,8 @@ async function createMember(roomId, memberId) {
       kind: 'Member',
       credentials: 'test',
       pipeline: pipeline,
+      on_join: "grpc://127.0.0.1:9099",
+      on_leave: "grpc://127.0.0.1:9099"
     }
   });
 

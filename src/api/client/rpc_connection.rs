@@ -106,7 +106,7 @@ pub struct RpcConnectionClosed {
 #[derive(Debug)]
 pub enum ClosedReason {
     /// [`RpcConnection`] was irrevocably closed.
-    Closed { is_normally: bool },
+    Closed { normal: bool },
     /// [`RpcConnection`] was lost, but may be reestablished.
     Lost,
 }

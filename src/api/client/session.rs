@@ -257,7 +257,7 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
                         if reason.code == CloseCode::Normal
                             || reason.code == CloseCode::Away
                         {
-                            ClosedReason::Closed { is_normally: true }
+                            ClosedReason::Closed { normal: true }
                         } else {
                             ClosedReason::Lost
                         }
