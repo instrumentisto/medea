@@ -21,7 +21,7 @@ use tracerr::Traced;
 use wasm_bindgen_futures::spawn_local;
 use web_sys::CloseEvent;
 
-use crate::utils::{JasonError, JsCaused, JsError};
+use crate::utils::{resolve_after, JasonError, JsCaused, JsError};
 
 use self::heartbeat::{Heartbeat, HeartbeatError};
 
@@ -233,40 +233,26 @@ impl Inner {
     }
 }
 
-/// Handles close message from remote server.
+/// Handles close message from a remote server.
 ///
 /// This function will be called on every WebSocket close (normal and abnormal)
 /// regardless of the [`CloseReason`].
-async fn on_close(inner_rc: Rc<RefCell<Inner>>, close_msg: &CloseMsg) {
-    inner_rc.borrow_mut().heartbeat.stop();
+async fn on_close(client: WebSocketRpcClient, close_msg: &CloseMsg) {
+    client.0.borrow_mut().heartbeat.stop();
 
-    // TODO: reconnect on disconnect, propagate error if unable
-    //       to reconnect
+    // TODO: propagate error if unable to reconnect
 
     match &close_msg {
         CloseMsg::Normal(_, reason) => match reason {
             CloseByServerReason::Reconnected => (),
             CloseByServerReason::Idle => {
-                while let Err(_) =
-                    inner_rc.borrow().sock.as_ref().unwrap().reconnect().await
-                {
-                    if let Err(e) = crate::utils::resolve_after(100).await {
-                        console_error!(format!(
-                            "Error while trying to set interval between \
-                             reconnects: {:?}",
-                            e
-                        ));
-                    };
-                }
-                let sock = inner_rc.borrow().sock.clone();
-                if let Some(sock) = sock {
-                    inner_rc.borrow_mut().heartbeat.start(sock).unwrap();
-                }
+                client.reconnect().await;
             }
             _ => {
-                inner_rc.borrow_mut().sock.take();
+                client.0.borrow_mut().sock.take();
                 if *reason != CloseByServerReason::Reconnected {
-                    inner_rc
+                    client
+                        .0
                         .borrow_mut()
                         .on_close_subscribers
                         .drain(..)
@@ -284,27 +270,17 @@ async fn on_close(inner_rc: Rc<RefCell<Inner>>, close_msg: &CloseMsg) {
             }
         },
         CloseMsg::Abnormal(_) => spawn_local(async move {
-            while let Err(_) =
-                inner_rc.borrow().sock.as_ref().unwrap().reconnect().await
-            {
-                if let Err(e) = crate::utils::resolve_after(100).await {
-                    console_error!(format!(
-                        "Error while trying to set interval between \
-                         reconnects: {:?}",
-                        e
-                    ));
-                };
-            }
+            client.reconnect().await;
         }),
     }
 }
 
-/// Handles messages from remote server.
+/// Handles messages from a remote server.
 fn on_message(
-    inner_rc: &RefCell<Inner>,
+    client: &WebSocketRpcClient,
     msg: Result<ServerMsg, Traced<TransportError>>,
 ) {
-    let inner = inner_rc.borrow();
+    let inner = client.0.borrow();
     match msg {
         Ok(ServerMsg::Pong(_num)) => {
             // TODO: detect no pings
@@ -335,6 +311,7 @@ fn on_message(
 // 4. Buffering if no socket?
 /// Client API RPC client to talk with server via [`WebSocket`].
 #[allow(clippy::module_name_repetitions)]
+#[derive(Clone)]
 pub struct WebSocketRpcClient(Rc<RefCell<Inner>>);
 
 impl WebSocketRpcClient {
@@ -342,6 +319,26 @@ impl WebSocketRpcClient {
     /// milliseconds.
     pub fn new(ping_interval: i32) -> Self {
         Self(Inner::new(ping_interval))
+    }
+
+    // TODO: Reconnection try limit.
+    /// Reconnect [`WebSocketRpcClient`].
+    pub async fn reconnect(&self) {
+        while let Err(_) =
+            self.0.borrow().sock.as_ref().unwrap().reconnect().await
+        {
+            if let Err(e) = resolve_after(100).await {
+                console_error!(format!(
+                    "Error while trying to set interval between reconnects: \
+                     {:?}",
+                    e
+                ));
+            };
+        }
+        let sock = self.0.borrow().sock.clone();
+        if let Some(sock) = sock {
+            self.0.borrow_mut().heartbeat.start(sock).unwrap();
+        }
     }
 }
 
@@ -353,35 +350,35 @@ impl RpcClient for WebSocketRpcClient {
         &self,
         transport: Rc<dyn RpcTransport>,
     ) -> LocalBoxFuture<'static, Result<(), Traced<RpcClientError>>> {
-        let inner = Rc::clone(&self.0);
+        let this = self.clone();
         Box::pin(async move {
-            inner
+            this.0
                 .borrow_mut()
                 .heartbeat
                 .start(Rc::clone(&transport))
                 .map_err(tracerr::map_from_and_wrap!())?;
 
-            let inner_rc = Rc::clone(&inner);
+            let this_clone = this.clone();
             let mut on_socket_message = transport
                 .on_message()
                 .map_err(tracerr::map_from_and_wrap!())?;
             spawn_local(async move {
                 while let Some(msg) = on_socket_message.next().await {
-                    on_message(&inner_rc, msg)
+                    on_message(&this_clone, msg)
                 }
             });
 
-            let inner_rc = Rc::clone(&inner);
+            let this_clone = this.clone();
             let mut on_socket_close = transport
                 .on_close()
                 .map_err(tracerr::map_from_and_wrap!())?;
             spawn_local(async move {
                 while let Some(msg) = on_socket_close.next().await {
-                    on_close(inner_rc.clone(), &msg).await;
+                    on_close(this_clone.clone(), &msg).await;
                 }
             });
 
-            inner.borrow_mut().sock.replace(transport);
+            this.0.borrow_mut().sock.replace(transport);
             Ok(())
         })
     }
