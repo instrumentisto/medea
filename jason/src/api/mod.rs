@@ -76,7 +76,7 @@ impl Jason {
                 .drain(..)
                 .for_each(|room| room.close(reason.clone()));
             inner.borrow_mut().media_manager = Rc::default();
-            inner.logs_sender.take();
+            inner.borrow_mut().logs_sender.take();
         }));
 
         let room = Room::new(rpc, peer_repository);
@@ -94,10 +94,9 @@ impl Jason {
     /// streams etc.) respectively. All objects related to this [`Jason`] API
     /// object will be detached (you will still hold them, but unable to use).
     pub fn dispose(self) {
-        let inner = self.0.borrow_mut();
-        inner.rooms.drain(..).for_each(|room| {
+        self.0.borrow_mut().rooms.drain(..).for_each(|room| {
             room.close(ClientDisconnect::RoomClosed.into());
         });
-        inner.logs_sender.take();
+        self.0.borrow_mut().logs_sender.take();
     }
 }

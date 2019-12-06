@@ -208,7 +208,7 @@ const controlDebugWindows = {
 window.onload = async function() {
   let rust = await import("../../pkg");
   let jason = new rust.Jason();
-  jason.init_log_sender(logslUrl, 5000);
+  jason.init_log_sender(logslUrl, 3000);
   console.log(baseUrl);
 
   Object.values(controlDebugWindows).forEach(s => s());

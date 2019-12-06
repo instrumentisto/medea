@@ -30,6 +30,7 @@ use crate::{
     shutdown::ShutdownGracefully,
     signalling::room_repo::RoomRepository,
 };
+use actix_web::web::Json;
 
 /// Parameters of new WebSocket connection creation HTTP request.
 #[derive(Debug, Deserialize)]
@@ -84,8 +85,8 @@ fn ws_index(
 
 /// Handles POST `/logs` HTTP requests and logs body.
 #[allow(clippy::needless_pass_by_value)]
-fn log_index(body: String) -> HttpResponse {
-    info!("client logs: {}", body);
+fn log_index(body: Json<Vec<String>>) -> HttpResponse {
+    info!("client logs: {:?}", body.into_inner());
 
     HttpResponse::Ok().body("Ok")
 }
