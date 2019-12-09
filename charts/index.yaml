@@ -1,9 +1,18 @@
 apiVersion: v1
 entries:
   medea-demo:
+  - apiVersion: v2
+    appVersion: 0.1.0
+    created: "2019-12-09T07:48:06.481147069Z"
+    digest: d049dbcc5fe68e0493ea0dc38fd4753631d2fc03964f5f83f4a727ef75c7a760
+    name: medea-demo
+    type: application
+    urls:
+    - https://instrumentisto.github.io/medea/charts/medea-demo-0.3.2.tgz
+    version: 0.3.2
   - apiVersion: v1
     appVersion: 0.1.0
-    created: "2019-11-07T15:31:07.571836+02:00"
+    created: "2019-12-09T07:48:06.480327562Z"
     digest: dc121dd16e286f51ef505b5644a8c20a091f95e1e522daabe57fcdea658c3064
     name: medea-demo
     urls:
@@ -11,7 +20,7 @@ entries:
     version: 0.3.1
   - apiVersion: v1
     appVersion: 0.1.0
-    created: "2019-11-07T15:31:07.570849+02:00"
+    created: "2019-12-09T07:48:06.479060053Z"
     digest: 352da84002120076aa671506165f9f03cb925e7174ed47793bdbfd7a4c067838
     name: medea-demo
     urls:
@@ -19,7 +28,7 @@ entries:
     version: 0.3.0
   - apiVersion: v1
     appVersion: 0.1.0
-    created: "2019-11-07T15:31:07.570045+02:00"
+    created: "2019-12-09T07:48:06.478131445Z"
     digest: e4bdbcd139aa1e66f2a27bd22f70143c8b0af625e0aefc1cd3b4530f41f2e0a0
     name: medea-demo
     urls:
@@ -27,7 +36,7 @@ entries:
     version: 0.2.0
   - apiVersion: v1
     appVersion: 0.1.0
-    created: "2019-11-07T15:31:07.567485+02:00"
+    created: "2019-12-09T07:48:06.477235738Z"
     digest: ac4e5cee69a8c49cd42b3b96875de82595bf25a5f32a849cafbc006518e5fa2f
     name: medea-demo
     urls:
@@ -35,10 +44,10 @@ entries:
     version: 0.1.1
   - apiVersion: v1
     appVersion: 0.1.0
-    created: "2019-11-07T15:31:07.565001+02:00"
+    created: "2019-12-09T07:48:06.476357832Z"
     digest: 309cdd8aa637c7385122b1d323dd73a3a26e10d0f8bfaefc4ea9e0b3b127610b
     name: medea-demo
     urls:
     - https://instrumentisto.github.io/medea/charts/medea-demo-0.1.0.tgz
     version: 0.1.0
-generated: "2019-11-07T15:31:07.563791+02:00"
+generated: "2019-12-09T07:48:06.475376524Z"
