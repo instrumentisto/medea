@@ -2,11 +2,11 @@
 kind: Deployment
 apiVersion: apps/v1
 metadata:
-  name: {{ template "medea-demo.fullname" . }}-web-client
+  name: {{ printf "%s-web-client" (include "medea-demo.fullname" .) | quote }}
   namespace: {{ .Release.Namespace | quote }}
   labels:
-    helm.sh/chart: {{ template "medea-demo.chart" . }}
-    app.kubernetes.io/name: {{ template "medea-demo.name" . }}
+    helm.sh/chart: {{ include "medea-demo.chart" . | quote }}
+    app.kubernetes.io/name: {{ include "medea-demo.name" . | quote }}
     app.kubernetes.io/instance: {{ .Release.Name | quote }}
     app.kubernetes.io/managed-by: {{ .Release.Service | quote }}
     app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
@@ -15,9 +15,9 @@ metadata:
     {{- toYaml . | nindent 4 }}
   {{- end }}
 spec:
-  replicas: {{ $webClient.deployment.replicas }}
-  revisionHistoryLimit: {{ $webClient.deployment.revisionHistoryLimit }}
-{{- if gt (int $webClient.deployment.replicas) 1 }}
+  replicas: {{ $webClient.deployment.replicas | int }}
+  revisionHistoryLimit: {{ $webClient.deployment.revisionHistoryLimit | int }}
+{{- if gt ($webClient.deployment.replicas | int) 1 }}
   strategy:
     rollingUpdate:
       maxSurge: 100%
@@ -25,13 +25,13 @@ spec:
 {{- end }}
   selector:
     matchLabels:
-      app.kubernetes.io/name: {{ template "medea-demo.name" . }}
+      app.kubernetes.io/name: {{ include "medea-demo.name" . | quote }}
       app.kubernetes.io/instance: {{ .Release.Name | quote }}
       app.kubernetes.io/component: web-client
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: {{ template "medea-demo.name" . }}
+        app.kubernetes.io/name: {{ include "medea-demo.name" . | quote }}
         app.kubernetes.io/instance: {{ .Release.Name | quote }}
         app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
         app.kubernetes.io/component: web-client
@@ -39,7 +39,7 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       annotations:
-        checksum/conf: {{ pick (include (print $.Template.BasePath "/configmap.web-client.yaml") . | fromYaml) "data" | toYaml | sha256sum }}
+        checksum/conf: {{ pick (include (print $.Template.BasePath "/configmap.web-client.yaml") . | fromYaml) "data" | toYaml | sha256sum | quote }}
       {{- with $webClient.deployment.revision }}
         revision: {{ . | quote }}
       {{- end }}
@@ -55,8 +55,8 @@ spec:
     {{- end }}
       containers:
         - name: demo
-          image: "{{ $webClient.image.repository }}:{{ $webClient.image.tag }}"
-          imagePullPolicy: {{ $webClient.image.pullPolicy }}
+          image: {{ printf "%s:%s" $webClient.image.repository $webClient.image.tag | quote }}
+          imagePullPolicy: {{ $webClient.image.pullPolicy | quote }}
           ports:
             - name: http
               containerPort: 80
@@ -79,4 +79,4 @@ spec:
       volumes:
         - name: conf
           configMap:
-            name: {{ template "medea-demo.fullname" . }}.web-client.conf
+            name: {{ printf "%s.web-client.conf" (include "medea-demo.fullname" .) | quote }}
