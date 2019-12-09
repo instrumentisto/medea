@@ -382,7 +382,7 @@ endif
 test-e2e-env = RUST_BACKTRACE=1 \
 	$(if $(call eq,$(log),yes),,RUST_LOG=warn) \
 	MEDEA_CONTROL__STATIC_SPECS_DIR=tests/specs/ \
-	MEDEA_CONF=tests/config.toml
+	MEDEA_CONF=tests/medea.config.toml
 
 test.e2e:
 ifeq ($(up),yes)

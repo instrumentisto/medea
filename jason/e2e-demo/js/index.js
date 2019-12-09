@@ -1,5 +1,5 @@
-const controlDomain = 'http://127.0.0.1:8000/';
-const controlUrl = controlDomain + 'control-api/';
+const controlDomain = 'http://127.0.0.1:8000';
+const controlUrl = controlDomain + '/control-api/';
 const baseUrl = 'ws://127.0.0.1:8080/ws/';
 
 let roomId = window.location.hash.replace("#", "");
@@ -549,7 +549,7 @@ const controlApi = {
 
   getCallbacks: async function() {
     try {
-      let resp = await axios.get(controlDomain + 'callbacks');
+      let resp = await axios.get(controlDomain + '/callbacks');
       return resp.data;
     } catch (e) {
       alert(JSON.stringify(e.response.data));

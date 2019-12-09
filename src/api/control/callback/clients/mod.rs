@@ -1,4 +1,7 @@
 //! Implementations of Control API callback clients for all protocols.
+
+pub mod grpc;
+
 use std::fmt::Debug;
 
 use futures::Future;
@@ -8,8 +11,6 @@ use crate::{
     api::control::callback::{url::CallbackUrl, CallbackRequest},
     log::prelude::*,
 };
-
-pub mod grpc;
 
 /// Client that sends [`CallbackRequest`]'s to [`Callback`] server.
 pub trait CallbackClient: Debug + Send + Sync {
