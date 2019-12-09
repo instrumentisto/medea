@@ -494,13 +494,16 @@ impl RpcClient for WebSocketRpcClient {
     }
 }
 
-impl Drop for Inner {
+impl Drop for WebSocketRpcClient {
     /// Drops related connection and its [`Heartbeat`].
     fn drop(&mut self) {
-        self.is_closed = true;
-        if let Some(socket) = self.sock.take() {
-            socket.set_close_reason(self.close_reason.clone());
+        let mut this_mut = self.0.borrow_mut();
+        if this_mut.close_reason != ClientDisconnect::RpcClientUnexpectedlyDropped {
+            this_mut.is_closed = true;
+            if let Some(socket) = this_mut.sock.take() {
+                socket.set_close_reason(this_mut.close_reason.clone());
+            }
+            this_mut.heartbeat.stop();
         }
-        self.heartbeat.stop();
     }
 }

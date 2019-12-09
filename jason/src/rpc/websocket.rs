@@ -394,25 +394,28 @@ impl WebSocketRpcTransport {
     }
 }
 
-impl Drop for InnerSocket {
+impl Drop for WebSocketRpcTransport {
     fn drop(&mut self) {
-        if self.socket_state.can_close() {
-            self.on_open_listener.take();
-            self.on_error_listener.take();
-            self.on_message_listener.take();
-            self.on_close_listener.take();
+        let mut this_mut = self.0.borrow_mut();
+        if this_mut.close_reason != ClientDisconnect::RpcTransportUnexpectedlyDropped {
+            if this_mut.socket_state.can_close() {
+                this_mut.on_open_listener.take();
+                this_mut.on_error_listener.take();
+                this_mut.on_message_listener.take();
+                this_mut.on_close_listener.take();
 
-            let close_reason: Cow<'static, str> =
-                serde_json::to_string(&self.close_reason)
-                    .unwrap_or_else(|_| {
-                        "Could not serialize close message".into()
-                    })
-                    .into();
+                let close_reason: Cow<'static, str> =
+                    serde_json::to_string(&this_mut.close_reason)
+                        .unwrap_or_else(|_| {
+                            "Could not serialize close message".into()
+                        })
+                        .into();
 
-            if let Err(err) =
-                self.socket.close_with_code_and_reason(1000, &close_reason)
-            {
-                console_error!(err);
+                if let Err(err) =
+                this_mut.socket.close_with_code_and_reason(1000, &close_reason)
+                {
+                    console_error!(err);
+                }
             }
         }
     }

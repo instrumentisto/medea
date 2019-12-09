@@ -82,18 +82,19 @@ impl From<MediaStreamConstraints> for SysMediaStreamConstraints {
 ///
 /// [1]: https://www.w3.org/TR/mediacapture-streams/#mediastreamtrack
 /// [2]: https://www.w3.org/TR/mediacapture-streams/#def-constraint-deviceId
-macro_rules! satisfies_by_device_id {
-    ($v:expr, $track:ident) => {{
-        match &$v.device_id {
-            None => true,
-            Some(device_id) => get_property_by_name(
-                &$track.get_settings(),
-                "deviceId",
-                |val| val.as_string(),
-            )
-            .map_or(false, |id| id.as_str() == device_id),
+fn satisfies_by_device_id(
+    device_id: &Option<String>,
+    track: &SysMediaStreamTrack,
+) -> bool {
+    match device_id {
+        None => true,
+        Some(device_id) => {
+            get_property_by_name(&track.get_settings(), "deviceId", |val| {
+                val.as_string()
+            })
+            .map_or(false, |id| id.as_str() == device_id)
         }
-    }};
+    }
 }
 
 /// Wrapper around [MediaTrackConstraints][1].
@@ -175,7 +176,7 @@ impl AudioTrackConstraints {
             return false;
         }
 
-        satisfies_by_device_id!(self, track)
+        satisfies_by_device_id(&self.device_id, track)
         // TODO returns Result<bool, Error>
     }
 }
@@ -240,7 +241,7 @@ impl VideoTrackConstraints {
             return false;
         }
 
-        satisfies_by_device_id!(self, track)
+        satisfies_by_device_id(&self.device_id, track)
     }
 }
 
