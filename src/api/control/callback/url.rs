@@ -146,10 +146,11 @@ mod tests {
             "asdf://127.0.0.1",
             "asdf://127.0.0.1:9090",
         ] {
-            match CallbackUrl::try_from(url.to_string()).unwrap_err() {
+            let err = CallbackUrl::try_from(url.to_string()).unwrap_err();
+            match err {
                 CallbackUrlParseError::UnsupportedScheme => {}
                 _ => {
-                    unreachable!("Unreachable error (URL = {}): {:?}", url, res)
+                    unreachable!("Unreachable error (URL = {}): {:?}", url, err)
                 }
             }
         }
@@ -163,7 +164,8 @@ mod tests {
             "example.com",
             "example.com:9090",
         ] {
-            match CallbackUrl::try_from(url.to_string()).unwrap_err() {
+            let err = CallbackUrl::try_from(url.to_string()).unwrap_err();
+            match err {
                 CallbackUrlParseError::UrlParseErr(e) => match e {
                     ParseError::RelativeUrlWithoutBase => {}
                     _ => unreachable!(
@@ -173,7 +175,7 @@ mod tests {
                 },
                 CallbackUrlParseError::MissingHost => {}
                 _ => {
-                    unreachable!("Unreachable error [URL = {}]: {:?}", url, res)
+                    unreachable!("Unreachable error [URL = {}]: {:?}", url, err)
                 }
             }
         }
