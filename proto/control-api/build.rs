@@ -17,7 +17,7 @@ mod grpc {
 
     impl ProtoNames {
         /// Load [`ProtoNames`] from [`GRPC_DIR`] directory.
-        pub fn new() -> io::Result<Self> {
+        pub fn load() -> io::Result<Self> {
             let proto_names = fs::read_dir(GRPC_DIR)?
                 .into_iter()
                 .collect::<Result<Vec<_>, _>>()?
@@ -71,7 +71,7 @@ mod grpc {
     /// ```
     /// in the root of the project.
     pub fn compile() -> Result<(), Box<dyn Error>> {
-        let proto_names = ProtoNames::new()?;
+        let proto_names = ProtoNames::load()?;
         let grpc_spec_files = proto_names.get_grpc_spec_files();
         let out_files = proto_names.get_out_files();
 
