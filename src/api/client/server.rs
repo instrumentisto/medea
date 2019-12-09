@@ -86,7 +86,9 @@ fn ws_index(
 /// Handles POST `/logs` HTTP requests and logs body.
 #[allow(clippy::needless_pass_by_value)]
 fn log_index(body: Json<Vec<String>>) -> HttpResponse {
-    info!("client logs: {:?}", body.into_inner());
+    for log in body.into_inner() {
+        info!("client log: {}", log);
+    }
 
     HttpResponse::Ok().body("Ok")
 }

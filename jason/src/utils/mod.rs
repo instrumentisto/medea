@@ -5,19 +5,22 @@ mod errors;
 
 mod callback;
 mod event_listener;
-mod logs_sender;
+mod log_sender;
 
 use js_sys::Reflect;
 use medea_client_api_proto::PeerId;
 use wasm_bindgen::prelude::*;
 use web_sys::Window;
 
+#[cfg(feature = "mockable")]
+#[doc(inline)]
+pub use self::log_sender::MockHTTPClient;
 #[doc(inline)]
 pub use self::{
     callback::{Callback, Callback2},
     errors::{HandlerDetachedError, JasonError, JsCaused, JsError},
     event_listener::{EventListener, EventListenerBindError},
-    logs_sender::LogSender,
+    log_sender::{FetchHTTPClient, HTTPClient, LogSender, JASON_LOG_KEY},
 };
 
 /// Returns [`Window`] object.
@@ -45,12 +48,11 @@ macro_rules! store_jason_error {
 
 /// Stores [`JasonError`] into local storage for further sending to the server.
 pub fn store_error(err: &JasonError, peer_id: Option<PeerId>) {
-    match peer_id {
-        Some(id) => {
-            LogSender::push_to_store(&format!("peer_id={} error={}", id, err))
-        }
-        None => LogSender::push_to_store(&format!("error={}", err)),
+    let value = match peer_id {
+        Some(id) => format!("\"peer_id={} error={}\"", id, err),
+        None => format!("\"error={}\"", err),
     };
+    LogSender::push_to_store(value.replace("\n", "\\n").into());
 }
 
 /// Wrapper around interval timer ID.

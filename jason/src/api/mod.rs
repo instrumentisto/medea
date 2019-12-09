@@ -14,7 +14,7 @@ use crate::{
     peer,
     rpc::{ClientDisconnect, RpcClient as _, WebSocketRpcClient},
     set_panic_hook,
-    utils::{JasonError, LogSender},
+    utils::{FetchHTTPClient, JasonError, LogSender},
 };
 
 #[doc(inline)]
@@ -51,7 +51,9 @@ impl Jason {
         url: &str,
         interval: i32,
     ) -> Result<(), JsValue> {
-        let sender = LogSender::new(url, interval).map_err(JasonError::from)?;
+        let client = Rc::new(FetchHTTPClient::new(url));
+        let sender =
+            LogSender::new(client, interval).map_err(JasonError::from)?;
         self.0.borrow_mut().logs_sender = Some(sender);
         Ok(())
     }
