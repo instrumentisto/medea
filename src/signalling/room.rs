@@ -159,7 +159,9 @@ enum State {
 pub struct Room {
     id: RoomId,
 
-    /// Repository which stores all callback clients.
+    /// Service for sending [`CallbackEvent`]s.
+    ///
+    /// [`CallbackEvent`]: crate::api::control::callbacks::CallbackEvent
     callbacks: CallbackService,
 
     /// [`Member`]s and associated [`RpcConnection`]s of this [`Room`], handles

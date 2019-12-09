@@ -15,6 +15,7 @@ use medea_control_api_proto::grpc::{
 
 use crate::{callback::CallbackItem, prelude::*};
 
+/// Type which used in [`GrpcCallbackServer`] for [`CallbackItem`] storing.
 type CallbackItems = Arc<Mutex<Vec<CallbackItem>>>;
 
 /// [`Actor`] wrapper for [`grpcio`] server.
@@ -46,6 +47,8 @@ pub struct GrpcCallbackService {
 }
 
 impl GrpcCallbackService {
+    /// Returns [`GrpcCallbackService`] with provided pointer to [`Vec`] of
+    /// [`CallbackItem`]s.
     pub fn new(events: CallbackItems) -> Self {
         Self { events }
     }

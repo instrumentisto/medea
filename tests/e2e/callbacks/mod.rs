@@ -46,6 +46,7 @@ impl Handler<GetCallbacks> for GrpcCallbackServer {
     }
 }
 
+/// [`grpcio`] server for receiving callbacks.
 #[derive(Clone)]
 pub struct CallbackServer {
     callbacks: CallbackItems,

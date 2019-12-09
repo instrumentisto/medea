@@ -4,7 +4,6 @@ pub mod clients;
 pub mod service;
 pub mod url;
 
-use actix::Message;
 use chrono::{DateTime, Utc};
 use derive_more::From;
 use medea_control_api_proto::grpc::callback::{
@@ -14,8 +13,6 @@ use medea_control_api_proto::grpc::callback::{
 };
 
 use crate::api::control::refs::StatefulFid;
-
-use self::clients::CallbackClientError;
 
 /// Event for `on_leave` `Member` callback.
 #[derive(Debug)]
@@ -94,14 +91,20 @@ impl Into<RequestOneofEventProto> for CallbackEvent {
 
 /// Control API callback.
 ///
-/// This struct is used as [`Message`] for sending callback in all callback
-/// clients.
+/// Used for sending callbacks with [`CallbackClient::send`].
+///
+/// [`CallbackClient::send`]:
+/// crate::api::control::callback::clients::CallbackClient::send
 #[allow(clippy::module_name_repetitions)]
-#[derive(Debug, Message)]
-#[rtype(result = "Result<(), CallbackClientError>")]
+#[derive(Debug)]
 pub struct CallbackRequest {
+    /// FID (Full ID) of element with which event was occurred.
     fid: StatefulFid,
+
+    /// [`CallbackEvent`] which occured.
     event: CallbackEvent,
+
+    /// Time on which event was occurred.
     at: DateTime<Utc>,
 }
 

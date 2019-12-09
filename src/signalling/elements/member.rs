@@ -89,10 +89,10 @@ struct MemberInner {
     /// [`IceUser`] of this [`Member`].
     ice_user: Option<IceUser>,
 
-    /// URL to which `OnJoin` Control API callback will be sent.
+    /// URL to which `on_join` Control API callback will be sent.
     on_join: Option<CallbackUrl>,
 
-    /// URL to which `OnLeave` Control API callback will be sent.
+    /// URL to which `on_leave` Control API callback will be sent.
     on_leave: Option<CallbackUrl>,
 }
 

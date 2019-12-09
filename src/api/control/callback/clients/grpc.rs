@@ -58,7 +58,7 @@ impl CallbackClient for GrpcCallbackClient {
             self.client
                 .on_event_async(&request.into())
                 .into_future()
-                .and_then(|q| q)
+                .and_then(|f| f)
                 .map(|_| ())
                 .map_err(CallbackClientError::from),
         )

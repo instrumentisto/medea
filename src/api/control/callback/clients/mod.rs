@@ -14,6 +14,7 @@ use crate::{
 
 /// Client that sends [`CallbackRequest`]'s to [`Callback`] server.
 pub trait CallbackClient: Debug + Send + Sync {
+    /// Sends [`CallbackRequest`] to [`Callback`] server.
     fn send(
         &self,
         request: CallbackRequest,
@@ -33,7 +34,7 @@ impl From<grpcio::Error> for CallbackClientError {
 
 /// Creates [`CallbackClient`] based on provided [`CallbackUrl`].
 pub fn build_client(url: &CallbackUrl) -> impl CallbackClient {
-    info!("Creating CallbackClient for url: {:?}", url);
+    info!("Creating CallbackClient for url: {}", url);
     match &url {
         CallbackUrl::Grpc(grpc_url) => grpc::GrpcCallbackClient::new(grpc_url),
     }

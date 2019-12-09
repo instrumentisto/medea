@@ -1,6 +1,6 @@
 use std::error::Error;
 
-/// Implementation of gRPC compilation.
+/// Implementation of gRPC Protobuf specs compilation.
 #[cfg(feature = "grpc")]
 mod grpc {
     use std::{borrow::Cow, error::Error, fs, io};

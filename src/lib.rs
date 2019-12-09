@@ -28,7 +28,9 @@ pub struct AppContext {
     /// Reference to [`TurnAuthService`].
     pub turn_service: Arc<dyn TurnAuthService>,
 
-    /// Repository which stores all callback clients.
+    /// Service for sending [`CallbackEvent`]s.
+    ///
+    /// [`CallbackEvent`]: crate::api::control::callbacks::CallbackEvent
     pub callbacks: CallbackService,
 }
 

@@ -53,6 +53,7 @@ impl From<CallbackProto> for CallbackItem {
     }
 }
 
+/// `on_join` callback's related entities and implementations.
 mod join {
 
     use medea_control_api_proto::grpc::callback::OnJoin as OnJoinProto;
@@ -70,6 +71,7 @@ mod join {
     }
 }
 
+/// `on_leave` callback's related entities and implementations.
 mod leave {
 
     use medea_control_api_proto::grpc::callback::{

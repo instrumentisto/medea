@@ -1,4 +1,4 @@
-//! Repository which stores and lazily creates [`CallbackRequest`] clients.
+//! Service which stores and lazily creates [`CallbackRequest`] clients.
 
 use std::{
     collections::hash_map::HashMap,
@@ -22,7 +22,7 @@ use super::{
     CallbackRequest,
 };
 
-/// Repository which stores and lazily creates [`CallbackRequest`] clients.
+/// Service which stores and lazily creates [`CallbackRequest`] clients.
 #[allow(clippy::module_name_repetitions)]
 #[derive(Clone, Debug, Default)]
 pub struct CallbackService(
@@ -34,7 +34,9 @@ pub struct CallbackService(
 
 impl CallbackService {
     /// Asynchronously sends [`CallbackEvent`] for provided [`StatefulFid`] to
-    /// callback client.  Will use existing [`CallbackClient`] or create new.
+    /// [`CallbackClient`].
+    ///
+    /// Will use existing [`CallbackClient`] or create new.
     // TODO: Add buffering and resending for failed 'Callback' sends.
     //       https://github.com/instrumentisto/medea/issues/61
     pub fn send_callback<T: Into<CallbackEvent>>(

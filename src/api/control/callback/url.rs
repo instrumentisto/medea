@@ -19,7 +19,7 @@ pub struct GrpcCallbackUrl(String);
 impl GrpcCallbackUrl {
     /// Returns address for gRPC callback client.
     ///
-    /// If you wish to get address with protocol - use [`Display`]
+    /// If you wish to get address with protocol - just use [`Display`]
     /// implementation.
     pub fn addr(&self) -> &str {
         &self.0
@@ -146,15 +146,7 @@ mod tests {
             "asdf://127.0.0.1",
             "asdf://127.0.0.1:9090",
         ] {
-            let res = if let Err(e) = CallbackUrl::try_from(url.to_string()) {
-                e
-            } else {
-                unreachable!(
-                    "Unreachable successful result of parsing. {}",
-                    url
-                );
-            };
-            match res {
+            match CallbackUrl::try_from(url.to_string()).unwrap_err() {
                 CallbackUrlParseError::UnsupportedScheme => {}
                 _ => {
                     unreachable!("Unreachable error (URL = {}): {:?}", url, res)
@@ -171,15 +163,7 @@ mod tests {
             "example.com",
             "example.com:9090",
         ] {
-            let res = if let Err(e) = CallbackUrl::try_from(url.to_string()) {
-                e
-            } else {
-                unreachable!(
-                    "Unreachable successful result of parsing. {}",
-                    url
-                );
-            };
-            match res {
+            match CallbackUrl::try_from(url.to_string()).unwrap_err() {
                 CallbackUrlParseError::UrlParseErr(e) => match e {
                     ParseError::RelativeUrlWithoutBase => {}
                     _ => unreachable!(
