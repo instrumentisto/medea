@@ -1,41 +1,39 @@
 kind: Deployment
 apiVersion: apps/v1
 metadata:
-  name: {{ template "medea-demo.fullname" . }}-server
+  name: {{ printf "%s-server" (include "medea-demo.fullname" .) | quote }}
   namespace: {{ .Release.Namespace | quote }}
   labels:
-    helm.sh/chart: {{ template "medea-demo.chart" . }}
-    app.kubernetes.io/name: {{ template "medea-demo.name" . }}
+    helm.sh/chart: {{ include "medea-demo.chart" . | quote }}
+    app.kubernetes.io/name: {{ include "medea-demo.name" . | quote }}
     app.kubernetes.io/instance: {{ .Release.Name | quote }}
     app.kubernetes.io/managed-by: {{ .Release.Service | quote }}
-    app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
     app.kubernetes.io/component: server
   {{- with .Values.labels }}
     {{- toYaml . | nindent 4 }}
   {{- end }}
 spec:
   replicas: 1
-  revisionHistoryLimit: {{ .Values.server.deployment.revisionHistoryLimit }}
+  revisionHistoryLimit: {{ .Values.server.deployment.revisionHistoryLimit | int }}
   strategy:
     type: Recreate
   selector:
     matchLabels:
-      app.kubernetes.io/name: {{ template "medea-demo.name" . }}
+      app.kubernetes.io/name: {{ include "medea-demo.name" . | quote }}
       app.kubernetes.io/instance: {{ .Release.Name | quote }}
       app.kubernetes.io/component: server
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: {{ template "medea-demo.name" . }}
+        app.kubernetes.io/name: {{ include "medea-demo.name" . | quote }}
         app.kubernetes.io/instance: {{ .Release.Name | quote }}
-        app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
         app.kubernetes.io/component: server
       {{- with .Values.labels }}
         {{- toYaml . | nindent 8 }}
       {{- end }}
       annotations:
-        checksum/conf: {{ pick (include (print $.Template.BasePath "/configmap.server.yaml") . | fromYaml) "data" | toYaml | sha256sum }}
-        checksum/cred: {{ pick (include (print $.Template.BasePath "/secret.server.yaml") . | fromYaml) "data" | toYaml | sha256sum }}
+        checksum/conf: {{ pick (include (print $.Template.BasePath "/configmap.server.yaml") . | fromYaml) "data" | toYaml | sha256sum | quote }}
+        checksum/cred: {{ pick (include (print $.Template.BasePath "/secret.server.yaml") . | fromYaml) "data" | toYaml | sha256sum | quote }}
       {{- with .Values.server.deployment.revision }}
         revision: {{ . | quote }}
       {{- end }}
@@ -55,8 +53,8 @@ spec:
       {{- $coturnDb := index .Values "server" "coturn-db" }}
       {{- $coturn := .Values.server.coturn }}
         - name: medea
-          image: "{{ .Values.server.image.repository }}:{{ .Values.server.image.tag }}"
-          imagePullPolicy: {{ .Values.server.image.pullPolicy }}
+          image: {{ printf "%s:%s" .Values.server.image.repository .Values.server.image.tag | quote }}
+          imagePullPolicy: {{ .Values.server.image.pullPolicy | quote }}
           env:
             - name: MEDEA_CONF
               value: /etc/medea.toml
@@ -66,13 +64,13 @@ spec:
               value: {{ $coturnDb.conf.port | quote }}
           envFrom:
             - secretRef:
-                name: {{ template "medea-demo.fullname" . }}.server.cred
+                name: {{ printf "%s.server.cred" (include "medea-demo.fullname" .) | quote }}
           ports:
             - name: http
-              containerPort: {{ .Values.server.conf.server.client.http.bind_port }}
+              containerPort: {{ .Values.server.conf.server.client.http.bind_port | int }}
               protocol: TCP
             - name: grpc
-              containerPort: {{ .Values.server.conf.server.control.grpc.bind_port }}
+              containerPort: {{ .Values.server.conf.server.control.grpc.bind_port | int }}
               protocol: TCP
           volumeMounts:
             - name: conf
@@ -84,36 +82,36 @@ spec:
         {{- end }}
           livenessProbe:
             tcpSocket:
-              port: {{ .Values.server.conf.server.client.http.bind_port }}
+              port: {{ .Values.server.conf.server.client.http.bind_port | int }}
             initialDelaySeconds: 3
           readinessProbe:
             tcpSocket:
-              port: {{ .Values.server.conf.server.client.http.bind_port }}
+              port: {{ .Values.server.conf.server.client.http.bind_port | int }}
             initialDelaySeconds: 5
       {{- $controlMock := index .Values "server" "control-mock" }}
         - name: control-mock
-          image: "{{ $controlMock.image.repository }}:{{ $controlMock.image.tag }}"
-          imagePullPolicy: {{ $controlMock.image.pullPolicy }}
+          image: {{ printf "%s:%s" $controlMock.image.repository $controlMock.image.tag | quote }}
+          imagePullPolicy: {{ $controlMock.image.pullPolicy | quote }}
           args:
-            - --addr=0.0.0.0:{{ $controlMock.conf.bind_port }}
-            - --medea-addr=127.0.0.1:{{ .Values.server.conf.server.control.grpc.bind_port }}
+            - --addr=0.0.0.0:{{ $controlMock.conf.bind_port | int }}
+            - --medea-addr=127.0.0.1:{{ .Values.server.conf.server.control.grpc.bind_port | int }}
           env:
             - name: RUST_LOG
               value: {{ $controlMock.conf.log.level | quote }}
           ports:
             - name: control-http
-              containerPort: {{ $controlMock.conf.bind_port }}
+              containerPort: {{ $controlMock.conf.bind_port | int }}
               protocol: TCP
         - name: coturn
-          image: "{{ $coturn.image.repository }}:{{ $coturn.image.tag }}"
-          imagePullPolicy: {{ $coturn.image.pullPolicy }}
+          image: {{ printf "%s:%s" $coturn.image.repository $coturn.image.tag | quote }}
+          imagePullPolicy: {{ $coturn.image.pullPolicy | quote }}
           command: ["turnserver"]
           args:
             - --log-file=stdout
             - --external-ip=$(EXTERNAL_IP)
             - --listening-ip=$(EXTERNAL_IP)
             - --relay-ip=$(EXTERNAL_IP)
-            - --redis-userdb=ip=127.0.0.1 port={{ $coturnDb.conf.port }} dbname={{ .Values.server.conf.turn.db.redis.db_number }} password=$(MEDEA_TURN__DB__REDIS__PASS)
+            - --redis-userdb=ip=127.0.0.1 port={{ $coturnDb.conf.port | int }} dbname={{ .Values.server.conf.turn.db.redis.db_number }} password=$(MEDEA_TURN__DB__REDIS__PASS)
             - --user={{ .Values.server.conf.turn.user }}:$(MEDEA_TURN__PASS)
           {{- with $coturn.extraArgs }}
             {{- toYaml . | nindent 12 }}
@@ -130,19 +128,19 @@ spec:
             - name: MEDEA_TURN__PASS
               valueFrom:
                 secretKeyRef:
-                  name: {{ template "medea-demo.fullname" . }}.server.cred
+                  name: {{ printf "%s.server.cred" (include "medea-demo.fullname" .) | quote }}
                   key: MEDEA_TURN__PASS
             - name: MEDEA_TURN__DB__REDIS__PASS
               valueFrom:
                 secretKeyRef:
-                  name: {{ template "medea-demo.fullname" . }}.server.cred
+                  name: {{ printf "%s.server.cred" (include "medea-demo.fullname" .) | quote }}
                   key: MEDEA_TURN__DB__REDIS__PASS
           ports:
             - name: turn
-              containerPort: {{ $coturn.conf.listening_port }}
+              containerPort: {{ $coturn.conf.listening_port | int }}
               protocol: TCP
             - name: turn-udp
-              containerPort: {{ $coturn.conf.listening_port }}
+              containerPort: {{ $coturn.conf.listening_port | int }}
               protocol: UDP
           volumeMounts:
             - name: conf
@@ -156,15 +154,15 @@ spec:
         {{- end }}
           livenessProbe:
             tcpSocket:
-              port: {{ $coturn.conf.listening_port }}
+              port: {{ $coturn.conf.listening_port | int }}
             initialDelaySeconds: 3
           readinessProbe:
             tcpSocket:
-              port: {{ $coturn.conf.listening_port }}
+              port: {{ $coturn.conf.listening_port | int }}
             initialDelaySeconds: 5
         - name: coturn-db
-          image: "{{ $coturnDb.image.repository }}:{{ $coturnDb.image.tag }}"
-          imagePullPolicy: {{ $coturnDb.image.pullPolicy }}
+          image: {{ printf "%s:%s" $coturnDb.image.repository $coturnDb.image.tag | quote }}
+          imagePullPolicy: {{ $coturnDb.image.pullPolicy | quote }}
           args:
             - redis-server
             - /etc/redis.conf
@@ -173,7 +171,7 @@ spec:
             - name: MEDEA_TURN__DB__REDIS__PASS
               valueFrom:
                 secretKeyRef:
-                  name: {{ template "medea-demo.fullname" . }}.server.cred
+                  name: {{ printf "%s.server.cred" (include "medea-demo.fullname" .) | quote }}
                   key: MEDEA_TURN__DB__REDIS__PASS
           volumeMounts:
             - name: conf
@@ -185,15 +183,15 @@ spec:
         {{- end }}
           livenessProbe:
             exec:
-              command: ['redis-cli', '-p', '{{ $coturnDb.conf.port }}', 'ping']
+              command: ['redis-cli', '-p', '{{ $coturnDb.conf.port | int }}', 'ping']
             initialDelaySeconds: 3
           readinessProbe:
             exec:
-              command: ['redis-cli', '-p', '{{ $coturnDb.conf.port }}', 'ping']
+              command: ['redis-cli', '-p', '{{ $coturnDb.conf.port | int }}', 'ping']
             initialDelaySeconds: 5
       volumes:
         - name: conf
           configMap:
-            name: {{ template "medea-demo.fullname" . }}.server.conf
+            name: {{ printf "%s.server.conf" (include "medea-demo.fullname" .) | quote }}
         - name: coturn-data
           emptyDir: {}
