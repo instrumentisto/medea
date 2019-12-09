@@ -2,66 +2,22 @@
 
 use std::rc::Rc;
 
-use futures::{
-    channel::{mpsc, oneshot},
-    future::Either,
-};
+use futures::channel::mpsc;
 use medea_client_api_proto::{Event, IceServer, PeerId};
 use medea_jason::{
-    api::Room,
+    api::{Room, RoomStream},
     media::{AudioTrackConstraints, MediaManager, MediaStreamConstraints},
     peer::{MockPeerRepository, PeerConnection, PeerEvent},
     rpc::MockRpcClient,
     utils::JasonError,
 };
-use wasm_bindgen::prelude::*;
 use wasm_bindgen_test::*;
 
-use crate::{get_test_tracks, resolve_after, MockNavigator};
-use medea_jason::api::RoomStream;
+use crate::{
+    get_test_tracks, resolve_after, wait_and_check_test_result, MockNavigator,
+};
 
 wasm_bindgen_test_configure!(run_in_browser);
-
-/// `assert_eq` analog but on failed comparison error will be sent with
-/// [`oneshot::Sender`].
-///
-/// This macro will be used in JS callback tests because this is the only
-/// option to trigger test fail.
-///
-/// `$test_tx` - [`oneshot::Sender`] to which comparison error will be sent.
-macro_rules! callback_assert_eq {
-    ($test_tx:tt, $actual:expr, $expected:expr) => {
-        if $actual != $expected {
-            $test_tx
-                .send(Err(format!("{} != {}", $actual, $expected)))
-                .unwrap();
-            return;
-        }
-    };
-}
-
-/// Waits for [`Result`] from [`oneshot::Receiver`] with tests result.
-///
-/// Also it will check result of test and will panic if some error will be
-/// found.
-pub async fn wait_and_check_test_result(
-    rx: oneshot::Receiver<Result<(), String>>,
-    finally: impl FnOnce(),
-) {
-    let result =
-        futures::future::select(Box::pin(rx), Box::pin(resolve_after(500)))
-            .await;
-    finally();
-    match result {
-        Either::Left((oneshot_fut_result, _)) => {
-            let assert_result = oneshot_fut_result.expect("Cancelled.");
-            assert_result.expect("Assertion failed");
-        }
-        Either::Right(_) => {
-            panic!("callback didn't fired");
-        }
-    };
-}
 
 fn get_test_room_and_exist_peer(
     count_gets_peer: usize,
@@ -83,6 +39,7 @@ fn get_test_room_and_exist_peer(
         .times(count_gets_peer)
         .returning_st(move || vec![Rc::clone(&peer_clone)]);
     rpc.expect_unsub().return_const(());
+    rpc.expect_set_close_reason().return_const(());
 
     let room = Room::new(Rc::new(rpc), repo, Rc::clone(&stream_source));
     (room, peer, stream_source)
@@ -159,6 +116,7 @@ fn get_test_room_and_new_peer(
         .return_once_st(move |_, _, _, _, _| Ok(peer_clone));
     rpc.expect_send_command().return_const(());
     rpc.expect_unsub().return_const(());
+    rpc.expect_set_close_reason().return_const(());
 
     let room = Room::new(Rc::new(rpc), repo, media_source);
     (room, peer)
@@ -224,16 +182,13 @@ async fn error_inject_invalid_local_stream_into_new_peer() {
     let (room, _peer) = get_test_room_and_new_peer(event_rx, true, true);
 
     let room_handle = room.new_handle();
-    let (test_tx, test_rx) = oneshot::channel();
-    let cb = Closure::once_into_js(move |err: JasonError| {
-        callback_assert_eq!(test_tx, &err.name(), "InvalidLocalStream");
-        callback_assert_eq!(
-            test_tx,
+    let (cb, test_result) = js_callback!(|err: JasonError| {
+        cb_assert_eq!(&err.name(), "InvalidLocalStream");
+        cb_assert_eq!(
             err.message(),
             "Invalid local stream: provided MediaStream was expected to have \
              single video track"
         );
-        test_tx.send(Ok(())).unwrap();
     });
     room_handle.on_failed_local_stream(cb.into()).unwrap();
 
@@ -256,7 +211,7 @@ async fn error_inject_invalid_local_stream_into_new_peer() {
         })
         .unwrap();
 
-    wait_and_check_test_result(test_rx, || {}).await;
+    wait_and_check_test_result(test_result, || {}).await;
 }
 
 // Tests Room::inject_local_stream for existing PeerConnection.
@@ -270,16 +225,13 @@ async fn error_inject_invalid_local_stream_into_new_peer() {
 //     1. Invoking `on_failed_local_stream` callback.
 #[wasm_bindgen_test]
 async fn error_inject_invalid_local_stream_into_room_on_exists_peer() {
-    let (test_tx, test_rx) = oneshot::channel();
-    let cb = Closure::once_into_js(move |err: JasonError| {
-        callback_assert_eq!(test_tx, &err.name(), "InvalidLocalStream");
-        callback_assert_eq!(
-            test_tx,
+    let (cb, test_result) = js_callback!(|err: JasonError| {
+        cb_assert_eq!(&err.name(), "InvalidLocalStream");
+        cb_assert_eq!(
             &err.message(),
             "Invalid local stream: provided MediaStream was expected to have \
              single video track"
         );
-        test_tx.send(Ok(())).unwrap();
     });
     let (room, peer, store) = get_test_room_and_exist_peer(1);
     let (audio_track, video_track) = get_test_tracks();
@@ -296,7 +248,7 @@ async fn error_inject_invalid_local_stream_into_room_on_exists_peer() {
     room_handle.on_failed_local_stream(cb.into()).unwrap();
     room_handle.inject_local_stream(stream).unwrap();
 
-    wait_and_check_test_result(test_rx, || {}).await;
+    wait_and_check_test_result(test_result, || {}).await;
 }
 
 #[wasm_bindgen_test]
@@ -305,17 +257,16 @@ async fn error_get_local_stream_on_new_peer() {
     let (room, _peer) = get_test_room_and_new_peer(event_rx, true, true);
 
     let room_handle = room.new_handle();
-    let (test_tx, test_rx) = oneshot::channel();
-    let cb = Closure::once_into_js(move |err: JasonError| {
-        callback_assert_eq!(test_tx, &err.name(), "CouldNotGetLocalMedia");
-        callback_assert_eq!(
-            test_tx,
+
+    let (cb, test_result) = js_callback!(|err: JasonError| {
+        cb_assert_eq!(&err.name(), "CouldNotGetLocalMedia");
+        cb_assert_eq!(
             &err.message(),
             "Failed to get local stream: MediaDevices.getUserMedia() failed: \
              Unknown JS error: error_get_local_stream_on_new_peer"
         );
-        test_tx.send(Ok(())).unwrap();
     });
+
     room_handle.on_failed_local_stream(cb.into()).unwrap();
 
     let mock_navigator = MockNavigator::new();
@@ -332,7 +283,8 @@ async fn error_get_local_stream_on_new_peer() {
         })
         .unwrap();
 
-    wait_and_check_test_result(test_rx, move || mock_navigator.stop()).await;
+    wait_and_check_test_result(test_result, move || mock_navigator.stop())
+        .await;
 }
 
 // Tests Room::join without set `on_failed_local_stream` callback.
@@ -349,6 +301,7 @@ async fn error_join_room_without_failed_stream_callback() {
     rpc.expect_subscribe()
         .return_once(move || Box::pin(event_rx));
     rpc.expect_unsub().return_const(());
+    rpc.expect_set_close_reason().return_const(());
     let repo = Box::new(MockPeerRepository::new());
     let store = Rc::new(RoomStream::new(Rc::new(MediaManager::default())));
     let room = Room::new(Rc::new(rpc), repo, store);
@@ -364,5 +317,223 @@ async fn error_join_room_without_failed_stream_callback() {
             );
             assert!(!e.trace().is_empty());
         }
+    }
+}
+
+/// Tests for `RoomHandle.on_close` JS side callback.
+mod on_close_callback {
+    use std::rc::Rc;
+
+    use futures::channel::mpsc;
+    use medea_client_api_proto::CloseReason as CloseByServerReason;
+    use medea_jason::{
+        api::{Room, RoomStream},
+        media::MediaManager,
+        peer::MockPeerRepository,
+        rpc::{ClientDisconnect, CloseReason, MockRpcClient},
+    };
+    use wasm_bindgen::{prelude::*, JsValue};
+    use wasm_bindgen_test::*;
+
+    use super::wait_and_check_test_result;
+
+    #[wasm_bindgen(inline_js = "export function get_reason(closed) { return \
+                                closed.reason(); }")]
+    extern "C" {
+        fn get_reason(closed: &JsValue) -> String;
+    }
+    #[wasm_bindgen(inline_js = "export function \
+                                get_is_closed_by_server(reason) { return \
+                                reason.is_closed_by_server(); }")]
+    extern "C" {
+        fn get_is_closed_by_server(reason: &JsValue) -> bool;
+    }
+    #[wasm_bindgen(inline_js = "export function get_is_err(reason) { return \
+                                reason.is_err(); }")]
+    extern "C" {
+        fn get_is_err(reason: &JsValue) -> bool;
+    }
+
+    /// Returns empty [`Room`] with mocks inside.
+    fn get_room() -> Room {
+        let mut rpc = MockRpcClient::new();
+        let repo = Box::new(MockPeerRepository::new());
+        let store = Rc::new(RoomStream::new(Rc::new(MediaManager::default())));
+
+        let (_event_tx, event_rx) = mpsc::unbounded();
+        rpc.expect_subscribe()
+            .return_once(move || Box::pin(event_rx));
+        rpc.expect_send_command().return_const(());
+        rpc.expect_unsub().return_const(());
+        rpc.expect_set_close_reason().return_const(());
+
+        Room::new(Rc::new(rpc), repo, store)
+    }
+
+    /// Tests that JS side [`RoomHandle::on_close`] works.
+    ///
+    /// # Algorithm
+    ///
+    /// 1. Subscribe to [`RoomHandle::on_close`].
+    ///
+    /// 2. Call [`Room::close`] with [`CloseByServerReason::Finished`] reason.
+    ///
+    /// 3. Check that JS callback was called with this reason.
+    #[wasm_bindgen_test]
+    async fn closed_by_server() {
+        let room = get_room();
+        let mut room_handle = room.new_handle();
+
+        let (cb, test_result) = js_callback!(|closed: JsValue| {
+            cb_assert_eq!(get_reason(&closed), "Finished");
+            cb_assert_eq!(get_is_closed_by_server(&closed), true);
+            cb_assert_eq!(get_is_err(&closed), false);
+        });
+        room_handle.on_close(cb.into()).unwrap();
+
+        room.close(CloseReason::ByServer(CloseByServerReason::Finished));
+        wait_and_check_test_result(test_result, || {}).await;
+    }
+
+    /// Tests that [`RoomHandle::on_close`] will be called on unexpected
+    /// [`Room`] drop.
+    ///
+    /// # Algorithm
+    ///
+    /// 1. Subscribe to [`RoomHandle::on_close`].
+    ///
+    /// 2. Drop [`Room`].
+    ///
+    /// 3. Check that JS callback was called with
+    ///    `CloseReason::ByClient(ClosedByClientReason::
+    /// RoomUnexpectedlyDropped`.
+    #[wasm_bindgen_test]
+    async fn unexpected_room_drop() {
+        let room = get_room();
+        let mut room_handle = room.new_handle();
+
+        let (cb, test_result) = js_callback!(|closed: JsValue| {
+            cb_assert_eq!(get_reason(&closed), "RoomUnexpectedlyDropped");
+            cb_assert_eq!(get_is_err(&closed), true);
+            cb_assert_eq!(get_is_closed_by_server(&closed), false);
+        });
+        room_handle.on_close(cb.into()).unwrap();
+
+        std::mem::drop(room);
+        wait_and_check_test_result(test_result, || {}).await;
+    }
+
+    /// Tests that [`RoomHandle::on_close`] will be called on closing by Jason.
+    ///
+    /// # Algorithm
+    ///
+    /// 1. Subscribe to [`RoomHandle::on_close`].
+    ///
+    /// 2. Call [`Room::close`] with [`CloseReason::ByClient`]
+    ///
+    /// 3. Check that JS callback was called with this [`CloseReason`].
+    #[wasm_bindgen_test]
+    async fn normal_close_by_client() {
+        let room = get_room();
+        let mut room_handle = room.new_handle();
+
+        let (cb, test_result) = js_callback!(|closed: JsValue| {
+            cb_assert_eq!(get_reason(&closed), "RoomUnexpectedlyDropped");
+            cb_assert_eq!(get_is_err(&closed), false);
+            cb_assert_eq!(get_is_closed_by_server(&closed), false);
+        });
+        room_handle.on_close(cb.into()).unwrap();
+
+        room.close(CloseReason::ByClient {
+            reason: ClientDisconnect::RoomUnexpectedlyDropped,
+            is_err: false,
+        });
+        wait_and_check_test_result(test_result, || {}).await;
+    }
+}
+
+mod rpc_close_reason_on_room_drop {
+    //! Tests which checks that when [`Room`] is dropped, the right close reason
+    //! is provided to [`RpcClient`].
+
+    use futures::channel::oneshot;
+    use medea_jason::rpc::{ClientDisconnect, CloseReason};
+
+    use super::*;
+
+    /// Returns [`Room`] and [`oneshot::Receiver`] which will be resolved
+    /// with [`RpcClient`]'s close reason ([`ClientDisconnect`]).
+    async fn get_client() -> (Room, oneshot::Receiver<ClientDisconnect>) {
+        let mut rpc = MockRpcClient::new();
+        let repo = Box::new(MockPeerRepository::new());
+        let store = Rc::new(RoomStream::new(Rc::new(MediaManager::default())));
+
+        let (_event_tx, event_rx) = mpsc::unbounded();
+        rpc.expect_subscribe()
+            .return_once(move || Box::pin(event_rx));
+        rpc.expect_send_command().return_const(());
+        rpc.expect_unsub().return_const(());
+        let (test_tx, test_rx) = oneshot::channel();
+        rpc.expect_set_close_reason().return_once(move |reason| {
+            test_tx.send(reason).unwrap();
+        });
+        let room = Room::new(Rc::new(rpc), repo, store);
+        (room, test_rx)
+    }
+
+    /// Tests that [`Room`] sets right [`ClientDisconnect`] close reason on
+    /// UNexpected drop.
+    ///
+    /// # Algorithm
+    ///
+    /// 1. Mock [`RpcClient::set_close_reason`].
+    ///
+    /// 2. Drop [`Room`].
+    ///
+    /// 3. Check that close reason provided into [`RpcClient::set_close_reason`]
+    ///    is [`ClientDisconnect::RoomUnexpectedlyDropped`].
+    #[wasm_bindgen_test]
+    async fn set_default_close_reason_on_drop() {
+        let (room, test_rx) = get_client().await;
+
+        std::mem::drop(room);
+
+        let close_reason = test_rx.await.unwrap();
+        assert_eq!(
+            close_reason,
+            ClientDisconnect::RoomUnexpectedlyDropped,
+            "Room sets RPC close reason '{:?} instead of \
+             'RoomUnexpectedlyDropped'.",
+            close_reason,
+        )
+    }
+
+    /// Tests that [`Room`] sets right [`ClientDisconnect`] close reason on
+    /// expected drop.
+    ///
+    /// # Algorithm
+    ///
+    /// 1. Mock [`RpcClient::set_close_reason`].
+    ///
+    /// 2. Close [`Room`] with [`Room::close`] with
+    ///    [`ClientDisconnect::RoomClosed`] as close reason.
+    ///
+    /// 3. Check that close reason provided into [`RpcClient::set_close_reason`]
+    ///    is [`ClientDisconnect::RoomClosed`].
+    #[wasm_bindgen_test]
+    async fn sets_provided_close_reason_on_drop() {
+        let (room, test_rx) = get_client().await;
+        room.close(CloseReason::ByClient {
+            reason: ClientDisconnect::RoomClosed,
+            is_err: false,
+        });
+
+        let close_reason = test_rx.await.unwrap();
+        assert_eq!(
+            close_reason,
+            ClientDisconnect::RoomClosed,
+            "Room sets RPC close reason '{:?}' instead of 'RoomClosed.",
+            close_reason,
+        );
     }
 }

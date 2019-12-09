@@ -76,7 +76,7 @@ server:
   coturn:
     image:
       repository: instrumentisto/coturn
-      tag: 4.5
+      tag: "4.5"
       pullPolicy: IfNotPresent
 
     # Coturn TURN server configuration.

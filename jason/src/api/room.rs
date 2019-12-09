@@ -23,13 +23,78 @@ use crate::{
     peer::{
         MediaStream, PeerError, PeerEvent, PeerEventHandler, PeerRepository,
     },
-    rpc::{RpcClient, RpcClientError, TransportError, WebSocketRpcTransport},
+    rpc::{
+        ClientDisconnect, CloseReason, RpcClient, RpcClientError,
+        TransportError, WebSocketRpcTransport,
+    },
     utils::{Callback, JasonError, JsCaused, JsError},
 };
 
 use super::{
     connection::Connection, room_stream::RoomStream, ConnectionHandle,
 };
+
+/// Reason of why [`Room`] has been closed.
+///
+/// This struct is passed into `on_close_by_server` JS side callback.
+#[allow(clippy::module_name_repetitions)]
+#[wasm_bindgen]
+pub struct RoomCloseReason {
+    /// Indicator if [`Room`] is closed by server.
+    ///
+    /// `true` if [`CloseReason::ByServer`].
+    is_closed_by_server: bool,
+
+    /// Reason of closing.
+    reason: String,
+
+    /// Indicator if closing is considered as error.
+    ///
+    /// This field may be `true` only on closing by client.
+    is_err: bool,
+}
+
+impl RoomCloseReason {
+    /// Creates new [`ClosedByServerReason`] with provided [`CloseReason`]
+    /// converted into [`String`].
+    ///
+    /// `is_err` may be `true` only on closing by client.
+    ///
+    /// `is_closed_by_server` is `true` on [`CloseReason::ByServer`].
+    pub fn new(reason: CloseReason) -> Self {
+        match reason {
+            CloseReason::ByServer(reason) => Self {
+                reason: reason.to_string(),
+                is_closed_by_server: true,
+                is_err: false,
+            },
+            CloseReason::ByClient { reason, is_err } => Self {
+                reason: reason.to_string(),
+                is_closed_by_server: false,
+                is_err,
+            },
+        }
+    }
+}
+
+#[wasm_bindgen]
+impl RoomCloseReason {
+    /// `wasm_bindgen` getter for [`RoomCloseReason::reason`] field.
+    pub fn reason(&self) -> String {
+        self.reason.clone()
+    }
+
+    /// `wasm_bindgen` getter for [`RoomCloseReason::is_closed_by_server`]
+    /// field.
+    pub fn is_closed_by_server(&self) -> bool {
+        self.is_closed_by_server
+    }
+
+    /// `wasm_bindgen` getter for [`RoomCloseReason::is_err`] field.
+    pub fn is_err(&self) -> bool {
+        self.is_err
+    }
+}
 
 /// Errors that may occur in a [`Room`].
 #[derive(Debug, dm::Display, dm::From, JsCaused)]
@@ -112,6 +177,12 @@ impl RoomHandle {
             .borrow_mut()
             .on_new_connection
             .set_func(f))
+    }
+
+    /// Sets `on_close` callback, which will be invoked on [`Room`] close,
+    /// providing [`RoomCloseReason`].
+    pub fn on_close(&mut self, f: js_sys::Function) -> Result<(), JsValue> {
+        map_weak!(self, |inner| inner.borrow_mut().on_close.set_func(f))
     }
 
     /// Sets `on_local_stream` callback, which will be invoked once media
@@ -246,6 +317,21 @@ impl Room {
         Self(room)
     }
 
+    /// Sets `close_reason` of [`InnerRoom`] and consumes [`Room`] pointer.
+    ///
+    /// Supposed that this function will trigger [`Drop`] implementation of
+    /// [`InnerRoom`] and call JS side `on_close` callback with provided
+    /// [`CloseReason`].
+    ///
+    /// Note that this function __doesn't guarantee__ that [`InnerRoom`] will be
+    /// dropped because theoretically other pointers to the [`InnerRoom`]
+    /// can exist. If you need guarantee of [`InnerRoom`] dropping then you
+    /// may check count of pointers to [`InnerRoom`] with
+    /// [`Rc::strong_count`].
+    pub fn close(self, reason: CloseReason) {
+        self.0.borrow_mut().set_close_reason(reason);
+    }
+
     /// Creates new [`RoomHandle`] used by JS side. You can create them as many
     /// as you need.
     #[inline]
@@ -282,6 +368,17 @@ struct InnerRoom {
 
     /// Indicates if outgoing video is enabled in this [`Room`].
     enabled_video: bool,
+
+    /// JS callback which will be called when this [`Room`] will be closed.
+    on_close: Rc<Callback<RoomCloseReason>>,
+
+    /// Reason of [`Room`] closing.
+    ///
+    /// This [`CloseReason`] will be provided into `on_close` JS callback.
+    ///
+    /// Note that `None` will be considered as error and `is_err` will be
+    /// `true` in [`JsCloseReason`] provided to JS callback.
+    close_reason: CloseReason,
 }
 
 impl InnerRoom {
@@ -302,7 +399,20 @@ impl InnerRoom {
             stream_storage,
             enabled_audio: true,
             enabled_video: true,
+            on_close: Rc::new(Callback::default()),
+            close_reason: CloseReason::ByClient {
+                reason: ClientDisconnect::RoomUnexpectedlyDropped,
+                is_err: true,
+            },
         }
+    }
+
+    /// Sets `close_reason` of [`InnerRoom`].
+    ///
+    /// [`Drop`] implementation of [`InnerRoom`] is supposed
+    /// to be triggered after this function call.
+    fn set_close_reason(&mut self, reason: CloseReason) {
+        self.close_reason = reason;
     }
 
     /// Creates new [`Connection`]s basing on senders and receivers of provided
@@ -564,5 +674,15 @@ impl Drop for InnerRoom {
     /// Unsubscribes [`InnerRoom`] from all its subscriptions.
     fn drop(&mut self) {
         self.rpc.unsub();
+
+        if let CloseReason::ByClient { reason, .. } = &self.close_reason {
+            self.rpc.set_close_reason(*reason);
+        };
+
+        self.on_close
+            .call(RoomCloseReason::new(self.close_reason))
+            .map(|result| {
+                result.map_err(|err| console_error!(err.as_string()))
+            });
     }
 }

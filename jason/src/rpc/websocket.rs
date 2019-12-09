@@ -2,7 +2,7 @@
 //!
 //! [WebSocket]: https://developer.mozilla.org/ru/docs/WebSockets
 
-use std::{cell::RefCell, convert::TryFrom, rc::Rc};
+use std::{borrow::Cow, cell::RefCell, convert::TryFrom, rc::Rc};
 
 use derive_more::{Display, From, Into};
 use futures::{
@@ -15,7 +15,7 @@ use tracerr::Traced;
 use web_sys::{CloseEvent, Event, MessageEvent, WebSocket as SysWebSocket};
 
 use crate::{
-    rpc::{CloseMsg, RpcTransport},
+    rpc::{ClientDisconnect, CloseMsg, RpcTransport},
     utils::{EventListener, EventListenerBindError, JsCaused, JsError},
 };
 
@@ -55,6 +55,25 @@ pub enum TransportError {
     /// Occurs when message is sent to a closed socket.
     #[display(fmt = "Underlying socket is closed")]
     ClosedSocket,
+}
+
+/// Wrapper for help to get [`ServerMsg`] from Websocket [MessageEvent][1].
+///
+/// [1]: https://developer.mozilla.org/en-US/docs/Web/API/MessageEvent
+#[derive(From, Into)]
+pub struct ServerMessage(ServerMsg);
+
+impl TryFrom<&MessageEvent> for ServerMessage {
+    type Error = TransportError;
+
+    fn try_from(msg: &MessageEvent) -> std::result::Result<Self, Self::Error> {
+        use TransportError::*;
+        let payload = msg.data().as_string().ok_or(MessageNotString)?;
+
+        serde_json::from_str::<ServerMsg>(&payload)
+            .map_err(ParseServerMessage)
+            .map(Self::from)
+    }
 }
 
 impl From<EventListenerBindError> for TransportError {
@@ -103,6 +122,7 @@ struct InnerSocket {
     on_message: Option<EventListener<SysWebSocket, MessageEvent>>,
     on_close: Option<EventListener<SysWebSocket, CloseEvent>>,
     on_error: Option<EventListener<SysWebSocket, Event>>,
+    close_reason: ClientDisconnect,
 }
 
 /// WebSocket [`RpcTransport`] between client and server.
@@ -121,6 +141,7 @@ impl InnerSocket {
             on_message: None,
             on_close: None,
             on_error: None,
+            close_reason: ClientDisconnect::RpcTransportUnexpectedlyDropped,
         })
     }
 
@@ -199,6 +220,10 @@ impl RpcTransport for WebSocketRpcTransport {
             _ => Err(tracerr::new!(TransportError::ClosedSocket)),
         }
     }
+
+    fn set_close_reason(&self, close_reason: ClientDisconnect) {
+        self.0.borrow_mut().close_reason = close_reason;
+    }
 }
 
 impl WebSocketRpcTransport {
@@ -266,42 +291,18 @@ impl Drop for WebSocketRpcTransport {
             inner.on_message.take();
             inner.on_close.take();
 
-            if let Err(err) = inner
-                .socket
-                .close_with_code_and_reason(1000, "Dropped unexpectedly")
+            let close_reason: Cow<'static, str> =
+                serde_json::to_string(&inner.close_reason)
+                    .unwrap_or_else(|_| {
+                        "Could not serialize close message".into()
+                    })
+                    .into();
+
+            if let Err(err) =
+                inner.socket.close_with_code_and_reason(1000, &close_reason)
             {
                 console_error!(err);
             }
         }
-    }
-}
-
-impl From<&CloseEvent> for CloseMsg {
-    fn from(event: &CloseEvent) -> Self {
-        let code: u16 = event.code();
-        let body = format!("{}:{}", code, event.reason());
-        match code {
-            1000 => Self::Normal(body),
-            _ => Self::Disconnect(body),
-        }
-    }
-}
-
-/// Wrapper for help to get [`ServerMsg`] from Websocket [MessageEvent][1].
-///
-/// [1]: https://developer.mozilla.org/en-US/docs/Web/API/MessageEvent
-#[derive(From, Into)]
-pub struct ServerMessage(ServerMsg);
-
-impl TryFrom<&MessageEvent> for ServerMessage {
-    type Error = TransportError;
-
-    fn try_from(msg: &MessageEvent) -> std::result::Result<Self, Self::Error> {
-        use TransportError::*;
-        let payload = msg.data().as_string().ok_or(MessageNotString)?;
-
-        serde_json::from_str::<ServerMsg>(&payload)
-            .map_err(ParseServerMessage)
-            .map(Self::from)
     }
 }

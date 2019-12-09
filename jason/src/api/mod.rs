@@ -6,12 +6,14 @@ mod room_stream;
 
 use std::{cell::RefCell, rc::Rc};
 
+use futures::FutureExt as _;
 use wasm_bindgen::prelude::*;
+use wasm_bindgen_futures::spawn_local;
 
 use crate::{
     media::{MediaManager, MediaManagerHandle},
     peer,
-    rpc::WebSocketRpcClient,
+    rpc::{ClientDisconnect, RpcClient as _, WebSocketRpcClient},
     set_panic_hook,
 };
 
@@ -51,6 +53,22 @@ impl Jason {
         let peer_repository = Box::new(peer::Repository::default());
         let stream_source =
             Rc::new(RoomStream::new(Rc::clone(&self.0.borrow().media_manager)));
+
+        let inner = self.0.clone();
+        spawn_local(rpc.on_close().map(move |res| {
+            // TODO: Don't close all rooms when multiple rpc connections
+            //       will be supported.
+            let reason = res.unwrap_or_else(|_| {
+                ClientDisconnect::RpcClientUnexpectedlyDropped.into()
+            });
+            inner
+                .borrow_mut()
+                .rooms
+                .drain(..)
+                .for_each(|room| room.close(reason.clone()));
+            inner.borrow_mut().media_manager = Rc::default();
+        }));
+
         let room = Room::new(rpc, peer_repository, stream_source);
         let handle = room.new_handle();
         self.0.borrow_mut().rooms.push(room);
@@ -65,5 +83,9 @@ impl Jason {
     /// Drops [`Jason`] API object, so all related objects (rooms, connections,
     /// streams etc.) respectively. All objects related to this [`Jason`] API
     /// object will be detached (you will still hold them, but unable to use).
-    pub fn dispose(self) {}
+    pub fn dispose(self) {
+        self.0.borrow_mut().rooms.drain(..).for_each(|room| {
+            room.close(ClientDisconnect::RoomClosed.into());
+        });
+    }
 }

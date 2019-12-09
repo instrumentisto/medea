@@ -250,20 +250,22 @@ window.onload = async function() {
     return await jason.media_manager().init_local_stream(constraints);
   }
 
-  try {
-    let controlBtns = document.getElementsByClassName('control')[0];
-    let joinCallerButton = document.getElementsByClassName('connect__join')[0];
-    let usernameInput = document.getElementsByClassName('connect__username')[0];
-    let audioSelect = document.getElementsByClassName('connect__select-device_audio')[0];
-    let videoSelect = document.getElementsByClassName('connect__select-device_video')[0];
-    let localVideo = document.querySelector('.local-video > video');
+  let room = newRoom();
+  let connectBtnsDiv = document.getElementsByClassName("connect")[0];
+  let controlBtns = document.getElementsByClassName('control')[0];
+  let audioSelect = document.getElementsByClassName('connect__select-device_audio')[0];
+  let videoSelect = document.getElementsByClassName('connect__select-device_video')[0];
+  let localVideo = document.querySelector('.local-video > video');
 
-    const updateLocalVideo = async (stream) => {
-      localVideo.srcObject = stream;
-      await localVideo.play();
-    };
+  const updateLocalVideo = async (stream) => {
+    localVideo.srcObject = stream;
+    await localVideo.play();
+  };
 
-    const room = await jason.init_room();
+  async function newRoom() {
+    jason = new rust.Jason();
+    room = await jason.init_room();
+
     try {
       const stream = await getStream(audioSelect, videoSelect);
       await updateLocalVideo(stream);
@@ -273,6 +275,45 @@ window.onload = async function() {
       console.error("Init local video failed: " + e.message());
       console.error(e.trace())
     }
+
+    room.on_new_connection( (connection) => {
+      connection.on_remote_stream( async (stream) => {
+        let videoDiv = document.getElementsByClassName("remote-videos")[0];
+        let video = document.createElement("video");
+        video.srcObject = stream.get_media_stream();
+        let innerVideoDiv = document.createElement("div");
+        innerVideoDiv.className = "video";
+        innerVideoDiv.appendChild(video);
+        videoDiv.appendChild(innerVideoDiv);
+
+        await video.play();
+      });
+    });
+
+    room.on_failed_local_stream((error) => {
+      console.error(error);
+    });
+
+    room.on_close(function (on_closed) {
+      let videos = document.getElementsByClassName('remote-videos')[0];
+      while (videos.firstChild) {
+        videos.firstChild.remove();
+      }
+      room = newRoom();
+      contentVisibility.show(connectBtnsDiv);
+      contentVisibility.hide(controlBtns);
+      alert(
+        `Call was ended.
+        Reason: ${on_closed.reason()};
+        Is closed by server: ${on_closed.is_closed_by_server()};
+        Is error: ${on_closed.is_err()}.`
+      );
+    });
+  }
+
+  try {
+    let joinCallerButton = document.getElementsByClassName('connect__join')[0];
+    let usernameInput = document.getElementsByClassName('connect__username')[0];
 
     audioSelect.addEventListener('change', async () => {
       try {
@@ -294,26 +335,9 @@ window.onload = async function() {
       }
     });
 
-    room.on_new_connection( (connection) => {
-      connection.on_remote_stream( async (stream) => {
-        let videoDiv = document.getElementsByClassName("remote-videos")[0];
-        let video = document.createElement("video");
-        video.srcObject = stream.get_media_stream();
-        let innerVideoDiv = document.createElement("div");
-        innerVideoDiv.className = "video";
-        innerVideoDiv.appendChild(video);
-        videoDiv.appendChild(innerVideoDiv);
-
-        await video.play();
-      });
-    });
-
-    room.on_failed_local_stream((error) => {
-      console.error(error);
-    });
-
     let muteAudio = document.getElementsByClassName('control__mute_audio')[0];
     let muteVideo = document.getElementsByClassName('control__mute_video')[0];
+    let closeApp = document.getElementsByClassName('control__close_app')[0];
     let isAudioMuted = false;
     let isVideoMuted = false;
 
@@ -339,11 +363,15 @@ window.onload = async function() {
         muteVideo.textContent = "Unmute video";
       }
     });
+    closeApp.addEventListener('click', () => {
+      jason.dispose();
+    });
 
     usernameInput.value = faker.name.firstName();
 
     let bindJoinButtons = function(roomId) {
       joinCallerButton.onclick = async function() {
+        contentVisibility.hide(connectBtnsDiv);
         contentVisibility.show(controlBtns);
 
         try {

@@ -16,8 +16,12 @@ use futures::{
     future::{self, Either},
     stream, FutureExt as _, StreamExt as _,
 };
-use medea_client_api_proto::{ClientMsg, Command, Event, PeerId, ServerMsg};
-use medea_jason::rpc::{MockRpcTransport, RpcClient, WebSocketRpcClient};
+use medea_client_api_proto::{
+    ClientMsg, CloseReason, Command, Event, PeerId, ServerMsg,
+};
+use medea_jason::rpc::{
+    ClientDisconnect, CloseMsg, MockRpcTransport, RpcClient, WebSocketRpcClient,
+};
 use wasm_bindgen_futures::spawn_local;
 use wasm_bindgen_test::*;
 
@@ -52,6 +56,7 @@ async fn message_received_from_transport_is_transmitted_to_sub() {
     transport
         .expect_on_close()
         .return_once(|| Ok(future::pending().boxed()));
+    transport.expect_set_close_reason().return_const(());
 
     let ws = WebSocketRpcClient::new(10);
 
@@ -78,6 +83,7 @@ async fn heartbeat() {
     transport
         .expect_on_close()
         .return_once(move || Ok(future::pending().boxed()));
+    transport.expect_set_close_reason().return_const(());
 
     let counter = Arc::new(AtomicU64::new(1));
     let counter_clone = counter.clone();
@@ -158,6 +164,7 @@ async fn transport_is_dropped_when_client_is_dropped() {
         .expect_on_close()
         .return_once(move || Ok(future::pending().boxed()));
     transport.expect_send().return_once(|_| Ok(()));
+    transport.expect_set_close_reason().return_const(());
     let rpc_transport = Rc::new(transport);
 
     let ws = WebSocketRpcClient::new(500);
@@ -194,6 +201,7 @@ async fn send_goes_to_transport() {
         on_send_tx.unbounded_send(e.clone()).unwrap();
         Ok(())
     });
+    transport.expect_set_close_reason().return_const(());
 
     let ws = WebSocketRpcClient::new(500);
     ws.connect(Rc::new(transport)).await.unwrap();
@@ -235,5 +243,208 @@ async fn send_goes_to_transport() {
         Either::Right(_) => {
             panic!("Command doesn't reach 'RpcTransport' within a 1s.")
         }
+    }
+}
+
+mod on_close {
+    //! Tests for [`WebSocketRpcClient::on_close`].
+
+    use super::*;
+
+    /// Returns [`WebSocketRpcClient`] which will be resolved
+    /// [`WebSocketRpcClient::on_close`] [`Future`] with provided
+    /// [`CloseMsg`].
+    async fn get_client(close_msg: CloseMsg) -> WebSocketRpcClient {
+        let mut transport = MockRpcTransport::new();
+        transport
+            .expect_on_message()
+            .return_once(move || Ok(stream::once(future::pending()).boxed()));
+        transport.expect_send().return_once(|_| Ok(()));
+        transport
+            .expect_on_close()
+            .return_once(move || Ok(Box::pin(async { Ok(close_msg) })));
+
+        let ws = WebSocketRpcClient::new(500);
+        ws.connect(Rc::new(transport)).await.unwrap();
+
+        ws
+    }
+
+    /// Tests that [`WebSocketRpcClient::on_close`]'s [`Future`] resolves on
+    /// normal closing.
+    ///
+    /// # Algorithm
+    ///
+    /// 1. Mock [`WebSocketRpcTransport::on_close`] to return
+    ///    [`CloseReason::Finished`] with `1000` code.
+    ///
+    /// 2. Wait for [`WebSocketRpcTransport::on_close`] resolving.
+    ///
+    /// 3. Check that [`medea_jason::rpc::CloseReason`] returned from this
+    ///    [`Future`] is [`rpc::CloseReason::ByServer`] with
+    ///    [`CloseReason::Finished`] as reason.
+    #[wasm_bindgen_test]
+    async fn resolve_on_normal_closing() {
+        let ws =
+            get_client(CloseMsg::Normal(1000, CloseReason::Finished)).await;
+
+        assert_eq!(
+            ws.on_close().await.unwrap(),
+            medea_jason::rpc::CloseReason::ByServer(CloseReason::Finished)
+        );
+    }
+
+    /// Tests that [`WebSocketRpcClient::on_close`]'s [`Future`] don't resolves
+    /// on [`CloseReason::Reconnected`].
+    ///
+    /// # Algorithm
+    ///
+    /// 1. Mock [`WebSocketRpcTransport::on_close`] to return
+    ///    [`CloseReason::Reconnected`] with `1000` code.
+    ///
+    /// 2. Wait `500ms` for [`WebSocketRpcTransport::on_close`] [`Future`]. If
+    ///    in this time interval this [`Future`] wasn't resolved then test
+    ///    considered passed.
+    #[wasm_bindgen_test]
+    async fn dont_resolve_on_reconnected_reason() {
+        let ws =
+            get_client(CloseMsg::Normal(1000, CloseReason::Reconnected)).await;
+
+        match future::select(
+            Box::pin(ws.on_close()),
+            Box::pin(resolve_after(500)),
+        )
+        .await
+        {
+            Either::Left((msg, _)) => {
+                unreachable!(
+                    "Some CloseMsg was unexpectedly thrown: {:?}.",
+                    msg
+                );
+            }
+            Either::Right(_) => (),
+        }
+    }
+
+    /// Tests that [`WebSocketRpcClient::on_close`]'s [`Future`] don't resolves
+    /// on [`CloseMsg::Abnormal`].
+    ///
+    /// # Algorithm
+    ///
+    /// 1. Mock [`WebSocketRpcTransport::on_close`] to return
+    ///    [`CloseMsg::Abnormal`] with `1500` code.
+    ///
+    /// 2. Wait `500ms` for [`WebSocketRpcTransport::on_close`] [`Future`]. If
+    ///    in this time interval this [`Future`] wasn't resolved then test
+    ///    considered passed.
+    #[wasm_bindgen_test]
+    async fn dont_resolve_on_abnormal_close() {
+        let ws = get_client(CloseMsg::Abnormal(1500)).await;
+
+        match future::select(
+            Box::pin(ws.on_close()),
+            Box::pin(resolve_after(500)),
+        )
+        .await
+        {
+            Either::Left((msg, _)) => {
+                unreachable!(
+                    "Some CloseMsg was unexpectedly thrown: {:?}.",
+                    msg
+                );
+            }
+            Either::Right(_) => (),
+        }
+    }
+}
+
+mod transport_close_reason_on_drop {
+    //! Tests which checks that when [`WebSocketRpcClient`] is dropped the right
+    //! close reason is provided to [`RpcTransport`].
+
+    use super::*;
+
+    /// Returns [`WebSocketRpcClient`] and [`oneshot::Receiver`] which will be
+    /// resolved with [`RpcTransport`]'s close reason
+    /// ([`ClientDisconnect`]).
+    async fn get_client(
+    ) -> (WebSocketRpcClient, oneshot::Receiver<ClientDisconnect>) {
+        let mut transport = MockRpcTransport::new();
+        transport
+            .expect_on_message()
+            .return_once(move || Ok(stream::once(future::pending()).boxed()));
+        transport.expect_send().return_once(|_| Ok(()));
+        transport
+            .expect_on_close()
+            .return_once(|| Ok(future::pending().boxed()));
+        let (test_tx, test_rx) = oneshot::channel();
+        transport
+            .expect_set_close_reason()
+            .return_once(move |reason| {
+                test_tx.send(reason).unwrap();
+            });
+
+        let ws = WebSocketRpcClient::new(500);
+        ws.connect(Rc::new(transport)).await.unwrap();
+
+        (ws, test_rx)
+    }
+
+    /// Tests that [`RpcClient`] sets right [`ClientDisconnect`] close reason on
+    /// UNexpected drop.
+    ///
+    /// # Algorithm
+    ///
+    /// 1. Mock [`RpcTransport::set_close_reason`].
+    ///
+    /// 2. Drop [`WebSocketRpcClient`].
+    ///
+    /// 3. Check that close reason provided
+    ///    into [`RpcTransport::set_close_reason`]
+    ///    is [`ClientDisconnect::RpcClientUnexpectedlyDropped`].
+    #[wasm_bindgen_test]
+    async fn sets_default_close_reason_on_drop() {
+        let (ws, test_rx) = get_client().await;
+
+        std::mem::drop(ws);
+
+        let close_reason = test_rx.await.unwrap();
+        assert_eq!(
+            close_reason,
+            ClientDisconnect::RpcClientUnexpectedlyDropped,
+            "RpcClient sets RpcTransport close reason '{:?}' instead of \
+             'RpcClientUnexpectedlyDropped'.",
+            close_reason,
+        );
+    }
+
+    /// Tests that [`RpcClient`] sets right [`ClientDisconnect`] close reason on
+    /// expected drop.
+    ///
+    /// # Algorithm
+    ///
+    /// 1. Mock [`RpcTransport::set_close_reason`].
+    ///
+    /// 2. Set [`ClientDisconnect::RoomClosed`] close reason and drop
+    ///    [`WebSocketRpcClient`].
+    ///
+    /// 3. Check that close reason provided
+    ///    into [`RpcTransport::set_close_reason`]
+    ///    is [`ClientDisconnect::RoomClosed`].
+    #[wasm_bindgen_test]
+    async fn sets_provided_close_reason_on_drop() {
+        let (ws, test_rx) = get_client().await;
+
+        ws.set_close_reason(ClientDisconnect::RoomClosed);
+        std::mem::drop(ws);
+
+        let close_reason = test_rx.await.unwrap();
+        assert_eq!(
+            close_reason,
+            ClientDisconnect::RoomClosed,
+            "RpcClient sets RpcTransport close reason '{:?}' instead of \
+             'RoomClosed'.",
+            close_reason,
+        );
     }
 }
