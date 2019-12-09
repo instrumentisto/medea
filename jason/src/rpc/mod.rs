@@ -11,17 +11,18 @@ use futures::{
     future::LocalBoxFuture,
     stream::{LocalBoxStream, StreamExt as _},
 };
-use js_sys::Date;
+use js_sys::{Date, Promise};
 use medea_client_api_proto::{
     ClientMsg, CloseDescription, CloseReason as CloseByServerReason, Command,
     Event, ServerMsg,
 };
 use serde::Serialize;
 use tracerr::Traced;
-use wasm_bindgen_futures::spawn_local;
+use wasm_bindgen::JsValue;
+use wasm_bindgen_futures::{spawn_local, JsFuture};
 use web_sys::CloseEvent;
 
-use crate::utils::{resolve_after, JasonError, JsCaused, JsError};
+use crate::utils::{window, JasonError, JsCaused, JsError};
 
 use self::heartbeat::{Heartbeat, HeartbeatError};
 
@@ -127,6 +128,13 @@ pub enum RpcClientError {
     /// Occurs if the heartbeat cannot be started.
     #[display(fmt = "Start heartbeat failed: {}", _0)]
     CouldNotStartHeartbeat(#[js(cause)] HeartbeatError),
+
+    /// Occurs if [`ProgressiveDelay`] fails to set timeout.
+    #[display(fmt = "Failed to set JS timeout: {}", _0)]
+    SetTimeoutError(#[js(cause)] JsError),
+
+    #[display(fmt = "Socket is None.")]
+    NoSocket,
 }
 
 // TODO: consider using async-trait crate, it doesnt work with mockall atm
@@ -304,6 +312,52 @@ fn on_message(
     }
 }
 
+struct ProgressiveDelay {
+    current_delay: i32,
+}
+
+impl ProgressiveDelay {
+    const MAX_DELAY: i32 = 10000;
+
+    /// Returns [`ProgressiveDelay`] with first delay as `1250ms`.
+    pub fn new() -> Self {
+        Self {
+            current_delay: 1250,
+        }
+    }
+
+    /// Returns next step of delay.
+    fn get_delay(&mut self) -> i32 {
+        if self.is_max_delay_reached() {
+            Self::MAX_DELAY
+        } else {
+            self.current_delay *= 2;
+            self.current_delay
+        }
+    }
+
+    /// Resolves after next delay.
+    pub async fn delay(&mut self) -> Result<(), Traced<JsError>> {
+        let delay_ms = self.get_delay();
+        JsFuture::from(Promise::new(&mut |yes, _| {
+            window()
+                .set_timeout_with_callback_and_timeout_and_arguments_0(
+                    &yes, delay_ms,
+                )
+                .unwrap();
+        }))
+        .await
+        .map(|_| ())
+        .map_err(JsError::from)
+        .map_err(tracerr::wrap!())
+    }
+
+    /// Returns `true` when `current_delay > Self::MAX_DELAY`.
+    fn is_max_delay_reached(&self) -> bool {
+        self.current_delay >= Self::MAX_DELAY
+    }
+}
+
 // TODO:
 // 1. Proper sub registry.
 // 2. Reconnect.
@@ -321,24 +375,35 @@ impl WebSocketRpcClient {
         Self(Inner::new(ping_interval))
     }
 
-    // TODO: Reconnection try limit.
     /// Reconnect [`WebSocketRpcClient`].
-    pub async fn reconnect(&self) {
-        while let Err(_) =
-            self.0.borrow().sock.as_ref().unwrap().reconnect().await
+    pub async fn reconnect(&self) -> Result<(), Traced<RpcClientError>> {
+        let mut delayer = ProgressiveDelay::new();
+        while let Err(_) = self
+            .0
+            .borrow()
+            .sock
+            .as_ref()
+            .ok_or_else(|| tracerr::new!(RpcClientError::NoSocket))?
+            .reconnect()
+            .await
         {
-            if let Err(e) = resolve_after(100).await {
-                console_error!(format!(
-                    "Error while trying to set interval between reconnects: \
-                     {:?}",
-                    e
-                ));
-            };
+            // TODO (evdokimovs): `.map_err(RpcClientError::SetTimeoutError)`
+            // will be much better, but I don't know how achieve it `tracerr`
+            // crate.
+            delayer
+                .delay()
+                .await
+                .map_err(tracerr::map_from_and_wrap!())?;
         }
         let sock = self.0.borrow().sock.clone();
         if let Some(sock) = sock {
-            self.0.borrow_mut().heartbeat.start(sock).unwrap();
+            self.0
+                .borrow_mut()
+                .heartbeat
+                .start(sock)
+                .map_err(tracerr::map_from_and_wrap!())?;
         }
+        Ok(())
     }
 }
 

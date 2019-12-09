@@ -6,9 +6,8 @@ mod errors;
 mod callback;
 mod event_listener;
 
-use js_sys::{Promise, Reflect};
+use js_sys::Reflect;
 use wasm_bindgen::prelude::*;
-use wasm_bindgen_futures::JsFuture;
 use web_sys::Window;
 
 #[doc(inline)]
@@ -72,17 +71,4 @@ where
     Reflect::get(value.as_ref(), &JsValue::from_str(name))
         .ok()
         .map_or_else(|| None, into)
-}
-
-/// Resolves after provided number of milliseconds.
-pub async fn resolve_after(delay_ms: i32) -> Result<(), JsValue> {
-    JsFuture::from(Promise::new(&mut |yes, _| {
-        window()
-            .set_timeout_with_callback_and_timeout_and_arguments_0(
-                &yes, delay_ms,
-            )
-            .unwrap();
-    }))
-    .await?;
-    Ok(())
 }
