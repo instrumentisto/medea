@@ -17,7 +17,8 @@ All user visible changes to this project will be documented in this file. This p
     - Expose `on_local_stream` callback in `Room` instead of `Jason` ([#54]);
     - Remove error argument from `on_local_stream` callback ([#54]);
     - Room initialization ([#46]):
-        - Remove `Jason.join_room()`.
+        - Remove `Jason.join_room()`;
+    - `CouldNotGetLocalMedia` and `InvalidLocalStream` errors moved to `MediaSourceError` from `RoomError` ([#70]).
 
 ### Added
 
@@ -56,6 +57,7 @@ All user visible changes to this project will be documented in this file. This p
 [#46]: /../../pull/46
 [#54]: /../../pull/54
 [#55]: /../../pull/55
+[#70]: /../../pull/70
 
 
 
