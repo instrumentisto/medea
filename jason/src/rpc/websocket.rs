@@ -18,6 +18,7 @@ use crate::{
     rpc::{ClientDisconnect, CloseMsg, RpcTransport},
     utils::{EventListener, EventListenerBindError, JsCaused, JsError},
 };
+use std::rc::Weak;
 
 /// Errors that may occur when working with [`WebSocket`].
 #[derive(Debug, Display, JsCaused)]
@@ -276,6 +277,18 @@ impl RpcTransport for WebSocketRpcTransport {
     }
 }
 
+pub struct WeakWebSocketRpcTransport(Weak<RefCell<InnerSocket>>);
+
+impl WeakWebSocketRpcTransport {
+    pub fn new(strong_pointer: WebSocketRpcTransport) -> Self {
+        Self(Rc::downgrade(&strong_pointer.0))
+    }
+
+    pub fn upgrade(&self) -> WebSocketRpcTransport {
+        WebSocketRpcTransport(self.0.upgrade().unwrap())
+    }
+}
+
 impl WebSocketRpcTransport {
     /// Initiates new WebSocket connection. Resolves only when underlying
     /// connection becomes active.
@@ -287,27 +300,27 @@ impl WebSocketRpcTransport {
         let socket = Self(Rc::new(RefCell::new(inner)));
 
         {
-            let mut socket_mut = socket.0.borrow_mut();
-            let inner = socket.clone();
-            socket_mut.on_close_listener = Some(
+            let inner = WeakWebSocketRpcTransport::new(socket.clone());
+            let socket_transport = socket.0.borrow().socket.clone();
+            socket.0.borrow_mut().on_close_listener = Some(
                 EventListener::new_once(
-                    Rc::clone(&socket_mut.socket),
+                    Rc::clone(&socket_transport),
                     "close",
                     move |_| {
-                        inner.0.borrow_mut().update_state();
+                        inner.upgrade().0.borrow_mut().update_state();
                         let _ = tx_close.send(());
                     },
                 )
                 .map_err(tracerr::map_from_and_wrap!())?,
             );
 
-            let inner = socket.clone();
-            socket_mut.on_open_listener = Some(
+            let inner = WeakWebSocketRpcTransport::new(socket.clone());
+            socket.0.borrow_mut().on_open_listener = Some(
                 EventListener::new_once(
-                    Rc::clone(&socket_mut.socket),
+                    Rc::clone(&socket_transport),
                     "open",
                     move |_| {
-                        inner.0.borrow_mut().update_state();
+                        inner.upgrade().0.borrow_mut().update_state();
                         let _ = tx_open.send(());
                     },
                 )
@@ -394,28 +407,25 @@ impl WebSocketRpcTransport {
     }
 }
 
-impl Drop for WebSocketRpcTransport {
+impl Drop for InnerSocket {
     fn drop(&mut self) {
-        let mut this_mut = self.0.borrow_mut();
-        if this_mut.close_reason != ClientDisconnect::RpcTransportUnexpectedlyDropped {
-            if this_mut.socket_state.can_close() {
-                this_mut.on_open_listener.take();
-                this_mut.on_error_listener.take();
-                this_mut.on_message_listener.take();
-                this_mut.on_close_listener.take();
+        if self.socket_state.can_close() {
+            self.on_open_listener.take();
+            self.on_error_listener.take();
+            self.on_message_listener.take();
+            self.on_close_listener.take();
 
-                let close_reason: Cow<'static, str> =
-                    serde_json::to_string(&this_mut.close_reason)
-                        .unwrap_or_else(|_| {
-                            "Could not serialize close message".into()
-                        })
-                        .into();
+            let close_reason: Cow<'static, str> =
+                serde_json::to_string(&self.close_reason)
+                    .unwrap_or_else(|_| {
+                        "Could not serialize close message".into()
+                    })
+                    .into();
 
-                if let Err(err) =
-                this_mut.socket.close_with_code_and_reason(1000, &close_reason)
-                {
-                    console_error!(err);
-                }
+            if let Err(err) =
+                self.socket.close_with_code_and_reason(1000, &close_reason)
+            {
+                console_error!(err);
             }
         }
     }

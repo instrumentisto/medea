@@ -52,7 +52,7 @@ async fn message_received_from_transport_is_transmitted_to_sub() {
                 .boxed(),
         )
     });
-    transport.expect_send().return_once(|_| Ok(()));
+    transport.expect_send().returning(|_| Ok(()));
     transport
         .expect_on_close()
         .return_once(|| Ok(stream::pending().boxed()));
@@ -82,7 +82,7 @@ async fn heartbeat() {
         .return_once(move || Ok(stream::once(future::pending()).boxed()));
     transport
         .expect_on_close()
-        .return_once(|| Ok(stream::pending().boxed()));
+        .return_once(|| Ok(stream::once(future::pending()).boxed()));
     transport.expect_set_close_reason().return_const(());
 
     let counter = Arc::new(AtomicU64::new(1));
@@ -163,7 +163,7 @@ async fn transport_is_dropped_when_client_is_dropped() {
     transport
         .expect_on_close()
         .return_once(|| Ok(stream::once(future::pending()).boxed()));
-    transport.expect_send().return_once(|_| Ok(()));
+    transport.expect_send().returning(|_| Ok(()));
     transport.expect_set_close_reason().return_const(());
     let rpc_transport = Rc::new(transport);
 
@@ -260,14 +260,16 @@ mod on_close {
         transport
             .expect_on_message()
             .return_once(move || Ok(stream::once(future::pending()).boxed()));
-        transport.expect_send().return_once(|_| Ok(()));
+        transport.expect_send().returning(|_| Ok(()));
+        transport
+            .expect_reconnect()
+            .return_once(|| future::pending().boxed());
+        transport.expect_set_close_reason().return_const(());
         // stream::once(async move { Ok(ServerMsg::Event(srv_event_cloned)) })
         //    .boxed(),
-        transport
-            .expect_on_close()
-            .return_once(move || Ok(stream::once(async move {
-                close_msg
-            }).boxed()));
+        transport.expect_on_close().return_once(move || {
+            Ok(stream::once(async move { close_msg }).boxed())
+        });
 
         let ws = WebSocketRpcClient::new(500);
         ws.connect(Rc::new(transport)).await.unwrap();

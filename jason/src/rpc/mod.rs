@@ -3,7 +3,11 @@
 mod heartbeat;
 mod websocket;
 
-use std::{cell::RefCell, rc::Rc, vec};
+use std::{
+    cell::RefCell,
+    rc::{Rc, Weak},
+    vec,
+};
 
 use derive_more::{Display, From};
 use futures::{
@@ -241,6 +245,18 @@ impl Inner {
     }
 }
 
+pub struct WeakWebsocketRpcClient(Weak<RefCell<Inner>>);
+
+impl WeakWebsocketRpcClient {
+    pub fn new(strong_pointer: WebSocketRpcClient) -> Self {
+        Self(Rc::downgrade(&strong_pointer.0))
+    }
+
+    pub fn upgrade(&self) -> WebSocketRpcClient {
+        WebSocketRpcClient(self.0.upgrade().unwrap())
+    }
+}
+
 /// Handles close message from a remote server.
 ///
 /// This function will be called on every WebSocket close (normal and abnormal)
@@ -388,8 +404,8 @@ impl WebSocketRpcClient {
             .await
         {
             // TODO (evdokimovs): `.map_err(RpcClientError::SetTimeoutError)`
-            // will be much better, but I don't know how achieve it `tracerr`
-            // crate.
+            // will be much better, but I don't know how achieve it with
+            // `tracerr` crate.
             delayer
                 .delay()
                 .await
@@ -423,23 +439,23 @@ impl RpcClient for WebSocketRpcClient {
                 .start(Rc::clone(&transport))
                 .map_err(tracerr::map_from_and_wrap!())?;
 
-            let this_clone = this.clone();
+            let this_clone = WeakWebsocketRpcClient::new(this.clone());
             let mut on_socket_message = transport
                 .on_message()
                 .map_err(tracerr::map_from_and_wrap!())?;
             spawn_local(async move {
                 while let Some(msg) = on_socket_message.next().await {
-                    on_message(&this_clone, msg)
+                    on_message(&this_clone.upgrade(), msg)
                 }
             });
 
-            let this_clone = this.clone();
+            let this_clone = WeakWebsocketRpcClient::new(this.clone());
             let mut on_socket_close = transport
                 .on_close()
                 .map_err(tracerr::map_from_and_wrap!())?;
             spawn_local(async move {
                 while let Some(msg) = on_socket_close.next().await {
-                    on_close(this_clone.clone(), &msg).await;
+                    on_close(this_clone.upgrade().clone(), &msg).await;
                 }
             });
 
@@ -494,16 +510,13 @@ impl RpcClient for WebSocketRpcClient {
     }
 }
 
-impl Drop for WebSocketRpcClient {
+impl Drop for Inner {
     /// Drops related connection and its [`Heartbeat`].
     fn drop(&mut self) {
-        let mut this_mut = self.0.borrow_mut();
-        if this_mut.close_reason != ClientDisconnect::RpcClientUnexpectedlyDropped {
-            this_mut.is_closed = true;
-            if let Some(socket) = this_mut.sock.take() {
-                socket.set_close_reason(this_mut.close_reason.clone());
-            }
-            this_mut.heartbeat.stop();
+        self.is_closed = true;
+        if let Some(socket) = self.sock.take() {
+            socket.set_close_reason(self.close_reason.clone());
         }
+        self.heartbeat.stop();
     }
 }
