@@ -146,12 +146,7 @@ impl MediaSource for RoomStream {
                 stream
             })
             .map_err(|e: Traced<Error>| {
-                fail.call(JasonError::new(
-                    e.as_ref().name(),
-                    e.as_ref().to_string(),
-                    e.trace().clone(),
-                    e.as_ref().js_cause(),
-                ));
+                fail.call(JasonError::from(&e));
                 e
             })
         })

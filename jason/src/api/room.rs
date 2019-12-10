@@ -344,12 +344,8 @@ impl Room {
 ///
 /// Shared between JS side ([`RoomHandle`]) and Rust side ([`Room`]).
 struct InnerRoom {
-    /// Collection of [`Connection`]s with a remote [`Member`]s.
-    connections: HashMap<PeerId, Connection>,
-
-    /// Callback from JS side which will be invoked on remote `Member` media
-    /// stream arrival.
-    on_new_connection: Callback<ConnectionHandle>,
+    /// Client to talk with media server via Client API RPC.
+    rpc: Rc<dyn RpcClient>,
 
     /// [`PeerConnection`] repository.
     peers: Box<dyn PeerRepository>,
@@ -357,8 +353,12 @@ struct InnerRoom {
     /// Channel for send events produced [`PeerConnection`] to [`Room`].
     peer_event_sender: mpsc::UnboundedSender<PeerEvent>,
 
-    /// Client to talk with media server via Client API RPC.
-    rpc: Rc<dyn RpcClient>,
+    /// Collection of [`Connection`]s with a remote [`Member`]s.
+    connections: HashMap<PeerId, Connection>,
+
+    /// Callback from JS side which will be invoked on remote `Member` media
+    /// stream arrival.
+    on_new_connection: Callback<ConnectionHandle>,
 
     /// Stores the injected local media stream for this [`Room`].
     stream_storage: Rc<RoomStream>,

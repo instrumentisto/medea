@@ -76,28 +76,13 @@ impl From<&JsError> for js_sys::Error {
 #[derive(Debug, Display)]
 #[display(fmt = "{}: {}\n{}", name, message, trace)]
 pub struct JasonError {
-    name: String,
+    name: &'static str,
     message: String,
     trace: Trace,
     source: Option<js_sys::Error>,
 }
 
 impl JasonError {
-    /// Returns new instance of [`JasonError`].
-    pub fn new<E: Into<js_sys::Error>>(
-        name: &str,
-        message: String,
-        trace: Trace,
-        source: Option<E>,
-    ) -> Self {
-        Self {
-            name: name.to_owned(),
-            message,
-            trace,
-            source: source.map(Into::into),
-        }
-    }
-
     /// Prints error information to `console.error()`.
     pub fn print(&self) {
         console_error!(self.to_string());
@@ -108,7 +93,7 @@ impl JasonError {
 impl JasonError {
     /// Returns name of error.
     pub fn name(&self) -> String {
-        self.name.clone()
+        String::from(self.name)
     }
 
     /// Returns message of errors.
@@ -132,7 +117,23 @@ impl JasonError {
 impl<E: JsCaused<Error = JsError> + Display> From<Traced<E>> for JasonError {
     fn from(traced: Traced<E>) -> Self {
         let (err, trace) = traced.into_parts();
-        Self::new(err.name(), err.to_string(), trace, err.js_cause())
+        Self {
+            name: err.name(),
+            message: err.to_string(),
+            trace,
+            source: err.js_cause().map(Into::into),
+        }
+    }
+}
+
+impl<E: JsCaused<Error = JsError> + Display> From<&Traced<E>> for JasonError {
+    fn from(traced: &Traced<E>) -> Self {
+        Self {
+            name: traced.as_ref().name(),
+            message: traced.as_ref().to_string(),
+            trace: traced.trace().clone(),
+            source: traced.as_ref().js_cause().map(Into::into),
+        }
     }
 }
 
