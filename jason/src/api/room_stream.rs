@@ -6,10 +6,10 @@ use tracerr::Traced;
 use web_sys::MediaStream as SysMediaStream;
 
 use crate::{
-    media::{MediaManager, MediaManagerError},
+    media::{MediaManager, MediaManagerError, MediaSource},
     peer::{
-        MediaSource, MediaStream, MediaStreamHandle, SimpleStreamRequest,
-        StreamRequest, StreamRequestError,
+        MediaStream, MediaStreamHandle, SimpleStreamRequest, StreamRequest,
+        StreamRequestError,
     },
     utils::{Callback, JasonError, JsCaused, JsError},
 };

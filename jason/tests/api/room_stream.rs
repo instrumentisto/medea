@@ -6,8 +6,11 @@ use wasm_bindgen_test::*;
 
 use medea_jason::{
     api::{RoomStream, StreamSourceError},
-    media::{AudioTrackConstraints, MediaManager, MediaStreamConstraints},
-    peer::{MediaSource, MediaStreamHandle, StreamRequest},
+    media::{
+        AudioTrackConstraints, MediaManager, MediaSource,
+        MediaStreamConstraints,
+    },
+    peer::{MediaStreamHandle, StreamRequest},
     utils::JasonError,
 };
 

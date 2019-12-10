@@ -13,10 +13,7 @@ mod track;
 use std::{cell::RefCell, collections::HashMap, convert::From, rc::Rc};
 
 use derive_more as dm;
-use futures::{
-    channel::mpsc,
-    future::{try_join_all, LocalBoxFuture},
-};
+use futures::{channel::mpsc, future::try_join_all};
 use medea_client_api_proto::{
     Direction, IceConnectionState, IceServer, PeerId as Id, Track, TrackId,
 };
@@ -26,6 +23,7 @@ use web_sys::{RtcIceConnectionState, RtcTrackEvent};
 
 use crate::{
     api::RoomStream as StreamSource,
+    media::MediaSource,
     utils::{JsCaused, JsError},
 };
 
@@ -128,18 +126,6 @@ pub enum PeerEvent {
         /// New [`IceConnectionState`].
         ice_connection_state: IceConnectionState,
     },
-}
-
-/// Source for acquire [`MediaStream`] by [`StreamRequest`].
-pub trait MediaSource {
-    /// Error that is returned if cannot receive the [`MediaStream`].
-    type Error;
-
-    /// Returns [`MediaStream`] by [`StreamRequest`].
-    fn get_media_stream(
-        &self,
-        request: StreamRequest,
-    ) -> LocalBoxFuture<Result<MediaStream, Traced<Self::Error>>>;
 }
 
 /// High-level wrapper around [`RtcPeerConnection`].
