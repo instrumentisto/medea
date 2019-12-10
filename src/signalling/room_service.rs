@@ -32,7 +32,6 @@ use crate::{
 };
 
 /// Errors of [`RoomService`].
-#[allow(clippy::module_name_repetitions)]
 #[derive(Debug, Fail, Display)]
 pub enum RoomServiceError {
     /// [`Room`] not found in [`RoomRepository`].

@@ -39,7 +39,6 @@ impl Room {
 }
 
 /// Element of [`Room`]'s pipeline.
-#[allow(clippy::module_name_repetitions)]
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(tag = "kind")]
 pub enum RoomElement {

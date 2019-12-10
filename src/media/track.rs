@@ -9,7 +9,6 @@ use medea_client_api_proto::{MediaType, TrackId as Id};
 /// Representation of [MediaStreamTrack][1] object.
 ///
 /// [1]: https://www.w3.org/TR/mediacapture-streams/#mediastreamtrack
-#[allow(clippy::module_name_repetitions)]
 #[derive(Debug)]
 pub struct MediaTrack {
     pub id: Id,

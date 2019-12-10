@@ -64,7 +64,6 @@ impl InnerStream {
 /// For using [`MediaStream`] on JS side, consider the [`MediaStreamHandle`].
 ///
 /// [1]: https://www.w3.org/TR/mediacapture-streams/#mediastream
-#[allow(clippy::module_name_repetitions)]
 pub struct MediaStream(Rc<InnerStream>);
 
 impl MediaStream {

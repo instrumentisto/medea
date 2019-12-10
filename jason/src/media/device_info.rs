@@ -21,7 +21,6 @@ pub enum Error {
 /// Representation of [MediaDeviceInfo][1].
 ///
 /// [1]: https://w3.org/TR/mediacapture-streams/#device-info
-#[allow(clippy::module_name_repetitions)]
 #[wasm_bindgen]
 pub struct InputDeviceInfo {
     device_type: InputDeviceKind,

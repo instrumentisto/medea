@@ -10,7 +10,6 @@ use crate::utils::{errors::JsCaused, JsError};
 /// Failed to bind to [`EventTarget`][1] event.
 ///
 /// [1]: https://developer.mozilla.org/en-US/docs/Web/API/EventTarget
-#[allow(clippy::module_name_repetitions)]
 #[derive(Debug, Display, From, JsCaused)]
 pub struct EventListenerBindError(JsError);
 

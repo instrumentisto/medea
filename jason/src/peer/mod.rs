@@ -48,7 +48,6 @@ pub use self::{
 ///
 /// [1]: https://w3.org/TR/webrtc/#rtcpeerconnection-interface
 #[derive(Debug, Display, From, JsCaused)]
-#[allow(clippy::module_name_repetitions)]
 pub enum PeerError {
     /// Errors that may occur in [`MediaConnections`] storage.
     #[display(fmt = "{}", _0)]
@@ -74,7 +73,6 @@ pub enum PeerError {
 type Result<T> = std::result::Result<T, Traced<PeerError>>;
 
 #[dispatchable]
-#[allow(clippy::module_name_repetitions)]
 /// Events emitted from [`RtcPeerConnection`].
 pub enum PeerEvent {
     /// [`RtcPeerConnection`] discovered new ICE candidate.
@@ -144,7 +142,6 @@ pub enum PeerEvent {
 }
 
 /// High-level wrapper around [`RtcPeerConnection`].
-#[allow(clippy::module_name_repetitions)]
 pub struct PeerConnection {
     /// Unique ID of [`PeerConnection`].
     id: Id,

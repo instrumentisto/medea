@@ -1,5 +1,3 @@
-#![allow(clippy::module_name_repetitions)]
-
 use medea_client_api_proto::{
     AudioSettings as ProtoAudioConstraints, MediaType as ProtoTrackConstraints,
     VideoSettings as ProtoVideoConstraints,

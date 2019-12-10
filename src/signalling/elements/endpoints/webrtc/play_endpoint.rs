@@ -90,7 +90,6 @@ impl Drop for WebRtcPlayEndpointInner {
 /// Signalling representation of Control API's [`WebRtcPlayEndpoint`].
 ///
 /// [`WebRtcPlayEndpoint`]: crate::api::control::endpoints::WebRtcPlayEndpoint
-#[allow(clippy::module_name_repetitions)]
 #[derive(Debug, Clone)]
 pub struct WebRtcPlayEndpoint(Rc<RefCell<WebRtcPlayEndpointInner>>);
 
@@ -175,7 +174,6 @@ impl WebRtcPlayEndpoint {
 }
 
 /// Weak pointer to [`WebRtcPlayEndpoint`].
-#[allow(clippy::module_name_repetitions)]
 #[derive(Debug, Clone)]
 pub struct WeakWebRtcPlayEndpoint(Weak<RefCell<WebRtcPlayEndpointInner>>);
 
