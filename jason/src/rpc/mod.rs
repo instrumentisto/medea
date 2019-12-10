@@ -22,7 +22,6 @@ use medea_client_api_proto::{
 };
 use serde::Serialize;
 use tracerr::Traced;
-use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::{spawn_local, JsFuture};
 use web_sys::CloseEvent;
 
@@ -137,7 +136,8 @@ pub enum RpcClientError {
     #[display(fmt = "Failed to set JS timeout: {}", _0)]
     SetTimeoutError(#[js(cause)] JsError),
 
-    #[display(fmt = "Socket is None.")]
+    /// Occurs if `socket` of [`WebSocketRpcClient`] is unexpectedly `None`.
+    #[display(fmt = "Socket of 'WebSocketRpcClient' is unexpectedly 'None'.")]
     NoSocket,
 }
 
@@ -245,15 +245,19 @@ impl Inner {
     }
 }
 
+/// [`Weak`] pointer which can be upgraded to [`WebSocketRpcClient`].
 pub struct WeakWebsocketRpcClient(Weak<RefCell<Inner>>);
 
 impl WeakWebsocketRpcClient {
-    pub fn new(strong_pointer: WebSocketRpcClient) -> Self {
-        Self(Rc::downgrade(&strong_pointer.0))
+    /// Returns [`WeakWebSocketRpcClient`] with [`Weak`] pointer to a provided
+    /// [`WebSocketRpcClient`].
+    pub fn new(strong: &WebSocketRpcClient) -> Self {
+        Self(Rc::downgrade(&strong.0))
     }
 
-    pub fn upgrade(&self) -> WebSocketRpcClient {
-        WebSocketRpcClient(self.0.upgrade().unwrap())
+    /// Returns `Some(WebSocketRpcClient)` if it still exists.
+    pub fn upgrade(&self) -> Option<WebSocketRpcClient> {
+        self.0.upgrade().map(WebSocketRpcClient)
     }
 }
 
@@ -270,7 +274,9 @@ async fn on_close(client: WebSocketRpcClient, close_msg: &CloseMsg) {
         CloseMsg::Normal(_, reason) => match reason {
             CloseByServerReason::Reconnected => (),
             CloseByServerReason::Idle => {
-                client.reconnect().await;
+                if let Err(e) = client.reconnect().await {
+                    console_error!(e.to_string());
+                }
             }
             _ => {
                 client.0.borrow_mut().sock.take();
@@ -294,7 +300,9 @@ async fn on_close(client: WebSocketRpcClient, close_msg: &CloseMsg) {
             }
         },
         CloseMsg::Abnormal(_) => spawn_local(async move {
-            client.reconnect().await;
+            if let Err(e) = client.reconnect().await {
+                console_error!(e.to_string());
+            }
         }),
     }
 }
@@ -347,12 +355,20 @@ impl ProgressiveDelay {
         if self.is_max_delay_reached() {
             Self::MAX_DELAY
         } else {
+            let delay = self.current_delay;
             self.current_delay *= 2;
-            self.current_delay
+            delay
         }
     }
 
-    /// Resolves after next delay.
+    /// Resolves after [`ProgressiveDelay::current_delay`] milliseconds.
+    ///
+    /// Next call of this function will delay
+    /// [`ProgressiveDelay::current_delay`] * 2 milliseconds.
+    ///
+    /// Initial delay is `1250ms`.
+    ///
+    /// Maximum delay is `10s`.
     pub async fn delay(&mut self) -> Result<(), Traced<JsError>> {
         let delay_ms = self.get_delay();
         JsFuture::from(Promise::new(&mut |yes, _| {
@@ -368,7 +384,8 @@ impl ProgressiveDelay {
         .map_err(tracerr::wrap!())
     }
 
-    /// Returns `true` when `current_delay > Self::MAX_DELAY`.
+    /// Returns `true` when max delay ([`ProgressiveDelay::MAX_DELAY`]) is
+    /// reached.
     fn is_max_delay_reached(&self) -> bool {
         self.current_delay >= Self::MAX_DELAY
     }
@@ -421,12 +438,16 @@ impl WebSocketRpcClient {
         }
         Ok(())
     }
+
+    fn downgrade(&self) -> WeakWebsocketRpcClient {
+        WeakWebsocketRpcClient::new(self)
+    }
 }
 
 impl RpcClient for WebSocketRpcClient {
     /// Creates new WebSocket connection to remote media server.
     /// Starts `Heartbeat` if connection succeeds and binds handlers
-    /// on receiving messages from server and closing socket.
+    /// on receiving messages from a server and closing socket.
     fn connect(
         &self,
         transport: Rc<dyn RpcTransport>,
@@ -439,23 +460,27 @@ impl RpcClient for WebSocketRpcClient {
                 .start(Rc::clone(&transport))
                 .map_err(tracerr::map_from_and_wrap!())?;
 
-            let this_clone = WeakWebsocketRpcClient::new(this.clone());
+            let this_clone = this.downgrade();
             let mut on_socket_message = transport
                 .on_message()
                 .map_err(tracerr::map_from_and_wrap!())?;
             spawn_local(async move {
                 while let Some(msg) = on_socket_message.next().await {
-                    on_message(&this_clone.upgrade(), msg)
+                    if let Some(this) = this_clone.upgrade() {
+                        on_message(&this, msg)
+                    }
                 }
             });
 
-            let this_clone = WeakWebsocketRpcClient::new(this.clone());
+            let this_clone = this.downgrade();
             let mut on_socket_close = transport
                 .on_close()
                 .map_err(tracerr::map_from_and_wrap!())?;
             spawn_local(async move {
                 while let Some(msg) = on_socket_close.next().await {
-                    on_close(this_clone.upgrade().clone(), &msg).await;
+                    if let Some(this) = this_clone.upgrade() {
+                        on_close(this, &msg).await;
+                    }
                 }
             });
 

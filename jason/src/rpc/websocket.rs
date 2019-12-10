@@ -2,7 +2,12 @@
 //!
 //! [WebSocket]: https://developer.mozilla.org/ru/docs/WebSockets
 
-use std::{borrow::Cow, cell::RefCell, convert::TryFrom, rc::Rc};
+use std::{
+    borrow::Cow,
+    cell::RefCell,
+    convert::TryFrom,
+    rc::{Rc, Weak},
+};
 
 use derive_more::{Display, From, Into};
 use futures::{
@@ -18,7 +23,6 @@ use crate::{
     rpc::{ClientDisconnect, CloseMsg, RpcTransport},
     utils::{EventListener, EventListenerBindError, JsCaused, JsError},
 };
-use std::rc::Weak;
 
 /// Errors that may occur when working with [`WebSocket`].
 #[derive(Debug, Display, JsCaused)]
@@ -277,15 +281,19 @@ impl RpcTransport for WebSocketRpcTransport {
     }
 }
 
+/// [`Weak`] pointer which can be upgraded to [`WebSocketRpcTransport`].
 pub struct WeakWebSocketRpcTransport(Weak<RefCell<InnerSocket>>);
 
 impl WeakWebSocketRpcTransport {
-    pub fn new(strong_pointer: WebSocketRpcTransport) -> Self {
-        Self(Rc::downgrade(&strong_pointer.0))
+    /// Returns [`WeakWebSocketRpcTransport`] with [`Weak`] pointer to a
+    /// provided [`WebSocketRpcTransport`].
+    pub fn new(strong: &WebSocketRpcTransport) -> Self {
+        Self(Rc::downgrade(&strong.0))
     }
 
-    pub fn upgrade(&self) -> WebSocketRpcTransport {
-        WebSocketRpcTransport(self.0.upgrade().unwrap())
+    /// Returns `Some(WebSocketRpcTransport)` if it still exists.
+    pub fn upgrade(&self) -> Option<WebSocketRpcTransport> {
+        self.0.upgrade().map(WebSocketRpcTransport)
     }
 }
 
@@ -300,27 +308,31 @@ impl WebSocketRpcTransport {
         let socket = Self(Rc::new(RefCell::new(inner)));
 
         {
-            let inner = WeakWebSocketRpcTransport::new(socket.clone());
+            let inner = socket.downgrade();
             let socket_transport = socket.0.borrow().socket.clone();
             socket.0.borrow_mut().on_close_listener = Some(
                 EventListener::new_once(
                     Rc::clone(&socket_transport),
                     "close",
                     move |_| {
-                        inner.upgrade().0.borrow_mut().update_state();
+                        if let Some(inner) = inner.upgrade() {
+                            inner.0.borrow_mut().update_state();
+                        }
                         let _ = tx_close.send(());
                     },
                 )
                 .map_err(tracerr::map_from_and_wrap!())?,
             );
 
-            let inner = WeakWebSocketRpcTransport::new(socket.clone());
+            let inner = socket.downgrade();
             socket.0.borrow_mut().on_open_listener = Some(
                 EventListener::new_once(
                     Rc::clone(&socket_transport),
                     "open",
                     move |_| {
-                        inner.upgrade().0.borrow_mut().update_state();
+                        if let Some(inner) = inner.upgrade() {
+                            inner.0.borrow_mut().update_state();
+                        }
                         let _ = tx_open.send(());
                     },
                 )
@@ -404,6 +416,10 @@ impl WebSocketRpcTransport {
         self.0.borrow_mut().on_message_listener = Some(on_message);
 
         Ok(())
+    }
+
+    fn downgrade(&self) -> WeakWebSocketRpcTransport {
+        WeakWebSocketRpcTransport::new(self)
     }
 }
 
