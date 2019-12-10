@@ -426,11 +426,6 @@ impl WebSocketRpcTransport {
 impl Drop for InnerSocket {
     fn drop(&mut self) {
         if self.socket_state.can_close() {
-            self.on_open_listener.take();
-            self.on_error_listener.take();
-            self.on_message_listener.take();
-            self.on_close_listener.take();
-
             let close_reason: Cow<'static, str> =
                 serde_json::to_string(&self.close_reason)
                     .unwrap_or_else(|_| {
