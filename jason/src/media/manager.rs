@@ -54,7 +54,6 @@ type Result<T> = std::result::Result<T, Traced<MediaManagerError>>;
 /// Manager that is responsible for [MediaStream][1] acquisition and storing.
 ///
 /// [1]: https://w3.org/TR/mediacapture-streams/#mediastream
-#[allow(clippy::module_name_repetitions)]
 #[derive(Default)]
 pub struct MediaManager(Rc<InnerMediaManager>);
 

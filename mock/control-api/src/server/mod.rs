@@ -116,7 +116,6 @@ macro_rules! gen_request_macro {
 ///
 /// [Control API]: https://tinyurl.com/yxsqplq7
 #[allow(clippy::needless_pass_by_value)]
-#[allow(clippy::module_name_repetitions)]
 mod delete {
     use super::*;
 
@@ -131,7 +130,6 @@ mod delete {
 ///
 /// [Control API]: https://tinyurl.com/yxsqplq7
 #[allow(clippy::needless_pass_by_value)]
-#[allow(clippy::module_name_repetitions)]
 mod get {
     use super::*;
 
@@ -146,7 +144,6 @@ mod get {
 ///
 /// [Control API]: https://tinyurl.com/yxsqplq7
 #[allow(clippy::needless_pass_by_value)]
-#[allow(clippy::module_name_repetitions)]
 mod create {
     use super::*;
 

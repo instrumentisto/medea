@@ -12,7 +12,6 @@ use crate::media::TrackConstraints;
 /// Representation of [MediaStreamTrack][1].
 ///
 /// [1]: https://www.w3.org/TR/mediacapture-streams/#mediastreamtrack
-#[allow(clippy::module_name_repetitions)]
 pub struct MediaTrack {
     id: Id,
     track: MediaStreamTrack,

@@ -12,7 +12,6 @@ use crate::{
 
 /// Errors that may occur in [`Heartbeat`].
 #[derive(Debug, Display, From, JsCaused)]
-#[allow(clippy::module_name_repetitions)]
 pub enum HeartbeatError {
     /// Occurs when `ping` cannot be send because no transport.
     #[display(fmt = "unable to ping: no transport")]

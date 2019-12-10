@@ -7,7 +7,6 @@ use tracerr::Traced;
 use super::{PeerConnection, PeerError, PeerEvent};
 
 /// [`PeerConnection`] factory and repository.
-#[allow(clippy::module_name_repetitions)]
 #[cfg_attr(feature = "mockable", mockall::automock)]
 pub trait PeerRepository {
     /// Creates new [`PeerConnection`] with provided ID and injecting provided

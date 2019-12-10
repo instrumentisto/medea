@@ -104,7 +104,6 @@ impl WebRtcPublishEndpointInner {
 ///
 /// [`WebRtcPublishEndpoint`]:
 /// crate::api::control::endpoints::WebRtcPublishEndpoint
-#[allow(clippy::module_name_repetitions)]
 #[derive(Debug, Clone)]
 pub struct WebRtcPublishEndpoint(Rc<RefCell<WebRtcPublishEndpointInner>>);
 
@@ -206,7 +205,6 @@ impl WebRtcPublishEndpoint {
 }
 
 /// Weak pointer to [`WebRtcPublishEndpoint`].
-#[allow(clippy::module_name_repetitions)]
 #[derive(Clone, Debug)]
 pub struct WeakWebRtcPublishEndpoint(Weak<RefCell<WebRtcPublishEndpointInner>>);
 

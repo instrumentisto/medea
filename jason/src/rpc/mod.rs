@@ -118,7 +118,6 @@ impl From<&CloseEvent> for CloseMsg {
 
 /// Errors that may occur in [`RpcClient`].
 #[derive(Debug, Display, From, JsCaused)]
-#[allow(clippy::module_name_repetitions)]
 pub enum RpcClientError {
     /// Occurs if WebSocket connection to remote media server failed.
     #[display(fmt = "Connection failed: {}", _0)]
@@ -131,7 +130,6 @@ pub enum RpcClientError {
 
 // TODO: consider using async-trait crate, it doesnt work with mockall atm
 /// Client to talk with server via Client API RPC.
-#[allow(clippy::module_name_repetitions)]
 #[cfg_attr(feature = "mockable", mockall::automock)]
 pub trait RpcClient {
     /// Establishes connection with RPC server.
@@ -164,7 +162,6 @@ pub trait RpcClient {
 }
 
 /// RPC transport between client and server.
-#[allow(clippy::module_name_repetitions)]
 #[cfg_attr(feature = "mockable", mockall::automock)]
 pub trait RpcTransport {
     /// Returns [`LocalBoxStream`] of all messages received by this transport.
@@ -297,7 +294,6 @@ fn on_message(
 // 3. Disconnect if no pongs.
 // 4. Buffering if no socket?
 /// Client API RPC client to talk with server via [`WebSocket`].
-#[allow(clippy::module_name_repetitions)]
 pub struct WebSocketRpcClient(Rc<RefCell<Inner>>);
 
 impl WebSocketRpcClient {

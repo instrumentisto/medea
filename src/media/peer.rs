@@ -40,7 +40,6 @@ pub struct Stable {}
 
 /// Produced when unwrapping [`PeerStateMachine`] to [`Peer`] with wrong state.
 #[derive(Debug, Display, Fail)]
-#[allow(clippy::module_name_repetitions)]
 pub enum PeerError {
     #[display(
         fmt = "Cannot unwrap Peer from PeerStateMachine [id = {}]. Expected \
@@ -67,7 +66,6 @@ impl PeerError {
 }
 
 /// Implementation of ['Peer'] state machine.
-#[allow(clippy::module_name_repetitions)]
 #[enum_delegate(pub fn id(&self) -> Id)]
 #[enum_delegate(pub fn member_id(&self) -> MemberId)]
 #[enum_delegate(pub fn partner_peer_id(&self) -> Id)]
