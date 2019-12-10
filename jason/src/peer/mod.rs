@@ -127,7 +127,6 @@ pub enum PeerEvent {
 }
 
 /// High-level wrapper around [`RtcPeerConnection`].
-#[allow(clippy::module_name_repetitions)]
 pub struct PeerConnection {
     /// Unique ID of [`PeerConnection`].
     id: Id,

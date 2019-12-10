@@ -22,7 +22,6 @@ pub use self::{
 };
 
 /// Source for acquire [`MediaStream`] by [`StreamRequest`].
-#[allow(clippy::module_name_repetitions)]
 pub trait MediaSource {
     /// Error that is returned if cannot receive the [`MediaStream`].
     type Error;
