@@ -380,7 +380,6 @@ impl ControlApi for ControlApiService {
 /// API].
 ///
 /// [Control API]: https://tinyurl.com/yxsqplq7
-#[allow(clippy::module_name_repetitions)]
 pub struct GrpcServer(Server);
 
 impl Actor for GrpcServer {

@@ -79,7 +79,6 @@ pub enum AuthorizationError {
 /// [`Member`]: crate::signalling::elements::member::Member
 #[derive(Debug, Message)]
 #[rtype(result = "Result<(), ()>")]
-#[allow(clippy::module_name_repetitions)]
 pub struct RpcConnectionEstablished {
     /// ID of [`Member`] that establishes [`RpcConnection`].
     ///
@@ -92,7 +91,6 @@ pub struct RpcConnectionEstablished {
 ///
 /// [`Member`]: crate::signalling::elements::member::Member
 #[derive(Debug, Message)]
-#[allow(clippy::module_name_repetitions)]
 pub struct RpcConnectionClosed {
     /// ID of [`Member`] which [`RpcConnection`] is closed.
     ///

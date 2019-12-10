@@ -58,7 +58,6 @@ use crate::{
 pub type ActFuture<I, E> =
     Box<dyn ActorFuture<Actor = Room, Item = I, Error = E>>;
 
-#[allow(clippy::module_name_repetitions)]
 #[derive(Debug, Fail, Display)]
 pub enum RoomError {
     #[display(fmt = "Couldn't find Peer with [id = {}]", _0)]

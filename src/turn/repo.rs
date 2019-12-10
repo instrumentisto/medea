@@ -27,7 +27,6 @@ impl From<RedisError> for TurnDatabaseErr {
 
 // Abstraction over remote Redis database used to store Turn server
 // credentials.
-#[allow(clippy::module_name_repetitions)]
 #[derive(Debug)]
 pub struct TurnDatabase {
     pool: RedisPool,

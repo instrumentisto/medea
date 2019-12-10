@@ -71,7 +71,6 @@ impl Display for Fid<ToEndpoint> {
 }
 
 /// Enum for storing [`Fid`]s in all states.
-#[allow(clippy::module_name_repetitions)]
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Display, From)]
 pub enum StatefulFid {
     Room(Fid<ToRoom>),

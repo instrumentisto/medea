@@ -1,7 +1,5 @@
 //! Settings for application servers.
 
-#![allow(clippy::module_name_repetitions)]
-
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, ToSocketAddrs as _};
 
 use serde::{Deserialize, Serialize};

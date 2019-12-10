@@ -54,7 +54,7 @@ pub enum MembersLoadError {
     EndpointNotFound(String),
 }
 
-#[allow(clippy::module_name_repetitions, clippy::pub_enum_variant_names)]
+#[allow(clippy::pub_enum_variant_names)]
 #[derive(Debug, Fail, Display)]
 pub enum MemberError {
     #[display(fmt = "Endpoint [id = {}] not found.", _0)]
@@ -67,7 +67,6 @@ pub enum MemberError {
 #[derive(Clone, Debug)]
 pub struct Member(Rc<RefCell<MemberInner>>);
 
-#[allow(clippy::module_name_repetitions)]
 #[derive(Debug)]
 struct MemberInner {
     /// [`RoomId`] of [`Room`] to which this [`Member`] relates.
@@ -407,7 +406,6 @@ impl Member {
 }
 
 /// Weak pointer to [`Member`].
-#[allow(clippy::module_name_repetitions)]
 #[derive(Clone, Debug)]
 pub struct WeakMember(Weak<RefCell<MemberInner>>);
 

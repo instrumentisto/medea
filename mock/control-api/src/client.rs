@@ -61,7 +61,6 @@ fn id_request(ids: Vec<String>) -> IdRequest {
 ///
 /// [Medea]: https://github.com/instrumentisto/medea
 /// [Control API]: https://tinyurl.com/yxsqplq7
-#[allow(clippy::module_name_repetitions)]
 pub struct ControlClient {
     /// [`grpcio`] gRPC client for Medea Control API.
     grpc_client: ControlApiClient,

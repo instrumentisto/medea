@@ -25,7 +25,6 @@ use super::{
 
 /// Errors that may occur in [`MediaConnections`] storage.
 #[derive(Debug, Display, JsCaused)]
-#[allow(clippy::module_name_repetitions)]
 pub enum MediaConnectionsError {
     /// Occurs when the provided [`MediaTrack`] cannot be inserted into
     /// provided [`Sender`]s transceiver.
@@ -78,7 +77,6 @@ struct InnerMediaConnections {
 }
 
 /// Storage of [`RtcPeerConnection`]'s [`Sender`] and [`Receiver`] tracks.
-#[allow(clippy::module_name_repetitions)]
 pub struct MediaConnections(RefCell<InnerMediaConnections>);
 
 impl MediaConnections {

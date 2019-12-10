@@ -60,7 +60,6 @@ impl<A> From<JsFunction> for Callback<A> {
 ///
 /// Can be used if you need to conditionally invoke function passing one of two
 /// args, e.g. first arg in case of success, and second as error.
-#[allow(clippy::module_name_repetitions)]
 pub struct Callback2<A1, A2> {
     f: RefCell<Option<JsFunction>>,
     _arg1: PhantomData<A1>,
