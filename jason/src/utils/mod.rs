@@ -20,7 +20,9 @@ pub use self::{
     callback::{Callback, Callback2},
     errors::{HandlerDetachedError, JasonError, JsCaused, JsError},
     event_listener::{EventListener, EventListenerBindError},
-    log_sender::{FetchHTTPClient, HTTPClient, LogSender, JASON_LOG_KEY},
+    log_sender::{
+        FetchHTTPClient, HTTPClient, HTTPClientError, LogSender, JASON_LOG_KEY,
+    },
 };
 
 /// Returns [`Window`] object.

@@ -178,7 +178,12 @@ pub enum HTTPClientError {
         code,
         message
     )]
-    ResponseFailed { code: u16, message: String },
+    ResponseFailed {
+        /// Status code of the response (e.g., 200 for a success).
+        code: u16,
+        /// Body of error response.
+        message: String,
+    },
 }
 
 /// HTTP client that uses the browser fetch API to send requests.
@@ -230,24 +235,27 @@ impl HTTPClient for FetchHTTPClient {
             .unwrap();
 
         Box::pin(async move {
-            JsFuture::from(window().fetch_with_request(&request))
-                .await
-                .map_err(JsError::from)
-                .map_err(HTTPClientError::InvalidRequest)
-                .map_err(tracerr::wrap!())
-                .and_then(|resp_value| {
-                    assert!(resp_value.is_instance_of::<Response>());
-                    let resp: Response = resp_value.dyn_into().unwrap();
-                    if !resp.ok() {
-                        return Err(tracerr::new!(
-                            HTTPClientError::ResponseFailed {
-                                code: resp.status(),
-                                message: resp.status_text(),
-                            }
-                        ));
-                    }
-                    Ok(())
-                })
+            let resp_value =
+                JsFuture::from(window().fetch_with_request(&request))
+                    .await
+                    .map_err(JsError::from)
+                    .map_err(HTTPClientError::InvalidRequest)
+                    .map_err(tracerr::wrap!())?;
+            assert!(resp_value.is_instance_of::<Response>());
+            let resp: Response = resp_value.dyn_into().unwrap();
+            if resp.ok() {
+                Ok(())
+            } else {
+                let message = JsFuture::from(resp.text().unwrap())
+                    .await
+                    .unwrap_or_else(|_| JsValue::from_str(""))
+                    .as_string()
+                    .unwrap();
+                Err(tracerr::new!(HTTPClientError::ResponseFailed {
+                    code: resp.status(),
+                    message,
+                }))
+            }
         })
     }
 }
