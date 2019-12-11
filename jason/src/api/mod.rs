@@ -14,6 +14,7 @@ use crate::{
     peer,
     rpc::{ClientDisconnect, RpcClient as _, WebSocketRpcClient},
     set_panic_hook,
+    utils::{FetchHTTPClient, JasonError, LogSender},
 };
 
 #[doc(inline)]
@@ -31,6 +32,7 @@ pub struct Jason(Rc<RefCell<Inner>>);
 struct Inner {
     media_manager: Rc<MediaManager>,
     rooms: Vec<Room>,
+    logs_sender: Option<LogSender>,
 }
 
 #[wasm_bindgen]
@@ -40,6 +42,20 @@ impl Jason {
     pub fn new() -> Self {
         set_panic_hook();
         Self::default()
+    }
+
+    /// Instantiates new [`LogSender`] to send saved logs to the specified URL
+    /// at the specified interval.
+    pub fn init_log_sender(
+        &self,
+        url: &str,
+        interval: i32,
+    ) -> Result<(), JsValue> {
+        let client = Rc::new(FetchHTTPClient::new(url));
+        let sender =
+            LogSender::new(client, interval).map_err(JasonError::from)?;
+        self.0.borrow_mut().logs_sender = Some(sender);
+        Ok(())
     }
 
     /// Returns [`RoomHandle`] for [`Room`].
@@ -62,6 +78,7 @@ impl Jason {
                 .drain(..)
                 .for_each(|room| room.close(reason.clone()));
             inner.borrow_mut().media_manager = Rc::default();
+            inner.borrow_mut().logs_sender.take();
         }));
 
         let room = Room::new(rpc, peer_repository);
@@ -82,5 +99,6 @@ impl Jason {
         self.0.borrow_mut().rooms.drain(..).for_each(|room| {
             room.close(ClientDisconnect::RoomClosed.into());
         });
+        self.0.borrow_mut().logs_sender.take();
     }
 }

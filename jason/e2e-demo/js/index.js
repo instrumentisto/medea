@@ -1,4 +1,5 @@
 const controlUrl = "http://127.0.0.1:8000/control-api/";
+const logslUrl = "http://127.0.0.1:8080/logs";
 const baseUrl = 'ws://127.0.0.1:8080/ws/';
 
 let roomId = window.location.hash.replace("#", "");
@@ -207,6 +208,7 @@ const controlDebugWindows = {
 window.onload = async function() {
   let rust = await import("../../pkg");
   let jason = new rust.Jason();
+  jason.init_log_sender(logslUrl, 3000);
   console.log(baseUrl);
 
   Object.values(controlDebugWindows).forEach(s => s());

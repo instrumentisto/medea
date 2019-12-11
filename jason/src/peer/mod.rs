@@ -15,7 +15,8 @@ use std::{cell::RefCell, collections::HashMap, convert::TryFrom, rc::Rc};
 use derive_more::{Display, From};
 use futures::{channel::mpsc, future};
 use medea_client_api_proto::{
-    Direction, IceConnectionState, IceServer, PeerId as Id, Track, TrackId,
+    Direction, IceConnectionState, IceServer, PeerId as Id, PeerId, Track,
+    TrackId,
 };
 use medea_macro::dispatchable;
 use tracerr::Traced;
@@ -234,6 +235,11 @@ impl PeerConnection {
             .map_err(tracerr::map_from_and_wrap!())?;
 
         Ok(peer)
+    }
+
+    /// Returns ID of [`PeerConnection`].
+    pub fn id(&self) -> PeerId {
+        self.id
     }
 
     /// Returns inner [`IceCandidate`]'s buffer len. Used in tests.

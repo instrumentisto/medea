@@ -3,6 +3,7 @@
 use std::io;
 
 use actix::{Actor, Addr, Handler, ResponseFuture};
+use actix_cors::Cors;
 use actix_web::{
     dev::Server as ActixServer,
     middleware,
@@ -29,6 +30,7 @@ use crate::{
     shutdown::ShutdownGracefully,
     signalling::room_repo::RoomRepository,
 };
+use actix_web::web::Json;
 
 /// Parameters of new WebSocket connection creation HTTP request.
 #[derive(Debug, Deserialize)]
@@ -81,6 +83,16 @@ fn ws_index(
     }
 }
 
+/// Handles POST `/logs` HTTP requests and logs body.
+#[allow(clippy::needless_pass_by_value)]
+fn log_index(body: Json<Vec<String>>) -> HttpResponse {
+    for log in body.into_inner() {
+        info!("client log: {}", log);
+    }
+
+    HttpResponse::Ok().body("Ok")
+}
+
 /// Context for [`App`] which holds all the necessary dependencies.
 pub struct Context {
     /// Repository of all currently existing [`Room`]s in application.
@@ -107,9 +119,19 @@ impl Server {
                     config: config.rpc.clone(),
                 })
                 .wrap(middleware::Logger::default())
+                .wrap(
+                    Cors::new()
+                        .send_wildcard()
+                        .allowed_methods(vec!["POST"])
+                        .max_age(3600),
+                )
                 .service(
                     resource("/ws/{room_id}/{member_id}/{credentials}")
                         .route(actix_web::web::get().to_async(ws_index)),
+                )
+                .service(
+                    resource("/logs")
+                        .route(actix_web::web::post().to(log_index)),
                 )
         })
         .disable_signals()
@@ -143,8 +165,9 @@ impl Handler<ShutdownGracefully> for Server {
 mod test {
     use std::{ops::Add, thread, time::Duration};
 
-    use actix_http::{ws::Message, HttpService};
+    use actix_http::{http::StatusCode, ws::Message, HttpService};
     use actix_http_test::{TestServer, TestServerRuntime};
+    use actix_web::web::Bytes;
     use futures::{future::IntoFuture as _, sink::Sink as _, Stream as _};
     use medea_client_api_proto::{CloseDescription, CloseReason};
 
@@ -254,5 +277,76 @@ mod test {
                     }),
             )
             .unwrap();
+    }
+
+    fn http_server() -> TestServerRuntime {
+        TestServer::new(|| {
+            HttpService::new(App::new().service(
+                resource("/logs").route(actix_web::web::post().to(log_index)),
+            ))
+        })
+    }
+
+    #[test]
+    fn bad_request_if_content_type_not_json() {
+        let mut server = http_server();
+        let req = server
+            .post("/logs")
+            .header("Content-Type", "text/plain")
+            .send_body("test_log");
+        let response = server.block_on(req).unwrap();
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[test]
+    fn bad_request_if_content_not_json() {
+        let mut server = http_server();
+        let req = server
+            .post("/logs")
+            .header("Content-Type", "application/json")
+            .send_body("test_log");
+        let mut response = server.block_on(req).unwrap();
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+        let bytes = server.block_on(response.body()).unwrap();
+        assert_eq!(
+            bytes,
+            Bytes::from_static(
+                "Json deserialize error: expected ident at line 1 column 2"
+                    .as_ref()
+            )
+        );
+    }
+
+    #[test]
+    fn bad_request_if_content_not_vec_of_string() {
+        let mut server = http_server();
+        let req = server
+            .post("/logs")
+            .header("Content-Type", "application/json")
+            .send_body("{\"log\":\"test_log\"}");
+        let mut response = server.block_on(req).unwrap();
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+        let bytes = server.block_on(response.body()).unwrap();
+        assert_eq!(
+            bytes,
+            Bytes::from_static(
+                "Json deserialize error: invalid type: map, expected a \
+                 sequence at line 1 column 0"
+                    .as_ref()
+            )
+        );
+    }
+
+    #[test]
+    fn success_receive_json_vec_of_string() {
+        let mut server = http_server();
+        let req = server
+            .post("/logs")
+            .header("Content-Type", "application/json")
+            .send_body("[\"test_log\",\"test_log2\"]");
+        let mut response = server.block_on(req).unwrap();
+        assert!(response.status().is_success());
+        let bytes = server.block_on(response.body()).unwrap();
+        assert_eq!(bytes, Bytes::from_static("Ok".as_ref()));
     }
 }
