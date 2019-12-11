@@ -79,7 +79,10 @@ mod media;
 mod peer;
 mod rpc;
 
-use futures::{channel::oneshot, future::Either};
+use futures::{
+    channel::oneshot,
+    future::{Either, LocalBoxFuture},
+};
 use js_sys::Promise;
 use medea_client_api_proto::{
     AudioSettings, Direction, MediaType, PeerId, Track, TrackId, VideoSettings,
@@ -168,4 +171,18 @@ async fn wait_and_check_test_result(
             panic!("callback didn't fired");
         }
     };
+}
+
+/// Awaits provided [`LocalBoxFuture`] for `timeout` milliseconds. If in
+/// provided `timeout` time this [`LocalBoxFuture`] will not be resolved -
+/// `Err(String)` will be returned otherwise result of provided
+/// [`LocalBoxFuture`] will be returned.
+async fn await_with_timeout<T>(
+    f: LocalBoxFuture<'_, T>,
+    timeout: i32,
+) -> Result<T, String> {
+    match futures::future::select(f, Box::pin(resolve_after(timeout))).await {
+        Either::Left((res, _)) => Ok(res),
+        Either::Right((_, _)) => Err("Future timed out.".to_string()),
+    }
 }

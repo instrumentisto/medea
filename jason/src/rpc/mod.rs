@@ -131,7 +131,7 @@ pub enum RpcClientError {
     #[display(fmt = "Start heartbeat failed: {}", _0)]
     CouldNotStartHeartbeat(#[js(cause)] HeartbeatError),
 
-    /// Occurs if [`ProgressiveDelay`] fails to set timeout.
+    /// Occurs if [`ProgressiveDelayer`] fails to set timeout.
     #[display(fmt = "Failed to set JS timeout: {}", _0)]
     SetTimeoutError(#[js(cause)] JsError),
 
@@ -173,7 +173,7 @@ pub trait RpcClient {
     fn set_close_reason(&self, close_reason: ClientDisconnect);
 }
 
-/// RPC transport between client and server.
+/// RPC transport between a client and server.
 #[cfg_attr(feature = "mockable", mockall::automock)]
 pub trait RpcTransport {
     /// Returns [`LocalBoxStream`] of all messages received by this transport.
@@ -194,10 +194,10 @@ pub trait RpcTransport {
     /// be dropped.
     fn set_close_reason(&self, reason: ClientDisconnect);
 
-    /// Sends message to server.
+    /// Sends a message to server.
     fn send(&self, msg: &ClientMsg) -> Result<(), Traced<TransportError>>;
 
-    /// Try to reconnect [`RpcTransport`].
+    /// Tries to reconnect this [`RpcTransport`].
     fn reconnect(
         &self,
     ) -> LocalBoxFuture<'static, Result<(), Traced<TransportError>>>;
@@ -258,89 +258,25 @@ impl WeakWebsocketRpcClient {
     }
 }
 
-/// Handles close message from a remote server.
+/// Delayer which will increase delay time in geometry progression after any
+/// `delay` calls.
 ///
-/// This function will be called on every WebSocket close (normal and abnormal)
-/// regardless of the [`CloseReason`].
-async fn on_close(client: WebSocketRpcClient, close_msg: &CloseMsg) {
-    client.0.borrow_mut().heartbeat.stop();
-
-    // TODO: propagate error if unable to reconnect
-
-    match &close_msg {
-        CloseMsg::Normal(_, reason) => match reason {
-            CloseByServerReason::Reconnected => (),
-            CloseByServerReason::Idle => {
-                if let Err(e) = client.reconnect().await {
-                    console_error!(e.to_string());
-                }
-            }
-            _ => {
-                client.0.borrow_mut().sock.take();
-                if *reason != CloseByServerReason::Reconnected {
-                    client
-                        .0
-                        .borrow_mut()
-                        .on_close_subscribers
-                        .drain(..)
-                        .filter_map(|sub| {
-                            sub.send(CloseReason::ByServer(*reason)).err()
-                        })
-                        .for_each(|reason| {
-                            console_error!(format!(
-                                "Failed to send reason of Jason close to \
-                                 subscriber: {:?}",
-                                reason
-                            ))
-                        });
-                }
-            }
-        },
-        CloseMsg::Abnormal(_) => spawn_local(async move {
-            if let Err(e) = client.reconnect().await {
-                console_error!(e.to_string());
-            }
-        }),
-    }
-}
-
-/// Handles messages from a remote server.
-fn on_message(
-    client: &WebSocketRpcClient,
-    msg: Result<ServerMsg, Traced<TransportError>>,
-) {
-    let inner = client.0.borrow();
-    match msg {
-        Ok(ServerMsg::Pong(_num)) => {
-            // TODO: detect no pings
-            inner.heartbeat.set_pong_at(Date::now());
-        }
-        Ok(ServerMsg::Event(event)) => {
-            // TODO: many subs, filter messages by session
-            if let Some(sub) = inner.subs.iter().next() {
-                if let Err(err) = sub.unbounded_send(event) {
-                    // TODO: receiver is gone, should delete
-                    //       this subs tx
-                    console_error!(err.to_string());
-                }
-            }
-        }
-        Err(err) => {
-            // TODO: protocol versions mismatch? should drop
-            //       connection if so
-            JasonError::from(err).print();
-        }
-    }
-}
-
-struct ProgressiveDelay {
+/// Delay time increasing will be stopped when 10 seconds of `current_delay`
+/// will be reached. 10 seconds is maximum delay. First delay will be `1250ms`.
+struct ProgressiveDelayer {
+    /// Milliseconds of [`ProgressiveDelayer::delay`] call.
+    ///
+    /// Will be increased by [`ProgressiveDelayer::delay`] call.
     current_delay: i32,
 }
 
-impl ProgressiveDelay {
+impl ProgressiveDelayer {
+    /// When `current_delay >= MAX_DELAY` then this delay will be returned.
+    ///
+    /// Delay increasing will be stopped on this value.
     const MAX_DELAY: i32 = 10000;
 
-    /// Returns [`ProgressiveDelay`] with first delay as `1250ms`.
+    /// Returns [`ProgressiveDelayer`] with first delay as `1250ms`.
     pub fn new() -> Self {
         Self {
             current_delay: 1250,
@@ -358,10 +294,10 @@ impl ProgressiveDelay {
         }
     }
 
-    /// Resolves after [`ProgressiveDelay::current_delay`] milliseconds.
+    /// Resolves after [`ProgressiveDelayer::current_delay`] milliseconds.
     ///
     /// Next call of this function will delay
-    /// [`ProgressiveDelay::current_delay`] * 2 milliseconds.
+    /// [`ProgressiveDelayer::current_delay`] * 2 milliseconds.
     ///
     /// Initial delay is `1250ms`.
     ///
@@ -381,7 +317,7 @@ impl ProgressiveDelay {
         .map_err(tracerr::wrap!())
     }
 
-    /// Returns `true` when max delay ([`ProgressiveDelay::MAX_DELAY`]) is
+    /// Returns `true` when max delay ([`ProgressiveDelayer::MAX_DELAY`]) is
     /// reached.
     fn is_max_delay_reached(&self) -> bool {
         self.current_delay >= Self::MAX_DELAY
@@ -393,8 +329,18 @@ impl ProgressiveDelay {
 // 2. Reconnect.
 // 3. Disconnect if no pongs.
 // 4. Buffering if no socket?
-/// Client API RPC client to talk with server via [`WebSocket`].
-#[derive(Clone)]
+/// Client API RPC client to talk with a server via [`WebSocket`].
+///
+/// Don't derive [`Clone`] and don't use it if there are no very serious reasons
+/// for this. Because with many strong [`Rc`]s we can catch many painful bugs
+/// with [`Drop`] implementation, memory leaks etc. It is especially not
+/// recommended use a strong pointer ([`Rc`]) in all kinds of callbacks and
+/// `async` closures. If you clone this then make sure that this
+/// [`WebSocketRpcClient`] will be normally [`Drop`]ed.
+///
+/// Alternative for [`Clone`] is [`WebSocketRpcClient::downgrade`] which will
+/// return [`WeakWebSocketRpcClient`] which can be upgraded to
+/// [`WebSocketRpcClient`] and will not hold this structure from destruction.
 pub struct WebSocketRpcClient(Rc<RefCell<Inner>>);
 
 impl WebSocketRpcClient {
@@ -404,9 +350,10 @@ impl WebSocketRpcClient {
         Self(Inner::new(ping_interval))
     }
 
-    /// Reconnect [`WebSocketRpcClient`].
+    /// Tries to reconnect [`WebSocketRpcTransport`] in a loop with delay until
+    /// it will not be reconnected.
     pub async fn reconnect(&self) -> Result<(), Traced<RpcClientError>> {
-        let mut delayer = ProgressiveDelay::new();
+        let mut delayer = ProgressiveDelayer::new();
         while let Err(_) = self
             .0
             .borrow()
@@ -424,17 +371,90 @@ impl WebSocketRpcClient {
                 .await
                 .map_err(tracerr::map_from_and_wrap!())?;
         }
-        let sock = self.0.borrow().sock.clone();
-        if let Some(sock) = sock {
+        let transport = self.0.borrow().sock.clone();
+        if let Some(transport) = transport {
             self.0
                 .borrow_mut()
                 .heartbeat
-                .start(sock)
+                .start(transport)
                 .map_err(tracerr::map_from_and_wrap!())?;
         }
         Ok(())
     }
 
+    /// Handles close message from a remote server.
+    ///
+    /// This function will be called on every WebSocket close (normal and
+    /// abnormal) regardless of the [`CloseReason`].
+    async fn on_close(self, close_msg: &CloseMsg) {
+        self.0.borrow_mut().heartbeat.stop();
+
+        // TODO: propagate error if unable to reconnect
+
+        match &close_msg {
+            CloseMsg::Normal(_, reason) => match reason {
+                CloseByServerReason::Reconnected => (),
+                CloseByServerReason::Idle => {
+                    if let Err(e) = self.reconnect().await {
+                        console_error!(e.to_string());
+                    }
+                }
+                _ => {
+                    self.0.borrow_mut().sock.take();
+                    if *reason != CloseByServerReason::Reconnected {
+                        self.0
+                            .borrow_mut()
+                            .on_close_subscribers
+                            .drain(..)
+                            .filter_map(|sub| {
+                                sub.send(CloseReason::ByServer(*reason)).err()
+                            })
+                            .for_each(|reason| {
+                                console_error!(format!(
+                                    "Failed to send reason of Jason close to \
+                                     subscriber: {:?}",
+                                    reason
+                                ))
+                            });
+                    }
+                }
+            },
+            CloseMsg::Abnormal(_) => spawn_local(async move {
+                if let Err(e) = self.reconnect().await {
+                    console_error!(e.to_string());
+                }
+            }),
+        }
+    }
+
+    /// Handles messages from a remote server.
+    fn on_message(&self, msg: Result<ServerMsg, Traced<TransportError>>) {
+        let inner = self.0.borrow();
+        match msg {
+            Ok(ServerMsg::Pong(_num)) => {
+                // TODO: detect no pings
+                inner.heartbeat.set_pong_at(Date::now());
+            }
+            Ok(ServerMsg::Event(event)) => {
+                // TODO: many subs, filter messages by session
+                if let Some(sub) = inner.subs.iter().next() {
+                    if let Err(err) = sub.unbounded_send(event) {
+                        // TODO: receiver is gone, should delete
+                        //       this subs tx
+                        console_error!(err.to_string());
+                    }
+                }
+            }
+            Err(err) => {
+                // TODO: protocol versions mismatch? should drop
+                //       connection if so
+                JasonError::from(err).print();
+            }
+        }
+    }
+
+    /// Downgrades strong ([`Rc`]) pointed [`WebSocketRpcClient`] to a [`Weak`]
+    /// pointed [`WeakWebSocketRpcClient`].
     fn downgrade(&self) -> WeakWebsocketRpcClient {
         WeakWebsocketRpcClient::new(self)
     }
@@ -448,7 +468,7 @@ impl RpcClient for WebSocketRpcClient {
         &self,
         transport: Rc<dyn RpcTransport>,
     ) -> LocalBoxFuture<'static, Result<(), Traced<RpcClientError>>> {
-        let this = self.clone();
+        let this = Self(Rc::clone(&self.0));
         Box::pin(async move {
             this.0
                 .borrow_mut()
@@ -463,7 +483,7 @@ impl RpcClient for WebSocketRpcClient {
             spawn_local(async move {
                 while let Some(msg) = on_socket_message.next().await {
                     if let Some(this) = this_clone.upgrade() {
-                        on_message(&this, msg)
+                        this.on_message(msg)
                     }
                 }
             });
@@ -475,7 +495,7 @@ impl RpcClient for WebSocketRpcClient {
             spawn_local(async move {
                 while let Some(msg) = on_socket_close.next().await {
                     if let Some(this) = this_clone.upgrade() {
-                        on_close(this, &msg).await;
+                        this.on_close(&msg).await;
                     }
                 }
             });

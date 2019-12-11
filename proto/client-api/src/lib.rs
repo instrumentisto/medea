@@ -61,7 +61,7 @@ pub enum ServerMsg {
 }
 
 #[cfg_attr(test, derive(PartialEq))]
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 /// Message from 'Client' to 'Media Server'.
 pub enum ClientMsg {
     /// `ping` message that WebSocket client is expected to send to the server

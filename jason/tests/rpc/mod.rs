@@ -452,8 +452,12 @@ mod transport_close_reason_on_drop {
     }
 }
 
+/// Tests which checks that on abnormal [`RpcTransport`] close, [`RpcClient`]
+/// tries to reconnect [`RpcTransport`].
 mod reconnect {
     use medea_jason::rpc::TransportError;
+
+    use crate::await_with_timeout;
 
     use super::*;
 
@@ -467,7 +471,7 @@ mod reconnect {
     /// 2. Resolve [`RpcTransport::on_close`] [`Future`] with
     ///    [`CloseMsg::Abnormal`].
     ///
-    /// 3. Check that [`RpcTransport::reconnect`] was called.
+    /// 3. Check [`RpcTransport::reconnect`] was called.
     #[wasm_bindgen_test]
     async fn on_abnormal_transport_close() {
         let mut transport = MockRpcTransport::new();
@@ -488,15 +492,14 @@ mod reconnect {
 
         let ws = WebSocketRpcClient::new(500);
         ws.connect(Rc::new(transport)).await.unwrap();
+
         close_reason_tx
             .unbounded_send(CloseMsg::Abnormal(1500))
             .unwrap();
-        match future::select(Box::pin(test_rx), Box::pin(resolve_after(100)))
+        await_with_timeout(Box::pin(test_rx), 100)
             .await
-        {
-            Either::Left((_, _)) => (),
-            Either::Right(_) => panic!("Test timed out."),
-        }
+            .unwrap()
+            .unwrap();
     }
 
     /// Tests that [`RpcClient`] will try to reconnect [`RpcTransport`] with
@@ -515,13 +518,15 @@ mod reconnect {
     #[wasm_bindgen_test]
     async fn timeout() {
         let mut transport = MockRpcTransport::new();
-        let (close_reason_tx, close_reason_rx) = mpsc::unbounded();
+        let (on_close_tx, on_close_rx) = mpsc::unbounded();
         let (test_tx, mut test_rx) = mpsc::unbounded();
         let reconnection_count = AtomicU64::new(0);
         transport
             .expect_on_message()
             .return_once(move || Ok(stream::once(future::pending()).boxed()));
         transport.expect_send().returning(|_| Ok(()));
+        transport.expect_set_close_reason().return_const(());
+
         transport.expect_reconnect().returning(move || {
             let current_reconnection_count =
                 reconnection_count.load(Ordering::Relaxed);
@@ -534,24 +539,23 @@ mod reconnect {
                 future::err(tracerr::new!(TransportError::InitSocket)).boxed()
             }
         });
-        transport.expect_set_close_reason().return_const(());
         transport
             .expect_on_close()
-            .return_once(move || Ok(close_reason_rx.boxed()));
+            .return_once(move || Ok(on_close_rx.boxed()));
 
         let ws = WebSocketRpcClient::new(500);
         ws.connect(Rc::new(transport)).await.unwrap();
-        close_reason_tx
+        on_close_tx
             .unbounded_send(CloseMsg::Abnormal(1500))
             .unwrap();
-        match future::select(
+
+        const TIMEOUT_FOR_TWO_RECONNECTIONS: i32 = 3800;
+        await_with_timeout(
             Box::pin(test_rx.next()),
-            Box::pin(resolve_after(3800)),
+            TIMEOUT_FOR_TWO_RECONNECTIONS,
         )
         .await
-        {
-            Either::Left((_, _)) => (),
-            Either::Right(_) => panic!("Test timed out."),
-        }
+        .unwrap()
+        .unwrap();
     }
 }

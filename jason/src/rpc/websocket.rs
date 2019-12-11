@@ -154,14 +154,6 @@ struct InnerSocket {
     /// https://developer.mozilla.org/en-US/docs/Web/API/WebSocket/close_event
     on_close_listener: Option<EventListener<SysWebSocket, CloseEvent>>,
 
-    /// Listener for [`WebSocket`] [`error`] event.
-    ///
-    /// [`WebSocket`]:
-    /// https://developer.mozilla.org/en-US/docs/Web/API/WebSocket
-    /// [`error`]:
-    /// https://developer.mozilla.org/en-US/docs/Web/API/WebSocket/error_event
-    on_error_listener: Option<EventListener<SysWebSocket, Event>>,
-
     /// [`mpsc::UnboundedSender`] for [`RpcTransport::on_message`]'s
     /// [`LocalBoxStream`].
     on_message: Option<mpsc::UnboundedSender<Result<ServerMsg>>>,
@@ -181,8 +173,18 @@ struct InnerSocket {
     url: String,
 }
 
-/// WebSocket [`RpcTransport`] between client and server.
-#[derive(Clone)]
+/// WebSocket [`RpcTransport`] between a client and server.
+///
+/// Don't derive [`Clone`] and don't use it if there are no very serious reasons
+/// for this. Because with many strong [`Rc`]s we can catch many painful bugs
+/// with [`Drop`] implementation, memory leaks etc. It is especially not
+/// recommended use a strong pointer ([`Rc`]) in all kinds of callbacks and
+/// `async` closures. If you clone this then make sure that this
+/// [`WebSocketRpcTransport`] will be normally [`Drop`]ed.
+///
+/// Alternative for [`Clone`] is [`WebSocketRpcTransport::downgrade`] which will
+/// return [`WeakWebSocketRpcTransport`] which can be upgraded to
+/// [`WebSocketRpcTransport`] and will not hold this structure from destruction.
 pub struct WebSocketRpcTransport(Rc<RefCell<InnerSocket>>);
 
 impl InnerSocket {
@@ -197,7 +199,6 @@ impl InnerSocket {
             on_open_listener: None,
             on_message_listener: None,
             on_close_listener: None,
-            on_error_listener: None,
             on_close: None,
             on_message: None,
             close_reason: ClientDisconnect::RpcTransportUnexpectedlyDropped,
@@ -248,7 +249,7 @@ impl RpcTransport for WebSocketRpcTransport {
     }
 
     fn reconnect(&self) -> LocalBoxFuture<'static, Result<()>> {
-        let this = self.clone();
+        let this = Self(Rc::clone(&self.0));
         Box::pin(async move {
             let url = this.0.borrow().url.clone();
             let new_transport = Self::new(&url).await?;
@@ -258,14 +259,6 @@ impl RpcTransport for WebSocketRpcTransport {
                 this.0.borrow_mut().on_close.take();
 
             RefCell::swap(&this.0, &new_transport.0);
-            let old_transport = new_transport;
-
-            // Take all listeners because we have pointers in them (cyclic
-            // dependency).
-            old_transport.0.borrow_mut().on_open_listener.take();
-            old_transport.0.borrow_mut().on_error_listener.take();
-            old_transport.0.borrow_mut().on_message_listener.take();
-            old_transport.0.borrow_mut().on_close_listener.take();
 
             // Set listeners again for an update Rc in a listener.
             //
@@ -361,16 +354,24 @@ impl WebSocketRpcTransport {
     /// Sets [`WebSocketRpcTransport::on_close_listener`] which will send
     /// [`CloseMsg`]s to [`WebSocketRpcTransport::on_close`].
     fn set_on_close_listener(&self) -> Result<()> {
-        let socket_clone = self.clone();
+        let weak_transport = self.downgrade();
         let on_close = EventListener::new_once(
             Rc::clone(&self.0.borrow().socket),
             "close",
             move |msg: CloseEvent| {
                 let close_msg = CloseMsg::from(&msg);
-                socket_clone.0.borrow_mut().update_state();
-                if let Some(on_close) =
-                    socket_clone.0.borrow().on_close.as_ref()
-                {
+                let transport =
+                    if let Some(socket_clone) = weak_transport.upgrade() {
+                        socket_clone
+                    } else {
+                        console_error!(
+                            "'WebSocketRpcTransport' was unexpectedly gone."
+                        );
+                        return;
+                    };
+                let mut transport_ref_mut = transport.0.borrow_mut();
+                transport_ref_mut.update_state();
+                if let Some(on_close) = transport_ref_mut.on_close.as_ref() {
                     on_close.unbounded_send(close_msg).unwrap_or_else(|e| {
                         console_error!(format!(
                             "WebSocket's 'on_close' callback receiver \
@@ -390,7 +391,7 @@ impl WebSocketRpcTransport {
     /// Sets [`WebSocketRpcTransport::on_message_listener`] which will send
     /// [`ServerMessage`]s to [`WebSocketRpcTransport::on_message`].
     fn set_on_message_listener(&self) -> Result<()> {
-        let socket_clone = self.clone();
+        let weak_transport = self.downgrade();
         let on_message = EventListener::new_mut(
             Rc::clone(&self.0.borrow().socket),
             "message",
@@ -398,9 +399,16 @@ impl WebSocketRpcTransport {
                 let parsed = ServerMessage::try_from(&msg)
                     .map(Into::into)
                     .map_err(tracerr::wrap!());
-                if let Some(on_message) =
-                    socket_clone.0.borrow().on_message.as_ref()
-                {
+                let transport = if let Some(t) = weak_transport.upgrade() {
+                    t
+                } else {
+                    console_error!(
+                        "'WebSocketRpcTransport' was unexpectedly gone."
+                    );
+                    return;
+                };
+                let transport_ref = transport.0.borrow();
+                if let Some(on_message) = transport_ref.on_message.as_ref() {
                     on_message.unbounded_send(parsed).unwrap_or_else(|e| {
                         console_error!(format!(
                             "WebSocket's 'on_message' callback receiver \
@@ -418,6 +426,8 @@ impl WebSocketRpcTransport {
         Ok(())
     }
 
+    /// Downgrades strong ([`Rc`]) pointed [`WebSocketRpcTransport`] to a
+    /// [`Weak`] pointed [`WeakWebSocketRpcTransport`].
     fn downgrade(&self) -> WeakWebSocketRpcTransport {
         WeakWebSocketRpcTransport::new(self)
     }
