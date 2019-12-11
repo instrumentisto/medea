@@ -36,7 +36,6 @@ use super::{connection::Connection, ConnectionHandle};
 /// Reason of why [`Room`] has been closed.
 ///
 /// This struct is passed into `on_close_by_server` JS side callback.
-#[allow(clippy::module_name_repetitions)]
 #[wasm_bindgen]
 pub struct RoomCloseReason {
     /// Indicator if [`Room`] is closed by server.
@@ -166,7 +165,6 @@ impl From<PeerError> for RoomError {
 /// Actually, represents a [`Weak`]-based handle to `InnerRoom`.
 ///
 /// For using [`RoomHandle`] on Rust side, consider the `Room`.
-#[allow(clippy::module_name_repetitions)]
 #[wasm_bindgen]
 pub struct RoomHandle(Weak<RefCell<InnerRoom>>);
 

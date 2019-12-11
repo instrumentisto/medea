@@ -25,7 +25,6 @@ use crate::{
 
 static TURN_PASS_LEN: usize = 16;
 
-#[allow(clippy::module_name_repetitions)]
 /// Manages Turn server credentials.
 pub trait TurnAuthService: fmt::Debug + Send + Sync {
     /// Generates and registers Turn credentials.
@@ -157,7 +156,6 @@ struct Service {
 }
 
 /// Create new instance [`TurnAuthService`].
-#[allow(clippy::module_name_repetitions)]
 pub fn new_turn_auth_service<'a>(
     cf: &conf::Turn,
 ) -> impl Future<Item = Arc<dyn TurnAuthService + 'a>, Error = TurnServiceErr> {
@@ -319,7 +317,6 @@ pub mod test {
         }
     }
 
-    #[allow(clippy::module_name_repetitions)]
     pub fn new_turn_auth_service_mock() -> Arc<dyn TurnAuthService> {
         Arc::new(TurnAuthServiceMock {})
     }

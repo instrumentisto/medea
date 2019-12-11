@@ -30,7 +30,6 @@ pub struct Id(pub String);
 /// Element of [`Room`]'s [`Pipeline`].
 ///
 /// [`Room`]: crate::signalling::room::Room
-#[allow(clippy::module_name_repetitions)]
 #[derive(Clone, Deserialize, Debug)]
 #[serde(tag = "kind")]
 pub enum RoomElement {
@@ -49,7 +48,6 @@ pub enum RoomElement {
 /// Newtype for [`RootElement::Room`].
 ///
 /// [Control API]: https://tinyurl.com/yxsqplq7
-#[allow(clippy::module_name_repetitions)]
 #[derive(Clone, Debug)]
 pub struct RoomSpec {
     pub id: Id,

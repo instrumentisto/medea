@@ -1,5 +1,7 @@
 //! Medea media server.
 
+#![allow(clippy::module_name_repetitions)]
+
 #[macro_use]
 pub mod utils;
 pub mod api;

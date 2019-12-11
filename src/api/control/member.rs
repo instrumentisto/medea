@@ -33,7 +33,6 @@ pub struct Id(pub String);
 /// Element of [`Member`]'s [`Pipeline`].
 ///
 /// [`Member`]: crate::signalling::elements::member::Member
-#[allow(clippy::module_name_repetitions)]
 #[derive(Clone, Deserialize, Debug)]
 #[serde(tag = "kind")]
 pub enum MemberElement {
@@ -51,7 +50,6 @@ pub enum MemberElement {
 }
 
 /// Newtype for [`RoomElement::Member`] variant.
-#[allow(clippy::module_name_repetitions)]
 #[derive(Clone, Debug)]
 pub struct MemberSpec {
     /// Spec of this `Member`.

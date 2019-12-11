@@ -51,7 +51,6 @@ impl Into<WebRtcPublishEndpointP2pProto> for P2pMode {
 
 /// Media element which is able to publish media data for another client via
 /// WebRTC.
-#[allow(clippy::module_name_repetitions)]
 #[derive(Clone, Deserialize, Debug)]
 pub struct WebRtcPublishEndpoint {
     /// Peer-to-peer mode of this [`WebRtcPublishEndpoint`].

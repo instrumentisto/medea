@@ -24,7 +24,6 @@ use super::{MediaStream, MediaTrack};
 /// Errors that may occur when validating [`StreamRequest`] or
 /// parsing [`MediaStream`].
 #[derive(Debug, Display, JsCaused)]
-#[allow(clippy::module_name_repetitions)]
 pub enum StreamRequestError {
     /// [`StreamRequest`] contains multiple [`AudioTrackConstraints`].
     #[display(fmt = "only one audio track is allowed in SimpleStreamRequest")]
@@ -101,7 +100,6 @@ impl StreamRequest {
 
 /// Subtype of [`StreamRequest`], which can have maximum one track of each kind
 /// and must have at least one track of any kind.
-#[allow(clippy::module_name_repetitions)]
 pub struct SimpleStreamRequest {
     audio: Option<(TrackId, AudioTrackConstraints)>,
     video: Option<(TrackId, VideoTrackConstraints)>,

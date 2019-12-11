@@ -48,7 +48,6 @@ use crate::{
     AppContext,
 };
 
-#[allow(clippy::module_name_repetitions)]
 #[derive(Debug, Display, Fail)]
 pub enum ParticipantServiceErr {
     /// Some error happened in [`TurnAuthService`].

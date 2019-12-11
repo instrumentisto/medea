@@ -132,7 +132,6 @@ impl fmt::Display for LocalUri<ToEndpoint> {
 }
 
 /// Error which can happen while [`LocalUri`] parsing.
-#[allow(clippy::module_name_repetitions)]
 #[derive(Debug, Fail, Display)]
 pub enum LocalUriParseError {
     /// Protocol of provided URI is not "local://".
@@ -161,7 +160,6 @@ pub enum LocalUriParseError {
 }
 
 /// Enum for storing [`LocalUri`]s in all states.
-#[allow(clippy::module_name_repetitions)]
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Display, From)]
 pub enum StatefulLocalUri {
     /// Stores [`LocalUri`] in [`ToRoom`] state.

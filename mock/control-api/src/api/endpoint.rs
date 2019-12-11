@@ -40,7 +40,6 @@ impl From<P2pModeProto> for P2pMode {
 /// [Control API]'s `WebRtcPublishEndpoint` representation.
 ///
 /// [Control API]: https://tinyurl.com/yxsqplq7
-#[allow(clippy::module_name_repetitions)]
 #[derive(Debug, Deserialize, Serialize)]
 pub struct WebRtcPublishEndpoint {
     /// ID of [`WebRtcPublishEndpoint`].
@@ -74,7 +73,6 @@ impl From<WebRtcPublishEndpointProto> for WebRtcPublishEndpoint {
 /// [Control API]'s `WebRtcPlayEndpoint` element representation.
 ///
 /// [Control API]: https://tinyurl.com/yxsqplq7
-#[allow(clippy::module_name_repetitions)]
 #[derive(Debug, Deserialize, Serialize)]
 pub struct WebRtcPlayEndpoint {
     /// ID of `WebRtcPlayEndpoint`.

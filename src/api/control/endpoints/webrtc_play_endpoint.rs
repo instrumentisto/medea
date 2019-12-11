@@ -18,7 +18,6 @@ use crate::api::control::{refs::SrcUri, TryFromProtobufError};
 pub struct WebRtcPlayId(String);
 
 /// Media element which is able to play media data for client via WebRTC.
-#[allow(clippy::module_name_repetitions)]
 #[derive(Clone, Deserialize, Debug)]
 pub struct WebRtcPlayEndpoint {
     /// Source URI in format `local://{room_id}/{member_id}/{endpoint_id}`.
