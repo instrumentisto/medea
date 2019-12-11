@@ -20,6 +20,7 @@ use wasm_bindgen_futures::{future_to_promise, spawn_local};
 use web_sys::MediaStream as SysMediaStream;
 
 use crate::{
+    media::InjectedOrFromManager,
     peer::{
         MediaStream, PeerError, PeerEvent, PeerEventHandler, PeerRepository,
     },
@@ -30,9 +31,7 @@ use crate::{
     utils::{Callback, JasonError, JsCaused, JsError},
 };
 
-use super::{
-    connection::Connection, room_stream::RoomStream, ConnectionHandle,
-};
+use super::{connection::Connection, ConnectionHandle};
 
 /// Reason of why [`Room`] has been closed.
 ///
@@ -101,7 +100,7 @@ enum RoomError {
     /// Returned if the `on_failed_local_stream` callback was not set before
     /// joining the room.
     #[display(fmt = "`on_failed_local_stream` callback is not set")]
-    CallbackNotSet,
+    OnFailedStreamCallbackNotSet,
 
     /// Returned if unable to init [`RpcTransport`].
     #[display(fmt = "Unable to init RPC transport: {}", _0)]
@@ -145,8 +144,10 @@ impl RoomHandle {
         async move {
             let inner = inner?;
 
-            if !inner.borrow().stream_storage.is_set_on_fail() {
-                return Err(tracerr::new!(RoomError::CallbackNotSet).into());
+            if !inner.borrow().media_source.is_set_on_fail() {
+                return Err(JasonError::from(tracerr::new!(
+                    RoomError::OnFailedStreamCallbackNotSet
+                )));
             }
 
             let websocket = WebSocketRpcTransport::new(&token)
@@ -187,7 +188,7 @@ impl RoomHandle {
     /// acquisition request will resolve successfully. Only invoked if media
     /// request was initiated by media server.
     pub fn on_local_stream(&self, f: js_sys::Function) -> Result<(), JsValue> {
-        map_weak!(self, |inner| inner.borrow().stream_storage.on_success(f))
+        map_weak!(self, |inner| inner.borrow().media_source.set_on_success(f))
     }
 
     /// Sets `on_failed_local_stream` callback, which will be invoked on local
@@ -196,7 +197,7 @@ impl RoomHandle {
         &self,
         f: js_sys::Function,
     ) -> Result<(), JsValue> {
-        map_weak!(self, |inner| inner.borrow().stream_storage.on_fail(f))
+        map_weak!(self, |inner| inner.borrow().media_source.set_on_fail(f))
     }
 
     /// Performs entering to a [`Room`] with the preconfigured authorization
@@ -259,7 +260,7 @@ impl Room {
     pub fn new(
         rpc: Rc<dyn RpcClient>,
         peers: Box<dyn PeerRepository>,
-        stream_source: Rc<RoomStream>,
+        stream_source: Rc<InjectedOrFromManager>,
     ) -> Self {
         enum RoomEvent {
             RpcEvent(RpcEvent),
@@ -359,7 +360,7 @@ struct InnerRoom {
     on_new_connection: Callback<ConnectionHandle>,
 
     /// Stores the injected local media stream for this [`Room`].
-    stream_storage: Rc<RoomStream>,
+    media_source: Rc<InjectedOrFromManager>,
 
     /// Indicates if outgoing audio is enabled in this [`Room`].
     enabled_audio: bool,
@@ -384,7 +385,7 @@ impl InnerRoom {
     #[inline]
     fn new(
         rpc: Rc<dyn RpcClient>,
-        stream_storage: Rc<RoomStream>,
+        media_source: Rc<InjectedOrFromManager>,
         peers: Box<dyn PeerRepository>,
         peer_event_sender: mpsc::UnboundedSender<PeerEvent>,
     ) -> Self {
@@ -394,7 +395,7 @@ impl InnerRoom {
             peers,
             peer_event_sender,
             rpc,
-            stream_storage,
+            media_source,
             enabled_audio: true,
             enabled_video: true,
             on_close: Rc::new(Callback::default()),
@@ -464,14 +465,14 @@ impl InnerRoom {
     /// If injecting fails, then invokes `on_failed_local_stream` callback with
     /// a failure error.
     fn inject_local_stream(&self, stream: SysMediaStream) {
-        self.stream_storage.store_local_stream(stream);
-        let media_source = Rc::clone(&self.stream_storage);
+        self.media_source.store_local_stream(stream);
+        let media_source = Rc::clone(&self.media_source);
         let peers = self.peers.get_all();
 
         spawn_local(async move {
             for peer in peers {
                 if let Err(err) = peer
-                    .update_stream(media_source.as_ref())
+                    .inject_local_stream(media_source.as_ref())
                     .await
                     .map_err(tracerr::map_from_and_wrap!(=> RoomError))
                 {
@@ -519,9 +520,9 @@ impl EventHandler for InnerRoom {
         self.create_connections_from_tracks(&tracks);
 
         let rpc = Rc::clone(&self.rpc);
-        let media_source = Rc::clone(&self.stream_storage);
+        let media_source = Rc::clone(&self.media_source);
         spawn_local(async move {
-            if let Err(err) = async move {
+            let result = async move {
                 match sdp_offer {
                     None => {
                         let sdp_offer = peer
@@ -550,10 +551,11 @@ impl EventHandler for InnerRoom {
                 };
                 Ok::<_, Traced<RoomError>>(())
             }
-            .await
-            {
+            .await;
+
+            if let Err(err) = result {
                 JasonError::from(err).print();
-            }
+            };
         });
     }
 

@@ -111,8 +111,9 @@ impl MediaConnections {
             .for_each(|s| s.set_track_enabled(enabled))
     }
 
-    /// Returns `true` if all [`MediaTrack`]s of all [`Senders`] with given
-    /// [`TransceiverKind`] are enabled or `false` otherwise.
+    /// Returns `true` if all [`MediaTrack`]s of all [`Sender`]s with given
+    /// [`TransceiverKind`] are enabled or `false` otherwise, or if there are no
+    /// [`Sender`]s atm.
     pub fn are_senders_enabled(&self, kind: TransceiverKind) -> bool {
         let conn = self.0.borrow();
         if conn.senders.is_empty() {

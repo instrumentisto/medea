@@ -5,10 +5,9 @@ use std::rc::Rc;
 use wasm_bindgen_test::*;
 
 use medea_jason::{
-    api::{RoomStream, StreamSourceError},
     media::{
-        AudioTrackConstraints, MediaManager, MediaSource,
-        MediaStreamConstraints,
+        AudioTrackConstraints, InjectedOrFromManager, MediaManager,
+        MediaSource, MediaStreamConstraints, StreamSourceError,
     },
     peer::{MediaStreamHandle, StreamRequest},
     utils::JasonError,
@@ -28,7 +27,7 @@ async fn returns_stored_stream_if_it_satisfies_request() {
         constraints
     };
     let (stream, _) = media_manager.get_stream(constraints).await.unwrap();
-    let room_store = RoomStream::new(media_manager);
+    let room_store = InjectedOrFromManager::new(media_manager);
     room_store.store_local_stream(stream);
     let (audio, _) = get_test_tracks();
     let mut request = StreamRequest::default();
@@ -45,11 +44,12 @@ async fn returns_stored_stream_if_it_satisfies_request() {
 
 #[wasm_bindgen_test]
 async fn fired_on_success_callback_if_received_new_stream_from_media_manager() {
-    let room_store = RoomStream::new(Rc::new(MediaManager::default()));
+    let room_store =
+        InjectedOrFromManager::new(Rc::new(MediaManager::default()));
     let (cb, test_result) = js_callback!(|s: MediaStreamHandle| {
         cb_assert_eq!(s.get_media_stream().is_ok(), true);
     });
-    room_store.on_success(cb.into());
+    room_store.set_on_success(cb.into());
     let (audio, video) = get_test_tracks();
     let mut request = StreamRequest::default();
     request.add_track_request(audio.id, audio.media_type);
@@ -69,7 +69,8 @@ async fn fired_on_success_callback_if_received_new_stream_from_media_manager() {
 async fn fired_on_fail_if_media_manager_failed() {
     let mock_navigator = MockNavigator::new();
     mock_navigator.error_get_user_media("failed_get_user_media".into());
-    let room_store = RoomStream::new(Rc::new(MediaManager::default()));
+    let room_store =
+        InjectedOrFromManager::new(Rc::new(MediaManager::default()));
     let (cb, test_result) = js_callback!(|err: JasonError| {
         cb_assert_eq!(&err.name(), "CouldNotGetLocalMedia");
         cb_assert_eq!(
@@ -78,7 +79,7 @@ async fn fired_on_fail_if_media_manager_failed() {
              Unknown JS error: failed_get_user_media"
         );
     });
-    room_store.on_fail(cb.into());
+    room_store.set_on_fail(cb.into());
     let (audio, _) = get_test_tracks();
     let mut request = StreamRequest::default();
     request.add_track_request(audio.id, audio.media_type);
@@ -104,7 +105,7 @@ async fn fired_on_fail_if_stored_stream_not_satisfied_request() {
         constraints
     };
     let (stream, _) = media_manager.get_stream(constraints).await.unwrap();
-    let room_store = RoomStream::new(media_manager);
+    let room_store = InjectedOrFromManager::new(media_manager);
     room_store.store_local_stream(stream);
     let (cb, test_result) = js_callback!(|err: JasonError| {
         cb_assert_eq!(&err.name(), "InvalidLocalStream");
@@ -114,7 +115,7 @@ async fn fired_on_fail_if_stored_stream_not_satisfied_request() {
              single video track"
         );
     });
-    room_store.on_fail(cb.into());
+    room_store.set_on_fail(cb.into());
     let (audio, video) = get_test_tracks();
     let mut request = StreamRequest::default();
     request.add_track_request(audio.id, audio.media_type);

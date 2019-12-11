@@ -22,8 +22,7 @@ use tracerr::Traced;
 use web_sys::{RtcIceConnectionState, RtcTrackEvent};
 
 use crate::{
-    api::RoomStream as StreamSource,
-    media::MediaSource,
+    media::{InjectedOrFromManager as StreamSource, MediaSource},
     utils::{JsCaused, JsError},
 };
 
@@ -344,10 +343,38 @@ impl PeerConnection {
         Ok(mids)
     }
 
+    /// Sync provided tracks creating all required `Sender`s and
+    /// `Receiver`s, request local stream if required, get, set and return
+    /// sdp offer.
+    pub async fn get_offer<S: MediaSource>(
+        &self,
+        tracks: Vec<Track>,
+        media_source: &S,
+    ) -> Result<String>
+    where
+        PeerError: From<<S as MediaSource>::Error>,
+    {
+        self.media_connections
+            .update_tracks(tracks)
+            .map_err(tracerr::map_from_and_wrap!())?;
+
+        self.inject_local_stream(media_source)
+            .await
+            .map_err(tracerr::wrap!())?;
+
+        let offer = self
+            .peer
+            .create_and_set_offer()
+            .await
+            .map_err(tracerr::map_from_and_wrap!())?;
+
+        Ok(offer)
+    }
+
     /// Requests [`MediaStream`] from [`MediaSource`] if [`MediaConnections`]
     /// have [`Sender`]s and insert or replace [`MediaTrack`]s into this
     /// [`Sender]`s from requested the media stream.
-    pub async fn update_stream<S: MediaSource>(
+    pub async fn inject_local_stream<S: MediaSource>(
         &self,
         media_source: &S,
     ) -> Result<()>
@@ -365,34 +392,6 @@ impl PeerConnection {
                 .map_err(tracerr::map_from_and_wrap!())?;
         }
         Ok(())
-    }
-
-    /// Sync provided tracks creating all required `Sender`s and
-    /// `Receiver`s, request local stream if required, get, set and return
-    /// sdp offer.
-    pub async fn get_offer<S: MediaSource>(
-        &self,
-        tracks: Vec<Track>,
-        media_source: &S,
-    ) -> Result<String>
-    where
-        PeerError: From<<S as MediaSource>::Error>,
-    {
-        self.media_connections
-            .update_tracks(tracks)
-            .map_err(tracerr::map_from_and_wrap!())?;
-
-        self.update_stream(media_source)
-            .await
-            .map_err(tracerr::wrap!())?;
-
-        let offer = self
-            .peer
-            .create_and_set_offer()
-            .await
-            .map_err(tracerr::map_from_and_wrap!())?;
-
-        Ok(offer)
     }
 
     /// Updates underlying [RTCPeerConnection][1]'s remote SDP from answer.
@@ -480,7 +479,7 @@ impl PeerConnection {
             .update_tracks(send)
             .map_err(tracerr::map_from_and_wrap!())?;
 
-        self.update_stream(media_source)
+        self.inject_local_stream(media_source)
             .await
             .map_err(tracerr::wrap!())?;
 

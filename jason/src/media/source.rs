@@ -1,3 +1,5 @@
+//! [`MediaSource`] trait and implementations.
+
 use std::{cell::RefCell, convert::TryFrom, rc::Rc};
 
 use derive_more::{Display, From};
@@ -6,13 +8,25 @@ use tracerr::Traced;
 use web_sys::MediaStream as SysMediaStream;
 
 use crate::{
-    media::{MediaManager, MediaManagerError, MediaSource},
+    media::{MediaManager, MediaManagerError},
     peer::{
         MediaStream, MediaStreamHandle, SimpleStreamRequest, StreamRequest,
         StreamRequestError,
     },
     utils::{Callback, JasonError, JsCaused, JsError},
 };
+
+/// Source for acquire [`MediaStream`] by [`StreamRequest`].
+pub trait MediaSource {
+    /// Error that is returned if cannot receive the [`MediaStream`].
+    type Error;
+
+    /// Returns [`MediaStream`] by [`StreamRequest`].
+    fn get_media_stream(
+        &self,
+        request: StreamRequest,
+    ) -> LocalBoxFuture<Result<MediaStream, Traced<Self::Error>>>;
+}
 
 /// Errors that may occur in process of receiving [`MediaStream`].
 #[derive(Debug, Display, From, JsCaused)]
@@ -29,18 +43,19 @@ pub enum Error {
     InvalidLocalStream(#[js(cause)] StreamRequestError),
 }
 
-/// Storage the local [MediaStream][1] for [`Room`] and callbacks for success
-/// and fail get [`MediaStream`].
+/// [`MediaSource`] that optionally stores [`MediaStream`] and either returns
+/// stored stream or request stream from [`MediaManager`]. Provides on fail and
+/// on success [`Callback`]s.
 ///
 /// [1]: https://www.w3.org/TR/mediacapture-streams/#mediastream
-pub struct RoomStream {
-    /// Local [`MediaStream`][1] injected into this [`Room`].
+pub struct InjectedOrFromManager {
+    /// Injected [`MediaStream`][1] that, if set, will be provided to callers.
     ///
     /// [1]: https://www.w3.org/TR/mediacapture-streams/#mediastream
-    local_stream: Rc<RefCell<Option<SysMediaStream>>>,
+    injected_stream: Rc<RefCell<Option<SysMediaStream>>>,
 
     /// [`MediaManager`] that will be used to acquire local
-    /// [`MediaStream`][1]s.
+    /// [`MediaStream`][1]s if no stream is currently injected.
     ///
     /// [1]: https://www.w3.org/TR/mediacapture-streams/#mediastream
     media_manager: Rc<MediaManager>,
@@ -59,11 +74,11 @@ pub struct RoomStream {
     on_fail: Rc<Callback<JasonError>>,
 }
 
-impl RoomStream {
-    /// Creates new [`RoomStorage`].
+impl InjectedOrFromManager {
+    /// Creates new [`InjectedOrFromManager`].
     pub fn new(media_manager: Rc<MediaManager>) -> Self {
         Self {
-            local_stream: Rc::new(RefCell::new(None)),
+            injected_stream: Rc::new(RefCell::new(None)),
             media_manager,
             on_success: Rc::new(Callback::default()),
             on_fail: Rc::new(Callback::default()),
@@ -74,21 +89,18 @@ impl RoomStream {
     ///
     /// [1]: https://www.w3.org/TR/mediacapture-streams/#mediastream
     pub fn store_local_stream(&self, stream: SysMediaStream) {
-        self.local_stream.borrow_mut().replace(stream);
+        self.injected_stream.borrow_mut().replace(stream);
     }
 
-    /// Set callback to receive successfully [`MediaStream`].
-    ///
-    /// NOTE: Callback to invoke only if [`MediaStream`] acquired from NEW
-    /// [`MediaStream`][1].
-    ///
-    /// [1]: https://www.w3.org/TR/mediacapture-streams/#mediastream
-    pub fn on_success(&self, f: js_sys::Function) {
+    /// Set callback that will be invoked when new [`MediaStream`] is acquired
+    /// from [`MediaManager`].
+    pub fn set_on_success(&self, f: js_sys::Function) {
         self.on_success.set_func(f);
     }
 
-    /// Set callback for fail receipt [`MediaStream`].
-    pub fn on_fail(&self, f: js_sys::Function) {
+    /// Set callback that will be invoked if [`MediaStream`] request to
+    /// [`MediaManager`] will fail.
+    pub fn set_on_fail(&self, f: js_sys::Function) {
         self.on_fail.set_func(f);
     }
 
@@ -98,7 +110,7 @@ impl RoomStream {
     }
 }
 
-impl MediaSource for RoomStream {
+impl MediaSource for InjectedOrFromManager {
     type Error = Error;
 
     /// Returns the stored local media stream if exists or retrieve new from
@@ -112,7 +124,7 @@ impl MediaSource for RoomStream {
         &self,
         request: StreamRequest,
     ) -> LocalBoxFuture<Result<MediaStream, Traced<Self::Error>>> {
-        let local_stream = Rc::clone(&self.local_stream);
+        let injected_stream = Rc::clone(&self.injected_stream);
         let media_manager = Rc::clone(&self.media_manager);
         let success = Rc::clone(&self.on_success);
         let fail = Rc::clone(&self.on_fail);
@@ -120,7 +132,7 @@ impl MediaSource for RoomStream {
             async move {
                 let caps = SimpleStreamRequest::try_from(request)
                     .map_err(tracerr::from_and_wrap!())?;
-                if let Some(stream) = local_stream.borrow().as_ref() {
+                if let Some(stream) = injected_stream.borrow().as_ref() {
                     Ok((
                         caps.parse_stream(stream)
                             .map_err(tracerr::map_from_and_wrap!())?,

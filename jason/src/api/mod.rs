@@ -2,7 +2,6 @@
 
 mod connection;
 mod room;
-mod room_stream;
 
 use std::{cell::RefCell, rc::Rc};
 
@@ -11,7 +10,7 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 
 use crate::{
-    media::{MediaManager, MediaManagerHandle},
+    media::{InjectedOrFromManager, MediaManager, MediaManagerHandle},
     peer,
     rpc::{ClientDisconnect, RpcClient as _, WebSocketRpcClient},
     set_panic_hook,
@@ -21,7 +20,6 @@ use crate::{
 pub use self::{
     connection::ConnectionHandle,
     room::{Room, RoomHandle},
-    room_stream::{Error as StreamSourceError, RoomStream},
 };
 
 /// General library interface.
@@ -51,8 +49,9 @@ impl Jason {
     pub fn init_room(&self) -> RoomHandle {
         let rpc = Rc::new(WebSocketRpcClient::new(3000));
         let peer_repository = Box::new(peer::Repository::default());
-        let stream_source =
-            Rc::new(RoomStream::new(Rc::clone(&self.0.borrow().media_manager)));
+        let media_source = Rc::new(InjectedOrFromManager::new(Rc::clone(
+            &self.0.borrow().media_manager,
+        )));
 
         let inner = self.0.clone();
         spawn_local(rpc.on_close().map(move |res| {
@@ -69,7 +68,7 @@ impl Jason {
             inner.borrow_mut().media_manager = Rc::default();
         }));
 
-        let room = Room::new(rpc, peer_repository, stream_source);
+        let room = Room::new(rpc, peer_repository, media_source);
         let handle = room.new_handle();
         self.0.borrow_mut().rooms.push(room);
         handle

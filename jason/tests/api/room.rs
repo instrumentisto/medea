@@ -5,8 +5,11 @@ use std::rc::Rc;
 use futures::channel::mpsc;
 use medea_client_api_proto::{Event, IceServer, PeerId};
 use medea_jason::{
-    api::{Room, RoomStream},
-    media::{AudioTrackConstraints, MediaManager, MediaStreamConstraints},
+    api::Room,
+    media::{
+        AudioTrackConstraints, InjectedOrFromManager, MediaManager,
+        MediaStreamConstraints,
+    },
     peer::{MockPeerRepository, PeerConnection, PeerEvent},
     rpc::MockRpcClient,
     utils::JasonError,
@@ -21,11 +24,11 @@ wasm_bindgen_test_configure!(run_in_browser);
 
 fn get_test_room_and_exist_peer(
     count_gets_peer: usize,
-) -> (Room, Rc<PeerConnection>, Rc<RoomStream>) {
+) -> (Room, Rc<PeerConnection>, Rc<InjectedOrFromManager>) {
     let mut rpc = MockRpcClient::new();
     let mut repo = Box::new(MockPeerRepository::new());
     let stream_source =
-        Rc::new(RoomStream::new(Rc::new(MediaManager::default())));
+        Rc::new(InjectedOrFromManager::new(Rc::new(MediaManager::default())));
     let (tx, _rx) = mpsc::unbounded();
     let peer = Rc::new(
         PeerConnection::new(PeerId(1), tx, vec![], true, true).unwrap(),
@@ -84,7 +87,7 @@ fn get_test_room_and_new_peer(
     let mut rpc = MockRpcClient::new();
     let mut repo = Box::new(MockPeerRepository::new());
     let media_source =
-        Rc::new(RoomStream::new(Rc::new(MediaManager::default())));
+        Rc::new(InjectedOrFromManager::new(Rc::new(MediaManager::default())));
 
     rpc.expect_subscribe()
         .return_once(move || Box::pin(event_rx));
@@ -303,14 +306,15 @@ async fn error_join_room_without_failed_stream_callback() {
     rpc.expect_unsub().return_const(());
     rpc.expect_set_close_reason().return_const(());
     let repo = Box::new(MockPeerRepository::new());
-    let store = Rc::new(RoomStream::new(Rc::new(MediaManager::default())));
+    let store =
+        Rc::new(InjectedOrFromManager::new(Rc::new(MediaManager::default())));
     let room = Room::new(Rc::new(rpc), repo, store);
 
     let room_handle = room.new_handle();
     match room_handle.inner_join(String::from("token")).await {
         Ok(_) => unreachable!(),
         Err(e) => {
-            assert_eq!(e.name(), "CallbackNotSet");
+            assert_eq!(e.name(), "OnFailedStreamCallbackNotSet");
             assert_eq!(
                 e.message(),
                 "`on_failed_local_stream` callback is not set",
@@ -327,8 +331,8 @@ mod on_close_callback {
     use futures::channel::mpsc;
     use medea_client_api_proto::CloseReason as CloseByServerReason;
     use medea_jason::{
-        api::{Room, RoomStream},
-        media::MediaManager,
+        api::Room,
+        media::{InjectedOrFromManager, MediaManager},
         peer::MockPeerRepository,
         rpc::{ClientDisconnect, CloseReason, MockRpcClient},
     };
@@ -358,7 +362,9 @@ mod on_close_callback {
     fn get_room() -> Room {
         let mut rpc = MockRpcClient::new();
         let repo = Box::new(MockPeerRepository::new());
-        let store = Rc::new(RoomStream::new(Rc::new(MediaManager::default())));
+        let store = Rc::new(InjectedOrFromManager::new(Rc::new(
+            MediaManager::default(),
+        )));
 
         let (_event_tx, event_rx) = mpsc::unbounded();
         rpc.expect_subscribe()
@@ -466,7 +472,9 @@ mod rpc_close_reason_on_room_drop {
     async fn get_client() -> (Room, oneshot::Receiver<ClientDisconnect>) {
         let mut rpc = MockRpcClient::new();
         let repo = Box::new(MockPeerRepository::new());
-        let store = Rc::new(RoomStream::new(Rc::new(MediaManager::default())));
+        let store = Rc::new(InjectedOrFromManager::new(Rc::new(
+            MediaManager::default(),
+        )));
 
         let (_event_tx, event_rx) = mpsc::unbounded();
         rpc.expect_subscribe()
