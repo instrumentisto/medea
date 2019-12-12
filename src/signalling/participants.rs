@@ -111,6 +111,8 @@ pub struct ParticipantService {
     /// Duration, after which the server deletes the client session if
     /// the remote RPC client does not reconnect after it is idle.
     rpc_reconnect_timeout: Duration,
+
+    idle_timeout: Duration,
 }
 
 impl ParticipantService {
@@ -126,6 +128,7 @@ impl ParticipantService {
             drop_connection_tasks: HashMap::new(),
             turn_service: context.turn_service.clone(),
             rpc_reconnect_timeout: context.config.rpc.reconnect_timeout,
+            idle_timeout: context.config.rpc.idle_timeout,
         })
     }
 
@@ -258,9 +261,14 @@ impl ParticipantService {
                     ParticipantServiceErr::from(err)
                 })
                 .and_then(
-                    move |ice: IceUser, room: &mut Room, _| {
-                        room.members.insert_connection(member_id, conn);
+                    move |ice: IceUser, room: &mut Room, ctx| {
+                        room.members.insert_connection(member_id.clone(), conn);
                         member.replace_ice_user(ice);
+                        ctx.spawn(wrap_future(
+                            room.members
+                                .send_rpc_settings_to_member(member_id)
+                                .map_err(|e| error!("{:?}", e)),
+                        ));
 
                         wrap_future(future::ok(member))
                     },
@@ -418,5 +426,19 @@ impl ParticipantService {
     /// Inserts given [`Member`] into [`ParticipantService`].
     pub fn insert_member(&mut self, id: MemberId, member: Member) {
         self.members.insert(id, member);
+    }
+
+    pub fn send_rpc_settings_to_member(
+        &mut self,
+        id: MemberId,
+    ) -> impl Future<Item = (), Error = RoomError> {
+        self.send_event_to_member(
+            id,
+            Event::RpcSettingsUpdated {
+                idle_timeout: self.idle_timeout.as_millis() as u32,
+                reconnection_timeout: self.rpc_reconnect_timeout.as_millis()
+                    as u32,
+            },
+        )
     }
 }

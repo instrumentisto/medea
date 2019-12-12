@@ -63,6 +63,8 @@ pub enum ClientDisconnect {
 
     /// [`RpcTransport`] was unexpectedly dropped.
     RpcTransportUnexpectedlyDropped,
+
+    ReconnectTimeout,
 }
 
 impl ClientDisconnect {
@@ -71,7 +73,8 @@ impl ClientDisconnect {
         match self {
             Self::RoomUnexpectedlyDropped
             | Self::RpcClientUnexpectedlyDropped
-            | Self::RpcTransportUnexpectedlyDropped => true,
+            | Self::RpcTransportUnexpectedlyDropped
+            | Self::ReconnectTimeout => true,
             Self::RoomClosed => false,
         }
     }
@@ -138,6 +141,11 @@ pub enum RpcClientError {
     /// Occurs if `socket` of [`WebSocketRpcClient`] is unexpectedly `None`.
     #[display(fmt = "Socket of 'WebSocketRpcClient' is unexpectedly 'None'.")]
     NoSocket,
+
+    ProgressiveDelayer(#[js(cause)] ProgressiveDelayerError),
+
+    #[display(fmt = "Reconnection deadline reached.")]
+    Deadline,
 }
 
 // TODO: consider using async-trait crate, it doesnt work with mockall atm
@@ -171,6 +179,8 @@ pub trait RpcClient {
     /// Sets reason, that will be passed to underlying transport when this
     /// client will be dropped.
     fn set_close_reason(&self, close_reason: ClientDisconnect);
+
+    fn update_settings(&self, idle_timeout: u32, reconnect_timeout: u32);
 }
 
 /// RPC transport between a client and server.
@@ -227,6 +237,10 @@ struct Inner {
 
     /// Indicates that this [`WebSocketRpcClient`] is closed.
     is_closed: bool,
+
+    reconnection_timeout: u32,
+
+    idle_timeout: u32,
 }
 
 impl Inner {
@@ -238,6 +252,8 @@ impl Inner {
             heartbeat: Heartbeat::new(heartbeat_interval),
             close_reason: ClientDisconnect::RpcClientUnexpectedlyDropped,
             is_closed: false,
+            reconnection_timeout: 10000,
+            idle_timeout: 10000,
         }))
     }
 }
@@ -258,6 +274,15 @@ impl WeakWebsocketRpcClient {
     }
 }
 
+#[derive(Debug, From, Display, JsCaused)]
+pub enum ProgressiveDelayerError {
+    #[display(fmt = "{}", _0)]
+    Js(JsError),
+
+    #[display(fmt = "Deadline reached.")]
+    Deadline,
+}
+
 /// Delayer which will increase delay time in geometry progression after any
 /// `delay` calls.
 ///
@@ -268,6 +293,9 @@ struct ProgressiveDelayer {
     ///
     /// Will be increased by [`ProgressiveDelayer::delay`] call.
     current_delay: i32,
+
+    /// Timestamp after which [`ProgressiveDelayer::delay`] should return [`ProgressiveDelayerError::Deadline`].
+    deadline: u128,
 }
 
 impl ProgressiveDelayer {
@@ -277,9 +305,10 @@ impl ProgressiveDelayer {
     const MAX_DELAY: i32 = 10000;
 
     /// Returns [`ProgressiveDelayer`] with first delay as `1250ms`.
-    pub fn new() -> Self {
+    pub fn new(deadline: u128) -> Self {
         Self {
             current_delay: 1250,
+            deadline,
         }
     }
 
@@ -294,6 +323,17 @@ impl ProgressiveDelayer {
         }
     }
 
+
+    fn is_deadline_reached(&self) -> bool {
+        Date::now() as u128 >= self.deadline
+    }
+
+    /// Returns `true` when max delay ([`ProgressiveDelayer::MAX_DELAY`]) is
+    /// reached.
+    fn is_max_delay_reached(&self) -> bool {
+        self.current_delay >= Self::MAX_DELAY
+    }
+
     /// Resolves after [`ProgressiveDelayer::current_delay`] milliseconds.
     ///
     /// Next call of this function will delay
@@ -302,7 +342,13 @@ impl ProgressiveDelayer {
     /// Initial delay is `1250ms`.
     ///
     /// Maximum delay is `10s`.
-    pub async fn delay(&mut self) -> Result<(), Traced<JsError>> {
+    pub async fn delay(
+        &mut self,
+    ) -> Result<(), Traced<ProgressiveDelayerError>> {
+        if self.is_deadline_reached() {
+            return Err(tracerr::new!(ProgressiveDelayerError::Deadline));
+        }
+
         let delay_ms = self.get_delay();
         JsFuture::from(Promise::new(&mut |yes, _| {
             window()
@@ -314,13 +360,7 @@ impl ProgressiveDelayer {
         .await
         .map(|_| ())
         .map_err(JsError::from)
-        .map_err(tracerr::wrap!())
-    }
-
-    /// Returns `true` when max delay ([`ProgressiveDelayer::MAX_DELAY`]) is
-    /// reached.
-    fn is_max_delay_reached(&self) -> bool {
-        self.current_delay >= Self::MAX_DELAY
+        .map_err(tracerr::from_and_wrap!())
     }
 }
 
@@ -353,24 +393,51 @@ impl WebSocketRpcClient {
     /// Tries to reconnect [`WebSocketRpcTransport`] in a loop with delay until
     /// it will not be reconnected.
     pub async fn reconnect(&self) -> Result<(), Traced<RpcClientError>> {
-        let mut delayer = ProgressiveDelayer::new();
-        while let Err(_) = self
+        let idle_timeout = self.0.borrow().idle_timeout as u128;
+        let reconnection_timeout = self.0.borrow().reconnection_timeout as u128;
+        let last_pong = self
+            .0
+            .borrow()
+            .heartbeat
+            .get_pong_at()
+            .unwrap_or_else(|| Date::now() as u128);
+        let deadline = (idle_timeout * 2) + reconnection_timeout + last_pong;
+
+        let mut delayer = ProgressiveDelayer::new(deadline);
+        let sock = self
             .0
             .borrow()
             .sock
             .as_ref()
-            .ok_or_else(|| tracerr::new!(RpcClientError::NoSocket))?
-            .reconnect()
-            .await
-        {
-            // TODO (evdokimovs): `.map_err(RpcClientError::SetTimeoutError)`
-            // will be much better, but I don't know how achieve it with
-            // `tracerr` crate.
-            delayer
-                .delay()
-                .await
-                .map_err(tracerr::map_from_and_wrap!())?;
+            .map(Rc::clone)
+            .ok_or_else(|| tracerr::new!(RpcClientError::NoSocket))?;
+        while let Err(_) = sock.reconnect().await {
+            if let Err(e) = delayer.delay().await {
+                match e.as_ref() {
+                    ProgressiveDelayerError::Deadline => {
+                        let reason = ClientDisconnect::ReconnectTimeout;
+                        let mut on_close_subs = Vec::new();
+                        std::mem::swap(
+                            &mut on_close_subs,
+                            &mut self.0.borrow_mut().on_close_subscribers,
+                        );
+                        on_close_subs
+                            .into_iter()
+                            .filter_map(|sub| sub.send(reason.into()).err())
+                            .for_each(|reason| {
+                                console_error!(format!(
+                                    "Failed to send reason of Jason close to \
+                                     subscriber: {:?}",
+                                    reason
+                                ))
+                            });
+                        return Err(tracerr::new!(RpcClientError::Deadline))
+                    }
+                    _ => return Err(tracerr::map_from_and_new!(e)),
+                }
+            }
         }
+
         let transport = self.0.borrow().sock.clone();
         if let Some(transport) = transport {
             self.0
@@ -433,7 +500,7 @@ impl WebSocketRpcClient {
         match msg {
             Ok(ServerMsg::Pong(_num)) => {
                 // TODO: detect no pings
-                inner.heartbeat.set_pong_at(Date::now());
+                inner.heartbeat.set_pong_at(Date::now() as u128);
             }
             Ok(ServerMsg::Event(event)) => {
                 // TODO: many subs, filter messages by session
@@ -548,6 +615,11 @@ impl RpcClient for WebSocketRpcClient {
     /// client will be dropped.
     fn set_close_reason(&self, close_reason: ClientDisconnect) {
         self.0.borrow_mut().close_reason = close_reason
+    }
+
+    fn update_settings(&self, idle_timeout: u32, reconnection_timeout: u32) {
+        self.0.borrow_mut().idle_timeout = idle_timeout;
+        self.0.borrow_mut().reconnection_timeout = reconnection_timeout;
     }
 }
 

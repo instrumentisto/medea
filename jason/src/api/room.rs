@@ -666,6 +666,14 @@ impl EventHandler for InnerRoom {
             self.peers.remove(*id);
         })
     }
+
+    fn on_rpc_settings_updated(
+        &mut self,
+        idle_timeout: u32,
+        reconnect_timeout: u32,
+    ) {
+        self.rpc.update_settings(idle_timeout, reconnect_timeout);
+    }
 }
 
 /// [`PeerEvent`]s handling.

@@ -11,7 +11,7 @@ use actix::{
 };
 use derive_more::Display;
 use failure::Fail;
-use futures::future;
+use futures::{future, future::Future as _};
 use medea_client_api_proto::{
     Command, CommandHandler, Event, IceCandidate, PeerId, PeerMetrics, TrackId,
 };

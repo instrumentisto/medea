@@ -38,7 +38,7 @@ struct InnerHeartbeat {
     /// Sent pings counter.
     num: u64,
     /// Timestamp of last pong received.
-    pong_at: Option<f64>,
+    pong_at: Option<u128>,
     /// Connection with remote RPC server.
     transport: Option<Rc<dyn RpcTransport>>,
     /// Handler of sending `ping` task. Task is dropped if you drop handler.
@@ -120,7 +120,11 @@ impl Heartbeat {
     }
 
     /// Timestamp of last pong received.
-    pub fn set_pong_at(&self, at: f64) {
+    pub fn set_pong_at(&self, at: u128) {
         self.0.borrow_mut().pong_at = Some(at);
+    }
+
+    pub fn get_pong_at(&self) -> Option<u128> {
+        self.0.borrow().pong_at
     }
 }

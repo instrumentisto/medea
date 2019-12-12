@@ -173,6 +173,10 @@ pub struct CloseDescription {
 #[cfg_attr(feature = "jason", derive(Deserialize))]
 #[serde(tag = "event", content = "data")]
 pub enum Event {
+    RpcSettingsUpdated {
+        idle_timeout: u32,
+        reconnection_timeout: u32,
+    },
     /// Media Server notifies Web Client about necessity of RTCPeerConnection
     /// creation.
     PeerCreated {
