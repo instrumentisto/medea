@@ -40,7 +40,8 @@ All user visible changes to this project will be documented in this file. This p
         - `Room.on_failed_local_stream` callback ([#54]);
         - `Room.on_close` callback for WebSocket close initiated by server ([#55]).
 - RPC messaging:
-    - Cleanup Jason state on normal (`code = 1000`) WebSocket close ([#55]).
+    - Cleanup Jason state on normal (`code = 1000`) WebSocket close ([#55]);
+    - `RpcClient` and `RpcTransport` reconnection ([#75](/../../pull/75)).
 - Signalling:
     - Emitting of RPC commands:
         - `AddPeerConnectionMetrics` with `IceConnectionState` ([#71](/../../pull/71)).
