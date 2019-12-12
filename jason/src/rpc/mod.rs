@@ -199,8 +199,10 @@ pub trait RpcTransport {
         Traced<TransportError>,
     >;
 
-    /// Returns [`LocalBoxFuture`], that will be resolved when this transport
-    /// will be closed.
+    /// Returns [`LocalBoxStream`] which will produce [`CloseMsg`]s on
+    /// [`RpcTransport`] close. This is [`LocalBoxStream`] because
+    /// [`RpcTransport`] can reconnect after closing with
+    /// [`RpcTransport::reconnect`].
     fn on_close(
         &self,
     ) -> Result<LocalBoxStream<'static, CloseMsg>, Traced<TransportError>>;
@@ -246,7 +248,7 @@ struct Inner {
     /// Time for which server will wait if client connection was lost.
     reconnection_timeout: u64,
 
-    /// The time after the last ping received by the server, after which the
+    /// Time after the last ping received by the server, after which the
     /// server will consider that the connection with the client is lost.
     idle_timeout: u64,
 }
@@ -406,7 +408,7 @@ impl WebSocketRpcClient {
     }
 
     /// Tries to reconnect [`WebSocketRpcTransport`] in a loop with delay until
-    /// it will not be reconnected.
+    /// it will not be reconnected or deadline not be reached.
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     pub async fn reconnect(&self) -> Result<(), Traced<RpcClientError>> {
         let idle_timeout = self.0.borrow().idle_timeout as u64;
@@ -520,6 +522,7 @@ impl WebSocketRpcClient {
         match msg {
             Ok(ServerMsg::Pong(_num)) => {
                 // TODO: detect no pings
+
                 // This is safe to cast timestamp from 'Date::now' to u64
                 // because '18446744073709551615' timestamp
                 // is very far.

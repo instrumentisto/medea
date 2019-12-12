@@ -461,8 +461,7 @@ mod reconnect {
     ///
     /// 1. Mock [`RpcTransport::reconnect`] and [`RpcTransport::on_close`].
     ///
-    /// 2. Resolve [`RpcTransport::on_close`] [`Future`] with
-    ///    [`CloseMsg::Abnormal`].
+    /// 2. Send [`CloseMsg::Abnormal`] to [`RpcTransport::on_close`] [`Stream`].
     ///
     /// 3. Check [`RpcTransport::reconnect`] was called.
     #[wasm_bindgen_test]
@@ -502,8 +501,7 @@ mod reconnect {
     ///
     /// 1. Mock [`RpcTransport::reconnect`] and [`RpcTransport::on_close`].
     ///
-    /// 2. Resolve [`RpcTransport::on_close`] [`Future`] with
-    ///    [`CloseMsg::Abnormal`].
+    /// 2. Send [`CloseMsg::Abnormal`] to [`RpcTransport::on_close`] [`Stream`].
     ///
     /// 3. Wait for 3 calls of [`RpcTransport::reconnect`] (while this function
     ///    is not called 3 times, result of reconnection will be
@@ -558,10 +556,9 @@ mod reconnect {
     /// # Algorithm
     ///
     /// 1. Mock [`RpcTransport::reconnect`] to resolve
-    /// [`TransportError::InitSocket`] and [`RpcTransport::on_close`].
+    ///    [`TransportError::InitSocket`] and [`RpcTransport::on_close`].
     ///
-    /// 2. Resolve [`RpcTransport::on_close`] [`Future`] with
-    ///    [`CloseMsg::Abnormal`].
+    /// 2. Send [`CloseMsg::Abnormal`] to [`RpcTransport::on_close`] [`Stream`].
     ///
     /// 3. Wait for [`RpcClient::on_close`] resolving. Test considered as
     ///    successful if [`RpcClient::on_close`] was resolved in less than
