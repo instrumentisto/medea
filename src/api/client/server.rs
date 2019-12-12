@@ -211,6 +211,7 @@ mod test {
                     .map_err(|e| panic!("{:?}", e))
                     .and_then(|socket| {
                         socket
+                            // skip 'Event::RpcSettingsUpdated'
                             .skip(1)
                             .into_future()
                             .map_err(|(e, _)| panic!("{:?}", e))
