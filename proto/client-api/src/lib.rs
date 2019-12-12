@@ -173,13 +173,6 @@ pub struct CloseDescription {
 #[cfg_attr(feature = "jason", derive(Deserialize))]
 #[serde(tag = "event", content = "data")]
 pub enum Event {
-    /// The Media server notifies Web Client about necessity to update RPC
-    /// settings.
-    RpcSettingsUpdated {
-        idle_timeout: u64,
-        reconnection_timeout: u64,
-    },
-
     /// Media Server notifies Web Client about necessity of RTCPeerConnection
     /// creation.
     PeerCreated {
@@ -203,6 +196,13 @@ pub enum Event {
     /// Media Server notifies Web Client about necessity of RTCPeerConnection
     /// close.
     PeersRemoved { peer_ids: Vec<PeerId> },
+
+    /// The Media server notifies Web Client about necessity to update RPC
+    /// settings.
+    RpcSettingsUpdated {
+        idle_timeout: u64,
+        reconnection_timeout: u64,
+    },
 }
 
 /// Represents [RTCIceCandidateInit][1] object.

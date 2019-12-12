@@ -210,8 +210,8 @@ mod test {
                     .into_future()
                     .map_err(|e| panic!("{:?}", e))
                     .and_then(|socket| {
+                        // Skip 'Event::RpcSettingsUpdated' with '.skip(1)'.
                         socket
-                            // skip 'Event::RpcSettingsUpdated'
                             .skip(1)
                             .into_future()
                             .map_err(|(e, _)| panic!("{:?}", e))
