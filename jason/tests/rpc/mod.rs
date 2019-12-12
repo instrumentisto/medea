@@ -558,4 +558,47 @@ mod reconnect {
         .unwrap()
         .unwrap();
     }
+
+    /// Tests that [`RpcClient`] will resolve [`RpcClient::on_close`] if
+    /// reconnection deadline reached.
+    ///
+    /// # Algorithm
+    ///
+    /// 1. Mock [`RpcTransport::reconnect`] to resolve
+    /// [`TransportError::InitSocket`] and [`RpcTransport::on_close`].
+    ///
+    /// 2. Resolve [`RpcTransport::on_close`] [`Future`] with
+    ///    [`CloseMsg::Abnormal`].
+    ///
+    /// 3. Wait for [`RpcClient::on_close`] resolving. Test considered as
+    ///    successful if [`RpcClient::on_close`] was resolved in less than
+    ///    600 milliseconds.
+    #[wasm_bindgen_test]
+    async fn reconnect_timeout() {
+        let mut transport = MockRpcTransport::new();
+        let (on_close_tx, on_close_rx) = mpsc::unbounded();
+        transport
+            .expect_on_message()
+            .return_once(move || Ok(stream::once(future::pending()).boxed()));
+        transport.expect_send().returning(|_| Ok(()));
+        transport.expect_set_close_reason().return_const(());
+        transport.expect_reconnect().returning(move || {
+            future::err(tracerr::new!(TransportError::InitSocket)).boxed()
+        });
+        transport
+            .expect_on_close()
+            .return_once(move || Ok(on_close_rx.boxed()));
+        let ws = WebSocketRpcClient::new(10);
+        ws.connect(Rc::new(transport)).await.unwrap();
+        ws.update_settings(125, 250);
+
+        on_close_tx
+            .unbounded_send(CloseMsg::Abnormal(1500))
+            .unwrap();
+
+        await_with_timeout(Box::pin(ws.on_close()), 600)
+            .await
+            .unwrap()
+            .unwrap();
+    }
 }

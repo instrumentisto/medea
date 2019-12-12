@@ -316,7 +316,7 @@ impl ProgressiveDelayer {
     /// Returns [`ProgressiveDelayer`] with first delay as `1250ms`.
     pub fn new(deadline: u64) -> Self {
         Self {
-            current_delay: 1250,
+            current_delay: 500,
             deadline,
         }
     }
