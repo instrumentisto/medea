@@ -228,7 +228,6 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
                 self.last_activity = Instant::now();
                 match serde_json::from_str::<ClientMsg>(&text) {
                     Ok(ClientMsg::Ping(n)) => {
-                        debug!("Received ping: {}", n);
                         // Answer with Heartbeat::Pong.
                         ctx.text(
                             serde_json::to_string(&ServerMsg::Pong(n)).unwrap(),
@@ -239,7 +238,7 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
                             self.room.try_send(CommandMessage::from(command))
                         {
                             error!(
-                                "Cannot send Command to Room {}, because {}",
+                                "Cannot send Command to Room from Member [{}], because {}",
                                 self.member_id, err
                             )
                         }
