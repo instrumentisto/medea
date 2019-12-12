@@ -119,11 +119,12 @@ impl Heartbeat {
         self.0.borrow_mut().transport.take();
     }
 
-    /// Timestamp of last pong received.
+    /// Sets timestamp of last received pong.
     pub fn set_pong_at(&self, at: u64) {
         self.0.borrow_mut().pong_at = Some(at);
     }
 
+    /// Returns timestamp of last received pong.
     pub fn get_pong_at(&self) -> Option<u64> {
         self.0.borrow().pong_at
     }

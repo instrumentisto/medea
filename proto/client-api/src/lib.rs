@@ -173,10 +173,13 @@ pub struct CloseDescription {
 #[cfg_attr(feature = "jason", derive(Deserialize))]
 #[serde(tag = "event", content = "data")]
 pub enum Event {
+    /// The Media server notifies Web Client about necessity to update RPC
+    /// settings.
     RpcSettingsUpdated {
         idle_timeout: u64,
         reconnection_timeout: u64,
     },
+
     /// Media Server notifies Web Client about necessity of RTCPeerConnection
     /// creation.
     PeerCreated {
@@ -185,6 +188,7 @@ pub enum Event {
         tracks: Vec<Track>,
         ice_servers: Vec<IceServer>,
     },
+
     /// Media Server notifies Web Client about necessity to apply specified SDP
     /// Answer to Web Client's RTCPeerConnection.
     SdpAnswerMade { peer_id: PeerId, sdp_answer: String },

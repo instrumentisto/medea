@@ -112,6 +112,8 @@ pub struct ParticipantService {
     /// the remote RPC client does not reconnect after it is idle.
     rpc_reconnect_timeout: Duration,
 
+    /// Duration, after which the server deletes the client session if
+    /// the remote RPC client does not reconnect after it is idle.
     idle_timeout: Duration,
 }
 

@@ -144,7 +144,7 @@ pub enum RpcClientError {
     #[display(fmt = "Socket of 'WebSocketRpcClient' is unexpectedly 'None'.")]
     NoSocket,
 
-    /// Occures if [`ProgressiveDelayer`] errored.
+    /// Occurs if [`ProgressiveDelayer`] errored.
     ProgressiveDelayer(#[js(cause)] ProgressiveDelayerError),
 
     /// Occurs if time frame in which we can reconnect was passed.
@@ -243,8 +243,11 @@ struct Inner {
     /// Indicates that this [`WebSocketRpcClient`] is closed.
     is_closed: bool,
 
+    /// Time for which server will wait if client connection was lost.
     reconnection_timeout: u64,
 
+    /// The time after the last ping received by the server, after which the
+    /// server will consider that the connection with the client is lost.
     idle_timeout: u64,
 }
 
@@ -295,7 +298,7 @@ pub enum ProgressiveDelayerError {
 /// `delay` calls.
 ///
 /// Delay time increasing will be stopped when 10 seconds of `current_delay`
-/// will be reached. 10 seconds is maximum delay. First delay will be `1250ms`.
+/// will be reached. 10 seconds is maximum delay. First delay will be `500ms`.
 struct ProgressiveDelayer {
     /// Milliseconds of [`ProgressiveDelayer::delay`] call.
     ///
@@ -311,9 +314,9 @@ impl ProgressiveDelayer {
     /// When `current_delay >= MAX_DELAY` then this delay will be returned.
     ///
     /// Delay increasing will be stopped on this value.
-    const MAX_DELAY: i32 = 10000;
+    const MAX_DELAY: i32 = 2000;
 
-    /// Returns [`ProgressiveDelayer`] with first delay as `1250ms`.
+    /// Returns [`ProgressiveDelayer`] with first delay as `500ms`.
     pub fn new(deadline: u64) -> Self {
         Self {
             current_delay: 500,
@@ -351,7 +354,7 @@ impl ProgressiveDelayer {
     /// Next call of this function will delay
     /// [`ProgressiveDelayer::current_delay`] * 2 milliseconds.
     ///
-    /// Initial delay is `1250ms`.
+    /// Initial delay is `500ms`.
     ///
     /// Maximum delay is `10s`.
     pub async fn delay(
@@ -636,6 +639,7 @@ impl RpcClient for WebSocketRpcClient {
         self.0.borrow_mut().close_reason = close_reason
     }
 
+    /// Updates RPC settings of this [`RpcClient`].
     fn update_settings(&self, idle_timeout: u64, reconnection_timeout: u64) {
         self.0.borrow_mut().idle_timeout = idle_timeout;
         self.0.borrow_mut().reconnection_timeout = reconnection_timeout;

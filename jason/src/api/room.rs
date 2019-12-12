@@ -28,11 +28,10 @@ use crate::{
         ClientDisconnect, CloseReason, RpcClient, RpcClientError,
         TransportError, WebSocketRpcTransport,
     },
-    utils::{Callback, JasonError, JsCaused, JsError},
+    utils::{console_error, Callback, JasonError, JsCaused, JsError},
 };
 
 use super::{connection::Connection, ConnectionHandle};
-use crate::utils::console_error;
 
 /// Reason of why [`Room`] has been closed.
 ///
@@ -668,6 +667,7 @@ impl EventHandler for InnerRoom {
         })
     }
 
+    /// Updates [`RpcClient`] settings.
     fn on_rpc_settings_updated(
         &mut self,
         idle_timeout: u64,

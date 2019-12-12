@@ -25,7 +25,7 @@ use medea_jason::rpc::{
 use wasm_bindgen_futures::spawn_local;
 use wasm_bindgen_test::*;
 
-use crate::resolve_after;
+use crate::{await_with_timeout, resolve_after};
 
 wasm_bindgen_test_configure!(run_in_browser);
 
@@ -133,14 +133,10 @@ async fn unsub_drops_subs() {
     });
     ws.unsub();
 
-    match future::select(Box::pin(test_rx), Box::pin(resolve_after(1000))).await
-    {
-        Either::Left(_) => (),
-        Either::Right(_) => panic!(
-            "'unsub_drops_sub' lasts more that 1s. Most likely 'unsub' is \
-             broken."
-        ),
-    }
+    await_with_timeout(Box::pin(test_rx), 1000)
+        .await
+        .unwrap()
+        .unwrap();
 }
 
 /// Tests that [`RpcTransport`] will be dropped when [`WebSocketRpcClient`] was
@@ -238,13 +234,10 @@ async fn send_goes_to_transport() {
 
     ws.send_command(test_cmd);
 
-    match future::select(Box::pin(test_rx), Box::pin(resolve_after(1000))).await
-    {
-        Either::Left(_) => (),
-        Either::Right(_) => {
-            panic!("Command doesn't reach 'RpcTransport' within a 1s.")
-        }
-    }
+    await_with_timeout(Box::pin(test_rx), 1000)
+        .await
+        .unwrap()
+        .unwrap();
 }
 
 /// Tests for [`WebSocketRpcClient::on_close`].
