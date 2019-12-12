@@ -5,7 +5,7 @@ use tracerr::Traced;
 use wasm_bindgen::{closure::Closure, convert::FromWasmAbi, JsCast};
 use web_sys::EventTarget;
 
-use crate::utils::{errors::JsCaused, JsError};
+use crate::utils::{console_error, errors::JsCaused, JsError};
 
 /// Failed to bind to [`EventTarget`][1] event.
 ///
@@ -96,7 +96,7 @@ where
                 self.closure.as_ref().unchecked_ref(),
             )
         {
-            console_error!(err);
+            console_error(err);
         }
     }
 }

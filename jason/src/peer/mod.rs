@@ -25,7 +25,7 @@ use web_sys::{
 
 use crate::{
     media::{MediaManager, MediaManagerError},
-    utils::{JsCaused, JsError},
+    utils::{console_error, JsCaused, JsError},
 };
 
 #[cfg(feature = "mockable")]
@@ -276,7 +276,7 @@ impl PeerConnection {
             Disconnected => IceConnectionState::Disconnected,
             Closed => IceConnectionState::Closed,
             _ => {
-                console_error!("Unknown ICE connection state");
+                console_error("Unknown ICE connection state");
                 return;
             }
         };

@@ -174,8 +174,8 @@ pub struct CloseDescription {
 #[serde(tag = "event", content = "data")]
 pub enum Event {
     RpcSettingsUpdated {
-        idle_timeout: u32,
-        reconnection_timeout: u32,
+        idle_timeout: u64,
+        reconnection_timeout: u64,
     },
     /// Media Server notifies Web Client about necessity of RTCPeerConnection
     /// creation.

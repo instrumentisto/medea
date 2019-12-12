@@ -9,11 +9,12 @@ use wasm_bindgen::{prelude::*, JsCast};
 
 pub use medea_macro::JsCaused;
 
-/// Prints `$e` as `console.error()`.
-macro_rules! console_error {
-    ($e:expr) => {
-        web_sys::console::error_1(&$e.into())
-    };
+/// Prints provided argument with `console.error()`.
+pub fn console_error<I>(i: I)
+where
+    I: Into<JsValue>,
+{
+    web_sys::console::error_1(&i.into());
 }
 
 /// Representation of an error which can caused by error returned from the
@@ -85,7 +86,7 @@ pub struct JasonError {
 impl JasonError {
     /// Prints error information to `console.error()`.
     pub fn print(&self) {
-        console_error!(self.to_string());
+        console_error(self.to_string());
     }
 }
 

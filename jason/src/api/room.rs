@@ -32,6 +32,7 @@ use crate::{
 };
 
 use super::{connection::Connection, ConnectionHandle};
+use crate::utils::console_error;
 
 /// Reason of why [`Room`] has been closed.
 ///
@@ -322,7 +323,7 @@ impl Room {
                         // happen, actually, since
                         // `InnerSession` should drop its `tx` by unsub from
                         // `RpcClient`.
-                        console_error!("Inner Room dropped unexpectedly")
+                        console_error("Inner Room dropped unexpectedly")
                     }
                     Some(inner) => {
                         match event {
@@ -669,8 +670,8 @@ impl EventHandler for InnerRoom {
 
     fn on_rpc_settings_updated(
         &mut self,
-        idle_timeout: u32,
-        reconnect_timeout: u32,
+        idle_timeout: u64,
+        reconnect_timeout: u64,
     ) {
         self.rpc.update_settings(idle_timeout, reconnect_timeout);
     }
@@ -748,8 +749,6 @@ impl Drop for InnerRoom {
 
         self.on_close
             .call(RoomCloseReason::new(self.close_reason))
-            .map(|result| {
-                result.map_err(|err| console_error!(err.as_string()))
-            });
+            .map(|result| result.map_err(console_error));
     }
 }

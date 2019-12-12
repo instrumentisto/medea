@@ -428,16 +428,22 @@ impl ParticipantService {
         self.members.insert(id, member);
     }
 
+    /// Sends RPC settings from server config to a [`Member`] with provided
+    /// [`MemberId`].
+    #[allow(clippy::cast_possible_truncation)]
     pub fn send_rpc_settings_to_member(
         &mut self,
         id: MemberId,
     ) -> impl Future<Item = (), Error = RoomError> {
         self.send_event_to_member(
             id,
+            // The 'serde-json' doesn't support 'u128', so we are casting this
+            // timestamp to more reasonable 'u64', since it's
+            // definitely enough.
             Event::RpcSettingsUpdated {
-                idle_timeout: self.idle_timeout.as_millis() as u32,
+                idle_timeout: self.idle_timeout.as_millis() as u64,
                 reconnection_timeout: self.rpc_reconnect_timeout.as_millis()
-                    as u32,
+                    as u64,
             },
         )
     }

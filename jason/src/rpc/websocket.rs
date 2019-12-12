@@ -21,7 +21,9 @@ use web_sys::{CloseEvent, Event, MessageEvent, WebSocket as SysWebSocket};
 
 use crate::{
     rpc::{ClientDisconnect, CloseMsg, RpcTransport},
-    utils::{EventListener, EventListenerBindError, JsCaused, JsError},
+    utils::{
+        console_error, EventListener, EventListenerBindError, JsCaused, JsError,
+    },
 };
 
 /// Errors that may occur when working with [`WebSocket`].
@@ -364,8 +366,8 @@ impl WebSocketRpcTransport {
                     if let Some(socket_clone) = weak_transport.upgrade() {
                         socket_clone
                     } else {
-                        console_error!(
-                            "'WebSocketRpcTransport' was unexpectedly gone."
+                        console_error(
+                            "'WebSocketRpcTransport' was unexpectedly gone.",
                         );
                         return;
                     };
@@ -373,7 +375,7 @@ impl WebSocketRpcTransport {
                 transport_ref_mut.update_state();
                 if let Some(on_close) = transport_ref_mut.on_close.as_ref() {
                     on_close.unbounded_send(close_msg).unwrap_or_else(|e| {
-                        console_error!(format!(
+                        console_error(format!(
                             "WebSocket's 'on_close' callback receiver \
                              unexpectedly gone. {:?}",
                             e
@@ -402,15 +404,15 @@ impl WebSocketRpcTransport {
                 let transport = if let Some(t) = weak_transport.upgrade() {
                     t
                 } else {
-                    console_error!(
-                        "'WebSocketRpcTransport' was unexpectedly gone."
+                    console_error(
+                        "'WebSocketRpcTransport' was unexpectedly gone.",
                     );
                     return;
                 };
                 let transport_ref = transport.0.borrow();
                 if let Some(on_message) = transport_ref.on_message.as_ref() {
                     on_message.unbounded_send(parsed).unwrap_or_else(|e| {
-                        console_error!(format!(
+                        console_error(format!(
                             "WebSocket's 'on_message' callback receiver \
                              unexpectedly gone. {:?}",
                             e
@@ -446,7 +448,7 @@ impl Drop for InnerSocket {
             if let Err(err) =
                 self.socket.close_with_code_and_reason(1000, &close_reason)
             {
-                console_error!(err);
+                console_error(err);
             }
         }
     }

@@ -25,7 +25,7 @@ use tracerr::Traced;
 use wasm_bindgen_futures::{spawn_local, JsFuture};
 use web_sys::CloseEvent;
 
-use crate::utils::{window, JasonError, JsCaused, JsError};
+use crate::utils::{console_error, window, JasonError, JsCaused, JsError};
 
 use self::heartbeat::{Heartbeat, HeartbeatError};
 
@@ -64,6 +64,8 @@ pub enum ClientDisconnect {
     /// [`RpcTransport`] was unexpectedly dropped.
     RpcTransportUnexpectedlyDropped,
 
+    /// Reconnection timeout was expired. Indicates that reconnection is
+    /// impossible now.
     ReconnectTimeout,
 }
 
@@ -142,9 +144,11 @@ pub enum RpcClientError {
     #[display(fmt = "Socket of 'WebSocketRpcClient' is unexpectedly 'None'.")]
     NoSocket,
 
+    /// Occures if [`ProgressiveDelayer`] errored.
     ProgressiveDelayer(#[js(cause)] ProgressiveDelayerError),
 
-    #[display(fmt = "Reconnection deadline reached.")]
+    /// Occurs if time frame in which we can reconnect was passed.
+    #[display(fmt = "Reconnection deadline passed.")]
     Deadline,
 }
 
@@ -180,7 +184,8 @@ pub trait RpcClient {
     /// client will be dropped.
     fn set_close_reason(&self, close_reason: ClientDisconnect);
 
-    fn update_settings(&self, idle_timeout: u32, reconnect_timeout: u32);
+    /// Updates RPC settings of this [`RpcClient`].
+    fn update_settings(&self, idle_timeout: u64, reconnect_timeout: u64);
 }
 
 /// RPC transport between a client and server.
@@ -238,9 +243,9 @@ struct Inner {
     /// Indicates that this [`WebSocketRpcClient`] is closed.
     is_closed: bool,
 
-    reconnection_timeout: u32,
+    reconnection_timeout: u64,
 
-    idle_timeout: u32,
+    idle_timeout: u64,
 }
 
 impl Inner {
@@ -274,11 +279,14 @@ impl WeakWebsocketRpcClient {
     }
 }
 
+/// Errors which can occur in [`ProgressiveDelayer`].
 #[derive(Debug, From, Display, JsCaused)]
 pub enum ProgressiveDelayerError {
+    /// Error which can happen while setting JS timer.
     #[display(fmt = "{}", _0)]
     Js(JsError),
 
+    /// Occurs if time frame in which we can reconnect was passed.
     #[display(fmt = "Deadline reached.")]
     Deadline,
 }
@@ -294,8 +302,9 @@ struct ProgressiveDelayer {
     /// Will be increased by [`ProgressiveDelayer::delay`] call.
     current_delay: i32,
 
-    /// Timestamp after which [`ProgressiveDelayer::delay`] should return [`ProgressiveDelayerError::Deadline`].
-    deadline: u128,
+    /// Timestamp after which [`ProgressiveDelayer::delay`] should return
+    /// [`ProgressiveDelayerError::Deadline`].
+    deadline: u64,
 }
 
 impl ProgressiveDelayer {
@@ -305,7 +314,7 @@ impl ProgressiveDelayer {
     const MAX_DELAY: i32 = 10000;
 
     /// Returns [`ProgressiveDelayer`] with first delay as `1250ms`.
-    pub fn new(deadline: u128) -> Self {
+    pub fn new(deadline: u64) -> Self {
         Self {
             current_delay: 1250,
             deadline,
@@ -323,9 +332,12 @@ impl ProgressiveDelayer {
         }
     }
 
-
+    /// Returns `true` when current time is greater or equal then `deadline`.
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     fn is_deadline_reached(&self) -> bool {
-        Date::now() as u128 >= self.deadline
+        // This is safe to cast timestamp from 'Date::now' to u64 because
+        // '18446744073709551615' timestamp is very far.
+        Date::now() as u64 >= self.deadline
     }
 
     /// Returns `true` when max delay ([`ProgressiveDelayer::MAX_DELAY`]) is
@@ -392,15 +404,18 @@ impl WebSocketRpcClient {
 
     /// Tries to reconnect [`WebSocketRpcTransport`] in a loop with delay until
     /// it will not be reconnected.
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     pub async fn reconnect(&self) -> Result<(), Traced<RpcClientError>> {
-        let idle_timeout = self.0.borrow().idle_timeout as u128;
-        let reconnection_timeout = self.0.borrow().reconnection_timeout as u128;
+        let idle_timeout = self.0.borrow().idle_timeout as u64;
+        let reconnection_timeout = self.0.borrow().reconnection_timeout as u64;
+        // This is safe to cast timestamp from 'Date::now' to u64 because
+        // '18446744073709551615' timestamp is very far.
         let last_pong = self
             .0
             .borrow()
             .heartbeat
             .get_pong_at()
-            .unwrap_or_else(|| Date::now() as u128);
+            .unwrap_or_else(|| Date::now() as u64);
         let deadline = (idle_timeout * 2) + reconnection_timeout + last_pong;
 
         let mut delayer = ProgressiveDelayer::new(deadline);
@@ -425,13 +440,13 @@ impl WebSocketRpcClient {
                             .into_iter()
                             .filter_map(|sub| sub.send(reason.into()).err())
                             .for_each(|reason| {
-                                console_error!(format!(
+                                console_error(format!(
                                     "Failed to send reason of Jason close to \
                                      subscriber: {:?}",
                                     reason
                                 ))
                             });
-                        return Err(tracerr::new!(RpcClientError::Deadline))
+                        return Err(tracerr::new!(RpcClientError::Deadline));
                     }
                     _ => return Err(tracerr::map_from_and_new!(e)),
                 }
@@ -463,7 +478,7 @@ impl WebSocketRpcClient {
                 CloseByServerReason::Reconnected => (),
                 CloseByServerReason::Idle => {
                     if let Err(e) = self.reconnect().await {
-                        console_error!(e.to_string());
+                        console_error(e.to_string());
                     }
                 }
                 _ => {
@@ -477,7 +492,7 @@ impl WebSocketRpcClient {
                                 sub.send(CloseReason::ByServer(*reason)).err()
                             })
                             .for_each(|reason| {
-                                console_error!(format!(
+                                console_error(format!(
                                     "Failed to send reason of Jason close to \
                                      subscriber: {:?}",
                                     reason
@@ -488,19 +503,23 @@ impl WebSocketRpcClient {
             },
             CloseMsg::Abnormal(_) => spawn_local(async move {
                 if let Err(e) = self.reconnect().await {
-                    console_error!(e.to_string());
+                    console_error(e.to_string());
                 }
             }),
         }
     }
 
     /// Handles messages from a remote server.
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     fn on_message(&self, msg: Result<ServerMsg, Traced<TransportError>>) {
         let inner = self.0.borrow();
         match msg {
             Ok(ServerMsg::Pong(_num)) => {
                 // TODO: detect no pings
-                inner.heartbeat.set_pong_at(Date::now() as u128);
+                // This is safe to cast timestamp from 'Date::now' to u64
+                // because '18446744073709551615' timestamp
+                // is very far.
+                inner.heartbeat.set_pong_at(Date::now() as u64);
             }
             Ok(ServerMsg::Event(event)) => {
                 // TODO: many subs, filter messages by session
@@ -508,7 +527,7 @@ impl WebSocketRpcClient {
                     if let Err(err) = sub.unbounded_send(event) {
                         // TODO: receiver is gone, should delete
                         //       this subs tx
-                        console_error!(err.to_string());
+                        console_error(err.to_string());
                     }
                 }
             }
@@ -617,7 +636,7 @@ impl RpcClient for WebSocketRpcClient {
         self.0.borrow_mut().close_reason = close_reason
     }
 
-    fn update_settings(&self, idle_timeout: u32, reconnection_timeout: u32) {
+    fn update_settings(&self, idle_timeout: u64, reconnection_timeout: u64) {
         self.0.borrow_mut().idle_timeout = idle_timeout;
         self.0.borrow_mut().reconnection_timeout = reconnection_timeout;
     }
