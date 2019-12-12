@@ -10,11 +10,11 @@ use wasm_bindgen::{prelude::*, JsCast};
 pub use medea_macro::JsCaused;
 
 /// Prints provided argument with `console.error()`.
-pub fn console_error<I>(i: I)
+pub fn console_error<M>(msg: M)
 where
-    I: Into<JsValue>,
+    M: Into<JsValue>,
 {
-    web_sys::console::error_1(&i.into());
+    web_sys::console::error_1(&msg.into());
 }
 
 /// Representation of an error which can caused by error returned from the

@@ -356,7 +356,7 @@ impl ProgressiveDelayer {
     ///
     /// Initial delay is `500ms`.
     ///
-    /// Maximum delay is `10s`.
+    /// Maximum delay is `2s`.
     pub async fn delay(
         &mut self,
     ) -> Result<(), Traced<ProgressiveDelayerError>> {
@@ -471,10 +471,8 @@ impl WebSocketRpcClient {
     ///
     /// This function will be called on every WebSocket close (normal and
     /// abnormal) regardless of the [`CloseReason`].
-    async fn on_close(self, close_msg: &CloseMsg) {
+    async fn on_transport_close(self, close_msg: &CloseMsg) {
         self.0.borrow_mut().heartbeat.stop();
-
-        // TODO: propagate error if unable to reconnect
 
         match &close_msg {
             CloseMsg::Normal(_, reason) => match reason {
@@ -514,7 +512,10 @@ impl WebSocketRpcClient {
 
     /// Handles messages from a remote server.
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-    fn on_message(&self, msg: Result<ServerMsg, Traced<TransportError>>) {
+    fn on_transport_message(
+        &self,
+        msg: Result<ServerMsg, Traced<TransportError>>,
+    ) {
         let inner = self.0.borrow();
         match msg {
             Ok(ServerMsg::Pong(_num)) => {
@@ -572,7 +573,7 @@ impl RpcClient for WebSocketRpcClient {
             spawn_local(async move {
                 while let Some(msg) = on_socket_message.next().await {
                     if let Some(this) = this_clone.upgrade() {
-                        this.on_message(msg)
+                        this.on_transport_message(msg)
                     }
                 }
             });
@@ -584,7 +585,7 @@ impl RpcClient for WebSocketRpcClient {
             spawn_local(async move {
                 while let Some(msg) = on_socket_close.next().await {
                     if let Some(this) = this_clone.upgrade() {
-                        this.on_close(&msg).await;
+                        this.on_transport_close(&msg).await;
                     }
                 }
             });
