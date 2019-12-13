@@ -99,6 +99,7 @@ impl Heartbeat {
         let mut on_message_stream = transport
             .on_message()
             .map_err(tracerr::map_from_and_wrap!())?;
+        self.update_idle_resolver();
         let (fut, pong_abort) = future::abortable(async move {
             while let Some(msg) = on_message_stream.next().await {
                 if let Some(this) = weak_this.upgrade().map(Heartbeat) {

@@ -46,6 +46,8 @@ pub struct WsSession {
     /// Indicates whether WebSocket connection is closed by server ot by
     /// client.
     closed_by_server: bool,
+
+    last_ping_num: u64,
 }
 
 impl WsSession {
@@ -61,6 +63,7 @@ impl WsSession {
             idle_timeout,
             last_activity: Instant::now(),
             closed_by_server: false,
+            last_ping_num: 0,
         }
     }
 
@@ -91,7 +94,9 @@ impl WsSession {
 
     fn start_pinger(ctx: &mut <Self as Actor>::Context) {
         ctx.run_interval(Duration::from_secs(5), |session, ctx| {
-            ctx.text(serde_json::to_string(&ServerMsg::Ping(1)).unwrap());
+            debug!("Send ping.");
+            session.last_ping_num += 1;
+            ctx.text(serde_json::to_string(&ServerMsg::Ping(session.last_ping_num)).unwrap());
         });
     }
 }
@@ -107,6 +112,7 @@ impl Actor for WsSession {
         debug!("Started WsSession for Member [id = {}]", self.member_id);
 
         Self::start_watchdog(ctx);
+        Self::start_pinger(ctx);
 
         ctx.wait(
             wrap_future(self.room.send(RpcConnectionEstablished {
