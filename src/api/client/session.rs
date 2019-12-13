@@ -88,6 +88,12 @@ impl WsSession {
             }
         });
     }
+
+    fn start_pinger(ctx: &mut <Self as Actor>::Context) {
+        ctx.run_interval(Duration::from_secs(5), |session, ctx| {
+            ctx.text(serde_json::to_string(&ServerMsg::Ping(1)).unwrap());
+        });
+    }
 }
 
 /// [`Actor`] implementation that provides an ergonomic way to deal with
@@ -227,12 +233,12 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for WsSession {
             ws::Message::Text(text) => {
                 self.last_activity = Instant::now();
                 match serde_json::from_str::<ClientMsg>(&text) {
-                    Ok(ClientMsg::Ping(n)) => {
+                    Ok(ClientMsg::Pong(n)) => {
                         debug!("Received ping: {}", n);
                         // Answer with Heartbeat::Pong.
-                        ctx.text(
-                            serde_json::to_string(&ServerMsg::Pong(n)).unwrap(),
-                        );
+//                        ctx.text(
+//                            serde_json::to_string(&ServerMsg::Pong(n)).unwrap(),
+//                        );
                     }
                     Ok(ClientMsg::Command(command)) => {
                         if let Err(err) =
